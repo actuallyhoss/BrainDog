@@ -336,8 +336,13 @@ export function resolveDay(word: string, now: number): string | null {
  * `loop/research-m4-app.md` taught its sentence them (`contains` since `2023a1c0`). A two-word operator
  * takes any run of spaces between its words, because the record splits a clause on `\s+` and reads the
  * words, and `op` below folds the run to one space.
+ *
+ * THE `s` FLAG IS FOR A QUOTED VALUE THAT HOLDS A LINE BREAK. `quoteValue` quotes any whitespace but a single space, the
+ * record reads `what is "a\nb"` as the text with its line break, and without the flag `.` stopped at the break, so this
+ * engine refused the whole clause as "not something a filter can say" (`loop/research-audit-2026-09-25-layouts.md`
+ * §16). `NAMED_ON` below takes the same flag for the same sentence.
  */
-const CLAUSE = /^\s*([a-z][a-z0-9_ ]*?)\s+(is not|is|before|after|on|has|lacks|contains|more\s+than|at\s+least|less\s+than|at\s+most|between)(?:\s+(.+?))?\s*$/i;
+const CLAUSE = /^\s*([a-z][a-z0-9_ ]*?)\s+(is not|is|before|after|on|has|lacks|contains|more\s+than|at\s+least|less\s+than|at\s+most|between)(?:\s+(.+?))?\s*$/is;
 
 /**
  * THE SAME CLAUSE, WITH THE FIELD'S OWN NAME ALLOWED TO END IN THE WORD `on`.
@@ -373,7 +378,7 @@ const CLAUSE = /^\s*([a-z][a-z0-9_ ]*?)\s+(is not|is|before|after|on|has|lacks|c
  * refuses it as an operator it cannot read. Both refuse, and neither invents a clause, which is the
  * property that matters here.
  */
-const NAMED_ON = /^\s*([a-z][a-z0-9_ ]*?\s+on)\s+(is not|is|before|after|on|has|lacks|contains|more\s+than|at\s+least|less\s+than|at\s+most|between)(?:\s+(.+?))?\s*$/i;
+const NAMED_ON = /^\s*([a-z][a-z0-9_ ]*?\s+on)\s+(is not|is|before|after|on|has|lacks|contains|more\s+than|at\s+least|less\s+than|at\s+most|between)(?:\s+(.+?))?\s*$/is;
 
 /**
  * The operators `21-AUTHORING` §4.2 publishes and this build does not read.
@@ -905,7 +910,9 @@ function needleOf(text: string, field: string, type: string, said: string): { ne
   if (opened) {
     const [open, close] = opened;
     let shut = said.indexOf(close, open.length);
-    while (shut !== -1 && !/^\s/.test(said.slice(shut + close.length))) shut = said.indexOf(close, shut + 1);
+    /* A DOUBLED MARK IS ONE MARK OF THE TEXT, stepped over whole, as the record's `contains` steps over it. */
+    while (shut !== -1 && (said.startsWith(close, shut + close.length) || !/^\s/.test(said.slice(shut + close.length))))
+      shut = said.indexOf(close, shut + (said.startsWith(close, shut + close.length) ? 2 : 1) * close.length);
     const more = shut === -1 ? '' : said.slice(shut + close.length).trim();
     if (more)
       return {
@@ -915,7 +922,9 @@ function needleOf(text: string, field: string, type: string, said: string): { ne
   const pair = QUOTES.find(([open, close]) => said.length >= 2 && said.startsWith(open) && said.endsWith(close));
   let needle: string;
   if (pair) {
-    needle = said.slice(pair[0].length, said.length - pair[1].length);
+    /* THE RECORD'S `unquoted` READS THE ESCAPE, so a name `quoteValue` had to write with its `"` doubled is looked for
+       as itself; the text between the outer marks is kept where the last mark went into a doubling, as the record does. */
+    needle = unquoted(said) ?? said.slice(pair[0].length, said.length - pair[1].length);
     if (!needle) return { fix: `${text}: contains what? The quotes hold nothing.` };
   } else {
     if (QUOTES.some(([open]) => said.startsWith(open)))
@@ -1696,6 +1705,19 @@ export function registerHref(register: string, where: string | undefined): strin
    */
   if (w.any) return `/r/${register}`;
   if (w.clauses.some((c) => c.op === 'contains' || c.op === 'gt' || c.op === 'gte' || c.op === 'lt' || c.op === 'lte' || c.op === 'between'))
+    return `/r/${register}`;
+  /* AND A VALUE HOLDING A COMMA, WHICH A QUOTED SENTENCE CAN CARRY AND A CHIP CANNOT. `chipsOf` cuts a chip's values on
+     every comma after the address is decoded (`spokenElement` below has the measurement), so `what is "Studio rent,
+     June"`, which a template writes for the seed's own rows, minted `what:in:Studio%20rent%2C%20June` and read back as
+     the two values `Studio rent` and ` June`: an empty list under a tile that counted the row. */
+  const cut = (v: string): boolean => v.includes(',');
+  if (
+    w.clauses.some((c) =>
+      c.op === 'has' || c.op === 'lacks'
+        ? cut(spokenElement(register, c.field, c.values[0]))
+        : 'values' in c && c.values.some((v) => cut(declaredValue(register, c.field, v))),
+    )
+  )
     return `/r/${register}`;
 
   /* A NEGATION BECOMES `not-in` RATHER THAN THE ENUM'S COMPLEMENT: the complement is only writable

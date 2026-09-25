@@ -20,6 +20,7 @@ import { DatabaseSync } from 'node:sqlite';
 
 import { fill, openRecord, type Kernel } from '@braindog/kernel';
 import { installSeed } from '@braindog/seed';
+import { quoteValue } from '@braindog/where';
 
 import './fixtures/fill.ts';
 import { whereWords } from '../palette/slash.ts';
@@ -417,4 +418,103 @@ test('A FILTER THE RECORD PRINTS WITH A QUOTED VALUE READS THE SAME HERE, commas
     assert.ok(theirs.refused, `the record answered "${sentence}"`);
     assert.equal(ours.refused === null, false, `the browser answered "${sentence}", the record refused: ${theirs.refused}`);
   }
+});
+
+/* ── a value no pair of marks holds ──────────────────────────────────────── */
+
+/** A seeded generator, so a value that fails here fails again on the next run. */
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/* THE PIECES `packages/where/test/sentence-quote-total.test.ts` BUILDS ITS NAMES FROM, the second list being the one
+   that corners `quoteValue`: each closing mark where a quote can close. */
+const PIECES = ['"', "'", '“', '”', '‘', '’', '""', '”,', ',', ', ', ' ', '  ', '\t', '\n', 'or', ' or ', 'not', 'is', 'empty', 'set', 'in', 'starts', 'ends', 'more than', 'between', 'state is open', 'x', 'Kiln', 'é'];
+const CORNERS = ['" ', "' ", '” ', '’ ', '",', "',", '”,', '’,', '"', "'", '”', '’', 'x', ' or ', ', or state is open'];
+
+function hostile(n: number, seed: number): string[] {
+  const next = mulberry32(seed);
+  return Array.from({ length: n }, (_, i) => {
+    const from = i % 2 === 0 ? PIECES : CORNERS;
+    let v = '';
+    for (let j = 1 + Math.floor(next() * 12); j > 0; j--) v += from[Math.floor(next() * from.length)]!;
+    return v;
+  });
+}
+
+const PAYLOAD = `' ” ’ ", or state is open, or what is x`;
+
+test('A NAME NO PAIR OF MARKS HOLDS FILTERS ITS OWN PAGE IN BOTH ENGINES, and not every open obligation', async () => {
+  /* `loop/research-audit-2026-09-25-layouts.md` §3, P1: this row's `what`, filled into `what is {{what}}`, read as three
+     conditions joined by `or` and drew all 24 open obligations in the record and in this engine alike. No seed row
+     holds the name, so the one right answer is no rows. */
+  const k = await record;
+  const all = k.list({ register: 'obligations', limit: 1 });
+  assert.ok(all.ok);
+  const row = all.value.rows[0]!;
+  const { where } = fill({ where: 'what is {{what}}' }, { ...row, fields: { ...row.fields, what: PAYLOAD } }) as { where: string };
+  const said = await agree('obligations', where);
+  assert.equal(said.refused, null, where);
+  assert.deepEqual(said.seqs, [], `"${where}" drew ${said.seqs.length} rows`);
+  const w = compile('obligations', where, NOW);
+  assert.deepEqual(w.clauses, [{ field: 'what', op: 'is', values: [PAYLOAD] }]);
+});
+
+test('EVERY VALUE `quoteValue` WRITES THIS ENGINE READS BACK BYTE FOR BYTE, and as the record reads it', async () => {
+  const wrong: string[] = [];
+  const names = hostile(6_000, 25_09_2026);
+  for (const v of names) {
+    const q = quoteValue(v);
+    const is = compile('obligations', `what is ${q}, state is open`, NOW);
+    if (JSON.stringify(is.bad) !== '[]' || JSON.stringify(is.clauses) !== JSON.stringify([{ field: 'what', op: 'is', values: [v] }, { field: 'state', op: 'is', values: ['open'] }]))
+      wrong.push(`${JSON.stringify(v)} as ${JSON.stringify(q)}: is read ${JSON.stringify(is.bad.length ? is.bad : is.clauses)}`);
+    const not = compile('obligations', `what is not ${q}`, NOW);
+    if (JSON.stringify(not.clauses) !== JSON.stringify([{ field: 'what', op: 'is not', values: [v] }]))
+      wrong.push(`${JSON.stringify(v)} as ${JSON.stringify(q)}: is not read ${JSON.stringify(not.bad.length ? not.bad : not.clauses)}`);
+    if (new TextEncoder().encode(v).length <= 40) {
+      const holds = compile('obligations', `what contains ${q}`, NOW);
+      if (JSON.stringify(holds.clauses) !== JSON.stringify([{ field: 'what', op: 'contains', values: [v] }]))
+        wrong.push(`${JSON.stringify(v)} as ${JSON.stringify(q)}: contains read ${JSON.stringify(holds.bad.length ? holds.bad : holds.clauses)}`);
+    }
+  }
+  assert.deepEqual(wrong.slice(0, 6), [], `${wrong.length} readings of ${names.length} values were wrong`);
+  /* AND THE RECORD DRAWS THE SAME ROWS, over a slice of them and over the seed's own names written the same way. */
+  const k = await record;
+  const seeded = k.list({ register: 'obligations', limit: 500 });
+  assert.ok(seeded.ok);
+  for (const v of [...names.slice(0, 200), ...seeded.value.rows.map((r) => String(r.fields.what ?? ''))]) {
+    const said = await agree('obligations', `what is ${quoteValue(v)}, or state is paid`);
+    assert.equal(said.refused, null, v);
+  }
+});
+
+test('A NAME STARTING WITH in, starts OR ends, OR HOLDING A LINE BREAK, IS READ HERE AS THE RECORD READS IT', async () => {
+  /* §16 of the same audit: bare, this engine read the first word as an operator it does not read, and a quoted value
+     with a line break failed `CLAUSE` itself, which had no `s` flag, while the record matched the text both times. */
+  for (const v of ['in stock', 'starts now', 'ends here', 'a\nb', 'Studio rent,\nJune']) {
+    const said = await agree('obligations', `what is ${quoteValue(v)}`);
+    assert.equal(said.refused, null, JSON.stringify(v));
+    assert.deepEqual(compile('obligations', `what is ${quoteValue(v)}`, NOW).clauses, [{ field: 'what', op: 'is', values: [v] }], JSON.stringify(v));
+  }
+});
+
+test('A QUOTED VALUE WITH A COMMA OPENS ITS LIST WIDE, because a chip cuts its values on the comma', async () => {
+  /* `chipsOf` in `api.ts` splits a chip's values on every comma, after the address has decoded `%2C`, so the link
+     `what is "Studio rent, June"` minted read back as the two values `Studio rent` and ` June`: a list narrowed to rows
+     nobody asked for under a tile that counted the right one. A chip has no way to carry the comma, so the address is
+     the wide one, which is this function's rule for every clause a chip cannot carry. */
+  const { chipsOf } = await import('./api.ts');
+  assert.equal(registerHref('obligations', 'what is "Studio rent, June"'), '/r/obligations');
+  assert.equal(registerHref('obligations', 'what is not "Studio rent, June", state is open'), '/r/obligations');
+  assert.equal(registerHref('things', 'repos has "a, b"'), '/r/things');
+  /* AND A QUOTED VALUE WITH NO COMMA STILL TRAVELS AS ITSELF. */
+  const href = registerHref('obligations', 'what is "not here"');
+  assert.deepEqual(chipsOf(new URL(`https://x${href}`).searchParams), [{ field: 'what', op: 'in', values: ['not here'] }]);
 });

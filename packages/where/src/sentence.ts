@@ -346,13 +346,26 @@ const QUOTES: readonly (readonly [string, string])[] = [
  * opens nothing. It closes at the first matching mark followed by nothing but spaces before a comma or the end: that is
  * the one place a quoted value can end, so a comma inside the marks is the value's and not the sentence's. A mark that
  * never closes that way opens nothing either, and the comma after it ends the clause as it always did.
+ *
+ * A CLOSING MARK WRITTEN TWICE IS ONE MARK OF THE VALUE AND CLOSES NOTHING, read left to right, so `"a"", b"` is the one
+ * value `a", b`. Without it a value holding all four closing marks, each followed by a space, a comma or its end, had no
+ * pair that could hold it, and `' ” ’ ", or state is open, or what is x` filled into a template's `what is {{what}}` read
+ * as three conditions, one of them `state is open`: a one-row page drew all 24 open obligations on the seed
+ * (`loop/research-audit-2026-09-25-layouts.md` §3). `quoteValue` doubles only for such a value, and `unquoted` reads
+ * the doubling by this same rule, so the cut and the value can never disagree about where a quote ends.
  */
 function quoteEnd(text: string, at: number): number {
   const pair = QUOTES.find(([open]) => text.startsWith(open, at));
   if (!pair || (at > 0 && !/[\s,]/.test(text[at - 1]!))) return -1;
   const [open, close] = pair;
-  for (let shut = text.indexOf(close, at + open.length); shut !== -1; shut = text.indexOf(close, shut + 1))
+  for (let shut = text.indexOf(close, at + open.length); shut !== -1; ) {
+    if (text.startsWith(close, shut + close.length)) {
+      shut = text.indexOf(close, shut + 2 * close.length);
+      continue;
+    }
     if (/^\s*(?:,|$)/.test(text.slice(shut + close.length))) return shut + close.length;
+    shut = text.indexOf(close, shut + close.length);
+  }
   return -1;
 }
 
@@ -396,7 +409,8 @@ function quotedAfter(sentence: string, after: number, negated: boolean): string 
 
 /**
  * What is inside a value that is one quoted value, or `null` when it is not one: the marks open at its first character
- * and close at its last, and no closing mark inside is followed by a space.
+ * and close at its last, and no closing mark inside is followed by a space. A closing mark written twice inside is
+ * one mark of the value (`quoteEnd` has why), and is handed back once.
  *
  * EXPORTED FOR THE BROWSER'S ENGINE (`apps/web/src/lib/record/where.ts`), which reads the same sentences over its own
  * rows and would otherwise hold a second copy of where a quote closes.
@@ -404,14 +418,37 @@ function quotedAfter(sentence: string, after: number, negated: boolean): string 
 export function unquoted(value: string): string | null {
   const pair = QUOTES.find(([open, close]) => value.length >= open.length + close.length && value.startsWith(open) && value.endsWith(close));
   if (!pair) return null;
-  const inside = value.slice(pair[0].length, value.length - pair[1].length);
-  for (let shut = inside.indexOf(pair[1]); shut !== -1; shut = inside.indexOf(pair[1], shut + 1))
-    if (/^\s/.test(inside.slice(shut + pair[1].length))) return null;
-  return inside;
+  const [open, close] = pair;
+  let inside = '';
+  for (let at = open.length; at < value.length; ) {
+    if (!value.startsWith(close, at)) {
+      inside += value[at];
+      at += 1;
+    } else if (value.startsWith(close, at + close.length)) {
+      inside += close;
+      at += 2 * close.length;
+    } else if (at + close.length === value.length) {
+      return inside;
+    } else if (/^\s/.test(value.slice(at + close.length))) {
+      return null;
+    } else {
+      inside += close;
+      at += close.length;
+    }
+  }
+  /* THE LAST MARK WENT INTO A DOUBLED PAIR, so nothing closed the quote, which is what `quoteEnd` says of it too. */
+  return null;
 }
 
-/** The words the grammar reads for itself at the start of a value: a negation, an absence, an order. */
-const GRAMMAR_START = /^(?:not|empty|set|present|between|(?:more|less)\s+than|at\s+(?:least|most))(?:\s|$)/i;
+/**
+ * The words the grammar reads for itself at the start of a value: a negation, an absence, an order.
+ *
+ * AND `in`, `starts` AND `ends`, WHICH ONLY THE BROWSER READS THERE. `apps/web/src/lib/record/where.ts` names them as
+ * operators it does not read, so it refused `what is in stock` with *"in" is not an operator this build reads* while
+ * the kernel matched the text: 3,445 of the audit's fuzz disagreements were this one rule
+ * (`loop/research-audit-2026-09-25-layouts.md` §16). Quoted, both engines read the words as the value.
+ */
+const GRAMMAR_START = /^(?:not|empty|set|present|between|in|starts|ends|(?:more|less)\s+than|at\s+(?:least|most))(?:\s|$)/i;
 
 /**
  * A value written into a sentence so the grammar reads it back as exactly that one value.
@@ -419,9 +456,16 @@ const GRAMMAR_START = /^(?:not|empty|set|present|between|(?:more|less)\s+than|at
  * BARE WHERE THE BARE WORDS ALREADY DO: no comma, no quote mark, no word `or`, no space but single ones (the bare words are re-joined with one), no space at either end,
  * and no word the grammar reads for itself at the start. Everything a page prints today is one of those, so a filter
  * that was `part is The box` stays that. Anything else is quoted, in the first pair of marks whose closing mark the value
- * never follows with a space, a comma or its end, since that is the one place a quote can close (`quoteEnd`,
- * `quotedAfter`). A value holding every closing mark in such a place has no pair that holds it, and is quoted in the
- * straight pair, which is the one value this cannot write whole.
+ * never follows with a space, a comma, its end or the same mark again, since the first three are where a quote can close
+ * (`quoteEnd`, `quotedAfter`) and the fourth is the escape. A value holding every closing mark in such a place has no
+ * pair that holds it, and is written in the straight pair with each `"` doubled.
+ *
+ * TOTAL, AND THE FUZZ IS WHAT SAYS SO. It used to write that last value in the straight pair as it stood, and the
+ * grammar closed the quote at the first `"` (`quoteEnd` has what that did to a template page). The empty string is
+ * written `""`, which both engines refuse as a quote holding nothing, so it is the one value refused rather than read.
+ * `test/sentence-quote-total.test.ts` builds 20,000 values from quote marks, commas, grammar words and whitespace and
+ * asks each back through `clausesOf` and `parseWhere`: before the escape 1,671 of them did not read back as themselves,
+ * and none fails now. `apps/web/src/lib/record/where-compare.test.ts` asks the browser's engine the same.
  *
  * FOR A TEMPLATE: `fill` in `packages/kernel/src/pages.ts` writes a row's field into a block's `where` through this, so a
  * part called `Wax, wick and scent` filters its own page rather than refusing it.
@@ -436,11 +480,15 @@ export function quoteValue(value: string): string {
     !GRAMMAR_START.test(value);
   if (bare) return value;
   const fits = ([, close]: readonly [string, string]): boolean => {
-    for (let at = value.indexOf(close); at !== -1; at = value.indexOf(close, at + 1)) if (/^(?:[\s,]|$)/.test(value.slice(at + close.length))) return false;
+    for (let at = value.indexOf(close); at !== -1; at = value.indexOf(close, at + 1)) {
+      const after = value.slice(at + close.length);
+      if (/^(?:[\s,]|$)/.test(after) || after.startsWith(close)) return false;
+    }
     return true;
   };
-  const [open, close] = QUOTES.find(fits) ?? QUOTES[0]!;
-  return open + value + close;
+  const pair = QUOTES.find(fits);
+  if (pair) return pair[0] + value + pair[1];
+  return `"${value.replaceAll('"', '""')}"`;
 }
 
 /**
@@ -1046,7 +1094,9 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
       if (opened) {
         const [open, close] = opened;
         let shut = text.indexOf(close, open.length);
-        while (shut !== -1 && !/^\s/.test(text.slice(shut + close.length))) shut = text.indexOf(close, shut + 1);
+        /* A DOUBLED MARK IS ONE MARK OF THE TEXT (`quoteEnd`), and is stepped over whole. */
+        while (shut !== -1 && (text.startsWith(close, shut + close.length) || !/^\s/.test(text.slice(shut + close.length))))
+          shut = text.indexOf(close, shut + (text.startsWith(close, shut + close.length) ? 2 : 1) * close.length);
         const more = shut === -1 ? '' : text.slice(shut + close.length).trim();
         if (more) {
           bad.push({
@@ -1061,7 +1111,10 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
       const pair = QUOTES.find(([open, close]) => text.length >= 2 && text.startsWith(open) && text.endsWith(close));
 
       if (pair) {
-        const inside = text.slice(pair[0].length, text.length - pair[1].length);
+        /* A DOUBLED MARK INSIDE IS ONE MARK OF THE NEEDLE, read by `unquoted` as `is` reads it, so a value `quoteValue`
+           had to double is looked for as itself. A last mark swallowed by a doubling closes nothing there; the text
+           between the outer marks is kept for it, which is how it read before the escape. */
+        const inside = unquoted(text) ?? text.slice(pair[0].length, text.length - pair[1].length);
         /* AN EMPTY NEEDLE IS IN EVERY ROW. SQLite's `instr` answers 1 for `''`, which is why
            `compile` refuses the literal; refused here too, with the sentence a person can act on. */
         if (!inside) {

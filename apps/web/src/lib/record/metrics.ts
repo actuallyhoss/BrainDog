@@ -48,6 +48,7 @@ import {
   type Reduce,
   type TargetIn,
 } from '@braindog/kernel';
+import { clausesOf, quoteValue } from '@braindog/where';
 import { day as longDay, integer, money, shortDay } from 'braindog-render';
 
 import { copy } from '../copy.ts';
@@ -949,15 +950,26 @@ const PARAM = '{{it}}';
  * figure is about. Split on the comma regardless, `state is paid, or thing is {{it}}` kept ` or thing is Kiln` as its
  * scope, which compiled to no row, and read `held: 0` beside eighteen matched rows on the seed; the other order read
  * `held: 10` under the same eighteen (`where-any.test.ts`).
+ *
+ * THE NAME IS WRITTEN BY THE GRAMMAR'S OWN `quoteValue` AND THE CLAUSES CUT BY ITS OWN `clausesOf`, which is what the
+ * kernel's `fill` does with the same template. This copy substituted the name raw and cut on every comma
+ * (`loop/research-audit-2026-09-25-layouts.md` §9): a project called `not Kiln` became `thing is not Kiln`, whose tile
+ * linked to `f=thing:not-in:Kiln`, every project but Kiln; `Wax, wick and scent` became `thing is Wax` and a clause
+ * about a field called `wick`; and `Kiln, or state is paid` widened the figure's scope with an `or`. Quoted, each is
+ * the one name. `metrics-param.test.ts` holds `where` and `within` byte for byte to the kernel's.
+ *
+ * SPLIT AND JOINED, NOT `replaceAll(PARAM, it)`: a string replacement expands `$&`, `$'` and `` $` ``, so a name holding
+ * `$'` was written with the rest of the sentence in its place.
  */
 export function withParam(decl: MetricDecl, it: string): MetricDecl {
   if (decl.where === undefined) return decl;
-  const scope = joinsWithOr(decl.where) ? [] : decl.where.split(',').filter((clause) => clause.includes(PARAM));
+  const named = quoteValue(it);
+  const scope = joinsWithOr(decl.where) ? [] : clausesOf(decl.where).filter((clause) => clause.includes(PARAM));
   return {
     ...decl,
     metric: `${decl.metric}:${it}`,
-    where: decl.where.replaceAll(PARAM, it),
-    ...(scope.length === 0 ? {} : { within: scope.join(',').replaceAll(PARAM, it) }),
+    where: decl.where.split(PARAM).join(named),
+    ...(scope.length === 0 ? {} : { within: scope.join(',').split(PARAM).join(named) }),
   };
 }
 
