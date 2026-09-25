@@ -531,7 +531,8 @@ const option = (id: string, label: string, because: string, recommended = false)
 
 /**
  * The sample's governance rows: its open questions and the decisions it shows, with the same
- * questions, options, recommended option and reasons as `apps/web/src/lib/record/data.ts`.
+ * questions, options, recommended option and reasons as the web's sample, which is test-only since
+ * `loop/DIRECTION.md` §26 and lives in `apps/web/src/lib/record/fixtures/sample.ts`.
  *
  * THE IDS ARE THE RECORD'S, NOT THE SAMPLE'S. `suggestion` and `decision` are counters that start at
  * 1 and move only when `propose` and `decide` allocate from them, so SG27 or D41 could only be
@@ -551,7 +552,7 @@ export function governanceSeed(kernel: Pick<Kernel, 'get'>): SeedQuestion[] {
   return [
     {
       sample: 'D41',
-      question: 'Which registrar holds the Kiln names?',
+      question: 'Which domain host holds the Kiln names?',
       body_kind: 'options',
       body: {
         options: [

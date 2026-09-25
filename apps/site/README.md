@@ -52,7 +52,8 @@ when the owner asked for the numbering to go. A band opens on its own word and a
 heading.
 
 **Nothing in them is invented.** Every label, figure, name and time is read off the seed each use
-case installs (`packages/seed/src/usecases`) or the demo record (`apps/web/src/lib/record/data.ts`)
+case installs (`packages/seed/src/usecases`) or the web app's test-only sample
+(`apps/web/src/lib/record/fixtures/sample.ts`)
 and lives in `copy.ts` with the rest of the words; the one liberty, a question on Decide, is named
 beside the data. `src/lib/arrange.test.ts` holds the rail's glyphs to the app's and every list and
 Home table to rows that are there.

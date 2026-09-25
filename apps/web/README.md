@@ -1,18 +1,21 @@
 # @braindog/web
 
-The browser client of the record. **A frontend mock-up: every screen, no write path.**
+The browser client of the record. Every screen reads a real record through `/api`, and draws no
+sample of its own since `loop/DIRECTION.md` section 26.
 
 ```
 pnpm install
+node tools/gates/record.mjs   # from the root: the seeded record, on the port pnpm dev proxies /api to
 pnpm dev            # http://localhost:5183
 pnpm build          # one build/ directory, served unchanged by both hosts
-pnpm shots          # screenshots of every route, both schemes, into shots/
+pnpm shots          # screenshots of every route below, both schemes, into shots/
 ```
 
-The record it shows is `src/lib/record/` — synthetic by rule, the same rule the fixture corpus
-follows: invented names, `.example` hosts, no real person and no real credential. Swapping
-`record/api.ts` for a real `lib/data/call.ts` is the whole of what the wiring costs; the shapes above
-that file are the real ones.
+With nothing behind the proxy every screen draws the card that says the record was not reached.
+`tools/gates/record.mjs` is the record the browser gates read: the seed installed through the
+record's own write path, with its clock pinned, invented names and `.example` hosts, no real person
+and no real credential. The sample that used to stand in for it is test-only now, in
+`src/lib/record/fixtures/`, and a gate refuses a shipped file that imports it.
 
 ---
 
@@ -20,18 +23,18 @@ that file are the real ones.
 
 | | |
 |---|---|
-| `/` | Home — what needs you, and what changed while you were away |
-| `/decide` · `/decide/SG31` | the queue, ranked by cost of being wrong; and the gate |
+| `/` | Home: what needs you, and what changed while you were away |
+| `/decide` · `/decide/SG5` | the queue, ranked by cost of being wrong; and the gate |
 | `/inbox` | arrivals no pattern matched |
 | `/r/obligations` · `/r/obligations/1` | a register, and a row |
-| `/v/obligations.overdue` | a saved view — a named predicate |
+| `/v/obligations.open` | a saved view, a named predicate: the one `tools/gates/record.mjs` saves |
 | `/p/money` · `?src=1` | a declared page, and its declaration as text |
 | `/t/2` | a track: what has been said on it, who is working on it, what is open |
 | `/vault` · `/packs` · `/settings/appearance` · `/audit` | the rest of the spine |
 | `/start` | the first run: one row, typed by hand |
-| `/jobs/j_7Q2F` | a tier-C run's transcript |
-| `/s/<token>` | a shared page: signed, read-only, and a landing page |
-| `/SG31` | the spoken-id resolver |
+| `/jobs/<id>` | a tier-C run's transcript; no record answers with a run's steps yet, so every id draws "no such run" |
+| `/s/<token>` | a shared page: signed, read-only, and a landing page; today every token draws "This link does not open a page" |
+| `/SG5` | the spoken-id resolver |
 
 ---
 

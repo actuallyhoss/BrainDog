@@ -135,8 +135,15 @@ const READ = { packages: ['src', 'grammars'], apps: ['src', 'scripts'] };
  * sample, which is core and is read as core. `apps/web` was exempted whole while it waited for a gate
  * of its own. Measured on 25 September with the twenty-one words, the two held 5 and 2 hits, against
  * 82 and 11 on 23 September with ten; a sixth in the seed was `bakery`, which `WHOLE` explains. Each
- * is an entry below naming its file and its words: an exemption the size of a tree is how a leak the
+ * became an entry naming its file and its words: an exemption the size of a tree is how a leak the
  * size of the kernel's in either would have read green.
+ *
+ * AND FIVE OF THE SEVEN WERE REWORDED THE SAME DAY, so their entries went. Three were the Kiln
+ * sample's `registrar` in the seed, and the web's two were `EGP` among the common currencies and the
+ * web copy of the sample's `D41`. Measured when those words went and the entries had not: the gate
+ * named every one of their files as exempted and idle and exited 1. What is left is the guide's
+ * `payday`, which is a word a stranger types, the public site's changelog, and Estate's Services line,
+ * whose entry below says why it stays.
  *
  * `*.test.ts` and any `test` directory are out by rule rather than by entry, because a test asserts
  * on what a record was handed: `packages/record/test/ask-person-reach.test.ts` arrives
@@ -146,20 +153,15 @@ const READ = { packages: ['src', 'grammars'], apps: ['src', 'scripts'] };
  * The hit counts are 25 September's, from this gate's own reading.
  */
 const OUT = {
-  /* THE SAMPLE RECORD, a studio called Kiln whose domains are renewed through a registrar. It is sample
-     content rather than a branch the core takes, and `loop/research-legacy-parity.md` has it leave
-     with section 26's sample removal, when these two entries and the web's `fixtures/sample.ts` go idle and the
-     gate says so. */
-  'packages/seed/src/index.ts': {
-    why: 'the sample record (1 hit).',
-    words: { registrar: 'the sample decision `D41` asks which registrar holds the Kiln names.' },
-  },
-  'packages/seed/src/modules/portfolio.ts': {
-    why: 'the sample record (2 hits).',
-    words: { registrar: 'the Kiln sample write-up names its domains, their registrar email, and the decision `D41`.' },
-  },
+  /* A RELEASED DECLARATION, WHICH A REWORD CANNOT REACH WITHOUT A VERSION OF ITS OWN. `holds` on
+     `register.services` is part of what `pack-versions.test.ts` fingerprints, and estate 1.2.0 has been
+     on `origin/master` since `8b8915e4` on 22 September with successful deploys after it. Reworded on
+     25 September, the fingerprint moved to `6ffcf19b2d7a4b0c` and was set again under 1.2.0, which that
+     file allows only for a version no record can hold yet; a record on 1.2.0 would have kept the old
+     words while the pack said it declared the new ones. The word goes when estate raises to 1.3.0 in
+     `packs/first-party.ts`, and this entry then goes idle and the gate asks for it out. */
   'packages/seed/src/modules/estate.ts': {
-    why: 'Estate, a first-party module still in the core (1 hit).',
+    why: 'Estate, a released first-party module still in the core (1 hit).',
     words: { registrar: 'the Services list says what a row holds, a renewal date, a registrar and a cost, which is what a domain is.' },
   },
   /* A WORD A STRANGER TYPES, read to tell which kind of record they want, and not a use case the core
@@ -167,22 +169,6 @@ const OUT = {
   'packages/seed/src/usecases/personal.ts': {
     why: 'the guide signals for Personal (1 hit).',
     words: { payday: 'a word a person says about their own money, in the list the guide matches what they type against.' },
-  },
-  /* TO BE CLEARED. `apps/web` is being rewritten by another brief, and these are its two hits on
-     25 September; they are named here so the gate is green meanwhile and so neither file exempts any
-     other word. Each goes idle when its file is reworded, and the gate then asks for the entry out.
-     `currencies.ts` lists `EGP` among twelve common currencies, which the parity survey judged
-     legitimate and which is also the one Middle Eastern bias in the list; `fixtures/sample.ts` is the
-     web's copy of the sample's `D41`. It was `record/data.ts` when this entry was written, and the
-     move to `fixtures/` the same morning turned the gate red on that one line: an entry names a file,
-     so a file that moves takes its exemption with it only if the entry moves too. */
-  'apps/web/src/lib/record/currencies.ts': {
-    why: 'the currency picker, to be cleared (1 hit).',
-    words: { egp: 'one of the twelve codes offered before the rest.' },
-  },
-  'apps/web/src/lib/record/fixtures/sample.ts': {
-    why: 'the sample engine, to be cleared (1 hit).',
-    words: { registrar: 'the web copy of the sample decision `D41`.' },
   },
   'apps/site': {
     why: 'the public site is prose about the product, not code that runs a record (3 hits).',

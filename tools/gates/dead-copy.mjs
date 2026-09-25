@@ -144,8 +144,8 @@ export default async function deadCopy(root = process.env.BRAINDOG_GATE_ROOT ?? 
    *
    * This greps raw file text, so a key named in prose counted as rendered. This repository's
    * comments name keys constantly. Three do it today: `pref.ts` explains why `copy.markAllRead` left
-   * the allow-list, `data.ts` discusses `copy.lastDecided`, `schema.ts` `copy.levelMeans`. All three
-   * are alive for other reasons, so the gate is not wrong about them; it is one deletion away from
+   * the allow-list, `fixtures/sample.ts` discusses `copy.lastDecided`, `schema.ts` `copy.levelMeans`.
+   * All three are alive for other reasons, so the gate is not wrong about them; it is one deletion away from
    * being propped up by its own commentary, which is the shape `refusals` and `secret-grep` were
    * caught in.
    *

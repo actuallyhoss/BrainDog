@@ -27,8 +27,13 @@
  * person who wrote it, and every picker drew it that way: measured, `currencyChoices` answered `EGP` first for a record
  * at `GBP`, at `JPY` and with no home currency at all, and the rates form drew it directly. So the order is now asked
  * of the record (its home currency first, in `currencyChoices`) and, with none, of the runtime.
+ *
+ * AND `EGP` IS NO LONGER ONE OF THEM, which leaves eleven. With the order fixed it was still the twelfth, on the list for
+ * the same reason it had led it, and `tools/gates/shell-words.mjs` exempted this file by name for that one code. A
+ * record at `EGP` loses nothing by it: `currencyChoices` leads the common group with the held code whichever group it
+ * came from, and `currencies.test.ts` holds that for `EGP` in particular.
  */
-const COMMON = new Set(['AED', 'AUD', 'CAD', 'CHF', 'CNY', 'EGP', 'EUR', 'GBP', 'INR', 'JPY', 'SAR', 'USD']);
+const COMMON = new Set(['AED', 'AUD', 'CAD', 'CHF', 'CNY', 'EUR', 'GBP', 'INR', 'JPY', 'SAR', 'USD']);
 
 /**
  * The codes the runtime lists that the picker does not offer, each with the reason it is not offered.

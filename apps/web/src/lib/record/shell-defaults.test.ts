@@ -76,7 +76,7 @@ test('HOME’S TILE AND A PAGE’S TILE LEAVE THE DOOR OFF A FIGURE WITH NO LIST
 /* ── the currency picker ───────────────────────────────────────────────── */
 
 test('THE COMMON CURRENCIES LEAD WITH THE RECORD’S OWN, whichever it is', () => {
-  for (const home of ['GBP', 'JPY', 'usd', ' egp ']) {
+  for (const home of ['GBP', 'JPY', 'usd', ' eur ']) {
     const { common, other } = currencyChoices(home);
     const code = home.trim().toUpperCase();
     assert.equal(common[0], code, `a record at ${code} was offered ${common[0]} first`);

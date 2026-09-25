@@ -73,7 +73,7 @@ Licence generator | reads the tier, emits the PDF | blocked
 
 \`\`\`spec | Domains and hosting
 kiln.example | renews {{until:2026-09-15}} | the apex
-kilnfonts.example | lapsing {verified: registrar email, 8 Aug} | auto-renew is off
+kilnfonts.example | lapsing {verified: renewal email, 8 Aug} | auto-renew is off
 Object storage | {{money:4100 GBP}} a month | the binaries
 \`\`\`
 
@@ -96,7 +96,7 @@ as {{ref:tasks#3}}.
 {{ago:2026-05-19}} | Moved off the old CI | Hobnail cancelled
 \`\`\`
 
-Settled by research. Do not run it again: the registrar comparison is D41.
+Settled by research. Do not run it again: the domain host comparison is D41.
 
 \`\`\`stat | This block is wrong on purpose
 Too | many | cells | for | a | stat | row

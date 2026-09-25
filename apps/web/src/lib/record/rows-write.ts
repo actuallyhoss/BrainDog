@@ -4,7 +4,7 @@
  * A ROUTE-ONLY MODULE, like `row-live.ts`: the client carries the route table as a value, so only the two register
  * screens that write import it.
  *
- * ONLY A LIVE SCREEN CALLS THIS. A screen drawing the sample never gets here and says `notWritten` as it always did.
+ * ONLY A LIVE SCREEN CALLS THIS, and since the sample record went (DIRECTION 26) every screen is live.
  *
  * THE VALUES GO OUT IN THE RECORD'S SPELLING AND COME BACK IN THE SCREEN'S. The screen holds a ref as the number a
  * person says and an enum as whichever spelling the address carried; the record stores the target row's ULID and the

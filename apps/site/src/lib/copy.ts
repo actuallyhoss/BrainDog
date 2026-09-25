@@ -36,9 +36,10 @@
  * scene's history is in no file under `packages/seed`. All three rows, the two older ones
  * (`seq 4160`, and `seq 4188` by `rule.reply`) and Claude's landing row (`seq 4192` and `4191`,
  * creating `services#6` and `services#7`), are the app's fixture ledger in
- * `apps/web/src/lib/record/data.ts`, which wave C of `loop/research-no-sample.md` moves to
- * test-only fixtures. The seed holds the question and the two services, not the rows that record
- * them. The comments beside the rows still cite the ledger by that name. A key that nothing renders is deleted rather than kept for later.
+ * `apps/web/src/lib/record/fixtures/sample.ts`, which was `record/data.ts` until wave C of
+ * `loop/research-no-sample.md` made it test-only. The seed holds the question and the two services,
+ * not the rows that record them. The comments beside the rows cite that file as `sample.ts`.
+ * A key that nothing renders is deleted rather than kept for later.
  *
  * WHY THERE ARE FEWER SECTIONS THAN THERE WERE. `typed` and `agents` were two bands of their own and
  * are now three sentences inside one. The page used to open on typed rows, registers and the MCP
@@ -234,8 +235,8 @@ export const site = {
    * EVERY WORD IS THE SEED'S OR THE FIXTURE LEDGER'S, and there is one liberty, named here. `SG33`
    * in `packages/seed/src/index.ts` asks *Add the two services on the Fenwick invoice?*, recommends
    * *Add both* with this `change` as its body, and is decided by you; the fixture ledger in
-   * `apps/web/src/lib/record/data.ts` follows it with Claude creating `services#6` and `services#7`,
-   * three hours before its clock. THE LIBERTY: in the seed the question is opened by the record's own
+   * `apps/web/src/lib/record/fixtures/sample.ts` follows it with Claude creating `services#6` and
+   * `services#7`, three hours before its clock. THE LIBERTY: in the seed the question is opened by the record's own
    * reader of the arriving invoice, not by Claude. An agent proposing over MCP is real (`propose` is
    * one of the six writes `agents.mcp.writes` lists), so the scene draws a thing the product does,
    * compressed into one agent where the seed has two actors.
@@ -258,23 +259,23 @@ export const site = {
     verb: 'Accept',
     accepted: 'Accepted by you',
     history: [
-      /* THE TIMES ARE `data.ts`'s AND NOT THE OLD LEDGER'S. It said `2d ago` and `14h ago`; the
+      /* THE TIMES ARE `sample.ts`'s AND NOT THE OLD LEDGER'S. It said `2d ago` and `14h ago`; the
          rows it was quoting are `seq 4160` at `stamp(-31)` and `seq 4188` at `stamp(-9)`, and
          `stamp` counts hours (`packages/seed/src/modules/base.ts:104`). Named, never numbered. */
       { who: 'Codex', what: 'Opened a question about the Kiln licensing model', when: '1d ago' },
-      /* `seq 4188` in `data.ts`, at `stamp(-9)`, and it is `by: 'rule.reply'`, not the late-invoice
+      /* `seq 4188` in `sample.ts`, at `stamp(-9)`, and it is `by: 'rule.reply'`, not the late-invoice
          rule. This row credited it to *Chase late payments*, the name `names.ts` gives
          `invoice-late`, which wrote no row in the fixture ledger at all. `reply` is in no
          `RULE_NAMES` entry, so the app draws it through `actorOf`'s fallback as `reply rule`, and
          that is the name the app puts on this row. The note it added reads
          *Chased twice. 45-day terms expired 3 August.* on `obligations#1`. */
       { who: 'reply rule', what: 'Added a note to an invoice that is late', when: '9h ago' },
-      /* `seq 4192` and `4191` in `data.ts`: Object storage and the Workers plan, each `from the
+      /* `seq 4192` and `4191` in `sample.ts`: Object storage and the Workers plan, each `from the
          Fenwick invoice`. THE TIME IS NOT THE LEDGER'S `stamp(-3)`, AND THAT IS DELIBERATE. This row
          lands the moment the reader presses Accept, and it said `3h ago` while doing so: a row
          written a second ago under a time three hours old. The app's word for a row under a minute
          old is `just now` (`packages/render/src/format.ts`, `since`), and `decide-copy.test.ts`
-         reads the word from `since` so the two cannot drift. The two rows above keep `data.ts`'s
+         reads the word from `since` so the two cannot drift. The two rows above keep `sample.ts`'s
          times, because they were already there when the reader arrived. */
       { who: 'Claude', what: 'Added Object storage and the Workers plan, from the Fenwick invoice', when: 'just now' },
     ],

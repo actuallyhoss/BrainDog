@@ -33,9 +33,13 @@ packages/theme/proof.txt
 # it, which is the whole of what line 4 is for.
 !tools/gates/negative/*/apps/*/.svelte-kit/
 
-# A variant build — the same output for a different record, written by
-# `BRAINDOG_VARIANT=<name> vite build` so the browser gates can measure the half
-# of every branch the shipped seed cannot draw. Never committed: it is a build.
+# A deployment's build, beside production's `build/`: `BRAINDOG_ENV=alpha` writes
+# `apps/web/build-alpha/` (`apps/web/svelte.config.js`), which the Worker's alpha
+# environment serves. Never committed: it is a build. The pattern is wider than
+# that one name because it once also held the sample's variant builds
+# (`build-busy/`, `build-cloud/`, `build-quiet/`), which the browser gates now
+# get as records from `tools/gates/record.mjs`; a tree built before that still
+# has them, and they are output all the same.
 build-*/
 
 # The handoff wrapper writes here and neither belongs in the history.

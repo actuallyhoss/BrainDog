@@ -1,8 +1,9 @@
 /**
  * The Inbox's two writes against the record: file an arrival as a row in a list, and archive it.
  *
- * A ROUTE-ONLY MODULE, loaded by the one screen that writes it, like `inbox-live.ts`. ONLY A LIVE SCREEN CALLS THIS: the
- * sample says `notWritten` as it always did.
+ * A ROUTE-ONLY MODULE, loaded by the one screen that writes it, like `inbox-live.ts`. ONLY A LIVE SCREEN CALLS THIS, and
+ * since the sample left the app (`loop/DIRECTION.md` §26) every Inbox is a live one: there is no drawn Inbox left to
+ * answer a press with a sentence instead of a write.
  *
  * A POST TO `/api/<method>` WITH THE SESSION'S COOKIE, as `actions.ts` sends one, rather than through the client, whose
  * route table is not this screen's to change. The fetch is handed in, so a test drives every branch without a socket.

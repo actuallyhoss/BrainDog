@@ -21,10 +21,12 @@ answers: [
 
 # `raises:` AND `at:` BOTH NAMED SOMETHING THAT RAISES NOTHING. This fixture pointed at
 # `apps/web/src/lib/record/data.ts`, whose only use of this code is a demo sample row in the web
-# app's fake data (`data.ts:1269`), written so a drawn page has a failed connector to show. The code
-# is thrown in seven places in `packages/connect/src/auth.ts`, and the one `47 §6` describes is
-# line 263: the token endpoint answered 401 or 403. Its address is the `at` set at line 418, so this
-# fixture now carries `fetch.auth.token_url` instead of `credential`, which no emitter produces.
+# app's fake data, written so a drawn page has a failed connector to show. That file is test-only
+# now, as `apps/web/src/lib/record/fixtures/sample.ts` (`loop/DIRECTION.md` §26), and the row is
+# the `tallyard` connector there. The code is thrown in seven places in
+# `packages/connect/src/auth.ts`, and the one `47 §6` describes is line 263: the token endpoint
+# answered 401 or 403. Its address is the `at` set at line 418, so this fixture now carries
+# `fetch.auth.token_url` instead of `credential`, which no emitter produces.
 
 # `via: pull` WAS MINTED FOR THESE SEVEN ON SEPTEMBER 20TH 2026, and until then they said `rpc`,
 # which no RPC call could make true. `40 §6`'s `rpc` runner seeds a record and makes a `call:`; a

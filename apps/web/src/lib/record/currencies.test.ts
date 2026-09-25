@@ -44,13 +44,25 @@ test('THE PICKER DROPS ONLY CODES THE RUNTIME STILL LISTS, and every code it doe
 test('THE COMMON CURRENCIES COME FIRST, then every other offered code once, in code order', () => {
   /* IN THE RUNTIME'S ORDER AND NOT ONE PERSON'S. This pinned `EGP, USD, GBP, EUR` first until the order became the
      record's to set (`currencyChoices`, `shell-defaults.test.ts`). The common ones are now filtered out of the runtime's
-     list, so a common code the runtime stops listing would drop out of the group without a word; twelve holds it. */
+     list, so a common code the runtime stops listing would drop out of the group without a word; eleven holds it. */
   assert.deepEqual([...COMMON_CURRENCIES].sort(), [...COMMON_CURRENCIES]);
-  assert.equal(COMMON_CURRENCIES.length, 12);
+  assert.equal(COMMON_CURRENCIES.length, 11);
   assert.equal(new Set(OFFERED_CURRENCIES).size, OFFERED_CURRENCIES.length);
   assert.deepEqual([...OFFERED_CURRENCIES].sort(), [...OFFERED_CURRENCIES]);
   assert.equal(COMMON_CURRENCIES.length + OTHER_CURRENCIES.length, OFFERED_CURRENCIES.length);
-  assert.equal(OTHER_CURRENCIES.includes('EGP'), false);
+});
+
+test('EGP IS NOT ONE OF THE COMMON ONES, and a record whose home currency it is still leads with it', () => {
+  /* THE ELEVEN ARE THE CURRENCIES MOST PEOPLE HOLD, AND EGP WAS IN THEM BECAUSE ONE PERSON HOLDS IT. It was the
+     twelfth, the last trace of the list that led with it, and `shell-words` exempted this file by name for it until
+     25 September. Taken out, a person at EGP loses nothing: `currencyChoices` puts a held code the picker offers at the
+     head of the common group whatever group it came from, so their own money is still the first option, once. */
+  assert.equal(COMMON_CURRENCIES.includes('EGP'), false, 'EGP is offered among the common currencies');
+  assert.equal(OTHER_CURRENCIES.includes('EGP'), true, 'EGP is not offered at all');
+  const { common, other } = currencyChoices('EGP');
+  assert.equal(common[0], 'EGP', `a record at EGP was offered ${common[0]} first`);
+  assert.equal(other.includes('EGP'), false, 'EGP is offered in both groups, two options with one value');
+  assert.deepEqual(common.slice(1), COMMON_CURRENCIES, 'leading with EGP moved or dropped a common code');
 });
 
 test('A CODE THE PICKER DOES NOT OFFER IS STILL DRAWN WHEN THE SETTING HOLDS IT, and it is drawn first', () => {
@@ -58,7 +70,7 @@ test('A CODE THE PICKER DOES NOT OFFER IS STILL DRAWN WHEN THE SETTING HOLDS IT,
      the case asking `Intl` here would have broken, and it breaks silently, as a blank on a settings screen. */
   assert.equal(currencyChoices('xau').other[0], 'XAU');
   assert.equal(currencyChoices('hrk').other[0], 'HRK');
-  assert.equal(currencyChoices('egp').other, OTHER_CURRENCIES);
+  assert.equal(currencyChoices('gbp').other, OTHER_CURRENCIES);
   assert.equal(currencyChoices('').other, OTHER_CURRENCIES);
   assert.equal(currencyChoices('not a code').other, OTHER_CURRENCIES);
 });

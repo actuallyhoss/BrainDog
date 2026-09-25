@@ -7,7 +7,12 @@
  * instead (22 §10).
  *
  *   node scripts/shot.mjs                       every route, both schemes, 1440
- *   node scripts/shot.mjs /decide/SG31 390      one route at one width
+ *   node scripts/shot.mjs /decide/SG5 390       one route at one width
+ *
+ * IT PHOTOGRAPHS THE GATES' RECORD, SO RUN THAT FIRST: `node tools/gates/record.mjs` from the root
+ * serves the seed on the port `vite dev` proxies `/api` to. The app has drawn no sample of its own
+ * since `loop/DIRECTION.md` section 26, so with nothing behind the proxy every screen here is the
+ * card that says the record was not reached, and it photographs as a tidy page.
  *
  * On Git Bash, prefix a route argument with `MSYS_NO_PATHCONV=1` or the shell rewrites `/p/kiln`
  * into the Windows path `P:/kiln` before node ever sees it.
@@ -27,10 +32,18 @@ import { chromium } from '@playwright/test';
 const HOST = process.env.BD_HOST ?? 'http://localhost:5183';
 const OUT = process.env.BD_SHOTS ?? 'shots';
 
+/**
+ * THE ADDRESSES ARE THE ONES `tools/gates/routes.mjs` SAMPLES, because that is what the record above
+ * holds. Until 25 September this list opened the sample's `SG31`, `/v/obligations.overdue`,
+ * `/jobs/j_7Q2F` and `/s/9f2a7c41d8b3`, four addresses that only the sample ever held and that went
+ * with it. `SG5` is where `installSeed` files the Kiln licensing question, `obligations.open` is the
+ * view `record.mjs` saves, and the job and the shared link are the ids `routes.mjs` gives them: both
+ * routes draw their own "nothing here" screen for every id today, so that screen is the one to see.
+ */
 const ROUTES = [
   ['home', '/'],
   ['decide', '/decide'],
-  ['gate', '/decide/SG31'],
+  ['gate', '/decide/SG5'],
   ['inbox', '/inbox'],
   ['grid', '/r/obligations'],
   ['entry', '/r/obligations/1'],
@@ -43,10 +56,10 @@ const ROUTES = [
   ['settings', '/settings/appearance'],
   ['start', '/start'],
   ['audit', '/audit'],
-  ['job', '/jobs/j_7Q2F'],
-  ['view', '/v/obligations.overdue'],
-  ['shared', '/s/9f2a7c41d8b3'],
-  ['resolver', '/SG31'],
+  ['job', '/jobs/j_none'],
+  ['view', '/v/obligations.open'],
+  ['shared', '/s/no-page-yet'],
+  ['resolver', '/SG5'],
   ['not-found', '/nowhere'],
 ];
 

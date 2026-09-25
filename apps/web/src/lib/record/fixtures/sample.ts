@@ -460,7 +460,7 @@ export const QUESTIONS: Question[] = [
 export const DECIDED: Question[] = [
   {
     id: 'D41',
-    title: 'Which registrar holds the Kiln names?',
+    title: 'Which domain host holds the Kiln names?',
     cost: 'A transfer takes five days and a locked domain cannot be moved during a dispute.',
     rank: 0,
     opened: stamp(-2200),

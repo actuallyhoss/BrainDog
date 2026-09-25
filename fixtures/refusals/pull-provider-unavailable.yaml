@@ -20,9 +20,11 @@ answers: [
 
 # `raises:` AND `at:` BOTH NAMED SOMETHING THAT RAISES NOTHING. This fixture pointed at
 # `apps/web/src/lib/record/data.ts`, whose only use of this code is a demo sample row in the web
-# app's fake data (`data.ts:1260`). Five of the code's six emitters are in
-# `packages/connect/src/status.ts`, at lines 61, 100, 111, 118 and 137, which are the four causes
-# `47 §6` lists: a timeout, the network, an `error_when` status and an `error_when` body path. The
+# app's fake data. That file is test-only now, as `apps/web/src/lib/record/fixtures/sample.ts`
+# (`loop/DIRECTION.md` §26), and the row is the `kestrel` connector there. Five of the code's six
+# emitters are in `packages/connect/src/status.ts`, at lines 61, 100, 111, 118 and 137, which are
+# the four causes `47 §6` lists: a timeout, the network, an `error_when` status and an `error_when`
+# body path. The
 # sixth is `packages/connect/src/auth.ts:264`, the token endpoint answering anything but 401, 403 or
 # ok. `at` is the address the page loop passes in at `packages/connect/src/run.ts:300`, so
 # `fetch.page[1]` for a first page, instead of `source`, which no emitter produces.
