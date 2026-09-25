@@ -32,7 +32,7 @@ const open = async () => {
 test('an empty database becomes a record', async () => {
   const { sql, result } = await open();
   assert.ok(result.ok, fixOf(result));
-  assert.deepEqual(result.value, { kernel: 14, format: 1, applied: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14] });
+  assert.deepEqual(result.value, { kernel: 15, format: 1, applied: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] });
 
   const tables = sql
     .all<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
@@ -52,9 +52,9 @@ test('applying twice applies nothing twice', async () => {
   const first = await applyMigrations(sql, clock);
   const second = await applyMigrations(sql, clock);
   assert.ok(first.result.ok && second.result.ok);
-  assert.deepEqual(first.result.value.applied, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]);
+  assert.deepEqual(first.result.value.applied, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
   assert.deepEqual(second.result.value.applied, [], 'a second run re-applied a migration');
-  assert.equal(sql.all('SELECT version FROM migration').length, 14);
+  assert.equal(sql.all('SELECT version FROM migration').length, 15);
   sql.close();
 });
 
@@ -110,6 +110,8 @@ async function beforeMigration2() {
      old record, it would be simulating a state no record can be in — ledger at 1, schema at 10 —
      and the duplicate-column error it raises is the runner being right. */
   sql.exec('ALTER TABLE grant DROP COLUMN sealed_under');
+  /* And migration 15's column, for migration 10's reason. */
+  sql.exec('ALTER TABLE token DROP COLUMN reach');
   sql.exec('DELETE FROM migration WHERE version >= 2');
   return sql;
 }
@@ -120,7 +122,7 @@ test('A RECORD CREATED BEFORE MIGRATION 2 TAKES IT ON OPEN, and everything it he
 
   const { result } = await applyMigrations(sql, fixedClock(NOW));
   assert.ok(result.ok, fixOf(result));
-  assert.deepEqual(result.value.applied, [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]);
+  assert.deepEqual(result.value.applied, [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
 
   const after = snapshot(sql);
   assert.deepEqual(after.entry, before.entry, 'a row changed');
@@ -275,6 +277,7 @@ test('AN APPLIED MIGRATION IS NEVER EDITED, so each checksum is pinned here', as
     'a8d8837345552ba259423346f3cdbe109f6ca73f0d2d0da143e1ef8751f260b2',
     '4f26cd437a0d4d5e454477c5428f57e96b749cfecdf8c08822f3d798e57bd185',
     '5ed69b795dc9170533c90d3f49108bf0556c362db3524866ab411d7653a25a1a',
+    'dcaf26214d1331d23aa3632432e4538e2361b7e6ec47c8d5a75e58810dbfada1',
   ]);
 });
 
@@ -287,6 +290,7 @@ test('MIGRATION 4 REBUILDS device_grant: every row copied, a seventh reach, and 
   sql.exec('DROP TABLE device_grant');
   sql.exec(shipped);
   sql.exec('ALTER TABLE grant DROP COLUMN sealed_under');
+  sql.exec('ALTER TABLE token DROP COLUMN reach');
   sql.exec('DELETE FROM migration WHERE version >= 4');
   const row = ['fake-poll-id', 'fake-hash', 'denied', 'runner', 'old-box', null, null, 5, '2026-09-01T00:00:00.000Z', null, null, null];
   sql.exec(
@@ -296,7 +300,7 @@ test('MIGRATION 4 REBUILDS device_grant: every row copied, a seventh reach, and 
 
   const { result } = await applyMigrations(sql, clock);
   assert.ok(result.ok, fixOf(result));
-  assert.deepEqual(result.value.applied, [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]);
+  assert.deepEqual(result.value.applied, [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
   assert.deepEqual(
     { ...sql.one<Record<string, unknown>>('SELECT id, code_hash, status, reach, label, tries, scope FROM device_grant') },
     { id: 'fake-poll-id', code_hash: 'fake-hash', status: 'denied', reach: 'runner', label: 'old-box', tries: 5, scope: null },
@@ -317,13 +321,15 @@ test('MIGRATION 13 REBUILDS outbox: every row copied, and infer.ask admitted', a
   sql.exec(twelve.find((s) => s.startsWith('CREATE TABLE outbox_next'))!);
   sql.exec('ALTER TABLE outbox_next RENAME TO outbox');
   sql.exec('CREATE INDEX outbox_ready ON outbox(state, created)');
+  /* And migration 15's column, which `ADD COLUMN` cannot re-apply over itself. */
+  sql.exec('ALTER TABLE token DROP COLUMN reach');
   sql.exec('DELETE FROM migration WHERE version >= 13');
   sql.exec("INSERT INTO outbox (id, created, kind, payload, state, attempts) VALUES ('j1', '2026-09-01T00:00:00.000Z', 'script.run', '{}', 'failed', 3)");
   assert.throws(() => sql.exec("INSERT INTO outbox (id, created, kind, payload) VALUES ('j2', 'x', 'infer.ask', '{}')"), /CHECK/);
 
   const { result } = await applyMigrations(sql, clock);
   assert.ok(result.ok, fixOf(result));
-  assert.deepEqual(result.value.applied, [13, 14]);
+  assert.deepEqual(result.value.applied, [13, 14, 15]);
   assert.deepEqual(
     { ...sql.one<Record<string, unknown>>('SELECT id, kind, state, attempts FROM outbox') },
     { id: 'j1', kind: 'script.run', state: 'failed', attempts: 3 },

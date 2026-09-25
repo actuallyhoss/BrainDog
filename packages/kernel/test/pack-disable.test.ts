@@ -352,12 +352,14 @@ test('A RECORD FROM BEFORE MIGRATION 3 TAKES IT ON OPEN, and its packs arrive en
   /* And migration 10's column, which `ADD COLUMN` cannot re-apply: a rewind that left it behind
      would be a state no record can be in, ledger at 2 and schema at 10. */
   sql.exec('ALTER TABLE grant DROP COLUMN sealed_under');
+  /* And migration 15's column on `token`, for the same reason. */
+  sql.exec('ALTER TABLE token DROP COLUMN reach');
   /* And the ledger above it, since the runner applies only what is above the highest version it holds. */
   sql.exec('DELETE FROM migration WHERE version >= 3');
 
   const { result } = await applyMigrations(sql, fixedClock(NOW));
   assert.ok(result.ok, fixOf(result));
-  assert.deepEqual(result.value.applied, [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]);
+  assert.deepEqual(result.value.applied, [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
   assert.deepEqual({ ...sql.one<Record<string, unknown>>('SELECT id, version, disabled_at FROM pack') },{ id: 'notebook', version: '1.0.0', disabled_at: null });
 
   const reopened = await openRecord(sql, fixedClock(NOW));

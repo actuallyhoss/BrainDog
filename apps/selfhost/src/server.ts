@@ -314,9 +314,21 @@ async function bearerFor(sent: string, site: Site, surface: 'api' | 'mcp', door?
      holder has lost. NOT ON THIS RECORD IS 403, and a credential this record does not know is 401. */
   const held = api.kernel.access(seen.value.person_id);
   if (!held) return { refused: OFF };
+  /* THE REACH IS THE TOKEN ROW'S, AS `verifyToken` READ IT, and nothing in the request can add to it. The record's inbox
+     gate admits a whole-record owner token that carries `inbox` (DIRECTION section 30, P2); before this line no token
+     principal carried a reach at all, so a token minted with it was refused like any other. Left off when empty, so a
+     principal without one is the principal every older token had. */
+  const reach = seen.value.reach;
   return {
     ctx: {
-      principal: { kind: 'token', id: seen.value.id, scope: seen.value.scope, person: seen.value.person_id, level: held.level },
+      principal: {
+        kind: 'token',
+        id: seen.value.id,
+        scope: seen.value.scope,
+        person: seen.value.person_id,
+        level: held.level,
+        ...(reach.length === 0 ? {} : { reach }),
+      },
       ...(held.registers === null ? {} : { registers: held.registers }),
       ...(Object.keys(held.levels).length === 0 ? {} : { levels: held.levels }),
     },

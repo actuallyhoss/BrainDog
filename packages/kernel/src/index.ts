@@ -88,6 +88,7 @@ import {
   listTokens,
   revokeToken,
   verifyToken,
+  type CreateTokenArgs,
   type Minted,
   type Scope,
   type TokenDeps,
@@ -309,7 +310,7 @@ export { LEVELS as MEMBER_LEVELS, RECORD as WHOLE_RECORD } from './members.ts';
 export type { Member } from './members.ts';
 export { GONE as INVITE_GONE, INVITE_HOURS, tokenParts as inviteTokenParts } from './invitations.ts';
 export type { InvitationRow, InviteArgs, Invited } from './invitations.ts';
-export type { Minted, Scope, TokenRow, Verified } from './token.ts';
+export type { CreateTokenArgs, Minted, Scope, TokenReach, TokenRow, Verified } from './token.ts';
 export type { Arranging, Decision, Decided, Proposal, Suggestion, Verdict, GovernRegister, BodyKind } from './govern.ts';
 /* `exponentOf` IS EXPORTED SO THE RECORD'S CURRENCY TABLE IS NOT A SECOND EXPONENT READER. It is
    `Intl`, cached per code; a table built from a copy of it could disagree with the reading. */
@@ -6392,7 +6393,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     /* ── agent tokens ───────────────────────────────────── */
 
     /** Mint one. The secret exists once, in the answer, and is stored nowhere. */
-    createToken: (person: string, args: { scope: Scope; label?: string; days?: number }): Promise<Result<Minted>> =>
+    createToken: (person: string, args: CreateTokenArgs): Promise<Result<Minted>> =>
       Promise.resolve(tokenDeps()).then((deps) => transaction(() => createToken(deps, person, args))),
 
     /** Every token, with a revoke button's worth of information and nothing a hash needs. */

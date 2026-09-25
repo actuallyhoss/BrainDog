@@ -82,6 +82,7 @@ import {
   type InboxState,
   INBOX_STATES,
   type ArrivalSettled,
+  type CreateTokenArgs,
   setupCollapser,
   isUlid,
   slugify,
@@ -5823,7 +5824,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * than they can; the intersection is checked on every call, so a colleague whose access is
      * removed does not keep writing through a token they were issued last year.
      */
-    async createToken(args: { scope: Scope; label?: string; days?: number }, ctx: CallContext) {
+    async createToken(args: CreateTokenArgs, ctx: CallContext) {
       const stop = admin(ctx, undefined, 'createToken');
       if (stop) return { ok: false as const, refusal: stop };
       /* AND MINTING NEEDS A CREDENTIAL OF ITS OWN, which is not true of any other ADMIN method here.

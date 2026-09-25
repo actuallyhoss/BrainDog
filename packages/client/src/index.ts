@@ -437,11 +437,16 @@ export type Member = {
   suspended_at: string | null;
 };
 
+/** What a token may open beyond its scope, named when it is minted. `TOKEN_REACHES` in `@braindog/kernel`. */
+export type TokenReach = 'inbox';
+
 /** `listTokens` and `revokeToken`: one agent token, never the bearer. See `TokenRow` in `@braindog/kernel`. */
 export type TokenRow = {
   id: string;
   person_id: string;
   scope: 'read' | 'propose' | 'write';
+  /** Optional because a host older than token reaches answers without it, and that is a token that reaches nothing more. */
+  reach?: TokenReach[];
   label: string | null;
   created_at: string;
   last_used_at: string | null;
@@ -465,7 +470,7 @@ export type Invitation = {
 export type Invited = { invitation: Invitation; token: string };
 
 /** `createToken`: the only copy of the bearer there will ever be. Show it once, and keep it nowhere. */
-export type MintedToken = { id: string; bearer: string; scope: string; expires_at: string };
+export type MintedToken = { id: string; bearer: string; scope: string; reach?: TokenReach[]; expires_at: string };
 
 /** `createReportKey`: the only copy of a report key there will ever be. Show it once, and keep it nowhere. */
 export type MintedReportKey = { id: string; bearer: string; register: string; expires_at: string };
@@ -879,7 +884,8 @@ export function createClient(options: ClientOptions) {
     invitations: () => call<Invitation[]>('invitations'),
     revokeInvite: (args: { id: string }) => call<{ id: string; revoked_at: string }>('revokeInvite', args as Record<string, unknown>),
     removeMember: (args: { person: string; why?: string }) => call<unknown>('removeMember', args as Record<string, unknown>),
-    createToken: (args: { scope: TokenRow['scope']; label?: string; days?: number }) =>
+    /** `reach` opens something beyond the scope, and only an owner's whole-record token uses it: `['inbox']` reads the money inbox. */
+    createToken: (args: { scope: TokenRow['scope']; label?: string; days?: number; reach?: TokenReach[] }) =>
       call<MintedToken>('createToken', args as Record<string, unknown>),
     revokeToken: (args: { id: string }) => call<TokenRow>('revokeToken', args as Record<string, unknown>),
     /** A token that sends rows to one list and reaches nothing else. Revoked with `revokeToken`. */

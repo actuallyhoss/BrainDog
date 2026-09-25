@@ -45,6 +45,7 @@ import { serveStdio } from './stdio.ts';
 import { surfaceOver } from './surface.ts';
 import { pack } from './catalogue.ts';
 import { tools } from './tools.ts';
+import { tokenCommand } from './token.ts';
 import { usecase } from './usecase.ts';
 import { verify } from './verify.ts';
 
@@ -155,6 +156,9 @@ const usage = () =>
     '  Both ask the owner to approve the one operation in the app, with six digits, unless BRAINDOG_TOKEN is the self-host\'s server key.',
     'braindog import legacy <export.json> [--setup <setup.json>] [--host <host>] [--dry-run] | --draft-setup',
     '  Move a the old tool export into this BrainDog. Running it again updates what it added, and no key value is ever read.',
+    'braindog token create [--name <name>] [--scope <read|propose|write>] [--days <n>] [--inbox] [--host <host>]',
+    "  Mint a token for an agent and print it once. It reads unless --scope names more, and with --inbox it may also read the money inbox.",
+    "  The owner approves the one mint in the app, with six digits, unless BRAINDOG_TOKEN is the self-host's server key.",
     'braindog mcp [--agent claude|codex|cursor|other] [--host <host>]',
     '  Serve BrainDog to an agent over standard input and output. The agent starts it.',
     'braindog hook start|end',
@@ -327,12 +331,13 @@ async function agentCommand(which: 'skills' | 'tools' | 'page' | 'usecase' | 'pa
 }
 
 /**
- * `braindog export` and `braindog import <file.brainl>`, over the real terminal, and the exit code the command decides.
+ * `braindog export`, `braindog import <file.brainl>` and `braindog token create`, over the real terminal, and the exit code
+ * the command decides.
  *
- * NOT ONE OF `agentCommand`'s, because these two may run a device flow in the middle: they need the hosts file, and
+ * NOT ONE OF `agentCommand`'s, because these three may run a device flow in the middle: they need the hosts file, and
  * Ctrl+C, which the others never wait long enough to be given. The six digits go to stderr either way, as `login`'s do.
  */
-async function brainfileCommand(which: 'export' | 'import', args: string[]): Promise<void> {
+async function brainfileCommand(which: 'export' | 'import' | 'token', args: string[]): Promise<void> {
   const stopping = new AbortController();
   process.on('SIGINT', () => stopping.abort());
   const io = {
@@ -344,7 +349,7 @@ async function brainfileCommand(which: 'export' | 'import', args: string[]): Pro
     answer: json?.answer,
     signal: stopping.signal,
   };
-  const code = which === 'export' ? await exportFile(args, io) : await importFile(args, io);
+  const code = which === 'export' ? await exportFile(args, io) : which === 'token' ? await tokenCommand(args, io) : await importFile(args, io);
   if (json) emit(json.envelope(code));
   /* LEFT TO END ON ITS OWN, for the reason `hook` gives. */
   process.exitCode = code;
@@ -470,7 +475,7 @@ function install(args: string[]): void {
  * left to refuse the flag in its own words, which is the answer a caller deserves rather than an
  * empty document.
  */
-const JSON_COMMANDS = new Set(['--version', '-v', 'help', '--help', '-h', 'login', 'logout', 'skills', 'tools', 'page', 'usecase', 'pack', 'import', 'export', 'context', 'session', 'automations', 'scripts', 'install', 'verify']);
+const JSON_COMMANDS = new Set(['--version', '-v', 'help', '--help', '-h', 'login', 'logout', 'skills', 'tools', 'page', 'usecase', 'pack', 'import', 'export', 'token', 'context', 'session', 'automations', 'scripts', 'install', 'verify']);
 
 const [command, ...rest] = process.argv.slice(2);
 /* ONE DECISION, TAKEN BEFORE DISPATCH (`48 §4.5`, `json.ts`): the flag is answered here and removed,
@@ -509,6 +514,7 @@ try {
      into one environment variable, and adding a way to print one would undo the reason it exists. */
   else if (command === 'run') await keysCommand(['exec', ...rest]);
   else if (command === 'export') await brainfileCommand('export', args);
+  else if (command === 'token') await brainfileCommand('token', args);
   /* `import legacy` IS THE THE OLD TOOL IMPORTER, UNCHANGED, and any other `import` is a .brainl put back. Asked by
      whether the word is there at all rather than by position, because the importer's own `parseArgs` takes `--host <h>`
      ahead of it, and a file literally named `legacy` is not a .brainl anybody writes. */

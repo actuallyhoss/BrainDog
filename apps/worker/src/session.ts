@@ -22,7 +22,7 @@
 import { clearCookie, readSid, sameOrigin, sessionContext, sessionCookie } from '@braindog/host/auth';
 import { OPERATION_METHOD } from '@braindog/kernel';
 import type { AuthResult, Refusal, Who } from '@braindog/ports';
-import type { CallContext } from '@braindog/record';
+import { TOKEN_REACHES, type CallContext } from '@braindog/record';
 
 import { recordOf } from './route.ts';
 
@@ -100,7 +100,8 @@ export function withCookie(response: Response, cookie: string | undefined): Resp
 /** The three calls the bearer path makes: the Directory's `knows`, and the record's `verify` and `access`. */
 export type BearerDeps = {
   knows: (record: string) => Promise<boolean>;
-  verify: (record: string, bearer: string, surface: 'api' | 'mcp') => Promise<{ id: string; person_id: string; scope: string } | null>;
+  /** `reach` is what the token's own row says it opens beyond its scope (`verifyToken`), absent from an older record. */
+  verify: (record: string, bearer: string, surface: 'api' | 'mcp') => Promise<{ id: string; person_id: string; scope: string; reach?: readonly string[] } | null>;
   access: (record: string, person: string) => Promise<Held | null>;
   /** The record a live name means, the Directory's `resolve`. Asked only for a bearer that came under `/app/<slug>`. */
   named?: (slug: string) => Promise<string | null>;
@@ -185,12 +186,25 @@ export async function bearerOf(request: Request, surface: 'api' | 'mcp', deps: B
   const admitted = await heldBy(deps, record, seen.person_id, slug);
   if ('status' in admitted) return admitted;
   const held = admitted.held;
+  /* THE REACH IS THE TOKEN ROW'S, AS `verifyToken` READ IT INSIDE THE RECORD, and nothing in the request can add to it.
+     The record's inbox gate admits a whole-record owner token that carries `inbox` (DIRECTION section 30, P2), and
+     before this no token principal carried a reach, so a token minted with it was refused like any other. It crosses
+     an RPC whose declared answer does not name it, so it is matched against the record's own closed list rather than
+     cast: a string would pass `includes` as a substring, which is how the gate once admitted "no-inbox" (d41ec831). */
+  const reach = Array.isArray(seen.reach) ? TOKEN_REACHES.filter((r) => seen.reach?.includes(r)) : [];
   /* BOTH HALVES GO OVER, the token's scope and the person's level, and the record computes where they meet: a
      token says what its holder may do with their access and never what access they have. */
   return {
     record,
     ctx: {
-      principal: { kind: 'token', id: seen.id, scope: seen.scope as TokenPrincipal['scope'], person: seen.person_id, level: held.level as TokenPrincipal['level'] },
+      principal: {
+        kind: 'token',
+        id: seen.id,
+        scope: seen.scope as TokenPrincipal['scope'],
+        person: seen.person_id,
+        level: held.level as TokenPrincipal['level'],
+        ...(reach.length === 0 ? {} : { reach }),
+      },
       ...scoped(held),
     },
   };

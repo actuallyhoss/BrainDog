@@ -28,11 +28,27 @@ import { instant } from './migrate.ts';
 export const SCOPES = ['read', 'propose', 'write'] as const;
 export type Scope = (typeof SCOPES)[number];
 
+/**
+ * What a token may open beyond its scope, named by the owner when they mint it. One so far.
+ *
+ * A CLOSED LIST, AND THE RECORD HOLDS THE SAME ONE (`TOKEN_REACHES` in `packages/record`), because the record is where
+ * each reach is enforced and the kernel is where it is kept. The kernel cannot import the record, so the two lists are
+ * two lines; a reach added to one and not the other is either refused at mint or never admitted at the gate, and
+ * `test/token-reach.test.ts` pins this one.
+ *
+ * `inbox` IS THE MONEY INBOX: an owner's whole-record token that carries it reads `inbox`, which is otherwise the
+ * owner's alone (DIRECTION section 30, P2). It opens that read and nothing beside it.
+ */
+export const TOKEN_REACHES = ['inbox'] as const;
+export type TokenReach = (typeof TOKEN_REACHES)[number];
+
 /** What a listing shows. Never the hash, and never anything a hash could be rebuilt from. */
 export type TokenRow = {
   id: string;
   person_id: string;
   scope: Scope;
+  /** What the owner let it open beyond its scope. Empty for a token that reaches nothing more, and every older one. */
+  reach: TokenReach[];
   label: string | null;
   created_at: string;
   last_used_at: string | null;
@@ -41,7 +57,29 @@ export type TokenRow = {
   revoked_at: string | null;
 };
 
-const VISIBLE = 'id, person_id, scope, label, created_at, last_used_at, last_surface, expires_at, revoked_at';
+const VISIBLE = 'id, person_id, scope, reach, label, created_at, last_used_at, last_surface, expires_at, revoked_at';
+
+/**
+ * A `reach` column as the list it stands for.
+ *
+ * PARSED HERE AND FILTERED TO THE CLOSED LIST, because every reader downstream matches on it. The column is text until
+ * somebody parses it, and the record's gate once admitted the text "no-inbox" through a string's `includes`
+ * (d41ec831). A value this build does not name is dropped rather than passed on, so no principal carries a reach that
+ * nothing checked.
+ */
+const reachOf = (column: string | null): TokenReach[] => {
+  if (column === null) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(column);
+  } catch {
+    return [];
+  }
+  return Array.isArray(parsed) ? TOKEN_REACHES.filter((r) => parsed.includes(r)) : [];
+};
+
+type Stored = Omit<TokenRow, 'reach'> & { reach: string | null };
+const rowOf = (raw: Stored): TokenRow => ({ ...raw, reach: reachOf(raw.reach) });
 
 /** Ninety days. Long enough to be useful, short enough that a forgotten one stops working. */
 export const DEFAULT_DAYS = 90;
@@ -60,7 +98,10 @@ export type TokenDeps = {
   random: (n: number) => Uint8Array;
 };
 
-export type Minted = { id: string; bearer: string; scope: Scope; expires_at: string };
+export type Minted = { id: string; bearer: string; scope: Scope; reach: TokenReach[]; expires_at: string };
+
+/** What minting takes. `reach` is left out, or empty, for a token that opens nothing beyond its scope. */
+export type CreateTokenArgs = { scope: Scope; label?: string; days?: number; reach?: readonly TokenReach[] };
 
 const b64url = (bytes: Uint8Array): string => {
   let s = '';
@@ -78,7 +119,7 @@ const b64url = (bytes: Uint8Array): string => {
 export async function createToken(
   deps: TokenDeps,
   person: string,
-  args: { scope: Scope; label?: string; days?: number },
+  args: CreateTokenArgs,
 ): Promise<Result<Minted>> {
   if (!(SCOPES as readonly string[]).includes(args?.scope))
     return no<Minted>('ENUM_VALUE_UNKNOWN', `${String(args?.scope)} is not a scope a token can hold.`, {
@@ -92,6 +133,18 @@ export async function createToken(
       at: 'days',
     });
 
+  /* THE REACH IS CHECKED WHOLE, BEFORE ANYTHING IS WRITTEN, and a list with one unknown name in it is refused rather
+     than trimmed: the owner asked for a token that opens something, and handing back one that opens less would be a
+     token that fails later for a reason nobody was told. A string is not a list, because `'inbox'` read as one would
+     be the substring match the record's gate once let through. */
+  const asked: unknown = args.reach ?? [];
+  if (!Array.isArray(asked) || asked.some((r) => !(TOKEN_REACHES as readonly unknown[]).includes(r)))
+    return no<Minted>('ENUM_VALUE_UNKNOWN', `A token can reach ${TOKEN_REACHES.join(', ')} beyond its scope, named in a list, and this asked for ${JSON.stringify(asked)}.`, {
+      at: 'reach',
+      allowed: TOKEN_REACHES,
+    });
+  const reach = TOKEN_REACHES.filter((r) => asked.includes(r));
+
   const record = deps.recordId();
   if (!record)
     return no<Minted>('OUT_OF_BOUNDS', 'This record has no id yet, and a bearer carries the record it is for.', { at: 'record' });
@@ -104,33 +157,38 @@ export async function createToken(
   const expires = instant(deps.nowMs + days * 86_400_000);
 
   deps.sql.exec(
-    'INSERT INTO token (id, person_id, hash, scope, label, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO token (id, person_id, hash, scope, reach, label, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
     id,
     person,
     await deps.digest(secret),
     args.scope,
+    reach.length === 0 ? null : JSON.stringify(reach),
     args.label ?? null,
     at,
     expires,
   );
+  /* THE REACH GOES IN `field`, WHICH IS WHAT A GRANT IS ON. A person's level names the list it is held to there, and a
+     token's names what it opens beyond its scope, so who let an agent read the inbox, and when, is one query over the
+     log. `to_v` stays the scope, which is what Home's sentence for a new key reads. */
   deps.sql.exec(
-    "INSERT INTO event (id, ts, actor, kind, target, target_kind, to_v, note) VALUES (?, ?, ?, 'access.grant', ?, 'token', ?, ?)",
+    "INSERT INTO event (id, ts, actor, kind, target, target_kind, field, to_v, note) VALUES (?, ?, ?, 'access.grant', ?, 'token', ?, ?, ?)",
     deps.mint(),
     at,
     person,
     `token:${id}`,
+    reach.length === 0 ? null : reach.join(','),
     args.scope,
     (args.label ?? '').slice(0, 280) || null,
   );
 
   /* THE ONLY TIME THE SECRET EXISTS OUTSIDE THIS FUNCTION. The row holds its hash; nothing here or
      anywhere else can produce it again. */
-  return ok({ id, bearer: `${record}.${secret}`, scope: args.scope, expires_at: expires });
+  return ok({ id, bearer: `${record}.${secret}`, scope: args.scope, reach, expires_at: expires });
 }
 
 /** Every token, with a revoke button's worth of information and nothing a hash needs. */
 export const listTokens = (sql: Sql): TokenRow[] =>
-  sql.all<TokenRow>(`SELECT ${VISIBLE} FROM token ORDER BY created_at DESC, id`);
+  sql.all<Stored>(`SELECT ${VISIBLE} FROM token ORDER BY created_at DESC, id`).map(rowOf);
 
 /**
  * Revoke one.
@@ -140,7 +198,8 @@ export const listTokens = (sql: Sql): TokenRow[] =>
  * making them less sure.
  */
 export function revokeToken(deps: TokenDeps, person: string, id: string): Result<TokenRow> {
-  const row = deps.sql.one<TokenRow>(`SELECT ${VISIBLE} FROM token WHERE id = ?`, id);
+  const held = deps.sql.one<Stored>(`SELECT ${VISIBLE} FROM token WHERE id = ?`, id);
+  const row = held ? rowOf(held) : null;
   if (!row) return no<TokenRow>('OUT_OF_BOUNDS', `There is no token called ${id}.`, { at: 'id' });
   if (row.revoked_at) return ok(row);
 
@@ -157,7 +216,13 @@ export function revokeToken(deps: TokenDeps, person: string, id: string): Result
   return ok({ ...row, revoked_at: at });
 }
 
-export type Verified = { id: string; person_id: string; scope: Scope };
+/**
+ * A bearer that checked, and what it may do.
+ *
+ * `reach` IS WHAT A HOST PUTS ON THE TOKEN PRINCIPAL, read from this row and never from anything the caller sent. The
+ * record's inbox gate trusts it for exactly that reason.
+ */
+export type Verified = { id: string; person_id: string; scope: Scope; reach: TokenReach[] };
 
 /**
  * A bearer, checked.
@@ -189,11 +254,12 @@ export async function verifyToken(deps: TokenDeps, bearer: string, surface?: str
     id: string;
     person_id: string;
     scope: Scope;
+    reach: string | null;
     expires_at: string | null;
     revoked_at: string | null;
     suspended_at: string | null;
   }>(
-    `SELECT t.id AS id, t.person_id AS person_id, t.scope AS scope, t.expires_at AS expires_at,
+    `SELECT t.id AS id, t.person_id AS person_id, t.scope AS scope, t.reach AS reach, t.expires_at AS expires_at,
             t.revoked_at AS revoked_at, p.suspended_at AS suspended_at
      FROM token t LEFT JOIN person p ON p.id = t.person_id WHERE t.hash = ?`,
     await deps.digest(secret),
@@ -207,5 +273,5 @@ export async function verifyToken(deps: TokenDeps, bearer: string, surface?: str
     surface ?? null,
     row.id,
   );
-  return ok({ id: row.id, person_id: row.person_id, scope: row.scope });
+  return ok({ id: row.id, person_id: row.person_id, scope: row.scope, reach: reachOf(row.reach) });
 }

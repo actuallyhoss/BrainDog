@@ -219,7 +219,10 @@ export async function login(raw: string, io: LoginIo): Promise<number> {
 }
 
 /** What one device flow asks the host for: a login, a vault grant over one scope, or one operation. */
-type Asked = { reach: 'login' } | { reach: 'vault'; scope: string } | { reach: 'export' | 'import' };
+type Asked = { reach: 'login' } | { reach: 'vault'; scope: string } | { reach: OperationReach };
+
+/** The operation reaches this CLI asks for, each approving one ADMIN call (`OPERATIONS` in `packages/kernel/src/device.ts`). */
+export type OperationReach = 'export' | 'import' | 'token';
 
 /** The words a flow ends with that differ by what it asked for: the command that starts it again, and what did not happen. */
 type Words = { again: string; nothing: string; stopped: string };
@@ -339,7 +342,7 @@ async function approve(host: { key: string; url: URL }, asked: Asked, label: str
 }
 
 /**
- * A ten-minute operation grant for one `export` or one `import` (`docs/48-SPEC-CLI.md` §13 D1), held by the caller and
+ * A ten-minute operation grant for one `export`, one `import` or one `createToken` (`docs/48-SPEC-CLI.md` §13 D1), held by the caller and
  * never written anywhere, or the exit code once the reason has been said.
  *
  * THE LOGIN'S OWN FLOW, AND NOT A SECOND ONE, because every check it makes is one an operation needs as much: the
@@ -349,9 +352,9 @@ async function approve(host: { key: string; url: URL }, asked: Asked, label: str
  * and a copy on disk would be a credential that outlives the one request it was approved for.
  *
  * THE REACH IS IN THE LABEL THE APPROVER READS. `deviceStart` takes no subject, so `export` or `import` said in the
- * label is how the person at the browser knows it is not a sign-in they are approving.
+ * label is how the person at the browser knows it is not a sign-in they are approving. `token` says it too.
  */
-export async function approveOperation(raw: string, reach: 'export' | 'import', io: FlowIo & { label?: string | undefined }): Promise<{ bearer: string } | number> {
+export async function approveOperation(raw: string, reach: OperationReach, io: FlowIo & { label?: string | undefined }): Promise<{ bearer: string } | number> {
   const host = hostOf(raw, io.say);
   if (typeof host === 'number') return host;
   /* THE REACH IS APPENDED EVEN TO A LABEL THE CALLER CHOSE, and the machine's name is cut rather than the reach. */
@@ -359,7 +362,7 @@ export async function approveOperation(raw: string, reach: 'export' | 'import', 
   const got = await approve(host, { reach }, label, {
     again: `Run braindog ${reach} again to ask for a new code.`,
     nothing: 'nothing was approved',
-    stopped: `The approval was stopped before it finished, and nothing was ${reach === 'export' ? 'exported' : 'sent'}.`,
+    stopped: `The approval was stopped before it finished, and nothing was ${reach === 'export' ? 'exported' : reach === 'import' ? 'sent' : 'made'}.`,
   }, io);
   return typeof got === 'number' ? got : { bearer: got.bearer };
 }
