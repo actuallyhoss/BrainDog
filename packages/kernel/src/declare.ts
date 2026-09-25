@@ -1027,6 +1027,11 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
       return bad('DECLARATION_INVALID', `${id}.${at} is a capture and reads ${String(block.source)} as well. A capture writes into register: and reads nothing, so take the source off.`, at);
     if (kind === 'inputs' && block.source !== undefined)
       return bad('DECLARATION_INVALID', `${id}.${at} is inputs and reads ${String(block.source)} as well. Inputs edit one row of register:, so write register: ${String(block.source).replace(/^register\./u, '')} and take the source off.`, at);
+    /* AND THE ROW IS NAMED BY `row:`, WHICH `06 §1.1` SAYS AND THE READ DOES. `where:` installed here and nothing read it:
+       `loop/research-audit-2026-09-25-layouts.md` finding 6 installed `where: name is Two`, the block drew row One, and
+       typing into it wrote row One. Refused here, in the sentence the read refuses a hand-made block in. */
+    if (kind === 'inputs' && block.where !== undefined)
+      return bad('DECLARATION_INVALID', `${id}.${at} is inputs, which edit the one row that row: names and read no where:. Name the row with row:, such as row: ${typeof block.register === 'string' ? block.register : 'checks'}#2.`, at);
     if ((kind === 'capture' || kind === 'inputs') && block.register !== undefined) {
       if (typeof block.register !== 'string' || !REGISTER_ID.test(block.register))
         return bad('DECLARATION_INVALID', `${id}.${at}'s register is ${JSON.stringify(block.register)}; it is a register's id, such as tasks.`, at);

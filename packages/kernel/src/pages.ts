@@ -391,6 +391,17 @@ export type PageDeps = {
   points?: (series: string, from: string, to: string) => { at: string; value: number; unit?: string | null }[];
 };
 
+/**
+ * What `registersOf` asks to name the lists a block reads beside its source: the reads of `PageDeps` it needs, and the
+ * list a run's project is a row of. Declarations, never rows, so asking costs no read of any list.
+ */
+export type ListsBeside = {
+  stepsOf?: (register: string) => readonly { register: string }[];
+  scopeOf?: (register: string) => { field: string; to: string } | null;
+  /** The one list that declares `scopes:`, whose rows the ladder places runs in, or `null` when there is none. */
+  projects?: () => string | null;
+};
+
 /** The sources a block may name that are not a register. Named, so a new one is a refusal. */
 const COMPUTED = new Set(['forecast.runway', 'activity', 'sessions.live', 'actions', 'governance.open']);
 
@@ -1882,6 +1893,12 @@ function inputsBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: 
   const register = block.register;
   if (typeof register !== 'string' || register === '')
     return { ...base, refusals: also({ code: 'REQUIRED_MISSING', fix: 'Inputs name the list whose row they edit, as register: checks.', at: 'register' }) };
+  /* `where:` IS REFUSED, NOT READ, because nothing here read it and the row it seemed to pick was the list's first:
+     `loop/research-audit-2026-09-25-layouts.md` finding 6 installed `where: name is Two` and typing into the block wrote
+     row One. `06 §1.1` names the row with `row:` alone, so a page installed before `declare.ts` refused the key draws no
+     row to type into rather than the wrong one. */
+  if (block.where !== undefined)
+    return { ...base, refusals: also({ code: 'DECLARATION_INVALID', fix: `Inputs edit the one row that row: names, such as ${register}#2, and read no where:. Name the row with row:.`, at: 'where' }) };
   const schema = deps.schemaOf(register);
   if (!schema) return { ...base, refusals: also({ code: 'REGISTER_UNKNOWN', fix: `There is no register called ${register}, so the inputs have no row to edit.`, at: 'register' }) };
   const fields = (block.columns ?? []).map((c) => c.field);
@@ -2333,8 +2350,15 @@ export function fill(doc: unknown, row: Entry | null, param?: string): unknown {
  * An empty answer is prose. A caller that asks `reaches` or `readable` of every name refuses `*` to anybody whose
  * ceiling is not the whole record, and a caller that treats the answer as a list of lists to NAME must leave `*`
  * out.
+ *
+ * AND THE LISTS A BLOCK READS BESIDE ITS SOURCE, WHICH ARE NAMED BY DECLARATIONS AND NOT BY THE BLOCK, through
+ * `beside`. `loop/research-audit-2026-09-25-layouts.md` finding 1 measured a member invited to Areas alone drawn a
+ * hidden list's `salary` by a card's `as: next`, because `nextsOf` reads every row of the steps under the cards and
+ * this named only Areas; `as: ring` read the same rows, and `as: scope`, `inherit` and the live runs read the titles
+ * of the projects list the same way. A caller that holds blocks passes `beside`, as it passes `metric`; without it
+ * these are not named, which is what this answered before.
  */
-export function registersOf(decl: PageDecl, metric?: (id: string) => MetricDecl | null): string[] {
+export function registersOf(decl: PageDecl, metric?: (id: string) => MetricDecl | null, beside?: ListsBeside): string[] {
   const named = new Set<string>();
   const add = (source: unknown) => {
     if (typeof source === 'string' && source.startsWith('register.')) named.add(source.slice('register.'.length));
@@ -2357,6 +2381,19 @@ export function registersOf(decl: PageDecl, metric?: (id: string) => MetricDecl 
        agent on it. `sessionsLive` refuses somebody without `read` on `session`, and the block on the same page
        handed that person each run's repo, what it was doing and its token id. */
     if (block.source === 'sessions.live' || block.working === true) named.add(SESSION);
+    /* A LIVE RUN IS NAMED BY ITS PROJECT'S TITLE (`projectsOf`), a row of the list that declares `scopes:`. */
+    const projects = block.source === 'sessions.live' ? beside?.projects?.() : null;
+    if (projects) named.add(projects);
+    /* A CARD'S NEXT STEP AND ITS RING READ EVERY LIST OF STEPS UNDER THE CARDS, all of them, because `ringsOf` tallies
+       each and `stepsHolding` refuses a field none of them has with every one's name and fields in `allowed`. */
+    const source = typeof block.source === 'string' && block.source.startsWith('register.') ? block.source.slice('register.'.length) : null;
+    if (source !== null && block.kind === 'cards' && (block.columns ?? []).some((c) => c?.as === 'next' || c?.as === 'ring'))
+      for (const list of beside?.stepsOf?.(source) ?? []) named.add(list.register);
+    /* A ROW'S SCOPE IS DRAWN AS ITS PROJECT'S TITLE (`scopesOf`), and an inherited read walks the project's rows. */
+    if (source !== null && (block.inherit === true || (block.columns ?? []).some((c) => c?.as === 'scope'))) {
+      const scope = beside?.scopeOf?.(source);
+      if (scope) named.add(scope.to);
+    }
     /* WHAT READS ACROSS THE RECORD IS NAMED `*`. The open questions, the scheduled actions and the log belong to
        no list, and naming none made each one prose: `pages` listed the page to anybody and `page` drew the queue
        and a bank key's host and label to a member whom `governance` and `actions` both refuse. `*` is the one
@@ -2374,6 +2411,9 @@ export function registersOf(decl: PageDecl, metric?: (id: string) => MetricDecl 
     /* A WALK THAT STARTS FROM A FIGURE READS THAT FIGURE'S LIST, and so does the figure its late knob marks. */
     if (block.opening && typeof block.opening === 'object') add(metric?.(block.opening.metric)?.source);
     if (typeof block.late === 'string') add(metric?.(block.late)?.source);
+    /* AND THE FIGURE A PROGRESS BLOCK SETS ITS ROWS AGAINST, which `spentOf` reads whole into `readings`. Unnamed, a
+       budget over Budgets with `spent:` a figure of Payroll drew a member invited to Budgets the Payroll total to the unit. */
+    for (const figure of [block.spent, block.toward]) if (typeof figure === 'string') add(metric?.(figure)?.source);
     /* AND THE FIGURE ITS SELL KNOB OFFERS, which is a total of a list: a member who may not open Holdings is not handed
        what is in it as the amount a date control would add. */
     if (block.sell && typeof block.sell === 'object' && typeof block.sell.metric === 'string') add(metric?.(block.sell.metric)?.source);
@@ -2511,6 +2551,6 @@ function valuesOf(deps: PageDeps, block: PageBlock): Record<string, Json> | unde
  * `block.source` alone: a `stat` block has none, so its readings were never blanked for a caller
  * who cannot read the register behind them.
  */
-export function registersOfBlock(block: PageBlock, metric?: (id: string) => MetricDecl | null): string[] {
-  return registersOf({ page: '', title: '', blocks: [block] }, metric);
+export function registersOfBlock(block: PageBlock, metric?: (id: string) => MetricDecl | null, beside?: ListsBeside): string[] {
+  return registersOf({ page: '', title: '', blocks: [block] }, metric, beside);
 }

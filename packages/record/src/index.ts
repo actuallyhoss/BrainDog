@@ -1871,12 +1871,47 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * `sessionsLive` refuses somebody without `read` on `session`. A leg is JSON somebody wrote, so one with no list names
    * nothing here and the walk refuses it when it runs.
    */
-  const alsoReads = (b: { source?: unknown; from?: unknown; working?: unknown }): string[] => [
+  const alsoReads = (b: { kind?: unknown; source?: unknown; from?: unknown; working?: unknown; inherit?: unknown; columns?: unknown }): string[] => [
     ...(Array.isArray(b.from)
       ? (b.from as unknown[]).flatMap((leg) => (leg !== null && typeof leg === 'object' && typeof (leg as { register?: unknown }).register === 'string' ? [(leg as { register: string }).register] : []))
       : []),
     ...(b.source === 'sessions.live' || b.working === true ? [SESSION] : []),
+    ...besideReads(b),
   ];
+
+  /**
+   * THE LISTS A BLOCK READS BESIDE ITS SOURCE, named by declarations rather than by the block: the steps under a card
+   * grid with `as: next` or `as: ring`, the projects a row's scope or an inherited read is drawn from, and the projects a
+   * live run is named from. `pages.ts` `registersOf` names them when it is handed `ListsBeside`, and
+   * `kernel.blockRegisters` does not hand it one, so the record reads the same declarations here.
+   *
+   * MEASURED BEFORE (`loop/research-audit-2026-09-25-layouts.md` finding 1 and `test/audit-layouts-privacy.test.ts`):
+   * Wren, invited to Areas alone, was drawn `GBP 44,500` from a hidden list's `salary` by `{ field: salary, as: next }`,
+   * the done share of the same steps by `as: ring`, and `Secret Kiln`, a row of a projects list she may not open, by
+   * `as: scope` and by a live run's card. A miss was worse: `as: next` over a field nobody declared answered
+   * `FIELD_UNKNOWN` with every field of the hidden list in `allowed`. Held here, both are the same `FORBIDDEN` shell.
+   *
+   * EVERY LIST OF STEPS AND EVERY LIST OF PROJECTS, not the one the block happens to use: a ring tallies every list of
+   * steps under the cards, and a run placed before a second `scopes:` list was installed still names the first.
+   */
+  const besideReads = (b: { kind?: unknown; source?: unknown; inherit?: unknown; columns?: unknown }): string[] => {
+    const declared = [...kernel.registers().values()];
+    if (b.source === 'sessions.live') return declared.filter((r) => r.scopes !== undefined).map((r) => r.id);
+    const source = typeof b.source === 'string' && b.source.startsWith('register.') ? b.source.slice('register.'.length) : null;
+    if (source === null) return [];
+    const roles = (Array.isArray(b.columns) ? (b.columns as unknown[]) : []).map((c) => (c !== null && typeof c === 'object' ? (c as { as?: unknown }).as : undefined));
+    /* The list a field points at: the named one, or with no name the scope field, as `scopeFieldOf` finds it. */
+    const targetOf = (fields: RegisterDecl['fields'], id: string | undefined): unknown =>
+      (fields.find((f) => (id === undefined ? f.scope !== undefined && !f.retired : f.id === id)) as { to?: unknown } | undefined)?.to;
+    const out: string[] = [];
+    if (b.kind === 'cards' && (roles.includes('next') || roles.includes('ring')))
+      for (const r of declared) if (r.steps !== undefined && targetOf(r.fields, r.steps.of) === source) out.push(r.id);
+    if (b.inherit === true || roles.includes('scope')) {
+      const to = targetOf(kernel.registers().get(source)?.fields ?? [], undefined);
+      if (typeof to === 'string') out.push(to);
+    }
+    return out;
+  };
 
   /**
    * What a refused block drew, taken back. The empties that were blanked before stay as empties, so a host that reads
@@ -1886,7 +1921,16 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * total of a list: a walk refused for that list still carried it, so a member not invited to the list was handed its
    * total to the minor unit (`test/forecast-sell-held.test.ts`).
    */
-  const DRAWN = ['where', 'fx', 'walk', 'walks', 'walkFx', 'past', 'inherited', 'scopes', 'rings', 'history', 'bars', 'changes', 'working_now', 'lateness', 'late_name', 'sells', 'seen'] as const;
+  /* AND EVERY OTHER KEY THE KERNEL ANSWERS (`ANSWER_KEYS` in `packages/kernel/src/block-keys.ts`), which the
+     audit-layouts test holds this list to. Seven were left off it: a held steps block kept `open: 2`, the open
+     steps of a list its reader may not open, with `done_now` and `next` beside it, a held inputs block kept
+     `types`, the schema `schema` refuses her (`loop/research-audit-2026-09-25-layouts.md` finding 7), and a block
+     written with every answer key and held kept `nexts`, `fills` and `drawn` as written. `fills` is what a capture's
+     `where` presets, which is the `where` above in other words. */
+  const DRAWN = [
+    'where', 'fx', 'walk', 'walks', 'walkFx', 'past', 'inherited', 'scopes', 'rings', 'history', 'bars', 'changes', 'working_now', 'lateness', 'late_name',
+    'sells', 'seen', 'open', 'done_now', 'next', 'nexts', 'types', 'fills', 'drawn',
+  ] as const;
 
   /**
    * AND WHAT A REFUSED BLOCK WAS WRITTEN TO READ, which is the names of lists and figures she cannot open.
@@ -1937,6 +1981,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       delete kept.source;
       delete kept.columns;
     }
+    /* AN INPUTS BLOCK NAMES ITS LIST BY `register:`, and a capture does too, so the source check above never saw it: a
+       held inputs block over Steps kept `register: steps`, `row: steps#2` and `columns` with Steps' field ids. */
+    if (!log && typeof (b as { register?: unknown }).register === 'string') {
+      delete kept.register;
+      delete kept.row;
+      delete kept.columns;
+    }
     return {
       ...(kept as typeof b),
       rows: [],
@@ -1979,8 +2030,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        whole log and names rows of every list, so somebody invited to named lists is refused the block, as
        `whatsNew` holds a line about the record as a whole back from them. */
     /* AND THE OPEN QUESTIONS AND THE SCHEDULED ACTIONS ARE THE SAME KIND OF READ (`ACROSS`). */
+    /* THE OPEN QUESTIONS ASK MORE THAN THE CEILING, because `governance` holds a rowset about a list back from a reader
+       who may not read that list, and a member at `read` with Diary held to `append` has no ceiling: `wholeRecord` called
+       her whole, and the queue drew her the Diary rowset's question that `governance` held back
+       (`loop/research-audit-2026-09-25-layouts.md` finding 15). So a queue is for whoever reads every list. */
+    const whole = b.source === 'governance.open' ? readsEveryList(ctx) : wholeRecord(ctx);
     const log: Refusal | null =
-      typeof b.source === 'string' && ACROSS.has(b.source) && (!wholeRecord(ctx) || allows(ctx, 'read') !== null)
+      typeof b.source === 'string' && ACROSS.has(b.source) && (!whole || allows(ctx, 'read') !== null)
         ? {
             code: 'FORBIDDEN',
             fix:
@@ -2014,7 +2070,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    *
    * THE PLACES ARE THE ONES `touches` WALKS FOR A PAGE (`packages/kernel/src/reach.ts`): a `metric`, `late`, `then` or
    * `each` key, a `source` of `metric.<id>`, and a bare `{{id}}` in prose, which in a template is the row's field when
-   * the list declares one by that name.
+   * the list declares one by that name. AND A PROGRESS BLOCK'S `spent` AND `toward`, which `touches` does not walk: held
+   * by `heldBy` and not renamed, a Payroll figure there answered `FORBIDDEN` where a figure nobody declared answered
+   * `METRIC_UNKNOWN`, which said the record keeps it (`test/audit-layouts-privacy.test.ts`).
    */
   const unplaced = (ctx: CallContext, block: unknown, forList: unknown): { block: unknown; back: Map<string, string> } => {
     const back = new Map<string, string>();
@@ -2042,7 +2100,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     };
     const visit = (node: unknown, key: string | undefined): unknown => {
       if (typeof node === 'string') {
-        const named = key === 'metric' || key === 'late' || key === 'then' || key === 'each' ? figure(node) : key === 'source' && node.startsWith('metric.') ? `metric.${figure(node.slice('metric.'.length))}` : node;
+        const named = key === 'metric' || key === 'late' || key === 'then' || key === 'each' || key === 'spent' || key === 'toward' ? figure(node) : key === 'source' && node.startsWith('metric.') ? `metric.${figure(node.slice('metric.'.length))}` : node;
         return named.replace(/\{\{(\s*(?:[a-z]+:\s*)?)([a-z][a-z0-9_-]*)(\s*)\}\}/gu, (all, lead: string, id: string, tail: string) =>
           fields.has(id) || id === 'spoken' || !hidden(id) ? all : `{{${lead}${renamed(id)}${tail}}}`,
         );
@@ -2087,6 +2145,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const b = block as { source?: unknown; register?: unknown; where?: unknown; from?: unknown };
     const own = typeof b.source === 'string' && b.source.startsWith('register.') ? b.source.slice('register.'.length) : typeof b.register === 'string' ? b.register : null;
     const asks: { register: string; where: unknown; inner: boolean }[] = own !== null && b.where !== undefined ? [{ register: own, where: b.where, inner: false }] : [];
+    /* A RING'S `of:` IS A SENTENCE OVER THE SAME LIST, resolved the same way, and it was not asked: a ring over Budgets
+       with `of: project is Secret Kiln` drew its count while `project is Nothing Here` answered `REF_UNKNOWN`, the
+       title oracle into a projects list above, one key along (`test/audit-layouts-privacy.test.ts`). */
+    const of = (block as { of?: unknown }).of;
+    if (own !== null && of !== undefined) asks.push({ register: own, where: of, inner: false });
     for (const leg of Array.isArray(b.from) ? (b.from as unknown[]) : [])
       if (leg !== null && typeof leg === 'object' && typeof (leg as { register?: unknown }).register === 'string' && (leg as { where?: unknown }).where !== undefined)
         asks.push({ register: (leg as { register: string }).register, where: (leg as { where: unknown }).where, inner: true });

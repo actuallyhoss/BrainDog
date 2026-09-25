@@ -81,12 +81,20 @@ export const KEY_KINDS: Readonly<Record<string, readonly string[]>> = {
  * otherwise report `rows` and `matched` as keys this record does not read. `rings`, `queue`, `walks` and `walkFx` were
  * answered and missing from this list, so a card grid read back with its rings was refused for a key the read had
  * written.
+ *
+ * `open` WAS ANSWERED AND MISSING TOO: a steps block's short view counts its open rows, and read back it was refused
+ * "open: is not a key this record reads" (`loop/research-audit-2026-09-25-layouts.md` finding 7).
+ *
+ * EXPORTED BECAUSE THE RECORD BLANKS A HELD BLOCK BY IT. Every key here is something the read computed from rows, so
+ * a block held from a reader keeps none of them beyond the empties, and the record's test holds its shell to this list:
+ * the same audit found `open`, `done_now`, `next`, `nexts` and `types` answered here and left on a held block, where
+ * `open: 2` counted the open steps of a list the reader may not open.
  */
-const ANSWERED = [
+export const ANSWER_KEYS: readonly string[] = [
   'drawn', 'rows', 'matched', 'readings', 'walk', 'walks', 'walkFx', 'refusals', 'inherited', 'scopes', 'feed', 'seen',
   'history', 'values', 'bars', 'measures', 'past', 'changes', 'working_now', 'lateness', 'late_name', 'sells', 'fx',
-  'fills', 'rings', 'queue', 'nexts', 'done_now', 'next', 'types',
-] as const;
+  'fills', 'rings', 'queue', 'nexts', 'done_now', 'next', 'open', 'types',
+];
 
 /**
  * Every key a block may be DECLARED with. An answer's keys are not among them: `{ kind: cards, next: what }` installed
@@ -95,7 +103,7 @@ const ANSWERED = [
 export const BLOCK_INSTALLS: ReadonlySet<string> = new Set([...GENERAL, ...Object.keys(KEY_KINDS)]);
 
 /** Every key a block may carry and the read will not refuse by name: what it is declared with, and what a read answered. */
-export const BLOCK_READS: ReadonlySet<string> = new Set([...BLOCK_INSTALLS, ...ANSWERED]);
+export const BLOCK_READS: ReadonlySet<string> = new Set([...BLOCK_INSTALLS, ...ANSWER_KEYS]);
 
 /** The keys a block of this kind may be declared with, for a refusal's `allowed`. */
 export const keysFor = (kind: string): string[] => [...GENERAL, ...Object.keys(KEY_KINDS).filter((k) => KEY_KINDS[k]!.includes(kind))];
@@ -122,7 +130,7 @@ const BLOCK_INSTEAD: Readonly<Record<string, string>> = {
 export const unreadBlockKey = (key: string): string =>
   `${key}: is not a key a block has. ${
     own(BLOCK_INSTEAD, key) ??
-    ((ANSWERED as readonly string[]).includes(key)
+    (ANSWER_KEYS.includes(key)
       ? 'It is what a read answers, and a block is not declared with it. Take it off.'
       : 'Take it off; the keys this kind reads are listed with this refusal.')
   }`;
