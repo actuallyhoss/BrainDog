@@ -44,11 +44,9 @@
     COMPARE,
     CONDITION_HINT,
     DAYS,
-    EVERY,
     TRIGGER_KINDS,
     VERB_LABELS,
     blankTrigger,
-    clockOf,
     find,
     getAt,
     leafOf,
@@ -69,7 +67,8 @@
     type CompareOp,
     type Trigger,
   } from './flow.ts';
-  import { often, openActions, whatOf, type ActionRow } from '$lib/record/actions.ts';
+  import { openActions, whatOf, type ActionRow } from '$lib/record/actions.ts';
+  import { CLOCKS, MONTHS, MONTH_DAYS, MONTH_WORDS, andWords, clockTo, clockWords, dayWords, fallsIn, monthsOf, type ClockWas } from './calendar.ts';
   import { CHANNEL_WORDS, DAY_WORDS, doorsPickable, groupChips, idWords, pickerOf, withCurrent } from './chips.ts';
   import type { FlowDraft } from './flow.svelte.ts';
 
@@ -244,6 +243,16 @@
     flow.setTrigger({ arrival: next } as Trigger);
   }
 
+  /* A CLOCK IS WRITTEN WHOLE FROM THE CLOCK IT WAS, through `calendar.ts`. This went through `clockOf`, which keeps a
+     day for a week alone, so a monthly rule opened here lost its day and its month the moment any clock was picked,
+     and had no field for either to put them back. `month` is read loosely because `Trigger` does not spell it yet. */
+  const clock = $derived<ClockWas>('every' in t ? t : {});
+  const months = $derived(clock.every === undefined ? null : monthsOf(clock.every));
+
+  function setClock(patch: ClockWas) {
+    if ('every' in t) flow.setTrigger(clockTo(patch.every ?? t.every, { ...clock, ...patch }));
+  }
+
   const OPS = [
     ['create', 'Added'],
     ['update', 'Changed'],
@@ -311,18 +320,39 @@
         </select>
       {:else if 'every' in t}
         <label class="label" for="flow-every">How often</label>
-        <select id="flow-every" class="select" value={t.every} onchange={(e) => flow.setTrigger(clockOf(e.currentTarget.value, t.at, t.day))}>
-          {#each EVERY as e (e)}<option value={e}>{often(e)}</option>{/each}
-          {#if !(EVERY as readonly string[]).includes(t.every)}<option value={t.every}>{often(t.every)}</option>{/if}
+        <select id="flow-every" class="select" value={t.every} onchange={(e) => setClock({ every: e.currentTarget.value })}>
+          {#each CLOCKS as e (e)}<option value={e}>{clockWords(e)}</option>{/each}
+          {#if !CLOCKS.includes(t.every)}<option value={t.every}>{clockWords(t.every)}</option>{/if}
         </select>
-        {#if t.every === '1d' || t.every === '1w'}
+        {#if months !== null}
+          <!-- THE MONTH, THEN THE DAY, THEN THE TIME, so the fields read down as the rule is said: every 3 months from
+               January, on the 1st, at 09:00. Each is required by the lint and none is left blank (`calendar.ts`). -->
+          {#if months > 1}
+            {@const month = typeof clock.month === 'string' ? clock.month : 'jan'}
+            <label class="label" for="flow-month">{months === 12 ? 'In' : 'Starting in'}</label>
+            <select id="flow-month" class="select" value={month} onchange={(e) => setClock({ month: e.currentTarget.value })}>
+              {#each MONTHS as m (m)}<option value={m}>{MONTH_WORDS[m]}</option>{/each}
+            </select>
+            {#if months < 12}<p class="help">Runs in {andWords(fallsIn(t.every, month))}.</p>{/if}
+          {/if}
+          <label class="label" for="flow-date">On the</label>
+          <select id="flow-date" class="select" value={String(clock.day ?? 1)} onchange={(e) => setClock({ day: e.currentTarget.value === 'last' ? 'last' : Number(e.currentTarget.value) })}>
+            {#each MONTH_DAYS as d (d)}<option value={String(d)}>{dayWords(d)}</option>{/each}
+          </select>
+          {#if typeof clock.day === 'number' && clock.day > 28}<p class="help">A month with fewer days runs on its last day.</p>{/if}
           <label class="label" for="flow-at">At</label>
           <div class="field">
-            <input id="flow-at" class="field-input" type="time" value={t.at ?? ''} oninput={(e) => flow.setTrigger(clockOf(t.every, e.currentTarget.value, t.day))} />
+            <!-- A CLEARED TIME IS NOT WRITTEN: the record refuses a monthly clock with no `at:`, and the time it had is kept. -->
+            <input id="flow-at" class="field-input" type="time" required value={t.at ?? ''} oninput={(e) => e.currentTarget.value !== '' && setClock({ at: e.currentTarget.value })} />
+          </div>
+        {:else if t.every === '1d' || t.every === '1w'}
+          <label class="label" for="flow-at">At</label>
+          <div class="field">
+            <input id="flow-at" class="field-input" type="time" value={t.at ?? ''} oninput={(e) => setClock({ at: e.currentTarget.value })} />
           </div>
           {#if t.every === '1w' && t.at}
             <label class="label" for="flow-day">On</label>
-            <select id="flow-day" class="select" value={t.day ?? 'mon'} onchange={(e) => flow.setTrigger(clockOf(t.every, t.at, e.currentTarget.value))}>
+            <select id="flow-day" class="select" value={t.day ?? 'mon'} onchange={(e) => setClock({ day: e.currentTarget.value })}>
               {#each DAYS as d (d)}<option value={d}>{DAY_WORDS[d] ?? d}</option>{/each}
             </select>
           {/if}

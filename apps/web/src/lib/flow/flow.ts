@@ -17,6 +17,7 @@
 
 import { dropIndex, moveAt } from '../record/arrange.ts';
 import { everyMs, often } from '../record/actions.ts';
+import { DAYS, EVERY, calendarFault, calendarWords, clockWords, inMonths } from './calendar.ts';
 
 /* ── the definition, as §3 sketches it and `rules.ts` declares it ──────────── */
 
@@ -28,9 +29,14 @@ import { everyMs, often } from '../record/actions.ts';
 export type Trigger =
   | { written: { register: string; op?: ('create' | 'update' | 'delete')[]; fields?: string[]; from_rules?: boolean } }
   | { arrival: { ingest?: string; channel?: 'webhook' | 'email' | 'paste' | 'api' | 'pull'; state?: string[]; unverified?: boolean } }
-  | { every: string; at?: string; day?: string }
+  /* `day` IS A WEEKDAY ON A WEEK AND 1 TO 31 OR `last` ON A CLOCK OF MONTHS, and `month` counts a clock of months from
+     one (`calendar.ts`). */
+  | { every: string; at?: string; day?: string | number; month?: string }
   | { metric: { id: string; crosses: 'target' | { lte: number } | { gte: number } } }
   | { manual: true };
+
+/** A clock trigger alone, which is what a pick of a clock builds. */
+export type Clock = Extract<Trigger, { every: string }>;
 
 /** A step as the body holds it: exactly one verb key, and for `if` its two arms. Read loosely, because agents write these. */
 export type Step = Record<string, unknown>;
@@ -561,7 +567,7 @@ export function withChip(value: string, start: number, end: number, chip: string
 export const TRIGGER_KINDS = ['written', 'arrival', 'every', 'manual'] as const;
 export type TriggerKind = (typeof TRIGGER_KINDS)[number];
 
-export const triggerKind = (t: Trigger): string => Object.keys(t).find((k) => k !== 'at' && k !== 'day') ?? 'manual';
+export const triggerKind = (t: Trigger): string => Object.keys(t).find((k) => k !== 'at' && k !== 'day' && k !== 'month') ?? 'manual';
 
 /** A trigger of another kind, keeping the list it watched when it goes from a change to an arrival and back is moot. */
 export function blankTrigger(kind: TriggerKind, was?: Trigger): Trigger {
@@ -571,16 +577,15 @@ export function blankTrigger(kind: TriggerKind, was?: Trigger): Trigger {
   return { manual: true };
 }
 
-/** The clocks offered. The record's floor is fifteen minutes; a time of day belongs to a day or a week only. */
-export const EVERY = ['15m', '1h', '6h', '1d', '1w'] as const;
-export const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
+/** The clocks under a month, and the weekdays. Defined in `calendar.ts`, which says why. */
+export { DAYS, EVERY };
 export const CHANNELS = ['webhook', 'email', 'paste', 'api', 'pull'] as const;
 
 /**
  * A clock with its time and day kept only where the record reads them: `at` on a day or a week, `day` on a week, and
  * a week given a time is given Monday, because the lint refuses a weekly time with no day.
  */
-export function clockOf(every: string, at?: string, day?: string): Trigger {
+export function clockOf(every: string, at?: string, day?: string): Clock {
   const daily = every === '1d';
   const weekly = every === '1w';
   const time = (daily || weekly) && at ? { at } : {};
@@ -994,7 +999,9 @@ export function sayTrigger(t: Trigger): string {
     if (a.channel) return `When something arrives by ${a.channel}`;
     return 'When anything arrives';
   }
-  if ('every' in t) return `${cap(often(t.every))}${t.day ? ` on ${t.day}` : ''}${t.at ? ` at ${t.at}` : ''}`;
+  /* A CLOCK OF MONTHS IS SAID AS THE RECORD SAYS IT, "On the last day of each month at 09:00", and not as "1mo on last
+     at 09:00". One the record would refuse is said as it was written, in the words of its count. */
+  if ('every' in t) return calendarWords(t) ?? `${cap(inMonths(t.every) === null ? often(t.every) : clockWords(t.every))}${t.day ? ` on ${t.day}` : ''}${t.at ? ` at ${t.at}` : ''}`;
   if ('metric' in t) {
     const c = t.metric.crosses;
     return c === 'target'
@@ -1171,12 +1178,16 @@ const blank = (v: unknown): boolean =>
 export function faultsOf(d: Draft, { slash }: { slash: boolean } = { slash: false }): Fault[] {
   const out: Fault[] = [];
   const t = d.trigger;
-  const kind = Object.keys(t)[0] ?? 'manual';
-  const rowless = ROWLESS.includes(kind);
+  const rowless = ROWLESS.includes(triggerKind(t));
   if ('written' in t && t.written.register.trim() === '') out.push({ key: null, say: 'Say which list it watches.' });
-  if ('every' in t) {
+  /* A CLOCK OF MONTHS IS `calendar.ts`'s, which asks what the lint asks of one. `everyMs` knows m, h, d and w, and read
+     every monthly clock as no clock at all, so picking one turned Send off. */
+  if ('every' in t && inMonths(t.every) !== null) {
+    const said = calendarFault(t);
+    if (said !== null) out.push({ key: null, say: said });
+  } else if ('every' in t) {
     const ms = everyMs(t.every);
-    if (ms === null) out.push({ key: null, say: `${t.every} is not a clock. Write 15m, 1h, 1d or 1w.` });
+    if (ms === null) out.push({ key: null, say: `${t.every} is not a clock. Write 15m, 1h, 1d, 1w or 1mo.` });
     else if (ms < FLOOR_MS) out.push({ key: null, say: 'The shortest clock is every 15 minutes.' });
   }
   if ('metric' in t) out.push({ key: null, say: 'Nothing in this build watches a metric yet, so it would never start.' });

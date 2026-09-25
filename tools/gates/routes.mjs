@@ -53,13 +53,21 @@ const SAMPLES = {
   ],
   '[track]': '2',
   '[view]': 'obligations.overdue',
-  '[token]': '9f2a7c41d8b3',
+  /* ANY TOKEN, AND ON PURPOSE. `9f2a7c41d8b3` was the one token that opened the sample's Money page; the sample is
+     gone (DIRECTION 26) and every token now draws the same card, "This link does not open a page". That card is still
+     measured and not dropped: it is the whole of what `/s/[token]` draws, it is the one screen a stranger arrives at,
+     and a route with no sample is a failure of both browser gates. The token names what it is rather than a page. */
+  '[token]': 'no-page-yet',
 };
 
 /** A job id or a pack id is not a suggestion id, and `[id]` is all three. Keyed by the route it sits
  *  under. `people` is a pack the seeded record holds: the seed writes no `pack` row, so a pack is
- *  known by the `pack:` its declarations carry, and `braindog-starter` is only the document's name. */
-const BY_ROUTE = { '/jobs/[id]': 'j_7Q2F', '/packs/[id]': 'people' };
+ *  known by the `pack:` its declarations carry, and `braindog-starter` is only the document's name.
+ *
+ *  `/jobs/[id]` DRAWS "no such run" FOR EVERY ID, since no record answers with a run's steps yet and the sample's
+ *  `j_7Q2F` went with the sample (DIRECTION 26). The refusal is what the route draws, so it is what is measured, under
+ *  an id that says so rather than one that looks like a run somebody could open. */
+const BY_ROUTE = { '/jobs/[id]': 'j_none', '/packs/[id]': 'people' };
 
 async function walk(dir, out = []) {
   for (const e of await readdir(dir, { withFileTypes: true })) {
