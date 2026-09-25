@@ -52,7 +52,7 @@ test('with no client the answer is to sign in, and nothing is sent', async () =>
   const answer = await approve('123456', null);
   assert.deepEqual(answer, { kind: 'signin' });
   assert.equal(answerLine(answer)?.line, copy.signInAgainWhy);
-  assert.notEqual(answerLine(answer)?.line, copy.notOnDemo);
+  assert.doesNotMatch(answerLine(answer)?.line ?? '', /demo/iu);
   /* A MALFORMED ENTRY IS STILL SAID FIRST, because it is the mistake the person can fix on this screen. */
   assert.equal((await approve('12', null)).kind, 'malformed');
 });

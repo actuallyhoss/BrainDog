@@ -272,7 +272,7 @@ try {
             reducedMotion: 'reduce',
           });
           await context.addCookies([
-            { name: 'bd_pref', value: encodeURIComponent(JSON.stringify({ scheme, sampleSaid: true, defined: ['row', 'page', 'block'] })), url: host.base },
+            { name: 'bd_pref', value: encodeURIComponent(JSON.stringify({ scheme, defined: ['row', 'page', 'block'] })), url: host.base },
           ]);
           const page = await context.newPage();
           for (const view of views(c)) {

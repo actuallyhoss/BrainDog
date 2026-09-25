@@ -55,12 +55,6 @@
     predicate: string;
     /** The same filter in the words a person reads, which the block's heading carries after the list's name. */
     says: string;
-    /**
-     * CALLED BY NOTHING. It was the sample's answer to the press, and the sheet has no sample side now. It stays optional
-     * in the type because `/r/[register]` still passes one and that screen belongs to the register list's own change
-     * (wave B1 of `loop/research-no-sample.md`); drop it there, then here.
-     */
-    onbind?: (page: string, kind: string) => void;
   } = $props();
 
   /** What the record offers, or its refusal. Nothing until `boot` has answered. */

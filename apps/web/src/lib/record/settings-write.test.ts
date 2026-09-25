@@ -23,6 +23,7 @@ import {
   exportFile,
   inviteEmail,
   inviteLink,
+  mintAgent,
   moveLevel,
   readInvites,
   readPeople,
@@ -246,4 +247,27 @@ test('an invitation is minted for one address, handed back once as a link, liste
   assert.equal(unreached.from, 'refused');
   const said = host(() => json(403, { ok: false, refusal: { code: 'FORBIDDEN', fix: 'Only an owner sees invitations.' } })).io;
   assert.deepEqual(await readInvites(BASE, said), { from: 'refused', fix: 'Only an owner sees invitations.' });
+});
+
+test('CONNECT AN AGENT SENDS THE INBOX ONLY WHEN IT WAS CHOSEN, and an ordinary agent is sent what it always was', async () => {
+  /* MEASURED BEFORE THIS: the screen minted `{ scope: 'write', label, days }` whatever the owner wanted, so no token made
+     in Settings could carry the reach the record's inbox gate reads (DIRECTION section 30, P2). */
+  const minted = { id: 't_1', bearer: 'rec_1.thesecret', scope: 'write', reach: ['inbox'], expires_at: '2026-12-24T09:00:00.000Z' };
+  const { io, sent } = host(() => json(200, { ok: true, value: minted }));
+  assert.deepEqual(await mintAgent(BASE, { label: 'triage', inbox: true, days: 90 }, io), { ok: true, value: minted });
+  assert.ok((await mintAgent(BASE, { label: 'laptop', inbox: false, days: 90 }, io)).ok);
+  assert.deepEqual(sent.map((s) => [s.path, s.method, s.body]), [
+    ['/api/createToken', 'POST', { scope: 'write', label: 'triage', days: 90, reach: ['inbox'] }],
+    ['/api/createToken', 'POST', { scope: 'write', label: 'laptop', days: 90 }],
+  ]);
+
+  /* THE RECORD'S REFUSAL IS WHAT THE OWNER READS, as it is for every other write here. */
+  const refused = host(() => json(403, { ok: false, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Open this from the app.' } })).io;
+  assert.deepEqual(await mintAgent(BASE, { label: 'x', inbox: true, days: 90 }, refused), {
+    ok: false,
+    from: 'refused',
+    code: 'NEEDS_BROWSER_SESSION',
+    fix: 'Open this from the app.',
+    raced: false,
+  });
 });

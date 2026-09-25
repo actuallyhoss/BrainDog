@@ -43,5 +43,4 @@ export const fieldWords = {
   reason: 'Added by the owner from a row.',
   added: (label: string) => `${label} is on every row now.`,
   filed: (label: string) => `${label} is waiting on Decide for the owner.`,
-  sample: 'A field would be added to every row',
 } as const;

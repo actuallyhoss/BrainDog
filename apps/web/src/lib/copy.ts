@@ -161,8 +161,6 @@ export const copy = {
      indistinguishable from a broken one, so every action that cannot happen here says what it
      would have done and that it did not happen — once, in the toast, not as a disabled state.
      A disabled control tells you a thing exists and refuses to say why it will not work. */
-  /** What to do with something the record noticed: put it where things get decided. */
-  raiseIt: 'Open a question',
   /**
    * TWO SCREENS DRAW WORKED EXAMPLES AND NEITHER OF THEM SAID SO.
    *
@@ -314,40 +312,11 @@ export const copy = {
   wakeOn: 'Wake me on',
   required: 'required',
   nothingToUndo: 'Nothing to undo.',
-  /**
-   * IT CLAIMED SUCCESS IN THE PAST TENSE FOR SOMETHING THAT DOES NOT PERSIST.
-   *
-   * `Archived tasks#9.` with an Undo beside it, and a reload brings the row back. A friction pass
-   * listed it under "things that lie", and it is the sharpest kind of lie this product can tell:
-   * every other write control in the app says `notWritten`, so a reader learns that this product
-   * tells them when nothing happened, and then meets the one that does not.
-   *
-   * THE ROW ITSELF NOW CARRIES THE RECEIPT, so the toast is the backup for a row that has scrolled
-   * away, and it says the same thing the chip says. The past tense goes with the claim.
-   */
-  archived: (id: string) => `${id} would be archived. Nothing was saved yet.`,
-  /**
-   * AND ITS TWO TWINS ARE GONE, because both were reworded in place while the screens that would
-   * have said them had moved on. `restored` read "`x` is back. Nothing had been saved." and `marked`
-   * read "`x` would be `state`. Nothing was saved yet.", and `research-selfaudit.md` §28 recorded
-   * that neither had a call site. Putting a row back is a chip on the row, `writeMarkRestored`
-   * (`r/[register]/+page.svelte:2005`), and a restored BACKUP is `restoredTo`
-   * (`settings/[area]/+page.svelte:1046`) under a `restoreThis` button drawn at `:2551`. Marking one
-   * row is `setRowState`, which says `notWritten` over the state in the register's own words
-   * (`r/[register]/+page.svelte:1153`), because the schema's word is the only right one there.
-   *
-   * `dead-copy` excused both, and its excuse for `restored` named a restore control that does not
-   * exist. It exists, and it is the second file named above. An excuse nobody re-derives is how a
-   * list of eighteen becomes a list of forty.
-   */
   copied: (what: string) => `Copied ${what}.`,
   copyRefused: 'The browser would not give this page the clipboard.',
 
   /* The chip on a row that has just been acted on. One word, in the past tense, so the row says
      what happened to it where the row is rather than in a toast at the other end of the screen. */
-  /* The bar over a sample record. It says what the record is, and where the way out is: a stranger
-     landing on somebody else's company with no explanation is the first screen this product had. */
-  sampleWhat: 'This is a sample record.',
   densityPreview: 'How a list looks',
   sourcesAdd: 'New sources arrive the way new lists do: with an add-on, or set up by your assistant.',
   sourcesAddGo: 'Browse add-ons',
@@ -403,26 +372,11 @@ export const copy = {
   cellNoValue: 'That column is a control rather than a value, so there is nothing in it to change.',
   setTo: (state: string) => `Set to ${state}`,
   markArchived: 'Archived',
-  markNotWritten: 'Not saved',
-  /* AND THE SAME FACT, WHEREVER YOU ARE STANDING. A row typed on the first run and left behind is
-     unwritten, and the only screen that said so was the list it belongs to, which is the one screen
-     the person has already walked away from. The shell says how many there are and where they are.
-
-     IT IS GONE AT ZERO, and that is the honest part: a nought drawn here would be the shell
-     reporting on a thing that has not happened. */
-  unsavedRows: (n: number) => (n === 1 ? 'One row you typed has not been saved.' : `${n} rows you typed have not been saved.`),
-  unsavedRowsWhy:
-    'Each one is at the top of the list it was typed into, marked Not saved, and it lasts until this tab is closed or reloaded.',
-  markNeeds: (fields: string) => `Needs ${fields}`,
   undoRow: 'Put back',
   /* WHAT A ROW IS CALLED WHEN IT HAS NO NAME YET. `undoRowOf` puts the row's title in the control's
      accessible name, and a row typed into the capture line has a title only if the capture WAS the
      title; the grid falls back to `#<seq>`, which for a pending row is the negative sentinel. */
   thisRow: 'this row',
-  /* The confirmation AFTER `Put back`, and not a second copy of the button. A toast that
-     repeats the verb reads like the command rather than like the outcome, which leaves
-     somebody pressing it again to find out whether the first press worked. */
-  undoneRow: (row: string) => `${row} was taken back. It was never saved.`,
   undoRowOf: (row: string) => `Put ${row} back`,
   archiveRow: (row: string) => `Archive ${row}`,
   moreOn: (row: string) => `More on ${row}`,
@@ -866,18 +820,6 @@ export const copy = {
   archiveSelected: 'Archive them',
   clearFilters: 'Clear filters',
   saveAsView: 'Save as a view',
-  /* WHAT `Alt+V` WOULD DO, AND IT SAID `register`. `19 §9` bans that word from a screen by name,
-     and two other files in this repository had swept the markup and concluded it never reaches
-     one. Both sweeps were right about the markup: the sentence is a toast typed into the route, so
-     it does not exist until somebody presses the chord, and no sweep of visible text can see it. */
-  viewWouldBeSaved: 'The filter would be saved as a named view on this list',
-  /* AND THE OTHER ONE, WHICH IS NOT A TOAST AND WAS MISSED FOR A DIFFERENT REASON. The banner over
-     the busiest list names the field the rejected saves were aimed at, and falls back to naming
-     the list when the refusal carries no field. That fallback is static markup, so a sweep could
-     have seen it — but only on a record whose newest refusal has no field on it, and this one's
-     has. A word that only appears in a state the seeded record is not in is a word nobody reads
-     until somebody's own record reaches that state. */
-  thisList: 'this list',
   export: 'Export the record',
   requestAccess: 'Request access',
   tryAgain: 'Load it again',
@@ -926,7 +868,6 @@ export const copy = {
     `This record is at version ${n}. Every change moves it by one, so a version is a way of naming a moment.`,
   goBack: 'Choose something else',
   editRow: 'Edit the row',
-  stopRun: 'Stop the run',
   /**
    * ONE SCREEN, ONE NOUN FOR ITS OWN SUBJECT, AND IT USED TO HAVE TWO.
    *
@@ -937,7 +878,6 @@ export const copy = {
    * those are handles; the two words on the screen are not.
    */
   run: 'Run',
-  runWouldStop: 'The run would stop at its next step',
   verifyFile: 'Check an exported file',
   /* WHAT DELETING DOES, said instead of a one-word heading that states no fact. `Danger` was over
      `Delete this record` over `Delete the studio` — three lines, two of them the same sentence, and
@@ -946,11 +886,6 @@ export const copy = {
     `Deleting ${record} removes every list, page and row in it. It cannot be undone.`,
   deleteRecord: (record: string): string => `Delete ${record}`,
   showExample: 'Show an example row',
-  /* AND WHAT PRESSING IT WOULD DO. The toast printed the schema's own value back inside a
-     backtick — "marked `example`" — on the empty state of a list somebody has just made. The mark
-     is real and it is a value in a `tags` field; its spelling is not what somebody deciding
-     whether they want a sample row is asking about. */
-  exampleWouldBeAdded: 'One example row would be added, marked as an example',
   /* `Preview` AND IT WAS `Peek`. It is printed as a keyboard hint on every list, `p peek`, which is
      a word the product invented for a thing every other product calls a preview. */
   peek: 'Preview the row',
@@ -1061,12 +996,6 @@ export const copy = {
   allInstalledWhy: 'Add-ons this record does not already have appear here, each with what it would add before you install it.',
   install: 'Install',
   uninstall: 'Uninstall',
-  /* AND WHAT UNINSTALLING WOULD DO, WHICH SAID `declares`. That is the schema's verb, and it sat
-     on the one control of the trust screen a person presses when they have decided against a file
-     they let in. What they want to know is what leaves and what stays, and the pack ADDED those
-     things; declaring them is what the file did before any of this concerned them. */
-  uninstallWould: (pack: string) =>
-    `${pack} and everything it added would be removed, with what changes shown first, and the rows it created would stay`,
   /* TURNING ONE OFF. An add-on that is off stays on the screen, dimmed and labelled, because its
      rows are still in the record. A refused switch says who leans on it and offers the cascade as a
      second press, never as a side effect of the first. */
@@ -1108,19 +1037,6 @@ export const copy = {
      the refusal is visible rather than silent, and then it does not happen. */
   diffNavKept: 'shown, not applied. Your sidebar is yours',
   diffUnread: 'This record has not read the add-on yet, so the details arrive when you install it.',
-  /* `02 §1`: a name another pack ships is a name this one cannot own, and the whole install is one
-     transaction — so it does not half-apply.
-
-     AND IT NAMES WHAT COLLIDES. "Installing is refused while a name collides" said the shape of the
-     rule and not the fact: the reader is looking at a disabled button and the one thing they need is
-     WHICH name, because it is the only part of this they can act on — drop the pack, or ask its
-     author to rename. `10 §7`'s fourth rule, on a screen rather than in an envelope. */
-  /* AND IT JOINED THEM WITH ` and `, so three colliding names read "Money and Services and People".
-     `list()` is at the top of this file for exactly this, and `rowRequired` and `rowFieldProblem`
-     both already use it for the same job. Two names is the common case, which is why a sentence
-     that reads wrong at three was not noticed. */
-  diffRefused: (names: string[]) =>
-    `${list(names)} ${names.length === 1 ? 'is already a list' : 'are already lists'} on this record, and an add-on cannot take a name another one owns. Nothing would be applied.`,
   /* THE SENTENCE UNDER THE TITLE. The screen was `Packs`, a word nobody brings with them; it is
      `Add-ons` now, the reader's word for an installable thing with an author. The API, the docs and
      the `mcp` surface keep `pack`. The sentence stays for what an add-on here is: text, not code. */
@@ -1142,8 +1058,6 @@ export const copy = {
   shareReading: 'Reading',
   shareAddressNotOne: 'That is not a web address. Paste the whole https address of the file.',
   shareAddressHttps: 'A use case is read only from an https address.',
-  shareAddressUnread: (host: string) => `${host} did not let this page read the file. Download it, then choose it as a file.`,
-  shareAddressAnswered: (host: string, status: number) => `${host} answered ${status}, so there was no file to read.`,
   shareTooBig: (kb: number) => `This file is ${kb} KB, and a shared use case is at most 256 KB.`,
   shareConflict: (name: string, pack: string) => `${name} is already held by ${pack}, so this cannot be installed beside it.`,
   shareStale: 'Something changed since the plan was read, so it has been read again. Look it over, then install.',
@@ -1193,7 +1107,6 @@ export const copy = {
   shareDownload: 'Download the file',
   shareDownloaded: (file: string, n: number) =>
     n === 0 ? `${file} is saved, with no rows of yours in it.` : `${file} is saved, with ${n} example ${n === 1 ? 'row' : 'rows'}.`,
-  shareSampleNote: 'This is the sample, so the file is made from a record of your own.',
   shareStep: 'What changed since it was last shared',
   shareStepPatch: 'Words, rows or small fixes',
   shareStepMinor: 'A list or a page added',
@@ -1555,13 +1468,6 @@ export const copy = {
   /* A ROW IS NAMED BY ITS NUMBER, and "no obligation CALLED #9999" is not English. `19 §642`: a row
      "has a number you can say" — so the sentence says it the way somebody would. */
   noSuchNumber: (one: string, seq: number | string) => `There is no ${one} #${seq}.`,
-  /* A NEGATIVE NUMBER IS NOT A NUMBER ANYBODY TYPED. `pending` hands an unwritten row a negative
-     sequence so it can never collide with a real one, and a link to that row is good for exactly as
-     long as the tab is open. Saying "There is no obligation #-1" to somebody who followed their own
-     link back after a reload tells them nothing they can act on; saying that the row was never
-     saved does. */
-  neverSaved: (one: string) =>
-    `That ${one.toLowerCase()} was never saved, so it is gone. Nothing typed into this product is kept until the record is given it.`,
   /**
    * THE HALF OF THE REFUSAL A PERSON CAN ACT ON, AND IT WAS A BARE FULL STOP.
    *
@@ -1700,8 +1606,6 @@ export const copy = {
   signInAgain: 'Sign in again',
   approvedNow: (label: string, means: string) => `${label} is approved. It can ${means}.`,
   unnamedMachine: 'A machine with no name',
-  /* One sentence for every control here that would need an account. */
-  notOnDemo: 'The demo has no account, so nothing here can be approved, revoked or connected.',
 
   /* the tokens — `12 §3`: listed with a revoke button, and never the token itself */
   tokens: 'Tokens',
@@ -1723,6 +1627,9 @@ export const copy = {
   connectTitle: 'Connect an agent',
   connectLabel: 'Name the machine',
   connectGo: 'Connect',
+  /* THE INBOX, OFF UNTIL THE OWNER TURNS IT ON (DIRECTION section 30, P2). What it opens, and what it still cannot do. */
+  connectInbox: 'May read the inbox',
+  connectInboxHint: 'May read the inbox: the bank texts and other arrivals no rule has filed yet. It cannot file or archive them.',
   tokenOnce: 'Shown once. Copy it now.',
   copyToken: 'Copy the token',
   tokenCopied: 'Token copied',

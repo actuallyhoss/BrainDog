@@ -88,7 +88,6 @@ export const firstRun = {
     items.length < 2 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`,
   shapeIn: (name: string, list: string) => `${name} in ${list}`,
   shapeMade: (items: string) => `Made ${items}.`,
-  shapeMadeWaiting: (items: string, mark: string) => `Made ${items}, marked ${mark}.`,
   shapeReady: 'Your lists are ready.',
   shapeTurnedOn: (names: string) => `Turned on ${names}.`,
   shapeAbsent: (names: string) => `Not installed on this record: ${names}. Nothing was made there.`,

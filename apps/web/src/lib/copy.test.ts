@@ -133,14 +133,14 @@ test('A REFUSAL NAMES ADDRESSES, because the person reading it just typed one th
 });
 
 test('A LIST OF NAMES IS BUILT BY `list()`, and one sentence was joining them by hand', () => {
-  /* `diffRefused` used `names.join(' and ')`, so three colliding pack names read
-     "Money and Services and People" on the screen that refuses the install. Two names is the
-     common case, which is why a sentence that reads wrong at three went unnoticed. */
-  assert.match(copy.diffRefused(['Money']), /^Money is already a list/u);
-  assert.match(copy.diffRefused(['Money', 'Services']), /^Money and Services are already lists/u);
-  assert.match(copy.diffRefused(['Money', 'Services', 'People']), /^Money, Services and People are already lists/u);
-  /* And the refusal still NAMES what collides, which is the only part the reader can act on. */
-  assert.match(copy.diffRefused(['Money']), /cannot take a name another one owns/u);
+  /* The refusal that found it, `diffRefused`, used `names.join(' and ')`, so three colliding pack
+     names read "Money and Services and People". It is gone, rendered nowhere once the sample went
+     (DIRECTION 26); the sentences that still name several add-ons are held to the same rule. Two
+     names is the common case, which is why a sentence that reads wrong at three went unnoticed. */
+  assert.equal(copy.packNeededBy(['Money']), 'Needed by Money');
+  assert.equal(copy.packNeededBy(['Money', 'Services']), 'Needed by Money and Services');
+  assert.equal(copy.packNeededBy(['Money', 'Services', 'People']), 'Needed by Money, Services and People');
+  assert.match(copy.packTurnedOffNamed(['Money', 'Services', 'People']), /^Money, Services and People are turned off/u);
 });
 
 test('and the two sentences that teach the keyboard describe the keyboard that is bound', () => {

@@ -15,7 +15,7 @@
  * `NEEDS_BROWSER_SESSION` or `FORBIDDEN`, and that refusal's `fix` is what the person reads.
  */
 
-import { createClient, type EraseReport, type Invitation, type Invited, type Level, type Member, type Restored, type Snapshot } from '@braindog/client';
+import { createClient, type EraseReport, type Invitation, type Invited, type Level, type Member, type MintedToken, type Restored, type Snapshot } from '@braindog/client';
 
 import { BASE } from '../at.ts';
 import { copy } from '../copy.ts';
@@ -151,6 +151,31 @@ export async function readInvites(base: string, io?: Fetch): Promise<InvitesRead
 /** Withdraw one. Its link stops working at once. */
 export async function withdrawInvite(base: string, id: string, io?: Fetch): Promise<Wrote<{ id: string; revoked_at: string }>> {
   return wrote(await clientOf(base, io).revokeInvite({ id }));
+}
+
+/* ── agents ─────────────────────────────────────────────────────────────── */
+
+/**
+ * Connect an agent: a write token for `days`, named by its label, that reads the money inbox only when the owner said so.
+ *
+ * THE INBOX IS OFF UNLESS IT WAS CHOSEN, AND THEN IT IS NAMED. The record lets an owner's whole-record token read
+ * `inbox` when its row carries that reach (DIRECTION section 30, P2), and this screen always minted `{ scope, label,
+ * days }`, so no token made here could ever read it. `reach` is left out rather than sent empty when the switch is off,
+ * so what is sent for an ordinary agent is byte for byte what it was.
+ */
+export async function mintAgent(
+  base: string,
+  args: { label: string; inbox: boolean; days: number },
+  io?: Fetch,
+): Promise<Wrote<MintedToken>> {
+  return wrote(
+    await clientOf(base, io).createToken({
+      scope: 'write',
+      label: args.label,
+      days: args.days,
+      ...(args.inbox ? { reach: ['inbox'] } : {}),
+    }),
+  );
 }
 
 /* ── export ─────────────────────────────────────────────────────────────── */

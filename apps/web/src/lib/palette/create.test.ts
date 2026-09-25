@@ -22,7 +22,7 @@ import { openRecord, type Kernel } from '@braindog/kernel';
 import * as create from './create.ts';
 import { REGISTERS } from '../record/api.ts';
 import { layoutOf } from '../record/boot-live.ts';
-import { listsOf, type List } from '../record/palette.ts';
+import type { List } from '../record/palette.ts';
 import { capturedFields } from '../record/rows-write.ts';
 import type { Fetch } from '../record/row-live.ts';
 
@@ -30,8 +30,8 @@ const BASE = 'http://record.test';
 const NOW = Date.parse('2026-09-24T10:00:00Z');
 const OWNER = { actor: 'p_1' };
 
-/** The sample's lists, which is what the palette holds with no record behind it. */
-const registers: List[] = listsOf(false, []);
+/** Every list this build declares, as `boot` would hand them to the palette. */
+const registers: List[] = Object.values(REGISTERS).map((r) => ({ id: r.id, name: r.name, count: 0, icon: 'rows' }));
 
 /* ── the sentence ─────────────────────────────────────────────────────────── */
 
@@ -72,9 +72,6 @@ test('only a list this build can title a row in is offered, the same rule a page
 
 test('the row says the list by its name and the words as they were typed', () => {
   assert.equal(create.words.row('Tasks', 'buy milk'), 'Add to Tasks: buy milk');
-  /* THE SAMPLE'S SENTENCE, which goes through `copy.notWritten` like every other write on the sample. */
-  assert.match(create.words.would('Tasks', 'buy milk'), /buy milk/u);
-  assert.match(create.words.would('Tasks', 'buy milk'), /Tasks/u);
 });
 
 /* ── the write, against a real kernel ─────────────────────────────────────── */

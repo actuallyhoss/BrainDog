@@ -34,8 +34,6 @@ export const words = {
   /** The declaration's title, which `admits()` checks. The row draws `row` in its place. */
   declared: 'Add to a list',
   row: (list: string, title: string) => `Add to ${list}: ${title}`,
-  /** The sample's half, which goes through `copy.notWritten` as every write there does. */
-  would: (list: string, title: string) => `“${title}” would be added to ${list}`,
   added: (list: string, title: string) => `Added “${title}” to ${list}.`,
   /** The heading over the row. It is drawn first, because a whole sentence of intent outranks a match on its words. */
   group: 'Add',

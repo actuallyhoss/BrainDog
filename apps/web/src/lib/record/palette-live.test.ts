@@ -7,10 +7,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { latest } from '../palette/latest.ts';
-import { REGISTERS, ROWS } from './api.ts';
+import { REGISTERS } from './api.ts';
 import { METRICS } from './declared.ts';
 import { isTemplate } from './metrics.ts';
-import { FIGURE_IDS, listsOf, recentOf, roundRobin, type List } from './palette.ts';
+import { FIGURE_IDS, recentOf, roundRobin, type List } from './palette.ts';
 import { paletteReader } from './palette-live.ts';
 import type { Fetch } from './search-live.ts';
 
@@ -33,13 +33,6 @@ const LISTS: List[] = [
   { id: 'obligations', name: 'Obligations', count: 3, icon: 'rows' },
   { id: 'people', name: 'People', count: 2, icon: 'rows' },
 ];
-
-test('a live record lists what boot counted, and the sample lists every register it declares', () => {
-  assert.deepEqual(listsOf(true, LISTS), LISTS);
-  const sample = listsOf(false, LISTS);
-  assert.equal(sample.length, Object.keys(REGISTERS).length);
-  for (const l of sample) assert.equal(l.count, (ROWS[l.id] ?? []).length, `${l.id}'s count is not the sample's`);
-});
 
 test('the record\'s hits are capped one list per round, and every total is kept', () => {
   const hit = (register: string, seq: number) => ({ title: `${register} ${seq}`, detail: '', href: `/r/${register}/${seq}`, kind: register, icon: 'rows' as const });

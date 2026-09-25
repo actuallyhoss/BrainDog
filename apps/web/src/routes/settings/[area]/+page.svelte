@@ -56,7 +56,7 @@
   import { billingLine, hostedHere } from '../billing.ts';
   import CallsOut from '$lib/ui/CallsOut.svelte';
   /* Lane F: backups, putting a copy back, erasing a person and deleting the record. */
-  import { backUpNow, deleteRecordNow, downloadSnapshot, erasePerson, readSnapshots, restoreSnapshot } from '$lib/record/settings-write.ts';
+  import { backUpNow, deleteRecordNow, downloadSnapshot, erasePerson, mintAgent, readSnapshots, restoreSnapshot } from '$lib/record/settings-write.ts';
   import type { Snapshot as KeptCopy } from '@braindog/client';
   /* Lane G: inviting somebody by address, with a link the owner sends and nobody mails. */
   import { inviteEmail, inviteLink, readInvites, withdrawInvite } from '$lib/record/settings-write.ts';
@@ -141,6 +141,8 @@
   /* THE BEARER LIVES HERE AND NOWHERE ELSE, and only until Done or leaving the area. */
   let minted = $state<{ label: string; bearer: string } | null>(null);
   let mintLabel = $state('');
+  /* OFF UNTIL THE OWNER TURNS IT ON, and off again for the next agent: reading the inbox is chosen per token. */
+  let mintInbox = $state(false);
   let minting = $state(false);
   let mintRefusal = $state('');
   let origin = $state('');
@@ -255,7 +257,7 @@
     mintRefusal = '';
     const at = opened();
     /* THE BEARER IS SHOWN ONCE, from this answer, and never stored, logged or written anywhere else. */
-    const out = wrote(await agentClient.createToken({ scope: 'write', label, days: TOKEN_DAYS }));
+    const out = await mintAgent(apiBase(), { label, inbox: mintInbox, days: TOKEN_DAYS });
     closed(true, at);
     minting = false;
     if (!out.ok) {
@@ -264,6 +266,7 @@
     }
     minted = { label, bearer: out.value.bearer };
     mintLabel = '';
+    mintInbox = false;
     const held = await agentClient.listTokens();
     if (held.ok) tokens = standing(held.value as TokenRow[]);
     await offerPack(agentClient);
@@ -2355,6 +2358,18 @@
                 />
               </div>
               <Button weight="primary" type="submit" disabled={minting || mintLabel.trim() === ''}>{copy.connectGo}</Button>
+            </div>
+            <!-- THE INBOX IS ONE THING ON OR OFF, so it is the switch the rest of Settings uses, and it starts off. -->
+            <div class="switch-row">
+              <p class="hint">{copy.connectInboxHint}</p>
+              <button
+                type="button"
+                class="switch"
+                role="switch"
+                aria-checked={mintInbox}
+                aria-label={copy.connectInbox}
+                onclick={() => (mintInbox = !mintInbox)}><span class="switch-track"></span></button
+              >
             </div>
             <p class="code-said" id="agent-label-said" role="status" data-intent={mintRefusal ? 'bad' : undefined}>{mintRefusal}</p>
           </form>

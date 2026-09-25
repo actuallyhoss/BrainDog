@@ -1,11 +1,11 @@
 /**
- * What the palette lists besides its commands, from the record when there is one and the sample when there is not.
+ * What the palette lists besides its commands, from the record.
  *
  * PURE, so `node --test` imports it and the palette imports it without the client: the reads that need the record are
  * in `palette-live.ts`, which the palette loads only on a live record.
  */
 
-import { iconFor, REGISTERS, ROWS, type SearchResult } from './api.ts';
+import type { SearchResult } from './api.ts';
 import { METRICS } from './declared.ts';
 import { isTemplate, unreadable } from './metrics.ts';
 import type { IconName } from '../ui/icons.ts';
@@ -14,22 +14,10 @@ import type { IconName } from '../ui/icons.ts';
 export type List = { id: string; name: string; count: number; icon: IconName };
 
 /**
- * The lists, with their counts.
- *
- * THE SAMPLE LISTS EVERY REGISTER IT DECLARES, as the palette always did. A live record lists what `boot` counted for
- * this caller, which is the rail's own list: a register the caller may not read, or one with nothing in it, is not
- * there, so its count is never the sample's.
- */
-export function listsOf(live: boolean, registers: readonly List[]): List[] {
-  if (live) return [...registers];
-  return Object.values(REGISTERS).map((r) => ({ id: r.id, name: r.name, count: (ROWS[r.id] ?? []).length, icon: iconFor(r.icon, 'rows') }));
-}
-
-/**
  * At most `limit` hits, one from each list per round, with every total kept.
  *
- * The sample's `search` already hands its hits over this way. The record's answer arrives grouped, so a list with many
- * matches would otherwise fill the whole budget before the next list drew a row.
+ * The record's answer arrives grouped, so a list with many matches would otherwise fill the whole budget before the
+ * next list drew a row.
  */
 export function roundRobin(result: SearchResult, limit: number): SearchResult {
   const hits: SearchResult['hits'] = [];
