@@ -16,6 +16,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { installEvery, installInto } from '../src/install.ts';
+import { REPLACE, REPLACE_FILE } from './replace.ts';
 
 const APP = join(dirname(fileURLToPath(import.meta.url)), '..');
 const scripts = join(APP, 'hooks');
@@ -77,7 +78,7 @@ test('A WRITE THAT FAILS ON THE SECOND FILE PUTS THE FIRST BACK, leaves no .tmp 
   const before = snapshot(a.dir);
 
   for (const attempt of ['first', 'retry']) {
-    const ran = cli(['install', '--replace', '--apply', '--config-dir', a.dir], home);
+    const ran = cli(['install', '--replace', REPLACE_FILE, '--apply', '--config-dir', a.dir], home);
     assert.equal(ran.code, 1, `${attempt}: ${ran.stdout}`);
     assert.deepEqual(snapshot(a.dir), before, `${attempt}: the profile is not as it was`);
     assert.ok(ran.stderr.includes('changed nothing'), `${attempt}: ${ran.stderr}`);
@@ -99,11 +100,11 @@ test('EVERY PROFILE IS READ BEFORE ANY IS WRITTEN: a malformed third profile lea
   writeFileSync(c.settings, '{ "hooks": {}, }');
   const before = [snapshot(a.dir), snapshot(b.dir), snapshot(c.dir)];
 
-  assert.throws(() => installEvery([a.dir, b.dir, c.dir], [], { apply: true, replace: true, scripts, home }), /is not valid JSON, so braindog install leaves it alone/);
+  assert.throws(() => installEvery([a.dir, b.dir, c.dir], [], { apply: true, replace: REPLACE, scripts, home }), /is not valid JSON, so braindog install leaves it alone/);
   assert.deepEqual([snapshot(a.dir), snapshot(b.dir), snapshot(c.dir)], before);
 
   writeFileSync(c.settings, '{ "hooks": {} }');
-  const lines = installEvery([a.dir, b.dir, c.dir], [], { apply: true, replace: true, scripts, home });
+  const lines = installEvery([a.dir, b.dir, c.dir], [], { apply: true, replace: REPLACE, scripts, home });
   for (const p of [a, b]) {
     assert.deepEqual(readdirSync(p.dir).sort(), ['.claude.json', '.claude.json.bak', 'settings.json', 'settings.json.bak']);
     assert.ok(!readFileSync(p.settings, 'utf8').includes('session-start.ps1'));
@@ -118,7 +119,7 @@ test('A STALE .tmp FROM AN EARLIER FAILED RUN, read-only as that run made it, do
   writeFileSync(`${a.claudeJson}.tmp`, '{ "half": ');
   chmodSync(`${a.claudeJson}.tmp`, 0o444);
 
-  const lines = installInto(a.dir, { apply: true, replace: true, scripts, home });
+  const lines = installInto(a.dir, { apply: true, replace: REPLACE, scripts, home });
   assert.ok(lines.includes(`The file as it was is kept at ${a.claudeJson}.bak.`), lines.join('\n'));
   assert.deepEqual(readdirSync(a.dir).sort(), ['.claude.json', '.claude.json.bak', 'settings.json', 'settings.json.bak']);
   assert.ok(!readFileSync(a.claudeJson, 'utf8').includes('brain-mcp.mjs'));
@@ -127,7 +128,7 @@ test('A STALE .tmp FROM AN EARLIER FAILED RUN, read-only as that run made it, do
 test('THE SAME FILE NAMED TWICE is written once, from one reading', () => {
   const home = folder('home');
   const a = profile(join(home, '.claude-a'));
-  const lines = installEvery([a.dir], [a.settings], { apply: true, replace: true, scripts, home });
+  const lines = installEvery([a.dir], [a.settings], { apply: true, replace: REPLACE, scripts, home });
   assert.deepEqual(readdirSync(a.dir).sort(), ['.claude.json', '.claude.json.bak', 'settings.json', 'settings.json.bak']);
   assert.equal(lines.filter((l) => l === `Changed ${a.settings}:`).length, 1, lines.join('\n'));
 });
@@ -158,7 +159,7 @@ test('A TOKEN IN AN ARGUMENT, A PATH OR A QUERY IS NEVER PRINTED, on the dry run
   const home = folder('home');
   const a = profile(join(home, '.claude-a'), LEAKY);
 
-  const text = installInto(a.dir, { apply: false, replace: true, scripts, home }).join('\n');
+  const text = installInto(a.dir, { apply: false, replace: REPLACE, scripts, home }).join('\n');
   for (const secret of SECRETS) assert.ok(!text.includes(secret.slice(0, 12)), `${secret} was printed:\n${text}`);
   /* Still readable: what runs is named, and what was withheld is marked rather than silently dropped. */
   assert.ok(text.includes("  - mcpServers.token-in-args, the old tool's: node [3 arguments hidden]"), text);
@@ -166,7 +167,7 @@ test('A TOKEN IN AN ARGUMENT, A PATH OR A QUERY IS NEVER PRINTED, on the dry run
   assert.ok(text.includes("  - mcpServers.token-joined, the old tool's: node [2 arguments hidden]"), text);
   assert.ok(text.includes("  - mcpServers.proxied-with-header, the old tool's: npx [5 arguments hidden]"), text);
 
-  const ran = cli(['install', '--replace', '--json', '--config-dir', a.dir], home);
+  const ran = cli(['install', '--replace', REPLACE_FILE, '--json', '--config-dir', a.dir], home);
   assert.equal(ran.code, 0, ran.stderr);
   for (const secret of SECRETS) assert.ok(!`${ran.stdout}${ran.stderr}`.includes(secret.slice(0, 12)), `${secret} reached the envelope`);
   assert.ok(ran.stdout.includes('[hidden]'), ran.stdout);
@@ -187,13 +188,13 @@ test('A SERVER REGISTERED THROUGH A PROXY, npx mcp-remote https://brain.example.
     other: { command: 'npx', args: ['-y', 'mcp-remote', 'https://notbrain.example.com.example.com/mcp'] },
   });
 
-  const dry = installInto(a.dir, { apply: false, replace: true, scripts, home });
+  const dry = installInto(a.dir, { apply: false, replace: REPLACE, scripts, home });
   assert.ok(dry.includes("  - mcpServers.remote, the old tool's: npx [3 arguments hidden]"), dry.join('\n'));
   assert.ok(dry.some((l) => l.startsWith("  - mcpServers.remote-one-string, the old tool's: ")), dry.join('\n'));
   assert.ok(dry.some((l) => l.startsWith("  - mcpServers.dotted, the old tool's: ")), dry.join('\n'));
   assert.ok(!dry.some((l) => l.includes('mcpServers.other')), dry.join('\n'));
 
-  installInto(a.dir, { apply: true, replace: true, scripts, home });
+  installInto(a.dir, { apply: true, replace: REPLACE, scripts, home });
   const now = JSON.parse(readFileSync(a.claudeJson, 'utf8')) as { mcpServers: Record<string, unknown> };
   assert.deepEqual(Object.keys(now.mcpServers), ['other', 'braindog']);
   assert.ok(!existsSync(`${a.claudeJson}.tmp`));

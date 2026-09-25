@@ -15,6 +15,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { installInto } from '../src/install.ts';
+import { REPLACE } from './replace.ts';
 
 const APP = join(dirname(fileURLToPath(import.meta.url)), '..');
 const scratch = mkdtempSync(join(tmpdir(), 'braindog-install-shapes-'));
@@ -28,7 +29,7 @@ function lineFor(server: Record<string, unknown>): string {
   const dir = join(home, '.claude-shapes');
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, '.claude.json'), JSON.stringify({ mcpServers: { brain: server } }));
-  const lines = installInto(dir, { apply: false, replace: true, scripts: join(APP, 'hooks'), home });
+  const lines = installInto(dir, { apply: false, replace: REPLACE, scripts: join(APP, 'hooks'), home });
   const line = lines.find((l) => l.startsWith("  - mcpServers.brain, the old tool's: "));
   assert.ok(line, `the entry was not named: ${lines.join(' | ')}`);
   return line.slice("  - mcpServers.brain, the old tool's: ".length);

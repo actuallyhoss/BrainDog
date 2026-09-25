@@ -287,7 +287,8 @@ const CASES = [
      finding dead ones. */
   { gate: 'flags', expect: /a branch nobody takes/, findings: 1 },
   { gate: 'no-declarations-in-kernel', expect: /declaration written in the kernel/, findings: 1 },
-  { gate: 'shell-words', expect: /a use case named in the core/, findings: 9 },
+  /* FIVE SINCE 25 SEPTEMBER: the importer left `apps/cli` for `packs/legacy-import` (brief B2), and its two exemptions and their two seeded files went with it. */
+  { gate: 'shell-words', expect: /a use case named in the core/, findings: 5 },
   /* THE SEEDED FIXTURE HOLDS TWO SENTENCES AND RENDERS ONE, so a gate that named both (or neither)
      is a gate that is counting keys rather than finding dead ones. */
   { gate: 'dead-copy', expect: /nobody reads/, findings: 1 },

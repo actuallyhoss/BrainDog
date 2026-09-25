@@ -19,6 +19,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { REPLACE_FILE } from './replace.ts';
 
 const MAIN = fileURLToPath(new URL('../src/main.ts', import.meta.url));
 
@@ -47,7 +48,7 @@ test('a live session file is named with its profile, and a dead one is not', () 
   writeFileSync(join(dir, 'sessions', `${String(dead)}.json`), '{}');
   const env: NodeJS.ProcessEnv = { ...process.env, HOME: scratch, USERPROFILE: scratch };
   delete env.CLAUDE_CONFIG_DIR;
-  const run = spawnSync(process.execPath, ['--experimental-strip-types', MAIN, 'install', '--replace', '--config-dir', dir], { env, encoding: 'utf8' });
+  const run = spawnSync(process.execPath, ['--experimental-strip-types', MAIN, 'install', '--replace', REPLACE_FILE, '--config-dir', dir], { env, encoding: 'utf8' });
   assert.equal(run.status, 0, run.stderr);
   const line = run.stdout.split('\n').find((l) => l.includes(String(process.pid)));
   assert.ok(line !== undefined && line.includes(dir), run.stdout);

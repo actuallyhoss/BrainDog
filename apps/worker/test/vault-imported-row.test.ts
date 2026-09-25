@@ -3,7 +3,7 @@
  * the the old tool import made, on a record that lives in a Durable Object.
  *
  * WHY THIS FILE EXISTS. `loop/research-switch-left.md` finding 4 and brief 45-B. The import carries 91 Keys rows and
- * not one value (`apps/cli/src/legacy.ts`, the line that says so every run), so each of his 72 values goes in by
+ * not one value (`packs/legacy-import/adapter.ts`, the line that says so every run), so each of his 72 values goes in by
  * hand, once, and it is the only copy. A deposit finds its row by `credential` or by `label` within the caller's reach
  * (`keyFor` in `packages/record/src/index.ts`), and the importer sets `project` on a key whose the old tool scope names
  * one. Read and not measured, that meant a `keys put` under the wrong grant would make a second row of the same label
@@ -78,9 +78,10 @@ import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { createClient, type Client } from '../../../packages/client/src/index.ts';
-import { isRef, planLegacyTool, readLegacyTool, readSetup } from '../../cli/src/legacy.ts';
+import { isRef } from '../../cli/src/adapter.ts';
+import { planLegacyTool, readLegacyTool, readSetup } from '../../../packs/legacy-import/test/harness.ts';
 import { keys } from '../../cli/src/keys.ts';
-import { syntheticExport, syntheticSetup } from '../../cli/test/legacy-export.ts';
+import { syntheticExport, syntheticSetup } from '../../../packs/legacy-import/test/synthetic.ts';
 
 const fromWrangler = createRequire(createRequire(import.meta.url).resolve('wrangler/package.json'));
 const esbuild = fromWrangler('esbuild') as { build(o: object): Promise<{ outputFiles: { text: string }[] }> };

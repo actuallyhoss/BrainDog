@@ -1,0 +1,7 @@
+{
+  "targets": {
+    "order": ["tasks"],
+    "names": { "tasks": "Tasks" },
+    "providedBy": { "tasks": "Tasks" }
+  }
+}

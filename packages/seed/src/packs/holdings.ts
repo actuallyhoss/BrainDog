@@ -42,7 +42,7 @@ export const HOLDINGS_VERSION = '1.0.0';
  *
  * MEASURED, LIVE, BEFORE THE REGISTER WAS WRITTEN: the the old tool export's `money.assets` held lots
  * of a metal bought on different days, a saving certificate with a maturity, and insurance policies
- * paid monthly in another currency. `apps/cli/src/legacy.ts` named every one of them in a skip line
+ * paid monthly in another currency. The importer, now `packs/legacy-import/adapter.ts`, named every one of them in a skip line
  * and said why it was skipped: the nearest list here was an account with a BALANCE, and filing a
  * policy there would count it as cash somebody could spend. That is the reason it is a register of
  * its own rather than a fourth `accounts.kind`.

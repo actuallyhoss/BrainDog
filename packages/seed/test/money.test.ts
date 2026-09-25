@@ -934,7 +934,7 @@ test('A HEADING THAT SAYS PAY OVER TWO ROWS OF MONEY COMING IN, because the tabl
  *      for every row. Measured against that engine, the split would draw nought rows under its
  *      heading and a refusal beside it, which is worse than the number it draws now.
  *   3. AND `ends is empty` ALONE, THE ONE CLAUSE THE SENTENCE DOES SUPPORT, IS WORSE THAN NOTHING.
- *      The importer skips a stream that ended before the export (`apps/cli/src/legacy.ts:916`) and
+ *      The importer skips a stream that ended before the export ("It ended before the export" in `packs/legacy-import/adapter.ts`) and
  *      writes `ends` only when it is still ahead, so on the one real record every row carrying an
  *      `ends` at all is a schedule that IS still running. That clause drops exactly those.
  *
@@ -965,7 +965,7 @@ test('A SCHEDULE ENDS ON ITS LAST DAY BECAUSE AN HOURLY SWEEP ENDS IT, and the s
 
   /* THE SAMPLE HIDES THE SHAPE because its one stopped row was hand-set to `ended`. This is the
      shape a real record has: the importer writes `ends` only when it is ahead and skips a stream
-     that stopped before the export (`apps/cli/src/legacy.ts:916`), so what a record accumulates
+     that stopped before the export ("It ended before the export" in `packs/legacy-import/adapter.ts`), so what a record accumulates
      is live rows whose end day goes past while nothing writes to them. */
   const stopped = k.create(
     'recurring',

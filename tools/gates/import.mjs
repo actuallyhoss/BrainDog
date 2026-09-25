@@ -4,9 +4,9 @@
  *
  *   node tools/gates/import.mjs
  *
- * WHY THIS EXISTS. `apps/cli/src/import.ts` is the one command that moves somebody's whole working
+ * WHY THIS EXISTS. `apps/cli/src/import.ts`, with the `packs/legacy-import` adapter, is the one command that moves somebody's whole working
  * life out of the old tool and into this product, and until this gate there was nothing repeatable
- * behind it. Its 499 lines of test drive an IN-MEMORY FAKE door (`apps/cli/test/import.test.ts`
+ * behind it. Its 499 lines of test drive an IN-MEMORY FAKE door (`packs/legacy-import/test/import.test.ts`
  * `memoryRecord`) and one stub HTTP server that answers `{ok:true}` to every method. Neither
  * validates anything, so every one of those tests passes against a planner emitting nonsense: a
  * field the founder pack never declared, an amount in the wrong shape, a lesson under the length
@@ -28,7 +28,7 @@
  *      write to be attributed to, and the import writes as that owner.
  *   3. The packs, through the door the owner uses: a `pack` proposal on Decide and the owner
  *      accepting it, which is `packages/record/src/usecase.ts`'s path and not a private one. Three
- *      of them, because between them they declare every list `legacy.ts` `PROVIDED_BY` names:
+ *      of them, because between them they declare every list the adapter's `map.json` `providedBy` names:
  *      Solo founder carries Projects, People, Money and Work under it and adds organisations and
  *      datapoints, Estate adds services, and the agents pack adds learnings, skills, tools and the
  *      key index. `session` is the kernel's own.
@@ -45,7 +45,7 @@
  *   7. And the import again, because "re-running updates, it never adds a second row" is a claim
  *      this command's header makes and only the fake had ever been asked to keep.
  *
- * THE EXPORT IS `apps/cli/test/legacy-export.ts`'s, deliberately. `52 §1` lets a gate import a
+ * THE EXPORT IS `packs/legacy-import/test/synthetic.ts`'s, deliberately. `52 §1` lets a gate import a
  * package's source directly and `slash-actor` already imports `packages/kernel/test/sqlite.ts` for
  * the same kind of reason: the synthetic export is the fixture those 499 lines of test drive, so
  * running THAT one through a real record is what turns them from assertions about a fake into
@@ -90,11 +90,14 @@ const root = process.env.BRAINDOG_GATE_ROOT ?? join(fileURLToPath(new URL('.', i
 const at = (...parts) => join(root, ...parts);
 const load = (...parts) => import(pathToFileURL(at(...parts)).href);
 
-/** The four modules this gate is about, and a tree missing one has nothing for it to measure. */
+/** The modules this gate is about, and a tree missing one has nothing for it to measure. */
 const SERVER = ['apps', 'selfhost', 'src', 'server.ts'];
 const IMPORT = ['apps', 'cli', 'src', 'import.ts'];
-const PLANNER = ['apps', 'cli', 'src', 'legacy.ts'];
-const EXPORT = ['apps', 'cli', 'test', 'legacy-export.ts'];
+const PLANNER = ['packs', 'legacy-import', 'test', 'harness.ts'];
+const EXPORT = ['packs', 'legacy-import', 'test', 'synthetic.ts'];
+/** The adapter the command is named, and the catalogue its offers are resolved in: the one the app ships. */
+const ADAPTER = ['packs', 'legacy-import', 'adapter.ts'];
+const CATALOGUE = ['apps', 'web', 'static', 'catalogue'];
 
 /**
  * Exit 3 is a SKIP and not a pass (`run.mjs`), and this is the only thing that earns one.
@@ -103,11 +106,11 @@ const EXPORT = ['apps', 'cli', 'test', 'legacy-export.ts'];
  * thing to check. Everything below this line is red instead, including a record that will not
  * onboard: a host that cannot be stood up is a finding about the host and not an absence of one.
  */
-const absent = [SERVER, IMPORT, PLANNER, EXPORT].filter((parts) => !existsSync(at(...parts)));
+const absent = [SERVER, IMPORT, PLANNER, EXPORT, ADAPTER].filter((parts) => !existsSync(at(...parts)));
 if (absent.length > 0) {
   console.log(
     `  import: no ${absent.map((parts) => parts.join('/')).join(' and no ')}, ` +
-      'so there is no import to rehearse and nothing was checked. Run it from a tree that holds apps/cli and apps/selfhost.',
+      'so there is no import to rehearse and nothing was checked. Run it from a tree that holds apps/cli, apps/selfhost and packs/legacy-import.',
   );
   process.exit(3);
 }
@@ -321,7 +324,7 @@ rehearsal: {
     headers: async () => ({}),
   };
 
-  exit = await importCommand(['legacy', 'export.json', '--setup', 'setup.json'], io, TODAY);
+  exit = await importCommand([at(...ADAPTER), '--catalogue', at(...CATALOGUE), 'export.json', '--setup', 'setup.json'], io, TODAY);
 
   /* ── 5 · what the record actually holds ─────────────────────────────────────────────────────────── */
 
@@ -413,7 +416,7 @@ rehearsal: {
    */
   const before = [...kernel.registers().keys()].reduce((n, register) => n + kernel.count(register), 0);
   const onDecide = governance.ok && Array.isArray(governance.value) ? governance.value.length : null;
-  again = await importCommand(['legacy', 'export.json', '--setup', 'setup.json'], { ...io, out: () => {}, say: () => {} }, TODAY);
+  again = await importCommand([at(...ADAPTER), '--catalogue', at(...CATALOGUE), 'export.json', '--setup', 'setup.json'], { ...io, out: () => {}, say: () => {} }, TODAY);
   const after = [...kernel.registers().keys()].reduce((n, register) => n + kernel.count(register), 0);
   if (after !== before)
     findings.push(`the same export imported twice left ${String(after - before)} more row(s) in the record, and re-running is what this command tells somebody to do when a host stops answering`);

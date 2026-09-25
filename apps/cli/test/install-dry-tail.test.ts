@@ -16,6 +16,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { REPLACE_FILE } from './replace.ts';
 
 const MAIN = join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'main.ts');
 const SAM = { type: 'stdio', command: 'node', args: ['C:\\Tools\\legacy\\mcp\\brain-mcp.mjs'], env: {} };
@@ -40,7 +41,7 @@ test('the dry run ends once, with every --config-dir and the --mcp-json it was g
   writeFileSync(mcp, JSON.stringify({ mcpServers: { brain: SAM } }, null, 2));
   const env: NodeJS.ProcessEnv = { ...process.env, HOME: scratch, USERPROFILE: scratch };
   delete env.CLAUDE_CONFIG_DIR;
-  const run = spawnSync(process.execPath, ['--experimental-strip-types', MAIN, 'install', '--replace', '--config-dir', quartz, '--config-dir', acme, '--mcp-json', mcp], { env, encoding: 'utf8' });
+  const run = spawnSync(process.execPath, ['--experimental-strip-types', MAIN, 'install', '--replace', REPLACE_FILE, '--config-dir', quartz, '--config-dir', acme, '--mcp-json', mcp], { env, encoding: 'utf8' });
   assert.equal(run.status, 0, run.stderr);
   const tails = run.stdout.split('\n').filter((line) => line.startsWith('Nothing was changed.'));
   assert.equal(tails.length, 1, run.stdout);

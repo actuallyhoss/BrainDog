@@ -298,7 +298,7 @@ const ran = (args: string[], cwd: string): Promise<Ran> =>
     child.on('close', (code) => done({ code, stdout, stderr }));
   });
 
-test('THE COMMAND KNOWS BOTH WORDS, and import legacy is still the the old tool importer', async (t) => {
+test('THE COMMAND KNOWS BOTH WORDS, and import with an adapter and its options is still the importer', async (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'braindog-brainfile-cli-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
 
@@ -311,12 +311,14 @@ test('THE COMMAND KNOWS BOTH WORDS, and import legacy is still the the old tool 
      in this folder, and that is said before the file is looked for. */
   const noHost = await ran(['import', 'latest.brainl'], dir);
   assert.equal(noHost.code, 1);
-  assert.ok(!noHost.stderr.includes('legacy <export.json>'), `a .brainl was handed to the the old tool importer: ${noHost.stderr}`);
+  assert.ok(!noHost.stderr.includes('<adapter> <export.json>'), `a .brainl was handed to the adapter importer: ${noHost.stderr}`);
   assert.match(noHost.stderr, /No BrainDog host is set/);
 
-  const sam = await ran(['import', 'legacy'], dir);
-  assert.equal(sam.code, 1);
-  assert.match(sam.stderr, /braindog import takes legacy <export\.json>/);
+  /* AN ADAPTER IS TOLD FROM A .brainl BY A SECOND WORD OR AN OPTION ONLY IT TAKES (`isAdapterImport`): one word alone is
+     a file to put back, as it was before the importer took any adapter. */
+  const adapter = await ran(['import', 'legacy-import', '--dry-run'], dir);
+  assert.equal(adapter.code, 1);
+  assert.match(adapter.stderr, /braindog import takes <adapter> <export\.json>/);
 
   const json = await ran(['export', '--bogus', '--json'], dir);
   assert.equal(json.code, 1);

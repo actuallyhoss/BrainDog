@@ -142,7 +142,7 @@ test('A PROJECT EARNING IN ANOTHER CURRENCY IS NEVER ADDED TO THE REST, which is
 /**
  * WHAT AN IMPORTED RECORD ACTUALLY LOOKS LIKE, AND IT IS THE CASE THIS FILE HAD NO ROW FOR.
  *
- * `apps/cli/src/legacy.ts` files a project's monthly revenue as a READING and writes no annual
+ * the the old tool adapter (`packs/legacy-import/adapter.ts`) files a project's monthly revenue as a READING and writes no annual
  * field, which is right: a month is not a year and the importer has no year to write. So on an
  * imported record every project in play arrives with `revenue` unset, and the three figures above
  * were declared over `lane is building or earning` with nothing said about whether a row states a

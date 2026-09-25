@@ -124,28 +124,6 @@ const OUT = {
       egypt: 'the changelog entry at `routes/changelog/entries.ts:297` says `Egyptian pounds` about a currency fix that shipped.',
     },
   },
-  'apps/cli/src/legacy.ts': {
-    why: "the the old tool importer (30 hits), which reads that tool's export by its own field names while the switch out of it is under way. It leaves with the importer.",
-    words: {
-      legacy: 'the source is named for itself: `KEY_PREFIX` is `legacy:`, the reader is `readLegacyTool` and the planner `planLegacyTool` (6 hits).',
-      registrar: "the export's `registrar` field and table on a domain, and a person's `registrar` role (12 hits).",
-      gold: "the export's holdings kind `gold`, which the importer maps to a commodity and counts to say so (12 hits).",
-    },
-  },
-  'apps/cli/src/import.ts': {
-    why: "the `braindog import` command (25 hits), whose one source is the the old tool export and whose one bank is that export's. It leaves with the importer.",
-    words: {
-      hsbc: "the one bank pack the command offers, `bank-hsbc-eg`, found by an account id or name matching `hsbc` in the export (11 hits).",
-      egypt: "the same offer's label and question, `HSBC Egypt` (3 hits).",
-      legacy: 'the one source it reads: the `legacy` subcommand, the key prefix it filters on, and the importer it calls (11 hits).',
-    },
-  },
-  'apps/cli/src/main.ts': {
-    why: "the command line, which names the importer's subcommand. It leaves with the importer.",
-    words: {
-      legacy: 'the help line for `braindog import legacy` (1 hit).',
-    },
-  },
 };
 
 /**

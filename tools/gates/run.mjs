@@ -114,11 +114,11 @@ const GATES = [
   ['slash-actor', ['node', [join(here, 'slash-actor.mjs')]]],
   /* BESIDE `slash-actor` BECAUSE IT IS THE OTHER GATE THAT BUILDS A RECORD RATHER THAN READING
      SOURCE, and it is the only one that stands a whole host up. The the old tool import is the switch
-     out of the tool the owner runs his work from today, and its own 499 lines of test drive an
+     out of the tool the owner runs his work from today, and its own tests drive an
      in-memory fake door and a stub server answering ok to every method, so nothing in them asserts
      that the founder, agents and estate declarations accept the fields the planner emits. This
-     onboards a self-host, installs those three packs on Decide, runs `braindog import legacy`
-     over HTTP and looks for every planned row in the record. About a second, which is a grep's
+     onboards a self-host, installs those three packs on Decide, runs `braindog import` with the
+     `packs/legacy-import` adapter over HTTP and looks for every planned row in the record. About a second, which is a grep's
      price, and it needs no build and no browser. */
   ['import', ['node', [join(here, 'import.mjs')]]],
   ['refusals', call(join(here, 'refusals.mjs'))],

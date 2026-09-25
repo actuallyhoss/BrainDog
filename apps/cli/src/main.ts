@@ -28,8 +28,8 @@ import { automations, scripts } from './automations.ts';
 import { exportFile, importFile } from './brainfile.ts';
 import { hookEnd, hookStart, readSession, sessionPath } from './hooks.ts';
 import { budgetOf, clientFor, hostsPath, target, type Target } from './http.ts';
-import { importCommand } from './import.ts';
-import { REPLACE_BY_HAND, byHand, handRun, installProfiles, profilesOf, shellOf } from './install.ts';
+import { importCommand, isAdapterImport } from './import.ts';
+import { byHand, handRun, installProfiles, profilesOf, readReplace, replaceByHand, shellOf, type Replace } from './install.ts';
 import { machine, takeJson, type Machine } from './json.ts';
 import { keys, spawnInherit } from './keys.ts';
 import { lapseWarning, login } from './login.ts';
@@ -154,8 +154,8 @@ const usage = () =>
     'braindog import <file.brainl> [--key <pubkey|url>] [--host <host>]',
     "  Check the file here, then put the record back from it, in place of everything it holds now. The record takes only its own copy.",
     '  Both ask the owner to approve the one operation in the app, with six digits, unless BRAINDOG_TOKEN is the self-host\'s server key.',
-    'braindog import legacy <export.json> [--setup <setup.json>] [--host <host>] [--dry-run] | --draft-setup',
-    '  Move a the old tool export into this BrainDog. Running it again updates what it added, and no key value is ever read.',
+    'braindog import <adapter> <export.json> [--setup <setup.json>] [--map <map.json>] [--catalogue <folder|address>] [--host <host>] [--dry-run] | --draft-setup | --since <day|last>',
+    "  Move another tool's export into this BrainDog through its adapter: a pack id such as one in packs/, or the path of a module. Running it again updates what it added, and no key value is ever read.",
     'braindog token create [--name <name>] [--scope <read|propose|write>] [--days <n>] [--inbox] [--host <host>]',
     "  Mint a token for an agent and print it once. It reads unless --scope names more, and with --inbox it may also read the money inbox.",
     "  The owner approves the one mint in the app, with six digits, unless BRAINDOG_TOKEN is the self-host's server key.",
@@ -163,8 +163,8 @@ const usage = () =>
     '  Serve BrainDog to an agent over standard input and output. The agent starts it.',
     'braindog hook start|end',
     '  What Claude Code runs when a session starts and ends, with its event on standard input.',
-    'braindog install [--apply] [--replace] [--config-dir <folder>] [--settings <file>] [--mcp-json <file>]',
-    "  Show the two hooks it would add to Claude Code's settings (a profile folder, or one settings file such as a project's .claude/settings.local.json), and write them only with --apply. With --replace it also takes out the old tool's hooks and MCP servers, and says which, and from a .mcp.json only when it is named with --mcp-json and is outside any repository.",
+    'braindog install [--apply] [--replace <replace.json>] [--config-dir <folder>] [--settings <file>] [--mcp-json <file>]',
+    "  Show the two hooks it would add to Claude Code's settings (a profile folder, or one settings file such as a project's .claude/settings.local.json), and write them only with --apply. With --replace it also takes out the hooks, MCP servers and skills the replace file names as an old tool's, and says which, and from a .mcp.json only when it is named with --mcp-json and is outside any repository.",
     'braindog verify <file> [--key <pubkey|url>]',
     "  Check a .brainl file on this machine: its format, every table against its manifest, and its signature, against the key you name when you name one. Nothing is sent, but for fetching a key from an address.",
     'braindog init <slug> --owner <email>',
@@ -408,18 +408,27 @@ async function hook(args: string[]): Promise<void> {
 }
 
 function install(args: string[]): void {
-  let values: { apply?: boolean | undefined; replace?: boolean | undefined; 'config-dir'?: string[] | undefined; settings?: string[] | undefined; 'mcp-json'?: string[] | undefined };
+  let values: { apply?: boolean | undefined; replace?: string | undefined; 'config-dir'?: string[] | undefined; settings?: string[] | undefined; 'mcp-json'?: string[] | undefined };
   try {
     ({ values } = parseArgs({
       args,
-      options: { apply: { type: 'boolean' }, replace: { type: 'boolean' }, 'config-dir': { type: 'string', multiple: true }, settings: { type: 'string', multiple: true }, 'mcp-json': { type: 'string', multiple: true } },
+      options: { apply: { type: 'boolean' }, replace: { type: 'string' }, 'config-dir': { type: 'string', multiple: true }, settings: { type: 'string', multiple: true }, 'mcp-json': { type: 'string', multiple: true } },
       strict: true,
     }));
   } catch {
-    return stop('braindog install takes --apply, --replace, --config-dir <folder>, --settings <file> and --mcp-json <file>, and nothing else.');
+    return stop('braindog install takes --apply, --replace <replace.json>, --config-dir <folder>, --settings <file> and --mcp-json <file>, and nothing else.');
   }
   const scripts = fileURLToPath(new URL('../hooks/', import.meta.url));
-  const options = { apply: values.apply === true, replace: values.replace === true, scripts };
+  /* THE FILE IS READ BEFORE ANYTHING ELSE IS, so a replace file that does not read changes nothing anywhere. */
+  let replace: Replace | undefined;
+  if (values.replace !== undefined) {
+    try {
+      replace = readReplace(values.replace);
+    } catch (e) {
+      return stop(e instanceof Error ? e.message : String(e));
+    }
+  }
+  const options = { apply: values.apply === true, replace, scripts };
   const dirs = values['config-dir'] ?? [];
   const files = values.settings ?? [];
   const mcpFiles = values['mcp-json'] ?? [];
@@ -433,20 +442,20 @@ function install(args: string[]): void {
   lines.push(...run.lines);
   /*
    * EVERY SESSION STILL OPEN ON A PROFILE THIS RUN CHANGES, NAMED BY ITS PROCESS ID (brief 53-B). The plan's first
-   * sentence is to close them all, and the survey found three open on the default profile and two on quartz with
+   * sentence is to close them all, and the survey found three open on the default profile and two on a named one with
    * nothing in the install's output to say so: its one sentence about open sessions was printed under `.claude.json`
    * alone and gave a reason that was not observed. A line, never a refusal (see `openSessionsLine`).
    */
   const open = profiles.flatMap((dir) => {
-    const said = openSessionsLine(dir, openSessions(dir), options.replace);
+    const said = openSessionsLine(dir, openSessions(dir), options.replace?.name ?? null);
     return said === null ? [] : [said];
   });
   if (open.length > 0) lines.push('', ...open);
   /* Named, the .mcp.json is in the run above, and telling the person to do it by hand would be wrong. */
-  if (options.replace && mcpFiles.length === 0) lines.push('', REPLACE_BY_HAND);
+  if (options.replace && mcpFiles.length === 0) lines.push('', replaceByHand(options.replace));
   /*
    * ONE LINE PER PROFILE LEFT WITHOUT THE SERVER, each naming its profile. It was one line for the run, withheld when
-   * any file gained the entry, and the audit's `.claude-acme` ended with no server and no line
+   * any file gained the entry, and the audit's second profile ended with no server and no line
    * (`loop/research-batch-forty-two-audit.md` §5). A run that names only settings files has no profile to name, so
    * its line is for the profile the shell is in, as it always was.
    *
@@ -515,10 +524,9 @@ try {
   else if (command === 'run') await keysCommand(['exec', ...rest]);
   else if (command === 'export') await brainfileCommand('export', args);
   else if (command === 'token') await brainfileCommand('token', args);
-  /* `import legacy` IS THE THE OLD TOOL IMPORTER, UNCHANGED, and any other `import` is a .brainl put back. Asked by
-     whether the word is there at all rather than by position, because the importer's own `parseArgs` takes `--host <h>`
-     ahead of it, and a file literally named `legacy` is not a .brainl anybody writes. */
-  else if (command === 'import' && !args.includes('legacy')) await brainfileCommand('import', args);
+  /* AN ADAPTER IMPORT TAKES TWO WORDS OR AN OPTION OF ITS OWN, and any other `import` is a .brainl put back
+     (`isAdapterImport`). Asked of the whole line rather than of a position, because both take `--host <h>` anywhere. */
+  else if (command === 'import' && !isAdapterImport(args)) await brainfileCommand('import', args);
   else if (command === 'skills' || command === 'tools' || command === 'page' || command === 'usecase' || command === 'pack' || command === 'import' || command === 'context' || command === 'session' || command === 'automations' || command === 'scripts' || command === 'verify') await agentCommand(command, args);
   else if (command === 'hook') await hook(rest);
   else if (command === 'install') install(args);

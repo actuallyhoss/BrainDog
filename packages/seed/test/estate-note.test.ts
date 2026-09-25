@@ -4,7 +4,7 @@
  * WHY THIS FILE EXISTS. the old tool's domain register carries a note on most of its rows, and they are the most
  * valuable text in it: one is a standing conflict between two registers, one names the open task behind a site that
  * resolves nowhere, one runs to the whole clearance search behind a purchase. `services` declared nine fields and not
- * one of them held prose, so `apps/cli/src/legacy.ts` left every note in the export and named the domain in a skip
+ * one of them held prose, so the importer (now `packs/legacy-import/adapter.ts`) left every note in the export and named the domain in a skip
  * line. Measured before this change, against the seeded record: `create('services', {..., note})` answered
  * `services has no field called note. (FIELD_UNKNOWN)`, so the row was refused whole rather than carried without it.
  *

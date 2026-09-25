@@ -90,7 +90,7 @@ test('IT REQUIRES NO PACK BY NAME, and names no host but the example', () => {
  * THE DECLARATION IS THE ONE THE IMPORT FILES TODAY, BUT FOR ITS NAME. The setup file's `polls` are `PollSpec`s, which
  * `apps/cli/src/import.ts` hands to `pollPack`, so a spec that fills this file and builds the same poll there is the
  * proof that moving the import onto this file changes what is polled in nothing but the ingest's name and the pack's.
- * The spec is the synthetic setup's own poll (`apps/cli/test/legacy-export.ts`), with a project and a key.
+ * The spec is the synthetic setup's own poll (`packs/legacy-import/test/synthetic.ts`), with a project and a key.
  */
 test('A SETUP FILE’S POLL FILLS IT AS IT STANDS, and the poll is the one the builder in the seed makes', () => {
   const setup: FeedSpec = {

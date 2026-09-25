@@ -7,7 +7,7 @@
  * measures at one address are one request an interval. A key, when the address needs one, is named by its label in
  * the vault and opened by the host at send time; the pack never holds it, and `SECRET_IN_PACK` refuses one that tries.
  *
- * THE SPEC IS THE SETUP FILE'S POLL, FIELD FOR FIELD. `apps/cli/src/legacy.ts` reads `polls` from the setup file an
+ * THE SPEC IS THE SETUP FILE'S POLL, FIELD FOR FIELD. The the old tool adapter (`packs/legacy-import/adapter.ts`) reads `polls` from the setup file an
  * owner writes beside an export, each one `{ id, url, every, grant, project, organisation, measures }`, which is the
  * `PollSpec` of `packages/seed/src/usecases/founder-poll.ts`. So a poll in a setup file fills this file as it stands,
  * and `live-feed.test.ts` holds the filled declaration equal to what that builder makes, but for its name.

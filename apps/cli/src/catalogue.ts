@@ -71,12 +71,14 @@ import {
   unchanged,
   verifyVersion,
   type AuthorKey,
+  type CatalogueEntry,
   type CatalogueFile,
   type CatalogueIndex,
   type Changes,
   type EntryKind,
   type KnownKeys,
   type Reach,
+  type Signature,
   type Trust,
 } from '@braindog/declare/catalogue';
 import { refused, type Result } from '@braindog/ports';
@@ -295,7 +297,7 @@ export function trustLine(given: Trust, named: string): string {
 /** The keys this machine has seen per entry (`trustSubject`: kind and id, never the author name), beside the hosts file. */
 export const knownKeysPath = (io: AgentIo): string => join(dirname(hostsPath(io.env)), 'known-keys.json');
 
-function knownKeys(io: AgentIo): KnownKeys {
+export function knownKeys(io: AgentIo): KnownKeys {
   try {
     return readKnownKeys(JSON.parse(readFileSync(knownKeysPath(io), 'utf8')));
   } catch {
@@ -626,6 +628,35 @@ function planLines(file: CatalogueFile): string[] {
   return [`${title} ${version} reads as ${NOUN[file.kind].a}, and this is what installing it would ask.`, ...reachLines(reachOf(file))];
 }
 
+/**
+ * Whether a version already held to its checksum may be asked for, and how far its signature is trusted, or the sentence
+ * refusing it: signed by a key its author revoked, unsigned after signed versions, or unsigned where this machine has
+ * seen a key for it.
+ *
+ * ONE CHECK FOR EVERY DOOR A PACK COMES IN BY. `pack install` asks it, and so does the import when it resolves the packs
+ * an adapter offers (`packFrom` in `adapter.ts`). The import held an offer to its checksum and its entry only, so a
+ * version `pack install` refuses as revoked was filed on Decide by the import as if nothing were wrong.
+ */
+export async function trustVersion(
+  entry: CatalogueEntry,
+  version: string,
+  signature: Signature | null | undefined,
+  keys: unknown,
+  known: KnownKeys,
+): Promise<{ ok: true; trust: Trust } | { ok: false; fix: string }> {
+  const statements = await verifiedStatements(keys);
+  const title = oneLine(entry.title);
+  /* A REVOKED KEY IS SAID AND NOTHING IS ASKED. */
+  const revoked = revokedNotice(statements, title, version, signature);
+  if (revoked !== null) return { ok: false, fix: oneLine(revoked) };
+  const before = await keysSignedBefore(entry, version);
+  /* NOR IS ONE THAT LOST ITS SIGNATURE AFTER SIGNED VERSIONS. */
+  if (!signature && before.length > 0) return { ok: false, fix: strippedNotice(title, version, before) };
+  const trust = trustOf(known, trustSubject(entry), signature, statements, before);
+  if (trust.kind === 'stripped') return { ok: false, fix: `${title} ${version}: ${trustLine(trust, entry.author)}` };
+  return { ok: true, trust };
+}
+
 /** `install <id> --from <catalogue> [--version x.y.z]`: the file held to its checksum and signature, then asked for on Decide, or with `dryRun` only said. */
 export async function installFromCatalogue(
   id: string,
@@ -682,25 +713,13 @@ export async function installFromCatalogue(
     refuse(io, matches, saidWithCode(matches));
     return 1;
   }
-  const statements = await verifiedStatements(at.index.keys);
-  /* A REVOKED KEY IS SAID AND NOTHING IS ASKED. */
+  const trusted = await trustVersion(entry, chosen.version, held.value, at.index.keys, knownKeys(io));
+  if (!trusted.ok) {
+    io.say(`${trusted.fix} Nothing was sent.`);
+    return 1;
+  }
+  const { trust } = trusted;
   const title = oneLine(entry.title);
-  const revoked = revokedNotice(statements, title, chosen.version, held.value);
-  if (revoked !== null) {
-    io.say(`${oneLine(revoked)} Nothing was sent.`);
-    return 1;
-  }
-  const before = await keysSignedBefore(entry, chosen.version);
-  /* NOR IS ONE THAT LOST ITS SIGNATURE AFTER SIGNED VERSIONS. */
-  if (held.value === null && before.length > 0) {
-    io.say(`${strippedNotice(title, chosen.version, before)} Nothing was sent.`);
-    return 1;
-  }
-  const trust = trustOf(knownKeys(io), trustSubject(entry), held.value, statements, before);
-  if (trust.kind === 'stripped') {
-    io.say(`${title} ${chosen.version}: ${trustLine(trust, entry.author)} Nothing was sent.`);
-    return 1;
-  }
   const said = trustLine(trust, entry.author);
   io.out(said);
   const question = `Install ${title} ${chosen.version} from a catalogue? ${said}`;

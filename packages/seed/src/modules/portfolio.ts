@@ -260,7 +260,7 @@ export const PROJECT_METRICS: Record<string, SeedMetric> = {
      TOLD AN IMPORTED RECORD IT EARNED NOTHING. Driven on a self-host at Sam's size,
      21 registers and his 26 projects imported through the owner's own door plus the founder pack's
      one example project: 27 projects, 14 of them in play, and not one annual figure on any of them,
-     because `apps/cli/src/legacy.ts` files a project's monthly revenue as a READING and has no
+     because the the old tool adapter (`packs/legacy-import/adapter.ts`) files a project's monthly revenue as a READING and has no
      year to write. `projects-earning` answered `value: 0, rows: 14, held: 27, met: true`, so the
      Earning tile drew "Earned in a year GBP 0.00" with "GBP 0.00 the year before", in the GOOD tone
      and linked into the list, in the same block row as a bar correctly drawing "No project in play

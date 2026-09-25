@@ -1,13 +1,18 @@
 /**
- * `braindog import legacy <export.json>`: move a the old tool record into this BrainDog (`loop/research-switch.md` §4).
+ * `braindog import <adapter> <export.json>`: move another tool's record into this BrainDog (`loop/research-switch.md`
+ * §4, and brief B2 of the parity survey under `loop/`).
+ *
+ * THE ADAPTER IS NAMED ON THE LINE AND IS NOT THIS FILE (`adapter.ts` says what one is). It reads its tool's export
+ * and plans the rows; this file applies the plan, and holds nothing about any one tool. A pack id names a folder in
+ * `packs/` with an `adapter.ts` and a `map.json` in it, and a path names a module anywhere.
  *
  * IT WRITES AS ANY AGENT DOES, over the API, with the token this machine signed in with: `create` and `update` for rows
  * and `propose` for an open question. So it works the same on a self-host and on brain.dog, and it can do nothing a
- * signed-in agent could not. Installing Solo founder and Agents is the owner's, in the app; a record without their lists
+ * signed-in agent could not. Installing the lists a plan writes into is the owner's, in the app; a record without them
  * is told which to install, and nothing is written. It writes as ONE RUN OF ITS OWN, never the folder's, and ends that
  * run `done` once the last write has answered: see the headers in `importCommand`.
  *
- * RE-RUNNING UPDATES, IT NEVER ADDS A SECOND ROW. Every row carries its the old tool key in its tags (an agent run in its
+ * RE-RUNNING UPDATES, IT NEVER ADDS A SECOND ROW. Every row carries its adapter key in its tags (an agent run in its
  * `client_id`, a question in its body), each list is read once before writing, and a row found by its key is updated
  * only in the fields that differ. A question already asked is never asked again, answered or not.
  *
@@ -19,9 +24,10 @@
  * questions asked, everything left out with its reason, and every row the record refused with the record's own sentence.
  * `--dry-run` reads and reports and writes nothing.
  *
- * THE OWNER'S SETUP COMES BESIDE THE EXPORT (`--setup`): the organisations he runs and the numbers to poll, which the old tool
- * never kept. Organisations are rows like any other; a poll is filed on Decide as a pack to install, because it sends
- * requests to another server and only the owner approves that. `--draft-setup` prints a first one from the export.
+ * THE OWNER'S SETUP COMES BESIDE THE EXPORT (`--setup`), for what the old tool never kept, such as the organisations he
+ * runs and the numbers to poll. What it may hold is the adapter's to read. A poll is filed on Decide as a pack to
+ * install, because it sends requests to another server and only the owner approves that. `--draft-setup` prints a
+ * first one from the export, when the adapter can draft one.
  *
  * AND IT REMEMBERS WHAT EACH RUN CARRIED, so `--since` can say it the next morning. See `Run`.
  */
@@ -31,22 +37,47 @@ import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
 import { satisfies } from '@braindog/declare';
+import type { KnownKeys } from '@braindog/declare/catalogue';
 import { coerce, type FieldDecl } from '@braindog/kernel';
 import { no, ok, refused, type Result } from '@braindog/ports';
 
 import { budgetOf, hostsPath, target, type Target } from './http.ts';
-import { bankHsbcEgPack, holdingsPack } from '@braindog/seed';
 import { pollPack } from '@braindog/seed/usecases/founder-poll';
 
-import { KEY_PREFIX, OPTIONAL, ORDER, draftSetup, holdsKey, PROVIDED_BY, isRef, planLegacyTool, readLegacyTool, readSetup, type Plan, type PlannedRow, type Setup, type Skipped } from './legacy.ts';
+import { TOOLS, folderCatalogue, holdsKey, isRef, loadAdapter, packFrom, type CatalogueRead, type ImportMap, type Offer, type Plan, type PlannedRow, type Settled, type Skipped } from './adapter.ts';
+import { knownKeys } from './catalogue.ts';
 import type { AgentIo } from './skills.ts';
+import { readSource } from './usecase.ts';
 
 import { createClient } from '@braindog/client';
 
 const USAGE =
-  'braindog import takes legacy <export.json> [--setup <setup.json>] [--host <host>] [--dry-run], or legacy <export.json> --draft-setup, or legacy --since <day or last>.';
+  'braindog import takes <adapter> <export.json> [--setup <setup.json>] [--map <map.json>] [--catalogue <folder or address>] [--host <host>] [--dry-run], or <adapter> <export.json> --draft-setup, or <adapter> --since <day or last>. The adapter is a pack in packs/ by its id, or the path of an adapter module.';
 
-/** The largest export this reads: the old tool's is about 108 KB of document and an audit of up to 100,000 lines. */
+/** The options only an adapter import takes, which is how `main.ts` tells one from putting a .brainl file back. */
+export const ADAPTER_OPTIONS = ['setup', 'map', 'catalogue', 'dry-run', 'draft-setup', 'since', 'bin-emptied'] as const;
+
+/**
+ * Whether a line after `braindog import` is an adapter import rather than a .brainl put back: two words before any
+ * option, or any option only an adapter import takes. `braindog import <file.brainl>` takes one word and `--key` and
+ * `--host`, so the two never meet.
+ */
+export function isAdapterImport(args: string[]): boolean {
+  let words = 0;
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i]!;
+    if (arg.startsWith('--')) {
+      const name = arg.slice(2).split('=')[0]!;
+      if ((ADAPTER_OPTIONS as readonly string[]).includes(name)) return true;
+      if (!arg.includes('=') && (name === 'host' || name === 'key')) i++;
+      continue;
+    }
+    words++;
+  }
+  return words >= 2;
+}
+
+/** The largest export this reads: the first one it read is about 108 KB of document and an audit of up to 100,000 lines. */
 export const IMPORT_MOST_BYTES = 64 * 1024 * 1024;
 
 type Row = { id: string; seq: number | null; version: number; fields: Record<string, unknown>; deleted_at?: string | null };
@@ -60,7 +91,7 @@ export type Door = {
    *
    * A DOOR THAT ANSWERS LIVE ROWS ONLY IS NOT SAFE, and this sentence used to say it was. Nothing is read as deleted,
    * so nothing is held back, and every row he deleted is planned again as new: measured against a host at `19d4c785`
-   * (`test/import-deleted-skew.test.ts`), task 101 and ledger row T1 came back, `Tasks: 1 added` and `Ledger: 1 added`,
+   * (the adapter's `test/import-deleted-skew.test.ts`), task 101 and ledger row T1 came back, `Tasks: 1 added` and `Ledger: 1 added`,
    * exit 0. So the importer's door asks as a POST, which every host decodes (`listWithDeleted`), and `applyPlan`
    * refuses an answer that holds nothing in the bin when the run before saw rows there that cannot have left it
    * (`BinUnread`).
@@ -71,7 +102,7 @@ export type Door = {
   governance: (args: { register?: string; status?: string; limit?: number; cursor?: string }) => Promise<Result<unknown>>;
   propose: (args: { question: string; body_kind: 'options' | 'pack' | 'change'; body: Record<string, unknown> }) => Promise<Result<unknown>>;
   /**
-   * The packs this record holds and at which version: read only when a pack is to be offered (see `banksOf`).
+   * The packs this record holds and at which version: read only when a pack is to be offered (see `offer` in `applyPlan`).
    * OPTIONAL BECAUSE A DOOR WITHOUT IT STILL WORKS. The pack is then proposed unchecked, and a record that cannot take
    * it answers with its own refusal, which lands under "Refused by the record" like any other.
    */
@@ -79,13 +110,10 @@ export type Door = {
 };
 
 /**
- * A pack his export shows he uses, to be offered on Decide with its document: see `banksOf` and `holdingsOf`.
- *
- * THE DOCUMENT TRAVELS WITH THE ID because the pack is in no catalogue a record resolves an install id against.
- * `bank-hsbc-eg` and `holdings` are deliberately not in `seedCatalogue`: a pack in the catalogue is a pack every record
- * is offered. `says` is what the pack is for, in the words that open the line saying why it was held back.
+ * A pack the adapter says the export shows he uses (`Offer`), with the document the host's catalogue holds for it, or
+ * `null` and the sentence saying why the catalogue could not give it (`unfound`), which the report says in its place.
  */
-export type PlannedPack = { install: string; name: string; question: string; doc: Record<string, unknown>; says: string };
+export type PlannedPack = Offer & { doc: Record<string, unknown> | null; unfound?: string };
 export type PlannedBank = PlannedPack;
 
 export type Tally = { added: number; updated: number; unchanged: number };
@@ -94,7 +122,7 @@ export type Tally = { added: number; updated: number; unchanged: number };
  * A ROW THE IMPORT'S OWN RETIRE PASS PUT IN THE BIN, BY ITS ID AND THE VERSION THE DELETE LEFT IT AT.
  *
  * The holdings retire deletes, because Holdings has no state to close a row with, and a deleted row is what `gone` in
- * `applyPlan` reads as his. Measured before this (`test/import-own-deletes.test.ts`): a gold lot corrected 5 to 6 and
+ * `applyPlan` reads as his. Measured before this (the adapter's `test/import-own-deletes.test.ts`): a gold lot corrected 5 to 6 and
  * back to 5 in the old tool left no lot here, and the report said he had deleted it. The row itself does not say who
  * deleted it, so the run remembers it (`Run.binned`), and a row still in the bin at the version the import's delete
  * gave it is the import's. A row he put back and deleted again is at a later version, and is his.
@@ -122,7 +150,7 @@ const SWEPT_AFTER_MS = 29 * 86_400_000;
 /** A row written without the row it names, as both reports say it: see `Report.unfiled`. */
 export type Unfiled = { register: string; label: string; names: { register: string; label: string }[] };
 
-/** A question settled in the old tool and still open on Decide here, as both reports say it: see `settledOf`. */
+/** A question settled in the old tool and still open on Decide here, as both reports say it: see the adapter's `settled`. */
 export type Waiting = { label: string; question: string | null; answer: string };
 
 export type Report = {
@@ -153,7 +181,7 @@ export type Report = {
    * too old to take it. Absent when the run was handed no bank to offer.
    */
   banks?: { filed: number; before: number; waiting: string[] };
-  /** The same for every other pack the export shows he needs (`holdingsOf`), counted apart so Banks stays about banks. */
+  /** The same for every other pack the export shows he needs (`Offer`), counted apart so Banks stays about banks. */
   packs?: { filed: number; before: number; waiting: string[] };
   /**
    * The words the old tool used that a closed list here did not hold (`PlannedRow.own`), each said as `crypto as a kind in
@@ -187,58 +215,35 @@ export type Report = {
    * export files under a project he threw away. Optional for the same reason.
    */
   unfiled?: Unfiled[];
-  /** What happened to each planned row, by its key: the report lists dates, domains and services one by one. */
+  /** What happened to each planned row, by its key: the report lists the kinds the mapping names one by one. */
   outcomes: Record<string, 'added' | 'updated' | 'unchanged' | 'refused' | 'deleted'>;
   plan: Plan;
+  /** What the report is said in (`Words`). Optional for a report written by hand, which is then said by the plan's ids. */
+  words?: Words;
 };
 
 /**
- * The words a report names a list by.
+ * WHAT A RUN SAYS THINGS IN: the tool the export came from, and the mapping's lists, their names and what installs each.
  *
- * THE `satisfies` IS HERE BECAUSE THIS MAP LIVES IN A DIFFERENT FILE FROM THE LIST IT HAS TO COVER, AND THE FALLBACK IS
- * SILENT. Every lookup of it reads `NAMES[register] ?? register`, so a register added to `ORDER` (`src/legacy.ts`)
- * and not named here prints the API's own id at a person rather than refusing. It has happened twice. `installments`
- * printed `installments: 1 added, 0 updated, 0 unchanged.` in the main tally directly beside `Accounts: 1 added`, and
- * `fx` did it again this week. `PROVIDED_BY`, the other map a new register needs a line in, was filled in the same edit,
- * and the only difference between the two is that it sits in `legacy.ts` under `ORDER` and this one is a file away
- * and belongs to a different agent. So the seam is where the maps live, not who was careless. Held as
- * `satisfies`, a register with no name here is a compile error that names it (measured: `Property 'fx' is missing`),
- * which whoever adds one reads before any run of the import does. `satisfies` checks an object literal for excess keys
- * as well, so a name left behind for a register `ORDER` has stopped writing is an error too (measured: `'snapshots'
- * does not exist in type`). `test/import.test.ts` still holds the printed lines to their words, because the one thing
- * the compiler cannot check is that a name is the one the product shows a person.
+ * THE NAMES ARE THE MAPPING'S AND NOT THIS FILE'S, and a list the mapping writes is named there or the mapping is
+ * refused (`readMap`). They were a table here, a file away from the list of lists it had to cover, and three times a
+ * list was added to the one and not the other, so the report printed `installments: 1 added` and then `fx` at a person
+ * where the page says Instalments and Exchange rates. Held to each other where they are read, a list with no name is a
+ * sentence before the first row is sent rather than an id in the report.
+ *
+ * A PLAN APPLIED WITHOUT A MAPPING, as a test that writes its own plan does, writes its lists in the order its rows
+ * first name them and names each by its id.
  */
-const NAMES: Readonly<Record<string, string>> = {
-  things: 'Projects',
-  people: 'People',
-  tracks: 'Threads',
-  tasks: 'Tasks',
-  datapoints: 'Datapoints',
-  learnings: 'Learnings',
-  skills: 'Skills',
-  tools: 'Tools',
-  credentials: 'Keys (the index only)',
-  /* THE WORDS money-core PUTS OVER THIS LIST (`packages/seed/src/modules/money.ts:506`), not "FX" or "Rates": a person
-     reading the report has the same two words over the page the import filled. */
-  fx: 'Exchange rates',
-  accounts: 'Accounts',
-  /* AND THE THIRD TIME THIS FILE HAS BEEN THE ONE A NEW REGISTER FORGOT, which the paragraph above predicted in so many
-     words: `ORDER` gained `holdings` in `legacy.ts`, an agent's own file, and this map is a file away and was another
-     agent's. `Holdings` is what the holdings pack puts over the list (`packages/seed/src/packs/holdings.ts`, `name`), so
-     a person reading the report has the same word over the page the import filled. */
-  holdings: 'Holdings',
-  categories: 'Categories',
-  obligations: 'Money in and out',
-  /* THE WORDS money-core PUTS OVER THESE FOUR LISTS AND NOTHING ELSE (`packages/seed/src/modules/money.ts`), which is
-     the run that put the sentence above here: `installments` was the register with no entry, and the id it fell back to
-     was what a person read. */
-  transactions: 'Ledger',
-  recurring: 'Repeating',
-  installments: 'Instalments',
-  services: 'Services',
-  organisations: 'Organisations',
-  session: 'Agent runs',
-} satisfies Record<(typeof ORDER)[number], string>;
+export type Words = { source: string; map: ImportMap };
+
+/** The words a plan is said in when nobody gave any: see `Words`. */
+export const plainWords = (plan: Plan): Words => ({
+  source: 'the export',
+  map: { targets: { order: [...new Set(plan.rows.map((r) => r.register))], optional: [], providedBy: {}, names: {} }, usecase: null, listed: null, raw: {} },
+});
+
+/** What the report calls a list: the mapping's name for it, or its id. */
+const nameIn = (w: Words, register: string): string => w.map.targets.names[register] ?? register;
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const fixOf = (r: Result<unknown>): string => (refused(r) ? `${r.refusal.fix} (${r.refusal.code})` : 'Somebody else changed it at the same moment. Run the import again.');
@@ -253,11 +258,11 @@ function stable(v: unknown): string {
   return JSON.stringify(v);
 }
 
-/** The key a row was imported under: in its tags, or in `client_id` for an agent run. */
-const keyOf = (register: string, fields: Record<string, unknown>): string | null => {
-  if (register === 'session') return typeof fields.client_id === 'string' && fields.client_id.startsWith(KEY_PREFIX) ? fields.client_id : null;
+/** The key a row was imported under, by the plan's prefix: in its tags, or in `client_id` for an agent run. */
+const keyOf = (prefix: string, register: string, fields: Record<string, unknown>): string | null => {
+  if (register === 'session') return typeof fields.client_id === 'string' && fields.client_id.startsWith(prefix) ? fields.client_id : null;
   const tags = Array.isArray(fields.tags) ? fields.tags : [];
-  return (tags.find((t) => typeof t === 'string' && t.startsWith(KEY_PREFIX)) as string | undefined) ?? null;
+  return (tags.find((t) => typeof t === 'string' && t.startsWith(prefix)) as string | undefined) ?? null;
 };
 
 class Unreachable extends Error {}
@@ -312,20 +317,20 @@ class BinUnread extends Error {
  * thousand pages is half a million rows in one list, and a run that reached it would have been carrying on with an
  * answer that was missing everything past it.
  */
-async function readAll(door: Door, register: string): Promise<Row[]> {
+async function readAll(door: Door, register: string, name: string): Promise<Row[]> {
   const out: Row[] = [];
   let cursor: string | null = null;
   for (let pages = 0; pages < 1000; pages++) {
     const got = await door.list({ register, limit: 500, deleted: true, ...(cursor === null ? {} : { cursor }) });
     if (!got.ok) {
       if (unreachable(got)) throw new Unreachable();
-      throw new PartlyRead(NAMES[register] ?? register, fixOf(got));
+      throw new PartlyRead(name, fixOf(got));
     }
     for (const r of got.value.rows) if (isObj(r) && typeof r.id === 'string' && isObj(r.fields)) out.push(r as unknown as Row);
     cursor = got.value.cursor;
     if (cursor === null) return out;
   }
-  throw new PartlyRead(NAMES[register] ?? register, `This list is longer than an import reads in one run (${String(out.length)} rows and more).`);
+  throw new PartlyRead(name, `This list is longer than an import reads in one run (${String(out.length)} rows and more).`);
 }
 
 /**
@@ -345,7 +350,7 @@ const DECIDE_PAGE = 200;
  *
  * His first run is one write per row, about 3,315 of them, and it is the run the freeze waits on. Sent one at a time,
  * each write waited out its own round trip before the next was sent. Measured on 23 September through the Worker in
- * workerd with a fixed delay put on every request (`test/import-throughput.test.ts` has the method), for the 44-row
+ * workerd with a fixed delay put on every request (the adapter's `test/import-throughput.test.ts` has the method), for the 44-row
  * fixture grown by 320 tasks, 400 requests in all:
  *
  *   at a time:   1        4        8        16
@@ -411,92 +416,7 @@ async function readDecide(door: Door): Promise<Result<Decide>> {
   return no('OUT_OF_BOUNDS', `Decide holds more than ${String(DECIDE_PAGE * 1000)} rows, which is more than an import reads in one run.`);
 }
 
-/**
- * The words a ledger row's `source` carries when a bank's own message wrote it. Only `sms` was seen on his live ledger
- * on 22 September (beside `sheet`, his typed rows); the two mail words are here because the pack reads alert mails as
- * well and a row a mail wrote is the same evidence as one a text wrote.
- */
-const READ_FROM_A_MESSAGE = new Set(['sms', 'email', 'mail']);
-
-/**
- * THE BANK PACKS HIS EXPORT SHOWS HE USES, AND ONLY THOSE: today one, `bank-hsbc-eg`.
- *
- * money-core 1.8.0 gave HSBC Egypt's wordings to an optional pack (`loop/DIRECTION.md` section 22), so a record set up
- * for him no longer reads his bank's texts until somebody installs it, and the import is the one moment that knows he
- * needs it. It has to know that from his data and not from being his importer, or it is the core assuming one bank
- * again in another file.
- *
- * WHAT COUNTS IS AN HSBC ACCOUNT WITH A ROW ON IT THAT A MESSAGE WROTE, and the export carries nothing better. It holds
- * no pattern and no inbox (`scripts/legacy-export.mjs` asks four routes and none of them is either); what it does
- * hold, measured against his live `/api/money/overview` and `/api/money/txn` on 22 September, is two accounts whose id
- * and name say HSBC and a `source` on every ledger row, `sms` on the rows the bank's texts wrote and `sheet` on the ones
- * he typed in before the texts were wired. Neither alone is enough. An account called HSBC whose every row was typed
- * says he banks there, not that there is anything for the pack to read; a row read from a text on some other account
- * says a bank texts him, not which. the old tool's parser reads only the Egypt wordings the pack carries, so a row it
- * wrote from a text onto an HSBC account is a message in exactly those wordings.
- */
-export function banksOf(exp: Record<string, unknown>): PlannedBank[] {
-  const money = isObj(exp.money) ? exp.money : null;
-  if (!money) return [];
-  const hsbc = new Set<string>();
-  for (const a of Array.isArray(money.accounts) ? money.accounts : [])
-    if (isObj(a) && (typeof a.id === 'string' || typeof a.id === 'number') && /hsbc/iu.test(`${String(a.id)} ${typeof a.name === 'string' ? a.name : ''}`)) hsbc.add(String(a.id).toLowerCase());
-  if (hsbc.size === 0) return [];
-  /* THE LEDGER IN EVERY SHAPE `legacy.ts` READS IT IN: the route's answer whole, or its rows under one of three names. */
-  const ledger = money.ledger;
-  const rows: unknown[] = Array.isArray(ledger) ? ledger : isObj(ledger) ? [ledger.txns, ledger.transactions, ledger.rows].find(Array.isArray) ?? [] : [];
-  const read = rows.some((t) => isObj(t) && typeof t.source === 'string' && READ_FROM_A_MESSAGE.has(t.source.toLowerCase()) && hsbc.has(String(t.account_id ?? t.account).toLowerCase()));
-  return read ? [{ install: 'bank-hsbc-eg', name: 'HSBC Egypt', question: 'Read HSBC Egypt texts and mails into Money?', doc: bankHsbcEgPack(), says: 'Reading HSBC Egypt texts and mails' }] : [];
-}
-
-/**
- * THE HOLDINGS PACK, WHEN HIS EXPORT HOLDS ANYTHING HE OWNS.
- *
- * money-core 2.0.0 gave `holdings` to a pack of its own (`packages/seed/src/packs/holdings.ts`), which no use case
- * installs, so a record set up after the move has nowhere to put his gold, his certificate or his policies until
- * somebody installs it, and the import is the one moment that knows he needs it. What counts is a row in
- * `money.assets`, the route that answered all fourteen on 22 September; one the plan will skip for having no cost still
- * says he holds things. On a record that already has the list from an older money-core the offer waits, with the
- * reason, because the pack asks for money-core 2.0.0 and beside 1.8.0 it is refused: see `applyPlan`.
- */
-export function holdingsOf(exp: Record<string, unknown>): PlannedPack[] {
-  const money = isObj(exp.money) ? exp.money : null;
-  const assets = money && Array.isArray(money.assets) ? money.assets : [];
-  return assets.some(isObj)
-    ? [{ install: 'holdings', name: 'Holdings', question: 'Keep what you hold in a Holdings list?', doc: holdingsPack(), says: 'A list for what you hold' }]
-    : [];
-}
-
-/**
- * A question the old tool has answered or put away, by the key the import asked it under: see `settledOf`.
- */
-export type Settled = { key: string; label: string; question: string | null; status: 'decided' | 'dismissed'; decision: string | null };
-
-/**
- * THE QUESTIONS HIS EXPORT SAYS ARE SETTLED, so a run can say which of them still wait on Decide here.
- *
- * NOTHING ELSE CAN CLOSE THEM. The planner leaves a decided or dismissed question out, the import never asks one twice,
- * and a token cannot decide, so the twin an earlier night asked stays open here for as long as nobody answers it: over
- * the shadow week's made-up nights, SG7 decided in the old tool on night 3 was open on Decide here on night 7
- * (`loop/research-shadow-week.md` §2 night 3). What the run can do is say so, with what to do, which is the answer he
- * gave there given again here, or a dismissal. Read from the export the way `banksOf` reads it, because the plan keeps
- * only the questions it asks.
- */
-export function settledOf(exp: Record<string, unknown>): Settled[] {
-  const db = isObj(exp.db) ? exp.db : null;
-  const out: Settled[] = [];
-  for (const s of db && Array.isArray(db.suggestions) ? db.suggestions : []) {
-    if (!isObj(s) || typeof s.id !== 'string' || (s.status !== 'decided' && s.status !== 'dismissed')) continue;
-    out.push({
-      key: `${KEY_PREFIX}suggestion:${s.id}`,
-      label: s.id,
-      question: typeof s.question === 'string' && s.question.trim() !== '' ? s.question.trim() : null,
-      status: s.status,
-      decision: typeof s.decision === 'string' && s.decision.trim() !== '' ? s.decision.trim() : null,
-    });
-  }
-  return out;
-}
+export type { Settled };
 
 /**
  * A range as a sentence says it: `>=2.0.0` is "2.0.0 or later" and `>=1.8.0 <3.0.0` is "1.8.0 or later, before 3.0.0".
@@ -519,7 +439,9 @@ export async function applyPlan(
   door: Door,
   o: {
     dryRun: boolean;
-    banks?: PlannedBank[];
+    /** What the run is said in: the tool the export came from, and the mapping. Without it, `plainWords`. */
+    words?: Words;
+    banks?: PlannedPack[];
     packs?: PlannedPack[];
     settled?: Settled[];
     /** The rows earlier runs into this record put in the bin themselves (`Binned`), as `imports.jsonl` remembers them. */
@@ -542,6 +464,12 @@ export async function applyPlan(
   },
 ): Promise<Report> {
   let plan = given;
+  const words = o.words ?? plainWords(given);
+  const { order, providedBy } = words.map.targets;
+  const optional = new Set(words.map.targets.optional);
+  const name = (register: string) => nameIn(words, register);
+  /* WHAT A MISSING LIST IS INSTALLED BESIDE, when the mapping says: the use case the rest of the lists came with. */
+  const beside = words.map.usecase ? ` beside ${words.map.usecase}` : '';
   const questions: NonNullable<Report['questions']> = [];
   const waiting: Waiting[] = [];
   const deleted: NonNullable<Report['deleted']> = [];
@@ -567,9 +495,10 @@ export async function applyPlan(
     unfiled,
     outcomes: {},
     plan,
+    words,
   };
   if (o.progress) o.progress.report = report;
-  let registers = ORDER.filter((r) => plan.rows.some((row) => row.register === r));
+  let registers = order.filter((r) => plan.rows.some((row) => row.register === r));
 
   /**
    * A LIST WITH NOTHING PLANNED FOR IT IS STILL ASKED ABOUT WHEN A ROW IS TO BE RETIRED OUT OF IT OR INTO IT. An
@@ -601,7 +530,7 @@ export async function applyPlan(
     if (has.ok) answered.add(register);
     if (!has.ok) {
       if (unreachable(has)) throw new Unreachable();
-      if (OPTIONAL.has(register) || spare.includes(register)) absent.push(register);
+      if (optional.has(register) || spare.includes(register)) absent.push(register);
       else report.missing.push(register);
       continue;
     }
@@ -660,15 +589,15 @@ export async function applyPlan(
      */
     const lead = new Map<string, string>();
     for (const register of new Set(out.map((r) => r.register))) {
-      const by = PROVIDED_BY[register] ?? register;
+      const by = providedBy[register] ?? register;
       const versioned = /^(.+) (\d+\.\d+\.\d+)$/u.exec(by);
       if (!versioned) {
-        lead.set(register, `Install ${by} beside Solo founder`);
+        lead.set(register, `Install ${by}${beside}`);
         continue;
       }
       const pack = versioned[1]!;
       const version = versioned[2]!;
-      const siblings = Object.entries(PROVIDED_BY).flatMap(([r, p]) => (r !== register && (p === pack || p.startsWith(`${pack} `)) ? [r] : []));
+      const siblings = Object.entries(providedBy).flatMap(([r, p]) => (r !== register && (p === pack || p.startsWith(`${pack} `)) ? [r] : []));
       let held = siblings.some((r) => answered.has(r));
       for (const r of siblings) {
         if (held) break;
@@ -677,7 +606,7 @@ export async function applyPlan(
         if (!has.ok && unreachable(has)) throw new Unreachable();
         held = has.ok;
       }
-      lead.set(register, held ? `Update ${pack} to ${version}` : `Install ${by} beside Solo founder`);
+      lead.set(register, held ? `Update ${pack} to ${version}` : `Install ${by}${beside}`);
     }
     plan = {
       ...plan,
@@ -690,7 +619,7 @@ export async function applyPlan(
           .filter((register) => out.some((r) => r.register === register))
           .map((register) => {
             const line = {
-              reason: `This BrainDog has no ${NAMES[register] ?? register} list. ${lead.get(register) ?? `Install ${PROVIDED_BY[register] ?? register} beside Solo founder`}, then run the import again to bring these in`,
+              reason: `This BrainDog has no ${name(register)} list. ${lead.get(register) ?? `Install ${providedBy[register] ?? register}${beside}`}, then run the import again to bring these in`,
               items: out.filter((r) => r.register === register).map((r) => r.label),
             };
             leftOut.set(register, line);
@@ -766,7 +695,7 @@ export async function applyPlan(
       skipped: [
         ...plan.skipped,
         ...[...unheld.values()].map(({ register, field, items }) => ({
-          reason: `This BrainDog's ${NAMES[register] ?? register} list has no ${field} field yet, so each of these is sent without its ${field} and with everything else. Update ${(PROVIDED_BY[register] ?? register).replace(/ \d+\.\d+\.\d+$/u, '')}, then run the import again to bring it in`,
+          reason: `This BrainDog's ${name(register)} list has no ${field} field yet, so each of these is sent without its ${field} and with everything else. Update ${(providedBy[register] ?? register).replace(/ \d+\.\d+\.\d+$/u, '')}, then run the import again to bring it in`,
           items,
         })),
       ],
@@ -800,7 +729,7 @@ export async function applyPlan(
   /**
    * A WORD THE OLD TOOL USED THAT A CLOSED LIST HERE HAS NOT GOT IS PROPOSED TO THE LIST, BEFORE ANY ROW IS WRITTEN.
    *
-   * Measured before this (`test/import-values.test.ts`): a `crypto` holding arrived as `other`, a `registrar` service as
+   * Measured before this (the adapter's `test/import-values.test.ts`): a `crypto` holding arrived as `other`, a `registrar` service as
    * `hosting` and an `investor` as `collaborator`, and two of the three said nothing. The record grows a closed list at
    * run time: an `add` of values is answered by rule and lands at once when the owner's own key files it, and waits on
    * Decide when anybody else does (DIRECTION §22). So each list gets ONE `add` carrying every word it is missing, and a
@@ -827,7 +756,7 @@ export async function applyPlan(
     report.values = values;
     const decided = await readDecideOnce();
     for (const [register, fields] of decided === null ? [] : wanted) {
-      const put = (field: string, word: string) => `${word} as a ${field} in ${NAMES[register] ?? register}`;
+      const put = (field: string, word: string) => `${word} as a ${field} in ${name(register)}`;
       const fresh: Record<string, string[]> = {};
       for (const [field, words] of fields)
         for (const word of words)
@@ -870,8 +799,8 @@ export async function applyPlan(
   /**
    * AN EXPORT TAKEN BEFORE ONE AN EARLIER RUN CARRIED INTO THIS RECORD CLOSES NOTHING.
    *
-   * Every retire reads tonight's export against itself, so a row only a newer export held reads as gone from Sam
-   * Brain. Measured before this (`test/import-older-export.test.ts`, `loop/research-batch-fifty-three-audit.md` section
+   * Every retire reads tonight's export against itself, so a row only a newer export held reads as gone from the old
+   * tool. Measured before this (the adapter's `test/import-older-export.test.ts`, `loop/research-batch-fifty-three-audit.md` section
    * 3): an export of 2026-09-16 and then a saved one of 2026-09-09 dropped the newer one's task, voided its ledger row
    * dated inside the older ledger's days, and deleted its gold lot, each said as gone from the old tool. The ledger's own
    * window (`Retire.inside`) spares only a row dated after the older export's newest day. So the whole pass is skipped,
@@ -890,7 +819,7 @@ export async function applyPlan(
         ...plan.skipped,
         {
           reason: `Nothing an earlier import carried was closed tonight in these lists, because this export was taken on ${when(plan.taken)} and an earlier import into this BrainDog carried one taken on ${when(newest)}: a row this one does not hold may only be newer than it. Every row it does hold was written as it stands in this export, so a row changed since reads as it did then until the newest export is imported again`,
-          items: [...new Set(retiring.map((r) => NAMES[r.register] ?? r.register))],
+          items: [...new Set(retiring.map((r) => name(r.register)))],
         },
       ],
     };
@@ -914,8 +843,8 @@ export async function applyPlan(
    * EVERY KEY A ROW HE DELETED HERE STILL HOLDS, AND THE PLAN DOES NOT WRITE ONE OF THEM AGAIN.
    *
    * `readAll` listed live rows only, and a planned key no live row holds is a row to create, so a task or a ledger row
-   * he deleted in BrainDog was added back by the next night's import, which is every night of the shadow week: Sam
-   * Brain is still where he works, and its export still holds the row (`test/import-deleted-stays.test.ts`, measured
+   * he deleted in BrainDog was added back by the next night's import, which is every night of the shadow week: the old
+   * tool is still where he works, and its export still holds the row (the adapter's `test/import-deleted-stays.test.ts`, measured
    * before this: `Tasks: 1 added` and `Ledger: 1 added` for the two rows deleted). A deleted row is still a row in the
    * record until it is purged, with its tags, so its key is read with the live ones and set aside here.
    *
@@ -924,8 +853,8 @@ export async function applyPlan(
    * And a deleted row takes no example count and no category name, because the record's unique index on a name is on
    * live rows alone (`packages/kernel/src/declare.ts`, `deleted_at IS NULL`).
    *
-   * AND A ROW THE IMPORT PUT IN THE BIN ITSELF IS NOT ONE HE DELETED (`Binned`): its key is written again the night Sam
-   * Brain holds it again, and the row is remembered once more for as long as it stays in the bin, so a memory older
+   * AND A ROW THE IMPORT PUT IN THE BIN ITSELF IS NOT ONE HE DELETED (`Binned`): its key is written again the night the old
+   * tool holds it again, and the row is remembered once more for as long as it stays in the bin, so a memory older
    * than the sixty runs `imports.jsonl` keeps does not turn it into his.
    */
   const gone = new Set<string>();
@@ -934,7 +863,7 @@ export async function applyPlan(
   /** Every id tonight's answer holds, live or deleted, which is how a row the run before saw in the bin is accounted for. */
   const inAnswer = new Set<string>();
   for (const register of read)
-    for (const row of await readAll(door, register)) {
+    for (const row of await readAll(door, register, name(register))) {
       inAnswer.add(row.id);
       if (typeof row.deleted_at === 'string' && row.deleted_at !== '') {
         bin.push({ id: row.id, register, since: row.deleted_at });
@@ -942,13 +871,13 @@ export async function applyPlan(
           binned.push({ id: row.id, version: row.version });
           continue;
         }
-        const key = keyOf(register, row.fields);
+        const key = keyOf(plan.key, register, row.fields);
         if (key) gone.add(key);
         continue;
       }
       if (Array.isArray(row.fields.tags) && row.fields.tags.includes('example')) report.examples++;
       if (register === 'categories' && typeof row.fields.name === 'string') named.set(row.fields.name.toLowerCase(), row);
-      const key = keyOf(register, row.fields);
+      const key = keyOf(plan.key, register, row.fields);
       if (key) {
         existing.set(key, row);
         ids.set(key, row.id);
@@ -963,7 +892,7 @@ export async function applyPlan(
     const now = o.now ?? Date.now();
     const lists = new Set(read);
     const unread = o.bin.filter((b) => lists.has(b.register) && !inAnswer.has(b.id) && !(Date.parse(b.since) <= now - SWEPT_AFTER_MS));
-    if (unread.length > 0) throw new BinUnread([...new Set(unread.map((b) => NAMES[b.register] ?? b.register))], unread.length);
+    if (unread.length > 0) throw new BinUnread([...new Set(unread.map((b) => name(b.register)))], unread.length);
   }
 
   const later: { row: PlannedRow; field: string; value: unknown }[] = [];
@@ -1084,7 +1013,7 @@ export async function applyPlan(
         ids.set(row.key, `(new ${row.key})`);
         return;
       }
-      const made = await door.create({ register: row.register, fields: create, note: 'Imported from the old tool.' });
+      const made = await door.create({ register: row.register, fields: create, note: `Imported from ${words.source}.` });
       if (!made.ok) {
         if (unreachable(made)) {
           stopped = true;
@@ -1122,7 +1051,7 @@ export async function applyPlan(
      *
      * A one-off's `state` and `done_on` are the planner's reading of its day against the day of the import, so kept
      * past a change of day they describe a day that is gone. Measured before this (`loop/research-batch-fifty-one-audit.md`
-     * finding 5, `test/import-moved-oneoff.test.ts`): a return dated 2026-09-01 arrived done on the 17th, was moved in
+     * finding 5, the adapter's `test/import-moved-oneoff.test.ts`): a return dated 2026-09-01 arrived done on the 17th, was moved in
      * the old tool to 2026-10-15, and the next night patched `by` alone, leaving a task done six weeks before its day and
      * in no list of what is due. A night on which the day did not move sends none of them, so a state he set holds
      * until the old tool moves the day it was set against.
@@ -1145,7 +1074,7 @@ export async function applyPlan(
       tally.updated++;
       return;
     }
-    const done = await door.update({ register: row.register, seq: found.seq as number, patch, version: found.version, note: 'Imported again from the old tool.' });
+    const done = await door.update({ register: row.register, seq: found.seq as number, patch, version: found.version, note: `Imported again from ${words.source}.` });
     if (!done.ok) {
       if (unreachable(done)) {
         stopped = true;
@@ -1160,7 +1089,7 @@ export async function applyPlan(
   };
 
   /**
-   * ONE LIST AT A TIME, IN `ORDER`, AND UP TO `WRITES_AT_ONCE` OF ITS ROWS IN FLIGHT. A list starts only once every
+   * ONE LIST AT A TIME, IN `targets.order`, AND UP TO `WRITES_AT_ONCE` OF ITS ROWS IN FLIGHT. A list starts only once every
    * write of the one before it has answered, so rates are in before the first account and every project before the
    * task that names it, exactly as when rows went one by one. Within a list the lanes take rows in plan order, and
    * each row's report lines wait in its slot so the report reads in plan order whatever order the answers came in.
@@ -1185,7 +1114,7 @@ export async function applyPlan(
         try {
           await writeRow(list[at]!, said[at]!);
         } catch (error) {
-          /* A THROW STOPS THE SENDING TOO, not only the taking. Measured before this line (`test/import-throughput.test.ts`):
+          /* A THROW STOPS THE SENDING TOO, not only the taking. Measured before this line (the adapter's `test/import-throughput.test.ts`):
              with task 101's create throwing, task 102, already in a lane and waiting on its parent's answer, was sent
              afterwards, a write made after the run had failed. */
           failed ??= { error };
@@ -1212,7 +1141,7 @@ export async function applyPlan(
     /**
      * A REF TO A ROW HE DELETED HERE IS NEVER RESOLVED, AND THAT WAS SAID OF THE ROW HE DELETED ONLY.
      *
-     * Measured before this (`test/import-own-deletes.test.ts`, `loop/research-batch-fifty-four-audit.md` section 6): the
+     * Measured before this (the adapter's `test/import-own-deletes.test.ts`, `loop/research-batch-fifty-four-audit.md` section 6): the
      * project `lanternly` deleted here, and the next export filing a new task 106 under it. Task 106 arrived with no
      * project, and the one line was the project's. So the row is named with what it names, and only when the field is
      * empty on the row as it now stands: task 101, written before the delete, still points at the project's id and lost
@@ -1227,7 +1156,7 @@ export async function applyPlan(
     if (put === undefined && wrote && held.length > 0 && (at?.fields[field] ?? null) === null)
       unfiled.push({ register: row.register, label: row.label, names: held.map((x) => ({ register: byKey.get(x.$ref)?.register ?? row.register, label: byKey.get(x.$ref)?.label ?? x.$ref })) });
     if (put === undefined || !at || o.dryRun || stable(at.fields[field]) === stable(put)) continue;
-    const done = await door.update({ register: row.register, seq: at.seq as number, patch: { [field]: put }, version: at.version, note: 'Imported from the old tool.' });
+    const done = await door.update({ register: row.register, seq: at.seq as number, patch: { [field]: put }, version: at.version, note: `Imported from ${words.source}.` });
     if (done.ok) existing.set(row.key, done.value as Row);
     else if (unreachable(done)) throw new Unreachable();
     else report.refused.push({ label: row.label, register: row.register, fix: fixOf(done) });
@@ -1239,9 +1168,9 @@ export async function applyPlan(
    * THE ROWS AN EARLIER IMPORT LEFT IN A LIST THIS ONE HAS MOVED OFF, CLOSED SO NOTHING IS COUNTED TWICE.
    *
    * Moving a key is what makes these invisible: `existing` is keyed by import key alone, so a row written under
-   * `legacy:instalment:` is never found by a plan that writes `legacy:schedule:`, and the record ends up
+   * `<key>instalment:` is never found by a plan that writes `<key>schedule:`, and the record ends up
    * holding the same instalment in two lists with a wall that is double. Measured on an in-memory record with
-   * money-core 1.2.0 installed (`test/legacy.test.ts`): a wall of EGP 5,000,000 imported under the old shape and
+   * money-core 1.2.0 installed (the adapter's `test/plan.test.ts`): a wall of EGP 5,000,000 imported under the old shape and
    * then under the new read EGP 10,000,000 across the two lists.
    *
    * THE PATCH ONLY EVER CLOSES A ROW, and the reason goes in the write's own note rather than into the row's `note`
@@ -1258,7 +1187,7 @@ export async function applyPlan(
       if (Object.entries(r.only).some(([field, value]) => stable(at.fields[field]) !== stable(value))) continue;
       /* A ROW DATED OUTSIDE THE DAYS THE EXPORT SPOKE ABOUT IS NOT ONE IT DROPPED (`Retire.inside`): an opening balance
          older than a windowed ledger answer was voided here, and so was a row only a newer export carried when an
-         older one was imported after it (`test/import-ledger-window.test.ts`). A row with no day is outside too. */
+         older one was imported after it (the adapter's `test/import-ledger-window.test.ts`). A row with no day is outside too. */
       if (r.inside && !(r.spoken ?? []).some((p) => key.startsWith(p))) {
         const day = at.fields[r.inside.field];
         if (typeof day !== 'string' || day.slice(0, 10) <= r.inside.after || day.slice(0, 10) >= r.inside.before) continue;
@@ -1270,7 +1199,7 @@ export async function applyPlan(
       if (o.dryRun) {
         report.retired.push({ register: r.register, label, why: r.why });
         /* A DRY RUN READS ON AS THE REAL ONE WOULD: a later pass sees the row as this pass leaves it, so a half kept
-           owed by one pass is not then listed as written off by the next (`test/legacy-part.test.ts`). */
+           owed by one pass is not then listed as written off by the next (the adapter's `test/part.test.ts`). */
         existing.set(key, { ...at, fields: { ...at.fields, ...patch } } as Row);
         continue;
       }
@@ -1279,7 +1208,7 @@ export async function applyPlan(
         /* A DELETE WHOSE ANSWER NEVER CAME MAY HAVE LANDED, and if it did the row is in the bin at the next version,
            because every write moves a row one version on (`packages/kernel/src/index.ts`, `version = version + 1`).
            Remembered at that version it is the import's if it landed, and matches nothing if it did not. Measured
-           before this (`test/import-own-deletes.test.ts`, DURING): the delete landed, the run stopped, and the next
+           before this (the adapter's `test/import-own-deletes.test.ts`, DURING): the delete landed, the run stopped, and the next
            night read the lot as his delete. A row he deletes himself at exactly that version before the next night is
            read as the import's, which costs one row the old tool still holds coming back; the other way lost it. */
         if (unreachable(done)) {
@@ -1325,7 +1254,7 @@ export async function applyPlan(
         questions.push({ label: ask.label, question: ask.question });
         continue;
       }
-      const done = await door.propose({ question: ask.question, body_kind: 'options', body: ask.body });
+      const done = await door.propose({ question: ask.question, body_kind: ask.kind ?? 'options', body: ask.body });
       if (!done.ok) {
         if (unreachable(done)) throw new Unreachable();
         report.refused.push({ label: ask.label, register: 'Decide', fix: fixOf(done) });
@@ -1335,7 +1264,7 @@ export async function applyPlan(
       questions.push({ label: ask.label, question: ask.question });
     }
   }
-  /* A QUESTION SETTLED IN THE OLD TOOL THAT IS STILL OPEN HERE, said with what to do: see `settledOf`. Only one this
+  /* A QUESTION SETTLED IN THE OLD TOOL THAT IS STILL OPEN HERE, said with what to do: see the adapter's `settled`. Only one this
      record was asked, because one it never was has no twin here to answer. */
   if (decide !== null)
     for (const s of settledThere)
@@ -1377,11 +1306,11 @@ export async function applyPlan(
   /**
    * A PACK HIS DATA SHOWS HE USES, FILED ONCE, THE WAY A POLL IS, AND NOT FILED AT ALL ON A MONEY TOO OLD TO TAKE IT.
    *
-   * `bank-hsbc-eg` requires money-core 1.8.0 or later, and on 1.7.0 the same twelve ids are still money-core's: the pack's
-   * own header records that install being refused `PROVIDES_CONFLICT` on all twelve, a sentence about two packs owning
-   * one declaration that does not say the step he is missing is Money's update. `holdings` is the same shape a major
-   * later: up to 1.8.0 the list is money-core's, and the pack asks for 2.0.0. Filed anyway, either would sit on Decide as
-   * a proposal that refuses the moment he presses it. So the version is read first and the report names the update. A
+   * A bank pack that took its wordings over from money-core 1.8.0 requires 1.8.0 or later, and on 1.7.0 the same ids are
+   * still money-core's: that install is refused `PROVIDES_CONFLICT` on every one, a sentence about two packs owning one
+   * declaration that does not say the step he is missing is Money's update. `holdings` is the same shape a major later:
+   * up to 1.8.0 the list is money-core's, and the pack asks for 2.0.0. Filed anyway, either would sit on Decide as a
+   * proposal that refuses the moment he presses it. So the version is read first and the report names the update. A
    * door that cannot say which packs it holds files unchecked, and the record's own refusal is then what he reads.
    *
    * ONE LOOP FOR BOTH, COUNTED APART. The bank's line in the report reads `Banks:`, and a list for what he holds is not a
@@ -1395,12 +1324,18 @@ export async function applyPlan(
   const offer = async (list: readonly PlannedPack[]): Promise<{ filed: number; before: number; waiting: string[] }> => {
     const tally = { filed: 0, before: 0, waiting: [] as string[] };
     for (const pack of list) {
-      /* HELD IS AS GOOD AS OFFERED. The bank pack's header says whoever banks with HSBC Egypt may install it by hand,
-         which leaves nothing on Decide, and `propose` does not refuse a pack the record already holds: reading Decide
-         alone filed a second offer of a pack that was already reading his texts (`test/import-bank-pack.test.ts`). */
+      /* HELD IS AS GOOD AS OFFERED. A bank pack may be installed by hand by whoever banks there, which leaves nothing on
+         Decide, and `propose` does not refuse a pack the record already holds: reading Decide alone filed a second offer
+         of a pack that was already reading his texts (the adapter's `test/import-bank-pack.test.ts`). */
       if (installs.has(pack.install) || (holding?.ok === true && holding.value.some((p) => p.id === pack.install))) {
         if (installs.has(pack.install)) onDecide.add(pack.install);
         tally.before++;
+        continue;
+      }
+      /* A PACK THE CATALOGUE COULD NOT GIVE IS SAID WITH WHY, and nothing is filed: an offer with no document behind it is
+         a question whose yes installs nothing. */
+      if (pack.doc === null) {
+        tally.waiting.push(`${pack.says} (the ${pack.install} pack) was not filed on Decide: ${pack.unfound ?? 'no catalogue gave it'}. Install it with braindog pack install ${pack.install}, or run the import again once the catalogue holds it.`);
         continue;
       }
       const requires = isObj(pack.doc.requires) && isObj(pack.doc.requires.packs) ? pack.doc.requires.packs['money-core'] : undefined;
@@ -1434,12 +1369,12 @@ export async function applyPlan(
    * A LIST WHOSE PACK IS WAITING ON DECIDE IS APPROVED THERE, NOT INSTALLED. The "Left out" line is written before the
    * packs are offered, so the first run's report said "Packs: 1 filed on Decide for you to approve" and, under it, "This
    * BrainDog has no Holdings list. Install Holdings beside Solo founder": two instructions for one step, and the second
-   * is not the one he should take (`loop/research-switch-today.md` brief 50-B, `test/import-holdings-lead.test.ts`).
+   * is not the one he should take (`loop/research-switch-today.md` brief 50-B, the adapter's `test/import-holdings-lead.test.ts`).
    * A dry run files nothing and a Money too old holds the offer back, so neither is on Decide and both keep the install.
    */
   for (const [register, line] of leftOut) {
-    const pack = [...banks, ...packs].find((p) => p.name === PROVIDED_BY[register] && onDecide.has(p.install));
-    if (pack) line.reason = `This BrainDog has no ${NAMES[register] ?? register} list. Approve "${pack.question}" on Decide, then run the import again to bring these in`;
+    const pack = [...banks, ...packs].find((p) => p.name === providedBy[register] && onDecide.has(p.install));
+    if (pack) line.reason = `This BrainDog has no ${name(register)} list. Approve "${pack.question}" on Decide, then run the import again to bring these in`;
   }
   return report;
 }
@@ -1457,43 +1392,46 @@ const and = (items: string[]) => (items.length < 2 ? items.join('') : `${items.s
 const few = (items: string[], most = 8) => (items.length <= most ? items.join(', ') : `${items.slice(0, most).join(', ')} and ${String(items.length - most)} more`);
 
 /** The rows held back because he deleted them here, as both reports name them: each one's label and its list. */
-const deletedSaid = (rows: { register: string; label: string }[]): string => few(rows.map((r) => `${r.label} (${NAMES[r.register] ?? r.register})`));
+const deletedSaid = (rows: { register: string; label: string }[], name: (register: string) => string): string => few(rows.map((r) => `${r.label} (${name(r.register)})`));
 
 /**
  * The rows written without a row he deleted here, as both reports say them: one sentence for each row he deleted, naming
  * every row that went without it. BY THE ROW DELETED AND NOT BY THE ROW WRITTEN, because one deleted project is named by
  * its new task and by each of its readings, and said row by row the project was named five times in one line.
  */
-const unfiledSaid = (rows: Unfiled[], dryRun = false): string[] => {
+const unfiledSaid = (rows: Unfiled[], name: (register: string) => string, dryRun = false): string[] => {
   const by = new Map<string, string[]>();
   for (const r of rows) {
-    const names = and(r.names.map((n) => `${n.label} (${NAMES[n.register] ?? n.register})`));
-    by.set(names, [...(by.get(names) ?? []), `${r.label} (${NAMES[r.register] ?? r.register})`]);
+    const names = and(r.names.map((n) => `${n.label} (${name(n.register)})`));
+    by.set(names, [...(by.get(names) ?? []), `${r.label} (${name(r.register)})`]);
   }
   return [...by].map(
     ([names, items]) => `${dryRun ? 'Would be written' : 'Written'} without ${names}, which is deleted in this BrainDog: ${few(items)}. Put it back here and the next import files them under it.`,
   );
 };
 
-/** A question waiting on Decide as both reports name it: its the old tool id, its words, and what the old tool did with it. */
+/** A question waiting on Decide as both reports name it: its id in the old tool, its words, and what the old tool did with it. */
 const waitingSaid = (w: Waiting): string => `${w.label}${w.question ? `, ${w.question}` : ''}, ${w.answer}.`;
 
 /** The report as the lines a person reads. */
 export function said(report: Report, o: { dryRun: boolean; file: string }): string[] {
   const { plan } = report;
+  const words = report.words ?? plainWords(plan);
+  const name = (register: string) => nameIn(words, register);
+  const { source } = words;
   const lines: string[] = [];
   const when = plan.taken ? `, exported ${plan.taken.slice(0, 10)}` : '';
   lines.push(`${o.dryRun || report.missing.length > 0 ? 'Read, and wrote nothing' : 'Imported'}: ${o.file}${when}.`);
   if (report.missing.length > 0) {
-    const need = [...new Set(report.missing.map((r) => PROVIDED_BY[r] ?? r))];
-    lines.push(`This BrainDog has no ${and(report.missing.map((r) => NAMES[r] ?? r))} lists, so nothing was written. Install ${and(need)} on this BrainDog first, then run the import again.`);
+    const need = [...new Set(report.missing.map((r) => words.map.targets.providedBy[r] ?? r))];
+    lines.push(`This BrainDog has no ${and(report.missing.map(name))} lists, so nothing was written. Install ${and(need)} on this BrainDog first, then run the import again.`);
     return lines;
   }
   const verb = o.dryRun ? 'would be ' : '';
-  for (const register of ORDER) {
+  for (const register of words.map.targets.order) {
     const t = report.tally[register];
     if (!t) continue;
-    lines.push(`${NAMES[register] ?? register}: ${String(t.added)} ${verb}added, ${String(t.updated)} ${verb}updated, ${String(t.unchanged)} unchanged.`);
+    lines.push(`${name(register)}: ${String(t.added)} ${verb}added, ${String(t.updated)} ${verb}updated, ${String(t.unchanged)} unchanged.`);
   }
   if (plan.asks.length > 0) lines.push(`Decide: ${String(report.asked)} ${o.dryRun ? 'would be asked' : 'asked'}, ${String(report.alreadyAsked)} asked before.`);
   if (plan.polls.length > 0)
@@ -1508,22 +1446,24 @@ export function said(report: Report, o: { dryRun: boolean; file: string }): stri
   }
   if (report.values) {
     const { added, filed, before } = report.values;
-    if (added.length > 0) lines.push(`Added to your lists, so those rows carry the word the old tool used: ${and(added)}.`);
+    if (added.length > 0) lines.push(`Added to your lists, so those rows carry the word ${source} used: ${and(added)}.`);
     /* A DRY RUN CANNOT SAY WHICH OF THE TWO IT WOULD BE: whether an addition lands is the record's answer to the key
        that files it, and a dry run files nothing. */
     if (filed.length > 0)
       lines.push(
         o.dryRun
-          ? `Would be proposed, so those rows can carry the word the old tool used: ${and(filed)}. From your own key it lands at once; otherwise it waits on Decide.`
+          ? `Would be proposed, so those rows can carry the word ${source} used: ${and(filed)}. From your own key it lands at once; otherwise it waits on Decide.`
           : `Filed on Decide for you to approve: ${and(filed)}. Until you do, those rows carry the word the list already had, and the next import after you approve moves them.`,
       );
     if (before.length > 0)
       lines.push(`Proposed before and not in your lists: ${and(before)}. It waits on Decide or was turned down there, so those rows carry the word the list already had.`);
   }
-  const estate = plan.rows.filter((r) => /^legacy:(date|domain|service):/u.test(r.key));
-  if (estate.length > 0) {
-    lines.push('', 'Dates, domains and services:');
-    const kind = (r: PlannedRow) => (r.key.startsWith(`${KEY_PREFIX}date:`) ? 'Date' : r.key.startsWith(`${KEY_PREFIX}domain:`) ? 'Domain' : 'Service');
+  /* THE ROWS THE MAPPING NAMES ONE BY ONE (`listed`), by the kind that follows the plan's prefix in their key. */
+  const listed = words.map.listed;
+  const kind = (r: PlannedRow): string | null => (listed === null || !r.key.startsWith(plan.key) ? null : (listed.kinds[r.key.slice(plan.key.length).split(':')[0] ?? ''] ?? null));
+  const estate = plan.rows.filter((r) => kind(r) !== null);
+  if (listed !== null && estate.length > 0) {
+    lines.push('', `${listed.heading}:`);
     const outcome = (r: PlannedRow) => {
       const was = report.outcomes[r.key];
       if (was === 'added') return o.dryRun ? 'would be added' : 'added';
@@ -1531,27 +1471,27 @@ export function said(report: Report, o: { dryRun: boolean; file: string }): stri
       if (was === 'refused') return 'refused';
       /* A ROW HE DELETED HERE IS NOT "UNCHANGED". It fell through to that word, so the same night's report called
          lanternly.example unchanged on Estate two lines above saying it was deleted and not added again (measured on
-         the synthetic export with the domain deleted, `test/import-deleted-stays.test.ts`). */
+         the synthetic export with the domain deleted, the adapter's `test/import-deleted-stays.test.ts`). */
       if (was === 'deleted') return o.dryRun ? 'deleted here, so it would not be added again' : 'deleted here, so not added again';
       return 'unchanged';
     };
-    for (const r of estate) lines.push(`- ${kind(r)}: ${r.label}, ${outcome(r)} (${NAMES[r.register] ?? r.register}).`);
+    for (const r of estate) lines.push(`- ${String(kind(r))}: ${r.label}, ${outcome(r)} (${name(r.register)}).`);
   }
   if (report.changes.length > 0) {
     lines.push('', o.dryRun ? 'What would change:' : 'What changed:');
     const most = 40;
-    for (const c of report.changes.slice(0, most)) lines.push(`- ${NAMES[c.register] ?? c.register}, ${c.label}: ${c.fields.join(', ')}.`);
+    for (const c of report.changes.slice(0, most)) lines.push(`- ${name(c.register)}, ${c.label}: ${c.fields.join(', ')}.`);
     if (report.changes.length > most) lines.push(`- and ${String(report.changes.length - most)} more.`);
   }
   if (report.retired.length > 0) {
     const by = new Map<string, string[]>();
-    for (const r of report.retired) by.set(r.why, [...(by.get(r.why) ?? []), `${NAMES[r.register] ?? r.register}, ${r.label}`]);
+    for (const r of report.retired) by.set(r.why, [...(by.get(r.why) ?? []), `${name(r.register)}, ${r.label}`]);
     lines.push('', o.dryRun ? 'What would be closed, and why:' : 'Closed, and why:');
     for (const [why, items] of by) lines.push(`- ${why} ${few(items)}.`);
   }
   if ((report.waiting ?? []).length > 0) {
-    lines.push('', 'Answered in the old tool and still open on Decide here:');
-    for (const w of report.waiting ?? []) lines.push(`- ${waitingSaid(w)} ${w.answer.startsWith('decided') ? 'Answer it on Decide the way you answered it in the old tool, or dismiss it.' : 'Dismiss it on Decide too.'}`);
+    lines.push('', `Answered in ${source} and still open on Decide here:`);
+    for (const w of report.waiting ?? []) lines.push(`- ${waitingSaid(w)} ${w.answer.startsWith('decided') ? `Answer it on Decide the way you answered it in ${source}, or dismiss it.` : 'Dismiss it on Decide too.'}`);
   }
   if (report.clashes.length > 0) {
     lines.push('', 'Categories this BrainDog already has under that name:');
@@ -1562,12 +1502,12 @@ export function said(report: Report, o: { dryRun: boolean; file: string }): stri
      be the same list every night. What to do is the second sentence: put back here, a row is his again and the next
      import updates it. */
   if ((report.deleted ?? []).length > 0)
-    lines.push('', `Deleted in this BrainDog, so ${o.dryRun ? 'it would not be' : 'not'} added again: ${deletedSaid(report.deleted ?? [])}. To have one back, put it back here; the import then keeps it up to date.`);
-  if ((report.unfiled ?? []).length > 0) lines.push('', ...unfiledSaid(report.unfiled ?? [], o.dryRun));
+    lines.push('', `Deleted in this BrainDog, so ${o.dryRun ? 'it would not be' : 'not'} added again: ${deletedSaid(report.deleted ?? [], name)}. To have one back, put it back here; the import then keeps it up to date.`);
+  if ((report.unfiled ?? []).length > 0) lines.push('', ...unfiledSaid(report.unfiled ?? [], name, o.dryRun));
   if (report.refused.length > 0) {
     /* A DRY RUN SENT NOTHING, so the record refused nothing yet: these are the rows the kernel's coercion says it will. */
     lines.push('', o.dryRun ? 'Would be refused by the record:' : 'Refused by the record:');
-    for (const r of report.refused) lines.push(`- ${r.label} (${NAMES[r.register] ?? r.register}): ${r.fix}`);
+    for (const r of report.refused) lines.push(`- ${r.label} (${name(r.register)}): ${r.fix}`);
   }
   if (plan.changed.length > 0) {
     lines.push('', 'Carried with a change:');
@@ -1594,7 +1534,7 @@ export function said(report: Report, o: { dryRun: boolean; file: string }): stri
  * Until this, every answer to that was printed once at three in the morning to a terminal nobody was reading.
  *
  * WHY THIS FILE AND NOT THE RECORD'S OWN LOG, which does hold every write this import makes with its note on it
- * ("Imported from the old tool."). Two things the morning needs are not in it. A log line carries the one write it came
+ * ("Imported from" and the tool's name). Two things the morning needs are not in it. A log line carries the one write it came
  * from (`batch`) and nothing groups the hundreds of writes of one run, so "since last night" has no edge to stop at.
  * And a row left out or refused was never written, so the log has no line for it at all, while "and was it carried"
  * is half of the question. So the report keeps what it already worked out, and nothing it did not: the rows added,
@@ -1634,13 +1574,19 @@ export type Run = {
   /**
    * THE HOST STOPPED ANSWERING PART WAY, and what this line holds is what had answered by then. Such a run used to be
    * forgotten, which lost the rows its retire pass had put in the bin, and the next night read them as his deletes
-   * (`test/import-own-deletes.test.ts`, the checker's gap on `48858b72`). Optional: a line without it ran to the end.
+   * (the adapter's `test/import-own-deletes.test.ts`, the checker's gap on `48858b72`). Optional: a line without it ran
+   * to the end.
    */
   stopped?: boolean;
+  /**
+   * THE TOOL THE EXPORT CAME FROM, as its adapter names itself, so a morning read of one adapter's nights is not handed
+   * another's. Optional: a line written before adapters were named on the line was a night of the one importer there was.
+   */
+  source?: string;
 };
 
 /** The run a report describes, as `--since` reads it back. */
-export function runOf(report: Report, o: { at: string; host: string; file: string }): Run {
+export function runOf(report: Report, o: { at: string; host: string; file: string; source?: string }): Run {
   /* A CHANGE IS RECORDED BEFORE ITS WRITE IS SENT, so an update the record then refused is in `changes` too. It is said
      once, as refused, and not also as carried. */
   const turnedDown = new Set(report.refused.map((r) => `${r.register}\n${r.label}`));
@@ -1648,6 +1594,7 @@ export function runOf(report: Report, o: { at: string; host: string; file: strin
     at: o.at,
     host: o.host,
     file: o.file,
+    ...(o.source === undefined ? {} : { source: o.source }),
     taken: report.plan.taken,
     created: report.plan.rows.filter((r) => report.outcomes[r.key] === 'added').map((r) => ({ register: r.register, label: r.label })),
     updated: report.changes.filter((c) => !turnedDown.has(`${c.register}\n${c.label}`)).map((c) => ({ register: c.register, label: c.label, fields: c.fields })),
@@ -1688,12 +1635,15 @@ function localClock(at: string, offsetOf: (at: Date) => number): { day: string; 
 /**
  * The lines `--since` says: every run from `since` on (a day, `2026-09-21`) or the newest one (`last`), oldest first.
  *
- * WHAT WAS LEFT OUT ON THE NIGHT BEFORE AS WELL IS NOT SAID AGAIN. The synthetic export alone leaves out 29 things
- * under 23 reasons every night (measured on `test/legacy-export.ts`), and a morning that repeats them hides the one
- * that is new. So a run says only
+ * WHAT WAS LEFT OUT ON THE NIGHT BEFORE AS WELL IS NOT SAID AGAIN. The adapter's synthetic export alone leaves out 29
+ * things under 23 reasons every night, and a morning that repeats them hides the one that is new. So a run says only
  * what it left out that the run before it, into the same host, did not; the first run remembered says all of it.
+ *
+ * `words` names the lists and the tool, as the night's own report did; without it each list is named by its id.
  */
-export function sinceSaid(runs: Run[], since: string, offsetOf: (at: Date) => number = localOffset): { found: number; lines: string[] } {
+export function sinceSaid(runs: Run[], since: string, offsetOf: (at: Date) => number = localOffset, words?: Words): { found: number; lines: string[] } {
+  const name = (register: string) => (words ? nameIn(words, register) : register);
+  const source = words?.source ?? 'the old tool';
   if (runs.length === 0) return { found: 0, lines: ['No import run is remembered on this machine yet.'] };
   const local = runs.map((r) => localClock(r.at, offsetOf));
   const shown = since === 'last' ? [runs.length - 1] : runs.flatMap((_, i) => (local[i]!.day >= since ? [i] : []));
@@ -1704,7 +1654,7 @@ export function sinceSaid(runs: Run[], since: string, offsetOf: (at: Date) => nu
     const before = runs.slice(0, i).findLast((r) => r.host === run.host);
     /* BY THE ITEM ALONE, NOT THE ITEM WITH ITS REASON. A reason is a sentence this code writes, and the first morning
        after wave fifty-two reworded three of them said every decided and dismissed question and every deleted task once
-       more as "Newly left out" (`test/import-left-out.test.ts`). The item is what the old tool holds, so a new wording is
+       more as "Newly left out" (the adapter's `test/import-left-out.test.ts`). The item is what the old tool holds, so a new wording is
        not news and a new item is. An item several reasons used to share, `the ledger`, was split so this holds. */
     const had = new Set((before?.skipped ?? []).flatMap((s) => s.items));
     if (lines.length > 0) lines.push('');
@@ -1720,32 +1670,32 @@ export function sinceSaid(runs: Run[], since: string, offsetOf: (at: Date) => nu
     const byList = <T extends { register: string }>(rows: T[], say: (row: T) => string, head: string) => {
       const lists = new Map<string, string[]>();
       for (const row of rows) lists.set(row.register, [...(lists.get(row.register) ?? []), say(row)]);
-      for (const [register, items] of lists) lines.push(`- ${head} ${NAMES[register] ?? register}: ${few(items)}.`);
+      for (const [register, items] of lists) lines.push(`- ${head} ${name(register)}: ${few(items)}.`);
     };
     byList(run.created, (r) => r.label, 'Created in');
     byList(run.updated, (r) => `${r.label} (${r.fields.join(', ')})`, 'Updated in');
     /* CLOSED BY REASON, AS THE NIGHT'S OWN REPORT SAYS IT, each row under the list it was closed in. */
     const closed = new Map<string, string[]>();
-    for (const r of run.retired ?? []) closed.set(r.why, [...(closed.get(r.why) ?? []), `${NAMES[r.register] ?? r.register}, ${r.label}`]);
+    for (const r of run.retired ?? []) closed.set(r.why, [...(closed.get(r.why) ?? []), `${name(r.register)}, ${r.label}`]);
     for (const [why, items] of closed) lines.push(`- Closed: ${why} ${few(items)}.`);
     for (const q of run.asked ?? []) lines.push(`- Asked on Decide: ${q.label}, ${q.question}`);
     for (const w of run.waiting ?? [])
-      lines.push(`- Still open on Decide here, answered in the old tool: ${waitingSaid(w)} ${w.answer.startsWith('decided') ? 'Answer it on Decide the same way, or dismiss it.' : 'Dismiss it on Decide too.'}`);
-    for (const r of run.refused) lines.push(`- Not carried, ${NAMES[r.register] ?? r.register}: ${r.label}. ${r.fix}`);
+      lines.push(`- Still open on Decide here, answered in ${source}: ${waitingSaid(w)} ${w.answer.startsWith('decided') ? 'Answer it on Decide the same way, or dismiss it.' : 'Dismiss it on Decide too.'}`);
+    for (const r of run.refused) lines.push(`- Not carried, ${name(r.register)}: ${r.label}. ${r.fix}`);
     /* A ROW HELD BACK THE NIGHT BEFORE AS WELL IS NOT SAID AGAIN, for the reason the skips below are not: the export
        holds a row he deleted here every night until the old tool closes, and the morning is for what is new. */
     const heldBefore = new Set((before?.deleted ?? []).map((r) => `${r.register}\n${r.label}`));
     const newlyHeld = (run.deleted ?? []).filter((r) => !heldBefore.has(`${r.register}\n${r.label}`));
-    if (newlyHeld.length > 0) lines.push(`- Deleted in this BrainDog, so not added again: ${deletedSaid(newlyHeld)}.`);
+    if (newlyHeld.length > 0) lines.push(`- Deleted in this BrainDog, so not added again: ${deletedSaid(newlyHeld, name)}.`);
     /* THE SAME FOR A ROW FILED WITHOUT ONE OF THOSE: said the first morning, and again only once it is a different row. */
     const looseBefore = new Set((before?.unfiled ?? []).map((r) => `${r.register}\n${r.label}`));
     const newlyLoose = (run.unfiled ?? []).filter((r) => !looseBefore.has(`${r.register}\n${r.label}`));
-    for (const line of unfiledSaid(newlyLoose)) lines.push(`- ${line}`);
+    for (const line of unfiledSaid(newlyLoose, name)) lines.push(`- ${line}`);
     for (const s of run.skipped) {
       const fresh = s.items.filter((item) => !had.has(item));
       if (fresh.length > 0) lines.push(`- Newly left out: ${few(fresh)}. ${s.reason}.`);
     }
-    if (lines.length === start) lines.push('- Nothing moved in the old tool since the run before.');
+    if (lines.length === start) lines.push(`- Nothing moved in ${source} since the run before.`);
   }
   return { found: shown.length, lines };
 }
@@ -1794,6 +1744,7 @@ function isRun(run: unknown): run is Run {
     (run.binned === undefined || (Array.isArray(run.binned) && run.binned.every((b) => isObj(b) && isText(b.id) && typeof b.version === 'number'))) &&
     (run.bin === undefined || (itemsHold(run.bin, ['id', 'register', 'since']) && (run.bin as { since: string }[]).every((b) => !Number.isNaN(Date.parse(b.since))))) &&
     (run.stopped === undefined || typeof run.stopped === 'boolean') &&
+    (run.source === undefined || isText(run.source)) &&
     (run.unfiled === undefined || (itemsHold(run.unfiled, ['register', 'label']) && (run.unfiled as { names?: unknown }[]).every((u) => itemsHold(u.names, ['register', 'label'])))) &&
     (run.waiting === undefined || (itemsHold(run.waiting, ['label', 'answer']) && (run.waiting as { question?: unknown }[]).every((w) => w.question === null || isText(w.question))))
   );
@@ -1853,7 +1804,7 @@ const wroteAny = (report: Report): boolean =>
  * `client.list` SENDS A READ AS A GET, and a GET's `includeDeleted` is decoded only by a host at `dc9ec9e4` or later,
  * where `ROUTES` declares it. Wave fifty-four moved this read onto that GET, and against a host at `19d4c785`, the
  * build production answered on 23 September, it came back with live rows alone, 200, and every row he had deleted
- * was added back (`loop/research-batch-fifty-five-audit.md` section 1, `test/import-deleted-skew.test.ts`). A POST's
+ * was added back (`loop/research-batch-fifty-five-audit.md` section 1, the adapter's `test/import-deleted-skew.test.ts`). A POST's
  * body keeps its JSON types, and the record hands `includeDeleted: true` to the kernel on every host from before
  * `19d4c785` on, which the audit measured on both builds. So this is the door the import keeps whichever build the
  * host is at, and it carries the headers, the bearer and the deadline every other request of the run carries.
@@ -1885,36 +1836,134 @@ async function listWithDeleted(send: typeof fetch, to: Target, args: { register:
   return lost(`${String(res.status)} with an answer this import does not recognise`);
 }
 
-/** `braindog import legacy <file>`, and the exit code: 0 done, 1 refused or partly refused, 3 the host did not answer. */
+/**
+ * A plan as an adapter handed it back, held to the shape `applyPlan` reads, or the sentence saying which part is not.
+ *
+ * AN ADAPTER IS CODE SOMEBODY ELSE WROTE, and `applyPlan` reads a plan without checking it, because the planner that
+ * wrote plans used to be this file's own. A plan whose rows are not a list, or whose keys do not start with the key the
+ * adapter names, would be read as far as it went and then throw with the rows before it written, or write rows no
+ * second run finds again. So the shape is held here, once, before anything is read from the record.
+ */
+function planFault(plan: unknown, key: string): string | null {
+  if (!isObj(plan)) return 'its plan is not an object';
+  if (plan.key !== key) return `its plan's key is ${JSON.stringify(plan.key)}, and the adapter names ${JSON.stringify(key)}`;
+  for (const list of ['rows', 'asks', 'polls', 'skipped', 'changed'] as const) if (!Array.isArray(plan[list])) return `its plan has no list of ${list}`;
+  const rows = plan.rows as unknown[];
+  const bad = rows.find((r) => !isObj(r) || typeof r.register !== 'string' || typeof r.key !== 'string' || !r.key.startsWith(key) || typeof r.label !== 'string' || !isObj(r.fields));
+  if (bad !== undefined) return `a row of its plan is not { register, key, label, fields } under its key: ${JSON.stringify(bad).slice(0, 120)}`;
+  const asks = plan.asks as unknown[];
+  if (asks.some((a) => !isObj(a) || typeof a.key !== 'string' || !a.key.startsWith(key) || typeof a.question !== 'string' || !isObj(a.body))) return 'a question in its plan is not { key, label, question, body } under its key';
+  return null;
+}
+
+/**
+ * The document of each pack the adapter offers, from the catalogue: `--catalogue` when it is named, and the host's own
+ * (`/app/catalogue/`) when not, the one the app's Browse lists and `pack install <id>` reads. An offer the catalogue
+ * cannot give keeps its place with the reason, so the report says it rather than leaving it out.
+ */
+async function resolveOffers(offers: readonly Offer[], catalogue: CatalogueRead, known: KnownKeys): Promise<PlannedPack[]> {
+  if (offers.length === 0) return [];
+  const index = catalogue.read('index.json');
+  const out: PlannedPack[] = [];
+  for (const offer of offers) {
+    const got = await packFrom(catalogue, offer.install, index, known);
+    out.push(got.ok ? { ...offer, doc: got.doc } : { ...offer, doc: null, unfound: got.fix });
+  }
+  return out;
+}
+
+/**
+ * A catalogue at an address, read as a host serves one: no token goes with it, because a catalogue is public.
+ *
+ * THROUGH `readSource`, THE READ `pack install` MAKES OF THE SAME FILES, and within the import's own budget. It was a
+ * bare `fetch`: no deadline, a redirect followed anywhere, no cap on the answer and http to any machine. Measured on
+ * 25 September (`test/import-adapter.test.ts`), a catalogue that took the connection and never answered held the
+ * import on its first read of `index.json` until the test's ten seconds ran out, where the host's own requests give up
+ * at the budget.
+ */
+const addressCatalogue = (base: string, io: AgentIo, ms: number): CatalogueRead => ({
+  where: base,
+  read: async (path) => {
+    const got = await readSource(new URL(path, base.endsWith('/') ? base : `${base}/`).href, io, ms);
+    return got.ok ? got.text : null;
+  },
+});
+
+/** `braindog import <adapter> <file>`, and the exit code: 0 done, 1 refused or partly refused, 3 the host did not answer. */
 export async function importCommand(args: string[], io: AgentIo, given?: string, now: () => Date = () => new Date(), offsetOf: (at: Date) => number = localOffset): Promise<number> {
   /* THE PLAN'S DAY IS THE OWNER'S LOCAL DAY, NOT THE UTC DATE. It was `toISOString().slice(0, 10)`, so a nightly run at
      22:30 at -03:00 planned on tomorrow's UTC date: a date due today was filed as already done, and a run at 01:30 at
      +03:00 planned on yesterday's. Taken from `now` and `offsetOf`, the same clock `--since` reads a run by. */
   const today = given ?? localClock(now().toISOString(), offsetOf).day;
-  let values: { host?: string | undefined; 'dry-run'?: boolean | undefined; setup?: string | undefined; 'draft-setup'?: boolean | undefined; since?: string | undefined; 'bin-emptied'?: boolean | undefined };
+  let values: {
+    host?: string | undefined;
+    'dry-run'?: boolean | undefined;
+    setup?: string | undefined;
+    map?: string | undefined;
+    catalogue?: string | undefined;
+    'draft-setup'?: boolean | undefined;
+    since?: string | undefined;
+    'bin-emptied'?: boolean | undefined;
+  };
   let positionals: string[];
   try {
     ({ values, positionals } = parseArgs({
       args,
       allowPositionals: true,
       strict: true,
-      options: { host: { type: 'string' }, 'dry-run': { type: 'boolean' }, setup: { type: 'string' }, 'draft-setup': { type: 'boolean' }, since: { type: 'string' }, 'bin-emptied': { type: 'boolean' } },
+      options: {
+        host: { type: 'string' },
+        'dry-run': { type: 'boolean' },
+        setup: { type: 'string' },
+        map: { type: 'string' },
+        catalogue: { type: 'string' },
+        'draft-setup': { type: 'boolean' },
+        since: { type: 'string' },
+        'bin-emptied': { type: 'boolean' },
+      },
     }));
   } catch {
     io.say(USAGE);
     return 1;
   }
-  const [source, file, ...more] = positionals;
+  const [spec, file, ...more] = positionals;
+  if (!spec || more.length > 0 || (values.since === undefined && !file) || (values.since !== undefined && file)) {
+    io.say(USAGE);
+    return 1;
+  }
+  const loaded = await loadAdapter(spec, { cwd: io.cwd, map: values.map });
+  if (!loaded.ok) {
+    io.say(loaded.fix);
+    return 1;
+  }
+  const { adapter, map } = loaded;
+  const words: Words = { source: adapter.source, map };
+  /** Only this adapter's nights: another tool's say nothing about this one's export or its keys. A night with no source
+      was written before runs named one, by the one importer there was, and is the adapter's that says `unsourced`. */
+  const mine = (r: Run) => (r.source === undefined ? adapter.unsourced === true : r.source === adapter.source);
+  /**
+   * AN ADAPTER IS SOMEBODY ELSE'S CODE, SO WHAT IT THROWS IS SAID AS ITS REFUSAL, NAMING IT, and the run stops before
+   * anything is sent. `plan` was wrapped this way and the rest were not, so an adapter whose `read` threw on a file it
+   * did not expect ended the command in a bare stack that named neither the adapter nor the file.
+   */
+  const ask = <T>(what: string, fn: () => T): { ok: true; value: T } | { ok: false } => {
+    try {
+      return { ok: true, value: fn() };
+    } catch (e) {
+      io.say(`The ${adapter.source} adapter could not ${what}: ${e instanceof Error ? e.message : String(e)}`);
+      return { ok: false };
+    }
+  };
   /* THE MORNING READ NEEDS NO EXPORT AND NO HOST: it is what this machine remembers of the nights before, and the
      host may be the very thing that did not answer at three in the morning. */
-  if (source === 'legacy' && values.since !== undefined && !file) {
+  if (values.since !== undefined) {
     if (values.since !== 'last' && !DAY.test(values.since)) {
       io.say('--since takes a day as 2026-09-21, or last.');
       return 1;
     }
     const read = readRuns(io.home);
     for (const n of read.passed) io.say(`Line ${String(n)} of ${runsFile(io.home)} is not a run as this command writes one, so it was passed over.`);
-    const got = sinceSaid(read.runs, values.since, offsetOf);
+    const got = sinceSaid(read.runs.filter(mine), values.since, offsetOf, words);
     if (got.found === 0) {
       io.say(got.lines.join(' '));
       return 1;
@@ -1922,10 +1971,7 @@ export async function importCommand(args: string[], io: AgentIo, given?: string,
     for (const line of got.lines) io.out(line);
     return 0;
   }
-  if (source !== 'legacy' || !file || more.length > 0 || values.since !== undefined) {
-    io.say(USAGE);
-    return 1;
-  }
+  if (file === undefined) return 1;
   const path = resolve(io.cwd, file);
   let text: string;
   try {
@@ -1938,17 +1984,29 @@ export async function importCommand(args: string[], io: AgentIo, given?: string,
     io.say(`${file} could not be read.`);
     return 1;
   }
-  const read = readLegacyTool(text);
+  const reading = ask(`read ${file}`, () => adapter.read(text));
+  if (!reading.ok) return 1;
+  const read = reading.value;
   if (!read.ok) {
     io.say(read.fix);
     return 1;
   }
   if (values['draft-setup'] === true) {
-    io.out(JSON.stringify(draftSetup(read.value), null, 2));
+    if (!adapter.draftSetup) {
+      io.say(`The ${adapter.source} adapter drafts no setup file.`);
+      return 1;
+    }
+    const draft = ask(`draft a setup file from ${file}`, () => adapter.draftSetup?.(read.value));
+    if (!draft.ok) return 1;
+    io.out(JSON.stringify(draft.value, null, 2));
     return 0;
   }
-  let setup: Setup | undefined;
+  let setup: unknown;
   if (values.setup !== undefined) {
+    if (!adapter.readSetup) {
+      io.say(`The ${adapter.source} adapter reads no setup file.`);
+      return 1;
+    }
     let setupText: string;
     try {
       setupText = readFileSync(resolve(io.cwd, values.setup), 'utf8');
@@ -1956,14 +2014,32 @@ export async function importCommand(args: string[], io: AgentIo, given?: string,
       io.say(`${values.setup} could not be read.`);
       return 1;
     }
-    const got = readSetup(setupText);
+    const asked = ask(`read ${values.setup}`, () => adapter.readSetup?.(setupText, TOOLS));
+    if (!asked.ok) return 1;
+    const got = asked.value;
+    if (got === undefined) return 1;
     if (!got.ok) {
       io.say(got.fix);
       return 1;
     }
     setup = got.value;
   }
-  const plan = planLegacyTool(read.value, today, setup);
+  const planned = ask(`plan ${file}`, () => adapter.plan(read.value, { today, ...(setup === undefined ? {} : { setup }), map: map.raw, tools: TOOLS }));
+  if (!planned.ok) return 1;
+  const plan: Plan = planned.value;
+  const fault = planFault(plan, adapter.key);
+  if (fault !== null) {
+    io.say(`The ${adapter.source} adapter is not one this command can apply: ${fault}. Nothing was read from the record or sent to it.`);
+    return 1;
+  }
+  /* WHAT IT OFFERS AND WHAT IT SAYS IS SETTLED ARE ASKED HERE, BEFORE THE HOST IS, so a throw from either stops the run
+     with nothing sent, as a throw from `plan` does. */
+  const offering = ask(`say which packs ${file} offers`, () => adapter.offers?.(read.value, map.raw) ?? []);
+  if (!offering.ok) return 1;
+  const settling = ask(`say which questions ${file} has settled`, () => adapter.settled?.(read.value) ?? []);
+  if (!settling.ok) return 1;
+  /* A ROW HOLDING A VALUE SHAPED LIKE A KEY IS NEVER SENT, WHOEVER PLANNED IT. The planner this file used to hold left
+     such a row out itself; an adapter somebody else wrote may not, and the write is refused row by row in `writeOne`. */
 
   let to: Target;
   try {
@@ -1977,15 +2053,15 @@ export async function importCommand(args: string[], io: AgentIo, given?: string,
    * MACHINE'S NAME (`loop/research-shadow-week.md` §4 option A, and the checker's note under it).
    *
    * It sent `io.headers(to.key)`, the folder's position and the run its session file names, and measured through this
-   * command on a host over the record (`test/import-own-run.test.ts`) that was 44 runs for the fixture's 44 writes from
-   * a folder with no repository, every one left `active`, and from a folder an agent was working in, the agent's own run
-   * signing every write. A client id of its own is what the ladder finds the same run by on every write, whatever the
-   * folder. And the folder's repository, remote and path go with the run it names, not only the session headers: sent
-   * beside the new client id they placed the import's run in that folder's project, because a run re-attached by its
-   * client id from a place it names is placed there (`packages/kernel/src/index.ts`, `locateRun`), and the skill and
-   * the key belonging to other projects were refused `FORBIDDEN`, exit 1. The import writes to every project at once,
-   * so it has no folder to be placed by. The host is kept because it names the machine the night ran on, and that alone
-   * places nothing.
+   * command on a host over the record (the adapter's `test/import-own-run.test.ts`) that was 44 runs for the fixture's
+   * 44 writes from a folder with no repository, every one left `active`, and from a folder an agent was working in, the
+   * agent's own run signing every write. A client id of its own is what the ladder finds the same run by on every write,
+   * whatever the folder. And the folder's repository, remote and path go with the run it names, not only the session
+   * headers: sent beside the new client id they placed the import's run in that folder's project, because a run
+   * re-attached by its client id from a place it names is placed there (`packages/kernel/src/index.ts`, `locateRun`),
+   * and the skill and the key belonging to other projects were refused `FORBIDDEN`, exit 1. The import writes to every
+   * project at once, so it has no folder to be placed by. The host is kept because it names the machine the night ran
+   * on, and that alone places nothing.
    */
   const folder = await io.headers(to.key);
   const headers: Record<string, string> = {
@@ -2010,14 +2086,23 @@ export async function importCommand(args: string[], io: AgentIo, given?: string,
     propose: (a) => client.call('propose', a),
     packs: () => client.packs(),
   };
+  /* THE CATALOGUE THE OFFERS ARE RESOLVED IN: a folder or an address named with `--catalogue`, else the host's own. */
+  const named = values.catalogue;
+  const catalogue: CatalogueRead =
+    named === undefined
+      ? addressCatalogue(new URL('/app/catalogue/', to.base).href, io, ms)
+      : /^[a-z][a-z0-9+.-]*:\/\//iu.test(named)
+        ? addressCatalogue(named, io, ms)
+        : folderCatalogue(resolve(io.cwd, named));
+  const offered = await resolveOffers(offering.value, catalogue, knownKeys(io));
   /**
    * WHAT THE NIGHTS BEFORE LEFT IN THIS RECORD, AS THIS MACHINE REMEMBERS THEM: the rows their retire passes put in the
    * bin (`Binned`), and the newest export they carried, which an older one tonight is measured against (`newest` in
-   * `applyPlan`). Only runs into the same host, because another record's bin and another record's exports say nothing
-   * about this one. A machine with no memory of a night reads the record as it did before: a row in the bin is his, and
-   * an export is closed against itself.
+   * `applyPlan`). Only runs into the same host and from the same tool, because another record's bin and another tool's
+   * exports say nothing about this one. A machine with no memory of a night reads the record as it did before: a row in
+   * the bin is his, and an export is closed against itself.
    */
-  const before = readRuns(io.home).runs.filter((r) => r.host === to.key);
+  const before = readRuns(io.home).runs.filter((r) => r.host === to.key && mine(r));
   const newest = before.reduce<string | null>((a, r) => (r.taken && !Number.isNaN(Date.parse(r.taken)) && (a === null || Date.parse(r.taken) > Date.parse(a)) ? r.taken : a), null);
   /* THE LAST RUN THAT KEPT WHAT IT SAW IN THE BIN, and only the last: an older night's bin has had more time to empty
      in ways the newer night already saw. */
@@ -2027,7 +2112,7 @@ export async function importCommand(args: string[], io: AgentIo, given?: string,
   const remember = (report: Report, stopped: boolean) => {
     let letGo: number[] = [];
     try {
-      letGo = rememberRun(io.home, { ...runOf(report, { at: now().toISOString(), host: to.key, file }), ...(stopped ? { stopped: true } : {}) });
+      letGo = rememberRun(io.home, { ...runOf(report, { at: now().toISOString(), host: to.key, file, source: adapter.source }), ...(stopped ? { stopped: true } : {}) });
     } catch {
       io.say(`This run was imported but could not be remembered in ${runsFile(io.home)}, so --since will not show it.`);
     }
@@ -2040,9 +2125,10 @@ export async function importCommand(args: string[], io: AgentIo, given?: string,
   try {
     report = await applyPlan(plan, door, {
       dryRun,
-      banks: banksOf(read.value),
-      packs: holdingsOf(read.value),
-      settled: settledOf(read.value),
+      words,
+      banks: offered.filter((p) => p.kind === 'bank'),
+      packs: offered.filter((p) => p.kind !== 'bank'),
+      settled: settling.value,
       binned: before.flatMap((r) => r.binned ?? []),
       newest,
       ...(lastBin?.bin === undefined ? {} : { bin: lastBin.bin }),
@@ -2054,13 +2140,13 @@ export async function importCommand(args: string[], io: AgentIo, given?: string,
     if (e instanceof Unreachable) {
       io.say(`${to.key} stopped answering part way. Run the import again: rows already written are found and not added twice.`);
       /* AND WHAT IT DID BEFORE THAT IS REMEMBERED, which it was not. The rows the retire pass put in the bin were then in
-         no run's `binned`, and the next night held back every one of them as a row he had deleted: the lot of 5 that
-         the old tool held again the night after stayed in the bin (`test/import-own-deletes.test.ts`, measured before
-         this). Only a run that wrote or binned something, because one that stopped while reading changed nothing. */
+         no run's `binned`, and the next night held back every one of them as a row he had deleted: the lot of 5 that the
+         old tool held again the night after stayed in the bin (the adapter's `test/import-own-deletes.test.ts`, measured
+         before this). Only a run that wrote or binned something, because one that stopped while reading changed nothing. */
       const got = progress.report;
       if (!dryRun && got !== null && got.missing.length === 0 && (wroteAny(got) || (got.binned ?? []).length > 0)) {
         remember(got, true);
-        io.say('What it did before it stopped is remembered, and braindog import legacy --since last says it.');
+        io.say(`What it did before it stopped is remembered, and braindog import ${spec} --since last says it.`);
       }
       return 3;
     }
@@ -2099,7 +2185,7 @@ export async function importCommand(args: string[], io: AgentIo, given?: string,
     const taken = plan.taken ? (Number.isNaN(Date.parse(plan.taken)) ? plan.taken.slice(0, 10) : localClock(plan.taken, offsetOf).day) : null;
     const ended = await client.handoff({
       state: 'done',
-      doing: taken ? `the old tool import, export of ${taken}` : `the old tool import on ${today}`,
+      doing: taken ? `${adapter.source} import, export of ${taken}` : `${adapter.source} import on ${today}`,
       note: `${String(t.added)} added, ${String(t.updated)} updated, ${String(t.unchanged)} unchanged, ${String(report.asked)} asked on Decide, ${String(report.refused.length)} refused.`,
     });
     if (!ended.ok) io.say(`The import's own run could not be ended (${fixOf(ended)}), so it reads as live until the record sweeps it.`);

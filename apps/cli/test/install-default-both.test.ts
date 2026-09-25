@@ -17,6 +17,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { REPLACE_FILE } from './replace.ts';
 
 const MAIN = join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'main.ts');
 const SAM = { type: 'stdio', command: 'node', args: ['C:\\Tools\\legacy\\mcp\\brain-mcp.mjs'], env: {} };
@@ -31,7 +32,7 @@ test('a default profile whose folder holds its own .claude.json has BrainDog in 
   writeFileSync(inside, JSON.stringify({ firstStartTime: '2026-09-21T16:56:06.607Z', mcpServers: { brain: SAM } }, null, 2));
   const env: NodeJS.ProcessEnv = { ...process.env, HOME: home, USERPROFILE: home };
   delete env.CLAUDE_CONFIG_DIR;
-  const run = spawnSync(process.execPath, ['--experimental-strip-types', MAIN, 'install', '--replace', '--apply', '--config-dir', join(home, '.claude')], { env, encoding: 'utf8' });
+  const run = spawnSync(process.execPath, ['--experimental-strip-types', MAIN, 'install', '--replace', REPLACE_FILE, '--apply', '--config-dir', join(home, '.claude')], { env, encoding: 'utf8' });
   assert.equal(run.status, 0, run.stderr);
   for (const file of [join(home, '.claude.json'), inside]) {
     const servers = (JSON.parse(readFileSync(file, 'utf8')) as { mcpServers: Record<string, unknown> }).mcpServers;
@@ -51,7 +52,7 @@ test('a default profile whose folder holds no .claude.json is not given one by -
   writeFileSync(join(bare, '.claude.json'), JSON.stringify({ mcpServers: { brain: SAM } }, null, 2));
   const env: NodeJS.ProcessEnv = { ...process.env, HOME: bare, USERPROFILE: bare };
   delete env.CLAUDE_CONFIG_DIR;
-  const run = spawnSync(process.execPath, ['--experimental-strip-types', MAIN, 'install', '--replace', '--apply', '--config-dir', join(bare, '.claude')], { env, encoding: 'utf8' });
+  const run = spawnSync(process.execPath, ['--experimental-strip-types', MAIN, 'install', '--replace', REPLACE_FILE, '--apply', '--config-dir', join(bare, '.claude')], { env, encoding: 'utf8' });
   assert.equal(run.status, 0, run.stderr);
   assert.deepEqual(Object.keys((JSON.parse(readFileSync(join(bare, '.claude.json'), 'utf8')) as { mcpServers: Record<string, unknown> }).mcpServers), ['braindog'], run.stdout);
   assert.ok(!existsSync(join(bare, '.claude', '.claude.json')), `the run made a second servers file:\n${run.stdout}`);

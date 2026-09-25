@@ -18,6 +18,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { installInto } from '../src/install.ts';
+import { REPLACE } from './replace.ts';
 
 const APP = join(dirname(fileURLToPath(import.meta.url)), '..');
 const scratch = mkdtempSync(join(tmpdir(), 'braindog-hook-tokens-'));
@@ -34,7 +35,7 @@ function dryRun(hook: string | null, server: Record<string, unknown> | null): st
   mkdirSync(dir, { recursive: true });
   if (hook) writeFileSync(join(dir, 'settings.json'), JSON.stringify({ hooks: { SessionStart: [{ hooks: [{ type: 'command', command: hook }] }] } }));
   if (server) writeFileSync(join(dir, '.claude.json'), JSON.stringify({ mcpServers: { brain: server } }));
-  return installInto(dir, { apply: false, replace: true, scripts: join(APP, 'hooks'), home });
+  return installInto(dir, { apply: false, replace: REPLACE, scripts: join(APP, 'hooks'), home });
 }
 
 /** The words after "the old tool's: " on the line that starts with `prefix`. */

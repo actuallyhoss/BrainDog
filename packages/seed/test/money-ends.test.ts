@@ -81,7 +81,7 @@ test('a monthly bill ending on 10 November walks 10 September, October and Novem
   assert.deepEqual(walked(k, 'The next 30 days', HOSTING.what), ['2026-09-10 -4500']);
 
   /* CLEARED, THE ROW IS A MONTHLY BILL WITH NO END AGAIN, which is what the import sends the night the old tool takes an
-     end away (`apps/cli/test/import-null-clears.test.ts`). The kernel must take `null` as the clear. */
+     end away (`packs/legacy-import/test/import-null-clears.test.ts`). The kernel must take `null` as the clear. */
   const cleared = k.update('obligations', made.value.id, { ends: null }, { ...OWNER, version: made.value.version });
   assert.ok(cleared.ok, sayOf(cleared));
   assert.equal(Object.hasOwn(cleared.value.fields, 'ends') ? cleared.value.fields.ends : null, null);

@@ -1579,7 +1579,7 @@ export const MONEY_RULES: Record<string, SeedRule> = {
    * (`apps/web/src/lib/record/where.ts:533`), so the block would draw nought rows and a refusal. And
    * `ends is empty` alone drops exactly the rows still running, because the importer skips a stream
    * that ended before the export and so writes `ends` only when it is ahead
-   * (`apps/cli/src/legacy.ts:916`).
+   * ("It ended before the export" in `packs/legacy-import/adapter.ts`).
    *
    * SO THE REPAIR IS WHERE THE ROW IS. `rulesAboutTime` (`packages/kernel/src/index.ts:3475`) sweeps
    * hourly every rule whose `when:` names a relative day and which declares `once_per`, so this one

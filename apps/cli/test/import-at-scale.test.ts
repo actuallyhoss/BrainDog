@@ -29,7 +29,7 @@ import { openRecord, type Kernel } from '@braindog/kernel';
 
 import { fixedClock, openSqlite } from '../../../packages/kernel/test/sqlite.ts';
 import { applyPlan, type Door } from '../src/import.ts';
-import type { Plan, PlannedAsk, PlannedRow } from '../src/legacy.ts';
+import type { Plan, PlannedAsk, PlannedRow } from '../src/adapter.ts';
 
 const NOW = Date.UTC(2026, 8, 17, 9);
 
@@ -112,7 +112,7 @@ function doorOf(kernel: Kernel, o: { refuseListAfter?: number; refuseDecide?: bo
   return { door, lists: () => lists };
 }
 
-const plan = (rows: PlannedRow[], asks: PlannedAsk[] = []): Plan => ({ taken: '2026-09-15', rev: 1, rows, asks, polls: [], skipped: [], changed: [] });
+const plan = (rows: PlannedRow[], asks: PlannedAsk[] = []): Plan => ({ key: 'legacy:', taken: '2026-09-15', rev: 1, rows, asks, polls: [], skipped: [], changed: [] });
 
 const project = (n: number): PlannedRow => ({
   register: 'things',
@@ -121,7 +121,7 @@ const project = (n: number): PlannedRow => ({
   fields: { name: `Project ${String(n)}` },
 });
 
-/** The one question this import brings, shaped as `legacy.ts` shapes an open question. */
+/** The one question this import brings, shaped as `packs/legacy-import/adapter.ts` shapes an open question. */
 const ASK: PlannedAsk = {
   key: 'legacy:suggestion:SG7',
   label: 'SG7',

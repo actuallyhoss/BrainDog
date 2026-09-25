@@ -17,8 +17,9 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { HOOK_MS, hookBudget, notSignedIn, readSession, sessionPath, writeSession } from '../src/hooks.ts';
-import { REPLACE_BY_HAND, hookCommand, installInto, serversFileOf } from '../src/install.ts';
+import { replaceByHand, hookCommand, installInto, serversFileOf } from '../src/install.ts';
 import { sessionHeaders } from '../src/position.ts';
+import { REPLACE, REPLACE_FILE } from './replace.ts';
 
 const APP = join(dirname(fileURLToPath(import.meta.url)), '..');
 /* Obviously fake, and long enough that a fragment of it in any output is findable. */
@@ -455,7 +456,7 @@ test('INSTALL --REPLACE IS A DRY RUN THAT NAMES EVERY THE OLD TOOL HOOK AND MCP 
   const main = cutOverProfile(join(home, '.claude'), join(home, '.claude.json'));
   const acme = cutOverProfile(join(home, '.claude-acme'), join(home, '.claude-acme', '.claude.json'));
   const scripts = join(APP, 'hooks');
-  const options = { apply: false, replace: true, scripts, home };
+  const options = { apply: false, replace: REPLACE, scripts, home };
 
   const lines = [...installInto(join(home, '.claude'), options), ...installInto(join(home, '.claude-acme'), options)];
   const text = lines.join('\n');
@@ -474,7 +475,7 @@ test('INSTALL --REPLACE IS A DRY RUN THAT NAMES EVERY THE OLD TOOL HOOK AND MCP 
   assert.equal(lines.filter((l) => l === "  - projects[\"C:/Repos/acme\"].mcpServers.brain, the old tool's: node [1 argument hidden]").length, 2, text);
   assert.ok(!text.includes(OLD_SHIM) && !text.includes(LOOKALIKE) && !text.includes('brainy') && !text.includes('figma'), text);
   assert.ok(!text.includes(HB_SECRET), 'the dry run printed the env of a server it would remove');
-  assert.equal(lines.filter((l) => l.startsWith('Nothing was changed. To write it, run this in ') && l.includes(' install --replace --apply --config-dir ')).length, 2, text);
+  assert.equal(lines.filter((l) => l.startsWith('Nothing was changed. To write it, run this in ') && l.includes(' install --replace ') && l.includes(REPLACE_FILE) && l.includes(' --apply --config-dir ')).length, 2, text);
 
   assert.equal(readFileSync(main.settings, 'utf8'), main.before);
   assert.equal(readFileSync(join(home, '.claude.json'), 'utf8'), main.mcpBefore);
@@ -502,7 +503,7 @@ test('INSTALL --REPLACE --APPLY copies each file beside itself, removes only the
   const start = hookCommand('start', scripts);
   const end = hookCommand('end', scripts);
 
-  const lines = installInto(dir, { apply: true, replace: true, scripts, home });
+  const lines = installInto(dir, { apply: true, replace: REPLACE, scripts, home });
   const text = lines.join('\n');
   assert.ok(text.includes(`The file as it was is kept at ${settings}.bak.`), text);
   assert.ok(text.includes(`The file as it was is kept at ${claudeJson}.bak.`), text);
@@ -525,7 +526,7 @@ test('INSTALL --REPLACE --APPLY copies each file beside itself, removes only the
   assert.deepEqual(mcp.projects['C:/Repos/acme'], { allowedTools: [], mcpServers: {} });
 
   /* `checkout` a folder in no git tree, so the moving-checkout line, which follows the real tree's state, is not owed. */
-  const again = installInto(dir, { apply: true, replace: true, scripts, home, checkout: home });
+  const again = installInto(dir, { apply: true, replace: REPLACE, scripts, home, checkout: home });
   assert.deepEqual(again, [
     `${settings} already runs both BrainDog hooks and no the old tool hook. Nothing to change.`,
     `${claudeJson} registers no the old tool MCP server. Nothing to change.`,
@@ -576,7 +577,7 @@ test('INSTALL --REPLACE --MCP-JSON names the the old tool servers in a .mcp.json
   const profile = folder('profile');
   const env = envFor(folder('config'), {});
 
-  const dry = await run(['install', '--replace', '--config-dir', profile, '--mcp-json', file], env, '');
+  const dry = await run(['install', '--replace', REPLACE_FILE, '--config-dir', profile, '--mcp-json', file], env, '');
   assert.equal(dry.code, 0, dry.stderr);
   assert.ok(dry.stdout.includes(`braindog install --replace would change ${file}:`), dry.stdout);
   assert.ok(dry.stdout.includes("  - mcpServers.brain, the old tool's: node [1 argument hidden]"), dry.stdout);
@@ -599,13 +600,13 @@ test('INSTALL --REPLACE --MCP-JSON names the the old tool servers in a .mcp.json
    * SENTENCE ITSELF: this first looked for "removed by hand", words the sentence no longer holds, and it stayed green
    * with main.ts printing the sentence on every --replace.
    */
-  assert.ok(!dry.stdout.includes(REPLACE_BY_HAND), dry.stdout);
-  const unnamed = await run(['install', '--replace', '--config-dir', profile], env, '');
-  assert.ok(unnamed.stdout.includes(REPLACE_BY_HAND), unnamed.stdout);
+  assert.ok(!dry.stdout.includes(replaceByHand(REPLACE)), dry.stdout);
+  const unnamed = await run(['install', '--replace', REPLACE_FILE, '--config-dir', profile], env, '');
+  assert.ok(unnamed.stdout.includes(replaceByHand(REPLACE)), unnamed.stdout);
   assert.equal(readFileSync(file, 'utf8'), before, 'the dry run changed the .mcp.json');
   assert.deepEqual(readdirSync(outside), ['.mcp.json']);
 
-  const applied = await run(['install', '--replace', '--apply', '--config-dir', profile, '--mcp-json', file], env, '');
+  const applied = await run(['install', '--replace', REPLACE_FILE, '--apply', '--config-dir', profile, '--mcp-json', file], env, '');
   assert.equal(applied.code, 0, applied.stderr);
   assert.ok(applied.stdout.includes(`The file as it was is kept at ${file}.bak.`), applied.stdout);
   assert.equal(readFileSync(`${file}.bak`, 'utf8'), before);
@@ -616,7 +617,7 @@ test('INSTALL --REPLACE --MCP-JSON names the the old tool servers in a .mcp.json
   /* The same run wrote the profile's hooks: one change, not two. */
   assert.ok(existsSync(join(profile, 'settings.json')));
 
-  const again = await run(['install', '--replace', '--apply', '--config-dir', profile, '--mcp-json', file], env, '');
+  const again = await run(['install', '--replace', REPLACE_FILE, '--apply', '--config-dir', profile, '--mcp-json', file], env, '');
   assert.ok(again.stdout.includes(`${file} registers no the old tool MCP server. Nothing to change.`), again.stdout);
   assert.deepEqual(readdirSync(outside).sort(), ['.mcp.json', '.mcp.json.bak']);
 });
@@ -628,7 +629,7 @@ test('INSTALL --MCP-JSON IS REFUSED inside a git working tree, without --replace
   const nested = join(repo.dir, 'tools');
   const shared = mcpJsonFile(nested);
 
-  const refused = await run(['install', '--replace', '--apply', '--config-dir', profile, '--mcp-json', shared.file], env, '');
+  const refused = await run(['install', '--replace', REPLACE_FILE, '--apply', '--config-dir', profile, '--mcp-json', shared.file], env, '');
   assert.equal(refused.code, 1);
   assert.match(refused.stderr, /is inside the git working tree at .+, so braindog install leaves it alone/);
   assert.equal(readFileSync(shared.file, 'utf8'), shared.before);
@@ -642,7 +643,7 @@ test('INSTALL --MCP-JSON IS REFUSED inside a git working tree, without --replace
   assert.equal(readFileSync(outside.file, 'utf8'), outside.before);
   assert.deepEqual(readdirSync(profile), []);
 
-  const missing = await run(['install', '--replace', '--config-dir', profile, '--mcp-json', join(folder('repos'), '.mcp.json')], env, '');
+  const missing = await run(['install', '--replace', REPLACE_FILE, '--config-dir', profile, '--mcp-json', join(folder('repos'), '.mcp.json')], env, '');
   assert.equal(missing.code, 1);
   assert.match(missing.stderr, /There is no .+\.mcp\.json/);
 });
@@ -669,7 +670,7 @@ test('a the old tool URL joined to its flag with = is known, and a short secret 
       },
     }),
   );
-  const text = installInto(dir, { apply: false, replace: true, scripts: join(APP, 'hooks'), home }).join('\n');
+  const text = installInto(dir, { apply: false, replace: REPLACE, scripts: join(APP, 'hooks'), home }).join('\n');
   assert.ok(text.includes("  - mcpServers.joined, the old tool's: npx [3 arguments hidden]"), text);
   assert.ok(text.includes("  - mcpServers.joined-query, the old tool's: npx [3 arguments hidden]"), text);
   assert.ok(text.includes("  - mcpServers.short-flag, the old tool's: node [5 arguments hidden]"), text);

@@ -9,7 +9,7 @@
  * the one field that record could not hold. That is exactly what `holdings.currency` did to fourteen rows at once.
  *
  * THE ROWS ARE PLANNED BY HAND AND NOT BY `planLegacyTool`, on purpose. Whether the the old tool mapping puts a note on a
- * domain row is `src/legacy.ts`'s decision; this file holds `applyPlan` to what it does with one once it is there.
+ * domain row is `packs/legacy-import/adapter.ts`'s decision; this file holds `applyPlan` to what it does with one once it is there.
  *
  * THE DOOR ANSWERS `schema` WITH THE REGISTER THE KERNEL HOLDS, as `packages/record`'s `schema` does over HTTP, because
  * the declared field ids in that answer are what the importer reads to tell the two records apart.
@@ -22,8 +22,8 @@ import { openRecord, type Kernel } from '@braindog/kernel';
 import { declarations } from '@braindog/seed';
 
 import { fixedClock, openSqlite } from '../../../packages/kernel/test/sqlite.ts';
-import type { Plan, PlannedRow } from '../src/legacy.ts';
-import { applyPlan, said, type Door } from '../src/import.ts';
+import type { Plan, PlannedRow } from '../src/adapter.ts';
+import { applyPlan, said, type Door, type Words } from '../src/import.ts';
 
 const NOW = Date.UTC(2026, 8, 22, 6);
 const ACTOR = 'p_1';
@@ -67,7 +67,14 @@ const domain = (name: string, note?: string): PlannedRow => ({
   fields: { name, kind: 'domain', cycle: 'yearly', state: 'live', provider: 'Cove Domains', ...(note === undefined ? {} : { note }) },
 });
 
-const planOf = (rows: PlannedRow[]): Plan => ({ taken: null, rev: null, rows, asks: [], polls: [], skipped: [], changed: [] });
+/* THE WORDS AN ADAPTER'S `map.json` GIVES: what the list is called and which pack brings it. The command knows neither on
+   its own, so the line that names the list is held to saying what these say. */
+const WORDS: Words = {
+  source: 'the old tool',
+  map: { targets: { order: ['services'], optional: [], providedBy: { services: 'Estate' }, names: { services: 'Services' } }, usecase: null, listed: null, raw: {} },
+};
+
+const planOf = (rows: PlannedRow[]): Plan => ({ key: 'legacy:', taken: null, rev: null, rows, asks: [], polls: [], skipped: [], changed: [] });
 
 const held = async (kernel: Kernel): Promise<Record<string, Record<string, unknown>>> => {
   const got = await kernel.list({ register: 'services', limit: 50 });
@@ -92,7 +99,7 @@ test('ON A RECORD WHOSE SERVICES HOLD A NOTE, the note is written, and a second 
 
 test('ON A RECORD STILL ON THE ESTATE WITH NO NOTE, the row still arrives and the note is named in a line of its own', async () => {
   const { sql, kernel } = await record(false);
-  const report = await applyPlan(planOf([domain('brain.example', NOTE), domain('cove.example')]), doorOf(kernel), { dryRun: false });
+  const report = await applyPlan(planOf([domain('brain.example', NOTE), domain('cove.example')]), doorOf(kernel), { dryRun: false, words: WORDS });
   assert.deepEqual(report.refused, [], 'a field this record has not got cost the whole row');
   const rows = await held(kernel);
   assert.deepEqual(Object.keys(rows).sort(), ['brain.example', 'cove.example']);

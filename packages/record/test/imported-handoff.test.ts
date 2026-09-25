@@ -35,7 +35,7 @@ const agent = (session: CallContext['session']): CallContext => ({
 
 /**
  * The seed with Projects placed by repository, a project `Probe` in `probe-repo`, and a run written as the import
- * writes one (`apps/cli/src/legacy.ts:2145` to `:2170`): by a token, naming the repository, with no hints to attach
+ * writes one (the agent runs in `packs/legacy-import/adapter.ts`): by a token, naming the repository, with no hints to attach
  * it by. A minute later a second agent attaches in the same repository and asks where it stands.
  */
 async function seeded() {

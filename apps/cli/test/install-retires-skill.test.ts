@@ -24,6 +24,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { installEvery } from '../src/install.ts';
+import { REPLACE, REPLACE_FILE } from './replace.ts';
 
 const APP = join(dirname(fileURLToPath(import.meta.url)), '..');
 const scripts = join(APP, 'hooks');
@@ -97,7 +98,7 @@ test('A PROFILE HOLDING THE old-brain SKILL: the dry run lists - skills/old-brai
   const p = profile(home, '.claude-quartz');
   const before = tree(p.dir);
 
-  const dry = installEvery([p.dir], [], { apply: false, replace: true, scripts, home, checkout: still() });
+  const dry = installEvery([p.dir], [], { apply: false, replace: REPLACE, scripts, home, checkout: still() });
   assert.ok(
     dry.some((l) => l.startsWith('  - skills/old-brain')),
     `no line for the skill:\n${dry.join('\n')}`,
@@ -112,7 +113,7 @@ test('--APPLY MOVES IT UNDER skills/.replaced/ WITH THE SAME BYTES, and skills/o
   const p = profile(home, '.claude-quartz');
   const skill = tree(p.skill);
 
-  const lines = installEvery([p.dir], [], { apply: true, replace: true, scripts, home, checkout: still() });
+  const lines = installEvery([p.dir], [], { apply: true, replace: REPLACE, scripts, home, checkout: still() });
   assert.ok(!existsSync(p.skill), `skills/old-brain is still there:\n${lines.join('\n')}`);
   const kept = readdirSync(join(p.dir, 'skills', '.replaced'));
   assert.equal(kept.length, 1, kept.join(', '));
@@ -122,7 +123,7 @@ test('--APPLY MOVES IT UNDER skills/.replaced/ WITH THE SAME BYTES, and skills/o
   assert.ok(lines.some((l) => l.includes(join(p.dir, 'skills', '.replaced', kept[0]!))), lines.join('\n'));
 
   /* A second run finds nothing to retire, and a folder under `.replaced` is never taken for a skill. */
-  const again = installEvery([p.dir], [], { apply: true, replace: true, scripts, home, checkout: still() });
+  const again = installEvery([p.dir], [], { apply: true, replace: REPLACE, scripts, home, checkout: still() });
   assert.ok(!again.some((l) => l.startsWith('  - skills/')), again.join('\n'));
   assert.deepEqual(readdirSync(join(p.dir, 'skills', '.replaced')), kept);
 });
@@ -133,7 +134,7 @@ test('A SKILL THAT DOES NOT NAME THE HOST, AND commands/, ARE BYTE FOR BYTE AS T
   const tidy = tree(p.tidy);
   const commands = tree(p.commands);
 
-  installEvery([p.dir], [], { apply: true, replace: true, scripts, home, checkout: still() });
+  installEvery([p.dir], [], { apply: true, replace: REPLACE, scripts, home, checkout: still() });
   assert.deepEqual(tree(p.tidy), tidy);
   assert.deepEqual(tree(p.commands), commands);
 
@@ -155,7 +156,7 @@ test('A FAILURE IN A LATER FILE PUTS THE SKILL FOLDER BACK', { skip: process.pla
   chmodSync(b.claudeJson, 0o444);
   const before = [tree(a.dir), tree(b.dir)];
 
-  assert.throws(() => installEvery([a.dir, b.dir], [], { apply: true, replace: true, scripts, home, checkout: still() }), /changed nothing/);
+  assert.throws(() => installEvery([a.dir, b.dir], [], { apply: true, replace: REPLACE, scripts, home, checkout: still() }), /changed nothing/);
   assert.deepEqual([tree(a.dir), tree(b.dir)], before);
   /* Nor is an empty `.replaced` left behind: the folder was this run's. */
   assert.ok(!existsSync(join(a.dir, 'skills', '.replaced')));
@@ -179,11 +180,11 @@ test('A CHECKOUT WITH AN UNCOMMITTED CHANGE PRINTS THE WARNING, a clean one does
    */
   writeFileSync(join(repo, 'notes.test.ts'), 'export {};\n');
 
-  const clean = installEvery([p.dir], [], { apply: false, replace: true, scripts, home, checkout: repo });
+  const clean = installEvery([p.dir], [], { apply: false, replace: REPLACE, scripts, home, checkout: repo });
   assert.ok(!clean.some((l) => MOVING.test(l)), clean.join('\n'));
 
   writeFileSync(join(repo, 'main.ts'), 'export const half = \n');
-  const moving = installEvery([p.dir], [], { apply: false, replace: true, scripts, home, checkout: repo });
+  const moving = installEvery([p.dir], [], { apply: false, replace: REPLACE, scripts, home, checkout: repo });
   const warned = moving.filter((l) => MOVING.test(l));
   assert.equal(warned.length, 1, moving.join('\n'));
   /* It names the tree and the fix, and the run goes on to plan everything it would without it. */
@@ -201,7 +202,7 @@ test('THROUGH main.ts, each profile lists + mcpServers.braindog and - skills/old
   const acme = profile(home, '.claude-acme');
   const env: NodeJS.ProcessEnv = { ...process.env, HOME: home, USERPROFILE: home, XDG_CONFIG_HOME: join(home, 'config') };
   for (const name of Object.keys(env)) if (name.startsWith('BRAINDOG_') || name === 'CLAUDE_CONFIG_DIR') delete env[name];
-  const ran = spawnSync(process.execPath, [join(APP, 'src', 'main.ts'), 'install', '--replace', '--config-dir', quartz.dir, '--config-dir', acme.dir], { cwd: home, env, encoding: 'utf8', timeout: 30_000 });
+  const ran = spawnSync(process.execPath, [join(APP, 'src', 'main.ts'), 'install', '--replace', REPLACE_FILE, '--config-dir', quartz.dir, '--config-dir', acme.dir], { cwd: home, env, encoding: 'utf8', timeout: 30_000 });
 
   assert.equal(ran.status, 0, ran.stderr);
   const lines = ran.stdout.split('\n');

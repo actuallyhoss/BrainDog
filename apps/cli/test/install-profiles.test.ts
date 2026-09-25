@@ -24,6 +24,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { installEvery } from '../src/install.ts';
+import { REPLACE, REPLACE_FILE } from './replace.ts';
 
 const APP = join(dirname(fileURLToPath(import.meta.url)), '..');
 const scripts = join(APP, 'hooks');
@@ -115,7 +116,7 @@ test('THE ACME SHAPE, no the old tool server in its .claude.json: the dry run pl
   const home = folder('home');
   const acme = profile(home, '.claude-acme', { numStartups: 4, mcpServers: { figma: FIGMA } });
 
-  const dry = installEvery([acme.dir], [], { apply: false, replace: true, scripts, home });
+  const dry = installEvery([acme.dir], [], { apply: false, replace: REPLACE, scripts, home });
   assert.ok(!dry.includes(`${acme.claudeJson} registers no the old tool MCP server. Nothing to change.`), dry.join('\n'));
   assert.ok(dry.includes(`braindog install --replace would change ${acme.claudeJson}:`), dry.join('\n'));
   assert.ok(dry.includes(PLUS), dry.join('\n'));
@@ -126,12 +127,12 @@ test('A PROFILE WITH NO .claude.json AT ALL gets one on --apply, holding only Br
   const home = folder('home');
   const bare = profile(home, '.claude-bare', null);
 
-  const dry = installEvery([bare.dir], [], { apply: false, replace: true, scripts, home });
+  const dry = installEvery([bare.dir], [], { apply: false, replace: REPLACE, scripts, home });
   assert.ok(dry.includes(`braindog install --replace would change ${bare.claudeJson}, a new file:`), dry.join('\n'));
   assert.ok(dry.includes(PLUS), dry.join('\n'));
   assert.ok(!existsSync(bare.claudeJson), 'the dry run made the file');
 
-  const applied = installEvery([bare.dir], [], { apply: true, replace: true, scripts, home });
+  const applied = installEvery([bare.dir], [], { apply: true, replace: REPLACE, scripts, home });
   assert.ok(applied.includes('There was no file before, so there is nothing to keep a copy of.'), applied.join('\n'));
   assert.deepEqual(JSON.parse(readFileSync(bare.claudeJson, 'utf8')), { mcpServers: { braindog: BRAINDOG } });
 });
@@ -139,7 +140,7 @@ test('A PROFILE WITH NO .claude.json AT ALL gets one on --apply, holding only Br
 test('--APPLY OVER HIS THREE PROFILES, through main.ts: every .claude.json ends with braindog, the .mcp.json loses brain and keeps the rest, and no hand-run line is owed', () => {
   const home = folder('home');
   const { quartz, acme, work, mcpJson } = his(home);
-  const args = ['install', '--replace', '--config-dir', quartz.dir, '--config-dir', acme.dir, '--config-dir', work.dir, '--mcp-json', mcpJson];
+  const args = ['install', '--replace', REPLACE_FILE, '--config-dir', quartz.dir, '--config-dir', acme.dir, '--config-dir', work.dir, '--mcp-json', mcpJson];
 
   const dry = cli(args, home);
   assert.equal(dry.code, 0, dry.stderr);
@@ -191,7 +192,7 @@ test('A PROFILE ALREADY HOLDING braindog is left byte for byte beside two that g
   const quartz = profile(home, '.claude-quartz', { mcpServers: { brain: SAM } });
   const acme = profile(home, '.claude-acme', { mcpServers: { figma: FIGMA } });
 
-  const lines = installEvery([settled.dir, quartz.dir, acme.dir], [], { apply: true, replace: true, scripts, home });
+  const lines = installEvery([settled.dir, quartz.dir, acme.dir], [], { apply: true, replace: REPLACE, scripts, home });
   assert.ok(lines.includes(`${settled.claudeJson} registers no the old tool MCP server. Nothing to change.`), lines.join('\n'));
   assert.equal(readFileSync(settled.claudeJson, 'utf8'), settled.before);
   assert.ok(!existsSync(`${settled.claudeJson}.bak`));
@@ -209,7 +210,7 @@ test('A FAILURE WRITING THE THIRD PROFILE PUTS THE FIRST TWO BACK AS THEY WERE',
   chmodSync(acme.claudeJson, 0o444);
   const before = [snapshot(quartz.dir), snapshot(work.dir), snapshot(acme.dir)];
 
-  assert.throws(() => installEvery([quartz.dir, work.dir, acme.dir], [], { apply: true, replace: true, scripts, home }), /changed nothing/);
+  assert.throws(() => installEvery([quartz.dir, work.dir, acme.dir], [], { apply: true, replace: REPLACE, scripts, home }), /changed nothing/);
   assert.deepEqual([snapshot(quartz.dir), snapshot(work.dir), snapshot(acme.dir)], before);
 });
 
@@ -249,7 +250,7 @@ test('THE DEFAULT ~/.claude PROFILE gets the line that clears CLAUDE_CONFIG_DIR,
   assert.deepEqual(twice.stdout.split('\n').filter((l) => l.includes('claude mcp add')), [forProfile(acme.dir)], twice.stdout);
 
   const listed = profile(home, '.claude-listed', { mcpServers: [] });
-  const refused = cli(['install', '--replace', '--config-dir', listed.dir], home);
+  const refused = cli(['install', '--replace', REPLACE_FILE, '--config-dir', listed.dir], home);
   assert.equal(refused.code, 0, refused.stderr);
   assert.ok(refused.stdout.includes(`${listed.claudeJson} registers no the old tool MCP server. Nothing to change. Its mcpServers is not an object`), refused.stdout);
   assert.deepEqual(refused.stdout.split('\n').filter((l) => l.includes('claude mcp add')), [forProfile(listed.dir)], refused.stdout);
@@ -258,7 +259,7 @@ test('THE DEFAULT ~/.claude PROFILE gets the line that clears CLAUDE_CONFIG_DIR,
 test('NO TOKEN IN ANY ENTRY OR LINE, on the dry run, on --apply, or in a file written', () => {
   const home = folder('home');
   const { quartz, acme, work, mcpJson } = his(home);
-  const args = ['install', '--replace', '--config-dir', quartz.dir, '--config-dir', acme.dir, '--config-dir', work.dir, '--mcp-json', mcpJson];
+  const args = ['install', '--replace', REPLACE_FILE, '--config-dir', quartz.dir, '--config-dir', acme.dir, '--config-dir', work.dir, '--mcp-json', mcpJson];
 
   for (const run of [cli(args, home), cli([...args, '--json'], home), cli([...args, '--apply'], home)]) {
     assert.equal(run.code, 0, run.stderr);

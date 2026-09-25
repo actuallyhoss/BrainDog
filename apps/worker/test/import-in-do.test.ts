@@ -48,9 +48,9 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { createClient, type Client } from '../../../packages/client/src/index.ts';
 import { importCommand } from '../../cli/src/import.ts';
-import { KEY_PREFIX, planLegacyTool, readLegacyTool, readSetup, type Plan } from '../../cli/src/legacy.ts';
+import { ADAPTER, CATALOGUE, KEY_PREFIX, planLegacyTool, readLegacyTool, readSetup, type Plan } from '../../../packs/legacy-import/test/harness.ts';
 import type { AgentIo } from '../../cli/src/skills.ts';
-import { syntheticExport, syntheticSetup } from '../../cli/test/legacy-export.ts';
+import { syntheticExport, syntheticSetup } from '../../../packs/legacy-import/test/synthetic.ts';
 import { start } from '../../selfhost/src/server.ts';
 
 const fromWrangler = createRequire(createRequire(import.meta.url).resolve('wrangler/package.json'));
@@ -115,7 +115,7 @@ async function runImport(base: string, token: string): Promise<Run> {
   };
   let exit: number;
   try {
-    exit = await importCommand(['legacy', 'export.json', '--setup', 'setup.json'], io, TODAY);
+    exit = await importCommand([ADAPTER, '--catalogue', CATALOGUE, 'export.json', '--setup', 'setup.json'], io, TODAY);
   } finally {
     globalThis.fetch = real;
   }
