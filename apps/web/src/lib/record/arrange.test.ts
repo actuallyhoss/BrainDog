@@ -16,9 +16,12 @@ import assert from 'node:assert/strict';
 import {
   differs,
   dropIndex,
+  dropInto,
   floorFor,
   moveAt,
+  nearestInArea,
   removeAt,
+  setAreaAt,
   setSpanAt,
   spanLabel,
   spanOf,
@@ -80,6 +83,50 @@ test('`differs` sees a reorder, a resize and a removal', () => {
   assert.equal(differs(base, moveAt(base, 0, 1)), true);
   assert.equal(differs(base, setSpanAt(base, 0, 6)), true);
   assert.equal(differs(base, removeAt(base, 0)), true);
+});
+
+/* ── the main column and the rail (brief D4) ──────────────────────────────── */
+
+/* A page with a rail, as the arrangement holds it: declared order, and each block's area. */
+const areas = (...placed: ('main' | 'rail')[]): Slot[] => placed.map((area, i) => ({ i, span: 12, area }));
+
+test('A BLOCK MOVED TO THE RAIL IS A CHANGE, so Done writes it rather than saying nothing moved', () => {
+  // THE BUG THIS CATCHES IS SILENT. `differs` compared order and span, so a draft whose only change
+  // was a block moved to the rail read as equal to the page, and Done cancelled the mode with
+  // "Nothing moved." while the block sat in the rail on screen.
+  const base = areas('main', 'main');
+  assert.equal(differs(base, setAreaAt(base, 1, 'rail')), true);
+  // An area left out is the main column, which is what the declaration means by leaving it out.
+  assert.equal(differs([{ i: 0, span: 12 }], [{ i: 0, span: 12, area: 'main' }]), false);
+});
+
+test('moving a block to the rail touches one slot and keeps its place and width', () => {
+  const next = setAreaAt(areas('main', 'main', 'main'), 1, 'rail');
+  assert.deepEqual(next.map((s) => s.area), ['main', 'rail', 'main']);
+  assert.deepEqual(order(next), [0, 1, 2]);
+});
+
+test('UP AND DOWN STEP OVER THE OTHER AREA, so a rail block moves past the rail block beside it', () => {
+  // The list is one order and the screen draws it as two columns. A step to the next index would
+  // land a rail block behind a main block, which changes nothing the reader can see: the button
+  // is pressed and the page stays as it was.
+  const s = areas('main', 'rail', 'main', 'rail');
+  assert.equal(nearestInArea(s, 1, 1), 3, 'the next rail block is two places down');
+  assert.equal(nearestInArea(s, 2, -1), 0, 'the main block before it is two places up');
+  assert.equal(nearestInArea(s, 3, 1), 3, 'the last rail block has nowhere lower to go');
+  assert.deepEqual(order(moveAt(s, 1, nearestInArea(s, 1, 1))), [0, 2, 3, 1]);
+  // A page with no rail steps one place, as it always has.
+  assert.equal(nearestInArea(slots(12, 6, 6), 1, 1), 2);
+});
+
+test('A BLOCK DROPPED ON A BLOCK IN THE OTHER AREA JOINS THAT AREA, where it was dropped', () => {
+  const s = areas('main', 'main', 'rail');
+  const dropped = dropInto(s, 0, 2, 'before');
+  assert.deepEqual(order(dropped), [1, 0, 2]);
+  assert.deepEqual(dropped.map((x) => x.area), ['main', 'rail', 'rail']);
+  // Within one area it is the drag it always was, and no area is written where none was.
+  assert.deepEqual(dropInto(slots(12, 6, 6), 0, 2, 'after'), moveAt(slots(12, 6, 6), 0, dropIndex(0, 2, 'after')));
+  assert.equal('area' in dropInto(slots(12, 6), 0, 1, 'after')[0]!, false);
 });
 
 /* ── the width floor, which is 13 §4.1 made enforceable ───────────────────── */

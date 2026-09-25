@@ -51,7 +51,8 @@
   import Reporting from '../../routes/p/[slug]/Reporting.svelte';
   import { words as actionWords } from '$lib/record/actions.ts';
   import { Arrangement } from '$lib/record/arrange.svelte.ts';
-  import { COLUMNS, dropIndex, spanOf as declaredSpan } from '$lib/record/arrange.ts';
+  import { COLUMNS, dropInto, nearestInArea, setAreaAt, spanOf as declaredSpan, type Slot } from '$lib/record/arrange.ts';
+  import { areaOf, boxesOf, layoutOf, mainSpan, splitAreas, sticks, words as railWords, type Run } from './layout.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { resolverOf, type LiveBlock, type LivePageDecl, type Opened } from '$lib/record/page-live.ts';
   import type { Declared, Kept } from '$lib/record/page-write.ts';
@@ -388,14 +389,82 @@
    */
   const laid = $derived.by(() => {
     const blocks = all;
-    const slots = arrangement.slots ?? blocks.map((b, i) => ({ i, span: spanOf(b) }));
+    const slots = arrangement.slots ?? blocks.map(slotOf);
     return slots
       .map((slot) => ({ slot, block: blocks[slot.i] }))
-      .filter((x): x is { slot: { i: number; span: number }; block: LiveBlock } => Boolean(x.block));
+      .filter((x): x is { slot: Slot; block: LiveBlock } => Boolean(x.block));
   });
 
+  /* ── the main column and the rail (brief D4) ──────────────────────────────
+     A PAGE THAT DECLARES `layout` DRAWS TWO COLUMNS; every other page draws the one flow it always has, through the same
+     markup, so nothing below changes for it. `layout.ts` says why the rail is a split of the one list and never a
+     second list. */
+  const layout = $derived(result ? layoutOf(result.page) : null);
+
+  /**
+   * A declared block's slot: its declared index, its clamped span, and `area: rail` when it sits in the rail.
+   *
+   * NO `area` KEY FOR A MAIN BLOCK, so a page with no layout makes exactly the slots it always made and a Done that moved
+   * nothing compares them equal.
+   */
+  const slotOf = (b: LiveBlock, i: number): Slot => (areaOf(b, layout) === 'rail' ? { i, span: spanOf(b), area: 'rail' } : { i, span: spanOf(b) });
+
+  /** Every drawn pair with `at`, its index in `laid`, which is the index the arrangement moves by. */
+  type Laid = { slot: Slot; block: LiveBlock; at: number };
+  const pairs = $derived<Laid[]>(laid.map((x, at) => ({ ...x, at })));
+
+  /** Each area's pairs, in declared order. The slot says where a block is, because a move to the rail is a slot's. */
+  const split = $derived(splitAreas(pairs, layout, (x) => x.slot.area));
+
+  /**
+   * THE ORDER A READER MEETS THE BLOCKS IN, which is the main column and then the rail: the order the page draws them
+   * in, the order a phone stacks them in, and so the order `j` and `k` walk. On a page with no rail it is `laid`.
+   */
+  const reading = $derived(layout ? [...split.main, ...split.rail] : pairs);
+
+  /**
+   * The runs an area draws in. A boxed section and the blocks after it share one surface while reading; while arranging
+   * every block is loose, because a block being moved is a list item and a list item inside a surface inside the list
+   * is a listitem whose parent is not the list.
+   */
+  const runsOf = (list: Laid[]): Run<Laid>[] => (arranging ? [{ box: false, items: list }] : boxesOf(list, (x) => x.block));
+
+  /* WHETHER THE RAIL STAYS IN VIEW, measured, since `sticky: true` is honoured only while the rail fits (`sticks`). The
+     room is the scrolling column's height under the page head, the same `--sticky` offset the rail sticks at. */
+  let railEl = $state<HTMLElement | null>(null);
+  let railHeight = $state(0);
+  let room = $state(0);
+  $effect(() => {
+    const el = railEl;
+    if (!el || !layout?.sticky) return;
+    const scroller = el.closest('main') ?? document.documentElement;
+    const root = getComputedStyle(document.documentElement);
+    const px = (token: string) => Number.parseFloat(root.getPropertyValue(token)) || 0;
+    const measure = () => {
+      room = scroller.clientHeight - px('--sticky') - 2 * px('--sp-4');
+    };
+    measure();
+    const watch = new ResizeObserver(measure);
+    watch.observe(scroller);
+    return () => watch.disconnect();
+  });
+  const stuck = $derived(sticks(layout, railHeight, room));
+
+  /** The other area, which is where the block's move button sends it. */
+  function toOtherArea(at: number, from: 'main' | 'rail') {
+    if (arrangement.slots) arrangement.slots = setAreaAt(arrangement.slots, at, from === 'rail' ? 'main' : 'rail');
+  }
+
+  /**
+   * One step up or down inside the block's own area. `to` is the position the bar asked for within that area; the
+   * arrangement moves by `laid` index, so the step is found there. With no rail this is `at - 1` and `at + 1`.
+   */
+  function stepInArea(at: number, pos: number, to: number) {
+    arrangement.move(at, nearestInArea(arrangement.slots ?? [], at, to < pos ? -1 : 1));
+  }
+
   function beginArrange() {
-    arrangement.begin(all.map((b, i) => ({ i, span: spanOf(b) })));
+    arrangement.begin(all.map(slotOf));
   }
 
   /**
@@ -408,7 +477,7 @@
   function add(block: PageBlock) {
     extra = [...extra, block];
     arrangement.slots = [
-      ...(arrangement.slots ?? (result?.blocks ?? []).map((b, i) => ({ i, span: spanOf(b) }))),
+      ...(arrangement.slots ?? (result?.blocks ?? []).map(slotOf)),
       { i: (result?.blocks.length ?? 0) + extra.length - 1, span: block.span ?? 12 },
     ];
     const named = copy.kindNames[block.kind] ?? block.kind;
@@ -438,7 +507,19 @@
     const title = result?.page.title ?? slug;
     const m = await import('$lib/record/page-write.ts');
     const placed = arrangement.body.map((b) => ({ i: b.block, span: b.span }));
-    const out = await m.saveArrangement(apiBase(), slug, result?.blocks.length ?? 0, placed, extra, undefined, result?.page.declared_version);
+    /* A PAGE WITH A RAIL WRITES EACH BLOCK'S AREA TOO. `arrangement.body` is order and span, and so is `saveArrangement`,
+       so a block moved to the rail was written back in the main column; `layout-write.ts` says why it is a second path. */
+    const out = layout
+      ? await (await import('./layout-write.ts')).saveLaidOut(
+          apiBase(),
+          slug,
+          result?.blocks.length ?? 0,
+          (arrangement.slots ?? []).map((s) => ({ i: s.i, span: s.span, ...(s.area ? { area: s.area } : {}) })),
+          extra,
+          undefined,
+          result?.page.declared_version,
+        )
+      : await m.saveArrangement(apiBase(), slug, result?.blocks.length ?? 0, placed, extra, undefined, result?.page.declared_version);
     saving = false;
     if (out.from !== 'written') return void toasts.push(out.fix, { intent: 'warn' });
     arrangement.commit();
@@ -468,17 +549,20 @@
      the short edge of half the blocks on the page. */
   let over = $state<{ at: number; edge: 'before' | 'after' } | null>(null);
 
-  function trackDrop(e: DragEvent, at: number, span: number) {
+  /* `stacked` IS WHETHER THE BLOCK HAS THE WHOLE ROW, which a full-width block does and every block in the rail does,
+     since the rail is one stack whatever a block's span says. */
+  function trackDrop(e: DragEvent, at: number, stacked: boolean) {
     if (!arranging || dragging === null) return;
     e.preventDefault();
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const stacked = span >= COLUMNS;
     const past = stacked ? e.clientY > r.top + r.height / 2 : e.clientX > r.left + r.width / 2;
     over = { at, edge: past ? 'after' : 'before' };
   }
 
+  /* A DROP ON A BLOCK IN THE OTHER COLUMN MOVES THE HELD BLOCK INTO THAT COLUMN, at the edge it was let go on. With no
+     rail it is the drag it always was: `dropInto` is `moveAt` at `dropIndex` when the two areas are the same. */
   function drop() {
-    if (dragging !== null && over) arrangement.move(dragging, dropIndex(dragging, over.at, over.edge));
+    if (dragging !== null && over && arrangement.slots) arrangement.slots = dropInto(arrangement.slots, dragging, over.at, over.edge);
     dragging = null;
     over = null;
   }
@@ -521,7 +605,8 @@
     if (e.altKey || e.shiftKey || showSource || arranging) return;
     if (silenced(e)) return;
 
-    const blocks = laid;
+    /* THE READING ORDER, so on a page with a rail `j` walks the main column and then the rail, as the page draws them. */
+    const blocks = reading;
     if (e.key === 'j' || e.key === 'ArrowDown') {
       e.preventDefault();
       cursor = Math.min(cursor + 1, blocks.length - 1);
@@ -591,7 +676,7 @@
 
   /** Scrolls the cursor into view under the sticky head. `.block-slot` already carries the margin. */
   function focusBlock() {
-    const slot = laid[cursor]?.slot.i;
+    const slot = reading[cursor]?.slot.i;
     if (slot !== undefined) document.getElementById(`b-${slot + 1}`)?.scrollIntoView({ block: 'nearest' });
   }
 
@@ -754,7 +839,8 @@
   <!-- A LIST while arranging, and nothing while reading. The blocks become a reorderable list only
        in the mode where they are reorderable; announcing "list, 5 items" to somebody reading a page
        is describing the furniture. -->
-  <div class="page" role={arranging ? 'list' : undefined}>
+  <!-- ON A PAGE WITH A RAIL EACH COLUMN IS ITS OWN LIST while arranging, named, and the page is neither. -->
+  <div class="page" role={arranging && !layout ? 'list' : undefined}>
     {#if showSource}
       <!-- The declaration as diffable text. A page is a row, so this is the row (19 §2). -->
       <!-- `tabindex="0"`: it is a long scrolling code block, and a scrolling box a keyboard cannot
@@ -773,7 +859,16 @@
       <pre class="source" tabindex="0" aria-label={copy.declarationOf(result.page.title)}><code
           >{declaration}</code></pre>
     {:else}
-      {#each laid as { slot, block }, at (slot.i)}
+      <!-- ONE BLOCK, WHEREVER IT IS DRAWN. It was the body of the page's one `each`; it is a snippet so the main column,
+           the rail and a boxed run draw the same markup, and a page with no rail draws exactly what it drew before. -->
+      {#snippet slotted({ slot, block, at }: Laid)}
+        <!-- `rail` is whether the block is drawn in the rail; `pos` and `count` are its place in its own column, which is
+             what Move up and Move down step through. -->
+        {@const rail = layout !== null && slot.area === 'rail'}
+        {@const peers = rail ? split.rail : layout ? split.main : pairs}
+        {@const pos = peers.findIndex((x) => x.at === at)}
+        {@const count = peers.length}
+        {@const stacked = rail || slot.span >= COLUMNS}
         <!-- `drawn: false` means the server evaluated `when:` and said no. A page that shows a
              warning that does not apply teaches people to ignore warnings (06 §1). -->
         {#if block.drawn}
@@ -814,15 +909,15 @@
             aria-labelledby="h-{slot.i + 1}"
             style="--span:{slot.span}"
             data-arranging={arranging ? '' : undefined}
-            data-cursor={!arranging && !showSource && at === cursor ? '' : undefined}
+            data-cursor={!arranging && !showSource && reading[cursor]?.slot.i === slot.i ? '' : undefined}
             role={arranging ? 'listitem' : 'region'}
             data-dragging={dragging === at ? '' : undefined}
             data-drop={over && over.at === at && dragging !== at ? over.edge : undefined}
-            data-stacked={slot.span >= COLUMNS ? '' : undefined}
+            data-stacked={stacked ? '' : undefined}
             draggable={arranging}
             ondragstart={() => (dragging = at)}
             ondragend={() => ((dragging = null), (over = null))}
-            ondragover={(e) => trackDrop(e, at, slot.span)}
+            ondragover={(e) => trackDrop(e, at, stacked)}
             ondrop={(e) => {
               e.preventDefault();
               drop();
@@ -835,8 +930,8 @@
                  focus — the handle, a width button, Move up. A listitem that is itself a tab stop
                  puts a stop in the sequence that does nothing when you land on it. */
               if (!arranging || !e.altKey) return;
-              if (e.key === 'ArrowUp') { e.preventDefault(); arrangement.move(at, at - 1); }
-              if (e.key === 'ArrowDown') { e.preventDefault(); arrangement.move(at, at + 1); }
+              if (e.key === 'ArrowUp') { e.preventDefault(); stepInArea(at, pos, pos - 1); }
+              if (e.key === 'ArrowDown') { e.preventDefault(); stepInArea(at, pos, pos + 1); }
             }}
           >
             {#if arranging}
@@ -844,12 +939,23 @@
                 kind={block.kind}
                 span={slot.span}
                 columns={block.columns.length}
-                {at}
-                count={laid.length}
-                onmove={(to) => arrangement.move(at, to)}
+                at={pos}
+                {count}
+                onmove={(to) => stepInArea(at, pos, to)}
                 onspan={(span) => arrangement.setSpan(at, span)}
                 onremove={() => arrangement.remove(at)}
               />
+              <!-- THE KEYBOARD'S WAY ACROSS, as Move up is its way along: a drag onto the other column does the same, and
+                   WCAG 2.5.7 asks for the control that is not a drag. Only on a page with a rail, since a page without
+                   one has nowhere to send a block. -->
+              {#if layout}
+                <div class="area-move">
+                  <Button weight="bare" onclick={() => toOtherArea(at, rail ? 'rail' : 'main')}>
+                    <Icon name={rail ? 'back' : 'arrow'} size="s" />
+                    {rail ? railWords.toMain : railWords.toRail}
+                  </Button>
+                </div>
+              {/if}
             {/if}
             <header class="block-bar">
               <!-- A BLOCK WITH NO AUTHORED `heading:` PRINTED ITS DIALECT ID: `spec`, `chips`, `gauge`,
@@ -992,7 +1098,54 @@
             {/if}
           </div>
         {/if}
-      {/each}
+      {/snippet}
+
+      <!-- A COLUMN'S BLOCKS, run by run. A boxed section and the blocks after it are one surface, drawn only when one of
+           them is drawn, so a box whose every block said no to `when:` leaves no empty panel behind. -->
+      {#snippet column(list: Laid[])}
+        {#each runsOf(list) as run}
+          {#if run.box}
+            {#if run.items.some((x) => x.block.drawn)}
+              <div class="box">
+                {#each run.items as x (x.slot.i)}{@render slotted(x)}{/each}
+              </div>
+            {/if}
+          {:else}
+            {#each run.items as x (x.slot.i)}{@render slotted(x)}{/each}
+          {/if}
+        {/each}
+      {/snippet}
+
+      {#if layout}
+        <!-- TWO COLUMNS, the main one a twelve-column flow of its own so a block's `span` keeps its meaning inside it, and
+             the rail one stack. The rail is drawn only while it holds a block, so a page whose every block is in main
+             draws as one column rather than beside an empty third of the screen. -->
+        <div
+          class="area"
+          data-area="main"
+          style="--area-span:{mainSpan(layout)}"
+          role={arranging ? 'list' : undefined}
+          aria-label={arranging ? railWords.main : undefined}
+        >
+          {@render column(split.main)}
+        </div>
+        {#if split.rail.length > 0}
+          <div
+            class="area"
+            data-area="rail"
+            style="--area-span:{layout.rail}"
+            data-sticky={stuck ? '' : undefined}
+            role={arranging ? 'list' : undefined}
+            aria-label={arranging ? railWords.rail : undefined}
+            bind:this={railEl}
+            bind:clientHeight={railHeight}
+          >
+            {@render column(split.rail)}
+          </div>
+        {/if}
+      {:else}
+        {@render column(pairs)}
+      {/if}
     {/if}
   </div>
 
@@ -1053,6 +1206,100 @@
      the first one, 90px at 1440, and wrapped a word to a line. */
   .page.said {
     display: block;
+  }
+
+  /* ── the main column and the rail (brief D4) ──────────────────────────────
+     THE TWO COLUMNS ARE SPANS OF THE PAGE'S OWN TWELVE, so the rail's `4` is four of the same twelfths a block's span
+     is counted in, and the gutter between the columns is the gutter between blocks. At 1440 with the app's rail open
+     the page is about 1126px across: tracks of about 64.5px and 32px gaps, so a rail of 4 is 354px and the main column
+     740px; a rail of 3 is 258px, which still holds a card, and that is why the kernel stops at 3.
+
+     THE MAIN COLUMN IS A TWELVE-COLUMN FLOW OF ITS OWN, so `span: 6` there is half the main column, not half the page.
+     THE RAIL IS ONE STACK, and a block's span means nothing in it: every block is the rail's width, one under another,
+     each as tall as itself. That is the property a flow could not give, where a short block beside a tall one left a
+     hole under it. `align-items: start` on `.page` is what keeps the rail its own height rather than the main
+     column's, and a sticky rail depends on it: a rail stretched to the main column's height has nowhere to stick. */
+  .area {
+    display: grid;
+    grid-column: span var(--area-span, 12);
+    align-items: start;
+    gap: var(--sp-7) var(--sp-6);
+    min-inline-size: 0;
+  }
+
+  .area[data-area='main'] {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+  }
+
+  /* A RAIL WITH NOTHING IN IT IS NOT DRAWN, and the main column then takes the page rather than leaving a third of it
+     empty beside itself. */
+  .area[data-area='main']:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .area[data-area='rail'] {
+    grid-template-columns: minmax(0, 1fr);
+    /* Where it sticks, set whether or not it does: the same offset the settings page's sticky list uses, under the
+       page head, and the offset `PageView` subtracts when it measures whether the rail fits. */
+    inset-block-start: calc(var(--sticky) + var(--sp-4));
+  }
+
+  .area[data-area='rail'] .block-slot {
+    grid-column: auto;
+  }
+
+  /* STICKY ONLY WHERE THERE ARE TWO COLUMNS. Under 900px the rail follows the main column, and a rail pinned at the
+     top of a phone would cover the column it follows. */
+  @media (width >= 900px) {
+    .area[data-area='rail'][data-sticky] {
+      position: sticky;
+    }
+  }
+
+  /* A BOXED SECTION'S SURFACE: the section and the blocks after it, up to the next section, on one panel. The same
+     ladder every surface here climbs: the page is `--bg`, this is one step up at `--s1` with the hairline a lifted
+     panel has, and the cards inside it sit a step above that. `--r-lg` because it holds `--r-md` cards with padding
+     between, and a frame with the radius of what it holds reads as drawn a size too small. Inside it the blocks keep
+     their spans, as twelfths of the box. */
+  .box {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    align-items: start;
+    gap: var(--sp-5) var(--sp-6);
+    min-inline-size: 0;
+    padding: var(--sp-5);
+    background: var(--s1);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+  }
+
+  .area[data-area='rail'] .box {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* While arranging, the block's way to the other column, under its bar and at its leading edge. */
+  .area-move {
+    display: flex;
+    margin-block-end: var(--sp-2);
+  }
+
+  /* UNDER 900px THE RAIL FOLLOWS THE MAIN COLUMN, the app's one narrow breakpoint, for the reason the page's own single
+     column gives below: the declared order is the one thing a narrow screen keeps. At 390 the page is 358px between
+     the 16px gutters, both columns take all of it, and the rail's blocks come after the main column's in the order
+     they were declared. A box drops its inner columns and a step of padding, so its blocks are 324px across rather than 308. */
+  @media (width < 900px) {
+    .area,
+    .area[data-area='main'],
+    .area[data-area='rail'] {
+      grid-column: 1 / -1;
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .box {
+      grid-template-columns: minmax(0, 1fr);
+      padding: var(--sp-4);
+    }
   }
 
   .block-slot {

@@ -17,7 +17,7 @@ import { signedOf } from './bridge.ts';
 import { figureLike } from './figure.ts';
 import { MISSING } from './format.ts';
 
-export type ProgressForm = 'goal' | 'budget';
+export type ProgressForm = 'goal' | 'budget' | 'range';
 
 /** One row as the plan reads it: the value and target as drawn, and a tone the host wrote, if any. */
 export type ProgressInput = { value: string; target: string; tone?: Tone };
@@ -78,3 +78,84 @@ export const PROGRESS_SHARE = 'Share';
 export const progressToGo = (figure: string): string => `${figure} to go`;
 export const progressLeft = (figure: string): string => `${figure} left`;
 export const progressOver = (figure: string): string => `${figure} over`;
+export const PROGRESS_NOT_SPENT = 'Not spent';
+export const PROGRESS_TOTAL = 'Total';
+export const progressSpentSaid = (figure: string): string => `${figure} spent`;
+export const progressRangeSaid = (low: string, high: string): string => `${low || MISSING} to ${high || MISSING}`;
+
+/* ── the range form ───────────────────────────────────────────────────────── */
+
+/** One row of a range as the plan reads it: the three figures as drawn, and a tone the host wrote. */
+export type RangeInput = { spent: string; low: string; high: string; tone?: Tone };
+
+export type RangeBar = {
+  /** Whether the low and the high both read, the high is above zero and not below the low. A row that is not keeps its words. */
+  drawable: boolean;
+  /** Where the band starts and ends along the one scale, `0.00` to `1.00`. */
+  from: string;
+  to: string;
+  /** Where what was spent sits on the same scale, or null when nothing was. */
+  at: string | null;
+  /** Past the high is `bad`; anything inside the band or under it is not coloured. A tone the host wrote wins. */
+  intent: Tone | undefined;
+  /** The band in words, `£100.00 to £200.00`. */
+  range: string;
+  /** What was spent in words, or that nothing was. */
+  spent: string;
+};
+
+/**
+ * What a figure is counted in, read off how it is written: the symbol or code around the number.
+ *
+ * `£1,200.00` is in `£`, `GBP 150.00` in `GBP`, `1200` in nothing. Two cells in two units cannot be added, and the
+ * record refuses a range over two currencies (`MIXED_CURRENCY`), so a hand-built block that has them gets no total
+ * rather than a sum of pounds and dollars. Crude on purpose: it has to tell two units apart, not name either.
+ */
+const unitOf = (figure: string): string => figure.replace(/[\d.,\s−-]/gu, '');
+
+/**
+ * Each row's band and mark on one scale, and the total line.
+ *
+ * ONE SCALE FOR THE BLOCK, THE LARGEST FIGURE ON IT, which the survey wrote as the largest high: measured against the
+ * largest high alone, a line overspent past every estimate put its mark past the end of its own track. The largest of
+ * the highs and the spends keeps every mark on the track and every band where it was.
+ *
+ * THE TOTAL IS ADDED UP HERE AND NOT WRITTEN BY THE HOST, so it cannot disagree with the rows above it: a total line
+ * the evaluator wrote could be read from a different moment than the rows. A column with a figure that does not read
+ * has no total, and nothing spent is nothing, so an unspent row adds zero to what was spent.
+ */
+export function rangePlan(rows: readonly RangeInput[]): { bars: RangeBar[]; total: { spent: string; low: string; high: string } } {
+  const read = rows.map((r) => ({ spent: signedOf(r.spent), low: signedOf(r.low), high: signedOf(r.high) }));
+  const scale = Math.max(0, ...read.flatMap((r) => [r.high, r.spent]).filter(Number.isFinite));
+  const at = (v: number): string => fixed(v / scale);
+
+  const bars = rows.map((r, i): RangeBar => {
+    const { spent, low, high } = read[i]!;
+    const drawable = scale > 0 && Number.isFinite(low) && Number.isFinite(high) && high > 0 && low <= high;
+    const spentAt = Number.isFinite(spent) && scale > 0 ? at(Math.max(0, spent)) : null;
+    const over = Number.isFinite(spent) && Number.isFinite(high) && spent > high;
+    return {
+      drawable,
+      from: drawable ? at(Math.max(0, low)) : '0.00',
+      to: drawable ? at(high) : '0.00',
+      at: drawable ? spentAt : null,
+      intent: r.tone ?? (over ? 'bad' : undefined),
+      range: progressRangeSaid(r.low, r.high),
+      spent: r.spent.trim() === '' ? PROGRESS_NOT_SPENT : progressSpentSaid(r.spent),
+    };
+  });
+
+  const units = new Set(rows.flatMap((r) => [r.spent, r.low, r.high]).filter((c) => c.trim() !== '').map(unitOf));
+  const sum = (column: 'spent' | 'low' | 'high'): string => {
+    if (units.size > 1 || rows.length === 0) return MISSING;
+    const cells = rows.map((r) => r[column]);
+    const values = read.map((r, i) => (column === 'spent' && cells[i]!.trim() === '' ? 0 : r[column]));
+    if (!values.every(Number.isFinite)) return MISSING;
+    const template = cells.find((c) => c.trim() !== '') ?? '';
+    return figureLike(template, values.reduce((a, b) => a + b, 0));
+  };
+  return { bars, total: { spent: sum('spent'), low: sum('low'), high: sum('high') } };
+}
+
+/** A range track's accessible name: the label, what was spent, and the band. */
+export const rangeSentence = (label: string, spent: string, range: string): string => `${label || PROGRESS_PART}: ${spent}, ${range}`;

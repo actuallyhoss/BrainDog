@@ -1,5 +1,5 @@
 /**
- * The eight primitives, the thirty-three kinds, and the four intent words.
+ * The eight primitives, the thirty-four kinds, and the four intent words.
  *
  * A block set is a SYSTEM, not a catalogue. Every kind draws from the same eight primitives and the
  * same tokens, and no kind introduces a colour, a font or a spacing value (05 §1).
@@ -147,8 +147,16 @@ export type KindSpec = {
 };
 
 /**
- * Thirty-three, counted. `diagram` is post-v1 and arrives as a
+ * Thirty-four, counted. `diagram` is post-v1 and arrives as a
  * pack, which is the whole reason the primitive layer exists (05 §2).
+ *
+ * THE THIRTY-FOURTH, `inputs`, AND FIVE FORMS CAME TOGETHER, for one reason: a person building a desk of their own
+ * (`loop/research-dynamic-layouts.md`, DIRECTION 28) needed a card that names its next step, a path, a decision drawn
+ * as what its options are, a budget as ranges, an opening sentence and a few numbers to type into, and the kernel
+ * answered every one of them (wave one) while this table could draw none: a fence of `steps path` degraded as
+ * `"steps" takes no word after it`, and a `next` column as a column this build did not know (measured). Each form is
+ * a word on a kind that already existed, so a drawer that does not know the word yet still draws the kind; only
+ * `inputs` is new, because nothing here took typed input from a page except `capture`'s one line.
  *
  * The table is written `as const satisfies` so the KEYS derive the `Kind` union and every entry is
  * shape-checked — and then re-exported as `Record<Kind, KindSpec>`, because `as const` alone narrows
@@ -157,7 +165,10 @@ export type KindSpec = {
  */
 const TABLE = {
   /* Prose and emphasis */
-  note: { primitive: 'panel', cells: 0, tone: true, prose: true, minSpan: 4, purpose: 'say' },
+  /* The `lead` form is the page's opening sentence, said from its figures. It draws as a note and carries the form on
+     its figure, so the host sets it as the screen's one sentence; the plural and nought rules are the writer's
+     (`apps/web`'s `noteOf`), because only the host knows which words in the body are figures. */
+  note: { primitive: 'panel', cells: 0, forms: ['lead'], tone: true, prose: true, minSpan: 4, purpose: 'say' },
   quote: { primitive: 'panel', cells: 2, tone: false, rows: 1, minSpan: 4, purpose: 'say' },
 
   /* Figures */
@@ -183,7 +194,10 @@ const TABLE = {
   lines: { primitive: 'proportional', cells: 0, tone: false, header: true, minSpan: 4, purpose: 'figure' },
   /* `label | value | target | note`: one track a row filled toward its target, and the `budget` form, where the target
      is a limit and spending past it is marked (`src/progress.ts`). */
-  progress: { primitive: 'proportional', cells: 4, optional: 1, forms: ['budget'], tone: true, minSpan: 4, purpose: 'figure' },
+  /* The `range` form reads the same four cells as `label | spent | low | high`: each row a band from its low to its
+     high on one scale for the block, what was spent marked on it, and a total line the drawer adds up itself
+     (`rangePlan`), so a total can never disagree with the rows above it. */
+  progress: { primitive: 'proportional', cells: 4, optional: 1, forms: ['budget', 'range'], tone: true, minSpan: 4, purpose: 'figure' },
   /* `opening | day | label | balance`, then `past`, `step`, `horizon` and `knobs` rows: a cash walk as a
      line, with knobs where the host asks for them (`src/forecast.ts`). Page-only, because its rows are
      a walk the record computed. */
@@ -216,7 +230,9 @@ const TABLE = {
      written so the declaration says what the row means: the last two cells may be left off, and a two-cell
      todo, or one whose last two cells are blank as a page's projection pads them, draws exactly as it did. */
   todo: { primitive: 'list', cells: 4, optional: 2, tone: false, checkbox: true, minSpan: 3, purpose: 'plan' },
-  steps: { primitive: 'list', cells: 3, tone: false, ordered: true, minSpan: 4, purpose: 'plan' },
+  /* The `path` form reads the third cell as a mark, `done`, `next` or nothing, and a last row of two cells,
+     `more | N`, as how many open steps the short view left out (`src/path.ts`). */
+  steps: { primitive: 'list', cells: 3, forms: ['path'], tone: false, ordered: true, minSpan: 4, purpose: 'plan' },
   timeline: { primitive: 'list', cells: 3, tone: true, minSpan: 4, purpose: 'plan' },
   board: { primitive: 'grid', cells: 3, tone: false, minSpan: 6, purpose: 'plan' },
   /* `day | value`: twelve weeks by weekday ending on this one, each day washed by how busy it was (`src/heat.ts`,
@@ -247,7 +263,9 @@ const TABLE = {
   /* Page-bound, on existing primitives so `PRIMITIVES_VERSION` does not move. A `cards` fence's
      first row names what each column is on a card (`src/cards.ts`); a `section` has one row,
      `glyph | count | fold`. Both reach a fence only from a page's own evaluator (`parse`'s `page`). */
-  cards: { primitive: 'grid', cells: 0, tone: true, header: true, pageOnly: true, minSpan: 4, purpose: 'list' },
+  /* The `lead` form marks the first card for the host to draw two tracks wide, as `stat lead` marks its first figure:
+     told, never inferred from the width (05 §4). */
+  cards: { primitive: 'grid', cells: 0, forms: ['lead'], tone: true, header: true, pageOnly: true, minSpan: 4, purpose: 'list' },
   section: { primitive: 'panel', cells: 3, tone: false, rows: 1, pageOnly: true, minSpan: 12, purpose: 'say' },
 
   /* The agent path's two more, on existing primitives for the same reason. A `feed` row is
@@ -262,11 +280,17 @@ const TABLE = {
      `q | id | who | when | question | why | cost` and `opt | id | key | label | because | recommended`, as
      `feed` marks one of its rows `seen`. The seventh cell is the band the record put the question in, which
      is also the order the rows arrive in. Page-only, because the questions are the record's own. */
-  queue: { primitive: 'list', cells: 7, tone: true, pageOnly: true, minSpan: 6, purpose: 'list' },
+  /* An option row's seventh cell is what the option IS (`swatch:`, `figure:` or `file:`), and the `tiles` form draws a
+     tile per question led by its recommended option's visual, the ways to answer folded under it. */
+  queue: { primitive: 'list', cells: 7, forms: ['tiles'], tone: true, pageOnly: true, minSpan: 6, purpose: 'list' },
   /* The one-line add (`src/capture.ts`): `into | register | label | where` once, then `set | field | value` for each
      equality a new row inherits. On the panel, because it is one bounded field and not rows of anything. Page-only,
      because what it writes into is the record's, and a write-up has no host to write with. */
   capture: { primitive: 'panel', cells: 4, tone: false, pageOnly: true, minSpan: 4, purpose: 'list' },
+  /* A few fields of one row to type into (`src/inputs.ts`): `field | label | type | value`, a row a field. On `rows`,
+     because where the host cannot write it IS a spec of the values, drawn with the spec's own classes, so the mirror
+     and the digest read the figures a verdict under it is about. Page-only, because the row is the record's. */
+  inputs: { primitive: 'rows', cells: 4, tone: false, pageOnly: true, minSpan: 4, purpose: 'figure' },
 } as const satisfies Record<string, KindSpec>;
 
 export type Kind = keyof typeof TABLE;

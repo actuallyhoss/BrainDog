@@ -12,8 +12,16 @@
 
 import { KINDS, isKind } from 'braindog-render';
 
-/** One block's arrangement. `i` indexes the DECLARED order, so a draft can be diffed against it. */
-export type Slot = { i: number; span: number };
+/** Which of a page's two columns a block sits in, on a page that declares `layout` (brief D4). */
+export type Area = 'main' | 'rail';
+
+/**
+ * One block's arrangement. `i` indexes the DECLARED order, so a draft can be diffed against it.
+ *
+ * `area` IS ABSENT ON A PAGE WITH NO RAIL, and absent means main, as it does in the declaration. So every slot a page
+ * with no `layout` has ever made is still a slot, and compares equal to the same slot with `area: 'main'`.
+ */
+export type Slot = { i: number; span: number; area?: Area };
 
 /** 12 · 6 · 4 — full, half, third. 21 §3.1's steps, and Home Assistant's multiplier of 3. */
 export const STEPS = [12, 6, 4] as const;
@@ -59,9 +67,48 @@ export const removeAt = (slots: readonly Slot[], at: number): Slot[] => slots.fi
 export const setSpanAt = (slots: readonly Slot[], at: number, span: number): Slot[] =>
   slots.map((s, n) => (n === at ? { ...s, span } : s));
 
-/** True once one list says something different from the other. Drives Done's behaviour. */
+/** The area a slot is in, reading an absent one as the main column the declaration means by leaving it out. */
+const areaOf = (s: Slot | undefined): Area => s?.area ?? 'main';
+
+/**
+ * True once one list says something different from the other. Drives Done's behaviour.
+ *
+ * THE AREA COUNTS. It compared order and span only, so a draft whose one change was a block moved to the rail read as
+ * the page unchanged, and Done closed the mode with "Nothing moved." over a block sitting in the rail on screen
+ * (measured: `differs` answered false for exactly that pair before the area was compared).
+ */
 export const differs = (a: readonly Slot[], b: readonly Slot[]): boolean =>
-  a.length !== b.length || a.some((s, n) => s.i !== b[n]?.i || s.span !== b[n]?.span);
+  a.length !== b.length || a.some((s, n) => s.i !== b[n]?.i || s.span !== b[n]?.span || areaOf(s) !== areaOf(b[n]));
+
+export const setAreaAt = (slots: readonly Slot[], at: number, area: Area): Slot[] =>
+  slots.map((s, n) => (n === at ? { ...s, area } : s));
+
+/**
+ * The index a block one step up or down lands at, counting only the blocks in its own area.
+ *
+ * THE LIST IS ONE ORDER AND THE SCREEN DRAWS IT AS TWO COLUMNS. Rail and main blocks interleave in the declaration, so
+ * `at - 1` can be a block in the other column: the move is a real splice that the reader cannot see, and Move up looks
+ * like a button that does nothing. The neighbour in the same area is the block drawn above or below it. With no rail
+ * every block is main, and this is `at - 1` and `at + 1` as it always was. `at` itself when there is nowhere to go.
+ */
+export function nearestInArea(slots: readonly Slot[], at: number, step: -1 | 1): number {
+  const area = areaOf(slots[at]);
+  for (let n = at + step; n >= 0 && n < slots.length; n += step) if (areaOf(slots[n]) === area) return n;
+  return at;
+}
+
+/**
+ * A drag released on the `edge` of block `at`: the held block takes that block's area, then its place.
+ *
+ * DROPPING ON THE OTHER COLUMN IS HOW A POINTER MOVES A BLOCK THERE, which is what the reader meant by letting go over
+ * it. The area is set only when it differs, so on a page with no rail no slot gains an `area` it did not have and the
+ * drag is exactly `moveAt` at `dropIndex`, as before.
+ */
+export function dropInto(slots: readonly Slot[], from: number, at: number, edge: 'before' | 'after'): Slot[] {
+  const target = areaOf(slots[at]);
+  const joined = areaOf(slots[from]) === target ? [...slots] : setAreaAt(slots, from, target);
+  return moveAt(joined, from, dropIndex(from, at, edge));
+}
 
 /**
  * The narrowest span a kind survives, and the steps that are therefore offered.

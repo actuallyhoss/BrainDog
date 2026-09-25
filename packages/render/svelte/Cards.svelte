@@ -27,6 +27,8 @@
     type RenderOptions,
     type Row,
   } from '../src/index.ts';
+  /* From the module and not the root, which does not export it: the word is this drawer's and `html.ts`'s alone. */
+  import { CARDS_NEXT } from '../src/cards.ts';
   import Text from './Text.svelte';
 
   let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
@@ -45,7 +47,7 @@
   <p class="cards-empty">{CARDS_NONE}</p>
 {:else}
   <ul class="cards-grid">
-    {#each rows as r}
+    {#each rows as r, n}
       {@const mark = L.mark >= 0 ? markOf(said(r, L.mark)) : null}
       {@const face = L.nameIsWho ? initialOf(said(r, L.name)) : null}
       {@const symbol = L.figure >= 0 ? symbolFigure(r.cells[L.figure] ?? '') : null}
@@ -53,7 +55,8 @@
       {@const t = L.trend >= 0 ? trendOf(said(r, L.trend)) : null}
       {@const m = L.ring >= 0 ? ringOf(said(r, L.ring)) : null}
       {@const whoFace = L.who >= 0 ? initialOf(said(r, L.who)) : null}
-      <li class="cards-item" data-intent={r.tone} data-quiet={isQuiet(L, r.cells) ? '' : undefined}>
+      <!-- The lead is the first card of a `cards lead` block and no other, told rather than inferred (05 §4). -->
+      <li class="cards-item" data-lead={block.form === 'lead' && n === 0 ? '' : undefined} data-intent={r.tone} data-quiet={isQuiet(L, r.cells) ? '' : undefined}>
         <div class="cards-head">
           {#if mark}<span class="cards-mark" aria-hidden="true">{mark}</span>
           {:else if face}<span class="cards-face" aria-hidden="true">{face}</span>{/if}
@@ -61,6 +64,8 @@
           {#if r.tone}<span class="glyph" role="img" aria-label={TONES[r.tone].label}>{TONES[r.tone].glyph}</span>{/if}
           {#if L.when >= 0 && r.cells[L.when]}<span class="cards-when"><Text nodes={nodes(r, L.when)} {opts} /></span>{/if}
         </div>
+        <!-- The reply is the line under the head, and an empty one draws nothing, as in `toHTML`. -->
+        {#if L.reply >= 0 && r.cells[L.reply]}<p class="cards-reply"><Text nodes={nodes(r, L.reply)} {opts} /></p>{/if}
         {#if L.figure >= 0 || t || (L.ring >= 0 && r.cells[L.ring])}
           <div class="cards-body">
             {#if L.figure >= 0}
@@ -112,6 +117,8 @@
             {/each}
           </dl>
         {/if}
+        <!-- "Next:" over nothing would say there is a step nobody wrote down, so an empty next draws no line. -->
+        {#if L.next >= 0 && r.cells[L.next]}<p class="cards-next">{CARDS_NEXT}: <Text nodes={nodes(r, L.next)} {opts} /></p>{/if}
         {#if L.who >= 0 && r.cells[L.who]}
           <div class="cards-who">
             {#if whoFace}<span class="cards-face" aria-hidden="true">{whoFace}</span>{/if}

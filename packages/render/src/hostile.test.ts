@@ -86,11 +86,14 @@ const SHAPES: Readonly<Record<string, { rows: string[][] }>> = {
   section: { rows: [[HOSTILE, HOSTILE]] },
   cards: {
     rows: [
-      ['title: ' + HOSTILE, 'figure: ' + HOSTILE, 'fact: ' + HOSTILE, 'who', 'when', 'mark'],
-      Array.from({ length: 6 }, () => HOSTILE),
-      Array.from({ length: 6 }, () => HOSTILE),
+      ['title: ' + HOSTILE, 'figure: ' + HOSTILE, 'fact: ' + HOSTILE, 'who', 'when', 'mark', 'next', 'reply: ' + HOSTILE],
+      Array.from({ length: 8 }, () => HOSTILE),
+      Array.from({ length: 8 }, () => HOSTILE),
     ],
   },
+  /* AN INPUTS ROW'S FIELD AND TYPE ARE WORDS THIS PACKAGE CHECKS, and a hostile one degrades before anything is drawn,
+     so they are real here; the label and the value, which are the person's, are the hostile ones. */
+  inputs: { rows: [['price', HOSTILE, 'money', HOSTILE], ['note', HOSTILE, 'text', HOSTILE]] },
   feed: { rows: [['agent', HOSTILE, HOSTILE, HOSTILE, HOSTILE], ['you', HOSTILE, HOSTILE, HOSTILE, HOSTILE]] },
   diff: { rows: [['  ' + HOSTILE], ['- ' + HOSTILE], ['+ ' + HOSTILE]] },
   /* The `more` row's path holds no space, because a path with one is not a path and the block
@@ -149,7 +152,39 @@ test('NO CELL BECOMES MARKUP, on any of the kinds there are', () => {
   /* The count is the guard on the guard: a kind quietly dropped from the loop is a kind nobody
      sweeps, and the number in the comment above would go on reading as though it had been. */
   assert.equal(drew, Object.keys(KINDS).length - NO_FENCE.size);
-  assert.equal(drew, 32);
+  assert.equal(drew, 33);
+});
+
+/**
+ * THE SWEEP ABOVE DRAWS EVERY KIND IN ITS PLAIN FORM ONLY, so a form's own drawer (a path's stones, a queue's tiles
+ * and an option's visual, a range's bands, a lead card) was never swept by it: each is a separate branch in `html.ts`
+ * reached only through the word after the kind. Each form is fenced here with every free cell hostile, and the cells
+ * that must parse (a mark, a count, a figure, a colour) are real, because a fence that degrades draws nothing to sweep.
+ */
+test('NO CELL BECOMES MARKUP ON A FORM EITHER, and an option\'s visual is data', () => {
+  const FORMS: Record<string, string[]> = {
+    'cards lead': ['title | next | reply', `${HOSTILE} | ${HOSTILE} | ${HOSTILE}`, `${HOSTILE} | ${HOSTILE} | ${HOSTILE}`],
+    'steps path': [`${HOSTILE} | ${HOSTILE} | done`, `${HOSTILE} | ${HOSTILE} | next`, `${HOSTILE} | ${HOSTILE} | `, 'more | 3'],
+    'queue tiles': [
+      `q | s1 | ${HOSTILE} | ${HOSTILE} | ${HOSTILE} | ${HOSTILE}`,
+      `opt | s1 | ${HOSTILE} | ${HOSTILE} | ${HOSTILE} | true | swatch:#1f3a5f`,
+      `opt | s1 | ${HOSTILE} | ${HOSTILE} | ${HOSTILE} |  | figure:${HOSTILE}`,
+      `opt | s1 | k | ${HOSTILE} |  |  | file:parts#2/photo`,
+    ],
+    'progress range': [`${HOSTILE} | £1.00 | £1.00 | £2.00`, `${HOSTILE} | ${HOSTILE} | ${HOSTILE} | ${HOSTILE}`],
+    'note lead': [HOSTILE],
+  };
+  for (const [info, body] of Object.entries(FORMS)) {
+    const blocks = parse(['```' + info + ' | ' + HOSTILE, ...body, '```'].join('\n'), { page: true });
+    assert.equal(blocks.length, 1);
+    const bad = blocks.find((b) => b.type !== 'block');
+    assert.equal(bad, undefined, `${info} degraded instead of drawing: ${bad && 'fix' in bad ? bad.fix : ''}`);
+    /* The host's file resolver answers hostile text too, and an address it hands back is escaped into `src`. */
+    const html = toHTML(blocks, { resolve: () => HOSTILE, file: () => '/' + HOSTILE.replace(/ /gu, '') } as never);
+    assert.equal(html.includes('<script'), false, `${info} let a tag through`);
+    assert.equal(html.includes('onmouseover'), true, `${info} dropped the cell instead of drawing it`);
+    assert.equal(html.includes(BROKE_OUT), false, `${info} let a value out of its attribute`);
+  }
 });
 
 /** A resolved `{{path}}` is a value the host handed back, and a value is never markup either. */

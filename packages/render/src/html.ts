@@ -13,15 +13,22 @@
  * ONE escape function, used on every value, and the only inline `style` values in the output are
  * custom properties holding numbers this file formats itself, never a colour or a length. This said
  * three of them, `--cells`, `--magnitude` and `--at`, long after `--chars`, `--cols`, `--fill` and
- * `--limit` had joined; `roadmap` adds `--tracks`, `--track`, `--lines` and `--line`, and `heat` adds `--weeks`.
+ * `--limit` had joined; `roadmap` adds `--tracks`, `--track`, `--lines` and `--line`, `heat` adds `--weeks`, and a
+ * range adds `--from` and `--to`.
+ *
+ * ONE EXCEPTION, NAMED: `--swatch`, on an option's visual, holds a colour from the record, because which lining a
+ * choice is IS a colour (`05 §5`). It holds six hex digits `queue.ts` checked on the way in and nothing else, it is
+ * written only inside that option's `queue-visual`, and nothing on the page is drawn in it.
  */
 
 import { KINDS, SPARKLINE_POINT, TONES, type Kind } from './kinds.ts';
 import { inline, magnitudeOfCell, text as plain, type Inline, type InlineOptions } from './inline.ts';
 import { MISSING, day, figureChars, leadingCode, symbolFigure, symbolText, valueWord } from './format.ts';
-import { CARDS_NONE, FOLD_HIDE, FOLD_SHOW, TREND, cardLayout, counted, initialOf, isQuiet, markOf, ringDash, ringOf, trendOf } from './cards.ts';
+import { CARDS_NEXT, CARDS_NONE, FOLD_HIDE, FOLD_SHOW, TREND, cardLayout, counted, initialOf, isQuiet, markOf, ringDash, ringOf, trendOf } from './cards.ts';
 import { FEED_EARLIER, feedNew, feedPlan } from './feed.ts';
-import { QUEUE_RECOMMENDED, queueMore, queuePlan } from './queue.ts';
+import { QUEUE_RECOMMENDED, fileSrc, queueMore, queuePlan, queueSuggested, queueWays, type QueueShows } from './queue.ts';
+import { PATH_DONE, PATH_NEXT, pathMore, pathPlan } from './path.ts';
+import { INPUTS_NONE, inputsPlan } from './inputs.ts';
 import { captureNowhere, capturePlan, capturePromptFor } from './capture.ts';
 import { takeWorking, WORKING_GLYPH, WORKING_LABEL } from './working.ts';
 import { TODO_META_JOIN, todoMeta as metaCells } from './todo.ts';
@@ -31,7 +38,7 @@ import { SPLIT_AMOUNT, SPLIT_PART, SPLIT_SHARE, SPLIT_ZERO, splitPlan, splitSent
 import { BRIDGE_AMOUNT, BRIDGE_STEP, bridgePlan, bridgeSentence, signedOf } from './bridge.ts';
 import { SERIES_NET, SERIES_NONE, seriesPlan } from './series.ts';
 import { LINES_AGAINST, LINES_NONE, LINES_NUMBERS, linesPlan } from './lines.ts';
-import { PROGRESS_NONE, PROGRESS_OF, progressPlan, progressSentence } from './progress.ts';
+import { PROGRESS_NONE, PROGRESS_OF, PROGRESS_TOTAL, progressPlan, progressRangeSaid, progressSentence, progressSpentSaid, rangePlan, rangeSentence } from './progress.ts';
 import { figureLike } from './figure.ts';
 import { FORECAST_BALANCE, FORECAST_MOVE, FORECAST_NONE, FORECAST_NUMBERS, FORECAST_WHAT, FORECAST_WHEN, baseKnobs, forecastModel, forecastPlan, scenario, underNote } from './forecast.ts';
 import { DIFF_GLYPHS, DIFF_WORDS, diffFolded, diffPlan, type DiffLine } from './diff.ts';
@@ -94,6 +101,14 @@ export type RenderOptions = InlineOptions & {
    * too has one place to put itself. It must be safe to call on an address it has already rendered.
    */
   href?: (path: string) => string;
+  /**
+   * Where a file the record holds is served, by the row and the field that hold it, or `null` for nowhere.
+   *
+   * A READ, SO IT IS HERE AND NOT BESIDE THE CALLBACKS: a queue option that shows a photograph names `parts#2/photo`,
+   * and only the host knows the address of that file. Absent, or answering an address that is not a path of this
+   * host's, the picture is left out and the option keeps its words (`queue.ts` `fileSrc`).
+   */
+  file?: (row: string, field: string) => string | null;
 };
 
 /** An address as the host serves it (`RenderOptions.href`). */
@@ -288,6 +303,7 @@ function grid(b: Block, o: RenderOptions): string {
 }
 
 function rows(b: Block, o: RenderOptions): string {
+  if (b.kind === 'inputs') return inputs(b, o);
   const body = b.rows
     .map(
       (r) =>
@@ -396,6 +412,7 @@ function list(b: Block, o: RenderOptions): string {
   if (b.kind === 'agents') return agents(b, o);
   if (b.kind === 'queue') return queue(b, o);
   if (b.kind === 'roadmap') return roadmap(b, o);
+  if (b.kind === 'steps' && b.form === 'path') return path(b, o);
   const spec = KINDS[b.kind];
   const tag = spec.ordered ? 'ol' : 'ul';
   const body = b.rows
@@ -412,6 +429,53 @@ function list(b: Block, o: RenderOptions): string {
     })
     .join('');
   return `<${tag} class="list" data-kind="${b.kind}">${body}</${tag}>`;
+}
+
+/**
+ * `steps path`: the stones in the list's order, each marked done, next or later (`src/path.ts`), and the count of the
+ * open steps the short view left out. `svelte/Path.svelte` is this function's twin.
+ *
+ * THE LIST'S OWN CLASSES, WITH THE MARK AS AN ATTRIBUTE, so a host that styles `steps` already draws a path as a
+ * numbered list and the connecting line is one rule on `data-mark` away. A done stone's tick is an image named "done",
+ * as `todo`'s box is where it cannot be pressed; the next one is said in a word, because the whole form exists so a
+ * reader can find it without reading every row; a later one has no marker text at all.
+ */
+function path(b: Block, o: RenderOptions): string {
+  const plan = pathPlan(b.rows);
+  const body = plan.stones
+    .map(({ row: r, mark }) => {
+      const marker =
+        mark === 'done'
+          ? `<span class="item-marker" role="img" aria-label="${PATH_DONE}">${TONES.good.glyph}</span>`
+          : mark === 'next'
+            ? `<span class="item-marker"><span class="path-next">${PATH_NEXT}</span></span>`
+            : `<span class="item-marker"></span>`;
+      return `<li class="item" data-mark="${mark}">${marker}${cell('item-title', r.cells[0], o)}${cell('item-detail', r.cells[1], o)}</li>`;
+    })
+    .join('');
+  const more = plan.more > 0 ? `<p class="path-more">${escape(pathMore(plan.more))}</p>` : '';
+  return `<ol class="list" data-kind="steps" data-form="path">${body}</ol>${more}`;
+}
+
+/**
+ * `inputs` where nothing can write: a `spec` of the values (`src/inputs.ts`), drawn with the spec's own classes.
+ *
+ * NO FIELD, EVER, for the reason `capture` draws none here: `toHTML` has no callbacks, and a box that swallows what is
+ * typed into it is worse than the figure it would have held. `svelte/Inputs.svelte` draws this same tree when its host
+ * passes no `oninput`, so the two are equal by construction.
+ */
+function inputs(b: Block, o: RenderOptions): string {
+  const plan = inputsPlan(b.rows);
+  if (plan.fields.length === 0) return `<p class="inputs-empty">${escape(plan.empty || INPUTS_NONE)}</p>`;
+  const body = plan.fields
+    .map(
+      (f) =>
+        `<div class="row"><span class="row-label">${escape(f.label)}</span><span class="row-value num">${
+          f.value ? renderInline(inline(f.value, o), o) : MISSING
+        }</span><span class="row-note"></span></div>`,
+    )
+    .join('');
+  return `<div class="rows" data-inputs="">${body}</div>`;
 }
 
 /**
@@ -639,7 +703,7 @@ function cards(b: Block, o: RenderOptions): string {
   const labelled = (i: number): string => (label(i) ? `<span class="cards-label">${escape(label(i))}</span>` : '');
 
   const body = rows
-    .map((r) => {
+    .map((r, n) => {
       const mark = L.mark >= 0 ? markOf(said(r, L.mark)) : null;
       const face = L.nameIsWho ? initialOf(said(r, L.name)) : null;
       const lead = mark
@@ -682,7 +746,14 @@ function cards(b: Block, o: RenderOptions): string {
           : '';
       /* DIMMED BY AN ATTRIBUTE, so the host's CSS decides how, and the card keeps every word it had. */
       const quiet = isQuiet(L, r.cells) ? ' data-quiet=""' : '';
-      return `<li class="cards-item"${toneAttrs(r.tone)}${quiet}><div class="cards-head">${lead}${name}${toneGlyph(r.tone)}${when}</div>${middle}${facts}${who}</li>`;
+      /* THE REPLY IS THE LINE UNDER THE HEAD and the next step the card's last word before who is on it, and an empty
+         cell draws neither: "Next:" over nothing says there is a step nobody wrote down. */
+      const reply = L.reply >= 0 && r.cells[L.reply] ? `<p class="cards-reply">${drawn(r, L.reply)}</p>` : '';
+      const next = L.next >= 0 && r.cells[L.next] ? `<p class="cards-next">${CARDS_NEXT}: ${drawn(r, L.next)}</p>` : '';
+      /* THE LEAD IS TOLD, NEVER INFERRED (05 §4): the first card of a `cards lead` block, and the host's grid decides
+         what two tracks are, so a phone's one column keeps it one card wide. */
+      const leading = b.form === 'lead' && n === 0 ? ' data-lead=""' : '';
+      return `<li class="cards-item"${leading}${toneAttrs(r.tone)}${quiet}><div class="cards-head">${lead}${name}${toneGlyph(r.tone)}${when}</div>${reply}${middle}${facts}${next}${who}</li>`;
     })
     .join('');
   return `<ul class="cards-grid">${body}</ul>`;
@@ -767,12 +838,13 @@ function queue(b: Block, o: RenderOptions): string {
   const plan = queuePlan(b.rows);
   if (plan.items.length === 0) return `<p class="queue-empty">${escape(plan.empty)}</p>`;
   const drawn = (v: string | undefined): string => renderInline(inline(v ?? '', o), o);
+  const tiles = b.form === 'tiles';
   const body = plan.items
     .map((item) => {
       const options = item.options
         .map(
           (opt) =>
-            `<li class="queue-option"${opt.recommended ? ' data-recommended' : ''}><span class="queue-label">${escape(opt.label)}</span>${
+            `<li class="queue-option"${opt.recommended ? ' data-recommended' : ''}>${visual(opt.shows, o)}<span class="queue-label">${escape(opt.label)}</span>${
               opt.recommended ? `<span class="queue-rec">${escape(QUEUE_RECOMMENDED)}</span>` : ''
             }${opt.because ? `<span class="queue-because">${drawn(opt.because)}</span>` : ''}</li>`,
         )
@@ -782,16 +854,40 @@ function queue(b: Block, o: RenderOptions): string {
          content. `data-cost` carries the band's own word so a stylesheet can weight the dearest one
          without matching on English. */
       const cost = item.costLabel ? `<span class="queue-cost" data-cost="${escape(item.cost)}">${escape(item.costLabel)}</span>` : '';
-      return `<article class="queue-card"${toneAttrs(item.row.tone)}><p class="queue-by"><span class="queue-who">${drawn(
-        item.who,
-      )}</span><span class="queue-when">${drawn(item.when)}</span>${cost}</p><h3 class="queue-question">${drawn(item.question)}</h3>${
-        item.why ? `<p class="queue-why">${drawn(item.why)}</p>` : ''
-      }<ul class="queue-options">${options}</ul></article>`;
+      const by = `<p class="queue-by"><span class="queue-who">${drawn(item.who)}</span><span class="queue-when">${drawn(item.when)}</span>${cost}</p>`;
+      const question = `<h3 class="queue-question">${drawn(item.question)}</h3>`;
+      const why = item.why ? `<p class="queue-why">${drawn(item.why)}</p>` : '';
+      if (!tiles) return `<article class="queue-card"${toneAttrs(item.row.tone)}>${by}${question}${why}<ul class="queue-options">${options}</ul></article>`;
+      /* A TILE IS THE SAME CARD LED BY WHAT ITS RECOMMENDED OPTION IS, its ways to answer folded under it. The fold is a
+         `details`, so it opens with no script in the mirror and in the app alike, and it starts shut: a tile that
+         arrived showing one option picked out and the rest hidden would be the recommendation standing in for the
+         choice. The recommendation is still a line of words, never a selection. */
+      const suggested = item.options.find((opt) => opt.recommended);
+      return `<article class="queue-card queue-tile"${toneAttrs(item.row.tone)}>${suggested ? visual(suggested.shows, o) : ''}${by}${question}${
+        suggested ? `<p class="queue-suggested">${escape(queueSuggested(suggested.label))}</p>` : ''
+      }${why}<details class="queue-ways"><summary class="queue-ways-toggle">${escape(queueWays(item.options.length))}</summary><ul class="queue-options">${options}</ul></details></article>`;
     })
     .join('');
   const said = escape(queueMore(plan.more));
   const more = plan.more === 0 ? '' : plan.moreHref ? `<a class="queue-more" href="${escape(hrefFor(o, plan.moreHref))}">${said}</a>` : `<p class="queue-more">${said}</p>`;
   return `<div class="queue">${body}${more}</div>`;
+}
+
+/**
+ * What an option is, drawn in its own box beside its label (`src/queue.ts`), or nothing.
+ *
+ * THE BOX IS THE ONLY PLACE A COLOUR FROM THE RECORD IS WRITTEN, one `--swatch` a chip, and the chip is hidden from a
+ * screen reader because six hex digits are not a name: the label beside it is. A figure is text and is read. A file is
+ * drawn only where the host gave it an address of its own (`fileSrc`), with no alt text of its own for the same reason
+ * the swatch has none.
+ */
+function visual(shows: QueueShows | null, o: RenderOptions): string {
+  if (!shows) return '';
+  if ('swatch' in shows)
+    return `<span class="queue-visual" data-shows="swatch" aria-hidden="true">${shows.swatch.map((c) => `<span class="queue-swatch" style="--swatch:${escape(c)}"></span>`).join('')}</span>`;
+  if ('figure' in shows) return `<span class="queue-visual" data-shows="figure"><span class="queue-figure num">${escape(shows.figure)}</span></span>`;
+  const src = fileSrc(o.file?.(shows.file.row, shows.file.field));
+  return src ? `<span class="queue-visual" data-shows="file"><img class="queue-file" src="${escape(hrefFor(o, src))}" alt=""></span>` : '';
 }
 
 /**
@@ -852,6 +948,7 @@ function diff(b: Block): string {
  * `Progress.svelte` is this function's twin.
  */
 function progress(b: Block, o: RenderOptions): string {
+  if (b.form === 'range') return range(b, o);
   const form = b.form === 'budget' ? 'budget' : 'goal';
   const said = (r: Row, i: number) => plain(inline(r.cells[i] ?? '', o));
   const plan = progressPlan(b.rows.map((r) => ({ value: said(r, 1), target: said(r, 2), ...(r.tone ? { tone: r.tone } : {}) })), form);
@@ -874,6 +971,36 @@ function progress(b: Block, o: RenderOptions): string {
   /* NO FOLD OF NUMBERS: every row already says its figure, its target and its share as text, so a fold under the bars
      repeated them behind a stray "The numbers". */
   return `<div class="prop progress"${form === 'budget' ? ' data-form="budget"' : ''}>${body}</div>`;
+}
+
+/**
+ * `progress range`: a row a line of a budget, its band from low to high on one scale for the block, what was spent
+ * marked on it, and a total line (`src/progress.ts` `rangePlan`). `Progress.svelte` is this function's twin.
+ *
+ * ON `progress`'s OWN ROW AND TRACK, so a host that draws a goal already lays a range out; the band and the mark are
+ * two spans inside the track the host places by `--from`, `--to` and `--at`. Every figure is also said in words beside
+ * the track, so the drawing repeats what a reader can already read and the track's name says it once more for a
+ * screen reader.
+ */
+function range(b: Block, o: RenderOptions): string {
+  const said = (r: Row, i: number) => plain(inline(r.cells[i] ?? '', o));
+  const plan = rangePlan(b.rows.map((r) => ({ spent: said(r, 1), low: said(r, 2), high: said(r, 3), ...(r.tone ? { tone: r.tone } : {}) })));
+  if (b.rows.length === 0) return `<div class="prop progress" data-form="range"><p class="progress-empty">${escape(PROGRESS_NONE)}</p></div>`;
+  const body = b.rows
+    .map((r, i) => {
+      const p = plan.bars[i]!;
+      const track = p.drawable
+        ? `<span class="progress-track" role="img" aria-label="${escape(rangeSentence(said(r, 0), p.spent, p.range))}" style="--from:${p.from};--to:${p.to}"><span class="progress-band"></span>${
+            p.at === null ? '' : `<span class="progress-at" style="--at:${p.at}"></span>`
+          }</span>`
+        : '';
+      return `<div class="progress-row"${toneAttrs(p.intent)}>${cell('progress-label', r.cells[0], o)}<span class="progress-figure num"><span class="progress-value">${escape(p.spent)}</span></span><span class="progress-range num">${escape(p.range)}</span>${track}${toneGlyph(p.intent)}</div>`;
+    })
+    .join('');
+  const total = `<div class="progress-row" data-total=""><span class="progress-label">${PROGRESS_TOTAL}</span><span class="progress-figure num"><span class="progress-value">${escape(
+    progressSpentSaid(plan.total.spent),
+  )}</span></span><span class="progress-range num">${escape(progressRangeSaid(plan.total.low, plan.total.high))}</span></div>`;
+  return `<div class="prop progress" data-form="range">${body}${total}</div>`;
 }
 
 /**

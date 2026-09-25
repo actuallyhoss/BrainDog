@@ -19,7 +19,9 @@
   import Table from './p/Table.svelte';
   import { comparisonPlan } from '../src/table.ts';
   import Media from './p/Media.svelte';
+  import Inputs from './Inputs.svelte';
   import type { OnCapture } from './types.ts';
+  import type { OnInput } from '../src/inputs.ts';
 
   let {
     block,
@@ -29,6 +31,7 @@
     onact,
     oncapture,
     onreschedule,
+    oninput,
   }: {
     block: Block;
     opts?: RenderOptions;
@@ -63,6 +66,11 @@
      * layer so the two halves cannot come apart again unnoticed.
      */
     onreschedule?: ((row: Row, drop: RoadmapDrop) => void) | undefined;
+    /**
+     * The `rows` primitive's one write: a field of an `inputs` block changed, handed on with the row it was drawn
+     * from and the text as it stands (`../src/inputs.ts`). Every keystroke; the pause before a write is the host's.
+     */
+    oninput?: OnInput | undefined;
   } = $props();
 
   const PRIMITIVE = { panel: Panel, grid: Grid, rows: Rows, proportional: Proportional, inline: InlineRun, list: List, media: Media };
@@ -103,6 +111,12 @@
            right by hand. -->
       <Table columns={comparison.columns} rows={comparison.rows} total={comparison.rows.length} label={block.heading} href={opts.href} />
     {/if}
+  {:else if block.kind === 'inputs'}
+    <!-- BY KIND, THE ONE PLACE THIS COMPONENT ASKS FOR ONE, because the callback belongs to one kind on a primitive two
+         others share: handed to `Rows`, a `spec` would take a write it can never make. -->
+    <!-- AND NOT THROUGH `Rows` EVEN READ-ONLY: an inputs row is `field | label | type | value`, so `Rows` would print the
+         field's id as its label and its label as its value. `Inputs` draws the spec itself, in `Rows`' classes. -->
+    <Inputs {block} {opts} {oninput} />
   {:else if spec.primitive === 'grid'}
     <!-- BY NAME rather than through `Draw`, because the callback belongs to one primitive: handed
          to the union the other six are in, it is a prop none of them declares. -->

@@ -20,7 +20,7 @@
  * are separate rows, the first cell saying which:
  *
  *   q    | id | who | when | question | why | cost
- *   opt  | id | key | label | because | recommended
+ *   opt  | id | key | label | because | recommended | shows, optional
  *   more | n | where the rest of them are, optional
  *
  * The `more` row, last and at most one, is how many are waiting past the ones drawn, so a person
@@ -41,6 +41,18 @@
  * the option it names, and nothing is pre-chosen: a queue that arrives with an answer already filled
  * in is a queue that gets pressed through, which is the opposite of what a question is for. The same
  * rule as `19 §6` read from the other side.
+ *
+ * `shows` IS WHAT THE OPTION IS, drawn beside its label: which lining is a colour, which box is a price, which cut is
+ * a photograph. Three spellings and no others, each one the kernel's `showsOf` already checked on filing:
+ *
+ *   swatch:#1f3a5f,#c9a227     one to eight colours, six hex digits each
+ *   figure:EGP 1,200           a few words or a figure, drawn as text
+ *   file:parts#2/photo         a file the record holds, by row and field, which only the host can turn into an address
+ *
+ * A SWATCH IS THE ONE PLACE A COLOUR FROM DATA REACHES A SCREEN (`05 §5`), so this package checks the spelling again
+ * rather than trusting the kernel did: a cell that is not six hex digits could close the custom property it is written
+ * into and write a style of its own. It is drawn only inside that option's visual, never as a colour the page, the card
+ * or the tile is drawn in.
  */
 
 import { safeHref } from './inline.ts';
@@ -91,6 +103,51 @@ export const QUEUE_COSTS: Record<string, string> = {
 export const queueCost = (band: string): string => (Object.hasOwn(QUEUE_COSTS, band) ? QUEUE_COSTS[band]! : '');
 /** What the last line says when a queue holds more than it draws. */
 export const queueMore = (n: number): string => `${n} more`;
+/** A tile's line naming the option its agents recommend, in the word the card already uses for it. */
+export const queueSuggested = (label: string): string => `${QUEUE_RECOMMENDED}: ${label}`;
+/** What a tile's folded list of options is called. There is always at least one, or the block degraded. */
+export const queueWays = (n: number): string => (n === 1 ? '1 way to answer' : `${n} ways to answer`);
+
+/** What an option is, read off its seventh cell. */
+export type QueueShows = { swatch: string[] } | { figure: string } | { file: { row: string; field: string } };
+
+const HEX = /^#[0-9a-fA-F]{6}$/u;
+const SWATCH_MOST = 8;
+const FILE = /^([a-z][a-z0-9_]*#[1-9][0-9]*)\/([a-z][a-z0-9_]*)$/u;
+
+/**
+ * An option's visual from its cell, or null for a cell that says none or says it wrongly.
+ *
+ * NULL FOR BOTH, and the parser tells them apart (`queueFault`): a blank cell is an option with nothing to show, and a
+ * cell this cannot read is a fault in the fence. A host that built the block by hand gets the visual left out, never a
+ * value written into a style it did not pass.
+ */
+export function showsOf(value: string): QueueShows | null {
+  const v = value.trim();
+  const at = v.indexOf(':');
+  if (at < 0) return null;
+  const what = v.slice(0, at);
+  const rest = v.slice(at + 1).trim();
+  if (what === 'swatch') {
+    const colours = rest.split(',').map((c) => c.trim());
+    return colours.length >= 1 && colours.length <= SWATCH_MOST && colours.every((c) => HEX.test(c)) ? { swatch: colours } : null;
+  }
+  if (what === 'figure') return rest === '' ? null : { figure: rest };
+  if (what === 'file') {
+    const m = FILE.exec(rest);
+    return m ? { file: { row: m[1]!, field: m[2]! } } : null;
+  }
+  return null;
+}
+
+/**
+ * Where a file the host resolved may be drawn from: a path of this host's and nowhere else.
+ *
+ * A REMOTE IMAGE IS REFUSED ON A PAGE (`06 §7`), because loading one tells another host who is reading and when, so an
+ * address with a scheme or a protocol-relative one is left out even when the host hands it back. The same check
+ * `ours` makes of the `more` row's address, for the same reason.
+ */
+export const fileSrc = (src: string | null | undefined): string | null => (typeof src === 'string' && ours(src) ? src : null);
 
 /**
  * Where the rest of a queue is: a path of this host's, or nothing. Anything else is a fault.
@@ -141,6 +198,10 @@ export function queueFault(rows: readonly (readonly string[])[]): string | null 
       options = 0;
     } else {
       if (!open) return 'an option before any question';
+      /* A VISUAL THIS CANNOT READ IS A FAULT, AND NO VISUAL IS NOT, the rule the band above keeps: `swatch:red` left
+         out in silence is an option drawn without the one thing that said what it was. */
+      const shows = (cells[6] ?? '').trim();
+      if (shows !== '' && showsOf(shows) === null) return `a visual this build does not draw: "${shows}"`;
       options += 1;
     }
   }
@@ -155,6 +216,8 @@ export type QueueOption<R> = {
   /** The reason to pick it, which the option's author wrote. */
   because: string;
   recommended: boolean;
+  /** What the option is, drawn beside its label, or null when it shows nothing. */
+  shows: QueueShows | null;
 };
 
 export type QueueItem<R> = {
@@ -206,7 +269,14 @@ export function queuePlan<R extends { cells: readonly string[] }>(rows: readonly
     if (word !== 'opt') continue;
     const at = items.at(-1);
     if (!at) continue;
-    at.options.push({ row, key: cell(row.cells, 2), label: cell(row.cells, 3) || cell(row.cells, 2), because: cell(row.cells, 4), recommended: cell(row.cells, 5).toLowerCase() === 'true' });
+    at.options.push({
+      row,
+      key: cell(row.cells, 2),
+      label: cell(row.cells, 3) || cell(row.cells, 2),
+      because: cell(row.cells, 4),
+      recommended: cell(row.cells, 5).toLowerCase() === 'true',
+      shows: showsOf(cell(row.cells, 6)),
+    });
   }
   return { items, more, moreHref, empty: QUEUE_CLEARED };
 }

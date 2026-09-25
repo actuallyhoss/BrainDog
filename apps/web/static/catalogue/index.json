@@ -205,6 +205,40 @@
     },
     {
       "kind": "pack",
+      "id": "pad",
+      "title": "Pad",
+      "summary": "Notes beside the work, with a second opinion from Slash written under each one.",
+      "author": "BrainDog",
+      "license": "Apache-2.0",
+      "audience": "addon",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "6ac6384a72f3c8d9fb237dc6daf6ef31cdacd099e7644e705ef5b8e53b966f7f",
+          "bytes": 2854,
+          "published_at": "2026-09-25T07:46:33.666Z",
+          "bump": null,
+          "reach": {
+            "modules": [],
+            "lists": [
+              "Notes"
+            ],
+            "pages": [
+              "Pad"
+            ],
+            "rules": [
+              "Write a second opinion under each note"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          }
+        }
+      ]
+    },
+    {
+      "kind": "pack",
       "id": "portfolio-bands",
       "title": "Revenue bands",
       "summary": "What your projects take a month now, and the room left in their forecasts next and later, worked out every day and drawn as one bar.",

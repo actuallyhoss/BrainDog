@@ -22,6 +22,8 @@ import { feedFault } from './feed.ts';
 import { queueFault } from './queue.ts';
 import { captureFault } from './capture.ts';
 import { diffFault } from './diff.ts';
+import { pathFault } from './path.ts';
+import { inputsFault } from './inputs.ts';
 
 /**
  * `page` is set by a page's own evaluator and never by a write-up. It admits the page-only kinds
@@ -278,7 +280,7 @@ export function parse(src: string, opts: ParseOptions = {}): Segment[] {
         type: 'degraded',
         code: 'DIALECT_KIND_UNKNOWN',
         fix: written
-          ? `"${written}" is not one of the thirty-three kinds. The block is shown as you wrote it.`
+          ? `"${written}" is not one of the thirty-four kinds. The block is shown as you wrote it.`
           : 'A fence with no kind is shown as you wrote it.',
         raw,
         info,
@@ -336,7 +338,10 @@ export function parse(src: string, opts: ParseOptions = {}): Segment[] {
               : kind === 'capture'
                 ? /* A WRITE-UP HAS NO HOST TO ADD WITH, and "use comparison" would send the author to draw a table of a line nobody can type into. */
                   `"capture" adds a row to a list from a page, so a write-up cannot carry one. Link to the list instead. The block is shown as you wrote it.`
-                : `"${kind}" draws a register on a page, so it has no rows in a fence. Use "comparison". The block is shown as you wrote it.`,
+                : kind === 'inputs'
+                  ? /* NOR A ROW TO TYPE INTO, and the values the inputs would show are a spec, which a write-up can carry. */
+                    `"inputs" edits a row of a list from a page, so a write-up cannot carry one. Use "spec" for the values. The block is shown as you wrote it.`
+                  : `"${kind}" draws a register on a page, so it has no rows in a fence. Use "comparison". The block is shown as you wrote it.`,
         raw,
         info,
         start,
@@ -400,6 +405,11 @@ export function parse(src: string, opts: ParseOptions = {}): Segment[] {
     /* A CAPTURE ROW IS THE LIST OR A VALUE A NEW ROW IS FILLED WITH, and a stray one is a line that adds to
        the wrong list or as the wrong state, which is a write the person did not make. */
     const capture = kind === 'capture' ? captureFault(rows.map((r) => r.cells)) : null;
+    /* A PATH'S MARK AND AN INPUT'S FIELD ARE READ, NOT PRINTED, so a word neither knows is a fault rather than a cell:
+       a stone marked `doing` would be drawn as later, and a field id that is not one would be handed back to the host
+       as the field to write. Only the path form reads the mark; a plain `steps` row's third cell is still free text. */
+    const path = kind === 'steps' && form === 'path' ? pathFault(rows.map((r) => r.cells)) : null;
+    const inputs = kind === 'inputs' ? inputsFault(rows.map((r) => r.cells)) : null;
     /* A STAT'S FOURTH CELL IS A TREND, and a word there is a note in the wrong column rather than a
        line with no points: before the trend it was a fifth cell and degraded, and it still does. */
     const trend = kind === 'stat' ? rows.find((r) => (r.cells[3] ?? '').trim() !== '' && !/\d/u.test(r.cells[3]!)) : undefined;
@@ -413,9 +423,13 @@ export function parse(src: string, opts: ParseOptions = {}): Segment[] {
           ? `A queue block has ${queue}.`
           : capture
             ? `A capture block has ${capture}.`
-            : diff !== null
-              ? `A diff row starts with "- ", "+ " or two spaces, and "${diff}" does not.`
-              : null;
+            : path
+              ? `A steps path has ${path}.`
+              : inputs
+                ? `An inputs block has ${inputs}.`
+                : diff !== null
+                  ? `A diff row starts with "- ", "+ " or two spaces, and "${diff}" does not.`
+                  : null;
     if (fault) {
       out.push({
         type: 'degraded',

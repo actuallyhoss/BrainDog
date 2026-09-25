@@ -377,6 +377,8 @@ importers:
 
   packs/mercury: {}
 
+  packs/pad: {}
+
   packs/portfolio-bands: {}
 
   packs/project-brief: {}

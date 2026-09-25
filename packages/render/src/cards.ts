@@ -10,16 +10,21 @@
  *
  * `quiet` is never printed: a card whose `quiet` cell says anything is drawn dimmed, as a run not
  * heard from lately is. The page's evaluator writes it from the record's clock, so a declaration
- * does not name it (`packages/kernel/src/declare.ts` keeps the eight a page may declare).
+ * does not name it (`packages/kernel/src/declare.ts` keeps the ten a page may declare).
+ *
+ * `next` is the first open step under the card, said "Next: ...", and `reply` a line written under
+ * the title in a quieter voice, a second opinion under a note. Both are one cell a card, and both
+ * draw nothing when the cell is empty: a group whose steps are all done has no next step, and a line
+ * reading "Next:" and then nothing says there is one nobody wrote down.
  */
-export const CARD_ROLES = ['title', 'figure', 'fact', 'trend', 'ring', 'who', 'when', 'mark', 'quiet'] as const;
+export const CARD_ROLES = ['title', 'figure', 'fact', 'trend', 'ring', 'who', 'when', 'mark', 'next', 'reply', 'quiet'] as const;
 
 export type CardRole = (typeof CARD_ROLES)[number];
 
 const isRole = (s: string): s is CardRole => (CARD_ROLES as readonly string[]).includes(s);
 
 /** One figure and at most three facts, so a card stays a card rather than a form. */
-const MOST: Record<CardRole, number> = { title: 1, figure: 1, fact: 3, trend: 1, ring: 1, who: 1, when: 1, mark: 1, quiet: 1 };
+const MOST: Record<CardRole, number> = { title: 1, figure: 1, fact: 3, trend: 1, ring: 1, who: 1, when: 1, mark: 1, next: 1, reply: 1, quiet: 1 };
 
 /** A header cell is `role` or `role: label`. */
 function headCell(cell: string): { word: string; label: string } {
@@ -63,6 +68,10 @@ export type CardLayout = {
   who: number;
   /** The column that dims a card when it says anything. */
   quiet: number;
+  /** The first open step under the card, said as "Next: ...". */
+  next: number;
+  /** The line under the title, in a quieter voice. */
+  reply: number;
 };
 
 /** Whether a card is dimmed: its `quiet` cell holds anything but space. */
@@ -91,6 +100,8 @@ export function cardLayout(cells: readonly string[]): CardLayout {
     facts: read.flatMap((c, i) => (c.word === 'fact' ? [i] : [])).slice(0, MOST.fact),
     who: title >= 0 ? who : -1,
     quiet: first('quiet'),
+    next: first('next'),
+    reply: first('reply'),
   };
 }
 
@@ -178,6 +189,8 @@ export const CARDS_NONE = 'Nothing to show.';
 export const FOLD_SHOW = 'Show';
 export const FOLD_HIDE = 'Hide';
 export const TREND = 'Trend';
+/** The word before a card's next step. */
+export const CARDS_NEXT = 'Next';
 
 /** A section's count is shown only when it counts something: a zero says nothing a sentence below it does not. */
 export const counted = (value: string): boolean => {
