@@ -16,7 +16,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { openRecord, validateDeclaration, type Declaration } from '../src/index.ts';
+import { jcs, openRecord, validateDeclaration, type Declaration } from '../src/index.ts';
 import { fixedClock, openSqlite } from './sqlite.ts';
 
 const NOW = Date.UTC(2026, 8, 25, 12);
@@ -317,6 +317,24 @@ test('INPUTS READ ONE ROW AND SAY EACH FIELD\'S TYPE, the first row of the list 
   const whole = k.block({ kind: 'inputs', register: 'lines' } as never);
   assert.deepEqual(whole.refusals, []);
   assert.deepEqual(whole.types, { item: 'text', low: 'int', high: 'int', spent: 'int' });
+});
+
+test("INPUTS SAY THE RECORD'S HOME CURRENCY BESIDE THE TYPES, so a bare figure in an empty money box is written in it and never in GBP", async () => {
+  /* `loop/research-audit-2026-09-25-layouts.md` finding 2: an EGP record stored a cost typed 1200 as GBP 1,200.00,
+     because the browser's guess at the home currency read rows a shipped build never holds. */
+  const k = await record();
+  const inputs = { kind: 'inputs', register: 'lines', columns: [{ field: 'low' }] } as never;
+  assert.equal(k.block(inputs).home, null, 'a record with no home currency answered one');
+  k.rememberPack({
+    id: 'money-core',
+    version: '1.0.0',
+    source: 'local',
+    ref: null,
+    manifest: jcs({ pack: 'money-core', version: '1.0.0', config: { home_currency: { type: 'text' } } }),
+    checksum: 'not-a-real-checksum',
+  });
+  assert.ok(k.setPackConfig('money-core', { home_currency: 'EGP' }, { actor: 'p_1' }).ok);
+  assert.equal(k.block(inputs).home, 'EGP');
 });
 
 test('A RANGE READS FIGURES: a column of text where a low should be is refused on the block', async () => {

@@ -269,6 +269,9 @@
             .find((e) => e.seq === ref.seq)?.fields[field],
         reread,
         said: (said) => (inputSaid = said),
+        /* THE RECORD'S HOME CURRENCY, AS THE KERNEL ANSWERS IT ON AN `inputs` BLOCK, so a bare figure typed into an empty
+           money box is written in it; with none set the box says to type the code (`inputs-write.ts` `home`). */
+        home: () => all.find((b) => b.kind === 'inputs' && typeof b.home === 'string')?.home ?? null,
       });
     });
     void inputsWriter.then((w) => w.input(row, value));

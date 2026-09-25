@@ -365,4 +365,6 @@ test('INPUTS ARE ONE ROW\'S FIELDS, field, label, type and value, and each row n
     ['launched', 'Launched', 'bool', 'false'],
   ]);
   assert.deepEqual(b.rows.map((r) => r.ref && [r.ref.register, r.ref.seq, r.ref.version]), [['checks', 1, 1], ['checks', 1, 1], ['checks', 1, 1]]);
+  /* AND THE RECORD'S HOME CURRENCY, as the kernel answers it beside the types, which a bare figure is written in: none is set here. */
+  assert.equal(block.home, null);
 });

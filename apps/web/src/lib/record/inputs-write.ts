@@ -23,7 +23,7 @@
 
 import { exponentOf, money, type Row, type RowRef } from 'braindog-render';
 
-import { copy } from '../copy.ts';
+import { copy, INPUTS_SAID } from '../copy.ts';
 import { display } from './api.ts';
 import { REGISTERS } from './held.ts';
 import { patchOf } from './field-draft.ts';
@@ -53,7 +53,8 @@ export type InputsDeps = {
    *
    * HANDED IN, BECAUSE NOTHING IN THIS BUILD HOLDS IT. The web's own `homeCurrency()` counts the currencies in `ROWS`,
    * which nothing fills outside a test, so on every live record it answered null and an empty money box fell through
-   * to GBP. Absent or null, a figure typed with no code into an empty box is refused beside it and nothing is written.
+   * to GBP. `PageView` hands the one the kernel answers on the `inputs` block itself (`home`, beside `types`). Absent or
+   * null, a figure typed with no code into an empty box is refused beside it and nothing is written.
    */
   home?: () => string | null;
   clock?: Clock;
@@ -82,19 +83,6 @@ const MONEY = /^(?:([A-Z]{3})\s*)?(-?[\d,.]+)(?:\s*([A-Z]{3}))?$/u;
  * writes `1,250.50`, and guessing between them is a hundredfold error in somebody's money, so it is refused.
  */
 const FIGURE = /^-?(?:\d{1,3}(?:,\d{3})+|\d*)(?:\.\d+)?$/u;
-
-/**
- * The sentences only this box says.
- *
- * HERE AND NOT IN `copy.ts` because that file belonged to another change while this one was written; they move there
- * with the next edit of it.
- */
-export const INPUTS_SAID = {
-  comma: 'A comma here only groups thousands, as in 1,250.50. Write a part of one with a point: 1.20, not 1,20.',
-  noCurrency: (typed: string): string => `Nothing says which currency this is in yet, so type its three-letter code with the figure, as USD ${typed}.`,
-  changed: (label: string, now: string, typed: string): string =>
-    `This row was changed somewhere else while you typed, and ${label} now holds ${now}. What you typed, ${typed}, was not written: type it again to write it over.`,
-};
 
 /**
  * What a field's text is as the record stores it, or the sentence the record would refuse it with.

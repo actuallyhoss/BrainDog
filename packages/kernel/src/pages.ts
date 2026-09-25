@@ -238,6 +238,12 @@ export type BlockResult = PageBlock & {
   open?: number;
   /** An `inputs` block's: the type of each field it draws, by field id, which a host picks its control by. */
   types?: Record<string, string>;
+  /**
+   * And the record's home currency, or `null` when it has none, which a bare figure typed into an empty money box is
+   * written in. The browser's own guess was the sample's rows, which a shipped build never fills, so it wrote GBP on a
+   * record in EGP (`loop/research-audit-2026-09-25-layouts.md` finding 2).
+   */
+  home?: string | null;
   /** A `feed` block's rows, newest first, a burst being one row. */
   feed?: FeedRow[];
   /** A `queue` block's questions, in the record's own order, cut to `limit`. `matched` is how many are open. */
@@ -373,6 +379,8 @@ export type PageDeps = {
   openQuestions?: (limit: number) => { questions: QueueQuestion[]; open: number };
   /** The record's timezone, which a day of readings is counted in. `UTC` when absent. */
   tz?: string;
+  /** The record's home currency, or `null` when it has none, which an `inputs` block answers as `home`. */
+  home?: () => string | null;
   /**
    * The readings a `stat` or `lines` over a register draws: the named fields of every row the predicate admits whose
    * `when` is on or after `since`, and the newest reading of each measure whenever it was.
@@ -1933,6 +1941,7 @@ function inputsBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: 
     rows: got.value.rows,
     matched: got.value.rows.length,
     types: Object.fromEntries(named.map((f) => [f, schema.fields[f]!.type])),
+    home: deps.home?.() ?? null,
   };
 }
 

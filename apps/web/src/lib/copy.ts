@@ -2329,3 +2329,14 @@ export const copy = {
 } as const;
 
 export type Copy = typeof copy;
+
+/**
+ * The sentences only an `inputs` block's box says (`record/inputs-write.ts`): a comma that does not group thousands, a
+ * bare figure in an empty money box on a record with no home currency, and a row changed somewhere else while it was typed.
+ */
+export const INPUTS_SAID = {
+  comma: 'A comma here only groups thousands, as in 1,250.50. Write a part of one with a point: 1.20, not 1,20.',
+  noCurrency: (typed: string): string => `Nothing says which currency this is in yet, so type its three-letter code with the figure, as USD ${typed}.`,
+  changed: (label: string, now: string, typed: string): string =>
+    `This row was changed somewhere else while you typed, and ${label} now holds ${now}. What you typed, ${typed}, was not written: type it again to write it over.`,
+} as const;

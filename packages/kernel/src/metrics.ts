@@ -1647,6 +1647,11 @@ function one(
      is a figure of the right size in whatever unit happened to be commonest. */
   /* AN AVERAGE DAY IS AVERAGED AS DAYS SINCE 1970, never as text: SQLite reads `2026-07-28` as 2026. */
   if (type === 'day' && kind === 'avg') return aggregate(sql, field, 'decimal', `(julianday(${expr}) - 2440587.5)`, where, params, kind, fn, rows);
+  /* AN AVERAGE BOOL COUNTS A ROW NOBODY MARKED AS NOT YET, never as absent: SQL's `avg` skips a null, so two essential
+     steps with one done and one cleared to null averaged 1 and the desk said "All 2 essential steps are done" with one
+     open (`loop/research-audit-2026-09-25-layouts.md` finding 13). The browser reads it the same way (`apps/web`
+     `metrics.ts` `one`). */
+  if (type === 'bool' && kind === 'avg') return aggregate(sql, field, type, `coalesce(${expr}, 0)`, where, params, kind, fn, rows);
   return aggregate(sql, field, type, expr, where, params, kind, fn, rows, fx);
 }
 

@@ -226,7 +226,8 @@ export function withFx(source: () => { home: string | null; rates: readonly Rate
 /** The home currency and rates figures are read with now. */
 export const fxNow = (): { home: string | null; rates: readonly Rate[] } => fxSource();
 
-type Fx = { into: string | null; home: string | null; rates: readonly Rate[]; today: string; day: string | null };
+/** How a figure is read: the currency it is added up in and the rates, and `bools`, the register's yes-or-no fields. */
+type Fx = { into: string | null; home: string | null; rates: readonly Rate[]; today: string; day: string | null; bools: ReadonlySet<string> };
 
 /** What a figure is, beside its number: the currency it is in, or its parts and how it was read. */
 type Figure = { value: number | null; unit: string | null; parts?: Part[]; fx?: FxRead };
@@ -239,7 +240,7 @@ type Figure = { value: number | null; unit: string | null; parts?: Part[]; fx?: 
  */
 function figureOf(rows: Entry[], value: Value, fx: Fx): Figure {
   if ('ratio' in value || 'diff' in value) return pairOf(rows, value, fx);
-  const n = evaluateValue(rows, value);
+  const n = evaluateValue(rows, value, fx.bools);
   const seen = currenciesOf(rows, value);
   const only = seen.size === 1 ? [...seen][0]! : null;
   const unit = only === BARE ? null : only;
@@ -505,7 +506,7 @@ const carries = (e: Entry, field: string): boolean => {
   return v !== undefined && v !== null && v !== '';
 };
 
-function aggregate(rows: Entry[], agg: Aggregation): number | null {
+function aggregate(rows: Entry[], agg: Aggregation, bools: ReadonlySet<string> = new Set()): number | null {
   /* A COUNT COUNTS ROWS THAT HAVE A VALUE, WHATEVER TYPE THE VALUE IS. This went through `operand`,
      which is `amountOf`, which is `null` for every string, so `count: 'note'` read 0 where the
      record reads 5, and `count: 'due'` and `count: 'state'` read 0 over thirty-eight rows that all
@@ -539,7 +540,11 @@ function aggregate(rows: Entry[], agg: Aggregation): number | null {
   }
 
   const field = 'sum' in agg ? agg.sum : 'avg' in agg ? agg.avg : 'min' in agg ? agg.min : agg.max;
-  const values = rows.map((e) => operand(e, field)).filter((n): n is number => n !== null);
+  /* AN AVERAGE BOOL READS A ROW NOBODY MARKED AS 0, as the record's `coalesce` does: skipped, two essential steps with one
+     done and one cleared averaged 1, and the lead said "All 2 essential steps are done" with one open
+     (`loop/research-audit-2026-09-25-layouts.md` finding 13). */
+  const unmarked = 'avg' in agg && typeof field === 'string' && bools.has(field);
+  const values = rows.map((e) => operand(e, field) ?? (unmarked ? 0 : null)).filter((n): n is number => n !== null);
   if ('sum' in agg) return values.reduce((a, n) => a + n, 0);
   // An average, a minimum and a maximum OF NOTHING is not zero. `null` renders as the em dash.
   if (values.length === 0) return null;
@@ -548,18 +553,18 @@ function aggregate(rows: Entry[], agg: Aggregation): number | null {
   return Math.max(...values);
 }
 
-function evaluateValue(rows: Entry[], value: Value): number | null {
+function evaluateValue(rows: Entry[], value: Value, bools?: ReadonlySet<string>): number | null {
   if ('ratio' in value || 'diff' in value) {
     const pair = 'ratio' in value ? value.ratio : value.diff;
-    const of = aggregate(rows, pair.of);
-    const per = aggregate(rows, pair.per);
+    const of = aggregate(rows, pair.of, bools);
+    const per = aggregate(rows, pair.per, bools);
     if (of === null || per === null) return null;
     /* A ZERO DENOMINATOR IS NOT A NUMBER. §2.2's last row: never `0`, never infinity, never `NaN` —
        the em dash, and the numerator is still on the row behind it. */
     if ('ratio' in value) return per === 0 ? null : of / per;
     return of - per;
   }
-  return aggregate(rows, value);
+  return aggregate(rows, value, bools);
 }
 
 /**
@@ -1070,6 +1075,7 @@ export function read(decl: MetricDecl, now: number = Date.now()): Reading {
     rates: heldFx.rates,
     today: new Date(now).toISOString().slice(0, 10),
     day: dayFieldOf(REGISTERS[register]?.fields ?? []),
+    bools: new Set((REGISTERS[register]?.fields ?? []).filter((f) => f.type === 'bool').map((f) => f.id)),
   };
   /* A SUM ACROSS CURRENCIES IS CONVERTED OR SAID IN PARTS, before the refusals below, as the record reads it. */
   const figure = figureOf(rows, decl.value, fx);

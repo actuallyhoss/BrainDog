@@ -119,7 +119,7 @@ import type { StepsDecl } from './steps.ts';
 import { isMechanism, loadLeg, markPinned, neighboursOf, pairsReads, passOf, settle, windowSql, PAIRS_ACTOR, type Leg as PairLeg, type PairsDecl, type Pairing } from './pairs.ts';
 import { costOf, costRank } from './weigh.ts';
 import { evaluateMetric, predicateOf, scorePrediction, snapshot, unaggregatableIn, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
-import { readBlock, readPage, registersOf, registersOfBlock, resolvePages, type ActivityEvent, type BlockResult, type PageBlock, type PageDecl, type PageDeps, type PageResult } from './pages.ts';
+import { readBlock, readPage, registersOf, registersOfBlock, resolvePages, type ActivityEvent, type BlockResult, type ListsBeside, type PageBlock, type PageDecl, type PageDeps, type PageResult } from './pages.ts';
 import { SETUP_KIND, setupCollapser, type FeedLine } from './feed.ts';
 import {
   carryingOf,
@@ -285,6 +285,8 @@ export { AGGREGATIONS, bucketState, deltaFrom, evaluateMetric, fxOfPair, largest
 export { HOME_CURRENCY_SETTING, across, convertMinor, dayFieldOf, homeFrom, pairParts, partsOf, rateFor, ratesFrom, reduceOf } from './fx.ts';
 export type { Across, Amount, Part, Rate, Reduce } from './fx.ts';
 export { RAIL_PAGES, REDUCES, fill, railRoom, readBlock, readPage, resolvePages, slugify } from './pages.ts';
+/* WHAT A READ ANSWERS ON A BLOCK, which the record takes off a block it holds from a reader (`packages/record` `DRAWN`). */
+export { ANSWER_KEYS } from './block-keys.ts';
 export {
   CHANNELS,
   carryingOf,
@@ -4272,6 +4274,20 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
   });
 
   /** What the page layer reads through. It runs queries it did not write, so it takes callbacks. */
+  /**
+   * The lists a block reads beside its source, for `registersOf`: the steps under a card grid's `as: next` and `as: ring`,
+   * the projects a scope column or an inherited read is drawn from, and the list of projects a live run is named from
+   * (`loop/research-audit-2026-09-25-layouts.md` finding 1). Declarations only, so naming them reads no row.
+   */
+  const beside = (): ListsBeside => {
+    const deps = pageDeps();
+    return {
+      ...(deps.stepsOf ? { stepsOf: deps.stepsOf } : {}),
+      ...(deps.scopeOf ? { scopeOf: deps.scopeOf } : {}),
+      projects: () => [...registers.values()].find((r) => r.scopes !== undefined)?.id ?? null,
+    };
+  };
+
   const pageDeps = (): PageDeps => ({
     pages: () =>
       sql
@@ -4342,6 +4358,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       const f = scopeFieldOf(registers.get(register)?.fields ?? []);
       return f && 'to' in f && typeof f.to === 'string' ? { field: f.id, to: f.to } : null;
     },
+    home: () => homeCurrency(sql),
     inScope: (register, project, opts) => inScope(register, project, opts),
     stepsOf: (register) =>
       [...registers.values()].flatMap((r) => {
@@ -5572,7 +5589,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       resolvePages(pageDeps()).map((p) => ({
         slug: p.slug,
         title: p.decl.title,
-        registers: registersOf(p.decl, pageDeps().metric),
+        registers: registersOf(p.decl, pageDeps().metric, beside()),
         /* WHERE IT SITS IN THE RAIL, for `boot`. A declaration's `nav` is checked at install, so only its shape is asked here. */
         nav: navOf(p.decl.nav),
         /* AND WHICH ROW IT IS A PAGE OF, which is not one of the registers above: those are the
@@ -5608,7 +5625,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      * caller has no way to resolve, so the check simply did not apply to a page made of figures and
      * its readings were handed to anybody who could open the page.
      */
-    blockRegisters: (block: PageBlock): string[] => registersOfBlock(block, pageDeps().metric),
+    blockRegisters: (block: PageBlock): string[] => registersOfBlock(block, pageDeps().metric, beside()),
 
     /**
      * What a rule WOULD do, without doing any of it.

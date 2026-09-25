@@ -16,7 +16,7 @@ import { costOf, fill, isStale, openRecord, ratesFrom, readBlock as kernelBlock,
 import { AGENTS_PAGES, NOW, PAGES, RUNS_ON, installSeed } from '@braindog/seed';
 
 import { page, pages, readBlock as webBlock } from './fixtures/readers.ts';
-import { ROWS } from './held.ts';
+import { REGISTERS, ROWS } from './held.ts';
 import { METRICS } from './declared.ts';
 import { runway as webRunway, type Leg } from './forecast.ts';
 import { read as webRead, withFx, withParam, type MetricDecl as WebMetric } from './metrics.ts';
@@ -705,5 +705,41 @@ test('A FIGURE WITH A PARAMETER HOLDS THE SAME `held` IN BOTH ENGINES, which is 
       kernel.value.held < whole,
       `${id}:${it} counts all ${whole} rows of ${register} as its scope, so a project with nothing in it reads as settled`,
     );
+  }
+});
+
+test('AN AVERAGE BOOL READS A ROW NOBODY MARKED AS NOT YET, the same in both engines: two essential steps, one done, is a half', async () => {
+  /* `loop/research-audit-2026-09-25-layouts.md` finding 13: SQL's `avg` skips a null, so a step whose `done` was cleared
+     counted for nothing, the share read 1, and the desk's lead said "All 2 essential steps are done" with one open. A
+     list of its own, in a record of its own, so the seed the tests above share is not touched. */
+  const k = await openRecord(openSqlite(), { now: () => NOW });
+  const fields = [
+    { id: 'what', type: 'text', required: true },
+    { id: 'done', type: 'bool' },
+  ];
+  assert.ok((await k.install([{ id: 'register.bool_steps', kind: 'register', body: { id: 'bool_steps', name: 'Steps', title: 'what', fields } } as never])).ok);
+  for (const [what, done] of [['Pour', true], ['Label', null], ['Ship', false], ['Price', true]] as const)
+    assert.ok(k.create('bool_steps', { what, ...(done === null ? {} : { done }) } as never, { actor: 'p_1' } as never).ok);
+  const rows = k.list({ register: 'bool_steps' });
+  assert.ok(rows.ok);
+  REGISTERS.bool_steps = { id: 'bool_steps', name: 'Steps', one: 'step', title: 'what', mobile: ['what', 'done', 'what'], fields } as never;
+  ROWS.bool_steps = rows.value.rows.map((r) => ({ seq: r.seq, fields: r.fields, version: r.version, created: r.created_at, by: 'p_1' })) as never;
+  try {
+    const base = { name: 'Done share', source: 'register.bool_steps', format: 'pct', target: { gte: 0 }, window: '30d', compare: 'none' } as const;
+    for (const [decl, want] of [
+      [{ ...base, metric: 'all-done', value: { avg: 'done' } }, 0.5],
+      [{ ...base, metric: 'two-done', where: 'what is Pour or Label', value: { avg: 'done' } }, 0.5],
+      [{ ...base, metric: 'none-marked', where: 'what is Label', value: { avg: 'done' } }, 0],
+    ] as const) {
+      const kernel = k.metric(decl as never);
+      assert.ok(kernel.ok, `${decl.metric}, the kernel: ${JSON.stringify(kernel)}`);
+      const web = webRead(decl as WebMetric, NOW);
+      assert.deepEqual(web.refusals, [], `${decl.metric}, the app: ${web.refusals.join('; ')}`);
+      assert.equal(kernel.value.value, want, `${decl.metric}, the kernel`);
+      assert.equal(web.value, kernel.value.value, `${decl.metric}: the two engines`);
+    }
+  } finally {
+    delete REGISTERS.bool_steps;
+    delete ROWS.bool_steps;
   }
 });

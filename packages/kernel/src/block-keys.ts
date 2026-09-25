@@ -93,7 +93,7 @@ export const KEY_KINDS: Readonly<Record<string, readonly string[]>> = {
 export const ANSWER_KEYS: readonly string[] = [
   'drawn', 'rows', 'matched', 'readings', 'walk', 'walks', 'walkFx', 'refusals', 'inherited', 'scopes', 'feed', 'seen',
   'history', 'values', 'bars', 'measures', 'past', 'changes', 'working_now', 'lateness', 'late_name', 'sells', 'fx',
-  'fills', 'rings', 'queue', 'nexts', 'done_now', 'next', 'open', 'types',
+  'fills', 'rings', 'queue', 'nexts', 'done_now', 'next', 'open', 'types', 'home',
 ];
 
 /**

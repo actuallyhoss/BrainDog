@@ -180,6 +180,11 @@ export type LiveBlock = BlockResult & {
   actions?: ActionRow[];
   /** Set when this build cannot draw the block from a live answer: the one line drawn instead. */
   cannot?: string;
+  /**
+   * An `inputs` block's: the record's home currency as the kernel answers it beside `types`, or `null` where none is set,
+   * which a bare figure typed into an empty money box is written in (`inputs-write.ts` `home`).
+   */
+  home?: string | null;
 };
 
 export type LivePage = { page: LivePageDecl; blocks: LiveBlock[] };
@@ -622,6 +627,7 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
        build that sent one in a shape this cannot read draws the plain form rather than a wrong one. */
     nexts: nexted,
     types: typed,
+    home: homeSaid,
     done_now: doneNow,
     next: nextAt,
     open: openSteps,
@@ -709,7 +715,8 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
     const types = isObject(typed) && Object.values(typed).every((t) => typeof t === 'string') ? (typed as Record<string, string>) : null;
     if (!register || !REGISTERS[register] || !types) return cannot;
     const entries = got.slice(0, 1).map((r) => entryOf(register, r, refs));
-    return { ...shell, register, entries, matched: entries, rows: toRows(register, entries, shell.columns, now, namesOf(refs)), shown: entries.length, total: entries.length, names: namesOf(refs), types } as LiveBlock;
+    const home = typeof homeSaid === 'string' && /^[A-Z]{3}$/u.test(homeSaid) ? homeSaid : null;
+    return { ...shell, register, entries, matched: entries, rows: toRows(register, entries, shell.columns, now, namesOf(refs)), shown: entries.length, total: entries.length, names: namesOf(refs), types, home } as LiveBlock;
   }
   /* A CAPTURE READS NO ROWS, and it has no `source:` either, so it is answered before the check that sends a block
      with none back as written text. Its list is kept on `register`, which every other block here takes from its
