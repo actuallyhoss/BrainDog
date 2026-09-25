@@ -18,6 +18,7 @@ import { openRecord, type Kernel } from '@braindog/kernel';
 import { fixedClock, openSqlite, type NodeSql } from '../../kernel/test/sqlite.ts';
 
 import { NOW } from '../src/index.ts';
+import { handingAsShipped } from './pack-files.ts';
 
 export type Body = Record<string, unknown>;
 export type Doc = { pack: string; version: string; requires: { packs: Record<string, string> }; declarations: Body[]; hands?: Record<string, string>; config?: unknown };
@@ -128,34 +129,35 @@ function before240(doc: unknown): Doc {
   return d;
 }
 
-/** A money-core document as 2.3.0, the release before `ends`: see `before240`. */
+/** A money-core document as 2.3.0, the release before `ends`, with the `hands` it shipped with: see `before240`. */
 export function asMoneyCore230(doc: unknown): Doc {
-  const d = before240(doc);
+  const d = handingAsShipped(before240(doc));
   d.version = '2.3.0';
   return d;
 }
 
-/** A money-core document as 1.8.0: `holdings` back after `accounts`, where 1.8.0 carried it, and not handed anywhere. */
+/**
+ * A money-core document as 1.8.0: `holdings` back after `accounts`, where 1.8.0 carried it, and not handed anywhere.
+ * The bank's twelve are handed, as 1.8.0 first handed them; today's document hands nothing (`pack-files.ts`).
+ */
 export function asMoneyCore180(doc: unknown): Doc {
-  const d = asShipped(doc);
+  const d = handingAsShipped(asShipped(doc), { holdings: false });
   d.version = '1.8.0';
   const rest = d.declarations.filter((x) => x.register !== 'holdings');
   const at = rest.findIndex((x) => x.register === 'accounts') + 1;
   assert.ok(at > 0, 'money-core no longer declares accounts, so there is nowhere to put holdings back');
   d.declarations = [...rest.slice(0, at), structuredClone(HOLDINGS_1_8_0), ...rest.slice(at)];
-  if (d.hands) delete d.hands['register.holdings'];
   return d;
 }
 
 /**
- * A money-core document as 2.0.0: `holdings` out and handed to the pack of that name. Today's document already is one,
- * and this changes nothing in it; it exists so the same test reads the same record against the tree before the move.
+ * A money-core document as 2.0.0: `holdings` out and handed to the pack of that name, beside the bank's twelve. Today's
+ * document declares the same and hands nothing, so this puts back the `hands` 2.0.0 shipped with.
  */
 export function asMoneyCore200(doc: unknown): Doc {
-  const d = asShipped(doc);
+  const d = handingAsShipped(asShipped(doc));
   d.version = '2.0.0';
   d.declarations = d.declarations.filter((x) => x.register !== 'holdings');
-  d.hands = { ...(d.hands ?? {}), 'register.holdings': 'holdings' };
   return d;
 }
 

@@ -305,11 +305,10 @@ test('INSTALLING THE SEED INSTALLS THE DOOR A BANK MESSAGE COMES THROUGH, and th
     k.declarations().filter((d) => d.kind === 'ingest').map((d) => d.id).sort(),
     [
       /* EACH WITH ITS WEBHOOK TWIN, `-sms`, since money-core 1.7.0: the same reading behind a path token, for the
-         Shortcut that posts a bank's text message rather than forwarding its mail. */
+         Shortcut that posts a bank's text message rather than forwarding its mail. money-core's two card wordings
+         only, since 25 September: the twelve that read one Egyptian bank were in the sample for the tests that forward
+         that bank's lines, and those install the bank's pack file now (`pack-files.ts`). */
       'ingest.bank-card-in', 'ingest.bank-card-in-sms', 'ingest.bank-card-out', 'ingest.bank-card-out-sms',
-      'ingest.bank-card-used', 'ingest.bank-card-used-sms', 'ingest.bank-from-in', 'ingest.bank-from-in-sms',
-      'ingest.bank-from-out', 'ingest.bank-from-out-sms', 'ingest.bank-from-unsure', 'ingest.bank-from-unsure-sms',
-      'ingest.bank-ipn-in', 'ingest.bank-ipn-in-sms', 'ingest.bank-ipn-out', 'ingest.bank-ipn-out-sms',
     ],
     'the seed installed no pattern for a forwarded bank message',
   );

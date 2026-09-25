@@ -11,6 +11,10 @@
  * SO money-core HANDS THEM OVER rather than dropping them (`MONEY_CORE_HANDS`, and `hands` in `declare`). The plan's
  * retire lines name `bank-hsbc-eg`, the declarations are never retired, and the token minted before the update is
  * the token that opens the door after both steps.
+ *
+ * money-core HANDED THEM FROM 1.8.0 UNTIL 2.4.0 STOPPED NAMING OTHER PACKS, and the bank's pack is a file now. So the
+ * 1.8.0 below carries the `hands` it shipped with (`asMoneyCore180`, from `seed/test/pack-files.ts`) and the pack
+ * installed is `packs/bank-hsbc-eg/bank-hsbc-eg.pack.json`, which is still the step a record on 1.7.0 took.
  */
 
 import { test } from 'node:test';
@@ -22,8 +26,8 @@ import type { Diff } from '../src/index.ts';
 import { createRecordApi, type CallContext } from '../../record/src/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 import { FIRST_PARTY, NOW, firstPartyDocument } from '../../seed/src/index.ts';
-import { BANK_HSBC_EG_VERSION, HSBC_EG_INGESTS, HSBC_EG_SMS_INGESTS, MONEY_CORE_HANDS, bankHsbcEgPack } from '../../seed/src/packs/bank-hsbc-eg.ts';
 import { asMoneyCore180 } from '../../seed/test/money-core-earlier.ts';
+import { HSBC_EG_INGESTS, HSBC_EG_SMS_INGESTS, MONEY_CORE_HANDS, bankHsbcEgFile } from '../../seed/test/pack-files.ts';
 
 const owner: CallContext = { principal: { kind: 'person', id: 'p_owner', level: 'owner' } };
 
@@ -104,7 +108,7 @@ test('A TOKEN MINTED ON 1.7.0 OPENS THE DOOR AFTER THE UPDATE AND AFTER THE PACK
   for (const r of update.retires)
     assert.equal(r.to, r.id === 'ingest.bank-from-out-sms' ? 'bank-hsbc-eg' : undefined, `${r.id} retires to the wrong place`);
 
-  const bank = await put(api, bankHsbcEgPack());
+  const bank = await put(api, bankHsbcEgFile());
   assert.deepEqual(bank.conflicts, []);
   assert.deepEqual(bank.adds.map((a) => a.id).sort(), [...HSBC, 'ingest.bank-not-mine-sms'].sort());
   assert.deepEqual(await api.ingestVerify({ ingest: 'bank-from-out-sms' }), door, 'the owner has to mint again');
@@ -112,9 +116,9 @@ test('A TOKEN MINTED ON 1.7.0 OPENS THE DOOR AFTER THE UPDATE AND AFTER THE PACK
   const owners = api.kernel.declarations().filter((d) => HSBC.includes(d.id)).map((d) => d.pack_id);
   assert.deepEqual([...new Set(owners)], ['bank-hsbc-eg']);
   assert.equal(owners.length, 12);
-  /* THE VERSION IT SHIPS, 1.0.1 since its range was widened past money-core 2.0.0 (`bank-hsbc-eg.ts`). Read off the
-     constant because this line holds that the pack arrived, and the range step is `seed/test/bank-pack.test.ts`'s. */
-  assert.ok(api.kernel.packs().some((p) => p.id === 'bank-hsbc-eg' && p.version === BANK_HSBC_EG_VERSION));
+  /* THE VERSION ITS FILE SHIPS. Read off the file because this line holds that the pack arrived, and the range step is
+     `seed/test/bank-pack.test.ts`'s. */
+  assert.ok(api.kernel.packs().some((p) => p.id === 'bank-hsbc-eg' && p.version === bankHsbcEgFile().version));
   assert.equal(api.kernel.packs().find((p) => p.id === 'money-core')?.version, '1.8.0');
   sql.close();
 });
@@ -132,7 +136,7 @@ test('A PATTERN THE OWNER CHANGED IS HIS, so it is not handed, and the pack is r
   assert.deepEqual(update.retires.map((r) => r.id).sort(), HSBC.filter((id) => id !== 'ingest.bank-ipn-in'));
   assert.equal(k.declarations().find((d) => d.id === 'ingest.bank-ipn-in')?.pack_id, null);
 
-  const bank = said<{ diff: Diff }>(await api.planPack({ doc: bankHsbcEgPack(), source: { kind: 'local' } } as never, owner)).diff;
+  const bank = said<{ diff: Diff }>(await api.planPack({ doc: bankHsbcEgFile(), source: { kind: 'local' } } as never, owner)).diff;
   assert.deepEqual(bank.conflicts, [{ id: 'ingest.bank-ipn-in', pack: '(this record)' }]);
   sql.close();
 });

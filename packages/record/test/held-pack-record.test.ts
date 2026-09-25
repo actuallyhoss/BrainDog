@@ -15,7 +15,7 @@ import assert from 'node:assert/strict';
 import { createRecordApi, type CallContext } from '../src/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 import { FIRST_PARTY, firstPartyDocument } from '../../seed/src/index.ts';
-import { bankHsbcEgPack } from '../../seed/src/packs/bank-hsbc-eg.ts';
+import { bankHsbcEgFile as bankHsbcEgPack } from '../../seed/test/pack-files.ts';
 import { asMoneyCore180, asMoneyCore200 } from '../../seed/test/money-core-earlier.ts';
 
 const owner: CallContext = { principal: { kind: 'person', id: 'p_owner', level: 'owner' } };

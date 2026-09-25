@@ -131,6 +131,52 @@ export function deeperThan(value: unknown, limit: number = BODY_DEPTH): boolean 
 
 const listed = (x: unknown): string => (Array.isArray(x) ? x.map(words).join(' or ') : words(x));
 
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const MONTH_WORDS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+/** The fewest and the most days each month has, a common year's February and a leap year's. */
+const SHORTEST = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+const LONGEST = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+const ordinal = (n: number): string => `${n}${n % 10 === 1 && n !== 11 ? 'st' : n % 10 === 2 && n !== 12 ? 'nd' : n % 10 === 3 && n !== 13 ? 'rd' : 'th'}`;
+
+/**
+ * A clock of months as a person says one (`clock.ts` in the kernel), or `null` for any other clock.
+ *
+ * MEASURED BEFORE THIS: `{ every: 1mo, day: last, at: 09:00 }` was said as "Every 1mo at 09:00 on last.", the weekly
+ * sentence with a month's words dropped into it. A clock of three months names the four months it falls in rather
+ * than `3mo` and a month to count from, because that is the arithmetic a person approving it would otherwise do, and a
+ * day some months lack says where it falls in them, so nobody reads "the 31st" and wonders about April.
+ *
+ * IT READS ONLY WHAT THE KERNEL'S LINT TAKES, `Nmo` or `Ny` with a day and a time, and anything else falls through to the
+ * sentence every other clock gets, so a body the lint would refuse is still said as it was written.
+ */
+function calendarSaid(on: Body): string | null {
+  const count = typeof on.every === 'string' ? /^([1-9]\d{0,2})(mo|y)$/u.exec(on.every) : null;
+  if (count === null || typeof on.at !== 'string') return null;
+  const months = Number(count[1]) * (count[2] === 'y' ? 12 : 1);
+  const day = on.day === 'last' ? 'last' : typeof on.day === 'number' && Number.isInteger(on.day) && on.day >= 1 && on.day <= 31 ? on.day : null;
+  if (day === null || ![1, 2, 3, 4, 6, 12].includes(months)) return null;
+  const which = day === 'last' ? 'the last day' : `the ${ordinal(day)}`;
+  if (months === 1) {
+    const short = day !== 'last' && day > SHORTEST[1]! ? `, or on the last day of a month that has no ${ordinal(day)}` : '';
+    return `On ${which} of each month at ${on.at}${short}.`;
+  }
+  const from = typeof on.month === 'string' ? MONTH_WORDS.indexOf(on.month) : -1;
+  if (from < 0) return null;
+  const falling = MONTH_NAMES.map((_, m) => m).filter((m) => (((m - from) % months) + months) % months === 0);
+  /* THE FALLBACK IS SAID ONLY WHERE ONE OF THESE MONTHS CAN LACK THE DAY, and a yearly day its month never has is said
+     as the last day, which is where `clock.ts` puts it every year. */
+  const short = day !== 'last' && falling.some((m) => day > SHORTEST[m]!);
+  if (months === 12) {
+    const name = MONTH_NAMES[from]!;
+    if (day !== 'last' && day > LONGEST[from]!) return `On the last day of ${name} each year at ${on.at}.`;
+    return `On ${which} of ${name} each year at ${on.at}${short ? `, or on the last day of ${name} in a year that has no ${ordinal(day as number)}` : ''}.`;
+  }
+  const falls = falling.map((m) => MONTH_NAMES[m]!);
+  const listed = `${falls.slice(0, -1).join(', ')} and ${falls.at(-1)!}`;
+  return `On ${which} of ${listed} at ${on.at}${short ? `, or on the last day of a month that has no ${ordinal(day as number)}` : ''}.`;
+}
+
 /** What starts a body, in one sentence a person reads on Decide. */
 function started(body: Body): string {
   const on = isObject(body.on) ? body.on : {};
@@ -155,6 +201,8 @@ function started(body: Body): string {
       return `When something arrives${at}${by}${state}, ${verified}. A redelivery starts nothing.`;
     }
     case 'every': {
+      const monthly = calendarSaid(on);
+      if (monthly !== null) return monthly;
       const at = typeof on.at === 'string' ? ` at ${on.at}` : '';
       const day = typeof on.day === 'string' ? ` on ${on.day}` : '';
       return `Every ${words(on.every)}${at}${day}.`;

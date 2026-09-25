@@ -166,8 +166,10 @@ test('AN ARRIVAL NAMED FOR A DOOR WITH A WRONG TOKEN IS OFFERED NO PATTERN AND S
 });
 
 test('HSBC EGYPT\'S SIX TEXT TWINS SHARE ONE DOOR: a card text posted to bank-from-out-sms is filed by the card twin', async () => {
+  /* THE BANK'S PACK FILE ON THE SEED, since the sample stopped carrying its twelve on 25 September
+     (`seed/test/pack-files.ts`): with the seed alone this text arrived at a door the record did not have. */
   const { installSeed, day } = await import('../../seed/src/index.ts');
-  const { HSBC_EG_SMS_INGESTS } = await import('../../seed/src/packs/bank-hsbc-eg.ts');
+  const { HSBC_EG_SMS_INGESTS, bankDeclarations } = await import('../../seed/test/pack-files.ts');
   const twins = Object.values(HSBC_EG_SMS_INGESTS) as unknown as { ingest: string; door?: string }[];
   assert.deepEqual(twins.filter((t) => t.door === undefined).map((t) => t.ingest), ['bank-from-out-sms'], 'more than one twin is its own door');
   assert.equal(twins.filter((t) => t.door === 'bank-from-out-sms').length, 5);
@@ -176,6 +178,8 @@ test('HSBC EGYPT\'S SIX TEXT TWINS SHARE ONE DOOR: a card text posted to bank-fr
   const k = await openRecord(sql, fixedClock(NOW));
   const seeded = await installSeed(k);
   assert.ok(seeded.ok, why(seeded));
+  const bank = await k.install(bankDeclarations());
+  assert.ok(bank.ok, why(bank));
   const card = k.create('accounts', { name: 'Cairo credit card', kind: 'card', balance: { amount: 0, currency: 'EGP' }, as_of: day(0), liquid: false, last4: '9052' }, { actor: 'p_seed' });
   assert.ok(card.ok, why(card));
 

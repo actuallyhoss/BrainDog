@@ -4,9 +4,10 @@
  *
  * THE DOCUMENT WAS A FUNCTION IN `packages/seed`. `bankHsbcEgPack` in `packages/seed/src/packs/bank-hsbc-eg.ts` built
  * it in code, so the shell carried one person's bank as TypeScript, which section 27 says nothing in `packages/` may do.
- * It is now `bank-hsbc-eg.pack.json`, installed through the record's own `planPack` and `installPack`. The builder stays
- * until the import resolves the pack by id (brief B2), and while it does the first test holds the file to what it
- * builds, byte for byte in meaning, so a wording changed in one and not the other fails here and not on his phone.
+ * It is now `bank-hsbc-eg.pack.json`, installed through the record's own `planPack` and `installPack`. The builder went
+ * on 25 September, once the import resolved the pack by id from the catalogue (brief B2), and until then the first test
+ * held the file to what it built, byte for byte in meaning; they were still equal when it was deleted. The file is the
+ * only copy now.
  *
  * THE TESTS ARE THE ONES THAT READ THE BANK'S LINES, MOVED FROM `packages/seed/test` (`bank-hsbc-eg.test.ts`,
  * `bank-not-mine.test.ts` and the HSBC half of `money-bank.test.ts`), and they now stand on the file. Those three
@@ -19,8 +20,8 @@
  * RED FIRST, MEASURED ON SEPTEMBER 25TH. With no file, twelve of the thirteen failed ENOENT, and the thirteenth is the
  * one that holds a record with every first-party pack to leaving this bank's card alert `untriaged`, so nothing here
  * passes because money-core already reads the line. With `SIGNED_DEBIT` taken out of `bank-from-in`'s `none:` in the
- * file, two failed: the builder comparison, and the claims test on the line carrying both glued signs, so the claims
- * test is asked of the file and not of the builder.
+ * file, two failed: the builder comparison, since removed, and the claims test on the line carrying both glued signs,
+ * so the claims test is asked of the file and not of the builder.
  */
 
 import { test } from 'node:test';
@@ -31,7 +32,7 @@ import { readPackFile } from '../../packages/declare/src/catalogue.ts';
 import { openRecord, type Arrived, type Kernel } from '../../packages/kernel/src/index.ts';
 import { createRecordApi, type CallContext } from '../../packages/record/src/index.ts';
 import { fixedClock, openSqlite, type NodeSql } from '../../packages/kernel/test/sqlite.ts';
-import { FIRST_PARTY, bankHsbcEgPack, firstPartyDocument } from '../../packages/seed/src/index.ts';
+import { FIRST_PARTY, firstPartyDocument } from '../../packages/seed/src/index.ts';
 
 const NOW = Date.UTC(2026, 8, 3, 12);
 const TODAY = '2026-09-03';
@@ -56,7 +57,7 @@ const file = (): Body & { declarations: Body[] } => JSON.parse(readFileSync(PACK
 /** The door the Shortcut posts every text to, read off the file: the one twin the other five name as their `door:`. */
 const door = (): string => String(file().declarations.find((d) => typeof d.door === 'string')!.door);
 
-/** The six wordings and their twins, and the door's catch-all: thirteen, spelled out so a pattern lost from both the file and the builder still fails. */
+/** The six wordings and their twins, and the door's catch-all: thirteen, spelled out so a pattern lost from the file fails here. */
 const THIRTEEN = [
   'ingest.bank-card-used', 'ingest.bank-card-used-sms', 'ingest.bank-from-in', 'ingest.bank-from-in-sms',
   'ingest.bank-from-out', 'ingest.bank-from-out-sms', 'ingest.bank-from-unsure', 'ingest.bank-from-unsure-sms',
@@ -149,8 +150,7 @@ const text = (k: Kernel, body: string, sha256: string): Arrived => said<Arrived>
 
 /* ── the file ────────────────────────────────────────────────────────────────────────────────────────────────────── */
 
-test('THE FILE IS WHAT THE BUILDER BUILDS, byte for byte in meaning, until the builder goes', () => {
-  assert.deepEqual(file(), JSON.parse(JSON.stringify(bankHsbcEgPack())));
+test('THE FILE IS bank-hsbc-eg 1.3.0, on money-core 1.8.0 or later before 3.0.0, with the thirteen', () => {
   const doc = file();
   assert.deepEqual([doc.pack, doc.version], ['bank-hsbc-eg', '1.3.0']);
   assert.deepEqual((doc.requires as { packs: unknown }).packs, { 'money-core': '>=1.8.0 <3.0.0' });

@@ -85,13 +85,17 @@ export type RuleAction =
  * is a rule that grew a trigger rather than a ninth kind: the rules already installed in somebody's record are
  * automations the canvas can open, with no migration and no second engine doing the same job.
  *
- * ONE KEY, and `every` is the only one with companions (`at`, `day`). A body naming two triggers is refused rather than
- * read as "either", because nothing downstream could say which one started a run.
+ * ONE KEY, and `every` is the only one with companions (`at`, `day`, `month`). A body naming two triggers is refused
+ * rather than read as "either", because nothing downstream could say which one started a run.
+ *
+ * `day` IS A WEEKDAY ON A WEEKLY CLOCK AND A DAY OF THE MONTH ON A CLOCK OF MONTHS (`every: 1mo`, `3mo`, `1y`): `mon` to
+ * `sun` there, and 1 to 31 or `last` here, which is why it is a number or a word. `month` is the month a clock of more
+ * than one month counts from (`clock.ts`).
  */
 export type Trigger =
   | { written: { register: string; op?: ('create' | 'update' | 'delete')[]; fields?: string[]; from_rules?: boolean } }
   | { arrival: { ingest?: string; channel?: 'webhook' | 'email' | 'paste' | 'api' | 'pull'; state?: string[] } }
-  | { every: string; at?: string; day?: string }
+  | { every: string; at?: string; day?: string | number; month?: string }
   | { metric: { id: string; crosses: 'target' | { lte: number } | { gte: number } } }
   /** Reserved. A run's own asks resume it without this, and the lint refuses it as not in this build. */
   | { decided: { automation?: string } }

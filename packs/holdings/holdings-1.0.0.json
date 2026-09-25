@@ -1,0 +1,86 @@
+{
+  "pack": "holdings",
+  "version": "1.0.0",
+  "summary": "What you hold rather than spend: certificates, policies and commodities, with what each one cost.",
+  "author": "BrainDog",
+  "license": "MIT",
+  "requires": {
+    "format": 1,
+    "primitives": 1,
+    "packs": {
+      "money-core": ">=2.0.0"
+    }
+  },
+  "declarations": [
+    {
+      "register": "holdings",
+      "name": "Holdings",
+      "icon": "money",
+      "one": "holding",
+      "holds": "what you hold rather than spend: certificates, policies and commodities, with what each one cost and when it matures",
+      "title": "label",
+      "mobile": [
+        "label",
+        "qty",
+        "unit_cost"
+      ],
+      "pack": "holdings",
+      "fields": [
+        {
+          "id": "label",
+          "label": "Description",
+          "type": "text",
+          "required": true,
+          "search": true
+        },
+        {
+          "id": "kind",
+          "label": "Type",
+          "type": "enum",
+          "values": [
+            "certificate",
+            "policy",
+            "commodity",
+            "other"
+          ],
+          "index": true,
+          "required": true,
+          "search": true
+        },
+        {
+          "id": "qty",
+          "label": "How many",
+          "type": "decimal",
+          "min": 0,
+          "required": true,
+          "qualifies": "unit_cost"
+        },
+        {
+          "id": "unit_cost",
+          "label": "Cost each",
+          "type": "money",
+          "required": true
+        },
+        {
+          "id": "acquired_on",
+          "type": "day",
+          "index": true
+        },
+        {
+          "id": "matures_on",
+          "type": "day",
+          "index": true
+        },
+        {
+          "id": "note",
+          "type": "text"
+        },
+        {
+          "id": "tags",
+          "type": "list",
+          "of": "text"
+        }
+      ]
+    }
+  ]
+}

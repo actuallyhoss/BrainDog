@@ -12,6 +12,11 @@
  * the kernel it opens, the same way production does. So every wording is forwarded here through the
  * real record over `installSeed`, and the row it writes is read back field by field.
  *
+ * THE BANK'S SIX ARE ITS PACK FILE'S, INSTALLED ON TOP OF THE SEED. The sample carried them until 25 September, and
+ * this file was one of the reasons it did; it now installs `packs/bank-hsbc-eg/bank-hsbc-eg.pack.json` itself
+ * (`seed/test/pack-files.ts`), so what is read here is what a person who installs that pack reads. Measured with the
+ * sample's twelve gone and nothing in their place: ten of this file's fourteen tests failed.
+ *
  * PROVED RED BY MUTATION, on a copy of `packages/seed/src/modules/money.ts` restored from the copy
  * afterwards: `bank-ipn-in`'s map set to `{ credited: 'out' }` failed the InstaPay-in row here on
  * `direction`, which is the flip nothing caught before.
@@ -31,7 +36,7 @@ import { createRecordApi } from '../src/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 import { NOW, day, installSeed } from '../../seed/src/index.ts';
 import { MONEY_INGESTS } from '../../seed/src/modules/money.ts';
-import { HSBC_EG_INGESTS } from '../../seed/src/packs/bank-hsbc-eg.ts';
+import { HSBC_EG_INGESTS, bankDeclarations } from '../../seed/test/pack-files.ts';
 
 /** The seeded record, and two EGP accounts whose digits the invented wordings name. */
 async function record(): Promise<{ k: Kernel; sql: Sql; card: string; current: string; company: string }> {
@@ -40,6 +45,8 @@ async function record(): Promise<{ k: Kernel; sql: Sql; card: string; current: s
   const k = api.kernel;
   const seeded = await installSeed(k);
   assert.ok(seeded.ok, JSON.stringify(seeded));
+  const bank = await k.install(bankDeclarations());
+  assert.ok(bank.ok, JSON.stringify(bank));
   const made = (fields: Record<string, unknown>): string => {
     const got = k.create('accounts', fields, { actor: 'p_seed' });
     assert.ok(got.ok, JSON.stringify(got));

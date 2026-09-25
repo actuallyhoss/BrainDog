@@ -25,6 +25,10 @@
  * `arrivalDoor`, and its test at `:232`), and its own three-segment shape carries no token, so on the self-host his
  * Shortcut has no URL a path token can ride in yet; that door is `apps/selfhost`'s to open. The mint is routed now,
  * as the ADMIN write `/api/ingestMint`, and (8) drives it from the request a browser would send to the SMS it matches.
+ *
+ * THE BANK'S PATTERNS ARE ITS PACK FILE'S, INSTALLED ON TOP OF THE SEED. The sample carried the twelve until
+ * 25 September, for this file among others; `record()` now installs `packs/bank-hsbc-eg/bank-hsbc-eg.pack.json` itself
+ * (`seed/test/pack-files.ts`), and (7) holds what the seed alone still ships, which is money-core's own twins.
  */
 
 import assert from 'node:assert/strict';
@@ -38,7 +42,7 @@ import { ROUTES, handlersFor, serveApi, serveIngest, type IngestDoor } from '../
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 import { NOW, day, installSeed } from '../../seed/src/index.ts';
 import { MONEY_INGESTS, MONEY_SMS_INGESTS } from '../../seed/src/modules/money.ts';
-import { HSBC_EG_INGESTS, HSBC_EG_SMS_INGESTS } from '../../seed/src/packs/bank-hsbc-eg.ts';
+import { HSBC_EG_INGESTS, HSBC_EG_SMS_INGESTS, bankDeclarations } from '../../seed/test/pack-files.ts';
 
 const REC = 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD';
 
@@ -54,19 +58,24 @@ const SMS_AGAIN = 'From HSBC: 17AUG26 ATM Cash Withdrawal from 310-527***-846 EG
 const CREDIT = 'From HSBC: 01AUG26 Deposit Interest 310-527***-846 EGP 418.62+ Your available balance is EGP 33,540.25';
 
 /**
- * The pack's webhook twins, as declarations. The seed installs them since money-core 1.7.0, so installing them again
- * here changes nothing, and the tests that do so still say which twins each one leans on.
+ * The pack's webhook twins, as declarations. `record()` installs the pack's file, so installing them again here
+ * changes nothing, and the tests that do so still say which twins each one leans on.
  */
 const twins = (...ids: string[]) =>
   ids.map((id) => ({ id: `ingest.${id}`, kind: 'ingest' as const, body: HSBC_EG_SMS_INGESTS[id]! as never }));
 
 type Api = Awaited<ReturnType<typeof createRecordApi>>;
 
-async function record(): Promise<{ k: Kernel; sql: ReturnType<typeof openSqlite>; api: Api }> {
+/** The seed, and the bank's pack file on it unless `bank` is false, and the current account the invented lines name. */
+async function record(bank = true): Promise<{ k: Kernel; sql: ReturnType<typeof openSqlite>; api: Api }> {
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
   const k = api.kernel;
   assert.ok((await installSeed(k)).ok);
+  if (bank) {
+    const put = await k.install(bankDeclarations());
+    assert.ok(put.ok, JSON.stringify(put));
+  }
   const made = k.create(
     'accounts',
     { name: 'Cairo current account', kind: 'bank', balance: { amount: 0, currency: 'EGP' }, as_of: day(0), liquid: true, last4: '846' },
@@ -192,15 +201,26 @@ test('(6) verify: IS READ WHERE IT IS WRITTEN: a path token on a webhook, and no
   sql.close();
 });
 
-test('(7) THE SEED SHIPS THE TWINS: a record set up with money-core has the Shortcut\'s door with nothing installed by hand', async () => {
+test('(7) THE SEED SHIPS money-core\'s TWINS: a record set up with money-core has a text door with nothing installed by hand, and the bank\'s comes with its pack', async () => {
   /* RED BEFORE `INGESTS` SPREAD `MONEY_SMS_INGESTS`: `ingestVerify` answered null here, so the SMS was a 404 on every
      record the product had set up, and each test above had to install the twins itself to show anything. */
-  const { k, sql, api } = await record();
-  assert.deepEqual(await api.ingestVerify({ ingest: 'bank-from-out-sms' }), { kind: 'none' });
+  /* money-core's OWN TWINS, SINCE THE SAMPLE STOPPED CARRYING THE BANK'S: the card twins are the seed's doors, and the
+     bank's door arrives with the bank's pack and not before it. */
+  const { k, sql, api } = await record(false);
+  assert.deepEqual(await api.ingestVerify({ ingest: 'bank-card-out-sms' }), { kind: 'none' });
+  assert.equal(await api.ingestVerify({ ingest: 'bank-from-out-sms' }), null, 'the seed alone carries the bank pack\'s door');
   assert.deepEqual(
-    k.declarations().filter((d) => d.kind === 'ingest' && d.id.endsWith('-sms')).map((d) => d.id).length,
-    Object.keys(MONEY_SMS_INGESTS).length + Object.keys(HSBC_EG_SMS_INGESTS).length,
+    k.declarations().filter((d) => d.kind === 'ingest' && d.id.endsWith('-sms')).map((d) => d.id).sort(),
+    Object.keys(MONEY_SMS_INGESTS).map((id) => `ingest.${id}`).sort(),
   );
+  /* AND WITH THE PACK, ITS SIX TWINS AND THE DOOR'S CATCH-ALL BESIDE THEM. */
+  const withBank = await record();
+  assert.deepEqual(await withBank.api.ingestVerify({ ingest: 'bank-from-out-sms' }), { kind: 'none' });
+  assert.equal(
+    withBank.k.declarations().filter((d) => d.kind === 'ingest' && d.id.endsWith('-sms')).length,
+    Object.keys(MONEY_SMS_INGESTS).length + Object.keys(HSBC_EG_SMS_INGESTS).length + 1,
+  );
+  withBank.sql.close();
   sql.close();
 });
 

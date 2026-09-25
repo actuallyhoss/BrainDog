@@ -26,10 +26,6 @@ import { AGENTS_PACK, AGENTS_REGISTERS, RUNS_ON, agentsPackDocument } from './pa
 
 export { AGENTS_PACK, AGENTS_PAGES, AGENTS_REGISTERS, RUNS_ON, agentsPackDocument, type PackManifest } from './packs/agents.ts';
 export { FIRST_PARTY, FIRST_PARTY_VERSIONS, crossPack, firstPartyDocument, firstPartyManifest, type DocumentOptions, type FirstPartyId } from './packs/first-party.ts';
-export { BANK_HSBC_EG_VERSION, HSBC_EG_INGESTS, HSBC_EG_SMS_INGESTS, bankHsbcEgPack } from './packs/bank-hsbc-eg.ts';
-import { HSBC_EG_INGESTS, HSBC_EG_SMS_INGESTS } from './packs/bank-hsbc-eg.ts';
-export { HOLDINGS, HOLDINGS_VERSION, MONEY_CORE_HOLDINGS_HANDS, holdingsPack } from './packs/holdings.ts';
-import { HOLDINGS } from './packs/holdings.ts';
 export * from './modules/base.ts';
 export { ACCOUNTS, CATEGORIES, INSTALLMENTS, MONEY_INGESTS, MONEY_SMS_INGESTS, OBLIGATIONS, RECURRING_ITEMS, SNAPSHOTS, TRANSACTIONS, cashSeries, nightOf, snapshotRows, type SeedIngest } from './modules/money.ts';
 export { SERVICES } from './modules/estate.ts';
@@ -186,17 +182,6 @@ export const declarations = (): Declaration[] =>
   Object.values(REGISTERS).map((body) => ({ id: `register.${body.id}`, kind: 'register' as const, body: withTags(body) as never }));
 
 /**
- * The `holdings` pack's one list as a kernel declaration, for a record opened the way `declarations()` opens one.
- *
- * NOT AMONG `declarations()`, AND SO NOT IN THE SAMPLE. money-core carried the list from 1.5.0 to 1.8.0, so every record
- * the seed opened held it, empty; since 2.0.0 it is a pack of its own (`packs/holdings.ts`), and the sample is a London
- * studio that holds nothing of the kind. Left in, `declarations()` stops being what `packDocument()` installs, which
- * `test/pack.test.ts` holds the two to: measured on 23 September, three of its tests went red with it left in. A test
- * that writes holdings into a sample record adds this beside it.
- */
-export const holdingsDeclarations = (): Declaration[] => [{ id: `register.${HOLDINGS.id}`, kind: 'register' as const, body: withTags(HOLDINGS) as never }];
-
-/**
  * The pages and the metrics, as declarations.
  *
  * A REGISTER AND A PAGE ARE THE SAME KIND OF THING — a document with an id and a body — and they
@@ -250,7 +235,7 @@ export const automationDeclarations = (): Declaration[] =>
  * was read only by `test/money.test.ts`, which installs it by hand before it forwards anything, so
  * every assertion there held while the record `installSeed` actually opens carried no pattern at
  * all. Measured on a seeded record before this line: nought declarations of kind `ingest`, and an
- * HSBC charge alert posted at the arrival path was stored, hashed, left `untriaged` and wrote
+ * bank's card alert posted at the arrival path was stored, hashed, left `untriaged` and wrote
  * nothing, which is correct behaviour and an empty ledger beside a full inbox.
  *
  * AND THE SAME EIGHT READINGS AS WEBHOOKS, since money-core 1.7.0, because his bank's messages reach him as
@@ -258,32 +243,18 @@ export const automationDeclarations = (): Declaration[] =>
  * `bank-from-out-sms` answered 404 on every record the product had set up
  * (`packages/host/test/ingest-shortcut.test.ts` (7)). A twin matches nothing until an owner mints its token.
  *
- * money-core's ONLY, SINCE 1.8.0: the two card wordings and their twins. HSBC Egypt's six and their twins are the
- * `bank-hsbc-eg` pack's (`packs/bank-hsbc-eg.ts`), and this is what `packDocument()` and every first-party document are
- * built from, so a starter use case no longer carries them.
+ * money-core's ONLY, SINCE 1.8.0: the two card wordings and their twins. One Egyptian bank's six and their twins are a
+ * pack of their own, a file under `packs/`, and this is what `packDocument()` and every first-party document are built
+ * from, so a starter use case no longer carries them.
+ *
+ * AND THE SAMPLE NO LONGER CARRIES THEM EITHER, since 25 September. `installSeed` spread that pack's twelve in beside
+ * these, because the tests that forward the bank's lines forwarded them into the sample; those tests install the pack
+ * file on the record now (`test/pack-files.ts`), and the sample is a London studio, which has no Cairo bank.
  */
 export const INGESTS: Record<string, SeedIngest> = { ...MONEY_INGESTS, ...MONEY_SMS_INGESTS };
 
 export const ingestDeclarations = (): Declaration[] =>
   Object.values(INGESTS).map((body) => ({ id: `ingest.${body.ingest}`, kind: 'ingest' as const, body: body as never }));
-
-/**
- * THE SAMPLE RECORD STILL HOLDS THE BANK PACK'S TWELVE, and only the sample. `installSeed` is a fixture and a demo, not
- * a way a person's record is set up, and it is what the bank tests forward their lines into. Measured with these left
- * out on 22 September: six tests in this package and seven of the eight in `packages/host/test/ingest-shortcut.test.ts`
- * went red, every one of them a `From HSBC:`, InstaPay or card-used line arriving at a record with no pattern for it.
- * They are installed as the pack declares them, `pack: 'bank-hsbc-eg'` in the body, so a sample exported and opened
- * elsewhere says whose they are.
- *
- * THIS PACKAGE'S OWN BANK TESTS NO LONGER NEED THEM. They moved to `packs/bank-hsbc-eg/bank-hsbc-eg.test.ts` on
- * 25 September, where the record is the first-party packs and the pack file (`loop/research-legacy-parity.md` B1).
- * Measured with these left out after the move: `test/seed.test.ts` 1, `packages/kernel/test/ingest-door.test.ts` 1,
- * `packages/record/test/money-ipn.test.ts` 10, `packages/record/test/ingest-verify-digest.test.ts` 1 and
- * `packages/host/test/ingest-shortcut.test.ts` 2 went red, each forwarding a bank line into `installSeed`. Once those
- * install the pack file on their record instead, this goes, and so does the last `hsbc` in this file but the exports.
- */
-const sampleBankDeclarations = (): Declaration[] =>
-  [...Object.values(HSBC_EG_INGESTS), ...Object.values(HSBC_EG_SMS_INGESTS)].map((body) => ({ id: `ingest.${body.ingest}`, kind: 'ingest' as const, body: body as never }));
 
 export const metricDeclarations = (): Declaration[] =>
   Object.values(METRICS).map((body) => ({ id: `metric.${body.metric}`, kind: 'metric' as const, body: body as never }));
@@ -479,7 +450,6 @@ export async function installSeed(kernel: Kernel, actor = 'p_seed'): Promise<Res
     ...pageDeclarations().filter((d) => d.id !== 'page.project'),
     ...metricDeclarations(),
     ...ingestDeclarations(),
-    ...sampleBankDeclarations(),
   ]);
   if (!installed.ok) return installed as Result<Seeded>;
   const agents = await installAgentsPack(kernel, actor);

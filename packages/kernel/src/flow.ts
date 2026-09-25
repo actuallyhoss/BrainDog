@@ -39,6 +39,7 @@ import { fixOf, no, ok, refused } from '@braindog/ports';
 import { compile, evaluate, type Predicate, type Schema } from '@braindog/where';
 
 import { meter, type Metered } from './actions.ts';
+import { calendarOf, nextCalendar } from './clock.ts';
 import { nextOccurrence } from './digest.ts';
 import { RUN_PATH, RUNS_PER_DAY_CEILING, passFilled, pathOf, sealedAs, triggerOf } from './flow-lint.ts';
 import type { Entry } from './index.ts';
@@ -751,10 +752,15 @@ export function onArrival(
   }
 }
 
-/** When a clock rule is first due: its time of day where it names one, and one interval from now where it does not. */
+/**
+ * When a clock rule is first due: the next day of the month it names on a clock of months, its time of day where it
+ * names one, and one interval from now where it does not.
+ */
 export function firstDue(body: FlowDecl, nowMs: number, tz: string): number | null {
   const on = body.on as { every?: string; at?: string; day?: string } | undefined;
   if (typeof on?.every !== 'string') return null;
+  const calendar = calendarOf(on);
+  if (calendar !== null) return nextCalendar(calendar, nowMs, tz);
   const ms = intervalMs(on.every);
   if (ms === null) return null;
   if (typeof on.at === 'string') return nextOccurrence({ at: on.at, ...(typeof on.day === 'string' ? { day: on.day } : {}) }, nowMs, tz);
@@ -777,6 +783,10 @@ export function onClock(deps: FlowDeps, rule: string, dueAt: string): number | n
     if (at !== null) wake(deps, started.value.run, at);
   }
   const on = found.body.on as { every: string; at?: string; day?: string };
+  /* A CLOCK OF MONTHS IS ASKED THE CALENDAR AGAIN, FROM NOW, and never given a length to add: thirty days from the 31st
+     of January is the 2nd of March, and from there the date walks a day or two further off with every month. */
+  const calendar = calendarOf(on);
+  if (calendar !== null) return nextCalendar(calendar, deps.nowMs, deps.tz);
   if (typeof on.at === 'string') return nextOccurrence({ at: on.at, ...(typeof on.day === 'string' ? { day: on.day } : {}) }, deps.nowMs, deps.tz);
   const ms = intervalMs(on.every);
   if (ms === null) return null;

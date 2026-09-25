@@ -26,6 +26,7 @@
 
 import type { Refusal } from '@braindog/ports';
 
+import { CALENDAR_STEPS, calendarOf, isMonthDay, monthsIn, MONTHS, timeOf } from './clock.ts';
 import type { Known } from './declare.ts';
 import { nextOccurrence } from './digest.ts';
 import { figureFault } from './figure.ts';
@@ -1194,7 +1195,7 @@ function triggerFault(id: string, on: unknown, installed?: Known): Refusal | nul
   }
   if (!isObject(on)) return bad('DECLARATION_INVALID', `${id}'s on: is one trigger, such as { every: 1h }.`, 'on', TRIGGERS);
   const named = Object.keys(on).filter((k) => (TRIGGERS as readonly string[]).includes(k));
-  const stray = Object.keys(on).find((k) => !(TRIGGERS as readonly string[]).includes(k) && !((k === 'at' || k === 'day') && 'every' in on));
+  const stray = Object.keys(on).find((k) => !(TRIGGERS as readonly string[]).includes(k) && !((k === 'at' || k === 'day' || k === 'month') && 'every' in on));
   if (stray !== undefined) return bad('DECLARATION_INVALID', `${id}'s on: has no trigger called ${stray}.`, `on.${stray}`, TRIGGERS);
   if (named.length !== 1)
     return bad('DECLARATION_INVALID', `${id}'s on: names ${named.length === 0 ? 'no trigger' : named.join(' and ')}, and a rule is started by exactly one.`, 'on', TRIGGERS);
@@ -1238,25 +1239,37 @@ function triggerFault(id: string, on: unknown, installed?: Known): Refusal | nul
     case 'every': {
       /* THE CLOCK GRAMMAR IS `pull.ts`'s, AND SO IS THE FLOOR. `m` is minutes here, as on a connector, and fifteen of
          them is the shortest clock anything in this record keeps: a run every minute is a meter nobody meant to buy. */
+      const { at: time, day, month } = on as { at?: unknown; day?: unknown; month?: unknown };
+      /* A CLOCK OF MONTHS IS `clock.ts`'s AND IS READ BEFORE THE INTERVAL, because `mo` is not a unit `intervalMs` has
+         and never should be: a month is no number of milliseconds. Measured on 25 September, `1mo` was refused here as
+         not a clock, and a bill on the last day of each month could only be carried forward by hand. */
+      if (monthsIn(value) !== null) return calendarFault(id, String(value), on as Record<string, unknown>);
       const ms = typeof value === 'string' ? intervalMs(value) : null;
       if (ms === null)
-        return bad('DECLARATION_INVALID', `${id} runs every ${JSON.stringify(value)}, and a clock is a number and one of m, h, d or w. Write 1h.`, at);
+        return bad(
+          'DECLARATION_INVALID',
+          `${id} runs every ${JSON.stringify(value)}, and a clock is a number and one of m, h, d or w, or a count of months such as 1mo, 3mo or 1y. Write 1h.`,
+          at,
+        );
       if (ms < FLOOR_MS)
         return bad('DECLARATION_INVALID', `${id} runs every ${String(value)}, and fifteen minutes is the shortest clock this record keeps. Write 15m or more.`, at);
-      const { at: time, day } = on as { at?: unknown; day?: unknown };
+      if (month !== undefined)
+        return bad('DECLARATION_INVALID', `${id} runs every ${String(value)}, so month: has nothing to choose. A month belongs to a clock of months, such as every: 3mo.`, 'on.month');
       if (day !== undefined && time === undefined)
         return bad('DECLARATION_INVALID', `${id} names a day and no time. Write at: 08:00 beside it.`, 'on.at');
       if (time === undefined) return null;
       /* `at` IS `digest.ts`'s `nextOccurrence`, which knows a day and a week and nothing else. `every: 6h, at: 08:00`
          has no reading anybody would agree on, so it is refused rather than guessed. */
       if (ms !== DAY_MS && ms !== WEEK_MS)
-        return bad('DECLARATION_INVALID', `${id} runs every ${String(value)} at a time of day, and a time of day belongs to every: 1d or every: 1w.`, 'on.at');
+        return bad('DECLARATION_INVALID', `${id} runs every ${String(value)} at a time of day, and a time of day belongs to every: 1d, every: 1w or a clock of months.`, 'on.at');
       if (ms === WEEK_MS && day === undefined)
         return bad('REQUIRED_MISSING', `${id} runs weekly at ${String(time)} and names no day. Write day: mon.`, 'on.day');
+      /* A DAY OF THE MONTH ON A DAY OR A WEEK is somebody reaching for the monthly clock, and is told where it is. */
+      const monthly = isMonthDay(day) ? ' A day of the month belongs to every: 1mo.' : '';
       if (ms === DAY_MS && day !== undefined)
-        return bad('DECLARATION_INVALID', `${id} runs every day, so day: has nothing to choose. Write every: 1w.`, 'on.day');
+        return bad('DECLARATION_INVALID', `${id} runs every day, so day: has nothing to choose. Write every: 1w for a weekday, or every: 1mo for a day of the month.`, 'on.day');
       if (typeof time !== 'string' || (day !== undefined && typeof day !== 'string') || nextOccurrence({ at: time, ...(day === undefined ? {} : { day: day as string }) }, 0, 'UTC') === null)
-        return bad('DECLARATION_INVALID', `${id} runs at ${JSON.stringify(time)}${day === undefined ? '' : ` on ${JSON.stringify(day)}`}, and a time is HH:MM and a day is mon to sun.`, 'on.at');
+        return bad('DECLARATION_INVALID', `${id} runs at ${JSON.stringify(time)}${day === undefined ? '' : ` on ${JSON.stringify(day)}`}, and a time is HH:MM and a day is mon to sun.${monthly}`, 'on.at');
       return null;
     }
     case 'metric': {
@@ -1287,6 +1300,38 @@ function triggerFault(id: string, on: unknown, installed?: Known): Refusal | nul
       return value === true ? null : bad('DECLARATION_INVALID', `${id}'s manual: is true.`, at);
   }
   return null;
+}
+
+/**
+ * What is wrong with a clock of months, one thing at a time, or `null` when `clock.ts`'s `calendarOf` reads it.
+ *
+ * EVERY KEY IS REQUIRED THAT DECIDES WHICH DAY, and none is defaulted. A monthly clock with no `day:` could mean the
+ * 1st or the day it was installed on, and the second moves whenever the rule is edited; one with no `at:` has no
+ * reading at all. `month:` is required of a count above one for the same reason and refused on a count of one, as
+ * `day:` is refused on a daily clock, because it would choose nothing.
+ */
+function calendarFault(id: string, every: string, on: Record<string, unknown>): Refusal | null {
+  const months = monthsIn(every)!;
+  const steps = `1mo, 2mo, 3mo, 4mo, 6mo, 12mo or 1y`;
+  if (!CALENDAR_STEPS.includes(months))
+    return bad('DECLARATION_INVALID', `${id} runs every ${every}, and a clock of months divides the year, so it falls in the same months every year: ${steps}.`, 'on.every');
+  if (on.day === undefined)
+    return bad('REQUIRED_MISSING', `${id} runs every ${every} and names no day of the month. Write day: 1, or day: last.`, 'on.day');
+  if (!isMonthDay(on.day))
+    return bad(
+      'DECLARATION_INVALID',
+      `${id} runs on day ${JSON.stringify(on.day)}, and a day of the month is 1 to 31, or last. A day past a month's end falls on its last day.`,
+      'on.day',
+    );
+  if (on.at === undefined) return bad('REQUIRED_MISSING', `${id} runs every ${every} and names no time. Write at: 09:00 beside it.`, 'on.at');
+  if (timeOf(on.at) === null) return bad('DECLARATION_INVALID', `${id} runs at ${JSON.stringify(on.at)}, and a time is HH:MM.`, 'on.at');
+  if (months === 1 && on.month !== undefined)
+    return bad('DECLARATION_INVALID', `${id} runs every month, so month: has nothing to choose. Write every: 3mo or 1y beside it.`, 'on.month');
+  if (months > 1 && on.month === undefined)
+    return bad('REQUIRED_MISSING', `${id} runs every ${every} and names no month to count from. Write month: jan.`, 'on.month');
+  if (months > 1 && !(typeof on.month === 'string' && MONTHS.includes(on.month)))
+    return bad('DECLARATION_INVALID', `${id} counts from month ${JSON.stringify(on.month)}, and a month is one of ${MONTHS.join(', ')}.`, 'on.month', MONTHS);
+  return calendarOf(on) === null ? bad('DECLARATION_INVALID', `${id} runs every ${every}, and this record cannot read that clock.`, 'on.every') : null;
 }
 
 /** One step's own shape, not its children. `names` collects every answer name the body declares. */

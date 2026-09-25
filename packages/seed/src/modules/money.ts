@@ -390,11 +390,11 @@ export const SNAPSHOTS: Fields[] = snapshotRows();
  * carried the same amount, merchant and day a few minutes apart, and the near rule skipped the second as already
  * said, although the limits they print differ by exactly the charge (`loop/research-bank-real.md`). The same alert
  * sent again prints the same figure, so a pattern that reads this and names it in its `dedupe:` files two charges
- * and still files one resend once (`test/bank-hsbc-eg.test.ts`). Not indexed: the register is at the ceiling of
+ * and still files one resend once (the bank pack's own test under `packs/`). Not indexed: the register is at the ceiling of
  * eight, and the dedupe that reads it has already narrowed to one account, one amount and three days.
  *
- * A CONSTANT, BECAUSE TWO PLACES DECLARE IT. `register.transactions` carries it from money-core 2.1.0, and `bank-hsbc-eg`
- * lays the same field through `extends` for a record still on 1.8.0 or 2.0.0, which its range admits. Written twice, the
+ * A CONSTANT, BECAUSE TWO PLACES DECLARE IT. `register.transactions` carries it from money-core 2.1.0, and a bank pack under
+ * `packs/` lays the same field through `extends` for a record still on 1.8.0 or 2.0.0, which its range admits. Written twice, the
  * two could disagree about a type, and a record would then hold whichever arrived first.
  */
 export const AVAILABLE = { id: 'available', label: 'Available after', type: 'money' } as const;
@@ -541,8 +541,8 @@ export const MONEY_REGISTERS: Record<string, MoneyRegister> = {
     ],
   },
 
-  /* `holdings` WAS DECLARED HERE FROM 1.5.0 TO 1.8.0. money-core 2.0.0 hands it to a pack of its own,
-     `packs/holdings.ts`, and its reasons went with it: what one person holds is not what everybody's Money is for
+  /* `holdings` WAS DECLARED HERE FROM 1.5.0 TO 1.8.0. money-core 2.0.0 gave it to a pack of its own, now the file
+     `packs/holdings/holdings.pack.json`, and its reasons went with it: what one person holds is not what everybody's Money is for
      (`loop/DIRECTION.md` section 22). */
   /**
    * WHAT ONE CURRENCY IS WORTH IN ANOTHER, AND ON WHICH DAY (`08 §2.5`). Money in more than one currency is added up in the
@@ -1759,8 +1759,8 @@ export const MONEY_INGESTS: Record<string, SeedIngest> = {
     on_conflict: 'skip',
   },
 
-  /* HSBC EGYPT'S SIX WORDINGS WERE HERE UNTIL money-core 1.8.0, and they are in `packs/bank-hsbc-eg.ts` now, unchanged
-     but for `pack:`. They read one bank in one country, so every record set up as Personal, Founder or Small business
+  /* ONE EGYPTIAN BANK'S SIX WORDINGS WERE HERE UNTIL money-core 1.8.0, and they are a pack file under `packs/` now,
+     unchanged but for `pack:`. They read one bank in one country, so every record set up as Personal, Founder or Small business
      carried them (`loop/DIRECTION.md` section 22). The two above stay because nothing in them names a bank: `card
      ending 4471 was debited` is a shape written against fixtures, not against one bank's text. */
 };
@@ -1769,10 +1769,11 @@ export const MONEY_INGESTS: Record<string, SeedIngest> = {
 export type SmsIngest = SeedIngest & { verify: { kind: 'path' } };
 
 /**
- * Each mail pattern in `mail` as its webhook twin, keyed `<id>-sms`. EXPORTED FOR THE BANK PACKS, which build their
- * twins with it (`packs/bank-hsbc-eg.ts`), so a twin is made one way whichever pack declares it.
+ * Each mail pattern in `mail` as its webhook twin, keyed `<id>-sms`. NO LONGER EXPORTED: the bank pack built its twins
+ * with this while it was TypeScript here, and once its builder left `src` on 25 September nothing outside this module
+ * called it. The pack's file still holds twins of exactly this shape, written out.
  */
-export const smsTwins = (mail: Record<string, SeedIngest>): Record<string, SmsIngest> =>
+const smsTwins =(mail: Record<string, SeedIngest>): Record<string, SmsIngest> =>
   Object.fromEntries(
     Object.values(mail).map((m) => {
       const ingest = `${m.ingest}-sms`;

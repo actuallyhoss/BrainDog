@@ -20,8 +20,9 @@ import { readFileSync } from 'node:fs';
 
 import { satisfies } from '@braindog/declare';
 
-import { BANK_HSBC_EG_VERSION, FIRST_PARTY, FIRST_PARTY_VERSIONS, bankHsbcEgPack, firstPartyDocument } from '../src/index.ts';
+import { FIRST_PARTY, FIRST_PARTY_VERSIONS, firstPartyDocument } from '../src/index.ts';
 import { asMoneyCore180, asMoneyCore200, attempt, planOf, put, record, type Doc } from './money-core-earlier.ts';
+import { bankHsbcEgFile } from './pack-files.ts';
 
 /**
  * The Mercury pack as it ships, with the marks that say what a person fills taken off.
@@ -51,7 +52,7 @@ async function onMoney(build: (doc: unknown) => Doc) {
   return { k, sql };
 }
 
-test('money-core IS ON 2.x, DECLARES NO HOLDINGS, AND HANDS THE LIST to the pack of that name', () => {
+test('money-core IS ON 2.x AND DECLARES NO HOLDINGS, and the 2.0.0 that took it out handed the list to the pack of that name', () => {
   const doc = firstPartyDocument('money-core') as unknown as Doc;
   /* ON 2.x AND NOT PINNED TO 2.0.0, since 2.1.0 added `available` to `register.transactions`: a minor step takes
      nothing away, so the holdings half of this test is as true of it as of 2.0.0. */
@@ -62,7 +63,10 @@ test('money-core IS ON 2.x, DECLARES NO HOLDINGS, AND HANDS THE LIST to the pack
     [],
     'money-core still declares register.holdings, with these kinds',
   );
-  assert.equal(doc.hands?.['register.holdings'], 'holdings');
+  /* THE HANDOVER IS 2.0.0's AS IT SHIPPED, NOT TODAY'S DOCUMENT'S. money-core stopped naming other packs under 2.4.0
+     (`money-core-names-no-pack.test.ts`), so the rebuilt 2.0.0 carries the `hands` it had, and today's carries none. */
+  assert.equal(asMoneyCore200(doc).hands?.['register.holdings'], 'holdings');
+  assert.equal(doc.hands, undefined);
 });
 
 /**
@@ -80,7 +84,7 @@ test('THE 1.8.0 THIS FILE BUILDS IS THE 1.8.0 THAT SHIPPED, by the fingerprint `
 
 test('bank-hsbc-eg AND MERCURY PLAN CLEAN AND INSTALL on money-core 1.8.0 and on 2.0.0', async () => {
   for (const [at, build] of [['1.8.0', asMoneyCore180], ['2.0.0', asMoneyCore200]] as const) {
-    for (const [name, doc] of [['bank-hsbc-eg', bankHsbcEgPack()], ['mercury', mercuryFile()]] as const) {
+    for (const [name, doc] of [['bank-hsbc-eg', bankHsbcEgFile()], ['mercury', mercuryFile()]] as const) {
       const { k, sql } = await onMoney(build);
       const { diff } = await planOf(k, doc);
       assert.deepEqual(diff.requires.packs.filter((p) => !p.ok), [], `${name} on money-core ${at}`);
@@ -102,10 +106,9 @@ test('EACH RANGE MOVED WITH A VERSION OF ITS OWN, and neither admits a money-cor
      instead, 1.1.0, because its five twin doors gained `door:` on top of the wider range (one door, several patterns;
      wave forty-two), and 1.2.0 since `bank-card-used` reads and compares the limit its alert prints; the range did not
      move with it. */
-  assert.equal(BANK_HSBC_EG_VERSION, '1.3.0');
-  assert.equal(bankHsbcEgPack().version, '1.3.0');
+  assert.equal(bankHsbcEgFile().version, '1.3.0');
   assert.equal(mercuryFile().version, '1.1.0');
-  for (const [name, doc] of [['bank-hsbc-eg', bankHsbcEgPack()], ['mercury', mercuryFile()]] as const) {
+  for (const [name, doc] of [['bank-hsbc-eg', bankHsbcEgFile()], ['mercury', mercuryFile()]] as const) {
     const range = (doc.requires as { packs: Record<string, string> }).packs['money-core']!;
     assert.deepEqual(['1.7.0', '1.8.0', '2.0.0', '2.9.0', '3.0.0'].filter((v) => satisfies(v, range)), name === 'mercury' ? ['1.7.0', '1.8.0', '2.0.0', '2.9.0'] : ['1.8.0', '2.0.0', '2.9.0'], name);
   }
@@ -124,7 +127,7 @@ test('EACH RANGE MOVED WITH A VERSION OF ITS OWN, and neither admits a money-cor
  */
 test('THE HOLE R5 READ IS CLOSED: a record holding a pack on ^1.8.0 is refused money-core 2.0.0, naming that pack', async () => {
   const { k, sql } = await onMoney(asMoneyCore180);
-  const old = { ...bankHsbcEgPack(), version: '1.0.0', requires: { format: 1, primitives: 1, packs: { 'money-core': '^1.8.0' } } };
+  const old = { ...bankHsbcEgFile(), version: '1.0.0', requires: { format: 1, primitives: 1, packs: { 'money-core': '^1.8.0' } } };
   await put(k, old);
   const { diff, out } = await attempt(k, asMoneyCore200(firstPartyDocument('money-core')));
   assert.deepEqual(diff.dependents, [{ id: 'bank-hsbc-eg', version: '1.0.0', range: '^1.8.0', ok: false, was: true }], 'the plan does not name the dependent it strands');
@@ -136,9 +139,9 @@ test('THE HOLE R5 READ IS CLOSED: a record holding a pack on ^1.8.0 is refused m
 
   /* AND THE SHIPPED PACK, INSTALLED BEFORE THE SAME UPDATE, STILL HAS WHAT IT ASKS FOR AFTER IT. */
   const { k: k2, sql: sql2 } = await onMoney(asMoneyCore180);
-  await put(k2, bankHsbcEgPack());
+  await put(k2, bankHsbcEgFile());
   await put(k2, asMoneyCore200(firstPartyDocument('money-core')));
-  const wants = (bankHsbcEgPack() as unknown as Doc).requires.packs['money-core']!;
+  const wants = (bankHsbcEgFile() as unknown as Doc).requires.packs['money-core']!;
   assert.equal(satisfies(k2.packs().find((p) => p.id === 'money-core')?.version ?? null, wants), true);
   sql.close();
   sql2.close();

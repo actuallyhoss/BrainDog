@@ -24,8 +24,6 @@
 import { packDocument } from '../index.ts';
 import { MONEY_HOME_SETTING, targetConfigOf } from '../modules/money.ts';
 import type { PackManifest } from './agents.ts';
-import { MONEY_CORE_HANDS } from './bank-hsbc-eg.ts';
-import { MONEY_CORE_HOLDINGS_HANDS } from './holdings.ts';
 
 export type FirstPartyId = 'portfolio' | 'people' | 'money-core' | 'estate' | 'work';
 
@@ -88,12 +86,12 @@ const SUMMARIES: Record<FirstPartyId, string> = {
  *   reading under the id `<pattern>-sms`, which an iOS Shortcut posts the SMS to at an address carrying a token only an
  *   owner can make. Until the token is made every message posted there waits in the inbox, and none is written. Eight
  *   declarations added and nothing taken away, so the step is a minor one.
- * - money-core 1.8.0: HSBC Egypt's wordings leave for a pack of their own, `bank-hsbc-eg` (`packs/bank-hsbc-eg.ts`).
+ * - money-core 1.8.0: one Egyptian bank's wordings leave for a pack of their own, now a file under `packs/`.
  *   Six mail patterns and their six `-sms` twins read one bank in one country, and every record set up as Personal,
  *   Founder or Small business carried them (`loop/DIRECTION.md` section 22). The two generic card wordings stay. Twelve
  *   ingests taken away and no list and no field, so by the rule above the step is a minor one, as 1.4.0's two figures
- *   were. A record on 1.7.0 that updates keeps those of the twelve it uses: the update hands them to `bank-hsbc-eg`
- *   (`hands`, from `MONEY_CORE_HANDS`) rather than retiring them, and that pack takes them over when it installs. One it
+ *   were. A record on 1.7.0 that updates keeps those of the twelve it uses: the update hands them to the bank's pack
+ *   (`hands`) rather than retiring them, and that pack takes them over when it installs. One it
  *   never used, no token minted and no row filed, is retired, which `declare`'s plan decides from the record's `used`
  *   (`test/bank-pack.test.ts`); handing all twelve left every updated record holding a pack it never chose. Until the
  *   record fills `used`, the plan cannot tell and still hands all twelve. The bank pack needs `^1.8.0` so that it cannot
@@ -101,20 +99,21 @@ const SUMMARIES: Record<FirstPartyId, string> = {
  *   move, because a handed twin is never retired and `heldDigest` in `packages/record/src/index.ts` keeps
  *   a digest while every version since the mint is live (`packages/declare/test/door-hold.test.ts`). A record already
  *   updated to 1.8.0 before the handover existed lost the twelve, and there the owner installs the pack and mints again.
- * - money-core 2.0.0: `holdings` leaves for a pack of its own, `holdings` (`packs/holdings.ts`), and `gold` leaves with it.
+ *   Both handovers were taken out of the document under 2.4.0, the last entry below.
+ * - money-core 2.0.0: `holdings` leaves for a pack of its own, `packs/holdings`, and `gold` leaves with it.
  *   What one person holds is not what everybody's Money is for, and gold among the list's kinds was the use case
  *   `loop/DIRECTION.md` section 22 named by name. A list taken away, so by the rule above the step is major, the first
- *   this pack has taken. The list is HANDED, not retired (`MONEY_CORE_HOLDINGS_HANDS`), so a record holding rows in it
+ *   this pack has taken. The list is HANDED, not retired (`hands`), so a record holding rows in it
  *   keeps every row, its id and its history, and the holdings pack takes it over when it installs, keeping `gold` as the
  *   record's own kind where rows were written under it (`test/holdings-pack.test.ts`). An empty list on a record that
  *   says what it uses is retired instead, and the pack declares it afresh. The two packs that require money-core had
  *   caret ranges on 1.x, which no 2.0.0 satisfies and which the range grammar cannot widen with `||`
- *   (`loop/research-seed-roles.md` R5), so `bank-hsbc-eg` and every Mercury pack widen to `<3.0.0` in the same change,
+ *   (`loop/research-seed-roles.md` R5), so the bank's pack and every Mercury pack widen to `<3.0.0` in the same change,
  *   each with a version step of its own (`test/money-core-major.test.ts`).
  * - money-core 2.1.0: a transaction says what the bank said was left after it moved, `available`, as a card alert prints
  *   its available limit. Two card alerts in a hundred of his texts had the same amount, merchant and day, and the near
  *   rule skipped the second as already said although their limits differ by exactly the charge
- *   (`loop/research-bank-real.md`); `bank-hsbc-eg` 1.2.0 reads the limit into this field and names it in its `dedupe:`,
+ *   (`loop/research-bank-real.md`); the bank's pack at 1.2.0 reads the limit into this field and names it in its `dedupe:`,
  *   so two charges file and one alert sent twice files once. One field added and nothing taken away, so the step is a
  *   minor one, and a new version rather than a reset because 2.0.0 shipped with the deploy of 23 September at 08:02 UTC.
  *   2.1.0 SHIPPED AS THAT AND NOTHING MORE, with the deploy of `bab716a5` at 23:27 UTC on 23 September. `baf7048a` put
@@ -175,6 +174,15 @@ const SUMMARIES: Record<FirstPartyId, string> = {
  *   doing or blocked, and a step created with a parent and no project takes the parent's project and thread. Four ids
  *   are added and nothing is taken away, so the step is a minor one. A version and not a reset because 1.7.0 is on
  *   `origin/master` (`814ca32c`), and an id gained is a declaration a record on 1.7.0 could never be told about.
+ * - money-core 2.4.0, NO STEP: `hands` is gone, so the core pack names no other pack (`loop/research-legacy-parity.md`
+ *   brief B1, `test/money-core-names-no-pack.test.ts`). It gave the bank's twelve patterns and `holdings` to the two
+ *   packs that are now files under `packs/`, which is the core knowing one person's bank and one person's list by id.
+ *   No declaration and no setting changed, and those are what `test/pack-versions.test.ts` fingerprints, so the
+ *   version stays. WHAT A RECORD LOSES, measured through `declare`'s plan: one still on 1.7.0 updating now retires the
+ *   twelve instead of handing them, so a Shortcut token minted there stops opening its door until the owner installs
+ *   the bank's pack and mints again; one on 1.5.0 to 1.8.0 holding rows in `holdings` is refused `WOULD_ORPHAN` rather
+ *   than losing them. The survey that brief rests on found no record on a money-core before 1.8.0. The handover itself
+ *   is still `declare`'s, and its tests make their own `hands` (`test/pack-files.ts`).
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.4.0',
@@ -366,17 +374,6 @@ export function firstPartyDocument(id: string, options: DocumentOptions = {}): R
     /* THE SETTINGS ITS FIGURES' TARGETS ARE HELD TO (`MONEY_TARGET_SETTINGS`), which a person changes later, and Money's
        home currency. */
     ...(Object.keys(configOf(id, pack.declarations)).length > 0 ? { config: configOf(id, pack.declarations) } : {}),
-    /* THE TWELVE HSBC EGYPT DOORS ARE HANDED, NOT RETIRED, so a token minted for one survives the move (`bank-hsbc-eg.ts`),
-       and so is `holdings`, so its rows do (`holdings.ts`). The twelve are still handed at 2.0.0, because a record on
-       1.7.0 may take this update without ever having taken 1.8.0.
-       THIS IS THE LAST PLACE money-core NAMES ANOTHER PACK, and brief B1 of `loop/research-legacy-parity.md` drops it.
-       It stays for now because it is what eleven tests outside this package's bank files drive: measured on
-       25 September with the line taken out, `test/hands-first-party.test.ts` 2, `test/money-core-major.test.ts` 1,
-       `packages/declare/test/door-hold.test.ts` 2, `packages/declare/test/plan-handover-shown.test.ts` 4 and
-       `packages/record/test/handover-used.test.ts` 2 went red, each asserting the handover this line makes. Taking it
-       out changes no id a record on 2.4.0 holds (`pack-versions.test.ts` fingerprints declarations and settings, and
-       `hands` is neither), so it needs no version step, only those tests moved to a `hands` of their own making. */
-    ...(id === 'money-core' ? { hands: { ...MONEY_CORE_HANDS, ...MONEY_CORE_HOLDINGS_HANDS } } : {}),
   };
 }
 

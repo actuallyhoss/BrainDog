@@ -51,7 +51,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { createClient, type Client } from '../../../packages/client/src/index.ts';
-import { bankHsbcEgPack } from '../../../packages/seed/src/index.ts';
+import { bankHsbcEgFile as bankHsbcEgPack } from '../../../packages/seed/test/pack-files.ts';
 
 const fromWrangler = createRequire(createRequire(import.meta.url).resolve('wrangler/package.json'));
 const esbuild = fromWrangler('esbuild') as { build(o: object): Promise<{ outputFiles: { text: string }[] }> };
@@ -138,7 +138,7 @@ async function record(): Promise<Held> {
     const accepted = await owner.call('decide', { id: filed.value.id, decide: { option: 'accept', reason: 'the Shortcut needs it' } });
     assert.ok(accepted.ok, `${body.install} would not install on the Worker: ${JSON.stringify(accepted)}`);
   }
-  /* THE ACCOUNT THE TEXT NAMES. `last4` is text and the bank prints three digits (`bank-hsbc-eg.ts`). */
+  /* THE ACCOUNT THE TEXT NAMES. `last4` is text and the bank prints three digits (`packs/bank-hsbc-eg`). */
   const account = await owner.create({
     register: 'accounts',
     fields: { name: 'Cairo current account', kind: 'bank', balance: { amount: 0, currency: 'EGP' }, as_of: '2026-08-01', liquid: true, last4: '846' },

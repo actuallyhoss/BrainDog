@@ -24,7 +24,8 @@ import assert from 'node:assert/strict';
 import { normalise, type Diff } from '../src/index.ts';
 import { createRecordApi, type CallContext } from '../../record/src/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
-import { FIRST_PARTY, FIRST_PARTY_VERSIONS, firstPartyDocument, holdingsPack as shippedHoldings } from '../../seed/src/index.ts';
+import { FIRST_PARTY, FIRST_PARTY_VERSIONS, firstPartyDocument } from '../../seed/src/index.ts';
+import { holdings100 as shippedHoldings } from '../../seed/test/pack-files.ts';
 import { asMoneyCore180 } from '../../seed/test/money-core-earlier.ts';
 
 const owner: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'owner' } };
@@ -46,8 +47,8 @@ type Api = Awaited<ReturnType<typeof createRecordApi>>;
  *
  * FROM THE SHIPPED DOCUMENT AND NOT A RE-VERSIONED COPY OF IT. Until 23 September this took money-core 1.8.0, dropped the
  * list and called the result 2.0.0; since then the shipped 2.0.0 is that document, handing `register.holdings` to
- * `holdings` beside the twelve HSBC Egypt doors. Only the one entry this file varies is touched, so the doors' handover
- * rides along as it does in every real update.
+ * `holdings`. Since money-core stopped naming other packs (parity B1 step 2) it hands nothing else, so the one entry
+ * this file varies is the whole of `hands`.
  */
 const moneyCore = (to: string | null): Doc => {
   const d = structuredClone(firstPartyDocument('money-core')) as unknown as Doc;
@@ -59,7 +60,7 @@ const moneyCore = (to: string | null): Doc => {
 };
 
 /**
- * The shipped `holdings` pack (`packages/seed/src/packs/holdings.ts`), under another id or with other `requires` when a
+ * The `holdings` pack as it shipped at 1.0.0 (`packs/holdings/holdings-1.0.0.json`), under another id or with other `requires` when a
  * guard below needs one. Its kinds carry no `gold`, which is the case `loop/research-shell-seed-next.md` §3A walks (§22
  * takes gold out of the shipped values), and `commodity` in its place.
  *

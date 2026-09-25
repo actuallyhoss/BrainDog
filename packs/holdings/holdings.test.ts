@@ -5,8 +5,10 @@
  * THE DOCUMENT WAS A FUNCTION IN `packages/seed`. `holdingsPack` in `packages/seed/src/packs/holdings.ts` built it in
  * code, so the shell carried one person's kind of list as TypeScript, and the only thing that ever offered it was the
  * the old tool import. It is now `holdings.pack.json`, installed through the record's own `planPack` and `installPack`.
- * The builder stays until the import resolves the pack by id (brief B2), and while it does the first test holds the
- * list in this file to the list it builds, so the two cannot say different things about a row.
+ * The builder went on 25 September, once the import resolved the pack by id from the catalogue (brief B2). What it built
+ * is kept beside this file as `holdings-1.0.0.json`, written from it that day, because 1.0.0 is what a record that took
+ * money-core 2.0.0 was offered and is what the update below starts from. The first test holds the list in this file to
+ * that one, so the two cannot say different things about a row.
  *
  * WHY 1.1.0 AND WHY A SCRIPT. The survey's row 47 read "no value figure, no page". A figure is one aggregation over one
  * field (`AGGREGATIONS` in `packages/kernel/src/metrics.ts`), and `product` multiplies a field by a NAMED FACTOR TABLE,
@@ -20,12 +22,13 @@
  * writes neither, so every row a record already held stayed uncosted until somebody edited it. Measured on September
  * 25th: 1.0.0, three rows, then this file, then the rule and the outbox drained. `cost` stayed undefined on all three,
  * and the figure read value 0 over rows 3 under the note "what was paid for 3 holding(s)", a wrong amount stated as a fact.
- * Every real record gets here that way, because the the old tool import still installs the builder's 1.0.0. The pack
- * grammar has no trigger for "installed", so the script also runs on `every: 1d`, whose first run the kernel spreads
- * inside fifteen minutes of the install, and with no row to work on it costs every row whose `cost` is empty. A script
- * reads one page of fifty (`bands.js` says the same), so a record with more uncosted rows than that is costed fifty a
- * day. Daily rather than hourly because every sweep filters on an unindexed field, and the Mercury ledger measured what
- * an hourly scan does to the index analyser: about 720 observations a month against its threshold of 200.
+ * Every record the the old tool import set up before it resolved packs from the catalogue gets here that way, because
+ * that import installed 1.0.0. The pack grammar has no trigger for "installed", so the script also runs on
+ * `every: 1d`, whose first run the kernel spreads inside fifteen minutes of the install, and with no row to work on it
+ * costs every row whose `cost` is empty. A script reads one page of fifty (`bands.js` says the same), so a record
+ * with more uncosted rows than that is costed fifty a day. Daily rather than hourly because every sweep filters on an
+ * unindexed field, and the Mercury ledger measured what an hourly scan does to the index analyser: about 720
+ * observations a month against its threshold of 200.
  *
  * AND THE FIGURE ADDS UP ONLY ROWS THAT HAVE A COST (`cost is set`), so an uncosted row is left out rather than added as
  * nothing, and the note says how many of how many holdings the sum covers, through a third figure, `holdings-costed`.
@@ -57,7 +60,7 @@ import { scriptReads, scriptRunner } from '../../packages/host/src/script.ts';
 import { createRecordApi, type CallContext } from '../../packages/record/src/index.ts';
 import { fixedClock, openSqlite } from '../../packages/kernel/test/sqlite.ts';
 import { runInQuickJs } from '../../packages/script/src/quickjs.ts';
-import { FIRST_PARTY, firstPartyDocument, holdingsPack } from '../../packages/seed/src/index.ts';
+import { FIRST_PARTY, firstPartyDocument } from '../../packages/seed/src/index.ts';
 
 const NOW = Date.UTC(2026, 8, 25, 9);
 const owner: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'owner' } };
@@ -79,6 +82,10 @@ type Money = { amount: number; currency: string };
 const PACK_FILE = new URL('./holdings.pack.json', import.meta.url);
 const file = (): Body & { version: string; declarations: Body[] } => JSON.parse(readFileSync(PACK_FILE, 'utf8')) as never;
 const SOURCE = readFileSync(new URL('./cost.js', import.meta.url), 'utf8');
+
+/** 1.0.0 as the builder in `packages/seed` shipped it, the one list and nothing else. Not a pack file the catalogue reads. */
+const v100 = (): Body & { version: string; requires: unknown; declarations: Body[] } =>
+  JSON.parse(readFileSync(new URL('./holdings-1.0.0.json', import.meta.url), 'utf8')) as never;
 
 /** A fresh record holding every first-party pack, which is where a person stands when they add this one. */
 async function money(): Promise<{ api: Api; clock: ReturnType<typeof fixedClock>; close: () => void }> {
@@ -123,12 +130,12 @@ const HELD: readonly Body[] = [
   { label: 'Life cover', kind: 'policy', qty: 12, unit_cost: { amount: 4_500, currency: 'USD' }, acquired_on: '2025-11-01', matures_on: '2055-11-01' },
 ];
 
-test('THE FILE DECLARES THE LIST THE BUILDER DOES, with `cost` added, and a version above the one the builder ships', () => {
+test('THE FILE DECLARES THE LIST 1.0.0 DID, with `cost` added, and a version above it', () => {
   const doc = file();
-  const built = holdingsPack() as Body & { version: string; declarations: Body[] };
+  const built = v100();
   assert.equal(doc.pack, 'holdings');
   assert.equal(doc.version, '1.1.0');
-  assert.equal(built.version, '1.0.0', 'the builder moved, so this file has to say what it now is beside it');
+  assert.equal(built.version, '1.0.0', 'the frozen 1.0.0 moved, so this file has to say what it now is beside it');
   assert.deepEqual(doc.requires, built.requires);
   const list = doc.declarations.find((d) => d.register === 'holdings')!;
   const fields = list.fields as Body[];
@@ -239,10 +246,10 @@ async function tile(api: Api): Promise<{ rows: number; held: number | undefined;
   return { rows: r.rows, held: r.held, parts: parts.map((p) => [p.currency, p.amount] as [string, number]).sort(), values: block.values ?? {} };
 }
 
-/** A record where the builder's 1.0.0 went in first and the rows were written under it, then the file on top. */
+/** A record where 1.0.0 went in first and the rows were written under it, then the file on top. */
 async function upgraded(rows: readonly Body[] = HELD): Promise<{ api: Api; clock: ReturnType<typeof fixedClock>; ids: string[]; close: () => void }> {
   const { api, clock, close } = await money();
-  said(await put(api, holdingsPack()));
+  said(await put(api, v100()));
   const ids = rows.map((row) => hold(api, row));
   said(await put(api, file()));
   assert.equal(api.kernel.packs().find((p) => p.id === 'holdings')?.version, '1.1.0');

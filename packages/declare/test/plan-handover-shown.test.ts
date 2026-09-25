@@ -11,6 +11,9 @@
  * own, a token minted for one of them, then money-core's current document proposed as an update by an agent. The record
  * names what it uses (`handover-used.test.ts`), so the door with the token is handed, and with it `bank-from-out-sms`,
  * the door that pattern names (`door-follows-patterns.test.ts`). Ten retire.
+ *
+ * THE UPDATE IS money-core WITH THE `hands` IT SHIPPED FROM 1.8.0 UNTIL 2.4.0 STOPPED NAMING OTHER PACKS, and the pack it
+ * hands to is its file in `packs/` (`seed/test/pack-files.ts`), so this still drives the handover a record on 1.7.0 met.
  */
 
 /** The door his Shortcut posts to, and the door it names through `door:`, which goes where it goes. */
@@ -22,8 +25,8 @@ import assert from 'node:assert/strict';
 import { createRecordApi, type CallContext } from '../../record/src/index.ts';
 import type { CatalogueEntry } from '../../record/src/arrange.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
-import { FIRST_PARTY, NOW, bankHsbcEgPack, firstPartyDocument } from '../../seed/src/index.ts';
-import { HSBC_EG_INGESTS, HSBC_EG_SMS_INGESTS } from '../../seed/src/packs/bank-hsbc-eg.ts';
+import { FIRST_PARTY, NOW, firstPartyDocument } from '../../seed/src/index.ts';
+import { HSBC_EG_INGESTS, HSBC_EG_SMS_INGESTS, bankHsbcEgFile, handingAsShipped } from '../../seed/test/pack-files.ts';
 
 const owner: CallContext = { principal: { kind: 'person', id: 'p_owner', level: 'owner' } };
 const agent: CallContext = { principal: { kind: 'token', id: 't_1', scope: 'propose', person: 'p_owner', level: 'owner' } };
@@ -49,10 +52,13 @@ const v170 = (): Doc => {
   return d;
 };
 
-/** The host's catalogue, offering money-core at the version the seed builds now, and the pack it hands to. */
+/** money-core at the version the seed builds now, with the `hands` it shipped with until 2.4.0. */
+const handingMoney = (): Body => handingAsShipped(firstPartyDocument('money-core')) as unknown as Body;
+
+/** The host's catalogue, offering that money-core, and the pack it hands to. */
 const CATALOGUE: CatalogueEntry[] = [
-  { id: 'money-core', kind: 'pack', title: 'Money', summary: 'Money.', modules: [], doc: () => firstPartyDocument('money-core') as unknown as Body },
-  { id: 'bank-hsbc-eg', kind: 'pack', title: 'HSBC Egypt', summary: 'HSBC Egypt.', modules: ['money-core'], doc: () => bankHsbcEgPack() },
+  { id: 'money-core', kind: 'pack', title: 'Money', summary: 'Money.', modules: [], doc: handingMoney },
+  { id: 'bank-hsbc-eg', kind: 'pack', title: 'HSBC Egypt', summary: 'HSBC Egypt.', modules: ['money-core'], doc: () => bankHsbcEgFile() },
 ];
 
 /** A record at money-core 1.7.0 with one HSBC door holding a token, as the audit's `hands.mts phantom` drew it. */
@@ -146,7 +152,7 @@ test('A USE CASE PLANNED OVER THE UPDATE NAMES THE HANDED DOOR APART, with the p
   const { sql, api } = await recordAt170();
   const file = { usecase: 'money-look', version: '1.0.0', title: 'Money look', summary: 's', author: 'a', license: 'MIT', audience: 'other', tone: 't', modules: ['money-core'] };
   const planned = value<{ packs: { id: string; retires: string[]; hands?: { id: string; to: string }[] }[] }>(
-    await api.planUseCase({ doc: file, modules: { 'money-core': firstPartyDocument('money-core') } }, owner),
+    await api.planUseCase({ doc: file, modules: { 'money-core': handingMoney() } }, owner),
   );
   const money = planned.packs.find((p) => p.id === 'money-core');
   assert.ok(money, JSON.stringify(planned.packs.map((p) => p.id)));

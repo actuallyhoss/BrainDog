@@ -23,7 +23,8 @@ import { install, normalise, plan, satisfies, type Diff, type Host, type Install
 import type { Kernel } from '@braindog/kernel';
 import type { NodeSql } from '../../kernel/test/sqlite.ts';
 import { FIRST_PARTY, firstPartyDocument } from '../../seed/src/index.ts';
-import { BANK_HSBC_EG_VERSION, bankHsbcEgPack } from '../../seed/src/packs/bank-hsbc-eg.ts';
+import { bankHsbcEgFile as bankHsbcEgPack } from '../../seed/test/pack-files.ts';
+const BANK_HSBC_EG_VERSION = bankHsbcEgPack().version;
 import { asMoneyCore180, asMoneyCore200, record } from '../../seed/test/money-core-earlier.ts';
 
 type Out = { ok: boolean; refusal?: { code: string; fix: string; at?: string } };

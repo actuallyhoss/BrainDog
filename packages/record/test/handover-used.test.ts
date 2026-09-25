@@ -7,6 +7,10 @@
  * twelve HSBC Egypt doors to `bank-hsbc-eg`, a pack the owner never chose. `installedState` now names every ingest that
  * has filed an arrival (`ingest_receipt`) and every webhook door that holds a token (`heldDigest`), and, since audit
  * thirty-six's finding 2, every door that has claimed an arrival at all, which is a door whose lines wait in review.
+ *
+ * THE UPDATE PLANNED IS money-core WITH THE `hands` IT SHIPPED FROM 1.8.0 UNTIL 2.4.0 STOPPED NAMING OTHER PACKS
+ * (`seed/test/pack-files.ts`), because what this holds is the record's half of a handover, and today's document hands
+ * nothing to be halved.
  */
 
 import { test } from 'node:test';
@@ -15,7 +19,7 @@ import assert from 'node:assert/strict';
 import { createRecordApi, type CallContext } from '../src/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 import { FIRST_PARTY, NOW, firstPartyDocument } from '../../seed/src/index.ts';
-import { HSBC_EG_INGESTS, HSBC_EG_SMS_INGESTS } from '../../seed/src/packs/bank-hsbc-eg.ts';
+import { HSBC_EG_INGESTS, HSBC_EG_SMS_INGESTS, handingAsShipped } from '../../seed/test/pack-files.ts';
 
 const owner: CallContext = { principal: { kind: 'person', id: 'p_owner', level: 'owner' } };
 
@@ -60,7 +64,7 @@ test('THE RECORD NAMES WHAT IT USES, SO THE UPDATE HANDS A DOOR THAT FILED A ROW
   /* AND A DOOR HIS SHORTCUT POSTS TO: a webhook twin with a token minted for it. */
   value(await api.ingestMint({ ingest: 'bank-ipn-in-sms' }, owner));
 
-  const { diff } = value<Planned>(await api.planPack({ doc: firstPartyDocument('money-core') }, owner));
+  const { diff } = value<Planned>(await api.planPack({ doc: handingAsShipped(firstPartyDocument('money-core')) }, owner));
   const hsbc = diff.retires.filter((r) => HSBC.includes(r.id));
   /* `bank-from-out-sms` IS HANDED FOR `bank-ipn-in-sms`, which names it through `door:` and goes to the same pack
      (`declare/test/door-follows-patterns.test.ts`). It filed nothing and holds no token. */
@@ -94,7 +98,7 @@ test('A DOOR WHOSE ARRIVALS WAIT IN REVIEW IS A DOOR IN USE, so bank-from-unsure
   assert.deepEqual([out.ingest, out.state], ['bank-from-unsure', 'review'], out.reason);
   assert.equal(sql.all('SELECT ingest_id FROM ingest_receipt').length, 0, 'the line filed a row, so this is the case above');
 
-  const { diff } = value<Planned>(await api.planPack({ doc: firstPartyDocument('money-core') }, owner));
+  const { diff } = value<Planned>(await api.planPack({ doc: handingAsShipped(firstPartyDocument('money-core')) }, owner));
   const handed = diff.retires.filter((r) => HSBC.includes(r.id) && r.to !== undefined).map((r) => [r.id, r.to]);
   assert.deepEqual(handed, [['ingest.bank-from-unsure', 'bank-hsbc-eg']]);
   sql.close();

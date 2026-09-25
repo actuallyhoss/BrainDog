@@ -56,7 +56,7 @@ export type ModuleId = (typeof MODULES)[number];
  * collided at install on any record with Agents. Moving a list between modules is an edit here and nowhere else.
  *
  * `holdings` IS NOT MONEY'S SINCE money-core 2.0.0, and it is in no module here, because the pack that declares it now
- * (`packages/seed/src/packs/holdings.ts`) is not a module a use case names. So an add-on or a shared use case declaring a
+ * (`packs/holdings/holdings.pack.json`) is not a module a use case names. So an add-on or a shared use case declaring a
  * list called `holdings` is read as its own list, as `gold_lots` always was, and meets the holdings pack, if the record
  * has it, as the `PROVIDES_CONFLICT` two packs owning one declaration always get at install.
  */
