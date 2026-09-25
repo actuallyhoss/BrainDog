@@ -206,8 +206,30 @@ const KEY_SHAPES: readonly RegExp[] = [
   /\beyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/u,
   /hooks\.slack\.com\/services\/[A-Za-z0-9/]{20,}/u,
   /discord(?:app)?\.com\/api\/webhooks\/\d+\/[A-Za-z0-9_-]{20,}/u,
-  /\b[a-z][a-z0-9+.-]*:\/\/[^\s/:@]+:[^\s/@]+@/iu,
+  /\b[a-z][a-z0-9+.-]{0,31}:\/\/[^\s/:@]+:[^\s/@]+@/iu,
+  /* A TELEGRAM BOT'S TOKEN IS ITS URL'S PATH, `api.telegram.org/bot<id>:<35>/sendMessage`, so the path exemption below
+     let the whole token through (audit of 25 September, S2). The `bot` prefix is what makes it a shape. */
+  /\bbot\d{5,}:[A-Za-z0-9_-]{30,}/u,
+  /* HEX, WHICH THE RANDOM-RUN TEST NEVER READS because a key made of it has no capitals. A digest is hex too and is
+     let through, so what makes one of these a key is its issuer's prefix (DigitalOcean, Mailgun) or a name in front
+     of it that says so: `api_key=`, `AUTH_TOKEN=`, `"secret": "`. Measured stored before this: twenty hex after
+     `?api_key=`, a DigitalOcean `dop_v1_` token and a Mailgun `key-` token. */
+  /\bdo[opr]_v1_[0-9a-f]{64}/u,
+  /\bkey-[0-9a-f]{32}\b/u,
+  /(?:key|token|secret|passw(?:or)?d|auth)["']?\s*[:=]\s*["']?[0-9a-f]{20,}(?![0-9a-z])/iu,
 ];
+
+/**
+ * What a text looks like once the characters nobody can see are gone.
+ *
+ * ONE ZERO-WIDTH SPACE IN THE MIDDLE OF A KEY BROKE EVERY SHAPE ABOVE IN TWO, and the key was stored with it
+ * (`ghp_...<U+200B>...`, audit of 25 September, S2). A key copied out of a chat or a document picks these up without
+ * anyone seeing them, and a key with one in it still works once it is cleaned. Unicode's default-ignorable set is
+ * exactly the characters a renderer draws as nothing: zero-width spaces and joiners, the soft hyphen, the word joiner,
+ * the byte-order mark, direction marks and variation selectors. Removing them only joins what sits either side, so
+ * Arabic with a direction mark in it and an emoji family joined by ZWJ still read as what they are.
+ */
+const INVISIBLE = /\p{Default_Ignorable_Code_Point}/gu;
 
 /**
  * A run a key could be written as: the base64 and base64url alphabets, thirty-two or longer.
@@ -217,8 +239,87 @@ const KEY_SHAPES: readonly RegExp[] = [
  */
 const KEY_RUN = /[A-Za-z0-9+/=_-]{32,4096}/gu;
 
-/** A URL's path, where a document's own id lives. A link to a document is not a key to it. */
-const URL_PATH = /\b([a-z][a-z0-9+.-]*:\/\/[^\s/?#]+)\/[^\s?#]*/giu;
+/**
+ * A URL's origin, its path and its query, where a document's own id lives. A link to a document is not a key to it.
+ *
+ * THE SCHEME IS BOUNDED AT 32. Unbounded, every word boundary in `a.a.a.a...` started a scan to the end of the text for a
+ * `://` that never came: 16 KB of it took half a second here and in the password-in-a-URL shape above, and a 512 KB
+ * document took 288 seconds (measured 25 September). A link's scheme is `https`, `mailto` or a word like them; one past
+ * 32 is not read as a link, and its path is judged as plain text, which is the stricter reading.
+ */
+const URL_PARTS = /\b([a-z][a-z0-9+.-]{0,31}:\/\/([^\s/?#]*))([^\s?#]*)(\?[^\s#]*)?/giu;
+
+/**
+ * The words that make a URL an endpoint rather than a link, as its host's first label or one of its path's segments.
+ *
+ * AN ENDPOINT'S PATH IS WHERE AN INTEGRATION PUTS ITS SECRET, and the exemption for links let it through: Zapier's
+ * MCP address is `mcp.zapier.com/api/mcp/s/<secret>/mcp`, and the audit's `https://mcp.example.com/api/mcp/s/<48>/sse`
+ * was stored in every text field it tried. A Google Doc, a Drive file, a SharePoint share and a Figma file carry none
+ * of these words, so their ids stay links.
+ */
+const ENDPOINT = /^(?:api|mcp|hooks?|webhooks?|keys?|tokens?|secrets?)$/iu;
+
+/**
+ * THE LONGEST DOCUMENT ID MEASURED IS 58, a Teams meeting's; SharePoint's share is 46, Google's 44, Drive's 33 and
+ * Figma's 22. A random run of 64 or more in a link is past every one of them, so it is judged as a key on any host.
+ *
+ * THE RUN, NOT THE SEGMENT, is what is measured. A Teams link's segment is `19%3ameeting_<48>%40thread.v2`, 73 long,
+ * and measured whole it was judged, its 58-long run read as random and an ordinary meeting link was refused
+ * (checker, 25 September). What could be a key is a run, so a run is what has to reach 64.
+ */
+const LONGEST_ID = 64;
+
+/**
+ * The words that make a query parameter's value a secret whatever its length: `?token=`, `?api_key=`, `?sig=`,
+ * `?client_secret=`, `?code=`, `?password=`. A parameter with any other name holds an id, like a path does, and is
+ * judged only past 64: YouTube's `list=` is 34 long and random by every measure here.
+ *
+ * `pwd` IS LEFT OFF ON PURPOSE. It is the passcode of a Zoom meeting link, which the invitation carries so that anyone
+ * invited can join with one press; refusing it refuses every Zoom link pasted from a calendar.
+ */
+const SECRET_NAME = /key|token|secret|sig|pass|auth|cred|session|code|jwt/iu;
+
+/** The runs in a piece of a link that are long enough to be judged anyway. */
+const longRuns = (piece: string): string[] => [...piece.matchAll(KEY_RUN)].map(([run]) => run).filter((run) => run.length >= LONGEST_ID);
+
+/** A value from a query, decoded, or as it stands when it is not valid percent-encoding. */
+const decoded = (value: string): string => {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+};
+
+/**
+ * A text with each link cut to what could still be a key: all of an endpoint's path and query, a link's named secrets,
+ * and a link's runs of 64 or more. The origin stays, and so does a fragment, where an OAuth token travels.
+ *
+ * A LINK INSIDE A QUERY IS JUDGED AS A LINK, a level down (`depth`): a redirect or a safe-links wrapper around an MCP
+ * endpoint carries the endpoint's secret percent-encoded, and under a neutral name like `url=` it would otherwise be
+ * judged only past 64. Two levels is every wrapper seen, and the bound keeps a value nested a thousand deep from
+ * becoming a thousand calls.
+ */
+function unlinked(text: string, depth = 0): string {
+  return text.replace(URL_PARTS, (_whole, origin: string, authority: string, path: string, query: string | undefined) => {
+    /* Segment by segment, because `/` is in the base64 alphabet and a whole path would be read as one run. */
+    const segments = path.split('/');
+    const host = authority.slice(authority.lastIndexOf('@') + 1).split(/[.:]/u)[0] ?? '';
+    const endpoint = ENDPOINT.test(host) || segments.some((s) => ENDPOINT.test(s));
+    const kept = endpoint ? [...segments] : segments.flatMap(longRuns);
+    for (const param of (query ?? '').slice(1).split('&')) {
+      const eq = param.indexOf('=');
+      const value = param.slice(eq + 1);
+      const inner = decoded(value);
+      /* A value with no name has nothing to say it is an id, and is judged whole. Decoded, because an Azure `sig=`
+         spells its base64 `+`, `/` and `=` as `%2B`, `%2F` and `%3D`, which cut it into runs too short to read. */
+      if (endpoint || eq < 0 || SECRET_NAME.test(param.slice(0, eq))) kept.push(value, inner);
+      else if (depth < 2 && inner.includes('://')) kept.push(unlinked(inner, depth + 1));
+      else kept.push(...longRuns(value));
+    }
+    return `${origin} ${kept.join(' ')}`;
+  });
+}
 
 const classOf = (c: string): number => (c >= 'a' && c <= 'z' ? 0 : c >= 'A' && c <= 'Z' ? 1 : c >= '0' && c <= '9' ? 2 : 3);
 
@@ -251,15 +352,55 @@ function random(run: string): boolean {
  * Whether a text holds what looks like a key: a known issuer's shape, or a long random token.
  *
  * LET THROUGH ON PURPOSE: a hex digest or a git hash of any length, a ULID, a UUID and the record's
- * own ids, none of which mixes cases; a token inside a URL's path, which is a link; and anything
- * under 32 characters. A long base64 value that is not secret, such as a public key or a wallet
- * address, is refused with the keys, because it cannot be told apart from one.
+ * own ids, none of which mixes cases; a run under 64 characters in a link's path, or in a query value
+ * whose name does not say secret, which is a document's id; and anything under 32 characters. A long base64 value that is not secret, such as a
+ * public key or a wallet address, is refused with the keys, because it cannot be told apart from one.
  */
 export function looksLikeCredential(text: string): boolean {
-  if (KEY_SHAPES.some((shape) => shape.test(text))) return true;
-  for (const [run] of text.replace(URL_PATH, '$1 ').matchAll(KEY_RUN)) if (random(run)) return true;
+  const seen = text.replace(INVISIBLE, '');
+  if (KEY_SHAPES.some((shape) => shape.test(seen))) return true;
+  for (const [run] of unlinked(seen).matchAll(KEY_RUN)) if (random(run)) return true;
   return false;
 }
+
+/**
+ * Whether any string in a JSON value, a key of one of its objects included, looks like a key.
+ *
+ * A WALK WITH ITS OWN STACK, NOT A RECURSION. Recursing a call per level, a document about 3,500 levels deep threw
+ * `RangeError` out of `coerce`, which the write path answers as a failure of its own rather than a refusal the caller
+ * can read (checker, 25 September). An array's indexes are not read as names: they are numbers.
+ */
+function holdsKey(value: unknown): boolean {
+  const stack: unknown[] = [value];
+  const seen = new Set<object>();
+  while (stack.length > 0) {
+    const one = stack.pop();
+    if (typeof one === 'string') {
+      if (looksLikeCredential(one)) return true;
+      continue;
+    }
+    if (typeof one !== 'object' || one === null || seen.has(one)) continue;
+    seen.add(one);
+    /* One at a time: spreading a list of a million into one call is a RangeError of its own. */
+    if (Array.isArray(one)) for (const inner of one) stack.push(inner);
+    else
+      for (const [name, inner] of Object.entries(one)) {
+        if (looksLikeCredential(name)) return true;
+        stack.push(inner);
+      }
+  }
+  return false;
+}
+
+/**
+ * The one refusal for a key, in every type that can hold text. No `found`, because the value may be the key.
+ *
+ * `url`, `email` AND `json` HAD NO CHECK AT ALL, and `https://admin:<password>@git.example.com/skills.git` and
+ * `ghp_<36>@example.com` were both stored through the kernel (audit of 25 September, S3). The import checks first, so
+ * it could not reach them, and an agent over MCP or a caller of the API could.
+ */
+const keyRefused = (at: string): Coerced =>
+  bad('VALUE_MALFORMED', `${at} holds what looks like a key, and a key never goes in a row. Deposit it in the vault, and write here what it opens.`, at);
 
 /**
  * What `min:` and `max:` measure (`02 §5`): the UTF-8 bytes of a text or a document, the value of a
@@ -343,12 +484,7 @@ export function coerce(field: FieldDecl, value: unknown, look: Lookups = {}, at 
          `SECRET_IN_PACK` says it about a pack, and its repair is an edit to a pack file that a caller
          writing a learning has not got. `FORBIDDEN` is about who asks, and a person is refused this
          as surely as an agent. No `found`, because the value may be the key. */
-      if (looksLikeCredential(value))
-        return bad(
-          'VALUE_MALFORMED',
-          `${at} holds what looks like a key, and a key never goes in a row. Deposit it in the vault, and write here what it opens.`,
-          at,
-        );
+      if (looksLikeCredential(value)) return keyRefused(at);
       /* In this order: a JSON-quoted string also contains no newline, and reporting the second would
          send the caller looking for a line break that was never the problem. */
       if (isJsonQuoted(value))
@@ -550,6 +686,7 @@ export function coerce(field: FieldDecl, value: unknown, look: Lookups = {}, at 
       if (typeof value !== 'string') return malformed(`${at} takes a URL.`);
       const over = overCap('url', value, at);
       if (over) return over;
+      if (looksLikeCredential(value)) return keyRefused(at);
       let url: URL;
       try {
         url = new URL(value.trim());
@@ -567,6 +704,7 @@ export function coerce(field: FieldDecl, value: unknown, look: Lookups = {}, at 
       if (typeof value !== 'string') return malformed(`${at} takes an email address.`);
       const over = overCap('email', value, at);
       if (over) return over;
+      if (looksLikeCredential(value)) return keyRefused(at);
       const s = value.trim();
       const parts = s.split('@');
       if (parts.length !== 2 || !parts[0] || !parts[1] || /\s/.test(s))
@@ -599,7 +737,7 @@ export function coerce(field: FieldDecl, value: unknown, look: Lookups = {}, at 
     }
 
     case 'json':
-      return good(value as Json);
+      return holdsKey(value) ? keyRefused(at) : good(value as Json);
 
     default:
       return malformed(`${at} has a type this build does not read.`);

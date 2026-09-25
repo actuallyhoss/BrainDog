@@ -21,7 +21,7 @@ import type { Refusal, Result, Sql } from '@braindog/ports';
 import { clash, no, ok } from '@braindog/ports';
 import { compile, INBOX_RAW, INBOX_RAW_REFUSES, jsonPath, type Predicate } from '@braindog/where';
 
-import { FIELD_TYPES, coerce, isAbsent, isCurrencyCode, measure, range, type FieldDecl, type Json } from './coerce.ts';
+import { FIELD_TYPES, coerce, isAbsent, isCurrencyCode, looksLikeCredential, measure, range, type FieldDecl, type Json } from './coerce.ts';
 import { instant } from './migrate.ts';
 import { SESSION_BODY } from './migrations/0002_session.ts';
 import { checkInterval, type PullDecl } from './pull.ts';
@@ -3872,6 +3872,17 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners, 
        the same in both places, rather than two that disagree until somebody finds the other door. */
     if (enumeral && (f.values as readonly unknown[]).some((v) => typeof v !== 'string'))
       return bad('DECLARATION_INVALID', `${id}.${f.id} lists a value that is not text, and an enum is compared as text.`, f.id);
+    /* AND NO VALUE IS SHAPED LIKE A KEY. A list grows at run time: an `add` of values lands by rule when the owner's key
+       files it (DIRECTION §22), and the import proposed a person's role and a service's kind straight from the old tool.
+       The audit measured `register.people v2` holding a GitHub token as a role, resolved by rule, and a declaration is
+       versioned history, so the value would stay after any fix (`loop/research-audit-2026-09-25-import.md` S1). Every
+       version is checked here, so no door can add one. No `found`, because the value may be the key. */
+    if (enumeral && (f.values as readonly string[]).some((v) => looksLikeCredential(v)))
+      return bad(
+        'DECLARATION_INVALID',
+        `${id}.${f.id} lists a value that looks like a key, and a key never goes in a declaration. Deposit it in the vault, and list what it opens instead.`,
+        f.id,
+      );
 
     /* `state` IS RESERVED WHETHER OR NOT THE BODY POINTS AT IT (`34 §4`, `02 §1`). This branch used
        to live below, behind `body.state` naming the field, so `{ id: state, type: text }` with no

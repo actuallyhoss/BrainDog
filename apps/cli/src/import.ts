@@ -38,7 +38,7 @@ import { parseArgs } from 'node:util';
 
 import { satisfies } from '@braindog/declare';
 import type { KnownKeys } from '@braindog/declare/catalogue';
-import { coerce, type FieldDecl } from '@braindog/kernel';
+import { coerce, looksLikeCredential, type FieldDecl } from '@braindog/kernel';
 import { no, ok, refused, type Result } from '@braindog/ports';
 
 import { budgetOf, hostsPath, target, type Target } from './http.ts';
@@ -741,16 +741,46 @@ export async function applyPlan(
    * list, and proposing every word to it every night, with no way to tell whether one had landed, would be a question
    * a night on Decide.
    */
+  /* A WORD SHAPED LIKE A KEY IS NEVER PROPOSED, whichever adapter planned it. The audit measured one landing in
+     `register.people` as a role, resolved by rule, where a declaration's history keeps it for good
+     (`loop/research-audit-2026-09-25-import.md` S1). The the old tool adapter leaves such a word out itself, and this is
+     the same check for every other adapter; the kernel refuses the declaration too. The row still arrives with the word
+     the list already holds, and the line names the row and the field, never the word, because it is printed and saved. */
+  const keyish: string[] = [];
   const wanted = new Map<string, Map<string, string[]>>();
   for (const row of plan.rows)
     for (const [field, word] of Object.entries(row.own ?? {})) {
       const has = closed.get(row.register)?.get(field);
       if (has === undefined || typeof word !== 'string' || has.has(word)) continue;
+      if (looksLikeCredential(word)) {
+        keyish.push(`${row.label}: ${field}`);
+        continue;
+      }
       const fields = wanted.get(row.register) ?? new Map<string, string[]>();
       const words = fields.get(field) ?? [];
       if (!words.includes(word)) words.push(word);
       wanted.set(row.register, fields.set(field, words));
     }
+  if (keyish.length > 0) {
+    const plain = (r: PlannedRow): PlannedRow => {
+      const kept = Object.entries(r.own ?? {}).filter(([, word]) => !(typeof word === 'string' && looksLikeCredential(word)));
+      const { own: _dropped, ...rest } = r;
+      return kept.length > 0 ? { ...rest, own: Object.fromEntries(kept) } : rest;
+    };
+    plan = {
+      ...plan,
+      rows: plan.rows.map((r) => (r.own === undefined ? r : plain(r))),
+      skipped: [
+        ...plan.skipped,
+        {
+          reason:
+            'A word shaped like a key was not proposed as a new option on its list, so the row arrived with the word the list already holds. Put the right word on the row by hand',
+          items: keyish,
+        },
+      ],
+    };
+    report.plan = plan;
+  }
   if (wanted.size > 0) {
     const values: NonNullable<Report['values']> = { added: [], filed: [], before: [] };
     report.values = values;
