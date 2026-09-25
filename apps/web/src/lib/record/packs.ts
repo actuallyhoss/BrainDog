@@ -138,7 +138,7 @@ export type Offer = { id: string; doc: Record<string, unknown>; plan: Plan; call
  * use case's, or none: a module added here never brings the seed's studio rows into somebody's record.
  */
 export async function packDocument(id: string, installed?: readonly PackState[], usecase?: string): Promise<Record<string, unknown> | null> {
-  const seed = await import('@braindog/seed');
+  const seed = await import('@braindog/seed/packs');
   if (id === seed.AGENTS_PACK.manifest.id) return seed.agentsPackDocument();
   if (installed === undefined) return seed.firstPartyDocument(id);
   const { moduleDocument, dayOf } = await import('@braindog/seed/usecases/install');
@@ -163,7 +163,7 @@ export async function packDocument(id: string, installed?: readonly PackState[],
  * Work alone stayed on the version it started with. /packs offers these through the same plan an install gets.
  */
 export async function moduleUpdates(states: readonly PackState[]): Promise<{ id: string; from: string; to: string }[]> {
-  const seed = await import('@braindog/seed');
+  const seed = await import('@braindog/seed/packs');
   const { compareVersions } = await import('@braindog/declare/catalogue');
   const shipped = new Map<string, string>([...seed.FIRST_PARTY.map((id) => [id, seed.FIRST_PARTY_VERSIONS[id]] as const), [seed.AGENTS_PACK.manifest.id, seed.AGENTS_PACK.manifest.version]]);
   return states.flatMap((s) => {

@@ -61,7 +61,7 @@
   import { inviteEmail, inviteLink, readInvites, withdrawInvite } from '$lib/record/settings-write.ts';
   import { levelWord, openRecord } from '$lib/record/switcher.ts';
   import type { Invitation } from '@braindog/client';
-  import { AGENTS_PACK, agentsPackDocument } from '@braindog/seed';
+  import { AGENTS_PACK, agentsPackDocument } from '@braindog/seed/packs';
   /* Imported here and nowhere in the layout, so the client stays out of the entry chunk. */
   import { createClient } from '@braindog/client';
   import { checkBrainl } from '@braindog/kernel';

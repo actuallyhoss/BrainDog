@@ -17,19 +17,27 @@
  *
  * AND THE SEED'S ROOT, FOR THE SAME REASON. `@braindog/seed` is the sample: its root export is `REGISTERS`, `ROWS`,
  * `NOW` and `installSeed`, 27 KB brotli, and a route that imports it for one table carries all of it. Its subpaths
- * (`@braindog/seed/usecases/*`) are product, the use cases a person installs, and are free to import.
+ * (`@braindog/seed/usecases/*`, and `@braindog/seed/packs` for the first-party declarations) are product, and are free
+ * to import.
  *
- * THREE FILES STILL NEED THE ROOT, AND THEY ARE NAMED RATHER THAN EXEMPTED BY A PATTERN. Each reads a first-party
- * declaration that is product, not sample: the modules' figures, the documents Install sends, and the Agents pack. They
- * need a subpath of `@braindog/seed` that exports those without the rest, which is `packages/seed/package.json`'s to
- * add. Each is printed on every run, and an entry whose file no longer imports the root is a finding, so the list can
- * only shrink.
+ * WITH NO FILE EXCUSED. Three shipped files read the root for product until 25 September (the modules' figures in
+ * `declared.ts`, the documents Install sends in `packs.ts`, the Agents pack in Settings) and sat on a named waiting
+ * list here. `@braindog/seed/packs` is their door now, so the list is gone rather than empty: an empty list is a place
+ * the next exemption goes without anybody deciding it.
+ *
+ * NOT A WORD THAT ENDS IN `import`. `\bimport` matched inside `legacy-import`, where `\b` sits after the hyphen, so
+ * prose in a component's markup read as a bare import of the next string; `loader.import(...)` read as a dynamic one.
+ * Each keyword is held to the start of a token, not after a word character, `$`, `.` or `-`.
+ *
+ * AND A GLOB IS AN IMPORT. `import.meta.glob('./fixtures/*.ts', { eager: true })` bundles every file it matches, and
+ * none of the four spellings read it. Its patterns are read, one string or a list, and a negated one (`!`) is left out,
+ * because it takes files away.
  *
  * COMMENTS ARE NOT IMPORTS. A comment saying where the sample went is not a read of it, so `//`, `/* *\/` and, in a
  * `.svelte` file, `<!-- -->` are blanked before anything is matched; strings are left, because a specifier is one.
  */
 
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -40,16 +48,6 @@ const APP = join('apps', 'web', 'src');
 const SOURCE = /\.(ts|js|mjs|svelte)$/u;
 /** A test, which may import any fixture it likes. */
 const TEST = /\.test\.(ts|js|mjs)$/u;
-
-/**
- * The files that may still import `@braindog/seed` itself, each with what it reads there, until the seed exports it
- * from a subpath. Paths are from the root, with forward slashes.
- */
-export const WAITING = {
-  'apps/web/src/lib/record/declared.ts': "the first-party modules' figures (`METRICS`), which live pages and Home read",
-  'apps/web/src/lib/record/packs.ts': 'the first-party and Agents documents Install sends (`firstPartyDocument`, `agentsPackDocument`)',
-  'apps/web/src/routes/settings/[area]/+page.svelte': 'the Agents pack Settings offers to install (`AGENTS_PACK`, `agentsPackDocument`)',
-};
 
 /** Every source file under `dir`, with the `fixtures/` directories left out: they are the fixtures. */
 function walk(dir, out = []) {
@@ -107,17 +105,28 @@ export function uncommented(source, svelte = false) {
   return out.join('');
 }
 
-/** Every module specifier a file names: `import ... from`, a bare `import`, `export ... from` and `import()`. */
+/**
+ * Every module specifier a file names: `import ... from`, a bare `import`, `export ... from`, `import()`, and each
+ * pattern of an `import.meta.glob`.
+ */
 export function specifiers(code) {
   const found = [];
+  const lineOf = (at) => code.slice(0, at).split('\n').length;
   const PATTERNS = [
-    /\bimport\s+(?:type\s+)?[\w$*{}\s,]*?\bfrom\s*(['"])([^'"]+)\1/gu,
-    /\bimport\s*(['"])([^'"]+)\1/gu,
-    /\bexport\s+(?:type\s+)?(?:\*|\{[^}]*\})\s*(?:as\s+[\w$]+\s*)?from\s*(['"])([^'"]+)\1/gu,
-    /\bimport\s*\(\s*(['"])([^'"]+)\1\s*\)/gu,
+    /(?<![\w$.-])import\s+(?:type\s+)?[\w$*{}\s,]*?\bfrom\s*(['"])([^'"]+)\1/gu,
+    /(?<![\w$.-])import\s*(['"])([^'"]+)\1/gu,
+    /(?<![\w$.-])export\s+(?:type\s+)?(?:\*|\{[^}]*\})\s*(?:as\s+[\w$]+\s*)?from\s*(['"])([^'"]+)\1/gu,
+    /(?<![\w$.-])import\s*\(\s*(['"])([^'"]+)\1\s*\)/gu,
   ];
-  for (const p of PATTERNS)
-    for (const m of code.matchAll(p)) found.push({ spec: m[2], line: code.slice(0, m.index).split('\n').length });
+  for (const p of PATTERNS) for (const m of code.matchAll(p)) found.push({ spec: m[2], line: lineOf(m.index) });
+  /* THE GLOB'S FIRST ARGUMENT, a string or a list of them, with a type argument allowed before it. Each pattern keeps
+     its own line, so a list over several lines names the line the fixture's pattern is on. The list is stepped string by
+     string, because a pattern can hold a `]` (`./routes/[area]/*.ts`) and a list read to its first `]` lost the rest. */
+  for (const m of code.matchAll(/(?<![\w$.-])import\.meta\.glob\s*(?:<[^>]*>)?\s*\(\s*(\[(?:[^\]'"`]|'[^']*'|"[^"]*"|`[^`]*`)*\]|(['"`])[^'"`]*\2)/gu)) {
+    const from = m.index + m[0].length - m[1].length;
+    for (const s of m[1].matchAll(/(['"`])([^'"`]+)\1/gu))
+      if (!s[2].startsWith('!')) found.push({ spec: s[2], line: lineOf(from + s.index) });
+  }
   return found;
 }
 
@@ -147,26 +156,16 @@ export default function noFixtures(
   }
 
   const findings = [];
-  const waited = new Map(Object.keys(WAITING).map((p) => [p, 0]));
   for (const file of files) {
     const rel = relative(ROOT, file).replace(/\\/g, '/');
     for (const { spec, line } of specifiers(uncommented(readFileSync(file, 'utf8'), file.endsWith('.svelte')))) {
       const why = refused(spec);
-      if (why === null) continue;
-      if (spec === '@braindog/seed' && waited.has(rel)) waited.set(rel, waited.get(rel) + 1);
-      else findings.push(`  ${rel}:${line}  ${why} (${spec})`);
+      if (why !== null) findings.push(`  ${rel}:${line}  ${why} (${spec})`);
     }
   }
 
-  /* A NAMED FILE THAT NO LONGER NEEDS THE ROOT IS A FINDING, so the next import of it there is seen. Only for a file
-     that is there: a seeded tree without it has nothing to say about it. */
-  for (const [p, n] of waited)
-    if (n === 0 && existsSync(join(ROOT, p))) findings.push(`  ${p} is listed as waiting on a seed subpath and imports no seed root. Take it out of WAITING.`);
-
   if (findings.length === 0) {
-    const still = [...waited].filter(([, n]) => n > 0);
-    console.log(`  no-fixtures: ${files.length} shipped file(s), 0 finding(s); ${still.length} still read the seed's root, waiting on a subpath:`);
-    for (const [p] of still) console.log(`      ${p}: ${WAITING[p]}`);
+    console.log(`  no-fixtures: ${files.length} shipped file(s), 0 finding(s)`);
     return;
   }
   for (const f of findings) console.error(f);
