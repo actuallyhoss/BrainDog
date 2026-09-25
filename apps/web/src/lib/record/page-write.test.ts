@@ -163,6 +163,40 @@ test('AN ARRANGED BODY IS THE STORED ONE REORDERED AND RESIZED, with an added bl
   assert.equal(arrangedBody(BODY, [{ i: 9, span: 12 }], []), null, 'a place past both lists was written as a guess');
 });
 
+test('AN ARRANGED BODY WRITES THE COLUMN EACH BLOCK WAS MOVED TO, and leaves the rest of each block as the record holds it', () => {
+  // THE RED: this wrote order and span only, so a block moved to the rail went back to the record in the main column.
+  const laid = {
+    page: 'desk',
+    title: 'Desk',
+    layout: { rail: 4 },
+    blocks: [
+      { kind: 'table', source: 'register.steps', span: 12 },
+      { kind: 'note', body: 'Pinned.', area: 'rail', span: 12 },
+      { kind: 'note', body: 'Said main.', area: 'main', span: 12 },
+      { kind: 'note', body: 'Left alone.', area: 'rail', span: 12 },
+    ],
+  };
+  const out = arrangedBody(
+    laid,
+    [
+      { i: 0, span: 12, area: 'rail' },
+      { i: 1, span: 12, area: 'main' },
+      { i: 2, span: 12, area: 'main' },
+      { i: 3, span: 12 },
+    ],
+    [],
+  );
+  assert.deepEqual(out?.blocks[0], { kind: 'table', source: 'register.steps', span: 12, area: 'rail' });
+  // Main is what a block with no area already means, so a block moved back loses the key rather than gaining a second
+  // spelling of the default.
+  assert.deepEqual(out?.blocks[1], { kind: 'note', body: 'Pinned.', span: 12 });
+  // A block whose column did not change is written as it was, `area: main` and all, and one placed with no column at all
+  // (every block on a page with no rail) is where the record has it.
+  assert.deepEqual(out?.blocks[2], laid.blocks[2]);
+  assert.deepEqual(out?.blocks[3], laid.blocks[3]);
+  assert.equal(out?.layout, laid.layout);
+});
+
 test('DONE READS THE STORED BODY, SETS IT WHOLE, and hands back the one before for undo', async () => {
   const sent: { url: string; body: unknown }[] = [];
   const io: ClientFetch = async (input, init) => {

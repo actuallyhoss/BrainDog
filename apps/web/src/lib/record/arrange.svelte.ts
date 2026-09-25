@@ -94,8 +94,14 @@ export class Arrangement {
     if (this.slots) this.slots = setSpanAt(this.slots, at, span);
   }
 
-  /** What the declaration would become. The caller writes it; this class never does. */
+  /**
+   * What the declaration would become. The caller writes it; this class never does.
+   *
+   * THE COLUMN GOES WITH THE PLACE. This mapped each slot to its block and span, so a block moved to the side rail came
+   * out of the draft in no column at all, and the page wrote it back where the record already had it. A slot with no
+   * `area` stays without one, which is the block left where the record holds it.
+   */
   get body() {
-    return (this.slots ?? []).map((s) => ({ block: s.i, span: s.span }));
+    return (this.slots ?? []).map((s) => ({ block: s.i, span: s.span, ...(s.area ? { area: s.area } : {}) }));
   }
 }

@@ -25,9 +25,16 @@
     onmove,
     onspan,
     onremove,
+    widths = true,
   }: {
     kind: string;
     span: number;
+    /**
+     * Whether Full, Half and Third are offered. NOT IN THE SIDE RAIL, which is one stack: every block there is the rail's
+     * width whatever its span says, so the buttons pressed there changed a number and nothing on the screen. The span is
+     * kept all the same, for the day the block is moved back to the main column.
+     */
+    widths?: boolean;
     /** How many columns the block declares — a table's width floor is a property of the block. */
     columns: number;
     at: number;
@@ -45,24 +52,26 @@
 
   <span class="kind">{copy.kindNames[kind] ?? kind}</span>
 
-  <div class="widths" role="group" aria-label={copy.width}>
-    {#each steps as step}
-      <button
-        type="button"
-        class="width"
-        data-on={span === step ? '' : undefined}
-        aria-pressed={span === step ? 'true' : 'false'}
-        onclick={() => onspan(step)}
-      >
-        {spanLabel(step)}
-      </button>
-    {/each}
-    <!-- A span a pack wrote as 5 keeps its own number rather than being rounded onto a button.
-         Inferred from the value, never stored — 21 §3.1. -->
-    {#if !steps.includes(span)}
-      <span class="width" data-on aria-current="true">{spanLabel(span)}</span>
-    {/if}
-  </div>
+  {#if widths}
+    <div class="widths" role="group" aria-label={copy.width}>
+      {#each steps as step}
+        <button
+          type="button"
+          class="width"
+          data-on={span === step ? '' : undefined}
+          aria-pressed={span === step ? 'true' : 'false'}
+          onclick={() => onspan(step)}
+        >
+          {spanLabel(step)}
+        </button>
+      {/each}
+      <!-- A span a pack wrote as 5 keeps its own number rather than being rounded onto a button.
+           Inferred from the value, never stored — 21 §3.1. -->
+      {#if !steps.includes(span)}
+        <span class="width" data-on aria-current="true">{spanLabel(span)}</span>
+      {/if}
+    </div>
+  {/if}
 
   <!--
     ABSENT AT THE ENDS, NOT GREYED THERE.
@@ -77,7 +86,8 @@
     end of a list of three that is two grey buttons out of six on the screen. Absent, the bar has
     the verbs that can act and nothing else.
   -->
-  <div class="moves">
+  <!-- WITH NO WIDTHS THE MOVES TAKE THEIR PLACE AT THE END, where the widths' own margin used to push them. -->
+  <div class="moves" data-alone={widths ? undefined : ''}>
     {#if at > 0}
       <button type="button" class="icon-btn" onclick={() => onmove(at - 1)} aria-label={copy.moveUp}>
         <Icon name="arrowUp" size="s" />
@@ -155,6 +165,10 @@
   .moves {
     display: flex;
     gap: 2px;
+  }
+
+  .moves[data-alone] {
+    margin-inline-start: auto;
   }
 
   .icon-btn {

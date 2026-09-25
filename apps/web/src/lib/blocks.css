@@ -217,6 +217,25 @@
     color: var(--dim);
   }
 
+  /* `note lead` IS THE PAGE'S OPENING SENTENCE, said from its figures, so it is set as the one sentence
+     on the screen rather than as a callout: no raised surface and no hairline, in ink at the step above
+     a card's name. Boxed, it was one more panel in a column of blocks, and the line meant to be read
+     first was dressed exactly like a footnote. A tone keeps its mark, so the gutter stays where a mark
+     sits and goes only where none does. */
+  .block[data-kind='note'][data-form='lead'] .panel {
+    max-inline-size: var(--measure);
+    padding-inline-end: 0;
+    background: none;
+    border-color: transparent;
+    color: var(--ink);
+    font-size: var(--t-lg);
+    line-height: var(--lh-tight);
+  }
+
+  .block[data-kind='note'][data-form='lead'] .panel:not([data-marked]) {
+    padding-inline-start: 0;
+  }
+
   /* ── grid: stat, board ──────────────────────────────────────────────────
      `--cells` comes from the declaration. A layout primitive must be TOLD how many things it
      contains and must never infer the count from the space available (05 §4). */
@@ -809,6 +828,44 @@
     color: var(--dim);
   }
 
+  /* THE REPLY IS THE LINE UNDER THE HEAD and the next step the card's last word before who is on it.
+     Both are sentences somebody wrote, so they wrap at the card's edge rather than trimming, and the
+     reply sits a step quieter than the name it answers. */
+  .cards-reply,
+  .cards-next {
+    margin: 0;
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    overflow-wrap: anywhere;
+  }
+
+  .cards-next {
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  /* `cards lead`: THE FIRST CARD IS TWO TRACKS WIDE WHERE THE GRID HAS TWO, and one where it has one.
+     The renderer only marks the card (05 §4, told and never inferred), so the host has to know how
+     many tracks there are, and the grid cannot say. `span 2` in a grid of one track makes an
+     implicit second track: measured in a 560px block, the tracks came out 470px and 66px and the
+     cards after the lead fell into them by turns, one 470px wide and the next 66. So the block is
+     its own container and the span waits for a width that holds two 17rem tracks and the gap:
+     34rem plus 24px, which is at most 36rem at any root of 12px or more. Between the two widths
+     the lead is one card wide for a few pixels, which is the safe side to be wrong on. */
+  .block[data-kind='cards'][data-form='lead'] {
+    container-type: inline-size;
+  }
+
+  @container (inline-size >= 36rem) {
+    .cards-item[data-lead] {
+      grid-column: span 2;
+    }
+  }
+
+  .cards-item[data-lead] .cards-title {
+    font-size: var(--t-lg);
+  }
+
   /* ── section: a heading for the blocks after it ──────────────────────────
      A group on a page is a heading and air, never a box: one step above a block's name, the count on
      its baseline, and the fold a pill at the end of the line. */
@@ -1247,6 +1304,142 @@
     color: var(--ink);
   }
 
+  /* AN OPTION'S VISUAL IS ITS OWN BOX, on the first track above the option's words, because the three
+     tracks are shared by every option (above) and a box beside the label would push the buttons out
+     of their one edge. Above the words it reads as a sample laid over its name. */
+  .queue-option > .queue-visual {
+    grid-column: 1;
+    justify-self: start;
+  }
+
+  .queue-visual {
+    display: flex;
+    gap: 2px;
+    min-inline-size: 0;
+  }
+
+  /* THE ONE COLOUR ON THE PAGE THAT NO THEME CHOSE (05 §5, "a colour from data is drawn only inside
+     its option's box"). `--swatch` is set on this chip and nowhere else, so nothing around it can
+     inherit it, and this is the only rule that reads it. The hairline is the theme's, so a swatch
+     the colour of the surface under it is still a chip rather than a hole. And forced colours leave
+     it alone, because in that mode every background is repainted and the lining a person is asked
+     to choose would be drawn as no colour at all. */
+  .queue-swatch {
+    flex: none;
+    inline-size: 20px;
+    block-size: 20px;
+    background: var(--swatch);
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    forced-color-adjust: none;
+  }
+
+  .queue-figure {
+    padding-inline: var(--sp-2);
+    border-radius: var(--r-pill);
+    background: var(--s2);
+    color: var(--ink);
+    font-size: var(--t-sm);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .queue-file {
+    display: block;
+    inline-size: 4rem;
+    aspect-ratio: 1;
+    object-fit: cover;
+    border-radius: var(--r-sm);
+    background: var(--s2);
+  }
+
+  /* `queue tiles`: A TILE A QUESTION, SIDE BY SIDE WHERE THEY FIT, each led by what its recommended
+     option is. The tracks answer the queue's own width, as the cards grid does, and the count of what
+     is left spans them all rather than sitting in a tile's place. */
+  .queue:has(> .queue-tile) {
+    grid-template-columns: repeat(auto-fill, minmax(min(16rem, 100%), 1fr));
+    align-items: start;
+  }
+
+  .queue:has(> .queue-tile) > .queue-more {
+    grid-column: 1 / -1;
+  }
+
+  /* THE LEADING VISUAL FILLS THE TILE'S WIDTH: the swatches share it, the figure is the tile's
+     largest type, the file is a picture at the tile's width. It is the same box an option draws,
+     only larger, so the colour is still inside its option's box. */
+  .queue-tile > .queue-visual {
+    margin-block: calc(var(--sp-4) * -1) var(--sp-1);
+    margin-inline: calc(var(--sp-4) * -1);
+    overflow: hidden;
+    border-start-start-radius: var(--r-lg);
+    border-start-end-radius: var(--r-lg);
+  }
+
+  .queue-tile > .queue-visual > .queue-swatch {
+    flex: 1;
+    inline-size: auto;
+    block-size: 4.5rem;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .queue-tile > .queue-visual > .queue-figure {
+    padding: var(--sp-4);
+    flex: 1;
+    border-radius: 0;
+    font-size: var(--t-xl);
+    font-weight: 500;
+  }
+
+  .queue-tile > .queue-visual > .queue-file {
+    flex: 1;
+    inline-size: 100%;
+    aspect-ratio: 16 / 9;
+    border-radius: 0;
+  }
+
+  .queue-suggested {
+    margin: 0;
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    font-weight: 500;
+  }
+
+  /* THE WAYS TO ANSWER ARE FOLDED AND SAY SO IN WORDS, a pill like a section's fold, because the tile
+     has to be read before it is answered and the recommendation must not stand in for the choice. */
+  .queue-ways > .queue-options {
+    margin-block-start: var(--sp-2);
+  }
+
+  .queue-ways-toggle {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: var(--ctl-h-sm);
+    padding-inline: var(--sp-2);
+    border-radius: var(--r-sm);
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    font-weight: 500;
+    list-style: none;
+    cursor: pointer;
+  }
+
+  .queue-ways-toggle::-webkit-details-marker {
+    display: none;
+  }
+
+  .queue-ways-toggle:hover {
+    background: var(--s2);
+    color: var(--ink);
+  }
+
+  @media (pointer: coarse) {
+    .queue-ways-toggle {
+      min-block-size: var(--tap);
+    }
+  }
+
   /* ── capture: the one-line add ───────────────────────────────────────────
      The register's own add line, as a block: one rounded field on the first raised surface, the Add
      inside its edge once there is text. The same box, border and height the grid's line draws in
@@ -1491,6 +1684,86 @@
 
     .row-note {
       text-align: end;
+    }
+  }
+
+  /* ── inputs: a few fields of one row to type into ──────────────────────────
+     Where the host cannot write, `inputs` is a spec and the rules above draw it. Where it can, each
+     field is a label holding its control, laid on the spec's own tracks, so the same block reads the
+     same whether or not it can be typed into and a label lines up with a spec's label above it. The
+     box is `capture`'s: the raised surface, the hairline, the control height. */
+  .inputs {
+    display: grid;
+  }
+
+  .inputs-field {
+    display: grid;
+    grid-template-columns: minmax(9ch, 22ch) minmax(0, 1fr);
+    gap: var(--sp-3);
+    align-items: center;
+    padding: var(--sp-2) var(--sp-3);
+    border-block-end: 1px solid var(--line-soft);
+    cursor: text;
+  }
+
+  .inputs-field:last-child {
+    border-block-end: 0;
+  }
+
+  .inputs-field:has(> .inputs-check) {
+    cursor: pointer;
+  }
+
+  .inputs-label {
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  .inputs-box {
+    min-inline-size: 0;
+    min-block-size: var(--ctl-h);
+    padding-inline: var(--sp-3);
+    background: var(--s1);
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--t-ui);
+    font-variant-numeric: tabular-nums;
+    transition: border-color var(--d-state) var(--ease-out);
+  }
+
+  .inputs-box:hover {
+    border-color: var(--edge);
+  }
+
+  /* A CHECKBOX IS ITS OWN SIZE AT THE START OF ITS TRACK, and ticked in the accent, the checked
+     state being one of the accent's four jobs. */
+  .inputs-check {
+    justify-self: start;
+    inline-size: 18px;
+    block-size: 18px;
+    margin: 0;
+    accent-color: var(--accent);
+  }
+
+  .inputs-empty {
+    max-inline-size: var(--measure);
+    margin: 0;
+    color: var(--dim);
+  }
+
+  @media (pointer: coarse) {
+    .inputs-box {
+      min-block-size: var(--tap);
+    }
+  }
+
+  /* On a phone the label leads and the control takes the line under it, as a spec's row does. */
+  @media (width < 640px) {
+    .inputs-field {
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--sp-1);
     }
   }
 
@@ -1877,6 +2150,109 @@
     border-radius: 0;
     color: var(--dim);
     font-size: var(--t-xs);
+  }
+
+  /* `steps path`: A STONE A STEP ON ONE LINE, the stones in a column of their own and the line drawn
+     through its middle behind them, so the hairlines between rows go and the line is the structure.
+     The column is as wide as the word "Next", so every stone is centred on the same x whether it
+     holds a tick, the word or nothing. A step's number goes too: the stone says where it is. */
+  .list[data-kind='steps'][data-form='path'] > .item {
+    position: relative;
+    grid-template-columns: 3.5rem minmax(0, 1fr) minmax(0, auto);
+    border-block-end: 0;
+    counter-increment: none;
+  }
+
+  .list[data-kind='steps'][data-form='path'] .item-title::before {
+    content: none;
+  }
+
+  .list[data-kind='steps'][data-form='path'] > .item::before {
+    content: '';
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: calc(var(--sp-3) + 1.75rem - 1px);
+    inline-size: 2px;
+    background: var(--line);
+  }
+
+  /* THE LINE STARTS AND ENDS AT A STONE'S MIDDLE, which is half a line under the row's padding and
+     not half the row: under 400px a step's detail takes a second line, and at 50% the first stone
+     sat 3px above where the line began (measured at 390, a row of 60.5px). */
+  .list[data-kind='steps'][data-form='path'] > .item:first-child::before {
+    inset-block-start: calc(var(--sp-2) + 0.5lh);
+  }
+
+  .list[data-kind='steps'][data-form='path'] > .item:last-child::before {
+    inset-block-end: auto;
+    block-size: calc(var(--sp-2) + 0.5lh);
+  }
+
+  .list[data-kind='steps'][data-form='path'] > .item:only-child::before {
+    content: none;
+  }
+
+  /* A LATER STONE IS THE LIST'S EMPTY BOX, round; a DONE one is a ticked box, the checked state that
+     is one of the accent's four jobs (as `todo`'s is), with its step muted; the NEXT one is the word,
+     in ink on the page's ground, with its step at full weight, because finding it without reading
+     every row is what the form is for. Each stone has a ground, so the line passes behind it. */
+  .list[data-form='path'] .item-marker {
+    position: relative;
+    justify-self: center;
+    border-radius: var(--r-pill);
+    background: var(--bg);
+  }
+
+  .list[data-form='path'] > .item[data-mark='done'] > .item-marker {
+    background: var(--accent);
+    border-color: var(--accent);
+    font-variant-emoji: text;
+  }
+
+  .list[data-form='path'] > .item[data-mark='done'] .item-title {
+    color: var(--dim);
+  }
+
+  .list[data-form='path'] > .item[data-mark='next'] > .item-marker {
+    inline-size: auto;
+    block-size: auto;
+    border: 0;
+  }
+
+  .path-next {
+    display: inline-block;
+    padding: 1px var(--sp-2);
+    border: 1px solid var(--ink);
+    border-radius: var(--r-pill);
+    background: var(--bg);
+    color: var(--ink);
+    font-size: var(--t-xs);
+    font-weight: 500;
+  }
+
+  .list[data-form='path'] > .item[data-mark='next'] .item-title {
+    font-weight: 500;
+  }
+
+  /* THE STEPS THE SHORT VIEW LEFT OUT, said as a count under the last stone, dim like the queue's. */
+  .path-more {
+    margin: 0;
+    padding-block: var(--sp-1) 0;
+    padding-inline: calc(var(--sp-3) + 3.5rem + var(--sp-3)) var(--sp-3);
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  /* ON THE NARROWEST PHONE THE DETAIL GOES UNDER ITS STEP, as a plain step's does, and the stones
+     keep their column so the line stays straight. */
+  @media (width < 400px) {
+    .list[data-kind='steps'][data-form='path'] > .item {
+      grid-template-columns: 3.5rem minmax(0, 1fr);
+    }
+
+    .list[data-kind='steps'][data-form='path'] .item-detail {
+      grid-column: 2;
+    }
   }
 
   /* ── table: comparison, and the register grid's body ────────────────────── */
@@ -2569,5 +2945,66 @@
     margin-block: var(--sp-5);
     border: 0;
     border-block-start: 1px solid var(--line);
+  }
+
+  /* ── progress range: a budget as bands against what was spent ────────────
+     On `progress`'s own row and track (`blocks-charts.css`), so the label, the figure and the track
+     keep the places a goal gives them; the range in words takes the place a goal's share has. Each
+     rule names the form, so it outranks the goal's rule it changes in whichever order the two sheets
+     load. The track is one scale for the block, the band runs from the low estimate to the high and
+     the mark is what was spent, so an overspend is found by its place, past the band's end, and the
+     intent's colour only repeats it. */
+
+  /* AN EMPTY BAND BY DEFAULT, which each drawn track replaces in its own `style`. Declared here as
+     well because `css-rules` reads only the first custom property of a `style` attribute: the track
+     writes `--from:…;--to:…`, and `--to` was reported as a token nothing declares (measured). */
+  .progress[data-form='range'] {
+    --from: 0;
+    --to: 0;
+  }
+
+  .progress[data-form='range'] .progress-range {
+    grid-area: share;
+    color: var(--dim);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .progress[data-form='range'] .progress-track {
+    block-size: 8px;
+    margin-block: var(--sp-1);
+    overflow: visible;
+  }
+
+  .progress-band {
+    position: absolute;
+    inset-block: 0;
+    inset-inline: calc(var(--from) * 100%) calc((1 - var(--to)) * 100%);
+    border-radius: var(--r-pill);
+    background: var(--edge);
+  }
+
+  /* The mark stands 4px proud of the track on each side, so it reads over the band as well as
+     past it, and it is 2px wide and centred on its figure. */
+  .progress-at {
+    position: absolute;
+    inset-block: -4px;
+    inset-inline-start: calc(var(--at) * 100% - 1px);
+    inline-size: 2px;
+    border-radius: 1px;
+    background: var(--tone, var(--ink));
+  }
+
+  /* THE TOTAL IS A LINE UNDER THE ROWS, added up by the drawer from them, so it has no track: a
+     band for the sum would be drawn on a scale the rows set and read as one more line of the budget. */
+  .progress[data-form='range'] > .progress-row[data-total] {
+    margin-block-start: var(--sp-1);
+    padding-block-start: var(--sp-2);
+    border-block-start: 1px solid var(--line);
+  }
+
+  .progress[data-form='range'] > .progress-row[data-total] > .progress-label {
+    color: var(--ink);
+    font-weight: 500;
   }
 }

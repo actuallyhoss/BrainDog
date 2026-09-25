@@ -224,8 +224,11 @@ function footOf(rows: readonly Row[], lanes: readonly string[], lane: string): n
 
 /* ── arranging a page ────────────────────────────────────────────────────── */
 
-/** One place in the arrangement: which block (declared first, then added) and the width it takes. */
-export type Placed = { i: number; span: number };
+/**
+ * One place in the arrangement: which block (declared first, then added), the width it takes, and on a page with a rail
+ * the column it sits in. No `area` is the block left where the record has it.
+ */
+export type Placed = { i: number; span: number; area?: 'main' | 'rail' };
 
 /** A block added in arrange mode, in the app's spelling. Only the keys a declaration may carry go to the record. */
 export type Added = { kind: string; [key: string]: unknown };
@@ -250,7 +253,15 @@ export function declaredBlock(block: Added): BlockBody {
 }
 
 /**
- * The page's body with its blocks in the order and at the widths placed, and the added ones declared where they were put.
+ * The page's body with its blocks in the order, at the widths and in the columns placed, and the added ones declared
+ * where they were put.
+ *
+ * THE AREA WENT NOWHERE UNTIL THIS WROTE IT. This wrote order and span only, so a block moved to the rail went back to
+ * the record in the main column and the page read after Done drew it where it had been; wave two answered that with a
+ * second write path for pages with a rail (`layout-write.ts`), which this replaces. A block moved to the rail gains
+ * `area: rail`; one moved to main loses the key, since main is what a block with none already means, rather than
+ * gaining a second spelling of the default. A block whose column did not change is written as the record holds it,
+ * `area: main` and all, so arranging the order of a page does not rewrite how somebody chose to spell its areas.
  *
  * `null` WHEN THE PLACES DO NOT FIT THE BODY: an index past both lists means the page changed under the arrangement, and
  * writing a body built from a guess would drop or duplicate a block somebody else declared.
@@ -261,9 +272,18 @@ export function arrangedBody(body: PageBody, placed: readonly Placed[], added: r
   for (const p of placed) {
     const from = p.i < declared ? body.blocks[p.i] : added[p.i - declared] ? declaredBlock(added[p.i - declared]!) : undefined;
     if (!from) return null;
-    blocks.push({ ...from, span: p.span });
+    blocks.push(inArea({ ...from, span: p.span }, p.area));
   }
   return { ...body, blocks };
+}
+
+/** A block in the column it was placed in, touched only when that column is not the one it already says. */
+function inArea(block: BlockBody, to: Placed['area']): BlockBody {
+  const now = block.area === 'rail' ? 'rail' : 'main';
+  if (to === undefined || to === now) return block;
+  if (to === 'rail') return { ...block, area: 'rail' };
+  const { area: _moved, ...rest } = block;
+  return { ...rest, kind: block.kind };
 }
 
 export type Arranged =

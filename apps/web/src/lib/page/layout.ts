@@ -14,8 +14,7 @@
  * PURE, SO `node --test` READS IT WITH NO SVELTEKIT. `PageView.svelte` draws what this answers and decides nothing.
  */
 
-import { COLUMNS, type Area, type Slot } from '../record/arrange.ts';
-import type { PageBody } from '../record/pages-live.ts';
+import { COLUMNS, type Area } from '../record/arrange.ts';
 
 export type { Area };
 
@@ -114,37 +113,3 @@ export function boxesOf<T>(blocks: readonly T[], read: (b: T) => { kind?: unknow
  */
 export const sticks = (layout: Layout | null, rail: number, room: number): boolean =>
   layout?.sticky === true && rail > 0 && rail <= room;
-
-/**
- * The body Done writes, with each block in the area its slot is in. `body` is `arrangedBody`'s answer, so its blocks
- * are in `placed` order, one for one.
- *
- * ONLY A BLOCK WHOSE AREA CHANGED IS TOUCHED. A block moved to the rail gains `area: rail`; one moved back to main loses
- * the key, since main is what a block with none already means, rather than gaining a second spelling of the default.
- * A block that stayed is written as the record holds it, `area: main` and all, so arranging the order of a page does
- * not rewrite how somebody chose to spell its areas.
- */
-export function withAreas(body: PageBody, placed: readonly Pick<Slot, 'i' | 'area'>[]): PageBody {
-  return {
-    ...body,
-    blocks: body.blocks.map((block, n) => {
-      const to = placed[n]?.area;
-      if (to === undefined || named(block.area) === to) return block;
-      if (to === 'rail') return { ...block, area: 'rail' };
-      const { area: _moved, ...rest } = block;
-      return { ...rest, kind: block.kind };
-    }),
-  };
-}
-
-/**
- * The words the rail's controls say. Here rather than in `copy.ts` because that file is not this brief's to edit; they
- * belong beside `moveUp` and `moveDown` there, and moving them is a rename.
- */
-export const words = {
-  toRail: 'Move to rail',
-  toMain: 'Move to main',
-  /* WHAT EACH COLUMN IS CALLED WHILE IT IS A LIST, so a screen reader moving between them hears which one it is in. */
-  main: 'Main column',
-  rail: 'Side rail',
-} as const;

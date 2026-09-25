@@ -358,7 +358,7 @@ function rebuilt(deps: FlowDeps, run: string, program: Op[], started: Record<str
     const cleaned = clean();
     const trigger = cleaned ? { ...started, row: cleaned.fields } : started;
     if (done.kind === 'set' || done.kind === 'tag') {
-      const step = program[done.n]?.step;
+      const step = program[done.n]?.step && emptied(done.kind, program[done.n]!.step, { vars, trigger: started, metric }, row);
       const w = step && row && cleaned ? writes(deps, done.kind, step, { vars, trigger: started, metric }, { vars: { ...vars, ...kept }, trigger, metric }, row, cleaned) : null;
       /* AND A FIELD THAT DOES NOT HOLD WHAT THE CLEAN FILL WOULD HAVE WRITTEN IS HELD BACK TOO. Two fills of the row as it
          is now agree once the secret is cleared during the wait, while the field still holds what the step wrote from
@@ -378,7 +378,7 @@ function rebuilt(deps: FlowDeps, run: string, program: Op[], started: Record<str
       continue;
     }
     if (typeof spec?.name !== 'string' || typeof spec.to !== 'string') continue;
-    const again = String(fill(spec.to, { vars: { ...vars, ...kept }, trigger, metric }));
+    const again = varText(spec.to, { vars: { ...vars, ...kept }, trigger, metric });
     vars[spec.name] = done.answer;
     if (again === done.answer) delete kept[spec.name];
     else kept[spec.name] = again;
@@ -886,7 +886,9 @@ export function advance(deps: FlowDeps, id: string): number | null {
   try {
     while (i < program.length) {
       const op = program[i]!;
-      const step = op.step;
+      /* A `set` OR A `create` FIELD THAT WOULD FILL WITH NOTHING IS TAKEN AS NOTHING (`emptied`), here and not in the
+         pass, because the pass fills from the run through the paths it is handed and cannot tell a hole from a dash. */
+      const step = op.verb === 'set' || op.verb === 'create' ? emptied(op.verb, op.step, scope(), subject) : op.step;
 
       if (op.verb === 'jump') {
         i = op.to;
@@ -923,7 +925,7 @@ export function advance(deps: FlowDeps, id: string): number | null {
 
       if (op.verb === 'set_var') {
         const spec = step.set_var as { name: string; to: string };
-        const value = String(fill(spec.to, scope()));
+        const value = varText(spec.to, scope());
         if (value.length > VAR_BYTES) return fail(i, 'set_var', `rule.${run.rule} sets ${spec.name} to ${value.length} characters, and one answer holds ${VAR_BYTES}.`);
         /* AND FILLED A SECOND TIME, FROM WHAT A QUESTION TO SLASH MAY CARRY: the row `sendable` leaves, and every
            variable already kept here read as it was kept, so one set from another carries the cleaning with it. The
@@ -937,7 +939,7 @@ export function advance(deps: FlowDeps, id: string): number | null {
            a variable holding `plain more`. */
         const row = read();
         const now = scope();
-        const clean = String(fill(spec.to, { vars: { ...vars, ...kept }, trigger: row ? { ...now.trigger, row: sendable(deps, row, unsent).fields } : now.trigger, metric }));
+        const clean = varText(spec.to, { vars: { ...vars, ...kept }, trigger: row ? { ...now.trigger, row: sendable(deps, row, unsent).fields } : now.trigger, metric });
         /* AND WHETHER IT TOOK A SECRET, read from where its paths go before the value goes in (`sealedPaths`), for the
            steps after it that write. */
         const secret = sealedIn(spec.to, paths());
@@ -1655,10 +1657,78 @@ function fill(x: unknown, scope: Record<string, unknown>): unknown {
  */
 function pathValue(scope: Record<string, unknown>, head: string, path: string): string {
   if (head === 'metric') return typeof scope.metric === 'function' ? (scope.metric as (id: string) => string)(path) : '—';
+  const at = reached(scope, head, path);
+  if (hole(at)) return '—';
+  return typeof at === 'object' ? JSON.stringify(at) : String(at);
+}
+
+/** What one `{{vars.…}}` or `{{trigger.…}}` path reaches in `scope`, walked as `pathValue` walks it. */
+function reached(scope: Record<string, unknown>, head: string, path: string): unknown {
   let at: unknown = scope[head];
   for (const part of path.split('.')) at = isObject(at) ? at[part] : Array.isArray(at) ? at[Number(part)] : undefined;
-  if (at === undefined || at === null || at === '') return '—';
-  return typeof at === 'object' ? JSON.stringify(at) : String(at);
+  return at;
+}
+
+/** What a fill writes the dash for. */
+const hole = (at: unknown): boolean => at === undefined || at === null || at === '';
+
+/**
+ * Every spelling a text a run writes can hold, in the pass's order (`rules.ts`'s `SPELLED`): a run path (groups 1 and
+ * 2), a figure (3 and 4), a create's tuple, and the row's `{{field}}` or `{{kind:field}}` (5 and 6).
+ */
+const SPELLING = new RegExp(`${RUN_PATH.source}|${FIGURE.source}|\\{\\{each\\.\\d\\}\\}|\\{\\{(\\w+)(?::(\\w+))?\\}\\}`, 'g');
+
+/**
+ * Whether `text` is spellings that each reach nothing and white space between them, so that filling it would write
+ * the dash and nothing else. `row` is the row its `{{field}}`s are filled from, or `null` where nothing fills them.
+ *
+ * THE DASH IS FOR A HOLE IN A SENTENCE, NOT FOR A WHOLE VALUE. `Paid {{vars.x}}` with nothing in `x` writes `Paid —`,
+ * because `Paid ` alone reads as a bug. A text that is nothing but the hole has no sentence around it, and writing the
+ * dash there wrote a value where there was none: measured on 25 September, a `set` from `{{trigger.row.note}}` over an
+ * empty note wrote the memo as `—`, and a `packs/pad` question acked `done` with empty text set the note's reply to
+ * `—` with `once_per` then never asking again. (`packages/slash`'s own pass refuses a blank answer before it acks, so
+ * that second one reaches a record only through a host that acks the outbox itself.) A `day` field refuses the dash,
+ * so a `create` whose due day filled with nothing failed its run instead of leaving the day blank
+ * (`flow-empty-answer.test.ts`).
+ *
+ * A FIGURE, A TUPLE, AN `{{id}}` AND A ROW'S FIELD WITH NO ROW ARE NEVER NOTHING HERE: a figure writes its words or
+ * `WITHHELD`, a tuple is filled by the create, the id always holds something, and a field with no row is refused by
+ * the create in a sentence of its own, which this leaves to say so.
+ */
+function nothingIn(text: string, scope: Record<string, unknown>, row: Entry | null): boolean {
+  let spelled = false;
+  for (const m of text.matchAll(SPELLING)) {
+    spelled = true;
+    if (m[1] !== undefined) {
+      if (!hole(reached(scope, m[1], m[2]!))) return false;
+      continue;
+    }
+    const head = m[5];
+    if (head === undefined || head === 'id' || row === null || !hole(row.fields[m[6] ?? head])) return false;
+  }
+  return spelled && text.replace(SPELLING, '').trim() === '';
+}
+
+/** A text a run keeps (a `set_var`), filled as `fill` fills it, and empty where it filled with nothing (`nothingIn`). */
+const varText = (text: string, scope: Record<string, unknown>): string => (nothingIn(text, scope, null) ? '' : String(fill(text, scope)));
+
+/**
+ * The step as a run takes it: a `set` whose `to`, or a `create` field whose text, would fill with nothing is written
+ * as nothing (`nothingIn`). The `set` writes the field empty rather than skipping it, because the rule said what the
+ * field is and what it is is nothing; a stale value left in its place would say the rule wrote it. A `create` leaves
+ * the field out, and a required one is then refused by the list in its own words rather than holding a dash.
+ *
+ * THE EMPTY `set` CLEARS A TEXT FIELD AND NOTHING ELSE. Measured by the checker on 25 September: a `set` of a `day`
+ * field from nothing still fails the run (`due takes a day, as YYYY-MM-DD`), as it did on the dash, and a `money` one
+ * fails the same way, so those two are no worse and no better. And a `create` whose required title filled from an
+ * empty field used to make a row titled `—` and now fails the run on `tasks needs what.`, which is the refusal meant.
+ */
+function emptied(verb: string, step: Record<string, unknown>, scope: Record<string, unknown>, row: Entry | null): Record<string, unknown> {
+  if (verb === 'set' && isObject(step.set) && typeof step.set.to === 'string' && nothingIn(step.set.to, scope, row)) return { ...step, set: { ...step.set, to: '' } };
+  if (verb !== 'create' || !isObject(step.create) || !isObject(step.create.fields)) return step;
+  const fields = Object.entries(step.create.fields);
+  const left = fields.filter(([, t]) => !(typeof t === 'string' && nothingIn(t, scope, row)));
+  return left.length === fields.length ? step : { ...step, create: { ...step.create, fields: Object.fromEntries(left) } };
 }
 
 /** The run's paths as the pass is handed them, from `scope`, saying of none that it reaches a secret. */

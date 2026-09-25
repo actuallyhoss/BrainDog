@@ -130,6 +130,12 @@ export const copy = {
   width: 'Width',
   moveUp: 'Move up',
   moveDown: 'Move down',
+  /* ACROSS, ON A PAGE WITH A SIDE RAIL, as Move up and Move down are along: the keyboard's way to the other column, and
+     what each column is called while it is a list, so a screen reader moving between them hears which one it is in. */
+  moveToRail: 'Move to rail',
+  moveToMain: 'Move to main',
+  mainColumn: 'Main column',
+  sideRail: 'Side rail',
   /* The nav's own two, which the arrange verbs above do not cover: a rail is sectioned, so "top"
      means the top of the section, and "hide" is the nav's word for removing a row without deleting
      the page behind it (19 §3). */

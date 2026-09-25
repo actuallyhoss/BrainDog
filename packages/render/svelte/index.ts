@@ -1,5 +1,5 @@
 /**
- * `braindog-render/svelte` — the same thirty-three kinds, drawn as components.
+ * `braindog-render/svelte` — the same thirty-four kinds, drawn as components.
  *
  * This subpath ships NO stylesheet. The markup contract is the whole of what a host draws against:
  * every block is one `<figure>` carrying its kind, its primitive and its tone as data attributes,

@@ -20,7 +20,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { openRecord } from '@braindog/kernel';
 
 import { blockOf } from '../record/page-live.ts';
-import { boxesOf, layoutOf, mainSpan, splitAreas, sticks, withAreas, type Layout } from './layout.ts';
+import { boxesOf, layoutOf, mainSpan, splitAreas, sticks, type Layout } from './layout.ts';
 
 const RAIL: Layout = { rail: 4, sticky: false };
 
@@ -114,31 +114,6 @@ test('THE RAIL STAYS IN VIEW ONLY WHEN IT WAS ASKED TO AND FITS', () => {
   assert.equal(sticks(sticky, 0, 700), false, 'not measured yet');
 });
 
-test('DONE WRITES THE AREA A BLOCK WAS MOVED TO, and leaves the rest of each block as the record holds it', () => {
-  const body = {
-    page: 'desk',
-    title: 'Desk',
-    layout: { rail: 4 },
-    blocks: [
-      { kind: 'table', source: 'register.steps', span: 12 },
-      { kind: 'note', body: 'Pinned.', area: 'rail', span: 12 },
-      { kind: 'note', body: 'Said main.', area: 'main', span: 12 },
-    ],
-  };
-  const out = withAreas(body, [
-    { i: 0, area: 'rail' },
-    { i: 1, area: 'main' },
-    { i: 2, area: 'main' },
-  ]);
-  assert.deepEqual(out.blocks[0], { kind: 'table', source: 'register.steps', span: 12, area: 'rail' });
-  // Main is what a block with no area already means, so a block moved back loses the key rather than gaining a second
-  // spelling of the default.
-  assert.deepEqual(out.blocks[1], { kind: 'note', body: 'Pinned.', span: 12 });
-  // A block whose area did not change is written as it was, `area: main` and all.
-  assert.deepEqual(out.blocks[2], body.blocks[2]);
-  assert.equal(out.layout, body.layout);
-});
-
 /* ── Done, over the wire ──────────────────────────────────────────────── */
 
 const DESK_BODY = {
@@ -166,9 +141,11 @@ function desk(): { io: (input: RequestInfo | URL, init?: RequestInit) => Promise
   };
 }
 
-test('DONE WRITES A BLOCK MOVED TO THE RAIL IN THE RAIL, which the arrangement write alone sends back to main', async () => {
-  // THE RED THIS FILE ANSWERS: `saveArrangement` lays the body out by order and span, so the area a block was moved to
-  // never reached the record, and the page read after Done drew it where it had been.
+test('DONE WRITES A BLOCK MOVED TO THE RAIL IN THE RAIL, through the one arrangement write every page uses', async () => {
+  // THE RED WAVE TWO LEFT: `saveArrangement` laid the body out by order and span, so the area a block was moved to never
+  // reached the record, and pages with a rail went through a second write, `layout-write.ts`, to carry it. `Placed`
+  // carries `area` now and `arrangedBody` writes it (`page-write.test.ts` holds the rules), so that file is gone and
+  // this is the plain path, which failed here with the areas as the record held them: Pinned still rail, Every step main.
   const placed = [
     { i: 1, span: 12, area: 'main' as const },
     { i: 0, span: 12, area: 'rail' as const },
@@ -176,13 +153,7 @@ test('DONE WRITES A BLOCK MOVED TO THE RAIL IN THE RAIL, which the arrangement w
   const plain = desk();
   const { saveArrangement } = await import('../record/page-write.ts');
   assert.equal((await saveArrangement('http://record.test', 'desk', 2, placed, [], plain.io as never)).from, 'written');
-  assert.deepEqual(plain.set()?.blocks.map((b) => [b.heading, b.area]), [['Pinned', 'rail'], ['Every step', undefined]], 'the arrangement write now carries area, and layout-write.ts can go');
-
-  const laid = desk();
-  const { saveLaidOut } = await import('./layout-write.ts');
-  const out = await saveLaidOut('http://record.test', 'desk', 2, placed, [], laid.io as never);
-  assert.equal(out.from, 'written');
-  assert.deepEqual(laid.set()?.blocks.map((b) => [b.heading, b.area]), [['Pinned', undefined], ['Every step', 'rail']]);
+  assert.deepEqual(plain.set()?.blocks.map((b) => [b.heading, b.area]), [['Pinned', undefined], ['Every step', 'rail']]);
 });
 
 /* ── through the record ───────────────────────────────────────────────── */

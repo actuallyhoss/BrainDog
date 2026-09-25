@@ -28,7 +28,7 @@
   import { KINDS, isKind, type Row, type RowRef } from 'braindog-render';
   import { Block, Degraded, Markdown, Table } from 'braindog-render/svelte';
   import '$lib/blocks-charts.css';
-  import { untrack } from 'svelte';
+  import { tick, untrack } from 'svelte';
   import { goto } from '$app/navigation';
   import { page as route } from '$app/state';
   import { copy } from '$lib/copy.ts';
@@ -52,10 +52,11 @@
   import { words as actionWords } from '$lib/record/actions.ts';
   import { Arrangement } from '$lib/record/arrange.svelte.ts';
   import { COLUMNS, dropInto, nearestInArea, setAreaAt, spanOf as declaredSpan, type Slot } from '$lib/record/arrange.ts';
-  import { areaOf, boxesOf, layoutOf, mainSpan, splitAreas, sticks, words as railWords, type Run } from './layout.ts';
+  import { areaOf, boxesOf, layoutOf, mainSpan, splitAreas, sticks, type Run } from './layout.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { resolverOf, type LiveBlock, type LivePageDecl, type Opened } from '$lib/record/page-live.ts';
   import type { Declared, Kept } from '$lib/record/page-write.ts';
+  import type { InputsWriter } from '$lib/record/inputs-write.ts';
   import type { Drop } from '$lib/record/roadmap-write.ts';
   import ActionRows from '../../routes/p/[slug]/ActionRows.svelte';
 
@@ -239,6 +240,42 @@
     toasts.push(row.filled.length > 0 ? copy.markAddedFilled(row.filled) : copy.writeMarkAdded, { intent: 'good' });
     await reread();
   }
+
+  /**
+   * A field typed into on an `inputs` block, written to its row after a pause and the page read again (`inputs-write.ts`).
+   *
+   * THE WRITER IS LOADED ON THE FIRST KEYSTROKE, as `page-write.ts` is on the first tick, so a page nobody types into
+   * never pulls it in; keystrokes made while it loads wait on the same promise, in the order they were typed. What the
+   * record refused is kept by field and said under the block (`inputSaid`).
+   */
+  let inputsWriter: Promise<InputsWriter> | null = null;
+  let inputsKey = $state.raw<((ref: RowRef, field: string) => string) | null>(null);
+  let inputSaid = $state.raw<ReadonlyMap<string, string>>(new Map());
+  function typeInto(row: Row, value: string) {
+    if (!live) return;
+    inputsWriter ??= Promise.all([import('$lib/record/inputs-write.ts'), import('$lib/record/rows-write.ts')]).then(([m, { rowWriter }]) => {
+      inputsKey = m.keyOf;
+      const writer = rowWriter(apiBase());
+      return m.inputsWriter({
+        write: (register, seq, patch, version) => writer.update(register, seq, patch, version),
+        /* WHAT THE ROW HOLDS NOW, from the answer the page is drawing, so a money keeps its currency and a box left as it
+           opened sends nothing. SEARCHED OVER EVERY `inputs` BLOCK ON THE LIST: two blocks over one list, each with its
+           own `where:`, edit two rows, and asking only the first finds nothing for the second: a price typed there without
+           its code then goes to `inputPatch` with no currency held and is written in the home currency. */
+        held: (ref, field) =>
+          all
+            .filter((b) => b.kind === 'inputs' && b.register === ref.register)
+            .flatMap((b) => b.entries)
+            .find((e) => e.seq === ref.seq)?.fields[field],
+        reread,
+        said: (said) => (inputSaid = said),
+      });
+    });
+    void inputsWriter.then((w) => w.input(row, value));
+  }
+
+  /** The record's sentence about one drawn field of an `inputs` block, when it refused what was typed there. */
+  const saidOf = (row: Row): string | undefined => (row.ref && inputsKey ? inputSaid.get(inputsKey(row.ref, row.cells[0]?.trim() ?? '')) : undefined);
 
   /**
    * A task ticked done or not done, with a receipt whose undo puts the row back as it was.
@@ -450,9 +487,19 @@
   });
   const stuck = $derived(sticks(layout, railHeight, room));
 
-  /** The other area, which is where the block's move button sends it. */
-  function toOtherArea(at: number, from: 'main' | 'rail') {
-    if (arrangement.slots) arrangement.slots = setAreaAt(arrangement.slots, at, from === 'rail' ? 'main' : 'rail');
+  /**
+   * The other area, which is where the block's move button sends it.
+   *
+   * AND FOCUS GOES WITH THE BLOCK. The block leaves one column's keyed list and is made again in the other, so the button
+   * just pressed is destroyed and keyboard focus fell to the page's body: the reader who moved a block to the rail had
+   * to tab from the top of the page to find it again. Once the page has drawn the move, the same control on the moved
+   * block takes focus, so a second press sends it back. `i` is the declared index its slot keeps, which is its id.
+   */
+  async function toOtherArea(at: number, from: 'main' | 'rail', i: number) {
+    if (!arrangement.slots) return;
+    arrangement.slots = setAreaAt(arrangement.slots, at, from === 'rail' ? 'main' : 'rail');
+    await tick();
+    document.getElementById(`b-${i + 1}`)?.querySelector<HTMLElement>('.area-move button')?.focus();
   }
 
   /**
@@ -506,20 +553,10 @@
     saving = true;
     const title = result?.page.title ?? slug;
     const m = await import('$lib/record/page-write.ts');
-    const placed = arrangement.body.map((b) => ({ i: b.block, span: b.span }));
-    /* A PAGE WITH A RAIL WRITES EACH BLOCK'S AREA TOO. `arrangement.body` is order and span, and so is `saveArrangement`,
-       so a block moved to the rail was written back in the main column; `layout-write.ts` says why it is a second path. */
-    const out = layout
-      ? await (await import('./layout-write.ts')).saveLaidOut(
-          apiBase(),
-          slug,
-          result?.blocks.length ?? 0,
-          (arrangement.slots ?? []).map((s) => ({ i: s.i, span: s.span, ...(s.area ? { area: s.area } : {}) })),
-          extra,
-          undefined,
-          result?.page.declared_version,
-        )
-      : await m.saveArrangement(apiBase(), slug, result?.blocks.length ?? 0, placed, extra, undefined, result?.page.declared_version);
+    /* EACH BLOCK'S COLUMN GOES WITH ITS PLACE, through the one write every page uses: a page with a rail went through a
+       second one, `layout-write.ts`, while `arrangedBody` wrote order and span only. */
+    const placed = arrangement.body.map((b) => ({ i: b.block, span: b.span, ...(b.area ? { area: b.area } : {}) }));
+    const out = await m.saveArrangement(apiBase(), slug, result?.blocks.length ?? 0, placed, extra, undefined, result?.page.declared_version);
     saving = false;
     if (out.from !== 'written') return void toasts.push(out.fix, { intent: 'warn' });
     arrangement.commit();
@@ -944,15 +981,16 @@
                 onmove={(to) => stepInArea(at, pos, to)}
                 onspan={(span) => arrangement.setSpan(at, span)}
                 onremove={() => arrangement.remove(at)}
+                widths={!rail}
               />
               <!-- THE KEYBOARD'S WAY ACROSS, as Move up is its way along: a drag onto the other column does the same, and
                    WCAG 2.5.7 asks for the control that is not a drag. Only on a page with a rail, since a page without
                    one has nowhere to send a block. -->
               {#if layout}
                 <div class="area-move">
-                  <Button weight="bare" onclick={() => toOtherArea(at, rail ? 'rail' : 'main')}>
+                  <Button weight="bare" onclick={() => void toOtherArea(at, rail ? 'rail' : 'main', slot.i)}>
                     <Icon name={rail ? 'back' : 'arrow'} size="s" />
-                    {rail ? railWords.toMain : railWords.toRail}
+                    {rail ? copy.moveToMain : copy.moveToRail}
                   </Button>
                 </div>
               {/if}
@@ -1048,7 +1086,16 @@
                     onact={(row, option) => askGate(row, option)}
                     onreschedule={(row, drop) => void rescheduleBar(block, row, drop, slot.i, shown.rows)}
                     oncapture={capturable(block) ? captureLine : undefined}
-                  />{:else if segment.type === 'degraded'}<Degraded {segment} />{:else if segment.type === 'markdown'}<div class="document"><Markdown {segment} opts={{ href: inApp }} /></div>{/if}
+                    oninput={block.kind === 'inputs' && live ? typeInto : undefined}
+                  />
+                  <!-- WHAT THE RECORD REFUSED ABOUT A FIELD IS SAID UNDER ITS BLOCK, named by the field's label, until that
+                       field is written. -->
+                  {#if segment.kind === 'inputs'}
+                    {#each shown.rows as r}
+                      {@const fix = saidOf(r)}
+                      {#if fix}<p class="block-said" role="status" data-intent="bad">{r.cells[1]}: {fix}</p>{/if}
+                    {/each}
+                  {/if}{:else if segment.type === 'degraded'}<Degraded {segment} />{:else if segment.type === 'markdown'}<div class="document"><Markdown {segment} opts={{ href: inApp }} /></div>{/if}
               {/each}
             {/if}
 
@@ -1120,15 +1167,19 @@
         <!-- TWO COLUMNS, the main one a twelve-column flow of its own so a block's `span` keeps its meaning inside it, and
              the rail one stack. The rail is drawn only while it holds a block, so a page whose every block is in main
              draws as one column rather than beside an empty third of the screen. -->
-        <div
-          class="area"
-          data-area="main"
-          style="--area-span:{mainSpan(layout)}"
-          role={arranging ? 'list' : undefined}
-          aria-label={arranging ? railWords.main : undefined}
-        >
-          {@render column(split.main)}
-        </div>
+        <!-- AND THE MAIN COLUMN IS DRAWN ONLY WHILE IT HOLDS ONE, so a page whose every block is in the rail does not draw
+             two thirds of the screen empty beside it; the rail then takes the row, as main does when it is alone. -->
+        {#if split.main.length > 0}
+          <div
+            class="area"
+            data-area="main"
+            style="--area-span:{mainSpan(layout)}"
+            role={arranging ? 'list' : undefined}
+            aria-label={arranging ? copy.mainColumn : undefined}
+          >
+            {@render column(split.main)}
+          </div>
+        {/if}
         {#if split.rail.length > 0}
           <div
             class="area"
@@ -1136,7 +1187,7 @@
             style="--area-span:{layout.rail}"
             data-sticky={stuck ? '' : undefined}
             role={arranging ? 'list' : undefined}
-            aria-label={arranging ? railWords.rail : undefined}
+            aria-label={arranging ? copy.sideRail : undefined}
             bind:this={railEl}
             bind:clientHeight={railHeight}
           >
@@ -1193,6 +1244,13 @@
     font-size: var(--t-sm);
   }
 
+  /* An input's refusal, under the inputs it is about, in the size the slice line under a block is said in. */
+  .block-said {
+    margin: 0;
+    padding-block-start: var(--sp-2);
+    font-size: var(--t-sm);
+  }
+
   .page {
     display: grid;
     grid-template-columns: repeat(12, minmax(0, 1fr));
@@ -1232,8 +1290,9 @@
   }
 
   /* A RAIL WITH NOTHING IN IT IS NOT DRAWN, and the main column then takes the page rather than leaving a third of it
-     empty beside itself. */
-  .area[data-area='main']:last-child {
+     empty beside itself. A MAIN COLUMN WITH NOTHING IN IT is not drawn either, and the rail takes the page the same way. */
+  .area[data-area='main']:last-child,
+  .area[data-area='rail']:first-child {
     grid-column: 1 / -1;
   }
 

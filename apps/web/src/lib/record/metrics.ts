@@ -1320,6 +1320,36 @@ export function noteOf(template: string, said: (id: string) => string | null): s
     .replace(/([A-Za-z]+)\(s\)/gu, '$1s');
 }
 
+/** A `{{path}}` a lead sentence may name: a figure's id, and the page's own paths such as `steps.count` or `tasks#12.state`. */
+const HOLE = /\{\{\s*([a-z][a-z0-9_-]*(?:[.#][a-z0-9_-]+)*)\s*\}\}/gu;
+
+/**
+ * A `note lead`'s body, said by `noteOf`'s two rules and with every `{{path}}` LEFT FOR THE RENDERER TO FILL.
+ *
+ * WHY NOT `noteOf` ITSELF. `noteOf` writes each figure in as the record's text, so money went on the screen as
+ * `GBP 7,200.00` where every other sentence on the page says `£7,200.00`: the page's resolver is what writes a figure
+ * the way the cells beside it do, and a body with no holes left in it never reaches that resolver. So the clauses are
+ * chosen and the plurals settled here, from what `said` answers, and the holes go through as written.
+ *
+ * THE COUNT BEFORE THE WORD IS THE ONE THAT COUNTS IT, across the words between them: `{{done}} essential step(s)`
+ * is one step or several by `{{done}}`, where `noteOf` only reads a number with the word straight after it and said
+ * "1 essential steps". A number two figures back (`{{done}} of the {{all}} step(s)`) is not the count, because a
+ * figure between them stops the words.
+ */
+export function leadOf(template: string, said: (path: string) => string | null): string {
+  const kept = template.split(/,\s+/u).filter((clause) => {
+    const paths = [...clause.matchAll(HOLE)].map((m) => m[1]!);
+    return paths.length === 0 || paths.some((p) => said(p) !== '0');
+  });
+  const one = (count: string): boolean => count.trim() === '1';
+  return kept
+    .join(', ')
+    .replace(/(\{\{\s*([a-z][a-z0-9_-]*(?:[.#][a-z0-9_-]+)*)\s*\}\}|\b\d[\d,]*)((?:\s+[A-Za-z]+)*?)\s+([A-Za-z]+)\(s\)/gu, (_, figure: string, path: string | undefined, between: string, word: string) =>
+      `${figure}${between} ${one(path === undefined ? figure : (said(path) ?? '')) ? word : `${word}s`}`,
+    )
+    .replace(/([A-Za-z]+)\(s\)/gu, '$1s');
+}
+
 /**
  * A window as a person reads it, from the window as a declaration writes it.
  *

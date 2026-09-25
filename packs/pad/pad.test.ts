@@ -132,6 +132,21 @@ test('A NOTE WITH NO REPLY IS PUT TO SLASH, and what Slash answers is written un
   sql.close();
 });
 
+test('AN EMPTY ANSWER FROM SLASH LEAVES THE REPLY EMPTY, never a mark under the note', async () => {
+  /* MEASURED ON 25 SEPTEMBER, BEFORE THE KERNEL'S FIX: the question acked `done` with no text wrote `—` as the reply.
+     `packages/slash`'s own pass refuses a blank answer before it acks, so this is a host that acks the outbox itself,
+     which the kernel accepts. The run fills `{{vars.opinion}}` with the dash a hole in a sentence gets, and the `set`
+     took the dash as the whole value. `once_per` had marked the note by then, so it was never asked again either. A
+     reply that is empty is at least one a person can see is missing, and write. */
+  const { api, sql } = await padded();
+  const note = write(api, { text: 'Try the green ink on the cover.' });
+  await api.kernel.drain();
+  await answer(api, '');
+  assert.equal(noteOf(api, note.id).fields.reply ?? null, null, 'an empty answer was written under the note as a mark');
+  assert.equal(runs(sql), 1);
+  sql.close();
+});
+
 test('A NOTE WRITTEN WITH A REPLY QUEUES NOTHING: no run and no question', async () => {
   const { api, sql } = await padded();
   write(api, { text: 'Move the stall to the corner by the door.', reply: 'Written by hand, beside the note.' });

@@ -36,13 +36,14 @@
 
 import { across, convertMinor, dayFieldOf, rateFor, type Part, type Rate } from '@braindog/kernel';
 import { day as longDay, money, parse, since, workingCell, WORKING_MARK, type Block } from 'braindog-render';
-import { KINDS, isKind, type CardRole } from 'braindog-render';
+import { KINDS, isKind, showsOf, type CardRole } from 'braindog-render';
 import type { Column } from 'braindog-render/svelte';
-import { display, feedWho, homeCurrency, walkTable, type BlockResult } from './api.ts';
+import { display, feedWho, homeCurrency, labelOf, walkTable, type BlockResult } from './api.ts';
 /* `ROWS` IS `held.ts`'S, EMPTY IN A SHIPPED TAB: a gauge whose filter matched nothing took its currency from the sample's
    rows of the list, on any record. With no rows held it is the block's own sum or none, and a test over the sample fills
    the table (`fixtures/fill.ts`). */
 import { REGISTERS, ROWS } from './held.ts';
+import { draftOf } from './field-draft.ts';
 
 /**
  * The instant a block was read at, which is the clock everything drawn from it is told against.
@@ -542,7 +543,7 @@ function boardOrder(block: BlockResult): BlockResult {
  * include it — `KINDS[kind].tone` says whether a trailing tone word is read, and the dialect's own
  * parser takes it from the end of the line.
  */
-function projectRows(block: BlockResult, cells: number): string[] {
+function projectRows(block: BlockResult, cells: number, markAt?: (i: number) => string): string[] {
   const fields = block.columns.map((c) => c.field);
   return block.rows.map((row, i) => {
     const entry = block.entries[i];
@@ -574,6 +575,8 @@ function projectRows(block: BlockResult, cells: number): string[] {
      */
     const spec = KINDS[block.kind as keyof typeof KINDS];
     const out = values.map(escapeCell);
+    /* A PATH'S LAST CELL IS THE RECORD'S MARK, written in the dialect's own words and never a field's text (`pathRows`). */
+    if (markAt) out[cells - 1] = markAt(i);
     /**
      * `working: true`'s DOT, on the cell the kind calls the row by — `workingCell` knows which, so the
      * writing side and the drawing side cannot drift about it. Written BEFORE the checkbox mark below,
@@ -721,7 +724,12 @@ function queueRows(block: BlockResult): string[] {
          (`@braindog/kernel`'s `weigh.ts`). Passed through as the record's own word rather than as a
          sentence: the words a reader sees are `render/src/queue.ts`'s, the way tone's are. */
       ['q', q.id, feedWho(q.who, null), since(q.at, at), q.question, q.why, q.cost ?? ''].map(escapeCell).join(' | '),
-      ...options.map((o) => ['opt', q.id, o.key, o.label, o.because, o.recommended ? 'true' : ''].map(escapeCell).join(' | ')),
+      /* AN OPTION'S SEVENTH CELL IS WHAT IT IS (`showsCell`), written only when it has one, so an option with no visual
+         is the six-cell row it always was. */
+      ...options.map((o) => {
+        const shows = showsCell((o as { shows?: unknown }).shows);
+        return ['opt', q.id, o.key, o.label, o.because, o.recommended ? 'true' : '', ...(shows ? [shows] : [])].map(escapeCell).join(' | ');
+      }),
     ];
   });
   const more = Math.max(0, block.total - waiting.length);
@@ -953,7 +961,7 @@ function drawSegments(block: BlockResult): ReturnType<typeof parse> {
      its author wrote "What needs doing?". */
   const heading = (block.kind === 'section' || block.kind === 'capture') && block.heading ? ` | ${escapeCell(block.heading)}` : '';
   /* THE HERO FIGURE IS A FORM OF `stat`, written after the kind: ```stat lead. */
-  const form = block.kind === 'stat' && block.lead ? ' lead' : block.kind === 'series' && block.net ? ' net' : block.kind === 'progress' && block.spent ? ' budget' : '';
+  const form = formOf(block);
   const head = `${block.kind}${form}${heading || (block.tone ? ` |  | ${block.tone}` : '')}`;
   const spec = isKind(block.kind) ? KINDS[block.kind] : undefined;
 
@@ -1000,6 +1008,8 @@ function drawSegments(block: BlockResult): ReturnType<typeof parse> {
         ? chipsRows(block)
       : block.kind === 'gauge'
         ? gaugeRows(block)
+      : block.kind === 'progress' && block.register && ranged(block)
+        ? rangeRows(block)
       : block.kind === 'progress' && block.register
         ? progressRows(block)
       : block.kind === 'cards'
@@ -1008,6 +1018,10 @@ function drawSegments(block: BlockResult): ReturnType<typeof parse> {
         ? queueRows(block)
       : block.kind === 'capture'
         ? captureRows(block)
+      : block.kind === 'inputs'
+        ? inputsRows(block)
+      : block.kind === 'steps' && marksOf(block) && block.register && block.columns.length > 0 && spec
+        ? pathRows(block, spec.cells)
       : block.kind === 'section'
         ? [sectionRow(block)]
       : block.register && block.columns.length > 0 && spec
@@ -1018,32 +1032,175 @@ function drawSegments(block: BlockResult): ReturnType<typeof parse> {
   /* `page`, because this is a page's evaluator: it is the one caller that may draw the page-only
      kinds whose rows it wrote itself. `table` has no rows to write and still degrades. */
   const segments = parse(['```' + head, ...rows, '```'].join('\n'), { page: true });
+  /* EVERY FIELD OF AN `inputs` BLOCK IS THE ONE ROW IT EDITS, so each drawn row names that row: the write a change makes
+     is an update of it at the version it was read at (`inputs-write.ts`). */
+  if (block.kind === 'inputs' && block.register) return withRefs(segments, block.register, rows.map(() => block.entries[0]!).filter(Boolean));
   const projected =
     !conflicted &&
     !block.authored?.length &&
     !block.metrics &&
     !['bar', 'split', 'chips', 'gauge', 'progress', 'cards', 'section', 'stat', 'queue'].includes(block.kind) &&
     Boolean(block.register && block.columns.length > 0 && spec);
+  /* A PATH'S COUNT OF THE REST IS ITS LAST ROW AND NO RECORD ROW, so the stones before it are named and it is not. */
+  const counted = block.kind === 'steps' && rows.length === block.entries.length + 1 ? 1 : 0;
   return projected && block.register
-    ? withRefs(segments, block.register, block.kind === 'board' ? boardOrder(block).entries : block.entries)
+    ? withRefs(segments, block.register, block.kind === 'board' ? boardOrder(block).entries : block.entries, counted)
     : segments;
 }
 
 /**
  * EACH PROJECTED ROW NAMES THE RECORD ROW IT CAME FROM, after the parse, because the text in between carries no identity.
  *
- * One drawn row per entry, in the order `projectRows` wrote them. A parse that drew anything else, a degraded fence or a
- * different number of rows, gets no refs at all: a card named by the wrong row would move somebody else's row.
+ * One drawn row per entry, in the order `projectRows` wrote them, and `trailing` rows after them that are no row of the
+ * record (a path's count of the rest). A parse that drew anything else, a degraded fence or a different number of rows,
+ * gets no refs at all: a card named by the wrong row would move somebody else's row.
  */
-function withRefs(segments: ReturnType<typeof parse>, register: string, entries: BlockResult['entries']): ReturnType<typeof parse> {
+function withRefs(segments: ReturnType<typeof parse>, register: string, entries: BlockResult['entries'], trailing = 0): ReturnType<typeof parse> {
   const drawn = segments.filter((s): s is Block => s.type === 'block');
   const only = drawn.length === 1 && segments.length === 1 ? drawn[0] : undefined;
-  if (!only || only.rows.length !== entries.length) return segments;
-  only.rows.forEach((row, i) => {
+  if (!only || only.rows.length !== entries.length + trailing) return segments;
+  only.rows.slice(0, entries.length).forEach((row, i) => {
     const entry = entries[i];
     if (entry && entry.seq > 0) row.ref = { register, seq: entry.seq, version: entry.version };
   });
   return segments;
+}
+
+/* ── the forms a built page draws (brief D7) ─────────────────────────────── */
+
+/** A key the record answers or a declaration carries that the app's block type does not name, read as it came. */
+const keyOf = (block: BlockResult, key: string): unknown => (block as unknown as Record<string, unknown>)[key];
+
+/** Whether a `progress` block is drawn as ranges, which is the declaration's `range: true` and nothing looser. */
+const ranged = (block: BlockResult): boolean => keyOf(block, 'range') === true;
+
+/** A path's done marks as the record answered them, aligned with the rows, or `null` for a `steps` block that is no path. */
+function marksOf(block: BlockResult): boolean[] | null {
+  const marks = keyOf(block, 'done_now');
+  return Array.isArray(marks) && marks.length === block.entries.length ? marks.map((m) => m === true) : null;
+}
+
+/**
+ * The word after the kind in the fence, one of the forms the renderer names (`KINDS[kind].forms`).
+ *
+ * A PATH IS A FORM THE RECORD DECIDES and every other one is the author's. `steps path` is written when the record
+ * answered `done_now`, which it does only over a list that declares `steps:`, because a mark cell is a fact about which
+ * rows are done and a list that says nothing about that has no marks to write. The rest are the declaration's own
+ * words, each read as `true` and nothing looser, as `sticky` and `box` are.
+ */
+function formOf(block: BlockResult): string {
+  if (block.kind === 'stat' && block.lead) return ' lead';
+  if (block.kind === 'series' && block.net) return ' net';
+  if (block.kind === 'progress' && ranged(block)) return ' range';
+  if (block.kind === 'progress' && block.spent) return ' budget';
+  if ((block.kind === 'note' || block.kind === 'cards') && block.lead === true) return ' lead';
+  if (block.kind === 'steps' && marksOf(block)) return ' path';
+  if (block.kind === 'queue' && keyOf(block, 'tiles') === true) return ' tiles';
+  return '';
+}
+
+/**
+ * A path's rows: each stone `title | detail | mark`, the mark `done`, `next` or blank, then `more | N` when the short
+ * view left steps out (`render/src/path.ts`).
+ *
+ * THE MARKS ARE THE RECORD'S, `done_now` and `next`, and the projected third cell is thrown away for them. That cell
+ * was the list's free text, so a path whose third column was a stage drew "sample" where the record knew the step was
+ * done; on a path the third cell is the one fact the form exists to say.
+ *
+ * `N` IS WHAT THE SHORT VIEW DID NOT DRAW, the list's `matched` less the stones, which is the kernel's own arithmetic
+ * ("1 of 3" is what the drawer's "2 more" is counted from, `pages.ts`). It is written only under `first:`, because a
+ * path cut by `limit:` is a slice, and the page's slice line under it already says so with a door to the rest.
+ */
+function pathRows(block: BlockResult, cells: number): string[] {
+  const marks = marksOf(block) ?? [];
+  const next = keyOf(block, 'next');
+  const stones = projectRows(block, cells, (i) => (marks[i] ? 'done' : next === i ? 'next' : ''));
+  const more = typeof keyOf(block, 'first') === 'number' ? Math.max(0, block.total - stones.length) : 0;
+  return more > 0 ? [...stones, `more | ${more}`] : stones;
+}
+
+/**
+ * A range's rows: `label | spent | low | high`, one a row the list matched (`render/src/progress.ts` `rangePlan`).
+ *
+ * EACH FIGURE IS THE RECORD'S, SAID ONCE, through the one formatter every cell uses, so 12050 pence is `GBP 120.50` here
+ * and on the list; the scale, the band and the total are the drawer's arithmetic over these same strings. A row with
+ * nothing spent writes an empty cell, which the drawer says as "Not spent", rather than nought, which it would draw as
+ * a mark at the start of the track: a spend of nothing and no spend yet are two different facts.
+ */
+function rangeRows(block: BlockResult): string[] {
+  const register = block.register ?? '';
+  const [label, spent, low, high] = block.columns.map((c) => c.field);
+  if (!label || !spent || !low || !high) return [];
+  const said = (field: string, v: unknown): string => (v === null || v === undefined || v === '' ? '' : (display(register, field, v, clockOf(block), block.names) ?? ''));
+  return block.matched.map((e) => [label, spent, low, high].map((f) => escapeCell(said(f, e.fields[f]))).join(' | '));
+}
+
+/**
+ * An `inputs` block's rows: `field | label | type | value`, one a field of the one row the record read
+ * (`render/src/inputs.ts`).
+ *
+ * THE TYPE IS THE RECORD'S ANSWER (`types`), which is what picks the control; an enum carries its choices from the
+ * list's declaration, as `enum:idea,sample,made`, so the select offers exactly what the record would take.
+ *
+ * THE VALUE IS WHAT THE BOX OPENS ON AND WHAT THE SPEC SAYS WHERE NOTHING CAN WRITE. Money is the record's reading said
+ * once (`GBP 1,200.00`, never a bare `1200` that has lost its currency), and `inputs-write.ts` reads it back; a yes or
+ * no is the record's own spelling; an instant is cut to the minute a `datetime-local` box holds. Everything else is
+ * what the row page's box opens on (`draftOf`), so a duration opens in its unit and not in seconds.
+ */
+function inputsRows(block: BlockResult): string[] {
+  const register = block.register ?? '';
+  const entry = block.entries[0];
+  const types = keyOf(block, 'types');
+  if (!entry || types === null || typeof types !== 'object') return [];
+  const decl = REGISTERS[register];
+  /* WITH NO `columns:` THE KERNEL DREW EVERY TYPABLE FIELD, and names them in `types`, so those are the rows. */
+  const named = block.columns.length ? block.columns : Object.keys(types).map((f) => ({ field: f, label: f }));
+  return named.flatMap((c) => {
+    const type = (types as Record<string, unknown>)[c.field];
+    if (typeof type !== 'string') return [];
+    const field = decl?.fields.find((f) => f.id === c.field);
+    /* THE FIELD'S NAME, as the row page says it, where the declaration gave the column none: `price` is the schema
+       talking, and it went on the screen as the input's label. */
+    const label = c.label !== c.field ? c.label : field ? labelOf(field) : c.field;
+    const v = entry.fields[c.field];
+    const choices = type === 'enum' ? (field?.values ?? []).join(',') : '';
+    const value =
+      v === null || v === undefined
+        ? type === 'bool' || type === 'boolean'
+          ? 'false'
+          : ''
+        : type === 'money'
+          ? (display(register, c.field, v, clockOf(block), block.names) ?? '')
+          : type === 'bool' || type === 'boolean'
+            ? String(v === true)
+            : type === 'instant'
+              ? String(v).slice(0, 16)
+              : field
+                ? draftOf(field, v, null)
+                : String(v);
+    return [[c.field, label, choices ? `${type}:${choices}` : type, value].map(escapeCell).join(' | ')];
+  });
+}
+
+/**
+ * An option's seventh cell: what it IS, as the renderer spells it (`render/src/queue.ts`), or empty.
+ *
+ * HELD TO THE RENDERER'S OWN READING BEFORE IT IS WRITTEN. A cell the parser would not read degrades the WHOLE queue,
+ * so one option whose colour a record on another build spelled differently would take every question on the page with
+ * it; checked here, that option shows nothing and the rest still draw. The record checks the same three shapes on
+ * filing (`govern.ts` `showsOf`), so on this build nothing is dropped.
+ */
+function showsCell(shows: unknown): string {
+  if (shows === null || typeof shows !== 'object') return '';
+  const s = shows as { swatch?: unknown; figure?: unknown; file?: { row?: unknown; field?: unknown } };
+  const cell = Array.isArray(s.swatch)
+    ? `swatch:${s.swatch.join(',')}`
+    : typeof s.figure === 'string'
+      ? `figure:${s.figure}`
+      : s.file && typeof s.file.row === 'string' && typeof s.file.field === 'string'
+        ? `file:${s.file.row}/${s.file.field}`
+        : '';
+  return cell !== '' && showsOf(cell) !== null ? cell : '';
 }
 
 /**
@@ -1237,10 +1394,13 @@ export function draw(
   /* A FIGURE IN A LABEL-AND-VALUE ROW READS AS MONEY, the way the table beside it does. The
      primitive draws its cells as text, so a `spec` block on a project page said `GBP 14.00` under a
      table saying `£8,530.00`. A code block keeps what was written, and so does a capture, whose cells nobody
-     reads: they are the list and the values the host writes into a new row, in the form the record stores. */
+     reads: they are the list and the values the host writes into a new row, in the form the record stores.
+     AN `inputs` VALUE IS WHAT ITS BOX OPENS ON AND WHAT `inputs-write.ts` READS BACK, so it keeps the record's own
+     spelling too: on a record whose home is pounds the box would open on `£1,200.00`, and `$` is the symbol of more than
+     one currency, so what came back could not say which it was in. */
   const home = homeCurrency();
   const segments = toSegments(block).map((s) =>
-    s.type === 'block' && s.kind !== 'code' && s.kind !== 'capture' ? { ...s, rows: s.rows.map((r) => ({ ...r, cells: r.cells.map((c) => symbolText(c, home)) })) } : s,
+    s.type === 'block' && s.kind !== 'code' && s.kind !== 'capture' && s.kind !== 'inputs' ? { ...s, rows: s.rows.map((r) => ({ ...r, cells: r.cells.map((c) => symbolText(c, home)) })) } : s,
   );
   /* A CARD GRID IS BLANK WHEN IT HAS NO ENTRIES, whatever its first row says: that row names the
      columns and is not a card. A section over a register that admitted nothing has nothing under

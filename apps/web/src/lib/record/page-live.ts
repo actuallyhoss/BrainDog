@@ -42,7 +42,7 @@ import { REGISTERS } from './held.ts';
 import { linkOf } from './blocks.ts';
 import { METRICS } from './declared.ts';
 import { readBoot } from './boot-live.ts';
-import { format, fxNote, hrefFor, noteOf, partsShown, partsText, targetSaid, walksNote, withParam, type MetricDecl } from './metrics.ts';
+import { format, fxNote, hrefFor, leadOf, noteOf, partsShown, partsText, targetSaid, walksNote, withParam, type MetricDecl } from './metrics.ts';
 import { entryOf, learn, namesOf, refMapOf, targetsOf, type RecordRow, type RefMap } from './remote.ts';
 import { REDUCES, SUMS, type PageBlock, type PageDecl } from './schema.ts';
 import { compile } from './where.ts';
@@ -195,6 +195,10 @@ const EVERYWHERE = 'Everywhere';
 /** The register a block's rows belong to, when it has one this build can draw. */
 function registerOf(b: Answered): string | null {
   if (b.source === 'sessions.live') return 'session';
+  /* AN `inputs` BLOCK NAMES ITS LIST AS `register:`, as a capture does, and has no `source:`. Without this the page read
+     never asked for a pack's list before drawing one, and every such block came back as the line saying it cannot be
+     drawn, on the first record that had not already opened that list somewhere else. */
+  if (b.kind === 'inputs') return typeof b.register === 'string' && b.register !== '' ? b.register : null;
   return b.source?.startsWith('register.') ? b.source.slice('register.'.length) : null;
 }
 
@@ -202,10 +206,14 @@ function registerOf(b: Answered): string | null {
 const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined);
 
 /**
- * The roles a DECLARATION may give a column, which is the eight `declare.ts` admits.
+ * The roles a DECLARATION may give a column, which is the ten `declare.ts` admits.
  *
- * `braindog-render`'s own `CARD_ROLES` has a ninth, `quiet`, and its comment says why it is not one of
+ * `braindog-render`'s own `CARD_ROLES` has an eleventh, `quiet`, and its comment says why it is not one of
  * these: the evaluator writes `quiet` from the record's clock, and a declaration does not name it.
+ *
+ * `next` AND `reply` CAME WITH WAVE ONE, AND THIS LIST DROPPED BOTH. The kernel admitted them and answered `nexts`, the
+ * renderer drew "Next: ...", and a card declared `{ field: 'what', as: 'next' }` reached the fence as `fact: Next` over
+ * the card's own `what`: "The first piece" where the record had answered "Sample the fit" (`dynamic-app.test.ts`).
  * `scope` is not a role either. It says what the cell HOLDS, which this file settles from `scopes`
  * before anything is drawn, so it is not carried onto the column.
  *
@@ -213,7 +221,7 @@ const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : und
  * is the second half of a check rather than the only one, and `as Column[]` was the app promising a
  * closed set about a string it had not looked at.
  */
-const ROLES = ['title', 'figure', 'fact', 'trend', 'ring', 'who', 'when', 'mark'] as const;
+const ROLES = ['title', 'figure', 'fact', 'trend', 'ring', 'who', 'when', 'mark', 'next', 'reply'] as const;
 const roleOf = (v: unknown): (typeof ROLES)[number] | undefined => ROLES.find((r) => r === v);
 
 const columnsOf = (b: Answered) => {
@@ -610,6 +618,12 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
        unchecked: `fills` is what a press writes, so a value in it the app did not look at is a value it would store. */
     register: into,
     fills: filled,
+    /* WHAT A BUILT PAGE'S FORMS ARE DRAWN FROM (brief D7), taken by name and narrowed below, so a record on another
+       build that sent one in a shape this cannot read draws the plain form rather than a wrong one. */
+    nexts: nexted,
+    types: typed,
+    done_now: doneNow,
+    next: nextAt,
     ...rest
   } = b;
 
@@ -653,7 +667,9 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
     ...(authored === undefined ? {} : { authored }),
     ...(cells === undefined ? {} : { cells }),
     register: undefined,
-    columns: columnsOf(b),
+    /* THE CAST IS `schema.ts`'S ROLE LIST BEING TWO SHORT: it still names the eight roles and `scope`, and the renderer's
+       `Column` and the kernel both take `next` and `reply`. That file is not this brief's; the two words belong there. */
+    columns: columnsOf(b) as LiveBlock['columns'],
     entries: [],
     matched: [],
     refusals: refusals.map((r) => r.fix),
@@ -668,6 +684,32 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
   const cannot: LiveBlock = { ...shell, cannot: liveWords.cannot };
 
   if (refusals.length || drawn === false) return shell;
+  /* A LEAD NOTE IS THE SCREEN'S ONE SENTENCE, SAID BY `noteOf`'S RULES (`leadOf`): a clause whose every figure is nought
+     goes, and `N thing(s)` is one thing or several. Before this the body went to the renderer as written, which filled
+     each figure and left the rest alone, so the first line of a desk read "1 essential step(s) done" (measured at HEAD
+     in `dynamic-app.test.ts`). The holes are kept, so each figure is still written by the page's resolver, the way the
+     cells beside it are.
+
+     A LEAD WITH NOTHING LEFT TO SAY IS NOT DRAWN, as a note whose `when:` said no is not: "0 essential steps done" is
+     the clause the rule exists to take away, and a panel with no sentence in it is a hole in the first screen. */
+  if (kind === 'note' && rest.lead === true && body !== undefined) {
+    const lead = leadOf(body, resolverOf(values));
+    return lead.trim() === '' ? { ...shell, body: '', drawn: false } : { ...shell, body: lead };
+  }
+  /* AN `inputs` BLOCK IS ONE ROW'S FIELDS TO TYPE INTO, read by `register:` and never by `source:`, so it is answered
+     before the check that sends a block with no source back as written text. That check was where it went: the kernel
+     answered the row and its `types`, and the page drew `Nothing matched.` over a row it had been handed.
+
+     THE TYPES ARE THE RECORD'S, and a block whose `types` is not a map of words draws the line saying it cannot be drawn
+     rather than guessing a control from the value: a money guessed to be text is a box that writes a string into a
+     money field. */
+  if (kind === 'inputs') {
+    const register = registerOf(b);
+    const types = isObject(typed) && Object.values(typed).every((t) => typeof t === 'string') ? (typed as Record<string, string>) : null;
+    if (!register || !REGISTERS[register] || !types) return cannot;
+    const entries = got.slice(0, 1).map((r) => entryOf(register, r, refs));
+    return { ...shell, register, entries, matched: entries, rows: toRows(register, entries, shell.columns, now, namesOf(refs)), shown: entries.length, total: entries.length, names: namesOf(refs), types } as LiveBlock;
+  }
   /* A CAPTURE READS NO ROWS, and it has no `source:` either, so it is answered before the check that sends a block
      with none back as written text. Its list is kept on `register`, which every other block here takes from its
      source, because `draw()` names the list from it and the page decides from it whether a line can be written.
@@ -809,14 +851,32 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
       row.cells[i] = scopes?.[n] ?? (live ? (row.cells[i] ?? null) : EVERYWHERE);
     });
   });
+  /* EACH CARD'S NEXT STEP IS THE RECORD'S ANSWER, `nexts`, written into the cell and never into the row, unlike a ring.
+     The column names a field of the STEPS list, and the card's own list may hold a field of the same name: the measured
+     desk's areas have a `what` of their own, so merged into the row it would also have replaced the card's `what` in
+     any other column drawing it. A card with no open step says nothing there. */
+  const nexts = kind === 'cards' && Array.isArray(nexted) && nexted.length === got.length ? nexted.map((v) => (typeof v === 'string' ? v : null)) : null;
+  (b.columns ?? []).forEach((c, i) => {
+    if (c.as !== 'next') return;
+    rows.forEach((row, n) => {
+      row.cells[i] = nexts?.[n] ?? null;
+    });
+  });
+  /* A PATH'S MARKS ARE THE RECORD'S, one a row, and the first open one's place. A path under `first:` SAYS ITS OWN REST
+     as "N more" (`blocks.ts` `pathRows`), so `shown` is the whole match and the page's slice line is not drawn under it
+     as the same count told twice. */
+  const marks = kind === 'steps' && Array.isArray(doneNow) && doneNow.length === got.length && doneNow.every((d) => typeof d === 'boolean') ? (doneNow as boolean[]) : null;
+  const path = marks ? { done_now: marks, next: typeof nextAt === 'number' && Number.isInteger(nextAt) && nextAt >= 0 && nextAt < marks.length ? nextAt : null } : {};
+  const short = marks !== null && typeof rest.first === 'number';
   return {
     ...shell,
     register,
     entries,
     matched: entries,
     rows,
-    shown: reduces ? matched : entries.length,
+    shown: reduces || short ? matched : entries.length,
     total: matched,
+    ...path,
     ...(spentBy === undefined ? {} : { spentBy }),
     names: namesOf(refs),
     ...(inherited === undefined ? {} : { inherited }),
