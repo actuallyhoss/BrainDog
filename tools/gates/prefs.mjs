@@ -241,10 +241,18 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
        * without it. That is the third control in this product found to move a tick and write nothing.
        */
       name: 'suggestPages',
-      what: 'how many rows the holding pen draws (29 §4)',
+      what: 'the switch the page draws, and the holding pen or the empty state it draws instead (29 §4)',
       route: '/settings/navigation',
       values: [{}, { suggestPages: false }],
-      probe: () => String(document.querySelectorAll('#main .ledger li').length),
+      /* THE SWITCH AND WHAT IT EMPTIES, not the pen's rows alone. The rows came from the sample record, and with it gone
+         (DIRECTION 26) a record with nothing waiting draws none either way, so the count read 0 for both values and the
+         gate called a working switch dead. The switch's own state and the section's empty-state title are what a page
+         load settles on any record. */
+      probe: () => [
+        document.querySelector('#main button[role="switch"][aria-label="Suggest new pages"]')?.getAttribute('aria-checked') ?? 'none',
+        document.querySelectorAll('#main .ledger li').length,
+        [...document.querySelectorAll('#main h3, #main [class*="empty"] strong, #main [class*="empty"] h3')].map((e) => e.textContent?.trim()).filter(Boolean).join('|'),
+      ].join(' '),
     },
     {
       name: 'nav',
