@@ -107,11 +107,23 @@ export type RangeBar = {
 /**
  * What a figure is counted in, read off how it is written: the symbol or code around the number.
  *
- * `£1,200.00` is in `£`, `GBP 150.00` in `GBP`, `1200` in nothing. Two cells in two units cannot be added, and the
- * record refuses a range over two currencies (`MIXED_CURRENCY`), so a hand-built block that has them gets no total
- * rather than a sum of pounds and dollars. Crude on purpose: it has to tell two units apart, not name either.
+ * `£1,200.00` is in `£`, `GBP 150.00` in `GBP`, `1200` in nothing. Two cells in two units cannot be added or drawn on
+ * one scale. Crude on purpose: it has to tell two units apart, not name either.
  */
 const unitOf = (figure: string): string => figure.replace(/[\d.,\s−-]/gu, '');
+
+/** How many decimals a figure is written to: `£120.50` two, `0.333` three, `10,000` none. */
+const placesOf = (figure: string): number => /\d[\d,]*(?:\.(\d+))?/u.exec(figure)?.[1]?.length ?? 0;
+
+/**
+ * Said in place of the scale and the total when the figures are not all in one unit.
+ *
+ * MEASURED BEFORE IT WAS WRITTEN: a spend in money beside a low and a high in plain numbers (pence written as ints)
+ * drew `£120.50` as 120.5 on a scale of 30,000, so every mark sat at the start of its track and the drawing said
+ * nothing had been spent. The record refuses two currencies (`MIXED_CURRENCY`) but not money beside a plain number,
+ * and a hand-built fence is refused by nobody, so the drawer says it too.
+ */
+export const RANGE_MIXED = 'These figures are not all in one unit, money beside plain numbers or two currencies, so they are not drawn on one scale or added up.';
 
 /**
  * Each row's band and mark on one scale, and the total line.
@@ -123,17 +135,30 @@ const unitOf = (figure: string): string => figure.replace(/[\d.,\s−-]/gu, '');
  * THE TOTAL IS ADDED UP HERE AND NOT WRITTEN BY THE HOST, so it cannot disagree with the rows above it: a total line
  * the evaluator wrote could be read from a different moment than the rows. A column with a figure that does not read
  * has no total, and nothing spent is nothing, so an unspent row adds zero to what was spent.
+ *
+ * AND IT IS DRAWN TO THE PLACE OF THE FINEST FIGURE ON THE BLOCK, added in whole units of that place. It took the first
+ * cell of its column as the shape and rounded the sum to that cell's decimals, so a budget whose first line was a
+ * whole number drew the launch desk's lines as `Total 181 spent 251 to 421` where they add to 181.499, 250.989 and
+ * 421.499. Money is written to its currency's minor unit in every cell, so for money the finest place is that unit.
+ *
+ * FIGURES IN TWO UNITS ARE REFUSED WITH `refused`, and not drawn: no row gets a track and there is no total, and each
+ * figure is still said as written, because each cell is right on its own and only the arithmetic across them is not.
+ * A cell that does not read as a number (blank, or the dash) is no unit at all, so a gap does not refuse the block.
  */
-export function rangePlan(rows: readonly RangeInput[]): { bars: RangeBar[]; total: { spent: string; low: string; high: string } } {
+export function rangePlan(rows: readonly RangeInput[]): { bars: RangeBar[]; total: { spent: string; low: string; high: string }; refused: string | null } {
   const read = rows.map((r) => ({ spent: signedOf(r.spent), low: signedOf(r.low), high: signedOf(r.high) }));
-  const scale = Math.max(0, ...read.flatMap((r) => [r.high, r.spent]).filter(Number.isFinite));
+  const figures = rows.flatMap((r) => [r.spent, r.low, r.high]).filter((c) => Number.isFinite(signedOf(c)));
+  const refused = new Set(figures.map(unitOf)).size > 1 ? RANGE_MIXED : null;
+  const scale = refused ? 0 : Math.max(0, ...read.flatMap((r) => [r.high, r.spent]).filter(Number.isFinite));
   const at = (v: number): string => fixed(v / scale);
 
   const bars = rows.map((r, i): RangeBar => {
     const { spent, low, high } = read[i]!;
     const drawable = scale > 0 && Number.isFinite(low) && Number.isFinite(high) && high > 0 && low <= high;
     const spentAt = Number.isFinite(spent) && scale > 0 ? at(Math.max(0, spent)) : null;
-    const over = Number.isFinite(spent) && Number.isFinite(high) && spent > high;
+    /* OVER IS ARITHMETIC ACROSS TWO CELLS TOO, so a refused block calls no row over: `£120.50` read against a plain high
+       of 100 came back `bad`, where that high in pence was £100 and the same spend against 10,000 would have been fine. */
+    const over = !refused && Number.isFinite(spent) && Number.isFinite(high) && spent > high;
     return {
       drawable,
       from: drawable ? at(Math.max(0, low)) : '0.00',
@@ -145,16 +170,19 @@ export function rangePlan(rows: readonly RangeInput[]): { bars: RangeBar[]; tota
     };
   });
 
-  const units = new Set(rows.flatMap((r) => [r.spent, r.low, r.high]).filter((c) => c.trim() !== '').map(unitOf));
+  const places = Math.max(0, ...figures.map(placesOf));
+  const shape = figures.find((c) => placesOf(c) === places) ?? '';
   const sum = (column: 'spent' | 'low' | 'high'): string => {
-    if (units.size > 1 || rows.length === 0) return MISSING;
+    if (refused || rows.length === 0) return MISSING;
     const cells = rows.map((r) => r[column]);
     const values = read.map((r, i) => (column === 'spent' && cells[i]!.trim() === '' ? 0 : r[column]));
     if (!values.every(Number.isFinite)) return MISSING;
-    const template = cells.find((c) => c.trim() !== '') ?? '';
-    return figureLike(template, values.reduce((a, b) => a + b, 0));
+    /* WHOLE UNITS OF THE FINEST PLACE, each rounded once from the figure as written, so 0.333 three times is 999
+       thousandths and not 0.9990000000000001. */
+    const units = values.reduce((a, v) => a + Math.sign(v) * Math.round(Math.abs(v) * 10 ** places), 0);
+    return figureLike(shape, units / 10 ** places);
   };
-  return { bars, total: { spent: sum('spent'), low: sum('low'), high: sum('high') } };
+  return { bars, total: { spent: sum('spent'), low: sum('low'), high: sum('high') }, refused };
 }
 
 /** A range track's accessible name: the label, what was spent, and the band. */

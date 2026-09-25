@@ -997,9 +997,13 @@ function range(b: Block, o: RenderOptions): string {
       return `<div class="progress-row"${toneAttrs(p.intent)}>${cell('progress-label', r.cells[0], o)}<span class="progress-figure num"><span class="progress-value">${escape(p.spent)}</span></span><span class="progress-range num">${escape(p.range)}</span>${track}${toneGlyph(p.intent)}</div>`;
     })
     .join('');
-  const total = `<div class="progress-row" data-total=""><span class="progress-label">${PROGRESS_TOTAL}</span><span class="progress-figure num"><span class="progress-value">${escape(
-    progressSpentSaid(plan.total.spent),
-  )}</span></span><span class="progress-range num">${escape(progressRangeSaid(plan.total.low, plan.total.high))}</span></div>`;
+  /* FIGURES IN TWO UNITS GET THE SENTENCE WHERE THE TOTAL WOULD BE: a total of dashes under rows with no tracks said
+     that something was missing and not what. */
+  const total = plan.refused
+    ? `<p class="progress-empty">${escape(plan.refused)}</p>`
+    : `<div class="progress-row" data-total=""><span class="progress-label">${PROGRESS_TOTAL}</span><span class="progress-figure num"><span class="progress-value">${escape(
+        progressSpentSaid(plan.total.spent),
+      )}</span></span><span class="progress-range num">${escape(progressRangeSaid(plan.total.low, plan.total.high))}</span></div>`;
   return `<div class="prop progress" data-form="range">${body}${total}</div>`;
 }
 

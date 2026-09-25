@@ -302,6 +302,58 @@ test('A RANGE IS WRITTEN label, spent, low and high, each figure the record\'s o
   assert.match(html, /--from:0\.33;--to:1\.00"><span class="progress-band"><\/span><span class="progress-at" style="--at:0\.40">/u);
 });
 
+/**
+ * One range over a list of budget lines typed as the caller says, read through the record's page, `blockOf` and `draw`,
+ * and said as a reader hears it.
+ */
+async function budget(types: { spent: string; low: string; high: string }, lines: Record<string, unknown>[]): Promise<{ refusals: unknown[]; words: string; html: string }> {
+  const LEDGER = { ...LINES, fields: [{ id: 'item', type: 'text', required: true }, ...(['spent', 'low', 'high'] as const).map((id) => ({ id, type: types[id] }))] };
+  const k = await openRecord(openSqlite(), { now: () => NOW });
+  const page: Declaration = {
+    id: 'page.budget',
+    kind: 'page',
+    body: { page: 'budget', title: 'Budget', requires: ['register.lines'], blocks: [DESK.find((b) => b.heading === 'Budget')] } as never,
+  };
+  const out = await k.install([register(LEDGER), page]);
+  assert.ok(out.ok, JSON.stringify(out));
+  for (const line of lines) assert.ok(k.create('lines', line, OWNER).ok);
+  REGISTERS.lines = LEDGER as never;
+  const read = k.page('budget') as { ok: boolean; value: { blocks: Record<string, unknown>[] } };
+  assert.ok(read.ok, JSON.stringify(read));
+  const block = blockOf(read.value.blocks[0] as never, new Map(), NOW);
+  REGISTERS.lines = LINES as never;
+  const html = toHTML([fence(block)]);
+  return { refusals: block.refusals, words: html.replace(/<[^>]+>/gu, ' ').replace(/\s+/gu, ' ').trim(), html };
+}
+
+test('THE LAUNCH DESK\'S BUDGET TOTAL IS THE SUM OF ITS LINES, drawn to the place of the finest one', async () => {
+  /* THE LINES THE AUDIT TYPED INTO THE SHIPPED DESK, whose budget fields are decimals. The Numbers page drew
+     `Total 181 spent 251 to 421`, the sum rounded to the first line's whole number, where the lines add to 181.499,
+     250.989 and 421.499. */
+  const decimal = { spent: 'decimal', low: 'decimal', high: 'decimal' };
+  const { words } = await budget(decimal, [
+    { item: 'Wax', low: 150, high: 300, spent: 180 },
+    { item: 'Labels', low: 99.99, high: 120.5, spent: 0.5 },
+    { item: 'Boxes', low: 0.333, high: 0.333, spent: 0.333 },
+    { item: 'Ribbon', low: 0.333, high: 0.333, spent: 0.333 },
+    { item: 'Card', low: 0.333, high: 0.333, spent: 0.333 },
+  ]);
+  assert.match(words, /Total 181\.499 spent 250\.989 to 421\.499$/u);
+});
+
+test('A RANGE OF MONEY BESIDE PLAIN NUMBERS IS SAID TO BE ONE, not drawn as if nothing were spent', async () => {
+  /* MEASURED AT HEAD: the record answered this block with no refusal (`rangeFault` compares currencies only among money
+     values), and the page drew every spent mark at `0.00` and a total of dashes. The record still answers it, so the
+     drawing is where it is refused. */
+  const { refusals, words, html } = await budget({ spent: 'money', low: 'int', high: 'int' }, [
+    { item: 'Wax', spent: pound(120.5), low: 10000, high: 30000 },
+    { item: 'Box', spent: pound(50), low: 4000, high: 8000 },
+  ]);
+  assert.deepEqual(refusals, [], 'the record answers this block, so the drawing is the only place it is refused');
+  assert.doesNotMatch(html, /progress-track|data-total/u);
+  assert.match(words, /not all in one unit, money beside plain numbers or two currencies, so they are not drawn on one scale or added up\.$/u);
+});
+
 /* ── P8: inputs ─────────────────────────────────────────────────────────── */
 
 test('INPUTS ARE ONE ROW\'S FIELDS, field, label, type and value, and each row names the record row it edits', async () => {

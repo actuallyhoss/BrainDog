@@ -1,7 +1,8 @@
 <!--
   `progress`: one track a row, filled toward its target, the value of the target, the share, what is left, and the
   figures as text. The `budget` form marks spending past the limit beyond a line at the limit, and the `range` form
-  draws each row as a band from its low to its high on one scale, what was spent marked on it, and a total line.
+  draws each row as a band from its low to its high on one scale, what was spent marked on it, and a total line, or
+  the sentence saying why not when the figures are in two units.
   `src/progress.ts` decides every fill, band and word; `progress` and `range` in `src/html.ts` are this file's twins.
 -->
 <script lang="ts">
@@ -51,11 +52,15 @@
           {/if}
         </div>
       {/each}
-      <div class="progress-row" data-total="">
-        <span class="progress-label">{PROGRESS_TOTAL}</span>
-        <span class="progress-figure num"><span class="progress-value">{progressSpentSaid(ranges.total.spent)}</span></span>
-        <span class="progress-range num">{progressRangeSaid(ranges.total.low, ranges.total.high)}</span>
-      </div>
+      {#if ranges.refused}
+        <p class="progress-empty">{ranges.refused}</p>
+      {:else}
+        <div class="progress-row" data-total="">
+          <span class="progress-label">{PROGRESS_TOTAL}</span>
+          <span class="progress-figure num"><span class="progress-value">{progressSpentSaid(ranges.total.spent)}</span></span>
+          <span class="progress-range num">{progressRangeSaid(ranges.total.low, ranges.total.high)}</span>
+        </div>
+      {/if}
     {:else}
       <p class="progress-empty">{PROGRESS_NONE}</p>
     {/if}
