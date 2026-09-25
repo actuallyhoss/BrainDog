@@ -125,6 +125,31 @@ test('A ROW VERB ON A TRIGGER WITH NO ROW IS REFUSED, since it would reach for a
   assert.equal(code(rule({ rule: 'whenless', on: { manual: true }, when: 'what is x', then: [{ stop: true }] })), 'DECLARATION_INVALID');
 });
 
+test('A CREATE ON A TRIGGER WITH NO ROW FILLS NOTHING FROM ONE, refused at install in the sentence its run would fail with', async () => {
+  /* MEASURED BEFORE THIS, on 25 September: `each: [party]` on a monthly clock and `{{what}}` on a button both installed,
+     and each run of either failed at its create (`clock-create.test.ts`), every month or every press, for a rule the
+     lint had called sound. The sentence is the runner's own (`rowlessCreate`), so the two cannot come to say it apart. */
+  const crossed = rule({ rule: 'crossed', on: { every: '1mo', day: 1, at: '09:00' }, then: [{ create: { register: 'obligations', each: ['party'], fields: { what: 'Rent {{each.0}}' }, bound: 3 } }] });
+  const copied = rule({ rule: 'copied', on: { manual: true }, steps: [{ set_var: { name: 'n', to: 'x' } }, { create: { register: 'obligations', fields: { what: 'Rent', party: 'for {{party}}' }, bound: 1 } }] });
+  const a = validateDeclaration(crossed);
+  assert.equal(a?.code, 'DECLARATION_INVALID');
+  assert.equal(a?.at, 'then[0].create.each');
+  assert.match(a?.fix ?? '', /^rule\.crossed crosses party in its create, and a run started by every has no row to cross them from\./u);
+  const b = validateDeclaration(copied);
+  assert.equal(b?.code, 'DECLARATION_INVALID');
+  assert.equal(b?.at, 'steps[1].create.fields.party');
+  assert.match(b?.fix ?? '', /^rule\.copied fills party of the obligations row it creates from \{\{party\}\}, a field of the row that started it, and a run started by manual has no row\./u);
+  assert.equal(refusedAs(await install(crossed)), 'DECLARATION_INVALID');
+  assert.equal(refusedAs(await install(copied)), 'DECLARATION_INVALID');
+
+  /* THE CONTROLS: the run's own words fill a create with no row, the day of its turn among them, and the same create on
+     writes to a list has the row it reads. */
+  const words = rule({ rule: 'words', on: { every: '1mo', day: 1, at: '09:00' }, then: [{ create: { register: 'obligations', fields: { what: 'Rent {{trigger.day}} {{ trigger.at }}', party: 'Acme' }, bound: 1 } }] });
+  assert.equal(validateDeclaration(words), null, JSON.stringify(validateDeclaration(words)));
+  const onRow = rule({ rule: 'on_row', on: { written: { register: 'obligations', op: ['create'] } }, once_per: ['entry'], steps: [{ create: { register: 'obligations', fields: { what: 'Rent', party: 'for {{party}}' }, bound: 1 } }] });
+  assert.equal(validateDeclaration(onRow), null, JSON.stringify(validateDeclaration(onRow)));
+});
+
 test('A METRIC TRIGGER NAMES A METRIC THAT IS THERE', async () => {
   const crossing = rule({ rule: 'crossing', on: { metric: { id: 'cash_now', crosses: { lte: 0 } } }, then: [{ stop: true }] });
   assert.equal(code(crossing), 'NOT_IN_THIS_BUILD');

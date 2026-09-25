@@ -265,6 +265,37 @@ export const RUN_PATH = /\{\{\s*(vars|trigger)\.([A-Za-z0-9_.]+)\s*\}\}/g;
 const ROW_FILL = /\{\{(\w+)(?::(\w+))?\}\}/g;
 
 /**
+ * What a `create` would fill from a row, said of a run that has none, or `null`: `each:`, or a row's `{{field}}` in one
+ * of its fields. `at` is under the create. `run` says which run: the one failing, or the ones a trigger starts.
+ *
+ * ONE SENTENCE FOR THE LINT AND THE RUNNER. `rules.ts`'s `expand` refused both at the run on 25 September, and the lint
+ * let both install, so a monthly rule the owner was told was sound failed at every turn with a sentence nobody saw at
+ * install (`clock-create.test.ts`). Both ask this now, so the refusal an owner reads when installing is the one a run
+ * stored before the lint fails with.
+ *
+ * `ROW_FILL` AND NOT `rules.ts`'s `SPELLED`, which is the same for this question: a run's path, a figure and `{{each.0}}`
+ * each have a dot, which `\w` does not take, so the only spellings `ROW_FILL` finds are the row's. A text that is not a
+ * string is `fillFault`'s to refuse.
+ */
+export function rowlessCreate(id: string, spec: { register?: unknown; each?: unknown; fields?: unknown }, run: string): { fix: string; at: string } | null {
+  if (Array.isArray(spec.each) && spec.each.length > 0)
+    return {
+      fix: `${id} crosses ${spec.each.map(String).join(' and ')} in its create, and ${run} has no row to cross them from. Take each: out, or start the rule from writes to the list that holds them.`,
+      at: 'each',
+    };
+  if (!isObject(spec.fields)) return null;
+  for (const [field, template] of Object.entries(spec.fields)) {
+    const spelled = typeof template === 'string' ? (template.match(ROW_FILL)?.[0] ?? null) : null;
+    if (spelled !== null)
+      return {
+        fix: `${id} fills ${field} of the ${String(spec.register)} row it creates from ${spelled}, a field of the row that started it, and ${run} has no row. Write the words themselves, or start the rule from writes to the list whose row it means.`,
+        at: `fields.${field}`,
+      };
+  }
+  return null;
+}
+
+/**
  * The fields of a row that a question would carry off the record, by the spelling that reaches each: the row's
  * `{{pin}}` and `{{money:pin}}`, the run's `{{trigger.row.pin}}`, and `{{trigger.row}}`, which names no field and is
  * written as the JSON of the whole row (`flow.ts`'s `fill`, where a path reaches an object).
@@ -835,6 +866,12 @@ export function flowFault(id: string, body: Record<string, unknown>, installed?:
         return bad('DECLARATION_INVALID', `${id} is started by ${trigger}, which has no row, and ${here} is ${verb}, which acts on one.`, here);
       const fault = stepFault(id, verb, step, here, subjectOf(decl), installed, names);
       if (fault) return fault;
+      /* A CREATE NEEDS NO ROW, BUT WHAT IT CROSSES OR COPIES FROM ONE DOES (`rowlessCreate`). An arrival is left to the
+         runner, since whether one brings a row is the door's to say at the run. */
+      if (rowless && verb === 'create' && isObject(step.create)) {
+        const alone = rowlessCreate(id, step.create, `a run started by ${trigger}`);
+        if (alone) return bad('DECLARATION_INVALID', alone.fix, `${here}.create.${alone.at}`);
+      }
       /* `about:` IS FIELDS OF THE RUN'S ROW, SO IT NEEDS ONE, and the fields have to be on it. The runner reads each
          from the row it holds and would send `null` for a field the list does not have, which is a question with its
          facts missing and no sentence to say so. A field the lint cannot place, on an arrival at no named door, is

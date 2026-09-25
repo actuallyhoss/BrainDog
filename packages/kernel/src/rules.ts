@@ -33,7 +33,7 @@ import { sealedEver } from './declare.ts';
 import { instant } from './migrate.ts';
 import { spanMs } from './vault.ts';
 import { evaluateMetric, predicateOf, type Aggregation, type EvalContext, type MetricDecl } from './metrics.ts';
-import { RUN_PATH, inlineFault } from './flow-lint.ts';
+import { RUN_PATH, inlineFault, rowlessCreate } from './flow-lint.ts';
 import { FIGURE } from './figure.ts';
 import { observe } from './observe.ts';
 
@@ -795,26 +795,13 @@ function expand(deps: RulesDeps, name: string, spec: CreateSpec, from: Standing)
       },
     );
 
-  /* WHAT ONLY A ROW COULD FILL IS REFUSED WHERE THERE IS NONE, before anything is written. The lint reads neither
-     against the trigger: measured with `validateDeclaration` on 25 September, `each: [kinds]` and `what: 'Rent {{what}}'`
-     both install on `every: 1mo`. Crossed against no row, `each:` made no tuple, so nothing was created and nothing was
-     said; a row's `{{field}}` would have written the dash into the task a person reads. */
+  /* WHAT ONLY A ROW COULD FILL IS REFUSED WHERE THERE IS NONE, before anything is written. Crossed against no row,
+     `each:` made no tuple, so nothing was created and nothing was said; a row's `{{field}}` would have written the dash
+     into the task a person reads. The lint refuses both on a clock or a button at install, in this sentence
+     (`rowlessCreate`); this line is for an arrival that wrote nothing, and a rule stored before the lint did. */
   if (from.entry === null) {
-    if (spec.each?.length)
-      return nothing({
-        code: 'DECLARATION_INVALID',
-        fix: `rule.${name} crosses ${spec.each.join(' and ')} in its create, and this run has no row to cross them from. Nothing was created; take each: out, or start the rule from writes to the list that holds them.`,
-        at: 'each',
-      });
-    for (const [id, template] of Object.entries(spec.fields)) {
-      const spelled = typeof template === 'string' ? rowSpelling(template) : null;
-      if (spelled !== null)
-        return nothing({
-          code: 'DECLARATION_INVALID',
-          fix: `rule.${name} fills ${id} of the ${spec.register} row it creates from ${spelled}, a field of the row that started it, and this run has no row. Nothing was created.`,
-          at: `fields.${id}`,
-        });
-    }
+    const alone = rowlessCreate(`rule.${name}`, spec, 'this run');
+    if (alone) return nothing({ code: 'DECLARATION_INVALID', fix: `${alone.fix} Nothing was created.`, at: alone.at });
   }
   const row: Entry = from.entry ?? { id: '', register: '', seq: null, fields: {}, state: null, version: 0, created_at: '', updated_at: '', deleted_at: null };
 
@@ -909,12 +896,6 @@ type CreateSpec = { register: string; each?: string[]; bound: number; fields: Re
  * is the row; with no row it is the run (`createAlone`).
  */
 type Standing = { entry: Entry | null; parent: string; register: string | null; batch: string; run?: RunFill };
-
-/** The first `{{field}}` or `{{kind:field}}` of a row in `text`, or `null`. The row's spellings are `SPELLED`'s sixth group. */
-const rowSpelling = (text: string): string | null => {
-  for (const m of text.matchAll(SPELLED)) if (m[6] !== undefined) return m[0];
-  return null;
-};
 
 /**
  * A `create` step taken by a run that has no row: a clock, a button, an arrival that wrote nothing.

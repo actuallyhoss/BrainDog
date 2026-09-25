@@ -42,6 +42,7 @@ import { compile, evaluate, type Predicate, type Schema } from '@braindog/where'
 
 import { meter, type Metered } from './actions.ts';
 import { calendarOf, nextCalendar } from './clock.ts';
+import { dayIn } from './finished.ts';
 import { nextOccurrence } from './digest.ts';
 import { RUN_PATH, RUNS_PER_DAY_CEILING, passFilled, pathOf, sealedAs, triggerOf } from './flow-lint.ts';
 import type { Entry } from './index.ts';
@@ -139,6 +140,12 @@ export type Installed = { id: string; version: number; body: FlowDecl };
 /** What started a run, as the run row keeps it and `{{trigger.…}}` reads it. */
 export type RunTrigger = {
   kind: 'written' | 'arrival' | 'every' | 'manual';
+  /**
+   * The instant of the run's turn: when a clock's turn was due, and when anything else started the run. `startRun`
+   * stamps it, and `{{trigger.day}}` is its date in the record's zone (`context`). A run started before the stamp has
+   * none, and both spellings are the dash there.
+   */
+  at?: string;
   entry?: string;
   register?: string;
   op?: string;
@@ -651,7 +658,7 @@ export function startRun(
     id,
     rule.id,
     rule.version,
-    JSON.stringify(trigger),
+    JSON.stringify({ ...trigger, at: trigger.at ?? instant(deps.nowMs) }),
     o.depth ?? 0,
     rule.body.project ?? null,
     o.actor,
@@ -780,7 +787,11 @@ export function firstDue(body: FlowDecl, nowMs: number, tz: string): number | nu
 export function onClock(deps: FlowDeps, rule: string, dueAt: string): number | null {
   const found = installed(deps.sql).find((r) => r.id === rule);
   if (!found || triggerOf(found.body) !== 'every') return null;
-  const started = startRun(deps, found, { kind: 'every' }, { actor: `rule:${rule}`, arm: false });
+  /* THE TURN IS WHEN IT WAS DUE, NOT WHEN THE DRAIN GOT TO IT. A host that was off over the first of the month takes
+     that turn on the third, and the task it makes is the first's; stamped with the drain's instant, `{{trigger.day}}`
+     would have moved a rent due on the first to the day the machine came back. */
+  const turn = Date.parse(dueAt);
+  const started = startRun(deps, found, { kind: 'every', ...(Number.isFinite(turn) ? { at: instant(turn) } : {}) }, { actor: `rule:${rule}`, arm: false });
   if (started.ok) {
     const at = advance(deps, started.value.run);
     if (at !== null) wake(deps, started.value.run, at);
@@ -1484,10 +1495,21 @@ function deletedRow(sql: Sql, id: string): Entry | null {
   return r ? { ...r, fields: JSON.parse(r.fields) as Entry['fields'] } : null;
 }
 
-/** `{{trigger.…}}`: what started the run, the row's fields, and an arrival's JSON body where it has one. */
+/**
+ * `{{trigger.…}}`: what started the run, the instant of its turn and that turn's day, the row's fields, and an arrival's
+ * JSON body where it has one.
+ *
+ * `day` IS THE DATE OF THE TURN IN THE RECORD'S ZONE, `YYYY-MM-DD`, which is what a `day` field takes. Before it, a task a
+ * monthly rule made had no due day, since nothing a run fills said which day it was, and `{{trigger.at}}` would not do:
+ * it is an instant, which a `day` field refuses, and its UTC date is the next day wherever the zone is behind UTC in the
+ * evening (`clock-create.test.ts` takes a turn at 20:00 in Los Angeles). Worked out here and never stored, so the zone
+ * is the record's as the step is filled, as every other day the record writes is (`finished.ts`'s `dayIn`).
+ */
 function context(deps: FlowDeps, trigger: RunTrigger, subject: Entry | null): Record<string, unknown> {
   const { chain: _chain, ...said } = trigger;
   const out: Record<string, unknown> = { ...said };
+  const turn = trigger.at === undefined ? NaN : Date.parse(trigger.at);
+  if (Number.isFinite(turn)) out.day = dayIn(turn, deps.tz);
   if (subject) out.row = subject.fields;
   if (trigger.arrival) {
     const raw = deps.sql.one<{ body: string | null }>('SELECT body FROM inbox_raw WHERE id = ?', trigger.arrival);
