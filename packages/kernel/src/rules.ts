@@ -510,7 +510,7 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
        is one query rather than an archaeology of timestamps. */
     let happened = Object.keys(patch).length > 0 || notes.length > 0 || later.length > 0;
     for (const spec of made) {
-      const grown = expand(deps, rule, spec, fired);
+      const grown = expand(deps, rule.rule, spec, { entry: fired.entry, parent: fired.entry.id, register: fired.register, batch: fired.batch, ...(fired.run ? { run: fired.run } : {}) });
       /* A COPY OF A SECRET IS OBSERVED as the other texts' are (`undone`); a bound or an axis is refused as it was. */
       for (const r of grown.refusals)
         if (r.code === 'DECLARATION_INVALID' && /secret or file field/.test(r.fix)) undone(`${spec.at}.create.${r.at ?? 'fields'}`, 'DECLARATION_INVALID', r.fix);
@@ -782,12 +782,7 @@ export const CREATE_CEILING = 500;
  * The key is the RULE and not the register: the worked example writes into an ordinary register,
  * which has no `key:` of its own to be idempotent on.
  */
-function expand(
-  deps: RulesDeps,
-  rule: RuleDecl,
-  spec: { register: string; each?: string[]; bound: number; fields: Record<string, string> },
-  fired: Fired,
-): { refusals: Refusal[]; grew: boolean } {
+function expand(deps: RulesDeps, name: string, spec: CreateSpec, from: Standing): { refusals: Refusal[]; grew: boolean } {
   const nothing = (refusal: Refusal) => ({ refusals: [refusal], grew: false });
 
   const bound = Math.floor(spec.bound);
@@ -795,17 +790,40 @@ function expand(
     return nothing(
       {
         code: 'OUT_OF_BOUNDS',
-        fix: `${rule.rule} declares a bound of ${String(spec.bound)}, and a bound is between 1 and ${CREATE_CEILING}.`,
+        fix: `${name} declares a bound of ${String(spec.bound)}, and a bound is between 1 and ${CREATE_CEILING}.`,
         at: 'bound',
       },
     );
 
-  const axes = (spec.each ?? []).map((f) => asValues(fired.entry.fields[f]));
+  /* WHAT ONLY A ROW COULD FILL IS REFUSED WHERE THERE IS NONE, before anything is written. The lint reads neither
+     against the trigger: measured with `validateDeclaration` on 25 September, `each: [kinds]` and `what: 'Rent {{what}}'`
+     both install on `every: 1mo`. Crossed against no row, `each:` made no tuple, so nothing was created and nothing was
+     said; a row's `{{field}}` would have written the dash into the task a person reads. */
+  if (from.entry === null) {
+    if (spec.each?.length)
+      return nothing({
+        code: 'DECLARATION_INVALID',
+        fix: `rule.${name} crosses ${spec.each.join(' and ')} in its create, and this run has no row to cross them from. Nothing was created; take each: out, or start the rule from writes to the list that holds them.`,
+        at: 'each',
+      });
+    for (const [id, template] of Object.entries(spec.fields)) {
+      const spelled = typeof template === 'string' ? rowSpelling(template) : null;
+      if (spelled !== null)
+        return nothing({
+          code: 'DECLARATION_INVALID',
+          fix: `rule.${name} fills ${id} of the ${spec.register} row it creates from ${spelled}, a field of the row that started it, and this run has no row. Nothing was created.`,
+          at: `fields.${id}`,
+        });
+    }
+  }
+  const row: Entry = from.entry ?? { id: '', register: '', seq: null, fields: {}, state: null, version: 0, created_at: '', updated_at: '', deleted_at: null };
+
+  const axes = (spec.each ?? []).map((f) => asValues(row.fields[f]));
   if (axes.length > 2)
     return nothing({
       /* TWO IS A MATRIX. Three is a cube, and nobody has ever wanted a cube. */
       code: 'OUT_OF_BOUNDS',
-      fix: `${rule.rule} crosses ${axes.length} fields, and two is the most a matrix can be.`,
+      fix: `${name} crosses ${axes.length} fields, and two is the most a matrix can be.`,
       at: 'each',
     });
 
@@ -813,7 +831,7 @@ function expand(
   if (tuples.length > bound)
     return nothing({
       code: 'OUT_OF_BOUNDS',
-      fix: `${rule.rule} would make ${tuples.length} rows in ${spec.register}, and its bound is ${bound}. Nothing was created.`,
+      fix: `${name} would make ${tuples.length} rows in ${spec.register}, and its bound is ${bound}. Nothing was created.`,
       at: 'bound',
     });
 
@@ -823,14 +841,14 @@ function expand(
      half-made matrix looks like sizes nobody stocks. The lint refuses both at install (`flow-lint.ts`, `copyFault`),
      and this is the second line, for a rule stored before it did and for a run's step, whose values exist only at the
      run. */
-  const own = sealedOf(deps.sql, fired.register);
+  const own = from.register === null ? new Set<string>() : sealedOf(deps.sql, from.register);
   const theirs = sealedOf(deps.sql, spec.register);
-  const crossed = (spec.each ?? []).find((f) => own.has(f) && present(fired.entry.fields[f]));
+  const crossed = (spec.each ?? []).find((f) => own.has(f) && present(row.fields[f]));
   if (crossed !== undefined)
-    return nothing({ code: 'DECLARATION_INVALID', fix: copied(rule.rule, `each: ${crossed}`, `every ${spec.register} row it creates`), at: 'each' });
+    return nothing({ code: 'DECLARATION_INVALID', fix: copied(name, `each: ${crossed}`, `every ${spec.register} row it creates`), at: 'each' });
   for (const [id, template] of Object.entries(spec.fields)) {
-    const secret = filling(template, fired.entry, deps.nowMs, { sealed: own, ...(fired.run ? { run: fired.run } : {}) }).secret;
-    if (secret !== null && !theirs.has(id)) return nothing({ code: 'DECLARATION_INVALID', fix: copied(rule.rule, secret, `${id} of the ${spec.register} row it creates`), at: `fields.${id}` });
+    const secret = filling(template, row, deps.nowMs, { sealed: own, ...(from.run ? { run: from.run } : {}) }).secret;
+    if (secret !== null && !theirs.has(id)) return nothing({ code: 'DECLARATION_INVALID', fix: copied(name, secret, `${id} of the ${spec.register} row it creates`), at: `fields.${id}` });
   }
 
   const out: Refusal[] = [];
@@ -854,8 +872,8 @@ function expand(
          AND json_extract(fields, '$._rule') = ?
          AND json_extract(fields, '$._parent') = ? AND json_extract(fields, '$._each') = ?`,
         spec.register,
-        rule.rule,
-        fired.entry.id,
+        name,
+        from.parent,
         each,
       )
     )
@@ -870,17 +888,50 @@ function expand(
        result, so a `kinds` item holding the words `{{pin}}` became the secret (`filling` says what was measured). */
     const fields: Record<string, unknown> = {};
     for (const [id, template] of Object.entries(spec.fields))
-      fields[id] = typeof template === 'string' ? filling(template, fired.entry, deps.nowMs, { each: tuple, ...(fired.run ? { run: fired.run } : {}) }).text : template;
+      fields[id] = typeof template === 'string' ? filling(template, row, deps.nowMs, { each: tuple, ...(from.run ? { run: from.run } : {}) }).text : template;
 
-    const made = deps.generate(spec.register, fields, `rule:${rule.rule}`, fired.batch, {
-      _rule: rule.rule,
-      _parent: fired.entry.id,
+    const made = deps.generate(spec.register, fields, `rule:${name}`, from.batch, {
+      _rule: name,
+      _parent: from.parent,
       _each: each,
     });
     if (refused(made)) out.push(made.refusal);
     else grew = true;
   }
   return { refusals: out, grew };
+}
+
+/** What a `create` declares, as `expand` reads it. */
+type CreateSpec = { register: string; each?: string[]; bound: number; fields: Record<string, string> };
+
+/**
+ * Where a create stands: the row that fired it, or none, and the id its rows name as their `_parent`. On a row the parent
+ * is the row; with no row it is the run (`createAlone`).
+ */
+type Standing = { entry: Entry | null; parent: string; register: string | null; batch: string; run?: RunFill };
+
+/** The first `{{field}}` or `{{kind:field}}` of a row in `text`, or `null`. The row's spellings are `SPELLED`'s sixth group. */
+const rowSpelling = (text: string): string | null => {
+  for (const m of text.matchAll(SPELLED)) if (m[6] !== undefined) return m[0];
+  return null;
+};
+
+/**
+ * A `create` step taken by a run that has no row: a clock, a button, an arrival that wrote nothing.
+ *
+ * MEASURED BEFORE THIS, on 25 September: such a create installed, armed, ran on time and failed every run with "this run
+ * has none to act on", because `flow.ts`'s `act` sent every step with no subject away from `runRules`, and `runRules` is
+ * the only thing that reached `expand`. So a rule could not make the next task each month, which is the one thing a
+ * monthly clock with a create is for (`clock-monthly.test.ts`).
+ *
+ * THE RUN IS THE PARENT. `expand` makes a tuple once per parent, and on a row the parent is the row. A clock has none,
+ * and a parent of the rule alone would make the first month's task and then find it already there every month after;
+ * the run is one per turn, so each turn makes its row, and the same run taken again from its create after a drain died
+ * between the write and the save finds the row it made (`clock-create.test.ts`). The bound, the ceiling and the refusal
+ * of a copied secret are `expand`'s, as they are on a row.
+ */
+export function createAlone(deps: RulesDeps, rule: string, spec: CreateSpec, run: string, by?: RunFill): { refusals: Refusal[]; grew: boolean } {
+  return expand(deps, rule, spec, { entry: null, parent: run, register: null, batch: run, ...(by ? { run: by } : {}) });
 }
 
 /**

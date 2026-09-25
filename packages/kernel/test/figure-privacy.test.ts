@@ -145,9 +145,10 @@ test('A FIGURE KEPT IN A VARIABLE FIRST is withheld too, since the variable is w
   sql.close();
 });
 
-/* A `create` NEEDS THE RUN'S ROW IN THIS BUILD: first written as a clock, the run failed "rule.tally's create step acts
-   on a row, and this run has none to act on". What is measured is that the list created into is asked about, and not
-   only the run's own row's list.
+/* STARTED BY A NEW SALARY, NOT A CLOCK. It was first written as a clock and the run failed "rule.tally's create step
+   acts on a row, and this run has none to act on"; a create on a run with no row now makes its row (`createAlone` in
+   `rules.ts`), but a clock has no row's list to compare with. What is measured is that the list created into is asked
+   about, and not only the run's own row's list, so the run needs a row of its own.
 
    ON SALARIES, THE LIST THE FIGURE ADDS UP, AND NOT ON INBOX. Written on Inbox, the run's own row was already a list
    other than Salaries, so the note was withheld whether or not Diary was counted: the checker took `create` out of

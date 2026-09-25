@@ -12,7 +12,9 @@
  *
  * EVERY ACTION A RULE HAS RUNS THROUGH `runRules`, one step at a time, against the run's row. `set`, `move`, `create`
  * and the rest therefore meet the write path, the transitions and `create`'s bound exactly as an inline rule's do,
- * with the rule's own name as the actor. Two things are changed for a step, and both are said where they are done.
+ * with the rule's own name as the actor. Two things are changed for a step, and both are said where they are done. On a
+ * run with no row, `notify`, `suggest` and `create` go past it: the first two straight to the note and the queue, and a
+ * `create` to the same `expand` by way of `createAlone`.
  *
  * A STEP THAT ASKS HANDS OFF AND PARKS, AND THE ANSWER IS WHAT WAKES IT (Brief C). `ask_person` opens an `options`
  * suggestion whose body names the run and the step, and the kernel's `decide` hands the pick to `answerStep` in the
@@ -49,6 +51,7 @@ import { FIGURE, WITHHELD } from './figure.ts';
 import { enqueue } from './outbox.ts';
 import { intervalMs } from './pull.ts';
 import {
+  createAlone,
   figureText,
   filling,
   marker,
@@ -1017,7 +1020,12 @@ export function advance(deps: FlowDeps, id: string): number | null {
          string is filled here, and a copy in one of those fails the step here. The sentence names the spelling and
          never the value. */
       const by = paths();
-      const handed = handOn(step, by, subject !== null);
+      /* A CREATE'S FIELDS GO TO THE PASS AS TYPED WITH OR WITHOUT A ROW, since `createAlone` fills them as `runRules`
+         does, and the copy of a secret is refused by the create either way. Filled here as well, they were filled
+         twice: measured on 25 September, a button's `set_var: { to: 'a {{what}} b' }` then `what: 'x {{vars.label}}'`
+         reached the create as `x a {{what}} b` and was refused as reading a row the run does not have, where the
+         braces were only what the variable held (`clock-create.test.ts`). */
+      const handed = handOn(step, by, subject !== null || op.verb === 'create');
       /* A `tag` OF THE RUN'S OWN ROW IS REFUSED WITH THE REST, and a `set` is refused by the pass, which fills its `to`
          (`rules.ts`). Wave fifty-four wrote both and held the field back from what leaves; measured at HEAD `b7409d2d`,
          `tag: 'x {{trigger.row.pin}}'` stored past the lint put `x hunter2` in the row's tags, which every reader of
@@ -1084,7 +1092,8 @@ function act(
 
   if (subject === null) {
     /* NO ROW: A CLOCK, A BUTTON, OR AN ARRIVAL THAT WROTE NOTHING. The lint keeps the row verbs off the first two;
-       an arrival may still reach one, and says so here rather than acting on no row. */
+       an arrival may still reach one, and says so here rather than acting on no row. `notify`, `suggest` and `create`
+       need no row, and are taken. */
     if ('notify' in action) {
       if (action.notify.urgent === true) r.interrupt({ actor, say: action.notify.say });
       else deps.note(actor, action.notify.say);
@@ -1100,6 +1109,15 @@ function act(
         ok: false,
         say: `rule.${rule}'s ${verb} step acts on ${gone.seq === null ? gone.id : `${gone.register}#${gone.seq}`}, which was deleted, and a step does not write to a deleted row.`,
       };
+    /* A CREATE MAKES A ROW AND NEEDS NONE TO STAND ON, so it is taken here, keyed on the run (`createAlone` says why).
+       Sent on to the sentence below, a create on a weekly or monthly clock installed and failed every turn (measured on
+       25 September, `clock-monthly.test.ts`). Its fields reach here as typed (`handOn`), so the create fills them once. */
+    if ('create' in action) {
+      const grown = createAlone(r, rule, action.create, batch, run);
+      const first = grown.refusals[0];
+      if (first) return { ok: false, say: first.fix };
+      return { ok: true, stop: false, answer: null };
+    }
     return { ok: false, say: `rule.${rule}'s ${verb} step acts on a row, and this run has none to act on.` };
   }
 

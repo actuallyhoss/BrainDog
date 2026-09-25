@@ -191,9 +191,33 @@ test('A RULE ON THE LAST DAY OF EACH MONTH IS ARMED FOR IT, RUNS ON IT, AND IS A
   assert.equal(due(), '2027-07-31T08:00:00.000Z');
 });
 
-/* A CREATE ON ANY CLOCK INSTALLS AND THEN FAILS EVERY RUN, the weekly one included. Measured on 25 September with
+/* A CREATE ON ANY CLOCK INSTALLED AND THEN FAILED EVERY RUN, the weekly one included. Measured on 25 September with
    `then: [{ create: { register: obligations, fields: { what: Rent }, bound: 1 } }]` on `every: 1w` and on `every: 1mo`:
    both armed, both ran on time, and both runs failed with "rule.<id>'s create step acts on a row, and this run has none
-   to act on." (`flow.ts` `act`, where a step with no subject reaches `runRules`, which fills a create from the row that
-   fired it). The clock is not the gap; making the next task each month also needs a create that stands on no row. */
-test.todo('a create on a clock makes its row at each turn, bounded, once the runner fills a create that has no row behind it');
+   to act on." (`flow.ts` `act`, where a step with no subject reached `runRules`, which fills a create from the row that
+   fired it). The clock was not the gap; making the next task each month also needed a create that stands on no row,
+   which `rules.ts`'s `createAlone` is. `clock-create.test.ts` holds what such a create refuses. */
+test('A CREATE ON A CLOCK MAKES ITS ROW AT EACH TURN, weekly and monthly, one row a turn and the run done', async () => {
+  for (const on of [{ every: '1w', day: 'mon', at: '09:00' }, { every: '1mo', day: 'last', at: '09:00' }]) {
+    const sql = openSqlite();
+    const clock = fixedClock(Date.UTC(2027, 0, 20, 12));
+    const k = await openRecord(sql, clock);
+    await withRuns(sql);
+    assert.ok(k.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'studio', name: 'Studio', tz: 'Europe/London', locale: 'en', owner: { id: 'p_1' } }).ok);
+    const next = rule({ rule: 'next_rent', on, then: [{ create: { register: 'obligations', fields: { what: 'Rent' }, bound: 1 } }] });
+    const done = await k.install([OBLIGATIONS, next]);
+    assert.ok(done.ok, JSON.stringify(done));
+
+    const due = (): string => sql.one<{ due_at: string }>("SELECT due_at FROM schedule WHERE kind = 'rule' AND key = 'flow.every:next_rent' AND state = 'pending'")!.due_at;
+    const rows = (): string[] => sql.all<{ what: string }>("SELECT json_extract(fields, '$.what') AS what FROM entry WHERE register = 'obligations' AND deleted_at IS NULL").map((r) => r.what);
+    const said = (): (string | null)[] => sql.all<{ say: string | null }>("SELECT say FROM automation_run WHERE rule = 'next_rent' ORDER BY started_at, rowid").map((r) => r.say);
+
+    for (const turn of [1, 2]) {
+      clock.set(Date.parse(due()));
+      await k.drain();
+      assert.deepEqual(said(), Array(turn).fill(null), `${on.every} turn ${turn}: ${said().join(' | ')}`);
+      assert.deepEqual(rows(), Array(turn).fill('Rent'), `${on.every} turn ${turn} made ${rows().length} rows`);
+    }
+    sql.close();
+  }
+});

@@ -543,7 +543,8 @@ steps:
 | Refused | Because |
 |---|---|
 | no `register:` and no `on:` | the pass selects rules by register, so nothing would ever start it |
-| `every:` under `15m`, or a clock it cannot read | fifteen minutes is the shortest clock the record keeps, as it is for a connector; `at:` belongs to `every: 1d` or `every: 1w` with a `day:` |
+| `every:` under `15m`, or a clock it cannot read | fifteen minutes is the shortest clock the record keeps, as it is for a connector; `at:` belongs to `every: 1d`, to `every: 1w` with a `day:`, or to a clock of months. The grammar is under *The clock*, below |
+| a clock of months that does not divide the year (`5mo`, `2y`), or that leaves out its `day:` or its `at:`, or a count above one with no `month:`, or `month:` on `1mo` | each of those decides which day it runs, and none is defaulted: a missing `day:` could mean the 1st or the day it was installed, and the second moves whenever the rule is edited (`calendarFault` in `packages/kernel/src/flow-lint.ts`) |
 | two triggers in one `on:` | a run has to say which one started it |
 | `decided:` | reserved: a run's own questions resume it without a trigger |
 | `metric:`, once its id and its `crosses:` are right | nothing in this build watches a metric for a crossing, so it would install and never start: `NOT_IN_THIS_BUILD` until the start lands in the `snapshot` handler |
@@ -566,6 +567,38 @@ steps:
 
 A `create` inside a branch meets the same bound and the same foreign-register check as one in `then:`, because the
 lint walks every action wherever it sits.
+
+**The clock.** `every:` is either a length or a count of months, and what may sit beside it depends on which.
+A month is no number of milliseconds, so a clock of months never goes through `intervalMs`: `packages/kernel/src/clock.ts`
+works out each run as the next date on the wall of the record's zone.
+
+| `every:` | `at:` | `day:` | `month:` |
+|---|---|---|---|
+| `15m` and up, in `m`, `h`, `d` or `w` (`6h`, `2d`) | refused, except on the two below | refused, except on `1w` | refused |
+| `1d` | optional, `HH:MM` | refused: *"Write every: 1w for a weekday, or every: 1mo for a day of the month"* | refused |
+| `1w` | optional, `HH:MM` | `mon` to `sun`: required with an `at:`, refused without one | refused |
+| `1mo` | required, `HH:MM` | required: `1` to `31`, or `last` | refused: it would choose nothing |
+| `2mo`, `3mo`, `4mo`, `6mo`, `12mo` or `1y` | required, `HH:MM` | required: `1` to `31`, or `last` | required: `jan` to `dec`, the month it counts from |
+
+```yaml
+on: { every: 1mo, day: last, at: "09:00" }              # the last day of every month
+on: { every: 3mo, day: 15, at: "08:30", month: feb }    # 15 February, May, August and November
+on: { every: 1y, day: 1, at: "09:00", month: apr }      # 1 April every year
+```
+
+- **The day is clamped and never carried.** `day: 31` runs on 30 April and on 31 May, because each run is worked out
+  from the rule and never from the day the one before landed on.
+- **Every few months names its month.** Without `month:`, a quarter would count from wherever the schedule row was
+  armed, and an edit re-arms it from today, so fixing a typo would move the quarter. With it, the months are written in
+  the rule, and the count divides the year so they are the same months every year. `12mo` and `1y` are one clock.
+- **The time is the record's zone,** and a time the zone skips or says twice is read as `clock.ts`'s `instantOf`
+  says. That is not always the reading a digest at the same time gives, on the two nights a year the clocks change.
+
+The canvas offers the same clocks (`apps/web/src/lib/flow/calendar.ts`): 15 minutes to a week, then every month,
+2, 3, 4 or 6 months, and every year, with the month, the day and the time as fields. A rule written with `12mo` opens
+with its own clock kept. Measured on 25 September, the canvas's own fault list (`faultsOf` in
+`apps/web/src/lib/flow/flow.ts`) still says *"1mo is not a clock"* of every one of them, so Send stays off on a monthly
+rule the record would take, and the card and the sheet's heading say the clock as written (*"1mo on 31 at 09:00"*).
 
 **One older shape is let through, and only one.** Some rules carry `on: create` as a word. Nothing ever read it:
 the pass fired those rules on every write. They lint as they did and answer `inline`. `create` is the only word any
@@ -594,7 +627,7 @@ the transaction of whatever started it, and the next drain takes its steps.
 |---|---|---|
 | `written` | the write path, beside the inline pass | `op:`, `fields:` (which fields this write changed), `project:` (the row's scope field), `when:`, and `once_per:`, claimed when the run starts with the marker an inline rule uses |
 | `arrival` | after `arrive` has committed, in a transaction of its own | `ingest:`, `channel:`, `state:`; never a redelivery, and never an arrival nothing verified unless the trigger says `unverified: true`. The run's row is the first row the arrival wrote |
-| `every` | a `rule` schedule row keyed `flow.every:<id>`, armed at install one interval out, or at the next `at:` | taken at once when the row fires; the next turn counts from when this one was due, so an hourly rule stays on its hour |
+| `every` | a `rule` schedule row keyed `flow.every:<id>`, armed at install one interval out, at the next `at:`, or for a clock of months at its next date | taken at once when the row fires; the next turn counts from when this one was due, so an hourly rule stays on its hour. A clock of months is asked for its next date from now instead, so a drain a month late takes one turn and not one for every month it missed |
 | `manual` | `automationRun(rule, actor)` on the kernel | only a rule that says `on: { manual: true }` |
 
 `metric` is noticed nowhere yet, and the lint refuses it until it is.
@@ -620,7 +653,7 @@ for in writing.
 
 | Step | What the runner does |
 |---|---|
-| any action of the table above | one step through the inline pass, against the run's row, with the rule's own name as the actor: the write path, the transitions and `create`'s bound apply as they do to an inline rule. On a run with no row, `notify` writes a note (or interrupts, when `urgent`), `suggest` opens a question, and the row verbs fail the run |
+| any action of the table above | one step through the inline pass, against the run's row, with the rule's own name as the actor: the write path, the transitions and `create`'s bound apply as they do to an inline rule. On a run with no row, `notify` writes a note (or interrupts, when `urgent`), `suggest` opens a question, `create` makes its rows with the run as their parent, one set per run, so a monthly clock makes the next task each month (`createAlone` in `rules.ts`), and the row verbs fail the run |
 | `set_var` | fills `{{vars.…}}` and `{{trigger.…}}` into `to:` and keeps the answer; one answer holds 4 KB, all of them 64 KB |
 | `if` | reads the condition with the sentence builder over the run's row and its answers together; a field of the row wins over an answer of the same name |
 | `wait` | parks the run on its own schedule row and resumes it when the span has passed. A wait whose step row already says `done` is over and is not armed again |
