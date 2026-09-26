@@ -1,6 +1,9 @@
 <!--
   For agents and services.
 
+  REBUILT ON 26 SEPTEMBER with the rest of the site (`loop/DIRECTION.md` §33): a two-tone heading, a
+  way to connect first, and no eyebrow tags. The drawing of a client reaching the record is kept.
+
   THE PAGE THE HOME PAGE'S TECHNICAL MATERIAL MOVED TO. `loop/DIRECTION.md` §19 is the owner's own
   instruction: the counted figures and the tool grid come off the home page, and what is worth
   keeping goes on a page a curious reader reaches on purpose. For one hour on 21 September there was
@@ -30,7 +33,7 @@
 <script lang="ts">
   import Icon from '$lib/Icon.svelte';
   import Mark from '$lib/Mark.svelte';
-  import { SOURCE, site } from '$lib/copy.ts';
+  import { SIGNUP, SOURCE, site } from '$lib/copy.ts';
 
   const a = site.agents;
 </script>
@@ -44,14 +47,27 @@
   <meta property="og:description" content={site.meta.agents.description} />
 </svelte:head>
 
-<!-- NO MARK OVER THE HEADLINE, for the home page's reason: an uppercase eyebrow over an `h1` is a
-     regression `DIRECTION.md` §1 lists by name. The page's own name is in the nav a reader just
-     pressed. So the numbering starts at the drawing, and the tag this band used to wear is gone
-     from the page rather than moved. -->
-<section class="band head" data-ground="page">
-  <div class="in head-row">
-    <h1 class="display">{a.title}</h1>
+<section class="band head" data-ground="page" aria-labelledby="agents-h1">
+  <div class="in head-in">
+    <h1 class="display" id="agents-h1">{a.title}</h1>
     <p class="lead">{a.lead}</p>
+  </div>
+</section>
+
+<!-- ── Connect: the two ways in, each with the one line a reader copies. ── -->
+<section class="band" data-ground="page" aria-labelledby="connect-title">
+  <div class="in">
+    <h2 class="h2" id="connect-title">{a.connect.title}</h2>
+    <ul class="ways">
+      {#each a.connect.ways as w, i (w.head)}
+        <li class="way">
+          <span class="way-icon" aria-hidden="true"><Icon name={i === 0 ? 'link' : 'terminal'} /></span>
+          <h3>{w.head}</h3>
+          <p>{w.said}</p>
+          <code>{w.code}</code>
+        </li>
+      {/each}
+    </ul>
   </div>
 </section>
 
@@ -62,12 +78,10 @@
      them is read out and none of them is a colour spelled in this file. -->
 <section class="band" data-ground="flip" aria-labelledby="mcp-title">
   <div class="in">
-    <div class="band-mark band-mark-line">
-      <h2 class="title" id="mcp-title">{a.mcp.title}</h2>
-      <span class="band-rule"></span>
-      <span class="band-tag">{a.mcp.tag}</span>
+    <div class="sec-head">
+      <h2 class="h2" id="mcp-title">{a.mcp.title}</h2>
+      <p class="lead">{a.mcp.lead}</p>
     </div>
-    <p class="lead">{a.mcp.lead}</p>
 
     <figure class="reach" aria-labelledby="mcp-title">
       <div class="lane lane-write">
@@ -131,13 +145,9 @@
      leads with the limit and the sentence under it is the reason. -->
 <section class="band" data-ground="page" aria-labelledby="report-title">
   <div class="in">
-    <p class="band-mark">
-      <span class="band-tag">{a.report.tag}</span>
-      <span class="band-rule"></span>
-    </p>
     <div class="split">
       <div>
-        <h2 class="title" id="report-title">{a.report.title}</h2>
+        <h2 class="h2 h2-s" id="report-title">{a.report.title}</h2>
         <p class="lead">{a.report.lead}</p>
       </div>
       <dl class="limits hair">
@@ -158,11 +168,8 @@
      lead and the refusals sharing one left edge beside it. -->
 <section class="band" data-ground="page" aria-labelledby="cannot-title">
   <div class="in side">
-    <p class="band-mark band-mark-side">
-      <span class="band-tag">{a.cannot.tag}</span>
-    </p>
     <div>
-      <h2 class="title" id="cannot-title">{a.cannot.title}</h2>
+      <h2 class="h2 h2-s" id="cannot-title">{a.cannot.title}</h2>
       <p class="lead">{a.cannot.lead}</p>
       <dl class="rows">
         {#each a.cannot.rows as one (one.what)}
@@ -172,9 +179,10 @@
           </div>
         {/each}
       </dl>
-      {#if SOURCE}
-        <p class="source"><a href={SOURCE}>{site.nav.source}</a></p>
-      {/if}
+      <p class="source">
+        <a class="btn btn-primary btn-lg" href={SIGNUP} rel="external">{site.nav.start}<Icon name="arrow" size="s" /></a>
+        {#if SOURCE}<a class="quiet" href={SOURCE}>{site.nav.source}</a>{/if}
+      </p>
     </div>
   </div>
 </section>
@@ -214,19 +222,6 @@
     font-family: var(--font-id);
   }
 
-  /* THE TITLE AND WHAT THE PAGE IS FOR ON ONE ROW, so the first screen reaches both edges of the
-     column instead of stacking a headline over a paragraph in its left half. */
-  .head-row {
-    display: grid;
-    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
-    gap: var(--sp-8);
-    align-items: end;
-  }
-
-  .head-row .lead {
-    margin: 0;
-  }
-
   .lead {
     max-inline-size: 62ch;
     margin-block-start: var(--sp-4);
@@ -234,28 +229,6 @@
     font-size: var(--t-md);
     line-height: var(--lh-body);
     text-wrap: pretty;
-  }
-
-  .title {
-    margin: 0;
-    font-size: var(--t-xl);
-    letter-spacing: var(--tr-tight);
-  }
-
-  /* THE ONE-LINE OPENER, the home page's mechanism band treatment and the pricing page's table band: the
-     heading takes the mark's baseline and the rule runs from the end of its words to the tag.
-     `flex-wrap` and a floor under the rule, because this heading is forty-one characters of 24px and
-     does not fit beside the tag on a phone; the rule takes the tag to a second line rather than
-     shrinking to nothing. */
-  .band-mark-line {
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: var(--sp-2) var(--sp-4);
-  }
-
-  .band-mark-line .band-rule {
-    align-self: center;
-    min-inline-size: var(--sp-7);
   }
 
   /* ── The drawing ─────────────────────────────────────────────────────── */
@@ -417,8 +390,14 @@
   }
 
   .addr {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     margin: 0;
+  }
+
+  /* SEVEN ADDRESSES IN FOUR COLUMNS: the last one takes two, so no cell of the hairline grid is left
+     showing its ground. At two columns it takes the whole row, and at one it is simply the last. */
+  .addr-cell:last-child {
+    grid-column: span 2;
   }
 
   .addr-cell {
@@ -474,18 +453,11 @@
 
   .side {
     display: grid;
-    grid-template-columns: 14ch minmax(0, 1fr);
-    gap: var(--sp-6);
+    grid-template-columns: minmax(0, 1fr);
   }
 
-  /* THE MARK STANDING UP. No rule, because the column it would run across is the rail itself; the
-     number and the tag stack and the rail's width is what separates them from the argument. */
-  .band-mark-side {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--sp-1);
-    margin: 0;
-    padding-block-start: var(--sp-2);
+  .side > div {
+    max-inline-size: 880px;
   }
 
   .rows {
@@ -547,7 +519,6 @@
      because a horizontal wire that ends on a stroke nobody can see the far end of is a line
      rather than a connection. What is left is the order of the drawing, top to bottom. */
   @media (width < 900px) {
-    .head-row,
     .split {
       grid-template-columns: minmax(0, 1fr);
       gap: var(--sp-6);
@@ -602,11 +573,6 @@
       gap: var(--sp-3);
     }
 
-    .band-mark-side {
-      flex-direction: row;
-      gap: var(--sp-3);
-    }
-
     .row {
       grid-template-columns: minmax(0, 1fr);
       gap: var(--sp-2);
@@ -617,6 +583,111 @@
     .addr,
     .limits {
       grid-template-columns: minmax(0, 1fr);
+    }
+
+    .addr-cell:last-child {
+      grid-column: auto;
+    }
+  }
+  /* ── 26 September: the head, the ways in, and the smaller section heading ── */
+
+  .head {
+    padding-block: clamp(56px, 7vw, 104px);
+  }
+
+  .head-in {
+    display: grid;
+    gap: var(--sp-5);
+  }
+
+  .head-in .display {
+    max-inline-size: 18ch;
+    font-size: clamp(2.375rem, 4.7vw, 4.25rem);
+  }
+
+  .head-in .lead {
+    max-inline-size: 60ch;
+    margin: 0;
+  }
+
+  .h2-s {
+    font-size: clamp(1.75rem, 1.1rem + 2vw, 2.5rem);
+  }
+
+  .ways {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--sp-4);
+    margin: var(--sp-6) 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .way {
+    display: grid;
+    align-content: start;
+    gap: var(--sp-3);
+    padding: var(--sp-6);
+    background: var(--s1);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+  }
+
+  .way-icon {
+    display: grid;
+    place-items: center;
+    inline-size: 40px;
+    block-size: 40px;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    color: var(--ink);
+  }
+
+  .way h3 {
+    margin: var(--sp-2) 0 0;
+    font-size: var(--t-lg);
+    font-weight: 600;
+  }
+
+  .way p {
+    margin: 0;
+    color: var(--ink2);
+    font-size: var(--t-base);
+    line-height: 1.6;
+  }
+
+  .way code {
+    display: block;
+    margin-block-start: var(--sp-2);
+    padding: 12px 14px;
+    overflow-x: auto;
+    background: var(--ink);
+    border-radius: 10px;
+    color: var(--bg);
+    font-family: var(--font-id);
+    font-size: var(--t-sm);
+    white-space: nowrap;
+  }
+
+  .source {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-4);
+  }
+
+  .quiet {
+    color: var(--ink2);
+  }
+
+  @media (width < 760px) {
+    .ways {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .way {
+      padding: var(--sp-5);
     }
   }
 </style>

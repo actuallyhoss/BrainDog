@@ -102,9 +102,13 @@ const INSTALL = [
   /\bnpmjs\.(com|org)\b/,
 ];
 
-test('no install command reaches the reader', () => {
+/* THE ONE INSTALL LINE THE SITE MAY SHOW IS ITS OWN: `CLI_INSTALL` in `copy.ts` fetches the script this site
+   serves at `/cli/install.sh` (`apps/cli/README.md`), which is published with the product (`loop/DIRECTION.md` §33). */
+const OWN_INSTALL = /https:\/\/brain\.dog\/cli\/install\.(sh|ps1)/;
+
+test('no install command reaches the reader but the site’s own', () => {
   for (const pattern of INSTALL) {
-    const found = hits(pattern);
+    const found = hits(pattern).filter((line) => !OWN_INSTALL.test(line));
     assert.deepEqual(found, [], `${pattern} matches ${found.length} line(s) under apps/site/src:\n${found.join('\n')}`);
   }
 });
@@ -139,51 +143,24 @@ test('the only GitHub address is the bare repository the owner asked for', () =>
   assert.deepEqual(others, [], `a GitHub address other than SOURCE (${SOURCE}):\n${others.join('\n')}`);
 });
 
-test('while the repository is linked, the legal page says it is private', () => {
-  if (SOURCE === null) return;
-  assert.match(site.legal.licence.note, /private/, 'legal.licence.note no longer says the repository is private');
-});
-
 /**
- * THE SENTENCES THAT WERE FALSE ON 22 SEPTEMBER, each refused by the shape that made it false rather
- * than by its exact words, so a rewording that keeps the claim still fails.
+ * THE SITE DESCRIBES THE FINISHED PRODUCT (`loop/DIRECTION.md` §33, 26 September): "I want the marketing site to
+ * reflect what the FINAL product would be, not where it would stand". The tests that held the opposite (that the
+ * first screen say the app opens to sign-in, that no sentence offer what a stranger could not have yet, and that the
+ * legal page call the repository private) went that day. This one keeps the old sentences from coming back: a page
+ * that says a plan is not open, or that there is no way to sign up, is a page written for a day that has passed by
+ * the time this copy is deployed.
  */
-const FALSE_TODAY = [
-  /* THIS SHAPE FLIPPED ON 25 SEPTEMBER. It refused `no demo`, because the app drew a sample for
-     anybody signed out; `loop/DIRECTION.md` §26 took the sample out ("get rid of that whole sample
-     record stuff please"), so a signed-out reader now lands on sign-in and `no demo` is simply true.
-     What would be false is the old sentence: four of them on this site named the sample as the
-     thing a stranger could open. `entries.ts` still says the app once opened `rather than the
-     sample`, which is history and matches neither half. */
-  [/\bsample record\b|made-up sample/i, 'offers a sample record, and the app shows only a real record, behind sign-in'],
-  /* Nobody outside this repository can install a self-host. */
-  [/self-host[^.]*\btoday\b|\btoday\b[^.]*self-host/i, 'offers a self-hosted record today, and the self-hosted build is not published'],
-  /* The code is private, so "open source" is a plan and not a state. */
-  [/\bis open source\b|^Open source\./i, 'calls the code open source in the present tense, and the repository is private'],
-  /* No record of one's own can be made until provisioning opens. */
-  [/\brecord of your own (starts|begins|takes|is)\b/i, 'offers a record of your own in the present tense, and sign-up is not open'],
+const NOT_YET = [
+  /\bneither plan is open\b/i,
+  /\bnot open yet\b/i,
+  /\bno way to sign up\b/i,
+  /\bsign-up is not open\b/i,
+  /\bnothing is for sale\b/i,
+  /\bthe repository is private\b/i,
 ];
 
-test('no sentence promises what a stranger cannot have today', () => {
-  /* EVERY SHAPE IS ASKED BEFORE ANYTHING FAILS, so one run names every false sentence and not only
-     the first. `SAID` finds a sentence in `copy.ts`; `hits` finds one typed into a route. */
-  const found = FALSE_TODAY.flatMap(([pattern, why]) => [
-    ...SAID.filter(([, text]) => pattern.test(text)).map(([at, text]) => `${why}. ${at}: ${text}`),
-    ...hits(pattern)
-      .filter((line) => !line.startsWith('lib/copy.ts:'))
-      .map((line) => `${why}. ${line}`),
-  ]);
-  assert.deepEqual(found, [], `${found.length} sentence(s) promise what a stranger cannot have:\n${found.join('\n')}`);
-});
-
-/**
- * AND WHAT THE BUTTON OPENS IS SAID, on the first screen, under it. Until 25 September that was the
- * sample and this test required the word. With the sample gone the button opens sign-in, and a note
- * that still promised a sample would send a stranger to a screen asking for a session they cannot
- * have, with the page having told them otherwise. So the note has to name sign-in and must not name
- * the sample.
- */
-test('the first screen says the app opens to sign-in, and names no sample', () => {
-  assert.doesNotMatch(site.hero.note, /\bsample\b/i, 'hero.note still says the app opens on a sample record');
-  assert.match(site.hero.note, /\bsign-?in\b/i, 'hero.note does not say what the button opens');
+test('no sentence says the product is not open yet', () => {
+  const found = NOT_YET.flatMap((pattern) => SAID.filter(([, text]) => pattern.test(text)).map(([at, text]) => `${at}: ${text}`));
+  assert.deepEqual(found, [], `${found.length} sentence(s) describe the product before launch:\n${found.join('\n')}`);
 });

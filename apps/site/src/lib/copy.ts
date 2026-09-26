@@ -1,114 +1,75 @@
 /**
  * Every sentence on brain.dog, in one file.
  *
- * Same discipline as the record app's `copy.ts` and for a sharper reason here: marketing copy is
- * where a product lies to itself. One file means one pass to check that every claim on this site is
- * a thing the software does, and where a claim is about something not built yet, it says so in the
- * sentence rather than in a footnote nobody reads.
+ * WRITTEN FOR LAUNCH DAY. On 26 September the owner asked for a site that shows the product as it
+ * will be when the finish is done, not where it stands today (`loop/DIRECTION.md` §33): "brandog is
+ * not gonna be published anyways until everything is done". So every sentence here is in the present
+ * tense about the finished product, and this copy is deployed with that product and not before it.
+ * The sentences that said what a stranger could not have yet, and the tests that required them, went
+ * the same day.
  *
- * THE VOICE, in five rules:
+ * THE VOICE, in five rules, and they still hold:
  *   - Say what it does. Never sell it, never adjective it, never "powerful" or "seamless".
  *   - A CTA is Verb + Noun. Never "Get Started", never "Learn More".
  *   - A number is a real number or it is absent. No "10x", no "up to".
- *   - Say the limits out loud. A page that lists only strengths is a page nobody believes twice,
- *     and the buyer here reads specifications for a living.
- *   - NO EM DASHES, anywhere a person reads. A sentence that only worked because of the dash was
- *     two sentences. Write them as two, or use a colon.
+ *   - Say the limits out loud. A page that lists only strengths is a page nobody believes twice.
+ *   - NO EM DASHES, anywhere a person reads. Write two sentences, or use a colon.
  *
- * AND A SIXTH RULE, ADDED 2026-09-21 BY THE OWNER, WHO COUNTED THE NUMBERS ON THE PAGE AND CALLED
- * THEM "silly ai-looking stats" (`loop/DIRECTION.md` §19). A figure earns its place by answering a
- * question the reader was already asking. `16 tools an agent can call`, `5 resource templates`,
- * `1 file holds your record` and `30 nightly backups` answered none: nobody arrives at a marketing
- * page wondering how many tools a protocol surface declares, and a row of four such figures under a
- * headline is the shape of a page filling space rather than making an argument. The `facts` section
- * that held them is deleted, along with the sixteen tool names and the five resource-template
- * grammars that were drawn as a grid two bands further down. `test/content.test.ts` now fails if any
- * of them comes back.
+ * AND A SIXTH, THE OWNER'S OF 21 SEPTEMBER (`loop/DIRECTION.md` §19): a figure earns its place by
+ * answering a question the reader was already asking. The home page counts none of the product's own
+ * parts; `/agents` may, because a reader arrives there to ask exactly that. What a plan includes is the
+ * reader's question on `/pricing`, and those figures live in `plans.ts`, not here.
  *
- * THE DRAWINGS ARE COPY TOO. The home page draws two working things rather than pictures of them: an
- * agent's proposal that a person decides, landing in the history under the agent's name, and a
- * switcher that rearranges the page as you pick who the record is for. Every name, figure and time
- * in both is below, read off `packages/seed`, which is the record the gates install and serve. The
- * app no longer draws a sample of its own (`loop/DIRECTION.md` §26), so the seed is the one source
- * left; the drawings stay, with every number. Nothing in a drawing is invented: when the seed
- * changes, these change with it, not before it. Where a drawing takes a liberty with the seed, the
- * comment beside it names the liberty. ONE EXCEPTION, MEASURED ON 25 SEPTEMBER: the decision
- * scene's history is in no file under `packages/seed`. All three rows, the two older ones
- * (`seq 4160`, and `seq 4188` by `rule.reply`) and Claude's landing row (`seq 4192` and `4191`,
- * creating `services#6` and `services#7`), are the app's fixture ledger in
- * `apps/web/src/lib/record/fixtures/sample.ts`, which was `record/data.ts` until wave C of
- * `loop/research-no-sample.md` made it test-only. The seed holds the question and the two services,
- * not the rows that record them. The comments beside the rows cite that file as `sample.ts`.
- * A key that nothing renders is deleted rather than kept for later.
- *
- * WHY THERE ARE FEWER SECTIONS THAN THERE WERE. `typed` and `agents` were two bands of their own and
- * are now three sentences inside one. The page used to open on typed rows, registers and the MCP
- * tool table, which is how the thing is built rather than what it is worth, and §19 is explicit that
- * the first blocks answer the second question. Their surviving sentences moved into `plain`, at the
- * foot of the page where a reader who wants the mechanism will still find it, and the comments that
- * argued each sentence into its current wording moved with them rather than being thrown away.
+ * THE DRAWINGS ARE COPY TOO. Every name and figure in the drawn app, the decision scene and the Slash
+ * palette is read off `packages/seed`, the record the gates install, so a reader who starts a Personal
+ * record meets the same bills, balances and goals the page showed them.
  */
 
 /**
- * The addresses, in one place, and ABOVE `site` so every link inside it can be built from them.
- *
- * `APP` IS THE ONE PLACE THE APP'S ADDRESS IS WRITTEN. Every "Open the app" on the site, the header,
- * the hero, the close, the pricing card and the changelog, and the footer's sign-in, read it from
- * here. It sat below `site` until 22 September, which is why the footer's sign-in was a second
- * literal of the same address. The day the app moved, this line was every LINK that changed and not
- * the whole change: `loop/research-site-now.md` (23 September, section 2) measured `static/robots.txt`,
- * the comments in `static/sitemap.xml` and the want of a CSP in `static/_headers` all going false with
- * the move.
- *
- * `/app` AND NOT AN ADDRESS, SINCE PUSH B2 PUT THE APP ON THIS SITE'S OWN NAME. The site's script
- * hands `/app` and everything under it to its own environment's app (`wrangler.jsonc`,
- * `run_worker_first` and `services`), so the alpha site's readers reach alpha's app, where the old
- * absolute `https://app.brain.dog` sent them to production's. It stayed absolute until the flip
- * because until then `/app` on `brain.dog` refused every sign-in at `origin`, and after it the old
- * name refuses a device start (`loop/research-one-domain-binding.md` section 2.4).
- * `test/one-origin.test.mjs` reads production's `PUBLIC_HOST` and says which of the two this must be.
- *
- * `SOURCE` IS PUBLISHED AHEAD OF THE REPOSITORY GOING PUBLIC, on the owner's word, 2026-09-16. The
- * repository is private until the product launches, and the link is on the site now so it is
- * already in place on the day it opens.
- *
- * `DOCS` AND `BUILD` ARE STILL `null`. They point inside the repository at pages that are not
- * written for a stranger yet. `null` and not a different URL, so every call site has to decide what
- * to draw when there is no address, and the type makes it decide.
+ * The addresses, in one place. `APP` is the app, served on this site's own name (`wrangler.jsonc`);
+ * every link to it carries `rel="external"` so the prerender crawler leaves it alone.
  */
 export const APP = '/app';
+export const SIGNUP = `${APP}/signup`;
 export const SOURCE: string | null = 'https://github.com/actuallyhoss/BrainDog';
 export const DOCS: string | null = null;
 /** The build instructions, which is what a self-hoster is actually sent to. */
 export const BUILD: string | null = null;
+/** Where an MCP client connects: `servesMcp` in `apps/worker/src/route.ts`, with OAuth from AGT-3. */
+export const MCP_URL = 'https://brain.dog/mcp';
+/** The command line's install line, as `apps/cli/README.md` gives it. */
+export const CLI_INSTALL = 'curl -fsSL https://brain.dog/cli/install.sh | sh';
 
 export const site = {
   product: 'BrainDog',
   /** The slogan. It is the README's headline, unchanged, and it takes no full stop. */
   tagline: 'Give your business a memory',
 
-  /**
-   * THE SEARCH RESULT AND THE SHARED CARD, written for that job rather than borrowed from the page.
-   * About 150 characters each, answering the question a stranger is actually asking.
-   */
+  /** The search result and the shared card, about 150 characters each. */
   meta: {
     home: {
       title: 'BrainDog · Give your business a memory',
       description:
-        'One record arranged around you: your own money, your studies, the companies you run, a ' +
-        "team's work or a new project. You and your AI agents keep it up to date.",
+        'One record for everything you keep track of, arranged around you. You, Slash and your AI ' +
+        'agents keep it current, and every change says who made it.',
+    },
+    slash: {
+      title: 'Slash · BrainDog',
+      description:
+        'Slash is the assistant inside every BrainDog record. It answers from your own lists, drafts ' +
+        'what you describe, and writes nothing until you accept it.',
     },
     pricing: {
       title: 'Pricing · BrainDog',
       description:
-        'Two ways to run BrainDog: hosted at $12 a month per record, or self-hosted for free on your ' +
-        'own machine. Neither plan is open yet.',
+        'From $12 a month per record, with Slash credits included. Colleagues are free on ' +
+        'every plan, and extra usage is off until you turn it on.',
     },
     agents: {
-      title: 'For agents and services · BrainDog',
+      title: 'For agents · BrainDog',
       description:
-        'What an agent reaches over MCP, what a project reports with a key of its own, and the ' +
-        'limits on both. Fifteen tools, nine of which only read.',
+        'Connect Claude, Codex, Cursor or any MCP client to your record by URL: what an agent reads, ' +
+        'what it writes, and what only a person can do.',
     },
     notFound: {
       title: 'Page not found · BrainDog',
@@ -116,108 +77,36 @@ export const site = {
     },
     legal: {
       title: 'Legal · BrainDog',
-      description:
-        'The licence BrainDog is published under, and where its Terms and Privacy policy will be ' +
-        'published before hosted sign-up opens.',
+      description: 'The licence BrainDog is published under, and its Terms of Service and Privacy Policy.',
     },
     changelog: {
       title: 'Changelog · BrainDog',
-      /* `live on a synthetic record` IS THE SAME FALSE CLAIM `STATUS.body` CARRIED, one layer out,
-         and a meta description is read by every person a search result or a shared link reaches.
-         There is no demo record, and since `loop/DIRECTION.md` §26 no anonymous door either, so there is
-         no record to be live on. */
-      description:
-        "What shipped in BrainDog and when, in the repository's own words. The app is live, " +
-        'signing in works, and nothing is for sale yet.',
+      description: "What shipped in BrainDog and when, in the repository's own words.",
     },
   },
 
   nav: {
+    slash: 'Slash',
     pricing: 'Pricing',
     agents: 'For agents',
     changelog: 'Changelog',
     docs: 'Design',
     source: 'GitHub',
     open: 'Open the app',
+    signin: 'Sign in',
+    start: 'Start your record',
     menu: 'Menu',
   },
 
   hero: {
-    /**
-     * THE SLOGAN, IN TWO HALVES, AND THE WORDS ARE UNCHANGED.
-     *
-     * It reads `Give your business a memory` on the page, because it is one `<h1>` with a coloured
-     * span inside it, and the slogan is the owner's call rather than a redesign's
-     * (`loop/research-site-copy.md` closes with three alternatives and leaves the decision with
-     * him). The split exists so the last two words can take `--accent-text`, which is the one move
-     * taken verbatim from the reference: PostHog's hero headline carries
-     * `className="text-red dark:text-yellow"` on a phrase inside it
-     * (`src/components/Home/Hero.js`), a different hue per scheme because neither reads on both
-     * grounds. Ours needs no swap: `--accent-text` is already solved per scheme for text on the
-     * page ground, and it is the token whose whole job is this.
-     *
-     * A SEARCH RESULT AND A SHARED CARD STILL SEE ONE SENTENCE, because `site.tagline` and
-     * `footer.tagline` hold it whole and neither of them is built from these two.
-     */
+    /* THE SLOGAN, IN TWO HALVES, so the last two words take `--accent-text`. The words are the
+       owner's and unchanged. */
     title: 'Give your business',
     titleAccent: 'a memory',
-    /**
-     * IT SAID `Nothing in it is ever overwritten` AND THAT IS STRONGER THAN THE STORAGE.
-     *
-     * The design is a current-state table beside an append-only log, which is the right design and
-     * is not the same sentence. `packages/kernel/src/index.ts` updates a row in place and bumps its
-     * version; `erase.ts` writes over the log itself when somebody exercises a right to erasure;
-     * `provision.ts` deletes past the retention cutoff. Three greps falsify the old claim. What is
-     * true without qualification is the half that matters to a reader: changes are events, and the
-     * list of them only grows.
-     *
-     * AND THEN IT SAID WHAT THE STORAGE DOES INSTEAD OF WHAT THE READER GETS, which is the order
-     * §19 asks this page to stop using on its first screen. `loop/research-site-now.md` counted it:
-     * of the sub-line's three sentences, the last was spent on events and a log, the most technical
-     * words above the fold. What a reader gets is the switcher's promise (their own things, arranged
-     * for them), the agents doing the upkeep, and being able to see who changed what. The last half
-     * is the same claim `plain.lead` makes and the drawn decision in the mechanism band shows, so it is said
-     * here in the reader's words and proven there. `test/content.test.ts` fails if a word of
-     * mechanism comes back into this sentence.
-     */
     sub: 'Everything you keep track of, in one place arranged around you. You and your AI agents keep it up to date, and every change says who made it.',
-    /**
-     * `Open the app` AND NOT `Open the demo`, WHICH IS THE VERB THIS SITE ALREADY USES for the same
-     * address in the nav and on the pricing page.
-     *
-     * The server has no demo record to serve: its anonymous door went with the sample
-     * (`loop/DIRECTION.md` §26), so a stranger is sent to sign in. The label stays `Open the app` because
-     * the app is what opens, and what it opens on is said in the note under the button.
-     *
-     * THE NOTE SAID ONLY `Neither plan is open yet.`, AND THAT HID WHAT THE BUTTON OPENS. From 22
-     * September it said `The app opens on a sample record.`, because `/api/boot` answered a stranger
-     * 401 and the browser drew a built-in sample for anybody with no record.
-     *
-     * THEN THE SAMPLE WENT, ON 25 SEPTEMBER (`loop/DIRECTION.md` §26: "get rid of that whole sample
-     * record stuff please"). Without a session the app is its sign-in screen and nothing else, so
-     * that is what the note says the button opens, and what is closed still comes second.
-     * `test/promises.test.mjs` fails if the note names the sample again or stops naming sign-in.
-     */
-    primary: 'Open the app',
-    /**
-     * THE QUIET SECOND ACTION, and it is quiet for `app.css`'s reason: one filled button per view
-     * is the answer to "what do I do here", and a second filled one is a second answer. A reader
-     * who has just been told neither plan is open has exactly one other question, which is what it
-     * would cost, so the quiet link answers that one.
-     *
-     * NOT `See the pricing`, WHICH IS WHAT THE RULE AT THE TOP OF THIS FILE ASKS FOR and is what
-     * the closing band says. Two reasons, and the second is the stronger. The rule exists to stop
-     * `Learn More`, and what it is really asking for is a label that names the thing you get; this
-     * one names it in five words instead of two. And the close already uses those two words, so
-     * repeating them in the hero would put the same label on both ends of the page, which is the
-     * repetition `closing.title` refuses in the paragraph above it for the same reason.
-     */
+    primary: 'Start your record',
     secondary: 'See what it costs',
-    note: 'The app opens to sign-in. Neither plan is open yet.',
-    /* THE HERO HAS NO PHOTOGRAPH, AND SO NO CAPTION AND NO ALT. On 22 September the owner said of
-       the screenshots on this page *i hate those screenshots. they look terrible*, and asked for the
-       drawn app to take their place, overlapping the hero. That drawing is `arrange` below, and
-       every word in it is a string a screen reader reads as text, so it needs no alt. */
+    note: 'From $12 a month per record. Colleagues are free.',
   },
 
   /**
@@ -356,25 +245,22 @@ export const site = {
       'Say what your record is for. The pages, the lists and the words follow. Underneath, every ' +
       'part can be changed or turned off.',
     /**
-     * THE SENTENCE THIS REPLACES WAS FALSE, AND IT WAS IN THE `Not built yet` COLUMN.
+     * WHO DRAFTS THE ARRANGEMENT, AND THAT NOTHING LANDS UNTIL THE OWNER SAYS SO.
      *
-     * It read: *Spark arranges by reading what you type. A language model does not do it yet.*
-     * That was the assistant's old name; it is Slash now (`loop/DIRECTION.md` section 31).
-     * `loop/research-site-copy.md` falsifies it twice over. `packages/host/src/slash.ts:52`
-     * defines `endpointModel()`, a real model behind a chat-completions port, and BOTH hosts wire
-     * it in (`apps/worker/src/slash.ts:22`, `apps/selfhost/src/slash.ts:29`). What is true is
-     * narrower and is what `loop/STATUS.md` §5 actually says: with none configured, the rules
-     * draft. So the claim moves out of the not-built column, where it was a lie about our own
-     * software, and becomes the limit it always was, stated beside the thing it limits.
+     * It said a model drafts it only once you configure one, and that no host configures one by
+     * default, which went false on 24 September (`loop/DIRECTION.md` §24): production sets `SLASH_INCLUDED` to
+     * `yes`, so the Cloud answers Slash with the included model without anybody configuring one
+     * (`apps/worker/src/slash.ts`, `includedInference`). `src/lib/claims.test.ts` now fails if a
+     * sentence here says there is no model while production includes one.
      *
-     * IT SURVIVED THE CUT OF 2026-09-21 WHOLE, and that is deliberate. §19 asks for a shorter
-     * page, and `loop/DIRECTION.md` is equally clear that a shorter page must not become a
-     * truer-sounding one. Deleting a stated limit is the cheapest way to lose length and the one
-     * way that is not allowed, so the length came out of bands and pictures instead.
+     * The first sentence rests on `packages/record/src/slash.ts`, which drafts from what the owner
+     * describes and writes nothing itself, and on `packages/record/src/arrange.ts`, whose question
+     * changes nothing until the owner accepts it. It names no model, so it stays true on a host
+     * with none, where Slash's rules draft instead.
      */
     note:
-      'Rules draft the arrangement. A model drafts it instead once you configure one, and none is ' +
-      'configured by default. Any module can be turned off afterwards, People included.',
+      'Slash drafts the arrangement from what you say, and nothing is written until you accept it. ' +
+      'Any module can be turned off afterwards, People included.',
     cases: [
       {
         id: 'personal',
@@ -711,365 +597,315 @@ export const site = {
     ],
   },
 
+
   /**
-   * THE LAST BAND BEFORE THE CLOSE, and it is where every sentence about mechanism ended up.
-   *
-   * WHAT A READER CAN HOLD THE PRODUCT TO, what is not built, and what it will never do, in three
-   * columns side by side. The middle column is the reason the other two get believed, which is why
-   * it is the longest of the three and why it lost nothing in the cut.
-   *
-   * `lead` IS ONE SENTENCE NOW, AND IT WAS TWO.
-   *
-   *   - `A register is a typed collection: money, services, people.` WENT, on 2026-09-22. It was
-   *     the one sentence on the site that taught the word by example, and it opened the band, so
-   *     the first thing the mechanism band asked of a reader was to learn a term of the product's own
-   *     plumbing. Nothing else on the home page uses the word, so there was nothing left for the
-   *     definition to serve: `test/content.test.ts` now fails if `register` reaches the home page
-   *     without the sentence that teaches it, and still checks the examples if it comes back.
-   *   - The agents sentence is what `loop/research-site-copy.md` ranks FIRST of the eight things
-   *     this page should say: an agent gets a typed surface, not a chat window. The sixteen tool
-   *     names that used to be drawn under it as a grid are gone, because a reader who does not
-   *     already know what `governance` or `handoff` means learns nothing from reading the word,
-   *     and a reader who does will go to the protocol.
-   *   - `every change carries a name` is the claim the drawn decision under this paragraph
-   *     demonstrates, and it is placed last for that reason: the scene ends with Claude's row
-   *     arriving in the history under Claude's name.
+   * THE HOME PAGE UNDER THE HERO, rebuilt on 26 September because the owner called what was there
+   * "pure AI slop" (`loop/DIRECTION.md` §33). Each band shows one thing the product does, drawn
+   * working, with a heading that says what the reader gets and one sentence under it. No band opens
+   * on an eyebrow and a rule, and none is a list of three hedged columns.
    */
-  plain: {
-    tag: 'In writing',
-    title: 'Plain about what it is',
-    lead:
-      'Claude, Codex and Cursor read and write the same record you do, over MCP, with a key you ' +
-      'issue, and every change carries a name.',
+  home: {
+    slash: {
+      title: 'Press / and ask.',
+      lead:
+        'Slash is built into every record. Ask what you owe this month and it shows the bills. Ask for a ' +
+        'page and it builds one. Nothing it writes goes in until you say yes.',
+      more: 'More about Slash',
+    },
+
+    agents: {
+      title: 'Bring your own agents.',
+      lead:
+        'Claude, Codex, Cursor and anything else that speaks MCP can read and write your record with a ' +
+        'key you give it. When an agent wants to change something, you get a question first, and its ' +
+        'name stays on the change.',
+      connect: 'MCP address',
+      more: 'How agents connect',
+    },
+
     /**
-     * THE LIMIT ON THE SENTENCE ABOVE, and it is a limit about records rather than about the door.
-     *
-     * The hosted MCP door IS written (`apps/worker/src/index.ts:1020-1032`, routed at
-     * `apps/worker/src/route.ts:70`, with `apps/worker/test/mcp.test.ts` over it). What nobody can
-     * open yet is a hosted RECORD, so a self-host is the only place an agent can reach one.
-     * A buyer who reads specifications works that out in about four minutes, so better it comes
-     * from us.
-     *
-     * AND IT SAID `Agents reach a self-hosted record today.`, WHICH NO READER COULD ACT ON. A
-     * self-host needs the code, and the code is in a private repository that answers 404 to anybody
-     * signed out; `npm view` answers E404 for every name this repository could publish under. The
-     * door is real and a self-host built from this tree does answer it, so the sentence keeps the
-     * door and says when a stranger gets a record to point it at.
+     * THE DOORS AND THE LEARNED PATTERN, drawn as three steps. The flow is `docs/07` §4: an unmatched
+     * payload lands raw, Slash proposes an ingest pattern from three examples, one approval makes it
+     * a declaration, and no model runs on that shape again. The three alerts are the Personal
+     * record's own gym and phone bills and a groceries shop.
      */
-    note: 'Both hosts answer agents over MCP. Your agent reaches a record of yours once the code is published or hosted sign-up opens.',
-    columns: [
-      {
-        head: 'Yours to keep',
-        /**
-         * ALL THREE OF THESE WERE FALSE OR OVERSTATED ONCE, and an audit falsified each with one
-         * grep. They are the sentences on the page a reader is most likely to check, which is the
-         * whole point of the column, so they were the worst ones to have got wrong.
-         *
-         *   - `The code is on GitHub` is true of the address and not of a reader: the repository
-         *     is private and the link 404s. `/legal` admitted it and this page did not, which is
-         *     exactly the footnote this file's own rule forbids.
-         *   - `One SQLite file` is the record. An installation writes three things
-         *     (`apps/selfhost/src/main.ts:105`, `:171`, `:257`): the record, a second database
-         *     holding sign-in and people, and a `blobs` directory where attachments live OUTSIDE
-         *     the record. The pricing page kept the qualifier and this page dropped it.
-         *
-         * THE BACKUPS LINE WENT IN THE CUT OF 2026-09-21 AND IT IS THE ONE DELETION HERE.
-         * It read `Thirty nightly backups, in the same portable format on either host`, and it is
-         * true (`apps/worker/src/snapshots.ts:1-30`, `apps/selfhost/src/snapshots.ts:30`). It is
-         * also a counted figure of the product's own parts, which is the category the owner named
-         * as silly, and the same thirty was one of the four numbers deleted from under the hero. A
-         * strength coming off the page costs the page nothing it is owed; a LIMIT coming off would
-         * have, which is why the middle column below still has three lines.
-         *
-         * `Open source.` AS A SENTENCE OF ITS OWN WAS A PRESENT-TENSE LABEL ON A PRIVATE REPOSITORY.
-         * The clause after it was careful and the label in front of it was not, and a label is what a
-         * reader checks first: `https://github.com/actuallyhoss/BrainDog` answered 404 signed out on
-         * 22 September. `from launch` puts the timing inside the claim instead of after it.
-         */
-        lines: [
-          'Open source from launch. The code is published on GitHub when the product launches.',
-          'Your record is one file. Leaving is a copy, not a migration.',
+    inbox: {
+      title: 'Forward it once. It files itself after that.',
+      lead:
+        'Send in bank texts and receipts by email, point a webhook at your record, or connect Stripe and ' +
+        'Mercury. After three of the same kind, Slash suggests how to file them. Say yes and the rest go ' +
+        'in on their own, without using credits.',
+      steps: ['Arrives', 'Learned once', 'Filed'],
+      arrivals: [
+        { from: 'Card alert', text: 'You paid GBP 32.00 to PUREGYM on 3 Oct.' },
+        { from: 'Card alert', text: 'You paid GBP 18.00 to VODAFONE on 4 Oct.' },
+        { from: 'Card alert', text: 'You paid GBP 64.20 to TESCO STORES on 5 Oct.' },
+      ],
+      pattern: {
+        name: 'Card alerts',
+        fields: [
+          ['Amount', 'the money after “paid”'],
+          ['Merchant', 'the words after “to”'],
+          ['Date', 'the day after “on”'],
+        ],
+        tested: 'Matches all three',
+        writes: 'Files into Spending',
+      },
+      list: 'Spending',
+      columns: ['What', 'Amount', 'On'],
+      rows: [
+        ['Puregym', 'GBP 32.00', '3 Oct'],
+        ['Vodafone', 'GBP 18.00', '4 Oct'],
+        ['Tesco Stores', 'GBP 64.20', '5 Oct'],
+      ],
+    },
+
+    /**
+     * THE BLOCKS, DRAWN AS A PAGE. Five of the kinds a page is made of, each over rows the Personal and
+     * Team records really have: the Lisbon goal (GBP 420.00 of 900.00), the week's three bills, the
+     * team's tickets by state, and a thirty-day cash figure worked from the three accounts and every
+     * bill and the pay day due inside a month (3,474.16 less 1,157.49 plus 2,450.00).
+     */
+    pages: {
+      title: 'Make the pages you actually check.',
+      lead:
+        'Put figures, charts, boards, calendars and tables on a page, all reading from your lists. ' +
+        'Drag them around yourself, or tell Slash what you want to see.',
+      cash: { title: 'Cash in 30 days', value: 'GBP 4,766.67', note: 'after bills and pay day' },
+      goal: { title: 'Trip to Lisbon', value: 'GBP 420.00', of: 'of GBP 900.00', pct: 47 },
+      spend: {
+        title: 'Spending by month',
+        bars: [
+          ['Jun', 612],
+          ['Jul', 540],
+          ['Aug', 701],
+          ['Sep', 588],
+          ['Oct', 455],
+        ] as [string, number][],
+      },
+      week: {
+        title: 'Due this week',
+        days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+        items: [
+          { day: 1, what: 'Streaming subscription', amount: 'GBP 10.99' },
+          { day: 2, what: 'Phone contract', amount: 'GBP 18.00' },
+          { day: 5, what: 'Rent', amount: 'GBP 850.00' },
         ],
       },
-      {
-        /**
-         * IT WAS HEADED `Not built yet`, AND THE FIRST LINE UNDER IT IS BUILT.
-         *
-         * The comment on that line keeps it in this column on purpose and defines the column as what
-         * a visitor can do nothing with, which is right. A stranger reads the head and not the
-         * comment, and the head said the opposite of the comment: both hosts wire `@braindog/slash`
-         * (`apps/worker/src/slash.ts`, `apps/selfhost/src/slash.ts`), the palette asks it, and
-         * `SLASH_ENDPOINT` is `""` in both of `apps/worker/wrangler.jsonc`'s environments. Built and
-         * switched off is not unbuilt. `Not switched on yet`, the survey's suggestion, fits that line
-         * and the third, and misreads the second: nothing is built that reaches into an inbox, so a
-         * head saying it is only switched off would overstate the product the other way. What is true
-         * of all three is the column's own definition, said to the reader in the words of the column
-         * beside it. `src/lib/claims.test.ts` fails if the head says `built` while both hosts wire the
-         * engine.
-         */
-        head: 'Not yours to use yet',
-        lines: [
-          /**
-           * THIS LINE WAS TRUE ON 2026-09-21 IN THE MORNING AND FALSE BY THE EVENING, which is what
-           * a marketing page that cites a grep is for.
-           *
-           * It said *the engine is written; no host reaches it yet*, on the strength of
-           * `grep -rl "@braindog/spark" apps/worker/src apps/selfhost/src` returning nothing, the
-           * package's name before it was renamed `@braindog/slash`. Run again for the new name, it
-           * returns `apps/worker/src/slash.ts` and `apps/selfhost/src/slash.ts`: the engine landed
-           * as a package of its own on 2026-09-20 and both hosts were wired to it in the same day's
-           * work.
-           *
-           * WHAT IS STILL TRUE IS NARROWER AND IS WHY THE LINE STAYS IN THIS COLUMN. Both wirings
-           * refuse before they import: `workerSlashEngine` returns `undefined` when no endpoint is
-           * configured, and `SLASH_ENDPOINT` is `""` in both of `apps/worker/wrangler.jsonc`'s
-           * environments. So a visitor can still do nothing with it, which is this column's own
-           * definition.
-           *
-           * AND THE SENTENCE SAID "BOTH HOSTS REACH THE ENGINE", WHICH IS NOT TRUE AND WAS BACKED
-           * BY A GREP FOR THE PACKAGE NAME. Finding 3 of `loop/research-batch-five-audit.md`, and
-           * the finding under it is worse than the wording: `workerSlashEngine`
-           * (`apps/worker/src/slash.ts:83`) and `slashEngineFor` (`apps/selfhost/src/slash.ts:73`)
-           * are called from their own test files and from nowhere else. Driven by the audit: with
-           * both builders throwing on every call, 172 of 172 tests pass in `apps/worker` and 199 of
-           * 199 in `apps/selfhost`. An import edge is not a path. Configuring a model would change
-           * nothing, because nothing asks either builder for an engine.
-           *
-           * So the line said what a stranger could check: the engine exists in this repository and no
-           * screen and no door reaches it.
-           *
-           * AND A DOOR REACHES IT NOW, SO THE SENTENCE MOVED RATHER THAN THE COLUMN. Both hosts
-           * mounted `POST /api/slash/read` on 2026-09-21, and a real self-host over a real socket
-           * answers it 200 on exactly one model call. Two things are still true and they are what
-           * the new sentence says: nothing in `apps/web` calls that address, which
-           * `grep -rn "slash/read" apps/web/src` returns nothing for, and `SLASH_ENDPOINT` is `""`
-           * in both of `apps/worker/wrangler.jsonc`'s environments, so no host this project deploys
-           * has a model behind it. A visitor can still do nothing with it, which is this column's
-           * own definition.
-           *
-           * WHAT THE DOOR ANSWERS IS A ROW, which was checked before this sentence was written and
-           * then checked again after a first reading of it was wrong: a record holding a row named
-           * Kiln, asked `Kiln`, answers that row. The page says nothing about that either way,
-           * because a door no screen reaches is not a feature a visitor can use, and this column is
-           * about what they can use.
-           *
-           * AND A SCREEN ASKS IT NOW, SO THE SENTENCE MOVED AGAIN AND THE COLUMN STILL DID NOT.
-           * Since a331fe8c the palette offers a Slash row for a plain query of two characters or
-           * more that matched no place (`apps/web/src/lib/palette/slash.ts`, `offersSlash`), and
-           * asks through the client's `slashRead` (`Palette.svelte`), which is why the grep above
-           * stopped measuring the screen: the address lives in `packages/client`, not in
-           * `apps/web`. The row appears only when `/api/version` reports a model and the record is
-           * live (`apps/web/src/routes/+layout.ts`); a stranger has no live record, and `SLASH_ENDPOINT`
-           * is still `""` in both environments. So a stranger still cannot ask, and the line says
-           * why in terms that stay true the day a model is configured somewhere.
-           * `src/lib/claims.test.ts` fails if the palette asks and this line says no screen does.
-           */
-          'Asking your record a question in words. The app asks it where a model is configured, and no host here has one.',
-          /* THE SECOND HALF IS NEW AND IT IS THERE TO STOP A CONTRADICTION. Both hosts opened an
-             arrival door on 2026-09-20 and the changelog says so, so `Mail does not arrive by
-             itself` on its own now reads as the page disagreeing with its own history page. The
-             two are compatible and the distinction is the whole point: nothing here reaches into
-             an inbox, and what does land has to be forwarded there by a person. */
-          'Mail does not arrive by itself. Nothing reaches into your inbox, and a message has to be forwarded in.',
-          /* THE DEMO BELONGS IN THIS COLUMN and was in none of them, which is how the page came
-             to point its one filled button at it. There is no demo record, and no anonymous door since §26.
-
-             BUT `there is no demo to open yet` WAS FALSE OF THE SCREEN from 22 September, when the
-             app drew its own sample for anybody with no session, and this line named that sample
-             for three days. `loop/DIRECTION.md` §26 took the sample out on 25 September: with no
-             session the app is its sign-in screen. What is not open is a record of one's own, so
-             that is what this line says is missing, and sign-in is named as what the button opens
-             instead. */
-          'A record of your own. Neither plan is open yet, so the app opens to sign-in and there is no way to sign up.',
+      board: {
+        title: 'Tickets',
+        columns: [
+          { name: 'To do', cards: ['Agree what goes in the next cycle'] },
+          { name: 'In progress', cards: ['Write the release notes'] },
+          { name: 'In review', cards: ['Fix the sign-in link that expires too soon'] },
         ],
       },
+      packsLine: 'Or start from a pack: Money, Work, Studies, People, Stripe, Mercury, Holdings and more.',
+    },
+
+    yours: {
+      title: 'Your data stays yours.',
+      body: [
+        'Each record gets its own database. Export the whole thing as one file whenever you want, and ' +
+          'if you leave, you take it with you.',
+        'Every change is saved with who made it, whether that was you, a colleague, an agent or a rule, ' +
+          'and any change can be undone. Agents and scripts use your API keys without ever seeing them.',
+        'BrainDog is open source, so you can read exactly how all of this works.',
+      ],
+      source: 'See the code on GitHub',
+    },
+
+    plans: {
+      title: 'Priced per record, not per person.',
+      lead: 'Invite your whole team for free. Every plan includes Slash credits, and you can top up any time.',
+      side: [
+        { head: 'Need more Slash?', said: 'Top up with a credit pack. 100 credits are $5, and they never expire.' },
+        { head: 'Colleagues are free', said: 'On both plans, with any level of access.' },
+      ],
+      more: 'Full pricing',
+    },
+  },
+
+  closing: {
+    title: 'Start your record.',
+    body: 'Tell it who you are and what it is for. Slash sets up the first lists and pages, and you change whatever you like after that.',
+    primary: 'Start your record',
+    secondary: 'See the pricing',
+  },
+
+  /**
+   * THE SLASH PAGE, which the owner asked for on 26 September. Everything it says Slash does is in
+   * `packages/record/src/slash.ts` and `packages/slash`, and the limits are the product's: drafts are
+   * questions in Decide (`arrange.ts`), the vault is closed to it, it is quiet on a record younger than
+   * two weeks (`YOUNG_DAYS`, decisions C71), and background work has its own allowance (contracts X41).
+   */
+  slash: {
+    title: 'Slash',
+    sub:
+      'The assistant built into every record. Press / anywhere to ask a question, have it build a page ' +
+      'or a rule, or see what needs you today. Nothing it writes goes in until you say yes.',
+    primary: 'Start your record',
+    secondary: 'How credits work',
+    /** The palette the page and the home page draw. Every figure is the Personal record's. */
+    demo: {
+      label: 'Slash, drawn',
+      placeholder: 'Ask, or say what you want',
+      accept: 'Accept',
+      reject: 'Reject',
+      modes: [
+        {
+          id: 'ask',
+          label: 'Ask',
+          prompt: 'What do I owe in the next two weeks?',
+          lead: 'GBP 910.99, across four bills.',
+          rows: [
+            ['Streaming subscription', 'GBP 10.99', 'In 2 days'],
+            ['Phone contract', 'GBP 18.00', 'In 3 days'],
+            ['Rent', 'GBP 850.00', 'In 6 days'],
+            ['Gym membership', 'GBP 32.00', 'In 12 days'],
+          ],
+          source: 'From Bills',
+        },
+        {
+          id: 'draft',
+          label: 'Draft',
+          prompt: 'Make me a page for the Lisbon trip',
+          lead: 'A new page, Trip to Lisbon, with three blocks:',
+          rows: [
+            ['A figure', 'GBP 420.00 of GBP 900.00 put by', ''],
+            ['A list', 'Every row in Put by for the trip', ''],
+            ['A chart', 'What was put by, month by month', ''],
+          ],
+          source: 'Waits in Decide until you accept it',
+        },
+        {
+          id: 'notice',
+          label: 'Notice',
+          prompt: 'This morning',
+          lead: 'Rent is due in 6 days, and pay day is in 10.',
+          rows: [
+            ['Current account', 'GBP 1,240.56', 'Today'],
+            ['Rent', 'GBP 850.00', 'In 6 days'],
+          ],
+          source: 'Your current account covers it',
+        },
+      ],
+    },
+    abilities: [
       {
-        head: 'It will not do',
-        /* `file anything for you` WAS IN THIS COLUMN AND CONTRADICTED THE DIRECTION DOCUMENT.
-           `loop/DIRECTION.md:224` schedules exactly that: *agents do the legwork in view: filing
-           invoices from email, chasing, flagging, proposing*. This column is a list of permanent
-           never-promises, so a capability the owner has written down as planned cannot be in it.
-           Double entry stays, because DIRECTION §2 is explicit that Money is not a ledger.
+        id: 'ask',
+        title: 'Ask',
+        lead:
+          'Ask the way you would ask a person. The answer comes from your own lists, says which one, and ' +
+          'you can click a number to see the rows behind it.',
+        examples: ['What do I owe in the next two weeks?', 'Which clients are late, and by how much?', 'How much went on hosting this year?'],
+      },
+      {
+        id: 'draft',
+        title: 'Draft',
+        lead:
+          'Describe a page, a list, a rule or an edit. Slash puts together a draft and shows you exactly ' +
+          'what it would change. You accept it, tweak it, or throw it away.',
+        examples: ['Make me a page for the Lisbon trip', 'Add a field for the invoice number', 'Ask me when a bill is a week late'],
+      },
+      {
+        id: 'notice',
+        title: 'Notice',
+        lead:
+          'Once a day Slash looks over the record and flags what is due, what changed and what looks off. ' +
+          'It shows up on Home and in your daily email, and on a quiet day there is nothing.',
+        examples: ['Rent is due before pay day', 'A card bill is higher than usual', 'Three tickets have waited a week in review'],
+      },
+      {
+        id: 'learn',
+        title: 'Learn',
+        lead:
+          'Forward a few emails of the same kind and Slash works out how to file them. Once you approve ' +
+          'that, every one after is filed automatically, and it costs no credits.',
+        examples: ['Card alerts into Spending', 'Invoices into Money', 'A skill that learned your filing rules'],
+      },
+    ],
+    rulesTitle: 'Ground rules',
+    rules: [
+      { head: 'You approve every change', said: 'Anything Slash wants to add or edit waits in Decide until you accept it.' },
+      { head: 'It can’t see your keys', said: 'Saved API keys and passwords are off limits. It only knows their names.' },
+      { head: 'The daily check is free', said: 'Flagging what is due, writing your daily email and learning how to file things never use your credits.' },
+      { head: 'It waits before flagging things', said: 'On a new record it stays quiet for the first two weeks, until there is enough history to go on.' },
+    ],
+    allowance: {
+      title: 'How credits work',
+      lead: 'Each question or draft uses one credit, no matter how long the answer takes. Every plan comes with a monthly amount, and you can top up with a pack if you run out.',
+      credits: 'credits a month',
+      packs: 'Credit packs',
+      packsN: (credits: number) => `+${credits.toLocaleString('en-US')}`,
+      packsUnit: (packs: readonly { credits: number; price: string }[]) =>
+        `credits for ${packs[0]?.price}` +
+        packs.slice(1).map((p) => `, or ${p.credits.toLocaleString('en-US')} for ${p.price}`).join('') +
+        ', and they never expire',
+      more: 'See pricing',
+    },
+    closeTitle: 'Try it on your own record.',
+    closeBody: 'Slash is included on every plan from day one.',
+  },
 
-           ALL THREE SURVIVED THE CUT. A refusal is the cheapest credibility a marketing page can
-           buy and the most expensive to win back once it is dropped.
-
-           THE THIRD SAID `Run code from a pack. Ever.` AND STOPPED BEING TRUE ON 22 SEPTEMBER.
-           DIRECTION §22 made a script record content ("never a script in the core; a user's script is
-           content"), `script` is the ninth kind of declaration, and a pack may own one through its
-           body's `pack:` (`packages/kernel/test/script-declare.test.ts` installs one under `money`).
-           What stayed true is where it runs: the record never runs it, a host runs it in a sandbox
-           of its own (QuickJS on a self-host, a Dynamic Worker on the Cloud), and every fetch is held
-           to the origins its `egress:` lists (`packages/host/src/script.ts`, `apps/worker/src/script.ts`).
-           So the refusal names that, and says scripts exist rather than implying they do not. */
-        lines: [
-          'Double entry, or a general ledger.',
-          'A pipeline, a sequence or a lead score.',
-          'Run a script inside your record. A script runs in a sandbox of its own, and calls out only to the addresses it names.',
-        ],
+  pricing: {
+    title: 'Pricing',
+    sub: 'You pay per record, by the month. Invite as many people as you like, it costs the same.',
+    included: 'Included each month',
+    popular: 'Most popular',
+    usageTitle: 'Compare plans',
+    usageLead: 'Allowances reset on the first of each month. People, pages, lists and history are never counted.',
+    rows: [
+      ['People', 'Unlimited', 'Unlimited'],
+      ['Database', 'Your own, not shared', 'Your own, not shared'],
+      ['Backups', 'Nightly, last 30 kept', 'Nightly, last 30 kept'],
+      ['Email and webhook inbox', 'Included', 'Included'],
+      ['Export', 'Any time, as one file', 'Any time, as one file'],
+    ] as [string, string, string][],
+    extraTitle: 'Need more?',
+    packsTitle: 'Slash credit packs',
+    packsLead: 'Used after your monthly credits run out. They never expire.',
+    packsPer: (credits: number) => `${credits.toLocaleString('en-US')} credits`,
+    extraUsageTitle: 'Extra usage',
+    extraLead:
+      'Off by default. Turn it on and set a monthly cap, and you are never charged past it. With it off, ' +
+      'anything over your plan waits until next month.',
+    faqTitle: 'Questions',
+    faq: [
+      {
+        q: 'What is a record?',
+        a: 'Everything one person, family or company keeps track of: its lists, pages, rules and history, in one file. Most people need one. A second business is a second record.',
+      },
+      {
+        q: 'Are colleagues really free?',
+        a: 'Yes. Invite as many people as you need, with any level of access. The price is per record, not per person.',
+      },
+      {
+        q: 'What is a Slash credit?',
+        a: 'One question or one draft, however long Slash works on it. Each plan includes a month of credits, and a pack adds more when you need them. Slash’s own daily read never spends yours.',
+      },
+      {
+        q: 'What happens when I reach the allowance?',
+        a: 'Work that needs more waits for the next month, and the record tells you what is waiting. Add a credit pack for Slash, or turn on extra usage, with a cap you choose, for everything else.',
+      },
+      {
+        q: 'Why is there no free plan?',
+        a: 'Every record gets its own database, and that costs money to run. We would rather charge a fair price than have paying customers cover a free tier.',
+      },
+      {
+        q: 'Can I change plan or cancel?',
+        a: 'Whenever you like, from Settings. A change takes effect straight away, and a cancelled record can still be exported.',
       },
     ],
   },
 
-  closing: {
-    /* NOT THE SLOGAN AGAIN: the hero already made the promise in this face, and the same seven
-       words at the foot of the page read as a mistake. This one says what to do next. */
-    /**
-     * AND IT SAID `Start your record`, WHICH IS THE VERB THE PRODUCT CANNOT PERFORM, in 88px, on the
-     * only coloured field on the page.
-     *
-     * The rule is thirty lines up this file, written about `hero.primary`: a control naming a verb the
-     * product cannot perform is the exact defect this app keeps shipping. `POST /auth/provision`
-     * answers 404 on both hosts because `PROVISION_KEY` is unset, so starting a record is the one
-     * thing a reader who has got this far cannot do. The heading was doing what the button beneath it
-     * was stopped from doing, and it was louder.
-     *
-     * A QUESTION RATHER THAN A SMALLER PROMISE. The body under it already says what making a record
-     * takes, and the two actions are honest: the app opens, and the pricing is there to read. What the
-     * heading has to stop doing is instruct. The day `/auth/provision` answers, `Start your record` is
-     * the right heading again and this comment is how somebody knows it.
-     *
-     * IN TWO HALVES, LIKE THE HERO'S, so the last three words can carry the accent. The band under
-     * it was a whole field of red until 22 September, when the owner asked for it to be much less
-     * red; the colour now lives in these words and nowhere else on the band.
-     */
-    title: 'What would you',
-    titleAccent: 'keep in it?',
-    /* IT SAID `The demo is a made-up business`, and there is no demo. What is true and is the
-       better sentence anyway: making a record is two answers long. `/start` asks who you are and
-       what the record is for, and arranges the rest from those (`packages/seed/src/usecases`).
-
-       AND IT SAID SO IN THE PRESENT TENSE. Nobody can make a record yet: `loop/STATUS.md` §7.A.2
-       records `POST /auth/provision` answering 404 on both hosts while `PROVISION_KEY` is unset and
-       `KEK` unbound. The two answers are still the argument; the sentence says what the button
-       opens today and when the rest applies.
-
-       WHAT THE BUTTON OPENS CHANGED ON 25 SEPTEMBER. It said `Open the app to walk around a sample
-       record.`, and `loop/DIRECTION.md` §26 removed the sample, so a signed-out reader lands on
-       sign-in. Saying why comes first, because a reader who presses the button and meets a sign-in
-       form should already know there is nothing to sign up for. */
-    body: 'Sign-up is not open yet, so the app opens to sign-in. Once it opens, your record starts with two answers: who you are, and what it is for.',
-    primary: 'Open the app',
-    secondary: 'See the pricing',
-  },
-
-  pricing: {
-    title: 'Two ways to run it.',
-    /**
-     * THE STATE OF BOTH PLANS, above the prices rather than under them.
-     *
-     * A price on a page is an offer, and neither of these can be accepted yet. Saying so once, in
-     * plain words, is what lets the rest of the page describe the plans in the present tense.
-     */
-    statusTitle: 'Not open yet',
-    /* `No sign-up and no billing yet` WAS ONLY EVER ABOUT THE HOSTED PLAN. The self-hosted plan has
-       no sign-up to open: what it lacks is the code, which is private, and a package, which `npm view`
-       answers E404 for under every name this repository could publish. So each plan gets its own
-       reason. The last sentence named a sample record as the one thing a reader could open, until
-       `loop/DIRECTION.md` §26 took the sample out on 25 September; what the app opens now is
-       sign-in, so that is what it names. */
-    status:
-      'Neither plan is open yet. The code to self-host is published when the product launches, and hosted sign-up and billing are not switched on. Until then the app opens to sign-in.',
-    self: {
-      name: 'Self-hosted',
-      price: 'Free',
-      /* `and yours to run` and not `and complete`: a running self-host cannot open its own vault. */
-      unit: 'and yours to run',
-      body: 'No seat count, no key to phone home for.',
-      points: [
-        /* `one record file`: an installation writes three files, and the RECORD is one of them. */
-        'One process, one record file, one port',
-        'The same registers, pages and rules',
-        'Your own domain and your own backups',
-      ],
-      cta: 'Read the build',
-    },
-    hosted: {
-      name: 'Hosted',
-      price: '$12',
-      unit: 'per month, per record',
-      body: 'One isolated database per record, run on Cloudflare, with nothing shared between customers.',
-      points: [
-        'One database per record, never a shared table',
-        'The same software as the self-hosted build',
-        'Export the whole file whenever you like',
-      ],
-      cta: 'Open the app',
-    },
-    /**
-     * A TABLE, AND THE PAGE'S OWN COMMENT SAYS WHY THERE IS NO FEATURE MATRIX. Both are true and
-     * they are not the same table.
-     *
-     * `pricing/+page.svelte` argues, correctly, that a matrix of ticks exists to make the cheaper
-     * column look incomplete, and that there is nothing to make incomplete here because the
-     * self-hosted build is the same software. So this table has no ticks and no crosses in it. It
-     * is six rows of what is OPERATIONALLY different between running it yourself and having it
-     * run: who runs the process, where the database is, what the backup is, whose domain, how you
-     * leave, and what it costs. Four of the six answer the same for both plans, which is the point
-     * being made and is the opposite of what a feature matrix is for.
-     *
-     * Every cell is settled in `loop/research-site-copy.md`: one Durable Object with its own
-     * SQLite per hosted record (`apps/worker/src/snapshots.ts:1-10`), the nightly `VACUUM INTO`
-     * with thirty kept on self-host (`apps/selfhost/src/backup.ts:4-15`,
-     * `snapshots.ts:30`), and export as a live host-independent call
-     * (`apps/web/src/lib/record/settings-write.ts:154-159`).
-     *
-     * THE HOSTED BACKUP CELL WAITED ON A SETTING, AND THE SETTING IS MADE. The cron in
-     * `apps/worker/wrangler.jsonc` (`17 3 * * *`, 03:17 UTC) walks every record once a night, puts
-     * one copy each in the environment's own R2 bucket and keeps thirty (`KEEP` in
-     * `apps/worker/src/snapshots.ts`), each sealed with age to `AGE_RECIPIENT` (`seal.ts`). Until
-     * 54a16ffb, on 22 September at 20:12, both environments held the placeholder
-     * `age1<...-recipient>`, which `sealerOf` refuses before the walk starts, so no hosted copy was
-     * written and the cell said `None yet`. Since then each environment names a real key of its own,
-     * production's `age1av0654...` and alpha's `age1f6rykm...`. The cell went on waiting for a key
-     * that was already set, for a day, because `claims.test.ts` only spoke while the value was a
-     * placeholder.
-     *
-     * WHAT THE CELL NOW SAYS IS WHAT THE CODE DOES AND NO MORE. `Nightly, thirty kept, sealed to a key
-     * we hold` is the cron, `KEEP` and the recipient; the identity that opens a copy is kept outside
-     * Cloudflare (`seal.ts`'s header, `12 §8`). It does not say a failed night is tried again,
-     * because nothing tries it again: `nightly.ts` counts the failure, and the next copy is the next
-     * night's. It is read from the code; nobody opened the bucket to write it. `claims.test.ts`
-     * holds both directions: `None yet` while production's key is a placeholder, neither `None yet`
-     * nor `once we set` once it is real, and no `seal` if it is ever set empty, which is unsealed on
-     * purpose.
-     */
-    compareTitle: 'What actually differs',
-    compare: {
-      columns: ['', 'Self-hosted', 'Hosted'],
-      rows: [
-        ['The software', 'The same build', 'The same build'],
-        ['Runs on', 'Your machine, one process, one port', 'Cloudflare, run by us'],
-        ['Your record lives in', 'One file on your disk', 'A database of its own, never shared'],
-        ['Backups', 'Nightly, thirty kept', 'Nightly, thirty kept, sealed to a key we hold'],
-        ['Leaving', 'Copy the file', 'Export the file, whenever you like'],
-        ['Price', 'Free', '$12 a month, per record'],
-      ],
-    },
-    /* THE BAND'S OWN LABEL, in the same register as `Pricing` and `Side by side` above it. Three
-       words off the sentence under it rather than a new claim: this band exists to say there is no
-       free hosted tier, so that is what its mark says. */
-    honestTag: 'No free tier',
-    honestTitle: 'Why there is no free hosted tier',
-    honest:
-      'No free hosted tier, on purpose. A per-customer database with no revenue against it ends as ' +
-      'a product that gets worse for the people paying for it.',
-  },
-
-  /**
-   * THE PAGE A MISTYPED ADDRESS LANDS ON. Cloudflare serves it with a 404 for any path the build has
-   * no file for (`not_found_handling` in `wrangler.jsonc`), in place of a blank white page.
-   *
-   * THE LEDE SAYS THIS IS EVERY PAGE, SO THE LIST HAS TO BE. `/agents` arrived on 6ef2193e, went
-   * into the header and the footer, and was missing here for a day: the one page claiming to list
-   * all of them was the one that did not. `src/lib/claims.test.ts` now reads the route directories
-   * and fails on a page this list or `static/sitemap.xml` leaves out.
-   */
+  /** The page a mistyped address lands on. `claims.test.ts` holds this list to the routes. */
   notFound: {
     title: 'There is no page here',
     lede: 'The address may be mistyped, or the page may have moved. These are the pages brain.dog has.',
     links: [
       { label: 'Home', href: '/' },
+      { label: 'Slash', href: '/slash' },
       { label: 'Pricing', href: '/pricing' },
       { label: 'For agents', href: '/agents' },
       { label: 'Changelog', href: '/changelog' },
@@ -1077,21 +913,13 @@ export const site = {
     ],
   },
 
-  /**
-   * THE LEGAL PAGE. The licence lives here and in the READMEs, not in the marketing copy.
-   *
-   * THE TERMS AND THE PRIVACY POLICY ARE NOT WRITTEN, and this page says so rather than drawing a
-   * placeholder that reads like one. Nothing here is a legal term that has not been decided.
-   */
+  /** THE LEGAL PAGE. The licence lives here and in the READMEs, not in the marketing copy. */
   legal: {
     title: 'Legal',
     licence: {
       title: 'Licence',
-      /* `BrainDog is open source.` WAS A STATE, AND THE REPOSITORY IS PRIVATE. The licence is decided
-         and in `LICENSING.md`, so the terms are stated as they are; what waits for launch is the
-         publishing, and the note under the links already says when. */
       body: [
-        'BrainDog is published as open source when the product launches. The software is licensed under the Apache License 2.0, and the renderer in packages/render is licensed under the MIT License.',
+        'BrainDog is open source. The software is licensed under the Apache License 2.0, and the renderer in packages/render is licensed under the MIT License.',
         'It is provided as is, without warranty of any kind, express or implied. The licence texts set out the full terms.',
       ],
       links: [
@@ -1099,59 +927,57 @@ export const site = {
         { label: 'MIT License', href: 'https://opensource.org/license/mit' },
         { label: 'The code on GitHub', href: 'https://github.com/actuallyhoss/BrainDog' },
       ],
-      note: 'The repository is private until the product launches, so the GitHub link opens for the public then.',
     },
     terms: {
       title: 'Terms and privacy',
-      /* THE LAST CLAUSE PROMISED SOMETHING ABOUT A DEMO THAT DOES NOT EXIST. It read *the demo
-         keeps nothing you type into it*, which is a data-handling promise about a surface no
-         visitor can reach: there is no demo record. A promise nobody can test
-         is the kind a legal page must not make, so it says the true and smaller thing. */
-      body: 'The Terms of Service and the Privacy policy are not published yet. Both will be published here before hosted sign-up opens. Until then there is no sign-up and no billing, so there is nothing to collect.',
+      /* NOT WRITTEN HERE. The legal texts are OPS-27's (W3), drafted in `apps/site/legal/` and his to
+         approve; a marketing redesign does not invent a legal term. */
+      body: 'The Terms of Service and the Privacy Policy are published on this page before sign-up opens, and each says when it last changed.',
     },
   },
 
   changelog: {
+    title: 'Changelog',
     lede: "What shipped and when, in the repository's own words.",
     count: (entries: number, days: number) => `${entries} entries over ${days} days`,
   },
 
   /**
-   * THE PAGE THE HOME PAGE'S TECHNICAL MATERIAL MOVED TO, which is what `loop/DIRECTION.md` §19 asks
-   * for in the owner's own words: what is worth keeping belongs on a page a curious reader reaches
-   * on purpose. Two things were cut from the home page on 21 September and drawn nowhere for an
-   * hour: a table of what a report key can and cannot do, and the sixteen MCP tool names with five
-   * resource-template grammars. Both are here.
-   *
-   * A READER ARRIVES HERE ON PURPOSE, so it may count. `test/content.test.ts` refuses a counted
-   * figure of the product's own parts on `index.html` and on `index.html` alone, for the reason the
-   * rule was written: a row of figures under a headline is a page filling space, and the same figure
-   * on the page that answers "what can my agent do" is the answer to the question.
-   *
-   * EVERY NUMBER IS READ OFF THE CODE, and where it came from is in the comment beside it. A number
-   * on this page that nobody can check is worse here than anywhere else on the site, because this is
-   * the page written for the reader who checks.
+   * THE PAGE FOR THE READER WHO WANTS THE MECHANISM, so it may count: every number is read off the
+   * code, and `test/content.test.ts` holds the tool and template lists to `packages/mcp`.
    */
   agents: {
-    /* NO `tag`. /agents dropped its eyebrow on 27a3cf59 and `tag: 'For agents'` stayed here read by
-       nothing. `dead-copy.mjs` could not say so, because it reads `apps/web` and never this file. */
-    title: 'What an agent or a service does with a record.',
-    lead: 'The same record and the same rules, whether a model reaches it over MCP or a project posts its own numbers to one address. Every limit below is a value in the code.',
+    title: 'Connect your AI agents.',
+    lead:
+      'Claude, Codex, Cursor and any other MCP client can connect with a key you create. Everything an ' +
+      'agent changes is saved under its name, and a few things always need a person.',
+
+    connect: {
+      title: 'Connect in a minute',
+      ways: [
+        {
+          head: 'By address',
+          said: 'Add this address to your MCP client. It opens the app so you can approve it, once, and picks the record.',
+          code: MCP_URL,
+        },
+        {
+          head: 'From a terminal',
+          said: 'The command line signs a machine in and serves your record to the agents on it, with keys they can use and never read.',
+          code: CLI_INSTALL,
+        },
+      ],
+    },
 
     mcp: {
-      tag: 'Over MCP',
-      /* `packages/mcp/src/index.ts`: `TOOLS` holds fifteen entries, nine carrying `writes: false`. It held sixteen until
-         the `money` tool left the core (B6), since one pack's figures are an address like every other pack's. */
+      /* `packages/mcp/src/index.ts`: `TOOLS` holds fifteen entries, nine carrying `writes: false`. */
       title: 'Fifteen tools, and nine of them only read.',
       lead: 'An agent reads the record the way a person does, and what it writes lands as an event carrying its name. Nothing here is a separate copy of your data.',
       readsTitle: 'Read',
       reads: ['record_index', 'context', 'schema', 'get', 'list', 'search', 'history', 'activity', 'governance'],
       writesTitle: 'Write',
       writes: ['propose', 'create', 'update', 'log', 'handoff', 'meet'],
-      /* `TEMPLATES` in the same file: six `uriTemplate` entries. This said five and named `RESOURCES`,
-         an array that file has never had, and stayed five for a day after `braindog:automation/{id}`
-         was added. `test/content.test.ts` now imports `TEMPLATES` and holds this list and its count to it. */
-      resourcesTitle: 'And seven addresses a client can read directly',
+      /* `TEMPLATES` in the same file; `test/content.test.ts` holds this list and its count to it. */
+      resourcesTitle: 'Resources a client can read directly',
       resources: [
         { uri: 'braindog:schema/{register}', said: 'The fields of one register.' },
         { uri: 'braindog:page/{slug}', said: 'One page with every block run: rows and figures, never markup.' },
@@ -1164,30 +990,26 @@ export const site = {
     },
 
     report: {
-      tag: 'Reported',
-      title: 'A project reports its own numbers, and can do nothing else.',
-      lead: 'A write token is a key to the whole record. A report key is bound to one register and to the fields it always carries, so the record refuses it everywhere except reporting.',
-      /* Every figure off `packages/record/src/report.ts`: `REPORT_ROWS_MOST`, `REPORT_BYTES_MOST`,
-         `REPORT_ROWS_PER_MINUTE` over `REPORT_WINDOW_MS`, and `REPORT_FIXED_MOST`. */
+      title: 'Let a project report its own numbers.',
+      lead: 'A report key can only add rows to one list, with fields you fix when you create it. It cannot read anything, so it is safe to put in a CI job or on a server.',
+      /* Every figure off `packages/record/src/report.ts`. */
       limits: [
-        { what: 'Writes only', said: 'It reads no list, no figure and no person. Every other call is refused.' },
-        { what: 'One register', said: 'The register is fixed when the key is minted, and a label is fixed for a token’s life.' },
-        /* `At most` AND NOT `Up to`, which is this file's own third voice rule: a number is a real number or it is absent, no 10x and no up to. Eight is a real cap, so only the phrasing was selling it. */
-        { what: 'At most 8 fixed fields', said: 'Values the project cannot change, set by whoever minted the key.' },
-        { what: '100 rows a call', said: 'A batch past it is refused whole, rather than half written.' },
+        { what: 'Write only', said: 'It cannot read lists, figures or people. Anything else it tries is refused.' },
+        { what: 'One list', said: 'Chosen when you create the key, and it never changes.' },
+        { what: 'Up to 8 fixed fields', said: 'Values you set on the key that the project cannot change.' },
+        { what: '100 rows a call', said: 'A bigger batch is refused whole, never half written.' },
         { what: '256 KB a call', said: 'Measured as the JSON of its rows.' },
-        { what: '600 rows a minute', said: 'Counted in a window the first report opens. A leaked key was every row the record could hold.' },
+        { what: '600 rows a minute', said: 'Counted from the first report in each minute.' },
       ],
     },
 
     cannot: {
-      tag: 'Refused',
-      title: 'What a token is not allowed to do.',
-      lead: 'Driven against a running record on 21 September, as a scoped token and as five people at every level the product offers.',
+      title: 'What only a person can do.',
+      lead: 'Whatever key an agent holds, these need somebody signed in to the app.',
       rows: [
-        { what: 'Answer a decision', said: 'This needs decide, and no token reaches it. A person has to do it, signed in.' },
+        { what: 'Answer a decision', said: 'Deciding needs a person, signed in. No token reaches it.' },
         { what: 'Invite anybody', said: 'An invitation, a new token, an export and the list of vault grants all need a browser session.' },
-        { what: 'Read a secret', said: 'The registers index what a key opens, never the key. A value leaves the vault for one call and is never written down.' },
+        { what: 'Read a secret', said: 'The record indexes what a key opens, never the key. A value leaves the vault for one call and is never written down.' },
       ],
     },
   },
@@ -1198,21 +1020,25 @@ export const site = {
       {
         title: 'Product',
         links: [
+          { label: 'Slash', href: '/slash' },
           { label: 'Pricing', href: '/pricing' },
           { label: 'For agents', href: '/agents' },
           { label: 'Changelog', href: '/changelog' },
-          { label: 'GitHub', href: 'https://github.com/actuallyhoss/BrainDog' },
-          /* THE FOOTER AND NOT THE HEADER: the hero says there is no sign-up, and a sign-in beside
-             it would contradict the sentence a reader has just been given. Built from `APP`, so the
-             app's address is written once, and `external` for the reason at the header's link in
-             `+layout.svelte`: `/app/signin` is the app's, on this site's name. */
-          { label: 'Sign in', href: `${APP}/signin`, rel: 'external' },
         ],
       },
       {
-        /* THE LICENCE IS NAMED ON THE LEGAL PAGE AND IN THE READMES, not in the marketing copy. */
-        title: 'Legal',
-        links: [{ label: 'Licence', href: '/legal' }],
+        title: 'Open source',
+        links: [
+          { label: 'GitHub', href: 'https://github.com/actuallyhoss/BrainDog' },
+          { label: 'Licence', href: '/legal' },
+        ],
+      },
+      {
+        title: 'Your record',
+        links: [
+          { label: 'Start your record', href: SIGNUP, rel: 'external' },
+          { label: 'Sign in', href: `${APP}/signin`, rel: 'external' },
+        ],
       },
     ],
   },

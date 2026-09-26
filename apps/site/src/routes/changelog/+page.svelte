@@ -58,45 +58,9 @@
   still here by title and none of them was edited to make room.
 -->
 <script lang="ts">
-  import Icon from '$lib/Icon.svelte';
   import type { Hue } from '$lib/icons.ts';
-  import { APP, SOURCE, site } from '$lib/copy.ts';
+  import { site } from '$lib/copy.ts';
   import { ENTRIES, type Entry } from './entries.ts';
-
-  const STATUS = {
-    title: 'The app is live. Nothing is for sale yet.',
-    /* TWO SENTENCES, AND IT WAS NINE, THEN THREE. The third said what this page is for, which the
-       heading and the lede above it have already said twice. Measured on the built page: 50 words
-       to 31. */
-    /**
-     * `For now it draws a made-up record` WAS FALSE, AND IT CONTRADICTED TWO OTHER PAGES OF THIS
-     * SAME SITE.
-     *
-     * `loop/research-site-copy.md` settled it: the Worker's demo variable was empty in both
-     * environments, so `apps/worker/src/route.ts` never opened its anonymous-read door (and since
-     * `loop/DIRECTION.md` §26 neither the variable nor the door exists). That is the exact fact
-     * `copy.ts` already cites on the home page to justify saying *there is no demo to open yet*,
-     * and on the pricing page to say neither plan is open. This page was the one that had not been
-     * brought along, so a reader who opened the app from here expected a populated demo and got
-     * nothing to look at.
-     *
-     * It says the state instead, which is also the more interesting sentence: signing in works on
-     * both hosts and there is nothing behind it yet (the 2026-09-16 entry below says so in its own
-     * words), which is a real thing to know about a product that ships in slices.
-     *
-     * AND `no record to look at yet` WAS THE SAME MISTAKE MADE THE OTHER WAY ROUND, on 22 September.
-     * The demo variable governed the server's anonymous door and nothing else, and the browser then drew a
-     * sample of its own for a stranger, so this line said the app showed a made-up sample record.
-     *
-     * ON 25 SEPTEMBER THE SAMPLE WENT (`loop/DIRECTION.md` §26), and this is the one sentence here
-     * that described it. With no session the app is its sign-in screen, so the line says that, and
-     * it stays two sentences. `test/promises.test.mjs` now refuses `sample record` anywhere on the
-     * site, this page included.
-     */
-    body:
-      'The record app deploys from this repository on every green build, and opens to sign-in. ' +
-      'Signing in works, and sign-up and billing are not open yet.',
-  };
 
   const LABEL = { shipped: 'shipped', changed: 'changed', fixed: 'fixed' } as const;
 
@@ -149,11 +113,7 @@
      one attribute. -->
 <section class="band" data-ground="sunk">
   <div class="head">
-    <p class="band-mark">
-      <span class="band-tag">Where it stands</span>
-      <span class="band-rule"></span>
-    </p>
-    <h1 class="title">{site.nav.changelog}</h1>
+    <h1 class="title">{site.changelog.title}</h1>
   <p class="lede">{site.changelog.lede}</p>
   <!-- THE COUNTS ARE COUNTED, from the list below, so they cannot drift from it. -->
   <p class="counts">
@@ -163,19 +123,7 @@
     {/each}
   </p>
 
-  <div class="status">
-    <div class="status-copy">
-      <h2 class="status-title"><span class="live" aria-hidden="true"></span>{STATUS.title}</h2>
-      <p class="status-body">{STATUS.body}</p>
-      <!-- ONE ACTION WHILE THE REPOSITORY IS PRIVATE, and it is this page's filled primary: the
-           status says the app is live, and this is how you see that it is. -->
-      <p class="status-links">
-        <a class="btn btn-primary" href={APP} rel="external">{site.nav.open}<Icon name="arrow" size="s" /></a>
-        {#if SOURCE}<a class="btn" href={SOURCE}>{site.nav.source}</a>{/if}
-      </p>
-      </div>
-    </div>
-  </div>
+</div>
 </section>
 
 <div class="band" data-ground="page">
@@ -221,7 +169,8 @@
   }
 
   .title {
-    font-size: clamp(36px, 2.4vw + 22px, 56px);
+    font-family: var(--font-display);
+    font-size: clamp(2.375rem, 4.7vw, 4.25rem);
     font-weight: 600;
     line-height: 1.04;
     letter-spacing: -0.04em;
@@ -248,54 +197,6 @@
     margin-inline-end: var(--sp-2);
     color: var(--dim);
     font-size: var(--t-sm);
-  }
-
-  /* The state of the product, as a plain block between two hairlines with one dot of state on
-     it: it is the only thing here that is about now rather than a day in the past. */
-  .status {
-    margin-block-start: var(--sp-6);
-    padding-block: var(--sp-5);
-    border-block-start: 1px solid var(--line);
-  }
-
-  .live {
-    flex: none;
-    inline-size: var(--dot);
-    block-size: var(--dot);
-    background: var(--earn);
-    border-radius: var(--r-pill);
-  }
-
-  .status-copy {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--sp-2);
-    min-inline-size: 0;
-  }
-
-  .status-title {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    font-size: var(--t-base);
-    font-weight: 600;
-    letter-spacing: 0;
-  }
-
-  .status-body {
-    max-inline-size: 66ch;
-    color: var(--ink2);
-    font-size: var(--t-base);
-    line-height: 1.6;
-    text-wrap: pretty;
-  }
-
-  .status-links {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--sp-3);
-    margin-block-start: var(--sp-1);
   }
 
   .log {
@@ -418,11 +319,6 @@
 
     .lede {
       font-size: var(--t-md);
-    }
-
-    .status-links {
-      align-self: stretch;
-      flex-direction: column;
     }
 
     .entries {

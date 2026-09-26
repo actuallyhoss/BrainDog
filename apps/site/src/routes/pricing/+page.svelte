@@ -1,36 +1,23 @@
-<!--
-  Pricing.
-
-  TWO PLANS AND STILL NO TABLE OF TICKS. A feature matrix exists to make the cheaper column look
-  incomplete, and there is nothing to make incomplete here: the self-hosted build is the same
-  software with the same features. What is being sold is somebody else running it.
-
-  THERE IS A TABLE NOW AND IT IS NOT THAT TABLE. `loop/research-site-reference.md` measured this
-  page's problem as the home page's: one flat ground, one layout, and ink that stops well short of
-  the column. The answer is not ticks, it is the six things that actually differ when you choose
-  who runs it, four of which answer the SAME for both plans. A matrix says "look what you do not
-  get"; this says "look how little of it is about the software", which is the honest pitch for a
-  product whose whole argument is that the two builds are one build.
-
-  The paragraph about there being no free hosted tier stays on the page. A price nobody explains
-  reads as a price somebody is embarrassed by, and the reason is a good one.
-
-  THREE BANDS ON `page, flip, page`, AND THEY WERE FOUR ON `page, sunk, page, sunk`.
-  `loop/research-site-now.md` change 5 read this page as the home page before its rebuild: every
-  band opened with the same mark, and the ground alternated with `--sunk`, which is 1.07:1 against
-  `--bg` and which the eye adapts to rather than reads. The title and the two plans are one band now,
-  because the plans ARE what the title promises and a band holding only a headline and one status
-  line was the emptiest screen on the site. So both seams are inversions, the table is the band that
-  turns over, and no two bands open the same way: the first with no mark at all (an eyebrow over
-  the `h1` is a regression `DIRECTION.md` §1 lists by name), the table with the one-line opener the
-  home page gives its mechanism band, and the last with the plain mark. `bands.test.ts` beside this file holds
-  all three.
--->
 <script lang="ts">
+  /**
+   * Pricing.
+   *
+   * TWO PLANS, WHAT EACH INCLUDES, AND WHAT MORE COSTS, on the owner's ask of 26 September
+   * (`loop/DIRECTION.md` §33): "include the credits/usages offered on the plans, show extra usage
+   * pricings, add another extended plan". Every figure is read from `plans.ts`, which is the one file
+   * to edit when a price or an allowance changes.
+   *
+   *   plans     the two cards, each with its allowance.
+   *   usage     the full table, allowances first and then what else differs.
+   *   extra     the price of each unit past the plan, off until the owner turns it on.
+   *   faq       the six questions a buyer asks before paying.
+   */
   import Icon from '$lib/Icon.svelte';
-  import { APP, BUILD, site } from '$lib/copy.ts';
+  import { SIGNUP, site } from '$lib/copy.ts';
+  import { EXTRA, PACKS, PLANS, USAGE } from '$lib/plans.ts';
 
   const p = site.pricing;
+  const cols = PLANS.map((x) => x.name);
 </script>
 
 <svelte:head>
@@ -42,90 +29,77 @@
   <meta property="og:description" content={site.meta.pricing.description} />
 </svelte:head>
 
-<!-- ONE GRID, TWO ROWS, TWO COLUMNS: the title over the free plan and the state of the product over
-     the paid one. The status line sits directly above the plan it most qualifies, which is the
-     hosted one, because that is the plan with a button under it. -->
-<section class="band head" data-ground="page">
-  <div class="in plans">
-    <h1 class="display">{p.title}</h1>
-    <!-- ABOVE THE PRICES, NOT UNDER THEM. A price on a page is an offer, and neither of these can
-         be accepted today. Saying so once, before the plans, is what lets the plans describe
-         themselves in the present tense without the page lying. -->
-    <div class="status">
-      <h2 class="status-title"><span class="dot" aria-hidden="true"></span>{p.statusTitle}</h2>
-      <p class="status-body">{p.status}</p>
+<section class="head" data-ground="page" aria-labelledby="pricing-h1">
+  <div class="in">
+    <div class="intro">
+      <h1 class="display" id="pricing-h1">{p.title}</h1>
+      <p class="sub">{p.sub}</p>
     </div>
-    {#each [p.self, p.hosted] as plan, i (plan.name)}
-      <article class="plan" data-featured={i === 1 ? '' : undefined}>
-        <h2 class="plan-name">{plan.name}</h2>
-        <p class="plan-price">
-          <span class="plan-figure num">{plan.price}</span>
-          <span class="plan-unit">{plan.unit}</span>
-        </p>
-        <p class="plan-body">{plan.body}</p>
-        <ul class="plan-points">
-          {#each plan.points as point (point)}
-            <li><span class="tick"><Icon name="check" size="s" /></span>{point}</li>
-          {/each}
-        </ul>
-        <!--
-          THE SELF-HOSTED PLAN HAS NO ACTION WHILE THE REPOSITORY IS PRIVATE: its action sent you to
-          build instructions nobody can read. An absent control and not a disabled one, because a
-          greyed button under a price is a product telling you it does not want your business. The
-          sentence above the plans already says neither plan is open yet.
-        -->
-        {#if i === 1}
-          <a class="btn btn-primary btn-lg" href={APP} rel="external">{plan.cta}<Icon name="arrow" size="s" /></a>
-        {:else if BUILD}
-          <a class="btn btn-lg" href={BUILD}>{plan.cta}</a>
-        {/if}
-      </article>
-    {/each}
+
+    <div class="plans">
+      {#each PLANS as plan (plan.id)}
+        <article class="plan" data-featured={plan.id === 'cloud' ? '' : undefined} aria-labelledby="plan-{plan.id}">
+          <div class="plan-top">
+            <h2 class="plan-name" id="plan-{plan.id}">{plan.name}</h2>
+            {#if plan.id === 'cloud'}<span class="flag">{p.popular}</span>{/if}
+          </div>
+          <p class="plan-price">
+            <span class="plan-figure num">{plan.price}</span>
+            <span class="plan-unit">{plan.unit}</span>
+          </p>
+          <p class="plan-for">{plan.for}</p>
+          <a
+            class="btn btn-lg"
+            class:btn-primary={plan.id === 'cloud'}
+            href={plan.href}
+            rel={plan.external ? 'external' : undefined}>{plan.cta}<Icon name="arrow" size="s" /></a
+          >
+
+          <div class="inc">
+            <h3 class="inc-title">{p.included}</h3>
+            <ul class="inc-list">
+              {#each USAGE as u (u.key)}
+                <li><span>{u.name}</span><b class="num">{u.unit(plan.allowance[u.key])}</b></li>
+              {/each}
+            </ul>
+          </div>
+
+          <ul class="plan-points">
+            {#each plan.points as point (point)}
+              <li><span class="tick"><Icon name="check" size="s" /></span>{point}</li>
+            {/each}
+          </ul>
+        </article>
+      {/each}
+    </div>
   </div>
 </section>
 
-<!-- THE TABLE IS THE BAND THAT TURNS OVER, and not the plans, for a reason in the tokens. The hosted
-     card is painted in `--accent-ground`, which `tokens.css` mixes against `--bg` on `:root`, so on
-     a flipped band it would keep the current scheme's ground: in the dark scheme, a near-black
-     card in the middle of a near-white field. The hairline grid is made of nothing but `--line`, `--bg` and `--s1`, and `app.css`
-     re-solves all three for this ground. -->
-<section class="band" data-ground="flip" aria-labelledby="compare-title">
+<section class="sec" id="usage" data-ground="page" aria-labelledby="usage-title">
   <div class="in">
-    <div class="band-mark band-mark-line">
-      <h2 class="title" id="compare-title">{p.compareTitle}</h2>
-      <span class="band-rule"></span>
-      <span class="band-tag">Side by side</span>
+    <div class="sec-head">
+      <h2 class="h2" id="usage-title">{p.usageTitle}</h2>
+      <p class="lede">{p.usageLead}</p>
     </div>
 
-    <!--
-      A GRID AND NOT A `<table>` ELEMENT, with `role` put back on by hand, which is the treatment
-      PostHog's own `OSTable` uses (`src/components/OSTable/index.tsx`: an `inline-grid` with
-      `divide-x divide-y`). The reason to prefer it here is the narrow layout: a real table cannot
-      restack into two-line rows on a phone without a second copy of its markup, and a grid can,
-      because the rows are `display: contents` at the desk and blocks below 760px.
-
-      The roles are spelled out so a screen reader still meets a table: every browser drops the
-      implicit table semantics the moment `display` is not `table`, which is the one real cost of
-      this technique and the one thing that must not be left to chance.
-    -->
-    <div class="compare hair" role="table" aria-labelledby="compare-title">
-      <div class="crow chead" role="row">
-        {#each p.compare.columns as column, i (column)}
-          <div class="cell chead-cell" role="columnheader">
-            {#if i === 0}<span class="sr">Property</span>{:else}{column}{/if}
-          </div>
-        {/each}
+    <div class="table" role="table" aria-labelledby="usage-title">
+      <div class="trow thead" role="row">
+        <span class="cell term" role="columnheader"><span class="sr">What</span></span>
+        {#each cols as c (c)}<span class="cell" role="columnheader">{c}</span>{/each}
       </div>
-      {#each p.compare.rows as row (row[0])}
-        <div class="crow" role="row">
-          <!-- NOT KEYED, and it cannot be: the first row answers "The same build" in both
-               columns, so the obvious key is a duplicate and Svelte refuses one. The list is
-               static and never reorders, so there is nothing for a key to buy here. -->
-          {#each row as cell, i}
-            <div class="cell" class:cell-term={i === 0} role={i === 0 ? 'rowheader' : 'cell'}>
-              {#if i > 0}<span class="cell-of" aria-hidden="true">{p.compare.columns[i]}</span>{/if}
-              {cell}
-            </div>
+      {#each USAGE as u (u.key)}
+        <div class="trow" role="row">
+          <span class="cell term" role="rowheader"><b>{u.name}</b><small>{u.said}</small></span>
+          {#each PLANS as plan (plan.id)}
+            <span class="cell num" role="cell"><span class="of" aria-hidden="true">{plan.name}</span>{u.unit(plan.allowance[u.key])}</span>
+          {/each}
+        </div>
+      {/each}
+      {#each p.rows as row (row[0])}
+        <div class="trow" role="row">
+          <span class="cell term" role="rowheader"><b>{row[0]}</b></span>
+          {#each row.slice(1) as cell, i}
+            <span class="cell" role="cell"><span class="of" aria-hidden="true">{cols[i]}</span>{cell}</span>
           {/each}
         </div>
       {/each}
@@ -133,161 +107,138 @@
   </div>
 </section>
 
-<!-- THE LAST BAND WAS A 16px HEADING AND TWO LINES IN THE LEFT HALF OF A 1,136px COLUMN, which is
-     the emptiness fault the home page was rebuilt to remove, on the page that asks for money. The
-     question is a heading at the size of a heading, and the answer sits beside it so the row
-     reaches both edges. It is the one band here with the plain mark: its tag and a rule. -->
-<section class="band" data-ground="page" aria-labelledby="honest-title">
+<section class="sec" id="extra" data-ground="sunk" aria-labelledby="extra-title">
   <div class="in">
-    <p class="band-mark">
-      <span class="band-tag">{p.honestTag}</span>
-      <span class="band-rule"></span>
-    </p>
-    <!-- THE CAP GOES ON THE PARAGRAPH AND NOT ON `.in`. `.in` is `margin-inline: auto`, so
-         narrowing the element that carries it centred the whole block in the page: the one section
-         on the pricing page that is an aside was the only one not sharing the left edge with
-         everything above it. -->
-    <div class="honest-row">
-      <h2 class="honest-title" id="honest-title">{p.honestTitle}</h2>
-      <p class="honest-body">{p.honest}</p>
+    <h2 class="h2" id="extra-title">{p.extraTitle}</h2>
+    <div class="extra">
+      <div class="need-col">
+        <h3 class="need-title"><span class="k" aria-hidden="true">/</span>{p.packsTitle}</h3>
+        <p class="need-lead">{p.packsLead}</p>
+        <ul class="packs">
+          {#each PACKS as pack (pack.credits)}
+            <li class="pack">
+              <span class="pack-n num">{p.packsPer(pack.credits)}</span>
+              <span class="pack-price num">{pack.price}</span>
+            </li>
+          {/each}
+        </ul>
+      </div>
+      <div class="need-col">
+        <h3 class="need-title">{p.extraUsageTitle}</h3>
+        <p class="need-lead">{p.extraLead}</p>
+        <ul class="extra-list">
+          {#each EXTRA as e (e.name)}
+            <li><span class="e-name">{e.name}</span><span class="e-price num">{e.price}</span><span class="e-per">{e.per}</span></li>
+          {/each}
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" data-ground="page" aria-labelledby="faq-title">
+  <div class="in">
+    <h2 class="h2" id="faq-title">{p.faqTitle}</h2>
+    <dl class="faq">
+      {#each p.faq as f (f.q)}
+        <div>
+          <dt>{f.q}</dt>
+          <dd>{f.a}</dd>
+        </div>
+      {/each}
+    </dl>
+    <div class="end">
+      <a class="btn btn-primary btn-lg" href={SIGNUP} rel="external">{site.closing.primary}<Icon name="arrow" size="s" /></a>
     </div>
   </div>
 </section>
 
 <style>
-  .band {
-    padding-block: var(--sp-8);
-  }
-
-  /* The same seam the home page draws, and for the same measured reason: `--sunk` against `--bg`
-     is 1.07:1, which the eye adapts to rather than reads as an edge, and PostHog marks off every
-     one of its sections with a 1px top border and 32px of padding either side. */
-  .band + .band {
-    border-block-start: 1px solid var(--line);
-  }
-
   .head {
-    padding-block: var(--sp-7) var(--sp-8);
+    padding-block: clamp(56px, 7vw, 104px) clamp(72px, 8vw, 120px);
+  }
+
+  .intro {
+    display: grid;
+    justify-items: center;
+    gap: var(--sp-5);
+    text-align: center;
   }
 
   .display {
     margin: 0;
     color: var(--ink);
     font-family: var(--font-display);
-    font-size: clamp(2.25rem, 4vw, 3.5rem);
+    font-size: clamp(2.375rem, 4.7vw, 4.25rem);
     font-weight: 600;
     line-height: var(--lh-3xl);
     letter-spacing: var(--tr-tight);
     text-wrap: balance;
   }
 
-  .title {
+  .sub {
+    max-inline-size: 58ch;
     margin: 0;
-    font-size: var(--t-xl);
-    letter-spacing: var(--tr-tight);
-  }
-
-  /* THE ONE-LINE OPENER, the home page's mechanism band treatment. A `div` and not a `p`, because it carries
-     the band's `h2` and a heading inside a paragraph is markup a validator refuses. The heading
-     takes the mark's baseline and the rule runs from the end of its words to the tag. */
-  .band-mark-line {
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: var(--sp-2) var(--sp-4);
-  }
-
-  /* A FLOOR UNDER THE RULE SO IT WRAPS RATHER THAN VANISHES. At 390 the column is 326px, and the
-     number, twenty-one characters of 24px heading and the uppercase tag come to more than that
-     before any gap. A `flex: 1` rule with no minimum is the item that gives way first, down to
-     nothing; with a floor it takes the tag onto a second line instead. */
-  .band-mark-line .band-rule {
-    align-self: center;
-    min-inline-size: var(--sp-7);
-  }
-
-  /* A fact about the state of the product, not an alarm: a line of text with one dot of state. */
-  .status {
-    padding-block-start: var(--sp-4);
-    border-block-start: 1px solid var(--line);
-  }
-
-  .status-title {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    font-size: var(--t-base);
-    font-weight: 600;
-    letter-spacing: 0;
-  }
-
-  .dot {
-    flex: none;
-    inline-size: var(--dot);
-    block-size: var(--dot);
-    background: var(--warn);
-    border-radius: var(--r-pill);
-  }
-
-  .status-body {
-    margin-block-start: var(--sp-1);
     color: var(--ink2);
-    font-size: var(--t-base);
+    font-size: clamp(1rem, 0.95rem + 0.3vw, 1.125rem);
     line-height: 1.6;
     text-wrap: pretty;
   }
 
-  /* THE TITLE, THE STATE OF THE PRODUCT AND BOTH PLANS IN ONE GRID. The title and the status were
-     a row of their own, and before that they were stacked, which left the right half of a 1,440
-     viewport empty for the whole of the first screen. As the first row of the plans' own grid they
-     share its two columns, so the status line stands over the hosted plan it qualifies and the
-     band has one set of edges instead of two.
+  /* ── The three cards ─────────────────────────────────────────────────── */
 
-     THE CARDS ARE THE SAME HEIGHT, SIDE BY SIDE. `align-items: start` kept the free plan short
-     because it has no action under it while the repository is private, and two cards ending 50px
-     apart read as a layout that did not finish. On a phone, where they stack, height does not
-     apply. The first row sits on its baseline instead, so a one-line title and a three-line status
-     end together. */
   .plans {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-items: stretch;
-    gap: var(--sp-7) var(--sp-4);
-  }
-
-  .plans > .display,
-  .plans > .status {
-    align-self: end;
+    gap: var(--sp-4);
+    max-inline-size: 880px;
+    margin: clamp(var(--sp-7), 6vw, 80px) auto 0;
   }
 
   .plan {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-3);
+    gap: var(--sp-4);
     padding: var(--sp-6);
     background: var(--bg);
     border: 1px solid var(--line);
-    border-radius: var(--r-lg);
+    border-radius: 20px;
   }
 
-  /* THE HOSTED PLAN TAKES A FIRMER EDGE AND THE ACCENT GROUND, and nothing else: no glow, no
-     ribbon, no "most popular", no scale transform. `tokens.css` names exactly two callers for
-     `--accent-ground`, and this is the second of them.
-
-     THE EDGE CARRIES IT NOW AND THE TINT IS THE SECOND SIGNAL. The card sat on `--sunk` while the
-     plans had a band of their own, so the tint was a step away from its surround. On the page's
-     own ground it is the pair the home page measured at 1.04:1 when its closing band wore it. The
-     1440 dark capture of this band on 22 September shows the tint does read beside an untinted
-     card, faintly, but `--accent-edge` against `--bg` is the difference a reader meets first, and
-     the free plan beside it is drawn in `--line` alone. */
   .plan[data-featured] {
-    background: var(--accent-ground);
-    border-color: var(--accent-edge);
+    background: var(--s3);
+    border-color: var(--ink);
+    box-shadow: var(--e3);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .plan[data-featured] {
+      background: var(--s1);
+      border-color: var(--edge);
+    }
+  }
+
+  .plan-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-3);
   }
 
   .plan-name {
-    font-size: var(--t-base);
+    margin: 0;
+    font-size: var(--t-md);
     font-weight: 600;
     letter-spacing: 0;
+  }
+
+  .flag {
+    padding: 3px 10px;
+    background: var(--accent);
+    border-radius: var(--r-pill);
+    color: var(--accent-ink);
+    font-size: var(--t-xs);
+    font-weight: 600;
   }
 
   .plan-price {
@@ -295,13 +246,15 @@
     flex-wrap: wrap;
     align-items: baseline;
     gap: var(--sp-2);
+    margin: 0;
   }
 
   .plan-figure {
     color: var(--ink);
-    font-size: clamp(2.5rem, 2vw + 1.75rem, 3.25rem);
+    font-family: var(--font-display);
+    font-size: clamp(2.75rem, 2vw + 2rem, 3.5rem);
     font-weight: 600;
-    letter-spacing: -0.04em;
+    letter-spacing: -0.045em;
     line-height: 1;
   }
 
@@ -310,25 +263,62 @@
     font-size: var(--t-sm);
   }
 
-  .plan-body {
+  .plan-for {
+    margin: 0;
+    min-block-size: 3.2em;
     color: var(--ink2);
     font-size: var(--t-base);
     line-height: 1.55;
     text-wrap: pretty;
   }
 
-  .plan-points {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-2);
-    margin: 0;
-    /* `padding-inline: 0` is load-bearing: base.css resets a list's MARGIN and not its padding. */
-    padding-inline: 0;
+  .plan .btn {
+    align-self: stretch;
+  }
+
+  .inc {
     padding-block-start: var(--sp-4);
+    border-block-start: 1px solid var(--line);
+  }
+
+  .inc-title {
+    margin: 0 0 var(--sp-3);
+    color: var(--dim);
+    font-size: var(--t-sm);
+    font-weight: 500;
+  }
+
+  .inc-list {
+    display: grid;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .inc-list li {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--sp-3);
+    color: var(--ink2);
+    font-size: var(--t-sm);
+  }
+
+  .inc-list b {
+    color: var(--ink);
+    font-weight: 600;
+    text-align: end;
+  }
+
+  .plan-points {
+    display: grid;
+    gap: var(--sp-2);
+    margin: auto 0 0;
+    padding: var(--sp-4) 0 0;
     border-block-start: 1px solid var(--line);
     list-style: none;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--t-sm);
   }
 
   .plan-points li {
@@ -338,67 +328,63 @@
     line-height: 1.45;
   }
 
-  /* One line-box tall, so the tick centres on the first line of a point that wraps. */
   .tick {
     display: flex;
     align-items: center;
     block-size: 1.45em;
-    color: var(--dim);
+    color: var(--earn);
   }
 
-  .plan .btn {
-    align-self: flex-start;
-    margin-block-start: var(--sp-3);
+  /* ── The table ───────────────────────────────────────────────────────── */
+
+  .table {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) repeat(2, minmax(0, 1fr));
+    margin-block-start: var(--sp-7);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    overflow: hidden;
   }
 
-  /* ── The comparison ───────────────────────────────────────────────────── */
-
-  .compare {
-    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 1fr);
-    margin-block-start: var(--sp-6);
-  }
-
-  /* `display: contents` so the twenty-one cells are the grid's children and the hairline gap can
-     draw between all of them, while the row element keeps carrying `role="row"` for a reader who
-     is walking the table rather than looking at it. */
-  .crow {
+  .trow {
     display: contents;
   }
 
   .cell {
-    padding: var(--sp-4);
-    background: var(--bg);
+    padding: var(--sp-4) var(--sp-5);
+    border-block-start: 1px solid var(--line);
     color: var(--ink);
     font-size: var(--t-base);
-    line-height: var(--lh-body);
-    text-wrap: pretty;
+    line-height: 1.5;
   }
 
-  .chead-cell {
+  .thead .cell {
+    border-block-start: 0;
     background: var(--s1);
     font-size: var(--t-sm);
     font-weight: 600;
   }
 
-  .cell-term {
+  .term {
+    display: grid;
+    gap: 2px;
+  }
+
+  .term b {
+    font-weight: 600;
+  }
+
+  .term small {
     color: var(--dim);
-    font-family: var(--font-id);
     font-size: var(--t-sm);
   }
 
-  /* THE COLUMN'S NAME, CARRIED INTO THE CELL, and invisible until the table stacks. Below 760px
-     the header row is gone and a bare "Nightly, thirty kept" belongs to nobody, so each cell says
-     which plan it is about. `aria-hidden`, because a reader who is not looking at it already has
-     the column header through `role`. */
-  .cell-of {
+  .of {
     display: none;
     color: var(--dim);
-    font-family: var(--font-id);
     font-size: var(--t-xs);
   }
 
-  /* Named rather than empty: the first column header has no word over it because the words under
-     it are the questions, and a blank `columnheader` is a cell a screen reader reads as nothing. */
   .sr {
     position: absolute;
     inline-size: 1px;
@@ -408,64 +394,207 @@
     white-space: nowrap;
   }
 
-  /* The question on the left and the answer on the right, on one row, which is what the closing
-     band of the home page does with the same two parts. `align-items: start` rather than `end`,
-     because the heading is one line and the answer is three at this width. */
-  .honest-row {
+  /* ── Extra usage ──────────────────────────────────────────────────────── */
+
+  .extra {
     display: grid;
-    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
-    gap: var(--sp-8);
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: var(--sp-6);
     align-items: start;
+    margin-block-start: var(--sp-7);
   }
 
-  .honest-title {
+  .need-col {
+    display: grid;
+    gap: var(--sp-3);
+  }
+
+  .need-title {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
     margin: 0;
-    max-inline-size: 22ch;
+    color: var(--ink);
     font-size: var(--t-lg);
     font-weight: 600;
-    line-height: var(--lh-tight);
-    letter-spacing: var(--tr-tight);
+    letter-spacing: -0.02em;
   }
 
-  .honest-body {
+  .need-lead {
+    margin: 0 0 var(--sp-2);
+    max-inline-size: 52ch;
+    color: var(--ink2);
+    font-size: var(--t-base);
+    line-height: 1.6;
+  }
+
+  .k {
+    display: grid;
+    place-items: center;
+    inline-size: 24px;
+    block-size: 24px;
+    background: var(--accent);
+    border-radius: 7px;
+    color: var(--accent-ink);
+    font-family: var(--font-display);
+    font-size: 13px;
+  }
+
+  .packs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--sp-3);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .pack {
+    display: grid;
+    gap: var(--sp-3);
+    padding: var(--sp-5);
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+  }
+
+  .pack-n {
+    color: var(--ink2);
+    font-size: var(--t-base);
+    font-weight: 500;
+  }
+
+  .pack-price {
+    color: var(--ink);
+    font-family: var(--font-display);
+    font-size: 40px;
+    font-weight: 600;
+    letter-spacing: -0.04em;
+    line-height: 1;
+  }
+
+  .extra-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+  }
+
+  .extra-list li {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto 9.5rem;
+    gap: var(--sp-4);
+    align-items: baseline;
+    padding: var(--sp-4) var(--sp-5);
+  }
+
+  .extra-list li + li {
+    border-block-start: 1px solid var(--line);
+  }
+
+  .e-name {
+    color: var(--ink);
+  }
+
+  .e-price {
+    color: var(--ink);
+    font-size: var(--t-lg);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  .e-per {
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  /* ── Questions ────────────────────────────────────────────────────────── */
+
+  .faq {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--sp-7) var(--sp-8);
+    margin: var(--sp-7) 0 0;
+  }
+
+  .faq div {
+    padding-block-start: var(--sp-4);
+    border-block-start: 1px solid var(--line);
+  }
+
+  dt {
+    margin: 0 0 var(--sp-2);
+    color: var(--ink);
+    font-size: var(--t-md);
+    font-weight: 600;
+  }
+
+  dd {
     margin: 0;
     color: var(--ink2);
-    font-size: var(--t-md);
-    line-height: var(--lh-body);
+    font-size: var(--t-base);
+    line-height: 1.6;
     text-wrap: pretty;
   }
 
-  @media (width < 900px) {
-    .honest-row {
+  .end {
+    display: flex;
+    justify-content: center;
+    margin-block-start: var(--sp-8);
+  }
+
+  @media (width < 1000px) {
+    .plans {
+      grid-template-columns: minmax(0, 1fr);
+      max-inline-size: 560px;
+      margin-inline: auto;
+    }
+
+    .extra {
       grid-template-columns: minmax(0, 1fr);
       gap: var(--sp-6);
     }
   }
 
   @media (width < 760px) {
-    .plans {
+    .table {
       grid-template-columns: minmax(0, 1fr);
     }
 
-    /* ONE COLUMN, AND EACH ROW BECOMES A LITTLE BLOCK. Three columns of prose inside 358px is
-       about eleven characters a line. The property becomes the row's heading and each answer says
-       which plan it belongs to, which is the same information in the shape a narrow screen can
-       actually hold. */
-    .compare {
-      grid-template-columns: minmax(0, 1fr);
-    }
-
-    .chead {
+    .thead {
       display: none;
     }
 
-    .cell-term {
+    .term {
       background: var(--s1);
-      color: var(--ink);
     }
 
-    .cell-of {
+    .cell:not(.term) {
+      display: grid;
+      grid-template-columns: 7rem minmax(0, 1fr);
+      gap: var(--sp-3);
+      padding-block: var(--sp-2);
+      border-block-start: 0;
+    }
+
+    .of {
       display: block;
+    }
+
+    .faq {
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--sp-5);
+    }
+
+    .extra-list li {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .e-per {
+      grid-column: 1 / -1;
+      margin-block-start: -6px;
     }
   }
 
@@ -474,12 +603,8 @@
       padding: var(--sp-5);
     }
 
-    .plan .btn {
-      align-self: stretch;
-    }
-
     .cell {
-      padding: var(--sp-3);
+      padding-inline: var(--sp-4);
     }
   }
 </style>

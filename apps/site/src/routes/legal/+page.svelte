@@ -54,7 +54,6 @@
         <li><a href={link.href}>{link.label}</a></li>
       {/each}
     </ul>
-    <p class="part-note">{l.licence.note}</p>
   </div>
 </section>
 
@@ -82,7 +81,8 @@
   }
 
   .title {
-    font-size: clamp(36px, 2.4vw + 22px, 56px);
+    font-family: var(--font-display);
+    font-size: clamp(2.375rem, 4.7vw, 4.25rem);
     font-weight: 600;
     line-height: 1.04;
     letter-spacing: -0.04em;
@@ -141,12 +141,6 @@
 
   .part-links a:active {
     opacity: var(--press-dim);
-  }
-
-  .part-note {
-    color: var(--dim);
-    font-size: var(--t-sm);
-    line-height: 1.5;
   }
 
   @media (width < 640px) {

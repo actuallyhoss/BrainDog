@@ -217,12 +217,14 @@
     inline-size: 100%;
   }
 
+  /* Named for a screen reader only: the scene says it better than a caption over it. */
   .label {
-    margin-block-end: var(--sp-3);
-    padding-inline: var(--sp-1);
-    color: var(--dim);
-    font-family: var(--font-id);
-    font-size: var(--t-xs);
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   /* TWO COLUMNS AT A DESK, the proposal on the left and the history it writes to on the right, so

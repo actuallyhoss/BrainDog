@@ -20,7 +20,7 @@
   import { page } from '$app/state';
   import Icon from '$lib/Icon.svelte';
   import Mark from '$lib/Mark.svelte';
-  import { APP, DOCS, SOURCE, site } from '$lib/copy.ts';
+  import { APP, DOCS, SIGNUP, SOURCE, site } from '$lib/copy.ts';
 
   let { children } = $props();
 
@@ -30,6 +30,7 @@
   /* `Design` IS ABSENT UNTIL `DOCS` HAS AN ADDRESS. `GitHub` is drawn from `SOURCE`, which is
      published ahead of the repository going public, on the owner's word (see `copy.ts`). */
   const links: { href: string; label: string }[] = [
+    { href: '/slash', label: site.nav.slash },
     { href: '/pricing', label: site.nav.pricing },
     /* THE PAGE THE HOME PAGE'S SPECIFICATIONS MOVED TO, in the bar because §19 asks for a page a
        curious reader reaches ON PURPOSE, and a link only in the footer is one they reach by
@@ -83,7 +84,10 @@
          followed the link and the build stopped at "404 /app (linked from /)" (measured when `APP`
          became `/app`). SvelteKit's crawler skips a link marked `external` (`crawl.js` tests `rel`
          for it) and its router leaves the click to the browser, so it is an ordinary page load. -->
-    <a class="btn btn-sm cta" href={APP} rel="external">{site.nav.open}</a>
+    <!-- SIGN IN QUIET AND START FILLED: the site describes the finished product (`loop/DIRECTION.md`
+         §33), where a stranger's one action is to start a record and a customer's is to sign in. -->
+    <a class="signin" href="{APP}/signin" rel="external">{site.nav.signin}</a>
+    <a class="btn btn-sm btn-primary cta" href={SIGNUP} rel="external">{site.nav.start}</a>
 
     <!-- THE PHONE'S BAR IS ONE ROW. It was two: the brand and the action, then the links on a line
          of their own, over a hundred pixels before the first word of the page. The links live in
@@ -101,7 +105,8 @@
             onclick={() => (menuOpen = false)}>{link.label}<Icon name="arrow" size="s" /></a
           >
         {/each}
-        <a class="btn menu-app" href={APP} rel="external">{site.nav.open}</a>
+        <a class="menu-link" href="{APP}/signin" rel="external">{site.nav.signin}<Icon name="arrow" size="s" /></a>
+        <a class="btn btn-primary menu-app" href={SIGNUP} rel="external">{site.nav.start}</a>
       </nav>
     </details>
   </div>
@@ -232,6 +237,22 @@
 
   .cta {
     flex: none;
+  }
+
+  .signin {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    min-block-size: var(--ctl-h);
+    padding-inline: var(--sp-3);
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    font-weight: 500;
+    text-decoration: none;
+  }
+
+  .signin:hover {
+    color: var(--ink);
   }
 
   .menu {
@@ -381,7 +402,8 @@
       gap: var(--sp-2);
     }
 
-    .links {
+    .links,
+    .signin {
       display: none;
     }
 
