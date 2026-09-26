@@ -977,7 +977,7 @@ export const site = {
       writesTitle: 'Write',
       writes: ['propose', 'create', 'update', 'log', 'handoff', 'meet'],
       /* `TEMPLATES` in the same file; `test/content.test.ts` holds this list and its count to it. */
-      resourcesTitle: 'Resources a client can read directly',
+      resourcesTitle: 'Seven resources a client can read directly',
       resources: [
         { uri: 'braindog:schema/{register}', said: 'The fields of one register.' },
         { uri: 'braindog:page/{slug}', said: 'One page with every block run: rows and figures, never markup.' },
