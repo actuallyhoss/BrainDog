@@ -1,6 +1,6 @@
 {
   "pack": "count-cash",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "title": "Count the cash",
   "summary": "Write down what is actually in a cash box or an account, and the record writes the difference into the ledger and sets the balance to what was counted.",
   "author": "BrainDog",
@@ -9,7 +9,7 @@
     "format": 1,
     "primitives": 1,
     "packs": {
-      "money-core": ">=1.0.0 <3.0.0"
+      "money-core": ">=1.0.0 <4.0.0"
     }
   },
   "declarations": [

@@ -1218,6 +1218,34 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     return slugged.length === 1 ? slugged[0]! : null;
   };
   /**
+   * The one setting a figure set from the app is held to, as the pack that holds the figure declares it, or `null`.
+   *
+   * A FIGURE'S TARGET NAMES A SETTING OF THE PACK THAT DECLARED IT (money-core 3.0.0 holds every money target to one, with
+   * no default). `setDeclaration` reads the body as a pack of its own called `in-app`, which declares no settings, so
+   * `normalise` refused every edit of such a figure `FIELD_UNKNOWN`: renaming "Spent, 30 days" failed on a live record.
+   * The setting is lent to that one-declaration pack only when the figure already stands on this record under a pack
+   * that declares it: the live row's pack, or, once an owner has edited it, the pack whose row the edit replaced
+   * (`detached`). A figure written from nothing names no pack, so a setting it names is still refused.
+   */
+  const heldSetting = (body: unknown): Record<string, unknown> | null => {
+    if (body === null || typeof body !== 'object' || Array.isArray(body)) return null;
+    const { metric, target } = body as { metric?: unknown; target?: unknown };
+    if (typeof metric !== 'string' || target === null || typeof target !== 'object') return null;
+    const key = (target as { setting?: unknown }).setting;
+    if (typeof key !== 'string') return null;
+    const id = `metric.${metric}`;
+    const live = sql.one<{ pack: string | null }>(
+      "SELECT coalesce(pack_id, json_extract(body, '$.pack')) AS pack FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0",
+      id,
+    );
+    if (!live) return null;
+    const pack = live.pack ?? kernel.detached().find((d) => d.id === id)?.was ?? null;
+    if (!pack) return null;
+    const read = kernel.packConfig(pack);
+    const said = read.ok && Object.hasOwn(read.value.config, key) ? read.value.config[key] : undefined;
+    return said === undefined ? null : { [key]: said };
+  };
+  /**
    * After every write: re-arm the alarm, then ring the doorbell.
    *
    * HERE AND NOT IN THE HOST. An earlier shape hung this off the HTTP layer, which meant a write
@@ -6170,6 +6198,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          A second parser for the in-app form would be a second grammar. And through the theme check,
          because a theme set here and a theme installed from a file are one declaration, and the
          kernel checks a theme's shape and never its palette (`theme-check.ts`). */
+      const held = heldSetting(args?.body);
       const one = await normaliseChecked(
         {
           pack: 'in-app',
@@ -6178,6 +6207,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           author: 'this record',
           license: 'none',
           declarations: [args?.body],
+          ...(held ? { config: held } : {}),
         },
         { kind: 'local' },
       );

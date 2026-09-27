@@ -1,0 +1,146 @@
+{
+  "pack": "count-cash",
+  "version": "1.0.1",
+  "title": "Count the cash",
+  "summary": "Write down what is actually in a cash box or an account, and the record writes the difference into the ledger and sets the balance to what was counted.",
+  "author": "BrainDog",
+  "license": "Apache-2.0",
+  "requires": {
+    "format": 1,
+    "primitives": 1,
+    "packs": {
+      "money-core": ">=1.0.0 <4.0.0"
+    }
+  },
+  "declarations": [
+    {
+      "register": "cash_counts",
+      "name": "Cash counts",
+      "one": "count",
+      "holds": "what was actually in a cash box or an account when somebody counted it, and how far the record was out",
+      "title": "on",
+      "fields": [
+        {
+          "id": "account",
+          "label": "Account",
+          "type": "ref",
+          "to": "accounts",
+          "required": true,
+          "index": true
+        },
+        {
+          "id": "counted",
+          "label": "Counted",
+          "type": "money",
+          "required": true
+        },
+        {
+          "id": "on",
+          "label": "Counted on",
+          "type": "day",
+          "required": true,
+          "index": true
+        },
+        {
+          "id": "difference",
+          "label": "Out by",
+          "type": "money"
+        },
+        {
+          "id": "note",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "rule": "count_cash",
+      "name": "Write the difference of each count",
+      "on": {
+        "written": {
+          "register": "cash_counts",
+          "op": [
+            "create"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "script": {
+            "id": "count_cash",
+            "as": "queued"
+          }
+        }
+      ]
+    },
+    {
+      "script": "count_cash",
+      "title": "The difference of a cash count",
+      "runs": {
+        "rule": true
+      },
+      "egress": [],
+      "keys": [],
+      "reads": [
+        "cash_counts",
+        "accounts"
+      ],
+      "writes": [
+        "transactions",
+        "accounts",
+        "cash_counts"
+      ],
+      "source": "/**\n * Count the cash: the counted amount less the account's balance, written as a dated transaction, and the account set\n * to what was counted.\n *\n * STARTED BY THE PACK'S AUTOMATION ON EACH NEW COUNT, which hands it the count's id. A count is a row a person writes,\n * because a question to a person offers a closed list of answers and an amount is not one (`count-cash.test.ts`, the\n * first test, measured).\n *\n * THE DIFFERENCE IS A TRANSACTION, NOT AN EDIT TO THE BALANCE ALONE. A balance that jumps from 500.00 to 412.50 with\n * nothing in the ledger is 87.50 nobody can account for, and every figure over the ledger would disagree with the\n * account by that much. So the gap goes in as money out (or in, when there is more than the record thought), dated\n * the day of the count, on that account, and the account's balance and day move to the count.\n *\n * WHAT IT REFUSES TO GUESS. A count in another currency than the account's is said and nothing is written, because\n * two currencies are never subtracted. A count dated before the day the account's balance is from is kept and changes\n * nothing, because a later balance already says more than an older count can correct. A count that agrees writes no\n * transaction and still moves the account's day, since the balance was checked on it.\n */\n\nconst WHAT = 'Cash count difference';\n\nexport default async function run(ctx) {\n  const count = await ctx.record.get(String(ctx.input.id));\n  if (count === null) {\n    ctx.log('The count that started this run is gone, so nothing was written.');\n    return;\n  }\n  const account = await ctx.record.get(String(count.fields.account));\n  if (account === null) {\n    ctx.log('The account this count is for is gone, so nothing was written.');\n    return;\n  }\n  const name = String(account.fields.name);\n  const counted = count.fields.counted;\n  const held = account.fields.balance;\n  const day = String(count.fields.on);\n\n  if (counted.currency !== held.currency) {\n    ctx.log(`This count is counted in ${counted.currency} and ${name} is held in ${held.currency}, and two currencies are not subtracted, so nothing was written.`);\n    return;\n  }\n  if (typeof account.fields.as_of === 'string' && account.fields.as_of > day) {\n    ctx.log(`${name}'s balance is from ${account.fields.as_of}, after this count of ${day}, so the count is kept and nothing else was written.`);\n    return;\n  }\n\n  const difference = counted.amount - held.amount;\n  if (difference !== 0)\n    ctx.write('transactions', {\n      what: WHAT,\n      on: day,\n      direction: difference > 0 ? 'in' : 'out',\n      amount: { amount: Math.abs(difference), currency: counted.currency },\n      account: account.id,\n      state: 'cleared',\n      note: `From the cash count of ${day}.`,\n    });\n  ctx.update(`accounts#${account.seq}`, { balance: { amount: counted.amount, currency: counted.currency }, as_of: day }, account.version);\n  ctx.update(`cash_counts#${count.seq}`, { difference: { amount: difference, currency: counted.currency } }, count.version);\n}\n"
+    },
+    {
+      "page": "cash-counts",
+      "title": "Cash counts",
+      "nav": {
+        "section": "Money",
+        "order": 40
+      },
+      "icon": "money",
+      "requires": [
+        "register.cash_counts"
+      ],
+      "blocks": [
+        {
+          "kind": "table",
+          "heading": "Counts",
+          "span": 12,
+          "source": "register.cash_counts",
+          "columns": [
+            {
+              "field": "on",
+              "label": "Counted on",
+              "width": "13ch"
+            },
+            {
+              "field": "account",
+              "label": "Account",
+              "width": "minmax(14ch,1fr)"
+            },
+            {
+              "field": "counted",
+              "label": "Counted",
+              "width": "15ch",
+              "align": "end"
+            },
+            {
+              "field": "difference",
+              "label": "Out by",
+              "width": "15ch",
+              "align": "end"
+            }
+          ],
+          "order": [
+            {
+              "field": "on",
+              "dir": "desc"
+            }
+          ],
+          "empty": "Nothing has been counted yet. Add a count with what is actually in the box or the account, and the difference goes into the ledger."
+        }
+      ]
+    }
+  ]
+}

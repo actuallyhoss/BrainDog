@@ -40,7 +40,6 @@ import {
   unsaidFigure,
   updatesIn,
   runsIn,
-  whereOf,
   workingAt,
   workingNowAt,
   type Backlink,
@@ -62,7 +61,7 @@ import { answers, terms, tokensOf, why } from '../find.ts';
 import { METRICS } from '../declared.ts';
 import { fxNote, meetsTarget, offTarget, targetLine, targetSaid, windowMs, type MetricDecl, type Reading } from '../metrics.ts';
 import { blockOf, tileOf as pageTile } from '../page-live.ts';
-import { entryOf, refMapOf, type RefMap } from '../remote.ts';
+import { entryOf, refMapOf, sentenceOf, type RefMap } from '../remote.ts';
 import type { Entry, Filter, Job, PageBlock, PageDecl } from '../schema.ts';
 
 /* A SENTENCE ONLY THIS FILE SAYS, so it is kept here and not in `copy.ts`, where a sentence no screen draws is a dead
@@ -103,16 +102,48 @@ function openSqlite(): Sql {
   return sql as unknown as Sql;
 }
 
+/** How long before `NOW` a run's edit still counts as the row it is on now: the hour the sample's `WRITTEN` opens with. */
+const ON_IT_MS = 3_600_000;
+
 /**
  * The seeded record, opened at the sample's clock when this module loads.
  *
- * NOTHING HERE WRITES TO IT, so what it answered once is what it answers every time, and each answer below is asked for
- * once and kept. A test that needs a record it can write to opens its own.
+ * NOTHING HERE WRITES TO IT AFTER IT LOADS, so what it answered once is what it answers every time, and each answer below
+ * is asked for once and kept. A test that needs a record it can write to opens its own.
+ *
+ * TWO THINGS THE SEED DOES NOT WRITE ARE WRITTEN HERE, from the sample that says them. `installSeed` fills the lists and
+ * signs every row `p_seed`, so the record held no daily points (a stat's `trend:` drew nothing, where the sample walks
+ * `SERIES`) and no run had touched a row (`working: true` lit nothing, where the sample's ledger has Claude's live run on
+ * the task it is doing). So each series goes in as the points a nightly would have written, and each edit the ledger has
+ * an agent make in the last hour goes in signed by that agent's live run, at the minute the ledger gives it, because the
+ * kernel marks a row by the run that signed it (`pages.ts` `workingOf`) and not by the agent's name.
  */
 const RECORD: Kernel = await (async () => {
-  const k = await openRecord(openSqlite(), { now: () => NOW });
+  let clock = NOW;
+  const k = await openRecord(openSqlite(), { now: () => clock });
   const seeded = await installSeed(k);
   if (!seeded.ok) throw new Error(`the seed did not install on the fixture's record: ${JSON.stringify(seeded)}`);
+
+  for (const [series, points] of Object.entries(SERIES)) {
+    const format = METRICS[series]?.format;
+    const unit = format?.startsWith('money.') ? format.slice('money.'.length) : '';
+    const wrote = k.writePoints('sample', points.map((p) => ({ series, grain: 'day', at: p.at, value: p.value, unit, n: null })));
+    if (!wrote.ok) throw new Error(`the sample's ${series} points did not go in: ${JSON.stringify(wrote)}`);
+  }
+
+  const runs = k.list({ register: 'session', where: 'state is active', limit: 50 });
+  if (!runs.ok) throw new Error(`the fixture's record did not list its runs: ${JSON.stringify(runs)}`);
+  const runOf = new Map(runs.value.rows.map((run) => [String(run.fields.agent), `S${String(run.seq)}`]));
+  for (const e of [...AUDIT].reverse()) {
+    const signed = runOf.get(e.by);
+    const at = Date.parse(e.at);
+    const [register = '', seq = ''] = (e.target ?? '').split('#');
+    if (e.kind !== 'edit' || signed === undefined || NOW - at > ON_IT_MS || !Object.hasOwn(REGISTERS, register) || seq === '') continue;
+    clock = at;
+    const wrote = k.update(register, `${register}#${seq}`, {}, { actor: signed, note: e.note });
+    clock = NOW;
+    if (!wrote.ok) throw new Error(`${signed}'s edit to ${e.target ?? ''} did not go in: ${JSON.stringify(wrote)}`);
+  }
   return k;
 })();
 
@@ -303,14 +334,15 @@ export function noticed(register: string, suspended: string | null = SUSPENDED):
 /**
  * The rows of `entries` a list's chips admit, as the record answers the sentence the chips write.
  *
- * THE RECORD MATCHES AND THIS KEEPS WHAT IT NAMED. `whereOf` writes the chips as the sentence a live list sends, the
+ * THE RECORD MATCHES AND THIS KEEPS WHAT IT NAMED. `sentenceOf` writes the chips as the sentence a live list sends, the
  * record lists the rows it admits, and a row is kept here when the record named its number. A sentence the record
  * refuses admits no row, which is what an unreadable filter has always matched.
  */
 export function applyFilters(register: string, entries: Entry[], filters: Filter[], q?: string, join?: 'any'): Entry[] {
   let out = entries;
   if (filters.length) {
-    const admitted = new Set((walk({ register, where: whereOf(filters, join) }) ?? []).map((row) => row.seq));
+    const where = sentenceOf(register, filters, refs(), join);
+    const admitted = new Set((walk({ register, ...(where === undefined ? {} : { where }) }) ?? []).map((row) => row.seq));
     out = entries.filter((e) => admitted.has(e.seq));
   }
 

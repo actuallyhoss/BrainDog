@@ -174,10 +174,13 @@ export function actor(by: string, me: string | null = null, names: ReadonlyMap<s
   /* AN AGENT NAMED BY AN ID IS STILL AN AGENT, said by its kind's word rather than the ULID it was minted under. */
   if (agent !== undefined) return said(ULID.test(agent) ? nameWords.agent : agentName(agent), 'agent');
   if (/^S\d+$/u.test(who)) return said(nameWords.agent, 'agent');
-  if (who.startsWith('p_') || ULID.test(who)) return { name: copy.feedSomeone, kind: 'person' };
   const mechanism = /^[a-z][a-z0-9-]*:(.+)$/u.exec(who)?.[1];
-  /* A MECHANISM NAMED BY A MINTED ID is an automation all the same, said by its kind's word rather than the ULID. */
+  /*
+   * A MECHANISM NAMED BY A MINTED ID is an automation all the same, said by its kind's word rather than the ULID.
+   * BEFORE THE PERSON CHECK, because `ULID` finds an id anywhere in the string, so `runner:<ULID>` was a person.
+   */
   if (mechanism !== undefined) return said(ULID.test(mechanism) ? nameWords.automation : humanize(mechanism), 'automation');
+  if (who.startsWith('p_') || ULID.test(who)) return { name: copy.feedSomeone, kind: 'person' };
   if (who === '' || who.includes('_') || who.includes(':')) return { name: copy.feedSomeone, kind: 'person' };
   return { name: who, kind: 'person' };
 }

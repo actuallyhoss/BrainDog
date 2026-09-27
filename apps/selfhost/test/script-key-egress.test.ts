@@ -186,19 +186,30 @@ test('THE KEY IS SCRUBBED FROM AN ANSWER IN EVERY SPELLING A PROVIDER ECHOES IT 
 /* ── the two edges where the hosts answered different codes (`apps/worker/test/script.test.ts` holds the other side) ── */
 
 test('A KEY SENT AWAY AND THEN AN OVERRUN IS FORBIDDEN, as on the Cloud: the broken rule outranks the deadline', async () => {
+  /* THE DEADLINE MUST COME AFTER THE FETCH, OR THERE IS NO BROKEN RULE FOR IT TO BE OUTRANKED BY. `wall_ms` counts from
+     before QuickJS is instantiated, and `cpu_ms` counts the interpreter's time up to the fetch. This test once ran
+     `wall_ms: 300` under the default `cpu_ms` of 200 and busy-waited after the fetch: under a loaded machine (three
+     workspaces at once, or 96 spinning processes on 32 cores, measured on September 27th) the engine had not reached
+     the fetch by 300 ms, the run was an honest overrun with no key sent, and it answered OUT_OF_BOUNDS. So the budgets
+     are wide enough that the fetch always lands inside them, and the overrun after it is a wait on a promise that never
+     settles, which spends no CPU and can end only at the deadline. */
+  const WALL = 3_000;
   const late = await run(
     `export default async function run(ctx) {
   try { await ctx.fetch(${JSON.stringify(COLLECTOR)} + '/in', { key: 'goldapi' }); } catch (e) { ctx.log('caught'); }
-  const t = Date.now();
-  while (Date.now() - t < 1500) {}
+  await new Promise(() => {});
 }`,
     [GOLD, COLLECTOR],
     ['goldapi'],
-    { wall_ms: 300 },
+    { wall_ms: WALL, cpu_ms: 1_000 },
   );
   assert.ok('refused' in late.answer, JSON.stringify(late.answer));
   assert.equal(late.answer.refused.code, 'FORBIDDEN');
-  assert.deepEqual(late.sent, []);
+  assert.match(late.answer.refused.why, /The key "goldapi" opens api\.gold\.test, and relay fetched collector\.test with it/);
+  /* AND THE DEADLINE DID END IT: the script caught the refusal and carried on, and only the clock stopped it. */
+  assert.match(late.answer.log, /caught/);
+  assert.ok(late.answer.usage.wall_ms >= WALL - 50, `the run ended at ${late.answer.usage.wall_ms} ms, before its wall_ms of ${WALL}`);
+  assert.deepEqual([late.sent, late.opened], [[], []]);
 });
 
 test('A DECLARATION THAT IS MALFORMED AND NAMES THE `slash` KEY IS FORBIDDEN, as on the Cloud', async () => {

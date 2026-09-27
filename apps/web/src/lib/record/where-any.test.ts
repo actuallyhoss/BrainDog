@@ -184,7 +184,7 @@ test('A BLOCK SAYS BOTH SIDES OF AN OR-GROUP PLAINLY, and not the second in the 
      Measured before the repair: `which way is Money in, or due before +30d`, the first half in the words the rows are read
      in and the second in the declaration's, which is the half-and-half line the printer exists never to draw. */
   assert.equal(saidPlainly('obligations', 'direction is owed_to_me, or due before +30d'), 'which way is Money in, or due before 30 days from now');
-  assert.equal(saidPlainly('obligations', 'state is paid, OR direction is owed_to_me'), 'status is paid, or which way is Money in');
+  assert.equal(saidPlainly('obligations', 'state is paid, OR direction is owed_to_me'), 'status is Paid, or which way is Money in');
   /* AND A PLAIN COMMA IS SAID AS IT WAS. */
   assert.equal(saidPlainly('obligations', 'direction is owed_to_me, due before +30d'), 'which way is Money in, due before 30 days from now');
 });

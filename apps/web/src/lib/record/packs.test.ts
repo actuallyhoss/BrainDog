@@ -226,8 +226,12 @@ const EVERY_TYPE: PackConfig = {
 test('EACH CONTROL STARTS FROM ITS VALUE, AND SAVE SENDS ONLY WHAT MOVED', async () => {
   const money = await settingsOf();
   const targets = draftsOf(money);
-  /* GROUPED AS AMOUNTS READ ELSEWHERE, and read back as the same amount, so an untouched box has not moved. */
-  assert.equal(targets.most_out_30d?.text, '50,000.00');
+  /* A MONEY CEILING STARTS EMPTY SINCE money-core 3.0.0, so its box does, and one somebody typed starts from what they
+     typed. GROUPED AS AMOUNTS READ ELSEWHERE, and read back as the same amount, so an untouched box has not moved. */
+  assert.equal(targets.most_out_30d?.text, '');
+  const typed: PackConfig = { ...money, values: { ...money.values, most_out_30d: { amount: 5_000_000, currency: 'GBP' } } };
+  assert.equal(draftsOf(typed).most_out_30d?.text, '50,000.00');
+  assert.deepEqual(changesOf(typed, draftsOf(typed)), { values: {}, wrong: {} });
   assert.deepEqual(changesOf(money, { ...targets, most_out_30d: { ...targets.most_out_30d!, text: '1,234.50' } }).values, { most_out_30d: { amount: 123_450, currency: 'GBP' } });
   assert.ok('most_out_30d' in changesOf(money, { ...targets, most_out_30d: { ...targets.most_out_30d!, text: '1,23' } }).wrong);
   assert.equal(targets.most_days_late?.text, '14');
@@ -344,15 +348,21 @@ test('PEOPLE ALONE, FROM THE ADD-ONS SCREEN: no "Met in" without Projects, and n
   assert.ok((await packDocument('people'))?.seeds, 'with no record to go into, the document is as it always was');
 });
 
-test('A MODULE A USE CASE BRINGS IS ITS, even on a record where none speaks yet: Personal gives Money a person\'s sums and words', async () => {
-  type Doc = { declarations: { metric?: string; name?: string; target?: { lte?: number } }[] };
+/* A PERSON'S SUMS OF MONEY DO NOT TAKE SINCE money-core 3.0.0, and a number of days does. A money setting holds
+   `{ amount, currency }` and a use case's sums are in no currency, so they start empty as Money's own do (`moduleDocument`
+   in `packages/seed/src/usecases/install.ts`); the days money in may be late are no currency's, so Personal's three
+   replace Money's fourteen. What the use case still gives is a person's words and a person's days. */
+test('A MODULE A USE CASE BRINGS IS ITS, even on a record where none speaks yet: Personal gives Money a person\'s days and words', async () => {
+  type Doc = { declarations: { metric?: string; name?: string; target?: { lte?: number; setting?: string } }[] };
   const figure = (doc: unknown, metric: string) => (doc as Doc).declarations.find((d) => d.metric === metric);
   const personal = await packDocument('money-core', [], 'personal');
-  assert.equal(figure(personal, 'out-30d')?.target?.lte, 250_000);
+  assert.equal(figure(personal, 'days-late-in')?.target?.lte, 3);
   assert.equal(figure(personal, 'days-late-in')?.name, 'Pay comes in late by');
+  assert.deepEqual(figure(personal, 'out-30d')?.target, { setting: 'most_out_30d' }, 'a sum in no currency was given a bound');
   const bare = await packDocument('money-core', []);
-  assert.equal(figure(bare, 'out-30d')?.target?.lte, 5_000_000, 'with no use case, Money keeps its own');
-  assert.equal(figure(await packDocument('money-core', [], 'reading-club'), 'out-30d')?.target?.lte, 5_000_000, 'a use case this build does not know changes nothing');
+  assert.equal(figure(bare, 'days-late-in')?.target?.lte, 14, 'with no use case, Money keeps its own');
+  assert.deepEqual(figure(bare, 'out-30d')?.target, { setting: 'most_out_30d' }, 'Money names a ceiling nobody typed');
+  assert.equal(figure(await packDocument('money-core', [], 'reading-club'), 'days-late-in')?.target?.lte, 14, 'a use case this build does not know changes nothing');
 });
 
 test("A MODULE ALREADY HERE IS OFFERED IN A USE CASE'S WORDS ONLY WHEN THE USE CASE GIVES IT SOME, and with no example rows", async () => {
@@ -363,11 +373,16 @@ test("A MODULE ALREADY HERE IS OFFERED IN A USE CASE'S WORDS ONLY WHEN THE USE C
   const money = (await relabelDocument('money-core', held, 'personal'))!;
   assert.equal(money.seeds, undefined, 'an update would write example bills into a record already holding Money');
   assert.ok(JSON.stringify(money.declarations).includes('Pay comes in late by'));
-  assert.deepEqual((money.config as Record<string, { default: unknown }>).most_out_30d?.default, { amount: 250_000, currency: 'GBP' });
+  /* A PERSON'S DAYS ARE WHAT IT GIVES MONEY'S SETTINGS, and a sum of money stays empty (money-core 3.0.0). */
+  const config = money.config as Record<string, { default?: unknown }>;
+  assert.equal(config.most_days_late?.default, 3);
+  assert.equal(config.most_out_30d?.default, undefined, 'a sum in no currency was given a default');
 });
 
 test("MONEY'S SUMS ARE TYPED IN THE HOME CURRENCY once one is chosen, and one still held in sterling has not moved until typed over", async () => {
-  const sterling = await settingsOf();
+  /* A SUM SOMEBODY TYPED IN STERLING, since money-core 3.0.0's own start empty and so hold nothing in any currency. */
+  const shipped = await settingsOf();
+  const sterling: PackConfig = { ...shipped, values: { ...shipped.values, most_out_30d: { amount: 5_000_000, currency: 'GBP' } } };
   const money: PackConfig = { ...sterling, values: { ...sterling.values, home_currency: 'EGP' } };
   assert.equal(currencyOf(money, 'most_out_30d'), 'EGP');
   assert.equal(currencyOf(sterling, 'most_out_30d'), 'GBP', 'a record whose home is sterling types its sums in sterling');

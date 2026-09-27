@@ -10,21 +10,26 @@
  * DOM nodes and **no new kind of control**. `ENOUGH_TO_SIFT = 8` is the only disclosure threshold in
  * the product, and after it fires nothing else ever appears.
  *
- * `ROWS` IS A MUTABLE EXPORT and this test puts it back. That is deliberate rather than convenient:
- * the thing under test is behaviour at a row count the seed does not have, and a fixture register
- * would be a second record whose declarations could drift from the real one — which is the whole
- * failure this file exists inside.
+ * THE LIST ITSELF IS A RECORD GROWN TO EACH SIZE, under the seed's own declaration of obligations,
+ * because the thing under test is behaviour at a row count the seed does not have, and a list the
+ * record does not hold is not what a grid pages through (see "a record at each size" below). The
+ * projection and the search still read `held.ts`'s `ROWS`, a mutable export, so those two swap it
+ * for rows at each size and put it back.
  */
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
+
+import { openRecord, type Kernel } from '@braindog/kernel';
+import { installSeed } from '@braindog/seed';
 
 import './fixtures/fill.ts';
 import { DOM_CAP, PAGE, columnsFor } from './api.ts';
-import { list, search } from './fixtures/readers.ts';
+import { search } from './fixtures/readers.ts';
 import { NOW, REGISTERS } from './fixtures/sample.ts';
 import { ROWS } from './held.ts';
 import type { Entry } from './schema.ts';
@@ -65,14 +70,114 @@ const at = (register: string, n: number, run: () => void) => {
   }
 };
 
-test('a list never returns fewer rows than it says it holds', () => {
-  for (const n of SIZES)
-    at('obligations', n, () => {
-      const got = list('obligations');
-      assert.equal(got.total, n, `${n} rows: total is ${got.total}`);
-      assert.equal(got.matched, n, `${n} rows: matched is ${got.matched}`);
-      assert.equal(got.entries.length, n, `${n} rows: ${got.entries.length} came back`);
-    });
+/* ── a record at each size ───────────────────────────────────────────────── */
+
+/**
+ * A RECORD THAT GROWS, AND THE SAMPLE CANNOT. The list tests below swapped the fixture's `ROWS` for rows at each size and
+ * asked the fixture's `list`, which answered out of those rows. Since ARC-1 the fixture's `list` asks a kernel seeded
+ * once and never written to (`fixtures/readers.ts`), so a swapped `ROWS` reaches nothing and every size answered the
+ * seed's own. What a grid pages through on a live tab is the record's `list` (`data/record.ts` `ask`, a page of `PAGE`
+ * at a time on the record's cursor), so that is what is grown and asked here.
+ *
+ * THE LIST IS SHAPED LIKE OBLIGATIONS, its declaration as the seed installs it with the links left out (a link needs a
+ * row at the other end, and what is measured is the size of one list), under its own name, so no seeded row is in it.
+ */
+type Sql = Parameters<typeof openRecord>[0];
+function openSqlite(): Sql {
+  const db = new DatabaseSync(':memory:');
+  let depth = 0;
+  return {
+    exec: (text: string, ...params: unknown[]) => {
+      if (params.length === 0) db.exec(text);
+      else db.prepare(text).run(...(params as never[]));
+    },
+    all: (text: string, ...params: unknown[]) => db.prepare(text).all(...(params as never[])),
+    one: (text: string, ...params: unknown[]) => db.prepare(text).get(...(params as never[])),
+    transactionSync<T>(fn: () => T): T {
+      if (depth > 0) return fn();
+      db.exec('BEGIN');
+      depth++;
+      try {
+        const value = fn();
+        db.exec('COMMIT');
+        return value;
+      } catch (e) {
+        db.exec('ROLLBACK');
+        throw e;
+      } finally {
+        depth--;
+      }
+    },
+  } as unknown as Sql;
+}
+
+const GROWN = 'growth';
+type Field = { id: string; type: string; values?: string[] };
+const record = (async () => {
+  const k = await openRecord(openSqlite(), { now: () => NOW });
+  assert.ok((await installSeed(k)).ok, 'the seed did not install');
+  const d = (k.declarations() as { id: string; body: string | Record<string, unknown> }[]).find((x) => x.id === 'register.obligations');
+  assert.ok(d, 'the seed no longer declares obligations');
+  const body = (typeof d.body === 'string' ? JSON.parse(d.body) : d.body) as { fields: Field[] };
+  const fields = body.fields.filter((f) => f.type !== 'ref');
+  const installed = await k.install([{ id: `register.${GROWN}`, kind: 'register', body: { ...body, id: GROWN, name: 'Growth', fields } as never }]);
+  assert.ok(installed.ok, JSON.stringify(installed));
+  return { k, fields, held: 0 };
+})();
+
+/** The grown record, holding at least `n` rows written the way `synthetic` shapes them, one transaction a growth. */
+async function grownTo(n: number): Promise<Kernel> {
+  const r = await record;
+  if (r.held >= n) return r.k;
+  r.k.transaction(() => {
+    for (let i = r.held + 1; i <= n; i++) {
+      const fields: Record<string, unknown> = {};
+      for (const f of r.fields) {
+        if (f.type === 'money') fields[f.id] = { amount: (i * 7919) % 1_000_000, currency: 'GBP' };
+        else if (f.type === 'day') fields[f.id] = `2026-${String((i % 12) + 1).padStart(2, '0')}-${String((i % 28) + 1).padStart(2, '0')}`;
+        else if (f.type === 'enum') fields[f.id] = f.values![i % f.values!.length];
+        else if (f.type === 'int' || f.type === 'decimal') fields[f.id] = i;
+        else if (f.type === 'text') fields[f.id] = `${f.id} ${i}`;
+      }
+      const made = r.k.create(GROWN, fields, { actor: 'p_owner' });
+      assert.ok(made.ok, JSON.stringify(made));
+    }
+  });
+  r.held = n;
+  return r.k;
+}
+
+type Page = { rows: { seq: number | null; fields: Record<string, unknown> }[]; matched: number; cursor: string | null };
+const pageOf = (k: Kernel, q: Parameters<Kernel['list']>[0]): Page => {
+  const out = k.list(q);
+  assert.ok(out.ok, JSON.stringify(out));
+  return out.value as Page;
+};
+
+/** Every page of one question, `PAGE` rows at a time as a grid asks, each page's `matched` beside it. */
+function walked(k: Kernel, q: Omit<Parameters<Kernel['list']>[0], 'limit' | 'cursor'>, most = Infinity): { seqs: number[]; pages: Page[] } {
+  const seqs: number[] = [];
+  const pages: Page[] = [];
+  let cursor: string | null = null;
+  do {
+    const page = pageOf(k, { ...q, limit: PAGE, ...(cursor === null ? {} : { cursor }) });
+    assert.ok(page.rows.length <= PAGE, `a page held ${page.rows.length} rows`);
+    seqs.push(...page.rows.map((r) => r.seq!));
+    pages.push(page);
+    assert.ok(pages.length < 200, 'the walk did not terminate');
+    cursor = page.cursor;
+  } while (cursor !== null && seqs.length < most);
+  return { seqs, pages };
+}
+
+test('a list never returns fewer rows than it says it holds', async () => {
+  for (const n of SIZES) {
+    const k = await grownTo(n);
+    const { seqs, pages } = walked(k, { register: GROWN });
+    for (const p of pages) assert.equal(p.matched, n, `${n} rows: matched is ${p.matched}`);
+    assert.equal(seqs.length, n, `${n} rows: ${seqs.length} came back`);
+    assert.equal(new Set(seqs).size, n, `${n} rows: a row came back on two pages`);
+  }
 });
 
 test('the projection does not grow with the rows', () => {
@@ -102,31 +207,33 @@ test('search answers within its limit and spreads across the lists', () => {
     });
 });
 
-test('an order over five thousand rows is still an order', () => {
-  at('obligations', 5_000, () => {
-    const up = list('obligations', { sort: { field: 'amount', dir: 'asc' } }).entries;
-    assert.equal(up.length, 5_000);
-    for (let i = 1; i < up.length; i++) {
-      const a = (up[i - 1]!.fields.amount as { amount: number }).amount;
-      const b = (up[i]!.fields.amount as { amount: number }).amount;
-      assert.ok(a <= b, `row ${i} is out of order: ${a} then ${b}`);
-    }
-  });
+test('an order over five thousand rows is still an order', async () => {
+  const k = await grownTo(5_000);
+  const up: number[] = [];
+  let cursor: string | null = null;
+  do {
+    const page = pageOf(k, { register: GROWN, order: [{ field: 'amount', dir: 'asc' }], limit: PAGE, ...(cursor === null ? {} : { cursor }) });
+    up.push(...page.rows.map((r) => (r.fields.amount as { amount: number }).amount));
+    cursor = page.cursor;
+  } while (cursor !== null);
+  assert.equal(up.length, 5_000);
+  for (let i = 1; i < up.length; i++) assert.ok(up[i - 1]! <= up[i]!, `row ${i} is out of order: ${up[i - 1]} then ${up[i]}`);
 });
 
-test('a filter over five thousand rows narrows to the rows it names', () => {
-  at('obligations', 5_000, () => {
-    const decl = REGISTERS.obligations!;
-    const state = decl.fields.find((f) => f.id === decl.state)!;
-    const value = state.values![0]!;
-    const got = list('obligations', { filters: [{ field: state.id, op: 'in', values: [value] }] });
-    assert.ok(got.matched > 0 && got.matched < 5_000, `matched ${got.matched} of 5,000`);
-    assert.ok(
-      got.entries.every((e) => e.fields[state.id] === value),
-      'a row that does not match came back',
-    );
-    assert.equal(got.total, 5_000, 'total stopped being the list its own count');
-  });
+test('a filter over five thousand rows narrows to the rows it names', async () => {
+  const k = await grownTo(5_000);
+  const decl = REGISTERS.obligations!;
+  const state = decl.fields.find((f) => f.id === decl.state)!;
+  const value = state.values![0]!;
+  const { seqs, pages } = walked(k, { register: GROWN, where: { field: state.id, is: value } as never });
+  const matched = pages[0]!.matched;
+  assert.ok(matched > 0 && matched < 5_000, `matched ${matched} of 5,000`);
+  assert.equal(seqs.length, matched, 'the pages are not the rows the filter said it matched');
+  assert.ok(
+    pages.every((p) => p.rows.every((r) => r.fields[state.id] === value)),
+    'a row that does not match came back',
+  );
+  assert.equal(pageOf(k, { register: GROWN, limit: 1 }).matched, 5_000, 'the list stopped being its own count');
 });
 
 
@@ -225,87 +332,72 @@ test('and every capped list draws the line that says so', () => {
  * What has to hold is that walking the cursor is the same answer, cut up: every row exactly once, in
  * the same order, with nothing repeated across a boundary and nothing dropped at one.
  */
-test('walking the cursor yields the whole answer, once each, in order', () => {
-  at('obligations', 5_000, () => {
-    const whole = list('obligations', { sort: { field: 'amount', dir: 'asc' } }).entries.map((e) => e.seq);
+/** THE MOST ROWS ONE `list` CALL ANSWERS, which is the record's own ceiling (`limit` in the kernel's `list`). */
+const RECORD_CEILING = 500;
 
-    const walked: number[] = [];
-    let cursor: string | undefined;
-    let pages = 0;
-    for (;;) {
-      const page = list('obligations', {
-        sort: { field: 'amount', dir: 'asc' },
-        limit: PAGE,
-        ...(cursor === undefined ? {} : { cursor }),
-      });
-      assert.equal(page.stale, false, 'a cursor this walk produced did not resolve');
-      assert.ok(page.entries.length <= PAGE, `a page held ${page.entries.length} rows`);
-      walked.push(...page.entries.map((e) => e.seq));
-      pages++;
-      assert.ok(pages < 200, 'the walk did not terminate');
-      if (page.cursor === null) break;
-      cursor = page.cursor;
-    }
+/** The whole answer to one question in the fewest calls the record allows, `RECORD_CEILING` rows at a time. */
+function whole(k: Kernel, q: Omit<Parameters<Kernel['list']>[0], 'limit' | 'cursor'>): number[] {
+  const seqs: number[] = [];
+  let cursor: string | null = null;
+  do {
+    const page = pageOf(k, { ...q, limit: RECORD_CEILING, ...(cursor === null ? {} : { cursor }) });
+    seqs.push(...page.rows.map((r) => r.seq!));
+    cursor = page.cursor;
+  } while (cursor !== null);
+  return seqs;
+}
 
-    assert.deepEqual(walked, whole, 'the pages are not the answer');
-    assert.equal(new Set(walked).size, walked.length, 'a row came back on two pages');
-    assert.equal(pages, Math.ceil(whole.length / PAGE), `${pages} pages for ${whole.length} rows`);
-  });
+test('walking the cursor yields the whole answer, once each, in order', async () => {
+  const k = await grownTo(5_000);
+  const q = { register: GROWN, order: [{ field: 'amount', dir: 'asc' as const }] };
+  const all = whole(k, q);
+  const { seqs, pages } = walked(k, q);
+  assert.equal(all.length, 5_000);
+  assert.deepEqual(seqs, all, 'the pages are not the answer');
+  assert.equal(new Set(seqs).size, seqs.length, 'a row came back on two pages');
+  assert.equal(pages.length, Math.ceil(all.length / PAGE), `${pages.length} pages for ${all.length} rows`);
 });
 
-test('a page is capped at the contract ceiling, and no limit means the whole answer', () => {
-  /* `33 §2`: `limit` 25 by default, 200 at most. A caller asking for more gets the ceiling rather
-     than what it asked for, and a caller asking for nothing gets everything — which is what a count,
-     a metric and a forecast read, and why paging is something a GRID does rather than the API. */
-  at('obligations', 5_000, () => {
-    assert.equal(list('obligations', { limit: 10_000 }).entries.length, PAGE);
-    assert.equal(list('obligations', { limit: 1 }).entries.length, 1);
-    assert.equal(list('obligations').entries.length, 5_000);
-    assert.equal(list('obligations').cursor, null, 'the whole answer still offered a next page');
-  });
+test('a page is capped at the record\'s ceiling, and the grid\'s page is inside it', async () => {
+  /* A CALLER ASKING FOR MORE GETS THE CEILING rather than what it asked for, and says where the rest starts. This held
+     `33 §2`'s 200 and a whole answer for no `limit`, which were the fixture's own paging over its rows; the record is
+     what a grid pages through now, with its own ceiling, and a count reads `matched` rather than every row. */
+  const k = await grownTo(5_000);
+  const most = pageOf(k, { register: GROWN, limit: 10_000 });
+  assert.equal(most.rows.length, RECORD_CEILING);
+  assert.ok(most.cursor !== null, 'a page cut at the ceiling offered no next page');
+  assert.equal(pageOf(k, { register: GROWN, limit: 1 }).rows.length, 1);
+  assert.ok(PAGE <= RECORD_CEILING, 'the grid asks for a page the record would cut short');
+  assert.equal(pageOf(k, { register: GROWN, limit: PAGE }).rows.length, PAGE);
 });
 
-test('a cursor from another answer is stale, not an empty page', () => {
+test('a cursor from another answer is refused, not an empty page', async () => {
   /**
-   * THE ONE FAILURE THAT LOOKS LIKE SUCCESS. If the row a cursor names has left the answer — the
-   * filter moved, the row was archived — returning `[]` is indistinguishable from reaching the end
-   * of the list, and the grid would stop with two thirds of the rows unfetched and nothing on screen
-   * saying so. `stale` makes the caller start again, which is what `50 §5.2` step 5 already requires
-   * of a changed order.
+   * THE ONE FAILURE THAT LOOKS LIKE SUCCESS. If a cursor is read against an answer it was not minted
+   * for, returning `[]` is indistinguishable from reaching the end of the list, and the grid would
+   * stop with two thirds of the rows unfetched and nothing on screen saying so. The record refuses
+   * it, which makes the caller start again, as `50 §5.2` step 5 already requires of a changed order.
+   * The fixture's list said `stale` for this; the record says it with a refusal.
    */
-  at('obligations', 500, () => {
-    const first = list('obligations', { limit: PAGE });
-    assert.equal(first.stale, false);
-    assert.ok(first.cursor !== null);
+  const k = await grownTo(5_000);
+  const up = pageOf(k, { register: GROWN, order: [{ field: 'amount', dir: 'asc' }], limit: PAGE });
+  assert.ok(up.cursor !== null);
 
-    /* The same cursor against an answer that cannot contain it. */
-    const elsewhere = list('obligations', {
-      limit: PAGE,
-      cursor: first.cursor!,
-      filters: [{ field: 'seq', op: 'is', values: ['-1'] }],
-    });
-    assert.equal(elsewhere.stale, true, 'a cursor that resolves to nothing reported a normal page');
-    assert.deepEqual(elsewhere.entries, []);
-    assert.equal(elsewhere.cursor, null);
-  });
+  /* The same cursor against an answer in another order, and against the record's own order. */
+  const down = k.list({ register: GROWN, order: [{ field: 'amount', dir: 'desc' }], limit: PAGE, cursor: up.cursor });
+  assert.ok(!down.ok, 'a cursor from the ascending answer paged the descending one');
+  const unsorted = k.list({ register: GROWN, limit: PAGE, cursor: up.cursor });
+  assert.ok(!unsorted.ok, 'a cursor from a sorted answer paged the unsorted one');
+  const junk = k.list({ register: GROWN, limit: PAGE, cursor: 'junk' });
+  assert.ok(!junk.ok, 'a cursor the record never minted paged from the start');
 });
 
-test('the cap is the end of the sequence, not a slice of it', () => {
+test('the cap is the end of the sequence, not a slice of it', async () => {
   /* `DOM_CAP` is 2,000 and a page is 200, so the grid stops after ten pages — and the row it stops
      at has to be the two-thousandth of the answer, not the two-thousandth of a re-sliced one. */
-  at('obligations', 5_000, () => {
-    const whole = list('obligations').entries.map((e) => e.seq);
-    const walked: number[] = [];
-    let cursor: string | undefined;
-    while (walked.length < DOM_CAP) {
-      const page = list('obligations', { limit: PAGE, ...(cursor === undefined ? {} : { cursor }) });
-      walked.push(...page.entries.map((e) => e.seq));
-      if (page.cursor === null) break;
-      cursor = page.cursor;
-    }
-    assert.equal(walked.length, DOM_CAP);
-    assert.deepEqual(walked, whole.slice(0, DOM_CAP), 'the first 2,000 paged are not the first 2,000');
-  });
+  const k = await grownTo(5_000);
+  const all = whole(k, { register: GROWN });
+  const { seqs } = walked(k, { register: GROWN }, DOM_CAP);
+  assert.equal(seqs.length, DOM_CAP);
+  assert.deepEqual(seqs, all.slice(0, DOM_CAP), 'the first 2,000 paged are not the first 2,000');
 });
-
-void NOW;

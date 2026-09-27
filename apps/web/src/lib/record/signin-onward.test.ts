@@ -132,7 +132,14 @@ test('ACCEPTING AN INVITATION FORGETS THE KEPT BOOT, and only once the host has 
   assert.ok(accept, 'no `accept` on the invite screen');
   /* ON SUCCESS, NOT BEFORE THE ANSWER. A refused Accept leaves the stranger exactly as signed out as before, and the
      tab's kept answers are still right for a tab with no session, so dropping them there only asks for them again. */
-  assert.match(accept, /if \(out\.ok\) \{[^}]*\bforget\(\)/u, `accept() does not call forget() on success:\n${accept}`);
+  /* SUCCESS IS NOW TWO ANSWERS (OPS-7): joined, or a mail sent to prove the address. Proving leaves the stranger as
+     signed out as a refusal does, so the kept boot is dropped only in the branch after both, where they joined. */
+  assert.match(
+    accept,
+    /if \(!out\.ok\) \{[\s\S]*?\}\s*else if \(out\.value\.kind === 'proving'\)[^\n]*\n\s*else \{[^}]*\bforget\(\)/u,
+    `accept() does not call forget() once, and only once they joined:\n${accept}`,
+  );
+  assert.equal(accept.match(/\bforget\(\)/gu)?.length, 1, `accept() calls forget() on more than one answer:\n${accept}`);
 });
 
 /* ── 7 · the dot where an icon was ───────────────────────────────────── */

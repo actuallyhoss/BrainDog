@@ -117,10 +117,11 @@ const recordHost = (k: Kernel): Host => ({
   },
 });
 
-async function guideRecord(said: string | null): Promise<Kernel> {
+/* A sentence forms the plan whatever `examples` says; without one the use case's own examples come only when asked (C11). */
+async function guideRecord(said: string | null, examples = false): Promise<Kernel> {
   const k = await openRecord(openSqlite(), fixedClock(NOW));
   assert.ok(k.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'my-podcast', name: 'My podcast', tz: 'UTC', locale: 'en', owner: { id: 'p_1', email: 'maker@example.test', name: 'Ada' } }).ok);
-  const pack = value<Pack>(await normalise(carriedDocument(useCase('guide')!, TODAY, said), { kind: 'local' }));
+  const pack = value<Pack>(await normalise(carriedDocument(useCase('guide')!, TODAY, said, { examples }), { kind: 'local' }));
   const diff = await plan(pack, stateOf(k));
   value(await install(pack, diff, recordHost(k), diff.planHash));
   return k;
@@ -135,9 +136,12 @@ test("A GUIDE'S PLAN FORMED FROM WHAT THE PERSON SAID IS NEVER OFFERED FOR CLEAR
   assert.deepEqual(value(formed.clearExamples({ actor: 'p_1' })), { cleared: 0, kept: 0 });
   assert.equal(value<{ rows: unknown[] }>(formed.list({ register: 'milestones', limit: 50 })).rows.length, milestones.length, 'the plan is all still there');
 
-  const plain = await guideRecord(null);
+  const bare = await guideRecord(null);
+  assert.deepEqual(bare.examples(), { untouched: 0, touched: 0, registers: {}, others: 0 }, 'a guide set up without a sentence plants no examples unless asked');
+
+  const plain = await guideRecord(null, true);
   const demo = plain.examples();
-  assert.ok(demo.untouched > 0, "a guide set up without a sentence has the use case's own examples to clear");
+  assert.ok(demo.untouched > 0, "a guide set up without a sentence asked for its examples has the use case's own to clear");
   assert.equal(value<{ cleared: number }>(plain.clearExamples({ actor: 'p_1' })).cleared, demo.untouched);
 });
 

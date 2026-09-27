@@ -128,18 +128,28 @@ const printOf = (d: { declarations: unknown; config?: unknown }): string =>
  * TWO STEPS AND NOT ONE, BECAUSE 1.5.0 MOVED A SECOND PAGE. Until it, the project page was the only thing between the
  * current document and 1.3.2, and undoing it alone printed 3e4927061f959b6d. Once Home gained "Due this week" and
  * "Lapsing", the same undo printed 4d2724eb47aa50e0, which is no version anybody shipped. Undoing 1.5.0 first and
- * checking the 1.4.0 it gives means a later version that moves a third page fails at the step it broke.
+ * checking the 1.4.0 it gives means a later version that moves a third page fails at the step it broke. 1.5.1 moved
+ * only Home's words, so it is undone first, and checked the same way.
  */
 async function onEarlier(): Promise<{ k: Kernel; before: Record<string, unknown> }> {
   const u = useCase('founder')!;
   const now = useCaseDocument('founder', TODAY) as { declarations: Record<string, unknown>[]; version: string; config?: unknown };
 
+  /* 1.5.1 TO 1.5.0: Home's empty title with its closing full stop back. Due this week is the same block it was, now taken
+     from Money by name, so the words are the only step. */
+  const v150 = {
+    ...now,
+    version: '1.5.0',
+    config: JSON.parse(JSON.stringify(now.config ?? null).replace('"Nothing needs your call"', '"Nothing needs your call."')) as unknown,
+  };
+  assert.equal(printOf(v150), 'b3550baded7ee204', 'the rebuilt 1.5.0 is not the 1.5.0 that shipped');
+
   /* 1.5.0 TO 1.4.0: Home without the two tables it gained, and without the services list they read. */
   const added = new Set(['Due this week', 'Lapsing']);
   const v140 = {
-    ...now,
+    ...v150,
     version: '1.4.0',
-    declarations: now.declarations.map((d) =>
+    declarations: v150.declarations.map((d) =>
       d.page !== 'home-founder'
         ? d
         : {

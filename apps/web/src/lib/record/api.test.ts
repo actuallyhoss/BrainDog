@@ -17,6 +17,10 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { DatabaseSync } from 'node:sqlite';
+
+import { openRecord, type Kernel } from '@braindog/kernel';
+import { installSeed } from '@braindog/seed';
 
 import { columnsFor, currencyFor, dirOf, display, identityFor, isProse, labelOf, learnHome, seqWidth, packDiff, readableFields, spokenRow, toRows, unnamed } from './api.ts';
 import { applyFilters, backlinks, boot, metric, page, pages, readBlock, search } from './fixtures/readers.ts';
@@ -27,6 +31,9 @@ import { seedBlock } from './seed.ts';
 import { hrefFor } from './metrics.ts';
 import { AUDIT, JOB, NEWS, NOW, PACKS, VAULT } from './fixtures/sample.ts';
 import { PAGES, REGISTERS, ROWS } from './held.ts';
+import { blockOf as liveBlockOf } from './page-live.ts';
+import { layoutOf } from './boot-live.ts';
+import type { BlockResult } from './api.ts';
 import type { Entry } from './schema.ts';
 import type { Column } from 'braindog-render/svelte';
 import { magnitudeOf } from 'braindog-render';
@@ -89,7 +96,10 @@ test('a day is spelled, so no reader has to know the local order', () => {
 
 test('an enum reads as words, not as an identifier', () => {
   assert.equal(display('tasks', 'state', 'done'), 'done');
-  assert.equal(display('obligations', 'state', 'written_off'), 'written off');
+  /* A VALUE WITH NO LABEL LOSES ITS UNDERSCORES. This was `obligations.state`'s `written_off` until money-core 3.0.0
+     labelled that list's values, which the next line holds. */
+  assert.equal(display('updates', 'health', 'at_risk'), 'at risk');
+  assert.equal(display('obligations', 'state', 'written_off'), 'Written off');
   /* AND A DECLARED LABEL WINS, where the value has one: money in and money out, not who owes whom. */
   assert.equal(display('obligations', 'direction', 'owed_to_me'), 'Money in');
   assert.equal(display('obligations', 'direction', 'owed_by_me'), 'Money out');
@@ -315,60 +325,119 @@ test('the three money tiles are disjoint, so a row is in at most one', () => {
 
 /* ── a total is a total, however many rows went into it ──────────────────── */
 
+/** A record in memory over `node:sqlite`, bound the way the kernel's own tests bind one. */
+function openSqlite(): Parameters<typeof openRecord>[0] {
+  const db = new DatabaseSync(':memory:');
+  let depth = 0;
+  return {
+    exec: (text: string, ...params: unknown[]) => {
+      if (params.length === 0) db.exec(text);
+      else db.prepare(text).run(...(params as never[]));
+    },
+    all: (text: string, ...params: unknown[]) => db.prepare(text).all(...(params as never[])),
+    one: (text: string, ...params: unknown[]) => db.prepare(text).get(...(params as never[])),
+    transactionSync<T>(fn: () => T): T {
+      if (depth > 0) return fn();
+      db.exec('BEGIN');
+      depth++;
+      try {
+        const value = fn();
+        db.exec('COMMIT');
+        return value;
+      } catch (e) {
+        db.exec('ROLLBACK');
+        throw e;
+      } finally {
+        depth--;
+      }
+    },
+  } as unknown as Parameters<typeof openRecord>[0];
+}
+
+/** The seeded record, of this file's own, which a test may write to. */
+async function seededRecord(): Promise<Kernel> {
+  const k = await openRecord(openSqlite(), { now: () => NOW });
+  assert.ok((await installSeed(k)).ok, 'the seed did not install');
+  return k;
+}
+
 /**
- * Run `fn` with `n` extra open obligations owed by you, then put the register back.
+ * A seeded record with `n` extra open obligations owed by you, due inside thirty days.
  *
  * The seed has fewer rows than the cut, which is why this defect was invisible: it only appears on a
  * register that has outgrown one page, and every register does.
+ *
+ * A RECORD OF ITS OWN, AND IT WAS THE SAMPLE'S `ROWS` PUT BACK AFTERWARDS. Since ARC-1 the fixture reads a record seeded
+ * once and never written to (`fixtures/readers.ts`), so a row pushed into `ROWS` reaches no block.
  */
-function withExtra<T>(n: number, amount: number, fn: () => T): T {
-  const before = [...(ROWS.obligations ?? [])];
-  const next = before.length + 1;
-  ROWS.obligations = [
-    ...before,
-    ...Array.from({ length: n }, (_, i) => ({
-      seq: next + i,
-      /* MONEY, not a bare integer: a filler row written as a number would make every total this
-         test reads a MIXED one, and the bar would show the refusal rather than the figure. */
-      fields: { what: `Filler ${i}`, party: 3, direction: 'owed_by_me', amount: gbp(amount), due: '2026-09-20', state: 'open', thing: null, note: '', category: 'software' },
-      version: 1,
-      created: '2026-01-01T00:00:00.000Z',
-      by: 'test',
-    })),
-  ];
-  try {
-    return fn();
-  } finally {
-    ROWS.obligations = before;
+async function withExtra(n: number, amount: number): Promise<Kernel> {
+  const k = await seededRecord();
+  for (let i = 0; i < n; i++) {
+    /* MONEY, not a bare integer: a filler row written as a number would make every total this
+       test reads a MIXED one, and the bar would show the refusal rather than the figure. */
+    const made = k.create('obligations', { what: `Filler ${i}`, direction: 'owed_by_me', amount: gbp(amount), due: '2026-09-20', state: 'open', note: '', category: 'software' }, { actor: 'p_owner' });
+    assert.ok(made.ok, JSON.stringify(made));
   }
+  return k;
+}
+
+/**
+ * WHERE THE MONEY OWED INSIDE THIRTY DAYS GOES, by what it is for, as the Money page declared it before money-core 3.0.0
+ * made that page one and left this block off it. Declared here, because what is held is how a block that adds up reads
+ * the rows under it, and that is the record's rule for every `split`, not one page's.
+ */
+const OWED_SPLIT = {
+  kind: 'split',
+  heading: 'Owed by you, 30 days, by what it is for',
+  span: 7,
+  source: 'register.obligations',
+  where: 'state is open or part, direction is owed by me, due before +31d',
+  columns: [{ field: 'category' }, { field: 'amount' }],
+  limit: 6,
+  unset: 'Uncategorised',
+  empty: 'Nothing to pay in the next 30 days.',
+} as const;
+
+/** The block as the record reads it and a live page draws it, on `k`, or on the fixture's record. */
+const splitOn = (k?: Kernel): BlockResult =>
+  k === undefined ? readBlock(OWED_SPLIT as never) : liveBlockOf(k.block(OWED_SPLIT as never) as never, new Map(), NOW);
+
+/** Every row of `k`'s obligations that `OWED_SPLIT`'s filter admits, as the record lists them. */
+function admittedBy(k: Kernel): { amount: number }[] {
+  const out = k.list({ register: 'obligations', where: OWED_SPLIT.where, limit: 500 });
+  assert.ok(out.ok && out.value.cursor === null, JSON.stringify(out.ok ? out.value.cursor : out));
+  return out.value.rows.map((r) => ({ amount: amountOf(r.fields.amount) ?? 0 }));
 }
 
 const barOf = (slug: string, heading: string) => page(slug)?.blocks.find((b) => b.heading === heading);
 
-test('A BAR ADDS UP THE ANSWER, NOT THE FIRST PAGE OF IT', () => {
+test('A BAR ADDS UP THE ANSWER, NOT THE FIRST PAGE OF IT', async () => {
   // `limit:` is how much a reader can take in. Applied before the sum it is how much of the money
   // exists, and the figure is wrong by however many rows did not fit — with nothing on screen that
   // says so, because a total is one line either way.
-  withExtra(80, 100_000, () => {
-    const block = barOf('money', 'Owed by you, 30 days, by what it is for');
-    assert.ok(block, 'the bar is gone; this test is about the bar');
-    assert.ok(block.matched.length > 50, `only ${block.matched.length} rows matched, so the cut was never reached`);
-    const truth = block.matched.reduce((a, e) => a + (amountOf(e.fields.amount) ?? 0), 0);
-    const drawn = toSegments(block)
-      .flatMap((seg) => ('rows' in seg ? (seg.rows as { cells: string[] }[]) : []))
-      .reduce((a, r) => a + Number((r.cells[1] ?? '').replace(/[^0-9.]/g, '')) * 100, 0);
-    assert.ok(Math.abs(drawn - truth) < 200, `the bars add to ${drawn} where the rows add to ${truth}`);
-  });
+  const k = await withExtra(80, 100_000);
+  const block = splitOn(k);
+  assert.deepEqual(block.refusals, [], 'the split refused, so nothing was added up');
+  const admitted = admittedBy(k);
+  assert.ok(admitted.length > 50, `only ${admitted.length} rows matched, so the cut was never reached`);
+  const truth = admitted.reduce((a, e) => a + e.amount, 0);
+  const drawn = toSegments(block)
+    .flatMap((seg) => ('rows' in seg ? (seg.rows as { cells: string[] }[]) : []))
+    .reduce((a, r) => a + Number((r.cells[1] ?? '').replace(/[^0-9.]/g, '')) * 100, 0);
+  assert.ok(Math.abs(drawn - truth) < 200, `the bars add to ${drawn} where the rows add to ${truth}`);
 });
 
-test('the rows it DRAWS are still cut, because that half was never the bug', () => {
-  withExtra(80, 100_000, () => {
-    const block = barOf('money', 'Owed by you, 30 days, by what it is for');
-    assert.ok(block);
-    assert.ok(block.entries.length <= (block.limit ?? 50), 'the reading cap stopped applying');
-    assert.ok(block.matched.length > block.entries.length, 'nothing was cut, so nothing is being tested');
-    assert.equal(block.total, block.matched.length, 'the count under the block counts the drawn rows');
-  });
+test('the rows it DRAWS are still cut, because that half was never the bug', async () => {
+  /* THE RECORD HANDS A BLOCK THAT ADDS UP EVERY ROW IT MATCHED, never a page of them (`SUMS` in the kernel's
+     `pages.ts`), so what is cut is what is DRAWN: the groups, at the block's `limit`, the rest carried below. */
+  const k = await withExtra(80, 100_000);
+  const block = splitOn(k);
+  const admitted = admittedBy(k);
+  assert.equal(block.total, admitted.length, 'the count under the block is not the rows it matched');
+  assert.equal(block.entries.length, admitted.length, 'the block added up a page of its answer');
+  const drawn = toSegments(block).flatMap((seg) => ('rows' in seg ? (seg.rows as { cells: string[] }[]) : []));
+  assert.ok(drawn.length <= (block.limit ?? 50), 'the reading cap stopped applying');
+  assert.ok(admitted.length > drawn.length, 'nothing was cut, so nothing is being tested');
 });
 
 test('a gauge sums past the cut too', () => {
@@ -381,7 +450,7 @@ test('a gauge sums past the cut too', () => {
   assert.ok(Math.abs(Number((drawn[0]?.cells[1] ?? '').replace(/[^0-9.]/g, '')) * 100 - truth) < 200);
 });
 
-test('a gauge keeps its currency when nothing matches', () => {
+test('a gauge keeps its currency when nothing matches', async () => {
   /**
    * BOTH FIGURES LOST THEIR UNIT THE MOMENT THE FILTER MATCHED NOTHING.
    *
@@ -395,42 +464,49 @@ test('a gauge keeps its currency when nothing matches', () => {
    * declared constant: it does not change when a filter matches nothing, so it cannot lose a unit
    * it never took from the rows.
    */
-  const kept = ROWS.services;
-  try {
-    /* THE ROWS STAY AND THE FILTER MISSES, which is the state that was measured: a young record
-       whose services exist and are not on a monthly cycle. A register with NO rows at all has no
-       currency anywhere to find — a money field declares none, only its values carry one — so that
-       case is a gap in the declaration rather than in this code, and it is filed as one. */
-    ROWS.services = kept!.map((e) => ({ ...e, fields: { ...e.fields, cycle: 'yearly' } }));
-    const block = page('estate')?.blocks.find((b) => b.kind === 'gauge');
-    assert.ok(block, 'the estate page has no gauge');
-    const drawn = toSegments(block).flatMap((seg) => ('rows' in seg ? (seg.rows as { cells: string[] }[]) : []));
-    assert.equal(drawn.length, 1, 'a gauge is one row');
-    const [, value, target] = drawn[0]!.cells;
-    assert.match(String(value), /^[A-Z]{3}\s/, `the value lost its currency: ${value}`);
-    assert.match(String(target), /^[A-Z]{3}\s/, `the target lost its currency: ${target}`);
-    assert.doesNotMatch(String(target), /^\d/, 'the target printed as raw minor units');
-  } finally {
-    ROWS.services = kept!;
+  /* THE ROWS STAY AND THE FILTER MISSES, which is the state that was measured: a young record
+     whose services exist and are not on a monthly cycle. A register with NO rows at all has no
+     currency anywhere to find (a money field declares none, only its values carry one), so that
+     case is a gap in the declaration rather than in this code, and it is filed as one.
+
+     ON A RECORD OF ITS OWN, AND IT WAS THE SAMPLE'S `ROWS` PUT BACK AFTERWARDS, which since ARC-1 reached nothing: the
+     gauge read the seed's monthly services and this asked the case where something matches. */
+  const k = await seededRecord();
+  const services = k.list({ register: 'services', limit: 500 });
+  assert.ok(services.ok && services.value.rows.length > 0, 'the seed holds no services');
+  for (const s of services.value.rows) {
+    const wrote = k.update('services', `services#${s.seq}`, { cycle: 'yearly' }, { actor: 'p_owner' });
+    assert.ok(wrote.ok, JSON.stringify(wrote));
   }
+  const opened = k.page('estate');
+  assert.ok(opened.ok, JSON.stringify(opened));
+  const answered = opened.value.blocks.find((b) => (b as { kind?: unknown }).kind === 'gauge');
+  assert.ok(answered, 'the estate page has no gauge');
+  const block = liveBlockOf(answered as never, new Map(), NOW);
+  assert.equal(block.total, 0, 'a service is still monthly, so this is not the case where nothing matches');
+  const drawn = toSegments(block).flatMap((seg) => ('rows' in seg ? (seg.rows as { cells: string[] }[]) : []));
+  assert.equal(drawn.length, 1, 'a gauge is one row');
+  const [, value, target] = drawn[0]!.cells;
+  assert.match(String(value), /^[A-Z]{3}\s/, `the value lost its currency: ${value}`);
+  assert.match(String(target), /^[A-Z]{3}\s/, `the target lost its currency: ${target}`);
+  assert.doesNotMatch(String(target), /^\d/, 'the target printed as raw minor units');
 });
 
 test('chips count every matching row, and the counts add to the matched total', () => {
-  withExtra(80, 100_000, () => {
-    const block = page('estate')?.blocks.find((b) => b.kind === 'chips');
-    assert.ok(block);
-    const counted = toSegments(block)
-      .flatMap((seg) => ('rows' in seg ? (seg.rows as { cells: string[] }[]) : []))
-      .reduce((a, r) => a + Number(r.cells[1] ?? 0), 0);
-    assert.equal(counted, block.matched.length);
-  });
+  /* ON THE SEED AS IT IS. This ran inside `withExtra`, whose rows are obligations and never reached the estate's chips,
+     which count services; the rule is the same at any size, and the size is the bar's to test above. */
+  const block = page('estate')?.blocks.find((b) => b.kind === 'chips');
+  assert.ok(block);
+  const counted = toSegments(block)
+    .flatMap((seg) => ('rows' in seg ? (seg.rows as { cells: string[] }[]) : []))
+    .reduce((a, r) => a + Number(r.cells[1] ?? 0), 0);
+  assert.equal(counted, block.matched.length);
 });
 
 test('when there are more groups than fit, the rest is CARRIED, not dropped', () => {
   // The other way to get a wrong total: cut the bars instead of the rows and the figure is short by
   // the tail. A named remainder keeps the sum whole and says out loud that there is more.
-  const block = barOf('money', 'Owed by you, 30 days, by what it is for');
-  assert.ok(block);
+  const block = splitOn();
   const rowsOf = (b: typeof block) =>
     toSegments(b).flatMap((seg) => ('rows' in seg ? (seg.rows as { cells: string[] }[]) : []));
   const whole = rowsOf(block);
@@ -963,7 +1039,7 @@ test('the # column is 8ch for short ids and widens with the digits of the highes
 
 /* ── the Money page's arithmetic ─────────────────────────────────────────── */
 
-const rowsOfBlock = (block: NonNullable<ReturnType<typeof barOf>>) =>
+const rowsOfBlock = (block: BlockResult) =>
   toSegments(block).flatMap((seg) => ('rows' in seg ? (seg.rows as { cells: string[] }[]) : []));
 
 test('THE BRIDGE ADDS UP BY CONSTRUCTION: cash now, what comes in, what goes out, and where it lands', () => {
@@ -980,8 +1056,7 @@ test('THE BRIDGE ADDS UP BY CONSTRUCTION: cash now, what comes in, what goes out
 });
 
 test('A SPLIT GROUPS BY WHAT THE MONEY IS FOR, in the words the screen shows', () => {
-  const block = barOf('money', 'Owed by you, 30 days, by what it is for');
-  assert.ok(block);
+  const block = splitOn();
   const labels = rowsOfBlock(block).map((r) => r.cells[0]);
   assert.ok(labels.includes('Tax'), `no tax group in ${labels.join(', ')}`);
   assert.ok(!labels.some((l) => l?.includes('_')), 'a category printed as its id');
@@ -1019,7 +1094,9 @@ test('THE MONEY PAGE DRAWS ITS CASH AHEAD as a forecast: the opening, ninety day
   assert.ok(marks.filter((m) => m === 'past').length >= 80, 'the sample remembers ninety days of cash');
   assert.equal(marks.filter((m) => m === 'step').length, forecast.walk!.steps.length, 'every movement, not a slice of them');
   assert.deepEqual(segment.rows.find((r) => r.cells[0] === 'horizon')?.cells.slice(0, 2), ['horizon', '365']);
-  assert.deepEqual(segment.rows.find((r) => r.cells[0] === 'knobs')?.cells.slice(0, 2), ['knobs', 'horizon late spend leave grow drift count']);
+  /* `leave` IS FOLDED INTO `count` AND `sell` IS OFFERED, since money-core 3.0.0: one control over the streams, not two
+     with opposite meanings, and what a pack declares sellable. */
+  assert.deepEqual(segment.rows.find((r) => r.cells[0] === 'knobs')?.cells.slice(0, 2), ['knobs', 'horizon late spend count grow drift sell']);
   /* AND EACH INSTALMENT'S PLAN ON AN `of` ROW UNDER IT, which is what the count control groups the parts of a plan by. */
   assert.ok(segment.rows.some((r) => r.cells[0] === 'of' && r.cells[1] === 'Proofing press'), 'no step says it is part of the proofing press');
   /* THE LATE KNOB MARKS HOW LATE MONEY HAS COME IN, the sample's paid invoices averaged, and a crossing inside a month is said. */
@@ -1150,9 +1227,37 @@ test('AN ACCOUNT BALANCE OLDER THAN A WEEK SAYS IT IS OUT OF DATE, beside its da
   assert.match(readBlock({ ...cards, stale: { field: 'name', after: '7d' } } as never).refusals.join(), /stale:/);
 });
 
-test('COMING IN AND GOING OUT SIGN THEIR AMOUNTS AND SAY WHO CHANGED EACH ROW LAST, without a colour', () => {
-  const table = page('money')!.blocks.find((b) => b.kind === 'table' && b.source === 'register.obligations')!;
+/**
+ * WHAT IS STILL TO COME IN AND GO OUT, IN ONE LIST BY DATE, as the Money page declared it before money-core 3.0.0 made
+ * the page one and drew what falls due from `deadlines` instead. Declared here, because a signed amount and who changed a
+ * row last are the record's rules for any table over a list, and Bills and invoices is the list that has both.
+ */
+const COMING_AND_GOING = {
+  kind: 'table',
+  heading: 'Coming in and going out',
+  span: 12,
+  source: 'register.obligations',
+  where: 'state is open or part',
+  columns: [
+    { field: 'what', label: 'Description', width: 'minmax(14ch,1fr)' },
+    { field: 'amount', label: 'Amount', width: '15ch', align: 'end', sign: { field: 'direction', minus: 'owed_by_me' } },
+    { field: 'due', label: 'Due', width: '13ch', align: 'end' },
+    { field: 'changed', label: 'Changed by', width: '18ch' },
+  ],
+  order: [{ field: 'due', dir: 'asc' }],
+  empty: 'Nothing is coming in or going out.',
+  limit: 12,
+};
+
+test('COMING IN AND GOING OUT SIGN THEIR AMOUNTS AND SAY WHO CHANGED EACH ROW LAST, without a colour', async () => {
+  /* ON A RECORD OF ITS OWN, WHERE A RULE CAN ACT. The seed no longer holds a row a rule changed after it was written, so
+     the rule's change to Halden's 2026-041 is written here, as a rule matching Halden's reply would write it. */
+  const k = await seededRecord();
+  const wrote = k.update('obligations', 'obligations#1', { note: 'Halden replied that nothing is due yet.' }, { actor: 'rule:late-reply' });
+  assert.ok(wrote.ok, JSON.stringify(wrote));
+  const table = liveBlockOf(k.block(COMING_AND_GOING as never) as never, new Map(), NOW);
   assert.deepEqual(table.refusals, []);
+  assert.ok(table.entries.length > 0, 'nothing is coming in or going out, so this asks nothing');
   const amount = table.columns.findIndex((c) => c.field === 'amount');
   const changed = table.columns.findIndex((c) => c.field === 'changed');
   table.entries.forEach((e, n) => {
@@ -1161,7 +1266,7 @@ test('COMING IN AND GOING OUT SIGN THEIR AMOUNTS AND SAY WHO CHANGED EACH ROW LA
   });
   /* THE NEWEST THING SAID ABOUT A ROW IS WHO CHANGED IT: a rule matched Halden's reply on 2026-041. */
   const halden = table.rows.find((r) => r.key === 'obligations#1')!;
-  assert.match(String(halden.cells[changed]), /^Reply, \d{1,2} [A-Z][a-z]{2}$/u);
+  assert.match(String(halden.cells[changed]), /^Late reply, \d{1,2} [A-Z][a-z]{2}$/u);
   const other = table.rows.find((r) => r.key !== 'obligations#1')!;
   assert.match(String(other.cells[changed]), /^You, \d{1,2} [A-Z][a-z]{2}$/u);
 
@@ -1221,47 +1326,70 @@ test("Student's Assignments list shows the course of each by default", async () 
  * them under Projects. Open tracks in the same function are capped at five under a comment saying
  * why, and the same argument was never applied to the pages a template produces.
  *
- * `ROWS` IS A MUTABLE EXPORT and these tests put it back, the way `growth.test.ts` does: the thing
- * under test is behaviour at a row count the seed does not have, and a fixture register would be a
- * second record whose declaration could drift from the real one.
+ * AT HIS SCALE ON A RECORD OF ITS OWN, AND IT WAS THE SAMPLE'S `ROWS` PUT BACK AFTERWARDS. Since ARC-1 the fixture's
+ * `pages` and `boot` ask a record seeded once and never written to (`fixtures/readers.ts`), so the rows swapped in
+ * reached nothing and the sample kept its three projects. The projects are written to a seeded record here, and the rail
+ * is the one a live tab draws of it: the record's own list of pages, each saying which row it is about, through the
+ * shell's `layoutOf` (`boot-live.ts`), which spends the record's `railRoom`.
  */
-const withProjects = (n: number, run: () => void) => {
-  const kept = ROWS.things!;
-  ROWS.things = Array.from(
-    { length: n },
-    (_, i) => ({ seq: i + 1, version: 1, fields: { name: `Project ${i + 1}`, lane: i % 2 ? 'building' : 'earning' } }) as unknown as Entry,
-  );
-  try {
-    run();
-  } finally {
-    ROWS.things = kept;
+type Scaled = { k: Kernel; listed: { slug: string; about: { register: string } | null }[]; shell: ReturnType<typeof layoutOf> };
+async function atScale(n: number, also: { id: string; kind: string; body: Record<string, unknown> }[] = []): Promise<Scaled> {
+  const k = await seededRecord();
+  if (also.length) {
+    const installed = await k.install(also as never);
+    assert.ok(installed.ok, JSON.stringify(installed));
   }
+  /* THE SEED'S PROJECTS IN PLAY COUNT TOWARDS `n`; the rest are written building or earning, named by their number. */
+  const seeded = new Set((k.pages() as { about: { register: string; seq: number } | null }[]).flatMap((p) => (p.about?.register === 'things' ? [p.about.seq] : []))).size;
+  for (let i = seeded + 1; i <= n; i++) {
+    const made = k.create('things', { name: `Project ${i}`, lane: i % 2 ? 'building' : 'earning' }, { actor: 'p_owner' });
+    assert.ok(made.ok, JSON.stringify(made));
+  }
+  const listed = k.pages() as Scaled['listed'];
+  const held = k.list({ register: 'things', limit: 1 });
+  assert.ok(held.ok);
+  const shell = layoutOf({
+    registers: [{ id: 'things', name: 'Projects', count: held.value.matched }],
+    now: new Date(NOW).toISOString(),
+    record: { slug: 'the-studio', name: 'The Studio', locale: 'en', currency: 'GBP' },
+    me: { kind: 'person', person: 'p_owner', name: 'You', level: 'owner' },
+    pages: listed,
+  } as never);
+  return { k, listed, shell };
+}
+
+/** The rail entries one template produced: the pages about a row of `register`, under `section` when one is named. */
+const railRowsOf = (s: Scaled, register: string) => {
+  const about = new Set(s.listed.filter((p) => p.about?.register === register).map((p) => `/p/${p.slug}`));
+  return s.shell.nav.filter((n) => about.has(n.href));
 };
 
-/** The rail entries one template produced: the pages about a row of `register`. */
+/** The rail entries one template produced on the fixture's record: the pages about a row of `register`. */
 const railRows = (register: string) => {
   const about = new Set(Object.entries(pages()).filter(([, p]) => p.identity?.register === register).map(([slug]) => `/p/${slug}`));
   return boot().nav.filter((n) => about.has(n.href));
 };
 
-test('A RAIL IS NOT A LIST: twenty-six projects do not put twenty-six links in it', () => {
-  withProjects(26, () => {
-    assert.equal(Object.values(pages()).filter((p) => p.identity?.register === 'things').length, 26, 'the template did not expand');
-    const rail = railRows('things');
-    assert.ok(rail.length <= 5, `${rail.length} project links in the rail, and the open tracks beside them are capped at 5`);
-  });
+test('A RAIL IS NOT A LIST: twenty-six projects do not put twenty-six links in it', async () => {
+  const s = await atScale(26);
+  const projects = s.listed.filter((p) => p.about?.register === 'things');
+  assert.equal(projects.length, 26, 'the template did not expand');
+  const rail = railRowsOf(s, 'things');
+  assert.ok(rail.length <= 5, `${rail.length} project links in the rail, and the open tracks beside them are capped at 5`);
 });
 
-test('and the projects past the cap are pages, still reachable, not pages that stopped existing', () => {
-  withProjects(26, () => {
-    const all = pages();
-    assert.ok(all['project-26'], 'the twenty-sixth project has no page');
-    assert.ok(page('project-26'), '/p/project-26 does not resolve');
-    /* THE LIST IS WHERE THEY LIVE, and it says how many: the rail draws Projects with its own count
-       out of `index.registers`, and `/p/portfolio` is the page that lists them. */
-    assert.equal(boot().index.registers.find((r) => r.id === 'things')?.count, 26);
-    assert.ok(boot().nav.some((n) => n.href === '/p/portfolio'), 'the Projects overview left the rail');
-  });
+test('and the projects past the cap are pages, still reachable, not pages that stopped existing', async () => {
+  const s = await atScale(26);
+  assert.ok(s.listed.some((p) => p.slug === 'project-26'), 'the twenty-sixth project has no page');
+  assert.ok(s.shell.pages.includes('project-26'), 'the shell does not offer /p/project-26');
+  const opened = s.k.page('project-26');
+  assert.ok(opened.ok, '/p/project-26 does not resolve');
+  /* THE LIST IS WHERE THEY LIVE, and it says how many: the rail draws Projects with its own count
+     out of `index.registers`, and `/p/portfolio` is the page that lists them. */
+  const held = s.k.list({ register: 'things', limit: 1 });
+  assert.ok(held.ok);
+  assert.equal(s.shell.index.registers.find((r) => r.id === 'things')?.count, held.value.matched);
+  assert.ok(s.shell.nav.some((n) => n.href === '/p/portfolio'), 'the Projects overview left the rail');
 });
 
 test('the cap takes nothing off the rail at the size the record is today', () => {
@@ -1270,13 +1398,14 @@ test('the cap takes nothing off the rail at the size the record is today', () =>
   assert.equal(railRows('things').length, (ROWS.things ?? []).filter((t) => t.fields.lane === 'building' || t.fields.lane === 'earning').length);
 });
 
-test('a page somebody wrote is never capped away by the rows of a register', () => {
-  const written = (): string[] => {
-    const templated = new Set(Object.entries(pages()).filter(([, p]) => p.identity).map(([slug]) => `/p/${slug}`));
-    return boot().nav.filter((n) => n.href.startsWith('/p/') && !templated.has(n.href)).map((n) => n.href).sort();
+test('a page somebody wrote is never capped away by the rows of a register', async () => {
+  const written = (s: Scaled): string[] => {
+    const templated = new Set(s.listed.filter((p) => p.about).map((p) => `/p/${p.slug}`));
+    return s.shell.nav.filter((n) => n.href.startsWith('/p/') && !templated.has(n.href)).map((n) => n.href).sort();
   };
-  const before = written();
-  withProjects(26, () => assert.deepEqual(written(), before, 'growing a register moved the hand-written pages'));
+  const before = written(await atScale(0));
+  assert.ok(before.length > 0, 'the seed writes no page of its own, so this asks nothing');
+  assert.deepEqual(written(await atScale(26)), before, 'growing a register moved the hand-written pages');
 });
 
 /**
@@ -1293,18 +1422,14 @@ test('a page somebody wrote is never capped away by the rows of a register', () 
  * thing the cap is for: what grows the rail here is somebody writing a second declaration, not the
  * record filling up.
  */
-test('two templates over one list are two capped headings, not one heading and nothing', () => {
-  withProjects(26, () => {
-    const kept = PAGES.client;
-    PAGES.client = { ...PAGES.project!, page: 'client', title: 'Client {{name}}', nav: { section: 'Clients', order: 10 } };
-    try {
-      const drawn = (section: string) => boot().nav.filter((n) => n.section === section).length;
-      assert.equal(drawn('Clients'), 5, 'the second template over the same list got no rail entry at all');
-      assert.equal(drawn('Projects'), 6, 'five projects and the overview somebody wrote');
-    } finally {
-      /* The shipped record declares no `client` page, so putting it back means taking it away. */
-      if (kept) PAGES.client = kept;
-      else delete PAGES.client;
-    }
-  });
+test('two templates over one list are two capped headings, not one heading and nothing', async () => {
+  /* THE SECOND TEMPLATE IS INSTALLED ON THE RECORD, as a pack would install it: the project page, named and headed anew. */
+  const probe = await seededRecord();
+  const project = (probe.declarations() as { id: string; body: string | Record<string, unknown> }[]).find((d) => d.id === 'page.project');
+  assert.ok(project, 'the seed no longer declares the project page');
+  const body = (typeof project.body === 'string' ? JSON.parse(project.body) : project.body) as Record<string, unknown>;
+  const s = await atScale(26, [{ id: 'page.client', kind: 'page', body: { ...body, page: 'client', title: 'Client {{name}}', nav: { section: 'Clients', order: 10 } } }]);
+  const drawn = (section: string) => s.shell.nav.filter((n) => n.section === section).length;
+  assert.equal(drawn('Clients'), 5, 'the second template over the same list got no rail entry at all');
+  assert.equal(drawn('Projects'), 6, 'five projects and the overview somebody wrote');
 });

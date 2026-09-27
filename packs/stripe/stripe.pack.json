@@ -1,6 +1,6 @@
 {
   "pack": "stripe",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "title": "Stripe",
   "summary": "Reads the Stripe balance, available and pending, and the payouts on their way to the bank from api.stripe.com every hour, into Money's accounts.",
   "author": "BrainDog",
@@ -9,7 +9,7 @@
     "format": 1,
     "primitives": 1,
     "packs": {
-      "money-core": ">=1.0.0 <3.0.0"
+      "money-core": ">=1.0.0 <4.0.0"
     }
   },
   "extends": {

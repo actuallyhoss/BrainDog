@@ -10,8 +10,26 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.3.0",
+      "latest": "1.3.1",
       "versions": [
+        {
+          "version": "1.3.1",
+          "checksum": "953a4b1f1dcb400b0f2124b55185f64be4e3a9bc08549f348dd3e99ce3a52fab",
+          "bytes": 45254,
+          "published_at": "2026-09-27T13:03:15.858Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          }
+        },
         {
           "version": "1.3.0",
           "checksum": "96d409feeaa352bb2ac76a3997d8becbb19378e6b9c9575c99fb5fff64d07cc2",
@@ -88,8 +106,33 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.0.0",
+      "latest": "1.0.1",
       "versions": [
+        {
+          "version": "1.0.1",
+          "checksum": "e17bc6641fb6278b9f3b21c8d1aa3f18b1d4b4a255ffbfa5601cc91af7185a4e",
+          "bytes": 6444,
+          "published_at": "2026-09-27T13:03:15.858Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Cash counts"
+            ],
+            "pages": [
+              "Cash counts"
+            ],
+            "rules": [
+              "Write the difference of each count"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "preview": true
+        },
         {
           "version": "1.0.0",
           "checksum": "1b85ac1e3cb5ba1f67b279de2be2b70297749068b1f571bdeed7104da9667fab",
@@ -339,8 +382,37 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.1.0",
+      "latest": "1.1.1",
       "versions": [
+        {
+          "version": "1.1.1",
+          "checksum": "2d83f1498c42a331572940b818afd60b525e490760916674b700791ca97c9907",
+          "bytes": 11033,
+          "published_at": "2026-09-27T13:03:15.858Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "api.mercury.com",
+                "line": "CALLS OUT api.mercury.com · every 1h · grant \"none\"",
+                "key": null
+              },
+              {
+                "host": "api.mercury.com",
+                "line": "CALLS OUT api.mercury.com · every 1h · key \"Mercury (read only)\" to the host its vault entry opens",
+                "key": "Mercury (read only)"
+              }
+            ]
+          }
+        },
         {
           "version": "1.1.0",
           "checksum": "22bd5b192f079ae4e44dc6535b170edb1f655c0cba3804b1c07ff35f5fe68512",
@@ -668,8 +740,32 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.0.0",
+      "latest": "1.0.1",
       "versions": [
+        {
+          "version": "1.0.1",
+          "checksum": "641ecc213d2896af9f3b03faa945f4c68310b416066a38b2fb630be010c15c9d",
+          "bytes": 6537,
+          "published_at": "2026-09-27T13:03:15.858Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "api.stripe.com",
+                "line": "CALLS OUT api.stripe.com · every 1h · key \"stripe\" to the host its vault entry opens",
+                "key": "stripe"
+              }
+            ]
+          }
+        },
         {
           "version": "1.0.0",
           "checksum": "e9bb842bba2d4c80ea6e67ceed4dcbb716e5df0f51c86ca21dae3429de4882f5",

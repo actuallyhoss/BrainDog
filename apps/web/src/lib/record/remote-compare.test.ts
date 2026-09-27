@@ -151,7 +151,8 @@ test('the two chips measured before the fix open on a record the rows the sample
 
   const rent = await address('obligations', 'f=what:contains:rent');
   assert.deepEqual(rent.record, rent.sample);
-  assert.equal((rent.record as number[]).length, 3, 'the seed moved, so the measurement in the header is stale');
+  /* TWO SINCE money-core 3.0.0, whose seed writes fewer obligations than the one the header measured three over. */
+  assert.equal((rent.record as number[]).length, 2, 'the seed moved, so the measurement in the header is stale');
 
   /* `between` OVER A DAY ARRIVES AS ONE CHIP ONLY WHEN SOMEBODY TYPES IT, since `compile` makes a
      range of days two clauses and so two chips. Typed, it is still the range. */

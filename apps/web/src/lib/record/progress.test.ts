@@ -5,8 +5,10 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { DatabaseSync } from 'node:sqlite';
 
 import type { Block } from 'braindog-render';
+import { openRecord } from '@braindog/kernel';
 
 import './fixtures/fill.ts';
 import { REGISTERS } from './api.ts';
@@ -134,28 +136,69 @@ test('A GOAL IS SET AGAINST WHAT WAS LOGGED TOWARD IT, keyed by the row, in the 
   assert.deepEqual(block.rows.map((r) => r.cells.slice(0, 4)), [['Run three times a week', '2', '3', 'runs'], ['Cook at home', '0', '5', 'nights']]);
 });
 
-test('A BUDGET IN ONE CURRENCY AND A FIGURE IN ANOTHER ARE NEVER SET AGAINST EACH OTHER in the sample', async () => {
-  const { readBlock } = await import('./fixtures/readers.ts');
-  const { ROWS } = await import('./held.ts');
-  const { METRICS } = await import('./declared.ts');
-  REGISTERS.budgets_x = register('budgets_x', [
+/** A record in memory over `node:sqlite`, bound the way the kernel's own tests bind one. */
+function openSqlite(): Parameters<typeof openRecord>[0] {
+  const db = new DatabaseSync(':memory:');
+  let depth = 0;
+  return {
+    exec: (text: string, ...params: unknown[]) => {
+      if (params.length === 0) db.exec(text);
+      else db.prepare(text).run(...(params as never[]));
+    },
+    all: (text: string, ...params: unknown[]) => db.prepare(text).all(...(params as never[])),
+    one: (text: string, ...params: unknown[]) => db.prepare(text).get(...(params as never[])),
+    transactionSync<T>(fn: () => T): T {
+      if (depth > 0) return fn();
+      db.exec('BEGIN');
+      depth++;
+      try {
+        const value = fn();
+        db.exec('COMMIT');
+        return value;
+      } catch (e) {
+        db.exec('ROLLBACK');
+        throw e;
+      } finally {
+        depth--;
+      }
+    },
+  } as unknown as Parameters<typeof openRecord>[0];
+}
+
+/* ON A RECORD OF ITS OWN, AND IT WAS "in the sample". The sample is a kernel seeded once and never written to since
+   ARC-1 (`fixtures/readers.ts`), so a list pushed into `held.ts` for it reaches nothing and the record refused the
+   source it had never been given. The lists, the figure and the rows are declared and written here instead; the page's
+   `REGISTERS` still learns the list, which is what a live tab does before it draws one. */
+test('A BUDGET IN ONE CURRENCY AND A FIGURE IN ANOTHER ARE NEVER SET AGAINST EACH OTHER on a record', async () => {
+  const budgets = register('budgets_x', [
     { id: 'category', type: 'enum', values: ['groceries'] },
     { id: 'limit', type: 'money' },
   ]);
-  REGISTERS.spend_x = register('spend_x', [
+  const spend = register('spend_x', [
     { id: 'category', type: 'enum', values: ['groceries'] },
     { id: 'amount', type: 'money' },
   ]);
-  const row = (fields: Record<string, unknown>, seq: number) => ({ seq, fields: fields as never, version: 1, created: '2026-09-01T09:00:00Z', by: 'p_owner' });
-  ROWS.spend_x = [row({ category: 'groceries', amount: gbp(4_500) }, 1)];
-  (METRICS as Record<string, unknown>)['spent-x'] = { metric: 'spent-x', name: 'Spent', source: 'register.spend_x', value: { sum: 'amount' }, group_by: 'category', format: 'money.GBP', target: { gte: 0 }, window: '30d', compare: 'none' };
+  REGISTERS.budgets_x = budgets;
+  REGISTERS.spend_x = spend;
+  const k = await openRecord(openSqlite(), { now: () => NOW });
+  const installed = await k.install([
+    { id: 'register.budgets_x', kind: 'register', body: budgets as never },
+    { id: 'register.spend_x', kind: 'register', body: spend as never },
+    { id: 'metric.spent-x', kind: 'metric', body: { metric: 'spent-x', name: 'Spent', source: 'register.spend_x', value: { sum: 'amount' }, group_by: 'category', format: 'money.GBP', target: { gte: 0 }, window: '30d', compare: 'none' } as never },
+  ]);
+  assert.ok(installed.ok, JSON.stringify(installed));
+  assert.ok(k.create('spend_x', { category: 'groceries', amount: gbp(4_500) }, { actor: 'p_owner' }).ok);
+  const limit = k.create('budgets_x', { category: 'groceries', limit: gbp(5_000) }, { actor: 'p_owner' });
+  assert.ok(limit.ok, JSON.stringify(limit));
   const block = { kind: 'progress', source: 'register.budgets_x', columns: [{ field: 'category' }, { field: 'limit' }], spent: 'spent-x' };
-  ROWS.budgets_x = [row({ category: 'groceries', limit: gbp(5_000) }, 1)];
-  const same = readBlock(block as never);
+  const read = () => blockOf(k.block(block as never) as never, new Map(), NOW);
+
+  const same = read();
   assert.deepEqual(same.refusals, []);
-  assert.deepEqual(same.spentBy?.groups, [{ key: 'groceries', value: 4_500 }], 'the sample reads what was spent, not nothing');
-  ROWS.budgets_x = [row({ category: 'groceries', limit: { amount: 5_000, currency: 'EUR' } }, 1)];
-  const mixed = readBlock(block as never);
+  assert.deepEqual(same.spentBy?.groups, [{ key: 'groceries', value: 4_500 }], 'the record reads what was spent, not nothing');
+
+  assert.ok(k.update('budgets_x', `budgets_x#${limit.value.seq}`, { limit: { amount: 5_000, currency: 'EUR' } }, { actor: 'p_owner' }).ok);
+  const mixed = read();
   assert.equal(mixed.spentBy, undefined);
   assert.match(mixed.refusals.join(' '), /EUR.*GBP.*two currencies/u);
 });

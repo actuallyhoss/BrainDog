@@ -35,9 +35,11 @@ test('every declared metric is drawn from what the record read, and none of them
 
 test('THE FIGURES ARE THE ONES THE SWITCH PRODUCED', () => {
   // Ported, not rewritten: if a number here changes, a page changed and somebody has to say why.
+  /* MOVED BY money-core 3.0.0 (MOD-4): repeating money lives in `recurring` alone, so the Kiln storefront payout
+     (GBP 930.00 owed to you, on Kiln) and the studio rent (GBP 1,650.00 due inside thirty days) are no longer bills. */
   for (const [id, want] of [
-    ['owed-to-you', 'GBP 29,250.00'],
-    ['due-30d', 'GBP 28,340.00'],
+    ['owed-to-you', 'GBP 28,320.00'],
+    ['due-30d', 'GBP 26,690.00'],
     ['overdue', 'GBP 10,540.00'],
     ['renews-30d', '6'],
     ['lapsing', '1'],
@@ -46,7 +48,7 @@ test('THE FIGURES ARE THE ONES THE SWITCH PRODUCED', () => {
        with the name typed into each. Same numbers as the `kiln-*` documents they replace. */
     /* Seven since Work split the specimen page into steps, two of them Kiln's. */
     ['project-open:Kiln', '7'],
-    ['project-owed:Kiln', 'GBP 4,980.00'],
+    ['project-owed:Kiln', 'GBP 4,050.00'],
     ['project-cost:Kiln', 'GBP 1,036.00'],
   ] as const) {
     assert.equal(metric(id).value, want, `${id} moved`);
@@ -146,14 +148,23 @@ test('a tile over a list with rows under it carries a verdict', () => {
   /* THE HALF OF THE EMPTY-LIST RULE THIS FILE CAN REACH. A tile over a list that holds nothing carries no tick
      (`engines.test.ts`, on a real reading), and a build that never tones anything would satisfy that; this is the
      assertion that it does tone a list with rows in it. */
-  const toned = Object.values(METRICS)
-    .filter((d) => !isTemplate(d) && d.source === 'register.obligations')
-    .map((d) => metric(d.metric).tone);
-  assert.ok(toned.length > 0, 'no obligations metric was reachable to check');
+  /* A VERDICT NEEDS A TARGET, AND A MONEY CEILING STARTS EMPTY since money-core 3.0.0 (`MONEY_TARGET_SETTINGS`): empty
+     is no target, so until a person types a sum those figures have nothing to be judged against and carry no tone. The
+     rest still must, over the same rows. */
+  const bounded = (d: MetricDecl) => {
+    const target = (d.target ?? {}) as { lte?: unknown; gte?: unknown };
+    return typeof target.lte === 'number' || typeof target.gte === 'number';
+  };
+  const over = Object.values(METRICS).filter((d) => !isTemplate(d) && d.source === 'register.obligations');
+  const toned = over.filter(bounded).map((d) => [d.metric, metric(d.metric).tone] as const);
+  assert.ok(toned.length > 0, 'no obligations metric with a target was reachable to check');
   assert.ok(
-    toned.every((t) => t === 'good' || t === 'warn' || t === 'bad'),
-    `a figure over thirty-eight rows reports no verdict: ${JSON.stringify(toned)}`,
+    toned.every(([, t]) => t === 'good' || t === 'warn' || t === 'bad'),
+    `a figure over a list with rows in it reports no verdict: ${JSON.stringify(toned)}`,
   );
+  const untargeted = over.filter((d) => !bounded(d)).map((d) => [d.metric, metric(d.metric).tone] as const);
+  assert.ok(untargeted.length > 0, 'every obligations figure has a target again, so the empty ceiling is not checked');
+  assert.ok(untargeted.every(([, t]) => t === undefined), `a figure nobody set a target for carries a verdict: ${JSON.stringify(untargeted)}`);
 });
 
 /* ── the words under every figure in the product ─────────────────────────── */
@@ -206,9 +217,10 @@ test('an aggregation or a format this build does not say is NAMED before it woul
 });
 
 test('A FRACTIONAL FACTOR ROUNDS PER ROW, as the record does, and the tile says the record’s penny', () => {
-  /* `every-month-out` takes a third of a quarterly bill and a twelfth of a yearly one. Summed then rounded it reads
-     £10,416.17, and the record rounds each row and reads £10,416.16. */
-  assert.equal(metric('every-month-out').value, 'GBP 10,416.16');
+  /* `every-month-out` takes a third of a quarterly bill and a twelfth of a yearly one. It reads `recurring` since
+     money-core 3.0.0, where the VAT is a third of GBP 7,420.00 and the accountant a twelfth of GBP 1,450.00, each a third
+     of a penny over. Summed then rounded it reads £10,692.17, and the record rounds each row and reads £10,692.16. */
+  assert.equal(metric('every-month-out').value, 'GBP 10,692.16');
 });
 
 test('A NOTE THAT ONLY SAYS NOUGHT IS NOT SAID: a clause whose figures are all 0 goes', async () => {

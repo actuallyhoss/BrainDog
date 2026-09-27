@@ -9,13 +9,18 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { DatabaseSync } from 'node:sqlite';
+
+import { openRecord, type Kernel } from '@braindog/kernel';
+import { installSeed } from '@braindog/seed';
 
 import './fixtures/fill.ts';
 import { REGISTERS, columnsFor, display, sortRows } from './api.ts';
 import { list, applyFilters } from './fixtures/readers.ts';
 import { ROWS, NOW } from './fixtures/sample.ts';
+import { whereFor } from './remote.ts';
 import { compile, explain } from './where.ts';
-import type { Entry } from './schema.ts';
+import type { Entry, Filter } from './schema.ts';
 
 const rows = (...fields: Record<string, unknown>[]): Entry[] =>
   fields.map((f, i) => ({ seq: i + 1, fields: f }) as Entry);
@@ -75,38 +80,107 @@ test('text sorts without regard to case, not the way a byte compares, and in the
 
 /* ── filtering ───────────────────────────────────────────────────────────── */
 
-const OBL = rows(
+/**
+ * THE RECORD MATCHES, SO THE ROWS A FILTER IS ASKED ABOUT ARE WRITTEN TO A RECORD. These asked the fixture's
+ * `applyFilters` about rows made up here, which it matched in the browser; since ARC-1 it asks the seeded record which of
+ * ITS rows a filter admits and keeps a made-up row whose number the record happened to name (`fixtures/readers.ts`), so
+ * the rows below were being matched against obligations they never were. They are written to a record of their own now,
+ * under the seed's declaration of obligations with every field optional (so a row may leave a day empty) and the links
+ * left out, and asked the way a live list asks: the chips and the box as `whereFor` sends them to the record's `list`.
+ */
+type Sql = Parameters<typeof openRecord>[0];
+function openSqlite(): Sql {
+  const db = new DatabaseSync(':memory:');
+  let depth = 0;
+  return {
+    exec: (text: string, ...params: unknown[]) => {
+      if (params.length === 0) db.exec(text);
+      else db.prepare(text).run(...(params as never[]));
+    },
+    all: (text: string, ...params: unknown[]) => db.prepare(text).all(...(params as never[])),
+    one: (text: string, ...params: unknown[]) => db.prepare(text).get(...(params as never[])),
+    transactionSync<T>(fn: () => T): T {
+      if (depth > 0) return fn();
+      db.exec('BEGIN');
+      depth++;
+      try {
+        const value = fn();
+        db.exec('COMMIT');
+        return value;
+      } catch (e) {
+        db.exec('ROLLBACK');
+        throw e;
+      } finally {
+        depth--;
+      }
+    },
+  } as unknown as Sql;
+}
+
+/** The seed's declaration of obligations, as a record installs it, every field optional and no link in it. */
+const DECLARED = (async () => {
+  const k = await openRecord(openSqlite(), { now: () => NOW });
+  assert.ok((await installSeed(k)).ok, 'the seed did not install');
+  const d = (k.declarations() as { id: string; body: string | Record<string, unknown> }[]).find((x) => x.id === 'register.obligations');
+  assert.ok(d, 'the seed no longer declares obligations');
+  const body = (typeof d.body === 'string' ? JSON.parse(d.body) : d.body) as { fields: { type: string; required?: boolean }[] };
+  return { ...body, fields: body.fields.filter((f) => f.type !== 'ref').map(({ required: _, ...f }) => f) };
+})();
+
+/** The numbers of the rows the record admits, of `given` written in order, for the chips and the box a list sends. */
+async function admitted(given: Record<string, unknown>[], filters: Filter[], q = ''): Promise<number[]> {
+  const out = await asked(given, filters, q);
+  assert.ok(out.ok, JSON.stringify(out));
+  return out.value.rows.map((r) => r.seq!).sort((a, b) => a - b);
+}
+
+/** The record's whole answer to that question, a refusal included. */
+async function asked(given: Record<string, unknown>[], filters: Filter[], q = ''): Promise<ReturnType<Kernel['list']>> {
+  const k = await openRecord(openSqlite(), { now: () => NOW });
+  const installed = await k.install([{ id: 'register.obligations', kind: 'register', body: (await DECLARED) as never }]);
+  assert.ok(installed.ok, JSON.stringify(installed));
+  for (const fields of given) {
+    const made = k.create('obligations', Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== null)), { actor: 'p_owner' });
+    assert.ok(made.ok, JSON.stringify(made));
+  }
+  const where = whereFor('obligations', filters, q, new Map());
+  return k.list({ register: 'obligations', limit: 500, ...(where === undefined ? {} : { where: where as never }) });
+}
+
+const OBL = [
   { state: 'open', direction: 'owed_to_me', due: '2026-07-27' },
   { state: 'paid', direction: 'owed_to_me', due: '2026-09-14' },
   { state: 'open', direction: 'owed_by_me', due: '2026-11-05' },
-);
+];
 
-test('`in` keeps a row matching any of its values', () => {
-  assert.deepEqual(seqs(applyFilters('obligations', OBL, [{ field: 'state', op: 'in', values: ['open', 'paid'] }])), [1, 2, 3]);
-  assert.deepEqual(seqs(applyFilters('obligations', OBL, [{ field: 'state', op: 'in', values: ['paid'] }])), [2]);
+test('`in` keeps a row matching any of its values', async () => {
+  assert.deepEqual(await admitted(OBL, [{ field: 'state', op: 'in', values: ['open', 'paid'] }]), [1, 2, 3]);
+  assert.deepEqual(await admitted(OBL, [{ field: 'state', op: 'in', values: ['paid'] }]), [2]);
 });
 
-test('an empty `in` keeps nothing, which is what the reader asked for', () => {
+test('an empty `in` keeps nothing, which is what the reader asked for', async () => {
   // Not "keeps everything". A filter chip showing zero selected values and a full list underneath
-  // is a filter that silently ignored you.
-  assert.deepEqual(seqs(applyFilters('obligations', OBL, [{ field: 'state', op: 'in', values: [] }])), []);
+  // is a filter that silently ignored you. The record goes further and refuses the question, so the
+  // list draws its sentence rather than no rows: no row comes back either way.
+  const out = await asked(OBL, [{ field: 'state', op: 'in', values: [] }]);
+  assert.ok(!out.ok, `an empty chip was answered with ${out.ok ? out.value.rows.length : 0} rows`);
 });
 
-test('before and after are exclusive of the day named', () => {
-  assert.deepEqual(seqs(applyFilters('obligations', OBL, [{ field: 'due', op: 'before', values: ['2026-09-14'] }])), [1]);
-  assert.deepEqual(seqs(applyFilters('obligations', OBL, [{ field: 'due', op: 'after', values: ['2026-09-14'] }])), [3]);
+test('before and after are exclusive of the day named', async () => {
+  assert.deepEqual(await admitted(OBL, [{ field: 'due', op: 'before', values: ['2026-09-14'] }]), [1]);
+  assert.deepEqual(await admitted(OBL, [{ field: 'due', op: 'after', values: ['2026-09-14'] }]), [3]);
 });
 
-test('two filters are AND, never OR', () => {
-  const out = applyFilters('obligations', OBL, [
+test('two filters are AND, never OR', async () => {
+  const out = await admitted(OBL, [
     { field: 'state', op: 'in', values: ['open'] },
     { field: 'direction', op: 'in', values: ['owed_to_me'] },
   ]);
-  assert.deepEqual(seqs(out), [1]);
+  assert.deepEqual(out, [1]);
 });
 
-test('no filters and no query is the whole list, untouched', () => {
-  assert.deepEqual(seqs(applyFilters('obligations', OBL, [])), [1, 2, 3]);
+test('no filters and no query is the whole list, untouched', async () => {
+  assert.deepEqual(await admitted(OBL, []), [1, 2, 3]);
 });
 
 /* ── search ──────────────────────────────────────────────────────────────── */
@@ -182,16 +256,15 @@ test('punctuation separates rather than matching, the way FTS5 tokenises', () =>
   assert.deepEqual(seqs(applyFilters('obligations', some, [], 'kiln example')), [1]);
 });
 
-test('a filter and a query are both applied', () => {
+test('a filter and a query are both applied', async () => {
   /* Its own rows, because `OBL` carries no searchable field — which is the point of the fixture it
      is used for and would make this test pass by matching nothing. */
-  const both = rows(
+  const both = [
     { state: 'open', what: 'Kiln retainer' },
     { state: 'paid', what: 'Kiln licence' },
     { state: 'open', what: 'Portage invoice' },
-  );
-  const out = applyFilters('obligations', both, [{ field: 'state', op: 'in', values: ['open'] }], 'kiln');
-  assert.deepEqual(seqs(out), [1]);
+  ];
+  assert.deepEqual(await admitted(both, [{ field: 'state', op: 'in', values: ['open'] }], 'kiln'), [1]);
 });
 
 
@@ -309,7 +382,7 @@ test('a column whose values differ actually reorders the list', () => {
 
 /* ── a date is compared as a date ──────────────────────────────────────── */
 
-test('`is <a date>` ON A DATE FIELD MATCHED NOTHING, ON EVERY REGISTER, ALWAYS', () => {
+test('`is <a date>` ON A DATE FIELD MATCHED NOTHING, ON EVERY REGISTER, ALWAYS', async () => {
   /**
    * `before` and `after` had a date path from the day they were written and `is` never got one, so
    * the value went through `formsOf` — which compares against the raw store (`2026-09-03`) and
@@ -320,8 +393,8 @@ test('`is <a date>` ON A DATE FIELD MATCHED NOTHING, ON EVERY REGISTER, ALWAYS',
    * `display()` happened to render an instant through `relative()` — a filter whose meaning was a
    * side effect of a formatting choice, which broke the day that formatter learned to say `3h ago`.
    */
-  const rows2 = rows({ due: '2026-09-03' }, { due: '2026-09-14' }, { due: null });
-  assert.deepEqual(seqs(applyFilters('obligations', rows2, [{ field: 'due', op: 'is', values: ['2026-09-03'] }])), [1]);
+  const rows2 = [{ due: '2026-09-03' }, { due: '2026-09-14' }, { due: null }];
+  assert.deepEqual(await admitted(rows2, [{ field: 'due', op: 'is', values: ['2026-09-03'] }]), [1]);
 
   /* A relative literal, which is the thing somebody actually types, read as the day itself and kept in its word. The
      rows each of the three operators admits are the record's to count (ARC-2). */
@@ -332,7 +405,7 @@ test('`is <a date>` ON A DATE FIELD MATCHED NOTHING, ON EVERY REGISTER, ALWAYS',
   assert.deepEqual(compile('obligations', 'due after today').clauses, [{ field: 'due', op: 'after', day: 'today' }]);
 });
 
-test('`is not <a date>` IS NOT `is <a date>`', () => {
+test('`is not <a date>` IS NOT `is <a date>`', async () => {
   /**
    * The date path was gated on the field's type and not on the OPERATOR, and `before`/`after` are
    * consumed above it — so `is not` fell straight through and the negation was dropped. `due is not
@@ -343,7 +416,7 @@ test('`is not <a date>` IS NOT `is <a date>`', () => {
    * `?f=due:not-in:2026-09-14` returned the complement of what the chip said. A filter that quietly
    * inverts is the one failure a declarative surface must not have.
    */
-  const some = rows({ due: '2026-09-03' }, { due: '2026-09-14' }, { due: null });
+  const some = [{ due: '2026-09-03' }, { due: '2026-09-14' }, { due: null }];
   const is = compile('obligations', 'due is 2026-09-14');
   const isNot = compile('obligations', 'due is not 2026-09-14');
   assert.deepEqual(explain(is), []);
@@ -354,14 +427,14 @@ test('`is not <a date>` IS NOT `is <a date>`', () => {
 
   /* The same through the URL shape, which is where it was reachable. A row with no date is not the named day, so it is
      in the negation: `34 §6`, every positive operator is false on a missing value. */
-  assert.deepEqual(seqs(applyFilters('obligations', some, [{ field: 'due', op: 'not-in', values: ['2026-09-14'] }])), [1, 3]);
+  assert.deepEqual(await admitted(some, [{ field: 'due', op: 'not-in', values: ['2026-09-14'] }]), [1, 3]);
 });
 
-test('and an enum whose value is the word `today` is untouched', () => {
+test('and an enum whose value is the word `today` is untouched', async () => {
   /* The date path is taken only when the FIELD is a date. A register that really holds the word
      would otherwise stop being filterable by it — the fix eating a case it was not about. */
-  const some = rows({ state: 'open' }, { state: 'paid' });
-  assert.deepEqual(seqs(applyFilters('obligations', some, [{ field: 'state', op: 'in', values: ['open'] }])), [1]);
+  const some = [{ state: 'open' }, { state: 'paid' }];
+  assert.deepEqual(await admitted(some, [{ field: 'state', op: 'in', values: ['open'] }]), [1]);
   const said = compile('obligations', 'state is open');
   assert.deepEqual(explain(said), []);
   assert.deepEqual(said.clauses, [{ field: 'state', op: 'is', values: ['open'] }]);

@@ -9,8 +9,12 @@
  * with a caret on 1.x, `bank-hsbc-eg` at `^1.8.0` and every Mercury pack at `^1.0.0`, and the range grammar has no `||`.
  * So at 2.0.0 neither installs, and the owner's own import proposes the bank pack. Both ranges are widened to
  * `>=1.x.0 <3.0.0` in the same change, each with a version step of its own, and both are planned here on a record at
- * 1.8.0 and on one at 2.0.0. The upper bound stays: 3.0.0 is another list taken away, and whether these two still read
- * right beside it is a question for that step rather than something to admit in advance.
+ * 1.8.0 and on one at 2.0.0.
+ *
+ * AND AGAIN AT 3.0.0, WHICH ANSWERED THE QUESTION THE UPPER BOUND LEFT OPEN. 3.0.0 took two pages and the card wordings
+ * away and kept every list, field and id the bank's pack and Mercury write, so each widened to `<4.0.0` in a patch step
+ * of its own (bank-hsbc-eg 1.3.1, mercury-company 1.1.1, and count-cash 1.0.1 and stripe 1.0.1 beside them), and both are
+ * planned here on the 3.0.0 the seed ships as well. The new upper bound stays for the same reason the old one did.
  */
 
 import { test } from 'node:test';
@@ -52,11 +56,11 @@ async function onMoney(build: (doc: unknown) => Doc) {
   return { k, sql };
 }
 
-test('money-core IS ON 2.x AND DECLARES NO HOLDINGS, and the 2.0.0 that took it out handed the list to the pack of that name', () => {
+test('money-core IS ON 2.0.0 OR LATER AND DECLARES NO HOLDINGS, and the 2.0.0 that took it out handed the list to the pack of that name', () => {
   const doc = firstPartyDocument('money-core') as unknown as Doc;
-  /* ON 2.x AND NOT PINNED TO 2.0.0, since 2.1.0 added `available` to `register.transactions`: a minor step takes
-     nothing away, so the holdings half of this test is as true of it as of 2.0.0. */
-  assert.match(FIRST_PARTY_VERSIONS['money-core'], /^2\.\d+\.\d+$/u);
+  /* ON 2.0.0 OR LATER AND NOT PINNED TO 2.0.0, since 2.1.0 added `available` to `register.transactions`, and 3.0.0
+     took pages and card wordings and gave no list back: the holdings half of this test is as true of each as of 2.0.0. */
+  assert.equal(satisfies(FIRST_PARTY_VERSIONS['money-core'], '>=2.0.0'), true, FIRST_PARTY_VERSIONS['money-core']);
   assert.equal(doc.version, FIRST_PARTY_VERSIONS['money-core']);
   assert.deepEqual(
     doc.declarations.filter((d) => d.register === 'holdings').map((d) => (d.fields as { id: string; values?: string[] }[]).find((f) => f.id === 'kind')?.values),
@@ -82,8 +86,9 @@ test('THE 1.8.0 THIS FILE BUILDS IS THE 1.8.0 THAT SHIPPED, by the fingerprint `
   assert.equal(fingerprint(asMoneyCore180(firstPartyDocument('money-core', { seeds: [] }))), '8bcd20187c61cf1b');
 });
 
-test('bank-hsbc-eg AND MERCURY PLAN CLEAN AND INSTALL on money-core 1.8.0 and on 2.0.0', async () => {
-  for (const [at, build] of [['1.8.0', asMoneyCore180], ['2.0.0', asMoneyCore200]] as const) {
+test('bank-hsbc-eg AND MERCURY PLAN CLEAN AND INSTALL on money-core 1.8.0, on 2.0.0 and on the one the seed ships', async () => {
+  const shipped = (doc: unknown): Doc => doc as Doc;
+  for (const [at, build] of [['1.8.0', asMoneyCore180], ['2.0.0', asMoneyCore200], [FIRST_PARTY_VERSIONS['money-core'], shipped]] as const) {
     for (const [name, doc] of [['bank-hsbc-eg', bankHsbcEgFile()], ['mercury', mercuryFile()]] as const) {
       const { k, sql } = await onMoney(build);
       const { diff } = await planOf(k, doc);
@@ -96,7 +101,7 @@ test('bank-hsbc-eg AND MERCURY PLAN CLEAN AND INSTALL on money-core 1.8.0 and on
   }
 });
 
-test('EACH RANGE MOVED WITH A VERSION OF ITS OWN, and neither admits a money-core 3.0.0 nobody has read them against', () => {
+test('EACH RANGE MOVED WITH A VERSION OF ITS OWN, and neither admits a money-core 4.0.0 nobody has read them against', () => {
   /* MERCURY'S WIDER RANGE WAS A PATCH STEP, 1.0.1, AND THE REASON IS WHAT A RECORD HOLDS. Not one of its declarations
      moved: the bytes a record stages are the bytes it staged, and only which Money they may sit beside is wider.
      `first-party.ts`'s rule asks a minor step for something added and a major one for something taken away, and this
@@ -105,12 +110,17 @@ test('EACH RANGE MOVED WITH A VERSION OF ITS OWN, and neither admits a money-cor
      minor, and the range did not move with it, which is what the loop below still holds. bank-hsbc-eg is a minor step
      instead, 1.1.0, because its five twin doors gained `door:` on top of the wider range (one door, several patterns;
      wave forty-two), and 1.2.0 since `bank-card-used` reads and compares the limit its alert prints; the range did not
-     move with it. */
-  assert.equal(bankHsbcEgFile().version, '1.3.0');
-  assert.equal(mercuryFile().version, '1.1.0');
+     move with it. The widening to `<4.0.0` beside money-core 3.0.0 is a patch step on each, 1.3.1 and 1.1.1, by the
+     same reason as Mercury's 1.0.1: no declaration moved. */
+  assert.equal(bankHsbcEgFile().version, '1.3.1');
+  assert.equal(mercuryFile().version, '1.1.1');
   for (const [name, doc] of [['bank-hsbc-eg', bankHsbcEgFile()], ['mercury', mercuryFile()]] as const) {
     const range = (doc.requires as { packs: Record<string, string> }).packs['money-core']!;
-    assert.deepEqual(['1.7.0', '1.8.0', '2.0.0', '2.9.0', '3.0.0'].filter((v) => satisfies(v, range)), name === 'mercury' ? ['1.7.0', '1.8.0', '2.0.0', '2.9.0'] : ['1.8.0', '2.0.0', '2.9.0'], name);
+    assert.deepEqual(
+      ['1.7.0', '1.8.0', '2.0.0', '2.9.0', '3.0.0', '3.9.0', '4.0.0'].filter((v) => satisfies(v, range)),
+      name === 'mercury' ? ['1.7.0', '1.8.0', '2.0.0', '2.9.0', '3.0.0', '3.9.0'] : ['1.8.0', '2.0.0', '2.9.0', '3.0.0', '3.9.0'],
+      name,
+    );
   }
 });
 

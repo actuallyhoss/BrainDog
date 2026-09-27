@@ -212,8 +212,15 @@ test('AND IT REACHES THE FIGURES, which no search could reach before', () => {
     const read = metric(id);
     assert.equal(read.label, decl.name, `${id} draws under a name that is not its own`);
     assert.ok(read.value.trim().length > 0, `${id} has no reading to print`);
-    assert.ok(read.note.trim().length > 0, `${id} prints a bare figure, which is a number you look at`);
     assert.match(read.href ?? '', /^\//u, `${id} has nowhere to go, so the palette would drop it`);
+    /* A MONEY CEILING STARTS EMPTY SINCE money-core 3.0.0 (`MONEY_TARGET_SETTINGS`), and empty is no target: until a
+       person types a sum the figure has no line to hold it to and no verdict, so a bare figure there is the truth. */
+    const target = (decl.target ?? {}) as { lte?: unknown; gte?: unknown };
+    if (typeof target.lte !== 'number' && typeof target.gte !== 'number') {
+      assert.equal(read.tone, undefined, `${id} carries a verdict against a target nobody typed`);
+      continue;
+    }
+    assert.ok(read.note.trim().length > 0, `${id} prints a bare figure, which is a number you look at`);
   }
   /* AND THE ONES IT DROPS REALLY ARE UNREADABLE, so the filter is not throwing away rows that work. */
   for (const [id, decl] of Object.entries(METRICS))

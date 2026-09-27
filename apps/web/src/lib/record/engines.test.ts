@@ -255,20 +255,25 @@ test('A CARD SAYS "Everywhere" FOR A ROW OF NO PROJECT: a scope column on a card
 test('THE LIVE HOME TILE KEYS ITS VERDICT OFF WHAT THE LIST HOLDS, because the record answers that beside what the predicate matched', async () => {
   /* THE TILE IS HANDED A KERNEL READING WHOLE, over the wire, which is why it is held to a real one
      here and not to a literal a test wrote. Measured on the seed: nothing has been written off, so this predicate matches
-     nobody over a list of forty obligations. `rows: 0, held: 40` is an answer, and `rows: 0,
+     nobody over a list that holds every obligation the seed writes. `rows: 0` over a full list is an answer, and `rows: 0,
      held: 0` is an empty list, which is not. Keying the tile off `rows` collapsed the two, so an
      hour-old record drew a green tick on a figure computed from no data at all, and a record with
-     forty invoices and nothing overdue was denied the good news and the door to the filter. */
+     dozens of invoices and nothing overdue was denied the good news and the door to the filter. */
   await seeded;
   const decl = { metric: 'overdue', name: 'Overdue to pay', source: 'register.obligations', where: 'state is written off', value: { sum: 'amount' }, format: 'money.GBP', target: { lte: 0 }, window: '30d', compare: 'none' };
   const none = opened!.metric(decl as never);
   assert.ok(none.ok, JSON.stringify(none));
   assert.equal(none.value.rows, 0);
-  assert.equal(none.value.held, 40, 'the seed no longer holds forty obligations, so this reads a different case');
+  /* HELD IS EVERY ROW THE LIST HOLDS, counted by the record's own list, so the seed may grow or shrink (money-core 3.0.0
+     wrote fewer) without this reading a different case. */
+  const all = opened!.list({ register: 'obligations', limit: 500 });
+  assert.ok(all.ok, JSON.stringify(all));
+  assert.ok(all.value.rows.length > 0 && all.value.cursor === null, 'the seed holds no obligations, or more than one call reaches');
+  assert.equal(none.value.held, all.value.rows.length, 'held is not what the list holds, so this reads a different case');
   assert.equal(none.value.met, true);
 
   const answered = tileOf('overdue', none.value as never);
-  assert.equal(answered.tone, 'good', 'nothing overdue over forty invoices is the good news the figure exists to deliver');
+  assert.equal(answered.tone, 'good', 'nothing overdue over a list of invoices is the good news the figure exists to deliver');
   assert.ok(answered.href, 'the filter that produced the zero is a door, and the tile shut it');
 
   const empty = tileOf('overdue', { ...none.value, held: 0 } as never);
@@ -279,7 +284,7 @@ test('THE LIVE HOME TILE KEYS ITS VERDICT OFF WHAT THE LIST HOLDS, because the r
      pages use the one that was not changed. `news-live.ts` draws Home and `page-live.ts` draws
      `/p/<slug>`, and both are handed a kernel reading whole over the wire. Measured on this reading
      before this assertion existed: Home answered `tone: "good"` with an href and the page answered
-     `tone: undefined` with none, so a record with forty invoices and nothing overdue was given the
+     `tone: undefined` with none, so a record full of invoices and nothing overdue was given the
      good news on one screen and denied it on the other, including on the project page the kernel's
      own `held` narrowing was written for. Two screens, one figure, one answer or one of them is
      lying. */

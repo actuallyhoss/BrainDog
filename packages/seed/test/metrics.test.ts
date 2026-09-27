@@ -106,6 +106,7 @@ function byHand(k: Kernel, decl: SeedMetric): { value: number | null; unit: stri
   const rows = held.filter((e) => evaluate(said.predicate, e.fields, schema));
 
   const v = decl.value as Record<string, unknown>;
+  if ('rolled' in v) return rolledByHand(k, v.rolled as Rolled, rows);
   /* A DIFF IS ITS TWO HALVES READ OVER THE SAME ROWS, one less the other. */
   if ('diff' in v) {
     const pair = v.diff as { of: unknown; per: unknown };
@@ -145,6 +146,67 @@ function byHand(k: Kernel, decl: SeedMetric): { value: number | null; unit: stri
   return { value: Math.max(...values), unit };
 }
 
+/**
+ * CASH ROLLED FORWARD, BY HAND (money-core 3.0.0 `cash-now`, `modules.md` C3). It is not a sum over one list, so it is
+ * read here the way the declaration says in words, over rows listed whole and filtered with `evaluate`: per account the
+ * latest statement on or before today (its own `balance` on `as_of`, or a check list's row about it, the account's own
+ * winning a tie), then every admitted move after that day and on or before today, money out taken off. An account
+ * stated only after today is rolled back from its earliest statement. Shares nothing with `readRolled` but the rows.
+ */
+type Rolled = {
+  balance: string;
+  as_of: string;
+  checks?: { register: string; by: string; balance: string; on: string }[];
+  moves: { register: string; by: string; on: string; amount: string; direction: string; out: string; where?: string };
+};
+
+function rolledByHand(k: Kernel, rolled: Rolled, accounts: readonly Entry[]): { value: number | null; unit: string | null } {
+  const today = new Date(NOW).toISOString().slice(0, 10);
+  const all = (register: string): Entry[] => (k.list({ register, limit: 1000 }) as { ok: true; value: { rows: Entry[] } }).value.rows;
+  const dayIn = (x: unknown): string => (typeof x === 'string' ? x.slice(0, 10) : '');
+  const moneyIn = (x: unknown): { amount: number; currency: string } | null =>
+    x !== null && typeof x === 'object' && typeof (x as { amount?: unknown }).amount === 'number' ? (x as { amount: number; currency: string }) : null;
+
+  const moveSchema = schemaOf(rolled.moves.register);
+  const moveWhere = rolled.moves.where === undefined ? null : parseWhere(rolled.moves.where, moveSchema, { nowMs: NOW });
+  assert.deepEqual(moveWhere?.bad ?? [], [], 'the moves sentence reads');
+  const moves = all(rolled.moves.register).filter((e) => moveWhere === null || evaluate(moveWhere.predicate, e.fields, moveSchema));
+  const checks = (rolled.checks ?? []).map((c) => ({ c, rows: all(c.register) }));
+
+  const units = new Set<string>();
+  let total = 0;
+  let any = false;
+  const add = (money: { amount: number; currency: string }, sign: number) => {
+    units.add(money.currency);
+    total += sign * money.amount;
+    any = true;
+  };
+  const movesOf = (account: string, after: string, upTo: string) =>
+    moves.filter((e) => e.fields[rolled.moves.by] === account && moneyIn(e.fields[rolled.moves.amount]) && dayIn(e.fields[rolled.moves.on]) > after && dayIn(e.fields[rolled.moves.on]) <= upTo);
+  const signOf = (e: Entry) => (e.fields[rolled.moves.direction] === rolled.moves.out ? -1 : 1);
+
+  for (const a of accounts) {
+    type Said = { day: string; money: { amount: number; currency: string } | null };
+    const own: Said = { day: dayIn(a.fields[rolled.as_of]), money: moneyIn(a.fields[rolled.balance]) };
+    const stated = checks.flatMap(({ c, rows }) =>
+      rows.filter((r) => r.fields[c.by] === a.id && moneyIn(r.fields[c.balance])).map((r): Said => ({ day: dayIn(r.fields[c.on]), money: moneyIn(r.fields[c.balance]) })),
+    );
+    let start: Said | null = own.day === '' || own.day <= today ? own : null;
+    for (const s of stated) if (s.day !== '' && s.day <= today && (start === null || s.day > start.day)) start = s;
+    if (start !== null) {
+      if (start.money) add(start.money, 1);
+      for (const e of movesOf(a.id, start.day, today)) add(moneyIn(e.fields[rolled.moves.amount])!, signOf(e));
+      continue;
+    }
+    let later: Said = own;
+    for (const s of stated) if (s.day > today && s.day < later.day) later = s;
+    if (later.money) add(later.money, 1);
+    for (const e of movesOf(a.id, today, later.day)) add(moneyIn(e.fields[rolled.moves.amount])!, -signOf(e));
+  }
+  assert.ok(units.size <= 1, 'cash in two currencies, so this reference cannot answer it');
+  return { value: any ? total : null, unit: [...units][0] ?? null };
+}
+
 const filled = (decl: SeedMetric, it: string): MetricDecl =>
   JSON.parse(JSON.stringify(decl).replaceAll('{{it}}', it)) as MetricDecl;
 
@@ -155,6 +217,10 @@ test('EVERY DECLARED METRIC READS THE SAME IN SQL AND IN TYPESCRIPT', async () =
   let checked = 0;
 
   for (const decl of Object.values(METRICS)) {
+    /* A FIGURE OVER THE WALK AHEAD IS NOT AN AGGREGATE OVER ONE LIST (money-core 3.0.0), so this reference has no second
+       reading of it. It is held to the forecast it walks with in `money.test.ts` (the tiles and the bridge add up the same
+       movements) and `kernel/test/money-figures.test.ts` (a figure over the walk adds up the same movements). */
+    if (decl.source === 'forecast.runway') continue;
     const params = JSON.stringify(decl).includes('{{it}}') ? THINGS.map((t) => String(t.name)) : [null];
     for (const it of params) {
       const one = it === null ? (decl as MetricDecl) : filled(decl, it);

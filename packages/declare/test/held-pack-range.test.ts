@@ -105,7 +105,7 @@ test('THE WAY OUT THE REFUSAL NAMES INSTALLS: the bank-hsbc-eg update first, the
   await put(k, sql, bankHsbcEgPack());
   assert.equal(version(k, 'bank-hsbc-eg'), BANK_HSBC_EG_VERSION);
   const diff = await put(k, sql, asMoneyCore200(firstPartyDocument('money-core')));
-  assert.deepEqual(diff.dependents, [{ id: 'bank-hsbc-eg', version: BANK_HSBC_EG_VERSION, range: '>=1.8.0 <3.0.0', ok: true, was: true }]);
+  assert.deepEqual(diff.dependents, [{ id: 'bank-hsbc-eg', version: BANK_HSBC_EG_VERSION, range: '>=1.8.0 <4.0.0', ok: true, was: true }]);
   assert.equal(version(k, 'money-core'), '2.0.0');
   for (const p of stateOf(k, sql).packs) for (const [on, range] of Object.entries(p.requires ?? {})) assert.ok(satisfies(version(k, on), range), `${p.id} needs ${on} ${range}`);
   sql.close();

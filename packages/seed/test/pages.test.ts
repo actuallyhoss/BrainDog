@@ -77,8 +77,12 @@ const blocksOf = (page: Record<string, unknown>): Block[] => (page.blocks as Blo
  * NAMED, so a new one is a failure rather than a silent skip. `forecast.runway` is the cash walk —
  * a computed source rather than a stored one, which `05` §2 anticipates by deferring a `forecast`
  * KIND and saying the primitive layer exists so it can be drawn without one.
+ *
+ * THE KERNEL'S OWN LIST (`COMPUTED` in `packages/kernel/src/pages.ts`), written out, since money-core 3.0.0's one
+ * `money` page draws `governance.open`, `deadlines` and `activity` beside the walk. A source the kernel does not name
+ * is refused there, so one missing from here is still a failure.
  */
-const COMPUTED = new Set(['forecast.runway']);
+const COMPUTED = new Set(['forecast.runway', 'activity', 'sessions.live', 'actions', 'governance.open', 'runs_on', 'deadlines', 'figures.home']);
 
 /**
  * The figures the record computes rather than declares.

@@ -325,21 +325,27 @@ test('THE WHOLE PATH ON A SELF-HOST: installed from the file, the key opened for
       return diff.approve;
     };
     for (const id of ['portfolio', 'people', 'money-core']) await put(firstPartyDocument(id, { seeds: [] }));
+    /* money-core 3.0.0 DECLARES `arrives` ITSELF (`accounts.arrives`, contracts §4.3a), in the very shape this pack lays
+       it, so the pack's `extends` lays nothing here and is not refused as a second field under that id. It keeps the
+       extension for a record on a money-core before 3.0.0, where accounts has no `arrives` and the pack lays it. */
     const before = api.kernel.register('accounts')?.fields.map((f) => f.id) ?? [];
-    assert.equal(before.includes('arrives'), false, 'accounts already says when money arrives');
+    assert.equal(before.includes('arrives'), true, 'money-core 3.0.0 does not say when money arrives');
     /* THE VAULT ENTRY FIRST, because install refused the pack without it: "Add the key called "stripe" to the vault,
        then install." It is a row, a label and what it opens and no bytes, because `openKey` above is the key store. */
     running.sql.exec(
       "INSERT INTO grant (id, label, opens, kind, kdf, wrapped_by, kek_id, created_at) VALUES ('g_stripe', 'stripe', 'api.stripe.com', 'api_token', 'none', 'kek', 'k_test', ?)",
       NOW,
     );
+    const laid = (await api.planPack({ doc: PACK, source: { kind: 'local' } } as never, owner)) as { ok: boolean; value?: { diff: { extends: { id: string; adds: string[]; refusal?: unknown }[] } } };
+    assert.ok(laid.ok, fixOf(laid as never));
+    assert.deepEqual(laid.value?.diff.extends, [{ id: 'register.accounts', adds: [] }], 'the pack laid a second arrives over money-core\'s');
     const approve = await put(PACK);
     /* THE LINE THE OWNER APPROVES NAMES THE HOST AND THE KEY. */
     assert.equal(approve[0], 'CALLS OUT api.stripe.com · every 1h · key "stripe" to api.stripe.com');
     /* AND IT SAYS WHAT THE SCRIPT COULD CARRY OUT. It reads accounts only to find its own rows, and the host still
        tells the owner that what it reads may leave for Stripe, which is true of any script with a read and a fetch. */
     assert.ok(approve.includes('stripe reads accounts and may send what it reads to api.stripe.com.'), JSON.stringify(approve));
-    assert.ok(api.kernel.register('accounts')?.fields.some((f) => f.id === 'arrives'), 'the pack laid no arrives on accounts');
+    assert.ok(api.kernel.register('accounts')?.fields.some((f) => f.id === 'arrives'), 'accounts lost arrives when the pack installed');
 
     const due = () => running.sql.exec("UPDATE schedule SET due_at = ? WHERE kind = 'script' AND key = ?", new Date(Date.now() - 1_000).toISOString(), SCRIPT.script);
     due();

@@ -69,9 +69,9 @@ const ioOf = (k: Kernel): LinkIo => ({
 });
 
 /** A guide record made the way onboarding makes one from a sentence: the pack, formed around it, and its examples linked. */
-async function guideFor(said: string): Promise<Kernel> {
+async function guideFor(said: string, examples = false): Promise<Kernel> {
   const k = await openRecord(openSqlite(), fixedClock(NOW));
-  await put(k, carriedDocument(guide, TODAY, said));
+  await put(k, carriedDocument(guide, TODAY, said, { examples }));
   const formed = formedFor(guide, said);
   await linkExamples(ioOf(k), 'guide', formed ? { links: formed.links } : undefined);
   return k;
@@ -148,8 +148,11 @@ test('A PODCAST OPENS ON A PODCAST PLAN, linked: its milestone underway, its fir
   assert.ok(steps.every((s) => Array.isArray(s.fields.tags) && (s.fields.tags as string[]).includes('example')), 'a formed plan is marked as examples');
   assert.ok(steps.every((s) => typeof s.fields.by === 'string' && s.fields.by > TODAY), 'each first step is due after today');
 
-  /* A SENTENCE THAT NAMES NO KIND KEEPS THE GENERAL PLAN, exactly as the pack ships it. */
-  const plain = await guideFor("I'm starting something new");
+  /* A SENTENCE THAT NAMES NO KIND FORMS NOTHING, so nothing is planted (C11); asked for its examples, the guide carries the
+     general plan exactly as the pack ships it. */
+  const bare = await guideFor("I'm starting something new");
+  assert.deepEqual(rows(bare, 'milestones'), [], 'a sentence that forms no plan plants no example milestones');
+  const plain = await guideFor("I'm starting something new", true);
   assert.deepEqual(rows(plain, 'milestones').map((m) => m.fields.what).sort(), GUIDE.pack.seeds.filter((s) => s.register === 'milestones').map((s) => s.fields.what as string).sort());
 });
 

@@ -14,13 +14,15 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { DatabaseSync } from 'node:sqlite';
+
+import { openRecord } from '@braindog/kernel';
+import { NOW, installSeed } from '@braindog/seed';
 
 import './fixtures/fill.ts';
 import { toSegments } from './blocks.ts';
-import { page } from './fixtures/readers.ts';
-import { ROWS } from './fixtures/sample.ts';
+import { blockOf as liveBlockOf } from './page-live.ts';
 import type { BlockResult } from './api.ts';
-import type { Fields } from './schema.ts';
 
 /** The minimum a `BlockResult` needs to be rendered, with no register behind it. */
 const authored = (kind: string, rows: { cells: string[]; tone?: 'good' | 'warn' | 'bad' | 'info' }[]): BlockResult =>
@@ -37,11 +39,34 @@ const authored = (kind: string, rows: { cells: string[]; tone?: 'good' | 'warn' 
     stale_at: '2026-09-05T00:00:00.000Z',
   }) as unknown as BlockResult;
 
-/** Put a field back exactly as it was, including not being there at all. */
-const restore = (fields: Fields, key: string, was: Fields[string] | undefined): void => {
-  if (was === undefined) delete fields[key];
-  else fields[key] = was;
-};
+/** A record in memory over `node:sqlite`, bound the way the kernel's own tests bind one. */
+function openSqlite(): Parameters<typeof openRecord>[0] {
+  const db = new DatabaseSync(':memory:');
+  let depth = 0;
+  return {
+    exec: (text: string, ...params: unknown[]) => {
+      if (params.length === 0) db.exec(text);
+      else db.prepare(text).run(...(params as never[]));
+    },
+    all: (text: string, ...params: unknown[]) => db.prepare(text).all(...(params as never[])),
+    one: (text: string, ...params: unknown[]) => db.prepare(text).get(...(params as never[])),
+    transactionSync<T>(fn: () => T): T {
+      if (depth > 0) return fn();
+      db.exec('BEGIN');
+      depth++;
+      try {
+        const value = fn();
+        db.exec('COMMIT');
+        return value;
+      } catch (e) {
+        db.exec('ROLLBACK');
+        throw e;
+      } finally {
+        depth--;
+      }
+    },
+  } as unknown as Parameters<typeof openRecord>[0];
+}
 
 /** Every cell of every row the parser gave back. */
 const cellsOf = (block: BlockResult): string[][] =>
@@ -112,45 +137,51 @@ test('a block that declares BOTH a source and authored rows renders neither', ()
 
 /* ── a value somebody typed cannot break the block it is in ──────────────── */
 
-test('a pipe in a register value does not delete the block', () => {
+/**
+ * The estate page's "points at" block, drawn from a seeded record of this file's own with one domain's `points_at`
+ * written as `value`.
+ *
+ * A RECORD OF ITS OWN, BECAUSE THE SAMPLE CANNOT BE WRITTEN TO. These two changed a row in the fixture's `ROWS` and
+ * read the page back, which reached the page while the sample drew it with a browser engine over those rows. Since
+ * ARC-1 the fixture's `page` asks a kernel seeded once and never written to (`fixtures/readers.ts`), so the value is
+ * written to a record here and the page drawn from it the way a live page is (`page-live.ts`).
+ */
+async function pointsAtWith(value: string): Promise<BlockResult> {
+  const k = await openRecord(openSqlite(), { now: () => NOW });
+  assert.ok((await installSeed(k)).ok, 'the seed did not install');
+  const listed = k.list({ register: 'services', where: 'kind is domain', limit: 1 });
+  const domain = listed.ok ? listed.value.rows[0] : undefined;
+  assert.ok(domain, 'the seed needs a domain for this to mean anything');
+  const wrote = k.update('services', `services#${domain.seq}`, { points_at: value }, { actor: 'p_owner' });
+  assert.ok(wrote.ok, JSON.stringify(wrote));
+  const opened = k.page('estate');
+  assert.ok(opened.ok, JSON.stringify(opened));
+  const block = opened.value.blocks.find((b) => String((b as { heading?: unknown }).heading ?? '').includes('points at'));
+  assert.ok(block, 'the estate page no longer draws the block about what each domain points at');
+  return liveBlockOf(block as never, new Map(), NOW);
+}
+
+test('a pipe in a register value does not delete the block', async () => {
   // The dialect separates cells on `|`, so one pipe in a free-text field made the row a cell too
   // wide, failed the arity check, and degraded the WHOLE BLOCK to a fence the app then dropped on
   // the floor. `redirect | kiln.example` in a domain's target field deleted the block it was in.
-  const row = (ROWS.services ?? []).find((r) => r.fields.kind === 'domain');
-  assert.ok(row, 'the seed needs a domain for this to mean anything');
-  const before = row.fields.points_at;
-  row.fields.points_at = 'redirect | kiln.example';
-  try {
-    const block = page('estate')?.blocks.find((b) => b.heading?.includes('points at'));
-    assert.ok(block);
-    const segs = toSegments(block);
-    assert.deepEqual([...new Set(segs.map((x) => x.type))], ['block'], 'the block degraded');
-    const cells = segs.flatMap((seg) => ('rows' in seg ? (seg.rows as { cells: string[] }[]) : [])).map((r) => r.cells);
-    assert.ok(cells.length > 0, 'the rows vanished');
-    assert.ok(
-      cells.some((c) => c.some((v) => v === 'redirect | kiln.example')),
-      'the value did not survive the round trip intact',
-    );
-  } finally {
-    restore(row.fields, 'points_at', before);
-  }
+  const block = await pointsAtWith('redirect | kiln.example');
+  const segs = toSegments(block);
+  assert.deepEqual([...new Set(segs.map((x) => x.type))], ['block'], 'the block degraded');
+  const cells = segs.flatMap((seg) => ('rows' in seg ? (seg.rows as { cells: string[] }[]) : [])).map((r) => r.cells);
+  assert.ok(cells.length > 0, 'the rows vanished');
+  assert.ok(
+    cells.some((c) => c.some((v) => v === 'redirect | kiln.example')),
+    'the value did not survive the round trip intact',
+  );
 });
 
-test('a backslash in a register value survives too', () => {
+test('a backslash in a register value survives too', async () => {
   // `String.raw` because a plain literal drops an unknown escape: 'C:\Repos' IS 'C:Repos' in
   // JavaScript, so the obvious version of this test compares a string to itself and proves nothing.
   const value = String.raw`C:\\Repos\\kiln`;
   assert.ok(value.includes('\\'), 'the fixture has to actually contain a backslash');
-  const row = (ROWS.services ?? []).find((r) => r.fields.kind === 'domain');
-  assert.ok(row);
-  const before = row.fields.points_at;
-  row.fields.points_at = value;
-  try {
-    const block = page('estate')?.blocks.find((b) => b.heading?.includes('points at'));
-    const segs = toSegments(block!);
-    const cells = segs.flatMap((seg) => ('rows' in seg ? (seg.rows as { cells: string[] }[]) : [])).map((r) => r.cells);
-    assert.ok(cells.some((c) => c.some((v) => v === value)), 'the backslash did not round-trip');
-  } finally {
-    restore(row.fields, 'points_at', before);
-  }
+  const segs = toSegments(await pointsAtWith(value));
+  const cells = segs.flatMap((seg) => ('rows' in seg ? (seg.rows as { cells: string[] }[]) : [])).map((r) => r.cells);
+  assert.ok(cells.some((c) => c.some((v) => v === value)), 'the backslash did not round-trip');
 });

@@ -1,9 +1,9 @@
 /**
- * How far along a project is, from the steps under it, in the two engines.
+ * How far along a project is, from the steps under it.
  *
  * A list may say its rows are steps of a project (`steps: { of, done }`), and a card whose ring reads a field nobody filled
- * draws the share of those steps done. The record works it out and this app draws what it answered; the sample works it
- * out the same way. Both must draw the same ring, and a number somebody typed must win in both.
+ * draws the share of those steps done. The record works it out and this app draws what it answered, and a number somebody
+ * typed wins. The sample was a second engine that worked it out again until ARC-1; it is the record now.
  */
 
 import { test } from 'node:test';
@@ -15,7 +15,6 @@ import { NOW, installSeed } from '@braindog/seed';
 
 import './fixtures/fill.ts';
 import { page } from './fixtures/readers.ts';
-import { REGISTERS, ROWS } from './held.ts';
 import { toSegments } from './blocks.ts';
 import { blockOf } from './page-live.ts';
 
@@ -62,7 +61,7 @@ const SAID = [true, false, false, false];
 /** Each card's title and ring cell, as the renderer is handed them. */
 const rings = (block: Parameters<typeof toSegments>[0]): string => JSON.stringify(toSegments(block));
 
-test('A PROJECT WITH NO NUMBER TYPED IS AS FAR ALONG AS ITS STEPS, AND BOTH ENGINES DRAW THE SAME RING', async () => {
+test('A PROJECT WITH NO NUMBER TYPED IS AS FAR ALONG AS ITS STEPS, AND A NUMBER TYPED IS KEPT', async () => {
   /* THE RECORD: Portage's number cleared, four milestones on it, one done. */
   const k = await openRecord(openSqlite(), { now: () => NOW });
   assert.ok((await installSeed(k)).ok);
@@ -74,18 +73,12 @@ test('A PROJECT WITH NO NUMBER TYPED IS AS FAR ALONG AS ITS STEPS, AND BOTH ENGI
   assert.deepEqual(answered.rings, [null, null, 25]);
   const live = rings(blockOf(answered as never, new Map(), NOW));
 
-  /* THE SAMPLE: the same list, the same four, and Portage's number cleared. */
-  (REGISTERS as Record<string, unknown>).milestones = MILESTONES;
-  const things = ROWS.things!;
-  const at = things.findIndex((e) => e.fields.name === 'Portage');
-  things[at] = { ...things[at]!, fields: { ...things[at]!.fields, progress: null } };
-  ROWS.milestones = SAID.map((done, i) => ({ ...things[at]!, id: `m_${i}`, seq: i + 1, fields: { what: `Milestone ${i + 1}`, thing: things[at]!.seq, done } }));
-  const sample = rings(page('portfolio')!.blocks.find((b) => b.heading === 'In play')!);
-
+  /* THE SAMPLE IS THE RECORD NOW (ARC-1): `fixtures/readers.ts` asks a kernel seeded once and never written to, so the
+     sample's half of this, which grew a list in `held.ts` for a browser engine to count, reaches nothing. What stays is
+     the record's answer drawn the way a live page draws it, and the unmodified seed drawn by the fixture the same way,
+     each number typed on a project kept. */
   assert.match(live, /25%/u, live);
-  assert.match(sample, /25%/u, sample);
-  for (const typed of ['60%', '85%']) {
-    assert.ok(live.includes(typed), `the record's ${typed} was drawn over`);
-    assert.ok(sample.includes(typed), `the sample's ${typed} was drawn over`);
-  }
+  for (const typed of ['60%', '85%']) assert.ok(live.includes(typed), `the record's ${typed} was drawn over`);
+  const sample = rings(page('portfolio')!.blocks.find((b) => b.heading === 'In play')!);
+  for (const typed of ['60%', '85%', '35%']) assert.ok(sample.includes(typed), `the sample's ${typed} was drawn over`);
 });

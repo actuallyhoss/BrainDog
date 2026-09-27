@@ -43,16 +43,20 @@ type Doc = { pack: string; version: string; declarations: Body[]; hands?: Record
 type Api = Awaited<ReturnType<typeof createRecordApi>>;
 
 /**
- * money-core as it ships (2.0.0, without `holdings`), handing the list to `to` when there is one and to nobody when not.
+ * money-core as it ships (without `holdings` since 2.0.0), handing the list to `to` when there is one and to nobody when not.
  *
  * FROM THE SHIPPED DOCUMENT AND NOT A RE-VERSIONED COPY OF IT. Until 23 September this took money-core 1.8.0, dropped the
  * list and called the result 2.0.0; since then the shipped 2.0.0 is that document, handing `register.holdings` to
  * `holdings`. Since money-core stopped naming other packs (parity B1 step 2) it hands nothing else, so the one entry
  * this file varies is the whole of `hands`.
+ *
+ * READ AGAIN AT 3.0.0 (MOD-4): 3.0.0 still declares no `holdings` and hands nothing, and the `holdings` pack asks for
+ * money-core `>=2.0.0`, which 3.0.0 is. So a record on 1.8.0 updating straight to 3.0.0 takes the same step 2.0.0 was.
  */
 const moneyCore = (to: string | null): Doc => {
   const d = structuredClone(firstPartyDocument('money-core')) as unknown as Doc;
-  assert.equal(d.version.split('.')[0], '2', 'money-core left 2.x, so the list it hands is worth reading again');
+  assert.equal(d.version.split('.')[0], '3', 'money-core left 3.x, so the list it hands is worth reading again');
+  assert.deepEqual(Object.keys(d.hands ?? {}), [], 'money-core hands a list of its own again, so what this file varies is not the whole of it');
   assert.ok(!d.declarations.some((x) => x.register === 'holdings'), 'money-core declares holdings again, so nothing here is a handover');
   const { 'register.holdings': _shipped, ...rest } = d.hands ?? {};
   d.hands = to === null ? rest : { ...rest, 'register.holdings': to };

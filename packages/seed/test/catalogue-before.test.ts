@@ -28,7 +28,8 @@ test('WHAT AGENTS NEEDS is read off its own manifest, the one `seedCatalogue` al
 });
 
 test('THE FIVE STARTER MODULES ARE ASKED AS BEFORE, and an agents list beside them lands in install order', () => {
-  assert.deepEqual(before(['register.transactions']), ['portfolio', 'people', 'money-core']);
+  // money-core 3.0.0 links People softly (`LINKS['money-core'] = ['party']`), so Money no longer pulls People in.
+  assert.deepEqual(before(['register.transactions']), ['portfolio', 'money-core']);
   assert.deepEqual(before(['register.tasks']), ['work']);
   assert.deepEqual(before(['register.tasks', 'register.skills']), ['portfolio', 'work', 'agents']);
   assert.deepEqual(before(['register.nosuch']), []);

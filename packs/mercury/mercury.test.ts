@@ -471,9 +471,11 @@ test('THE PACK NAMES A KEY AND CARRIES NONE, and both intervals agree', () => {
     declarations: Record<string, unknown>[];
   };
   assert.equal(doc.pack, 'mercury-kiln');
-  /* BELOW 3.0.0 AND NOT A CARET ON 1.x: money-core 2.0.0 took `holdings` away, which nothing here writes into, and a
-     `^1.0.0` refused this pack beside it (`packages/seed/test/money-core-major.test.ts` plans it on both). The floor is unmoved. */
-  assert.deepEqual(doc.requires.packs, { 'money-core': '>=1.0.0 <3.0.0' });
+  /* BELOW 4.0.0 AND NOT A CARET ON 1.x: money-core 2.0.0 took `holdings` away, which nothing here writes into, and a
+     `^1.0.0` refused this pack beside it (`packages/seed/test/money-core-major.test.ts` plans it on both). 3.0.0 took
+     pages and card wordings and kept the accounts and transactions this pack writes, so 1.1.1 widened to it. The floor
+     is unmoved. */
+  assert.deepEqual(doc.requires.packs, { 'money-core': '>=1.0.0 <4.0.0' });
 
   const decl = doc.declarations[0] as {
     ingest: string; every: string; dedupe: string[]; on_conflict: string;

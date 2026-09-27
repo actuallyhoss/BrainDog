@@ -1,0 +1,122 @@
+{
+  "pack": "mercury-company",
+  "version": "1.1.1",
+  "summary": "Reads the balance of every Mercury account from api.mercury.com every 1h, into Money's accounts, and its last thirty days of transactions into the ledger.",
+  "fill": {
+    "id": "A name for the Mercury profile, lower case, digits and hyphens. The pack is mercury-<id>, its pull mercury_<id> and its ledger script mercury_ledger_<id>, each cut to 32 characters.",
+    "grant": "The label of the key in the vault, which the pull and the ledger script both send as a bearer token. A label and never the key itself: a pack that carries a key is refused. The script's source names it too, on its line const KEY.",
+    "every": "How often it asks, written in the three places a schedule reads it: the pull's two and the script's runs. 1h is four orders of magnitude inside what Mercury publishes.",
+    "base": "Where it asks. Mercury itself unless a test points it somewhere that is not a bank. The script's egress and its line const API follow it."
+  },
+  "author": "BrainDog",
+  "license": "MIT",
+  "requires": {
+    "format": 1,
+    "primitives": 1,
+    "packs": {
+      "money-core": ">=1.0.0 <4.0.0"
+    }
+  },
+  "extends": {
+    "register.transactions": {
+      "fields": [
+        {
+          "id": "mercury_id",
+          "label": "Mercury transaction",
+          "type": "text"
+        }
+      ]
+    }
+  },
+  "declarations": [
+    {
+      "ingest": "mercury_company",
+      "channel": "pull",
+      "every": "1h",
+      "fetch": {
+        "base": "https://api.mercury.com",
+        "path": "/api/v1/accounts",
+        "method": "GET",
+        "auth": {
+          "kind": "bearer",
+          "grant": "Mercury (read only)"
+        },
+        "schedule": {
+          "every": "1h"
+        },
+        "read": {
+          "rows": "accounts"
+        },
+        "page": {
+          "kind": "none"
+        },
+        "expect": [
+          {
+            "path": "accounts",
+            "present": true
+          }
+        ],
+        "limits": {
+          "rows_per_run": 200,
+          "max_pages": 1,
+          "timeout": "10s"
+        }
+      },
+      "map": {
+        "name": {
+          "path": "name",
+          "type": "text"
+        },
+        "kind": {
+          "value": "bank"
+        },
+        "balance": {
+          "path": "currentBalance",
+          "type": "money",
+          "currency": "USD"
+        },
+        "as_of": {
+          "arrived": true
+        },
+        "liquid": {
+          "value": true
+        }
+      },
+      "writes": {
+        "register": "accounts",
+        "confidence": "exact"
+      },
+      "dedupe": [
+        "name"
+      ],
+      "on_conflict": "update"
+    },
+    {
+      "script": "mercury_ledger_company",
+      "title": "Mercury transactions",
+      "runs": {
+        "every": "1h"
+      },
+      "egress": [
+        "https://api.mercury.com"
+      ],
+      "keys": [
+        "Mercury (read only)"
+      ],
+      "reads": [
+        "accounts",
+        "transactions",
+        "categories"
+      ],
+      "writes": [
+        "transactions"
+      ],
+      "limits": {
+        "cpu_ms": 1000,
+        "fetches": 12,
+        "writes": 1000
+      },
+      "source": "/**\n * Mercury's transactions, every hour, into Money's ledger: one row a transaction, kept in step as it clears.\n *\n * WHY A SCRIPT AND NOT A SECOND PULL. Mercury says which way money moved by the sign of `amount` and nothing else, and\n * a pull's `map:` cannot read a sign (`mercury.test.ts`, \"A TRANSACTIONS PULL WRITES NOTHING\", measured). The\n * transactions also live under each account's own id, `/api/v1/account/<id>/transactions`, which a pull's fixed path\n * cannot follow. A script asks for the accounts, then for each one's transactions.\n *\n * WHICH ACCOUNT. The balances pull in this same pack writes one `accounts` row a Mercury account, named as Mercury\n * names it, and a transaction's `account` is that row. An account the record does not hold yet is said in the log and\n * skipped, and its transactions arrive the hour after the balances pull has written it.\n *\n * ONE ROW A TRANSACTION, FOUND AGAIN BY MERCURY'S OWN ID. The id goes in `mercury_id`, a field this pack lays on the\n * ledger, and every hour re-reads the last thirty days: a transaction already held is updated in place, never\n * written twice, and a pending one becomes cleared when Mercury says `sent`.\n *\n * ONLY THE BANK'S FACTS ARE UPDATED: the day, the direction, the amount and the state. What a person or a rule set on a\n * row, its category above all, and its description, project, person or note, is never in the patch. So a category\n * somebody pinned stays pinned however many times Mercury restates the transaction, and a row somebody voided stays\n * void. A row somebody DELETED is not found again and is written anew the next hour, because a script's list reads\n * live rows only; voiding is how a person takes a Mercury transaction out of the figures. On a new row the category is\n * Mercury's own when the record has a live category of exactly that name facing the same way, and otherwise it is\n * left for the record's own rules to file.\n *\n * A KEY MERCURY REFUSES STOPS THE RUN WITH A SENTENCE, and the record pauses a script after three refused runs.\n */\n\nconst API = \"https://api.mercury.com\";\nconst KEY = \"Mercury (read only)\";\nconst DAYS = 30;\nconst PAGE = 50;\n/* THE DECLARED `limits.writes`. Past it the run would be refused whole, so the script stops queuing one short of it\n   and the rest arrive the next hour, which finds what this hour wrote. */\nconst WRITES = 1000;\n/* THE DECLARED `limits.fetches`, the accounts list and one a Mercury account. The same reason: a fetch past it refuses\n   the run whole, so an account past it is said and not asked about. */\nconst FETCHES = 12;\nconst STATES = { pending: 'pending', sent: 'cleared', cancelled: 'void', failed: 'void' };\n\nasync function ask(ctx, path) {\n  const r = await ctx.fetch(API + path, { key: KEY });\n  if (r.status === 401)\n    throw new Error(`Mercury refused the key labelled \"${KEY}\" (401) at ${path}, so nothing was written. Put a working read-only token in the vault under that label.`);\n  if (!r.ok) throw new Error(`Mercury answered ${r.status} at ${path}, so nothing was written this hour.`);\n  return r.json();\n}\n\nconst chunks = (list) => {\n  const out = [];\n  for (let i = 0; i < list.length; i += PAGE) out.push(list.slice(i, i + PAGE));\n  return out;\n};\n\n/** A Mercury transaction as the ledger's fields, or `null` for a status this pack has not heard of. */\nexport function ledgerOf(t, account) {\n  const state = STATES[t.status];\n  if (state === undefined) return null;\n  return {\n    what: String(t.counterpartyName || t.counterpartyNickname || t.bankDescription || 'Mercury'),\n    on: String(t.postedAt || t.createdAt).slice(0, 10),\n    direction: t.amount < 0 ? 'out' : 'in',\n    amount: { amount: Math.round(Math.abs(t.amount) * 100), currency: 'USD' },\n    account,\n    state,\n    mercury_id: t.id,\n  };\n}\n\nexport default async function run(ctx) {\n  const { accounts = [] } = await ask(ctx, '/api/v1/accounts');\n  const names = [...new Set(accounts.map((a) => String(a.name)))];\n  const rows = new Map();\n  for (const chunk of chunks(names))\n    for (const r of await ctx.record.list('accounts', { field: 'name', in: chunk })) rows.set(String(r.fields.name), r.id);\n\n  const start = new Date(Date.parse(ctx.now()) - DAYS * 86400000).toISOString().slice(0, 10);\n  const seen = [];\n  let fetched = 1;\n  for (const a of accounts) {\n    const account = rows.get(String(a.name));\n    if (account === undefined) {\n      ctx.log(`${a.name} is not in accounts yet, so its transactions wait until the balances pull has written it.`);\n      continue;\n    }\n    if (fetched >= FETCHES) {\n      ctx.log(`${a.name} is past the ${FETCHES - 1} accounts one run reads, so its transactions are not read.`);\n      continue;\n    }\n    fetched += 1;\n    const page = await ask(ctx, `/api/v1/account/${encodeURIComponent(a.id)}/transactions?limit=500&start=${start}`);\n    const listed = page.transactions ?? [];\n    if (typeof page.total === 'number' && page.total > listed.length)\n      ctx.log(`${a.name} has ${page.total} transactions since ${start}, and the first ${listed.length} were read.`);\n    for (const t of listed) {\n      const fields = ledgerOf(t, account);\n      if (fields === null) ctx.log(`Mercury says ${t.id} is ${JSON.stringify(t.status)}, which this pack does not know, so it is left out.`);\n      else seen.push({ fields, category: typeof t.mercuryCategory === 'string' ? t.mercuryCategory : null });\n    }\n  }\n\n  const held = new Map();\n  for (const chunk of chunks(seen.map((s) => s.fields.mercury_id)))\n    for (const r of await ctx.record.list('transactions', { field: 'mercury_id', in: chunk })) held.set(String(r.fields.mercury_id), r);\n\n  const wanted = [...new Set(seen.filter((s) => !held.has(s.fields.mercury_id) && s.category !== null).map((s) => s.category))];\n  const categories = new Map();\n  for (const chunk of chunks(wanted))\n    for (const c of await ctx.record.list('categories', { all: [{ field: 'name', in: chunk }, { field: 'state', is: 'live' }] })) categories.set(String(c.fields.name), c);\n\n  let writes = 0;\n  for (const { fields, category } of seen) {\n    if (writes >= WRITES) {\n      ctx.log(`${WRITES} writes queued, which is this script's limit, so the rest arrive next hour.`);\n      break;\n    }\n    const row = held.get(fields.mercury_id);\n    if (row === undefined) {\n      /* A TRANSACTION THAT NEVER WENT THROUGH AND WAS NEVER HELD IS NOT WORTH A ROW. */\n      if (fields.state === 'void') continue;\n      const c = category === null ? undefined : categories.get(category);\n      const fits = c !== undefined && (c.fields.direction === 'both' || c.fields.direction === fields.direction);\n      ctx.write('transactions', fits ? { ...fields, category: c.id } : fields);\n      writes += 1;\n      continue;\n    }\n    const patch = {};\n    /* A HELD ROW THAT IS VOID STAYS VOID. Mercury never sends a transaction it cancelled or failed, so a void row\n       Mercury calls `sent` was voided by a person, most often as the copy of one typed in by hand, and restating it\n       counted the duplicate again every hour for thirty days (`mercury.test.ts`, \"A TRANSACTION A PERSON VOIDED\"). */\n    if (row.fields.state !== fields.state && row.fields.state !== 'void') patch.state = fields.state;\n    if (row.fields.on !== fields.on) patch.on = fields.on;\n    if (row.fields.direction !== fields.direction) patch.direction = fields.direction;\n    const was = row.fields.amount;\n    if (was === null || typeof was !== 'object' || was.amount !== fields.amount.amount || was.currency !== fields.amount.currency) patch.amount = fields.amount;\n    if (Object.keys(patch).length === 0) continue;\n    ctx.update(`transactions#${row.seq}`, patch, row.version);\n    writes += 1;\n  }\n}\n"
+    }
+  ]
+}

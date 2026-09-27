@@ -119,17 +119,27 @@ test('A BLOCK COMES BACK WITH ROWS AND A COUNT OF WHAT MATCHED, which are differ
   // A block draws the first `limit:` rows and its total is over ALL of them: summing the page
   // instead of the answer is a figure wrong by however many rows did not fit, and it is the same
   // number of pixels either way.
+  /* WHAT MOVED, since money-core 3.0.0 retired the Money page's table of bills: the seed holds more movements than
+     the block's `limit:` draws, so the two numbers differ here rather than only in principle. */
   const { k, sql } = await seeded();
   const money = page(k, 'money');
-  const table = money.blocks.find((b) => b.kind === 'table' && b.source === 'register.obligations')!;
+  const table = money.blocks.find((b) => b.kind === 'table' && b.source === 'register.transactions');
+  assert.ok(table, 'the Money page draws no table of what moved');
 
   assert.deepEqual(table.refusals, []);
   assert.ok(table.rows.length > 0, 'the block drew nothing');
-  assert.ok(table.matched >= table.rows.length, 'more rows were drawn than matched');
-  for (const row of table.rows) assert.ok(row.fields.state === 'open' || row.fields.state === 'part', 'a paid row is not still to come');
-  /* AND EACH ROW SAYS WHO CHANGED IT LAST, from its history. */
-  assert.equal(table.changes?.length, table.rows.length);
-  assert.ok(table.changes?.every((c) => c !== null && c.by === 'you' && c.who === 'p_seed'), JSON.stringify(table.changes?.slice(0, 2)));
+  assert.ok(table.matched > table.rows.length, `${table.matched} matched and ${table.rows.length} were drawn, so the count is the page`);
+  for (const row of table.rows) assert.notEqual(row.fields.state, 'void', 'a voided movement is not one that moved');
+  /* AND EACH ROW SAYS WHO CHANGED IT LAST, from its history, when the block asks for the `changed` column. What moved
+     does not, so the same block is read by hand with it. */
+  const asked = k.block({ ...table, columns: [...(table.columns ?? []), { field: 'changed' }] });
+  assert.deepEqual(asked.refusals, []);
+  assert.equal(asked.changes?.length, asked.rows.length);
+  /* A MOVEMENT IS WRITTEN BY THE SEED AND MAY BE CATEGORISED BY A RULE AFTER, and the last of the two is the one said. */
+  assert.ok(
+    asked.changes?.every((c) => c !== null && ((c.by === 'you' && c.who === 'p_seed') || (c.by === 'rule' && c.who.startsWith('rule:')))),
+    JSON.stringify(asked.changes?.slice(0, 2)),
+  );
   sql.close();
 });
 
@@ -138,7 +148,8 @@ test('a `stat` block comes back with readings, each in its own currency', async 
   const stat = page(k, 'money').blocks.find((b) => b.kind === 'stat')!;
   assert.ok(stat.readings && stat.readings.length >= 3);
 
-  for (const metric of ['cash-now', 'in-30d', 'out-30d', 'every-month-out']) {
+  /* THE MONEY THERE IS AND THE WALK'S THIRTY DAYS, which the page leads with since money-core 3.0.0. */
+  for (const metric of ['cash-now', 'arriving-30d', 'leaving-30d']) {
     const cell: NonNullable<typeof stat.readings>[number] = stat.readings.find((r) => r.metric === metric)!;
     assert.ok(cell?.reading, cell?.refusal ? `${cell.refusal.code}: ${cell.refusal.fix}` : `${metric}: no reading`);
     assert.ok((cell.reading.value ?? 0) > 0, `${metric} read nothing`);
@@ -241,7 +252,8 @@ test('a block that names a field the register does not declare says so, and draw
 
   // Read one block by hand with a column nobody declared: the refusal names the field and the ones
   // that exist, so whoever wrote it can fix it without opening the schema.
-  const block = out.value.blocks.find((b) => b.source === 'register.obligations' && b.columns)!;
+  const block = out.value.blocks.find((b) => b.source === 'register.transactions' && b.kind === 'table' && b.columns);
+  assert.ok(block, 'the Money page draws no table to read by hand');
   const result = k.block({ ...block, columns: [{ field: 'colour' }] });
   assert.equal(result.refusals[0]?.code, 'FIELD_UNKNOWN');
   assert.match(result.refusals[0]?.fix ?? '', /colour/);

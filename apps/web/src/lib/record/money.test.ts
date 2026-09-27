@@ -440,10 +440,22 @@ test('A NOTE QUOTING A FIGURE THE RECORD SENT IN PARTS writes each amount', () =
 });
 
 test('A TARGET TYPED IN THE HOME CURRENCY IS SAID AS TYPED, and one converted says from which', () => {
-  const decl = { ...METRICS['out-30d']!, target: { lte: 2_000_000 } } as MetricDecl;
+  /* A FIGURE THAT NAMES ITS OWN CURRENCY, which money-core's no longer do since 3.0.0 (a bare `money` format, the record's
+     home currency) and a pack or a use case still may. Its target is in that currency, so read in another it is either
+     typed there or converted from it, and says which. */
+  const decl = { ...METRICS['out-30d']!, format: 'money.GBP', target: { lte: 2_000_000 } } as MetricDecl;
   const typed = targetSaid(decl, { unit: 'EGP', targetIn: { currency: 'EGP', target: { lte: 2_000_000 }, asOf: '2026-09-17', forward: false, stale: false, from: 'EGP' } });
   const converted = targetSaid(decl, { unit: 'EGP', targetIn: { currency: 'EGP', target: { lte: 2_000_000 }, asOf: '2026-09-17', forward: false, stale: false } });
   assert.ok(typed.includes('20,000'), typed);
   assert.ok(!typed.includes('converted'), typed);
   assert.ok(converted.includes('GBP'), converted);
+
+  /* AND money-core's OWN, whose bare `money` names no currency: the sum a person typed is held in the home currency
+     (`liveTarget` in `packages/kernel/src/declare.ts`), so it is said in the one the figure was read in and never as
+     converted from anywhere. */
+  const bare = { ...METRICS['out-30d']!, target: { lte: 2_000_000 } } as MetricDecl;
+  assert.equal(bare.format, 'money', 'money-core names a currency on its figures again, so this reads a different case');
+  const home = targetSaid(bare, { unit: 'EGP', targetIn: { currency: 'EGP', target: { lte: 2_000_000 }, asOf: '2026-09-17', forward: false, stale: false } });
+  assert.ok(home.includes('EGP') && home.includes('20,000'), home);
+  assert.ok(!home.includes('converted'), home);
 });

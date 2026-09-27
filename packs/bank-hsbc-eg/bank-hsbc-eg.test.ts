@@ -153,10 +153,13 @@ const text = (k: Kernel, body: string, sha256: string): Arrived => said<Arrived>
 
 /* ── the file ────────────────────────────────────────────────────────────────────────────────────────────────────── */
 
-test('THE FILE IS bank-hsbc-eg 1.3.0, on money-core 1.8.0 or later before 3.0.0, with the thirteen', () => {
+/* 1.3.1 BESIDE money-core 3.0.0, A PATCH STEP: the range widened to `<4.0.0` and not one wording moved. money-core 3.0.0
+   took pages and the card wordings away and kept every list, field and id these thirteen write (`first-party.ts`), and
+   the tests below install the file on the 3.0.0 the seed ships. 1.4.0 is MOD-20's, in W2 (contracts §7.6). */
+test('THE FILE IS bank-hsbc-eg 1.3.1, on money-core 1.8.0 or later before 4.0.0, with the thirteen', () => {
   const doc = file();
-  assert.deepEqual([doc.pack, doc.version], ['bank-hsbc-eg', '1.3.0']);
-  assert.deepEqual((doc.requires as { packs: unknown }).packs, { 'money-core': '>=1.8.0 <3.0.0' });
+  assert.deepEqual([doc.pack, doc.version], ['bank-hsbc-eg', '1.3.1']);
+  assert.deepEqual((doc.requires as { packs: unknown }).packs, { 'money-core': '>=1.8.0 <4.0.0' });
   assert.deepEqual(doc.declarations.map((d) => `ingest.${String(d.ingest)}`).sort(), THIRTEEN);
 });
 
@@ -177,7 +180,7 @@ test('INSTALLED FROM THE FILE: thirteen patterns, nothing refused, and the same 
   assert.deepEqual(diff.conflicts, []);
   assert.deepEqual(diff.adds.map((a) => a.id).sort(), THIRTEEN);
   await put(api, file());
-  assert.equal(api.kernel.packs().find((p) => p.id === 'bank-hsbc-eg')?.version, '1.3.0');
+  assert.equal(api.kernel.packs().find((p) => p.id === 'bank-hsbc-eg')?.version, '1.3.1');
   const opened = said<{ pack: { manifest: { pack: string } } }>(await readPackFile(readFileSync(PACK_FILE, 'utf8')));
   assert.equal(opened.pack.manifest.pack, 'bank-hsbc-eg');
   sql.close();

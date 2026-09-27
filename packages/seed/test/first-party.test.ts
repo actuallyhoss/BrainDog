@@ -114,9 +114,24 @@ test('an id that is not one of the five has no document', () => {
 
 /* ── all five ───────────────────────────────────────────────────────────── */
 
+/* EVERY LIST THE STARTER HOLDS. A document asked for with no `holds` walks only its own pack's lists in a figure
+   (`firstPartyDocument`, money-core 3.0.0), so the five are compared with the starter as documents for a record that
+   holds all of them. */
+const everyList = (): string[] => (packDocument() as { declarations: Body[] }).declarations.flatMap((d) => (typeof d.register === 'string' ? [d.register] : []));
+
+/* A FIGURE'S LEGS OVER ANOTHER PACK'S LIST, left out: installed one at a time in order, Money comes before Estate, so its
+   walk figures carry no `services` renews leg until Money is installed again for a record that holds Estate. */
+const ownLegs = (body: string): string => {
+  const d = JSON.parse(body) as Body;
+  if (!Array.isArray(d.legs) || typeof d.pack !== 'string') return body;
+  const own = new Set(firstPartyManifest(d.pack as never).provides);
+  return JSON.stringify({ ...d, legs: (d.legs as Body[]).filter((l) => own.has(`register.${String(l.register)}`)) });
+};
+
 test('THE FIVE AND THE PROJECT TEMPLATE ARE THE STARTER, and nothing is in two of them', () => {
   const starter = packDocument() as { declarations: Body[]; seeds: Body[] };
-  const docs = FIRST_PARTY.map((id) => firstPartyDocument(id) as { declarations: Body[]; seeds?: Body[] });
+  const holds = everyList();
+  const docs = FIRST_PARTY.map((id) => firstPartyDocument(id, { holds }) as { declarations: Body[]; seeds?: Body[] });
 
   const ids = docs.flatMap((d) => d.declarations.map(idOf));
   assert.equal(new Set(ids).size, ids.length, 'a declaration is in two packs');
@@ -143,7 +158,11 @@ test('INSTALLED IN ORDER ON AN EMPTY RECORD, each through its own plan, they mak
       .filter((d) => d.kind !== 'theme' && d.id !== 'page.project')
       .map((d) => [d.id, d.body] as [string, string])
       .sort((a, b) => a[0].localeCompare(b[0]));
-  assert.deepEqual(shapes(one.k), shapes(whole.k));
+  const own = (list: [string, string][]) => list.map(([id, body]) => [id, ownLegs(body)]);
+  assert.deepEqual(own(shapes(one.k)), own(shapes(whole.k)));
+  /* And that leg is the only difference: every other declaration is the starter's byte for byte. */
+  const differ = shapes(one.k).filter(([id, body]) => shapes(whole.k).find(([w]) => w === id)?.[1] !== body).map(([id]) => id);
+  assert.deepEqual(differ, ['metric.arriving-30d', 'metric.leaving-30d', 'metric.runway-days']);
 
   /* Each pack's claims are its own, so turning one off later retires only what it brought. */
   for (const id of FIRST_PARTY) assert.deepEqual([...one.k.packClaims(id)].sort(), firstPartyManifest(id).provides);

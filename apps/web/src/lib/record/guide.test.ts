@@ -1,7 +1,7 @@
 /**
- * The New project guide's pages in the two engines: a real record made from a sentence, with an agent's work in it, and
- * this app's sample engine holding the same declarations and rows. The Guide, its Home and the page of the milestone
- * underway must draw the same blocks, figures and rows in both, and how far each milestone is must fill the same.
+ * The New project guide's pages: a real record made from a sentence, with an agent's work in it, drawn the way a live
+ * page draws the record's answer. The Guide, its Home and the page of the milestone underway must draw the blocks,
+ * figures and rows the record answered, and how far each milestone is must count what the list calls done.
  */
 
 import { test } from 'node:test';
@@ -16,13 +16,10 @@ import { carriedDocument, dayOf, formedFor } from '@braindog/seed/usecases/insta
 import { linkExamples } from '@braindog/seed/usecases/links';
 
 import './fixtures/fill.ts';
-import { page, pages } from './fixtures/readers.ts';
-import { PAGES, REGISTERS, ROWS } from './held.ts';
-import { METRICS } from './declared.ts';
+import { REGISTERS } from './held.ts';
 import { toSegments } from './blocks.ts';
 import { blockOf } from './page-live.ts';
 import { refMapOf, type RefMap } from './remote.ts';
-import type { Entry } from './schema.ts';
 
 type Sql = Parameters<typeof openRecord>[0];
 
@@ -103,51 +100,45 @@ const kernel = (async () => {
   return k;
 })();
 
-/** The sample engine holding what the record holds: its declarations, and its rows with each link as the row's number. */
-async function sampleLikeRecord(k: Kernel): Promise<void> {
-  for (const d of k.declarations() as { id: string; kind: string; body: string | Record<string, unknown> }[]) {
-    const id = d.id.slice(d.id.indexOf('.') + 1);
-    const body = (typeof d.body === 'string' ? JSON.parse(d.body) : d.body) as Record<string, unknown>;
-    if (d.kind === 'register' && LISTS.includes(id)) (REGISTERS as Record<string, unknown>)[id] = { ...body, id };
-    if (d.kind === 'metric' && id.startsWith('guide-')) (METRICS as Record<string, unknown>)[id] = { ...body, metric: id };
-    if (d.kind === 'page' && (id === 'guide' || id === 'home-guide' || id === 'milestone')) (PAGES as Record<string, unknown>)[id] = { ...body, page: id };
-  }
-  const seqs = new Map(LISTS.flatMap((l) => rows(k, l).map((r) => [r.id, r.seq] as const)));
-  for (const list of LISTS) {
-    const refs = new Set((REGISTERS[list]!.fields as { id: string; type: string }[]).filter((f) => f.type === 'ref').map((f) => f.id));
-    ROWS[list] = rows(k, list).map((r): Entry => ({
-      seq: r.seq!,
-      fields: Object.fromEntries(Object.entries(r.fields).map(([f, v]) => [f, refs.has(f) && typeof v === 'string' ? (seqs.get(v) ?? v) : v])) as Entry['fields'],
-      version: 1,
-      created: new Date(NOW).toISOString(),
-      by: 'you',
-    }));
-  }
-}
-
 const digits = (v: unknown) => String(v ?? '').replace(/[^0-9-]/gu, '');
 const titleOf = (fields: Record<string, unknown>) => String(fields.what ?? fields.question ?? fields.name ?? '');
 
 type Answered = Parameters<typeof blockOf>[0] & { heading?: string; kind: string; drawn?: boolean; matched?: number; refusals?: unknown[]; rows?: Row[]; readings?: { reading?: { value?: unknown } }[] };
 
-test('THE GUIDE, ITS HOME AND THE MILESTONE UNDERWAY DRAW THE SAME BLOCKS, FIGURES AND ROWS IN BOTH ENGINES', async () => {
+/**
+ * ONE ENGINE SINCE ARC-1, AND THIS WAS TWO. The sample was a second engine in this app that these tests filled with the
+ * record's declarations and rows and held to the record's answer. `fixtures/readers.ts` now asks a kernel seeded once
+ * with the sample and never written to, so a guide record's pages cannot reach it and there is nothing second to hold
+ * equal. What stays is the half a person sees: the record's answer for each page, drawn the way a live page draws it
+ * (`page-live.ts`), refusing nothing and saying the same figures and rows the record answered.
+ */
+const drawnOf = (k: Kernel, slug: string): { record: Answered[]; drawn: ReturnType<typeof blockOf>[] } => {
+  /* THE PAGE LEARNS THE LISTS IT DRAWS, as a live tab learns them from the record before drawing a block over one. */
+  for (const d of k.declarations() as { id: string; kind: string; body: string | Record<string, unknown> }[]) {
+    const id = d.id.slice(d.id.indexOf('.') + 1);
+    if (d.kind !== 'register' || !LISTS.includes(id)) continue;
+    const body = (typeof d.body === 'string' ? JSON.parse(d.body) : d.body) as Record<string, unknown>;
+    (REGISTERS as Record<string, unknown>)[id] = { ...body, id };
+  }
+  const refs = new Map<string, RefMap>(LISTS.map((l) => [l, refMapOf(l, rows(k, l))]));
+  const record = value<{ blocks: Answered[] }>(k.page(slug)).blocks;
+  return { record, drawn: record.map((kb) => blockOf(kb, refs, NOW)) };
+};
+
+test('THE GUIDE, ITS HOME AND THE MILESTONE UNDERWAY DRAW THE BLOCKS, FIGURES AND ROWS THE RECORD ANSWERED', async () => {
   const k = await kernel;
-  await sampleLikeRecord(k);
   const underway = (k.pages() as { slug: string }[]).map((p) => p.slug).find((s) => s.startsWith('say-what-the-show'));
   assert.ok(underway, 'the record has a page for the milestone underway');
-  assert.ok(pages()[underway], `the sample has no /p/${underway}: ${Object.keys(pages()).filter((s) => s.startsWith('say')).join(', ')}`);
 
-  const refs = new Map<string, RefMap>(LISTS.map((l) => [l, refMapOf(l, rows(k, l))]));
   for (const slug of ['guide', 'home-guide', underway]) {
-    const record = value<{ blocks: Answered[] }>(k.page(slug)).blocks;
-    const demo = page(slug)!;
-    assert.equal(demo.blocks.length, record.length, slug);
+    const { record, drawn } = drawnOf(k, slug);
+    assert.ok(record.length > 0, `${slug} answered no block`);
     record.forEach((kb, i) => {
-      const wb = demo.blocks[i]!;
+      const wb = drawn[i]!;
       const at = `${slug}: ${String(kb.heading)}`;
       assert.deepEqual(kb.refusals ?? [], [], `${at}, the record: ${JSON.stringify(kb.refusals)}`);
-      assert.deepEqual(wb.refusals, [], `${at}, the sample: ${wb.refusals.join('; ')}`);
-      assert.equal(wb.drawn !== false, kb.drawn !== false, `${at}: drawn in one engine and not the other`);
+      assert.deepEqual(wb.refusals, [], `${at}, as drawn: ${wb.refusals.join('; ')}`);
+      assert.equal(wb.drawn !== false, kb.drawn !== false, `${at}: the record drew it and the page did not, or the other way`);
       if (kb.drawn === false) return;
       if (kb.kind === 'stat') {
         assert.deepEqual(wb.metrics?.map((m) => digits(m.value)), (kb.readings ?? []).map((r) => digits(r.reading?.value)), at);
@@ -156,20 +147,16 @@ test('THE GUIDE, ITS HOME AND THE MILESTONE UNDERWAY DRAW THE SAME BLOCKS, FIGUR
       if (kb.kind === 'series') return;
       assert.equal(wb.total, kb.matched, `${at}: how many matched`);
       assert.deepEqual(wb.entries.map((e) => titleOf(e.fields)), (kb.rows ?? []).map((r) => titleOf(r.fields)), `${at}: the rows, in order`);
-      if (kb.kind === 'progress') {
-        const live = JSON.stringify(toSegments(blockOf(kb, refs, NOW)));
-        const sample = JSON.stringify(toSegments(wb));
-        assert.equal(sample, live, `${at}: each milestone fills the same`);
-      }
     });
   }
 });
 
 test('HOW FAR EACH MILESTONE IS COUNTS A STEP DONE BY THE STATES THE LIST CALLS DONE', async () => {
   const k = await kernel;
-  await sampleLikeRecord(k);
-  const progress = page('guide')!.blocks.find((b) => b.heading === 'How far each milestone is')!;
-  const said = JSON.stringify(toSegments(progress));
+  const { record, drawn } = drawnOf(k, 'guide');
+  const at = record.findIndex((b) => b.heading === 'How far each milestone is');
+  assert.ok(at >= 0, 'the guide no longer draws how far each milestone is');
+  const said = JSON.stringify(toSegments(drawn[at]!));
   /* THE FIRST MILESTONE HAS TWO STEPS, ONE DONE BY THE AGENT AND ONE BLOCKED; THE SECOND TWO, NEITHER DONE. */
   assert.match(said, /Say what the show is about and who will listen/u);
   assert.match(said, /"1"[^\]]*"2"|1 \| 2/u, said);

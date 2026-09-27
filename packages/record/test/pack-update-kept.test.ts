@@ -53,19 +53,23 @@ const AFTER = `${major}.${minor + 2}.0`;
 /** The refusal's "leave money-core at <version>", with the dots of the version taken literally. */
 const leaveAt = (version: string) => new RegExp(`leave money-core at ${version.replaceAll('.', '\\.')}`, 'u');
 
-/** The only bank patterns 1.5.0 had. Every other one, mail pattern or SMS twin, arrived with a later version. */
+/**
+ * The only bank patterns 1.5.0 had. Every other one, mail pattern or SMS twin, arrived with a later version. Since
+ * money-core 3.0.0 the card patterns live in `packs/card-alerts` (USE-1), so the current document carries none and
+ * `BANK` is empty: the "did not arrive" loop below guards the day a pattern comes back, and checks nothing today.
+ */
 const IN_150 = ['bank-card-in', 'bank-card-out'];
 const BANK = (firstPartyDocument('money-core') as unknown as Doc).declarations
   .map((x) => x.ingest)
   .filter((i): i is string => typeof i === 'string' && !IN_150.includes(i));
 
 /**
- * 1.5.0 REBUILT FROM THE CURRENT DOCUMENT, fingerprint `6442babb13c81d12`, the one `pack-versions.test.ts` records for
- * `money-core@1.5.0`. Every bank pattern but the two 1.5.0 had is taken out, which undoes `aeef01c5`, `fcde1212`, the
- * `From HSBC:` patterns 1.6.0 gained after them and 1.7.0's eight `-sms` twins, and Spent and Received count 31 days
- * again. Measured on 22 September against `firstPartyDocument('money-core')` built from `aeef01c5^`: the declarations
- * are the same JSON in the same order. Taking out only the four patterns the probe named left `ingest.bank-from-in` and
- * `ingest.bank-from-unsure` behind, which fingerprints `7b4159bc59d812fa` and is not 1.5.0.
+ * AN OLDER money-core STANDING IN FOR 1.5.0, rebuilt from the current document: called 1.5.0, every bank pattern but the
+ * two 1.5.0 had taken out, and Spent and Received counting 31 days again. It was once exactly 1.5.0 (fingerprint
+ * `6442babb13c81d12`, measured on 22 September 2026 against the document built from `aeef01c5^`). It is no longer: the
+ * current document has no bank pattern to take out, and 3.0.0 changed the figures (each money target is now a setting),
+ * so this is today's declarations under an older number and the two older windows. That is all these tests need: an
+ * installed version below the current one, and a `spent-30d` whose `where` the update would rewrite.
  */
 const v150 = (): Doc => {
   const d = structuredClone(firstPartyDocument('money-core')) as unknown as Doc;
@@ -296,5 +300,24 @@ test('an edit of a declaration another pack wrote first is a conflict for this p
   const planned = said<{ diff: Diff }>(await api.planPack({ doc: next, source: { kind: 'local' } } as never, owner));
   assert.deepEqual(planned.diff.kept, []);
   assert.deepEqual(planned.diff.conflicts, [{ id: 'metric.fx-count', pack: '(this record)' }]);
+  sql.close();
+});
+
+/* An owner's edit of a figure held to one of its pack's settings. money-core 3.0.0 holds every money target to a setting,
+   and `setDeclaration` reads the body as a one-declaration pack called `in-app`, which declares none: measured before the
+   repair, renaming "Spent, 30 days" was refused `FIELD_UNKNOWN` at `metric.spent-30d.target.setting`. The second edit
+   stands on a row with `pack_id` null, so the setting is found through the pack whose row the first edit replaced. */
+test('a figure held to its pack’s setting can be edited, twice, and a figure written from nothing still cannot name one', async () => {
+  const { sql, api, k } = await recordWith(null, 'metric.spent-30d');
+  const first = row(k, 'metric.spent-30d')!;
+  assert.deepEqual(first.body.target, { setting: 'most_spent_30d' });
+  assert.equal(first.pack, null);
+  said(await api.setDeclaration({ body: { metric: 'spent-30d', ...first.body, name: 'Spent, mine' }, version: first.version } as never, owner));
+  assert.equal(row(k, 'metric.spent-30d')?.body.name, 'Spent, mine');
+
+  const mine = { metric: 'my-spent', name: 'Mine', source: 'register.transactions', value: { sum: 'amount' }, format: 'money', target: { setting: 'most_spent_30d' }, window: '30d', compare: 'previous' };
+  const no = refused(await api.setDeclaration({ body: mine } as never, owner));
+  assert.equal(no.code, 'FIELD_UNKNOWN');
+  assert.equal(row(k, 'metric.my-spent'), null);
   sql.close();
 });

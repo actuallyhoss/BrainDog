@@ -12,8 +12,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { draw, saidPlainly, toSegments } from './blocks.ts';
-import { page } from './fixtures/readers.ts';
-import { PAGES } from './fixtures/sample.ts';
+import { page, pages, readBlock } from './fixtures/readers.ts';
 import { KINDS } from 'braindog-render';
 import type { BlockResult } from './api.ts';
 import type { PageBlock } from './schema.ts';
@@ -88,11 +87,15 @@ test('EVERY KIND GETS THE SURFACE, which is the whole defect', () => {
        degraded with "no into row" on every page that declared one (`capture-wire.test.ts`). Now the
        answer is the list the block names and no refusal, and this says so. */
     if (kind === 'capture') {
-      const { refusal, segments } = draw(bound({ kind, rows: [], entries: [], matched: [], refusals: [], empty: 'Nothing matched.' }, ['authored', 'body', 'metrics']));
+      /* THE LIST THE BLOCK NAMES, whichever that is: the money page's first list-bound table read Bills and invoices
+         until money-core 3.0.0 and reads what moved since, and the capture names whatever list it was built on. */
+      const base = bound({ kind, rows: [], entries: [], matched: [], refusals: [], empty: 'Nothing matched.' }, ['authored', 'body', 'metrics']);
+      assert.ok(base.register, 'the block this is built on names no list');
+      const { refusal, segments } = draw(base);
       assert.equal(refusal, null, 'a capture reported an empty answer about rows it never read');
       assert.deepEqual(
         segments.map((s) => (s.type === 'block' ? [s.kind, s.rows[0]?.cells[0], s.rows[0]?.cells[1]] : s.type)),
-        [['capture', 'into', 'obligations']],
+        [['capture', 'into', base.register]],
       );
       continue;
     }
@@ -120,8 +123,8 @@ test('a block that HAS something to draw refuses nothing', () => {
     if (refusal) continue;
     asked += 1;
     /* Every key a block can carry its content in: a table has rows, a chips or bar block has
-       entries, a stat has its read metrics, a forecast has a walk, a series has its bars and everything else has the
-       fenced text it was written with. */
+       entries, a stat has its read metrics, a forecast has a walk, a series has its bars, a queue its questions, a
+       capture the list it writes into, and everything else has the fenced text it was written with. */
     const held = block as unknown as Record<string, unknown>;
     const many = (key: string) => Array.isArray(held[key]) && (held[key] as unknown[]).length > 0;
     const drawn =
@@ -129,6 +132,8 @@ test('a block that HAS something to draw refuses nothing', () => {
       many('entries') ||
       many('metrics') ||
       many('readings') ||
+      many('queue') ||
+      (held.kind === 'capture' && typeof held.register === 'string' && held.register !== '') ||
       ((held.walk as { steps?: unknown[] } | undefined)?.steps?.length ?? 0) > 0 ||
       ((held.bars as { keys?: unknown[] } | undefined)?.keys?.length ?? 0) > 0 ||
       ((held.parts as { groups?: unknown[] } | undefined)?.groups?.length ?? 0) > 0 ||
@@ -155,21 +160,20 @@ test('the seeded pages refuse nothing at all, so no page ships a broken declarat
  * as an empty block. That is the state reserved for "it asked and the answer was nothing", which
  * makes a documented feature that does not exist look like a register that is empty.
  */
+/**
+ * The money page's first list-bound table as the record reads it, declared with `over` on top.
+ *
+ * THE RECORD READS THE DECLARATION, AND IT CANNOT BE WRITTEN TO HERE. This changed the sample's `PAGES` and read the
+ * page back, which reached the browser's page expander; since ARC-1 the fixture's `page` asks a kernel seeded once and
+ * never written to, so the change reached nothing. The record's `block`, which reads one declaration without a page
+ * around it (`readBlock` in `fixtures/readers.ts`), is handed the changed declaration instead.
+ */
 const declared = (over: Record<string, unknown>): BlockResult => {
   const base = page('money')?.blocks.find((b) => b.kind === 'table' && b.register);
   assert.ok(base);
-  const decl = PAGES.money?.blocks.find((b) => b.heading === base.heading);
+  const decl = pages().money?.blocks.find((b) => b.heading === base.heading);
   assert.ok(decl);
-  const was = { ...decl };
-  Object.assign(decl, over);
-  try {
-    const out = page('money')?.blocks.find((b) => b.heading === base.heading);
-    assert.ok(out);
-    return out;
-  } finally {
-    for (const key of Object.keys(over)) delete (decl as Record<string, unknown>)[key];
-    Object.assign(decl, was);
-  }
+  return readBlock({ ...decl, ...over } as PageBlock);
 };
 
 test('A `where:` WRITTEN AS THE PREDICATE TREE THE DOCS SHOW DOES NOT BLANK THE PAGE', () => {
@@ -178,30 +182,45 @@ test('A `where:` WRITTEN AS THE PREDICATE TREE THE DOCS SHOW DOES NOT BLANK THE 
   // one is following the documentation. The tree arrived as an object, `.split` threw, and the
   // throw took every other block on the page with it — against the page route's own stated
   // invariant that six queries are six independent failures.
-  const block = declared({ where: { all: [{ field: 'state', in: ['open'] }] } });
-  assert.ok(block.refusals.length, 'the tree was accepted');
-  assert.match(block.refusals[0] ?? '', /sentence/);
+  /* THE RECORD READS THE TREE, since ARC-2 (`where: Predicate | string`), where the browser refused it for not being a
+     sentence. So a tree over values the list holds draws its rows, and one naming a value it does not hold is refused
+     on its own block in the record's words, the page around it drawn. */
+  const base = page('money')?.blocks.find((b) => b.kind === 'table' && b.register);
+  assert.ok(base);
+  const read = declared({ where: { all: [{ field: 'state', in: ['cleared'] }] } });
+  assert.deepEqual(read.refusals, [], 'a tree the documentation shows was refused');
+  assert.ok(read.rows.length > 0, 'the tree matched nothing, so this asks nothing');
+  const block = declared({ where: { all: [{ field: 'state', in: ['nowhere'] }] } });
+  assert.ok(block.refusals.length, 'a tree naming a value the list does not hold was accepted');
+  assert.match(block.refusals[0] ?? '', /nowhere/);
   assert.equal(draw(block).refusal?.kind, 'error');
   // And the rest of the page survived.
-  const others = (page('money')?.blocks ?? []).filter((b) => b.heading !== block.heading);
+  const others = (page('money')?.blocks ?? []).filter((b) => b.heading !== base.heading);
   assert.ok(others.length > 3);
   assert.ok(others.some((b) => b.rows.length > 0 || b.metrics?.length), 'one bad block blanked the page');
 });
 
 test('a block that throws becomes a block that refuses, whatever threw', () => {
-  const block = declared({ cells: 'not an array' });
+  let block: BlockResult;
+  try {
+    block = declared({ cells: 'not an array' });
+  } catch (e) {
+    assert.fail(`the record threw instead of refusing the block: ${String(e)}`);
+  }
   assert.ok(block.refusals.length, 'a throw was swallowed instead of being reported');
   assert.equal(draw(block).refusal?.kind, 'error');
 });
 
-test('a `source:` that resolves to nothing says which prefixes do', () => {
+test('a `source:` that resolves to nothing says it is not one the record reads', () => {
   // `06-PAGES` §1.1 documents `metric.<id>` and `block.<n>`. `block.<n>` is not implemented, and used to draw the
   // author's own "nothing matched" sentence; `metric.<id>` is read by a bar or a split only, and says so on a table.
+  /* IN THE RECORD'S WORDS SINCE ARC-1, which name the source and do not list the prefixes the browser's sentence did. */
   assert.match(declared({ source: 'metric.overdue' }).refusals.join(' '), /a bar or a split does/u);
   for (const source of ['block.0', 'nonsense']) {
     const block = declared({ source });
-    assert.ok(block.refusals.some((r) => r.startsWith('source:')), `${source} was accepted`);
-    assert.match(block.refusals.join(' '), /register\.<id>/);
+    assert.ok(block.refusals.some((r) => r.startsWith(source)), `${source} was accepted`);
+    assert.match(block.refusals.join(' '), /is not a source this record reads/u);
+    assert.equal(draw(block).refusal?.kind, 'error');
   }
 });
 
@@ -242,18 +261,9 @@ test('A REGISTER-BOUND `todo` CAN SHOW A TICK, and it comes from the register', 
   // which of its states are terminal, in `done:`.
   const rows = (where: string) => {
     const decl = { kind: 'todo', heading: 'T', span: 3, source: 'register.tasks', columns: [{ field: 'what' }, { field: 'by' }], where, limit: 4, empty: 'x' };
-    /* `blocks` is `readonly` on the declaration and this is a mock whose seed is module state, so
-       the cast is the honest way to add one for the length of a test. */
-    const blocks = PAGES.money?.blocks as PageBlock[] | undefined;
-    assert.ok(blocks);
-    blocks.push(decl as unknown as PageBlock);
-    try {
-      const block = page('money')?.blocks.at(-1);
-      assert.ok(block);
-      return toSegments(block).flatMap((s) => ('rows' in s ? (s.rows as { cells: string[]; done?: boolean }[]) : []));
-    } finally {
-      blocks.pop();
-    }
+    /* READ BY THE RECORD AS ONE BLOCK, since the sample's `PAGES` no longer reach the page it draws (ARC-1). */
+    const block = readBlock(decl as unknown as PageBlock);
+    return toSegments(block).flatMap((s) => ('rows' in s ? (s.rows as { cells: string[]; done?: boolean }[]) : []));
   };
 
   const done = rows('state is done');
@@ -350,7 +360,8 @@ test('THE QUOTED QUERY IS THE READER’S WORDS, not the column’s', () => {
      headed its own `Status`, so all six carry `label: 'Status'` now and every filter sentence
      about the field followed without a line of printer code changing — which is exactly what
      "a pack that renames a field renames every filter sentence about it" means. */
-  assert.equal(saidPlainly('obligations', 'state is paid'), 'status is paid');
+  /* AND THE VALUE IS ITS LABEL, `Paid`, since money-core 3.0.0 labels the enum's values: the same mechanism, one word on. */
+  assert.equal(saidPlainly('obligations', 'state is paid'), 'status is Paid');
   /* AND A FIELD THAT STILL CARRIES NO LABEL IS STILL ITS OWN ID, which is the half the line above
      used to hold on its own: `labelOf` falls back to the id with its underscores taken out. */
   assert.equal(saidPlainly('obligations', 'note is x'), 'note is x');

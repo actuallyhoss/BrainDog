@@ -68,9 +68,12 @@ test('AN ENTRY IS PROPOSED ONLY WHEN THE SENTENCE FILLS IT COMPLETELY', () => {
 test('A MODULE NOTHING POINTED AT DOES NOT ARRIVE, and what one leans on still does', () => {
   /* The maths student's Projects, which the reader answers for any sentence at all. */
   assert.ok(!said('I keep losing track of my coursework deadlines').modules.includes('portfolio'));
-  /* Money points at a project and at the person an invoice is to, so both come with it. */
+  /* Money leans on a project, so Projects comes with it. The person an invoice is to is a link and not a dependency
+     since money-core 3.0.0 (`LINKS` in `packages/seed/src/packs/first-party.ts`), so People does not arrive with it
+     when the sentence named nobody. */
   const money = said('I send invoices').modules;
-  for (const m of ['portfolio', 'people', 'money-core']) assert.ok(money.includes(m), `${m} did not come with Money`);
+  for (const m of ['portfolio', 'money-core']) assert.ok(money.includes(m), `${m} did not come with Money`);
+  assert.ok(!money.includes('people'), 'People came with Money, though who an invoice is to is only a link');
 });
 
 test('THE SAME WORDS ALWAYS GIVE THE SAME PROPOSAL', () => {

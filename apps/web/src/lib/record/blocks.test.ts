@@ -5,7 +5,8 @@
  * GBP 38,880.00`, one negative and one positive over money leaving the same record inside the same
  * thirty days, and that was filed as one screen contradicting itself. It is a disagreement on
  * purpose: `bridgeRows` in `blocks.ts` carries the measurements, both of what the renderer does when
- * the minus is taken off and of why a tile saying `Owed by you` must not have one.
+ * the minus is taken off and of why a tile stating an amount must not have one. Since money-core
+ * 3.0.0 the tile is `Going out, 30 days`, read from the bridge's own walk, so the pair is one sum.
  *
  * WHAT THIS FILE ADDS IS THE PAIR, because a sign that is right on its own terms in two places can
  * still drift into two answers, which is what 491e7e05 measured on these very blocks. So the two
@@ -54,7 +55,7 @@ const blockOf = (slug: string, kind: string, source?: string) => {
 /** A figure as a reader sees it, sign and all: `signedOf` reads `GBP −42,741.00` back as a number. */
 const figure = (row: Row | undefined): number => signedOf(row?.cells[1] ?? '');
 
-test('THE BRIDGE’S OUT ROW AND THE `Owed by you` TILE ARE ONE MONEY IN TWO READINGS, and neither may take the other’s sign', () => {
+test('THE BRIDGE’S OUT ROW AND THE `Going out, 30 days` TILE ARE ONE MONEY IN TWO READINGS, and neither may take the other’s sign', () => {
   const bridge = blockOf('money', 'bridge', 'forecast.runway');
   const rows = drawnRows(bridge);
   assert.deepEqual(
@@ -84,33 +85,28 @@ test('THE BRIDGE’S OUT ROW AND THE `Owed by you` TILE ARE ONE MONEY IN TWO REA
   assert.equal(moveOf(2, values.length, out), 'down');
 
   /* THE TILE IS FOUND BY THE FIGURE IT READS AND NOT BY ITS WORDS, because its words are one of the
-     things under test: looking it up by label would make a rename invisible to this test. */
+     things under test: looking it up by label would make a rename invisible to this test.
+
+     SINCE money-core 3.0.0 THE HERO READS THE WALK, and it read one list. `out-30d` summed what Bills and invoices owed
+     inside thirty days while the bridge walked every list that holds a dated amount, so the tile could only be a part of
+     the leg and 491e7e05 kept the two apart in words. The hero's `leaving-30d` walks `CASH_LEGS` over the same thirty
+     days as the bridge (`packages/seed/src/modules/money.ts`), so it is no longer a part of the leg but the leg itself,
+     and the rival-total and the words half of this test move with it: the two must now be the same money exactly, and
+     saying it in the bridge's words is saying the same thing twice rather than two things alike. */
   const hero = blockOf('money', 'stat');
-  const declared = hero.metrics?.find((m) => m.id === 'out-30d');
-  assert.ok(declared, 'the hero no longer draws `out-30d`, which is the tile this pair is about');
+  const declared = hero.metrics?.find((m) => m.id === 'leaving-30d');
+  assert.ok(declared, 'the hero no longer draws `leaving-30d`, which is the tile this pair is about');
   const tile = figure(drawnRows(hero).find((r) => r.cells[0] === declared.label));
   assert.ok(
     tile > 0,
-    `a tile labelled ${JSON.stringify(declared.label)} states a debt rather than a term in a sum, and it drew ${declared.value}`,
+    `a tile labelled ${JSON.stringify(declared.label)} states an amount rather than a term in a sum, and it drew ${declared.value}`,
   );
+  assert.equal(tile, -out, `the tile says ${tile} leaves where the bridge's own leg says ${-out}, over the one walk and the same thirty days`);
 
-  /* AND IT IS A PART OF THAT LEG, NEVER A RIVAL TOTAL. The walk reads three lists that hold a dated
-     amount where the tile reads one of them, so the tile can only be the smaller of the two: on the
-     shipped record GBP 38,880.00 of the GBP 42,741.00 leaving, the difference being the parts of a
-     plan and GBP 111.00 of subscriptions. A tile larger than the leg it is part of means one of the
-     two has quietly started answering a different question. */
-  assert.ok(
-    tile <= -out,
-    `the tile says ${tile} leaves where the bridge's own leg says ${-out}, so the tile is no longer a part of it`,
-  );
-  /* THE WORDS ARE REFUSED AT THEIR OPENING AND NOT ONLY WHOLE, because the label 491e7e05 took off
-     this tile was `Going out, 30 days` and `copy.bridgeOut` is `Going out`: written as a notEqual,
-     this line passed against the very label it names, measured on the two strings. A tile that opens
-     with the bridge's words is the failure, whatever it appends. */
-  assert.ok(
-    !declared.label.startsWith(copy.bridgeOut),
-    `the tile has taken the bridge’s words back as ${JSON.stringify(declared.label)}, and 491e7e05 measured those words over two different figures on one page`,
-  );
+  /* AND THE OTHER LEG IS THE OTHER TILE, by the same walk: what arrives is said once as a figure and once as a term. */
+  const arriving = hero.metrics?.find((m) => m.id === 'arriving-30d');
+  assert.ok(arriving, 'the hero no longer draws `arriving-30d`');
+  assert.equal(figure(drawnRows(hero).find((r) => r.cells[0] === arriving.label)), values[1], 'the tile and the bridge disagree on what comes in');
 });
 
 /* ── the heading over a refusal ───────────────────────────────────────────── */

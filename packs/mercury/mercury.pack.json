@@ -1,6 +1,6 @@
 {
   "pack": "mercury-company",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "summary": "Reads the balance of every Mercury account from api.mercury.com every 1h, into Money's accounts, and its last thirty days of transactions into the ledger.",
   "fill": {
     "id": "A name for the Mercury profile, lower case, digits and hyphens. The pack is mercury-<id>, its pull mercury_<id> and its ledger script mercury_ledger_<id>, each cut to 32 characters.",
@@ -14,7 +14,7 @@
     "format": 1,
     "primitives": 1,
     "packs": {
-      "money-core": ">=1.0.0 <3.0.0"
+      "money-core": ">=1.0.0 <4.0.0"
     }
   },
   "extends": {
