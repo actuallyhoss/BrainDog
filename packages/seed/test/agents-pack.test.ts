@@ -270,7 +270,7 @@ test('A PROJECT PAGE SAYS WHAT IT RUNS ON: its own keys, tools and skills, then 
   const skills = said('Skills', 'name');
   assert.ok(skills.includes('review-pr @ Kiln') && !skills.includes('review-pr @ everywhere'), skills.join(', '));
   assert.ok(!skills.some((s) => s.startsWith('chase-invoice')), 'a retired skill is listed');
-  assert.ok(said('Keys', 'label').includes('Nordhaven API @ everywhere'));
+  assert.ok(said('Keys', 'name').includes('Nordhaven API @ everywhere'));
   assert.ok(said('Tools', 'name').includes('fenwick @ Kiln'));
   sql.close();
 });

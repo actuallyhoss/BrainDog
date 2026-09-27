@@ -96,8 +96,17 @@ test('an update that changes a list the owner changed is said as refused, in the
    portfolio's update first and files it; `arrangement` planned money-core by itself against a record without the new
    list and said `REGISTER_UNRESOLVED`. Measured by the checker, and red against `planAll([p.id])`. */
 test('an update that reads a list its module update adds is offered, as propose files it', async () => {
+  /* PORTFOLIO'S OWN NEXT, THE SAME WAY MONEY-CORE'S IS BUILT (`CURRENT`/`NEXT` above), and never the version it is
+     already on. This test wrote a bare `'1.5.0'` while that was still portfolio's next minor over its installed
+     version; once `FIRST_PARTY_VERSIONS['portfolio']` itself reached 1.5.0 the literal named the version already
+     installed, so `updateOf` saw no update to offer, `expand` never added portfolio to the install, and the extra
+     list this test means to add was never there for money-core to read: refused `REGISTER_UNRESOLVED` for a reason
+     that was never money-core's. */
+  const portfolioCurrent = FIRST_PARTY_VERSIONS['portfolio'];
+  const [portfolioMajor, portfolioMinor] = portfolioCurrent.split('.').map(Number) as [number, number];
+  const portfolioNext = `${portfolioMajor}.${portfolioMinor + 1}.0`;
   const portfolio = structuredClone(firstPartyDocument('portfolio')) as unknown as Doc;
-  portfolio.version = '1.5.0';
+  portfolio.version = portfolioNext;
   const { scopes: _scopes, ...list } = structuredClone(portfolio.declarations.find((x) => x.register === 'things')!);
   portfolio.declarations.push({ ...list, register: 'extra', name: 'Extra' });
   /* A METRIC THE KERNEL TAKES, since the arranger now asks it: this one said `value: 'count'` and no target, and was
@@ -106,7 +115,7 @@ test('an update that reads a list its module update adds is offered, as propose 
     d.declarations.push({ metric: 'extra-count', name: 'Extra count', source: 'register.extra', value: { count: 'id' }, format: 'int', target: { gte: 1 }, window: '30d', compare: 'none' });
   });
   const sql = openSqlite();
-  const catalogue = offering(money).map((e) => (e.id === 'portfolio' ? { ...e, version: '1.5.0', doc: () => structuredClone(portfolio) as never } : e));
+  const catalogue = offering(money).map((e) => (e.id === 'portfolio' ? { ...e, version: portfolioNext, doc: () => structuredClone(portfolio) as never } : e));
   const api = await createRecordApi({ sql, clock: fixedClock(Date.UTC(2026, 8, 22, 12)), catalogue });
   for (const id of FIRST_PARTY) {
     const pack = firstPartyDocument(id);

@@ -148,8 +148,9 @@ test('ONE ROW PER MODEL CALL, and pass 2 on an ask_id does not replace the read 
     assert.equal(quoted?.question, 'what is still open');
     assert.match(quoted?.predicate ?? '', /"obligations"/);
 
-    /* The meter counts reads and proposals on tier a, not patterns: four, and nothing held is left counted. */
-    assert.equal(slash.status().asks.used, 4);
+    /* The meter counts reads, proposals and pattern presses on tier a (AGT-26: a pattern press is metered as one
+       ask): five, and nothing held is left counted. */
+    assert.equal(slash.status().asks.used, 5);
     assert.equal(sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM slash_call WHERE code = 'SLASH_PENDING'")?.n, 0);
   } finally {
     sql.close();

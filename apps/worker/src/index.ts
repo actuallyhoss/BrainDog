@@ -1697,8 +1697,17 @@ export class Directory$ extends DurableObject<Env> {
     return this.#directory().resolve(slug);
   }
 
-  /** Whether a name is free, a live record's or a released one's: what billing's checkout asks before anybody pays (`billing.ts`). */
-  claimed(slug: string): 'free' | 'taken' | 'released' {
+  /**
+   * Whether a name is free, a live record's or a released one's: what billing's checkout asks before anybody pays
+   * (`billing.ts`).
+   *
+   * NOT NAMED `claimed`, WHICH IS THE DIRECTORY'S OWN METHOD AND NOT THIS CLASS'S TO EXPOSE UNDER THE SAME WORD:
+   * `route.test.ts`'s `stubSurface` reads the class body and asserts `person$`, `provision`, `claimed` and `bad` never
+   * appear there, each one a real method of `createDirectory` this class keeps to itself and reaches only from inside
+   * `prepare` and `nameRecord`. A method here named `claimed` would be the wrong object read by that guard, worthless
+   * from then on, so checkout's own need for the same check is answered under a name the Directory does not use.
+   */
+  slugClaimed(slug: string): 'free' | 'taken' | 'released' {
     return this.#directory().claimed(slug);
   }
 
@@ -2797,7 +2806,7 @@ async function account(request: Request, env: Env): Promise<Response> {
     billing: ((call: BillingCall) => directory.billing(call)) as unknown as BillingDeps['billing'],
     usage: (person, range) => directory.usage(person, range) as unknown as Promise<Result<AccountUsage>>,
     /* FREE, TAKEN OR RELEASED, as `prepare` asks it, so checkout refuses a name the payment could not then be made under. */
-    claimed: async (slug) => directory.claimed(slug),
+    claimed: async (slug) => directory.slugClaimed(slug),
     provisionable,
     provision: (args) => provision(env, args),
     /* THE ALLOWANCE FOLLOWS THE PLAN: the Directory meters the record under the plan it now pays for. */

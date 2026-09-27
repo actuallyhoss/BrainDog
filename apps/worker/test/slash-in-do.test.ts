@@ -130,6 +130,16 @@ before(async () => {
   const accepted = await owner().call('decide', { id: filed.value.id, decide: { option: 'accept', reason: 'the ask needs a list to read' } });
   assert.ok(accepted.ok, `the pack would not install: ${JSON.stringify(accepted)}`);
 
+  /* AND `agents`, BECAUSE THE VAULT DEPOSITS INTO IT. `putKey` below always writes to `register.credentials`
+     (`record/src/index.ts`'s `KEYS`), and `agents` is the one pack that declares that list; no production path
+     installs it for a record on its own, so a real owner reaches this door only after installing it, the same as
+     this test now does. Without this, the door refused `REGISTER_UNKNOWN`: "There is no register called
+     credentials.", for a reason usecase-founder had nothing to do with. */
+  const withAgents = await owner().call<{ id: string }>('propose', { question: 'Install agents?', body_kind: 'pack', body: { install: 'agents' } });
+  assert.ok(withAgents.ok, `agents could not be offered: ${JSON.stringify(withAgents)}`);
+  const agentsIn = await owner().call('decide', { id: withAgents.value.id, decide: { option: 'accept', reason: 'the key door needs somewhere to put his key' } });
+  assert.ok(agentsIn.ok, `agents would not install: ${JSON.stringify(agentsIn)}`);
+
   /* HIS KEY, PUT IN THROUGH THE KEY DOOR AS AN API TOKEN, and picked in Settings by its grant id. The sign-in above is a
      proof of a moment ago, so the vault's gate that both the key door and a save pointing his key somewhere ask is open. */
   const put = await owner().putKey({ label: 'model provider', opens: 'Slash', value: HIS_TOKEN, kind: 'api_token' });

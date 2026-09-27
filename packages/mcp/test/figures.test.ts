@@ -78,6 +78,9 @@ test('M1 AND THE ONE NO PAGE DRAWS: get of every figure the removed tool read an
 test('record_index NAMES THE FIGURES IT CAN, and each one it names is one get answers, a template once its slot is filled', async () => {
   const { sql, api } = await money();
   assert.ok(api.kernel.create('things', { name: 'Kiln', lane: 'building' }, { actor: 'p_1' }).ok);
+  /* `book-cash` (money-core 3.1.0) is a template too, `book is {{it}}`, filled the same way as `project-owed`
+     below: a books row named Kiln, so `book-cash:Kiln` is one `get` answers rather than REF_UNKNOWN. */
+  assert.ok(api.kernel.create('books', { name: 'Kiln', currency: 'GBP' }, { actor: 'p_1' }).ok);
   const index = await called(api, 'record_index', {});
   assert.equal(index.isError, false, index.text);
   const figures = (JSON.parse(index.text) as { figures?: unknown }).figures;
@@ -107,7 +110,12 @@ test('record_index names every figure money-core declares, and resources/list ev
   assert.ok(named.includes('late-in'));
   assert.ok(named.includes('project-owed:<value>'), `the template is not named with its slot: ${named.filter((id) => id.startsWith('project'))}`);
   const offered = (await tools(api as never).resources(owner)).map((r) => r.uri).filter((u) => u.startsWith('braindog:metric/'));
-  assert.deepEqual(offered.map((u) => u.slice('braindog:metric/'.length)).sort(), declared.filter((id) => !['project-owed', 'project-in-by-month', 'project-out-by-month'].includes(id)).sort());
+  /* `book-cash` (money-core 3.1.0) is a template too, `book is {{it}}`, so it is left out of `resources/list` the same
+     way `project-owed` and the two project walks are: an address is offered only if reading it answers bare. */
+  assert.deepEqual(
+    offered.map((u) => u.slice('braindog:metric/'.length)).sort(),
+    declared.filter((id) => !['project-owed', 'project-in-by-month', 'project-out-by-month', 'book-cash'].includes(id)).sort(),
+  );
   for (const uri of offered) assert.ok((await tools(api as never).read(uri, owner)).ok, `${uri} is offered and refuses`);
   sql.close();
 });

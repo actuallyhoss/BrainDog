@@ -316,6 +316,8 @@ async function record(decl: Ingest): Promise<{ k: Kernel; sql: NodeSql; decl: In
 
   const decls: Declaration[] = [
     { id: 'register.accounts', kind: 'register', body: REGISTERS.accounts as never },
+    /* register.accounts.book (money-core 3.1.0) points at books, so this minimal install carries books too. */
+    { id: 'register.books', kind: 'register', body: REGISTERS.books as never },
     { id: `ingest.${decl.ingest}`, kind: 'ingest', body: decl as never },
   ];
   const put = await k.install(decls);

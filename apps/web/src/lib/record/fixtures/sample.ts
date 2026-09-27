@@ -26,7 +26,6 @@ import {
   MONEY_HOME_SETTING,
   targetConfigOf,
   day,
-  projectWithRunsOn,
   PROJECTS_SAID,
   stamp,
 } from '@braindog/seed';
@@ -71,10 +70,10 @@ import { cashSeries, openTasksSeries } from '@braindog/seed';
  * The pages the record ships with. They live in the seed, because a page is a document it holds.
  *
  * THE AGENTS PACK'S PAGES ARE HERE BECAUSE ITS REGISTERS ARE: `/p/agents`, a page per skill, and the
- * project template with "Runs on" after its own blocks, taken from the seed as a record holding the
- * pack installs them.
+ * project template already ends with "Runs on" (the seed's own `PAGES.project`, agents.md AGT-10), taken from the
+ * seed as a record holding the pack installs them.
  */
-export const PAGES: Record<string, PageDecl> = { ...SEED_PAGES, project: projectWithRunsOn(), ...AGENTS_PAGES } as unknown as Record<string, PageDecl>;
+export const PAGES: Record<string, PageDecl> = { ...SEED_PAGES, ...AGENTS_PAGES } as unknown as Record<string, PageDecl>;
 import { NOW, TODAY } from '@braindog/seed';
 import { sessionDeclaration, stampFinished, type Counted } from '@braindog/kernel';
 /* `find.ts` reads the declarations `fill.ts` puts in `held.ts`; `answers` is only called when a receipt is counted, so

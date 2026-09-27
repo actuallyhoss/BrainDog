@@ -139,6 +139,8 @@ test('RED, AND IT STAYS RED: A PULL OVER A TWO-CURRENCY BALANCE WRITES BOTH CURR
   };
   const decls: Declaration[] = [
     { id: 'register.accounts', kind: 'register', body: REGISTERS.accounts as never },
+    /* register.accounts.book (money-core 3.1.0) points at books, so this minimal install carries books too. */
+    { id: 'register.books', kind: 'register', body: REGISTERS.books as never },
     { id: 'ingest.stripe_balance', kind: 'ingest', body: pull as never },
   ];
   const put = await k.install(decls);

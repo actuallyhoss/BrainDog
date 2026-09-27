@@ -858,7 +858,9 @@ test('EVERY MONEY FIGURE IT DECLARES COMES BACK IN THE CURRENCY ITS OWN ROWS CAR
  */
 test('THE LISTS SAY WHAT 3.0.0 PROMISED, and nothing a record holds is renamed', () => {
   const field = (list: string, id: string) => REGISTERS[list]?.fields.find((f) => f.id === id);
-  assert.deepEqual(REGISTERS.balances?.fields.map((f) => [f.id, f.type]), [['account', 'ref'], ['balance', 'money'], ['as_of', 'day'], ['source', 'text']]);
+  /* `book` (money-core 3.1.0) joins every list that holds money, `balances` included: a ref to `books`, so a balance
+     check says which book it is in the same way an account does. */
+  assert.deepEqual(REGISTERS.balances?.fields.map((f) => [f.id, f.type]), [['account', 'ref'], ['balance', 'money'], ['as_of', 'day'], ['source', 'text'], ['book', 'ref']]);
   assert.equal(field('balances', 'account')?.to, 'accounts');
   assert.equal(field('transactions', 'balance_after')?.type, 'money');
   assert.equal(field('accounts', 'arrives')?.type, 'day');

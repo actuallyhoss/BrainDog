@@ -15,6 +15,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { createRecordApi } from '@braindog/record';
+import type { Proposal } from '@braindog/slash';
 
 import { fixedClock, openSqlite } from '../../../packages/kernel/test/sqlite.ts';
 import { slashLook, workerSlashDoor, workerSlashEngine, workerSlashModel } from '../src/slash.ts';
@@ -197,17 +198,22 @@ test("A REAL ASK ON HIS OWN KEY REACHES THE PACKAGE'S ENGINE THROUGH THE WORKER'
 
   const out = await engine.propose('Which tasks are open?', OWNER, key as never, undefined, key as never);
   assert.ok(out.ok, `refused: ${JSON.stringify(out)}`);
-  assert.equal(out.value.body_kind, 'rowset');
-  assert.deepEqual(out.value.citations, ['tasks#1']);
-  assert.match(String(out.value.filed), /^SG[0-9]+$/u, 'nothing was filed on the record');
+  /* `door.engine!()` IS TYPED BY THE HOST'S OWN `SlashAskEngine<C>`, whose `propose` answers `Result<unknown>` on
+     purpose so `packages/host` never imports `@braindog/slash` (`loop/finish/rules.md` §5). This test drives the
+     package's real engine underneath it, so the answer is the package's own `Proposal`, cast back to it here rather
+     than in the shared host type. */
+  const proposed = out.value as Proposal;
+  assert.equal(proposed.body_kind, 'rowset');
+  assert.deepEqual(proposed.citations, ['tasks#1']);
+  assert.match(String(proposed.filed), /^SG[0-9]+$/u, 'nothing was filed on the record');
   /* THE FOLD'S LAST LINE IS THE VAULT, REFUSED, on every ask (`46 §4.2`), which is the boundary showing in the output. */
-  assert.deepEqual(out.value.read.at(-1), { register: 'grant', rows: 0, predicate: 'refused' });
+  assert.deepEqual(proposed.read.at(-1), { register: 'grant', rows: 0, predicate: 'refused' });
 
   /* THE QUESTION IS ON THE REAL RECORD'S DECIDE. */
   const boot = (await api.boot(OWNER)) as { ok: boolean; value: { waiting: { id: string }[] } };
   assert.ok(boot.ok);
   assert.equal(boot.value.waiting.length, 1);
-  assert.equal(boot.value.waiting[0]!.id, out.value.filed);
+  assert.equal(boot.value.waiting[0]!.id, proposed.filed);
 
   /* AND THE ANSWER CAME FROM THE PACKAGE'S ENGINE AND NOT FROM THE RULES: two rows in Slash's OWN meter, and the record's
      own Slash still modelless, so nothing here could have come from `SlashModel.draft`. */

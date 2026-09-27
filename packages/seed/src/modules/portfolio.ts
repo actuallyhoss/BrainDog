@@ -892,6 +892,55 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         body: '{{note}}',
         empty: 'Nothing is written about {{name}} yet. Its note is on the project.',
       },
+      /* THE PAGE ENDS WITH WHAT RUNS ON IT (agents.md AGT-10): its own keys, tools and skills, then the ones that
+         apply everywhere, faint beneath. `panel: actions` names the host panel a section draws under it, so
+         `BlockSlot.svelte` attaches the scheduled actions list (Resume, Pause) here without matching English text
+         (`loop/finish/contracts.md` X5). A record without the agents pack, or with none of a kind, says so through
+         each block's own `empty:` rather than refusing: `runs_on` reads a list only where the record holds it. */
+      {
+        kind: 'section',
+        heading: 'Runs on',
+        icon: 'plug',
+        span: 12,
+        panel: 'actions',
+      },
+      {
+        /* `{{spoken}}` IS THIS PROJECT'S OWN ROW, `things#1`, which `runs_on` takes as `about:` and reads every kind
+           from, so the same three blocks below narrow one read to a kind apiece by `where:` rather than asking the
+           kernel three times. `about:` is read by a `cards` block (`block-keys.ts` `KEY_KINDS`), as it is by `table`;
+           `cards` is `minSpan: 4` (`kinds.ts`), where `table`'s own floor is 6 and three at span 4 would not tile. */
+        kind: 'cards',
+        heading: 'Keys',
+        span: 4,
+        source: 'runs_on',
+        about: '{{spoken}}',
+        where: 'kind is key',
+        columns: [{ field: 'name', as: 'title' }, { field: 'detail', label: 'Opens', as: 'fact' }],
+        limit: 8,
+        empty: 'No keys apply to {{name}}.',
+      },
+      {
+        kind: 'cards',
+        heading: 'Tools',
+        span: 4,
+        source: 'runs_on',
+        about: '{{spoken}}',
+        where: 'kind is tool',
+        columns: [{ field: 'name', as: 'title' }, { field: 'detail', label: 'Transport', as: 'fact' }],
+        limit: 8,
+        empty: 'No tools apply to {{name}}.',
+      },
+      {
+        kind: 'cards',
+        heading: 'Skills',
+        span: 4,
+        source: 'runs_on',
+        about: '{{spoken}}',
+        where: 'kind is skill',
+        columns: [{ field: 'name', as: 'title' }, { field: 'detail', label: 'Rev', as: 'fact' }],
+        limit: 8,
+        empty: 'No skills apply to {{name}}.',
+      },
     ],
   },
 };
