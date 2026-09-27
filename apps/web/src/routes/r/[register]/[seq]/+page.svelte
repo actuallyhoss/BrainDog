@@ -41,7 +41,10 @@
   import AddField from '$lib/ui/AddField.svelte';
   import AddValue from './AddValue.svelte';
   import { putBackOf, valueWords } from '$lib/record/field-write.ts';
-  import { draftOf, editable, patchOf, unitOf, wrongMoney } from '$lib/record/field-draft.ts';
+  import { draftOf, editable, isJson, isQuantity, patchOf, unitOf, unitsOf, wrongValue } from '$lib/record/field-draft.ts';
+  import DayBox from '$lib/ui/DayBox.svelte';
+  import QuantityBox from '$lib/ui/QuantityBox.svelte';
+  import JsonBox from '$lib/ui/JsonBox.svelte';
   import { ownsRecord, type Me } from '../../../settings/levels.ts';
   import { Table } from 'braindog-render/svelte';
   import { readHistory, readNames, type Told } from '$lib/record/history-live.ts';
@@ -53,6 +56,8 @@
   import { choicesOf, stateSaid } from './lead.ts';
   import { addedSaid, daySaid, dueSaid, rowWords } from './said.ts';
   import { actor, listName, nameWords } from '$lib/record/names.ts';
+  import { movable, scopeFieldOf } from '$lib/record/scope-move.ts';
+  import ScopeMove from './ScopeMove.svelte';
 
   const id = $derived(page.params.register ?? '');
   const seq = $derived(Number(page.params.seq));
@@ -255,9 +260,27 @@
     if (current) told = h;
   }
 
+  /**
+   * THE ROW AGAIN, AFTER THE HEAD'S CHIP MOVED IT, and its history, whose newest line is the move. Read in place and
+   * not through `readRow`, which empties the page first: the row is still here, and only where it applies changed.
+   */
+  async function rowMoved(register: string, n: number) {
+    const key = `${register}#${n}`;
+    const at = opened();
+    reader ??= rowReader(apiBase());
+    const r = await reader.read(register, n);
+    const current = askedFor === key;
+    closed(!current || r.from !== 'refused', at);
+    if (!current) return;
+    got = r;
+    void refreshHistory(register, n);
+  }
+
   async function saveEdit(f: FieldDecl) {
     if (!row || saving || !live) return;
-    const bad = wrongMoney(f, draft, row.fields[f.id], listCurrency(f));
+    /* WHAT THE RECORD WOULD REFUSE IS SAID UNDER THE BOX FIRST: a money's places, a quantity with no unit, structured
+       data that does not read, a day that is not one. Structured data would otherwise be stored as the text typed. */
+    const bad = wrongValue(f, draft, row.fields[f.id], listCurrency(f));
     if (bad) {
       problem = bad;
       return;
@@ -423,11 +446,18 @@
      that declares none says the state word alone, since any other date would be a guess at when it happened. */
   const finishedDay = $derived(done && decl?.finished && row ? row.fields[decl.finished] : undefined);
   const finishedOn = $derived(typeof finishedDay === 'string' && finishedDay !== '' ? daySaid(finishedDay, clock) : null);
+  /* WHERE THE ROW APPLIES IS SAID BY THE CHIP IN THE HEAD AND MOVED FROM IT (`ScopeMove.svelte`), so a field one press
+     moves is not a fact as well: empty, it was the chip "+ Where it applies" under a row that applies everywhere. */
+  const scopeField = $derived.by(() => (void got, scopeFieldOf(id)));
   const leadIds = $derived(
     new Set(
-      [figure !== null ? figureField?.id : undefined, due ? dueField?.id : undefined, stateValue ? decl?.state : undefined, finishedOn ? decl?.finished : undefined].filter(
-        (x): x is string => Boolean(x),
-      ),
+      [
+        figure !== null ? figureField?.id : undefined,
+        due ? dueField?.id : undefined,
+        stateValue ? decl?.state : undefined,
+        finishedOn ? decl?.finished : undefined,
+        movable(scopeField) ? scopeField.id : undefined,
+      ].filter((x): x is string => Boolean(x)),
     ),
   );
   /* THE TITLE IS THE HEAD, SO IT IS NOT A FACT AS WELL. It is listed only while it is empty, when its chip is the way
@@ -531,6 +561,8 @@
            page led with a developer verb: the first control a person saw on an invoice was the one
            that puts `obligations#1` on the clipboard, ahead of anything that does something to the
            invoice. Details holds the number and its "Copy link", and `y` still copies the id. -->
+      <!-- WHERE THE ROW APPLIES, FIRST: the project's chip, or the globe and "Everywhere", which opens the move. -->
+      <ScopeMove register={id} {row} {names} {live} title={String(row.fields[decl.title] ?? '')} onmoved={() => void rowMoved(id, seq)} />
       <Button weight="quiet" onclick={editTitle}>{copy.editRow}</Button>
       <!-- ARCHIVE IS THE LIST'S OWN VERB, on the row itself: a row that can be archived in one
            place and not the other is two products. `Put back` stands where `Archive` was for as
@@ -617,7 +649,14 @@
                         {#each choicesOf(f) as [v, said]}<option value={v}>{said}</option>{/each}
                       </select>
                     {:else if f.type === 'day'}
-                      <div class="field"><input class="field-input" type="date" bind:value={draft} /></div>
+                      <!-- A DAY IN THE RECORD'S WORDS, `3 Sep 2026`, and not the browser's `mm/dd/yyyy` (MOD-22). -->
+                      <DayBox bind:value={draft} label={labelOf(f)} />
+                    {:else if isQuantity(f)}
+                      <!-- A NUMBER AND THE UNIT IT COUNTS, the unit chosen from the ones the field knows (MOD-22). -->
+                      <QuantityBox bind:value={draft} units={unitsOf(f, value)} label={labelOf(f)} />
+                    {:else if isJson(f)}
+                      <!-- STRUCTURED DATA WRITTEN OUT, refused on the save when it does not read (MOD-22). -->
+                      <JsonBox bind:value={draft} label={labelOf(f)} />
                     {:else if f.type === 'money'}
                       <!-- THE CURRENCY THE BOX WRITES IN, by the chain `field-draft.ts` types in: the row's, the field
                            default's, the list's, then the record's, so an empty box names what it will write. -->

@@ -48,7 +48,7 @@ const fakeAi = (answers: string[]) => {
 
 /** The production environment's Slash vars as `wrangler.jsonc` declared them until 24 September, when he switched the
     included model on (`SLASH_INCLUDED: yes` in both environments), over a fake binding. */
-const shipped = (ai: ReturnType<typeof fakeAi>) => ({ SLASH_ENDPOINT: '', AI: ai.AI, AI_GATEWAY: 'braindog' });
+const shipped = (ai: ReturnType<typeof fakeAi>) => ({ AI: ai.AI, AI_GATEWAY: 'braindog' });
 /** And the same with the included model switched on. */
 const switchedOn = (ai: ReturnType<typeof fakeAi>) => ({ ...shipped(ai), SLASH_INCLUDED: 'yes' });
 
@@ -62,7 +62,7 @@ test('DARK AS SHIPPED: AI bound and SLASH_INCLUDED unset is no model, no engine,
   assert.equal(workerSlashAnswers(shipped(ai), noGrants, deps), undefined);
   assert.equal(await workerSlashDoor(shipped(ai), noGrants, deps, new Set()).engine!(), undefined);
   /* AND THE SWITCH WITHOUT THE BINDING IS NOTHING EITHER, which is a deploy that forgot `ai`. */
-  assert.equal(workerSlashModel({ SLASH_ENDPOINT: '', SLASH_INCLUDED: 'yes' }, noGrants), undefined);
+  assert.equal(workerSlashModel({ SLASH_INCLUDED: 'yes' }, noGrants), undefined);
   assert.equal(ai.runs.length, 0);
   deps.sql.close();
 });
@@ -105,21 +105,83 @@ test("AN AUTOMATION'S QUESTION IS ANSWERED WITH NO VAULT GRANT, because the incl
   own.close();
 });
 
-test('HIS OWN ENDPOINT WINS: with SLASH_ENDPOINT set as well, the fake AI never runs and the POST goes to the endpoint', async () => {
+/* ── his own key, chosen in Slash's own store ───────────────────────────────────────────────────────────────────────── */
+
+const GRANT = '01M33H56ZCMM62YT38ARN8JRM8';
+const HIS_TOKEN = 'provider-token-for-this-test';
+/** His vault, as the host reads it: one live API token, the one he picked. */
+const hisVault = () => ({ kernel: { grants: () => [{ id: GRANT, label: 'model provider', kind: 'api_token', revoked_at: null }] } }) as never;
+
+/** Slash's own store with his key chosen: the two tables `slashOwnKeyOf` reads, written as the package writes them. */
+const chosen = (provider: 'anthropic' | 'openai' = 'openai') => {
+  const store = openSqlite();
+  store.exec('CREATE TABLE slash_settings (singleton INTEGER PRIMARY KEY, tier TEXT, model TEXT, grant_id TEXT, ask_cap INTEGER, updated_at TEXT)');
+  store.exec('CREATE TABLE slash_meta (key TEXT PRIMARY KEY, value TEXT)');
+  store.exec("INSERT INTO slash_settings VALUES (1, 'b', 'his-model', ?, 80, '2026-09-23T09:00:00.000Z')", GRANT);
+  store.exec("INSERT INTO slash_meta VALUES ('own.provider', ?), ('own.base_url', ?)", provider, URL_.replace('/chat/completions', ''));
+  return store;
+};
+
+test('HIS OWN KEY WINS ON THE PRESS: with his key chosen, the included model never runs and the POST carries his key', async () => {
+  const ai = fakeAi(['{"drafts":[]}']);
+  const store = chosen();
+  const sent: { url: string; authorization: string | null; model: unknown }[] = [];
+  const model = workerSlashModel({ ...switchedOn(ai), KEK: FAKE_KEK }, hisVault, {
+    store: () => store,
+    send: async (url, init) => (
+      sent.push({ url: String(url), authorization: new Headers(init.headers).get('authorization'), model: (JSON.parse(String(init.body)) as { model: unknown }).model }),
+      new Response(JSON.stringify({ choices: [{ message: { content: '{"drafts":[]}' } }] }), { status: 200 })
+    ),
+    open: () => async () => HIS_TOKEN,
+  });
+  assert.equal(model?.name, 'your key');
+  await model.draft({ usage: {} } as never);
+  assert.deepEqual(sent, [{ url: URL_, authorization: `Bearer ${HIS_TOKEN}`, model: 'his-model' }]);
+  assert.equal(ai.runs.length, 0, 'the included model ran for a record set to its own key');
+
+  /* AND BACK ON THE INCLUDED MODEL, THE SAME MODEL OBJECT ASKS IT: the choice is read on each press, not when the object opened. */
+  store.exec("UPDATE slash_settings SET tier = 'a' WHERE singleton = 1");
+  assert.equal(model.name, 'included');
+  await model.draft({ usage: {} } as never);
+  assert.equal(ai.runs.length, 1);
+  assert.equal(sent.length, 1);
+  store.close();
+});
+
+test('A KEY THAT WILL NOT OPEN SENDS NOTHING, and the included model is not asked in its place', async () => {
   const ai = fakeAi([]);
-  const posted: string[] = [];
-  const model = workerSlashModel({ ...switchedOn(ai), SLASH_ENDPOINT: URL_, KEK: FAKE_KEK }, noGrants, {
-    send: async (url, _init) => (posted.push(String(url)), new Response('{"drafts":[]}', { status: 200 })),
+  const store = chosen();
+  const sent: string[] = [];
+  const model = workerSlashModel({ ...switchedOn(ai), KEK: FAKE_KEK }, hisVault, {
+    store: () => store,
+    send: async (url) => (sent.push(String(url)), new Response('{}', { status: 200 })),
     open: () => async () => null,
   });
-  assert.equal(model?.name, 'endpoint');
-  await model.draft({ usage: {} } as never);
-  assert.deepEqual(posted, [URL_]);
-  assert.equal(ai.runs.length, 0, 'the included model ran on a Worker that names its own endpoint');
-  /* AND AN ENDPOINT WITH NO `KEK` IS NO MODEL, NOT THE INCLUDED ONE: `slash.ts` says falling through there would answer his
-     asks on the account's neurons while he believes they go to his own provider. The checker added this line because no
-     case held it: with `workerSlashModel` falling back to `includedModel` after an endpoint that built nothing, all passed. */
-  assert.equal(workerSlashModel({ ...switchedOn(ai), SLASH_ENDPOINT: URL_ }, noGrants), undefined, 'a keyless endpoint fell through to the included model');
+  await assert.rejects(model!.draft({ usage: {} } as never), /would not open/u);
+  assert.deepEqual(sent, [], 'a call went out with no key (`loop/finish/defects.md` S2)');
+  assert.equal(ai.runs.length, 0);
+  store.close();
+});
+
+test('HIS KEY ON ANTHROPIC IS ASKED IN MESSAGES: x-api-key, the version header, and no bearer', async () => {
+  const ai = fakeAi([]);
+  const store = chosen('anthropic');
+  store.exec("UPDATE slash_meta SET value = 'https://api.anthropic.example.test' WHERE key = 'own.base_url'");
+  const sent: { url: string; headers: Headers }[] = [];
+  const model = workerSlashModel({ ...switchedOn(ai), KEK: FAKE_KEK }, hisVault, {
+    store: () => store,
+    send: async (url, init) => (
+      sent.push({ url: String(url), headers: new Headers(init.headers) }),
+      new Response(JSON.stringify({ content: [{ type: 'text', text: '{"drafts":[]}' }], usage: { input_tokens: 3, output_tokens: 2 } }), { status: 200 })
+    ),
+    open: () => async () => HIS_TOKEN,
+  });
+  assert.deepEqual(await model!.draft({ usage: {} } as never), { drafts: [] });
+  assert.equal(sent[0]?.url, 'https://api.anthropic.example.test/v1/messages');
+  assert.equal(sent[0]?.headers.get('x-api-key'), HIS_TOKEN);
+  assert.equal(sent[0]?.headers.get('anthropic-version'), '2023-06-01');
+  assert.equal(sent[0]?.headers.get('authorization'), null);
+  store.close();
 });
 
 /**
@@ -192,27 +254,41 @@ test('A BAD ANSWER IS BILLED AND ENDS THE RUN: prose from the included model is 
   own.close();
 });
 
-/* HIS OWN ENDPOINT WINS ON THE ENGINE TOO, and not only on the record's model. The checker measured the engine's choice
-   unpinned: with `workerSlashEngine` taking the included model first whenever it is on, every case stayed green, and a
-   version of this case driven through `workerSlashDoor` stayed green as well, because the door hands every ask the
-   asker's endpoint inference and so hides the engine's own. The engine is therefore asked here with no door around it. */
-test("HIS OWN ENDPOINT WINS ON THE ENGINE: with both set, the engine's own model is the endpoint and the fake AI never runs", async () => {
+/* AN AUTOMATION'S QUESTION GOES TO HIS KEY TOO (`loop/finish/agents.md` AGT-21, "the answer path"), signed by the rule, and
+   neither the included model nor the operator's ceiling is in it. The record's vault is his, seen through a view whose
+   `grants` holds the one key he picked, because this suite seals no key. */
+test("ON HIS OWN KEY AN AUTOMATION'S QUESTION IS ANSWERED THERE: one POST with his key, no run of the included model", async () => {
   const clock = fixedClock(Date.UTC(2026, 8, 23, 9));
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock });
+  const withKey = Object.create(api, {
+    kernel: { value: Object.create(api.kernel, { grants: { value: () => [{ id: GRANT, label: 'model provider', kind: 'api_token', revoked_at: null }] } }) },
+  }) as typeof api;
   const own = openSqlite();
   const ai = fakeAi([]);
-  const posted: string[] = [];
-  const engine = await workerSlashEngine({ ...switchedOn(ai), SLASH_ENDPOINT: URL_, KEK: FAKE_KEK }, () => api, {
+  const sent: { url: string; authorization: string | null }[] = [];
+  const opened: (string | undefined)[] = [];
+  const deps = {
     sql: own,
     clock,
-    send: async (url, _init) => (posted.push(String(url)), new Response('', { status: 503 })),
-    open: () => async () => null,
-  });
-  assert.ok(engine);
-  await engine.propose('Which tasks are open?', OWNER);
-  assert.ok(posted.length > 0, 'nothing went to the endpoint');
-  assert.equal(ai.runs.length, 0, 'the included model ran on a Worker that names its own endpoint');
+    send: async (url: URL, init: RequestInit) => (
+      sent.push({ url: String(url), authorization: new Headers(init.headers).get('authorization') }),
+      new Response(JSON.stringify({ choices: [{ message: { content: '{"answer":4.25}' } }], usage: { prompt_tokens: 9, completion_tokens: 3 } }), { status: 200 })
+    ),
+    open: (_api: unknown, actor?: string) => (opened.push(actor), async () => HIS_TOKEN),
+  };
+  /* THE ENGINE BUILDS SLASH'S TABLES, and his choice is then written into them as Settings would save it. */
+  assert.ok(await workerSlashEngine({ ...switchedOn(ai), KEK: FAKE_KEK }, () => withKey, deps));
+  own.exec("UPDATE slash_settings SET tier = 'b', model = 'his-model', grant_id = ? WHERE singleton = 1", GRANT);
+  own.exec("INSERT INTO slash_meta (key, value) VALUES ('own.provider', 'openai'), ('own.base_url', 'https://gateway.example.test/v1')");
+
+  const answer = workerSlashAnswers({ ...switchedOn(ai), KEK: FAKE_KEK }, () => withKey, deps);
+  assert.ok(answer);
+  const out = await answer(ASK);
+  assert.ok(out.ok, JSON.stringify(out));
+  assert.deepEqual(sent, [{ url: URL_, authorization: `Bearer ${HIS_TOKEN}` }]);
+  assert.deepEqual(opened, ['rule:rate'], "his key was opened for somebody other than the rule that asked");
+  assert.equal(ai.runs.length, 0, 'the included model ran for a record set to its own key');
   sql.close();
   own.close();
 });

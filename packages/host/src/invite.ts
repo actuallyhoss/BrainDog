@@ -154,6 +154,12 @@ export function personName(raw: unknown): Result<string | null> {
   if (/[\p{Cc}\p{Zl}\p{Zp}\p{Bidi_Control}]/u.test(name) || INVISIBLE_INSIDE.test(name) || /[\u200C\u200D]/.test(name.replace(JOINER_SPELLING, '')))
     return malformed('That name has a hidden character in it, such as a line break or a direction mark. Type it again without it.');
   if (NOISE.test(name)) return malformed('That name has a character in it that draws no letter, such as an accent on its own. Type it again without it.');
+  /* A NAME NOBODY TYPED IS REFUSED, NOT STORED (`loop/finish/defects.md` H2): a form filled from a template stored
+     `{{first_name}} {{last_name}}` as a person's name, and every place the name is drawn said it for good. A merge
+     field is a doubled bracket around a word, `${first}`, `*|FNAME|*` or `%FIRST_NAME%`; a single bracket inside a
+     name stays a name. */
+  if (/[\p{Ps}]{2}[^\p{Ps}\p{Pe}]*[\p{Pe}]{2}/u.test(name) || /\$\{[^}]*\}/u.test(name) || /\*\|[^|]*\|\*/u.test(name) || /%[\p{L}_]+%/u.test(name))
+    return malformed('That name is a template field nobody filled in, such as {{first_name}}. Type the name itself.');
   return { ok: true, value: name.replace(SPACE_RUN, '$1') };
 }
 

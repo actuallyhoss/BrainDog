@@ -12,7 +12,12 @@
  * `install`, `rpc`, `import`, `pull` and `ask`, which is what `DRIVERS` says in sentences. Four since
  * `packages/record/test/refusals-install.test.ts` began driving `install` on September 22nd 2026, and
  * none later the same day: `rpc`, `import`, `pull` and `ask` each have a runner beside the file their
- * fixtures' `raises:` names, and `DRIVERS` says where. `rpc`'s covers 5 of its 30.
+ * fixtures' `raises:` names, and `DRIVERS` says where.
+ *
+ * AND `rpc` IS DRIVEN HERE AS A WHOLE FAMILY, because the runners beside its raisers each hold one slice
+ * and none of them could say which of the rest nothing drove. `rpc.mjs` drives every fixture it can
+ * against a self-host and names every one it cannot with the reason, on the fixture's own line: see
+ * its header, and `SCENES` there for the list.
  *
  * WHAT A DRIVER IS. One async function per `via`, `(input, fixture) => Envelope`, where `Envelope`
  * is `{ kind, code?, at?, fix?, extra? }` and `kind` is `refusal`, `conflict` or `accepted`. Nothing else in
@@ -81,11 +86,11 @@
  *   node --experimental-strip-types tools/refusals/run-via.mjs lint
  *   node --experimental-strip-types tools/refusals/run-via.mjs where
  *   node --experimental-strip-types tools/refusals/run-via.mjs where --json
- *   node --experimental-strip-types tools/refusals/run-via.mjs rpc        # says what is missing
+ *   node --experimental-strip-types tools/refusals/run-via.mjs rpc        # and names what it cannot drive
  *
- * Exit codes: 0 every fixture agreed with its surface; 1 at least one did not; 2 this `via` has no
- * driver, or nothing could be driven at all. 2 rather than 0 because a runner that ran nothing and
- * said nothing is the state this file exists to end.
+ * Exit codes: 0 every fixture agreed with its surface; 1 at least one did not, or was not driven;
+ * 2 this `via` has no driver, or nothing could be driven at all. 2 rather than 0 because a runner that
+ * ran nothing and said nothing is the state this file exists to end.
  */
 
 import { readFileSync } from 'node:fs';
@@ -313,14 +318,18 @@ async function driveWhere(input) {
  * Every `via` and what drives it. A `string` in place of a function is the reason there is none, and
  * it is printed rather than treated as an absence.
  *
- * THE SEVEN SENTENCES ARE ALL THE SAME REASON NOW, and they are still written out because each names
- * where its family is driven. None of the seven is missing a driver: each has one somewhere else, and
- * a second copy here would be two answers about one corpus. `rpc` is the one family whose driver
- * covers only part of it, and its sentence says which part.
+ * THE SENTENCES ARE ALL THE SAME REASON, and they are still written out because each names where its
+ * family is driven. None of them is missing a driver: each has one somewhere else, and a second copy
+ * here would be two answers about one corpus.
+ *
+ * `rpc` IS A FUNCTION AND NOT A SENTENCE, although its slices have runners elsewhere, because no one of
+ * those runners covers the family: see `rpc.mjs`. It is loaded when it is asked for and not before, so
+ * `lint` and `where` do not pay for the self-host it stands up.
  */
 const DRIVERS = {
   lint: driveLint,
   where: driveWhere,
+  rpc: async (input, fixture) => (await import('./rpc.mjs')).driveRpc(input, fixture),
   write: 'driven by `packages/kernel/test/refusals-write.test.ts` since e74a563b. Run: node --test --experimental-strip-types "packages/kernel/test/refusals-write.test.ts"',
   render: 'driven by `apps/web/test/refusals-render.test.ts` since e74a563b. Run: node --test --experimental-strip-types "apps/web/test/refusals-render.test.ts"',
   /* SIXTEEN SINCE `create-foreign-register` ARRIVED FROM `lint`, fifteen since the five `ACTION_`
@@ -330,13 +339,11 @@ const DRIVERS = {
      path. A `record/test` file and not a function here, for the reason `write` has one: `40 §6` puts
      the family there, and five of the thirteen need a SQLite record this file has no business opening. */
   install: 'driven by `packages/record/test/refusals-install.test.ts`: 13 of 16, and the three theme codes skipped by name. Run: node --test --experimental-strip-types "packages/record/test/refusals-install.test.ts"',
-  /* THE LAST FOUR READ "no driver" UNTIL SEPTEMBER 22ND 2026, a day after each had one. `389fbc15`,
+  /* `import`, `pull` AND `ask` READ "no driver" UNTIL SEPTEMBER 22ND 2026, a day after each had one. `389fbc15`,
      `cd5c0a86` and `9c62122f` put the runners in the packages whose files the fixtures name in
-     `raises:`, one file per raiser, so `rpc` and `pull` are split across packages and none of the four
-     is in the `record/test` or `connect/test` alone that `40 §6` first gave them. Run on that day:
-     `rpc` 5 of 30 driven (3 + 3 + 4 tests, one of them a todo), `import` 9 of 9 tests, `pull` 6 + 3,
-     `ask` 5. The 25 undriven `rpc` fixtures wait on `40 §4`'s seed records, which do not exist. */
-  rpc: 'driven for 5 of 30, each by a test beside the file its `raises:` names: `packages/host/test/refusals-rpc.test.ts` (BODY_MALFORMED, ROUTE_UNKNOWN), `apps/selfhost/test/refusals-rpc.test.ts` (UNAUTHORIZED, RECORD_UNAVAILABLE) and `packages/client/test/refusals-rpc.test.ts` (UNREACHABLE). The other 25 need a seeded record with a principal behind it, and `40 §4`\'s seeds are not built. Run: node --test --experimental-strip-types "packages/host/test/refusals-rpc.test.ts" "apps/selfhost/test/refusals-rpc.test.ts" "packages/client/test/refusals-rpc.test.ts"',
+     `raises:`, one file per raiser, so `pull` is split across packages and none of them is in
+     the `connect/test` alone that `40 §6` first gave them. Run on that day: `import` 9 of 9 tests,
+     `pull` 6 + 3, `ask` 5. */
   import: 'driven by `packages/kernel/test/refusals-import.test.ts`: all 7, one `tamper:` verb each, against a record the test builds because `40 §4`\'s seeds are not built. Run: node --test --experimental-strip-types "packages/kernel/test/refusals-import.test.ts"',
   pull: 'driven in two halves by the file each fixture\'s `raises:` names: the five raised in `packages/connect` by `packages/connect/test/refusals-pull.test.ts` through `runPull`, and the two raised in `packages/host/src/actions.ts` by `packages/host/test/refusals-pull.test.ts` through `sendAction`. Run: node --test --experimental-strip-types "packages/connect/test/refusals-pull.test.ts" "packages/host/test/refusals-pull.test.ts"',
   /* FIVE SINCE SEPTEMBER 23RD 2026, when `ANSWER_UNREADABLE` joined the family with its fixture and its runner learned
@@ -389,12 +396,20 @@ function compare(fixture, answer) {
 
 /* ── the command ────────────────────────────────────────────────────────────────────────────── */
 
-function borrowed(via) {
-  if (via !== 'lint') return new Map();
+/**
+ * What a via lends a fixture that carries no input of its own, and what the report calls it.
+ *
+ * `lint` BORROWS BODIES FROM `lint-inputs.json`; `rpc` HAS SCENES, and a scene is not a borrowed input
+ * but the state a call needs, built and then called. So the two are marked differently on the report,
+ * and a scene's entry may be a sentence instead, which is the reason that fixture is not driven.
+ */
+async function borrowed(via) {
+  if (via === 'rpc') return { source: 'scene', lent: (await import('./rpc.mjs')).SCENES };
+  if (via !== 'lint') return { source: 'borrowed', lent: new Map() };
   try {
-    return new Map(Object.entries(JSON.parse(readFileSync(INPUTS, 'utf8'))));
+    return { source: 'borrowed', lent: new Map(Object.entries(JSON.parse(readFileSync(INPUTS, 'utf8')))) };
   } catch (e) {
-    if (e?.code === 'ENOENT') return new Map();
+    if (e?.code === 'ENOENT') return { source: 'borrowed', lent: new Map() };
     throw new Error(`tools/refusals/lint-inputs.json is not JSON this reader can hand to JSON.parse: ${String(e)}`);
   }
 }
@@ -413,11 +428,11 @@ function borrowed(via) {
  * families' input formats in one chain with nothing saying which line belonged to which. See
  * `READERS`.
  */
-function inputFor(via, fixture, lent) {
+function inputFor(via, fixture, { source, lent }) {
   const own = READERS[via]?.(fixture.keys);
   if (own !== null && own !== undefined) return { source: 'fixture', input: own };
   const lending = lent.get(fixture.name);
-  if (lending !== undefined) return { source: 'borrowed', input: lending };
+  if (lending !== undefined) return { source, input: lending };
   return { source: 'none', input: null };
 }
 
@@ -458,6 +473,13 @@ const READERS = {
       ...(keys.has('subject') ? { subject: keys.get('subject') } : {}),
     };
   },
+  /* `call:` DECIDES WHETHER THERE IS AN INPUT, and `principal:` says who makes it. Both are flow
+     collections. A call with no principal is read as `null`, and `rpc.mjs` refuses to guess one. */
+  rpc: (keys) => {
+    const call = keys.get('call');
+    if (call === undefined) return null;
+    return { call: JSON.parse(call), principal: keys.has('principal') ? JSON.parse(keys.get('principal')) : null };
+  },
 };
 
 async function main(argv) {
@@ -480,7 +502,7 @@ async function main(argv) {
     return 2;
   }
 
-  const lent = borrowed(via);
+  const lent = await borrowed(via);
   const rows = [];
   for (const fixture of fixtures) {
     /* READING THE INPUT IS INSIDE THE REPORT AND NOT BESIDE IT, because it throws and the reader has
@@ -508,6 +530,12 @@ async function main(argv) {
       rows.push({ fixture: fixture.name, code: fixture.keys.get('code'), source, verdict: 'undriven', faults: ['carries no input, so nothing drives it'] });
       continue;
     }
+    /* A SENTENCE WHERE A SCENE WOULD BE IS THE REASON NOTHING DRIVES THIS ONE, and it is printed as
+       the fixture's fault so the report names it rather than counting it. */
+    if (typeof input === 'string') {
+      rows.push({ fixture: fixture.name, code: fixture.keys.get('code'), source, verdict: 'undriven', faults: [`not driven: ${input}`] });
+      continue;
+    }
     let answer;
     try {
       answer = await driver(input, fixture);
@@ -531,13 +559,17 @@ async function main(argv) {
   } else {
     process.stdout.write(`${via}: ${fixtures.length} fixtures\n`);
     for (const row of rows) {
-      const mark = row.verdict === 'agreed' ? 'ok  ' : 'FAIL';
-      process.stdout.write(`  ${mark} ${row.fixture}${row.source === 'borrowed' ? ' (borrowed)' : ''}\n`);
+      const mark = row.verdict === 'agreed' ? 'ok  ' : row.verdict === 'undriven' ? 'NONE' : 'FAIL';
+      process.stdout.write(`  ${mark} ${row.fixture}${row.source === 'borrowed' || row.source === 'scene' ? ` (${row.source})` : ''}\n`);
       for (const fault of row.faults) process.stdout.write(`       ${fault}\n`);
     }
     const agreed = rows.filter((r) => r.verdict === 'agreed').length;
     const lending = rows.filter((r) => r.source === 'borrowed').length;
-    process.stdout.write(`${agreed}/${rows.length} agreed with the surface; ${lending} ran on a borrowed input.\n`);
+    const undriven = rows.filter((r) => r.verdict === 'undriven').length;
+    process.stdout.write(
+      `${agreed}/${rows.length} agreed with the surface; ${lending} ran on a borrowed input` +
+        `${undriven === 0 ? '' : `; ${undriven} not driven, each with its reason above`}.\n`,
+    );
   }
 
   if (rows.length === 0) return 2;

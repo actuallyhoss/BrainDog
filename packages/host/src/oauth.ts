@@ -104,6 +104,15 @@ export type OAuthDeps = {
   approver: (request: Request, record: string) => Promise<Approver>;
   /** The text of a metadata document at an `https:` client id, at most `DOCUMENT_MOST_BYTES`, or `null`. Absent: no documents. */
   fetchDocument?: ((url: string) => Promise<string | null>) | undefined;
+  /**
+   * Every other address `/mcp` answers at on this host, beside `${issuer}/mcp`, or none: the self-host's loopback names
+   * (`apps/selfhost/src/oauth.ts`). Absent on the Cloud, which has one name.
+   *
+   * A CLIENT CHECKS THE RESOURCE AGAINST THE ADDRESS IT TYPED (RFC 9728 §3.3), so a request that reached one of these is
+   * told that one as the resource, and an app may name any of them as `resource`: a token minted here works at every
+   * name this host answers by, so none of them is a different resource.
+   */
+  resources?: readonly string[] | undefined;
 };
 
 /** What the consent screen draws for one held request, and what `GET /oauth/request` answers. */
@@ -148,6 +157,11 @@ export const escapeHtml = (text: string): string =>
  * is left unset on purpose: a browser holds a form's redirect to it too, and Allow's answer is a 303 to the app's own
  * address, which is exactly where the page must be able to send the person. No colour is named: the page takes the
  * browser's own light or dark, so it has no palette of its own to drift from the theme's.
+ *
+ * `same-origin` AND NOT `no-referrer`, BECAUSE ALLOW AND DENY ARE FORMS POSTED TO THIS ORIGIN. Under `no-referrer` a
+ * browser sends `Origin: null` on a form's POST (the Fetch standard's "append a request `Origin` header"), so
+ * `sameOrigin` refused every Allow and every Deny a person pressed. `same-origin` keeps the origin on this BrainDog's
+ * own requests and still sends nothing to an app: the redirect to its address carries `no-referrer` itself (`goTo`).
  */
 export function oauthPage(status: number, title: string, html: string, extra: Header[] = []): Response {
   const body = `<!doctype html>
@@ -156,7 +170,7 @@ export function oauthPage(status: number, title: string, html: string, extra: He
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<meta name="referrer" content="no-referrer">
+<meta name="referrer" content="same-origin">
 <title>${escapeHtml(title)}</title>
 <style>
 body { font-family: system-ui, sans-serif; line-height: 1.5; margin: 0; }
@@ -183,7 +197,7 @@ ${html}
       ['content-type', 'text/html; charset=utf-8'],
       ['cache-control', 'no-store'],
       ['x-content-type-options', 'nosniff'],
-      ['referrer-policy', 'no-referrer'],
+      ['referrer-policy', 'same-origin'],
       ['content-security-policy', "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'"],
       ...extra,
     ],
@@ -447,8 +461,18 @@ export const scopeSentence = (scope: OAuthScope): string =>
       ? 'Read your record and propose changes, which wait for you to decide.'
       : 'Read your record, propose changes, and change rows directly.';
 
-/** Whether a `resource` names the one resource this server protects (RFC 8707), with or without a trailing slash. */
-const isResource = (resource: string, issuer: string): boolean => resource === `${issuer}/mcp` || resource === `${issuer}/mcp/`;
+/**
+ * Whether a `resource` names the one resource this server protects (RFC 8707), by any address it has (`resources`),
+ * with or without a trailing slash.
+ */
+const isResource = (resource: string, deps: OAuthDeps): boolean =>
+  [`${deps.issuer}/mcp`, ...(deps.resources ?? [])].some((r) => resource === r || resource === `${r}/`);
+
+/** The resource as this request reached it: one of `resources` when it came in by that address, and the issuer's otherwise. */
+function resourceAt(request: Request, deps: OAuthDeps): string {
+  const reached = `${new URL(request.url).origin}/mcp`;
+  return deps.resources?.includes(reached) === true ? reached : `${deps.issuer}/mcp`;
+}
 
 /** Whether a client id is an address a metadata document may be read from: `https:`, a path, no fragment, no user. */
 function isDocumentUrl(id: string): boolean {
@@ -463,9 +487,12 @@ function isDocumentUrl(id: string): boolean {
 
 /* ── METADATA ──────────────────────────────────────────────────────────────────────────────────────── */
 
-/** RFC 9728: what `/mcp` is, and who issues its tokens. The `WWW-Authenticate` of `/mcp`'s 401 points here. */
-export const protectedResource = (issuer: string) => ({
-  resource: `${issuer}/mcp`,
+/**
+ * RFC 9728: what `/mcp` is, and who issues its tokens. The `WWW-Authenticate` of `/mcp`'s 401 points here. `resource`
+ * is `${issuer}/mcp` unless the request reached another of the host's names for it (`OAuthDeps.resources`).
+ */
+export const protectedResource = (issuer: string, resource = `${issuer}/mcp`) => ({
+  resource,
   authorization_servers: [issuer],
   scopes_supported: [...OAUTH_SCOPES],
   bearer_methods_supported: ['header'],
@@ -613,7 +640,7 @@ async function authorize(request: Request, deps: OAuthDeps): Promise<Response> {
   const scope = scopeAsked(q.get('scope'));
   if (scope === null) return back('invalid_scope', `BrainDog's scopes are ${OAUTH_SCOPES.join(', ')}.`);
   const resource = q.get('resource');
-  if (resource !== null && !isResource(resource, deps.issuer)) return back('invalid_target', `This server issues tokens for ${deps.issuer}/mcp and nothing else.`);
+  if (resource !== null && !isResource(resource, deps)) return back('invalid_target', `This server issues tokens for ${deps.issuer}/mcp and nothing else.`);
 
   const held: HeldRequest = { id: b64url(random(24)), client_id: client.client_id, redirect_uri: redirect, challenge, scope, state, expires: deps.now() + REQUEST_LIFE };
   if ((await deps.store({ op: 'hold', request: held })) === 'full')
@@ -754,7 +781,7 @@ async function token(request: Request, deps: OAuthDeps): Promise<Response> {
   if (row === null) return oauthError(400, 'invalid_grant', spent);
   if (textField(f.client_id) !== row.request.client_id) return oauthError(400, 'invalid_grant', 'This code was given to another app.');
   if (f.redirect_uri !== undefined && f.redirect_uri !== row.request.redirect_uri) return oauthError(400, 'invalid_grant', 'The redirect address is not the one this code was asked for.');
-  if (f.resource !== undefined && !isResource(textField(f.resource), deps.issuer)) return oauthError(400, 'invalid_target', `This server issues tokens for ${deps.issuer}/mcp and nothing else.`);
+  if (f.resource !== undefined && !isResource(textField(f.resource), deps)) return oauthError(400, 'invalid_target', `This server issues tokens for ${deps.issuer}/mcp and nothing else.`);
   if ((await challengeOf(verifier)) !== row.request.challenge) return oauthError(400, 'invalid_grant', 'The code_verifier does not match the code_challenge this sign-in began with.');
   const bearer = await openBearer(row.bearer_sealed, code);
   if (bearer === null) return oauthError(400, 'invalid_grant', spent);
@@ -772,7 +799,7 @@ export async function serveOAuthDoor(request: Request, deps: OAuthDeps): Promise
   const path = new URL(request.url).pathname.replace(/\/{2,}/g, '/').replace(/(.)\/+$/, '$1');
   const read = ['GET', 'HEAD'] as const;
   if (path === '/.well-known/oauth-protected-resource' || path === '/.well-known/oauth-protected-resource/mcp')
-    return onlyMethods(request, read) ?? json(200, protectedResource(deps.issuer));
+    return onlyMethods(request, read) ?? json(200, protectedResource(deps.issuer, resourceAt(request, deps)));
   if (path.startsWith('/.well-known/oauth-protected-resource/'))
     return oauthError(404, 'invalid_request', `This BrainDog protects one resource, ${deps.issuer}/mcp, described at /.well-known/oauth-protected-resource.`);
   if (path === '/.well-known/oauth-authorization-server')

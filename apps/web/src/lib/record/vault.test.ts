@@ -220,7 +220,7 @@ test('an answer with no plan hash is no plan, so nothing can be installed from i
 });
 
 test('RECONNECT OPENS THE KEY A PAUSED ACTION NAMED: its row to replace, or Add under that name, and the action to resume', () => {
-  const row = { id: 'cred_1', label: 'Stripe read', opens: 'api.stripe.com', project: null, sealed: true, opened: 3, lastOpened: null, grant: 'g_1' };
+  const row = { id: 'cred_1', label: 'Stripe read', opens: 'api.stripe.com', project: null, scope: null, sealed: true, opened: 3, lastOpened: null, grant: 'g_1' };
   const asked = (href: string) => new URL(href, 'https://x.example').searchParams;
   assert.deepEqual(reconnectOf(asked('/vault?reconnect=stripe%20READ&then=stripe-balance'), [row]), { mode: 'replace', row, then: 'stripe-balance' });
   assert.deepEqual(reconnectOf(asked('/vault?reconnect=GitHub%20deploy'), [row]), { mode: 'add', label: 'GitHub deploy', then: null });

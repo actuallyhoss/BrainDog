@@ -48,6 +48,7 @@ import { entryOf, learn, namesOf, refMapOf, targetsOf, type RecordRow, type RefM
 import { REDUCES, SUMS, type PageBlock, type PageDecl } from './schema.ts';
 import { compile } from './where.ts';
 import { drawerOf } from '../page/kinds/index.ts';
+import { pathOf } from '../ui/icons.ts';
 import type { BlockResult as Answer } from '@braindog/kernel';
 
 export type Fetch = NonNullable<ClientOptions['fetch']>;
@@ -188,7 +189,28 @@ export type LiveBlock = BlockResult & {
    * which a bare figure typed into an empty money box is written in (`inputs-write.ts` `home`).
    */
   home?: string | null;
+  /** A block with a column `as: scope`: what each of those cells draws its chip from (`scopeCellsOf`). */
+  scopeCells?: ScopeCells;
 };
+
+/** The mark and hue of the project a row applies to, as the kernel answers them beside `scopes` (`scope_marks`). */
+export type ScopeMark = { mark: string | null; hue: number | null };
+
+/**
+ * WHAT A SCOPE CELL DRAWS ITS CHIP FROM, handed to the renderer beside the block (agents C8).
+ *
+ * `columns` are the indexes of the columns declared `as: scope`; a cell there holds the project's name, or
+ * `everywhere`. `marks` is each name's mark and hue, and `glyph` the globe's path, which the renderer draws for
+ * everywhere because it ships no glyph art of its own (05 §3).
+ *
+ * BY NAME, AND NOT BY ROW, because a board or a checklist keeps a row somebody just moved where they left it
+ * (`page-writes.ts` `keptSegment`), so a list aligned with the rows as read would hand a card another row's mark. A
+ * name is the cell's own text wherever the row ends up.
+ *
+ * THE RENDERER READS THE SAME SHAPE under the same name (`packages/render/svelte/p/Table.svelte`, `Cards.svelte`),
+ * and it is written out there rather than imported, because this app's modules are not the render package's to read.
+ */
+export type ScopeCells = { columns: readonly number[]; everywhere: string; glyph: string | null; marks: ReadonlyMap<string, ScopeMark> };
 
 export type LivePage = { page: LivePageDecl; blocks: LiveBlock[] };
 
@@ -199,6 +221,42 @@ export type Opened =
 
 /** What a scope cell reads for a row that applies to every project, as the sample says it. */
 const EVERYWHERE = 'Everywhere';
+
+/**
+ * One row's half of `scope_marks`, narrowed: a mark that is words, and a hue that is a whole degree on the wheel, else
+ * `null` in that half. The kernel checks both (`pages.ts` `markOf`); a record on another build is read, not trusted.
+ */
+const scopeMarkOf = (v: unknown): ScopeMark | null => {
+  if (!isObject(v)) return null;
+  const { mark, hue } = v;
+  return {
+    mark: typeof mark === 'string' && mark.trim() !== '' ? mark : null,
+    hue: typeof hue === 'number' && Number.isInteger(hue) && hue >= 0 && hue <= 359 ? hue : null,
+  };
+};
+
+/**
+ * What a block's scope cells draw their chips from, or nothing for a block with no column `as: scope`.
+ *
+ * THE MARK IS READ BESIDE THE NAME THE CELL ALREADY HOLDS, from `scope_marks`, which the kernel reads off the same
+ * project rows as `scopes`, so a chip and the words in it never come from two reads. A `scope_marks` that is not one
+ * entry a row is left out whole, and the cells keep their words with no mark.
+ */
+function scopeCellsOf(columns: readonly { as?: unknown }[], rows: readonly { cells: (string | null)[] }[], said: unknown): ScopeCells | undefined {
+  const at = columns.flatMap((c, i) => (c.as === 'scope' ? [i] : []));
+  if (at.length === 0) return undefined;
+  const each = Array.isArray(said) && said.length === rows.length ? said : [];
+  const marks = new Map<string, ScopeMark>();
+  rows.forEach((row, n) => {
+    const mark = scopeMarkOf(each[n]);
+    if (!mark) return;
+    for (const i of at) {
+      const name = row.cells[i];
+      if (typeof name === 'string' && name !== '' && name !== EVERYWHERE) marks.set(name, mark);
+    }
+  });
+  return { columns: at, everywhere: EVERYWHERE, glyph: pathOf('globe', undefined) ?? null, marks };
+}
 
 /** The register a block's rows belong to, when it has one this build can draw. */
 function registerOf(b: Answered): string | null {
@@ -248,7 +306,8 @@ const columnsOf = (b: Answered) => {
      place. A block over no register has nothing to ask and truncates as the text it is drawn as. */
   const register = registerOf(b) ?? '';
   return (b.columns ?? []).map((c) => {
-    /* A SCOPE COLUMN ON A CARD IS A FACT: the cell says where the row applies, filled from `scopes` below. */
+    /* A SCOPE COLUMN ON A CARD IS A FACT: the cell says where the row applies, filled from `scopes` below, and the
+       renderer draws it as a chip from the block's `scopeCells`. */
     const as = c.as === 'scope' && b.kind === 'cards' ? 'fact' : roleOf(c.as);
     return {
       field: c.field,
@@ -493,6 +552,8 @@ function walkOf(v: unknown): Walk | null {
     crossed: isStep(v.crossed) ? v.crossed : null,
     /* A WALK OF SEVERAL, one a currency, carries its own remembered cash. */
     ...(pastOf(v.past) ? { past: pastOf(v.past)! } : {}),
+    /* THE WALK'S OWN LENGTH, `horizon: 'last'` resolved (kernel's `Runway.horizon`), for the horizon knob's readout. */
+    ...(typeof v.horizon === 'number' ? { horizon: v.horizon } : {}),
   };
 }
 
@@ -604,6 +665,8 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
     matched = 0,
     readings,
     scopes,
+    /* EACH ROW'S PROJECT MARK, taken by name so it reaches the page narrowed on `scopeCells` and never raw through `rest`. */
+    scope_marks: scopeMarked,
     rings,
     inherited,
     refusals = [],
@@ -877,6 +940,9 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
       row.cells[i] = scopes?.[n] ?? (live ? (row.cells[i] ?? null) : EVERYWHERE);
     });
   });
+  /* AND THE CHIP EACH OF THOSE CELLS WEARS: the project's mark in its hue, or the globe for everywhere (agents C8). A
+     run's project is where it was placed, and a run placed nowhere is not "everywhere", so an agent's runs draw words. */
+  const scopeCells = live ? undefined : scopeCellsOf(b.columns ?? [], rows, scopeMarked);
   /* EACH CARD'S NEXT STEP IS THE RECORD'S ANSWER, `nexts`, written into the cell and never into the row, unlike a ring.
      The column names a field of the STEPS list, and the card's own list may hold a field of the same name: the measured
      desk's areas have a `what` of their own, so merged into the row it would also have replaced the card's `what` in
@@ -912,6 +978,7 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
     ...(live ? { quiet: got.map((r) => isStale({ fields: r.fields as never, updated_at: r.updated_at ?? r.created_at }, now)) } : {}),
     ...(working ? { working } : {}),
     ...(workingNow ? { working_now: workingNow } : {}),
+    ...(scopeCells ? { scopeCells } : {}),
   };
 }
 

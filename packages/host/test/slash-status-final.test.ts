@@ -16,6 +16,10 @@
  *
  * THE REAL `endpointInference` AND THE REAL `createSlash`, reached by relative paths as `slash-answers-unreachable.test.ts`
  * reaches them, because which throws carry which mark is this host's decision and how each is settled is the package's.
+ *
+ * THE KEY IS HIS OWN KEY NOW (`loop/finish/agents.md` AGT-21): the grant he picked by id, opened through `slashOwnInference`,
+ * which always requires it. No label chooses a key any more (`loop/finish/defects.md` S1), so the cases that opened the
+ * grant labelled `slash` open his instead, and the findings hold on that path unchanged.
  */
 
 import { test } from 'node:test';
@@ -23,7 +27,7 @@ import assert from 'node:assert/strict';
 
 import { codeOf, fixOf } from '@braindog/ports';
 
-import { endpointInference, slashFromEnv, slashInferenceOf, type SlashHostDeps } from '../src/slash.ts';
+import { endpointInference, slashFromEnv, slashInferenceOf, slashOwnInference, type SlashHostDeps } from '../src/slash.ts';
 import { createSlash } from '../../slash/src/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
@@ -32,7 +36,9 @@ const FAKE_KEY = 'fake-key-for-tests-only';
 const URL_ = 'https://gateway.example.test/v1/chat/completions';
 const RATE = { rule: 'rate', step: 0, question: 'What rate applies to Gold?', shape: 'number' as const };
 const CALL = { model: 'glm-5.3-flash', messages: [], maxTokens: 10, jsonSchema: {} };
-const SLASH_GRANT = { id: 'g_01JZ8QK3F7R2M9V4XN6TCB5HAE', label: 'slash', revoked_at: null };
+const HIS_GRANT = { id: 'g_01JZ8QK3F7R2M9V4XN6TCB5HAE', label: 'model provider', kind: 'api_token', revoked_at: null };
+/** His own key as Settings saves it, at the address `URL_` is the chat-completions path of. */
+const OWN = { provider: 'openai' as const, base_url: 'https://gateway.example.test/v1', model: 'his-model', grant_id: HIS_GRANT.id };
 
 function endpoint(answer: () => Response) {
   const sent: { authorization: string | null }[] = [];
@@ -55,9 +61,9 @@ function slash() {
   return { engine, rows, close: () => sql.close() };
 }
 
-/** The Worker's shape of deps: the vault's `slash` grant, opened by `open`, over `send`. */
+/** The Worker's shape of deps: the vault holding the grant he picked, opened by `open`, over `send`. */
 const vault = (send: SlashHostDeps['send'], open: SlashHostDeps['openKey'], extra: Partial<SlashHostDeps> = {}): SlashHostDeps => ({
-  grants: () => [SLASH_GRANT],
+  grants: () => [HIS_GRANT],
   openKey: open,
   send,
   ...extra,
@@ -97,17 +103,17 @@ test('408, 425, 429 AND 5XX ARE THE PLAIN THROW THE LADDER ASKS AGAIN; 400, 401,
 
 /* ── what the package makes of them ──────────────────────────────────────── */
 
-test('A 401 ON THE VAULT KEY IS ONE POST, SETTLED UNDER THE DASH, and the sentence names the key and the status', async () => {
+test('A 401 ON HIS OWN KEY IS ONE POST, SETTLED UNDER THE DASH, and the sentence names the key and the status', async () => {
   const s = slash();
   try {
     const net = endpoint(status(401));
-    const inference = slashInferenceOf(CONFIG, vault(net.send, async () => FAKE_KEY))!;
+    const inference = slashOwnInference(OWN, vault(net.send, async () => FAKE_KEY))!;
     const out = await s.engine.answer(RATE, inference as never);
     assert.equal(net.sent.length, 1);
     assert.equal(net.sent[0]!.authorization, `Bearer ${FAKE_KEY}`);
     /* ANY CODE BUT `UNREACHABLE` IS ONE `serveAsks` ACKS `done`, so this is what keeps the ladder from asking again. */
     assert.equal(codeOf(out), 'PULL_REQUEST_REFUSED', fixOf(out));
-    assert.equal(fixOf(out), 'rule.rate asked Slash at step 1, and the provider refused the key labelled slash (401), so the run stopped there rather than ask it again.');
+    assert.equal(fixOf(out), 'rule.rate asked Slash at step 1, and the provider refused your own key for Slash (401), so the run stopped there rather than ask it again.');
     assert.deepEqual(s.rows(), [{ model: '-', status: 'error', code: 'PULL_REQUEST_REFUSED' }]);
     assert.equal(s.engine.status().asks.used, 0);
     assert.doesNotMatch(fixOf(out), new RegExp(FAKE_KEY), 'the key is in the sentence');
@@ -121,7 +127,7 @@ test('A 400 AND A 404 ARE FINAL TOO, and the sentence names the status and says 
     const s = slash();
     try {
       const net = endpoint(status(n));
-      const out = await s.engine.answer(RATE, slashInferenceOf(CONFIG, vault(net.send, async () => FAKE_KEY)) as never);
+      const out = await s.engine.answer(RATE, slashOwnInference(OWN, vault(net.send, async () => FAKE_KEY)) as never);
       assert.equal(codeOf(out), 'PULL_REQUEST_REFUSED', fixOf(out));
       assert.equal(
         fixOf(out),
@@ -137,7 +143,7 @@ test('A 400 AND A 404 ARE FINAL TOO, and the sentence names the status and says 
 test('A 503 IS STILL UNREACHABLE, and so still the one code the ladder asks again', async () => {
   const s = slash();
   try {
-    const out = await s.engine.answer(RATE, slashInferenceOf(CONFIG, vault(endpoint(status(503)).send, async () => FAKE_KEY)) as never);
+    const out = await s.engine.answer(RATE, slashOwnInference(OWN, vault(endpoint(status(503)).send, async () => FAKE_KEY)) as never);
     assert.equal(codeOf(out), 'UNREACHABLE', fixOf(out));
   } finally {
     s.close();
@@ -146,11 +152,11 @@ test('A 503 IS STILL UNREACHABLE, and so still the one code the ladder asks agai
 
 /* ── a key that will not open ────────────────────────────────────────────── */
 
-test('WITH keyRequired, A `slash` GRANT THAT WILL NOT OPEN SENDS NOTHING AND WRITES NO LEDGER ROW', async () => {
+test('HIS OWN KEY THAT WILL NOT OPEN SENDS NOTHING AND WRITES NO LEDGER ROW, whatever keyRequired says', async () => {
   const s = slash();
   try {
     const net = endpoint(status(401));
-    const inference = slashInferenceOf(CONFIG, vault(net.send, async () => null, { keyRequired: true }))!;
+    const inference = slashOwnInference(OWN, vault(net.send, async () => null))!;
     await assert.rejects(inference.complete(CALL), (e: unknown) => {
       assert.equal((e as { sent?: unknown }).sent, false, 'the throw does not say that nothing was sent');
       return true;
@@ -166,16 +172,25 @@ test('WITH keyRequired, A `slash` GRANT THAT WILL NOT OPEN SENDS NOTHING AND WRI
   }
 });
 
-test('WITH keyRequired, A GRANT REVOKED AFTER THE CHECK IS A THROW TOO, and not a keyless POST', async () => {
+test('HIS OWN KEY REVOKED AFTER THE ADAPTER WAS BUILT IS A THROW TOO, and not a keyless POST', async () => {
+  const net = endpoint(status(401));
+  let grants: (typeof HIS_GRANT)[] = [HIS_GRANT];
+  const inference = slashOwnInference(OWN, { grants: () => grants, openKey: async () => FAKE_KEY, send: net.send })!;
+  grants = [];
+  await assert.rejects(inference.complete(CALL));
+  assert.equal(net.sent.length, 0);
+});
+
+test("WITH keyRequired, THIS HOST'S OWN ENDPOINT WITH NO OPERATOR KEY IS A THROW, and not a keyless POST", async () => {
   const net = endpoint(status(401));
   const inference = slashInferenceOf(CONFIG, { grants: () => [], openKey: async () => FAKE_KEY, send: net.send, keyRequired: true })!;
   await assert.rejects(inference.complete(CALL));
   assert.equal(net.sent.length, 0);
 });
 
-/* THE SELF-HOST'S LOCAL MODEL, WHICH IS WHY THE RULE IS AN OPTION AND NOT THE DEFAULT: no `slash` grant, and a server on
-   the owner's own machine that asks for no key. */
-test('WITHOUT keyRequired, NO `slash` GRANT IS ONE KEYLESS POST, as a local model on a self-host needs', async () => {
+/* THE SELF-HOST'S LOCAL MODEL, WHICH IS WHY THE RULE IS AN OPTION AND NOT THE DEFAULT: no operator key, and a server on
+   the owner's own machine that asks for none. */
+test('WITHOUT keyRequired, THE HOST ENDPOINT WITH NO OPERATOR KEY IS ONE KEYLESS POST, as a local model on a self-host needs', async () => {
   const net = endpoint(() => new Response(JSON.stringify({ choices: [{ message: { content: '{"answer":4}' } }] }), { status: 200 }));
   const inference = slashInferenceOf(CONFIG, { grants: () => [], openKey: async () => null, send: net.send })!;
   await inference.complete(CALL);

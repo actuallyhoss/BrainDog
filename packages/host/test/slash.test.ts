@@ -18,13 +18,14 @@ import {
   answerOf,
   endpointInference,
   endpointModel,
-  slashByokOf,
+  slashBaseUrlOf,
   slashFromEnv,
-  slashGrantIdOf,
   slashInferenceOf,
   slashModelNameOf,
   slashModelOf,
   slashNamedEngine,
+  slashOwnInference,
+  slashOwnKeyOf,
   slashRecord,
   SLASH_INSTRUCTIONS,
   SLASH_PLAN_INSTRUCTIONS,
@@ -369,21 +370,58 @@ test('A PREDICATE THE GRAMMAR REFUSES FALLS BACK ON THE RECORD\'S OWN SEARCH, wh
   own.close();
 });
 
-/* ── tier `b`: the owner's own key, named by the setting, and the owner's own model name (research-slash-routes K1) ─── */
+/* ── his own key: named by the setting, asked in the provider's shape, with the model its owner typed (AGT-21) ────── */
 
-/** Two live grants and a revoked one. `g_...HAD` is the host's `slash`-labelled key and `g_...HAE` is the one the owner names. */
+/** Two live grants and a revoked one. `g_...HAD` is labelled `slash`, which chooses nothing now; `g_...HAE` is the one he picks. */
 const SLASH_GRANT = 'g_01JZ8QK3F7R2M9V4XN6TCB5HAD';
 const OWN_GRANT = 'g_01JZ8QK3F7R2M9V4XN6TCB5HAE';
 const GONE_GRANT = 'g_01JZ8QK3F7R2M9V4XN6TCB5HAF';
 const VAULT = [
-  { id: SLASH_GRANT, label: 'slash', revoked_at: null },
-  { id: OWN_GRANT, label: 'openai', revoked_at: null },
-  { id: GONE_GRANT, label: 'anthropic', revoked_at: '2026-09-01T00:00:00.000Z' },
+  { id: SLASH_GRANT, label: 'slash', kind: 'api_token', revoked_at: null },
+  { id: OWN_GRANT, label: 'openai', kind: 'api_token', revoked_at: null },
+  { id: GONE_GRANT, label: 'anthropic', kind: 'api_token', revoked_at: '2026-09-01T00:00:00.000Z' },
 ];
 const keyOf = (id: string) => `fake-key-of-${id}`;
 const bearer = (net: { sent: { init: RequestInit }[] }, i: number) => (net.sent[i]!.init.headers as Record<string, string>).authorization;
+/** His own key as the store keeps it once he picks it: chat completions at a public address, and the model he typed. */
+const OWN = { provider: 'openai' as const, base_url: 'https://api.example.test/v1', model: 'gpt-4o-mini', grant_id: OWN_GRANT };
 
-test('TIER b ASKS WITH THE KEY ITS SETTING NAMES AND THE MODEL ITS OWNER TYPED, and not the slash-labelled key or SLASH_MODEL', async () => {
+test('HIS OWN KEY IS READ FROM THE STORE AS SETTINGS SAVED IT, and not before a key is picked', async () => {
+  const own = openSqlite();
+  const clock = fixedClock(Date.UTC(2026, 8, 22, 9));
+  const api = await createRecordApi({ sql: openSqlite(), clock });
+  const slash = createSlash({ sql: own, clock, inference: { complete: async () => assert.fail('nothing is asked here') }, record: slashRecord(api) });
+  assert.equal(slashOwnKeyOf(own), null);
+  assert.ok(slash.configure({ source: 'key', provider: 'anthropic', base_url: 'https://api.example.test', model: '  claude-x ', grant_id: OWN_GRANT }, owner).ok);
+  assert.deepEqual(slashOwnKeyOf(own), { provider: 'anthropic', base_url: 'https://api.example.test', model: 'claude-x', grant_id: OWN_GRANT });
+  assert.ok(slash.configure({ source: 'included' }, owner).ok);
+  assert.equal(slashOwnKeyOf(own), null);
+  own.close();
+});
+
+test('AN ADDRESS FOR HIS KEY IS https ON THE PUBLIC INTERNET: plain http, loopback, a private range and a local name are refused', () => {
+  assert.deepEqual(slashBaseUrlOf(' https://api.anthropic.com/ '), { ok: true, value: 'https://api.anthropic.com' });
+  assert.deepEqual(slashBaseUrlOf('https://api.openai.com/v1/'), { ok: true, value: 'https://api.openai.com/v1' });
+  for (const refused of [
+    'http://api.openai.com/v1',
+    'https://127.0.0.1/v1',
+    'https://localhost:11434/v1',
+    'https://10.0.0.5/v1',
+    'https://192.168.1.2/v1',
+    'https://169.254.169.254/latest',
+    'https://[::1]/v1',
+    'https://ollama/v1',
+    'https://box.local/v1',
+    'https://user:pass@api.openai.com/v1',
+    'not an address',
+  ]) {
+    const out = slashBaseUrlOf(refused);
+    assert.equal(out.ok, false, `${refused} was taken`);
+    assert.equal(!out.ok && 'refusal' in out ? out.refusal.at : null, 'base_url');
+  }
+});
+
+test('HIS OWN KEY ASKS BOTH PASSES WITH THE KEY HE PICKED AND THE MODEL HE TYPED, and never the slash-labelled key or SLASH_MODEL', async () => {
   const sql = openSqlite();
   const own = openSqlite();
   const clock = fixedClock(Date.UTC(2026, 8, 22, 9));
@@ -400,69 +438,77 @@ test('TIER b ASKS WITH THE KEY ITS SETTING NAMES AND THE MODEL ITS OWNER TYPED, 
   const config = slashFromEnv({ SLASH_ENDPOINT: 'http://localhost:11434/v1/chat/completions', SLASH_MODEL: 'llama3' }, { operatorKey: false });
   const slash = createSlash({ sql: own, clock, inference: slashInferenceOf(config, deps)!, record: slashRecord(api) });
 
-  /* NOTHING TO OPEN BEFORE THE OWNER NAMES A GRANT: the settings row starts with none, and `propose` then says so. */
-  assert.equal(slashGrantIdOf(own), null);
-  assert.equal(slashByokOf(config, deps, slashGrantIdOf(own)), undefined);
-
-  assert.ok(slash.configure({ tier: 'b', model: 'gpt-4o-mini', grant_id: OWN_GRANT }, owner).ok);
-  assert.equal(slashGrantIdOf(own), OWN_GRANT);
-  const byok = slashByokOf(config, deps, slashGrantIdOf(own));
-  assert.ok(byok, 'a named, live grant built no adapter');
-  /* BUILDING IT OPENS NOTHING. The key is opened on the call, as the host's own path opens it, so a propose that finds no
-     rows and calls no model is not a `grant.read` on the record. */
+  assert.ok(slash.configure({ source: 'key', provider: 'openai', base_url: OWN.base_url, model: OWN.model, grant_id: OWN_GRANT }, owner).ok);
+  const chosen = slashOwnKeyOf(own);
+  assert.deepEqual(chosen, OWN);
+  const key = slashOwnInference(chosen!, deps);
+  assert.ok(key, 'a picked, live grant built no adapter');
+  /* BUILDING IT OPENS NOTHING. The key is opened on the call, so a propose that finds no rows and calls no model is not a
+     `grant.read` on the record. */
   assert.deepEqual(opened, []);
 
-  const out = await slash.propose('Which tasks are open?', owner, byok);
+  /* BOTH PASSES ON HIS KEY: the host hands the one adapter to `propose` as `byok` and as the pass-1 `inference`. */
+  const out = await slash.propose('Which tasks are open?', owner, key, undefined, key);
   assert.ok(out.ok, `refused: ${JSON.stringify(out)}`);
   assert.equal(out.value.body_kind, 'rowset');
   assert.equal(net.sent.length, 2);
-  /* THE DRAFTING CALL IS THE HOST'S, because the package drafts the predicate on its own inference on every tier
-     (`propose.ts` hands `byok` to the proposal alone), so it goes with the `slash` key and `SLASH_MODEL`. */
-  assert.equal(bearer(net, 0), `Bearer ${keyOf(SLASH_GRANT)}`);
-  assert.equal(sentModel(net, 0), 'llama3');
-  /* THE PROPOSAL IS THE OWNER'S: the grant the setting names, and the model name as the owner typed it. */
+  assert.deepEqual(net.sent.map((s) => s.url), [`${OWN.base_url}/chat/completions`, `${OWN.base_url}/chat/completions`]);
+  assert.equal(bearer(net, 0), `Bearer ${keyOf(OWN_GRANT)}`);
   assert.equal(bearer(net, 1), `Bearer ${keyOf(OWN_GRANT)}`);
+  assert.equal(sentModel(net, 0), 'gpt-4o-mini');
   assert.equal(sentModel(net, 1), 'gpt-4o-mini');
-  assert.deepEqual(opened, [SLASH_GRANT, OWN_GRANT]);
+  /* THE `slash`-LABELLED KEY IS NEVER OPENED (`loop/finish/defects.md` S1). */
+  assert.deepEqual(opened, [OWN_GRANT, OWN_GRANT]);
   assert.ok(!String(net.sent[1]!.init.body).includes(keyOf(OWN_GRANT)), 'the key went into what the model reads');
 
   /* A SHORT NAME THE OWNER TYPED IS STILL THE OWNER'S. `SLASH_MODEL` is the host's answer to its own tier `a` routing, and
      on the owner's key and bill it has no say: `glm-5.3` goes out as `glm-5.3`, where the host's path would send `llama3`. */
-  await byok.complete(ask('glm-5.3'));
+  const typed = slashOwnInference({ ...OWN, model: 'glm-5.3' }, deps)!;
+  await typed.complete(ask('glm-5.3'));
   assert.equal(sentModel(net, 2), 'glm-5.3');
 
-  /* AN OPERATOR'S KEY DOES NOT STAND IN FOR THE OWNER'S: a self-host with `SLASH_KEY` set still sends the named grant. */
-  const operated = slashByokOf({ ...config!, key: 'fake-operator-key' }, deps, OWN_GRANT)!;
-  await operated.complete(ask('gpt-4o-mini'));
-  assert.equal(bearer(net, 3), `Bearer ${keyOf(OWN_GRANT)}`);
+  /* NO ADAPTER for a grant that is revoked, one the vault never held, one that is not an API token, and a host that
+     cannot open keys. */
+  assert.equal(slashOwnInference({ ...OWN, grant_id: GONE_GRANT }, deps), undefined);
+  assert.equal(slashOwnInference({ ...OWN, grant_id: 'g_01JZ8QK3F7R2M9V4XN6TCB5HAG' }, deps), undefined);
+  assert.equal(slashOwnInference(OWN, { ...deps, grants: () => VAULT.map((g) => ({ ...g, kind: 'password' })) }), undefined);
+  assert.equal(slashOwnInference(OWN, { ...deps, openKey: null }), undefined);
+  /* AND FOR AN ADDRESS THE RULES REFUSE, stored before a rule changed: it is checked again on every call. */
+  assert.equal(slashOwnInference({ ...OWN, base_url: 'https://10.0.0.5/v1' }, deps), undefined);
 
-  /* NO ADAPTER, AND SO THE PACKAGE'S OWN FORBIDDEN, for a grant that is revoked, one the vault never held, a host that
-     cannot open keys, and a host with no endpoint. */
-  assert.equal(slashByokOf(config, deps, GONE_GRANT), undefined);
-  assert.equal(slashByokOf(config, deps, 'g_01JZ8QK3F7R2M9V4XN6TCB5HAG'), undefined);
-  assert.equal(slashByokOf(config, { ...deps, openKey: null }, OWN_GRANT), undefined);
-  assert.equal(slashByokOf(undefined, deps, OWN_GRANT), undefined);
-  /* THE DRAFT IS QUEUED AGAIN BECAUSE THE REFUSAL COMES AFTER THE ROWS. The first writing of this line asked with the
-     queue empty, the draft came back `{}`, the rules found no rows, and the package answered `ok` with `model: '-'`
-     before it ever looked for a key (`propose.ts`: zero rows, zero inference). That was the package being right. */
-  answers.push('{"registers":["tasks"],"where":{"field":"state","is":"open"},"q":null}');
-  const refused = await slash.propose('Which tasks are open?', owner, slashByokOf(config, deps, GONE_GRANT));
-  assert.ok(!refused.ok && 'refusal' in refused, `answered: ${JSON.stringify(refused)}`);
-  assert.equal(refused.refusal.code, 'FORBIDDEN');
-
-  /* A GRANT REVOKED BETWEEN THE ADAPTER AND THE CALL, OR ONE THE HOST COULD NOT OPEN, SENDS NOTHING. The host's own path
-     would go out with no `authorization` at all, which to a provider is an anonymous call on the owner's account. */
+  /* A GRANT REVOKED BETWEEN THE ADAPTER AND THE CALL, OR ONE THE HOST COULD NOT OPEN, SENDS NOTHING. A call with no
+     `authorization` at all is, to a provider, an anonymous call on the owner's account (`loop/finish/defects.md` S2). */
   const sent = net.sent.length;
-  const shut = slashByokOf(config, { ...deps, openKey: async () => null }, OWN_GRANT)!;
-  await assert.rejects(shut.complete(ask('gpt-4o-mini')), /could not be opened/u);
+  const shut = slashOwnInference(OWN, { ...deps, openKey: async () => null })!;
+  await assert.rejects(shut.complete(ask('gpt-4o-mini')), /would not open/u);
   let vault = VAULT;
-  const revoking = slashByokOf(config, { ...deps, grants: () => vault }, OWN_GRANT)!;
+  const revoking = slashOwnInference(OWN, { ...deps, grants: () => vault })!;
   vault = VAULT.map((g) => (g.id === OWN_GRANT ? { ...g, revoked_at: '2026-09-22T09:00:00.000Z' } : g));
-  await assert.rejects(revoking.complete(ask('gpt-4o-mini')), /could not be opened/u);
+  await assert.rejects(revoking.complete(ask('gpt-4o-mini')), /would not open/u);
   assert.equal(net.sent.length, sent);
 
   sql.close();
   own.close();
+});
+
+test('HIS OWN KEY ON ANTHROPIC IS ASKED IN MESSAGES: its address, x-api-key and the version, the schema in the system text', async () => {
+  const net = endpoint(() =>
+    new Response(JSON.stringify({ content: [{ type: 'text', text: '{"answer":4}' }], usage: { input_tokens: 12, output_tokens: 3 } }), { status: 200 }),
+  );
+  const deps = { grants: () => VAULT, openKey: async (g: { id: string }) => keyOf(g.id), send: net.send };
+  const key = slashOwnInference({ ...OWN, provider: 'anthropic', base_url: null, model: 'claude-x' }, deps)!;
+  const reply = await key.complete(ask('glm-5.3'));
+  assert.deepEqual(reply, { text: '{"answer":4}', usage: { in: 12, out: 3 }, model: 'claude-x' });
+  assert.equal(net.sent[0]!.url, 'https://api.anthropic.com/v1/messages');
+  const headers = net.sent[0]!.init.headers as Record<string, string>;
+  assert.equal(headers['x-api-key'], keyOf(OWN_GRANT));
+  assert.equal(headers['anthropic-version'], '2023-06-01');
+  assert.equal(headers.authorization, undefined);
+  const body = JSON.parse(String(net.sent[0]!.init.body)) as { model: string; system: string; messages: { role: string }[]; max_tokens: number };
+  assert.equal(body.model, 'claude-x');
+  assert.match(body.system, /JSON Schema/u);
+  assert.ok(body.messages.every((m) => m.role === 'user'));
+  assert.equal(typeof body.max_tokens, 'number');
 });
 
 test('NO ENDPOINT MEANS NEITHER PORT IS BUILT, so a keyless host keeps drafting with the rules', async () => {
@@ -471,10 +517,12 @@ test('NO ENDPOINT MEANS NEITHER PORT IS BUILT, so a keyless host keeps drafting 
   assert.equal(slashFromEnv({}), undefined);
   assert.equal(slashModelOf(slashFromEnv({}), deps), undefined);
   assert.equal(slashInferenceOf(slashFromEnv({}), deps), undefined);
-  /* AND AN ENDPOINT WITH NO KEY ANYWHERE IS STILL NO MODEL on a host that cannot open the vault (`slashModelOf`'s rule). */
+  /* AN ENDPOINT WITH NO OPERATOR KEY IS A KEYLESS MODEL, a server on the owner's own machine, whether or not the host can
+     open the vault: the vault is not read for it (`loop/finish/defects.md` S1). Where a key is required, a call is refused
+     before anything is sent. */
   const configured = slashFromEnv({ SLASH_ENDPOINT: 'http://localhost:11434/v1/chat/completions' }, { operatorKey: false });
-  assert.equal(slashInferenceOf(configured, deps), undefined);
-  assert.ok(slashInferenceOf(configured, { ...deps, openKey: async () => null }) !== undefined);
+  assert.ok(slashInferenceOf(configured, deps) !== undefined);
+  await assert.rejects(slashInferenceOf(configured, { ...deps, keyRequired: true })!.complete(ask('glm-5.3')), /no key for its Slash endpoint/u);
   assert.equal(net.sent.length, 0);
 });
 

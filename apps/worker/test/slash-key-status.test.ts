@@ -15,6 +15,9 @@
  * and that one is not this change's to edit: `src/index.ts` bundled by `wrangler`'s esbuild, its record over
  * `node:sqlite`, the key put through `serveWorkerKeys` under a bound `KEK`, the rule filed as the canvas files one, and
  * `globalThis.fetch` the only double. What is added is `rekey`, which wakes the object again under another `KEK`.
+ *
+ * THE KEY IS HIS OWN, CHOSEN IN SETTINGS, since `loop/finish/agents.md` AGT-21: put through the key door and picked by its
+ * grant id through the settings door, as `slash-answers.test.ts` now does. Findings 2 and 4 hold on that path unchanged.
  */
 
 import { test } from 'node:test';
@@ -30,7 +33,7 @@ const REC = 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD';
 const OWNER_ID = 'p_01JZ8QK3F7R2M9V4XN6TCB5HAO';
 const KEK = 'a'.repeat(64);
 const OTHER_KEK = 'b'.repeat(64);
-const ENDPOINT = 'https://gateway.example.test/v1/chat/completions';
+const PROVIDER = 'https://gateway.example.test/v1';
 
 const TASKS = { id: 'tasks', name: 'Tasks', title: 'what', fields: [{ id: 'what', type: 'text', required: true }] };
 const RATE = {
@@ -44,8 +47,7 @@ const RATE = {
 };
 
 /** The sentence a key that is there and will not open ends the run on, before anything is posted or spent. */
-const WONT_OPEN =
-  "rule.rate asked Slash at step 1, and the key labelled slash in this record's vault would not open on this Worker, so nothing was sent and the run stopped there.";
+const WONT_OPEN = 'rule.rate asked Slash at step 1, and your own key for Slash would not open on this Worker, so nothing was sent and the run stopped there.';
 
 type Reply = { ok: boolean; value?: { id?: string }; refusal?: { code: string; fix: string } };
 type Object$ = {
@@ -64,7 +66,6 @@ async function hosted(answer: () => Response) {
   const storage = objectStorage();
   const env: Record<string, unknown> = {
     PUBLIC_HOST: HOST,
-    SLASH_ENDPOINT: ENDPOINT,
     KEK,
     INGRESS: { send: async () => {} },
     DIRECTORY: { idFromName: (n: string) => n, get: () => ({ knows: async (id: string) => id === REC, mayRun: async () => null, meter: async () => {} }) },
@@ -110,7 +111,11 @@ async function hosted(answer: () => Response) {
   assert.ok((await call('decide', { id: pack.value?.id, decide: { option: 'accept', reason: 'the vault needs its list' } })).ok);
   const value = `bd_fake_slash_${crypto.randomUUID().replaceAll('-', '')}`;
   const put = await serveWorkerKeys(
-    new Request(`${ORIGIN}/api/keys/put`, { method: 'POST', headers: { origin: ORIGIN, 'content-type': 'application/json' }, body: JSON.stringify({ label: 'slash', opens: 'Slash', value }) }),
+    new Request(`${ORIGIN}/api/keys/put`, {
+      method: 'POST',
+      headers: { origin: ORIGIN, 'content-type': 'application/json' },
+      body: JSON.stringify({ label: 'model provider', opens: 'Slash', value, kind: 'api_token' }),
+    }),
     owner() as never,
     {
       origins: new Set([ORIGIN]),
@@ -124,6 +129,16 @@ async function hosted(answer: () => Response) {
     },
   );
   assert.equal(put.status, 200, await put.text());
+  const [grant] = storage.sql.exec("SELECT id FROM grant WHERE label = 'model provider'").toArray() as { id: string }[];
+  assert.ok(grant, 'the key door filed no grant for his key');
+  const chose = await object.fetch(
+    new Request(`${ORIGIN}/api/slash/settings`, {
+      method: 'POST',
+      headers: { origin: ORIGIN, 'content-type': 'application/json', 'x-braindog-ctx': JSON.stringify(owner()) },
+      body: JSON.stringify({ source: 'key', provider: 'openai', base_url: PROVIDER, model: 'his-model', grant_id: grant.id }),
+    }),
+  );
+  assert.equal(chose.status, 200, await chose.text());
   assert.ok((await change('rule.rate', 'rule', RATE)).ok, 'the rule was not filed');
 
   const sql = storage.sql;
@@ -159,7 +174,7 @@ async function hosted(answer: () => Response) {
 
 /* ── P1 · the KEK changed under the record ───────────────────────────────── */
 
-test('A `slash` KEY THAT WILL NOT OPEN UNDER THIS KEK: NOTHING IS POSTED, NOTHING IS WRITTEN TO THE LEDGER, and the run says why', async () => {
+test('HIS KEY THAT WILL NOT OPEN UNDER THIS KEK: NOTHING IS POSTED, NOTHING IS WRITTEN TO THE LEDGER, and the run says why', async () => {
   const s = await hosted(() => new Response('{"error":"no key"}', { status: 401 }));
   try {
     s.rekey();
@@ -200,7 +215,7 @@ for (const n of [400, 401, 404])
       assert.equal(
         r?.say,
         n === 401
-          ? 'rule.rate asked Slash at step 1, and the provider refused the key labelled slash (401), so the run stopped there rather than ask it again.'
+          ? 'rule.rate asked Slash at step 1, and the provider refused your own key for Slash (401), so the run stopped there rather than ask it again.'
           : `rule.rate asked Slash at step 1, and the provider answered ${n} with no completion, which asking again would not change, so the run stopped there.`,
       );
     } finally {

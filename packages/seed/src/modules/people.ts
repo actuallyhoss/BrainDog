@@ -3,14 +3,24 @@
  *
  * One module of the sample record, split out of `index.ts` so each first-party module's registers, rows,
  * figures and pages sit in one file. `index.ts` composes them and keeps every export it had.
+ *
+ * A MODULE NOTHING ELSE NEEDS. Money says who a bill or a payment is with through a link, and Work says who holds a task
+ * the same way (`LINKS` in `packs/first-party.ts`), so both install and draw on a record with People off. People in turn
+ * reads none of their lists: a page of People's that drew one would be refused at install on every record that lacks it,
+ * which is every record People reaches before Money or Work (`PEOPLE_PAGES.someone` says why).
  */
 
 import type { MeetsFields } from '@braindog/kernel';
 
 import { gbp, type Fields, type SeedPage, type SeedRegister } from './base.ts';
 
-/** People's one list, which also says it is the list `meet` writes. */
-type PeopleRegister = SeedRegister & { meets: MeetsFields };
+/**
+ * People's one list, which also says it is the list `meet` writes, and keeps a person other rows still name.
+ *
+ * `delete` IS TYPED HERE AND NOT ON `SeedRegister`, because this is the one list in this file that declares it, and the
+ * kernel's own list of the values it takes (`DELETE_RULES` in `packages/kernel/src/referenced.ts`) has this one member.
+ */
+type PeopleRegister = SeedRegister & { meets: MeetsFields; delete: 'refuse_while_referenced' };
 
 /* ── people ───────────────────────────────────────────────────────────────── */
 
@@ -40,6 +50,13 @@ export const PEOPLE_REGISTERS: Record<string, PeopleRegister> = {
        `projects` is the one part that goes when the record holds no Projects: `packs/first-party.ts` drops it with the
        `projects` field it names, so a student's People still installs and `meet` records a person and links nobody. */
     meets: { name: 'name', email: 'email', handles: 'handles', projects: 'projects', met: 'met', merged_into: 'merged_into' },
+    /* A CLIENT WITH BILLS AGAINST THEIR NAME IS NOT DELETED OUT FROM UNDER THEM, since People 2.2.0. A payment's or a
+       bill's `party` and a task's `owner` point here, and deleting the person they name left each one pointing at a row
+       nobody could open, so the money and the work belonged to nobody. The write path now refuses that delete and says
+       which lists still name the person and how many rows (`referencedBy`, `packages/kernel/src/referenced.ts`), so they
+       can be pointed elsewhere first. A person folded into another by a merge goes as before when nothing names them;
+       when something does, accepting the merge is refused with the same sentence, which is the stranding this stops. */
+    delete: 'refuse_while_referenced',
     fields: [
       { id: 'name', type: 'text', required: true, search: true },
       /* Optional, because a person an agent meets in a commit has no role until somebody gives one.
@@ -65,32 +82,93 @@ export const PEOPLE_REGISTERS: Record<string, PeopleRegister> = {
 };
 
 export const PEOPLE_PAGES: Record<string, SeedPage> = {
-  /** Emerged from the data and NOT placed: it sits in the holding pen until a person moves it. The
-      system never writes nav order after first install (06 §3, 29 §3). */
+  /** Placed under its own section, since People 2.2.0: it waited off the rail, in the holding pen, until somebody moved it. */
   people: {
     page: 'people',
     title: 'People',
+    nav: { section: 'People', order: 10 },
     icon: 'people',
     requires: ['register.people'],
-    origin: 'derived',
-    placed: false,
     blocks: [
       {
         /* CARDS, with a face for each person, as the old tool draws people: a table of four columns read
-           as a directory. Each card still opens the person's row. Where they were met and in which
-           projects, because most people here arrive from an agent's commit rather than by hand, and
-           the newest first, because the person met yesterday is the one somebody is asking about. */
+           as a directory. Each card still opens the person's row. Their role, and the projects they were
+           met in, because most people here arrive from an agent's commit rather than by hand, and the
+           newest first, because the person met yesterday is the one somebody is asking about.
+
+           NOT THE `met` LINES, which the card drew whole: "2026-08-27 · commit 8b1e4d0 in portage" is where an
+           agent was when it met them, in the agent's words, and a card is read by a person. The lines stay on
+           the row, where the history of a person is read. */
         kind: 'cards',
         heading: 'Everyone',
         source: 'register.people',
         columns: [
           { field: 'name', label: 'Name', as: 'who' },
-          { field: 'met', label: 'Met', as: 'fact' },
-          { field: 'projects', label: 'Met in', as: 'fact' },
           { field: 'role', label: 'Role', as: 'fact' },
+          { field: 'projects', label: 'Met in', as: 'fact' },
         ],
         order: [{ field: 'seq', dir: 'desc' }],
         empty: 'Nobody yet.',
+      },
+    ],
+  },
+
+  /**
+   * ONE PAGE PER PERSON, since People 2.2.0: who they are, the projects they were met in, and what is written about them.
+   * Only what the rows say: nothing here works out anything about a person that nobody wrote down.
+   *
+   * NOT THE MONEY OR THE WORK BETWEEN YOU, WHICH THE BRIEF ASKS FOR, because a block of People's over `transactions`,
+   * `obligations` or `tasks` makes People lean on those lists: `@braindog/declare` counts every block's `source` a page
+   * reads (`pointsAt` in `packages/declare/src/index.ts`) and refuses the install `REGISTER_UNRESOLVED` while the list is
+   * not held. A record is made with People before Money and Work (`MODULE_ORDER` in `usecases/index.ts`), and a student's
+   * or a team's has no Money at all, so such a block would refuse People on nearly every record, whatever `when:` it
+   * carried, since the install reads no `when:`. Those blocks wait for the document to leave out a block over a list the
+   * record will not hold, as it leaves out a walk's leg (`firstPartyDocument` in `packs/first-party.ts`).
+   *
+   * NO `nav`, because a rail with a line for every client and contractor is a rail nobody reads.
+   *
+   * CALLED `someone` AND NOT `person`, BECAUSE THE NAME DECIDES WHO KEEPS A SHARED ADDRESS. A template's pages claim
+   * their addresses after every page somebody wrote, and among templates in the order of their ids (`resolvePages` in
+   * `packages/kernel/src/pages.ts`). `person` sorts before `project`, so a client called what a project is called
+   * would have taken the project's `/p/` address and moved the project's to a numbered one. `someone` sorts after
+   * `project`, `organisation`, `milestone` and `skill`, so a person is the one that gives way.
+   *
+   * BY NAME, AS A PROJECT'S PAGE IS (`name is {{name}}`), so of two people of one name the card draws one, which `meet`
+   * asks the owner to merge when it sees them.
+   */
+  someone: {
+    page: 'someone',
+    title: '{{name}}',
+    for: { register: 'people' },
+    icon: 'people',
+    pack: 'people',
+    requires: ['register.people'],
+    blocks: [
+      {
+        kind: 'cards',
+        span: 12,
+        source: 'register.people',
+        where: 'name is {{name}}',
+        columns: [
+          { field: 'name', label: 'Name', as: 'who' },
+          { field: 'role', label: 'Role', as: 'fact' },
+          { field: 'projects', label: 'Met in', as: 'fact' },
+          { field: 'email', label: 'Email', as: 'fact' },
+        ],
+        limit: 1,
+        empty: 'Nothing is kept about {{name}} yet.',
+      },
+      {
+        /* A DOCUMENT, AS A PROJECT'S NOTES ARE, because a person `meet` recorded has no `note` at all, so the body stays
+           `{{note}}`, and a sample client's is empty. A document note reads a body that is empty or still its
+           placeholder as nothing written and draws nothing, so the `empty:` below is what the page says
+           (`drawSegments` in `apps/web/src/lib/record/blocks.ts`). */
+        kind: 'note',
+        document: true,
+        heading: 'Notes',
+        span: 12,
+        body: '{{note}}',
+        empty: 'Nothing is written about {{name}} yet.',
       },
     ],
   },

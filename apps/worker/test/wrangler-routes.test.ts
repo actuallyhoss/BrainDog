@@ -35,6 +35,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { servesAccount, servesApi, servesAuth, servesBuild, servesIn, servesMcp } from '../src/route.ts';
+import { HEALTHZ } from '../src/health.ts';
 
 type Route = { pattern: string; custom_domain?: boolean; zone_name?: string; zone_id?: string };
 type Assets = { not_found_handling?: string; run_worker_first?: string[] | boolean };
@@ -118,7 +119,7 @@ const siteAt = (push: Push): Config => (push.change === null ? site : SITE_AT[pu
  * is "does a request here belong to this Worker", not "is it a navigation".
  */
 const served = (path: string): boolean =>
-  /^\/app(?:\/|$)/.test(path) || servesApi(path) || servesAuth(path) || servesAccount(path) || servesMcp(path) || servesIn(path) || servesBuild(path);
+  /^\/app(?:\/|$)/.test(path) || servesApi(path) || servesAuth(path) || servesAccount(path) || servesMcp(path) || servesIn(path) || servesBuild(path) || HEALTHZ.test(path);
 
 /**
  * The paths a `run_worker_first` entry stands for, with its star filled in.

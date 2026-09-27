@@ -81,8 +81,15 @@ test('the comparison with the baseline is said in words', () => {
 
 test('the horizon offers what fits, and the heaviest movements are summed by label', () => {
   assert.deepEqual(horizonChoices(model()), [], 'a two-month walk has no three-month choice');
-  assert.deepEqual(horizonChoices({ ...model(), horizon: 180 }), [[3, 91], [6, 180]]);
-  assert.deepEqual(horizonChoices({ ...model(), horizon: 365 }), [[3, 91], [6, 183], [12, 365]]);
+  assert.deepEqual(horizonChoices({ ...model(), horizon: 180 }), [
+    { days: 91, label: '3 months' },
+    { days: 180, label: '6 months' },
+  ]);
+  assert.deepEqual(horizonChoices({ ...model(), horizon: 365 }), [
+    { days: 91, label: '3 months' },
+    { days: 183, label: '6 months' },
+    { days: 365, label: '1 year' },
+  ]);
   assert.deepEqual(largest(model())[0], { label: 'Tax', amount: '−£2,400.00' });
 });
 
@@ -221,7 +228,7 @@ test('WHAT COUNTS: every stream and every plan, in and out, and a plan counted o
   assert.deepEqual(
     streamsOf(m),
     { in: [{ label: 'Salary', amount: '£4,000.00' }], out: [{ label: 'Proofing press', amount: '−£3,750.00' }] },
-    'a movement that happens once is not a stream; the heaviest five still offer it under Leave out',
+    'a movement that happens once is not a stream; the heaviest five still offer it under What counts',
   );
   const without = scenario(m, { ...baseKnobs(m), leave: ['Proofing press'] });
   assert.ok(without.steps.every((s) => !s.label.startsWith('Proofing press')));

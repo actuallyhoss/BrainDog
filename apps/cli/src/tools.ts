@@ -28,7 +28,7 @@ import { parseArgs } from 'node:util';
 import type { Brief, Client, Context } from '@braindog/client';
 
 import { hostsPath, readHosts } from './http.ts';
-import { keys } from './keys.ts';
+import { HEADER_NAME, keys } from './keys.ts';
 import { connect, fixOf, isObject, readLock, samePath, sha256, spokenOf, Stopped, valueOf, writeLock, type AgentIo } from './skills.ts';
 
 type Env = Record<string, string | undefined>;
@@ -493,20 +493,40 @@ export const runClaude: ClaudeRunner = (args, cwd) =>
 
 const VARIABLE = /^[A-Z_][A-Z0-9_]*$/;
 
+/** A key's spoken id as a `needs` entry names it, checked before it is written into a command a shell reads. */
+const CREDENTIAL = /^credentials#[1-9][0-9]{0,8}$/;
+
+/**
+ * This command's path as a `headersHelper` can name it inside double quotes: printable ASCII that no shell reads as
+ * more than itself there. A path holding anything else leaves the header out rather than a command that runs
+ * something else.
+ */
+const HELPER_PATH = /^[A-Za-z0-9 _.:/()-]+$/;
+
 /**
  * A tool row's Claude Code entry, and a sentence for each need it cannot carry.
  *
  * A stdio tool's keys are handed to it by `braindog keys exec`, one wrapper per key, so the entry names the key and
- * never holds it. An env value BrainDog does not keep, and a header that needs a key, are left out and said.
+ * never holds it. An HTTP tool's header key is handed over by `braindog keys headers`, which the entry names as its
+ * `headersHelper`: Claude Code runs that command when it connects and reads the header from its standard output
+ * (`loop/finish/agents.md` C9), so the entry holds the command and never the key. An entry has one helper, so a second
+ * header key is left out and said, as is an env or header value BrainDog does not keep.
  */
 export function renderEntry(name: string, fields: Record<string, unknown>, cli: string): { entry: Record<string, unknown> | null; notes: string[] } {
   const notes: string[] = [];
   const needs = strings(fields.needs);
   if (fields.transport === 'http') {
     if (typeof fields.endpoint !== 'string') return { entry: null, notes };
-    for (const need of needs.filter((n) => n.startsWith('header:')))
-      notes.push(`Tool ${name}: its ${need.slice(7).split('=')[0] ?? ''} header is left out, because no command here hands a header its key yet.`);
-    return { entry: { type: 'http', url: fields.endpoint }, notes };
+    let helper: string | null = null;
+    for (const need of needs.filter((n) => n.startsWith('header:'))) {
+      const [header = '', credential] = need.slice(7).split('=');
+      if (credential === undefined) notes.push(`Tool ${name} needs its ${header} header, whose value BrainDog does not keep, so set it in the entry yourself.`);
+      else if (helper !== null) notes.push(`Tool ${name}: its ${header} header is left out, because an entry has one headersHelper and it already hands over another header.`);
+      else if (!HEADER_NAME.test(header) || !CREDENTIAL.test(credential) || !HELPER_PATH.test(cli))
+        notes.push(`Tool ${name}: its ${header} header is left out, because the command that would hand it its key cannot be written safely here.`);
+      else helper = `node "${cli}" keys headers ${credential} --as ${header}`;
+    }
+    return { entry: { type: 'http', url: fields.endpoint, ...(helper === null ? {} : { headersHelper: helper }) }, notes };
   }
   if (typeof fields.command !== 'string') return { entry: null, notes };
   let argv = [fields.command, ...strings(fields.args)];

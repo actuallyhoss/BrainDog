@@ -60,7 +60,7 @@ test('THE BRIDGE’S OUT ROW AND THE `Going out, 30 days` TILE ARE ONE MONEY IN 
   const rows = drawnRows(bridge);
   assert.deepEqual(
     rows.map((r) => r.cells[0]),
-    [copy.bridgeStart, copy.bridgeIn, copy.bridgeOut, copy.bridgeEnd(bridge.horizon ?? 180)],
+    [copy.bridgeStart, copy.bridgeIn, copy.bridgeOut, copy.bridgeEnd(typeof bridge.walk?.horizon === 'number' ? bridge.walk.horizon : typeof bridge.horizon === 'number' ? bridge.horizon : 180)],
     'the bridge draws start, in, out and end in that order, and everything below reads those positions',
   );
   const values = rows.map((r) => figure(r));

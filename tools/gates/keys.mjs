@@ -318,7 +318,8 @@ export default async function keys(root = join(import.meta.dirname, '..', '..'))
       },
 
       /* A page's block cursor starts on the first block, which on `/p/kiln` is a stat tile with no
-         register behind it. `j` moves to one that has. */
+         register behind it. `j` moves to the next block, since portfolio 1.5.0 the "Waiting on you" queue, which has
+         no register either, so `o` and `y` open and copy nothing there; the press still moves the cursor. */
       'block-move': { route: '/p/kiln', press: ['j'] },
       'block-source': { route: '/p/kiln', press: ['j', 'o'] },
       'block-link': { route: '/p/kiln', press: ['j', 'y'] },

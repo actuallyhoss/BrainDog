@@ -181,8 +181,12 @@ export const workerFirst = (entries, path) => {
  * reason that has nothing to do with the deploy it is judging. So `test/wrangler-routes.test.ts` holds this list to
  * `route.ts` instead: every entry must be a path the Worker serves, and every door the app's own `run_worker_first` has
  * built must have an entry here. A door added to the router without a line here fails that test rather than a deploy.
+ *
+ * `/healthz` IS A DOOR LIKE THE OTHERS (defects H4). The router answers it before anything else (`HEALTHZ` in
+ * `src/health.ts`) and the site's own `run_worker_first` hands it over, but it was missing here, so a site that kept it
+ * as its 404 page read as bound and every uptime check on that name read the site.
  */
-export const DOORS = ['/app', '/app/', '/app/acme/api/boot', '/api/boot', '/auth/methods', '/account/usage', '/mcp', '/in/abc', '/.well-known/braindog-build'];
+export const DOORS = ['/app', '/app/', '/app/acme/api/boot', '/api/boot', '/auth/methods', '/account/usage', '/mcp', '/in/abc', '/.well-known/braindog-build', '/healthz'];
 
 /**
  * Which of the site's names are this app's in one environment, and when none are, the sentence that says why.

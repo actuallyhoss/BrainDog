@@ -183,7 +183,7 @@ test('A THEME, A DIGEST OR A BLOCK IS STILL DROPPED, in the sentence that now na
   const { api, sql } = await record(model, 20);
   const out = value<Filed>(await api.slashPropose({}, OWNER));
   assert.ok(
-    out.dropped.includes('Proposal 1 was a change to a theme, and Slash changes only a register, an ingest, a rule, a metric or a page.'),
+    out.dropped.includes('Proposal 1 was a change to a theme, and Slash changes only a register, an ingest, a rule, a metric, a page or a script.'),
     JSON.stringify(out.dropped),
   );
   sql.close();
@@ -194,7 +194,7 @@ test('WHAT THE MODEL IS TOLD NAMES A METRIC AMONG WHAT A CHANGE BUILDS, and says
      (`apps/worker/src/slash.ts`) ask with this same text. */
   const said = SLASH_INSTRUCTIONS.split('\n');
   const change = said.find((l) => l.startsWith('change builds'));
-  assert.ok(change?.includes('one register, ingest, rule, metric or page'), change);
+  assert.ok(change?.includes('one register, ingest, rule, metric, page or script'), change);
   const asked = said.find((l) => l.includes('`asked`'));
   assert.ok(asked, 'nothing in the instructions reads `asked`');
   /* THE GRAMMARS ARE NAMED WHERE THEY ARE SENT, under `grammar` in the input, and by no address nothing serves
@@ -584,7 +584,7 @@ test('A DESCRIPTION NEVER FILES AN INGEST, a rule that reaches out, or anything 
   assert.deepEqual(out.dropped, [
     'Proposal 1 would open ingest.launchsync, a door to the outside, and Slash never opens one from a description. Ask for it on its own.',
     'Proposal 2 has rule.launchsync, which would run something beyond the record, and Slash never opens a door to the outside from a description. Ask for it on its own.',
-    'Proposal 3 was a settings proposal, and from a description Slash files only a change that builds a list, a figure, a page or a rule.',
+    'Proposal 3 was a settings proposal, and from a description Slash files only a change that builds a list, a figure, a page, a rule or a script.',
     'The model proposed nothing Slash could use, so nothing was drafted from what you described.',
   ]);
 

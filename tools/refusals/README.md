@@ -5,17 +5,17 @@ raises it. `tools/gates/refusal-fixtures.mjs` holds the corpus to the first and 
 text. Nothing read the second until a runner existed, and nothing at all drove the surface and looked
 at what came back.
 
-`run-via.mjs` is that runner, for two `via`s so far:
+`run-via.mjs` is that runner, for `lint`, `where` and `rpc`:
 
 ```
 node --experimental-strip-types tools/refusals/run-via.mjs lint
 node --experimental-strip-types tools/refusals/run-via.mjs where
 node --experimental-strip-types tools/refusals/run-via.mjs where --json
-node --experimental-strip-types tools/refusals/run-via.mjs rpc     # says what a driver would need
+node --experimental-strip-types tools/refusals/run-via.mjs rpc        # and names what it cannot drive
 ```
 
-Exit 0 when every fixture agreed with its surface, 1 when one did not, 2 when this runner drove
-nothing at all.
+Exit 0 when every fixture agreed with its surface, 1 when one did not or was not driven, 2 when
+this runner drove nothing at all.
 
 ## Two of the nine runners already existed
 

@@ -908,11 +908,16 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
          whether to send a person to the provider or to the format. */
       invalid.push(...got.invalid);
     } else {
-      for (const [field, form] of Object.entries(matched.extract ?? {})) {
+      for (const [field, declared] of Object.entries(matched.extract ?? {})) {
+        /* A FIELD'S `strip:` IS READ AFTER ITS FORM AND NEVER BY IT. The form is handed on without the key, because
+           `slices` takes the first key that is not `note` as the form, and `{ strip, text }` would have cut the text by
+           the list of prefixes. A value the prefixes leave empty is a miss, as an empty slice is. */
+        const { form, strip } = stripOf(declared);
         const got = resolve(deps, form, text);
-        if (got.value === null) missed.push(field);
+        const value = strip === null || typeof got.value !== 'string' ? got.value : stripped(got.value, strip) || null;
+        if (value === null) missed.push(field);
         else {
-          extracted[field] = got.value;
+          extracted[field] = value;
           /* A ROW FOUND BY ITS PRINTED TAIL IS NOT A CHOICE OR A DEFAULT, and the fold below says which it is. */
           if (got.outcome === 'tail' && got.tail !== undefined && typeof got.value === 'string')
             tails.push({ field, digits: got.tail.digits, row: got.value, register: got.tail.register });
@@ -1336,6 +1341,50 @@ export function resolve(deps: IngestDeps, form: Extractor, text: string): Extrac
   if (got.outcome !== 'exact' || got.value === null) return got;
   const tail = tailOf(deps, form, text, got.value, 1);
   return tail === null ? got : { value: got.value, outcome: 'tail', tail };
+}
+
+/**
+ * The most prefixes one field's `strip:` may list, and the most times one value is cut.
+ *
+ * A CEILING ON THE WALK, NOT ONLY ON THE LIST. A value that repeats a prefix (`FAWRY*FAWRY*Vodafone`) is cut again, and
+ * the walk stops after this many cuts whatever the text holds, so a stranger's message cannot make it run longer.
+ */
+export const STRIP_MOST = 16;
+
+/**
+ * A field's declared form without its `strip:`, and the prefixes it lists, or `null` where it lists none.
+ *
+ * `strip` SITS BESIDE THE FORM, ON THE FIELD, and never inside one: `{ first: [...], strip: ['FAWRY*'] }` strips whichever
+ * arm answered, where a key inside each arm would have to be written once per arm. `declare.ts` refuses it anywhere
+ * else, and refuses it beside a form that does not read text.
+ */
+export function stripOf(declared: Extractor): { form: Extractor; strip: readonly string[] | null } {
+  if (declared === null || typeof declared !== 'object' || !Object.hasOwn(declared, 'strip')) return { form: declared, strip: null };
+  const copy: Record<string, unknown> = { ...(declared as Record<string, unknown>) };
+  const listed = copy.strip;
+  delete copy.strip;
+  const strip = Array.isArray(listed) ? listed.filter((p): p is string => typeof p === 'string' && p.trim() !== '').slice(0, STRIP_MOST) : [];
+  return { form: copy as unknown as Extractor, strip };
+}
+
+/**
+ * A merchant's name with the acquirer's prefix taken off: `FAWRY*Vodafone` is `Vodafone`.
+ *
+ * A CASE AWAY, AS AN ANCHOR IS. The prefix is matched over the ASCII fold `slices` uses, which keeps every length, so the
+ * cut lands where the prefix ends and the name keeps the capitals the bank sent. The longest listed prefix is tried
+ * first, so `PAYMOB*` is not cut as `PAY`. Each cut is followed by another look, up to `STRIP_MOST` of them, and then
+ * every run of white space is one space and the ends are trimmed.
+ */
+export function stripped(value: string, prefixes: readonly string[]): string {
+  const longest = [...prefixes].sort((a, b) => b.length - a.length);
+  let out = value.trim();
+  for (let cut = 0; cut < STRIP_MOST; cut++) {
+    const folded = fold(out);
+    const hit = longest.find((p) => p.trim() !== '' && folded.startsWith(fold(p)));
+    if (hit === undefined) break;
+    out = out.slice(hit.length).trimStart();
+  }
+  return out.replace(/\s+/g, ' ').trim();
 }
 
 function resolveAt(deps: IngestDeps, form: Extractor, text: string, depth: number): Extracted {
@@ -1881,8 +1930,11 @@ function slices(form: Record<string, unknown>, text: string): string[] {
  * `String.prototype.toLowerCase` is the wrong tool one character in a thousand and that is enough:
  * it is locale-independent but not length-preserving, and a single `İ` in a subject line would
  * shift every anchor after it by one and cut every value one character short.
+ *
+ * EXPORTED FOR `rules.ts`'s `link`, whose lower rungs compare a name a case away, so a merchant a `strip:` read and a
+ * category's `match` are folded by the one rule.
  */
-function fold(text: string): string {
+export function fold(text: string): string {
   return text.replace(/[A-Z]+/g, (run) => run.toLowerCase());
 }
 

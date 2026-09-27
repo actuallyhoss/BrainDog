@@ -32,6 +32,13 @@
   import { MISSING } from '../../src/format.ts';
   import { WORKING_GLYPH, WORKING_LABEL } from '../../src/working.ts';
 
+  /**
+   * What a scope cell draws its chip from. The host's type of the same shape is `ScopeCells` in
+   * `apps/web/src/lib/record/page-live.ts`, which builds it; `Cards.svelte` writes the same shape out for the one it
+   * reads from `RenderOptions`. Written here rather than imported, because nothing in this package imports the app.
+   */
+  type ScopeCells = { columns: readonly number[]; everywhere: string; glyph: string | null; marks: ReadonlyMap<string, { mark: string | null; hue: number | null }> };
+
   let {
     columns,
     rows,
@@ -47,6 +54,7 @@
     onmore,
     cellSnippet,
     href,
+    scope,
   }: {
     columns: readonly Column[];
     rows: readonly TableRow[];
@@ -74,7 +82,17 @@
     cellSnippet?: Snippet<[TableRow, Column, string | null]> | undefined;
     /** Where a row's link goes, as the host serves it: `RenderOptions.href`, which this primitive is not otherwise handed. */
     href?: RenderOptions['href'];
+    /**
+     * WHERE A ROW APPLIES, AS A CHIP (agents C8). The columns that hold a project's name or the word for everywhere,
+     * each name's mark and hue, and the globe's path, all the host's: a cell there draws the project's mark in its hue
+     * beside the name, or the globe beside "Everywhere". Absent, every cell is its words, as it always was.
+     */
+    scope?: ScopeCells | undefined;
   } = $props();
+
+  /* THE FIELDS WHOSE CELLS ARE CHIPS, by field and not by index, because the cell body is handed its column and not
+     where the column sits. */
+  const scoped = $derived(new Set((scope?.columns ?? []).map((i) => columns[i]?.field).filter((f): f is string => f !== undefined)));
 
   const tracks = $derived(columns.map((c) => c.width).join(' '));
   /* One function for the groups AND the step they are counted in, because `aria-rowindex` is
@@ -210,6 +228,13 @@
   reader and unlabelled on screen, as the figure is.
 -->
 <!--
+  A SCOPE CELL IS A CHIP: the globe beside "Everywhere", or the project's mark in its own hue beside its name. The
+  mark is the project's character, drawn as `Cards.svelte` draws a card's, and hidden from a screen reader, which reads
+  the name. The same markup as `Cards.svelte`'s chip, so a scope reads alike in a table and on a card.
+-->
+{#snippet scopeChip(cells: ScopeCells, said: string)}{@const everywhere = said === cells.everywhere}{@const m = everywhere ? undefined : cells.marks.get(said)}<span class="scope-chip" data-everywhere={everywhere ? '' : undefined}>{#if everywhere && cells.glyph}<svg class="scope-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={cells.glyph} /></svg>{:else if m?.mark}<span class="scope-mark" style={m.hue === null ? undefined : `--hue:${m.hue}`} aria-hidden="true">{m.mark}</span>{/if}<span class="scope-name">{said}</span></span>{/snippet}
+
+<!--
   ONE CELL BODY, DRAWN BY BOTH ARMS.
 
   THE CARD ARM DREW CELLS ITS OWN WAY AND THAT IS THE WHOLE DEFECT. It never called `cellSnippet`,
@@ -225,7 +250,7 @@
   Rendering it once is also the only form of the fix that stays fixed. The two arms are two hundred
   lines apart and the next change to a cell will be made in whichever one the author is reading.
 -->
-{#snippet cellBody(row: TableRow, column: Column, value: string | null)}{#if cellSnippet}{@render cellSnippet(row, column, value)}{:else}{@const drawn = tableCellBody(value)}{#if drawn.working}<span role="img" aria-label={WORKING_LABEL} title={WORKING_LABEL}>{WORKING_GLYPH}</span>{' '}{/if}{#if drawn.body.kind === 'missing'}<span class="missing">{MISSING}</span>{:else if drawn.body.kind === 'coded'}{drawn.body.sign}<span class="amount-code">{drawn.body.currency}</span> {drawn.body.rest}{:else}{drawn.body.text}{/if}{/if}{/snippet}
+{#snippet cellBody(row: TableRow, column: Column, value: string | null)}{#if cellSnippet}{@render cellSnippet(row, column, value)}{:else if scope && value && scoped.has(column.field)}{@render scopeChip(scope, value)}{:else}{@const drawn = tableCellBody(value)}{#if drawn.working}<span role="img" aria-label={WORKING_LABEL} title={WORKING_LABEL}>{WORKING_GLYPH}</span>{' '}{/if}{#if drawn.body.kind === 'missing'}<span class="missing">{MISSING}</span>{:else if drawn.body.kind === 'coded'}{drawn.body.sign}<span class="amount-code">{drawn.body.currency}</span> {drawn.body.rest}{:else}{drawn.body.text}{/if}{/if}{/snippet}
 
 {#snippet pair(row: TableRow, cell: CardCell)}
   <span class="table-card-pair" data-truncate={cell.column.truncate ?? 'end'}>

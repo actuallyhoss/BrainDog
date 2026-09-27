@@ -128,11 +128,12 @@ test('a yes or no is ticked, not typed', () => {
   assert.equal(draft.unchanged(AMOUNT, '12.51', { amount: 1250, currency: 'EGP' }, null), false);
 });
 
-test('every type the record has is editable but a secret and the three a box cannot hold', () => {
+test('every type the record has is editable but a secret and a file', () => {
   assert.equal(typeof draft.editable, 'function', 'field-draft.ts exports no editable');
-  /* THE RECORD'S EIGHTEEN, NOT THE APP'S FIFTEEN, because a declaration the record serves can carry any of them. */
+  /* THE RECORD'S TYPES, NOT THE APP'S, because a declaration the record serves can carry any of them. A quantity and
+     structured data came back when a box could take each apart (MOD-22); a file waits for the file store. */
   const not = RECORD_TYPES.filter((type) => !draft.editable({ type: type as FieldDecl['type'] }));
-  assert.deepEqual(not, ['quantity', 'file', 'secret', 'json']);
+  assert.deepEqual(not, ['file', 'secret']);
 });
 
 test('no editable type opens on the words [object Object]', () => {
@@ -165,7 +166,7 @@ test('the grid says why a cell is not the editor only for the types it cannot ed
   const refused = RECORD_TYPES.filter((type) => !draft.editable({ type: type as FieldDecl['type'] }));
   const unexplained = refused.filter((type) => copy.cellWhy[type] === undefined);
   assert.deepEqual(unexplained, [], `a refused type falls back to a sentence about no type: ${unexplained.join(', ')}`);
-  const said = String((copy as Record<string, unknown>).cellNotEdited instanceof Function ? copy.cellNotEdited('Weight', copy.cellWhy.quantity ?? '') : '');
+  const said = String((copy as Record<string, unknown>).cellNotEdited instanceof Function ? copy.cellNotEdited('Receipt', copy.cellWhy.file ?? '') : '');
   assert.ok(said !== '', 'copy.ts has no cellNotEdited');
   assert.ok(!/open the row/iu.test(said), `the grid sends a reader to a row that cannot change it either: ${said}`);
   assert.ok(!('cellOpensRow' in copy), 'copy.ts still keeps the sentence that sends a reader to the row');
@@ -189,7 +190,7 @@ test('a cell save goes through the same three the row page saves through', () =>
   const commit = GRID.slice(GRID.indexOf('function commitEdit('), GRID.indexOf('const copyId ='));
   assert.ok(commit.length > 200, 'commitEdit was not found, so this sweep proves nothing');
   assert.ok(/\bpatchOf\(/u.test(commit), 'a cell save builds its own patch instead of patchOf');
-  assert.ok(/\bwrongMoney\(/u.test(commit), 'a cell save does not ask wrongMoney, so EGP 1.234 would reach the record');
+  assert.ok(/\bwrongValue\(/u.test(commit), 'a cell save does not ask wrongValue, so EGP 1.234 would reach the record');
   const open = GRID.slice(GRID.indexOf('function openEditor('), GRID.indexOf('function leftTheRow('));
   assert.ok(/\bdraftOf\(/u.test(open), 'the cell opens on String(value), so a money opens as [object Object]');
   /* A YES OR NO IS A TOGGLE IN THE CELL, NOT A BOX to type `true` into. */

@@ -448,7 +448,7 @@ export function declOf(raw: RegisterDecl): RegisterDecl {
   const fields = Array.isArray(raw.fields) ? raw.fields : [];
   const others = fields.map((f) => f.id).filter((id) => id !== raw.title && id !== raw.state);
   const picked = [raw.title, raw.state ?? others[0], raw.state ? others[0] : others[1]].map((id) => id ?? raw.title) as [string, string, string];
-  const mobile = Array.isArray(raw.mobile) && raw.mobile.length === 3 ? raw.mobile : picked;
+  const mobile = Array.isArray(raw.mobile) && raw.mobile.length >= 3 ? (raw.mobile.slice(0, 3) as [string, string, string]) : picked;
   return { ...raw, name, one, fields, mobile };
 }
 

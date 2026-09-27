@@ -88,7 +88,7 @@ test('A MODEL THAT DRAFTS AN INGEST HAS IT FILED AS A CHANGE, carrying the egres
   const { api, sql } = await record(model);
 
   const out = value<Filed>(await api.slashPropose({}, owner));
-  assert.deepEqual(out.dropped, ['Proposal 2 was a change to a theme, and Slash changes only a register, an ingest, a rule, a metric or a page.']);
+  assert.deepEqual(out.dropped, ['Proposal 2 was a change to a theme, and Slash changes only a register, an ingest, a rule, a metric, a page or a script.']);
   assert.equal(out.by, 'test model');
   assert.deepEqual(out.filed.map((f) => [f.question, f.by]), [['Fetch the gold rate every hour into Rates? You have been typing it in by hand.', 'test model']]);
 

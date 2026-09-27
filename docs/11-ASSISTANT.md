@@ -172,12 +172,23 @@ Per ask, the host opens that grant under the asker's browser session, decrypts i
 Slash a per-call `Inference` adapter and writes one `grant.read` event — the package never holds the
 key ([46-SPEC-SLASH](46-SPEC-SLASH.md) §5.9; [12-SECURITY](12-SECURITY.md) §6).
 
+**Routing on his own key, as built.** Settings offers "Included" or "Your own key". On his own key
+the routing table above does not decide the model: every job, both passes of a question, the
+arranger's press and an automation's question, goes to the one model he named, at the provider he
+chose (Anthropic Messages or an OpenAI-compatible endpoint) and the `https:` public address he gave,
+with the vault key he picked by its id. The request goes from the Worker straight to that address
+and not through AI Gateway, so the gateway's caching, DLP and cost tracking in the table above apply
+to the included model only; the passthrough design in the note above is not what shipped. His asks
+are listed in Settings and not capped, since his provider bills them.
+
 **With no model configured the product still works.** Every deterministic feature — registers,
 pages, metrics, declared ingests, rules, digests, search, the decision gate, MCP — runs with zero
-inference. `SLASH_ENDPOINT` unset means the host never imports the package and registers no Slash
-route; `GET /api/version` answers `slash: false` and the client draws nothing
-([46-SPEC-SLASH](46-SPEC-SLASH.md) §5.1). Slash is an accelerant, never a dependency. A record that
-stops working because a model endpoint is down is not a record.
+inference. A host with no model to offer never imports the package and answers every Slash door
+`NOT_IN_THIS_BUILD`; `GET /api/version` answers `slash: false` and the client draws nothing
+([46-SPEC-SLASH](46-SPEC-SLASH.md) §5.1). On the Cloud that is the included model switched off and
+no `KEK` to open his key with; on a self-host it is `SLASH_ENDPOINT` unset. Slash is an
+accelerant, never a dependency. A record that stops working because a model endpoint is down is
+not a record.
 
 ---
 

@@ -17,6 +17,14 @@ const ctx: any = {
 };
 const raw = (body: string): any => ({ id: 'r', ts: '2026-09-19T12:00:00Z', channel: 'email', body });
 
+/**
+ * THE CEILINGS ARE `43 §7`'S AND CI HOLDS THEM AS WRITTEN; ANYWHERE ELSE THEY ARE DOUBLED. Each run is timed on the wall
+ * clock, and on a machine running every workspace's tests at once a run is also timed waiting for a core, so the p99
+ * there is the machine's load as much as this code (`loop/finish/defects.md` T1: these fail loaded and pass alone).
+ * Doubled off CI, where nothing else runs, and CI's ceiling is still the one a regression has to clear.
+ */
+const SLACK = process.env.CI ? 1 : 2;
+
 function bench(label: string, ceiling: number, runs: number, fn: () => void) {
   for (let i = 0; i < Math.min(runs, 5); i++) fn();
   const ms: number[] = [];
@@ -24,8 +32,9 @@ function bench(label: string, ceiling: number, runs: number, fn: () => void) {
   ms.sort((a, b) => a - b);
   const p50 = ms[Math.floor(ms.length * 0.5)]!;
   const p99 = ms[Math.min(ms.length - 1, Math.floor(ms.length * 0.99))]!;
-  console.log(`  ${label.padEnd(18)} p50 ${p50.toFixed(2).padStart(8)} ms   p99 ${p99.toFixed(2).padStart(8)} ms   ceiling ${ceiling} ms`);
-  assert.ok(p99 <= ceiling, `${label}: p99 ${p99.toFixed(2)} ms over the ${ceiling} ms ceiling`);
+  const most = ceiling * SLACK;
+  console.log(`  ${label.padEnd(18)} p50 ${p50.toFixed(2).padStart(8)} ms   p99 ${p99.toFixed(2).padStart(8)} ms   ceiling ${most} ms`);
+  assert.ok(p99 <= most, `${label}: p99 ${p99.toFixed(2)} ms over the ${most} ms ceiling`);
 }
 
 const D6: any = { id: 'd', writes: { register: 'txn' }, extract: {

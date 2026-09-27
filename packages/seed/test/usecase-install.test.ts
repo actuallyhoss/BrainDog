@@ -288,7 +288,7 @@ test('A TEAM’S PRODUCT IN PLAY HAS A PAGE: where it stands, its tickets and it
   const headings = page.blocks.map((b) => b.heading);
   assert.ok(headings.includes('Where it stands') && headings.includes('Waiting on you') && headings.includes('Agents'), headings.join(', '));
   assert.ok(!headings.includes('Money') && !headings.includes('Keeping it alive'), 'a team record holds no money or services');
-  assert.deepEqual(page.blocks.find((b) => b.heading === 'Waiting on you')!.rows?.map((r) => r.fields.what), ['Review the store listing']);
+  assert.deepEqual(page.blocks.find((b) => b.heading === 'Handed back or blocked')!.rows?.map((r) => r.fields.what), ['Review the store listing']);
   /* THE ROW OF FIGURES IS MADE UP FROM ITS TICKETS, with money left out: open, due soon, in review, done this week. */
   const glance = page.blocks.find((b) => b.heading === 'At a glance')! as unknown as { readings: { label?: string; reading: { value: number } | null }[] };
   assert.deepEqual(glance.readings.map((r) => [r.label, r.reading?.value]), [['Open', 1], ['Due soon', 0], ['In review', 1], ['Done this week', 0]]);

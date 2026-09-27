@@ -195,13 +195,14 @@ test('TIER b REACHES THE ENDPOINT WITH THE KEY THE OWNER PUT IN AND THE MODEL TH
     assert.equal(out.status, 200, out.raw);
     assert.equal(out.body?.value?.['body_kind'], 'rowset');
     assert.equal(s.sent.length, 2);
-    /* THE PROPOSAL CARRIES THE VALUE TYPED INTO THE KEY DOOR, opened from the vault by id, and the owner's model name. */
-    assert.equal(s.bearer(1), `Bearer ${value}`);
-    assert.equal(s.model(1), 'gpt-4o-mini');
-    assert.ok(!String(s.sent[1]!.body).includes(value), 'the key went into what the model reads');
-    /* THE DRAFT WENT ON THIS HOST'S OWN ROUTE: the operator's key and `SLASH_MODEL`. */
-    assert.equal(s.bearer(0), `Bearer ${OPERATOR}`);
-    assert.equal(s.model(0), 'llama3');
+    /* BOTH PASSES CARRY THE VALUE TYPED INTO THE KEY DOOR, opened from the vault by id, and the owner's model name. The
+       draft went on this host's own route, the operator's key and `SLASH_MODEL`, until his own key carried both passes
+       (`loop/finish/agents.md` AGT-21); with no address of his own it is still this host's endpoint he is sent to. */
+    for (const i of [0, 1]) {
+      assert.equal(s.bearer(i), `Bearer ${value}`);
+      assert.equal(s.model(i), 'gpt-4o-mini');
+      assert.ok(!String(s.sent[i]!.body).includes(value), 'the key went into what the model reads');
+    }
   } finally {
     await s.close();
   }

@@ -24,6 +24,7 @@
  * under `register.any` would have been read as about that list and filed.
  */
 
+import { FIGURE } from './figure.ts';
 import { rowRegisterOf } from './flow-lint.ts';
 import type { FlowDecl } from './rules.ts';
 
@@ -52,10 +53,13 @@ const LIST_REF = /^register\.([a-z][a-z0-9_]*)$/;
 /** A page block's sources that are not a list and not a figure, and read no list outside what its legs name. */
 const PAGE_SOURCES = new Set(['forecast.runway']);
 /**
- * The names a rule's template fills from the run and not from a list: `{{trigger.row.what}}`, `{{vars.x}}`, `{{each.0}}`.
- * Read as lists, the kernel refused a rule on Inbox under `register.inbox` as reading `register.trigger` (K4).
+ * The names a rule's template fills from the run and not from a list: `{{trigger.row.what}}`, `{{vars.x}}`, `{{each.0}}`
+ * and `{{metric.total}}`, every head `rules.ts`'s `SPELLED` fills besides the row's own `{{field}}`. Read as lists, the
+ * kernel refused a rule on Inbox under `register.inbox` as reading `register.trigger` (K4), and a rule reading
+ * `{{metric.x}}` was placed under a list called `metric`, so a member was held from it for no reason (62.4b). A figure
+ * is still a read: the walk places it through its metric (`FIGURE` below), as it places a page's `{{inbox-count}}`.
  */
-const RUN_SCOPE = new Set(['trigger', 'vars', 'each']);
+const RUN_SCOPE = new Set(['trigger', 'vars', 'each', 'metric']);
 /** A door that fetches on its own clock or is called out to, which `actions` lists as a scheduled action. */
 const CALLS_OUT = new Set(['pull', 'call', 'poll']);
 
@@ -103,6 +107,10 @@ function walk(body: unknown, kind: Kind, resolve: Resolve, self?: string): Touch
       else if (page && key === 'source' && !PAGE_SOURCES.has(node)) lists.add(node === 'sessions.live' ? 'session' : ACROSS);
       for (const m of node.matchAll(/\{\{\s*(?:[a-z]+:)?\s*([a-z][a-z0-9_]*)(?:#\d+)?\.[A-Za-z]/g))
         if (!(kind === 'rule' && RUN_SCOPE.has(m[1]!))) lists.add(m[1]!);
+      /* A RULE'S `{{metric.cash-now}}` IS THE FIGURE, read by the run through `figureText`, so it touches the list the
+         figure counts and not one called `metric`. A page has no such spelling: `pathOf` reads `metric.x` there as a
+         state count of a list called `metric`, which is what the line above keeps it as. */
+      if (kind === 'rule') for (const m of node.matchAll(FIGURE)) figure(m[2]!);
       /* A BARE `{{diary-count}}` IN A PAGE'S PROSE IS A FIGURE, as `pathOf` reads one. A code span is text and is skipped,
          as `pathsOf` skips it, and in a template a field of the row is the row's, and so is `{{spoken}}`: `fill` answers
          it with the row's spoken id before it reads a field or a metric, and `declare.ts` reserves the word as a field

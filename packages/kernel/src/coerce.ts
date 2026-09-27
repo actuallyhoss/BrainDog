@@ -217,7 +217,35 @@ const KEY_SHAPES: readonly RegExp[] = [
   /\bdo[opr]_v1_[0-9a-f]{64}/u,
   /\bkey-[0-9a-f]{32}\b/u,
   /(?:key|token|secret|passw(?:or)?d|auth)["']?\s*[:=]\s*["']?[0-9a-f]{20,}(?![0-9a-z])/iu,
+  /* A BARE 32-HEX STRING STAYS ALLOWED, with no name or prefix in front of it. An MD5 checksum, a Notion page's id and
+     a Loom share are exactly that shape, and a key written alone that way cannot be told apart from them, so refusing
+     it would refuse every one of those; the named and prefixed shapes above are what a key pasted from a config
+     carries. */
+  /* A BEARER TOKEN IS A KEY WHATEVER ITS ALPHABET, because the word in front of it says what it is, as
+     `@braindog/declare`'s `credentials.ts` already reads it. Twenty or more of RFC 6750's token characters, so the
+     placeholder `Bearer <token>` and the prose "a Bearer token" pass. A Basic header is read by `basicCredential`. */
+  /\bBearer\s+[A-Za-z0-9._~+/-]{20,4096}/iu,
 ];
+
+/**
+ * An `Authorization: Basic` header's credentials: base64 that decodes to `user:password`.
+ *
+ * DECODED, NOT MATCHED BY LENGTH, because the header's value can be as short as `YTpi` (`a:b`) and the prose after
+ * the same two words ("Authorization: Basic auth is off") is as short. What only a credential does is decode to a
+ * pair joined by a colon.
+ */
+const BASIC = /\bauthorization["']?\s*[:=]\s*["']?basic\s+([A-Za-z0-9+/]{4,4096}={0,2})(?![A-Za-z0-9+/=])/giu;
+
+function basicCredential(text: string): boolean {
+  for (const [, b64] of text.matchAll(BASIC)) {
+    try {
+      if (atob(b64!).includes(':')) return true;
+    } catch {
+      /* Not base64 after all, so not a header's credentials: the next one is read. */
+    }
+  }
+  return false;
+}
 
 /**
  * What a text looks like once the characters nobody can see are gone.
@@ -359,6 +387,7 @@ function random(run: string): boolean {
 export function looksLikeCredential(text: string): boolean {
   const seen = text.replace(INVISIBLE, '');
   if (KEY_SHAPES.some((shape) => shape.test(seen))) return true;
+  if (basicCredential(seen)) return true;
   for (const [run] of unlinked(seen).matchAll(KEY_RUN)) if (random(run)) return true;
   return false;
 }

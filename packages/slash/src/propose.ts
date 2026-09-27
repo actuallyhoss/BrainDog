@@ -319,14 +319,12 @@ export type Palette = {
 
 export const palette = (core: Core, record: RecordApi, fallback: Inference): Palette => {
   /**
-   * Tier `a` is metered here and the other two are not, AND THE REASON THIS LINE ONCE GAVE, "on `b` and `byo` the asker
-   * is paying", IS FALSE. Pass one drafts on `fallback`, the host's endpoint and key, on every tier (`look` below), and on
-   * `byo` the proposal does too, since the settings hold no address of the owner's. Only tier `b`'s proposal is on the
-   * asker's key. Measured at `ask_cap: 1`: five reads on `b` made five calls on the operator's key
-   * (`loop/research-batch-thirty-one-audit.md` §3), and on `byo` the four reads after the first all answered 200
-   * (`apps/selfhost/test/slash-byok-guard.test.ts`, red before the host counted `byo`). The host meters those drafts and
-   * the `byo` proposal (`apps/selfhost/test/slash-byo-propose.test.ts`), in
-   * `packages/host/src/slash.ts` `slashGuardedEngine`, because the count is of money this package never sees spent.
+   * Tier `a` is metered here, `byo` by the host, and tier `b` by nobody, because tier `b` is the owner's own key and asks
+   * on it are listed and not capped (`loop/finish/agents.md` §5 item 7). THAT HOLDS ONLY BECAUSE BOTH PASSES GO THERE: a
+   * host hands the own key's adapter as `inference` as well as `byok`, so pass one drafts on it too. Before it did, pass
+   * one drafted on the host's model on every tier, and five reads on `b` at `ask_cap: 1` made five calls on the operator's
+   * key (`loop/research-batch-thirty-one-audit.md` §3). `byo` still drafts and proposes on the host's own endpoint, so
+   * the host counts it, in `packages/host/src/slash.ts` `slashGuardedEngine`, where the money is seen spent.
    */
   const spent = (): Refusal | null => {
     const s = core.settings();
@@ -633,8 +631,10 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
     const s = core.settings();
     /* TIER `b` IS THE CUSTOMER'S OWN KEY AND THIS PACKAGE HAS NEVER SEEN IT (`46 §5.9`). The host opens
        the grant under the asker's own browser session, decrypts it where key material belongs, and
-       hands in an adapter for one call. No adapter means no open key, which is a sentence about the
-       vault and not a fault in the question. On `a` and `byo` the proposal is the host's model, handed in for this ask. */
+       hands in an adapter for the ask, the same one pass one drafted on. No adapter means no open key,
+       which is a sentence about the vault and not a fault in the question, and the included model is
+       never asked in its place: the owner chose where his questions go. On `a` and `byo` the proposal
+       is the host's model, handed in for this ask. */
     const engine = s.tier === 'b' ? byok : host;
     if (engine === undefined)
       return no(

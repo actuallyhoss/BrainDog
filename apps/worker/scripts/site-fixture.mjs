@@ -12,8 +12,11 @@
  * own `assets` block, and no `main`, `services` or `run_worker_first` anywhere.
  */
 
-/** The doors the site runs its script first on once it is bound: the eight of the research's section 1.1, and `/mcp/`. */
-export const SITE_DOORS = ['/app', '/app/*', '/api/*', '/auth/*', '/account/*', '/mcp', '/mcp/', '/in/*', '/.well-known/braindog-build'];
+/**
+ * The doors the site runs its script first on once it is bound: those of the research's section 1.1, `/mcp/`, and
+ * `/healthz`, which the real site's `run_worker_first` hands the app and the checker's `DOORS` asks for (defects H4).
+ */
+export const SITE_DOORS = ['/app', '/app/*', '/api/*', '/auth/*', '/account/*', '/mcp', '/mcp/', '/in/*', '/.well-known/braindog-build', '/healthz'];
 
 export const UNBOUND = Object.freeze({
   name: 'braindog-site',

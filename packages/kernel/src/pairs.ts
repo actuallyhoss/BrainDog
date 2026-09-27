@@ -1075,6 +1075,14 @@ function answerOf(p: Pairing, leg: Leg, known: Map<string, string | null>, windo
    anything should reach. */
 const SETTLE_MOST = 256;
 
+/* WHEN ONE WRITE READS THE WHOLE LIST, AS A PASS DOES: once it holds this many rows to answer, or has asked this many
+   windows. Without a `Ledger` each window is a query that reads every row of the list (`candidatesOf`), and every row
+   in it that mirrors the leg is asked `pairable` or `waiting` afresh, each a question to the event table, so a write
+   whose window was busy read the list again for every window it asked: one create after 10,000 rows of one amount took
+   about 3 s (`loop/finish/defects.md`, L5). Below this a write asks its few windows by query, as it always has, since a
+   list read whole parses every row of it and a quiet write has no need of that. */
+const READ_WHOLE_AT = 16;
+
 /**
  * Every row whose pair a write has changed, with the partner it now has (`null` for none).
  *
@@ -1092,13 +1100,26 @@ const SETTLE_MOST = 256;
  * `answered` collects every row whose partner was asked, changed or not: a row asked once has had its answer written,
  * and asking it again as a seed of its own only read its set a second time. Measured on 10,000 rows of fifty round
  * amounts in one year, the pass asked 59,194 rows before it kept this.
+ *
+ * A WRITE'S OWN `settle`, CALLED WITH NO `pass`, READS THE LIST ONCE WHEN ITS WINDOWS ARE BUSY (`READ_WHOLE_AT`), and
+ * answers every window after that from it, as a pass does. It keeps its answers and its windows for the length of the
+ * call, as it always did. Nothing is written until every row is answered, so the list read at that moment is the list
+ * each window would have queried, and a window already answered by query stays as it is: `around` reads the same rows
+ * from a `Ledger` as from SQL. It takes the `Ledger` from `passOf`, so a declaration that reads its own mark still asks
+ * every window by query: the condition is said in one place for a pass and for a write.
  */
 export function settle(p: Pairing, seeds: readonly string[], pass?: Pass): { leg: Leg; to: string | null }[] {
   const want = new Map<string, { leg: Leg; to: string | null }>();
   const known = pass?.known ?? new Map<string, string | null>();
   const windows = pass?.windows ?? windowsOf();
+  /* A PASS HAS ALREADY ASKED `passOf`, and holds its `Ledger` or, where its rule reads the mark, none. */
+  let asked = pass !== undefined;
   const queue = [...seeds];
   while (queue.length > 0 && want.size < SETTLE_MOST) {
+    if (!asked && (queue.length >= READ_WHOLE_AT || windows.seen.size >= READ_WHOLE_AT)) {
+      asked = true;
+      windows.ledger = passOf(p).windows?.ledger ?? null;
+    }
     const id = queue.shift()!;
     if (want.has(id)) continue;
     /* A ROW AN EARLIER CALL OF THE SAME PASS ANSWERED IS NOT WALKED AGAIN, when the pass keeps its answers (`passOf`):

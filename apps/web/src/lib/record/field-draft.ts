@@ -16,7 +16,7 @@
  * known a money is not written, and the box says why.
  */
 
-import { exponentOf } from 'braindog-render';
+import { day, exponentOf } from 'braindog-render';
 
 import { copy } from '../copy.ts';
 import { amountOf, currencyOf } from './money.ts';
@@ -28,18 +28,128 @@ import { listFromDraft, listLine } from './tags.ts';
 /**
  * Whether a field's value can be changed where it is drawn.
  *
- * EVERY TYPE BUT FOUR, ON BOTH SCREENS, and one predicate so the two cannot drift again. A secret is never drawn and
- * never edited: a credential does not go in a row, the vault is a different surface with different rules, and
- * `readableFields` has already left it out.
+ * EVERY TYPE BUT THOSE `UNBOXED` NAMES, ON BOTH SCREENS, and one predicate so the two cannot drift again. A secret is
+ * never drawn and never edited: a credential does not go in a row, the vault is a different surface with different
+ * rules, and `readableFields` has already left it out. A `file` is bytes the record keeps outside the row, and a box
+ * that takes typing cannot hold one; it waits for the file store (M5 `/a`).
  *
- * `quantity`, `file` AND `json` ARE HELD AS OBJECTS THAT NO BOX HERE TAKES APART. The first version of this answered
- * yes to them, and `draftOf` handed the box `String` of the value: a `json` cell holding `{ a: 1 }` opened as
- * `[object Object]`, and one character typed after it went back as that string, which the record's `json` coercion
- * accepts as it comes (`field-draft.test.ts`). None of the three is declared by a register this app draws today, so
- * leaving them out takes nothing away from anybody; they come back when something here can type one.
+ * `quantity` AND `json` WERE REFUSED BESIDE THEM, because `draftOf` handed the box `String` of the value: a `json`
+ * cell holding `{ a: 1 }` opened as `[object Object]`, and one character typed after it went back as that string,
+ * which the record's `json` coercion accepts as it comes (`field-draft.test.ts`). Each now opens as text that says
+ * the whole value, a number and its unit or the structure written out, and goes back through `patchOf` as the object
+ * the record stores, in the box drawn for it (`QuantityBox.svelte`, `JsonBox.svelte`).
  */
-const UNBOXED: ReadonlySet<string> = new Set(['secret', 'quantity', 'file', 'json']);
+const UNBOXED: ReadonlySet<string> = new Set(['secret', 'file']);
 export const editable = (f: Pick<FieldDecl, 'type'>): boolean => !UNBOXED.has(f.type);
+
+/**
+ * A `quantity` field, and a `json` one.
+ *
+ * COMPARED AS TEXT, because this app's `FieldType` lists only the types a register it ships declares (`schema.ts`), and
+ * neither of these is on it, while a declaration the record serves can carry both. A plain `===` against the union
+ * would be refused by the type checker as a comparison that is never true, and on a record that declares one it is.
+ */
+export const isQuantity = (f: Pick<FieldDecl, 'type'>): boolean => (f.type as string) === 'quantity';
+export const isJson = (f: Pick<FieldDecl, 'type'>): boolean => (f.type as string) === 'json';
+
+/** A typed number, read as decimal digits and nothing else, so `0x10` is refused rather than written as 16. */
+const DECIMAL = /^-?\d+(\.\d+)?$/u;
+
+/** The unit a stored quantity carries, or `null` for anything that is not one. */
+function unitHeld(value: unknown): string | null {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return null;
+  const unit = (value as { unit?: unknown }).unit;
+  return typeof unit === 'string' && unit.trim() !== '' ? unit.trim() : null;
+}
+
+/**
+ * The units a quantity box offers: the one the row holds, the one the field declares, then the one its default is in,
+ * each once and in that order, which is also the order a number typed without a unit is written in.
+ *
+ * NEVER A UNIT NOBODY CHOSE. With none of the three known the box takes the unit as typing, and a number sent without
+ * one is refused where it was typed (`wrongValue`), because `3` on its own is a number of something the row forgot.
+ */
+export function unitsOf(f: FieldDecl, held: unknown): string[] {
+  const declared = typeof f.unit === 'string' && f.unit.trim() !== '' ? f.unit.trim() : null;
+  return [...new Set([unitHeld(held), declared, unitHeld(f.default)].filter((u): u is string => u !== null))];
+}
+
+/**
+ * A quantity as one line of text, the number and then its unit, which is how `draftOf` opens it and how the box writes
+ * it back into the one string both screens keep for whatever is being typed.
+ *
+ * NO NUMBER IS NO QUANTITY: a box whose number was cleared is the field being emptied, whatever unit sits beside it,
+ * so the line is empty and the save tells the record the row no longer carries the field.
+ */
+export const quantityLine = (number: string, unit: string): string =>
+  number.trim() === '' ? '' : unit.trim() === '' ? number : `${number} ${unit.trim()}`;
+
+/**
+ * The two halves of a quantity's line: the run of figures it starts with, and the rest as its unit, so `2 kg` and
+ * `2kg` typed by hand are both two kilograms.
+ *
+ * EVERY FIGURE STANDING ON ITS OWN STAYS IN THE NUMBER, the comma, the point and a space between digits with it, so
+ * `1,5 kg` and `1 000 kg` are numbers `DECIMAL` refuses, and not the number `1` in a unit called `,5 kg` or `000 kg`:
+ * that would be a value nobody typed, written without a word. A figure written against letters starts the unit, so a
+ * row holding two of a unit called `100g` opens as `2 100g` and reads back as the same two.
+ */
+export function quantityParts(line: string): { number: string; unit: string } {
+  const m = /^(-?[\d.,]+(?:\s+[\d.,]+(?=\s|$))*)?\s*(.*)$/su.exec(line.trim());
+  return { number: m?.[1] ?? '', unit: (m?.[2] ?? '').trim() };
+}
+
+/** Structured data read from what was typed, or a note that it does not read. */
+function jsonOf(text: string): { ok: true; value: unknown } | { ok: false } {
+  try {
+    return { ok: true, value: JSON.parse(text) as unknown };
+  } catch {
+    return { ok: false };
+  }
+}
+
+const MONTHS = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+
+/**
+ * A day as the record writes it on every screen, `3 Sep 2026`, which is what a day box opens on (`DayBox.svelte`).
+ *
+ * THE BROWSER'S DATE CONTROL SPOKE ITS OWN FORMAT, `mm/dd/yyyy` on a machine set to American English, in a record that
+ * writes the same day as `3 Sep 2026` in the cell beside it (design SYS-15). So the box is text, and it opens on the
+ * record's own words for the day, from the formatter that draws the cell (`braindog-render` `day`).
+ */
+export const dayLine = (value: string): string => (value.trim() === '' ? '' : day(value.trim()));
+
+/**
+ * The day a person typed, as the record stores it (`YYYY-MM-DD`), or `null` when it is not one.
+ *
+ * TWO SPELLINGS ARE READ: the one the box opened on, a day, a month's name or the first three or more letters of it,
+ * and a year (`3 Sep 2026`, `3 september 2026`), and the stored form itself, which is what a person pasting from
+ * elsewhere most often has. Slashes are not read at all: `03/09/2026` is the third of September in one country and
+ * the ninth of March in the next, and a guess between them is a date nobody typed.
+ *
+ * AND THE DAY HAS TO EXIST. `Date.UTC` rolls 30 February into March without a word, so the parts are compared after
+ * the trip, as the record's own `day` coercion does.
+ */
+export function dayFrom(typed: string): string | null {
+  const s = typed.trim();
+  let y: number;
+  let m: number;
+  let d: number;
+  const iso = /^(\d{4})-(\d{2})-(\d{2})$/u.exec(s);
+  if (iso) {
+    [y, m, d] = [Number(iso[1]), Number(iso[2]), Number(iso[3])];
+  } else {
+    const said = /^(\d{1,2})\s+([A-Za-z]{3,})\.?,?\s+(\d{4})$/u.exec(s);
+    if (!said) return null;
+    const word = (said[2] ?? '').toLowerCase();
+    const at = MONTHS.findIndex((name) => name.startsWith(word));
+    if (at < 0) return null;
+    [y, m, d] = [Number(said[3]), at + 1, Number(said[1])];
+  }
+  const back = new Date(Date.UTC(y, m - 1, d, 12));
+  if (back.getUTCFullYear() !== y || back.getUTCMonth() !== m - 1 || back.getUTCDate() !== d) return null;
+  const two = (n: number): string => String(n).padStart(2, '0');
+  return `${y}-${two(m)}-${two(d)}`;
+}
 
 /**
  * The currency a money box is typed in: the row's own, else the field's default's, else the list's, else the record's,
@@ -54,6 +164,13 @@ const currencyIn = (f: FieldDecl, held: unknown, currency: string | null | undef
  */
 const words = {
   noCurrency: 'Nothing says which currency this amount is in yet, so it was not written: this row has none, and neither does the record.',
+  /* AND THE SAME FOR THE BOXES THAT TAKE A VALUE APART (MOD-22): each says what it would have written, so the
+     sentence under the box is a way to fix it rather than a refusal the record would give a second later. */
+  quantityShape: 'Write the amount as a number, like 2.5, with its unit beside it.',
+  noUnit: 'Nothing says what this number counts yet, so it was not written: choose its unit beside it.',
+  unitUnknown: (units: string) => `This field counts in ${units}: write the number alone and choose its unit beside it.`,
+  jsonShape: 'This does not read as structured data yet: check its brackets, quotes and commas.',
+  dayShape: 'Write the day as the record does, like 3 Sep 2026.',
 } as const;
 
 /**
@@ -90,11 +207,23 @@ function durationDraft(f: FieldDecl, held: unknown): string {
   return String(seconds / per);
 }
 
-/** The value as a box holds it: money in major units, a duration in its unit, a list as its tags, the rest as stored. */
+/**
+ * The value as a box holds it: money in major units, a duration in its unit, a list as its tags, a quantity as its
+ * number and unit, structured data written out, the rest as stored.
+ *
+ * STRUCTURED DATA IS ASKED BEFORE THE LIST, because a `json` field may hold an array, and an array opened as tags with
+ * commas would go back as a list of words, its numbers and nesting gone. It is written out two spaces to a level, so
+ * the box shows its shape; `unchanged` compares what it reads as rather than its spacing.
+ */
 export function draftOf(f: FieldDecl, held: unknown, currency: string | null | undefined): string {
   if (held === null || held === undefined) return '';
+  if (isJson(f)) return JSON.stringify(held, null, 2) ?? '';
   /* A LIST IS TYPED AS ITS TAGS WITH COMMAS, and the tags the record keeps for itself are not in the box (`tags.ts`). */
   if (Array.isArray(held)) return listLine(held) ?? '';
+  if (isQuantity(f)) {
+    const number = held !== null && typeof held === 'object' ? (held as { value?: unknown }).value : held;
+    return quantityLine(number === undefined || number === null ? '' : String(number), unitHeld(held) ?? '');
+  }
   if (f.type === 'duration') return durationDraft(f, held);
   if (f.type !== 'money') return String(held);
   const minor = amountOf(held);
@@ -123,6 +252,41 @@ export function wrongMoney(f: FieldDecl, typed: string, held: unknown, currency:
 }
 
 /**
+ * What the record would refuse about any box, said where it was typed: a money's places and currency (`wrongMoney`),
+ * a quantity with no number or no unit, structured data that does not read, and a day that is not one.
+ *
+ * BOTH SCREENS ASK THIS BEFORE A WRITE, and for structured data it is the only thing standing between a slip and a
+ * wrong value: the record's `json` coercion takes a string as readily as an object, so `{ "a": 1` sent as it was
+ * typed would be stored as text rather than refused.
+ */
+export function wrongValue(f: FieldDecl, typed: string, held: unknown, currency: string | null | undefined): string | null {
+  if (f.type === 'money') return wrongMoney(f, typed, held, currency);
+  const raw = typed.trim();
+  if (raw === '') return null;
+  if (f.type === 'day') return dayFrom(raw) === null ? words.dayShape : null;
+  if (isQuantity(f)) {
+    const { number, unit } = quantityParts(raw);
+    if (!DECIMAL.test(number)) return words.quantityShape;
+    const known = unitsOf(f, held);
+    if (unit === '') return known.length === 0 ? words.noUnit : null;
+    /* A UNIT THE FIELD DOES NOT KNOW, WHERE IT KNOWS SOME, is most often a word typed into the number box beside a
+       unit already chosen, as `3 lb` beside `kg` reads `lb kg`, and the box offers only the units it knows anyway. */
+    return known.length > 0 && !known.includes(unit) ? words.unitUnknown(known.join(' or ')) : null;
+  }
+  if (isJson(f)) return jsonOf(raw).ok ? null : words.jsonShape;
+  return null;
+}
+
+/**
+ * A quantity or structured data as a patch carries it.
+ *
+ * THE RECORD'S SHAPES, WHICH THIS APP'S `Fields` DOES NOT LIST: it types the values of the types a register this app
+ * ships declares (`schema.ts`), and `{ value, unit }` and an arbitrary structure are not among them. The record's own
+ * coercion is what checks them, on the write.
+ */
+const stored = (value: unknown): Fields[string] => value as Fields[string];
+
+/**
  * The one field, in the shape the record stores.
  *
  * A YES OR NO IS TICKED, so `typed` is a boolean for a `bool` and the text in the box for everything else.
@@ -138,10 +302,27 @@ export function wrongMoney(f: FieldDecl, typed: string, held: unknown, currency:
  * before, and the record read `3` as three seconds. In any unit bigger than a second the product is rounded to a
  * whole second, a precision the unit never showed; in seconds it goes as typed, so `1.5` meets the record's sentence
  * about whole numbers instead of quietly becoming `2`. What is not a number goes as typed, for the same sentence.
+ *
+ * A QUANTITY IS A NUMBER AND A UNIT, `{ value, unit }`, and a number typed alone goes in the unit `unitsOf` puts
+ * first. Structured data goes as what it reads as, and a day typed as the record writes it goes as the day it names.
+ * What does not read goes as typed, and `wrongValue` has said so under the box before any caller gets here.
  */
 export function patchOf(f: FieldDecl, typed: string | boolean, held: unknown, currency: string | null | undefined): Fields {
   if (f.type === 'bool') return { [f.id]: typed === true };
   const raw = String(typed).trim();
+  if (isJson(f)) {
+    if (raw === '') return { [f.id]: null };
+    const read = jsonOf(raw);
+    return { [f.id]: read.ok ? stored(read.value) : raw };
+  }
+  if (isQuantity(f)) {
+    if (raw === '') return { [f.id]: null };
+    const { number, unit } = quantityParts(raw);
+    const said = unit !== '' ? unit : unitsOf(f, held)[0];
+    if (!DECIMAL.test(number) || said === undefined) return { [f.id]: raw };
+    return { [f.id]: stored({ value: Number(number), unit: said }) };
+  }
+  if (f.type === 'day' && raw !== '') return { [f.id]: dayFrom(raw) ?? raw };
   if (f.type === 'list' || Array.isArray(held)) return { [f.id]: listFromDraft(raw, held) };
   if (f.type === 'duration') {
     if (!/^-?\d+(\.\d+)?$/u.test(raw)) return { [f.id]: raw };
@@ -163,8 +344,15 @@ export function patchOf(f: FieldDecl, typed: string | boolean, held: unknown, cu
  * A SAVE THAT CHANGES NOTHING IS NOT A WRITE: it would put a line in the row's history saying a field went from a value
  * to the same value, which is a fact about a press. Compared as the box would draw the held value, which is the row
  * page's own test, and a toggle as a toggle.
+ *
+ * STRUCTURED DATA IS COMPARED AS WHAT IT READS AS, so a box whose spacing was tidied and whose values were not is not
+ * a change; what does not read is a change, and `wrongValue` stops it before it is sent.
  */
 export function unchanged(f: FieldDecl, typed: string | boolean, held: unknown, currency: string | null | undefined): boolean {
   if (f.type === 'bool') return typed === (held === true);
+  if (isJson(f) && String(typed).trim() !== '') {
+    const read = jsonOf(String(typed));
+    return read.ok && JSON.stringify(read.value) === JSON.stringify(held ?? null);
+  }
   return String(typed).trim() === draftOf(f, held, currency).trim();
 }

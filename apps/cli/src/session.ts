@@ -130,12 +130,14 @@ async function show(rest: string[], io: AgentIo): Promise<number> {
 
   const place = c.project ? `project ${clip(c.project.name, 60)}` : 'no project here';
   /* A STATE IS THE RECORD'S WORD, not a closed list: the client types it `string | null`, and `braindog context` clips
-     the same field in its headline. Printed as sent here, a DEL and a U+009B in it reached the terminal. */
-  io.out(c.session.state === null ? `${c.session.spoken} · ${place}.` : `${c.session.spoken} is ${clip(c.session.state, 40)} · ${place}.`);
+     the same field in its headline. Printed as sent here, a DEL and a U+009B in it reached the terminal. THE SPOKEN ID
+     IS THE RECORD'S WORD TOO, so it is clipped to the 40 characters `headline` in `context.ts` gives it (defects G5). */
+  const spoken = clip(c.session.spoken, 40);
+  io.out(c.session.state === null ? `${spoken} · ${place}.` : `${spoken} is ${clip(c.session.state, 40)} · ${place}.`);
 
   if (c.handoff === null) io.out('No handoff has been left here.');
   else {
-    io.out(stopped(`Last handoff (${c.handoff.from}, ${ago(c.handoff.age_s)}): ${clip(c.handoff.next, 200)}`));
+    io.out(stopped(`Last handoff (${clip(c.handoff.from, 40)}, ${ago(c.handoff.age_s)}): ${clip(c.handoff.next, 200)}`));
     for (const tried of c.handoff.tried.slice(-TRIED)) io.out(stopped(`  Already tried: ${clip(tried, 160)}`));
   }
 
@@ -143,7 +145,7 @@ async function show(rest: string[], io: AgentIo): Promise<number> {
   const others = c.live.same_repo.filter((r) => r.spoken !== own);
   if (others.length === 0) io.out('Nobody else is live in this repository.');
   else {
-    const named = others.slice(0, PER_LINE).map((r) => `${r.spoken} ${typeof r.state === 'string' ? clip(r.state, 40) : 'unknown'}${r.doing ? ` "${clip(r.doing, 60)}"` : ''}, seen ${ago(r.age_s)}`);
+    const named = others.slice(0, PER_LINE).map((r) => `${clip(r.spoken, 40)} ${typeof r.state === 'string' ? clip(r.state, 40) : 'unknown'}${r.doing ? ` "${clip(r.doing, 60)}"` : ''}, seen ${ago(r.age_s)}`);
     io.out(`Also live here: ${named.join('; ')}.`);
   }
   /* The same three facts the lines carry, unclipped: a caller that has to clip them can, and one that
@@ -190,7 +192,7 @@ async function oneLine(verb: Line, rest: string[], io: AgentIo): Promise<number>
   }
   const said = text.trim();
   const body = verb === 'next' ? { next: said } : verb === 'tried' ? { tried: said } : { note: said };
-  return send(at, body, io, SAID[verb](at.context.session.spoken), { run: at.context.session.spoken, left: verb });
+  return send(at, body, io, SAID[verb](clip(at.context.session.spoken, 40)), { run: at.context.session.spoken, left: verb });
 }
 
 /* ── end ───────────────────────────────────────────────────────────────── */
@@ -246,7 +248,7 @@ async function end(rest: string[], io: AgentIo): Promise<number> {
       ...(where.head === null ? {} : { head: where.head }),
     },
     io,
-    ENDED[state](at.context.session.spoken),
+    ENDED[state](clip(at.context.session.spoken, 40)),
     { run: at.context.session.spoken, state },
   );
 }

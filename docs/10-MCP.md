@@ -44,8 +44,11 @@ session in a repo on a machine with no browser; or it is made by OAuth, below, f
 connects by URL. Both land in the same list under Settings, Agents, and revoking one there stops it.
 
 **OAuth, as built** (`packages/host/src/oauth.ts`, the protocol; `packages/record/src/oauth.ts`, its
-store on the Directory's SQL; `apps/worker/src/oauth.ts`, the Cloud's wiring). The Cloud serves all of
-it; a self-host does not yet, and its `/mcp` still takes a token made in the app or by the device grant.
+store on the Directory's SQL; `apps/worker/src/oauth.ts`, the Cloud's wiring; `apps/selfhost/src/oauth.ts`, the
+self-host's). The Cloud serves all of it. A self-host serves it too, on the origin it serves the app from, wherever
+somebody can sign in to it from a browser; an issuer at an `http:` address is allowed only while the process listens on
+loopback alone (`BRAINDOG_HOST=127.0.0.1`), and then each loopback name `/mcp` answers by is named as the resource when
+it is the one a client reached.
 
 - `POST /mcp` without a bearer answers 401 with
   `WWW-Authenticate: Bearer resource_metadata="https://<host>/.well-known/oauth-protected-resource"`.

@@ -206,7 +206,8 @@ test('AND IT REACHES THE FIGURES, which no search could reach before', () => {
   /* Six metrics are declared, each with a target and a window, and the only way to any of them was
      to know which page it was a tile on. The palette lists the ones that can be read, drawn with
      the reading and the target beside the name so the row answers without being opened. */
-  const drawn = Object.entries(METRICS).filter(([, d]) => !isTemplate(d) && unreadable(d).length === 0);
+  const drawn = Object.entries(METRICS).filter(([, d]) => !isTemplate(d) && unreadable(d).length === 0 && d.source !== 'register.books');
+  /* THE SAMPLE KEEPS NO BOOK, so a figure over books has no row to open and the palette rightly gives it no door. */
   assert.ok(drawn.length >= 5, 'the figures group would be all but empty');
   for (const [id, decl] of drawn) {
     const read = metric(id);

@@ -12,15 +12,13 @@
  * seeded Agents page (`packages/seed/src/packs/agents.ts`) opens with a `governance.open` queue, so
  * this gate drives `/p/agents` and nothing else.
  *
- * TWO BEHAVIOURS, AND BOTH ARE ABOUT WHAT ARRIVES ON THE OTHER SIDE OF A PRESS. `askGate` in
- * `apps/web/src/routes/p/[slug]/+page.svelte` sends a pressed option to `/decide/[id]?option=`, and
- * the gate reads that query once to set `highlighted`. The gate's own rule, written at the top of
- * `apps/web/src/routes/decide/[id]/+page.svelte`, is that a recommendation is DISPLAYED AND NEVER
- * PRE-CHOSEN: a question that arrives with an answer already picked is a question that gets pressed
- * through. So a run of this gate lands on a card that carries a recommended option, presses the
- * OTHER one on purpose, and checks three things: the gate it lands on is the same question the card
- * asked, the option pressed and none other carries `data-on`, and no commit step is open, because a
- * commit step open is what "already chosen" would look like on this screen.
+ * THE PRESS IS THE ANSWER, WHERE IT IS SHOWN (MOD-9). `QueueAnswer.svelte` never sends a pressed
+ * option to `/decide/[id]`: the card opens a reason line under itself, focused, and Enter sends it;
+ * the card then becomes one line naming what was chosen, `.qa-done` and not `.queue-card`, so it
+ * never breaks the ranking. So a run of this gate presses whatever a card offers, and checks three
+ * things: the reason line opened with the focus, the press answered the question in place (the card
+ * settled to `.qa-done` rather than the reason line timing out), and the page's own URL never moved,
+ * because a question is answered where it is shown.
  *
  * THE SECOND BEHAVIOUR IS THE LAST LINE OF A QUEUE THAT HOLDS MORE THAN IT DRAWS: `queueMore(n)`,
  * an `<a class="queue-more">` where the evaluator supplied an address and a bare `<p>` where it did
@@ -300,30 +298,20 @@ export default async function queue(root = join(import.meta.dirname, '..', '..')
             findings.push(`the card "${questionText}" has no pressable option.`);
           } else {
             const pressedLabel = (await press.innerText()).trim();
+            const from = page.url();
             await press.click();
-            await page.waitForURL(/\/decide\//, { timeout: budget('ready').settleTimeoutMs });
-            const gateState = await ready.settled(page);
-            const unmeasuredGate = ready.check('queue press-option gate', new URL(page.url()).pathname, gateState);
-            if (unmeasuredGate) findings.push(unmeasuredGate);
-
-            const gateTitle = (await page.locator('h1.title span[dir="auto"]').innerText()).trim();
-            if (gateTitle !== questionText)
-              findings.push(`pressing "${pressedLabel}" landed on "${gateTitle}", not the question it was pressed from ("${questionText}").`);
-
-            const onCards = page.locator('.cards .card[data-on]');
-            const onCount = await onCards.count();
-            if (onCount !== 1) {
-              findings.push(`the gate arrived with ${onCount} option(s) marked highlighted; expected exactly the one pressed.`);
-            } else {
-              const highlightedTitle = (await onCards.first().locator('.card-title').innerText()).trim();
-              if (highlightedTitle !== pressedLabel)
-                findings.push(`the gate highlighted "${highlightedTitle}", not the option pressed ("${pressedLabel}").`);
+            /* THE PRESS IS THE ANSWER, WHERE IT IS SHOWN (MOD-9). The record wants a reason, so the card opens one line
+               under itself, focused; Enter sends it, and the card becomes one line naming what was chosen. */
+            const why = card.locator('.qa-reason input');
+            const done = block.locator('.qa-done', { hasText: pressedLabel });
+            await Promise.race([why.waitFor({ timeout: budget('ready').settleTimeoutMs }), done.waitFor({ timeout: budget('ready').settleTimeoutMs })]).catch(() => {});
+            if ((await why.count()) > 0) {
+              if (!(await why.evaluate((el) => el === document.activeElement))) findings.push('the reason line opened without the focus.');
+              await why.fill('Answered by the queue gate.');
+              await why.press('Enter');
             }
-
-            /* NOTHING IS CHOSEN. `committing` is null until a card's own Choose button is pressed, and
-               the only thing on screen that says otherwise is the commit step this checks for. */
-            if ((await page.locator('section.commit').count()) > 0)
-              findings.push('the gate arrived with a commit step already open, as though an option were already chosen.');
+            await done.waitFor({ timeout: budget('ready').settleTimeoutMs }).catch(() => findings.push(`pressing "${pressedLabel}" did not answer "${questionText}" in place.`));
+            if (page.url() !== from) findings.push(`pressing "${pressedLabel}" left the page for ${new URL(page.url()).pathname}; a question is answered where it is shown.`);
           }
         }
       }
@@ -367,7 +355,7 @@ export default async function queue(root = join(import.meta.dirname, '..', '..')
     if (blind) findings.push(blind);
 
     if (findings.length === 0) {
-      console.log('queue: pressed a queue option to its gate (highlighted, not chosen), the count of what is left to /decide, and the cards arrived dearest first.');
+      console.log('queue: pressed a queue option and had it answered in place (the reason line focused, then the card settling to one line naming the choice), the count of what is left to /decide, and the cards arrived dearest first.');
     } else {
       console.error('\n  the queue block, driven in a real browser:');
       for (const f of findings) console.error(`      ${f}`);

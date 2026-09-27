@@ -347,7 +347,7 @@ export const site = {
             name: 'Keep balances current',
             starts: 'When a row in Accounts is added or changed',
             only: 'Its balance was last set more than a week ago',
-            then: 'Asks you on Decide to update it, once for each account and date',
+            then: 'Notes it on the account, once for each account and date',
           },
           {
             name: 'Chase late payments',
@@ -471,7 +471,7 @@ export const site = {
             name: 'Keep balances current',
             starts: 'When a row in Accounts is added or changed',
             only: 'Its balance was last set more than a week ago',
-            then: 'Asks you on Decide to update it, once for each account and date',
+            then: 'Notes it on the account, once for each account and date',
           },
           {
             name: 'Ask about a missed day',

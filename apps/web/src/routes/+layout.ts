@@ -59,7 +59,9 @@ export async function load({ url, fetch }): Promise<Shell & { slash: boolean }> 
   const api = apiBase(url);
   /* Read inside the record: the address is `/app/acme/start` and every rule below is written about `/start`. */
   const inner = here(url.pathname);
-  const spared = inner === '/start' || inner === '/signin' || inner === '/invite' || inner.startsWith('/s/');
+  /* `/connect` too: an app's sign-in lands there, and a redirect to `/start` would strand it halfway (AGT-8). */
+  const spared =
+    inner === '/start' || inner === '/signin' || inner === '/invite' || inner === '/connect' || inner.startsWith('/s/');
   const booted = await live.readBoot(api);
 
   /* AN ADDRESS THAT WILL NOT OPEN FOR A STRANGER ASKS FOR SIGN-IN (`signInFirst`), the bare `/app/` as much as

@@ -1,6 +1,7 @@
 /**
- * `slashGuardedEngine`'s `answer` (`src/slash.ts`): tier `b` and `byo`'s monthly cap, held for an automation's question
- * as it is for a person's read. `loop/research-infer-ask.md` §2.3 and §6 Brief C, case (6).
+ * `slashGuardedEngine`'s `answer` (`src/slash.ts`): `byo`'s monthly cap, held for an automation's question as it is for a
+ * person's read. `loop/research-infer-ask.md` §2.3 and §6 Brief C, case (6). Tier `b` was held to it too until it became
+ * his own key, whose asks are listed and not capped (`loop/finish/agents.md` AGT-21).
  *
  * THE GUARD WRAPPED `read` AND `propose` AND NOTHING ELSE, so a method the package gained reached the engine unguarded
  * through the prototype `Object.create` leaves. The package counts tier `a` alone (`packages/slash/src/propose.ts`,
@@ -74,22 +75,31 @@ const guardOf = (tier: 'a' | 'b' | 'byo', askCap: number, reads: number) => {
   return { guarded, reached, sql };
 };
 
-for (const tier of ['b', 'byo'] as const)
-  test(`on tier ${tier} at ask_cap 1 with one read made, answer refuses SLASH_BUDGET_SPENT without calling through`, async () => {
-    const { guarded, reached } = guardOf(tier, 1, 1);
-    const out = await guarded.answer(ASK, INFERENCE);
-    assert.equal(reached.length, 0);
-    assert.deepEqual(out, {
-      ok: false,
-      refusal: {
-        code: 'SLASH_BUDGET_SPENT',
-        fix: "rule.rate asked Slash at step 2, and this month's asks are spent until 1 October. Raise the monthly limit, or wait.",
-      },
-    });
+test('on tier byo at ask_cap 1 with one read made, answer refuses SLASH_BUDGET_SPENT without calling through', async () => {
+  const { guarded, reached } = guardOf('byo', 1, 1);
+  const out = await guarded.answer(ASK, INFERENCE);
+  assert.equal(reached.length, 0);
+  assert.deepEqual(out, {
+    ok: false,
+    refusal: {
+      code: 'SLASH_BUDGET_SPENT',
+      fix: "rule.rate asked Slash at step 2, and this month's asks are spent until 1 October. Raise the monthly limit, or wait.",
+    },
   });
+});
+
+/* ON HIS OWN KEY NOTHING IS CAPPED (`loop/finish/agents.md` §5 item 7): his provider bills the ask, so the guard lists it
+   and stands aside, as it does on tier `a`, where the package holds the cap itself. Before his own key replaced the host's
+   drafting on tier `b`, this case was the refusal above. */
+test('on his own key, tier b, at ask_cap 1 with one read made, the guard calls through: his asks are listed and not capped', async () => {
+  const { guarded, reached } = guardOf('b', 1, 1);
+  const out = await guarded.answer(ASK, INFERENCE);
+  assert.deepEqual(out, { ok: true, value: { text: '4' } });
+  assert.equal(reached.length, 1);
+});
 
 test('under the cap the guard calls through, with the job and the inference it was handed', async () => {
-  const { guarded, reached } = guardOf('b', 2, 1);
+  const { guarded, reached } = guardOf('byo', 2, 1);
   const out = await guarded.answer(ASK, INFERENCE);
   assert.deepEqual(out, { ok: true, value: { text: '4' } });
   assert.equal(reached.length, 1);
@@ -105,11 +115,11 @@ test('on tier a the guard stands aside, because the package holds that cap itsel
 
 test("an answer's own ledger row, kind read with no predicate, is spent from the same count as a person's read", async () => {
   /* BRIEF B WRITES THE ROW AS `read` AND NOT A NEW KIND (§4), and this pins the half of that choice the guard relies on:
-     `drafted()` counts it, and the tier `b` exemption for a stored `ask_id` does not, since it needs a predicate. */
-  const { guarded, reached, sql } = guardOf('b', 1, 0);
+     `drafted()` counts it. */
+  const { guarded, reached, sql } = guardOf('byo', 1, 0);
   sql.exec(
     `INSERT INTO slash_call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status, question)
-     VALUES ('c_answer', ?, 'read', 'b', 'glm-5.3-flash', 10, 10, 0, 5, 'ok', 'rule.rate step 2')`,
+     VALUES ('c_answer', ?, 'read', 'byo', 'glm-5.3-flash', 10, 10, 0, 5, 'ok', 'rule.rate step 2')`,
     new Date(NOW - 1_000).toISOString(),
   );
   const out = await guarded.answer(ASK, INFERENCE);

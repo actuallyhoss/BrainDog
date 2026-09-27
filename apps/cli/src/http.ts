@@ -11,10 +11,12 @@ import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 import { createClient, type Client } from '@braindog/client';
+import type { Result } from '@braindog/ports';
 
 type Env = Record<string, string | undefined>;
 
-type Held = { value: string; expires: string; label: string };
+/** One bearer the hosts file keeps: a login's, or a runner's enrolment. */
+export type Held = { value: string; expires: string; label: string };
 
 /** `docs/48-SPEC-CLI.md` §4.1, with the vault grants of the plan's §2.3. */
 export type HostsFile = {
@@ -192,4 +194,105 @@ export function clientFor(to: Target, headers: () => Promise<Record<string, stri
       return fetch(input, { ...init, headers: sent, signal, redirect: 'error' });
     },
   });
+}
+
+/* ── a runner's enrolment, and the three calls it makes ─────────────────── */
+
+/**
+ * The host a runner works for and the bearer it was enrolled with (`docs/48-SPEC-CLI.md` §5.13,
+ * `loop/finish/agents.md` C14).
+ *
+ * THE ENROLMENT AND NEVER THE LOGIN. A runner's bearer is a device grant of reach `runner`, which the
+ * record admits at `claimJob`, `postJobEvent` and `readCancel` and at nothing else, and a login is
+ * refused at all three. So `BRAINDOG_TOKEN` is not read here, and neither is the `token` beside it.
+ */
+export type RunnerTarget = { key: string; base: string; bearer: string; label: string };
+
+/**
+ * Which host `braindog runner run` claims from, and with what: `--host`, then `BRAINDOG_HOST`, then the
+ * one host this machine is enrolled on, then the file's default. Throws one sentence when there is no
+ * enrolment to use, and no sentence quotes a bearer.
+ *
+ * THE ONE ENROLLED HOST COMES BEFORE THE DEFAULT, because the default is the login's (`login` sets
+ * it) and a machine signed in to one record may run the jobs of another.
+ */
+export function runnerTarget(flag: string | undefined, env: Env, file: string, now: number = Date.now()): RunnerTarget {
+  const hosts = readHosts(file);
+  const enrolled = Object.entries(hosts.hosts).filter(([, entry]) => isObject(entry) && isObject(entry.runner));
+  const named = flag || env.BRAINDOG_HOST || (enrolled.length === 1 ? enrolled[0]?.[0] : undefined) || hosts.default;
+  if (!named)
+    throw new Error(
+      enrolled.length > 1
+        ? 'This machine is enrolled as a runner on more than one BrainDog. Name one with --host.'
+        : 'This machine is not enrolled as a runner. Run braindog runner enrol https://brain.dog/app/<slug>.',
+    );
+  const key = hostKey(named);
+  const url = new URL(key);
+  if (inTheClear(url)) throw new Error(`${key} is http, not https. A runner sends its enrolment only over https, except to this machine.`);
+  const held = enrolled.find(([written]) => sameHost(written, key))?.[1]?.runner;
+  if (!isObject(held) || typeof held.value !== 'string' || held.value === '')
+    throw new Error(`This machine is not enrolled as a runner on ${key}. Run braindog runner enrol ${key}.`);
+  /* AN EXPIRY THAT DOES NOT READ AS A DATE IS AN ENDED ONE, so a hand-edited file never runs on a bearer of unknown age. */
+  const until = typeof held.expires === 'string' ? Date.parse(held.expires) : Number.NaN;
+  if (!(until > now)) throw new Error(`The runner enrolment on ${key} ended on ${String(held.expires).slice(0, 10)}. Run braindog runner enrol ${key}.`);
+  return { key, base: url.origin, bearer: held.value, label: typeof held.label === 'string' ? held.label : '' };
+}
+
+/**
+ * Keeps a runner's enrolment under its host, beside the login and never in its place.
+ *
+ * THE FILE IS READ AGAIN HERE, just before the write, because minutes pass while somebody approves the
+ * six digits and another command may have written the file meanwhile.
+ */
+export function keepRunner(file: string, key: string, runner: Held): void {
+  const hosts = readHosts(file);
+  hosts.hosts[key] = { ...hosts.hosts[key], runner };
+  saveHosts(file, hosts);
+}
+
+/** The three calls a runner makes, and the only ones its enrolment opens. */
+export type RunnerMethod = 'claimJob' | 'postJobEvent' | 'readCancel';
+
+/**
+ * One of a runner's three calls, and the record's answer as a `Result`. A host that did not answer, or
+ * answered with something that is not an envelope, is `UNREACHABLE`.
+ *
+ * A DEADLINE ON EVERY CALL, set by the caller, because a claim is held open by the host for as long as
+ * the runner asked it to wait, and a far end that vanishes without closing the socket would otherwise
+ * hold the loop for ever (`26 §5`). A redirect is refused rather than followed, for `clientFor`'s
+ * reason: it would carry the bearer somewhere nobody chose.
+ */
+export async function runnerCall(
+  to: RunnerTarget,
+  method: RunnerMethod,
+  args: object,
+  o: { ms: number; signal?: AbortSignal | undefined; fetch?: typeof globalThis.fetch | undefined },
+): Promise<Result<unknown>> {
+  const gone: Result<unknown> = { ok: false, refusal: { code: 'UNREACHABLE', fix: `${to.key} did not answer.` } };
+  const deadline = AbortSignal.timeout(o.ms);
+  let res: Response;
+  try {
+    res = await (o.fetch ?? globalThis.fetch)(`${to.base}/api/${method}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${to.bearer}` },
+      body: JSON.stringify(args),
+      redirect: 'error',
+      signal: o.signal ? AbortSignal.any([o.signal, deadline]) : deadline,
+    });
+  } catch {
+    /* The error could quote the request, and the request holds the bearer. */
+    return gone;
+  }
+  let body: unknown;
+  try {
+    body = await res.json();
+  } catch {
+    return gone;
+  }
+  if (!isObject(body) || typeof body.ok !== 'boolean') return gone;
+  if (body.ok) return { ok: true, value: body.value };
+  const refusal = body.refusal;
+  if (isObject(refusal) && typeof refusal.code === 'string' && typeof refusal.fix === 'string')
+    return { ok: false, refusal: { code: refusal.code, fix: refusal.fix, ...(typeof refusal.at === 'string' ? { at: refusal.at } : {}) } };
+  return gone;
 }

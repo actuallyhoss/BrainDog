@@ -31,6 +31,7 @@ import type { Auth, AuthCall, AuthResult, Param, Refusal, Result, Row, Scheduler
 import { createDirectory, switcherAsk, type AccountUsage, type Directory as Dir, type RunUsage, type SessionAsk, type SwitcherAsk, type SwitcherRow } from '@braindog/record/directory';
 import type { BillingAnswers, BillingCall } from '@braindog/record/directory';
 import type { MeterTally } from '@braindog/record/directory';
+import type { Plan } from '@braindog/record/directory';
 import { answerOAuth, type OAuthAnswers, type OAuthCall } from '@braindog/record/oauth';
 import { seedCatalogue } from '@braindog/seed/usecases/catalogue';
 
@@ -89,6 +90,9 @@ import { bindingLimiter, classOf, limitKey, refusedFor, type LimitClass, type Li
 import { codeOf, guarded } from '@braindog/ports';
 import { KERNEL_MIGRATION, type Ack } from '@braindog/kernel';
 import { doorPath, op, outboxFields, type AckedRow } from './oplog.ts';
+/* BILLING (`loop/finish/ops.md` OPS-13): the account's four billing doors, and the Stripe client they call through. */
+import { billingDoors, type BillingDeps } from './billing.ts';
+import { stripeOf } from './stripe.ts';
 
 /** What a record answers between arming a restore and being reset: the gap between `51 D15`'s two calls. */
 const RESTORING: Refusal = { code: 'RECORD_UNAVAILABLE', fix: 'This record is going back to a copy and starts again in a moment. Ask again then.', at: 'record' };
@@ -170,9 +174,9 @@ type Env = {
    * (`52 §13 #17`), which is a red gate rather than a dead record.
    */
   BRAINDOG_BUILD?: string;
-  /** Empty when no Slash is wired, so `/api/slash/*` is not routed at all (`33 §4`). */
+  /** Read by `deploy-parity` and `apps/site`'s claims only: this Worker no longer reads it. Slash is his own key or the included model (`slash.ts`). */
   SLASH_ENDPOINT?: string;
-  /** The model name the Slash endpoint expects, when it expects one. The key is the person's own, from the vault (`slash.ts`). */
+  /** Unread by this Worker for the same reason as `SLASH_ENDPOINT`. */
   SLASH_MODEL?: string;
   /**
    * The Directory's MAC key: a secret, `wrangler secret put SESSION_SECRET --env <environment>`, 32 random
@@ -506,6 +510,17 @@ export class Record$ extends DurableObject<Env> {
   #scripts = new ScriptRuns();
 
   /**
+   * The record's own switch, set by the account door over RPC (`loop/finish/ops.md` §4.0 F): while it is on, the
+   * record answers reads and refuses writes, and its alarm runs the drain and nothing else.
+   */
+  #lapsed = false;
+
+  /** Set or clear this record's lapse: billing's webhook, when a payment moves it into or out of one. */
+  setLapsed(on: boolean): void {
+    this.#lapsed = on;
+  }
+
+  /**
    * One call a running script made, from `ScriptOutbound` or `ScriptRecord`: a fetch, a list or a get.
    *
    * AN RPC INTO THE OBJECT THE RUN STARTED IN, which is still awaiting it in `#act`. The key store, the vault and the
@@ -533,8 +548,9 @@ export class Record$ extends DurableObject<Env> {
   /** Migrate, then arm. Both before any request is answered, which is what the block is for. */
   async #open(): Promise<RecordApi> {
     let api!: RecordApi;
-    /* SLASH'S MODEL: the endpoint the deployment names, called with the person's own vault key, or none (`slash.ts`). */
-    const slashModel = workerSlashModel(this.env, () => api);
+    /* SLASH'S MODEL: his own key where he chose it in Settings, read from Slash's store on each press, or the
+       included model (`slash.ts`). */
+    const slashModel = workerSlashModel(this.env, () => api, { store: () => sql });
     const sql = guardedSql(this.ctx.storage);
     /* WHAT ANSWERS AN AUTOMATION'S QUESTION TO SLASH, off the same endpoint and the same key path as `slashModel`, so
        `answersSlash` below and `/api/version`'s `slash` are one fact. The storage is this object's own, the one the door's
@@ -1553,6 +1569,12 @@ export class Directory$ extends DurableObject<Env> {
     return this.#directory().billing(call);
   }
 
+  /** Put a record on a plan: billing's webhook, when a payment moves a record to Cloud or Cloud Plus (`billing.ts`). `null` is set. */
+  setPlan(record: string, plan: Plan): Refusal | null {
+    const out = this.#directory().setPlan(record, plan);
+    return out.ok ? null : refusalOf(out);
+  }
+
   /**
    * OAuth's store, one RPC for all of it, as `billing` is (`answerOAuth` in `@braindog/record/oauth`, `loop/finish/agents.md`
    * C4). `serveOAuth` in `oauth.ts` calls it and nothing else does.
@@ -1673,6 +1695,11 @@ export class Directory$ extends DurableObject<Env> {
   /** Which record this name means, or `null` if it means none. The hop, and the whole of it. */
   resolve(slug: string): { record: string; slug: string } | null {
     return this.#directory().resolve(slug);
+  }
+
+  /** Whether a name is free, a live record's or a released one's: what billing's checkout asks before anybody pays (`billing.ts`). */
+  claimed(slug: string): 'free' | 'taken' | 'released' {
+    return this.#directory().claimed(slug);
   }
 
   /** An address that can already sign in: a person with a passkey or a record. `/auth/invite` sends them to sign in first. */
@@ -2748,15 +2775,44 @@ async function agent(request: Request, env: Env): Promise<Response> {
 
 /**
  * `/account/*`, through the same `serveAccount` the self-host runs: the Directory's usage ledger, for the session
- * cookie. Without `SESSION_SECRET` nobody signs in, so every account route is 401.
+ * cookie, and on this host billing's four doors (`billing.ts`). Without `SESSION_SECRET` nobody signs in, so every
+ * account route but the webhook is 401; the webhook is Stripe's, has no cookie, and checks its own signature.
+ *
+ * A POST IS LIMITED BY ADDRESS BEFORE ANYTHING IS READ, on the write budget, as `/auth/*` is: a checkout and a portal
+ * each spend a Stripe call, and the webhook is a public door (`loop/finish/rules.md` §12). The address is
+ * `cf-connecting-ip`, which Cloudflare writes and a caller cannot.
+ *
+ * THE BILLING DOORS ARE HANDED IN WHATEVER THE SETTINGS SAY: while billing is off the list says so and every other
+ * door answers `NOT_IN_THIS_BUILD` with the sentence naming the setting (`billingKey`), so the rows are never a 404
+ * that reads as a missing route.
  */
 async function account(request: Request, env: Env): Promise<Response> {
+  if (request.method === 'POST') {
+    const over = await overLimit(env, null, request, 'write');
+    if (over !== null) return over;
+  }
   const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
+  const billing: BillingDeps = {
+    clock: () => Date.now(),
+    billing: ((call: BillingCall) => directory.billing(call)) as unknown as BillingDeps['billing'],
+    usage: (person, range) => directory.usage(person, range) as unknown as Promise<Result<AccountUsage>>,
+    /* FREE, TAKEN OR RELEASED, as `prepare` asks it, so checkout refuses a name the payment could not then be made under. */
+    claimed: async (slug) => directory.claimed(slug),
+    provisionable,
+    provision: (args) => provision(env, args),
+    /* THE ALLOWANCE FOLLOWS THE PLAN: the Directory meters the record under the plan it now pays for. */
+    setPlan: (record, plan) => directory.setPlan(record, plan),
+    /* THE RECORD'S OWN SWITCH, over RPC to its object by id (`loop/finish/ops.md` §4.0 F): while it is on, the record
+       answers reads and refuses writes, and its alarm runs the drain and nothing else. */
+    setLapsed: (record, on) => env.RECORD.get(env.RECORD.idFromName(record)).setLapsed(on),
+    stripe: (key) => stripeOf(key, () => Date.now()),
+  };
   return serveAccount(request, {
     origin: `https://${env.PUBLIC_HOST ?? ''}`,
     auth: (env.SESSION_SECRET ?? '').length >= 32 ? (((call: AuthCall) => directory.auth(call)) as unknown as Auth) : null,
     usage: (person, range) => directory.usage(person, range) as unknown as Promise<Result<AccountUsage>>,
     records: async (person) => ({ ok: true as const, value: await directory.recordsFor(person) }),
+    ...billingDoors(env, billing),
   });
 }
 
@@ -2999,7 +3055,49 @@ function zoneFix(asked: unknown): string {
 function placeholderName(name: string): boolean {
   const trimmed = name.trim();
   if (/[<>]/u.test(trimmed) || /&[lg]t;/iu.test(trimmed) || /\byour\s+name\b/iu.test(trimmed)) return true;
+  if (mergeField(trimmed)) return true;
   return /^[\p{Ps}<＜‹«]+[^\p{Pe}>＞›»“”‘]*[\p{Pe}>＞›»“”‘]+$/u.test(trimmed);
+}
+
+/**
+ * Whether a name holds a mail-merge field nobody filled, anywhere in it.
+ *
+ * ONE SPAN AT BOTH ENDS WAS NOT THE WHOLE CLASS (`loop/finish/defects.md` H2). A form filled from a template stored
+ * `{{first_name}} {{last_name}}` as an owner's name: two spans, so neither end-to-end rule above matched it, and every
+ * place the name is drawn said it for good. A merge field is a doubled bracket around a word (`{{first}}`, `[[Name]]`),
+ * or the other spellings template tools print: `${first}`, `*|FNAME|*` and `%FIRST_NAME%`. A single bracket inside a
+ * name stays a name (`Bo {B} Tanner`, `Ada (work)`), because only the doubled one is a template's.
+ */
+function mergeField(name: string): boolean {
+  return (
+    /[\p{Ps}]{2}[^\p{Ps}\p{Pe}]*[\p{Pe}]{2}/u.test(name) ||
+    /\$\{[^}]*\}/u.test(name) ||
+    /\*\|[^|]*\|\*/u.test(name) ||
+    /%[\p{L}_]+%/u.test(name)
+  );
+}
+
+/**
+ * The checks a provision makes before anything is written: the zone, in the runtime's own spelling, or why the zone or
+ * the owner's name cannot be had.
+ *
+ * REFUSED BEFORE `prepare` WRITES A PERSON, so the retry with his name is still a first provision. AND ASKED AT
+ * CHECKOUT TOO (`billing.ts`), before anybody pays, because a record paid for is made only once the payment is in, and
+ * a name or a zone refused then would be a payment with nothing to show for it.
+ */
+function provisionable(args: { name?: string; tz?: unknown }): Result<string> {
+  const tz = zoneOf(args.tz);
+  if (tz === null) return { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: zoneFix(args.tz), at: 'tz' } };
+  if (args.name !== undefined && placeholderName(args.name))
+    return {
+      ok: false,
+      refusal: {
+        code: 'VALUE_MALFORMED',
+        fix: 'name is the owner’s name as the passkey will show it, and this one reads as a placeholder: a word in brackets, a < or a >, a template field, or the words your name. Type the name itself.',
+        at: 'name',
+      },
+    };
+  return ok(tz);
 }
 
 /**
@@ -3022,26 +3120,9 @@ function placeholderName(name: string): boolean {
  * counted one more `dir_person` on `Mars/Olympus` and failed.
  */
 async function provision(env: Env, args: { slug: string; email: string; name?: string; tz?: unknown }): Promise<Result<Provisioned>> {
-  const tz = zoneOf(args.tz);
-  if (tz === null)
-    return {
-      ok: false,
-      refusal: {
-        code: 'VALUE_MALFORMED',
-        fix: zoneFix(args.tz),
-        at: 'tz',
-      },
-    };
-  /* REFUSED HERE, BEFORE `prepare` WRITES A PERSON, so the retry with his name is still a first provision. */
-  if (args.name !== undefined && placeholderName(args.name))
-    return {
-      ok: false,
-      refusal: {
-        code: 'VALUE_MALFORMED',
-        fix: 'name is the owner’s name as the passkey will show it, and this one reads as a placeholder: a word in brackets, a < or a >, or the words your name. Type the name itself.',
-        at: 'name',
-      },
-    };
+  const checked = provisionable(args);
+  if (!checked.ok) return checked;
+  const tz = checked.value;
   const store = await keyStoreOf(env.KEK);
   const keyless = keylessRefusal(store, env.PROVISION_WITHOUT_KEYS);
   if (keyless) return { ok: false, refusal: keyless };

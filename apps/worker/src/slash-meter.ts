@@ -15,9 +15,9 @@
  * `workerSlashAnswers` already are; it holds nothing of its own between asks.
  *
  * PRICED ONLY WHERE THE OPERATOR PAYS. On the included model every call is Workers AI on his account, so the row is
- * priced at the package's own rate for it (`MODELS['glm-5.3-flash']`, the rate the engine prices every tier at there).
- * Where `SLASH_ENDPOINT` is set the model is the owner's own provider on the owner's own bill, and the row is counted and
- * priced 0, which is `slashRecordMeter`'s rule for a host that does not pay.
+ * priced at the package's own rate for it (`MODELS['glm-5.3-flash']`). On the owner's own key the model is his provider on
+ * his own bill: the engine's `status()` says `capped: false` there, and `slashRecordMeter` lists the press under his model's
+ * name, priced 0 and held to no cap, as every other ask on his key is.
  *
  * LAZY, AND THE PACKAGE IS IMPORTED ONLY WHEN A PRESS ASKS, which is `46 §5.1`: a keyless deployment never evaluates
  * `@braindog/slash`, and the rate is read off it rather than copied a third time beside `src/inference.ts` and the package.
@@ -27,9 +27,8 @@
 
 import { slashRecordMeter } from '@braindog/host';
 import type { RecordApi, SlashMeter } from '@braindog/record';
-import { slashFromEnv } from '@braindog/host/slash';
 
-import { workerSlashEngine, type SlashEngineDeps, type SlashEnv } from './slash.ts';
+import { includedInference, workerSlashEngine, type SlashEngineDeps, type SlashEnv } from './slash.ts';
 
 /** The routing name the package's own tier `a` rows carry, and so the one the ceiling and `status()` count under. */
 const INCLUDED_MODEL = 'glm-5.3-flash';
@@ -39,7 +38,7 @@ export function workerSlashMeter(env: SlashEnv, api: () => RecordApi, deps: Slas
   const meterOf = (): Promise<SlashMeter> =>
     (built ??= (async () => {
       const engine = await workerSlashEngine(env, api, deps);
-      const included = slashFromEnv(env, { operatorKey: false }) === undefined;
+      const included = includedInference(env) !== undefined;
       const rate = engine !== undefined && included ? (await import('@braindog/slash')).MODELS[INCLUDED_MODEL] : undefined;
       return slashRecordMeter({ sql: deps.sql, clock: deps.clock, engine: async () => engine, model: INCLUDED_MODEL, rate });
     })().catch((e: unknown) => {

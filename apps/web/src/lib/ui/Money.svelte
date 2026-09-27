@@ -153,7 +153,10 @@
     color: inherit;
   }
 
+  /* A STRONG FIGURE IS SET AT THE FIGURE'S WEIGHT, 600 (design-brief, Type: "600 (titles, figures)"). It was 500, and
+     because this rule sits on `.amount` it won over the caller: a row page's hero figure asks for 600 on `.lead-figure`
+     and was drawn at 500 inside it. */
   .money[data-weight='strong'] .amount {
-    font-weight: 500;
+    font-weight: 600;
   }
 </style>

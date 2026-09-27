@@ -106,7 +106,7 @@ match:
 extract:
   amount:   { money: { after: "EGP", currency: "EGP" } }
   date:     { date: { format: "DD/MM/YY" } }
-  merchant: { text: { between: ["at ", " on"] } }
+  merchant: { text: { between: ["at ", " on"] }, strip: ["FAWRY*", "PAYMOB*"] }
   account:  { lookup: { register: accounts, by: last4 } }
 writes:
   register: transactions
@@ -208,6 +208,20 @@ rejected one confirms nothing, and another tail on the same account waits again.
 names by its whole value is filed as it always was. The rule is `matchLiterals` in
 `packages/extract/src/extractors.ts`; the confirmation is `confirmedTail` in
 `packages/kernel/src/ingest.ts`.
+
+**A field that reads text may take a prefix off it: `strip: [prefix, ...]`.** A card payment made
+through an acquirer arrives as `FAWRY*Vodafone` or `PAYMOB*Talabat`, and the merchant is the part after
+the star. `strip` sits beside the field's form, never inside it, so `{ first: [...], strip: ["FAWRY*"] }`
+strips whichever arm answered. After the form has read the value, the longest listed prefix the value
+starts with is taken off, **a case away** (the same ASCII fold the anchors use, so the name keeps the
+capitals the bank sent), and the value is looked at again, so `FAWRY*PAYMOB*Talabat` loses both; then
+every run of white space becomes one space and the ends are trimmed. A value the prefixes leave empty is
+a miss, as an empty slice is. `declare` refuses a `strip` that is not a list of 1 to `STRIP_MOST`
+prefixes, each no longer than an anchor may be (`LITERAL_BYTES`), and one beside a form whose value is not text (`money`, `date`, `int`,
+`decimal`, `enum`, `lookup`, or a combinator holding one): an amount has no prefix, and a row's id or a
+declared value with its start cut off is a value nobody declared. The ceiling and the cut are
+`STRIP_MOST` and `stripped` in `packages/kernel/src/ingest.ts`; the check is `stripFault` in
+`packages/kernel/src/declare.ts`.
 
 **A date reads the whole token set, and the build stops being behind the grammar.** The runtime
 read four named formats — `DD/MM/YY`, `DD/MM/YYYY`, `MM/DD/YYYY`, `YYYY-MM-DD` — where
@@ -320,7 +334,7 @@ once_per: [entry, renews]     # never twice for the same renewal date
 | `notify` | emit a notification — the six-field contract in [09-ALARMS](09-ALARMS-AND-NOTIFICATIONS.md) §4; a rule never names a `channel` |
 | `schedule` | insert a future row into `schedule` |
 | `suggest` | open a suggestion with options for a human |
-| `link` | set a `ref` field to a resolved row |
+| `link` | set a `ref` field to a resolved row, found by the ladder below the shapes |
 | **`create`** | write bounded rows into a declared register — §6.1 |
 | `run` | queue one run of a declared `call`, sending the fields of this row that the call's `sends:` names |
 | `stop` | halt rule evaluation for this entry |
@@ -388,6 +402,29 @@ Eleven, written out, because six of them had no syntax an implementer could pars
 `key` (the `once_per` tuple). There is no `channel` — routing is [09-ALARMS](09-ALARMS-AND-NOTIFICATIONS.md)
 §5's, by `urgent`, never the rule's. *(An earlier draft wrote `channel: digest` here, a field the
 six-field contract does not have.)*
+
+**`link` finds its row by a ladder, and links one row or none.** The value is filled from the row, and
+then:
+
+1. **The whole value.** One row of the linked list whose `by` field equals the value is linked,
+   whatever that row says about how it matches. Two such rows link nothing: *two rows bear that
+   name*.
+2. **How it starts, then anywhere in it.** Only if the linked list declares a field named for `by`
+   with `_by` after it (`match` and `match_by`), whose value is `exact`, `starts` or `contains`. A row
+   saying `starts` is found when the value begins with its `by` text, and one saying `contains` when
+   the value holds it anywhere, both **a case away** over the anchors' ASCII fold. Every row saying
+   `starts` is tried before any saying `contains`.
+3. **The first rung that finds a row decides, and on it the longest `by` text wins.** `FENWICK CLOUD
+   LTD` beats `FENWICK` on the same rung. Two rows of the same longest length on that rung are a tie,
+   and a tie links nothing and asks nothing: *two rows match it equally well*.
+
+A list with no such field is linked by the whole value alone, which is what every `link` did before
+the ladder, so nothing a record already files moves. money-core's `categories` declares
+`match_by` (default `exact`), and `txn-categorise` links a transaction's `category` by `match`, so a
+category that says `starts` files `FENWICK CLOUD` and `FENWICK CLOUD LTD 4471` alike. The lower rungs
+read at most `LADDER_ROWS` rows of the linked list per link, longest first. The dry run below reads
+the same ladder, and says the rung when it is not the whole value (*link category, matched by how it
+starts*). The read is `linkOf` in `packages/kernel/src/rules.ts`.
 
 ---
 

@@ -1,21 +1,27 @@
 <!--
   Rows as cards, which is what a list looks like below 640px.
 
-  A PHONE IS NOT A NARROW DESKTOP, and which three fields a card shows comes from the register's own
-  `mobile:` declaration rather than from a media query — the register knows what matters about its own
+  A PHONE IS NOT A NARROW DESKTOP, and which fields a card shows comes from the register's own
+  `mobile:` declaration rather than from a media query: the register knows what matters about its own
   rows better than a breakpoint does (13 §10, 50 §5.2 step 10).
+
+  TWO LINES, AND WHAT A DOT MEANS IS SAID BESIDE IT (design SYS-6, DSN-7). Line one is the project's
+  mark, the title and the figure. Line two is the dot and its word, the date that word is about, and
+  one detail, with nothing after it: "Overdue · 3 Sep · Kiln", "Paid · 2 Sep". The dot sat beside
+  "Money out" once, so what it meant was never said, and the row's number ended the line in the id
+  face; the number is gone from the card, since a person opens a row by its title.
 
   ONE BODY AT A TIME. Above 640px this does not exist and the table does; below it, the other way
   round. There is never a moment where both are half-visible, and the table is one `v` away.
 
   IT IS A COMPONENT BECAUSE TWO SURFACES SHOW ROWS. A register and a saved view are the same list
-  with a different predicate — and only the register had cards, so a saved view on a phone kept the
+  with a different predicate, and only the register had cards, so a saved view on a phone kept the
   desktop table and its own horizontal scrollbar. Two surfaces, one device, two behaviours, from one
   of them having been written second.
 
   AND A CARD CAN CARRY THE ROW'S VERBS. The table has a row menu, a selected state and a sort on
   every column header; a card had a link and nothing else, so a register on a phone was a list you
-  could read and open and do nothing else to — peek, copy, archive, select and set-state all lived
+  could read and open and do nothing else to: peek, copy, archive, select and set-state all lived
   behind keys, on the one device with no keyboard. `13 §10` says authoring is a desktop act, and
   that is right; but *choosing a row and acting on it* is not authoring, it is the list working.
 
@@ -26,13 +32,14 @@
 <script lang="ts">
   import { apiBase, at } from '../at.ts';
   import type { Snippet } from 'svelte';
-  import { leadingCode, symbolFigure, TONES } from 'braindog-render';
+  import { day, leadingCode, shortDay, symbolFigure, TONES } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import { valueSaid } from '$lib/voice.ts';
   import { dirOf, display, identityFor, toneOf } from '$lib/record/api.ts';
   import { REGISTERS } from '$lib/record/held.ts';
-  import type { Entry } from '$lib/record/schema.ts';
+  import { isMoney, type Entry } from '$lib/record/schema.ts';
   import type { Names } from '$lib/record/remote.ts';
+  import Money from './Money.svelte';
 
   let {
     register,
@@ -49,7 +56,7 @@
     href?: (e: Entry) => string;
     /** Which rows are selected, by `seq`. Omitted where a surface has no bulk verbs. */
     picked?: ReadonlySet<number>;
-    /** The trailing control on each card — the caller's, because the verbs are the caller's. */
+    /** The trailing control on each card: the caller's, because the verbs are the caller's. */
     action?: Snippet<[Entry]>;
     /**
      * A LINE UNDER THE CARD, FULL WIDTH, for something about the row rather than a control on it.
@@ -86,18 +93,46 @@
   const to = $derived(href ?? ((e: Entry) => `/r/${register}/${e.seq}`));
 
   /**
-   * THE ROW'S TONE, WHICH THE TABLE HAS ALWAYS DRAWN AND THE CARD NEVER DID.
+   * THE ROW'S TONE, LATE OR CLOSE AND NOTHING ELSE.
    *
-   * A register declares a `deadline:` field and `toRows` turns "past it" into `bad` and "done" into
-   * `good`. On a phone that used to disappear, so an overdue invoice and a paid one were the same
-   * card, on the surface where somebody is most likely to be looking for exactly that.
+   * A register declares a `deadline:` field and `toneOf` turns "past it" into `bad`, "within two
+   * weeks" into `warn` and "done" into `good`. The card draws the first two. A finished row is the
+   * calm state (design-brief §10): "Paid" and "Cleared" carry no colour, and a green dot on every one
+   * of them said nothing the word did not.
    *
-   * A GLYPH AT THE HEAD OF THE TITLE, AND NO COLOURED EDGE. `13 §5.1`: "Colour never carries meaning
-   * alone. The glyph is part of the intent token, not a choice at the call site." The glyph has a
-   * name for a screen reader and a shape for anybody who does not see red; the bar that used to run
-   * down the card had neither, and on a list with no box round it read as an alert.
+   * A DOT WITH ITS WORD, AND NO COLOURED EDGE. `13 §5.1`: "Colour never carries meaning alone." The
+   * dot has a name for a screen reader and the word beside it for everybody else; the bar that used
+   * to run down the card had neither, and on a list with no box round it read as an alert.
    */
-  const toneFor = (e: Entry) => toneOf(register, e, now);
+  const lateness = (e: Entry): 'bad' | 'warn' | undefined => {
+    const tone = toneOf(register, e, now);
+    return tone === 'bad' || tone === 'warn' ? tone : undefined;
+  };
+
+  /* THE CARD'S OWN WORDS FOR A DEADLINE, as short as a second line has room for. The row page says
+     how many days late ("Overdue by 38 days", `[seq]/said.ts`); a card in a list says that it is. */
+  const words = {
+    overdue: 'Overdue',
+    dueToday: 'Due today',
+    dueTomorrow: 'Due tomorrow',
+    dueIn: (days: number): string => `Due in ${days} days`,
+  } as const;
+
+  const DAY = /^\d{4}-\d{2}-\d{2}$/u;
+  const DAY_MS = 86_400_000;
+
+  /* How far off a close deadline is, in calendar days as the row page counts them. */
+  const dueSaid = (iso: string, tone: 'bad' | 'warn'): string => {
+    if (tone === 'bad') return words.overdue;
+    const days = Math.floor(Date.parse(`${iso}T00:00:00Z`) / DAY_MS) - Math.floor(now / DAY_MS);
+    return days <= 0 ? words.dueToday : days === 1 ? words.dueTomorrow : words.dueIn(days);
+  };
+
+  /* A stored day as a card says it: "2 Sep" in the year it is read in, "2 Sep 2025" outside it. */
+  const daySaid = (iso: unknown): string | null => {
+    if (typeof iso !== 'string' || !DAY.test(iso)) return null;
+    return iso.slice(0, 4) === String(new Date(now).getUTCFullYear()) ? shortDay(iso) : day(iso);
+  };
 
   /**
    * AND THE THING THE ROW BELONGS TO, WHICH IS THE ONE COLOUR THIS PRODUCT HAS AND DOES NOT SPEND.
@@ -139,11 +174,39 @@
   /* A FIGURE IS A QUANTITY, and the first of the card's two fields that is one ends the title's line. */
   const FIGURES = new Set(['money', 'int', 'decimal']);
   const figure = $derived(decl?.mobile.slice(1).find((f) => FIGURES.has(decl.fields.find((d) => d.id === f)?.type ?? '')));
-  /* The rest is the detail line, in the declared order. */
-  const detail = $derived(decl ? decl.mobile.slice(1).filter((f) => f !== figure) : []);
-  /* ONE LEADING SLOT, KEPT ON EVERY CARD when any card has a mark or a tone: the mark in it on the
-     first line, the tone on the second, and the words of both lines start at one x. */
-  const slotted = $derived(entries.some((e) => markFor(e) !== null || toneFor(e) !== undefined));
+  /* THE DATE THE TONE IS ABOUT, which is the field `toneOf` reads: the one `day` declared `deadline:`. */
+  const dated = $derived(decl?.fields.find((f) => f.type === 'day' && f.deadline)?.id);
+  /* ONE DETAIL, the first declared card field that is none of the others and has something to say. */
+  const detailFields = $derived(
+    decl ? decl.mobile.slice(1).filter((f) => f !== figure && f !== dated && f !== decl.state && f !== decl.finished) : [],
+  );
+
+  /* A field's words on this card: a declared value by its label (`worded`), anything else as `display` says it. */
+  const saidOf = (e: Entry, f: string): string => worded(f, e.fields[f], display(register, f, e.fields[f], now, names) ?? '');
+
+  /**
+   * THE SECOND LINE: `● word · date · detail` (design SYS-6).
+   *
+   * THE WORD IS THE TONE'S WHEN THE ROW IS LATE OR CLOSE ("Overdue", "Due in 3 days"), and otherwise the
+   * row's own state ("Open", "Paid"), so the dot is never beside a word that says something else. The
+   * date is the deadline, or on a finished row the day it finished, which the record writes into the
+   * list's `finished` field ("Paid · 2 Sep"): a due date beside "Paid" would read as the day it was
+   * paid. A finished row on a list that declares no such field says its word alone.
+   */
+  const lineOf = (e: Entry) => {
+    const tone = lateness(e);
+    const due = dated ? e.fields[dated] : undefined;
+    const state = decl?.state;
+    const done = Boolean(state && decl?.done?.includes(String(e.fields[state] ?? '')));
+    const word = tone && typeof due === 'string' ? dueSaid(due, tone) : state ? saidOf(e, state) || null : null;
+    const date = done ? (decl?.finished ? daySaid(e.fields[decl.finished]) : null) : daySaid(due);
+    const detail = detailFields.find((f) => saidOf(e, f) !== '');
+    return { tone, word, date, detail };
+  };
+
+  /* ONE LEADING SLOT, KEPT ON EVERY CARD when any card has a mark or a word: the mark in it on the first
+     line, the dot on the second, and the words of both lines start at one x. */
+  const slotted = $derived(Boolean(decl?.state || dated) || entries.some((e) => markFor(e) !== null));
 </script>
 
 <!-- An amount is drawn with its currency's symbol, or with its code set quiet where it has none. -->
@@ -157,12 +220,13 @@
   <ul class="cards">
     {#each entries as e (e.seq)}
       {@const title = display(register, decl.mobile[0], e.fields[decl.mobile[0]], now, names)}
+      {@const line = lineOf(e)}
       <li class="card-line" data-picked={picked?.has(e.seq) ? '' : undefined}>
-        <a class="card" href={at(to(e))} data-intent={toneFor(e) ?? undefined}>
+        <a class="card" href={at(to(e))}>
           <!-- THE TITLE FIRST, in the document as well as on the screen, so a screen reader hears
-               what the row is before its number. ONE THING LEADS IT, the project's mark, in a slot
-               every card keeps when any card in the list has one, so the titles share an edge. The
-               tone and the mark both led it once, two dots before a word. -->
+               what the row is before anything about it. ONE THING LEADS IT, the project's mark, in a
+               slot every card keeps when any card in the list has one, so the titles share an edge.
+               The tone and the mark both led it once, two dots before a word. -->
           <span class="card-title" dir={dirOf(register, decl.mobile[0])} data-whole={figure ? undefined : ''} data-slot={slotted ? '' : undefined}>
             {#if markFor(e)}
               {@const it = markFor(e)!}
@@ -178,33 +242,37 @@
                  first line would read as a card that failed to draw. -->
             {#if title === null}<span class="card-missing">Not set</span>{:else}{title}{/if}
           </span>
-          <!-- THE FIGURE ENDS THE FIRST LINE, where the eye goes down a list of amounts. `#1` held
-               this slot and pushed the amount to the second line (rule 7). -->
+          <!-- THE FIGURE ENDS THE FIRST LINE, where the eye goes down a list of amounts, drawn by
+               `Money` as every amount is: the home currency as "£2,400.00", another with its code
+               after it, a negative with a true minus. -->
           {#if figure}
+            {@const value = e.fields[figure]}
             <span class="card-figure" dir={dirOf(register, figure)}>
-              {@render amount(display(register, figure, e.fields[figure], now, names) ?? '')}
+              {#if isMoney(value)}<Money minor={value.amount} currency={value.currency} />{:else}{display(register, figure, value, now, names) ?? ''}{/if}
             </span>
           {/if}
-          <!-- THE TONE QUALIFIES THE DETAIL, at its head: a due date or a status is what it is about. -->
-          <span class="card-b" data-slot={slotted ? '' : undefined}>
-            {#if toneFor(e)}
-              <span class="glyph" role="img" aria-label={TONES[toneFor(e)!].label}>{TONES[toneFor(e)!].glyph}</span>
+          <!-- THE DOT AND ITS WORD, THE DATE THE WORD IS ABOUT, AND ONE DETAIL. `data-intent` is on the
+               line and not on the dot, because what resolves `--tone-fill` for the dot is `blocks.css`'s
+               intent map, and an element with an intent holds its named glyph (`a11y.mjs`). A calm word
+               has a quiet dot with no name, since the word says all there is. -->
+          <span class="card-b" data-slot={slotted ? '' : undefined} data-intent={line.tone}>
+            {#if line.tone}
+              <span class="glyph" role="img" aria-label={TONES[line.tone].label}>{TONES[line.tone].glyph}</span>
+            {:else if line.word}
+              <span class="glyph" aria-hidden="true"></span>
             {/if}
-            {#each detail.map((f) => [f, worded(f, e.fields[f], display(register, f, e.fields[f], now, names) ?? '')] as const).filter(([, said]) => said) as [field, said], i (field)}
-              {#if i > 0}<span aria-hidden="true">{' · '}</span>{/if}<span dir={dirOf(register, field)} data-enum={isEnum(field) ? '' : undefined}>{@render amount(said)}</span>
-            {/each}
-          </span>
-          <span class="card-seq">
-            {#if picked?.has(e.seq)}
-              <!-- A GLYPH, NOT A TINT. `13 §5.1`: colour never carries meaning alone, and "this row
-                   is one of the four the bar above is about" is the meaning most worth not losing. -->
-              <span class="picked-tick" role="img" aria-label={selectedLabel}>✓</span>
+            {#if line.word}<span class="card-word" data-late={line.tone ? '' : undefined}>{line.word}</span>{/if}
+            {#if line.date}{#if line.word}<span aria-hidden="true">{' · '}</span>{/if}<span class="card-date">{line.date}</span>{/if}
+            {#if line.detail}
+              {@const f = line.detail}
+              {#if line.word || line.date}<span aria-hidden="true">{' · '}</span>{/if}<span dir={dirOf(register, f)} data-enum={isEnum(f) ? '' : undefined}>{@render amount(saidOf(e, f))}</span>
             {/if}
-            <!-- A ROW THAT HAS NO ID PRINTS NO ID. `pending` mints a negative sequence so a row
-                 somebody typed can never collide with one the record has; `#-1` is that sentinel
-                 with a minus sign in front of it, and it was going straight to the screen. -->
-            {#if e.seq >= 0}#{e.seq}{/if}
           </span>
+          {#if picked?.has(e.seq)}
+            <!-- A GLYPH, NOT A TINT. `13 §5.1`: colour never carries meaning alone, and "this row is one
+                 of the four the bar above is about" is the meaning most worth not losing. -->
+            <span class="card-pick"><span class="picked-tick" role="img" aria-label={selectedLabel}>✓</span></span>
+          {/if}
         </a>
         <!-- OUTSIDE THE ANCHOR, because a button inside a link is neither. The card stays the whole
              tap target for opening the row and this sits beside it. -->
@@ -245,12 +313,13 @@
       list-style: none;
     }
 
+    /* ONE HAIRLINE BETWEEN ROWS, in the soft line a row takes at every width (design-brief §5). */
     .cards li + li {
-      border-block-start: 1px solid var(--line);
+      border-block-start: 1px solid var(--line-soft);
     }
 
     /* THE CARD AND ITS VERB SHARE A LINE. `align-items: stretch` so the menu button is the height of
-       the card rather than of its own glyph — a 44px control beside a 56px card leaves 12px of dead
+       the card rather than of its own glyph: a 44px control beside a 56px card leaves 12px of dead
        edge that looks tappable and is not. */
     .card-line {
       display: flex;
@@ -267,7 +336,7 @@
       align-items: center;
       gap: var(--sp-2);
       padding: var(--sp-2) var(--sp-3);
-      border-block-start: 1px solid var(--line);
+      border-block-start: 1px solid var(--line-soft);
     }
 
     /* A NOTE THAT SAYS NOTHING TAKES NO ROOM. `note` is a snippet, and the register passes one for
@@ -299,23 +368,22 @@
       min-inline-size: 0;
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto;
-      gap: 2px var(--sp-3);
-      /* 44px on both axes. A control grown only in height measures 38 x 44 and fails (13 §7). */
-      min-block-size: 56px;
+      align-content: center;
+      /* The card's two lines are 4px apart (design-brief §3, Space). */
+      gap: var(--sp-1) var(--sp-3);
+      /* A two-line row: 44px on both axes and then some, so the whole card is the target. */
+      min-block-size: var(--row-h-2);
       /* Next to no inline padding: there is no box for the text to be inset from. */
       padding: var(--sp-2) var(--sp-1);
-      /* `data-intent` stays on the card because it is what resolves `--tone` for the glyph, through
-         `blocks.css`'s intent map, the one place an intent becomes a colour. */
       color: var(--ink);
-      font-size: var(--t-ui);
+      font-size: var(--t-md);
       text-decoration: none;
     }
 
-    /* THE TITLE WRAPS ON THE NARROWEST PHONE, because there is nothing else on its line to protect.
-       At 390 the column is wide enough that nothing truncates; at 320 nine of the thirty-eight
-       obligation cards lost their end — `Invoice 2026-041 — brand` — and the row number beside it,
-       which is the only other thing on that line, is four characters. A card grows; that is the
-       whole reason it is a card. */
+    /* THE TITLE IS ONE LINE (design-brief §5, a card at 390), and what does not fit ends in an
+       ellipsis. The line under it says what state the row is in and when, so the end of a long title
+       is the part a person can most afford to lose, and a card that grows to three lines pushes the
+       next row's word and date off the screen. */
     .card-title {
       grid-column: 1;
       grid-row: 1;
@@ -340,12 +408,36 @@
       margin: 0;
     }
 
+    /* THE DOT HANGS IN THE SLOT the mark takes on the line above, so the word starts where the title
+       does and the dot sits just before it. */
     .card-b .glyph {
       position: absolute;
       inset-inline-start: 1px;
-      /* The detail is one line, so the middle of the box is the middle of the line. */
+      /* The line is one line, so the middle of the box is the middle of the line. */
       inset-block-start: 50%;
       translate: 0 -50%;
+    }
+
+    /* A CALM WORD'S DOT IS QUIET, in the ink open, paid and cleared are drawn in (design-brief §10).
+       Only an intent on the line gives the dot a colour, through `blocks.css`'s intent map. */
+    .card-b:not([data-intent]) .glyph {
+      background: var(--dim);
+    }
+
+    /* A LATE OR CLOSE WORD IS READ FIRST, in the second ink and not the tone's colour: the dot beside
+       it is the colour channel, and red text on a hovered row fails its contrast pair. */
+    .card-word[data-late] {
+      color: var(--ink2);
+      font-weight: 500;
+    }
+
+    /* A state word is the record's value, raised to sentence case by the stylesheet as the pills are. */
+    .card-word {
+      display: inline-block;
+    }
+
+    .card-word::first-letter {
+      text-transform: uppercase;
     }
 
     .card-missing {
@@ -353,18 +445,12 @@
       font-weight: 400;
     }
 
-    @media (width < 400px) {
-      .card-title {
-        overflow: visible;
-        text-overflow: clip;
-        white-space: normal;
-      }
-    }
-
+    /* The figure is never cut and never wraps: `Money` keeps sign, symbol and digits on one line. */
     .card-figure {
       grid-column: 2;
       grid-row: 1;
       color: var(--ink);
+      font-weight: 500;
       font-variant-numeric: tabular-nums;
       text-align: end;
       white-space: nowrap;
@@ -375,8 +461,9 @@
       grid-column: 1 / -1;
     }
 
+    /* The whole width, but for a selected row's tick at its end. */
     .card-b {
-      grid-column: 1;
+      grid-column: 1 / -1;
       grid-row: 2;
       min-inline-size: 0;
       overflow: hidden;
@@ -387,15 +474,18 @@
       font-variant-numeric: tabular-nums;
     }
 
-    /* The spoken id ends the detail line, quiet, in the id face. */
-    .card-seq {
+    /* NOTHING ENDS THE SECOND LINE BUT THE TICK of a selected row. The row's number stood here, in the
+       id face, on every card (design SYS-6: no "#" on a phone). */
+    .card-pick {
       grid-column: 2;
       grid-row: 2;
       align-self: center;
-      color: var(--dim);
-      font-family: var(--font-id);
-      font-size: var(--t-xs);
+      font-size: var(--t-sm);
       text-align: end;
+    }
+
+    .card:has(.card-pick) .card-b {
+      grid-column: 1;
     }
 
     /* Sentence case in the stylesheet, so the text stays the record's own word for search and for a

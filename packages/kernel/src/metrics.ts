@@ -1041,10 +1041,16 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
    * `08 §2.1`'s rules: one field; a `bucket` only beside a day or an instant, and a day or an instant
    * only with one, because a bar per distinct date is a list rather than a chart. A ratio or a diff
    * of groups is a second dimension of arithmetic this build does not do, so it says so.
+   *
+   * WHEN A ROW WAS WRITTEN GROUPS TOO: `created_at` and `updated_at`, the two instants the record stamps (`isStamped`).
+   * No register declares them, so this asked `schema.fields` alone and refused `group_by: created_at` as `FIELD_UNKNOWN`,
+   * and a count of what was added each week could not be declared over any list (`loop/finish/agents.md` C12). The
+   * other names the record keeps in a column, `id`, `seq` and `version`, are not dates, and a grouping by one is a bar
+   * per row, so they are still refused.
    */
   if (decl.group_by !== undefined) {
     const by = typeof decl.group_by === 'string' ? decl.group_by : null;
-    const type = by && schema && Object.hasOwn(schema.fields, by) ? schema.fields[by]?.type : undefined;
+    const type = by && schema && (Object.hasOwn(schema.fields, by) || isStamped(schema, by)) ? typeOf(schema, by) : undefined;
     const dated = type === 'day' || type === 'instant';
     if (by === null) at('DECLARATION_INVALID', 'group_by is one field name', 'group_by');
     else if (schema && type === undefined) at('FIELD_UNKNOWN', `${register} has no field called ${by}`, 'group_by');
@@ -1276,7 +1282,10 @@ function groupsOf(
   const by = decl.group_by!;
   const where = `register = ? AND deleted_at IS NULL AND ${w.sql}`;
   const params: (string | number)[] = [schema.register, ...w.params];
-  const field = `json_extract(fields, '${jsonPath(by)}')`;
+  /* A STAMPED INSTANT IS `entry`'S OWN COLUMN, never a key of `fields`, where `json_extract` finds nothing on any row. The
+     name is written into the SQL as it is only because `isStamped` has just matched it to one of the record's own
+     columns, `created_at` or `updated_at`, and nothing else reaches that branch. */
+  const field = isStamped(schema, by) ? by : `json_extract(fields, '${jsonPath(by)}')`;
   const tables = tablesOf(decl);
   const value = decl.value as Aggregation;
 

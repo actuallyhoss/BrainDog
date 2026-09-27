@@ -32,6 +32,7 @@
  */
 
 import { account } from './copy/account.ts';
+import { agents } from './copy/agents.ts';
 import { automations } from './copy/automations.ts';
 import { data } from './copy/data.ts';
 import { decide } from './copy/decide.ts';
@@ -56,6 +57,7 @@ export const copy = {
   ...decide,
   ...automations,
   ...account,
+  ...agents,
   ...packs,
   ...home,
   ...palette,

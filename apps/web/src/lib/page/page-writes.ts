@@ -69,8 +69,6 @@ export type WritesDeps = {
   base: () => string;
   /** Reads the page again after a write, without blanking it. */
   reread: () => Promise<void>;
-  /** Opens an address inside the app: where a queue's pressed option takes the reader. */
-  go: (to: string) => void;
   /** The app's toasts, where a write says what it did and offers its way back. */
   toasts: Pick<typeof toasts, 'push'>;
   /** Where the writes keep what they hold, read fresh on every gesture. */
@@ -180,19 +178,6 @@ export function pageWrites(deps: WritesDeps) {
       undone: { to: from },
       said: (w) => w.moved(title, to),
     });
-  }
-
-  /**
-   * An option pressed in a `queue` block takes you to the gate with that option highlighted.
-   *
-   * THE PRESS IS NOT THE ANSWER. A decision carries a reason and the reason is written on the gate, so what the press
-   * buys is the two steps of getting there: the question opened, and the option the reader already leaned to marked
-   * as leaned to rather than typed again.
-   */
-  function askGate(row: Row, option: string) {
-    const id = row.cells[1] ?? '';
-    if (id === '') return;
-    deps.go(`/decide/${encodeURIComponent(id)}?option=${encodeURIComponent(option)}`);
   }
 
   /**
@@ -319,7 +304,7 @@ export function pageWrites(deps: WritesDeps) {
     });
   }
 
-  return { forPage, keptSegment, moveCard, askGate, capturable, captureLine, typeInto, saidOf, tickTask, rescheduleBar };
+  return { forPage, keptSegment, moveCard, capturable, captureLine, typeInto, saidOf, tickTask, rescheduleBar };
 }
 
 /** The writes a page hands every block it draws; `null` where the page is inert. */

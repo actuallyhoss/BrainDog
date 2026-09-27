@@ -20,6 +20,8 @@
   import { at as inApp } from '../at.ts';
   import { Block, Degraded, Markdown, Table, Text } from 'braindog-render/svelte';
   import { inline, text } from 'braindog-render';
+  import QueueAnswer from './QueueAnswer.svelte';
+  import { queueMore } from 'braindog-render';
   import { page as route } from '$app/state';
   import { copy } from '$lib/copy.ts';
   import { homeCurrency } from '$lib/record/api.ts';
@@ -92,6 +94,8 @@
     /* A FIGURE IS A DOOR, and the address is the metric's own: `hrefFor` derives it from the same predicate the figure
        is computed over, so a tile and the list it opens cannot disagree. */
     cellHref: (n: number) => block.metrics?.[n]?.href ?? null,
+    /* WHERE A ROW APPLIES, AS A CHIP, in a card grid's scope facts (agents C8, `page-live.ts` `scopeCells`). */
+    ...(block.scopeCells ? { scope: block.scopeCells } : {}),
   });
 
   /**
@@ -212,7 +216,13 @@
     {#if part.table}<Table columns={part.table.columns} rows={part.table.rows} total={part.table.total} label={headingText} href={inApp} />{/if}
   {/each}
 {:else if block.kind === 'table' && !block.answer}
-  <Table columns={block.columns} rows={block.rows} total={block.total} label={headingText} href={inApp} />
+  <Table columns={block.columns} rows={block.rows} total={block.total} label={headingText} href={inApp} scope={block.scopeCells} />
+{:else if block.kind === 'queue' && block.queue && block.queue.length > 0 && writes}
+  <!-- A QUESTION IS ANSWERED WHERE IT IS SHOWN (MOD-9, `QueueAnswer.svelte`): one card a question, and the count of what is left is still the door to Decide. -->
+  <div class="queue">
+    {#each block.queue as question (question.id)}<QueueAnswer {question} onanswered={() => {}} />{/each}
+    {#if block.total > block.queue.length}<a class="queue-more" href={inApp('/decide')}>{queueMore(block.total - block.queue.length)}</a>{/if}
+  </div>
 {:else}
   {#each drawn.segments as segment}
     {#if segment.type === 'block'}
@@ -227,7 +237,6 @@
         {opts}
         onmove={w ? (row, to) => w.moveCard(block, row, to, i, shown.rows) : undefined}
         ontick={w ? (row, done) => w.tickTask(block, row, done, i, shown.rows) : undefined}
-        onact={w ? (row, option) => w.askGate(row, option) : undefined}
         onreschedule={w ? (row, drop) => void w.rescheduleBar(block, row, drop, i, shown.rows) : undefined}
         oncapture={w && w.capturable(block) ? w.captureLine : undefined}
         oninput={w && typable ? w.typeInto : undefined}
@@ -267,7 +276,7 @@
   {@const to = openHref(block)}
   <p class="block-slice" role="status">
     {block.source === 'forecast.runway'
-      ? copy.ofWhichWalked(block.shown, block.total, block.horizon ?? 180)
+      ? copy.ofWhichWalked(block.shown, block.total, typeof block.walk?.horizon === 'number' ? block.walk.horizon : typeof block.horizon === 'number' ? block.horizon : 180)
       : copy.ofWhichDrawn(block.shown, block.total)}.{#if to}{' '}
       <a class="tap" href={inApp(to)}>{copy.openTheRest(REGISTERS[block.register!]?.name ?? block.register!)}</a>
     {/if}

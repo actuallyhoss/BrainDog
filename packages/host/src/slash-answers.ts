@@ -17,6 +17,9 @@
  * STRUCTURAL, AND IT IMPORTS NEITHER `@braindog/slash` NOR AN APP. `answer` is handed in as a function, so the package's
  * `answer` method, the key opened in the rule's name and the tier all stay the app's to build; `31 §2` puts the package at
  * row 13 and `46 §5.1` has only the app `import()` it, which is the rule `slash.ts` states at its own header.
+ *
+ * AND THE SHAPE OF WHAT ANSWERS THE RECORD'S OTHER MODEL JOBS, `infer.draft` and `infer.prose`, sits at the foot of this
+ * file for the same reason (`ModelJobInference`): the pass that leases them is `model-jobs.ts`'s, and Slash is handed in.
  */
 
 import type { Kernel, OutboxRow } from '@braindog/kernel';
@@ -189,3 +192,50 @@ export async function serveAsks(
   if (out.answered + out.failed + out.refused > 0) await kernel.tail(scheduler);
   return out;
 }
+
+/* ── the record's model jobs: a pattern's draft and a digest's two sentences (`loop/finish/contracts.md` X8) ────────── */
+
+/**
+ * One arrival a pattern is drafted from: `@braindog/slash`'s `RawPayload`, restated because this package never imports
+ * that one (the header's rule). The pass reads it off the kernel's inbox, by the ids an `infer.draft` job names.
+ */
+export type DraftSample = {
+  id: string;
+  channel: 'email' | 'webhook' | 'pull' | 'paste' | 'api';
+  ts: string;
+  from: string | null;
+  subject: string | null;
+  body: string;
+};
+
+/**
+ * A pattern drafted and not filed, in the shape the kernel's `ack` reads an `infer.draft` job's `result` in
+ * (`{ question, body_kind, body }`, `packages/kernel/src/outbox.ts`), and files as `slash` in the ack's transaction.
+ *
+ * THE INGEST IS A DECLARATION, `{ id, kind: 'ingest', body }`, BECAUSE THAT IS WHAT AN ACCEPT INSTALLS: a bare body was
+ * filed and then refused at every accept (`loop/finish/defects.md` A7).
+ */
+export type DraftedPattern = {
+  question: string;
+  body_kind: 'pattern';
+  body: { ingest: { id: string; kind: 'ingest'; body: Record<string, unknown> }; samples: string[] };
+};
+
+/**
+ * What answers the record's model jobs on a host: `serveModelJobs`'s `deps.inference` (`packages/host/src/model-jobs.ts`).
+ *
+ * `draft` IS A PATTERN FOR THE SAMPLES, AND IT FILES NOTHING. The pass acks the job with it, and the kernel files it
+ * through its one gate; a draft that filed itself would be filed a second time by that ack.
+ *
+ * `prose` IS HANDED THE `infer.prose` PAYLOAD AS THE KERNEL QUEUED IT, parsed and unread (the assembled digest,
+ * `packages/kernel/src/digest.ts`), and answers the `{ text }` the ack prefixes to it. `{ text: '' }` is an answer too:
+ * the model said nothing usable, the digest goes as figures, and a retry would only bill the same call twice. A refusal
+ * is a model not reached, which the pass acks as failed so the retry ladder asks again, and the kernel sends the figures
+ * at the ladder's ceiling.
+ *
+ * STRUCTURAL, AS `SlashAnswer` IS: each host builds it over its own engine, the Worker in `apps/worker/src/slash-jobs.ts`.
+ */
+export type ModelJobInference = {
+  draft(samples: readonly DraftSample[]): Promise<Result<DraftedPattern>>;
+  prose(digest: unknown): Promise<Result<{ text: string }>>;
+};

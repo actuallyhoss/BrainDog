@@ -1,11 +1,13 @@
 /**
- * Slash's doors: `POST /api/slash/read`, `GET /api/slash/status`, `POST /api/slash/settings` and
- * `POST /api/slash/propose`, the half both hosts share. `docs/46` §5.2, `23 §7` and `§8`.
+ * Slash's doors: `POST /api/slash/read`, `GET /api/slash/status`, `POST /api/slash/settings`,
+ * `POST /api/slash/propose`, `GET /api/slash/asks` and `POST /api/slash/pattern`, the half both hosts
+ * share. `docs/46` §5.2, `23 §7` and `§8`, and C15 in `loop/finish/agents.md`.
  *
- * FOUR OF `46 §5.2`'s FIVE, AND THE READ WAS ALONE FOR A DAY. `loop/research-spark-routes.md` found that
- * the Slash object both hosts build has five methods and only `read` had a door, so tier stayed `a`, the
- * cap stayed 80, and an owner could neither see nor set Slash's model from the product. Status, settings
- * and propose are here now; `pattern` is not, and `SlashAskEngine` says why.
+ * THE READ WAS ALONE FOR A DAY. `loop/research-spark-routes.md` found that the Slash object both hosts
+ * build had five methods and only `read` had a door, so tier stayed `a`, the cap stayed 80, and an owner
+ * could neither see nor set Slash's model from the product. Status, settings and propose came next; the
+ * owner's list of what was asked (`asks`) and a pattern drafted from the inbox (`pattern`) are the last
+ * two, and this file is their one writer (`loop/finish/contracts.md` X26).
  *
  * BOTH HOSTS MOUNT THIS DOOR, AND THE ENGINE IS REACHED THROUGH IT FROM A BROWSER. `903bc9c9` wrote the
  * door and `1816500a` wrote the two branches in front of it, eight minutes apart on 21 September:
@@ -59,12 +61,12 @@
  * that replaces it.
  *
  * THE ENGINE IS A THUNK AND NOT AN OBJECT, because `46 §5.1` has the host `import()` the package once
- * and only when an endpoint is configured, and `apps/worker/src/slash.ts` builds it on the first ask
+ * and only when it has a model to offer, and `apps/worker/src/slash.ts` builds it on the first ask
  * rather than at boot, when the Durable Object's record already exists. A door holding the built
  * engine would be a door that decided when to build it, one level too low.
  *
  * NO MODEL HERE IS A SENTENCE AND NOT A 404. `46 §5.1` says the routes are not registered at all
- * when `SLASH_ENDPOINT` is unset, and `/api/version` already answers `slash: false` so the app draws
+ * on a host with no model to offer, and `/api/version` already answers `slash: false` so the app draws
  * no row to press. What is left for this door to answer is a caller who asked anyway, and
  * `ROUTE_UNKNOWN` would tell them the address is wrong when the address is right and the host has no
  * model. `keys.ts` made the same call for the same shape, `NOT_IN_THIS_BUILD` at 501: *"This host
@@ -77,30 +79,31 @@ import type { Refusal, Result, Sql } from '@braindog/ports';
 import type { SlashMeter } from '@braindog/record';
 
 import { httpStatus } from './index.ts';
+import { slashBaseUrlOf, slashKeySave } from './slash.ts';
 import { VAULT_HEADERS } from './vault.ts';
 
 /**
- * The four methods of `Slash` these doors call, over whatever context the host resolves a session to.
+ * The methods of `Slash` these doors call, over whatever context the host resolves a session to.
  *
  * STRUCTURAL, AS `RecordSurface` IS. `packages/host` must not depend on `@braindog/slash`: `31 §2`
  * puts the package at row 13 and `46 §5.1` puts the `import()` in the app, so naming the type here
  * would be the edge this file exists to serve, pointing the wrong way. Both hosts already pass the
  * whole `Slash`, which satisfies this shape without a line of either app changing.
  *
- * FOUR AND NOT FIVE. This type said "one method rather than five because a door that names `configure`
- * is a door somebody can reach settings through", and that was the right caution while nothing checked
- * who was configuring. The check is the package's, and it was measured before this door named the
- * method: `configure` answers a `write` member and a `system` principal 403 `FORBIDDEN`, "Only the
- * record owner changes how Slash is set up." `proposePattern` is still left out on purpose, because it
- * is neither metered nor capped (`loop/research-spark-routes.md` F4: with `ask_cap: 0`, `read` refused
- * and `proposePattern` called the model anyway), and a door in front of it would be a second unmetered
- * model call behind a button until `docs/46` §4.1 says whether a pattern is an ask.
+ * `configure` AND `history` ARE THE OWNER'S AND THE PACKAGE SAYS SO: each answers a `write` member and a
+ * `system` principal 403 `FORBIDDEN`. `inference` on `read`, `propose` and `proposePattern` is the model
+ * for this one ask, his own key where he chose it, which the door opens for the asker (`byok`).
+ *
+ * `history` AND `proposePattern` ARE OPTIONAL so an engine built before them still fits, and a door
+ * over one answers their paths 501 in `NO_MODEL`'s words rather than a 500.
  */
 export type SlashAskEngine<C> = {
-  read(question: string, ctx: C): Promise<Result<unknown>>;
+  read(question: string, ctx: C, inference?: unknown): Promise<Result<unknown>>;
   status(): unknown;
   configure(patch: Record<string, unknown>, ctx: C): Result<unknown>;
-  propose(question: string, ctx: C, byok?: unknown, askId?: string): Promise<Result<unknown>>;
+  propose(question: string, ctx: C, byok?: unknown, askId?: string, inference?: unknown): Promise<Result<unknown>>;
+  history?(limit: number, ctx: C): Result<unknown>;
+  proposePattern?(samples: readonly unknown[], ctx: C, inference?: unknown): Promise<Result<unknown>>;
 };
 
 /**
@@ -114,21 +117,28 @@ export type SlashAskEngine<C> = {
  * deployment configured no endpoint. Both are the same fact to a person, so both get the same
  * sentence.
  *
- * `byok` IS THE HOST'S WAY TO OPEN THE OWNER'S OWN KEY FOR ONE PROPOSE, built on both hosts wherever a
- * key store is (`bd8add33`), and handed the asker's context so the vault's own gate runs on it
- * (`slashByokFor` in `slash.ts`). The door reads nothing about tiers: it hands `propose` whatever
- * `byok` answers for this session, and when that answer is a refusal it is the answer, before the
- * engine is called, so a caller the vault turns away costs no model call. A read asks it too and acts only on a
- * refusal marked `hostKey`, which `slashByokFor` writes when this host's own model is keyed from the vault, so the
- * included model is held to the vault's gate wherever it would open a vault key. Where `byok` is absent the
- * settings door refuses tier `b` outright, because a stored tier `b` that no host can serve would make
- * every later `propose` answer `FORBIDDEN`.
+ * `byok` IS THE HOST'S WAY TO OPEN THE OWNER'S OWN KEY FOR ONE ASK, built on both hosts wherever a
+ * key store is, and handed the asker's context so the vault's own gate runs on it (`slashOwnKeyFor`
+ * in `slash.ts`). The door reads nothing about tiers: it hands every ask whatever `byok` answers for
+ * this session, as the model for both passes, and when that answer is a refusal it is the answer,
+ * before the engine is called, so a caller the vault turns away costs no model call. Where `byok` is
+ * absent the settings door refuses his own key outright, because a stored choice no host can serve
+ * would make every later ask answer `FORBIDDEN`.
+ *
+ * `vault` IS THE VAULT'S OWN GATE, which a save that points his key somewhere must pass (`slashKeySave`):
+ * the owner, in a browser, proved in the last fifteen minutes. `samples` reads the inbox arrivals a
+ * pattern is asked for, under the asker's own context, so the record decides who may read them.
  */
 export type SlashAskDoor<C> = {
   origins: ReadonlySet<string>;
   engine?: (() => Promise<SlashAskEngine<C> | undefined>) | undefined;
   byok?: ((ctx: C) => Promise<unknown>) | undefined;
+  vault?: ((ctx: C) => Promise<Refusal | null>) | undefined;
+  samples?: ((ids: readonly string[], ctx: C) => Promise<Result<unknown[]>>) | undefined;
 };
+
+/** What a host hands `slashAskDoor` beside the builder: the vault's gate and the inbox's reader (`SlashAskDoor`). */
+export type SlashDoorReads<C> = Pick<SlashAskDoor<C>, 'vault' | 'samples'>;
 
 /**
  * A door over a builder that is asked once, which is what each host's `slash.ts` hands this file.
@@ -152,6 +162,7 @@ export function slashAskDoor<C>(
   origins: ReadonlySet<string>,
   build: () => Promise<SlashAskEngine<C> | undefined>,
   byok?: (ctx: C) => Promise<unknown>,
+  reads: SlashDoorReads<C> = {},
 ): SlashAskDoor<C> {
   let built: Promise<SlashAskEngine<C> | undefined> | null = null;
   return {
@@ -164,28 +175,46 @@ export function slashAskDoor<C>(
       return built;
     },
     ...(byok === undefined ? {} : { byok }),
+    ...(reads.vault === undefined ? {} : { vault: reads.vault }),
+    ...(reads.samples === undefined ? {} : { samples: reads.samples }),
   };
 }
 
 /** A Slash door this file answers. */
-export type SlashRoute = 'read' | 'status' | 'settings' | 'propose';
+export type SlashRoute = 'read' | 'status' | 'settings' | 'propose' | 'asks' | 'pattern';
+
+/** The two doors that are a GET: they read and change nothing, so a browser sends them with no `Origin`. */
+const GETS: ReadonlySet<SlashRoute> = new Set(['status', 'asks']);
 
 /**
- * Which Slash door a path is, or `null`. `46 §5.2` has five and four are served here; `pattern` waits for
- * `46 §4.1` to say whether a pattern is an ask (see `SlashAskEngine`).
+ * Which Slash door a path is, or `null`.
  *
- * BOTH HOSTS DISPATCH ON THE TRUTH OF THIS AND NOTHING ELSE, which is why widening it mounted three doors
+ * BOTH HOSTS DISPATCH ON THE TRUTH OF THIS AND NOTHING ELSE, which is why widening it mounts a door
  * without an edit to either app: `apps/selfhost/src/server.ts` hands the request to `serveSlash` when it
  * answers anything, and `apps/worker/src/index.ts` does the same inside `Record$` and refuses a bearer in
- * the router on `!== null`.
+ * the router on `!== null`. `packages/host/test/slash-ask.test.ts` reads both hosts' wiring as text for it.
  */
 export function servesSlash(pathname: string): SlashRoute | null {
-  const hit = /^\/+api\/+slash\/+(read|status|settings|propose)\/*$/.exec(pathname);
+  const hit = /^\/+api\/+slash\/+(read|status|settings|propose|asks|pattern)\/*$/.exec(pathname);
   return hit ? (hit[1] as SlashRoute) : null;
 }
 
-/** The four keys a settings patch may carry, which are the four `configure` reads (`packages/slash/src/index.ts`). */
-const SETTINGS = ['tier', 'model', 'grant_id', 'ask_cap'] as const;
+/**
+ * The keys a settings patch may carry, which are the keys `configure` reads (`packages/slash/src/index.ts`): the source and
+ * where his own key is asked (`loop/finish/contracts.md` §3.2), and `tier`, kept readable for one workflow.
+ */
+const SETTINGS = ['source', 'provider', 'base_url', 'model', 'grant_id', 'ask_cap', 'tier'] as const;
+
+/** The asks one `GET /api/slash/asks` lists when it names no `limit`, and the most it lists when it names more. */
+const ASKS_LISTED = 20;
+const ASKS_MOST = 100;
+
+/**
+ * The most arrivals one pattern is drafted from, the ceiling on what one press sends a model. Three alike is where the inbox
+ * offers the button (AGT-26), and a pattern is checked anchor by anchor against every sample it was drafted from, so a
+ * handful proves it as well as a hundred would.
+ */
+export const PATTERN_SAMPLES_MOST = 10;
 
 /**
  * A question is 400 bytes to the engine (`propose.ts` `ASK_BYTES`), and this is the envelope around it.
@@ -236,11 +265,15 @@ const NO_MODEL: Refusal = {
  * this, because an action that swallowed it into an `ok` would be an action nothing reaches again.
  */
 export async function serveSlash<C>(request: Request, door: SlashAskDoor<C>, ctx: C): Promise<Response> {
-  const route = servesSlash(new URL(request.url).pathname);
+  const url = new URL(request.url);
+  const route = servesSlash(url.pathname);
   if (route === null)
-    return refusal(404, { code: 'ROUTE_UNKNOWN', fix: "Slash's doors are /api/slash/read, /api/slash/status, /api/slash/settings and /api/slash/propose." });
+    return refusal(404, {
+      code: 'ROUTE_UNKNOWN',
+      fix: "Slash's doors are /api/slash/read, /api/slash/status, /api/slash/settings, /api/slash/propose, /api/slash/asks and /api/slash/pattern.",
+    });
   const path = `/api/slash/${route}`;
-  const verb = route === 'status' ? 'GET' : 'POST';
+  const verb = GETS.has(route) ? 'GET' : 'POST';
   if (request.method !== verb) return refusal(405, { code: 'ROUTE_UNKNOWN', fix: `${path} takes a ${verb}.` }, [['allow', verb]]);
 
   /* A BEARER OF ANY KIND, BEFORE ANYTHING ELSE, as in `keys.ts`: on a self-host the server key makes
@@ -255,13 +288,13 @@ export async function serveSlash<C>(request: Request, door: SlashAskDoor<C>, ctx
      The GET is held to `apps/selfhost/src/server.ts` `forged` instead: a NAMED origin this host does not
      answer for, or a `Sec-Fetch-Site` that names another site, is a page somewhere else. Status reads no
      row and calls no model, so what a request with neither header can learn is a tier, a model name and
-     a count. */
+     a count. `asks` is the other GET and is held the same way; it answers only the owner's own session
+     (`history` in the package), so a page elsewhere learns nothing through a cookie it cannot read. */
   const origin = request.headers.get('origin');
   const site = request.headers.get('sec-fetch-site');
-  const foreign =
-    route === 'status'
-      ? (origin !== null && !door.origins.has(origin)) || (site !== null && site !== 'same-origin' && site !== 'none')
-      : origin === null || !door.origins.has(origin);
+  const foreign = GETS.has(route)
+    ? (origin !== null && !door.origins.has(origin)) || (site !== null && site !== 'same-origin' && site !== 'none')
+    : origin === null || !door.origins.has(origin);
   if (foreign) return refusal(403, { code: 'FORBIDDEN', fix: 'Slash is asked from this app, in a browser, on this address.', at: 'origin' });
 
   if (!door.engine) return refusal(501, NO_MODEL);
@@ -272,13 +305,28 @@ export async function serveSlash<C>(request: Request, door: SlashAskDoor<C>, ctx
     return answer(() => ({ ok: true, value: engine.status() }));
   }
 
+  if (route === 'asks') {
+    /* DIGITS OR NOTHING, as a typed number is read everywhere (`loop/finish/rules.md` §4): `?limit=0x10` is not sixteen. */
+    const said = url.searchParams.get('limit');
+    if (said !== null && !/^[0-9]{1,4}$/u.test(said))
+      return refusal(422, { code: 'VALUE_MALFORMED', fix: `limit is a whole number of asks, at most ${ASKS_MOST}.`, at: 'limit' });
+    const limit = said === null ? ASKS_LISTED : Math.min(Math.max(1, Number(said)), ASKS_MOST);
+    const engine = await built(door.engine);
+    if (engine instanceof Response) return engine;
+    const history = engine.history?.bind(engine);
+    if (history === undefined) return refusal(501, NO_MODEL);
+    return answer(() => history(limit, ctx));
+  }
+
   if ((request.headers.get('content-type') ?? '').split(';')[0]?.trim().toLowerCase() !== 'application/json')
     return refusal(400, { code: 'BODY_MALFORMED', fix: `${path} takes a JSON object, sent as application/json.` });
   const raw = await request.text();
   if (raw.length > BODY_LIMIT)
     return route === 'settings'
-      ? refusal(400, { code: 'BODY_MALFORMED', fix: "Slash's settings are four short fields, and this is far longer than all four." })
-      : refusal(400, { code: 'BODY_MALFORMED', fix: 'A question is a sentence, and Slash reads the first 400 bytes of it.', at: 'question' });
+      ? refusal(400, { code: 'BODY_MALFORMED', fix: "Slash's settings are a few short fields, and this is far longer than all of them." })
+      : route === 'pattern'
+        ? refusal(400, { code: 'BODY_MALFORMED', fix: `A pattern is asked for with at most ${PATTERN_SAMPLES_MOST} arrivals, and this is far longer.`, at: 'samples' })
+        : refusal(400, { code: 'BODY_MALFORMED', fix: 'A question is a sentence, and Slash reads the first 400 bytes of it.', at: 'question' });
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
@@ -292,10 +340,32 @@ export async function serveSlash<C>(request: Request, door: SlashAskDoor<C>, ctx
   if (route === 'settings') {
     const wrong = unsettled(body, door.byok !== undefined);
     if (wrong) return wrong;
+    /* THE ADDRESS IS CHECKED AND WRITTEN ONE WAY HERE, where the host can say what a public address is, and the package
+       stores what this hands it (`slashBaseUrlOf`). */
+    const patch: Record<string, unknown> = { ...body };
+    const typed = patch['base_url'];
+    if (typeof typed === 'string' && typed.trim() !== '') {
+      const checked = slashBaseUrlOf(typed);
+      if (!checked.ok) return slashReply(checked);
+      patch['base_url'] = checked.value;
+    }
+    /* AND A SAVE THAT POINTS HIS KEY SOMEWHERE PASSES THE VAULT'S OWN GATE FIRST (`slashKeySave`), in the vault's own
+       sentence, so a month-old cookie cannot send his key to an address of somebody else's choosing. */
+    if (door.vault !== undefined && slashKeySave(patch)) {
+      let stop: Refusal | null;
+      try {
+        stop = await door.vault(ctx);
+      } catch (e) {
+        return refusal(500, { code: 'INTERNAL', fix: `The vault could not be asked about your key: ${e instanceof Error ? e.message : String(e)}.` });
+      }
+      if (stop !== null) return slashReply({ ok: false, refusal: stop });
+    }
     const engine = await built(door.engine);
     if (engine instanceof Response) return engine;
-    return answer(() => engine.configure(body, ctx));
+    return answer(() => engine.configure(patch, ctx));
   }
+
+  if (route === 'pattern') return pattern(body, door, ctx);
 
   /* THE TYPE AND NOT THE CONTENTS. A blank question is the engine's own refusal, in the engine's own
      words ("Ask Slash a question first. A blank ask has nothing to read."), and saying it twice in
@@ -317,28 +387,86 @@ export async function serveSlash<C>(request: Request, door: SlashAskDoor<C>, ctx
   const engine = await built(door.engine);
   if (engine instanceof Response) return engine;
 
-  /* `byok` IS ASKED ON A READ TOO, AFTER THE ENGINE IS BUILT, because a read drafts on this host's model and that model can
-     be keyed from the vault. Before this a read never asked, and a read colleague with a fifty-minute-old proof read on
-     the owner's `slash` key with 200 and three `grant.read` rows signed `system` (`loop/research-batch-thirty-three-audit.md`
-     §2). A read acts only on a refusal marked `hostKey` and drops any adapter, since the proposal is not a read's to make.
-     After the build and not before, because the settings row `slashGrantIdOf` reads is created by the build. */
-  let byok: unknown;
+  /* HIS OWN KEY, OPENED FOR THIS ASKER, IS THE MODEL FOR BOTH PASSES. After the build and not before, because the settings
+     row `slashOwnKeyOf` reads is created by the build. A refused opening is the answer and the engine is not asked: handed
+     nothing instead, pass one would draft on another model before the package found the key closed. */
+  const own = await opened(door, ctx);
+  if (own instanceof Response) return own;
+  if (route === 'read') return answer(() => engine.read(question, ctx, own));
+  return answer(() => engine.propose(question, ctx, own, askId as string | undefined, own));
+}
+
+/**
+ * `POST /api/slash/pattern`: a pattern drafted from arrivals the inbox holds, filed on Decide as a `pattern` proposal.
+ *
+ * THE ARRIVALS ARE NAMED BY ID AND READ BY THE RECORD, under the asker's own context (`door.samples`), so a caller who may
+ * not read the inbox is refused in the record's own words and never has a message's text go to a model. The draft is the
+ * package's (`proposePattern`, `packages/slash/src/jobs.ts`), on his own key where he chose it.
+ *
+ * A PRESS IS CHECKED AGAINST THE MONTH BEFORE ANY MODEL IS ASKED, on the same count `status()` shows: the package does
+ * not hold a pattern to `ask_cap` itself, and a button that drafts past the month's limit is a model call nobody stopped
+ * (`loop/research-spark-routes.md` F4). On his own key nothing is capped, so nothing stops it here.
+ * ON THE INCLUDED MODEL, CHECKED AND NOT YET COUNTED. The draft settles as a `kind = 'pattern'` row, and the included
+ * count `status()` reads is `read` and `propose` rows alone (`asksUsed` in `packages/slash/src/call.ts`), so a press does
+ * not yet move it. Counting it is `call.ts`'s, which this unit asked of that file's owner. On his own key the listing
+ * counts the press already (`keyedAsks` in `packages/slash/src/index.ts`).
+ */
+async function pattern<C>(body: Record<string, unknown>, door: SlashAskDoor<C>, ctx: C): Promise<Response> {
+  const stray = Object.keys(body).find((k) => k !== 'samples');
+  if (stray !== undefined)
+    return refusal(422, { code: 'FIELD_UNKNOWN', fix: `${stray} is not something this call takes. It takes samples.`, at: stray, allowed: ['samples'] });
+  const ids = body['samples'];
+  if (!Array.isArray(ids) || ids.length === 0 || ids.length > PATTERN_SAMPLES_MOST || !ids.every((id) => typeof id === 'string' && id !== ''))
+    return refusal(422, {
+      code: 'VALUE_MALFORMED',
+      fix: `samples are the arrivals a pattern is drafted from, from one to ${PATTERN_SAMPLES_MOST} of them, each named as the inbox names it.`,
+      at: 'samples',
+    });
+  if (!door.engine || !door.samples) return refusal(501, NO_MODEL);
+  const engine = await built(door.engine);
+  if (engine instanceof Response) return engine;
+  const draft = engine.proposePattern?.bind(engine);
+  if (draft === undefined) return refusal(501, NO_MODEL);
+
+  const own = await opened(door, ctx);
+  if (own instanceof Response) return own;
+  const asks = (engine.status() as { asks?: { used?: unknown; cap?: unknown; resets?: unknown; capped?: unknown } } | undefined)?.asks;
+  if (asks?.capped !== false && typeof asks?.used === 'number' && typeof asks.cap === 'number' && asks.used >= asks.cap)
+    return slashReply({
+      ok: false,
+      refusal: {
+        code: 'SLASH_BUDGET_SPENT',
+        fix: `This month's Slash asks are spent until ${typeof asks.resets === 'string' ? asks.resets.slice(0, 10) : 'next month'}, so no pattern was drafted.`,
+      },
+    });
+
+  let read: Result<unknown[]>;
   try {
-    byok = door.byok ? await door.byok(ctx) : undefined;
+    read = await door.samples([...new Set(ids as string[])], ctx);
+  } catch (e) {
+    return refusal(500, { code: 'INTERNAL', fix: `The inbox could not be read for Slash: ${e instanceof Error ? e.message : String(e)}.` });
+  }
+  if (!read.ok) return slashReply(read);
+  const samples = read.value;
+  return answer(() => draft(samples, ctx, own));
+}
+
+/**
+ * His own key for this asker, as the host's `byok` answers it: an adapter, `undefined` on the included model, or the
+ * refusal as the door's answer. A throw is a 500 with its sentence, since the vault was asked and did not answer.
+ */
+async function opened<C>(door: SlashAskDoor<C>, ctx: C): Promise<unknown> {
+  let own: unknown;
+  try {
+    own = door.byok ? await door.byok(ctx) : undefined;
   } catch (e) {
     return refusal(500, { code: 'INTERNAL', fix: `Your key could not be opened for Slash: ${e instanceof Error ? e.message : String(e)}.` });
   }
-  if (route === 'read') return refusedKey(byok) && byok.hostKey === true ? slashReply({ ok: false, refusal: byok.refusal }) : answer(() => engine.read(question, ctx));
-
-  /* A REFUSED OPENING IS THE ANSWER, AND THE ENGINE IS NOT ASKED. Handing the package `undefined` instead would reach
-     its own `FORBIDDEN` only after pass one had drafted on this host's model, so a caller the vault refuses would
-     still have spent a call. Only `ok` and `refusal` go back: `hostKey` is this door's to read and not a caller's. */
-  if (refusedKey(byok)) return slashReply({ ok: false, refusal: byok.refusal });
-  return answer(() => engine.propose(question, ctx, byok, askId as string | undefined));
+  return refusedKey(own) ? slashReply({ ok: false, refusal: own.refusal }) : own;
 }
 
-/** A `byok` answer that is the host refusing to open the key, as `slashByokFor` writes one, and not an adapter. */
-const refusedKey = (value: unknown): value is { ok: false; refusal: Refusal; hostKey?: unknown } =>
+/** A `byok` answer that is the host refusing to open the key, as `slashOwnKeyFor` writes one, and not an adapter. */
+const refusedKey = (value: unknown): value is { ok: false; refusal: Refusal } =>
   typeof value === 'object' && value !== null && (value as { ok?: unknown }).ok === false && typeof (value as { refusal?: unknown }).refusal === 'object';
 
 const shown = (value: unknown): string => JSON.stringify(value) ?? String(value);
@@ -376,8 +504,8 @@ async function answer(run: () => Result<unknown> | Promise<Result<unknown>>): Pr
  * the values themselves (a tier it does not run, a cap below zero, a grant id of the wrong shape) stay the
  * engine's, in its words.
  *
- * AND TIER `b` WHERE THE HOST CANNOT OPEN A KEY IS 501, because storing it would break the palette on save:
- * every later `propose` would answer `FORBIDDEN` for a key no host here can open.
+ * AND HIS OWN KEY WHERE THE HOST CANNOT OPEN A KEY IS 501, because storing it would break the palette on save:
+ * every later ask would answer `FORBIDDEN` for a key no host here can open.
  */
 function unsettled(patch: Record<string, unknown>, byok: boolean): Response | null {
   const stray = Object.keys(patch).find((k) => !(SETTINGS as readonly string[]).includes(k));
@@ -388,7 +516,7 @@ function unsettled(patch: Record<string, unknown>, byok: boolean): Response | nu
       at: stray,
       allowed: [...SETTINGS],
     });
-  for (const key of ['tier', 'model', 'grant_id'] as const) {
+  for (const key of ['source', 'provider', 'base_url', 'tier', 'model', 'grant_id'] as const) {
     const value = patch[key];
     if (value !== undefined && value !== null && typeof value !== 'string')
       return refusal(422, { code: 'VALUE_MALFORMED', fix: `${key} is text or null, and this one is ${shown(value)}.`, at: key });
@@ -399,8 +527,8 @@ function unsettled(patch: Record<string, unknown>, byok: boolean): Response | nu
       fix: `ask_cap is a number of asks, and this one is ${shown(patch['ask_cap'])}.`,
       at: 'ask_cap',
     });
-  if (patch['tier'] === 'b' && !byok)
-    return refusal(501, { code: 'NOT_IN_THIS_BUILD', fix: 'Slash cannot use a key of your own on this host yet.', at: 'tier' });
+  if ((patch['source'] === 'key' || patch['tier'] === 'b') && !byok)
+    return refusal(501, { code: 'NOT_IN_THIS_BUILD', fix: 'Slash cannot use a key of your own on this host yet.', at: patch['source'] === 'key' ? 'source' : 'tier' });
   return null;
 }
 
@@ -456,11 +584,14 @@ export function slashRecordMeter(deps: SlashLedgerDeps): SlashMeter {
       const engine = await deps.engine();
       /* NO ENGINE IS NO LEDGER, AND NO LEDGER IS NO SPEND: the record reads a refusal as "the rules draft". */
       if (engine === undefined) return { ok: false, refusal: { code: 'NOT_IN_THIS_BUILD', fix: 'Slash has no ledger on this host to count the ask in.' } };
-      const status = engine.status() as { tier?: unknown; asks?: { used?: unknown; cap?: unknown; resets?: unknown } } | undefined;
+      const status = engine.status() as { tier?: unknown; model?: unknown; asks?: { used?: unknown; cap?: unknown; resets?: unknown; capped?: unknown } } | undefined;
       const asks = status?.asks;
       if (typeof asks?.used !== 'number' || typeof asks.cap !== 'number')
         return { ok: false, refusal: { code: 'INTERNAL', fix: "Slash's count of this month's asks could not be read, so its model was not asked." } };
-      if (asks.used >= asks.cap)
+      /* ON HIS OWN KEY THE PRESS IS LISTED AND NOT CAPPED, as every ask there is (`capped: false`), and nothing of this
+         host's is spent, so the row is priced 0 and named for the model his key is asked for. */
+      const own = asks.capped === false;
+      if (!own && asks.used >= asks.cap)
         return {
           ok: false,
           refusal: {
@@ -471,6 +602,7 @@ export function slashRecordMeter(deps: SlashLedgerDeps): SlashMeter {
       /* THE TIER THE ENGINE READS AND NOT THE ONE THE ROW HOLDS. Where a host does not run a stored tier the package reads it
          as `a` (`SlashOptions.tiers`), and a row written under the stored one would sit outside the count `status()` is. */
       const tier = typeof status?.tier === 'string' ? status.tier : 'a';
+      const model = own && typeof status?.model === 'string' && status.model !== '' ? status.model : deps.model;
       const id = mint();
       const at = () => new Date(deps.clock.now()).toISOString();
       const t0 = deps.clock.now();
@@ -480,7 +612,7 @@ export function slashRecordMeter(deps: SlashLedgerDeps): SlashMeter {
         id,
         at(),
         tier,
-        deps.model,
+        model,
         kind === 'draft' ? "Slash's press" : "Slash's first plan",
       );
       let done = false;
@@ -490,7 +622,7 @@ export function slashRecordMeter(deps: SlashLedgerDeps): SlashMeter {
           settle: ({ usage, code }) => {
             if (done) return;
             done = true;
-            const rate = deps.rate;
+            const rate = own ? undefined : deps.rate;
             const neurons = rate === undefined ? 0 : Math.round((usage.in * rate.in) / 1e6 + (usage.out * rate.out) / 1e6);
             deps.sql.exec(
               'UPDATE slash_call SET ts = ?, tokens_in = ?, tokens_out = ?, neurons = ?, ms = ?, status = ?, code = ? WHERE id = ?',

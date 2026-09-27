@@ -22,9 +22,9 @@ import type { Result } from '@braindog/ports';
 import { install, normalise, plan, type Applied, type Installed } from '@braindog/declare';
 import { KERNEL_WRITTEN, type Declaration, type FieldDecl, type IngestDecl, type Json, type Kernel } from '@braindog/kernel';
 
-import { AGENTS_PACK, AGENTS_REGISTERS, RUNS_ON, agentsPackDocument } from './packs/agents.ts';
+import { AGENTS_PACK, AGENTS_REGISTERS, agentsPackDocument } from './packs/agents.ts';
 
-export { AGENTS_PACK, AGENTS_PAGES, AGENTS_REGISTERS, RUNS_ON, agentsPackDocument, type PackManifest } from './packs/agents.ts';
+export { AGENTS_METRICS, AGENTS_PACK, AGENTS_PAGES, AGENTS_REGISTERS, agentsPackDocument, type PackManifest } from './packs/agents.ts';
 export { FIRST_PARTY, FIRST_PARTY_VERSIONS, crossPack, firstPartyDocument, firstPartyManifest, type DocumentOptions, type FirstPartyId } from './packs/first-party.ts';
 export * from './modules/base.ts';
 export { ACCOUNTS, CATEGORIES, INSTALLMENTS, OBLIGATIONS, RECURRING_ITEMS, SNAPSHOTS, TRANSACTIONS, cashSeries, nightOf, snapshotRows } from './modules/money.ts';
@@ -38,6 +38,7 @@ import {
   ACCOUNTS,
   CATEGORIES,
   INSTALLMENTS,
+  MONEY_AUTOMATIONS,
   MONEY_HOME_SETTING,
   MONEY_METRICS,
   MONEY_PAGES,
@@ -51,6 +52,7 @@ import {
 } from './modules/money.ts';
 export { MONEY_HOME_SETTING, MONEY_TARGET_SETTINGS, targetConfigOf } from './modules/money.ts';
 import { ESTATE_METRICS, ESTATE_PAGES, ESTATE_REGISTERS, SERVICES } from './modules/estate.ts';
+import { ESTATE_AUTOMATIONS, estateTargetConfig } from './modules/estate.ts';
 import { PORTFOLIO_PAGES, PORTFOLIO_REGISTERS, PORTFOLIO_RULES, PROJECTS_SAID, PROJECT_METRICS, THINGS } from './modules/portfolio.ts';
 import { PEOPLE, PEOPLE_PAGES, PEOPLE_REGISTERS } from './modules/people.ts';
 import { RUNS, TASKS, TRACKS, UPDATES, WORK_AUTOMATIONS, WORK_METRICS, WORK_PAGES, WORK_REGISTERS } from './modules/work.ts';
@@ -189,13 +191,6 @@ export const declarations = (): Declaration[] =>
 export const pageDeclarations = (): Declaration[] =>
   Object.values(PAGES).map((body) => ({ id: `page.${body.page}`, kind: 'page' as const, body: body as never }));
 
-/** The project template with the agents pack's "Runs on" after its own blocks, for a record holding that pack. */
-export const projectWithRunsOn = (): SeedPage => ({
-  ...PAGES.project!,
-  requires: [...((PAGES.project!.requires as string[] | undefined) ?? []), ...RUNS_ON.requires],
-  blocks: [...((PAGES.project!.blocks as unknown[] | undefined) ?? []), ...RUNS_ON.blocks],
-});
-
 /** The rules the modules ship with. */
 export const RULES: Record<string, SeedRule> = { ...MONEY_RULES, ...PORTFOLIO_RULES };
 
@@ -203,7 +198,8 @@ export const ruleDeclarations = (): Declaration[] =>
   Object.values(RULES).map((body) => ({ id: `rule.${body.rule}`, kind: 'rule' as const, body: body as never }));
 
 /**
- * The automations the modules ship with: a rule that starts a script, and the script, as one list (`WORK_AUTOMATIONS`).
+ * The automations the modules ship with: a rule that starts a script, and the script, and the rules that act on an
+ * answer given in Decide, as one list (`WORK_AUTOMATIONS`, `MONEY_AUTOMATIONS`, `ESTATE_AUTOMATIONS`).
  *
  * NOT IN `RULES`, because a `SeedRule` is the older `register:` and `then:` form that `applyRule` reads over the rows
  * already written, and these are automations that start on a write (`on: written`) and hand off to a script. And not
@@ -216,7 +212,7 @@ export const ruleDeclarations = (): Declaration[] =>
  * document held 93 declarations where the seed's own lists count 89, and the record the pack made held
  * `rule.close_follow_ups`, `rule.start_with_parent` and their two scripts where the one the seed made did not.
  */
-export const AUTOMATIONS: readonly Record<string, unknown>[] = WORK_AUTOMATIONS;
+export const AUTOMATIONS: readonly Record<string, unknown>[] = [...WORK_AUTOMATIONS, ...MONEY_AUTOMATIONS, ...ESTATE_AUTOMATIONS];
 
 export const automationDeclarations = (): Declaration[] =>
   AUTOMATIONS.map((body) =>
@@ -327,7 +323,11 @@ export function packDocument(): Record<string, unknown> {
       ...AUTOMATIONS,
     ],
     /* THE SETTINGS MONEY'S TARGETS ARE HELD TO, which a person changes later, and the currency it adds up in. */
-    config: { ...MONEY_HOME_SETTING, ...targetConfigOf(Object.values(METRICS) as unknown as Record<string, unknown>[]) },
+    config: {
+      ...MONEY_HOME_SETTING,
+      ...targetConfigOf(Object.values(METRICS) as unknown as Record<string, unknown>[]),
+      ...estateTargetConfig(Object.values(METRICS) as unknown as Record<string, unknown>[]),
+    },
     /* A REGISTER WHOSE REQUIRED FIELD IS A REF CANNOT BE SEEDED BY A PACK. A pack's seeds are one
        row per register with no order between them, so a `ref` in one would resolve against whatever
        happened to be written first — a different row on a different day. `updates` needs a `track`,
@@ -434,24 +434,20 @@ export async function installSeed(kernel: Kernel, actor = 'p_seed'): Promise<Res
         },
       };
 
-  /* THE PROJECT TEMPLATE WAITS FOR THE AGENTS PACK, because its "Runs on" blocks read the pack's
-     registers, and a page requiring a register the record does not hold yet is refused. */
-  /* AND THE ARRIVAL PATTERNS GO IN WITH THE LISTS THEY READ AND WRITE. `writes.register` is checked
+  /* THE ARRIVAL PATTERNS GO IN WITH THE LISTS THEY READ AND WRITE. `writes.register` is checked
      for its grammar at install and never resolved, so a pattern installs happily into a record with
      no `transactions` in it and says nothing until the first message lands. Putting it in the batch
      that declares `transactions` and `accounts` is what keeps the first forwarded alert from being
      the test of whether the register was there. */
   const installed = await kernel.install([
     ...declarations(),
-    ...pageDeclarations().filter((d) => d.id !== 'page.project'),
+    ...pageDeclarations(),
     ...metricDeclarations(),
     ...ingestDeclarations(),
   ]);
   if (!installed.ok) return installed as Result<Seeded>;
   const agents = await installAgentsPack(kernel, actor);
   if (!agents.ok) return agents as unknown as Result<Seeded>;
-  const project = await kernel.install([{ id: 'page.project', kind: 'page', body: projectWithRunsOn() as never }]);
-  if (!project.ok) return project as Result<Seeded>;
 
   let rows = 0;
   for (const register of [...ORDER, ...AGENTS_ORDER])

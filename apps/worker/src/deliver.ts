@@ -120,6 +120,26 @@ export function delivers(env: { VAPID_PUBLIC?: string | undefined; VAPID_PRIVATE
 }
 
 /**
+ * What a record on this deployment is told it can have delivered: `delivers`, and `infer.prose` where a model answers it.
+ *
+ * `delivers` IS WHAT `pump` LEASES AND THIS IS WHAT THE RECORD QUEUES FOR, and for one kind the two differ. A digest
+ * declaring `prose: slash` queues its `infer.prose` row only when the record's list names that kind
+ * (`packages/kernel/src/digest.ts`), and otherwise goes at once as figures; but `makeDeliver` has no branch that asks a
+ * model, so the pump must never lease one, or every digest would walk the ladder on "nothing in this deployment
+ * delivers a infer.prose". The row is served by the alarm's model pass instead (`serveModelJobs`,
+ * `packages/host/src/model-jobs.ts`), which leases it by kind, so a Worker with a model hands this list to the record and
+ * keeps `delivers` for the pump. The row is queued by the alarm's own drain and served by the same alarm's model pass,
+ * so the bell it rings in between is one.
+ *
+ * `infer.draft` IS NOT HERE AND NEED NOT BE: the kernel queues a draft whatever the list says, and the list only rings
+ * the doorbell, which would buy a pump pass that leases nothing for every write while a draft waited on the alarm.
+ * `answered` is whether this Worker has a model at all, the fact `/api/version`'s `slash` reads.
+ */
+export function recordDelivers(env: { VAPID_PUBLIC?: string | undefined; VAPID_PRIVATE?: string | undefined }, answered: boolean): OutboxKind[] {
+  return answered ? [...delivers(env), 'infer.prose'] : delivers(env);
+}
+
+/**
  * A URL a webhook may be posted to.
  *
  * HTTPS AND A PUBLIC HOST. The URL comes out of a declaration somebody wrote, and a declaration is

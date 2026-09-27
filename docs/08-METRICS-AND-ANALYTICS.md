@@ -73,7 +73,7 @@ metric: spend-by-channel
 source: register.campaign_day
 where: { all: [{ field: day, after: "-90d" }] }
 value:    { sum: spend }
-group_by: channel            # an enum, a ref, or a date field
+group_by: channel            # an enum, a ref, a date field, or created_at / updated_at
 bucket:   week               # only when group_by is a date
 format:   money.GBP
 target:   { lte: { amount: 400000, currency: GBP } }   # per group

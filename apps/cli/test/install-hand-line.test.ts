@@ -79,6 +79,8 @@ test('THE SHELL IS GIT BASH ON WIN32 WHERE MSYSTEM OR A bash SHELL SAYS SO, Powe
   assert.equal(shellOf({ SHELL: '/usr/bin/bash' }, 'win32'), 'Git Bash');
   assert.equal(shellOf({ PSModulePath: 'C:\\Windows\\system32\\WindowsPowerShell\\v1.0\\Modules' }, 'win32'), 'PowerShell');
   assert.equal(shellOf({}, 'win32'), 'PowerShell');
+  assert.equal(shellOf({ MSYSTEM: 'MINGW64', _: 'C:/WINDOWS/System32/WindowsPowerShell/v1.0/powershell' }, 'win32'), 'PowerShell');
+  assert.equal(shellOf({ MSYSTEM: 'MINGW64', _: 'C:/Program Files/nodejs/node' }, 'win32'), 'Git Bash');
   assert.equal(shellOf({ MSYSTEM: 'MINGW64' }, 'linux'), 'sh');
   assert.equal(shellOf({}, 'darwin'), 'sh');
 });
@@ -183,7 +185,7 @@ test('THE POWERSHELL LINES PASTED INTO GIT BASH RUN NOTHING, so a line printed f
 
 test('AND THE sh LINES PASTED INTO POWERSHELL 5.1 RUN NOTHING, since the shell is told from the environment and can be told wrong', { skip: process.platform !== 'win32' }, () => {
   /*
-   * A PowerShell started under Git Bash inherits `MSYSTEM`, so `install` run there prints the `sh` form. Each line is
+   * The shell is read from the environment and can be read wrong, so a PowerShell handed the `sh` form must still run nothing. Each line is
    * its own script, because a `ParserError` in one file refuses the whole file and would hide what the other did.
    */
   const dir = mkdtempSync(join(scratch, 'ps-sh-'));

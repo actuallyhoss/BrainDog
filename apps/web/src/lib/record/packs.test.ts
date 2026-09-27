@@ -78,7 +78,7 @@ test('INSTALLING PLANS FIRST, SENDS THE PLAN THAT WAS SHOWN, AND PLANS AGAIN WHE
       return { ok: true, value: { id: 'estate' } };
     },
   };
-  const nameOf = (_: 'register' | 'page', id: string) => (id === 'services' ? 'Services' : id);
+  const nameOf = (_: 'register' | 'page' | 'metric', id: string) => (id === 'services' ? 'Services' : id);
 
   const planned = value(await planInstall(client, 'estate', doc, nameOf));
   assert.equal(planned.plan.planHash, '12.abc');

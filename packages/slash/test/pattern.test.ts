@@ -71,9 +71,14 @@ test('a pattern Slash derived is always needs-review, whatever the model said', 
   const { slash, record, inference } = build();
   inference.say(ingest());
   await slash.proposePattern(SAMPLES, OWNER);
-  const body = record.filed[0]?.body['ingest'] as { writes: { confidence: string }; on_conflict: string };
-  assert.equal(body.writes.confidence, 'needs-review');
-  assert.equal(body.on_conflict, 'skip');
+  /* FILED AS THE DECLARATION IT INSTALLS AS, on the channel the samples came by (`loop/finish/defects.md` A7): a bare
+     body has no id, and the kernel refuses it at every accept. */
+  const filed = record.filed[0]?.body['ingest'] as { id: string; kind: string; body: { channel: string; writes: { confidence: string }; on_conflict: string } };
+  assert.equal(filed.kind, 'ingest');
+  assert.match(filed.id, /^ingest\.slash-/u);
+  assert.equal(filed.body.channel, 'email');
+  assert.equal(filed.body.writes.confidence, 'needs-review');
+  assert.equal(filed.body.on_conflict, 'skip');
 });
 
 test('an anchor that is in no sample is a fabrication, and nothing is filed', async () => {

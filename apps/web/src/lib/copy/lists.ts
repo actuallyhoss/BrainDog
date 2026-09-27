@@ -27,11 +27,10 @@ export const lists = {
      on an update's `When` answered *When is a row in another list*, which was not true of an instant: a wrong sentence
      is worse than the silence it replaced, because silence is not a claim. The grid then learnt to edit money, ref,
      document, instant, duration and yes or no, and their reasons stayed behind as sentences explaining a refusal that
-     no longer happens. What is left is the four `editable` answers no to, which `field-draft.test.ts` holds equal. */
+     no longer happens. What is left is what `editable` answers no to, a file and a secret, which `field-draft.test.ts`
+     holds equal. */
   cellWhy: {
-    quantity: 'an amount and a unit held together',
     file: 'a file rather than something typed',
-    json: 'structured data rather than one value',
     secret: 'held by the vault and never drawn in full',
   } as Record<string, string | undefined>,
   /* FOR A REFUSED TYPE `cellWhy` DOES NOT NAME. Every type `editable` refuses today is named above, so this is said
@@ -139,7 +138,6 @@ export const lists = {
   zToA: 'Z to A',
   firstAdded: 'first added',
   lastAdded: 'last added',
-  rowOrder: 'Back to row order',
   /** Under a row's Details: when it was added, and by whom, in the middle of a sentence. */
   rowAddedBy: (when: string, who: string) => `${when} by ${who}`,
   rowByYou: 'you',

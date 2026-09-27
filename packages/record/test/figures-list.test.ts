@@ -54,13 +54,15 @@ test('EVERY FIGURE A PACK DECLARES IS LISTED, late-in among them, each with its 
     declared.map((d) => d.id.slice('metric.'.length)).sort(),
     `${listed.length} of ${declared.length} listed`,
   );
-  /* Measured on this record before the method existed: 36 declared and 18 drawn; money-core 3.0.0 made it 41. The number
+  /* Measured on this record before the method existed: 36 declared and 18 drawn; money-core 3.0.0 made it 41, and its books and a project's monthly
+     series (the second finish workflow) made it 47. The number
      is asserted so that a pack shipping fewer figures is noticed here rather than read as the finding closing on its own. */
-  assert.equal(declared.length, 41);
+  assert.equal(declared.length, 47);
   const late = listed.find((f) => f.id === 'late-in');
   assert.deepEqual(late, { id: 'late-in', name: 'Late to you', format: 'money', list: 'obligations', pack: 'money-core', param: false });
-  /* AND THE ONE TEMPLATE, which `metric` refuses bare (`REF_UNKNOWN`, "thing is {{it}}") and answers as `project-owed:Kiln`. */
-  assert.deepEqual(listed.filter((f) => f.param).map((f) => f.id), ['project-owed']);
+  /* AND THE TEMPLATES, which `metric` refuses bare (`REF_UNKNOWN`, "thing is {{it}}") and answers named, as `project-owed:Kiln`:
+     a project's own figures and its monthly series, and a book's cash. */
+  assert.deepEqual(listed.filter((f) => f.param).map((f) => f.id), ['book-cash', 'project-in-by-month', 'project-out-by-month', 'project-owed']);
   for (const f of listed) {
     const row = declared.find((d) => d.id === `metric.${f.id}`)!;
     assert.equal(f.pack, row.pack_id, f.id);
@@ -143,7 +145,7 @@ test('AND IT IS ROUTED: the client asks the host, READ+, and gets the same list 
   const client = createClient({ base: 'https://braindog.example', fetch });
   const listed = value<Figure[]>(await client.figures());
   assert.deepEqual(listed, value<Figure[]>(await api.figures(owner)));
-  assert.equal(listed.length, 41);
+  assert.equal(listed.length, 47);
   assert.deepEqual(sent, ['GET /api/figures']);
   sql.close();
 });

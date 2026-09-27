@@ -23,7 +23,6 @@ import { bundled, objectStorage } from './bundled-worker.ts';
 
 const HOST = 'app.example.test';
 const REC = 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD';
-const URL_ = 'https://gateway.example.test/v1/chat/completions';
 const FAKE_KEK = '0'.repeat(64);
 
 /** A person context that no sign-in built: the shape the demo door used to forward, `p_demo` at `read`. */
@@ -49,9 +48,25 @@ test('A DEPLOYMENT THAT STILL SETS DEMO_RECORD OPENS NOTHING: a GET with no cred
   assert.deepEqual(addressed, [], 'a record was addressed for a request that carried no credential');
 });
 
-const hostedRecord = async () => {
+/* THE INCLUDED MODEL OVER A FAKE BINDING, counted. This file drove the Worker's own endpoint until that endpoint was taken
+   out (`loop/finish/defects.md` S1); the lock it holds is the door's, whichever model is behind it. */
+const fakeAi = () => {
+  const ai = {
+    calls: 0,
+    AI: {
+      run: async () => {
+        ai.calls++;
+        const content = '{"registers":[],"where":null,"q":"open"}';
+        return { choices: [{ message: { role: 'assistant', content }, finish_reason: 'stop' }], usage: { prompt_tokens: 1, completion_tokens: 1 } };
+      },
+    },
+  };
+  return ai;
+};
+
+const hostedRecord = async (ai: ReturnType<typeof fakeAi>) => {
   const { Record$ } = await bundled();
-  const env = { PUBLIC_HOST: HOST, SLASH_ENDPOINT: URL_, KEK: FAKE_KEK, INGRESS: { send: async () => {} } };
+  const env = { PUBLIC_HOST: HOST, AI: ai.AI, SLASH_INCLUDED: 'yes', KEK: FAKE_KEK, INGRESS: { send: async () => {} } };
   const state = { storage: objectStorage(), id: { toString: () => REC }, blockConcurrencyWhile: (f: () => unknown) => f(), waitUntil: () => {} };
   const object = new Record$(state, env);
   const made = await object.create({ id: REC, slug: 'studio', name: 'Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_owner', email: 'ada@example.test', name: 'Ada' } });
@@ -67,26 +82,16 @@ const ask = (ctx: object) =>
     body: JSON.stringify({ question: 'Which tasks are open?' }),
   });
 
-/** The model, answered here and counted, so a refusal is seen to have spent nothing. */
-const withModel = async (run: () => Promise<Response>): Promise<{ status: number; body: { refusal?: { code: string; at?: string } }; calls: number }> => {
-  const real = globalThis.fetch;
-  let calls = 0;
-  globalThis.fetch = (async () => {
-    calls++;
-    const content = '{"registers":[],"where":null,"q":"open"}';
-    return new Response(JSON.stringify({ choices: [{ message: { role: 'assistant', content } }], usage: { prompt_tokens: 1, completion_tokens: 1 } }), { status: 200 });
-  }) as typeof fetch;
-  try {
-    const out = await run();
-    return { status: out.status, body: (await out.json()) as { refusal?: { code: string; at?: string } }, calls };
-  } finally {
-    globalThis.fetch = real;
-  }
+/** One ask at the object, with the model's calls counted, so a refusal is seen to have spent nothing. */
+const asked = async (ctx: object): Promise<{ status: number; body: { refusal?: { code: string; at?: string } }; calls: number }> => {
+  const ai = fakeAi();
+  const object = await hostedRecord(ai);
+  const out = await object.fetch(ask(ctx));
+  return { status: out.status, body: (await out.json()) as { refusal?: { code: string; at?: string } }, calls: ai.calls };
 };
 
 test('A PERSON CONTEXT THAT SAYS IT IS NOT CREDENTIALED IS REFUSED AT THE OBJECT, and the model is not called', async () => {
-  const object = await hostedRecord();
-  const out = await withModel(() => object.fetch(ask(UNCREDENTIALED)));
+  const out = await asked(UNCREDENTIALED);
   assert.equal(out.status, 403, `an uncredentialed person asked Slash and was answered ${out.status}: ${JSON.stringify(out.body)}`);
   assert.equal(out.body.refusal?.code, 'NEEDS_BROWSER_SESSION');
   assert.equal(out.body.refusal?.at, 'principal');
@@ -94,15 +99,13 @@ test('A PERSON CONTEXT THAT SAYS IT IS NOT CREDENTIALED IS REFUSED AT THE OBJECT
 });
 
 test('A PERSON CONTEXT THAT DOES NOT SAY IT IS CREDENTIALED is refused the same way', async () => {
-  const object = await hostedRecord();
-  const out = await withModel(() => object.fetch(ask({ principal: { kind: 'person', id: 'p_owner', level: 'owner' } })));
+  const out = await asked({ principal: { kind: 'person', id: 'p_owner', level: 'owner' } });
   assert.equal(out.status, 403, JSON.stringify(out.body));
   assert.equal(out.calls, 0);
 });
 
 test('A SIGNED-IN PERSON STILL GETS THROUGH, or the lock would be a door shut on everybody', async () => {
-  const object = await hostedRecord();
-  const out = await withModel(() => object.fetch(ask({ principal: { kind: 'person', id: 'p_owner', level: 'owner' }, credentialed: true })));
+  const out = await asked({ principal: { kind: 'person', id: 'p_owner', level: 'owner' }, credentialed: true });
   assert.equal(out.status, 200, JSON.stringify(out.body));
   assert.equal(out.calls, 1);
 });

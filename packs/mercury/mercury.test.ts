@@ -34,6 +34,11 @@
  * pull, carried in the pack file byte for byte. Measured before it was in the file, against `772c0be1`: all six ledger
  * tests below failed at their first read of the pack, "mercury.pack.json declares no script, so nothing in the pack
  * can write a transaction", the whole path on a self-host included.
+ *
+ * 1.2.0 COUNTS THE MONEY ONCE (`loop/finish/defects.md` DEF-3). A row typed in by hand before the pack is taken by the
+ * transaction it stands for instead of being written beside it, and a transaction whose row a person deleted is not
+ * written again. The tests after "A TRANSACTION A PERSON VOIDED" hold both, and the whole path holds them against the
+ * record's own `list`. They were written from reading the code, before any of them had run.
  */
 
 import { test } from 'node:test';
@@ -134,6 +139,8 @@ test('the file reads clean as an add-on somebody opens from disk, and says what 
   const file = await readPackFile(readFileSync(PACK_FILE, 'utf8'));
   assert.ok(file.ok, fixOf(file));
   assert.equal(file.value.pack.manifest.pack, 'mercury-company');
+  /* A TITLE OF ITS OWN, where it had none and a person read its id, "mercury-company", as its name. */
+  assert.equal(file.value.title, 'Mercury');
   assert.deepEqual(Object.keys((file.value.doc.fill ?? {}) as object), ['id', 'grant', 'every', 'base']);
 });
 
@@ -630,7 +637,7 @@ test('THE PACK CARRIES ledger.js AS ITS SOURCE, byte for byte, beside the pull, 
   assert.deepEqual((doc.extends as Record<string, { fields: { id: string }[] }>)['register.transactions']?.fields.map((f) => f.id), ['mercury_id']);
 });
 
-type Row = { id: string; register: string; seq: number; fields: Record<string, Json>; version: number; updated_at: string };
+type Row = { id: string; register: string; seq: number; fields: Record<string, Json>; version: number; updated_at: string; deleted_at?: string };
 let minted = 0;
 const rowOf = (register: string, fields: Record<string, Json>, version = 1): Row => {
   minted += 1;
@@ -660,19 +667,37 @@ const OPS_TXNS = [
   txn('txn_3', -60, 'cancelled', 'Coffee Stall', '2026-09-20T09:00:00Z', null),
 ];
 
-/** A host double: Mercury's two addresses, and the three lists the script reads, filtered as the record filters them. */
-function mercuryHost(state: { accounts: Row[]; transactions: Row[]; categories: Row[]; txns?: unknown[]; status?: number }): CtxHost & { asked: HostRequest[] } {
+/**
+ * A host double: Mercury's two addresses, and the three lists the script reads, filtered as the record filters them.
+ *
+ * A ROW WITH `deleted_at` SET IS ONE A PERSON DELETED, and it is listed only when the script asks for deleted rows as
+ * well, which is the record's own rule (`scriptReads` in `packages/host/src/script.ts`). A money `is` compares the
+ * amount and the currency, as the record does, and `between` takes both ends.
+ */
+function mercuryHost(state: { accounts: Row[]; transactions: Row[]; categories: Row[]; txns?: unknown[]; status?: number }): CtxHost & { asked: HostRequest[]; lists: [string, Json, Json][] } {
   const asked: HostRequest[] = [];
+  const lists: [string, Json, Json][] = [];
+  const same = (a: Json | undefined, b: Json | undefined): boolean => {
+    if (a !== null && b !== null && typeof a === 'object' && typeof b === 'object') {
+      const x = a as { amount?: Json; currency?: Json };
+      const y = b as { amount?: Json; currency?: Json };
+      return x.amount === y.amount && x.currency === y.currency;
+    }
+    return a === b;
+  };
   const matches = (row: Row, where: Json): boolean => {
-    const w = where as { field?: string; in?: Json[]; is?: Json; all?: Json[] } | null;
+    const w = where as { field?: string; in?: Json[]; is?: Json; all?: Json[]; between?: [string, string]; empty?: boolean } | null;
     if (w === null) return true;
     if (Array.isArray(w.all)) return w.all.every((x) => matches(row, x));
     const value = row.fields[w.field ?? ''];
-    if (w.in !== undefined) return w.in.includes(value as Json);
-    return value === w.is;
+    if (w.in !== undefined) return w.in.some((v) => same(value, v));
+    if (w.between !== undefined) return typeof value === 'string' && value >= w.between[0] && value <= w.between[1];
+    if (w.empty === true) return value === undefined || value === null || value === '';
+    return same(value, w.is);
   };
   return {
     asked,
+    lists,
     fetch: async (request) => {
       asked.push(request);
       const url = new URL(request.url);
@@ -684,9 +709,11 @@ function mercuryHost(state: { accounts: Row[]; transactions: Row[]; categories: 
             : { total: 0, transactions: [] };
       return { status: state.status ?? 200, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) };
     },
-    list: async (register, where) => {
+    list: async (register, where, options) => {
+      lists.push([register, where, options]);
+      const withDeleted = (options as { includeDeleted?: boolean } | null)?.includeDeleted === true;
       const rows = register === 'accounts' ? state.accounts : register === 'transactions' ? state.transactions : register === 'categories' ? state.categories : [];
-      return rows.filter((r) => matches(r, where)) as unknown as Json[];
+      return rows.filter((r) => (withDeleted || r.deleted_at === undefined) && matches(r, where)) as unknown as Json[];
     },
     now: () => new Date(NOW).toISOString(),
     tz: 'UTC',
@@ -787,6 +814,79 @@ test('A TRANSACTION A PERSON VOIDED STAYS VOID, because Mercury never sends one 
   assert.deepEqual(writesOf(a), [{ op: 'update', spoken: `transactions#${voided.seq}`, patch: { amount: { amount: 124_075, currency: 'USD' } }, version: 3 }]);
 });
 
+/** The Halden payment as the script writes it on a record that holds no row for it. */
+const haldenOn = (account: string): Record<string, Json> => ({
+  what: 'Halden Studio',
+  on: '2026-09-20',
+  direction: 'in',
+  amount: { amount: 500_000, currency: 'USD' },
+  account,
+  state: 'pending',
+  mercury_id: 'txn_2',
+});
+
+test('A TRANSACTION WHOSE ROW A PERSON DELETED IS NOT WRITTEN AGAIN, because the ledger is read with its deleted rows as well', async () => {
+  /* THE BREAK OF M6: he deleted the Fenwick row, and the next hour wrote it back, because the list read live rows
+     only. The ledger is asked again, deleted rows included, about the transactions it holds no live row for. */
+  const ops = rowOf('accounts', { name: OPS.name, kind: 'bank' });
+  const deleted: Row = {
+    ...rowOf('transactions', { what: 'Fenwick Cloud', on: '2026-09-19', direction: 'out', amount: { amount: 124_075, currency: 'USD' }, account: ops.id, state: 'cleared', mercury_id: 'txn_1' }),
+    deleted_at: '2026-09-19T20:00:00.000Z',
+  };
+  const h = mercuryHost({ accounts: [ops], transactions: [deleted], categories: [], txns: [OPS_TXNS[0], OPS_TXNS[1]] });
+  const a = await runInQuickJs(ledgerDecl(), h);
+  assert.deepEqual(writesOf(a), [{ op: 'create', register: 'transactions', fields: haldenOn(ops.id) }]);
+  assert.match(a.log, /1 Mercury transaction whose row a person deleted was left out, as deleted/);
+  assert.deepEqual(
+    h.lists.filter(([, , options]) => options !== null),
+    [['transactions', { field: 'mercury_id', in: ['txn_1', 'txn_2'] }, { includeDeleted: true }]],
+  );
+});
+
+test('A ROW TYPED IN BY HAND BEFORE THE PACK IS TAKEN, NOT WRITTEN AGAIN: what the person set is kept, and the day moves to the bank’s', async () => {
+  const ops = rowOf('accounts', { name: OPS.name, kind: 'bank' });
+  const money = { amount: 124_075, currency: 'USD' };
+  /* TYPED THE DAY BEFORE IT POSTED, under a category and a description of the person's own, with no Mercury
+     transaction. */
+  const typed = rowOf('transactions', { what: 'Cloud hosting, September', on: '2026-09-18', direction: 'out', amount: money, account: ops.id, state: 'cleared', category: 'cat_hosting' }, 2);
+  /* AND THREE ROWS THAT ARE NOT THE SAME MONEY: the same amount coming in, the same amount three days before, and the
+     same payment voided by the person, which voiding took out of the figures. */
+  const refund = rowOf('transactions', { what: 'Refund', on: '2026-09-19', direction: 'in', amount: money, account: ops.id, state: 'cleared' });
+  const early = rowOf('transactions', { what: 'Hosting', on: '2026-09-16', direction: 'out', amount: money, account: ops.id, state: 'cleared' });
+  const voided = rowOf('transactions', { what: 'Fenwick', on: '2026-09-19', direction: 'out', amount: money, account: ops.id, state: 'void' });
+  const a = await runInQuickJs(ledgerDecl(), mercuryHost({ accounts: [ops], transactions: [typed, refund, early, voided], categories: [], txns: [OPS_TXNS[0]] }));
+  assert.deepEqual(writesOf(a), [{ op: 'update', spoken: `transactions#${typed.seq}`, patch: { on: '2026-09-19', mercury_id: 'txn_1' }, version: 2 }]);
+  assert.match(a.log, /1 row typed in by hand was the same money as a Mercury transaction/);
+});
+
+test('TWO ROWS THAT COULD BE THE SAME MONEY ARE NOT GUESSED BETWEEN: the transaction is written as its own row, and the log names its day and amount', async () => {
+  const ops = rowOf('accounts', { name: OPS.name, kind: 'bank' });
+  const money = { amount: 124_075, currency: 'USD' };
+  const one = rowOf('transactions', { what: 'Fenwick', on: '2026-09-19', direction: 'out', amount: money, account: ops.id, state: 'cleared' });
+  const two = rowOf('transactions', { what: 'Fenwick Cloud', on: '2026-09-20', direction: 'out', amount: money, account: ops.id, state: 'pending' });
+  const a = await runInQuickJs(ledgerDecl(), mercuryHost({ accounts: [ops], transactions: [one, two], categories: [], txns: [OPS_TXNS[0]] }));
+  assert.deepEqual(writesOf(a), [
+    { op: 'create', register: 'transactions', fields: { what: 'Fenwick Cloud', on: '2026-09-19', direction: 'out', amount: money, account: ops.id, state: 'cleared', mercury_id: 'txn_1' } },
+  ]);
+  assert.match(a.log, /2 rows typed in by hand could be Mercury's 1,240\.75 USD out on 2026-09-19, so none was taken/);
+});
+
+test('ONE ROW TYPED BY HAND IS TAKEN ONCE: two Mercury transactions of the same money on one day take it and write one', async () => {
+  /* TWO COFFEES OF 60.00 ON THE 19TH, and one typed in. The first takes it; the second finds it taken, since the
+     update is queued and the ledger still answers it as a row with no Mercury transaction, and is written. */
+  const ops = rowOf('accounts', { name: OPS.name, kind: 'bank' });
+  const typed = rowOf('transactions', { what: 'Coffee', on: '2026-09-19', direction: 'out', amount: { amount: 6_000, currency: 'USD' }, account: ops.id, state: 'cleared' }, 1);
+  const txns = [
+    txn('txn_a', -60, 'sent', 'Coffee Stall', '2026-09-19T08:00:00Z', '2026-09-19T09:00:00Z'),
+    txn('txn_b', -60, 'sent', 'Coffee Stall', '2026-09-19T14:00:00Z', '2026-09-19T15:00:00Z'),
+  ];
+  const a = await runInQuickJs(ledgerDecl(), mercuryHost({ accounts: [ops], transactions: [typed], categories: [], txns }));
+  assert.deepEqual(writesOf(a), [
+    { op: 'update', spoken: `transactions#${typed.seq}`, patch: { mercury_id: 'txn_a' }, version: 1 },
+    { op: 'create', register: 'transactions', fields: { what: 'Coffee Stall', on: '2026-09-19', direction: 'out', amount: { amount: 6_000, currency: 'USD' }, account: ops.id, state: 'cleared', mercury_id: 'txn_b' } },
+  ]);
+});
+
 test('A KEY MERCURY REFUSES STOPS THE RUN WITH A SENTENCE AND WRITES NOTHING', async () => {
   const a = await runInQuickJs(ledgerDecl(), mercuryHost({ accounts: [], transactions: [], categories: [], status: 401 }));
   assert.ok('refused' in a, JSON.stringify(a));
@@ -839,7 +939,11 @@ test('THE WHOLE PATH ON A SELF-HOST: installed from the file, run on the hour, a
 
     /* THE ACCOUNT, AS THE BALANCES PULL WRITES IT, and the pull itself held off so that this hour runs the ledger and
        nothing else. The pull's own rows are the tests above. */
-    said(await api.create({ register: 'accounts', fields: { name: OPS.name, kind: 'bank', balance: { amount: 1_842_050, currency: 'USD' }, as_of: '2026-09-20', liquid: true } }, owner));
+    const opsRow = said<{ id: string }>(await api.create({ register: 'accounts', fields: { name: OPS.name, kind: 'bank', balance: { amount: 1_842_050, currency: 'USD' }, as_of: '2026-09-20', liquid: true } }, owner));
+    /* THE HALDEN PAYMENT, TYPED IN BY HAND BEFORE THE PACK, a day after Mercury dates it and under the person's own
+       words. The first hour takes it rather than writing Mercury's copy beside it, which is the record's own `list`
+       answering the question `twinsOf` in `ledger.js` asks. */
+    said(await api.create({ register: 'transactions', fields: { what: 'Halden, September invoice', on: '2026-09-21', direction: 'in', amount: { amount: 500_000, currency: 'USD' }, account: opsRow.id, state: 'pending' } }, owner));
     said(await api.create({ register: 'categories', fields: { name: 'Software', direction: 'out' } }, owner));
     const hosting = said<{ id: string }>(await api.create({ register: 'categories', fields: { name: 'Hosting', direction: 'out' } }, owner));
     running.sql.exec("UPDATE schedule SET due_at = '2099-01-01T00:00:00.000Z' WHERE kind = 'pull'");
@@ -855,6 +959,7 @@ test('THE WHOLE PATH ON A SELF-HOST: installed from the file, run on the hour, a
     );
     const outcome = JSON.parse(event?.to_v ?? '{}') as { outcome?: string; log?: string };
     assert.equal(outcome.outcome, 'ok', `${event?.note ?? 'no run event'} ${outcome.log ?? ''}`);
+    assert.match(outcome.log ?? '', /1 row typed in by hand was the same money as a Mercury transaction/);
     assert.ok(sent.length > 0 && sent.every((r) => r.auth === 'Bearer KEY-OF-mercury'), JSON.stringify(sent));
 
     type Txn = { seq: number; what: string; direction: string; amount: number; state: string; mercury_id: string; category: string | null };
@@ -872,7 +977,8 @@ test('THE WHOLE PATH ON A SELF-HOST: installed from the file, run on the hour, a
       first.map(({ seq: _seq, ...r }) => r),
       [
         { what: 'Fenwick Cloud', direction: 'out', amount: 124_075, state: 'cleared', mercury_id: 'txn_1', category: software },
-        { what: 'Halden Studio', direction: 'in', amount: 500_000, state: 'pending', mercury_id: 'txn_2', category: null },
+        /* THE ROW HE TYPED, CARRYING MERCURY'S TRANSACTION, with his words kept: two rows and not three. */
+        { what: 'Halden, September invoice', direction: 'in', amount: 500_000, state: 'pending', mercury_id: 'txn_2', category: null },
       ],
     );
 
@@ -888,6 +994,17 @@ test('THE WHOLE PATH ON A SELF-HOST: installed from the file, run on the hour, a
         ['txn_2', 'cleared', null],
       ],
     );
+
+    /* HE DELETES THE FENWICK ROW, AND THE NEXT HOUR LEAVES IT DELETED. Before 1.2.0 it was back an hour later, because
+       the ledger was read live rows only (`loop/finish/defects.md` M6); the record's own deleted rows are what say
+       otherwise now. `deleted_at: true`, because the record stamps the time with its own clock. */
+    said(await api.update({ register: 'transactions', seq: first[0]!.seq, patch: { deleted_at: true } }, owner));
+    await hour();
+    assert.deepEqual(
+      ledgerRows().map((r) => r.mercury_id),
+      ['txn_2'],
+    );
+    assert.equal(running.sql.one<{ n: number }>("SELECT count(*) AS n FROM entry WHERE register = 'transactions' AND json_extract(fields, '$.mercury_id') = 'txn_1'")?.n, 1);
   } finally {
     await running.close();
     rmSync(dir, { recursive: true, force: true });

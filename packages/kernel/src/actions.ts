@@ -223,7 +223,7 @@ export type GrantChoosable = { id: string; label: string; revoked_at: string | n
  *
  * ONE ORDER, WRITTEN ONCE, BECAUSE FOUR COPIES OF IT HAD ALREADY LET A FIFTH GO WRONG. The vault admits two live grants
  * under one label, and at `afb3b1b2` the newest-first clause was spelled out in `keyNamed` and `opensNamed` here, in
- * `grantNamed` (`@braindog/host/script`) and in `slashGrantOf` (`@braindog/host/slash`). The audit of wave forty-nine
+ * `grantNamed` (`@braindog/host/script`) and in `slashOwnKeyFor` (`@braindog/host/slash`). The audit of wave forty-nine
  * found Slash's own path taking `grants().find(...)`, which is `listGrants` order and so the OLDEST key, while every action
  * named `slash` sent the newest. The four that agreed agreed because each author copied the same words; measured on
  * 23 September, no state `test/grant-chooser.test.ts` or `packages/host/test/grant-named.test.ts` builds made two of them

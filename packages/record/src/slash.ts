@@ -5,7 +5,7 @@
  * quarter, and what agents write. From that it says what it noticed, in plain sentences, and drafts at most a few
  * proposals in the kinds an agent already files (`pack`, `settings`, `arrange`, and a `rowset` for a skill a use case names),
  * each with its reason as the question. The words it may change are only those the speaking use case declares (S8). A
- * model may also draft a `change` that builds a register, an ingest, a rule, a metric or a page (`fromModel`, Brief D), and
+ * model may also draft a `change` that builds a register, an ingest, a rule, a metric, a page or a script (`fromModel`, Brief D), and
  * when the owner describes what they want (`asked`), that description is what it drafts from.
  *
  * IT RECOMMENDS AND NEVER REARRANGES (§5c, `docs/29` §1). Nothing here writes a row, a pack or a setting. A draft becomes a
@@ -24,6 +24,7 @@
 import type { FigureTest, Grows } from './arrange.ts';
 import type { Refusal, Result, Sql } from '@braindog/ports';
 import type { Json, Kernel } from '@braindog/kernel';
+import { coerce } from '@braindog/kernel';
 import { labelSetting, voiceSetting } from '@braindog/declare';
 
 const DAY_MS = 86_400_000;
@@ -834,10 +835,18 @@ const QUESTION_MAX = 280;
  * The old reason for leaving it out, that nothing Slash reads says what a figure should be, stopped holding once the owner
  * can describe the page they want: the description says it.
  *
+ * A SCRIPT JOINED IN THE SECOND FINISH WORKFLOW (`loop/finish/agents.md` S12 and AGT-27, `loop/finish/contracts.md` X42).
+ * "Fetch the price hourly into Rates" is a script: a clock, the origin it fetches from, and the list it writes. With
+ * `script` left out, Slash dropped that answer as a change to a script, so the brief's own example could not be drafted
+ * at all. Its every reach beyond the record is in its header, `egress` and `keys` (`scriptBody` in `kernel/src/script.ts`),
+ * which the kernel refuses when computed and prints as the outside calls line Decide draws (`egressOf`), so where it
+ * sends is never the model's to leave unsaid. Filing it runs nothing: a clock is armed only when the owner accepts, and
+ * a trial is `scriptTry`, which nothing here calls.
+ *
  * A theme, a digest or a block is still left to a person or an agent, because nothing Slash reads or hears says what one
  * should look like, and `kernel.propose` reviews a metric exactly as it reviews the page beside it.
  */
-const BUILDS: ReadonlySet<string> = new Set(['register', 'ingest', 'rule', 'metric', 'page']);
+const BUILDS: ReadonlySet<string> = new Set(['register', 'ingest', 'rule', 'metric', 'page', 'script']);
 
 /** "a register", "an ingest": the article a kind takes when a dropped line names it. */
 const aKind = (kind: string): string => `${/^[aeiou]/u.test(kind) ? 'an' : 'a'} ${kind}`;
@@ -848,8 +857,13 @@ const aKind = (kind: string): string => `${/^[aeiou]/u.test(kind) ? 'an' : 'a'} 
  * collector.evil.example sending payroll's names and salaries, under the question "Build the launch desk you described?".
  * `SLASH_INSTRUCTIONS` told the model to answer only lists, figures, pages and rules here, and nothing in the record held
  * it to that. An ingest is a door to the outside, and one is opened on its own ask, where the question is about the door.
+ *
+ * A SCRIPT IS LET THROUGH, HELD TO WHAT `describedScript` ALLOWS (`loop/finish/contracts.md` X42). An owner asking for
+ * something fetched is asking for exactly the call a script makes, its origins and keys are written in its header where
+ * the kernel checks them, and the record says them in the question in its own words (`scriptSays`). What stays out is
+ * what finding 14 used: rows handed to code that fetches.
  */
-const DESCRIBED_BUILDS: ReadonlySet<string> = new Set(['register', 'rule', 'metric', 'page']);
+const DESCRIBED_BUILDS: ReadonlySet<string> = new Set(['register', 'rule', 'metric', 'page', 'script']);
 
 /**
  * The verbs by which a rule reaches beyond the record, and what each would do, in a dropped line. `run` starts an ingest or
@@ -881,7 +895,82 @@ function reachesOut(value: unknown, depth = 0): string | null {
 }
 
 /** How the owner calls each kind a description builds, in the line the record writes about what exists. */
-const OWNERS_WORD: Readonly<Record<string, string>> = { register: 'list', metric: 'figure', page: 'page', rule: 'rule' };
+const OWNERS_WORD: Readonly<Record<string, string>> = { register: 'list', metric: 'figure', page: 'page', rule: 'rule', script: 'script' };
+
+/** The strings of a header's list, such as a script's `egress` or `writes`, and nothing else in it. */
+const strings = (value: unknown): string[] => (Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : []);
+
+/**
+ * Whether any string in a change body and the declarations it carries, or any key of one of its objects, looks like a key.
+ *
+ * A KEY IS NAMED BY ITS LABEL AND NEVER WRITTEN OUT. A script's `keys` are vault labels the host opens for one request, and
+ * `scriptBody` checks only their length, so a model that wrote a provider's key into `source`, into a fetch's headers or
+ * in place of a label would have filed it into the proposal's body, where Decide draws it and the record keeps it. Every
+ * kind is read and not only a script, because an ingest's address and a page's note are text a model writes as freely.
+ *
+ * THE KERNEL'S OWN WALK, READ THROUGH `coerce` AS A `json` VALUE, because that arm refuses exactly a value holding a key
+ * and nothing else. A second walk here would be a second answer to one question, and the kernel's keeps its own stack,
+ * so a body nested deeper than a recursion reaches is read to the bottom rather than throwing `RangeError` out of Slash.
+ */
+const holdsKey = (value: unknown): boolean => !coerce({ id: 'change', type: 'json' }, value).ok;
+
+/**
+ * Why a script drafted from a description is dropped, or `null` when it may be filed.
+ *
+ * ON ITS CLOCK ONLY. `runs.door` hands it each arrival at a door and `runs.rule` lets a rule hand it a row, and a row handed
+ * to code that fetches beyond the record is finding 14's shape, where a rule sent each new row of a list to a collector.
+ * Either is asked for on its own, as an ingest is.
+ *
+ * AND IT READS NO LIST, WHEN IT FETCHES. `reads` are the lists `ctx.record` may read while it runs, and read by code that
+ * also fetches they are rows that can leave in the next request. The list it writes is no exception: writing grants no
+ * read (`registers` is `reads` alone in `@braindog/host`'s `script.ts`), and the list a model names to write can be one
+ * the owner already keeps, so a script reading Payroll, writing Payroll and fetching from a collector would have been
+ * filed as "reads only what it writes". Fetching a figure into a list needs no read at all.
+ */
+function describedScript(d: { id?: unknown; body?: unknown }, n: number): string | null {
+  const body = (d.body ?? {}) as { runs?: unknown; reads?: unknown; egress?: unknown };
+  const id = String(d.id ?? 'a script').slice(0, 80);
+  const runs = body.runs;
+  const starts = runs !== null && typeof runs === 'object' && !Array.isArray(runs) ? Object.keys(runs) : [];
+  if (starts.some((k) => k !== 'every'))
+    return `Proposal ${n} has ${id}, which a door or a rule would start, and from a description Slash builds a script that runs only on its clock. Ask for it on its own.`;
+  const read = strings(body.reads)[0];
+  if (read !== undefined && strings(body.egress).length > 0)
+    return `Proposal ${n} has ${id}, which would read your list "${read.slice(0, 40)}" and fetch beyond the record, and Slash never sends a list out from a description. Ask for it on its own.`;
+  return null;
+}
+
+/**
+ * What a script would do on its own once accepted, in the record's words, added to the question Decide draws.
+ *
+ * THE MODEL'S QUESTION NAMES ONLY WHAT IT CHOOSES TO. Finding 14's was "Build the launch desk you described?" over a change
+ * that called a collector, so which lists a script reads, where it fetches from, which keys go with it and which lists it
+ * writes are said here from its own header, on every path, beside the kernel's line under "Calls out" (`egressOf`). Every
+ * start the header names is said, because a script with a clock and a door runs on both. The header is the model's, so
+ * each name is cut to a length; a header the kernel then refuses is never filed, and neither is this line.
+ */
+function scriptSays(d: { id?: unknown; body?: unknown }): string {
+  const body = (d.body ?? {}) as { runs?: unknown; egress?: unknown; keys?: unknown; reads?: unknown; writes?: unknown };
+  const id = String(d.id ?? '');
+  const bare = id.slice(id.indexOf('.') + 1).slice(0, 40);
+  const hosts = strings(body.egress).map((o) => o.replace(/^https:\/\//iu, '').slice(0, 80));
+  const reads = strings(body.reads).map((r) => `"${r.slice(0, 40)}"`);
+  const writes = strings(body.writes).map((w) => `"${w.slice(0, 40)}"`);
+  const keys = strings(body.keys).map((k) => `"${k.slice(0, 40)}"`);
+  const runs = (body.runs !== null && typeof body.runs === 'object' ? body.runs : {}) as { every?: unknown; door?: unknown; rule?: unknown };
+  const when = [
+    ...(typeof runs.every === 'string' ? [`every ${runs.every.slice(0, 16)}`] : []),
+    ...(typeof runs.door === 'string' ? [`on each arrival at the door "${runs.door.slice(0, 40)}"`] : []),
+    ...(runs.rule === true ? ['whenever a rule starts it'] : []),
+  ];
+  const does = [
+    ...(reads.length > 0 ? [`read your ${reads.length === 1 ? 'list' : 'lists'} ${joinNames(reads)}`] : []),
+    ...(hosts.length > 0 ? [`fetch from ${joinNames(hosts)}`] : []),
+    ...(writes.length > 0 ? [`write to your ${writes.length === 1 ? 'list' : 'lists'} ${joinNames(writes)}`] : []),
+  ];
+  const sent = keys.length > 0 ? `, sending your ${keys.length === 1 ? 'key' : 'keys'} ${joinNames(keys)} with each request` : '';
+  return `Accepting it lets the script "${bare}" ${does.length > 0 ? joinNames(does) : 'run'} ${joinNames(when)} on its own${sent}.`;
+}
 
 /**
  * A model's `change` body as the kernel takes it, or why it is dropped. `to` is one declaration or `{ declarations }` of
@@ -897,6 +986,8 @@ const OWNERS_WORD: Readonly<Record<string, string>> = { register: 'list', metric
  * record, and `says` is what the record itself adds to the question about what already exists: the declarations it would
  * replace, and the existing list a rule would change rows of. The same finding filed `page.home` at version 1, swapped to
  * read Payroll, and Decide drew it as a new page; the question was the model's own words and named nothing it replaced.
+ * A script adds its own line on every path, described or not (`scriptSays`), and no change body a model drafts is filed
+ * with a key written out in it (`holdsKey`).
  */
 function changeBody(
   body: Record<string, unknown>,
@@ -911,7 +1002,15 @@ function changeBody(
   if (listed.length === 0) return { ok: false, why: `Proposal ${n} was a change with no declaration in it.` };
   const stray = listed.find((d) => typeof d?.kind !== 'string' || !BUILDS.has(d.kind));
   if (stray !== undefined)
-    return { ok: false, why: `Proposal ${n} was a change to ${aKind(String(stray?.kind ?? 'unnamed kind')).slice(0, 40)}, and Slash changes only a register, an ingest, a rule, a metric or a page.` };
+    return { ok: false, why: `Proposal ${n} was a change to ${aKind(String(stray?.kind ?? 'unnamed kind')).slice(0, 40)}, and Slash changes only a register, an ingest, a rule, a metric, a page or a script.` };
+  /* THE WHOLE BODY AND NOT ONLY ITS DECLARATIONS, because every key a model writes beside `to` is filed with it (the
+     kernel drops only `egress`, `approve` and `from_version`). THE SENTENCE NAMES NO DECLARATION, because the id is the
+     model's too, and an id that is the key would be the key said back on the Slash page. */
+  if (holdsKey(body))
+    return {
+      ok: false,
+      why: `Proposal ${n} holds something shaped like a key. A key stays in the vault and a change names it by its label, so Slash files none written out.`,
+    };
   const says: string[] = [];
   if (described) {
     const door = listed.find((d) => !DESCRIBED_BUILDS.has(String(d.kind)));
@@ -924,6 +1023,8 @@ function changeBody(
           ok: false,
           why: `Proposal ${n} has ${String(d.id ?? 'a rule').slice(0, 80)}, which would ${REACHES_OUT[verb]}, and Slash never opens a door to the outside from a description. Ask for it on its own.`,
         };
+      const held = d.kind === 'script' ? describedScript(d, n) : null;
+      if (held !== null) return { ok: false, why: held };
     }
     if (drawn !== undefined) {
       const bare = (id: unknown): string => String(id ?? '').slice(String(id ?? '').indexOf('.') + 1);
@@ -936,6 +1037,7 @@ function changeBody(
       }
     }
   }
+  for (const d of listed) if (d.kind === 'script') says.push(scriptSays(d));
   const named = typeof body.declaration_id === 'string' ? body.declaration_id : String(listed[0]?.id ?? '');
   /* THE VERSION EACH DECLARATION WAS DRAWN FROM IS THE READING'S, AND WHATEVER THE MODEL WROTE IS REPLACED. The reading a
      model is handed names no version, so a number it writes is a guess, and the likeliest guess is the version live when
@@ -1020,7 +1122,7 @@ function modelDraft(x: unknown, n: number, name: string, drawn: ((id: string) =>
     return { why: `Proposal ${n} was a ${String(d.body_kind)} proposal, and Slash files only pack, settings, arrange and change.` };
   if (d.body === null || typeof d.body !== 'object' || Array.isArray(d.body)) return { why: `Proposal ${n} had no body.` };
   if (described && d.body_kind !== 'change')
-    return { why: `Proposal ${n} was a ${d.body_kind} proposal, and from a description Slash files only a change that builds a list, a figure, a page or a rule.` };
+    return { why: `Proposal ${n} was a ${d.body_kind} proposal, and from a description Slash files only a change that builds a list, a figure, a page, a rule or a script.` };
   let body = d.body as Record<string, unknown>;
   let question = d.question.trim();
   if (d.body_kind === 'change') {

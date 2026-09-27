@@ -4503,7 +4503,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const extra = stray((args ?? {}) as Record<string, unknown>, ['usecase', 'said']);
       if (extra) return { ok: false as const, refusal: extra };
       if (typeof args?.usecase !== 'string' || args.usecase === '') return no('REQUIRED_MISSING', 'usecase is the use case the plan is for, such as guide.', { at: 'usecase' });
-      if (typeof args.said !== 'string' || args.said.trim() === '' || args.said.length > FORM_SAID_MOST)
+      if (typeof args.said !== 'string' || args.said.trim() === '' || [...args.said.trim()].length > FORM_SAID_MOST)
         return no('VALUE_MALFORMED', `said is what the person said the project is, a sentence of at most ${FORM_SAID_MOST} characters.`, { at: 'said' });
       const id = args.usecase.startsWith('usecase-') ? args.usecase : `usecase-${args.usecase}`;
       const spec = (deps.catalogue ?? []).find((e) => e.id === id)?.forms;

@@ -44,19 +44,30 @@ const names = (rows: { fields: Record<string, unknown> }[], field = 'name') => r
 /* ── it installs ─────────────────────────────────────────────────────────── */
 
 test('THE PACK IS A LEGAL PACK, with the manifest the plan gives it', async () => {
-  assert.deepEqual(AGENTS_PACK.manifest, { id: 'agents', version: '1.2.0', requires: ['register.things'] });
+  assert.deepEqual(AGENTS_PACK.manifest, { id: 'agents', version: '1.3.0', requires: ['register.things'] });
   const pack = value<Pack>(await normalise(agentsPackDocument()));
   assert.equal(pack.manifest.pack, 'agents');
-  assert.equal(pack.manifest.version, '1.2.0');
+  assert.equal(pack.manifest.version, '1.3.0');
   assert.deepEqual([...pack.manifest.provides].sort(), PROVIDES);
 });
 
-const PROVIDES = ['page.agents', 'page.skill', 'register.credentials', 'register.learnings', 'register.skills', 'register.tools'];
+const PROVIDES = [
+  'metric.keys-by-week',
+  'metric.learnings-by-week',
+  'metric.learnings-faded',
+  'metric.tools-by-week',
+  'page.agents',
+  'page.skill',
+  'register.credentials',
+  'register.learnings',
+  'register.skills',
+  'register.tools',
+];
 
 test('THE SEED INSTALLS IT THROUGH THE PACK PATH, and the record says so', async () => {
   const { k, sql } = await seeded();
   /* It asks for a list (`register.things`), not a pack, so the `pack` row's `requires` names no pack. */
-  assert.deepEqual({ ...k.packs().find((p) => p.id === 'agents') }, { id: 'agents', version: '1.2.0', requires: {} });
+  assert.deepEqual({ ...k.packs().find((p) => p.id === 'agents') }, { id: 'agents', version: '1.3.0', requires: {} });
   assert.deepEqual([...k.packClaims('agents')].sort(), PROVIDES);
   for (const id of Object.keys(AGENTS_REGISTERS)) assert.equal(k.count(id), ROWS[id]?.length, `${id} lost rows`);
   assert.equal(k.get('LN7')?.fields.supersedes, k.get('LN6')?.id, 'a learning names the one it replaces by its row');
@@ -208,9 +219,10 @@ test('/p/agents: the runs working now, the newest seen first, then what was lear
   assert.ok(left.length > 0, 'the seed has no run that left a next step');
   assert.deepEqual(headed(blocks, 'Where they left off').rows.map((r) => r.fields.next), left.map((r) => r.next), 'a run that left no next step is listed, or a working one is');
 
-  assert.ok(headed(blocks, 'Tools and servers').rows.length > 0 && !headed(blocks, 'Tools and servers').rows.some((r) => r.fields.state !== 'active'));
-  const keys = headed(blocks, 'Keys');
-  assert.ok(keys.rows.length > 0 && !keys.rows.some((r) => r.fields.state === 'retired'), 'a retired key is listed');
+  assert.ok(blocks.some((b) => b.kind === 'agents'), 'the page lost what the brain learned');
+  const growth = headed(blocks, 'Growth') as Drawn & { bars?: { states: string[]; values: unknown[][] } };
+  assert.equal(growth.bars?.values.length, 3, 'the growth chart lost a line');
+  assert.equal(growth.bars?.states.at(-1), 'partial', 'this week is not marked unfinished');
 
   const learnings = headed(blocks, 'Learnings');
   assert.equal(learnings.matched, ROWS.learnings!.filter((r) => (r.state ?? 'active') === 'active').length, 'a superseded learning is counted');

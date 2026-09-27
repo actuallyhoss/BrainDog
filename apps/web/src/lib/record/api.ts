@@ -1366,6 +1366,8 @@ export type Walk = {
   crossed: WalkStep | null;
   /** On a walk drawn once per currency: the opening figure remembered in this walk's currency, oldest first. */
   past?: readonly { at: string; value: number }[] | undefined;
+  /** How many days the record walked, `last` resolved to the walk's last dated movement. */
+  horizon?: number | undefined;
 };
 
 /** Where a step's row opens: this build's `href`, or the record's `register#seq` as that row's address. */

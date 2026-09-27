@@ -1,23 +1,39 @@
 <!--
-  Settings > Agents: approving a machine, the machines and keys that can act on this record,
-  connecting a new agent, and what Slash may do on its own.
+  Settings > Agents: connecting an agent three ways, approving a machine, everything that is connected, and what Slash
+  may do on its own (`loop/finish/agents.md` AGT-8).
+
+  THREE WAYS IN, EACH A CARD. Any MCP client takes the record's address and signs in through OAuth, which the owner
+  allows on `/connect`; Claude Code with its hooks and skills is one install line and one `braindog setup`, which
+  shows six digits to approve here; a script or a server is given a key, shown once, with the header it is sent in.
+
+  THE SIX DIGITS LEAD WHILE A MACHINE IS WAITING. A person arriving from a terminal is holding a code and looking for
+  the box, so while a machine waits the field is the first thing on the screen; otherwise it is the setup card's last
+  step, which is where the code turns up.
+
+  ONE LIST OF WHAT IS CONNECTED. A machine, a key and an app are three ways of letting something act on the record,
+  and `connected` in `record/device.ts` folds them into rows that each say what it is, what it can do, when it last
+  worked and which run last used it, with Revoke.
+
+  ALL OF IT IS THE OWNER'S. Approving, minting, revoking and listing what can act on the record are ADMIN methods, so a
+  colleague is told who can do it rather than shown controls the record refuses them.
 -->
 <script lang="ts">
-  import { apiBase } from '$lib/at.ts';
+  import { apiBase, at } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
   import * as clipboard from '$lib/clipboard.ts';
+  import { read, type Result } from '$lib/data/read.svelte.ts';
+  import { INSTALL_LINES, OSES, osOf, type Os } from '$lib/device.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  /* THE DECLARATION CACHE, WHICH ONLY THE RECORD FILLS (`held.ts`). */
-  import { REGISTERS } from '$lib/record/held.ts';
   import {
-    CODE_DIGITS, LABEL_MAX, TOKEN_DAYS, connectLines, reachKey, revocable,
-    reportKeyOf, standing, type Answer, type DeviceRow, type TokenRow,
+    CODE_DIGITS, LABEL_MAX, RUNS_READ, TOKEN_DAYS, connectLines, connected, headerLine, nameOf, reachOf, runName, runsOf,
+    standing, waiting, type Answer, type Connection, type DeviceRow, type Run, type TokenRow,
   } from '$lib/record/device.ts';
   /* THE APPROVAL `/vault` SENDS TOO, from one module, so the two screens cannot drift apart. */
   import { answerLine as lineOf, approve, planOf, reprove, revoke, words as vaultWords, type Plan } from '$lib/record/vault.ts';
   import { callsOutOf, type CallOut } from '$lib/record/actions.ts';
   import { mintAgent, wrote } from '$lib/record/settings-write.ts';
   import { hostedHere } from '../../billing.ts';
+  import { words as levelWords } from '../../levels.ts';
   import CallsOut from '$lib/ui/CallsOut.svelte';
   import { AGENTS_PACK, agentsPackDocument } from '@braindog/seed/packs';
   /* Imported here and nowhere in the layout, so the client stays out of the entry chunk. */
@@ -33,6 +49,7 @@
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import Empty from '$lib/ui/Empty.svelte';
+  import ReadState from '$lib/ui/ReadState.svelte';
   import { bareOrigin, settingsState, type AreaProps } from '../settings-state.svelte.ts';
 
   let { shell }: AreaProps = $props();
@@ -42,20 +59,40 @@
   const anOwner = $derived(s.anOwner);
   const SLUG = $derived(shell.index.slug);
 
+  let client: ReturnType<typeof createClient> | null = null;
+  const clientOf = (): ReturnType<typeof createClient> => (client ??= createClient({ base: apiBase() }));
+
+  /** What the record answered: its machines, its standing keys, and the newest runs, which name who used each. */
+  type Held = { machines: DeviceRow[]; tokens: TokenRow[]; runs: Run[] };
+
   /**
-   * WHERE THIS AREA'S ROWS CAME FROM. `refused` is a host that answered no, and its sentence is shown.
-   *
-   * THERE WAS A `sample` STATE, for a host with no record behind it, which drew machines and tokens
-   * out of `data.ts` that nobody had connected and dated them by the sample's `NOW`. With no sample
-   * (DIRECTION 26) a signed-out or unreached host is a refusal like any other, in the client's words.
+   * THE MACHINES DECIDE WHETHER THE LIST WAS READ; the keys and the runs only add to it. A record that answers the
+   * machines and not the keys still has a list worth drawing, and a run that cannot be read only leaves "last run"
+   * off a row. There was a `sample` state here, which drew machines nobody connected; with no sample (DIRECTION 26) a
+   * refusal is the record's sentence like any other.
    */
-  let agentsFrom = $state<'reading' | 'live' | 'refused'>('reading');
-  let agentsRefusal = $state('');
-  let machines = $state<DeviceRow[]>([]);
-  let tokens = $state<TokenRow[]>([]);
-  let agentClient: ReturnType<typeof createClient> | null = null;
-  /* WHAT A PRESS SAYS WHEN THERE IS NO RECORD TO SEND IT TO: the host's refusal, or, before one arrives, that it was not reached. */
-  const agentsCannot = () => agentsRefusal || copy.recordNotReached;
+  async function listed(): Promise<Result<Held>> {
+    const c = clientOf();
+    const devices = await c.listDevices();
+    if (!devices.ok) return devices;
+    const keys = await c.listTokens();
+    const runs = await c.list({ register: 'session', limit: RUNS_READ, order: [{ field: 'last_seen', dir: 'desc' }] });
+    return {
+      ok: true,
+      value: {
+        machines: devices.value,
+        tokens: keys.ok ? standing(keys.value as TokenRow[]) : [],
+        runs: runs.ok ? runsOf(runs.value.rows) : [],
+      },
+    };
+  }
+
+  /* ASKED ONLY OF AN OWNER, because every one of these reads is an owner's: a colleague asking would be told no, and
+     that no would mark the whole screen refused for a question it had no reason to ask. */
+  const held = read(() => (anOwner ? `agents:${apiBase()}` : null), listed);
+  const rows = $derived(held.value ? connected(held.value.machines, held.value.tokens, held.value.runs) : []);
+  const machines = $derived(held.value?.machines ?? []);
+  const first = $derived(waiting(machines, Date.now()).length > 0);
 
   let typed = $state('');
   let approving = $state(false);
@@ -63,11 +100,19 @@
   /* THE BEARER LIVES HERE AND NOWHERE ELSE, and only until Done or leaving the area, which unmounts this component. */
   let minted = $state<{ label: string; bearer: string } | null>(null);
   let mintLabel = $state('');
-  /* OFF UNTIL THE OWNER TURNS IT ON, and off again for the next agent: reading the inbox is chosen per token. */
+  /* OFF UNTIL THE OWNER TURNS IT ON, and off again for the next key: reading the inbox is chosen per key. */
   let mintInbox = $state(false);
   let minting = $state(false);
   let mintRefusal = $state('');
-  let origin = $state('');
+  /* ONE REVOKE AT A TIME, so a double press sends one. */
+  let revoking = $state<string | null>(null);
+
+  /* THE LINES CARRY THE BARE HOST, which only `settings-state.svelte.ts` reads (`lib/at-sites.test.ts`). */
+  const origin = bareOrigin();
+  /* THE SETUP LINE NAMES THIS RECORD, which the Cloud device flow needs; a shell with no record names none. */
+  const lines = $derived(connectLines(origin, shell.live ? SLUG : null));
+  /* THE INSTALLER FOR THE COMPUTER THIS BROWSER IS ON, and one press away from the other one. */
+  let os = $state<Os>(osOf(globalThis.navigator));
 
   /** A mark for the states that need one; `13 §5.1`, so the glyph and the tone come from one map. */
   const DEVICE_TONE: Record<string, 'good' | 'warn' | 'bad' | undefined> = {
@@ -77,29 +122,24 @@
     denied: 'bad',
   };
 
-  /* READ ON ARRIVING AT THE AREA. Leaving it takes the bearer and the offer with the component, which
-     is what the page's old `area !== 'agents'` arm did by hand. `untrack` for the reason the Ingest
-     area gives. */
-  $effect(() => {
-    untrack(() => void readAgents());
-  });
+  /* A grant that has not finished working carries its state's mark; a key or a machine nobody has used carries one too,
+     because the one nobody has used is the one to look at. */
+  const toneOf = (c: Connection): 'good' | 'warn' | 'bad' | undefined =>
+    c.machine && c.machine.status !== 'active' ? DEVICE_TONE[c.machine.status] : c.used === null ? 'warn' : undefined;
 
-  async function readAgents() {
-    const at = opened();
-    origin = bareOrigin();
-    agentClient ??= createClient({ base: apiBase() });
-    const listed = await agentClient.listDevices();
-    if (!listed.ok) {
-      agentsRefusal = 'refusal' in listed ? listed.refusal.fix : copy.writeRaced;
-      agentsFrom = 'refused';
-      closed(true, at);
-      return;
-    }
-    machines = listed.value;
-    const held = await agentClient.listTokens();
-    tokens = held.ok ? standing(held.value as TokenRow[]) : [];
-    agentsFrom = 'live';
-    closed(true, at);
+  /**
+   * The facts under a row's name, each its own item, so a line that wraps breaks between facts and never leaves a
+   * separator leading the next line (design-brief §5). A grant that is waiting or finished says only that: "never used"
+   * beside "turned away" says nothing more.
+   */
+  function factsOf(c: Connection, nowMs: number): string[] {
+    if (c.machine?.ended_by === 'operator' || c.token?.ended_by === 'operator') return [copy.endedByOperator];
+    const status = c.machine?.status;
+    if (status === 'pending' || status === 'expired' || status === 'denied' || status === 'revoked') return [copy.deviceState[status] ?? status];
+    const facts: string[] = status === 'approved' ? [copy.deviceState.approved ?? status] : [];
+    facts.push(c.used ? copy.usedWhen(since(c.used, nowMs)) : copy.neverUsed);
+    if (c.token?.expires_at) facts.push(copy.endsWhen(relative(c.token.expires_at.slice(0, 10), nowMs)));
+    return facts;
   }
 
   /* A new keystroke clears the last answer, so the field is never marked wrong for a value it no longer holds. */
@@ -112,15 +152,14 @@
     e?.preventDefault();
     if (approving) return;
     approving = true;
-    const at = opened();
-    answer = await approve(typed, agentClient);
-    closed(true, at);
+    const busy = opened();
+    answer = await approve(typed, clientOf());
+    closed(true, busy);
     approving = false;
     /* THE CODE STAYS IN THE FIELD ON A REFUSAL: six digits with one wrong is a thing to correct. */
-    if (answer.kind === 'approved' && agentClient) {
+    if (answer.kind === 'approved') {
       typed = '';
-      const again = await agentClient.listDevices();
-      if (again.ok) machines = again.value;
+      await held.reread();
     }
   }
 
@@ -137,48 +176,33 @@
     if (back) await tryCode();
   }
 
-  async function revokeMachine(row: DeviceRow) {
-    if (agentsFrom !== 'live' || !agentClient) {
-      toasts.push(agentsCannot(), { intent: 'warn' });
-      return;
-    }
-    const at = opened();
-    const out = await revoke(agentClient, machines, row.handle);
-    closed(true, at);
-    if (out.ok) machines = out.rows;
-    else toasts.push(out.fix, { intent: 'warn' });
+  /**
+   * Revoke one row, and read the list again whether or not the record agreed.
+   *
+   * A MACHINE THAT SIGNED IN IS REVOKED AS A MACHINE: the kernel takes the key its grant minted with it
+   * (`deviceRevoke`), which is why `connected` drew the two as one row.
+   */
+  async function revokeRow(c: Connection) {
+    if (revoking !== null) return;
+    revoking = c.key;
+    const busy = opened();
+    const out = c.machine ? await revoke(clientOf(), machines, c.machine.handle) : c.token ? wrote(await clientOf().revokeToken({ id: c.token.id })) : null;
+    closed(true, busy);
+    if (out !== null && !out.ok) toasts.push(out.fix, { intent: 'warn' });
+    await held.reread();
+    revoking = null;
   }
 
-  async function revokeTokenRow(row: TokenRow) {
-    if (agentsFrom !== 'live' || !agentClient) {
-      toasts.push(agentsCannot(), { intent: 'warn' });
-      return;
-    }
-    const at = opened();
-    const out = wrote(await agentClient.revokeToken({ id: row.id }));
-    closed(true, at);
-    if (out.ok) tokens = tokens.filter((t) => t.id !== row.id);
-    else {
-      toasts.push(out.fix, { intent: 'warn' });
-      const held = await agentClient.listTokens();
-      if (held.ok) tokens = standing(held.value as TokenRow[]);
-    }
-  }
-
-  async function connectAgent(e: SubmitEvent) {
+  async function makeKey(e: SubmitEvent) {
     e.preventDefault();
     const label = mintLabel.trim().slice(0, LABEL_MAX);
     if (!label || minting) return;
-    if (agentsFrom !== 'live' || !agentClient) {
-      mintRefusal = agentsCannot();
-      return;
-    }
     minting = true;
     mintRefusal = '';
-    const at = opened();
+    const busy = opened();
     /* THE BEARER IS SHOWN ONCE, from this answer, and never stored, logged or written anywhere else. */
     const out = await mintAgent(apiBase(), { label, inbox: mintInbox, days: TOKEN_DAYS });
-    closed(true, at);
+    closed(true, busy);
     minting = false;
     if (!out.ok) {
       mintRefusal = out.fix;
@@ -187,24 +211,37 @@
     minted = { label, bearer: out.value.bearer };
     mintLabel = '';
     mintInbox = false;
-    const held = await agentClient.listTokens();
-    if (held.ok) tokens = standing(held.value as TokenRow[]);
-    await offerPack(agentClient);
+    await held.reread();
   }
 
   /*
-   * THE AGENTS ADD-ON, OFFERED ONCE A TOKEN IS SHOWN, when this record does not have it. The plan is
-   * the record's own `planPack` answer in the Packs screen's words, and Install sends its `planHash`
-   * back, so what installs is what was shown. Not now changes nothing.
+   * THE AGENTS ADD-ON, OFFERED ONCE SOMETHING IS CONNECTED, when this record does not have it, and on every visit
+   * after that until it is installed or put off: the first connection is when a record starts to have agents worth a
+   * page, and a key shown once was the only moment it was offered before. The plan is the record's own `planPack`
+   * answer in the Packs screen's words, and Install sends its `planHash` back, so what installs is what was shown.
+   * Not now changes nothing.
    */
   let offer = $state<Plan | null>(null);
+  /* ASKED ONCE PER VISIT, and never again after Not now: the list is read again after every press, and each read
+     would otherwise plan the pack again. */
+  let offerAsked = false;
+  $effect(() => {
+    if (!rows.some((c) => c.live && c.machine?.status !== 'pending')) return;
+    /* `untrack` FOR THE INGEST AREA'S REASON: `opened()` reads and writes the same state, and an effect that
+       depends on what it writes runs for ever. */
+    untrack(() => {
+      if (offerAsked) return;
+      offerAsked = true;
+      void offerPack(clientOf());
+    });
+  });
   /* THE PLAN'S `calls_out`, beside the plan rather than in it, so `vault.ts` does not pull in `actions.ts`. */
   let offerCalls = $state<CallOut[]>([]);
   let installing = $state(false);
   let offerSaid = $state('');
 
-  const packName = (kind: 'register' | 'page', id: string): string => {
-    const named = kind === 'register' ? AGENTS_PACK.registers[id]?.name : AGENTS_PACK.pages[id]?.title;
+  const packName = (kind: 'register' | 'page' | 'metric', id: string): string => {
+    const named = kind === 'register' ? AGENTS_PACK.registers[id]?.name : kind === 'metric' ? AGENTS_PACK.metrics[id]?.name : AGENTS_PACK.pages[id]?.title;
     return typeof named === 'string' && !named.includes('{{') ? named : id.charAt(0).toUpperCase() + id.slice(1);
   };
 
@@ -212,15 +249,15 @@
      call without them, and this screen shows every one through `CallsOut` before Install is pressed. */
   let offerApprove: string[] = [];
 
-  async function offerPack(client: ReturnType<typeof createClient>) {
-    const at = opened();
-    const held = await client.packs();
-    if (!held.ok || held.value.some((p) => p.id === AGENTS_PACK.manifest.id)) {
-      closed(true, at);
+  async function offerPack(c: ReturnType<typeof createClient>) {
+    const busy = opened();
+    const packs = await c.packs();
+    if (!packs.ok || packs.value.some((p) => p.id === AGENTS_PACK.manifest.id)) {
+      closed(true, busy);
       return;
     }
-    const planned = await client.planPack({ doc: agentsPackDocument(), source: { kind: 'local' } });
-    closed(true, at);
+    const planned = await c.planPack({ doc: agentsPackDocument(), source: { kind: 'local' } });
+    closed(true, busy);
     offerSaid = '';
     const diff = planned.ok ? (planned.value as { diff?: { calls_out?: unknown; approve?: unknown } }).diff : undefined;
     offer = planned.ok ? planOf(diff, packName) : null;
@@ -229,11 +266,11 @@
   }
 
   async function installOffer() {
-    if (!offer || installing || !agentClient) return;
+    if (!offer || installing) return;
     installing = true;
-    const at = opened();
-    const out = wrote(await agentClient.installPack({ doc: agentsPackDocument(), source: { kind: 'local' }, planHash: offer.planHash, ...(offerApprove.length > 0 ? { approve: offerApprove } : {}) }));
-    closed(true, at);
+    const busy = opened();
+    const out = wrote(await clientOf().installPack({ doc: agentsPackDocument(), source: { kind: 'local' }, planHash: offer.planHash, ...(offerApprove.length > 0 ? { approve: offerApprove } : {}) }));
+    closed(true, busy);
     installing = false;
     if (out.ok) {
       offer = null;
@@ -241,156 +278,181 @@
     } else if (!out.ok && out.from === 'refused' && out.code === 'PLAN_STALE') {
       /* THE PLAN MOVED UNDER IT, so it is read again and shown again: what installs is what was shown.
          The sentence says the plan moved only when a fresh plan is on screen to approve. */
-      await offerPack(agentClient);
+      await offerPack(clientOf());
       offerSaid = offer ? out.fix : '';
     } else offerSaid = out.fix;
   }
 
-  /* THE LOGIN LINE NAMES THIS RECORD, which the Cloud device flow needs; a shell with no record names none. */
-  const lines = $derived(connectLines(origin, shell.live ? SLUG : null));
+  /* A LINE IS COPIED WITH ITS OWN SENTENCE, and the line is never quoted in the toast: the key is one of them. */
+  const put = (line: string, said: string): void => void clipboard.put(line, line, said);
 </script>
 
 <!--
-  THE FIELD COMES FIRST, because a machine prints this address: the person arriving is holding six
-  digits and looking for the box. A `<form>`, so Enter sends it.
--->
-<!--
-  AND APPROVING A MACHINE IS THE OWNER'S, which this screen never asked.
-
-  `deviceApprove` needs `owner`, and a `read` colleague was offered the six-digit field and the
-  `Approve` button beside it. The two sections below already draw the record's own refusal over
-  the lists they cannot read, so this one is taken away rather than explained twice.
+  APPROVING, MINTING AND LISTING ARE THE OWNER'S, which this screen once never asked: `deviceApprove`, `createToken`,
+  `listDevices` and `listTokens` all need `owner`, and a `read` colleague was offered the six-digit field and its
+  Approve button. So everything but Slash's sections is drawn inside this arm, and a colleague is told who can do it.
 -->
 {#if anOwner}
-<Section title={copy.approveTitle}>
-  <form class="code-form field-row" onsubmit={tryCode} novalidate>
-    <label class="field-row-label" for="user-code">{copy.codeLabel}</label>
-    <div class="field-row-controls">
-      <div class="field field-lg">
-        <!-- Paste is never blocked and there is no `maxlength`: the CLI prints the code in two
-             groups, and seven digits is refused out loud rather than trimmed to a different code. -->
-        <input
-          class="field-input code-input"
-          id="user-code"
-          type="text"
-          inputmode="numeric"
-          autocomplete="one-time-code"
-          autocapitalize="off"
-          spellcheck="false"
-          placeholder={'0'.repeat(CODE_DIGITS)}
-          value={typed}
-          oninput={(e) => retype((e.currentTarget as HTMLInputElement).value)}
-          aria-describedby="user-code-said"
-          aria-invalid={answerLine?.tone === 'bad' ? 'true' : undefined}
-        />
-      </div>
-      <Button weight="primary" type="submit" disabled={approving}>{copy.codeGo}</Button>
-    </div>
-    <!-- Always in the document: a live region inserted with its first sentence is not reliably announced. -->
-    <p class="code-said" id="user-code-said" role="status" data-intent={answerLine?.tone}>{answerLine?.line ?? ''}</p>
-    {#if answer?.kind === 'signin'}
-      <div class="row-actions">
-        <Button weight="quiet" disabled={reproving} onclick={() => void signInAgain()}>{copy.signInAgain}</Button>
-      </div>
-    {/if}
-  </form>
-</Section>
-{/if}
-
-<!-- Every row the record keeps, denied ones included: "I said no to a request I did not make" (`12 §6.1`). -->
-<Section title={copy.machines} count={machines.length}>
-  {#if agentsFrom === 'refused'}
-    <Empty kind="error" title={agentsRefusal} />
-  {:else if agentsFrom !== 'reading' && machines.length === 0}
-    <!-- THE LINE THAT WORKS, NOT THE COMMAND'S NAME. This printed `braindog login` with nothing
-         after it, which the CLI refuses without a host (`research-first-sign-in.md` friction
-         6), while "Connect an agent" below already printed `lines.login` naming this record. -->
-    <Empty kind="no-data-yet" title={copy.noDevices} agentPrompt={lines.login} />
-  {/if}
-  <ul class="whos">
-    {#each machines as d (d.handle)}
-      {@const tone = DEVICE_TONE[d.status]}
-      <li class="who" data-intent={tone}>
-        <div class="who-head">
-          {#if tone}
-            <span class="glyph" role="img" aria-label={TONES[tone].label}>{TONES[tone].glyph}</span>
-          {:else}<Icon name="session" size="s" />{/if}
-          <!-- The label the machine sent. The handle is how the record names the row, and it means nothing to a person. -->
-          <span class="who-name">{d.label ?? copy.unnamedMachine}</span>
-          <!-- `since`, because `last_used` is an instant and `relative` takes a day. -->
-          <span class="who-detail">
-            {d.ended_by === 'operator' ? copy.endedByOperator : (copy.deviceState[d.status] ?? d.status)} · {d.last_used ? copy.usedWhen(since(d.last_used, Date.now())) : copy.neverUsed}
-          </span>
-          <span class="who-detail who-reach">{copy.reachMeans[reachKey(d.reach, d.scope)] ?? d.reach}</span>
-          <span class="who-do">
-            {#if revocable(d) && d.ended_by !== 'operator'}
-              <Button weight="bare" tone="bad" onclick={() => void revokeMachine(d)}>{copy.revokeKey}</Button>
-            {/if}
-          </span>
-        </div>
-      </li>
-    {/each}
-  </ul>
-</Section>
-
-<!-- `12 §3`: what can act as you, with a revoke button, and never the secret itself. -->
-<Section title={copy.tokens} count={tokens.length}>
-  {#if agentsFrom === 'live' && tokens.length === 0}
-    <Empty kind="no-data-yet" title={copy.noKeys} />
-  {/if}
-  <ul class="whos">
-    {#each tokens as t (t.id)}
-      {@const report = reportKeyOf(t.label)}
-      <!-- The one nobody has used is the one to look at, so it carries a mark as well as the words. -->
-      <li class="who" data-intent={t.last_used_at === null ? 'warn' : undefined}>
-        <div class="who-head">
-          {#if t.last_used_at === null}
-            <span class="glyph" role="img" aria-label={TONES.warn.label}>{TONES.warn.glyph}</span>
-          {:else}<Icon name="key" size="s" />{/if}
-          <span class="who-name">{report ? copy.reportKeyNamed(report.name) : (t.label ?? copy.unnamedToken)}</span>
-          <span class="who-detail">{report ? copy.reportKeyCan(report.register ? (REGISTERS[report.register]?.name ?? report.register) : '') : (copy.keyCan[t.scope] ?? t.scope)}</span>
-          <span class="who-detail">
-            {#if t.ended_by === 'operator'}{copy.endedByOperator}{:else}{t.last_used_at ? copy.usedWhen(since(t.last_used_at, Date.now())) : copy.neverUsed}{#if t.expires_at}{' · '}{copy.endsWhen(relative(t.expires_at.slice(0, 10), Date.now()))}{/if}{/if}
-          </span>
-          <span class="who-do">
-            {#if t.ended_by !== 'operator'}
-              <Button weight="bare" tone="bad" onclick={() => void revokeTokenRow(t)}>{copy.revokeKey}</Button>
-            {/if}
-          </span>
-        </div>
-      </li>
-    {/each}
-  </ul>
-
   <!--
-    CONNECT AN AGENT. The bearer is drawn once, from `minted`, which Done and leaving the area both
-    empty; nothing else on this screen holds it. The two lines carry no token (`48 §2`).
+    THE SIX-DIGIT FIELD, drawn once, in one of two places: first on the screen while a machine is waiting, and as the
+    setup card's last step otherwise. A `<form>`, so Enter sends it. Paste is never blocked and there is no
+    `maxlength`: the CLI prints the code in two groups, and seven digits is refused out loud rather than trimmed to a
+    different code.
   -->
-  <!-- AND MINTING ONE IS THE OWNER'S TOO. `createToken` needs `owner`, and `SlashDaily` below
-       already draws nothing on a record the caller does not own: this is that rule, applied to
-       the control above it rather than only to the one under it. The section keeps its heading
-       and its count, because what is in the list is still a fact about this record. -->
-  {#if anOwner}
-  {#if minted}
-    {@const bearer = minted.bearer}
-    <div class="code-form" role="status">
-      <p class="code-label">{copy.tokenOnce}</p>
-      <p class="mono wrap">{bearer}</p>
-      <div class="row-actions">
-        <Button weight="primary" onclick={() => void clipboard.put(bearer, copy.tokenCopied)}>{copy.copyToken}</Button>
+  {#snippet codeForm()}
+    <form class="code-form field-row" onsubmit={tryCode} novalidate>
+      <label class="field-row-label" for="user-code">{copy.codeLabel}</label>
+      <div class="field-row-controls">
+        <div class="field field-lg">
+          <input
+            class="field-input code-input"
+            id="user-code"
+            type="text"
+            inputmode="numeric"
+            autocomplete="one-time-code"
+            autocapitalize="off"
+            spellcheck="false"
+            placeholder={'0'.repeat(CODE_DIGITS)}
+            value={typed}
+            oninput={(e) => retype((e.currentTarget as HTMLInputElement).value)}
+            aria-describedby="user-code-said"
+            aria-invalid={answerLine?.tone === 'bad' ? 'true' : undefined}
+          />
+        </div>
+        <Button weight="primary" type="submit" disabled={approving}>{copy.codeGo}</Button>
       </div>
-      <p class="code-label">{copy.onNewMachine}</p>
-      <p class="mono wrap">{lines.login}</p>
-      <div class="row-actions">
-        <Button weight="quiet" onclick={() => void clipboard.put(lines.login, copy.lineCopied)}>{copy.copyLine}</Button>
-      </div>
-      <p class="code-label">{copy.inClaudeCode}</p>
-      <p class="mono wrap">{lines.mcp}</p>
-      <div class="row-actions">
-        <Button weight="quiet" onclick={() => void clipboard.put(lines.mcp, copy.lineCopied)}>{copy.copyLine}</Button>
-        <Button weight="bare" onclick={() => ((minted = null), (offer = null))}>{copy.connectDone}</Button>
-      </div>
+      <!-- Always in the document: a live region inserted with its first sentence is not reliably announced. The mark
+           beside the sentence carries its tone, so the tone is never colour alone. -->
+      <p class="code-said" id="user-code-said" role="status" data-intent={answerLine?.tone}>
+        {#if answerLine}<span role="img" aria-label={TONES[answerLine.tone].label}>{TONES[answerLine.tone].glyph}</span> {answerLine.line}{/if}
+      </p>
+      {#if answer?.kind === 'signin'}
+        <div class="row-actions">
+          <Button weight="quiet" disabled={reproving} onclick={() => void signInAgain()}>{copy.signInAgain}</Button>
+        </div>
+      {/if}
+    </form>
+  {/snippet}
+
+  <!-- A LINE TO COPY: the text in the code face, breaking anywhere so a long line never pushes the page sideways, and
+       its button beside it, or under it where the two do not fit. -->
+  {#snippet copyable(line: string, button: string, said: string)}
+    <div class="line">
+      <code class="mono">{line}</code>
+      <Button onclick={() => put(line, said)}>{button}</Button>
     </div>
+  {/snippet}
+
+  {#if first}
+    <Section title={copy.approveTitle}>{@render codeForm()}</Section>
+  {/if}
+
+  <Section title={copy.connectTitle}>
+    <ul class="doors">
+      <li class="door">
+        <h3 class="door-title"><Icon name="globe" size="s" />{copy.doorAny}</h3>
+        <p class="hint">{copy.doorAnyHint}</p>
+        {@render copyable(lines.mcp, copy.copyAddress, copy.lineCopied)}
+        <p class="step">{copy.doorAnyClaude}</p>
+        {@render copyable(lines.claude, copy.copyCommand, copy.lineCopied)}
+      </li>
+      <li class="door">
+        <h3 class="door-title"><Icon name="session" size="s" />{copy.doorSetup}</h3>
+        <p class="hint">{copy.doorSetupHint}</p>
+        <p class="step">{copy.doorInstall}</p>
+        <div class="segmented" role="group" aria-label={copy.doorOs}>
+          {#each OSES as o (o)}
+            <button type="button" class="segment" aria-pressed={os === o} data-on={os === o ? '' : undefined} onclick={() => (os = o)}>{copy.osNames[o]}</button>
+          {/each}
+        </div>
+        {@render copyable(INSTALL_LINES[os], copy.copyCommand, copy.lineCopied)}
+        <p class="step">{copy.doorSetupRun}</p>
+        {@render copyable(lines.setup, copy.copyCommand, copy.lineCopied)}
+        {#if !first}{@render codeForm()}{/if}
+      </li>
+      <li class="door">
+        <h3 class="door-title"><Icon name="key" size="s" />{copy.doorKey}</h3>
+        <!-- THE KEY IS DRAWN ONCE, from `minted`, which Done and leaving the area both empty; nothing else on this
+             screen holds it. -->
+        {#if minted}
+          {@const bearer = minted.bearer}
+          <div class="minted" role="status">
+            <p class="step">{copy.tokenOnce}</p>
+            {@render copyable(bearer, copy.copyKey, copy.keyCopied)}
+            <p class="step">{copy.doorKeyHeader}</p>
+            {@render copyable(headerLine(bearer), copy.copyHeader, copy.lineCopied)}
+            <div class="row-actions">
+              <Button weight="bare" onclick={() => (minted = null)}>{copy.connectDone}</Button>
+            </div>
+          </div>
+        {:else}
+          <p class="hint">{copy.doorKeyHint}</p>
+          <form class="field-row" onsubmit={makeKey}>
+            <label class="field-row-label" for="agent-label">{copy.doorKeyLabel}</label>
+            <div class="field-row-controls">
+              <div class="field">
+                <input class="field-input" id="agent-label" type="text" maxlength={LABEL_MAX} bind:value={mintLabel} aria-describedby="agent-label-said" />
+              </div>
+              <Button type="submit" disabled={minting || mintLabel.trim() === ''}>{copy.doorKeyGo}</Button>
+            </div>
+            <!-- THE INBOX IS ONE THING ON OR OFF, so it is the switch the rest of Settings uses, and it starts off. -->
+            <div class="setting-row">
+              <p class="hint">{copy.connectInboxHint}</p>
+              <button
+                type="button"
+                class="switch"
+                role="switch"
+                aria-checked={mintInbox}
+                aria-label={copy.connectInbox}
+                onclick={() => (mintInbox = !mintInbox)}><span class="switch-track"></span></button
+              >
+            </div>
+            <p class="code-said" id="agent-label-said" role="status" data-intent={mintRefusal ? 'bad' : undefined}>
+              {#if mintRefusal}<span role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span> {mintRefusal}{/if}
+            </p>
+          </form>
+        {/if}
+      </li>
+    </ul>
+  </Section>
+
+  <!-- Every row the record keeps, denied ones included: "I said no to a request I did not make" (`12 §6.1`). Never a
+       secret, a handle or an id: a row is named by what runs on it or the name it was given (`12 §3`). -->
+  <Section title={copy.connectedTitle} count={rows.length}>
+    {#if held.state === 'waiting' || held.state === 'refused' || held.state === 'offline'}
+      <ReadState state={held.state} refusal={held.refusal} onretry={held.reread} />
+    {:else if rows.length === 0}
+      <Empty kind="no-data-yet" title={copy.connectedNone} body={copy.connectedNoneWhy} />
+    {:else}
+      {@const nowMs = Date.now()}
+      <ul class="whos">
+        {#each rows as c (c.key)}
+          {@const tone = toneOf(c)}
+          <li class="who" data-intent={tone}>
+            <div class="who-head">
+              {#if tone}
+                <span class="glyph" role="img" aria-label={TONES[tone].label}>{TONES[tone].glyph}</span>
+              {:else}<Icon name={c.machine ? 'session' : 'key'} size="s" />{/if}
+              <!-- `dir="auto"`: an app names itself, in whatever script it chose. -->
+              <span class="who-name" dir="auto">{nameOf(c)}</span>
+              <span class="who-detail who-reach">{reachOf(c)}</span>
+              <span class="who-detail who-facts">
+                {#each factsOf(c, nowMs) as fact}<span>{fact}</span>{/each}
+                <!-- THE RUN THAT LAST USED IT, BY THE NAME ITS WRITES ARE SIGNED WITH, and a link to what it did. `.tap`
+                     because `S47` in small text is a target far under a thumb's 44px. -->
+                {#if c.run}<span>{copy.lastRun} <a class="run tap" href={at(`/r/session/${c.run.seq}`)}>{runName(c.run)}</a></span>{/if}
+              </span>
+              <span class="who-do">
+                {#if c.live}
+                  <Button weight="bare" tone="bad" disabled={revoking !== null} onclick={() => void revokeRow(c)}>{copy.revokeKey}</Button>
+                {/if}
+              </span>
+            </div>
+          </li>
+        {/each}
+      </ul>
+    {/if}
+
     {#if offer}
       <div class="code-form">
         <p class="code-label">{copy.installDiff}</p>
@@ -401,7 +463,7 @@
             <ul class="plan-adds">
               {#each offer.adds as add (add.kind + add.name)}
                 <li>
-                  <Icon name={add.kind === 'list' ? 'rows' : 'doc'} size="s" />
+                  <Icon name={add.kind === 'list' ? 'rows' : add.kind === 'figure' ? 'observe' : 'doc'} size="s" />
                   <span class="plan-name">{add.name}</span>
                   <span class="plan-detail">{add.detail}</span>
                 </li>
@@ -421,47 +483,21 @@
           <dd>{offer.touches}</dd>
         </dl>
         <div class="row-actions">
-          <Button weight="primary" disabled={installing || offer.conflicts.length > 0} onclick={() => void installOffer()}>{copy.install}</Button>
+          <Button disabled={installing || offer.conflicts.length > 0} onclick={() => void installOffer()}>{copy.install}</Button>
           <Button weight="bare" onclick={() => (offer = null)}>{vaultWords.notNow}</Button>
         </div>
-        <p class="code-said" role="status" data-intent={offerSaid ? 'bad' : undefined}>{offerSaid}</p>
+        <p class="code-said" role="status" data-intent={offerSaid ? 'bad' : undefined}>
+          {#if offerSaid}<span role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span> {offerSaid}{/if}
+        </p>
       </div>
     {/if}
-  {:else}
-    <form class="code-form field-row" onsubmit={connectAgent}>
-      <label class="field-row-label" for="agent-label">{copy.connectTitle}</label>
-      <div class="field-row-controls">
-        <div class="field">
-          <input
-            class="field-input"
-            id="agent-label"
-            type="text"
-            maxlength={LABEL_MAX}
-            placeholder={copy.connectLabel}
-            aria-label={copy.connectLabel}
-            bind:value={mintLabel}
-            aria-describedby="agent-label-said"
-          />
-        </div>
-        <Button weight="primary" type="submit" disabled={minting || mintLabel.trim() === ''}>{copy.connectGo}</Button>
-      </div>
-      <!-- THE INBOX IS ONE THING ON OR OFF, so it is the switch the rest of Settings uses, and it starts off. -->
-      <div class="setting-row">
-        <p class="hint">{copy.connectInboxHint}</p>
-        <button
-          type="button"
-          class="switch"
-          role="switch"
-          aria-checked={mintInbox}
-          aria-label={copy.connectInbox}
-          onclick={() => (mintInbox = !mintInbox)}><span class="switch-track"></span></button
-        >
-      </div>
-      <p class="code-said" id="agent-label-said" role="status" data-intent={mintRefusal ? 'bad' : undefined}>{mintRefusal}</p>
-    </form>
-  {/if}
-  {/if}
-</Section>
+  </Section>
+{:else}
+  <!-- A COLLEAGUE IS TOLD WHO CAN, rather than shown three ways in that the record would refuse them at the end. -->
+  <Section title={copy.connectTitle}>
+    <Empty kind="no-permission" title={levelWords.ownersOnlyTitle} body={levelWords.ownersOnlyHow} />
+  </Section>
+{/if}
 <SlashAsks owner={anOwner} />
 <SlashModel owner={anOwner} />
 <!-- SLASH LOOKING ON ITS OWN is the owner's choice, beside the agents they let in (`loop/research-spark.md` S15). -->
@@ -519,9 +555,12 @@
     margin-inline-start: var(--sp-2);
   }
 
+  /* A NAME AN APP OR A MACHINE CHOSE MAY BE ONE LONG WORD, a host name most of all, and it breaks rather than
+     pushing the row past the edge at 320. */
   .who-name {
     color: var(--ink);
     font-weight: 600;
+    overflow-wrap: anywhere;
   }
 
   .who-detail {
@@ -548,6 +587,21 @@
     flex: none;
     flex-wrap: wrap;
     gap: var(--sp-2);
+  }
+
+  /* ONE COLUMN ON A PHONE, AND REVOKE ON A LINE OF ITS OWN. Beside the name it took a third of a 390px row from
+     the words that say what is being revoked, and a destructive button pressed by mistake next to a name is the
+     worst tap on this screen. */
+  @media (width < 640px) {
+    .who-head {
+      grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    .who-head > .who-do {
+      grid-column: 1 / -1;
+      grid-row: auto;
+      margin-inline-start: 0;
+    }
   }
 
   /* A whole sentence, wrapping, under the row it is about. */
@@ -591,12 +645,6 @@
     font-size: var(--t-md);
     font-variant-numeric: tabular-nums;
     letter-spacing: 0.18em;
-  }
-
-  /* A BASE64 KEY HAS NO SPACES IN IT, so it is one 43-character word and it reached 432px inside a
-     400px screen. `13 §10` and the layout gate's first rule: the page body never scrolls sideways. */
-  .wrap {
-    overflow-wrap: anywhere;
   }
 
   /* THE PACKS SCREEN'S PLAN, drawn the same way where an agent is connected. */
@@ -657,12 +705,96 @@
   }
 
   /* THE ONE PLACE A MONOSPACE FACE IS RIGHT. `Money.svelte` argues against it for figures (a mono
-     face gives the thousands separator a full character width), and a key is not a figure: it is a
-     string somebody compares character by character against another screen. */
+     face gives the thousands separator a full character width), and a key or a command is not a
+     figure: it is a string somebody compares character by character against another screen, or
+     pastes into a terminal. `--font-id` is the theme's face for exactly that (design-brief §3).
+
+     A BASE64 KEY HAS NO SPACES IN IT, so it is one 43-character word, and it reached 432px inside a
+     400px screen: every line here breaks anywhere and keeps its own spaces, so the page body never
+     scrolls sideways (`13 §10`, the layout gate's first rule). */
   .mono {
-    font-family: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, monospace;
+    flex: 1 1 24ch;
+    min-inline-size: 0;
+    margin: 0;
+    padding-block: var(--sp-2);
+    padding-inline: var(--sp-3);
+    background: var(--sunk);
+    border-radius: var(--r-md);
+    color: var(--ink);
+    font-family: var(--font-id);
     font-size: var(--t-sm);
     letter-spacing: 0;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  /* A LINE AND ITS COPY BUTTON on one row where both fit, the button under the line where they do not. */
+  .line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2);
+  }
+
+  /* THE THREE WAYS IN, one card each and one under another at every width: each holds a line too long to share a
+     row with a second card's, and a card that is the whole width is the phone's layout already. */
+  .doors {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .door {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    min-inline-size: 0;
+    padding: var(--sp-4);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+  }
+
+  .door-title {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--t-base);
+    font-weight: 600;
+  }
+
+  /* WHAT THE NEXT LINE IS FOR, as a label is drawn above its field. */
+  .step {
+    margin: 0;
+    margin-block-start: var(--sp-1);
+    color: var(--ink2);
+    font-size: var(--t-sm);
+  }
+
+  .minted {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+  }
+
+  /* THE FACTS UNDER A NAME WRAP AS WHOLE ITEMS, with space between them and no separator to lead a line. */
+  .who-facts {
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: var(--sp-3);
+  }
+
+  /* A LINK AS EVERY LINK IS DRAWN (design-brief §3): ink, with a 1px underline at 40% ink, 3px below. */
+  .run {
+    color: var(--link);
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, var(--ink) 40%, transparent);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
   }
 
   .code-said {

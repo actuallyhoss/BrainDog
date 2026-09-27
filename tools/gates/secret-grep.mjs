@@ -148,8 +148,13 @@ const SINKS = [
   { id: 'a serialisation', re: /JSON\.stringify\s*\(/g, wire: false },
   { id: 'a response', re: /new Response\s*\(/g },
   { id: 'an outbound request', re: /(?<![.\w])fetch\s*\(/g, wire: false },
-  /* AND STANDARD OUTPUT, where a key is one line away from a terminal's scrollback or an agent's transcript. No
-     command prints a key (`loop/research-agent-path.md` §5.7), so no function anywhere is exempt from this sink. */
+  /* AND STANDARD OUTPUT, where a key is one line away from a terminal's scrollback or an agent's transcript. ONE
+     COMMAND PRINTS A KEY, `braindog keys headers`, and one function in it, `headersOne` in the CLI's `keys.ts`, is
+     exempt below (`loop/finish/agents.md` C9, owner item 3). It exists because Claude Code's `headersHelper` reads
+     an HTTP server's headers only from a command's standard output, so a key an HTTP tool needs in a header reaches
+     it no other way; the command refuses a terminal before it opens anything, so what it prints goes to a program.
+     Every other function, in that file and everywhere else, is still a finding, which the seeded negative
+     `secret-grep-headers` proves. */
   { id: 'standard output', re: /\bprocess\.stdout\.write\s*\(/g },
   { id: 'standard output', re: /\bwriteFileSync\s*\((?=\s*1\s*,)/g },
   /* AND A CHILD PROCESS, which can print, log or keep its arguments and its environment. `braindog keys exec` hands
@@ -258,14 +263,16 @@ const BRAND_HOMES = [
 /**
  * THE SINKS A BRAND HOME MAY USE, EACH BY FILE AND BY FUNCTION.
  *
- * A key has to leave somewhere: a deposit is sent to its host once, a read is answered once, and a key read back on
- * an agent's machine goes into the environment of one command. Those three places are named here, nothing on the
- * read side is exempt from standard output, and the same sink anywhere else in the same file is still a finding, which is what the seeded
- * negative `secret-grep-vault` proves.
+ * A key has to leave somewhere: a deposit is sent to its host once, a read is answered once, a key read back on an
+ * agent's machine goes into the environment of one command, and a key an HTTP tool needs in a header is printed once
+ * for Claude Code's `headersHelper` to read. Those places are named here, `headersOne` is the one function exempt from
+ * standard output, and the same sink anywhere else in the same file is still a finding, which is what the seeded
+ * negatives `secret-grep-vault` and `secret-grep-headers` prove.
  */
 const EXEMPT = [
   { file: /^apps[\\/]cli[\\/]src[\\/]keys\.ts$/, fn: 'depositOne', sinks: ['an outbound request', 'a serialisation'] },
   { file: /^apps[\\/]cli[\\/]src[\\/]keys\.ts$/, fn: 'execOne', sinks: ['a child process'] },
+  { file: /^apps[\\/]cli[\\/]src[\\/]keys\.ts$/, fn: 'headersOne', sinks: ['standard output'] },
   { file: /^apps[\\/]selfhost[\\/]src[\\/]vault\.ts$/, fn: 'answerOpen', sinks: ['a serialisation', 'a response'] },
   { file: /^apps[\\/]worker[\\/]src[\\/]vault\.ts$/, fn: 'answerOpen', sinks: ['a serialisation', 'a response'] },
 ];

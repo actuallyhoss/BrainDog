@@ -26,6 +26,7 @@
   import { copy } from '../copy.ts';
   import { valueSaid } from '../voice.ts';
   import { firstAsks } from '../first-run.ts';
+  import DayBox from './DayBox.svelte';
   import Icon from './Icon.svelte';
 
   /**
@@ -412,9 +413,7 @@
              hardcoded date is a past date within weeks, on the one screen where a wrong default is
              the first thing anybody sees. Four weeks is a plausible term somebody overwrites, and
              `deadline:` is the register saying which field is the one a date belongs on. -->
-        <div class="field">
-          <input class="field-input" id={id(f)} type="date" required={f.required} bind:value={typed[f.id]} />
-        </div>
+        <DayBox id={id(f)} label={labelOf(f)} bind:value={typed[f.id]} />
       {:else if f.type === 'int' || f.type === 'decimal' || f.type === 'duration'}
         <div class="field">
           <input class="field-input num" id={id(f)} type="text" inputmode="decimal" required={f.required} bind:value={typed[f.id]} />

@@ -1294,19 +1294,44 @@
     min-block-size: var(--ctl-h);
   }
 
-  .forecast-segs,
-  .forecast-chips {
+  /* THE HORIZON AND THE CURRENCY ARE EACH ONE SEGMENTED CONTROL, `controls.css`'s track and segments, and were three
+     separate bordered buttons (design §2.11). The track keeps its own width at the start of the knob rather than
+     stretching across the grid column, and wraps inside it where the choices outnumber the room. */
+  .forecast-segs {
+    justify-self: start;
+    max-inline-size: 100%;
+  }
+
+  /* A SELL DAY IS A FIELD, drawn by `controls.css` as every bare date is, and was left at the browser's width and type
+     size (defects P10). Sixteen pixels, because every input is sixteen at every width (design brief §3). The `font`
+     shorthand resets the tabular figures `controls.css` gives every bare date, so they are said again after it. */
+  .forecast-date {
+    justify-self: start;
+    min-inline-size: 16ch;
+    font: inherit;
+    font-size: var(--t-md);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* MONEY IN AND MONEY OUT, each a group of its own under What counts, named by a quiet line above it. */
+  .forecast-counts {
     display: flex;
     flex-wrap: wrap;
     gap: var(--sp-1);
   }
 
+  .forecast-counts-side {
+    flex-basis: 100%;
+    color: var(--dim);
+    font-size: var(--t-xs);
+  }
+
   /* EVERYTHING A KNOB OFFERS TO PRESS IS A PILL, as every button in the product is (design §6.2), edged in `--edge`,
-     a control's boundary, rather than the hairline between rows. What is chosen takes `--selected`, the one "on"
-     ground: `--s2` sat on the light page at almost its own colour, so a chosen horizon did not show. */
-  .forecast-seg,
+     a control's boundary, rather than the hairline between rows. What is counted takes `--selected`, the one "on"
+     ground: `--s2` sat on the light page at almost its own colour, so a chosen pill did not show. */
   .forecast-chip,
-  .forecast-reset {
+  .forecast-reset,
+  .forecast-tool {
     display: inline-flex;
     align-items: center;
     gap: var(--sp-2);
@@ -1326,32 +1351,63 @@
   /* HOVER ONLY WHERE THERE IS ONE: a phone keeps `:hover` on the last thing tapped, so a pill pressed with a thumb
      would stay washed after the finger left it and read as chosen (design brief §6, "Touch"). */
   @media (hover: hover) and (pointer: fine) {
-    .forecast-seg:hover,
     .forecast-chip:hover,
-    .forecast-reset:hover {
+    .forecast-reset:hover,
+    .forecast-tool:hover {
       background: var(--hover-wash);
     }
   }
 
-  .forecast-seg[aria-pressed='true'],
-  .forecast-chip[aria-pressed='true'] {
+  .forecast-chip[aria-checked='true'] {
     background: var(--selected);
     color: var(--ink);
   }
 
-  /* STRUCK THROUGH MEANS LEFT OUT OF THE WALK, IN BOTH KNOBS, which press the opposite way round over one list: in
-     "Leave out" a pressed chip is left out, and in "What counts" a pressed chip is counted, so there it is the chip
-     NOT pressed that is struck. Striking every pressed chip crossed out exactly what "What counts" was counting.
-     "What counts" is the knob whose chips sit in a group of their own (`role="group"`, one for money in and one for
-     money out); "Leave out" puts its chips straight into its knob's group. */
-  .forecast-chips:not([role]) > .forecast-chip[aria-pressed='true'] .forecast-chip-label,
-  .forecast-chips[role='group'] > .forecast-chip[aria-pressed='false'] .forecast-chip-label {
+  /* ON IS COUNTED AND OFF IS LEFT OUT, one meaning in one control. "Leave out" and "What counts" pressed the opposite
+     way round over one list, and a strike had to follow which knob a chip sat in; now what is struck is what is off. */
+  .forecast-chip[aria-checked='false'] .forecast-chip-label {
     text-decoration: line-through;
   }
 
   .forecast-chip-label {
+    flex: 1 1 auto;
     min-inline-size: 0;
     overflow-wrap: anywhere;
+  }
+
+  /* THE SWITCH IS THE HOUSE'S TRACK AND THUMB (`controls.css` `.switch-track`), drawn only where a chip is a row on a
+     phone; as a pill the fill already says what is on. Its "on" is written here because the chip is the control and
+     not `.switch`, whose own rule names the one class this button is not. */
+  .forecast-chip .switch-track {
+    display: none;
+    flex: none;
+  }
+
+  .forecast-chip[aria-checked='true'] .switch-track {
+    background: var(--on);
+    border-color: var(--on);
+  }
+
+  .forecast-chip[aria-checked='true'] .switch-track::after {
+    translate: 16px 0;
+    background: var(--on-ink);
+  }
+
+  .forecast-chip[aria-checked='true']:dir(rtl) .switch-track::after {
+    translate: -16px 0;
+  }
+
+  /* ADJUST AND FULL SCREEN, a row of quiet pills under the chart. Adjust is a phone's: where the block has the room,
+     the knobs are already under the chart and it is not drawn. */
+  .forecast-tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+    margin-inline: var(--sp-2);
+  }
+
+  .forecast-adjust {
+    display: none;
   }
 
   /* A SIGNED FIGURE IS ONE WORD. The design review found a chip at 390 with its minus at the end of one line and its
@@ -1365,12 +1421,117 @@
   }
 
   @media (pointer: coarse) {
-    .forecast-seg,
     .forecast-chip,
     .forecast-reset,
+    .forecast-tool,
     .forecast-range {
       min-block-size: var(--tap);
       font-size: var(--t-md);
+    }
+  }
+
+  /* ── the Adjust sheet and the full-screen view ──────────────────────────────
+     Native dialogs the renderer opens itself, drawn as the house draws a dialog: 560px and centred on a wide screen,
+     the full-screen view as wide as a page, and under 640px a bottom sheet, as tall as what it holds up to 88dvh,
+     that rides the keyboard (`--kb`) so the sell day stays in view while it is typed. A closed dialog keeps the
+     browser's `display: none`, so only an open one is laid out. */
+  .forecast-sheet {
+    box-sizing: border-box;
+    inline-size: min(560px, 100%);
+    max-inline-size: 100%;
+    max-block-size: calc(88dvh - var(--kb));
+    margin: auto;
+    padding: 0;
+    overflow: auto;
+    border: 1px solid var(--edge);
+    border-radius: var(--r-lg);
+    background: var(--s1);
+    color: var(--ink);
+    box-shadow: var(--e3);
+  }
+
+  .forecast-sheet[open] {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .forecast-sheet[data-full] {
+    inline-size: min(var(--page-max), 100% - 2 * var(--sp-6));
+  }
+
+  .forecast-sheet::backdrop {
+    background: var(--scrim);
+  }
+
+  /* THE HANDLE IS A PHONE'S, as the house sheet's is (`lib/ui/Sheet.svelte`): the dialog from 640px up is centred and
+     has no handle to pull, and the rule below 640px shows it. */
+  .forecast-sheet-grab {
+    display: none;
+  }
+
+  .forecast-sheet-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-3);
+    padding: var(--sp-3) var(--sp-4);
+  }
+
+  .forecast-sheet-title {
+    min-inline-size: 0;
+    margin: 0;
+    font-size: var(--t-lg);
+    font-weight: 600;
+    line-height: var(--lh-tight);
+    overflow-wrap: anywhere;
+  }
+
+  .forecast-sheet-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+    padding: 0 var(--sp-2) var(--sp-4);
+  }
+
+  /* THE CHART FULL SCREEN IS AS TALL AS THE SCREEN LEAVES IT, above the fold its sentence and head take. */
+  .forecast-sheet[data-full] .forecast-chart {
+    block-size: min(60dvh, 480px);
+  }
+
+  @media (width < 640px) {
+    .forecast-sheet,
+    .forecast-sheet[data-full] {
+      inline-size: 100%;
+      margin-block: auto var(--kb);
+      border-block-end: 0;
+      border-end-start-radius: 0;
+      border-end-end-radius: 0;
+      padding-block-end: max(0px, calc(env(safe-area-inset-bottom) - var(--kb)));
+      /* THE PULL: how far the handle has been drawn down, written on the dialog while a thumb holds it. */
+      translate: 0 var(--pulled, 0px);
+    }
+
+    /* A strip across the top a thumb finds, holding a short pill a person reads as "this pulls", drawn as the house
+       sheet draws it. `touch-action: none` keeps the pull from scrolling the page underneath. */
+    .forecast-sheet-grab {
+      display: grid;
+      place-items: center;
+      flex: none;
+      block-size: var(--sp-5);
+      touch-action: none;
+      cursor: grab;
+    }
+
+    .forecast-sheet-grab-bar {
+      inline-size: var(--sp-6);
+      block-size: var(--sp-1);
+      background: var(--edge);
+      border-radius: var(--r-pill);
+    }
+
+    /* The handle's strip is the head's top padding on a phone, so it is not paid twice. */
+    .forecast-sheet-head {
+      padding-block-start: 0;
     }
   }
 
@@ -1379,16 +1540,21 @@
       block-size: 160px;
     }
 
-    /* EVERY MONTH, EVERY OTHER OR EVERY THIRD, BY HOW MANY THERE ARE, so the names do not run into each other on a
-       phone and no month is left alone on its axis. Every third was the rule for any walk, so a walk that crossed two
-       or three month starts kept only the first, one name under a whole chart. Up to six each keeps its name; from
-       seven to twelve every other one does; past twelve, every third. */
-    .forecast-ticks:has(> .forecast-tick:nth-child(7)):not(:has(> .forecast-tick:nth-child(13))) > .forecast-tick:nth-child(even) {
+    /* EVERY MONTH OR EVERY OTHER, BY HOW MANY THERE ARE, so the names do not run into each other on a phone and no
+       month is left alone on its axis. The plan names at most twelve months, and a walk of years by quarters, half
+       years or years (`src/forecast.ts` `TICKS_MOST`), so from seven names every other one is kept. Every third was
+       the rule for any walk once, and a walk that crossed two or three month starts kept only the first. */
+    .forecast-ticks:has(> .forecast-tick:nth-child(7)) > .forecast-tick:nth-child(even) {
       display: none;
     }
 
-    .forecast-ticks:has(> .forecast-tick:nth-child(13)) > .forecast-tick:not(:nth-child(3n + 1)) {
+    /* ON A PHONE THE KNOBS ARE IN THE ADJUST SHEET, and the chart keeps the screen. */
+    .forecast-knobs[data-inline] {
       display: none;
+    }
+
+    .forecast-adjust {
+      display: inline-flex;
     }
 
     .forecast-knobs {
@@ -1400,19 +1566,17 @@
       min-inline-size: 0;
     }
 
-    /* A CHIP ON A PHONE IS A ROW: the name at the start, the signed figure at the end, one hairline between rows and
-       nothing round the list (design §6.8 rule 6). A column of pills would be a box per line, with the chosen ones
-       filled in, so "What counts", where nearly everything is chosen, would draw as a solid panel. A row needs no
-       fill to say its state: the strike through a name is what says it is left out. The height is left to the
-       rules above, so a thumb still gets 44px. */
-    .forecast-chips {
+    /* WHAT COUNTS ON A PHONE IS A CHECKLIST: a row a stream, its switch at the start, its name, and the signed figure at
+       the end, one hairline between rows and nothing round the list (design §6.8 rule 6). A column of pills would be a
+       box per line, with the counted ones filled in, so a list where nearly everything counts would draw as a solid
+       panel. The switch says what is on; the height is left to the rules above, so a thumb still gets 44px. */
+    .forecast-counts {
       flex-direction: column;
       flex-wrap: nowrap;
       gap: 0;
     }
 
     .forecast-chip {
-      justify-content: space-between;
       inline-size: 100%;
       padding-inline: 0;
       border: 0;
@@ -1423,12 +1587,232 @@
       border-block-start: 1px solid var(--line-soft);
     }
 
-    .forecast-chip[aria-pressed] {
+    .forecast-chip[aria-checked] {
       background: transparent;
+    }
+
+    .forecast-chip .switch-track {
+      display: block;
     }
 
     .forecast-readout {
       max-inline-size: 12rem;
+    }
+  }
+
+  /* ── roadmap: dated work on one time axis ─────────────────────────────────
+     NO RULE DREW THIS KIND, so a shipped pack's roadmap put its names under the chart in a heap (defects P2) and the
+     marks took the weak paints `src/roadmap.ts` gives a page with no stylesheet. A window is a wash of the one series
+     inside a line of it, so the name drawn over it stays readable; a date is a stem in `--dim`, a tone in its intent;
+     today is a dashed ink line. The names sit in HTML over the box, placed by `--at` across and by their track or
+     label line down, and each stops at the end edge rather than running past it. On a phone the chart gives way to
+     the table under it, read as a dated list. It is the renderer's own kind and not a registered one
+     (`lib/page/kinds/`), which is why its rules sit here with the other charts and not in a `kinds/` sheet. */
+  .block[data-kind='roadmap'] {
+    container-type: inline-size;
+  }
+
+  /* `--tracks` AND `--lines` ARE THE PLAN'S, written on the element by both drawers; these are what a roadmap with none
+     written reads, and the element's own `style` wins over them. `--track` on a name is the same. */
+  .roadmap {
+    --tracks: 1;
+    --lines: 0;
+    --roadmap-lane: var(--sp-7);
+    --roadmap-line: calc(var(--sp-4) + var(--sp-1));
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+  }
+
+  .roadmap-plot {
+    position: relative;
+    margin-inline: var(--sp-2);
+    padding-block-start: calc(var(--lines) * var(--roadmap-line));
+  }
+
+  .roadmap-chart {
+    display: block;
+    inline-size: 100%;
+    block-size: calc(max(var(--tracks), 1) * var(--roadmap-lane));
+    overflow: visible;
+  }
+
+  .roadmap-band {
+    fill: none;
+  }
+
+  .roadmap-band[data-odd] {
+    fill: var(--hover-wash);
+    fill-opacity: 1;
+  }
+
+  .roadmap-bar {
+    fill: color-mix(in srgb, var(--series-1) 25%, transparent);
+    fill-opacity: 1;
+    stroke: var(--series-1);
+    stroke-width: 1px;
+  }
+
+  .roadmap-bar[data-intent] {
+    fill: var(--tone-fill);
+    stroke: var(--tone);
+  }
+
+  .roadmap-stem {
+    stroke: var(--dim);
+    stroke-opacity: 1;
+    stroke-width: 1.5px;
+  }
+
+  .roadmap-stem[data-intent] {
+    stroke: var(--tone);
+  }
+
+  .roadmap-today {
+    stroke: var(--ink);
+    stroke-width: 1px;
+    stroke-dasharray: 3 3;
+  }
+
+  .roadmap-names,
+  .roadmap-months {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .roadmap-names {
+    position: absolute;
+    inset-block: 0;
+    inset-inline: 0;
+    pointer-events: none;
+  }
+
+  /* A NAME STOPS AT THE END EDGE, in an ellipsis on the item that holds its words, so no roadmap scrolls the page. */
+  .roadmap-name {
+    --track: 0;
+    position: absolute;
+    inset-inline-start: calc(var(--at) * 100%);
+    max-inline-size: calc((1 - var(--at)) * 100%);
+    padding-inline: var(--sp-1);
+    overflow: hidden;
+    color: var(--ink);
+    font-size: var(--t-xs);
+    line-height: var(--roadmap-line);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* A WINDOW'S NAME sits on its own track, in the middle of the lane its bar is drawn in. */
+  .roadmap-name:not([data-stem]) {
+    inset-block-start: calc(var(--lines) * var(--roadmap-line) + (var(--track) + 0.5) * var(--roadmap-lane));
+    translate: 0 -50%;
+  }
+
+  /* A DATE'S NAME sits above the chart on the line the plan spaced it to, where its stem meets the top. */
+  .roadmap-name[data-stem] {
+    inset-block-start: calc(var(--line) * var(--roadmap-line));
+    color: var(--ink2);
+  }
+
+  .roadmap-months {
+    position: relative;
+    block-size: var(--roadmap-line);
+    margin-inline: var(--sp-2);
+  }
+
+  .roadmap-month {
+    position: absolute;
+    inset-inline-start: calc(var(--at) * 100%);
+    max-inline-size: calc((1 - var(--at)) * 100%);
+    padding-inline-start: var(--sp-1);
+    overflow: hidden;
+    color: var(--dim);
+    font-size: var(--t-xs);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* EVERY PLACED ROW SAID AGAIN, for a screen reader where the chart has the room, and for everyone on a phone. */
+  .roadmap-numbers {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .roadmap-table {
+    inline-size: 100%;
+    border-collapse: collapse;
+    font-size: var(--t-sm);
+  }
+
+  .roadmap-table th,
+  .roadmap-table td {
+    padding-block: var(--sp-2);
+    padding-inline: 0;
+    border-block-end: 1px solid var(--line-soft);
+    font-weight: 400;
+    text-align: start;
+    vertical-align: baseline;
+  }
+
+  .roadmap-table thead th {
+    color: var(--dim);
+    font-size: var(--t-xs);
+  }
+
+  .roadmap-table tbody th {
+    color: var(--ink);
+    font-weight: 500;
+    overflow-wrap: anywhere;
+  }
+
+  .roadmap-table td {
+    padding-inline-start: var(--sp-3);
+    color: var(--dim);
+    font-variant-numeric: tabular-nums;
+    text-align: end;
+    white-space: nowrap;
+  }
+
+  .roadmap-table tbody tr:last-child > * {
+    border-block-end: 0;
+  }
+
+  .roadmap-empty,
+  .roadmap-skipped {
+    margin: 0;
+    margin-inline: var(--sp-2);
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  @container (inline-size < 30rem) {
+    .roadmap-plot,
+    .roadmap-months {
+      display: none;
+    }
+
+    .roadmap-numbers {
+      position: static;
+      inline-size: auto;
+      block-size: auto;
+      margin-inline: var(--sp-2);
+      overflow: visible;
+      clip-path: none;
+      white-space: normal;
+    }
+
+    .roadmap-table {
+      font-size: var(--t-md);
+    }
+
+    .roadmap-table thead th {
+      font-size: var(--t-sm);
     }
   }
 

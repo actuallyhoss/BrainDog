@@ -107,7 +107,7 @@ test('record_index names every figure money-core declares, and resources/list ev
   assert.ok(named.includes('late-in'));
   assert.ok(named.includes('project-owed:<value>'), `the template is not named with its slot: ${named.filter((id) => id.startsWith('project'))}`);
   const offered = (await tools(api as never).resources(owner)).map((r) => r.uri).filter((u) => u.startsWith('braindog:metric/'));
-  assert.deepEqual(offered.map((u) => u.slice('braindog:metric/'.length)).sort(), declared.filter((id) => id !== 'project-owed').sort());
+  assert.deepEqual(offered.map((u) => u.slice('braindog:metric/'.length)).sort(), declared.filter((id) => !['project-owed', 'project-in-by-month', 'project-out-by-month'].includes(id)).sort());
   for (const uri of offered) assert.ok((await tools(api as never).read(uri, owner)).ok, `${uri} is offered and refuses`);
   sql.close();
 });

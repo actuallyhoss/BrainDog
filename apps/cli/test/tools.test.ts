@@ -438,8 +438,7 @@ test('WRITE IS A DRY RUN BY DEFAULT: each entry is shown, a key is handed over b
   assert.deepEqual(await h.write(), [
     'Tool kiln-deploy needs KILN_REGION, whose value BrainDog does not keep, so set it in the entry yourself.',
     `+ kiln-deploy at user scope: ${JSON.stringify(deployEntry)}`,
-    'Tool docs: its Authorization header is left out, because no command here hands a header its key yet.',
-    '+ docs at user scope: {"type":"http","url":"https://docs.example/mcp"}',
+    `+ docs at user scope: ${JSON.stringify({ type: 'http', url: 'https://docs.example/mcp', headersHelper: `node "${CLI}" keys headers credentials#2 --as Authorization` })}`,
     'Nothing was changed. Run braindog tools write --scope user for the global tools, or --scope project for this repository.',
   ]);
   assert.deepEqual(h.calls, []);

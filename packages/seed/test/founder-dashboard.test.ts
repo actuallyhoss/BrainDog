@@ -107,14 +107,17 @@ test('A FOUNDER’S PROJECT HAS A PAGE, with Estate since founder 1.4.0: what is
   const blocks = value<{ blocks: Drawn[] }>(k.page(page.slug)).blocks;
   assert.deepEqual(blocks.map((b) => b.heading), [
     'At a glance',
-    'Where it stands',
     'Waiting on you',
+    'Where it stands',
+    'Handed back or blocked',
     'What is open',
     'Agents',
+    'What changed',
+    'The plan',
+    'Money by month',
     'Money',
     'Keeping it alive',
     'Notes',
-    'Work on this from an agent',
     'The numbers',
     'Thirty days against the thirty before',
     'Send numbers here',
@@ -122,6 +125,6 @@ test('A FOUNDER’S PROJECT HAS A PAGE, with Estate since founder 1.4.0: what is
   for (const b of blocks) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
   assert.deepEqual((blocks[0] as unknown as { cells: { label: string }[] }).cells.map((c) => c.label), ['Open', 'Owed to you', 'Costs a year'], 'with Estate present, what it costs a year takes the place the task figures held');
   /* THE PROJECT'S NOTE, which is where an imported plan and its decisions are written, and which this example has none of. */
-  assert.equal((blocks[7] as unknown as { document?: boolean }).document, true);
-  assert.deepEqual(blocks[9]!.measures?.map((m) => [m.name, m.latest?.value]), [['Installs', 7]]);
+  assert.equal((blocks[11] as unknown as { document?: boolean }).document, true);
+  assert.deepEqual(blocks[12]!.measures?.map((m) => [m.name, m.latest?.value]), [['Installs', 7]]);
 });

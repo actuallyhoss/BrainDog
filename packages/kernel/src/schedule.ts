@@ -149,6 +149,13 @@ export function expandRepeat(anchor: number, repeat: Repeat, now: number, horizo
 
   const start = new Date(anchor);
 
+  /* A REPEAT THAT BEGAN ON ITS MONTH'S LAST DAY IS "THE END OF THE MONTH", NOT A DAY NUMBER, as `forecast.ts`'s
+     `stepsOf` reads the same row. The clamp alone stepped a bill due 30 September to 30 October, so the reminder fired
+     a day before the charge the forecast showed on the 31st, and one due 28 February to the 28th of every month after.
+     A cycle of whole years keeps its anniversary there too, so only a step that leaves the month moves to its end. */
+  const startLast = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 0, 12)).getUTCDate();
+  const monthEnd = FREQ[repeat.freq] === 'month' && interval % 12 !== 0 && start.getUTCDate() === startLast;
+
   /* NO ARM MEANS NO OCCURRENCES. The chain below ended in an `else`, so a word it did not know
      was a year rather than a refusal. `declare` refuses an unknown frequency at install; this is
      what the same fact looks like to a caller holding a record that was installed before it did. */
@@ -168,11 +175,12 @@ export function expandRepeat(anchor: number, repeat: Repeat, now: number, horizo
     else if (freq === 'week') at = anchor + n * interval * 7 * DAY_MS;
     else {
       /* BY CALENDAR AND CLAMPED. Adding to the month number rolls 31 January into 3 March, which is
-         not what anybody means by "monthly" — the last day of the month they named is. */
+         not what anybody means by "monthly": the last day of the month they named is. A month-end
+         start lands on every month's last day (`monthEnd` above). */
       const months = freq === 'month' ? n * interval : n * interval * 12;
       const first = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + months, 1, 12));
       const last = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0, 12)).getUTCDate();
-      at = Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), Math.min(start.getUTCDate(), last), 12);
+      at = Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), monthEnd ? last : Math.min(start.getUTCDate(), last), 12);
     }
 
     if (at > limit) break;

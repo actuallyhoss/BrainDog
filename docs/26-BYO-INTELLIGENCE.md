@@ -23,6 +23,28 @@ All figures retrieved **2026-09-01**.
 | Cost per 1,000 turns | **$0.90** | $8.60 *(Sonnet 5, warm cache)* | **$0.00** |
 | Its job | triage, extraction, digests, embeddings | **the phone** | **the desk** |
 
+### Tier B as built: "Your own key" in Settings
+
+Settings offers Slash two sources, **Included** (tier A on the Cloud, the host's own endpoint on a
+self-host) and **Your own key** (tier B). His own key is four things, and the key is never typed on
+that page:
+
+| Field | What it is | The rule |
+|---|---|---|
+| Provider | Anthropic Messages, or any endpoint that speaks OpenAI's chat completions | one of the two, `anthropic` or `openai` |
+| Address | the provider's base URL, empty for the provider's own | `https:` only, no name or password in it, and a public host: loopback, private ranges, link-local and local names are refused, at the settings door and again on every call |
+| Model | the model name he types, trimmed | sent as typed for every call, the package's short names included |
+| Key | one of his vault's live API tokens, picked from a list | stored by its grant id; no key is ever chosen by its label |
+
+Both passes of a question, an automation's `ask_slash` and the arranger's press all go to the source
+he chose. On his own key the asks are listed and not capped, and the operator's monthly ceiling does
+not apply, because the provider bills him and not BrainDog. A key that is revoked, gone or will not
+open stops the ask before anything is sent; a call on his key never goes out without it.
+
+The Worker names no endpoint of its own any more. Its models are the included one and his key; a
+self-host keeps `SLASH_ENDPOINT`, called with the operator's `SLASH_KEY` or with none, and his own
+key with no address of his own is sent to that endpoint.
+
 ### The assumption this inverts
 
 "Bring your own machine" sounds like the premium tier that should handle everything. It cannot
@@ -481,6 +503,13 @@ per-call `Inference` adapter and writes one `grant.read` event; the package neve
 weeks: enrolment over the device grant, a WebSocket dispatcher with leases and requeue, a
 cross-platform runner, an installer, an offline UX, a revocation UI, and a distributed-systems test
 suite. **Prove people want Claude-grade answers before building the tier that makes them free.**
+
+**B is built.** Settings, Slash, "Your own key" takes a provider, an address, a model and a vault
+key he picks (§1), and every model call Slash makes on his behalf goes there: both passes of the
+palette, the arranger's press and first plan, and an automation's question. The Anthropic adapter
+sits beside the chat-completions one in `packages/host/src/slash.ts`, over the same `post`, so the
+key discipline is written once. Opening his key for a palette ask runs the vault's own gate, an
+owner proved in the last fifteen minutes, and so does a save that points his key somewhere.
 
 ### Cut, each with the reason
 

@@ -44,6 +44,7 @@ import { httpStatus } from './index.ts';
 
 export { DEVICE_ROUTES, type DeviceAsk, type DeviceDoor, type DeviceFlow, type DeviceStarted } from './device.ts';
 export { INVITE_ROUTES, NO_MAIL, type InviteDoor, type InviteFlow, type InviteSeen } from './invite.ts';
+export { personName } from './invite.ts';
 
 /* ── the account ─────────────────────────────────────────────────────────── */
 
@@ -76,8 +77,8 @@ export const ACCOUNT_ROUTES: readonly AccountRoute[] = [
      answers for every one they can open at all, which is the wider question the sidebar asks. */
   { path: '/account/records', method: 'GET', on: 'both', needs: 'session', what: 'Which records you can reach, each with its name and the level you hold there.' },
   { path: '/account/billing', method: 'GET', on: 'worker', needs: 'session', what: 'Each record you own, whether it is paid for, and whether this host takes payment at all.' },
-  { path: '/account/billing/checkout', method: 'POST', on: 'worker', needs: 'session', what: 'A payment page for a new record, `{ slug, name?, tz? }`, or for paying again, `{ record }`.' },
-  { path: '/account/billing/portal', method: 'POST', on: 'worker', needs: 'session', what: 'The page the payment provider keeps for a record you own, `{ record }`.' },
+  { path: '/account/billing/checkout', method: 'POST', on: 'worker', needs: 'session', what: 'A payment page for a new record, `{ slug, name?, tz?, plan? }`, or for paying again, `{ record, plan? }`.' },
+  { path: '/account/billing/portal', method: 'POST', on: 'worker', needs: 'session', what: 'The page the payment provider keeps for a record you own, `{ record }`, or `{ record, plan }` to switch its plan.' },
   { path: '/account/billing/webhook', method: 'POST', on: 'worker', needs: 'stripe', what: 'The payment provider saying a payment happened, signed over the body as it was sent.' },
   { path: '/account/close', method: 'POST', on: 'worker', needs: 'session', what: 'Close your account, `{ email }` typed to confirm, from a sign-in in the last fifteen minutes.' },
 ];

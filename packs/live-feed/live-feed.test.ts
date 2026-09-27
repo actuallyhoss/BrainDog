@@ -8,9 +8,9 @@
  * there. A record whose readings come from any other pack could not use it, and a feed that one person polls became
  * a use case compiled into the seed. This is the same declaration as a file anybody can read, with what a person
  * supplies named under `fill`. It names no pack it requires: it writes a list called `datapoints`, from whichever pack
- * declares it, and the last test says what the plan does not yet check about that. His own feeds are two fills of it
- * in the setup file he keeps beside his export, never files in the repository, so the only host the pack file names
- * is `stats.example.com`.
+ * declares it, and the last test holds the plan to refusing it on a record where no pack does. His own feeds are two
+ * fills of it in the setup file he keeps beside his export, never files in the repository, so the only host the pack
+ * file names is `stats.example.com`.
  *
  * RED FIRST, MEASURED ON SEPTEMBER 25TH AGAINST `772c0be1`: with no `fill.ts` and no pack file this file did not load,
  * ERR_MODULE_NOT_FOUND on `./fill.ts`, which is the brief's red ("at HEAD the pack does not exist").
@@ -299,22 +299,16 @@ test('A KEY NAMED BUT NOT IN THE VAULT IS REFUSED AT INSTALL, so nothing is ever
   r.sql.close();
 });
 
-test(
-  'ON A RECORD WITH NO DATAPOINTS LIST THE FEED IS REFUSED, NAMING THE LIST',
-  {
-    todo: 'pointsAt in packages/declare/src/index.ts reads fields, pages and figures and not an ingest\'s writes.register, so the plan finds nothing unresolved and the feed installs on a record that has no datapoints list',
-  },
-  async () => {
-    /* MEASURED WHILE BUILDING THIS PACK, AND NOT THIS PACK'S TO REPAIR. On a record holding Portfolio and no readings
-       list, the plan's `unresolved` was empty, the install was `ok`, and the first run counted as `ok` and `changed`
-       while every answer went to review with the suggestion "There is no register called datapoints". So the owner
-       approves a call out that runs every hour, reads as working, and files nothing. The repair is one line in the
-       shell, for every ingest: count `writes.register` among the lists a declaration points at. */
-    const r = await recordWith({ vault: true, readings: false });
-    const put = await r.put(fillFeed(template(), EXAMPLE));
-    assert.equal(put.ok, false, 'a feed installed on a record with nowhere for a reading to go');
-    assert.equal(put.refusal?.code, 'REGISTER_UNRESOLVED');
-    assert.match(put.refusal?.fix ?? '', /points at the datapoints list/);
-    r.sql.close();
-  },
-);
+test('ON A RECORD WITH NO DATAPOINTS LIST THE FEED IS REFUSED, NAMING THE LIST', async () => {
+  /* MEASURED WHILE BUILDING THIS PACK, AND NOT THIS PACK'S TO REPAIR. On a record holding Portfolio and no readings
+     list, the plan's `unresolved` was empty, the install was `ok`, and the first run counted as `ok` and `changed`
+     while every answer went to review with the suggestion "There is no register called datapoints". So the owner
+     approved a call out that ran every hour, read as working, and filed nothing. The repair is in the shell, for every
+     ingest: `pointsAt` in `packages/declare` counts `writes.register` among the lists a declaration points at. */
+  const r = await recordWith({ vault: true, readings: false });
+  const put = await r.put(fillFeed(template(), EXAMPLE));
+  assert.equal(put.ok, false, 'a feed installed on a record with nowhere for a reading to go');
+  assert.equal(put.refusal?.code, 'REGISTER_UNRESOLVED');
+  assert.match(put.refusal?.fix ?? '', /points at the datapoints list/);
+  r.sql.close();
+});

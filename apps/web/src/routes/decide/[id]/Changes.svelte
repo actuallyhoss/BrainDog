@@ -9,13 +9,35 @@
 
   `compact` IS THE QUEUE'S. There a long diff folds to its name and its count of lines, so the answer
   buttons for a proposal sit under its title and not a screen below it; the gate draws it whole.
+
+  A MOVE OF WHERE A ROW APPLIES IS TWO CHIPS (agents C8): "Where it applies: Kiln → Everywhere", each the project's
+  mark and name or the globe, and never the two row ids the proposal carries. The projects are read once a list for
+  the tab (`scope-move.ts` `placesIn`); until they arrive, and for a project this reader cannot see, a side reads
+  "A project".
 -->
 <script lang="ts">
   import { diffPlan, ref } from 'braindog-render';
   import { Diff } from 'braindog-render/svelte';
+  import { apiBase } from '$lib/at.ts';
+  import { placeNamed, placesIn, words as scopeWords, type Place, type Scope } from '$lib/record/scope-move.ts';
+  import ScopeChip from '$lib/ui/ScopeChip.svelte';
   import { words, type Updated } from './changes.ts';
 
   let { updates, compact = false }: { updates: readonly Updated[]; compact?: boolean } = $props();
+
+  /* THE PROJECTS EACH MOVE NAMES, by the list they are in, read only where a proposal moves a row. */
+  let places = $state<Record<string, Place[] | null>>({});
+  const lists = $derived([...new Set(updates.flatMap((u) => u.changes.flatMap((c) => (!c.long && c.scope ? [c.scope.to] : []))))]);
+  $effect(() => {
+    for (const to of lists)
+      void placesIn(apiBase(), to).then((got) => {
+        if (!Object.hasOwn(places, to)) places = { ...places, [to]: got };
+      });
+  });
+
+  /** One side of a move, as its chip: the project it names, or `null` for everywhere. */
+  const sideOf = (to: string, said: string | null): Scope | null =>
+    said === null ? null : (placeNamed(places[to] ?? null, said) ?? { spoken: said, name: scopeWords.someProject, mark: null, hue: null });
 </script>
 
 <ul class="changes">
@@ -39,6 +61,15 @@
             <p class="change-label">{c.label}</p>
             <Diff block={c.block} />
           </div>
+        {:else if c.scope}
+          <p class="change-line">
+            <span class="change-label">{c.label}</span>
+            <span class="plain">
+              <del class="was was-chip"><span class="vh">{words.before}: </span><ScopeChip scope={sideOf(c.scope.to, c.scope.before)} /></del>
+              <span class="move-to" aria-hidden="true">→</span>
+              <ins class="now"><span class="vh">{words.after}: </span><ScopeChip scope={sideOf(c.scope.to, c.scope.after)} /></ins>
+            </span>
+          </p>
         {:else}
           <p class="change-line">
             <span class="change-label">{c.label}</span>
@@ -133,6 +164,16 @@
     color: var(--ink);
     font-weight: 500;
     text-decoration: none;
+  }
+
+  /* A CHIP IS NOT STRUCK THROUGH: a line across a pill reads as a broken pill. The arrow after it says which side was
+     before, and a screen reader hears "Before" and "After" as it does for every other field. */
+  .was-chip {
+    text-decoration-line: none;
+  }
+
+  .move-to {
+    color: var(--dim);
   }
 
   .vh {

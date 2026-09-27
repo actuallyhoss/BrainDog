@@ -271,12 +271,11 @@ test('NO MODEL CONFIGURED SAYS SO IN WORDS, and every other route on the same ho
   const listed = (await rows.json()) as { ok: boolean; value: { rows: unknown[] } };
   assert.equal(listed.value.rows.length, 3);
 
-  /* AND THE SLASH ROUTE NOBODY HAS BUILT IS NOT SILENTLY ONE OF THE OTHERS. `/api/slash/pattern` falls through
-     to the method router and is told there is no such method, which is true, rather than being answered by a
-     door that does something else. Status with no model says the same sentence the ask does. */
-  const pattern = await ask(host.origin, {}, {}, '/api/slash/pattern');
-  assert.equal(pattern.status, 404);
-  assert.equal(pattern.body.refusal?.code, 'ROUTE_UNKNOWN');
+  /* AND THE PATTERN DOOR, BUILT IN AGT-21, SAYS THE SAME SENTENCE THE ASK DOES with no model behind it, rather than
+     falling through to the method router. Status with no model says it too. */
+  const pattern = await ask(host.origin, { samples: ['in_01JZ8QK3F7R2M9V4XN6TCB5HAD'] }, {}, '/api/slash/pattern');
+  assert.equal(pattern.status, 501, JSON.stringify(pattern.body));
+  assert.equal(pattern.body.refusal?.code, 'NOT_IN_THIS_BUILD');
   const status = await fetch(`${host.origin}/api/slash/status`);
   assert.equal(status.status, 501);
   assert.equal(((await status.json()) as Answer['body']).refusal?.code, 'NOT_IN_THIS_BUILD');
@@ -444,8 +443,9 @@ test('THE DOOR IS NOT A METHOD, which is what keeps it out of the record surface
   assert.equal(servesSlash('/api/slash/propose'), 'propose');
   assert.equal(servesSlash('/api/slash/status/'), 'status');
   assert.equal(servesSlash('/api/slash/settings'), 'settings');
-  /* `proposePattern` IS NEITHER METERED NOR CAPPED (`loop/research-spark-routes.md` F4), so it has no door yet. */
-  assert.equal(servesSlash('/api/slash/pattern'), null);
+  /* THE TWO DOORS `loop/finish/contracts.md` X26 GIVES AGT-21: the owner's list of asks, and a pattern from arrivals. */
+  assert.equal(servesSlash('/api/slash/asks'), 'asks');
+  assert.equal(servesSlash('/api/slash/pattern'), 'pattern');
 });
 
 /**

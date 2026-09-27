@@ -105,9 +105,12 @@ test('EACH RANGE MOVED WITH A VERSION OF ITS OWN, and neither admits a money-cor
      instead, 1.1.0, because its five twin doors gained `door:` on top of the wider range (one door, several patterns;
      wave forty-two), and 1.2.0 since `bank-card-used` reads and compares the limit its alert prints; the range did not
      move with it. The widening to `<4.0.0` beside money-core 3.0.0 is a patch step on each, 1.3.1 and 1.1.1, by the
-     same reason as Mercury's 1.0.1: no declaration moved. */
+     same reason as Mercury's 1.0.1: no declaration moved.
+
+     Mercury is 1.2.0 since DEF-3, a minor step for its ledger script counting money once, and the range did not
+     move with it. */
   assert.equal(bankHsbcEgFile().version, '1.3.1');
-  assert.equal(mercuryFile().version, '1.1.1');
+  assert.equal(mercuryFile().version, '1.2.0');
   for (const [name, doc] of [['bank-hsbc-eg', bankHsbcEgFile()], ['mercury', mercuryFile()]] as const) {
     const range = (doc.requires as { packs: Record<string, string> }).packs['money-core']!;
     assert.deepEqual(

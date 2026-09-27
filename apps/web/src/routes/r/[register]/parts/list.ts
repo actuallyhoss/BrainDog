@@ -116,6 +116,25 @@ export const wayOf = (field: string, decl: RegisterDecl | undefined): readonly [
 };
 
 /**
+ * THE FIELD A ROW'S TONE IS ABOUT: the register's `day` field declared `deadline:`, the one `toneOf`
+ * (`lib/record/api.ts`) dates a row by. A table marks this column as the one that carries the tone,
+ * so the dot sits beside the date that made the row late or close (design DSN-7). It was the state
+ * column, and a red dot beside "Open" said overdue while the word beside it said something else.
+ */
+export const deadlineOf = (decl: RegisterDecl | undefined): string | undefined =>
+  decl?.fields.find((f) => f.type === 'day' && f.deadline)?.id;
+
+/**
+ * A FINISHED ROW CARRIES NO COLOUR. `toneOf` calls a row in a `done` state `good`, which drew a green
+ * dot beside every "Paid" and "Cleared" on a list and beside "Cancelled" too. A normal state is the
+ * calm one (design-brief §10): a list draws a row late or close, and a finished row says it is
+ * finished in its own word. The rows keep every other field as they came.
+ */
+export function withoutGood<R extends { tone?: Tone | undefined }>(rows: readonly R[]): R[] {
+  return rows.map((r) => (r.tone === 'good' ? { ...r, tone: undefined } : r));
+}
+
+/**
  * The `sort` parameter a press on `field` writes: ascending on a new field, and the other way on the
  * field already sorted ascending.
  *

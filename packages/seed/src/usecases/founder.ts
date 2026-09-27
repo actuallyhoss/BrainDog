@@ -23,7 +23,7 @@ import { DUE_THIS_WEEK } from '../modules/money.ts';
 import { projectTemplate } from '../modules/portfolio.ts';
 
 /** The lists a founder's record holds once its five modules and this pack are in, services among them. */
-const HOLDS = ['things', 'people', 'accounts', 'obligations', 'services', 'tasks', 'tracks', 'runs', 'updates', 'organisations', 'datapoints'];
+const HOLDS = ['things', 'people', 'accounts', 'obligations', 'transactions', 'services', 'tasks', 'tracks', 'runs', 'updates', 'organisations', 'datapoints'];
 
 /**
  * THE NUMBERS BLOCKS, ONCE, for the dashboard, an organisation and a project: which field is which, the example left
@@ -55,8 +55,12 @@ export const FOUNDER = {
      but `page.home-founder` now requires `register.services`, which is the same kind of step 1.4.0 was.
 
      1.5.1 BECAUSE HOME'S EMPTY TITLE LOSES ITS FULL STOP. A title ends without one everywhere else, and a record
-     is offered the words only when the version goes up. */
-  version: '1.5.1',
+     is offered the words only when the version goes up.
+
+     1.6.0 BECAUSE THE PROJECT PAGE TAKES PORTFOLIO 1.5.0'S TEMPLATE: the questions waiting on a project, what
+     changed on it, its plan on a time axis and its money by month, over the same registers this use case already
+     lists (`transactions` joins `HOLDS` so the money series draws). */
+  version: '1.6.0',
   title: 'Solo founder',
   summary: 'The organisations you run, the money across them, and the numbers your projects report.',
   author: 'BrainDog',

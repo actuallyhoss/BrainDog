@@ -377,13 +377,42 @@
     {
       "kind": "pack",
       "id": "mercury-company",
-      "title": "mercury-company",
+      "title": "Mercury",
       "summary": "Reads the balance of every Mercury account from api.mercury.com every 1h, into Money's accounts, and its last thirty days of transactions into the ledger.",
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.1.1",
+      "latest": "1.2.0",
       "versions": [
+        {
+          "version": "1.2.0",
+          "checksum": "e1279d5004954603b672fa3d9f3db8dbc810c852cf3940567670620571987afd",
+          "bytes": 17264,
+          "published_at": "2026-09-27T22:16:05.238Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "api.mercury.com",
+                "line": "CALLS OUT api.mercury.com · every 1h · grant \"none\"",
+                "key": null
+              },
+              {
+                "host": "api.mercury.com",
+                "line": "CALLS OUT api.mercury.com · every 1h · key \"Mercury (read only)\" to the host its vault entry opens",
+                "key": "Mercury (read only)"
+              }
+            ]
+          }
+        },
         {
           "version": "1.1.1",
           "checksum": "2d83f1498c42a331572940b818afd60b525e490760916674b700791ca97c9907",
@@ -740,8 +769,32 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.0.1",
+      "latest": "1.1.0",
       "versions": [
+        {
+          "version": "1.1.0",
+          "checksum": "9594d6abf7422bca1ec7d592482dcb1937e367ffbde476bf40e82e05d5ae14f5",
+          "bytes": 10677,
+          "published_at": "2026-09-27T22:16:05.238Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "api.stripe.com",
+                "line": "CALLS OUT api.stripe.com · every 1h · key \"stripe\" to the host its vault entry opens",
+                "key": "stripe"
+              }
+            ]
+          }
+        },
         {
           "version": "1.0.1",
           "checksum": "641ecc213d2896af9f3b03faa945f4c68310b416066a38b2fb630be010c15c9d",

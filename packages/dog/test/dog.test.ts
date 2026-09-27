@@ -45,7 +45,6 @@ function corpus(): Found[] {
   const into = new Map<string, Found>();
   pagesIn(Object.values(seed), 'seed', into);
   pagesIn(seed.pageDeclarations(), 'seed', into);
-  pagesIn(seed.projectWithRunsOn(), 'seed', into);
   pagesIn(seed.agentsPackDocument(), 'seed', into);
   for (const id of seed.FIRST_PARTY) pagesIn(seed.firstPartyDocument(id), 'seed', into);
   for (const u of USE_CASES) {

@@ -279,3 +279,37 @@ test('A HYPHEN BEFORE A LETTER IS A REFERENCE AND NOT A SIGN', () => {
   assert.deepEqual(parseMoney('1,250.00- EGP', TABLE), money(-125000, 'EGP'));
   assert.deepEqual(parseMoney('(EGP 1,250.00-)', TABLE), money(-125000, 'EGP'));
 });
+
+/**
+ * A DATE NEVER TAKES THE CURRENCY, and its first field did.
+ *
+ * The tokenizer refuses every field of a date but the first, because only the later ones have a digit behind
+ * the slash. So the `14` of `14/08/2026` was a figure, and in `Amount 120.00 EGP 14/08/2026` it took as its
+ * prefix the `EGP` the real amount had already read as its suffix: EGP 14.00 beside EGP 120.00. The year of an
+ * ISO date and the hour of a time start the same way, so `scanMoney` now skips all three.
+ *
+ * READ LEFT TO RIGHT, as before. The amount keeps the code it found first, and a code between two real
+ * figures still reads for both, which `5.00 EGP 245.00` above pins and HSBC Egypt's `From HSBC:` line needs.
+ */
+test('A DATE NEVER TAKES THE CURRENCY, not its day, not its year and not its hour', () => {
+  assert.deepEqual(scanMoney('Amount 120.00 EGP 14/08/2026', TABLE), [money(12000, 'EGP')]);
+  assert.deepEqual(scanMoney('Amount 120.00 EGP 14/08/2026', TABLE, 'USD'), [money(12000, 'EGP')], 'nor the fallback');
+  assert.deepEqual(scanMoney('Amount 120.00 EGP 2026-08-14', TABLE), [money(12000, 'EGP')], 'the ISO year');
+  assert.deepEqual(scanMoney('EGP 120.00 on 14/08/2026 16:42', TABLE, 'EGP'), [money(12000, 'EGP')], 'the hour');
+  /* With a declared currency the day came first and was the answer, ahead of the amount the line was about. */
+  assert.deepEqual(parseMoney('on 29/08/26 EGP 5.00', TABLE, 'USD'), money(500, 'EGP'));
+});
+
+/**
+ * A SPACE AFTER A POINT ENDS THE FIGURE, so two figures side by side are two tokens.
+ *
+ * `USD 5.00 6.00` was one token holding a point, a space and a point, which no shape reads, so the USD 5.00
+ * written plainly at its start was lost with it. A space still groups where nothing else has: `1 250,00` is
+ * one figure, and a card number printed in fours is one figure no shape reads rather than four amounts.
+ */
+test('A FIGURE AFTER A FINISHED FIGURE IS A SECOND FIGURE', () => {
+  assert.deepEqual(scanMoney('USD 5.00 6.00', TABLE), [money(500, 'USD')]);
+  assert.deepEqual(scanMoney('USD 5.00 6.00', TABLE, 'EGP'), [money(500, 'USD'), money(600, 'EGP')]);
+  assert.deepEqual(scanMoney('1 250,00 EUR', TABLE), [money(125000, 'EUR')]);
+  assert.deepEqual(scanMoney('card 4471 1234 5678 9012', TABLE, 'EGP'), []);
+});

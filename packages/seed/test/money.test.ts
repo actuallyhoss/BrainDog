@@ -298,7 +298,7 @@ test('AN INSTALMENT DUE IS TOLD AND NOT ASKED, so the gate keeps only the questi
   const open = k.governance('suggestion', { status: 'open' });
   assert.ok(open.ok, sayOf(open));
   const asked = open.value.map((q) => String((q as { opened_by?: unknown }).opened_by ?? '')).filter((by) => by.startsWith('rule:'));
-  assert.deepEqual([...new Set(asked)].sort(), ['rule:cash-stale', 'rule:invoice-late'], 'a money rule started asking, or stopped');
+  assert.deepEqual([...new Set(asked)].sort(), ['rule:invoice-late', 'rule:recurring-missed'], 'a money rule started asking, or stopped');
 });
 
 /* ── the four figures a night holds ──────────────────────────────────────── */
@@ -661,13 +661,14 @@ const blockOf = (k: Kernel, slug: string, heading: string): DrawnBlock => {
  * with them.
  */
 test('MONEY IS ONE PAGE, and every block on it answers on the sample without a refusal', async () => {
-  assert.deepEqual(Object.keys(MONEY_PAGES), ['money'], 'money-core declares a page besides Money');
+  assert.deepEqual(Object.keys(MONEY_PAGES), ['money', 'money-book'], 'money-core declares a page besides Money and one a book');
   const page = MONEY_PAGES.money!;
   assert.equal(page.title, 'Money');
   assert.ok(!(page.requires as string[]).includes('register.people'), 'Money needs People again');
   const headings = (page.blocks as { heading?: string }[]).map((b) => b.heading);
   assert.deepEqual(headings, [
     'What you have',
+    'What you have, by book',
     'Accounts',
     'Add an account',
     'Waiting on you',
@@ -675,6 +676,7 @@ test('MONEY IS ONE PAGE, and every block on it answers on the sample without a r
     'The next 30 days',
     "Where this month's money went",
     'Coming up',
+    'Being chased',
     'Late to you',
     'Late to pay',
     'In and out, by month',
@@ -836,7 +838,7 @@ test('EVERY MONEY FIGURE IS IN THE CURRENCY THE RECORD CHOSE, and every money ce
 test('EVERY MONEY FIGURE IT DECLARES COMES BACK IN THE CURRENCY ITS OWN ROWS CARRY, or carries none at all', async () => {
   const k = await seeded();
   const sample = String((ACCOUNTS[0]!.balance as { currency: string }).currency);
-  const read = Object.values(MONEY_METRICS).filter((m) => m.format === 'money');
+  const read = Object.values(MONEY_METRICS).filter((m) => m.format === 'money' && !JSON.stringify(m).includes('{{it}}'));
   assert.ok(read.length > 0, 'no money figure was read, so this test would pass over nothing');
 
   for (const m of read) {

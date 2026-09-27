@@ -59,6 +59,7 @@
   import { rowsAsCards } from '$lib/ui/body.svelte.ts';
   import { keptColumns, viewReader, type ViewReader, type Viewed } from '$lib/record/views-live.ts';
   import { closed, drew, opened } from '../../../lib/ui/screen.svelte.ts';
+  import { deadlineOf, withoutGood } from '../../r/[register]/parts/list.ts';
 
   /**
    * A register's named predicate, never a free-form slug.
@@ -66,7 +67,7 @@
    * THE SENTENCE IS DERIVED, NOT TYPED. It used to be a `says:` string beside the filters, and the
    * two disagreed: Overdue printed "state is open or part, and due is before today" above a list
    * that only filtered on state, so 28 rows were drawn under the word Overdue and 24 of them were
-   * not overdue — row four was due in four days. A printed predicate that is not the predicate is
+   * not overdue: row four was due in four days. A printed predicate that is not the predicate is
    * worse than none, because it is checkable and wrong.
    *
    * WHICH IS WHY A LIVE VIEW MAY PRINT NO SENTENCE AT ALL. The record holds the predicate as a
@@ -80,15 +81,15 @@
   /**
    * THE REST OF THE URL, WHICH THIS ROUTE USED TO THROW AWAY WITHOUT SAYING SO.
    *
-   * `/v/obligations.overdue?q=zzzzz` returned `4 of 38` — the same four rows as with no query at
-   * all — while `/r/obligations?q=zzzzz` correctly drew `no-results` with the term quoted. Same
+   * `/v/obligations.overdue?q=zzzzz` returned `4 of 38`, the same four rows as with no query at
+   * all, while `/r/obligations?q=zzzzz` correctly drew `no-results` with the term quoted. Same
    * record, same list, two behaviours, and this is the one in the rail on day one. A parameter read
    * by one surface and silently dropped by its twin is this build's signature failure: something
    * complete-looking that reports success and does nothing.
    *
    * `19 §1` says the saved view IS the predicate and the URL is its serialisation. So an extra
    * clause in the URL is a narrower question about the same list, and the answer is the narrower
-   * list — ANDed on, never replacing, because the view's own predicate is what makes it that view.
+   * list, ANDed on and never replacing, because the view's own predicate is what makes it that view.
    * The way back is the view's own address, which the state and the note both offer.
    */
   const q = $derived(page.url.searchParams.get('q') ?? '');
@@ -166,24 +167,39 @@
    * the `where` sentence; this is the half that knows the register, so a field is called what its
    * column is called and an enum value is written the way its cell writes it. A date clause keeps
    * its value as typed, because `today` is already a word and `display` would read it as a day.
+   *
+   * AND THE LIST'S STATE SAYS ITSELF (design SYS-6, DSN-7): "Open or part paid", and not "Filter
+   * Status is open or part". A state's values are the words a person uses for where a row is, so
+   * they need no field name in front of them; any other field keeps its name, because "Money in"
+   * alone does not say it is about which way the money went.
    */
+  const stateReads = (values: readonly string[]): string => {
+    const said = values.map((v, i) => (i > 0 && /^[A-Z][a-z]/u.test(v) ? v.charAt(0).toLowerCase() + v.slice(1) : v)).join(' or ');
+    return said.charAt(0).toUpperCase() + said.slice(1);
+  };
   const readable = (said: Filter[]): string =>
     copy.filterReads(
       said.map((f) => {
         const field = decl?.fields.find((d) => d.id === f.field);
         const dated = f.op === 'before' || f.op === 'after';
         const values = dated || !register ? f.values : f.values.map((v) => display(register, f.field, v) ?? v);
+        if (field?.type === 'enum' && field.id === decl?.state && (f.op === 'is' || f.op === 'in')) return stateReads(values);
         return copy.filterClause(field ? labelOf(field) : f.field, values, f.op);
       }),
     );
 
-  /* THE SAME CAP THE REGISTER APPLIES, because this is the same list with a different filter — and
+  /* THE SAME CAP THE REGISTER APPLIES, because this is the same list with a different filter, and
      it is the surface `13 §4.3` sends you to when a register gets big, so it was the one place a
      five-thousand-row answer was rendered whole. `Table` draws the line that says so. */
   const shown = $derived(entries.slice(0, DOM_CAP));
-  const rows = $derived(register ? toRows(register, shown, columns, clock, names) : []);
-  /* The `#` column holds the digits of the highest id in hand, as on the list this view narrows. */
-  const sized = $derived(columns.map((c) => (c.field === 'seq' ? { ...c, width: seqWidth(entries) } : c)));
+  /* WHAT A DOT MEANS IS WHAT IT MEANS ON THE LIST THIS VIEW NARROWS (`parts/list.ts`): a finished row
+     carries none, and the deadline's column carries the rest, beside the date it is about. */
+  const rows = $derived(register ? withoutGood(toRows(register, shown, columns, clock, names)) : []);
+  const dueField = $derived(deadlineOf(decl));
+  /* The number's column holds the digits of the highest id in hand, as on the list this view narrows. */
+  const sized = $derived(
+    columns.map((c) => ({ ...(c.field === 'seq' ? { ...c, width: seqWidth(entries) } : c), tone: c.field === dueField })),
+  );
 
   let focus = $state({ row: 0, col: 1 });
   let binding = $state(false);
@@ -279,7 +295,9 @@
 {:else}
   <PageHead icon={iconFor(decl.icon, 'rows')} kicker={decl.name} back={register ? `/r/${register}` : undefined} title={name} count={matched} {total}>
     {#snippet actions()}
-      <Button weight="bare" href="/r/{register}"><Icon name="external" size="s" />Open {decl.name}</Button>
+      <!-- NO LEAVING GLYPH: the list is in this app, one step up, and an arrow out of the page said it
+           was somewhere else (design §2.9). -->
+      <Button weight="bare" href="/r/{register}">{copy.openUnfiltered(decl.name)}</Button>
       <!-- `BindBlock`'s own file header opens "THIS IS THE WHOLE WIZARD", which is what `13 §10`
            means by a page builder. It opened and worked on a phone. -->
       <span class="bind-slot">
@@ -308,8 +326,9 @@
          length is what is asked, not the array, and `extra` counts too so a `?f=` clause over an
          unfiltered view is still written out. -->
     {#if filters?.length || narrowed || live?.search}
+      <!-- THE SENTENCE STANDS ON ITS OWN, with no "Filter" in front of it: under the view's name it
+           can only be what the view shows. -->
       <p class="predicate">
-        <span class="predicate-label">Filter</span>
         {#if filters && filters.length + extra.length > 0}<span class="predicate-said">{readable([...filters, ...extra])}</span>{/if}
         <!-- A SAVED VIEW REMEMBERS WHAT WAS IN THE BOX, and the record has stored it all along with
              nothing reading it back. It is quoted as typed, like `q`, because it is text somebody typed. -->
@@ -325,7 +344,7 @@
       THE FIVE STATES, WHICH THIS ROUTE HAD NONE OF.
 
       Its only `<Empty>` was the 404. At zero matching rows it drew a header, a `0`, the filter chip,
-      a bare column-header row and about 1,200px of blank canvas — on the surface `19 §1` calls the
+      a bare column-header row and about 1,200px of blank canvas, on the surface `19 §1` calls the
       up half of the two-altitude ladder, and the one thing in the rail under Obligations on day one.
 
       TWO DIFFERENT NOTHINGS, and this is the whole of `19 §6`'s argument. A list nobody has typed
@@ -352,11 +371,15 @@
       </Empty>
     {/if}
 
-    <!-- ONE BODY AT A TIME, in the document and not only in the stylesheet — the register's own
-         measurement: both bodies were built at every width and one was hidden, so a list of 2,614
-         rows held 4,001 rows and 102,681 nodes and took eight seconds to settle. -->
+    <!-- ONE BODY AT A TIME, in the document and not only in the stylesheet: the register's own
+         measurement is that both bodies were built at every width and one was hidden, so a list of
+         2,614 rows held 4,001 rows and 102,681 nodes and took eight seconds to settle.
+
+         THE SAME CARDS AS THE LIST, read against the same clock and naming refs by the same record's
+         names. Without them a card dated its tone by this browser's clock and named a ref by the
+         titles this tab happened to have learnt. -->
     {#if entries.length > 0 && rowsAsCards()}
-      <RowCards {register} entries={shown} />
+      <RowCards {register} entries={shown} now={clock} {names} />
     {:else}
     <div class="table-slot" class:gone={entries.length === 0}>
       <Table
@@ -381,7 +404,7 @@
       numbers.
 
       And the comment that used to sit here justified itself with *"`Table` used to draw it from
-      `aria-rowcount`, which is `-1` while a filtered list pages"* — true of the register, and this
+      `aria-rowcount`, which is `-1` while a filtered list pages"*, true of the register, and this
       route does not page at all and passes `matched`, never `-1`. It was the register's reason,
       copied onto a screen it is not about.
     -->
@@ -398,6 +421,12 @@
   .table-slot.gone,
   .gone :global(.cards) {
     display: none;
+  }
+
+  /* ONE HAIRLINE BETWEEN ROWS AND NONE AROUND THE TABLE, as on the list this view narrows: the last
+     row's own line closed the list like a box. */
+  .table-slot :global(.rowgroup:not(:has(~ .rowgroup)) > .tr:last-child) {
+    border-block-end-color: transparent;
   }
 
   .predicate-q {

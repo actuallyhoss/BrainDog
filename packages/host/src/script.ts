@@ -209,8 +209,8 @@ export function grantNamed(grants: () => ReturnType<RecordApi['kernel']['grants'
  * a parent would otherwise open every name under it, whoever holds them.
  *
  * AND NEVER THE VAULT'S `slash` KEY, WHATEVER IT OPENS. On a host with no `SLASH_KEY` it is the key the included model
- * answers everybody with (`hostKeyedFromVault`), which `slashGuardedEngine` already refuses as a tier `b` key for the
- * same reason. It is matched on the label the lookup found, so naming it by its grant id is refused too.
+ * answers everybody with, which `slashGuardedEngine` already refuses as a tier `b` key for the same reason. It is
+ * matched on the label the lookup found, so naming it by its grant id is refused too.
  */
 export function keyRefused(script: string, grant: ScriptGrant, at: URL): ScriptRefusal | null {
   if (grant.label === SLASH_KEY_LABEL)

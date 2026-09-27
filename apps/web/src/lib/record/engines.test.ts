@@ -16,7 +16,7 @@ import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 
 import { costOf, fill, openRecord, readBlock as kernelBlock, type Kernel, type PageBlock as KernelBlock, type PageDeps } from '@braindog/kernel';
-import { NOW, RUNS_ON, installSeed } from '@braindog/seed';
+import { NOW, installSeed } from '@braindog/seed';
 
 import { page, readBlock as webBlock } from './fixtures/readers.ts';
 import { tileOf } from './news-live.ts';
@@ -189,25 +189,6 @@ test('Kiln’s fenwick tool hides the global one, and keys and learnings add up,
     }
   const keys = await both('credentials', 'Kiln');
   assert.ok(keys.kernel.rows.includes('Nordhaven API @ Everywhere') && keys.kernel.rows.includes('Fenwick deploy key @ Kiln'), keys.kernel.rows.join(', '));
-});
-
-test('“RUNS ON”, AS THE PROJECT TEMPLATE DECLARES IT, names the rows the record answered', async () => {
-  const deps = await seeded;
-  for (const project of ['Kiln', 'Portage'])
-    for (const declared of RUNS_ON.blocks) {
-      if (declared.kind === 'section') continue;
-      const block = JSON.parse(JSON.stringify(declared).split('{{name}}').join(project)) as KernelBlock & PageBlock;
-      const title = block.columns![0]!.field;
-      const kernel = kernelBlock(deps, block);
-      const web = webBlock(block);
-      const at = `${String(block.heading)} on ${project}`;
-      assert.deepEqual(kernel.refusals, [], `${at}, the kernel: ${JSON.stringify(kernel.refusals)}`);
-      assert.deepEqual(web.refusals, [], `${at}, the app: ${web.refusals.join('; ')}`);
-      const rows = kernel.rows.map((r, i) => `${String(r.fields[title])} @ ${kernel.scopes?.[i] ?? 'Everywhere'}`);
-      assert.deepEqual(web.rows.map((r) => `${r.cells[0]} @ ${r.cells[1]}`), rows, at);
-      assert.deepEqual({ inherited: web.inherited, matched: web.total }, { inherited: kernel.inherited, matched: kernel.matched }, at);
-      if (block.heading === 'Skills') assert.ok(!rows.some((r) => r.startsWith('chase-invoice')), `${at}: a retired skill is listed`);
-    }
 });
 
 test('KILN AND PORTAGE DRAW "RUNS ON" on the seeded record, with no block refused', () => {

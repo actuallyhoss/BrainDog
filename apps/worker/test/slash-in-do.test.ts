@@ -12,14 +12,16 @@
  * is the record's model being configured and never builds the engine, so the palette offers the ask; the ask itself was the
  * 500. The flag is asserted true on the run that failed as well as on the run that passed, so the test says which half moved.
  *
- * THE MODEL IS A `node:http` SERVER ON 127.0.0.1 AND IT IS COUNTED. A 200 that never reached the model reads as green if only
- * the status is checked, and that is exactly what this file found once the pragma was guarded: see the `todo` at the end.
+ * THE MODEL IS HIS OWN KEY'S, AND IT IS COUNTED (`loop/finish/defects.md` G4). The Worker has no endpoint of its own any more;
+ * a record reaches a model it did not come with only through the key its owner picked. So the owner puts an API token in
+ * the vault through the key door, picks it in Settings with a provider, an address and a model, and the ask is answered by
+ * Miniflare's `outboundService`, which is every `fetch` the Worker makes. It counts the calls and keeps the address and the
+ * header each carried. A 200 that never reached the model reads as green if only the status is checked, which is what
+ * this file once found; and a call that reached it without the key is the fault S2 names, so the header is asserted too.
  */
 
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { createServer, type Server } from 'node:http';
-import type { AddressInfo } from 'node:net';
 import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -27,10 +29,14 @@ import { createClient, type Client } from '../../../packages/client/src/index.ts
 
 const fromWrangler = createRequire(createRequire(import.meta.url).resolve('wrangler/package.json'));
 const esbuild = fromWrangler('esbuild') as { build(o: object): Promise<{ outputFiles: { text: string }[] }> };
-const { Miniflare, convertV4MiniflareOptions } = (await import(pathToFileURL(fromWrangler.resolve('miniflare')).href)) as {
+const miniflare = (await import(pathToFileURL(fromWrangler.resolve('miniflare')).href)) as {
   Miniflare: new (o: object) => { ready: Promise<URL>; dispose(): Promise<void> };
   convertV4MiniflareOptions(o: object): object;
+  Response?: typeof Response;
 };
+const { Miniflare, convertV4MiniflareOptions } = miniflare;
+/* MINIFLARE'S OWN `Response` WHERE IT EXPORTS ONE, since a handler it calls answers in its classes; the global otherwise. */
+const Answer = miniflare.Response ?? Response;
 
 const HOST = 'app.example.test';
 const ORIGIN = `https://${HOST}`;
@@ -39,28 +45,32 @@ const SLUG = 'asking';
 /* NOT SECRETS. They guard a Worker that lives in this process for a few seconds. */
 const PROVISION_KEY = 'slash-in-do-operator-key-not-a-secret';
 const SESSION_SECRET = 'slash-in-do-session-secret-not-a-secret-0123456789';
-/* THE FAKE KEK `slash-demo.test.ts` uses: bound, so the Worker has a key path and builds a model at all. */
+/* THE FAKE KEK `slash-demo.test.ts` uses: bound, so the Worker can seal and open a key of the owner's at all. */
 const FAKE_KEK = '0'.repeat(64);
+/* HIS PROVIDER, an address on a name reserved for tests, which `slashBaseUrlOf` reads as public and nothing resolves. */
+const PROVIDER = 'https://model.example.test/v1';
+/* NOT A SECRET: the value put in the vault for this run, so the header the provider sees can be told to be his. */
+const HIS_TOKEN = 'slash-in-do-provider-token-not-a-secret';
 
 let mf: InstanceType<typeof Miniflare> | undefined;
-let model: Server | undefined;
 let calls = 0;
+const reached: { url: string; authorization: string | null }[] = [];
 let base = '';
 let cookie = '';
 
 before(async () => {
-  /* ONE CHAT COMPLETION, the pass-1 draft `slash-demo.test.ts` answers with: no register named, no predicate, a keyword. */
-  model = createServer((req, res) => {
+  /* ONE CHAT COMPLETION, the pass-1 draft `slash-demo.test.ts` answers with: no register named, no predicate, a keyword.
+     Anything else the Worker fetches is answered 502 and counted too, so a call to somewhere unexpected is seen. */
+  const provider = (request: Request): Response => {
     calls++;
-    req.resume();
-    req.on('end', () => {
-      const content = '{"registers":[],"where":null,"q":"open"}';
-      res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ choices: [{ message: { role: 'assistant', content } }], usage: { prompt_tokens: 1, completion_tokens: 1 } }));
+    reached.push({ url: request.url, authorization: request.headers.get('authorization') });
+    if (!request.url.startsWith(PROVIDER)) return new Answer('not the provider', { status: 502 });
+    const content = '{"registers":[],"where":null,"q":"open"}';
+    return new Answer(JSON.stringify({ choices: [{ message: { role: 'assistant', content } }], usage: { prompt_tokens: 1, completion_tokens: 1 } }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
     });
-  });
-  await new Promise<void>((resolve) => model!.listen(0, '127.0.0.1', resolve));
-  const endpoint = `http://127.0.0.1:${String((model.address() as AddressInfo).port)}/v1/chat/completions`;
+  };
 
   const built = await esbuild.build({
     entryPoints: [fileURLToPath(new URL('../src/index.ts', import.meta.url))],
@@ -82,13 +92,14 @@ before(async () => {
       compatibilityFlags: [],
       durableObjects: { RECORD: { className: 'Record$', useSQLite: true }, DIRECTORY: { className: 'Directory$', useSQLite: true } },
       queueProducers: { INGRESS: 'braindog-ingress' },
+      outboundService: provider,
+      /* NO `AI` AND NO `SLASH_INCLUDED`: the included model is off, so the only model this Worker can reach is his key. */
       bindings: {
         PUBLIC_HOST: HOST,
         SESSION_SECRET,
         PROVISION_KEY,
         PROVISION_WITHOUT_KEYS: 'yes',
         BRAINDOG_BUILD: '',
-        SLASH_ENDPOINT: endpoint,
         KEK: FAKE_KEK,
       },
     }),
@@ -118,11 +129,22 @@ before(async () => {
   assert.ok(filed.ok, `the pack could not be offered: ${JSON.stringify(filed)}`);
   const accepted = await owner().call('decide', { id: filed.value.id, decide: { option: 'accept', reason: 'the ask needs a list to read' } });
   assert.ok(accepted.ok, `the pack would not install: ${JSON.stringify(accepted)}`);
+
+  /* HIS KEY, PUT IN THROUGH THE KEY DOOR AS AN API TOKEN, and picked in Settings by its grant id. The sign-in above is a
+     proof of a moment ago, so the vault's gate that both the key door and a save pointing his key somewhere ask is open. */
+  const put = await owner().putKey({ label: 'model provider', opens: 'Slash', value: HIS_TOKEN, kind: 'api_token' });
+  assert.ok(put.ok, `the key door would not take his key: ${JSON.stringify(put)}`);
+  const grants = await owner().listGrants();
+  assert.ok(grants.ok, JSON.stringify(grants));
+  const grant = (grants.value as { id: string; label: string }[]).find((g) => g.label === 'model provider');
+  assert.ok(grant, 'the key door filed no grant for his key');
+  const saved = await owner().slashSettings({ source: 'key', provider: 'openai', base_url: PROVIDER, model: 'his-model', grant_id: grant.id });
+  assert.ok(saved.ok, `Settings would not save his own key: ${JSON.stringify(saved)}`);
+  assert.equal(calls, 0, 'something was sent before anything was asked');
 });
 
 after(async () => {
   await mf?.dispose();
-  await new Promise<void>((resolve) => (model ? model.close(() => resolve()) : resolve()));
 });
 
 const owner = (): Client =>
@@ -161,19 +183,27 @@ test('THE ASK IS ANSWERED ON A DURABLE OBJECT, and not a 500 naming SQLITE_AUTH'
   assert.equal(typeof reading.value?.ask_id, 'string');
 });
 
-/* A SECOND FAULT BEHIND THE FIRST, and not this file's to repair. With the pragma guarded the ask answers 200, but the model is
-   never called: workerd throws `Invalid redirect value, must be one of "follow" or "manual"` out of `fetch` at the
-   `redirect: 'error'` in `packages/host/src/slash.ts`'s `post`, `core.run` reads that as `UNREACHABLE`, and pass 1 falls back to
-   the question as keywords. Measured on 22 September by logging the throw inside workerd, and then by bundling this same file
-   with that one value swapped for `'manual'` in memory: both tests went green with exactly one call to this server. So Miniflare
-   does reach 127.0.0.1; the Worker's own request is what is refused. The record's model (`endpointModel`) posts through the same
-   function, so `slashPropose` and `slashForm` on the Worker fall to the rules the same way. When `post` is repaired this `todo`
-   passes, and the marker comes off. */
-test(
-  'THE ASK REACHES THE MODEL, exactly once',
-  async () => {
-    const out = await ask();
-    assert.equal(out.status, 200, out.body);
-    assert.equal(out.calls, 1, `the ask did not reach the model exactly once: ${out.body}`);
-  },
-);
+/* `post` SENDS WITH `redirect: 'manual'`, which workerd takes; it once sent `'error'`, which workerd refuses outright, and the
+   ask then answered 200 on the question as keywords with no call made (measured on 22 September). */
+test('THE ASK REACHES HIS KEY, exactly once, at the address he named, carrying the key he picked', async () => {
+  const from = reached.length;
+  const out = await ask();
+  assert.equal(out.status, 200, out.body);
+  assert.equal(out.calls, 1, `the ask did not reach his provider exactly once: ${out.body}`);
+  assert.deepEqual(reached.slice(from), [{ url: `${PROVIDER}/chat/completions`, authorization: `Bearer ${HIS_TOKEN}` }]);
+});
+
+/* HIS ASKS ARE LISTED AND NOT CAPPED (`loop/finish/agents.md` §5 item 7), and the one count that feeds the list is the one
+   status reads, so the asks above are in it. */
+test('ON HIS OWN KEY STATUS SAYS SO: the source, the provider, and a count with no cap', async () => {
+  const status = await owner().slashStatus();
+  assert.ok(status.ok, JSON.stringify(status));
+  assert.equal(status.value.source, 'key');
+  assert.equal(status.value.provider, 'openai');
+  assert.equal(status.value.model, 'his-model');
+  assert.equal(status.value.asks.capped, false);
+  assert.ok(status.value.asks.used >= 1, `the asks on his key were not counted: ${JSON.stringify(status.value)}`);
+  const asks = await owner().slashAsks();
+  assert.ok(asks.ok, JSON.stringify(asks));
+  assert.ok(asks.value.asks.some((a) => a.question === 'What is still open?'), JSON.stringify(asks.value));
+});

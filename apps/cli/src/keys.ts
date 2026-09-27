@@ -1,7 +1,7 @@
 /**
- * `braindog keys put <label>` and `braindog keys exec <label> -- <command>`: a key into the vault, and a key handed to
- * one command, through the host's key doors, under a vault grant (`loop/research-agent-path.md` §5.7,
- * `docs/48-SPEC-CLI.md` §2).
+ * `braindog keys put <label>`, `braindog keys exec <label> -- <command>` and `braindog keys headers <credential> --as
+ * <Header>`: a key into the vault, a key handed to one command, and a key handed to one program as the header it asks
+ * for, through the host's key doors, under a vault grant (`loop/research-agent-path.md` §5.7, `docs/48-SPEC-CLI.md` §2).
  *
  * `put` WITH NO VAULT GRANT TO USE SENDS THE LOGIN INSTEAD (`loop/finish/agents.md` C1). The deposit door takes a
  * `write` token too, and the record puts the key in this run's project as a NEW key: a label already there is refused
@@ -12,9 +12,14 @@
  * THE VALUE IS NEVER AN ARGUMENT. `put` reads it from standard input, because an argument is kept in shell history
  * and shown in every process list.
  *
- * AND NO COMMAND PRINTS A KEY. `exec` reads one back and puts it into the environment of the command after `--`,
- * under one variable, and nowhere else: not standard output, not standard error, not a file. A printed key lands in
- * a terminal's scrollback or an agent's transcript, which is the leak §5.7 closes by having no such command.
+ * AND ONE COMMAND PRINTS A KEY, TO A PROGRAM AND NEVER TO A PERSON. `exec` reads one back and puts it into the
+ * environment of the command after `--`, under one variable, and nowhere else: not standard output, not standard
+ * error, not a file. A printed key lands in a terminal's scrollback or an agent's transcript, which is the leak §5.7
+ * closes. `headers` is the one exception (`loop/finish/agents.md` C9, owner item 3): Claude Code's `headersHelper`
+ * reads an HTTP server's headers only from a command's standard output, so a key an HTTP tool needs in a header can
+ * reach it no other way. It refuses standard output that is a terminal before it reads or sends anything, it opens
+ * the key under a vault grant as `exec` does, which the host logs as a `grant.read`, and it prints the one header
+ * document and nothing else.
  *
  * NOR IS A KEY PUT WHERE IT CHANGES THE COMMAND. A name such as `NODE_OPTIONS`, `LD_PRELOAD` or `PATH` is refused
  * before any request, whether `--as` names it or a label makes it. On Windows a `.cmd` such as `pnpm` or `npx` is
@@ -22,15 +27,15 @@
  * command line.
  *
  * ONE OF THE THREE FILES THE `Plaintext` BRAND LIVES IN. The value is typed `Plaintext` where it is read and where
- * the host's answer is parsed. It leaves this file in the request `depositOne` sends and in the environment
- * `execOne` hands to the command, the two recorded exemptions in `secret-grep`.
+ * the host's answer is parsed. It leaves this file in the request `depositOne` sends, in the environment `execOne`
+ * hands to the command, and in the header `headersOne` prints, the recorded exemptions in `secret-grep`.
  *
  * NO SENTENCE HERE QUOTES A VALUE, A BEARER, A LABEL OR A VARIABLE NAME. A label or a name is echoed by nobody,
  * because a value pasted in its place would otherwise be printed to stderr, which ends up in an agent's logs.
  */
 
 import { spawn } from 'node:child_process';
-import { statSync } from 'node:fs';
+import { statSync, writeFileSync } from 'node:fs';
 import { win32 } from 'node:path';
 import { parseArgs } from 'node:util';
 
@@ -65,6 +70,8 @@ export type KeysIo = {
   headers: (host: string) => Promise<Record<string, string>>;
   /** How `exec` starts its command: `spawnInherit` on a real terminal. */
   spawn: Spawner;
+  /** Whether standard output is a terminal, which `headers` refuses: `process.stdout.isTTY` unless a test says. */
+  terminal?: (() => boolean) | undefined;
   /** The platform the command starts on: `process.platform` unless a test names another. */
   platform?: string | undefined;
   /** Whether a path is a file, for finding a command through PATH on Windows. */
@@ -85,6 +92,13 @@ const SPOKEN = /^[a-z][a-z0-9_]{0,63}#[1-9][0-9]{0,8}$/;
 
 /** An environment variable name `exec` will set. */
 const VARIABLE = /^[A-Z_][A-Z0-9_]*$/;
+
+/**
+ * A header name `headers` will print, and `tools write` will put in a `headersHelper` command. LETTERS, DIGITS, `-`,
+ * `_` AND `.` ONLY, a subset of what HTTP allows, because the name is written into a JSON string by hand here and
+ * into a command line a shell reads there, and none of these needs quoting in either.
+ */
+export const HEADER_NAME = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/;
 
 /**
  * NAMES THAT CHANGE HOW A PROGRAM RUNS, which a key is never put in. A value under `NODE_OPTIONS`, `LD_PRELOAD` or
@@ -318,6 +332,65 @@ function execOne(run: Launch & { name: string }, value: Plaintext, io: KeysIo): 
   return exited;
 }
 
+/**
+ * Print one key as the one header a program asks for, `{"<Header>":"<value>"}`. THE ONE PLACE A KEY IS PRINTED, and
+ * `secret-grep` names this function as its exemption from standard output and from nothing else.
+ *
+ * THE DOCUMENT IS WRITTEN BY HAND RATHER THAN SERIALISED, so the value reaches one sink and not two: the header's name
+ * is `HEADER_NAME`'s and needs no escaping, and the value is refused unless every character is one a header can carry,
+ * which leaves `"` and `\` as the only characters JSON needs escaped. Written synchronously, so it is out before the
+ * exit.
+ */
+function headersOne(header: string, value: Plaintext, io: KeysIo): number {
+  if (/[^\x20-\x7e]/.test(value)) {
+    io.say('That key holds a character a header cannot carry, such as a line break, so it was not printed.');
+    return REFUSED;
+  }
+  const quoted = value.replace(/["\\]/g, '\\$&');
+  writeFileSync(1, `{"${header}":"${quoted}"}\n`);
+  return 0;
+}
+
+/**
+ * `keys headers`: one key read back and printed as a header, for Claude Code's `headersHelper` (the file's header
+ * says why this command exists at all).
+ *
+ * REFUSED BEFORE ANYTHING IS READ OR SENT when standard output is a terminal, because then a person is reading it and
+ * not a program. A vault grant and never the login, as `exec`: the login may add a key and never read one.
+ */
+async function openHeader(label: string, flags: { as?: string | undefined; vault?: string | undefined; host?: string | undefined }, io: KeysIo): Promise<number> {
+  if ((io.terminal ?? (() => process.stdout.isTTY === true))()) {
+    io.say('braindog keys headers prints a key for a program that reads its standard output, such as a headersHelper, and standard output here is a terminal, so nothing was opened.');
+    return REFUSED;
+  }
+  if (flags.as === undefined || !HEADER_NAME.test(flags.as)) {
+    io.say('--as takes the name of the header the key goes in, such as Authorization: letters, digits, -, _ and . only.');
+    return REFUSED;
+  }
+  const header = flags.as;
+  const door = doorFor(flags, io, false);
+  if (typeof door === 'string') {
+    io.say(door);
+    return REFUSED;
+  }
+  try {
+    const ask = SPOKEN.test(label) ? { credential: label } : { label };
+    const got = await getOne(door, ask, await io.headers(door.key), io);
+    if ('refused' in got) {
+      io.say(refusedLine(door, got.refused));
+      return REFUSED;
+    }
+    return headersOne(header, got.value, io);
+  } catch {
+    if (io.signal?.aborted) {
+      io.say('Stopped before the host answered.');
+      return REFUSED;
+    }
+    io.say(`${door.key} did not answer.`);
+    return UNREACHABLE;
+  }
+}
+
 /** The variable a label becomes when `--as` is not given: upper case, other runs to `_`, no leading digits or `_`. */
 export function variableOf(label: string): string {
   return label
@@ -328,14 +401,16 @@ export function variableOf(label: string): string {
 
 const USAGE_PUT = 'braindog keys put takes one label, --opens, --kind, --vault and --host, and reads the value from standard input.';
 const USAGE_EXEC = 'braindog keys exec takes one label or spoken id, --as, --vault and --host, then -- and the command to run.';
+const USAGE_HEADERS = 'braindog keys headers takes one spoken id or label, --as with the header name, --vault and --host, and nothing else.';
 
-/** `braindog keys put|exec`, and the exit code: for `exec`, the command's own once it has run. */
+/** `braindog keys put|exec|headers`, and the exit code: for `exec`, the command's own once it has run. */
 export async function keys(args: string[], io: KeysIo): Promise<number> {
   const [verb, ...all] = args;
-  if (verb !== 'put' && verb !== 'exec') {
-    io.say('braindog keys takes put <label>, with the value on standard input, or exec <label> -- <command>.');
+  if (verb !== 'put' && verb !== 'exec' && verb !== 'headers') {
+    io.say('braindog keys takes put <label>, with the value on standard input, exec <label> -- <command>, or headers <credential> --as <Header>.');
     return REFUSED;
   }
+  const usage = verb === 'put' ? USAGE_PUT : verb === 'exec' ? USAGE_EXEC : USAGE_HEADERS;
 
   /* EVERYTHING AFTER THE FIRST `--` IS THE COMMAND, flags and all, and is never read as this command's own. */
   const cut = verb === 'exec' ? all.indexOf('--') : -1;
@@ -356,14 +431,16 @@ export async function keys(args: string[], io: KeysIo): Promise<number> {
         : parseArgs({ args: rest, allowPositionals: true, strict: true, options: { as: { type: 'string' }, vault: { type: 'string' }, host: { type: 'string' } } }));
   } catch {
     /* parseArgs quotes what it could not read, and that could be a value typed as an argument. */
-    io.say(verb === 'put' ? USAGE_PUT : USAGE_EXEC);
+    io.say(usage);
     return REFUSED;
   }
   const [label, ...more] = positionals;
   if (label === undefined || more.length > 0 || !label.trim()) {
-    io.say(verb === 'put' ? USAGE_PUT : USAGE_EXEC);
+    io.say(usage);
     return REFUSED;
   }
+  /* `headers` TAKES `exec`'s FLAGS AND NO COMMAND, and has a path of its own from here. */
+  if (verb === 'headers') return openHeader(label.trim(), values, io);
 
   /* REFUSED BEFORE ANYTHING IS READ OR SENT, so a mistake costs nothing. */
   let run: (Launch & { name: string }) | null = null;

@@ -40,14 +40,16 @@ of four codes (§4.4).
 
 | Command | Arguments · flags | Calls | Prints | Exit |
 |---|---|---|---|---|
+| `setup <host>` | `<host>` = `https://origin[/slug]` · `--dry-run` | in order, stopping at the first step that fails (§5.15): `login <host>` unless a live login for it is held; `install --apply` into the user profile; `claude mcp add-json braindog <json> --scope user` unless that entry is already there; `tools write --scope user`; `skills sync`, the last two as if outside any repository | one line per step on stdout with its command's own lines indented under it, and the six digits on stderr; last, `Nothing changed: this machine was already set up from <host>.` when no step changed anything. `--dry-run` asks for no login, writes no file, runs no `claude`, and reads the record only with a login already held | 0 · 1 · 3 |
 | `login <host>` | `<host>` = `https://origin[/slug]` · `--vault <project\|*>` | `POST /auth/device` then `POST /auth/device/token` until approved; with `--vault`, `reach: 'vault'` and `scope` | the six digits and the URL (stderr); `logged in to <host> as <label> · token expires <date>`, or with `--vault` `vault grant for <scope> on <host> kept as <label> · expires <date>`; an expired code, a denial and Ctrl+C are one sentence each | 0 · 1 · 3 |
 | `logout [<host>]` | `<host>` = `https://origin[/slug]`, or `--host <host>`; both together only when they name the same host. There is no `--all` | nothing, on the network or off it. Reads the hosts file and rewrites it with `saveHosts`: for every key that names the host (`sameHost`, so a hand-written trailing slash goes too), `token`, `runner` and the whole `vault` map, then the entry once nothing is left in it, then `default` when it named that host. The host is never told, so the token stays live there until it expires or the owner revokes it in the app | `signed out of <host> · a token, a runner token and N vault grants removed`, and ` · no default host is set now` when the default named it; `No login to <host> is kept on this machine, so there was nothing to remove.` when there was nothing, which is 0; never a token, a label or a vault scope | 0 · 1 |
 | `keys put <label>` | `--opens <what>` · `--kind <kind>` · `--vault <project>` · `--host <host>`; the value on stdin, never an argument | `POST /api/vault/deposit { label, opens?, kind?, value }` with the vault grant as bearer and the session headers | `deposited <credentials#n> on <host> · version <n>`, or `rotated …` when the label was already a key in scope; never the value or the label | 0 · 1 · 3 |
 | `keys exec <label \| credentials#n> -- <command> [args...]` | `--as <ENV_NAME>` · `--vault <project>` · `--host <host>` | `POST /api/vault/open { label }` or `{ credential }`, as `put`; then the command, with no shell, its own standard streams, and the key in one environment variable, named by `--as` or made from the label. On Windows the command is found through PATH and PATHEXT, and a `.cmd` or `.bat` starts through `cmd.exe /d /v:off /s /c` with every argument escaped for it and the key never on that line | nothing of its own, and never the value; a missing command, a bad `--as`, a label no name can be made from, a name that changes how a command runs (§8), or a batch file's argument that cannot be escaped is one sentence before any request | the command's exit code (1 for a signal) · 1 · 3 |
-| `run <label \| credentials#n> -- <command> [args...]` | `--as <ENV_NAME>` · `--vault <project>` · `--host <host>` | `keys exec`, dispatched to unchanged. It is a shorter name, not a second door: there is still no command that prints a key | what `keys exec` prints | the command's exit code (1 for a signal) · 1 · 3 |
+| `run <label \| credentials#n> -- <command> [args...]` | `--as <ENV_NAME>` · `--vault <project>` · `--host <host>` | `keys exec`, dispatched to unchanged. It is a shorter name, not a second door, and never prints a key | what `keys exec` prints | the command's exit code (1 for a signal) · 1 · 3 |
+| `keys headers <credentials#n \| label>` | `--as <Header>`, required · `--vault <project>` · `--host <host>` | nothing when standard output is a terminal, which is refused first; otherwise `POST /api/vault/open { credential }` or `{ label }` under a vault grant and never the login, as `exec`, which the host logs as a `grant.read` (§5.16) | `{"<Header>":"<value>"}` and a line break on stdout, for a program that reads it, such as Claude Code's `headersHelper`, and nothing else. A terminal, a header name outside letters, digits, `-`, `_` and `.`, and a key holding a character a header cannot carry are one sentence each on stderr, and print no key | 0 · 1 · 3 |
 | `skills sync` | `--host <host>` · `--dry-run` | `GET /api/context`; `GET /api/get` for each skill it writes or checks; `POST /api/propose` with a rowset update of `body` and `rev` for a local edit; `POST /api/create` with `managed: false` for a file found by hand. Writes `<CLAUDE_CONFIG_DIR or ~/.claude>/skills/<name>/SKILL.md` or `commands/<name>.md`, a project's under `<top-level>/.claude/`, and the lock at `~/.braindog/skills-lock.json` | one line per file written, updated, deleted, kept and proposed, or registered, a file in a repository marked `(in the repository, not committed)`; `Skills are in sync.` when there was nothing to do | 0 · 1 · 3 |
 | `tools scan` | `--host <host>` · `--dry-run` | reads `<top-level>/.mcp.json` and `~/.claude.json` (`mcpServers`, and `projects[<path>].mcpServers`) and writes neither; `GET /api/context` and `/api/get`; `POST /api/create` for a new server, `POST /api/update` of `hosts` and `seen` for a matching row, `POST /api/propose` with a rowset for one that differs; each key through `keys put` | one line per server recorded, proposed or skipped, and one sentence when keys were recorded by name only for want of a vault grant, which the start hook says once per host until a grant is kept; never a value | 0 · 1 · 3 |
-| `tools write` | `--scope user\|project` · `--dry-run` · `--host <host>` | `GET /api/context` and `/api/get`; reads the entry already in `~/.claude.json` or `<top-level>/.mcp.json`; with `--scope`, `claude mcp remove` and `claude mcp add-json <name> <json> --scope <scope>`, only for an entry that is absent, still what `~/.braindog/tools-lock.json` says was written, or still the command the scan read | each entry it would add or replace, as `+ <name> at <scope> scope: <json>` or `~ …`, a line for each need an entry cannot carry, then what was applied; no entry holds a value | 0 · 1 · 3 |
+| `tools write` | `--scope user\|project` · `--dry-run` · `--host <host>` | `GET /api/context` and `/api/get`; reads the entry already in `~/.claude.json` or `<top-level>/.mcp.json`; with `--scope`, `claude mcp remove` and `claude mcp add-json <name> <json> --scope <scope>`, only for an entry that is absent, still what `~/.braindog/tools-lock.json` says was written, or still the command the scan read | each entry it would add or replace, as `+ <name> at <scope> scope: <json>` or `~ …`, a line for each need an entry cannot carry, then what was applied; no entry holds a value. A stdio tool's key is wrapped in `keys exec`, and an HTTP tool's header key is named by a `headersHelper` that runs `keys headers` (§5.16) | 0 · 1 · 3 |
 | `session show\|next\|tried\|note\|end` | `show` takes no argument; `next`, `tried` and `note` take one line of text in quotes; `end` takes `--state idle\|handoff\|done` (`idle` by default) · `--next <text>` · `--host <host>`. No verb names a run, because the session file for this folder does and a token that named one would be refused | `GET /api/context` for every verb, then for all but `show` `POST /api/handoff` with one of `{ next }`, `{ tried }`, `{ note }` or `{ state, next?, branch?, head? }`, as the run the session headers name | `show`: the run and its state, the last handoff left here with the last three things tried, and who else is live in this repository. The rest: one line naming the run. A folder with no session file, a `--state` outside the three, and a missing or unquoted line are one sentence each, before any request | 0 · 1 · 3 |
 | `context` | `--host <host>` | `GET /api/context`, one call, and it opens no run | the briefing, at most 40 lines and 3,000 characters, as the start hook prints it, but with a first line that names the run and where it stands rather than an event it did not have | 0 · 1 · 3 |
 | `automations list` | `--host <host>` | `GET /api/context`, then `GET /api/automations` with no `rule`: READ+, held by the record to the lists the caller reads | `Automations on this BrainDog:` and one line each: the bare id, the name when one was given, what starts it and whether as a run or inside the write, `Turned off.`, the pack and project, the next clock time, the last run's state, time and sentence, the runs still open, and this month's counts. `No automation you can read is set up on this BrainDog.` when the list is empty. Under `--json` the value is the record's `AutomationRow[]` unchanged | 0 · 1 · 3 |
@@ -84,6 +86,8 @@ Thirty commands plus `--version`, counted: the seventeen of the first design, th
 (its two events in one row), `install`, `keys put` and `keys exec`, `skills sync`, `tools scan` and `tools write`,
 and the agent path's `logout`, `run`, `session` (its five verbs in one row) and `context`. `automations` and `scripts`
 came after the count, for DIRECTION 22, and have their five rows above.
+`setup` and `keys headers` came after it too, for the agent layer's finish (`loop/finish/agents.md` C9), and have
+their rows above.
 `--json` **is built.** Exactly one JSON document on stdout, every progress line moved to stderr, and the flag is
 taken out of the arguments before dispatch so no command's own `parseArgs` has to know a global exists
 (`apps/cli/src/json.ts`). `mcp` is excluded, because its stdout is the protocol; §4.5 lists the other six.
@@ -91,7 +95,7 @@ taken out of the arguments before dispatch so no command's own `parseArgs` has t
 `default`. A host is written `https://origin[/slug]`; a bare name means https, and plain http is refused
 except to this machine, because the bearer would cross the network in the clear.
 
-**Built today: `mcp`, `hook`, `install`, `login`, `logout`, `keys put`, `keys exec`, `run`, `skills sync`, `tools scan`, `tools write`, `session`, `context`, `automations`, `scripts`, `--version`, `init` and `serve`.** The command runs from a checkout as
+**Built today: `setup`, `mcp`, `hook`, `install`, `login`, `logout`, `keys put`, `keys exec`, `keys headers`, `run`, `skills sync`, `tools scan`, `tools write`, `session`, `context`, `automations`, `scripts`, `--version`, `init` and `serve`.** The command runs from a checkout as
 `node apps/cli/src/main.ts`. Until §3's bundle exists, the manifest's `bin` points at that file and the manifest
 stays `private`, so `tools/release.mjs` does not offer a file npm could not run. `init` and `serve` are the
 self-host's, which has no `bin` of its own and tells people to type them, so this command claims the name and
@@ -109,7 +113,8 @@ measured on 2026-09-22, no method in `packages/host/src/index.ts`'s route table 
 `script` or listed script declarations (`actions` filters to `pull`, `call` and `poll`), so the id to resume was only
 in the event that paused the script. The record's READ+ `scripts` is that read now, and `list` prints it.
 
-Claude Code registers `mcp` once per profile, and no token appears in the line or in the file it writes:
+Claude Code registers `mcp` once per profile, and no token appears in the line or in the file it writes. `setup`
+runs this line itself, as its third step (§5.15):
 
 ```
 claude mcp add-json braindog '{"type":"stdio","command":"node","args":["<checkout>/apps/cli/src/main.ts","mcp","--agent","claude"]}' --scope user
@@ -402,7 +407,9 @@ streams through. `usecase preview` was the seventh and was missed at first: it s
 `stdio: 'inherit'`, so the child owns the process's stdout until Ctrl+C, and `usecase preview <file> --json` left
 `BrainDog self-host listening on ...` above the document, which `JSON.parse` throws on. Each of the seven is left
 off the flag rather than made to refuse it, so the command's own strict `parseArgs` refuses it in the command's own
-words.
+words. `keys headers` and `setup` are left off it for the same reason: the first prints the one header document a
+program reads from stdout, and the second prints for a person while its first step may wait for six digits (§5.15,
+§5.16).
 
 **No token is ever in this document**, on any path. It carries only lines a command already wrote to stdout,
 sentences it already wrote to stderr, refusals a host sent, and values a command handed over by name; the bearer is
@@ -588,36 +595,100 @@ the undo is one query (07 §6.1); the dry run is the undo by design.
 print `token <id> · <name> · <scope> · expires <date>`, a blank line, the token, then `shown once`. `list` and
 `revoke` are `listTokens {}` and `revokeToken { id }` under the same reach.
 
-### 5.13 · `runner enroll` · `runner run` (`runner.ts`)
+### 5.13 · `runner enrol` · `runner repos` · `runner run` · `runner allow` (`runner.ts`)
 
-`enroll`: `execFileSync('claude', ['--version'])` must parse to ≥ `2.1.248` (26 §5) — below it, or absent, a
-local error; then `device(host, { reach: 'runner' })`; `hosts[key].runner = { value, expires, label }`.
+*(Rewritten on 27 September 2026 for `loop/finish/agents.md` C14, against `apps/cli/src/runner.ts`, and departing
+from the first design on purpose.)* The first design ran every job in an empty `mkdtemp` folder, allowed only
+`mcp__braindog__*` tools and checked the kind against four fixed prompts. A job that reads a repository needs the
+folder it lives in and `Read`, `Grep` and `Glob`, so what a run may do is now a `job.<id>` declaration: approved once
+by the owner in Decide, installed by an ordinary `change`, and pinned once on each machine that runs it. The host
+sends a repository's name and never a path.
 
-`run [--once]` — the pull loop of 33 §11 and 46 §5 *Hold*, one job at a time:
+`enrol <host>`: Claude Code is checked first (below), so a machine that could never run a job is not enrolled to
+hold one. Then the device flow of §5.2 with `reach: 'runner'` and the label `<machine name> · braindog-cli · runner`,
+and the bearer is kept as `hosts[key].runner = { value, expires, label }`, beside the login and never in its place
+(`keepRunner` in `http.ts`). It prints the six digits and `enrolled on <host> as <label> · runner expires <date>`,
+and never the bearer.
 
-1. Version gate as above, at start and before every job.
-2. **Wait:** `call(host, 'claimJob', { wait: 20 }, runner, { timeoutMs: 30_000 })` — wait + 10 s, because `fetch` has no timeout of its own. `Idle` → sleep `idle_ms`, doubling on consecutive empties to 30,000 (46 §5); a `Claim` → step 3; `Unreachable` → one line, sleep 30 s, poll again.
-3. **Check:** `job.kind` must be one of the four and a key of `PROMPTS`, else post `error { unknown_kind }` then `end { status: 'refused' }` — a compromised host cannot invent a fifth job (26 §4.3). Every `args` value ≤ 64 bytes and without whitespace, the record's own rule (46 §5 *Create*), else the same refusal. Every `mcp.tools` entry must start `mcp__braindog__`, else the same — the job bearer is `read`+`propose`, and no other tool is ever allowed.
-4. **Prepare:** `dir = mkdtemp('braindog-job-')`, empty; `mcp.json` (mode 0600): `{ mcpServers: { braindog: { type: 'http', url: new URL(mcp.url, origin).href, headers: { Authorization: `Bearer ${bearer}` } } } }`; `schema.json` = `PROMPTS[kind].schema`; `prompt` = `PROMPTS[kind].system + '\n\n' + user` with each `%SLOT%` replaced once by `args[slot]`, never re-scanned (46 §4.5).
-5. **Spawn:** `spawn('claude', ['--restricted', '-p', prompt, '--output-format', 'stream-json', '--json-schema', schemaPath, '--strict-mcp-config', '--mcp-config', mcpPath, '--allowedTools', mcp.tools.join(','), '--permission-mode', 'dontAsk', '--max-turns', '12', '--disable-slash-commands', ...(job.claude_session ? ['--resume', job.claude_session] : [])], { cwd: dir, stdio: ['ignore', 'pipe', 'pipe'] })`. Never `--bare`; never `--dangerously-skip-permissions`.
-6. **Distil:** each stdout line → `distil(line)` → at most one event (table below), `seq` from `job.seq + 1`; `call(host, 'postJobEvent', ev, runner)` → `Ack`. `cancel = 1` → `child.kill('SIGTERM')`, post `end { status: 'cancelled' }`, stop.
-7. **Heartbeat:** 20 s without an event → `call(host, 'readCancel', { job_id }, runner)`; the reply renews the 60-second lease and carries `cancel` (46 §5 *Renew*).
-8. **Finish:** exit 0 with a `result` line → `end` with `EndBody`: `status` from the result's own `status` field, `limit` on `error_max_turns`, `error` on another `error_*`, `needs_decision` when the result names a decision — the laptop never decides (26 §5); `claude_session` from the `init` line; `turns`, `ms` from the result. Exit 143 → `end { status: 'interrupted' }`. `dir` and `mcp.json` are removed in `finally`.
-9. `--once` returns after one job; otherwise back to step 2.
+`repos add <name> <folder>`: this machine's own map, in `~/.braindog/runner.json` (`{ repos, allowed, waiting }`,
+mode 0600, written atomically). A name has the shape the kernel's lint gives a kind's `repo` (letters, digits, `.`,
+`_` and `-`); the folder must exist, and is kept as an absolute path. `repos list` prints the map. Nothing is sent.
+
+**Claude Code on the machine.** `claude --version` must parse to at least `2.1.248` (26 §5, `CLAUDE_LEAST`) at
+`enrol`, at the start of `run` and after every job; missing, silent about its version, or older is one sentence,
+and nothing is claimed. `claude --help` is read at the same moments, for the two flags of the first design that
+were never confirmed against an installed Claude Code (`loop/finish/agents.md` risk 9). On Windows a `claude.cmd`
+is found through PATH and PATHEXT and started through `cmd.exe`, as `keys exec` starts one (`planCommand`).
+
+`run [--once] [--host <host>]`, one job at a time:
+
+1. **Host.** `--host`, then `BRAINDOG_HOST`, then the one host this machine is enrolled on, then the default
+   (`runnerTarget`). The enrolment is the bearer; the login token and `BRAINDOG_TOKEN` are never read.
+2. **Wait.** `claimJob { wait: 20 }`, aborted 10 s after the wait, because a far end that vanishes without closing
+   the socket would otherwise hold the loop for ever. A claim the host held is asked again at once. One answered at
+   once with `{ job: null, idle_ms }` is asked again after `idle_ms`, doubling to 30 s, for a proxy that cannot hold
+   twenty seconds (46 §5). A host that does not answer is one line, then a claim every 30 s. Any other refusal ends
+   the command with its sentence.
+3. **Check.** The claim, `{ job: { id, kind, title, prompt, tools, turns, permission, repo, args, seq }, lease_until,
+   bearer, mcp: { url } }`, is read field by field, and the kernel's own lint (`jobBody`) runs again over what it
+   carries, so a tool, a permission mode or a prompt the record would refuse at install is refused here too. Each
+   argument is at most 64 characters and one line. `mcp.url` is resolved against the enrolled host and must stay on
+   its origin, so the job's bearer goes nowhere else. A kind that names a repository needs that name in `repos`, and
+   its folder must still be there. When the installed help lists the permission modes, the kind's must be among them.
+   Any failure posts `error { text }` and `end { status: 'refused', error }`, and Claude Code never starts.
+4. **Pin.** The first time this machine sees a kind, by the SHA-256 of `{ kind, title, prompt, tools, turns,
+   permission, repo }` with the prompt's `%arg%` slots unfilled, it prints the kind whole to stderr (where it works,
+   what it may use, how it asks, its turns and its prompt) and asks `Allow <kind> to run on this machine? [y/N]`. Yes
+   adds the hash to `allowed`; anything else refuses the job. With no terminal attached, the kind is kept under
+   `waiting` and the job is refused with a sentence naming `braindog runner allow <kind>`, which asks the same
+   question later at a terminal. A host that forges a kind cannot run it on a machine that never allowed it (owner
+   item 13). The lease is renewed while the person reads, and a Cancel in the app ends the question.
+5. **Prepare.** The working folder is the repository's mapped folder, or an empty `mkdtemp('braindog-job-')` of its
+   own when the kind names none. `mcp.json`, at mode 0600 in a `mkdtemp('braindog-mcp-')` of its own, is
+   `{ mcpServers: { braindog: { type: 'http', url, headers: { Authorization: 'Bearer <the job bearer>' } } } }`.
+6. **Spawn.** `claude -p [--restricted] [--disable-slash-commands] --output-format stream-json --verbose
+   --strict-mcp-config --mcp-config <mcp.json> --allowedTools <each of the kind's tools> --permission-mode <the
+   kind's> --max-turns <the kind's turns>`, in that folder, with no shell and without `BRAINDOG_TOKEN` in its
+   environment. The two bracketed flags are passed only where `claude --help` lists them. `--verbose` is there
+   because `stream-json` under `-p` is refused without it. Each tool is its own argument, so a named command holding
+   a comma or a space is never split. The prompt, filled once by `fillPrompt` and never re-scanned, goes on standard
+   input, so it is in no process list and needs no escaping for `cmd.exe`. `--json-schema` went with the fixed kinds,
+   which were the only thing that had a schema, and `--resume` because a claim names no session. Never `--bare`;
+   never `--dangerously-skip-permissions`.
+7. **Distil.** Each stdout line becomes the lines of the table below, numbered from the claim's `seq` plus one and
+   posted one at a time, in order, through `postJobEvent`. A post the host does not answer is sent again, a few times
+   (`POST_TRIES`), and the record answers a repeat of its last line as it did the first time. A line the record
+   refuses as too long is dropped and counted; once it refuses a job's next line as one too many, the rest are
+   dropped and counted, and the end still goes.
+8. **Renew and cancel.** A job that has posted nothing for 14 s asks `readCancel`, checked every 5 s, which renews
+   the 60-second lease; every post's answer renews it too. Either answer's `cancel: true` stops Claude Code (on
+   Windows with `taskkill /T`, because `claude.cmd` runs under `cmd.exe`) and ends the job `cancelled`, so a Cancel
+   pressed in the app is seen within twenty seconds. Any refusal of a post or a renewal other than "did not answer"
+   means the record no longer holds the job for this machine: Claude Code is stopped and nothing more is posted.
+9. **Finish.** `end` carries `{ status, result?: { text?, filed?, dropped? }, error?, claude_session?, turns?, ms? }`.
+   `ok` on a `success` result. `needs_decision` when the run filed a proposal through `mcp__braindog__propose`, with
+   `filed: [{ id, decide? }]` read from that tool's answer, because the laptop never decides (26 §5). `limit`, after a
+   `limit { turns }` line, on `error_max_turns`. `error`, after an `error { subtype, text }` line, on another
+   `error_*`, or when Claude Code ended with no result at all. `interrupted` on exit 143 or 130 or on Ctrl+C here.
+   `cancelled` on the owner's Cancel. No cost is sent: the figure in the stream is Claude Code's estimate in dollars,
+   and on the owner's own subscription it is effort, never money the owner chose to count. `mcp.json`, and the empty folder
+   when there was one, are removed in `finally`.
+10. `--once` returns after one job; otherwise back to step 2.
 
 | stream-json line | event | body |
 |---|---|---|
-| `type: system, subtype: init` | `start` | `{ model, session_id, tools: n }` |
+| `type: system, subtype: init` | `start` | `{ model, tools: n, mcp? }`, `mcp` being the braindog server's status |
 | `type: assistant`, a `text` part | `say` | `{ text: head(2000), len }` |
 | `type: assistant`, a `thinking` part | `think` | `{ text: head(500), len }` |
-| `type: assistant`, a `tool_use` part | `tool` | `{ name, input: head(2000), len }` |
-| `type: user`, a `tool_result` part | `out` | `{ text: head(2000), len }` — the fold names both lengths (18 §6) |
+| `type: assistant`, a `tool_use` part | `tool` | `{ call, name, input: head(2000), len }`, `call` counted from 1 |
+| `type: user`, a `tool_result` part | `out` | `{ call, text: head(2000), len, error? }`, `call` being its `tool` line's, so the transcript folds the two onto one row. Claude Code's own ids are not sent, because the record replaces anything that looks like a key |
 | `type: result, subtype: error_max_turns` | `limit` | `{ turns }` |
-| `type: result, subtype: success` | `end` | `EndBody` — cost is effort, never money (26 §5) |
-| `type: result`, another `error_*` | `error` | `{ subtype, message }` |
-| the runner's own | `note` | `{ text }` — version gate, cancel seen, a line type the table does not name |
+| `type: result`, another `error_*` | `error` | `{ subtype, text }` |
+| `type: result, subtype: success` | `end` | step 9 |
+| a line type this table does not name | `note` | `{ text }`, once per type (`UNREAD_MOST` types at most) |
+| the runner's own refusal (steps 3 and 4) | `error` | `{ text }`, then `end { status: 'refused', error }` |
 
-Nine kinds, the `job_event.kind` CHECK. The raw stream is never relayed (26 §5).
+The kinds are the `job_event.kind` CHECK (`JOB_EVENT_KINDS`). The raw stream is never relayed (26 §5).
 
 ### 5.14 · `init <slug>` · `dev` (spawn the self-host)
 
@@ -628,6 +699,61 @@ Nine kinds, the `job_event.kind` CHECK. The raw stream is never relayed (26 §5)
 The self-host's `init <slug>` creates `<data>/<slug>/record.brain`, runs migration 0001 and writes the owner
 into the Directory; its `dev` runs the process against a scratch data dir with the memory ports (33 §5). Both
 are [49-SPEC-SELFHOST](49-SPEC-SELFHOST.md)'s to implement (§13 D5).
+
+### 5.15 · `setup <host>` (`setup.ts`)
+
+The one line a new machine needs (`loop/finish/agents.md` C9). Each step is a command of its own, and `setup` only
+runs them in order, stopping at the first that fails with that step's sentence:
+
+1. **Sign in.** A live login is the one `target` would send for the host: the hosts file's, unexpired, or
+   `BRAINDOG_TOKEN`. Held, none is asked for; and when the hosts file keeps it while its `default` names another host
+   or none, `default` becomes this host, because the MCP entry and the hooks name no host of their own. Not held,
+   `login <host>` runs as §5.3 says, with its six digits on stderr.
+2. **Hooks.** `install` is planned dry over the user profile (`CLAUDE_CONFIG_DIR`, else `~/.claude`). When it would
+   add a hook, `install --apply` writes both, keeping the copy `settings.json.bak` first. A settings file `install`
+   cannot read stops the run with its sentence, and nothing is written.
+3. **MCP server.** The profile's servers file (`~/.claude.json` for the default profile, `<profile>/.claude.json` for
+   a named one) is read for `mcpServers.braindog`. An entry with this command's `type`, `command` and `args` is left.
+   Another entry by that name is removed first with `claude mcp remove braindog --scope user`. Then
+   `claude mcp add-json braindog '{"type":"stdio","command":"node","args":["<this command's file>","mcp","--agent","claude"]}' --scope user`,
+   run with no shell. `claude` missing, or a non-zero exit, stops the run.
+4. **Tools.** `tools write --scope user` (§2 and §5.16), over the tools the record applies everywhere.
+5. **Skills.** `skills sync`, into the profile's `skills/` and `commands/` alone.
+
+Steps 4 and 5 run as if outside any repository, so nothing at project scope is read or written: a project's
+`.mcp.json` is still written only by `tools write --scope project`, typed by hand. Each step prints one line saying
+what it did or found, then its command's own lines indented under it. The last line says the run changed nothing
+only when no step did: no login asked for, no default moved, no hook added, no entry registered, and no line from
+steps 4 and 5. `--dry-run` asks for no login, writes no file, runs no `claude`, and reads the record only with a login
+already held; without one it says steps 4 and 5 were not read.
+
+### 5.16 · `keys headers` and a tool's `headersHelper` (`keys.ts`, `tools.ts`)
+
+The one command that prints a key (`loop/finish/agents.md` C9, owner item 3). Claude Code runs an HTTP MCP server's
+`headersHelper` when it connects and reads the server's headers, as a JSON object, from that command's standard
+output and nowhere else, so a key an HTTP tool needs in a header reaches it no other way. `tools write` renders an
+HTTP tool whose `needs` hold `header:<Header>=credentials#N` as
+
+```
+{ "type": "http", "url": "<endpoint>", "headersHelper": "node \"<this command's file>\" keys headers credentials#N --as <Header>" }
+```
+
+so the entry holds the command and never the key. An entry has one helper, so a second header key is left out and
+said. The header name and the spoken id are checked before they are written into a command a shell reads, and a path
+to this command holding anything but letters, digits, spaces and `_ . : / ( ) -` leaves the header out rather than
+write it. `keys headers <credentials#n | label> --as <Header>`:
+
+1. Standard output that is a terminal is refused, before anything is read or sent: a person is reading it, not a
+   program.
+2. `--as` is required, and matches `^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$`, or it is one sentence.
+3. The vault grant `exec` would use, and never the login: a login may add a key and never read one.
+4. `POST /api/vault/open { credential }` or `{ label }`, as `exec`, which the host logs as a `grant.read`.
+5. `headersOne`: a key holding a character outside printable ASCII is refused; otherwise `{"<Header>":"<value>"}`,
+   with `"` and `\` escaped, is written to standard output synchronously and the exit is 0. `secret-grep` exempts
+   this one function from its standard-output sink and nothing else in the file, and the seeded negative
+   `secret-grep-headers` holds it to that.
+
+If owner item 3 takes the command back, `tools write` leaves the header out again and says so.
 
 ---
 
@@ -705,13 +831,13 @@ Startup has nothing to load but one file: no dependency resolution, no `node_mod
 | `export` · `import` | the `.brainl` is verified after it arrives and before it is sent; the `.brain` and `.brainl` are written `0600` — they carry the whole record with its sealed grants (03 §5) |
 | Attachments | bytes are hashed before they are written under their name; the content address is the check |
 | The runner | `--restricted`, `--permission-mode dontAsk`, `--strict-mcp-config`, an empty working directory it owns, the closed kind list and the 64-byte no-whitespace arg rule, the `mcp__braindog__` tool filter, the version gate, the job bearer only inside a `0600` `mcp.json` deleted after the job; never `--bare`, never `--dangerously-skip-permissions` (26 §4.4: one flag turns on [C]). The dedicated unix user and the hardened systemd unit of 26 §5 are the operator's ([53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md)) |
-| `keys` | the value is read from stdin, never an argument, and no command prints a key: `exec` puts it into the environment of the one command it spawns, with no shell, and never on stdout, stderr or a file; it travels only in the one deposit request and the one read's answer, neither of which follows a redirect. The vault grant goes only to `/api/vault/*`, and no sentence quotes a value, a grant or a label (12 §6 rule 9). `exec` never puts a key in a variable that changes how a command runs, whether `--as` names it or a label makes it: `PATH`, `PATHEXT`, `HOME`, `USERPROFILE`, `SHELL`, `ENV`, `BASH_ENV`, `COMSPEC`, `SYSTEMROOT`, `WINDIR`, `NODE_OPTIONS`, `LD_PRELOAD`, `LD_LIBRARY_PATH`, `DYLD_INSERT_LIBRARIES`, `DYLD_LIBRARY_PATH`, `PYTHONPATH`, `PYTHONSTARTUP`, `PYTHONHOME`, `RUBYOPT`, `RUBYLIB`, `PERL5OPT`, `PERL5LIB`, `PERLLIB`, `JAVA_TOOL_OPTIONS`, `_JAVA_OPTIONS`, `JDK_JAVA_OPTIONS`, `PROMPT_COMMAND`, `PS4`, `IFS`, `SHELLOPTS`, `BASHOPTS`, `ZDOTDIR`, and any name starting `NODE_`, `LD_` or `DYLD_`. On Windows a `.cmd` or `.bat` runs through `cmd.exe` with AutoRun and delayed expansion off and every argument caret-escaped twice, once for `cmd.exe` and once for the batch file's `%*`, so `&`, `|`, `^`, `"` and `%` in an argument start nothing and expand nothing. An argument with a line break, or an environment variable whose name ends in `^`, is refused, because neither can be escaped. A batch file that reads its arguments a third time, through `call`, is outside that promise |
+| `keys` | the value is read from stdin, never an argument, and one command prints a key, `keys headers`, to a program and never to a terminal (§5.16): `exec` puts it into the environment of the one command it spawns, with no shell, and never on stdout, stderr or a file; it travels only in the one deposit request and the one read's answer, neither of which follows a redirect. The vault grant goes only to `/api/vault/*`, and no sentence quotes a value, a grant or a label (12 §6 rule 9). `exec` never puts a key in a variable that changes how a command runs, whether `--as` names it or a label makes it: `PATH`, `PATHEXT`, `HOME`, `USERPROFILE`, `SHELL`, `ENV`, `BASH_ENV`, `COMSPEC`, `SYSTEMROOT`, `WINDIR`, `NODE_OPTIONS`, `LD_PRELOAD`, `LD_LIBRARY_PATH`, `DYLD_INSERT_LIBRARIES`, `DYLD_LIBRARY_PATH`, `PYTHONPATH`, `PYTHONSTARTUP`, `PYTHONHOME`, `RUBYOPT`, `RUBYLIB`, `PERL5OPT`, `PERL5LIB`, `PERLLIB`, `JAVA_TOOL_OPTIONS`, `_JAVA_OPTIONS`, `JDK_JAVA_OPTIONS`, `PROMPT_COMMAND`, `PS4`, `IFS`, `SHELLOPTS`, `BASHOPTS`, `ZDOTDIR`, and any name starting `NODE_`, `LD_` or `DYLD_`. On Windows a `.cmd` or `.bat` runs through `cmd.exe` with AutoRun and delayed expansion off and every argument caret-escaped twice, once for `cmd.exe` and once for the batch file's `%*`, so `&`, `|`, `^`, `"` and `%` in an argument start nothing and expand nothing. An argument with a line break, or an environment variable whose name ends in `^`, is refused, because neither can be escaped. A batch file that reads its arguments a third time, through `call`, is outside that promise |
 | The session file | ids, a commit and the host's address, never a token; `0600` beside `hosts.json`; its ids are sent only to the host that wrote it |
 | Hook output | the briefing names a row by its spoken id and its own words, and a key by its label only; it reads only string fields, so a key's sealed-state projection never reaches the model. A failure line is fixed text or the host's refusal sentence, never an exception's message. A commit named by the record is checked to look like one before git sees it |
 | `install` | a dry run unless `--apply`; a copy of the settings file before any write; never a project's `.mcp.json`; a settings file it cannot parse is not quoted, because its `env` may hold keys |
 | `skills sync` | a name matching `^[a-z0-9][a-z0-9-]{0,63}$`, whose path resolves inside the skills or commands folder, or nothing is written; a file is overwritten or deleted only while its SHA-256 is still the lock's, so a local edit is never lost; a row with `managed: false` is never written; a file in a repository is reported and never committed; the lock holds paths, spoken ids, versions and hashes |
 | `tools scan` | both configs are read only; a key-named (`…KEY`, `…TOKEN`, `…SECRET`, `…PASSWORD`, `…PAT`, `Authorization`) or key-shaped env or header value goes only to `keys put`, and the row keeps `NAME=credentials#N`; with no vault grant it keeps the name, drops the value, and says so in one sentence, once per host from the start hook; a key in a command, an argument or an address keeps the server out of the record; a config it cannot parse is named, never quoted; no line, row, proposal or lock holds a value |
-| `tools write` | a dry run unless `--scope` names one; a stdio tool's keys are handed over by `braindog keys exec`, so no entry holds one; a header that needs a key is left out and said; `claude` runs with no shell and its output is not relayed; a project's `.mcp.json` changes only under `--scope project`, typed by hand; an entry changed by hand since is left |
+| `tools write` | a dry run unless `--scope` names one; a stdio tool's keys are handed over by `braindog keys exec`, so no entry holds one; a header that needs a key is named by a `headersHelper` that runs `keys headers`, one per entry, and a second is left out and said; `claude` runs with no shell and its output is not relayed; a project's `.mcp.json` changes only under `--scope project`, typed by hand; an entry changed by hand since is left |
 | Logging | a line names a host, a command, a code, a count — never a token, a row, a grant, a prompt (12 §8) |
 | Input | `parseArgs` in strict mode; a `.brainl` line that is neither `#…` nor a JSON array is an error; the only DDL a `.brain` build runs is the kernel's own |
 

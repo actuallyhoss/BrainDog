@@ -21,13 +21,18 @@
   import { Table, type Column, type TableRow } from 'braindog-render/svelte';
   import { display, DOM_CAP, identityFor, identityOf, labelOf } from '$lib/record/api.ts';
   import { currencyTypedIn } from '$lib/ui/money-typed.ts';
-  import { unitOf } from '$lib/record/field-draft.ts';
+  import { isJson, isQuantity, unitOf, unitsOf } from '$lib/record/field-draft.ts';
+  import { scopeFieldOf, scopeOf } from '$lib/record/scope-move.ts';
   import type { Names } from '$lib/record/remote.ts';
   import type { Entry, FieldDecl, RegisterDecl } from '$lib/record/schema.ts';
   import IdentityMark from '$lib/ui/IdentityMark.svelte';
   import Chip from '$lib/ui/Chip.svelte';
   import Icon from '$lib/ui/Icon.svelte';
-  import { boxOf, type Receipt } from './list.ts';
+  import DayBox from '$lib/ui/DayBox.svelte';
+  import QuantityBox from '$lib/ui/QuantityBox.svelte';
+  import JsonBox from '$lib/ui/JsonBox.svelte';
+  import ScopeChip from '$lib/ui/ScopeChip.svelte';
+  import { boxOf, deadlineOf, withoutGood, type Receipt } from './list.ts';
 
   let {
     register,
@@ -104,6 +109,22 @@
     archive: (seq: number) => void;
     openCardMenu: (seq: number, el: HTMLElement) => void;
   } = $props();
+
+  /**
+   * WHAT A DOT MEANS, AT 1440 (design DSN-7).
+   *
+   * THE DOT SITS BESIDE THE DATE IT IS ABOUT. The row's tone is its deadline's, and it was drawn in the
+   * status column, so "Open" wore a red dot that meant overdue and "Live" an amber one that meant due
+   * soon. The deadline column carries the tone now, whichever column the page marked; with that column
+   * hidden in Display, `Table` puts the dot at the head of the row's first value, as it does for any
+   * table that names no tone column.
+   *
+   * AND A FINISHED ROW HAS NONE. "Cleared" and "Paid" are the calm states, and a green dot on every
+   * cleared line of a ledger said nothing but that the ledger was a ledger.
+   */
+  const dated = $derived(deadlineOf(decl));
+  const toned = $derived(columns.map((c) => ({ ...c, tone: c.field === dated })));
+  const calm = $derived(withoutGood(rows));
 </script>
 
 <div class="table-slot" data-picking={selected.size > 0 ? '' : undefined}>
@@ -143,8 +164,8 @@
        without it, so eight header buttons over a single row, each announcing
        `aria-sort="none"`, become eight headings. -->
   <Table
-    {columns}
-    {rows}
+    columns={toned}
+    rows={calm}
     {total}
     cap={DOM_CAP}
     {onmore}
@@ -171,7 +192,7 @@
           class="pick tap"
           tabindex="-1"
           data-on={selected.has(seq) ? '' : undefined}
-          aria-label="{selected.has(seq) ? copy.deselect : copy.select} {display(register, decl.title, rowAt(seq)?.fields[decl.title]) ?? `#${seq}`}"
+          aria-label="{selected.has(seq) ? copy.deselect : copy.select} {display(register, decl.title, rowAt(seq)?.fields[decl.title]) ?? copy.thisRow}"
           onclick={(e) => {
             /* The cell activates the row. Without this, picking one opened it. */
             e.stopPropagation();
@@ -247,6 +268,42 @@
             onfocusout={leftTheRow}
             onkeydown={(e) => cellKeys(e, false)}
           ></textarea>
+        {:else if f?.type === 'day'}
+          <!-- A DAY IN THE RECORD'S WORDS, `3 Sep 2026`, and not the browser's `mm/dd/yyyy` (MOD-22). -->
+          <DayBox
+            fit="cell"
+            autofocus
+            label={labelOf(f)}
+            bind:value={editValue}
+            onclick={(e) => e.stopPropagation()}
+            onfocusout={leftTheRow}
+            onkeydown={(e) => cellKeys(e, true)}
+          />
+        {:else if f && isQuantity(f)}
+          <!-- A NUMBER AND THE UNIT IT COUNTS, the unit chosen from the ones the field knows (MOD-22). Moving between
+               the two stays inside the row, so `leftTheRow` keeps the editor open. -->
+          <QuantityBox
+            fit="cell"
+            autofocus
+            units={unitsOf(f, shownValue(seq, column.field))}
+            label={labelOf(f)}
+            bind:value={editValue}
+            onclick={(e) => e.stopPropagation()}
+            onfocusout={leftTheRow}
+            onkeydown={(e) => cellKeys(e, true)}
+          />
+        {:else if f && isJson(f)}
+          <!-- STRUCTURED DATA KEEPS ITS LINE BREAKS, so Enter is a new line and the grid's Cmd+Enter commits, as a
+               document's cell does (MOD-22). -->
+          <JsonBox
+            fit="cell"
+            autofocus
+            label={labelOf(f)}
+            bind:value={editValue}
+            onclick={(e) => e.stopPropagation()}
+            onfocusout={leftTheRow}
+            onkeydown={(e) => cellKeys(e, false)}
+          />
         {:else}
           {@const box = boxOf(f?.type)}
           <span class="cell-box">
@@ -286,7 +343,7 @@
           archiving a row opened it on the way out.
         -->
         {@const said = receiptFor(seq)}
-        {@const name = display(register, decl.title, rowAt(seq)?.fields[decl.title]) ?? `#${seq}`}
+        {@const name = display(register, decl.title, rowAt(seq)?.fields[decl.title]) ?? copy.thisRow}
         {#if said}
           <span class="said">
             <Chip label={said.short ?? said.mark} tone={said.intent} />
@@ -333,12 +390,16 @@
               }}><Icon name="more" size="s" /></button>
           </span>
         {/if}
+      {:else if column.field === scopeFieldOf(register)?.id && scopeOf(register, rowAt(seq)?.fields ?? {}, names) !== undefined}
+        <!-- WHERE THE ROW APPLIES, AS A CHIP (agents C8): the project's mark and name, or the globe and "Everywhere", where an empty cell drew nothing. -->
+        <ScopeChip scope={scopeOf(register, rowAt(seq)?.fields ?? {}, names) ?? null} />
       {:else if ident}
         <IdentityMark identity={ident} />
       {:else if column.field === 'seq'}
-        <!-- EVERY ROW HERE HAS A NUMBER THE RECORD GAVE IT. The guard that hid the `#-1` a row
-             typed against the sample wore went with `pending` (`loop/research-no-sample.md` B1).
-        --><span class="row-seq">{value}</span>
+        <!-- EVERY ROW HERE HAS A NUMBER THE RECORD GAVE IT, and it is drawn as the number under the
+             column's name, with no "#" in front (design DSN-7): the cell's text is `toRows`' spoken
+             form, which is for a sentence and not for a column headed Number.
+        --><span class="row-seq">{seq}</span>
       {:else if value === null}
         <!-- AN EMPTY CELL DRAWS NOTHING. A dash in every gap was a column of marks that meant
              nothing; only a title says so, because a row with no name needs words to be found. -->
@@ -439,11 +500,21 @@
     color: var(--dim);
   }
 
-  /* The spoken id at the end of the row, quiet, in the face that says it is an identifier. */
+  /* THE ROW'S NUMBER, QUIET, IN THE BODY FACE with tabular figures, so a column of them lines up. It was
+     the identifier face, and mono is for what a person wrote as code, never for a number (design-brief
+     §11). */
   .row-seq {
     color: var(--dim);
-    font-family: var(--font-id);
-    font-size: var(--t-xs);
+    font-family: var(--font-ui);
+    font-size: var(--t-sm);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ONE HAIRLINE BETWEEN ROWS AND NONE AROUND THE TABLE (design DSN-7). Every row draws the line under
+     itself, so the last one drew a rule under the list that closed it like a box. The last group is the
+     one with no group after it, since the paging sentinel can follow it. */
+  .table-slot :global(.rowgroup:not(:has(~ .rowgroup)) > .tr:last-child) {
+    border-block-end-color: transparent;
   }
 
   /**

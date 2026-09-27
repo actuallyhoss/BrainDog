@@ -174,6 +174,10 @@ const CASES = [
   { gate: 'secret-grep-report', run: 'secret-grep', expect: /a report key or an opened action key reaches a log/, findings: 1 },
   { gate: 'secret-grep-opened', run: 'secret-grep', expect: /a report key or an opened action key reaches a log/, findings: 1 },
   { gate: 'secret-grep-held', run: 'secret-grep', expect: /a report key or an opened action key reaches an error message/, findings: 1 },
+  /* THE TENTH: the one function that may print a key. `headersOne` writes a key read back to standard output for
+     Claude Code's `headersHelper`, which is its recorded exemption, and a second function in the same file writes the
+     same key there too. One finding, and one in all, proves the exemption covers that function and nothing beside it. */
+  { gate: 'secret-grep-headers', run: 'secret-grep', expect: /a plaintext reaches standard output/, findings: 1, total: 1 },
   /* THREE, because a kind in one source and not the other three is three statements about the same
      drift, and which three is the repair. A count of one would pass a gate that compared two. */
   { gate: 'event-kinds', expect: /and migration 0001 does not/, findings: 3 },

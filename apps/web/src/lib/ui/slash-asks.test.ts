@@ -12,9 +12,16 @@ test('tier a shows the month as used of cap, the unit an ask and nothing else', 
   assert.equal(asksShown(on(0)), '0 of 80');
 });
 
-test('off tier a the ask row is gone, not zeroed: byo and b are not metered', () => {
+test('on byo the ask row is gone, not zeroed, and on his own key the count is listed with no cap', () => {
   assert.equal(asksShown(on(0, 80, 'byo')), null);
   assert.equal(asksShown(on(12, 80, 'b')), null);
+  assert.equal(asksShown({ ...on(12, 80, 'b'), source: 'key', asks: { used: 12, cap: 80, resets: RESETS, capped: false } }), '12');
+});
+
+test('on his own key nothing is near or at a cap, since nothing stops at it', () => {
+  const key: SlashStatus = { source: 'key', tier: 'b', model: 'claude-x', asks: { used: 500, cap: 80, resets: RESETS, capped: false } };
+  assert.equal(nearCap(key), false);
+  assert.equal(atCap(key), false);
 });
 
 test('near the cap is 80 per cent and at it is 100, both on tier a only', () => {

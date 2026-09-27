@@ -108,6 +108,42 @@ const DECLARED: Record<string, Version> = {
       'The Earning figures stop summing every project in play and sum the projects that said what they earn, which is the row set the bar beside them draws, and `projects-earning` says how many of them there were through the new `projects-earning-said`. A record where nobody had said anything read GBP 0.00 as a fact about the portfolio -> 7e7c2e05e820f763',
     ],
   },
+  'money-core@3.1.0': {
+    holds: `
+      metric.arriving-30d metric.book-cash metric.books-held metric.cash-accounts metric.cash-as-of metric.cash-by-book
+      metric.cash-now metric.chasing metric.days-late-in metric.due-30d metric.every-month-by-category
+      metric.every-month-in metric.every-month-out metric.in-30d metric.in-by-month metric.in-due-by-month
+      metric.installments-due-30d metric.installments-left metric.late-in metric.leaving-30d metric.net-by-month
+      metric.out-30d metric.out-by-month metric.out-due-by-month metric.overdue metric.owed-by-you metric.owed-to-you
+      metric.project-in-by-month metric.project-out-by-month metric.project-owed metric.received-30d
+      metric.runway-days metric.spent-30d metric.spent-by-category-month metric.txn-uncategorised
+      page.money page.money-book
+      register.accounts register.balances register.books register.categories register.fx register.installments
+      register.obligations register.recurring register.snapshots register.transactions
+      rule.cash-stale rule.installment-due-soon rule.invoice-chased rule.invoice-late rule.recurring-ended
+      rule.recurring-missed rule.recurring-stopped rule.txn-categorise
+      setting.home_currency setting.most_days_late setting.most_due_30d setting.most_leaving_30d
+      setting.most_left_in_parts setting.most_on_one_category setting.most_out_30d setting.most_out_every_month
+      setting.most_owed_by_you setting.most_owed_to_you setting.most_parts_due_30d setting.most_spent_30d
+      setting.most_spent_on_one_category
+    `,
+    declares: 'e174c8e1ad7deb1f',
+    history: [
+      "Books keep money that is not one person's apart. A `books` list, an optional book on every list that holds money, a page per book under Money with its own walk, and one Cash now per book once there are two; a late invoice answered Chase it is stamped chased, a repeating line answered It stopped is ended, a stale balance is a digest line and not a question, and an account or book that rows point at cannot be deleted. One list, fields, figures, a page and two automations added and nothing taken away, so the step is a minor one -> e174c8e1ad7deb1f",
+    ],
+  },
+  'portfolio@1.5.0': {
+    holds: `
+      metric.projects-aim-30d metric.projects-by-health metric.projects-earning metric.projects-earning-before
+      metric.projects-earning-change metric.projects-earning-said metric.projects-live metric.projects-need-you
+      metric.projects-parked metric.projects-past-aim metric.projects-retired metric.projects-with-agent
+      page.portfolio register.things rule.project-past-aim
+    `,
+    declares: 'e034fa8da981b2ea',
+    history: [
+      "A project page leads with the questions waiting on it, draws what changed on it, its plan on a time axis when its tasks have days and its money month by month, signs the amount on its Money table, drops the agent code block, and every money figure on `page.portfolio` is in the record's own currency with its target a setting -> e034fa8da981b2ea",
+    ],
+  },
   'money-core@1.1.0': { declares: '5cb37a57b9de3499' },
   'money-core@1.2.0': { declares: '4f42a8e447293eaf' },
   /**
@@ -522,6 +558,13 @@ const DECLARED: Record<string, Version> = {
       '`register.people` declares `meets:`, naming the field that plays each part, so the kernel reads the list meet writes off the list instead of finding one called people -> 36fef157b524227d',
     ],
   },
+  'people@2.2.0': {
+    holds: ` page.people page.someone register.people `,
+    declares: 'dc4d1d8e39453316',
+    history: [
+      'One page per person (`page.someone`), with who they are, the projects they were met in and what is written about them; People\'s own page is placed under a People section and its cards leave out the agent\'s met lines; and a person that other rows still name is not deleted -> dc4d1d8e39453316',
+    ],
+  },
   'estate@1.1.0': {
     holds: `
       metric.estate-year metric.lapsing metric.points-nowhere metric.project-cost metric.renews-30d
@@ -547,6 +590,21 @@ const DECLARED: Record<string, Version> = {
     `,
     declares: '0983c05a00b9d1a2',
     history: ['`services` says a row holds who it is with where it said a registrar, which is what a domain is held with and not what hosting or a subscription is -> 0983c05a00b9d1a2'],
+  },
+  'estate@2.0.0': {
+    holds: `
+      metric.estate-month metric.estate-month-by-kind metric.estate-year metric.lapsing metric.points-nowhere
+      metric.project-cost metric.renews-30d
+      page.estate
+      register.services
+      rule.renew-soon rule.renewal-cancelled rule.renewal-kept rule.renewal-passed
+      setting.most_a_month setting.most_a_year setting.most_a_year_on_a_project setting.most_lapsing
+      setting.most_renewing_30d
+    `,
+    declares: '04aad1e9a082907a',
+    history: [
+      'Raised a major step because a rule now moves a live `services` row past its renewal day to lapsing and one asks before each renewal, four types join, every target becomes a setting with no default, and Services leads with what a month costs -> 04aad1e9a082907a',
+    ],
   },
 };
 

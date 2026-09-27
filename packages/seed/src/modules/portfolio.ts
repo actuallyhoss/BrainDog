@@ -207,6 +207,9 @@ export const PORTFOLIO_REGISTERS: Record<string, SeedRegister> = {
 /** A project somebody is working on: the ones with a page. */
 const LIVE = 'lane is building or earning';
 
+/** A money figure, in the record's own currency (`loop/finish/modules.md` C1). */
+const MONEY = 'money';
+
 /** A count of projects, which is all the Overview's figures are. */
 const counted = (metric: string, name: string, where: string, target: SeedMetric['target'] = { gte: 0 }): SeedMetric => ({
   metric,
@@ -245,10 +248,12 @@ export const PROJECT_METRICS: Record<string, SeedMetric> = {
      reads. The Overview has no such machinery, so what a project earns is the project's own
      statement, read off the project's own row.
 
-     ONE CURRENCY, OR NO NUMBER. `format: 'money.GBP'` is the currency each reading is judged in. A
-     sum over rows in two currencies is converted at the record's own dated rates, or comes back as
-     one amount per currency with no total at all (`kernel/src/metrics.ts`); it is never the two
-     added together, which is the arithmetic the whole money type exists to refuse.
+     ONE CURRENCY, OR NO NUMBER, AND THE RECORD'S, SINCE portfolio 1.5.0. `format: 'money'` is added
+     up in the record's home currency when one is set, else in the one currency the rows are in
+     (`loop/finish/modules.md` C1); it named sterling before, which is one studio's currency and not
+     the person's. A sum over rows in two currencies is converted at the record's own dated rates, or
+     comes back as one amount per currency with no total at all (`kernel/src/metrics.ts`); it is never
+     the two added together, which is the arithmetic the whole money type exists to refuse.
 
      AND `compare: 'none'` ON ALL THREE, which is a statement and not an omission. The comparison
      the engine offers is the same predicate against a moved clock, and these predicates name no
@@ -299,7 +304,7 @@ export const PROJECT_METRICS: Record<string, SeedMetric> = {
     source: 'register.things',
     where: `${LIVE}, revenue is set`,
     value: { sum: 'revenue' },
-    format: 'money.GBP',
+    format: MONEY,
     target: { gte: 0 },
     window: '12m',
     compare: 'none',
@@ -311,7 +316,7 @@ export const PROJECT_METRICS: Record<string, SeedMetric> = {
     source: 'register.things',
     where: `${LIVE}, revenue is set`,
     value: { sum: 'earned_before' },
-    format: 'money.GBP',
+    format: MONEY,
     target: { gte: 0 },
     window: '12m',
     compare: 'none',
@@ -341,7 +346,7 @@ export const PROJECT_METRICS: Record<string, SeedMetric> = {
     source: 'register.things',
     where: `${LIVE}, revenue is set`,
     value: { diff: { of: { sum: 'revenue' }, per: { sum: 'earned_before' } } },
-    format: 'money.GBP',
+    format: MONEY,
     target: { gte: 0 },
     window: '12m',
     compare: 'none',
@@ -402,18 +407,24 @@ export const PROJECT_METRICS: Record<string, SeedMetric> = {
     compare: 'none',
   },
 
+  /* HELD TO THE MOST A PERSON SAID MAY BE OWED TO THEM AT ONCE, SINCE portfolio 1.5.0: Money's own setting
+     (`most_owed_to_you`, `MONEY_TARGET_SETTINGS` in `money.ts`), which the record reads from the pack this figure is
+     filed in, and a project owed more than the whole record's line is past it by the person's own measure. The number
+     it carried was one studio's size in one currency. Empty until somebody sets it, so no verdict until then. */
   'project-owed': {
     metric: 'project-owed',
     name: 'Owed to you',
     source: 'register.obligations',
     where: `${OPEN}, direction is owed to me, thing is {{it}}`,
     value: { sum: 'amount' },
-    format: 'money.GBP',
-    target: { lte: 1_000_000 },
+    format: MONEY,
+    target: { setting: 'most_owed_to_you' },
     window: '30d',
     compare: 'none',
   },
 
+  /* A SETTING OF SERVICES, SINCE portfolio 1.5.0 (`ESTATE_TARGET_SETTINGS` in `estate.ts`), because the figure reads
+     services and is filed with them; empty, so no verdict until somebody sets the most a project may cost a year. */
   'project-cost': {
     metric: 'project-cost',
     name: 'Costs a year',
@@ -421,9 +432,55 @@ export const PROJECT_METRICS: Record<string, SeedMetric> = {
     where: 'thing is {{it}}, state is not cancelled',
     value: { sum: { product: ['cost', { lookup: 'per_year', by: 'cycle' }] } },
     lookups: { per_year: LOOKUPS.per_year! },
-    format: 'money.GBP',
-    target: { lte: 120_000 },
+    format: MONEY,
+    target: { setting: 'most_a_year_on_a_project' },
     window: '90d',
+    compare: 'none',
+  },
+
+  /* THE TASKS ON A PROJECT THAT HAVE A DAY, which is what a plan is: the project page draws them on a time axis
+     (`roadmap`) when there is at least one, and says nothing about a plan a project does not have. The roadmap pack's
+     own clauses (`packs/roadmap`), narrowed to the project. */
+  'project-dated': {
+    metric: 'project-dated',
+    name: 'Planned with a day',
+    source: 'register.tasks',
+    where: 'thing is {{it}}, by is set, state is not done or dropped',
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  /* WHAT MOVED ON A PROJECT, MONTH BY MONTH, in and out: Money's `in-by-month` and `out-by-month` narrowed to the project,
+     from what moved and not from what was promised. Filed with Money by the list they read (`packs/first-party.ts`), and
+     left off the project page on a record that keeps no Money (`PROJECT_LINKS`). */
+  'project-in-by-month': {
+    metric: 'project-in-by-month',
+    name: 'Money in, by month',
+    source: 'register.transactions',
+    where: 'thing is {{it}}, state is cleared, transfer is false, direction is in, on after -13m',
+    value: { sum: 'amount' },
+    group_by: 'on',
+    bucket: 'month',
+    format: MONEY,
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  'project-out-by-month': {
+    metric: 'project-out-by-month',
+    name: 'Money out, by month',
+    source: 'register.transactions',
+    where: 'thing is {{it}}, state is cleared, transfer is false, direction is out, on after -13m',
+    value: { sum: 'amount' },
+    group_by: 'on',
+    bucket: 'month',
+    format: MONEY,
+    target: { gte: 0 },
+    window: '30d',
     compare: 'none',
   },
 };
@@ -635,8 +692,13 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
    * product's own thesis stated back at it: the record is the coordinator, and it is better than a
    * model because it cannot be persuaded (23 §12).
    *
-   * Spans read left to right: the stat takes the row, then work and agents sit side by side,
-   * then money and the estate.
+   * WHAT NEEDS A PERSON COMES FIRST, SINCE portfolio 1.5.0 (`loop/finish/modules.md` MOD-13): after the figures, the
+   * questions a rule or an agent asked about this project, answered where they are shown; then where it stands, the work
+   * handed back and what is open; the agents on it beside what changed on it; its plan on a time axis when its tasks
+   * have days; its money month by month and row by row, and what keeps it running; and what is written about it.
+   *
+   * Spans read left to right, 7 beside 5 and 8 beside 4, and every block is one column at a phone's width, in this
+   * order.
    */
   /**
    * ONE DECLARATION, FOUR PAGES. This was `kiln:`, with the name typed into six predicates, three
@@ -653,7 +715,7 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
     for: { register: 'things', where: 'lane is building or earning' },
     nav: { section: 'Projects', order: 10 },
     icon: 'thing',
-    requires: ['register.things', 'register.tasks', 'register.session', 'register.obligations', 'register.services'],
+    requires: ['register.things', 'register.tasks', 'register.session', 'register.obligations', 'register.services', 'register.transactions'],
     blocks: [
       {
         kind: 'stat',
@@ -664,6 +726,18 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
           { metric: 'project-owed:{{name}}', label: 'Owed to you' },
           { metric: 'project-cost:{{name}}', label: 'Costs a year' },
         ],
+      },
+      {
+        /* WHAT A RULE OR AN AGENT HAS ASKED ABOUT THIS PROJECT, answered where it is shown, three at a time, and the rest
+           are in Decide. A question names the row it is about (`about`, `things#1`), and `{{spoken}}` is this project's,
+           so the queue holds this project's calls and no other's. No `empty:` of its own: with nothing waiting the queue
+           says its own line. */
+        kind: 'queue',
+        heading: 'Waiting on you',
+        span: 7,
+        source: 'governance.open',
+        where: 'about is {{spoken}}',
+        limit: 3,
       },
       {
         /* WHERE IT STANDS, as whoever works on it last said: how it is going, what is next, how far along, and the agent
@@ -684,9 +758,10 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         empty: 'Nobody has said where {{name}} stands yet.',
       },
       {
-        /* THE WORK ON IT THAT WAITS ON A PERSON: handed back by an agent to be checked, or blocked, and who changed it last. */
+        /* THE WORK ON IT THAT WAITS ON A PERSON: handed back by an agent to be checked, or blocked, and who changed it last.
+           Its own heading, since the questions above are what "Waiting on you" names on every module's page. */
         kind: 'table',
-        heading: 'Waiting on you',
+        heading: 'Handed back or blocked',
         span: 7,
         source: 'register.tasks',
         where: 'thing is {{name}}, state is review or blocked',
@@ -698,7 +773,7 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         ],
         order: [{ field: 'by', dir: 'asc' }],
         limit: 6,
-        empty: 'Nothing on {{name}} is waiting on you.',
+        empty: 'Nothing on {{name}} is handed back or blocked.',
       },
       {
         kind: 'todo',
@@ -727,26 +802,65 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         empty: 'No agent has touched {{name}}.',
       },
       {
+        /* WHAT CHANGED ON THE PROJECT, from the record's own log, newest first, beside the agents doing it: who said how it
+           is going, what is next and how far along, a person or an agent or a rule. `{{spoken}}` is this project's row,
+           which is what an edit of it names as its target. */
+        kind: 'feed',
+        heading: 'What changed',
+        span: 5,
+        source: 'activity',
+        where: 'target is {{spoken}}',
+        first: 5,
+        empty: 'Nothing about {{name}} has changed yet.',
+      },
+      {
+        /* ITS PLAN ON A TIME AXIS: each task in play with a day, as a window as long as its effort ending on that day, or a
+           line on the day where it has no effort. Drawn only when the project has such a task (`project-dated`), so a
+           project nobody has planned in days says nothing about a plan rather than showing an empty axis. */
+        kind: 'roadmap',
+        heading: 'The plan',
+        span: 12,
+        source: 'register.tasks',
+        where: 'thing is {{name}}, by is set, state is not done or dropped',
+        columns: [
+          { field: 'what', label: 'What' },
+          { field: 'by', label: 'Due' },
+          { field: 'effort', label: 'Effort' },
+        ],
+        order: [{ field: 'by', dir: 'asc' }],
+        limit: 50,
+        when: { metric: 'project-dated:{{name}}', gt: 0 },
+        empty: 'No task on {{name}} has a day yet.',
+      },
+      {
+        /* ITS MONEY MONTH BY MONTH, in and out, from what moved in the twelve months to now, with what was left each month
+           as a line. Read from Money's transactions, so a record that keeps no Money has the page without it
+           (`PROJECT_LINKS`). A line names its figure with this project as its parameter, as a tile's cell does. */
+        kind: 'series',
+        heading: 'Money by month',
+        span: 12,
+        series: [
+          { metric: 'project-in-by-month:{{name}}', label: 'Money in' },
+          { metric: 'project-out-by-month:{{name}}', label: 'Money out', dir: 'out' },
+        ],
+        back: 12,
+        net: true,
+        empty: 'No money has moved on {{name}} in the last twelve months.',
+      },
+      {
         kind: 'table',
         heading: 'Money',
-        /* EIGHT, which is what four columns of a `table` need. Declared at 6 it was clamped up
-           anyway — `floorFor` gives a table two twelfths a column so its cells do not truncate — so
-           the declaration was a number that never reached the screen. Its row partner is the 4. */
+        /* EIGHT, beside the 4 that keeps it running: `floorFor` gives a table two twelfths a column so its cells do not
+           truncate, so three columns need six, and eight leaves the description room. */
         span: 8,
         source: 'register.obligations',
         where: 'thing is {{name}}',
-        /* THE DIRECTION IS A COLUMN, because this block holds both and its own `empty:` says so.
-           Four columns of `# | What | Amount | Due` drew a receivable and seven payables in one
-           unsigned column: read down it and Kiln looks like GBP 25,530.00 of something, where the
-           net is minus GBP 23,610.00. Nothing else in the row carried the sign — the tone comes from
-           state and date, which are the same for both directions. */
-        /* Four columns, so the block still fits beside the 4 next to it. `#` is the one that goes:
-           `what` already links to the row, and a direction the reader cannot see is worse than a
-           number they cannot say out loud. */
+        /* THE AMOUNT CARRIES ITS OWN SIGN, because this block holds money in and money out, and a column of unsigned
+           amounts read down as one sum when the net is the other way. The sign is the row's direction, money out drawn
+           with a minus, so which way it goes is said by the figure and not by a column of words beside it. */
         columns: [
           { field: 'what', label: 'Description', width: 'minmax(18ch,1fr)' },
-          { field: 'direction', label: 'Which way', width: '13ch' },
-          { field: 'amount', label: 'Amount', width: '15ch', align: 'end' },
+          { field: 'amount', label: 'Amount', width: '15ch', align: 'end', sign: { field: 'direction', minus: 'owed_by_me' } },
           { field: 'due', label: 'Due', width: '15ch', align: 'end' },
         ],
         order: [{ field: 'due', dir: 'asc' }],
@@ -778,30 +892,6 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         body: '{{note}}',
         empty: 'Nothing is written about {{name}} yet. Its note is on the project.',
       },
-      {
-        /**
-         * A `code` block is authored rather than projected: `body` is the whole of it, verbatim. It
-         * is on a project page because the question "how do I point an agent at this one" is asked
-         * once per project and answered nowhere else.
-         *
-         * ONLY THE FIRST LINE WAS TEMPLATED, AND THE OTHER TWO INSTRUCTED SOMEBODY TO DAMAGE ROWS
-         * THAT ARE NOT THIS PAGE'S. `{{name}}` resolves per page; `tasks#7` and `track 1` did not,
-         * so Kiln, Marlow & Co and Portage all printed the same two literals — and `tasks#7` is
-         * "Retire the Tallow staging box", a TALLOW task, while `track 1` is "Variable axis QA", a
-         * KILN track. A person on their client's page, running the block their own record handed
-         * them, would set a third project's task to `doing` and overwrite a fourth's health with a
-         * sentence about neither.
-         *
-         * WHAT IS LEFT IS THE LINE THAT IS TRUE ON EVERY PAGE, and it is a read. The two writes
-         * were demonstrating a verb at the cost of being wrong, and a demonstration that is wrong
-         * is not a demonstration. A second line naming a row this page can resolve would need the
-         * projection a `code` block deliberately does not have.
-         */
-        kind: 'code',
-        heading: 'Work on this from an agent',
-        span: 12,
-        body: 'braindog.list tasks where thing is {{name}} and state is open',
-      },
     ],
   },
 };
@@ -810,9 +900,10 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
  * THE LISTS THE PROJECT TEMPLATE ONLY LINKS TO. What a project runs on, and what that costs a year, come from Estate's
  * services, and a record that keeps no services still has projects worth a page: a founder's apps, a student's passion
  * project. So services are a link and not a dependency, the way People's "Met in" is (`first-party.ts` `LINKS`). Money
- * owed on a project is the same: a team's products have work and agents on them and no invoices in the record.
+ * owed on a project is the same: a team's products have work and agents on them and no invoices in the record. So is
+ * what moved on it, month by month, which Money's transactions hold.
  */
-export const PROJECT_LINKS: readonly string[] = ['services', 'obligations'];
+export const PROJECT_LINKS: readonly string[] = ['services', 'obligations', 'transactions'];
 
 /** What a project's stat row says from its tasks when a figure over money is left out, and how many figures the row holds. */
 const PROJECT_WORK_CELLS: readonly { metric: string; label: string }[] = [
@@ -833,10 +924,14 @@ export function projectTemplate(holds: Iterable<string>): SeedPage {
     const register = source.replace(/^register\./u, '');
     return source.startsWith('register.') && PROJECT_LINKS.includes(register) && !held.has(register);
   };
+  /* A FIGURE AS A PAGE NAMES IT, `project-in-by-month:{{name}}`, is over the list its declaration reads. */
+  const figureGone = (said: unknown): boolean => typeof said === 'string' && gone(PROJECT_METRICS[said.split(':')[0] ?? '']?.source);
+  /* A SERIES READS NO LIST BY `source:`, ONLY THROUGH ITS LINES' FIGURES, so it goes with the list they read. */
+  const linesGone = (series: unknown): boolean => Array.isArray(series) && series.some((line) => figureGone((line as { metric?: unknown } | null)?.metric));
   const page = PORTFOLIO_PAGES.project!;
   const blocks: Record<string, unknown>[] = [];
   for (const block of page.blocks as Record<string, unknown>[]) {
-    if (gone(block.source)) {
+    if (gone(block.source) || linesGone(block.series)) {
       const before = blocks.at(-1);
       if (before && typeof before.span === 'number' && typeof block.span === 'number')
         blocks[blocks.length - 1] = { ...before, span: Math.min(12, before.span + block.span) };
@@ -847,7 +942,7 @@ export function projectTemplate(holds: Iterable<string>): SeedPage {
       blocks.push(block);
       continue;
     }
-    const kept = cells.filter((c) => !gone(PROJECT_METRICS[c.metric.split(':')[0] ?? '']?.source));
+    const kept = cells.filter((c) => !figureGone(c.metric));
     /* A ROW THAT LOST A FIGURE IS MADE UP FROM THE PROJECT'S TASKS, so a team's page does not lead with Open alone. */
     const made = kept.length < cells.length ? [...kept, ...PROJECT_WORK_CELLS].slice(0, PROJECT_CELLS) : kept;
     blocks.push({ ...block, cells: made });

@@ -43,6 +43,9 @@
     hide: (field: string, off: boolean) => void;
     showAll: () => void;
   } = $props();
+
+  /* This part's own words: the list's own order as one of the choices, and the direction's group. */
+  const words = { rowOrder: 'Row order', direction: 'Direction' } as const;
 </script>
 
 <Sheet bind:open title={copy.display}>
@@ -64,31 +67,54 @@
 
       Two rows or fewer and there is nothing to order, which is the same test the table applies
       before it wires `onsort` at all.
+
+      ONE CHOICE IS A RADIO GROUP, WITH THE CURRENT ORDER CHECKED (design SYS-6, DSN-7). It was a column
+      of toggle chips, drawn as checkboxes, for a choice that has one answer, and nothing was checked
+      while the list was in its own order. The list's own order is the first radio; choosing a field
+      orders by it from the start, and the direction is a pair of segments under the group, each named
+      in the field's own words ("oldest first"), which press the same toggle a header does.
     -->
     {#if canSort}
+      {@const way = sort ? wayOf(sort.field, decl) : undefined}
       <fieldset class="filter-group">
         <legend class="filter-legend">{copy.sortedBy}</legend>
         <div class="filter-values">
-          {#each sortable as c}
+          <label class="filter-value" data-on={sort ? undefined : ''}>
+            <input type="radio" name="display-sort" checked={!sort} onchange={() => unsort()} />
+            {words.rowOrder}
+          </label>
+          {#each sortable as c (c.field)}
             {@const on = sort?.field === c.field}
-            {@const way = wayOf(c.field, decl)}
-            <button
-              type="button"
-              class="filter-value"
-              data-on={on ? '' : undefined}
-              aria-pressed={on ? 'true' : 'false'}
-              onclick={() => sortBy(c.field)}
-            >
-              <!-- THE ARROW IS THE DIRECTION AND THE BOX IS THE STATE. A pressed chip that does
-                   not say which way it went is half an answer, and `13 §5.1` will not let the
-                   raised background carry it alone. -->
-              <span class="filter-box" aria-hidden="true">{on ? (sort?.dir === 'asc' ? '↑' : '↓') : ''}</span>
+            <label class="filter-value" data-on={on ? '' : undefined}>
+              <input type="radio" name="display-sort" value={c.field} checked={on} onchange={() => sortBy(c.field)} />
               {c.label}
-              {#if on}<span class="locked">{sort?.dir === 'asc' ? way[0] : way[1]}</span>{/if}
-            </button>
+            </label>
           {/each}
         </div>
       </fieldset>
+      {#if sort && way}
+        {@const current = sort}
+        <div class="segmented sort-way" role="group" aria-label={words.direction}>
+          <button
+            type="button"
+            class="segment"
+            data-on={current.dir === 'asc' ? '' : undefined}
+            aria-pressed={current.dir === 'asc' ? 'true' : 'false'}
+            onclick={() => {
+              if (current.dir !== 'asc') sortBy(current.field);
+            }}>{way[0]}</button
+          >
+          <button
+            type="button"
+            class="segment"
+            data-on={current.dir === 'desc' ? '' : undefined}
+            aria-pressed={current.dir === 'desc' ? 'true' : 'false'}
+            onclick={() => {
+              if (current.dir !== 'desc') sortBy(current.field);
+            }}>{way[1]}</button
+          >
+        </div>
+      {/if}
     {/if}
 
     <!-- NOT ON A PHONE. Below 640px the register draws cards, and a card shows the declaration's
@@ -125,11 +151,8 @@
     {#if [...hidden].some((f) => f !== 'seq')}
       <Button weight="bare" onclick={() => showAll()}>{copy.showAll}</Button>
     {/if}
-    <!-- A SORT YOU CANNOT UNDO IS A TRAP. The only other way back to the register's own order was
-         Clear filters, which also throws away the search and every chip. -->
-    {#if sort}
-      <Button weight="bare" onclick={() => unsort()}>{copy.rowOrder}</Button>
-    {/if}
+    <!-- A SORT YOU CANNOT UNDO IS A TRAP, and the way back to the list's own order is the first radio
+         in the group above, where it is one of the choices rather than a button after them. -->
   {/snippet}
 </Sheet>
 
@@ -226,6 +249,12 @@
     margin-inline-start: auto;
     color: var(--dim);
     font-size: var(--t-xs);
+  }
+
+  /* The direction sits under the choice it qualifies, as its own short track. */
+  .sort-way {
+    align-self: start;
+    margin-block-start: calc(-1 * var(--sp-3));
   }
 
   @media (width < 640px) {

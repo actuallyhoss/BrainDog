@@ -72,23 +72,29 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const started = performance.now();
-
 /**
  * Node's opinion of `node:sqlite` is not this gate's output.
  *
  * `52 §4`: "nothing else is printed by a gate". Opening the record emits an `ExperimentalWarning` on
  * stderr, and a gate whose output carries two lines of somebody else's warning is a gate people
  * learn to read past. Only that class is dropped; anything else Node has to say still prints.
+ *
+ * AND THE LISTENERS IT FOUND ARE PUT BACK. Called by `run.mjs`, this process is the runner's, and
+ * every gate after this one would otherwise run with Node's own warning line taken away. So the filter
+ * holds for this call and the answer is a function that undoes it.
  */
-process.removeAllListeners('warning');
-process.on('warning', (w) => {
-  if (w.name !== 'ExperimentalWarning') console.warn(w);
-});
-
-const root = process.env.BRAINDOG_GATE_ROOT ?? join(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
-const at = (...parts) => join(root, ...parts);
-const load = (...parts) => import(pathToFileURL(at(...parts)).href);
+function quietExperimental() {
+  const kept = process.listeners('warning');
+  const quiet = (w) => {
+    if (w.name !== 'ExperimentalWarning') console.warn(w);
+  };
+  process.removeAllListeners('warning');
+  process.on('warning', quiet);
+  return () => {
+    process.off('warning', quiet);
+    for (const listener of kept) process.on('warning', listener);
+  };
+}
 
 /** The modules this gate is about, and a tree missing one has nothing for it to measure. */
 const SERVER = ['apps', 'selfhost', 'src', 'server.ts'];
@@ -98,42 +104,6 @@ const EXPORT = ['packs', 'legacy-import', 'test', 'synthetic.ts'];
 /** The adapter the command is named, and the catalogue its offers are resolved in: the one the app ships. */
 const ADAPTER = ['packs', 'legacy-import', 'adapter.ts'];
 const CATALOGUE = ['apps', 'web', 'static', 'catalogue'];
-
-/**
- * Exit 3 is a SKIP and not a pass (`run.mjs`), and this is the only thing that earns one.
- *
- * A tree with no importer and no host has no switch to rehearse, and there is no smaller honest
- * thing to check. Everything below this line is red instead, including a record that will not
- * onboard: a host that cannot be stood up is a finding about the host and not an absence of one.
- */
-const absent = [SERVER, IMPORT, PLANNER, EXPORT, ADAPTER].filter((parts) => !existsSync(at(...parts)));
-if (absent.length > 0) {
-  console.log(
-    `  import: no ${absent.map((parts) => parts.join('/')).join(' and no ')}, ` +
-      'so there is no import to rehearse and nothing was checked. Run it from a tree that holds apps/cli, apps/selfhost and packs/legacy-import.',
-  );
-  process.exit(3);
-}
-
-const findings = [];
-
-/**
- * What the green line gets to claim, filled in as the gate earns each part.
- *
- * DECLARED HERE BECAUSE THE GATE CAN STOP EARLY. Onboarding and the pack install both end the run
- * before there is a record to read, and a reporter reaching for a binding that has not been
- * evaluated yet crashes with a `ReferenceError` instead of printing the finding it was called to
- * print, which is a gate failing loudly about the wrong thing.
- */
-let running = null;
-let scratch = null;
-let lists = 0;
-let planned = 0;
-let held = 0;
-let asks = 0;
-let polls = 0;
-let exit = null;
-let again = null;
 
 /** The one owner this record has, and the address every write is attributed to. */
 const OWNER = 'owner@example.test';
@@ -185,21 +155,22 @@ function rowsOf(kernel, register) {
 }
 
 /**
- * THE RUN, IN ONE BLOCK, SO THAT A FINDING CAN END IT.
+ * THE RUN, IN ONE FUNCTION, SO THAT A FINDING CAN END IT.
  *
  * SOME OF THE FINDINGS BELOW MAKE EVERYTHING AFTER THEM MEANINGLESS: a record that will not onboard
  * has no lists to import into, a pack that will not install leaves the rows of its lists missing for
  * a reason that is not the planner's, and a plan that cannot be read has nothing to compare against.
- * Each of those breaks out of here and the reporter runs once, at the bottom, with what it has.
+ * Each of those returns from here, and the reporter runs once, after the host is closed, with what it has.
  *
- * AND THE REPORTER DOES NOT CALL `process.exit`, WHICH IS WHY THIS IS A BLOCK RATHER THAN A RETURN.
- * Measured on Windows: exiting from inside the reporter while the host is still tearing its sockets
- * down aborts the process with `Assertion failed: !(handle->flags & UV_HANDLE_CLOSING)` and an exit
- * code of 127, which `run.mjs` reports as a failure with no sentence a reader can act on. Draining
- * the loop instead costs nothing: both the real run and the seeded one end within a tick of the
- * last line being printed.
+ * AND NOTHING HERE CALLS `process.exit`. Measured on Windows: exiting from inside the reporter while the
+ * host was still tearing its sockets down aborted the process with
+ * `Assertion failed: !(handle->flags & UV_HANDLE_CLOSING)` and an exit code of 127, which `run.mjs`
+ * reported as a failure with no sentence a reader can act on. And since `run.mjs` calls this gate
+ * rather than spawning it, an exit would end the runner too. So the host and the scratch folder go in
+ * the caller's `finally`, which is every path out of here, a throw included, and `tally` is how this
+ * function hands them over: a server left listening would keep the runner from ever finishing.
  */
-rehearsal: {
+async function rehearse(at, load, findings, tally) {
   /* ── 1 · a self-host, onboarded ─────────────────────────────────────────────────────────────────── */
 
   const { start } = await load(...SERVER);
@@ -207,12 +178,13 @@ rehearsal: {
   const { KEY_PREFIX, planLegacyTool, readLegacyTool, readSetup } = await load(...PLANNER);
   const { syntheticExport, syntheticSetup } = await load(...EXPORT);
 
-  running = await start({ file: ':memory:', directory: ':memory:', port: 0, host: '127.0.0.1', pollMs: 0, token: TOKEN });
+  const running = await start({ file: ':memory:', directory: ':memory:', port: 0, host: '127.0.0.1', pollMs: 0, token: TOKEN });
+  tally.running = running;
 
   const person = running.directory.person$(OWNER, 'Owner');
   if (!person.ok) {
     findings.push(`the Directory would not hold an owner for the record: ${said(person)}`);
-    break rehearsal;
+    return;
   }
 
   const made = await running.api.createRecord({
@@ -225,13 +197,13 @@ rehearsal: {
   });
   if (!made.ok) {
     findings.push(`the self-host would not create a record to import into: ${said(made)}`);
-    break rehearsal;
+    return;
   }
 
   const named = running.directory.provision({ slug: SLUG, email: OWNER, record: RECORD_ID, plan: 'selfhost' });
   if (!named.ok) {
     findings.push(`the Directory would not name the record: ${said(named)}`);
-    break rehearsal;
+    return;
   }
 
   /* THE OWNER, AS THE APP CALLS IN. Onboarding is the owner's, in a browser session, which is what
@@ -250,13 +222,14 @@ rehearsal: {
     const accepted = await running.api.decide({ id: filed.value.id, decide: { option: 'accept', reason: 'the rehearsal installs it' } }, ownerCtx);
     if (!accepted.ok) findings.push(`${pack} was offered and would not install: ${said(accepted)}`);
   }
-  if (findings.length > 0) break rehearsal;
+  if (findings.length > 0) return;
 
-  lists = running.api.kernel.registers().size;
+  tally.lists = running.api.kernel.registers().size;
 
   /* ── 3 · what the planner means to write ────────────────────────────────────────────────────────── */
 
-  scratch = mkdtempSync(join(tmpdir(), 'braindog-gate-import-'));
+  const scratch = mkdtempSync(join(tmpdir(), 'braindog-gate-import-'));
+  tally.scratch = scratch;
   const exported = syntheticExport();
   const setup = syntheticSetup();
   writeFileSync(join(scratch, 'export.json'), JSON.stringify(exported));
@@ -275,19 +248,19 @@ rehearsal: {
   const asked = readSetup(JSON.stringify(setup));
   if (!read.ok || !asked.ok) {
     findings.push(`the synthetic export or its setup is not readable as one, so this run planned nothing: ${read.fix ?? asked.fix}`);
-    break rehearsal;
+    return;
   }
   const plan = planLegacyTool(read.value, TODAY, asked.value);
-  planned = plan.rows.length;
-  asks = plan.asks.length;
-  polls = plan.polls.length;
+  tally.planned = plan.rows.length;
+  tally.asks = plan.asks.length;
+  tally.polls = plan.polls.length;
 
   /* A PLAN WITH NO ROWS SATISFIES "EVERY ROW WAS ACCEPTED" THE WAY AN EMPTY LIST SATISFIES ANYTHING,
      which is the silence `self-test.mjs` exists to break. `slash-actor` guards the same hole by
      writing the one event its query is about before running the query. */
-  if (planned === 0) {
+  if (tally.planned === 0) {
     findings.push('the export planned no rows at all, so this gate offered the record nothing and asserts nothing about it');
-    break rehearsal;
+    return;
   }
 
   /**
@@ -307,7 +280,7 @@ rehearsal: {
         `${PACKS.join(', ')} declare no ${register} list on this record, so the ` +
           `${String(plan.rows.filter((row) => row.register === register).length)} row(s) planned for it were never offered`,
       );
-    break rehearsal;
+    return;
   }
 
   /* ── 4 · the import, over the API, as the owner's agent ─────────────────────────────────────────── */
@@ -324,7 +297,7 @@ rehearsal: {
     headers: async () => ({}),
   };
 
-  exit = await importCommand([at(...ADAPTER), '--catalogue', at(...CATALOGUE), 'export.json', '--setup', 'setup.json'], io, TODAY);
+  const exit = await importCommand([at(...ADAPTER), '--catalogue', at(...CATALOGUE), 'export.json', '--setup', 'setup.json'], io, TODAY);
 
   /* ── 5 · what the record actually holds ─────────────────────────────────────────────────────────── */
 
@@ -344,7 +317,7 @@ rehearsal: {
           : (tags.find((t) => typeof t === 'string' && t.startsWith(KEY_PREFIX)) ?? null);
       if (key !== null) keyed.set(key, register);
     }
-  held = keyed.size;
+  tally.held = keyed.size;
 
   /**
    * The record's own sentence for a row it turned away, by the label the report names it under.
@@ -416,7 +389,7 @@ rehearsal: {
    */
   const before = [...kernel.registers().keys()].reduce((n, register) => n + kernel.count(register), 0);
   const onDecide = governance.ok && Array.isArray(governance.value) ? governance.value.length : null;
-  again = await importCommand([at(...ADAPTER), '--catalogue', at(...CATALOGUE), 'export.json', '--setup', 'setup.json'], { ...io, out: () => {}, say: () => {} }, TODAY);
+  const again = await importCommand([at(...ADAPTER), '--catalogue', at(...CATALOGUE), 'export.json', '--setup', 'setup.json'], { ...io, out: () => {}, say: () => {} }, TODAY);
   const after = [...kernel.registers().keys()].reduce((n, register) => n + kernel.count(register), 0);
   if (after !== before)
     findings.push(`the same export imported twice left ${String(after - before)} more row(s) in the record, and re-running is what this command tells somebody to do when a host stops answering`);
@@ -432,18 +405,15 @@ rehearsal: {
      answering, and either with every row present is a disagreement worth a sentence of its own. */
   if (exit !== 0 && findings.length === 0) findings.push(`the import exited ${String(exit)} and every planned row is in the record, so the code and the record disagree`);
   if (again !== 0 && findings.length === 0) findings.push(`the second import exited ${String(again)} over a record that already holds every row of it`);
-
 }
-
-await report();
-
-/* ── The line ───────────────────────────────────────────────────────────────────────────────────── */
 
 /** A refusal said the way the record says it, for a call this gate made itself. */
 function said(r) {
   const why = r?.refusal ?? r?.conflict ?? {};
   return `${why.code ?? 'no code'}, ${why.fix ?? 'no reason given'}`;
 }
+
+/* ── The line ───────────────────────────────────────────────────────────────────────────────────── */
 
 /**
  * One line, and the census is on it.
@@ -453,15 +423,13 @@ function said(r) {
  * onboarding quietly collapsed would look exactly like a clean bill of health. The two numbers that
  * tell them apart are the rows planned and the rows found, and both are 0 on a gate that has stopped
  * examining anything.
+ *
+ * IT PRINTS AND ANSWERS, AND CLOSES NOTHING: by the time it runs, the caller's `finally` has closed the
+ * host and taken the scratch folder away. 1 for a finding, and nothing for a pass.
  */
-async function report() {
+function report(findings, tally, started) {
   const ms = Math.round(performance.now() - started);
-  try {
-    await running?.close();
-  } catch {
-    /* A host that will not close is not a finding about the import, and it is in memory. */
-  }
-  if (scratch !== null) rmSync(scratch, { recursive: true, force: true });
+  const { planned, lists, held, asks, polls } = tally;
 
   if (findings.length === 0) {
     console.log(
@@ -469,19 +437,87 @@ async function report() {
         `${String(PACKS.length)} packs, ${String(held)} found in the record by their key, ${String(asks)} question(s) and ` +
         `${String(polls)} poll(s) on Decide, and a second import added nothing, in ${String(ms)}ms`,
     );
-  } else {
-    /* AND THE HEADER DOES NOT CLAIM A PLAN IT NEVER BUILT. Several of the findings above stop the
-       run before a row has been planned at all, and "over 42 planned rows" on one of those is the
-       gate overstating what it read, on the line a reader takes as the summary. */
-    const over = planned === 0 ? 'before a row was planned' : `over ${String(planned)} planned row(s),`;
-    console.error(`\n  import: ${String(findings.length)} finding(s) ${over} in ${String(ms)}ms, loop/research-switch.md §4\n`);
-    for (const f of [...new Set(findings)]) console.error(`    ${f}`);
-    console.error(
-      '\n  The import is the switch. Its own tests drive an in-memory fake door and a stub server that\n' +
-        '  answers ok to everything, so a field the founder, agents or estate declarations do not accept\n' +
-        '  passes every one of them and fails on the day somebody moves their record. A refusal here is\n' +
-        '  the planner and the declarations disagreeing, and the record has said which.\n',
-    );
-    process.exitCode = 1;
+    return undefined;
   }
+  /* AND THE HEADER DOES NOT CLAIM A PLAN IT NEVER BUILT. Several of the findings above stop the
+     run before a row has been planned at all, and "over 42 planned rows" on one of those is the
+     gate overstating what it read, on the line a reader takes as the summary. */
+  const over = planned === 0 ? 'before a row was planned' : `over ${String(planned)} planned row(s),`;
+  console.error(`\n  import: ${String(findings.length)} finding(s) ${over} in ${String(ms)}ms, loop/research-switch.md §4\n`);
+  for (const f of [...new Set(findings)]) console.error(`    ${f}`);
+  console.error(
+    '\n  The import is the switch. Its own tests drive an in-memory fake door and a stub server that\n' +
+      '  answers ok to everything, so a field the founder, agents or estate declarations do not accept\n' +
+      '  passes every one of them and fails on the day somebody moves their record. A refusal here is\n' +
+      '  the planner and the declarations disagreeing, and the record has said which.\n',
+  );
+  return 1;
 }
+
+/**
+ * THE CHECK IS A FUNCTION, imported by `run.mjs` rather than spawned: `52 §5.1` step 3, argued in the
+ * runner's `IMPORTED OR SPAWNED` header. Nothing in this file happens on import, and everything above
+ * this line is a declaration.
+ *
+ * WHAT A SCRIPT GOT FOR NOTHING IS WRITTEN OUT HERE. The process ending used to close the host, drop
+ * the scratch folder and restore Node's warning line; inside the runner none of that happens by itself,
+ * so the `finally` does all three on every path out, a throw included, before the line is printed.
+ *
+ * THE ROOT IS AN ARGUMENT, defaulting to `BRAINDOG_GATE_ROOT`, which is the handle `self-test` aims this
+ * gate at its seeded fixture with, and then to the repository this file sits in.
+ */
+export default async function importGate(
+  root = process.env.BRAINDOG_GATE_ROOT ?? join(fileURLToPath(new URL('.', import.meta.url)), '..', '..'),
+) {
+  const started = performance.now();
+  const at = (...parts) => join(root, ...parts);
+  const load = (...parts) => import(pathToFileURL(at(...parts)).href);
+
+  /**
+   * Exit 3 is a SKIP and not a pass (`run.mjs`), and this is the only thing that earns one.
+   *
+   * A tree with no importer and no host has no switch to rehearse, and there is no smaller honest
+   * thing to check. Everything below this line is red instead, including a record that will not
+   * onboard: a host that cannot be stood up is a finding about the host and not an absence of one.
+   */
+  const absent = [SERVER, IMPORT, PLANNER, EXPORT, ADAPTER].filter((parts) => !existsSync(at(...parts)));
+  if (absent.length > 0) {
+    console.log(
+      `  import: no ${absent.map((parts) => parts.join('/')).join(' and no ')}, ` +
+        'so there is no import to rehearse and nothing was checked. Run it from a tree that holds apps/cli, apps/selfhost and packs/legacy-import.',
+    );
+    return 3;
+  }
+
+  const findings = [];
+
+  /**
+   * What the green line gets to claim, filled in as the gate earns each part, and the two things the
+   * run opens, handed back so they can be closed whatever happened.
+   *
+   * DECLARED HERE BECAUSE THE GATE CAN STOP EARLY. Onboarding and the pack install both end the run
+   * before there is a record to read, and a reporter reaching for a binding that has not been
+   * evaluated yet crashes with a `ReferenceError` instead of printing the finding it was called to
+   * print, which is a gate failing loudly about the wrong thing.
+   */
+  const tally = { running: null, scratch: null, lists: 0, planned: 0, held: 0, asks: 0, polls: 0 };
+
+  const loud = quietExperimental();
+  try {
+    await rehearse(at, load, findings, tally);
+  } finally {
+    try {
+      await tally.running?.close();
+    } catch {
+      /* A host that will not close is not a finding about the import, and it is in memory. */
+    }
+    if (tally.scratch !== null) rmSync(tally.scratch, { recursive: true, force: true });
+    loud();
+  }
+  return report(findings, tally, started);
+}
+
+/* AND IT IS STILL A SCRIPT, because `self-test` spawns it at its seeded fixture with
+   `BRAINDOG_GATE_ROOT`, and the header documents the command line. `?? 0` because a pass returns
+   nothing. */
+if (import.meta.main) process.exitCode = (await importGate()) ?? 0;

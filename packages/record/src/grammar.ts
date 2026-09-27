@@ -53,10 +53,11 @@ const PAGE = {
     heading: 'the words over it; on a section, the section itself',
     empty: 'the sentence drawn when it has no rows',
     body: "a note's own prose",
-    source: 'register.<id>, metric.<id>, block.<n>, forecast.runway, activity, sessions.live, actions, governance.open, deadlines (what falls due across the lists; horizon: days ahead, 14 when it says nothing; where: list is tasks) or figures.home (the figures pinned to Home, on a stat with no cells)',
+    source: 'register.<id>, metric.<id>, block.<n>, forecast.runway, activity, sessions.live, actions, governance.open, runs_on (the keys, tools, skills and scheduled actions of the project about: names, then those that apply everywhere; on a table or cards, with no order), deadlines (what falls due across the lists; horizon: days ahead, 14 when it says nothing; where: list is tasks) or figures.home (the figures pinned to Home, on a stat with no cells)',
     where: 'a filter, such as state is open, or a predicate tree. On a capture, what the new row is preset with: about is parts#2 presets a link',
     register: 'the list a capture adds to, or the list whose one row inputs edits',
     row: "on inputs, the row it edits by its id, such as checks#1; the list's first row when it says nothing",
+    about: 'required over runs_on and read nowhere else: the project it reads, by its row, such as things#1, or {{spoken}} on a page with for:',
     columns: '[{field, label?}], 1 to 16; on cards, as: title, figure, fact, trend, ring, who, when, mark, next (the first open step under the card, from the list whose steps: {of, done, order?} names it), reply (a quieter line under the title, such as a second opinion), hue (a whole-number field from 0 to 359, drawn only on the card\'s mark) or picture (a file field the card leads with)',
     over_a_list: {
       calendar: 'columns [title field, day or instant field]; back and ahead are whole months either side of this one, 0 to 12, defaults 2 and 0; at most 500 rows, and no limit',

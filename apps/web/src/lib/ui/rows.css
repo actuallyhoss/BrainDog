@@ -2,9 +2,13 @@
  * The list shape every spine screen uses: one surface, hairlines between the rows inside it, and
  * one column per kind of thing so the eye can run down a figure or a date.
  *
- * It lives in one file rather than in each screen's `<style>` because it is one contract, not eight
- * — and a rule declared in a stylesheet that nothing emits reads as live and is what somebody edits
+ * It lives in one file rather than in each screen's `<style>` because it is one contract, not eight,
+ * and a rule declared in a stylesheet that nothing emits reads as live and is what somebody edits
  * by mistake (22 §7).
+ *
+ * A ROW AT 1440 IS `--table-row-h` WITH ONE SOFT HAIRLINE BETWEEN ROWS AND NONE AROUND THE LIST
+ * (design-brief §5, design DSN-7), the same row the register's grid draws, so a row is a row
+ * wherever it is drawn.
  */
 
 @layer components {
@@ -25,7 +29,7 @@
 
   .ledger > li + li > .line,
   .ledger > .line + .line {
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--line-soft);
   }
 
   .line {
@@ -33,7 +37,7 @@
     grid-template-columns: 12ch minmax(0, 1fr) auto 9ch;
     align-items: center;
     gap: var(--sp-4);
-    min-block-size: 38px;
+    min-block-size: var(--table-row-h);
     padding: var(--sp-2) var(--sp-4);
     color: var(--ink);
     font-size: var(--t-ui);
@@ -43,7 +47,7 @@
   }
 
   /* A TINT, not a rung. `--s2` is one step up the surface ladder from the `--s1` the ledger sits on,
-     and in the light scheme that is two points of luminance — a hover state you cannot see, on the
+     and in the light scheme that is two points of luminance: a hover state you cannot see, on the
      rows that carry most of what a person clicks. The same mix the table rows use, so a row is a
      row wherever it is drawn. */
   a.line:hover,
@@ -53,7 +57,7 @@
 
   .line-tall {
     align-items: start;
-    min-block-size: 56px;
+    min-block-size: var(--row-h-2);
     padding-block: var(--sp-3);
   }
 
@@ -77,14 +81,14 @@
   /**
    * AND UNDER A THUMB THE ROW IS 44, WHICH IS THE ONE `13 §7` NUMBER THIS FILE NEVER PAID.
    *
-   * `.line` is 38 and `.line-short` is 34, and `.line` is the tap target on Home, `/decide`,
-   * `/audit`, `/inbox`, `/vault`, `/packs` and `/jobs/<id>` — seven screens. `/decide` already
-   * writes `min-block-size: 44px` by hand inside its own `@media (width >= 640px)` guard, which is
-   * one screen fixing a rule that belongs to the row.
+   * `.line` is `--table-row-h` and `.line-short` is 34, and `.line` is the tap target on Home,
+   * `/decide`, `/audit`, `/inbox`, `/vault`, `/packs` and `/jobs/<id>`. `/decide` already writes
+   * `min-block-size: 44px` by hand inside its own `@media (width >= 640px)` guard, which is one
+   * screen fixing a rule that belongs to the row.
    *
    * THE POINTER AND NOT THE WIDTH, which is why it was invisible. Below 640 a row is a two-line
    * card and measures 83 to 166px, so `layout.mjs` finds nothing and is right not to; the gate
-   * runs its target rule below 640 only. The 38px row is what a coarse pointer gets ABOVE that
+   * runs its target rule below 640 only. The desktop row is what a coarse pointer gets ABOVE that
    * breakpoint, which is a tablet, and nothing has ever measured one. `05 §6`: density follows the
    * pointer, and `--ctl-h` in `tokens.css` already goes to 44 in this exact condition.
    *
@@ -119,8 +123,8 @@
        every list is what made them read as a terminal. Tabular figures keep an id lined up. */
     font-size: var(--t-sm);
     font-variant-numeric: tabular-nums;
-    /* CLIPPED, AND THE ELLIPSIS IS THE CHILD'S. `text-overflow` does nothing on a flex container —
-       it applies to a block container's own inline content — so this declared a behaviour it did not
+    /* CLIPPED, AND THE ELLIPSIS IS THE CHILD'S. `text-overflow` does nothing on a flex container
+       (it applies to a block container's own inline content), so this declared a behaviour it did not
        have, and a caller putting long text here got a hard cut with nothing to say it happened.
        `fenwick.example.com` read `fenwick.examp`, six senders in a row. Whoever puts text longer
        than a spoken id in here wraps it in a span and ellipsises that; `css-rules` is red on the
@@ -229,7 +233,7 @@
   }
 
   /* Below 640px a row becomes a two-line card. It is the register's three declared `mobile:` fields
-     that decide what a card shows — a declaration, not a media query (13 §10). */
+     that decide what a card shows: a declaration, not a media query (13 §10). */
   @media (width < 640px) {
     /**
      * AND A CARD HAS A LINE TO SPARE, SO THE TITLE TAKES IT.
@@ -239,7 +243,7 @@
      * a column that must stay in step with the header above it. A card has neither constraint.
      *
      * Measured on Home at 390: "Does Portage keep sending from portagemail.example, or move to the
-     * apex?" is 512px of text in a 324px box, so 188px of a question is gone — while the card
+     * apex?" is 512px of text in a 324px box, so 188px of a question is gone, while the card
      * directly under it carries two lines of wrapped body text. `/decide` renders the same three
      * questions in full, three lines each, which is the proof the space is there.
      */
@@ -265,14 +269,14 @@
      *
      * THE SECOND ONE IS RIGHT AND THE PARAGRAPH WAS WRONG. Measured on Home at 390 with the first
      * declaration forced to win: `.seq` does not become the top line, it lands at y+123, BELOW the
-     * date, and the card grows from 142.5px to 146.5px. The reason is placement rather than taste
-     * — `.line-amount` already holds row 1 column 2 and `.line-main` holds row 2 across both
+     * date, and the card grows from 142.5px to 146.5px. The reason is placement rather than taste:
+     * `.line-amount` already holds row 1 column 2 and `.line-main` holds row 2 across both
      * columns, so a full-width `.seq` with no row of its own is auto-placed past all of them. A
      * card whose id is printed under its date is not a line of its own, it is a stray.
      *
      * So the card is: id and amount on the first line, the title and its detail across the second,
      * the date on the third. `min-inline-size: max-content` is what keeps the id off the flexible
-     * track's floor — that half of the old comment was true and is kept. Anything longer than a
+     * track's floor, and that half of the old comment was true and is kept. Anything longer than a
      * spoken id goes in a span that ellipsises, which is the contract stated on `.seq` itself
      * above and which `/inbox` keeps with `.host`.
      */

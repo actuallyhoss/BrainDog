@@ -290,6 +290,7 @@ export type { CreateRecordArgs, Provisioned, Purged, WrappedKey } from './provis
 export { GRANT_KINDS, spanMs } from './vault.ts';
 import { GROUP_CAP } from './buckets.ts';
 import { ratesFrom } from './fx.ts';
+import { laidOf } from './pack-laid.ts';
 export { BUCKETS, GROUP_CAP, bucketOf, bucketRun, bucketStart, isBucket, nextBucket, shiftBucket } from './buckets.ts';
 export { MEASURES_MOST, MEASURE_BACK, MEASURE_BUCKETS, localDays, measureBucket, measurePeriod, measureSeries, measureWindow, readableZone } from './measures.ts';
 export type { MeasureBucket, MeasureSeries, RawReading } from './measures.ts';
@@ -4636,6 +4637,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
           )
           .map((r) => String(r.email))
           .filter(Boolean),
+      phones: () => ownersPushSubs(sql).length,
       /* A PUSH IS ONE JOB PER OWNER SUBSCRIPTION, `{ sub: { id } }` AND NOTHING ELSE (`51 §5`, `push.ts`). One per phone
          because the ack says whether THAT phone is gone; by id because the outbox travels in every `.brain` file and
          `push_sub` does not, so the endpoint comes out only under the lease (`pushTarget` below). And without the title
@@ -7430,13 +7432,21 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      * person installs one: audit forty-two's finding 1 put money-core 2.0.0 over `bank-hsbc-eg` 1.0.0 on `^1.8.0` through
      * `planPack` and `installPack`, and it planned `dependents: []` and installed. A manifest that does not parse, or
      * names no pack, gives `{}`: no range is claimed, and a plan says of that pack what it said before.
+     *
+     * `laid` IS READ OFF THE SAME MANIFEST (`laidOf`): the fields the pack laid through `extends`, by list id, which is
+     * how a plan lets a pack change a field it laid and no other. Absent for a pack that laid none, so a row reads as it
+     * did before `extends` existed.
      */
-    packs: (): { id: string; version: string; requires: Record<string, string> }[] =>
-      sql.all<{ id: string; version: string; manifest: string }>('SELECT id, version, manifest FROM pack ORDER BY id').map((p) => ({
-        id: p.id,
-        version: p.version,
-        requires: requiresOf(p.manifest),
-      })),
+    packs: (): { id: string; version: string; requires: Record<string, string>; laid?: Record<string, string[]> }[] =>
+      sql.all<{ id: string; version: string; manifest: string }>('SELECT id, version, manifest FROM pack ORDER BY id').map((p) => {
+        const laid = laidOf(p.manifest);
+        return {
+          id: p.id,
+          version: p.version,
+          requires: requiresOf(p.manifest),
+          ...(Object.keys(laid).length > 0 ? { laid } : {}),
+        };
+      }),
 
     /**
      * Every pack this record has, on or off, with the registers each one holds.

@@ -72,23 +72,37 @@ const BALANCE = {
 };
 
 /** One payout as `/v1/payouts` answers it. `arrival_date` is Unix seconds, and it is a date, not a moment. */
-const payout = (id: string, amount: number, currency: string, arrives: string) => ({
+const payout = (id: string, amount: number, currency: string, arrives: string, status = 'in_transit') => ({
   id,
   object: 'payout',
   amount,
   currency,
   arrival_date: Date.parse(`${arrives}T00:00:00Z`) / 1000,
   created: Date.parse('2026-09-23T10:00:00Z') / 1000,
-  status: 'in_transit',
+  status,
   method: 'standard',
 });
 
-/** Two dollar payouts in transit, the later one listed first, and one in euros. */
-const IN_TRANSIT = {
+/**
+ * Two dollar payouts in transit, the later one listed first, one in euros, and one in euros still pending, which lands
+ * before the euro one in transit.
+ */
+const ON_ITS_WAY = {
   object: 'list',
   has_more: false,
   url: '/v1/payouts',
-  data: [payout('po_b', 120_000, 'usd', '2026-09-28'), payout('po_a', 80_000, 'usd', '2026-09-26'), payout('po_c', 5_000, 'eur', '2026-09-29')],
+  data: [
+    payout('po_b', 120_000, 'usd', '2026-09-28'),
+    payout('po_a', 80_000, 'usd', '2026-09-26'),
+    payout('po_c', 5_000, 'eur', '2026-09-29'),
+    payout('po_d', 3_000, 'eur', '2026-09-27', 'pending'),
+  ],
+};
+
+/** `/v1/payouts` for one request: the list kept to the `status` the address names, as Stripe keeps it. */
+const payoutsAt = (payouts: unknown, url: URL): unknown => {
+  const list = payouts as { data?: { status: string }[] };
+  return { ...list, data: (list.data ?? []).filter((p) => p.status === url.searchParams.get('status')) };
 };
 
 /* ── A pull cannot say it ─────────────────────────────────────────────────────────────────────── */
@@ -162,6 +176,12 @@ test('THE PACK CARRIES stripe.js AS ITS SOURCE, byte for byte, and asks for one 
   assert.deepEqual(SCRIPT.keys, ['stripe']);
   assert.deepEqual(SCRIPT.reads, ['accounts']);
   assert.deepEqual(SCRIPT.writes, ['accounts']);
+  /* THE BALANCE, THE PAYOUTS IN TRANSIT AND THE PAYOUTS PENDING, and not one request more, which the first run below
+     counts. */
+  assert.deepEqual(SCRIPT.limits, { fetches: 3 });
+  /* money-core 3.0.0 AND NOT EARLIER, because only its walk brings a payout in on the day it lands (`accounts.arrives`),
+     and this pack no longer counts one as cash today. */
+  assert.deepEqual((JSON.parse(TEXT) as { requires: { packs: Record<string, string> } }).requires.packs, { 'money-core': '>=3.0.0 <4.0.0' });
   const file = await readPackFile(TEXT);
   assert.ok(file.ok, fixOf(file));
   assert.equal(file.value.pack.manifest.pack, 'stripe');
@@ -181,7 +201,7 @@ function stripeHost(answers: { balance: unknown; payouts: unknown; status?: numb
     fetch: async (request) => {
       asked.push(request);
       const url = new URL(request.url);
-      const body = url.pathname === '/v1/balance' ? answers.balance : url.pathname === '/v1/payouts' ? answers.payouts : { error: { message: 'No such route' } };
+      const body = url.pathname === '/v1/balance' ? answers.balance : url.pathname === '/v1/payouts' ? payoutsAt(answers.payouts, url) : { error: { message: 'No such route' } };
       return { status: answers.status ?? 200, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) };
     },
     list: async (register, where) => {
@@ -220,29 +240,36 @@ const created = (name: string, amount: number, currency: string, liquid: boolean
 });
 
 test('ONE ROW A KIND AND A CURRENCY, AND ONE PAYOUT ROW A CURRENCY: the payouts summed, dated by the soonest to land', async () => {
-  const h = stripeHost({ balance: BALANCE, payouts: IN_TRANSIT });
+  const h = stripeHost({ balance: BALANCE, payouts: ON_ITS_WAY });
   const a = await runInQuickJs(declOf(), h);
   assert.deepEqual(writesOf(a), [
     created('Stripe available EUR', 31_000, 'EUR', true),
     created('Stripe available USD', 1_842_050, 'USD', true),
-    created('Stripe payout in transit EUR', 5_000, 'EUR', true, '2026-09-29'),
+    /* 5,000 IN TRANSIT AND 3,000 STILL PENDING, dated by the pending one, which lands first. While the pack asked for
+       payouts in transit alone the 3,000 was in no row at all: it had left the available balance and was not on its
+       way yet. */
+    created('Stripe payout in transit EUR', 8_000, 'EUR', false, '2026-09-27'),
     /* 120,000 AND 80,000 CENTS, and the one listed second lands first. A script that took the first payout's date
-       would say the 28th, two days after the money is in the bank. */
-    created('Stripe payout in transit USD', 200_000, 'USD', true, '2026-09-26'),
+       would say the 28th, two days after the money is in the bank. NOT CASH, because it is not in the bank yet:
+       money-core walks it in as money on the day it lands. */
+    created('Stripe payout in transit USD', 200_000, 'USD', false, '2026-09-26'),
     created('Stripe pending EUR', 0, 'EUR', false),
     created('Stripe pending USD', 250_000, 'USD', false),
   ]);
 
-  /* TWO REQUESTS, BOTH TO STRIPE, BOTH NAMING THE KEY BY ITS LABEL. The payouts are asked for in transit only, so a
-     paid payout, already in the bank's balance, is never counted twice. */
+  /* THREE REQUESTS, ALL TO STRIPE, ALL NAMING THE KEY BY ITS LABEL, which is the declared `limits.fetches`. The payouts
+     are asked for in transit and pending only, so a paid payout, already in the bank's balance, is never counted
+     twice. */
   assert.deepEqual(
     h.asked.map((r) => [r.method, r.url, r.key]),
     [
       ['GET', `${API}/v1/balance`, 'stripe'],
       ['GET', `${API}/v1/payouts?status=in_transit&limit=100`, 'stripe'],
+      ['GET', `${API}/v1/payouts?status=pending&limit=100`, 'stripe'],
     ],
   );
-  assert.deepEqual(h.filters, [{ field: 'name', starts: 'Stripe ' }]);
+  assert.equal(h.asked.length, SCRIPT.limits?.fetches);
+  assert.deepEqual(h.filters, [{ field: 'name', starts: 'Stripe' }]);
 });
 
 /** A row this pack wrote on an earlier hour. */
@@ -267,13 +294,62 @@ test('THE NEXT HOUR UPDATES IN PLACE: a payout that landed goes to zero, an unmo
      this pack writes are the pack's, so it is neither zeroed nor rewritten. */
   const theirs = held('Stripe reserve (kept by hand)', 1_000_000, 'USD');
   const settled = { ...BALANCE, pending: [] };
-  const a = await runInQuickJs(declOf(), stripeHost({ balance: settled, payouts: { ...IN_TRANSIT, data: [] } }, [usd, eur, transit, theirs]));
+  const a = await runInQuickJs(declOf(), stripeHost({ balance: settled, payouts: { ...ON_ITS_WAY, data: [] } }, [usd, eur, transit, theirs]));
   assert.deepEqual(writesOf(a), [
     { op: 'update', spoken: `accounts#${eur.seq}`, patch: { balance: { amount: 31_000, currency: 'EUR' }, as_of: TODAY }, version: 3 },
     /* THE DOLLARS LANDED, so the row says nothing is on its way rather than standing at 2,000.00 beside the bank
        balance that now holds the same money. */
     { op: 'update', spoken: `accounts#${transit.seq}`, patch: { balance: { amount: 0, currency: 'USD' }, as_of: TODAY, arrives: null }, version: 3 },
   ]);
+});
+
+test('A PAYOUT ROW WRITTEN BEFORE 1.1.0 STOPS COUNTING AS CASH, so the money is not in Cash now and in the walk as well', async () => {
+  /* WRITTEN AS CASH BY 1.0.x, with nothing else about it out of date. The next hour sets it not cash and changes
+     nothing else. */
+  const transit = held('Stripe payout in transit USD', 200_000, 'USD', TODAY, { arrives: '2026-09-26' });
+  const payouts = { ...ON_ITS_WAY, data: ON_ITS_WAY.data.filter((p) => p.currency === 'usd') };
+  const a = await runInQuickJs(declOf(), stripeHost({ balance: { available: [], pending: [] }, payouts }, [transit]));
+  assert.deepEqual(writesOf(a), [{ op: 'update', spoken: `accounts#${transit.seq}`, patch: { balance: { amount: 200_000, currency: 'USD' }, as_of: TODAY, arrives: '2026-09-26', liquid: false }, version: 3 }]);
+});
+
+test('A STRIPE BALANCE TYPED IN BY HAND BEFORE THE PACK IS TAKEN OVER ON THE FIRST RUN, and no other Stripe row is', async () => {
+  /* "Stripe" WITH ITS CURRENCY ONLY IN ITS BALANCE, AND "Stripe EUR" WITH IT IN ITS NAME, both typed a week ago. The
+     first run renames each to the available row of its currency and sets it from Stripe, where it used to write that
+     row beside it, so Cash now counted the dollars twice. */
+  const dollars = held('Stripe', 1_800_000, 'USD', '2026-09-18');
+  const euros = held('Stripe EUR', 30_000, 'EUR', '2026-09-18');
+  const theirs = held('Stripe reserve', 1_000_000, 'USD');
+  const a = await runInQuickJs(declOf(), stripeHost({ balance: BALANCE, payouts: ON_ITS_WAY }, [dollars, euros, theirs]));
+  assert.deepEqual(writesOf(a), [
+    {
+      op: 'update',
+      spoken: `accounts#${dollars.seq}`,
+      patch: { name: 'Stripe available USD', kind: 'bank', balance: { amount: 1_842_050, currency: 'USD' }, as_of: TODAY, liquid: true },
+      version: 3,
+    },
+    {
+      op: 'update',
+      spoken: `accounts#${euros.seq}`,
+      patch: { name: 'Stripe available EUR', kind: 'bank', balance: { amount: 31_000, currency: 'EUR' }, as_of: TODAY, liquid: true },
+      version: 3,
+    },
+    /* AND NO AVAILABLE ROW IS WRITTEN BESIDE THEM. "Stripe reserve" is in no write. */
+    created('Stripe payout in transit EUR', 8_000, 'EUR', false, '2026-09-27'),
+    created('Stripe payout in transit USD', 200_000, 'USD', false, '2026-09-26'),
+    created('Stripe pending EUR', 0, 'EUR', false),
+    created('Stripe pending USD', 250_000, 'USD', false),
+  ]);
+  assert.match(a.log, /"Stripe" was typed in before this pack, so it is now "Stripe available USD"/);
+  assert.match(a.log, /"Stripe EUR" was typed in before this pack, so it is now "Stripe available EUR"/);
+});
+
+test('A HAND ROW BESIDE ONE THE PACK ALREADY KEEPS IS LEFT AS IT IS AND SAID, so the pack never takes a row over twice', async () => {
+  /* THE PACK'S OWN ROW WINS: it is Stripe's figure already, and a second rename would be two rows under one name. */
+  const ours = held('Stripe available USD', 1_842_050, 'USD', TODAY);
+  const typed = held('Stripe USD', 1_800_000, 'USD', '2026-09-18');
+  const a = await runInQuickJs(declOf(), stripeHost({ balance: { available: [{ amount: 1_842_050, currency: 'usd' }], pending: [] }, payouts: { ...ON_ITS_WAY, data: [] } }, [ours, typed]));
+  assert.deepEqual(writesOf(a), []);
+  assert.match(a.log, /"Stripe USD" was typed in by hand and "Stripe available USD" is already kept from Stripe, so both count/);
 });
 
 test('A KEY STRIPE REFUSES STOPS THE RUN WITH A SENTENCE AND WRITES NOTHING, which is what pauses the script after three', async () => {
@@ -291,7 +367,7 @@ test('THE WHOLE PATH ON A SELF-HOST: installed from the file, the key opened for
   const { start } = await import('../../apps/selfhost/src/server.ts');
   const dir = mkdtempSync(join(tmpdir(), 'braindog-stripe-'));
   const sent: { host: string; path: string; auth: string | null }[] = [];
-  let answers: { balance: unknown; payouts: unknown } = { balance: BALANCE, payouts: IN_TRANSIT };
+  let answers: { balance: unknown; payouts: unknown } = { balance: BALANCE, payouts: ON_ITS_WAY };
   const running = await start({
     file: join(dir, 'record.brain'),
     directory: join(dir, 'directory.sqlite'),
@@ -303,7 +379,7 @@ test('THE WHOLE PATH ON A SELF-HOST: installed from the file, the key opened for
       openKey: async (grant) => (grant.label === 'stripe' ? 'KEY-OF-stripe' : null),
       send: async (url, init) => {
         sent.push({ host: url.host, path: `${url.pathname}${url.search}`, auth: new Headers(init.headers).get('authorization') });
-        const body = url.pathname === '/v1/balance' ? answers.balance : answers.payouts;
+        const body = url.pathname === '/v1/balance' ? answers.balance : payoutsAt(answers.payouts, url);
         return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
       },
       resolve: async (host) => (host === 'api.stripe.com' ? [{ address: '203.0.113.10', family: 4 }] : []),
@@ -326,8 +402,9 @@ test('THE WHOLE PATH ON A SELF-HOST: installed from the file, the key opened for
     };
     for (const id of ['portfolio', 'people', 'money-core']) await put(firstPartyDocument(id, { seeds: [] }));
     /* money-core 3.0.0 DECLARES `arrives` ITSELF (`accounts.arrives`, contracts §4.3a), in the very shape this pack lays
-       it, so the pack's `extends` lays nothing here and is not refused as a second field under that id. It keeps the
-       extension for a record on a money-core before 3.0.0, where accounts has no `arrives` and the pack lays it. */
+       it, so the pack's `extends` lays nothing here and is not refused as a second field under that id. The extension
+       is the one 1.0.0 shipped with, before money-core declared the field, and since 1.1.0 asks for money-core 3.0.0 it
+       lays nothing on any record this version installs on. */
     const before = api.kernel.register('accounts')?.fields.map((f) => f.id) ?? [];
     assert.equal(before.includes('arrives'), true, 'money-core 3.0.0 does not say when money arrives');
     /* THE VAULT ENTRY FIRST, because install refused the pack without it: "Add the key called "stripe" to the vault,
@@ -360,20 +437,26 @@ test('THE WHOLE PATH ON A SELF-HOST: installed from the file, the key opened for
     assert.deepEqual(sent, [
       { host: 'api.stripe.com', path: '/v1/balance', auth: 'Bearer KEY-OF-stripe' },
       { host: 'api.stripe.com', path: '/v1/payouts?status=in_transit&limit=100', auth: 'Bearer KEY-OF-stripe' },
+      { host: 'api.stripe.com', path: '/v1/payouts?status=pending&limit=100', auth: 'Bearer KEY-OF-stripe' },
     ]);
     assert.deepEqual(accountsIn(running.sql), [
       ['Stripe available EUR', 31_000, 'EUR'],
       ['Stripe available USD', 1_842_050, 'USD'],
-      ['Stripe payout in transit EUR', 5_000, 'EUR'],
+      ['Stripe payout in transit EUR', 8_000, 'EUR'],
       ['Stripe payout in transit USD', 200_000, 'USD'],
       ['Stripe pending EUR', 0, 'EUR'],
       ['Stripe pending USD', 250_000, 'USD'],
     ]);
-    const arrives = running.sql.one<{ arrives: string }>("SELECT json_extract(fields, '$.arrives') AS arrives FROM entry WHERE register = 'accounts' AND json_extract(fields, '$.name') = 'Stripe payout in transit USD'");
-    assert.equal(arrives?.arrives, '2026-09-26');
+    /* ON ITS WAY, SO NOT CASH, AND DATED: the two things money-core's walk reads to bring it in on the day it lands.
+       `liquid` reads back as SQLite's 0 because a bool is stored as an integer. */
+    const transit = running.sql.one<{ arrives: string; liquid: number }>(
+      "SELECT json_extract(fields, '$.arrives') AS arrives, json_extract(fields, '$.liquid') AS liquid FROM entry WHERE register = 'accounts' AND json_extract(fields, '$.name') = 'Stripe payout in transit USD'",
+    );
+    assert.deepEqual([transit?.arrives, transit?.liquid], ['2026-09-26', 0]);
 
-    /* THE NEXT HOUR, THE DOLLARS LANDED AND A EURO PAYOUT LEFT. Six rows still, updated where they moved. */
-    answers = { balance: { ...BALANCE, available: [{ amount: 2_042_050, currency: 'usd' }, { amount: 31_000, currency: 'eur' }] }, payouts: { ...IN_TRANSIT, data: [IN_TRANSIT.data[2]] } };
+    /* THE NEXT HOUR, THE DOLLARS LANDED AND ONE EURO PAYOUT IS STILL ON ITS WAY. Six rows still, updated where they
+       moved. */
+    answers = { balance: { ...BALANCE, available: [{ amount: 2_042_050, currency: 'usd' }, { amount: 31_000, currency: 'eur' }] }, payouts: { ...ON_ITS_WAY, data: [ON_ITS_WAY.data[2]] } };
     due();
     await running.poll();
     assert.deepEqual(accountsIn(running.sql), [

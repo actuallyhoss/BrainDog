@@ -192,7 +192,7 @@ export async function relabelDocument(id: string, installed: readonly PackState[
  * Ask the record what installing a document would do. The plan is what the screen draws, and its `planHash` is what
  * Install sends back, so what installs is what was shown.
  */
-export async function planInstall(client: Installer, id: string, doc: Record<string, unknown>, nameOf: (kind: 'register' | 'page', id: string) => string): Promise<Answer<Offer>> {
+export async function planInstall(client: Installer, id: string, doc: Record<string, unknown>, nameOf: (kind: 'register' | 'page' | 'metric', id: string) => string): Promise<Answer<Offer>> {
   const planned = said(await client.planPack({ doc, source: { kind: 'local' } }));
   if (!planned.ok) return planned;
   const diff = (planned.value as { diff?: { calls_out?: unknown; approve?: unknown } } | null)?.diff;
@@ -209,7 +209,7 @@ export async function planInstall(client: Installer, id: string, doc: Record<str
 export async function installPlanned(
   client: Installer,
   offer: Offer,
-  nameOf: (kind: 'register' | 'page', id: string) => string,
+  nameOf: (kind: 'register' | 'page' | 'metric', id: string) => string,
 ): Promise<{ ok: true } | { ok: false; fix: string; again: Offer | null }> {
   const out = said(
     await client.installPack({ doc: offer.doc, source: { kind: 'local' }, planHash: offer.plan.planHash, ...(offer.approve.length > 0 ? { approve: offer.approve } : {}) }),

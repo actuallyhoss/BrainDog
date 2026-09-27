@@ -340,6 +340,19 @@ const DECLARED: Record<string, Version> = {
       "Home's empty title, `setting.voice_nothing_needs_you`, loses its closing full stop, and `page.home-founder` takes Due this week from Money by name since money-core 3.0.0 retired Money's own Home -> 0dab9110c0bce0d0",
     ],
   },
+  'founder@1.6.0': {
+    holds: `
+      metric.datapoints-30d page.dashboard page.home-founder page.organisation page.project
+      register.datapoints register.organisations
+      setting.shared_version setting.speaks
+      setting.voice_home setting.voice_lists setting.voice_needs_you setting.voice_nothing_needs_you
+      setting.voice_right_now setting.voice_since_away
+    `,
+    declares: 'fb63016ae24fe5a5',
+    history: [
+      "`page.project` takes portfolio 1.5.0's project template: the questions waiting on a project, what changed on it, its plan and its money by month -> fb63016ae24fe5a5",
+    ],
+  },
   'team@2.3.0': {
     holds: `
       page.agent-work page.cycles page.home-team page.project register.cycle_plan register.cycles
@@ -388,6 +401,22 @@ const DECLARED: Record<string, Version> = {
     `,
     declares: '177854b0f15b0158',
     history: ["Home's empty title, `setting.voice_nothing_needs_you`, loses its closing full stop, as every other title already has -> 177854b0f15b0158"],
+  },
+  'team@2.5.0': {
+    holds: `
+      page.agent-work page.cycles page.home-team page.project register.cycle_plan register.cycles
+      setting.holds_people setting.holds_tasks
+      setting.label_cycle_plan setting.label_cycles setting.label_people setting.label_people__role__collaborator
+      setting.label_tasks setting.label_tasks__state__backlog setting.label_tasks__state__doing
+      setting.label_tasks__state__open setting.label_tasks__state__review
+      setting.one_tasks setting.shared_version setting.speaks
+      setting.voice_home setting.voice_lists setting.voice_needs_you setting.voice_nothing_needs_you
+      setting.voice_right_now setting.voice_since_away
+    `,
+    declares: '35c567fe0cc7cd90',
+    history: [
+      "`page.project` takes portfolio 1.5.0's project template: the questions waiting on a project, what changed on it, its plan and its money by month -> 35c567fe0cc7cd90",
+    ],
   },
   'guide@1.2.0': {
     holds: `

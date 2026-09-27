@@ -152,14 +152,23 @@ export type Shell = 'PowerShell' | 'Git Bash' | 'sh';
 
 /**
  * The shell that ran `braindog install`, where the environment can tell it: `MSYSTEM`, or a `SHELL` naming bash, is
- * Git Bash on win32. NEITHER IS PROOF, which is why every form fails closed in the others and the lines are headed with
- * the name. Measured in this tree's session: a PowerShell started under Git Bash inherits `MSYSTEM=MINGW64`, so it is
- * handed the `sh` form. That form is refused whole there, "is not recognized" for a named profile ("missing the
- * terminator" when its folder holds an apostrophe) and "Missing closing ')'" for the default one, and in `cmd` too,
- * with a stand-in `claude` first on the PATH never run.
+ * Git Bash on win32, unless `_` says the command bash last started was PowerShell.
+ *
+ * `_` IS BASH'S NOTE OF THE PROGRAM IT RAN, AND A POWERSHELL STARTED UNDER GIT BASH KEEPS IT. Measured on 27 September
+ * in Git Bash on Windows 11: `node` run straight from bash saw `MSYSTEM=MINGW64` and `_` naming `node`; the same `node`
+ * run from a `powershell -NoProfile` started in that bash saw the same `MSYSTEM`, and `_` naming
+ * `C:/WINDOWS/System32/WindowsPowerShell/v1.0/powershell`, because PowerShell inherits the variable and never writes it.
+ * Without this, that PowerShell was handed the `sh` form (defects H3). `pwsh` is matched by the same rule and was not
+ * measured: it was not installed on the machine that measured.
+ *
+ * NONE OF THIS IS PROOF, which is why every form fails closed in the others and the lines are headed with the name.
+ * The `sh` form is refused whole in PowerShell, "is not recognized" for a named profile ("missing the terminator" when
+ * its folder holds an apostrophe) and "Missing closing ')'" for the default one, and in `cmd` too, with a stand-in
+ * `claude` first on the PATH never run.
  */
 export function shellOf(env: Env = process.env, platform: string = process.platform): Shell {
   if (platform !== 'win32') return 'sh';
+  if (/(?:^|[\\/])(?:powershell|pwsh)(?:\.exe)?$/i.test(env._ ?? '')) return 'PowerShell';
   return env.MSYSTEM || /bash/i.test(env.SHELL ?? '') ? 'Git Bash' : 'PowerShell';
 }
 

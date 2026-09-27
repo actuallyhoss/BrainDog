@@ -236,7 +236,13 @@ test("THE QUESTION IS ASKED ONCE, TYPED AS A NUMBER, ON THE OWNER'S KEY OPENED I
   try {
     const ada = s.plant();
     const value = ['bd_fake_slash_', randomBytes(24).toString('hex')].join('');
-    assert.equal((await s.post('/api/keys/put', ada, { label: 'slash', opens: 'Slash', value })).status, 200, 'the key was not put in');
+    const put = await s.post('/api/keys/put', ada, { label: 'model provider', opens: 'Slash', value });
+    assert.equal(put.status, 200, 'the key was not put in');
+    /* AND PICKED IN SETTINGS BY ITS GRANT ID, since no label chooses a key any more (`loop/finish/defects.md` S1). With no
+       address of his own, his key is sent to this host's endpoint. */
+    const row = s.running.api.kernel.get(String(put.body?.value?.['credential'])) ?? assert.fail('the key row is not there');
+    const chose = await s.post('/api/slash/settings', ada, { source: 'key', model: 'his-model', grant_id: String(row.fields['value']) });
+    assert.equal(chose.status, 200, chose.raw);
     assert.ok((await s.running.api.kernel.install([RATE])).ok, 'the rule did not install');
 
     await s.write('Gold');

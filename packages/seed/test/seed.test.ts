@@ -266,11 +266,11 @@ test('THE SAMPLE’S QUESTIONS ARE FILED THROUGH propose AND decide, in the orde
   assert.ok(open.ok, fixOf(open));
   const byRule = (r: { opened_by?: unknown }) => String(r.opened_by ?? '').startsWith('rule:');
   assert.deepEqual(open.value.filter((r) => !byRule(r)).map((r) => r.id).sort(), ['SG2', 'SG3', 'SG4', 'SG5', 'SG7']);
-  /* AND MONEY'S RULES ASK AFTER THEM: the two invoices more than a week late, and the balance nine days old. */
+  /* AND MONEY'S RULES ASK AFTER THEM: the two invoices more than a week late, and the repeating line past its day. */
   const asked = open.value.filter(byRule);
-  assert.deepEqual(asked.map((r) => String(r.opened_by)).sort(), ['rule:cash-stale', 'rule:invoice-late', 'rule:invoice-late']);
+  assert.deepEqual(asked.map((r) => String(r.opened_by)).sort(), ['rule:invoice-late', 'rule:invoice-late', 'rule:recurring-missed']);
   assert.ok(asked.every((r) => Number(String(r.id).slice(2)) > 7), 'a rule question took a number in the middle of the sample');
-  assert.equal(k.question(String(asked.find((r) => r.opened_by === 'rule:cash-stale')!.id)), 'The balance of Tax reserve was last set 9 days ago. Update it?');
+  assert.match(k.question(String(asked.find((r) => r.opened_by === 'rule:recurring-missed')!.id)) ?? '', /^Ledger Post, sending plan was due 4 days ago, .+\. Did it go through\?$/u);
 
   const kiln = k.governanceRow('suggestion', 'SG5');
   assert.equal(k.question('SG5'), 'Does Kiln licence per-seat, per-product, or one flat studio price?');

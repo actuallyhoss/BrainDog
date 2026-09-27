@@ -19,7 +19,6 @@ import { createRecordApi } from '@braindog/record';
 import { fixedClock, openSqlite } from '../../../packages/kernel/test/sqlite.ts';
 import { slashLook, workerSlashDoor, workerSlashEngine, workerSlashModel } from '../src/slash.ts';
 
-const URL_ = 'https://gateway.example.test/v1/chat/completions';
 const FAKE_KEK = '0'.repeat(64);
 const FAKE_PERSON_KEY = 'fake-person-key-for-tests-only';
 
@@ -28,45 +27,62 @@ const net = () => {
   return { sent, send: async (_u: URL, init: RequestInit) => (sent.push(init), new Response('{"drafts":[]}', { status: 200 })) };
 };
 
-test('NO ENDPOINT OR NO KEK, NO MODEL: a hosted record says slash: false and the rules draft', () => {
+/** Slash's own store with the two tables `slashOwnKeyOf` reads, on the included model until a test chooses his key. */
+const slashStore = () => {
+  const store = openSqlite();
+  store.exec('CREATE TABLE slash_settings (singleton INTEGER PRIMARY KEY, tier TEXT, model TEXT, grant_id TEXT, ask_cap INTEGER, updated_at TEXT)');
+  store.exec('CREATE TABLE slash_meta (key TEXT PRIMARY KEY, value TEXT)');
+  store.exec("INSERT INTO slash_settings VALUES (1, 'a', NULL, NULL, 80, '2026-09-21T09:00:00.000Z')");
+  return store;
+};
+
+/** His key chosen in that store, as Settings saves it: the grant by its id, a model, and his provider's address. */
+const chooseKey = (store: { exec(sql: string, ...p: (string | number | null)[]): void }, grant: string) => {
+  store.exec("UPDATE slash_settings SET tier = 'b', model = 'his-model', grant_id = ? WHERE singleton = 1", grant);
+  store.exec("INSERT INTO slash_meta (key, value) VALUES ('own.provider', 'openai'), ('own.base_url', 'https://gateway.example.test/v1')");
+};
+
+test('NO INCLUDED MODEL AND NO KEK, NO MODEL: a hosted record says slash: false and the rules draft', () => {
   const api = () => ({ kernel: { grants: () => [] } }) as never;
   assert.equal(workerSlashModel({}, api), undefined);
-  assert.equal(workerSlashModel({ SLASH_ENDPOINT: URL_ }, api), undefined, 'a model was built with no way to open a key');
-  assert.equal(workerSlashModel({ SLASH_ENDPOINT: '', KEK: FAKE_KEK }, api), undefined);
+  /* A `KEK` WITH NO STORE TO READ HIS CHOICE FROM IS NO MODEL EITHER: nothing could say which key to open. */
+  assert.equal(workerSlashModel({ KEK: FAKE_KEK }, api), undefined);
+  const store = slashStore();
+  assert.ok(workerSlashModel({ KEK: FAKE_KEK }, api, { store: () => store }), 'a Worker that can open his key offered no Slash to set up');
+  store.close();
 });
 
-test("THE PERSON'S OWN KEY, labelled slash in the vault, is opened on each call and sent only as the call's authorization", async () => {
+test('NO KEY IS CHOSEN BY ITS LABEL: a live token labelled slash is never opened, and his own key is opened by its id on each call', async () => {
   const opened: string[] = [];
-  let grants = [
-    { id: 'g_old', label: 'slash', revoked_at: '2026-09-01T00:00:00.000Z' },
-    { id: 'g_other', label: 'example read', revoked_at: null },
+  const grants = [
+    { id: 'g_label', label: 'slash', kind: 'api_token', revoked_at: null },
+    { id: 'g_his', label: 'model provider', kind: 'api_token', revoked_at: null },
   ];
   const api = () => ({ kernel: { grants: () => grants } }) as never;
   const wire = net();
-  const model = workerSlashModel({ SLASH_ENDPOINT: URL_, SLASH_MODEL: 'small', KEK: FAKE_KEK }, api, {
+  const store = slashStore();
+  const model = workerSlashModel({ KEK: FAKE_KEK }, api, {
+    store: () => store,
     send: wire.send,
     open: () => async (grant) => (opened.push(grant.id), FAKE_PERSON_KEY),
   });
   assert.ok(model);
 
-  /* NO LIVE KEY FOR Slash YET: called with none, and nothing opened. An operator key is never read here, even when set. */
-  await model.draft({} as never);
+  /* NOTHING CHOSEN, AND NO INCLUDED MODEL HERE: the press is refused before anything is sent, and the `slash` key stays shut
+     (`loop/finish/defects.md` S1). */
+  await assert.rejects(model.draft({} as never), /Pick your key in Settings/u);
   assert.deepEqual(opened, []);
-  assert.equal((wire.sent[0]!.headers as Record<string, string>).authorization, undefined);
+  assert.equal(wire.sent.length, 0);
 
-  /* A KEY PUT IN AFTER BOOT COUNTS ON THE NEXT CALL. */
-  grants = [...grants, { id: 'g_new', label: 'slash', revoked_at: null }];
+  /* HIS CHOICE COUNTS ON THE NEXT CALL, with no restart. */
+  chooseKey(store, 'g_his');
   await model.draft({ usage: {} } as never);
-  assert.deepEqual(opened, ['g_new']);
-  assert.equal((wire.sent[1]!.headers as Record<string, string>).authorization, `Bearer ${FAKE_PERSON_KEY}`);
-  const body = String(wire.sent[1]!.body);
+  assert.deepEqual(opened, ['g_his']);
+  assert.equal((wire.sent[0]!.headers as Record<string, string>).authorization, `Bearer ${FAKE_PERSON_KEY}`);
+  const body = String(wire.sent[0]!.body);
   assert.ok(!body.includes(FAKE_PERSON_KEY), 'the key went into what the model reads');
-  assert.equal((JSON.parse(body) as { model: string }).model, 'small');
-
-  const env = { SLASH_ENDPOINT: URL_, KEK: FAKE_KEK, SLASH_KEY: 'fake-operator-key' } as never;
-  const hosted = workerSlashModel(env, api, { send: wire.send, open: () => async () => FAKE_PERSON_KEY });
-  await hosted!.draft({} as never);
-  assert.equal((wire.sent[2]!.headers as Record<string, string>).authorization, `Bearer ${FAKE_PERSON_KEY}`, 'an operator key was used on a hosted record');
+  assert.equal((JSON.parse(body) as { model: string }).model, 'his-model');
+  store.close();
 });
 
 test('THE DAILY LOOK runs once a day on a real record and never throws out of an alarm', async () => {
@@ -154,21 +170,32 @@ const twoOpenTasks = async (clock: { now: () => number }) => {
   return { sql, api };
 };
 
-test("A REAL ASK REACHES THE PACKAGE'S ENGINE THROUGH THE WORKER'S OWN BUILDER, and its answer lands on the record's Decide", async () => {
+/**
+ * A REAL ASK ON HIS OWN KEY, THROUGH THE WORKER'S OWN DOOR BUILDER: the door opens his key for the asker (`byok`), and both
+ * passes go to it. The opener records the actor it was built for, which is the actor the real `keyOpener` signs
+ * `grant.read` with (`key-opener-actor.test.ts`), so the asker's name on both openings is measured here, not supposed.
+ */
+test("A REAL ASK ON HIS OWN KEY REACHES THE PACKAGE'S ENGINE THROUGH THE WORKER'S DOOR, both passes on his key, signed by the asker", async () => {
   const clock = fixedClock(Date.UTC(2026, 8, 21, 9));
   const { sql, api } = await twoOpenTasks(clock);
+  (api.kernel as { grants: () => unknown }).grants = () => [{ id: 'g_his', kind: 'api_token', label: 'model provider', revoked_at: null }];
   const own = openSqlite();
   const wire = modelDouble();
+  const opened: (string | undefined)[] = [];
 
-  const engine = await workerSlashEngine({ SLASH_ENDPOINT: URL_, SLASH_MODEL: 'small', KEK: FAKE_KEK }, () => api, {
+  const door = workerSlashDoor({ KEK: FAKE_KEK }, () => api, {
     sql: own,
     clock,
     send: wire.send,
-    open: () => async () => FAKE_PERSON_KEY,
-  });
-  assert.ok(engine, 'a configured Worker built no engine');
+    open: (_api, actor) => async () => (opened.push(actor), FAKE_PERSON_KEY),
+  }, new Set());
+  const engine = await door.engine!();
+  assert.ok(engine, 'a Worker that can open his key built no engine');
+  chooseKey(own, 'g_his');
+  const key = await door.byok!(OWNER);
+  assert.ok(key !== undefined && !(typeof key === 'object' && key !== null && 'refusal' in key), `his key was not opened: ${JSON.stringify(key)}`);
 
-  const out = await engine.propose('Which tasks are open?', OWNER);
+  const out = await engine.propose('Which tasks are open?', OWNER, key as never, undefined, key as never);
   assert.ok(out.ok, `refused: ${JSON.stringify(out)}`);
   assert.equal(out.value.body_kind, 'rowset');
   assert.deepEqual(out.value.citations, ['tasks#1']);
@@ -192,51 +219,18 @@ test("A REAL ASK REACHES THE PACKAGE'S ENGINE THROUGH THE WORKER'S OWN BUILDER, 
   assert.equal(reading.value.model, null);
 
   /* THE WIRE SAYS WHICH PORT SPOKE. `json_schema` with `strict` is `endpointInference`'s request and `endpointModel` never
-     sends it: the record's model asks for a bare `json_object`. And `small` is this deployment's id standing in for the short
-     name `glm-5.3-flash` the package's routing table asked for (`46 §2`), which is the mapping living in the host. */
+     sends it: the record's model asks for a bare `json_object`. And the model is the name he typed, for both passes, the
+     package's short names included: on his key `SLASH_MODEL` has no say (`ownOptionsOf`). */
   assert.equal(wire.sent.length, 2);
   const asked = JSON.parse(String(wire.sent[0]!.body)) as { model: string; response_format: { type: string; json_schema: { strict: boolean } } };
   assert.equal(asked.response_format.type, 'json_schema');
   assert.equal(asked.response_format.json_schema.strict, true);
-  assert.equal(asked.model, 'small');
-  /* NO KEY ON THE CALL, because this record's vault holds no live grant labelled `slash`. What a grant that IS there does is
-     the test above, over the same `wireOf` these two builders share, so it is not driven twice through the slower path. */
-  assert.equal((wire.sent[0]!.headers as Record<string, string>).authorization, undefined);
-
-  sql.close();
-  own.close();
-});
-
-/**
- * THE DOOR'S BUILDER OPENS THE VAULT'S `slash` KEY IN THE ASKER'S NAME, NOT IN NOBODY'S. On a hosted record the included model
- * is always keyed from the vault, and `workerSlashDoor`'s `build` wraps the engine in `slashAskerEngine` so each ask's
- * `grant.read` is signed by whoever asked. Nothing measured that on the Worker: with the wrap replaced by `return engine;`
- * every Worker test stayed green (`check:slash-byo-and-signing`). The opener here records the actor it was built for,
- * which is the actor the real `keyOpener` signs `grant.read` with (`key-opener-actor.test.ts`).
- */
-test("THE WORKER DOOR'S ENGINE OPENS THE `slash` KEY FOR THE ASKER, so its grant.read is signed by her and never by system", async () => {
-  const clock = fixedClock(Date.UTC(2026, 8, 21, 9));
-  const { sql, api } = await twoOpenTasks(clock);
-  /* A LIVE slash GRANT, SO THE MODEL OPENS A KEY AT ALL: with none it is called keyless and nothing is signed by anybody. */
-  const grants = [{ id: 'g_slash', kind: 'api_key', label: 'slash', revoked_at: null }];
-  (api.kernel as { grants: () => unknown }).grants = () => grants;
-  const own = openSqlite();
-  const wire = modelDouble();
-  const opened: (string | undefined)[] = [];
-  const door = workerSlashDoor({ SLASH_ENDPOINT: URL_, SLASH_MODEL: 'small', KEK: FAKE_KEK }, () => api, {
-    sql: own,
-    clock,
-    send: wire.send,
-    open: (_api, actor) => async () => (opened.push(actor), FAKE_PERSON_KEY),
-  }, new Set());
-  const engine = await door.engine!();
-  assert.ok(engine, 'a configured Worker built no engine');
-
-  const out = await engine.propose('Which tasks are open?', OWNER);
-  assert.ok(out.ok, `refused: ${JSON.stringify(out)}`);
-  assert.equal(wire.sent.length, 2);
-  assert.ok(wire.sent.every((init) => (init.headers as Record<string, string>).authorization === `Bearer ${FAKE_PERSON_KEY}`), 'the ask did not go out on the `slash` key');
+  assert.equal(asked.model, 'his-model');
+  /* BOTH PASSES ON HIS KEY, AND EACH OPENING SIGNED BY THE ASKER, never by `system`. */
+  assert.ok(wire.sent.every((init) => (init.headers as Record<string, string>).authorization === `Bearer ${FAKE_PERSON_KEY}`), 'an ask did not go out on his key');
   assert.deepEqual(opened, ['p_owner', 'p_owner'], 'a grant.read of the ask was not signed by the asker');
+  /* AND THE LEDGER KEEPS BOTH UNDER HIS TIER, which the included count and the operator's ceiling do not read. */
+  assert.deepEqual(own.all<{ tier: string }>('SELECT tier FROM slash_call ORDER BY rowid').map((r) => r.tier), ['b', 'b']);
 
   sql.close();
   own.close();
@@ -278,8 +272,8 @@ test('THE KEYLESS PATH BUILDS NO ENGINE EITHER, so a host with nothing configure
   const deps = { sql: openSqlite(), clock: fixedClock(0) };
   const api = () => ({ kernel: { grants: () => [] } }) as never;
   assert.equal(await workerSlashEngine({}, api, deps), undefined);
-  /* AN ENDPOINT WITH NO WAY TO OPEN A KEY IS STILL NOTHING, which is the rule `/api/version`'s own flag follows. */
-  assert.equal(await workerSlashEngine({ SLASH_ENDPOINT: URL_ }, api, deps), undefined);
+  /* THE SWITCH WITH NO BINDING AND NO WAY TO OPEN A KEY IS STILL NOTHING, which is the rule `/api/version`'s own flag follows. */
+  assert.equal(await workerSlashEngine({ SLASH_INCLUDED: 'yes' }, api, deps), undefined);
   const { slashEngineFor } = await import('../../selfhost/src/slash.ts');
   assert.equal(await slashEngineFor(undefined, api, undefined, deps), undefined);
   deps.sql.close();
@@ -418,10 +412,22 @@ const objectStorage = () => {
   };
 };
 
+/** Workers AI's `run`, answering the pass-1 draft `slash-demo.test.ts` answers with, and counting every run. */
+let aiRuns = 0;
+const countedAi = {
+  run: async () => {
+    aiRuns++;
+    const content = '{"registers":[],"where":null,"q":"open"}';
+    return { choices: [{ message: { role: 'assistant', content }, finish_reason: 'stop' }], usage: { prompt_tokens: 1, completion_tokens: 1 } };
+  },
+};
+
 /** One hosted record with a model configured and a read token of its own, and the Worker routing to it. */
 const hostedRecord = async () => {
   const { default: worker, Record$ } = await bundled();
-  const env: Record<string, unknown> = { PUBLIC_HOST: HOST, SLASH_ENDPOINT: URL_, KEK: FAKE_KEK, INGRESS: { send: async () => {} } };
+  /* THE INCLUDED MODEL OVER A COUNTED FAKE BINDING: the Worker names no endpoint of its own any more (`loop/finish/defects.md`
+     S1), and the locks held here are the door's, whichever model is behind it. */
+  const env: Record<string, unknown> = { PUBLIC_HOST: HOST, AI: countedAi, SLASH_INCLUDED: 'yes', KEK: FAKE_KEK, INGRESS: { send: async () => {} } };
   const state = { storage: objectStorage(), id: { toString: () => REC }, blockConcurrencyWhile: (f: () => unknown) => f(), waitUntil: () => {} };
   const object = new Record$(state, env);
   /* WHAT THE ROUTER FORWARDS IS COUNTED, so a refusal at the router is told apart from the object's own below it. */
@@ -456,18 +462,19 @@ const ask = (headers: Record<string, string>) =>
     body: JSON.stringify({ question: 'Which tasks are open?' }),
   });
 
-/** The model, answered here and counted, so a test can say that nothing was spent as well as what came back. */
+/** The model, answered here and counted, so a test can say that nothing was spent as well as what came back. Every call
+    to it, and any `fetch` the Worker makes beside it, is one call. */
 const withModel = async (run: () => Promise<Response>): Promise<{ status: number; body: Record<string, unknown>; calls: number }> => {
   const real = globalThis.fetch;
   let calls = 0;
+  const from = aiRuns;
   globalThis.fetch = (async () => {
     calls++;
-    const content = '{"registers":[],"where":null,"q":"open"}';
-    return new Response(JSON.stringify({ choices: [{ message: { role: 'assistant', content } }], usage: { prompt_tokens: 1, completion_tokens: 1 } }), { status: 200 });
+    return new Response('{}', { status: 502 });
   }) as typeof fetch;
   try {
     const out = await run();
-    return { status: out.status, body: (await out.json()) as Record<string, unknown>, calls };
+    return { status: out.status, body: (await out.json()) as Record<string, unknown>, calls: calls + aiRuns - from };
   } finally {
     globalThis.fetch = real;
   }

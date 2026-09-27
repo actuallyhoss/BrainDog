@@ -37,6 +37,7 @@ import { jobBody } from './jobs.ts';
 import { MAP_TYPES } from './map.ts';
 /* THE LIST `arrive` ANSWERS BY, so a value this file lets through is one the kernel has an answer for. */
 import { ON_CONFLICTS } from './ingest.ts';
+import { STRIP_MOST } from './ingest.ts';
 import { HOME_CURRENCY_SETTING, homeFrom } from './fx.ts';
 import { HOLDS, PARTS as ROLE_PARTS, aims, legacyShaped, plays, type RoleField, type RoleKey, type RoleList } from './roles.ts';
 /* THE FUNCTION THE REMINDERS ARE DERIVED WITH, so an offset this file accepts is one `remindersFor`
@@ -57,6 +58,7 @@ import type { FlowDecl } from './rules.ts';
 /* THE FORMAT, THE WINDOW AND THE TWO FIGURES THAT ARE NOT A SUM, checked here by the same functions that read them. */
 import { isMoneyFormat, windowMs } from './metrics.ts';
 import { WALKS, WALK_SOURCE, isRolled, rolledFault, type Rolled } from './money-figures.ts';
+import { INDEX_CEILING } from './observe.ts';
 
 /**
  * `34-GRAMMARS` §4. Checked before an id is inlined into an index name or a JSON path.
@@ -137,7 +139,6 @@ type FieldLike = {
 
 /** `02 §5`'s caps table, and the sentence each one is there to make true. */
 const FIELD_CEILING = 64;
-const INDEX_CEILING = 8;
 
 /** What the full-text index can take. `02 §1`, and `SEARCH_FIELD_TYPE` is the code for the rest. */
 const SEARCHABLE = ['text', 'document', 'enum', 'url', 'email'] as const;
@@ -586,7 +587,8 @@ function valueFields(value: unknown): string[] {
  * five record-owned fields too, so this does not look at `where`.
  *
  * THE SAME RULE THE READER KEEPS, NO WIDER. `evaluateMetric` admits `id` in a value and nothing else the
- * record owns, and admits no record-owned field as a grouping, so a `sum: 'created_at'` accepted
+ * record owns, and admits no record-owned field as a grouping but the two instants the record stamps, created_at and
+ * updated_at (metrics.ts isStamped), so a `sum: 'created_at'` accepted
  * here would be the same defect with a better-sounding name. The code is `FIELD_UNKNOWN` because it
  * is the code the reader already gives this fact, and `30 §6`'s "one code, two moments" is the
  * argument for giving it the same one at install. A source whose register is not known is left to
@@ -602,7 +604,7 @@ function metricFieldFault(id: string, source: unknown, value: unknown, groupBy: 
   for (const field of rolled ? [rolled.balance, rolled.as_of] : valueFields(value))
     if (field !== 'id' && !declared.includes(field))
       return bad('FIELD_UNKNOWN', `${id} reads ${field}, and ${register} has no field called ${field}.`, 'value', ['id', ...declared]);
-  if (typeof groupBy === 'string' && !declared.includes(groupBy))
+  if (typeof groupBy === 'string' && !declared.includes(groupBy) && groupBy !== 'created_at' && groupBy !== 'updated_at')
     return bad('FIELD_UNKNOWN', `${id} groups by ${groupBy}, and ${register} has no field called ${groupBy}.`, 'group_by', declared);
   return null;
 }
@@ -2004,8 +2006,13 @@ function ingestBody(decl: Declaration, installed?: Known): Refusal | null {
     if (extract === null || typeof extract !== 'object' || Array.isArray(extract))
       return bad('DECLARATION_INVALID', `${id}'s extract is one form per field.`, 'extract');
     for (const [field, form] of Object.entries(extract as Record<string, unknown>)) {
-      const unknown = extractorFault(form, `${id}.extract.${field}`, 0);
+      /* THE FORM IS CHECKED WITHOUT ITS `strip:`, which is the field's and not the form's, and then the prefixes are. A
+         `strip` inside a nested form is still an unknown key there, since only the field carries one. */
+      const bare = withoutStrip(form);
+      const unknown = extractorFault(bare, `${id}.extract.${field}`, 0);
       if (unknown) return unknown;
+      const wrong = stripFault(form, bare, `${id}.extract.${field}`);
+      if (wrong) return wrong;
     }
   }
 
@@ -2436,6 +2443,60 @@ function* literalsOf(form: Record<string, unknown>): Generator<[string, string]>
      long, and putting it in `at` puts it in every log line that carries the refusal. */
   if (key === 'enum' && args.map !== null && typeof args.map === 'object' && !Array.isArray(args.map))
     for (const l of Object.keys(args.map as Record<string, unknown>)) yield ['enum.map', l];
+}
+
+/** The forms whose value is the text they cut, which is all a `strip:` can take a prefix off. */
+const TEXT_FORMS: readonly string[] = ['after', 'before', 'between', 'text'];
+
+/** A field's form with its `strip:` left out, or the form as it came where it carries none. */
+function withoutStrip(form: unknown): unknown {
+  if (form === null || typeof form !== 'object' || Array.isArray(form) || !Object.hasOwn(form, 'strip')) return form;
+  const copy: Record<string, unknown> = { ...(form as Record<string, unknown>) };
+  delete copy.strip;
+  return copy;
+}
+
+/** Whether every value `form` can yield is cut text: one of `TEXT_FORMS`, or a combinator holding only those. */
+function readsText(form: unknown, depth: number): boolean {
+  if (form === null || typeof form !== 'object' || Array.isArray(form) || depth > 3) return false;
+  const held = form as Record<string, unknown>;
+  const key = Object.keys(held).find((k) => k !== 'note');
+  if (key === undefined) return false;
+  if (TEXT_FORMS.includes(key)) return true;
+  if (key === 'first') return Array.isArray(held.first) && held.first.length > 0 && held.first.every((arm) => readsText(arm, depth + 1));
+  const inner = held[key];
+  if ((key === 'nth' || key === 'default') && inner !== null && typeof inner === 'object')
+    return readsText((inner as { of?: unknown }).of, depth + 1);
+  return false;
+}
+
+/**
+ * A field's `strip: [<prefix>, ...]`: 1 to `STRIP_MOST` prefixes, each no longer than an anchor (`LITERAL_BYTES`), beside
+ * a form that reads text.
+ *
+ * BESIDE A TEXT FORM ONLY, because a prefix is taken off a name and nothing else here is one. An amount, a day or a
+ * number is not text by the time it is read, and a `lookup` or an `enum` answers a row's id or a declared value, which a
+ * prefix cut off would turn into a value nobody declared. Refused here, where the author reads it, rather than skipped at
+ * every arrival.
+ */
+function stripFault(form: unknown, bare: unknown, at: string): Refusal | null {
+  if (form === null || typeof form !== 'object' || Array.isArray(form) || !Object.hasOwn(form, 'strip')) return null;
+  const strip = (form as { strip?: unknown }).strip;
+  if (!Array.isArray(strip) || strip.length === 0 || strip.length > STRIP_MOST)
+    return bad('DECLARATION_INVALID', `${at}'s strip is a list of 1 to ${STRIP_MOST} prefixes to take off the value, such as ["FAWRY*"].`, `${at}.strip`);
+  for (const [i, prefix] of strip.entries()) {
+    if (typeof prefix !== 'string' || prefix.trim() === '')
+      return bad('DECLARATION_INVALID', `${at}.strip[${i}] is ${JSON.stringify(prefix ?? null)}, and a prefix is the text a value starts with.`, `${at}.strip[${i}]`);
+    if (byteLength(prefix) > LITERAL_BYTES)
+      return bad('OUT_OF_BOUNDS', `${at}.strip[${i}] is ${byteLength(prefix)} bytes, and a prefix is 1 to ${LITERAL_BYTES}.`, `${at}.strip[${i}]`);
+  }
+  if (!readsText(bare, 0))
+    return bad(
+      'DECLARATION_INVALID',
+      `${at} strips a prefix from a value that is not text. Strip sits beside after, before, between or text, or a first, nth or default holding only those.`,
+      `${at}.strip`,
+    );
+  return null;
 }
 
 /** A form's own key, against the thirteen — and through a combinator, which holds forms. */

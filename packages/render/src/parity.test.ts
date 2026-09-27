@@ -246,7 +246,7 @@ test('a forecast draws its knobs only where the host asks, and the rest of the t
   const Knobbed = Block as unknown as Component<{ block: BlockSegment; opts: { scenario: boolean } }>;
   const knobs = render(Knobbed, { props: { block, opts: { scenario: true } } }).body;
   assert.match(knobs, /type="range"/u);
-  assert.match(knobs, /aria-pressed/u);
+  assert.match(knobs, /role="switch"/u);
   assert.doesNotMatch(render(Block, { props: { block } }).body, /type="range"/u);
 });
 

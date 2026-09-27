@@ -327,15 +327,19 @@ export function analyse(deps: AnalyseDeps): Analysis {
   /* AND THE FINDINGS THAT ARE AN ABSENCE, which no amount of grouping over `observation` produces:
      the row is the one that is not there. They go last, so a register nobody reads never outranks a
      shape nobody can ingest — a thing that is failing beats a thing that is merely unused. */
-  const found = [...findingsFrom(counts), ...dormant(deps)];
+  const full = fullLists(deps.sql);
+  const found = [...findingsFrom(counts), ...dormant(deps)].map((f) => (full(f) ? { ...f, why: atCeiling(f) } : f));
 
   /* ONE AT A TIME, and the one that cleared its threshold by the most. A list of eleven proposals is
      a list nobody reads, and the second-best one will still be there next week.
 
      AND NOT ONE IT HAS ALREADY ASKED ABOUT. This runs weekly and nothing recorded that it had
      proposed, so one finding became one model-call draft every seven days for ever. The next-best
-     finding is taken instead, which is the same rule read the other way round. */
-  const best = found.find((f) => !asked(deps, f)) ?? null;
+     finding is taken instead, which is the same rule read the other way round.
+
+     AND NOT AN INDEX THE LIST HAS NO ROOM FOR (`full`): the finding stays in `found`, saying so, and no draft is
+     queued for it. */
+  const best = found.find((f) => !full(f) && !asked(deps, f)) ?? null;
 
   /**
    * ONE PROPOSAL IN TEN IS DRAWN FROM BELOW THE THRESHOLD — 24 §4.3's third governor, and the note
@@ -361,7 +365,7 @@ export function analyse(deps: AnalyseDeps): Analysis {
   );
   const exploring = (drafted + 1) % EXPLORE_EVERY === 0;
   const below = exploring ? findingsFrom(counts.filter((c) => !found.some((f) => f.subject === c.subject)), true) : [];
-  const candidate = (exploring ? (below.find((f) => !asked(deps, f)) ?? best) : best) ?? null;
+  const candidate = (exploring ? (below.find((f) => !full(f) && !asked(deps, f)) ?? best) : best) ?? null;
 
   if (candidate)
     deps.outbox({
@@ -378,6 +382,49 @@ export function analyse(deps: AnalyseDeps): Analysis {
 
 /** One in ten, and the number is 24 §4.3's. */
 const EXPLORE_EVERY = 10;
+
+/**
+ * The most fields one list may index, `02 §5`'s ceiling, which `declare.ts` refuses past as `INDEXES_OVER_CAP`.
+ *
+ * READ HERE AS WELL AS AT INSTALL, because the scan advice drafted "an index would pay for itself" for a list already
+ * holding eight, and the proposal it earned could not install: a model call spent on a change nobody can accept, and
+ * three of those marked incorrect suspend the whole analyser (`governors`).
+ */
+export const INDEX_CEILING = 8;
+
+/**
+ * Whether a finding is a scan of a list that already indexes `INDEX_CEILING` fields, so no index can be proposed for it.
+ *
+ * COUNTED AS `declare.ts` COUNTS IT, every field declaring `index: true` or `unique: true` on the live declaration, and
+ * asked once per list per look, so a look reads each list's declaration at most once however many of its fields were
+ * scanned.
+ */
+function fullLists(sql: Sql): (f: Finding) => boolean {
+  const known = new Map<string, boolean>();
+  return (f) => {
+    if (f.signal !== 'query.scan') return false;
+    const list = f.subject.slice(0, Math.max(0, f.subject.indexOf('.')));
+    if (list === '') return false;
+    if (!known.has(list)) {
+      const body = sql.one<{ body: string }>(
+        'SELECT body FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0 ORDER BY version DESC LIMIT 1',
+        `register.${list}`,
+      )?.body;
+      const fields = body === undefined ? undefined : (JSON.parse(body) as { fields?: unknown }).fields;
+      const indexed = Array.isArray(fields)
+        ? fields.filter((x) => typeof x === 'object' && x !== null && ((x as { index?: unknown }).index === true || (x as { unique?: unknown }).unique === true)).length
+        : 0;
+      known.set(list, indexed >= INDEX_CEILING);
+    }
+    return known.get(list) === true;
+  };
+}
+
+/** What a scan finding says when its list has no room for another index: the count, and that nothing is proposed. */
+const atCeiling = (f: Finding): string => {
+  const list = f.subject.slice(0, f.subject.indexOf('.'));
+  return `${f.subject} was scanned ${f.n} times in thirty days, and ${list} already indexes ${INDEX_CEILING} fields, its ceiling, so no index is proposed.`;
+};
 
 const thresholdOf = (signal: Signal): number => DETECTORS.find((d) => d.signal === signal)?.n ?? 1;
 

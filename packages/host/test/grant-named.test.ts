@@ -1,5 +1,7 @@
 /**
- * The same vault answers the same key to Slash, to a scheduled action and to a script. SPK-3's guard against drift.
+ * The same vault answers the same key to a scheduled action and to a script. SPK-3's guard against drift. Slash was a third
+ * caller until its key became the one the owner picks by id (`loop/finish/agents.md` AGT-21), and the paragraphs below keep
+ * the history as it was measured.
  *
  * THREE CALLERS, ONE ORDER. A scheduled action's `grant:` opens what `keyNamed` (`packages/kernel/src/actions.ts`) finds,
  * and the approval line names what `opensNamed` finds. A script's key is what `grantNamed` (`src/script.ts`) finds. The
@@ -35,7 +37,7 @@ import { fixOf } from '@braindog/ports';
 import { openRecord, type GrantKind, type GrantRow, type Kernel } from '@braindog/kernel';
 
 import { grantNamed } from '../src/script.ts';
-import { SLASH_KEY_LABEL, slashGrantOf } from '../src/slash.ts';
+import { SLASH_KEY_LABEL } from '../src/slash.ts';
 import { keyNamed } from '../../kernel/src/actions.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
@@ -71,11 +73,12 @@ async function vault() {
     return (made.value as GrantRow).id;
   };
   const script = grantNamed(() => k.grants());
-  /** What each caller opens under `name`. Slash is asked only about its own label, which is the only one it reads. */
+  /* SLASH IS NO LONGER ONE OF THE CALLERS. Its key is the grant the owner picked by id in Settings, and no label chooses
+     it (`loop/finish/defects.md` S1), so `slashGrantOf` is gone and `slash` is a label like `goldapi` to the two left. */
+  /** What each caller opens under `name`. */
   const opened = (name: string) => ({
     action: keyNamed(sql, name)?.id ?? null,
     script: script(name)?.id ?? null,
-    ...(name === SLASH_KEY_LABEL ? { slash: slashGrantOf(k.grants())?.id ?? null } : {}),
   });
   /** Every caller opens `want` under `name`, and the approval line names what that entry opens. */
   const agree = (name: string, want: string | null) => {
@@ -140,12 +143,12 @@ test('(4) THREE TOKENS UNDER `slash`, THE LAST BOUND NOT THE NEWEST: the order i
   }
 });
 
-test('(5) ACROSS KINDS SLASH KEEPS ITS OWN RULE: a password bound after the token is what an action sends and not what Slash does', async () => {
+test('(5) ACROSS KINDS AN ACTION AND A SCRIPT TAKE THE NEWEST ENTRY: a password bound after the token is what both send', async () => {
   const v = await vault();
   try {
-    const token = v.bind(SLASH_KEY_LABEL);
+    v.bind(SLASH_KEY_LABEL);
     const password = v.bind(SLASH_KEY_LABEL, { kind: 'password' });
-    assert.deepEqual(v.opened(SLASH_KEY_LABEL), { action: password, script: password, slash: token });
+    assert.deepEqual(v.opened(SLASH_KEY_LABEL), { action: password, script: password });
   } finally {
     v.close();
   }

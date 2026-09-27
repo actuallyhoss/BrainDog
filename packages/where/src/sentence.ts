@@ -504,7 +504,8 @@ export function quoteValue(value: string): string {
  * which already reads both types in their words.
  *
  * A `secret` IS THE THIRD, and the worst of them (`loop/research-batch-fifty-eight-audit.md` §8).
- * `TEXTUAL` admits it, and its column holds the id of a grant in the vault, never the secret. K4:
+ * Its column holds the id of a grant in the vault, never the secret, and `TEXTUAL` no longer admits it,
+ * so the JSON form refuses the same question. K4:
  * `token contains a` compiled to `{ field: token, contains: a }` and a kernel `list` answered `ok`,
  * matching or missing rows on the letters of an id nobody is shown. It has no `is` to be pointed
  * at either, since `is` would compare the same id, so its refusal names `is set` and `is empty`,

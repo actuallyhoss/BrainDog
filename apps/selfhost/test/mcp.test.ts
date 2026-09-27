@@ -151,7 +151,7 @@ test('401 BEFORE THE BODY: a request whose body never arrives is still answered,
     for (const auth of [[], [`Authorization: Bearer ${REC}.not-a-token-this-record-minted`], ['Authorization: '], ['Authorization: Bearer']]) {
       const got = await head(s.port, ['POST /mcp HTTP/1.1', `Host: 127.0.0.1:${s.port}`, 'Content-Type: application/json', 'Content-Length: 4096', ...auth]);
       assert.match(got, /^HTTP\/1\.1 401 /, auth.join());
-      assert.match(got, /\r\nwww-authenticate: Bearer\r\n/i);
+      assert.match(got, /\r\nwww-authenticate: Bearer resource_metadata="http:\/\/127\.0\.0\.1:\d+\/\.well-known\/oauth-protected-resource"\r\n/i);
       assert.match(got, /\r\ncache-control: no-store\r\n/i);
     }
 
@@ -167,7 +167,7 @@ test('401 BEFORE THE BODY: a request whose body never arrives is still answered,
     assert.equal((await s.http('/api/boot', { headers: { cookie } })).status, 200, 'the cookie is not live, so this proves nothing');
     const refused = await s.mcp(null, rpc('ping'), { cookie });
     assert.equal(refused.status, 401);
-    assert.equal(refused.headers.get('www-authenticate'), 'Bearer');
+    assert.equal(refused.headers.get('www-authenticate'), `Bearer resource_metadata="http://127.0.0.1:${s.port}/.well-known/oauth-protected-resource"`);
     assert.equal(refused.wire.error?.code, -32001);
     s.clean();
   } finally {

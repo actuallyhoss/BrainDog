@@ -18,7 +18,7 @@
  * know about a step beyond its day and amount comes on an `of` row under it, written only when the host knows it.
  */
 
-import { MISSING, axisFigure } from './format.ts';
+import { MISSING, axisFigure, exponentOf, money } from './format.ts';
 import { signedOf } from './bridge.ts';
 import { figureLike } from './figure.ts';
 
@@ -29,6 +29,8 @@ const MONTH_DAYS = 30.4375;
 const YEAR_DAYS = MONTH_DAYS * 12;
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const PAIR = /^[A-Z]{3} to [A-Z]{3}$/u;
+/** A rate as the host writes it: decimal digits, and an exponent where a number that small is written with one. */
+const RATE = /^\d+(?:\.\d+)?(?:e-?\d+)?$/iu;
 
 export const FORECAST_KNOBS = ['horizon', 'late', 'spend', 'leave', 'grow', 'drift', 'count', 'sell'] as const;
 export type ForecastKnob = (typeof FORECAST_KNOBS)[number];
@@ -46,6 +48,12 @@ export type ForecastStep = {
 /** Money a reader may count as sold on a day: what it is called and what it is worth, in the walk's own money. */
 export type ForecastSell = { label: string; value: number };
 
+/**
+ * Another currency the walk may be shown in: the walk's own (`from`), the one shown (`to`), the day of the rate and how
+ * many of `to` one of `from` buys, from a `show | GBP to USD | 2026-09-20 | 1.2712` row the host writes.
+ */
+export type ForecastShow = { from: string; to: string; day: string; rate: number };
+
 export type ForecastModel = {
   today: string;
   /** What the opening figure is called: `Cash now`. */
@@ -56,6 +64,11 @@ export type ForecastModel = {
   past: { day: string; value: number }[];
   steps: ForecastStep[];
   horizon: number;
+  /**
+   * The lengths the horizon knob offers as the block declared them (`horizons:`), each whole days or `last`, the walk's
+   * last dated movement; `null` when the host sent none, and the knob offers a quarter, half a year and a year.
+   */
+  horizons: (number | 'last')[] | null;
   knobs: ForecastKnob[];
   /** How many days late money has come in on average, which the late knob marks, or `null` when the host sent none. */
   late: number | null;
@@ -70,6 +83,18 @@ export type ForecastModel = {
   group: { id: string; key: string } | null;
   /** What the sell knob may count as sold, from the `sell` rows written in this walk's money. */
   sells: ForecastSell[];
+  /** The other currencies the walk may be shown in, with the record's rates into each; empty when the host sent none. */
+  shows: ForecastShow[];
+  /**
+   * The record's own currency, from a `home | GBP |  |` row, or `null` when the host sent none. A figure shown in it is
+   * written by its symbol alone, and one in any other currency keeps its code after the amount.
+   */
+  home: string | null;
+  /**
+   * What went out in an average month of the last three, in the walk's own money, from a `spent | 3 |  | £2,400.00` row,
+   * or `null` when the host sent none or wrote it in another money. The spend slider reaches twice it.
+   */
+  spent: number | null;
 };
 
 /** Growth a year, in percent, of money going out and of money coming in. */
@@ -160,13 +185,153 @@ export function forecastModel(rows: readonly (readonly string[])[]): ForecastMod
     }),
     steps: stepsOf(rows, today),
     horizon: Number.isInteger(horizonCell) && horizonCell > 0 ? horizonCell : 180,
+    horizons: horizonsOf(rows.find((r) => r[0]?.trim() === 'horizons')),
     knobs: FORECAST_KNOBS.filter((k) => knobWords.includes(k)),
     late: whole(rows.find((r) => r[0]?.trim() === 'late')?.[1]),
     lateName: rows.find((r) => r[0]?.trim() === 'late')?.[2]?.trim() || null,
     under: whole(rows.find((r) => r[0]?.trim() === 'under')?.[1], 1),
     group: groupOf(rows.find((r) => r[0]?.trim() === 'group')),
     sells: sellsOf(rows, opening[3]!),
+    shows: showsOf(rows),
+    home: homeOf(rows.find((r) => r[0]?.trim() === 'home')),
+    spent: spentOf(rows.find((r) => r[0]?.trim() === 'spent'), opening[3]!),
   };
+}
+
+/** A `home | GBP |  |` row's currency, or `null` when there is none or it is not a code. */
+function homeOf(row: readonly string[] | undefined): string | null {
+  const code = row?.[1]?.trim() ?? '';
+  return /^[A-Z]{3}$/u.test(code) ? code : null;
+}
+
+/**
+ * A `spent | 3 |  | £2,400.00` row's monthly figure, or `null`.
+ *
+ * ONLY IN THE WALK'S OWN MONEY, as a `sell` figure is (`sellsOf`): the number is read without the unit it is written in,
+ * so an average in dollars beside a walk in pounds would set the slider's reach by the wrong amount.
+ */
+function spentOf(row: readonly string[] | undefined, template: string): number | null {
+  const cell = row?.[3]?.trim() ?? '';
+  const v = Math.abs(signedOf(cell));
+  return cell && Number.isFinite(v) && v > 0 && unitOf(cell) === unitOf(template) ? v : null;
+}
+
+/**
+ * A `horizons | 90 180 365 last |  |` row's lengths, or `null` when there is no row or nothing in it reads.
+ *
+ * A WORD THAT IS NOT A LENGTH IS LEFT OUT, NOT THE ROW. The record checks `horizons:` before it answers, so a word here
+ * that is neither whole days nor `last` came from somewhere else, and the lengths beside it are still the author's.
+ */
+function horizonsOf(row: readonly string[] | undefined): (number | 'last')[] | null {
+  const said = (row?.[1] ?? '').split(/\s+/u).flatMap((w): (number | 'last')[] => {
+    if (w === 'last') return ['last'];
+    return /^\d+$/u.test(w) && Number(w) >= 1 ? [Number(w)] : [];
+  });
+  return said.length ? said : null;
+}
+
+/**
+ * The `show | GBP to USD | day | rate` rows: every currency the walk may be shown in, once each, all from the walk's own.
+ *
+ * A ROW FROM ANOTHER CURRENCY THAN THE FIRST ROW'S IS LEFT OUT, because the rate multiplies the walk's own figures and
+ * a rate out of dollars applied to a walk in pounds would draw every amount wrong by the rate between the two.
+ */
+function showsOf(rows: readonly (readonly string[])[]): ForecastShow[] {
+  const out: ForecastShow[] = [];
+  for (const r of rows) {
+    if (r[0]?.trim() !== 'show') continue;
+    const pair = r[1]?.trim() ?? '';
+    const day = r[2]?.trim() ?? '';
+    const cell = r[3]?.trim() ?? '';
+    if (!PAIR.test(pair) || !ISO.test(day) || !RATE.test(cell)) continue;
+    const [from, to] = pair.split(' to ') as [string, string];
+    const rate = Number(cell);
+    if (!Number.isFinite(rate) || rate <= 0 || from === to) continue;
+    if (out.some((s) => s.to === to) || (out[0] !== undefined && out[0].from !== from)) continue;
+    out.push({ from, to, day, rate });
+  }
+  return out;
+}
+
+/**
+ * The walk in another currency: every amount multiplied by the rate and rounded to that currency's own decimals, and
+ * written as a screen writes that currency (`writtenIn`), so the chart, the table and every knob's figure read in it.
+ *
+ * ONE RATE FOR EVERY DAY OF THE WALK, the newest the record holds, because no rate is known for a day ahead of today
+ * and a walk is days ahead of today. The remembered balance before today is shown at the same rate, which the note
+ * beside the control says by naming the rate's day.
+ */
+export function inCurrency(model: ForecastModel, show: ForecastShow): ForecastModel {
+  const unit = 10 ** exponentOf(show.to);
+  /* THE SIGN IS PUT BACK AFTER ROUNDING, as `scaled` below does it, so a cost and a refund of one size agree. */
+  const by = (v: number): number => (Math.sign(v) * Math.round(Math.abs(v) * show.rate * unit)) / unit;
+  const opening = by(model.opening);
+  return {
+    ...model,
+    opening,
+    template: writtenIn(Math.round(opening * unit), show.to, model.home),
+    past: model.past.map((p) => ({ ...p, value: by(p.value) })),
+    steps: model.steps.map((s) => ({ ...s, delta: by(s.delta) })),
+    sells: model.sells.map((s) => ({ ...s, value: by(s.value) })),
+    shows: [],
+    spent: model.spent === null ? null : by(model.spent),
+  };
+}
+
+/** How English writes a currency in one of its two displays, or `undefined`; it throws on a code the runtime refuses. */
+const display = (currency: string, currencyDisplay: 'symbol' | 'narrowSymbol'): string | undefined =>
+  new Intl.NumberFormat('en', { style: 'currency', currency, currencyDisplay }).formatToParts(0).find((p) => p.type === 'currency')?.value;
+
+/**
+ * The symbol a currency is written with, `$` for USD, or `null` for one English writes by its code (`EGP`, `CHF`).
+ *
+ * THE APP'S OWN RULE (`symbolOf` in `apps/web/src/lib/record/money.ts`), SAID AGAIN because this package imports nothing
+ * from the app: the walk's own figures reach this file already drawn by it, and a converted figure beside them has to
+ * be drawn the same way or the two amounts in one table read as two kinds of money.
+ */
+function symbolOf(currency: string): string | null {
+  try {
+    if (display(currency, 'symbol')?.toUpperCase() === currency) return null;
+    const narrow = display(currency, 'narrowSymbol');
+    return narrow && narrow.toUpperCase() !== currency ? narrow : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * An amount in minor units as a screen writes money (contracts §8.3): `£2,400.00` in the record's own currency,
+ * `$4,800.00 USD` in any other, and `EGP 58,185.54`, code first, for a currency with no symbol of its own.
+ *
+ * A CURRENCY NOT KNOWN TO BE THE RECORD'S KEEPS ITS CODE AFTER THE AMOUNT, so a bare `$` never stands for a dollar nobody
+ * named: when the host sends no `home` row, every converted figure says which currency it is in.
+ */
+function writtenIn(minor: number, currency: string, home: string | null): string {
+  const coded = money(minor, currency);
+  const symbol = symbolOf(currency);
+  const m = /^[A-Z]{3} (−?)(.+)$/u.exec(coded);
+  if (!symbol || !m) return coded;
+  return `${m[1]}${symbol}${m[2]}${currency === home ? '' : ` ${currency}`}`;
+}
+
+/**
+ * A currency as a person names it, `US dollar` for USD, for a control that offers one; its code only where the runtime
+ * knows no name for it.
+ *
+ * SENTENCE CASE, the last word lower: English gives `US Dollar` and `British Pound`, and every label in the product is
+ * in sentence case (design brief §9). A name of one word, `Euro`, stays as it is, because it begins the label.
+ */
+export function currencyName(code: string): string {
+  let name: string | undefined;
+  try {
+    name = new Intl.DisplayNames('en', { type: 'currency' }).of(code);
+  } catch {
+    return code;
+  }
+  if (!name || name.toUpperCase() === code) return code;
+  const words = name.split(' ');
+  if (words.length > 1) words[words.length - 1] = words[words.length - 1]!.toLowerCase();
+  return words.join(' ');
 }
 
 /**
@@ -313,12 +478,90 @@ export function scenario(model: ForecastModel, knobs: Knobs): Scenario {
   return { horizon, days, steps: after, crossed, lowest };
 }
 
-/** The horizon choices, in months, that fit inside the declared walk: `[[3, 91], [6, 180]]`. */
-export function horizonChoices(model: ForecastModel): [number, number][] {
-  return ([3, 6, 12] as const).flatMap((m): [number, number][] => {
-    const days = Math.round(m * MONTH_DAYS);
-    return days - 7 <= model.horizon ? [[m, Math.min(days, model.horizon)]] : [];
-  });
+/** One length the horizon knob offers: how many days it walks, and how a person says it. */
+export type HorizonChoice = { days: number; label: string };
+
+/** What the knob offers when the block declared no `horizons:`: a quarter, half a year and a year, in days. */
+const HORIZONS_SAID = [91, 183, 365] as const;
+
+/**
+ * How far past the walk a choice may reach and still be offered, drawn as the walk. A six-month choice over a walk of
+ * 180 days is 183 days, and refusing it for three days would take away the choice the walk was declared for.
+ */
+const HORIZON_SLACK = 7;
+
+/**
+ * The horizon choices that fit inside the walk the host made, in the order the block declared them, each once.
+ *
+ * NO CHOICE REACHES PAST THE WALK. The host walks as far as the block's `horizon:` and no further (`pages.ts`
+ * `recordedOf`), so a five-year choice over a one-year walk would draw the same year under a longer name. `last` is the
+ * day of the walk's last dated movement, which the walk itself holds.
+ */
+export function horizonChoices(model: ForecastModel): HorizonChoice[] {
+  const out: HorizonChoice[] = [];
+  for (const h of model.horizons ?? HORIZONS_SAID) {
+    const choice = h === 'last' ? lastChoice(model) : h - HORIZON_SLACK <= model.horizon ? { days: Math.min(h, model.horizon), label: spanWords(h) } : null;
+    if (choice && !out.some((c) => c.days === choice.days)) out.push(choice);
+  }
+  return out;
+}
+
+/** "To the end": as far as the walk's last dated movement, or `null` when nothing is dated after today. */
+function lastChoice(model: ForecastModel): HorizonChoice | null {
+  const last = model.steps.reduce((most, s) => (s.day > most ? s.day : most), model.today);
+  const days = Math.min(daysBetween(model.today, last), model.horizon);
+  return days >= 1 ? { days, label: FORECAST_TO_END } : null;
+}
+
+/** How near a length must be to whole months or whole years, in days, to be said in them. */
+const MONTH_NEAR = 4;
+const YEAR_NEAR = 7;
+
+/** A length as a person says it: `3 months`, `1 year`, `5 years`, or `45 days` when it is neither. */
+function spanWords(days: number): string {
+  const years = Math.round(days / YEAR_DAYS);
+  if (years >= 1 && Math.abs(days - years * YEAR_DAYS) <= YEAR_NEAR) return forecastYears(years);
+  const months = Math.round(days / MONTH_DAYS);
+  if (months >= 1 && Math.abs(days - months * MONTH_DAYS) <= MONTH_NEAR) return forecastMonths(months);
+  return forecastDays(days);
+}
+
+/** How many stops the spend slider has at most, so every stop is a figure a person would say. */
+const SPEND_STOPS = 50;
+/** The months of going out the spend slider's reach is measured over. */
+const SPEND_MONTHS = 3;
+
+/** The spend slider's reach and its step, both in the walk's own money. */
+export type SpendRange = { max: number; step: number };
+
+/**
+ * The spend slider: from nothing to twice what goes out in an average month, in steps that are round in the money
+ * the walk is drawn in (1, 2 or 5 times a power of ten of its units), never finer than one unit of it.
+ *
+ * THE AVERAGE OF THE LAST THREE MONTHS GOING OUT, which the host sends on a `spent` row (`model.spent`). A walk that
+ * came without one is measured by its own first three months ahead instead, because that is the money going out the
+ * other rows hold: a walk carries what is dated ahead of today and nothing of what was spent before it. It was a fixed
+ * 0 to 5,000 in steps of 100 in whatever money the walk was in, so one slider reached a month's rent in one currency
+ * and a fraction of one in another.
+ *
+ * A WALK WITH NOTHING GOING OUT reaches a sixth of its opening balance, twice a twelfth, the same measure of a month;
+ * and a walk with neither has only the smallest stops.
+ */
+export function spendRange(model: ForecastModel): SpendRange {
+  const until = addDays(model.today, Math.round(SPEND_MONTHS * MONTH_DAYS));
+  const ahead = model.steps.reduce((n, s) => (s.delta < 0 && s.day <= until ? n - s.delta : n), 0) / SPEND_MONTHS;
+  const month = model.spent ?? (ahead > 0 ? ahead : Math.abs(model.opening) / 12);
+  if (!(month > 0)) return { max: SPEND_STOPS, step: 1 };
+  const step = roundStep((2 * month) / SPEND_STOPS);
+  return { max: Math.max(step, Math.ceil((2 * month) / step) * step), step };
+}
+
+/** The round number at or above `n`, 1, 2 or 5 times a power of ten, and never less than one of the money's units. */
+function roundStep(n: number): number {
+  if (!(n > 1)) return 1;
+  const tens = 10 ** Math.floor(Math.log10(n));
+  const lead = n / tens;
+  return (lead <= 1 ? 1 : lead <= 2 ? 2 : lead <= 5 ? 5 : 10) * tens;
 }
 
 /** The five movements that weigh most, by label, with their summed amount as drawn. */
@@ -342,7 +585,7 @@ export function largest(model: ForecastModel, most = 5): { label: string; amount
  * is part of when the host said so and by its label when not, money in apart from money out and the heaviest first.
  *
  * MORE THAN ONCE, because that is what a stream or a plan is without naming either: a salary comes every month and a
- * plan has parts. A movement that happens once is a one-off, which `largest` offers under Leave out when it weighs.
+ * plan has parts. A movement that happens once is a one-off, which `countsOf` offers beside these when it weighs.
  */
 export function streamsOf(model: ForecastModel): { in: { label: string; amount: string }[]; out: { label: string; amount: string }[] } {
   const by = new Map<string, { sum: number; weight: number; n: number }>();
@@ -358,6 +601,37 @@ export function streamsOf(model: ForecastModel): { in: { label: string; amount: 
   const all = [...by.entries()].filter(([, g]) => g.n > 1).sort((a, b) => b[1].weight - a[1].weight);
   const said = ([label, g]: [string, { sum: number }]) => ({ label, amount: figureLike(model.template, g.sum) });
   return { in: all.filter(([, g]) => g.sum > 0).map(said), out: all.filter(([, g]) => g.sum <= 0).map(said) };
+}
+
+/** A stream, a plan or a one-off a reader may count in or out, with its amount as drawn. */
+export type Counted = { label: string; amount: string };
+
+/**
+ * Everything "What counts" offers, money in apart from money out and the heaviest first: every stream and plan
+ * (`streamsOf`), and the `most` heaviest movements that happen once.
+ *
+ * ONE CONTROL, ONE MEANING OF ON. "Leave out" offered the heavy movements and "What counts" the streams, over the one
+ * list of what is left out, and a chip pressed in one meant the opposite of a chip pressed in the other. A movement
+ * is keyed as `streamsOf` keys it, by the plan it is part of and by its label when not, which is what `scenario`
+ * leaves out.
+ */
+export function countsOf(model: ForecastModel, most = 5): { in: Counted[]; out: Counted[] } {
+  const by = new Map<string, { sum: number; weight: number; n: number }>();
+  for (const s of model.steps) {
+    const key = s.of ?? s.label;
+    if (key === '') continue;
+    const g = by.get(key) ?? { sum: 0, weight: 0, n: 0 };
+    g.sum += s.delta;
+    g.weight += Math.abs(s.delta);
+    g.n += 1;
+    by.set(key, g);
+  }
+  const all = [...by.entries()];
+  const heaviest = (a: [string, { weight: number }], b: [string, { weight: number }]) => b[1].weight - a[1].weight;
+  const once = all.filter(([, g]) => g.n === 1).sort(heaviest).slice(0, most);
+  const offered = [...all.filter(([, g]) => g.n > 1), ...once].sort(heaviest);
+  const said = ([label, g]: [string, { sum: number }]): Counted => ({ label, amount: figureLike(model.template, g.sum) });
+  return { in: offered.filter(([, g]) => g.sum > 0).map(said), out: offered.filter(([, g]) => g.sum <= 0).map(said) };
 }
 
 /** Every pair a step of this walk was converted through, which the drift knob offers one slider each. */
@@ -406,6 +680,27 @@ export type ForecastPlan = {
   sentence: string;
 };
 
+/** How many month names the time axis holds at most, when it names every month. */
+const TICKS_MOST = 12;
+/**
+ * How many names it holds at most when it skips months. HALF, because a phone keeps every other name from seven up
+ * (`blocks-charts.css`), and every other name of "2027 Jul 2028 Jul" is four Julys and no year.
+ */
+const TICKS_SPACED = 6;
+/** The months between two names on the time axis, tried in order: every month, a quarter, half a year, a year. */
+const TICK_EVERY = [1, 3, 6, 12] as const;
+
+/**
+ * A name on the time axis: the month, and the year where the names are a year apart or a year begins between them.
+ *
+ * A JANUARY SAYS ITS YEAR ONCE THE AXIS SKIPS MONTHS, because "Jan Jul Jan Jul" does not say which year a point is in,
+ * and a line two years long is read by its years.
+ */
+function tickLabel(day: string, every: number): string {
+  const m = Number(day.slice(5, 7)) - 1;
+  return every > 1 && m === 0 ? day.slice(0, 4) : MONTHS[m]!;
+}
+
 /**
  * The paths, the marks and the words for one scenario, with the baseline drawn faint when a knob has
  * moved. The value axis always holds zero, and a stem stands for every movement worth at least a
@@ -443,12 +738,20 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
       .map((s) => `M${x(s.day)} ${y(0)}V${y(s.delta)}`)
       .join(' ');
 
-  const ticks: ForecastPlan['ticks'] = [];
+  const starts: { d: number; day: string }[] = [];
   for (let d = 0; d <= span; d++) {
     const day = addDays(start, d);
     /* NOT AT THE VERY EDGES, where half the word would hang outside the chart. */
-    if (day.endsWith('-01') && d / span > 0.03 && d / span < 0.97) ticks.push({ at: at(d / span), label: MONTHS[Number(day.slice(5, 7)) - 1]! });
+    if (day.endsWith('-01') && d / span > 0.03 && d / span < 0.97) starts.push({ d, day });
   }
+  /* THE FEWEST MONTHS BETWEEN TWO NAMES THAT KEEP THE AXIS SHORT, each on its calendar's own months (a quarter is
+     January, April, July and October), so a five-year walk names five Januaries by their years and not sixty months run
+     into one another. */
+  const month = (day: string): number => Number(day.slice(5, 7)) - 1;
+  const every = TICK_EVERY.find((n) => starts.filter((s) => month(s.day) % n === 0).length <= (n === 1 ? TICKS_MOST : TICKS_SPACED)) ?? 12;
+  const ticks: ForecastPlan['ticks'] = starts
+    .filter((s) => month(s.day) % every === 0)
+    .map((s) => ({ at: at(s.d / span), label: tickLabel(s.day, every) }));
 
   const c = shown.crossed;
   const said = c ? forecastUnder(shortDay(c.day)) : forecastAbove(shortDay(end));
@@ -521,7 +824,6 @@ export const FORECAST_HORIZON = 'Horizon';
 export const FORECAST_LATE = 'Money in arrives late by';
 export const FORECAST_SPEND = "Spending the record doesn't know";
 export const FORECAST_SPEND_NOTE = "the record only knows bills you've entered";
-export const FORECAST_LEAVE = 'Leave out';
 export const FORECAST_GROW_OUT = 'Spending grows by';
 export const FORECAST_GROW_IN = 'Money in grows by';
 export const FORECAST_COUNT = 'What counts';
@@ -529,16 +831,27 @@ export const FORECAST_COUNT_IN = 'Money in';
 export const FORECAST_COUNT_OUT = 'Money out';
 export const FORECAST_SELL_NOTE = 'empty keeps them';
 export const forecastPerYear = (n: number): string => `${n}% a year`;
-/** The drift knob for one pair: `The USD to EGP rate moves by`. */
-export const forecastDrift = (pair: string): string => `The ${pair} rate moves by`;
-/** What the drift knob's number means, from the pair: `how much more EGP one USD buys each year`. */
-export const forecastDriftNote = (pair: string): string => {
+/**
+ * The drift knob for one pair, each currency by its name and never its code (design brief §1):
+ * `The US dollar against the Egyptian pound moves by`.
+ */
+export const forecastDrift = (pair: string): string => {
   const [from, to] = pair.split(' to ');
-  return `how much more ${to ?? ''} one ${from ?? ''} buys each year`;
+  return `The ${currencyName(from ?? '')} against the ${currencyName(to ?? '')} moves by`;
 };
+/** What the drift knob's number means, from the pair: `above zero, one US dollar buys more each year`. */
+export const forecastDriftNote = (pair: string): string => `above zero, one ${currencyName(pair.split(' to ')[0] ?? '')} buys more each year`;
 /** The sell knob, naming what it sells as the host called it: `Gold, Bonds sold on`. */
 export const forecastSold = (labels: readonly string[]): string => `${labels.join(', ')} sold on`;
 export const FORECAST_RESET = 'Reset';
+/** The one control a phone draws for every knob, which opens them in a sheet. */
+export const FORECAST_ADJUST = 'Adjust';
+export const FORECAST_FULL = 'Open full screen';
+export const FORECAST_CLOSE = 'Close';
+export const FORECAST_SHOW_IN = 'Show in';
+export const FORECAST_TO_END = 'To the end';
+/** Under the "Show in" control while another currency is shown: the day of the rate every amount was converted at. */
+export const forecastRateOf = (day: string): string => `converted at the rate of ${shortDay(day)}`;
 export const FORECAST_SAME = 'Goes under on the same day as before';
 export const FORECAST_NO_LONGER = 'No longer goes under';
 export const FORECAST_STILL = 'Still stays above zero';
@@ -547,11 +860,12 @@ export const forecastAbove = (day: string): string => `Stays above zero to ${day
 export const forecastSooner = (n: number): string => `${n} ${n === 1 ? 'day' : 'days'} sooner than before`;
 export const forecastLater = (n: number): string => `${n} ${n === 1 ? 'day' : 'days'} later than before`;
 export const forecastNow = (day: string): string => `Now goes under on ${day}`;
-export const forecastMonths = (n: number): string => `${n} months`;
+export const forecastMonths = (n: number): string => `${n} ${n === 1 ? 'month' : 'months'}`;
+export const forecastYears = (n: number): string => `${n} ${n === 1 ? 'year' : 'years'}`;
 export const forecastDays = (n: number): string => `${n} ${n === 1 ? 'day' : 'days'}`;
 export const forecastPerMonth = (figure: string): string => `${figure} a month`;
-/** Spending the record does not know in one currency of a walk drawn once per currency. */
-export const forecastSpendIn = (key: string): string => `${FORECAST_SPEND}, in ${key}`;
+/** Spending the record does not know in one currency of a walk drawn once per currency, the currency by its name. */
+export const forecastSpendIn = (key: string): string => `${FORECAST_SPEND}, in ${/^[A-Z]{3}$/u.test(key) ? currencyName(key) : key}`;
 export const forecastRecorded = (day: string, figure: string): string => `recorded from ${day}, when it was ${figure}`;
 export const forecastUnderIn = (n: number): string => (n <= 0 ? 'Cash goes under today' : `Cash goes under in ${n} ${n === 1 ? 'day' : 'days'}`);
 export const forecastAverage = (n: number): string => (n <= 0 ? 'on average so far: on time' : `on average so far: ${n} ${n === 1 ? 'day' : 'days'}`);

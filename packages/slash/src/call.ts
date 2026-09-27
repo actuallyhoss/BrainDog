@@ -455,7 +455,7 @@ export const core = (sql: Sql, clock: Clock, fallback: Inference, priced: readon
        not reached. The index `slash_call_meter (tier, kind, ts)` still serves the count. */
     asksUsed: () =>
       sql.one<{ n: number }>(
-        "SELECT COUNT(*) AS n FROM slash_call WHERE tier = 'a' AND kind IN ('read', 'propose') AND model <> '-' AND ts >= ?",
+        "SELECT COUNT(*) AS n FROM slash_call WHERE tier = 'a' AND kind IN ('read', 'propose', 'pattern') AND model <> '-' AND ts >= ?",
         monthOf(clock.now(), 0),
       )?.n ?? 0,
     /* THE CHECK AND THE COUNT WERE TWO STEPS WITH A MODEL BETWEEN THEM. `spent()` read `asksUsed()`, and the row that

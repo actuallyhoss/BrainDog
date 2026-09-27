@@ -160,8 +160,10 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
       {
         name: 'capture typed',
         run: async (page) => {
+          /* BELOW 640 THE CAPTURE LINE IS A SHEET BEHIND THE HEAD'S "+" (design DSN-7), so the act opens it first. */
+          if (!(await page.locator('#capture').isVisible())) await page.click('.capture-open', { timeout: 4000 });
           await page.fill('#capture', 'a');
-          await page.waitForSelector('.capture-go', { timeout: 4000 });
+          await page.waitForSelector('.capture-go, [data-capture-go]:not([disabled])', { timeout: 4000 });
         },
       },
       {

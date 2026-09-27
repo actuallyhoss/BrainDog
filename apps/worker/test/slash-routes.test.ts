@@ -27,7 +27,6 @@ import { bundled, objectStorage } from './bundled-worker.ts';
 const HOST = 'app.example.test';
 const ORIGIN = `https://${HOST}`;
 const REC = 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD';
-const URL_ = 'https://gateway.example.test/v1/chat/completions';
 /* A PERSON CONTEXT NO SIGN-IN BUILT, the shape the public demo forwarded until it went (`loop/research-no-sample.md` A1).
    The demo is gone and the object's lock is not, so the lock is held here to a context a forged or mis-wired door could
    still hand it. */
@@ -42,7 +41,7 @@ const read = async (res: Response): Promise<Reply> => ({ status: res.status, bod
 /** One hosted record with a model configured and a read token of its own, and the router's forwards counted. */
 const hostedRecord = async () => {
   const { default: worker, Record$ } = await bundled();
-  const env: Record<string, unknown> = { PUBLIC_HOST: HOST, SLASH_ENDPOINT: URL_, KEK: FAKE_KEK, INGRESS: { send: async () => {} } };
+  const env: Record<string, unknown> = { PUBLIC_HOST: HOST, KEK: FAKE_KEK, INGRESS: { send: async () => {} } };
   const state = { storage: objectStorage(), id: { toString: () => REC }, blockConcurrencyWhile: (f: () => unknown) => f(), waitUntil: () => {} };
   const object = new Record$(state, env);
   /* WHAT THE ROUTER FORWARDS IS COUNTED, so a refusal at the router is told apart from the object's own below it. */
@@ -179,8 +178,7 @@ before(async () => {
         PROVISION_KEY,
         PROVISION_WITHOUT_KEYS: 'yes',
         BRAINDOG_BUILD: '',
-        /* AN ADDRESS NOTHING LISTENS ON: an engine is built only where an endpoint is named, and nothing here posts to it. */
-        SLASH_ENDPOINT: 'http://127.0.0.1:9/v1/chat/completions',
+        /* A `KEK` AND NO INCLUDED MODEL: an engine is built because a key of his could be opened, and nothing here asks it. */
         KEK: FAKE_KEK,
       },
     }),

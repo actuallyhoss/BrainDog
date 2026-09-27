@@ -34,10 +34,20 @@
   import { hrefFor } from '../src/html.ts';
   import Text from './Text.svelte';
 
-  let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
+  /**
+   * What a scope cell draws its chip from, as `p/Table.svelte` takes it, written out here for the reason given there.
+   * The host hands it in `opts` beside the block, since a card grid reaches this file through `Block` and `Grid`, which
+   * pass `opts` on whole.
+   */
+  type ScopeCells = { columns: readonly number[]; everywhere: string; glyph: string | null; marks: ReadonlyMap<string, { mark: string | null; hue: number | null }> };
+
+  let { block, opts = {} }: { block: Block; opts?: RenderOptions & { scope?: ScopeCells | undefined } } = $props();
 
   const L = $derived(cardLayout(block.rows[0]?.cells ?? []));
   const rows = $derived(block.rows.slice(1));
+
+  /* WHERE A ROW APPLIES IS A FACT THAT IS DRAWN AS A CHIP (agents C8): a fact in a column the host names as a scope. */
+  const scoped = (i: number): boolean => opts.scope?.columns.includes(i) ?? false;
 
   const label = (i: number): string => L.labels[i] ?? '';
   const said = (r: Row, i: number): string => (i < 0 ? '' : text(inline(r.cells[i] ?? '', opts)));
@@ -45,6 +55,10 @@
 </script>
 
 {#snippet labelled(i: number)}{#if label(i)}<span class="cards-label">{label(i)}</span>{/if}{/snippet}
+
+<!-- A SCOPE CHIP, as `p/Table.svelte` draws one: the globe beside "Everywhere", or the project's mark in its own hue
+     beside its name. The mark is hidden from a screen reader, which reads the name. -->
+{#snippet scopeChip(cells: ScopeCells, said: string)}{@const everywhere = said === cells.everywhere}{@const m = everywhere ? undefined : cells.marks.get(said)}<span class="scope-chip" data-everywhere={everywhere ? '' : undefined}>{#if everywhere && cells.glyph}<svg class="scope-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={cells.glyph} /></svg>{:else if m?.mark}<span class="scope-mark" style={m.hue === null ? undefined : `--hue:${m.hue}`} aria-hidden="true">{m.mark}</span>{/if}<span class="scope-name">{said}</span></span>{/snippet}
 
 {#if rows.length === 0}
   <p class="cards-empty">{CARDS_NONE}</p>
@@ -124,9 +138,10 @@
         {#if L.facts.length}
           <dl class="cards-facts">
             {#each L.facts as i}
+              {@const scope = r.cells[i] && scoped(i) ? opts.scope : undefined}
               <div class="cards-fact">
                 <dt>{label(i)}</dt>
-                <dd>{#if r.cells[i]}<Text nodes={nodes(r, i)} {opts} />{:else}{MISSING}{/if}</dd>
+                <dd>{#if scope}{@render scopeChip(scope, r.cells[i] ?? '')}{:else if r.cells[i]}<Text nodes={nodes(r, i)} {opts} />{:else}{MISSING}{/if}</dd>
               </div>
             {/each}
           </dl>

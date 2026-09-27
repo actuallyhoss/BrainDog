@@ -20,7 +20,7 @@
 -->
 <script lang="ts">
   /* `at` IS THE BLOCK INDEX WHERE THE PAGE BODY LAYS BLOCKS OUT, so the address helper goes by another name here too. */
-  import { apiBase, at as inApp } from '../at.ts';
+  import { apiBase } from '../at.ts';
   import { titleOf } from '$lib/title.ts';
   import '$lib/blocks-charts.css';
   /* EVERY REGISTERED KIND'S STYLESHEET, with the screen that draws its blocks (`kinds/styles.ts`). */
@@ -81,7 +81,6 @@
     blocks: () => all,
     base: () => apiBase(),
     reread: () => reread(),
-    go: (to) => void goto(inApp(to)),
     toasts,
     state: { get: () => held, set: (next) => (held = next) },
   });

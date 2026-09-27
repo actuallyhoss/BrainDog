@@ -100,6 +100,30 @@ function startsNumber(text: string, p: number): boolean {
 }
 
 /**
+ * Is this token the first field of a date, a time or an account number?
+ *
+ * `mayStart` REFUSES EVERY FIELD BUT THE FIRST, because only the later ones have a digit behind the `/`, `:` or
+ * `-` in front of them. The first field starts cleanly and carries its separator after it, so the `14` of
+ * `14/08/2026` was a figure. In `Amount 120.00 EGP 14/08/2026` it took the `EGP` the real amount had just read
+ * as its suffix, and the line gave EGP 14.00 beside EGP 120.00; with a declared currency, `on 29/08/26 EGP 5.00`
+ * gave the day, as 29.00 in the fallback, ahead of the amount the line was about.
+ *
+ * A BARE RUN OF DIGITS ONLY. A date, a time and an account number print their fields with no point and no
+ * grouping, so a figure that has either is never skipped: `12.00-15.00` is a range whose first price still reads,
+ * which is the rule the trailing minus in `scanMoney` is written around. A range of bare figures such as
+ * `EGP 100-200` reads nothing, which is a missing field a person sees rather than a day read as money.
+ *
+ * ASKED BY `scanMoney` ALONE. `scanInts` and `scanDecimals` read the same token list and still yield the `29` of
+ * `29/08/26`, because a money read is the one where a figure takes a currency that belongs to its neighbour.
+ */
+function opensDate(text: string, token: NumberToken): boolean {
+  const next = text[token.end];
+  if ((next !== '/' && next !== ':' && next !== '-') || !isDigit(text[token.end + 1])) return false;
+  for (const ch of token.text) if (!isDigit(ch)) return false;
+  return true;
+}
+
+/**
  * Where the run of digits that `i` sits in ends, over the separators that do not end a number.
  *
  * NOT OVER A SPACE, although a space groups digits inside a token. A refused run is an identifier or a date,
@@ -116,6 +140,13 @@ function runEnd(text: string, i: number): number {
  *
  * A separator is only part of the token when a digit follows it, so a full stop ending a sentence ends the
  * token, and two spaces end it even though one would not.
+ *
+ * A SPACE AFTER A POINT, A COMMA OR AN APOSTROPHE ENDS THE TOKEN. A space groups digits only in front of the
+ * decimal separator (`1 250,00`), so once a token has crossed any other separator the space after it is the
+ * gap between two figures. Read as one token, `USD 5.00 6.00` held a point, a space and a point, which no shape
+ * in `readAmount` reads, so the USD 5.00 written plainly at its start was lost with the figure beside it. A space
+ * between bare runs still continues the token, which is what keeps a card number printed in fours one figure no
+ * shape reads and not four amounts in the fallback currency.
  *
  * `glued` IS HOW A CURRENCY CODE TOUCHING ITS FIGURE GETS THE FIGURE. Only `scanMoney` has the table that says
  * whether the three letters before a digit are a code, so it answers here; `scanInts` and `scanDecimals` pass
@@ -138,12 +169,15 @@ export function numberTokens(text: string, glued?: (at: number) => boolean): Num
       continue;
     }
     let j = i;
+    /* Whether the token has crossed a point, a comma or an apostrophe yet. */
+    let marked = false;
     while (j < text.length) {
       if (isDigit(text[j])) {
         j += 1;
         continue;
       }
-      if (isSep(text[j]) && isDigit(text[j + 1])) {
+      if (isSep(text[j]) && isDigit(text[j + 1]) && !(marked && isSpace(text[j]))) {
+        if (!isSpace(text[j])) marked = true;
         j += 1;
         continue;
       }
@@ -329,6 +363,10 @@ export function scanMoney(text: string, table: CurrencyTable, declared?: string)
      makes, so the code that let the number start is the code it is read in. `gluedFigure` narrows it to the
      glued codes that cannot be a word or a reference. */
   for (const token of numberTokens(text, (at) => gluedFigure(text, at, table))) {
+    /* A date's first field is skipped before it can take a currency, and before it can claim one either, so the
+       code the amount beside it read as a suffix stays that amount's alone. */
+    if (opensDate(text, token)) continue;
+
     /* Backwards: spaces, a currency, a sign and an opening parenthesis, each at most once and in whichever
        order they come — `-EGP 5` and `EGP -5` are the same amount and both are written. */
     let before: string | null = null;

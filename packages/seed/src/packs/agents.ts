@@ -11,6 +11,7 @@
  */
 
 import type { SeedRegister } from '../index.ts';
+import type { SeedMetric } from '../modules/base.ts';
 
 export type PackManifest = { id: string; version: string; requires: readonly string[] };
 
@@ -26,7 +27,15 @@ export const AGENTS_REGISTERS: Record<string, SeedRegister> = {
     title: 'lesson',
     state: 'state',
     done: ['superseded', 'reverted'],
-    mobile: ['lesson', 'kind', 'project'],
+    /* `topic` IS ON THE SHORT FORM SINCE 1.3.0, so `context` hands an agent the skill a lesson bears on (`brief()` in
+       `packages/record/src/index.ts` projects the title and these), which is what tells a run a skill may need its next
+       version.
+
+       IT TAKES `project`'S PLACE, because a short form holds three fields (`docs/42-SPEC-DECLARE.md` §4.4) and `project`
+       was the one of them `context` never carried: `brief()` skips the scope field and says `project` or `global`
+       instead. On the list, "Where it applies" is no longer a column it opens on, and the Display sheet still offers
+       it (`columnsFor` in `apps/web/src/lib/record/api.ts`). */
+    mobile: ['lesson', 'kind', 'topic'],
     fields: [
       { id: 'lesson', label: 'Lesson', type: 'text', required: true, min: 12, max: 400, search: true },
       /* The failure that taught it. Required, because a lesson with no failure behind it cannot be
@@ -34,7 +43,9 @@ export const AGENTS_REGISTERS: Record<string, SeedRegister> = {
       { id: 'because', label: 'Because', type: 'text', required: true, min: 24, max: 600, search: true },
       { id: 'kind', label: 'Kind', type: 'enum', values: ['method', 'fact'], required: true, index: true },
       { id: 'project', label: 'Where it applies', type: 'ref', to: 'things', index: true, scope: { widen: 'person' } },
-      { id: 'topic', label: 'Topic', type: 'text', index: true },
+      /* A SKILL'S NAME WHEN THE LESSON BEARS ON ONE, and a plain topic otherwise. The id stays `topic`, because ids are
+         for ever; the label says what an agent should write in it. */
+      { id: 'topic', label: 'Skill or topic it bears on', type: 'text', index: true },
       { id: 'confirmed_on', label: 'Last confirmed', type: 'day', index: true },
       { id: 'supersedes', label: 'Replaces', type: 'ref', to: 'learnings' },
       {
@@ -64,7 +75,14 @@ export const AGENTS_REGISTERS: Record<string, SeedRegister> = {
     title: 'name',
     state: 'state',
     done: ['retired'],
-    mobile: ['name', 'trigger', 'rev'],
+    /* `because` IS ON THE SHORT FORM SINCE 1.3.0, so `context` says which learnings a skill already carries, by their
+       spoken ids, and a lesson bearing on it that is not among them is the one to propose into its next version.
+
+       IT IS A FOURTH FIELD AND TAKES NO OTHER'S PLACE, because each of the three before it is needed where it is: the
+       skills sync reads `trigger` and `rev` off each row of `context` (`apps/cli/src/skills.ts`), and a list's card is
+       titled by the first (`RowCards.svelte` in `apps/web/src/lib/ui`). A card is drawn from three fields, so `because`
+       goes after them: it is here for `context`, not for a card. */
+    mobile: ['name', 'trigger', 'rev', 'because'],
     fields: [
       /* The folder name the skill is written to, so a project's skill of the same name replaces the global one. */
       { id: 'name', label: 'Name', type: 'text', required: true, max: 64, index: true, search: true },
@@ -144,16 +162,65 @@ export const AGENTS_REGISTERS: Record<string, SeedRegister> = {
 };
 
 /**
- * The pack's pages (`loop/research-agent-path.md` §7): what the agents are doing and what they found
- * out, at `/p/agents`, and a page per skill with its versions.
+ * THE WEEKS THE BRAIN GREW IN: how many learnings, keys and tools were added each week.
+ *
+ * BY `created_at`, THE DAY THE RECORD WROTE THE ROW, because no field a person types says when a lesson was learned or a
+ * key was handed over, and the record stamps every row it writes. The kernel groups a figure by one of the two instants
+ * it stamps and reads it off the row's own column (`evaluateMetric` and `groupsOf` in `packages/kernel/src/metrics.ts`).
+ *
+ * MORE WEEKS ARE READ THAN DRAWN. The page's `back:` is the most a `series` block reaches back (`SERIES_BACK.most` in
+ * `packages/kernel/src/series.ts`), and each figure reads a little further, so the oldest week on the chart is whole: a
+ * week cut by the figure's own window would be drawn short and read as a quiet week.
+ *
+ * A COUNT HAS NO GOOD OR BAD NUMBER, so each target is only that it is a count, as Work's weekly figures are.
+ */
+const WEEKLY = { value: { count: 'id' }, group_by: 'created_at', bucket: 'week', format: 'int', target: { gte: 0 }, window: '30d', compare: 'none' } as const;
+
+export const AGENTS_METRICS: Record<string, SeedMetric> = {
+  'learnings-by-week': { metric: 'learnings-by-week', name: 'Learnings added, by week', source: 'register.learnings', where: 'created_at after -182d', ...WEEKLY },
+  'keys-by-week': { metric: 'keys-by-week', name: 'Keys added, by week', source: 'register.credentials', where: 'created_at after -182d', ...WEEKLY },
+  'tools-by-week': { metric: 'tools-by-week', name: 'Tools added, by week', source: 'register.tools', where: 'created_at after -182d', ...WEEKLY },
+  /**
+   * THE LEARNINGS THAT HAVE FADED, BY THE RECORD'S OWN RULE: active, and neither confirmed nor written in the last ninety
+   * days (`FADES` and `FADE_MS` in `packages/record/src/index.ts`, which leaves them out of `context`). A row never
+   * confirmed is judged by the day it was written.
+   *
+   * A TREE AND NOT A SENTENCE, because the rule is an `and` around an `or`, and a sentence may join its clauses with
+   * commas or with `, or` but not both (`packages/where/src/sentence.ts`).
+   */
+  'learnings-faded': {
+    metric: 'learnings-faded',
+    name: 'Faded learnings',
+    source: 'register.learnings',
+    where: {
+      all: [
+        { field: 'state', is: 'active' },
+        {
+          any: [
+            { field: 'confirmed_on', before: '-90d' },
+            { all: [{ field: 'confirmed_on', empty: true }, { field: 'created_at', before: '-90d' }] },
+          ],
+        },
+      ],
+    },
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+};
+
+/**
+ * The pack's pages (`loop/research-agent-path.md` §7): the agents home at `/p/agents`, and a page per skill with its
+ * versions.
+ *
+ * THE HOME READS TOP DOWN IN THE ORDER A PERSON ACTS ON IT: what is waiting on them, who is working, what the brain
+ * learned, how it has grown, and then what it holds. Until 1.3.0 it was a grid of cards per list, each of the same
+ * weight, with nothing to say which came first (`loop/finish/agents.md` §3 item 4).
  *
  * NO PEOPLE ON THEM. "People met lately" would make the page require `register.people`, and then a
  * record without People could not take this pack. The people an agent meets are on the People page.
- *
- * "WORKING NOW" READS `register.session` UNTIL THE INSTALL CHECK ADMITS `sessions.live`. The page
- * layer computes that source, and `declare.ts` admits only `forecast.runway` among the computed
- * ones, so a block naming it would stop the pack installing. The rows are the same: the runs not
- * done or abandoned, the most recently seen first.
  */
 export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: string }> = {
   agents: {
@@ -177,7 +244,9 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
         empty: 'Nothing is waiting on you.',
       },
       /* ONLY THE RUNS STILL WORKING. The end hook leaves a run idle and a handoff waits for a pickup, and both were
-         listed here as working, the run that closed a minute ago beside the one typing now. */
+         listed here as working, the run that closed a minute ago beside the one typing now. A run still active and not
+         heard from lately stays, and the host draws it dimmed, because it may yet come back. The project is a scope
+         chip, read off the run's placed project (`projectsOf` in `packages/kernel/src/pages.ts`). */
       {
         kind: 'cards',
         heading: 'Working now',
@@ -187,35 +256,51 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
         columns: [
           { field: 'doing', as: 'title' },
           { field: 'agent', as: 'who' },
-          { field: 'project', label: 'Project', as: 'fact' },
+          { field: 'project', label: 'Project', as: 'scope' },
           { field: 'next', label: 'Next', as: 'fact' },
           { field: 'last_seen', as: 'when' },
         ],
         limit: 12,
         empty: 'No agent is working right now.',
       },
-      /* WHERE THE STOPPED RUNS LEFT OFF, led by the next step, because that is what the next session starts from. A
-         run that stopped without one has nothing to hand on, and is left out. */
+      /* WHAT THE AGENTS ADDED AND CHANGED IN WHAT THE BRAIN HOLDS, one group per run, from the record's own log. An
+         `agents` block and not a `feed`, because a feed groups by the kind of actor and would put every run under one
+         head; this groups by who, and `first:` folds each run's rest into one line with its count, so a busy run
+         cannot push the others off the page (`agentRows` in `packages/kernel/src/pages.ts`). `list is skills` is the
+         word the record gives an event's list over `activity` (`loop/finish/contracts.md` §11 X6).
+
+         IT DOES NOT SAY "SINCE YOU LAST LOOKED", because only a `feed` reads `since:` (`KEY_KINDS` in
+         `packages/kernel/src/block-keys.ts`), and a heading promising a mark the block cannot draw would be untrue. */
       {
-        kind: 'cards',
-        heading: 'Where they left off',
+        kind: 'agents',
+        heading: 'What the brain learned',
         span: 12,
-        source: 'sessions.live',
-        where: 'state is idle or handoff, next is set',
-        columns: [
-          { field: 'next', as: 'title' },
-          { field: 'agent', as: 'who' },
-          { field: 'doing', label: 'Was doing', as: 'fact' },
-          { field: 'project', label: 'Project', as: 'fact' },
-          { field: 'last_seen', as: 'when' },
-        ],
-        limit: 6,
-        empty: 'No run has left a next step.',
+        source: 'activity',
+        where: 'list is learnings or skills or credentials or tools',
+        first: 3,
+        empty: 'No agent has added a lesson, a skill, a key or a tool yet.',
       },
+      /* HOW THE BRAIN HAS GROWN, a week to a bar, each week's learnings, keys and tools stacked in it. The week the clock
+         is in is drawn as not yet finished (`barsOf` in `packages/kernel/src/series.ts` marks it `partial`), so a
+         Tuesday is not read as a slow week. */
+      {
+        kind: 'series',
+        heading: 'Growth',
+        span: 12,
+        series: [
+          { metric: 'learnings-by-week', label: 'Learnings' },
+          { metric: 'keys-by-week', label: 'Keys' },
+          { metric: 'tools-by-week', label: 'Tools' },
+        ],
+        back: 24,
+        empty: 'Nothing was added in these weeks.',
+      },
+      /* THE NEWEST LESSONS, each with where it applies, and beside them how many have faded: active, and not confirmed
+         in ninety days, which `context` stops handing to agents. */
       {
         kind: 'cards',
         heading: 'Learnings',
-        span: 6,
+        span: 8,
         source: 'register.learnings',
         where: 'state is active',
         columns: [
@@ -229,66 +314,61 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
         empty: 'Nothing learned yet.',
       },
       {
-        kind: 'cards',
+        kind: 'stat',
+        span: 4,
+        cells: [{ metric: 'learnings-faded', label: 'Faded', note: 'not confirmed in 90 days' }],
+      },
+      /* THE SKILLS IN USE, with the sentence that makes a session reach for each, its version and who changed it last. */
+      {
+        kind: 'table',
         heading: 'Skills',
-        span: 6,
+        span: 12,
         source: 'register.skills',
         where: 'state is active',
         columns: [
-          { field: 'name', as: 'title' },
-          { field: 'trigger', label: 'When to use it', as: 'fact' },
-          { field: 'rev', label: 'Version', as: 'fact' },
-          { field: 'project', label: 'Where it applies', as: 'scope' },
+          { field: 'name', label: 'Skill' },
+          { field: 'trigger', label: 'When to use it' },
+          { field: 'rev', label: 'Version' },
+          { field: 'changed', label: 'Last change' },
         ],
         order: [{ field: 'seq', dir: 'desc' }],
         limit: 8,
         empty: 'No skills yet.',
       },
-      /* WHAT THE AGENTS RUN ON: the servers and tools they recorded, and the keys by name. A key is its label and what
-         it opens, never its value, which no page can read. */
+      /* WHERE THE STOPPED RUNS LEFT OFF, led by the next step, because that is what the next session starts from. A
+         run that stopped without one has nothing to hand on, and is left out. */
       {
         kind: 'cards',
-        heading: 'Tools and servers',
-        span: 6,
-        source: 'register.tools',
-        where: 'state is active',
+        heading: 'Where they left off',
+        span: 12,
+        source: 'sessions.live',
+        where: 'state is idle or handoff, next is set',
         columns: [
-          { field: 'name', as: 'title' },
-          { field: 'trigger', label: 'When to use it', as: 'fact' },
-          { field: 'transport', label: 'Transport', as: 'fact' },
-          { field: 'project', label: 'Where it applies', as: 'scope' },
-          { field: 'seen', as: 'when' },
+          { field: 'next', as: 'title' },
+          { field: 'agent', as: 'who' },
+          { field: 'doing', label: 'Was doing', as: 'fact' },
+          { field: 'project', label: 'Project', as: 'scope' },
+          { field: 'last_seen', as: 'when' },
         ],
-        order: [{ field: 'seq', dir: 'desc' }],
-        limit: 8,
-        empty: 'No tools recorded yet.',
-      },
-      {
-        kind: 'cards',
-        heading: 'Keys',
-        span: 6,
-        source: 'register.credentials',
-        where: 'state is not retired',
-        columns: [
-          { field: 'label', as: 'title' },
-          { field: 'opens', label: 'What it opens', as: 'fact' },
-          { field: 'project', label: 'Where it applies', as: 'scope' },
-          { field: 'verified', as: 'when' },
-        ],
-        order: [{ field: 'seq', dir: 'desc' }],
-        limit: 8,
-        empty: 'No keys kept yet.',
+        limit: 6,
+        empty: 'No run has left a next step.',
       },
     ],
   },
   /* One page per skill in use. The trigger leads, because it is the sentence that makes a session
-     reach for the skill, and the versions follow, each against the one before it. */
+     reach for the skill, the versions follow, each against the one before it, and last the lessons that bear on it,
+     which are what its next version would be made from.
+
+     THE LESSONS ARE THE ONES WHOSE `topic` NAMES THE SKILL, and not a note over `{{because}}`: a page is filled from the
+     row's fields as they are held (`fill` in `packages/kernel/src/pages.ts`), and `because` holds row ids, so the note
+     would print ids where a person reads. Since 1.3.0 `topic` asks for the skill a lesson bears on, which is also how
+     the briefing finds a lesson a skill does not carry yet. */
   skill: {
     page: 'skill',
     title: '{{name}}',
     for: { register: 'skills', where: 'state is active' },
     icon: 'skill',
-    requires: ['register.skills'],
+    requires: ['register.skills', 'register.learnings'],
     blocks: [
       { kind: 'note', span: 12, body: '{{trigger}}' },
       {
@@ -301,71 +381,44 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
         versions: 5,
         empty: 'One version so far.',
       },
+      {
+        kind: 'cards',
+        heading: 'Learnings that bear on it',
+        span: 12,
+        source: 'register.learnings',
+        where: 'topic is {{name}}, state is active',
+        columns: [
+          { field: 'lesson', as: 'title' },
+          { field: 'kind', label: 'Kind', as: 'fact' },
+          { field: 'project', label: 'Where it applies', as: 'scope' },
+          { field: 'confirmed_on', as: 'when' },
+        ],
+        order: [{ field: 'seq', dir: 'desc' }],
+        limit: 8,
+        empty: 'No lesson names this skill yet.',
+      },
     ],
   },
 };
 
-/**
- * What a project page gains where this pack is installed: the keys, tools and skills it runs on, its
- * own first and then the ones that apply everywhere.
- *
- * BLOCKS FOR THE SEED'S `project` TEMPLATE, AND NOT A PAGE OF THEIR OWN, because a second template
- * over projects would put a second page at every project's address. They are not written into the
- * template itself either: the template ships in the starter pack, which a record without this pack
- * installs, and a page requiring a register the record lacks is refused.
- *
- * `project is {{name}}` AND NOT `{{spoken}}`, because a ref is matched by its title. A retired row is
- * left out by state, so a skill nobody uses is not listed as one the project runs on. Each list is in name order, the project's own rows first.
+/*
+ * WHAT A PROJECT RUNS ON IS NOT HERE ANY MORE. Until 1.3.0 this file exported three blocks the seed spliced into the
+ * project template, which only a record built by the seed's installer ever got. It is now the `runs_on` source the
+ * record computes (`packages/kernel/src/pages.ts`), which reads whichever of these lists exist, and one block on the
+ * portfolio module's project template draws it on every record (`loop/finish/agents.md` §3 item 1).
  */
-export const RUNS_ON: { requires: readonly string[]; blocks: readonly Record<string, unknown>[] } = {
-  requires: ['register.credentials', 'register.tools', 'register.skills'],
-  blocks: [
-    { kind: 'section', heading: 'Runs on', icon: 'plug', span: 12 },
-    {
-      kind: 'spec',
-      heading: 'Keys',
-      span: 4,
-      source: 'register.credentials',
-      where: 'project is {{name}}, state is not retired',
-      inherit: true,
-      columns: [{ field: 'label' }, { field: 'project', as: 'scope' }],
-      order: [{ field: 'label', dir: 'asc' }],
-      limit: 8,
-      empty: 'No keys apply to {{name}}.',
-    },
-    {
-      kind: 'spec',
-      heading: 'Tools',
-      span: 4,
-      source: 'register.tools',
-      where: 'project is {{name}}, state is not retired',
-      inherit: true,
-      columns: [{ field: 'name' }, { field: 'project', as: 'scope' }],
-      order: [{ field: 'name', dir: 'asc' }],
-      limit: 8,
-      empty: 'No tools apply to {{name}}.',
-    },
-    {
-      kind: 'spec',
-      heading: 'Skills',
-      span: 4,
-      source: 'register.skills',
-      where: 'project is {{name}}, state is active',
-      inherit: true,
-      columns: [{ field: 'name' }, { field: 'project', as: 'scope' }],
-      order: [{ field: 'name', dir: 'asc' }],
-      limit: 8,
-      empty: 'No skills apply to {{name}}.',
-    },
-  ],
-};
 
-export const AGENTS_PACK: { manifest: PackManifest; registers: Record<string, SeedRegister>; pages: typeof AGENTS_PAGES } = {
-  /* 1.2.0 ADDS ONE OPTIONAL FIELD, `credentials.note`, so a record on 1.1.1 is offered the update and loses no key by
-     waiting: the import sends each key without its note to a list that has no such field, and names the update. */
-  manifest: { id: 'agents', version: '1.2.0', requires: ['register.things'] },
+export const AGENTS_PACK: { manifest: PackManifest; registers: Record<string, SeedRegister>; pages: typeof AGENTS_PAGES; metrics: typeof AGENTS_METRICS } = {
+  /* 1.2.0 ADDED ONE OPTIONAL FIELD, `credentials.note`, so a record on 1.1.1 is offered the update and loses no key by
+     waiting: the import sends each key without its note to a list that has no such field, and names the update.
+     1.3.0 IS A MINOR VERSION BECAUSE IT ONLY ADDS AND RELABELS: the growth and faded figures, the agents home drawn
+     anew, a block on the skill page, `topic` relabelled and put on the learnings' short form in `project`'s place, and
+     `because` added to the skills'. No list, page or field goes and no field changes type, so every row a record holds
+     is kept as it is. */
+  manifest: { id: 'agents', version: '1.3.0', requires: ['register.things'] },
   registers: AGENTS_REGISTERS,
   pages: AGENTS_PAGES,
+  metrics: AGENTS_METRICS,
 };
 
 /**
@@ -389,6 +442,8 @@ export function agentsPackDocument(): Record<string, unknown> {
         ...rest,
         fields: [...rest.fields, { id: 'tags', type: 'list', of: 'text' }],
       })),
+      /* The figures before the pages that draw them. */
+      ...Object.values(AGENTS_METRICS),
       ...Object.values(AGENTS_PAGES),
     ],
   };

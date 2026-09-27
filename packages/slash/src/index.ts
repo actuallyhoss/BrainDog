@@ -20,7 +20,7 @@
  *
  * WHAT IS BUILT HERE AND WHAT IS NOT. `46 §2` describes eleven methods; this is five of them, the
  * five the interface audits agree on, and `answer`, which `46 §2` does not name and
- * `loop/research-infer-ask.md` §4 does. `triage`, `digestProse`, `embed` and `analyseDraft` have no
+ * `loop/research-infer-ask.md` §4 does. `triage`, `embed` and `analyseDraft` have no
  * caller in this tree yet, and `AUDIT-interface-B` IB-60 is explicit that tier A `triage` has no
  * dispatcher at all: no outbox kind carries it and no record step calls it. The tier C dispatcher
  * (`jobs`) is the other half, and it waits on the record's six JOBS methods, which do not exist
@@ -28,12 +28,17 @@
  * `24 §4.3` groups unmatched arrivals on exactly that string, and `46 §13` D15 fixes it as code's
  * and never the model's.
  *
- * HOW A HOST LOADS IT. `SLASH_ENDPOINT` unset means the host never imports this package, registers
- * no route, and answers `{ version, slash: false }` (`46 §13` D4). Absence is the default and
- * presence is proven, which is why nothing here reads an environment variable: the decision is the
- * host's, one level up, where it can be made without loading the module it is about. An erasure is
- * the one other reason to load it, and a host does so only where Slash's ledger exists to erase
- * from (`eraseSlash`, `erase.ts`).
+ * HOW A HOST LOADS IT. A host with no model to offer never imports this package, registers no
+ * route, and answers `{ version, slash: false }` (`46 §13` D4). Absence is the default and presence
+ * is proven, which is why nothing here reads an environment variable: the decision is the host's,
+ * one level up, where it can be made without loading the module it is about. An erasure is the one
+ * other reason to load it, and a host does so only where Slash's ledger exists to erase from
+ * (`eraseSlash`, `erase.ts`).
+ *
+ * WHERE THE MODEL IS, THE OWNER SAYS. `source` is the model the host includes, or a key of his own
+ * at a provider he named (`Setup`). This package stores that choice and never acts on the key: the
+ * host reads the choice back (`slashOwnKeyOf` in `packages/host/src/slash.ts`), opens the key, and
+ * hands each ask an `Inference` over it, so the third boundary above still holds on his own key.
  */
 
 import { no, ok, type Result } from '@braindog/ports';
@@ -42,7 +47,20 @@ import { answering } from './answer.ts';
 import { core as makeCore, openStore, TIERS } from './call.ts';
 import { patterns } from './jobs.ts';
 import { palette } from './propose.ts';
-import type { CallContext, Settings, Slash, SlashDeps, Status, Tier } from './types.ts';
+import {
+  ASK_CAP_DEFAULT,
+  PROVIDERS,
+  type Asked,
+  type CallContext,
+  type Provider,
+  type Setup,
+  type SetupPatch,
+  type Slash,
+  type SlashDeps,
+  type Source,
+  type Status,
+  type Tier,
+} from './types.ts';
 
 export { eraseSlash } from './erase.ts';
 export { STORE_VERSION } from './call.ts';
@@ -52,6 +70,7 @@ export { ANSWER_SYSTEM, MODELS, PROMPTS, SYSTEM } from './prompts.ts';
 export type { ModelId, ModelRate, PromptId, PromptTemplate } from './prompts.ts';
 export type {
   Ask,
+  Asked,
   CallContext,
   Citable,
   Inference,
@@ -63,19 +82,40 @@ export type {
   ProjectionRow,
   ProjectQuery,
   Proposal,
+  Provider,
   RawPayload,
   ReadTrace,
   Reading,
   RecordApi,
   Settings,
+  Setup,
+  SetupPatch,
   Slash,
   SlashDeps,
+  Source,
   Status,
   Tier,
   Verb,
   Where,
 } from './types.ts';
-export { VERBS } from './types.ts';
+export { ASK_CAP_DEFAULT, BACKGROUND_ASKS_MONTH, PROVIDERS, VERBS } from './types.ts';
+export type { IngestDeclaration, PatternDraft } from './jobs.ts';
+
+/**
+ * The two `slash_meta` keys the own key's provider and address are kept under (`Setup`).
+ *
+ * `packages/host/src/slash.ts` READS THE SAME TWO NAMES, written out there because that package may not import this one
+ * (`46 §5.1`); a rename here is a rename there, in the same change.
+ */
+export const OWN_PROVIDER = 'own.provider';
+export const OWN_BASE_URL = 'own.base_url';
+
+/** The asks `history` answers when its caller names no number, and the most it answers when one names more. */
+export const ASKS_LISTED = 20;
+export const ASKS_MOST = 100;
+
+/** The two sources, as the owner names them. */
+const SOURCES: readonly Source[] = ['included', 'key'];
 
 /**
  * What a host says about its own money and its own models, beside the ports.
@@ -87,8 +127,8 @@ export { VERBS } from './types.ts';
  *
  * `tiers` NAMES THE TIERS THE HOST RUNS AT ALL, and unset is all three. A tier outside it is refused at `configure`, and
  * one already stored is read as `a`, the included model, with the row left as it was saved (`call.ts` `settings`). The
- * Worker names `a` and `b`: `byo` asks the host's endpoint for a model the owner typed, and on the Cloud there is no
- * endpoint of the owner's to ask (C15 in `loop/finish/agents.md`, until the own-key choice replaces the three tiers).
+ * Worker names `a` and `b`, the included model and his own key: `byo` asks the host's endpoint for a model the owner
+ * typed, and the Cloud has no endpoint but its included model (C15 in `loop/finish/agents.md`).
  *
  * Arguments and not fields of `SlashDeps` because `SlashDeps` is the ports, and neither of these is a port.
  */
@@ -110,13 +150,25 @@ const namedTiers = (tiers: readonly Tier[]): string => {
  * A grant id and not a key: `g_` and a 26-character ULID (`34 §4`).
  *
  * THIS IS THE ONLY DOOR A CREDENTIAL COULD WALK IN THROUGH, so it is the one place that checks. An
- * owner configuring tier B names a grant the record's vault already holds; an owner who pastes the
+ * owner choosing his own key picks a grant the record's vault already holds; an owner who pastes the
  * key itself into that box has handed a plaintext to a package whose entire boundary argument is
  * that it never holds one, and it would then sit in Slash's own SQLite, in a column called
  * `grant_id`, until somebody exported the database. The shape is cheap to check and the failure
  * mode is not recoverable, which is the whole test for whether a check earns its line.
  */
 const GRANT_ID = /^g_[0-9A-HJKMNP-TV-Z]{26}$/u;
+
+/**
+ * The tier a patch asks for, or `undefined` for one that leaves it: `source` first, then the older `tier`.
+ *
+ * `included` IS `byo` WHERE THE PATCH SAYS `byo` TOO, since both are the host's own model and `byo` only names it.
+ */
+const tierAsked = (patch: SetupPatch): Tier | undefined =>
+  patch.source === 'key' ? 'b' : patch.source === 'included' ? (patch.tier === 'byo' ? 'byo' : 'a') : patch.tier;
+
+/** A provider this package knows, read off a stored or a typed value. */
+const providerOf = (value: unknown): Provider | null =>
+  typeof value === 'string' && (PROVIDERS as readonly string[]).includes(value) ? (value as Provider) : null;
 
 /**
  * Build a Slash over one record's storage.
@@ -140,7 +192,7 @@ export function createSlash(deps: SlashDeps, options: SlashOptions = {}): Slash 
   deps.sql.exec(
     'INSERT OR IGNORE INTO slash_settings (singleton, tier, model, grant_id, ask_cap, updated_at) VALUES (1, ?, NULL, NULL, ?, ?)',
     'a',
-    80,
+    ASK_CAP_DEFAULT,
     new Date(deps.clock.now()).toISOString(),
   );
 
@@ -150,32 +202,72 @@ export function createSlash(deps: SlashDeps, options: SlashOptions = {}): Slash 
   const pattern = patterns(core, deps.record, deps.inference);
   const automation = answering(core, deps.inference);
 
+  /** Where the own key is asked, as the owner last saved it, whatever the tier is now. */
+  const own = (): { provider: Provider | null; base_url: string | null } => {
+    const rows = deps.sql.all<{ key: string; value: string }>('SELECT key, value FROM slash_meta WHERE key IN (?, ?)', OWN_PROVIDER, OWN_BASE_URL);
+    const said = (key: string): string | undefined => rows.find((r) => r.key === key)?.value;
+    const base = said(OWN_BASE_URL);
+    return { provider: providerOf(said(OWN_PROVIDER)), base_url: base === undefined || base === '' ? null : base };
+  };
+  const remember = (key: string, value: string | null): void => {
+    if (value === null) deps.sql.exec('DELETE FROM slash_meta WHERE key = ?', key);
+    else deps.sql.exec('INSERT INTO slash_meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value', key, value);
+  };
+
+  /* HIS OWN KEY'S ASKS THIS MONTH, the count `status` lists on that source and nothing stops at, over tier `b`, which is
+     where an own key's rows are kept, with the same `model <> '-'` as the included count (`call.ts`, `asksUsed`).
+     A PATTERN PRESS IS AN ASK ON HIS KEY AS A QUESTION IS. `POST /api/slash/pattern` settles a `kind = 'pattern'` row
+     (`jobs.ts`), and left out of this count a press was a call to his provider the listing never showed. The included
+     count reads `read` and `propose` alone until `call.ts` counts the press as well, which this unit asked of its owner. */
+  const keyedAsks = (): number =>
+    deps.sql.one<{ n: number }>(
+      "SELECT COUNT(*) AS n FROM slash_call WHERE tier = 'b' AND kind IN ('read', 'propose', 'pattern') AND model <> '-' AND ts >= ?",
+      core.monthStart(),
+    )?.n ?? 0;
+
   const status = (): Status => {
     const s = core.settings();
+    const key = s.tier === 'b';
     return {
+      source: key ? 'key' : 'included',
       tier: s.tier,
+      /* THE PROVIDER ONLY WHERE IT ANSWERS. A provider saved before the owner went back to the included model is kept for
+         the next time he picks his key, and naming it now would say a model answers that does not. */
+      provider: key ? (own().provider ?? 'openai') : null,
       /* ON TIER `a` THE ROUTING TABLE DECIDES AND `settings.model` IS NULL, so the name a person is
          shown is the model that would actually answer their next ask rather than an empty box. */
       model: s.tier === 'a' ? 'glm-5.3-flash' : (s.model ?? 'glm-5.3-flash'),
-      asks: { used: core.asksUsed(), cap: s.ask_cap, resets: core.resets() },
+      /* ONE COUNT FOR WHAT IS SHOWN AND WHAT STOPS AN ASK. On the included model it is the count `spent()` refuses on
+         (`propose.ts`); on his own key it is the same kinds of row on his tier, listed and never a limit. */
+      asks: { used: key ? keyedAsks() : core.asksUsed(), cap: s.ask_cap, resets: core.resets(), capped: !key },
     };
   };
 
-  const configure = (
-    patch: Partial<Pick<Settings, 'tier' | 'model' | 'grant_id' | 'ask_cap'>>,
-    ctx: CallContext,
-  ): Result<Settings> => {
+  const configure = (patch: SetupPatch, ctx: CallContext): Result<Setup> => {
     /* THE OWNER AND NOBODY ELSE (`46 §5.2`). Switching tiers spends somebody's money and names a
        vault grant; a member with `write` on one register is not the person who decides either. */
     if (ctx.principal.kind !== 'person' || ctx.principal.level !== 'owner')
       return no('FORBIDDEN', 'Only the record owner changes how Slash is set up.');
 
     const before = core.settings();
-    const tier = patch.tier ?? before.tier;
+    const stored = own();
+
+    /* A SAVE OF NOTHING READS WHAT IS SAVED, AND WRITES NOTHING. Settings needs the address and the key he picked to draw
+       his own key's form as he left it, and `status` is read by every signed-in person, so neither goes there: a
+       colleague is not told which vault grant the owner's key lives in. `updated_at` stays the last real save's. */
+    if (Object.keys(patch).length === 0) {
+      const saved: Setup = { ...before, source: before.tier === 'b' ? 'key' : 'included', provider: stored.provider, base_url: stored.base_url };
+      return ok(saved);
+    }
+
+    if (patch.source !== undefined && !SOURCES.includes(patch.source))
+      return no('ENUM_VALUE_UNKNOWN', 'Slash runs on the included model or on your own key.', { at: 'source', allowed: SOURCES });
+
+    const tier = tierAsked(patch) ?? before.tier;
     if (!tiers.includes(tier))
       return no('ENUM_VALUE_UNKNOWN', `Slash runs on ${namedTiers(tiers)} on this host.`, {
-        at: 'tier',
-        allowed: tiers,
+        at: patch.source !== undefined ? 'source' : 'tier',
+        allowed: patch.source !== undefined ? SOURCES.filter((s) => tiers.includes(s === 'key' ? 'b' : 'a')) : tiers,
       });
 
     const askCap = patch.ask_cap ?? before.ask_cap;
@@ -190,40 +282,95 @@ export function createSlash(deps: SlashDeps, options: SlashOptions = {}): Slash 
         at: 'grant_id',
       });
     if (tier === 'b' && grant === null)
-      return no('VALUE_MALFORMED', 'Tier B answers with your own key, so it needs the vault grant that holds one.', {
+      return no('VALUE_MALFORMED', 'Your own key is a key in the vault, so pick the one Slash answers with.', {
         at: 'grant_id',
       });
 
-    const model = patch.model === undefined ? before.model : patch.model;
-    if (tier !== 'a' && (model === null || model.trim() === ''))
+    const typed = patch.model === undefined ? before.model : patch.model;
+    /* TRIMMED ON THE WAY IN, because the name goes on the wire as stored: `  llama3:8b \n` saved ok and was then asked for
+       as exactly that, which no provider serves (`apps/web/src/lib/ui/slash-model.ts` measured it on 22 September). */
+    const model = typed === null ? null : typed.trim();
+    if (tier !== 'a' && (model === null || model === ''))
       return no('VALUE_MALFORMED', 'Name the model your key or your endpoint answers with.', { at: 'model' });
 
-    const after: Settings = {
+    /* THE PROVIDER IS ONE OF TWO SHAPES, and a record set to its own key before there were two was set to the one there was,
+       chat completions, which is what it reads as when it names none. */
+    if (patch.provider !== undefined && patch.provider !== null && providerOf(patch.provider) === null)
+      return no('ENUM_VALUE_UNKNOWN', 'Slash asks your own key through Anthropic Messages or an OpenAI-compatible endpoint.', {
+        at: 'provider',
+        allowed: PROVIDERS,
+      });
+    const provider = patch.provider === undefined ? stored.provider : patch.provider;
+
+    /* AN ADDRESS ONLY OVER https, SINCE THE KEY RIDES IN ITS HEADERS. Whether the host it names is a public one is the
+       host's to check, where the address is resolved and sent (`slashBaseUrlOf` in `packages/host/src/slash.ts`), both
+       at this door and again on every call; this package has no network to ask. */
+    const base = patch.base_url === undefined ? stored.base_url : patch.base_url === null || patch.base_url.trim() === '' ? null : patch.base_url.trim();
+    if (base !== null && !httpsAddress(base))
+      return no('VALUE_MALFORMED', 'Slash sends your key only to an https address, such as https://api.anthropic.com.', { at: 'base_url' });
+
+    const after: Setup = {
       tier,
+      source: tier === 'b' ? 'key' : 'included',
       /* TIER `a` HAS NO MODEL OF ITS OWN (`46 §4.1`): the routing table decides per job, so a name
          left behind from a previous tier would be a setting that reads as though it were in force. */
       model: tier === 'a' ? null : model,
       grant_id: grant,
       ask_cap: askCap,
       updated_at: core.now(),
+      provider: tier === 'b' ? (provider ?? 'openai') : provider,
+      base_url: base,
     };
-    deps.sql.exec(
-      'UPDATE slash_settings SET tier = ?, model = ?, grant_id = ?, ask_cap = ?, updated_at = ? WHERE singleton = 1',
-      after.tier,
-      after.model,
-      after.grant_id,
-      after.ask_cap,
-      after.updated_at,
-    );
+    deps.sql.transactionSync(() => {
+      deps.sql.exec(
+        'UPDATE slash_settings SET tier = ?, model = ?, grant_id = ?, ask_cap = ?, updated_at = ? WHERE singleton = 1',
+        after.tier,
+        after.model,
+        after.grant_id,
+        after.ask_cap,
+        after.updated_at,
+      );
+      remember(OWN_PROVIDER, after.provider);
+      remember(OWN_BASE_URL, after.base_url);
+    });
     return ok(after);
+  };
+
+  /* THE LEDGER, NEWEST FIRST, FOR THE PERSON WHO PAYS FOR IT. A hold still in flight is not an ask yet and is left out; the
+     order is the ledger's own, the order the calls were settled in (`call.ts`, `account`). */
+  const history = (limit: number, ctx: CallContext): Result<{ asks: Asked[] }> => {
+    if (ctx.principal.kind !== 'person' || ctx.principal.level !== 'owner')
+      return no('FORBIDDEN', 'Only the record owner reads what Slash was asked.');
+    const most = Number.isInteger(limit) && limit > 0 ? Math.min(limit, ASKS_MOST) : ASKS_LISTED;
+    const asks = deps.sql
+      .all<Asked>(
+        "SELECT id, ts, kind, status, code, question, model, filed FROM slash_call WHERE code IS NOT 'SLASH_PENDING' ORDER BY rowid DESC LIMIT ?",
+        most,
+      )
+      .map((r) => ({ id: r.id, ts: r.ts, kind: r.kind, status: r.status, code: r.code, question: r.question, model: r.model, filed: r.filed }));
+    return ok({ asks });
   };
 
   return {
     read: asking.read,
     propose: asking.propose,
-    proposePattern: pattern.proposePattern,
+    /* A PATTERN ON HIS OWN KEY IS DRAFTED ON IT, over the same ledger: `patterns` is a factory over the core and the model it
+       is handed, so the model for this one ask is a second closure and not a slot. The included model's is built once. */
+    proposePattern: (samples, ctx, inference) => (inference === undefined ? pattern : patterns(core, deps.record, inference)).proposePattern(samples, ctx),
+    draftPattern: pattern.draftPattern,
+    digestProse: pattern.digestProse,
     answer: automation.answer,
     configure,
     status,
+    history,
   };
 }
+
+/** An address that parses and is `https:`, and nothing else is claimed of it here (`configure`). */
+const httpsAddress = (raw: string): boolean => {
+  try {
+    return new URL(raw).protocol === 'https:';
+  } catch {
+    return false;
+  }
+};

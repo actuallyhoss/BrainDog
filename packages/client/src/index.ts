@@ -632,19 +632,71 @@ export type Reading = { ask_id: string; predicate: SlashWhere | null; q: string 
 
 /**
  * `slashStatus`'s answer, `Status` in `packages/slash/src/types.ts` key for key, and written by hand for `Reading`'s reason.
- * `model` is the package's short name on tier `a` today and not the model that answers, which is F2 of
- * `loop/research-spark-routes.md` and the host's to fix, so a page drawing it is drawing what the host said.
+ *
+ * `source` IS THE OWNER'S ONE CHOICE, "Included" or "Your own key", and `tier` is the name it is stored under (`a` and `b`),
+ * readable for one workflow while every reader moves to `source` (`loop/finish/contracts.md` §3.2). `provider` is said only
+ * on his own key. `asks.capped` is `false` there: his asks are listed and not held to a cap, so a page draws the count
+ * without "of" (`agents.md` §5 item 7). OPTIONAL HERE for that same workflow, because a host a release behind answers
+ * without them, and a reader treats a missing `source` as what `tier` says.
  */
 export type SlashTier = 'a' | 'b' | 'byo';
-export type SlashStatus = { tier: SlashTier; model: string; asks: { used: number; cap: number; resets: string } };
+export type SlashSource = 'included' | 'key';
+export type SlashProvider = 'anthropic' | 'openai';
+export type SlashStatus = {
+  source?: SlashSource;
+  tier: SlashTier;
+  provider?: SlashProvider | null;
+  model: string;
+  asks: { used: number; cap: number; resets: string; capped?: boolean };
+};
 
-/** `slashSettings`'s answer, `Settings` in the same file. `model` is `null` on tier `a`, which has none of its own. */
-export type SlashSettings = { tier: SlashTier; model: string | null; grant_id: string | null; ask_cap: number; updated_at: string };
+/**
+ * `slashSettings`'s answer, `Setup` in the same file: the stored settings with the source, the provider and the address
+ * his key is sent to. `model` is `null` on the included model, which has none of its own; `base_url` is `null` where he
+ * named none and his provider's own address is used; `grant_id` names the vault key he picked, never the key.
+ */
+export type SlashSettings = {
+  source?: SlashSource;
+  tier: SlashTier;
+  provider?: SlashProvider | null;
+  base_url?: string | null;
+  model: string | null;
+  grant_id: string | null;
+  ask_cap: number;
+  updated_at: string;
+};
 
-/** The four keys a settings patch may carry. The door refuses any other with `FIELD_UNKNOWN`. */
-export type SlashSettingsPatch = Partial<Pick<SlashSettings, 'tier' | 'model' | 'grant_id' | 'ask_cap'>>;
+/**
+ * What a settings save may carry (`contracts.md` §3.2). `source: 'key'` wants a `provider`, a `model` and a `grant_id`;
+ * `base_url` is `https:` on the public internet, and left out it is the provider's own. `tier` is kept for one workflow.
+ * The door refuses any other key with `FIELD_UNKNOWN`.
+ */
+export type SlashSettingsPatch = Partial<{
+  source: SlashSource;
+  provider: SlashProvider;
+  base_url: string | null;
+  model: string | null;
+  grant_id: string | null;
+  ask_cap: number;
+  tier: SlashTier;
+}>;
 
-/** `slashPropose`'s answer, `Proposal` in the same file. `filed` is the `SG<n>` it put on Decide, or `null` for a `query`. */
+/**
+ * One ask as `slashAsks` lists it, `Asked` in the same file, newest first. `question` is what was typed, or `null` where
+ * an erasure took it; `filed` is the `SG<n>` a proposal put on Decide. `code` is the refusal's, `null` for an answer.
+ */
+export type SlashAsked = {
+  id: string;
+  ts: string;
+  kind: string;
+  status: string;
+  code: string | null;
+  question: string | null;
+  model: string;
+  filed: string | null;
+};
+
+/** `slashAnswer`'s answer, `Proposal` in the same file. `filed` is the `SG<n>` it put on Decide, or `null` for a `query`. */
 export type SlashProposal = {
   text: string;
   citations: string[];
@@ -730,7 +782,8 @@ export function createClient(options: ClientOptions) {
 
   /**
    * The host's own doors: the app's key doors, `POST /api/keys/put` and `POST /api/keys/open`, and Slash's,
-   * `POST /api/slash/read`, `/api/slash/settings` and `/api/slash/propose` (and its one GET, in `hostGet` below).
+   * `POST /api/slash/read`, `/api/slash/settings`, `/api/slash/propose` and `/api/slash/pattern` (and its two GETs, in
+   * `hostGet` below).
    *
    * NOT THROUGH `call`, BECAUSE THEY ARE NOT METHODS. `ROUTES` is the record's surface; these are a host step in
    * front of it at a fixed path, and a name in `NAMES` would be a name `handlersFor` had to route. The key doors
@@ -742,7 +795,7 @@ export function createClient(options: ClientOptions) {
    * browser's own and it sends both by itself.
    */
   async function hostDoor<T>(
-    path: 'keys/put' | 'keys/open' | 'slash/read' | 'slash/settings' | 'slash/propose',
+    path: 'keys/put' | 'keys/open' | 'slash/read' | 'slash/settings' | 'slash/propose' | 'slash/pattern',
     args: Record<string, unknown>,
   ): Promise<Result<T>> {
     return hostAnswer<T>(() =>
@@ -755,13 +808,13 @@ export function createClient(options: ClientOptions) {
   }
 
   /**
-   * The one host door that is a GET, `GET /api/slash/status`, under the same no-bearer rule.
+   * The host doors that are a GET, `GET /api/slash/status` and `GET /api/slash/asks`, under the same no-bearer rule.
    *
-   * A GET AND NOT `hostDoor` WITH AN EMPTY BODY, because `46 §5.2` has it as a GET and the door holds it to one:
-   * a browser sends no `Origin` on a same-origin GET, and the door's origin rule for status is written for exactly
+   * A GET AND NOT `hostDoor` WITH AN EMPTY BODY, because `46 §5.2` has status as a GET and the door holds it to one:
+   * a browser sends no `Origin` on a same-origin GET, and the door's origin rule for both is written for exactly
    * that request. A POST here would be answered 405.
    */
-  async function hostGet<T>(path: 'slash/status'): Promise<Result<T>> {
+  async function hostGet<T>(path: 'slash/status' | `slash/asks?limit=${number}`): Promise<Result<T>> {
     return hostAnswer<T>(() => doFetch(`${base}/api/${path}`, { method: 'GET' }));
   }
 
@@ -807,21 +860,36 @@ export function createClient(options: ClientOptions) {
      */
     slashRead: (question: string) => hostDoor<Reading>('slash/read', { question }),
     /**
-     * Slash's tier, the model it names, and this month's asks against the cap. Any signed-in person may ask; the palette
-     * asks on open, which also builds the engine so the first question of the day finds it built. 501 with no model.
+     * Slash's source, the model it names, and this month's asks, against the cap on the included model and uncapped on
+     * his own key. Any signed-in person may ask; the palette asks on open, which also builds the engine so the first
+     * question of the day finds it built. 501 with no model.
      */
     slashStatus: () => hostGet<SlashStatus>('slash/status'),
     /**
      * Change how Slash is set up. The owner only, which the engine decides and answers 403 `FORBIDDEN` to anyone else;
-     * a key the door does not know is 422 `FIELD_UNKNOWN`, and tier `b` on a host that cannot open a key is 501.
+     * a key the door does not know is 422 `FIELD_UNKNOWN`, and his own key on a host that cannot open a key is 501. A
+     * save that points his key somewhere asks what opening it asks: a proof in the last fifteen minutes.
      */
     slashSettings: (patch: SlashSettingsPatch) => hostDoor<SlashSettings>('slash/settings', patch as Record<string, unknown>),
     /**
-     * Pass 2 of `46 §5.5`: what Slash proposes about the rows pass 1 found. `askId` is `Reading.ask_id`, and with it the
-     * engine re-projects the predicate it already drafted rather than asking the model for a second one.
+     * Pass 2 of `46 §5.5`: what Slash answers about the rows pass 1 found. `askId` is `Reading.ask_id`, and with it the
+     * engine re-projects the predicate it already drafted rather than asking the model for a second one. The door is
+     * still `/api/slash/propose`; the method was `slashPropose` until `contracts.md` X42 named it for what it gives.
      */
-    slashPropose: (question: string, askId?: string) =>
+    slashAnswer: (question: string, askId?: string) =>
       hostDoor<SlashProposal>('slash/propose', askId === undefined ? { question } : { question, ask_id: askId }),
+    /**
+     * This record's asks, newest first: what was asked, of which model, and what came of it. The owner only. `limit` is
+     * how many, 20 when left out; the host answers at most 100, so a larger number is sent as 100 rather than as digits
+     * the door refuses, and a number that is not finite as the 20 left out.
+     */
+    slashAsks: (limit = 20) =>
+      hostGet<{ asks: SlashAsked[] }>(`slash/asks?limit=${Number.isFinite(limit) ? Math.min(100, Math.max(1, Math.floor(limit))) : 20}`),
+    /**
+     * A `pattern` proposal drafted from inbox arrivals, named by the ids the inbox gives them (one to ten). It installs
+     * nothing: the proposal goes to Decide like any other, and is refused once the month's asks are spent.
+     */
+    slashPattern: (samples: readonly string[]) => hostDoor<SlashProposal>('slash/pattern', { samples: [...samples] }),
     boot: () => call<Boot>('boot'),
     version: () => call<Version>('version'),
     schema: (register: string) => call<unknown>('schema', { register }),

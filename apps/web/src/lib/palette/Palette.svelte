@@ -163,7 +163,7 @@
      proposal the engine was already writing is still filed on Decide. `latest` only decides whether the answer is drawn. */
   const slashPropose = latest((a: { question: string; askId: string }) =>
     client()
-      .then((c) => c.slashPropose(a.question, a.askId))
+      .then((c) => c.slashAnswer(a.question, a.askId))
       .catch(unreached),
   );
 

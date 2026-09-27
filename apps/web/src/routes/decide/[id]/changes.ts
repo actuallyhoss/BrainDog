@@ -28,13 +28,31 @@ export const words = {
   empty: 'Empty',
 } as const;
 
+/**
+ * A MOVE OF WHERE A ROW APPLIES, which is drawn as two chips and not as two row ids (agents C8): the list its
+ * projects are in, and the project each side names, as the proposal and the record hold it, `null` for everywhere.
+ * `Changes.svelte` names each one from that list; the ids themselves are never drawn.
+ */
+export type Moved = { to: string; before: string | null; after: string | null };
+
 export type Change =
   | { field: string; label: string; long: true; block: Block }
-  | { field: string; label: string; long: false; before: string | null; after: string | null };
+  | { field: string; label: string; long: false; before: string | null; after: string | null; scope?: Moved };
 
 export type Updated = { at: string; title: string; changes: Change[] };
 
-type Decl = { title?: string; fields: readonly { id: string; type: string; label?: string }[] };
+type Decl = { title?: string; fields: readonly { id: string; type: string; label?: string; to?: string; scope?: unknown; retired?: boolean }[] };
+
+/**
+ * The field that says where a row applies: the one that declares `scope:` and is not retired, a ref to one project.
+ * The kernel's own reading (`scope.ts` `scopeFieldOf`), over the declaration the record answered for the proposal.
+ */
+const isScope = (f: Decl['fields'][number] | undefined): f is Decl['fields'][number] & { to: string } =>
+  f !== undefined && f.type === 'ref' && typeof f.to === 'string' && f.scope !== undefined && f.scope !== null && f.retired !== true;
+
+/** One side of a move: the project a value names, or `null` for everywhere. */
+const placeSaid = (v: unknown): string | null => (typeof v === 'string' && v !== '' ? v : null);
+
 type Row = { id?: string; seq: number | null; version: number; fields: Record<string, unknown> };
 
 /** A row's internal id, which a proposal may name a row by instead of its spoken id. */
@@ -98,9 +116,11 @@ export function updatesOf(
       const f = decl?.fields.find((x) => x.id === field);
       const label = f?.label ?? field.replace(/_/g, ' ').replace(/^./u, (c) => c.toUpperCase());
       changes.push(
-        isLong(f?.type ?? 'text', before, after)
-          ? { field, label, long: true, block: diffBlock(text(before), text(after)) }
-          : { field, label, long: false, before: dated(show(body.register, field, before)), after: dated(show(body.register, field, after)) },
+        isScope(f)
+          ? { field, label, long: false, before: null, after: null, scope: { to: f.to, before: placeSaid(before), after: placeSaid(after) } }
+          : isLong(f?.type ?? 'text', before, after)
+            ? { field, label, long: true, block: diffBlock(text(before), text(after)) }
+            : { field, label, long: false, before: dated(show(body.register, field, before)), after: dated(show(body.register, field, after)) },
       );
     }
     if (changes.length === 0) continue;

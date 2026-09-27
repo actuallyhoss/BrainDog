@@ -63,7 +63,7 @@ export const ALARM_RUNS = 5;
  * `actor` SIGNS THE `grant.read`, AND `system` IS RIGHT ONLY WHERE NOBODY ASKED. The alarm's actions have no asker, so the
  * default stands. Slash's tier `b` does have one, and with `system` written into this line an owner reading the vault's
  * log could not tell her own asks from a colleague's (`loop/research-batch-thirty-one-audit.md` §1). That path is the one
- * to pass the asker's id here; until `slash.ts`'s `wireOf` does, `slashByokFor` hands this opener a view of the record
+ * to pass the asker's id here; until `slash.ts`'s `wireOf` does, `slashOwnKeyFor` hands this opener a view of the record
  * whose `openGrant` signs as the asker whatever it is told.
  */
 export function keyOpener(api: Pick<RecordApi, 'kernel'>, bound: KekBinding | undefined, actor = 'system'): OpenKey | null {

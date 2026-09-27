@@ -542,8 +542,7 @@ export function runway(
  * that step a month agree because they are one function.
  *
  * EXCEPT AT A MONTH END ON A CYCLE THAT IS NOT WHOLE YEARS, where the day moves to each later
- * month's last day (`stepsOf`). `expandRepeat` in `schedule.ts` still steps 30 September to
- * 30 October, so a reminder on such a row fires a day before the charge this walk shows.
+ * month's last day (`stepsOf`).
  *
  * A WEEK IS SEVEN DAYS AND TWICE A MONTH IS TWO NAMED DAYS, each stepped by `stepsOf` below.
  */

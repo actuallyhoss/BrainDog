@@ -570,7 +570,7 @@ const NAMED_BODIES = ['rule', 'script', 'digest', 'metric'] as const;
  * What a pattern's `ingest` is when it is not an ingest, in the words the refusal names it by, or `null` when it is one.
  *
  * AN INGEST IN EITHER OF ITS TWO SHAPES. Slash's prompt (`slash/src/prompts.ts`) asks for ONE ingest declaration BODY
- * and `slash/src/jobs.ts` files it bare, `{ match, extract, writes, on_conflict }`; an agent or a person files the whole
+ * and `slash/src/jobs.ts` filed it bare until A7, and files the declaration now; an agent or a person files the whole
  * declaration, as the probe of audit fifty-one did. Wave fifty-one's check knew only the second, and was held because it
  * refused every pattern Slash proposes. A bare body is told apart by carrying neither `id` nor `kind`, and no ingest
  * body carries either: `IngestDecl` and `ActionDecl` have no such key, and name themselves in `ingest`.

@@ -45,15 +45,11 @@ function enclosing(markup: string, at: number): string {
   return stack.join(' && ');
 }
 
-test('friction 6: an area with no machine yet hands over the login line that names this record', () => {
-  const agents = area('agents');
-  const empty = /<Empty kind="no-data-yet" title=\{copy\.noDevices\}[^>]*>/u.exec(agents)?.[0];
-  assert.ok(empty, 'the machines section no longer has its empty state, so this is about nothing');
-  /* `copy.enrollPrompt` IS `braindog login` WITH NOTHING AFTER IT, which the CLI refuses. */
-  assert.doesNotMatch(empty, /copy\.enrollPrompt/u, 'the empty state still prints `braindog login` with no host');
-  assert.match(empty, /agentPrompt=\{lines\.login\}/u, 'the empty state does not print the line `connectLines` builds');
-  /* AND THAT LINE IS THE ONE THE CLOUD'S DEVICE FLOW TAKES, measured against the CLI's own refusal. */
-  assert.equal(connectLines('https://app.brain.dog', 'sam').login, 'braindog login https://app.brain.dog/app/sam');
+/* THE AREA NO LONGER HAS A MACHINES LIST WITH ITS OWN EMPTY STATE (AGT-8): the setup card hands over the line, and the
+   check on the markup went with the markup it read. What stays is the fact the friction was about: the line names the
+   record, because the Cloud's device flow refuses one that does not. */
+test('friction 6: the line that signs a machine in names this record', () => {
+  assert.equal(connectLines('https://app.brain.dog', 'sam').setup, 'braindog setup https://app.brain.dog/app/sam');
 });
 
 test('friction 10: once signed out, nobody is named as signed in, and Sign in comes back here', () => {

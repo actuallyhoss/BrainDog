@@ -128,11 +128,15 @@ function launch(extra: Record<string, string>, options: { args?: string[]; confi
    *
    * TEN SECONDS IS FOURTEEN TIMES THE SLOWEST CALL MEASURED HERE. Every call in this file was timed:
    * the longest took 706 ms, the hung read that waits out its own 400 ms budget with the child's
-   * startup in front of it, and the rest came back in 330 to 410 ms. So this cannot fire on a slow
-   * machine, and when it does fire the child's stderr goes in the message, because a reply that
+   * startup in front of it, and the rest came back in 330 to 410 ms. So on a machine doing nothing
+   * else this does not fire, and when it does fire the child's stderr goes in the message, because a reply that
    * never arrives is usually a child that died saying why.
    */
-  const DEADLINE_MS = 10_000;
+  /* AND DOUBLED OFF CI. The timings above were taken on a machine doing nothing else, and `loop/finish/defects.md` T1
+     found this deadline firing on one running every workspace's tests at once, where the child's own startup waits for
+     a core. A deadline is here to turn a hang into a failure, not to time anything, so off CI it is twice as long and
+     on CI it is the ten seconds argued for above. */
+  const DEADLINE_MS = process.env.CI ? 10_000 : 20_000;
   const expect = (id: number | null, what: string) =>
     new Promise<Rpc>((done, fail) => {
       const timer = setTimeout(

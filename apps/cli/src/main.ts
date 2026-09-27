@@ -9,6 +9,10 @@
  * briefing from a shell. There is no longer a list of commands that name themselves and do nothing:
  * a word this command does not know is a typo, and it says so.
  *
+ * `setup` IS THE ONE LINE A NEW MACHINE NEEDS (`loop/finish/agents.md` C9, `setup.ts`): it runs `login`, `install`,
+ * the MCP registration, `tools write` and `skills sync` in order, each of them still a command of its own. `runner`
+ * runs the jobs the record hands this machine (C14), and lives in `runner.ts`.
+ *
  * `init` AND `serve` BELONG TO THE SELF-HOST, which has no `bin` of its own and whose messages tell
  * people to run `braindog init` and `braindog serve`. This command claims the name and hands those two
  * to the self-host's entry in a child process (`docs/48-SPEC-CLI.md` §5.14). Apps never import each
@@ -44,6 +48,8 @@ import { signedOutFix, signedOutSurface } from './signed-out.ts';
 import { serveStdio } from './stdio.ts';
 import { surfaceOver } from './surface.ts';
 import { pack } from './catalogue.ts';
+import { runner } from './runner.ts';
+import { setup } from './setup.ts';
 import { tools } from './tools.ts';
 import { tokenCommand } from './token.ts';
 import { usecase } from './usecase.ts';
@@ -88,6 +94,8 @@ const emit = (envelope: unknown): void => writeFileSync(1, `${JSON.stringify(env
 
 const usage = () =>
   [
+    'braindog setup <host> [--dry-run]',
+    "  Set this machine up from one record, in order: sign in unless it already is, add the two hooks to Claude Code's settings, register the braindog MCP server, write the tools the record applies everywhere, and sync its skills. One line per step, and it stops at the first that fails.",
     'braindog login <host> [--vault <project|*>]',
     '  Sign this machine in. It prints six digits to approve in the app, and keeps the token in the hosts file.',
     '  With --vault it asks for a grant that opens the keys of one project, or with * the keys of no project.',
@@ -99,6 +107,8 @@ const usage = () =>
     '  Run the command with the key in one environment variable, named from the label unless --as names it. It is never printed.',
     'braindog run <label | credentials#n> [--as <ENV_NAME>] [--vault <project>] [--host <host>] -- <command> [args...]',
     '  The same as keys exec, under a shorter name.',
+    'braindog keys headers <credentials#n | label> --as <Header> [--vault <project>] [--host <host>]',
+    "  Print the key as one header, {\"<Header>\":\"<value>\"}, for a program that reads it, such as Claude Code's headersHelper. It refuses to print to a terminal.",
     'braindog skills sync [--host <host>] [--dry-run]',
     "  Write the record's skills where Claude Code reads them, keep a local edit and propose it, and register a skill kept by hand.",
     'braindog tools scan [--host <host>] [--dry-run]',
@@ -167,6 +177,14 @@ const usage = () =>
     "  Show the two hooks it would add to Claude Code's settings (a profile folder, or one settings file such as a project's .claude/settings.local.json), and write them only with --apply. With --replace it also takes out the hooks, MCP servers and skills the replace file names as an old tool's, and says which, and from a .mcp.json only when it is named with --mcp-json and is outside any repository.",
     'braindog verify <file> [--key <pubkey|url>]',
     "  Check a .brainl file on this machine: its format, every table against its manifest, and its signature, against the key you name when you name one. Nothing is sent, but for fetching a key from an address.",
+    'braindog runner enrol <host>',
+    '  Sign this machine in as a runner: six digits to approve in the app, and the runner token kept in the hosts file.',
+    'braindog runner repos add <name> <folder> | repos list',
+    '  Name a folder on this machine that a job may run in, or list the names kept. The host only ever sends the name.',
+    'braindog runner allow <kind>',
+    '  Allow a job kind on this machine, as runner run asks the first time it sees one, for a runner with no terminal.',
+    'braindog runner run [--once] [--host <host>]',
+    "  Claim the jobs approved for this machine and run each in Claude Code with only its kind's tools, sending back what it does. With --once, one job.",
     'braindog init <slug> --owner <email>',
     'braindog serve [<record file>]',
     '  Create or serve a record on this machine, through the self-host.',
@@ -175,7 +193,7 @@ const usage = () =>
     '',
     `The host comes from --host, then BRAINDOG_HOST, then the default in ${hostsPath(process.env)}.`,
     'The token comes from BRAINDOG_TOKEN, then the same file. It is never taken as an argument.',
-    '--json answers with one JSON document on stdout and moves every other line to stderr. mcp, keys exec, run, hook, init and serve do not take it.',
+    '--json answers with one JSON document on stdout and moves every other line to stderr. mcp, keys exec, keys headers, run, hook, setup, init and serve do not take it.',
   ].join('\n');
 
 async function mcp(args: string[]): Promise<void> {
@@ -269,7 +287,7 @@ async function signIn(args: string[]): Promise<void> {
   setTimeout(() => process.exit(code), 1_000).unref();
 }
 
-/** `braindog keys put|exec`, over the real terminal, and the exit code `keys` decides. */
+/** `braindog keys put|exec|headers`, over the real terminal, and the exit code `keys` decides. */
 async function keysCommand(args: string[]): Promise<void> {
   const cwd = process.cwd();
   const code = await keys(args, {
@@ -351,6 +369,65 @@ async function brainfileCommand(which: 'export' | 'import' | 'token', args: stri
     signal: stopping.signal,
   };
   const code = which === 'export' ? await exportFile(args, io) : which === 'token' ? await tokenCommand(args, io) : await importFile(args, io);
+  if (json) emit(json.envelope(code));
+  /* LEFT TO END ON ITS OWN, for the reason `hook` gives. */
+  process.exitCode = code;
+  setTimeout(() => process.exit(code), 1_000).unref();
+}
+
+/**
+ * `braindog setup <host> [--dry-run]`, over the real terminal, and the exit code of the first step that failed.
+ *
+ * NOT ONE OF `agentCommand`'s, because its first step may run the device flow and wait for six digits, so it needs
+ * the hosts file and Ctrl+C, as `login` does. NO `--json`: each step prints for the person at the terminal, and its
+ * strict `parseArgs` refuses the flag in its own words. The two paths are found exactly as `tools` and `install` find
+ * them, so what `setup` writes is what those commands would write, and a later run of either finds it in place.
+ */
+async function setupCommand(args: string[]): Promise<void> {
+  const stopping = new AbortController();
+  process.on('SIGINT', () => stopping.abort());
+  const cwd = process.cwd();
+  const code = await setup(args, {
+    env: process.env,
+    cwd,
+    home: homedir(),
+    out: (line: string) => writeFileSync(1, `${line}\n`),
+    say,
+    signal: stopping.signal,
+    cli: fileURLToPath(new URL('./main.ts', import.meta.url)).replaceAll('\\', '/'),
+    scripts: fileURLToPath(new URL('../hooks/', import.meta.url)),
+    /* The run the session file names, sent only to the host that wrote it, as `mcp` does. */
+    headers: async (host: string) => {
+      const held = readSession(sessionPath(process.env, cwd));
+      return sessionHeaders(await positionOf(cwd), undefined, held?.host === host ? held : undefined);
+    },
+  });
+  /* LEFT TO END ON ITS OWN, for the reason `hook` gives. */
+  process.exitCode = code;
+  setTimeout(() => process.exit(code), 1_000).unref();
+}
+
+/**
+ * `braindog runner enrol|repos|allow|run`, over the real terminal, and the exit code `runner` decides (`runner.ts`,
+ * `loop/finish/agents.md` C14).
+ *
+ * NOT ONE OF `agentCommand`'s, because `enrol` runs the device flow and `run` waits for jobs until Ctrl+C, so both need
+ * the hosts file and the stop signal, as `login` does. `--json` IS TAKEN: every verb says its lines on stderr and keeps
+ * stdout for its answer, so the envelope is the one document there once the verb returns.
+ */
+async function runnerCommand(args: string[]): Promise<void> {
+  const stopping = new AbortController();
+  process.on('SIGINT', () => stopping.abort());
+  const code = await runner(args, {
+    env: process.env,
+    cwd: process.cwd(),
+    home: homedir(),
+    file: hostsPath(process.env),
+    out: json ? json.out : (line: string) => writeFileSync(1, `${line}\n`),
+    say: json ? json.say : say,
+    answer: json?.answer,
+    signal: stopping.signal,
+  });
   if (json) emit(json.envelope(code));
   /* LEFT TO END ON ITS OWN, for the reason `hook` gives. */
   process.exitCode = code;
@@ -484,8 +561,12 @@ function install(args: string[]): void {
  * text; `init` and `serve` pass a spawned self-host's streams straight through. Each of the six is
  * left to refuse the flag in its own words, which is the answer a caller deserves rather than an
  * empty document.
+ *
+ * `setup` AND `keys headers` ARE LEFT OFF IT FOR THE SAME REASON: the second prints the one header document a
+ * program reads from stdout, and the first prints for a person while its first step may wait for six digits
+ * (`setupCommand`, `48 §5.15`, `§5.16`). Both refuse the flag through their own strict `parseArgs`.
  */
-const JSON_COMMANDS = new Set(['--version', '-v', 'help', '--help', '-h', 'login', 'logout', 'skills', 'tools', 'page', 'usecase', 'pack', 'import', 'export', 'token', 'context', 'session', 'automations', 'scripts', 'install', 'verify']);
+const JSON_COMMANDS = new Set(['--version', '-v', 'help', '--help', '-h', 'login', 'logout', 'skills', 'tools', 'page', 'usecase', 'pack', 'import', 'export', 'token', 'context', 'session', 'automations', 'scripts', 'install', 'verify', 'runner']);
 
 const [command, ...rest] = process.argv.slice(2);
 /* ONE DECISION, TAKEN BEFORE DISPATCH (`48 §4.5`, `json.ts`): the flag is answered here and removed,
@@ -493,7 +574,8 @@ const [command, ...rest] = process.argv.slice(2);
 const cut = takeJson(rest);
 /* `keys put` IS THE ONE VERB OF ITS COMMAND THAT HAS AN ANSWER: it deposits a key and reports which
    credential row it became. `keys exec` hands stdout to a child process and takes no envelope (§4.5),
-   so the flag is offered on the verb rather than on the command. */
+   and `keys headers` prints the one header document a program reads there, so the flag is offered on
+   the verb rather than on the command. */
 /* `usecase preview` IS A SEVENTH COMMAND WITH NOTHING TO PUT IN AN ENVELOPE, for the reason §4.5 gives
    about `init` and `serve`: it spawns the self-host with `stdio: 'inherit'`, so the child owns this
    process's stdout until Ctrl+C. Measured before this line existed, `usecase preview <file> --json`
@@ -513,6 +595,8 @@ try {
     if (json) emit({ ok: true, value: { app: build(), format: FORMAT_VERSION, kernel: KERNEL_MIGRATION, primitives: PRIMITIVES_VERSION } });
     else process.stdout.write(`${version()}\n`);
   } else if (command === 'mcp') await mcp(rest);
+  else if (command === 'setup') await setupCommand(rest);
+  else if (command === 'runner') await runnerCommand(args);
   else if (command === 'login') await signIn(args);
   /* LOCAL ONLY, AND IT OPENS NO SOCKET, so it needs none of the guards the others end with. */
   else if (command === 'logout') {
@@ -520,8 +604,9 @@ try {
     if (json) emit(json.envelope(code));
     process.exitCode = code;
   } else if (command === 'keys') await keysCommand(args);
-  /* `run` IS `keys exec` UNDER ITS SHORTER NAME (`48 §2`), not a second door: one command opens a key
-     into one environment variable, and adding a way to print one would undo the reason it exists. */
+  /* `run` IS `keys exec` UNDER ITS SHORTER NAME (`48 §2`), not a second door: it opens a key into one
+     environment variable. The one verb that prints a key is `keys headers`, to a program and never to a
+     terminal, and it has no shorter name, so nobody reaches it by typing less. */
   else if (command === 'run') await keysCommand(['exec', ...rest]);
   else if (command === 'export') await brainfileCommand('export', args);
   else if (command === 'token') await brainfileCommand('token', args);

@@ -43,7 +43,9 @@ import { KINDS, isKind, showsOf, type CardRole } from 'braindog-render';
 /* WHICH FILES A CARD LEADS WITH, the renderer's list, read by `pictureCell`. */
 import { isPictureMime } from 'braindog-render';
 import type { Column } from 'braindog-render/svelte';
-import { display, feedWho, homeCurrency, labelOf, walkTable, type BlockResult } from './api.ts';
+import { display, homeCurrency, labelOf, walkTable, type BlockResult } from './api.ts';
+/* WHO ASKED A QUEUE'S QUESTION, in the words the card that answers it uses. */
+import { proposer } from '../page/queue-answer.ts';
 import { REGISTERS } from './held.ts';
 import { draftOf } from './field-draft.ts';
 import { citedWords } from '../cite.ts';
@@ -320,7 +322,7 @@ function bridgeRows(block: BlockResult): string[] {
     `${escapeCell(copy.bridgeStart)} | ${money(walk.from, currency)} | `,
     `${escapeCell(copy.bridgeIn)} | ${money(sum(ins), currency)} | `,
     `${escapeCell(copy.bridgeOut)} | ${money(sum(outs), currency)} | `,
-    `${escapeCell(copy.bridgeEnd(block.horizon ?? 180))} | ${money(end, currency)} | `,
+    `${escapeCell(copy.bridgeEnd(typeof walk.horizon === 'number' ? walk.horizon : typeof block.horizon === 'number' ? block.horizon : 180))} | ${money(end, currency)} | `,
   ];
 }
 
@@ -364,8 +366,24 @@ function forecastRows(block: BlockResult): string[] {
     /* WHAT THE SELL CONTROL MAY COUNT AS SOLD, in the walk's own money. The renderer leaves out a figure in any other,
        so a holding the host could not convert is not offered rather than added as the wrong amount. */
     ...((block as BlockResult & { sells?: readonly ForecastSell[] }).sells ?? []).map((s) => `sell |  | ${escapeCell(s.label)} | ${said(s.value)}`),
-    `horizon | ${block.horizon ?? 180} |  | `,
+    `horizon | ${typeof walk.horizon === 'number' ? walk.horizon : typeof block.horizon === 'number' ? block.horizon : 180} |  | `,
+    /* THE LENGTHS THE HORIZON KNOB OFFERS, as the block declared them (`horizons:`); the renderer offers each only as far as the walk reaches. */
+    ...(block.horizons?.length ? [`horizons | ${block.horizons.join(' ')} |  | `] : []),
     ...(block.knobs?.length ? [`knobs | ${block.knobs.join(' ')} |  | `] : []),
+    /* CONVERTED "SHOW IN" FIGURES ARE WRITTEN BY SYMBOL ALONE IN THE RECORD'S OWN CURRENCY, and with the code after in
+       any other (design §8.3); the render package cannot know which is home, so this row says it. */
+    ...(homeCurrency() ? [`home | ${homeCurrency()} |  | `] : []),
+    /* EVERY OTHER CURRENCY THE RECORD'S RATES REACH FROM THE WALK'S, at the newest rate on or before the day the block was
+       read, which the "Show in" control converts the walk with (`show` rows, `packages/render/src/forecast.ts` `showsOf`). */
+    ...(walk.currency && block.fx
+      ? [...new Set(block.fx.rates.flatMap((r) => [r.currency, r.base]))]
+          .filter((c) => c !== walk.currency)
+          .sort()
+          .flatMap((c) => {
+            const r = rateFor(block.fx!.rates as Rate[], walk.currency!, c, today);
+            return r ? [`show | ${walk.currency} to ${c} | ${r.as_of} | ${r.rate}`] : [];
+          })
+      : []),
     /* ONE WALK OF SEVERAL, which moves with the others under the knobs the last of them draws. */
     ...(block.walkGroup ? [`group | ${escapeCell(block.walkGroup.id)} | ${escapeCell(block.walkGroup.key)} | `] : []),
     /* HOW LATE MONEY HAS COME IN, in whole days, which the late knob marks; and how near a crossing is said. */
@@ -762,7 +780,10 @@ function queueRows(block: BlockResult): string[] {
       /* AND THE BAND THE RECORD PUT IT IN, last, which is also the order these rows arrive in
          (`@braindog/kernel`'s `weigh.ts`). Passed through as the record's own word rather than as a
          sentence: the words a reader sees are `render/src/queue.ts`'s, the way tone's are. */
-      ['q', q.id, feedWho(q.who, null), since(q.at, at), q.question, q.why, q.cost ?? ''].map(escapeCell).join(' | '),
+      /* WHO ASKED IS SAID AS THE CARD THAT ANSWERS IT SAYS IT (`QueueAnswer.svelte`, through `proposer`): "Claude",
+         "A rule: chase late payments", "Slash", never `rule:cash-stale`. This fence is handed no reader, so a person
+         who asked is Someone on this record here; the card names them from the shell's people. */
+      ['q', q.id, proposer(q.who).name, since(q.at, at), q.question, q.why, q.cost ?? ''].map(escapeCell).join(' | '),
       /* AN OPTION'S SEVENTH CELL IS WHAT IT IS (`showsCell`), written only when it has one, so an option with no visual
          is the six-cell row it always was. */
       ...options.map((o) => {

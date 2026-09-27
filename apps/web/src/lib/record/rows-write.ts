@@ -45,8 +45,9 @@ const isRow = (v: unknown): v is RecordRow => v !== null && typeof v === 'object
  * Fields as the record stores them.
  *
  * A REF GIVEN AS A NUMBER BECOMES ITS ROW'S ULID; one the map does not hold goes as it is, and the record names it. An
- * enum goes in its declared spelling. A number typed into a box arrives as text and goes as a number, unless it is not
- * one, in which case the record gets the text and says what is wrong with it.
+ * enum goes in its declared spelling. A number typed into a box arrives as text and goes as a number when `typedNumber`
+ * reads it as one. Text it does not read never reaches here from the writer, which refuses it first (`misTyped`); a
+ * caller that hands it over anyway sends the text as it is, and the record says what is wrong with it.
  *
  * AND A `list<ref>` IS A REF EIGHT TIMES OVER, which this function did not know until a read-side repair made it
  * matter. The reader learned to resolve a list of row numbers back to their rows; this path still only resolved a
@@ -70,11 +71,47 @@ export function outbound(register: string, fields: Fields, refs: ReadonlyMap<str
           : one,
       );
     else if (f?.type === 'enum' && typeof value === 'string') out[key] = declaredValue(register, key, value);
-    else if ((f?.type === 'int' || f?.type === 'decimal') && typeof value === 'string')
-      out[key] = Number.isFinite(Number(value)) ? Number(value) : value;
+    else if ((f?.type === 'int' || f?.type === 'decimal') && typeof value === 'string') out[key] = typedNumber(value) ?? value;
     else out[key] = value;
   }
   return out;
+}
+
+/**
+ * A number as a person types it: an optional leading minus, digits with grouping commas in threes, and one point.
+ *
+ * `Number()` READ MORE THAN A PERSON WRITES. It takes "0x10" as sixteen and "1e3" as a thousand, so a box holding either
+ * wrote a figure nobody typed, and the record cannot tell, because it reads a decimal the same way (defects M11). A
+ * comma anywhere but between groups of three is refused rather than dropped: "1,5" is one and a half where the comma is
+ * the decimal mark and fifteen where it is not, and a guess either way writes a figure somebody did not mean.
+ */
+const DIGITS = /^[-−]?(?:\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?|\.\d+)$/u;
+
+function typedNumber(text: string): number | null {
+  const said = text.trim();
+  return DIGITS.test(said) ? Number(said.replace(/,/gu, '').replace('−', '-')) : null;
+}
+
+/** The words this file says itself. The record's own sentences come back through `failed`. */
+const words = {
+  /* A WHOLE-NUMBER FIELD IS NOT OFFERED `3.5` AS ITS EXAMPLE, because the record would refuse that next. */
+  notDigits: (label: string, typed: string, whole: boolean): string =>
+    `${label} takes a number written in digits, such as ${whole ? '1,200' : '1,200 or 3.5'}, and "${typed}" is not one, so nothing was written.`,
+} as const;
+
+/**
+ * A NUMBER BOX HOLDING SOMETHING THAT IS NOT A NUMBER IS REFUSED HERE, with the field's sentence, before anything goes.
+ * Sent as text, the record would read "0x10" in a decimal field as sixteen and keep it, so the one place that knows
+ * what was typed is the one that says no.
+ */
+function misTyped(register: string, fields: Fields): string | null {
+  const decl = REGISTERS[register];
+  for (const [key, value] of Object.entries(fields)) {
+    const f = decl?.fields.find((x) => x.id === key);
+    if (!f || (f.type !== 'int' && f.type !== 'decimal') || typeof value !== 'string' || value.trim() === '') continue;
+    if (typedNumber(value) === null) return words.notDigits(labelOf(f), value.trim(), f.type === 'int');
+  }
+  return null;
 }
 
 /** What the list's address says about the rows on screen: the chips, the search box and the order. */
@@ -351,6 +388,8 @@ export function rowWriter(base: string, io?: Fetch): RowWriter {
   };
 
   async function update(register: string, seq: number, patch: Fields, version?: number): Promise<Wrote> {
+    const wrong = misTyped(register, patch);
+    if (wrong !== null) return { ok: false, why: 'refused', fix: wrong };
     const refs = await refsHolding(register, patch);
     const out = await client.update({ register, seq, patch: outbound(register, patch, refs), ...(version === undefined ? {} : { version }) });
     if (!out.ok) return failed(register, seq, out, refs);
@@ -373,6 +412,8 @@ export function rowWriter(base: string, io?: Fetch): RowWriter {
       return noted((await client.call('retireDeclaration', { id })) as { ok: true } | Failed);
     },
     async create(register, fields, note) {
+      const wrong = misTyped(register, fields);
+      if (wrong !== null) return { ok: false, why: 'refused', fix: wrong };
       const refs = await refsHolding(register, fields);
       const out = await client.create({ register, fields: outbound(register, fields, refs), ...(note ? { note } : {}) });
       if (!out.ok) return failed(register, null, out, refs);

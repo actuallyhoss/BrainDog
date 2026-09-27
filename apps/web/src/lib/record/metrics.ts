@@ -596,20 +596,55 @@ const HOLE = /\{\{\s*([a-z][a-z0-9_-]*(?:[.#][a-z0-9_-]+)*)\s*\}\}/gu;
  * is one step or several by `{{done}}`, where `noteOf` only reads a number with the word straight after it and said
  * "1 essential steps". A number two figures back (`{{done}} of the {{all}} step(s)`) is not the count, because a
  * figure between them stops the words.
+ *
+ * NOUGHT IS NOUGHT IN ANY CURRENCY. A money figure comes back from `said` as `GBP 0.00`, never `0`, so a clause saying
+ * only that nothing was owed was kept while the same clause over a count went (defects M12). `nought` reads the figure
+ * as the resolver writes it, one currency's part at a time.
+ *
+ * A FIGURE THAT DID NOT READ TAKES ITS CLAUSE WITH IT. `said` answers `null` for a figure the record refused, and the
+ * renderer then draws the hole as the mark for a missing figure, a clause that says nothing; the rest of the sentence
+ * still stands, and a lead with no clause left is not drawn at all (`page-live.ts`).
+ *
+ * THE VERB AFTER A COUNTED NOUN AGREES WITH THE SAME COUNT: `{{all}} essential step(s) are done` is "1 essential step
+ * is done" and "3 essential steps are done", whichever form the template wrote. Only the verbs `VERB` names are
+ * changed, because a verb that agrees by an `s` of its own cannot be told from a noun by reading it.
+ *
+ * AND A NUMBER IS READ WHOLE. `2.1 day(s)` was counted from the `1` after the point, and said "2.1 day".
  */
 export function leadOf(template: string, said: (path: string) => string | null): string {
   const kept = template.split(/,\s+/u).filter((clause) => {
-    const paths = [...clause.matchAll(HOLE)].map((m) => m[1]!);
-    return paths.length === 0 || paths.some((p) => said(p) !== '0');
+    const figures = [...clause.matchAll(HOLE)].map((m) => said(m[1]!));
+    if (figures.length === 0) return true;
+    if (figures.some((f) => f === null)) return false;
+    return figures.some((f) => f !== null && !nought(f));
   });
   const one = (count: string): boolean => count.trim() === '1';
   return kept
     .join(', ')
-    .replace(/(\{\{\s*([a-z][a-z0-9_-]*(?:[.#][a-z0-9_-]+)*)\s*\}\}|\b\d[\d,]*)((?:\s+[A-Za-z]+)*?)\s+([A-Za-z]+)\(s\)/gu, (_, figure: string, path: string | undefined, between: string, word: string) =>
-      `${figure}${between} ${one(path === undefined ? figure : (said(path) ?? '')) ? word : `${word}s`}`,
+    .replace(
+      /(\{\{\s*([a-z][a-z0-9_-]*(?:[.#][a-z0-9_-]+)*)\s*\}\}|(?<![\d.,])\b\d[\d,]*(?:\.\d+)?)((?:\s+[A-Za-z]+)*?)\s+([A-Za-z]+)\(s\)(?:(\s+)(are|is|were|was|have|has)\b)?/gu,
+      (_, figure: string, path: string | undefined, between: string, word: string, gap: string | undefined, verb: string | undefined) => {
+        const single = one(path === undefined ? figure : (said(path) ?? ''));
+        const forms = verb !== undefined && Object.hasOwn(VERB, verb) ? VERB[verb] : undefined;
+        return `${figure}${between} ${single ? word : `${word}s`}${forms ? `${gap ?? ' '}${single ? forms[0] : forms[1]}` : ''}`;
+      },
     )
     .replace(/([A-Za-z]+)\(s\)/gu, '$1s');
 }
+
+/** A figure as `resolverOf` writes it, `0`, `0.0`, `0%` or `GBP 0.00`, one part or several joined by ` · `. */
+const NOUGHT = /^(?:[A-Z]{3} )?[-−]?0+(?:\.0+)?%?$/u;
+const nought = (figure: string): boolean => figure.split(' · ').every((part) => NOUGHT.test(part.trim()));
+
+/** The verbs `leadOf` makes agree, each as its one form and its many. */
+const VERB: Readonly<Record<string, readonly [string, string]>> = {
+  is: ['is', 'are'],
+  are: ['is', 'are'],
+  was: ['was', 'were'],
+  were: ['was', 'were'],
+  has: ['has', 'have'],
+  have: ['has', 'have'],
+};
 
 /**
  * A window as a person reads it, from the window as a declaration writes it.

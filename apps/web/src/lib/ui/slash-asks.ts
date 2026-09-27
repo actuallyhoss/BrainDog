@@ -5,29 +5,28 @@
  * PURE, SO `node --test` CAN IMPORT IT. The rules and the words live here rather than in `copy.ts`, which the palette's
  * Slash work owns this run; the component only draws what these answer.
  *
- * NO `a`/`b` SWITCH, ON PURPOSE. `research-spark-routes.md` F6 measured that on both hosts as built tier `a` already spends
- * the owner's own key, so a control offering *Use your own key* would switch between two ways of spending the same key.
- * That still holds wherever a `SLASH_ENDPOINT` is set. On a Cloud deployment with none, the Worker's included model is built
- * (`apps/worker/src/slash.ts` `includedInference`) and spends the Cloudflare account's Workers AI, and it answers only once
- * `SLASH_INCLUDED` is `yes`, which no environment sets yet. From then on, tier `a` on that deployment does not spend the
- * owner's key, and the premise of this paragraph is gone there. The row shows what the host says and lets the owner set
- * the monthly limit. The `a`/`byo` choice that §4 of the same file offers the owner, with the model name `byo` requires, is NOT built here yet:
- * that is a gap in this row, not a decision against it.
+ * THE CHOICE OF MODEL IS `SlashModel`'s, beside this row: "Included" or "Your own key" (`loop/finish/agents.md` AGT-21).
+ * This row shows what the host says of the choice made. On the included model the month's asks against the cap, and the
+ * limit the owner sets. On his own key the same count with no cap beside it, because his asks there are listed and not
+ * capped (`agents.md` §5 item 7): the host says so with `asks.capped: false`.
  */
 
 import type { SlashStatus } from '@braindog/client';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
-/* ONLY TIER `a` IS METERED. `b` is the owner's key and `byo` the operator's endpoint. `23 §8` says the meter
-   "disappears entirely" on `byo`, and the engine caps `b` no more than it does `byo`: the budget check in
-   `packages/slash/src/propose.ts` refuses only when the tier is `a`. The package still answers `asks` on every tier, so `{ used: 0, cap: 80 }` arrives on a
-   `byo` host and a row drawn from it would read `0 of 80`: a limit that nothing enforces, stated as a fact. The first
-   version of `asksShown` below did exactly that, and the test that says `null` failed on `'0 of 80'`. */
-const metered = (s: SlashStatus): boolean => s.tier === 'a';
+/* ONLY THE INCLUDED MODEL IS METERED. `23 §8` says the meter "disappears entirely" on `byo`, the operator's endpoint, and
+   on his own key the host answers `capped: false`. The package still answers `asks` on every tier, so `{ used: 0, cap: 80 }`
+   arrives on a `byo` host and a row drawn from it would read `0 of 80`: a limit that nothing enforces, stated as a fact.
+   The first version of `asksShown` below did exactly that, and the test that says `null` failed on `'0 of 80'`. A host a
+   release behind says no `capped`, and there tier `a` alone is metered, as it always was. */
+export const metered = (s: SlashStatus): boolean => (s.asks.capped === undefined ? s.tier === 'a' : s.asks.capped && s.tier !== 'byo');
 
-/** `41 of 80` on tier `a`; `null` anywhere else, so the row is gone rather than zeroed. */
-export const asksShown = (s: SlashStatus): string | null => (metered(s) ? `${s.asks.used} of ${s.asks.cap}` : null);
+/** On his own key: the count is his to see, and nothing stops at it. */
+const listed = (s: SlashStatus): boolean => s.asks.capped === false && (s.source === 'key' || s.tier === 'b');
+
+/** `41 of 80` on the included model; `12` on his own key, listed and not capped; `null` on `byo`, gone rather than zeroed. */
+export const asksShown = (s: SlashStatus): string | null => (metered(s) ? `${s.asks.used} of ${s.asks.cap}` : listed(s) ? String(s.asks.used) : null);
 
 /** The palette's one footer line, once a month (`23 §8`, 80 %). Settings draws nothing at this point. */
 export const nearCap = (s: SlashStatus): boolean => metered(s) && s.asks.used >= s.asks.cap * 0.8;
@@ -62,6 +61,8 @@ export const capSaid = (cap: number): string =>
 export const words = {
   title: 'Slash',
   asks: 'Asks this month',
+  keyAsks: 'Asks on your key this month',
+  keyHint: 'Your provider bills these, so Slash lists them and sets no limit.',
   model: 'Model',
   resets: 'Resets',
   spent: 'Out of asks',

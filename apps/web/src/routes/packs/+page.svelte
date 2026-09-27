@@ -22,6 +22,7 @@
      six and two add-ons nobody wrote (wave C1, `modules.ts`). */
   import { MODULES } from '$lib/record/modules.ts';
   import { PAGES, REGISTERS } from '$lib/record/held.ts';
+  import { METRICS } from '$lib/record/declared.ts';
   import CallsOut from '$lib/ui/CallsOut.svelte';
   import type { Shell } from '$lib/record/boot-live.ts';
   import { hostedHere } from '../settings/billing.ts';
@@ -90,8 +91,10 @@
   /** A plan names registers and pages by id; the reader is asked about names. */
   const planName =
     (pack: PackInfo) =>
-    (kind: 'register' | 'page', key: string): string =>
-      pack.titles?.[key] ?? (kind === 'register' ? REGISTERS[key]?.name : PAGES[key]?.title) ?? key.charAt(0).toUpperCase() + key.slice(1);
+    (kind: 'register' | 'page' | 'metric', key: string): string =>
+      pack.titles?.[key] ??
+      (kind === 'register' ? REGISTERS[key]?.name : kind === 'metric' ? METRICS[key]?.name : PAGES[key]?.title) ??
+      key.charAt(0).toUpperCase() + key.slice(1);
 
   /**
    * Install, first press: the record's plan for this add-on, drawn under it. An entry nothing ships a document for is

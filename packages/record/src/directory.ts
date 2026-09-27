@@ -80,7 +80,7 @@ const RESERVED = new Set([
      record called `settings` would make `/app/settings/agents` two pages at once, for ever. `fonts` and `catalogue`
      are the static folders served under `/app` beside the pages. `test/directory.test.ts` reads the app's route and
      static folders and fails for any this set does not hold, so a route added later cannot fall behind it. */
-  'audit', 'automations', 'catalogue', 'decide', 'fonts', 'inbox', 'invite', 'jobs', 'packs', 'search', 'settings',
+  'audit', 'automations', 'catalogue', 'connect', 'decide', 'fonts', 'inbox', 'invite', 'jobs', 'packs', 'search', 'settings',
   'signin', 'slash', 'start', 't', 'usage', 'v', 'vault',
 ]);
 
@@ -124,7 +124,7 @@ CREATE TABLE IF NOT EXISTS dir_record (
   owner      TEXT NOT NULL DEFAULT '',      -- the founding owner. 33 §593: record_dir.owner_person
   created_at TEXT NOT NULL,
   closed_at  TEXT,
-  plan       TEXT NOT NULL DEFAULT 'hosted' -- 'hosted' or 'selfhost': the monthly allowance its scheduled actions run under
+  plan       TEXT NOT NULL DEFAULT 'hosted' -- 'hosted', 'plus' or 'selfhost': the monthly allowance its scheduled actions run under
 );
 
 -- A slug is a name for a record and a record has one live name. A released row stays as a tombstone:
@@ -383,8 +383,12 @@ export type Directory = ReturnType<typeof createDirectory>;
 
 /* ── plans and usage ─────────────────────────────────────────────────────── */
 
-/** The plans a record can be on. `hosted` is the record at $12 a month; `selfhost` is counted and never limited. */
-export const PLANS = ['hosted', 'selfhost'] as const;
+/**
+ * The plans a record can be on. `hosted` is Cloud, the record at $12 a month; `plus` is Cloud Plus, at $29 a month with
+ * a larger allowance (`loop/DIRECTION.md` §33, `HOSTED_PLANS` in `apps/worker/src/billing.ts`); `selfhost` is counted
+ * and never limited.
+ */
+export const PLANS = ['hosted', 'plus', 'selfhost'] as const;
 export type Plan = (typeof PLANS)[number];
 
 /** One month's allowance: runs, requests, bytes fetched and run time in milliseconds. Failures are never limited. */
@@ -399,6 +403,7 @@ export type Allowance = { runs: number; requests: number; bytes: number; ms: num
  */
 export const ALLOWANCE: Record<Plan, Allowance | null> = {
   hosted: { runs: 15_000, requests: 150_000, bytes: 1_000_000_000, ms: 50 * 3_600_000 },
+  plus: { runs: 60_000, requests: 600_000, bytes: 5_000_000_000, ms: 200 * 3_600_000 },
   selfhost: null,
 };
 

@@ -83,6 +83,8 @@ import { unwrap, type KeyStore } from './keys.ts';
 import { shellOf } from './shell.ts';
 import { signerFor } from './sign.ts';
 import { keysDoor, vaultDoor } from './vault.ts';
+/* OAUTH 2.1 ON THIS HOST (`loop/finish/agents.md` C4, AGT-31): the host package's doors over this process's Directory. */
+import { oauthHere, servesOAuth, type OAuthHere } from './oauth.ts';
 import { claimIdle, holdClaim, runnerContext } from '@braindog/host';
 import { withVaultPassphrase } from '@braindog/host';
 import { rootKeysOf } from './keys.ts';
@@ -316,6 +318,8 @@ type Site = {
    * that started it.
    */
   limits: Limiter | null;
+  /** `/oauth/*` and the OAuth metadata (`./oauth.ts`): on where somebody signs in from a browser, and off with its sentence. */
+  oauth: OAuthHere;
 };
 
 /** Who is asking, a refusal, or a bare status; and the cookie the answer carries, when it carries one. */
@@ -1228,7 +1232,9 @@ export async function start(options: {
      arrangement and the engine that answers a question are two features sharing a name (`1f85a49a`), and two
      reads of the environment are two hosts that come to disagree about which one is configured. */
   const slashConfig = options.slash ?? slashFromEnv(env);
-  const slashModel = slashModelFor(slashConfig, () => api, options.keys);
+  /* HIS OWN KEY'S CHOICE IS READ FROM SLASH'S STORE ON EACH PRESS, through a thunk because `slashSql` is opened
+     below; nothing calls it before then. */
+  const slashModel = slashModelFor(slashConfig, () => api, options.keys, () => slashSql);
   /* SLASH'S OWN SQLITE AND NOT THE RECORD'S (`46 §2`): the engine writes its `settings` and `call` tables into
      its own database, beside the record's rather than inside it. */
   /* BESIDE THE RECORD FILE, `<dir>/slash.sqlite`, AS `inbound.token` IS, AND IN MEMORY ONLY WHERE THE RECORD IS.
@@ -1843,6 +1849,23 @@ export async function start(options: {
         : !trustProxy && ['127.0.0.1', '::1', 'localhost'].includes(host)
           ? null
           : windowLimiter(() => Date.now()),
+    /* OAUTH, OVER THE DIRECTORY'S OWN FILE AND THE SAME SIGN-IN `/api` READS (`./oauth.ts`), built once so its decision
+       about this socket is made once. An app's metadata document is read as a shared file is, through `shared`'s socket
+       and name service, because both are a public document at an address somebody else names. */
+    oauth: oauthHere({
+      sql: dirSql,
+      clock,
+      api,
+      origin,
+      origins,
+      auth: off === null ? directory.auth : null,
+      mode,
+      listen: host,
+      trustProxy,
+      names: (slug) => site !== null && site.names(slug),
+      send: options.shared?.send,
+      resolve: options.shared?.resolve,
+    }),
     snapshots: kept,
     names: (slug) => {
       const here = api.kernel.identity()?.id;
@@ -2127,6 +2150,15 @@ async function answer(
      byte of the body is read, because it reads the body only for a bearer it knows. */
   const path = new URL(url).pathname;
   if (/^\/+mcp\/*$/.test(path)) return write(res, await agent(req, url, method, headers, site));
+  /* OAUTH 2.1, BEFORE THE BODY IS WEIGHED, as `/mcp` is: its doors read at most their own few kilobytes, counted as they
+     arrive, so a body is handed over unread and the hundred mebibytes below are never held for a stranger here. The
+     request is built at the origin the socket was reached by (`originAt`), because the metadata names the address the
+     client typed; ONE LEADING SLASH, because `//oauth/token` resolved against an origin is a URL whose host is `oauth`. */
+  if (servesOAuth(path)) {
+    const at = new URL(`${path.replace(/^\/+/, '/')}${asked.search}`, site.oauth.originAt(req.headers.host ?? ''));
+    const init: RequestInit = SAFE.has(method) ? { method, headers } : { method, headers, body: bodyOf(req), duplex: 'half' };
+    return write(res, await site.oauth.serve(new Request(at, init), ipOf(req, trustProxy)));
+  }
 
   /* A BODY IS WEIGHED AS IT ARRIVES, BEFORE ANYBODY IS KNOWN. Every byte was held in memory before the credential was
      read, so anybody who could reach a host bound to every interface could send it gigabytes with no key at all.
@@ -2313,11 +2345,14 @@ async function agent(req: IncomingMessage, url: string, method: string, headers:
   if (early) return early;
   const sent = presented(head);
   const seen = sent === undefined ? null : await bearerFor(sent, site, 'mcp');
-  if (seen === null) return unauthorized();
+  /* THE 401 NAMES WHERE TO SIGN IN, as the Worker's does, so an MCP client holding no token starts OAuth from it
+     (RFC 9728, `loop/finish/agents.md` C4): at the name this process was reached by, and not at all while OAuth is off. */
+  const metadata = site.oauth.metadata(req.headers.host ?? '');
+  if (seen === null) return unauthorized(metadata);
   if ('refused' in seen) {
     /* A credential this record does not know is the transport's 401. One it knows, for somebody no longer on
        the record or a record nobody may act on, gets the status and the sentence `/api` gives. */
-    if (seen.refused.code === 'UNAUTHORIZED') return unauthorized();
+    if (seen.refused.code === 'UNAUTHORIZED') return unauthorized(metadata);
     const out = { ok: false as const, refusal: seen.refused };
     return json(httpStatus(out), out);
   }

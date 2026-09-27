@@ -81,15 +81,16 @@
     void import('$lib/ui/Keymap.svelte').then((m) => (Keymap = m.default));
   });
 
-  /* Three surfaces carry no shell. `/start` because a record with zero registers has no nav to draw,
+  /* These surfaces carry no shell. `/start` because a record with zero registers has no nav to draw,
      `/s/<token>` because a shared page is a capability URL: it renders one page, read-only,
      with no nav and no palette, and must not imply there is a record behind it (50 §5.13 step 6),
      and `/signin` because a rail listing somebody else's registers behind a sign-in form is the
-     screen claiming you are already in. */
+     screen claiming you are already in. `/connect`, an app's consent screen, comes before any work
+     in a record as sign-in does, and without the rail it fits a phone with Allow in thumb reach (AGT-8). */
   const bare = $derived.by(() => {
     /* Read inside the record: the address is `/app/acme/start` and the rule is about `/start`. */
     const at = here(page.url.pathname);
-    return at === '/start' || at === '/signin' || at === '/invite' || at.startsWith('/s/');
+    return at === '/start' || at === '/signin' || at === '/invite' || at === '/connect' || at.startsWith('/s/');
   });
 
   /* THE SHELL'S, AND A PAGE'S. It was local, so a page could not open the palette — which is why

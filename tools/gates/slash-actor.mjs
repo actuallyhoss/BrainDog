@@ -81,8 +81,6 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const started = performance.now();
-
 /**
  * Node's opinion of `node:sqlite` is not this gate's output.
  *
@@ -90,16 +88,24 @@ const started = performance.now();
  * on stderr on every run, and a gate whose output carries two lines of somebody else's warning is a
  * gate people learn to read past. Only that class is dropped; anything else Node has to say still
  * prints, because a warning nobody sees is the failure this whole directory is about.
+ *
+ * AND THE LISTENERS IT FOUND ARE PUT BACK, which a script never had to do. As a script this process
+ * was the gate's alone and ended with it; called by `run.mjs` it is the runner's, and every gate after
+ * this one would have run with Node's own warning line taken away. So the filter holds for this call
+ * and the answer is a function that undoes it.
  */
-process.removeAllListeners('warning');
-process.on('warning', (w) => {
-  if (w.name !== 'ExperimentalWarning') console.warn(w);
-});
-
-const root = process.env.BRAINDOG_GATE_ROOT ?? join(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
-const at = (...parts) => join(root, ...parts);
-const read = (...parts) => readFileSync(at(...parts), 'utf8');
-const load = (...parts) => import(pathToFileURL(at(...parts)).href);
+function quietExperimental() {
+  const kept = process.listeners('warning');
+  const quiet = (w) => {
+    if (w.name !== 'ExperimentalWarning') console.warn(w);
+  };
+  process.removeAllListeners('warning');
+  process.on('warning', quiet);
+  return () => {
+    process.off('warning', quiet);
+    for (const listener of kept) process.on('warning', listener);
+  };
+}
 
 /**
  * The three modules a record is made of, and why the adapter is one of them.
@@ -113,130 +119,6 @@ const load = (...parts) => import(pathToFileURL(at(...parts)).href);
 const KERNEL = ['packages', 'kernel', 'src', 'index.ts'];
 const ADAPTER = ['packages', 'kernel', 'test', 'sqlite.ts'];
 const SEED = ['packages', 'seed', 'src', 'index.ts'];
-
-/**
- * Exit 3 is a SKIP and not a pass (`run.mjs`), and this is the only thing that earns one.
- *
- * A tree with no kernel and no seed has no record to materialise, and there is no smaller honest
- * thing to check: the query is a question about rows. Everything below this line is red instead,
- * including a seed that will not install, because a record that cannot be built is a finding about
- * the record and not an absence of one.
- */
-const absent = [KERNEL, ADAPTER, SEED].filter((parts) => !existsSync(at(...parts)));
-if (absent.length > 0) {
-  console.log(
-    `  slash-actor: no ${absent.map((parts) => parts.join('/')).join(' and no ')}, ` +
-      'so there is no record to materialise and nothing was checked.',
-  );
-  process.exit(3);
-}
-
-const findings = [];
-
-/**
- * What the green line gets to claim, filled in as the gate earns each part.
- *
- * DECLARED HERE BECAUSE THE GATE CAN STOP EARLY. Two of the findings below end the run before a
- * record exists at all, and a reporter reaching for a `const` that has not been evaluated yet
- * crashes with a `ReferenceError` instead of printing the finding it was called to print, which is
- * a gate that fails loudly about the wrong thing.
- */
-let sql = null;
-let rows = 0;
-let events = 0;
-let mine = 0;
-let guarded = 0;
-let offered = 0;
-
-/* ── 1 · the invariant, out of the document that owns it ────────────────────────────────────────── */
-
-/* A MISSING DOCUMENT IS A FINDING AND NOT A STACK TRACE. A tree that has a record and no `30` is a
-   tree where the invariant has no owner, which is worth a sentence; a gate that answers it with an
-   ENOENT is a gate whose output a reader has to decode before they can act on it. */
-const blueprint = (() => {
-  try {
-    return read('docs', '30-BLUEPRINT.md');
-  } catch {
-    return '';
-  }
-})();
-const from = blueprint.indexOf('## 3 · The `actor` grammar');
-const section = from < 0 ? '' : blueprint.slice(from, blueprint.indexOf('\n## ', from + 1));
-
-/* THE SENTENCE WRAPS, AND IT WRAPS INSIDE THE BACKTICKS. `30 §3` breaks the line between `NOT IN`
-   and its list, so a pattern anchored on a single line matches nothing and the gate would report
-   that the invariant is missing from the document that states it. Whitespace is collapsed first. */
-const stated = /actor\s*=\s*'([a-z]+)'\s+AND\s+kind\s+NOT\s+IN\s*\(([^)]*)\)/.exec(section.replace(/\s+/g, ' '));
-
-if (!stated) {
-  findings.push("30 §3's query is not where this gate looks for it, so the invariant was read from nothing");
-  report();
-}
-
-const actor = stated[1];
-const allowed = [...stated[2].matchAll(/'([^']*)'/g)].map((m) => m[1]);
-
-/**
- * `30 §3`'s query, built from `30 §3`'s own words.
- *
- * `id` is selected beside `kind` because a finding has to name the row. `52 §4` fixes the failure
- * line's `what` as `slash wrote <kind>` and `52 §5.2` clause 4 says the `where` names the record and
- * the event id, and an id is the difference between "something in here is wrong" and a row somebody
- * can open.
- */
-const QUERY =
-  `SELECT id, kind FROM event WHERE actor = '${actor}' ` +
-  `AND kind NOT IN (${allowed.map((kind) => `'${kind}'`).join(',')})`;
-
-const kernel = await load(...KERNEL);
-
-/* AND THE CODE'S COPY IS COMPARED, NOT TRUSTED. `SLASH_KINDS` is the set five writers check against
-   and `30 §3` is where the closure is decided; the day they disagree, the record enforces a rule
-   the document does not make, which is the drift `event-kinds` and `closed-lists` exist for on the
-   two lists big enough to have done it already. */
-if (kernel.SLASH !== actor)
-  findings.push(`30 §3 files a model's writing under '${actor}' and SLASH is '${kernel.SLASH}'`);
-
-const held = [...kernel.SLASH_KINDS].sort();
-if (held.join(' ') !== [...allowed].sort().join(' '))
-  findings.push(`30 §3 closes ${actor} to ${allowed.join(', ')} and SLASH_KINDS holds ${held.join(', ')}`);
-
-/* ── 2 · the record, materialised ───────────────────────────────────────────────────────────────── */
-
-const { openSqlite, fixedClock } = await load(...ADAPTER);
-const seed = await load(...SEED);
-
-sql = openSqlite();
-const record = await kernel.openRecord(sql, fixedClock(seed.NOW));
-
-const installed = await seed.installSeed(record);
-if (!installed.ok) {
-  const why = installed.refusal ?? installed.conflict ?? {};
-  findings.push(`the record would not take the seed: ${why.code ?? 'no code'}, ${why.fix ?? 'no reason given'}`);
-  report();
-}
-rows = Number(installed.value.rows);
-
-/* THE FIRST REGISTER THAT HOLDS A ROW, not the first declared. Since migration 0002 the kernel's own
-   `session` register is declared before the seed's, and it starts empty, so `registers[0]` offered
-   nothing to write against and the guard below was never reached. */
-const registers = [...record.registers().keys()];
-let register;
-let listed = null;
-for (const id of registers) {
-  /* Not the kernel's own register: it refuses its kernel-written fields before 30 §3's guard is
-     reached, so a refusal there would pass this gate for the wrong reason. */
-  if (id === 'session') continue;
-  const tried = record.list({ register: id, limit: 1 });
-  if (tried?.ok && tried.value.rows.length > 0) {
-    register = id;
-    listed = tried;
-    break;
-  }
-}
-const row = listed?.ok ? listed.value.rows[0] : undefined;
-
-/* ── 3 · the write a model is allowed to make ───────────────────────────────────────────────────── */
 
 /**
  * `propose`, as `slash`, which is `45 §5`'s `infer.draft` filing a model's answer.
@@ -260,131 +142,92 @@ const PROPOSAL = {
   },
 };
 
-let opened = null;
-try {
-  opened = record.propose(PROPOSAL, actor);
-} catch (e) {
-  findings.push(`offering ${actor} the write 30 §3 allows threw: ${e.message}`);
-}
-
-if (opened && !opened.ok) {
-  const why = opened.refusal ?? {};
-  findings.push(
-    `the record refused the one write 30 §3 allows ${actor} to make (${why.code ?? 'no code'}: ` +
-      `${(why.fix ?? 'no reason given').replace(/\.$/, '')}), so the query below filters nothing. ` +
-      'A guard that refuses everything passes a test that only tries the refusals',
-  );
-}
-
-/* ── 4 · the writes it is not ───────────────────────────────────────────────────────────────────── */
-
 /**
- * The four public writers that take an actor from outside themselves, one forbidden kind each.
+ * THE CHECK IS A FUNCTION, imported by `run.mjs` rather than spawned: `52 §5.1` step 3, argued in the
+ * runner's `IMPORTED OR SPAWNED` header. Nothing in this file happens on import, and everything above
+ * this line is a declaration.
  *
- * EACH ONE WOULD WRITE AN EVENT IF IT WERE ACCEPTED, which is the property that makes this an input
- * to the query rather than a second assertion beside it. Measured on this record: `create` writes
- * one, an empty `update` still writes an `edit`, `log` writes a `note`, and `decide` writes two.
+ * IT RETURNS, AND NEVER CALLS `process.exit`. As a script the reporter ended the process from wherever
+ * a finding stopped the run, and inside the runner that would end every gate after this one. So a
+ * finding that stops the run returns what the reporter answers: 1 for a finding, and nothing for a pass.
  *
- * THE FIELDS COME FROM A ROW THE RECORD ALREADY HOLDS. A `create` with an empty body is refused for
- * `REQUIRED_MISSING` before it reaches the guard at all, which would have made this offer prove
- * nothing while looking exactly like a refusal.
+ * THE RECORD IS CLOSED ON EVERY PATH OUT, and so is the warning filter, in the `finally` below, because a
+ * throw here is now the runner's to report and the runner goes on to the next gate.
  *
- * TWO GUARD SITES, NOT ONE: `create`, `update` and `log` reach `appendEvent` in the kernel's write
- * path, and `decide` reaches the governance writer's own `event`. Three of the five sites `slash.ts`
- * names are covered by these four offers; the header says which two are not and why.
+ * THE ROOT IS AN ARGUMENT, defaulting to `BRAINDOG_GATE_ROOT`, which is the handle `self-test` aims this
+ * gate at its seeded fixture with, and then to the repository this file sits in.
  */
-const offers = [
-  ['create', () => record.create(register, row.fields, { actor })],
-  ['edit', () => record.update(register, row.id, {}, { actor })],
-  ['note', () => record.log(register, row.seq, { actor }, 'A note no model may sign on its own account.')],
-];
-if (opened?.ok)
-  offers.push([
-    'decide',
-    () => record.decide(opened.value.id, { decide: { option: PROPOSAL.body.options[0].id, reason: 'the invoice names two lines' } }, actor),
-  ]);
+export default async function slashActor(
+  root = process.env.BRAINDOG_GATE_ROOT ?? join(fileURLToPath(new URL('.', import.meta.url)), '..', '..'),
+) {
+  const started = performance.now();
+  const at = (...parts) => join(root, ...parts);
+  const read = (...parts) => readFileSync(at(...parts), 'utf8');
+  const load = (...parts) => import(pathToFileURL(at(...parts)).href);
 
-offered = offers.length;
-
-const accepted = [];
-const elsewhere = [];
-
-if (row === undefined) {
-  findings.push('the materialised record holds no row, so there was nothing to offer a write against');
-} else {
-  for (const [kind, offer] of offers) {
-    try {
-      const out = offer();
-      if (out?.ok) accepted.push(kind);
-      else elsewhere.push(`${kind} (${out?.refusal?.code ?? 'no code'})`);
-    } catch (e) {
-      /* AND THE THROW HAS TO BE THE RIGHT THROW. `catch {}` counting as a refusal is how a gate
-         turns a crash into a pass: a renamed method, a changed signature, a missing register all
-         throw, and all three would have read as "the guard held". The guard's sentence names the
-         actor and the kind, so that is what is checked. */
-      if (String(e?.message ?? '').includes(`${actor} wrote ${kind}`)) guarded++;
-      else findings.push(`offering ${actor} a ${kind} threw something that is not 30 §3's refusal: ${e.message}`);
-    }
-  }
-}
-
-/* ── 5 · the query ──────────────────────────────────────────────────────────────────────────────── */
-
-const wrote = sql.all(QUERY);
-for (const e of wrote) findings.push(`${actor} wrote ${e.kind}, in the seed record, event ${e.id}`);
-
-/* AND A WRITE THE RECORD TOOK WITHOUT LOGGING IT IS THE SAME BREACH, QUIETER. The query can only
-   find a row that exists; a writer that accepted a model's write and appended no event has broken
-   30 §3 in the one way the query is blind to, and the log is the only place either would show. */
-const seen = new Set(wrote.map((e) => e.kind));
-for (const kind of accepted)
-  if (!seen.has(kind)) findings.push(`the record accepted a ${kind} from ${actor} and wrote no event saying so`);
-
-/* ── 6 · and the query was asked of something ───────────────────────────────────────────────────── */
-
-events = Number(sql.one('SELECT count(*) AS n FROM event')?.n ?? 0);
-mine = sql
-  .all(`SELECT kind, count(*) AS n FROM event WHERE actor = '${actor}' GROUP BY kind`)
-  .reduce((n, r) => n + Number(r.n), 0);
-
-if (mine === 0)
-  findings.push(
-    `the record holds no ${actor} event, so 30 §3's query is satisfied the way an empty list satisfies anything`,
-  );
-
-if (guarded === 0 && accepted.length === 0)
-  findings.push(
-    `no write reached 30 §3's guard, so the query filtered nothing: ${elsewhere.join('; ') || 'none was offered'}`,
-  );
-
-report();
-
-/* ── The line ───────────────────────────────────────────────────────────────────────────────────── */
-
-/**
- * One line, and the census is on both of them.
- *
- * `graph` argues this and it is the same argument here: "the query returns 0" is the same sentence
- * whether the query ran over the whole record or over an empty table, and a materialisation that
- * quietly collapsed would look exactly like a clean bill of health. The counts tell them apart, and
- * the two that matter are the `slash` events the record holds and the forbidden writes it refused:
- * both are 0 on a gate that has stopped examining anything.
- */
-function report() {
-  const ms = Math.round(performance.now() - started);
-  try {
-    sql?.close();
-  } catch {
-    /* A record that will not close is not a finding about `30 §3`, and it is in memory. */
-  }
-
-  if (findings.length === 0) {
+  /**
+   * Exit 3 is a SKIP and not a pass (`run.mjs`), and this is the only thing that earns one.
+   *
+   * A tree with no kernel and no seed has no record to materialise, and there is no smaller honest
+   * thing to check: the query is a question about rows. Everything below this line is red instead,
+   * including a seed that will not install, because a record that cannot be built is a finding about
+   * the record and not an absence of one.
+   */
+  const absent = [KERNEL, ADAPTER, SEED].filter((parts) => !existsSync(at(...parts)));
+  if (absent.length > 0) {
     console.log(
-      `  slash-actor: ${rows} rows and ${events} events materialised through the write path; ` +
-        `${mine} ${actor} event(s) in the record, ${guarded} of ${offered} writes 30 §3 forbids refused ` +
-        `at the write path, and the query returns 0, in ${ms}ms`,
+      `  slash-actor: no ${absent.map((parts) => parts.join('/')).join(' and no ')}, ` +
+        'so there is no record to materialise and nothing was checked.',
     );
-  } else {
+    return 3;
+  }
+
+  const findings = [];
+
+  /**
+   * What the green line gets to claim, filled in as the gate earns each part.
+   *
+   * DECLARED HERE BECAUSE THE GATE CAN STOP EARLY. Two of the findings below end the run before a
+   * record exists at all, and a reporter reaching for a `const` that has not been evaluated yet
+   * crashes with a `ReferenceError` instead of printing the finding it was called to print, which is
+   * a gate that fails loudly about the wrong thing.
+   */
+  let sql = null;
+  let actor = 'slash';
+  let rows = 0;
+  let events = 0;
+  let mine = 0;
+  let guarded = 0;
+  let offered = 0;
+
+  /* ── The line ───────────────────────────────────────────────────────────────────────────────────── */
+
+  /**
+   * One line, and the census is on both of them.
+   *
+   * `graph` argues this and it is the same argument here: "the query returns 0" is the same sentence
+   * whether the query ran over the whole record or over an empty table, and a materialisation that
+   * quietly collapsed would look exactly like a clean bill of health. The counts tell them apart, and
+   * the two that matter are the `slash` events the record holds and the forbidden writes it refused:
+   * both are 0 on a gate that has stopped examining anything.
+   */
+  const report = () => {
+    const ms = Math.round(performance.now() - started);
+    try {
+      sql?.close();
+    } catch {
+      /* A record that will not close is not a finding about `30 §3`, and it is in memory. */
+    }
+    sql = null;
+
+    if (findings.length === 0) {
+      console.log(
+        `  slash-actor: ${rows} rows and ${events} events materialised through the write path; ` +
+          `${mine} ${actor} event(s) in the record, ${guarded} of ${offered} writes 30 §3 forbids refused ` +
+          `at the write path, and the query returns 0, in ${ms}ms`,
+      );
+      return undefined;
+    }
     /* AND THE HEADER DOES NOT CLAIM A RECORD IT NEVER BUILT. Two of the findings above stop the run
        before `installSeed` returns, and "over the materialised seed record" on one of those is the
        gate overstating what it read, on the line a reader takes as the summary. */
@@ -397,7 +240,211 @@ function report() {
         '  whole of 11 §2 in one row of one table, and the log is the only place a record that had\n' +
         '  broken it would say so.\n',
     );
-    process.exitCode = 1;
+    return 1;
+  };
+
+  const loud = quietExperimental();
+  try {
+    /* ── 1 · the invariant, out of the document that owns it ────────────────────────────────────── */
+
+    /* A MISSING DOCUMENT IS A FINDING AND NOT A STACK TRACE. A tree that has a record and no `30` is a
+       tree where the invariant has no owner, which is worth a sentence; a gate that answers it with an
+       ENOENT is a gate whose output a reader has to decode before they can act on it. */
+    const blueprint = (() => {
+      try {
+        return read('docs', '30-BLUEPRINT.md');
+      } catch {
+        return '';
+      }
+    })();
+    const from = blueprint.indexOf('## 3 · The `actor` grammar');
+    const section = from < 0 ? '' : blueprint.slice(from, blueprint.indexOf('\n## ', from + 1));
+
+    /* THE SENTENCE WRAPS, AND IT WRAPS INSIDE THE BACKTICKS. `30 §3` breaks the line between `NOT IN`
+       and its list, so a pattern anchored on a single line matches nothing and the gate would report
+       that the invariant is missing from the document that states it. Whitespace is collapsed first. */
+    const stated = /actor\s*=\s*'([a-z]+)'\s+AND\s+kind\s+NOT\s+IN\s*\(([^)]*)\)/.exec(section.replace(/\s+/g, ' '));
+
+    if (!stated) {
+      findings.push("30 §3's query is not where this gate looks for it, so the invariant was read from nothing");
+      return report();
+    }
+
+    actor = stated[1];
+    const allowed = [...stated[2].matchAll(/'([^']*)'/g)].map((m) => m[1]);
+
+    /**
+     * `30 §3`'s query, built from `30 §3`'s own words.
+     *
+     * `id` is selected beside `kind` because a finding has to name the row. `52 §4` fixes the failure
+     * line's `what` as `slash wrote <kind>` and `52 §5.2` clause 4 says the `where` names the record and
+     * the event id, and an id is the difference between "something in here is wrong" and a row somebody
+     * can open.
+     */
+    const QUERY =
+      `SELECT id, kind FROM event WHERE actor = '${actor}' ` +
+      `AND kind NOT IN (${allowed.map((kind) => `'${kind}'`).join(',')})`;
+
+    const kernel = await load(...KERNEL);
+
+    /* AND THE CODE'S COPY IS COMPARED, NOT TRUSTED. `SLASH_KINDS` is the set five writers check against
+       and `30 §3` is where the closure is decided; the day they disagree, the record enforces a rule
+       the document does not make, which is the drift `event-kinds` and `closed-lists` exist for on the
+       two lists big enough to have done it already. */
+    if (kernel.SLASH !== actor)
+      findings.push(`30 §3 files a model's writing under '${actor}' and SLASH is '${kernel.SLASH}'`);
+
+    const held = [...kernel.SLASH_KINDS].sort();
+    if (held.join(' ') !== [...allowed].sort().join(' '))
+      findings.push(`30 §3 closes ${actor} to ${allowed.join(', ')} and SLASH_KINDS holds ${held.join(', ')}`);
+
+    /* ── 2 · the record, materialised ───────────────────────────────────────────────────────────── */
+
+    const { openSqlite, fixedClock } = await load(...ADAPTER);
+    const seed = await load(...SEED);
+
+    sql = openSqlite();
+    const record = await kernel.openRecord(sql, fixedClock(seed.NOW));
+
+    const installed = await seed.installSeed(record);
+    if (!installed.ok) {
+      const why = installed.refusal ?? installed.conflict ?? {};
+      findings.push(`the record would not take the seed: ${why.code ?? 'no code'}, ${why.fix ?? 'no reason given'}`);
+      return report();
+    }
+    rows = Number(installed.value.rows);
+
+    /* THE FIRST REGISTER THAT HOLDS A ROW, not the first declared. Since migration 0002 the kernel's own
+       `session` register is declared before the seed's, and it starts empty, so `registers[0]` offered
+       nothing to write against and the guard below was never reached. */
+    const registers = [...record.registers().keys()];
+    let register;
+    let listed = null;
+    for (const id of registers) {
+      /* Not the kernel's own register: it refuses its kernel-written fields before 30 §3's guard is
+         reached, so a refusal there would pass this gate for the wrong reason. */
+      if (id === 'session') continue;
+      const tried = record.list({ register: id, limit: 1 });
+      if (tried?.ok && tried.value.rows.length > 0) {
+        register = id;
+        listed = tried;
+        break;
+      }
+    }
+    const row = listed?.ok ? listed.value.rows[0] : undefined;
+
+    /* ── 3 · the write a model is allowed to make: `PROPOSAL`, above ──────────────────────────────── */
+
+    let opened = null;
+    try {
+      opened = record.propose(PROPOSAL, actor);
+    } catch (e) {
+      findings.push(`offering ${actor} the write 30 §3 allows threw: ${e.message}`);
+    }
+
+    if (opened && !opened.ok) {
+      const why = opened.refusal ?? {};
+      findings.push(
+        `the record refused the one write 30 §3 allows ${actor} to make (${why.code ?? 'no code'}: ` +
+          `${(why.fix ?? 'no reason given').replace(/\.$/, '')}), so the query below filters nothing. ` +
+          'A guard that refuses everything passes a test that only tries the refusals',
+      );
+    }
+
+    /* ── 4 · the writes it is not ───────────────────────────────────────────────────────────────── */
+
+    /**
+     * The four public writers that take an actor from outside themselves, one forbidden kind each.
+     *
+     * EACH ONE WOULD WRITE AN EVENT IF IT WERE ACCEPTED, which is the property that makes this an input
+     * to the query rather than a second assertion beside it. Measured on this record: `create` writes
+     * one, an empty `update` still writes an `edit`, `log` writes a `note`, and `decide` writes two.
+     *
+     * THE FIELDS COME FROM A ROW THE RECORD ALREADY HOLDS. A `create` with an empty body is refused for
+     * `REQUIRED_MISSING` before it reaches the guard at all, which would have made this offer prove
+     * nothing while looking exactly like a refusal.
+     *
+     * TWO GUARD SITES, NOT ONE: `create`, `update` and `log` reach `appendEvent` in the kernel's write
+     * path, and `decide` reaches the governance writer's own `event`. Three of the five sites `slash.ts`
+     * names are covered by these four offers; the header says which two are not and why.
+     */
+    const offers = [
+      ['create', () => record.create(register, row.fields, { actor })],
+      ['edit', () => record.update(register, row.id, {}, { actor })],
+      ['note', () => record.log(register, row.seq, { actor }, 'A note no model may sign on its own account.')],
+    ];
+    if (opened?.ok)
+      offers.push([
+        'decide',
+        () => record.decide(opened.value.id, { decide: { option: PROPOSAL.body.options[0].id, reason: 'the invoice names two lines' } }, actor),
+      ]);
+
+    offered = offers.length;
+
+    const accepted = [];
+    const elsewhere = [];
+
+    if (row === undefined) {
+      findings.push('the materialised record holds no row, so there was nothing to offer a write against');
+    } else {
+      for (const [kind, offer] of offers) {
+        try {
+          const out = offer();
+          if (out?.ok) accepted.push(kind);
+          else elsewhere.push(`${kind} (${out?.refusal?.code ?? 'no code'})`);
+        } catch (e) {
+          /* AND THE THROW HAS TO BE THE RIGHT THROW. `catch {}` counting as a refusal is how a gate
+             turns a crash into a pass: a renamed method, a changed signature, a missing register all
+             throw, and all three would have read as "the guard held". The guard's sentence names the
+             actor and the kind, so that is what is checked. */
+          if (String(e?.message ?? '').includes(`${actor} wrote ${kind}`)) guarded++;
+          else findings.push(`offering ${actor} a ${kind} threw something that is not 30 §3's refusal: ${e.message}`);
+        }
+      }
+    }
+
+    /* ── 5 · the query ──────────────────────────────────────────────────────────────────────────── */
+
+    const wrote = sql.all(QUERY);
+    for (const e of wrote) findings.push(`${actor} wrote ${e.kind}, in the seed record, event ${e.id}`);
+
+    /* AND A WRITE THE RECORD TOOK WITHOUT LOGGING IT IS THE SAME BREACH, QUIETER. The query can only
+       find a row that exists; a writer that accepted a model's write and appended no event has broken
+       30 §3 in the one way the query is blind to, and the log is the only place either would show. */
+    const seen = new Set(wrote.map((e) => e.kind));
+    for (const kind of accepted)
+      if (!seen.has(kind)) findings.push(`the record accepted a ${kind} from ${actor} and wrote no event saying so`);
+
+    /* ── 6 · and the query was asked of something ───────────────────────────────────────────────── */
+
+    events = Number(sql.one('SELECT count(*) AS n FROM event')?.n ?? 0);
+    mine = sql
+      .all(`SELECT kind, count(*) AS n FROM event WHERE actor = '${actor}' GROUP BY kind`)
+      .reduce((n, r) => n + Number(r.n), 0);
+
+    if (mine === 0)
+      findings.push(
+        `the record holds no ${actor} event, so 30 §3's query is satisfied the way an empty list satisfies anything`,
+      );
+
+    if (guarded === 0 && accepted.length === 0)
+      findings.push(
+        `no write reached 30 §3's guard, so the query filtered nothing: ${elsewhere.join('; ') || 'none was offered'}`,
+      );
+
+    return report();
+  } finally {
+    /* A THROW ABOVE NEVER REACHED THE REPORTER, so the record it opened is closed here. */
+    try {
+      sql?.close();
+    } catch {
+      /* In memory, and the throw is what the runner reports. */
+    }
+    loud();
   }
-  process.exit(process.exitCode ?? 0);
 }
+
+/* AND IT IS STILL A SCRIPT, because `self-test` spawns it at its seeded fixture with
+   `BRAINDOG_GATE_ROOT`, and the header documents the command line. `?? 0` because a pass returns
+   nothing. */
+if (import.meta.main) process.exitCode = (await slashActor()) ?? 0;

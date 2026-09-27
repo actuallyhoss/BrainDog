@@ -43,7 +43,9 @@ export const TEAM = {
   /* 2.2.0: a page for each product or project in play, from Projects' template. */
   /* 2.4.0: Home's three headings stop drawing one ticket twice, and In flight says when each of its tickets is due. */
   /* 2.4.1: Home's empty title loses its full stop, as every other title already has. */
-  version: '2.4.1',
+  /* 2.5.0: the project page takes Portfolio 1.5.0's project template: the questions waiting on a project, what
+     changed on it, its plan and its money by month. */
+  version: '2.5.0',
   title: 'Team board',
   summary: 'Tickets with an owner and a status, the cycle each is in, and the work your agents took on.',
   author: 'BrainDog',

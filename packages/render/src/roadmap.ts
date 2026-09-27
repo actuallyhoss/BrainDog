@@ -236,8 +236,27 @@ export const ROADMAP_NONE = 'Nothing here has a date that can be drawn.';
    2 days` was told its good day did not read while the cell at fault was the effort. */
 export const roadmapSkipped = (titles: readonly string[]): string => `Not drawn, because the date or the effort does not read: ${titles.join(', ')}.`;
 
-/** An effort as a person reads it, `10`, `1.5 d` or `3d`: a number of days, the unit optional. */
-const EFFORT = /^(-?\d+(?:\.\d+)?)\s*d?$/u;
+/**
+ * An effort as a person reads it, `10`, `1.5 d`, `3d`, `1,200 d`, `4 h` or `2 w`: a number in one of a duration's
+ * units, days when none is written.
+ *
+ * EVERY UNIT A DURATION CAN BE DECLARED IN, AND THE COMMAS THAT GROUP IT. The web's `display()` writes a duration in
+ * its field's own unit (`s`, `m`, `h`, `d` or `w`, where `m` is minutes) and groups the figure, so a task of 1,200
+ * days, or one whose effort is declared in hours, reached this pattern as text it refused, and the row was skipped as
+ * a date that does not read (defects P9). The commas are read only in groups of three, as `display()` writes them.
+ */
+const EFFORT = /^(-?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?)\s*([smhdw])?$/u;
+
+/** The days an effort `EFFORT` matched comes to, before it is rounded up. */
+const effortDays = (m: RegExpExecArray): number => {
+  const n = Number(m[1]!.replace(/,/gu, ''));
+  const unit = m[2] ?? 'd';
+  if (unit === 'w') return n * 7;
+  if (unit === 'd') return n;
+  /* A UNIT SHORTER THAN A DAY DIVIDES, and is never multiplied by a rounded fraction such as `1 / 24`, so a whole
+     number of days written in hours comes out whole, and the rounding up below does not draw it a day longer. */
+  return n / (unit === 'h' ? 24 : unit === 'm' ? 1_440 : DAY_SECONDS);
+};
 
 /** A day as `day()` in `format.ts` writes it: `10 Oct 2026`, and `15 Mar 950` for a year it does not pad. */
 const WRITTEN = /^(\d{1,2}) ([A-Z][a-z]{2}) (\d{3,4})$/u;
@@ -269,7 +288,8 @@ const dayRead = (text: string): string => {
  *
  * ROUNDED UP BECAUSE A FRACTION OF A DAY IS STILL WORKED ON A DAY. Fifteen of the seed's 27 tasks carry
  * 0.2, 0.3 or 0.5 of a day (counted in `work.ts`), and rounding to the nearest would have drawn more
- * than half the work as no work at all.
+ * than half the work as no work at all. An effort in hours or minutes is part of a day in the same way:
+ * `3 h` is worked on one day, and `36 h` on two.
  *
  * NO EFFORT, OR NONE, IS A DATE: a task due on a day with no work declared is a deadline, and it is
  * drawn as the stem a deadline is. Anything else that does not read, a word or a minus, is handed to
@@ -282,11 +302,12 @@ export function roadmapRow(title: string, by: string, effort: string, tone?: Ton
   const toned = tone ? { tone } : {};
   if (!isDay(end)) return { start: '', end, title, ...toned };
   const m = EFFORT.exec(said);
-  if (said === '' || (m && Number(m[1]) === 0)) return { start: '', end, title, ...toned };
+  const days = m ? effortDays(m) : Number.NaN;
+  if (said === '' || days === 0) return { start: '', end, title, ...toned };
   if (!m) return { start: said, end, title, ...toned };
   /* An effort too long for the calendar hands the plan its own text as the start, which is no day, so the
      row is skipped by index like any other that does not read. */
-  return { start: shifted(end, 1 - Math.ceil(Number(m[1]))) || said, end, title, ...toned };
+  return { start: shifted(end, 1 - Math.ceil(days)) || said, end, title, ...toned };
 }
 
 /** Which part of a bar was dragged: the whole of it, its first day, or its last. */
@@ -390,10 +411,11 @@ export function roadmapLane(track: number, tracks: number): { y: string; height:
 /**
  * How each mark is painted when the page has no rule for it: `currentColor` at a low opacity, or `none`.
  *
- * NO STYLESHEET DREW THIS KIND, and an SVG shape nobody paints is filled black. `blocks-charts.css` in the web
- * styles every other chart by class and has no `roadmap-` rule, so the box came out one black slab with its
- * stems and today's line black on black (read off the markup `toHTML` wrote). Presentation attributes are the
- * weakest thing in the cascade, so any rule a host writes for a band, a bar or a tone still wins over them.
+ * NO STYLESHEET DREW THIS KIND AT FIRST, and an SVG shape nobody paints is filled black: the box came out one
+ * black slab with its stems and today's line black on black (read off the markup `toHTML` wrote), before
+ * `blocks-charts.css` gained its `roadmap-` rules. Presentation attributes are the weakest thing in the cascade,
+ * so any rule a host writes for a band, a bar or a tone still wins over them. `blocks-charts.css` now styles
+ * every mark by class, and these paints are what a host with no stylesheet draws.
  *
  * CURRENT COLOUR, NEVER A COLOUR OF THIS KIND'S (05 §1): the ink the block is already drawn in, made quieter.
  * A bar is lighter than the ink so its title stays readable over it, and a band lighter still.

@@ -29,6 +29,7 @@ import { jsonPath, compile, type Predicate, type Schema } from '@braindog/where'
 
 import type { Entry } from './index.ts';
 import { moneyText } from './ingest.ts';
+import { fold } from './ingest.ts';
 import { sealedEver } from './declare.ts';
 import { instant } from './migrate.ts';
 import { spanMs } from './vault.ts';
@@ -447,18 +448,13 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
         did.push(`move ${action.move}`);
       } else if ('link' in action) {
         /* EXACTLY ONE MATCH OR NOTHING. Two rows bearing the name is a question about which, and a
-           rule that picked one would pick a different one next week. */
-        /* `by` IS A FIELD ID FROM A DECLARATION, and it was inlined into the path with no grammar
-           check — see the note on `jsonPath`. A rule can arrive in a pack. */
+           rule that picked one would pick a different one next week. The row is found by the ladder
+           (`linkOf`), the one read the dry run below makes too, so what it previews is what this links. */
         const value = said(action.link.to.value, `then[${i}].link.to.value`, 'the value it links by');
         if (value === null) continue;
-        const found = deps.sql.all<{ id: string }>(
-          `SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL AND json_extract(fields, '${jsonPath(action.link.to.by)}') = ? LIMIT 2`,
-          action.link.to.register,
-          value,
-        );
-        if (found.length === 1) {
-          patch[action.link.field] = found[0]!.id;
+        const found = linkOf(deps, action.link.to, value);
+        if ('id' in found) {
+          patch[action.link.field] = found.id;
           did.push(`link ${action.link.field}`);
         }
       } else if ('note' in action) {
@@ -604,6 +600,89 @@ function matches(deps: RulesDeps, schema: Schema, rule: RuleDecl, entry: Entry):
 
 const asList = (value: unknown): string[] => (Array.isArray(value) ? value.map(String) : []);
 
+/* ── the row a `link` names ──────────────────────────────────────────────── */
+
+/** The rungs a `link` climbs, in order: the whole value, how it starts, anywhere in it. */
+type LinkRung = 'exact' | 'starts' | 'contains';
+
+/** The row a `link` found and the rung it was found on, or the sentence saying why it links nothing. */
+type Linked = { id: string; rung: LinkRung } | { none: string };
+
+/**
+ * The most rows of the linked list the `starts` and `contains` rungs read for one link, longest first on each rung.
+ *
+ * A CEILING PER LINK, because the lower rungs cannot be asked of an index: every row that says how it starts or
+ * where it appears is read and compared. Past this many, the shortest names on the `contains` rung are the ones never
+ * tried.
+ */
+const LADDER_ROWS = 500;
+
+/** What the dry run adds after `link <field>`, by the rung the row was found on. The whole value adds nothing. */
+const RUNG_SAID: Record<LinkRung, string> = { exact: '', starts: ', matched by how it starts', contains: ', matched anywhere in it' };
+
+/**
+ * The one row whose `by` field names `value`, by the ladder: the whole value, then how it starts, then anywhere in it.
+ *
+ * THE WHOLE VALUE FIRST, AND AS IT ALWAYS WAS. One row whose `by` equals the value is linked, whatever that row says
+ * about how it matches, and two such rows link nothing, which is what every `link` did before the ladder.
+ *
+ * THEN THE LINKED LIST SAYS HOW EACH ROW MATCHES, in a field named for `by` with `_by` after it (`match` and
+ * `match_by`), whose value is `exact`, `starts` or `contains`. A bank writes one shop as `FENWICK CLOUD` on Monday and
+ * `FENWICK CLOUD LTD 4471` on Friday, and a category that says `starts` files both. A list that declares no such field
+ * is linked by the whole value alone, so no list that links today links differently.
+ *
+ * THE FIRST RUNG THAT FINDS A ROW DECIDES, AND ON IT THE LONGEST `by` WINS. `FENWICK CLOUD LTD` beats `FENWICK` on the
+ * same rung, because the longer one is the more particular claim. Two rows of the same longest length on that rung are
+ * a tie, and a tie links nothing and asks nothing: a rule that picked one would pick a different one next week.
+ *
+ * A CASE AWAY ON THE LOWER RUNGS, over the ASCII fold the ingest anchors use (`fold`), compared here rather than in SQL
+ * because SQLite's `lower()` can fold more than ASCII where a build carries ICU, and the record runs on more than one
+ * build (`node:sqlite` and the Durable Object).
+ * Lengths are counted in characters, as SQLite's `length()` orders them.
+ */
+function linkOf(deps: Pick<RulesDeps, 'sql' | 'schemaOf'>, to: { register: string; by: string }, value: string): Linked {
+  /* `by` IS A FIELD ID FROM A DECLARATION, and it was inlined into the path with no grammar check (see the note on
+     `jsonPath`). A rule can arrive in a pack, so it goes through `jsonPath` here, in the one place both readers call. */
+  const by = jsonPath(to.by);
+  const whole = deps.sql.all<{ id: string }>(
+    `SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL AND json_extract(fields, '${by}') = ? LIMIT 2`,
+    to.register,
+    value,
+  );
+  if (whole.length === 1) return { id: whole[0]!.id, rung: 'exact' };
+  if (whole.length > 1) return { none: 'two rows bear that name' };
+
+  /* THE FIELD IS ASKED OF THE LIST'S DECLARATION, never guessed from the rows, so its name is a declared field id and
+     `jsonPath` takes it. */
+  const how = `${to.by}_by`;
+  const schema = deps.schemaOf(to.register);
+  if (schema === null || !Object.hasOwn(schema.fields, how)) return { none: 'nothing bears that name' };
+  const rows = deps.sql.all<{ id: string; rung: number; said: string }>(
+    `SELECT id, rung, said FROM (
+       SELECT id, CASE json_extract(fields, '${jsonPath(how)}') WHEN 'starts' THEN 2 WHEN 'contains' THEN 3 END AS rung,
+              json_extract(fields, '${by}') AS said
+       FROM entry WHERE register = ? AND deleted_at IS NULL AND json_type(fields, '${by}') = 'text'
+     ) WHERE rung IS NOT NULL AND said <> '' ORDER BY rung, length(said) DESC, id LIMIT ?`,
+    to.register,
+    LADDER_ROWS,
+  );
+  const folded = fold(value);
+  let won: { id: string; rung: number; long: number } | null = null;
+  for (const row of rows) {
+    const said = fold(row.said);
+    if (!(row.rung === 2 ? folded.startsWith(said) : folded.includes(said))) continue;
+    const long = [...row.said].length;
+    if (won === null) {
+      won = { id: row.id, rung: row.rung, long };
+      continue;
+    }
+    if (won.rung === row.rung && won.long === long) return { none: 'two rows match it equally well' };
+    break;
+  }
+  if (won === null) return { none: 'nothing bears that name' };
+  return { id: won.id, rung: won.rung === 2 ? 'starts' : 'contains' };
+}
+
 /* ── the sentence a rule writes ──────────────────────────────────────────── */
 
 const DAY_MS = 86_400_000;
@@ -705,10 +784,34 @@ export function filling(template: unknown, row: Entry, nowMs: number, by: FillBy
  * THE HISTORY AND NOT A REFUSED DROP. A refusal would guard only the drops still to come, and a record that dropped a
  * retired secret before this line exists already, its rows holding the value; reading the history closes those too, and
  * leaves retiring and then dropping the removal it was.
+ *
+ * KEPT PER LIST AND LATEST VERSION (`sealedKept`), because a rule fire asks this and `sealedEver` parses every version
+ * of the list's declaration each time it is asked. Every version is a new row and none is edited, so the answer can
+ * change only when a version is added, and a new version is a new key. The caller gets its own copy of the set.
  */
 export function sealedOf(sql: Sql, register: string): Set<string> {
-  return new Set(sealedEver(sql, register).keys());
+  const latest = sql.one<{ version: number; checksum: string }>(
+    "SELECT version, checksum FROM declaration WHERE id = ? AND kind = 'register' ORDER BY version DESC LIMIT 1",
+    `register.${register}`,
+  );
+  const key = latest === undefined ? '' : `${latest.version}:${latest.checksum}`;
+  let lists = sealedKept.get(sql);
+  if (lists === undefined) sealedKept.set(sql, (lists = new Map()));
+  const kept = lists.get(register);
+  if (kept !== undefined && kept.key === key) return new Set(kept.sealed);
+  const sealed = new Set(sealedEver(sql, register).keys());
+  lists.set(register, { key, sealed });
+  return new Set(sealed);
 }
+
+/**
+ * `sealedOf`'s answers, per record and per list, each under the version and checksum of the list's newest declaration.
+ *
+ * THE CHECKSUM AS WELL AS THE VERSION, as `flow.ts`'s `installed` keys its cache, because an install that rolls back
+ * leaves the next install the same version number for different bytes. One entry per list the record holds, replaced
+ * and never added to, so it grows with the lists and not with the fires.
+ */
+const sealedKept = new WeakMap<Sql, Map<string, { key: string; sealed: ReadonlySet<string> }>>();
 
 /** One `{{field}}` or `{{kind:field}}` of the row, as `fill` writes it. */
 function rowValue(head: string, tail: string | undefined, row: Entry, nowMs: number): string {
@@ -1259,18 +1362,11 @@ function describe(deps: RulesDeps, rule: RuleDecl, entry: Entry): string[] {
     else if ('link' in a) {
       /* A LINK THAT CANNOT BE MADE IS NAMED HERE, because the preview is where somebody finds out
          that half their rows name a party nobody has a row for. */
-      /* THE SAME GUARD AS THE PASS ITSELF. One of the two call sites was fixed and this one, 418
-         lines below it, builds the identical query from the identical declaration value. */
-      const found = deps.sql.all<{ id: string }>(
-        `SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL AND json_extract(fields, '${jsonPath(a.link.to.by)}') = ? LIMIT 2`,
-        a.link.to.register,
-        fill(a.link.to.value, entry, deps.nowMs),
-      );
-      out.push(
-        found.length === 1
-          ? `link ${a.link.field}`
-          : `link ${a.link.field}: ${found.length === 0 ? 'nothing bears that name' : 'two rows bear that name'}`,
-      );
+      /* THE SAME READ AS THE PASS ITSELF (`linkOf`), so a rung the pass would climb is one the preview climbs. An exact
+         link reads as it always has; a link found further down says how, since that is what a person checks before
+         turning a `starts` or `contains` category on. */
+      const found = linkOf(deps, a.link.to, fill(a.link.to.value, entry, deps.nowMs));
+      out.push('id' in found ? `link ${a.link.field}${RUNG_SAID[found.rung]}` : `link ${a.link.field}: ${found.none}`);
     }
   }
   return out;

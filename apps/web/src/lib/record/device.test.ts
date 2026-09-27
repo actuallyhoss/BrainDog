@@ -119,9 +119,9 @@ test('the words on this screen carry no em dash and no schema word', () => {
   const words = [
     ...Object.values(copy.deviceState), ...Object.values(copy.reachMeans), ...Object.values(copy.keyCan),
     copy.approveTitle, copy.codeLabel, copy.codeGo, copy.codeEmpty, copy.codeOther, copy.codeWrong, copy.codeTries,
-    copy.codeExpired, copy.signInAgainWhy, copy.signInAgain, copy.machines, copy.noDevices,
-    copy.tokens, copy.noKeys, copy.connectTitle, copy.connectLabel, copy.connectGo, copy.tokenOnce, copy.copyToken,
-    copy.onNewMachine, copy.inClaudeCode, copy.connectDone, copy.unnamedMachine, copy.unnamedToken,
+    copy.codeExpired, copy.signInAgainWhy, copy.signInAgain, copy.connectedTitle, copy.connectedNone,
+    copy.connectedNoneWhy, copy.connectTitle, copy.doorKeyLabel, copy.doorKeyGo, copy.tokenOnce, copy.copyKey,
+    copy.doorAny, copy.doorSetup, copy.doorKey, copy.connectDone, copy.unnamedMachine, copy.unnamedKey,
   ];
   for (const w of words) {
     assert.doesNotMatch(w, /—/, w);
@@ -161,15 +161,15 @@ test('nothing here builds machines or keys that are not the record', () => {
 
 /* ── connect an agent ── */
 
-test('the two lines to copy name the origin and carry no token', () => {
+test('the lines to copy name the origin and carry no key', () => {
   const lines = connectLines('https://record.example');
-  assert.equal(lines.login, 'braindog login https://record.example');
-  /* THE CLOUD DEVICE FLOW NEEDS A SLUG, and the line had none: `braindog login https://brain.dog` was refused there. */
-  assert.equal(connectLines('https://brain.dog', 'acme').login, 'braindog login https://brain.dog/app/acme');
-  const json = /^claude mcp add-json braindog '(.+)' --scope user$/.exec(lines.mcp)?.[1];
-  assert.ok(json, lines.mcp);
-  assert.deepEqual(JSON.parse(json), { type: 'stdio', command: 'braindog', args: ['mcp', '--agent', 'claude'] });
-  assert.doesNotMatch(lines.mcp, /token|bearer|bd_/i);
+  assert.equal(lines.setup, 'braindog setup https://record.example');
+  /* THE CLOUD DEVICE FLOW NEEDS A SLUG, and a line with none was refused there. */
+  assert.equal(connectLines('https://brain.dog', 'acme').setup, 'braindog setup https://brain.dog/app/acme');
+  /* ANY MCP CLIENT TAKES THE ADDRESS, and Claude Code takes it as an HTTP server: no stdio `braindog` to have installed. */
+  assert.equal(lines.mcp, 'https://record.example/mcp');
+  assert.equal(lines.claude, 'claude mcp add --transport http braindog https://record.example/mcp');
+  for (const line of Object.values(lines)) assert.doesNotMatch(line, /token|bearer|bd_/i);
 });
 
 test('a token minted here is a ninety-day write token with a label the kernel accepts', () => {

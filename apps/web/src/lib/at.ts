@@ -23,7 +23,7 @@ export const BASE = '/app';
  */
 export const APP_WORDS: ReadonlySet<string> = new Set(
   (
-    'audit automations catalogue decide fonts inbox invite jobs p packs r s search settings signin slash start t usage v vault ' +
+    'audit automations catalogue connect decide fonts inbox invite jobs p packs r s search settings signin slash start t usage v vault ' +
     'api auth mcp a in ws admin app assets static www new _app'
   ).split(' '),
 );

@@ -153,8 +153,15 @@ export type Installed = {
    * OPTIONAL, as `used` is, so every caller that hands in `kernel.packs()` keeps compiling. A row without it names no
    * range, and a plan asked of such a record says nothing about the packs that lean on the one it updates, which is how
    * a record holding bank-hsbc-eg 1.0.0 on `^1.8.0` took money-core 2.0.0 without a word (`held-pack-range.test.ts`).
+   *
+   * `laid` IS WHAT EACH PACK LAID THROUGH `extends`, as its stored manifest says it: the ids of the fields, by list id.
+   * It is the one thing that tells a field a pack laid from a field the list declares itself, because the list a pack
+   * extends is staged with no pack and reads as the record's own from then on. Without it a pack could never change a
+   * field it had laid: its next version, changing that field in any way, was refused `PROVIDES_CONFLICT` as though the
+   * list's own pack had declared it (`loop/finish/defects.md` L3). Optional for the reason `requires` is, and a row
+   * without it laid nothing a plan can see.
    */
-  packs: { id: string; version: string; requires?: Readonly<Record<string, string>> }[];
+  packs: { id: string; version: string; requires?: Readonly<Record<string, string>>; laid?: Readonly<Record<string, readonly string[]>> }[];
   declarations: { id: string; version: number; kind: DeclKind; pack_id: string | null; body: string; checksum: string }[];
   rows: Record<string, number>;
   /**
@@ -346,9 +353,10 @@ export type Diff = {
   stays: { id: string; values: string[]; rows: number; holding?: Record<string, number>; binned?: Record<string, number>; body?: string }[];
   /**
    * What this pack lays on each list it `extends`: `adds` names what is new to the list (`domain`, or `role.family` for a
-   * value), and `body` is the live list with those laid after its own, as JCS text, absent when the list has them all
-   * already. `refusal` is why `install` will not lay them, which is only ever the list's own shape: a field id it has
-   * in another shape, or a value for a field that is not a closed list or not there.
+   * value) and each field this pack laid before and now lays in another shape, and `body` is the live list with those
+   * laid on it, as JCS text, absent when the list has them all already. `refusal` is why `install` will not lay them,
+   * which is only ever the list's own shape: a field id it has in another shape that is not this pack's alone, or a
+   * value for a field that is not a closed list or not there.
    *
    * `install` STAGES `body` WITH NO PACK, as it stages a rebased list, so the kernel is handed an ordinary register body
    * and the list reads as the record's own from then on. The owning pack's next update keeps the additions through
@@ -356,7 +364,7 @@ export type Diff = {
    *
    * NOT UNDER THE LIST'S OWN PACK, which audit forty-four's finding 2 was first answered with: staged under Portfolio,
    * Portfolio's next minor planned Projects as a plain change and installed it without `domain`, under a row holding
-   * one. `detached()` is the only thing a plan is handed that says which fields another pack laid, and only while the
+   * one. `detached()` is the only thing a plan is handed that says which fields are the list's own, and only while the
    * row has no pack. So that finding's other half, Decide saying a rebased list's update is not taken, is the
    * arranger's to fix: a `kept` entry with `rebased` is an update that installs.
    *
@@ -983,8 +991,13 @@ function readExtends(pack: string, raw: unknown, declared: ReadonlySet<string>):
  * cannot take. `carried`'s rule: a field the list lacks goes after its fields, and a value a closed list lacks after its
  * values. A field or a value the list has already, in the same shape, is not laid twice, so installing a pack again
  * changes nothing.
+ *
+ * `mine` IS THE FIELDS THIS PACK MAY CHANGE: the ones it laid on this list itself, which no other pack laid and the list
+ * does not declare (`laidBy`). Such a field in another shape is the pack's next version of its own field, and it takes
+ * the field's place, so rows written under it keep their order and their values. Any other field under the same id is
+ * still two fields sharing one.
  */
-function extended(pack: string, id: string, live: string, ext: Extension): Diff['extends'][number] {
+function extended(pack: string, id: string, live: string, ext: Extension, mine: ReadonlySet<string> = new Set()): Diff['extends'][number] {
   const list = id.slice('register.'.length);
   const at = `extends.${id}`;
   let was: Record<string, Json>;
@@ -1004,12 +1017,19 @@ function extended(pack: string, id: string, live: string, ext: Extension): Diff[
     }
     /* THE SAME FIELD IS NOT A SECOND ONE, and another field under the same id is two fields sharing an id: the rows
        written under the list's own would be read as this pack's. */
-    if (canonicalise(held) !== canonicalise(f))
-      return {
-        id,
-        adds: [],
-        refusal: { code: 'PROVIDES_CONFLICT', fix: `${list} has a field called ${String(f.id)} already, and ${pack} lays one of its own under that id. Two fields cannot share an id, so ${pack} has to lay its field under another id.`, at: `${at}.fields.${String(f.id)}` },
-      };
+    if (canonicalise(held) === canonicalise(f)) continue;
+    /* UNLESS IT IS THIS PACK'S OWN FIELD, laid by its earlier version, which it may change as a list's own pack changes
+       the list's fields. Said in `adds`, because what is added and what is changed are both what this pack lays now. */
+    if (mine.has(String(f.id))) {
+      fields[fields.indexOf(held)] = structuredClone(f);
+      adds.push(String(f.id));
+      continue;
+    }
+    return {
+      id,
+      adds: [],
+      refusal: { code: 'PROVIDES_CONFLICT', fix: `${list} has a field called ${String(f.id)} already, and ${pack} lays one of its own under that id. Two fields cannot share an id, so ${pack} has to lay its field under another id.`, at: `${at}.fields.${String(f.id)}` },
+    };
   }
   for (const [field, more] of Object.entries(ext.values ?? {})) {
     const held = fields.find((h) => h.id === field);
@@ -1025,6 +1045,34 @@ function extended(pack: string, id: string, live: string, ext: Extension): Diff[
   if (adds.length === 0) return { id, adds };
   const body = canonicalise({ ...was, fields });
   return body === null ? { id, adds: [], refusal: { code: 'PACK_MALFORMED', fix: `${list} with ${pack}'s additions cannot be written down.`, at } } : { id, adds, body };
+}
+
+/**
+ * The fields `pack` may change on the list `id` (`extended`'s `mine`): the ones its installed manifest says it laid
+ * there (`Installed.packs[].laid`), less every one another pack laid there too and every one the list declares itself.
+ *
+ * THE LIST'S OWN FIELDS ARE THE ONES IN THE BODY ITS PACK LAST WROTE. A list a pack extends is staged with no pack, and
+ * `detached` holds the body it started from, so a field in that body is the list's own however many packs laid it
+ * again. A list still under a pack is that pack's body whole, so none of its fields is another pack's to change. A
+ * list with no pack and nothing detached is the record's own, and only `laid` can say which of its fields a pack laid.
+ *
+ * A PACK THAT LAID A FIELD TWO PACKS SHARE MAY NOT CHANGE IT, because the other pack laid it in the shape it had and
+ * its rows are written to that shape: the change would be one pack deciding for both.
+ */
+function laidBy(installed: Installed, pack: string, id: string, live: { pack_id: string | null; body: string }): ReadonlySet<string> {
+  const laid = installed.packs.find((p) => p.id === pack)?.laid?.[id] ?? [];
+  if (laid.length === 0 || live.pack_id !== null) return new Set();
+  const others = new Set(installed.packs.flatMap((p) => (p.id === pack ? [] : (p.laid?.[id] ?? []))));
+  const from = installed.detached?.[id];
+  let own: ReadonlySet<string> = new Set();
+  if (from !== undefined)
+    try {
+      own = new Set(fieldsOf(JSON.parse(from.body)).keys());
+    } catch {
+      /* A BODY THAT DOES NOT READ SAYS NOTHING ABOUT WHOSE A FIELD IS, so no field is this pack's to change. */
+      return new Set();
+    }
+  return new Set(laid.filter((field) => !others.has(field) && !own.has(field)));
 }
 
 /**
@@ -1488,7 +1536,7 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
   /* A LIST THE RECORD LACKS HAS NOTHING TO LAY ON, and `unresolved` names it with the module that declares it. */
   const extensions: Diff['extends'] = Object.entries(pack.manifest.extends ?? {}).flatMap(([id, ext]) => {
     const held = live.get(id);
-    return held === undefined || held.kind !== 'register' ? [] : [extended(mine, id, held.body, ext)];
+    return held === undefined || held.kind !== 'register' ? [] : [extended(mine, id, held.body, ext, laidBy(installed, mine, id, held))];
   });
 
   const format = { wanted: pack.manifest.requires.format, has: installed.format, ok: installed.format >= pack.manifest.requires.format };
@@ -1628,7 +1676,16 @@ function filledWith(pack: Pack, config: Diff['config']): Pack {
 /** The kernel's own lists, which migration 2 seats in every record and no pack declares. */
 const KERNEL_LISTS = new Set(['session']);
 
-/** Every list a declaration points at, with where: a field's `to:`, a page's `requires` and block sources, a metric's `source`. */
+/**
+ * Every list a declaration points at, with where: a field's `to:`, a page's `requires` and block sources, a metric's
+ * `source`, the lists a feed writes, and the list a rule is about or creates rows in.
+ *
+ * A FEED'S LIST AND A RULE'S WERE LEFT OUT, and they are the lists a pack leans on hardest. On a record with no readings
+ * list, a feed writing `datapoints` planned with nothing unresolved, installed, and counted its first run as `ok` and
+ * `changed` while every answer went to review with "There is no register called datapoints" (`live-feed.test.ts`). A
+ * rule about a list nothing holds has no row to fire on, and one that creates rows in it has nowhere to put them.
+ * `writes.register` is a name or a routing table, and each row of the table names a list, so each is counted.
+ */
 function pointsAt(decl: PackDeclaration): { register: string; at: string }[] {
   const out: { register: string; at: string }[] = [];
   const add = (value: unknown, at: string, prefixed: boolean) => {
@@ -1648,6 +1705,25 @@ function pointsAt(decl: PackDeclaration): { register: string; at: string }[] {
     });
   }
   if (decl.kind === 'metric') add(body.source, `${decl.id}.source`, true);
+  if (decl.kind === 'ingest' && isObject(body.writes)) {
+    const target = body.writes.register;
+    add(target, `${decl.id}.writes.register`, false);
+    if (isObject(target))
+      listOf(target, 'to').forEach((row, i) => {
+        if (isObject(row)) add(row.register, `${decl.id}.writes.register.to[${i}].register`, false);
+      });
+  }
+  if (decl.kind === 'rule') {
+    add(body.register, `${decl.id}.register`, false);
+    if (isObject(body.on) && isObject(body.on.written)) add(body.on.written.register, `${decl.id}.on.written.register`, false);
+    /* A `create` IN THE RULE'S OWN LIST OF ACTIONS, as `spawnsOf` reads one, and not inside a branch: the steps a
+       branch nests are the lint's to walk, under its own ceiling on depth, and a second walk here would need a second
+       copy of that ceiling. */
+    for (const key of ['then', 'steps'])
+      listOf(body, key).forEach((a, i) => {
+        if (isObject(a) && isObject(a.create)) add(a.create.register, `${decl.id}.${key}[${i}].create.register`, false);
+      });
+  }
   return out;
 }
 

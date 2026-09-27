@@ -69,6 +69,9 @@
 
   /* The phone's filter sheet: every enum field and Clear, behind one button beside Display. */
   let filterOpen = $state(false);
+
+  /* This part's own words: the phone's Filter button, named with what is chosen in it. */
+  const words = { filterOn: (chosen: string): string => `${copy.filter}: ${chosen}` } as const;
 </script>
 
 {#if shown}
@@ -89,10 +92,6 @@
     />
   </label>
 
-  <!-- EVERYTHING AFTER THE SEARCH BOX, IN ONE BOX, so a phone can scroll the chips without
-       scrolling the search away. On a laptop this is `display: contents` and the bar is the
-       single row it always was. -->
-  <div class="bar-rest">
   <!--
     THREE FIELDS OF PILLS DO NOT FIT ONE ROW. Services filters by kind, cycle and status, ten pills
     that measured 928px beside a 242px search in a 1126px bar at 1440, so the last group and
@@ -105,8 +104,12 @@
     ON A PHONE THE FIELDS ARE ONE BUTTON AND A SHEET. Three field menus, Clear filters and Display
     measured past 390 on Services with one filter on, so Clear and Display were reached by
     scrolling the bar sideways, and a control nobody knows is there is a control that is not
-    there. Filter names what is chosen, the sheet holds every field and Clear, and Display sits
-    beside it: two controls that fit any phone, with nothing out of sight.
+    there. The sheet holds every field and Clear, and Display sits beside it.
+
+    AND THE BUTTON IS 44px SQUARE, so the phone's bar is one row: search, Filter, Display (design
+    SYS-6, DSN-7). It said "Filter" and every chosen value in words, which took a second line under
+    the search box. How many values are on is the figure beside the glyph, and what they are is in
+    its name for a screen reader and in the sheet it opens.
   -->
   {#if rowsAsCards() && enums.length}
     {@const chosen = enums.flatMap((f) => (f.values ?? []).filter((value) => isOn(f.id, value)).map((value) => valueSaid(f, value)))}
@@ -115,11 +118,11 @@
       class="sift sift-sheet tap"
       data-on={chosen.length ? '' : undefined}
       aria-haspopup="dialog"
+      aria-label={chosen.length ? words.filterOn(chosen.join(', ')) : copy.filter}
       onclick={() => (filterOpen = true)}
     >
-      <Icon name="filter" size="s" />
-      <span class="sift-name">{copy.filter}</span>
-      {#if chosen.length}<span class="sift-chosen">{chosen.join(', ')}</span>{/if}
+      <Icon name="filter" size="m" />
+      {#if chosen.length}<span class="sift-count num" aria-hidden="true">{chosen.length}</span>{/if}
     </button>
   {:else if enums.length >= 3}
     {#each enums as f}
@@ -186,7 +189,7 @@
   {/each}
 
   {#if filtered && !(rowsAsCards() && enums.length)}
-    <Button weight="bare" href="/r/{register}"><Icon name="close" size="s" />{copy.clearFilters}</Button>
+    <span class="bar-clear"><Button weight="bare" href="/r/{register}"><Icon name="close" size="s" />{copy.clearFilters}</Button></span>
   {/if}
 
   <!-- DISPLAY WAS A KEY AND NOTHING ELSE. `v` opens its sheet, the keymap sheet prints it, and
@@ -202,19 +205,21 @@
        explaining its own interface to people who had not asked. The bindings are untouched.
        The `?` sheet lists them by reading the registry, and the row menu prints each verb's
        key beside it, which is where somebody learning them is already looking. -->
+  <!-- SAVE AS A VIEW, only while a filter or a search is on (`ViewsMenu` says why). It stands
+       before Display because both are about the list as a whole, and Display stays last as the
+       one that changes how it looks. On a phone with filters it lives in the filter sheet
+       instead, beside Clear, for the reason Clear does. -->
+  {#if filtered && !(rowsAsCards() && enums.length)}
+    <span class="bar-save"><ViewsMenu {saveView} /></span>
+  {/if}
+  <!-- ITS NAME IS "Display" AT EVERY WIDTH. On a phone the word is hidden and the glyph is the
+       44px control, and the word stays in the button for a screen reader and for the gates that
+       press it by name. -->
   <span class="bar-end">
-    <!-- SAVE AS A VIEW, only while a filter or a search is on (`ViewsMenu` says why). It stands
-         before Display because both are about the list as a whole, and Display stays last as the
-         one that changes how it looks. On a phone with filters it lives in the filter sheet
-         instead, beside Clear, for the reason Clear does. -->
-    {#if filtered && !(rowsAsCards() && enums.length)}
-      <ViewsMenu {saveView} />
-    {/if}
     <Button weight="bare" onclick={ondisplay}>
-      <Icon name="settings" size="s" />{copy.display}
+      <Icon name="settings" size="m" /><span class="bar-word">{copy.display}</span>
     </Button>
   </span>
-  </div>
 </div>
 {/if}
 
@@ -269,24 +274,17 @@
      identical shape and was not fixed with it: at 320 `dropped` ran off the edge of `/r/tasks` and
      the app panel scrolled sideways by 30px. */
   .bar {
-    flex-wrap: wrap;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-2);
   }
 
-  /* NOT A BOX ABOVE 640px. The chips, Clear and Display are children of the bar exactly as they
-     were before the phone needed them grouped; `contents` removes the wrapper from layout. */
-  .bar-rest {
-    display: contents;
-  }
-
   /**
-   * THE FILTERS ARE PILLS: one rounded track on a raised surface, and the chosen value a lighter pill
-   * in it with its word in ink. `controls.css` asks for the state to be a SHAPE and not a shade, and
-   * this keeps that, drawn round rather than as a box of boxes. Scoped to this screen, so every other
-   * segmented control keeps the shared rule.
+   * THE FILTERS ARE PILLS: one rounded track on a raised surface, and the chosen value a pill in it
+   * on the selected ground with its word in ink (design D-2: pills for what you press and choose).
+   * `controls.css` asks for the state to be a SHAPE and not a shade, and this keeps that. Scoped to
+   * this screen, so every other segmented control keeps the shared rule.
    *
    * THE COUNT SITS BESIDE THE WORD AND QUIETER THAN IT, so a pill says what it holds before it is
    * pressed. The weight does not change when a pill is chosen, so the bar does not shift under the
@@ -295,14 +293,14 @@
    */
   .segmented {
     background: var(--s1);
-    border-radius: var(--r-sm);
+    border-radius: var(--r-pill);
   }
 
   .segment {
     display: inline-flex;
     align-items: center;
     gap: var(--sp-2);
-    border-radius: var(--r-sm);
+    border-radius: var(--r-pill);
     color: var(--ink2);
     font-weight: 500;
   }
@@ -315,8 +313,10 @@
     }
   }
 
+  /* `--selected`, which darkens in light, where `--s3` was a lighter pill on a light track that could
+     not be found (design SYS-5). */
   .segment[data-on] {
-    background: var(--s3);
+    background: var(--selected);
     color: var(--ink);
     font-weight: 500;
   }
@@ -344,41 +344,48 @@
     min-block-size: var(--ctl-h);
     padding: 0 var(--sp-2) 0 var(--sp-3);
     background: var(--s1);
-    border-radius: var(--r-sm);
+    border-radius: var(--r-pill);
     color: var(--ink2);
     font-weight: 500;
     white-space: nowrap;
   }
 
-  :global(.menu-trigger):hover .sift,
+  /* Hover only where there is one: a phone keeps `:hover` on the last thing tapped. */
+  @media (hover: hover) and (pointer: fine) {
+    :global(.menu-trigger):hover .sift {
+      background: var(--hover-wash);
+    }
+  }
+
   .sift[data-on] {
-    background: var(--s3);
+    background: var(--selected);
   }
 
   .sift-chosen {
     color: var(--ink);
   }
 
-  /* The phone's one filter control is a real button, so it sheds the button's own box, and what is
-     chosen gives way with an ellipsis before Display is pushed off the screen. */
+  /* THE PHONE'S ONE FILTER CONTROL IS A 44px PILL with the glyph and, when values are on, how many.
+     It is a real button, so it sheds the button's own box. */
   .sift-sheet {
-    min-inline-size: 0;
+    justify-content: center;
+    gap: var(--sp-1);
+    min-inline-size: var(--tap);
+    padding: 0 var(--sp-2);
     border: 0;
     font: inherit;
     font-weight: 500;
     cursor: pointer;
   }
 
-  .sift-sheet .sift-chosen {
-    min-inline-size: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  .sift-count {
+    color: var(--ink);
+    font-size: var(--t-sm);
   }
 
   /* A LIST CLAUSE IS A PILL THAT IS ALREADY ON, drawn in the same track as the rest of the bar so it
      reads as one of them rather than as a message. A repository is a URL and a handle is
-     `git:jokonkwo`, so the element gives way with an ellipsis before Display is pushed off a phone,
-     which is the same treatment the phone's own filter button gets and for the same reason. */
+     `git:jokonkwo`, so the element gives way with an ellipsis before it runs past a phone's edge. */
   .listed {
     min-inline-size: 0;
     border: 0;
@@ -412,15 +419,24 @@
     color: var(--ink);
   }
 
-  /* The search box is a pill too, so the bar is one family of shapes. */
+  /* THE SEARCH BOX IS A FIELD, with the radius every field has (design D-2), on the pills' surface. */
   .bar > .field {
     background: var(--s1);
-    border-radius: var(--r-sm);
+    border-radius: var(--r-md);
   }
 
-  /* Display ends the bar: it changes how the list looks, not what it holds. */
+  /* Display ends the bar: it changes how the list looks, not what it holds. Save as a view, when it
+     is drawn, stands just before it, and the two are pushed to the end together. */
   .bar-end {
     margin-inline-start: auto;
+  }
+
+  .bar-save {
+    margin-inline-start: auto;
+  }
+
+  .bar-save + .bar-end {
+    margin-inline-start: 0;
   }
 
   /* The menu rows: the same 34px and the same tint-on-hover as every menu row on this screen. */
@@ -537,75 +553,57 @@
 
   @media (width < 640px) {
     /**
-     * THE BAR STOPS WRAPPING AND STARTS SCROLLING, because wrapping put the first row of the list
-     * below the fold on every phone in the product.
+     * ONE ROW OF 44px CONTROLS: THE SEARCH BOX, FILTER AND DISPLAY (design SYS-6, DSN-7).
      *
-     * Measured at 390 by 844, `/r/obligations` drew, in order: a note card, the heading, the
-     * subtitle, the count, New item, the search box, two chip groups, Display, one sentence about
-     * what the search box searches, the capture field, and one sentence about what a row may be
-     * missing. Eleven things. The first invoice began at 700px and the reader had to scroll to
-     * learn the screen had any rows on it at all.
+     * The bar was two lines on a phone, the search box across the first and a sideways scroller of
+     * Filter, its chosen values and Display across the second, under a capture line of its own, so
+     * three rows of controls stood over the first card. The capture line went behind the head's "+"
+     * and Filter became one square button, and what is left fits one row at 320: the search box
+     * takes the width Filter and Display leave.
      *
-     * `flex-wrap: wrap` is right on a laptop, where the bar is one line and the wrap is the
-     * safety net. On a phone every child is close to the full width, so wrap is not a safety net,
-     * it is the layout: five rows of controls standing over the thing they control. A row of chips
-     * that scrolls sideways is what a phone does with a filter bar, it costs one row instead of
-     * five, and nothing is hidden, which is the difference between this and a drawer.
-     *
-     * The panel itself must not scroll sideways: `min-inline-size: 0` on the flex child is what
-     * keeps the overflow inside the bar. Without it the bar sizes to its content and takes the app
-     * with it, which is the 30px sideways scroll the comment above `.bar` records fixing once.
-     */
-    /**
-     * AND THEN THE SEARCH BOX SCROLLED WITH THE CHIPS, WHICH IS WHY IT HAS A LINE OF ITS OWN NOW.
-     *
-     * The first version of this made the whole bar one sideways scroller and gave the search box a
-     * floor. The floor was on the wrapper, so the input measured 62px and read `Searcl`; moving it
-     * to the input gave 96px and `Search mor`. A floor cannot win, because the placeholder is
-     * "Search" plus the register's own name and `Search services` is longer than `Search money`.
-     * And the comment that gave the box its floor said it was "the one thing that never scrolls out
-     * of reach", which was true only while nobody scrolled.
-     *
-     * So the search box takes the bar's first line at full width and the chips, Clear and Display
-     * share a second line that is the only thing that scrolls. Two lines instead of the five that
-     * wrapping gave, and the search box is always the whole width of the phone.
+     * WHAT DOES NOT FIT IS A SECOND LINE, AND ONLY WHILE THERE IS SOMETHING ON IT. A list clause from
+     * the address, and Clear and Save on a list with no fields to filter, come after Display and wrap
+     * under the row. The search box's floor leaves room for two square buttons and nothing more, so
+     * they cannot squeeze it. `min-inline-size: 0` keeps the bar inside the panel, which is the 30px
+     * sideways scroll the comment above `.bar` records fixing once.
      */
     .bar {
-      flex-wrap: wrap;
       min-inline-size: 0;
     }
 
     .bar > .field {
-      flex: 1 1 100%;
+      flex: 1 1 0;
+      min-inline-size: calc(100% - 2 * var(--tap) - 2 * var(--sp-2));
     }
 
-    .bar-rest {
-      display: flex;
-      flex: 1 1 100%;
-      flex-wrap: nowrap;
-      align-items: center;
-      gap: var(--sp-2);
+    .listed,
+    .bar-clear,
+    .bar-save {
+      order: 1;
       min-inline-size: 0;
-      overflow-x: auto;
-      overscroll-behavior-x: contain;
-      scrollbar-width: none;
-      /* Room for the shadow of the last chip, and a scroll that ends flush rather than clipped. */
-      padding-block-end: var(--sp-1);
     }
 
-    .bar-rest::-webkit-scrollbar {
-      display: none;
+    .bar-save {
+      margin-inline-start: 0;
     }
 
-    .bar-rest > * {
-      flex: 0 0 auto;
+    .bar-save + .bar-end {
+      margin-inline-start: auto;
     }
 
-    /* The one control allowed to shrink, so a long list of chosen values ends in an ellipsis
-       inside the phone rather than past its edge. */
-    .bar-rest > .sift-sheet,
-    .bar-rest > .listed {
-      flex: 0 1 auto;
+    /* DISPLAY IS ITS GLYPH, 44px square, and its word stays in the button for a screen reader. */
+    .bar-end :global(.btn) {
+      min-inline-size: var(--tap);
+      padding-inline: 0;
+    }
+
+    .bar-word {
+      position: absolute;
+      inline-size: 1px;
+      block-size: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
     }
   }
 </style>

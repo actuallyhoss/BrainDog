@@ -13,7 +13,7 @@ import { test } from 'node:test';
 
 import { codeOf, refused } from '@braindog/ports';
 
-import { createSlash } from '../src/index.ts';
+import { ASK_CAP_DEFAULT, BACKGROUND_ASKS_MONTH, createSlash } from '../src/index.ts';
 import { canned, fakeRecord, fixedClock, MEMBER, NOW, OWNER, openSqlite } from './double.ts';
 
 const build = () => {
@@ -43,13 +43,42 @@ test('createSlash costs no network and no model call', () => {
   assert.equal(inference.seen.length, 0);
 });
 
-test('status is tier a, the routing table model, and a meter that resets on the first of next month', () => {
+test('status is the included source on tier a, the routing table model, and a capped meter that resets on the first of next month', () => {
   const { slash } = build();
   assert.deepEqual(slash.status(), {
+    source: 'included',
     tier: 'a',
+    provider: null,
     model: 'glm-5.3-flash',
-    asks: { used: 0, cap: 80, resets: '2026-12-01T00:00:00.000Z' },
+    asks: { used: 0, cap: 80, resets: '2026-12-01T00:00:00.000Z', capped: true },
   });
+});
+
+/* HIS OWN KEY (`loop/finish/agents.md` AGT-21): the source, the provider and the model he chose, and his asks listed with no
+   cap beside them. A save of nothing reads what is saved, for Settings' form, and writes nothing. */
+test('on his own key status says so, lists his asks uncapped, and a save of nothing reads the setup back unchanged', () => {
+  const { sql, slash } = build();
+  const saved = slash.configure({ source: 'key', provider: 'anthropic', base_url: 'https://api.example.test', model: ' claude-x ', grant_id: 'g_01JZ8QK3F7R2M9V4XN6TCB5HAE' }, OWNER);
+  assert.ok(saved.ok, JSON.stringify(saved));
+  sql.exec(
+    `INSERT INTO slash_call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status)
+     VALUES ('c_key', '2026-11-14T08:00:00.000Z', 'read', 'b', 'claude-x', 1, 1, 0, 1, 'ok')`,
+  );
+  assert.deepEqual(slash.status(), {
+    source: 'key',
+    tier: 'b',
+    provider: 'anthropic',
+    model: 'claude-x',
+    asks: { used: 1, cap: 80, resets: '2026-12-01T00:00:00.000Z', capped: false },
+  });
+  const read = slash.configure({}, OWNER);
+  assert.ok(read.ok);
+  assert.deepEqual(read.value, saved.value);
+});
+
+test('ASK_CAP_DEFAULT AND BACKGROUND_ASKS_MONTH ARE THE NAMES THE CONTRACT GIVES, at 80 and 60', () => {
+  assert.equal(ASK_CAP_DEFAULT, 80);
+  assert.equal(BACKGROUND_ASKS_MONTH, 60);
 });
 
 test('the meter counts tier a asks in this month, reads and proposals alike, and nothing else', () => {

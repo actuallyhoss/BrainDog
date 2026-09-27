@@ -182,7 +182,7 @@ test('toHTML draws the bars, the stem and today from the plan, where the plan pu
 
 test('EVERY MARK IN THE DRAWING SAYS HOW IT IS PAINTED, so a page with no roadmap rules does not fill it black', () => {
   /* NO STYLESHEET DREW THIS KIND. `apps/web/src/lib/blocks-charts.css` styles `series-bar`, `lines-*` and the rest by
-     class and has no `roadmap-` rule, and an SVG shape with no fill is painted black: the month bands, every bar and
+     class and had no `roadmap-` rule when this test was written, and an SVG shape with no fill is painted black: the month bands, every bar and
      the whole box came out one black slab, with the stems and today's line drawn black on black (read off the HTML
      this renderer wrote, before this test). So each mark carries its own presentation attributes, which any rule a
      host's stylesheet writes still overrides, and they are `currentColor` or `none`, never a colour of this kind's. */

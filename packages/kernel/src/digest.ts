@@ -82,6 +82,14 @@ export type DigestDeps = {
   ctx: EvalContext;
   /** Where an email would go: the owners, by address. Empty means the email channel cannot fire. */
   owners: () => string[];
+  /**
+   * How many phones a push reaches: the owners' push subscriptions, one `notify.push` row each (`push.ts`'s
+   * `ownersPushSubs`). Zero means the push channel cannot fire, as an empty `owners` means for email.
+   *
+   * OPTIONAL SO A CALLER THAT HAS NOT SAID STILL SENDS AS BEFORE: absent, a push is taken to have gone, which is the
+   * receipt this used to write for every record, subscribed or not.
+   */
+  phones?: () => number;
   outbox: (kind: OutboxKind, payload: unknown) => void;
   note: (actor: string, text: string) => void;
   /**
@@ -346,6 +354,13 @@ ${sent.text}` : sent.text;
       continue;
     }
     if (channel === 'push') {
+      /* A RECORD NOBODY HAS SUBSCRIBED ON QUEUES NO PUSH (the kernel's `outbox` dep writes one row per phone), so the
+         receipt does not name the channel either: it said `push` went on a record with no phone to ring, which is the
+         lie the email arm above already refuses to tell. */
+      if (deps.phones !== undefined && deps.phones() === 0) {
+        went.pop();
+        continue;
+      }
       /* NO CONTENT IN A PUSH. It says how many things and where, and the record is where they are:
          a lock screen is not a place a person chose to read their business on. */
       deps.outbox('notify.push', { title: `${sent.name}: ${sent.sections.length} items`, url: `/digest/${sent.digest}` });

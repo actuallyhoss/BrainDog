@@ -36,9 +36,9 @@ import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import provisionCheck, { applyPush, environmentOf, guardsKeylessRecords, plan, pushes, readBuild, readMethods, readProvision, wranglerConfig } from './provision-check.mjs';
+import provisionCheck, { DOORS, applyPush, environmentOf, guardsKeylessRecords, plan, pushes, readBuild, readMethods, readProvision, siteBinding, wranglerConfig } from './provision-check.mjs';
 import { unflipped } from './flip-fixture.mjs';
-import { UNBOUND, boundSite } from './site-fixture.mjs';
+import { SITE_DOORS, UNBOUND, boundSite } from './site-fixture.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
@@ -108,6 +108,19 @@ test('once the site hands this app its doors, the site\'s name is that environme
      Worker that is not answering there, and alpha's would describe a deploy nobody meant to make. */
   const crossed = boundSite({ alpha: 'braindog-alpha', production: 'braindog-alpha' });
   assert.equal(environmentOf(staged.B2, 'brain.dog', crossed), null);
+});
+
+test('a site that keeps /healthz as its own page does not hand this app its name, and the sentence names the door', () => {
+  /* `/healthz` IS ONE OF THE DOORS (defects H4). Before it was, a site that handed over every other door read as bound
+     here, while `/healthz` on its name answered the site's 404 page to every uptime check. */
+  assert.ok(DOORS.includes('/healthz'), 'the checker does not ask for /healthz');
+  assert.ok(SITE_DOORS.includes('/healthz'), 'the bound site in the fixture does not hand over /healthz');
+  const config = wranglerConfig(root);
+  const bound = { alpha: 'braindog-alpha', production: 'braindog-production' };
+  assert.equal(environmentOf(config, 'brain.dog', boundSite(bound))?.name, 'production');
+  const kept = boundSite(bound, UNBOUND, SITE_DOORS.filter((door) => door !== '/healthz'));
+  assert.equal(environmentOf(config, 'brain.dog', kept), null);
+  assert.match(siteBinding(config, kept, 'production').why ?? '', /does not run its script first on \/healthz,/);
 });
 
 test('a staged push that names an environment or a key the file does not have is refused, not ignored', () => {

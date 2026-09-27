@@ -14,8 +14,13 @@
  * METERED AS A PERSON'S READ IS. Owner question 2's default (§5): one ask per model call, on the one `ask_cap`, so a
  * clock rule spends the same allowance a person does and stops at the same line. The row is `kind = 'read'` because the
  * `46 §4.1` CHECK admits no kind for this and changing it is the package's first schema change (`createSlash`); every
- * count already reads `kind = 'read'` correctly for it, and the host's tier `b` exemption for a stored draft asks
- * `predicate IS NOT NULL`, which this row never is.
+ * count already reads `kind = 'read'` correctly for it. On his own key the row is listed with his other asks and nothing
+ * caps it, as a person's read there is not capped.
+ *
+ * ON HIS OWN KEY THE QUESTION GOES TO HIS KEY. The host hands `answer` an adapter over the key he picked, opened in the
+ * rule's name (`apps/worker/src/slash.ts` `workerSlashAnswers`), because he chose where Slash's questions go and a rule's
+ * question is one of them (`loop/finish/agents.md` AGT-21). Installing the rule is his consent to its question being
+ * asked with nobody signed in, as it always was for the included model's key.
  */
 
 import { no, ok, refused, type Result } from '@braindog/ports';
@@ -86,7 +91,7 @@ type Stopped = { status: number; key: string | null };
  * The host's `refused` mark on a thrown error (`SlashRefusedError`, `packages/host/src/slash.ts`), read structurally as
  * `heardIn` reads `answered`, or `null` for any other throw.
  *
- * `key` IS A NAME THE HOST WROTE, `the key labelled slash`, and never the key. Anything that is not a string is read as
+ * `key` IS A NAME THE HOST WROTE, `your own key for Slash`, and never the key. Anything that is not a string is read as
  * no key at all, so a host that leaves it out gets the keyless sentence rather than a sentence with `undefined` in it.
  */
 const stoppedIn = (e: unknown): Stopped | null => {
@@ -150,14 +155,12 @@ export const answering = (core: Core, fallback: Inference): { answer(ask: Ask, i
     const step = ask.step + 1;
 
     const s = core.settings();
-    /* THE CAP IS CHECKED HERE ON TIER `a` ONLY, as `read`'s is (`propose.ts`, `spent`). On `b` and `byo` this package
-       does not refuse on the count at all: the host's model answers there too, and the host's `slashGuardedEngine`
-       (`packages/host/src/slash.ts`) is what holds those tiers to `ask_cap`. That guard wraps `answer` as well as `read`
-       and `propose`: before it did, an automation on `b` or `byo` at `ask_cap: 1` with one read made still reached the
-       engine (`packages/host/test/slash-guard-answer.test.ts`). It is not guarded here as well, because the host counts
-       those tiers with its own query over this same table, and a second check here would be a second copy of that count
-       to drift from it. The row below carries the settings' tier so that guard's `kind = 'read' AND tier IN ('b', 'byo')`
-       count already sees it. */
+    /* THE CAP IS CHECKED HERE ON TIER `a` ONLY, as `read`'s is (`propose.ts`, `spent`). Tier `b` is his own key, whose
+       asks are listed and not capped. On `byo` the host's own endpoint answers, and the host's `slashGuardedEngine`
+       (`packages/host/src/slash.ts`) is what holds that tier to `ask_cap`; that guard wraps `answer` as well as `read` and
+       `propose` (`packages/host/test/slash-guard-answer.test.ts`). It is not guarded here as well, because the host counts
+       that tier with its own query over this same table, and a second check here would be a second copy of that count to
+       drift from it. The row below carries the settings' tier so the count for its tier sees it. */
     if (s.tier === 'a' && core.asksUsed() >= s.ask_cap)
       return no(
         'SLASH_BUDGET_SPENT',
@@ -168,8 +171,8 @@ export const answering = (core: Core, fallback: Inference): { answer(ask: Ask, i
        ten answers sent together at a cap of two make two model calls (`test/answer.test.ts`, case 3). */
     const held = core.reserve('read', s.tier, PROMPTS.answer.model);
     try {
-      /* THE HOST'S MODEL ON EVERY TIER, never tier `b`'s own key (owner question 4's default): the adapter handed in is
-         keyed in the rule's name, and a rule nobody is signed in to has no session to open the owner's key under. */
+      /* THE MODEL THE HOST HANDS IN FOR THIS JOB, keyed in the rule's name: his own key where he chose it, and otherwise the
+         host's. With none handed in, the host's model this engine was built on. */
       const engine = inference ?? fallback;
       /* THE PROVIDER'S OWN WORDS ARE KEPT for the one sentence that needs them. `core.run` folds them into a sentence
          written for a person at the palette ("ask again"), and a host retrying on the outbox's ladder wants the status. */
@@ -217,8 +220,8 @@ export const answering = (core: Core, fallback: Inference): { answer(ask: Ask, i
 
       /* `rule.<id> step <n>` AND NEVER THE QUESTION. The kernel filled the question with the run's row, and `46 §4.1`
          keeps a row's values out of this ledger; the rule and the step are what a person reading it can look up. */
-      /* A MODEL NOT REACHED IS SETTLED UNDER `-`, THE LEDGER'S MARK FOR A ROW THAT CALLED NOTHING, and both counts pass
-         over it: the tier `a` count here (`asksUsed`) and the host's for `b` and `byo`. Settled under the model's name,
+      /* A MODEL NOT REACHED IS SETTLED UNDER `-`, THE LEDGER'S MARK FOR A ROW THAT CALLED NOTHING, and every count passes
+         over it: the tier `a` count here (`asksUsed`), his own key's list, and the host's for `byo`. Settled under the model's name,
          `loop/research-batch-forty-two-audit.md` finding 6 measured three `ECONNREFUSED` answers at `ask_cap: 3` leave the
          fourth `SLASH_BUDGET_SPENT` on tiers `a` and `b`, and the host asks an `UNREACHABLE` again up to the ladder's
          eighth rung. The row stays, so an outage is still in the ledger. `PROPOSAL_SCHEMA` keeps the model's name,
@@ -261,7 +264,7 @@ export const answering = (core: Core, fallback: Inference): { answer(ask: Ask, i
            to `finally`, whose `release` deletes it, so the ledger reads as it does for a record with no key at all
            (`46 §5.2`). `FORBIDDEN` AND NOT `UNREACHABLE`, because the next rung would find the same key closed and open
            the vault again for nothing. The sentence is the host's, since this package cannot say what the host's vault is
-           called; the Worker, the one host that asks for the throw, answers its own over it (`apps/worker/src/slash.ts`). */
+           called; each host answers its own over it on his own key (`apps/worker/src/slash.ts`, `apps/selfhost/src/slash.ts`). */
         if (code === 'UNREACHABLE' && (unsent as boolean))
           return no('FORBIDDEN', `rule.${ask.rule} asked Slash at step ${step}: ${sentence(lost)}`, { at: 'grant' });
         /* A STATUS NO RETRY MENDS ENDS THE RUN, UNCOUNTED. `loop/research-batch-forty-nine-audit.md` finding 4 measured

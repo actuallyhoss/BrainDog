@@ -263,8 +263,12 @@ function readOne(decl: Declaration, body: Json, format: Format, ctx: ExtractCtx)
   if (format === 'text') {
     const text = normalise(typeof body === 'string' ? body : String(body));
     const folded = fold(text);
-    for (const [field, form] of Object.entries(decl.extract ?? {})) {
-      const found = run(form, text, folded, ctx, `extract.${field}`);
+    for (const [field, rawForm] of Object.entries(decl.extract ?? {})) {
+      /* `STRIP` IS DATA BESIDE THE FORM, LIKE `NOTE` INSIDE ONE. The kernel's own rule reads and applies it
+         after this package hands a value back; `run` counts every key but `note`, so a form carrying it
+         unfiltered throws `EXTRACTOR_UNKNOWN` on a declaration the kernel accepts. */
+      const { strip: _strip, ...form } = rawForm as Record<string, unknown> & { strip?: unknown };
+      const found = run(form as Form, text, folded, ctx, `extract.${field}`);
       if (found === 'ambiguous') {
         outcome[field] = 'ambiguous';
         continue;

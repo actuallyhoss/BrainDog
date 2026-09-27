@@ -42,10 +42,11 @@
   import Icon from '$lib/ui/Icon.svelte';
   import { drew } from '../../../lib/ui/screen.svelte.ts';
   import { capturedFields, holdInPlace, inverseOf, rowWriter, type Held, type RowWriter, type Wrote } from '$lib/record/rows-write.ts';
-  import { draftOf, editable, patchOf, unchanged, wrongMoney } from '$lib/record/field-draft.ts';
+  import { draftOf, editable, patchOf, unchanged, wrongValue } from '$lib/record/field-draft.ts';
   import { spentPutBacks, type Change } from './put-back.ts';
   import { chipOn, dropChip, filterableOf, listedOf, nextSort, toggleChip, weighed, type Receipt } from './parts/list.ts';
   import CaptureLine from './parts/CaptureLine.svelte';
+  import CapturePlus from './parts/CapturePlus.svelte';
   import ChipsBar from './parts/ChipsBar.svelte';
   import ListEmpty from './parts/ListEmpty.svelte';
   import BulkBar from './parts/BulkBar.svelte';
@@ -629,14 +630,12 @@
    * and the select-all were left unconditional, so half of the answer to "is this list big enough
    * to act on in bulk" was drawn and half was not.
    */
-  /* The register's own projection, with its state marked as the column that carries the row's
-     tone, so `⊘ open` reads as one thing rather than a mark in one column and a word in another. */
+  /* The register's own projection. Which column carries the row's tone is `ListTable`'s (`deadlineOf` in `parts/list.ts`): the deadline, beside the date it is about (design DSN-7). */
   const projected = $derived(
     /* THE NUMBER IS THE ONE COLUMN OFF BY DEFAULT (DSN-5: no list has an id column until Display adds "Number"), so for
        it the stored set means the reverse: in the set, drawn. */
     columnsFor(id, decl, hidden.has('seq'))
       .filter((c) => c.field === 'seq' || !hidden.has(c.field))
-      .map((c) => (c.field === decl?.state ? { ...c, tone: true } : c))
       .map((c) => weighed(c, c.field === decl?.title, result.entries)),
   );
 
@@ -831,6 +830,8 @@
    * to fill in later, which is what a record with a shape is for.
    */
   let capture = $state('');
+  /* THE PHONE'S CAPTURE SHEET, which the head's "+" opens (`parts/CapturePlus.svelte`) and `CaptureLine` draws below 640px. */
+  let captureOpen = $state(false);
 
   /* ── writes ───────────────────────────────────────────────────────────────── */
 
@@ -1035,12 +1036,14 @@
    * already drawn in a box of exactly the right width, and the cheapest possible edit is that box
    * becoming writable where it sits. Enter commits, Escape cancels, and the caret is put in it.
    *
-   * EVERY TYPE BUT `secret`, WHICH IS WHAT THE ROW PAGE EDITS. This said four types and argued that a money and a
-   * ref were two decisions each, so a cell that took one of them would write half a value. The row page had already
-   * answered both: a money box is the amount alone and goes back in the currency the row held, and a ref is typed as
-   * the number a person says. Its three closures could not be called from here, so the grid refused twelve types for a
-   * problem solved one screen away. They are `field-draft.ts` now, and a cell save goes through the same three, so a
-   * money cell refuses a third decimal on EGP where it was typed, exactly as the row page does.
+   * EVERY TYPE BUT `secret` AND `file`, WHICH IS WHAT THE ROW PAGE EDITS. This said four types and argued that a money
+   * and a ref were two decisions each, so a cell that took one of them would write half a value. The row page had
+   * already answered both: a money box is the amount alone and goes back in the currency the row held, and a ref is
+   * typed as the number a person says. Its three closures could not be called from here, so the grid refused twelve
+   * types for a problem solved one screen away. They are `field-draft.ts` now, and a cell save goes through the same
+   * three, so a money cell refuses a third decimal on EGP where it was typed, exactly as the row page does. A quantity
+   * opens as its number and its unit and structured data written out (`draftOf`), and the same `wrongValue` refuses
+   * what does not read before any write.
    *
    * WHICH IS WHICH IS DRAWN AND NOT EXPLAINED. The pencil appears on an editable cell and on no
    * other, so the answer is in front of the reader at the moment they are looking at that cell. A
@@ -1106,9 +1109,9 @@
     if (!editableHere(field)) {
       /* A BOUND KEY DOES NOT ANSWER WITH SILENCE. `19 §4`'s sheet advertises `e` for the grid with
          no condition on it, and when this refused money and refs the press did nothing, drew nothing
-         and reported nothing, on the two types where a person was most likely to try. A quantity, a
-         file, a json and a secret are refused now, on this screen and the row's alike, and the
-         sentence says why without sending the reader to the row, which would refuse them too. */
+         and reported nothing, on the two types where a person was most likely to try. A file and a
+         secret are refused now, on this screen and the row's alike, and the sentence says why without
+         sending the reader to the row, which would refuse them too. */
       const f = fieldOf(field);
       /* AND A COLUMN THAT IS NOT A FIELD STILL ANSWERS. The picker and the row's verbs carry no
          declaration, so `fieldOf` is undefined for them and this returned in silence: a printed key
@@ -1185,8 +1188,9 @@
     if (unchanged(f, typed, shown, currency)) return;
     /* WHAT THE ROW PAGE REFUSES UNDER ITS BOX IS REFUSED HERE BEFORE ANY WRITE, and the typing goes back into the cell
        so it is corrected rather than typed again. `EGP 1.234` sent to the record would be rounded by `patchOf` into an
-       amount nobody typed, which is worse than the record refusing it. */
-    const bad = wrongMoney(f, String(typed), shown, currency);
+       amount nobody typed, which is worse than the record refusing it, and structured data that does not read would
+       be stored as the text typed, which the record's `json` coercion takes as it comes. */
+    const bad = wrongValue(f, String(typed), shown, currency);
     if (bad) {
       toasts.push(bad, { intent: 'warn' });
       editing = at;
@@ -1767,8 +1771,12 @@
    * NO NAMING DIALOG. The address already says which rows these are, so the name is the list and its filter in the
    * list's own words, and the toast's undo retires the page and comes back here. See `viewPage` for why it is a page.
    */
+  /* ONE SAVE AT A TIME. A second press of Save as view, or a second Alt+V, while the first write was still out made a
+     second page over the same filter (defects U2). Not `$state`, because nothing draws it. */
+  let saving = false;
+
   async function saveView() {
-    if (!decl) return;
+    if (!decl || saving) return;
     if (filters.length === 0 && q === '') {
       toasts.push(copy.viewNeedsFilter, { intent: 'warn' });
       return;
@@ -1780,21 +1788,26 @@
     const title = copy.viewTitle(decl.name, copy.filterReads(q ? [...clauses, `"${q}"`] : clauses));
     const back = `${page.url.pathname}${page.url.search}`;
     const drawn = columns.map((c) => c.field).filter((f) => f !== 'select' && f !== 'act' && f !== 'seq');
-    const out = await writes().saveView(id, title, { filters, q, sort }, drawn);
-    if (!out.ok) {
-      toasts.push(out.fix, { intent: 'warn' });
-      return;
+    saving = true;
+    try {
+      const out = await writes().saveView(id, title, { filters, q, sort }, drawn);
+      if (!out.ok) {
+        toasts.push(out.fix, { intent: 'warn' });
+        return;
+      }
+      await goto(at(`/p/${out.slug}`));
+      toasts.push(copy.viewSaved(title), {
+        undo: () =>
+          void writes()
+            .dropView(out.id)
+            .then((gone) => {
+              if (gone.ok) void goto(at(back));
+              else toasts.push(gone.fix, { intent: 'warn' });
+            }),
+      });
+    } finally {
+      saving = false;
     }
-    await goto(at(`/p/${out.slug}`));
-    toasts.push(copy.viewSaved(title), {
-      undo: () =>
-        void writes()
-          .dropView(out.id)
-          .then((gone) => {
-            if (gone.ok) void goto(at(back));
-            else toasts.push(gone.fix, { intent: 'warn' });
-          }),
-    });
   }
 
   /* EVERY PUT BACK PRESSED ON THIS SCREEN, so a row's chip and the toast over the same rows write each change once
@@ -1965,6 +1978,7 @@
       <span class="new-row" data-alone={arriving ? '' : undefined}>
         <Button weight="primary" onclick={() => (createOpen = true)}><Icon name="plus" size="s" />{copy.newRow} {decl.one}</Button>
       </span>
+      {#if !arriving}<CapturePlus one={decl.one} onclick={() => (captureOpen = true)} />{/if}
     {/snippet}
   </PageHead>
 
@@ -1982,7 +1996,7 @@
          that does not act on the rows below it. Not on the arrival itself, where the New button in
          the head is the way in. -->
     {#if !arriving}
-      <CaptureLine one={decl.one} bind:value={capture} {captureRow} />
+      <CaptureLine one={decl.one} bind:value={capture} bind:open={captureOpen} {captureRow} allFields={() => (createOpen = true)} />
     {/if}
 
     <!-- THE BAR, which draws itself only while there is something to sift, and the phone's filter
@@ -2191,8 +2205,8 @@
     font-size: var(--t-xs);
   }
 
-  /* THE HEAD'S NEW BUTTON, which a phone does without: the capture line under it starts a row in
-     fewer presses. It stays on the arrival (`data-alone`), where the capture line is not drawn. */
+  /* THE HEAD'S NEW BUTTON, which a phone does without: the "+" beside it opens the capture sheet, which starts a row in
+     fewer presses. It stays on the arrival (`data-alone`), where neither the line nor the "+" is drawn. */
   .new-row {
     display: contents;
   }

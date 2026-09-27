@@ -18,39 +18,100 @@
   exists, in its cells and its receipt; said in advance, over the list, it was the screen
   explaining itself.
 
+  ON A PHONE IT IS A SHEET BEHIND THE HEAD'S "+" (design SYS-6, DSN-7). The line stood over the
+  search box and the filters, so three rows of controls came before the first card, and a phone's
+  list starts within 150px of its head. Below 640px the line is not drawn; `CapturePlus` in the
+  head's action slot opens this sheet with the field focused, "Add" as its primary, and "All fields"
+  for a row that needs more than its name, which is the page's whole form.
+
   THE LINE IS THE PAGE'S. `value` is bound to the page's `capture`, because the page empties it when
-  the question changes and puts the typing back when the record refuses it; `captureRow` is the
-  page's write, and this file only draws the line.
+  the question changes and puts the typing back when the record refuses it; `open` is the page's
+  too, since the "+" that opens the sheet is in the head; `captureRow` and `allFields` are the page's,
+  and this file only draws the line.
 -->
 <script lang="ts">
   import { copy } from '$lib/copy.ts';
+  import { rowsAsCards } from '$lib/ui/body.svelte.ts';
+  import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import Sheet from '$lib/ui/Sheet.svelte';
 
-  let { one, value = $bindable(''), captureRow }: { one: string; value?: string; captureRow: () => void } = $props();
+  let {
+    one,
+    value = $bindable(''),
+    open = $bindable(false),
+    captureRow,
+    allFields,
+  }: {
+    one: string;
+    value?: string;
+    /** The phone's sheet, which the head's "+" opens. */
+    open?: boolean;
+    captureRow: () => void;
+    /** The whole form, for a row that needs more than its name. Absent, the sheet offers only Add. */
+    allFields?: (() => void) | undefined;
+  } = $props();
+
+  /* This part's own words. */
+  const words = { allFields: 'All fields' } as const;
 </script>
 
-<form
-  class="capture"
-  onsubmit={(e) => {
-    e.preventDefault();
-    captureRow();
-  }}
->
-  <label class="capture-label" for="capture">{copy.captureIn(one)}</label>
-  <div class="capture-field">
-    <Icon name="plus" size="m" />
-    <input
-      id="capture"
-      class="capture-input"
-      type="text"
-      autocomplete="off"
-      bind:value
-      placeholder={copy.captureIn(one)}
-    />
-    <!-- Present only once there is something to add. -->
-    {#if value.trim()}<button type="submit" class="capture-go">{copy.captureAdd}</button>{/if}
-  </div>
-</form>
+{#if rowsAsCards()}
+  <!-- THE SHEET CLOSES ON ADD, so the row lands in front of the person with its receipt on it, and a
+       refusal puts the typing back in the line for the next time it opens. -->
+  <Sheet bind:open title={copy.captureIn(one)}>
+    <form
+      id="capture-sheet"
+      class="capture"
+      onsubmit={(e) => {
+        e.preventDefault();
+        if (!value.trim()) return;
+        captureRow();
+        open = false;
+      }}
+    >
+      <label class="capture-label" for="capture">{copy.captureIn(one)}</label>
+      <div class="capture-field">
+        <input id="capture" class="capture-input" type="text" autocomplete="off" enterkeyhint="done" bind:value placeholder={copy.captureIn(one)} />
+      </div>
+    </form>
+    {#snippet footer()}
+      <Button weight="primary" type="submit" form="capture-sheet" disabled={!value.trim()} data-capture-go>{copy.captureAdd}</Button>
+      {#if allFields}
+        <Button
+          weight="bare"
+          onclick={() => {
+            open = false;
+            allFields?.();
+          }}>{words.allFields}</Button
+        >
+      {/if}
+    {/snippet}
+  </Sheet>
+{:else}
+  <form
+    class="capture"
+    onsubmit={(e) => {
+      e.preventDefault();
+      captureRow();
+    }}
+  >
+    <label class="capture-label" for="capture">{copy.captureIn(one)}</label>
+    <div class="capture-field">
+      <Icon name="plus" size="m" />
+      <input
+        id="capture"
+        class="capture-input"
+        type="text"
+        autocomplete="off"
+        bind:value
+        placeholder={copy.captureIn(one)}
+      />
+      <!-- Present only once there is something to add. -->
+      {#if value.trim()}<button type="submit" class="capture-go">{copy.captureAdd}</button>{/if}
+    </div>
+  </form>
+{/if}
 
 <style>
   /* ONE LINE, AND IT LOOKS LIKE ONE. The label is for a screen reader and for nobody else: the
@@ -73,7 +134,7 @@
      is the shape "add" has in every list a person has used. */
   /* ONE HEIGHT FOR THE WHOLE HEAD (DESIGN-SYSTEM APPENDIX C8). This was 47px over a 34px search and
      32px filters, three sizes of box in two rows; it is `--ctl-h` now, 32 under a mouse and 44 under
-     a thumb, with the radius every control has. */
+     a thumb, with the radius a field has (design D-2: fields are `--r-md`, what you press a pill). */
   .capture-field {
     display: flex;
     align-items: center;
@@ -82,7 +143,7 @@
     padding-inline: var(--sp-3) var(--sp-1);
     background: var(--s1);
     border: 1px solid var(--line);
-    border-radius: var(--r-sm);
+    border-radius: var(--r-md);
     color: var(--dim);
     transition: border-color var(--d-state) var(--ease-out);
   }
@@ -108,7 +169,8 @@
     border: 0;
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-ui);
+    /* 16px in every input at every width (design-brief §3), so a phone never zooms into the field. */
+    font-size: var(--t-md);
   }
 
   .capture-input:focus-visible {
@@ -123,7 +185,7 @@
     padding: 0 var(--sp-3);
     background: var(--ink);
     border: 1px solid var(--ink);
-    border-radius: var(--r-sm);
+    border-radius: var(--r-pill);
     color: var(--bg);
     font-size: var(--t-sm);
     font-weight: 500;

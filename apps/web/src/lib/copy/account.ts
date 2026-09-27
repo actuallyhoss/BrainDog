@@ -258,11 +258,6 @@ export const account = {
   yourRecords: 'Records you can open',
   thisOne: 'you are here',
 
-  /* agents — `12 §6.1`'s device grants. The heading counts every row beneath it, denied ones included,
-     so it names machines rather than connections. */
-  machines: 'Machines',
-  /* `13 §5.2`: an empty list the person fills from a machine carries the command that fills it. */
-  noDevices: 'No machine has asked yet',
   /* `backup` AND IT WAS `sealed copy` AND `snapshot`, WHICH ARE TWO WORDS FOR ONE IDEA. A friction
      pass found them competing on the same screen: `/decide` said "The newest sealed copy is from
      2026-09-02" and a card beside it was titled `Snapshot`. Neither is the word a person uses, and
@@ -317,8 +312,6 @@ export const account = {
   unnamedMachine: 'A machine with no name',
 
   /* the tokens — `12 §3`: listed with a revoke button, and never the token itself */
-  tokens: 'Tokens',
-  noKeys: 'Nothing can act as you',
   /* `19 §9` again: what it can do, said as what it can do. There is no `admin` (ADR-060). */
   keyCan: {
     read: 'can read, and change nothing',
@@ -326,20 +319,15 @@ export const account = {
     write: 'can read and change rows',
   } as Record<string, string>,
   endsWhen: (when: string) => `ends ${when}`,
-  unnamedToken: 'A token with no name',
   /* A REPORT KEY IN THE TOKENS LIST (`record/device.ts` `reportKeyOf`): its name and the one thing it can do. */
   reportKeyNamed: (name: string | null) => (name ? `Report key for ${name}` : 'A report key'),
   reportKeyCan: (list: string) => (list ? `can send numbers to ${list}, and nothing else` : 'can do nothing, because it is bound to no list'),
 
   /* Connect an agent: a write token for ninety days, its bearer shown once. */
   connectTitle: 'Connect an agent',
-  connectLabel: 'Name the machine',
-  connectGo: 'Connect',
   /* THE INBOX, OFF UNTIL THE OWNER TURNS IT ON (DIRECTION section 30, P2). What it opens, and what it still cannot do. */
   connectInbox: 'May read the inbox',
   connectInboxHint: 'May read the inbox: the bank texts and other arrivals no rule has filed yet. It cannot file or archive them.',
-  onNewMachine: 'On a new machine',
-  inClaudeCode: 'In Claude Code',
 
   /* ingest — `25 §9` draws this screen */
   sources: 'Where rows come in from',

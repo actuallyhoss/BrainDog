@@ -23,6 +23,7 @@
 
 import { packDocument } from '../index.ts';
 import { MONEY_HOME_SETTING, targetConfigOf } from '../modules/money.ts';
+import { estateTargetConfig } from '../modules/estate.ts';
 import type { PackManifest } from './agents.ts';
 
 export type FirstPartyId = 'portfolio' | 'people' | 'money-core' | 'estate' | 'work';
@@ -34,7 +35,7 @@ const SUMMARIES: Record<FirstPartyId, string> = {
   portfolio: 'The things you run, and the plan for each.',
   people: 'Clients, contractors and accountants, and what each one is for.',
   'money-core': 'What you owe and what you are owed, with a date and a currency.',
-  estate: 'Domains, hosting, subscriptions and certificates, and when each one renews.',
+  estate: 'Domains, hosting, subscriptions, memberships, insurance and bills, and when each one renews.',
   work: 'Tasks, the threads of work they belong to, and how each thread is going.',
 };
 
@@ -210,12 +211,30 @@ const SUMMARIES: Record<FirstPartyId, string> = {
  *   the role off the list instead of finding a list called `people` (`LEGACY` in `packages/kernel/src/roles.ts`). On a
  *   record with no Projects the `projects` part goes with the field it names (`without` below). A key added to a list
  *   and nothing taken away, so the step is a minor one.
+ * - money-core 3.1.0: books keep money that is not one person's apart. A `books` list, an optional `book` on every list
+ *   that holds money, a page per book under Money (`money-book`) with its own walk, and one Cash now per book once there
+ *   are two. `chased` on obligations: a late invoice answered Chase it is stamped chased (`rule.invoice-chased`), and a
+ *   repeating line answered It stopped is ended (`rule.recurring-stopped`). A stale balance is a digest line and not a
+ *   question, a repeating line past its day asks, and an account or book that rows point at cannot be deleted
+ *   (`delete: refuse_while_referenced`). One list, fields, figures, a page and two automations added and nothing taken
+ *   away, so the step is a minor one.
+ * - portfolio 1.5.0: a project page leads with the questions waiting on it, draws what changed on it, its plan on a time
+ *   axis when its tasks have days and its money month by month, signs the amount on its Money table, drops the agent
+ *   code block, and every money figure is in the record's own currency (`format: money`) with its target a setting.
+ * - estate 2.0.0: Services keeps subscriptions, memberships, insurance and utilities, opens with what it costs a month,
+ *   asks before a renewal (`rule.renew-soon`) and marks a passed renewal lapsing (`rule.renewal-passed`), pins Renews in
+ *   30 days to Home, and every target is a setting with no default. A major step because the gauge and its fixed
+ *   targets are taken away.
+ * - people 2.2.0: one page per person (`page.someone`), with who they are, the projects they were met in and what is
+ *   written about them; People's own page is placed under a People section and its cards leave out the agent's `met`
+ *   lines; and a person that other rows still name is not deleted (`delete: refuse_while_referenced`). A page and a
+ *   list key are added and nothing is taken away, so the step is a minor one.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
-  portfolio: '1.4.0',
-  people: '2.1.0',
-  'money-core': '3.0.0',
-  estate: '1.3.0',
+  portfolio: '1.5.0',
+  people: '2.2.0',
+  'money-core': '3.1.0',
+  estate: '2.0.0',
   work: '1.8.0',
 };
 
@@ -442,6 +461,7 @@ export function firstPartyDocument(id: string, options: DocumentOptions = {}): R
 const configOf = (id: string, declarations: readonly Body[]): Record<string, unknown> => ({
   ...(id === 'money-core' ? MONEY_HOME_SETTING : {}),
   ...targetConfigOf(declarations),
+  ...estateTargetConfig(declarations),
 });
 
 /** The starter's declarations no single first-party pack can hold, because they read more than one. */

@@ -31,7 +31,7 @@
   import { CODE_DIGITS, type Answer, type DeviceRow } from '$lib/record/device.ts';
   import {
     answerLine, approve, asks, daysFor, holders, keysOf, namesOf, reconnectOf, reprove, revoke, scopeName, words, type GrantState,
-    type KeyRow,
+    type KeyRow, type ProjectMark,
   } from '$lib/record/vault.ts';
   import { words as actionWords } from '$lib/record/actions.ts';
   import { read } from '$lib/data/record.ts';
@@ -43,6 +43,7 @@
   import Chip from '$lib/ui/Chip.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import ScopeChip from '$lib/ui/ScopeChip.svelte';
   import Sheet from '$lib/ui/Sheet.svelte';
   import { closed, drew, opened } from '../../lib/ui/screen.svelte.ts';
   import { countSaid, machinesTellOf, mayAct, saidOf, tellOf, words as tells, type Said } from './said.ts';
@@ -55,7 +56,7 @@
   let from = $state<'reading' | 'live'>('reading');
   let machines = $state<DeviceRow[]>([]);
   let keys = $state<KeyRow[]>([]);
-  let names = $state(new Map<string, string>());
+  let names: ReadonlyMap<string, string> & { marks?: ReadonlyMap<string, ProjectMark> } = $state(new Map());
   let client: ReturnType<typeof createClient> | null = null;
 
   /**
@@ -124,7 +125,7 @@
         client.list({ register: 'credentials', limit: 200 }),
         client.listGrants(),
       ]);
-      type Row = { id: string; fields: Record<string, unknown>; state: string | null };
+      type Row = { id: string; seq: number | null; fields: Record<string, unknown>; state: string | null };
       index = saidOf(credentials);
       counted = saidOf(grants);
       /* A RECORD WITH NO PROJECTS LIST NAMES NO PROJECT, and the chips say "A project" where a scope
@@ -467,7 +468,7 @@
           <div class="who-head">
             <Icon name="key" size="s" />
             <span class="who-name">{k.label}</span>
-            <Chip label={k.project ?? words.global} />
+            <ScopeChip scope={k.scope} />
             <span class="who-detail">
               {k.sealed ? words.sealed : words.indexOnly}{#if k.sealed}{' · '}{counts ? words.opened(k.opened) : countSaid(counted)}{#if counts && k.lastOpened}{', '}{words.lastOpened(since(k.lastOpened, Date.now()))}{/if}{/if}
             </span>

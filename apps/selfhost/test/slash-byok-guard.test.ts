@@ -231,7 +231,9 @@ test('§1: THE OWNER WITH A STALE PROOF IS SENT BACK TO THE VAULT TOO, since the
   }
 });
 
-test("§1: THE OWNER'S OWN FRESH PROPOSE GOES OUT ON HER KEY, and the one grant.read is signed by her and not by system", async () => {
+/* BOTH PASSES ON HER KEY SINCE `loop/finish/agents.md` AGT-21: the draft went to this host's key before, and now the one
+   adapter the door opens is handed to both, so there are two openings and both are hers. */
+test("§1: THE OWNER'S OWN FRESH PROPOSE GOES OUT ON HER KEY, both passes, and each grant.read is signed by her and not by system", async () => {
   const s = await stack();
   try {
     const ada = s.plant(s.owner);
@@ -240,8 +242,8 @@ test("§1: THE OWNER'S OWN FRESH PROPOSE GOES OUT ON HER KEY, and the one grant.
     assert.equal(out.status, 200, out.raw);
     assert.equal(out.body?.value?.['body_kind'], 'rowset');
     assert.equal(s.sent.length, 2);
-    assert.ok(s.bearer(s.sent[1]!) === `Bearer ${value}`, "the proposal did not carry the owner's key");
-    assert.deepEqual(s.reads(), [s.owner], 'the key was opened under somebody other than the asker');
+    assert.ok(s.sent.every((init) => s.bearer(init) === `Bearer ${value}`), "a pass did not carry the owner's key");
+    assert.deepEqual(s.reads(), [s.owner, s.owner], 'the key was opened under somebody other than the asker');
     /* AND THE KEY IS IN NO RESPONSE AND NO ROW THE ASK WROTE. */
     assert.ok(!out.raw.includes(value), 'the key came back in the answer');
     assert.ok(!JSON.stringify(s.running.sql.all('SELECT * FROM event')).includes(value), 'the key is in the event table');
@@ -283,26 +285,25 @@ test('§1: BACK ON TIER a, THE GRANT LEFT IN SETTINGS OPENS NO GATE, so a read c
   }
 });
 
-test('§3: ON TIER b AT ask_cap 1, THE SECOND READ IS SLASH_BUDGET_SPENT, because the draft is on this host and its key', async () => {
+/* ON HER OWN KEY THE MONTHLY LIMIT STOPS NOTHING (`loop/finish/agents.md` §5 item 7). Before her key carried both passes,
+   the draft was on this host's key and this case was five reads refused past a cap of one; now every call is on her key
+   and her bill, so each is listed in status and none is refused, and the operator's key is never used. */
+test('§3: ON HER OWN KEY AT ask_cap 1, EVERY READ IS ANSWERED ON HER KEY, listed in status and never capped', async () => {
   const s = await stack();
   try {
     const ada = s.plant(s.owner);
-    await s.tierB(ada);
+    const { value } = await s.tierB(ada);
     const cap = await s.call('/api/slash/settings', ada, { ask_cap: 1 });
     assert.equal(cap.status, 200, cap.raw);
 
-    const first = await s.call('/api/slash/read', ada, { question: 'Which tasks are open?' });
-    assert.equal(first.status, 200, first.raw);
     const statuses: number[] = [];
-    for (let i = 0; i < 4; i++) statuses.push((await s.call('/api/slash/read', ada, { question: 'Which tasks are open?' })).status);
-    const second = await s.call('/api/slash/propose', ada, { question: 'Which tasks are open?' });
+    for (let i = 0; i < 5; i++) statuses.push((await s.call('/api/slash/read', ada, { question: 'Which tasks are open?' })).status);
 
-    assert.deepEqual(statuses, [422, 422, 422, 422], `reads past the cap: ${statuses.join(' ')}`);
-    assert.equal(second.body?.refusal?.code, 'SLASH_BUDGET_SPENT', `a propose that drafts went past the cap: ${second.status}`);
-    const onOperator = s.sent.filter((init) => s.bearer(init) === `Bearer ${OPERATOR}`).length;
-    assert.equal(onOperator, 1, `${s.sent.length} model calls, ${onOperator} of them on the operator key`);
+    assert.deepEqual(statuses, [200, 200, 200, 200, 200], `reads on her own key were refused: ${statuses.join(' ')}`);
+    assert.ok(s.sent.every((init) => s.bearer(init) === `Bearer ${value}`), 'a read went out on a key other than hers');
     const status = await s.call('/api/slash/status', ada);
-    assert.deepEqual(status.body?.value?.['asks'] && { used: (status.body.value['asks'] as { used: number }).used }, { used: 1 });
+    const asks = status.body?.value?.['asks'] as { used: number; capped: boolean } | undefined;
+    assert.deepEqual(asks && { used: asks.used, capped: asks.capped }, { used: 5, capped: false });
   } finally {
     await s.close();
   }

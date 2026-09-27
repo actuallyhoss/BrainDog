@@ -435,7 +435,15 @@ const QUALIFIER: Record<string, { part: string; key: string }> = {
 };
 
 const ORDERED = new Set(['int', 'decimal', 'duration', 'money', 'quantity', 'day', 'instant']);
-const TEXTUAL = new Set(['text', 'document', 'url', 'email', 'enum', 'ref', 'secret']);
+/**
+ * The types `contains`, `starts` and `ends` read the letters of.
+ *
+ * NOT `secret`, WHOSE COLUMN HOLDS THE ID OF A GRANT IN THE VAULT AND NEVER THE SECRET. Admitted here, the JSON form
+ * compiled `{ field: token, contains: a }` and matched or missed rows on the letters of an id nobody is shown, while
+ * the sentence refused the same question (`sentence.ts`'s `SPOKEN_AS_NOT_STORED`). A secret still answers `empty` and
+ * `present`, the two questions a sealed field can.
+ */
+const TEXTUAL = new Set(['text', 'document', 'url', 'email', 'enum', 'ref']);
 
 /**
  * A CURRENCY IS UPPER CASE ON THE WAY IN, SO IT IS UPPER CASE IN THE QUESTION TOO.

@@ -30,6 +30,12 @@
  * (`slash-in-do.test.ts`, `SQLITE_AUTH` on a pragma), and the engine this pass builds is the one the door builds over the
  * same storage, which that file already drives through workerd; the alarm, the key door and a filed rule in Miniflare
  * are a harness of their own and were not built in this pass.
+ *
+ * ON HIS OWN KEY SINCE `loop/finish/agents.md` AGT-21. The Worker named an endpoint of its own and keyed it with whatever
+ * the vault held under the label `slash`; it names none now, and the one model a keyed question reaches is the key the
+ * owner picked in Settings, by its grant id (`loop/finish/defects.md` S1). So the key is put through the key door as
+ * before and then chosen through the settings door, as the owner chooses it, and every sentence about a missing key is
+ * the one his own key's path says.
  */
 
 import { test } from 'node:test';
@@ -44,8 +50,8 @@ const ORIGIN = `https://${HOST}`;
 const REC = 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD';
 const OWNER_ID = 'p_01JZ8QK3F7R2M9V4XN6TCB5HAO';
 const KEK = 'a'.repeat(64);
-const ENDPOINT = 'https://gateway.example.test/v1/chat/completions';
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+/* HIS PROVIDER'S ADDRESS, AS HE TYPES IT: the chat-completions path is added by the host (`ownAddressOf`). */
+const PROVIDER = 'https://gateway.example.test/v1';
 
 const TASKS = { id: 'tasks', name: 'Tasks', title: 'what', fields: [{ id: 'what', type: 'text', required: true }] };
 
@@ -60,8 +66,13 @@ const RATE = {
   ],
 };
 
-/** The sentence a Worker record with no `slash` key fails the run on, before anything is posted or spent. */
-const NO_KEY = "rule.rate asked Slash at step 1, and this record's vault holds no key labelled slash, so the run stopped there. Put your model key in the vault under slash.";
+/** The sentence a Worker record with no included model and no key chosen fails the run on, before anything is posted or spent. */
+const NO_KEY =
+  'rule.rate asked Slash at step 1, and Slash on this host answers on your own key, which is not chosen yet, so the run stopped there. Pick your key in Settings.';
+
+/** And the one for a key he chose that is no longer a key in the vault. */
+const KEY_GONE =
+  'rule.rate asked Slash at step 1, and the key Slash was set to answer with is no longer a key in the vault, so nothing was sent and the run stopped there. Pick your key again in Settings.';
 
 /** The model's usual answer: the number, and a count that bills a few tokens. */
 const RATE_ANSWER = (): Response =>
@@ -89,8 +100,9 @@ type Posted = { body: string; authorization: string | null };
 const owner = () => ({ principal: { kind: 'person', id: OWNER_ID, level: 'owner' }, credentialed: true, provedAt: Date.now() });
 
 /**
- * A hosted record in `Record$` as `src/index.ts` ships it, over `objectStorage()`, with `SLASH_ENDPOINT` set, `KEK` bound
- * unless `kek` is false, and the owner's model key put under `slash` through the app's own key door when `key` says so.
+ * A hosted record in `Record$` as `src/index.ts` ships it, over `objectStorage()`, with `KEK` bound unless `kek` is false
+ * and no included model, and the owner's model key put through the app's own key door and chosen in Settings when `key`
+ * says so.
  *
  * THE MODEL IS `globalThis.fetch`, REPLACED FOR THE WHOLE CASE, because the Worker's `send` is `fetch` and there is no
  * other seam in the shipped object. Every request is kept with its body and its `authorization`, and none leaves.
@@ -100,7 +112,6 @@ async function hosted(opts: { kek?: boolean; key?: boolean; answer?: () => Respo
   const storage = objectStorage();
   const env: Record<string, unknown> = {
     PUBLIC_HOST: HOST,
-    SLASH_ENDPOINT: ENDPOINT,
     ...(opts.kek === false ? {} : { KEK }),
     INGRESS: { send: async () => {} },
     DIRECTORY: { idFromName: (n: string) => n, get: () => ({ knows: async (id: string) => id === REC, mayRun: async () => null, meter: async () => {} }) },
@@ -155,7 +166,11 @@ async function hosted(opts: { kek?: boolean; key?: boolean; answer?: () => Respo
   const value = `bd_fake_slash_${crypto.randomUUID().replaceAll('-', '')}`;
   if (opts.key) {
     const put = await serveWorkerKeys(
-      new Request(`${ORIGIN}/api/keys/put`, { method: 'POST', headers: { origin: ORIGIN, 'content-type': 'application/json' }, body: JSON.stringify({ label: 'slash', opens: 'Slash', value }) }),
+      new Request(`${ORIGIN}/api/keys/put`, {
+        method: 'POST',
+        headers: { origin: ORIGIN, 'content-type': 'application/json' },
+        body: JSON.stringify({ label: 'model provider', opens: 'Slash', value, kind: 'api_token' }),
+      }),
       owner() as never,
       {
         origins: new Set([ORIGIN]),
@@ -169,6 +184,17 @@ async function hosted(opts: { kek?: boolean; key?: boolean; answer?: () => Respo
       },
     );
     assert.equal(put.status, 200, await put.text());
+    /* AND CHOSEN IN SETTINGS BY ITS GRANT ID, through the settings door as the owner's page sends it. */
+    const [grant] = storage.sql.exec("SELECT id FROM grant WHERE label = 'model provider'").toArray() as { id: string }[];
+    assert.ok(grant, 'the key door filed no grant for his key');
+    const chose = await object.fetch(
+      new Request(`${ORIGIN}/api/slash/settings`, {
+        method: 'POST',
+        headers: { origin: ORIGIN, 'content-type': 'application/json', 'x-braindog-ctx': JSON.stringify(owner()) },
+        body: JSON.stringify({ source: 'key', provider: 'openai', base_url: PROVIDER, model: 'his-model', grant_id: grant.id }),
+      }),
+    );
+    assert.equal(chose.status, 200, await chose.text());
   }
 
   const sql = storage.sql;
@@ -221,7 +247,7 @@ const answerType = (body: string): unknown =>
 
 /* ── 1 · the switch ──────────────────────────────────────────────────────── */
 
-test('WITH AN ENDPOINT AND KEK, A RULE THAT ASKS SLASH IS FILED, where before this Worker refused it NOT_IN_THIS_BUILD', async () => {
+test('WITH A KEK TO OPEN HIS KEY, A RULE THAT ASKS SLASH IS FILED, where before this Worker refused it NOT_IN_THIS_BUILD', async () => {
   const s = await hosted();
   try {
     const filed = await s.change('rule.rate', 'rule', RATE);
@@ -261,7 +287,10 @@ test("THE QUESTION IS POSTED ONCE, TYPED AS A NUMBER, ON THE OWNER'S KEY OPENED 
 
 /* ── 3 · the one meter ───────────────────────────────────────────────────── */
 
-test("AT ask_cap 0 NOTHING IS POSTED, and the run ends on the month's own sentence", async () => {
+/* ON HIS OWN KEY THE MONTHLY LIMIT DOES NOT STOP HIM (`loop/finish/agents.md` §5 item 7): his provider bills the ask, so
+   Slash lists it and caps nothing. Before his own key the same setting ended this run on the month's sentence, with no
+   post; the limit is the included model's, and this Worker has none. */
+test('ON HIS OWN KEY ask_cap 0 STOPS NOTHING: the question is posted once, and the run ends done', async () => {
   const s = await hosted({ key: true });
   try {
     const res = await s.object().fetch(
@@ -277,11 +306,9 @@ test("AT ask_cap 0 NOTHING IS POSTED, and the run ends on the month's own senten
 
     await s.settle();
 
-    const next = MONTHS[(new Date().getUTCMonth() + 1) % 12];
-    assert.equal(s.sent.length, 0, `${s.sent.length} model calls with the month spent`);
+    assert.equal(s.sent.length, 1, `${s.sent.length} model calls for one question on his own key`);
     const [r] = s.runs();
-    assert.equal(r?.state, 'failed', r?.say ?? 'no run');
-    assert.equal(r?.say, `rule.rate asked Slash at step 1, and this month's asks are spent until 1 ${next}. Raise the monthly limit, or wait.`);
+    assert.equal(r?.state, 'done', r?.say ?? 'no run');
   } finally {
     s.close();
   }
@@ -289,7 +316,7 @@ test("AT ask_cap 0 NOTHING IS POSTED, and the run ends on the month's own senten
 
 /* ── 4 · no key in the vault ─────────────────────────────────────────────── */
 
-test('KEK BOUND AND NO KEY LABELLED slash: NOTHING IS POSTED, NOTHING IS SPENT, and the run says where the key goes', async () => {
+test('KEK BOUND AND NO KEY CHOSEN: NOTHING IS POSTED, NOTHING IS SPENT, and the run says where the key is chosen', async () => {
   const s = await hosted({ answer: () => new Response('{"error":"no key"}', { status: 401 }) });
   try {
     assert.ok((await s.change('rule.rate', 'rule', RATE)).ok, 'the rule was not filed');
@@ -309,16 +336,14 @@ test('KEK BOUND AND NO KEY LABELLED slash: NOTHING IS POSTED, NOTHING IS SPENT, 
 
 /* ── 4b · a key that was revoked ─────────────────────────────────────────── */
 
-/* A REVOKED GRANT KEEPS ITS ROW AND ITS LABEL (`packages/kernel/src/vault.ts` `revokeGrant`), so a check that read the
-   label alone would pass it, and the host's key path, which finds no live `slash` grant, would then post with no
-   `authorization`: case 4's keyless POST by another road. Measured by the checker on 23 September with the
-   `revoked_at === null` clause taken out of `workerSlashAnswers`: every case above still passed and this one saw one
-   POST to the provider where it expects none. */
-test('A `slash` KEY THAT WAS REVOKED IS NO KEY: nothing is posted, nothing is spent, and the run says where the key goes', async () => {
+/* A REVOKED GRANT KEEPS ITS ROW AND ITS ID (`packages/kernel/src/vault.ts` `revokeGrant`), and Slash's settings still name
+   it, so a check that read the setting alone would pass it and post with no `authorization`: case 4's keyless POST by
+   another road. The key path asks the vault whether the grant is live on every call (`ownOptionsOf`). */
+test('HIS KEY, REVOKED AFTER HE CHOSE IT, IS NO KEY: nothing is posted, nothing is spent, and the run says to pick it again', async () => {
   const s = await hosted({ key: true, answer: () => new Response('{"error":"no key"}', { status: 401 }) });
   try {
-    const [grant] = s.storage.sql.exec("SELECT id FROM grant WHERE label = 'slash'").toArray() as { id: string }[];
-    assert.ok(grant, 'the key door filed no slash grant');
+    const [grant] = s.storage.sql.exec("SELECT id FROM grant WHERE label = 'model provider'").toArray() as { id: string }[];
+    assert.ok(grant, 'the key door filed no grant for his key');
     const revoked = await s.call('revokeGrant', { id: grant.id });
     assert.ok(revoked.ok, JSON.stringify(revoked));
     assert.ok((await s.change('rule.rate', 'rule', RATE)).ok, 'the rule was not filed');
@@ -330,7 +355,7 @@ test('A `slash` KEY THAT WAS REVOKED IS NO KEY: nothing is posted, nothing is sp
     assert.deepEqual(s.calls(), [], 'an ask was written to the ledger with no live key to make it');
     const [r] = s.runs();
     assert.equal(r?.state, 'failed', r?.say ?? 'no run');
-    assert.equal(r?.say, NO_KEY);
+    assert.equal(r?.say, KEY_GONE);
   } finally {
     s.close();
   }

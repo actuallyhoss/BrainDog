@@ -66,11 +66,11 @@ test('THE PORTFOLIO OVERVIEW DRAWS WHAT THE PROJECTS EARN, in a figure and in a 
       assert.equal(b.source, 'register.things', `${b.heading ?? b.kind} reads ${b.source}, and the Overview reads Projects alone`);
 });
 
-test('and each figure says which currency it is in, because a sum with no currency is not money', () => {
+test("and each figure is money in the record's own currency, because a sum with no currency is not money", () => {
   for (const id of ['projects-earning', 'projects-earning-before', 'projects-earning-change']) {
     const decl = METRICS[id];
     assert.ok(decl, `${id} is not declared`);
-    assert.match(String(decl.format), /^money\.[A-Z]{3}$/u, `${id} is drawn as ${decl.format}, which does not name a currency`);
+    assert.equal(decl.format, 'money', `${id} is drawn as ${decl.format}, and a money figure is added up in the record's own currency`);
     assert.equal(decl.source, 'register.things', `${id} reads ${decl.source}, and the Portfolio pack may read Projects alone`);
   }
 });

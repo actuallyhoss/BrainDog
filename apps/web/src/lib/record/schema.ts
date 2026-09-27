@@ -355,7 +355,10 @@ export type PageBlock = {
    * forecast while its own `empty:` sentence promised six months. The kernel's `PageBlock` has
    * carried this key since it was written and nothing on this side read it.
    */
-  horizon?: number;
+  horizon?: number | 'last';
+
+  /** A `forecast`'s: the lengths its horizon knob offers, each whole days or `last`. */
+  horizons?: readonly (number | 'last')[];
 
   /** Mandatory on every source-bound block. An empty state that says nothing is a dead end, and a
       record is MOSTLY empty on day one (06 §1). */

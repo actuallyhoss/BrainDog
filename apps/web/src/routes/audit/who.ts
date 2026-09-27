@@ -17,12 +17,13 @@
  *     through unchanged, so the line read `Gave access p_01M1KJ7RG0TYYA0AX15QPGJJ4` and linked it
  *     to `/p_01M1KJ7RG0TYYA0AX15QPGJJ4`, which the spoken-id resolver resolves to nothing.
  *
- * THE RULE ALREADY EXISTED AND THIS SCREEN WAS THE ONE PLACE NOT KEEPING IT. `whoDid` in
- * `lib/record/api.ts` is the product's own answer: the reader is You, a person the record has a
+ * THE RULE ALREADY EXISTED AND THIS SCREEN WAS THE ONE PLACE NOT KEEPING IT. `actor` in
+ * `lib/record/names.ts` is the product's own answer: the reader is You, a person the record has a
  * name for is that name, and any other person is Someone on this record, never their id. Home's
- * feed has gone through it since `boot-live.ts` was written. This module is the same call, wearing
- * the two extra facts this screen needs: that an actor which is NOT a person starts a line with a
- * capital however `actor` in `lib/record/names.ts` words it (Slash, BrainDog, a rule's name), and
+ * feed goes through it by way of `whoDid`. This module asks it directly, wearing the three extra
+ * facts this screen needs: that an actor which is NOT a person starts a line with a capital
+ * however `actor` words it (Slash, BrainDog, a rule's name), that a rule says it is one ("A rule:
+ * Renewal", because a rule's name reads like a task and "Renewal" alone could be a person), and
  * that a person is not a destination, so their line carries no link.
  *
  * WHAT IT CANNOT DO IS INVENT A NAME. Measured on that same record: `members()` returned
@@ -32,7 +33,12 @@
  * further change here.
  */
 
-import { whoDid } from '../../lib/record/api.ts';
+import { actor, type ActorKind } from '../../lib/record/names.ts';
+
+/** The words this file says of its own: a rule is named as one, beside the rule glyph its face wears. */
+export const whoWords = {
+  rule: (name: string): string => `A rule: ${name}`,
+} as const;
 
 /**
  * A PERSON REACHES THIS SCREEN AS A TARGET IN TWO SPELLINGS, and the second one is not a typo.
@@ -61,7 +67,16 @@ export type Said = {
   you: boolean;
   /** True when the subject is a person at all, as opposed to a rule, an agent, the assistant or the record itself. */
   person: boolean;
+  /** What acted, as `actor` says it, which is what `Face` draws: a rule its glyph, an agent its face. */
+  kind: ActorKind;
 };
+
+/** `actor`'s answer as this screen holds it. */
+function saidOf(by: string, me: string | null, names: ReadonlyMap<string, string>): Said {
+  const said = actor(by, me, names);
+  const you = said.kind === 'you';
+  return { name: said.name, you, person: you || said.kind === 'person', kind: said.kind };
+}
 
 /**
  * A ROW'S LEAD AND A FILTER CHIP STAND ALONE, SO THEY START WITH A CAPITAL, which is what the
@@ -75,12 +90,13 @@ const lead = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
  * Who wrote the line, for the actor column and the `by` filter.
  *
  * `by` IS ALREADY `actorFor`'s ANSWER: `news-live.ts` turns the reader's own id into `you` before
- * the screen sees it, and `whoDid` takes `you` as itself, so the sample and a live record go through
+ * the screen sees it, and `actor` takes `you` as itself, so the sample and a live record go through
  * one call.
  */
 export function actorSaid(by: string, me: string | null, names: ReadonlyMap<string, string>): Said {
-  const said = whoDid(by, me, names);
-  return said.person ? said : { ...said, name: lead(said.name) };
+  const said = saidOf(by, me, names);
+  if (said.person) return said;
+  return { ...said, name: said.kind === 'rule' ? whoWords.rule(lead(said.name)) : lead(said.name) };
 }
 
 /**
@@ -92,7 +108,7 @@ export function actorSaid(by: string, me: string | null, names: ReadonlyMap<stri
  */
 export function targetSaid(target: string, me: string | null, names: ReadonlyMap<string, string>): Said | null {
   const person = personIn(target);
-  return person === null ? null : whoDid(person, me, names);
+  return person === null ? null : saidOf(person, me, names);
 }
 
 /**

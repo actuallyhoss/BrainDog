@@ -1,11 +1,16 @@
 /**
- * A row's history on `/r/<register>/<seq>`, read from the record.
+ * A row's history on `/r/<register>/<seq>`, read from the record, and what History leads with: who signed what is new
+ * since the reader last looked.
  *
  * A ROUTE-ONLY MODULE, like `search-live.ts`: the client carries the route table as a value.
  *
  * EVERY REFUSAL IS THE RECORD'S OWN SENTENCE. `UNREACHABLE` and `UNAUTHORIZED` at an address with no slug used to
  * read the sample's ledger instead, which put another business's history beside whatever row the address named; there
  * is no sample now (DIRECTION 26), so a host that did not answer says so and a 401 says to sign in.
+ *
+ * EVERY SENTENCE THE RECORD STORED LEAVES HERE THROUGH `moneyInText`, as the feed and the log leave `news-live.ts`. A
+ * rule's note holds an amount the way a program reads it, "GBP 2,400.00", and a row's history printed it so; the screen
+ * says it the way a person does, "£2,400.00" in the home currency and "$4,800.00 USD" in any other (design.md §5, DSN-4).
  */
 
 import { createClient, type ClientOptions } from '@braindog/client';
@@ -13,6 +18,7 @@ import { createClient, type ClientOptions } from '@braindog/client';
 import { display, labelOf } from './api.ts';
 import { REGISTERS } from './held.ts';
 import { readBoot } from './boot-live.ts';
+import { moneyInText } from './money.ts';
 
 export type Fetch = NonNullable<ClientOptions['fetch']>;
 
@@ -58,9 +64,14 @@ export function noteOf(register: string, e: Event): string {
 /* A RULE IS `rule:<id>` ON THE RECORD AND `rule.<id>` IN THE SAMPLE, and `actorOf` words the second. */
 const actor = (a: string): string => a.replace(/^rule:/u, 'rule.');
 
-/** The record's events, oldest first, as the page's lines, newest first. */
+/**
+ * The record's events, oldest first, as the page's lines, newest first.
+ *
+ * `moneyInText` HERE AND NOT IN `noteOf`, because `news-live.ts` words its lines with `noteOf` and hands the whole
+ * sentence through `moneyInText` itself; one pass over one sentence, wherever it is made.
+ */
 export const linesOf = (register: string, events: readonly Event[]): Line[] =>
-  events.map((e) => ({ by: actor(e.actor), note: noteOf(register, e), at: e.ts })).reverse();
+  events.map((e) => ({ by: actor(e.actor), note: moneyInText(noteOf(register, e)), at: e.ts })).reverse();
 
 /**
  * The names of the people on this record, by id, for saying who did what. `boot` sends them to the owner and to a member
@@ -93,4 +104,23 @@ export async function readHistory(base: string, register: string, seq: number, i
   const out = await client.history(register, seq);
   if (out.ok) return { from: 'live', lines: linesOf(register, out.value as Event[]), now: Date.now() };
   return { from: 'refused', fix: 'refusal' in out ? out.refusal.fix : 'The row changed while it was being read.' };
+}
+
+/**
+ * What is new since the reader last looked, as who signed each line, and whether the record holds more than it sent.
+ *
+ * `whatsNew` IS THE RECORD'S OWN ANSWER to "since you last looked": the lines after the reader's read mark, which Home
+ * stamps on leaving, newest first and at most one page of them (`sinceCapped` says there are more). Reading it moves
+ * nothing; only `markRead` does, so History asking does not take Home's news away.
+ *
+ * ONLY THE SIGNATURES, because the lead line counts who and says nothing of what: the lines themselves are the log
+ * below it, which `readLog` reads.
+ */
+export type Unseen = { from: 'live'; actors: string[]; capped: boolean } | { from: 'refused'; fix: string };
+
+export async function readUnseen(base: string, io?: Fetch): Promise<Unseen> {
+  const client = createClient({ base, ...(io ? { fetch: io } : {}) });
+  const out = await client.whatsNew();
+  if (out.ok) return { from: 'live', actors: out.value.events.map((e) => e.actor), capped: out.value.sinceCapped };
+  return { from: 'refused', fix: 'refusal' in out ? out.refusal.fix : 'The record changed while it was being read.' };
 }

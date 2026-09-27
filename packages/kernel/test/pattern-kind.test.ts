@@ -8,7 +8,7 @@
  *
  * TWO SHAPES ARE AN INGEST, AND WAVE FIFTY-ONE'S CHECK KNEW ONE. It refused every `ingest` without `id` and `kind`, and
  * its checker found that broke Slash: `slash/src/prompts.ts` asks the model for ONE ingest declaration BODY, and
- * `slash/src/jobs.ts` files it bare, `{ match, extract, writes, on_conflict }`, which `slash/test/pattern.test.ts` drives.
+ * `slash/src/jobs.ts` filed it bare until A7, and files the declaration now.
  * Held to the declaration alone, every pattern Slash proposed was refused at filing. So a bare body is an ingest unless it
  * carries another kind's name or a rule's steps, and a declaration is one when its `kind` says `ingest`.
  */

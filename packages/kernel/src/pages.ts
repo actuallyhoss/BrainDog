@@ -21,6 +21,7 @@ import type { Refusal, Result } from '@braindog/ports';
 import { no, ok, refused } from '@braindog/ports';
 import type { Leaf, Predicate, Schema } from '@braindog/where';
 import { clausesOf, evaluate, quoteValue } from '@braindog/where';
+import { unquoted } from '@braindog/where';
 
 import type { ActionRow } from './actions.ts';
 import { BLOCK_READS, kindsReading, wrongKindKey } from './block-keys.ts';
@@ -617,7 +618,7 @@ function everyRow(deps: PageDeps, register: string, where: Predicate | undefined
 }
 
 export function resolvePages(deps: PageDeps): { slug: string; decl: PageDecl; row?: Entry; refusal?: Refusal }[] {
-  const out: { slug: string; decl: PageDecl; row?: Entry; refusal?: Refusal }[] = [];
+  type Resolved = { slug: string; decl: PageDecl; row?: Entry; refusal?: Refusal };
   const taken = new Set<string>();
 
   /**
@@ -645,9 +646,27 @@ export function resolvePages(deps: PageDeps): { slug: string; decl: PageDecl; ro
     return unique;
   };
 
-  for (const decl of deps.pages()) {
+  /* THE ADDRESSES ARE CLAIMED IN AN ORDER THAT DOES NOT MOVE: the pages somebody wrote first, then the templates, each
+     by its declaration's id. They were claimed in the order the record handed the declarations over, and that read
+     has no `ORDER BY`, so whichever template the store answered first took the bare name: two templates over one list
+     could trade `/p/<name>`, and re-installing one could move it (`loop/finish/defects.md` P1). A page somebody wrote
+     goes first because its name is the author's word for it, where a template's is a row's title that happens to
+     match. The ids are compared by code unit and not by `localeCompare`, so every host sorts them alike.
+
+     ONLY THE CLAIMING IS SORTED. The pages still come out in the order the record handed them over, which is the
+     order `boot`, `pages` and the rail read them in, because this is about addresses and not about places. */
+  const decls = deps.pages();
+  const made: Resolved[][] = decls.map(() => []);
+  const claimOrder = decls
+    .map((decl, at) => ({ decl, at }))
+    .sort((x, y) => {
+      if (!x.decl.for !== !y.decl.for) return x.decl.for ? 1 : -1;
+      return x.decl.page < y.decl.page ? -1 : x.decl.page > y.decl.page ? 1 : x.at - y.at;
+    });
+  for (const { decl, at } of claimOrder) {
+    const here = made[at]!;
     if (!decl.for) {
-      out.push({ slug: claim(decl.page, 'page', null), decl });
+      here.push({ slug: claim(decl.page, 'page', null), decl });
       continue;
     }
 
@@ -655,7 +674,7 @@ export function resolvePages(deps: PageDeps): { slug: string; decl: PageDecl; ro
        so a declaration with a typo in its `for.where` was reported as a page that does not exist —
        to the person who had just written it. */
     const refuse = (refusal: Refusal): void => {
-      out.push({ slug: claim(decl.page, 'page', null), decl, refusal });
+      here.push({ slug: claim(decl.page, 'page', null), decl, refusal });
     };
 
     const schema = deps.schemaOf(decl.for.register);
@@ -732,9 +751,9 @@ export function resolvePages(deps: PageDeps): { slug: string; decl: PageDecl; ro
       const place = (counts.get(slugify(name)) ?? 0) > 1 ? placeOf(row) : null;
       slugs.set(row, claim(place === null ? name : `${name} ${place}`, decl.for.register, row.seq));
     }
-    for (const row of rows) out.push({ slug: slugs.get(row)!, decl: fill(decl, row) as PageDecl, row });
+    for (const row of rows) here.push({ slug: slugs.get(row)!, decl: fill(decl, row) as PageDecl, row });
   }
-  return out;
+  return made.flat();
 }
 
 /**
@@ -1069,7 +1088,14 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
 
   /* A SERIES READS ITS FIGURES, grouped by one bucket, and lines them up on one run of buckets. */
   if (block.kind === 'series') {
-    const got = barsOf(block.series, block.back, block.ahead, deps.metric, deps.read);
+    /* A LINE NAMES ITS FIGURE AS A CELL DOES, `project-in-by-month:Kiln`: the first colon separates, and the declaration
+       is read with its parameter filled, so one figure draws one project's months on each project's page. */
+    const lineOf = (id: string): MetricDecl | null => {
+      const at = id.indexOf(':');
+      const decl = deps.metric(at < 0 ? id : id.slice(0, at));
+      return decl === null || at < 0 ? decl : (fill(decl, null, id.slice(at + 1)) as MetricDecl);
+    };
+    const got = barsOf(block.series, block.back, block.ahead, lineOf, deps.read);
     return 'refusal' in got ? { ...base, refusals: also(got.refusal) } : { ...base, bars: got.bars, matched: got.bars.keys.length };
   }
 
@@ -1334,7 +1360,12 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
      `matched` is still the whole list's, asked apart, and `open` is this read's own count: the drawer's "more" is the
      open steps it did not draw, so it is counted from `open` and not from `matched`, which holds the done ones too. */
   const short = path && block.first !== undefined ? path : null;
-  const listed = short ? ask(openOf(said.predicate, short.done), Math.min(limit, Math.max(1, Math.floor(block.first!)))) : ask(said.predicate, limit);
+  /* `first: 0` DRAWS NO STEPS, which is what it says, as `limit: 0` draws no rows. `Math.max(1, …)` drew one, so a hand-made
+     block asking for none got the first open step (`loop/research-audit-2026-09-25-layouts.md` §19). The open steps are
+     still asked, one row, because the read's count is what the drawer's "more" is made from, and the kernel's `list`
+     reads a limit of 0 as no limit given and answers its default. */
+  const drawn = short ? Math.min(limit, Math.floor(block.first!)) : limit;
+  const listed = short ? ask(openOf(said.predicate, short.done), Math.max(1, drawn)) : ask(said.predicate, limit);
   if (!listed.ok) return { ...base, refusals: refused(listed) ? also(listed.refusal) : also() };
   const whole = short ? ask(said.predicate, 1) : listed;
   if (!whole.ok) return { ...base, refusals: refused(whole) ? also(whole.refusal) : also() };
@@ -1413,11 +1444,21 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
   if (block.working === true && !(deps.history && deps.sessionsLive))
     return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read whether an agent is on a row onto a page yet.', at: 'working' }) };
 
-  const read = listed.value.rows;
+  const read = short && !(drawn > 0) ? [] : listed.value.rows;
   const ranged = block.kind === 'progress' && block.range === true ? rangeFault(block, register, schema, read) : null;
   if (ranged) return { ...base, refusals: also(ranged) };
   const rows = read;
   const marks = path ? rows.map((r) => r.fields[path.done] === true) : null;
+  /* A PATH'S NEXT STEP IS ITS FIRST OPEN STEP IN THE ORDER ITS LIST DECLARES, not the first open one drawn. Under
+     `order: rank desc` a path drew S3, S2, S1 and marked S2 as next while the card over the same steps said S1
+     (`loop/research-audit-2026-09-25-layouts.md` §19). So it is picked by `nextSteps`, the rule a card's next step is
+     picked by, with every drawn row put under one parent so that its one answer is the whole path's. */
+  const lead = path
+    ? nextSteps(
+        rows.map((r, at) => ({ seq: r.seq, at, fields: { path: 1, done: r.fields[path.done], rank: path.order === undefined ? null : r.fields[path.order] } })),
+        { of: 'path', done: 'done', order: 'rank' },
+      ).get('1')
+    : undefined;
   /* WHICH OF THE ROWS ARE IN THE PATH'S SHORT VIEW, beside every row up to `limit`, so both views draw from this one
      answer (`shortOf`). */
   const inShort = shortOf(deps, block, register, schema, rows);
@@ -1456,7 +1497,7 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
     ...(scope ? scopesOf(deps, rows, scope) : {}),
     ...ringsOf(deps, block, register, rows),
     ...nextsOf(deps, block, register, rows),
-    ...(marks ? { done_now: marks, next: marks.indexOf(false) < 0 ? null : marks.indexOf(false) } : {}),
+    ...(marks ? { done_now: marks, next: lead === undefined ? null : lead.at } : {}),
     ...inShort,
   };
 }
@@ -1603,8 +1644,14 @@ function shortOf(
   return { short_now: rows.map((r) => inView.has(r.id)) };
 }
 
-/** The field types a range's low, high and spent may be: figures, money among them. */
-const RANGE_TYPES = new Set(['int', 'number', 'decimal', 'money']);
+/**
+ * The field types a range's low, high and spent may be: figures, money among them.
+ *
+ * ONLY TYPES THE KERNEL DECLARES (`FIELD_TYPES` in `coerce.ts`). `number` sat here beside them, a type no field can
+ * have, so it admitted nothing and read as if it did. A `quantity` is left out: it is a figure with a unit, and nothing
+ * here checks that the three columns share one.
+ */
+const RANGE_TYPES = new Set(['int', 'decimal', 'money']);
 
 /**
  * Why a `progress` block drawn as ranges cannot be, or `null`.
@@ -1653,14 +1700,16 @@ function openingOf(
 ): { value: number | null; unit: string | null; refusal?: Refusal; parts?: Part[]; missing?: string[]; converted?: boolean } {
   if (typeof opening === 'number') return { value: opening, unit: null };
   if (!opening || typeof opening !== 'object' || typeof opening.metric !== 'string') return { value: null, unit: null };
-  const decl = deps.metric(opening.metric);
+  /* THE FIRST COLON SEPARATES, as in a stat cell: `book-cash:Kiln` is one book's opening, read with its parameter filled. */
+  const at = opening.metric.indexOf(':');
+  const decl = deps.metric(at < 0 ? opening.metric : opening.metric.slice(0, at));
   if (!decl)
     return {
       value: null,
       unit: null,
       refusal: { code: 'METRIC_UNKNOWN', fix: `There is no metric called ${opening.metric} for the walk to start from.`, at: 'opening' },
     };
-  const read = deps.read(decl);
+  const read = deps.read(at < 0 ? decl : (fill(decl, null, opening.metric.slice(at + 1)) as MetricDecl));
   if (!read.ok) return { value: null, unit: null, ...(refused(read) ? { refusal: read.refusal } : {}) };
   if (read.value.refusals.length) return { value: null, unit: null, refusal: read.value.refusals[0]! };
   /* A BALANCE IN SEVERAL CURRENCIES WITH NO RATE BETWEEN THEM IS NOT ONE AMOUNT TO START FROM: its parts are, one walk a
@@ -2219,8 +2268,14 @@ function captureBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also:
   return { ...base, fills: captureFills(said.predicate, schema, deps.titleOf(register), byId.bad.length ? undefined : byId.predicate) };
 }
 
-/** The field types an `inputs` block can offer a control for. A ref, a list, a file or a document is not typed into a box. */
-const TYPABLE = new Set(['text', 'url', 'email', 'enum', 'int', 'number', 'decimal', 'money', 'pct', 'day', 'instant', 'bool', 'boolean', 'duration']);
+/**
+ * The field types an `inputs` block can offer a control for. A ref, a list, a file or a document is not typed into a box.
+ *
+ * ONLY TYPES THE KERNEL DECLARES (`FIELD_TYPES` in `coerce.ts`). `number`, `pct` and `boolean` sat here beside them,
+ * names no field can have, so they admitted nothing and read as if they did. A `quantity` stays out until a host has a
+ * box that takes a figure and its unit together (MOD-22 in `loop/finish/modules.md`); until then it is edited on the row.
+ */
+const TYPABLE = new Set(['text', 'url', 'email', 'enum', 'int', 'decimal', 'money', 'day', 'instant', 'bool', 'duration']);
 
 /**
  * An `inputs` block over `register:`: one row of the list, and the type of each field it draws.
@@ -2245,7 +2300,20 @@ function inputsBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: 
   const fields = (block.columns ?? []).map((c) => c.field);
   /* WITH NO `columns:` THE ROW'S TYPABLE FIELDS ARE DRAWN, and a ref, a list or a file is left out as it is refused when
      named: answering its type handed the host a box to type a row id or a document into. */
-  const named = fields.length ? fields : Object.keys(schema.fields).filter((f) => TYPABLE.has(schema.fields[f]!.type));
+  /* AND ONLY THE ONES A PERSON MAY TYPE INTO. A field changed only by an accepted proposal (`by: decide`), one that
+     keeps its first value (`immutable`), one the record computes (`derived`) and one the list retired were each drawn
+     as a box, and typing into the first was answered `FORBIDDEN approved_price changes only by an accepted proposal`
+     (`loop/research-audit-2026-09-25-layouts.md` §19). The schema a block reads carries types and not these, so they
+     are read off the list's own declaration; a host that hands no `lists` leaves them to the write to refuse. */
+  const shut = new Set(
+    (deps.lists?.().find((l) => l.id === register)?.fields ?? [])
+      .filter((f) => {
+        const said = f as { by?: unknown; immutable?: unknown; derived?: unknown; retired?: unknown };
+        return said.by === 'decide' || said.immutable === true || said.derived === true || said.retired === true;
+      })
+      .map((f) => f.id),
+  );
+  const named = fields.length ? fields : Object.keys(schema.fields).filter((f) => TYPABLE.has(schema.fields[f]!.type) && !shut.has(f));
   const unknown = named.filter((f) => !Object.hasOwn(schema.fields, f));
   if (unknown.length)
     return { ...base, refusals: also({ code: 'FIELD_UNKNOWN', fix: `${register} has no field called ${unknown.join(', ')}.`, at: 'columns', allowed: Object.keys(schema.fields) }) };
@@ -2841,7 +2909,8 @@ export function fill(doc: unknown, row: Entry | null, param?: string): unknown {
      parameter is ever handed: a page template is filled from a ROW and carries no top-level `where`
      of its own. So the key is added on that shape and nowhere else. */
   const scope = param === undefined || doc === null || typeof doc !== 'object' || Array.isArray(doc) ? undefined : scopeOf((doc as { where?: unknown }).where);
-  const valueOf = (key: string): string | null => {
+  /* What a hole names, as the row holds it, or `null` when nothing is held there. */
+  const heldOf = (key: string): Json | null => {
     if (key === 'it') return param ?? null;
     /* A ROW'S SPOKEN ID, spelled as the ladder writes a run's `project` (`things#1`), so a template page
        finds its runs by `project is {{spoken}}`. A register with its own prefix would need its
@@ -2849,12 +2918,43 @@ export function fill(doc: unknown, row: Entry | null, param?: string): unknown {
     if (key === 'spoken') return row ? row.register + '#' + String(row.seq) : null;
     /* OWN PROPERTIES ONLY. `{{constructor}}` read the prototype and filled a heading with source code. */
     const value = row && Object.hasOwn(row.fields, key) ? row.fields[key] : undefined;
-    return value === null || value === undefined ? null : String(value);
+    return value === undefined ? null : value;
+  };
+  const valueOf = (key: string): string | null => {
+    const value = heldOf(key);
+    return value === null ? null : String(value);
+  };
+  /* A LIST IN A SENTENCE IS ITS VALUES JOINED BY `or`, which is how the grammar reads several values after `is`
+     (`state is open or doing`). Written with `String` it was `a,b`, and the comma cut the clause in two
+     (`loop/research-audit-2026-09-25-layouts.md` §19). A quote holds one value, so a list holding a value that has to be
+     quoted has no sentence it can be written as, and it is left unfilled, as a field holding nothing is. */
+  const saidOf = (key: string): string | null => {
+    const value = heldOf(key);
+    if (!Array.isArray(value)) return value === null ? null : quoteValue(String(value));
+    const words = value.map((one) => (typeof one === 'string' || typeof one === 'number' || typeof one === 'boolean' ? String(one) : null));
+    const [only] = words;
+    if (words.length === 1 && typeof only === 'string') return quoteValue(only);
+    return words.length > 1 && words.every((word) => word !== null && quoteValue(word) === word) ? words.join(' or ') : null;
   };
   const text = (s: string, sentence: boolean): string =>
-    s.replace(/\{\{(\w+)\}\}/g, (whole, key: string) => {
-      const value = valueOf(key);
-      return value === null ? whole : sentence ? quoteValue(value) : value;
+    s.replace(/\{\{(\w+)\}\}/g, (whole: string, key: string, at: number) => {
+      if (!sentence) return valueOf(key) ?? whole;
+      /* A HOLE THE AUTHOR ALREADY QUOTED IS NOT QUOTED AGAIN. `what contains "{{it}}"` took the value quoted by
+         `quoteValue` inside the author's own marks, and a value that needed quoting came out as two quotes the grammar
+         reads as neither (§19 of the same audit). So where the marks round the hole are a quote by the grammar's own
+         reading (`unquoted`, opening at the start of a word and closing before a comma or the end), the value goes in
+         as it stands with each closing mark written twice, which the grammar reads back as one mark of the value. */
+      const close = s[at + whole.length];
+      if (
+        close === undefined ||
+        at === 0 ||
+        (at > 1 && !/[\s,]/.test(s[at - 2] ?? '')) ||
+        unquoted(s.slice(at - 1, at + whole.length + 1)) !== whole ||
+        !/^\s*(?:,|$)/.test(s.slice(at + whole.length + 1))
+      )
+        return saidOf(key) ?? whole;
+      const value = heldOf(key);
+      return value === null || Array.isArray(value) ? whole : String(value).replaceAll(close, close + close);
     });
   const walk = (node: unknown, sentence: boolean): unknown => {
     if (typeof node === 'string') return text(node, sentence);
@@ -2979,9 +3079,13 @@ export function registersOf(decl: PageDecl, metric?: (id: string) => MetricDecl 
       addFigure(at < 0 ? cell.metric : cell.metric.slice(0, at));
     }
     /* A SERIES READS EVERY FIGURE IT LINES UP. */
-    for (const line of block.series ?? []) for (const id of [line?.metric, line?.then]) if (typeof id === 'string') addFigure(id);
+    for (const line of block.series ?? [])
+      for (const id of [line?.metric, line?.then]) if (typeof id === 'string') addFigure(id.indexOf(':') < 0 ? id : id.slice(0, id.indexOf(':')));
     /* A WALK THAT STARTS FROM A FIGURE READS THAT FIGURE'S LIST, and so does the figure its late knob marks. */
-    if (block.opening && typeof block.opening === 'object') addFigure(block.opening.metric);
+    if (block.opening && typeof block.opening === 'object') {
+      const at = block.opening.metric.indexOf(':');
+      addFigure(at < 0 ? block.opening.metric : block.opening.metric.slice(0, at));
+    }
     if (typeof block.late === 'string') addFigure(block.late);
     /* AND THE FIGURE A PROGRESS BLOCK SETS ITS ROWS AGAINST, which `spentOf` reads whole into `readings`. Unnamed, a
        budget over Budgets with `spent:` a figure of Payroll drew a member invited to Budgets the Payroll total to the unit. */

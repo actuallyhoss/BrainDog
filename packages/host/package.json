@@ -14,6 +14,7 @@
     "./script-try": "./src/script-try.ts",
     "./slash": "./src/slash.ts",
     "./slash-answers": "./src/slash-answers.ts",
+    "./stripe-sign": "./src/stripe-sign.ts",
     "./types": "./src/types.ts"
   },
   "dependencies": {

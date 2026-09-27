@@ -1,63 +1,63 @@
 /**
  * Slash on the Worker: the model hookup and the daily look (`loop/research-spark.md` S15, `docs/46` §5.9).
  *
- * TWO WAYS TO A MODEL, AND THE PERSON'S OWN ENDPOINT WINS. Where `SLASH_ENDPOINT` is set, it and `SLASH_MODEL` name where to
- * ask, and the key is the one the person put in their vault under the label `slash`, opened in the Worker through `KEK` on
- * each call (`actions.ts` `keyOpener`, one `grant.read` event each time) and dropped when the call returns. A hosted record
- * has no operator key for that path. The builder is `@braindog/host/slash`'s, the one the self-host uses, so the two hosts
- * cannot drift. Where it is empty, the model is the INCLUDED one (`includedInference` below): Workers AI through `AI`,
- * which spends the Cloudflare account's neurons and opens no key at all.
+ * TWO WAYS TO A MODEL, AND THE OWNER CHOOSES. The INCLUDED model (`includedInference` below): Workers AI through `AI`, which
+ * spends the Cloudflare account's neurons and opens no key at all. And HIS OWN KEY: a provider (Anthropic's Messages or an
+ * OpenAI-compatible endpoint), an https address on the public internet, a model name, and a key he picked from his vault,
+ * which Settings saves in Slash's own store and `@braindog/host/slash`'s `slashOwnKeyOf` reads back. The key is opened
+ * through `KEK` on each call (`actions.ts` `keyOpener`, one `grant.read` event each time) and dropped when the call returns.
+ * Which of the two answers is read on every ask, so a choice saved a second ago is the one the next ask goes to.
  *
- * NO `KEK`, NO ENDPOINT MODEL. Unbound, no vault key can be opened, so the endpoint path builds nothing, `/api/version` says
- * `slash: false`, and Slash's own rules draft. The included model does not read `KEK`.
+ * `SLASH_ENDPOINT` IS NOT READ HERE ANY MORE. It named a deployment's own endpoint, asked with whatever key the vault held
+ * under the label `slash`, which on a hosted record was the person's key sent to an address the operator chose. His own
+ * key replaces it: he names the address, he picks the key by its id, and no key is chosen by its label (`loop/finish/agents.md`
+ * §5 item 5, `loop/finish/defects.md` S1). The builders are `@braindog/host/slash`'s, the ones the self-host uses, so the two
+ * hosts cannot drift.
+ *
+ * EVERY WIRE HERE THAT CARRIES A KEY REQUIRES IT (`loop/finish/defects.md` S2). A key that will not open is a
+ * `SlashKeyClosedError` before anything is sent, never a request with no key, because every address his key goes to is a
+ * hosted provider on his own bill. `wireOf` sets it, and the own-key path in the host keeps it whatever a caller passes.
+ *
+ * NO `KEK`, NO OWN KEY. Unbound, no vault key can be opened, so the settings door will not store one, and Slash is the
+ * included model or nothing.
  *
  * THE INCLUDED MODEL IS SWITCHED ON BY `SLASH_INCLUDED`, NOT BY THE BINDING. `AI` is bound in both environments already
  * (`wrangler.jsonc`, since `src/inference.ts` was written) and `deploy.yml` deploys production on every green `ci`, so a
  * model keyed on the binding alone would have started spending his account at the first deploy of the commit that built it.
- * Spending it is his call (`loop/research-living-in-it.md` section 8, call 2), so it takes a var no environment declares.
+ * Spending it is his call (`loop/research-living-in-it.md` section 8, call 2), so it takes a var.
  *
- * TWO FEATURES SHARE THE NAME AND THIS FILE NOW BUILDS BOTH. `workerSlashModel` is the model behind the RECORD's Slash, which
+ * TWO FEATURES SHARE THE NAME AND THIS FILE BUILDS BOTH. `workerSlashModel` is the model behind the RECORD's Slash, which
  * proposes how a BrainDog is ARRANGED; `workerSlashEngine` is `@braindog/slash`, `docs/46`'s engine, which answers a typed
  * question about what is IN the record. `1f85a49a` settled that neither is a newer version of the other, and the app is where
- * the edge to the package belongs: `46 §5.1` has the host `import()` it once and only when an endpoint is configured, so the
- * decision cannot live in `packages/host/src/slash.ts`, a module every host loads.
+ * the edge to the package belongs: `46 §5.1` has the host `import()` it once and only when there is a model to offer, so the
+ * decision cannot live in `packages/host/src/slash.ts`, a module every host loads. Both read the owner's one choice, so the
+ * press on Decide and a question at the palette go to the same model.
  *
- * ONE KEY PATH FOR BOTH PORTS, which is what `wireOf` is for. The two builders below read the same `SLASH_ENDPOINT`, open the
- * same vault grant through the same opener, and refuse on the same condition, so `/api/version`'s single `slash` flag cannot
- * come to mean one thing for the record's model and another for the package's engine.
- *
- * AND `workerSlashDoor` IS THE THIRD NAME HERE, because a builder is not a caller: `POST /api/slash/read` is
- * what a request reaches. BOTH ARE REACHED NOW: `index.ts` keeps a `#slash` field on `Record$` and hands a
- * request to `serveSlash` when `servesSlash` names the path, which landed on 21 September.
- * `workerSlashDoor`'s own memo below carries what a real socket answers through the self-host's mirror of it.
+ * AND `workerSlashDoor` IS THE THIRD NAME HERE, because a builder is not a caller: `index.ts` keeps a `#slash` field on
+ * `Record$` and hands a request to `serveSlash` when `servesSlash` names the path.
  */
 
 import {
   SLASH_INSTRUCTIONS,
-  SLASH_KEY_LABEL,
+  SLASH_KEY_GONE,
   SLASH_PLAN_INSTRUCTIONS,
   SlashAnsweredError,
   SlashKeyClosedError,
   answerOf,
-  slashAskerEngine,
-  slashByokFor,
-  slashFromEnv,
-  slashGrantIdOf,
-  slashGrantOf,
   slashGuardedEngine,
-  slashInferenceOf,
-  slashModelNameOf,
-  slashModelOf,
-  slashNamedEngine,
+  slashOwnInference,
+  slashOwnKeyFor,
+  slashOwnKeyOf,
+  slashOwnModel,
   slashRecord,
+  slashSamplesOf,
   type SlashHostDeps,
   type SlashInference,
 } from '@braindog/host/slash';
 import type { OpenKey } from '@braindog/host/actions';
 import { slashAskDoor, type SlashAskDoor } from '@braindog/host';
-import { grantChosen } from '@braindog/kernel';
 import type { SlashAnswer } from '@braindog/host/slash-answers';
-import { no, type Clock, type Result, type Sql } from '@braindog/ports';
+import { no, ok, type Clock, type Refusal, type Result, type Sql } from '@braindog/ports';
 import type { CallContext, RecordApi, SlashModel } from '@braindog/record';
 import type { Slash } from '@braindog/slash';
 
@@ -66,13 +66,11 @@ import { aiInference, type AiBinding, type JsonSchema } from './inference.ts';
 import { isBound, type KekBinding } from './keys.ts';
 
 export type SlashEnv = {
-  SLASH_ENDPOINT?: string | undefined;
-  SLASH_MODEL?: string | undefined;
   KEK?: KekBinding | undefined;
   /** Workers AI, and the gateway its calls go through (`inference.ts` `AiEnv`). */
   AI?: AiBinding | undefined;
   AI_GATEWAY?: string | undefined;
-  /** `yes` to answer Slash with the included model where no endpoint is set. Anything else, including unset, is off. */
+  /** `yes` to offer Slash's included model. Anything else, including unset, is off, and Slash answers only on his own key. */
   SLASH_INCLUDED?: string | undefined;
   /** The most one record's asks may spend of the included model in a UTC month, in neurons. See `INCLUDED_MONTH_NEURONS`. */
   SLASH_INCLUDED_MONTH_NEURONS?: string | undefined;
@@ -267,15 +265,25 @@ export function includedModel(env: SlashEnv): SlashModel | undefined {
 export type SlashWire = {
   send?: ((input: URL, init: RequestInit) => Promise<Response>) | undefined;
   open?: ((api: Pick<RecordApi, 'kernel'>, actor?: string) => OpenKey | null) | undefined;
+  /**
+   * Slash's own store, where the owner's choice of model is kept, for the record's own model to read on each press.
+   *
+   * NAMED `store` AND NOT `sql` because `SlashEngineDeps` below adds its own `sql`, and one name for two meanings in one
+   * type would be a store handed where a thunk was asked for. A thunk because `index.ts` builds the record's model before
+   * the object's storage is wrapped. Absent, the record's model is the included one alone.
+   */
+  store?: (() => Sql) | undefined;
 };
 
 /**
- * The endpoint deps both ports are built from. Written once because the key discipline is the part that must not be copied.
+ * The deps every call on his own key is built from. Written once because the key discipline is the part that must not be copied.
  *
- * `actor` SIGNS EVERY `grant.read` THIS WIRE OPENS, AND `system` IS RIGHT ONLY WHERE NOBODY ASKED: the record's own model and
- * the engine's build-time model both run with nobody at the keyboard, so their callers pass none and `keyOpener`'s own
- * default stands. The door's two callers have an asker and pass their id: `slashByokFor` for tier `b`'s key, and
- * `slashAskerEngine` for this host's own model, built again on each ask.
+ * `keyRequired` IS ALWAYS SET (`loop/finish/defects.md` S2): every model this Worker reaches with a key is a hosted provider
+ * on his own bill, so a key that will not open is a `SlashKeyClosedError` before anything is sent.
+ *
+ * `actor` SIGNS EVERY `grant.read` THIS WIRE OPENS, AND `system` IS RIGHT ONLY WHERE NOBODY ASKED: the record's own press
+ * reaches its model with no context, so it passes none and `keyOpener`'s own default stands. The door has an asker and
+ * passes their id through `slashOwnKeyFor`, and an automation's question passes `rule:<id>`.
  */
 const wireOf = (env: SlashEnv, api: () => Pick<RecordApi, 'kernel'>, options: SlashWire, actor?: string): SlashHostDeps => {
   const opener = options.open ?? ((a: Pick<RecordApi, 'kernel'>, who?: string) => keyOpener(a, env.KEK, who));
@@ -283,17 +291,53 @@ const wireOf = (env: SlashEnv, api: () => Pick<RecordApi, 'kernel'>, options: Sl
     grants: () => api().kernel.grants(),
     openKey: isBound(env.KEK) ? async (grant) => (opener(api(), actor) ?? (async () => null))(grant) : null,
     send: options.send ?? ((input, init) => fetch(input, init)),
+    keyRequired: true,
   };
 };
 
+/** Where Slash on this Worker has nothing to answer with: no included model, and no key of his chosen. */
+const NO_MODEL_HERE = 'Slash answers on your own key on this host, and none is chosen yet. Pick your key in Settings.';
+
 /**
- * THE ENDPOINT WHEN ONE IS SET, EVEN WHERE IT BUILDS NOTHING. An endpoint with no `KEK` is no model, and falling through to
- * the included one there would answer his asks on the account's neurons while he believes they go to his own provider. The
- * four builders below make the same choice on the same test, so `/api/version`'s `slash` and the engines stay one fact.
+ * The record's own Slash, the arranger's press and first plan, on whichever model the owner chose, or nothing at all.
+ *
+ * THE CHOICE IS READ ON EACH ASK, not when the object opens: a save in Settings reaches the next press without a restart,
+ * and the press and a question at the palette go to the same model. His key where he chose it, the included model
+ * otherwise, and a throw the record reads as "the rules speak" where neither is there.
+ *
+ * `undefined` ONLY WHERE NEITHER COULD EVER ANSWER: the included model off and no `KEK` to open a key with, or no store
+ * handed in to read a choice from. That is what `/api/version`'s `slash` reads, so a Worker that can open a key says it
+ * has Slash, and Settings is where it is set up.
  */
 export function workerSlashModel(env: SlashEnv, api: () => Pick<RecordApi, 'kernel'>, options: SlashWire = {}): SlashModel | undefined {
-  const config = slashFromEnv(env, { operatorKey: false });
-  return config === undefined ? includedModel(env) : slashModelOf(config, wireOf(env, api, options));
+  const included = includedModel(env);
+  const store = options.store;
+  if (store === undefined || !isBound(env.KEK)) return included;
+  const own = () => slashOwnKeyOf(store());
+  const chosen = (): SlashModel => {
+    const key = own();
+    if (key === null) {
+      if (included === undefined) throw new NotSent(NO_MODEL_HERE);
+      return included;
+    }
+    const model = slashOwnModel(key, wireOf(env, api, options));
+    if (model === undefined) throw new NotSent(SLASH_KEY_GONE.fix);
+    return model;
+  };
+  return {
+    /* READ ON EACH ASK AS THE REST IS, because the record names who drafted by it and treats `included` as the one model
+       whose refusal before sending means the record was too large to ask about. */
+    get name() {
+      if (own() !== null) return 'your key';
+      return included?.name ?? 'none';
+    },
+    draft: async (input) => chosen().draft(input),
+    form: async (input) => {
+      const model = chosen();
+      if (model.form === undefined) throw new NotSent('The model Slash answers with here drafts no first plan.');
+      return model.form(input);
+    },
+  };
 }
 
 export type SlashEngineDeps = SlashWire & {
@@ -311,26 +355,28 @@ export type SlashEngineDeps = SlashWire & {
 };
 
 /**
- * The tiers Slash runs on the Cloud: the included model, and tier `b` where a stored one still drafts (below). Not `byo`.
+ * The tiers Slash runs on the Cloud: `a`, the included model, and `b`, his own key. Not `byo`.
  *
- * `byo` NAMES NO ADDRESS OF THE OWNER'S, only a model name for this host's own model. On the included model the name went
- * to Workers AI's own table, which answered "no adapter on this host" on every pass 2 (`src/inference.ts`), while the host
- * still counted each ask against the cap Settings said `byo` did not have; where `SLASH_ENDPOINT` is set it is the
- * deployment's endpoint all the same, and never one the owner chose. So on every Worker the package refuses to store it, reads a
- * record already saved on it as the included model, and the guard counts it the same way; Settings offers only the
- * included model on the Cloud (`apps/web/src/lib/ui/slash-model.ts` `kindsOn`), which reads the same `host: 'cloud'` every
- * Worker sends. Until the choice of an own key replaces the three tiers (C15 in `loop/finish/agents.md`), which is the
- * next writer of this list.
+ * `byo` NAMES NO ADDRESS OF THE OWNER'S, only a model name for a host's own model, and a Worker has no model of its own
+ * but the included one. On the included model the name went to Workers AI's own table, which answered "no adapter on this
+ * host" on every pass 2 (`src/inference.ts`), while the host still counted each ask against the cap Settings said `byo`
+ * did not have. So on every Worker the package refuses to store it, reads a record already saved on it as the included
+ * model, and the guard counts it the same way. Settings offers "Included" and "Your own key" and nothing else, which is
+ * the two sources of `loop/finish/agents.md` AGT-21.
  */
 export const CLOUD_TIERS = ['a', 'b'] as const;
 
 /**
- * `@braindog/slash` over this Worker's endpoint or the included model, and this record's guarded reads, or nothing at all.
+ * `@braindog/slash` over the included model or his own key, and this record's guarded reads, or nothing at all.
  *
  * THE IMPORT IS DYNAMIC AND THE REFUSAL COMES FIRST, in that order, which is the whole of `46 §5.1`: a Worker with neither
- * an endpoint it can open a key for nor the included model switched on never evaluates the module, so the bundle a keyless
+ * the included model switched on nor a `KEK` to open a key with never evaluates the module, so the bundle a keyless
  * deployment serves does not carry it and the keyless e2e row stays byte-identical. Reversing those two lines would keep the feature working and lose
  * the property the loading rule exists for.
+ *
+ * HIS KEY IS NOT THE ENGINE'S OWN MODEL. The door opens it for each asker and hands it to both passes (`slashOwnKeyFor`),
+ * and an automation's question is handed it the same way (`workerSlashAnswers`), so the engine's own is the included
+ * model, or, where that is off, a model that sends nothing and says so (`ownOnly`).
  *
  * `slashRecord` IS THE BRIDGE AND NOT THE RECORD'S OWN `project`, which does not exist yet: it composes the projection out of
  * `boot`, `schema`, `list`, `search` and `get`, so every read runs under the asker's own level and scoping. When the record
@@ -341,29 +387,65 @@ export const CLOUD_TIERS = ['a', 'b'] as const;
  * passes `workerSlashModel`, which is assigned after this module's own `#open` has begun.
  */
 export async function workerSlashEngine(env: SlashEnv, api: () => RecordApi, deps: SlashEngineDeps): Promise<Slash | undefined> {
-  const config = slashFromEnv(env, { operatorKey: false });
-  const inference = config === undefined ? includedInference(env) : slashInferenceOf(config, wireOf(env, api, deps));
+  const included = includedInference(env);
+  const inference = included ?? (isBound(env.KEK) ? ownOnly : undefined);
   if (inference === undefined) return undefined;
   const slash = await import('@braindog/slash');
-  /* EVERY TIER IS PRICED ON THE INCLUDED MODEL, because every call this engine makes there is Workers AI on the operator's
-     account. `byo` went there too before this Worker stopped running it (`CLOUD_TIERS`), and the audit's S3 read it
-     `neurons: 0` (finding 4); tier `b` is refused at the settings door on a Worker that can open no key, and a `b` stored
-     before that still drafts here. */
-  const priced = config === undefined ? { priced: ['a', 'b', 'byo'] as const } : {};
-  /* NAMED BY THIS HOST, as on the self-host: the package's tier `a` status says `glm-5.3-flash` whatever `SLASH_MODEL`
-     sends (`loop/research-spark-routes.md` F2), and one wrap here is what every door over this engine reads. */
-  const engine = slashNamedEngine(
-    slash.createSlash({ sql: deps.sql, clock: deps.clock, inference, record: slashRecord(api()) }, { ...priced, tiers: CLOUD_TIERS }),
-    slashModelNameOf(config),
-  );
-  /* GUARDED BY THIS HOST, as on the self-host: tier `b`'s drafts are on this Worker's endpoint and the package meters tier
-     `a` alone, and `configure` checks a grant id's shape and never the vault (`slashGuardedEngine`). It reads the tiers
-     this Worker runs as the package does, so a record saved on `byo` is counted where the package answers it. */
+  /* ONLY TIER `a` IS PRICED IN NEURONS, the package's default: those calls are Workers AI on the operator's account, and
+     a call on his own key is on his provider's bill, which this host has no rate for. */
+  const engine = slash.createSlash({ sql: deps.sql, clock: deps.clock, inference, record: slashRecord(api()) }, { tiers: CLOUD_TIERS });
+  /* GUARDED BY THIS HOST, as on the self-host: `configure` checks a grant id's shape and never the vault, and the guard
+     holds a save on his own key to a live API token (`slashGuardedEngine`). It reads the tiers this Worker runs as the
+     package does, so a record saved on `byo` is counted where the package answers it. */
   const guarded = slashGuardedEngine(engine, { sql: deps.sql, clock: deps.clock, grants: () => api().kernel.grants(), tiers: CLOUD_TIERS });
-  if (config !== undefined) return guarded;
+  if (included === undefined) return keyOnly(guarded, deps.sql);
   /* AND ON THE INCLUDED MODEL, HELD UNDER THE OPERATOR'S CEILING, outermost so its check runs before either count below
      it and with no `await` between them and the package's hold. */
   return operatorCeiling(guarded, deps, Math.floor(includedMonthNeurons(env) / worstAsk(slash)));
+}
+
+/**
+ * The engine's own model on a Worker whose included model is off: one that sends nothing, marked so the package releases
+ * its hold and writes no ledger row. Every ask on his own key is handed his key instead, so this answers only a question
+ * that reached the engine with no key chosen, which `keyOnly` below turns away first.
+ */
+const ownOnly: SlashInference = {
+  complete: async () => {
+    throw new NotSent(NO_MODEL_HERE);
+  },
+};
+
+/** Whether Slash's store says his own key, read on each ask so a save a second ago is the one that counts. */
+const onOwnKey = (sql: Sql): boolean =>
+  sql.one("SELECT 1 AS n FROM sqlite_master WHERE type = 'table' AND name = 'slash_settings'") !== undefined &&
+  sql.one<{ tier: string }>('SELECT tier FROM slash_settings WHERE singleton = 1')?.tier === 'b';
+
+/**
+ * The engine on a Worker with no included model: every ask refused in one sentence until his own key is chosen.
+ *
+ * `NOT_IN_THIS_BUILD` AND NOT A MODEL THAT FAILED. Nothing is wrong with a record that has not picked a key, and a
+ * refusal that reads as a failure would send an owner hunting for a fault; the sentence says what to do instead.
+ *
+ * A SAVE OF "INCLUDED" IS REFUSED HERE TOO, and only a save that asks for it. Settings offers both sources on every Cloud
+ * record (`kindsOn` in `apps/web/src/lib/ui/slash-model.ts`), and a switch back to the included model was stored, after
+ * which every ask answered `NOT_IN_THIS_BUILD`. Handing the package tier `b` alone would refuse it as well, but also every
+ * save on a record still on the default, since the package checks the stored tier when a patch names none, and an owner
+ * setting his monthly limit there would be told Slash runs on his own key.
+ */
+function keyOnly(engine: Slash, sql: Sql): Slash {
+  const refused = <T>(): Promise<Result<T>> => Promise.resolve(no('NOT_IN_THIS_BUILD', NO_MODEL_HERE));
+  const only = Object.create(engine) as Slash;
+  /* THE OWNER'S CHECK STAYS THE ENGINE'S AND COMES FIRST, so anybody else is refused `FORBIDDEN` as on every host. */
+  only.configure = (patch, ctx) => {
+    const owner = ctx.principal.kind === 'person' && ctx.principal.level === 'owner';
+    if (!owner || (patch.source !== 'included' && patch.tier !== 'a')) return engine.configure(patch, ctx);
+    return no('NOT_IN_THIS_BUILD', 'Slash has no included model on this host, so it answers only on your own key.', { at: patch.source === 'included' ? 'source' : 'tier' });
+  };
+  only.read = (question, ctx, inference) => (onOwnKey(sql) ? engine.read(question, ctx, inference) : refused());
+  only.propose = (question, ctx, byok, askId, inference) => (onOwnKey(sql) ? engine.propose(question, ctx, byok, askId, inference) : refused());
+  only.proposePattern = (samples, ctx, inference) => (onOwnKey(sql) ? engine.proposePattern(samples, ctx, inference) : refused());
+  only.answer = (ask, inference) => (onOwnKey(sql) ? engine.answer(ask, inference) : refused());
+  return only;
 }
 
 /**
@@ -403,7 +485,7 @@ const grouped = (n: number): string => String(n).replace(/\B(?=([0-9]{3})+(?![0-
  *
  * IT COUNTS CALLS AND NOT NEURONS, AND THAT IS WHAT MAKES IT EXACT. The package writes a hold row for each call before its
  * first `await` (`core.reserve`), with the model's name and 0 neurons, and a call settled under `-` reached no model. So
- * `model <> '-'` this month is every call already made and every call in flight, whatever the tier and whatever the kind,
+ * `model <> '-'` this month is every call already made and every call in flight, on any tier but his own key's and of any kind,
  * and a check taken synchronously before the engine's own sees them all: the lesson of
  * `packages/slash/test/cap-concurrent.test.ts`, where a check and a count with a model between them let ten asks through
  * a cap of two. A sum of `neurons` would miss every hold in flight, which is priced 0 until it settles.
@@ -416,9 +498,12 @@ const grouped = (n: number): string => String(n).replace(/\B(?=([0-9]{3})+(?![0-
  * propose. That is one call of at most 232 neurons past a ceiling counted at 232 a call.
  */
 function operatorCeiling(engine: Slash, deps: { sql: Sql; clock: Clock }, asks: number): Slash {
+  /* EVERY CALL BUT HIS OWN KEY'S. A call on tier `b` went to his provider on his bill and spent none of the operator's
+     neurons, so it is not counted here, and while he is on it the ceiling does not apply at all (`agents.md` §5 item 7). */
   const made = (): number =>
-    deps.sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM slash_call WHERE model <> '-' AND ts >= ?", monthOf(deps.clock.now(), 0))?.n ?? 0;
-  const spent = (): boolean => made() >= asks;
+    deps.sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM slash_call WHERE model <> '-' AND tier <> 'b' AND ts >= ?", monthOf(deps.clock.now(), 0))?.n ??
+    0;
+  const spent = (): boolean => !onOwnKey(deps.sql) && made() >= asks;
   const until = (): string => monthOf(deps.clock.now(), 1);
   const refused = <T>(): Result<T> =>
     no('SLASH_BUDGET_SPENT', `Slash has asked this host's model as often as one record may in a month, so it is out of asks until ${until().slice(0, 10)}.`);
@@ -427,7 +512,9 @@ function operatorCeiling(engine: Slash, deps: { sql: Sql; clock: Clock }, asks: 
   capped.read = (question, ctx, inference) => (spent() ? Promise.resolve(refused()) : engine.read(question, ctx, inference));
   capped.propose = (question, ctx, byok, askId, inference) =>
     spent() ? Promise.resolve(refused()) : engine.propose(question, ctx, byok, askId, inference);
-  capped.proposePattern = (samples, ctx) => (spent() ? Promise.resolve(refused()) : engine.proposePattern(samples, ctx));
+  capped.proposePattern = (samples, ctx, inference) => (spent() ? Promise.resolve(refused()) : engine.proposePattern(samples, ctx, inference));
+  capped.draftPattern = (samples) => (spent() ? Promise.resolve(refused()) : engine.draftPattern(samples));
+  capped.digestProse = (digest) => (spent() ? Promise.resolve(ok({ text: '' })) : engine.digestProse(digest));
   /* THE RUN'S OWN SENTENCE, NAMING THE RULE AND THE STEP, as the package's own cap refusal does. Any code but
      `UNREACHABLE` is one `serveAsks` acks `done`, so the run stops here and the ladder does not ask again. */
   capped.answer = (ask, inference) => {
@@ -453,114 +540,87 @@ function operatorCeiling(engine: Slash, deps: { sql: Sql; clock: Clock }, asks: 
     return engine.configure(patch, ctx);
   };
   /* AND WHERE THE CEILING IS THAT CAP, THE COUNT UNDER IT IS THE CEILING'S. The package counts tier `a` and the guard
-     counts `b` and `byo`, so an owner who moved from `a` to `byo` mid-month read `{ used: 2, cap: 10 }` from a host that
+     counts `byo`, so an owner who moved from `a` to `byo` mid-month read `{ used: 2, cap: 10 }` from a host that
      was refusing every ask (`test/slash-operator-cap.test.ts` case 9). The ceiling's count holds every row either of those
-     does, so where it binds it is never the smaller number. */
+     does, so where it binds it is never the smaller number. On his own key it is neither: his asks are listed and not
+     capped, and the package's own status says so. */
   capped.status = () => {
     const status = engine.status();
-    if (status.asks.cap < asks) return status;
+    if (status.tier === 'b' || status.asks.cap < asks) return status;
     return { ...status, asks: { ...status.asks, used: made(), cap: asks } };
   };
   return capped;
 }
 
 /**
- * The four kinds the vault admits that `slashGrantOf` passes over, as the gate's sentence names them. The names are the vault
- * screen's (`apps/web/src/lib/record/vault.ts` `kinds`), with the article a sentence needs. `api_token` is absent on
- * purpose: a token under `slash` is chosen, so the gate never has one to name.
- */
-const KIND_NAMED: Partial<Record<string, string>> = {
-  password: 'a password',
-  ssh_key: 'an SSH key',
-  recovery_codes: 'a set of recovery codes',
-  note: 'a note',
-};
-
-/**
  * What answers an automation's question to Slash on this Worker, or nothing: `serveAsks`'s `answer`, one job at a time.
  *
  * `undefined` EXACTLY WHERE `workerSlashEngine` IS, AND DECIDED WITHOUT AN `await`, because `Record$.#open` reads it to set
- * the record's `answersSlash` before `createRecordApi` runs. The test is the builder's own (`slashInferenceOf` over the same
- * `wireOf`), and `workerSlashModel`, which `/api/version`'s `slash` reads, comes out of the same `endpointOptionsOf`, so the
- * switch that files `ask_slash` and the flag the canvas reads are one fact (`test/slash-answers.test.ts` cases 2 and 5).
+ * the record's `answersSlash` before `createRecordApi` runs. The test is the builder's own: the included model switched on,
+ * or a `KEK` to open his key with. `workerSlashModel`, which `/api/version`'s `slash` reads, is `undefined` on the same
+ * test, so the switch that files `ask_slash` and the flag the canvas reads are one fact.
  *
  * THE ENGINE IS BUILT ONCE, ON THE FIRST QUESTION, THROUGH `workerSlashEngine`, so it is the guarded one and it meters on
  * the same `slash_settings` and `slash_call` tables the door's engine does, in the same storage: one `ask_cap` for a person's read and
  * an automation's question. A build that throws is let go, as `apps/selfhost/src/slash.ts` `slashAnswersFor` lets it go,
  * so the next pass builds again rather than every question after it failing on one bad import.
  *
- * NO KEY LABELLED `slash`, NO POST, AND THE RULE IS THIS FILE'S ALONE. The host's key path sends with no `authorization`
- * when the vault has no `slash` grant, which on a self-host is a local model working. Here the endpoint is a hosted provider
- * on the owner's own bill. With this check taken out, measured on 23 September in `test/slash-answers.test.ts`'s no-key
- * case with the provider answering 401: one POST with no `authorization` header, a ledger row settled `UNREACHABLE`, the run
- * still `waiting` and a `retry` row queued, so every rung of the ladder would be another keyless POST for a day. The
- * survey's W2 read the same POST counted as an ask and blamed on the model, under the status rule as it stood then. Either
- * way it is wrong here, so the job is refused `FORBIDDEN` before the engine is built or anything is held, and nothing is
- * written to the ledger (Q7's default).
+ * ON HIS OWN KEY THE QUESTION GOES TO HIS KEY, AND NO KEY, NO POST. Where his key is chosen the question is asked on it,
+ * and only on it: a grant revoked or gone since he picked it is refused `FORBIDDEN` before the engine is built or anything
+ * is held, and nothing is written to the ledger (Q7's default). The included model is never asked in its place, since he
+ * chose where his questions go.
  *
- * AND A KEY THAT IS THERE AND WILL NOT OPEN IS REFUSED TOO, which the check above cannot see: it reads which grant the key
- * path would choose, and the key path reads the opening. `loop/research-batch-forty-nine-audit.md` finding 2 put the
- * owner's key under one `KEK` and woke the object under another, as a `wrangler secret put KEK` leaves it: 8 POSTs with no
- * `authorization` of 8 over the ladder, 8 ledger rows under the dash, and a run ending "could not be reached".
- * `keyOpener` answers `null` for that and for four other ways a grant fails to open (`actions.ts`). So the rule's wire asks
- * for `keyRequired`, the host throws before `post` sends, and the job is refused `FORBIDDEN` with the same ledger as the
- * no-key case: none. `test/slash-key-status.test.ts` holds it.
+ * AND A KEY THAT IS THERE AND WILL NOT OPEN IS REFUSED TOO, which the check above cannot see: it reads that the grant is
+ * live, and the opening is the call's. `loop/research-batch-forty-nine-audit.md` finding 2 put the owner's key under one
+ * `KEK` and woke the object under another, as a `wrangler secret put KEK` leaves it: 8 POSTs with no `authorization` of 8
+ * over the ladder, 8 ledger rows under the dash, and a run ending "could not be reached". `keyOpener` answers `null` for
+ * that and for four other ways a grant fails to open (`actions.ts`). His key's wire always requires it (`wireOf`), the host
+ * throws before `post` sends, and the job is refused `FORBIDDEN` with the same ledger as a key that is gone: none.
  *
  * EACH QUESTION IS ASKED ON A WIRE SIGNED `rule:<id>`, so the vault's `grant.read` for the owner's key names the rule that
- * opened it and not `system`. This never calls `slashByokFor`: a rule has no session for the vault's gate to read, and
- * installing a rule that asks Slash is the owner's consent to its question going to this Worker's endpoint (Q3's default).
+ * opened it and not `system`. This never runs the vault's session gate (`slashOwnKeyFor`): a rule has no session for it
+ * to read, and installing a rule that asks Slash is the owner's consent to its question going to the model he chose (Q3's
+ * default).
  */
 export function workerSlashAnswers(env: SlashEnv, api: () => RecordApi, deps: SlashEngineDeps): SlashAnswer | undefined {
-  const config = slashFromEnv(env, { operatorKey: false });
+  const included = includedInference(env) !== undefined;
+  const keyed = isBound(env.KEK);
+  if (!included && !keyed) return undefined;
   let built: Promise<Slash | undefined> | null = null;
   const engineOf = () =>
     (built ??= workerSlashEngine(env, api, deps).catch((e: unknown) => {
       built = null;
       throw e;
     }));
-  /* THE INCLUDED MODEL OPENS NO KEY, SO NONE OF THE KEY RULES BELOW IS ITS. There is no vault grant to gate on, no
-     `keyRequired` to ask for and no rule id to sign a `grant.read` with, so the question goes to the engine's own model. */
-  if (config === undefined) {
-    if (includedInference(env) === undefined) return undefined;
-    return async (ask) => {
+  return async (ask) => {
+    const own = keyed ? slashOwnKeyOf(deps.sql) : null;
+    /* THE INCLUDED MODEL OPENS NO KEY, SO NONE OF THE KEY RULES BELOW IS ITS. There is no vault grant to gate on and no
+       rule id to sign a `grant.read` with, so the question goes to the engine's own model. */
+    if (own === null) {
+      if (!included)
+        return no(
+          'NOT_IN_THIS_BUILD',
+          `rule.${ask.rule} asked Slash at step ${ask.step + 1}, and Slash on this host answers on your own key, which is not chosen yet, so the run stopped there. Pick your key in Settings.`,
+        );
       const engine = await engineOf();
       if (engine === undefined) throw new Error('Slash has no model on this Worker to answer with.');
       return engine.answer(ask);
-    };
-  }
-  if (slashInferenceOf(config, wireOf(env, api, deps)) === undefined) return undefined;
-  return async (ask) => {
-    /* THE GATE ASKS THE KEY PATH'S OWN CHOOSER, so the two cannot disagree about whether there is a key. It read the label
-       and `revoked_at` alone until 23 September, a third chooser beside the kernel's and the host's: a `note` labelled
-       `slash` passed it, the key path chose nothing to open, and the run was told the key "would not open on this Worker",
-       which sends an owner to put in again a key that was never there (`test/slash-named.test.ts`, the note case). */
-    const grants = api().kernel.grants();
-    if (slashGrantOf(grants) === undefined) {
-      /* AND WHEN AN ENTRY IS THERE UNDER `slash` BUT IS NOT A TOKEN, THE SENTENCE SAYS WHICH KIND IT IS. After the gate
-         moved onto the chooser, a password as the only `slash` entry ended the run on "this record's vault holds no key
-         labelled slash", measured on 23 September through the bundled Worker (`test/slash-worker-chooser.test.ts` W1),
-         while the owner's own vault screen lists that very row as a key of kind Password. The entry named is the one an
-         action naming `slash` would open, the kernel's own `grantChosen` with no kind asked for, so this reads no fourth
-         order of its own. */
-      const held = grantChosen(grants, SLASH_KEY_LABEL);
-      const kind = held === undefined ? undefined : KIND_NAMED[held.kind];
+    }
+    const inference = slashOwnInference(own, wireOf(env, api, deps, `rule:${ask.rule}`));
+    if (inference === undefined)
       return no(
         'FORBIDDEN',
-        kind === undefined
-          ? `rule.${ask.rule} asked Slash at step ${ask.step + 1}, and this record's vault holds no key labelled ${SLASH_KEY_LABEL}, so the run stopped there. Put your model key in the vault under ${SLASH_KEY_LABEL}.`
-          : `rule.${ask.rule} asked Slash at step ${ask.step + 1}, and the key labelled ${SLASH_KEY_LABEL} in this record's vault is ${kind}, not an API token, so nothing was sent and the run stopped there. Put your model key in the vault under ${SLASH_KEY_LABEL} as an API token.`,
-        { at: 'grant' },
+        `rule.${ask.rule} asked Slash at step ${ask.step + 1}, and the key Slash was set to answer with is no longer a key in the vault, so nothing was sent and the run stopped there. Pick your key again in Settings.`,
+        { at: 'grant_id' },
       );
-    }
     const engine = await engineOf();
-    const inference = slashInferenceOf(config, { ...wireOf(env, api, deps, `rule:${ask.rule}`), keyRequired: true });
-    /* NEITHER IS REACHABLE WHILE THE TEST ABOVE HOLDS, and a thrown sentence here becomes the ladder's `failed` ack
-       rather than an answer nobody asked for. */
-    if (engine === undefined || inference === undefined) throw new Error('Slash has no model on this Worker to answer with.');
+    /* NOT REACHABLE WHILE THE TEST ABOVE HOLDS, and a thrown sentence here becomes the ladder's `failed` ack rather than
+       an answer nobody asked for. */
+    if (engine === undefined) throw new Error('Slash has no model on this Worker to answer with.');
     /* THE KEY IS OPENED ON THE CALL, SO WHETHER IT OPENS IS LEARNT INSIDE `answer`, and this wrap is how the pass hears
-       it: `SlashKeyClosedError` is thrown by `keyRequired` before `post` sends, and the package, reading its `sent: false`,
-       releases its hold and writes no ledger row. What the package cannot say is where the key lives, so the sentence is
-       this file's, beside the no-key one above it. */
+       it: `SlashKeyClosedError` is thrown before `post` sends, and the package, reading its `sent: false`, releases its
+       hold and writes no ledger row. What the package cannot say is where the key lives, so the sentence is this file's,
+       beside the one for a key that is gone. */
     let closed = false;
     const out = await engine.answer(ask, {
       complete: async (call) => {
@@ -575,8 +635,8 @@ export function workerSlashAnswers(env: SlashEnv, api: () => RecordApi, deps: Sl
     if (closed)
       return no(
         'FORBIDDEN',
-        `rule.${ask.rule} asked Slash at step ${ask.step + 1}, and the key labelled ${SLASH_KEY_LABEL} in this record's vault would not open on this Worker, so nothing was sent and the run stopped there.`,
-        { at: 'grant' },
+        `rule.${ask.rule} asked Slash at step ${ask.step + 1}, and your own key for Slash would not open on this Worker, so nothing was sent and the run stopped there.`,
+        { at: 'grant_id' },
       );
     return out;
   };
@@ -639,30 +699,24 @@ export function workerSlashDoor(
   deps: SlashEngineDeps,
   origins: ReadonlySet<string>,
 ): SlashAskDoor<CallContext> {
-  /* TIER `b` IS OFFERED ONLY WHERE A KEY CAN BE OPENED. With no `KEK` there is no engine either, but the door is built
-     before the engine, and a `byok` handed in here is what lets the settings door store tier `b`: offering it on a Worker
-     that can open nothing would save a setting every later propose refuses. `api` is not called until a propose, by which
-     time the engine is built and its `slash_settings` table exists for `slashGrantIdOf` to read. */
-  const config = slashFromEnv(env, { operatorKey: false });
-  const wire = wireOf(env, api, deps);
-  /* OPENED FOR THE ASKER, NOT FOR `system`: `slashByokFor` runs the vault's own gate on `ctx` and signs the `grant.read`
+  /* HIS OWN KEY IS OFFERED ONLY WHERE A KEY CAN BE OPENED. A `byok` handed in here is what lets the settings door store
+     it: offering it on a Worker with no `KEK` would save a choice every later ask refuses. `api` is not called until an
+     ask, by which time the engine is built and its `slash_settings` table exists for `slashOwnKeyOf` to read.
+     OPENED FOR THE ASKER, NOT FOR `system`: `slashOwnKeyFor` runs the vault's own gate on `ctx` and signs the `grant.read`
      with the asker's id, where this line once opened the owner's key for any caller the door let through
      (`loop/research-batch-thirty-one-audit.md` §1). */
-  const byok =
-    config === undefined || wire.openKey === null
-      ? undefined
-      : async (ctx: CallContext) => slashByokFor(config, slashGrantIdOf(deps.sql), api(), ctx, (_asker, actor) => wireOf(env, api, deps, actor));
-  /* AND THIS WORKER'S MODEL IS BUILT FOR THE ASKER ON EACH ASK, off the same `wireOf` with the same `actor`: on a hosted
-     record that model is always keyed from the vault, so without this every `grant.read` Slash made was signed `system`.
-     Per call and as an argument, because a slot would cross two asks in flight and `AsyncLocalStorage` is not here
-     (`slashAskerEngine`). The included model opens no key and so signs nothing, and its engine is handed on as built. */
-  const build = async () => {
-    const engine = await workerSlashEngine(env, api, deps);
-    return engine === undefined || config === undefined
-      ? engine
-      : slashAskerEngine(engine, (actor) => slashInferenceOf(config, wireOf(env, api, deps, actor)));
+  const byok = isBound(env.KEK)
+    ? async (ctx: CallContext) => slashOwnKeyFor(slashOwnKeyOf(deps.sql), api(), ctx, (_asker, actor) => wireOf(env, api, deps, actor))
+    : undefined;
+  /* THE VAULT'S OWN GATE FOR A SAVE THAT POINTS HIS KEY SOMEWHERE (`slashKeySave`), asked through the read that writes no
+     event, and the INBOX'S OWN READ for a pattern's arrivals, as the asker. */
+  const vault = async (ctx: CallContext): Promise<Refusal | null> => {
+    const gate = await api().listGrants(ctx);
+    if (gate.ok) return null;
+    return 'refusal' in gate ? gate.refusal : { code: 'FORBIDDEN', fix: 'The vault could not be asked about your key. Try again.' };
   };
-  return slashAskDoor(origins, build, byok);
+  const samples = (ids: readonly string[], ctx: CallContext) => slashSamplesOf(api(), ids, ctx);
+  return slashAskDoor(origins, () => workerSlashEngine(env, api, deps), byok, { vault, samples });
 }
 
 /** Slash's daily look, asked on an alarm and after a request: the record decides whether it is due. It never throws. */

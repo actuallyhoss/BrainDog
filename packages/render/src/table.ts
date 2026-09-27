@@ -160,10 +160,14 @@ export function ariaSort(
 }
 
 /**
- * Where the tone's glyph goes: the column that declares it carries the tone, which on a register is
- * its state, so the mark and the word it qualifies read as one thing (`⊘ open`). A table that
- * declares none keeps it at the head of its first VALUE, which is not always its first column: the
- * register leads with a row picker, and a glyph there qualifies a checkbox rather than a row.
+ * Where the tone's glyph goes: the column that declares it carries the tone, and it is the column the
+ * tone is ABOUT. On a register that is its deadline, so the dot sits beside the date that made the
+ * row late or close (design DSN-7). It sat in the state column, and a red dot beside "Open" or a
+ * green one beside "Cancelled" said something the word beside it contradicted.
+ *
+ * A table that declares none keeps it at the head of its first VALUE, which is not always its first
+ * column: the register leads with a row picker, and a glyph there qualifies a checkbox rather than a
+ * row. Which column declares the tone is the host's to say, since only the host knows its fields.
  */
 export function glyphColumn(columns: readonly Column[]): number {
   const declared = columns.findIndex((c) => c.tone);

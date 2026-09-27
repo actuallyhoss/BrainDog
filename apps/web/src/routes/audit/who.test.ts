@@ -60,7 +60,9 @@ test('THE READER IS YOU, whichever spelling the ledger wrote them in', () => {
 test('AN ACTOR THAT IS NOT A PERSON IS SAID BY ITS NAME, and still leads with a capital', () => {
   assert.equal(actorSaid('system', null, NO_NAMES).name, 'BrainDog');
   assert.equal(actorSaid('slash', null, NO_NAMES).name, 'Slash');
-  assert.equal(actorSaid('rule.renewal', null, NO_NAMES).name, 'Renewal');
+  /* A RULE SAYS IT IS ONE (MOD-16), so its name is never read as a person's. */
+  assert.equal(actorSaid('rule.renewal', null, NO_NAMES).name, 'A rule: Renewal');
+  assert.equal(actorSaid('rule.renewal', null, NO_NAMES).kind, 'rule');
   assert.equal(actorSaid('agent:claude', null, NO_NAMES).name, 'Claude');
   for (const by of ['system', 'slash', 'rule.renewal', 'agent:claude'])
     assert.equal(actorSaid(by, null, NO_NAMES).person, false, `${by} was read as a person`);

@@ -23,6 +23,7 @@
 
 import type { Clock, Result, Sql } from '@braindog/ports';
 import type { Predicate } from '@braindog/where';
+import type { PatternDraft } from './jobs.ts';
 
 export type { Result };
 
@@ -186,10 +187,85 @@ export type Settings = {
 };
 export type Tier = 'a' | 'b' | 'byo';
 
-export type Status = {
+/**
+ * The monthly ask limit a record starts with, and the one `ask_cap` is held to until its owner sets another.
+ *
+ * NAMED ONCE, HERE, because the site's price list and the Settings row both say it (`loop/finish/contracts.md` §7.5, X41):
+ * a number written in three places is three numbers the day one of them moves.
+ */
+export const ASK_CAP_DEFAULT = 80;
+
+/**
+ * The asks a month Slash's background work may spend on the included model: the daily look, an automation's question,
+ * digest prose and a pattern drafted for the inbox, apart from the asks a person makes (`loop/finish/agents.md` §5 item 6).
+ *
+ * THE NAME AND NOT YET THE COUNT. The meter that holds background work to it is the model-job meter (PLT-9), and the
+ * ledger's count that would tell a person's ask from a background one is `call.ts`'s; this is the number both read.
+ */
+export const BACKGROUND_ASKS_MONTH = 60;
+
+/**
+ * Where Slash's model comes from: the model this host includes, or a key of the owner's own at a provider he chose.
+ *
+ * THE OWNER'S WORD FOR THE CHOICE, AND THE TIER IS THE STORE'S. `slash_settings` keeps a tier under its `46 §4.1` CHECK, so
+ * `included` is stored as `a` and `key` as `b`, and a record a self-host keeps on `byo` reads as `included`: that is the
+ * host's own endpoint with a model name typed for it, and nothing of the owner's is sent. `tier` stays readable beside it
+ * for one workflow (`loop/finish/contracts.md` §3.2).
+ */
+export type Source = 'included' | 'key';
+
+/** The two shapes an own key is asked in: Anthropic's Messages API, and the chat completions most other providers speak. */
+export const PROVIDERS = ['anthropic', 'openai'] as const;
+export type Provider = (typeof PROVIDERS)[number];
+
+/**
+ * Settings as the owner chose them: the stored row, and where the own key is asked.
+ *
+ * `provider` AND `base_url` ARE KEPT BESIDE THE ROW AND NOT IN IT, in `slash_meta` (`index.ts`, `OWN_PROVIDER`), because a
+ * column is a step under `STORE_VERSION` and this is two values the row's own shape has no room for. `base_url` is `null`
+ * where the owner left it to the provider's own address, and the host fills that in.
+ */
+export type Setup = Settings & { source: Source; provider: Provider | null; base_url: string | null };
+
+/** What an owner may change, as the settings door hands it on (`loop/finish/contracts.md` §3.2). `tier` still works. */
+export type SetupPatch = Partial<{
+  source: Source;
   tier: Tier;
+  provider: Provider | null;
+  base_url: string | null;
+  model: string | null;
+  grant_id: string | null;
+  ask_cap: number;
+}>;
+
+/**
+ * `capped` IS WHETHER THE MONTH'S ASKS STOP AT `cap`. On his own key they are listed and not capped (`loop/finish/agents.md`
+ * §5 item 7), so `used` is still the count and `cap` is the limit that would apply on the included model.
+ */
+export type Status = {
+  source: Source;
+  tier: Tier;
+  provider: Provider | null;
   model: string;
-  asks: { used: number; cap: number; resets: string };
+  asks: { used: number; cap: number; resets: string; capped: boolean };
+};
+
+/**
+ * One ask in the ledger, as `history` lists it for the person who pays for them (`GET /api/slash/asks`).
+ *
+ * THE LEDGER'S OWN COLUMNS AND NOTHING WORKED OUT. `question` is what was typed, or `rule.<id> step <n>` for an
+ * automation's, or the record's own words for its press; `filed` is the suggestion it put on Decide. No row of the record
+ * and no prompt is here, because the ledger never held one (`call.ts`).
+ */
+export type Asked = {
+  id: string;
+  ts: string;
+  kind: string;
+  status: string;
+  code: string | null;
+  question: string | null;
+  model: string;
+  filed: string | null;
 };
 
 /** What a figure may be pinned to, built once per projection (`46 §5.6`). */
@@ -228,7 +304,7 @@ export type Ask = {
 };
 
 export type SlashDeps = {
-  /** Slash's OWN SQLite: the `settings` and `call` tables of `46 §4.1`, never the record's database. */
+  /** Slash's OWN SQLite: the `slash_settings` and `slash_call` tables of `46 §4.1`, never the record's database. */
   sql: Sql;
   clock: Clock;
   inference: Inference;
@@ -238,21 +314,28 @@ export type SlashDeps = {
 /**
  * The engine.
  *
- * `inference` ON `read` AND `propose` IS THE HOST'S OWN MODEL FOR THIS ONE ASK, in place of `SlashDeps.inference`. A host
- * whose model is keyed from the vault opens that key on every call, and the opening is an event with an actor; built once
- * for the engine, the adapter can name nobody, so the owner's own read was logged `system`. An argument and not a slot the
- * host sets around the call, because two asks awaiting the model together would share the slot, and not
- * `AsyncLocalStorage`, which the Worker has not got. `byok` stays tier `b`'s key for the proposal and nothing else.
+ * `inference` ON EVERY ASK IS THE MODEL FOR THIS ONE ASK, in place of `SlashDeps.inference`. On his own key it is the host's
+ * adapter over that key, opened for the asker (or in the rule's name, for an automation), and the opening is an event with
+ * an actor; built once for the engine, the adapter could name nobody. An argument and not a slot the host sets around the
+ * call, because two asks awaiting the model together would share the slot, and not `AsyncLocalStorage`, which the Worker
+ * has not got. `byok` is the adapter the proposal is asked on when Slash runs on his own key; a host hands the same one as
+ * `inference`, so both passes of one question go to the model he chose.
  */
 export interface Slash {
   read(question: string, ctx: CallContext, inference?: Inference): Promise<Result<Reading>>;
   propose(question: string, ctx: CallContext, byok?: Inference, askId?: string, inference?: Inference): Promise<Result<Proposal>>;
-  proposePattern(samples: readonly RawPayload[], ctx: CallContext): Promise<Result<Proposal>>;
+  proposePattern(samples: readonly RawPayload[], ctx: CallContext, inference?: Inference): Promise<Result<Proposal>>;
+  /** A pattern for the samples, drafted and not filed: the record's `infer.draft` job, which the host's pass acks with it (`jobs.ts`). */
+  draftPattern(samples: readonly RawPayload[]): Promise<Result<PatternDraft>>;
+  /** Two sentences above a digest about to be sent, or `{ text: '' }` for none: the record's `infer.prose` job (`jobs.ts`). */
+  digestProse(digest: unknown): Promise<Result<{ text: string }>>;
   /**
-   * An automation's question, answered in the shape its rule asked for. `inference` is the host's model for this job,
-   * keyed in the rule's name, as `read`'s is keyed in the asker's; it takes no `CallContext` because nobody is asking.
+   * An automation's question, answered in the shape its rule asked for. `inference` is the model for this job, keyed in the
+   * rule's name, as `read`'s is keyed in the asker's; it takes no `CallContext` because nobody is asking.
    */
   answer(ask: Ask, inference?: Inference): Promise<Result<{ text: string }>>;
-  configure(patch: Partial<Pick<Settings, 'tier' | 'model' | 'grant_id' | 'ask_cap'>>, ctx: CallContext): Result<Settings>;
+  configure(patch: SetupPatch, ctx: CallContext): Result<Setup>;
   status(): Status;
+  /** The owner's latest asks, newest first, at most `limit` of them (`ASKS_MOST` in `index.ts`). */
+  history(limit: number, ctx: CallContext): Result<{ asks: Asked[] }>;
 }

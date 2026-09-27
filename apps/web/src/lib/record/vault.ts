@@ -24,6 +24,8 @@ import type { DeviceApproved, DeviceRow } from '@braindog/client';
 import { BASE, signinFor } from '../at.ts';
 import { copy } from '../copy.ts';
 import { answerOf, codeOf, reachKey, type Answer, type Refusal } from './device.ts';
+import { REGISTERS } from './held.ts';
+import type { Scope } from './scope-move.ts';
 
 /** The scope a vault grant names when it opens the keys of no project. */
 export const GLOBAL = '*';
@@ -189,9 +191,33 @@ export const daysFor = (scope: string | null): number => (scope === null || scop
 export const scopeName = (scope: string | null, names: ReadonlyMap<string, string>): string =>
   scope === null || scope === GLOBAL ? words.global : (names.get(scope) ?? words.someProject);
 
-/** Project names by row id, from a `list` of the projects register. */
-export function namesOf(rows: readonly { id: string; fields: Record<string, unknown> }[], title = 'name'): Map<string, string> {
-  return new Map(rows.flatMap((r) => (typeof r.fields[title] === 'string' ? [[r.id, r.fields[title] as string] as const] : [])));
+/** A project's mark and hue by row id, from the same `list` `namesOf` reads (AGT-11): what a key's `scope` chip is drawn from. */
+export type ProjectMark = { seq: number; mark: string | null; hue: number | null };
+
+/**
+ * Project names by row id, from a `list` of the projects register, carrying each row's mark and hue
+ * alongside (`.marks`) for a scope chip; a row with no `seq` (the sample's untouched literal) carries none.
+ */
+export function namesOf(
+  rows: readonly { id: string; seq?: number | null; fields: Record<string, unknown> }[],
+  title = 'name',
+): ReadonlyMap<string, string> & { readonly marks: ReadonlyMap<string, ProjectMark> } {
+  const decl = REGISTERS.things;
+  const out = new Map<string, string>();
+  const marks = new Map<string, ProjectMark>();
+  for (const r of rows) {
+    if (typeof r.fields[title] === 'string') out.set(r.id, r.fields[title] as string);
+    if (typeof r.seq === 'number') {
+      const mark = decl?.identity ? r.fields[decl.identity.mark] : undefined;
+      const hue = decl?.identity ? r.fields[decl.identity.accent] : undefined;
+      marks.set(r.id, {
+        seq: r.seq,
+        mark: typeof mark === 'string' && mark !== '' ? mark : null,
+        hue: typeof hue === 'number' && Number.isInteger(hue) && hue >= 0 && hue <= 359 ? hue : null,
+      });
+    }
+  }
+  return Object.assign(out, { marks });
 }
 
 /* ── the keys ─────────────────────────────────────────────────────────── */
@@ -202,6 +228,9 @@ export type KeyRow = {
   label: string;
   opens: string;
   project: string | null;
+  /** Where the key applies, as the chip draws it (AGT-11): the project's spoken id, name, mark and hue, or `null` for
+      a global key. Built from the same project row `project` names, never a second lookup. */
+  scope: Scope | null;
   sealed: boolean;
   opened: number;
   lastOpened: string | null;
@@ -228,7 +257,7 @@ const isKnown = (v: unknown): v is KnownState =>
 export function keysOf(
   rows: readonly { id: string; fields: Record<string, unknown>; state?: string | null }[],
   grants: readonly GrantState[],
-  names: ReadonlyMap<string, string>,
+  names: ReadonlyMap<string, string> & { marks?: ReadonlyMap<string, ProjectMark> },
   field = 'value',
 ): KeyRow[] {
   const byId = new Map(grants.map((g) => [g.id, g]));
@@ -238,13 +267,19 @@ export function keysOf(
       const value = r.fields[field];
       const grant = typeof value === 'string' ? byId.get(value) : undefined;
       const known = isKnown(value) ? value : null;
-      const project = typeof r.fields.project === 'string' ? (names.get(r.fields.project) ?? words.someProject) : null;
+      const projectId = typeof r.fields.project === 'string' ? r.fields.project : null;
+      const project = projectId ? (names.get(projectId) ?? words.someProject) : null;
+      const mark = projectId ? names.marks?.get(projectId) : undefined;
+      const scope: Scope | null = projectId
+        ? { spoken: mark ? `things#${mark.seq}` : projectId, name: project ?? words.someProject, mark: mark?.mark ?? null, hue: mark?.hue ?? null }
+        : null;
       return {
         id: r.id,
         grant: grant ? grant.id : null,
         label: String(r.fields.label ?? ''),
         opens: String(r.fields.opens ?? ''),
         project,
+        scope,
         sealed: known ? known.sealed : grant ? grant.revoked_at === null : typeof value === 'string',
         opened: known?.opened ?? grant?.opened ?? 0,
         lastOpened: known?.last_opened ?? grant?.last_opened ?? null,
@@ -267,7 +302,7 @@ type PlanDiff = {
 /** "What this adds", as the Packs screen draws it. */
 export type Plan = {
   summary: string;
-  adds: { kind: 'list' | 'page'; name: string; detail: string }[];
+  adds: { kind: 'list' | 'page' | 'figure'; name: string; detail: string }[];
   conflicts: string[];
   /** What example rows it writes, or `null` when it writes none, so the plan has no line to say so. */
   seeds: string | null;
@@ -282,14 +317,18 @@ const counted = (summary: string, one: string, many: string): string =>
  * A plan from the record, in the Packs screen's words. `nameOf` names a register or a page by id; the
  * plan carries ids, and the reader is being asked about names. A plan with no hash is no plan.
  */
-export function planOf(diff: unknown, nameOf: (kind: 'register' | 'page', id: string) => string): Plan | null {
+export function planOf(diff: unknown, nameOf: (kind: 'register' | 'page' | 'metric', id: string) => string): Plan | null {
   if (typeof diff !== 'object' || diff === null) return null;
   const d = diff as PlanDiff;
   if (typeof d.planHash !== 'string' || d.planHash === '') return null;
-  const split = (id: string): { kind: 'register' | 'page'; name: string } => {
+  const split = (id: string): { kind: 'register' | 'page' | 'metric'; name: string } => {
     const [kind, ...rest] = id.split('.');
     const bare = rest.join('.') || id;
-    return kind === 'register' ? { kind, name: nameOf('register', bare) } : { kind: 'page', name: nameOf('page', bare) };
+    return kind === 'register'
+      ? { kind, name: nameOf('register', bare) }
+      : kind === 'metric'
+        ? { kind, name: nameOf('metric', bare) }
+        : { kind: 'page', name: nameOf('page', bare) };
   };
   return {
     summary: d.pack?.summary ?? '',
@@ -297,7 +336,9 @@ export function planOf(diff: unknown, nameOf: (kind: 'register' | 'page', id: st
       const { kind, name } = split(a.id);
       return kind === 'register'
         ? { kind: 'list', name, detail: counted(a.summary, 'field', 'fields') }
-        : { kind: 'page', name, detail: counted(a.summary, 'table or figure', 'tables and figures') };
+        : kind === 'metric'
+          ? { kind: 'figure', name, detail: '' }
+          : { kind: 'page', name, detail: counted(a.summary, 'table or figure', 'tables and figures') };
     }),
     conflicts: (d.conflicts ?? []).map((c) => words.conflict(split(c.id).name, c.pack)),
     seeds: (d.seeds?.count ?? 0) === 0 ? null : words.seeds(d.seeds?.count ?? 0),

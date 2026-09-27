@@ -19,6 +19,13 @@
  * `transactions`, which is where money that moved lives. Repeating money has one home, `recurring`, walked at every
  * cadence. Every list id, enum value and figure id a record already holds stays (`declare/src/index.ts`, `ID_RENAMED`),
  * because a pack update may rename a word and never an id.
+ *
+ * MONEY-CORE 3.1.0 KEEPS MONEY THAT IS NOT ONE PERSON'S APART, AND SAYS WHAT ITS RULES AND AGENTS DID
+ * (`loop/finish/modules.md` MOD-10, C12). A person who keeps their own money and a company's in one record read one
+ * Cash now over both, which is a number about nobody. `books` is the list of those separate sets, every list that holds
+ * money may say which book a row is in, and each book is a page of its own under Money. A question a rule asks is
+ * answered where it is asked: "Chase it" stamps the day on the bill (`MONEY_AUTOMATIONS`), and "It stopped" ends a
+ * repeating line.
  */
 
 import type { Leg, RatesFields, RegisterDecl } from '@braindog/kernel';
@@ -414,7 +421,28 @@ export const AVAILABLE = { id: 'available', label: 'Available after', type: 'mon
  * holds rates, and the kernel's own types carry both shapes, so neither can drift from what `pairs.ts` and `roles.ts`
  * check.
  */
-type MoneyRegister = SeedRegister & { pairs?: RegisterDecl['pairs']; rates?: RatesFields };
+type MoneyRegister = SeedRegister & {
+  pairs?: RegisterDecl['pairs'];
+  rates?: RatesFields;
+  /**
+   * `refuse_while_referenced`, the one value the kernel keeps (`packages/kernel/src/referenced.ts`, `DELETE_RULES`):
+   * deleting a row other live rows point at is refused, naming the lists and how many rows. Written as its one word
+   * rather than read off the kernel's list, because `RegisterDecl` does not carry the key and the check at install
+   * (`declare.ts`) is what holds it to that list.
+   */
+  delete?: 'refuse_while_referenced';
+};
+
+/**
+ * WHICH BOOK A ROW IS IN, SINCE money-core 3.1.0: an optional link to `books` on every list that holds money.
+ *
+ * OPTIONAL, because a record that keeps one set of money has no book at all, and every row it already holds stays
+ * valid through the update. A CONSTANT, BECAUSE EVERY SUCH LIST DECLARES IT, so none of them can call it something
+ * else or point it somewhere else. A pack that files into a book fills it on every row it writes (`loop/finish/modules.md`
+ * MOD-20, `{{config:book}}`), because a book page reads the field on each list and the grammar of `where` cannot follow
+ * a transaction to its account's book.
+ */
+const BOOK = { id: 'book', label: 'Book', type: 'ref', to: 'books' } as const;
 
 export const MONEY_REGISTERS: Record<string, MoneyRegister> = {
   obligations: {
@@ -488,6 +516,8 @@ export const MONEY_REGISTERS: Record<string, MoneyRegister> = {
         required: true,
       },
       { id: 'thing', label: 'Project', type: 'ref', to: 'things', index: true },
+      /* INDEXED, because a book's page filters its bills by it. */
+      { ...BOOK, index: true },
       { id: 'note', type: 'text' },
       /**
        * WHAT IT IS FOR, so a page can say where the money goes. Indexed, because a page groups by it
@@ -531,6 +561,12 @@ export const MONEY_REGISTERS: Record<string, MoneyRegister> = {
          it when the row is marked paid (`finished:` above). */
       { id: 'settled', label: 'Paid on', type: 'day' },
       /**
+       * THE DAY SOMEBODY DECIDED TO CHASE IT, SINCE money-core 3.1.0. Written by the record when "Chase it" is the
+       * answer to `invoice-late` in Decide (`invoice-chased` in `MONEY_AUTOMATIONS`), so Money can say how long an
+       * invoice has been chased rather than only that it is late. Empty on every row nobody chose to chase.
+       */
+      { id: 'chased', label: 'Chasing since', type: 'day' },
+      /**
        * HOW OFTEN A BILL SAID IT CAME ROUND, KEPT ON ITS ROWS AND WALKED NO MORE, SINCE money-core 3.0.0.
        *
        * What repeats lives in `recurring`, and the cash walk reads it there at every cadence. A bill that also said
@@ -555,6 +591,16 @@ export const MONEY_REGISTERS: Record<string, MoneyRegister> = {
     holds: 'what is in each bank account, cash box and card, and the day that was true',
     title: 'name',
     mobile: ['name', 'balance', 'as_of'],
+    /**
+     * AN ACCOUNT THAT MONEY MOVED THROUGH IS NOT DELETED OUT FROM UNDER ITS MOVEMENTS, SINCE money-core 3.1.0.
+     *
+     * `transactions.account` is required and every balance check names one, so deleting an account left each of its
+     * payments pointing at nothing: a ledger row nobody could reconcile, and a Cash now that no longer knew where the
+     * money had been. The record now refuses the delete and says which lists still point at it and how many rows
+     * (`packages/kernel/src/referenced.ts`); the person moves or deletes those first. Declared here in the workflow after
+     * the kernel learned the key, as `loop/finish/contracts.md` X14 settles.
+     */
+    delete: 'refuse_while_referenced',
     pack: 'money-core',
     fields: [
       { id: 'name', type: 'text', required: true, search: true },
@@ -581,6 +627,8 @@ export const MONEY_REGISTERS: Record<string, MoneyRegister> = {
        * every card and every account that is cash.
        */
       { id: 'arrives', label: 'Arrives', type: 'day' },
+      /* INDEXED, because Cash now by book groups the accounts by it and a book's page filters them by it. */
+      { ...BOOK, index: true },
     ],
   },
 
@@ -815,6 +863,9 @@ export const MONEY_REGISTERS: Record<string, MoneyRegister> = {
          no write cost. A ninth would come back as INDEXES_OVER_CAP at the door. */
       { id: 'party', label: 'Who', type: 'ref', to: 'people' },
       { id: 'thing', label: 'Project', type: 'ref', to: 'things', index: true },
+      /* NOT INDEXED, FOR THE REASON `party` IS NOT: the list's eight are spent, and a ninth is refused at the door. A
+         book's page reads it with the day and the state beside it. */
+      { ...BOOK },
       { id: 'state', label: 'Status', type: 'enum', values: ['pending', 'cleared', 'void'], default: 'cleared', index: true, required: true },
       /**
        * MOVING MONEY BETWEEN YOUR OWN ACCOUNTS IS NOT SPENDING IT, and a ledger that counts it as
@@ -884,6 +935,9 @@ export const MONEY_REGISTERS: Record<string, MoneyRegister> = {
       { id: 'category', type: 'ref', to: 'categories', index: true },
       { id: 'party', label: 'Who', type: 'ref', to: 'people' },
       { id: 'thing', label: 'Project', type: 'ref', to: 'things', index: true },
+      /* NOT INDEXED: this list is one short of `INDEX_CEILING` (`packages/kernel/src/declare.ts`), and the last index
+         is left for a field that needs it more. */
+      { ...BOOK },
       { id: 'state', label: 'Status', type: 'enum', values: ['live', 'paused', 'ended'], default: 'live', index: true, required: true },
       { id: 'note', type: 'text' },
     ],
@@ -926,6 +980,8 @@ export const MONEY_REGISTERS: Record<string, MoneyRegister> = {
       { id: 'account', type: 'ref', to: 'accounts', index: true },
       { id: 'category', type: 'ref', to: 'categories', index: true },
       { id: 'thing', label: 'Project', type: 'ref', to: 'things', index: true },
+      /* NOT INDEXED, as on `recurring`: this list is one short of `INDEX_CEILING`, and the last is left free. */
+      { ...BOOK },
       { id: 'note', type: 'text' },
     ],
   },
@@ -954,6 +1010,7 @@ export const MONEY_REGISTERS: Record<string, MoneyRegister> = {
       /* WHAT SAID IT: a statement, a bank's message, a count. The title, because a list of checks is read by where each
          came from. */
       { id: 'source', label: 'Said by', type: 'text', search: true },
+      { ...BOOK, index: true },
     ],
   },
 
@@ -1027,6 +1084,38 @@ export const MONEY_REGISTERS: Record<string, MoneyRegister> = {
          is a reading and a reading recomputed later from rows that have changed is not one. */
       { id: 'net', label: 'Net', type: 'money' },
       { id: 'taken', label: 'Taken', type: 'enum', values: ['nightly', 'typed'], default: 'nightly', index: true, required: true },
+      { id: 'note', type: 'text' },
+    ],
+  },
+
+  /**
+   * THE SETS OF MONEY A PERSON KEEPS APART, SINCE money-core 3.1.0: their own and a company's, a household's and a
+   * club's. One row a set, and every list that holds money says which one a row is in (`BOOK`).
+   *
+   * MONEY-CORE'S OWN LIST AND NOT AN ORGANISATION, because a use case may add no field to another pack's list
+   * (`usecases/founder.ts`), and a book is where money is kept, which is Money's to say. A founder's organisation may
+   * name its book. EMPTY UNTIL SOMEBODY ADDS ONE: a record with one set of money needs none, and the Money page's
+   * headline is what it was until a second book is there.
+   *
+   * `currency` IS THE ONE THE BOOK IS KEPT IN, as its owner says it, written as the three letters `fx` holds. It is a
+   * statement about the book, and no figure converts by it: a figure is added up in the record's home currency.
+   */
+  books: {
+    id: 'books',
+    name: 'Books',
+    icon: 'book',
+    one: 'book',
+    holds: 'the sets of money you keep apart, such as your own and a company you run, each read on its own page',
+    title: 'name',
+    mobile: ['name', 'currency', 'note'],
+    /* A BOOK THAT ROWS ARE FILED IN IS NOT DELETED OUT FROM UNDER THEM, as an account is not: each would be left in a
+       book that is no longer there, and drawn on no book's page. */
+    delete: 'refuse_while_referenced',
+    pack: 'money-core',
+    fields: [
+      /* UNIQUE, because a book's page is found by its name, and two books with one name are one page. */
+      { id: 'name', type: 'text', required: true, unique: true, search: true },
+      { id: 'currency', label: 'Currency', type: 'text' },
       { id: 'note', type: 'text' },
     ],
   },
@@ -1223,6 +1312,23 @@ const LIVE_LINES = (direction: 'in' | 'out'): Predicate => ({
   ],
 });
 
+/**
+ * CASH NOW'S ARITHMETIC, WRITTEN ONCE, SINCE money-core 3.1.0 READS IT THREE WAYS: over every account, grouped by book,
+ * and over one book's accounts. Three copies could come to disagree about which balance restarts an account, and the
+ * per-book figures would then not add up to the whole.
+ */
+const ROLLED = {
+  rolled: {
+    balance: 'balance',
+    as_of: 'as_of',
+    checks: [
+      { register: 'balances', by: 'account', balance: 'balance', on: 'as_of' },
+      { register: 'transactions', by: 'account', balance: 'balance_after', on: 'on' },
+    ],
+    moves: { register: 'transactions', by: 'account', on: 'on', amount: 'amount', direction: 'direction', out: 'out', where: 'state is cleared' },
+  },
+} as const;
+
 const DECLARED_METRICS: Record<string, SeedMetric> = {
   /**
    * WHAT IS IN THE BANK, the headline the owner asked for: "the money i have, not the money im
@@ -1240,23 +1346,61 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
     name: 'Cash now',
     source: 'register.accounts',
     where: 'liquid is true',
-    value: {
-      rolled: {
-        balance: 'balance',
-        as_of: 'as_of',
-        checks: [
-          { register: 'balances', by: 'account', balance: 'balance', on: 'as_of' },
-          { register: 'transactions', by: 'account', balance: 'balance_after', on: 'on' },
-        ],
-        moves: { register: 'transactions', by: 'account', on: 'on', amount: 'amount', direction: 'direction', out: 'out', where: 'state is cleared' },
-      },
-    },
+    value: ROLLED,
     format: MONEY,
     target: { gte: 0 },
     window: '30d',
     compare: 'none',
     snapshot: { grain: 'day', into: 'series.cash-now' },
     home: 1,
+  },
+
+  /**
+   * CASH NOW, ONE FIGURE A BOOK, SINCE money-core 3.1.0: the same roll, grouped by the book each account is in.
+   *
+   * THE HEADLINE OF A RECORD THAT KEEPS TWO BOOKS. Cash now over both added a company's money to a person's own, and
+   * neither of them has that much to spend. The Money page draws this in place of the one figure once a second book
+   * is there (`books-held`); an account in no book is its own part, so nothing held drops out of the sum.
+   */
+  'cash-by-book': {
+    metric: 'cash-by-book',
+    name: 'Cash now, by book',
+    source: 'register.accounts',
+    where: 'liquid is true',
+    value: ROLLED,
+    group_by: 'book',
+    format: MONEY,
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  /**
+   * CASH NOW IN ONE BOOK, read once per book as a project's figures are read once per project: `book-cash:Personal`
+   * fills `{{it}}` with the book's name. The figure a book's page leads with and its walk starts from.
+   */
+  'book-cash': {
+    metric: 'book-cash',
+    name: 'Cash now in one book',
+    source: 'register.accounts',
+    where: 'liquid is true, book is {{it}}',
+    value: ROLLED,
+    format: MONEY,
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  /* HOW MANY BOOKS THE RECORD KEEPS, so the Money page can tell one set of money from several. */
+  'books-held': {
+    metric: 'books-held',
+    name: 'Books',
+    source: 'register.books',
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
   },
 
   /* HOW MANY ACCOUNTS CASH NOW ADDS UP, AND THE OLDEST DAY ONE OF THEM WAS TRUE: the line under the
@@ -1435,6 +1579,20 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
     value: { sum: 'amount' },
     format: MONEY,
     target: { lte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  /* HOW MANY INVOICES SOMEBODY CHOSE TO CHASE AND STILL WAIT ON (`chased`, stamped from Decide), so the Money page
+     draws what is being chased only while something is. */
+  chasing: {
+    metric: 'chasing',
+    name: 'Being chased',
+    source: 'register.obligations',
+    where: `${OPEN}, direction is owed to me, chased is set`,
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
     window: '30d',
     compare: 'none',
   },
@@ -1738,13 +1896,13 @@ export const MONEY_METRICS: Record<string, SeedMetric> = Object.fromEntries(
 );
 
 /**
- * The two rules Money ships with, and each one asks rather than acts.
+ * The rules Money ships with. A rule asks where a person has a choice to make, and tells or acts where there is none.
  *
- * A QUESTION IN DECIDE, NOT A ROW OR A NOTE. An invoice more than a week late is a thing somebody chooses to
- * chase or not, and a balance a week old is a thing only a person can update; both are put in front of the
- * owner once, by the row and the day that made them true (`once_per`), and nothing else is written.
- * The record re-reads a rule about time as time passes, so an invoice that goes late while nobody touches
- * it is asked about too.
+ * A QUESTION IN DECIDE ONLY WHERE THERE IS A CHOICE. An invoice more than a week late is a thing somebody chooses to
+ * chase or not, and a repeating line whose day has gone either went through or stopped; each is put in front of the
+ * owner once, by the row and the day that made it true (`once_per`), and the answer is acted on by
+ * `MONEY_AUTOMATIONS` below. The record re-reads a rule about time as time passes, so an invoice that goes late while
+ * nobody touches it is asked about too.
  */
 export const MONEY_RULES: Record<string, SeedRule> = {
   'invoice-late': {
@@ -1755,12 +1913,23 @@ export const MONEY_RULES: Record<string, SeedRule> = {
     then: [{ suggest: { question: '{{what}} was due {{ago:due}}, {{money:amount}}. Chase it?', options: ['Chase it', 'Not yet'] } }],
     once_per: ['entry', 'due'],
   },
+  /**
+   * A BALANCE MORE THAN A WEEK OLD IS TOLD, SINCE money-core 3.1.0, AND IT WAS A QUESTION IN DECIDE.
+   *
+   * The question's only useful answer was typing a number, which Decide has no box for: "Update it" closed the question
+   * and left the balance as old as it was. The number is typed where the account is, and the Accounts card on the Money
+   * page already says a balance is out of date (`stale:`). So this tells instead of asking: a notification that is not
+   * urgent is a note on the account signed by the rule and nothing else (`packages/kernel/src/rules.ts`), which the
+   * Money page's "What agents and rules did" reads, once for each day a balance was set (`once_per`). NO DIGEST READS
+   * IT: a digest reads the lists and figures its declaration names (`sectionsOf` in `packages/kernel/src/digest.ts`),
+   * and money-core declares none.
+   */
   'cash-stale': {
     rule: 'cash-stale',
     pack: 'money-core',
     register: 'accounts',
     when: 'as_of before -7d',
-    then: [{ suggest: { question: 'The balance of {{name}} was last set {{ago:as_of}}. Update it?', options: ['Update it', 'It has not changed'] } }],
+    then: [{ notify: { say: 'The balance of {{name}} was last set {{ago:as_of}}.' } }],
     once_per: ['entry', 'as_of'],
   },
   /**
@@ -1790,8 +1959,8 @@ export const MONEY_RULES: Record<string, SeedRule> = {
     once_per: ['entry'],
   },
   /**
-   * AN INSTALMENT IS TOLD, NOT ASKED. The two rules above ask because there is a choice in front of
-   * the person: chase or wait, update or leave it. A part of a plan already agreed has no choice in
+   * AN INSTALMENT IS TOLD, NOT ASKED. `invoice-late` asks because there is a choice in front of
+   * the person: chase or wait. A part of a plan already agreed has no choice in
    * it, so a question with two options would be a question whose answer is always the same, and the
    * gate is the one place in this product that must never fill up with those.
    */
@@ -1804,16 +1973,22 @@ export const MONEY_RULES: Record<string, SeedRule> = {
     once_per: ['entry', 'due'],
   },
   /**
-   * A REPEATING ITEM WHOSE DAY HAS GONE AND WHICH IS STILL LIVE. Either it went out and nobody moved
-   * the date, or it did not go out at all, and those are different problems with one symptom. The
-   * record says which day it was and leaves the reading to the person.
+   * A REPEATING ITEM WHOSE DAY HAS GONE AND WHICH IS STILL LIVE. Either it went through and nobody moved
+   * the date, or it has stopped, and those are different problems with one symptom.
+   *
+   * ASKED, SINCE money-core 3.1.0, AND IT WAS TOLD. The notice said which day it was and left the person to find the
+   * row and end it by hand, so a line that had stopped went on walking in Cash ahead until somebody ended it.
+   * Now it asks once for each day it was due (`once_per`): "It went through" is recorded and asks nothing more this
+   * cycle, and "It stopped" ends the line (`recurring-stopped` in `MONEY_AUTOMATIONS`). The words fit money in as well as
+   * money out, since pay coming in is a repeating line too. Moving `next_due` on by one cycle is not offered, because the
+   * grammar a rule fills a field with has no arithmetic on a day.
    */
   'recurring-missed': {
     rule: 'recurring-missed',
     pack: 'money-core',
     register: 'recurring',
     when: 'state is live, next_due before today',
-    then: [{ notify: { say: '{{what}} was due {{ago:next_due}}, {{money:amount}}, and its next day has not moved.' } }],
+    then: [{ suggest: { question: '{{what}} was due {{ago:next_due}}, {{money:amount}}. Did it go through?', options: ['It went through', 'It stopped'] } }],
     once_per: ['entry', 'next_due'],
   },
   /**
@@ -1853,7 +2028,57 @@ export const MONEY_RULES: Record<string, SeedRule> = {
   },
 };
 
+/**
+ * WHAT HAPPENS WHEN A PERSON ANSWERS ONE OF MONEY'S QUESTIONS, SINCE money-core 3.1.0: automations started by a
+ * decision in Decide (`on: decided`, `packages/kernel/src/flow.ts`'s `onDecided`), in the pack document's own form.
+ *
+ * NOT IN `MONEY_RULES`, because a `SeedRule` is the older form the inline pass reads over rows already written, and
+ * these start on an answer, act on the row the question names (the question carries it as `about`), and hold no
+ * `when:`, which a decision refuses. They go into the pack document and into `installSeed` with Work's, through
+ * `AUTOMATIONS` in `../index.ts`.
+ *
+ * EACH NAMES THE RULE THAT ASKED AND THE ANSWER BY ITS WORDS. A rule's options are words whose ids are their places
+ * (`o1`, `o2`), so the words are what an author can write, and a trigger naming words the question does not offer would
+ * install and never start: the options here are `invoice-late`'s and `recurring-missed`'s, letter for letter. "Not yet"
+ * and "It went through" start nothing; the question's `once_per` is what decides when it is asked again.
+ */
+export const MONEY_AUTOMATIONS: Record<string, unknown>[] = [
+  {
+    rule: 'invoice-chased',
+    name: 'Mark an invoice as chased',
+    pack: 'money-core',
+    on: { decided: { about: 'rule.invoice-late', option: 'Chase it' } },
+    /* THE DAY IT WAS DECIDED, IN THE RECORD'S OWN ZONE (`{{trigger.day}}`), so the page can say how long it has been
+       chased, and a note on the row says why the day is there. */
+    steps: [{ set: { field: 'chased', to: '{{trigger.day}}' } }, { note: 'You chose to chase this in Decide.' }],
+  },
+  {
+    rule: 'recurring-stopped',
+    name: 'End a repeat that stopped',
+    pack: 'money-core',
+    on: { decided: { about: 'rule.recurring-missed', option: 'It stopped' } },
+    /* ENDED, THE STATE EVERY READER OF `recurring` ALREADY LEAVES OUT: the walk, the monthly figures and the page. */
+    steps: [{ move: 'ended' }],
+  },
+];
+
 /* ── the page ────────────────────────────────────────────────────────────── */
+
+/** The lists of Money's cash walk that say which book a row is in (`BOOK`). */
+const BOOKED: ReadonlySet<string> = new Set(['obligations', 'recurring', 'installments', 'accounts']);
+
+/**
+ * ONE BOOK'S CASH WALK: `CASH_LEGS`, each leg held to the rows filed in the book a page is about, SINCE money-core 3.1.0.
+ *
+ * DERIVED AND NOT WRITTEN AGAIN, so a leg the Money page's walk gains over a list in `BOOKED` reaches every book's walk
+ * with it, and the two cannot come to read one list two ways. A leg over a list that holds no book (a subscription in
+ * Services) is left out, because a clause naming a field the list does not have is refused. `{{name}}` is the book's,
+ * filled when the page is drawn. ONE ARRAY for the walk and the bridge, as on the Money page.
+ */
+const BOOK_LEGS: Leg[] = CASH_LEGS.filter((leg) => BOOKED.has(leg.register)).map((leg) => ({
+  ...leg,
+  where: leg.where === undefined ? 'book is {{name}}' : `${leg.where}, book is {{name}}`,
+}));
 
 /**
  * WHAT FALLS DUE THIS WEEK, AS ONE BLOCK A USE CASE'S HOME TAKES, SINCE money-core 3.0.0.
@@ -1901,13 +2126,18 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
     title: 'Money',
     nav: { section: 'Money', order: 10 },
     icon: 'money',
-    requires: ['register.accounts', 'register.obligations', 'register.transactions', 'register.recurring', 'register.installments', 'register.categories'],
+    requires: ['register.accounts', 'register.obligations', 'register.transactions', 'register.recurring', 'register.installments', 'register.categories', 'register.books'],
     pack: 'money-core',
     blocks: [
       {
         /* WHAT YOU HAVE, THEN HOW LONG IT LASTS, THEN WHAT MOVES IN THE NEXT THIRTY DAYS. The figures after it read the one walk
            "Cash ahead" and "The next 30 days" draw below (`CASH_LEGS`), so a tile and the chart under it cannot give two
-           answers about the same month. Cash now carries its twelve weeks as a line. */
+           answers about the same month. Cash now carries its twelve weeks as a line.
+
+           ONLY WHILE THE RECORD KEEPS ONE SET OF MONEY, since money-core 3.1.0. With two books or more, one Cash now
+           adds a company's money to a person's own, so the block below draws a figure a book instead. The other three
+           tiles go with it, because each is a sum over every book too: how long the money lasts is read on each book's
+           page, from that book's walk. "Cash ahead" below stays the walk of the whole record. */
         kind: 'stat',
         lead: true,
         heading: 'What you have',
@@ -1918,6 +2148,19 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
           { metric: 'arriving-30d', label: 'Coming in, 30 days' },
           { metric: 'leaving-30d', label: 'Going out, 30 days' },
         ],
+        when: { metric: 'books-held', lt: 2 },
+      },
+      {
+        /* WHAT YOU HAVE IN EACH BOOK, once there are two: Cash now rolled per book, the same arithmetic as the figure it
+           stands in for (`cash-by-book`). An account in no book is a part of its own, named, so no money leaves the
+           picture because nobody filed it. */
+        kind: 'bar',
+        heading: 'What you have, by book',
+        span: 12,
+        source: 'metric.cash-by-book',
+        unset: 'In no book',
+        when: { metric: 'books-held', gte: 2 },
+        empty: 'No account counts as cash yet.',
       },
       {
         /* WHERE THE MONEY IS, one card an account, with the day each balance was true. SECOND AND NOT LAST, because a
@@ -1953,7 +2196,9 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
         heading: 'Waiting on you',
         span: 12,
         source: 'governance.open',
-        where: 'list is obligations or transactions or accounts or recurring or installments',
+        /* EVERY LIST MONEY HOLDS, SINCE money-core 3.1.0, so a question an agent asks about a balance check, a category or
+           a book is answered here too, and not only in Decide. */
+        where: 'list is obligations or transactions or accounts or recurring or installments or balances or categories or books',
         limit: 3,
       },
       {
@@ -2033,6 +2278,27 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
         empty: 'Nothing falls due in the next 30 days.',
       },
       {
+        /* WHAT SOMEBODY CHOSE TO CHASE, AND SINCE WHEN, from the answer in Decide (`invoice-chased`), oldest first. Only
+           while something is being chased: a table that is empty on nearly every record is noise on the one page
+           everybody reads. `Coming up` cannot carry it, because a deadline row says its day and amount and nothing
+           else of the row it came from. */
+        kind: 'table',
+        heading: 'Being chased',
+        span: 12,
+        source: 'register.obligations',
+        where: `${OPEN}, direction is owed to me, chased is set`,
+        columns: [
+          { field: 'what', label: 'Description', width: 'minmax(14ch,1fr)' },
+          { field: 'party', label: 'Who', width: 'minmax(10ch,18ch)' },
+          { field: 'amount', label: 'Amount', width: '15ch', align: 'end' },
+          { field: 'chased', label: 'Chasing since', width: '15ch', align: 'end' },
+        ],
+        order: [{ field: 'chased', dir: 'asc' }],
+        limit: 6,
+        when: { metric: 'chasing', gt: 0 },
+        empty: 'Nothing is being chased.',
+      },
+      {
         /* NOTES THAT DRAW ONLY WHEN THEY ARE TRUE, and say what is late, never what the law says about it: a page
            everybody's Money draws does not speak for one country's courts. */
         kind: 'note',
@@ -2098,14 +2364,141 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
       },
       {
         /* WHAT RULES AND AGENTS DID TO MONEY, from the record's own log, so a payment a rule filed or a balance an agent
-           wrote is seen where the money is and not only in History. */
+           wrote is seen where the money is and not only in History. EVERY LIST MONEY HOLDS, SINCE money-core 3.1.0: an
+           answer in Decide that chased a bill or ended a repeating line is a rule's write to that row, and an agent's
+           balance check or category is a write to Money as much as a payment is. */
         kind: 'feed',
         heading: 'What agents and rules did',
         span: 12,
         source: 'activity',
-        where: 'actor is agent or rule, list is transactions or obligations or accounts',
+        where: 'actor is agent or rule, list is transactions or obligations or accounts or recurring or installments or balances or categories or books',
         first: 5,
         empty: 'Nothing has been changed here by a rule or an agent yet.',
+      },
+    ],
+  },
+
+  /**
+   * ONE PAGE A BOOK, UNDER MONEY, SINCE money-core 3.1.0: the Money page's own layout over the rows filed in that book.
+   *
+   * A TEMPLATE, as a project's page is: one declaration, one page for each row of `books`, every `{{name}}` filled from
+   * the row. A record that keeps no book has none of these pages and loses nothing. What the book's rows cannot say is
+   * left to the Money page: the questions and what agents did are read across the record by list, and a list is not a
+   * book, and the figures that read every list (by month, every month, late) have no book to be asked about.
+   *
+   * A CAPTURE HERE FILES INTO THIS BOOK. A capture presets a link only where its sentence names the row by its spoken
+   * id (`captureFills` in `packages/kernel/src/pages.ts`), because a title is a guess at a row, so the capture says
+   * `{{spoken}}` where every other block says the name a person reads.
+   */
+  'money-book': {
+    page: 'money-book',
+    title: '{{name}}',
+    for: { register: 'books' },
+    nav: { section: 'Money', order: 20 },
+    icon: 'book',
+    requires: ['register.books', 'register.accounts', 'register.obligations', 'register.transactions', 'register.recurring', 'register.installments'],
+    pack: 'money-core',
+    blocks: [
+      {
+        kind: 'stat',
+        lead: true,
+        heading: 'What you have',
+        span: 12,
+        cells: [{ metric: 'book-cash:{{name}}', label: 'Cash now' }],
+      },
+      {
+        kind: 'cards',
+        heading: 'Accounts',
+        span: 8,
+        source: 'register.accounts',
+        where: 'book is {{name}}',
+        columns: [
+          { field: 'name', as: 'title' },
+          { field: 'balance', as: 'figure' },
+          { field: 'kind', label: 'Type', as: 'fact' },
+          { field: 'as_of', label: 'As of', as: 'when' },
+        ],
+        order: [{ field: 'seq', dir: 'asc' }],
+        stale: { field: 'as_of', after: '7d' },
+        empty: 'No account is in {{name}} yet. Add one here and it is filed in this book.',
+      },
+      {
+        kind: 'capture',
+        heading: 'Add an account',
+        span: 4,
+        register: 'accounts',
+        where: 'book is {{spoken}}',
+      },
+      {
+        /* THIS BOOK'S WALK, FROM THIS BOOK'S CASH, over this book's bills, repeating lines, instalments and money on its
+           way (`BOOK_LEGS`). No `sell`: what a record holds to sell is filed in no book. */
+        kind: 'forecast',
+        heading: 'Cash ahead',
+        span: 12,
+        source: 'forecast.runway',
+        opening: { metric: 'book-cash:{{name}}' },
+        from: BOOK_LEGS,
+        horizon: 365,
+        horizons: [90, 180, 365, 730, 1825, 'last'],
+        knobs: ['horizon', 'late', 'spend', 'count', 'grow', 'drift'],
+        late: 'days-late-in',
+        under: 30,
+        empty: 'Nothing in {{name}} is dated in the next twelve months.',
+      },
+      {
+        kind: 'bridge',
+        heading: 'The next 30 days',
+        span: 5,
+        source: 'forecast.runway',
+        opening: { metric: 'book-cash:{{name}}' },
+        from: BOOK_LEGS,
+        horizon: 30,
+        empty: 'Nothing in {{name}} is dated in the next 30 days.',
+      },
+      {
+        kind: 'split',
+        heading: "Where this month's money went",
+        span: 7,
+        source: 'register.transactions',
+        where: 'state is cleared, transfer is false, direction is out, on at least bom, book is {{name}}',
+        columns: [{ field: 'category' }, { field: 'amount' }],
+        limit: 6,
+        unset: 'Uncategorised',
+        empty: 'Nothing has gone out of {{name}} this month.',
+      },
+      {
+        /* WHAT THIS BOOK OWES AND IS OWED IN THE NEXT THIRTY DAYS, late first. From the bills themselves and not from
+           `deadlines`, whose rows carry no book to be filtered by. */
+        kind: 'table',
+        heading: 'Coming up',
+        span: 12,
+        source: 'register.obligations',
+        where: `${OPEN}, due before +31d, book is {{name}}`,
+        columns: [
+          { field: 'what', label: 'Description', width: 'minmax(14ch,1fr)' },
+          { field: 'amount', label: 'Amount', width: '15ch', align: 'end', sign: { field: 'direction', minus: 'owed_by_me' } },
+          { field: 'due', label: 'Due', width: '13ch', align: 'end' },
+        ],
+        order: [{ field: 'due', dir: 'asc' }],
+        limit: 12,
+        empty: 'Nothing in {{name}} falls due in the next 30 days.',
+      },
+      {
+        kind: 'table',
+        heading: 'What moved',
+        span: 12,
+        source: 'register.transactions',
+        where: 'state is not void, book is {{name}}',
+        columns: [
+          { field: 'what', label: 'Description', width: 'minmax(14ch,1fr)' },
+          { field: 'account', label: 'Account', width: 'minmax(10ch,16ch)' },
+          { field: 'category', label: 'For', width: 'minmax(8ch,14ch)' },
+          { field: 'amount', label: 'Amount', width: '15ch', align: 'end', sign: { field: 'direction', minus: 'out' } },
+          { field: 'on', label: 'Date', width: '13ch', align: 'end' },
+        ],
+        order: [{ field: 'on', dir: 'desc' }],
+        limit: 10,
+        empty: 'Nothing has moved in {{name}} yet.',
       },
     ],
   },

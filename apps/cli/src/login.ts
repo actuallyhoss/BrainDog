@@ -219,7 +219,7 @@ export async function login(raw: string, io: LoginIo): Promise<number> {
 }
 
 /** What one device flow asks the host for: a login, a vault grant over one scope, or one operation. */
-type Asked = { reach: 'login' } | { reach: 'vault'; scope: string } | { reach: OperationReach };
+type Asked = { reach: 'login' } | { reach: 'vault'; scope: string } | { reach: OperationReach } | { reach: 'runner' };
 
 /** The operation reaches this CLI asks for, each approving one ADMIN call (`OPERATIONS` in `packages/kernel/src/device.ts`). */
 export type OperationReach = 'export' | 'import' | 'token';
@@ -365,4 +365,25 @@ export async function approveOperation(raw: string, reach: OperationReach, io: F
     stopped: `The approval was stopped before it finished, and nothing was ${reach === 'export' ? 'exported' : reach === 'import' ? 'sent' : 'made'}.`,
   }, io);
   return typeof got === 'number' ? got : { bearer: got.bearer };
+}
+
+/**
+ * A runner's enrolment for `braindog runner enrol <host>` (`docs/48-SPEC-CLI.md` §5.13, `loop/finish/agents.md` C14): the
+ * host as `hostKey` spells it, and the bearer of reach `runner` with its expiry and the label it was approved under, or
+ * the exit code once the reason has been said.
+ *
+ * THE LOGIN'S OWN FLOW, for `approveOperation`'s reason. The caller keeps the bearer in the hosts file beside the login
+ * (`keepRunner` in `http.ts`) and never prints it. THE REACH IS IN THE LABEL, so the person approving reads that this
+ * machine will run jobs, and the label is the name the record gives the machine in each job's transcript.
+ */
+export async function approveRunner(raw: string, io: FlowIo & { label?: string | undefined }): Promise<{ key: string; bearer: string; expires: string; label: string } | number> {
+  const host = hostOf(raw, io.say);
+  if (typeof host === 'number') return host;
+  const label = `${(io.label ?? `${hostname()} · braindog-cli`).slice(0, 110)} · runner`;
+  const got = await approve(host, { reach: 'runner' }, label, {
+    again: `Run braindog runner enrol ${host.key} to start again.`,
+    nothing: 'this machine was not enrolled',
+    stopped: 'Enrolment was stopped before it finished, and nothing was saved.',
+  }, io);
+  return typeof got === 'number' ? got : { key: host.key, bearer: got.bearer, expires: got.expires, label };
 }

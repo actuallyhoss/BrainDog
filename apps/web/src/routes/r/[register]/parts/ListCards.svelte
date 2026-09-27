@@ -19,6 +19,8 @@
   import RowCards from '$lib/ui/RowCards.svelte';
   import Chip from '$lib/ui/Chip.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import ScopeChip from '$lib/ui/ScopeChip.svelte';
+  import { scopeOf } from '$lib/record/scope-move.ts';
   import type { Receipt } from './list.ts';
 
   let {
@@ -54,10 +56,12 @@
          else, eight capabilities, none of them reachable. It opens the SAME row menu the
          keyboard opens, so there is one set of verbs rather than a touch copy of them, and
          each item still prints the key that replaces it. -->
+    <!-- NAMED BY THE ROW'S TITLE, as the grid's own "…" is, and never by its number: "Actions for this
+         row #12" was the one "#" left on a phone card once the card stopped printing it. -->
     <button
       type="button"
       class="card-more"
-      aria-label="{copy.rowMenu} #{e.seq}"
+      aria-label={copy.moreOn(display(register, decl.title, e.fields[decl.title]) ?? copy.thisRow)}
       onclick={(ev) => openCardMenu(e.seq, ev.currentTarget)}
     >
       <!-- `m`, AND IT WAS `s`: a 12px box of a 24-unit path at `stroke-width: 1.6`, so each dot
@@ -79,6 +83,9 @@
   -->
   {#snippet note(e)}
     {@const said = receiptFor(e.seq)}
+    {@const where = scopeOf(register, e.fields, names)}
+    <!-- WHERE THE ROW APPLIES, on the phone's card as on the grid (agents C8). -->
+    {#if where !== undefined}<ScopeChip scope={where} />{/if}
     {#if said}
       {@const name = display(register, decl.title, e.fields[decl.title]) ?? copy.thisRow}
       <Chip label={said.mark} tone={said.intent} />

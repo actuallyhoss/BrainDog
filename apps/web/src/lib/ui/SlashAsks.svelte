@@ -3,8 +3,12 @@
 
   "ONE ROW IN SETTINGS. NOTHING ANYWHERE ELSE." Every signed-in person sees this month's asks against the cap, the model the
   host names, and the day the count resets; the owner also sets the monthly limit. No gauge, no bar, no percentage: a
-  number with a label beside it, and at the cap a `warn` chip on the row. On a tier that is not metered the ask row and the
-  reset are gone rather than zeroed. The rules are `slash-asks.ts`, which the tests hold.
+  number with a label beside it, and at the cap a `warn` chip on the row. On his own key the count is listed with no cap
+  and no limit field, since nothing stops at it; on `byo` the ask row and the reset are gone rather than zeroed. The rules
+  are `slash-asks.ts`, which the tests hold.
+
+  EVERY LINE WRAPS. A model id is one long word with no space in it, so at 390px the value column breaks it anywhere
+  rather than pushing the page sideways.
 
   ON A HOST WITH NO MODEL, `23 §8`'s one line and no controls. On the sample, nothing: the sample has no Slash to read, and a
   sentence saying this host has no model would be a claim about a host nobody is on.
@@ -16,7 +20,7 @@
   import { onMount } from 'svelte';
   import { page } from '$app/state';
   import { createClient, type SlashStatus } from '@braindog/client';
-  import { asksShown, atCap, capOf, capSaid, resetsWords, words } from '$lib/ui/slash-asks.ts';
+  import { asksShown, atCap, capOf, capSaid, metered, resetsWords, words } from '$lib/ui/slash-asks.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import Section from '$lib/ui/Section.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -35,6 +39,7 @@
 
   const modelHere = $derived(page.data.slash === true);
   const asks = $derived(status ? asksShown(status) : null);
+  const capped = $derived(status !== null && metered(status));
   const cap = $derived(capOf(typed));
 
   /* A conflict cannot come back from either door, which read and write no row; the sentence is here so the type is whole. */
@@ -84,7 +89,7 @@
       <ul class="facts">
         {#if asks}
           <li>
-            <span class="fact-key">{words.asks}</span>
+            <span class="fact-key">{capped ? words.asks : words.keyAsks}</span>
             <span class="fact-value"
               ><span class="num">{asks}</span>{#if atCap(status)}
                 <Chip label={words.spent} tone="warn" />{/if}</span
@@ -96,9 +101,12 @@
           <li><span class="fact-key">{words.resets}</span><span class="fact-value num">{resetsWords(status.asks.resets)}</span></li>
         {/if}
       </ul>
-      <!-- THE LIMIT ONLY WHERE THERE IS A METER. On `b` and `byo` the engine counts nothing against it, so a field for it
+      {#if asks && !capped}
+        <p class="hint">{words.keyHint}</p>
+      {/if}
+      <!-- THE LIMIT ONLY WHERE THERE IS A METER. On his own key and on `byo` nothing counts against it, so a field for it
            there would be a control with nothing behind it. -->
-      {#if owner && asks}
+      {#if owner && capped}
         <form class="cap-form" onsubmit={save} novalidate>
           <label class="cap-label" for="slash-cap">{words.capLabel}</label>
           <p class="hint" id="slash-cap-hint">{words.capHint}</p>
@@ -151,7 +159,9 @@
     flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-2);
+    min-inline-size: 0;
     color: var(--ink2);
+    overflow-wrap: anywhere;
   }
 
   .hint {

@@ -23,7 +23,7 @@ export type SeedRegister = {
   one: string;
   holds: string;
   title: string;
-  mobile: readonly [string, string, string];
+  mobile: readonly [string, string, string, string?];
   state?: string;
   done?: readonly string[];
   /** A day field the record fills when a row enters a `done` state and empties when it leaves one. */
