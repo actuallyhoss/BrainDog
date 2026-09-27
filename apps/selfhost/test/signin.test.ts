@@ -21,6 +21,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 
 import { start } from '../src/server.ts';
+import { answers, serveUntil } from './serving.ts';
 import { asJSON, assert as authenticate, register, testKeys } from '../../../packages/record/test/fixtures/webauthn/authenticator.ts';
 
 const MINUTE = 60_000;
@@ -306,18 +307,19 @@ test('A BAD COOKIE ON AN OPEN SELF-HOST IS A 401 AND IS CLEARED, never the owner
   }
 });
 
-test('THE BOOT LINE NAMES THE WAYS IN AND NEVER THE KEY, on stdout or stderr', () => {
+test('THE BOOT LINE NAMES THE WAYS IN AND NEVER THE KEY, on stdout or stderr', async () => {
   const data = mkdtempSync(join(tmpdir(), 'braindog-boot-'));
   const serverKey = randomBytes(32).toString('base64url');
   try {
     const env = { ...process.env, BRAINDOG_DATA: data, PORT: '0' };
     const made = spawnSync(process.execPath, [MAIN, 'init', 'the-studio', '--owner', 'ada@example.com'], { encoding: 'utf8', env });
     assert.equal(made.status, 0, made.stderr);
-    /* \`serve\` runs until it is stopped, so it is stopped: the lines are written before it listens. */
-    const served = spawnSync(process.execPath, [MAIN, 'serve'], {
-      encoding: 'utf8',
-      timeout: 5000,
-      env: { ...env, BRAINDOG_TOKEN: serverKey, BRAINDOG_HOST: '127.0.0.1' },
+    /* `serve` RUNS UNTIL IT IS STOPPED, so it is stopped, once the line is out and it answers a request: the lines
+       under this one have been said by then, so the key is looked for in all of them (`serving.ts`). A fixed five
+       second timeout was measured too short for the boot under a loaded test run. */
+    const served = await serveUntil({ ...env, BRAINDOG_TOKEN: serverKey, BRAINDOG_HOST: '127.0.0.1' }, async (so) => {
+      const port = /sign in at http:\/\/localhost:(\d+)\/signin/.exec(so)?.[1];
+      return port !== undefined && (await answers(`http://127.0.0.1:${port}/healthz`));
     });
     const said = `${served.stdout ?? ''}${served.stderr ?? ''}`;
     assert.match(served.stderr ?? '', /behind BRAINDOG_TOKEN; sign in at http:\/\/localhost:\d+\/signin with a passkey or the server key/);

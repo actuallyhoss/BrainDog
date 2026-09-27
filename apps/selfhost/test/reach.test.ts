@@ -30,6 +30,7 @@ import { fileURLToPath } from 'node:url';
 
 import { certificateNames, nameChange, originFor, reachLine, reachOf } from '../src/reach.ts';
 import { start } from '../src/server.ts';
+import { answers, SERVE_DEADLINE_MS, serveUntil } from './serving.ts';
 
 const MAIN = fileURLToPath(new URL('../src/main.ts', import.meta.url));
 
@@ -242,10 +243,11 @@ function post(port: number, origin: string): Promise<{ status: number; body: str
 /**
  * The same two decisions through the real process, because they are made out of the environment.
  *
- * `serve` RUNS UNTIL IT IS STOPPED, so it is stopped: the boot lines are written before it listens, which
- * is the shape `signin.test.ts` already uses for the line about the ways in.
+ * `serve` RUNS UNTIL IT IS STOPPED, so it is stopped once it has said what is asserted (`serving.ts`). Its boot
+ * lines come after it has opened the record and listened, which under a loaded test run was measured past the
+ * five seconds a fixed `spawnSync` timeout gave it, so the wait is for the lines and not for a clock.
  */
-test('serve holds a certificate from the environment, and says when the name it is served at has moved', () => {
+test('serve holds a certificate from the environment, and says when the name it is served at has moved', async () => {
   const data = mkdtempSync(join(tmpdir(), 'braindog-serve-tls-'));
   try {
     const certFile = join(data, 'lan.cert');
@@ -257,10 +259,11 @@ test('serve holds a certificate from the environment, and says when the name it 
     const made = spawnSync(process.execPath, [MAIN, 'init', 'the-studio', '--owner', 'ada@example.com'], { encoding: 'utf8', env: base });
     assert.equal(made.status, 0, made.stderr);
 
-    const tls = spawnSync(process.execPath, [MAIN, 'serve'], {
-      encoding: 'utf8',
-      timeout: 5000,
-      env: { ...base, BRAINDOG_TLS_CERT: certFile, BRAINDOG_TLS_KEY: keyFile },
+    /* UNTIL IT ANSWERS, AND NOT ONLY UNTIL THE LINE: the name is recorded just under the line, and the second boot
+       below has nothing to compare against unless this one lived long enough to write it (`answers`). */
+    const tls = await serveUntil({ ...base, BRAINDOG_TLS_CERT: certFile, BRAINDOG_TLS_KEY: keyFile }, async (said) => {
+      const port = /sign in at https:\/\/brain\.home\.arpa:(\d+)\/signin/.exec(said)?.[1];
+      return port !== undefined && (await answers(`https://127.0.0.1:${port}/healthz`));
     });
     assert.match(tls.stderr ?? '', /sign in at https:\/\/brain\.home\.arpa:\d+\/signin with a passkey/);
     assert.ok(!(tls.stderr ?? '').includes('the name changed'), 'a first boot claimed the name had changed');
@@ -270,11 +273,8 @@ test('serve holds a certificate from the environment, and says when the name it 
        the passkey button that will never appear. The explanation has to be its own line, under the
        true one, or it is only printed in the cases where sign-in is off altogether. It is also a
        different hostname from the run above, so the passkey warning is due in the same output. */
-    const moved = spawnSync(process.execPath, [MAIN, 'serve'], {
-      encoding: 'utf8',
-      timeout: 5000,
-      env: { ...base, BRAINDOG_ORIGIN: 'https://192.168.1.50:8443' },
-    });
+    /* THE MOVE IS THE LAST OF THE LINES ASSERTED, so it is the one waited for. */
+    const moved = await serveUntil({ ...base, BRAINDOG_ORIGIN: 'https://192.168.1.50:8443' }, (said) => said.includes('the name changed'));
     assert.match(moved.stderr ?? '', /sign in at https:\/\/192\.168\.1\.50:8443\/signin with the server key/);
     assert.match(moved.stderr ?? '', /is an address and not a hostname/);
     assert.match(moved.stderr ?? '', /the name changed from brain\.home\.arpa to 192\.168\.1\.50/);
@@ -293,7 +293,7 @@ test('a certificate without its key is a refusal, and not a quiet fall back to p
        may already carry a key path, and inheriting one would make this test pass for the wrong reason. */
     const env: Record<string, string | undefined> = { ...process.env, BRAINDOG_DATA: data, PORT: '0', BRAINDOG_TLS_CERT: certFile };
     delete env.BRAINDOG_TLS_KEY;
-    const out = spawnSync(process.execPath, [MAIN, 'serve'], { encoding: 'utf8', timeout: 5000, env });
+    const out = spawnSync(process.execPath, [MAIN, 'serve'], { encoding: 'utf8', timeout: SERVE_DEADLINE_MS, env });
     assert.equal(out.status, 1, out.stderr);
     assert.match(out.stderr ?? '', /BRAINDOG_TLS_CERT and BRAINDOG_TLS_KEY go together/);
   } finally {
@@ -331,9 +331,10 @@ test('a certificate file that is not a certificate names the file, and not an Op
     const keyFile = join(data, 'lan.key');
     writeFileSync(certFile, 'this is a note somebody left in the wrong file\n');
     writeFileSync(keyFile, CERT_KEY);
+    /* A REFUSAL EXITS BY ITSELF, so the timeout is only a ceiling, and a loaded run must not reach it first. */
     const out = spawnSync(process.execPath, [MAIN, 'serve'], {
       encoding: 'utf8',
-      timeout: 5000,
+      timeout: SERVE_DEADLINE_MS,
       env: { ...process.env, BRAINDOG_DATA: data, PORT: '0', BRAINDOG_HOST: '127.0.0.1', BRAINDOG_TLS_CERT: certFile, BRAINDOG_TLS_KEY: keyFile },
     });
     assert.equal(out.status, 1, out.stderr);
@@ -357,7 +358,7 @@ test('a key that belongs to some other certificate names the key, and not an Ope
     writeFileSync(keyFile, other);
     const out = spawnSync(process.execPath, [MAIN, 'serve'], {
       encoding: 'utf8',
-      timeout: 5000,
+      timeout: SERVE_DEADLINE_MS,
       env: { ...process.env, BRAINDOG_DATA: data, PORT: '0', BRAINDOG_HOST: '127.0.0.1', BRAINDOG_TLS_CERT: certFile, BRAINDOG_TLS_KEY: keyFile },
     });
     assert.equal(out.status, 1, out.stderr);
@@ -376,15 +377,17 @@ test('a key that belongs to some other certificate names the key, and not an Ope
  * then died with `EISDIR: illegal operation on a directory` and exit 1. A directory standing where the
  * file goes is how that is reproduced on this machine; the shape in the field is a file left behind by
  * a boot that ran as another user, which reads and writes exactly as badly.
+ *
+ * SO IT IS KEPT UNTIL IT ANSWERS A REQUEST, not until the line: the death came just after the line, and a
+ * request answered once the line is out is the proof it lived through what follows it (`answers`).
  */
-test('a served-at that cannot be written does not take the host down with it', () => {
+test('a served-at that cannot be written does not take the host down with it', async () => {
   const data = started('braindog-serve-note-');
   try {
     mkdirSync(join(data, 'served-at'));
-    const out = spawnSync(process.execPath, [MAIN, 'serve'], {
-      encoding: 'utf8',
-      timeout: 4000,
-      env: { ...process.env, BRAINDOG_DATA: data, PORT: '0', BRAINDOG_HOST: '127.0.0.1' },
+    const out = await serveUntil({ ...process.env, BRAINDOG_DATA: data, PORT: '0', BRAINDOG_HOST: '127.0.0.1' }, async (said) => {
+      const port = /http:\/\/localhost:(\d+)/.exec(said)?.[1];
+      return port !== undefined && /^ {2}(loopback only|behind BRAINDOG_TOKEN)/m.test(said) && (await answers(`http://127.0.0.1:${port}/healthz`));
     });
     assert.notEqual(out.status, 1, out.stderr);
     assert.ok(!(out.stderr ?? '').includes('EISDIR'), out.stderr);
