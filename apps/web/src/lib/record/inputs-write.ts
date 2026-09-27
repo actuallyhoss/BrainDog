@@ -18,7 +18,7 @@
  * money the record would refuse is said here without asking it, in the words the row page uses (`field-draft.ts`).
  *
  * PURE BUT FOR THE CLOCK AND THE WRITE, both handed in, so the test drives the pause with a fake clock and the write
- * with a stub, and `PageView` hands it the row writer and its own re-read.
+ * with a stub, and the page's writes (`lib/page/page-writes.ts`) hand it the row writer and the page's re-read.
  */
 
 import { exponentOf, money, type Row, type RowRef } from 'braindog-render';
@@ -51,10 +51,11 @@ export type InputsDeps = {
   /**
    * The record's home currency as the kernel answers it (`declare.ts` `homeCurrency`), or null where none is set.
    *
-   * HANDED IN, BECAUSE NOTHING IN THIS BUILD HOLDS IT. The web's own `homeCurrency()` counts the currencies in `ROWS`,
-   * which nothing fills outside a test, so on every live record it answered null and an empty money box fell through
-   * to GBP. `PageView` hands the one the kernel answers on the `inputs` block itself (`home`, beside `types`). Absent or
-   * null, a figure typed with no code into an empty box is refused beside it and nothing is written.
+   * HANDED IN, AS THE BLOCK ANSWERED IT. The web's `homeCurrency()` once counted the currencies in `ROWS`, which nothing
+   * fills outside a test, so an empty money box fell through to GBP; the page's writes (`page-writes.ts`) hand the one
+   * the kernel answers on the `inputs` block itself (`home`, beside `types`), which is this record's own and needs no
+   * booted shell. Absent or null, a figure typed with no code into an empty box is refused beside it and nothing is
+   * written.
    */
   home?: () => string | null;
   clock?: Clock;

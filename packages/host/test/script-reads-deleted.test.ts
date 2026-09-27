@@ -110,9 +110,9 @@ test('AN OPTION THAT IS NOT `{ includeDeleted: true or false }` IS REFUSED, NOT 
 });
 
 /*
- * THIS ONE PASSES ONLY ONCE THE PRELUDE SENDS `list` ITS THIRD ARGUMENT. The prelude (`packages/script/src/prelude.ts`)
- * builds `ctx.record.list` inside the sandbox, and while it calls `host.list` with the register and the filter alone,
- * the option is dropped before it reaches the binding and Bolt never comes back. The two tests above call
+ * THIS ONE HOLDS THE PRELUDE TO SENDING `list` ITS THIRD ARGUMENT. The prelude (`packages/script/src/prelude.ts`)
+ * builds `ctx.record.list` inside the sandbox, and were it to call `host.list` with the register and the filter alone,
+ * the option would be dropped before it reached the binding and Bolt would never come back. The two tests above call
  * `scriptReads` directly and do not pass through it.
  */
 test("THE WHOLE PATH ON THE SELF-HOST: `ctx.record.list(register, where, { includeDeleted: true })` in QuickJS", async () => {

@@ -238,7 +238,7 @@
   <!-- RENAME OPENS THE TRIGGER'S SHEET, WHOSE FIRST FIELD IS THE NAME, and `Sheet.svelte` puts the caret in the first
        field it holds. A stranger clicked the title and nothing happened; the name was only reachable by opening the
        trigger card, which nothing on it says (`loop/research-canvas-ux.md` 1.13). -->
-  <PageHead icon="refresh" kicker={words.heading} {title}>
+  <PageHead icon="refresh" kicker={words.heading} back="/automations" {title}>
     {#snippet actions()}<Button onclick={() => flow.select('trigger')}>{say.rename}</Button>{/snippet}
   </PageHead>
   <div class="page">
@@ -377,7 +377,7 @@
   }
 
   .trigger[data-selected] {
-    border-color: var(--accent);
+    border-color: var(--ink2);
   }
 
   .trigger-kicker {
@@ -494,7 +494,7 @@
 
   .dot[data-state='pending'],
   .dot[data-state='running'] {
-    background: var(--accent);
+    background: var(--info);
   }
 
   .dot[data-state='done'] {

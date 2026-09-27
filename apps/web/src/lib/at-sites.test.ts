@@ -47,10 +47,9 @@ const RENDERED = new Map([
 const BARE_ORIGIN = new Map([
   ['lib/clipboard.ts', 'a copied link is absolute, and `at()` adds the record'],
   ['lib/ui/Sidebar.svelte', '`/auth/switch` is the person\'s, not a record\'s'],
-  ['lib/page/PageView.svelte', 'a block\'s link is this address with its fragment'],
   ['lib/ui/WebhookDoors.svelte', 'a door is `/in/…` at the root, which a stranger posts to'],
-  ['routes/p/[slug]/Reporting.svelte', 'the curl line is a bearer at `/api`, which names its record by the key'],
-  ['routes/settings/[area]/+page.svelte', 'the login line, the mail door and the invite link are built on the bare host'],
+  ['lib/page/panels/Reporting.svelte', 'the curl line is a bearer at `/api`, which names its record by the key'],
+  ['routes/settings/[area]/settings-state.svelte.ts', 'the login line, the mail door, the invite link and the move to another record are built on the bare host'],
 ]);
 
 test('NO ADDRESS IN THE APP IS RENDERED WITHOUT `at()`, and no record call goes to the bare origin', () => {

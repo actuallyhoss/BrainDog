@@ -31,7 +31,10 @@ import { compile, registerHref } from './where.ts';
 /* THE SAMPLE'S ROW NAMES, which a live tab learns from the record and this test asks the mirror about by name. */
 import './fixtures/fill.ts';
 
-const route = readFileSync(new URL('../../routes/r/[register]/+page.svelte', import.meta.url), 'utf8');
+/* THE LIST SCREEN IS ITS PAGE AND ITS PARTS (ARC-7a): the chips are parsed in the page and drawn by `ChipsBar`, read as one text. */
+const route = ['+page.svelte', 'parts/ChipsBar.svelte']
+  .map((at) => readFileSync(new URL(`../../routes/r/[register]/${at}`, import.meta.url), 'utf8'))
+  .join('\n');
 
 /** The seqs of the rows whose list field actually holds this element, read off the seed directly. */
 const holding = (register: string, field: string, element: unknown): number[] =>

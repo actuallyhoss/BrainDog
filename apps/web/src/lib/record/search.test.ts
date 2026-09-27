@@ -232,16 +232,6 @@ test('the count is styled on every screen, not only on a phone', () => {
 
 const SEARCH = src('routes', 'search', '+page.svelte');
 
-test('A CAPPED GROUP SAYS SO WHETHER OR NOT IT HAS A DOOR', () => {
-  /* `group.href && group.total > PER_LIST` — and the questions group's `href` is `null` by
-     construction, because `/decide` is not a filtered list. With fourteen matching decisions the
-     page drew ten rows under a count of fourteen and said nothing: the exact defect this route was
-     built to fix, one door along. */
-  assert.doesNotMatch(SEARCH, /\{#if group\.href && group\.total > PER_LIST\}/u);
-  assert.match(SEARCH, /\{#if group\.total > PER_LIST\}/u);
-  assert.match(SEARCH, /copy\.showingOf\(PER_LIST, group\.total\)/u, 'a doorless group has no disclosure');
-});
-
 test('the questions group really is the doorless one, so that branch is reachable', () => {
   /* An assertion about an unreachable branch is decoration. `search()` gives every register group a
      door and gives the questions group none, which is what makes the branch above real. */

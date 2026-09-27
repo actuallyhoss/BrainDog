@@ -105,19 +105,21 @@ export const INCLUDED_NEURONS_PER_CALL = 2_500;
  * types, with no upper limit. Its probe S1 saved `ask_cap: 1_000_000_000` through the door and 200 reads all reached the
  * binding, and the audit put 100,000 proposes from one owner with a cookie at about $283.
  *
- * WHY 900,000. At $0.011 a thousand neurons that is $9.90, about ten dollars a record a month. The package's own caps put
- * the default month (80 asks) at about 20,600 neurons at the very worst, some $0.23, so this is some forty times what an
- * owner who never touches the setting could spend, and room for one who raises it to use Slash every day. It is counted
- * in asks at the package's worst call, 232 neurons (`worstAsk`), which is 3,879 asks, so the bound holds whatever mix of
+ * WHY 300,000. At $0.011 a thousand neurons that is about $3.30 a record a month (`loop/finish/decisions.md` C19, down
+ * from 900,000 and about $9.90), the same number `wrangler.jsonc` sets in both environments, so an unset or mistyped var
+ * falls back to the ceiling the operator chose. The package's own caps put the default month (80 asks) at about 20,600
+ * neurons at the very worst, some $0.23, so this is some fourteen times what an owner who never touches the setting
+ * could spend, and room for one who raises it to use Slash most days. It is counted in asks at the package's worst
+ * call, 232 neurons (`worstAsk`), which is 1,293 asks, so the bound holds whatever mix of
  * reads, proposes, presses and first plans spends it; a read's worst is 25.5, so in practice a month at the ceiling costs
  * far less. The press and the first plan hold to it only because `includedModel` refuses either past 232 before sending:
  * their input is the record's and has no `capIn`, and at 300 lists a press's worst case was 272.
  *
  * IT IS PER RECORD AND NOT PER ACCOUNT. Each record's ledger is in its own Durable Object, and no count here sees another
- * record's. A thousand records at the ceiling is $9,900; bounding the account needs a counter every record shares, which
- * this file has not got.
+ * record's. A thousand records at the ceiling is about $3,300; bounding the account needs a counter every record shares,
+ * which this file has not got.
  */
-export const INCLUDED_MONTH_NEURONS = 900_000;
+export const INCLUDED_MONTH_NEURONS = 300_000;
 
 /**
  * `SLASH_INCLUDED_MONTH_NEURONS` read whole, or the default.

@@ -151,7 +151,7 @@
   const filters = $derived(live ? live.filters : null);
   /* THE COLUMNS THE VIEW KEPT, and the register's own where it kept none. The spoken id ends the
      row either way, as it does on the list this view narrows (DESIGN-SYSTEM rule 7). */
-  const columns = $derived(register ? keptColumns(columnsFor(register), live?.columns ?? []) : []);
+  const columns = $derived(register ? keptColumns(columnsFor(register, undefined, (live?.columns ?? []).includes('seq')), live?.columns ?? []) : []);
 
   const entries = $derived(got?.from === 'live' ? got.entries : []);
   const matched = $derived(got?.from === 'live' ? got.matched : 0);
@@ -277,7 +277,7 @@
     </Empty>
   </div>
 {:else}
-  <PageHead icon={iconFor(decl.icon, 'rows')} kicker="{decl.name} · saved view" title={name} count={matched} {total}>
+  <PageHead icon={iconFor(decl.icon, 'rows')} kicker={decl.name} back={register ? `/r/${register}` : undefined} title={name} count={matched} {total}>
     {#snippet actions()}
       <Button weight="bare" href="/r/{register}"><Icon name="external" size="s" />Open {decl.name}</Button>
       <!-- `BindBlock`'s own file header opens "THIS IS THE WHOLE WIZARD", which is what `13 §10`

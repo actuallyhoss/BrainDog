@@ -75,7 +75,7 @@ test('EACH FIRST-PARTY PACK IS A LEGAL PACK, and needs what its fields, pages an
   assert.deepEqual(requires, {
     portfolio: [],
     people: [],
-    'money-core': ['register.people', 'register.things'],
+    'money-core': ['register.things'],
     estate: ['register.things'],
     work: [],
   });
@@ -83,7 +83,8 @@ test('EACH FIRST-PARTY PACK IS A LEGAL PACK, and needs what its fields, pages an
   assert.deepEqual(Object.fromEntries(FIRST_PARTY.map((id) => [id, firstPartyManifest(id).links])), {
     portfolio: [],
     people: ['register.things'],
-    'money-core': [],
+    /* MONEY ONLY LINKS TO PEOPLE since 3.0.0: who a row is with is left out of a record without them. */
+    'money-core': ['register.people'],
     estate: [],
     /* WORK ONLY LINKS TO PEOPLE AND PROJECTS: who holds a task and what it is for are left out of a record without them. */
     work: ['register.people', 'register.things'],

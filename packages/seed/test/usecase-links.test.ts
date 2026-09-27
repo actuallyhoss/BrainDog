@@ -107,9 +107,9 @@ test('ON A REAL RECORD, A STUDENT, A GUIDE AND A TEAM OPEN WITH THEIR EXAMPLES L
     for (const m of modulesFor(u, ['people'])) {
       if (m === 'agents') continue;
       const holds = new Set([...held(), ...firstPartyManifest(m as never).provides.flatMap((p) => (p.startsWith('register.') ? [p.slice(9)] : []))]);
-      await put(moduleDocument(u, m, { today: TODAY, holds }));
+      await put(moduleDocument(u, m, { today: TODAY, holds, examples: true }));
     }
-    await put(carriedDocument(u, TODAY));
+    await put(carriedDocument(u, TODAY, null, { examples: true }));
 
     const io: LinkIo = {
       rows: async (register) => {
@@ -181,9 +181,9 @@ test('A PERSONAL RECORD FROM BEFORE THE LOG KEEPS ITS PROGRESS: each typed amoun
   for (const m of modulesFor(u, ['people'])) {
     if (m === 'agents') continue;
     const holds = new Set([...held(), ...firstPartyManifest(m as never).provides.flatMap((p) => (p.startsWith('register.') ? [p.slice(9)] : []))]);
-    await put(moduleDocument(u, m, { today: TODAY, holds }));
+    await put(moduleDocument(u, m, { today: TODAY, holds, examples: true }));
   }
-  await put(carriedDocument(u, TODAY));
+  await put(carriedDocument(u, TODAY, null, { examples: true }));
   /* WHAT 1.0.0 LEFT: a goal and a savings goal with their progress typed on them, and one with none. */
   const actor = { actor: 'p_owner', cascade: false };
   value(k.create('goals', { what: 'Swim 20 lengths', kind: 'goal', target: 20, done: 12, state: 'active' }, actor));

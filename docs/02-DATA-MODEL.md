@@ -748,7 +748,7 @@ page stated formally, is [34-GRAMMARS](34-GRAMMARS.md) §1.
 | Operator | Applies to | Compiles to |
 |---|---|---|
 | `is` / `not` | all | `=` on `json_extract(fields, '$.<id>')`, which is the indexed expression; `not` is `(expr IS NULL OR expr <> ?)` — see *Missing values* |
-| `in` / `not_in` | enum, ref, text | `IN (…)`, **chunked at 64 values** (100-parameter ceiling): chunks of `in` are joined with `OR`, chunks of `not_in` with `AND`, inside one parenthesis |
+| `in` / `not_in` | enum, ref, text | `IN (…)` up to 64 values; past 64, `IN (SELECT value FROM json_each(?))` with the whole list as one parameter. Money and quantity are still **chunked at 64 values**, chunks of `in` joined with `OR` and of `not_in` with `AND` inside one parenthesis, and the adapter's 100-parameter ceiling holds them because each value binds two |
 | `gt` `gte` `lt` `lte` | int, decimal, money, quantity, day, instant, duration | comparison; money and quantity compare inside one currency or unit — see *Money and quantity* |
 | `before` / `after` / `between` | day, instant | a bound parameter, resolved once at compile — see *Temporal literals*. `between: [a, b]` is inclusive of both ends |
 | `contains` | text, document | **a field-scoped substring**, ASCII-case-folded: `instr(lower(json_extract(…)), lower(?)) > 0`. The literal is ≤ 40 bytes (`CONTAINS_TOO_LONG`). **Identical on both backends** |
@@ -848,12 +848,13 @@ matching a sender or a subject literal — and it is now the same instrument on 
 them the same operator.)*
 
 **And one note on the subquery ban.** The author-facing grammar refuses subqueries. The *compiler*
-emits exactly **three** internal subquery forms — the FTS5 set-membership test for `matches`, the
-`IN (SELECT id …)` hop for `via:`, and `EXISTS (SELECT 1 FROM json_each(…))` for `has`/`lacks` — each
+emits these internal subquery forms and no others — the FTS5 set-membership test for `matches`, the
+`IN (SELECT id …)` hop for `via:`, `EXISTS (SELECT 1 FROM json_each(…))` for `has`/`lacks`, and
+`IN (SELECT value FROM json_each(?))` for an `in` or `not_in` past 64 values — each
 correlated to the current row or to a single register, none author-writable. That is what lets
 `matches` sit inside `any:` and `none:` branches at all, and it is why a `via:` leaf may not carry
 `matches` or `has` (`VIA_NESTED_SUBQUERY`). An earlier draft said one form, five paragraphs after
-defining a second; the count is three.
+defining a second; the list above is the whole of them.
 
 ### 6.1 · `immutable_when:` — the fifth consumer, and it costs one predicate
 

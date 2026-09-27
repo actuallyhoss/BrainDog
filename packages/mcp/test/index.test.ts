@@ -10,13 +10,13 @@
  *
  * SO EVERY TOOL IS CALLED, THROUGH THE SAME `handle` STDIO SERVES, over a real record. The table is
  * exhaustive against `TOOLS` on purpose: a tool added without a case here is red, which is the only
- * way a list of fifteen stays true. What is asserted is narrow and is the whole of the claim: the
+ * way a list of sixteen stays true. What is asserted is narrow and is the whole of the claim: the
  * name reached a method, so the answer is not `ROUTE_UNKNOWN` and not `NOT_IN_THIS_BUILD`. Whether
  * each tool then does what it says is `mcp.test.ts`.
  *
  * AND ONCE MORE OVER A SURFACE WITH NO OPTIONAL METHOD ON IT, which is what the command line hands
  * the tools when its allow-list is short. That run says exactly which tools go dark, and the list is
- * four; a fifth appearing in it is a tool somebody has to add a name for before it ships.
+ * five; a sixth appearing in it is a tool somebody has to add a name for before it ships.
  */
 
 import { test } from 'node:test';
@@ -76,6 +76,7 @@ const CALLS: Record<string, Record<string, unknown>> = {
   log: { spoken: 'obligations#1', note: 'Chased twice.' },
   handoff: { doing: 'Checking the tool list', next: 'Report what answered' },
   meet: { name: 'Ada', where: 'commit 4464966 in braindog' },
+  triage: { arrival: 'arr_1', ignore: true },
 };
 
 type ToolResult = { isError?: boolean; content: { text: string }[] };
@@ -125,7 +126,7 @@ const narrowOver = (api: Awaited<ReturnType<typeof record>>['api']): McpSurface<
   digestToday: (args, ctx) => api.digestToday(args, ctx),
 });
 
-test('AND A SURFACE WITH NOTHING OPTIONAL ON IT DARKENS FOUR OF THEM, which is the list a transport has to route', async () => {
+test('AND A SURFACE WITH NOTHING OPTIONAL ON IT DARKENS FIVE OF THEM, which is the list a transport has to route', async () => {
   /* THE COMMAND LINE BUILDS ITS SURFACE FROM A FIXED LIST (`apps/cli/src/surface.ts`), and a name
      missing from it is a tool that refuses for ever. */
   const { sql, api } = await record();
@@ -133,7 +134,7 @@ test('AND A SURFACE WITH NOTHING OPTIONAL ON IT DARKENS FOUR OF THEM, which is t
 
   const dark: string[] = [];
   for (const tool of TOOLS) if ((await called(tool.name, narrow, owner)) === 'NOT_IN_THIS_BUILD') dark.push(tool.name);
-  assert.deepEqual(dark, ['context', 'activity', 'handoff', 'meet']);
+  assert.deepEqual(dark, ['context', 'activity', 'handoff', 'meet', 'triage']);
   sql.close();
 });
 
@@ -162,6 +163,8 @@ test('AND THE RESOURCES GO THE SAME WAY, more quietly, which is the half of this
     'braindog:automations',
     'braindog:arrangement',
     'braindog:grammar/page',
+    'braindog:grammar/register',
+    'braindog:grammar/metric',
     'braindog:grammar/proposals',
   ]);
   sql.close();
@@ -181,7 +184,7 @@ test('THE SURVEY WAS RIGHT ABOUT BOTH: credentials is not a tool, and skill is a
   sql.close();
 });
 
-test('AND THE REFUSAL FOR A NAME THAT IS NOT A TOOL LISTS THE FIFTEEN, so the second attempt works', async () => {
+test('AND THE REFUSAL FOR A NAME THAT IS NOT A TOOL LISTS EVERY TOOL, so the second attempt works', async () => {
   const { sql, api } = await record();
   const reply = (await handle({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'money_overview', arguments: {} } }, api, owner)) as Reply;
   assert.ok('result' in reply);

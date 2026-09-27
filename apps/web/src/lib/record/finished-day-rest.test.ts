@@ -11,7 +11,7 @@
  *
  * EVERY CASE BELOW IS A REAL WRITE against a kernel on an in-memory SQLite, the gesture at the version the screen read and
  * the put back at the version the gesture answered with, because what a put back is worth is decided by what the record
- * keeps. The board's put back is loaded as `PageView.svelte` loads it, on the press.
+ * keeps. The board's put back is loaded as the page's writes (`lib/page/page-writes.ts`) load it, on the press.
  */
 
 import { test } from 'node:test';
@@ -25,7 +25,7 @@ import { putBackOf } from './field-write.ts';
 import { movePatch } from './page-write.ts';
 import type { Entry, Fields } from './schema.ts';
 
-const VIEW = readFileSync(new URL('../page/PageView.svelte', import.meta.url), 'utf8');
+const VIEW = readFileSync(new URL('../page/page-writes.ts', import.meta.url), 'utf8');
 
 const NOW = Date.parse('2026-09-24T10:00:00Z');
 const OWNER = { actor: 'p_1' };
@@ -92,7 +92,7 @@ function held(k: Kernel, seq: number): Entry {
 }
 
 /**
- * A card moved on a board and put back from the receipt, as `moveCard` and `putBack` in `PageView.svelte` send them: the
+ * A card moved on a board and put back from the receipt, as `moveCard` and `putBack` in `page-writes.ts` send them: the
  * move at the version the page read, and the way back at the version the move answered with. `row` is what the block
  * held, or `undefined` for a card the page is holding in place after a re-read left it out.
  */
@@ -175,7 +175,7 @@ test('a put back pressed after somebody else moved the card is a conflict and no
 
 test("the board's receipt builds its put back from the row the page held, through moveBackOf", () => {
   const at = VIEW.indexOf('function moveCard(');
-  assert.ok(at >= 0, 'PageView has no moveCard, so this sweep proves nothing');
+  assert.ok(at >= 0, 'the page writes have no moveCard, so this sweep proves nothing');
   const body = VIEW.slice(at, VIEW.indexOf('\n  }\n', at));
   /* THE OLD PUT BACK, which is the column alone and dates a done card today. */
   assert.doesNotMatch(body, /back: \([^)]*\) => \(field && from \? m\.movePatch\(ref, field, from/u, 'the move still puts back by the column alone');

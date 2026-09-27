@@ -54,11 +54,11 @@ test('EVERY FIGURE A PACK DECLARES IS LISTED, late-in among them, each with its 
     declared.map((d) => d.id.slice('metric.'.length)).sort(),
     `${listed.length} of ${declared.length} listed`,
   );
-  /* Measured on this record before the method existed: 36 declared and 18 drawn. The number is asserted so that a
-     pack shipping fewer figures is noticed here rather than read as the finding closing on its own. */
-  assert.equal(declared.length, 36);
+  /* Measured on this record before the method existed: 36 declared and 18 drawn; money-core 3.0.0 made it 41. The number
+     is asserted so that a pack shipping fewer figures is noticed here rather than read as the finding closing on its own. */
+  assert.equal(declared.length, 41);
   const late = listed.find((f) => f.id === 'late-in');
-  assert.deepEqual(late, { id: 'late-in', name: 'Late to you', format: 'money.GBP', list: 'obligations', pack: 'money-core', param: false });
+  assert.deepEqual(late, { id: 'late-in', name: 'Late to you', format: 'money', list: 'obligations', pack: 'money-core', param: false });
   /* AND THE ONE TEMPLATE, which `metric` refuses bare (`REF_UNKNOWN`, "thing is {{it}}") and answers as `project-owed:Kiln`. */
   assert.deepEqual(listed.filter((f) => f.param).map((f) => f.id), ['project-owed']);
   for (const f of listed) {
@@ -111,8 +111,9 @@ test('SOMEBODY INVITED TO ONE LIST IS LISTED EXACTLY THE FIGURES metric ADMITS T
   const wren = await member(api, 'p_9', { accounts: 'read' });
   const listed = value<Figure[]>(await api.figures(wren)).map((f) => f.id).sort();
   assert.deepEqual(listed, await answered(api, declared, wren));
-  /* AND THE CONTROL, so an empty list on both sides cannot pass: she reads the accounts, and the three figures over them. */
-  assert.deepEqual(listed, ['cash-accounts', 'cash-as-of', 'cash-now']);
+  /* AND THE CONTROL, so an empty list on both sides cannot pass: she reads the accounts, and the figures over them alone.
+     `cash-now` is not one since money-core 3.0.0, because it rolls the balances and transactions too, which she cannot read. */
+  assert.deepEqual(listed, ['cash-accounts', 'cash-as-of']);
   sql.close();
 });
 
@@ -142,7 +143,7 @@ test('AND IT IS ROUTED: the client asks the host, READ+, and gets the same list 
   const client = createClient({ base: 'https://braindog.example', fetch });
   const listed = value<Figure[]>(await client.figures());
   assert.deepEqual(listed, value<Figure[]>(await api.figures(owner)));
-  assert.equal(listed.length, 36);
+  assert.equal(listed.length, 41);
   assert.deepEqual(sent, ['GET /api/figures']);
   sql.close();
 });

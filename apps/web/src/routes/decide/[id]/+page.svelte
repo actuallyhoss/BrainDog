@@ -41,7 +41,6 @@
   import Cited from '$lib/ui/Cited.svelte';
   import { figuresIn, reasonIn } from '$lib/cite.ts';
   import Changes from './Changes.svelte';
-  import { spoken } from '../spoken.ts';
   import Proposed from './Proposed.svelte';
   import Arranged from './Arranged.svelte';
   import Applied from './Applied.svelte';
@@ -488,7 +487,7 @@
     </Empty>
   </div>
 {:else}
-  <PageHead icon="decide" kicker={copy.decide} title={question.title} id={spoken(question.id) ? question.id : undefined} />
+  <PageHead icon="decide" kicker={copy.decide} back="/decide" title={question.title} />
 
   <div class="page">
     <!-- THE BLOCK EXISTED AND ONLY THE RECORD COULD REACH IT. It was gated on `question.decided`,

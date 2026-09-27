@@ -40,6 +40,7 @@ import {
 } from '@braindog/host';
 import type { CallContext, RecordApi, SealTarget, Sealed } from '@braindog/record';
 import { no, ok, type Result } from '@braindog/ports';
+import { unlockedKey } from '@braindog/host';
 
 import { offeredId, unwrap, type KeyStore } from './keys.ts';
 
@@ -55,8 +56,20 @@ const VALUE_LIMIT = 65_536;
 const utf8 = (text: string): Uint8Array => new TextEncoder().encode(text);
 const text = (x: unknown): string => (typeof x === 'string' ? x : '');
 
-/** The grant's own key, or `null` when this host's key store does not open the record's. */
-async function grantKey(store: KeyStore, record: string, key: SealTarget['key'], grant: string): Promise<webcrypto.CryptoKey | null> {
+/**
+ * The grant's own key, or `null` when this host's key store does not open the record's.
+ *
+ * `unlocked` IS THE RECORD KEY A PASSPHRASE OPENED FOR THIS REQUEST (`unlockedKey`), and behind a passphrase it is the
+ * only way in: the root key opens nothing there. The caller zero-fills it when its request is answered.
+ */
+async function grantKey(
+  store: KeyStore,
+  record: string,
+  key: SealTarget['key'],
+  grant: string,
+  unlocked: Uint8Array | null = null,
+): Promise<webcrypto.CryptoKey | null> {
+  if (key.wrapped_by === 'passphrase') return unlocked === null ? null : await deriveGrantKey(unlocked, grant);
   if (key.kek_id === null) return null;
   const dek = await unwrap(store, record, 'record', { wrapped: key.wrapped, nonce: key.nonce, kek_id: key.kek_id, wrapped_by: 'kek' });
   if (!dek) return null;
@@ -91,8 +104,18 @@ function answerOpen(credential: string, label: string, plain: Plaintext): Respon
  */
 function steps(api: RecordApi, store: KeyStore) {
   const recordId = (): string | null => api.kernel.identity()?.id ?? null;
+  /* THE RECORD KEY A PASSPHRASE OPENS FOR ONE REQUEST, or `null` while the vault is on the root key. The record's
+     `unlockVault` puts the vault gate first and counts the try; the caller zero-fills what comes back. */
+  const unlocked = (record: string, by: By, body: Record<string, unknown>) =>
+    unlockedKey(body, record, (unlock) => api.unlockVault(unlock, by));
 
-  const deposit = async (by: By, body: Record<string, unknown>, hints: SessionHints): Promise<Result<unknown>> => {
+  /* `opts` IS SET ON THE LOGIN-TOKEN DEPOSIT ALONE (`depositByToken` below), and never from anything in a request. */
+  const deposit = async (
+    by: By,
+    body: Record<string, unknown>,
+    hints: SessionHints,
+    opts?: { agentDeposit?: true | undefined },
+  ): Promise<Result<unknown>> => {
     const record = recordId();
     if (record === null) return no('NOT_IN_THIS_BUILD', NO_IDENTITY, { at: 'record' });
     const said = body.value;
@@ -102,14 +125,23 @@ function steps(api: RecordApi, store: KeyStore) {
       value.fill(0);
       return no('OUT_OF_BOUNDS', 'A key is at most 64 KiB.', { at: 'value' });
     }
+    const door = await unlocked(record, by, body);
+    if (!door.ok) {
+      value.fill(0);
+      return door;
+    }
+    const recordKey = door.value;
     /* What it is, unopened: a length, never a character of it. */
     const hint = `a ${String(said.length)}-character value`;
     const seal = async (target: SealTarget): Promise<Result<Sealed>> => {
-      const key = await grantKey(store, record, target.key, target.grant);
-      if (!key || target.key.kek_id === null) return no('WRONG_KEY', WRONG_KEY, { at: 'kek_id' });
+      const key = await grantKey(store, record, target.key, target.grant, recordKey);
+      /* BEHIND A PASSPHRASE THE RECORD KEY NAMES NO ROOT KEY, and a grant row names one all the same: the one the
+         record's other keys are under, which a later rotation renames with them. */
+      const kekId = target.key.kek_id ?? (recordKey === null ? null : await offeredId(store, api.kernel.wrappingKey()));
+      if (!key || kekId === null) return no('WRONG_KEY', WRONG_KEY, { at: 'kek_id' });
       const nonce = new Uint8Array(randomBytes(NONCE_BYTES));
       const sealed = await sealBytes(key, nonce, target.aad, value);
-      return ok({ ciphertext: sealed, nonce, kdf: 'hkdf-sha256', kek_id: target.key.kek_id, bytes: value.length, hint });
+      return ok({ ciphertext: sealed, nonce, kdf: 'hkdf-sha256', kek_id: kekId, bytes: value.length, hint });
     };
     /* A PERSON MAY NAME THE ROW AND THE PROJECT AND AN AGENT MAY NOT, which is why this is two shapes rather than
        one spread. A vault grant already carries its project, and reading a second one out of its body would be a
@@ -119,43 +151,63 @@ function steps(api: RecordApi, store: KeyStore) {
         ? { label: body.label, opens: body.opens, kind: body.kind, project: body.project, credential: body.credential }
         : { label: body.label, opens: body.opens, kind: body.kind };
     try {
-      return await api.depositGrant(args, by, hints, seal);
+      return await api.depositGrant(args, by, hints, seal, opts);
     } finally {
       value.fill(0);
+      recordKey?.fill(0);
     }
   };
 
   const open = async (by: By, body: Record<string, unknown>, hints: SessionHints): Promise<Response> => {
     const record = recordId();
     if (record === null) return vaultReply(no('NOT_IN_THIS_BUILD', NO_IDENTITY, { at: 'record' }));
-    /* THE ID THE RECORD'S KEYS ARE WRAPPED UNDER, while the store still holds it, so a key opens between a new key file
-       and the re-wrap this process makes as it starts (`offeredId`). */
-    const kekId = await offeredId(store, api.kernel.wrappingKey());
-    const out = await api.openForGrant({ label: text(body.label), credential: text(body.credential) }, by, hints, kekId);
-    if (!out.ok) return vaultReply(out);
-    const sealed = out.value;
-    const key = await grantKey(store, record, sealed.key, sealed.id);
-    if (!key) return vaultReply(no('WRONG_KEY', WRONG_KEY, { at: 'kek_id' }));
-    const opened = await openBytes(key, sealed.nonce, sealed.aad, sealed.ciphertext);
-    /* A failed decrypt says only that these bytes do not open under this key. */
-    if (opened === null)
-      return vaultReply(no('WRONG_KEY', 'The sealed value did not open under this host key store.', { at: 'kek_id' }));
-    return answerOpen(sealed.credential, sealed.label, opened as Plaintext);
+    const door = await unlocked(record, by, body);
+    if (!door.ok) return vaultReply(door);
+    const recordKey = door.value;
+    try {
+      /* THE ID THE RECORD'S KEYS ARE WRAPPED UNDER, while the store still holds it, so a key opens between a new key file
+         and the re-wrap this process makes as it starts (`offeredId`). */
+      const kekId = await offeredId(store, api.kernel.wrappingKey());
+      const out = await api.openForGrant({ label: text(body.label), credential: text(body.credential) }, by, hints, kekId);
+      if (!out.ok) return vaultReply(out);
+      const sealed = out.value;
+      const key = await grantKey(store, record, sealed.key, sealed.id, recordKey);
+      if (!key) return vaultReply(no('WRONG_KEY', WRONG_KEY, { at: 'kek_id' }));
+      const opened = await openBytes(key, sealed.nonce, sealed.aad, sealed.ciphertext);
+      /* A failed decrypt says only that these bytes do not open under this key. */
+      if (opened === null)
+        return vaultReply(no('WRONG_KEY', 'The sealed value did not open under this host key store.', { at: 'kek_id' }));
+      return answerOpen(sealed.credential, sealed.label, opened as Plaintext);
+    } finally {
+      recordKey?.fill(0);
+    }
   };
 
   return { deposit, open };
 }
 
-/** An agent's door, `/api/vault/*`. Without a key store both halves answer `NOT_IN_THIS_BUILD`. */
-export function vaultDoor(api: RecordApi, store: KeyStore | undefined): VaultDoor {
+/**
+ * An agent's door, `/api/vault/*`. Without a key store both halves answer `NOT_IN_THIS_BUILD`.
+ *
+ * `token` IS THE HOST'S OWN `/api` BEARER CHECK, and with it the deposit door takes an agent's login token as well as a
+ * vault grant (`loop/finish/agents.md` C1): the record adds that key as new, in the token's run's project, or refuses.
+ * The open door still takes a vault grant only (`serveVault` in `@braindog/host`).
+ */
+export function vaultDoor(
+  api: RecordApi,
+  store: KeyStore | undefined,
+  token?: (request: Request) => Promise<Result<CallContext>>,
+): VaultDoor<CallContext> {
   const grant = (bearer: string) => api.vaultGrant(bearer);
   if (!store) return { grant };
   const { deposit, open } = steps(api, store);
   return {
     grant,
+    ...(token === undefined ? {} : { token }),
     keys: {
       deposit: (ask) => deposit(ask.grant, ask.body, ask.hints),
       open: (ask) => open(ask.grant, ask.body, ask.hints),
+      depositByToken: (ask) => deposit(ask.ctx, ask.body, ask.hints, { agentDeposit: true }),
     },
   };
 }

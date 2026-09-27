@@ -155,10 +155,10 @@ export const site = {
       /* `seq 4188` in `sample.ts`, at `stamp(-9)`, and it is `by: 'rule.reply'`, not the late-invoice
          rule. This row credited it to *Chase late payments*, the name `names.ts` gives
          `invoice-late`, which wrote no row in the fixture ledger at all. `reply` is in no
-         `RULE_NAMES` entry, so the app draws it through `actorOf`'s fallback as `reply rule`, and
+         `RULE_NAMES` entry, so the app draws it through `names.ts`'s `actor` as `Reply`, and
          that is the name the app puts on this row. The note it added reads
          *Chased twice. 45-day terms expired 3 August.* on `obligations#1`. */
-      { who: 'reply rule', what: 'Added a note to an invoice that is late', when: '9h ago' },
+      { who: 'Reply', what: 'Added a note to an invoice that is late', when: '9h ago' },
       /* `seq 4192` and `4191` in `sample.ts`: Object storage and the Workers plan, each `from the
          Fenwick invoice`. THE TIME IS NOT THE LEDGER'S `stamp(-3)`, AND THAT IS DELIBERATE. This row
          lands the moment the reader presses Accept, and it said `3h ago` while doing so: a row
@@ -969,13 +969,14 @@ export const site = {
     },
 
     mcp: {
-      /* `packages/mcp/src/index.ts`: `TOOLS` holds fifteen entries, nine carrying `writes: false`. */
-      title: 'Fifteen tools, and nine of them only read.',
+      /* `packages/mcp/src/index.ts`: `TOOLS` holds sixteen entries, nine carrying `writes: false`. `triage` joined last
+         (`loop/finish/contracts.md` §6.2). */
+      title: 'Sixteen tools, and nine of them only read.',
       lead: 'An agent reads the record the way a person does, and what it writes lands as an event carrying its name. Nothing here is a separate copy of your data.',
       readsTitle: 'Read',
       reads: ['record_index', 'context', 'schema', 'get', 'list', 'search', 'history', 'activity', 'governance'],
       writesTitle: 'Write',
-      writes: ['propose', 'create', 'update', 'log', 'handoff', 'meet'],
+      writes: ['propose', 'create', 'update', 'log', 'handoff', 'meet', 'triage'],
       /* `TEMPLATES` in the same file; `test/content.test.ts` holds this list and its count to it. */
       resourcesTitle: 'Seven resources a client can read directly',
       resources: [

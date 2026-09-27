@@ -61,7 +61,7 @@ const ran = (args: string[], env: NodeJS.ProcessEnv, cwd: string): Promise<Ran> 
     child.on('close', (code) => done({ code, stdout, stderr }));
   });
 
-/** The stub record: `context` and `page`, and a refusal for anything else, as `page.test.ts` answers. */
+/** The stub record: `context` and `arrangement`, and a refusal for anything else, as `page.test.ts` answers. */
 async function stub(t: { after: (fn: () => void | Promise<void>) => void }) {
   const server: Server = createServer((req, res) => {
     const chunks: Buffer[] = [];
@@ -76,11 +76,12 @@ async function stub(t: { after: (fn: () => void | Promise<void>) => void }) {
         res.end(JSON.stringify(value));
       };
       if (method === 'context') return answer({ ok: true, value: CONTEXT });
-      if (method === 'page')
+      /* `page pull` READS THE STORED DECLARATION through `arrangement({ page })`, not the drawn `page`. */
+      if (method === 'arrangement')
         return answer(
-          args.slug === 'invoicing'
-            ? { ok: true, value: PAGE_ANSWER }
-            : { ok: false, refusal: { code: 'PAGE_UNKNOWN', fix: `There is no page at ${String(args.slug)}.`, at: 'slug' } },
+          args.page === 'invoicing'
+            ? { ok: true, value: { id: 'page.invoicing', version: 1, pack: null, body: PAGE_ANSWER } }
+            : { ok: false, refusal: { code: 'PAGE_UNKNOWN', fix: `There is no page at ${String(args.page)}.`, at: 'page' } },
         );
       return answer({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: `The stub does not answer ${method}.` } });
     });
@@ -138,7 +139,7 @@ test('a refusal IS AS MACHINE-READABLE AS A SUCCESS: the code, the fix and the a
   assert.equal(out.code, 1);
   assert.deepEqual(document(out), {
     ok: false,
-    refusals: [{ code: 'PAGE_UNKNOWN', fix: 'There is no page at nowhere.', at: 'slug' }],
+    refusals: [{ code: 'PAGE_UNKNOWN', fix: 'There is no page at nowhere.', at: 'page' }],
   });
   /* The sentence is still said, on the stream a person reads. */
   assert.equal(out.stderr.trim(), 'There is no page at nowhere.');

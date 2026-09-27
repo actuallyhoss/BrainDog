@@ -15,12 +15,22 @@ import type { KernelParts } from '../parts.ts';
 
 /* EXTENSIONS: the imports, one line per file under this folder, named for the file. */
 import { extension as rehearse } from './rehearse.ts';
+import { extension as moneyFigures } from './money-figures.ts';
+import { extension as keys } from './keys.ts';
+import { extension as comments } from './comments.ts';
+import { extension as vaultPassphrase } from './vault-passphrase.ts';
+import { extension as jobs } from './jobs.ts';
 /* END EXTENSIONS */
 
 export function extensions(parts: KernelParts) {
   return {
     /* EXTENSIONS: the spreads, one line per file, in the order of the imports above. */
     ...rehearse(parts),
+    ...moneyFigures(parts),
+    ...keys(parts),
+    ...comments(parts),
+    ...vaultPassphrase(parts),
+    ...jobs(parts),
     /* END EXTENSIONS */
   };
 }

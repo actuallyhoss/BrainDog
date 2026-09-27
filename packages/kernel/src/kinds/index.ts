@@ -30,6 +30,10 @@
 import type { Refusal } from '@braindog/ports';
 
 import type { BlockResult, PageBlock, PageDeps } from '../pages.ts';
+import { calendar } from './calendar.ts';
+import { embed } from './embed.ts';
+import { gallery } from './gallery.ts';
+import { link } from './link.ts';
 
 /**
  * When a module's `validate` is asked: at install, before the page is written, or at read, for a page written under
@@ -73,7 +77,12 @@ export type KindModule = {
  * through it (`packages/kernel/test/kinds-registry.test.ts`). Looked up only through `kindModule`, never by bracket,
  * so a page naming `constructor` finds nothing.
  */
-export const BLOCK_KIND_MODULES: Record<string, KindModule> = {};
+export const BLOCK_KIND_MODULES: Record<string, KindModule> = {
+  calendar,
+  link,
+  gallery,
+  embed,
+};
 
 /** The module that reads `kind`, or `undefined` for a kind `pages.ts` reads itself. */
 export const kindModule = (kind: string): KindModule | undefined =>

@@ -31,7 +31,7 @@ const REWRAP_ROWS = 3;
  * one, is `ok` and silent.
  */
 export async function rewrapAtStart(
-  api: Pick<RecordApi, 'kernel' | 'rewrapKeys'>,
+  api: Pick<RecordApi, 'kernel'>,
   store: KeyStore | undefined,
   say: (line: string) => void = () => {},
 ): Promise<RewrapOutcome> {
@@ -83,7 +83,8 @@ export async function rewrapAtStart(
       continue;
     }
     /* ROWS SOMETHING ELSE MOVED FIRST ARE NOT IN `moved`, and they are under the current key already; a refusal is not. */
-    const done = await api.rewrapKeys({ from, to, rows });
+    /* THE KERNEL'S OWN, IN THIS PROCESS (`kernel/src/api/keys.ts`): INTERNAL, so no record method or route stands in front of it. */
+    const done = api.kernel.rewrapKeys({ from, to, rows });
     if (!done.ok) left = true;
   }
   if (left) return stuck();

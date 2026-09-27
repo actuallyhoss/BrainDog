@@ -106,7 +106,8 @@ export type PageBlock = {
    */
   opening?: number | { metric: string };
   from?: Leg[];
-  horizon?: number;
+  /** How many days the walk reads, or `'last'`: to the last dated movement, whose length the walk answers (`Runway.horizon`). */
+  horizon?: number | 'last';
   empty?: string;
   target?: number;
   /**
@@ -399,7 +400,7 @@ export type PageDeps = {
   titleOf: (register: string) => string | null;
   /** The cash walk, when a block names it. */
   /** `only` walks one currency's movements, unconverted, for a walk drawn once per currency. */
-  runway: (opening: number, legs: readonly Leg[], horizon?: number, only?: Only) => Runway | null;
+  runway: (opening: number, legs: readonly Leg[], horizon?: number | 'last', only?: Only) => Runway | null;
   ctx: EvalContext;
   /*
    * OPTIONAL, so a host that has not wired one of these gets `NOT_IN_THIS_BUILD` on the block that
@@ -2859,6 +2860,13 @@ export function registersOf(decl: PageDecl, metric?: (id: string) => MetricDecl 
   const add = (source: unknown) => {
     if (typeof source === 'string' && source.startsWith('register.')) named.add(source.slice('register.'.length));
   };
+  /* A FIGURE NAMES EVERY LIST IT READS, not its source alone (`money-figures.ts` `figureLists`): a rolled cash figure
+     reads its moves and its checks, and a walk its legs and the figure it opens from, so a page with one on it is held
+     from a member who may not read those lists as it is on Home and in the sell knob (`listsRead`). */
+  const addFigure = (id: string): void => {
+    const d = metric?.(id);
+    if (d) for (const list of listsRead(d, (other) => metric?.(other) ?? null)) named.add(list);
+  };
   if (decl.for?.register) named.add(decl.for.register);
   for (const block of decl.blocks ?? []) {
     add(block.source);
@@ -2914,37 +2922,37 @@ export function registersOf(decl: PageDecl, metric?: (id: string) => MetricDecl 
     for (const cell of block.cells ?? []) {
       /* THE FIRST COLON SEPARATES, as everywhere else: `project-owed:C:\Repos` is one project. */
       const at = cell.metric.indexOf(':');
-      add(metric?.(at < 0 ? cell.metric : cell.metric.slice(0, at))?.source);
+      addFigure(at < 0 ? cell.metric : cell.metric.slice(0, at));
     }
     /* A SERIES READS EVERY FIGURE IT LINES UP. */
-    for (const line of block.series ?? []) for (const id of [line?.metric, line?.then]) if (typeof id === 'string') add(metric?.(id)?.source);
+    for (const line of block.series ?? []) for (const id of [line?.metric, line?.then]) if (typeof id === 'string') addFigure(id);
     /* A WALK THAT STARTS FROM A FIGURE READS THAT FIGURE'S LIST, and so does the figure its late knob marks. */
-    if (block.opening && typeof block.opening === 'object') add(metric?.(block.opening.metric)?.source);
-    if (typeof block.late === 'string') add(metric?.(block.late)?.source);
+    if (block.opening && typeof block.opening === 'object') addFigure(block.opening.metric);
+    if (typeof block.late === 'string') addFigure(block.late);
     /* AND THE FIGURE A PROGRESS BLOCK SETS ITS ROWS AGAINST, which `spentOf` reads whole into `readings`. Unnamed, a
        budget over Budgets with `spent:` a figure of Payroll drew a member invited to Budgets the Payroll total to the unit. */
-    for (const figure of [block.spent, block.toward]) if (typeof figure === 'string') add(metric?.(figure)?.source);
+    for (const figure of [block.spent, block.toward]) if (typeof figure === 'string') addFigure(figure);
     /* AND THE FIGURE ITS SELL KNOB OFFERS, which is a total of a list: a member who may not open Holdings is not handed
        what is in it as the amount a date control would add. */
-    if (block.sell && typeof block.sell === 'object' && typeof block.sell.metric === 'string') add(metric?.(block.sell.metric)?.source);
+    if (block.sell && typeof block.sell === 'object' && typeof block.sell.metric === 'string') addFigure(block.sell.metric);
     /* WHAT READS ACROSS THE LISTS NAMES EVERY LIST IT MAY READ: the lists holding a deadline, the lists behind the
        figures pinned to Home, and behind every figure a sell knob with no `sell:` offers. Without the record's lists
        and figures to name them by (`beside`), each is named `*`, which holds it back from anybody who may not read the
        whole record rather than listing it as prose. */
     for (const name of acrossLists(block, beside)) named.add(name);
     /* A BAR OR A SPLIT OVER A FIGURE READS THE FIGURE'S LIST. */
-    if (typeof block.source === 'string' && block.source.startsWith('metric.')) add(metric?.(block.source.slice('metric.'.length))?.source);
+    if (typeof block.source === 'string' && block.source.startsWith('metric.')) addFigure(block.source.slice('metric.'.length));
     /* A `when:` READS A FIGURE TOO, and a block that draws only when a number crosses a line is a
        statement about that number whether or not the block is on the page. */
     if (block.when?.metric) {
       const at = block.when.metric.indexOf(':');
-      add(metric?.(at < 0 ? block.when.metric : block.when.metric.slice(0, at))?.source);
+      addFigure(at < 0 ? block.when.metric : block.when.metric.slice(0, at));
     }
     /* AND SO DOES A `{{path}}` IN ITS PROSE, which the page answer now fills from the record. */
     for (const path of pathsOf(block)) {
       const said = pathOf(path);
       if (!said) continue;
-      if ('metric' in said) add(metric?.(said.metric)?.source);
+      if ('metric' in said) addFigure(said.metric);
       else named.add(said.register);
     }
   }

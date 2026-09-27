@@ -203,7 +203,8 @@ export type AuthResult<B = unknown> =
 /** The body each flow answers with on a 200. */
 export type AuthBodies = {
   methods: Methods;
-  session: Who;
+  /** `lapsed` is there only when the session's record has lapsed billing (contracts §2.6), so a banner can say so. */
+  session: Who & { lapsed?: true };
   'key.exchange': Who;
   'passkey.register.options': RegistrationOptions;
   'passkey.register': PasskeyInfo;

@@ -29,7 +29,9 @@ export type Landing =
  * already say, which a colleague reads as a word they were never taught.
  */
 export function landing(shell: Pick<Shell, 'me' | 'lists'>): Landing | null {
-  const held = shell.me.lists;
+  /* AND A RECORD-WIDE APPENDER GIVEN READS ON SOME LISTS LANDS ON THOSE: `append` reads nothing of the record as a whole,
+     so Home has nothing to draw for them, and `boot` sent exactly the lists they read (`20 §1`). */
+  const held = shell.me.lists ?? (shell.me.level === 'append' ? shell.lists.map((l) => l.id) : null);
   if (!held || held.length === 0) return null;
   const named = new Map(shell.lists.map((l) => [l.id, l.name]));
   const lists = held.map((id) => ({ href: `/r/${id}`, name: named.get(id) ?? id }));

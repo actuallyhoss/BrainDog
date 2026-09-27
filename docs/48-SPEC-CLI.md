@@ -219,6 +219,7 @@ apps/cli/
 │                         files [dist] · engines { node: ">=24.13" } · dependencies {}
 ├── LICENSE               the Apache-2.0 text — a real file, exact name (31 §4 rules 3–4)
 ├── README.md
+├── scripts/bundle.mjs    the esbuild bundle, its build tuple and its .sha256
 ├── tsconfig.json         strict · verbatimModuleSyntax · erasableSyntaxOnly · noEmit
 ├── src/
 │   ├── main.ts           ~200 lines  parseArgs, the command table, dispatch, exit codes, --version, the four error classes
@@ -237,9 +238,13 @@ apps/cli/
 Six source files in the first design, counted. The agent path adds `position.ts`, `stdio.ts` and `surface.ts`
 for `mcp`; `hooks.ts` (the two hooks and the session file), `brief.ts` (the briefing) and `install.ts` for the
 hooks; `keys.ts` for the key doors; `skills.ts` and `tools.ts` for the sync, the scan and the write; and
-`hooks/braindog-hook.ps1` and `hooks/braindog-hook.sh`, the shims Claude Code runs. Published artefact: `dist/braindog.mjs`, one file, built by
-`esbuild src/main.ts --bundle --platform=node --format=esm --target=node24 --banner:js='#!/usr/bin/env node'
---define:__BUILD__='"<yyyy.mm.dd>+<sha7>"' --outfile=dist/braindog.mjs`. `tsc --noEmit` type-checks; tests run
+`hooks/braindog-hook.ps1` and `hooks/braindog-hook.sh`, the shims Claude Code runs. Published artefact: `dist/braindog.mjs`, one file, with `dist/braindog.mjs.sha256` beside it, built by
+`scripts/bundle.mjs` (`pnpm --filter braindog-cli build`): esbuild with `src/main.ts --bundle --platform=node
+--format=esm --target=node24 --define:__BUILD__="<yyyy.mm.dd>+<sha7>" --outfile=dist/braindog.mjs`, keeping the
+entry's own hashbang in place of a banner, the build taken from `BRAINDOG_BUILD` or else the UTC date and
+`git rev-parse --short=7 HEAD`. The deploy serves both at `https://brain.dog/cli/`, beside `install.ps1` and
+`install.sh`, which check the SHA-256, put the file at `~/.braindog/bin/braindog.mjs` and write a `braindog` shim on
+the user's PATH. `tsc --noEmit` type-checks; tests run
 the `.ts` sources directly under Node 24.13 (`node --test`). esbuild is a devDependency only (§13 D4).
 
 ---

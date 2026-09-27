@@ -134,8 +134,8 @@ export type Offer = { id: string; doc: Record<string, unknown>; plan: Plan; call
  *
  * FOR THE RECORD IT GOES INTO, WHEN THE SCREEN KNOWS WHICH PACKS THAT RECORD HOLDS. People sent whole pointed at
  * Projects, so installing People alone was refused on a record without them; a link to a list the record will not
- * hold is left out, the way onboarding leaves it out (`install.ts` `moduleDocument`). And the examples are the record's
- * use case's, or none: a module added here never brings the seed's studio rows into somebody's record.
+ * hold is left out, the way onboarding leaves it out (`install.ts` `moduleDocument`). And it carries no example rows
+ * (`moduleDocument`, `loop/finish/modules.md` C11): a module added here never writes rows nobody typed.
  */
 export async function packDocument(id: string, installed?: readonly PackState[], usecase?: string): Promise<Record<string, unknown> | null> {
   const seed = await import('@braindog/seed/packs');
@@ -147,7 +147,7 @@ export async function packDocument(id: string, installed?: readonly PackState[],
   const own = seed.FIRST_PARTY.includes(id as never) ? seed.firstPartyManifest(id as never).provides : [];
   const holds = [...on.flatMap((p) => p.registers), ...own.flatMap((p) => (p.startsWith('register.') ? [p.slice('register.'.length)] : []))];
   const speaking = on.find((p) => p.id.startsWith('usecase-'))?.id.slice('usecase-'.length);
-  /* THE USE CASE BEING INSTALLED, WHEN ONE IS, so a module it brings carries its examples, targets and words: Personal
+  /* THE USE CASE BEING INSTALLED, WHEN ONE IS, so a module it brings carries its targets and words: Personal
      installed from browse on an empty record was given Money with a business's sums and "Money in arrives late by". */
   const u = (usecase === undefined ? undefined : useCase(usecase)) ?? (speaking === undefined ? undefined : useCase(speaking));
   const doc = u ? moduleDocument(u, id, { today: dayOf(Date.now()), holds }) : seed.firstPartyDocument(id, { holds, seeds: [] });

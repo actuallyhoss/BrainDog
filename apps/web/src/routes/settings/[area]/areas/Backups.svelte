@@ -166,7 +166,7 @@
                routes existing, and the list drew four identical successes. `13 §6`: the
                record's own `note` is rendered, not a sentence written here. -->
           <span class="line-amount">
-            <span class="means">{snap.failed ? copy.snapshotFailed : snap.rows === null ? copy.sizeOnDisk(bytes(snap.bytes)) : copy.rowsAndSize(snap.rows, bytes(snap.bytes))}</span>
+            <span class="means">{snap.failed ? copy.snapshotFailed : snap.bytes === 0 ? copy.snapshotEmpty : snap.rows === null ? copy.sizeOnDisk(bytes(snap.bytes)) : copy.rowsAndSize(snap.rows, bytes(snap.bytes))}</span>
           </span>
           <span class="line-when">
             {#if !snap.failed}

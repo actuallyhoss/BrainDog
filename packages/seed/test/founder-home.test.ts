@@ -16,7 +16,7 @@ import { openRecord, type Kernel } from '@braindog/kernel';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
 import { NOW, firstPartyManifest } from '../src/index.ts';
-import { MONEY_PAGES } from '../src/modules/money.ts';
+import { DUE_THIS_WEEK } from '../src/modules/money.ts';
 import { modulesFor, useCase } from '../src/usecases/index.ts';
 import { carriedDocument, dayOf, moduleDocument } from '../src/usecases/install.ts';
 
@@ -42,13 +42,13 @@ test("A FOUNDER'S HOME DECLARES WHAT IS DUE THIS WEEK AND WHAT IS LAPSING, besid
 });
 
 /**
- * THE SAME TABLE AS MONEY'S HOME, NOT ONE LIKE IT. A founder installs money-core, so a record that ever drew both Homes
- * (a use case uninstalled, say) would show two "Due this week" tables, and two tables under one heading that disagree
- * about the window or the columns is a question about which one is right. Held equal here so the pair moves together.
+ * THE SAME TABLE AS MONEY'S, NOT ONE LIKE IT. Money exports its "Due this week" by name (`DUE_THIS_WEEK`) since
+ * money-core 3.0.0 retired its own Home, and two tables under one heading that disagree about the window or the columns
+ * would be a question about which one is right. Held equal here so the pair moves together.
  */
 test("ITS DUE THIS WEEK IS MONEY'S OWN: the same list, window, columns, order and limit", () => {
   const ours = declared().find((b) => b.heading === 'Due this week');
-  const money = (MONEY_PAGES.home!.blocks as Block[]).find((b) => b.heading === 'Due this week');
+  const money = DUE_THIS_WEEK as Block;
   assert.ok(ours && money);
   const { kind, source, where, columns, order, limit, empty } = money;
   assert.deepEqual({ kind: ours.kind, source: ours.source, where: ours.where, columns: ours.columns, order: ours.order, limit: ours.limit, empty: ours.empty }, { kind, source, where, columns, order, limit, empty });
@@ -97,9 +97,9 @@ async function founder(): Promise<Kernel> {
   for (const m of modulesFor(u, ['people'])) {
     if (m === 'agents') continue;
     const holds = new Set([...held(k), ...firstPartyManifest(m as never).provides.flatMap((p) => (p.startsWith('register.') ? [p.slice(9)] : []))]);
-    await put(k, moduleDocument(u, m, { today: TODAY, holds }));
+    await put(k, moduleDocument(u, m, { today: TODAY, holds, examples: true }));
   }
-  await put(k, carriedDocument(u, TODAY));
+  await put(k, carriedDocument(u, TODAY, null, { examples: true }));
   return k;
 }
 

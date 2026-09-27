@@ -399,6 +399,27 @@ const DECLARED: Record<string, Version> = {
       'The installments leg both walks on `page.money` read names `group: plan`, so each part of a plan reaches the chart as that plan and the count control can take the proofing press in or out whole, where every part was its own one-off; Cash ahead\'s knobs add `grow`, `drift` and `count` to horizon, late, spend and leave (brief B6) -> c98b58b3df5eaca1',
     ],
   },
+  'money-core@3.0.0': {
+    holds: `
+      metric.arriving-30d metric.cash-accounts metric.cash-as-of metric.cash-now metric.days-late-in metric.due-30d
+      metric.every-month-by-category metric.every-month-in metric.every-month-out metric.in-30d metric.in-by-month
+      metric.in-due-by-month metric.installments-due-30d metric.installments-left metric.late-in metric.leaving-30d
+      metric.net-by-month metric.out-30d metric.out-by-month metric.out-due-by-month metric.overdue metric.owed-by-you
+      metric.owed-to-you metric.project-owed metric.received-30d metric.runway-days metric.spent-30d
+      metric.spent-by-category-month metric.txn-uncategorised
+      page.money
+      register.accounts register.balances register.categories register.fx register.installments register.obligations
+      register.recurring register.snapshots register.transactions
+      rule.cash-stale rule.installment-due-soon rule.invoice-late rule.recurring-ended rule.recurring-missed rule.txn-categorise
+      setting.home_currency setting.most_days_late setting.most_due_30d setting.most_leaving_30d setting.most_left_in_parts
+      setting.most_on_one_category setting.most_out_30d setting.most_out_every_month setting.most_owed_by_you
+      setting.most_owed_to_you setting.most_parts_due_30d setting.most_spent_30d setting.most_spent_on_one_category
+    `,
+    declares: '22b7e4f2f0219a8c',
+    history: [
+      'Raised a major step because two pages go, `page.home` and `page.ledger`, into one `page.money`, and the four card wordings leave for packs/card-alerts; `register.balances` is new, `register.fx` says its `rates:`, and every list, field and figure id stays -> 22b7e4f2f0219a8c',
+    ],
+  },
   'work@1.1.0': { declares: 'b49e051fe7c26ac5' },
   'work@1.2.0': { declares: '49a30d2ef8c1d672' },
   'work@1.3.0': { declares: 'fb82e66d80644e3d' },
@@ -494,6 +515,13 @@ const DECLARED: Record<string, Version> = {
       'Raised a major step because `register.people` stops offering `registrar` on `role`; a record whose rows hold it keeps it as its own value -> a197d208773e19c1',
     ],
   },
+  'people@2.1.0': {
+    holds: ` page.people register.people `,
+    declares: '36fef157b524227d',
+    history: [
+      '`register.people` declares `meets:`, naming the field that plays each part, so the kernel reads the list meet writes off the list instead of finding one called people -> 36fef157b524227d',
+    ],
+  },
   'estate@1.1.0': {
     holds: `
       metric.estate-year metric.lapsing metric.points-nowhere metric.project-cost metric.renews-30d
@@ -510,6 +538,15 @@ const DECLARED: Record<string, Version> = {
     `,
     declares: 'd7e0189d652eca6f',
     history: ['A domain carries the reason it is held, so `services` gains a text `note` and the import stops leaving every domain note in the export -> d7e0189d652eca6f'],
+  },
+  'estate@1.3.0': {
+    holds: `
+      metric.estate-year metric.lapsing metric.points-nowhere metric.project-cost metric.renews-30d
+      page.estate
+      register.services
+    `,
+    declares: '0983c05a00b9d1a2',
+    history: ['`services` says a row holds who it is with where it said a registrar, which is what a domain is held with and not what hosting or a subscription is -> 0983c05a00b9d1a2'],
   },
 };
 

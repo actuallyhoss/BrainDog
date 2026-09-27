@@ -74,8 +74,9 @@ export function methods(deps: RecordDeps) {
   const wholeRecord = (ctx: CallContext): boolean => {
     const p = ctx.principal;
     if (p.kind === 'system') return true;
-    if (p.kind === 'runner') return false;
-    return p.level !== null && (ctx.registers === undefined || ctx.registers === '*');
+    if (p.kind === 'runner' || p.kind === 'share') return false;
+    /* AND A LEVEL THAT READS, as `wholeRecord` now asks: `append` reads nothing of the record (`20 §1`). */
+    return p.level !== null && p.level !== 'append' && (ctx.registers === undefined || ctx.registers === '*');
   };
 
   /** Whether the caller reads every list, which a body that may touch any list needs (`readsEveryList` in `index.ts`). */

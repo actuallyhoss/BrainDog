@@ -143,9 +143,9 @@ export function createRecord(
          permanently unopenable. `12 §6.1` names that outcome: it reads exactly like corruption, on
          the one screen where "the data is gone" and "the key changed" need different answers.
 
-         A KEY IS WRITTEN ONCE. Rotation is `rewrapped_at` and an UPDATE, which is a different verb
-         with a different audit trail; there is no path on which creating a record is how you replace
-         its keys. */
+         A KEY IS WRITTEN ONCE. Rotation is `rewrapKeys` (`api/keys.ts`), a compare-and-set that writes
+         `rewrapped_at` and a `grant.rotate` event; there is no path on which creating a record is how you
+         replace its keys. */
       sql.exec(
         `INSERT INTO vault_key (purpose, wrapped, nonce, wrapped_by, kek_id, salt, rewrapped_at) VALUES (?, ?, ?, ?, ?, NULL, NULL)
          ON CONFLICT (purpose) DO NOTHING`,

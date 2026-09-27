@@ -74,9 +74,9 @@ export const daysIn = (year: number, month: number): number => new Date(Date.UTC
 /**
  * The next instant a calendar clock falls on, strictly after `fromMs`.
  *
- * STRICTLY AFTER, because `onClock` asks at the instant a run was due, and an answer equal to it would run the same
- * turn again. And FROM NOW, not from the turn before: a drain that comes a month late takes one turn and is armed for
- * the next one ahead, as a weekly clock is, rather than firing once for every month it missed.
+ * STRICTLY AFTER THE ONE IT IS GIVEN, because `onClock` asks at the instant a run was due, and an answer equal to it
+ * would run the same turn again. `onClock` asks it from each turn in turn (`flow.ts`), so a drain that comes a month
+ * late takes every turn it missed, up to its ceiling, and is then armed for the next one ahead.
  */
 export function nextCalendar(cal: Calendar, fromMs: number, tz: string): number | null {
   const now = wall(fromMs, tz);

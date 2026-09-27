@@ -205,7 +205,13 @@ export default function routerGroups(
     const flows = [...new Set([...union.matchAll(/flow: '([a-z.]+)'/g)].map((m) => m[1]))];
     if (flows.length === 0) findings.push("the AuthCall union in packages/ports/src/auth.ts is not where this gate looks for it");
 
-    const READS = ['methods', 'session', 'passkeys'];
+    /* THE TWO HALVES OF AN INVITATION'S PROOF ARE FLOWS WITH NO ROW, AND MUST HAVE NONE: routed on its own,
+       `invite.prove` would mail a proof to any address anybody typed, so `/auth/invite` is the one door to both. The
+       sign-up rows are declared before the union names their flows (`SignupFlow` in auth.ts). */
+    const UNROUTED_FLOWS = ['invite.prove', 'invite.proved'];
+    const SIGNUP_FLOWS = ['signup.start', 'signup.verify', 'signup.name'];
+
+    const READS = ['methods', 'session', 'passkeys', 'sessions', 'signup.name'];
     const paths = new Set();
     for (const r of authRoutes) {
       if (paths.has(r.path)) findings.push(`${r.path} is in the sign-in table twice`);
@@ -213,13 +219,16 @@ export default function routerGroups(
       if (!['GET', 'POST'].includes(r.method)) findings.push(`${r.path} is a ${r.method}, and a sign-in route is a GET or a POST`);
       if (!['both', 'selfhost', 'worker'].includes(r.on)) findings.push(`${r.path} is served on ${r.on}, which is not a host`);
       if (!['nothing', 'session', 'operator'].includes(r.needs)) findings.push(`${r.path} needs ${r.needs}, which no host can check`);
-      if (r.flow !== 'provision' && !flows.includes(r.flow)) findings.push(`${r.path} names ${r.flow}, which is not in the AuthCall union`);
+      if (r.flow !== 'provision' && !SIGNUP_FLOWS.includes(r.flow) && !flows.includes(r.flow))
+        findings.push(`${r.path} names ${r.flow}, which is not in the AuthCall union`);
+      if (UNROUTED_FLOWS.includes(r.flow)) findings.push(`${r.path} routes ${r.flow}, which only /auth/invite may reach`);
       const named = r.flow === 'key.exchange' ? '/auth/token' : `/auth/${r.flow.replaceAll('.', '/')}`;
       if (r.path !== named) findings.push(`${r.flow} is served at ${r.path}, and the rule names it ${named}`);
       if (r.needs === 'operator' && (r.on !== 'worker' || r.method !== 'POST')) findings.push(`${r.path} is an operator route, and those are POSTs on the Worker only`);
       if (r.method === 'GET' && !READS.includes(r.flow)) findings.push(`${r.path} changes who is signed in, and it is a GET`);
     }
     for (const flow of flows) {
+      if (UNROUTED_FLOWS.includes(flow)) continue;
       const n = authRoutes.filter((r) => r.flow === flow).length;
       if (n !== 1) findings.push(`${flow} is in the AuthCall union and has ${n} sign-in routes`);
     }
@@ -229,8 +238,9 @@ export default function routerGroups(
 
   /**
    * THE SAME RULE, FOR THE THIRD TABLE. An account route is the Directory's, like sign-in, and none of `30 §5`'s six
-   * groups. Its group is its prefix and its door: every row lives under `/account/`, is a GET that both hosts serve,
-   * and needs the session cookie, which is the only thing `serveAccount` reads. A row in another shape is a row this
+   * groups. Its group is its prefix and its door: every row lives under `/account/`, is a GET or a POST served by
+   * both hosts or by the Worker alone, and needs the session cookie, except the payment provider's webhook, which is
+   * checked by its signature. A row in another shape is a row this
    * gate cannot read, and that is a finding too.
    *
    * AND THE PREFIX HAS TO REACH THE WORKER. Off `run_worker_first`, `/account/usage` is answered by the app shell with
@@ -258,9 +268,15 @@ export default function routerGroups(
         if (paths.has(r.path)) findings.push(`${r.path} is in the account table twice`);
         paths.add(r.path);
         if (!/^\/account\/[a-z][a-z0-9/-]*$/.test(r.path)) findings.push(`${r.path} is in the account table, and an account route lives under /account/`);
-        if (r.method !== 'GET') findings.push(`${r.path} is a ${r.method}, and an account route is a GET`);
-        if (r.on !== 'both') findings.push(`${r.path} is served on ${r.on}, and both hosts serve every account route`);
-        if (r.needs !== 'session') findings.push(`${r.path} needs ${r.needs}, and an account route reads the session cookie and nothing else`);
+        if (!['GET', 'POST'].includes(r.method)) findings.push(`${r.path} is a ${r.method}, and an account route is a GET or a POST`);
+        if (!['both', 'worker'].includes(r.on))
+          findings.push(`${r.path} is served on ${r.on}, and an account route is served on both hosts or on the Worker`);
+        if (!['session', 'stripe'].includes(r.needs))
+          findings.push(
+            `${r.path} needs ${r.needs}, and an account route reads the session cookie, or the payment provider's signature on its webhook alone`,
+          );
+        if (r.needs === 'stripe' && (r.path !== '/account/billing/webhook' || r.method !== 'POST' || r.on !== 'worker'))
+          findings.push(`${r.path} needs stripe, and only POST /account/billing/webhook on the Worker does`);
       }
 
       const wrangler = join(root, 'apps', 'worker', 'wrangler.jsonc');
@@ -283,7 +299,7 @@ export default function routerGroups(
        These two were each printed only when their own count was above zero, so the output of a run that
        read both tables and the output of a run that read neither differed by nothing at all. */
     console.log(`  router-groups: ${authRoutes.length} sign-in routes, one per flow, named by the rule`);
-    console.log(`  router-groups: ${accountRoutes.length} account route(s), each a GET under /account/ behind the session cookie`);
+    console.log(`  router-groups: ${accountRoutes.length} account route(s), each under /account/ behind the session cookie, the payment webhook behind its signature`);
   } else {
     console.error(`\n  router-groups: ${findings.length} finding(s) (30 §5)\n`);
     for (const f of [...new Set(findings)]) console.error(`    ${f}`);

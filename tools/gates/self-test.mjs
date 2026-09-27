@@ -198,6 +198,14 @@ const CASES = [
      the record enforces moved away from `budgets.json`'s `report.rowsPerMinute`. One each, so both halves are proved. */
   { gate: 'guards-report', run: 'guards', expect: /spends no reportBudget/, findings: 1 },
   { gate: 'guards-report-budget', run: 'guards', expect: /report.rowsPerMinute is/, findings: 1 },
+  /* AND THE HALF OF THE SURFACE WRITTEN SINCE ARC-6: a row under `packages/host/src/routes/` and its method under
+     `packages/record/src/methods/`, where `triage` is routed DATA and guarded `admin(ctx)`. A gate that read only the
+     two index files would find no row to check and pass. */
+  { gate: 'guards-methods', run: 'guards', expect: /routed as DATA and is guarded by admin\(\)/, findings: 1 },
+  /* AND ONE METHOD NAME WRITTEN IN TWO OF THE RECORD'S FILES, which the record's spread keeps one of without a word. */
+  { gate: 'guards-twice', run: 'guards', expect: /keeps only one of them/, findings: 1 },
+  /* AND AN INTERNAL METHOD ROUTED FROM A FILE UNDER `routes/`, which a gate reading only `index.ts` never sees. */
+  { gate: 'router-groups-routes', run: 'router-groups', expect: /INTERNAL is the host's own surface|puts it in INTERNAL/, findings: 2 },
   { gate: 'closed-lists', expect: /the migration admits/, findings: 1, total: 1 },
   /* AND THE OTHER HALF OF THAT GATE: a `CHECK` a later migration widened, over a document that
      never says which migration did it. `30 §1` is migration 0001 verbatim and cannot be corrected
@@ -209,6 +217,9 @@ const CASES = [
      message has quietly gained a member nobody reviewed. That is the whole argument for reading a
      closed list rather than counting it, and it is the one the render kinds table lost first. */
   { gate: 'closed-lists-extractors', run: 'closed-lists', expect: /not the same list in the same order/, findings: 1, total: 1 },
+  /* ONE FALSE COUNT BESIDE TRUE ONES AND A QUALIFIED ONE (`Three CSS gates`), so a total of one proves the gate reads the
+     code's tables rather than refusing every number, and leaves a count of some of a list alone. */
+  { gate: 'docs-counts', expect: /and the code holds/, findings: 1, total: 1 },
   /* THE SHELL CHECK, WHICH READS EVERY `apps/*\/src/app.html` IN THE WORKSPACE. It is in `bundle`
      because that gate already reads a built shell, and until now it read only the built one, only
      for `apps/web`, and only when there was a build. The source form needs neither, and it reaches
@@ -297,6 +308,10 @@ const CASES = [
      that sixth line into a failure rather than a pass that happened to count five. */
   { gate: 'shell-words', expect: /a use case named in the core/, findings: 10, total: 10 },
   { gate: 'no-fixtures', expect: /imports the test fixtures/, findings: 1, total: 1 },
+  /* THREE, ONE OF EACH SHAPE: a list id as a string, a link into a list written as a template with a hole, and a currency
+     code after `??`. Beside them sit a test, a `fixtures/` file, a currency table, markup classes, comments, a regular
+     expression and a time zone after `||`, each spelled like one of the three, and `total` says none of them was read. */
+  { gate: 'web-lists', expect: /names the first-party list/, findings: 3, total: 3 },
   /* THE SEEDED FIXTURE HOLDS TWO SENTENCES AND RENDERS ONE, so a gate that named both (or neither)
      is a gate that is counting keys rather than finding dead ones. */
   { gate: 'dead-copy', expect: /nobody reads/, findings: 1 },
@@ -306,6 +321,10 @@ const CASES = [
      the real record, named only by a component that had never been mounted. A grep over source said
      it was rendered. */
   { gate: 'dead-copy-orphan', run: 'dead-copy', expect: /nobody reads/, findings: 1 },
+
+  /* AND THE AGGREGATE (ARC-8): `copy` types nothing and spreads an area file, so the seeded sentence is found only
+     by following the spread to the file that types it. A gate reading only the aggregate finds no key and passes. */
+  { gate: 'dead-copy-spread', run: 'dead-copy', expect: /nobody reads/, findings: 1 },
 
   /* `packs/`, THE THIRD WORKSPACE ROOT, ONE FIXTURE PER TEXT GATE THAT READS IT. Each tree holds a
      violation under `packs/` and nothing a gate reading only `packages` and `apps` could find, so

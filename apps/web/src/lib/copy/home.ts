@@ -63,6 +63,4 @@ export const home = {
      record refused, tile by tile. Setting a record up is its owner's to do. */
   startNotYours: 'This BrainDog is already made, and setting it up is for its owner.',
   startNotYoursWhy: 'You were invited to part of it by its owner.',
-  addTheRow: 'Add the row',
-  goBack: 'Choose something else',
 } as const;

@@ -726,9 +726,8 @@ export function boot() {
        * rail was the clearest no in it: eight list links, each with its own tally, drawn identically
        * over a record of eight rows and a record of four hundred. Seven of the eight read `0`, and a
        * link to a list with nothing in it is a thing a person has to read, decide is irrelevant, and
-       * put down, every time they look at the rail. The precedent is `Second.svelte`, which filters
-       * the same way under a comment saying that counting every declared register "is the count that
-       * made this unreachable".
+       * put down, every time they look at the rail. Counting every declared register is the count that
+       * made a busy list unreachable, so only the lists that hold something are drawn.
        *
        * HERE AND NOT IN THE RAIL, because the rail is not the only reader. The phone's More sheet
        * draws this same list, and the last time a rail rule lived in one of the two surfaces rather

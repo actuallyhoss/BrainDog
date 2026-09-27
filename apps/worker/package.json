@@ -5,6 +5,7 @@
   "type": "module",
   "main": "src/index.ts",
   "dependencies": {
+    "@braindog/declare": "workspace:*",
     "@braindog/host": "workspace:*",
     "@braindog/kernel": "workspace:*",
     "@braindog/mcp": "workspace:*",

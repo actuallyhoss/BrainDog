@@ -21,6 +21,7 @@
   import { homeCurrency, actorOf } from '$lib/record/api.ts';
   import type { News } from '$lib/record/news-live.ts';
   import type { LiveBlock } from '$lib/record/page-live.ts';
+  import type { LivePageDecl } from '$lib/record/page-live.ts';
   import { landing } from '$lib/record/landing.ts';
   import { moneyInText, symbolText } from '$lib/record/money.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -29,6 +30,7 @@
   import Empty from '$lib/ui/Empty.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import Face from '$lib/ui/Face.svelte';
+  import { actor } from '$lib/record/names.ts';
   import DeclaredHome from '$lib/ui/DeclaredHome.svelte';
   import ClearExamples from '$lib/ui/ClearExamples.svelte';
   import { untrack } from 'svelte';
@@ -67,7 +69,9 @@
    * page is asked for when it is there, then the house one when that is, and otherwise none.
    */
   const declares = $derived(homeSlugOf(homePage(), data.pages));
-  let declared = $state<{ blocks: LiveBlock[]; now: number } | null>(null);
+  /* THE PAGE AS WELL AS ITS BLOCKS: `layout` is a key of the page, not of a block, so a use case's Home draws its rail
+     only when the wrapper is handed the page. */
+  let declared = $state<{ blocks: LiveBlock[]; now: number; page: LivePageDecl } | null>(null);
   let asking = $state(false);
   /* THE SHELL'S FEED IS SPOKEN THE WAY `readHome` SPEAKS ITS OWN, so a sentence holding an amount does not change its
      spelling ("GBP 2,400.00", then "£2,400.00") when the fresh answer lands (design.md §5, DSN-4). */
@@ -90,7 +94,7 @@
     const page = slug === null ? Promise.resolve(null) : import('$lib/record/page-live.ts').then((m) => m.pageReader(apiBase()).read(slug)).catch(() => null);
     void page
       .then((got) => {
-        declared = got?.from === 'live' ? { blocks: got.page.blocks, now: got.now } : null;
+        declared = got?.from === 'live' ? { blocks: got.page.blocks, now: got.now, page: got.page.page } : null;
         asking = false;
         return import('$lib/record/news-live.ts').then((m) => m.readHome(apiBase(), me));
       })
@@ -101,6 +105,15 @@
       })
       .finally(() => closed(ok, at));
   });
+
+  /* HOME'S WRITES ARE ON, SO A LANDED ONE READS THE PAGE AGAIN, without blanking it: a captured row appears, and a
+     conflict is answered over the rows the record holds now rather than the ones Home read on arrival. */
+  async function rereadHome() {
+    const slug = declares;
+    if (slug === null) return;
+    const got = await import('$lib/record/page-live.ts').then((m) => m.pageReader(apiBase()).read(slug)).catch(() => null);
+    if (got?.from === 'live' && slug === declares) declared = { blocks: got.page.blocks, now: got.now, page: got.page.page };
+  }
 
   function markRead() {
     /* Cleared here at once; a mark that did not land leaves the record's where it was, so the same
@@ -161,13 +174,21 @@
         the record said, and there is no action, because the reader cannot do anything about it from
         this screen and the sentence names the person who can.
       -->
-      <Empty kind="no-permission" title={data.refused.fix} />
+      <!-- AND A RECORD THAT COULD NOT BE REACHED IS NOT A REFUSAL (design SYS-8, DSN-12): the one offline sentence with
+           Retry, and the client's own reason under Details rather than as the title. -->
+      {#if data.refused.code === 'UNREACHABLE'}
+        <Empty kind="error" title={copy.readOffline} detail={data.refused.fix}>
+          {#snippet actions()}<Button weight="primary" onclick={() => location.reload()}>{copy.readRetry}</Button>{/snippet}
+        </Empty>
+      {:else}
+        <Empty kind="no-permission" title={data.refused.fix} />
+      {/if}
     {:else}
     <!-- THE EXAMPLES SETTING UP PLANTED, offered once they are all that is left to explain, and loudly once rows of the owner's own sit beside them. -->
     {#if data.live}<ClearExamples />{/if}
     <!-- THE DECLARED PAGE LEADS, figures and all, when the record holds one; Home draws no figure of its own. -->
     {#if declared}
-      <DeclaredHome blocks={declared.blocks} now={declared.now} />
+      <DeclaredHome blocks={declared.blocks} now={declared.now} page={declared.page} reread={rereadHome} />
     {/if}
 
     <!-- A DECLARED HOME SAYS WHAT IS DUE ITSELF, so this is only the questions waiting, and only when there are some. -->
@@ -256,7 +277,7 @@
               <a class="event" href={at(item.href)}>
                 <!-- The agent that wrote it, named. Never a sparkle badge: disclosed AI use costs
                      trust without buying anything (19 §6). -->
-                <span class="avatar"><Face name={who} you={who === 'you'} size="s" /></span>
+                <span class="avatar"><Face name={who} you={who === 'you'} kind={actor(item.by).kind} size="s" /></span>
                 <span class="event-by">{who.charAt(0).toUpperCase() + who.slice(1)}</span>
                 <span class="event-when num">{since(item.at, data.now)}</span>
                 <span class="event-text">{item.text}</span>

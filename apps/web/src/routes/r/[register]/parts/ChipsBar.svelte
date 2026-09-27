@@ -525,14 +525,14 @@
     flex: none;
     border: 1px solid var(--edge);
     border-radius: var(--r-sm);
-    color: var(--accent-ink);
+    color: var(--on-ink);
     font-size: var(--t-xs);
     line-height: 1;
   }
 
   .filter-value[data-on] .filter-box {
-    background: var(--accent);
-    border-color: var(--accent);
+    background: var(--on);
+    border-color: var(--on);
   }
 
   @media (width < 640px) {

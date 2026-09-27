@@ -8,7 +8,7 @@
  * one fallback was `list` and adding the rows up, which is the arithmetic the record exists to refuse (two currencies
  * summed). And `resources/list` offered a figure only when a page drew it: 18 of money-core's 36.
  *
- * WHAT REPLACES IT IS NO SIXTEENTH TOOL. The count is fifteen and the budget had 72 tokens left, so the two tools an
+ * WHAT REPLACES IT IS NO SIXTEENTH TOOL. The count was fifteen and the budget had 72 tokens left, so the two tools an
  * agent already reaches for carry it: `record_index` names the figures the caller may read, and `get` reads one by
  * that id, as the resource does, through the record's own `metric` and so through its own refusal. Neither knows one
  * pack's ids: the ids below are spelled out here so that `src/index.ts` does not have to (`money-out.test.ts`).
@@ -206,8 +206,8 @@ test('A HOST THAT DOES NOT IS LISTED THE DRAWN ONES, each read first, and a figu
   assert.deepEqual(listed, ['braindog:metric/owed']);
 });
 
-test('AND IT COST NO TOOL: fifteen, the same fifteen names', () => {
-  assert.equal(TOOLS.length, 15);
+test('AND IT COST NO TOOL: sixteen, and no figure tool among them', () => {
+  assert.equal(TOOLS.length, 16);
   assert.ok(TOOLS.some((t) => t.name === 'get' && /figure/.test(t.description)), 'get does not say it reads a figure');
   assert.ok(TOOLS.some((t) => t.name === 'record_index' && /figures/.test(t.description)), 'record_index does not say it names the figures');
 });

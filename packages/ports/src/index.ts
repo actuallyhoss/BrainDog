@@ -356,6 +356,8 @@ export type Refusal = {
   allowed?: readonly string[];
   /** For `RATE_LIMITED`: the whole seconds until asking again may be answered. A host sends it as `Retry-After`. */
   retry_after?: number;
+  /** The technical reason, kept apart from `fix` so a screen folds it under Details and never prints it as content. */
+  detail?: string;
 };
 
 export const ok = <T>(value: T): Result<T> => ({ ok: true, value });
@@ -444,6 +446,6 @@ export type { Http, HttpFault, HttpInit } from './http.ts';
 
 /* Sign-in's seam between a host and the Directory, type-only like everything above. */
 export type {
-  AssertionJSON, AssertionOptions, Auth, AuthBodies, AuthCall, AuthFlow, AuthResult, Mail, Methods, PasskeyInfo,
-  RegistrationJSON, RegistrationOptions, Who,
+  AssertionJSON, AssertionOptions, Auth, AuthBodies, AuthCall, AuthFlow, AuthResult, InviteProved, Mail, Methods,
+  PasskeyInfo, RegistrationJSON, RegistrationOptions, SessionInfo, Who,
 } from './auth.ts';

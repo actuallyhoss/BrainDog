@@ -5,7 +5,7 @@
  * record's block into the shape the old sample engine answered, `blocks.ts` turned that into the dialect with an arm
  * per kind, and `PageView.svelte` chose a drawing with more arms. A kind registered here is drawn straight from the
  * kernel's `BlockResult`: `page-live.ts` keeps the answer on the block as `answer`, and `blocks.ts` `draw`, which
- * `PageView.svelte` and `DeclaredHome.svelte` both draw through, asks this table before any arm of its own. A kind
+ * `BlockSlot.svelte` draws through, asks this table before any arm of its own. A kind
  * that is not here is drawn exactly as it was.
  *
  * ADDING A KIND is three files and three lines, one in each registry: this table and `kinds/<kind>.ts` beside it;
@@ -27,6 +27,10 @@ import type { BlockResult } from '@braindog/kernel';
 import type { Segment } from 'braindog-render';
 
 import type { Refusal } from '../../record/blocks.ts';
+import { calendar } from './calendar.ts';
+import { link } from './link.ts';
+import { gallery } from './gallery.ts';
+import { embed } from './embed.ts';
 
 /** What `draw` hands a kind besides its answer. */
 export type DrawOptions = {
@@ -53,7 +57,12 @@ export type KindDrawer = { draw(result: BlockResult, opts: DrawOptions): Drawn }
  * A PLAIN OBJECT AND NOT A FROZEN ONE, so a test can register a stub kind and draw a block through it
  * (`kinds.test.ts`). Looked up only through `drawerOf`, never by bracket, so a block named `constructor` finds nothing.
  */
-export const BLOCK_KIND_DRAWERS: Record<string, KindDrawer> = {};
+export const BLOCK_KIND_DRAWERS: Record<string, KindDrawer> = {
+  calendar,
+  link,
+  gallery,
+  embed,
+};
 
 /** The drawer for `kind`, or `undefined` for a kind `blocks.ts` draws itself. */
 export const drawerOf = (kind: string): KindDrawer | undefined =>

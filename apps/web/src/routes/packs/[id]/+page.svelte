@@ -204,7 +204,7 @@
     </Empty>
   </div>
 {:else if from === 'ready' && settings}
-  <PageHead icon="packs" kicker={copy.packs} title={name} />
+  <PageHead icon="packs" kicker={copy.packs} back="/packs" title={name} />
 
   <div class="page">
     {#if pack}<p class="blurb">{pack.blurb}</p>{/if}

@@ -79,7 +79,7 @@ export const MIGRATIONS: readonly Migration[] = [
  * Migration 16 renames the assistant to Slash in the values of rows and changes no table or column.
  * Migration 17 adds `automation_watch`, `local`, so no file carries it, and two indexes, which no file carries either.
  * Migration 18 rebuilds `declaration` with one more kind, keeping every column, and `job` with no CHECK on its kind and
- * one new nullable column; an older file carries only the kinds it still takes, and `job` is `local`, so no file carries
+ * two new nullable columns; an older file carries only the kinds it still takes, and `job` is `local`, so no file carries
  * it.
  */
 export const FORMAT_VERSION = 1 as const;

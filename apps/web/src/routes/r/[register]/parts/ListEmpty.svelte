@@ -36,7 +36,6 @@
     q,
     filters,
     searched,
-    addExample,
   }: {
     kind: 'no-data-yet' | 'no-results' | 'cleared';
     register: string;
@@ -51,7 +50,6 @@
     filters: Filter[];
     /** The labels of the fields the search box matches. */
     searched: string[];
-    addExample: () => void;
   } = $props();
 </script>
 
@@ -71,17 +69,11 @@
       : undefined}
 >
   {#snippet actions()}
+    <!-- NO "Add the first row" AND NO EXAMPLE ROW. The capture line sits directly above and the New button beside the
+         title, so an empty list drew three ways to add a row; and no row nobody typed is written by any path
+         (DIRECTION §26, MOD-6), so the example offer went too. -->
     {#if kind === 'no-results'}
       <Button href="/r/{register}">{copy.clearFilters}</Button>
-    {:else if kind === 'no-data-yet'}
-      <!-- NO "Add the first row" HERE ANY MORE. The capture line sits directly above and the New
-           button beside the title, so an empty list drew three ways to add a row and two filled
-           buttons. The one offer only this state can make is the example. -->
-      <!-- IT ADDS THE EXAMPLE ROW, through the same `create` and the same inference the capture line
-           uses: an empty list offering to show you what a row looks like, and answering with a sentence
-           about what it would have done, is the defect this phase exists to remove. It is a REAL row,
-           named as an example and wearing `Put back`, so nobody has to wonder which of these they typed. -->
-      <Button onclick={() => addExample()}>{copy.showExample}</Button>
     {/if}
   {/snippet}
 </Empty>

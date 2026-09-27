@@ -272,6 +272,14 @@ export type Principal =
    * JOBS methods (`record/src/jobs.ts`) admit it, by asking for it by kind.
    */
   | { kind: 'runner'; id: string; name: string }
+  /**
+   * Whoever holds a link to one page (`methods/shares.ts`), built by a host from a token it signed and checked
+   * (`packages/host/src/share.ts`) and never from anything the caller sent. `id` is the link's and `slug` the page it opens.
+   *
+   * NO LEVEL, BECAUSE A LINK IS NOBODY. `allows` refuses it every rung, so every guard refuses it; `sharedPage` admits it
+   * by kind and reads the page as the owner who opened the link could read it now.
+   */
+  | { kind: 'share'; id: string; slug: string }
   | { kind: 'system'; id: string };
 
 export type CallContext = {
@@ -560,6 +568,10 @@ export function allows(ctx: CallContext, need: Need, nameOf: (list: string) => s
      admit by the principal's kind and nothing on this ladder does. */
   if (p.kind === 'runner')
     return { code: 'FORBIDDEN', fix: 'A runner claims and runs jobs, and reaches nothing else on the record.', at: 'principal' };
+  /* AND A LINK TO ONE PAGE REACHES NO RUNG EITHER, for the runner's reason: all it may do is read the one page it was
+     opened for, which `sharedPage` admits by the principal's kind and nothing on this ladder does. */
+  if (p.kind === 'share')
+    return { code: 'FORBIDDEN', fix: 'A shared link opens its one page and reaches nothing else on the record.', at: 'principal' };
 
   /* NOTHING ON THE RECORD REACHES NOTHING ON THE RECORD. A caller with only register-scoped rows
      arrives here with `level: null` for anything not scoped to one of them.
@@ -737,6 +749,12 @@ export type Boot = {
     person: string | null;
     name: string | null;
     level: Level | null;
+    /**
+     * The level the caller holds on each list, by id: a grant naming the list, else the record-wide level, and no key for
+     * a list they hold nothing on (outside their ceiling, or an owner's list a record-wide appender does not reach). What
+     * the app asks before it draws a control (`may`, `apps/web/src/lib/record/may.ts`), so it never works it out.
+     */
+    levels: Record<string, Level>;
     /** What this person arranged for themselves (`setPref`), key by key as `Prefs` says. A person only. */
     prefs?: Prefs;
   };
@@ -758,7 +776,7 @@ export type Boot = {
    * How many questions wait on a person, and how many arrivals wait in the inbox.
    *
    * COUNTS AND NOT LISTS. `waiting` is capped for the first paint and a rail badge is the whole number. The inbox holds
-   * whatever was sent in, so only an owner is told how much; anybody else gets `null`, which is not zero.
+   * whatever was sent in, so only an owner, and a token an owner gave the `inbox` reach, is told how much; anybody else gets `null`, which is not zero.
    *
    * `arrived` IS EVERY ARRIVAL EVER RECEIVED, whatever became of it, so a screen can tell a record nothing was ever sent
    * to from one whose inbox was emptied. The owner's, as `inbox` is; `null` for anybody else.
@@ -1087,7 +1105,7 @@ export type RecordDeps = {
    * `owner` is whether the vault's own gate would open for this caller, and the host opens a key only on it; `stale` is
    * `true` when the one thing keeping it shut is a proof older than the vault allows, which changes what the run is told.
    */
-  tryScript?: ((draft: { record: { id: string; tz: string }; body: Record<string, unknown>; input: unknown; reads: { list(register: string, where: unknown): Promise<unknown[]>; get(spoken: string): Promise<unknown> }; owner: boolean; stale: boolean; asker: string }) => Promise<unknown>) | undefined;
+  tryScript?: ((draft: { record: { id: string; tz: string }; body: Record<string, unknown>; input: unknown; reads: { list(register: string, where: unknown, options?: unknown): Promise<unknown[]>; get(spoken: string): Promise<unknown> }; owner: boolean; stale: boolean; asker: string }) => Promise<unknown>) | undefined;
   /**
    * The Directory, where this host keeps it in the same process as the record, for the methods under `methods/`.
    *
@@ -1307,6 +1325,40 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   /** A list as its declaration names it, which is the name `boot` gives the rail, or its id when nothing declares it. */
   const listName = (list: string): string => kernel.register(list)?.name ?? list;
 
+  /**
+   * Whether a list is the owner's, which a record-wide "Adds only" does not reach (`20 §1`, `42 §4.4`).
+   *
+   * KEYS AND PEOPLE BY THEIR ROLES, AND ANY OTHER LIST BY ITS OWN WORD. Keys is the vault's list; People is the list
+   * `meet` writes, found by the kernel's own rule (`meetsList`: the list declaring `meets`, else the list `people`); a
+   * list declaring `owner_only: true` asks for the same. A contractor asked to file expenses could file a key and a
+   * person. A list that is not there is not one, so a missing Keys is still answered as a missing list.
+   */
+  const ownerOnly = (list: string): boolean => {
+    const decl = kernel.register(list);
+    if (decl === undefined) return false;
+    return list === KEYS || decl.owner_only === true || list === (kernel.meetsList()?.register ?? PEOPLE);
+  };
+
+  /**
+   * The refusal a record-wide appender meets on an owner's list, or `null` when this caller is not one or the list is not.
+   *
+   * ONLY THE RECORD-WIDE LEVEL, AND ONLY `append`. A grant naming the list is the owner saying so, and reaches it; `read`,
+   * `write` and `decide` are unchanged, because widening them is the owner's call (`loop/finish/platform.md` §4.0 A). The
+   * sentence names the list by the name the rail gives it, never its id. Asked first for `append`, so every other
+   * caller pays nothing for it.
+   */
+  const ownersListStop = (ctx: CallContext, list: string): Refusal | null => {
+    const p = ctx.principal;
+    if ((p.kind !== 'person' && p.kind !== 'token') || p.level !== 'append') return null;
+    if (Object.hasOwn(ctx.levels ?? {}, list) || !ownerOnly(list)) return null;
+    const name = listName(list);
+    return {
+      code: 'FORBIDDEN',
+      fix: `${name} is kept for the owner, so adding across the whole record reaches every list but ${name}. Ask the owner to give you ${name} by name.`,
+      at: 'register',
+    };
+  };
+
   /** Every method starts here: the ladder, then the ceiling, then the work. */
   const guard = (ctx: CallContext, need: Need, asked?: string): Refusal | null => {
     /* A REPORT KEY REACHES `report` AND NOTHING ELSE. Every DATA and READ+ method asks this function or `scoped`,
@@ -1332,8 +1384,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        authorisation check is not an escalation and is not a thing that should be possible. */
     const held =
       register !== undefined && Object.hasOwn(ctx.levels ?? {}, register) ? ctx.levels?.[register] : undefined;
+    /* A RECORD-WIDE "ADDS ONLY" STOPS AT THE OWNER'S LISTS, in one sentence naming the list, before the ladder is asked:
+       `append` reaches every other list, and a grant naming this one is the owner saying so (`ownersListStop`). */
+    const kept = register === undefined ? null : ownersListStop(ctx, register);
+    if (kept) return kept;
     const at: CallContext =
-      held === undefined || ctx.principal.kind === 'system' || ctx.principal.kind === 'runner'
+      held === undefined || ctx.principal.kind === 'system' || ctx.principal.kind === 'runner' || ctx.principal.kind === 'share'
         ? ctx
         : { ...ctx, principal: { ...ctx.principal, level: held } };
 
@@ -1360,14 +1416,21 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const binding = reportKeyOf(ctx);
     if (binding !== null) return reportOnly(binding);
     const p = ctx.principal;
-    if (p.kind === 'system' || p.kind === 'runner' || p.level !== null) return guard(ctx, need);
+    if (p.kind === 'system' || p.kind === 'runner' || p.kind === 'share') return guard(ctx, need);
+    /* THE RECORD-WIDE LEVEL FIRST, AND ITS REFUSAL IS NOT THE LAST WORD. A record-wide appender given Reads on Tasks was
+       handed to `guard` here and told "This needs read, and you have append access", which is the remedy `20 §1`
+       prescribes for somebody who must see what they filed, so the app did not open for them. A record-wide level that
+       does not reach the question now leaves it to the grants, as a caller with no record-wide level always did. Only
+       `append` fails a read, so nothing any other record-wide level reached moves. */
+    const whole = p.level === null ? null : guard(ctx, need);
+    if (p.level !== null && whole === null) return null;
 
     /* A LEVEL THIS RECORD DOES NOT PUBLISH IS NOT ONE. Only the index-max grant used to reach
        `allows`, and an unrecognised value sorts below every real one, so it never got there. Every
        grant is asked now, and `LEVEL_REACH[<anything else>]` is `undefined`, whose `.includes`
        throws a TypeError out of the one check this package promises never to throw over. */
     const held = Object.values(ctx.levels ?? {}).filter((level) => LEVELS.includes(level));
-    if (held.length === 0) return guard(ctx, need);
+    if (held.length === 0) return whole ?? guard(ctx, need);
 
     /* DOES ANY GRANT REACH THIS, RATHER THAN DOES THE HIGHEST ONE. This took the index-max level
        across the grants, and `append` sorts above `read` while `LEVEL_REACH.append` deliberately
@@ -1380,8 +1443,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        whether any one grant reaches the need. */
     if (held.some((level) => allows({ ...ctx, principal: { ...p, level } }, need) === null)) return null;
 
-    /* AND WHEN NONE OF THEM DOES, THE REFUSAL IS THE FURTHEST-REACHING GRANT'S, so the sentence
+    /* AND WHEN NONE OF THEM DOES, THE RECORD-WIDE LEVEL'S REFUSAL WHEN THERE IS ONE, since that is what they were
+       invited as, and else THE FURTHEST-REACHING GRANT'S, so the sentence
        names the largest thing they hold rather than whichever register happened to be listed first. */
+    if (whole) return whole;
     const best = held.sort((a, b) => LEVELS.indexOf(b) - LEVELS.indexOf(a))[0]!;
     return allows({ ...ctx, principal: { ...p, level: best } }, need, listName);
   };
@@ -2069,7 +2134,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     kernel
       .pages()
       .filter((p) => seesPage(ctx, p))
-      .map((p) => ({ slug: p.slug, title: p.title }));
+      .map((p) => ({ slug: p.slug, title: p.title, template: p.template }));
 
   /**
    * The computed sources that read across the whole record rather than any one list: the log, the scheduled actions and
@@ -2153,12 +2218,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * `cells: [{ metric: 'diary-count' }]` off a refused figures block, and `from: [{ register: 'bills' }]` with
    * `opening: 1000000` off a refused cash walk: two list names `boot` hides from her and, on a hand-written page, an
    * opening balance. The legs and the cells are what `blockRegisters` and `alsoReads` judged the block by, so what is
-   * refused is exactly what they name. `sell` is the same kind of name, the figure a forecast's sell control offers.
+   * refused is exactly what they name. `sell` is the same kind of name, the figure a forecast's sell control offers, and
+   * `about` is the spoken id of the row a `runs_on` block is about, in a list she may not open.
    *
    * `source` IS NOT HERE YET. `register.diary` on a refused table is the same kind of name, and
    * `test/scoped-audit.test.ts` finds that block by it; the test has to find it another way before `source` can go.
    */
-  const WRITTEN = ['from', 'cells', 'opening', 'sell'] as const;
+  const WRITTEN = ['from', 'cells', 'opening', 'sell', 'about'] as const;
 
   /**
    * One drawn block as this caller may see it: whole, or blanked with the one sentence that says why.
@@ -2292,8 +2358,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   const unplaced = (ctx: CallContext, block: unknown, forList: unknown): { block: unknown; back: Map<string, string> } => {
     const back = new Map<string, string>();
     const hidden = (id: string): boolean => {
-      const source = kernel.metricDecl(id)?.source;
-      return typeof source === 'string' && source.startsWith('register.') && readable(ctx, source.slice('register.'.length)) !== null;
+      /* EVERY LIST THE FIGURE READS, as `metric` asks: a walk names no `register.` source and a rolled figure reads more. */
+      const decl = kernel.metricDecl(id);
+      return !!decl && kernel.figureLists(decl).some((list) => readable(ctx, list) !== null);
     };
     const fields = typeof forList === 'string' ? fieldsOf(liveBody(`register.${forList}`)) : new Set<string>();
     const written = JSON.stringify(block) ?? '';
@@ -2657,6 +2724,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const graded = missedBy(row);
       if (graded.length > 0) return graded.some((p) => predictionHeld(ctx, p));
     }
+    /* A QUESTION SLASH FILED IS HELD TO A READER OF EVERY LIST: its options' words were written from rows the asker read,
+       of any list, and can quote a row's amount or say what it holds while naming no list at all. */
+    if (row.body_kind === 'options' && row.opened_by === SLASH) return !readsEveryList(ctx);
     const body = row.body as Record<string, unknown> | undefined;
     /* A QUESTION FILLED FROM AN ARRIVAL THAT WROTE NO ROW IS HELD AS THE INBOX IS, to the owner reading the whole record
        (`ruleAsked`, audit thirty-nine finding 1). */
@@ -3004,10 +3074,21 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       ? ({ ...row, question: kernel.question((row as unknown as { id: string }).id) ?? '' } as T)
       : row;
 
-  /** Whether the caller reads the record as a whole, rather than the registers they were invited to. */
+  /**
+   * Whether the caller reads the record as a whole, rather than the registers they were invited to.
+   *
+   * A LEVEL THAT READS, NOT ONLY A RECORD-WIDE ONE. This asked for any record-wide level and no ceiling, so a colleague
+   * who adds across the record and reads nothing was read as whole: a question about no list and the log's lines about
+   * the record itself went to the one level whose point is that it does not read (`20 §1`, `loop/finish/platform.md`
+   * §2.5). A token's scope always reads, so its person's level is what is asked. A link to one page is never whole.
+   */
   const wholeRecord = (ctx: CallContext): boolean =>
     ctx.principal.kind === 'system' ||
-    (ctx.principal.kind !== 'runner' && ctx.principal.level !== null && (ctx.registers === undefined || ctx.registers === '*'));
+    (ctx.principal.kind !== 'runner' &&
+      ctx.principal.kind !== 'share' &&
+      ctx.principal.level !== null &&
+      LEVEL_REACH[ctx.principal.level]?.includes('read') === true &&
+      (ctx.registers === undefined || ctx.registers === '*'));
 
   /**
    * One event as this caller may see it, or `null` when they may not.
@@ -3048,6 +3129,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (own === null || (spokenSettles !== null && settles === null)) return null;
       const said = own === id ? bare : { ...bare, target: `${kind}:${own}` };
       return settles === null ? { ...said, title } : { ...said, title, settles };
+    }
+    /* A COMMENT'S RESOLUTION IS ABOUT WHAT THE COMMENT IS ON (`kernel/src/api/comments.ts` writes it on `event:<id>`),
+       so it goes to whoever sees that and to nobody else. Held to the rule for a line about nothing in particular, it
+       would go to every whole-record reader, a member held to `append` on that list included, and she would read the
+       reason beside a comment she is not shown. */
+    if (kind === 'event' && e.kind === 'note' && e.field === 'resolve') {
+      const held = kernel.commentOf(id);
+      return held !== null && sightOf(ctx, held.target) !== null ? bare : null;
     }
     if (/^(?:grant|access|share)\./u.test(e.kind) || ['grant', 'vault_key', 'device_grant', 'member', 'person'].includes(kind ?? ''))
       return allows(ctx, 'owner') === null ? bare : null;
@@ -3186,6 +3275,31 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
   /** A question or decision a caller named, as the kernel keys it: a handle is turned back into its number, anything else goes as it came. */
   const spokenIn = (given: string): string => (isHandle(given) ? (spokenOf(sql, given) ?? given) : given);
+
+  /**
+   * What one thing a comment may be on is called to this caller, or `null` when she may not see it or it is not there
+   * (`docs/20-COLLABORATION.md` §5, `methods/comments.ts`).
+   *
+   * THE QUESTIONS `lineOf` ALREADY ASKS, asked of one target: a row goes to whoever may `list` its list, and a question
+   * or a decision to whoever `holds` does not hold it back from. A row is called by its spoken id and a question or a
+   * decision by the name `nameOf` hands her, so what a search answers is what `comments({ on })` takes back. A deleted
+   * row is not there, and anything that is not a row, a question or a decision has no comments.
+   */
+  const sightOf = (ctx: CallContext, target: string): string | null => {
+    const colon = target.indexOf(':');
+    const kind = colon > 0 ? target.slice(0, colon) : '';
+    const id = target.slice(colon + 1);
+    if (id === '') return null;
+    if (kind === 'entry') {
+      const row = kernel.get(id);
+      return row !== null && readable(ctx, row.register) === null ? kernel.nameOf(row.id) : null;
+    }
+    if (kind !== 'suggestion' && kind !== 'decision') return null;
+    const row = kernel.governanceRow(kind, id);
+    if (row === null || holds(ctx, row)) return null;
+    const own = nameOf(ctx, kind, id);
+    return own === null ? null : `${kind}:${own}`;
+  };
 
   /**
    * What `propose` answers, with the question's name as `nameOf` hands it. THE WORST OF THE TWO LEAKS, because it needs
@@ -3577,6 +3691,36 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     return Object.fromEntries(kernel.members().flatMap((m) => (typeof m.name === 'string' && m.name.trim() !== '' ? [[m.person_id, m.name.trim()]] : [])));
   };
 
+  /**
+   * The level this caller holds on each list, for `boot`'s `me.levels`: a grant naming the list, else the record-wide
+   * level, and no key for a list outside their ceiling or an owner's list a record-wide appender does not reach.
+   *
+   * ASKED OF THE SAME RULES `guard` ASKS (`reaches`, `ownersListStop`), so the app is told what a press would meet and
+   * never works it out (`apps/web/src/lib/record/may.ts`).
+   */
+  const levelsOf = (ctx: CallContext): Record<string, Level> => {
+    const p = ctx.principal;
+    if (p.kind !== 'person' && p.kind !== 'token') return {};
+    const out: Record<string, Level> = {};
+    for (const list of kernel.registers().keys()) {
+      if (reaches(ctx, list) !== null || ownersListStop(ctx, list) !== null) continue;
+      const held = Object.hasOwn(ctx.levels ?? {}, list) ? ctx.levels?.[list] : p.level;
+      if (held !== undefined && held !== null && LEVELS.includes(held)) out[list] = held;
+    }
+    return out;
+  };
+
+  /**
+   * A token an owner gave the `inbox` reach, as `inbox` admits one.
+   *
+   * `Array.isArray`, BECAUSE `includes` IS ALSO A STRING'S. Measured: a reach of "no-inbox" was admitted as a substring
+   * and a reach of 1 threw a TypeError out of the inbox's gate.
+   */
+  const inboxReached = (ctx: CallContext): boolean => {
+    const p = ctx.principal;
+    return p.kind === 'token' && p.level === 'owner' && Array.isArray(p.reach) && p.reach.includes('inbox');
+  };
+
   const shellFor = (ctx: CallContext): Pick<Boot, 'record' | 'me' | 'pages' | 'counts' | 'pen' | 'whatsNew' | 'names'> => {
     const p = ctx.principal;
     const person = p.kind === 'person' ? p.id : p.kind === 'token' ? p.person : null;
@@ -3598,6 +3742,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         person,
         name: person === null ? null : (kernel.members().find((m) => m.person_id === person)?.name ?? null),
         level: p.kind === 'person' || p.kind === 'token' ? p.level : null,
+        levels: levelsOf(ctx),
         ...(p.kind === 'person' ? { prefs } : {}),
       },
       /* THE SAME FILTER `pages` RUNS, and the register list stays behind for the same reason. */
@@ -3619,7 +3764,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         })),
       counts: {
         decide: open.ok ? open.value.filter((row) => !holds(ctx, row)).length : 0,
-        inbox: allows(ctx, 'owner') === null ? kernel.inboxWaiting() : null,
+        /* AN OWNER, AND A TOKEN AN OWNER GAVE THE `inbox` REACH, held to the whole record as `inbox` itself is: the agent
+           set up to triage the arrivals was told `null` about how many there were (S9). */
+        inbox: allows(ctx, 'owner') === null || (inboxReached(ctx) && wholeRecord(ctx)) ? kernel.inboxWaiting() : null,
         /* EVERY DECISION THIS CALLER MAY READ, for a screen that reads them a page at a time. Somebody who reads the whole
            record is held back from none, so theirs is the table's count. A member invited to named lists is held back from
            the decisions `holds` holds, and the table's count told them 2 where the list showed them 1: a number the
@@ -4626,7 +4773,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         if (!('draw' in plans[i]!) || block === null || typeof block !== 'object') return null;
         const w = block as { source?: unknown; horizon?: unknown; from?: unknown; opening?: unknown };
         if (w.source !== 'forecast.runway') return null;
-        const horizon = typeof w.horizon === 'number' ? w.horizon : WALK_HORIZON_DEFAULT;
+        /* `'last'` WALKS TO THE LAST DATED ROW, as far as the page's own ceiling, so it is costed at that ceiling. */
+        const horizon = typeof w.horizon === 'number' ? w.horizon : w.horizon === 'last' ? PAGE_HORIZON_MOST : WALK_HORIZON_DEFAULT;
         if (horizon > PREVIEW_HORIZON_MOST)
           return {
             code: 'OUT_OF_BOUNDS',
@@ -4742,7 +4890,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     },
 
     /** One figure, by the id a `stat` cell names. */
-    async metric(args: { metric: string }, ctx: CallContext) {
+    async metric(args: { metric: string }, ctx: CallContext): Promise<ReturnType<Kernel['metric']>> {
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false as const, refusal: stop };
       if (typeof args?.metric !== 'string' || !args.metric)
@@ -4766,8 +4914,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const filled = decl && param !== undefined ? (fill(decl, null, param) as typeof decl) : decl;
       const register = filled?.source.startsWith('register.') ? filled.source.slice('register.'.length) : null;
       /* AND THE CHECK IS `readable`, not the ceiling. A figure over a register somebody may only
-         append to answered with the figure, which is the same leak one number wide. */
-      if (!filled || (register && readable(ctx, register)))
+         append to answered with the figure, which is the same leak one number wide.
+         AND IT IS ASKED OF EVERY LIST THE FIGURE READS, NOT ITS SOURCE ALONE: a rolled cash figure reads its moves and
+         balance checks, and a walk (`forecast.runway`) names no list while its legs walk several (`figureLists`). */
+      if (!filled || kernel.figureLists(filled).some((list) => readable(ctx, list) !== null))
         return no('METRIC_UNKNOWN', `There is no metric called ${args.metric}.`, { at: 'metric' });
       /* AND THE CALLER'S OWN WORDS ARE RESOLVED ONLY AGAINST LISTS SHE READS, BY THE KERNEL, AS `list` RESOLVES THEM. The
          member invited to Jobs alone asking `client-jobs:<title>` was answered `ok` for a client on the Clients list she
@@ -4813,7 +4963,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       for (const row of rows) {
         const decl = JSON.parse(row.body) as MetricDecl;
         const list = decl.source.startsWith('register.') ? decl.source.slice('register.'.length) : null;
-        if (list !== null && readable(ctx, list)) continue;
+        /* HELD TO `metric`'s OWN CHECK, every list the figure reads, so a figure listed is one `metric` answers. */
+        if (kernel.figureLists(decl).some((l) => readable(ctx, l) !== null)) continue;
         out.push({
           id: row.id.slice('metric.'.length),
           name: decl.name,
@@ -4913,14 +5064,21 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const as: CallContext = { ...ctx, registers: ceiling };
       const script = String(b.script);
       const reads = {
-        list: async (register: string, where: unknown) => {
+        list: async (register: string, where: unknown, options: unknown = null) => {
           if (where !== null && (typeof where !== 'object' || Array.isArray(where)))
             throw new Error(
               `${script} filtered ${register} with ${JSON.stringify(where)}, and a script filters with a predicate tree, such as {"field":"name","is":"Acme"}, so nothing was read.`,
             );
           const field = namesSealed(where, sealedOf(register));
           if (field !== null) throw new Error(`${script} filtered ${register} on ${field}, which is a secret, and a script may not ask what a secret field holds.`);
-          const page = await this.list({ register, ...(where === null ? {} : { where }) } as never, as);
+          /* THE ONE OPTION A SCRIPT'S LIST TAKES, refused otherwise in the words of `listOptions` in `@braindog/host/script`,
+             since the record cannot import the host. Without it a trial dropped `includeDeleted` and answered live rows
+             alone while the scheduled run answered both. */
+          if (options !== null && (typeof options !== 'object' || Array.isArray(options) || Object.entries(options).some(([k, v]) => k !== 'includeDeleted' || typeof v !== 'boolean')))
+            throw new Error(`${script} listed ${register} with the options ${JSON.stringify(options)}, and a script's list takes {"includeDeleted":true} or nothing, so nothing was read.`);
+          const deleted = (options as { includeDeleted?: unknown } | null)?.includeDeleted;
+          const asked = typeof deleted === 'boolean' ? { includeDeleted: deleted } : {};
+          const page = await this.list({ register, ...(where === null ? {} : { where }), ...asked } as never, as);
           if (!page.ok) throw new Error(fixOf(page));
           return page.value.rows.map(unsealed);
         },
@@ -4974,7 +5132,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         kind: p.kind,
         id: p.kind === 'system' ? 'system' : p.id,
         person: p.kind === 'token' ? p.person : p.kind === 'person' ? p.id : null,
-        level: p.kind === 'system' ? 'owner' : p.kind === 'runner' ? null : p.level,
+        level: p.kind === 'system' ? 'owner' : p.kind === 'runner' || p.kind === 'share' ? null : p.level,
         scope: p.kind === 'token' ? p.scope : null,
         /* WHICH REGISTERS, when the caller is held to some of them. `null` is "all of them", which
            is a different answer from "none" and the two must never be one value. */
@@ -5008,9 +5166,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
              `metric` asks it, and a figure over no list, or one that is not declared, is kept only for somebody who reads
              the whole record. A section the kernel wrote about the digest itself (`Not sent`) names no source. */
           const sections = d.sections.filter((s) => {
-            const figure = s.source.startsWith('metric.') ? (kernel.metricDecl(s.source.slice('metric.'.length))?.source ?? '') : s.source;
-            const register = figure.startsWith('register.') ? figure.slice('register.'.length) : null;
-            if (register !== null) return !readable(ctx, register);
+            /* AND EVERY LIST THE FIGURE READS, not its source alone (`figureLists`), as `metric` asks. */
+            const decl = s.source.startsWith('metric.') ? kernel.metricDecl(s.source.slice('metric.'.length)) : null;
+            const lists = decl ? kernel.figureLists(decl) : s.source.startsWith('register.') ? [s.source.slice('register.'.length)] : [];
+            if (lists.length > 0) return lists.every((list) => !readable(ctx, list));
             return !s.source.startsWith('metric.') || wholeRecord(ctx);
           });
           return { ...d, sections, carrying: carryingOf(sections).length, headline: headline(d.name, carryingOf(sections)) };
@@ -6174,7 +6333,21 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (typeof args?.token !== 'string' || !args.token) return no('REQUIRED_MISSING', 'Which invitation?', { at: 'token' });
       if (args.person === undefined) {
         const found = await kernel.lookInvitation(args.token);
-        return found.ok ? ok({ email: found.value.email, expires_at: found.value.expires_at }) : found;
+        if (!found.ok) return found;
+        /* WHAT THE LINK OPENS, SAID BEFORE ANYBODY ACCEPTS (`loop/finish/platform.md` §4.0 M): the record's own name, what it
+           gives on the whole record, and each list by its name with what it gives there. A list removed since the link was
+           minted is left out, so no id reaches the page. */
+        const { email, expires_at, level, registers } = found.value;
+        return ok({
+          email,
+          expires_at,
+          record: kernel.identity()?.name ?? null,
+          level,
+          lists: Object.entries(registers).flatMap(([id, held]) => {
+            const list = kernel.register(id);
+            return list ? [{ id, name: list.name, level: held }] : [];
+          }),
+        });
       }
       const { id, email, name } = args.person;
       return tail(await kernel.acceptInvitation(args.token, { person: id, email, ...(name ? { name } : {}) }));
@@ -6201,11 +6374,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * token ladder reads the suspension too; stopping somebody whose agent kept writing would be
      * the shape of half-measure that makes people distrust the whole mechanism.
      */
-    async suspendMember(args: { person: string; suspended?: boolean }, ctx: CallContext) {
+    async suspendMember(args: { person: string; suspended: boolean }, ctx: CallContext) {
       const stop = admin(ctx);
       if (stop) return { ok: false as const, refusal: stop };
       if (!args?.person) return no('REQUIRED_MISSING', 'Who?', { at: 'person' });
-      return tail(kernel.suspendMember(actorOf(ctx), args.person, args.suspended !== false));
+      /* ONE VERB BOTH WAYS, AND THE WAY IS SAID (`loop/finish/contracts.md` X11). A missing `suspended` meant stop, so a page
+         that meant to let somebody back in and dropped the field stopped them instead. */
+      if (typeof args.suspended !== 'boolean') return no('REQUIRED_MISSING', 'Stop them, or let them back in?', { at: 'suspended' });
+      return tail(kernel.suspendMember(actorOf(ctx), args.person, args.suspended));
     },
 
     /* ── ADMIN: AGENT TOKENS ──────────────────────────── */
@@ -7184,10 +7360,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     ): Promise<Result<InboxPage>> {
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false, refusal: stop };
-      const p = ctx.principal;
-      /* `Array.isArray`, BECAUSE `includes` IS ALSO A STRING'S. Measured: a reach of "no-inbox" was admitted as a substring
-         and a reach of 1 threw a TypeError out of this gate. */
-      const granted = p.kind === 'token' && p.level === 'owner' && Array.isArray(p.reach) && p.reach.includes('inbox');
+      /* ONE RULE FOR THE REACH, `inboxReached`, which `boot`'s inbox count asks too, so the count and this door agree. */
+      const granted = inboxReached(ctx);
       const owner = granted ? null : allows(ctx, 'owner', listName);
       if (owner) return { ok: false, refusal: { ...owner, code: 'FORBIDDEN' } };
       if (!wholeRecord(ctx))
@@ -7281,7 +7455,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          this", so handing one down would search EVERY register on behalf of somebody who may read
          none of them. Nothing matches, so nothing is asked, and no `search.empty` observation is
          written about a query that was never the record's to answer. */
-      if (registers.length === 0) return ok({ hits: [], matched: {} });
+      /* AND THE COMMENTS SHE MAY READ (`docs/20-COLLABORATION.md` §5). A comment is a line of the log and not a row, so
+         the row index never held one; the kernel reads the log's newest lines for the words, and `sightOf` holds each to
+         what the caller sees, so a comment on a thing she may not see is neither answered nor counted. Asked before the
+         empty case below, so the two answers have one shape. */
+      const comments = kernel.commentsMatching(String(args.q ?? ''), (target) => sightOf(ctx, target));
+      if (registers.length === 0) return ok({ hits: [], matched: {}, comments });
       /**
        * HOW MANY MATCHED COMES BACK WITH THEM, and the answer is an object for that reason alone.
        *
@@ -7309,6 +7488,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           return [{ register: row.register, seq: row.seq, title: title ? String(row.fields[title] ?? '') : '', rank: hit.rank }];
         }),
         matched: found.matched,
+        comments,
       });
     },
 
@@ -7335,16 +7515,16 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        handed the guards above rather than a copy of them, so a method there is held to the same ladder as every method
        in this file; the `guards` gate reads those files as it reads this one, and refuses a name two files both define,
        since the later one would win here without a word. */
-    ...methods({ kernel, sql, guard, scoped, readable, admin, vault, named, no, tail, directory: deps.directory ?? null, clock }),
+    ...methods({ kernel, sql, guard, scoped, readable, sightOf, admin, vault, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted }),
     /* AND THE JOB METHODS, WHICH ARE `jobs.ts`'S AND NOT UNDER `methods/` (`loop/finish/contracts.md` §2.8): the owner's, in a
        browser, and a runner's, for a machine enrolled as one. Handed the same guards, so the owner's are held to `admin`
        as every ADMIN method here is, and a runner's admit the one principal every guard above refuses. */
-    ...jobMethods({ kernel, sql, guard, scoped, readable, admin, vault, named, no, tail, directory: deps.directory ?? null, clock }),
+    ...jobMethods({ kernel, sql, guard, scoped, readable, sightOf, admin, vault, named, no, tail, directory: deps.directory ?? null, clock }),
     /* AND `previewChange`, WHICH IS UNDER `methods/` BUT SPREAD HERE, as `jobs.ts` is, because it is handed the functions
        above that hold a page to its reader as well as the guards: a change is drawn through `page`'s own reader and held
        as `page` and `previewPage` hold a block, never by a second copy of who may see what (`methods/preview-change.ts`). */
     ...previewChangeMethods(
-      { kernel, sql, guard, scoped, readable, admin, vault, named, no, tail, directory: deps.directory ?? null, clock },
+      { kernel, sql, guard, scoped, readable, sightOf, admin, vault, named, no, tail, directory: deps.directory ?? null, clock },
       { heldBlock, shellOf, heldBy, unplaced, whereHeld, seesPage, readsEveryList },
     ),
   };

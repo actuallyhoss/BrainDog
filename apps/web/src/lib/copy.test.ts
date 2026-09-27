@@ -226,12 +226,9 @@ test('THE DISPLAY MENU AND A LANDED WRITE ARE EACH ONE WORD, TYPED ONCE', () => 
  * `example` was a key here, lower case and bare, excused as "the chip that mark would render". What
  * the bare word is is the tag the record keeps, declared in `record/tags.ts` and travelling in the
  * row's `tags` field, and a reader meets it through `shownTags` and `listLine` rather than through
- * any sentence typed here. `markExample` reads `Example` and is a narrower thing than the excuse
- * claimed: the receipt chip on the one row the empty state's offer writes, cleared when the question
- * changes, so no seeded example row has ever worn it. Two names for it in two files is how the chip
- * and the data drift apart, which is what the assertion below holds shut.
+ * any sentence typed here. Two names for it in two files is how the chip and the data drift apart,
+ * which is what the assertion below holds shut.
  */
 test('THE RECORD’S OWN TAGS ARE NOT KEYS OF `copy`', () => {
   for (const tag of [EXAMPLE, FORMED]) assert.deepEqual(keysHolding(tag), [], `\`${tag}\` is the record's word, not a sentence`);
-  assert.equal(copy.markExample, 'Example');
 });

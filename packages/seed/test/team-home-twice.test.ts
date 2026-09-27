@@ -86,9 +86,9 @@ async function board(): Promise<{ k: Kernel; sql: NodeSql }> {
   for (const m of modulesFor(u, ['people'])) {
     if (m === 'agents') continue;
     const holds = new Set([...held(k), ...firstPartyManifest(m as never).provides.flatMap((p) => (p.startsWith('register.') ? [p.slice(9)] : []))]);
-    await put(k, moduleDocument(u, m, { today: TODAY, holds }));
+    await put(k, moduleDocument(u, m, { today: TODAY, holds, examples: true }));
   }
-  const carried = carriedDocument(u, TODAY);
+  const carried = carriedDocument(u, TODAY, null, { examples: true });
   if (carried) await put(k, carried);
   return { k, sql };
 }

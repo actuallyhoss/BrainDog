@@ -284,65 +284,17 @@ test('THE SAMPLE’S QUESTIONS ARE FILED THROUGH propose AND decide, in the orde
   sql.close();
 });
 
-/* ── the door a forwarded bank message comes through ─────────────────────── */
+/* ── no bank's wording ships with the seed ─────────────────────────────── */
 
 /**
- * One HSBC card alert, in the wording Money's charge pattern is written for.
- *
- * THE IDS BELOW ARE SPELLED OUT RATHER THAN READ FROM `INGESTS`, because a test that derives what it
- * expects from the same constant the install derives it from passes when both are empty, which is
- * precisely the state this test exists to end.
+ * THE SEED INSTALLS NO PATTERN FOR A BANK MESSAGE, AND NO FIRST-PARTY PACK DECLARES ONE. money-core carried two card
+ * wordings and their `-sms` twins until 3.0.0; they are `packs/card-alerts` now, whose own test forwards a charge and a
+ * credit into a record (`packs/card-alerts/card-alerts.test.ts`), so a record set up with Money reads no bank's messages
+ * unless somebody adds the pack (`loop/DIRECTION.md` section 22).
  */
-const CHARGE = 'HSBC: Your card ending 4471 was debited GBP 42.99 at FENWICK CLOUD on 18/09/26. If this was not you, call us.';
-
-test('INSTALLING THE SEED INSTALLS THE DOOR A BANK MESSAGE COMES THROUGH, and the message lands as a ledger row', async () => {
-  /* DECLARED, VALID, TESTED AND INSTALLED BY NOTHING was the state this is about. `test/money.test.ts`
-     installs `MONEY_INGESTS` by hand before it forwards anything, so every assertion there held while
-     a real record — the one `installSeed` opens — had no pattern at all: each alert he forwards was
-     stored, hashed and left `untriaged` for ever, beside an empty ledger. */
+test('THE SEED INSTALLS NO PATTERN FOR A BANK MESSAGE, and no first-party pack declares one: card alerts are packs/card-alerts', async () => {
   const { k, sql } = await seeded();
-  assert.deepEqual(
-    k.declarations().filter((d) => d.kind === 'ingest').map((d) => d.id).sort(),
-    [
-      /* EACH WITH ITS WEBHOOK TWIN, `-sms`, since money-core 1.7.0: the same reading behind a path token, for the
-         Shortcut that posts a bank's text message rather than forwarding its mail. money-core's two card wordings
-         only, since 25 September: the twelve that read one Egyptian bank were in the sample for the tests that forward
-         that bank's lines, and those install the bank's pack file now (`pack-files.ts`). */
-      'ingest.bank-card-in', 'ingest.bank-card-in-sms', 'ingest.bank-card-out', 'ingest.bank-card-out-sms',
-    ],
-    'the seed installed no pattern for a forwarded bank message',
-  );
-
-  const before = k.count('transactions');
-  const out = k.arrive({ channel: 'email', headers: { From: 'alerts@hsbc.example', Subject: 'Card transaction' }, body: CHARGE, sha256: 'seed-charge-1' });
-  assert.ok(out.ok, fixOf(out));
-  assert.equal(out.value.state, 'matched', out.value.reason ?? '');
-  assert.equal(out.value.ingest, 'bank-card-out');
-  /* `exact` OR NOTHING WAS WRITTEN: a chosen or defaulted field files the arrival at `proposed`, which
-     opens a suggestion and leaves the ledger as empty as no pattern would have. */
-  assert.equal(out.value.confidence, 'exact');
-  assert.equal(k.count('transactions'), before + 1, 'the pattern installed and wrote nothing');
-
-  const charge = k.get(out.value.wrote[0]!)!;
-  assert.equal(charge.fields.what, 'FENWICK CLOUD');
-  assert.equal(charge.fields.direction, 'out', 'a charge was filed as money coming in');
-  assert.deepEqual(charge.fields.amount, { amount: 4_299, currency: 'GBP' }, 'the card digits were read as the amount, or the money is not in minor units');
-  assert.equal(charge.fields.on, '2026-09-18');
-  /* AND THE ACCOUNT RESOLVED AGAINST THE SEED'S OWN ROWS, which is what makes this end to end: the
-     `lookup:` reads `accounts.last4`, and the row it lands on was written by this same install. */
-  assert.equal(charge.fields.account, k.get('accounts#3')?.id, 'the lookup did not land on the company card');
+  assert.deepEqual(k.declarations().filter((d) => d.kind === 'ingest').map((d) => d.id), [], 'the seed still installs a bank pattern');
+  for (const id of FIRST_PARTY) assert.deepEqual(firstPartyManifest(id).provides.filter((d) => d.startsWith('ingest.') || d === ''), [], `${id} declares a pattern`);
   sql.close();
-});
-
-test('AND MONEY-CORE CLAIMS THEM, rather than filing a nameless declaration under the empty string', () => {
-  /* `idOf` IN `packs/first-party.ts` GAINED ITS `ingest` ARM BEFORE ANY INGEST REACHED IT, so the arm
-     has never been read over a real one. Without it every pattern would be filed as '' — and two
-     versions of the pack would then see one nameless declaration replace another, silently. */
-  const provides = firstPartyManifest('money-core').provides;
-  assert.ok(provides.includes('ingest.bank-card-out'), 'money-core does not carry the charge pattern');
-  assert.ok(provides.includes('ingest.bank-card-in'), 'money-core does not carry the credit pattern');
-  assert.equal(provides.includes(''), false, 'a declaration is filed under the empty string');
-  /* AND NO OTHER PACK TOOK ONE, which is what a missing `pack:` on a pattern would look like. */
-  for (const id of FIRST_PARTY.filter((p) => p !== 'money-core'))
-    assert.deepEqual(firstPartyManifest(id).provides.filter((d) => d.startsWith('ingest.')), [], `${id} claimed a bank pattern`);
 });

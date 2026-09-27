@@ -146,14 +146,15 @@ test('SERVICES, AGENTS AND WORK, with a team size', () => {
 });
 
 test('EVERY CHIP, on its own, turns something on or suggests a use case', () => {
-  for (const chip of firstRun.shapeChips) assert.ok(read(chip).packs.length > 0 || arrange(chip).pick !== null, chip);
+  for (const chip of firstRun.whoChips) assert.ok(read(chip).packs.length > 0 || arrange(chip).pick !== null, chip);
 });
 
 test('THE FIRST RUN ASKS WHAT THIS BRAINDOG IS FOR, not what the business is (`loop/research-spark.md` §1)', () => {
-  const first = [firstRun.shapeQuestion, firstRun.shapePlaceholder, ...firstRun.shapeChips, ...firstRun.whoChips, firstRun.firstLede];
+  /* ONE QUESTION SINCE MOD-6, and its four chips are the four people of DIRECTION §11. */
+  const first = [firstRun.whoQuestion, firstRun.whoPlaceholder, ...firstRun.whoChips];
   for (const line of first) assert.doesNotMatch(line, /business/iu, line);
-  const kinds = new Set(firstRun.shapeChips.map((c) => arrange(c).pick?.usecase).filter(Boolean));
-  assert.ok(kinds.has('student') && kinds.has('founder') && kinds.has('business'), [...kinds].join(', '));
+  const kinds = new Set(firstRun.whoChips.map((c) => arrange(c).pick?.usecase).filter(Boolean));
+  assert.ok(kinds.has('student') && kinds.has('founder') && kinds.has('team') && kinds.has('guide'), [...kinds].join(', '));
 });
 
 const SENTENCES = [
@@ -165,7 +166,7 @@ const SENTENCES = [
   'Clients like Fenwick and Pell & Vine',
   'hosting costs 20 pounds a month',
   'I freelance',
-  ...firstRun.shapeChips,
+  ...firstRun.whoChips,
 ];
 
 test('NEVER INVENTED: every amount is digits the sentence holds, every span is the sentence\'s own text', () => {
@@ -199,8 +200,9 @@ test('WHAT TURNS ON: dependencies first, and People whenever turn 1 heard a name
   /* A name alone is a person, not a project: People goes in without Projects. */
   assert.deepEqual(toTurnOn(read(''), true), ['people']);
   assert.deepEqual(toTurnOn(read('I use Claude'), true), ['portfolio', 'people', 'agents']);
-  /* An invoice is to somebody, so Money brings People with it. */
-  assert.deepEqual(toTurnOn(read('I send invoices'), false), ['portfolio', 'people', 'money-core']);
+  /* AN INVOICE'S PARTY IS A LINK MONEY GOES IN WITHOUT (MOD-4, `first-party.ts` `LINKS`), so Money alone does not bring
+     People: a name heard in the sentence does, as the cases above say. */
+  assert.deepEqual(toTurnOn(read('I send invoices'), false), ['portfolio', 'money-core']);
   assert.deepEqual(toTurnOn(read('Domains and hosting'), false), ['portfolio', 'estate']);
 });
 

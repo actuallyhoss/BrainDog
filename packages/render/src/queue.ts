@@ -88,7 +88,7 @@ export const QUEUE_COSTS: Record<string, string> = {
   undo: 'Hard to undo',
   shape: 'Changes the setup',
   rows: 'Adds rows',
-  call: 'A judgement',
+  call: 'Your call',
 };
 
 /**

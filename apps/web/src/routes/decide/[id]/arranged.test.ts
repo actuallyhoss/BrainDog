@@ -29,7 +29,7 @@ test('an arrangement reads as one story, in the order a person asks it', () => {
   assert.deepEqual(out.parts.map((p) => p.part), ['why', 'calls', 'packs', 'appears', 'words']);
   const [why, calls, packs, appears, words] = out.parts;
   assert.deepEqual(why?.part === 'why' && why.lines[1], { text: 'Two courses start on Monday.', at: 'courses#2' });
-  assert.deepEqual(calls?.part === 'calls' && calls.calls, [{ host: 'calendar.example', detail: 'every 1h, with the key “Timetable feed”' }]);
+  assert.deepEqual(calls?.part === 'calls' && calls.calls, [{ host: 'calendar.example', detail: 'every hour, with the key “Timetable feed”' }]);
   assert.deepEqual(packs?.part === 'packs' && packs.lines, ['Installs Portfolio, then Student', 'Turns off Money']);
   assert.ok(appears?.part === 'appears');
   assert.equal(appears.examples, 6);

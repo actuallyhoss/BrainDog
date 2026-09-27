@@ -27,7 +27,7 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import * as clipboard from '$lib/clipboard.ts';
   import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
-  import { currencyFor, dirOf, display, iconFor, identityOf, labelOf, readableFields, spokenRow, toneOf, whoDid } from '$lib/record/api.ts';
+  import { currencyFor, dirOf, display, homeCurrency, iconFor, identityOf, labelOf, readableFields, spokenRow, toneOf, whoDid } from '$lib/record/api.ts';
   import { REGISTERS } from '$lib/record/held.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import Face from '$lib/ui/Face.svelte';
@@ -619,8 +619,11 @@
                     {:else if f.type === 'day'}
                       <div class="field"><input class="field-input" type="date" bind:value={draft} /></div>
                     {:else if f.type === 'money'}
+                      <!-- THE CURRENCY THE BOX WRITES IN, by the chain `field-draft.ts` types in: the row's, the field
+                           default's, the list's, then the record's, so an empty box names what it will write. -->
+                      {@const unit = currencyOf(value) ?? currencyOf(f.default) ?? currencyFor(id, f.id) ?? homeCurrency()}
                       <div class="field">
-                        {#if currencyOf(value) ?? currencyFor(id, f.id)}<span class="edit-unit">{currencyOf(value) ?? currencyFor(id, f.id)}</span>{/if}
+                        {#if unit}<span class="edit-unit">{unit}</span>{/if}
                         <input class="field-input num" type="text" inputmode="decimal" bind:value={draft} />
                       </div>
                     {:else if f.type === 'int' || f.type === 'decimal' || f.type === 'duration'}
@@ -1352,9 +1355,10 @@
   }
 
   /* A FIGURE THAT DOES NOT FIT SHRINKS ONE STEP BEFORE ANYTHING ELSE (design-brief §6), which on the
-     narrowest phone is what keeps a long foreign amount from pushing the page sideways. */
+     narrowest phone is what keeps a long foreign amount from pushing the page sideways. The selector
+     carries `.num` so it outranks the 900px step above on specificity rather than on source order. */
   @container (inline-size < 20rem) {
-    .lead-figure {
+    .lead-figure.num {
       font-size: var(--t-lg);
     }
   }

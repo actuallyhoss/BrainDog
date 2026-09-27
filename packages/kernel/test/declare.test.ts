@@ -2081,12 +2081,12 @@ test('`02 §6.1`’s OWN LEDGER IS REFUSED AT INSTALL, rather than installed wit
 
 test('AND EVERY OTHER PUBLISHED REGISTER KEY THIS BUILD READS NOWHERE IS NAMED, one at a time', () => {
   /* Each of these was reproduced as ACCEPTED against `validate` before the closed list existed, and
-     each is a rule rather than a decoration: an upsert key that duplicates yesterday, a delete
-     guard that deletes, and a predicate name no `where:` can reach. `pairs` left the list with
-     W57-1, when the write path began marking a transfer's two legs (`pairs.test.ts`). */
+     each is a rule rather than a decoration: an upsert key that duplicates yesterday and a
+     predicate name no `where:` can reach. `pairs` left the list with W57-1, when the write path
+     began marking a transfer's two legs (`pairs.test.ts`), and `delete` with OPS-12, when the write
+     path began refusing to delete a row that live rows point at (`referenced.test.ts`). */
   const cases: [string, Record<string, unknown>][] = [
     ['key', { series: true, key: ['what'] }],
-    ['delete', { delete: 'refuse_while_referenced' }],
     ['predicates', { predicates: { overdue: { field: 'what', is: 'x' } } }],
     ['immutable_when', { immutable_when: { any: [] } }],
   ];

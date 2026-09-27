@@ -136,7 +136,7 @@ export const pages = {
   bridgeOut: 'Going out',
   bridgeEnd: (days: number) => `In ${days} days`,
   seriesWeekOf: (day: string) => `Week of ${day}`,
-  /* SEND NUMBERS HERE (`routes/p/[slug]/Reporting.svelte`): the seed's heading, which the panel is drawn under, and what
+  /* SEND NUMBERS HERE (`lib/page/panels/Reporting.svelte`): the seed's heading, which the panel is drawn under, and what
      a report key can and cannot do, said before anybody makes one. */
   reportHeading: 'Send numbers here',
   reportWhy: (title: string) =>
@@ -146,7 +146,7 @@ export const pages = {
   reportMake: 'Make a report key',
   reportKeys: 'Report keys',
   reportRevoked: 'Revoked. The key stops working now.',
-  /* THE POLL FORM (`routes/p/[slug]/PollForm.svelte`): an address, how often, and which number is which. It files a
+  /* THE POLL FORM (`lib/page/panels/PollForm.svelte`): an address, how often, and which number is which. It files a
      proposal, because a poll calls out on a clock and the owner approves the address once, on Decide. */
   pollHeading: 'Or let BrainDog fetch them',
   pollWhy:

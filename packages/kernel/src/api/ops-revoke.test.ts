@@ -7,7 +7,7 @@
  * made before the instant is refused in the sentence an unknown one gets, one made at it or after passes, and nothing is
  * written, so an earlier instant gives every one of them back.
  *
- * HERE AND NOT IN `test/`, beside `rehearse.test.ts`, which the kernel's `src/**/*.test.ts` glob runs.
+ * HERE AND NOT IN `test/`, beside `rehearse.test.ts`, which the kernel's glob for tests under `src` runs.
  */
 
 import { test } from 'node:test';

@@ -45,6 +45,7 @@
   import Waiting from '$lib/ui/Waiting.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import Face from '$lib/ui/Face.svelte';
+  import { actor } from '$lib/record/names.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Section from '$lib/ui/Section.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
@@ -226,7 +227,7 @@
     </Empty>
   </div>
 {:else}
-  <PageHead kicker={REGISTERS.tracks?.name ?? ''} title={String(track.fields.name)} icon="rows">
+  <PageHead kicker={REGISTERS.tracks?.name ?? ''} back="/r/tracks" title={String(track.fields.name)} icon="rows">
     {#snippet actions()}
       <!-- The health, and it is a CLAIM SOMEBODY MADE rather than a computed status: the chip says
            what the newest update said, and the thread below it says who said so and when. -->
@@ -263,7 +264,7 @@
       {#if updates.length === 0}
         <!-- Not an error, and not styled as one. Nobody has written about this thread yet, which is
              the ordinary state of one somebody started this morning. -->
-        <Empty kind="no-data-yet" title="No update yet." body={copy.threadNoUpdate} />
+        <Empty kind="no-data-yet" title="No update yet" body={copy.threadNoUpdate} />
       {:else}
         <ol class="thread">
           {#each updates.slice(0, DOM_CAP) as u (u.seq)}
@@ -272,7 +273,7 @@
               <!-- WHO SAID IT, AS A FACE, so an update reads as somebody speaking rather than a log
                    line; the health stays on the chip. -->
               <div class="u-head">
-                <Face name={who} you={who === 'you'} />
+                <Face name={who} you={who === 'you'} kind={actor(String(u.fields.by)).kind} />
                 <span class="u-by">{who.charAt(0).toUpperCase() + who.slice(1)}</span>
                 <Chip
                   label={healthSaid(REGISTERS.updates, String(u.fields.health))}

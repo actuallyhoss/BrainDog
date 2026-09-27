@@ -1,5 +1,5 @@
 /**
- * The `via: write` runner: fifteen fixtures, driven through the kernel's own write path.
+ * The `via: write` runner: sixteen fixtures, driven through the kernel's own write path.
  *
  * `52 §5.3` files these as tests and not as gates, in one line: *"the script owns the enumeration,
  * the tests own the behaviour"*. `tools/gates/refusal-fixtures.mjs` holds every code to having a
@@ -9,7 +9,8 @@
  * ever contained: `40 §6`'s own table said so, and nothing executed the table.
  *
  * IT DRIVES THE KERNEL AND NOT `@braindog/record`, which is where `40 §6`'s table puts it. All
- * fifteen `raises:` name `packages/kernel/src/index.ts` or `packages/kernel/src/coerce.ts`, and a
+ * sixteen `raises:` name a file of the kernel's write path (`index.ts`, `coerce.ts`, or `referenced.ts`, which that
+ * path calls), and a
  * runner one layer above the raiser is a runner that goes green when the layer between them starts
  * answering for itself. The register is the surface that raises the code, so the register is the
  * surface the fixture is driven against.
@@ -25,8 +26,8 @@
  *
  * `principal:` is in the column and no fixture here carries one. The kernel's `WriteContext` takes
  * an `actor` string and not a principal; a level is what the surface above it checks. Writing
- * `principal: { kind: person, level: owner }` into fifteen files and mapping all fifteen onto the
- * same `p_1` would be a key that looks load-bearing and is not.
+ * `principal: { kind: person, level: owner }` into every file and mapping each onto the same `p_1`
+ * would be a key that looks load-bearing and is not.
  *
  * ─── THE INPUT IS JSON, WHICH IS YAML ───────────────────────────────────────────────────────────
  *
@@ -71,11 +72,11 @@ const json = <T>(keys: Keys, key: string, where: string): T | undefined => {
 
 const family: Fixture[] = familyOf('write');
 
-/* THE COUNT IS ASSERTED SO THAT A SIXTEENTH CANNOT ARRIVE UNDRIVEN. `40 §6`'s table says the write
-   family is fifteen. A new one finds out here that it needs a body, rather than joining a family
+/* THE COUNT IS ASSERTED SO THAT A SEVENTEENTH CANNOT ARRIVE UNDRIVEN. `40 §6`'s table says the write
+   family is sixteen. A new one finds out here that it needs a body, rather than joining a family
    that nothing runs. */
-test('every write fixture in the corpus is driven here, and there are fifteen of them', () => {
-  assert.equal(family.length, 15);
+test('every write fixture in the corpus is driven here, and there are sixteen of them', () => {
+  assert.equal(family.length, 16);
   for (const f of family) assert.ok(f.keys.has('declare'), `${f.name} carries no \`declare:\`, so nothing drives it`);
 });
 

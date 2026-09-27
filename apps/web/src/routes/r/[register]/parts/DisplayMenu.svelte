@@ -98,17 +98,20 @@
     <fieldset class="filter-group columns-group">
       <legend class="filter-legend">{copy.columns}</legend>
       <div class="filter-values">
-        {#each columnsFor(register) as c}
-          {@const locked = c.field === 'seq' || c.field === decl.title}
+        <!-- THE NUMBER IS OFFERED AND OFF (DSN-5): it is the one column the page draws only once it is in `hidden`, so
+             its box reads the set the other way round, and the same press toggles it. -->
+        {#each columnsFor(register, decl, true) as c}
+          {@const locked = c.field === decl.title}
+          {@const on = c.field === 'seq' ? hidden.has('seq') : !hidden.has(c.field)}
           <button
             type="button"
             class="filter-value"
-            data-on={!hidden.has(c.field) ? '' : undefined}
-            aria-pressed={!hidden.has(c.field) ? 'true' : 'false'}
+            data-on={on ? '' : undefined}
+            aria-pressed={on ? 'true' : 'false'}
             disabled={locked}
             onclick={() => hide(c.field, !hidden.has(c.field))}
           >
-            <span class="filter-box" aria-hidden="true">{hidden.has(c.field) ? '' : '✓'}</span>
+            <span class="filter-box" aria-hidden="true">{on ? '✓' : ''}</span>
             {c.label}
             {#if locked}<span class="locked">{copy.always}</span>{/if}
           </button>
@@ -119,7 +122,7 @@
 
   {#snippet footer()}
     <Button weight="primary" onclick={() => (open = false)}><Icon name="check" size="s" />{copy.done}</Button>
-    {#if hidden.size > 0}
+    {#if [...hidden].some((f) => f !== 'seq')}
       <Button weight="bare" onclick={() => showAll()}>{copy.showAll}</Button>
     {/if}
     <!-- A SORT YOU CANNOT UNDO IS A TRAP. The only other way back to the register's own order was
@@ -209,14 +212,14 @@
     flex: none;
     border: 1px solid var(--edge);
     border-radius: var(--r-sm);
-    color: var(--accent-ink);
+    color: var(--on-ink);
     font-size: var(--t-xs);
     line-height: 1;
   }
 
   .filter-value[data-on] .filter-box {
-    background: var(--accent);
-    border-color: var(--accent);
+    background: var(--on);
+    border-color: var(--on);
   }
 
   .locked {

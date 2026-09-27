@@ -96,6 +96,11 @@ const GATES = [
   /* AND THE OTHER TWENTY-TWO CLOSED LISTS. 30 §2: a list enforced only by a validator is a list one
      code path forgets, which holds only while the CHECK and the document agree about what it is. */
   ['closed-lists', call(join(here, 'closed-lists.mjs'))],
+  /* AND THE COUNTS THE DOCUMENTS STATE, READ AGAINST THE CODE (`loop/finish/ops.md` OPS-25, defects DOC). A number in
+     prose about the gates, the block kinds, the MCP tools and templates, the refusal codes or the declaration kinds is
+     a claim, and those claims went stale unnoticed until this read them. Beside `closed-lists` because that gate
+     already holds the spelled-out block-kind counts, and this one reads the digits beside it. */
+  ['docs-counts', call(join(here, 'docs-counts.mjs'))],
   /* THE NINETY-NINE REFUSAL CODES, which had no `RefusalCode` type and so no list at all. A code is
      the one part of a refusal a caller can branch on, and `10 §7` builds the agent contract on it:
      the refusal teaches, and it teaches from a code stable across versions. Beside `event-kinds`
@@ -146,6 +151,10 @@ const GATES = [
      root, and a shipped file that imports either draws the sample on a real record. Beside `shell-words` because both
      are a grep over what the core ships for something it must not name. */
   ['no-fixtures', call(join(here, 'no-fixtures.mjs'))],
+  /* AND THE WEB NAMES NO FIRST-PARTY LIST OR PACK, AND GUESSES NO CURRENCY (`loop/finish/shell.md` USE-2, defects §4.2).
+     Beside `shell-words` and `no-fixtures` because it is the same kind of rule: a grep over what the app ships for
+     something it must not name. */
+  ['web-lists', call(join(here, 'web-lists.mjs'))],
   ['css-rules', call(join(here, 'css-rules.mjs'))],
   ['colour-grep', call(join(here, 'colour-grep.mjs'))],
   /* `50 §3` says one file holds every sentence so the copy is reviewable in one place. That is true

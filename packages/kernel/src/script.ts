@@ -263,8 +263,12 @@ export function fireScript(deps: ScriptDeps, row: { id: string; key: string }, s
  * its own rate and size (`@braindog/host/ingest`), and that bounds what is stored; this bounds what is spent after it.
  * Past it the arrival is still stored and matched as ever, the script is not started, and the day's first arrival
  * turned away says so on the script, once.
+ *
+ * A FUNCTION AND NOT A CONSTANT, because this module is first loaded inside `actions.ts`'s own load (`actions.ts` to
+ * `migrate.ts` to migration 16 to `declare.ts` to here), where `RULE_CALLS_PER_DAY` is not yet defined: a constant read
+ * of it here threw at import. It is read when a door is walked, by which time both modules have loaded.
  */
-export const DOOR_RUNS_PER_DAY = RULE_CALLS_PER_DAY;
+export const doorRunsPerDay = (): number => RULE_CALLS_PER_DAY;
 
 const DAY_MS = 86_400_000;
 
@@ -282,7 +286,7 @@ export type DoorArrival = { door: string; body: string; headers: Record<string, 
  * (its pause is already said on it, and `startScript` in `flow.ts` holds a rule to the same), and neither is one whose
  * arrival, with its headers, is over `bodyMost` bytes, the size an arrival is extracted from at all, which it says.
  *
- * THE WALK IS BOUNDED BY THE SCRIPTS INSTALLED ON THIS DOOR, one SELECT, and each start by `DOOR_RUNS_PER_DAY`.
+ * THE WALK IS BOUNDED BY THE SCRIPTS INSTALLED ON THIS DOOR, one SELECT, and each start by `doorRunsPerDay()`.
  */
 export function startAtDoor(sql: Sql, at: { mint: () => string; nowMs: number }, arrival: DoorArrival, bodyMost: number): string[] {
   const scripts = sql.all<{ version: number; body: string }>(
@@ -332,8 +336,9 @@ export function startAtDoor(sql: Sql, at: { mint: () => string; nowMs: number },
         since,
         name,
       )?.n ?? 0;
-    if (today >= DOOR_RUNS_PER_DAY) {
-      const full = `${arrival.door} has started ${name} ${DOOR_RUNS_PER_DAY} times in the past day, the most it may, so later arrivals are stored without starting it until fewer have.`;
+    const most = doorRunsPerDay();
+    if (today >= most) {
+      const full = `${arrival.door} has started ${name} ${most} times in the past day, the most it may, so later arrivals are stored without starting it until fewer have.`;
       const told = sql.one("SELECT 1 AS x FROM event WHERE kind = 'pull' AND target = ? AND note = ? AND ts >= ? LIMIT 1", `declaration:script.${name}`, full, since);
       if (!told) say(name, full);
       continue;

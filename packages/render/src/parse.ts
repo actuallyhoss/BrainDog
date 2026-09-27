@@ -24,6 +24,8 @@ import { captureFault } from './capture.ts';
 import { diffFault } from './diff.ts';
 import { pathFault } from './path.ts';
 import { inputsFault } from './inputs.ts';
+import { linkFault } from './links.ts';
+import { embedFault } from './embed.ts';
 
 /**
  * `page` is set by a page's own evaluator and never by a write-up. It admits the page-only kinds
@@ -280,7 +282,7 @@ export function parse(src: string, opts: ParseOptions = {}): Segment[] {
         type: 'degraded',
         code: 'DIALECT_KIND_UNKNOWN',
         fix: written
-          ? `"${written}" is not one of the thirty-four kinds. The block is shown as you wrote it.`
+          ? `"${written}" is not one of the thirty-eight kinds. The block is shown as you wrote it.`
           : 'A fence with no kind is shown as you wrote it.',
         raw,
         info,
@@ -341,6 +343,8 @@ export function parse(src: string, opts: ParseOptions = {}): Segment[] {
                 : kind === 'inputs'
                   ? /* NOR A ROW TO TYPE INTO, and the values the inputs would show are a spec, which a write-up can carry. */
                     `"inputs" edits a row of a list from a page, so a write-up cannot carry one. Use "spec" for the values. The block is shown as you wrote it.`
+                  : kind === 'embed'
+                    ? `"embed" frames a video, a design or a map on a page, so a write-up cannot carry one. Link to it instead. The block is shown as you wrote it.`
                   : `"${kind}" draws a register on a page, so it has no rows in a fence. Use "comparison". The block is shown as you wrote it.`,
         raw,
         info,
@@ -410,6 +414,10 @@ export function parse(src: string, opts: ParseOptions = {}): Segment[] {
        as the field to write. Only the path form reads the mark; a plain `steps` row's third cell is still free text. */
     const path = kind === 'steps' && form === 'path' ? pathFault(rows.map((r) => r.cells)) : null;
     const inputs = kind === 'inputs' ? inputsFault(rows.map((r) => r.cells)) : null;
+    /* A LINK'S ADDRESS AND AN EMBED'S ARE READ, NOT PRINTED: a row of links that quietly stopped being a link, or a frame
+       nobody may draw, is the fault the author has to see. */
+    const link = kind === 'link' ? linkFault(rows.map((r) => r.cells)) : null;
+    const embed = kind === 'embed' ? embedFault(rows.map((r) => r.cells)) : null;
     /* A STAT'S FOURTH CELL IS A TREND, and a word there is a note in the wrong column rather than a
        line with no points: before the trend it was a fifth cell and degraded, and it still does. */
     const trend = kind === 'stat' ? rows.find((r) => (r.cells[3] ?? '').trim() !== '' && !/\d/u.test(r.cells[3]!)) : undefined;
@@ -427,6 +435,10 @@ export function parse(src: string, opts: ParseOptions = {}): Segment[] {
               ? `A steps path has ${path}.`
               : inputs
                 ? `An inputs block has ${inputs}.`
+                : link
+                  ? link
+                : embed
+                  ? `An embed block has ${embed}.`
                 : diff !== null
                   ? `A diff row starts with "- ", "+ " or two spaces, and "${diff}" does not.`
                   : null;

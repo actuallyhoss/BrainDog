@@ -17,6 +17,7 @@
 -->
 <script lang="ts">
   import { inline, magnitudeOfCell, text, trendOf, SPARKLINE_POINT, TREND, TONES, MISSING, type Block, type Row, type RenderOptions } from '../../src/index.ts';
+  import { barFigure } from '../../src/format.ts';
   import Text from '../Text.svelte';
   import Trend from '../Trend.svelte';
   import Split from '../Split.svelte';
@@ -122,7 +123,7 @@
     {#snippet cells(row: Row, v: number, drawable: boolean)}
       <span class="prop-label"><Text nodes={inline(row.cells[0] ?? '', opts)} {opts} /></span>
       {#if drawable}<span class="prop-track" style="--magnitude:{fixed(v / scale)}"></span>{/if}
-      <span class="prop-value num"><Text nodes={inline(row.cells[1] ?? MISSING, opts)} {opts} /></span>
+      <span class="prop-value num"><Text nodes={inline(barFigure(row.cells[1] ?? MISSING), opts)} {opts} /></span>
       <span class="prop-note"><Text nodes={inline(row.cells[2] ?? '', opts)} {opts} /></span>
       {#if row.tone}
         <span class="glyph" role="img" aria-label={TONES[row.tone].label}>{TONES[row.tone].glyph}</span>

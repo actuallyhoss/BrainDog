@@ -23,6 +23,7 @@ import { env } from 'node:process';
 
 import { readCatalogue, type CatalogueIndex } from '@braindog/declare/catalogue';
 import { DEFAULT_KENNEL, KENNEL_BASE, kennelAsk, mergeIndexes } from '@braindog/declare/kennel';
+import { listedEntries } from '@braindog/declare/catalogue';
 
 import type { Answer } from './catalogue.ts';
 
@@ -204,7 +205,10 @@ export async function kennelAnswer(method: string, pathname: string, folder: str
   switch (asked.ask) {
     case 'index': {
       const theirs = base === null ? null : catalogueIn(await keptText(deps, `${base}index.json`, (text) => catalogueIn(text) !== null));
-      return { status: 200, headers: READ, body: JSON.stringify(mergeIndexes(catalogueIn(local(folder, 'index.json')), theirs)) };
+      /* THE INDEX LEAVES OUT AN `unlisted` ENTRY, as the Worker's does (`apps/worker/src/kennel.ts`, C41): its files still
+         answer by exact path. */
+      const merged = mergeIndexes(catalogueIn(local(folder, 'index.json')), theirs);
+      return { status: 200, headers: READ, body: JSON.stringify({ ...merged, entries: listedEntries(merged) }) };
     }
     case 'counts': {
       const counted = base === null ? null : countsIn(await keptText(deps, `${base}counts.json`, (text) => countsIn(text) !== null));

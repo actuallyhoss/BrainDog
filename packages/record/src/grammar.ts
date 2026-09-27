@@ -53,7 +53,7 @@ const PAGE = {
     heading: 'the words over it; on a section, the section itself',
     empty: 'the sentence drawn when it has no rows',
     body: "a note's own prose",
-    source: 'register.<id>, metric.<id>, block.<n>, forecast.runway, activity, sessions.live or actions',
+    source: 'register.<id>, metric.<id>, block.<n>, forecast.runway, activity, sessions.live, actions, governance.open, deadlines (what falls due across the lists; horizon: days ahead, 14 when it says nothing; where: list is tasks) or figures.home (the figures pinned to Home, on a stat with no cells)',
     where: 'a filter, such as state is open, or a predicate tree. On a capture, what the new row is preset with: about is parts#2 presets a link',
     register: 'the list a capture adds to, or the list whose one row inputs edits',
     row: "on inputs, the row it edits by its id, such as checks#1; the list's first row when it says nothing",

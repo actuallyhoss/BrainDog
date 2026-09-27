@@ -50,6 +50,7 @@ const SAMPLES = {
     'backups',
     'billing',
     'export',
+    'delete',
   ],
   '[track]': '2',
   /* THE VIEW THE GATES' RECORD SAVES (`record.mjs` `VIEW`). It was `obligations.overdue`, the sample's view, which the

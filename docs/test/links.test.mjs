@@ -3,8 +3,9 @@
  *
  *   node --test "docs/test/links.test.mjs"
  *
- * The root `pnpm test` runs it after every package's tests, which is the step CI's `ci.yml` and
- * `tag.yml` take, since `docs/` is not a workspace package and `pnpm -r` alone never reaches it.
+ * The root `pnpm test` runs it after every package's tests, which is the step `tag.yml` takes; `ci.yml`
+ * runs it as its own step in the `apps` leg of `test`, since `docs/` is not a workspace package and
+ * no `pnpm -r` filter reaches it.
  *
  * THE SPEC FOR THE ASSISTANT MOVED FROM `46-SPEC-SPARK.md` TO `46-SPEC-SLASH.md` ON 25 SEPTEMBER
  * (DIRECTION 31), and it was the most linked-to file in this folder: 32 links in 14 documents at

@@ -8,8 +8,8 @@
  * its Home is titled `Overview`, and Work installs a second page called Overview that draws a
  * ticked box. The first walk of the seed let the module's glyph win and drew the founder's front
  * page as a task list. The use case's own declaration is the one the app puts at the top of the
- * rail, so it is read last and wins. Its `Money` is the `obligations` register and draws a
- * receipt, not a note, which is the other one an eye would have picked wrong.
+ * rail, so it is read last and wins. Its `Money` is money-core's one Money page since 3.0.0 and
+ * draws the note, where it drew the receipt of the `obligations` list before.
  *
  * NOT IN `copy.ts`, because nothing here is a word a reader sees. It is keyed by the words that
  * are, so a name added to a case's `holds` without a line here fails the test instead of drawing
@@ -41,7 +41,7 @@ export const RAIL: Readonly<Record<string, IconName>> = {
   Dashboard: 'observe',
   Organisations: 'grid',
   Datapoints: 'observe',
-  Money: 'obligation',
+  Money: 'money',
   People: 'people',
   Tasks: 'task',
   /* Team */

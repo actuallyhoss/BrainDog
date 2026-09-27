@@ -12,7 +12,7 @@
  * everything they print comes back from here.
  */
 
-import { MISSING } from './format.ts';
+import { MISSING, axisFigure } from './format.ts';
 import { signedOf } from './bridge.ts';
 import { figureLike } from './figure.ts';
 
@@ -177,8 +177,8 @@ export function seriesPlan(rows: readonly (readonly string[])[], net = false): S
     zero: at(y(0)),
     netLine,
     netDots,
-    top: hi > 0 ? figureLike(template, hi) : '',
-    bottom: lo > 0 ? figureLike(template, -lo) : '',
+    top: hi > 0 ? axisFigure(figureLike(template, hi)) : '',
+    bottom: lo > 0 ? axisFigure(figureLike(template, -lo)) : '',
     empty: span <= 0,
     sentence,
   };

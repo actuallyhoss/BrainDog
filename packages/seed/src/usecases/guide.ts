@@ -42,7 +42,9 @@ const count = (metric: string, name: string, source: string, where?: string) => 
 
 export const GUIDE = {
   usecase: 'guide',
-  version: '1.2.0',
+  /* 1.2.1 BECAUSE HOME'S EMPTY TITLE LOSES ITS FULL STOP. A title ends without one everywhere else, and a record is
+     offered the words only when the version goes up. */
+  version: '1.2.1',
   title: 'New project guide',
   summary: 'The milestones of your project, the next step to take, the choices to make and what helps along the way.',
   author: 'BrainDog',
@@ -61,7 +63,7 @@ export const GUIDE = {
     home: 'Your project',
     right_now: 'Where you are',
     needs_you: 'Waiting on you',
-    nothing_needs_you: 'Nothing is waiting on you.',
+    nothing_needs_you: 'Nothing is waiting on you',
     since_away: 'What you have done so far',
     lists: 'Your notes',
   },

@@ -35,6 +35,7 @@ export {
   type CardLayout,
   type CardRole,
 } from './cards.ts';
+export { hueOf } from './cards.ts';
 export { AGENTS_EARLIER, AGENTS_NOTHING, AGENT_VERBS, agentDoing, agentsPlan, type AgentGroup } from './agents.ts';
 export {
   QUEUE_CLEARED,
@@ -139,7 +140,11 @@ export {
   type RangeBar,
   type RangeInput,
 } from './progress.ts';
-export { PATH_DONE, PATH_NEXT, pathFault, pathMore, pathPlan, type PathMark } from './path.ts';
+export { PATH_DONE, PATH_EVERYTHING, PATH_NEXT, PATH_STEP, PATH_VIEWS, pathFault, pathMore, pathPlan, pathRest, pathShort, type PathMark } from './path.ts';
+export { CALENDAR_MONTHS_MOST, CALENDAR_NONE, WEEKDAYS, calendarDay, calendarMore, calendarPlan, calendarSaid, calendarSkipped, type CalendarCell, type CalendarDay, type CalendarMonth, type CalendarPlan } from './calendar.ts';
+export { LINK_ADDRESS, LINKS_NONE, linkFault, linkHost, linkHref, linkPlan, type LinkLine } from './links.ts';
+export { GALLERY_NONE, PICTURE_MIMES, fileRef, galleryPlan, isPictureMime, pictureSrc, type GalleryTile } from './gallery.ts';
+export { EMBED_ASPECTS, EMBED_NONE, EMBED_PROVIDERS, embedAspect, embedFault, embedLoad, embedOf, embedOpen, embedPlan, type EmbedAspect, type EmbedPlan, type EmbedProvider } from './embed.ts';
 export {
   INPUT_TYPES,
   INPUTS_NONE,
@@ -216,4 +221,6 @@ export {
   symbolFigure,
   symbolText,
   figureChars,
+  axisFigure,
+  barFigure,
 } from './format.ts';

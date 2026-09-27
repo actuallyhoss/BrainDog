@@ -311,14 +311,17 @@ export function arranger(d: ArrangeDeps) {
   }
 
   /** One page's declaration, as installed, to read before proposing a change to it. */
-  function declaration(asked: string, pages: readonly { slug: string }[]): Result<Body> {
-    const id = asked.startsWith('page.') ? asked : `page.${asked}`;
-    const visible = pages.some((p) => `page.${p.slug}` === id);
-    const row = visible ? kernel.declarations().find((r) => r.id === id && r.kind === 'page') : undefined;
+  function declaration(asked: string, pages: readonly { slug: string; template?: string | null }[]): Result<Body> {
+    const slug = asked.startsWith('page.') ? asked.slice('page.'.length) : asked;
+    /* A PAGE MADE FOR EACH ROW OF A LIST HAS NO DECLARATION OF ITS OWN: its source is its template's, which is what a
+       change to it is written from (`docs/06-PAGES.md` §1). Asked only once the expanded page is visible to this caller. */
+    const seen = pages.find((p) => p.slug === slug);
+    const id = `page.${seen?.template ?? slug}`;
+    const row = seen ? kernel.declarations().find((r) => r.id === id && r.kind === 'page') : undefined;
     if (!row)
       return refuse(
         'PAGE_UNKNOWN',
-        `There is no page declaration ${id} that you can read. The pages are: ${listed(pages.map((p) => p.slug))}.`,
+        `There is no page declaration page.${slug} that you can read. The pages are: ${listed(pages.map((p) => p.slug))}.`,
         'page',
       );
     const body = JSON.parse(row.body) as Body;

@@ -69,7 +69,7 @@ jobs:
       # `typecheck` is NOT excluded here as it is in `ci.yml`: `run.mjs` runs it first, and this job
       # has no separate typecheck step to duplicate.
       #
-      # THE REST IS `ci.yml`'s `check` LIST, AND UNTIL 22 SEPTEMBER IT WAS THAT LIST AS IT STOOD
+      # THE REST IS `ci.yml`'s `gates` LIST, AND UNTIL 22 SEPTEMBER IT WAS THAT LIST AS IT STOOD
       # BEFORE THE 21ST. This job does not build, so under CI `passkey` and `queue` are refused for
       # want of `web-build`, `deploy-parity` for want of `DEPLOY_HOST`, and `self-test` exits red
       # without a build: four red gates on every tag, by construction, found by reading rather than

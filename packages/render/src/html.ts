@@ -24,7 +24,7 @@
 import { KINDS, SPARKLINE_POINT, TONES, type Kind } from './kinds.ts';
 import { inline, magnitudeOfCell, text as plain, type Inline, type InlineOptions } from './inline.ts';
 import { glyphPath } from './inline.ts';
-import { MISSING, day, figureChars, leadingCode, symbolFigure, symbolText, valueWord } from './format.ts';
+import { MISSING, barFigure, day, figureChars, leadingCode, symbolFigure, symbolText, valueWord } from './format.ts';
 import { CARDS_NEXT, CARDS_NONE, FOLD_HIDE, FOLD_SHOW, TREND, cardLayout, counted, initialOf, isQuiet, markOf, ringDash, ringOf, trendOf } from './cards.ts';
 import { FEED_EARLIER, feedNew, feedPlan } from './feed.ts';
 import { QUEUE_RECOMMENDED, fileSrc, queueMore, queuePlan, queueSuggested, queueWays, type QueueShows } from './queue.ts';
@@ -414,7 +414,7 @@ function proportional(b: Block, o: RenderOptions): string {
          claims the value IS zero. The number is still printed, with its sign. */
       const drawable = Number.isFinite(v) && v >= 0 && !r.hole && scale > 0;
       const track = drawable ? `<span class="prop-track" style="--magnitude:${magnitude(v / scale)}"></span>` : '';
-      const inner = `${cell('prop-label', r.cells[0], o)}${track}<span class="prop-value num">${drawn(r.cells[1])}</span>${cell('prop-note', r.cells[2], o)}${toneGlyph(r.tone)}`;
+      const inner = `${cell('prop-label', r.cells[0], o)}${track}<span class="prop-value num">${drawn(barFigure(r.cells[1] ?? MISSING))}</span>${cell('prop-note', r.cells[2], o)}${toneGlyph(r.tone)}`;
       return r.hole
         /* A HOLE ROW IS A CONTROL ONLY WHERE THE HOST CAN ACT ON IT — the same rule as an inline
            hole, for the same reason. This was a `<button>` with no handler on either side of the

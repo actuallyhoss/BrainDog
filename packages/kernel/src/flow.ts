@@ -61,6 +61,7 @@ import { meter, RULE_CALLS_PER_DAY, type CallQueued, type Metered } from './acti
 import { capability, serves } from './capabilities.ts';
 import { calendarOf, nextCalendar } from './clock.ts';
 import { dayIn } from './finished.ts';
+import { liveTarget } from './declare.ts';
 import { localParts, nextOccurrence } from './digest.ts';
 import { RELATIVE_DAY, RUN_PATH, RUNS_PER_DAY_CEILING, passFilled, pathOf, sealedAs, triggerOf } from './flow-lint.ts';
 import type { Entry } from './index.ts';
@@ -173,6 +174,11 @@ export type FlowDeps = {
    * install is still in the table.
    */
   answersSlash: boolean;
+  /**
+   * The hold the host's ledger put on this record's automations at its monthly allowance (`holdRuns` in `index.ts`), or
+   * absent. A run that has not started waits under it (`advance`).
+   */
+  held?: { until: number; say: string } | null | undefined;
 };
 
 /** A run-path rule as installed: its bare id, the version a run pins, and its body. */
@@ -1037,7 +1043,9 @@ export const WATCHED_PER_SWEEP = 200;
 function sideOf(deps: FlowDeps, id: string, crosses: unknown): { value: number; side: Side } | null {
   const found = deps.sql.one<{ body: string }>("SELECT body FROM declaration WHERE id = ? AND kind = 'metric' AND superseded_at IS NULL AND retired = 0", `metric.${id}`);
   if (!found) return null;
-  const decl = JSON.parse(found.body) as MetricDecl;
+  /* THE TARGET AS IT STANDS, a setting's value in place of the number written beside it, and no line at all for a
+     setting nobody has typed (`declare.ts` `liveTarget`): the reading then has no verdict, and the side is kept. */
+  const decl = liveTarget(deps.sql, JSON.parse(found.body) as MetricDecl);
   const read = evaluateMetric(deps.sql, decl, deps.rules().ctx);
   if (!read.ok || read.value.value === null) return null;
   /* A MONEY FIGURE ADDED UP OUT OF THE CURRENCY IT DECLARES CARRIES ITS TARGET CONVERTED (`targetIn`), and that is the
@@ -1209,6 +1217,14 @@ export function advance(deps: FlowDeps, id: string): number | null {
   if (off !== null) {
     finish(deps, run, 'cancelled', off);
     return null;
+  }
+  /* AT THE RECORD'S MONTHLY ALLOWANCE A RUN THAT HAS NOT STARTED WAITS FOR THE FIRST OF NEXT MONTH, with the Directory's
+     sentence on its row (`loop/finish/decisions.md` C34). The answer is the run's next due time, so its schedule row
+     wakes it then; a run already under way finishes what it started, and a body being tried is never held. */
+  const held = deps.trial ? null : deps.held;
+  if (held && held.until > deps.nowMs && run.state === 'pending' && run.step === 0) {
+    deps.sql.exec('UPDATE automation_run SET say = ? WHERE id = ?', held.say, run.id);
+    return held.until;
   }
   const decl = deps.trial ?? pinned(deps.sql, run.rule, run.version);
   if (!decl) {

@@ -88,6 +88,16 @@ corpus used it.* `diagram` — a **constrained shape set** of boxes, arrows and 
 arbitrary SVG — is **post-v1**, and everything after it
 arrives as a pack, which is the whole reason for the primitive layer.
 
+### Adding a kind
+
+A kind is three files and one line in each of three registries, and nothing else changes:
+
+- the kernel's `packages/kernel/src/kinds/<kind>.ts`, a `KindModule` (the keys only it reads, an optional `validate`, and `read`), and its line in `BLOCK_KIND_MODULES` in `packages/kernel/src/kinds/index.ts`;
+- the app's `apps/web/src/lib/page/kinds/<kind>.ts`, a `KindDrawer` that draws the kernel's `BlockResult` into the dialect, and its line in `BLOCK_KIND_DRAWERS` in `apps/web/src/lib/page/kinds/index.ts`, with its rules in `apps/web/src/lib/page/kinds/<kind>.css`;
+- the renderer's row in `TABLE` in `packages/render/src/kinds.ts`, on an existing primitive, with a component under `packages/render/svelte/` where the kind needs one.
+
+The install admits the kind and its keys from the kernel's registry, the read asks the registry before its own arms, and the app draws a registered kind from the record's answer before its own. The sentences that count the kinds, here and elsewhere, are brought up to date by the integrator once per workflow, so a kind unit writes no number.
+
 ### 2.1 · Row shape per kind — the grammar, stated
 
 The EBNF is [34-GRAMMARS](34-GRAMMARS.md) §2. This is what an author needs of it:
@@ -148,8 +158,8 @@ accepted**: a `document` is never parsed at write and never refused for its dial
 render is the feedback channel.
 
 **2 · Column positions are FIXED.** An unknown glyph draws no glyph rather than shifting the
-columns — a glyph is a `data-glyph` name the host's stylesheet draws, and the renderer ships no glyph
-art (36 §13 D17). A column that moves is worse than a column an agent has to count.
+columns — a glyph is a `data-glyph` name, drawn from the path the host answers (`RenderOptions.icon`),
+and the renderer ships no glyph art (36 §13 D17). A column that moves is worse than a column an agent has to count.
 
 **3 · The dialect names INTENT; the theme names appearance.** An agent writes `warn`, never
 amber. So a theme swap can never break a page, and an agent can never make a page ugly.
@@ -352,6 +362,14 @@ with a letter. There is no conditional `{{? … }}` form, no pipe `{{path | filt
 | **A percentage carries no colour, on purpose** | down is not bad. A fall in churn, in spend or in p95 is the work succeeding — say what it means in words; the interpolation only says what it *is* |
 | An argument that does not parse renders as the author's text, marked unresolved | `{{date:31 Sep}}` draws `31 Sep` dotted rather than vanishing or inventing a day |
 | The two forms cannot collide | a path has no colon in its character class; inside a typed form, a first character that is a letter makes the argument a path |
+
+**A glyph, `{{icon:<name>}}`, is not a typed form.** Its argument is a glyph name and never a path:
+`{{icon:rocket}} shipped` draws a rocket before the word, 1em high in the words' own colour, and holds the word after
+it on the same line. A name is one `GLYPH_NAMES` (`packages/render/src/glyphs/names.ts`) holds, as written or through
+its alias; any other name, `constructor` included, is the author's text, marked unresolved, and nothing is drawn for
+it. The renderer still ships no art (§3): the host answers `RenderOptions.icon` with a path, and without an answer the
+glyph is a named, empty `data-glyph` span of the same size, so the words around it never move. The same answer fills
+a section's glyph (20px) and a chip's (16px).
 
 ### 7.3 · Evidence tags
 

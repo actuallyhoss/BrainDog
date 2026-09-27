@@ -33,6 +33,8 @@ export type TokenRow = {
   last_surface: string | null;
   expires_at: string | null;
   revoked_at: string | null;
+  /** Present when the operator's cut-off ended it (OPS-10): it can do nothing, and the list says why. */
+  ended_by?: 'operator';
 };
 
 /**

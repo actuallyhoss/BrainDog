@@ -94,6 +94,6 @@ test('and index.ts routes /mcp before any door, checks the headers before the be
   const agent = src.indexOf('async function agent(');
   assert.ok(agent > 0, 'there is no /mcp branch');
   assert.ok(src.indexOf('gate(request)', agent) < src.indexOf("bearerOf(request, 'mcp'", agent), 'the bearer is checked before the headers are');
-  assert.match(src, /servesMcp\(new URL\(request\.url\)\.pathname\)\) return serveMcp\(request, api, ctx\)/u, 'the record does not answer /mcp through serveMcp');
+  assert.match(src, /servesMcp\(new URL\(request\.url\)\.pathname\)\) return serveMcp\(request, api, ctx[,)]/u, 'the record does not answer /mcp through serveMcp');
   assert.ok(!src.includes('surfaceOf'), 'the surface is read from the path again');
 });

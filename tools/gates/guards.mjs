@@ -139,11 +139,15 @@ const ROW = /\{ name: '([a-zA-Z]+)', group: '([A-Z+]+)',/g;
  */
 const SCOPED = ['guard', 'scoped'];
 
-/** Which guard each group implies. `JOBS` is here for the day the job routes land in this surface. */
+/**
+ * Which guard each group implies. `JOBS` takes `runner` beside the owner's two, because the methods a runner calls
+ * (`claimJob`, `postJobEvent`, `readCancel` in `packages/record/src/jobs.ts`) open with `runner(ctx)`, the one guard that
+ * admits the runner principal every other guard refuses.
+ */
 const IMPLIES = {
   ADMIN: ['admin'],
   VAULT: ['vault'],
-  JOBS: ['vault', 'admin'],
+  JOBS: ['vault', 'admin', 'runner'],
   'READ+': SCOPED,
   DATA: SCOPED,
 };
@@ -221,8 +225,17 @@ export default function guards(
      to this gate without anybody remembering to add it. A file under `methods/` is written in the same
      shape, a function returning an object of methods at four spaces, and is read the same way, each
      file on its own so that no body runs on into the next file's. */
+  /* AND `jobs.ts`, WHERE THE JOBS METHODS LIVE (`loop/finish/contracts.md` §2.8), read in the same shape as a file under
+     `methods/` when it is there. */
+  const jobs = read(root, 'packages', 'record', 'src', 'jobs.ts');
   const surfaces =
-    surface === null ? [] : [{ file: 'packages/record/src/index.ts', text: surface }, ...folder(root, 'packages', 'record', 'src', 'methods')];
+    surface === null
+      ? []
+      : [
+          { file: 'packages/record/src/index.ts', text: surface },
+          ...(jobs === null ? [] : [{ file: 'packages/record/src/jobs.ts', text: jobs }]),
+          ...folder(root, 'packages', 'record', 'src', 'methods'),
+        ];
 
   const bodies = new Map();
   const homes = new Map();
@@ -250,7 +263,7 @@ export default function guards(
   /** The first authorisation call in a body, ignoring the comments that explain why it is that one. */
   const guardOf = (body) => {
     const stripped = body.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
-    return /\b(admin|vault|guard|scoped)\(\s*ctx\b/.exec(stripped)?.[1] ?? null;
+    return /\b(admin|vault|guard|scoped|runner)\(\s*ctx\b/.exec(stripped)?.[1] ?? null;
   };
 
   /* ONE SENTENCE FOR AN ABSENT SURFACE, NOT EIGHTY-TWO. Without the file every route would land on

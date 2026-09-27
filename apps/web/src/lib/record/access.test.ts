@@ -481,7 +481,7 @@ test('and the delete control is the confirmation rather than a sentence about on
    * *"Deleting a record asks you to type its name first"*. A control that DESCRIBES its own safeguard
    * has not got one, and this is the action `53 §5.9` says has no rollback after step 2.
    */
-  const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'routes', 'settings', '[area]', '+page.svelte'), 'utf8');
+  const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'routes', 'settings', '[area]', 'areas', 'Delete.svelte'), 'utf8');
   assert.match(src, /id="delete-slug"/u, 'there is no field to type the slug into');
   /* `SLUG` IS THE SHELL'S SLUG, which is the record's own where there is a record and the sample's
      where there is none. It was `boot().index.slug` — the in-browser sample, on every record — so a
@@ -511,7 +511,7 @@ test('and the *Suggest new pages* switch that `19 §2` says the area exists for'
      what turns the PROPOSING off — `29 §2`: movement is forward-only and nothing already placed
      moves — and saying that is the difference between a switch somebody turns off and one they are
      afraid of. */
-  const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'routes', 'settings', '[area]', '+page.svelte'), 'utf8');
+  const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'routes', 'settings', '[area]', 'areas', 'Navigation.svelte'), 'utf8');
   assert.match(src, /suggestPages = \$state\(held\.suggestPages \?\? true\)/u, 'the switch does not read the store, so it comes back on');
   /* THE KEYS IT WRITES, NOT THE EXACT ARGUMENT LIST. This pinned `{ chars, suggestPages }`
      literally, so the first preference added to that same write broke a test whose own message is

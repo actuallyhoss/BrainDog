@@ -281,7 +281,7 @@
          cannot read the same. -->
     <Empty kind="cleared" title={copy.suggestOff} body={copy.suggestOffWhy} />
   {:else if pen.length === 0}
-    <Empty kind="cleared" title="Nothing waiting." />
+    <Empty kind="cleared" title="Nothing waiting" />
   {:else}
     <ul class="ledger ledger-glyph">
       {#each pen as p}

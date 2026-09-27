@@ -22,7 +22,7 @@ import { openRecord, type Kernel } from '@braindog/kernel';
 import { fixedClock, openSqlite, type NodeSql } from '../../kernel/test/sqlite.ts';
 
 import { FIRST_PARTY, FIRST_PARTY_VERSIONS, NOW, firstPartyDocument } from '../src/index.ts';
-import { SAME_MOVEMENT, type SeedIngest } from '../src/modules/money.ts';
+import type { ModuleIngest as SeedIngest } from '../src/index.ts';
 import { USE_CASES, useCaseDocument } from '../src/usecases/index.ts';
 import { asMoneyCore180 } from './money-core-earlier.ts';
 import { HSBC_EG_INGESTS, HSBC_EG_SMS_INGESTS, MONEY_CORE_HANDS, bankHsbcEgFile, handingAsShipped } from './pack-files.ts';
@@ -45,8 +45,11 @@ const HSBC = [
   'ingest.bank-from-out', 'ingest.bank-from-out-sms', 'ingest.bank-from-unsure', 'ingest.bank-from-unsure-sms',
   'ingest.bank-ipn-in', 'ingest.bank-ipn-in-sms', 'ingest.bank-ipn-out', 'ingest.bank-ipn-out-sms',
 ];
-/** The two generic card wordings (`card ending 4471 was debited`) and their twins, which stay in money-core. */
-const GENERIC = ['ingest.bank-card-in', 'ingest.bank-card-in-sms', 'ingest.bank-card-out', 'ingest.bank-card-out-sms'];
+/** Money-core declares no card wording since 3.0.0: the two generic ones and their twins are `packs/card-alerts`. */
+const GENERIC: string[] = [];
+
+/** The dedupe key money-core's card wordings carried until 3.0.0, which a 1.7.0 bank wording is rebuilt with. */
+const SAME_MOVEMENT: NonNullable<SeedIngest['dedupe']> = { near: { on: ['amount', 'account'], day: 'on', prefix: { field: 'what', chars: 12 } } };
 
 const ingestsOf = (doc: unknown): string[] =>
   ((doc as Doc).declarations ?? []).filter((d) => typeof d.ingest === 'string').map((d) => `ingest.${d.ingest}`).sort();
@@ -124,12 +127,12 @@ const v170 = (): Doc => {
 /** money-core as a record on 1.7.0 was offered it from 1.8.0 until 2.4.0 stopped handing: today's, with the `hands` it shipped. */
 const shippedUpdate = () => handingAsShipped(firstPartyDocument('money-core'));
 
-test('MONEY-CORE DECLARES ONLY THE TWO GENERIC CARD WORDINGS, and the twelve it handed until 2.4.0 are exactly the ones in the bank file', () => {
+test('MONEY-CORE DECLARES NO BANK WORDING, and the twelve it handed until 2.4.0 are exactly the ones in the bank file', () => {
   assert.deepEqual(ingestsOf(firstPartyDocument('money-core')), GENERIC);
   /* THE TWELVE LEFT AT 1.8.0, a minor step by `first-party.ts`'s own rule, since no list and no field moved;
      `pack-versions.test.ts` holds that version's fingerprint. 2.0.0 is the major step `holdings` leaving took, which is
-     `holdings-pack.test.ts`'s to hold. */
-  assert.equal(FIRST_PARTY_VERSIONS['money-core'].split('.')[0], '2');
+     `holdings-pack.test.ts`'s to hold, and 3.0.0 the one the card wordings and two pages leaving took. */
+  assert.equal(FIRST_PARTY_VERSIONS['money-core'].split('.')[0], '3');
   /* THE TWELVE IT HANDED FROM 1.8.0 TO 2.4.0 ARE THE TWELVE SPELLED OUT ABOVE, read off the bank's file, each to the
      bank's pack, and today's document hands none of them (`money-core-names-no-pack.test.ts`). */
   assert.deepEqual(Object.keys(MONEY_CORE_HANDS).sort(), HSBC);

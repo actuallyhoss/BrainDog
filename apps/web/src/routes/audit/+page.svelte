@@ -24,6 +24,7 @@
   import Waiting from '$lib/ui/Waiting.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import Face from '$lib/ui/Face.svelte';
+  import { actor } from '$lib/record/names.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import type { IconName } from '$lib/ui/icons.ts';
   /* THE URL IS NOT TYPED. `?kind=` carries whatever somebody pasted, and the words this screen
@@ -443,7 +444,7 @@
                is `whoDid`'s: a live record signs the reader's own writes with their id, and it is
                `news-live.ts` and `whoDid` between them that know the id is theirs. -->
           <span class="who">
-            <Face name={by.name} you={by.you} size="s" />
+            <Face name={by.name} you={by.you} kind={actor(e.by, me, names).kind} size="s" />
             <span class="who-name">{by.name}</span>
           </span>
           <span class="line-main">

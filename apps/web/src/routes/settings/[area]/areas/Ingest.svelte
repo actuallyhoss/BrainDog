@@ -17,7 +17,7 @@
   import Section from '$lib/ui/Section.svelte';
   import Button from '$lib/ui/Button.svelte';
   import WebhookDoors from '$lib/ui/WebhookDoors.svelte';
-  import Actions from '../../../p/[slug]/Actions.svelte';
+  import Actions from '$lib/page/panels/Actions.svelte';
   import { bareOrigin, settingsState, type AreaProps } from '../settings-state.svelte.ts';
 
   let { shell }: AreaProps = $props();

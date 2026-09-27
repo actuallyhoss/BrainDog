@@ -130,7 +130,8 @@ test('A NEW ADDRESS IS MADE NOBODY UNTIL ITS MAILBOX ANSWERS, and the proof then
   assert.ok(joined.sid, 'the new person was not signed in');
   assert.equal(joined.body.value?.email, 'bo@example.com');
   assert.deepEqual(s.accepted, [{ token: INVITE, email: 'bo@example.com', name: 'Bo Tanner' }]);
-  assert.deepEqual(s.people(), [{ email: 'bo@example.com', name: 'Bo Tanner' }]);
+  /* SPREAD, because `node:sqlite` hands rows back with a null prototype and a strict deep-equal counts the prototype. */
+  assert.deepEqual(s.people().map((p) => ({ ...p })), [{ email: 'bo@example.com', name: 'Bo Tanner' }]);
 
   /* ONCE. */
   const again = await s.call('/auth/invite', { body: { inviteToken: INVITE, accept: true, proof } });

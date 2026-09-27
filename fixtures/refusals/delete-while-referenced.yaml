@@ -1,0 +1,20 @@
+code:   DELETE_WHILE_REFERENCED
+via:    write
+raises: packages/kernel/src/referenced.ts
+at:     delete
+fix:    Point the rows that name this one elsewhere, or delete them, then delete it.
+declare: {
+    "id": "accounts", "name": "Accounts", "title": "what", "delete": "refuse_while_referenced",
+    "fields": [
+      { "id": "what", "type": "text", "required": true },
+      { "id": "within", "type": "ref", "to": "accounts" }
+    ]
+  }
+rows: [
+    { "what": "Current account" },
+    { "what": "Holiday pot", "within": "accounts#1" }
+  ]
+write: { "register": "accounts", "seq": 1, "patch": { "deleted_at": true } }
+
+# ONE LIST POINTING AT ITSELF, because the write runner installs one register (40 §6). The pot names the
+# current account through `within`, so deleting the current account is refused, naming Accounts and one row.

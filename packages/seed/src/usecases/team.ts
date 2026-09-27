@@ -42,7 +42,8 @@ export const TEAM = {
   usecase: 'team',
   /* 2.2.0: a page for each product or project in play, from Projects' template. */
   /* 2.4.0: Home's three headings stop drawing one ticket twice, and In flight says when each of its tickets is due. */
-  version: '2.4.0',
+  /* 2.4.1: Home's empty title loses its full stop, as every other title already has. */
+  version: '2.4.1',
   title: 'Team board',
   summary: 'Tickets with an owner and a status, the cycle each is in, and the work your agents took on.',
   author: 'BrainDog',
@@ -60,7 +61,7 @@ export const TEAM = {
     home: 'Team',
     right_now: 'In flight',
     needs_you: 'Waiting on a call',
-    nothing_needs_you: 'No call is waiting on you.',
+    nothing_needs_you: 'No call is waiting on you',
     since_away: 'What the team and its agents did',
     lists: 'Team lists',
   },

@@ -986,7 +986,11 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
      `<=` is neither true nor false, and it renders as a warn glyph over `NaN` with no refusal at
      all — which is precisely the class this file exists to prevent. */
   const bound = decl.target && ('lte' in decl.target ? decl.target.lte : decl.target.gte);
-  if (decl.target && typeof bound !== 'number')
+  /* A TARGET THAT NAMES A SETTING AND NO BOUND IS WAITING FOR A PERSON TO TYPE ONE, which is how a money ceiling ships:
+     it has no verdict until then (`verdictOf`), and it is not malformed (`loop/finish/contracts.md` §7.5). */
+  const shape = decl.target as { lte?: unknown; gte?: unknown; setting?: unknown } | undefined;
+  const waiting = shape !== undefined && typeof shape.setting === 'string' && shape.lte === undefined && shape.gte === undefined;
+  if (decl.target && typeof bound !== 'number' && !waiting)
     at('VALUE_MALFORMED', "target takes a number in the figure's own units: { lte: 400000 } for money in minor units", 'target');
 
   if (!decl.window) at('REQUIRED_MISSING', 'a number with no comparison window is a number you cannot act on', 'window');

@@ -51,6 +51,8 @@ import { actionsOf, callFault, flowFault, sealedAs, subjectOf } from './flow-lin
 import { BLOCK_INSTALLS, NAV_KEYS, PAGE_KEYS, PAGE_UNBUILT, keysFor, kindsReading, unreadBlockKey, unreadPageKey, wrongKindKey } from './block-keys.ts';
 /* THE KINDS THAT READ THEMSELVES, admitted into `BLOCK_KINDS` and asked to check their own blocks at install. */
 import { BLOCK_KIND_MODULES, kindModule } from './kinds/index.ts';
+/* THE PAGE WORDS THE INSTALL AND THE READ REFUSE IN ONE SENTENCE: a section's host panel, a path's short view and a roadmap's columns. */
+import { panelFault, roadmapFault, shortFault } from './kinds/words.ts';
 import type { FlowDecl } from './rules.ts';
 /* THE FORMAT, THE WINDOW AND THE TWO FIGURES THAT ARE NOT A SUM, checked here by the same functions that read them. */
 import { isMoneyFormat, windowMs } from './metrics.ts';
@@ -709,7 +711,7 @@ const REGISTER_ID = /^[a-z][a-z0-9_-]{0,31}$/u;
  */
 /* `next` IS THE FIRST OPEN STEP UNDER THE CARD, a field of the list whose rows are its steps (`pages.ts` `nextsOf`), and
    `reply` is a field drawn under the card's title in a quieter voice, the second opinion under a note. */
-const CARD_ROLES = ['title', 'figure', 'fact', 'trend', 'ring', 'who', 'when', 'mark', 'next', 'reply'] as const;
+const CARD_ROLES = ['title', 'figure', 'fact', 'trend', 'ring', 'who', 'when', 'mark', 'next', 'reply', 'hue', 'picture'] as const;
 const CARD_FACTS = 3;
 
 /** The field types a list of steps may be put in order by: lowest first. */
@@ -1030,6 +1032,16 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
     const kindFault = kindModule(kind as string)?.validate?.(block as Readonly<Record<string, unknown>>, { stage: 'install' }) ?? null;
     if (kindFault)
       return bad(kindFault.code, `${id}.${at}: ${kindFault.fix}`, kindFault.at === undefined ? at : `${at}.${kindFault.at}`, kindFault.allowed);
+
+    /* A SECTION'S HOST PANEL IS ABOUT THE PAGE'S ROW, so it is refused on a page with no `for:`; a path's short view is
+       a sentence and a label; and a roadmap over a list names the columns it places its rows by (`loop/finish/defects.md`
+       P8). The sentences are `kinds/words.ts`'s, which the read gives too. */
+    const worded =
+      panelFault((raw as { panel?: unknown }).panel, (body as { for?: unknown }).for !== undefined) ??
+      shortFault((raw as { short?: unknown }).short) ??
+      (kind === 'roadmap' ? roadmapFault(raw as Readonly<Record<string, unknown>>) : null);
+    if (worded)
+      return bad(worded.code, `${id}.${at}: ${worded.fix}`, worded.at === undefined ? at : `${at}.${worded.at}`, worded.allowed);
 
     /* WHICH OF THE PAGE'S TWO COLUMNS THE BLOCK SITS IN. A page with no `layout` has one column, so a block placed in its
        rail would be drawn where nothing says there is a rail. */
@@ -5417,6 +5429,12 @@ export function liveTarget<T extends { metric: string; format?: unknown; target?
   const { config, values } = settingsOf(m.manifest);
   const said = config[target.setting];
   const value = values[target.setting];
+  /* A SETTING NOBODY HAS TYPED IS NO TARGET, not the placeholder the declaration carries beside it: a money ceiling
+     starts empty and the figure has no verdict until a person sets one (`loop/finish/modules.md` C1). */
+  if (said !== undefined && (value === null || value === undefined)) {
+    const { lte: _lte, gte: _gte, ...rest } = target;
+    return { ...decl, target: rest };
+  }
   const currency = typeof decl.format === 'string' ? /^money\.([A-Z]{3})$/u.exec(decl.format)?.[1] : undefined;
   let bound: number | null = null;
   let typedIn: string | null = null;

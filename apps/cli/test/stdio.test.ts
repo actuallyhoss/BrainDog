@@ -255,6 +255,7 @@ const CALLS: Record<string, Record<string, unknown>> = {
   log: { spoken: 'obligations#1', note: 'Chased twice.' },
   handoff: { doing: 'Driving the tool list', next: 'Report what answered' },
   meet: { name: 'Ada', where: 'commit 4464966 in braindog' },
+  triage: { arrival: 'a1', ignore: true },
 };
 
 /** What the stub record answers each method, shaped only where a tool or a resource reads a field off it. */
@@ -275,6 +276,7 @@ const ANSWERS: Record<string, unknown> = {
   update: { spoken: 'obligations#1', version: 2 },
   handoff: { spoken: 'sessions#1' },
   meet: { person: 'people#1', created: true },
+  triage: { id: 'a1', state: 'ignored', entry: null, already: false },
   sessionsLive: { runs: [] },
   digestToday: { lines: [] },
   actions: [],
@@ -449,7 +451,10 @@ test('A HOST THAT DOES NOT ANSWER gets the unreachable sentence once the budget 
   const waited = Date.now() - started;
   assert.ok(waited >= 350, `it gave up after ${waited} ms, before its budget`);
   assert.equal(reply.result.isError, true);
-  assert.deepEqual(said(reply), { code: 'UNREACHABLE', fix: UNREACHABLE_FIX });
+  /* THE REASON RIDES IN `detail` (the client's refusal since DSN-12), beside the sentence and never as it. */
+  const { detail, ...refused } = said(reply) as { detail?: unknown };
+  assert.deepEqual(refused, { code: 'UNREACHABLE', fix: UNREACHABLE_FIX });
+  assert.equal(typeof detail, 'string');
 
   /* And while one call waits, the others are not held behind it. */
   const slow = s.ask('tools/call', { name: 'list', arguments: { register: 'hangs' } });

@@ -59,9 +59,9 @@ async function founder(): Promise<Kernel> {
   for (const m of modulesFor(u, ['people'])) {
     if (m === 'agents') continue;
     const holds = new Set([...held(k), ...firstPartyManifest(m as never).provides.flatMap((p) => (p.startsWith('register.') ? [p.slice(9)] : []))]);
-    await put(k, moduleDocument(u, m, { today: TODAY, holds }));
+    await put(k, moduleDocument(u, m, { today: TODAY, holds, examples: true }));
   }
-  await put(k, carriedDocument(u, TODAY));
+  await put(k, carriedDocument(u, TODAY, null, { examples: true }));
   return k;
 }
 

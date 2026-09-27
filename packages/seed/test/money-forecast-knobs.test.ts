@@ -35,10 +35,11 @@ async function cashAhead(): Promise<Walked> {
   return block;
 }
 
-test('CASH AHEAD OFFERS GROWTH, RATE DRIFT AND COUNTING, and not a sell knob it has no figure for', async () => {
+test('CASH AHEAD OFFERS GROWTH, RATE DRIFT, COUNTING AND SELLING, and sells nothing on a record that holds nothing to sell', async () => {
   const block = await cashAhead();
-  assert.deepEqual(block.knobs, ['horizon', 'late', 'spend', 'leave', 'grow', 'drift', 'count']);
-  assert.equal(block.sells, undefined, 'money-core names no holdings figure, so it offers nothing to sell');
+  /* `leave` FOLDED INTO `count` AT money-core 3.0.0, and `sell` offers what a pack declares `sellable`. */
+  assert.deepEqual(block.knobs, ['horizon', 'late', 'spend', 'count', 'grow', 'drift', 'sell']);
+  assert.deepEqual(block.sells, [], 'the sample holds no holdings pack, so there is nothing to sell');
 });
 
 test('EVERY INSTALMENT STEP SAYS ITS PLAN, and each plan’s steps add up to its open parts, to the minor unit', async () => {

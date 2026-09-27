@@ -201,6 +201,8 @@ export async function serveMcp<C>(
      * exactly what the caller sent.
      */
     session?: (ctx: C, said: unknown) => C;
+    /** Where this host serves the app, such as `https://brain.dog`. It is handed to `handle`, and the tools read it only to put a `decide` link on a filed question. Left out, that link is left out. */
+    origin?: string;
   } = {},
 ): Promise<Response> {
   const early = gate(request);
@@ -225,6 +227,6 @@ export async function serveMcp<C>(
   const meta = isObject(message) && isObject(message.params) && isObject(message.params._meta) ? message.params._meta : {};
   const who = options.session && Object.hasOwn(meta, 'session') ? options.session(ctx, meta.session) : ctx;
 
-  const reply = await handle(message, surface, who);
+  const reply = await handle(message, surface, who, options.origin);
   return reply === null ? bare(202) : json(statusOf(reply), reply);
 }

@@ -418,7 +418,7 @@
 
   /* THE CURSOR IS THE FOCUS RING, and only while it is the keyboard's. */
   .arrival .line:focus-visible {
-    outline: 2px solid var(--accent-text);
+    outline: 2px solid var(--focus-in);
     outline-offset: -2px;
   }
 
@@ -442,14 +442,14 @@
     background: none;
     border: 1px solid var(--edge);
     border-radius: var(--r-sm);
-    color: var(--accent-ink);
+    color: var(--on-ink);
     cursor: pointer;
     visibility: hidden;
   }
 
   .pick[data-on] {
-    background: var(--accent);
-    border-color: var(--accent-edge);
+    background: var(--on);
+    border-color: var(--on);
   }
 
   .arrival:hover .pick,

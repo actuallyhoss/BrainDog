@@ -19,6 +19,8 @@
 /* `loadSet` is a dynamic import inside that package, and the type imports erase: `set.ts` is not in
    this module's static graph, which is what the `bundle` gate measures. */
 import { CORE, loadSet, type CoreGlyph, type SetGlyph } from 'braindog-render/glyphs';
+/* The names only, never a path: `isGlyph` answers from the same set the renderer reads `{{icon:<name>}}` against. */
+import { GLYPH_NAMES, type AppGlyph } from 'braindog-render/glyphs/names';
 
 export const PATHS = {
   home: 'M4 11 12 4l8 7v8a1 1 0 0 1-1 1h-4v-5h-6v5H5a1 1 0 0 1-1-1z',
@@ -112,7 +114,7 @@ export const PATHS = {
   skill: 'M13 3 5 13.5h6L10 21l8-10.5h-6z',
   plug: 'M9 3v4M15 3v4M7 7h10v4a5 5 0 0 1-10 0zM12 16v5',
   globe: 'M12 21a9 9 0 1 1 0-18 9 9 0 0 1 0 18zM3 12h18M12 3c2.4 2.5 3.6 5.5 3.6 9s-1.2 6.5-3.6 9M12 3c-2.4 2.5-3.6 5.5-3.6 9s1.2 6.5 3.6 9',
-} as const;
+} as const satisfies Record<AppGlyph, string>;
 
 /**
  * A name a declaration may give: the app's own, then `braindog-render/glyphs`' core, then the rest of
@@ -120,60 +122,20 @@ export const PATHS = {
  * set shipped as data and nothing in the app could name it.
  *
  * `SetGlyph` IS A TYPE AND COSTS NOTHING AT RUN TIME. The paths it names are 188 strings that arrive
- * through `glyphSet()` below; only the names are carried up front, in `LATER`.
+ * through `glyphSet()` below; only the names are carried up front, in `GLYPH_NAMES` (`braindog-render/glyphs/names`).
  */
 export type IconName = keyof typeof PATHS | CoreGlyph | SetGlyph;
 
 /**
- * Every name the set holds, WITHOUT ITS PATHS, so `isGlyph` can answer synchronously.
- *
- * `iconFor` runs while a page's rail is being built and cannot wait on a network round trip, but the
- * paths are what `glyphs/index.ts` keeps behind a dynamic import so the shell does not carry all 251.
- * Measured on 24 September at brotli 11, the list below is 957 bytes and the paths it stands in for
- * are 7,440 (2,925 and 26,105 raw), so the name check costs an eighth of what carrying the set would. The
- * `satisfies` is what keeps it honest in both directions: a glyph added to `set.ts` and missing here
- * is a type error, and so is a name here that `set.ts` does not hold, because an object literal may
- * not carry a key its declared type has no room for.
- */
-const LATER = {
-  'list-todo': 1, flag: 1, milestone: 1, target: 1, 'calendar-days': 1, 'calendar-check': 1, hourglass: 1,
-  timer: 1, repeat: 1, 'circle-check': 1, 'circle-dot': 1, pause: 1, rocket: 1, wrench: 1, package: 1, truck: 1,
-  'list-checks': 1, 'list-ordered': 1, list: 1, 'square-kanban': 1, 'flag-triangle-right': 1, goal: 1,
-  'clipboard-list': 1, 'clipboard-check': 1, 'receipt-text': 1, wallet: 1, landmark: 1, 'credit-card': 1,
-  coins: 1, 'piggy-bank': 1, percent: 1, calculator: 1, scale: 1, 'trending-up': 1, 'trending-down': 1,
-  'arrow-down-left': 1, 'arrow-up-right': 1, 'hand-coins': 1, 'badge-pound-sterling': 1, 'badge-dollar-sign': 1,
-  'badge-euro': 1, 'pound-sterling': 1, 'dollar-sign': 1, euro: 1, 'chart-no-axes-column': 1,
-  'calendar-clock': 1, 'calendar-plus': 1, 'calendar-x': 1, 'calendar-range': 1, 'alarm-clock': 1,
-  'clock-alert': 1, 'clock-arrow-up': 1, user: 1, 'user-plus': 1, 'user-check': 1, 'user-x': 1, contact: 1,
-  handshake: 1, briefcase: 1, building: 1, 'building-2': 1, store: 1, factory: 1, 'loader-circle': 1,
-  'lock-open': 1, 'shield-check': 1, 'shield-alert': 1, 'octagon-alert': 1, 'circle-x': 1, 'circle-alert': 1,
-  'circle-pause': 1, 'circle-play': 1, 'circle-stop': 1, 'circle-slash': 1, 'circle-dashed': 1,
-  'circle-plus': 1, 'circle-minus': 1, circle: 1, file: 1, 'file-spreadsheet': 1, 'file-image': 1,
-  'file-plus': 1, 'file-check': 1, 'file-x': 1, paperclip: 1, folder: 1, 'folder-open': 1, image: 1, files: 1,
-  mail: 1, 'mail-open': 1, 'message-square': 1, 'message-circle': 1, 'messages-square': 1, phone: 1, send: 1,
-  'at-sign': 1, 'bell-off': 1, reply: 1, forward: 1, megaphone: 1, server: 1, database: 1, cloud: 1, cpu: 1,
-  terminal: 1, 'git-branch': 1, 'git-pull-request': 1, 'git-merge': 1, 'git-commit-horizontal': 1,
-  'hard-drive': 1, 'chart-line': 1, 'chart-column': 1, 'chart-pie': 1, gauge: 1, 'chart-area': 1,
-  'chart-bar': 1, 'chart-no-axes-combined': 1, minus: 1, 'chevron-left': 1, 'chevron-up': 1,
-  'chevrons-up-down': 1, 'arrow-up-down': 1, move: 1, laptop: 1, smartphone: 1, tags: 1, 'layout-list': 1,
-  'eye-off': 1, upload: 1, 'rotate-ccw': 1, 'refresh-cw': 1, 'ellipsis-vertical': 1, 'map-pin': 1, map: 1,
-  compass: 1, navigation: 1, bookmark: 1, heart: 1, 'thumbs-up': 1, 'thumbs-down': 1, pin: 1, 'link-2': 1,
-  hash: 1, 'list-filter': 1, 'arrow-up-narrow-wide': 1, 'arrow-down-wide-narrow': 1, cog: 1, 'settings-2': 1,
-  'log-in': 1, 'log-out': 1, menu: 1, 'panel-left': 1, share: 1, 'share-2': 1, printer: 1, save: 1, 'undo-2': 1,
-  'redo-2': 1, 'maximize-2': 1, 'minimize-2': 1, expand: 1, shrink: 1, music: 1, video: 1, camera: 1, mic: 1,
-  headphones: 1, book: 1, 'book-open': 1, 'notebook-pen': 1, 'graduation-cap': 1, 'heart-pulse': 1,
-  stethoscope: 1, car: 1, plane: 1, 'train-front': 1, bike: 1, 'shopping-cart': 1, 'shopping-bag': 1, gift: 1,
-  ticket: 1, utensils: 1, coffee: 1, dumbbell: 1, leaf: 1, sprout: 1, 'tree-pine': 1,
-} as const satisfies Record<SetGlyph, 1>;
-
-/**
  * Whether `name` is a glyph this build can draw, now or once the set arrives.
  *
- * `Object.hasOwn`, NOT `in`: a declaration is text a stranger wrote, and `constructor` in an `icon:`
- * would otherwise be found on the prototype and handed to the drawer as a name.
+ * ONE LIST, `GLYPH_NAMES`, answers this and the renderer's `{{icon:<name>}}` alike, so a name is nameable in
+ * text exactly when an `icon:` key can draw it. It carries the names WITHOUT THEIR PATHS, so this answers
+ * synchronously while a rail is built and the shell does not carry the set. A `Set`, NOT AN OBJECT: a declaration
+ * is text a stranger wrote, and `constructor` in an `icon:` would otherwise be found on a prototype and handed to
+ * the drawer as a name.
  */
-export const isGlyph = (name: string): name is IconName =>
-  Object.hasOwn(PATHS, name) || Object.hasOwn(CORE, name) || Object.hasOwn(LATER, name);
+export const isGlyph = (name: string): name is IconName => GLYPH_NAMES.has(name);
 
 /** The set once it has arrived, so an `Icon` mounted afterwards draws at once rather than waiting. */
 let arrived: Readonly<Record<string, string>> | undefined;
@@ -195,7 +157,7 @@ export const glyphSetNow = (): Readonly<Record<string, string>> | undefined => a
 /**
  * The path for `name`, in the order the app has always drawn: its own map first, so `home`, `search`
  * and `inbox` keep the shape the rail has had, then the core, then the set if it has arrived.
- * Undefined means "not yet", and only ever for a name in `LATER`: `isGlyph` has refused everything else.
+ * Undefined means "not yet", and only ever for a name only the set holds: `isGlyph` has refused everything else.
  */
 export const pathOf = (name: IconName, set: Readonly<Record<string, string>> | undefined): string | undefined =>
   Object.hasOwn(PATHS, name)

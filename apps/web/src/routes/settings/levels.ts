@@ -80,4 +80,8 @@ export const words = {
    * this names the ceiling and the remedy and claims nothing about the reader's level.
    */
   ownersOnly: 'Only an owner of this record can do this. Ask an owner to raise your access, or to do it for you.',
+  /* THE SAME TWO SENTENCES WHERE THEY ARE AN EMPTY STATE: a title takes no full stop, so the first is the title and the
+     second its body. */
+  ownersOnlyTitle: 'Only an owner can do this',
+  ownersOnlyHow: 'Ask an owner to raise your access, or to do it for you.',
 } as const;

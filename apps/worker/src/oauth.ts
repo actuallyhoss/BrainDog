@@ -125,9 +125,10 @@ const REFUSED: Record<401 | 403 | 429 | 503, string> = {
 async function mintOn(record: RecordCalls, origin: string, ctx: CallContext, args: { scope: OAuthScope; label: string; days: number }): Promise<Minted> {
   const asked = new Request(`${origin}/api/createToken`, { method: 'POST', headers: [['content-type', 'application/json']], body: JSON.stringify(args) });
   const out = await record.fetch(inward(asked, ctx));
-  let said: { ok?: unknown; value?: { bearer?: unknown }; refusal?: { fix?: unknown } } | null = null;
+  type Said = { ok?: unknown; value?: { bearer?: unknown }; refusal?: { fix?: unknown } };
+  let said: Said | null = null;
   try {
-    said = (await out.json()) as typeof said;
+    said = (await out.json()) as Said | null;
   } catch {
     said = null;
   }

@@ -101,8 +101,8 @@ export const LOG_BYTES = 8 * 1024;
  *
  * THE CEILING AND NOT THE DEFAULT OF 200, for the reason `FETCHES_UNSAID` in `actions.ts` gives: both are copies, and
  * if the sandbox's default is ever raised a copied default would refuse every honest run above the old number, where a
- * copied ceiling still holds the line no declaration can move. It also caps a declared `limits.writes`, because the
- * kernel installs any whole number there and only the sandbox refuses one above 1,000. Audit thirty-four measured
+ * copied ceiling still holds the line no declaration can move. It also caps a declared `limits.writes` on a script
+ * installed before `scriptBody` refused one over `SCRIPT_CEILINGS` (`script.ts`). Audit thirty-four measured
  * 5,000 creates from a script with no limit applied in one transaction of 1.0 to 3.4 seconds, and on a Durable Object
  * that is the record's one thread.
  */

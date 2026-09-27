@@ -44,9 +44,9 @@ test("THE COUNT ON SCREEN IS THE RECORD'S COUNT, and not the page the record was
   assert.equal(out.from, 'live');
   if (out.from !== 'live') return;
 
-  /* WHAT THE GROUP HEADING AND ITS DOOR PRINT. `copy.allIn(140, 'Obligations')` reads "All 140 in
-     Obligations", which is a true sentence about a door that opens on all 140; at 94 it was a false
-     one about a list the reader had no way to know was cut. */
+  /* WHAT THE GROUP HEADING AND ITS DOOR PRINT. The door reads "Show all 140" (`/search`'s `showAll`), which is a true
+     sentence about a door that opens on all 140; at 94 it was a false one about a list the reader had no way to know
+     was cut. */
   assert.deepEqual(
     out.value.groups.map((g) => [g.kind, g.total]),
     [

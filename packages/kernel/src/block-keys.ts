@@ -64,7 +64,9 @@ export const KEY_KINDS: Readonly<Record<string, readonly string[]>> = {
   fold: ['section'],
   icon: ['section'],
   box: ['section'],
+  panel: ['section'],
   tiles: ['queue'],
+  short: ['steps'],
   register: ['capture', 'inputs'],
   series: ['series'],
   net: ['series'],
@@ -80,6 +82,7 @@ export const KEY_KINDS: Readonly<Record<string, readonly string[]>> = {
   versions: ['diff'],
   field: ['diff'],
   row: ['diff', 'inputs'],
+  about: ['table', 'cards'],
   of: ['ring'],
 };
 
@@ -119,9 +122,11 @@ const READ_BY: Readonly<Record<string, readonly string[]>> = (() => {
  * `open: 2` counted the open steps of a list the reader may not open.
  */
 export const ANSWER_KEYS: readonly string[] = [
-  'drawn', 'rows', 'matched', 'readings', 'walk', 'walks', 'walkFx', 'refusals', 'inherited', 'scopes', 'feed', 'seen',
-  'history', 'values', 'bars', 'measures', 'past', 'changes', 'working_now', 'lateness', 'late_name', 'sells', 'fx',
+  'drawn', 'rows', 'matched', 'readings', 'walk', 'walks', 'walkFx', 'refusals', 'inherited', 'scopes',
+  'scope_marks', 'feed', 'seen', 'history', 'values', 'bars', 'measures', 'past', 'changes', 'working_now', 'lateness',
+  'late_name', 'sells', 'fx',
   'fills', 'rings', 'queue', 'nexts', 'done_now', 'next', 'open', 'types', 'home',
+  'short_now', 'window', 'files',
 ];
 
 /**

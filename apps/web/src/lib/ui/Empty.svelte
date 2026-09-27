@@ -17,6 +17,8 @@
   import type { Snippet } from 'svelte';
 
   import Icon from './Icon.svelte';
+  import { inline } from 'braindog-render';
+  import { Text } from 'braindog-render/svelte';
   import { drew, undrew } from './screen.svelte.ts';
   import type { IconName } from './icons.ts';
 
@@ -35,6 +37,7 @@
     compact = false,
     glyph,
     detail,
+    icon,
   }: {
     kind: EmptyKind;
     title: string;
@@ -78,6 +81,12 @@
      * transport's words one press away for whoever reports the fault.
      */
     detail?: string | undefined;
+    /**
+     * The host's glyph drawings, for a title an AUTHOR wrote (a block's `empty:`), so `{{icon:rocket}} shipped` draws
+     * the rocket rather than its braces (PGS-4). Absent, the title is drawn as the plain text it always was, which is
+     * every title typed in `copy`.
+     */
+    icon?: ((name: string) => string | null) | undefined;
   } = $props();
 
   /**
@@ -138,9 +147,9 @@
 <div class="empty" data-kind={kind} class:compact>
   {#if shown && !compact}<span class="empty-glyph" aria-hidden="true"><Icon name={shown} size="xl" /></span>{/if}
   {#if heading}
-    <h1 class="empty-title">{title}</h1>
+    <h1 class="empty-title">{#if icon}<Text nodes={inline(title, { icon })} opts={{ icon }} />{:else}{title}{/if}</h1>
   {:else}
-    <p class="empty-title">{title}</p>
+    <p class="empty-title">{#if icon}<Text nodes={inline(title, { icon })} opts={{ icon }} />{:else}{title}{/if}</p>
   {/if}
   {#if body}<p class="empty-body">{body}</p>{/if}
   {#if lines?.length}
@@ -167,7 +176,9 @@
     </p>
   {/if}
   {#if agentPrompt}
-    <p class="empty-agent">Or ask your assistant:</p>
+    <!-- "YOUR AGENT", NOT SLASH: the prompt under it is a line to paste into an agent outside BrainDog (Claude Code, a
+         terminal), which Slash cannot run, so naming Slash here would promise something untrue. -->
+    <p class="empty-agent">Or ask your agent:</p>
     <pre class="empty-prompt"><code>{agentPrompt}</code></pre>
   {/if}
   {#if actions}<div class="empty-actions">{@render actions()}</div>{/if}

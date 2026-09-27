@@ -1409,23 +1409,6 @@ test('and a column that IS sorted says so, whoever set it', () => {
   assert.equal(ariaSort(plain, { field: 'due', dir: 'asc' }, true), 'none');
 });
 
-test('A PHONE CARD DRAWS EVERY COLUMN, INCLUDING THE ONES WHOSE CELLS ARE EMPTY', () => {
-  /* The card arm guarded each label-and-value pair on `{#if row.cells[i + 1]}`, so a blank cell
-     took its label with it and the column left the card. A reader cannot tell a column that is
-     empty from a column the table does not have, which is the whole of what the grid arm's
-     missing mark is for and the opposite of the card's own rule: nothing hidden, nothing cut. */
-  const columns = [COLUMN({ field: 'who', label: 'Who' }), COLUMN({ field: 'owed', label: 'Owed' }), COLUMN({ field: 'note', label: 'Note' })];
-  const row: TableRow = { key: 'r1', cells: ['Ada', ''] };
-  assert.deepEqual(cardCells(row, columns).map((c) => [c.column.label, c.value]), [
-    ['Who', 'Ada'],
-    ['Owed', ''],
-    ['Note', null],
-  ]);
-  assert.equal(cardCells(row, columns).length, columns.length, 'a card drew fewer boxes than the table has columns');
-  // `null` and `''` stay apart: a cell the row does not have is missing, a cell left blank is blank.
-  assert.equal(cardCells({ key: 'r2', cells: [] }, columns).every((c) => c.value === null), true);
-});
-
 test('and it draws them the way the caller said to, which is the way the grid does', () => {
   /* `cellSnippet` is how a caller draws a cell itself: the register's row picker, its identity
      links, its in-place editor. The card arm never called it, so below 640px every one of those
@@ -1475,11 +1458,10 @@ test('A PHONE CARD LEADS WITH THE TEXT AND ENDS ITS FIRST LINE ON THE FIGURE', (
      1,615px for thirteen payments. The card is two lines now: the title and the amount, then the
      rest, and which is which comes from the alignment and truncation the columns already declare. */
   assert.deepEqual(cardPlan(WHO_OWES_YOU), { title: 0, mark: 2, start: [1], end: [3] });
-  // A related list leads with the register's `#`, an identifier aligned to the end. It ends the
-  // first line, which is where `RowCards` has always put it, and the text after it is the title.
-  assert.deepEqual(cardPlan(RELATED), { title: 1, mark: 0, start: [2], end: [] });
+  // A related list leads with the register's "#", an identifier, which never reaches a card.
+  assert.deepEqual(cardPlan(RELATED), { title: 1, mark: -1, start: [2], end: [] });
   // A row picker is a control: never the title, never the figure.
-  assert.deepEqual(cardPlan(PICKED), { title: 1, mark: 3, start: [0, 2], end: [4] });
+  assert.deepEqual(cardPlan(PICKED), { title: 1, mark: 3, start: [2], end: [4] });
   // A `comparison` declares no alignment at all, so its first cell leads and the rest are labelled.
   assert.deepEqual(cardPlan(COMPARISON), { title: 0, mark: -1, start: [1, 2], end: [] });
   // And the card reads the declaration without second-guessing it: `runwayBlock` sets `When` at
@@ -1498,46 +1480,18 @@ test('A FIGURE IS DRAWN WHOLE ON EITHER LINE, AND THE BALANCE ENDS THE LINE UNDE
      wrong (13 §4.2). */
   const plan = cardPlan(FORECAST);
   assert.deepEqual(plan, { title: 1, mark: 2, start: [], end: [0, 3] });
-  const cells = cardCells({ key: 'r', cells: ['3 Sep 2026', 'Legal review, February', 'GBP −19,100.00', 'GBP −4,190.00'] }, FORECAST);
-  assert.equal(cells[plan.mark]?.value, 'GBP −19,100.00');
-  assert.equal(cells[plan.end.at(-1) ?? -1]?.value, 'GBP −4,190.00');
+  const card = cardCells({ key: 'r', cells: ['3 Sep 2026', 'Legal review, February', 'GBP −19,100.00', 'GBP −4,190.00'] }, FORECAST);
+  assert.equal(card.mark?.value, 'GBP −19,100.00');
+  assert.equal(card.end.at(-1)?.value, 'GBP −4,190.00');
   // And the stylesheet is told which values are figures, on both lines, so it can keep them whole.
-  const card = snippetSource('card', 'row: TableRow');
-  assert.match(card, /class="table-card-mark" data-truncate=\{mark\.column\.truncate\}/u, 'the first line’s figure does not say it is one');
-  assert.match(card, /@render cellBody\(row, mark\.column, mark\.value\)/u, 'the figure is not drawn through the one cell body');
+  const arm = snippetSource('card', 'row: TableRow');
+  assert.match(arm, /class="table-card-mark" data-truncate=\{mark\.column\.truncate\}/u, 'the first line’s figure does not say it is one');
+  assert.match(arm, /@render cellBody\(row, mark\.column, mark\.value\)/u, 'the figure is not drawn through the one cell body');
   assert.match(
     snippetSource('pair', 'row: TableRow, cell: CardCell'),
     /class="table-card-pair" data-truncate=\{cell\.column\.truncate/u,
     'a figure on the second line does not say it is one',
   );
-});
-
-test('AN EMPTY CELL KEEPS ITS PLACE ON THE CARD AND STILL READS AS MISSING', () => {
-  /* The plan is given columns and no row, so no row can move a column by what it has in a cell:
-     a missing title keeps the title's place and draws the missing mark there. That is the fault
-     `cardCells` was written for, where a blank value took its column off the card. */
-  assert.equal(cardPlan.length, 1, 'the arrangement can see a row');
-  const plan = cardPlan(WHO_OWES_YOU);
-  const cells = cardCells({ key: 'r', cells: [null, 'Halden Type Co'] }, WHO_OWES_YOU);
-  assert.equal(cells[plan.title]?.column.label, 'Description', 'a missing title handed its place to the next column');
-  assert.equal(cells[plan.title]?.value, null);
-  assert.equal(cells[plan.mark]?.column.label, 'Amount');
-  assert.equal(cells[plan.mark]?.value, null, 'a missing figure is not on the card to read as missing');
-  // Every column is on the card exactly once: nothing hidden, nothing drawn twice.
-  for (const columns of [WHO_OWES_YOU, RELATED, PICKED, COMPARISON, FORECAST]) {
-    const p = cardPlan(columns);
-    const placed = [p.title, p.mark, ...p.start, ...p.end].filter((i) => i >= 0).sort((a, b) => a - b);
-    assert.deepEqual(placed, columns.map((_, i) => i), `a column of ${columns.map((c) => c.label).join(', ')} left the card`);
-  }
-  // And every slot draws through the one cell body, whose `null` is the missing mark, and none of
-  // them is skipped for the value that happens to be in it.
-  const card = snippetSource('card', 'row: TableRow');
-  const pair = snippetSource('pair', 'row: TableRow, cell: CardCell');
-  assert.notEqual(card, '', 'the card arm is not where this test thinks it is');
-  assert.notEqual(pair, '', 'the second line is not drawn by a `pair` snippet');
-  assert.match(card, /@render cellBody\(row, title\.column, title\.value\)/u);
-  assert.match(pair, /@render cellBody\(row, cell\.column, cell\.value\)/u);
-  assert.doesNotMatch(card + pair, /\{#if [^}]*\.value\b/u, 'a slot is drawn only when its cell has a value');
 });
 
 

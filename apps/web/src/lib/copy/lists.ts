@@ -203,7 +203,6 @@ export const lists = {
   archiveSelected: 'Archive them',
   saveAsView: 'Save as a view',
   editRow: 'Edit',
-  showExample: 'Show an example row',
   /* `Preview` AND IT WAS `Peek`. It is printed as a keyboard hint on every list, `p peek`, which is
      a word the product invented for a thing every other product calls a preview. */
   peek: 'Preview the row',
@@ -214,11 +213,7 @@ export const lists = {
   /* `example`, THE BARE LOWER-CASE WORD, IS THE RECORD'S AND NOT THIS FILE'S. It is the tag a seeded
      row carries in its `tags` field, declared once in `record/tags.ts` as `EXAMPLE`, and it reaches
      a reader from the record rather than from here: `shownTags` keeps it on a plain example row and
-     the row page draws the list through `listLine` (`r/[register]/[seq]/+page.svelte:225`). The one
-     sentence this file types near it is `markExample` below, and that is a narrower thing than the
-     excuse claimed: it is the receipt chip on the single row the empty state's offer writes
-     (`r/[register]/+page.svelte:1116` into `addLanded` at `:930`), and `receipts` is emptied
-     whenever the question changes (`:270`), so no seeded example row has ever worn it. Held here as
+     the row page draws the list through `listLine` (`r/[register]/[seq]/+page.svelte`). Held here as
      well, the bare word was a second name for a value the record defines, which is how the chip and
      the data drift apart. `dead-copy` excused it as the chip that mark would render. */
   stale: 'Stale',
@@ -239,10 +234,6 @@ export const lists = {
   viewTitle: (list: string, reads: string) => `${list}: ${reads}`,
   viewSaved: (title: string) => `Saved ${title}. It is under Views.`,
   viewNeedsFilter: 'Filter or search the list first. What is on screen is what a view saves.',
-  /* An example row that is a real row: it is named as one, so nobody has to wonder which of these they typed. */
-  exampleTitle: (one: string) => `Example ${one}`,
-  exampleAdded: (one: string) => `Added an example ${one}. Put it back if you do not want it.`,
-  markExample: 'Example',
   /* Lane I */
   /**
    * EDITING A ROW WHERE IT IS READ, which is the half this screen did not have.

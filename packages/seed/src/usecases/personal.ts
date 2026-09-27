@@ -140,8 +140,10 @@ export const PERSONAL = {
   /* 1.3.0: the Projects page went, so the rail has one Projects Overview, and its next steps are on Home.
      1.5.0: Personal lays its own roles on People through `extends`, and the relabels of the studio's roles went.
      1.6.0: the studio's roles are relabelled in a household's words that are not its own five.
-     1.7.0: the `registrar` label went, because People 2.0.0 no longer offers the value it read. */
-  version: '1.7.0',
+     1.7.0: the `registrar` label went, because People 2.0.0 no longer offers the value it read.
+     1.7.1: Home's empty title loses its full stop, as every other title already has; a record is offered the words
+     only when the version goes up. */
+  version: '1.7.1',
   title: 'Personal',
   summary: 'Your money and bills, what you are saving for, and the projects and goals you care about.',
   author: 'BrainDog',
@@ -160,7 +162,7 @@ export const PERSONAL = {
     home: 'Day to day',
     right_now: 'This month',
     needs_you: 'Worth a look',
-    nothing_needs_you: 'Nothing needs you right now.',
+    nothing_needs_you: 'Nothing needs you right now',
     since_away: 'Since you last looked',
     lists: 'My lists',
   },
@@ -778,6 +780,10 @@ const gbp = (pence: number) => ({ amount: pence, currency: 'GBP' });
  * WHAT GOOD LOOKS LIKE ON MONEY'S FIGURES FOR ONE PERSON, in place of a studio's. Money's own targets are a business's
  * ("no more than £50,000.00" going out in 30 days), which on a person's Overview read as though the record were somebody
  * else's. The use case installs Money with these, by metric, in pence; a figure left out keeps Money's.
+ *
+ * SINCE money-core 3.0.0 ONLY `days-late-in` TAKES: a money setting holds `{ amount, currency }`, these sums are in no
+ * currency, and so a sum of money starts empty (`moduleDocument` in `install.ts`). The sums stay here as the sizes a
+ * person's record is drawn at, for whoever gives a use case a currency.
  */
 export const PERSONAL_TARGETS: Readonly<Record<string, { lte: number } | { gte: number }>> = {
   'out-30d': { lte: 250_000 },

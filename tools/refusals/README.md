@@ -429,10 +429,9 @@ this file instead.
 
 The `install` family is driven by `packages/record/test/refusals-install.test.ts` and not from this
 file, for the reason `write` is: `40 §6` puts it in `record/test`, and five of its thirteen need a
-SQLite record. Sixteen fixtures: thirteen driven, and `contrast-floor`, `intent-inseparable` and
-`theme-ladder-order` skipped by name, because `packages/theme/src/checks.ts` is on no install path
-(`loop/research-via-runners.md` §2 finding 3). The test asserts the count, so a seventeenth arrives
-red. Each fixture carries its own `pack:`, `installed:` (the packs already on the record, each a whole
+SQLite record. Every fixture in the family is driven; the three that name `packages/theme/src/checks.ts`
+go through a real record, whose `planPack` reads every pack through `packages/record/src/theme-check.ts`.
+The test asserts the count, so a new one arrives red until it is counted. Each fixture carries its own `pack:`, `installed:` (the packs already on the record, each a whole
 manifest) and `facts:` (`rows`, `format`, `primitives`, `disabled`); nothing is borrowed, so there is
 no `install-inputs.json` and there should not be one.
 

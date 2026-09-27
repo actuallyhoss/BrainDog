@@ -196,7 +196,7 @@ export async function readShareToken(key: Uint8Array, token: string, now: number
   if (bytes === null) return null;
   let claim: unknown;
   try {
-    claim = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+    claim = JSON.parse(new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(bytes));
   } catch {
     return null;
   }

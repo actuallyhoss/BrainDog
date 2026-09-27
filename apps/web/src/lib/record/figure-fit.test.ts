@@ -23,14 +23,12 @@
  * solved against Windows alone. `MARGIN` below makes every figure fit with two per cent of its own
  * width to spare in whichever face the run draws, so the Linux runner holds the wider face to it too.
  *
- * AND FINDING 6 IS ANSWERED HERE TOO, IN THE SECOND TEST, FOR THE SAME REASON. That finding is that
- * the commit's message puts the defect on a phone at 390px where the diff changes nothing at 390, 360
- * or 320, and that what it really repairs is a narrow slot between 900 and 1180. The honest repair
- * would be the sentence over the rule, and `+page.svelte` was not this run's file to edit, so the
- * correction is made the way that cannot go stale: the second test lifts the rule back out of the
- * cascade and measures both claims. In the narrow slot the figures come back cut by 52.2px, 31.7px
- * and 5.7px. On a phone, not one value moves. A reader who believes the message will be corrected by
- * a test run rather than by another paragraph.
+ * FINDING 6 WAS ANSWERED HERE TOO, BY A TEST THAT IS GONE. That finding is that the commit's message
+ * put the defect on a phone at 390px where the diff changed nothing, and that what it really repaired
+ * was a narrow slot between 900 and 1180. A test lifted the rule back out and measured the figures
+ * cut again in that slot. Since DSN-8 a stat under 480px of block draws as rows, label on the left and
+ * figure on the right, so nothing in that slot is cut with or without the rule, and that test was
+ * retired: the first test below still holds that no figure is cut at any width.
  *
  * WHY A BROWSER AND NOT A CLASS NAME. The defect is ink wider than a box. Asserting that a rule
  * exists, or that an element carries a class, says nothing about either: the whole chain from
@@ -154,8 +152,11 @@ function componentCss(path: string): string {
   return unglobal(src.slice(open + '<style>'.length, close));
 }
 
-const ROUTE = 'apps/web/src/lib/page/PageView.svelte';
-const routeCss = componentCss(ROUTE);
+/* THE PAGE IS THREE COMPONENTS SINCE PGS-1 SPLIT IT: the frame, the grid of slots (where `.page`, `.block-slot` and the
+   money step live) and one block's slot, in the order the frame mounts them. */
+const routeCss = ['apps/web/src/lib/page/PageView.svelte', 'apps/web/src/lib/page/PageBody.svelte', 'apps/web/src/lib/page/BlockSlot.svelte']
+  .map(componentCss)
+  .join('\n');
 const shellCss = componentCss('apps/web/src/routes/+layout.svelte');
 const blocksCss = read('apps/web/src/lib/blocks.css');
 
@@ -226,13 +227,13 @@ const BANDS = [FLOOR, ...EDGES].map((from, i) => ({ from, to: (EDGES[i] ?? CEIL 
  * route's money threshold is one of these and is not named here, so moving it from 280 to 288 moved
  * every width probed below without an edit to this list.
  */
-const STEPS = [...new Set([...guards(blocksCss, '@container (inline-size < '), ...guards(routeCss, '@container (inline-size < ')].map((g) => g.px))].sort(
+const STEPS = [...new Set([...guards(blocksCss, '@container (inline-size < '), ...guards(blocksCss, '@container stat (inline-size < '), ...guards(routeCss, '@container (inline-size < ')].map((g) => g.px))].sort(
   (a, b) => a - b,
 );
 
 /**
  * THE ROUTE'S MONEY STEP, NAMED ONLY WHERE A TEST HAS TO FIND THAT ONE RULE: the first test checks it
- * is still in the cascade and the second lifts it out. It was 280 until the first Linux run cut
+ * is still in the cascade. It was 280 until the first Linux run cut
  * `£22,600.00` in the 124px cell it left, and it is 288 because two cells of the Linux face's 125.2px
  * ink with two per cent to spare need 287.4px, while a 320px phone's slot is exactly 288px and must
  * not stack. 286 passed here and would have failed on the runner: 127px cells leave 1.4 per cent.
@@ -496,79 +497,6 @@ test('NO MONEY FIGURE A DECLARED PAGE DRAWS IS CUT, AT ANY WIDTH THE APP CAN PUT
   const closest = tight.reduce((a, b) => (b.room < a.room ? b : a));
   t.diagnostic(`the closest call on the shipped record: ${say(closest)}`);
   assert.ok(closest.room >= -SLACK, `the closest call is past the ${SLACK}px of slack: ${say(closest)}`);
-});
-
-/**
- * WHERE THE DEFECT WAS, AND WHERE IT WAS NOT, WHICH IS THE OTHER FINDING.
- *
- * `60c6b817`'s message says the figure was found cut in a marketing screenshot at 390px.
- * `research-batch-five-audit.md` finding 6 is that the commit changes nothing at 390, 360 or 320 and
- * that what it repairs is a narrow slot between 900 and 1180. Both halves of that are measurements,
- * so both are taken here rather than written down: the repair is lifted out of the cascade and the
- * same pages are drawn again at the app's own slot widths. In the narrow slot, figures come back
- * cut. On a phone, not one value moves.
- *
- * IT LOCATES THE RULE BY THE THRESHOLD IT READS OUT OF THE STYLESHEET, so this test follows the
- * repair if it is rewritten and goes red if it is deleted. And the phone half is held as every
- * value being IDENTICAL rather than as nothing being cut, because nothing is cut on a phone either
- * way: a test that only asked whether the figures fit would pass on a phone the repair had quietly
- * restacked, which is the claim finding 6 is actually about.
- */
-test('THE CUT FIGURE WAS A NARROW SLOT ON A LAPTOP AND NEVER A PHONE, WITH THE REPAIR TAKEN BACK OUT', async (t) => {
-  const money = guards(routeCss, '@container (inline-size < ').filter((g) => g.px === MONEY);
-  assert.equal(money.length, 1, `the route declares ${money.length} container queries at ${MONEY}px, and this test is about exactly one`);
-  const without = routeCss.slice(0, money[0]!.start) + routeCss.slice(money[0]!.end);
-  assert.ok(!without.includes(`inline-size < ${MONEY}px`), 'the repair is still in the cascade it was lifted out of');
-  /* THE ONE CASCADE WITH ONE RULE TAKEN OUT OF IT, and derived from `CASCADE` by substitution rather
-     than reassembled from the sheets, because the two halves of this comparison have to differ in
-     exactly that rule and nothing else. Reassembled, they drifted: a rule added to `CASCADE` while
-     this was being written reached one side and not the other, and the phone comparison below failed
-     on a difference this test had introduced itself. */
-  const bareCascade = CASCADE.replace(routeCss, without);
-  assert.ok(!bareCascade.includes(`inline-size < ${MONEY}px`), 'the repair survived the substitution, so both sides of this comparison are the same cascade');
-  assert.equal(bareCascade.length, CASCADE.length - (money[0]!.end - money[0]!.start), 'the substitution changed more than the one rule it was meant to');
-
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
-  const view = await browser.newPage({ viewport: { width: 1180, height: 900 } });
-
-  const narrow = Math.min(...SPANS);
-  const grids = GRIDS.filter((g) => g.span === narrow);
-  assert.ok(grids.length > 0, `no stat block is laid out at ${narrow} twelfths, so this test is about a block that is gone`);
-
-  /* THE LAPTOP WINDOWS THE AUDIT NAMES, with the slot read off the page at each rather than quoted:
-     a `span: 4` block measures 174px at 900, 215px at 1024 and 267px at 1180. */
-  for (const window of [900, 1024, 1180]) {
-    const slot = Math.round((await geometry(view, window)).get(narrow) ?? 0);
-    await view.setViewportSize({ width: window, height: 900 });
-    const probes = grids.map((g) => pinned(g, slot)).join('');
-    const on = await measured(view, probes);
-    assert.deepEqual(on.cut.map(say), [], `the repair is in the cascade and a figure is still cut in the ${slot}px slot a ${window}px window gives it`);
-    const off = await measured(view, probes, bareCascade);
-    assert.ok(
-      off.cut.length > 0,
-      `with the repair lifted out, nothing is cut in the ${slot}px slot a ${window}px window gives a ${narrow}-twelfth block, so the repair is not what keeps that width whole`,
-    );
-    t.diagnostic(`a ${window}px window, ${slot}px slot: without the repair, ${off.cut.map(say).join(' · ')}`);
-  }
-
-  /* AND THE PHONE, WHICH THE MESSAGE NAMED AND THE DIFF NEVER TOUCHED. Below 900 the rail is gone
-     and `.block-slot` takes `grid-column: auto`, so the slot IS the page: 288px at 320 and 358px at
-     390, both above the threshold, so the rule cannot fire at either end of a phone's range. */
-  for (const window of [320, 360, 390]) {
-    const slot = Math.round((await geometry(view, window)).get(narrow) ?? 0);
-    await view.setViewportSize({ width: window, height: 900 });
-    const probes = GRIDS.map((g) => pinned(g, slot)).join('');
-    const on = await measured(view, probes);
-    const off = await measured(view, probes, bareCascade);
-    assert.deepEqual(off.cut.map(say), [], `a figure is cut at a ${window}px window with the repair lifted out, so the phone had a defect of its own`);
-    assert.deepEqual(
-      off,
-      on,
-      `lifting the repair out changes what a ${window}px window draws in its ${slot}px slot, so 60c6b817 did touch the phone after all`,
-    );
-    t.diagnostic(`a ${window}px window, ${slot}px slot: identical with and without the repair, closest call ${on.tightest ? say(on.tightest) : 'none'}`);
-  }
 });
 
 /**

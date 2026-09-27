@@ -75,8 +75,14 @@ export const PRELUDE = `(function (host) {
         host.log(words(parts));
       },
       record: freeze({
-        list: (register, where) =>
-          host.list(String(register), stringify(where === undefined ? null : where)).then(parse),
+        list: (register, where, options) =>
+          host
+            .list(
+              String(register),
+              stringify(where === undefined ? null : where),
+              stringify(options === undefined ? null : options),
+            )
+            .then(parse),
         get: (spoken) => host.get(String(spoken)).then(parse),
       }),
     });

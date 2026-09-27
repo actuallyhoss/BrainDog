@@ -16,7 +16,7 @@
  * everything they print comes back from here. No import from the app: this package is MIT and embeddable.
  */
 
-import { MISSING } from './format.ts';
+import { MISSING, axisFigure } from './format.ts';
 import { signedOf } from './bridge.ts';
 import { figureLike } from './figure.ts';
 
@@ -189,8 +189,8 @@ export function linesPlan(rows: readonly (readonly string[])[]): LinesPlan {
     lines,
     points,
     ticks,
-    top: every.length ? figureLike(template, hi) : '',
-    bottom: every.length && span > 0 ? figureLike(template, lo) : '',
+    top: every.length ? axisFigure(figureLike(template, hi)) : '',
+    bottom: every.length && span > 0 ? axisFigure(figureLike(template, lo)) : '',
     now,
     then,
     change,

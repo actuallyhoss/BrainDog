@@ -68,9 +68,9 @@ test('the record answers, and its hits are drawn grouped by register, best first
  * again the way any other refusal does.
  */
 for (const [what, answer, fix] of [
-  ['nothing answers', null, /^The record could not be reached: /u],
+  ['nothing answers', null, /^BrainDog could not reach this record\.$/u],
   ['the record says UNAUTHORIZED', () => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in again.' } }), /^Sign in again\.$/u],
-  ['a static host answers a 404 page', () => new Response('<!doctype html><title>Not found</title>', { status: 404 }), /^The record could not be reached: /u],
+  ['a static host answers a 404 page', () => new Response('<!doctype html><title>Not found</title>', { status: 404 }), /^BrainDog could not reach this record\.$/u],
 ] as const)
   test(`a search is refused when ${what}, never answered with the sample's hits`, async () => {
     const { io, sent } = host(answer);

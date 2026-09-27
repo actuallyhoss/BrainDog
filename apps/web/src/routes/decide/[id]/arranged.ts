@@ -98,6 +98,9 @@ export function callOf(line: string): Call {
     const grant = /^grant "(.*)"$/u.exec(part);
     if (grant) return grant[1] === 'none' ? copy.arrangeCallNoKey : copy.arrangeCallKey(grant[1]!);
     if (part.startsWith('sends ')) return copy.arrangeCallSends(part.slice('sends '.length));
+    /* A CADENCE IS SAID IN WORDS, "every hour" and never the record's `every 1h` (design SYS-14). */
+    const every = /^every (\d+)([mhdw])$/u.exec(part);
+    if (every) return copy.arrangeCallEvery(Number.parseInt(every[1]!, 10), every[2] as 'm' | 'h' | 'd' | 'w');
     return part;
   });
   return { host: m[1] === 'no' ? copy.arrangeCallNoHost : m[1]!, detail: rest.join(', ') };

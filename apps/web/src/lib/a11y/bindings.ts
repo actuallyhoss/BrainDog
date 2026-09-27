@@ -88,7 +88,7 @@ export const BINDINGS: Binding[] = [
   { id: 'undo', scope: 'document', key: '⌘Z', label: 'Undo the last change', bare: false },
   { id: 'commit', scope: 'document', key: '⌘↵', label: 'Commit the primary action of whatever is open', bare: false },
   { id: 'close', scope: 'document', key: 'Esc', label: 'Close the topmost layer, one per press', bare: false },
-  { id: 'help', scope: 'document', key: '?', label: 'This sheet. It is help, never the assistant', bare: true },
+  { id: 'help', scope: 'document', key: '?', label: 'This sheet. It is help, not Slash', bare: true },
   { id: 'menu', scope: 'document', key: '⇧F10', label: 'The row or block menu', bare: false },
 
   { id: 'row-down', scope: 'grid', key: 'j  ↓', label: 'Row down, keeping the column', bare: true },

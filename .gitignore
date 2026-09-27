@@ -42,6 +42,9 @@ packages/theme/proof.txt
 # has them, and they are output all the same.
 build-*/
 
+# The CLI the deploy copies into the site before building it (deploy.yml, "Build the CLI for the site"); built, never committed.
+apps/site/static/cli/braindog.mjs*
+
 # The handoff wrapper writes here and neither belongs in the history.
 loop/handoff.log
 loop/STOP

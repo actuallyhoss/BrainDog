@@ -95,7 +95,7 @@ async function withEngine(ai: ReturnType<typeof fakeAi>, neurons?: string) {
 }
 
 /* 232 NEURONS IS THE PACKAGE'S WORST CALL: a propose, 12,000 tokens in and 1,500 out at 13,636 and 45,455 a million, is
-   231.8. So 2,320 neurons is ten asks, and the default of 900,000 is 3,879. */
+   231.8. So 2,320 neurons is ten asks, and the default of 300,000 is 1,293. */
 const TEN_ASKS = '2320';
 
 test('S1 (1) AN OWNER CANNOT RAISE THE CAP PAST THE OPERATOR: ask_cap 1,000,000,000 is refused and names the ceiling', async () => {
@@ -105,10 +105,10 @@ test('S1 (1) AN OWNER CANNOT RAISE THE CAP PAST THE OPERATOR: ask_cap 1,000,000,
   /* RED: `{ ok: true }`, the audit's `saved: true`. */
   assert.equal(set.ok, false, 'an owner saved a cap a billion asks high');
   assert.equal(set.refusal?.code, 'VALUE_MALFORMED');
-  assert.match(set.refusal?.fix ?? '', /3,879/u);
+  assert.match(set.refusal?.fix ?? '', /1,293/u);
   /* AND THE CEILING ITSELF IS A CAP AN OWNER MAY SAVE, and anything under it. */
-  assert.ok((engine.configure({ ask_cap: 3_879 }, OWNER) as Refused).ok);
-  assert.equal((engine.configure({ ask_cap: 3_880 }, OWNER) as Refused).ok, false);
+  assert.ok((engine.configure({ ask_cap: 1_293 }, OWNER) as Refused).ok);
+  assert.equal((engine.configure({ ask_cap: 1_294 }, OWNER) as Refused).ok, false);
   done();
 });
 
@@ -159,7 +159,7 @@ test('S1 (4) THE VAR IS READ WHOLE OR NOT AT ALL: 0 turns the included model off
   /* A TYPO IS NOT "NO CEILING": `lots`, `-5` and `1e9x` each leave the default, which a save one past it shows. */
   for (const bad of ['lots', '-5', '1e9x', '']) {
     const { engine, done } = await withEngine(fakeAi(PREDICATE), bad);
-    assert.equal((engine.configure({ ask_cap: 3_880 }, OWNER) as Refused).ok, false, `SLASH_INCLUDED_MONTH_NEURONS=${JSON.stringify(bad)} lifted the ceiling`);
+    assert.equal((engine.configure({ ask_cap: 1_294 }, OWNER) as Refused).ok, false, `SLASH_INCLUDED_MONTH_NEURONS=${JSON.stringify(bad)} lifted the ceiling`);
     done();
   }
 });

@@ -637,11 +637,10 @@ applies, or a refusal.
    so a script asks the Directory's ledger on the same admission count as a `call` and a connector, and a record
    with one run left spends it once. The self-host's records are on the `selfhost` plan, which is never held. Each
    run's usage (requests, bytes, wall time) goes to `Directory.meter` with the rest of the pass.
-2. **Only a clock starts one.** `runs.door` and `runs.rule` install, and a script that fetches prints them in its
-   install-diff line, but the one caller that queues a `script.run` is the schedule's `fireScript`
-   (`packages/kernel/src/index.ts`): no ingest's arrival and no rule step starts a script yet, and an automation's
-   `script` step fails its run as not in this build. The MCP grammar says so (`packages/mcp/grammars/script.ts`,
-   `in_this_build`). A trial of a draft is not a queued run and is step 11.
+2. **A clock, a rule or a door starts one.** Three callers each queue a `script.run`: the schedule's `fireScript`
+   (`packages/kernel/src/index.ts`), a rule's `script` step for a script that says `runs.rule: true`, and a verified
+   arrival at its `runs.door` (`startAtDoor` in `packages/kernel/src/script.ts`); an unverified arrival starts nothing.
+   A trial of a draft is not a queued run and is step 11.
 3. **The version is the one it fired under** (`prepareScript`): the declaration row of that exact version, superseded
    or not, so a run queued before an edit runs the source the owner approved when it was queued. A script with no
    active version (retired, its pack off) runs nothing and is metered `dropped`.
@@ -967,7 +966,7 @@ assertion pair, an RS256 pair, each generated once with `subtle` and stored.
 - `ponytail:` attachments are the five image types; PDF when a register asks for it.
 - `ponytail:` inbound email trusts the forwarder's `Authentication-Results`; DKIM verification in-process (~150 lines, DNS + RSA) when a self-hoster runs their own MX.
 - `ponytail:` on Windows the KEK mode check is skipped; ACL inspection when a Windows self-host matters.
-- `ponytail:` a script starts only on its clock; `runs.door` and `runs.rule` are not wired (§5.23 step 2). A second WebAssembly instance per run is about 2 ms on the machine it was measured on, which a run every fifteen minutes can pay; a pool when a record runs scripts often enough to see it.
+- `ponytail:` a second WebAssembly instance per run is about 2 ms on the machine it was measured on, which a run every fifteen minutes can pay; a pool when a record runs scripts often enough to see it.
 
 Seventeen, counted.
 

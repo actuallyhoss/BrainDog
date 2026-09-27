@@ -276,7 +276,7 @@
   }
 
   .tile:hover {
-    border-color: var(--accent);
+    border-color: var(--ink2);
   }
 
   .tile-head {

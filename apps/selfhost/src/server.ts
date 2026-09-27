@@ -50,6 +50,7 @@ import { fileSnapshots, type FileSnapshots } from './snapshots.ts';
 import { seedCatalogue } from '@braindog/seed/usecases/catalogue';
 import { badSlug, createDirectory, switcherAsk, type Directory } from '@braindog/record/directory';
 import { fixOf, type Auth, type Param, type Refusal, type Row, type Scheduler, type Sql } from '@braindog/ports';
+import type { Result } from '@braindog/ports';
 
 import {
   actionExecutor,
@@ -82,6 +83,11 @@ import { unwrap, type KeyStore } from './keys.ts';
 import { shellOf } from './shell.ts';
 import { signerFor } from './sign.ts';
 import { keysDoor, vaultDoor } from './vault.ts';
+import { claimIdle, holdClaim, runnerContext } from '@braindog/host';
+import { withVaultPassphrase } from '@braindog/host';
+import { rootKeysOf } from './keys.ts';
+import { slashErasing } from './slash.ts';
+import { MEMBER_STOPPED } from '@braindog/kernel';
 import { deriveShareKey, serveShared, sharedNone, shareOf, withShareLinks, type SharedDoor } from '@braindog/host';
 /* NAMED APART FOR THE LINK'S DOOR, so the API door's own limiter can import the same two functions under their own
    names without this file binding one name twice. */
@@ -199,6 +205,9 @@ const NONE: Refusal = { code: 'UNAUTHORIZED', fix: 'This record takes a bearer t
 /** A credential it knows, belonging to somebody it does not. 403, and the Worker says the same. */
 const OFF: Refusal = { code: 'FORBIDDEN', fix: 'This credential does not reach this record.', at: 'principal' };
 
+/** What a person an owner has stopped reads at the session door, the Worker's words exactly (`MEMBER_STOPPED`). */
+const STOPPED: Refusal = { code: 'FORBIDDEN', fix: MEMBER_STOPPED, at: 'principal' };
+
 /**
  * A record whose every owner is suspended.
  *
@@ -279,8 +288,8 @@ type Site = {
   origins: ReadonlySet<string>;
   /** `/auth/*`, less the address, which is per request. */
   door: Omit<AuthDoor, 'ip'>;
-  /** The key doors: a vault grant's bearer, and this process's key store when it has one. */
-  vault: VaultDoor;
+  /** The key doors: a vault grant's bearer, an agent's login token at the deposit door, and this process's key store when it has one. */
+  vault: VaultDoor<CallContext>;
   /** The app's own key doors: a browser session on one of this host's origins, and the same key store. */
   keys: KeysDoor<CallContext>;
   /** Slash's ask, `POST /api/slash/read`, built on the first question and kept (`46 §5.2`). */
@@ -292,6 +301,11 @@ type Site = {
   snapshots: FileSnapshots | undefined;
   /** Whether the Directory gives this record `slug` as a name it holds now, beside the one the record carries. */
   names: (slug: string) => boolean;
+  /**
+   * The Directory's `leave`, after a `removeMember` the record accepted. The record's `member` table and the Directory's
+   * `dir_member` live in two databases, and without this the person removed stayed listed by `reaches` and `/account/records`.
+   */
+  leave: (person: string) => void;
   usage: AccountDoor['usage'];
   records: AccountDoor['records'];
   /** A link to one page, `Authorization: Share <token>` at `/api/sharedPage` (`@braindog/host`'s `share.ts`). */
@@ -404,7 +418,17 @@ async function bearerFor(sent: string, site: Site, surface: 'api' | 'mcp', door?
   /* A TOKEN MADE BEFORE THE OPERATOR'S CUT-OFF IS NOT ONE THIS RECORD KNOWS, in the same sentence, and at an operation
      door it falls to `operationFor`, which holds a grant to the same instant. */
   const seen = await api.kernel.verifyToken(sent, surface, validFrom());
-  if (!seen.ok) return door !== undefined && OPERATION_DOORS.has(door) ? operationFor(sent, api) : { refused: UNKNOWN };
+  if (!seen.ok) {
+    if (door !== undefined && OPERATION_DOORS.has(door)) return operationFor(sent, api);
+    /* AND A BEARER NO TOKEN ROW KNOWS MAY BE A RUNNER'S, AT THE THREE DOORS A RUNNER CALLS AND NOWHERE ELSE
+       (`loop/finish/agents.md` C13), as the Worker's `runnerOf` reads it: the record builds the runner's context from its
+       own device grants, held to the same cut-off, and every method but the JOBS ones refuses it. */
+    if (door !== undefined && RUNNER_DOORS.has(door)) {
+      const ran = await runnerContext(api, sent, validFrom());
+      return ran === null ? { refused: UNKNOWN } : { ctx: ran };
+    }
+    return { refused: UNKNOWN };
+  }
 
   /* THE PERSON'S LEVEL COMES FROM THE RECORD, never from a constant, so a token outlives nothing its
      holder has lost. NOT ON THIS RECORD IS 403, and a credential this record does not know is 401. */
@@ -440,6 +464,39 @@ async function bearerFor(sent: string, site: Site, surface: 'api' | 'mcp', door?
  * gate refuses it, which is the approver's phone saying "import" and the request saying "export".
  */
 const OPERATION_DOORS: ReadonlySet<string> = new Set(Object.values(OPERATION_METHOD));
+
+/** The methods a runner calls, and the only doors a runner's bearer is read at (`loop/finish/agents.md` C13). */
+const RUNNER_DOORS: ReadonlySet<string> = new Set(['claimJob', 'postJobEvent', 'readCancel']);
+
+/**
+ * The deposit door's write minute for a login token, by the request that spent it: `serveVault` answers a refused token
+ * with the vault grant's sentence, so the 429 is put back in its place where the door is answered (`answer`), as the
+ * Worker's `keyDoor` puts back its own.
+ */
+const vaultSpent = new WeakMap<Request, Response>();
+
+/**
+ * An agent's login token at `/api/vault/deposit` (`loop/finish/agents.md` C1): checked as `/api` checks any bearer, and a
+ * token's context or nothing. THE SERVER KEY NEVER REACHES THE DEPOSIT DOOR AS THE OWNER, and neither does anything else
+ * that is not a token, because the record's `allows` admits more than a token on its rungs. A token spends its own write
+ * minute here, as it does at `/api/create`.
+ */
+async function vaultToken(request: Request, site: Site | null): Promise<Result<CallContext>> {
+  const refused: Result<CallContext> = {
+    ok: false,
+    refusal: { code: 'UNAUTHORIZED', fix: 'That bearer is neither a vault grant nor a login this record knows.', at: 'authorization' },
+  };
+  const sent = presented(request);
+  if (site === null || sent === undefined) return refused;
+  const known = await bearerFor(sent, site, 'api');
+  if (!('ctx' in known) || known.ctx.principal.kind !== 'token') return refused;
+  const over = await overLimit(site, { door: 'bearer', ctx: known.ctx }, '', 'write');
+  if (over !== null) {
+    vaultSpent.set(request, over);
+    return { ok: false, refusal: { code: 'RATE_LIMITED', fix: 'This login has used its writes for this minute.', at: 'authorization' } };
+  }
+  return { ok: true, value: known.ctx };
+}
 
 /**
  * An operation bearer (`48 §5.2`): checked and spent by the record, then the approver at the level they hold NOW.
@@ -500,7 +557,7 @@ async function contextFor(request: Request, host: string, site: Site, door?: str
     /* A rotation reaches the cookie whatever the answer is. */
     const carried = out.session === undefined ? {} : { cookie: out.session === 'clear' ? clear : sessionCookie(out.session.sid, site.mode) };
     const held = api.kernel.access(out.body.person);
-    if (!held) return { refused: OFF, ...carried };
+    if (!held) return { refused: api.kernel.memberStopped(out.body.person) ? STOPPED : OFF, ...carried };
     /* AND A COOKIE WRITE MUST COME FROM A PAGE ON THIS ORIGIN (`12 §8` CSRF). `SameSite=Lax` keeps the
        cookie off a cross-site POST; this is the half that does not depend on the browser. */
     if (!SAFE.has(request.method) && !sameOrigin(request, site.origin)) return { refused: CROSS, ...carried };
@@ -1504,6 +1561,9 @@ export async function start(options: {
        `host` is for `boot`, so Billing reads that this is a self-host rather than inferring it from the mail door's 404. */
     build: { app: buildApp, slash: slashModel !== undefined, host: 'self-host' },
   });
+  /* AN ERASURE REACHES SLASH'S LEDGER TOO, in `slash.sqlite` beside the record's file (`slashErasing`,
+     `loop/finish/contracts.md` §7.2), which the kernel's erase cascade never reaches. */
+  slashErasing(api, slashSql);
 
   /* A MODULE-LEVEL REFUSAL NO LONGER ENDS THE PROCESS. This called `process.exit(1)` from inside a library function, so a
      record whose ledger names a migration this build lacks took the process down before `/healthz` could answer, and a
@@ -1535,10 +1595,19 @@ export async function start(options: {
   /* THE WIRING IS SHARED, not copied. Both hosts call `handlersFor`, so a route cannot exist in one
      and not the other, and it throws at start rather than 404ing in production. `openShare`'s answer is signed into a
      link on its way out (`withShareLinks`), for the record this process holds and the origin it serves the app from. */
-  const handlers = withShareLinks(handlersFor(api), async () => {
-    const record = api.kernel.identity()?.id;
-    return shareKey === null || record === undefined || site === null ? null : { key: shareKey, record, origin: site.origin };
-  });
+  /* AND THE VAULT PASSPHRASE'S TWO ROUTES ARE ANSWERED THROUGH THIS PROCESS'S KEY STORE (`withVaultPassphrase`), which
+     takes the passphrase off before the record is called. */
+  const handlers = withVaultPassphrase(
+    withShareLinks(handlersFor(api), async () => {
+      const record = api.kernel.identity()?.id;
+      return shareKey === null || record === undefined || site === null ? null : { key: shareKey, record, origin: site.origin };
+    }),
+    api,
+    async () => {
+      const record = api.kernel.identity()?.id;
+      return options.keys === undefined || record === undefined ? null : rootKeysOf(options.keys, record);
+    },
+  );
 
   /* THE BELT UNDER THE DOORBELL. A lost wake costs latency and never a job, because the row is still
      `pending` — and this tick is what makes that true. It is also what recovers a lease abandoned by
@@ -1758,7 +1827,9 @@ export async function start(options: {
     auth: off === null ? directory.auth : null,
     hosts: new Set([...loopback, new URL(origin).host]),
     origins,
-    vault: vaultDoor(api, options.keys),
+    /* AN AGENT'S LOGIN TOKEN MAY ADD A KEY AT THE DEPOSIT DOOR (`loop/finish/agents.md` C1), checked as every `/api`
+       bearer is (`vaultToken`); the record refuses anything but a token's context there. */
+    vault: vaultDoor(api, options.keys, (asked) => vaultToken(asked, site)),
     keys: keysDoor(api, options.keys, origins),
     slash: slashDoor(slashConfig, () => api, options.keys, { sql: slashSql, clock }, origins),
     /* ONE BUDGET PER PROCESS, built here so it outlives a request and is shared by every ingest. */
@@ -1776,6 +1847,11 @@ export async function start(options: {
     names: (slug) => {
       const here = api.kernel.identity()?.id;
       return here !== undefined && directory.namesOf(here).some((n) => n.slug === slug && n.released_at === null);
+    },
+    /* THE DIRECTORY REFUSES TO REMOVE THE OWNER, and that refusal stands: the record has already answered the removal. */
+    leave: (person) => {
+      const here = api.kernel.identity()?.id;
+      if (here !== undefined) directory.leave(here, person);
     },
     door: {
       on: 'selfhost',
@@ -1913,6 +1989,34 @@ async function overLimit(site: Site, door: LimitDoor | null, ip: string, cls: Li
   if (site.limits === null) return null;
   const said = await site.limits.limit(limitKey(door, ip), cls);
   return said.ok ? null : refusedFor(said.retryAfter);
+}
+
+/**
+ * A runner's `claimJob`, asked of the record again every `CLAIM_EVERY_MS` until a job is handed over or the wait the
+ * runner sent has passed (`holdClaim` in `@braindog/host`, `loop/finish/agents.md` C13): the last answer either way.
+ *
+ * `request` IS NEVER READ ITSELF: each ask answers a copy, because `serveApi` consumes the body it is handed. An answer
+ * that is not a 200 is a refusal, which `claimIdle` does not wait past.
+ */
+async function heldClaim(request: Request, handlers: Record<string, Handler>, ctx: CallContext): Promise<Response> {
+  const sent = (await request.clone().json().catch(() => null)) as { wait?: unknown } | null;
+  const ask = async (): Promise<{ out: Response; said: { ok: boolean; value?: unknown } | null }> => {
+    const answered = await serveApi(request.clone(), handlers, ctx);
+    const body = await answered.text();
+    const out = new Response(body, { status: answered.status, headers: answered.headers });
+    if (answered.status !== 200) return { out, said: null };
+    try {
+      return { out, said: JSON.parse(body) as { ok: boolean; value?: unknown } };
+    } catch {
+      return { out, said: null };
+    }
+  };
+  const last = await holdClaim(ask, sent?.wait, {
+    idle: (answer) => answer.said !== null && claimIdle(answer.said),
+    now: () => Date.now(),
+    sleep: (ms) => new Promise<void>((done) => setTimeout(done, ms)),
+  });
+  return last.out;
 }
 
 /**
@@ -2069,7 +2173,8 @@ async function answer(
     return write(
       res,
       named === null
-        ? await serveVault(request, site.vault)
+        ? /* A LOGIN TOKEN'S SPENT MINUTE IS ITS 429, put back in the place of the grant's sentence (`vaultToken`). */
+          await serveVault(request, site.vault).then((out) => vaultSpent.get(request) ?? out)
         : json(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'The key doors are at /api/vault/, and a grant names its own record.' } }),
     );
 
@@ -2112,11 +2217,22 @@ async function answer(
     const ctx = withSession(seen.ctx, sessionOf(request.headers));
     /* Slash's DOOR AHEAD OF THE KEY DOORS AND BOTH AHEAD OF `serveApi`, because `serveApi` answers anything it does
        not know as `ROUTE_UNKNOWN`, which is what `POST /api/slash/read` got until this line existed. */
+    const removal = method === 'POST' && /^\/+api\/+removeMember\/*$/.test(path) ? request.clone() : null;
+    /* A RUNNER'S CLAIM IS HELD HERE UNTIL A JOB IS QUEUED OR ITS WAIT RUNS OUT (`holdClaim`), as the Worker's
+       `heldClaim` holds it, and every other call is answered once. Only the runner's own principal is held, so a person
+       or a token asking `claimJob` is answered at once with the record's refusal. */
     const out = servesSlash(path)
       ? await serveSlash(request, site.slash, ctx)
       : servesKeys(path)
         ? await serveKeys(request, site.keys, ctx)
-        : await serveApi(request, handlers, ctx);
+        : ctx.principal.kind === 'runner' && method === 'POST' && /^\/+api\/+claimJob\/*$/.test(path)
+          ? await heldClaim(request, handlers, ctx)
+          : await serveApi(request, handlers, ctx);
+    /* A REMOVAL THE RECORD ACCEPTED IS FOLLOWED BY THE DIRECTORY'S `leave`, as the Worker's `leftDirectory` does. */
+    if (removal !== null && out.status === 200) {
+      const asked = (await removal.json().catch(() => null)) as { person?: unknown } | null;
+      if (typeof asked?.person === 'string' && asked.person !== '') site.leave(asked.person);
+    }
     return write(res, out, seen.cookie);
   }
   /* AND THE STATUS COMES FROM THE SHARED TABLE. This answered one status for three different facts —
@@ -2213,6 +2329,8 @@ async function agent(req: IncomingMessage, url: string, method: string, headers:
   /* The session headers, then `_meta.session` over them key by key, both checked the same way. */
   return serveMcp(new Request(url, { method, headers, body: bodyOf(req), duplex: 'half' }), site.api, withSession(seen.ctx, sessionOf(head.headers)), {
     session: (ctx, said) => withSession(ctx, hintsOf(said)),
+    /* WHERE THIS PROCESS SERVES THE APP (`BRAINDOG_ORIGIN`), so a filed `propose` carries its `decide` link here. */
+    origin: site.origin,
   });
 }
 

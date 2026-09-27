@@ -24,7 +24,10 @@ import { copy } from '../copy.ts';
 import * as draft from './field-draft.ts';
 import type { FieldDecl } from './schema.ts';
 
-const GRID = readFileSync(new URL('../../routes/r/[register]/+page.svelte', import.meta.url), 'utf8');
+/* THE LIST SCREEN IS ITS PAGE AND ITS PARTS (ARC-7a): the editor's functions are the page's and the cell it becomes is `ListTable`'s, read as one text, page first. */
+const GRID = ['+page.svelte', 'parts/ListTable.svelte']
+  .map((at) => readFileSync(new URL(`../../routes/r/[register]/${at}`, import.meta.url), 'utf8'))
+  .join('\n');
 const ROW = readFileSync(new URL('../../routes/r/[register]/[seq]/+page.svelte', import.meta.url), 'utf8');
 
 const AMOUNT: FieldDecl = { id: 'amount', type: 'money' };

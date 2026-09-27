@@ -230,7 +230,8 @@ async function mcp(args: string[]): Promise<void> {
   /* A closed stdout means nobody is left to read the answers. */
   process.stdout.on('error', () => process.exit(0));
   const ms = budgetOf(process.env);
-  await serveStdio(surface, () => ({ signal: AbortSignal.timeout(ms) }), process.stdin, process.stdout);
+  /* `to.base` IS THE HOST'S ORIGIN, where it serves the app, so a filed `propose` carries its `decide` link there. */
+  await serveStdio(surface, () => ({ signal: AbortSignal.timeout(ms) }), process.stdin, process.stdout, to.base);
   /* Every reply is flushed by now. LEFT TO END ON ITS OWN, and ended after a second if an idle keep-alive
      socket to the host holds it open, for the reason `hook` gives: `process.exit` straight after the last
      reply aborted Node 24 on Windows with a libuv assertion when the client closed standard input. */

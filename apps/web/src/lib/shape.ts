@@ -298,7 +298,8 @@ export const LEANS_ON: Readonly<Record<PackId, readonly PackId[]>> = {
   portfolio: [],
   /* People only links to Projects, to say where somebody was met, and goes in without them (`first-party.ts` `LINKS`). */
   people: [],
-  'money-core': ['portfolio', 'people'],
+  /* Money links to People for a payment's party and goes in without them (`first-party.ts` `LINKS`, MOD-4). */
+  'money-core': ['portfolio'],
   estate: ['portfolio'],
   /* Work only links to Projects and People too: a task's project and owner are left out of a record without them. */
   work: [],

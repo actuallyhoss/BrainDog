@@ -43,9 +43,9 @@ export const words = {
   indexOnly: 'Value not kept here',
   opened: (n: number) => (n === 0 ? 'never opened' : n === 1 ? 'opened once' : `opened ${n} times`),
   lastOpened: (when: string) => `last ${when}`,
-  noKeys: 'No keys yet.',
+  noKeys: 'No keys yet',
   noKeysHow: 'Add one here, or let an agent add one with braindog keys put and run a command with it through braindog keys exec <label> -- <command>.',
-  noMachines: 'No machine may open keys.',
+  noMachines: 'No machine may open keys',
   /* Putting a key in, replacing one, and reading one back: `/api/keys/*`, a browser session only. */
   addKey: 'Add a key',
   replace: 'Replace value',

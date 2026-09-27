@@ -26,16 +26,11 @@ import { readFileSync } from 'node:fs';
 
 import { connectLines } from '../../lib/record/device.ts';
 
-const PAGE = readFileSync(new URL('./[area]/+page.svelte', import.meta.url), 'utf8')
-  .replaceAll(/<!--[\s\S]*?-->/gu, '')
-  .replaceAll(/\/\*[\s\S]*?\*\//gu, '');
-
-/** The markup of one area, from its own arm to the next `{:else if area === …}`. */
+/** One area's file without its comments: each area is its own component since the settings split (ARC-7b). */
 function area(name: string): string {
-  const from = PAGE.indexOf(`area === '${name}'}`);
-  assert.ok(from >= 0, `${name} has no arm in the markup`);
-  const to = PAGE.indexOf("{:else if area === '", from + 1);
-  return PAGE.slice(from, to < 0 ? PAGE.length : to);
+  return readFileSync(new URL(`./[area]/areas/${name.charAt(0).toUpperCase()}${name.slice(1)}.svelte`, import.meta.url), 'utf8')
+    .replaceAll(/<!--[\s\S]*?-->/gu, '')
+    .replaceAll(/\/\*[\s\S]*?\*\//gu, '');
 }
 
 /** The condition of the innermost `{#if}` still open at `at` in `markup`. */
@@ -66,7 +61,7 @@ test('friction 10: once signed out, nobody is named as signed in, and Sign in co
   const row = identity.indexOf('copy.signedInAs');
   assert.ok(row >= 0, 'the Signed in as row is gone entirely, so this is about nothing');
   assert.match(enclosing(identity, row), /!signedOut\b/u, 'the Signed in as row is drawn after Sign out');
-  assert.match(PAGE, /signedOut = true/u, 'nothing records that the sign-out went through');
+  assert.match(identity, /signedOut = true/u, 'nothing records that the sign-out went through');
 
   const signIn = /<Button href=\{?([^>]*?)\}?>\{copy\.signIn\}<\/Button>/u.exec(identity);
   assert.ok(signIn, 'the Sign in button is gone, so this is about nothing');

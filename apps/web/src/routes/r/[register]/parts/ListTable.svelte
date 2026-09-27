@@ -110,10 +110,11 @@
   <!--
     THE THING THE ROW BELONGS TO, IN FRONT OF WHAT THE ROW IS.
 
-    `columnsFor` caps the default projection at ten and `thing` is not in Money's, so the
-    desktop grid of the first list in the rail was thirty-eight rows of grey with no way at all
-    to see which project any of them was about. The mark went into `#`, the one column every
-    projection has; `#` ends the row now, and the mark came with the title instead, because
+    `columnsFor` caps the default projection at nine fields, with no number among them, and `thing`
+    is not in Money's, so the desktop grid of the first list in the rail was thirty-eight rows of
+    grey with no way at all to see which project any of them was about. The mark went into `#`, the
+    one column every projection had then; `#` ends the row when a reader turns it on, and the mark
+    came with the title instead, because
     colour saying which project is read where the eye starts.
 
     The mark is a shape before it is a colour, which is `13 §5.1` met by the mark itself, and
@@ -407,7 +408,6 @@
 
   .cell-tick {
     margin: 0;
-    accent-color: var(--accent);
   }
 
   /* THE EDITOR IS THE CELL, so it takes the cell's box and none of its own. A control that grew the
@@ -419,7 +419,7 @@
     min-inline-size: 0;
     padding: 0 2px;
     background: var(--s1);
-    border: 1px solid var(--accent);
+    border: 1px solid var(--ink2);
     border-radius: var(--r-sm);
     color: var(--ink);
     font: inherit;
@@ -624,13 +624,13 @@
     background: none;
     border: 1px solid var(--edge);
     border-radius: var(--r-sm);
-    color: var(--accent-ink);
+    color: var(--on-ink);
     cursor: pointer;
   }
 
   .pick[data-on] {
-    background: var(--accent);
-    border-color: var(--accent-edge);
+    background: var(--on);
+    border-color: var(--on);
   }
 
   @media (width < 640px) {

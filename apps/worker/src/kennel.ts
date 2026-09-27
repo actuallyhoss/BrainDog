@@ -33,6 +33,7 @@
 import { httpStatus } from '@braindog/host';
 import { clearCookie, readSid, sameKey, sameOrigin, sessionCookie } from '@braindog/host/auth';
 import { emptyCatalogue, readCatalogue, type CatalogueIndex } from '@braindog/declare/catalogue';
+import { listedEntries } from '@braindog/declare/catalogue';
 import {
   acceptSubmission,
   emptyPublishers,
@@ -183,8 +184,12 @@ export async function serveKennel(request: Request, deps: KennelDeps): Promise<R
       }
     }
     switch (asked.ask) {
-      case 'index':
-        return answer(200, JSON.stringify(mergeIndexes(await bundledIndex(deps.assets, false), await readingIndex(deps.blobs))), { open: true, head });
+      case 'index': {
+        /* THE PUBLIC INDEX LEAVES OUT AN `unlisted` ENTRY (C41), while its files still download by exact path, and
+           install by id keeps resolving against the bundled catalogue, which keeps it. */
+        const merged = mergeIndexes(await bundledIndex(deps.assets, false), await readingIndex(deps.blobs));
+        return answer(200, JSON.stringify({ ...merged, entries: listedEntries(merged) }), { open: true, head });
+      }
       case 'counts':
         return answer(200, await countsOf(deps.blobs, now()), { open: true, head });
       case 'file':

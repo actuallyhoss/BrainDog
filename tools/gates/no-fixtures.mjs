@@ -9,10 +9,10 @@
  * not a test and not in a `fixtures/` directory, and imports a module through a `fixtures/` path, is a finding.
  *
  * WHY A GATE AND NOT A TEST BESIDE THE OTHERS. `no-sample-b2.test.ts` already walks the app for one directory, and it
- * ran green while eleven shipped files imported `data.ts`, the fixture before it moved, because the rule it held was
- * about a directory the fixture was not yet in. Measured on 25 September before the move: `api.ts`, `blocks.ts`,
- * `boot-live.ts`, `forecast.ts`, `metrics.ts`, `pages.ts`, `seed.ts`, the two `/packs` screens, `packs/sharing.ts` and
- * `/start` read the sample's rows or its add-ons on a live record, and `governance.ts` named a type from it. A rule
+ * ran green while shipped files imported `data.ts`, the fixture before it moved, because the rule it held was about a
+ * directory the fixture was not yet in. Measured on 25 September before the move: `api.ts`, `blocks.ts`,
+ * `boot-live.ts`, `metrics.ts`, `seed.ts`, the two `/packs` screens, `packs/sharing.ts` and `/start` (and two files
+ * since deleted) read the sample's rows or its add-ons on a live record, and `governance.ts` named a type from it. A rule
  * about what a shipped file may import is a rule about the whole tree, and that is a gate's question.
  *
  * AND THE SEED'S ROOT, FOR THE SAME REASON. `@braindog/seed` is the sample: its root export is `REGISTERS`, `ROWS`,

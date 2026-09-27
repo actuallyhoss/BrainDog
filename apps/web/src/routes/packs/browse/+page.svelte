@@ -99,12 +99,15 @@
 
   {#if catalogueRefused}
     <Empty kind="error" title={catalogueRefused} />
-  {:else if catalogue && catalogue.entries.length > 0}
+  {:else if catalogue && catalogue.entries.some((e) => e.unlisted !== true)}
+    <!-- AN UNLISTED PACK INSTALLS BY ID AND IS LEFT OUT OF EVERY LISTING (decisions C41), this public grid among them.
+         Filtered inline rather than through `listedEntries`, whose static import would carry the declare package and
+         the kernel into this route's bundle. -->
     <section class="catalogue" aria-labelledby="catalogue-h">
       <h2 class="catalogue-h" id="catalogue-h">{copy.catalogueHeading}</h2>
       <p class="blurb">{copy.catalogueBlurb}</p>
       <ul class="cards fill">
-        {#each catalogue.entries as entry (`${entry.kind}:${entry.id}`)}<CatalogueCard {entry} />{/each}
+        {#each catalogue.entries.filter((e) => e.unlisted !== true) as entry (`${entry.kind}:${entry.id}`)}<CatalogueCard {entry} />{/each}
       </ul>
     </section>
   {/if}

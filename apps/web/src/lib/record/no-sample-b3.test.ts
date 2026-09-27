@@ -56,7 +56,7 @@ test("a ref is named by the record's rows once a reader has walked them, and nev
 });
 
 test("a page looked up by its slug is called what the record's `boot` calls it, not what the sample called it", async () => {
-  assert.equal(held.PAGES.money?.title, 'Overview', 'the sample no longer calls its money page Overview, so this test proves nothing');
+  assert.equal(held.PAGES.money?.title, 'Money', 'the sample no longer calls its money page Money, so this test proves nothing');
   forget();
   const body = { registers: [], now: '2026-09-25T12:00:00.000Z', pages: [{ slug: 'money', title: 'Cash and bills', nav: null, icon: null }] };
   const io = (async () => new Response(JSON.stringify({ ok: true, value: body }), { status: 200, headers: { 'content-type': 'application/json' } })) as Fetch;

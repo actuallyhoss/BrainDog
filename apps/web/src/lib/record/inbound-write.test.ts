@@ -47,7 +47,7 @@ function host(answer: ((path: string) => Response) | null): { io: Fetch; sent: S
 }
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const AREA = readFileSync(join(HERE, '..', '..', 'routes', 'settings', '[area]', '+page.svelte'), 'utf8');
+const AREA = readFileSync(join(HERE, '..', '..', 'routes', 'settings', '[area]', 'areas', 'Ingest.svelte'), 'utf8');
 
 test('the address the screen prints is the address the mail door parses', () => {
   /* `servesIngest` in `packages/host/src/ingest.ts` splits the path, drops empty segments and wants exactly
@@ -167,9 +167,9 @@ test('THE MINT IS BUILT AND AN OWNER CAN NOW REACH IT', () => {
 
   /* IN THE INGEST AREA AND NOWHERE ELSE, which is where a person looking for where their mail lands goes. The
      section is cut out of the file so the assertions below cannot be satisfied by some other area's markup. */
-  const from = AREA.indexOf("{:else if area === 'ingest'}");
+  const from = AREA.indexOf('</script>');
   assert.ok(from > 0, 'there is no ingest area');
-  const section = AREA.slice(from, AREA.indexOf('{:else if area ===', from + 10));
+  const section = AREA.slice(from);
 
   assert.match(section, /mailWords\.once/u, 'the address is not said to be shown once');
   assert.match(section, /mailWords\.unknown/u, 'the screen does not admit it cannot read an existing address back');

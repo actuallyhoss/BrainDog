@@ -280,8 +280,8 @@ test('AN APPLIED MIGRATION IS NEVER EDITED, so each checksum is pinned here', as
     '5ed69b795dc9170533c90d3f49108bf0556c362db3524866ab411d7653a25a1a',
     'dcaf26214d1331d23aa3632432e4538e2361b7e6ec47c8d5a75e58810dbfada1',
     'ae2c2c8fbd2120ab152315c4290a22f763a4bf81f8d748e5ddb779523d50e2ee',
-    /* 0017: integrator */
-    /* 0018: integrator */
+    'db601baac1f2aacb645e06bf6b4c7e38115f9989a68ed4667060900fee33cb9a',
+    '2d37be52999866741056861e33ac6c4b3431837b5384e53824f236bc770213a4',
   ]);
 });
 

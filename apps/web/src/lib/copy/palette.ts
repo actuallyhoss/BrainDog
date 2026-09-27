@@ -27,7 +27,6 @@ export const palette = {
   searchClear: 'Clear the search',
   searchInHistory: 'Open History',
   searchWhere: 'Every list, every decision, and every page, by the words in them.',
-  allIn: (n: number, list: string) => `All ${n.toLocaleString('en')} in ${list}`,
   allMatches: (n: number, q: string) => `All ${n.toLocaleString('en')} matches for “${q}”`,
   showingOf: (shown: number, total: number) => (shown >= total ? `${shown}` : `${shown} of ${total}`),
   /**

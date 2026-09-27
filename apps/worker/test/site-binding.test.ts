@@ -81,6 +81,9 @@ const DOOR_OF: { [asked: string]: string[] } = {
   servesMcp: ['/mcp', '/mcp/'],
   servesIn: ['/in/abc'],
   servesVault: ['/api/vault/deposit'],
+  servesKennel: ['/api/kennel/v1/index.json'],
+  servesOAuth: ['/oauth/token', '/oauth/authorize'],
+  servesOAuthMeta: ['/.well-known/oauth-authorization-server', '/.well-known/oauth-protected-resource', '/.well-known/oauth-protected-resource/mcp'],
   appPath: ['/app', '/app/', '/app/acme/r/tasks', '/app/acme/api/boot'],
   servesApi: ['/api/boot'],
 };

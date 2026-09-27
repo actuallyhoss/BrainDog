@@ -31,9 +31,11 @@ Every document carries one of three labels.
 Where a label names sections, only those sections carry it, and the label after the semicolon covers the rest of that
 document. The last column names what reads each CONTRACT section, or the code it is kept beside when nothing reads it.
 
-Two rules hold for every document here, whatever its label: every relative link lands on a file
+These rules hold for every document here, whatever its label: every relative link lands on a file
 (`docs/test/links.test.mjs`), and a sentence that spells out how many block kinds there are must agree with the `TABLE`
-in `packages/render/src/kinds.ts` (`tools/gates/closed-lists.mjs`).
+in `packages/render/src/kinds.ts` (`tools/gates/closed-lists.mjs`). A count of gates, MCP tools, MCP resource templates,
+refusal codes or declaration kinds stated in `README.md` or in a document here that is not HISTORICAL must agree with
+the code too (`tools/gates/docs-counts.mjs`).
 
 | # | Document | Label | Read by, or kept beside |
 |---|---|---|---|
@@ -50,7 +52,7 @@ in `packages/render/src/kinds.ts` (`tools/gates/closed-lists.mjs`).
 | 11 | [The assistant](11-ASSISTANT.md) | REFERENCE | |
 | 12 | [Security](12-SECURITY.md) | REFERENCE | |
 | 13 | [The visual system](13-UI.md) | REFERENCE | |
-| 14 | [The Kennel and community](14-KENNEL-AND-COMMUNITY.md) | HISTORICAL | |
+| 14 | [The Kennel and community](14-KENNEL-AND-COMMUNITY.md) | CONTRACT §1, the Kennel as built; HISTORICAL | |
 | 15 | [Roadmap](15-ROADMAP.md) | HISTORICAL | replaced by [loop/ROADMAP.md](../loop/ROADMAP.md) |
 | 16 | [Decisions](16-DECISIONS.md) | REFERENCE | |
 | 17 | [Open questions](17-OPEN-QUESTIONS.md) | HISTORICAL | |

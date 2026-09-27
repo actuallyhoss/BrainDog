@@ -1560,7 +1560,7 @@ test('A SUSPENDED PERSON HOLDS NOTHING, which is what suspending is for', async 
   /* THROUGH THE PRODUCT, not through raw SQL. The column was written as NULL by `invite` and by
      provisioning and by nothing else, so once the ladder learned to read it, it was a check behind a
      switch nobody could flip. */
-  value(await api.suspendMember({ person: 'p_7' }, owner));
+  value(await api.suspendMember({ person: 'p_7', suspended: true }, owner));
   assert.equal(api.kernel.access('p_7'), null, 'a suspended person still held their access');
 
   // And it reaches their agents: a token is a capability handed to an agent BY a person.
@@ -1571,7 +1571,7 @@ test('A SUSPENDED PERSON HOLDS NOTHING, which is what suspending is for', async 
   assert.equal(api.kernel.access('p_7')?.level, 'write', 'suspension lost what they held');
 
   // The last owner cannot be suspended, for the reason they cannot be removed.
-  assert.equal(refusal(await api.suspendMember({ person: 'p_1' }, owner)).code, 'LEVEL_REQUIRED');
+  assert.equal(refusal(await api.suspendMember({ person: 'p_1', suspended: true }, owner)).code, 'LEVEL_REQUIRED');
   sql.close();
 });
 

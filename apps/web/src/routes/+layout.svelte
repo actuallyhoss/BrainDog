@@ -582,9 +582,8 @@
           <li>
             <a class="more-row" href={at('/settings/identity')}><Icon name="settings" size="m" /><span class="more-name">{copy.recordSettings}</span></a>
           </li>
-          <li>
-            <a class="more-row" href={at('/start')}><Icon name="plus" size="m" /><span class="more-name">{copy.newRecord}</span></a>
-          </li>
+          <!-- NO "NEW RECORD" HERE (MOD-6): it opened this record's own `/start`, and it is drawn only once the host says
+               the person may make a record, which `boot` does not carry yet. The rail's copy of it went the same way. -->
         </ul>
       {/if}
     </div>

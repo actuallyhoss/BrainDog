@@ -34,7 +34,7 @@ test('the switcher, Add a field and Runs on say nothing of a write that did not 
   const field = code('../ui/AddField.svelte');
   assert.doesNotMatch(field, /notWritten|fieldWords\.sample/u);
   assert.match(field, /\{:else if live\}/u, 'the Add a field button is drawn where nothing can be added');
-  const runs = code('../../routes/p/[slug]/Actions.svelte');
+  const runs = code('../page/panels/Actions.svelte');
   assert.doesNotMatch(runs, /\bNOW\b|\.sample\b|notWritten/u);
 });
 

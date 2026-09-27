@@ -33,6 +33,7 @@ import { sealedEver } from './declare.ts';
 import { instant } from './migrate.ts';
 import { spanMs } from './vault.ts';
 import { evaluateMetric, predicateOf, type Aggregation, type EvalContext, type MetricDecl } from './metrics.ts';
+import { isMoneyFormat } from './metrics.ts';
 import { RUN_PATH, inlineFault, rowlessCreate } from './flow-lint.ts';
 import { FIGURE } from './figure.ts';
 import { observe } from './observe.ts';
@@ -780,6 +781,9 @@ export function figureText(deps: Pick<RulesDeps, 'sql' | 'ctx'>, id: string): st
 
 /** Whether any field the figure adds up is typed money in its list, both halves of a ratio or a difference included. */
 function addsMoney(decl: MetricDecl, ctx: EvalContext): boolean {
+  /* A FIGURE THAT DECLARES ITSELF MONEY IS MONEY, whatever it adds up: a cash figure rolled forward and a walk add up no
+     field this could ask the type of, and were written as a bare number of minor units (`money-figures.ts`). */
+  if (isMoneyFormat(decl.format)) return true;
   const schema = decl.source.startsWith('register.') ? ctx.schemaOf(decl.source.slice('register.'.length)) : null;
   if (!schema) return false;
   const v = decl.value;
@@ -1251,6 +1255,7 @@ function describe(deps: RulesDeps, rule: RuleDecl, entry: Entry): string[] {
     else if ('schedule' in a) out.push(`in ${a.schedule.in}, ${fill(a.schedule.note, entry, deps.nowMs)}`);
     else if ('stop' in a) out.push('stop');
     else if ('run' in a) out.push(`run ${a.run}, which a rule applied to rows already there does not send`);
+    else if ('create' in a) out.push(`create up to ${a.create.bound} rows in ${a.create.register}`);
     else if ('link' in a) {
       /* A LINK THAT CANNOT BE MADE IS NAMED HERE, because the preview is where somebody finds out
          that half their rows name a party nobody has a row for. */

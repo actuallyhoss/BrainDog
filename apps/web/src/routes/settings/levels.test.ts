@@ -23,19 +23,6 @@ import { readFileSync } from 'node:fs';
 
 import { OWNER_CONTROLS, ownsRecord, words } from './levels.ts';
 
-/**
- * The page WITHOUT ITS COMMENTS, which is what every check below reads.
- *
- * AND IT IS NOT TIDINESS. This file's own subject is quoted at length in that page's comments, so a
- * check over the raw text matched the sentence describing the defect as readily as the defect: the
- * first version failed on a comment that quotes `peopleFrom !== 'live'` while saying why nothing
- * branches on it any more, and on one that names `/settings/export` while saying why the link to it
- * is drawn to an owner only. A test that a comment can fail is a test that punishes explaining.
- */
-const PAGE = readFileSync(new URL('./[area]/+page.svelte', import.meta.url), 'utf8')
-  .replaceAll(/<!--[\s\S]*?-->/gu, '')
-  .replaceAll(/\/\*[\s\S]*?\*\//gu, '');
-
 /** Every area the rail offers, in the order the page draws them. */
 const AREAS = [
   'appearance', 'keyboard', 'navigation', 'people', 'recovery', 'identity',
@@ -43,20 +30,28 @@ const AREAS = [
 ];
 
 /**
- * The markup for one area, from its own `{#if area === …}` to the next one's.
+ * An area's file WITHOUT ITS COMMENTS, which is what every check below reads.
  *
- * The script half never spells `=== '<area>'}` with the closing brace on it, so this cannot pick up
- * `if (area !== 'ingest') {` and friends.
+ * AND IT IS NOT TIDINESS. This file's own subject is quoted at length in that page's comments, so a
+ * check over the raw text matched the sentence describing the defect as readily as the defect: the
+ * first version failed on a comment that quotes `peopleFrom !== 'live'` while saying why nothing
+ * branches on it any more, and on one that names `/settings/export` while saying why the link to it
+ * is drawn to an owner only. A test that a comment can fail is a test that punishes explaining.
  */
+const source = (area: string): string =>
+  readFileSync(new URL(`./[area]/areas/${area.charAt(0).toUpperCase()}${area.slice(1)}.svelte`, import.meta.url), 'utf8')
+    .replaceAll(/<!--[\s\S]*?-->/gu, '')
+    .replaceAll(/\/\*[\s\S]*?\*\//gu, '');
+
+/** Every area's file, for the checks about a handler rather than one area's markup (ARC-7b split them). */
+const PAGE = AREAS.map(source).join('\n');
+
+/** One area's markup: its own file from `</script>` on, so a name in the script cannot stand in for a control. */
 function slice(area: string): string {
-  const opens = AREAS.map((a) => ({ a, at: PAGE.indexOf(`area === '${a}'}`) }))
-    .filter((o) => o.at >= 0)
-    .sort((x, y) => x.at - y.at);
-  const here = opens.findIndex((o) => o.a === area);
-  assert.ok(here >= 0, `${area} has no arm in the markup`);
-  const from = opens[here]!.at;
-  const to = opens[here + 1]?.at ?? PAGE.length;
-  return PAGE.slice(from, to);
+  const text = source(area);
+  const from = text.indexOf('</script>');
+  assert.ok(from >= 0, `${area} has no markup`);
+  return text.slice(from);
 }
 
 /** One control per owner's area that a colleague was offered and cannot use. */

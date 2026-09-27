@@ -233,6 +233,32 @@ const DECLARED: Record<string, Version> = {
       'The studio roles Personal relabels, `setting.label_people__role__client` and its siblings, lose their fifth: the `registrar` label went, because People 2.0.0 no longer offers the value (M3 B9) -> a50db125a0a2beb1',
     ],
   },
+  'personal@1.7.1': {
+    holds: `
+      extends.register.people.role.adviser extends.register.people.role.family extends.register.people.role.friend
+      extends.register.people.role.landlord extends.register.people.role.tradesperson
+      metric.bills-this-week metric.budget-each-month metric.logged-by-goal metric.logged-this-week-by-goal
+      metric.put-by-by-goal metric.saved-toward-goals metric.spent-this-month metric.spent-this-month-by-category
+      page.goals page.home-personal page.my-project page.spending
+      register.budgets register.goal_log register.goals register.project_steps register.put_by register.savings_goals
+      register.spending
+      setting.holds_obligations setting.holds_people setting.holds_things
+      setting.label_budgets setting.label_goal_log setting.label_goals setting.label_obligations
+      setting.label_people__role__accountant setting.label_people__role__client setting.label_people__role__collaborator
+      setting.label_people__role__contractor
+      setting.label_project_steps setting.label_put_by setting.label_savings_goals setting.label_spending
+      setting.label_things setting.label_things__lane__building setting.label_things__lane__earning
+      setting.label_things__lane__parked setting.label_things__lane__retired setting.label_things__revenue
+      setting.lk_10103af7 setting.lk_1d01726f setting.lk_303a3cce setting.lk_4f9bf906 setting.lk_666e92eb
+      setting.lk_91a285a5 setting.lk_d66e361a setting.lk_f625eca1
+      setting.one_budgets setting.one_obligations setting.one_spending setting.one_things
+      setting.shared_version setting.speaks
+      setting.voice_home setting.voice_lists setting.voice_needs_you setting.voice_nothing_needs_you
+      setting.voice_right_now setting.voice_since_away
+    `,
+    declares: '1e9eb57c702e9659',
+    history: ["Home's empty title, `setting.voice_nothing_needs_you`, loses its closing full stop, as every other title already has -> 1e9eb57c702e9659"],
+  },
   'student@1.2.0': {
     holds: `
       page.home-student page.studies register.assignments register.courses register.study_sessions
@@ -244,6 +270,18 @@ const DECLARED: Record<string, Version> = {
     `,
     declares: 'd7fb53638c177532',
     history: ['Raised to 1.2.0 in `08142621`, which shows the course on `assignments` by default, so a first day says what each piece of work is for -> d7fb53638c177532'],
+  },
+  'student@1.2.1': {
+    holds: `
+      page.home-student page.studies register.assignments register.courses register.study_sessions
+      setting.label_assignments setting.label_courses setting.label_study_sessions
+      setting.one_assignments setting.one_courses setting.one_study_sessions
+      setting.shared_version setting.speaks
+      setting.voice_home setting.voice_lists setting.voice_needs_you setting.voice_nothing_needs_you
+      setting.voice_right_now setting.voice_since_away
+    `,
+    declares: 'e13772efff3d1072',
+    history: ["Home's empty title, `setting.voice_nothing_needs_you`, loses its closing full stop, as every other title already has -> e13772efff3d1072"],
   },
   'founder@1.3.2': {
     holds: `
@@ -289,6 +327,19 @@ const DECLARED: Record<string, Version> = {
     declares: 'b3550baded7ee204',
     history: ["Raised to 1.5.0 because `page.home-founder` draws Money's Due this week and a Lapsing table over Estate's services, and requires the services list -> b3550baded7ee204"],
   },
+  'founder@1.5.1': {
+    holds: `
+      metric.datapoints-30d page.dashboard page.home-founder page.organisation page.project
+      register.datapoints register.organisations
+      setting.shared_version setting.speaks
+      setting.voice_home setting.voice_lists setting.voice_needs_you setting.voice_nothing_needs_you
+      setting.voice_right_now setting.voice_since_away
+    `,
+    declares: '0dab9110c0bce0d0',
+    history: [
+      "Home's empty title, `setting.voice_nothing_needs_you`, loses its closing full stop, and `page.home-founder` takes Due this week from Money by name since money-core 3.0.0 retired Money's own Home -> 0dab9110c0bce0d0",
+    ],
+  },
   'team@2.3.0': {
     holds: `
       page.agent-work page.cycles page.home-team page.project register.cycle_plan register.cycles
@@ -324,6 +375,20 @@ const DECLARED: Record<string, Version> = {
     declares: '96ace671f9e7f0e6',
     history: ['Raised to 2.4.0 because `home-team` drew a blocked ticket due inside the week under Blocked and again under Due this week, and In flight now carries the due day that holding it back would otherwise have taken off the page -> 96ace671f9e7f0e6'],
   },
+  'team@2.4.1': {
+    holds: `
+      page.agent-work page.cycles page.home-team page.project register.cycle_plan register.cycles
+      setting.holds_people setting.holds_tasks
+      setting.label_cycle_plan setting.label_cycles setting.label_people setting.label_people__role__collaborator
+      setting.label_tasks setting.label_tasks__state__backlog setting.label_tasks__state__doing
+      setting.label_tasks__state__open setting.label_tasks__state__review
+      setting.one_tasks setting.shared_version setting.speaks
+      setting.voice_home setting.voice_lists setting.voice_needs_you setting.voice_nothing_needs_you
+      setting.voice_right_now setting.voice_since_away
+    `,
+    declares: '177854b0f15b0158',
+    history: ["Home's empty title, `setting.voice_nothing_needs_you`, loses its closing full stop, as every other title already has -> 177854b0f15b0158"],
+  },
   'guide@1.2.0': {
     holds: `
       metric.guide-choices-made metric.guide-choices-open metric.guide-idea-left metric.guide-idea-reached
@@ -338,6 +403,21 @@ const DECLARED: Record<string, Version> = {
     `,
     declares: '8bdca5132ff466b5',
     history: ['Raised to 1.2.0 in `783095a7`, which asks before the next milestone starts (`start_next_milestone`) and lets a model form the first plan as rows on Decide -> 8bdca5132ff466b5'],
+  },
+  'guide@1.2.1': {
+    holds: `
+      metric.guide-choices-made metric.guide-choices-open metric.guide-idea-left metric.guide-idea-reached
+      metric.guide-milestones metric.guide-milestones-reached metric.guide-steps-agents metric.guide-steps-blocked
+      metric.guide-steps-done metric.guide-steps-done-7d metric.guide-steps-done-by-week metric.guide-steps-open
+      page.guide page.home-guide page.milestone
+      register.choices register.milestones register.resources register.steps
+      setting.label_choices setting.label_milestones setting.label_resources setting.label_steps
+      setting.shared_version setting.speaks setting.start_next_milestone
+      setting.voice_home setting.voice_lists setting.voice_needs_you setting.voice_nothing_needs_you
+      setting.voice_right_now setting.voice_since_away
+    `,
+    declares: 'c78b79e54f66d0bd',
+    history: ["Home's empty title, `setting.voice_nothing_needs_you`, loses its closing full stop, as every other title already has -> c78b79e54f66d0bd"],
   },
 };
 

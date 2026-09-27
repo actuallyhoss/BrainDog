@@ -103,8 +103,8 @@
      picker, and a glyph there sits on top of a checkbox, qualifying a control instead of a row. */
   const glyphAt = $derived(glyphColumn(columns));
 
-  /* WHICH LINE OF A PHONE CARD EACH COLUMN SITS ON, decided once from the columns and never from a
-     row. The two rules and the measurement that bought them are with `cardPlan` in `../types.ts`. */
+  /* WHICH COLUMNS A PHONE CARD MAY DRAW, decided once from the columns and never from a row. The rules are with
+     `cardPlan` in `../types.ts`. */
   const plan = $derived(cardPlan(columns));
 
   /**
@@ -202,18 +202,12 @@
   Fe…`, `GBP −19,100.00` spilling into the column beside it, and the Balance column, which is the
   entire reason the block exists, off the right edge behind a scrollbar.
 
-  EVERY COLUMN, LABELLED. A register's card can pick three fields because its declaration names
-  them; a block table has columns and no such declaration, so guessing which three matter would be
-  guessing. The first column leads the card and the rest are label and value — nothing hidden,
-  nothing cut, and no horizontal scroll on the surface `13 §10` says is for reading.
-
-  AND NO LONGER ONE LINE EACH, which is what that paragraph used to build. Every column after the
-  first was a label-and-value line of its own, so a four-column table was a four-line card: at 390,
-  `/p/money` was 6,267px against 2,800px at 1440, and its forecast was 1,615px for thirteen payments
-  at 116 to 144px each. The promise is kept and the lines are not. Every column is still on the card
-  with its label; `cardPlan` decides only which line it sits on, from the alignment and truncation
-  the columns already declare. The title and the figure share the first line, and the rest is a
-  quiet second line, text at its start and quantities at its end.
+  A CARD IS THE LEAD, THE FIGURE AND AT MOST TWO UNLABELLED VALUES. A register's card can pick its
+  fields because its declaration names them; a block table has columns and no such declaration, so
+  `cardPlan` and `cardCells` in `../types.ts` decide from the alignment and truncation the columns
+  already declare. The title and the figure share the first line, and a quiet second line holds the
+  first values that are there, text at its start and quantities at its end, each named for a screen
+  reader and unlabelled on screen, as the figure is.
 -->
 <!--
   ONE CELL BODY, DRAWN BY BOTH ARMS.
@@ -235,15 +229,15 @@
 
 {#snippet pair(row: TableRow, cell: CardCell)}
   <span class="table-card-pair" data-truncate={cell.column.truncate ?? 'end'}>
-    {#if !cell.column.hideLabel}<span class="table-card-label">{cell.column.label}</span>{/if}
+    <span class="table-card-name">{cell.column.label}</span>
     <span class="table-card-value">{@render cellBody(row, cell.column, cell.value)}</span>
   </span>
 {/snippet}
 
 {#snippet card(row: TableRow)}
-  {@const cells = cardCells(row, columns)}
-  {@const title = cells[plan.title]}
-  {@const mark = cells[plan.mark]}
+  {@const drawn = cardCells(row, columns, plan)}
+  {@const title = drawn.title}
+  {@const mark = drawn.mark}
   <span class="table-card-head">
     <span class="table-card-lead">
       {#if row.tone}
@@ -261,13 +255,13 @@
       </span>
     {/if}
   </span>
-  {#if plan.start.length + plan.end.length > 0}
+  {#if drawn.start.length + drawn.end.length > 0}
     <span class="table-card-rest">
-      {#if plan.start.length > 0}
-        <span class="table-card-start">{#each plan.start as i}{@render pair(row, cells[i]!)}{/each}</span>
+      {#if drawn.start.length > 0}
+        <span class="table-card-start">{#each drawn.start as cell}{@render pair(row, cell)}{/each}</span>
       {/if}
-      {#if plan.end.length > 0}
-        <span class="table-card-end">{#each plan.end as i}{@render pair(row, cells[i]!)}{/each}</span>
+      {#if drawn.end.length > 0}
+        <span class="table-card-end">{#each drawn.end as cell}{@render pair(row, cell)}{/each}</span>
       {/if}
     </span>
   {/if}

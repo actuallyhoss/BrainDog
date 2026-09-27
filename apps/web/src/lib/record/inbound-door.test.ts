@@ -44,11 +44,14 @@ function host(answer: (() => Response) | null): { io: Fetch; sent: Sent[] } {
 }
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const AREA = readFileSync(join(HERE, '..', '..', 'routes', 'settings', '[area]', '+page.svelte'), 'utf8');
+const SETTINGS = join(HERE, '..', '..', 'routes', 'settings', '[area]');
+/* THE INGEST AREA AND THE STATE IT SHARES WITH BILLING, where the host's answer is asked and kept (ARC-7b). */
+const AREA = [join(SETTINGS, 'areas', 'Ingest.svelte'), join(SETTINGS, 'settings-state.svelte.ts')].map((f) => readFileSync(f, 'utf8')).join('\n');
 const INGEST = ((): string => {
-  const from = AREA.indexOf("{:else if area === 'ingest'}");
+  const markup = readFileSync(join(SETTINGS, 'areas', 'Ingest.svelte'), 'utf8');
+  const from = markup.indexOf('</script>');
   assert.ok(from > 0, 'there is no ingest area');
-  return AREA.slice(from, AREA.indexOf('{:else if area ===', from + 10));
+  return markup.slice(from);
 })();
 
 test('A HOST WITH NO MINT DOOR IS KNOWN BEFORE ANYBODY PRESSES ANYTHING', async () => {

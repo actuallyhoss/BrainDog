@@ -124,12 +124,13 @@ function stepLines(list: unknown, at: readonly string[], arm: string, out: Appea
     const here = [...at, arm === '' ? String(i + 1) : copy.proposalArmStep(arm, i + 1)];
     const said = isRow(step) ? sayStep(step) : sayStep({});
     const verb = isRow(step) ? verbOf(step) : null;
-    /* A `call` STILL STOPS THE RUN AND A `script` DOES NOT (`flow.ts`: `startScript` queues it and goes on, a call fails
-       with NOT_IN_THIS_BUILD), so each gets the record dry run's sentence for it, not one sentence for both.
+    /* A `script` GOES ON WITHOUT WAITING, SO IT CARRIES THE DRY RUN'S SENTENCE; A `call` CARRIES NONE. Since AUT-2 a call
+       parks the run until its answer comes back, and the run goes on (`flow.ts`), so the "not in this build: a run stops
+       here" line it ended with was false; the step's own sentence says what it calls.
        NO `as:` IS HANDED ON. The sentence said what `as:` keeps when a step named one, because `sayStep` before it said
        "keeping the answer as"; it says "keeping the id of its queued run as" now, and handed the name, the line said
        the same fact twice. An empty name is the sentence without that clause. */
-    const tail = verb === 'call' ? copy.proposalNotBuilt : verb === 'script' ? copy.proposalScriptGoesOn : '';
+    const tail = verb === 'script' ? copy.proposalScriptGoesOn : '';
     out.push({ label: copy.proposalStep(here), value: tail === '' ? said : `${said}. ${tail}` });
     if (verb === 'if' && isRow(step)) {
       stepLines(step.then, here, canvas.then, out);

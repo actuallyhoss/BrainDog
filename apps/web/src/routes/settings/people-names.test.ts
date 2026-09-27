@@ -28,7 +28,7 @@ import { PEOPLE_ACCESS } from '../../lib/record/fixtures/sample.ts';
 import { personOf } from '../../lib/record/settings-write.ts';
 
 /** The page without its comments, so a comment quoting the defect cannot fail or pass a check. */
-const PAGE = readFileSync(new URL('./[area]/+page.svelte', import.meta.url), 'utf8')
+const PAGE = readFileSync(new URL('./[area]/areas/People.svelte', import.meta.url), 'utf8')
   .replaceAll(/<!--[\s\S]*?-->/gu, '')
   .replaceAll(/\/\*[\s\S]*?\*\//gu, '');
 

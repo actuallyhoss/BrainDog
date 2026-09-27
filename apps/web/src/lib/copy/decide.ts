@@ -106,11 +106,8 @@ export const decide = {
   /** Where a step sits: `Step 2`, and inside a branch `Step 2, if so 1` or `Step 2, if not 1`, in the canvas's arm words. */
   proposalStep: (at: readonly string[]) => `Step ${at.join(', ')}`,
   proposalArmStep: (arm: string, n: number) => `${arm.toLowerCase()} ${n}`,
-  /* `packages/record` `automations.ts` says it in these words in the dry run: a `call` step installs, and a run that
-     reaches one fails there (`NOT_IN_THIS_BUILD` in the kernel's `flow.ts`). */
-  proposalNotBuilt: 'Not in this build: a run stops here, after the steps before it.',
   /* A `script` STEP RUNS SINCE `e6010208` (`flow.ts` `startScript` queues the script and the run goes on), and Decide
-     went on ending it with `proposalNotBuilt` where the dry run had stopped. These are the dry run's facts in the
+     went on ending it with a "not in this build" line where the dry run had stopped. These are the dry run's facts in the
      owner's order, all four ways `startScript` stops a run included. What `as:` keeps, the id of the queued run, is
      said by the canvas's sentence before it. */
   proposalScriptGoesOn:
@@ -158,6 +155,11 @@ export const decide = {
   arrangeCallNoKey: 'with no key',
   arrangeCallNoHost: 'A service it does not name',
   arrangeCallSends: (fields: string) => `sends ${fields}`,
+  /** A pack's cadence (`every 1h`) in words: "every hour", "every 3 hours". */
+  arrangeCallEvery: (n: number, unit: 'm' | 'h' | 'd' | 'w') => {
+    const word = { m: 'minute', h: 'hour', d: 'day', w: 'week' }[unit];
+    return n === 1 ? `every ${word}` : `every ${n.toLocaleString('en')} ${word}s`;
+  },
   arrangePacks: 'Packs',
   arrangeInstalls: (names: readonly string[]) => `Installs ${names.join(', then ')}`,
   /** The same line inside the Packs section, which is why `arranged.ts` guards against printing both. */

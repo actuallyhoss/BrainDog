@@ -117,9 +117,11 @@ exception with no settings toggle, and it solves the screen-reader collision *me
 composite widget flips NVDA and JAWS out of browse mode, so a grid is the only place bare letters are
 safe and it is exactly where they are wanted.
 
-**`copy.ts`.** Every UI literal, in one file. Load-bearing twice: it is the only place a sentence is
-typed, so the rule that the interface never explains itself is reviewable in one pass; and it is the
-first input of the screenshot allow-list, where only text a developer typed into source stays legible.
+**`copy.ts` and `lib/copy/`.** Every UI literal, in one object: `copy`, typed in one area file per web
+domain under `lib/copy/` and spread together by `copy.ts`. Load-bearing twice: the area files are the
+only place a sentence is typed, so the rule that the interface never explains itself is reviewable in
+one pass over `lib/copy/`; and it is the first input of the screenshot allow-list, where only text a
+developer typed into source stays legible.
 
 
 **The widgets** (`routes/p/[slug]`, `lib/record/arrange.ts`, `lib/ui/AddBlock.svelte`). A page is a

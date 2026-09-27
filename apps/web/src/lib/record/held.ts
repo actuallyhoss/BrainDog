@@ -78,11 +78,3 @@ export const refOptions = (register: string): { value: number; label: string }[]
  * `fixtures/fill.ts`, which puts the sample's rows here for the tests that hold those engines to the kernel's.
  */
 export const ROWS: Record<string, Entry[]> = {};
-
-/**
- * The factor tables a figure multiplies by, by name: none, in a shipped build, and filled by `fixtures/fill.ts`.
- *
- * A RECORD CARRIES ITS FACTORS ON EACH FIGURE'S DECLARATION (`lookups`), and the kernel reads them there. Only the
- * browser's own figure engine reads this table, and only a test runs that engine, over the sample it fills in here.
- */
-export const LOOKUPS: Record<string, Record<string, number>> = {};

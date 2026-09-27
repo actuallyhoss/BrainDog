@@ -144,11 +144,14 @@
     hidden = new Set(pref.read().columns?.[id] ?? []);
   });
 
-  /** Every column back, and the register's entry out of the cookie rather than emptied in it. */
+  /** Every column back, and the register's entry out of the cookie rather than emptied in it. The number the reader
+      turned on stays on: it is in the set because it is drawn (`projected`), so emptying the set would take it away. */
   function showAll() {
-    hidden = new Set();
+    const kept = hidden.has('seq') ? ['seq'] : [];
+    hidden = new Set(kept);
     const all = { ...pref.read().columns };
-    delete all[id];
+    if (kept.length > 0) all[id] = kept;
+    else delete all[id];
     pref.write({ columns: all });
   }
 
@@ -629,8 +632,10 @@
   /* The register's own projection, with its state marked as the column that carries the row's
      tone, so `⊘ open` reads as one thing rather than a mark in one column and a word in another. */
   const projected = $derived(
-    columnsFor(id, decl)
-      .filter((c) => !hidden.has(c.field))
+    /* THE NUMBER IS THE ONE COLUMN OFF BY DEFAULT (DSN-5: no list has an id column until Display adds "Number"), so for
+       it the stored set means the reverse: in the set, drawn. */
+    columnsFor(id, decl, hidden.has('seq'))
+      .filter((c) => c.field === 'seq' || !hidden.has(c.field))
       .map((c) => (c.field === decl?.state ? { ...c, tone: true } : c))
       .map((c) => weighed(c, c.field === decl?.title, result.entries)),
   );
@@ -982,22 +987,6 @@
        chip's own way back, because a row filled in with guesses is the row most likely to be unwanted. */
     if (filled.length > 0) toasts.push(copy.captureFilled(filled), { undo: takeBack(out.entry) });
     return out.entry;
-  }
-
-  /**
-   * The empty state's offer, made good: one real row, named as an example.
-   *
-   * IT WRITES, through the same path as the capture line, so an example row and a typed row are the same kind of
-   * thing and are put back the same way. On the sample it said what it would have done; the sample is gone.
-   */
-  function addExample() {
-    if (!decl) return;
-    /* "PUT IT BACK IF YOU DO NOT WANT IT", AND THERE WAS NOTHING TO PRESS. The sentence promised a way back that only
-       the row menu's Archive gave, and it was said when the record had REFUSED the example too, over the refusal's own
-       toast: `createRow` answered nothing either way. It answers the row now, and no row is no sentence. */
-    void createRow(copy.exampleTitle(decl.one.toLowerCase()), () => {}, copy.markExample).then((made) => {
-      if (made && decl) toasts.push(copy.exampleAdded(decl.one.toLowerCase()), { undo: takeBack(made) });
-    });
   }
 
   /**
@@ -2016,7 +2005,7 @@
     />
 
     {#if rows.length === 0}
-      <ListEmpty kind={emptyKind} register={id} {decl} size={result.total} {q} {filters} {searched} {addExample} />
+      <ListEmpty kind={emptyKind} register={id} {decl} size={result.total} {q} {filters} {searched} />
     {:else}
       <!-- THE VERBS BELONG TO THE LIST, NOT TO ONE OF ITS TWO BODIES. Putting the branch in the
            markup rather than in the stylesheet swallowed this into the card arm, so a desktop

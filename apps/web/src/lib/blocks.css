@@ -1037,10 +1037,27 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* The renderer names a glyph and ships no art for it yet, so the slot takes no room rather than
-     holding an empty square until the glyph set lands. */
+  /* THE SLOT DRAWS ONLY WHAT THE HOST DREW INTO IT (`RenderOptions.icon`). The renderer ships no glyph art, so a
+     section whose name the host has no drawing for keeps an empty slot, and an empty slot takes no room rather than
+     holding a blank square. With a drawing it is `--icon-l` in the heading's own colour, and its block margins take
+     back what it stands above the heading's line, so the heading is as tall as it was without it. */
   .sec-glyph {
     display: none;
+  }
+
+  .sec-glyph:has(> svg) {
+    display: inline-flex;
+    align-self: center;
+    flex: none;
+    inline-size: var(--icon-l);
+    block-size: var(--icon-l);
+    margin-block: calc((1lh - var(--icon-l)) / 2);
+  }
+
+  .sec-glyph > svg {
+    display: block;
+    inline-size: 100%;
+    block-size: 100%;
   }
 
   .sec-fold {
@@ -2114,6 +2131,20 @@
     display: none;
   }
 
+  /* A CHIP WHOSE NAME THE HOST DREW shows the drawing in place of the dot, `--icon-m` in the chip's own colour. */
+  .pill-glyph:has(> svg) {
+    inline-size: var(--icon-m);
+    block-size: var(--icon-m);
+    border-radius: 0;
+    background: none;
+  }
+
+  .pill-glyph > svg {
+    display: block;
+    inline-size: 100%;
+    block-size: 100%;
+  }
+
   .pill-figure {
     color: var(--ink);
     font-size: var(--t-lg);
@@ -2476,11 +2507,10 @@
      * `/p/money` was 6,267px against 2,800px at 1440, its forecast 1,615px for thirteen payments at
      * 116 to 144px each, and the services table on `/p/estate` 2,329px for sixteen rows at 145px.
      *
-     * Now the title and the figure share the first line and every other column is the second,
-     * still labelled: text at its start, quantities at its end. Which column goes where is
+     * Now the title and the figure share the first line and at most two more values are the second,
+     * unlabelled: text at its start, quantities at its end. Which column goes where is
      * `cardPlan` in `braindog-render`, read from the alignment and truncation the table declares;
-     * this only draws it. Nothing left the card, so this is layout, which is all a width may change
-     * (05 §6).
+     * this only draws it. Which values a card draws is `cardCells` (05 §6).
      */
     .table-card-head {
       display: flex;
@@ -2564,11 +2594,6 @@
       align-items: baseline;
       gap: var(--sp-1);
       min-inline-size: 0;
-    }
-
-    .table-card-label {
-      color: var(--dim);
-      font-size: var(--t-xs);
     }
 
     .table-card-value {
@@ -2968,49 +2993,33 @@
   }
 
   /* ── the visible fence ──────────────────────────────────────────────────
-     Designed, not apologetic. It shows exactly what the author typed with the reason above it, and
-     when the author is an agent it is the only feedback channel there is (05 §3). */
-
-  .block-degraded .media {
-    border-start-start-radius: 0;
-    border-start-end-radius: 0;
-  }
-
-  /* THE BAR IS `--s1` WITH THE WARN WASH ON IT, and it used to be fourteen per cent of the FILL
-     role mixed into `--s1`.
-
-     Two things were wrong with that and `tokens.css` had already argued both. The hue was
-     `--warn-fill`, which is solved for an opaque chip or bar at 3:1 and in the dark scheme sits
-     BELOW `--warn` in lightness, so a tint of it does not gain in the dark the way a tint of the
-     text role does: measured against the `--s1` around it, the old bar was 1.19:1 in light and
-     1.19 in dark, where the wash is 1.21 and 1.28. And fourteen was a fifth strength of a tint the
-     product otherwise draws at twelve.
-
-     `--warn-wash` is the token for this and it already existed, declared for `.prop-row[data-hole]`
-     with a note saying the second warn-by-construction element gets a token beside it rather than
-     another percentage. This is that second element, and the token was already the right one. It
-     is painted over an explicit `--s1` rather than mixed into it, so what is behind the tint is a
-     declared surface rather than part of a call-site value.
-
-     The text on it is unmoved by the swap: `--ink2` measures 7.72 in light and 7.15 in dark where
-     it measured 7.82 and 7.65, and the glyph below measures 6.23 at its worst across the four
-     palettes. */
+     A QUIET NOTE, NOT AN ALARM (05 §3; design SYS-9). Nothing on it failed, so it has no border, no red
+     and no warning glyph: the reason first, as the parser's plain sentence, then what was written,
+     small, in the identifier face, in `--dim` on the sunk ground. The source WRAPS inside its column
+     rather than scrolling like a `.media` code block, so a long line never pushes a phone page
+     sideways. `Degraded.svelte` and `toHTML` write the same two classes. */
   .degraded-fix {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-2);
-    padding: var(--sp-2) var(--sp-3);
-    background: var(--s1);
-    border-block-end: 1px solid var(--line-soft);
-    border-start-start-radius: var(--r-md);
-    border-start-end-radius: var(--r-md);
+    margin-block-end: var(--sp-2);
     color: var(--ink2);
     font-size: var(--t-sm);
+    overflow-wrap: anywhere;
   }
 
-  .degraded-fix::before {
-    content: '⚠';
-    color: var(--warn);
+  .degraded-source {
+    margin: 0;
+    padding: var(--sp-2) var(--sp-3);
+    background: var(--sunk);
+    border-radius: var(--r-md);
+    color: var(--dim);
+    font-family: var(--font-id);
+    font-size: var(--t-xs);
+    line-height: 1.6;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
   }
 
   .degraded-action {
@@ -3043,6 +3052,15 @@
   .typed[data-form='money'],
   .typed[data-form='pct'] {
     font-weight: 500;
+  }
+
+  /* A GLYPH NAMED AMONG WORDS (`{{icon:rocket}}`) is 1em, so it follows the type it sits in, in the words' colour.
+     Only the drawn glyph takes room; the named, empty span a host with no art gets is nothing on the line. */
+  svg.glyph-inline {
+    display: inline-block;
+    inline-size: 1em;
+    block-size: 1em;
+    vertical-align: -0.125em;
   }
 
   /* A hole is an affordance, never a tag: it is the thing that fixes it. `font: inherit` sits it in

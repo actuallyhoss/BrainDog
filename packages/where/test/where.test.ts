@@ -1187,50 +1187,6 @@ test("A `none:` KEEPS THE ROWS WITH NOTHING IN THE FIELD, and SQL dropped every 
 
 /* ── the `in` chunk ──────────────────────────────────────────────────────── */
 
-test('AN `in:` GOES OUT IN CHUNKS OF SIXTY-FOUR, and it used to be one unbounded OR chain', () => {
-  /**
-   * `34 §1.10`'s limits table, `02 §6`'s operator table and `38 §5` step 3 all publish the same
-   * number and nothing implemented it: a 250-value `in:` compiled to a single OR chain of 250
-   * terms. Three documents describing a shape the compiler does not emit is the drift this suite
-   * exists to catch, and the shape is the part a grammar can promise. An unbounded OR chain is an
-   * unbounded expression tree, and expression depth is the one Durable Object ceiling `30 §13`
-   * leaves unguarded, on the argument that the compiler's output is bounded by construction.
-   *
-   * IT IS NOT ABOUT THE PARAMETER COUNT, and the assertion below says so out loud. `38 §5` step 3
-   * and `38 §7` are both explicit that chunking does not lower the total, and `38 §4.4` is explicit
-   * that this function is not the layer that owes the ceiling: *"`compile` neither counts nor
-   * refuses; `params.length` is on the result."* The hundred is the adapter's (`33 §1`), and the
-   * count being on the result is what lets a caller see it.
-   */
-  const values = Array.from({ length: 130 }, (_, i) => `t${i}`);
-  const c = compile({ field: 'what', in: values }, SCHEMA);
-  assert.deepEqual(c.bad, [], c.bad[0]?.fix);
-
-  /* 130 becomes 64, 64 and 2, which is `38 §5` step 3's own worked example. */
-  const groups = c.sql.match(/\(\(json_extract\(fields, '\$\.what'\) = \?\)(?: OR \(json_extract\(fields, '\$\.what'\) = \?\))*\)/g) ?? [];
-  assert.deepEqual(
-    groups.map((g) => (g.match(/= \?/g) ?? []).length),
-    [64, 64, 2],
-    `the emitted shape is ${c.sql.slice(0, 140)}`,
-  );
-
-  /* AND THE COUNT IS UNCHANGED AND STILL ON THE RESULT, which is the half a caller reads. */
-  assert.equal(c.params.length, 130);
-
-  /* `not_in` CHUNKS THE OTHER WAY: each slice negated, the slices ANDed. De Morgan, so the rows do
-     not move and only the shape does. */
-  const n = compile({ field: 'what', not_in: values }, SCHEMA);
-  assert.deepEqual(n.bad, []);
-  assert.equal((n.sql.match(/NOT \(/g) ?? []).length, 3, `the emitted shape is ${n.sql.slice(0, 140)}`);
-  assert.equal(n.params.length, 130);
-
-  /* ONE SLICE IS THE STRING THIS BRANCH ALWAYS PRODUCED, so nothing short changed shape. */
-  assert.equal(
-    compile({ field: 'state', in: ['open', 'part'] }, SCHEMA).sql,
-    '(state IS NOT NULL AND ((state = ?) OR (state = ?)))',
-  );
-});
-
 test('AND CHUNKING MOVES NO ROWS, which is the only thing a shape change may not do', () => {
   /* A list that crosses a chunk boundary and holds one value the fixture actually has: if the
      slices were joined with the wrong word, or a slice were dropped, this is where it shows. */

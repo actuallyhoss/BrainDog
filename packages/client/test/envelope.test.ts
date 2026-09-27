@@ -27,8 +27,10 @@ const answering = (status: number, body: string, type = 'application/json') =>
     fetch: (async () => new Response(body, { status, headers: { 'content-type': type } })) as typeof globalThis.fetch,
   });
 
-const refusalOf = (out: { ok: boolean } & Record<string, unknown>): { code: string; fix: string } | undefined =>
-  (out as { refusal?: { code: string; fix: string } }).refusal;
+/* THE REASON IS IN `detail`, AND `fix` IS THE ONE SENTENCE A PERSON READS, the same for every way the record is not
+   reached; so the cases below read the reason from `detail`. */
+const refusalOf = (out: { ok: boolean } & Record<string, unknown>): { code: string; fix: string; detail?: string } | undefined =>
+  (out as { refusal?: { code: string; fix: string; detail?: string } }).refusal;
 
 test('AN `ok` THAT IS NOT A BOOLEAN IS NOT AN ANSWER, whatever else the body carries', async () => {
   for (const [status, body] of [
@@ -40,7 +42,7 @@ test('AN `ok` THAT IS NOT A BOOLEAN IS NOT AN ANSWER, whatever else the body car
     const out = await answering(status, body).boot();
     assert.equal(out.ok, false, body);
     assert.equal(refusalOf(out)?.code, 'UNREACHABLE', body);
-    assert.match(refusalOf(out)?.fix ?? '', new RegExp(`${status} with an answer this client does not recognise`), body);
+    assert.match(refusalOf(out)?.detail ?? '', new RegExp(`${status} with an answer this client does not recognise`), body);
   }
 });
 
@@ -53,18 +55,19 @@ test('AND A SUCCESS THAT CARRIES NO VALUE IS NOT A SUCCESS', async () => {
   const out = await answering(200, '{"ok":true}').boot();
   assert.equal(out.ok, false);
   assert.equal(refusalOf(out)?.code, 'UNREACHABLE');
-  assert.match(refusalOf(out)?.fix ?? '', /carrying no value/);
+  assert.match(refusalOf(out)?.detail ?? '', /carrying no value/);
 });
 
 test('and the answers that were already refused are refused in the same words', async () => {
   const html = await answering(502, '<html>bad gateway</html>', 'text/html').boot();
-  assert.equal(refusalOf(html)?.fix, 'The record could not be reached: 502 with a body that is not JSON');
+  assert.equal(refusalOf(html)?.fix, 'BrainDog could not reach this record.');
+  assert.equal(refusalOf(html)?.detail, '502 with a body that is not JSON');
 
   const bare = await answering(422, '{"ok":false}').boot();
-  assert.match(refusalOf(bare)?.fix ?? '', /a failure carrying neither a refusal nor a conflict/);
+  assert.match(refusalOf(bare)?.detail ?? '', /a failure carrying neither a refusal nor a conflict/);
 
   const notAnObject = await answering(200, '[]').boot();
-  assert.match(refusalOf(notAnObject)?.fix ?? '', /an answer this client does not recognise/);
+  assert.match(refusalOf(notAnObject)?.detail ?? '', /an answer this client does not recognise/);
 });
 
 test('AND EVERY REAL ANSWER STILL PASSES THROUGH UNCHANGED, value, refusal and conflict alike', async () => {
@@ -97,7 +100,7 @@ test('THE KEY DOORS ARE HELD TO THE SAME SHAPES, because they are the same wire 
 
   const opened = await answering(200, '{"ok":true}').openKey({ label: 'Kiln deploy' });
   assert.equal(opened.ok, false);
-  assert.match(refusalOf(opened)?.fix ?? '', /carrying no value/);
+  assert.match(refusalOf(opened)?.detail ?? '', /carrying no value/);
 
   const fine = await answering(200, '{"ok":true,"value":{"credential":"credentials#1","label":"Kiln deploy","value":"bd_fake_value"}}').openKey({ label: 'Kiln deploy' });
   assert.ok(fine.ok);

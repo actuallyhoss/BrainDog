@@ -49,6 +49,7 @@ import { lockDown, openKeyStore, recordKeys } from './keys.ts';
 import { nameChange, reachLine, reachOf } from './reach.ts';
 import { initFrom } from './restore.ts';
 import { openSqlite, signedWebhooks, start } from './server.ts';
+import { rewrapAtStart } from './rewrap.ts';
 import { webhookPost } from './actions.ts';
 
 /**
@@ -584,6 +585,7 @@ async function serve(): Promise<void> {
     ...(shell === undefined ? {} : { shell }),
     ...(env.BRAINDOG_CATALOGUE === undefined ? {} : { catalogue: env.BRAINDOG_CATALOGUE }),
     sessionKey,
+    shareKey: store.shareKey,
     trustProxy: env.BRAINDOG_TRUST_PROXY === '1',
     /* THE SCHEDULED ACTIONS RUN ON THIS PROCESS'S TIMER, sending only to the origins their declarations name. */
     actions: {},
@@ -604,12 +606,16 @@ async function serve(): Promise<void> {
   /* `importKey` copied it, so these are the last copies this process holds as bytes. */
   sessionKey.fill(0);
   store.sessionKey.fill(0);
+  store.shareKey.fill(0);
 
   say(`braindog · ${file} · ${running.signIn.origin}`);
   /* A RECORD THIS BUILD REFUSES IS SERVED AS A REFUSAL, and this is the sentence that says why. `start()` used to exit
      here, so a container's health check saw a process gone rather than `/healthz`'s 503 and its code. */
   const stopped = running.api.kernel.refused();
   if (stopped) say(`  ${stopped.code}: ${stopped.fix} Every request is answered 503 until then, and /healthz says ${stopped.code}.`);
+  /* A NEW KEY FILE WITH THE OLD ONE BESIDE IT AS `.prev` IS A ROTATION, and this start moves the record's keys under the
+     new one before anybody is waiting on a key (`rewrap.ts`, `53 §5.6` step 8). */
+  if (!stopped) await rewrapAtStart(running.api, store, say);
   /* ONE LINE FOR WHO MAY GET IN, SAID OUT LOUD, because the safe default is also the surprising one:
      somebody who expected the server on their LAN needs to know why it is not, and somebody who set a
      token needs to know where to sign in. It names ways, never a key. */

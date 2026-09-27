@@ -803,7 +803,7 @@ of being code:
 | Sends | one grant, by label | the vault labels in `keys:`, each only to the host its vault entry says it opens, checked at every fetch (`keyRefused`; a fetch elsewhere is `FORBIDDEN` and refuses the run). A key with no `egress:` to go to is refused at install, and so is the vault's `slash` key (`FORBIDDEN` at `keys[i]`) |
 | Reads the record | no | the registers in `reads:`, with every secret field taken off and a filter on one refused |
 | Writes | the rows its mapping makes, into one register or series | creates and updates into the registers in `writes:`, applied together after the run, all or none |
-| Starts | on its schedule | on `runs.every`, no more often than every fifteen minutes (`ACTION_INTERVAL_TOO_SHORT`), first due at a jitter and not at once. `runs.door` and `runs.rule` are declared and **not wired**: nothing but the schedule queues a run |
+| Starts | on its schedule | on `runs.every`, no more often than every fifteen minutes (`ACTION_INTERVAL_TOO_SHORT`), first due at a jitter and not at once. a rule's `script` step starts one that says `runs.rule: true`, and every verified arrival at its `runs.door` queues one run with `input: { body, headers }`, at most `doorRunsPerDay()` a day (`startAtDoor` in `kernel/src/script.ts`) |
 | The install diff says | `CALLS OUT <host> · every … · grant "…"` (§7 rule 9) | `CALLS OUT <hosts> · every … · key "…"`, and when it both reads and fetches, a second sentence: *"<id> reads <lists> and may send what it reads to <hosts>."* Reading and fetching together is the one way a script can carry the record out, and that sentence is the owner's one chance to see it |
 | Ends short | the seven `PULL_*` codes (§9) | `PULL_ORIGIN_REFUSED`, `OUT_OF_BOUNDS`, `FORBIDDEN`, `DECLARATION_INVALID`, or the script's own throw with no code. The run's note says only that it did not finish; the reason goes in its log, which only an owner who reads every list the script touched is shown. Three refused runs in a row of the installed version pause it until the owner resumes it |
 | Tried before it is proposed | not by `script_try`, which takes a script only | yes, on request: `script_try` runs the draft now in the same sandbox, answers the writes it would make, its log and any refusal, and writes and files nothing |
@@ -822,8 +822,8 @@ naming a key is refused unsent and the script may catch that and go on; and it i
 as a run. It runs on a self-host whose actions are on and on the Cloud where `LOADER` is bound; elsewhere it is
 `NOT_IN_THIS_BUILD`, or on a Cloud with no `LOADER` a refusal that says there is no sandbox.
 
-**What is not built, said here because this document is where a reader looks for egress.** A door or a rule cannot
-start a script: `runs.door` and `runs.rule` install, and only the schedule queues a run. The egress line joins every
+**What is not built, said here because this document is where a reader looks for egress.** A door starts a script
+only on a verified arrival, and an unverified one starts nothing. The egress line joins every
 origin and every key into one line, so it does not say which host a key goes to, because `scriptEgress` does not
 see the vault; the key is held to its host at the fetch, not in the sentence the owner approves. And a key whose
 `opens` is not one of the script's `egress:` hosts is not refused at install, only at each fetch, where three

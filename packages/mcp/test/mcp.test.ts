@@ -1,5 +1,5 @@
 /**
- * The fifteen tools and the resources, from an agent's side, over a real record.
+ * The sixteen tools and the resources, from an agent's side, over a real record.
  *
  * Two things are being asserted, and the second is the unusual one. The first is that each tool does
  * what it says. The second is that its REFUSALS TEACH: the caller is a model that will try again
@@ -76,12 +76,13 @@ const refusal = (r: unknown) => {
 
 /* ── the surface itself ──────────────────────────────────────────────────── */
 
-test('THE COUNT IS THE DESIGN: fifteen, and each is named by the plan', () => {
+test('THE COUNT IS THE DESIGN: sixteen, and each is named by the plan', () => {
   /* `research-agent-path` §1.5: the eight of `10-MCP` §3 less what no token can use, plus `context`,
      `handoff` and `meet`, which are what an agent does every session. `decide` is ABSENT because no
      token reaches that rung: a tool that could only ever refuse is a tool an agent spends its turns
      discovering. `activity` is the fifteenth, and it is the one thing an agent could reach in Sam
      Brain (`brain_audit`) and nowhere here: see `activity.test.ts` for the rest of that comparison.
+     `triage` is the sixteenth, the one tool the ceiling was raised for (contracts §6.1).
 
      `money` WAS THE SIXTEENTH UNTIL 24 SEPTEMBER, and it read seven of money-core's figure ids by name, so the
      core knew one use case (`loop/research-m3-dynamic.md` B6, DIRECTION sections 22 and 24). A pack's figures are named
@@ -89,7 +90,7 @@ test('THE COUNT IS THE DESIGN: fifteen, and each is named by the plan', () => {
      other pack's (`figures.test.ts`, audit sixty-two finding 2). */
   assert.deepEqual(
     TOOLS.map((t) => t.name),
-    ['record_index', 'context', 'schema', 'get', 'list', 'search', 'history', 'activity', 'governance', 'propose', 'create', 'update', 'log', 'handoff', 'meet'],
+    ['record_index', 'context', 'schema', 'get', 'list', 'search', 'history', 'activity', 'governance', 'propose', 'create', 'update', 'log', 'handoff', 'meet', 'triage'],
   );
   for (const t of TOOLS) assert.ok(t.description.length > 30, `${t.name} has a description nobody can choose from`);
 });
@@ -103,7 +104,7 @@ test('AND NO TOOL READS A CREDENTIAL, because there is no vault tool', () => {
 test('a tool says whether it writes, so a client can tell its user before it runs', () => {
   assert.deepEqual(
     TOOLS.filter((t) => t.writes).map((t) => t.name),
-    ['propose', 'create', 'update', 'log', 'handoff', 'meet'],
+    ['propose', 'create', 'update', 'log', 'handoff', 'meet', 'triage'],
   );
 });
 

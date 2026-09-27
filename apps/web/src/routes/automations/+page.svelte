@@ -81,7 +81,7 @@
   </PageHead>
   <div class="page">
     {#if from === 'absent'}
-      <Empty kind="no-data-yet" title={words.absent} />
+      <Empty kind="no-data-yet" title={words.absent} body={words.absentHow} />
     {:else if rows.length === 0}
       <Empty kind="no-data-yet" title={words.none} body={words.noneWhy} {agentPrompt}>
         {#snippet actions()}<Button href="/automations/new">{words.newOne}</Button>{/snippet}

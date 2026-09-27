@@ -10,6 +10,7 @@
   /* THE DECLARATION CACHE, WHICH ONLY THE RECORD FILLS (`held.ts`). */
   import { REGISTERS } from '$lib/record/held.ts';
   import { LEVELS, type Level, type Person } from '$lib/record/schema.ts';
+  import { LIST_LEVELS } from '$lib/record/may.ts';
   /* THE WRITES THIS AREA MAKES, and the one reading of what the record answered to each. */
   import { addException, dropException, moveLevel, removeAccess, type Wrote } from '$lib/record/settings-write.ts';
   /* Lane F: erasing a person. */
@@ -354,7 +355,7 @@
       {#each people as p (p.id)}
         <li class="who">
           <div class="who-head">
-            <Face name={said(p)} you={self(p)} />
+            <Face name={said(p)} you={self(p)} kind="person" />
             <span class="who-name">{said(p)}</span>
             <!-- THE EMAIL, because that is what the invitation is bound to (12 §3) and what
                  tells two people with one name apart. And WHEN, because access with no date is
@@ -484,8 +485,10 @@
                 </label>
                 <label class="ex-field">
                   <span class="ex-label">{copy.exceptionLevel}</span>
+                  <!-- ONE LIST TAKES THE THREE LEVELS THE RECORD HONOURS THERE (`20 §1`, D5): a list's own Decides or
+                       Owner answers nothing more than Edits does, so offering them described a power it does not grant. -->
                   <select class="ex-select" bind:value={pickLevel}>
-                    {#each LEVELS as level}<option value={level}>{levelSaid(level)}</option>{/each}
+                    {#each LIST_LEVELS as level}<option value={level}>{levelSaid(level)}</option>{/each}
                   </select>
                 </label>
                 <Button weight="primary" type="submit" disabled={peopleBusy || !pickList}>{copy.exceptionAdd}</Button>

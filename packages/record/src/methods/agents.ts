@@ -80,7 +80,8 @@ export function methods(deps: RecordDeps) {
     const p = ctx.principal;
     if (p.kind === 'system') return true;
     if (p.kind !== 'person' && p.kind !== 'token') return false;
-    return p.level !== null && (ctx.registers === undefined || ctx.registers === '*');
+    /* AND A LEVEL THAT READS, as `wholeRecord` now asks: `append` reads nothing of the record (`20 §1`). */
+    return p.level !== null && p.level !== 'append' && (ctx.registers === undefined || ctx.registers === '*');
   };
 
   /**

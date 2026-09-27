@@ -72,9 +72,9 @@
  * COPIED IN: 183 findings and exit 1, one line per hash, every one of them saying `is not a commit in
  * this log`, and not one of them true. `git log` succeeds in a shallow clone and answers with the
  * single commit it was given, so nothing throws and the whole entry list reads as invented.
- * `actions/checkout@v4` clones at depth 1 unless a workflow says otherwise, and not one of the eight
- * checkouts in the five workflows under `.github/workflows` sets `fetch-depth`, so that reading is
- * what CI gets on every push.
+ * `actions/checkout@v4` clones at depth 1 unless a workflow says otherwise, and no checkout in the
+ * workflows under `.github/workflows` that test a push or a pull request sets `fetch-depth` (only
+ * `deploy.yml`'s does), so that reading is what CI gets on every push.
  *
  * SO IT DEEPENS THE CLONE RATHER THAN DECLINING TO RUN, and the reason is `tools/gates/run.mjs` and
  * not taste. That runner reads exit 3 as a skip, and then: `if (disallowed.length &&
@@ -86,7 +86,7 @@
  * then answer the question that was asked.
  *
  * THE FETCH IS THE ONE `fetch-depth: 0` WOULD HAVE MADE AT CHECKOUT, moved into the check that needs
- * it and away from five workflow files that would each have to remember. In a full clone it costs one
+ * it and away from every workflow file that would each have to remember. In a full clone it costs one
  * `git rev-parse` and fetches nothing, which is every developer run and every CI job the day a
  * workflow does set `fetch-depth: 0`. What is left on 3 is a shallow clone with nothing to deepen
  * from, a tarball or a copied tree, and that is not the CI path.

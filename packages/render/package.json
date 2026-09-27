@@ -1,13 +1,14 @@
 {
   "name": "braindog-render",
   "version": "0.0.0",
-  "description": "The BrainDog block dialect: a parser, thirty kinds over eight primitives, and two renderers held to one accessibility tree.",
+  "description": "The BrainDog block dialect: a parser, thirty-eight kinds over eight primitives, and two renderers held to one accessibility tree.",
   "type": "module",
   "license": "MIT",
   "exports": {
     ".": "./src/index.ts",
     "./svelte": "./svelte/index.ts",
-    "./glyphs": "./src/glyphs/index.ts"
+    "./glyphs": "./src/glyphs/index.ts",
+    "./glyphs/names": "./src/glyphs/names.ts"
   },
   "peerDependencies": {
     "svelte": "^5"

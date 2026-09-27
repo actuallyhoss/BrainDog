@@ -71,7 +71,7 @@ const value = <T>(r: { ok: boolean } & Record<string, unknown>): T => {
 };
 const refusal = (r: { ok: boolean }) => {
   assert.ok(!r.ok, 'the call succeeded');
-  return (r as never as { refusal: { code: string; fix: string; allowed?: string[] } }).refusal;
+  return (r as never as { refusal: { code: string; fix: string; allowed?: string[]; detail?: string } }).refusal;
 };
 
 /* ── it works ────────────────────────────────────────────────────────────── */
@@ -310,7 +310,9 @@ test('A NETWORK FAILURE IS A REFUSAL TOO, so a caller has exactly one branch to 
   const client = createClient({ base: 'http://127.0.0.1:9' });
   const out = refusal(await client.boot());
   assert.equal(out.code, 'UNREACHABLE');
-  assert.match(out.fix, /could not be reached/);
+  assert.match(out.fix, /could not reach this record/);
+  /* THE SOCKET'S REASON IS KEPT UNDER DETAILS, never as the sentence a person reads. */
+  assert.ok(typeof out.detail === 'string' && out.detail.length > 0, 'the reason was not kept under detail');
 });
 
 test('and an answer this client does not recognise is unreachable, not a success', async () => {

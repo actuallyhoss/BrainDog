@@ -213,9 +213,9 @@ const SUMMARIES: Record<FirstPartyId, string> = {
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.4.0',
-  people: '2.0.0',
-  'money-core': '2.5.0',
-  estate: '1.2.0',
+  people: '2.1.0',
+  'money-core': '3.0.0',
+  estate: '1.3.0',
   work: '1.8.0',
 };
 

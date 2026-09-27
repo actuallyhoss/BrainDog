@@ -20,8 +20,8 @@ test('a line and the period before it: the lead, the change, and the paths', () 
   /* A GAP BREAKS THE LINE: the current line starts again after 2 Sep, and never draws a zero there. */
   assert.equal((plan.lines[0]!.d.match(/M/gu) ?? []).length, 2);
   assert.match(plan.lines[0]!.end, /^M1000 /u);
-  assert.equal(plan.top, '£4,200.00');
-  assert.equal(plan.bottom, '£3,600.00');
+  assert.equal(plan.top, '£4.2k');
+  assert.equal(plan.bottom, '£3.6k');
   assert.deepEqual(plan.points[1]!.values, ['—', '£3,650.00']);
   assert.match(plan.sentence, /Revenue, 1 Sep £4,000.00 to 3 Sep £4,200.00, highest £4,200.00 on 3 Sep/u);
 });

@@ -46,6 +46,8 @@ import type { Column } from 'braindog-render/svelte';
 import { display, feedWho, homeCurrency, labelOf, walkTable, type BlockResult } from './api.ts';
 import { REGISTERS } from './held.ts';
 import { draftOf } from './field-draft.ts';
+import { citedWords } from '../cite.ts';
+import { moneyInText } from './money.ts';
 /* THE KINDS THAT DRAW THEMSELVES, asked first in `draw`. */
 import { drawerOf } from '../page/kinds/index.ts';
 
@@ -235,8 +237,13 @@ function progressRows(block: BlockResult): string[] {
   );
 }
 
-/** Two clauses of a sentence predicate as one. */
-const joined = (where: string | undefined, clause: string): string => (where?.trim() ? `${where}, ${clause}` : clause);
+/**
+ * Two clauses of a sentence predicate as one.
+ *
+ * A FIGURE'S WHERE MAY BE A PREDICATE TREE (MOD-4: one sentence cannot mix a comma with an `or`), which has no sentence
+ * to join a clause to, so the clause goes alone rather than a string operation throwing on an object.
+ */
+const joined = (where: unknown, clause: string): string => (typeof where === 'string' && where.trim() ? `${where}, ${clause}` : clause);
 
 /** The row for what no part holds: its label, linked to those rows, and its figure. */
 const unsetRow = (label: string, href: string, shown: string): string => `[${escapeCell(label)}](${href}) | ${escapeCell(shown)} | `;
@@ -760,7 +767,9 @@ function queueRows(block: BlockResult): string[] {
          is the six-cell row it always was. */
       ...options.map((o) => {
         const shows = showsCell((o as { shows?: unknown }).shows);
-        return ['opt', q.id, o.key, o.label, o.because, o.recommended ? 'true' : '', ...(shows ? [shows] : [])].map(escapeCell).join(' | ');
+        /* NO `{{ref:...}}` REACHES THE SCREEN: a Slash option's words carry citations, which read as their fallback
+           words here, and a stored money sentence is drawn in the record's currency, as `governance.ts` does. */
+        return ['opt', q.id, o.key, moneyInText(citedWords(o.label)), moneyInText(citedWords(o.because)), o.recommended ? 'true' : '', ...(shows ? [shows] : [])].map(escapeCell).join(' | ');
       }),
     ];
   });
@@ -1301,6 +1310,8 @@ export type Refusal = {
    * is already on screen; a second control saying so is a second control.
    */
   action?: { href: string; label: string };
+  /** The title is the block's own `empty:`, a sentence its author wrote, so the host reads it as text (a glyph). */
+  authored?: true;
 };
 
 /** Everything a surface needs to draw one block: the segments, or the reason there are none. */
@@ -1367,6 +1378,7 @@ export function draw(
          * and on a list that has never held a row no filter ran.
          */
         title: block.where || !block.empty ? `Nothing in ${held.name} yet.` : block.empty,
+        ...(block.where || !block.empty ? {} : { authored: true as const }),
         /* BE SPECIFIC ABOUT WHAT WILL BE HERE (19 §6). The register declares the sentence; every
            register does, and one screen was reading it. */
         ...(held.holds ? { body: `${held.name} holds ${held.holds}.` } : {}),
@@ -1379,7 +1391,7 @@ export function draw(
            the one line of user-facing English outside it. */
         ...(held.add ? { action: held.add } : {}),
       };
-    if (block.empty) return { kind: 'no-results', title: block.empty };
+    if (block.empty) return { kind: 'no-results', title: block.empty, authored: true };
     return { kind: 'no-results', title: 'Nothing matched.' };
   };
 
@@ -1388,7 +1400,7 @@ export function draw(
       segments: [],
       refusal: {
         kind: 'error',
-        /* `has` AND IT WAS `declares`. The same rule as the cycle refusal in `forecast.ts`: a
+        /* `has` AND IT WAS `declares`. The rule every refusal the kernel words keeps: a
            refusal is the teacher (`10 §7`), and the schema's verb in the first three words teaches
            the schema rather than the fix. The body below already names both halves in the
            dialect's own words, which is where an author needs them. */

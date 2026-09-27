@@ -45,6 +45,7 @@ import { serveAsks, type SlashAnswer } from '@braindog/host/slash-answers';
 
 import { alarmScheduler } from './alarm.ts';
 import { slashLook, workerSlashAnswers, workerSlashDoor, workerSlashModel } from './slash.ts';
+import { slashErasing } from './slash.ts';
 import { workerSlashMeter } from './slash-meter.ts';
 import { workerCatalogueOffers } from './catalogue.ts';
 import { serveKennel, servesKennel } from './kennel.ts';
@@ -57,7 +58,7 @@ import { fetchPush, pushKeyOf, servesPushKey, vapidKeys } from './vapid.ts';
 import { NO_SHARE_KEY, linkOpened, opensShare, serveShared, sharedNone, type SharedDoor } from '@braindog/host';
 /* NAMED APART FOR THE LINK'S DOOR, so the front doors' own limiter can import the same two functions under their own
    names without this file binding one name twice. */
-import { bindingLimiter as linkLimiter, refusedFor as linkRefused, type RateLimitBinding as LinkRateLimit } from '@braindog/host/limits';
+import { bindingLimiter as linkLimiter, refusedFor as linkRefused } from '@braindog/host/limits';
 import { shareKeyOf } from './share.ts';
 import { consume, pump } from './pump.ts';
 import { afterRestore, appPath, recoverRestore, restoredOf, asPage, atRoot, cloudIngest, copyAsked, copyRefusal, drained, ingestBudget, inward, isRecordId, legacyRedirect, restoreAsked, servesAccount, servesApi, servesAuth, servesBuild, servesIn, servesKey, servesMcp, type AppPath, type CloudIngestDeps, type Restored, type Stranded } from './route.ts';
@@ -72,7 +73,11 @@ import { workerSigner } from './sign.ts';
 import { dumpOf, prefixOf, r2Snapshots, type Dump } from './snapshots.ts';
 import { serveWorkerKeys, serveWorkerVault, servesKeys, servesVault, type KeyDeps } from './vault.ts';
 import type { GrantDeps } from './vault.ts';
+import { passphraseRoot } from './vault.ts';
+import { withVaultPassphrase, type PassphraseUnlock, type VaultPassphrase } from '@braindog/host';
+import type { HeldKeys, RewrapArgs, Rewrapped } from './rewrap.ts';
 import { serveOAuth } from './oauth.ts';
+import { servesOAuth, servesOAuthMeta } from './route.ts';
 import { claimIdle, holdClaim, runnerContext } from '@braindog/host';
 import { recordOf } from './route.ts';
 import { validFromOf } from './cut-off.ts';
@@ -175,6 +180,11 @@ type Env = {
    * `/auth/methods` says `not-configured` and every other `/auth` route is 404. Changing it signs everybody out.
    */
   SESSION_SECRET?: string;
+  /**
+   * The operator's fleet-wide cut-off, a secret: an ISO instant such as 2026-09-25T12:00:00Z before which every agent
+   * token and device grant is refused (53 §5.11). Unset is the epoch; unreadable refuses every bearer (`cut-off.ts`).
+   */
+  TOKENS_VALID_FROM?: string;
   /** The operator's bearer for `/auth/provision` and `/auth/claim/mint`, a secret too. Unset: both are 404. */
   PROVISION_KEY?: string;
   /**
@@ -382,8 +392,10 @@ function loggingAcks(api: RecordApi, sql: Sql): void {
  * The record's `/mcp`, with `_meta.session` checked as the session headers were and put on the context
  * over them, key by key. The headers' hints are already on `ctx`: `inward` put them there.
  */
-const serveMcp = (request: Request, api: RecordApi, ctx: CallContext): Promise<Response> =>
-  answerMcp(request, api, ctx, { session: (c, said) => withSession(c, hintsOf(said)) });
+/* `origin` IS WHERE THIS HOST SERVES THE APP, the start of a filed question's `decide` link (`loop/finish/contracts.md`
+   §6.3): the configured `PUBLIC_HOST` and never the request's own URL. Unset, it is left out, and so is the link. */
+const serveMcp = (request: Request, api: RecordApi, ctx: CallContext, origin?: string): Promise<Response> =>
+  answerMcp(request, api, ctx, { session: (c, said) => withSession(c, hintsOf(said)), ...(origin ? { origin } : {}) });
 
 /** Built once a Worker isolate, not once a record: every record on it is offered the same packs and use cases. */
 const CATALOGUE = seedCatalogue();
@@ -665,6 +677,8 @@ export class Record$ extends DurableObject<Env> {
         }
       /* EVERY ACK FROM HERE ON WRITES ITS `outbox` LINE, and the first open of this build says so once (`#booted`). */
       loggingAcks(api, sql);
+      /* AN ERASURE REACHES SLASH'S LEDGER TOO, in this same storage (`slashErasing`, `loop/finish/contracts.md` §7.2). */
+      slashErasing(api, sql);
       await this.#booted(api);
     });
     return api;
@@ -1062,6 +1076,13 @@ export class Record$ extends DurableObject<Env> {
     return api.kernel.access(person);
   }
 
+  /** Whether this person is on the record and an owner has stopped them, so a door can say so rather than "not on this record". */
+  async memberStopped(person: string): Promise<boolean> {
+    if (this.#gone) return false;
+    const api = await this.#record();
+    return api.kernel.memberStopped(person);
+  }
+
   /**
    * The switcher's `ask`: what this person may do here, and what this record calls itself.
    *
@@ -1169,6 +1190,18 @@ export class Record$ extends DurableObject<Env> {
     return api.kernel.refused() ? null : api.kernel.wrappingKey();
   }
 
+  /** This record's keys under a root key, for the nightly re-wrap (`src/rewrap.ts`), or `null` for a record this build refuses. AN RPC AND NEVER A ROUTE. */
+  async keysHeld(): Promise<HeldKeys | null> {
+    const api = await this.#record();
+    return api.kernel.refused() ? null : { record: api.kernel.identity()?.id ?? null, rows: api.kernel.wrappedKeys() };
+  }
+
+  /** The re-wrap's swap, compare-and-set on `vault_key.kek_id` (`kernel/src/api/keys.ts`). AN RPC AND NEVER A ROUTE: `rewrapKeys` is INTERNAL. */
+  async rewrapKeys(args: RewrapArgs): Promise<Result<Rewrapped>> {
+    const api = await this.#record();
+    return api.rewrapKeys(args);
+  }
+
   /**
    * A key deposited through a key door. AN RPC AND NEVER A ROUTE: `depositGrant` is INTERNAL.
    *
@@ -1211,6 +1244,17 @@ export class Record$ extends DurableObject<Env> {
     const api = await this.#record();
     const broken = api.kernel.refused();
     return broken ? { ok: false, refusal: broken } : api.openForGrant(args, by, hints, kekId);
+  }
+
+  /**
+   * Whether the record key opens for one key door's request. AN RPC AND NEVER A ROUTE: `unlockVault` is INTERNAL.
+   * `unlock` IS THE WORKER'S, CALLED BACK OVER RPC, as `seal` is for `depositGrant`: the passphrase and the key it opens
+   * stay in the Worker, and this object is told only whether it opened.
+   */
+  async unlockVault(by: VaultGrant | CallContext, unlock: PassphraseUnlock): Promise<Result<VaultPassphrase>> {
+    const api = await this.#record();
+    const broken = api.kernel.refused();
+    return broken ? { ok: false, refusal: broken } : api.unlockVault(unlock, by);
   }
 
   /**
@@ -1308,7 +1352,7 @@ export class Record$ extends DurableObject<Env> {
 
     /* `/mcp` READS ITS BODY HERE. The router checked the bearer from the headers alone, so nothing a stranger
        sent is parsed, and the tools reach this record through the same methods `/api` calls. */
-    if (servesMcp(new URL(request.url).pathname)) return serveMcp(request, api, ctx);
+    if (servesMcp(new URL(request.url).pathname)) return serveMcp(request, api, ctx, this.env.PUBLIC_HOST ? `https://${this.env.PUBLIC_HOST}` : undefined);
 
     /* A KEPT COPY'S DOOR ANSWERS AS THE LIST DOES, and not `ROUTE_UNKNOWN`. See `copyAsked`. */
     const copy = copyAsked(request.method, new URL(request.url).pathname);
@@ -1350,14 +1394,18 @@ export class Record$ extends DurableObject<Env> {
 
     /* SLASH'S DAILY LOOK, beside the answer and not in its way: the record says whether it is due, at most once a UTC day. */
     this.ctx.waitUntil(slashLook(api));
+    /* THE METHOD ROUTER'S HANDLERS, WITH THE VAULT PASSPHRASE'S TWO ROUTES ANSWERED THROUGH THE ROOT KEY INSIDE THIS OBJECT
+       (`withVaultPassphrase`), which takes the passphrase off before the record is called. Built once, so both calls
+       below serve the same table. */
+    const handlers = withVaultPassphrase(handlersFor(api), api, passphraseRoot(this.env.KEK, () => api.kernel.identity()?.id ?? null));
     /* A RESTORE THE PORT HAS ARMED ENDS THIS OBJECT, and nothing is written here from the arm on: `#arming` sets `#armed`
        as the bookmark is armed, which is before `restore` answers, and the Worker's `reopen` ends the object after. */
-    if (!restoreAsked(request.method, new URL(request.url).pathname)) return serveApi(request, handlersFor(api), ctx);
+    if (!restoreAsked(request.method, new URL(request.url).pathname)) return serveApi(request, handlers, ctx);
     /* AND THE OBJECT KEEPS WHAT ITS RESTORE SAID, in case the Worker never comes back to say it (`#left`). Counted in
        flight until the answer is read, so `stranded` cannot hand the next request an object this restore is still in. */
     this.#restoring++;
     try {
-      const out = await serveApi(request, handlersFor(api), ctx);
+      const out = await serveApi(request, handlers, ctx);
       if (this.#armed) this.#left = await restoredOf(out, actorOf(ctx));
       return out;
     } finally {
@@ -1511,9 +1559,11 @@ export class Directory$ extends DurableObject<Env> {
    *
    * ON THIS OBJECT'S STORAGE AND OUTSIDE `createDirectory`, because the store's tables are its own and made on first use:
    * the Directory never names them. Synchronous, so a `take` or a `redeem` reads and deletes its row with no yield
-   * between, and a code is spent once however many requests race for it.
+   * between, and a code is spent once however many requests race for it. `#directory()` FIRST, so the lockout's
+   * `dir_fail` exists on a Directory that has never been opened, since the per-address count writes to it.
    */
   oauth<C extends OAuthCall>(call: C): OAuthAnswers[C['op']] {
+    this.#directory();
     return answerOAuth(guardedSql(this.ctx.storage), { now: () => Date.now() }, call);
   }
 
@@ -1646,6 +1696,17 @@ export class Directory$ extends DurableObject<Env> {
   /** The record an accepted invitation names, reachable by its new member. */
   joinRecord(record: string, person: string): Result<null> {
     return this.#directory().join(record, person);
+  }
+
+  /**
+   * The record a removal named, no longer reached by the person removed. `forward()` calls it once the record has
+   * accepted the removal.
+   *
+   * THE OWNER IS REFUSED AND STAYS: the Directory's `leave` will not take a record's owner off it, and `forward`'s
+   * `leftDirectory` ignores that refusal because the record has already answered the removal.
+   */
+  leaveRecord(record: string, person: string): Result<null> {
+    return this.#directory().leave(record, person);
   }
 
   /**
@@ -2034,7 +2095,8 @@ export default {
    *
    * WHAT IS NOT HERE YET IS 53 §5.1's OTHER FOUR STEPS: the KEK re-wrap, the erasure reconcile, the
    * billing ladder and the ops record's `log` note. They belong in `ops.ts` beside this call and
-   * need `opsReport` and `rewrapKeys`, which this build does not have. The backup is the step the
+   * need `opsReport`; the re-wrap is `rewrapRecord` in `src/rewrap.ts`, which the walk is to call for each record
+   * (`loop/finish/ops.md` OPS-15). The backup is the step the
    * record cannot survive without, so it is the step that landed first.
    */
   async scheduled(_controller: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
@@ -2114,9 +2176,10 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
     if (servesAccount(url.pathname)) return account(request, env);
     /* OAUTH 2.1, WITH BRAINDOG AS ITS OWN AUTHORIZATION SERVER (`loop/finish/agents.md` C4): the metadata an MCP client
        discovers from `/mcp`'s 401, and the endpoints it signs in by. Before `/mcp` and every record door, because none
-       of it reaches a record until a person approves in the app. Only the two prefixes it owns are handed over, and
-       `serveOAuth` answers `null` for a path under them it does not serve, which falls through to the 404 below. */
-    if (url.pathname.startsWith('/oauth/') || url.pathname.startsWith('/.well-known/oauth-')) {
+       of it reaches a record until a person approves in the app. Only the names it owns are handed over (`servesOAuth`,
+       `servesOAuthMeta`), and `serveOAuth` answers `null` for a path under them it does not serve, which falls through
+       to the 404 below. */
+    if (servesOAuth(url.pathname) || servesOAuthMeta(url.pathname)) {
       const answered = await serveOAuth(request, env);
       if (answered !== null) return answered;
     }
@@ -2194,6 +2257,7 @@ async function recordApi(request: Request, env: Env, slug: string | null): Promi
       origin: `https://${env.PUBLIC_HOST ?? ''}`,
       session: (sid, slug) => directory.auth({ flow: 'session', sid, ...(slug === undefined ? {} : { slug }) }) as unknown as Promise<AuthResult<Who>>,
       access: (record, person) => held(env, record, (object) => object.access(person)),
+      stopped: (record, person) => held(env, record, (object) => object.memberStopped(person)),
     }, slug);
 
     /* A LINK TO ONE PAGE, `Authorization: Share <token>`, WHICH `doorOf` HANDS ON UNCHECKED. It opens `/api/sharedPage`
@@ -2333,8 +2397,7 @@ const shareKey = (env: Env): Promise<Uint8Array | null> => shareKeyOf(env.KEK);
  * nobody holds creates the object. A closed record is not one it knows, so a deleted record's links wake nothing.
  *
  * THE READ BUDGET IS `RL_READ` WHEN IT IS BOUND AND NOTHING WHEN IT IS NOT, as `bindingLimiter` says, keyed by the link.
- * It is read through a type that names it here, so this line compiles whether or not `Env` declares the binding yet. A
- * binding that throws opens the door, as `overLimit` does for every other caller: the record still decides whether the
+ * A binding that throws opens the door, as `overLimit` does for every other caller: the record still decides whether the
  * link opens anything, and a throw here would be a 500 where every other way a link fails is the one 404.
  *
  * THE CONTEXT IS THE LINK'S AND NO PERSON'S, and `inward` writes it over anything the caller sent, as it does for every
@@ -2342,7 +2405,7 @@ const shareKey = (env: Env): Promise<Uint8Array | null> => shareKeyOf(env.KEK);
  */
 function sharedDoor(env: Env): SharedDoor {
   const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
-  const limits = linkLimiter({ read: (env as Env & { RL_READ?: LinkRateLimit }).RL_READ });
+  const limits = linkLimiter({ read: env.RL_READ });
   return {
     key: () => shareKey(env),
     knows: (record) => directory.knows(record),
@@ -2569,9 +2632,7 @@ async function keyDoor(request: Request, env: Env): Promise<Response> {
      this one that leaked could add key rows with no cap. `serveVault` answers a refused token with the grant's sentence
      and reads no body, so nothing is deposited, and the 429 is put back in its place below. */
   const spent: { over: Response | null } = { over: null };
-  /* TYPED AS THE DOOR'S DEPENDENCIES PLUS `token`, written as the deposit door reads it, so the line compiles on
-     either side of `vault.ts` naming the field. */
-  const deps: GrantDeps & { token?: ((request: Request) => Promise<Result<{ record: string; ctx: CallContext }>>) | undefined } = {
+  const deps: GrantDeps = {
     knows: (id) => directory.knows(id),
     vaultGrant: async (id, bearer) => (await recordKeyHalf(env).vaultGrant(id, bearer)),
     token: async (asked) => {
@@ -2601,6 +2662,9 @@ function keyHalf(env: Env): KeyDeps {
       (await record(id).depositGrant(args, by as unknown as VaultGrant, hints, seal, opts)) as unknown as Result<Deposited>,
     openForGrant: async (id, args, by, hints, kekId) =>
       (await record(id).openForGrant(args, by as unknown as VaultGrant, hints, kekId)) as unknown as Result<OpenedForGrant>,
+    /* THE PASSPHRASE'S UNLOCK, over RPC: `unlock` is the Worker's, called back by the record after its vault gate. */
+    unlockVault: async (id, by, unlock) =>
+      (await record(id).unlockVault(by as unknown as VaultGrant, unlock)) as unknown as Result<VaultPassphrase>,
   };
 }
 

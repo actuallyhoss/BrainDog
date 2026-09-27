@@ -1000,10 +1000,11 @@ test('AND THE WORKER SETS THE CONTEXT IN ONE PLACE, for every door', () => {
   /* A SECOND PLACE THAT SET IT is a second chance to set it after something the caller controls, which is A9 in
      `loop/research-anon-read.md`. */
   assert.doesNotMatch(SOURCE, /headers\.set\(\s*'x-braindog-ctx'/u, 'index.ts sets the context itself again');
-  /* THREE DOORS NOW: a session, a bearer on `/api` and a bearer on `/mcp`, and each reaches the record through `inward`.
-     There were four while the public demo was a door. A count that drops means a door stopped going through it, and
-     one that rises means a door nobody listed here. */
-  assert.equal((SOURCE.match(/inward\(request, /gu) ?? []).length, 3, 'a door does not go through inward');
+  /* FIVE DOORS NOW: a session, the owner opening a shared link (whose answer the Worker signs), a shared link reading its
+     page, a bearer on `/api` and a bearer on `/mcp`, and each reaches the record through `inward`. There were four while
+     the public demo was a door. A count that drops means a door stopped going through it, and one that rises means a
+     door nobody listed here. */
+  assert.equal((SOURCE.match(/inward\(request, /gu) ?? []).length, 5, 'a door does not go through inward');
   /* AND THE DOOR IS DECIDED BEFORE THE BEARER IS READ, in `session.ts`. */
   assert.ok(SOURCE.includes('doorOf(request'), 'index.ts no longer asks session.ts which door');
   assert.ok(SOURCE.indexOf('doorOf(request') < SOURCE.indexOf("bearerOf(request, 'api'"), 'the door is not decided before the bearer is read');

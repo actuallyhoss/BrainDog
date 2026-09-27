@@ -19,8 +19,17 @@ import { handle, type Reply } from '@braindog/mcp/rpc';
  *
  * Resolves once the last reply is flushed, so the caller can exit without cutting one off. `ctxOf`
  * runs as each message arrives, so a deadline counts from when the call was made.
+ *
+ * `origin` is where the host serves the app, the host this command line talks to, handed to `handle` for a filed
+ * question's `decide` link (`loop/finish/contracts.md` §6.3), as `serveMcp` hands its own. Left out, that link is left out.
  */
-export async function serveStdio<C>(surface: McpSurface<C>, ctxOf: () => C, input: Readable, output: Writable): Promise<void> {
+export async function serveStdio<C>(
+  surface: McpSurface<C>,
+  ctxOf: () => C,
+  input: Readable,
+  output: Writable,
+  origin?: string,
+): Promise<void> {
   const inFlight = new Set<Promise<void>>();
   /* Settled by the write's own callback, which is what makes "flushed" true on a Windows pipe, where
      a write is asynchronous. */
@@ -43,7 +52,7 @@ export async function serveStdio<C>(surface: McpSurface<C>, ctxOf: () => C, inpu
       continue;
     }
     /* `handle` never throws, so a failed call is a reply and the loop goes on. */
-    track(handle(message, surface, ctxOf()).then((reply) => (reply ? send(reply) : undefined)));
+    track(handle(message, surface, ctxOf(), origin).then((reply) => (reply ? send(reply) : undefined)));
   }
 
   while (inFlight.size > 0) await Promise.all(inFlight);

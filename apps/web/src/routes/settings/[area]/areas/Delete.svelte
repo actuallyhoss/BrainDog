@@ -79,7 +79,7 @@
 -->
 {#if !anOwner}
   <Section title={copy.deleteRecord(RECORD)}>
-    <Empty kind="no-permission" title={levelWords.ownersOnly} />
+    <Empty kind="no-permission" title={levelWords.ownersOnlyTitle} body={levelWords.ownersOnlyHow} />
   </Section>
 {:else}
 <Section title={copy.deleteRecord(RECORD)}>

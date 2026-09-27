@@ -464,13 +464,12 @@ test('THE THREE COMMENTS IN `metrics.ts` THAT NAMED WORK IN ANOTHER FILE SAY WHA
   assert.equal(mine.includes('Closing it belongs in `declare.ts`'), false, 'the field still defers a check declare.ts has made');
   assert.equal(mine.includes('a convention rather than an invariant'), false, 'the field still calls the refusal a convention');
 
-  /* `Reading.held`: the browser narrows its own scope now, so nothing here may say the two disagree. */
+  /* `Reading.held`: the record counts held inside the scope a parameter filled, and the browser counts nothing since
+     ARC-1 (it prints the record's `held`), so what is held here is that `withParam` still writes the scope it cut. */
   const web = source('apps', 'web', 'src', 'lib', 'record', 'metrics.ts');
-  assert.match(web, /const heldRows = scope === null \? all : all\.filter/u, 'the browser counts held over the whole register again');
   assert.match(web, /within: scope\.join/u, 'withParam no longer writes the scope it cut');
   assert.equal(mine.includes('without setting any scope'), false, 'held still says the browser sets no scope');
   assert.equal(mine.includes('nothing measures the half they differ on'), false, 'held still says the parameterised case is unmeasured');
-  assert.match(source('apps', 'web', 'src', 'lib', 'record', 'engines.test.ts'), /withParam\(/u, 'engines.test.ts no longer fills a parameter by the browser’s own rule');
 
   /* `BARE_UNIT`: the web holds one literal and a re-export, not two literals, and its own test says so. */
   assert.equal(web.includes("BARE = 'no unit'"), false, 'the browser declares the mark again, so three modules hold it');

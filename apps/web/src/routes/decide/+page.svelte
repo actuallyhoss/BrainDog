@@ -892,7 +892,7 @@
   /* THE CURSOR IS THE FOCUS RING, drawn round the question with room to breathe, and only while it is
      the keyboard's. A pointer reader never sees it. */
   .q:focus-visible {
-    outline: 2px solid var(--accent-text);
+    outline: 2px solid var(--focus-in);
     outline-offset: var(--sp-2);
     border-radius: var(--r-sm);
   }
@@ -1024,14 +1024,14 @@
     background: none;
     border: 1px solid var(--edge);
     border-radius: var(--r-sm);
-    color: var(--accent-ink);
+    color: var(--on-ink);
     cursor: pointer;
     visibility: hidden;
   }
 
   .pick[data-on] {
-    background: var(--accent);
-    border-color: var(--accent-edge);
+    background: var(--on);
+    border-color: var(--on);
   }
 
   .q:hover .pick,

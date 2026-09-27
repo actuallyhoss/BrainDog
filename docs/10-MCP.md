@@ -223,14 +223,14 @@ field.
 
 | Item | Target | Why |
 |---|---|---|
-| `tools/list` total, `instructions` included | **≤ 2,600 tokens**, measured at 2,597 | it is in every turn of every session. 1,800 was set for eight tools; the agent path needs fourteen, and `activity` and `money` make sixteen ([44-SPEC-MCP](44-SPEC-MCP.md) §7) |
+| `tools/list` total, `instructions` included | **≤ 2,760 tokens**, raised once from 2,600 for `triage` | it is in every turn of every session. 1,800 was set for eight tools; the agent path needs fourteen, `activity` joined inside 2,600, and `triage` is the one tool the ceiling was raised for ([44-SPEC-MCP](44-SPEC-MCP.md) §7) |
 | One tool description | < 200 tokens, measured at 12 to 60 | forces the description to say when to use it, not how it works |
 | `record_index` response | < 500 tokens, measured at 256 on the seed | the first call of every session |
 | A `list` response, default page | < 2,000 tokens, **not met**: 5,380 for a page of fifty rows | the target was set for 25 rows, projected, not whole documents. The record's default page is 50 rows, and a row carries every field |
 | A `get` on a document row | full | if you asked for the document, you want the document |
 
 The first two are asserted by `packages/mcp/test/budget.test.ts` with `tokenBudget`
-([44-SPEC-MCP](44-SPEC-MCP.md) §5.8), over the tool list exactly as it is sent, with 3 tokens to spare. The other
+([44-SPEC-MCP](44-SPEC-MCP.md) §5.8), over the tool list exactly as it is sent, under the ceiling `CEILING` names. The other
 three are targets for the record's answers, which the tools relay made compact; they were measured once, over a real
 record with the seed's declarations, and no test holds them. A budget nobody measures is a budget that drifts, and the
 `list` row is the one that did.
@@ -340,7 +340,7 @@ addresses and six templates.
 | **`automation/<id>`** | one automation as declared, with its last ten runs, each step with its outcome. A template, never listed one by one |
 | **`arrangement`** | how this BrainDog is arranged: its packs, what else is on offer, its voice and settings, its pages, and what waits |
 | **`declaration/<slug>`** | one page as declared, to change and propose back. A template, never listed one by one |
-| **`grammar/page`**, **`grammar/proposals`** | what a page declaration may contain, and the `pack`, `settings` and `arrange` bodies of `propose`; `ttlMs` an hour |
+| **`grammar/page`**, **`grammar/register`**, **`grammar/metric`**, **`grammar/proposals`** | what a page, a list and a figure declaration may contain, each with one that installs, and the `pack`, `settings` and `arrange` bodies of `propose`; `ttlMs` an hour. A rule is `grammar/automations` |
 | **`grammar/script`**, **`grammar/automations`** | what a script and an automation may say, their limits, what does not run yet, and examples that install; `grammar/script` also says how to ask for a trial. `ttlMs` an hour |
 
 **Every resource is backed by a method but two**, so [ADR-018](16-DECISIONS.md)'s rule holds for seventeen by
@@ -466,11 +466,11 @@ Three things were meant to carry over as **tests**, not prose. One has:
 |---|---|---|
 | **Every route has a verdict** | each route in the router is either reachable through a tool, exposed as a resource, or named in the refusal list with a reason. A route with none of the three fails CI, which is how the predecessor found a briefing endpoint *"for the SessionStart hook"* that nothing called | no. `packages/mcp/test/index.test.ts` holds the other direction: every advertised tool and resource reaches a method ([44-SPEC-MCP](44-SPEC-MCP.md) §9) |
 | **The refusals are driven** | the test starts the sealed server and calls each refused path, asserting the refusal text arrives **before any fetch** | no, because there is no refusal list at the MCP layer to drive |
-| **The tool surface has a ceiling** | the predecessor caps the whole tool listing at ~4,900 tokens by test; **BrainDog's sum is §4's 2,600**, and `packages/mcp/test/budget.test.ts` asserts it. §4's budgets are the same idea per tool; this one is the sum | yes, measured at 2,597 |
+| **The tool surface has a ceiling** | the predecessor caps the whole tool listing at ~4,900 tokens by test; **BrainDog's sum is §4's 2,760**, and `packages/mcp/test/budget.test.ts` asserts it. §4's budgets are the same idea per tool; this one is the sum | yes, measured at 2,597 |
 
 And the server's `instructions` carry the contract every tool description would otherwise repeat. They go out in
 `initialize`, in `server/discover` and with every `tools/list` under the same `ttlMs`, because a 2026-07-28 client
-has no initialise step, and they are counted inside §4's 2,600 (the exact text is [44-SPEC-MCP](44-SPEC-MCP.md)
+has no initialise step, and they are counted inside §4's 2,760 (the exact text is [44-SPEC-MCP](44-SPEC-MCP.md)
 §4.6). They say: call `context` first; money in minor units, shifted by its currency's own decimals; on `VERSION_STALE`, re-read the row and re-apply your
 change, and never resend the copy you held (there is no 412, and no whole-document copy to resend: an earlier draft
 carried the predecessor's *"re-read on a 409, never resend"*, which is a whole-document rule); an agent never

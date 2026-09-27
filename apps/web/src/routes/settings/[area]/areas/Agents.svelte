@@ -319,11 +319,11 @@
           <span class="who-name">{d.label ?? copy.unnamedMachine}</span>
           <!-- `since`, because `last_used` is an instant and `relative` takes a day. -->
           <span class="who-detail">
-            {copy.deviceState[d.status] ?? d.status} · {d.last_used ? copy.usedWhen(since(d.last_used, Date.now())) : copy.neverUsed}
+            {d.ended_by === 'operator' ? copy.endedByOperator : (copy.deviceState[d.status] ?? d.status)} · {d.last_used ? copy.usedWhen(since(d.last_used, Date.now())) : copy.neverUsed}
           </span>
           <span class="who-detail who-reach">{copy.reachMeans[reachKey(d.reach, d.scope)] ?? d.reach}</span>
           <span class="who-do">
-            {#if revocable(d)}
+            {#if revocable(d) && d.ended_by !== 'operator'}
               <Button weight="bare" tone="bad" onclick={() => void revokeMachine(d)}>{copy.revokeKey}</Button>
             {/if}
           </span>
@@ -350,10 +350,12 @@
           <span class="who-name">{report ? copy.reportKeyNamed(report.name) : (t.label ?? copy.unnamedToken)}</span>
           <span class="who-detail">{report ? copy.reportKeyCan(report.register ? (REGISTERS[report.register]?.name ?? report.register) : '') : (copy.keyCan[t.scope] ?? t.scope)}</span>
           <span class="who-detail">
-            {t.last_used_at ? copy.usedWhen(since(t.last_used_at, Date.now())) : copy.neverUsed}{#if t.expires_at}{' · '}{copy.endsWhen(relative(t.expires_at.slice(0, 10), Date.now()))}{/if}
+            {#if t.ended_by === 'operator'}{copy.endedByOperator}{:else}{t.last_used_at ? copy.usedWhen(since(t.last_used_at, Date.now())) : copy.neverUsed}{#if t.expires_at}{' · '}{copy.endsWhen(relative(t.expires_at.slice(0, 10), Date.now()))}{/if}{/if}
           </span>
           <span class="who-do">
-            <Button weight="bare" tone="bad" onclick={() => void revokeTokenRow(t)}>{copy.revokeKey}</Button>
+            {#if t.ended_by !== 'operator'}
+              <Button weight="bare" tone="bad" onclick={() => void revokeTokenRow(t)}>{copy.revokeKey}</Button>
+            {/if}
           </span>
         </div>
       </li>

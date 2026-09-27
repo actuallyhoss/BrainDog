@@ -18,7 +18,7 @@
  * know about a step beyond its day and amount comes on an `of` row under it, written only when the host knows it.
  */
 
-import { MISSING } from './format.ts';
+import { MISSING, axisFigure } from './format.ts';
 import { signedOf } from './bridge.ts';
 import { figureLike } from './figure.ts';
 
@@ -478,8 +478,8 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
     span,
     lo,
     hi,
-    top: figure(hi),
-    bottom: figure(lo),
+    top: axisFigure(figure(hi)),
+    bottom: axisFigure(figure(lo)),
     rises: (shown.days.filter((p) => p.day <= end).at(-1)?.balance ?? model.opening) > (model.past[0]?.value ?? model.opening),
     sentence: `${sentence}.`,
   };

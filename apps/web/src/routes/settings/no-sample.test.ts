@@ -14,11 +14,13 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 
-const PAGE = readFileSync(new URL('./[area]/+page.svelte', import.meta.url), 'utf8')
-  .replaceAll(/<!--[\s\S]*?-->/gu, '')
-  .replaceAll(/\/\*[\s\S]*?\*\//gu, '');
+const DIR = new URL('./[area]/', import.meta.url);
+const strip = (text: string) => text.replaceAll(/<!--[\s\S]*?-->/gu, '').replaceAll(/\/\*[\s\S]*?\*\//gu, '');
+/* EVERY FILE SETTINGS IS DRAWN FROM since the split into one component per area (ARC-7b). */
+const FILES = ['+page.svelte', 'SettingsIndex.svelte', 'settings-state.svelte.ts', ...readdirSync(new URL('areas/', DIR)).map((f) => `areas/${f}`)];
+const PAGE = FILES.map((f) => strip(readFileSync(new URL(f, DIR), 'utf8'))).join('\n');
 
 /** The fixture constants the brief names, every one of which is the sample's and none of which a record answers. */
 const FIXTURES = [
@@ -47,8 +49,6 @@ test('and nothing on it says the demo sentence', () => {
 });
 
 test('the signing key is said to be out of reach on every shell, because the only key this screen ever drew was invented', () => {
-  const from = PAGE.indexOf("area === 'export'}");
-  assert.ok(from >= 0, 'export has no arm');
-  const arm = PAGE.slice(from);
+  const arm = strip(readFileSync(new URL('areas/Export.svelte', DIR), 'utf8'));
   assert.match(arm, /<Section title=\{copy\.theSignature\}>\s*<p class="hint">\{copy\.theSignatureNotHere\}<\/p>\s*<\/Section>/u);
 });

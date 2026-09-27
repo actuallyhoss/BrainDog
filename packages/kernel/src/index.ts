@@ -70,6 +70,7 @@ import { ack, enqueue, lease, unlease, type Ack, type AckDeps, type OutboxKind }
 import { ERASED, eraseSubjects, subjectsOf, type EraseReport, type EraseRequest } from './erase.ts';
 import { leasedPushTarget, ownersPushSubs, pushSubOf, settlePush, type PushSettled, type PushTarget } from './push.ts';
 import { access, invite, members, remove, type Level as MemberLevel, type Member, type MemberDeps, suspend } from './members.ts';
+import { stopped as stoppedOf, type Suspended } from './members.ts';
 import {
   GONE as INVITE_GONE,
   acceptInvitation,
@@ -162,6 +163,9 @@ import { capability } from './capabilities.ts';
 import { carryPins } from './pairs.ts';
 import { pruneFirings } from './rules.ts';
 import { runway, type Leg, type Runway } from './forecast.ts';
+import { WALK_SOURCE } from './money-figures.ts';
+import { referencedBy } from './referenced.ts';
+import { sweepJobs } from './jobs.ts';
 import { arrive, day, exponentOf, propose, shapeOf, type Arrival, type Arrived, type IngestDecl, type IngestDeps, type NumberReaders } from './ingest.ts';
 import { analyse, observe, type Analysis, type Observation } from './observe.ts';
 import { applyPull, firePull, type PullDecl, type PullDeps } from './pull.ts';
@@ -297,6 +301,9 @@ export { stepsPercent, tallySteps, type StepsDecl } from './steps.ts';
    that disagreed would be worse than no ranking at all. */
 export { COSTS, MANY_ROWS, costOf, costRank, worseCost, type Cost } from './weigh.ts';
 export { AGGREGATIONS, bucketState, deltaFrom, evaluateMetric, fxOfPair, largestFirst, meets, rateUnit, scorePrediction, snapshot, targetCurrency, targetFor, targetInto, targetOf, windowMs } from './metrics.ts';
+export { clockOf, isMoneyFormat, verdictOf } from './metrics.ts';
+export { ROLLED_ACCOUNTS_MOST, ROLLED_CHECKS_MOST, WALKS, WALK_SOURCE, figureLists } from './money-figures.ts';
+export type { Rolled, RolledCheck, RolledMoves, Walked } from './money-figures.ts';
 export { HOME_CURRENCY_SETTING, across, convertMinor, dayFieldOf, homeFrom, pairParts, partsOf, rateFor, ratesFrom, reduceOf } from './fx.ts';
 export type { Across, Amount, Part, Rate, Reduce } from './fx.ts';
 export { RAIL_PAGES, REDUCES, fill, railRoom, readBlock, readPage, resolvePages, slugify } from './pages.ts';
@@ -325,11 +332,30 @@ export { MET_CAP, PEOPLE } from './people.ts';
 export type { MeetArgs, Met } from './people.ts';
 export type { MeetsFields, RatesFields } from './roles.ts';
 export { SCOPES, DEFAULT_DAYS as TOKEN_DAYS } from './token.ts';
+export { cutOffReadable, endedByCutOff } from './token.ts';
 export { LEVELS as MEMBER_LEVELS, RECORD as WHOLE_RECORD } from './members.ts';
+export { STOPPED as MEMBER_STOPPED, type Suspended } from './members.ts';
 export type { Member } from './members.ts';
 export { GONE as INVITE_GONE, INVITE_HOURS, tokenParts as inviteTokenParts } from './invitations.ts';
 export type { InvitationRow, InviteArgs, Invited } from './invitations.ts';
 export type { CreateTokenArgs, Minted, Scope, TokenReach, TokenRow, Verified } from './token.ts';
+/* THE JOB QUEUE'S NAMES (`jobs.ts`, `kernel.jobs`). Its `Claimed` stays unexported here, because the scheduler's `Claimed`
+   already has the name; a caller reads it as `ReturnType` of `kernel.jobs.claim`. */
+export { JOB_EVENT_KINDS, JOB_LEASE_MS, JOB_MCP_PATH, JOB_MCP_PREFIX, JOB_PERMISSIONS, JOB_STATUSES, commandOf, fillPrompt, jobBody } from './jobs.ts';
+export type {
+  CancelRead,
+  Cancelled,
+  ClaimedJob,
+  CreateJobArgs,
+  JobBody,
+  JobEvent,
+  JobEvents,
+  JobRow,
+  JobRunner,
+  JobsPage,
+  PostJobEventArgs,
+  Posted,
+} from './jobs.ts';
 export type { Arranging, Decision, Decided, Proposal, Suggestion, Verdict, GovernRegister, BodyKind } from './govern.ts';
 /* `exponentOf` IS EXPORTED SO THE RECORD'S CURRENCY TABLE IS NOT A SECOND EXPONENT READER. It is
    `Intl`, cached per code; a table built from a copy of it could disagree with the reading. */
@@ -1768,6 +1794,24 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       if (decl.kind === 'rule' && Array.isArray(body.steps)) {
         const bad = unreadIf(decl.id, body as FlowDecl, shape, batch);
         if (bad) return bad;
+      }
+
+      /* A FIGURE'S OTHER SENTENCES ARE READ HERE TOO: the `where` of a rolled figure's moves and of each leg a walk reads
+         (`money-figures.ts`). `declare.ts` cannot read a sentence against a list, so one naming a field the list lacks
+         installed clean and then refused on every read. A list that is not there is `declare.ts`'s to say. */
+      if (decl.kind === 'metric') {
+        const asked: { register: unknown; where: unknown }[] = [];
+        const rolled = body.value !== null && typeof body.value === 'object' ? (body.value as { rolled?: { moves?: { register?: unknown; where?: unknown } } }).rolled : undefined;
+        if (rolled?.moves) asked.push({ register: rolled.moves.register, where: rolled.moves.where });
+        if (source === WALK_SOURCE && Array.isArray(body.legs))
+          for (const leg of body.legs as ({ register?: unknown; where?: unknown } | null)[]) if (leg) asked.push({ register: leg.register, where: leg.where });
+        for (const one of asked) {
+          if (typeof one.register !== 'string' || one.where === undefined || JSON.stringify(one.where).includes('{{')) continue;
+          const schema = shape(one.register);
+          if (!schema) continue;
+          const bad = unreadWhere(decl.id, one.where, schema, batch);
+          if (bad) return bad;
+        }
       }
       if (typeof register !== 'string') continue;
 
@@ -3526,6 +3570,14 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
           return no<Entry>('REQUIRED_MISSING', `${nameOf(current.id)} leaves ${from} only with ${missing} filled.`, { at: missing });
       }
 
+      /* `delete: refuse_while_referenced` (`referenced.ts`): a live row that other live rows point at is not taken out
+         from under them. A restore and a row already deleted are never asked. `parts` is declared below, and read here
+         only when a write runs, which is after the record has opened. */
+      if (deleting && patch.deleted_at !== null && current !== null && current.deleted_at === null) {
+        const held = referencedBy(parts, register, current.id, w.reads);
+        if (held) return { ok: false, refusal: held };
+      }
+
       /* ── persist ── */
       const now = instant(clock.now());
       const deletedAt = deleting ? (patch.deleted_at === null ? null : now) : (current?.deleted_at ?? null);
@@ -4059,7 +4111,27 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         /* WHAT A PERSON SAID ON THE OLD MARK IS WRITTEN ON THE NEW ONE FIRST, signed by them (`pairs.ts`'s `carryPins`),
            before the old mark is unpaired, so the pass below reads it as their word. Without it a renamed mark read
            Spent 0.00 against 20,000 (`pairs-followups.test.ts`). */
-        if (decl.pairs) carryPins(pairingOf(id, decl, decl.pairs), was.pairs.mark, decl.pairs.mark);
+        if (decl.pairs) {
+          const to = decl.pairs.mark;
+          const named = (f: string): string => (decl.fields.find((x) => x.id === f) ?? was.fields.find((x) => x.id === f))?.label ?? f.replace(/_/g, ' ');
+          const carried = `${decl.name} marks its moves on ${named(to)} from this install, so what was said on ${named(was.pairs.mark)} is carried over.`;
+          for (const { leg, value, by } of carryPins(pairingOf(id, decl, decl.pairs), was.pairs.mark, to)) {
+            if (leg.fields[to] !== value)
+              sql.exec('UPDATE entry SET fields = ?, version = version + 1, updated_at = ? WHERE id = ?', JSON.stringify({ ...leg.fields, [to]: value }), now, leg.id);
+            appendEvent({
+              kind: 'edit',
+              target: leg.id,
+              register: id,
+              actor: by,
+              at: now,
+              batch,
+              note: carried,
+              field: to,
+              from: shown(id, to, leg.fields[to] as Json | undefined) ?? null,
+              to: shown(id, to, value) ?? null,
+            });
+          }
+        }
         /* A MARK THE NEW DECLARATION RETIRED IS LEFT AS IT STANDS, since no reader counts by it; `_pair` still goes. */
         const live = decl.fields.some((f) => f.id === was.pairs!.mark && f.retired !== true);
         for (const r of sql.all<{ id: string }>("SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL AND json_extract(fields, '$._pair') IS NOT NULL", id))
@@ -4291,6 +4363,8 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     return {
       ...(deps.stepsOf ? { stepsOf: deps.stepsOf } : {}),
       ...(deps.scopeOf ? { scopeOf: deps.scopeOf } : {}),
+      ...(deps.lists ? { lists: deps.lists } : {}),
+      ...(deps.metrics ? { metrics: deps.metrics } : {}),
       projects: () => [...registers.values()].find((r) => r.scopes !== undefined)?.id ?? null,
     };
   };
@@ -4366,6 +4440,12 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       return f && 'to' in f && typeof f.to === 'string' ? { field: f.id, to: f.to } : null;
     },
     home: () => homeCurrency(sql),
+    /* EVERY LIST AND EVERY LIVE FIGURE, declarations only, which `deadlines`, `figures.home` and a sell knob choose from. */
+    lists: () => [...registers.values()],
+    metrics: () =>
+      sql
+        .all<{ body: string }>("SELECT body FROM declaration WHERE kind = 'metric' AND superseded_at IS NULL AND retired = 0 ORDER BY id")
+        .map((r) => liveTarget(sql, JSON.parse(r.body) as MetricDecl)),
     inScope: (register, project, opts) => inScope(register, project, opts),
     stepsOf: (register) =>
       [...registers.values()].flatMap((r) => {
@@ -4391,6 +4471,18 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         .filter((e): e is Entry => e !== null),
     /* THE RECORD'S SCHEDULED ACTIONS, as the `actions` read lists them: keys by label, nothing sealed read. */
     actions: () => listActions(sql, clock.now()),
+    /* WHO OPENED A KEY LAST, by the grant its row's secret field names: the newest `grant.read` event, as `keyState`
+       reads it. `runs_on` answers who and when, never the grant. */
+    keyOpened: (grant) =>
+      sql.one<{ actor: string; ts: string }>("SELECT actor, ts FROM event WHERE target = ? AND kind = 'grant.read' ORDER BY rowid DESC LIMIT 1", `grant:${grant}`) ?? null,
+    /* THE FIELDS A LIST MARKS ITS ROWS BY, its `identity:`, which the chip beside a row's scope is drawn from (`scope_marks`). */
+    identityOf: (register) => {
+      const decl: Readonly<Record<string, unknown>> | undefined = registers.get(register);
+      const said = decl?.identity;
+      if (said === null || typeof said !== 'object' || Array.isArray(said)) return null;
+      const { mark, accent } = said as { mark?: unknown; accent?: unknown };
+      return { ...(typeof mark === 'string' ? { mark } : {}), ...(typeof accent === 'string' ? { accent } : {}) };
+    },
     /*
      * THE OPEN QUESTIONS, for a `queue` block: what is waiting on a person, dearest first.
      *
@@ -4686,6 +4778,8 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
   }
 
   /** What the automation runner reads and writes through: the rule pass's own dependencies, and a row's project. */
+  /** The hold the host's ledger last put on this record's automations (`holdRuns`); `null` is none. */
+  let runsHeld: { until: number; say: string } | null = null;
   const flowDeps = (): FlowDeps => ({
     sql,
     mint,
@@ -4725,6 +4819,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       }),
     withdraw: (suggestion, actor, why) => void decide(governDeps(), suggestion, { resolved_as: 'wont-fix', reason: why }, actor),
     answersSlash: opts.answersSlash === true,
+    held: runsHeld,
   });
 
   /**
@@ -4859,6 +4954,8 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     nowMs: clock.now(),
     mint,
     outbox: (payload) => enqueue(sql, mint, clock.now(), 'pull.fetch', payload),
+    /* THE KEY A CONNECTOR NAMES, BY LABEL OR ID, resolved as a call's is, so the job carries its id (`firePull`). */
+    keyOf: (name) => keyNamed(sql, name),
   });
 
   /** The connector declaration a `pull` row is about, or `null` when it has been retired. */
@@ -5050,6 +5147,8 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     sendDigest: (assembled, prose) => sendDigest(digestDeps(), assembled as Assembled, twoSentences(prose)),
     /* AND AN AUTOMATION'S QUESTION TO SLASH, answered into its run in the ack's transaction. */
     answerRun: (a) => void answerStep(flowDeps(), a),
+    /* AND A PAGED CONNECTOR WHOSE KEY WAS REFUSED, told through the one router (`finishPull`, `pull.ts`). */
+    notify: (said) => void notify(interruptDeps(), { ...said, urgent: true }),
   });
 
   /** The same, plus who is asking and which record this is — the two halves of a `grant.read` row. */
@@ -5108,6 +5207,8 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     );
     /* A DEVICE GRANT past its time, or silent for fourteen days, is let go in the same hour. */
     transaction(() => deviceSweep(tokenDeps()));
+    /* A JOB NOBODY TOOK IN A DAY, OR ONE WHOSE MACHINE STOPPED ANSWERING, is let go in the same hour (`jobs.ts`). */
+    transaction(() => sweepJobs(tokenDeps()));
     rulesAboutTime();
     figuresWatched();
     /* A FINISHED AUTOMATION RUN IS KEPT NINETY DAYS, and its metered event after that: one line per run, as §4.5 asks.
@@ -5674,6 +5775,10 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
            rail's five are the rows touched last, which it can only choose with the time beside each (`boot-live.ts`). */
         about: p.row ? { register: p.row.register, seq: p.row.seq, updated_at: p.row.updated_at } : null,
         icon: typeof p.decl.icon === 'string' ? p.decl.icon : null,
+        /* THE TEMPLATE A PAGE WAS MADE FROM, by its own `page`, and `null` for a page somebody wrote. Its declaration is
+           the template's, so a reader of a page's source (`arrangement({ page })`) finds it by this. `fill` leaves
+           `page` untouched, so this is the template's own id. */
+        template: p.row ? p.decl.page : null,
       })),
 
     /**
@@ -5736,12 +5841,14 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      * What it reads is DECLARED rather than wired: a forecast that knew the word "obligations" would
      * be a forecast that works for one record.
      */
-    runway: (opening: number, legs: readonly Leg[], horizon?: number): Result<Runway> =>
+    runway: (opening: number, legs: readonly Leg[], horizon?: number | 'last', into?: string): Result<Runway> =>
       runway(
         { sql, schemaOf: (r) => (registers.has(r) ? schemaOf(r) : null), titleOf: (r) => registers.get(r)?.title ?? null, hydrate: (id) => byId(id), ctx: evalContext() },
         opening,
         legs,
         horizon,
+        undefined,
+        into,
       ),
 
     /**
@@ -6491,8 +6598,11 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
 
     /** Take somebody off. Never the last owner, and their person row stays. */
     /** Stop somebody without deciding about them, or start them again. */
-    suspendMember: (by: string, person: string, on: boolean, why?: string): Result<null> =>
+    suspendMember: (by: string, person: string, on: boolean, why?: string): Result<Suspended> =>
       transaction(() => suspend(memberDeps(), by, person, on, why)),
+
+    /** Whether this person is on the record and an owner has stopped them: which sentence a door turns them away with. */
+    memberStopped: (person: string): boolean => stoppedOf(sql, person),
 
     removeMember: (by: string, person: string, why?: string): Result<null> => transaction(() => remove(memberDeps(), by, person, why)),
 
@@ -6503,14 +6613,14 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       Promise.resolve(tokenDeps()).then((deps) => transaction(() => createToken(deps, person, args))),
 
     /** Every token, with a revoke button's worth of information and nothing a hash needs. */
-    listTokens: (): TokenRow[] => listTokens(sql),
+    listTokens: (validFrom?: string): TokenRow[] => listTokens(sql, validFrom),
 
     /** Revoke one, idempotently. */
     revokeToken: (person: string, id: string): Result<TokenRow> => transaction(() => revokeToken(tokenDeps(), person, id)),
 
     /** A bearer, checked. The one way a token is recognised, and there is no other. */
-    verifyToken: (bearer: string, surface?: string): Promise<Result<Verified>> =>
-      verifyToken(tokenDeps(), bearer, surface),
+    verifyToken: (bearer: string, surface?: string, validFrom?: string): Promise<Result<Verified>> =>
+      verifyToken({ ...tokenDeps(), validFrom }, bearer, surface),
 
     /* ── invitations, 12 §3 ───────────────────────────────── */
 
@@ -6554,19 +6664,19 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     deviceApprove: (person: string, args: { user_code: string }): Promise<Result<Approved>> => deviceApprove(tokenDeps(), person, args),
 
     /** The device asks again, and after approval gets its bearer once. INTERNAL. */
-    devicePoll: (args: { device_code: string }): Promise<Result<Waiting | Exchanged>> => devicePoll(tokenDeps(), args),
+    devicePoll: (args: { device_code: string }, validFrom?: string): Promise<Result<Waiting | Exchanged>> => devicePoll({ ...tokenDeps(), validFrom }, args),
 
     /** Every grant by its handle, never by the id a device polls with. */
-    deviceList: (): Promise<DeviceRow[]> => deviceList(tokenDeps()),
+    deviceList: (validFrom?: string): Promise<DeviceRow[]> => deviceList({ ...tokenDeps(), validFrom }),
 
     /** Revoke one; a login grant takes its token with it. */
     deviceRevoke: (person: string, handle: string): Promise<Result<DeviceRow>> => deviceRevoke(tokenDeps(), person, handle),
 
     /** A vault bearer, checked. INTERNAL. */
-    vaultGrant: (bearer: string): Promise<Result<VaultGrant>> => vaultGrant(tokenDeps(), bearer),
+    vaultGrant: (bearer: string, validFrom?: string): Promise<Result<VaultGrant>> => vaultGrant({ ...tokenDeps(), validFrom }, bearer),
 
     /** An operation bearer, checked and spent: the one ADMIN method it opens and who approved it. INTERNAL. */
-    operationGrant: (bearer: string): Promise<Result<OperationGrant>> => operationGrant(tokenDeps(), bearer),
+    operationGrant: (bearer: string, validFrom?: string): Promise<Result<OperationGrant>> => operationGrant({ ...tokenDeps(), validFrom }, bearer),
 
     /* ── the decision gate ─────────────────────────────────── */
 
@@ -6779,9 +6889,12 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      * that you know which key you are asking about, which is exactly the bar an export carrying the
      * sealed bytes should clear: a caller holding that key can open them one at a time already, and
      * a caller who is not holding it gains nothing from a file full of ciphertext.
+     *
+     * A KEY BEHIND A PASSPHRASE NAMES NO ROOT KEY, so it is passed over for the ones that do: otherwise a record whose
+     * `record` row came first would read as naming none.
      */
     wrappingKey(): string | null {
-      return sql.one<{ kek_id: string | null }>('SELECT kek_id FROM vault_key LIMIT 1')?.kek_id ?? null;
+      return sql.one<{ kek_id: string | null }>('SELECT kek_id FROM vault_key WHERE kek_id IS NOT NULL ORDER BY purpose LIMIT 1')?.kek_id ?? null;
     },
 
     export(opts: { sections?: readonly Section[]; redactGrants?: boolean; actor?: string } = {}) {
@@ -7694,6 +7807,14 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
 
     /** Start a finished run again, under the rule as installed now, with the trigger the first one had (`flow.ts`). */
     retryRun: (run: string, actor: string) => transaction(() => retryFlowRun(flowDeps(), run, actor)),
+
+    /**
+     * The hold the Directory's ledger puts on this record's automations at its monthly allowance, handed in by the host
+     * (`@braindog/host/actions` `holdAutomations`); `null` lifts it. Kept in memory only, because the host asks again.
+     */
+    holdRuns: (hold: { until: number; say: string } | null): void => {
+      runsHeld = hold;
+    },
 
     /**
      * Take an automation's steps over a sample, and say what each did, with nothing kept (`flow-try.ts`).

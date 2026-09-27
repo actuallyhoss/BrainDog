@@ -13,17 +13,14 @@
  * (`loop/research-switch.md` section 3, ranked gap 5).
  */
 
-import { MONEY_PAGES } from '../modules/money.ts';
-import { projectTemplate } from '../modules/portfolio.ts';
-
-/**
- * MONEY'S OWN "DUE THIS WEEK", TAKEN AND NOT COPIED, the way the project page takes Portfolio's template. A founder's
- * Home is drawn in place of Money's `home`, so this table was declared on every founder record and drawn on none of
- * them (`loop/research-living-in-it.md` 3.1). One declaration means the window, the columns and the order cannot drift
- * apart between the two Homes; and because it is read from Money, an edit there moves this use case's fingerprint,
- * which `usecase-versions.test.ts` then asks a version for.
+/*
+ * MONEY'S OWN "DUE THIS WEEK", TAKEN AND NOT COPIED, the way the project page takes Portfolio's template. Money exports
+ * it by name since money-core 3.0.0 retired its own `home`, where the block used to sit. One declaration means the
+ * window, the columns and the order cannot drift; and because it is read from Money, an edit there moves this use
+ * case's fingerprint, which `usecase-versions.test.ts` then asks a version for.
  */
-const DUE_THIS_WEEK = (MONEY_PAGES.home!.blocks as Record<string, unknown>[]).find((b) => b.heading === 'Due this week')!;
+import { DUE_THIS_WEEK } from '../modules/money.ts';
+import { projectTemplate } from '../modules/portfolio.ts';
 
 /** The lists a founder's record holds once its five modules and this pack are in, services among them. */
 const HOLDS = ['things', 'people', 'accounts', 'obligations', 'services', 'tasks', 'tracks', 'runs', 'updates', 'organisations', 'datapoints'];
@@ -55,8 +52,11 @@ export const FOUNDER = {
 
      1.5.0 BECAUSE HOME GAINS TWO TABLES AND A LIST IT REQUIRES: "Due this week", which Money's own Home drew
      and a founder's Home replaced, and "Lapsing", over Estate's services. Nothing is declared or taken away,
-     but `page.home-founder` now requires `register.services`, which is the same kind of step 1.4.0 was. */
-  version: '1.5.0',
+     but `page.home-founder` now requires `register.services`, which is the same kind of step 1.4.0 was.
+
+     1.5.1 BECAUSE HOME'S EMPTY TITLE LOSES ITS FULL STOP. A title ends without one everywhere else, and a record
+     is offered the words only when the version goes up. */
+  version: '1.5.1',
   title: 'Solo founder',
   summary: 'The organisations you run, the money across them, and the numbers your projects report.',
   author: 'BrainDog',
@@ -74,7 +74,7 @@ export const FOUNDER = {
     home: 'Overview',
     right_now: 'The numbers',
     needs_you: 'Needs your call',
-    nothing_needs_you: 'Nothing needs your call.',
+    nothing_needs_you: 'Nothing needs your call',
     since_away: 'While you were building',
     lists: 'Records',
   },

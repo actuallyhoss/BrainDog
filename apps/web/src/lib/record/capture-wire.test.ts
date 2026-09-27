@@ -96,7 +96,9 @@ test('A LIST THIS BUILD HAS NO DECLARATION FOR CANNOT BE WRITTEN FROM A PAGE, so
 });
 
 test('THE PAGE HANDS THE CAPTURE A WRITE ONLY WHERE ONE CAN BE MADE', () => {
-  const view = readFileSync(new URL('../page/PageView.svelte', import.meta.url), 'utf8');
-  assert.match(view, /oncapture=\{/, 'PageView never hands a capture its write, so every capture draws the read-only line');
-  assert.match(view, /captureRow\(/, 'the write is not the grid line one');
+  /* ONE BLOCK'S SLOT HANDS THE CALLBACK AND THE PAGE'S WRITES MAKE IT, since PGS-1 split the page. */
+  const slot = readFileSync(new URL('../page/BlockSlot.svelte', import.meta.url), 'utf8');
+  const writes = readFileSync(new URL('../page/page-writes.ts', import.meta.url), 'utf8');
+  assert.match(slot, /oncapture=\{/, 'the block never hands a capture its write, so every capture draws the read-only line');
+  assert.match(writes, /captureRow\(/, 'the write is not the grid line one');
 });

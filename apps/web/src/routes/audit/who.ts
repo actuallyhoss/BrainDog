@@ -21,9 +21,9 @@
  * `lib/record/api.ts` is the product's own answer: the reader is You, a person the record has a
  * name for is that name, and any other person is Someone on this record, never their id. Home's
  * feed has gone through it since `boot-live.ts` was written. This module is the same call, wearing
- * the two extra facts this screen needs: that an actor which is NOT a person still wants
- * `actorOf`'s lowercase words capitalised ("The record itself"), and that a person is not a
- * destination, so their line carries no link.
+ * the two extra facts this screen needs: that an actor which is NOT a person starts a line with a
+ * capital however `actor` in `lib/record/names.ts` words it (Slash, BrainDog, a rule's name), and
+ * that a person is not a destination, so their line carries no link.
  *
  * WHAT IT CANNOT DO IS INVENT A NAME. Measured on that same record: `members()` returned
  * `name: null` for all eight people and `boot.names` came back `{}`, because nothing in the product
@@ -65,9 +65,9 @@ export type Said = {
 
 /**
  * A ROW'S LEAD AND A FILTER CHIP STAND ALONE, SO THEY START WITH A CAPITAL, which is what the
- * `named` helper in the page was for: `actorOf` words an actor for the middle of a sentence ("by the
- * assistant"). It was applied to the result of `actorOf` and therefore to person ids as well, which
- * is how `P_01M…` got onto the screen. Here it is applied only to the branch it was written for.
+ * `named` helper in the page was for. It was applied to the result of `actorOf` and therefore to
+ * person ids as well, which is how `P_01M…` got onto the screen. Here it is applied only to the
+ * branch it was written for: an actor that is not a person.
  */
 const lead = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -119,10 +119,14 @@ export function offeredActors(
   me: string | null,
   names: ReadonlyMap<string, string>,
 ): string[] {
+  /* THE SEED AND THE RECORD ITSELF ARE BOTH SAID "BrainDog" (`actor`), so a live record whose log holds both offered
+     neither. They are one actor to a reader, so the record's own chip (`system`) stands for both and the seed's is not
+     counted beside it. */
+  const offered = all.includes('system') ? all.filter((by) => by !== 'p_seed') : all;
   const seen = new Map<string, number>();
-  for (const by of all) {
+  for (const by of offered) {
     const said = actorSaid(by, me, names).name;
     seen.set(said, (seen.get(said) ?? 0) + 1);
   }
-  return all.filter((by) => seen.get(actorSaid(by, me, names).name) === 1);
+  return offered.filter((by) => seen.get(actorSaid(by, me, names).name) === 1);
 }

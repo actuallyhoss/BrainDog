@@ -672,8 +672,9 @@ export const joinOf = (params: URLSearchParams): 'any' | undefined => (params.ge
  * `join` IS THE ADDRESS WORD `join=any`, AND UNDER IT THE CHIPS ARE JOINED WITH `, or`. One word is
  * the whole of it because both engines refuse a sentence mixing `,` and `, or` (wave two's brief 7),
  * so a set of chips is all "and" or all "or". `applyFilters` and `list` below pass it on the
- * sample, and on a record `treeOf` in `remote.ts` reads the same word into an `any` group, because
- * the list there never reads chips through this sentence. `remote-compare.test.ts` holds the two to
+ * sample, and on a record the register list sends this very sentence (`whereFor` in `remote.ts`),
+ * which the record parses; `treeOf` reads the same word into an `any` group only when the search box
+ * holds words. `remote-compare.test.ts` holds the two to
  * the same rows. The address is read by `joinOf` above, and the register route does not read it
  * yet, which is why `registerHref` still mints no such address.
  */
@@ -1450,11 +1451,8 @@ export type Parts = {
   unit?: string | null;
 };
 
-/** An agent as a person reads its name: `agent:claude` is Claude. A run (`S42`) and Slash are said as `actorOf` says them. */
-const agentNamed = (who: string): string => {
-  const named = actorOf(who);
-  return /^agent:/u.test(who) ? named.charAt(0).toUpperCase() + named.slice(1) : named;
-};
+/** An agent as a person reads its name: `agent:claude` is Claude and a run (`S42`) is An agent, as `names.ts`'s `actor` says them. */
+const agentNamed = (who: string): string => actorOf(who);
 
 /**
  * An `agents` block's rows as the renderer reads them: `who | count | what | when`. The agent is named as a person reads

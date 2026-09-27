@@ -678,13 +678,12 @@
    * `record/figure-fit.test.ts` asks for two per cent of room in the face the runner draws, so on Linux two cells need
    * 2 x 127.7 + 32 = 287.4px. 288 leaves each 128px: 3.9 per cent on Windows and about 2.2 on Linux. It stops at 288
    * because the phone is untouched at both ends of its range and has to stay so: the slot there is the page itself,
-   * 358px at 390 and exactly 288px at 320, and the query is strictly less than, so neither stacks and the two-up strip
-   * below is still what a phone draws.
+   * 358px at 390 and exactly 288px at 320, and the query is strictly less than, so neither stacks.
    *
    * AND THE THRESHOLD IS px WHERE EVERY OTHER QUERY IN THIS SYSTEM IS rem, because the width it guards is a px width:
    * `--t-xl` is 24px whatever the root font size is, so the figure stays 123px and a rem threshold would be the only
    * thing that moved. Written as `17.5rem` it was measured firing on a phone with the browser's own font size set to
-   * Large, which undid the two-up strip below for figures that were never in any danger.
+   * Large, which undid the two-up strip a phone drew then for figures that were never in any danger.
    */
   @container (inline-size < 288px) {
     .block-slot :global(.grid:has(> .cell:nth-child(2))) {
@@ -692,82 +691,11 @@
     }
   }
 
-  /* A stat's cells are declared, so the block cannot infer how many to draw (05 §4), but the HOST may restack what it
-     was given, and three figures across a 358px phone breaks `GBP 4,050.00` into two lines. A board on a phone stacks
-     its lanes, which is what this still does for one. */
+  /* A BOARD ON A PHONE STACKS ITS LANES. A stat is not restacked here: under 480px of block it is rows, label on the
+     left and figure on the right, drawn by blocks.css (DSN-8), and above that its own container steps decide. */
   @media (width < 640px) {
-    .block-slot :global(.grid) {
+    .block-slot :global(.grid:not(:has(> .cell))) {
       grid-template-columns: minmax(0, 1fr);
-    }
-
-    /**
-     * AND A STAT GOES TWO-UP. One figure a row put four figures at about a hundred and ten pixels each, measured at 390
-     * as cells 356 wide stacked from y 288 to y 716, so the next block started below the fold and the page read as four
-     * cards and nothing else.
-     *
-     * TWO COLUMNS, AND THE FIRST SPANS WHEN THE COUNT IS ODD: four figures are a two-by-two, three are a lead with two
-     * beneath, one is one. The count is still the declaration's; `:first-child:nth-last-child(odd)` only reads it.
-     *
-     * `:has(> .cell)` SO A BOARD IS NOT CAUGHT. Board and stat both render `class="grid"`, and a board's lanes two-up on
-     * a phone are two columns of cards at 170px, which is a different decision from this one.
-     *
-     * NO HAIRLINES BETWEEN THEM. Space separates figures, on a phone as on a desktop.
-     */
-    .block-slot :global(.grid:has(> .cell)) {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    /* No rules between the figures on a phone either; the grid's gap separates them. */
-    .block-slot :global(.grid:has(> .cell)) {
-      gap: var(--sp-4) var(--sp-5);
-    }
-
-    .block-slot :global(.grid:has(> .cell) > .cell:first-child:nth-last-child(odd)) {
-      grid-column: 1 / -1;
-    }
-
-    /* A step down so `GBP 28,320.00` stays one line in half a phone. */
-    .block-slot :global(.grid:has(> .cell) .cell-figure) {
-      font-size: var(--t-lg);
-      /* ONE AMOUNT NEVER BREAKS, because its code sits on a no-break space; a figure in several currencies breaks
-         between them rather than running out of half a phone. */
-      white-space: normal;
-    }
-
-    /* THE LEAD FIGURE STAYS THE SCREEN'S HERO on a phone, a step above the figures beside it. */
-    .block-slot :global(.block[data-form='lead'] .grid > .cell:first-child) {
-      grid-column: 1 / -1;
-    }
-
-    .block-slot :global(.block[data-form='lead'] .grid > .cell:first-child .cell-figure) {
-      font-size: var(--t-2xl);
-      /* A HERO IN SEVERAL CURRENCIES BREAKS BETWEEN THEM, never inside an amount, which keeps its code on a no-break space. */
-      white-space: normal;
-    }
-
-    /* A LEAD AND THREE OR MORE FIGURES: the rest are rows under it, the label on the left and the figure at the right
-       edge with its note beneath, so the last of them is not left alone on a row of its own and none of them wraps its
-       label to fit a third of a phone. */
-    .block-slot :global(.block[data-form='lead'] .grid:has(> .cell:nth-child(4))) {
-      grid-template-columns: minmax(0, 1fr);
-      row-gap: var(--sp-3);
-    }
-
-    .block-slot :global(.block[data-form='lead'] .grid:has(> .cell:nth-child(4)) > .cell:not(:first-child)) {
-      grid-template-areas:
-        'label glyph . figure'
-        'note note note figure';
-      /* THE LABEL IS NEVER SQUEEZED, so a figure in several currencies, which is long, breaks between its amounts instead
-         of the label going to a word a line. THE MARK SITS AGAINST ITS LABEL, and the space between is its own track. */
-      grid-template-columns: max-content auto minmax(0, 1fr) minmax(0, auto);
-      column-gap: var(--sp-2);
-    }
-
-    .block-slot :global(.block[data-form='lead'] .grid:has(> .cell:nth-child(4)) > .cell:not(:first-child) .cell-figure) {
-      font-size: var(--t-md);
-      text-align: end;
-      /* AND THE FIGURE BREAKS BETWEEN ITS AMOUNTS, never inside one: each keeps its code on a no-break space. */
-      white-space: normal;
     }
   }
 </style>

@@ -16,15 +16,14 @@ import { createHash } from 'node:crypto';
 import { createRecordApi, type CallContext } from '../src/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 import { NOW, installSeed } from '../../seed/src/index.ts';
-import { MONEY_SMS_INGESTS } from '../../seed/src/modules/money.ts';
-import { HSBC_EG_SMS_INGESTS, bankDeclarations } from '../../seed/test/pack-files.ts';
+import { CARD_SMS_INGESTS, HSBC_EG_SMS_INGESTS, bankDeclarations } from '../../seed/test/pack-files.ts';
 
 const owner: CallContext = { principal: { kind: 'person', id: 'p_owner', level: 'owner' } };
 
 const sha256 = (text: string): string => createHash('sha256').update(text).digest('hex');
 
 /**
- * The seed, money-core's twins, and the bank's pack file, whose `bank-from-out-sms` is the door his Shortcut posts to.
+ * The seed, the card alerts' twins (money-core's until 3.0.0), and the bank's pack file, whose `bank-from-out-sms` is the door his Shortcut posts to.
  * The file and not the sample since 25 September, when the sample stopped carrying the bank's twelve
  * (`seed/test/pack-files.ts`).
  */
@@ -32,7 +31,7 @@ async function record() {
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
   assert.ok((await installSeed(api.kernel)).ok);
-  const twins = Object.values(MONEY_SMS_INGESTS).map((body) => ({ id: `ingest.${body.ingest}`, kind: 'ingest' as const, body: body as never }));
+  const twins = Object.values(CARD_SMS_INGESTS).map((body) => ({ id: `ingest.${String(body.ingest)}`, kind: 'ingest' as const, body: body as never }));
   const put = await api.kernel.install([...twins, ...bankDeclarations()]);
   assert.ok(put.ok, JSON.stringify(put));
   return { sql, api };

@@ -18,7 +18,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { columnsFor, currencyFor, dirOf, display, identityFor, isProse, labelOf, seqWidth, packDiff, readableFields, spokenRow, toRows, unnamed } from './api.ts';
+import { columnsFor, currencyFor, dirOf, display, identityFor, isProse, labelOf, learnHome, seqWidth, packDiff, readableFields, spokenRow, toRows, unnamed } from './api.ts';
 import { applyFilters, backlinks, boot, metric, page, pages, readBlock, search } from './fixtures/readers.ts';
 import { amountOf } from './money.ts';
 import { toSegments } from './blocks.ts';
@@ -32,6 +32,8 @@ import type { Column } from 'braindog-render/svelte';
 import { magnitudeOf } from 'braindog-render';
 /* THE SAMPLE'S ROW NAMES, which a live tab learns from the record and this test asks the mirror about by name. */
 import './fixtures/fill.ts';
+/* THE SAMPLE'S RECORD IS KEPT IN POUNDS, as its `boot` would say: `homeCurrency()` reads the booted shell now and no longer counts the rows `fill.ts` puts in `held.ts`. */
+learnHome('GBP');
 
 /* ── money ───────────────────────────────────────────────────────────────── */
 

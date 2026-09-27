@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./catalogue": "./src/catalogue.ts",
+    "./job": "./src/job.ts",
     "./kennel": "./src/kennel.ts"
   },
   "dependencies": {

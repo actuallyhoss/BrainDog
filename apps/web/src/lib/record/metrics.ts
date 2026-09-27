@@ -186,6 +186,9 @@ export const fxNow = (): { home: string | null; rates: readonly Rate[] } => fxSo
  * added up in and saying so. Empty when the figure is in another currency and no rate converts its target.
  */
 export function targetSaid(decl: MetricDecl, r: { unit?: string | null | undefined; targetIn?: TargetIn | undefined }): string {
+  /* A BARE `money` FORMAT NAMES NO CURRENCY (money-core 3.0.0: the record's home one), so its target is said in the
+     currency the record read the figure in, never as a bare number of minor units. */
+  if (decl.format === 'money' && r.unit && /^[A-Z]{3}$/u.test(r.unit)) return targetLine({ ...decl, format: `money.${r.unit}` });
   if (!offTarget(decl, r.unit)) return targetLine(decl);
   if (!r.targetIn) return '';
   const from = r.targetIn.from ?? decl.format!.slice('money.'.length);
@@ -325,6 +328,10 @@ export function format(shape: string | undefined, n: number | null): string {
   if (n === null) return '—';
   if (!shape) return n.toLocaleString('en', { maximumFractionDigits: 2 });
   if (shape.startsWith('money.')) return money(Math.round(n), shape.slice('money.'.length));
+  /* A BARE `money` IS THE HOME CURRENCY'S (money-core 3.0.0). With none chosen it names no currency, so it is written
+     as the number it is rather than in a currency guessed for it. */
+  const home = shape === 'money' ? fxSource().home : null;
+  if (home !== null) return money(Math.round(n), home);
   switch (shape) {
     case 'int':
       return integer(Math.round(n));
@@ -374,7 +381,9 @@ export function hrefFor(decl: MetricDecl): string | null {
  * wrote, and the record still checks it against the register, so `project-owed:Atlantis` is refused
  * by name rather than reported as nothing owed.
  */
-export const isTemplate = (decl: MetricDecl): boolean => (decl.where ?? '').includes('{{');
+/* A WHERE MAY BE A PREDICATE TREE and not a sentence (MOD-4: one sentence cannot mix a comma with an `or`), and a tree is
+   never a template, so only a sentence is searched. */
+export const isTemplate = (decl: MetricDecl): boolean => typeof decl.where === 'string' && decl.where.includes('{{');
 
 /** The six aggregations this build reads. `08` §2.2 publishes eleven; the rest are post-v1. */
 const READS_AGGREGATION = ['sum', 'count', 'avg', 'min', 'max', 'distinct'];
@@ -396,8 +405,8 @@ const READS_AGGREGATION = ['sum', 'count', 'avg', 'min', 'max', 'distinct'];
  */
 const READS_KEY = new Set(['metric', 'name', 'source', 'where', 'value', 'format', 'target', 'window', 'compare', 'lookups', 'snapshot', 'group_by', 'bucket', 'within']);
 
-/** The formats this build writes. A format it does not know printed the bare number. */
-const READS_FORMAT = ['int', 'pct', 'days', 'decimal', 'day'];
+/** The formats this build writes. A format it does not know printed the bare number. `money` is money-core 3.0.0's, in the record's home currency. */
+const READS_FORMAT = ['money', 'int', 'pct', 'days', 'decimal', 'day'];
 
 /**
  * What the declaration asked for that this build cannot do — named, never ignored.
@@ -641,8 +650,11 @@ export function meetsTarget(decl: MetricDecl, value: number | null): boolean | n
  * line somebody set and ".00" on it is width a phone does not have.
  */
 export const targetLine = (decl: MetricDecl): string => {
-  const under = 'lte' in decl.target;
-  const bound = 'lte' in decl.target ? decl.target.lte : decl.target.gte;
+  /* A TARGET THAT NAMES A SETTING AND NO NUMBER YET (MOD-4, a money ceiling with no default) has no line to say. */
+  const target = decl.target as { lte?: unknown; gte?: unknown };
+  const under = typeof target.lte === 'number';
+  const bound = typeof target.lte === 'number' ? target.lte : typeof target.gte === 'number' ? target.gte : null;
+  if (bound === null) return '';
   if (under && bound === 0) return 'None expected';
   const figure = format(decl.format, bound).replace(/\.0+$/u, '');
   if (under) return `Limit ${figure}`;

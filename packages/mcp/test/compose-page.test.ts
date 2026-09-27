@@ -28,8 +28,8 @@
  * THREE THINGS THE BRIEF ASSUMED THAT THE RECORD DOES NOT DO, each measured here rather than worked around quietly:
  *   1. A page cannot be tried before its lists exist. `previewPage` holds a body to the install's lint, and the lint
  *      refuses a `requires` naming a list nobody installed, so the lists are filed and accepted first, and every page
- *      is tried and filed after. And a `{ declarations: [...] }` bundle cannot be tried at all: `try` reads one page or
- *      one script.
+ *      is tried and filed after. A `{ declarations: [...] }` bundle is tried with the record's `previewChange`, up to
+ *      `PREVIEW_DECLARATIONS_MOST` declarations (`packages/record/src/preview-change.ts`).
  *   2. A bundle filed under a list's name may carry no other list (`govern.ts` `namesFault`), and the refusal says to
  *      propose each other list as a change of its own. The agent files it under a figure's name instead, which the
  *      record asks only whoever reads the whole record about; the sentence does not say that this is allowed.
@@ -196,11 +196,13 @@ test('AN AGENT TRIES THE DESK, IS TOLD ITS LISTS ARE MISSING, FILES THEM, AND EV
   assert.equal(early.refusal?.code, 'DEPENDENCY_UNRESOLVED', JSON.stringify(early));
   assert.match(early.refusal?.fix ?? '', /register\.parts/);
 
-  /* AND THE WHOLE DESK AS ONE TRIED BUNDLE, which is the one change the brief would have sent, is refused outright. */
+  /* AND THE WHOLE DESK AS ONE TRIED BUNDLE, which is the one change the brief would have sent, is more than one preview
+     takes (`loop/finish/contracts.md` §2.4), so it is refused on its size, at the declarations. */
   const whole = bundle('Add the launch desk?', [...LISTS, ...PAGES], 'metric.essentials');
   const triedWhole = (await mcp.call('propose', { ...whole, body: { ...whole.body, try: true } }, agent)) as Out;
-  assert.equal(triedWhole.refusal?.code, 'VALUE_MALFORMED', JSON.stringify(triedWhole));
-  assert.match(triedWhole.refusal?.fix ?? '', /Only a script or a page change can be tried/);
+  assert.equal(triedWhole.refusal?.code, 'OUT_OF_BOUNDS', JSON.stringify(triedWhole));
+  assert.equal(triedWhole.refusal?.at, 'to.declarations');
+  assert.match(triedWhole.refusal?.fix ?? '', /at most 12 declarations at once, and this change has 23/);
 
   /* SO THE LISTS AND FIGURES GO FIRST, AS ONE CHANGE. Under the first list's name it is refused, since whoever reads
      Parts would read Steps in it; under a figure's name the record asks only whoever reads the whole record. Nothing

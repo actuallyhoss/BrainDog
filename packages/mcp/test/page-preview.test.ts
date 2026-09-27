@@ -87,15 +87,14 @@ test('try ON A PAGE IS true AND NOTHING ELSE, and a host without the method says
   assert.deepEqual(calls, [], 'a host that cannot draw the page filed it instead');
 });
 
-test('A RULE CHANGE STILL CANNOT BE TRIED, and the sentence names both kinds that can', async () => {
+test('A RULE CHANGE IS TRIED BY THE RECORD\'S tryAutomation, so a surface without it answers NOT_IN_THIS_BUILD', async () => {
   const { surface } = stub({ previewPage: async () => ({ ok: true, value: DRAWN }) });
   const rule = await tools(surface).call(
     'propose',
     { question: 'q', body_kind: 'change', body: { declaration_id: 'rule.x', to: { id: 'rule.x', kind: 'rule', body: { register: 'gold', then: [] } }, try: true } },
     { who: 'agent' },
   );
-  assert.equal(codeOf(rule), 'VALUE_MALFORMED');
-  assert.match((rule as { refusal: { fix: string } }).refusal.fix, /script or a page/);
+  assert.equal(codeOf(rule), 'NOT_IN_THIS_BUILD');
 });
 
 test("A PREVIEW THE RECORD REFUSES IS REFUSED IN ITS WORDS, and nothing is filed", async () => {

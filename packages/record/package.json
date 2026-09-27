@@ -7,7 +7,9 @@
     ".": "./src/index.ts",
     "./directory": "./src/directory.ts",
     "./webauthn": "./src/webauthn.ts",
-    "./catalogue-offers": "./src/catalogue-offers.ts"
+    "./catalogue-offers": "./src/catalogue-offers.ts",
+    "./automations": "./src/automations.ts",
+    "./oauth": "./src/oauth.ts"
   },
   "dependencies": {
     "@braindog/declare": "workspace:*",

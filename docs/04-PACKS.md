@@ -282,7 +282,7 @@ was expected — the failure mode to avoid is a valid-looking pack that half-loa
 
 | Code | Check | Refusal |
 |---|---|---|
-| `KIND_UNKNOWN` | Unknown kind | `widget is not one of the 9 kinds of declaration: register, page, block, ingest, rule, metric, theme, digest, script.` |
+| `KIND_UNKNOWN` | Unknown kind | `widget is not one of the 10 kinds of declaration: register, page, block, ingest, rule, metric, theme, digest, script, job.` |
 | `FIELD_TYPE_UNKNOWN` | Unknown field type | `register.invoices.fields[4].type 'currency' — did you mean 'money'?` |
 | `FIELDS_OVER_CAP` | Fields per register > 64 | `register.wide: 71 fields. The ceiling is 64 — a register with more than that is a database, not a register.` |
 | `INDEXES_OVER_CAP` | Fields with `index` or `unique` > 8 — `key:` is one index and is not counted | `register.invoices: 11 indexed fields; the ceiling is 8` |

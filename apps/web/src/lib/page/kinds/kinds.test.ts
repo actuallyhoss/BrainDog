@@ -1,7 +1,6 @@
 /**
  * A block kind registered in `index.ts` is drawn from the record's own answer, through the path every page takes:
- * `page-live.ts` `blockOf` keeps the answer, and `blocks.ts` `draw`, which `PageView.svelte` and `DeclaredHome.svelte`
- * draw through, hands it to the kind's module before any arm of its own.
+ * `page-live.ts` `blockOf` keeps the answer, and `blocks.ts` `draw`, which `BlockSlot.svelte` draws through, hands it to the kind's module before any arm of its own.
  *
  * THE ANSWER HERE IS THE KERNEL'S SHAPE, written out, because the record's half of the path is the kernel's own test
  * (`packages/kernel/test/kinds-registry.test.ts`) and this one begins where the answer arrives in the app.

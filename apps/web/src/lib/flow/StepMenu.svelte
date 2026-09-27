@@ -85,7 +85,7 @@
 
   .step-menu[data-landing] .add {
     border-style: solid;
-    border-color: var(--accent);
+    border-color: var(--ink2);
     color: var(--ink2);
   }
 

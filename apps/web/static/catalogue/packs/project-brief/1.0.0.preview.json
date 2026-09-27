@@ -1,0 +1,160 @@
+{
+  "format": 1,
+  "made_at": "2026-09-27T12:38:59.443Z",
+  "pages": [
+    {
+      "blocks": [
+        {
+          "columns": [
+            {
+              "field": "name",
+              "label": "Project",
+              "width": "minmax(14ch,1fr)"
+            },
+            {
+              "field": "blockers",
+              "label": "In the way",
+              "width": "minmax(24ch,2fr)"
+            }
+          ],
+          "empty": "Nothing is in the way of a project in play.",
+          "heading": "In the way",
+          "kind": "table",
+          "limit": 50,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "name"
+            }
+          ],
+          "source": "register.things",
+          "span": 12,
+          "where": "lane is building or earning, blockers is set",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        },
+        {
+          "columns": [
+            {
+              "field": "name",
+              "label": "Project",
+              "width": "minmax(14ch,1fr)"
+            },
+            {
+              "field": "summary",
+              "label": "One line",
+              "width": "minmax(24ch,2fr)"
+            },
+            {
+              "field": "lane",
+              "label": "Status",
+              "width": "10ch"
+            }
+          ],
+          "empty": "No project is in play.",
+          "heading": "What each one is",
+          "kind": "table",
+          "limit": 50,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "name"
+            }
+          ],
+          "source": "register.things",
+          "span": 12,
+          "where": "lane is building or earning",
+          "rows": [
+            {
+              "id": "01M3HE0D3K0XN7DHWQE4P7MD14",
+              "register": "things",
+              "seq": 1,
+              "fields": {
+                "name": "Kiln",
+                "lane": "earning",
+                "health": "at_risk",
+                "next": "Settle how Kiln is licensed, before the September issue announces it",
+                "progress": 60,
+                "aim": "2026-09-20",
+                "agent": "claude",
+                "revenue": {
+                  "amount": 1840000,
+                  "currency": "GBP"
+                },
+                "earned_before": {
+                  "amount": 1412000,
+                  "currency": "GBP"
+                },
+                "since": "2024-03-11",
+                "mark": "◆",
+                "hue": 214,
+                "note": "```chips\n● | 3 | cuts\n● | 2 | clients | good\n● | 1 | open question | warn\n```\n\n# Kiln\n\nEarning · a variable type family, licensed direct. {{money:1840000 GBP}} in the last twelve months, and\nearning since March 2024.\n\n## 1 · Where the money comes from\n\n```bar | Revenue by channel, twelve months\nDirect licences | 11200 | 61%\nStudio deals | 5300 | 29%\nSpecimen prints | 1900 | 10%\nUnattributed | 3400 | | hole\n```\n\nDirect licensing carries it, and that is the thing to protect. The unattributed row is not a\nchannel: it is three months of payouts that arrived before the reference field existed, and it\nsits outside the scale because a hole that sets the bar makes every real category a stub.\n\n## 2 · The licensing question\n\n```spec | What each model costs to run\nPer seat | Honour system | every foundry does this\nPer product | One number per shipped thing | needs a definition of \"shipped\"\nFlat studio | One price, no counting | hardest to raise later\n```\n\nOpen as SG31 and it blocks two quotes. The September issue announces whichever wins, so it is not\ndeferrable past {{date:2026-09-20}}.\n\n## 3 · What is on the roadmap\n\n```steps | Next three\nVariable axis QA | the new cut, all weights | doing\nSpecimen page | one screen, no marketing | open\nLicence generator | reads the tier, emits the PDF | blocked\n```\n\n## 4 · The estate underneath it\n\n```spec | Domains and hosting\nkiln.example | renews {{until:2026-09-15}} | the apex\nkilnfonts.example | lapsing {verified: renewal email, 8 Aug} | auto-renew is off\nObject storage | {{money:4100 GBP}} a month | the binaries\n```\n\n```note | Watch this | warn\n`kilnfonts.example` is the redirect every old licence PDF points at. Letting it lapse breaks\nlinks in files that have already been delivered, which is not a thing an apology fixes. Tracked\nas {{ref:tasks#3}}.\n```\n\n## What is not verified\n\n- The 61% direct share {estimate}; it excludes the unattributed rows above.\n- Whether studio deals renew at all {unknown}\n\n## Log\n\n```timeline | Recent\n{{ago:2026-08-14}} | Raised the studio tier | first increase since launch | good\n{{ago:2026-07-02}} | Shipped the italic | four weights | good\n{{ago:2026-05-19}} | Moved off the old CI | Hobnail cancelled\n```\n\nSettled by research. Do not run it again: the domain host comparison is D41.\n\n```stat | This block is wrong on purpose\nToo | many | cells | for | a | stat | row\n```",
+                "repos": [
+                  "git.kiln.example/type/kiln-type",
+                  "git.kiln.example/type/kiln-site"
+                ],
+                "folders": [
+                  "/Users/studio/Code/kiln-type",
+                  "/Users/studio/Code/kiln-site"
+                ],
+                "tags": [
+                  "example"
+                ]
+              },
+              "state": "earning",
+              "version": 1,
+              "created_at": "2026-09-27T12:38:59.443Z",
+              "updated_at": "2026-09-27T12:38:59.443Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 1,
+          "refusals": []
+        },
+        {
+          "columns": [
+            {
+              "field": "name",
+              "label": "Project",
+              "width": "minmax(14ch,1fr)"
+            },
+            {
+              "field": "plan",
+              "label": "The plan",
+              "width": "minmax(24ch,2fr)"
+            }
+          ],
+          "empty": "No project in play has a plan written down.",
+          "heading": "The plan",
+          "kind": "table",
+          "limit": 50,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "name"
+            }
+          ],
+          "source": "register.things",
+          "span": 12,
+          "where": "lane is building or earning, plan is set",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        }
+      ],
+      "icon": "thing",
+      "nav": {
+        "order": 20,
+        "section": "Projects"
+      },
+      "page": "briefs",
+      "requires": [
+        "register.things"
+      ],
+      "title": "Briefs",
+      "read_at": "2026-09-27T12:38:59.443Z",
+      "declared_version": 1
+    }
+  ]
+}

@@ -54,11 +54,11 @@ async function founder(): Promise<Kernel> {
   for (const m of modulesFor(u, ['people'])) {
     if (m === 'agents') continue;
     const holds = new Set([...held(k), ...firstPartyManifest(m as never).provides.flatMap((p) => (p.startsWith('register.') ? [p.slice(9)] : []))]);
-    const pack = value<Pack>(await normalise(moduleDocument(u, m, { today: TODAY, holds }), { kind: 'local' }));
+    const pack = value<Pack>(await normalise(moduleDocument(u, m, { today: TODAY, holds, examples: true }), { kind: 'local' }));
     const diff = await plan(pack, stateOf(k));
     value(await install(pack, diff, hostFor(k), diff.planHash));
   }
-  const pack = value<Pack>(await normalise(carriedDocument(u, TODAY), { kind: 'local' }));
+  const pack = value<Pack>(await normalise(carriedDocument(u, TODAY, null, { examples: true }), { kind: 'local' }));
   const diff = await plan(pack, stateOf(k));
   value(await install(pack, diff, hostFor(k), diff.planHash));
   return k;

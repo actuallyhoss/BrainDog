@@ -256,8 +256,8 @@ test('the real page, at the commit before its six missing days were written', (t
  *
  * REFUSING TO RUN IS NOT ENOUGH, WHICH IS WHY THIS DEEPENS. `tools/gates/run.mjs` counts exit 3 as a
  * skip and then `if (disallowed.length && process.env.CI) failed.push(...disallowed)`, so a gate that
- * skips on a shallow clone is RED in CI, where every checkout is shallow: not one of the eight
- * checkouts in the five workflows sets `fetch-depth`, and `actions/checkout@v4` clones at depth 1. A
+ * skips on a shallow clone is RED in CI, where every checkout is shallow: no checkout in
+ * the workflows that test a push or a pull request sets `fetch-depth`, and `actions/checkout@v4` clones at depth 1. A
  * skip there would have to be waived by name in `--allow-skip` for ever, which is a gate CI never runs.
  *
  * `fullHistory` TAKES THE GIT RUNNER AS AN ARGUMENT for the reason `check` takes the log as one: the

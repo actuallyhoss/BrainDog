@@ -257,7 +257,7 @@ test('WITH try IT IS TRIED AND FILED NOWHERE: the answer is script_try, and prop
   assert.deepEqual(tried[1], { body: { ...body(), runs: { every: '1h' } }, input: { body: 'debited EGP 12' } });
 });
 
-test('try IS REFUSED ON ANYTHING BUT A SCRIPT CHANGE, SPELLED ANY OTHER WAY, OR WHERE NOTHING CAN TRY ONE', async () => {
+test('try ON A SCRIPT CHANGE IS REFUSED SPELLED ANY OTHER WAY OR WHERE NOTHING CAN TRY ONE, and a rule change goes to tryAutomation', async () => {
   const tried: unknown[] = [];
   const { surface } = stub({ scriptTry: async (a) => (tried.push(a), { ok: true, value: ANSWERED }) });
   const rule = await tools(surface).call(
@@ -265,7 +265,7 @@ test('try IS REFUSED ON ANYTHING BUT A SCRIPT CHANGE, SPELLED ANY OTHER WAY, OR 
     { question: 'q', body_kind: 'change', body: { declaration_id: 'rule.x', to: { id: 'rule.x', kind: 'rule', body: { register: 'gold', then: [] } }, try: true } },
     { who: 'agent' },
   );
-  assert.equal(codeOf(rule), 'VALUE_MALFORMED');
+  assert.equal(codeOf(rule), 'NOT_IN_THIS_BUILD');
   const odd = await tools(surface).call('propose', change(body(), { try: 'yes' }), { who: 'agent' });
   assert.equal(codeOf(odd), 'VALUE_MALFORMED');
   const stray = await tools(surface).call('propose', change(body(), { try: { input: 1, dry: true } }), { who: 'agent' });

@@ -1,6 +1,6 @@
 /**
  * What the poll form on an organisation's page files: one address, how often, the key if the address needs one, and
- * which number in its answer is which measure (`routes/p/[slug]/PollForm.svelte`).
+ * which number in its answer is which measure (`lib/page/panels/PollForm.svelte`).
  *
  * THE FORM FILES A PROPOSAL AND INSTALLS NOTHING. A poll calls out on a clock, so the pack it makes goes in front of
  * the owner on Decide, where the host and the interval are printed and approved once (`founder-poll.ts`). The record

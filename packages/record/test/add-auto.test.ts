@@ -57,6 +57,9 @@ async function record() {
   return { sql, api, add, live, suggestion, declared };
 }
 
+/** The status of the one question a fresh record holds. */
+const filed = (sql: { one: <T>(q: string) => T | undefined }): string | undefined => sql.one<{ status: string }>('SELECT status FROM suggestion')?.status;
+
 const idOf = (out: Out): string => {
   assert.ok(out.ok, JSON.stringify(out));
   return String(out.value!.id);
@@ -200,12 +203,14 @@ test("A MEMBER'S KEY ASKS: an addition from a key of anybody but the owner files
      agents; `field-write.ts` holds the web to "a field on everybody's rows is the owner's call", and a member's key is
      that member. So `append`, `write` and `decide` all file, and none of them lands. */
   for (const level of ['append', 'write', 'decide'] as const) {
-    const { sql, add, live, suggestion, declared } = await record();
+    const { sql, add, live, declared } = await record();
     const member: CallContext = { ...agent, principal: { kind: 'token', id: 'tok_2', scope: 'propose', person: 'p_2', level } };
     const out = await add({ fields: [{ id: 'colour', type: 'text' }] }, member);
-    const id = idOf(out);
+    idOf(out);
     assert.equal(out.value!.landed, undefined, `a ${level} key landed the field`);
-    assert.equal(suggestion(id).status, 'open', `a ${level} key answered its own question`);
+    /* THE RECORD'S ONE QUESTION, READ BY ITSELF, because an `append` key is answered a receipt and not the question's
+       id: an appender reads nothing, not even what it filed (`20 §1`, COL-1). */
+    assert.equal(filed(sql), 'open', `a ${level} key answered its own question`);
     assert.deepEqual(live().fields.map((f) => f.id), ['name', 'lane']);
     assert.equal(declared().length, 0);
     sql.close();
@@ -238,12 +243,12 @@ test('AND A MEMBER INVITED AS OWNER OF PROJECTS ALONE is not the owner, and her 
      Projects at version 2, while `decide` refuses her for want of the whole record and the web's `ownsRecord` says she
      is not an owner. So the record's own level must be `owner`, and the list's may only keep it there. */
   for (const level of ['append', 'decide'] as const) {
-    const { sql, add, live, suggestion } = await record();
+    const { sql, add, live } = await record();
     const member: CallContext = { principal: { kind: 'token', id: 'tok_2', scope: 'propose', person: 'p_2', level }, levels: { things: 'owner' } };
     const out = await add({ fields: [{ id: 'colour', type: 'text' }] }, member);
-    const id = idOf(out);
+    idOf(out);
     assert.equal(out.value!.landed, undefined, `a ${level} key held to owner on Projects landed the field`);
-    assert.equal(suggestion(id).status, 'open');
+    assert.equal(filed(sql), 'open');
     assert.equal(live().version, 1);
     sql.close();
   }

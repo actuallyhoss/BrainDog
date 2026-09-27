@@ -102,8 +102,8 @@ test('A RECORD WITH TEAM 1.0.0 UPDATES TO TICKETS ON TASKS AND LOSES NOTHING', a
   const sql = openSqlite();
   const k = await openRecord(sql, fixedClock(NOW));
   const u = useCase('team')!;
-  value(await put(k, moduleDocument(u, 'portfolio', { today: TODAY, holds: ['things'] })));
-  value(await put(k, moduleDocument(u, 'people', { today: TODAY, holds: [...held(k), 'people'] })));
+  value(await put(k, moduleDocument(u, 'portfolio', { today: TODAY, holds: ['things'], examples: true })));
+  value(await put(k, moduleDocument(u, 'people', { today: TODAY, holds: [...held(k), 'people'], examples: true })));
   value(await put(k, TEAM_1));
 
   const cycle = value<Row>(k.create('cycles', { name: 'Cycle 7', state: 'active' }, OWNER));
@@ -113,7 +113,7 @@ test('A RECORD WITH TEAM 1.0.0 UPDATES TO TICKETS ON TASKS AND LOSES NOTHING', a
   value(k.create('tickets', { what: 'Retire the old importer', state: 'done', agent: 'claude', cycle: cycle.id, points: 2 }, OWNER));
 
   /* WORK FIRST, as the update's modules name it. */
-  value(await put(k, moduleDocument(u, 'work', { today: TODAY, holds: [...held(k), 'tasks', 'tracks', 'updates'] })));
+  value(await put(k, moduleDocument(u, 'work', { today: TODAY, holds: [...held(k), 'tasks', 'tracks', 'updates'], examples: true })));
 
   /* AN UPDATE THAT DROPPED THE LIST WOULD LEAVE THREE ROWS WITHOUT ONE, and is refused. */
   const bare = await put(k, useCaseDocument('team', TODAY));
@@ -164,13 +164,13 @@ test('A RECORD THAT TOOK TEAM 2.0.0 PUTS ITS BACKLOG TICKETS BACK IN THE BACKLOG
   const sql = openSqlite();
   const k = await openRecord(sql, fixedClock(NOW));
   const u = useCase('team')!;
-  value(await put(k, moduleDocument(u, 'portfolio', { today: TODAY, holds: ['things'] })));
-  value(await put(k, moduleDocument(u, 'people', { today: TODAY, holds: [...held(k), 'people'] })));
+  value(await put(k, moduleDocument(u, 'portfolio', { today: TODAY, holds: ['things'], examples: true })));
+  value(await put(k, moduleDocument(u, 'people', { today: TODAY, holds: [...held(k), 'people'], examples: true })));
   value(await put(k, TEAM_1));
   value(k.create('tickets', { what: 'Groom the backlog', state: 'backlog' }, OWNER));
   value(k.create('tickets', { what: 'Sketch the importer', state: 'backlog' }, OWNER));
   value(k.create('tickets', { what: 'Ship the export', state: 'to_do' }, OWNER));
-  value(await put(k, moduleDocument(u, 'work', { today: TODAY, holds: [...held(k), 'tasks', 'tracks', 'updates'] })));
+  value(await put(k, moduleDocument(u, 'work', { today: TODAY, holds: [...held(k), 'tasks', 'tracks', 'updates'], examples: true })));
   value(await put(k, useCaseDocument('team', TODAY, held(k))));
   /* AS 2.0.0 COPIED THEM: every one To do. Then a person started one of the backlog tickets. */
   for (const what of ['Groom the backlog', 'Sketch the importer', 'Ship the export']) value(k.create('tasks', { what, state: 'open', priority: 'normal' }, OWNER));

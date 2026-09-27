@@ -35,8 +35,7 @@ import type { Sql } from '@braindog/ports';
 import { createRecordApi } from '../src/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 import { NOW, day, installSeed } from '../../seed/src/index.ts';
-import { MONEY_INGESTS } from '../../seed/src/modules/money.ts';
-import { HSBC_EG_INGESTS, bankDeclarations } from '../../seed/test/pack-files.ts';
+import { CARD_INGESTS, HSBC_EG_INGESTS, bankDeclarations, cardAlertDeclarations } from '../../seed/test/pack-files.ts';
 
 /** The seeded record, and two EGP accounts whose digits the invented wordings name. */
 async function record(): Promise<{ k: Kernel; sql: Sql; card: string; current: string; company: string }> {
@@ -47,7 +46,10 @@ async function record(): Promise<{ k: Kernel; sql: Sql; card: string; current: s
   assert.ok(seeded.ok, JSON.stringify(seeded));
   const bank = await k.install(bankDeclarations());
   assert.ok(bank.ok, JSON.stringify(bank));
-  const made = (fields: Record<string, unknown>): string => {
+  /* THE CARD WORDINGS ARE THE CARD ALERTS PACK'S SINCE MONEY-CORE 3.0.0, so the seeded record no longer carries them. */
+  const cards = await k.install(cardAlertDeclarations());
+  assert.ok(cards.ok, JSON.stringify(cards));
+  const made =(fields: Record<string, unknown>): string => {
     const got = k.create('accounts', fields, { actor: 'p_seed' });
     assert.ok(got.ok, JSON.stringify(got));
     return got.value.id;
@@ -173,8 +175,8 @@ const HELD: Held[] = [
 test('EVERY MONEY PATTERN IS DRIVEN HERE, so a pattern added without a row to check fails this file', () => {
   assert.deepEqual(
     [...new Set([...WORDINGS, ...HELD].map((w) => w.ingest))].sort(),
-    Object.keys({ ...MONEY_INGESTS, ...HSBC_EG_INGESTS }).sort(),
-    'a pattern in MONEY_INGESTS has no wording here, so nothing checks what it writes',
+    Object.keys({ ...CARD_INGESTS, ...HSBC_EG_INGESTS }).sort(),
+    'a pattern in the card alerts or the bank file has no wording here, so nothing checks what it writes',
   );
 });
 
@@ -251,8 +253,12 @@ test('A `last4` OF FOUR DIGITS IS THE ACCOUNT A LINE PRINTING ITS LAST THREE BEH
   assert.ok(four.ok, JSON.stringify(four));
 
   const out = forward(r.k, 'From HSBC: 03AUG26 ATM Cash Withdrawal from 310-527***-518 EGP 900.00- Your available balance is EGP 4,100.00', 'money-ipn-suffix');
-  assert.equal(out.state, 'matched', out.reason ?? '');
-  const row = r.k.get(out.wrote[0]!)!;
+  /* THE FIRST LINE FILED BY ITS PRINTED TAIL WAITS FOR ONE CONFIRMATION (`loop/DIRECTION.md` §25 A2), and accepting it files the row. */
+  assert.equal(out.state, 'proposed', out.reason ?? '');
+  assert.equal(out.reason, 'Filed to Cairo savings by its last digits 518. Confirm it once and later ones file straight away.');
+  const yes = r.k.decide(out.suggestion!, { decide: { option: 'accept', reason: 'the savings account' } }, 'p_seed');
+  assert.ok(yes.ok, JSON.stringify(yes));
+  const row = r.k.get(yes.value.wrote[0]!)!;
   assert.equal(row.fields.direction, 'out');
   assert.deepEqual(row.fields.amount, { amount: 90_000, currency: 'EGP' });
   assert.equal(row.fields.account, four.value.id, 'the three printed digits did not land on the one account ending in them');

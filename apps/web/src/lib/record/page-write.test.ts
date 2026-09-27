@@ -329,10 +329,10 @@ test('A WRITE THAT LANDS SAYS THE VERSION IT MADE, which is the version Put back
 /**
  * THE SCREEN HALF, swept from the source because it is a component. A live tick or move that lands is held in place and
  * answered by a receipt carrying its way back; before the repair `writeRow` pushed a toast only on a refusal and nothing
- * in `PageView.svelte` named `keepInPlace`.
+ * in the page's writes (`PageView.svelte` then, `page-writes.ts` since PGS-1's split) named `keepInPlace`.
  */
 test('ON A LIVE PAGE THE ROWS GO THROUGH keepInPlace AND A LANDED WRITE PUSHES A RECEIPT WITH AN UNDO', () => {
-  const view = readFileSync(fileURLToPath(new URL('../page/PageView.svelte', import.meta.url)), 'utf8');
+  const view = readFileSync(fileURLToPath(new URL('../page/page-writes.ts', import.meta.url)), 'utf8');
   assert.match(view, /\.keepInPlace\(/);
   assert.match(view, /toasts\.push\(hold\.said\(m\.words\), \{ intent: 'good', undo:/);
 });

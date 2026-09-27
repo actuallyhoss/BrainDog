@@ -84,12 +84,12 @@ test('ping answers, and prompts are an empty list for now', async () => {
   assert.deepEqual(result(await handle(req('prompts/list'), surface, ctx)), { prompts: [], ttlMs: 3_600_000, cacheScope: 'private' });
 });
 
-test('tools/list is the fifteen, with the instructions again and the read-only ones marked', async () => {
+test('tools/list is the sixteen, with the instructions again and the read-only ones marked', async () => {
   const { surface, calls } = stub();
   const r = result<{ tools: { name: string; inputSchema: { type: string }; annotations?: { readOnlyHint: boolean } }[]; instructions: string; ttlMs: number }>(
     await handle(req('tools/list'), surface, ctx),
   );
-  assert.equal(r.tools.length, 15);
+  assert.equal(r.tools.length, 16);
   assert.deepEqual(r.tools.map((t) => t.name), TOOLS.map((t) => t.name));
   assert.equal(r.instructions, INSTRUCTIONS);
   assert.equal(r.ttlMs, 3_600_000);
@@ -120,6 +120,7 @@ const EACH: [tool: string, args: Record<string, unknown>, methods: string[], fir
   ['log', { spoken: 'obligations#41', note: 'Chased.' }, ['update'], { register: 'obligations', seq: 41, patch: {}, note: 'Chased.' }],
   ['handoff', { next: 'Wire the self-host.', tried: 'Reading the cookie.' }, ['handoff'], { next: 'Wire the self-host.', tried: 'Reading the cookie.' }],
   ['meet', { name: 'Ada', where: 'commit 4464966 in braindog' }, ['meet'], { name: 'Ada', where: 'commit 4464966 in braindog' }],
+  ['triage', { arrival: 'a1', ignore: true }, ['triage'], { arrival: 'a1', ignore: true }],
 ];
 
 test('EVERY TOOL REACHES THE RIGHT METHOD, with the context the transport handed over', async () => {

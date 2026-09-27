@@ -87,7 +87,10 @@ const FROM_PLUS = `From HSBC: 01AUG26 Deposit Interest ${ACCOUNT_LINE} EGP 418.6
 const FROM_SPACED = `From HSBC: 01AUG26 Transfer from NADIA FARID to ${ACCOUNT_LINE} EGP 418.62 - Your available balance is EGP 33,540.25`;
 const NO_SIGN = `From HSBC: 18AUG26 Card Payment ${ACCOUNT_LINE} EGP 1,200.00 Your available balance is EGP 30,000.00`;
 
-/** money-core's two generic card sentences, so the bank's patterns are held against the core's too. */
+/**
+ * The two generic card sentences, `packs/card-alerts`' since money-core 3.0.0, so no bank pattern is seen claiming a line
+ * that is the card alerts' to read.
+ */
 const CHARGE = 'HSBC: Your card ending 4471 was debited GBP 42.99 at FENWICK CLOUD on 18/09/26. If this was not you, call us.';
 const CREDIT = 'HSBC: Your card ending 4471 was credited GBP 5,005.00 from NILE REALTY on 29/08/26.';
 
@@ -300,7 +303,7 @@ test('THE `From HSBC:` LINE IS CLAIMED BY ITS SIGN: a glued `-` is the debit, a 
  * its own, the rest retired, because `arrive` takes the first pattern that matches and so can only ever report one.
  */
 test('NO WORDING IS CLAIMED BY TWO PATTERNS, and a line with both glued signs is claimed by none', async () => {
-  const mails = ['ingest.bank-card-in', 'ingest.bank-card-out', ...THIRTEEN.filter((id) => !id.endsWith('-sms'))];
+  const mails = THIRTEEN.filter((id) => !id.endsWith('-sms'));
   const bodies = {
     CARD, IPN_OUT, IPN_IN, IPN_BUY, FROM_OUT, FROM_IN, FROM_PLUS, FROM_SPACED, CHARGE, CREDIT,
     BOTH: `From HSBC: 01AUG26 Deposit Interest ${ACCOUNT_LINE} EGP 418.62+ Your available balance is EGP 2500.00- Your available balance is EGP 1.00`,

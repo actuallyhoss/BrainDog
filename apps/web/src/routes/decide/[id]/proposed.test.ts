@@ -87,10 +87,10 @@ test('a rule is what starts it and each step as a sentence, with a branch read a
     { label: 'Step 2', value: sayStep(steps[1]!) },
     { label: `Step 2, ${words.then.toLowerCase()} 1`, value: 'Tell you: A big one is late' },
     { label: `Step 2, ${words.otherwise.toLowerCase()} 1`, value: 'Add a note: Small, left alone' },
-    /* A CALL INSTALLS AND DOES NOT RUN in this build, and the record's dry run says so; the owner reads it before accepting. */
-    { label: 'Step 3', value: `${sayStep(steps[2]!)}. Not in this build: a run stops here, after the steps before it.` },
-    /* A SCRIPT STEP RUNS SINCE `e6010208`, and this screen still ended it "Not in this build: a run stops here", as the
-       call above, where the record's dry run says the run goes on. Measured red first on that sentence. What the owner
+    /* A CALL RUNS SINCE AUT-2: the run waits for its answer and goes on, so the step says what it calls and nothing more. */
+    { label: 'Step 3', value: sayStep(steps[2]!) },
+    /* A SCRIPT STEP RUNS SINCE `e6010208`, and this screen still ended it "Not in this build: a run stops here", as it
+       once ended a call, where the record's dry run says the run goes on. Measured red first on that sentence. What the owner
        reads instead is the dry run's: the run does not wait, and the things that stop it.
        WHAT `as:` KEEPS IS SAID ONCE, BY THE CANVAS. Decide carried a second sentence, "What is kept as queued is the id
        of its queued run, not what the script answers", because the canvas's line before it said "keeping the answer

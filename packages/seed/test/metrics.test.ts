@@ -75,13 +75,17 @@ const schemaOf = (register: string): Schema => ({
 function byHand(k: Kernel, decl: SeedMetric): { value: number | null; unit: string | null } {
   const register = decl.source.slice('register.'.length);
   const schema = schemaOf(register);
-  const said = parseWhere(decl.where, schema, {
-    nowMs: NOW,
-    refByTitle: (to, title) => {
-      const seq = (ROWS[to] ?? []).findIndex((r) => r[REGISTERS[to]!.title] === title);
-      return seq < 0 ? null : (k.get(`${to}#${seq + 1}`)?.id ?? null);
-    },
-  });
+  /* A TREE IS ALREADY WHAT A SENTENCE COMPILES TO (`SeedMetric.where`), so it is read as the predicate itself. */
+  const said =
+    typeof decl.where === 'object'
+      ? { predicate: decl.where, bad: [] as { fix: string }[] }
+      : parseWhere(decl.where, schema, {
+          nowMs: NOW,
+          refByTitle: (to, title) => {
+            const seq = (ROWS[to] ?? []).findIndex((r) => r[REGISTERS[to]!.title] === title);
+            return seq < 0 ? null : (k.get(`${to}#${seq + 1}`)?.id ?? null);
+          },
+        });
   assert.deepEqual(said.bad, [], `${decl.metric}: ${said.bad[0]?.fix ?? ''}`);
 
   /**

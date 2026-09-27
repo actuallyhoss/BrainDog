@@ -123,9 +123,6 @@ export const account = {
   accentHouse: 'House',
   accentSet: (name: string) => `${name} is this record's colour.`,
   accentReset: 'Back to the house colour.',
-  /* `/settings` REDIRECTS, AND DREW NOTHING WHILE IT DID. One line, so the frame before the
-     redirect lands is a page rather than a blank document with no title. */
-  settingsGoing: 'Opening Appearance.',
   /**
    * THE PALETTE THAT SHIPPED AND COULD NOT BE TURNED ON.
    *
@@ -286,6 +283,9 @@ export const account = {
     denied: 'turned away',
     revoked: 'revoked',
   } as Record<string, string>,
+  /* A KEY OR A MACHINE THE OPERATOR'S CUT-OFF ENDED (`ended_by: 'operator'`, OPS-10), said in place of its state, so the
+     owner reads why it stopped rather than a key that still looks connected. */
+  endedByOperator: 'ended by the operator',
 
   /* WHAT IT MAY REACH, with its life, because that difference is the whole decision. `19 §9` keeps
      every word from the schema off the screen. A vault grant's life depends on its scope. */
@@ -472,6 +472,8 @@ export const account = {
   keptCloud: (n: number) => `A backup of the whole record every night. The ${n} newest are kept, plus the latest.`,
   keptSelfHost: (n: number) => `A backup of the whole record every night, on this machine. The ${n} newest are kept.`,
   snapshotFailed: 'Nothing kept',
+  /* A COPY OF NOTHING SAYS SO, rather than "0 B" (design SYS-14): render's `bytes(0)` is pinned, so the line is chosen here. */
+  snapshotEmpty: 'Empty',
   download: 'Download',
   rowsAndSize: (rows: number, size: string) => `${rows.toLocaleString('en')} rows · ${size}`,
   snapshotNow: 'Back up now',

@@ -134,8 +134,8 @@ export type RateLimitBinding = { limit(options: { key: string }): Promise<{ succ
 /**
  * The Worker's `RL_READ` and `RL_WRITE` as a `Limiter`.
  *
- * AN ABSENT BINDING LIMITS NOTHING. The blocks are in `env.alpha` only (H1 in `research-hardening.md` §3), so a
- * production Worker and a test's `bundled()` have neither, and both must answer exactly as they did before.
+ * AN ABSENT BINDING LIMITS NOTHING. Production binds both (`apps/worker/wrangler.jsonc`, OPS-4); `alpha` and a test's
+ * `bundled()` bind neither, and answer exactly as they did before.
  *
  * SIXTY SECONDS TO WAIT, BECAUSE THE BINDING SAYS ONLY YES OR NO. Its answer carries no reset time, and sixty is the
  * `period` the binding is declared with: the longest the refusal can last, which is the honest bound to send.

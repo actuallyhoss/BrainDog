@@ -158,15 +158,15 @@ the table.
 | `where` | a predicate — [02-DATA-MODEL](02-DATA-MODEL.md) §6. On a `capture`, what a new row is filled with: each `is` of one value on an enum or a text field, at the top of the predicate or under a top-level `all`, other than the title. A set (`is open or doing`), a date and a link are never filled in, because each would be a value nobody chose | every row | no |
 | `register` | a register id, which the page `requires`. On a `capture`, the list a new row is added to; a `capture` takes no `source`, because it reads no row. On `inputs`, the list whose one row it edits, and it takes no `source` either | — | `capture`, `inputs` |
 | `when` | `{ metric: <id>, <op>: v }` — evaluated at render, never compiled | always drawn | no |
-| `columns` | `[{ field, label?, width?, align?: start \| end, link?: bool (**specified and not built**: no evaluator reads it, and a row that has somewhere to go is already a link in whole), tone_when? (**specified and not built**: no evaluator reads it, and a row's tone comes from its register's state field, not from its block), as? }]`. `as` is the column's role on a `cards` block: `title \| figure \| fact \| trend \| ring \| who \| when \| mark \| next \| reply`, one figure and at most three facts. `next` names a field of the list whose rows are steps of the cards' rows (`steps:` on that list), and the block answers `nexts`, aligned with `rows`: that field of the first step under each card that is not done, in the order the steps declare, `null` for a card with no open step. `reply` is a field drawn under the card's title in a quieter voice, the second opinion under a note. Absent, the first text column is the title, the first figure that never truncates is the figure, and the rest are facts. On a `table` or a `cards` block, `as: scope` on the register's scope field draws where the row applies instead: the project's name, or Everywhere. The block answers `scopes`, those names aligned with `rows`, and `scope_marks` beside them: `{ mark, hue }` of the project, read from the fields its list names in `identity:` (either `null` when the project holds none), or `null` for a row that applies everywhere. `sign: { field, minus }` on a money column writes each figure with `+` or `−`, `−` where the enum `field` holds `minus`: a word on the figure, never a colour. A column whose `field` is `changed`, on a register with no field of that name, says who changed the row last and the day, from its history. | — | `table`, `cards` |
+| `columns` | `[{ field, label?, width?, align?: start \| end, link?: bool (**specified and not built**: no evaluator reads it, and a row that has somewhere to go is already a link in whole), tone_when? (**specified and not built**: no evaluator reads it, and a row's tone comes from its register's state field, not from its block), as? }]`. `as` is the column's role on a `cards` block: `title \| figure \| fact \| trend \| ring \| who \| when \| mark \| next \| reply \| hue \| picture`, one figure and at most three facts. `picture` names a `file` field and leads the card with it, the row carrying the stored `{ sha256, mime, bytes, name }`; `hue` names an `int` field, 0 to 359, drawn only on the card's mark. Either over a field of another type is refused at read, naming the fields that are. A column's `label` is filled as a heading is, its `{{path}}`s answered in `values`. `next` names a field of the list whose rows are steps of the cards' rows (`steps:` on that list), and the block answers `nexts`, aligned with `rows`: that field of the first step under each card that is not done, in the order the steps declare, `null` for a card with no open step. `reply` is a field drawn under the card's title in a quieter voice, the second opinion under a note. Absent, the first text column is the title, the first figure that never truncates is the figure, and the rest are facts. On a `table` or a `cards` block, `as: scope` on the register's scope field draws where the row applies instead: the project's name, or Everywhere. The block answers `scopes`, those names aligned with `rows`, and `scope_marks` beside them: `{ mark, hue }` of the project, read from the fields its list names in `identity:` (either `null` when the project holds none), or `null` for a row that applies everywhere. `sign: { field, minus }` on a money column writes each figure with `+` or `−`, `−` where the enum `field` holds `minus`: a word on the figure, never a colour. A column whose `field` is `changed`, on a register with no field of that name, says who changed the row last and the day, from its history. | — | `table`, `cards` |
 | `inherit` | bool. On a block over a register with a scope field ([02-DATA-MODEL](02-DATA-MODEL.md) §5), the rows of the project its `where` names, then the rows that apply everywhere. A project's row hides a global row of the same title where the field says `same: nearer`; otherwise both show. The project is named in `where` as `project is {{name}}` | `false` | no |
 | `order` | `[{ field, dir: asc \| desc }]` | the first indexed date descending, else `seq` descending ([29-EMERGENT-PAGES](29-EMERGENT-PAGES.md) §5) | no |
-| `limit` | int | 50, at most 500 | no |
+| `limit` | int. A `calendar` takes none (it draws every row in its months, at most 500); a `gallery` at most 24 | 50, at most 500 | no |
 | `empty` | text, interpolatable | — | **yes, on every block with a `source`** |
 | `cells` | `[{ metric, label, trend?, note? }]`. `note` is the line under the figure in place of its target, and may name other figures as `{{id}}`; `N thing(s)` after a figure is said `1 thing` or `2 things` | — | `stat` |
 | `series` | 1–4 of `{ metric, then?, each?, label?, dir?: in \| out }`. On a `series`, each line is a metric grouped by a date and a bucket, every line the same bucket and one currency; `then` names the metric that answers the buckets after the current one (money due, where `metric` is money paid); `each`, on a series by month, names an ungrouped monthly figure added to every month after the current one (what repeats, at its monthly share), so a repeating bill is in every month ahead rather than only the one its next due day falls in. `in` stands on the zero rule, `out` hangs under it | — | `series` |
-| `back` | int, 1–24. On a `series`, how many buckets it draws up to and including the current one; leading buckets no line has a value in are trimmed | `6` | no |
-| `ahead` | int, 0–12. On a `series`, how many buckets after the current one it draws | `0` | no |
+| `back` | int, 1–24. On a `series`, how many buckets it draws up to and including the current one; leading buckets no line has a value in are trimmed. On a `calendar`, 0 to 12, how many whole months before this one it shows | `6`; on a `calendar`, `2` | no |
+| `ahead` | int, 0–12. On a `series`, how many buckets after the current one it draws. On a `calendar`, 0 to 12, how many whole months after this one it shows | `0` | no |
 | `net` | bool. On a `series`, draw in minus out per bucket as a line | `false` | no |
 | `recorded` | a series id, `cash-now` or `series.cash-now`. On a `forecast` over `forecast.runway`, the series its `opening` figure is remembered in, drawn solid over the ninety days before today; any other series is refused, because the line would join two measures at today | nothing before today | no |
 | `stale` | `{ field, after }`: a day field and a window. On a `cards` block, a row whose day is older than the window says it is out of date beside that day, with the watch glyph | never | no |
@@ -182,12 +182,14 @@ the table.
 | `fold` | bool. A `section` that starts shut, folding the blocks after it up to the next section; one press opens it | `false` | no |
 | `since` | `seen`, the reader's read mark. On a `feed`, the rows after it are new; the evaluator writes the `seen` row where it falls, with an empty time when the reader has no mark yet | absent: nothing is new | no |
 | `first` | int, 1–50. On a `feed` or `agents`, the most rows it draws, newest first, a collapsed burst being one row; what is past it goes in one last row per group, so no count loses anything. On a `steps` block, the short view: the first `n` rows not done, with `matched` still the whole count, so "N more" is `matched` less the rows; refused over a list that does not declare `steps:`, where no row is known to be done | every row | no |
+| `short` | `{ where: <sentence>, label: <text, at most 24 bytes> }`. On a `steps` block, the path's short view: the rows `where` admits, named `label` on the switch. The block still answers every row up to `limit`, and `short_now`, whether each row is in the short view, aligned with `rows`, so a host switches views without a second read | none | no |
 | `row` | a spoken id, interpolatable: `'{{spoken}}'` on a template. On a `diff`, the row whose history it reads. On `inputs`, the row it edits | on `inputs`, the list's first row | `diff` |
 | `about` | a spoken id, interpolatable: `'{{spoken}}'` on a template. Over `runs_on`, the project whose keys, tools, skills and actions it reads. Read by a `table` and a `cards` block | none | a block over `runs_on` |
 | `lead` | bool. On a `stat`, its first figure is the screen's one hero figure; on `cards`, the first card is drawn two tracks wide; on a `note`, its body is the page's opening sentence, said with the plural and nought rules a figure's note has | `false` | no |
 | `range` | bool. On a `progress` over a register, each row is a band from its low to its high on one scale shared by the rows (the largest high), what was spent marked on it, and a total line. It names four columns in order: the label, what was spent, the low and the high, the last three number or money fields in one currency | `false` | no |
 | `tiles` | bool. On a `queue`, one tile per question, showing its recommended option as what it is | `false` | no |
 | `box` | bool. On a `section`, the blocks after it, up to the next section, are drawn on one surface | `false` | no |
+| `panel` | `actions \| reporting`. On a `section` of a page per row (`for:`), the host panel drawn for the page's row under the section's heading: what the row's work runs on and is scheduled to do, or where its numbers are sent. Refused on a page with no `for:`. It is not `source: actions`, which lists the record's scheduled actions | none | no |
 | `field` | a field id on that row, `document` or `text`. On a `diff`, the field whose versions it compares | — | `diff` |
 | `versions` | int, 2–10. On a `diff`, how many versions it shows, newest first; each is compared with the one before it, one `diff` fence each | `2` | no |
 | *`accepts` names* | on a pack-declared `kind`, the keys its `accepts:` names are legal here, typed `register · metric · number · text` ([42-SPEC-DECLARE](42-SPEC-DECLARE.md) §4.6) | per the block declaration | as the declaration says |
@@ -218,6 +220,24 @@ calls. A swatch is the option's content, drawn only inside that option's box. An
 answers `rows: [that row]` and `types`, each drawn field's type; a ref, a list, a file or a document cannot
 be typed into, so named in `columns` it is refused, and with no `columns` it is left out. The write is the host's, through the row writer, and every block over the list
 answers the new figures on the next read.
+
+**A calendar, links, a gallery and an embed.** A `calendar` over a list names `columns: [{ field: <title> },
+{ field: <a day or an instant> }]` and reads every row whose day falls from the first day of the month `back`
+months ago to the last day of the month `ahead` months on, in the record's own zone, in day order. It answers
+`window: { from, to, today }`, each a day, so a host draws the months and an agenda from one read. It takes no
+`limit`: past 500 rows in its months it is refused `OUT_OF_BOUNDS` with both numbers, as a kind that adds its
+rows up is. Written out, a row is `{ cells: [title, day] }`. A `link` names `columns: [title, address, note?]`,
+the address a `url` or `text` field, or writes its rows out; an address is `https:`, `mailto:`, `#` or a path of
+this BrainDog, and a row written out with any other is refused: "A link is an https address, a mailto or a path
+of this BrainDog." A `gallery` names `columns: [{ field: <caption> }, { field: <a file field> }]`, or writes each
+row out as `{ cells: [caption, file:<list>#<seq>/<field>] }`, at most 24 either way. It answers `files`, each
+file as the record stores it, `{ sha256, mime, bytes, name }`, aligned with the rows it draws and `null` where
+the record holds none, and a list a written-out file names is one of the block's lists (`registersOf`). An
+`embed` is one row written out, `{ cells: [address, title?, shape?] }`, the shape `16:9` (the default), `4:3`,
+`1:1` or `9:16`; its address is from one of the players `EMBED_PROVIDERS` names
+(`packages/kernel/src/kinds/embed.ts`), and any other is refused at install naming them, without repeating the
+address. A `roadmap` over a list names two or three columns: the title, the day each row is due by and its
+effort in days, the effort optional. With none, one, or more than three it is refused, naming the three.
 
 A `feed` reads `{ source: activity, where: "actor is agent", since: seen, first: 20, empty: … }`: the
 rows are grouped as agents, rules and you, with counts, and a burst is one row, "Claude: 14 saves on
@@ -295,8 +315,9 @@ by the path as written ([05-BLOCKS-AND-THEMES](05-BLOCKS-AND-THEMES.md) §7.1): 
 (`{{due-30d}}`, money as `{ amount, currency }`), a row's field by spoken id (`{{tasks#125.state}}`),
 and a register's count (`{{blockers.count}}`). The paths inside a typed form count (`{{ago:tasks#3.due}}`)
 and a code span does not. A field is read from the row's own properties, and only when the register
-declares it as a figure: a document, a note, a secret, a ref and a list are not figures. Nothing else is
-worked out, so `{{tasks.open}}` is not answered yet. A path the record holds nothing for is absent and
+declares it as a figure: a document, a note, a secret, a ref and a list are not figures. It also answers
+how many of a list's rows are in one state (`{{tasks.open}}`, where `open` is a value of the list's `state`
+enum; a word the enum does not hold answers nothing). A column's `label` is read for paths as a heading is. A path the record holds nothing for is absent and
 draws `—`, a block that does not draw reads none, and the registers a path names are the block's
 registers (`registersOf`). Inside a template, `{{field}}` fills from the row's own fields the same way,
 and an expanded page carries `param: { register, seq, title }`, the row it is about.
@@ -319,6 +340,17 @@ shows the global one. The project's rows come first, and `inherited` counts the 
 apply everywhere, which the page draws faint under "From everywhere". Keys and learnings, whose scope
 field does not say `same: nearer`, add up instead. *An earlier draft of this document defined none of these; thirty-seven
 keys were in use across four documents with no type, default or required flag between them.*
+
+### 1.2 · Adding a kind
+
+A block's `kind:` is either one `packages/kernel/src/pages.ts` reads itself or one registered in
+`packages/kernel/src/kinds/index.ts` (`BLOCK_KIND_MODULES`). A registered kind is a module: `keys`, the keys only it
+reads, which the install and the read admit on it and refuse on every other kind; `validate`, its own check, run at
+install with the page and the block's place put in front of its sentence, and again at read; and
+`read(deps, block, base)`, its answer, asked after the keys nobody reads, `when:` and the `{{path}}` values and before
+any of `pages.ts`'s own arms. Adding one is three files and three lines: that module and its registry line, the app's
+drawer in `apps/web/src/lib/page/kinds/<kind>.ts` with its line in `BLOCK_KIND_DRAWERS`, and the renderer's row in
+`packages/render/src/kinds.ts` `TABLE`. The counts of the kinds are the integrator's.
 
 ---
 

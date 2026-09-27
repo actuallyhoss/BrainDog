@@ -97,7 +97,6 @@ export const shell = {
   everything: 'everything in it',
   switchRecord: 'Switch record',
   recordSettings: 'Record settings',
-  newRecord: 'New record',
   recordNotOpened: 'That record could not be opened just now. Try again in a moment.',
 
   /* Toasts. Past tense, the row named, and the undo is the sentence's point — never "Row archived

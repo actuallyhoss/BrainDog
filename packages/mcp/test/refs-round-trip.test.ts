@@ -80,6 +80,8 @@ const ASK: Record<string, (fx: Fixture) => Record<string, unknown>[]> = {
   log: (fx) => [{ spoken: fx.onDoomed.spoken, note: 'Read for the round trip.' }],
   handoff: () => [{ next: 'Send every ref back.' }],
   meet: () => [{ name: 'Ada Lovelace', email: 'ada@example.com', where: 'the refs round trip' }],
+  /* NOTHING TO ASK: `triage` files an arrival from the inbox, and this record holds none, so it answers no row. */
+  triage: () => [],
 };
 
 /** A row an answer carried, with its register and the ref fields it has set. */
@@ -186,7 +188,10 @@ test('the writers here are exactly the tools that write and take fields, a patch
   const takes = TOOLS.filter((t) => {
     const props = Object.keys((t.input as { properties?: Record<string, unknown> }).properties ?? {});
     return t.writes && props.some((p) => p === 'fields' || p === 'patch' || p === 'body');
-  }).map((t) => t.name);
+  })
+    /* `triage` WRITES A ROW ONLY OUT OF AN ARRIVAL IN THE INBOX, so a row an agent already holds has no way through it. */
+    .filter((t) => t.name !== 'triage')
+    .map((t) => t.name);
   assert.deepEqual(Object.keys(SEND).sort(), takes.sort(), 'a tool that writes a row has no way to send one back here');
   assert.deepEqual(Object.keys(ASK).sort(), TOOLS.map((t) => t.name).sort(), 'a tool is not asked anything here');
 });

@@ -8,7 +8,9 @@
 
 export const STUDENT = {
   usecase: 'student',
-  version: '1.2.0',
+  /* 1.2.1 BECAUSE HOME'S EMPTY TITLE LOSES ITS FULL STOP. A title ends without one everywhere else, and a record is
+     offered the words only when the version goes up. */
+  version: '1.2.1',
   title: 'Student',
   summary: 'Your courses, what is due and when, and how each piece of work went.',
   author: 'BrainDog',
@@ -26,7 +28,7 @@ export const STUDENT = {
     home: 'Today',
     right_now: 'This week',
     needs_you: 'Coming up',
-    nothing_needs_you: 'Nothing is due.',
+    nothing_needs_you: 'Nothing is due',
     since_away: 'Since you last looked',
     lists: 'Notebooks',
   },

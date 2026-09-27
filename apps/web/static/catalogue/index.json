@@ -30,7 +30,55 @@
             "calls_out": []
           }
         }
-      ]
+      ],
+      "categories": [
+        "doors",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      }
+    },
+    {
+      "kind": "pack",
+      "id": "card-alerts",
+      "title": "Card alerts",
+      "summary": "Reads a card alert that names the card's last four digits into Money as a transaction, forwarded by mail or posted as a text message.",
+      "author": "BrainDog",
+      "license": "MIT",
+      "audience": "addon",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "4781062cdd96af2945cc44a36ebb93fe476424ac873b166e231ca484429f6266",
+          "bytes": 9131,
+          "published_at": "2026-09-27T12:38:59.443Z",
+          "bump": null,
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          }
+        }
+      ],
+      "categories": [
+        "doors",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      }
     },
     {
       "kind": "pack",
@@ -66,7 +114,17 @@
             "calls_out": []
           }
         }
-      ]
+      ],
+      "categories": [
+        "modules",
+        "automations",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      }
     },
     {
       "kind": "pack",
@@ -100,7 +158,16 @@
             ]
           }
         }
-      ]
+      ],
+      "categories": [
+        "connectors",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      }
     },
     {
       "kind": "pack",
@@ -134,9 +201,20 @@
             "examples": 0,
             "skills": [],
             "calls_out": []
-          }
+          },
+          "preview": true
         }
-      ]
+      ],
+      "categories": [
+        "modules",
+        "automations",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      }
     },
     {
       "kind": "pack",
@@ -241,7 +319,17 @@
             "calls_out": []
           }
         }
-      ]
+      ],
+      "categories": [
+        "modules",
+        "automations",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      }
     },
     {
       "kind": "pack",
@@ -306,7 +394,16 @@
             ]
           }
         }
-      ]
+      ],
+      "categories": [
+        "connectors",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      }
     },
     {
       "kind": "pack",
@@ -340,7 +437,17 @@
             "calls_out": []
           }
         }
-      ]
+      ],
+      "categories": [
+        "modules",
+        "automations",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      }
     },
     {
       "kind": "pack",
@@ -374,7 +481,16 @@
             "calls_out": []
           }
         }
-      ]
+      ],
+      "categories": [
+        "modules",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      }
     },
     {
       "kind": "pack",
@@ -404,9 +520,19 @@
             "examples": 0,
             "skills": [],
             "calls_out": []
-          }
+          },
+          "preview": true
         }
-      ]
+      ],
+      "categories": [
+        "templates",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      }
     },
     {
       "kind": "pack",
@@ -440,7 +566,16 @@
             ]
           }
         }
-      ]
+      ],
+      "categories": [
+        "connectors",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      }
     },
     {
       "kind": "pack",
@@ -472,7 +607,16 @@
             "calls_out": []
           }
         }
-      ]
+      ],
+      "categories": [
+        "modules",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      }
     },
     {
       "kind": "pack",
@@ -502,9 +646,19 @@
             "examples": 0,
             "skills": [],
             "calls_out": []
-          }
+          },
+          "preview": true
         }
-      ]
+      ],
+      "categories": [
+        "templates",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      }
     },
     {
       "kind": "pack",
@@ -540,7 +694,16 @@
             ]
           }
         }
-      ]
+      ],
+      "categories": [
+        "connectors",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      }
     }
   ]
 }

@@ -44,26 +44,23 @@ test('a shell with no record behind it is told what is true on both hosts, and n
 });
 
 /** The page without its comments, so a comment quoting the defect cannot fail or pass a check. */
-const PAGE = readFileSync(new URL('./[area]/+page.svelte', import.meta.url), 'utf8')
+const PAGE = readFileSync(new URL('./[area]/areas/Billing.svelte', import.meta.url), 'utf8')
   .replaceAll(/<!--[\s\S]*?-->/gu, '')
   .replaceAll(/\/\*[\s\S]*?\*\//gu, '');
 
 test('and the screen asks the host that answered, and never the build', () => {
-  const from = PAGE.indexOf("area === 'billing'}");
-  assert.ok(from >= 0, 'billing has no arm');
-  const arm = PAGE.slice(from, PAGE.indexOf("{:else if area === '", from + 1));
-  assert.doesNotMatch(arm, /DEPLOYMENT/u, 'billing still follows the build and not the host');
-  assert.match(arm, /billingLine\(\{ host: shell\.host, mintsMail: mintsHere \}\)/u);
+  assert.doesNotMatch(PAGE, /DEPLOYMENT/u, 'billing still follows the build and not the host');
+  assert.match(PAGE, /billingLine\(\{ host: shell\.host, mintsMail: mintsHere \}\)/u);
 });
 
 test('and Billing asks the mail door itself, or a self-host reached straight at Billing never says what it is', () => {
   /* THE CHECKER DELETED THE BILLING EFFECT AND EVERY TEST ABOVE STAYED GREEN. `mintsHere` is otherwise
      asked only by the ingest area, so a self-host whose owner opened `/settings/billing` first kept
      `null`, and `billingLine` gave it the Cloud's default for as long as the screen was open. */
-  const page = readFileSync(new URL('./[area]/+page.svelte', import.meta.url), 'utf8');
+  const page = readFileSync(new URL('./[area]/areas/Billing.svelte', import.meta.url), 'utf8');
   assert.match(
     page,
-    /if \(area !== 'billing' \|\| !shell\.live\) return;\s*untrack\(\(\) => \{[^}]*askMailDoor\(\)/u,
+    /if \(!shell\.live\) return;\s*untrack\(\(\) => \{[^}]*askMailDoor\(\)/u,
     'Billing reads `mintsHere` and nothing on Billing ever asks for it',
   );
 });

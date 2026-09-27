@@ -720,14 +720,15 @@ export function meter(deps: Pick<ActionDeps, 'sql' | 'mint' | 'nowMs'>, usage: U
      timeout and a dropped connection gave it none, and the run is going to be tried again, so charging for it
      bills somebody up to eight times for one provider's outage. `failed` is the ladder's outcome and only the
      ladder's: a 401 pauses (`paused`), an origin the host would not call is `refused`, and both of those are
-     answers the record asked for and got. `failures` still counts, so a free run is never an invisible one, and
-     `bytes` and `ms` stay as they came, because those are what was spent rather than what is owed. */
+     answers the record asked for and got. `failures` still counts, so a free run is never an invisible one; its
+     `bytes` and `ms` count nothing either, because the allowance limits both and a run that is not owed must not
+     spend them (`loop/finish/decisions.md` C34). */
   const free = usage.outcome === 'dropped' || usage.outcome === 'held' || usage.outcome === 'failed';
   const counted = {
     runs: free ? 0 : 1,
     requests: free ? 0 : usage.requests,
-    bytes: usage.bytes,
-    ms: usage.ms,
+    bytes: free ? 0 : usage.bytes,
+    ms: free ? 0 : usage.ms,
     failures: usage.failures,
     held: usage.outcome === 'held' ? 1 : 0,
   };
@@ -937,8 +938,8 @@ export type Budget = {
  */
 const PAGES_UNSAID = 40;
 /* A SCRIPT THAT NAMES NO `fetches` IS RESERVED FOR THE MOST ANY SCRIPT MAY ASK, design section 5's ceiling of 20, and
-   not for the sandbox's default of 5. Both numbers live in `@braindog/script`, which the kernel may not import, so this
-   is a copy either way; copying the ceiling means that if the default is raised this over-reserves, where copying the
+   not for the sandbox's default of 5. The ceiling is `SCRIPT_CEILINGS.fetches` in `script.ts`, which imports this file,
+   so it is written out here rather than imported into a cycle; copying the ceiling means that if the default is raised this over-reserves, where copying the
    default would under-reserve, and an under-reservation is the one that takes a Cloudflare invocation down. */
 const FETCHES_UNSAID = 20;
 const TAIL = 6;
@@ -1447,7 +1448,7 @@ function scriptEgress(d: ScriptHeader, opensOf?: (label: string) => string | nul
 
   const when = [
     ...(every === null ? [] : [`every ${every}`]),
-    ...(door === null ? [] : [`when ${door} receives an arrival`]),
+    ...(door === null ? [] : [`when ${door} receives an arrival, at most ${RULE_CALLS_PER_DAY} a day`]),
     ...(rule ? [`when a rule runs it, at most ${RULE_CALLS_PER_DAY} a day`] : []),
   ];
   /* THE HOST THE KEY IS SENT TO, NOT THE WORDS IT WAS PUT IN WITH. Both are `hostOpened`'s reading, the one `keyRefused`

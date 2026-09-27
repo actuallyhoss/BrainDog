@@ -192,8 +192,8 @@ export const words = {
   records: 'Records',
   requests: 'requests',
   failures: (n: number) => (n === 1 ? '1 failure' : `${n.toLocaleString('en-GB')} failures`),
-  noUsage: 'Nothing has run this month.',
-  noLedger: 'This record does not report usage yet.',
+  noUsage: 'Nothing has run this month',
+  noLedger: 'This record does not report usage yet',
   ofAllowance: (used: number, allowance: number, resets: string) =>
     `${used.toLocaleString('en-GB')} of ${allowance.toLocaleString('en-GB')} runs. It starts again on ${resets}.`,
   waitingUntil: (resets: string) => `Actions on this record are waiting until ${resets}, because it has used this month's runs.`,

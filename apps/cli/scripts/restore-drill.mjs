@@ -507,4 +507,6 @@ async function main() {
   }
 }
 
-process.exitCode = await main();
+/* THE AGE READER IS THE REHEARSAL'S TOO (`migration-rehearsal.mjs`), and importing this file runs nothing. */
+export { ageOpen, keyOf, secretOf };
+if (import.meta.main) process.exitCode = await main();

@@ -67,19 +67,15 @@ for (const fixture of slice) {
     assert.ok(refusal !== undefined && !Array.isArray(refusal), `${where} was refused with no refusal object`);
     assert.equal(refusal.code, fixture.keys.get('code'));
 
-    /* SILENCE IS A CLAIM. `unreachable()` builds `{ code, fix }` and nothing else. */
+    /* SILENCE IS A CLAIM. `unreachable()` builds `{ code, fix, detail }` and no `at`: the reason is in `detail`. */
     assert.equal(refusal.at, fixture.keys.get('at'), `${where} claims \`at: ${fixture.keys.get('at')}\``);
     assert.ok(refusal.fix.trim().length > 0, `${where} was refused with an empty fix`);
   });
 
-  /* THE FIX IS NOT A SENTENCE, AND THIS IS MARKED `todo` RATHER THAN LEFT RED OR LEFT OUT. The client
-     writes `The record could not be reached: ${e.message}`, and the message Node's `fetch` throws is
-     `fetch failed`, so the whole fix reads "The record could not be reached: fetch failed" with no
-     full stop and a lower-case clause that means nothing to a person. `30 §6` asks a fix to be a
-     sentence. The repair is in `packages/client/src/index.ts`, which this runner does not own; the
-     day it lands this starts passing and node reports the todo as passing, which is the signal to
-     drop the marker. */
-  test(`${fixture.name}'s fix is a sentence`, { todo: 'unreachable() appends fetch\'s own "fetch failed" with no full stop' }, async () => {
+  /* THE FIX IS A SENTENCE. `30 §6` asks one of every fix, and this one used to end in Node's own
+     "fetch failed", with no full stop; the reason now rides in `detail` and the fix is the one sentence a
+     person reads. */
+  test(`${fixture.name}'s fix is a sentence`, async () => {
     const refusal = (await drive(fixture, failing)).refusal!;
     assert.ok(/[.?!]$/.test(refusal.fix.trim()), `${where} was refused with "${refusal.fix}", which is not a sentence`);
   });

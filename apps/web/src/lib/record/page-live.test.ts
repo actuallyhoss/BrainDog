@@ -155,12 +155,16 @@ test('no record here is refused in its own words, and the next page asks again',
 
   const nothing = await pageReader(BASE, host(null).io).read('desk');
   assert.equal(nothing.from, 'refused');
-  if (nothing.from === 'refused') assert.match(nothing.fix, /^The record could not be reached: /u);
+  if (nothing.from === 'refused') assert.match(nothing.fix, /^BrainDog could not reach this record\.$/u);
 });
 
 test('the page draws only a live answer, and reads nothing of the sample', () => {
   /* COMMENTS LEFT OUT, so the paragraph saying where the source view once fell back to `PAGES` is not a read of it. */
-  const view = readFileSync(new URL('../page/PageView.svelte', import.meta.url), 'utf8').replace(/<!--[\s\S]*?-->|\/\*[\s\S]*?\*\//gu, '');
+  /* THE READER IS SEVERAL FILES SINCE PGS-1 SPLIT IT, read as one text. */
+  const view = ['PageView.svelte', 'PageBody.svelte', 'BlockSlot.svelte', 'Arrange.svelte', 'SourceView.svelte', 'PageTabs.svelte', 'page-writes.ts']
+    .map((f) => readFileSync(new URL(`../page/${f}`, import.meta.url), 'utf8'))
+    .join('\n')
+    .replace(/<!--[\s\S]*?-->|\/\*[\s\S]*?\*\//gu, '');
   /* THE SEEDED STUDIO'S DECLARATIONS AND FIGURES, which a page read with no record behind it was drawn from. */
   assert.doesNotMatch(view, /\bPAGES\b|\bvalues\(\)|\breadPages?\b|'sample'|\bNOW\b|\bheldBy\b/u);
   /* A GESTURE ON A PAGE IS A WRITE OR IT IS NOTHING: a page is drawn only over a live record, so these said "nothing
@@ -282,7 +286,7 @@ test('the page route reads the record, waits for it, and draws what it cannot sa
   const route = readFileSync(new URL('../../routes/p/[slug]/+page.svelte', import.meta.url), 'utf8');
   assert.match(route, /pageReader\(apiBase\(\)\)/);
   /* THE ROUTE KEEPS THE READ; WHAT IT DRAWS IS `PageView`, moved out whole (`loop/research-modules-next.md`, Brief 5). */
-  const view = readFileSync(new URL('../page/PageView.svelte', import.meta.url), 'utf8');
+  const view = ['PageView.svelte', 'BlockSlot.svelte'].map((f) => readFileSync(new URL(`../page/${f}`, import.meta.url), 'utf8')).join('\n');
   assert.match(route, /<PageView /);
   assert.match(view, /\{#if got === null\}/);
   assert.match(view, /block\.cannot/);

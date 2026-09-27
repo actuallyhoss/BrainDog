@@ -592,9 +592,9 @@ test('A SUGGESTED ACCENT CAN BE SEEN AGAINST THE SURFACE IT IS PAINTED ON, IN BO
    *
    * The sentence was "dark enough to hold a 3:1 boundary against cream", and cream is the LIGHT
    * scheme. Nobody measured the other one. `--accent` is painted as an opaque colour a reader has
-   * to see against a surface in 20 declarations, 14 of them a control's own fill or a border in
-   * the accent's own colour, the checked switch track among them (`controls.css` sets `background`
-   * and `border-color` to it in one rule), so SC 1.4.11 asks 3:1 of the fill itself against
+   * to see against a surface in the declarations `grep 'var(--accent' apps/web/src packages/skin`
+   * finds, most of them a control's own fill or a border in the accent's own colour, so SC 1.4.11
+   * asks 3:1 of the fill itself against
    * whichever surface it lands on. `ACCENTS`' own note carries the recount. Measured on the record
    * ladder before this test existed, against the worst of the five surfaces over both profiles and
    * both schemes: Ink blue 1.92, Plum 2.15, Teal 2.41, Moss 2.47. Four of the five suggestions the

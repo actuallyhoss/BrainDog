@@ -64,12 +64,8 @@ const CURRENCY_TABLES = new Set(['apps/web/src/lib/record/currencies.ts', 'apps/
  * like anywhere else.
  */
 const HELD = {
-  /* The first run: its tiles, its keyword map to the modules, and a hand copy of the modules. The first run moves to
-     the catalogue in W2 (USE-3, then PGS-20), which is where these go. */
-  'apps/web/src/lib/first-run.ts': {
-    ids: ['obligations', 'people', 'services', 'tasks', 'things'],
-    why: 'the first run offers one tile per first-party module and turns People on for a person it heard.',
-  },
+  /* The first run: its keyword map to the modules, and a hand copy of the modules. The first run moves to the
+     catalogue in W2 (USE-3, then PGS-20), which is where these go. */
   'apps/web/src/lib/shape.ts': {
     ids: ['agents', 'estate', 'money-core', 'obligations', 'people', 'portfolio', 'things', 'work'],
     why: "the first run's map from what a person says to a first-party module, which catalogue signals replace.",
@@ -77,10 +73,6 @@ const HELD = {
   'apps/web/src/lib/record/modules.ts': {
     ids: ['agents', 'credentials', 'estate', 'learnings', 'money-core', 'obligations', 'people', 'portfolio', 'services', 'skills', 'tasks', 'things', 'tools', 'work'],
     why: 'a hand copy of the first-party modules, which the manifests and the catalogue replace.',
-  },
-  'apps/web/src/routes/start/+page.svelte': {
-    ids: ['milestones', 'people'],
-    why: "the first run writes the person it heard into People and draws the guide's first milestones.",
   },
   'apps/web/src/lib/who.ts': {
     ids: ['people'],

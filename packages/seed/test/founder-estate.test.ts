@@ -65,9 +65,9 @@ async function founder(): Promise<Kernel> {
   for (const m of modulesFor(u, ['people'])) {
     if (m === 'agents') continue;
     const holds = new Set([...held(k), ...firstPartyManifest(m as never).provides.flatMap((p) => (p.startsWith('register.') ? [p.slice(9)] : []))]);
-    await put(k, moduleDocument(u, m, { today: TODAY, holds }));
+    await put(k, moduleDocument(u, m, { today: TODAY, holds, examples: true }));
   }
-  await put(k, carriedDocument(u, TODAY));
+  await put(k, carriedDocument(u, TODAY, null, { examples: true }));
   return k;
 }
 
@@ -168,7 +168,7 @@ async function onEarlier(): Promise<{ k: Kernel; before: Record<string, unknown>
   const k = await openRecord(openSqlite(), fixedClock(NOW));
   for (const m of ['portfolio', 'people', 'money-core', 'work']) {
     const holds = new Set([...held(k), ...firstPartyManifest(m as never).provides.flatMap((p) => (p.startsWith('register.') ? [p.slice(9)] : []))]);
-    await put(k, moduleDocument(u, m, { today: TODAY, holds }));
+    await put(k, moduleDocument(u, m, { today: TODAY, holds, examples: true }));
   }
   await put(k, before);
   assert.ok(!held(k).includes('services'), 'a record on 1.3.2 holds no services');
@@ -198,7 +198,7 @@ test('A RECORD ON 1.3.2 IS OFFERED ESTATE THEN THE CURRENT VERSION, and neither 
   const lacking = modulesFor(u).filter((m) => !k.packs().some((p) => p.id === m));
   assert.deepEqual(lacking, ['estate'], 'the step offers exactly one module');
   const holds = new Set([...held(k), 'services']);
-  await put(k, moduleDocument(u, 'estate', { today: TODAY, holds }));
+  await put(k, moduleDocument(u, 'estate', { today: TODAY, holds, examples: true }));
   await put(k, next);
 
   assert.equal(k.packs().find((p) => p.id === 'usecase-founder')?.version, u.version);

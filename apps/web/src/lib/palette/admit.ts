@@ -181,7 +181,7 @@ export const COMMANDS: readonly Command[] = [
   /* AUTOMATIONS, the canvas an owner and an agent both edit (`loop/DIRECTION.md` section 22). Reachable only by its address
      until it was here and in the rail. */
   { id: 'c-automations', title: copy.automations, href: '/automations', group: copy.destinations, icon: 'refresh' },
-  { id: 'c-settings', title: copy.settings, href: '/settings/appearance', group: copy.destinations, icon: 'settings' },
+  { id: 'c-settings', title: copy.settings, href: '/settings', group: copy.destinations, icon: 'settings' },
   /* THE FRONT DOOR, WHICH NOTHING LINKED TO. A screen with no way in is the same as no screen,
      and the palette is `19 §4`'s primary way to reach one. */
   { id: 'c-signin', title: copy.signIn, href: '/signin', group: copy.destinations, icon: 'lock' },

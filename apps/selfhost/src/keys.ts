@@ -35,6 +35,7 @@ import { chmodSync, existsSync, linkSync, readFileSync, rmSync, statSync, writeF
 
 import { deriveSessionKey } from '@braindog/host/auth';
 import type { RecordWrapping, RootKeys } from '@braindog/host';
+import { deriveShareKey } from '@braindog/host';
 
 /** What a record stores about one wrapped key. The kernel writes it and never reads inside it. */
 export type WrappedKey = {
@@ -207,7 +208,10 @@ export const previousOf = (file: string): string => `${file}.prev`;
  * starts. A row wrapped under a key neither file holds answers `WRONG_KEY`, because a `byId` that answered for any id
  * would be a store claiming to hold keys it does not have.
  */
-export async function openKeyStore(file: string, say: (line: string) => void = () => {}): Promise<KeyStore & { sessionKey: Uint8Array }> {
+export async function openKeyStore(
+  file: string,
+  say: (line: string) => void = () => {},
+): Promise<KeyStore & { sessionKey: Uint8Array; shareKey: Uint8Array }> {
   const root = keyBytes(file, say);
   const prevFile = previousOf(file);
   let prev: Uint8Array | null = null;
@@ -220,6 +224,9 @@ export async function openKeyStore(file: string, say: (line: string) => void = (
        It is what the Directory takes every session and link MAC under, so replacing the key file signs
        everybody out, which is `12 §8`'s lever. `serve` hands it to the Directory once and zero-fills it. */
     const sessionKey = await deriveSessionKey(root);
+    /* AND THE SHARE KEY, info `braindog/share` (`loop/finish/contracts.md` §3.2): what a link to one page is signed and
+       checked with, from the key file and never from `BRAINDOG_SESSION_SECRET`. `serve` hands it over and zero-fills it. */
+    const shareKey = await deriveShareKey(root);
 
     /* THE PREVIOUS KEY OPENS AND NEVER WRAPS, so it is imported and nothing is derived from it. The same key in both
        files is the moment in the runbook where both slots hold it, and it adds nothing to hold it twice. */
@@ -241,19 +248,18 @@ export async function openKeyStore(file: string, say: (line: string) => void = (
       current: () => Promise.resolve({ kekId, key }),
       byId: (id) => Promise.resolve(id === kekId ? key : before !== null && id === before.kekId ? before.key : null),
       sessionKey,
+      shareKey,
     };
   } finally {
     /* AND THE ROOT BYTES GO. `49 §8`: read once, used once, zero-filled. The imported `CryptoKey` is
        not extractable, so what is left is a handle rather than a key. In `finally`, so a previous key
        file that refuses does not leave the current key's bytes behind it.
      *
-     * `k_code` AND `k_share` ARE NOT DERIVED HERE, and that is a decision rather than an omission.
-     * `49 §4.4` derives both by HKDF-SHA-256 over this root with the info strings
-     * `braindog/device-code` and `braindog/share`, and NOTHING IN THIS REPOSITORY SIGNS A DEVICE CODE
-     * OR A SHARE TOKEN: `/auth/device/*` and `/s/<token>` are unbuilt. They were derived, held for the
-     * life of the store, and read by nothing but their own test, which is the failure this codebase
-     * keeps finding, performed on key material. Two lines the day either route exists. The session key
-     * is derived above because sign-in reads it. */
+     * `k_code` IS NOT DERIVED HERE, and that is a decision rather than an omission. `49 §4.4` derives it
+     * by HKDF-SHA-256 over this root with the info string `braindog/device-code`, and nothing in this
+     * repository signs a device code with it. Deriving it would hold key material for the life of the
+     * store that nothing reads. The session key and the share key are derived above because sign-in and
+     * a link to one page read them. */
     root.fill(0);
     prev?.fill(0);
   }

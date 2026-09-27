@@ -28,7 +28,7 @@
  *
  * THE BANK'S PATTERNS ARE ITS PACK FILE'S, INSTALLED ON TOP OF THE SEED. The sample carried the twelve until
  * 25 September, for this file among others; `record()` now installs `packs/bank-hsbc-eg/bank-hsbc-eg.pack.json` itself
- * (`seed/test/pack-files.ts`), and (7) holds what the seed alone still ships, which is money-core's own twins.
+ * (`seed/test/pack-files.ts`), and (7) holds that the seed alone ships no text door at all since money-core 3.0.0.
  */
 
 import assert from 'node:assert/strict';
@@ -41,7 +41,6 @@ import type { Sql } from '@braindog/ports';
 import { ROUTES, handlersFor, serveApi, serveIngest, type IngestDoor } from '../src/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 import { NOW, day, installSeed } from '../../seed/src/index.ts';
-import { MONEY_INGESTS, MONEY_SMS_INGESTS } from '../../seed/src/modules/money.ts';
 import { HSBC_EG_INGESTS, HSBC_EG_SMS_INGESTS, bankDeclarations } from '../../seed/test/pack-files.ts';
 
 const REC = 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD';
@@ -201,24 +200,19 @@ test('(6) verify: IS READ WHERE IT IS WRITTEN: a path token on a webhook, and no
   sql.close();
 });
 
-test('(7) THE SEED SHIPS money-core\'s TWINS: a record set up with money-core has a text door with nothing installed by hand, and the bank\'s comes with its pack', async () => {
-  /* RED BEFORE `INGESTS` SPREAD `MONEY_SMS_INGESTS`: `ingestVerify` answered null here, so the SMS was a 404 on every
-     record the product had set up, and each test above had to install the twins itself to show anything. */
-  /* money-core's OWN TWINS, SINCE THE SAMPLE STOPPED CARRYING THE BANK'S: the card twins are the seed's doors, and the
-     bank's door arrives with the bank's pack and not before it. */
+test('(7) THE SEED SHIPS NO TEXT DOOR: a record set up with money-core has none until a pack brings one', async () => {
+  /* money-core's CARD TWINS LEFT FOR `packs/card-alerts` AT 3.0.0, as the bank's left for its own pack before them, so
+     a record the seed alone set up answers no text message at all, and each door arrives with the pack that holds it. */
   const { k, sql, api } = await record(false);
-  assert.deepEqual(await api.ingestVerify({ ingest: 'bank-card-out-sms' }), { kind: 'none' });
+  assert.equal(await api.ingestVerify({ ingest: 'bank-card-out-sms' }), null, 'the seed alone carries the card alerts\' door');
   assert.equal(await api.ingestVerify({ ingest: 'bank-from-out-sms' }), null, 'the seed alone carries the bank pack\'s door');
-  assert.deepEqual(
-    k.declarations().filter((d) => d.kind === 'ingest' && d.id.endsWith('-sms')).map((d) => d.id).sort(),
-    Object.keys(MONEY_SMS_INGESTS).map((id) => `ingest.${id}`).sort(),
-  );
+  assert.deepEqual(k.declarations().filter((d) => d.kind === 'ingest' && d.id.endsWith('-sms')).map((d) => d.id), []);
   /* AND WITH THE PACK, ITS SIX TWINS AND THE DOOR'S CATCH-ALL BESIDE THEM. */
   const withBank = await record();
   assert.deepEqual(await withBank.api.ingestVerify({ ingest: 'bank-from-out-sms' }), { kind: 'none' });
   assert.equal(
     withBank.k.declarations().filter((d) => d.kind === 'ingest' && d.id.endsWith('-sms')).length,
-    Object.keys(MONEY_SMS_INGESTS).length + Object.keys(HSBC_EG_SMS_INGESTS).length + 1,
+    Object.keys(HSBC_EG_SMS_INGESTS).length + 1,
   );
   withBank.sql.close();
   sql.close();

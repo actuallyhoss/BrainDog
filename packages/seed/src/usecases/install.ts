@@ -83,17 +83,23 @@ export function moduleDocument(u: UseCase | null, id: string, options: ModuleOpt
     doc.declarations = (doc.declarations as Body[]).map((d) => {
       if (typeof d.metric !== 'string') return d;
       const target = targets[d.metric] as Record<string, unknown> | undefined;
-      /* A TARGET THAT IS A SETTING KEEPS NAMING IT, and the setting starts at the use case's sum. */
+      /* A TARGET THAT IS A SETTING KEEPS NAMING IT, and the setting starts at the use case's sum. A SUM OF MONEY WITH NO
+         CURRENCY STARTS EMPTY, as money-core 3.0.0's own does (`targetConfigOf` in `modules/money.ts`): a money setting
+         takes `{ amount, currency }`, a use case's figure is in no currency, and a bare number there was refused at
+         install (`VALUE_MALFORMED`). Its bound goes with it, so the declaration names the setting and no figure. */
       const setting = (d.target as { setting?: unknown } | undefined)?.setting;
       const held = typeof setting === 'string' ? config[setting] : undefined;
+      let empty = false;
       if (target && held) {
         const bound = typeof target.lte === 'number' ? target.lte : (target.gte as number);
         const was = held.default as { currency?: string } | number | undefined;
-        held.default = typeof was === 'object' && was !== null ? { amount: bound, currency: was.currency } : bound;
+        if (typeof was === 'object' && was !== null) held.default = { amount: bound, currency: was.currency };
+        else if (held.type !== 'money') held.default = bound;
+        else empty = true;
       }
       return {
         ...d,
-        ...(target === undefined ? {} : { target: { ...target, ...(held ? { setting } : {}) } }),
+        ...(target === undefined || empty ? {} : { target: { ...target, ...(held ? { setting } : {}) } }),
         ...(names[d.metric] === undefined ? {} : { name: names[d.metric] }),
       };
     });

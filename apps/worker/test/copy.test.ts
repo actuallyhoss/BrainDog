@@ -63,5 +63,5 @@ test('the record\'s object asks it before the method router, which would answer 
   const src = readFileSync(fileURLToPath(new URL('../src/index.ts', import.meta.url)), 'utf8');
   const at = src.indexOf('copyAsked(request.method');
   assert.ok(at > 0, 'the object does not answer the copy door');
-  assert.ok(at < src.indexOf('return serveApi(request, handlersFor(api), ctx);'), 'the method router answers the copy door first');
+  assert.ok(at < src.indexOf('return serveApi(request, handlers, ctx);'), 'the method router answers the copy door first');
 });

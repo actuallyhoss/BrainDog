@@ -41,6 +41,7 @@ export function stub(over: Partial<McpSurface<Ctx>> = {}) {
     sessionsLive: said('sessionsLive', []),
     recentHistory: said('recentHistory', { events: [] as unknown[], cursor: null }),
     actions: said('actions', [] as unknown[]),
+    triage: said('triage', { id: 'a1', state: 'ignored', entry: null, already: false }),
     ...over,
   };
   return { surface, calls };

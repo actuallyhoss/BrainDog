@@ -14,10 +14,22 @@ import type { Route } from '../index.ts';
 
 /* ROUTES: the imports, one line per file under this folder, named for the file. */
 import { ROUTES as agents } from './agents.ts';
+import { ROUTES as automations } from './automations.ts';
+import { ROUTES as comments } from './comments.ts';
+import { ROUTES as members } from './members.ts';
+import { ROUTES as previewChange } from './preview-change.ts';
+import { ROUTES as slashDraft } from './slash-draft.ts';
+import { ROUTES as vaultPassphrase } from './vault-passphrase.ts';
 /* END ROUTES */
 
 export const EXTRA_ROUTES: readonly Route[] = [
   /* ROUTES: the spreads, one line per file, in the order of the imports above. */
   ...agents,
+  ...automations,
+  ...comments,
+  ...members,
+  ...previewChange,
+  ...slashDraft,
+  ...vaultPassphrase,
   /* END ROUTES */
 ];

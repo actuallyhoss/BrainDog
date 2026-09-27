@@ -518,9 +518,9 @@ const versionRead = (v: Record<string, unknown>): CatalogueVersion => {
 const entryRead = (e: Record<string, unknown>, versions: CatalogueVersion[]): CatalogueEntry => {
   const { categories, publisher, unlisted, ...rest } = e;
   const named = Array.isArray(categories) ? CATEGORIES.filter((c) => categories.includes(c)) : null;
-  const who =
+  const who: Publisher | null =
     isMap(publisher) && (publisher.kind === 'braindog' || publisher.kind === 'key' || publisher.kind === 'person') && typeof publisher.id === 'string' && typeof publisher.name === 'string'
-      ? { kind: publisher.kind, id: publisher.id, name: publisher.name }
+      ? { kind: publisher.kind as Publisher['kind'], id: publisher.id, name: publisher.name }
       : null;
   return {
     ...(rest as unknown as CatalogueEntry),

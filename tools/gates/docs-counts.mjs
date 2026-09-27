@@ -183,12 +183,6 @@ const CLAIMS = {
 const DEBT = [
   { file: 'README.md', line: 38, said: '22 gates', owner: 'OPS-26, which rewrites the README' },
   { file: 'README.md', line: 109, said: '22 gates', owner: 'OPS-26, which rewrites the README' },
-  {
-    file: 'docs/04-PACKS.md',
-    line: 285,
-    said: '9 kinds of declaration',
-    owner: "AGT-7, whose `job` made the kinds ten; the kernel's own sentence counts `KINDS` and is already true",
-  },
   { file: 'docs/10-MCP.md', line: 312, said: 'six templates', owner: 'AGT-19, with defects T7' },
   {
     file: 'docs/16-DECISIONS.md',

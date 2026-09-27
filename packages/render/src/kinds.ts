@@ -1,5 +1,5 @@
 /**
- * The eight primitives, the thirty-four kinds, and the four intent words.
+ * The eight primitives, the thirty-eight kinds, and the four intent words.
  *
  * A block set is a SYSTEM, not a catalogue. Every kind draws from the same eight primitives and the
  * same tokens, and no kind introduces a colour, a font or a spacing value (05 §1).
@@ -147,7 +147,7 @@ export type KindSpec = {
 };
 
 /**
- * Thirty-four, counted. `diagram` is post-v1 and arrives as a
+ * Thirty-eight, counted. `diagram` is post-v1 and arrives as a
  * pack, which is the whole reason the primitive layer exists (05 §2).
  *
  * THE THIRTY-FOURTH, `inputs`, AND FIVE FORMS CAME TOGETHER, for one reason: a person building a desk of their own
@@ -296,6 +296,19 @@ const TABLE = {
      because where the host cannot write it IS a spec of the values, drawn with the spec's own classes, so the mirror
      and the digest read the figures a verdict under it is about. Page-only, because the row is the record's. */
   inputs: { primitive: 'rows', cells: 4, tone: false, pageOnly: true, minSpan: 4, purpose: 'figure' },
+  /* `title | day`, and a tone: every month from the first row's to the last row's as a grid of weeks, each day naming
+     its first rows and counting the rest, then an agenda of the days that hold anything (`src/calendar.ts`). On `list`,
+     because a drawer that does not know the kind yet falls back to a dated list, as `roadmap` does. */
+  calendar: { primitive: 'list', cells: 2, tone: true, minSpan: 6, purpose: 'plan' },
+  /* `title | url | note`: an https address, a mailto or a path of this BrainDog, the host under the title and nothing
+     fetched (`src/links.ts`). */
+  link: { primitive: 'list', cells: 3, optional: 1, tone: false, minSpan: 3, purpose: 'list' },
+  /* `caption | file`: a tile a row, the picture where the host serves it and the file's name where it is not one
+     (`src/gallery.ts`). */
+  gallery: { primitive: 'grid', cells: 2, tone: false, minSpan: 4, purpose: 'media' },
+  /* `url | title | aspect`, one authored row from `EMBED_PROVIDERS`, a facade until a reader presses Load
+     (`src/embed.ts`). On the panel for `capture`'s reason: one bounded thing, not rows of anything. */
+  embed: { primitive: 'panel', cells: 3, optional: 2, tone: false, rows: 1, pageOnly: true, minSpan: 6, purpose: 'media' },
 } as const satisfies Record<string, KindSpec>;
 
 export type Kind = keyof typeof TABLE;

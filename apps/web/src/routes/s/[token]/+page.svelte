@@ -42,7 +42,7 @@
 
   <!-- NO ACTION. The revoked state offered Request access, which toasted what would have been asked and asked nobody:
        a control whose only answer is that it did nothing is not drawn. -->
-  <Empty kind="no-permission" heading title="This link does not open a page." body="No record answers a shared link yet, so there is nothing here to read." />
+  <Empty kind="no-permission" heading title="This link does not open a page" body="No record answers a shared link yet, so there is nothing here to read." />
 </div>
 
 <style>

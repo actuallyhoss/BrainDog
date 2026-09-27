@@ -2930,15 +2930,26 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
       'What you approved is not what this install would call out. Read the plan again.',
       { at: 'approve' },
     );
+  /* A SCRIPT'S LINE CARRIES ITS LABELS JOINED WITH ", " (`scriptEgress`), SO IT IS ASKED LABEL BY LABEL. Asked as the
+     joined string, a script that sends two keys asked the vault for a key called "a, b" and could never install; the
+     labels are the script declaration's own `keys`, as `labelsSent` in the kernel's `govern.ts` reads them for Decide. */
+  const labelsOf = (c: Diff['calls_out'][number], grant: string): string[] => {
+    if (c.channel !== 'script') return [grant];
+    const script = pack.declarations.find((d) => d.kind === 'script' && isObject(d.body) && d.body.script === c.ingest);
+    const keys = script !== undefined && isObject(script.body) ? script.body.keys : undefined;
+    return Array.isArray(keys) && keys.length > 0 && keys.every((k) => typeof k === 'string') ? (keys as string[]) : [grant];
+  };
   if (host.keyReady)
     for (const c of diff.calls_out) {
       if (c.change === 'same' || c.grant === null) continue;
-      const why = host.keyReady(c.grant, c.paged);
-      if (why === null) continue;
-      /* MISSING READS `REQUIRED_MISSING` AND UNOPENABLE READS `OUT_OF_BOUNDS`: one is a key to add,
-         the other is a key to add AGAIN, under the connector, and a caller that collapsed them
-         would tell somebody to deposit a key they have already deposited. */
-      return no<Applied>(why.code, why.fix, { at: 'approve' });
+      for (const label of labelsOf(c, c.grant)) {
+        const why = host.keyReady(label, c.paged);
+        if (why === null) continue;
+        /* MISSING READS `REQUIRED_MISSING` AND UNOPENABLE READS `OUT_OF_BOUNDS`: one is a key to add,
+           the other is a key to add AGAIN, under the connector, and a caller that collapsed them
+           would tell somebody to deposit a key they have already deposited. */
+        return no<Applied>(why.code, why.fix, { at: 'approve' });
+      }
     }
 
   /* THE SETTINGS ARE WRITTEN IN HERE, from the plan that was approved, so the bodies staged are the

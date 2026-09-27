@@ -62,6 +62,8 @@ export type KeyDeps = {
     by: By,
     hints: SessionHints,
     seal: (target: SealTarget) => Promise<Result<Sealed>>,
+    /* SET BY THE DEPOSIT DOOR ALONE, for a login token it checked itself (`loop/finish/agents.md` C1). */
+    opts?: { agentDeposit?: true | undefined },
   ): Promise<Result<Deposited>>;
   openForGrant(
     record: string,
@@ -85,6 +87,8 @@ export type KeyDeps = {
 export type GrantDeps = {
   knows(record: string): Promise<boolean>;
   vaultGrant(record: string, bearer: string): Promise<Result<VaultGrantSeen>>;
+  /** An agent's login token at the deposit door: the record it names and the context /api builds for it (`loop/finish/agents.md` C1). */
+  token?: ((request: Request) => Promise<Result<{ record: string; ctx: CallContext }>>) | undefined;
   keys?: KeyDeps | undefined;
 };
 
@@ -176,7 +180,7 @@ async function ready(keys: KeyDeps, record: string, by: By, body: Record<string,
 
 /** Both steps over one record, whose caller a door has already checked. */
 function doors(keys: KeyDeps, record: () => string | null) {
-  const deposit = async (by: By, body: Record<string, unknown>, hints: SessionHints): Promise<Result<unknown>> => {
+  const deposit = async (by: By, body: Record<string, unknown>, hints: SessionHints, opts?: { agentDeposit?: true | undefined }): Promise<Result<unknown>> => {
     const id = record();
     if (id === null) return UNKNOWN;
     const said = body.value;
@@ -206,7 +210,7 @@ function doors(keys: KeyDeps, record: () => string | null) {
           'principal' in by
             ? { label: body.label, opens: body.opens, kind: body.kind, project: body.project, credential: body.credential }
             : { label: body.label, opens: body.opens, kind: body.kind };
-        return await keys.depositGrant(id, args, by, hints, seal);
+        return await keys.depositGrant(id, args, by, hints, seal, opts);
       } finally {
         recordKey?.fill(0);
       }
@@ -253,7 +257,8 @@ function doors(keys: KeyDeps, record: () => string | null) {
 export function serveWorkerVault(request: Request, deps: GrantDeps): Promise<Response> {
   let checked: string | null = null;
   const steps = deps.keys ? doors(deps.keys, () => checked) : null;
-  return serveVault(request, {
+  const token = deps.token;
+  return serveVault<CallContext>(request, {
     grant: async (bearer) => {
       const record = recordOf(`Bearer ${bearer}`);
       if (record === null || !(await deps.knows(record))) return UNKNOWN;
@@ -261,10 +266,23 @@ export function serveWorkerVault(request: Request, deps: GrantDeps): Promise<Res
       if (out.ok) checked = record;
       return out;
     },
+    /* A LOGIN TOKEN'S RECORD IS THE ONE ITS OWN CHECK NAMED, held as a grant's is, so the key is sealed for that record
+       and no other (`loop/finish/agents.md` C1). */
+    ...(token === undefined
+      ? {}
+      : {
+          token: async (asked: Request) => {
+            const out = await token(asked);
+            if (!out.ok) return out;
+            checked = out.value.record;
+            return ok(out.value.ctx);
+          },
+        }),
     keys: steps
       ? {
           deposit: (ask) => steps.deposit(ask.grant, ask.body, ask.hints),
           open: (ask) => steps.open(ask.grant, ask.body, ask.hints),
+          depositByToken: (ask) => steps.deposit(ask.ctx, ask.body, ask.hints, { agentDeposit: true }),
         }
       : undefined,
   });

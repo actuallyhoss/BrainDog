@@ -29,10 +29,10 @@ import { fileURLToPath } from 'node:url';
 import { copy } from '../copy.ts';
 import { DEPLOYMENT, SNAPSHOTS, SNAPSHOTS_KEPT } from './fixtures/sample.ts';
 
-const AREA = readFileSync(
-  join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'routes', 'settings', '[area]', '+page.svelte'),
-  'utf8',
-);
+/** The three areas this file reads, each its own component since the settings split (ARC-7b). */
+const AREA = ['Backups', 'Billing', 'Delete']
+  .map((name) => readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'routes', 'settings', '[area]', 'areas', `${name}.svelte`), 'utf8'))
+  .join('\n');
 
 /** The hosted record itself, because what Cloud can do is decided by what this file hands the record. */
 const WORKER = readFileSync(

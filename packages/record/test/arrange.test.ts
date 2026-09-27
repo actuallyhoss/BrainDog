@@ -120,7 +120,7 @@ test('AN AGENT READS HOW THE RECORD IS ARRANGED IN ONE COMPACT ANSWER, and the g
   const page = value<{ block: { kind: string[] }; example: { id: string; kind: 'page'; body: never } }>(await api.arrangement({ grammar: 'page' }, agent));
   assert.ok(value(await api.arrangement({ grammar: 'proposals' }, agent)));
   const wrong = refusal(await api.arrangement({ grammar: 'yaml' }, agent));
-  assert.deepEqual(wrong.allowed, ['page', 'proposals']);
+  assert.deepEqual(wrong.allowed, ['page', 'register', 'metric', 'rule', 'proposals']);
   assert.equal(refusal(await api.arrangement({ pages: 'x' } as never, agent)).code, 'FIELD_UNKNOWN');
 
   /* THE KINDS ARE THE ONES THE LINT REFUSES AGAINST, and the example is a page that installs over Work. */

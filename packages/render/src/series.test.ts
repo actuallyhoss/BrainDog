@@ -26,8 +26,8 @@ test('in stands above the zero rule and out hangs under it, on one scale', () =>
   assert.deepEqual([downA!.dir, downA!.y, downA!.height], ['out', '50', '16.67']);
   assert.equal(upB!.state, 'partial');
   assert.equal(downB!.height, '50');
-  assert.equal(plan.top, '£300.00');
-  assert.equal(plan.bottom, '−£300.00');
+  assert.equal(plan.top, '£300');
+  assert.equal(plan.bottom, '−£300');
   assert.equal(plan.series[1]!.dir, 'out');
 });
 

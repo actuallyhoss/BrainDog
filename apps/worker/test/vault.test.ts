@@ -117,9 +117,11 @@ test('THE ROOT KEY IS READ ONLY FROM env.KEK: the doors and the alarm get keys o
   /* AND THE OUTBOX IS THE EIGHTH, added with the signed webhook (KRN-13): `leasedOpener` asks for the store only when a
      post names a key, so a malformed `KEK` fails that one post and not the email beside it. */
   assert.match(source, /leasedOpener\([\s\S]{0,200}?\(\) => keyStoreOf\(env\.KEK\)/, 'the outbox reads KEK some other way than through leasedOpener');
+  /* AND THE SHARE LINKS (COL-3, `shareKey`) AND THE VAULT PASSPHRASE (COL-5, `passphraseRoot`, built once for both of
+     the object's `serveApi` calls) READ IT TOO. */
   assert.equal(
     (source.match(/env\.KEK\b/g) ?? []).length,
-    8,
-    'something other than the two doors, the half they share, provisioning, the alarm, the connector runner, the export signer and the outbox signer reads KEK',
+    10,
+    'something other than the two doors, the half they share, provisioning, the alarm, the connector runner, the export signer, the outbox signer, the share links and the vault passphrase reads KEK',
   );
 });

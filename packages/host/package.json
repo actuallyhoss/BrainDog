@@ -9,6 +9,7 @@
     "./auth": "./src/auth.ts",
     "./connector": "./src/connector.ts",
     "./limits": "./src/limits.ts",
+    "./oauth": "./src/oauth.ts",
     "./script": "./src/script.ts",
     "./script-try": "./src/script-try.ts",
     "./slash": "./src/slash.ts",

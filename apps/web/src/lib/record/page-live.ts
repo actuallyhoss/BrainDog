@@ -214,9 +214,9 @@ function registerOf(b: Answered): string | null {
 const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined);
 
 /**
- * The roles a DECLARATION may give a column, which is the ten `declare.ts` admits.
+ * The roles a DECLARATION may give a column, which are the roles `declare.ts` admits (`CARD_ROLES` there).
  *
- * `braindog-render`'s own `CARD_ROLES` has an eleventh, `quiet`, and its comment says why it is not one of
+ * `braindog-render`'s own `CARD_ROLES` has one more, `quiet`, and its comment says why it is not one of
  * these: the evaluator writes `quiet` from the record's clock, and a declaration does not name it.
  *
  * `next` AND `reply` CAME WITH WAVE ONE, AND THIS LIST DROPPED BOTH. The kernel admitted them and answered `nexts`, the
@@ -229,7 +229,7 @@ const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : und
  * is the second half of a check rather than the only one, and `as Column[]` was the app promising a
  * closed set about a string it had not looked at.
  */
-const ROLES = ['title', 'figure', 'fact', 'trend', 'ring', 'who', 'when', 'mark', 'next', 'reply'] as const;
+const ROLES = ['title', 'figure', 'fact', 'trend', 'ring', 'who', 'when', 'mark', 'next', 'reply', 'hue', 'picture'] as const;
 const roleOf = (v: unknown): (typeof ROLES)[number] | undefined => ROLES.find((r) => r === v);
 
 const columnsOf = (b: Answered) => {

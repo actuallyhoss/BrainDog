@@ -18,7 +18,8 @@
 <script lang="ts">
   /* `at` IS THE BLOCK INDEX WHERE THE PAGE BODY LAYS BLOCKS OUT, so the address helper goes by another name here too. */
   import { at as inApp } from '../at.ts';
-  import { Block, Degraded, Markdown, Table } from 'braindog-render/svelte';
+  import { Block, Degraded, Markdown, Table, Text } from 'braindog-render/svelte';
+  import { inline, text } from 'braindog-render';
   import { page as route } from '$app/state';
   import { copy } from '$lib/copy.ts';
   import { homeCurrency } from '$lib/record/api.ts';
@@ -76,6 +77,9 @@
      build draws, or nothing, and the renderer then keeps its named, empty slot. A name in the set that has not arrived
      yet draws nothing for now, as an `Icon` does. */
   const icon = (name: string): string | null => (isGlyph(name) ? (pathOf(name, glyphSetNow()) ?? null) : null);
+
+  /* THE HEADING AS A TABLE'S ACCESSIBLE NAME: its words without a glyph's braces (`text` drops an icon to nothing). */
+  const headingText = $derived(block.heading ? text(inline(block.heading)).trim() : undefined);
 
   const opts = $derived({
     resolve: (path: string) => said(resolverOf(block.values)(path)),
@@ -166,9 +170,10 @@
 
 <header class="block-bar">
   <!-- A BLOCK WITH NO AUTHORED `heading:` PRINTS ITS KIND'S NAME, never its dialect id: an id is what an agent writes
-       into a declaration, a name is what a person reads. -->
+       into a declaration, a name is what a person reads. AN AUTHORED ONE IS READ AS TEXT, so `{{icon:rocket}} shipped`
+       draws the rocket (PGS-4) rather than its braces. -->
   <svelte:element this={level === 3 ? 'h3' : 'h2'} class="block-name" id="{ids}h-{i + 1}"
-    >{block.heading ?? copy.kindNames[block.kind] ?? block.kind}</svelte:element
+    >{#if block.heading}<Text nodes={inline(block.heading, { icon })} opts={{ icon }} />{:else}{copy.kindNames[block.kind] ?? block.kind}{/if}</svelte:element
   >
   {#if block.register}
     <!-- THE LIST'S NAME, not its id. The predicate stays, because without it a reader has no way to know the list is
@@ -195,7 +200,7 @@
   <ActionRows rows={block.actions} {now} />
 {:else if drawn.refusal}
   {@const act = drawn.refusal.action}
-  <Empty compact kind={drawn.refusal.kind} title={drawn.refusal.title} body={drawn.refusal.body} lines={drawn.refusal.lines}>
+  <Empty compact kind={drawn.refusal.kind} title={drawn.refusal.title} body={drawn.refusal.body} lines={drawn.refusal.lines} icon={drawn.refusal.authored ? icon : undefined}>
     {#snippet actions()}
       {#if act}<Button href={act.href}>{act.label}</Button>{/if}
     {/snippet}
@@ -204,10 +209,10 @@
   <!-- A TABLE OVER A WALK DRAWN ONCE PER CURRENCY: each currency's rows under its code, and why, once. -->
   {#each walkTables(block) ?? [] as part}
     {#each part.said as segment}{#if segment.type === 'markdown'}<div class="document"><Markdown {segment} opts={{ href: inApp }} /></div>{/if}{/each}
-    {#if part.table}<Table columns={part.table.columns} rows={part.table.rows} total={part.table.total} label={block.heading} href={inApp} />{/if}
+    {#if part.table}<Table columns={part.table.columns} rows={part.table.rows} total={part.table.total} label={headingText} href={inApp} />{/if}
   {/each}
 {:else if block.kind === 'table' && !block.answer}
-  <Table columns={block.columns} rows={block.rows} total={block.total} label={block.heading} href={inApp} />
+  <Table columns={block.columns} rows={block.rows} total={block.total} label={headingText} href={inApp} />
 {:else}
   {#each drawn.segments as segment}
     {#if segment.type === 'block'}

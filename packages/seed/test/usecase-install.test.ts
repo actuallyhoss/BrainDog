@@ -67,9 +67,9 @@ async function made(id: string): Promise<{ k: Kernel; sql: NodeSql }> {
   for (const m of modulesFor(u, ['people'])) {
     if (m === 'agents') continue;
     const holds = new Set([...held(k), ...firstPartyManifest(m as never).provides.flatMap((p) => (p.startsWith('register.') ? [p.slice(9)] : []))]);
-    await put(k, moduleDocument(u, m, { today: TODAY, holds }));
+    await put(k, moduleDocument(u, m, { today: TODAY, holds, examples: true }));
   }
-  const carried = carriedDocument(u, TODAY);
+  const carried = carriedDocument(u, TODAY, null, { examples: true });
   if (carried) await put(k, carried);
   return { k, sql };
 }
@@ -86,7 +86,7 @@ test('PEOPLE IS NOT A DEPENDENT OF PROJECTS: "Met in" is a link, left out when t
   assert.deepEqual([...manifest.links], ['register.things']);
 
   const { k, sql } = await record();
-  const alone = moduleDocument(useCase('student')!, 'people', { today: TODAY, holds: ['people'] }) as { declarations: { register?: string; fields?: { id: string }[] }[] };
+  const alone = moduleDocument(useCase('student')!, 'people', { today: TODAY, holds: ['people'], examples: true }) as { declarations: { register?: string; fields?: { id: string }[] }[] };
   await put(k, alone);
   const people = alone.declarations.find((d) => d.register === 'people');
   assert.ok(people && !people.fields?.some((f) => f.id === 'projects'), 'people points at a list the record does not hold');
@@ -101,7 +101,7 @@ test('PEOPLE IS NOT A DEPENDENT OF PROJECTS: "Met in" is a link, left out when t
 
 test('WITH NO USE CASE, A MODULE CARRIES THE SAMPLE ROWS AS IT ALWAYS DID', () => {
   for (const id of ['portfolio', 'people', 'money-core', 'estate', 'work'])
-    assert.deepEqual(moduleDocument(null, id, { today: TODAY }), firstPartyDocument(id), id);
+    assert.deepEqual(moduleDocument(null, id, { today: TODAY, examples: true }), firstPartyDocument(id), id);
 });
 
 test('A MODULE EXAMPLE IS FOR A LIST OF A MODULE THE USE CASE NAMES, at most eight per list', () => {
@@ -156,19 +156,21 @@ test('A PERSONAL RECORD HOLDS ROWS OF A PERSON: accounts, bills, spending, a bud
 
 test("A PERSON'S MONEY IS HELD TO A PERSON'S SUMS, not a studio's, and a founder's keeps Money's own", () => {
   const targetOf = (u: ReturnType<typeof useCase> | null, metric: string): unknown =>
-    ((moduleDocument(u ?? null, 'money-core', { today: TODAY }) as { declarations: { metric?: string; target?: unknown }[] }).declarations.find((d) => d.metric === metric) ?? {}).target;
-  assert.deepEqual(targetOf(useCase('personal'), 'out-30d'), { lte: 250_000, setting: 'most_out_30d' });
-  assert.deepEqual(targetOf(useCase('personal'), 'every-month-out'), { lte: 150_000, setting: 'most_out_every_month' });
-  assert.deepEqual(targetOf(useCase('founder'), 'out-30d'), { lte: 5_000_000, setting: 'most_out_30d' });
-  assert.deepEqual(targetOf(null, 'out-30d'), { lte: 5_000_000, setting: 'most_out_30d' });
-  /* EACH TARGET IS A SETTING A PERSON CHANGES LATER, starting at the use case's sum. */
-  const configOf = (u: ReturnType<typeof useCase> | null) => (moduleDocument(u ?? null, 'money-core', { today: TODAY }) as { config: Record<string, { type: string; default: unknown }> }).config;
-  assert.deepEqual(configOf(useCase('personal')).most_out_30d, { type: 'money', label: 'Most owed by you in 30 days', note: 'Held to this as soon as it is saved.', default: { amount: 250_000, currency: 'GBP' } });
+    ((moduleDocument(u ?? null, 'money-core', { today: TODAY, examples: true }) as { declarations: { metric?: string; target?: unknown }[] }).declarations.find((d) => d.metric === metric) ?? {}).target;
+  /* SINCE money-core 3.0.0 A SUM OF MONEY STARTS EMPTY for everybody, since neither the module nor a use case knows the
+     record's currency: the figure names its setting and holds no bound until a person types one. */
+  assert.deepEqual(targetOf(useCase('personal'), 'out-30d'), { setting: 'most_out_30d' });
+  assert.deepEqual(targetOf(useCase('personal'), 'every-month-out'), { setting: 'most_out_every_month' });
+  assert.deepEqual(targetOf(useCase('founder'), 'out-30d'), { setting: 'most_out_30d' });
+  assert.deepEqual(targetOf(null, 'out-30d'), { setting: 'most_out_30d' });
+  /* EACH TARGET IS A SETTING A PERSON CHANGES LATER; a number of days starts at the use case's own. */
+  const configOf = (u: ReturnType<typeof useCase> | null) => (moduleDocument(u ?? null, 'money-core', { today: TODAY, examples: true }) as { config: Record<string, { type: string; default?: unknown }> }).config;
+  assert.deepEqual(configOf(useCase('personal')).most_out_30d, { type: 'money', label: 'Most owed by you in 30 days', note: 'Held to this as soon as it is saved.' });
   assert.deepEqual(configOf(useCase('personal')).most_days_late?.default, 3);
-  assert.deepEqual(configOf(useCase('founder')).most_out_30d?.default, { amount: 5_000_000, currency: 'GBP' });
+  assert.equal(configOf(useCase('founder')).most_out_30d?.default, undefined);
   /* AND ITS WORDS: the late knob is called by this figure, so a person's pay, not a business's money in. */
   const nameOf = (u: ReturnType<typeof useCase> | null, metric: string): unknown =>
-    ((moduleDocument(u ?? null, 'money-core', { today: TODAY }) as { declarations: { metric?: string; name?: unknown }[] }).declarations.find((d) => d.metric === metric) ?? {}).name;
+    ((moduleDocument(u ?? null, 'money-core', { today: TODAY, examples: true }) as { declarations: { metric?: string; name?: unknown }[] }).declarations.find((d) => d.metric === metric) ?? {}).name;
   assert.equal(nameOf(useCase('personal'), 'days-late-in'), 'Pay comes in late by');
   assert.equal(nameOf(useCase('founder'), 'days-late-in'), 'Money in arrives late by');
 });
@@ -321,21 +323,9 @@ test('A RUN OR A SAVING IS A ROW THAT MOVES ITS GOAL, and a habit counts only th
   sql.close();
 });
 
-test('THE HOUSE HOME IS A DECLARED PAGE TOO: Money declares `home`, the figures then what is due this week', async () => {
-  const { k, sql } = await record();
-  for (const m of ['portfolio', 'people', 'money-core'] as const) await put(k, moduleDocument(null, m, { today: TODAY }));
-  const home = value<{ blocks: Drawn[] }>(k.page('home')).blocks;
-  assert.deepEqual(home.map((b) => b.heading), ['Right now', 'Due this week']);
-  for (const b of home) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
-  assert.deepEqual((home[0]!.readings ?? []).map((r) => r.metric), ['owed-to-you', 'due-30d', 'overdue']);
-  const doc = firstPartyDocument('money-core') as { declarations: { page?: string; nav?: unknown }[] };
-  assert.equal(doc.declarations.find((d) => d.page === 'home')?.nav, undefined, 'Home is not on the rail twice');
-  sql.close();
-});
-
 test('HOME IS NOT ON THE RAIL: a use case declares its Home page with no nav', () => {
   for (const id of ['student', 'founder', 'team', 'guide', 'personal']) {
-    const doc = carriedDocument(useCase(id)!, TODAY) as { declarations: { page?: string; nav?: unknown }[] };
+    const doc = carriedDocument(useCase(id)!, TODAY, null, { examples: true }) as { declarations: { page?: string; nav?: unknown }[] };
     const home = doc.declarations.find((d) => d.page === homePageOf(id));
     assert.ok(home, `${id} declares no Home`);
     assert.equal(home.nav, undefined);
@@ -349,8 +339,8 @@ test('THE AGENTS PACK IS A MODULE ONBOARDING CAN ADD, with what it needs said an
   assert.ok(manifest.provides.includes('register.skills'));
   assert.equal(moduleManifest('usecase-team'), null);
   const { k, sql } = await record();
-  await put(k, moduleDocument(useCase('team')!, 'portfolio', { today: TODAY }));
-  const doc = moduleDocument(useCase('team')!, 'agents', { today: TODAY });
+  await put(k, moduleDocument(useCase('team')!, 'portfolio', { today: TODAY, examples: true }));
+  const doc = moduleDocument(useCase('team')!, 'agents', { today: TODAY, examples: true });
   assert.equal(doc?.seeds, undefined, 'the agents pack brings nobody else\'s rows');
   await put(k, doc);
   assert.equal(k.count('skills'), 0);

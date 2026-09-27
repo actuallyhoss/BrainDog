@@ -85,6 +85,8 @@ export type Boot = {
     person: string | null;
     name: string | null;
     level: string | null;
+    /** The level the caller holds on each list, by id, as the record's `shellFor` answers it. Absent from an older host. */
+    levels?: Record<string, string>;
     /** A person's own settings, as `setPref` kept them, key by key: the record's `Prefs`. Absent for anybody else. */
     prefs?: Prefs;
   };
@@ -293,6 +295,8 @@ export type DeviceRow = {
   approved_by: string | null;
   approved_at: string | null;
   last_used: string | null;
+  /** Present when the operator's cut-off (TOKENS_VALID_FROM) ended it, so the list can say why it stopped. */
+  ended_by?: 'operator';
 };
 
 /** `deviceApprove`: the device that was let in, as the person approving it should see it. */
@@ -484,6 +488,8 @@ export type TokenRow = {
   last_surface: string | null;
   expires_at: string | null;
   revoked_at: string | null;
+  /** Present when the operator's cut-off (TOKENS_VALID_FROM) ended it, so the list can say why it stopped. */
+  ended_by?: 'operator';
 };
 
 /** `invitations`: one invitation still waiting to be used. Never its link. */
@@ -549,10 +555,15 @@ const NAMES = new Set(ROUTES.map((r) => r.name));
  * code, `PULL_ORIGIN_REFUSED`, for the record's OUTBOUND calls. The record's inbound half, which is
  * this file, had no such code, so it made one. The amendment gives it the same treatment the
  * outbound half already had: one code, named, for the whole vocabulary of ways a socket fails.
+ *
+ * THE REASON IS KEPT IN `detail`, NEVER IN `fix`. `fix` is the one sentence a person reads, and a socket's
+ * message ("fetch failed", "502 with a body that is not JSON") is not one; a screen folds `detail` under
+ * Details (design.md SYS-8), so the technical reason is there for whoever needs it and is never content.
  */
 const unreachable = (why: string): Refusal => ({
   code: 'UNREACHABLE',
-  fix: `The record could not be reached: ${why}`,
+  fix: 'BrainDog could not reach this record.',
+  detail: why,
 });
 
 /**
@@ -843,6 +854,24 @@ export function createClient(options: ClientOptions) {
       call<HistoryPage>('recentHistory', args as Record<string, unknown>),
     /** What arrived and no rule filed, newest first. An owner's read; `cursor` is the one the page above answered with. */
     inbox: (args: { cursor?: number; limit?: number } = {}) => call<InboxPage>('inbox', args as Record<string, unknown>),
+    /** Settle one arrival: file it on a list, with the fields it should carry, or ignore it with a note. DATA. */
+    triage: (args: { arrival: string; register?: string; fields?: Record<string, unknown>; ignore?: true; note?: string }) =>
+      call<Answer<'triage'>>('triage', args as Record<string, unknown>),
+    /** Which runs used a key or a tool, the one that used it last first, by the row's spoken name. READ+. */
+    usedBy: (args: { spoken: string }) => call<Answer<'usedBy'>>('usedBy', args as Record<string, unknown>),
+    /** Queue a job of a declared kind for a runner to take. */
+    createJob: (args: { kind: string; args?: Record<string, unknown>; about?: string }) =>
+      call<Answer<'createJob'>>('createJob', args as Record<string, unknown>),
+    /** Stop one job: at once while it waits, or by a flag its runner reads while a machine runs it. */
+    cancelJob: (args: { id: string }) => call<Answer<'cancelJob'>>('cancelJob', args as Record<string, unknown>),
+    /** The record's jobs, newest first. `cursor` is the one the page above answered with. */
+    listJobs: (args: { status?: string; limit?: number; cursor?: string } = {}) =>
+      call<Answer<'listJobs'>>('listJobs', args as Record<string, unknown>),
+    /** One job's lines after `after`, with where it stands now. */
+    jobEvents: (args: { id: string; after?: number }) => call<Answer<'jobEvents'>>('jobEvents', args as Record<string, unknown>),
+    /** Drafts Slash makes from a description, each with the rows it is drawn over; it spends the month's asks. ADMIN. */
+    slashDraft: (asked: string, page?: string) =>
+      call<Answer<'slashDraft'>>('slashDraft', page === undefined ? { asked } : { asked, page }),
     create: (args: { register: string; fields: Record<string, unknown>; note?: string }) =>
       call<unknown>('create', args as Record<string, unknown>),
     update: (args: { register: string; seq: number; patch: Record<string, unknown>; version?: number; note?: string }) =>
@@ -1022,9 +1051,23 @@ export function createClient(options: ClientOptions) {
        one automation with its runs, which is why it has two names here. `automationRun` and `cancelRun` are ADMIN, so a
        browser session: Run now is a person's decision. */
     automations: () => call<AutomationRow[]>('automations'),
-    automation: (rule: string) => call<Automation>('automations', { rule }),
+    automation: (rule: string, page: { before?: string; limit?: number } = {}) =>
+      call<Automation>('automations', { ...page, rule }),
     automationRun: (rule: string) => call<AutomationStarted>('automationRun', { rule }),
     cancelRun: (run: string) => call<RunCancelled>('cancelRun', { run }),
+    /** Whether an automation's body would install, without installing it: where it is wrong, if it is. READ+. */
+    checkAutomation: (args: { body: unknown }) => call<Answer<'checkAutomation'>>('checkAutomation', args as Record<string, unknown>),
+    /** What an automation's body would do to one sample, step by step, writing nothing. READ+. */
+    tryAutomation: (args: { body: unknown; sample: unknown }) =>
+      call<Answer<'tryAutomation'>>('tryAutomation', args as Record<string, unknown>),
+    /** Turn one automation on or off. ADMIN, so a browser session. */
+    setAutomation: (args: { rule: string; enabled: boolean }) =>
+      call<Answer<'setAutomation'>>('setAutomation', args as Record<string, unknown>),
+    /** Start a finished run again, as the rule is installed now and with the trigger the first run had. ADMIN. */
+    retryRun: (args: { run: string }) => call<Answer<'retryRun'>>('retryRun', args as Record<string, unknown>),
+    /** One automation's versions, newest first, each with its body, when and by whom it was installed. READ+. */
+    automationVersions: (args: { rule: string }) =>
+      call<Answer<'automationVersions'>>('automationVersions', args as Record<string, unknown>),
 
     /* THE SAVED VIEWS. `views` and `view` are READ+, held to the list they belong to; `saveView` and
        `retireView` are ADMIN, so a browser session, because a saved view goes on the list for

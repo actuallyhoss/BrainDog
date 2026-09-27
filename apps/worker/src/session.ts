@@ -23,6 +23,8 @@
 import { clearCookie, readSid, sameOrigin, sessionContext, sessionCookie } from '@braindog/host/auth';
 import { shareOf } from '@braindog/host';
 import { OPERATION_METHOD } from '@braindog/kernel';
+import type { TokenReach } from '@braindog/kernel';
+import { MEMBER_STOPPED } from '@braindog/kernel';
 import type { AuthResult, Refusal, Who } from '@braindog/ports';
 import { TOKEN_REACHES, type CallContext } from '@braindog/record';
 
@@ -37,6 +39,8 @@ export type Deps = {
   /** The Directory's `session` flow, with the path's slug when the request named one. */
   session: (sid: string, slug?: string) => Promise<AuthResult<Who>>;
   access: (record: string, person: string) => Promise<Held | null>;
+  /** Whether a person the record holds nothing for is on it and stopped, so the refusal says so. Absent, the door says its own words. */
+  stopped?: (record: string, person: string) => Promise<boolean>;
 };
 
 export type Door =
@@ -84,7 +88,11 @@ export async function doorOf(request: Request, deps: Deps, slug: string | null =
     if (record === null) return { door: 'refused', status: 403, refusal: { code: 'FORBIDDEN', fix: 'You are signed in and on no record yet.' }, ...carried };
     /* THE RECORD SAYS WHAT SOMEBODY MAY DO INSIDE IT, as on the bearer path: the Directory said which record. */
     const held = await deps.access(record, out.body.person);
-    if (!held) return { door: 'refused', status: 403, refusal: { code: 'FORBIDDEN', fix: 'You are not on this record.' }, ...carried };
+    if (!held) {
+      const stopped = (await deps.stopped?.(record, out.body.person)) === true;
+      const refusal: Refusal = stopped ? { code: 'FORBIDDEN', fix: MEMBER_STOPPED, at: 'principal' } : { code: 'FORBIDDEN', fix: 'You are not on this record.' };
+      return { door: 'refused', status: 403, refusal, ...carried };
+    }
     /* `12 §8` CSRF: a cookie write comes from a page on this origin or not at all. */
     if (!SAFE.has(request.method) && !sameOrigin(request, deps.origin)) return { door: 'refused', status: 403, refusal: CROSS, ...carried };
     return { door: 'session', record, ctx: sessionContext(out.body, held) as CallContext, ...carried };
@@ -112,7 +120,7 @@ export function withCookie(response: Response, cookie: string | undefined): Resp
 export type BearerDeps = {
   knows: (record: string) => Promise<boolean>;
   /** `reach` is what the token's own row says it opens beyond its scope (`verifyToken`), absent from an older record. */
-  verify: (record: string, bearer: string, surface: 'api' | 'mcp') => Promise<{ id: string; person_id: string; scope: string; reach?: readonly string[] } | null>;
+  verify: (record: string, bearer: string, surface: 'api' | 'mcp') => Promise<{ id: string; person_id: string; scope: string; reach?: readonly TokenReach[] } | null>;
   access: (record: string, person: string) => Promise<Held | null>;
   /** The record a live name means, the Directory's `resolve`. Asked only for a bearer that came under `/app/<slug>`. */
   named?: (slug: string) => Promise<string | null>;
@@ -199,9 +207,10 @@ export async function bearerOf(request: Request, surface: 'api' | 'mcp', deps: B
   const held = admitted.held;
   /* THE REACH IS THE TOKEN ROW'S, AS `verifyToken` READ IT INSIDE THE RECORD, and nothing in the request can add to it.
      The record's inbox gate admits a whole-record owner token that carries `inbox` (DIRECTION section 30, P2), and
-     before this no token principal carried a reach, so a token minted with it was refused like any other. It crosses
-     an RPC whose declared answer does not name it, so it is matched against the record's own closed list rather than
-     cast: a string would pass `includes` as a substring, which is how the gate once admitted "no-inbox" (d41ec831). */
+     before this no token principal carried a reach, so a token minted with it was refused like any other.
+     `Record$.verify` now declares it as the kernel's `Verified` has it, and it is still matched against the record's
+     own closed list rather than trusted as typed: a string would pass `includes` as a substring, which is how the gate
+     once admitted "no-inbox" (d41ec831). */
   const reach = Array.isArray(seen.reach) ? TOKEN_REACHES.filter((r) => seen.reach?.includes(r)) : [];
   /* BOTH HALVES GO OVER, the token's scope and the person's level, and the record computes where they meet: a
      token says what its holder may do with their access and never what access they have. */

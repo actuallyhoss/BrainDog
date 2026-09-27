@@ -500,7 +500,7 @@ export function previewer(deps: PreviewDeps) {
         : null;
       const rail = isMap(body.layout) ? body.layout.rail : undefined;
       const layout = isMap(body.layout) && (rail === 3 || rail === 4 || rail === 5)
-        ? { rail, ...(body.layout.sticky === true ? { sticky: true as const } : {}) }
+        ? { rail: rail as 3 | 4 | 5, ...(body.layout.sticky === true ? { sticky: true as const } : {}) }
         : null;
       const title = shown !== null && typeof shown.title === 'string' ? shown.title : typeof body.title === 'string' ? body.title : name;
       return ok({

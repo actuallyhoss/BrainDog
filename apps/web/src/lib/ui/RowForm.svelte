@@ -62,7 +62,7 @@
      */
     taken?: Fields;
     /**
-     * WHAT THE CHOICE HAS ALREADY ANSWERED, first run only: `firstRun.firstGiven`'s row for this
+     * WHAT THE CHOICE HAS ALREADY ANSWERED, in the first-row mode (`first`): the caller's row for this
      * register. Each value goes into `typed`, the map a press and a keystroke write, so the row
      * carries it exactly as if it had been chosen and the form does not ask for it.
      */

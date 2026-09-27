@@ -58,6 +58,7 @@ test('THE WORKER keyOpener SIGNS grant.read WITH THE ACTOR IT IS GIVEN, and with
   const api = {
     kernel: {
       identity: () => ({ id: REC }),
+      wrappingKey: () => null,
       openGrant: (_args: { id: string; kek_id?: string }, actor: string) => (signedBy.push(actor), ok(sealed)),
     },
   } as never;

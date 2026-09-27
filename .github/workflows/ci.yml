@@ -222,6 +222,10 @@ jobs:
 
       - run: pnpm --filter @braindog/web build
       - run: pnpm --filter @braindog/site build
+      # THE CLI BUNDLE TOO, so a change esbuild cannot bundle is red on the push and not first at the deploy, which
+      # builds it before anything goes live (AGT-1).
+      - run: pnpm --filter braindog-cli build
+      - run: node apps/cli/dist/braindog.mjs --version
 
       # AND THE BUILD MUST NOT HAVE CHANGED A TRACKED FILE.
       #

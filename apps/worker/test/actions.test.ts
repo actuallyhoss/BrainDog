@@ -187,6 +187,7 @@ test('BOUND, THE KEY IS OPENED FROM THE WORKER KEY STORE, and a root key that is
   const api = {
     kernel: {
       identity: () => ({ id: REC }),
+      wrappingKey: () => null,
       openGrant: (args: { id: string; kek_id?: string }) => (asked.push(args), ok(sealed)),
     },
   } as never;
@@ -201,7 +202,7 @@ test('BOUND, THE KEY IS OPENED FROM THE WORKER KEY STORE, and a root key that is
 
   assert.equal(await (keyOpener(api, hex(32)) ?? assert.fail())({ id: 'g_1', label: 'example read' }), null, 'another root key opened it');
   assert.equal(await (keyOpener(api, 'not a key') ?? assert.fail())({ id: 'g_1', label: 'example read' }), null);
-  const refusing = { kernel: { identity: () => ({ id: REC }), openGrant: () => ({ ok: false, refusal: { code: 'OUT_OF_BOUNDS', fix: 'gone' } }) } } as never;
+  const refusing = { kernel: { identity: () => ({ id: REC }), wrappingKey: () => null, openGrant: () => ({ ok: false, refusal: { code: 'OUT_OF_BOUNDS', fix: 'gone' } }) } } as never;
   assert.equal(await (keyOpener(refusing, kek) ?? assert.fail())({ id: 'g_1', label: 'example read' }), null);
 });
 

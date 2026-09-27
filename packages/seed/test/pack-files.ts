@@ -74,6 +74,22 @@ export const HSBC_EG_SMS_INGESTS: Readonly<Record<string, Body>> = byIngest(true
 export const bankDeclarations = (): Declaration[] =>
   bankHsbcEgFile().declarations.map((body) => ({ id: `ingest.${String(body.ingest)}`, kind: 'ingest' as const, body: body as never }));
 
+/** `packs/card-alerts/card-alerts.pack.json` as it ships: the two card wordings money-core carried until 3.0.0, and their twins. */
+export const cardAlertsFile = (): PackDoc => read('card-alerts/card-alerts.pack.json');
+
+const cardBy = (sms: boolean): Record<string, Body> =>
+  Object.fromEntries(cardAlertsFile().declarations.filter((d) => d.channel === (sms ? 'webhook' : 'email')).map((d) => [String(d.ingest), d]));
+
+/** The two card wordings, keyed by ingest id, as the file declares them. */
+export const CARD_INGESTS: Readonly<Record<string, Body>> = cardBy(false);
+
+/** Their two webhook twins, keyed the same way. */
+export const CARD_SMS_INGESTS: Readonly<Record<string, Body>> = cardBy(true);
+
+/** The whole file as kernel declarations, for a record opened with `installSeed`, which records no pack. */
+export const cardAlertDeclarations = (): Declaration[] =>
+  cardAlertsFile().declarations.map((body) => ({ id: `ingest.${String(body.ingest)}`, kind: 'ingest' as const, body: body as never }));
+
 /** What money-core 1.8.0 to 2.4.0 handed the bank pack: the twelve, each to `bank-hsbc-eg`. */
 export const MONEY_CORE_HANDS: Readonly<Record<string, string>> = Object.fromEntries(
   [...Object.keys(HSBC_EG_INGESTS), ...Object.keys(HSBC_EG_SMS_INGESTS)].map((id) => [`ingest.${id}`, 'bank-hsbc-eg']),

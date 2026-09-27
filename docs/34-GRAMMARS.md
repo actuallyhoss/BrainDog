@@ -72,7 +72,7 @@ rewrites it to an id at install (38 §13).
 | Operator | Applies to | `entry` compiles to | Notes |
 |---|---|---|---|
 | `is` / `not` | every type | `expr = ?` / `(expr IS NULL OR expr <> ?)` | `bool` binds 1/0; money and quantity take the two-expression form of §1.5 |
-| `in` / `not_in` | enum · ref · text · int | `IN (…)` chunked at 64 | chunks of `in` joined by `OR`, of `not_in` by `AND`, one parenthesis; the chunk bounds the statement's shape — the parameter ceiling is the adapter's (33 §1) |
+| `in` / `not_in` | enum · ref · text · int | `IN (…)` chunked at 64, or one `json_each(?)` parameter past 64 | up to 64 values, one parameter each; chunks of `in` joined by `OR`, of `not_in` by `AND`, one parenthesis; past 64 values a field with no currency or unit binds the whole list as one JSON parameter, `IN (SELECT value FROM json_each(?))`, a bare day against an instant being a second list compared with the date part; money and quantity keep their chunks and meet the adapter's parameter ceiling (33 §1) |
 | `gt gte lt lte` | int · decimal · money · quantity · day · instant · duration | comparison | money/quantity: two expressions, §1.5 |
 | `before` / `after` / `between` | day · instant | comparison on the resolved literal | `between` inclusive both ends |
 | `contains` | text · document · url · email | `instr(lower(expr), lower(?)) > 0` | **substring**, ASCII case-folded, ≤ 40 bytes (`CONTAINS_TOO_LONG`); a scan, honestly |
@@ -185,14 +185,14 @@ path, disagreeing about `channel`'s type (a `text` there, the DDL's `enum` here)
 The sentence form of a `match:` is the one shape the install check does not compile, because parsing one needs a
 `Schema` and a clock and `declare` is context-free. It reaches `predicateOf` through the record's own read check.
 
-### 1.10 · Limits, and the three legal subqueries
+### 1.10 · Limits, and the legal subqueries
 
 | Rule | Value |
 |---|---|
 | Nesting depth | 3, counting the root group; same-quantifier nesting is flattened on save |
-| `IN` chunk | 64 values a chunk — bounds the statement's shape; the 100-parameter ceiling is the adapter's (33 §1), not the grammar's |
+| `IN` chunk | 64 values a chunk, for money and quantity at any length and for every other type up to 64 values; past 64 a field with no currency or unit binds one `json_each(?)` parameter. The 100-parameter ceiling is the adapter's (33 §1), not the grammar's |
 | Text literals | `contains starts ends` ≤ 40 bytes, `starts`/`ends` measured after escaping; `matches` phrase ≤ 200 bytes — over either of the last three caps is `PATTERN_OVER_CAP`, over `contains`' is `CONTAINS_TOO_LONG` |
-| Internal subqueries the compiler may emit | **three, and only three**: the FTS5 set-membership test (`matches`), the `via:` hop, and `json_each` existence (`has`/`lacks`). None is author-writable; a `json_each(?)` form for a long `in` list would be a fourth and is not emitted |
+| Internal subqueries the compiler may emit | **these, and only these**: the FTS5 set-membership test (`matches`), the `via:` hop, `json_each` existence (`has`/`lacks`), and `IN (SELECT value FROM json_each(?))` for an `in` or `not_in` past 64 values. None is author-writable |
 | String literals in emitted SQL | single-quoted only; values are bound (double-quoted strings are identifiers in `node:sqlite`) |
 
 ### 1.11 · The compile contract
@@ -454,8 +454,8 @@ checked-in fixtures LF so the same hash comes out on Windows and Linux CI ([31-S
 | List | Count | Members | Owner |
 |---|---|---|---|
 | Value types | 16 + 2 meta | §3 | 02 §5 |
-| Pack kinds | 8 | `register page block ingest rule metric theme digest` | 04 §1 |
-| Block kinds | 20 | §2.1 — one TypeScript table, `render`'s `KINDS` | 05 §2 |
+| Pack kinds | 10 | `register page block ingest rule metric theme digest script job` | 04 §1 |
+| Block kinds | 38 | §2.1, one TypeScript table, `render`'s `KINDS` | 05 §2 |
 | Post-v1 kinds | 4 | `diagram sparkline series forecast` | 05 §2 |
 | Layout primitives | 8 | `panel grid rows proportional inline list table media` | 05 §1 |
 | Tone words | 4 (+4 aliases, +`hole`) | `good warn bad info` | 13 §2.3 |
@@ -468,6 +468,7 @@ checked-in fixtures LF so the same hash comes out on Windows and Linux CI ([31-S
 | Combinators | 3 | `ratio diff product` | 08 §2 |
 | `derive:` combinators | 7 | `sum diff product ratio band via normalise` | 02 §5 |
 | A register's `delete:` values | 1 | `refuse_while_referenced` | 42 §4.4 |
+| A register's `owner_only:` values | 1 | `true` | 42 §4.4 |
 | Rule actions | 11 | `set untag move schedule suggest link notify tag create run stop` | 07 §6 |
 | Extractors | 10 + 3 | `after before between money date text int decimal enum lookup` · `first nth default` | 07 §3 |
 | Notification fields | 6 | `tone say because to key urgent` | 09 §4 |
@@ -488,7 +489,7 @@ checked-in fixtures LF so the same hash comes out on Windows and Linux CI ([31-S
 | Principal kinds | 6 | `person token runner share system slash` | 33 §2 |
 | Device-grant statuses | 6 | `pending approved active expired denied revoked` | 12 §6.1 |
 | `device_grant.reach` | 6 | `login runner export import pack token` — the last four are operation grants | 30 §1 |
-| Job kinds | 4 | `triage explain propose draft` | 26 §4 |
+| Job kinds | open | the id of an installed `job` declaration since kernel migration 18, with no CHECK | 26 §4 |
 | Job statuses | 9 | `queued claimed ok needs_decision refused limit error interrupted cancelled` | 26 §5 |
 | Job event kinds | 9 | `start say think tool out limit note end error` | 26 §5 |
 | Grant kinds | 5 | `api_token password ssh_key recovery_codes note` | 12 §6 |

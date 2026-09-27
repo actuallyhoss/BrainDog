@@ -798,7 +798,8 @@ export const words = {
   /* A TITLE, SO NO FULL STOP, as Appendix C15 and D10 of `loop/DESIGN-SYSTEM.md` already made Search and Decide. */
   none: 'Nothing runs on its own yet',
   noneWhy: 'An automation starts on a change, an arrival, a clock or a button, and then does its steps in order.',
-  absent: 'This record does not list its automations yet. You can still draw one and send it to Decide.',
+  absent: 'This record does not list its automations yet',
+  absentHow: 'You can still draw one and send it to Decide.',
   steps: 'Steps',
   runs: 'Runs',
   written: 'As written',
@@ -862,7 +863,7 @@ export const words = {
     failed: 'failed',
     cancelled: 'stopped',
   } as Record<string, string>,
-  noRuns: 'No runs yet.',
+  noRuns: 'No runs yet',
   kinds: {
     written: 'A change',
     arrival: 'An arrival',

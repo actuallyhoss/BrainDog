@@ -183,6 +183,9 @@ importers:
 
   apps/worker:
     dependencies:
+      '@braindog/declare':
+        specifier: workspace:*
+        version: link:../../packages/declare
       '@braindog/host':
         specifier: workspace:*
         version: link:../../packages/host

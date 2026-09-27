@@ -9,7 +9,7 @@
   THE CARD UNDER THE FINGER IS FOUND BY `elementFromPoint`, because a captured pointer's events all go to the handle
   that captured them, so no other card ever hears a `pointerover`. Each card and each empty arm carries its list and
   index in `data-` attributes; the handle reads them from whatever is under the pointer and writes `over` on the draft,
-  and the card that `over` names draws the landing line. The same before-or-after rule as `PageView.svelte`'s blocks,
+  and the card that `over` names draws the landing line. The same before-or-after rule as `PageBody.svelte`'s blocks,
   copied rather than imported because that rule is scoped to that file, and here every card is full width, so the
   pointer's height alone decides the edge.
 
@@ -152,7 +152,7 @@
 
 <!-- THE KEYDOWN IS THE BUTTONS', BUBBLED. The card is not a tab stop and does nothing when it has focus itself; the
      handle, the sentence and the menu inside it are the stops, and Alt with an arrow pressed on any of them lands here,
-     the same arrangement `PageView.svelte` uses for a block's `⌥↑`. -->
+     the same arrangement `PageBody.svelte` uses for a block's `⌥↑`. -->
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <div
   class="card"
@@ -227,7 +227,7 @@
   }
 
   .card[data-selected] {
-    border-color: var(--accent);
+    border-color: var(--ink2);
   }
 
   /* A FAULT IS A WORD UNDER THE CARD, NOT A TINT ON IT. The card was `--warn-wash` behind its text, and
@@ -239,7 +239,7 @@
     opacity: 0.45;
   }
 
-  /* THE LANDING LINE, the rule `PageView.svelte` draws for a block, copied because it is scoped there: a 3px accent bar
+  /* THE LANDING LINE, the rule `PageBody.svelte` draws for a block, copied because it is scoped there: a 3px ink bar
      on the edge the held card will arrive at, over the gap rather than inside the card, so nothing reflows under the
      pointer. Every card is full width, so it is always a line across the top or the bottom. */
   .card[data-drop]::after {
@@ -248,7 +248,7 @@
     z-index: var(--z-raise);
     inset-inline: calc(var(--sp-1) * -1);
     block-size: 3px;
-    background: var(--accent);
+    background: var(--ink);
     border-radius: var(--r-pill);
     pointer-events: none;
   }

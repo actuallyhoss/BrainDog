@@ -45,9 +45,9 @@ type Hit = { register: string; seq: number; title: string };
  * character-for-character the answer to a query with exactly a hundred matches, so this module had
  * nothing to count but what it was handed, and `groupsOf` handed that on as a total.
  *
- * `matched` IS PER LIST because the sentences on the screen are: `allIn(140, 'Datapoints')` and
- * `showingOf(10, 140)` are both already written, and both become true the moment the count is real,
- * so this needs no new copy anywhere. `null` is a record that did not say, which is every record
+ * `matched` IS PER LIST because the sentences on the screen are: a list's door on `/search` reads
+ * "Show all 140" (its page's `showAll`) and the palette's count `showingOf(10, 140)`, and both become
+ * true the moment the count is real, so this needs no new copy anywhere. `null` is a record that did not say, which is every record
  * built before `fts.ts`'s `searchMatched` reaches the route, and then every total is what it was.
  *
  * BOTH SHAPES ARE READ, AND THAT IS NOT DEFENSIVENESS FOR ITS OWN SAKE. A self-host serves a built

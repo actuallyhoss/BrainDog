@@ -78,7 +78,7 @@ test("the people are the record's members, drawn as the screen's persons", async
 
   const off = await readPeople(BASE, host(null).io);
   assert.equal(off.from, 'refused', 'a host with no record behind it is drawn the sample');
-  assert.match(off.from === 'refused' ? off.fix : '', /could not be reached/u);
+  assert.match(off.from === 'refused' ? off.fix : '', /could not reach this record/u);
   assert.deepEqual(
     await readPeople(BASE, host(() => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in first.' } })).io),
     { from: 'refused', fix: 'Sign in first.' },
@@ -137,7 +137,7 @@ test("a refusal is the record's sentence, a race says so, and no record is a ref
   const unreachable = await removeAccess(BASE, bo, host(null).io);
   assert.equal(unreachable.ok ? '' : unreachable.from, 'refused');
   assert.equal(!unreachable.ok && unreachable.from === 'refused' && unreachable.code, 'UNREACHABLE');
-  assert.match(unreachable.ok ? '' : unreachable.fix, /could not be reached/);
+  assert.match(unreachable.ok ? '' : unreachable.fix, /could not reach this record/);
 
   const signedOut = await removeAccess(BASE, bo, host(() => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in first.' } })).io);
   assert.deepEqual(signedOut, { ok: false, from: 'refused', code: 'UNAUTHORIZED', fix: 'Sign in first.', raced: false });

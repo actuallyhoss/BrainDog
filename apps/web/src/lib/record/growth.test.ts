@@ -161,7 +161,7 @@ const CAPPED: readonly (readonly [route: string, what: string, capped: RegExp])[
      grid alone left this green, and uncapping the cards alone did too. Only uncapping both went red,
      which is the one state nobody would ever reach by accident. */
   ['r/[register]/+page.svelte', 'the register grid', /toRows\(id, result\.entries\.slice\(0, DOM_CAP\)/],
-  ['r/[register]/+page.svelte', 'the register’s phone cards', /<RowCards[^>]*entries=\{result\.entries\.slice\(0, DOM_CAP\)\}/],
+  ['r/[register]/+page.svelte', 'the register’s phone cards', /<ListCards[^>]*entries=\{result\.entries\.slice\(0, DOM_CAP\)\}/],
   /* AND THE SAVED VIEW'S TWO, WHICH ARE ONE SLICE READ TWICE, so the guard has to name the binding
      rather than the holder. This row said `result.entries.slice(0, DOM_CAP)` until the live half
      landed and the answer stopped being called `result`: the cap never moved, the spelling did, and
@@ -205,7 +205,7 @@ test('and every capped list draws the line that says so', () => {
        no numbers would satisfy a substring check and say nothing. */
     assert.match(src, /<CapLine shown=\{[^}]+\} total=\{[^}]+\} \/>/, `${route} caps its list and never says so`);
   }
-  for (const route of ['r/[register]/+page.svelte', 'v/[view]/+page.svelte']) {
+  for (const route of ['r/[register]/parts/ListTable.svelte', 'v/[view]/+page.svelte']) {
     const src = readFileSync(join(routes, route), 'utf8');
     assert.ok(/cap=\{DOM_CAP\}/.test(src), `${route} slices to the cap and does not pass it to Table`);
   }

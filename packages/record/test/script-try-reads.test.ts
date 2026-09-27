@@ -67,7 +67,29 @@ async function probe(reads: Reads): Promise<string[]> {
   return out;
 }
 
-async function record() {
+/**
+ * A list asking for the deleted rows too, and one asking with an option the scheduled run refuses: the trial's copy of
+ * `listOptions` (`host/src/script.ts`), held to the original by being asked the same two things.
+ */
+async function probeDeleted(reads: Reads): Promise<string[]> {
+  const out: string[] = [];
+  const say = async (label: string, f: () => Promise<unknown>) => {
+    try {
+      out.push(`${label} ${JSON.stringify(await f())}`);
+    } catch (e) {
+      out.push(`${label} refused: ${(e as Error).message}`);
+    }
+  };
+  const seen = (r: unknown) => {
+    const row = r as { fields: Record<string, unknown>; deleted_at: string | null };
+    return [row.fields.name, row.deleted_at !== null, 'token' in row.fields];
+  };
+  await say('D1 deleted too', async () => (await reads.list('clients', null, { includeDeleted: true })).map(seen));
+  await say('D2 option as text', async () => (await reads.list('clients', null, { includeDeleted: 'true' })).length);
+  return out;
+}
+
+async function record(run: (reads: Reads) => Promise<string[]> = probe) {
   let reads: Reads | null = null;
   const sql = openSqlite();
   const api = await createRecordApi({
@@ -75,7 +97,7 @@ async function record() {
     clock: fixedClock(NOW),
     tryScript: async (d) => {
       reads = d.reads;
-      return probe(d.reads);
+      return run(d.reads);
     },
   });
   assert.ok((await api.kernel.install([CLIENTS, SEEN])).ok);
@@ -118,5 +140,20 @@ test("AND NO MORE THAN ITS CALLER MAY: a list the body reads and the caller does
   assert.match(held.value![0]!, /^R1 clients refused: /u);
   assert.equal(held.value![3], 'R4 get clients#1 null');
   assert.notEqual(reads(), null);
+  sql.close();
+});
+
+test("AND ITS ONE LIST OPTION AS THE RUN TAKES IT: the deleted rows when asked, and any other option refused in the run's words", async () => {
+  const { sql, api, scheduled } = await record(probeDeleted);
+  const fresh = await api.get({ register: 'clients', seq: 2 } as never, owner);
+  assert.ok(fresh.ok && fresh.value !== null, JSON.stringify(fresh));
+  const gone = await api.update({ register: 'clients', seq: 2, patch: { deleted_at: true }, version: (fresh.value as { version: number }).version } as never, owner);
+  assert.ok(gone.ok, JSON.stringify(gone));
+
+  const tried = (await api.scriptTry({ body: BODY }, agent)) as { ok: boolean; value?: string[] };
+  assert.ok(tried.ok, JSON.stringify(tried));
+  assert.deepEqual(tried.value, await probeDeleted(scheduled as unknown as Reads));
+  assert.ok(tried.value![0]!.includes('["Bolt",true,false]'), `the trial did not hand over the deleted row: ${tried.value![0]}`);
+  assert.match(tried.value![1]!, /a script's list takes \{"includeDeleted":true\} or nothing, so nothing was read\.$/u);
   sql.close();
 });

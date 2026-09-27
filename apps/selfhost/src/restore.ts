@@ -286,7 +286,8 @@ export async function initFrom(o: {
           ? await unwrap(store, record, row.purpose, { wrapped: row.wrapped, nonce: row.nonce, kek_id: row.kek_id, wrapped_by: 'kek' })
           : null;
       if (key) key.fill(0);
-      else shut.push({ purpose: row.purpose, kek: row.kek_id ?? row.wrapped_by });
+      /* A KEY BEHIND THE VAULT PASSPHRASE IS NOT SHUT: it opens here with the same passphrase, and no key file is missing. */
+      else if (row.wrapped_by !== 'passphrase') shut.push({ purpose: row.purpose, kek: row.kek_id ?? row.wrapped_by });
     }
     opened.close();
     sql = null;

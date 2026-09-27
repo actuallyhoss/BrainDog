@@ -431,12 +431,12 @@ test('THE DOOR IS NOT A METHOD, which is what keeps it out of the record surface
     ROUTES.find((r) => r.name === 'slashAsk' || r.name.startsWith('slash/')),
     undefined,
   );
-  /* AND THE FOUR THAT ARE THERE ARE THE ARRANGEMENT ENGINE, which `1f85a49a` settled is a different feature
+  /* AND THE ONES THAT ARE THERE ARE THE ARRANGEMENT ENGINE, which `1f85a49a` settled is a different feature
      with the same name: they propose how a BrainDog is put together, and none of them answers a question
-     about what is in it. */
+     about what is in it. `slashDraft` (PGS-7) drafts a page or a list from a description and files nothing. */
   assert.deepEqual(
     ROUTES.filter((r) => r.name.startsWith('slash')).map((r) => r.name),
-    ['slash', 'slashPropose', 'slashDaily', 'slashForm'],
+    ['slash', 'slashPropose', 'slashDaily', 'slashForm', 'slashDraft'],
   );
   assert.equal(servesSlash('/api/slashAsk'), null);
   assert.equal(servesSlash('/api/slash/read'), 'read');

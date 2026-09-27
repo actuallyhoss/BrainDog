@@ -44,7 +44,7 @@
 
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -62,7 +62,11 @@ import { healthLabel } from '../record/api.ts';
 import { settingChoices } from '../../routes/packs/[id]/said.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const PAGE = readFileSync(join(here, '../../routes/r/[register]/+page.svelte'), 'utf8');
+/* THE LIST SCREEN IS ITS PAGE AND EVERY PART IT DRAWS THROUGH (ARC-7a), read as one text so each count below is the screen's. */
+const LIST = join(here, '../../routes/r/[register]');
+const PAGE = ['+page.svelte', ...readdirSync(join(LIST, 'parts')).filter((f) => f.endsWith('.svelte')).sort().map((f) => join('parts', f))]
+  .map((f) => readFileSync(join(LIST, f), 'utf8'))
+  .join('\n');
 const CARDS = readFileSync(join(here, 'RowCards.svelte'), 'utf8');
 const ROW_PAGE = readFileSync(join(here, '../../routes/r/[register]/[seq]/+page.svelte'), 'utf8');
 const TRACK_PAGE = readFileSync(join(here, '../../routes/t/[track]/+page.svelte'), 'utf8');
