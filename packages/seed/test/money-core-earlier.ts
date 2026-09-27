@@ -6,9 +6,13 @@
  * moved on, and the only way to have one is to build the 1.8.0 document back out of today's.
  *
  * BUILT, NOT A FIXTURE FILE, because 1.8.0 and 2.0.0 differ by one declaration. `register.holdings` below is the body
- * 1.8.0 shipped, read out of `firstPartyDocument('money-core')` on 23 September before `holdings` left, and
- * `money-core-major.test.ts` proves the rebuilt document is 1.8.0 rather than something near it: its fingerprint is
- * `8bcd20187c61cf1b`, the value `pack-versions.test.ts` recorded for `money-core@1.8.0`.
+ * 1.8.0 shipped, read out of `firstPartyDocument('money-core')` on 23 September before `holdings` left.
+ *
+ * NEAR 1.8.0 SINCE 3.0.0, NOT BYTE FOR BYTE. Until 3.0.0 the rebuild read `8bcd20187c61cf1b`, the fingerprint
+ * `pack-versions.test.ts` recorded for `money-core@1.8.0`, and `money-core-major.test.ts` held it there. 3.0.0 took pages,
+ * card wordings, ingests and the money ceilings' defaults away, and nothing below puts them back, so that test is
+ * retired and `pack-versions.test.ts` alone holds the 1.8.0 value. What the rebuild still carries, and what the tests
+ * that import it read, is 1.8.0's `holdings` in 1.8.0's place, the `hands` it shipped with, and version `1.8.0`.
  */
 
 import assert from 'node:assert/strict';
@@ -31,8 +35,8 @@ export const value = <T>(r: unknown): T => {
 
 /**
  * `register.holdings` AS money-core 1.5.0 TO 1.8.0 DECLARED IT, with `gold` first among its kinds and money-core as its
- * pack. Written out whole: every key, in the order the document carried them, because the fingerprint below is a hash of
- * these bytes and a reordered key is a different document.
+ * pack. Written out whole: every key, in the order the document carried them, so the list a record on the rebuilt 1.8.0
+ * holds is the list 1.8.0 declared, key for key.
  */
 export const HOLDINGS_1_8_0: Body = {
   register: 'holdings',
@@ -89,12 +93,13 @@ export const HELD_AT_1_8_0: readonly Held[] = [
 
 /**
  * Today's money-core document less what 2.1.0 and 2.2.0 added, which is `available` and `pairs:` on
- * `register.transactions`, so the two rebuilds below stay the releases they name. Without either the 1.8.0 rebuild's
- * fingerprint moved off the one `pack-versions.test.ts` recorded for 1.8.0, measured when each landed: `pairs:` alone read
- * `7e991afc1e7d11aa` against `8bcd20187c61cf1b` on 24 September. `pairs:` is taken off whole, so its `where:` gaining
- * `party` and `settles` at 2.2.0, and `settles` loosened to `settles is empty or transfer is true` at 2.3.0, needs
- * nothing here: `money-core-major.test.ts` still read `8bcd20187c61cf1b` off the 1.8.0 rebuild after 2.3.0 landed. What
- * 2.4.0 added is taken off first, by `before240` below.
+ * `register.transactions`, so the two rebuilds below stay as near the releases they name as today's document allows.
+ * Measured when each landed, before 3.0.0: without this step the 1.8.0 rebuild's fingerprint moved off the one
+ * `pack-versions.test.ts` recorded for 1.8.0 (`pairs:` alone read `7e991afc1e7d11aa` against `8bcd20187c61cf1b` on
+ * 24 September). `pairs:` is taken off whole, so its `where:` gaining `party` and `settles` at 2.2.0, and `settles`
+ * loosened to `settles is empty or transfer is true` at 2.3.0, needed nothing here: the 1.8.0 rebuild still read
+ * `8bcd20187c61cf1b` after 2.3.0 landed. It stopped reading it at 3.0.0, which took away more than these steps put back
+ * (see the top of this file). What 2.4.0 added is taken off first, by `before240` below.
  */
 function asShipped(doc: unknown): Doc {
   const d = before240(doc);
@@ -111,8 +116,9 @@ function asShipped(doc: unknown): Doc {
  * the obligations leg of each walk `page.money` draws. Every release before 2.4.0 is built on top of this.
  *
  * TAKEN OFF BY ID AND KEY, NOT BY POSITION, so the fields and the leg's keys keep the order the release carried them in,
- * which is what the fingerprint hashes. Measured on 24 September: `asMoneyCore230` read `8ad733c726f4fd0b` after 2.4.0
- * landed, the value `pack-versions.test.ts` holds for 2.3.0, and the 1.8.0 rebuild still read `8bcd20187c61cf1b`.
+ * which is what a fingerprint hashes. Measured on 24 September, before 3.0.0: `asMoneyCore230` read `8ad733c726f4fd0b`
+ * after 2.4.0 landed, the value `pack-versions.test.ts` holds for 2.3.0, and the 1.8.0 rebuild still read
+ * `8bcd20187c61cf1b`. Neither does since 3.0.0; `money-ends.test.ts` reads 2.3.0 from a fixture file instead.
  */
 function before240(doc: unknown): Doc {
   const d = before250(doc);
@@ -134,7 +140,7 @@ function before240(doc: unknown): Doc {
  * draws, and Cash ahead's `knobs` back to the four 2.4.0 offered. `before240` is built on top of this.
  *
  * TAKEN OFF BY KEY AND SET BACK IN PLACE, NOT BY POSITION, so the leg's keys and the block's keep the order the release
- * carried them in, which is what the fingerprint hashes.
+ * carried them in, which is what a fingerprint hashes.
  */
 function before250(doc: unknown): Doc {
   const d = structuredClone(doc) as Doc;

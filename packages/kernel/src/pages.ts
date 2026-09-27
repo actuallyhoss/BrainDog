@@ -832,13 +832,6 @@ export function readPage(deps: PageDeps, slug: string): Result<PageResult> {
 }
 
 /**
- * One block.
- *
- * IT NEVER THROWS. Everything a block can get wrong — a source nobody has, a predicate the register
- * cannot answer, a metric that is not declared — comes back as a refusal ON THE BLOCK, so the page
- * around it still draws.
- */
-/**
  * Whether a block's `when:` is satisfied, given the figure it names.
  *
  * A FIGURE THAT CANNOT BE READ DOES NOT DRAW THE BLOCK. The alternative, drawing it anyway, is how a
@@ -883,7 +876,56 @@ const kitOf = (deps: PageDeps): KindKit => ({
   today: () => localDays(deps.ctx.tz ?? deps.tz ?? 'UTC')(deps.ctx.asOfMs ?? deps.ctx.nowMs),
 });
 
+/**
+ * One block.
+ *
+ * IT NEVER THROWS. Everything a block can get wrong (a source nobody has, a predicate the register cannot answer, a
+ * metric that is not declared) comes back as a refusal ON THE BLOCK, so the page around it still draws.
+ *
+ * AND THIS IS WHERE THAT IS TRUE RATHER THAN HOPED. A declaration arrives as JSON from a pack or from
+ * an agent's `draw`, and the reads below were written against the type: `cells: 'not an array'` reached a `.map` and
+ * the throw took the page, or the agent's whole call, with it. Every shape the reads know to be wrong is refused in its
+ * own sentence below; what none of them foresaw is caught here and answered as a refusal ON THE BLOCK, with the
+ * technical reason under `detail` where a screen folds it away, so the page around it still draws.
+ */
 export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
+  try {
+    return readBlockAsWritten(deps, block);
+  } catch (e) {
+    return {
+      ...(block !== null && typeof block === 'object' ? shorn(block) : block),
+      rows: [],
+      matched: 0,
+      refusals: [
+        {
+          code: 'DECLARATION_INVALID',
+          fix: 'This block could not be read as it is written, so it draws nothing. Check each of its keys against what its kind reads.',
+          detail: e instanceof Error ? e.message : String(e),
+        },
+      ],
+    };
+  }
+}
+
+/** Whether a block's `cells:` is something other than what the type says: a list of figures, each naming its metric. */
+const cellsFault = (cells: unknown): boolean =>
+  cells !== undefined &&
+  !(Array.isArray(cells) && cells.every((c) => c !== null && typeof c === 'object' && typeof (c as { metric?: unknown }).metric === 'string'));
+
+/**
+ * A block without the `cells:` it was refused for.
+ *
+ * THE ANSWER CARRIES NO KEY ITS OWN TYPE SAYS CANNOT BE THERE. A refused block is still handed back with what it was
+ * written with, and a host reading `cells` off it reads the list `BlockResult` promises: `cells: 'two'` echoed back
+ * was the refused block throwing again one step later, in the host that draws the refusal.
+ */
+function shorn<T extends { cells?: unknown }>(block: T): T {
+  if (!cellsFault(block.cells)) return block;
+  const { cells: _refused, ...kept } = block;
+  return kept as T;
+}
+
+function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
   /* A KEY THIS BUILD DOES NOT READ IS SAID, and it is said whatever else the block turns out to be:
      a `cells` block with a misspelt key and a `table` block with one are the same mistake, and the
      stat arm below returns before any other check runs.
@@ -943,6 +985,15 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
    * had the first time. Every refusal this function knows about goes back in one list.
    */
   const also = (...more: readonly Refusal[]): Refusal[] => [...unread, ...more];
+
+  /* `cells:` IS A LIST OF FIGURES, EACH NAMING ITS METRIC, as the install says (`declare.ts` `pageBody`). A page installed
+     before that check, or a block an agent hands `draw`, can carry anything, and the stat arm, the page's `{{path}}`
+     values and the access walk all read it as the list the type promises. Said here, before any of them reads it. */
+  if (cellsFault(block.cells))
+    return {
+      ...shorn(base),
+      refusals: also({ code: 'DECLARATION_INVALID', fix: 'cells: is a list of figures, each naming its metric, such as cells: [{ metric: overdue }].', at: 'cells' }),
+    };
 
   /* AND A BLOCK WHOSE CONDITION IS NOT MET DRAWS NOTHING, before any query runs. `drawn` is on the
      result rather than implied by an empty one, because "the condition was false" and "the query
@@ -2919,7 +2970,10 @@ export function registersOf(decl: PageDecl, metric?: (id: string) => MetricDecl 
       if (about) named.add(about[1]!);
       named.add(WHOLE_RECORD);
     }
-    for (const cell of block.cells ?? []) {
+    /* ONLY A LIST OF CELLS NAMES FIGURES: `cells:` that is not one is refused on its block (`readBlock`) and draws
+       nothing, so it names no list, and walking it here threw where the block refuses. */
+    for (const cell of Array.isArray(block.cells) ? block.cells : []) {
+      if (cell === null || typeof cell !== 'object' || typeof cell.metric !== 'string') continue;
       /* THE FIRST COLON SEPARATES, as everywhere else: `project-owed:C:\Repos` is one project. */
       const at = cell.metric.indexOf(':');
       addFigure(at < 0 ? cell.metric : cell.metric.slice(0, at));
@@ -2984,7 +3038,7 @@ export function pathsOf(block: PageBlock): string[] {
     : [];
   const out = new Set<string>();
   /* A FIGURE'S OWN NOTE NAMES FIGURES TOO: `in {{cash-accounts}} account(s)` under Cash now. */
-  const notes = (block.cells ?? []).map((c) => (c as { note?: unknown }).note);
+  const notes = (Array.isArray(block.cells) ? (block.cells as unknown[]) : []).map((c) => (c !== null && typeof c === 'object' ? (c as { note?: unknown }).note : undefined));
   /* AND A COLUMN'S LABEL IS READ AS A HEADING IS: `Open ({{tasks.open}})` over a column was drawn with the braces in
      it, because the heading above it was filled and the label beside it was never asked (`loop/finish/pages.md` P9). */
   const labels = Array.isArray(block.columns) ? block.columns.map((c) => (c !== null && typeof c === 'object' ? (c as { label?: unknown }).label : undefined)) : [];

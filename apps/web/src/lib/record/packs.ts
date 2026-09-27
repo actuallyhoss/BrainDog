@@ -351,6 +351,8 @@ export function valueOf(decl: ConfigDecl, draft: Draft, currency: string | null)
       return { ok: true, value: draft.on };
     case 'money': {
       const typed = draft.text.trim();
+      /* AN EMPTY BOX IS NO LIMIT: money-core ships every ceiling with no default, so an untouched one has not moved, and clearing one sends null. */
+      if (typed === '') return { ok: true, value: null };
       /* Thousands grouped as the box first draws them are read as the digits they group; any other comma is refused below. */
       const raw = /^-?\d{1,3}(,\d{3})+(\.\d+)?$/u.test(typed) ? typed.replace(/,/gu, '') : typed;
       if (currency === null) return { ok: true, value: raw };
