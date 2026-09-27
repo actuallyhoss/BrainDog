@@ -10,21 +10,27 @@
  *
  * `quiet` is never printed: a card whose `quiet` cell says anything is drawn dimmed, as a run not
  * heard from lately is. The page's evaluator writes it from the record's clock, so a declaration
- * does not name it (`packages/kernel/src/declare.ts` keeps the ten a page may declare).
+ * does not name it (`packages/kernel/src/declare.ts` keeps the roles a page may declare, which are
+ * these less `quiet`).
  *
  * `next` is the first open step under the card, said "Next: ...", and `reply` a line written under
  * the title in a quieter voice, a second opinion under a note. Both are one cell a card, and both
  * draw nothing when the cell is empty: a group whose steps are all done has no next step, and a line
  * reading "Next:" and then nothing says there is one nobody wrote down.
+ *
+ * `hue` and `picture` are never printed either. `hue` is a whole number from 0 to 359, written on the
+ * card as `--hue` and drawn by the host on the card's mark alone, as the one identity accent a project
+ * or a person wears (`05 §5`); anything else in the cell is no hue. `picture` is a file the card leads
+ * with, in the form a gallery tile names one (`gallery.ts`), drawn only where the host serves it.
  */
-export const CARD_ROLES = ['title', 'figure', 'fact', 'trend', 'ring', 'who', 'when', 'mark', 'next', 'reply', 'quiet'] as const;
+export const CARD_ROLES = ['title', 'figure', 'fact', 'trend', 'ring', 'who', 'when', 'mark', 'next', 'reply', 'hue', 'picture', 'quiet'] as const;
 
 export type CardRole = (typeof CARD_ROLES)[number];
 
 const isRole = (s: string): s is CardRole => (CARD_ROLES as readonly string[]).includes(s);
 
 /** One figure and at most three facts, so a card stays a card rather than a form. */
-const MOST: Record<CardRole, number> = { title: 1, figure: 1, fact: 3, trend: 1, ring: 1, who: 1, when: 1, mark: 1, next: 1, reply: 1, quiet: 1 };
+const MOST: Record<CardRole, number> = { title: 1, figure: 1, fact: 3, trend: 1, ring: 1, who: 1, when: 1, mark: 1, next: 1, reply: 1, hue: 1, picture: 1, quiet: 1 };
 
 /** A header cell is `role` or `role: label`. */
 function headCell(cell: string): { word: string; label: string } {
@@ -72,6 +78,10 @@ export type CardLayout = {
   next: number;
   /** The line under the title, in a quieter voice. */
   reply: number;
+  /** The card's identity hue, which the host draws its mark in. */
+  hue: number;
+  /** The file the card leads with. */
+  picture: number;
 };
 
 /** Whether a card is dimmed: its `quiet` cell holds anything but space. */
@@ -102,7 +112,23 @@ export function cardLayout(cells: readonly string[]): CardLayout {
     quiet: first('quiet'),
     next: first('next'),
     reply: first('reply'),
+    hue: first('hue'),
+    picture: first('picture'),
   };
+}
+
+/**
+ * A card's hue, from its `hue` cell: a whole number from 0 to 359, or null.
+ *
+ * DIGITS AND NOTHING ELSE, because the number is written into the card's `style` as `--hue` and read by the host
+ * inside `oklch()`: a cell that could carry anything past the digits would be a value written into a style from a
+ * record's text. A turn past 359 is refused rather than wrapped, as the kernel refuses it at write.
+ */
+export function hueOf(value: string): number | null {
+  const t = value.trim();
+  if (!/^\d{1,3}$/u.test(t)) return null;
+  const n = Number(t);
+  return n <= 359 ? n : null;
 }
 
 /** Two decimals at most, and no trailing zeros, so a path stays short and exact. */

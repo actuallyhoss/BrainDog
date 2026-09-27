@@ -15,6 +15,12 @@
  *
  * A RECORD MADE BEFORE THE KEY STORE WAS BOUND HAS NO WRAPPED KEY, and it answers one sentence saying so.
  *
+ * A RECORD KEY BEHIND THE VAULT PASSPHRASE IS OPENED WITH THE PASSPHRASE THE BODY CARRIES, and never with the root key,
+ * which opens nothing there (`12 §6`, "The optional second factor"). The record's `unlockVault` is asked first, over RPC:
+ * it puts the vault gate before anything, counts the try against the passphrase's limit, and calls back the step
+ * `unlockedKey` builds, so the key it opens stays in this Worker for the one request and is zero-filled after it. An
+ * agent's vault grant carries no passphrase and opens nothing behind one.
+ *
  * THE BYTES ARE `@braindog/host`'S `sealing.ts`, shared with the self-host: `47 §13` D9's key hierarchy, held
  * in one place so a credential deposited in one host opens in the other. They were written out in both, byte for
  * byte the same, with nothing enforcing it. What stays here is where a DEK comes from, which is this host's
@@ -27,13 +33,13 @@
 
 import {
   grantKey as deriveGrantKey, NONCE_BYTES, openSealed as openBytes, seal as sealBytes,
-  serveKeys, serveVault, servesKeys, servesVault, VAULT_HEADERS, vaultReply,
-  type KeysDoor, type SessionHints, type VaultGrantSeen,
+  serveKeys, serveVault, servesKeys, servesVault, unlockedKey, VAULT_HEADERS, vaultReply,
+  type KeysDoor, type PassphraseUnlock, type RootKeys, type SessionHints, type VaultGrantSeen, type VaultPassphrase,
 } from '@braindog/host';
 import type { CallContext, Deposited, OpenedForGrant, SealTarget, Sealed } from '@braindog/record';
 import { no, ok, type Result } from '@braindog/ports';
 
-import { unwrap, type KeyStore } from './keys.ts';
+import { keyStoreOf, offeredId, rootKeysOf, unwrap, type KekBinding, type KeyStore } from './keys.ts';
 import { recordOf } from './route.ts';
 
 export { servesKeys, servesVault };
@@ -64,6 +70,15 @@ export type KeyDeps = {
     hints: SessionHints,
     kekId: string,
   ): Promise<Result<OpenedForGrant>>;
+  /**
+   * The record's `unlockVault`, over RPC: the vault gate, the count of wrong passphrases, and `unlock` called when the
+   * record key is behind a passphrase. `unlock` runs here in the Worker when the record calls it back, so the key it
+   * opens never reaches the record.
+   *
+   * OPTIONAL, BECAUSE THE RECORD'S HALF LANDS BESIDE IT. Without it a record behind a passphrase opens nothing here, and
+   * says `WRONG_KEY`, which is true of this host until it can ask.
+   */
+  unlockVault?: ((record: string, by: By, unlock: PassphraseUnlock) => Promise<Result<VaultPassphrase>>) | undefined;
 };
 
 /** What the Worker needs: whether the Directory holds the record, the record's answer, and its keys when bound. */
@@ -90,8 +105,14 @@ const WRONG_KEY = 'This host key store does not open this record, so no key was 
 const utf8 = (text: string): Uint8Array => new TextEncoder().encode(text);
 const text = (x: unknown): string => (typeof x === 'string' ? x : '');
 
-/** The grant's own key, or `null` when this key store does not open the record's. */
-async function grantKey(store: KeyStore, record: string, key: SealTarget['key'], grant: string) {
+/**
+ * The grant's own key, or `null` when this key store does not open the record's.
+ *
+ * `unlocked` IS THE RECORD KEY A PASSPHRASE OPENED FOR THIS REQUEST (`unlockedKey`), and behind a passphrase it is the
+ * only way in: the root key opens nothing there. The caller zero-fills it when its request is answered.
+ */
+async function grantKey(store: KeyStore, record: string, key: SealTarget['key'], grant: string, unlocked: Uint8Array | null = null) {
+  if (key.wrapped_by === 'passphrase') return unlocked === null ? null : await deriveGrantKey(unlocked, grant);
   if (key.kek_id === null) return null;
   const dek = await unwrap(store, record, 'record', { wrapped: key.wrapped, nonce: key.nonce, kek_id: key.kek_id, wrapped_by: 'kek' });
   if (!dek) return null;
@@ -135,12 +156,22 @@ function answerOpen(credential: string, label: string, plain: Plaintext): Respon
   return new Response(body, { status: 200, headers });
 }
 
-/** The store, once the record is known to have a wrapped key for it to open. */
-async function ready(keys: KeyDeps, record: string): Promise<Result<KeyStore>> {
+/**
+ * The store, and the record key when a passphrase opened it, once the record is known to have a wrapped key to open.
+ *
+ * THE PASSPHRASE IS TRIED AFTER THE STORE AND BEFORE THE RECORD IS ASKED WHAT IT IS WRAPPED BY. The record's
+ * `unlockVault` puts the vault gate first and counts the try, and a record key behind a passphrase names no root key,
+ * so it would otherwise read as a record made before the store was bound. `recordKey` is the caller's to zero-fill.
+ */
+async function ready(keys: KeyDeps, record: string, by: By, body: Record<string, unknown>): Promise<Result<{ store: KeyStore; recordKey: Uint8Array | null }>> {
   const store = await keys.store();
   if (!store) return no('NOT_IN_THIS_BUILD', NO_STORE, { at: 'keys' });
-  if ((await keys.wrappingKey(record)) === null) return no('NOT_IN_THIS_BUILD', OLD_RECORD, { at: 'keys' });
-  return ok(store);
+  const ask = keys.unlockVault;
+  const unlocked = ask === undefined ? ok(null) : await unlockedKey(body, record, (unlock) => ask(record, by, unlock));
+  if (!unlocked.ok) return unlocked;
+  const recordKey = unlocked.value;
+  if (recordKey === null && (await keys.wrappingKey(record)) === null) return no('NOT_IN_THIS_BUILD', OLD_RECORD, { at: 'keys' });
+  return ok({ store, recordKey });
 }
 
 /** Both steps over one record, whose caller a door has already checked. */
@@ -153,25 +184,32 @@ function doors(keys: KeyDeps, record: () => string | null) {
     const value = utf8(said) as Plaintext;
     try {
       if (value.length > VALUE_LIMIT) return no('OUT_OF_BOUNDS', 'A key is at most 64 KiB.', { at: 'value' });
-      const opened = await ready(keys, id);
+      const opened = await ready(keys, id, by, body);
       if (!opened.ok) return opened;
-      const store = opened.value;
-      /* What it is, unopened: a length, never a character of it. */
-      const hint = `a ${String(said.length)}-character value`;
-      const seal = async (target: SealTarget): Promise<Result<Sealed>> => {
-        const key = await grantKey(store, id, target.key, target.grant);
-        if (!key || target.key.kek_id === null) return no('WRONG_KEY', WRONG_KEY, { at: 'kek_id' });
-        const nonce = crypto.getRandomValues(new Uint8Array(NONCE_BYTES));
-        const sealed = await sealBytes(key, nonce, target.aad, value);
-        return ok({ ciphertext: sealed, nonce, kdf: 'hkdf-sha256', kek_id: target.key.kek_id, bytes: value.length, hint });
-      };
-      /* A PERSON MAY NAME THE ROW AND THE PROJECT AND AN AGENT MAY NOT. A vault grant already carries its
-         project, and reading a second one out of its body would be a way to put a key out of its reach. */
-      const args =
-        'principal' in by
-          ? { label: body.label, opens: body.opens, kind: body.kind, project: body.project, credential: body.credential }
-          : { label: body.label, opens: body.opens, kind: body.kind };
-      return await keys.depositGrant(id, args, by, hints, seal);
+      const { store, recordKey } = opened.value;
+      try {
+        /* What it is, unopened: a length, never a character of it. */
+        const hint = `a ${String(said.length)}-character value`;
+        const seal = async (target: SealTarget): Promise<Result<Sealed>> => {
+          const key = await grantKey(store, id, target.key, target.grant, recordKey);
+          /* BEHIND A PASSPHRASE THE RECORD KEY NAMES NO ROOT KEY, and a grant row names one all the same: the one the
+             record's other keys are under, which is the one a later rotation renames with them (`rewrapKeys`). */
+          const kekId = target.key.kek_id ?? (recordKey === null ? null : await offeredId(store, await keys.wrappingKey(id)));
+          if (!key || kekId === null) return no('WRONG_KEY', WRONG_KEY, { at: 'kek_id' });
+          const nonce = crypto.getRandomValues(new Uint8Array(NONCE_BYTES));
+          const sealed = await sealBytes(key, nonce, target.aad, value);
+          return ok({ ciphertext: sealed, nonce, kdf: 'hkdf-sha256', kek_id: kekId, bytes: value.length, hint });
+        };
+        /* A PERSON MAY NAME THE ROW AND THE PROJECT AND AN AGENT MAY NOT. A vault grant already carries its
+           project, and reading a second one out of its body would be a way to put a key out of its reach. */
+        const args =
+          'principal' in by
+            ? { label: body.label, opens: body.opens, kind: body.kind, project: body.project, credential: body.credential }
+            : { label: body.label, opens: body.opens, kind: body.kind };
+        return await keys.depositGrant(id, args, by, hints, seal);
+      } finally {
+        recordKey?.fill(0);
+      }
     } finally {
       value.fill(0);
     }
@@ -180,20 +218,26 @@ function doors(keys: KeyDeps, record: () => string | null) {
   const open = async (by: By, body: Record<string, unknown>, hints: SessionHints): Promise<Response> => {
     const id = record();
     if (id === null) return vaultReply(UNKNOWN);
-    const opened = await ready(keys, id);
+    const opened = await ready(keys, id, by, body);
     if (!opened.ok) return vaultReply(opened);
-    const store = opened.value;
-    const { kekId } = await store.current();
-    const out = await keys.openForGrant(id, { label: text(body.label), credential: text(body.credential) }, by, hints, kekId);
-    if (!out.ok) return vaultReply(out);
-    const sealed = out.value;
-    const key = await grantKey(store, id, sealed.key, sealed.id);
-    if (!key) return vaultReply(no('WRONG_KEY', WRONG_KEY, { at: 'kek_id' }));
-    const decrypted = await openBytes(key, sealed.nonce, sealed.aad, sealed.ciphertext);
-    /* A failed decrypt says only that these bytes do not open under this key. */
-    if (decrypted === null)
-      return vaultReply(no('WRONG_KEY', 'The sealed value did not open under this host key store.', { at: 'kek_id' }));
-    return answerOpen(sealed.credential, sealed.label, decrypted as Plaintext);
+    const { store, recordKey } = opened.value;
+    try {
+      /* THE ID THE RECORD'S KEYS ARE WRAPPED UNDER, while the store still holds it, so a key opens between a rotation and
+         this record's night (`offeredId`). Behind a passphrase the record does not compare it. */
+      const kekId = await offeredId(store, await keys.wrappingKey(id));
+      const out = await keys.openForGrant(id, { label: text(body.label), credential: text(body.credential) }, by, hints, kekId);
+      if (!out.ok) return vaultReply(out);
+      const sealed = out.value;
+      const key = await grantKey(store, id, sealed.key, sealed.id, recordKey);
+      if (!key) return vaultReply(no('WRONG_KEY', WRONG_KEY, { at: 'kek_id' }));
+      const decrypted = await openBytes(key, sealed.nonce, sealed.aad, sealed.ciphertext);
+      /* A failed decrypt says only that these bytes do not open under this key. */
+      if (decrypted === null)
+        return vaultReply(no('WRONG_KEY', 'The sealed value did not open under this host key store.', { at: 'kek_id' }));
+      return answerOpen(sealed.credential, sealed.label, decrypted as Plaintext);
+    } finally {
+      recordKey?.fill(0);
+    }
   };
 
   return { deposit, open };
@@ -224,6 +268,24 @@ export function serveWorkerVault(request: Request, deps: GrantDeps): Promise<Res
         }
       : undefined,
   });
+}
+
+/**
+ * The root key the vault passphrase's two routes are answered through, inside the record's own object: `env.KEK`'s
+ * store over the record that object holds, or `null` with no store bound or no identity yet
+ * (`withVaultPassphrase` in `packages/host/src/passphrase.ts`).
+ *
+ * OPENED WHEN A STEP RUNS AND NOT BEFORE, so the store is read only for an owner the record's vault gate has already
+ * let through. A bound value that is not a key still throws, as it does at every other door, rather than reading as a
+ * host with no store.
+ */
+export function passphraseRoot(bound: KekBinding | undefined, record: () => string | null): () => Promise<RootKeys | null> {
+  return async () => {
+    const id = record();
+    if (id === null) return null;
+    const store = await keyStoreOf(bound);
+    return store === null ? null : rootKeysOf(store, id);
+  };
 }
 
 /** What the app's own key doors need: the origins this Worker answers for, the record the session names, and the keys. */

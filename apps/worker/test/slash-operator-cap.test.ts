@@ -3,7 +3,7 @@
  * findings 1, 4 and 5, the audit's probes S1, S3 and S4 carried into this suite).
  *
  * FINDING 1, SEV 1. `4e701b15` switched the included model on in both environments, so a record's asks spend the
- * operator's Workers AI. The only monthly bound was `settings.ask_cap`, which is the record owner's to type: S1 saved
+ * operator's Workers AI. The only monthly bound was `slash_settings.ask_cap`, which is the record owner's to type: S1 saved
  * `ask_cap: 1_000_000_000` through the door's engine and 200 reads all reached the binding, `{ answered: 200, runs: 200 }`.
  * The ceiling is now a Worker var, `SLASH_INCLUDED_MONTH_NEURONS`, turned into asks at the package's worst call, and the
  * Worker holds every record's engine under it: a save above it is refused, and a cap already stored above it no longer
@@ -116,7 +116,7 @@ test('S1 (2) A CAP ALREADY STORED ABOVE THE CEILING DOES NOT LET AN ASK THROUGH:
   const ai = fakeAi(PREDICATE);
   const { own, engine, done } = await withEngine(ai, TEN_ASKS);
   /* WRITTEN AS A RECORD SAVED BEFORE THIS REPAIR HOLDS IT, past the door that now refuses it. */
-  own.exec('UPDATE settings SET ask_cap = 1000000000 WHERE singleton = 1');
+  own.exec('UPDATE slash_settings SET ask_cap = 1000000000 WHERE singleton = 1');
   let answered = 0;
   for (let i = 0; i < 12; i++) if (((await engine.read(`open tasks ${i}`, OWNER)) as Refused).ok) answered++;
   /* RED: 12 and 12, the ceiling was the owner's number. */
@@ -164,14 +164,15 @@ test('S1 (4) THE VAR IS READ WHOLE OR NOT AT ALL: 0 turns the included model off
   }
 });
 
-test('S1 (5) BOTH ENVIRONMENTS DECLARE THE CEILING, at the default the Worker falls back on', async () => {
+/* 300000 SINCE `loop/finish/decisions.md` C19: about $3.30 a record a month, down from 900000 and about $9.90. */
+test('S1 (5) BOTH ENVIRONMENTS DECLARE THE CEILING, at 300000 neurons a record a month', async () => {
   const checker = '../scripts/provision-check.mjs' as string;
   const { stripJsonc } = (await import(checker)) as { stripJsonc: (text: string) => string };
   const config = JSON.parse(stripJsonc(readFileSync(fileURLToPath(new URL('../wrangler.jsonc', import.meta.url)), 'utf8'))) as {
     env: Record<string, { vars?: Record<string, unknown> }>;
   };
   for (const name of ['alpha', 'production'])
-    assert.equal(config.env[name]?.vars?.['SLASH_INCLUDED_MONTH_NEURONS'], '900000', `env.${name} does not declare the ceiling`);
+    assert.equal(config.env[name]?.vars?.['SLASH_INCLUDED_MONTH_NEURONS'], '300000', `env.${name} does not declare the ceiling`);
 });
 
 /* THE RENAME (DIRECTION 31) CARRIES THE VALUES, NOT ONLY THE NAMES. `src/slash.ts` reads `SLASH_INCLUDED` and
@@ -180,7 +181,7 @@ test('S1 (5) BOTH ENVIRONMENTS DECLARE THE CEILING, at the default the Worker fa
    suffixes rather than by the old prefix, so this file holds no name the product no longer has.
    RED BEFORE THE RENAME, MEASURED ON 25 SEPTEMBER: 10 tests, 9 pass, this one failing on `env.alpha` with the three
    model vars under the old prefix and none under `SLASH_`. */
-test('S1 (5b) BOTH ENVIRONMENTS DECLARE THE INCLUDED MODEL UNDER SLASH_ NAMES ALONE, still on and still at 900000', async () => {
+test('S1 (5b) BOTH ENVIRONMENTS DECLARE THE INCLUDED MODEL UNDER SLASH_ NAMES ALONE, still on and at 300000', async () => {
   const checker = '../scripts/provision-check.mjs' as string;
   const { stripJsonc } = (await import(checker)) as { stripJsonc: (text: string) => string };
   const config = JSON.parse(stripJsonc(readFileSync(fileURLToPath(new URL('../wrangler.jsonc', import.meta.url)), 'utf8'))) as {
@@ -194,19 +195,27 @@ test('S1 (5b) BOTH ENVIRONMENTS DECLARE THE INCLUDED MODEL UNDER SLASH_ NAMES AL
       `env.${name} declares the model under another name`,
     );
     assert.equal(vars['SLASH_INCLUDED'], 'yes', `env.${name} turned the included model off`);
-    assert.equal(vars['SLASH_INCLUDED_MONTH_NEURONS'], '900000', `env.${name} moved the ceiling`);
+    assert.equal(vars['SLASH_INCLUDED_MONTH_NEURONS'], '300000', `env.${name} moved the ceiling`);
   }
 });
 
-test('S3 (6) TIER byo ON THE INCLUDED MODEL IS PRICED, because it runs on the operator account', async () => {
+/* TIER `byo` IS NOT RUN ON THE CLOUD (`CLOUD_TIERS`), so finding 4's probe cannot be saved any more. What stands in for it is
+   a record saved on `byo` before: read as the included model, answered, and priced and counted as the included model is.
+   The name typed for `byo` is not the included model's, and before this it went to the binding's table as typed. */
+test('S3 (6) A RECORD SAVED ON byo IS READ AS THE INCLUDED MODEL ON THE CLOUD: answered, priced, counted, and byo cannot be saved again', async () => {
   const ai = fakeAi(PREDICATE);
   const { own, engine, done } = await withEngine(ai);
-  assert.ok((engine.configure({ tier: 'byo', model: 'glm-5.3-flash' }, OWNER) as Refused).ok);
+  own.exec("UPDATE slash_settings SET tier = 'byo', model = 'llama3:8b' WHERE singleton = 1");
+  assert.equal((engine.status() as { tier: string }).tier, 'a');
   assert.ok(((await engine.read('open tasks', OWNER)) as Refused).ok);
   assert.equal(ai.runs(), 1);
-  const rows = own.all<{ tier: string; neurons: number }>('SELECT tier, neurons FROM call').map((r) => ({ ...r }));
-  /* RED: `neurons: 0`. 700 in and 60 out is 12.3. */
-  assert.deepEqual(rows, [{ tier: 'byo', neurons: 12 }]);
+  const rows = own.all<{ tier: string; neurons: number }>('SELECT tier, neurons FROM slash_call').map((r) => ({ ...r }));
+  /* 700 in and 60 out is 12.3. */
+  assert.deepEqual(rows, [{ tier: 'a', neurons: 12 }]);
+  assert.equal((engine.status() as Status).asks.used, 1);
+  const saved = engine.configure({ tier: 'byo', model: 'glm-5.3-flash' }, OWNER) as Refused & { refusal?: { allowed?: unknown } };
+  assert.equal(saved.refusal?.code, 'ENUM_VALUE_UNKNOWN');
+  assert.deepEqual(saved.refusal?.allowed, ['a', 'b']);
   done();
 });
 
@@ -221,14 +230,15 @@ test('S1 (7) AN OWNER WHO LOWERS THE CAP STILL LOWERS IT: at ask_cap 3 the fourt
 
 /* ADDED BY THE CHECKER, AND RED BEFORE ITS REPAIR: `{ used: 2, cap: 10 }` with every ask refused. Where the ceiling is the
    cap `status` names, the count under it has to be the ceiling's too: the package counts tier `a` and the guard `b` and
-   `byo`, so an owner who moved from `a` to `byo` in the month was shown 2 of 10 used by a host refusing the ninth ask. */
+   `byo`, so an owner who moved from `a` to `byo` in the month was shown 2 of 10 used by a host refusing the ninth ask.
+   `byo` cannot be saved on the Cloud now (`CLOUD_TIERS`), so the move is written into the row as a record saved before
+   holds it, and the count must still be the ceiling's. */
 test('S1 (9) WHERE THE CEILING IS THE CAP STATUS NAMES, THE COUNT IS THE CEILING\'S, across a tier moved mid-month', async () => {
   const ai = fakeAi(PREDICATE);
   const { own, engine, done } = await withEngine(ai, TEN_ASKS);
-  own.exec('UPDATE settings SET ask_cap = 1000000000 WHERE singleton = 1');
+  own.exec('UPDATE slash_settings SET ask_cap = 1000000000 WHERE singleton = 1');
   for (let i = 0; i < 8; i++) await engine.read(`open tasks ${i}`, OWNER);
-  assert.ok((engine.configure({ tier: 'byo', model: 'glm-5.3-flash' }, OWNER) as Refused).ok);
-  own.exec('UPDATE settings SET ask_cap = 1000000000 WHERE singleton = 1');
+  own.exec("UPDATE slash_settings SET tier = 'byo', model = 'glm-5.3-flash', ask_cap = 1000000000 WHERE singleton = 1");
   for (let i = 0; i < 3; i++) await engine.read(`more tasks ${i}`, OWNER);
   assert.equal(ai.runs(), 10);
   const { asks } = engine.status() as Status;
@@ -246,7 +256,7 @@ test('S4 (8) ONE BINDING THROW, ONE SETTLEMENT: the read and the answer both kee
   /* STILL `UNREACHABLE`, SO THE LADDER MAY ASK AGAIN, and each rung is now an ask the caps see. */
   assert.equal(out.refusal?.code, 'UNREACHABLE');
   type Row = { model: string; tokens_in: number; tokens_out: number; neurons: number; code: string | null };
-  const sel = 'SELECT model, tokens_in, tokens_out, neurons, code FROM call';
+  const sel = 'SELECT model, tokens_in, tokens_out, neurons, code FROM slash_call';
   for (const [path, rows, sql] of [
     ['read', own.all<Row>(sel), own],
     ['answer', own2.all<Row>(sel), own2],
@@ -258,7 +268,7 @@ test('S4 (8) ONE BINDING THROW, ONE SETTLEMENT: the read and the answer both kee
     assert.equal(row.code, 'UNREACHABLE');
     assert.equal(row.tokens_out, 0);
     assert.equal(row.neurons, Math.round((row.tokens_in * 13_636) / 1e6), `the ${path} row was priced off the rule`);
-    const counted = sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM call WHERE tier = 'a' AND model <> '-'")!.n;
+    const counted = sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM slash_call WHERE tier = 'a' AND model <> '-'")!.n;
     assert.equal(counted, 1, `the ${path} row is not an ask any count reads`);
   }
   assert.equal((engine.status() as Status).asks.used, 1);

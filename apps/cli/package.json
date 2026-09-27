@@ -4,7 +4,8 @@
   "private": true,
   "license": "Apache-2.0",
   "type": "module",
-  "bin": { "braindog": "src/main.ts" },
+  "bin": { "braindog": "dist/braindog.mjs" },
+  "files": ["dist"],
   "engines": { "node": ">=24.13" },
   "devDependencies": {
     "@braindog/client": "workspace:*",
@@ -14,9 +15,11 @@
     "@braindog/mcp": "workspace:*",
     "@braindog/ports": "workspace:*",
     "@braindog/seed": "workspace:*",
-    "braindog-render": "workspace:*"
+    "braindog-render": "workspace:*",
+    "esbuild": "0.28.1"
   },
   "scripts": {
+    "build": "node scripts/bundle.mjs",
     "test": "node --test test/*.test.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   }

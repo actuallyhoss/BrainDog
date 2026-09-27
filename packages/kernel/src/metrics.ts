@@ -28,7 +28,10 @@ import { fixOf, no, ok } from '@braindog/ports';
 import { KERNEL_FIELDS, compile, jsonPath, lookupRef, parseWhere, resolveDay, type Predicate, type Schema, type SentenceDeps } from '@braindog/where';
 
 import { GROUP_CAP, bucketOf, bucketRun, bucketStart, isBucket, nextBucket, type Bucket } from './buckets.ts';
+import type { Leg } from './forecast.ts';
 import { across, convertMinor, dayFieldOf, pairParts, rateFor, rateIsStale, type Part, type Rate, type Reduce } from './fx.ts';
+/* THE TWO FIGURES THAT ARE NOT A SUM OVER ONE LIST, read in their own file, which imports this one back (it says why that is safe). */
+import { isRolled, isWalked, readRolled, readWalk } from './money-figures.ts';
 
 /** The six this build reads. The other five are `08` §2.2's and are refused by name. */
 export const AGGREGATIONS = ['sum', 'count', 'avg', 'min', 'max', 'distinct'] as const;
@@ -56,7 +59,10 @@ export type Value = Aggregation | { ratio: { of: Aggregation; per: Aggregation }
 export type MetricDecl = {
   metric: string;
   name: string;
-  /** `register.<id>`. A `series.<id>` source reads `metric_point`, which this build does not. */
+  /**
+   * `register.<id>`, or `forecast.runway` for a figure over the cash walk ahead (`money-figures.ts`). A `series.<id>`
+   * source reads `metric_point`, which this build does not.
+   */
   source: string;
   /**
    * The predicate, structured or as a sentence.
@@ -81,8 +87,30 @@ export type MetricDecl = {
    * example uses. See `yearBefore` for what the record means by a year and for what the drift cost.
    */
   compare?: 'previous' | 'year_ago' | 'none' | undefined;
-  /** `money.GBP`, `int`, `pct`, `days`. It says how to WRITE the figure, never what it is of. */
+  /**
+   * `money`, `money.GBP`, `int`, `pct`, `days`. It says how to WRITE the figure, never what it is of.
+   *
+   * `money` NAMES NO CURRENCY, AND THAT IS THE POINT OF IT. A pack cannot know the currency of the record it lands on, and
+   * `money.GBP` written by a pack author was a fact about the author: the figure is added up in the record's home
+   * currency, else in its rows' one currency, else one amount per currency, whatever the format says (`evaluateMetric`).
+   * `money.<CUR>` is still read, for the figures installed before `money` was, and its currency is still the one a
+   * literal target is set in.
+   */
   format?: string | undefined;
+  /**
+   * The walk a `forecast.runway` figure adds up: the same legs a forecast block's `from` names (`forecast.ts` `Leg`).
+   * Only on that source; `declare.ts` refuses the key anywhere else.
+   */
+  legs?: readonly Leg[] | undefined;
+  /** The figure a `days_to_zero` walk starts from, by id: what is held now. */
+  opening?: { metric: string } | undefined;
+  /**
+   * Where the figure stands among the record's Home figures, 1 to 9, lowest first; the `figures.home` page source
+   * (`pages.ts`) draws the first of them. Absent is a figure Home does not draw.
+   */
+  home?: number | undefined;
+  /** `true` offers the figure to a forecast's sell control as something that could be sold for cash. */
+  sellable?: true | undefined;
   /**
    * The factor tables this figure's `product` reads, by name: `{ per_year: { monthly: 12, yearly: 1 } }`.
    *
@@ -263,6 +291,12 @@ export type Reading = {
    * currency into this one, and `met` is read against it. Absent when there is no such rate, and then `met` is `null`.
    */
   targetIn?: TargetIn;
+  /**
+   * ON A ROLLED CASH FIGURE, THE OLDEST DAY ANY OF ITS BALANCES WAS STATED ON, which the tile says as "as of 3 Sep" so a
+   * reader knows how old the weakest part of the figure is (`money-figures.ts` `readRolled`). Absent on every other
+   * figure, and on a rolled one with nothing stated.
+   */
+  as_of?: string;
 };
 
 /** A target converted into the currency a figure was added up in: the bound, and the rate's day. */
@@ -321,6 +355,39 @@ export function targetInto(
   return { currency: into, target: 'lte' in target ? { lte: bound } : { gte: bound }, asOf: r.as_of, forward: r.forward, stale: rateIsStale(r.as_of, today.slice(0, 10)) };
 }
 
+/** Whether a format says the figure is money: `money`, or `money.<CUR>` from before a figure could leave its currency unsaid. */
+export const isMoneyFormat = (format: unknown): boolean => format === 'money' || (typeof format === 'string' && /^money\.[A-Z]{3}$/u.test(format));
+
+/**
+ * Whether a figure clears its target, and the target it was held to when that is not the one written.
+ *
+ * ONE RULE FOR EVERY KIND OF FIGURE, a sum over a list, a rolled balance or a walk (`money-figures.ts`), so a tile's
+ * verdict does not depend on which file read its number. A target is set in a currency: the one a `money.<CUR>` format
+ * declares, else the one its setting was typed in (`liveTarget` in `declare.ts` writes it there), else none, and then it
+ * is read as it is in whatever currency the figure came back in (`loop/finish/modules.md` C1). A figure in a currency
+ * other than its target's is judged against the target converted at the latest rate, and has no verdict without one.
+ *
+ * A TARGET WITH NO NUMBER TO HOLD THE FIGURE TO HAS NO VERDICT, rather than the `false` that comparing against nothing
+ * would give: every figure is judged here, so whatever leaves a target without its bound leaves the figure unjudged.
+ */
+export function verdictOf(
+  decl: Pick<MetricDecl, 'format' | 'target'>,
+  value: number | null,
+  unit: string | null,
+  rates: readonly Rate[],
+  today: string,
+): { met: boolean | null; targetIn: TargetIn | null } {
+  const target = decl.target;
+  const bound = target as { lte?: unknown; gte?: unknown } | undefined;
+  if (!target || (typeof bound?.lte !== 'number' && typeof bound?.gte !== 'number')) return { met: null, targetIn: null };
+  const declared = typeof decl.format === 'string' && decl.format.startsWith('money.') ? decl.format.slice('money.'.length) : null;
+  const from = declared ?? (decl.format === 'money' ? targetCurrency(target, null) : null);
+  const moved = from !== null && unit !== null && unit !== from;
+  const targetIn = moved && from !== null && isCurrencyUnit(unit) ? targetFor(target, from, unit, rates, today) : null;
+  const judged = moved ? targetIn?.target : target;
+  return { met: value === null || !judged ? null : meets(value, judged), targetIn };
+}
+
 const WINDOW = /^(\d{1,4})([dwm])$/;
 const DAY = 86_400_000;
 
@@ -364,8 +431,10 @@ const UNREAD = ['last', 'delta', 'median', 'group_by', 'bucket', 'running', 'tre
  * IT IS UTC BECAUSE `resolveDay` IS. Every temporal word in a predicate resolves against
  * `new Date(nowMs).toISOString()`, so an anniversary computed in any other zone would name a day the
  * predicate then resolves differently, and the two would be one day apart for part of every year.
+ *
+ * Exported for `money-figures.ts`, whose rolled figure compares with a year ago by this same rule.
  */
-const yearBefore = (nowMs: number): number => {
+export const yearBefore = (nowMs: number): number => {
   const d = new Date(nowMs);
   const year = d.getUTCFullYear() - 1;
   const month = d.getUTCMonth();
@@ -443,6 +512,12 @@ const typeOf = (schema: Schema, field: string): string | undefined =>
  */
 const isDeadline = (schema: Schema, field: string): boolean => Object.hasOwn(schema.fields, field) && schema.fields[field]!.deadline === true;
 
+/**
+ * Whether the field is one the record stamps as a row is written, `created_at` or `updated_at`, rather than a day
+ * somebody typed: `typeOf` reads it off the record's own columns because no register declares it.
+ */
+const isStamped = (schema: Schema, field: string): boolean => !Object.hasOwn(schema.fields, field) && typeOf(schema, field) === 'instant';
+
 const dayAfter = (iso: string): string => new Date(Date.parse(`${iso.slice(0, 10)}T00:00:00Z`) + DAY).toISOString().slice(0, 10);
 
 function endedAt(shifted: Predicate | undefined, current: Predicate | undefined | null, schema: Schema, thenMs: number): Predicate | undefined {
@@ -479,12 +554,19 @@ function endedAt(shifted: Predicate | undefined, current: Predicate | undefined 
      live on the day and 50,000 as of it, `due after -2d` 300,000 and 0 (the audit,
      `loop/research-batch-twenty-one-audit.md` §6). `deadline: true` is the register saying which
      kind a field is; `test/metrics-past-window.test.ts` holds both, and that a field without it
-     still ends at the day. */
+     still ends at the day.
+
+     AND ALWAYS ON `created_at` AND `updated_at`, WHEREVER THE WINDOW BEGINS. The record stamps them when a row is
+     written, so a row stamped after the as-of day was not there on it, which is the one question the first-day rule
+     above guesses at and these two answer outright. `created_at after -1d` stored as the night of the 5th begins on
+     the 5th, so under that rule it took no end and counted every row written since, the next morning's included
+     (`loop/finish/defects.md` M17). `test/metrics-live-local-day.test.ts` holds it in Tokyo, where that night ends at
+     15:00 UTC. A declared `instant` keeps the first-day rule, because nothing says who wrote it or when. */
   if (current === null) {
     const asOfDay = new Date(thenMs).toISOString().slice(0, 10);
     for (const field of [...started]) {
       const begins = startOf(clauses, field);
-      if (begins === undefined || begins >= asOfDay || isDeadline(schema, field)) started.delete(field);
+      if (begins === undefined || isDeadline(schema, field) || (begins >= asOfDay && !isStamped(schema, field))) started.delete(field);
     }
   }
   if (started.size === 0) return shifted;
@@ -672,8 +754,10 @@ export function predicateOf(
  * its own. A live read used the UTC
  * date of `nowMs`: in `Asia/Tokyo` at 00:05 on the 6th, `today` was the 5th
  * (`test/metrics-live-local-day.test.ts`).
+ *
+ * Exported for `money-figures.ts`, so a rolled figure and a walk name today exactly as every other figure does.
  */
-function clockOf(ctx: EvalContext): number {
+export function clockOf(ctx: EvalContext): number {
   if (ctx.asOfMs !== undefined) return ctx.asOfMs;
   return ctx.tz === undefined ? ctx.nowMs : Date.parse(`${localDate(ctx.nowMs, ctx.tz)}T12:00:00Z`);
 }
@@ -683,10 +767,12 @@ function clockOf(ctx: EvalContext): number {
  *
  * `endedAt` finds a window's first day with `startOf`, which takes the first ten characters of a
  * bound. Handed the instants `localInstants` writes, that is the UTC date of local midnight, the day
- * before east of UTC: in `Asia/Tokyo`, `created_at after -1d` as of the 4th read as a window beginning
- * on the 3rd, took an as-of end it should not have, and gave 1 where the bare days give 1111
- * (`test/metrics-live-local-day.test.ts`). So the metric resolves here, writes its ends, and dates the
- * instants last, which is the order `snapshot` has always read in.
+ * before east of UTC, so a window over a declared `instant` that begins on the as-of day would read as
+ * one beginning the day before and take an as-of end it should not have. It was measured on
+ * `created_at` in `Asia/Tokyo` (`test/metrics-live-local-day.test.ts`), which no longer shows it:
+ * `created_at` and `updated_at` now take the end wherever the window begins (`endedAt`,
+ * `loop/finish/defects.md` M17). So the metric resolves here, writes its ends, and dates the instants
+ * last, which is the order `snapshot` has always read in.
  */
 function resolvedOf(
   where: Predicate | string | undefined,
@@ -907,6 +993,13 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
   const shift = decl.window ? windowMs(decl.window) : null;
   if (decl.window && shift === null) at('VALUE_MALFORMED', `${decl.window} is not a window: write 30d, 4w or 3m`, 'window');
 
+  /* CASH ROLLED FORWARD AND THE WALK AHEAD ARE READ IN THEIR OWN FILE (`money-figures.ts`), after the two keys every
+     figure needs and before anything that assumes one aggregation over one list. */
+  if (isRolled(decl.value) || isWalked(decl)) {
+    if (refusals.length) return { ok: false, refusal: refusals[0]! };
+    return isWalked(decl) ? readWalk(sql, decl, ctx) : readRolled(sql, decl, ctx);
+  }
+
   const register = decl.source.startsWith('register.') ? decl.source.slice('register.'.length) : null;
   if (!register) at('SOURCE_UNKNOWN', `${decl.source} is not a register this build reads`, 'source');
   const schema = register ? ctx.schemaOf(register) : null;
@@ -1011,7 +1104,7 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
    * WHAT REPLACES IT IS NOT A LOUDER FALLBACK. A figure over rows in one currency is IN that currency
    * and says so in `unit`; the tile writes it from `unit` rather than from the format when the two
    * differ (`apps/web/src/lib/record/metrics.ts:1106`), and a target in the declared currency is
-   * converted at the latest rate or has no verdict (`targetFor` below). Two currencies with no home
+   * converted at the latest rate or has no verdict (`verdictOf`, through `targetFor`). Two currencies with no home
    * currency are parts, exactly as before, and now `into` is `null` there, which is the true answer to
    * "in which currency is this being added up": in none, because nobody has chosen one.
    */
@@ -1077,11 +1170,13 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
    *
    * a weight read as money with no refusal, where the same rows in `h` still refused. The declared
    * type of the field the figure aggregates is in scope here, and it is the only thing that knows.
+   *
+   * `money` WITH NO CURRENCY IS THE SAME CLAIM, that the figure is money, and it is held to the same check.
    */
-  if (declared && now.value.unit && !isMoneyFigure(schema, decl.value))
+  if (isMoneyFormat(decl.format) && now.value.unit && !isMoneyFigure(schema, decl.value))
     return no<Reading>(
       'MIXED_CURRENCY',
-      `${decl.metric}: the rows are in ${now.value.unit} and the format says ${declared}.`,
+      `${decl.metric}: the rows are in ${now.value.unit} and the format says ${declared ?? 'money'}.`,
       { at: 'format', allowed: [now.value.unit] },
     );
 
@@ -1133,11 +1228,7 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
   const grouped = decl.group_by === undefined ? null : groupsOf(sql, current, schema, decl, ctx, fx);
   if (grouped && !grouped.ok) return grouped;
 
-  /* A TARGET IS IN THE CURRENCY THE FIGURE DECLARES, so a figure converted into another currency is judged against the
-     target converted at the latest rate, and has no verdict when there is none. */
-  const moved = declared !== null && now.value.unit !== null && now.value.unit !== declared;
-  const targetIn = moved && decl.target && /^[A-Z]{3}$/u.test(now.value.unit!) ? targetFor(decl.target, declared, now.value.unit!, fx.rates, fx.today) : null;
-  const judged = moved ? targetIn?.target : decl.target;
+  const { met, targetIn } = verdictOf(decl, now.value.value, now.value.unit, fx.rates, fx.today);
   /* ONE MORE `count(*)` ON A TABLE THIS FIGURE HAS ALREADY COUNTED ONCE, and it is counted here
      rather than inside a scan because it is a fact about the scope and not about an aggregation:
      the comparison window, the two halves of a ratio and every group are all the same rows under a
@@ -1147,7 +1238,7 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
     held: heldBy(sql, schema, scope.predicate),
     delta,
     why,
-    met: now.value.value === null || !judged ? null : meets(now.value.value, judged),
+    met,
     ...(targetIn ? { targetIn } : {}),
     ...(grouped ? grouped.value : {}),
   });

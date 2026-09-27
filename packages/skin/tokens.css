@@ -140,7 +140,12 @@
     --sp-9: 96px;
 
     /* Softer than they were (4 / 6 / 8), which read as a spreadsheet's cells. A control or a card
-       is a thing you can pick up, and a pill is the shape of a choice or a single action. */
+       is a thing you can pick up, and a pill is the shape of a choice or a single action.
+
+       WHAT TAKES WHICH, ONCE (design D-2). `--r-pill` is everything you press or choose: a button of
+       any weight, a segmented track and its segments, a chip, an answer option, a toast.
+       `--r-md` is a field, a select, a menu and a card; `--r-lg` a sheet, a dialog and the palette;
+       `--r-sm` the focus ring and small marks. There is no fifth radius. */
     --r-sm: 6px;
     --r-md: 8px;
     --r-lg: 12px;
@@ -309,10 +314,47 @@
      * element appears it gets a token beside this one, not a tenth percentage.
      */
     --hover-wash: color-mix(in srgb, var(--ink) 6%, transparent);
-    /* THE SOFT RING ROUND A FOCUSED TEXT FIELD, outside its accent edge (a11y.css, controls.css). One
-       value, so every field in the product focuses the same way. */
-    --focus-halo: color-mix(in srgb, var(--accent) 26%, transparent);
+    /* THE SOFT RING ROUND A FOCUSED TEXT FIELD, outside its `--ink2` edge (a11y.css, controls.css). One
+       value, so every field in the product focuses the same way.
+
+       INK AND NOT THE ACCENT, AND THIS IS WHERE THE PRODUCT STOPPED READING AS A WARNING. The accent
+       is the brand's red and sits at danger's own hue, so a focused field wore a red edge and a red
+       glow before anything had been typed, which is exactly what a validation error looks like
+       (design D-1, SYS-1). Focus is a place, not a verdict. */
+    --focus-halo: color-mix(in srgb, var(--ink) 14%, transparent);
     --hold-wash: color-mix(in srgb, var(--ink) 12%, transparent);
+
+    /**
+     * THE STATE ROLES: WHAT IS ON, WHAT IS CURRENT, WHAT IS A LINK, AND THE ONE CHART SERIES.
+     *
+     * Each of these was the accent, and each for a reason that sounded right on its own: a checked
+     * switch is "on", the rail's item is "here", a link is "go". Together they put the brand's red
+     * on every control that has a state, beside the same red on an overdue dot, so nothing on a
+     * screen could say "wrong" any more (design D-1). The accent now lives on the mark, the record
+     * tile, /start, /signin and `::selection`, and these roles carry the rest in ink.
+     *
+     * `--selected` IS OPAQUE AND MIXED INTO THE GROUND, NOT A WASH OVER WHATEVER IS BEHIND IT. The
+     * generated light ladder puts `s1`, `s2` and `s3` ABOVE the page, so a selected segment drawn in
+     * `s2` was a near-white box on a near-white page and vanished (design SYS-5). Ink mixed into
+     * `--bg` darkens in light and lightens in dark by construction, so the current thing shows in
+     * both schemes whatever the generator does to the surfaces.
+     *
+     * `--on-ink` IS THE GROUND, BECAUSE THE MARK ON AN INK FILL IS A HOLE IN IT: the thumb of a
+     * checked switch, the tick in a checked box and the dot in a checked radio all read as the page
+     * showing through.
+     *
+     * `--series-1` IS THE INFO HUE AND NOT INK, because a line drawn in ink reads as text on a chart
+     * that already carries text. Chart CSS names this token and never `--info`, so the day the
+     * primary series changes it changes here (contracts §8.3, §11 X40).
+     *
+     * They sit on `:root` for the reason `--hover-wash` does: every one resolves its `var()`s against
+     * the palette on `html`, which is the element `:root` is.
+     */
+    --selected: color-mix(in srgb, var(--ink) 8%, var(--bg));
+    --on: var(--ink);
+    --on-ink: var(--bg);
+    --link: var(--ink);
+    --series-1: var(--info);
     --accent-wash: color-mix(in srgb, var(--accent) 12%, transparent);
     /* A divider between rows of one list, softer than a boundary. */
     --line-soft: color-mix(in srgb, var(--line) 60%, transparent);

@@ -30,7 +30,7 @@ import { no, ok } from '@braindog/ports';
 
 import { instant } from './migrate.ts';
 import type { Ack, OutboxRow } from './outbox.ts';
-import { FLOOR_MS, intervalMs, jitterMs } from './pull.ts';
+import { FLOOR_MS, cursorOf, intervalMs, jitterMs, keyNameOf, type PullCursor } from './pull.ts';
 import type { Drained } from './schedule.ts';
 import type { LeasedSeal } from './vault.ts';
 /* TYPES ONLY, so there is no cycle at run time: `script-run.ts` imports `meter` and `pause` from this file. */
@@ -493,7 +493,7 @@ export type PullHandoff = {
   grant: { ciphertext: string; nonce: string; kek_id: string; grant_id: string; version: number } | null;
   dek: { wrapped: string; nonce: string; kek_id: string } | null;
   record: { id: string; tz: string };
-  cursor: { watermark: string | null };
+  cursor: PullCursor;
   slot: string;
 };
 
@@ -533,18 +533,23 @@ export function prepareAction(deps: ActionDeps, job: OutboxRow): Ready | Paged |
     const why = !found || found.decl.channel !== channel
       ? `${ingest} is no longer declared, or its pack is off, so nothing was sent.`
       : `${ingest} declares no https address this runner can call, so nothing was sent.`;
-    deps.ack({ id: job.id, state: 'done', leasedUntil: job.leasedUntil });
+    /* THE SENTENCE GOES WITH THE ACK, so a run waiting on this call stops on it rather than on "no answer". */
+    deps.ack({ id: job.id, state: 'done', leasedUntil: job.leasedUntil, result: { failed: why } });
     return meter(deps, { ingest, channel, host: null, project: found?.decl.project, status: null, outcome: 'dropped', requests: 0, bytes: 0, ms: 0, failures: 0 }, why);
   }
 
   const { decl } = found;
   const host = new URL(address).host;
   /* THE KEY THE FIRE NAMED, BY ID. A key revoked between the fire and the run is a key that is gone, and
-     sending the request without it would be a request the provider answers 401 to anyway. */
-  const named = payload.grant ?? decl.grant;
+     sending the request without it would be a request the provider answers 401 to anyway.
+
+     AND WITHOUT ONE, THE DECLARATION'S, by label or id: a connector's `fetch.auth.grant` before its top-level
+     `grant` (`keyNameOf`). A connector that named its key in its auth block, as its grammar says, was handed
+     no credential here and refused by the provider on every run. */
+  const named = payload.grant ?? keyNameOf(decl);
   const key = named === undefined ? null : keyNamed(deps.sql, named);
   if (named !== undefined && !key) {
-    deps.ack({ id: job.id, state: 'done', leasedUntil: job.leasedUntil });
+    deps.ack({ id: job.id, state: 'done', leasedUntil: job.leasedUntil, result: { failed: `${ingest} did not run: the key it sends to ${host} is gone.` } });
     pause(deps, channel, ingest, `${ingest} is paused: the key it sends to ${host} is gone.`);
     return meter(deps, { ingest, channel, host, project: decl.project, status: null, outcome: 'paused', requests: 0, bytes: 0, ms: 0, failures: 1 }, `${ingest} did not run: the key it sends to ${host} is gone.`);
   }
@@ -552,10 +557,19 @@ export function prepareAction(deps: ActionDeps, job: OutboxRow): Ready | Paged |
   const row = deps.sql.one<{ payload: string }>('SELECT payload FROM schedule WHERE kind = ? AND key = ?', channel, ingest);
   let since: number | null = null;
   let watermark: string | null = null;
+  /* A CONNECTOR'S CURSOR AND SLOT, as its pages and its last finish wrote them (`keepCursor`, `finishPull`). This read
+     `since` alone, which only the single-request path writes, so every paged run was handed a watermark of nothing
+     and fetched its first window again. */
+  let held: PullCursor | null = null;
+  let slot: string | null = null;
   try {
-    const said = row ? (JSON.parse(row.payload) as { since?: unknown }).since : undefined;
+    type Kept = { since?: unknown; cursor?: unknown; slot?: unknown };
+    const kept: Kept = row ? (JSON.parse(row.payload) as Kept) : {};
+    const said = kept.since;
     since = typeof said === 'string' ? Date.parse(said) : null;
     watermark = typeof said === 'string' ? said : null;
+    held = cursorOf(kept.cursor);
+    slot = typeof kept.slot === 'string' && !Number.isNaN(Date.parse(kept.slot)) ? kept.slot : null;
   } catch {
     since = null;
   }
@@ -619,10 +633,13 @@ export function prepareAction(deps: ActionDeps, job: OutboxRow): Ready | Paged |
         grant: seal?.grant ?? null,
         dek: seal?.dek ?? null,
         record: { id: deps.recordId, tz: deps.tz },
-        /* THE WATERMARK IS WHERE THE LAST RUN GOT TO, as the schedule row wrote it. A resumed run
-           reads back exactly what it left rather than recomputing a window from the clock. */
-        cursor: { watermark },
-        slot: instant(deps.nowMs),
+        /* THE CURSOR IS WHERE THE LAST RUN GOT TO, as the schedule row holds it. A resumed run reads
+           back exactly what it left, a half-read window included, rather than recomputing one from the
+           clock. A row with no cursor yet is a first run, or one the single-request path wrote. */
+        cursor: held ?? { watermark },
+        /* AND THE SLOT THE LAST FINISH COUNTED TO, so the next is counted from the slot and not from
+           whenever this alarm happened to ring. A first run has none, and its slot is now. */
+        slot: slot ?? instant(deps.nowMs),
       },
     };
   }
@@ -729,6 +746,16 @@ export function meter(deps: Pick<ActionDeps, 'sql' | 'mint' | 'nowMs'>, usage: U
   return { event, at, ingest: usage.ingest, channel: usage.channel, scope, outcome: usage.outcome, usage: counted };
 }
 
+/** Whether a job names no row: a clock's fire, or a `call` step's in a run with none. A payload that is not JSON names none. */
+function aboutNoRow(payload: string): boolean {
+  try {
+    const said = JSON.parse(payload) as { entry?: unknown } | null;
+    return said === null || typeof said !== 'object' || said.entry === undefined;
+  } catch {
+    return true;
+  }
+}
+
 /**
  * An answer comes back, and the run is finished in one transaction.
  *
@@ -738,7 +765,10 @@ export function meter(deps: Pick<ActionDeps, 'sql' | 'mint' | 'nowMs'>, usage: U
  *
  * 2XX IS A RUN. A `poll` compares the hash of the answer with the last one it kept and hands the answer to
  * the ingest pipeline only when it differs, so its rule fires on a change and on nothing else; the first
- * answer is a change. A `pull` hands every answer on. A `call` keeps nothing of the answer.
+ * answer is a change. A `pull` hands every answer on. A `call` about no row hands it on too, where it declares `writes`
+ * and an `extract` or a `map`; a call about a row keeps nothing of it. Either way the answer goes with the ack to the
+ * run a `call` step parked on it, if one did, and every other ack of a job carries the sentence it stopped on, for the
+ * same run.
  *
  * 429, 5XX, A TIMEOUT AND THE NETWORK WALK THE LADDER, by acking the job `failed`: the outbox's backoff,
  * doubling minutes, and at the eighth failure a dead letter a person sees. Every rung is an event.
@@ -757,7 +787,7 @@ export function finishAction(deps: ActionDeps, ready: Ready, answer: ActionAnswe
      if it was already due later), and the event carries the host's one sentence. It is not paused, so nobody
      has to resume it: it runs again on its own when the month turns. */
   if ('held' in answer && answer.held !== undefined) {
-    deps.ack({ id: job.id, state: 'done', leasedUntil: job.leasedUntil });
+    deps.ack({ id: job.id, state: 'done', leasedUntil: job.leasedUntil, result: { failed: answer.held.say } });
     deps.sql.exec(
       "UPDATE schedule SET due_at = MAX(due_at, ?) WHERE kind = ? AND key = ? AND state = 'pending'",
       instant(answer.held.until),
@@ -771,19 +801,21 @@ export function finishAction(deps: ActionDeps, ready: Ready, answer: ActionAnswe
   const status = 'status' in answer ? answer.status : null;
 
   if (status === 401 || status === 403) {
-    deps.ack({ id: job.id, state: 'done', leasedUntil: job.leasedUntil });
+    const said = `${ingest} stopped: ${host} answered ${status} to the key "${request.grant?.label ?? 'none'}". It will not retry until somebody resumes it.`;
+    deps.ack({ id: job.id, state: 'done', leasedUntil: job.leasedUntil, result: { failed: said } });
     if (request.grant) deps.sql.exec('UPDATE grant SET stale_at = ? WHERE id = ?', instant(deps.nowMs), request.grant.id);
     pause(deps, channel, ingest, `${ingest} is paused: ${host} refused the key "${request.grant?.label ?? 'none'}" with ${status}.`);
-    return meter(deps, { ...base, status, outcome: 'paused', failures: 1 }, `${ingest} stopped: ${host} answered ${status} to the key "${request.grant?.label ?? 'none'}". It will not retry until somebody resumes it.`);
+    return meter(deps, { ...base, status, outcome: 'paused', failures: 1 }, said);
   }
 
   /* THE HOST COULD NOT OPEN THE KEY: it holds no key store yet, or the key does not open on it. Nothing was sent,
      and the next interval would send nothing again, so the action pauses the way a refused key does, with the
      executor's sentence. The key is NOT marked stale, because no provider ever saw it. */
   if ('refused' in answer && answer.refused.code === 'WRONG_KEY') {
-    deps.ack({ id: job.id, state: 'done', leasedUntil: job.leasedUntil });
+    const said = `${ingest} stopped. ${answer.refused.fix} It will not retry until somebody resumes it.`;
+    deps.ack({ id: job.id, state: 'done', leasedUntil: job.leasedUntil, result: { failed: said } });
     pause(deps, channel, ingest, `${ingest} is paused. ${answer.refused.fix}`);
-    return meter(deps, { ...base, status: null, outcome: 'paused', failures: 1 }, `${ingest} stopped. ${answer.refused.fix} It will not retry until somebody resumes it.`);
+    return meter(deps, { ...base, status: null, outcome: 'paused', failures: 1 }, said);
   }
 
   if (status !== null && status >= 200 && status < 300 && 'body' in answer) {
@@ -794,7 +826,11 @@ export function finishAction(deps: ActionDeps, ready: Ready, answer: ActionAnswe
     } catch {
       kept = {};
     }
-    const changed = channel === 'poll' ? kept.seen !== hash : channel === 'pull';
+    /* A CALL ABOUT NO ROW KEEPS ITS ANSWER WHERE ITS DECLARATION SAYS: one its clock fired, or one a `call` step made in
+       a run that has no row (`loop/finish/contracts.md` §4.1). Such a call is a read of somebody's service, a rate or a
+       balance, and with `writes` and a `map` it lands as a pull's answer does. A call about a row is a post of that row,
+       and its answer lands nowhere but in the run that waits on it. */
+    const changed = channel === 'poll' ? kept.seen !== hash : channel === 'pull' || (channel === 'call' && aboutNoRow(job.payload));
     let outcome: Usage['outcome'] = channel === 'poll' ? (changed ? 'changed' : 'unchanged') : 'ok';
     let say = channel === 'poll'
       ? changed ? `${ingest} polled ${host}, and the answer changed.` : `${ingest} polled ${host}, and the answer is the same.`
@@ -802,8 +838,9 @@ export function finishAction(deps: ActionDeps, ready: Ready, answer: ActionAnswe
 
     if (changed && decl.writes?.register !== undefined && (decl.extract !== undefined || decl.map !== undefined)) {
       /* A POLL'S ARRIVALS ARE KEYED BY RUN, so an answer that goes A, B and back to A is three changes and
-         not a redelivery of the first. A PULL'S ARE KEYED BY CONTENT, so the same page twice is one row. */
-      const sha = channel === 'poll' ? `${ingest}:${hash}:${job.id}` : `${ingest}:${hash}`;
+         not a redelivery of the first. A PULL'S ARE KEYED BY CONTENT, so the same page twice is one row. A CALL'S BY RUN,
+         as a poll's: the same rate on two days is two readings. */
+      const sha = channel === 'poll' || channel === 'call' ? `${ingest}:${hash}:${job.id}` : `${ingest}:${hash}`;
       /* ONE ANSWER, SEVERAL ROWS: a poll whose map is a list hands the same answer in once a map, so three numbers at
          one address cost one request. Each arrival is its own, keyed by its place in the list. */
       const arrivals = Array.isArray(decl.map)
@@ -822,7 +859,9 @@ export function finishAction(deps: ActionDeps, ready: Ready, answer: ActionAnswe
         JSON.stringify({ ...kept, since: instant(deps.nowMs), ...(channel === 'poll' ? { seen: hash } : {}) }),
         row.id,
       );
-    deps.ack({ id: job.id, state: 'done', leasedUntil: job.leasedUntil });
+    /* A CALL'S ANSWER GOES BACK WITH ITS ACK, whole, and the outbox hands it to a run that waits on it (`outbox.ts`'s
+       `ack`); the run holds it to `VAR_BYTES` there. A call no step waits on keeps nothing of it, as it always has. */
+    deps.ack({ id: job.id, state: 'done', leasedUntil: job.leasedUntil, ...(channel === 'call' ? { result: { answer: answer.body } } : {}) });
     return meter(deps, { ...base, status, outcome, failures: outcome === 'refused' ? 1 : 0 }, say);
   }
 
@@ -840,8 +879,9 @@ export function finishAction(deps: ActionDeps, ready: Ready, answer: ActionAnswe
     return meter(deps, { ...base, status, outcome: 'failed', failures: 1 }, `${ingest} failed and will try again later. ${why}`);
   }
 
-  deps.ack({ id: job.id, state: 'done', leasedUntil: job.leasedUntil });
-  return meter(deps, { ...base, status, outcome: 'refused', failures: 1 }, `${ingest} was not retried. ${why}`);
+  const said = `${ingest} was not retried. ${why}`;
+  deps.ack({ id: job.id, state: 'done', leasedUntil: job.leasedUntil, result: { failed: said } });
+  return meter(deps, { ...base, status, outcome: 'refused', failures: 1 }, said);
 }
 
 /* ── the pass ───────────────────────────────────────────────────────────── */
@@ -1507,36 +1547,48 @@ export type CallQueued = {
   /** `unknown` is an action a rule may not run; `paused` is one waiting on somebody to resume it. */
   outcome: 'queued' | 'held' | 'paused' | 'unknown';
   say: string;
+  /** The outbox job queued, where one was: what a `call` step's run waits on (`flow.ts`). */
+  job?: string;
 };
 
 /**
- * A rule fired on a row and says `run: <ingest>`: queue one call, carrying only the fields its `sends:` names.
+ * A rule fired on a row and says `run: <ingest>`, or a run reached a `call` step: queue one call, carrying only the
+ * fields its `sends:` names.
  *
  * THE RECORD COPIES THE FIELDS HERE, when the rule fires, so the runner never reads the record. A field whose type is a
  * secret or a file is never copied, whatever the declaration says, because the install lint is one check and this is
  * the second.
  *
- * AT MOST `RULE_CALLS_PER_DAY` A DAY PER ACTION. A bulk change, such as five thousand invoices marked paid, becomes a
- * hundred calls and a held sentence, not five thousand posts. A held call is metered as held, which is not a failure,
- * and the owner is told once that day.
+ * AT MOST `RULE_CALLS_PER_DAY` A DAY PER ACTION, counted over both doors in: a `run:` about a row and a run's `call`
+ * step alike. A bulk change, such as five thousand invoices marked paid, becomes a hundred calls and a held sentence,
+ * not five thousand posts. A held call is metered as held, which is not a failure, and the owner is told once that day.
+ *
+ * A `call` STEP HANDS `run` (`flow.ts`), AND THE JOB CARRIES IT, so the answer finds its way back: `finishAction` acks the
+ * job with the answer or the sentence it stopped on, and the outbox's `ack` hands either to the run waiting on it. Such
+ * a step may have no row, when the call sends none (the price GET of `07 §6.2`), and then nothing of any row goes.
  */
 export function queueCall(
   deps: ActionDeps,
   fired: {
     ingest: string;
     rule: string;
-    entry: { id: string; register: string; seq: number | null; fields: Record<string, unknown> };
+    entry: { id: string; register: string; seq: number | null; fields: Record<string, unknown> } | null;
     typeOf: (field: string) => string | undefined;
+    run?: { run: string; step: number } | undefined;
   },
 ): CallQueued {
   const { ingest, rule, entry } = fired;
-  const spoken = entry.seq === null ? entry.id : `${entry.register}#${entry.seq}`;
+  const spoken = entry === null ? 'this run' : entry.seq === null ? entry.id : `${entry.register}#${entry.seq}`;
   const found = deps.lookup(ingest);
   if (!found || found.decl.channel !== 'call' || (found.decl.trigger !== 'rule' && found.decl.trigger !== 'both'))
     return { ingest, outcome: 'unknown', say: `${rule} runs ${ingest}, which is not a call a rule may run, so nothing was sent for ${spoken}.` };
   const { decl } = found;
   const address = addressOf(decl);
   const host = address && originOf(address) ? new URL(address).host : null;
+  /* A CALL THAT SENDS FIELDS OF A ROW IS NOT SENT FROM A RUN THAT HAS NONE. The lint refuses such a step on a clock, a
+     button or a figure at install (`flow-lint.ts`); this is the second line, for an arrival that wrote no row. */
+  if (entry === null && (decl.sends ?? []).length > 0)
+    return { ingest, outcome: 'unknown', say: `rule.${rule} calls ${ingest}, which sends fields of a row, and this run has no row, so nothing was sent.` };
 
   const state = deps.sql.one<{ state: string }>("SELECT state FROM schedule WHERE kind = 'call' AND key = ?", ingest)?.state;
   if (state === 'paused')
@@ -1549,10 +1601,12 @@ export function queueCall(
   }
 
   const day = instant(deps.nowMs).slice(0, 10);
+  /* A RULE'S CALL IS ONE THAT NAMES A ROW OR A RUN. A scheduled fire carries neither, so the clock's own turns are never
+     counted against what rules may start. */
   const today =
     deps.sql.one<{ n: number }>(
       `SELECT COUNT(*) AS n FROM outbox WHERE kind = 'pull.fetch' AND created >= ?
-       AND json_extract(payload, '$.ingest') = ? AND json_extract(payload, '$.entry') IS NOT NULL`,
+       AND json_extract(payload, '$.ingest') = ? AND (json_extract(payload, '$.entry') IS NOT NULL OR json_extract(payload, '$.run') IS NOT NULL)`,
       day,
       ingest,
     )?.n ?? 0;
@@ -1563,7 +1617,10 @@ export function queueCall(
       target,
       day,
     );
-    const say = `${ingest} did not send ${spoken}: it has made its ${RULE_CALLS_PER_DAY} calls from rules today. That row will not be sent later; rules can start it again tomorrow.`;
+    const say =
+      entry === null
+        ? `${ingest} was not called for rule.${rule}: it has made its ${RULE_CALLS_PER_DAY} calls from rules today. This run's call will not be made later; rules can start it again tomorrow.`
+        : `${ingest} did not send ${spoken}: it has made its ${RULE_CALLS_PER_DAY} calls from rules today. That row will not be sent later; rules can start it again tomorrow.`;
     meter(deps, { ingest, channel: 'call', host, project: decl.project, status: null, outcome: 'held', requests: 0, bytes: 0, ms: 0, failures: 0 }, say);
     if (!told)
       deps.notify({
@@ -1572,6 +1629,14 @@ export function queueCall(
         because: `A call a rule runs is sent at most ${RULE_CALLS_PER_DAY} times a day, so a change to many rows cannot become that many posts.`,
       });
     return { ingest, outcome: 'held', say };
+  }
+
+  /* THE RUN WAITING ON THE ANSWER, WHERE A STEP ASKED FOR ONE. Nothing else of the run goes in the job: the answer is
+     handed back by id (`outbox.ts`'s `ack`), and what the run holds stays in its row. */
+  const waiting = fired.run === undefined ? {} : { run: fired.run.run, step: fired.run.step };
+  if (entry === null) {
+    const job = deps.enqueue({ channel: 'call', ingest, grant: key.id, rule, ...waiting });
+    return { ingest, outcome: 'queued', say: `rule.${rule} queued ${ingest}.`, job };
   }
 
   /* AND A FIELD HOLDING WHAT A SECRET OR A FILE FIELD OF THE SAME ROW HOLDS IS LEFT OUT THE SAME WAY, whatever its own
@@ -1682,8 +1747,8 @@ export function queueCall(
     if (carried.has(field) || holds(entry.fields[field])) continue;
     row[field] = entry.fields[field] ?? null;
   }
-  deps.enqueue({ channel: 'call', ingest, grant: key.id, rule, entry: entry.id, row });
-  return { ingest, outcome: 'queued', say: `${rule} queued ${ingest} for ${spoken}.` };
+  const job = deps.enqueue({ channel: 'call', ingest, grant: key.id, rule, entry: entry.id, row, ...waiting });
+  return { ingest, outcome: 'queued', say: `${rule} queued ${ingest} for ${spoken}.`, job };
 }
 
 /** Every origin the active scheduled actions name. The self-host sends to these and to nothing else. */

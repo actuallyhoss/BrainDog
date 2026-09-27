@@ -34,6 +34,7 @@ import type { webcrypto } from 'node:crypto';
 import { chmodSync, existsSync, linkSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 
 import { deriveSessionKey } from '@braindog/host/auth';
+import type { RecordWrapping, RootKeys } from '@braindog/host';
 
 /** What a record stores about one wrapped key. The kernel writes it and never reads inside it. */
 export type WrappedKey = {
@@ -79,7 +80,17 @@ const SEP = 0x1f;
  */
 function keyBytes(file: string, say: (line: string) => void): Uint8Array {
   if (!existsSync(file)) mint(file);
+  return heldBytes(file, say);
+}
 
+/**
+ * The bytes of a key file that already exists, checked as the key file is: a regular file, `0600`, 32 bytes.
+ *
+ * ITS OWN FUNCTION BECAUSE THE PREVIOUS KEY FILE IS NEVER MADE. `keyBytes` mints a missing key, which is right for the
+ * current one on first run and would be wrong for `<file>.prev`: a previous key nobody put there is a key that wraps
+ * nothing, and minting one would put a second root key on the disk for no row to use.
+ */
+function heldBytes(file: string, say: (line: string) => void): Uint8Array {
   /* STAT BEFORE READ, AND IT MUST BE A FILE. `readFileSync` on a FIFO blocks for ever — `init`
      hangs with no output, no timeout and no sentence, which is the one failure mode worse than a
      refusal. A directory throws `EISDIR` from three frames down. Both are one `isFile()` away. */
@@ -184,39 +195,83 @@ async function fingerprint(raw: Uint8Array): Promise<string> {
     .slice(0, 18);
 }
 
+/** Where the previous key sits during a rotation: beside the key file, with `.prev` after its name (`53 §5.6` step 8). */
+export const previousOf = (file: string): string => `${file}.prev`;
+
 /**
- * The host's key store, over one file.
+ * The host's key store, over the key file and, during a rotation, the previous one beside it.
  *
- * `byId` KNOWS ONE ID, and that is the honest state rather than a limitation hidden behind an
- * interface: `49 §10` says rotation is a second file and a `kek_id → file` map, and neither exists.
- * A `byId` that answered for any id would be a store claiming to hold keys it does not have.
+ * `byId` KNOWS THE IDS OF THE FILES THAT ARE THERE AND NO OTHER. A rotation puts the new key in the key file and the
+ * old one in `<file>.prev` (`loop/finish/contracts.md` §9): `current` then wraps under the new key, `byId` still opens
+ * every row wrapped under the old, and `rewrapAtStart` (`rewrap.ts`) moves the record's rows across as the process
+ * starts. A row wrapped under a key neither file holds answers `WRONG_KEY`, because a `byId` that answered for any id
+ * would be a store claiming to hold keys it does not have.
  */
 export async function openKeyStore(file: string, say: (line: string) => void = () => {}): Promise<KeyStore & { sessionKey: Uint8Array }> {
   const root = keyBytes(file, say);
-  const kekId = await fingerprint(root);
-  const key = await crypto.subtle.importKey('raw', root, 'AES-GCM', false, ['encrypt', 'decrypt']);
-  /* THE SESSION KEY IS DERIVED HERE, from the root before it goes: HKDF-SHA-256, info `braindog/session`.
-     It is what the Directory takes every session and link MAC under, so replacing the key file signs
-     everybody out, which is `12 §8`'s lever. `serve` hands it to the Directory once and zero-fills it. */
-  const sessionKey = await deriveSessionKey(root);
+  const prevFile = previousOf(file);
+  let prev: Uint8Array | null = null;
+  try {
+    /* NEVER MINTED, and checked as the key file is: a previous key that is group-readable is the same leak. */
+    prev = existsSync(prevFile) ? heldBytes(prevFile, say) : null;
+    const kekId = await fingerprint(root);
+    const key = await crypto.subtle.importKey('raw', root, 'AES-GCM', false, ['encrypt', 'decrypt']);
+    /* THE SESSION KEY IS DERIVED HERE, from the root before it goes: HKDF-SHA-256, info `braindog/session`.
+       It is what the Directory takes every session and link MAC under, so replacing the key file signs
+       everybody out, which is `12 §8`'s lever. `serve` hands it to the Directory once and zero-fills it. */
+    const sessionKey = await deriveSessionKey(root);
 
-  /* AND THE ROOT BYTES GO. `49 §8`: read once, used once, zero-filled. The imported `CryptoKey` is
-     not extractable, so what is left is a handle rather than a key.
-   *
-   * `k_code` AND `k_share` ARE NOT DERIVED HERE, and that is a decision rather than an omission.
-   * `49 §4.4` derives both by HKDF-SHA-256 over this root with the info strings
-   * `braindog/device-code` and `braindog/share`, and NOTHING IN THIS REPOSITORY SIGNS A DEVICE CODE
-   * OR A SHARE TOKEN: `/auth/device/*` and `/s/<token>` are unbuilt. They were derived, held for the
-   * life of the store, and read by nothing but their own test — which is the failure this codebase
-   * keeps finding, performed on key material. Two lines the day either route exists. The session key
-   * is derived above because sign-in reads it. */
-  root.fill(0);
+    /* THE PREVIOUS KEY OPENS AND NEVER WRAPS, so it is imported and nothing is derived from it. The same key in both
+       files is the moment in the runbook where both slots hold it, and it adds nothing to hold it twice. */
+    const prevId = prev === null ? null : await fingerprint(prev);
+    const before =
+      prev === null || prevId === null || prevId === kekId
+        ? null
+        : { kekId: prevId, key: await crypto.subtle.importKey('raw', prev, 'AES-GCM', false, ['encrypt', 'decrypt']) };
 
-  return {
-    current: () => Promise.resolve({ kekId, key }),
-    byId: (id) => Promise.resolve(id === kekId ? key : null),
-    sessionKey,
-  };
+    /* A ROTATION SIGNS EVERYBODY OUT, and the boot says so (`loop/research-w61.md` §1 item 10): the session key above
+       comes from the new key file, so every session made under the old one no longer verifies, unless
+       `BRAINDOG_SESSION_SECRET` is set, which `main.ts` then derives the Directory's key from in its place. */
+    if (before !== null)
+      say(
+        `  ${prevFile} holds the previous key: a record wrapped under it still opens, and serving one re-wraps it under ${file}. Keep ${prevFile} while a backup made before the change may be restored. A new key file signs everybody out unless BRAINDOG_SESSION_SECRET is set.`,
+      );
+
+    return {
+      current: () => Promise.resolve({ kekId, key }),
+      byId: (id) => Promise.resolve(id === kekId ? key : before !== null && id === before.kekId ? before.key : null),
+      sessionKey,
+    };
+  } finally {
+    /* AND THE ROOT BYTES GO. `49 §8`: read once, used once, zero-filled. The imported `CryptoKey` is
+       not extractable, so what is left is a handle rather than a key. In `finally`, so a previous key
+       file that refuses does not leave the current key's bytes behind it.
+     *
+     * `k_code` AND `k_share` ARE NOT DERIVED HERE, and that is a decision rather than an omission.
+     * `49 §4.4` derives both by HKDF-SHA-256 over this root with the info strings
+     * `braindog/device-code` and `braindog/share`, and NOTHING IN THIS REPOSITORY SIGNS A DEVICE CODE
+     * OR A SHARE TOKEN: `/auth/device/*` and `/s/<token>` are unbuilt. They were derived, held for the
+     * life of the store, and read by nothing but their own test, which is the failure this codebase
+     * keeps finding, performed on key material. Two lines the day either route exists. The session key
+     * is derived above because sign-in reads it. */
+    root.fill(0);
+    prev?.fill(0);
+  }
+}
+
+/**
+ * The key id to offer a record's `openGrant` and `openForGrant`: the one its `vault_key` rows are wrapped under while
+ * this store holds it, and the current one otherwise.
+ *
+ * WHY NOT ALWAYS THE CURRENT ONE. The record refuses `WRONG_KEY` when the id offered is not the id its rows name
+ * (`packages/kernel/src/vault.ts`, `openGrant`), and between a new key file and the re-wrap every stored credential
+ * would refuse although `byId` could open them all (`loop/research-w61.md` §1 item 8). The same function as the
+ * Worker's, over this host's store. A record wrapped under a key neither file holds is offered the current id, so its
+ * refusal names both.
+ */
+export async function offeredId(store: KeyStore, wrapping: string | null): Promise<string> {
+  if (wrapping !== null && (await store.byId(wrapping)) !== null) return wrapping;
+  return (await store.current()).kekId;
 }
 
 /** `utf8(record_id) ‖ 0x1F ‖ utf8(purpose)` — `12 §6`, `47 §4.6`. */
@@ -265,6 +320,35 @@ export async function unwrap(store: KeyStore, record: string, purpose: Purpose, 
   } catch {
     return null;
   }
+}
+
+/**
+ * This store over one record, as the vault passphrase's steps take it (`RootKeys` in `packages/host/src/passphrase.ts`).
+ * The same function as the Worker's, over this host's store.
+ *
+ * `open` OPENS ONLY A KEY THE ROOT KEY WRAPPED. A record key behind a passphrase names no root key, and this store has
+ * nothing to open it with, which is the point of the passphrase. `close` wraps under `under`, the root key the record's
+ * other keys are under, while a key file still holds it, and under the current one otherwise, so taking a passphrase off
+ * between a new key file and the re-wrap at start leaves the record naming one root key and not two.
+ */
+export function rootKeysOf(store: KeyStore, record: string): RootKeys {
+  return {
+    record,
+    open: (held: RecordWrapping) =>
+      held.wrapped_by !== 'kek' || held.kek_id === null
+        ? Promise.resolve(null)
+        : unwrap(store, record, 'record', { wrapped: held.wrapped, nonce: held.nonce, kek_id: held.kek_id, wrapped_by: 'kek' }),
+    close: async (recordKey, under) => {
+      const held = under === null ? null : await store.byId(under);
+      if (under === null || held === null) {
+        const fresh = await wrap(store, record, 'record', recordKey);
+        return { wrapped: fresh.wrapped, nonce: fresh.nonce, kek_id: fresh.kek_id };
+      }
+      const nonce = new Uint8Array(randomBytes(NONCE_BYTES));
+      const sealed = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce, additionalData: aad(record, 'record') }, held, recordKey);
+      return { wrapped: new Uint8Array(sealed), nonce, kek_id: under };
+    },
+  };
 }
 
 /**

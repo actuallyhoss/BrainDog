@@ -11,9 +11,10 @@
  * comes after 5). It is the difference between a meter that says "a call happened" and an audit
  * that says what came of it: `status` and `code` are the outcome, not the transport.
  *
- * WHAT NEVER REACHES A ROW: a row of the record, a field value, a prompt, a key. `call.read` holds
- * the register, a count and the predicate, which is what `23 §6`'s fold shows a person, and
- * `12 §8` is the rule it is keeping.
+ * WHAT NEVER REACHES A ROW: a row of the record, a field value, a prompt, a key. `slash_call.read`
+ * holds the register, a count and the predicate, which is what `23 §6`'s fold shows a person, and
+ * `12 §8` is the rule it is keeping. What a person typed does reach one, in `question`, and
+ * `eraseSlash` (`erase.ts`) is how it leaves again.
  */
 
 import { no, ok, type Clock, type Result, type Sql } from '@braindog/ports';
@@ -21,6 +22,9 @@ import { no, ok, type Clock, type Result, type Sql } from '@braindog/ports';
 import { PROMPTS, MODELS, fill, type ModelId, type PromptId } from './prompts.ts';
 import { checkSchema, isRecord, tokens } from './project.ts';
 import type { Inference, ReadTrace, Settings, Tier } from './types.ts';
+
+/** Every tier the `slash_settings` CHECK admits, and the ones a host answers unless it says fewer (`SlashOptions.tiers`). */
+export const TIERS: readonly Tier[] = ['a', 'b', 'byo'];
 
 /** The seven kinds a `call` row may carry, as the `46 §4.1` CHECK spells them. Three have callers here. */
 export type CallKind = 'read' | 'propose' | 'triage' | 'pattern' | 'prose' | 'embed' | 'change';
@@ -86,13 +90,16 @@ export type Core = {
   monthStart(): string;
   /** The first instant of the next month, which is the sentence `SLASH_BUDGET_SPENT` ends on. */
   resets(): string;
-  /** `SELECT COUNT(*)` on `call_meter`: tier `a` reads and proposals this month that called a model. */
+  /** `SELECT COUNT(*)` on `slash_call_meter`: tier `a` reads and proposals this month that called a model. */
   asksUsed(): number;
   /** Hold one ask on the meter before its model is called; see `reserve` below. Returns the row id to settle. */
   reserve(kind: 'read' | 'propose', tier: Tier, model: string): string;
   /** Give a held ask back when no model was called. A row already settled by `account` is left alone. */
   release(id: string): void;
-  /** Write the row, or settle a held one: the same id replaces the hold. */
+  /**
+   * Write the row, or settle one this ledger minted: a hold from `reserve`, or an id from `mint` settled once already.
+   * A row already held under an id this ledger did not mint is refused with a throw and never replaced.
+   */
   account(row: AccountRow): void;
   run(args: RunArgs): Promise<Ran>;
 };
@@ -123,9 +130,27 @@ export const ulid = (ms: number): string => {
   return time + tail;
 };
 
-/** The `46 §4.1` schema. Two tables, and `PRAGMA user_version` in place of a migration table (`46 §10`). */
+/**
+ * The store's version, kept in the `slash_meta` row and never in `PRAGMA user_version`.
+ *
+ * THE ROW AND NOT THE PRAGMA, because a Durable Object's authorizer refuses the pragma (`SQLITE_AUTH`, measured in workerd
+ * on 22 September, `apps/worker/test/slash-in-do.test.ts`), so on the Worker it would read 0 for ever and a change keyed
+ * on it would run on every build. `dir_meta` carries the directory's version the same way (`packages/record/src/directory.ts`).
+ *
+ * 1 WAS THE TWO TABLES `46 §4.1` NAMED `settings` AND `call`, with no version anywhere. 2 is the same columns under
+ * Slash's own names, `slash_settings` and `slash_call`, with this row beside them: on the Worker they share the record's
+ * own SQLite, where a bare `settings` and `call` read as the record's. The next change to a column raises this number and
+ * adds its step to `openStore`.
+ */
+export const STORE_VERSION = 2;
+
+/** The store as a new one is built: the version row's table, the settings singleton and the ledger, all `IF NOT EXISTS`. */
 export const DDL: readonly string[] = [
-  `CREATE TABLE IF NOT EXISTS settings (
+  `CREATE TABLE IF NOT EXISTS slash_meta (
+     key   TEXT PRIMARY KEY,
+     value TEXT NOT NULL
+   )`,
+  `CREATE TABLE IF NOT EXISTS slash_settings (
      singleton  INTEGER PRIMARY KEY CHECK (singleton = 1),
      tier       TEXT NOT NULL DEFAULT 'a' CHECK (tier IN ('a','b','byo')),
      model      TEXT,
@@ -133,7 +158,7 @@ export const DDL: readonly string[] = [
      ask_cap    INTEGER NOT NULL DEFAULT 80,
      updated_at TEXT NOT NULL
    )`,
-  `CREATE TABLE IF NOT EXISTS call (
+  `CREATE TABLE IF NOT EXISTS slash_call (
      id         TEXT PRIMARY KEY,
      ts         TEXT NOT NULL,
      kind       TEXT NOT NULL CHECK (kind IN ('read','propose','triage','pattern','prose','embed','change')),
@@ -150,19 +175,78 @@ export const DDL: readonly string[] = [
      read       TEXT NOT NULL DEFAULT '[]',
      filed      TEXT
    )`,
-  'CREATE INDEX IF NOT EXISTS call_meter ON call(tier, kind, ts)',
-  /* THE ASSISTANT WAS CALLED SPARK UNTIL `loop/DIRECTION.md` SECTION 31, and a ledger written before then holds its two
-     codes under that name: a hold in flight, which `release` finds by its code and would never have found, so it stayed
-     counted against the month, and a refused ask, which is history. This package keeps no migration table and cannot
-     keep `user_version` on a Durable Object (`createSlash`), so the rename is one statement run with the tables on every
-     build (`test/storage.test.ts`).
-     THE PARTIAL INDEX IS WHAT MAKES "EVERY BUILD" CHEAP, because both hosts build a Slash per request. Without it the
-     statement scanned the whole ledger each time: 3.7 milliseconds at the median over 10,000 `call` rows, measured on 25
-     September 2026 over the test port. With it the planner searches the index, which holds only rows bearing an old
-     code and is empty once they are renamed, so no write pays for it: 0.04 milliseconds for both statements together. */
-  "CREATE INDEX IF NOT EXISTS call_old_code ON call(code) WHERE code IN ('SPARK_PENDING', 'SPARK_BUDGET_SPENT')",
-  "UPDATE call SET code = 'SLASH' || substr(code, 6) WHERE code IN ('SPARK_PENDING', 'SPARK_BUDGET_SPENT')",
+  'CREATE INDEX IF NOT EXISTS slash_call_meter ON slash_call(tier, kind, ts)',
 ];
+
+/** The ledger's columns, named once so a carried row lands column for column. */
+const CALL_COLUMNS = 'id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status, code, question, predicate, read, filed';
+
+/**
+ * What version 1 left that version 2 does not keep: its two index names, and the two codes the ledger wrote while the
+ * assistant was called Spark.
+ *
+ * THE CODES ARE RENAMED HERE, ONCE, and no longer on every build. A ledger written before `loop/DIRECTION.md` section 31
+ * holds a hold in flight as `SPARK_PENDING`, which `release` finds by its code and would never have found, so it stayed
+ * counted against the month, and a refused ask as `SPARK_BUDGET_SPENT`, which is history. Version 1 ran the rename with the
+ * tables on every build, over a partial index kept so that it cost nothing; with a version row the step runs once, reads
+ * the ledger once, and neither the statement nor its index is needed after it.
+ */
+const FROM_1: readonly string[] = [
+  'DROP INDEX IF EXISTS call_meter',
+  'DROP INDEX IF EXISTS call_old_code',
+  "UPDATE slash_call SET code = 'SLASH' || substr(code, 6) WHERE code IN ('SPARK_PENDING', 'SPARK_BUDGET_SPENT')",
+];
+
+/** Every name the store's tables have had, version 1's first, as `sqlite_master` spells them. */
+const NAMES = ['settings', 'call', 'slash_meta', 'slash_settings', 'slash_call'] as const;
+
+/**
+ * Bring Slash's store to `STORE_VERSION`, on every build, idempotently.
+ *
+ * THE COMMON PATH IS TWO READS AND NO WRITE: which of the names exist, and the version row. Only a store that is not yet
+ * at this version, or that holds a table under an old name, opens a transaction. A version above this build's is a store
+ * a newer build wrote, and it is refused rather than read, as the directory refuses one: `IF NOT EXISTS` over a newer
+ * shape runs silently, and the first ask would read columns this build does not know the meaning of.
+ *
+ * VERSION 1 IS RENAMED IN PLACE. `ALTER TABLE ... RENAME TO` keeps every row, every column and the `CHECK` lists, which is
+ * the whole of what an owner has: the tier and cap they chose, and the month's count of asks.
+ *
+ * AND BOTH NAMES AT ONCE IS A ROLLBACK, carried and not refused. A build older than this one, deployed after it had
+ * renamed the tables, creates `settings` and `call` again and meters into them. The ledger's rows are the count of what
+ * was spent, so they are carried into `slash_call` and the old table dropped. The settings row is not carried: the old
+ * build's singleton is the default it inserted on its first ask, not a choice, and copying it over would put the owner's
+ * cap back at the default. A choice made on the older build during the rollback is the one thing lost.
+ */
+export function openStore(sql: Sql): void {
+  const present = new Set(
+    sql
+      .all<{ name: string }>(`SELECT name FROM sqlite_master WHERE type = 'table' AND name IN (?, ?, ?, ?, ?)`, ...NAMES)
+      .map((r) => r.name),
+  );
+  const said = present.has('slash_meta') ? sql.one<{ value: string }>("SELECT value FROM slash_meta WHERE key = 'version'")?.value : undefined;
+  const stored = said !== undefined && /^[0-9]+$/u.test(said) ? Number(said) : 0;
+  if (stored > STORE_VERSION)
+    throw new Error(
+      `Slash's ledger was written by a newer BrainDog: it is at version ${stored} and this build reads ${STORE_VERSION}. Upgrade, and Slash answers again.`,
+    );
+  if (stored === STORE_VERSION && !present.has('settings') && !present.has('call')) return;
+
+  sql.transactionSync(() => {
+    if (present.has('settings')) sql.exec(present.has('slash_settings') ? 'DROP TABLE settings' : 'ALTER TABLE settings RENAME TO slash_settings');
+    if (present.has('call') && !present.has('slash_call')) sql.exec('ALTER TABLE call RENAME TO slash_call');
+    for (const statement of DDL) sql.exec(statement);
+    if (present.has('call') && present.has('slash_call')) {
+      sql.exec(`INSERT OR IGNORE INTO slash_call (${CALL_COLUMNS}) SELECT ${CALL_COLUMNS} FROM call`);
+      sql.exec('DROP TABLE call');
+    }
+    /* AFTER THE CARRY, so a code a carried row holds under the old name is renamed with the rest. */
+    for (const statement of FROM_1) sql.exec(statement);
+    sql.exec(
+      "INSERT INTO slash_meta (key, value) VALUES ('version', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+      String(STORE_VERSION),
+    );
+  });
+}
 
 /** The first instant of the month an epoch falls in, and of the one after it. UTC, see `createSlash`. */
 const monthOf = (ms: number, add: number): string => {
@@ -171,24 +255,49 @@ const monthOf = (ms: number, add: number): string => {
 };
 
 /**
- * `priced` IS THE HOST'S ANSWER TO WHOSE NEURONS EACH TIER SPENDS, and `['a']` is `46 §4.1`'s. See `SlashOptions` in
- * `index.ts` for the host that answers otherwise.
+ * The most ids one ledger remembers minting while their calls are in flight (`minted` in `core`).
+ *
+ * A HOLD IS FORGOTTEN WHEN IT IS RELEASED, which every caller of `reserve` does in a `finally`; an id from `mint` has no
+ * release, so the oldest is let go past this many. An id still needed is one whose call is awaiting its model, and the
+ * oldest of a thousand ids is one handed out a thousand calls ago, so an id let go here belongs to a call long settled.
  */
-export const core = (sql: Sql, clock: Clock, fallback: Inference, priced: readonly Tier[] = ['a']): Core => {
+const MINTED_MOST = 1_000;
+
+/**
+ * `priced` IS THE HOST'S ANSWER TO WHOSE NEURONS EACH TIER SPENDS, and `['a']` is `46 §4.1`'s. `tiers` IS ITS ANSWER TO
+ * WHICH TIERS IT RUNS AT ALL. See `SlashOptions` in `index.ts` for the host that answers otherwise.
+ */
+export const core = (sql: Sql, clock: Clock, fallback: Inference, priced: readonly Tier[] = ['a'], tiers: readonly Tier[] = TIERS): Core => {
   const now = (): string => new Date(clock.now()).toISOString();
+
+  /* THE IDS THIS LEDGER HANDED OUT, the only ones `account` may settle over a row that is already there (`account`). */
+  const minted = new Set<string>();
+  const remember = (id: string): string => {
+    minted.add(id);
+    if (minted.size > MINTED_MOST) {
+      const oldest = minted.values().next().value;
+      if (oldest !== undefined) minted.delete(oldest);
+    }
+    return id;
+  };
 
   const settings = (): Settings => {
     const row = sql.one<{ tier: string; model: string | null; grant_id: string | null; ask_cap: number; updated_at: string }>(
-      'SELECT tier, model, grant_id, ask_cap, updated_at FROM settings WHERE singleton = 1',
+      'SELECT tier, model, grant_id, ask_cap, updated_at FROM slash_settings WHERE singleton = 1',
     );
     /* THE SINGLETON IS INSERTED BY `createSlash` AND THIS IS STILL HERE, because a caller may hand
        Slash a database somebody else opened, and reading `undefined.tier` is a 500 on a warm-up
        request where a default is the honest answer. */
     if (row === undefined) return { tier: 'a', model: null, grant_id: null, ask_cap: 80, updated_at: now() };
-    const tier: Tier = row.tier === 'b' ? 'b' : row.tier === 'byo' ? 'byo' : 'a';
+    const stored: Tier = row.tier === 'b' ? 'b' : row.tier === 'byo' ? 'byo' : 'a';
+    /* A TIER THIS HOST DOES NOT RUN IS READ AS THE INCLUDED MODEL, and the row is left as the owner saved it. On the Cloud
+       `byo` names no address of the owner's, so a model name typed for it went to Workers AI's own table and every pass
+       2 failed on "no adapter on this host" (`apps/worker/src/inference.ts`). Read as `a`, the routing table picks the
+       model again and a record saved on `byo` answers; the next save stores what was read. */
+    const tier: Tier = tiers.includes(stored) ? stored : 'a';
     return {
       tier,
-      model: row.model,
+      model: tier === stored ? row.model : null,
       grant_id: row.grant_id,
       ask_cap: row.ask_cap,
       updated_at: row.updated_at,
@@ -209,12 +318,7 @@ export const core = (sql: Sql, clock: Clock, fallback: Inference, priced: readon
       priced.includes(row.tier) && rate !== undefined
         ? Math.round((row.usage.in * rate.in) / 1e6 + (row.usage.out * rate.out) / 1e6)
         : 0;
-    /* OR REPLACE, BECAUSE A HELD ASK IS SETTLED BY ITS OWN ID. The row `reserve` wrote is overwritten by the outcome, so a
-       `call` row still reads as one row per model call, with `ts` the moment it was settled, as it was before holds. */
-    sql.exec(
-      `INSERT OR REPLACE INTO call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status, code, question, predicate, read, filed)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      row.id,
+    const values = [
       now(),
       row.kind,
       row.tier,
@@ -229,6 +333,25 @@ export const core = (sql: Sql, clock: Clock, fallback: Inference, priced: readon
       row.predicate ?? null,
       JSON.stringify(row.read ?? []),
       row.filed ?? null,
+    ] as const;
+    /* A NEW ID IS INSERTED, AND A HELD ONE IS SETTLED ONLY WHEN THIS LEDGER MINTED IT (`defects.md` S14). The row
+       `reserve` wrote is overwritten by the outcome, and a call settled the moment its model answered is overwritten by
+       the exit that follows (`propose.ts`, `jobs.ts`), so a row still reads as one row per model call, with `ts` the
+       moment it was settled. It was `INSERT OR REPLACE` on whatever id it was handed, so a caller passing an id it had not
+       minted, a pass 2's quoted `ask_id` among them, would have overwritten a billed row and taken it off the month's
+       count. Such an id is refused now, loudly, because no caller in this package passes one and a caller that did is a
+       fault to find and not a row to lose.
+       A ROW THIS LEDGER MINTED IS REPLACED AND NOT UPDATED IN PLACE, so a settled call moves to the end of the ledger as it
+       always did, and `ORDER BY rowid` reads the calls in the order they were settled. An update kept the hold's place: a
+       pass 2 with no `ask_id` holds its proposal before its draft, so its two rows read propose before read, where every
+       reader of the ledger in rowid order (`test/account-write.test.ts`, `test/slash-ledger-model.test.ts`) reads the draft
+       first. The replace reaches only an id the check just below has found in `minted`. */
+    const held = sql.one('SELECT 1 AS n FROM slash_call WHERE id = ?', row.id) !== undefined;
+    if (held && !minted.has(row.id)) throw new Error("Slash's ledger already holds a call under that id, and this ask did not make it, so nothing was replaced.");
+    sql.exec(
+      `${held ? 'INSERT OR REPLACE' : 'INSERT'} INTO slash_call (${CALL_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      row.id,
+      ...values,
     );
   };
 
@@ -309,7 +432,7 @@ export const core = (sql: Sql, clock: Clock, fallback: Inference, priced: readon
     sql,
     clock,
     settings,
-    mint: () => ulid(clock.now()),
+    mint: () => remember(ulid(clock.now())),
     now,
     monthStart: () => monthOf(clock.now(), 0),
     resets: () => monthOf(clock.now(), 1),
@@ -329,10 +452,10 @@ export const core = (sql: Sql, clock: Clock, fallback: Inference, priced: readon
        name and still count. Under `-`, that `answer` row keeps the prompt estimate in `tokens_in`
        and gets 0 neurons on tier `a`, because `account` finds no rate for `-` in `MODELS`; under
        the model's name it was billed on that estimate. It also no longer says which model was
-       not reached. The index `call_meter (tier, kind, ts)` still serves the count. */
+       not reached. The index `slash_call_meter (tier, kind, ts)` still serves the count. */
     asksUsed: () =>
       sql.one<{ n: number }>(
-        "SELECT COUNT(*) AS n FROM call WHERE tier = 'a' AND kind IN ('read', 'propose') AND model <> '-' AND ts >= ?",
+        "SELECT COUNT(*) AS n FROM slash_call WHERE tier = 'a' AND kind IN ('read', 'propose') AND model <> '-' AND ts >= ?",
         monthOf(clock.now(), 0),
       )?.n ?? 0,
     /* THE CHECK AND THE COUNT WERE TWO STEPS WITH A MODEL BETWEEN THEM. `spent()` read `asksUsed()`, and the row that
@@ -341,13 +464,13 @@ export const core = (sql: Sql, clock: Clock, fallback: Inference, priced: readon
        10 of 2 (`loop/research-batch-twenty-eight-audit.md` §1, `test/cap-concurrent.test.ts`). The hold is a real row,
        written in the same synchronous step as the check, so the next ask's count already includes it. It is a row and not
        a counter in memory because both hosts build a Slash per request, and a counter would be one per request.
-       IT IS `error · SLASH_PENDING` AND NOT A NEW STATUS because the `46 §4.1` CHECK admits four, and changing it is the
-       first schema change, which `createSlash` says needs its version in a row first. A process that dies mid-call leaves
+       IT IS `error · SLASH_PENDING` AND NOT A NEW STATUS because the `46 §4.1` CHECK admits four, and a new one is a
+       change to a column's `CHECK`, which is a step of its own under `STORE_VERSION`. A process that dies mid-call leaves
        the hold counted, which is the side of the line a cap should err on. */
     reserve: (kind, tier, model) => {
       const id = ulid(clock.now());
       sql.exec(
-        `INSERT INTO call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status, code)
+        `INSERT INTO slash_call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status, code)
          VALUES (?, ?, ?, ?, ?, 0, 0, 0, 0, 'error', 'SLASH_PENDING')`,
         id,
         now(),
@@ -355,9 +478,13 @@ export const core = (sql: Sql, clock: Clock, fallback: Inference, priced: readon
         tier,
         model,
       );
-      return id;
+      return remember(id);
     },
-    release: (id) => sql.exec("DELETE FROM call WHERE id = ? AND code = 'SLASH_PENDING'", id),
+    /* AND THE ID IS FORGOTTEN WITH ITS HOLD: every caller releases in a `finally`, after its last `account`. */
+    release: (id) => {
+      minted.delete(id);
+      sql.exec("DELETE FROM slash_call WHERE id = ? AND code = 'SLASH_PENDING'", id);
+    },
     account,
     run,
   };

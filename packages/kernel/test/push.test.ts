@@ -127,7 +127,7 @@ const TASKS = {
 const URGENT = {
   id: 'rule.urgent',
   kind: 'rule',
-  body: { rule: 'urgent', register: 'tasks', on: 'create', once_per: ['row'], then: [{ notify: { say: 'Payment failed on {what}', urgent: true } }] },
+  body: { rule: 'urgent', register: 'tasks', on: 'create', once_per: ['row'], then: [{ notify: { say: 'Payment failed on {{what}}', urgent: true } }] },
 };
 
 async function interrupting(subscribed: boolean): Promise<{ k: Kernel; sql: NodeSql; clock: ReturnType<typeof fixedClock> }> {

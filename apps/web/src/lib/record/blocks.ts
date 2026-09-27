@@ -7,6 +7,9 @@
  * A page block becomes a Block segment THROUGH THE DIALECT, so a declared page and a hand-written
  * write-up take one code path from the first `<figure>` down.
  *
+ * A KIND REGISTERED IN `lib/page/kinds/index.ts` IS NOT DRAWN HERE. `draw` hands it to its own module with the
+ * record's answer, before any arm below, so a new kind adds no arm to this file.
+ *
  * ── THE PROJECTION IS DECLARED, NOT HARD-CODED ──────────────────────────────
  *
  * This file used to carry one bespoke row-builder per kind: `timelineRows` read `renews`, `name`
@@ -37,13 +40,14 @@
 import { across, convertMinor, dayFieldOf, rateFor, type Part, type Rate } from '@braindog/kernel';
 import { day as longDay, money, parse, since, workingCell, WORKING_MARK, type Block } from 'braindog-render';
 import { KINDS, isKind, showsOf, type CardRole } from 'braindog-render';
+/* WHICH FILES A CARD LEADS WITH, the renderer's list, read by `pictureCell`. */
+import { isPictureMime } from 'braindog-render';
 import type { Column } from 'braindog-render/svelte';
 import { display, feedWho, homeCurrency, labelOf, walkTable, type BlockResult } from './api.ts';
-/* `ROWS` IS `held.ts`'S, EMPTY IN A SHIPPED TAB: a gauge whose filter matched nothing took its currency from the sample's
-   rows of the list, on any record. With no rows held it is the block's own sum or none, and a test over the sample fills
-   the table (`fixtures/fill.ts`). */
-import { REGISTERS, ROWS } from './held.ts';
+import { REGISTERS } from './held.ts';
 import { draftOf } from './field-draft.ts';
+/* THE KINDS THAT DRAW THEMSELVES, asked first in `draw`. */
+import { drawerOf } from '../page/kinds/index.ts';
 
 /**
  * The instant a block was read at, which is the clock everything drawn from it is told against.
@@ -297,7 +301,9 @@ function partsRows(block: BlockResult): string[] {
 function bridgeRows(block: BlockResult): string[] {
   const walk = block.walk;
   if (!walk) return [];
-  const currency = walk.currency ?? homeCurrency() ?? null;
+  /* THE WALK'S OWN CURRENCY, AS THE KERNEL WALKED IT, and where it names none the record's (`homeCurrency()`, the one
+     its `boot` said). Nothing here reads a currency out of rows this tab happens to hold. */
+  const currency = walk.currency ?? homeCurrency();
   if (currency === null) return [];
   const ins = walk.steps.filter((s) => s.delta > 0);
   const outs = walk.steps.filter((s) => s.delta < 0);
@@ -312,9 +318,9 @@ function bridgeRows(block: BlockResult): string[] {
 }
 
 /**
- * A step with the two marks the forecast's controls read, which both walks set (`Step.from` and `Step.of` in
- * `forecast.ts` and in the kernel's) and `api.ts`'s `WalkStep` does not yet declare. Read through this rather than
- * declared there because that type is not this file's; it names nothing either walk does not already carry.
+ * A step with the two marks the forecast's controls read, which the kernel's walk sets (`Step.from` and `Step.of`)
+ * and `api.ts`'s `WalkStep` does not yet declare. Read through this rather than declared there because that type is
+ * not this file's; it names nothing the kernel's walk does not already carry.
  */
 type ControlledStep = { of?: string; from?: string };
 
@@ -331,7 +337,8 @@ type ForecastSell = { label: string; value: number };
 function forecastRows(block: BlockResult): string[] {
   const walk = block.walk;
   if (!walk) return [];
-  const currency = walk.currency ?? homeCurrency() ?? null;
+  /* THE WALK'S CURRENCY, ELSE THE RECORD'S, as the bridge reads it. */
+  const currency = walk.currency ?? homeCurrency();
   const said = (minor: number) => (currency ? money(minor, currency) : String(minor));
   /* THE DAY THE BLOCK WAS READ, which is the record's clock on a live page and the sample's here. */
   const today = block.stale_at.slice(0, 10);
@@ -378,7 +385,8 @@ function seriesRows(block: BlockResult): string[] {
   const lines = block.series ?? [];
   /* A SERIES OF COUNTS IS NOT MONEY: the home currency is only the unit of lines whose figures are money. */
   const inMoney = lines.some((l) => METRICS[l.metric]?.format?.startsWith('money.'));
-  const currency = bars.unit ?? (inMoney ? homeCurrency() : null) ?? null;
+  /* THE BARS' UNIT AS THE KERNEL READ THEM, ELSE THE RECORD'S CURRENCY for lines of money. */
+  const currency = bars.unit ?? (inMoney ? homeCurrency() : null);
   const head = [
     escapeCell(copy.seriesAxis[bars.bucket] ?? bars.bucket),
     ...lines.map((l) => `${l.dir === 'out' ? 'out' : 'in'}: ${escapeCell(l.label ?? l.metric)}`),
@@ -486,13 +494,13 @@ function gaugeRows(block: BlockResult): string[] {
    *
    * `13 §4.2`: a truncated figure is not shortened, it is wrong; a figure that has lost its unit is
    * the same failure, and the target had never had a unit to lose — it is a declared constant that
-   * does not change when a filter matches nothing. So the code falls back to the currency the FIELD
-   * holds anywhere in the register, which is what both numbers are denominated in either way.
+   * does not change when a filter matches nothing. So the code falls back to a currency somebody chose for a money
+   * field: its default's, then the record's own. It read the list's rows held in this tab, which a shipped tab holds
+   * none of, so on a live record the fallback was always none. Only a sum over nothing falls back, and only over a
+   * money field: rows that were summed and carried no currency are not given one.
    */
-  const declared =
-    sum.currency ??
-    (ROWS[block.register ?? ''] ?? []).map((e) => currencyOf(e.fields[of])).find(Boolean) ??
-    null;
+  const field = REGISTERS[block.register ?? '']?.fields.find((f) => f.id === of);
+  const declared = sum.currency ?? (sum.n === 0 && field?.type === 'money' ? (currencyOf(field.default) ?? homeCurrency()) : null);
   const fmt = (n: number) => display(block.register ?? '', of, asMoney(n, declared)) ?? String(n);
   /* The tone is the reading, and it is the whole point of a gauge: over the line is `bad`, close to
      it is `warn`, under it is nothing at all — a gauge that is fine should not be coloured. */
@@ -658,6 +666,14 @@ function cardsRows(block: BlockResult): string[] {
       return fields.find((f) => f.id === c.field)?.type === 'enum' && v ? v.charAt(0).toUpperCase() + v.slice(1) : v;
     };
     const cells = columns.map((c, j) => escapeCell(said(c, j)));
+    /* A HUE AND A PICTURE ARE WRITTEN FROM THE ROW'S OWN VALUE, never from the cell as said: a hue is the record's whole
+       number and a picture a reference the renderer resolves through the host (`pictureCell`). Neither is printed. */
+    roles.forEach((role, j) => {
+      const field = columns[j]?.field;
+      const v = field ? block.entries[i]?.fields[field] : undefined;
+      if (role === 'hue') cells[j] = typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= 359 ? String(v) : '';
+      if (role === 'picture') cells[j] = pictureCell(block.register, block.entries[i]?.seq, field, v);
+    });
     if (quiet) cells.push(quiet[i] ? 'quiet' : '');
     /* OUT OF DATE: the day is older than the window, so the card says so beside that day, with the watch glyph. */
     const old = staleAt(block, block.entries[i]);
@@ -673,6 +689,22 @@ function cardsRows(block: BlockResult): string[] {
     return `${cells.join(' | ')}${tone ? ` | ${tone}` : ''}`;
   });
   return [head, ...rows];
+}
+
+/**
+ * A card's `picture` cell: `file:<list>#<seq>/<field>` for a file the record holds that is a picture, or empty.
+ *
+ * ONLY THIS SIDE KNOWS A FILE'S TYPE, so only a picture is written by reference, and only in a shape the renderer reads
+ * as one (`showsOf`), which it turns into an address through the page's `RenderOptions.file`. Anything else writes
+ * nothing: a card leads with a picture or with its title, never with a file's name where its picture would be.
+ */
+function pictureCell(register: string | undefined, seq: number | undefined, field: string | undefined, v: unknown): string {
+  if (!register || seq === undefined || !field || v === null || typeof v !== 'object' || Array.isArray(v)) return '';
+  const mime = (v as { mime?: unknown }).mime;
+  if (typeof mime !== 'string' || !isPictureMime(mime)) return '';
+  const ref = `file:${register}#${seq}/${field}`;
+  const shows = showsOf(ref);
+  return shows && 'file' in shows ? ref : '';
 }
 
 /** Whether a row's `stale:` day is older than the window, on the clock the block was read at. */
@@ -1041,25 +1073,28 @@ function drawSegments(block: BlockResult): ReturnType<typeof parse> {
     !block.metrics &&
     !['bar', 'split', 'chips', 'gauge', 'progress', 'cards', 'section', 'stat', 'queue'].includes(block.kind) &&
     Boolean(block.register && block.columns.length > 0 && spec);
-  /* A PATH'S COUNT OF THE REST IS ITS LAST ROW AND NO RECORD ROW, so the stones before it are named and it is not. */
-  const counted = block.kind === 'steps' && rows.length === block.entries.length + 1 ? 1 : 0;
+  /* A PATH'S NAME FOR ITS SHORT VIEW IS ITS FIRST ROW AND ITS COUNT OF THE REST ITS LAST, and neither is a record row,
+     so the stones between them are named and they are not. */
+  const named = block.kind === 'steps' && form === ' path' && shortOf(block) ? 1 : 0;
+  const counted = block.kind === 'steps' && rows.length === block.entries.length + named + 1 ? 1 : 0;
   return projected && block.register
-    ? withRefs(segments, block.register, block.kind === 'board' ? boardOrder(block).entries : block.entries, counted)
+    ? withRefs(segments, block.register, block.kind === 'board' ? boardOrder(block).entries : block.entries, counted, named)
     : segments;
 }
 
 /**
  * EACH PROJECTED ROW NAMES THE RECORD ROW IT CAME FROM, after the parse, because the text in between carries no identity.
  *
- * One drawn row per entry, in the order `projectRows` wrote them, and `trailing` rows after them that are no row of the
- * record (a path's count of the rest). A parse that drew anything else, a degraded fence or a different number of rows,
- * gets no refs at all: a card named by the wrong row would move somebody else's row.
+ * One drawn row per entry, in the order `projectRows` wrote them, `leading` rows before them and `trailing` rows after
+ * them that are no row of the record (a path's name for its short view, and its count of the rest). A parse that drew
+ * anything else, a degraded fence or a different number of rows, gets no refs at all: a card named by the wrong row
+ * would move somebody else's row.
  */
-function withRefs(segments: ReturnType<typeof parse>, register: string, entries: BlockResult['entries'], trailing = 0): ReturnType<typeof parse> {
+function withRefs(segments: ReturnType<typeof parse>, register: string, entries: BlockResult['entries'], trailing = 0, leading = 0): ReturnType<typeof parse> {
   const drawn = segments.filter((s): s is Block => s.type === 'block');
   const only = drawn.length === 1 && segments.length === 1 ? drawn[0] : undefined;
-  if (!only || only.rows.length !== entries.length + trailing) return segments;
-  only.rows.slice(0, entries.length).forEach((row, i) => {
+  if (!only || only.rows.length !== leading + entries.length + trailing) return segments;
+  only.rows.slice(leading, leading + entries.length).forEach((row, i) => {
     const entry = entries[i];
     if (entry && entry.seq > 0) row.ref = { register, seq: entry.seq, version: entry.version };
   });
@@ -1100,8 +1135,9 @@ function formOf(block: BlockResult): string {
 }
 
 /**
- * A path's rows: each stone `title | detail | mark`, the mark `done`, `next` or blank, then `more | N` when the short
- * view left steps out (`render/src/path.ts`).
+ * A path's rows: `short | <label>` first when the block declares a short view the record answered (`shortOf`), then
+ * each stone `title | detail | mark`, the mark `done`, `next` or blank and `short` after it for a stone in that view,
+ * then `more | N` when the short view left steps out (`render/src/path.ts`).
  *
  * THE MARKS ARE THE RECORD'S, `done_now` and `next`, and the projected third cell is thrown away for them. That cell
  * was the list's free text, so a path whose third column was a stage drew "sample" where the record knew the step was
@@ -1117,10 +1153,27 @@ function formOf(block: BlockResult): string {
 function pathRows(block: BlockResult, cells: number): string[] {
   const marks = marksOf(block) ?? [];
   const next = keyOf(block, 'next');
-  const stones = projectRows(block, cells, (i) => (marks[i] ? 'done' : next === i ? 'next' : ''));
+  const short = shortOf(block);
+  /* A STONE IN THE SHORT VIEW SAYS SO AFTER ITS MARK, `done short`, `next short` or `short`, in the renderer's words. */
+  const stones = projectRows(block, cells, (i) => [marks[i] ? 'done' : next === i ? 'next' : '', short?.held[i] ? 'short' : ''].filter(Boolean).join(' '));
   const open = keyOf(block, 'open');
   const more = typeof keyOf(block, 'first') === 'number' && typeof open === 'number' ? Math.max(0, open - stones.length) : 0;
-  return more > 0 ? [...stones, `more | ${more}`] : stones;
+  return [...(short ? [`short | ${escapeCell(short.label)}`] : []), ...stones, ...(more > 0 ? [`more | ${more}`] : [])];
+}
+
+/**
+ * A path's short view: its name and which rows the record says are in it (`short_now`, aligned with the rows), or null.
+ *
+ * THE RECORD DECIDES WHICH STONES ARE IN IT, from the block's `short: { where, label }`, and this only carries that
+ * answer into the fence as its first row, `short | <label>`, and a word on each stone. An answer that does not line up
+ * with the rows, or a name that is empty, draws the path whole rather than a view of the wrong stones.
+ */
+function shortOf(block: BlockResult): { label: string; held: boolean[] } | null {
+  const short = keyOf(block, 'short');
+  const label = short !== null && typeof short === 'object' ? (short as { label?: unknown }).label : undefined;
+  const held = keyOf(block, 'short_now');
+  if (typeof label !== 'string' || label.trim() === '' || !Array.isArray(held) || held.length !== block.entries.length) return null;
+  return { label: label.trim(), held: held.map((h) => h === true) };
 }
 
 /**
@@ -1388,6 +1441,13 @@ export function draw(
       },
     };
 
+  /* A REGISTERED KIND DRAWS ITSELF, FROM THE RECORD'S ANSWER, and it is asked before any arm below
+     (`lib/page/kinds/index.ts`). The two answers above are every block's: a block with both a source and rows of its
+     own, and one the record refused, are said the same way whatever their kind. A registered kind read from something
+     other than a record, which carries no answer, falls through and is drawn as the dialect draws its kind. */
+  const drawer = drawerOf(block.kind);
+  if (drawer && block.answer) return drawer.draw(block.answer, { home: homeCurrency(), now: clockOf(block), nothing });
+
   /* A `table` is drawn by the grid rather than through the dialect, so its rows are the check. */
   if (block.kind === 'table')
     return {
@@ -1401,10 +1461,13 @@ export function draw(
      reads: they are the list and the values the host writes into a new row, in the form the record stores.
      AN `inputs` VALUE IS WHAT ITS BOX OPENS ON AND WHAT `inputs-write.ts` READS BACK, so it keeps the record's own
      spelling too: on a record whose home is pounds the box would open on `£1,200.00`, and `$` is the symbol of more than
-     one currency, so what came back could not say which it was in. */
+     one currency, so what came back could not say which it was in.
+     A TILE'S FIGURE IS A HEADLINE, the second cell of each `stat` row, and says a round amount without its ".00". */
   const home = homeCurrency();
   const segments = toSegments(block).map((s) =>
-    s.type === 'block' && s.kind !== 'code' && s.kind !== 'capture' && s.kind !== 'inputs' ? { ...s, rows: s.rows.map((r) => ({ ...r, cells: r.cells.map((c) => symbolText(c, home)) })) } : s,
+    s.type === 'block' && s.kind !== 'code' && s.kind !== 'capture' && s.kind !== 'inputs'
+      ? { ...s, rows: s.rows.map((r) => ({ ...r, cells: r.cells.map((c, j) => symbolText(c, home, s.kind === 'stat' && j === 1)) })) }
+      : s,
   );
   /* A CARD GRID IS BLANK WHEN IT HAS NO ENTRIES, whatever its first row says: that row names the
      columns and is not a card. A section over a register that admitted nothing has nothing under

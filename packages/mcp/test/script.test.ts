@@ -19,6 +19,7 @@ import { tools } from '../src/index.ts';
 import { SCRIPT_GRAMMAR } from '../grammars/script.ts';
 import { CEILINGS, DEFAULT_LIMITS, HEAP_BYTES, LOG_BYTES, SOURCE_BYTES } from '../../script/src/index.ts';
 import { FLOOR_MS } from '../../kernel/src/pull.ts';
+import { SCRIPT_CEILINGS, SCRIPT_SOURCE_BYTES } from '../../kernel/src/script.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 import { stub } from './stub.ts';
 
@@ -90,9 +91,13 @@ test('AND IT IS ASKED BEFORE IT IS OFFERED, on the same rung as the other gramma
 
 test('ITS NUMBERS ARE THE ONES THE SANDBOX AND THE KERNEL HOLD, because they are copies', () => {
   assert.deepEqual(SCRIPT_GRAMMAR.limits.most, CEILINGS);
+  /* THE KERNEL REFUSES AT INSTALL WHAT THE SANDBOX REFUSES AT A RUN, so its copy is held to the sandbox's here. */
+  assert.deepEqual(SCRIPT_CEILINGS, CEILINGS);
+  assert.equal(SCRIPT_SOURCE_BYTES, SOURCE_BYTES);
   assert.deepEqual(SCRIPT_GRAMMAR.limits.default, DEFAULT_LIMITS);
   assert.equal(SCRIPT_GRAMMAR.limits.source, `${SOURCE_BYTES / 1024} KB`);
-  assert.equal(SCRIPT_GRAMMAR.limits.memory, `${HEAP_BYTES / 1024 / 1024} MB`);
+  /* THE 32 MB IS THE QUICKJS SANDBOX'S, so the grammar says it of a self-host. */
+  assert.match(SCRIPT_GRAMMAR.limits.memory, new RegExp(`^${HEAP_BYTES / 1024 / 1024} MB on a self-host\\.`));
   assert.match(SCRIPT_GRAMMAR.ctx['log(...parts)'], new RegExp(`${LOG_BYTES / 1024} KB`));
   assert.match(SCRIPT_GRAMMAR.body.runs, new RegExp(`every ${FLOOR_MS / 60_000}m`));
 });

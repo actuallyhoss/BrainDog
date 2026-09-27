@@ -67,7 +67,7 @@ same `where:` grammar every consumer in [02-DATA-MODEL](02-DATA-MODEL.md) §6 us
 | Level | Can |
 |---|---|
 | `read` | see what the projection shows |
-| **`append`** | **`create`, `propose` and `log` — and no read.** The conservative half: an appender sees nothing, not even what it filed, unless a `read` grant on that register says so ([45-SPEC-RECORD](45-SPEC-RECORD.md) §5.1) |
+| **`append`** | **`create`, `propose` and `log` — and no read.** The conservative half: an appender sees nothing, not even what it filed, unless a `read` grant on that register says so ([45-SPEC-RECORD](45-SPEC-RECORD.md) §5.1). Held on the whole record, it adds to every list but the owner-only ones (below) |
 | `write` | create, edit, and change state on granted registers |
 | **`decide`** | **settle a question: pick an option and record the binding reason** |
 | **`owner`** | everything `decide` can, plus the sixteen ADMIN methods of [30-BLUEPRINT](30-BLUEPRINT.md) §5 — packs, declarations, rules, tokens, devices, invitations, export, import, snapshot, erase, restore, and deleting the record — and the vault (the VAULT group, owner-only by default). At least one per record; **never held by a token or a share link**, which is why there is no `admin` token scope ([ADR-060](16-DECISIONS.md)); a bearer reaches one ADMIN method only through an **operation grant** the owner approved in the browser, once, within ten minutes ([12-SECURITY](12-SECURITY.md) §3). *An earlier draft counted four* |
@@ -82,6 +82,29 @@ can't view or edit existing pages they haven't been individually granted access 
 natural role for an append-only system and the correct shape for a contractor: file a task,
 comment, propose an option, and read only what a separate `read` grant gives. It is also far cheaper
 than a filtered read.
+
+**What is built for each level** (`guard`, `scoped` and `wholeRecord` in `packages/record/src/index.ts`):
+
+- **Owner-only lists.** Keys, People (the list declaring the `meets` role, or the list `people`
+  where none declares it) and any list declaring `owner_only: true`
+  ([42-SPEC-DECLARE](42-SPEC-DECLARE.md) §4.4) are the owner's. A record-wide `append` does not
+  reach them: that colleague is refused in one sentence naming the list, and adds everywhere else.
+  A grant naming the list does reach it, and `read`, `write` and `decide` are unchanged.
+- **A record-wide appender with a `read` grant opens the app.** A read that names no list (`boot`,
+  `search`, `pages` and the rest) is admitted when the record-wide level or any one grant reaches
+  it, and its answer holds only the lists the caller may read. So `append` on the record and `read`
+  on Tasks opens on Tasks, where before `boot` refused it.
+- **Reading the record as a whole needs a level that reads.** A caller at `append` is never
+  treated as reading the whole record, whatever its ceiling, so the log's lines about the record
+  itself and the inbox do not reach it.
+- **A level on one list is `read`, `append` or `write`.** Answering a question is for somebody
+  invited to the whole record, whatever the question is about, so a list's own `decide` or `owner`
+  answers nothing more than `write` does, and the People screen offers the three.
+- **What `boot` says.** `me.levels` is the level the caller holds on each list it holds, with the
+  owner-only lists left out for a record-wide appender; the app asks it through one helper,
+  `may(shell, need, list?)` (`apps/web/src/lib/record/may.ts`), and prints what the record answers.
+  `counts.inbox` goes to an owner and to a token an owner gave the `inbox` reach, as `inbox` itself
+  does, and is `null` for anybody else.
 
 **`decide` is a level none of the four surveyed products has.** Verified across Notion's six
 levels, Airtable's five, Retool's three and Linear's role set: not one has a permission meaning
@@ -345,8 +368,37 @@ option deadlines and deferral wake dates.
 | On an **entry**, a **decision** and a **suggestion**. Nothing else | comments on a comment are a forum |
 | **One level of threading.** No nesting | depth is how a discussion becomes unsearchable |
 | Resolvable, with the resolution recorded | see §7 |
-| Comments are **rows**, indexed by FTS5 like everything else | a comment nobody can search is a second, worse record |
+| Comments are **searched** with everything else, and only by whoever may see what they are on | a comment nobody can search is a second, worse record |
 | A comment never carries state a field should carry | *"I think this is done"* in a comment on a row with a `state` field is a defect in the register, not a feature of comments |
+
+**What is built.** A comment is a `note` event on the thing it is about, not a row: no table, no
+event kind and no refusal code were added for it. Its target is the row (`entry:<id>`), the
+question (`suggestion:<id>`) or the decision (`decision:<id>`); `field` is `comment`, or
+`reply:<id>` for a reply, which names the comment that opened the thread; the words are in `note`,
+at most 280 characters; and `to_v` stays NULL, because a decision's note that carries a `to_v` is
+read as what was applied when it was accepted. A resolution is a `note` on `event:<id>` with
+`field: 'resolve'`, one of `addressed`, `wont-fix` or `incorrect` in `to_v` and the reason in
+`note`; the newest one is how the comment stands, and every one stays in the log. Being events,
+comments travel in an export and are reached by an erasure's event pass.
+
+| Method | Group | Who |
+|---|---|---|
+| `comments({ on })` answers `{ id, by, at, body, reply_to, resolved }[]`, oldest first | READ+ | whoever may see the thing |
+| `comment({ on, body, reply_to? })` answers `{ id }` | DATA | whoever may see the thing, a Reads colleague included; a token needs `propose` |
+| `resolveComment({ id, as, why })` answers `{ id, resolved }` | DATA | the comment's author, or whoever may change the thing: `write` on a row's list, `decide` for a question or a decision |
+
+`on` is a row's spoken id (`tasks#3`), `suggestion:<id>` or `decision:<id>`, and a question or a
+decision may be named by the handle the record hands a caller who does not read every list.
+**A thing the caller cannot see has no comments**: every method answers it in the sentence a thing
+that is not there gets, `search` answers only the comments on things she sees, and the line a
+resolution writes in the log goes only to whoever sees what the comment is on. One thing holds at
+most `THREAD_MOST` comments and replies. A search reads comments among the newest
+`COMMENT_SEARCH_EVENTS` events of the log, because the log has no index on a comment's words; an
+older comment is still read whole in its thread. The kernel's half is `packages/kernel/src/api/comments.ts`;
+the record's is `packages/record/src/methods/comments.ts`.
+
+Mentions and notifications between colleagues are not built; the paragraph below is the design
+they will follow.
 
 **Subscription is thread-level or record-level, and the distinction is precise.** From Linear: an
 @mention **in the body** subscribes you to the record; an @mention **in a comment thread**

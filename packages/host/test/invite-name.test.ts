@@ -33,7 +33,11 @@ import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
 const NOW = Date.UTC(2026, 8, 5, 12);
 const EXPIRES = new Date(NOW + 24 * 3_600_000).toISOString();
-const CONFIG: AuthConfig = { mac: new Uint8Array(32).fill(7), rp: { id: 'studio.example', origin: 'https://studio.example' }, magic: true };
+const ORIGIN = 'https://studio.example';
+const CONFIG: AuthConfig = { mac: new Uint8Array(32).fill(7), rp: { id: 'studio.example', origin: ORIGIN }, magic: true };
+
+/** The proof in a mailed link, `<origin>/app/invite#<invitation>&proof=<proof>`, or `''` when no link went out. */
+const proofOf = (link: string | undefined): string => /&proof=([A-Za-z0-9_-]+)$/.exec(link ?? '')?.[1] ?? '';
 
 /** The Worker's own rule for an address that can already sign in (`apps/worker/src/index.ts:58`). */
 const KNOWN_ADDRESS = `SELECT 1 AS x FROM dir_person p WHERE lower(p.email) = lower(?)
@@ -57,18 +61,25 @@ function setup() {
     person: (email, name) => Promise.resolve(d.person$(email, name)),
   };
 
-  /* A WORKER, so the self-host's "the owner needs a passkey first" rule is not what these tests hit. */
-  const door = { on: 'worker' as const, ip: '203.0.113.9', auth: d.auth, invite };
+  /* A WORKER, so the self-host's "the owner needs a passkey first" rule is not what these tests hit. It sends mail,
+     because a new address proves its mailbox before it is made anybody. */
+  const sent: string[] = [];
+  const door = { on: 'worker' as const, origin: ORIGIN, ip: '203.0.113.9', auth: d.auth, invite, mail: (_to: string, link: string) => void sent.push(link) };
   /* `serveAuth`'s own answer, reduced to the two things these tests read: the status, and whatever it carried. */
   const finish = (out: AuthResult) => new Response(JSON.stringify('body' in out ? out.body : null), { status: out.status });
 
   return {
     accepted,
-    /** Open an invitation for `email` and accept it, with whatever name the page sent. */
+    /**
+     * Open an invitation for `email` and accept it, with whatever name the page sent, then come back with the proof
+     * the mail carried, as the page the mail opens does. A refusal of the first press is answered as it is.
+     */
     accept: async (email: string, body: Record<string, unknown> = {}) => {
       const token = `rec_01JZ8QK3F7R2M9V4XN6TCB5HAD.${email}`;
       links.set(token, email);
-      return serveInvite({ inviteToken: token, accept: true, ...body }, undefined, door, finish);
+      const asked = await serveInvite({ inviteToken: token, accept: true, ...body }, undefined, door, finish);
+      if (asked.status !== 202) return asked;
+      return serveInvite({ inviteToken: token, accept: true, proof: proofOf(sent.at(-1)) }, undefined, door, finish);
     },
     /** The name on the Directory's row, which is what a screen draws. */
     nameOf: (email: string) => sql.one<{ name: string | null }>('SELECT name FROM dir_person WHERE lower(email) = lower(?)', email)?.name ?? null,
@@ -157,10 +168,14 @@ test('THE NAME REACHES THE RECORD, so People draws it and not the address', asyn
       known: (email) => Promise.resolve(Boolean(sql.one(KNOWN_ADDRESS, email))),
       person: (email, name) => Promise.resolve(d.person$(email, name)),
     };
-    const door = { on: 'worker' as const, ip: '203.0.113.9', auth: d.auth, invite };
+    const sent: string[] = [];
+    const door = { on: 'worker' as const, origin: ORIGIN, ip: '203.0.113.9', auth: d.auth, invite, mail: (_to: string, link: string) => void sent.push(link) };
     const finish = (out: AuthResult) => new Response(JSON.stringify('body' in out ? out.body : null), { status: out.status });
 
-    const out = await serveInvite({ inviteToken: token, accept: true, name: 'Bo Tanner' }, undefined, door, finish);
+    /* THE NAME IS TYPED BEFORE THE PROOF and travels with it, so the page the mail opens sends no name at all. */
+    const asked = await serveInvite({ inviteToken: token, accept: true, name: 'Bo Tanner' }, undefined, door, finish);
+    assert.equal(asked.status, 202, await asked.text());
+    const out = await serveInvite({ inviteToken: token, accept: true, proof: proofOf(sent.at(-1)) }, undefined, door, finish);
     assert.equal(out.status, 200, await out.text());
     const bo = api.kernel.members().find((m) => m.email === 'bo@example.com');
     assert.ok(bo, 'the invitation did not put anybody on the record');

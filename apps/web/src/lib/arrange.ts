@@ -1,6 +1,8 @@
 /**
- * What `/start` proposes a BrainDog is for, read from both of the first run's turns
- * (`loop/research-first-sign-in.md` §3, friction 3).
+ * What a BrainDog is for, read from what a person said about themselves and what they said it is for
+ * (`loop/research-first-sign-in.md` §3, friction 3). The first run asks one question now and hands
+ * its sentence over as the second, with no first (`start/propose.ts`), which is `arrange` alone;
+ * two sentences are still read together as below.
  *
  * BOTH TURNS ARE COUNTED TOGETHER. The screen used to read turn two alone and fall back to turn one
  * only when turn two picked nothing, so "I run a few companies" followed by "My companies, the money

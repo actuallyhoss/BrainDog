@@ -3,9 +3,8 @@
  * left open, one test per finding.
  *
  * EACH TEST WAS RUN AGAINST THE CODE BEFORE ITS REPAIR AND FAILED ON THE LINE NAMED IN ITS COMMENT. Two of the five
- * repairs are refusals rather than wiring, because the start of a `metric` run and the hourly re-read of a rule about
- * time both belong in `index.ts`, which this change does not own. A body the record would install and never start is
- * the failure `flow-lint.ts`'s header names, so until the start lands the lint says so in a sentence.
+ * repairs were refusals at first, a `metric` trigger and a run-path rule about time, until the hourly sweep started
+ * both (`flow.ts`'s `onMetrics` and `onTime`); their tests now hold that each installs.
  */
 
 import { test } from 'node:test';
@@ -111,18 +110,18 @@ const notes = (sql: NodeSql, actor: string): string[] =>
 
 /* ── (a) a metric trigger ──────────────────────────────────────────────── */
 
-test('A METRIC TRIGGER IS REFUSED WITH A SENTENCE until something starts it, and a wrong one is still told what is wrong', () => {
-  /* MEASURED BEFORE THE REPAIR: this body linted clean against a record holding the metric, and nothing in the kernel
-     reads `on.metric`. `onWritten`, `onArrival`, `onClock` and `automationRun` are the four starts there are, and each
-     skips every trigger but its own, so the rule installed and was read by nothing for ever. */
+test('A METRIC TRIGGER INSTALLS NOW THAT THE HOURLY SWEEP STARTS IT, and a wrong one is still told what is wrong', () => {
+  /* IT WAS REFUSED `NOT_IN_THIS_BUILD` while nothing read `on.metric`: `onWritten`, `onArrival`, `onClock` and
+     `automationRun` were the four starts, and each skipped every trigger but its own. `flow.ts`'s `onMetrics` reads it
+     now, from the hourly sweep. */
   const crossing = rule({ rule: 'crossing', on: { metric: { id: 'cash_now', crosses: { lte: 0 } } }, steps: [{ notify: { say: 'Cash is out.' } }] });
-  const said = lint(crossing);
-  assert.equal(said?.code, 'NOT_IN_THIS_BUILD', 'a metric trigger installed with nothing to start it');
-  assert.match(said?.fix ?? '', /metric/);
-  assert.equal(validateDeclaration(crossing)?.code, 'NOT_IN_THIS_BUILD');
-  /* The shape and the lookup still answer first, so the refusal a person reads is the one about what they wrote. */
+  assert.equal(lint(crossing), null);
+  assert.equal(validateDeclaration(crossing), null);
+  /* The shape and the lookup answer, so the refusal a person reads is the one about what they wrote. */
   assert.equal(lint(rule({ rule: 'vague', on: { metric: { id: 'cash_now', crosses: 'lots' } }, steps: [{ stop: true }] }))?.code, 'DECLARATION_INVALID');
   assert.equal(lint(rule({ rule: 'ghost', on: { metric: { id: 'nobody', crosses: 'target' } }, steps: [{ stop: true }] }))?.code, 'DECLARATION_UNKNOWN');
+  /* A figure with no target has no line for `crosses: target` to draw. */
+  assert.equal(lint(rule({ rule: 'aimless', on: { metric: { id: 'cash_now', crosses: 'target' } }, steps: [{ stop: true }] }))?.code, 'DECLARATION_INVALID');
 });
 
 /* ── (b) a run started by a delete ─────────────────────────────────────── */
@@ -181,29 +180,37 @@ test('A RUN STARTED BY A DELETE HOLDS NO COPY OF THE ROW, so erasing what the ro
 
 /* ── (c) a rule about time on the run path ─────────────────────────────── */
 
-test('A RUN-PATH RULE ABOUT TIME IS REFUSED, since the hourly re-read only reads inline rules', async () => {
+test('A RUN-PATH RULE ABOUT TIME IS READ AGAIN EACH HOUR, as an inline one is, and starts one run for the row', async () => {
   /* MEASURED BEFORE THE REPAIR: this rule installed, a row due tomorrow was created, and after two days and a sweep by
      hand (`purge()`, which is `sweepRecord`, which calls `rulesAboutTime`) it had no run and no note. `rulesAboutTime`
-     hands every rule to `applyRule`, which looks its register up by the top-level `register:`, and a run-path rule has
-     none, so the refusal it got back was thrown away. The same words on an inline rule are swept and fire. */
+     handed every rule to `applyRule`, which looks its register up by the top-level `register:`, and a run-path rule has
+     none, so the refusal it got back was thrown away, and the lint then refused the body as `NOT_IN_THIS_BUILD`.
+     `flow.ts`'s `onTime` reads it now, with the marker the inline pass writes. */
   const { k, sql, clock } = await record();
   const on = { written: { register: 'obligations', op: ['create', 'update'] } };
   const late = rule({ rule: 'late', on, when: 'due before today', once_per: ['what'], steps: [{ set: { field: 'note', to: 'late' } }] });
   const done = await k.install([OBLIGATIONS, late]);
-  assert.equal((done as { refusal?: { code: string } }).refusal?.code, 'NOT_IN_THIS_BUILD', 'a rule about time installed on the path nobody re-reads');
-  assert.match((done as { refusal?: { fix: string } }).refusal?.fix ?? '', /today/);
-
-  /* Without once_per the hourly re-read skips an inline rule too, so the run path is not refused for it. */
-  const plain = rule({ rule: 'late', on, when: 'due before today', steps: [{ set: { field: 'note', to: 'late' } }] });
-  assert.ok((await k.install([OBLIGATIONS, plain])).ok);
-
-  /* And the inline rule it can be rewritten as is swept, which is the sentence's promise. */
-  const inline = rule({ rule: 'late', register: 'obligations', when: 'due before today', once_per: ['what'], then: [{ set: { field: 'note', to: 'late' } }] });
-  assert.ok((await k.install([OBLIGATIONS, inline])).ok);
+  assert.ok(done.ok, why(done));
   const row = value<{ id: string }>(k.create('obligations', { what: 'Rent', due: '2026-09-23' }, { actor: 'p_1' }));
+  await k.drain();
+  assert.equal(k.get(row.id)?.fields.note, undefined, 'the row was not late when it was written');
   clock.advance(2 * DAY);
   k.purge();
+  await k.drain();
   assert.equal(k.get(row.id)?.fields.note, 'late');
+  /* ONCE PER KEY: the next hour's sweep finds the marker and starts nothing more. */
+  clock.advance(HOUR);
+  k.purge();
+  await k.drain();
+  assert.equal(sql.one<{ n: number }>("SELECT count(*) AS n FROM automation_run WHERE rule = 'late'")?.n, 1);
+
+  /* And the inline rule it could be written as is swept too. */
+  const inline = rule({ rule: 'late', register: 'obligations', when: 'due before today', once_per: ['what'], then: [{ set: { field: 'note', to: 'later' } }] });
+  assert.ok((await k.install([OBLIGATIONS, inline])).ok);
+  const second = value<{ id: string }>(k.create('obligations', { what: 'Gas', due: '2026-09-25' }, { actor: 'p_1' }));
+  clock.advance(2 * DAY);
+  k.purge();
+  assert.equal(k.get(second.id)?.fields.note, 'later');
   sql.close();
 });
 

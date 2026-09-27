@@ -257,7 +257,7 @@ test('an address is split at the last dot, and a key naming no register is none'
 });
 
 test("the columns a view kept are the ones it kept, in its order, with the spoken id last", () => {
-  const all = columnsFor('services');
+  const all = columnsFor('services', undefined, true);
   const kept = keptColumns(all, ['cost', 'seq', 'state']);
   assert.deepEqual(kept.map((c) => c.field), ['cost', 'state', 'seq']);
   /* A FIELD THE REGISTER NO LONGER DECLARES IS DROPPED rather than drawn as a column of blanks. */

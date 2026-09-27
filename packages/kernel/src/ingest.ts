@@ -43,6 +43,7 @@ import { instant } from './migrate.ts';
 import { attempt } from './tx.ts';
 import { slashMayWrite } from './slash.ts';
 import { parseAnswer, readRow, type Mapping } from './map.ts';
+import { startAtDoor } from './script.ts';
 
 export const CHANNELS = ['email', 'webhook', 'pull', 'paste', 'api'] as const;
 export type Channel = (typeof CHANNELS)[number];
@@ -87,19 +88,29 @@ export type Extractor =
  * What reading one field ACTUALLY DID — `43 §4.3`'s outcome, so `43 §5.1`'s confidence rule has
  * something to read.
  *
- * FIVE OF THE SIX. This said four, and said `ambiguous` "belongs to a scanner that returns every
- * match — this runtime has neither". Half of that was true when it was written and neither half is
+ * FIVE OF `43 §4.3`'s SIX, AND `tail` BELOW, WHICH IS THIS RECORD'S OWN. This said four, and said
+ * `ambiguous` "belongs to a scanner that returns every match — this runtime has neither". Half of that was true when it was written and neither half is
  * now: the number forms got their scanner, and `enum` and `lookup` never needed one to be
  * ambiguous. Two literals of equal length with different values, both present, is a text that said
  * two things, and answering it with either one is a guess written into a register.
  *
  * `invalid` IS STILL HONESTLY ABSENT. It is a field-shape check against `34 §3` and nothing here
  * runs one, so it stays out rather than becoming a word in a type that no code path can emit.
+ *
+ * `tail` IS A `lookup` THAT FOUND ITS ROW ONLY BY DIGITS PRINTED BEHIND STARS (`loop/DIRECTION.md` §25 A2). The row
+ * is read, and it is read from a part of the account number, so the first arrival filed that way for one ingest,
+ * account and tail waits for a person and the later ones file at `exact` once somebody has accepted one
+ * (`confirmedTail`). A misfiled transfer is wrong money, and one confirmation per account costs little.
  */
-export type FieldOutcome = 'exact' | 'chosen' | 'defaulted' | 'missing' | 'ambiguous';
+export type FieldOutcome = 'exact' | 'chosen' | 'defaulted' | 'missing' | 'ambiguous' | 'tail';
 
-/** What one field's form yielded, and how. */
-export type Extracted = { value: Json | null; outcome: FieldOutcome };
+/**
+ * What one field's form yielded, and how.
+ *
+ * `tail` CARRIES WHAT THE SENTENCE AND THE CONFIRMATION NEED, present exactly when `outcome` is `tail`: the digits
+ * the message printed and the list the lookup read.
+ */
+export type Extracted = { value: Json | null; outcome: FieldOutcome; tail?: { digits: string; register: string } };
 
 /** `43 §4.3`'s three combinators: they take a form's candidates rather than reading the payload. */
 const COMBINATORS = ['first', 'nth', 'default'] as const;
@@ -788,6 +799,15 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
       );
     };
 
+    /* A SCRIPT WHOSE `runs.door` IS THIS DOOR STARTS HERE, whatever the patterns make of the bytes: the script is how
+       that door is read, and a door with no pattern that matches is the ordinary case for one. The door is the ingest
+       the arrival names, or for unnamed mail the one that matched it. Only a verified arrival starts one, and only the
+       first time its bytes were offered anything: a redelivery returned above, and a rescued row that was offered before
+       (`reason` not `UNVERIFIED`) started its scripts then. */
+    const door = arrival.ingest ?? matched?.ingest;
+    if (!unverified && door !== undefined && (already === undefined || already.reason === UNVERIFIED))
+      startAtDoor(deps.sql, { mint: deps.mint, nowMs: deps.nowMs }, { door, body, headers }, BODY_BYTES_MAX);
+
     if (!matched) {
       /* UNTRIAGED IS NOT AN ERROR. It is the state a payload is in before anybody has said what it
          means, and the reason `inbox_raw` exists at all: an ingest pipeline whose answer to "I do not
@@ -865,6 +885,8 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
     /* THE OUTCOME PER FIELD, not only the value — `43 §5.1` step 7 files a row by the worst of them
        and this loop used to keep the value alone. */
     const soft: string[] = [];
+    /* AND THE FIELDS A `lookup` FILLED BY A PRINTED TAIL, which the fold below holds for a person until one is accepted. */
+    const tails: Tail[] = [];
 
     /* A MAP READS THE BODY AS JSON, once, and each field by its path; an extract reads the text with anchors. The
        outcomes are the same words, so everything below files a mapped row exactly as it files an extracted one.
@@ -891,7 +913,10 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
         if (got.value === null) missed.push(field);
         else {
           extracted[field] = got.value;
-          if (got.outcome !== 'exact') soft.push(field);
+          /* A ROW FOUND BY ITS PRINTED TAIL IS NOT A CHOICE OR A DEFAULT, and the fold below says which it is. */
+          if (got.outcome === 'tail' && got.tail !== undefined && typeof got.value === 'string')
+            tails.push({ field, digits: got.tail.digits, row: got.value, register: got.tail.register });
+          else if (got.outcome !== 'exact') soft.push(field);
         }
       }
     }
@@ -941,8 +966,12 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
        THE MIDDLE LEVEL HAD NO WAY TO BE REACHED and this comment said so: "there is no combinator
        here that chooses or defaults, so there is no honest third outcome to derive". There are three
        now, and `proposed` stopped being a level only a declared ceiling could produce. */
+    /* A ROW FOUND ONLY BY ITS PRINTED TAIL IS `proposed` UNTIL A PERSON HAS ACCEPTED ONE (`loop/DIRECTION.md` §25 A2):
+       once per ingest, account and tail, read from the rowsets this ingest opened and the decisions that accepted them
+       (`confirmedTail`). A lookup that matched the whole value never reaches `tails`, so it files as it always did. */
+    const pending = tails.filter((t) => !confirmedTail(deps.sql, matched.ingest, t));
     const confidence = worse(
-      missed.length ? 'needs-review' : soft.length ? 'proposed' : 'exact',
+      missed.length ? 'needs-review' : soft.length || pending.length ? 'proposed' : 'exact',
       ceiling,
     );
 
@@ -951,9 +980,10 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
        that makes a pattern nobody has approved yet safe to leave switched on. */
     if (confidence !== 'exact') {
       const state = confidence === 'proposed' ? 'proposed' : 'review';
-      /* THE REASON NAMES FIELD IDS AND NOTHING OUT OF THE PAYLOAD — `43 §6`'s leak rule. The middle
-         arm is new with the combinators: "files at ${ceiling}" was the only explanation this could
-         give, and it is a false one when the ceiling is `exact` and a field defaulted. */
+      /* THE REASON NAMES FIELD IDS AND NOTHING OUT OF THE PAYLOAD but a printed tail's digits, which end a value the
+         record already held (`byTail` below): `43 §6`'s leak rule. The middle arm is new with the combinators:
+         "files at ${ceiling}" was the only explanation this could give, and it is a false one when the ceiling is
+         `exact` and a field defaulted. */
       /**
        * A FIELD THE MESSAGE NEVER SENT AND A FIELD IT SENT UNREADABLY ARE TWO SENTENCES.
        *
@@ -987,7 +1017,9 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
        * for word what it was, so no receipt already in a record changes meaning.
        */
       const held = state === 'review' ? 'waits for a person on everything it reads, so nothing from this one is written until somebody accepts it.' : '';
-      const reason = missed.length
+      /* THE CEILING IS NAMED ONLY WHEN IT IS WHAT HELD THIS ONE. With nothing missed or soft and the ceiling `exact`,
+         the one cause left is a printed tail, and the sentence after this one says so. */
+      const cause = missed.length
         ? clauses.join(' ')
         : soft.length
           ? held
@@ -995,7 +1027,16 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
             : `${matched.ingest} chose or defaulted ${soft.join(', ')} rather than reading them, so what it read is proposed rather than written.`
           : held
             ? `${matched.ingest} ${held}`
-            : `${matched.ingest} files at ${ceiling}, so what it read is proposed rather than written.`;
+            : ceiling === 'exact'
+              ? ''
+              : `${matched.ingest} files at ${ceiling}, so what it read is proposed rather than written.`;
+      /* A TAIL IS SAID WHATEVER ELSE HELD THE ARRIVAL, because accepting the rowset confirms it, and a person should not
+         confirm an account they were never told was read from its last digits. The digits are the end of the value the
+         row already holds, so the sentence carries nothing the record did not have before the message came. */
+      const byTail = pending.length
+        ? `${pending.map((t) => `Filed to ${rowNamed(deps.sql, t)} by its last digits ${t.digits}.`).join(' ')} Confirm it once and later ones file straight away.`
+        : '';
+      const reason = [cause, byTail].filter((part) => part !== '').join(' ');
       store(state, reason);
       note('match', `ingest:${matched.ingest}`, `inbox_raw:${raw}`, 'inbox_raw', confidence);
 
@@ -1004,6 +1045,7 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
         register,
         rows: [extracted],
         question: `${reason} Accept it into ${register}, or fix the pattern.`,
+        ...(pending.length ? { tails: pending } : {}),
       });
       return ok<Arrived>({ raw, ingest: matched.ingest, state, wrote: [], reason, confidence, suggestion });
     }
@@ -1041,8 +1083,8 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
      * A NEAR MATCH UNDER `review` IS A QUESTION, NOT A SKIP. The arrival is stored as `review` and the reading goes in
      * front of a person as a rowset: accepting it files the second row, and declining it leaves the one already there.
      *
-     * THE REASON NAMES THE ROW AND THE FIELD IDS, and nothing out of the payload (`43 §6`'s leak rule, as the reasons
-     * above keep it). The row it resembles also rides in the suggestion's body as `resembles`, by id, so a screen can
+     * THE REASON NAMES THE ROW AND THE FIELDS BY THEIR LABELS, and nothing out of the payload (`43 §6`'s leak rule, as
+     * the reasons above keep it). The row it resembles also rides in the suggestion's body as `resembles`, by id, so a screen can
      * put the two side by side without parsing a sentence.
      */
     if (existing && conflict === 'review') {
@@ -1057,12 +1099,23 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
         const once = fields.filter((field, i) => fields.indexOf(field) === i);
         return once.length < 2 ? once.join('') : `${once.slice(0, -1).join(', ')} and ${once.at(-1)}`;
       };
+      /**
+       * A FIELD IS SAID BY ITS LABEL, NOT ITS ID. The person asked to tell two rows apart reads "As of" on the list,
+       * and read `as_of` here. A label opening one capital is lowered mid-sentence and one in capitals is kept; a
+       * field with no label is its id with `_` as a space, the name the list shows for it.
+       */
+      const labels = deps.schemaOf(register)?.fields ?? {};
+      const said = (field: string): string => {
+        const label = labels[field]?.label;
+        if (typeof label !== 'string' || label.trim() === '') return field.replace(/_/g, ' ');
+        return /^[A-Z][a-z]/.test(label) ? label.charAt(0).toLowerCase() + label.slice(1) : label;
+      };
       const dedupe = matched.dedupe!;
       const equal = Array.isArray(dedupe) ? dedupe : dedupe.near.on;
       const listed = and([
-        ...(equal.length ? [`the same ${and(equal)}`] : []),
-        ...(Array.isArray(dedupe) ? [] : [`${dedupe.near.day} within a day of it`]),
-        ...(!Array.isArray(dedupe) && dedupe.near.prefix ? [`${dedupe.near.prefix.field} starting the same way`] : []),
+        ...(equal.length ? [`the same ${and(equal.map(said))}`] : []),
+        ...(Array.isArray(dedupe) ? [] : [`${said(dedupe.near.day)} within a day of it`]),
+        ...(!Array.isArray(dedupe) && dedupe.near.prefix ? [`${said(dedupe.near.prefix.field)} starting the same way`] : []),
       ]);
       const reason = `This looks like ${like}, with ${listed}, so ${matched.ingest} held it for a person rather than skip it or file it twice.`;
       store('review', reason);
@@ -1141,7 +1194,7 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
 function openRowset(
   deps: IngestDeps,
   at: string,
-  item: { ingest: string; register: string; rows: Record<string, unknown>[]; question: string; resembles?: string },
+  item: { ingest: string; register: string; rows: Record<string, unknown>[]; question: string; resembles?: string; tails?: Tail[] },
 ): string {
   const id = `SG${deps.allocate('suggestion')}`;
   deps.sql.exec(
@@ -1152,6 +1205,8 @@ function openRowset(
       rows: item.rows,
       ingest: item.ingest,
       ...(item.resembles === undefined ? {} : { resembles: item.resembles }),
+      /* THE TAILS THIS ONE WAITS ON, so accepting it is the confirmation `confirmedTail` reads, with no table beside it. */
+      ...(item.tails === undefined ? {} : { tails: item.tails }),
     }),
     `ingest:${item.ingest}`,
     at,
@@ -1274,7 +1329,13 @@ export function extract(deps: IngestDeps, form: Extractor, text: string): Json |
  * it.
  */
 export function resolve(deps: IngestDeps, form: Extractor, text: string): Extracted {
-  return resolveAt(deps, form, text, 1);
+  const got = resolveAt(deps, form, text, 1);
+  /* A READ THAT CAME OUT `exact` IS ASKED ONE MORE THING: whether a `lookup` in it found its row only by a printed
+     tail. Asked here, over the whole form, so a lookup inside `first`, `nth` or `default` is asked too, and a field
+     read any other way is answered exactly as it was. */
+  if (got.outcome !== 'exact' || got.value === null) return got;
+  const tail = tailOf(deps, form, text, got.value, 1);
+  return tail === null ? got : { value: got.value, outcome: 'tail', tail };
 }
 
 function resolveAt(deps: IngestDeps, form: Extractor, text: string, depth: number): Extracted {
@@ -1424,13 +1485,6 @@ const AMBIGUOUS = 'ambiguous';
 type Candidates = Json[] | typeof AMBIGUOUS;
 
 /**
- * The `[literal, value]` table a literal-matching form searches for, or `null` for the other eight.
- *
- * `lookup`'s TABLE IS THE REGISTER'S OWN ROWS, one SELECT, which is what `43 §2` says the record
- * does: *every live row's `by` value*. Reading it here rather than one value at a time is what
- * makes *longest wins* and *equal length is ambiguous* askable at all.
- */
-/**
  * The mask a lookup's anchor ends in: its trailing run of stars and the one `-` or space after them, or `''`.
  * `bank-from-out` boxes its account between `***-` and a space, so the slice is a bare `518` and the one sign that
  * it is a tail sits in the anchor. Put back in front of the slice, it is what `lookup`'s masked-tail rule reads.
@@ -1444,6 +1498,171 @@ function maskAtEnd(anchor: string): string {
   return stars === at ? '' : anchor.slice(stars, at) + sep;
 }
 
+/**
+ * The digits a `lookup` in `form` found `value` by, when it found it ONLY by the masked-tail rule, or `null`.
+ *
+ * THE MATCH IS NOT DECIDED HERE, it is asked again of the rule that decided it. `literals` without the `lookup` form
+ * is the whole-token rule alone, so a slice it answers named the row by its whole value and nothing waits; a slice it
+ * does not answer, where `lookup` did, is one the tail rule answered (`matchLiterals` in
+ * `packages/extract/src/extractors.ts`). Only the digits are read back here, for the sentence and the confirmation.
+ *
+ * EVERY SLICE IS ASKED, because `candidatesAt` accepts one answer from several slices that agree, and a message that
+ * prints the whole value once has named the row whatever else it printed.
+ *
+ * ONE MORE READ OF THE LIST'S ROWS PER LOOKUP FIELD, and only when that field came out `exact`: the same SELECT
+ * `literalsOf` makes, bounded as it is by the list and by nothing else (`kernel/src/index.ts`, `rows`).
+ */
+function tailOf(deps: IngestDeps, form: Extractor, text: string, value: Json, depth: number): { digits: string; register: string } | null {
+  if (form === null || typeof form !== 'object' || depth > NESTING) return null;
+  if ('first' in form) {
+    for (const arm of Array.isArray(form.first) ? form.first : []) {
+      const got = tailOf(deps, arm, text, value, depth + 1);
+      if (got !== null) return got;
+    }
+    return null;
+  }
+  if ('nth' in form) return tailOf(deps, form.nth.of, text, value, depth + 1);
+  if ('default' in form) return tailOf(deps, form.default.of, text, value, depth + 1);
+  if (!('lookup' in form) || deps.literals === undefined) return null;
+
+  const lookup = form.lookup;
+  const table = literalsOf(deps, form);
+  if (table === null) return null;
+  const row = table.find(([, id]) => id === value);
+  if (row === undefined) return null;
+  const mask = maskAtEnd(lookup.between?.[0] ?? lookup.after ?? '');
+  let digits: string | null = null;
+  for (const anchored of slices(form as Record<string, unknown>, text)) {
+    const masked = mask + anchored;
+    const whole = deps.literals(masked, table);
+    if (whole !== AMBIGUOUS && whole.some((id) => id === value)) return null;
+    digits ??= printedTail(masked, row[0]);
+  }
+  return digits === null ? null : { digits, register: lookup.register };
+}
+
+/**
+ * The digits printed behind stars in a slice's first token that `whole` ends in, or `null`.
+ *
+ * THE SHAPE `matchMaskedTail` READS, and read back only after it has answered: a run of stars, one `-` or space, then
+ * the digits, in the first token, where the anchor put the mask, with no letter straight after them. Three digits at
+ * least, and fewer than the whole value, because a value no longer than the digits would have been a whole token.
+ */
+function printedTail(masked: string, whole: string): string | null {
+  /* SPACES ONLY, as `matchMaskedTail` skips them, so the first token here is the first token there. */
+  let first = 0;
+  while (masked[first] === ' ') first += 1;
+  const text = masked.slice(first);
+  const space = text.indexOf(' ');
+  const end = space === -1 ? text.length : space;
+  for (let star = text.indexOf('*'); star !== -1 && star < end; star = text.indexOf('*', star + 1)) {
+    if (text[star - 1] === '*') continue;
+    let at = star;
+    while (text[at] === '*') at += 1;
+    if (text[at] === '-' || text[at] === ' ') at += 1;
+    const from = at;
+    while (text[at] !== undefined && text[at]! >= '0' && text[at]! <= '9') at += 1;
+    const digits = text.slice(from, at);
+    if (/^[A-Za-z]/.test(text.slice(at))) continue;
+    if (digits.length >= 3 && whole.length > digits.length && whole.endsWith(digits)) return digits;
+  }
+  return null;
+}
+
+/**
+ * One field a `lookup` filled by a printed tail: the field, the digits, the row it landed on and that row's list.
+ *
+ * IT RIDES IN THE ROWSET'S BODY AS `tails`, and that is the whole of what the confirmation keeps. `ingest_receipt` is
+ * written only for a row filed at `exact`, so an accepted rowset leaves none, and no table is added for this: the
+ * rowset this ingest opened, resolved by a decision that accepted it, is the person's word. The field rides along for
+ * a screen that wants to point at it; the confirmation reads the digits and the row.
+ */
+type Tail = { field: string; digits: string; row: string; register: string };
+
+/**
+ * How many of an ingest's answered rowsets carrying a tail are read to find a confirmation, newest first.
+ *
+ * PAST IT A CONFIRMATION IS NOT FOUND, and that fails the safe way: the arrival is held for one more acceptance rather
+ * than filed. Each rowset read is one a person answered, so reaching this takes as many answered questions.
+ */
+const CONFIRMS_READ = 500;
+
+/**
+ * Whether a person has accepted an arrival `ingest` filed to `tail.row` by `tail.digits`, in whichever field.
+ *
+ * ACCEPTED, NOT ANSWERED. A rowset resolved `addressed` may have been accepted or rejected, so the decision is read as
+ * well, and it is found the way `govern.ts` finds it (`SETTLED_BY`): `decide` writes the `decide` event and the
+ * suggestion's `resolve` event one after the other, so the event just before the latest `resolve` names the decision.
+ * Matching on the instant, the actor or the question instead would let a rejection pressed in the same instant as an
+ * acceptance, on a rowset asking the same question, read as the acceptance. A rejection, a question reopened and
+ * answered no, and an erased one all read as not confirmed, so the next arrival waits again.
+ */
+function confirmedTail(sql: Sql, ingest: string, tail: Tail): boolean {
+  const answered = sql.all<{ id: string; body: string }>(
+    `SELECT id, body FROM suggestion WHERE body_kind = 'rowset' AND opened_by = ? AND status = 'resolved'
+       AND resolved_as = 'addressed' AND instr(body, '"tails"') > 0 ORDER BY opened_at DESC LIMIT ?`,
+    `ingest:${ingest}`,
+    CONFIRMS_READ,
+  );
+  for (const row of answered) {
+    let tails: unknown;
+    try {
+      tails = (JSON.parse(row.body) as { tails?: unknown }).tails;
+    } catch {
+      continue;
+    }
+    /* THE ACCOUNT AND THE TAIL, NOT THE FIELD. What a person confirmed is that these digits from this ingest are that
+       account, which stays true whichever of the ingest's fields printed them. */
+    const same = Array.isArray(tails) && tails.some((t: Partial<Tail> | null) => t?.digits === tail.digits && t.row === tail.row);
+    if (!same) continue;
+    const settled = sql.one<{ answer: string }>(
+      `SELECT d.answer AS answer FROM event r
+         JOIN event e ON e.rowid = r.rowid - 1 AND e.kind = 'decide' AND e.target LIKE 'decision:%'
+         JOIN decision d ON d.id = substr(e.target, 10)
+        WHERE r.kind = 'resolve' AND r.target = ? AND r.to_v = 'addressed'
+        ORDER BY r.rowid DESC LIMIT 1`,
+      `suggestion:${row.id}`,
+    );
+    if (settled?.answer === 'accept') return true;
+  }
+  return false;
+}
+
+/**
+ * What the reason calls the row a tail landed on: its title, as its list declares it, or its list's word for one row
+ * and the digits.
+ *
+ * READ FROM THE DECLARATION, because `IngestDeps` carries no title and the reason is written inside the arrival. A
+ * title field declared `secret` is never read into a sentence.
+ */
+function rowNamed(sql: Sql, tail: Tail): string {
+  const body = sql.one<{ body: string }>(
+    "SELECT body FROM declaration WHERE id = ? AND kind = 'register' AND superseded_at IS NULL AND retired = 0",
+    `register.${tail.register}`,
+  )?.body;
+  let list: { title?: unknown; one?: unknown; fields?: unknown } = {};
+  try {
+    list = body === undefined ? {} : (JSON.parse(body) as typeof list);
+  } catch {
+    list = {};
+  }
+  const title = typeof list.title === 'string' && /^[a-z][a-z0-9_]{0,31}$/.test(list.title) ? list.title : null;
+  const fields = Array.isArray(list.fields) ? (list.fields as { id?: unknown; type?: unknown }[]) : [];
+  if (title !== null && !fields.some((f) => f?.id === title && f.type === 'secret')) {
+    const name = sql.one<{ name: unknown }>(`SELECT json_extract(fields, '${jsonPath(title)}') AS name FROM entry WHERE id = ?`, tail.row)?.name;
+    if (typeof name === 'string' && name.trim() !== '') return name;
+  }
+  const one = typeof list.one === 'string' && list.one.trim() !== '' ? list.one : 'row';
+  return `the ${one} ending ${tail.digits}`;
+}
+
+/**
+ * The `[literal, value]` table a literal-matching form searches for, or `null` for the other eight.
+ *
+ * `lookup`'s TABLE IS THE REGISTER'S OWN ROWS, one SELECT, which is what `43 §2` says the record
+ * does: *every live row's `by` value*. Reading it here rather than one value at a time is what
+ * makes *longest wins* and *equal length is ambiguous* askable at all.
+ */
 function literalsOf(deps: IngestDeps, form: Extractor): readonly (readonly [string, Json])[] | null {
   if ('enum' in form) return Object.entries(form.enum.map);
   if ('lookup' in form) return deps.rows(form.lookup.register, form.lookup.by).map((r) => [r.value, r.id] as const);

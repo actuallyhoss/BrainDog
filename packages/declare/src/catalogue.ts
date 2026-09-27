@@ -20,15 +20,22 @@
  * adds, the example rows, the skills it suggests, every host it would call out to and the key it would send by label. A
  * version may carry its author's signature (`signing.ts`); one that does is verified on every fetch, and a reader says
  * which key signed it, or that nothing did.
+ *
+ * WHAT A MARKETPLACE SHOWS IS WORKED OUT, NOT WRITTEN (`loop/finish/platform.md` §4.0 C). An entry's categories come
+ * from what its file declares (`categoriesOf`), its publisher from who the catalogue knows published it, a version's
+ * notes from the file's own `changes`, and a preview of its pages from the record's own answer in a scratch record
+ * (`tools/catalogue/from-packs.mjs`), never from an author's screenshot. A pack whose manifest says `unlisted: true`
+ * stays in the index, so it installs by id and updates as any other, and is left out of every listing
+ * (`listedEntries`).
  */
 
 import type { Result } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
-import { digest, jcs, validateDeclaration, type Json } from '@braindog/kernel';
+import { digest, jcs, validateDeclaration, type Json, type PageResult } from '@braindog/kernel';
 
 import { credentialKey, credentialValue, NESTED_MOST, nestedPast } from './credentials.ts';
 import { egressOf, FIRST_PARTY_LISTS, normalise, type Pack, type PackSource } from './index.ts';
-import { kindUnknownSentence, readShared, SHARED_MOST_BYTES, type Shared } from './shared.ts';
+import { CHANGES_MOST, kindUnknownSentence, readChanges, readShared, SHARED_MOST_BYTES, type Shared } from './shared.ts';
 import { MODULE_LISTS, MODULES } from './usecase.ts';
 import {
   isRevocation,
@@ -87,7 +94,12 @@ export const CATALOGUE_INDEX = 'index.json';
 export const PACK_FILE_MOST_BYTES = SHARED_MOST_BYTES;
 
 const ID = /^[a-z][a-z0-9-]{0,62}$/u;
-const VERSION = /^(\d{1,6})\.(\d{1,6})\.(\d{1,6})$/u;
+/**
+ * THREE NUMBERS WITH NO LEADING ZERO. `01.0.0` read as 1.0.0 and was a different string, so an index could list one
+ * version twice under two spellings: `publishTo` let it in beside 1.0.0, and the check for an unsigned version after
+ * signed ones skipped the signed twin as not earlier (defects S13).
+ */
+const VERSION = /^(0|[1-9]\d{0,5})\.(0|[1-9]\d{0,5})\.(0|[1-9]\d{0,5})$/u;
 
 export type EntryKind = 'usecase' | 'pack';
 
@@ -123,7 +135,25 @@ export type CatalogueVersion = {
   reach: Reach;
   /** Its author's signature over the kind, id, version and checksum, when they signed it. */
   signature?: Signature;
+  /** What this version changed, from the file's `changes`, at most `CHANGES_MOST` characters. */
+  notes?: string;
+  /** Taken back by its author or the operator: still fetched by its exact version, never offered as the one to install. */
+  yanked?: { reason: string; at: string };
+  /** A `Preview` of its pages sits beside the file (`previewFile`). */
+  preview?: true;
+  /** When the operator listed it after review. */
+  reviewed?: string;
 };
+
+/** What an entry is, for the chips a marketplace groups by. Worked out from the file by `categoriesOf`, never chosen by its author. */
+export const CATEGORIES = ['ways-of-working', 'modules', 'templates', 'connectors', 'doors', 'automations', 'blocks', 'themes', 'made-by-braindog'] as const;
+export type Category = (typeof CATEGORIES)[number];
+
+/** Who published an entry, as the catalogue knows it: BrainDog itself, an author's signing key, or a person signed in. */
+export type Publisher = { kind: 'braindog' | 'key' | 'person'; id: string; name: string };
+
+/** BrainDog as a publisher: every entry the bundled catalogue lists from `packs/`. */
+export const BRAINDOG_PUBLISHER: Publisher = { kind: 'braindog', id: 'braindog', name: 'BrainDog' };
 
 export type CatalogueEntry = {
   kind: EntryKind;
@@ -137,7 +167,48 @@ export type CatalogueEntry = {
   latest: string;
   /** Newest first. */
   versions: CatalogueVersion[];
+  categories?: Category[];
+  publisher?: Publisher;
+  /** Its latest file says `unlisted: true`: installable by id and updated as any other, and left out of every listing. */
+  unlisted?: true;
 };
+
+/**
+ * The closed list of keys an add-on's manifest may say, which the SDK and the Kennel hold a file to. The record itself
+ * stays lenient and reads what it knows. `unlisted` is decisions.md C41's flag: a pack named for one person or one bank.
+ */
+export const MANIFEST_KEYS = ['pack', 'version', 'title', 'summary', 'changes', 'author', 'license', 'requires', 'provides', 'declarations', 'seeds', 'config', 'extends', 'note', 'unlisted'] as const;
+
+export const PREVIEW_FORMAT = 1;
+
+/** One page as the record's `page({ slug })` answers it: the page, its title and every block drawn. */
+export type PageAnswer = PageResult & { declared_version?: number };
+
+/**
+ * An entry's pages as a record holding it would draw them, made in a scratch record with its requirements and its
+ * example rows. Only a trusted party makes one (the integrator's `from-packs` run, the operator's review), because a
+ * picture an author drew could show anything.
+ */
+export type Preview = { format: typeof PREVIEW_FORMAT; made_at: string; pages: PageAnswer[] };
+
+/** Where a version's preview sits, beside its file. */
+export const previewFile = (id: string, version: string, kind: EntryKind = 'usecase'): string =>
+  kind === 'pack' ? `packs/${id}/${version}.preview.json` : `usecases/${id}/${version}.preview.json`;
+
+/** A preview read from anywhere, checked for its shape: its format, when it was made, and pages that each name a page and hold blocks. */
+export function readPreview(doc: unknown): Result<Preview> {
+  if (!isMap(doc) || doc.format !== PREVIEW_FORMAT || typeof doc.made_at !== 'string' || !Array.isArray(doc.pages))
+    return no('PACK_MALFORMED', `This is not a preview this version of BrainDog reads: it needs format ${PREVIEW_FORMAT}, when it was made, and its pages.`, { at: 'preview' });
+  if (!doc.pages.every((p) => isMap(p) && typeof p.page === 'string' && Array.isArray(p.blocks)))
+    return no('PACK_MALFORMED', 'A page in this preview has no name or no blocks.', { at: 'preview.pages' });
+  return ok({ format: PREVIEW_FORMAT, made_at: doc.made_at, pages: doc.pages as PageAnswer[] });
+}
+
+/** The entries a marketplace may list: every one but those whose file says `unlisted`. Installing by id reads `entries` whole. */
+export const listedEntries = (index: CatalogueIndex): CatalogueEntry[] => index.entries.filter((e) => e.unlisted !== true);
+
+/** The version an entry offers to install or update to: its newest that is not yanked, or `null` when every one is. */
+export const offeredVersion = (entry: Pick<CatalogueEntry, 'versions'>): CatalogueVersion | null => entry.versions.find((v) => v.yanked === undefined) ?? null;
 
 export type CatalogueIndex = {
   format: typeof CATALOGUE_FORMAT;
@@ -309,6 +380,43 @@ export function reachOf(file: Shared | PackFile | CatalogueFile): Reach {
   };
 }
 
+/** Ingest channels that fetch from somewhere on a schedule, and ones that wait for something to arrive. */
+const FETCHES: ReadonlySet<string> = new Set(['pull', 'poll', 'call']);
+const WAITS: ReadonlySet<string> = new Set(['webhook', 'email']);
+
+/**
+ * What an entry is, from what its file declares, in `CATEGORIES` order. More than one may apply.
+ *
+ * A use case is a way of working. A pack is: `templates` when it declares only pages, blocks and figures; `modules`
+ * when it adds a list, as BrainDog's own modules do; `connectors` when an ingest pulls, polls or calls, or a script may
+ * reach a host; `doors` when an ingest waits for a webhook or a mail; `automations` when a rule has a trigger or steps;
+ * `blocks` when it declares a block; `themes` when it declares only themes.
+ *
+ * `author` IS WHO THE CATALOGUE KNOWS PUBLISHED IT, never the file's own `author` line, which anybody can write: only
+ * `BRAINDOG_PUBLISHER.name` makes an entry `made-by-braindog`.
+ */
+export function categoriesOf(file: CatalogueFile, author: string): Category[] {
+  const found = new Set<Category>();
+  if (file.kind === 'usecase') found.add('ways-of-working');
+  else {
+    const decls = file.file.pack.declarations;
+    const only = (...kinds: string[]): boolean => decls.length > 0 && decls.every((d) => kinds.includes(d.kind));
+    if (only('page', 'block', 'metric')) found.add('templates');
+    if (only('theme')) found.add('themes');
+    for (const d of decls) {
+      const b = d.body as Record<string, unknown>;
+      if (d.kind === 'register') found.add('modules');
+      if (d.kind === 'block') found.add('blocks');
+      if (d.kind === 'ingest' && FETCHES.has(str(b.channel))) found.add('connectors');
+      if (d.kind === 'ingest' && WAITS.has(str(b.channel))) found.add('doors');
+      if (d.kind === 'script' && Array.isArray(b.egress) && b.egress.length > 0) found.add('connectors');
+      if (d.kind === 'rule' && (b.on !== undefined || (Array.isArray(b.steps) && b.steps.length > 0))) found.add('automations');
+    }
+  }
+  if (author === BRAINDOG_PUBLISHER.name) found.add('made-by-braindog');
+  return CATEGORIES.filter((c) => found.has(c));
+}
+
 /** One declaration named in a change: its kind, its id and the words a person reads for it. */
 export type Named = { kind: string; id: string; title: string };
 
@@ -389,6 +497,41 @@ export const unchanged = (c: Changes): boolean =>
 
 /* ── the index ──────────────────────────────────────────────────────────── */
 
+/**
+ * A version's marketplace fields kept only in their shapes, and the rest of it as the index gave it. A reader draws
+ * `notes` and `yanked` as text, so a number or a list there from a hand-edited or hostile index is dropped rather than
+ * thrown on further along.
+ */
+const versionRead = (v: Record<string, unknown>): CatalogueVersion => {
+  const { notes, yanked, preview, reviewed, ...rest } = v;
+  const y = isMap(yanked) && typeof yanked.reason === 'string' && typeof yanked.at === 'string' ? { reason: yanked.reason, at: yanked.at } : null;
+  return {
+    ...(rest as unknown as CatalogueVersion),
+    ...(typeof notes === 'string' ? { notes: [...notes].slice(0, CHANGES_MOST).join('') } : {}),
+    ...(y ? { yanked: y } : {}),
+    ...(preview === true ? { preview: true as const } : {}),
+    ...(typeof reviewed === 'string' ? { reviewed } : {}),
+  };
+};
+
+/** An entry's marketplace fields kept only in their shapes: categories this version names, a publisher with its three parts, `unlisted` only as `true`. */
+const entryRead = (e: Record<string, unknown>, versions: CatalogueVersion[]): CatalogueEntry => {
+  const { categories, publisher, unlisted, ...rest } = e;
+  const named = Array.isArray(categories) ? CATEGORIES.filter((c) => categories.includes(c)) : null;
+  const who =
+    isMap(publisher) && (publisher.kind === 'braindog' || publisher.kind === 'key' || publisher.kind === 'person') && typeof publisher.id === 'string' && typeof publisher.name === 'string'
+      ? { kind: publisher.kind, id: publisher.id, name: publisher.name }
+      : null;
+  return {
+    ...(rest as unknown as CatalogueEntry),
+    versions,
+    latest: (versions[0] as CatalogueVersion).version,
+    ...(named ? { categories: named } : {}),
+    ...(who ? { publisher: who } : {}),
+    ...(unlisted === true ? { unlisted: true as const } : {}),
+  };
+};
+
 /** An index read from anywhere, checked: its format, and every id and version safe to build a path from. */
 export function readCatalogue(doc: unknown): Result<CatalogueIndex> {
   const bad = (at: string, fix: string): Result<CatalogueIndex> => no('PACK_MALFORMED', fix, { at }) as Result<CatalogueIndex>;
@@ -404,10 +547,14 @@ export function readCatalogue(doc: unknown): Result<CatalogueIndex> {
         return bad(`entries[${i}].versions`, `A version of ${str(e.id)} in this catalogue has no version number or checksum.`);
       if (v.signature !== undefined && !isSignature(v.signature))
         return bad(`entries[${i}].versions`, `A version of ${str(e.id)} in this catalogue carries a signature that is not one.`);
-      versions.push(v as unknown as CatalogueVersion);
+      /* ONE LISTING PER VERSION. A second one beside a signed version could be the unsigned twin a reader is handed, so
+         an index that lists a version twice is not read at all (defects S13). */
+      if (versions.some((w) => w.version === v.version))
+        return bad(`entries[${i}].versions`, `${str(e.id)} ${str(v.version)} is listed twice in this catalogue, and a version is published once.`);
+      versions.push(versionRead(v));
     }
     versions.sort((a, b) => compareVersions(b.version, a.version));
-    entries.push({ ...(e as unknown as CatalogueEntry), versions, latest: (versions[0] as CatalogueVersion).version });
+    entries.push(entryRead(e, versions));
   }
   if (doc.keys !== undefined) {
     const k = doc.keys;
@@ -447,11 +594,19 @@ export const revokedNotice = (statements: KeyStatements, title: string, version:
 /**
  * The keys that verifiably signed an entry's versions earlier than `version`, as the index lists them. A signature covers
  * the kind, id, version and checksum, so it is checked from the index alone; one that does not verify counts for nothing.
+ *
+ * AN EQUAL VERSION IS NOT A NEWER ONE. When the entry lists `version` more than once, which `readCatalogue` refuses and
+ * only an entry built by hand can hold, every signed twin counts as before it, so an unsigned twin of a signed version
+ * is said as stripped rather than passed (defects S13). A version listed once never counts its own signature.
  */
 export async function keysSignedBefore(entry: Pick<CatalogueEntry, 'kind' | 'id' | 'versions'>, version: string): Promise<string[]> {
   const keys: string[] = [];
+  if (partsOf(version) === null) return keys;
+  const twinned = entry.versions.filter((v) => v.version === version).length > 1;
   for (const v of entry.versions) {
-    if (!v.signature || compareVersions(v.version, version) >= 0 || keys.includes(v.signature.key_id)) continue;
+    if (!v.signature || partsOf(v.version) === null || keys.includes(v.signature.key_id)) continue;
+    const order = compareVersions(v.version, version);
+    if (order > 0 || (order === 0 && !twinned)) continue;
     if ((await verifySignature(v.signature, entry.kind, entry.id, v.version, v.checksum)).ok) keys.push(v.signature.key_id);
   }
   return keys;
@@ -461,15 +616,21 @@ export async function keysSignedBefore(entry: Pick<CatalogueEntry, 'kind' | 'id'
 export const strippedNotice = (title: string, version: string, before: readonly string[]): string =>
   `${title} ${version} is unsigned, and earlier versions were signed by key ${before.join(', ')}. A catalogue does not publish an unsigned version after a signed one, so this one may not be from its author. It is not offered.`;
 
-/** The entries a search matches, best first: by id, title, summary, author, and the lists and pages the latest adds. */
+/**
+ * The entries a search matches, best first: by id, title, summary, author, the publisher's name, the categories (as
+ * written, `made-by-braindog`, or as words, "made by braindog"), and the lists and pages the latest adds. An unlisted
+ * entry is never among them, whatever is asked: a search is a listing.
+ */
 export function searchCatalogue(index: CatalogueIndex, query: string, kind?: EntryKind): CatalogueEntry[] {
-  const pool = kind === undefined ? index.entries : index.entries.filter((e) => e.kind === kind);
+  const listed = listedEntries(index);
+  const pool = kind === undefined ? listed : listed.filter((e) => e.kind === kind);
   const words = query.toLowerCase().split(/\s+/u).filter((w) => w !== '');
   if (words.length === 0) return [...pool];
   const scored = pool.map((e) => {
     const reach = e.versions[0]?.reach;
     const head = `${e.id} ${e.title}`.toLowerCase();
-    const body = [e.summary, e.author, ...(reach?.lists ?? []), ...(reach?.pages ?? [])].join(' ').toLowerCase();
+    const categories = (e.categories ?? []).flatMap((c) => [c, c.split('-').join(' ')]);
+    const body = [e.summary, e.author, e.publisher?.name ?? '', ...categories, ...(reach?.lists ?? []), ...(reach?.pages ?? [])].join(' ').toLowerCase();
     const score = words.reduce((n, w) => n + (head.includes(w) ? 2 : body.includes(w) ? 1 : -100), 0);
     return { e, score };
   });
@@ -508,6 +669,11 @@ export type Published = { index: CatalogueIndex; path: string; entry: CatalogueE
  *
  * `read` answers a file already in the catalogue by its path, or `null`, so the version before can be compared. `key` signs
  * the version; once an entry has a signed version, every later one must be signed by the same key.
+ *
+ * `publisher` is who the caller knows published it: BrainDog for `packs/`, the signed-in person or the verified key on
+ * the Kennel. Without one, a signed version is published by its key and an unsigned one by nobody named. The entry's
+ * categories, its `unlisted` flag and the version's notes are read from the file itself, and only a BrainDog publisher
+ * makes an entry `made-by-braindog`: a file's own `author` line is its author's word.
  */
 export async function publishTo(
   index: CatalogueIndex,
@@ -515,6 +681,7 @@ export async function publishTo(
   read: (path: string) => string | null | Promise<string | null>,
   now: Date = new Date(),
   key?: AuthorKey,
+  publisher?: Publisher,
 ): Promise<Result<Published>> {
   const got = await readCatalogueFile(text, { kind: 'local' });
   if (!got.ok) return got as Result<Published>;
@@ -524,7 +691,16 @@ export async function publishTo(
   const title = file.kind === 'usecase' ? file.shared.usecase.title : file.file.title;
   const noun = kind === 'usecase' ? 'a use case' : 'an add-on';
   if (!ID.test(s.id)) return no('PACK_MALFORMED', `A catalogue lists ${noun} by an id of lower-case letters, digits and dashes, and ${s.id} is not one.`, { at: kind });
-  if (!VERSION.test(s.version)) return no('PACK_MALFORMED', `A catalogue lists versions as three numbers, as in 1.0.0, and ${s.version} is not one.`, { at: 'version' });
+  if (!VERSION.test(s.version))
+    return no('PACK_MALFORMED', `A catalogue lists versions as three numbers with no leading zero, as in 1.0.0, and ${s.version} is not one.`, { at: 'version' });
+
+  /* THE MARKETPLACE'S TWO KEYS IN THE FILE. A use case's `changes` was read at its door; an add-on's manifest is read
+     leniently by the record, so the catalogue checks both of its own keys here. */
+  const notes = file.kind === 'usecase' ? ok(file.shared.changes ?? null) : readChanges(file.file.doc.changes);
+  if (!notes.ok) return notes as Result<Published>;
+  const flag = file.kind === 'pack' ? file.file.doc.unlisted : undefined;
+  if (flag !== undefined && flag !== true)
+    return no('PACK_MALFORMED', 'unlisted is either true, for a pack named for one person or one bank, or left out.', { at: 'unlisted' });
 
   const checksum = await fileChecksum(text);
   const was = index.entries.find((e) => e.id === s.id && e.kind === kind) ?? null;
@@ -537,7 +713,8 @@ export async function publishTo(
         : `${title} ${s.version} is already in this catalogue, and a published version never changes. Publish this file as a later version.`,
       { at: 'version' },
     );
-  if (was && compareVersions(s.version, was.latest) < 0)
+  /* AN EQUAL VERSION IS NOT A LATER ONE, however it is spelled (defects S13). */
+  if (was && compareVersions(s.version, was.latest) <= 0)
     return no('ALREADY_KNOWN', `${title} ${was.latest} is already in this catalogue, so this file needs a later version than ${s.version}.`, { at: 'version' });
 
   /* ONE KEY PER ENTRY ONCE IT IS SIGNED, or a key that one rotated to, so a reader who trusted the last version's key is
@@ -589,12 +766,24 @@ export async function publishTo(
     bump: was ? changes.bump : null,
     reach: reachOf(file),
     ...(signature ? { signature } : {}),
+    ...(notes.value !== null ? { notes: notes.value } : {}),
   };
   const head =
     file.kind === 'usecase'
       ? { summary: file.shared.usecase.summary, author: file.shared.usecase.author, license: file.shared.usecase.license, audience: file.shared.usecase.audience as string }
       : { summary: file.file.pack.manifest.summary, author: file.file.pack.manifest.author, license: file.file.pack.manifest.license, audience: 'addon' };
-  const entry: CatalogueEntry = { kind, id: s.id, title, ...head, latest: s.version, versions: [version, ...(was?.versions ?? [])] };
+  const by = publisher ?? (signature ? { kind: 'key' as const, id: signature.key_id, name: head.author } : null);
+  const entry: CatalogueEntry = {
+    kind,
+    id: s.id,
+    title,
+    ...head,
+    latest: s.version,
+    versions: [version, ...(was?.versions ?? [])],
+    categories: categoriesOf(file, by?.kind === 'braindog' ? BRAINDOG_PUBLISHER.name : ''),
+    ...(by ? { publisher: by } : {}),
+    ...(flag === true ? { unlisted: true as const } : {}),
+  };
   const entries = [...index.entries.filter((e) => !(e.id === s.id && e.kind === kind)), entry].sort((a, b) => a.kind.localeCompare(b.kind) || a.id.localeCompare(b.id));
   return ok({ index: { ...index, entries }, path: catalogueFile(s.id, s.version, kind), entry, version, changes });
 }
@@ -618,6 +807,10 @@ export type CatalogueUpdate = {
 /**
  * Every entry of a catalogue a record holds at an earlier version, with the latest file fetched and held to its checksum
  * and signature. A version that does not verify or read is left out and said in `refused`, never offered.
+ *
+ * THE LATEST IS THE NEWEST NOT YANKED (`offeredVersion`): a version its author took back still downloads by its exact
+ * number, and is never the one an update moves a record to. An unlisted entry is offered as any other, since the
+ * record that holds it is its owner's.
  */
 export async function catalogueUpdates(
   index: CatalogueIndex,
@@ -630,7 +823,7 @@ export async function catalogueUpdates(
   for (const entry of index.entries) {
     const installed = installedIdOf(entry);
     const state = held.find((h) => h.id === installed);
-    const latest = entry.versions[0];
+    const latest = offeredVersion(entry);
     if (!state || !latest || state.version === null || (state.disabled_at ?? null) !== null || compareVersions(state.version, latest.version) >= 0) continue;
     const text = await read(catalogueFile(entry.id, latest.version, entry.kind));
     if (text === null) {

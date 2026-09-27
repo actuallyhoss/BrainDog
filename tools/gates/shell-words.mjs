@@ -141,9 +141,15 @@ const READ = { packages: ['src', 'grammars'], apps: ['src', 'scripts'] };
  * AND FIVE OF THE SEVEN WERE REWORDED THE SAME DAY, so their entries went. Three were the Kiln
  * sample's `registrar` in the seed, and the web's two were `EGP` among the common currencies and the
  * web copy of the sample's `D41`. Measured when those words went and the entries had not: the gate
- * named every one of their files as exempted and idle and exited 1. What is left is the guide's
- * `payday`, which is a word a stranger types, the public site's changelog, and Estate's Services line,
- * whose entry below says why it stays.
+ * named every one of their files as exempted and idle and exited 1.
+ *
+ * AND THE SIXTH WENT WITH estate 1.3.0. Estate's Services line said a row held `a renewal date, a
+ * registrar and a cost`, and it was kept out while it could not change: `holds` on `register.services`
+ * is part of what `packages/seed/test/pack-versions.test.ts` fingerprints, and estate 1.2.0 had been on
+ * `origin/master` since `8b8915e4`, so a reword under 1.2.0 would have left a record holding the old
+ * words while the pack said it declared the new ones. It says `who it is with` at 1.3.0, and its entry
+ * went in the same change, because an entry left idle is a finding. What is left is the guide's
+ * `payday`, which is a word a stranger types, and the public site's changelog.
  *
  * `*.test.ts` and any `test` directory are out by rule rather than by entry, because a test asserts
  * on what a record was handed: `packages/record/test/ask-person-reach.test.ts` arrives
@@ -153,17 +159,6 @@ const READ = { packages: ['src', 'grammars'], apps: ['src', 'scripts'] };
  * The hit counts are 25 September's, from this gate's own reading.
  */
 const OUT = {
-  /* A RELEASED DECLARATION, WHICH A REWORD CANNOT REACH WITHOUT A VERSION OF ITS OWN. `holds` on
-     `register.services` is part of what `pack-versions.test.ts` fingerprints, and estate 1.2.0 has been
-     on `origin/master` since `8b8915e4` on 22 September with successful deploys after it. Reworded on
-     25 September, the fingerprint moved to `6ffcf19b2d7a4b0c` and was set again under 1.2.0, which that
-     file allows only for a version no record can hold yet; a record on 1.2.0 would have kept the old
-     words while the pack said it declared the new ones. The word goes when estate raises to 1.3.0 in
-     `packs/first-party.ts`, and this entry then goes idle and the gate asks for it out. */
-  'packages/seed/src/modules/estate.ts': {
-    why: 'Estate, a released first-party module still in the core (1 hit).',
-    words: { registrar: 'the Services list says what a row holds, a renewal date, a registrar and a cost, which is what a domain is.' },
-  },
   /* A WORD A STRANGER TYPES, read to tell which kind of record they want, and not a use case the core
      runs: the guide hears `payday` and offers Personal. */
   'packages/seed/src/usecases/personal.ts': {

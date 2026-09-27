@@ -1,101 +1,86 @@
 /**
- * What the first-run form asks for, and what the choice answers without asking.
+ * What the first run proposes from one sentence (`loop/finish/modules.md` C10, MOD-6), held against the use cases and
+ * the reader the app ships.
  *
- * AGAINST THE SEED THE APP SHIPS, not a fixture, for the reason `start.test.ts` gives for the tiles:
- * the defect was two lists drifting apart, what a tile promises and what its register requires, and
- * a fixture repeating one of them would pass while the screen stayed wrong.
- *
- * WHAT IT WAS. The form asked for the title and every required field, so Money was five fields for
- * one row, each wearing `required`, and `Which way` opened on `owed by me` under "Your first
- * invoice": the default most people accept recorded their first invoice backwards.
+ * AGAINST THE SEED, NOT A FIXTURE: the proposal is the arranger's, the modules are the seed's and the name is `who.ts`'s,
+ * and a fixture repeating any of them would pass while the screen proposed something else.
  */
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 
-import './record/fixtures/fill.ts';
-import { firstAsks, firstRun } from './first-run.ts';
-import { readableFields } from './record/api.ts';
-import { REGISTERS } from './record/fixtures/sample.ts';
-import type { FieldDecl } from './record/schema.ts';
+import { USE_CASES } from '@braindog/seed/usecases';
 
-const asks = (key: string): string[] =>
-  firstAsks(readableFields(key), REGISTERS[key]?.title, firstRun.firstGiven[key]).map((f) => f.id);
+import { firstRun } from './first-run.ts';
+import { propose, type Proposal } from './start/propose.ts';
 
-test('EVERY TILE ENDS IN A ROW ITS REGISTER WOULD TAKE: each required field is asked or given, never both', () => {
-  for (const c of firstRun.firstChoices) {
-    const decl = REGISTERS[c.key];
-    assert.ok(decl, `${c.label} opens ${c.key}, which the record does not declare`);
-    const given = firstRun.firstGiven[c.key] ?? {};
-    const asked = asks(c.key);
-    assert.ok(asked.includes(decl.title), `${c.label} does not ask for its title, the one fact the person types`);
-    for (const f of readableFields(c.key).filter((x) => x.required)) {
-      const a = asked.includes(f.id);
-      const g = given[f.id] !== undefined;
-      assert.ok(a || g, `${c.label}: ${f.id} is required and is neither asked for nor given`);
-      assert.ok(!(a && g), `${c.label}: ${f.id} is given, and then asked for anyway`);
-    }
+const CTX = { zone: 'Europe/London', locale: 'en-GB' };
+const said = (sentence: string): Proposal => propose(sentence, CTX);
+
+test('ONE SENTENCE GIVES THE WHOLE PROPOSAL: the name, the use case, the modules, and what each phrase became', () => {
+  const p = said('Sam, I run a few companies and I send invoices');
+  assert.equal(p.name, 'Sam');
+  assert.equal(p.usecase, 'founder');
+  const founder = USE_CASES.find((u) => u.usecase === 'founder')!;
+  for (const m of founder.modules) assert.ok(p.modules.includes(m), `the founder stands on ${m}, and it is not proposed`);
+  assert.ok(p.heard.length > 0, 'nothing was said back');
+  for (const h of p.heard) {
+    assert.ok('Sam, I run a few companies and I send invoices'.includes(h.phrase), `${h.phrase} is not a phrase of the sentence`);
+    assert.notEqual(h.became, '', `${h.phrase} became nothing`);
   }
 });
 
-test('A GIVEN VALUE IS ONE ITS FIELD DECLARES, and only a choice between declared values is ever given', () => {
-  for (const [key, given] of Object.entries(firstRun.firstGiven)) {
-    assert.ok(firstRun.firstChoices.some((c) => c.key === key), `${key} has answers, and no tile opens it`);
-    const decl = REGISTERS[key];
-    assert.ok(decl, `${key} is not a register`);
-    for (const [id, value] of Object.entries(given)) {
-      const f: FieldDecl | undefined = decl.fields.find((x) => x.id === id);
-      assert.ok(f, `${key}.${id} is not a field of ${key}`);
-      /* A DATE, AN AMOUNT OR A NAME IS A FACT ABOUT SOMEBODY'S BUSINESS, and one they did not type is
-         one they did not state. What a tile can answer is which of a register's own words applies. */
-      assert.equal(f.type, 'enum', `${key}.${id} is given, and it is not a choice between declared values`);
-      assert.ok(f.values?.includes(value), `${key}.${id} is given ${value}, which is not one of ${f.values?.join(', ')}`);
-    }
+test('EACH OF THE FOUR CHIPS PROPOSES ITS OWN PERSON: a student, a founder, a team and somebody starting something', () => {
+  const want = ['student', 'founder', 'team', 'guide'];
+  firstRun.whoChips.forEach((chip, i) => assert.equal(said(chip).usecase, want[i], chip));
+});
+
+test('A SENTENCE THESE RULES CANNOT READ IS KEPT, NEVER REFUSED: nothing heard, nothing guessed', () => {
+  for (const sentence of ['Je suis étudiante et je veux suivre mes devoirs', 'أنا طالب', '']) {
+    const p = said(sentence);
+    assert.equal(p.usecase, null, sentence);
+    assert.deepEqual(p.heard, [], sentence);
+    assert.deepEqual(p.rows, [], sentence);
+    assert.equal(p.currency, null, sentence);
   }
+  /* A NAME IS STILL HEARD, and People with it, so the words have somewhere to be kept. */
+  assert.deepEqual(said('Élodie, je suis étudiante').modules, ['people']);
 });
 
-test('AN INVOICE IS OWED TO YOU, and Money asks for what its question names', () => {
-  assert.equal(firstRun.firstGiven.obligations?.direction, 'owed_to_me');
-  assert.equal(firstRun.firstGiven.obligations?.state, 'open');
-  /* "What is it, and how much?": the title, the amount, and the due date `19 §6` pre-fills for the
-     person to overwrite. Not `Which way`, not `Status`. */
-  assert.deepEqual(asks('obligations'), ['what', 'amount', 'due']);
+test('THE CURRENCY IS ONE THAT WAS TYPED, or none', () => {
+  assert.equal(said('I invoice Halden EGP 5,000 every month on the 20th').currency, 'EGP');
+  assert.equal(said('I send invoices').currency, null);
+  assert.equal(said('hosting costs 20 pounds a month').currency, null, 'pounds could be sterling or Egyptian, and is not guessed');
 });
 
-test('A FIELD THE REGISTER DOES NOT REQUIRE IS NOT ON THE FIRST FORM, and the form fills only what it draws', () => {
-  /* Tasks declares a due date and does not require it. The form used to fill it anyway, out of sight:
-     the first task arrived with a date four weeks out that nobody was shown. */
-  assert.deepEqual(asks('tasks'), ['what']);
-
-  /* A SOURCE READ, for the half a unit test cannot drive: the form has to use this rule, seed only
-     what it draws, and put the answers where a press would. */
-  const form = readFileSync(fileURLToPath(new URL('./ui/RowForm.svelte', import.meta.url)), 'utf8');
-  assert.match(form, /firstAsks\(readableFields\(register\), decl\?\.title, given\)/u, 'the form does not ask by this rule');
-  assert.match(form, /for \(const f of fields\) \{\n\s+if \(first && f\.deadline/u, 'the form fills fields it does not draw');
-  assert.match(form, /return first \? \{ \.\.\.out, \.\.\.given \} : out;/u, 'the answers never reach the row');
-  const start = readFileSync(fileURLToPath(new URL('../routes/start/+page.svelte', import.meta.url)), 'utf8');
-  assert.match(start, /given=\{firstRun\.firstGiven\[choice\.key\]\}/u, 'the first-run screen does not hand the form its answers');
+test('AN ENTRY IS PROPOSED ONLY WHEN THE SENTENCE FILLS IT COMPLETELY', () => {
+  assert.deepEqual(said('I send invoices').rows, [], 'an invoice with no amount and no day is not written');
+  const full = said('We bill Fenwick £2,000 a month on the 1st');
+  const invoice = full.rows.find((r) => r.fields.what !== undefined);
+  assert.ok(invoice, 'a complete invoice is not proposed');
+  assert.deepEqual(invoice.fields.amount, { amount: 200000, currency: 'GBP' });
+  /* AND IT POINTS AT THE CLIENT THE SENTENCE NAMED, who comes before it, so the press can link the two. */
+  const party = invoice.party === undefined ? undefined : full.rows[invoice.party];
+  assert.equal(party?.fields.name, 'Fenwick', 'the invoice does not point at the client the sentence named');
+  assert.ok(invoice.party !== undefined && invoice.party < full.rows.indexOf(invoice), 'the client does not come before the invoice');
 });
 
-test('THE OUTCOME STARTS WITH A CAPITAL AND NAMES THE ROW, for every tile', () => {
-  /* The toast it replaced began "the first row in Money would be written", in lower case. */
-  for (const c of firstRun.firstChoices) {
-    const thing = firstRun.firstThing[c.key];
-    assert.ok(thing, `${c.label} has no name for the row it makes`);
-    /* SAVED, AND WHERE IT LIVES. The demo's sentences beside these said it was waiting and marked, and
-       went with the sample (DIRECTION 26). */
-    assert.match(firstRun.rowSaved(thing, 'Money'), /^[A-Z].* is saved to your record, at the top of the Money list\.$/u);
-    assert.match(firstRun.rowChangedSaved(thing, 'Money'), /^[A-Z].* on the Money list was changed\.$/u);
-  }
+test('A MODULE NOTHING POINTED AT DOES NOT ARRIVE, and what one leans on still does', () => {
+  /* The maths student's Projects, which the reader answers for any sentence at all. */
+  assert.ok(!said('I keep losing track of my coursework deadlines').modules.includes('portfolio'));
+  /* Money points at a project and at the person an invoice is to, so both come with it. */
+  const money = said('I send invoices').modules;
+  for (const m of ['portfolio', 'people', 'money-core']) assert.ok(money.includes(m), `${m} did not come with Money`);
+});
 
-  /* A REFUSAL IS THE RECORD'S OWN SENTENCE, PASSED THROUGH WHOLE. The screen names the row and then
-     stops: what to do about it is a rule the record holds and this file does not. */
-  assert.equal(
-    firstRun.rowNotSaved('Your invoice', 'Amount cannot be left out.'),
-    'Your invoice was not saved. Amount cannot be left out.',
-  );
+test('THE SAME WORDS ALWAYS GIVE THE SAME PROPOSAL', () => {
+  for (const sentence of ['Sam, I run a few companies', "I'm part of a team", 'I want to start a podcast'])
+    assert.deepEqual(said(sentence), said(sentence), sentence);
+});
+
+test('THE WORDS SAY NONE OF THE DEVELOPER WORDS THE OLD CARD SAID', () => {
+  const words = Object.values(firstRun).flatMap((w) => (typeof w === 'string' ? [w] : Array.isArray(w) ? w.map(String) : []));
+  for (const w of words) assert.doesNotMatch(w, /Builds on|Lists:|Pages:|In a voice that is|\brows?\b|\bregisters?\b|\bmodules?\b/u, w);
 });
 
 /**

@@ -20,7 +20,73 @@
 
 import { no, ok, type Refusal, type Result } from '@braindog/ports';
 
-import type { Citable, Projection, RawPayload } from './types.ts';
+import type { Citable, Projection, ProjectionRegister, ProjectionRow, RawPayload } from './types.ts';
+
+/**
+ * A figure the record read for this ask: a declared metric, by its id, as it stands.
+ *
+ * DECLARED HERE AND NOT IN `types.ts`, because the projection that carries it is the host's addition to `45 §4.4`'s shape
+ * (`SlashProjection` in `packages/host/src/slash.ts`), and a projection without it is still a projection. `value` is the
+ * kernel's reading: money in minor units under a currency `unit`, anything else a plain number, `null` when the record
+ * could not state it.
+ */
+export type ProjectedFigure = { id: string; name: string; value: number | null; unit: string | null; format: string | null };
+
+/** A figure the record keeps, listed on the index call by id and name so the predicate draft can name it. Never a reading. */
+export type FigureName = { id: string; name: string };
+
+/**
+ * The projection as a host that reads figures answers it.
+ *
+ * `cut` NAMES EVERY REGISTER WHOSE ROWS STOPPED SHORT, at the budget or at the list's own page, and a register named there
+ * is never totalled: a sum over the first fifty of two hundred matching rows is a figure that reads as the answer and is
+ * not. A projection that names none is read as whole, which is what every projection was before hosts said so.
+ */
+export type Figured = Projection & {
+  figures?: readonly ProjectedFigure[] | undefined;
+  cut?: readonly string[] | undefined;
+  index: Projection['index'] & { figures?: readonly FigureName[] | undefined };
+};
+
+/**
+ * A total code worked out over the rows read, which the model may cite as `{{sum:<id>}}` and never type.
+ *
+ * `id` IS `<register>.<field>` FOR A WHOLE NUMBER AND `<register>.<field>.<CURRENCY>` FOR MONEY, one total per currency,
+ * because two currencies are never added. `rows` is every row the total covers, in the order the record answered them, so
+ * the screen can put them one tap from the figure.
+ */
+export type Sum = { id: string; register: string; field: string; amount: number; currency: string | null; rows: readonly ProjectionRow[] };
+
+/** Everything a brace may be pinned to on one ask: the rows, their paths and values, the figures read and the totals. */
+export type Allowed = Citable & {
+  rows: ReadonlyMap<string, ProjectionRow>;
+  figures: ReadonlyMap<string, ProjectedFigure>;
+  sums: ReadonlyMap<string, Sum>;
+};
+
+/**
+ * What one brace in an answer stands for, kept on the answer so the palette draws it without asking the record again.
+ *
+ * ON THE ANSWER AND NEVER ON THE FILED QUESTION. The answer goes to the asker alone, who read every row it names; a filed
+ * question is shown to readers the record chooses by its own rule, and a title or an amount kept on it would reach one
+ * who cannot read the list it came from (`propose.ts`, where the body is filed). `apps/web/src/lib/cite.ts` reads this
+ * shape back, defensively.
+ *
+ * A ROW IS NAMED BY ITS TITLE. The spoken id is the link and never the words: nobody reads `obligations#7` aloud.
+ */
+export type DrawnFigure =
+  | { kind: 'row'; register: string; seq: number; title: string }
+  | { kind: 'value'; register: string; seq: number; field: string; type: string; value: unknown }
+  | { kind: 'metric'; name: string; value: number | null; unit: string | null; format: string | null }
+  | {
+      kind: 'sum';
+      register: string;
+      field: string;
+      amount: number;
+      currency: string | null;
+      n: number;
+      rows: { register: string; seq: number; title: string }[];
+    };
 
 const UTF8 = new TextEncoder();
 
@@ -78,20 +144,158 @@ export const shapeOf = (raw: RawPayload): string => {
  * two keys quotable, and a `json` field holding a webhook's echo of a payment is exactly that
  * object with no register behind it.
  */
-export const citable = (p: Projection): Citable => {
-  const typeOf = new Map<string, string>();
-  for (const reg of p.index.registers) for (const f of reg.fields) typeOf.set(`${reg.id}.${f.id}`, f.type);
+export const citable = (p: Projection, registers: readonly ProjectionRegister[] = p.index.registers): Allowed => {
+  const typeOf = typesOf(registers);
 
-  const out: Citable = { spoken: new Set(), paths: new Set(), money: new Set(), days: new Set() };
+  const spoken = new Set<string>();
+  const paths = new Set<string>();
+  const money = new Set<string>();
+  const days = new Set<string>();
+  const rows = new Map<string, ProjectionRow>();
   for (const row of p.rows) {
-    out.spoken.add(row.spoken);
+    spoken.add(row.spoken);
+    rows.set(row.spoken, row);
     for (const [field, value] of Object.entries(row.fields)) {
-      out.paths.add(`${row.spoken}.${field}`);
+      paths.add(`${row.spoken}.${field}`);
       const type = typeOf.get(`${row.register}.${field}`);
-      if (type === 'money' && isMoney(value)) out.money.add(`${value.amount} ${value.currency}`);
-      if (type === 'day' && typeof value === 'string') out.days.add(value);
+      if (type === 'money' && isMoney(value)) money.add(`${value.amount} ${value.currency}`);
+      if (type === 'day' && typeof value === 'string') days.add(value);
     }
   }
+  const figured = p as Figured;
+  const figures = new Map((figured.figures ?? []).map((f) => [f.id, f] as const));
+  const sums = new Map(sumsOf(p.rows, registers, figured.cut ?? []).map((s) => [s.id, s] as const));
+  return { spoken, paths, money, days, rows, figures, sums };
+};
+
+const typesOf = (registers: readonly ProjectionRegister[]): Map<string, string> => {
+  const out = new Map<string, string>();
+  for (const reg of registers) for (const f of reg.fields) out.set(`${reg.id}.${f.id}`, f.type);
+  return out;
+};
+
+/** A total over one row is that row's value, which the row already cites; two is the least worth adding up. */
+const SUM_LEAST = 2;
+
+/**
+ * The totals over the rows read: every money field per currency, and every whole-number field, per register.
+ *
+ * CODE ADDS AND THE MODEL CITES (`loop/finish/agents.md` §2.7, S13). "How much did I spend on software this month" has
+ * its answer in no single row, so under rule 1 it could never be said, and a model asked to add twelve amounts is the
+ * one place a figure would be typed with nothing behind it. The total is worked out here, handed to the model as a brace
+ * it may quote, and drawn from the same numbers.
+ *
+ * A `decimal` IS NOT TOTALLED, because binary fractions do not add to what a person expects (`0.1 + 0.2`), and a total
+ * that is out in its last place is a total nobody can check against the rows. Money and `int` are whole numbers.
+ *
+ * A REGISTER IN `cut` IS NOT TOTALLED AT ALL (`Figured`).
+ */
+export const sumsOf = (
+  rows: readonly ProjectionRow[],
+  registers: readonly ProjectionRegister[],
+  cut: readonly string[],
+): Sum[] => {
+  const out = new Map<string, { register: string; field: string; amount: number; currency: string | null; rows: ProjectionRow[] }>();
+  for (const reg of registers) {
+    if (cut.includes(reg.id)) continue;
+    for (const f of reg.fields) {
+      if (f.type !== 'money' && f.type !== 'int') continue;
+      for (const row of rows) {
+        if (row.register !== reg.id) continue;
+        const value = row.fields[f.id];
+        const currency = f.type === 'money' && isMoney(value) ? value.currency : null;
+        const amount = f.type === 'money' ? (isMoney(value) ? value.amount : null) : typeof value === 'number' ? value : null;
+        if (amount === null || !Number.isSafeInteger(amount)) continue;
+        const id = currency === null ? `${reg.id}.${f.id}` : `${reg.id}.${f.id}.${currency}`;
+        const into = out.get(id) ?? { register: reg.id, field: f.id, amount: 0, currency, rows: [] };
+        into.amount += amount;
+        into.rows.push(row);
+        out.set(id, into);
+      }
+    }
+  }
+  return [...out.entries()].filter(([, s]) => s.rows.length >= SUM_LEAST).map(([id, s]) => ({ id, ...s }));
+};
+
+/**
+ * A row's title: the first part of its summary that is not its spoken id.
+ *
+ * THE SUMMARY IS `spoken | title | state` ON THE HOST'S BRIDGE (`summaryOf` in `packages/host/src/slash.ts`) and the title
+ * alone on a record that writes its own, so the spoken id is dropped wherever it sits rather than assumed first. A row
+ * with nothing else to say has an empty title, and the screen names it by its list.
+ */
+export const titleOf = (row: Pick<ProjectionRow, 'spoken' | 'summary'>): string =>
+  row.summary
+    .split(' | ')
+    .map((part) => part.trim())
+    .find((part) => part !== '' && part !== row.spoken) ?? '';
+
+/** Rows a total names on the answer, at most: the rest are counted in `n` and are one list away on the register. */
+const SUM_ROWS_DRAWN = 50;
+
+const drawnRow = (row: ProjectionRow): { register: string; seq: number; title: string } => ({
+  register: row.register,
+  seq: row.seq,
+  title: titleOf(row),
+});
+
+/**
+ * Every brace in these texts, as what it stands for (`DrawnFigure`), keyed by the brace's inside.
+ *
+ * RUN AFTER `cite` PASSED, so every brace here names something `allowed` holds; one that does not is left out rather
+ * than guessed, and the screen draws its own words for it. A typed kind over a path (`{{money:obligations#7.amount}}`)
+ * is keyed by the path, which is what the screen looks up; a typed literal (`{{money:500500 EGP}}`) needs nothing here,
+ * because the literal is its own value.
+ */
+export const figuresOf = (texts: readonly string[], allowed: Allowed, registers: readonly ProjectionRegister[]): Record<string, DrawnFigure> => {
+  const typeOf = typesOf(registers);
+  const out: Record<string, DrawnFigure> = {};
+  const row = (spoken: string): void => {
+    const r = allowed.rows.get(spoken);
+    if (r) out[`ref:${spoken}`] = { kind: 'row', ...drawnRow(r) };
+  };
+  const path = (p: string): void => {
+    const whole = allowed.rows.get(p);
+    if (whole) {
+      out[p] = { kind: 'row', ...drawnRow(whole) };
+      return;
+    }
+    const q = QUALIFIED.exec(p);
+    const r = q ? allowed.rows.get(q[0]) : undefined;
+    if (q && r && p.startsWith(`${q[0]}.`)) {
+      const field = p.slice(q[0].length + 1);
+      if (Object.hasOwn(r.fields, field))
+        out[p] = { kind: 'value', register: r.register, seq: r.seq, field, type: typeOf.get(`${r.register}.${field}`) ?? 'text', value: r.fields[field] };
+      return;
+    }
+    const figure = allowed.figures.get(p);
+    if (figure) out[p] = { kind: 'metric', name: figure.name, value: figure.value, unit: figure.unit, format: figure.format };
+  };
+  for (const text of texts)
+    for (const match of text.replace(CODE_SPAN, blank).matchAll(INTERPOLATION)) {
+      const inner = match[0].slice(2, -2).trim();
+      const colon = inner.indexOf(':');
+      if (colon < 0) {
+        path(inner);
+        continue;
+      }
+      const kind = inner.slice(0, colon);
+      const arg = inner.slice(colon + 1).trim();
+      if (kind === 'ref') row(arg);
+      else if (kind === 'sum') {
+        const s = allowed.sums.get(arg);
+        if (s)
+          out[`sum:${arg}`] = {
+            kind: 'sum',
+            register: s.register,
+            field: s.field,
+            amount: s.amount,
+            currency: s.currency,
+            n: s.rows.length,
+            rows: s.rows.slice(0, SUM_ROWS_DRAWN).map(drawnRow),
+          };
+      } else if (!isLiteral(arg)) path(arg);
+    }
   return out;
 };
 
@@ -127,7 +331,10 @@ const INTERPOLATION = /\{\{[^}\n]*\}\}/gu;
  * legitimate homes for a digit are the two that survive. Everything else, including a year, a
  * percentage and the word "2" in a sentence, is a figure with nothing behind it.
  */
-export const cite = (text: string, allowed: Citable): Result<{ text: string; citations: string[] }> => {
+export const cite = (
+  text: string,
+  allowed: Citable & Partial<Pick<Allowed, 'figures' | 'sums'>>,
+): Result<{ text: string; citations: string[] }> => {
   const spans = text.replace(CODE_SPAN, blank);
   const bare = spans.replace(INTERPOLATION, blank);
 
@@ -145,21 +352,32 @@ export const cite = (text: string, allowed: Citable): Result<{ text: string; cit
     const colon = inner.indexOf(':');
 
     if (colon < 0) {
-      const fault = pathFault(inner, allowed);
-      if (fault) return no('PROPOSAL_UNCITED', NAME_IT, { at: whole });
+      /* A BARE ID IS A FIGURE THE RECORD READ FOR THIS ASK, OR IT IS NOTHING. It was refused before hosts read figures,
+         because no path in the projection matched it, so "why is runway four months" had nothing to cite (S13). */
+      if (pathFault(inner, allowed) && allowed.figures?.has(inner) !== true) return no('PROPOSAL_UNCITED', NAME_IT, { at: whole });
       addPath(inner, add);
       continue;
     }
 
     const kind = inner.slice(0, colon);
     const arg = inner.slice(colon + 1).trim();
+    /* `sum` IS SLASH'S OWN AND NOT A NINTH TYPED KIND OF `34 §2.3`: it names a total `sumsOf` worked out for this ask, and
+       quoting one cites every row it adds up, because those rows are what the total is a claim about. */
+    if (kind === 'sum') {
+      const total = allowed.sums?.get(arg);
+      if (total === undefined) return no('PROPOSAL_UNCITED', NAME_IT, { at: whole });
+      for (const row of total.rows) add(row.spoken);
+      continue;
+    }
     if (!TYPED.has(kind)) return no('PROPOSAL_UNCITED', NAME_IT, { at: whole });
 
     if (!isLiteral(arg)) {
       /* A PATH ARGUMENT FOLLOWS THE PATH RULE, whatever the kind is: `{{money:obligations#7.amount}}`
          is the row's own value rendered as money, which is the form `34 §2.3` says a rule's `say:`
-         template uses, and it is cited by the row it names. */
-      if (pathFault(arg, allowed)) return no('PROPOSAL_UNCITED', NAME_IT, { at: whole });
+         template uses, and it is cited by the row it names. A figure read for this ask is a path here as it is bare
+         (`{{pct:paid-share}}`), except under `ref`, which names a row and nothing else. */
+      const figure = kind !== 'ref' && allowed.figures?.has(arg) === true;
+      if (pathFault(arg, allowed) && !figure) return no('PROPOSAL_UNCITED', NAME_IT, { at: whole });
       addPath(arg, add);
       if (kind === 'ref') add(arg);
       continue;
@@ -278,9 +496,10 @@ export const isRecord = (v: unknown): v is Record<string, unknown> =>
  * a person.
  *
  * A SUBSET OF JSON SCHEMA AND NOT A VALIDATOR (`46 §10`): `type` (one name or a list), `required`,
- * `enum`, `additionalProperties: false`, and an array's `items.type`. That is exactly what the
- * three templates in `prompts.ts` use. `declare`'s Valibot path is the answer if a schema here ever
- * grows past ten keys; three keys does not earn a dependency.
+ * `enum`, `additionalProperties: false`, an array's `items`, `minItems` and `maxItems`. `anyOf` is NOT read: the
+ * proposal's body carries one for the provider, and `propose.ts` checks the body against the one schema in `BODIES`
+ * its `body_kind` names instead. `declare`'s Valibot path is the answer if a schema here ever grows past ten keys; this
+ * many does not earn a dependency.
  */
 export const checkSchema = (schema: object, value: unknown, at = ''): Refusal | null => {
   const s = schema as Record<string, unknown>;

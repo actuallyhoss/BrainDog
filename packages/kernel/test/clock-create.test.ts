@@ -6,9 +6,9 @@
  * from `runRules`, and `runRules` was the only thing that filled a create. `clock-monthly.test.ts` holds the clock half;
  * this file holds the button, and what a create with no row refuses rather than guesses.
  *
- * THE ROW A TURN MAKES IS KEYED ON THE RUN. A create on a row is once per tuple per parent row (`expand`'s header), and a
- * create with no row has no parent row, so the run stands in for it: every turn of the clock is a run of its own and
- * makes its row, and the same run taken twice finds the row it already made.
+ * THE ROW A PRESS MAKES IS KEYED ON THE RUN. A create on a row is once per tuple per parent row (`expand`'s header), and a
+ * create with no row has no parent row, so the run stands in for it on a button, and `<rule>@<turn>` on a clock: each
+ * press and each turn makes its row, and the same run or the same turn taken twice finds the row it already made.
  */
 
 import { test } from 'node:test';
@@ -70,8 +70,10 @@ const made = (sql: NodeSql): { what: string; parent: string }[] =>
 const run = (sql: NodeSql, id: string) => ({ ...sql.one<{ state: string; say: string | null }>('SELECT state, say FROM automation_run WHERE id = ?', id)! });
 
 test('A BUTTON THAT CREATES MAKES ONE ROW A PRESS, each keyed on its own run, filled from the run', async () => {
+  /* `bound: 2`, BECAUSE WITH NO ROW TO STAND ON THE BOUND IS A DAY'S (`rules.ts`'s `expand`), and both presses fall in
+     one day. */
   const { k, sql } = await record(
-    rule({ rule: 'next_bill', on: { manual: true }, steps: [{ set_var: { name: 'label', to: 'Water' } }, { create: { register: 'obligations', fields: { what: '{{vars.label}} bill' }, bound: 1 } }] }),
+    rule({ rule: 'next_bill', on: { manual: true }, steps: [{ set_var: { name: 'label', to: 'Water' } }, { create: { register: 'obligations', fields: { what: '{{vars.label}} bill' }, bound: 2 } }] }),
   );
   const first = press(k, 'next_bill');
   await k.drain();

@@ -2,9 +2,10 @@
   Below 900px the sidebar becomes a tab bar. Not a shrunken desktop.
 
   The declared nav CANNOT be a tab bar: it varies in length and the user reorders it. So the tab bar
-  carries the SPINE and a sheet carries the data — Home · Decide · Inbox · More — with the palette as
-  a header button rather than a fifth tab. A command surface in a tab slot looks like another place
-  to go (19 §3).
+  carries the SPINE and a sheet carries the rest: Home, Decide, Inbox and More. Search is the 44px
+  button in each screen's head bar (`PageHead.svelte`) and the first row of More, never a fifth tab:
+  a command surface in a tab slot looks like another place to go (19 §3). A new place is a row in
+  More and in the rail, never a fifth tab (design 6.6).
 
   Safe-area insets are paid exactly once, on the fixed elements only. Paying twice is a real, easy bug.
 -->
@@ -15,32 +16,49 @@
   import { said } from '../voice.svelte.ts';
   import Icon from './Icon.svelte';
 
-  let { open = 0, inbox = 0, onmore }: { open?: number; inbox?: number; onmore?: () => void } = $props();
+  let {
+    open = 0,
+    inbox = 0,
+    more = false,
+    onmore,
+  }: {
+    open?: number;
+    inbox?: number;
+    /** Whether the More sheet is open, said on the tab that opens it. */
+    more?: boolean;
+    onmore?: () => void;
+  } = $props();
 
   /* COMPARED INSIDE THE RECORD. `page.url` is the address as it came, `/app/acme/decide`, and these links are written
      `/decide`, so the comparison reads the address with the base and the slug taken off (`lib/at.ts`). */
   const here = (href: string) => inside(page.url.pathname) === href;
+  /* A DECISION IS STILL DECIDE, and an arrival still the inbox: the tab stays marked on the screens under it, as the
+     rail's rows do (`Sidebar.svelte`'s `under`). Home is exact, because every address is under `/`. */
+  const under = (href: string) => {
+    const where = inside(page.url.pathname);
+    return where === href || where.startsWith(`${href}/`);
+  };
 </script>
 
 <nav class="tabs" aria-label="Record">
   <a class="tab tap" href={at('/')} aria-current={here('/') ? 'page' : undefined}>
     <Icon name="home" size="l" /><span>{said('home')}</span>
   </a>
-  <a class="tab tap" href={at('/decide')} aria-current={here('/decide') ? 'page' : undefined}>
+  <a class="tab tap" href={at('/decide')} aria-current={under('/decide') ? 'page' : undefined}>
     <span class="badge-slot">
       <Icon name="decide" size="l" />
       {#if open}<span class="badge" data-intent="warn">{open}</span>{/if}
     </span>
     <span>{said('decide')}</span>
   </a>
-  <a class="tab tap" href={at('/inbox')} aria-current={here('/inbox') ? 'page' : undefined}>
+  <a class="tab tap" href={at('/inbox')} aria-current={under('/inbox') ? 'page' : undefined}>
     <span class="badge-slot">
       <Icon name="inbox" size="l" />
       {#if inbox}<span class="badge">{inbox}</span>{/if}
     </span>
     <span>{said('inbox')}</span>
   </a>
-  <button type="button" class="tab tap" onclick={onmore}>
+  <button type="button" class="tab tap" aria-haspopup="dialog" aria-expanded={more} onclick={onmore}>
     <Icon name="more" size="l" /><span>{copy.more}</span>
   </button>
 </nav>

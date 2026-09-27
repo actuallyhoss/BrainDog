@@ -69,18 +69,23 @@
     pointer-events: auto;
   }
 
-  /* Over the page, so it is allowed `--e2`: s1, a hairline, no accent (DESIGN-BRIEF 4.9). */
+  /* Over the page, so it is allowed `--e2`: s1, a hairline, no accent (DESIGN-BRIEF 4.9).
+
+     A PILL, because a toast is the answer to something you pressed and speaks in the same shape
+     (design D-2). The start pads a full step and the end half of one, so the text clears the curve
+     and the close glyph sits inside it. */
   .toast {
     display: flex;
     align-items: center;
     gap: var(--sp-3);
-    padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-4);
+    padding-block: var(--sp-2);
+    padding-inline: var(--sp-5) var(--sp-2);
     background: var(--s1);
     border: 1px solid var(--line);
-    border-radius: var(--r-md);
+    border-radius: var(--r-pill);
     box-shadow: var(--e2);
     color: var(--ink);
-    font-size: var(--t-sm);
+    font-size: var(--t-base);
     /* Ease-out, as the sheet: no overshoot on a report. */
     animation: toast-in var(--d-enter) var(--ease-out);
   }
@@ -111,16 +116,17 @@
     min-inline-size: 0;
   }
 
-  /* The undo is the loud thing in the toast: a secondary button in ink, not an accent link. */
-  /* AND IT IS A 44px TARGET ON A THUMB. It was 28 — the only control in the product that gives you
+  /* The undo is the loud thing in the toast: a secondary button in ink, not an accent link, drawn
+     as `Button`'s secondary is, a pill with an `--edge` border. */
+  /* AND IT IS A 44px TARGET ON A THUMB. It was 28: the only control in the product that gives you
      your data back, on a countdown, at two thirds of the floor. */
   .undo {
     flex: none;
     min-block-size: var(--ctl-h);
-    padding: 0 var(--sp-3);
+    padding: 0 var(--sp-4);
     background: none;
-    border: 1px solid var(--line);
-    border-radius: var(--r-sm);
+    border: 1px solid var(--edge);
+    border-radius: var(--r-pill);
     color: var(--ink);
     font: inherit;
     font-weight: 500;
@@ -128,10 +134,6 @@
     transition:
       background var(--d-state) var(--ease-out),
       border-color var(--d-state) var(--ease-out);
-  }
-
-  .undo:hover {
-    background: var(--s2);
   }
 
   /* `tap` EXPANDS THE HIT AREA WITHOUT MOVING THE GLYPH. `a11y.css`'s `.tap::before` grows a small
@@ -145,14 +147,28 @@
     flex: none;
     background: none;
     border: 0;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-pill);
     color: var(--dim);
     cursor: pointer;
   }
 
-  .close:hover {
-    background: var(--s2);
-    color: var(--ink);
+  /* HOVER ONLY WHERE THERE IS ONE: a phone keeps `:hover` on the last thing tapped. */
+  @media (hover: hover) and (pointer: fine) {
+    .undo:hover {
+      background: var(--hover-wash);
+    }
+
+    .close:hover {
+      background: var(--hover-wash);
+      color: var(--ink);
+    }
+  }
+
+  /* A THUMB READS THE TOAST AND ITS UNDO AT THE CONTROL SIZE, 16 (design DSN-2). */
+  @media (pointer: coarse) {
+    .toast {
+      font-size: var(--t-md);
+    }
   }
 
   /* No rail below 900px, and the tab bar owns the bottom edge. */

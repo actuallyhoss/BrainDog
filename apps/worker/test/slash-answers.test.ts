@@ -187,8 +187,8 @@ async function hosted(opts: { kek?: boolean; key?: boolean; answer?: () => Respo
     asks,
     /* SLASH'S LEDGER, in this object's own storage until `do/slash.ts` exists, which is what the Worker hands the engine. */
     calls: () => {
-      const has = sql.exec("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'call'").toArray().length > 0;
-      return has ? (sql.exec('SELECT model, tokens_out, status, code FROM call ORDER BY rowid').toArray() as { model: string; tokens_out: number; status: string; code: string | null }[]).map((r) => ({ ...r })) : [];
+      const has = sql.exec("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'slash_call'").toArray().length > 0;
+      return has ? (sql.exec('SELECT model, tokens_out, status, code FROM slash_call ORDER BY rowid').toArray() as { model: string; tokens_out: number; status: string; code: string | null }[]).map((r) => ({ ...r })) : [];
     },
     reads: () => (sql.exec("SELECT actor FROM event WHERE kind = 'grant.read' ORDER BY rowid").toArray() as { actor: string }[]).map((e) => e.actor),
     retries: () => (sql.exec("SELECT count(*) AS n FROM schedule WHERE kind = 'retry'").toArray()[0] as { n: number }).n,

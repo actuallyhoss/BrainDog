@@ -363,12 +363,13 @@
            with Workers AI only when this is `yes`; the binding alone never switched it on. One call may spend about 2,500
            neurons (about $0.03) before it is stopped, and one record's asks at most the ceiling below in a month. */
         "SLASH_INCLUDED": "yes",
-        /* THE OPERATOR'S CEILING ON ONE RECORD'S ASKS OF Slash, IN NEURONS A UTC MONTH: 900,000 is $9.90 at $0.011 a thousand.
-           It was the record owner's `ask_cap` alone, with no upper limit, and an owner saved a billion
-           (`loop/research-batch-sixty-audit.md` finding 1); `ask_cap` can now only lower this. It is per record and
-           not per account. `INCLUDED_MONTH_NEURONS` in `apps/worker/src/slash.ts` argues the number and is what an
-           unset or mistyped value falls back to; `0` turns every ask away. */
-        "SLASH_INCLUDED_MONTH_NEURONS": "900000",
+        /* THE OPERATOR'S CEILING ON ONE RECORD'S ASKS OF Slash, IN NEURONS A UTC MONTH: 300,000 is about $3.30 at $0.011 a
+           thousand (`loop/finish/decisions.md` C19, down from 900,000 and about $9.90). The 80 asks a month a record is
+           shown fit well inside it. It was the record owner's `ask_cap` alone, with no upper limit, and an owner saved a
+           billion (`loop/research-batch-sixty-audit.md` finding 1); `ask_cap` can now only lower this. It is per record
+           and not per account. `INCLUDED_MONTH_NEURONS` in `apps/worker/src/slash.ts` is what an unset or mistyped
+           value falls back to; `0` turns every ask away. */
+        "SLASH_INCLUDED_MONTH_NEURONS": "300000",
         "BRAINDOG_BUILD": "",
         /* EMPTY IS NO SIGN-IN LINKS. The sender, on a domain Email Service sends for, switches them on
            with the `EMAIL` binding below (51 §5.8). */
@@ -468,12 +469,14 @@
 
          "analytics_engine_datasets": [
            { "binding": "TELEMETRY", "dataset": "braindog_telemetry_alpha" }],
+
+         `ratelimits` IS THE EXCEPTION: the code reads it now (`overLimit` in `src/index.ts`) and production binds it.
+         Alpha leaves it drafted on purpose, kept for a rehearsal, and an unbound one limits nothing:
          "ratelimits": [
            { "name": "RL_READ",  "namespace_id": "1001", "simple": { "limit": 600, "period": 60 } },
            { "name": "RL_WRITE", "namespace_id": "1002", "simple": { "limit": 120, "period": 60 } }],
          "secrets_store_secrets": [
-           { "binding": "KEK",      "store_id": "<store-id>", "secret_name": "braindog-kek-alpha" },
-           { "binding": "KEK_PREV", "store_id": "<store-id>", "secret_name": "braindog-kek-alpha-prev" }]
+           { "binding": "KEK", "store_id": "<store-id>", "secret_name": "braindog-kek-alpha" }]
 
          THERE IS NO `kv_namespaces` KEY IN EITHER ENVIRONMENT, AND THERE WILL NOT BE ONE. The
          record is the Durable Object's own SQLite (33 §7); the Directory is a Durable Object; the
@@ -546,9 +549,9 @@
            with Workers AI only when this is `yes`; the binding alone never switched it on. One call may spend about 2,500
            neurons (about $0.03) before it is stopped, and one record's asks at most the ceiling below in a month. */
         "SLASH_INCLUDED": "yes",
-        /* THE OPERATOR'S CEILING ON ONE RECORD'S ASKS OF Slash, as alpha's comment says: 900,000 neurons, $9.90 a record a
-           month, which `ask_cap` can only lower. */
-        "SLASH_INCLUDED_MONTH_NEURONS": "900000",
+        /* THE OPERATOR'S CEILING ON ONE RECORD'S ASKS OF Slash, as alpha's comment says: 300,000 neurons, about $3.30 a
+           record a month (`loop/finish/decisions.md` C19), which `ask_cap` can only lower. */
+        "SLASH_INCLUDED_MONTH_NEURONS": "300000",
         "BRAINDOG_BUILD": "",
         /* EMPTY IS NO SIGN-IN LINKS. The sender, on a domain Email Service sends for, switches them on
            with the `EMAIL` binding below (51 §5.8). */
@@ -605,17 +608,27 @@
 
       /* REPEATED IN FULL, for the same reason: `worker_loaders` is not inheritable. Production without it deploys and
          meters every script run `dropped`, saying this host has no sandbox. The argument is in `alpha` above. */
-      "worker_loaders": [{ "binding": "LOADER" }]
+      "worker_loaders": [{ "binding": "LOADER" }],
 
-      /* The same drafted blocks as alpha, without the suffix:
+      /* THE FRONT DOORS' TWO BUDGETS, READ BY CODE AND SO BOUND HERE (`overLimit` in `src/index.ts`): one caller may ask
+         600 times a minute and write 120 times a minute, keyed by the token, the person, or for `/auth/*` the address.
+         The numbers are `READ_PER_MINUTE` and `WRITE_PER_MINUTE` in `packages/host/src/limits.ts`, which the self-host
+         counts to, and a change to one here that is not made there gives the two hosts different ceilings.
+
+         PRODUCTION ONLY. `alpha` keeps its block drafted and commented, and an unbound binding limits nothing, so alpha
+         answers as it did. NOT INHERITABLE, like every key in this block: an environment that should have it writes it.
+         A rate-limit namespace is not a resource to create first; `namespace_id` is a number this account chooses, and
+         a 429 `RATE_LIMITED` with `Retry-After: 60` is what a caller over it is answered. */
+      "ratelimits": [
+        { "name": "RL_READ", "namespace_id": "1001", "simple": { "limit": 600, "period": 60 } },
+        { "name": "RL_WRITE", "namespace_id": "1002", "simple": { "limit": 120, "period": 60 } }
+      ]
+
+      /* The same drafted blocks as alpha, without the suffix, less `ratelimits`, which is bound above:
          "analytics_engine_datasets": [
            { "binding": "TELEMETRY", "dataset": "braindog_telemetry" }],
-         "ratelimits": [
-           { "name": "RL_READ",  "namespace_id": "1001", "simple": { "limit": 600, "period": 60 } },
-           { "name": "RL_WRITE", "namespace_id": "1002", "simple": { "limit": 120, "period": 60 } }],
          "secrets_store_secrets": [
-           { "binding": "KEK",      "store_id": "<store-id>", "secret_name": "braindog-kek" },
-           { "binding": "KEK_PREV", "store_id": "<store-id>", "secret_name": "braindog-kek-prev" }]  */
+           { "binding": "KEK", "store_id": "<store-id>", "secret_name": "braindog-kek" }]  */
     }
   }
 
@@ -643,7 +656,15 @@
      DEK every sealed grant was made under — so the only repair is to throw the Directory name away, and 52 §13 has
      no undo for one. `PROVISION_WITHOUT_KEYS` in `vars` is the deliberate exception. It is deliberately not
      listed under `secrets.required`: that key fails the first deploy of an environment while the secret is unset,
-     and unset is a supported state for every door but that one. `KEK_PREV` is not read yet.
+     and unset is a supported state for every door but that one.
+
+     A ROTATION IS THE SAME SECRET HOLDING TWO KEYS, the new one, a space, and the old one (`src/keys.ts`, 53 §5.6),
+     and never a second binding: `KEK_PREV`, which 53 §5.6 still names, is read by nothing.
+     New keys are wrapped under the first at once and every record still opens under either. `rewrapRecord` in
+     `src/rewrap.ts` moves one record's keys under the first and answers `straggler` for a record it could not move,
+     and it is the nightly walk's to call for every record. Put the new key back alone only after a night whose walk
+     re-wrapped every record with no stragglers, and not while a copy made before the rotation may still be restored,
+     because a key the secret no longer holds opens nothing wrapped under it.
 
      `VAPID_PRIVATE` IS THE FIFTH, AND WEB PUSH'S SWITCH TOGETHER WITH THE `VAPID_PUBLIC` VAR. It is the 32-byte P-256
      private key in base64url, the second of the two strings a VAPID key generator prints, put with

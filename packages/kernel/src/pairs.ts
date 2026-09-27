@@ -366,7 +366,7 @@ export function markPinned(p: Pairing, id: string): boolean {
  * Who pinned this row's mark (`markPinned`), or `null` when nobody has.
  *
  * THE ACTOR AND NOT ONLY THE ANSWER, because an update that renames the mark carries his word to the new field
- * (`index.ts`, `settleRedeclared`) and the history has to say whose word it still is.
+ * (`carryPins`, called from `index.ts`'s `settleRedeclared`) and the history has to say whose word it still is.
  */
 export function pinnedBy(p: Pairing, id: string): string | null {
   const mark = p.pairs.mark;
@@ -387,6 +387,100 @@ export function pinnedBy(p: Pairing, id: string): string | null {
   const value = row !== null && typeof row === 'object' ? (row as Record<string, unknown>)[mark] : undefined;
   const declared = p.fields.find((f) => f.id === mark)?.default;
   return value !== undefined && value !== null && !same(value, declared) ? said.actor : null;
+}
+
+/** One pin `carryPins` found: the row as it stands, the value a person said on the old mark, and who said it. */
+export type Carried = { leg: Leg; value: boolean; by: string };
+
+/**
+ * How many versions of a list `carryPins` reads back for the old mark's shape: the one being installed and the one it
+ * replaces, which declared the old mark, since `pairsFault` refuses a `pairs.mark` naming no `bool` field.
+ */
+const CARRY_VERSIONS = 2;
+
+/**
+ * The old mark's field as the list declared it, for its `default`, which is how `pinnedBy` tells a create that said
+ * something about the mark from one that only filled it in.
+ *
+ * FROM THE NEW DECLARATION WHEN IT STILL HOLDS THE FIELD, AND FROM THE ONE BEFORE IT WHEN THE RENAME DROPPED IT. Read
+ * off the new fields alone, a dropped mark has no default, and every row a person typed in with `false` filled in would
+ * read as his "not a transfer" and never pair again.
+ */
+function markShape(p: Pairing, field: string): FieldShape | undefined {
+  const now = p.fields.find((f) => f.id === field);
+  if (now) return now;
+  const bodies = p.sql.all<{ body: string }>(
+    "SELECT body FROM declaration WHERE id = ? AND kind = 'register' ORDER BY version DESC LIMIT ?",
+    `register.${p.register}`,
+    CARRY_VERSIONS,
+  );
+  for (const { body } of bodies) {
+    try {
+      const fields = (JSON.parse(body) as { fields?: unknown }).fields;
+      const was = Array.isArray(fields) ? (fields as FieldShape[]).find((f) => f !== null && typeof f === 'object' && f.id === field) : undefined;
+      if (was) return was;
+    } catch {
+      /* A VERSION THIS CANNOT PARSE SAYS NOTHING ABOUT THE FIELD, so the one before it is asked. */
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Every row whose old mark a person pinned, with what he said, when an install moves `pairs.mark` from `from` to `to`.
+ * `p` is the list under the new declaration, whose `pairs.mark` is `to`.
+ *
+ * THE CHECKER OF `56b35c41` MEASURED WHAT A RENAME LOST. The pass that settles the list under the new declaration asks
+ * `markPinned` of the new field only, and nobody had said anything there: the dinner he unticked on `transfer` paired
+ * with Omar's repayment and read `moved: true`, Spent 0.00 against EGP 20,000.00, and a move he typed and ticked read
+ * `moved: false`, so money that only moved read as spent (`pairs-followups.test.ts`, ONE). What he said was about the
+ * row, whether it is one leg of a move, and not about the field it was written in.
+ *
+ * IT ANSWERS AND THE CALLER WRITES, as `settle` answers and `index.ts` writes the legs. The carried value is an `edit` on
+ * the new field signed by the actor `pinnedBy` names, so `markPinned` reads it as his word, with a note saying it came
+ * from the old field on this install; that event needs the kernel's minter, clock and batch, which a `Pairing` does not
+ * hold. A mark the pairing set itself (`PAIRS_ACTOR`) or a mechanism wrote is not a pin, so it is not carried and the
+ * pass derives it again.
+ *
+ * A ROW WHERE SOMEBODY SPOKE ON THE NEW FIELD LATER THAN ON THE OLD ONE KEEPS THAT, since it is the nearer word, and
+ * only then. held66's first cut kept any word on the new field, and its checker measured a mark renamed there and back:
+ * dinner's "not a transfer" was carried to `moved`, he ticked it there, and the update back to `transfer` kept the older
+ * false still standing in `transfer`, so his tick was lost and dinner read as spent, EGP 20,000.00
+ * (`pairs-followups.test.ts`, RENAMED THERE AND BACK). A word a create left, with no edit, is older than any edit.
+ *
+ * DELETED ROWS ARE CARRIED TOO, so a restore finds the pin it left with. ONLY A ROW THAT COULD HOLD A PIN IS ASKED: one
+ * with an `edit` of the old mark in its history, or whose old mark is not the field's default, which is what a create
+ * that pinned leaves; every other row answers `null` in `pinnedBy`.
+ *
+ * NOTHING IS CAPPED, as `settleRedeclared`'s pass is not: the rows walked are the list's, once, in the install's
+ * transaction, and a cap would drop his word on every row past it, which is the finding again.
+ */
+export function carryPins(p: Pairing, from: string, to: string): Carried[] {
+  if (from === to) return [];
+  const shape = markShape(p, from);
+  const old: Pairing = { ...p, pairs: { ...p.pairs, mark: from }, fields: shape && !p.fields.includes(shape) ? [...p.fields, shape] : p.fields };
+  const declared = shape?.default;
+  /* THE OLD MARK'S DEFAULT AS `json_type` NAMES IT, so a row still holding it, with no edit of it, is not asked. */
+  const unsaid = declared === true ? 'true' : declared === false ? 'false' : 'null';
+  const rows = p.sql.all<{ id: string }>(
+    `SELECT id FROM entry WHERE register = ? AND (coalesce(json_type(fields, ?), 'null') <> ?
+       OR EXISTS (SELECT 1 FROM event WHERE target = 'entry:' || entry.id AND kind = 'edit' AND field = ?))`,
+    p.register,
+    `$.${from}`,
+    unsaid,
+    from,
+  );
+  const last = (id: string, field: string): number =>
+    p.sql.one<{ n: number | null }>("SELECT max(rowid) AS n FROM event WHERE target = ? AND kind = 'edit' AND field = ?", `entry:${id}`, field)?.n ?? 0;
+  const carried: Carried[] = [];
+  for (const r of rows) {
+    const by = pinnedBy(old, r.id);
+    if (by === null || (markPinned(p, r.id) && last(r.id, to) >= last(r.id, from))) continue;
+    const leg = loadLeg(p, r.id);
+    const value = leg?.fields[from];
+    if (leg && typeof value === 'boolean') carried.push({ leg, value, by });
+  }
+  return carried;
 }
 
 /**

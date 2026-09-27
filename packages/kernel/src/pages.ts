@@ -23,18 +23,23 @@ import type { Leaf, Predicate, Schema } from '@braindog/where';
 import { clausesOf, evaluate, quoteValue } from '@braindog/where';
 
 import type { ActionRow } from './actions.ts';
-import { BLOCK_READS, KEY_KINDS, wrongKindKey } from './block-keys.ts';
+import { BLOCK_READS, kindsReading, wrongKindKey } from './block-keys.ts';
+import { kindModule } from './kinds/index.ts';
+import { fileLists } from './kinds/gallery.ts';
+import { panelFault, roadmapFault, shortFault } from './kinds/words.ts';
 import { BODY_KINDS, type Shows } from './govern.ts';
 import type { Json } from './coerce.ts';
 import type { Part, Rate } from './fx.ts';
 import type { Entry } from './index.ts';
 import { predicateOf, windowMs, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
 import { runway, type Leg, type Only, type Runway } from './forecast.ts';
+import { figureLists } from './money-figures.ts';
 import { barsOf, type Bars, type SeriesLine } from './series.ts';
 import { isStale, SESSION_PREFIX, STALE_MS } from './session.ts';
 import { nextSteps, stepsPercent, tallySteps, type StepsDecl } from './steps.ts';
 import { COSTS, type Cost } from './weigh.ts';
 import { MEASURE_BUCKETS, measureBucket, measureSeries, measureWindow, readableZone, type MeasureSeries, type RawReading } from './measures.ts';
+import { localDays } from './measures.ts';
 
 export type PageBlock = {
   kind: string;
@@ -137,6 +142,11 @@ export type PageBlock = {
    * record reads it and answers `sells`; the walk itself never counts it, because selling is the reader's what-if.
    */
   sell?: { metric: string };
+  /**
+   * A `forecast`'s: the lengths its horizon knob offers, each a whole number of days or `last`, the walk's last dated
+   * movement. Checked here and drawn by the host, which walks no further than `horizon:` whatever is chosen.
+   */
+  horizons?: (number | 'last')[];
   /** A `bar` or `split`'s: the label of the row that holds what no part does, drawn last and linked to those rows. */
   unset?: string;
   /** A `bar` or `split`'s: the intent a part is drawn in, by the value it groups, such as `{ off_track: bad }`. A part not named is neutral. */
@@ -167,22 +177,24 @@ export type PageBlock = {
    * row, and the equalities its `where:` pins are what the new row is filled with (`fills` on the answer).
    */
   register?: string;
+  /**
+   * Over `runs_on`: the project whose keys, tools, skills and actions it reads, by its spoken id, `'{{spoken}}'` on the
+   * project's template.
+   */
+  about?: string;
+  /**
+   * A `section`'s on a page per row: the host panel drawn for that row under the section's heading, `actions` or
+   * `reporting` (`kinds/words.ts` `PANELS`). The record checks the word and hands it back; the panel is the host's.
+   */
+  panel?: string;
+  /**
+   * A `steps` block's: the short view, the rows `where` admits, named `label` on the switch. The read still answers every
+   * row up to `limit`, and says which are in the short view in `short_now`.
+   */
+  short?: { where: string; label: string };
   /** Whether the condition was satisfied. Absent on a block with no `when:`, which always draws. */
   drawn?: boolean;
 };
-
-/**
- * Every key a block declaration may carry, so one it cannot is NAMED rather than ignored.
- *
- * A LIST AND NOT A TYPE CHECK, because a declaration arrives as JSON from a pack somebody else
- * wrote and TypeScript is not there at the moment it is read. The browser has had this since a
- * agent wrote `06 §1.1`'s own worked example, got `when:` silently dropped, and shipped a block
- * that always drew; the kernel accepted anything at all.
- *
- * THE LIST LIVES IN `block-keys.ts` NOW, with which kinds read each key that only some do, because the install check
- * refuses from the same list (`declare.ts` `pageBody`) and two copies were two answers.
- */
-const READS = BLOCK_READS;
 
 export type PageDecl = {
   page: string;
@@ -197,7 +209,10 @@ export type PageDecl = {
 export type BlockResult = PageBlock & {
   /** The rows the block draws, cut to `limit`. */
   rows: Entry[];
-  /** A `bar` or a `split` over rows: the record's home currency and dated rates, when it has either. */
+  /**
+   * A `bar` or a `split` over rows, and a `forecast`: the record's home currency and dated rates, when it has either. A
+   * host that shows a walk in another currency converts each step with these, never with rates of its own.
+   */
   fx?: { home: string | null; rates: Rate[] };
   /** How many the predicate matched, which is what a total is a total OF. */
   matched: number;
@@ -219,6 +234,11 @@ export type BlockResult = PageBlock & {
    * `sessions.live`, the name of the project each run was placed in.
    */
   scopes?: (string | null)[];
+  /**
+   * Aligned with `scopes`: the mark and hue of the project each row applies to (the first, where a row names several),
+   * or `null` where it applies everywhere. A project that declares no mark or hue answers `null` in that half.
+   */
+  scope_marks?: ({ mark: string | null; hue: number | null } | null)[];
   /** A `cards` block's: how far along each row is from the steps under it, where its ring's own field is empty (`steps.ts`). */
   rings?: (number | null)[];
   /**
@@ -236,6 +256,21 @@ export type BlockResult = PageBlock & {
    * drew 2 and said 3 more where 1 was left out).
    */
   open?: number;
+  /**
+   * A `steps` block's with `short:`: whether each row is in the short view, aligned with `rows`. The rows are every row
+   * up to `limit`, so a host switches between the two views without a second read.
+   */
+  short_now?: boolean[];
+  /**
+   * A `calendar`'s: the months it shows, from the first day of the first to the last day of the last, and today, each a
+   * day in the record's own zone. Every row it answers falls between `from` and `to` (`kinds/calendar.ts`).
+   */
+  window?: { from: string; to: string; today: string };
+  /**
+   * A `gallery`'s: each file it draws as the record stores it, aligned with the rows it draws (the list's, or the ones
+   * written out), `null` where the record holds none (`kinds/gallery.ts`).
+   */
+  files?: (StoredFile | null)[];
   /** An `inputs` block's: the type of each field it draws, by field id, which a host picks its control by. */
   types?: Record<string, string>;
   /**
@@ -302,6 +337,11 @@ export type FeedRow = {
   thing?: string | null;
   /** On a `setup` row (`feed.ts`), how many example rows the record set itself up with. */
   rows?: number;
+  /**
+   * The list the target is a row of, the register part of `tasks#3`, or `null` for anything else. An `activity` block
+   * answers it on every row it draws, and its `where` reads it as `list is tasks` (`listOf`).
+   */
+  list?: string | null;
 };
 
 /** One way to answer a question, as a queue draws it. `because` is the reason its author gave for it. */
@@ -324,7 +364,11 @@ export type QueueOption = { key: string; label: string; because: string; recomme
  * compute one rather than to keep saying so (`19 §6`, risk 6, the fourth countermeasure).
  */
 /** `about` is what the question is about, as its body says it (`body.about`), which a queue's `where` filters on. */
-export type QueueQuestion = { id: string; who: string; at: string; kind: string; question: string; why: string; cost: Cost; options: QueueOption[]; about?: string };
+/**
+ * `list` is the list the question's row is on, the register part of an `about` that names a row (`obligations#4`), and
+ * `null` when it names none. A `governance.open` block answers it on every question it draws (`listOf`).
+ */
+export type QueueQuestion = { id: string; who: string; at: string; kind: string; question: string; why: string; cost: Cost; options: QueueOption[]; about?: string; list?: string | null };
 
 /** One event, as the activity source reads it. */
 export type ActivityEvent = { ts: string; actor: string; kind: string; target: string | null; note: string | null; thing?: string | null; rows?: number };
@@ -375,6 +419,13 @@ export type PageDeps = {
   sessionsLive?: () => Entry[];
   /** Every active scheduled action, as the record's `actions` read lists them, keys by label. */
   actions?: () => ActionRow[];
+  /**
+   * Who opened a key last and when: the newest `grant.read` event on the grant a key's row points at, or `null` when
+   * nobody has. `runs_on` asks it with the grant's id and answers only who and when, never the grant.
+   */
+  keyOpened?: (grant: string) => { actor: string; ts: string } | null;
+  /** The fields a list marks its rows by, its `identity:` (`{ mark, accent }`), or `null` when it declares none. */
+  identityOf?: (register: string) => { mark?: string; accent?: string } | null;
   /** The open questions, oldest first as the record holds them, and how many are open in all. */
   openQuestions?: (limit: number) => { questions: QueueQuestion[]; open: number };
   /** The record's timezone, which a day of readings is counted in. `UTC` when absent. */
@@ -397,6 +448,47 @@ export type PageDeps = {
   /** A series' daily points from one day to another, both included, oldest first (`metric_point`). */
   /** `unit` is the currency or unit the point was written in, `''` or absent for none. */
   points?: (series: string, from: string, to: string) => { at: string; value: number; unit?: string | null }[];
+  /**
+   * Every list the record declares, with the states that finish its rows and its fields: what `deadlines` walks, since
+   * it reads across the lists rather than one. Declarations only, so asking reads no row.
+   */
+  lists?: () => readonly ListShape[];
+  /** Every live metric declaration, which `figures.home` and a forecast's sell knob choose from by what each declares. */
+  metrics?: () => readonly MetricDecl[];
+  /**
+   * What `readBlock` hands a registered kind beside the record's reads (`KindKit`). Filled by `readBlock` when it asks a
+   * kind module, and by nothing else: a host leaves it out, and whatever a host put here is replaced.
+   */
+  kit?: KindKit;
+};
+
+/**
+ * What a kind module (`kinds/index.ts`) reads a block with that it may not import: this file's and `metrics.ts`'s own
+ * functions, handed over on `deps.kit` when `readBlock` asks the module.
+ *
+ * HANDED OVER AND NOT IMPORTED, because importing them is a loop the module loses. `block-keys.ts` and `declare.ts`
+ * read the kind registry while they load, and this file and `metrics.ts` each reach `declare.ts` through their own
+ * imports (`govern.ts` down to `migrate.ts`). A kind module importing either, loaded first as the registry's own test
+ * loads it, would load `block-keys.ts` before the registry's table existed, and the kernel would not load at all.
+ */
+export type KindKit = {
+  /** `metrics.ts`'s own, so a kind reads a `where:` sentence, and the clauses it adds, exactly as every block does. */
+  predicateOf: typeof predicateOf;
+  /** Today in the record's own zone, `2026-09-25`, as a `stat` over readings counts its days (`measures.ts`). */
+  today: () => string;
+};
+
+/** A `file` field's stored value, which is what a page answers for a file: never its bytes and never an address. */
+export type StoredFile = { sha256: string; mime: string; bytes: number; name: string };
+
+/**
+ * What a list says about itself that a read across the lists needs: its id, the states that mean finished, and which of
+ * its fields are deadlines. The kernel's `RegisterDecl` is one; named by shape, so this file imports no more of it.
+ */
+export type ListShape = {
+  id: string;
+  done?: readonly string[] | undefined;
+  fields: readonly { id: string; type: string; deadline?: boolean | undefined; retired?: boolean | undefined }[];
 };
 
 /**
@@ -408,17 +500,26 @@ export type ListsBeside = {
   scopeOf?: (register: string) => { field: string; to: string } | null;
   /** The one list that declares `scopes:`, whose rows the ladder places runs in, or `null` when there is none. */
   projects?: () => string | null;
+  /** Every list, as `PageDeps.lists` answers, so a `deadlines` block names each list that holds a deadline. */
+  lists?: () => readonly ListShape[];
+  /** Every live metric, as `PageDeps.metrics` answers, so the home figures and the sell knob name the lists behind theirs. */
+  metrics?: () => readonly MetricDecl[];
 };
 
 /** The sources a block may name that are not a register. Named, so a new one is a refusal. */
-const COMPUTED = new Set(['forecast.runway', 'activity', 'sessions.live', 'actions', 'governance.open']);
+const COMPUTED = new Set(['forecast.runway', 'activity', 'sessions.live', 'actions', 'governance.open', 'runs_on', 'deadlines', 'figures.home']);
 
 /** The name `registersOf` gives a read across the whole record, which no register id can be. */
 export const WHOLE_RECORD = '*';
 
 /**
- * The computed sources that belong to no list. The other two are named by what they read: a walk by its legs'
- * lists, the live runs by `session`.
+ * The computed sources that belong to no list. The others are each named by what they read (`registersOf`): a walk by
+ * its legs' lists, the live runs by `session`, `deadlines` by every list that holds a deadline and `figures.home` by
+ * the list behind each pinned figure.
+ *
+ * `deadlines` IS NOT ONE OF THESE, though it reads across the record. Its rows are rows of named lists, so a reader who
+ * may open every list that holds a deadline may be shown them all, and naming `*` would hold them back from anybody
+ * whose access is the lists themselves rather than the whole record.
  */
 const WHOLE: ReadonlySet<string> = new Set(['activity', 'actions', 'governance.open']);
 
@@ -719,7 +820,13 @@ export function readPage(deps: PageDeps, slug: string): Result<PageResult> {
     ...(found.row && found.row.seq !== null
       ? { param: { register: found.row.register, seq: found.row.seq, title: String((title && Object.hasOwn(found.row.fields, title) ? found.row.fields[title] : null) ?? '') } }
       : {}),
-    blocks: found.decl.blocks.map((b) => readBlock(deps, b)),
+    /* A HOST PANEL IS ABOUT THE PAGE'S ROW, so on a page about no row it draws nothing and says why. It is said here
+       because the page is in hand here; the word itself was checked with the block (`kinds/words.ts` `panelFault`). */
+    blocks: found.decl.blocks.map((b) => {
+      const read = readBlock(deps, b);
+      const astray = found.decl.for || panelFault(b.panel, null) ? null : panelFault(b.panel, false);
+      return astray ? { ...read, rows: [], matched: 0, refusals: [...read.refusals, astray] } : read;
+    }),
   });
 }
 
@@ -764,20 +871,40 @@ function drawnWhen(deps: PageDeps, block: PageBlock): boolean {
   });
 }
 
+/**
+ * What a kind module is handed on `deps.kit` (`KindKit`), made for the one block it reads.
+ *
+ * TODAY IS THE DAY THE BLOCK'S OWN SENTENCE CALLS TODAY: the as-of instant when the read has one, in the zone the
+ * sentence is read in (`metrics.ts` `clockOf`), so a calendar's months and a `where:` naming `today` never disagree.
+ */
+const kitOf = (deps: PageDeps): KindKit => ({
+  predicateOf,
+  today: () => localDays(deps.ctx.tz ?? deps.tz ?? 'UTC')(deps.ctx.asOfMs ?? deps.ctx.nowMs),
+});
+
 export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
   /* A KEY THIS BUILD DOES NOT READ IS SAID, and it is said whatever else the block turns out to be:
      a `cells` block with a misspelt key and a `table` block with one are the same mistake, and the
-     stat arm below returns before any other check runs. */
+     stat arm below returns before any other check runs.
+
+     A LIST AND NOT A TYPE CHECK, because a declaration arrives as JSON from a pack somebody else wrote and TypeScript
+     is not there at the moment it is read. The list lives in `block-keys.ts`, with which kinds read each key that only
+     some do, because the install check refuses from the same list (`declare.ts` `pageBody`) and two copies were two
+     answers. It is read here, when a block is read, and never copied into a constant of this file when it loads: a
+     kind module may import this file, and `block-keys.ts` is built from the kind registry, so a copy taken at load
+     could be taken before the list exists (`kinds/index.ts`). */
   const unread = Object.keys(block)
-    .filter((key) => !READS.has(key))
+    .filter((key) => !BLOCK_READS.has(key))
     .map((key): Refusal => ({ code: 'DECLARATION_INVALID', fix: `${key}: is not a key this record reads.`, at: key }));
   /* AND A KEY ANOTHER KIND READS IS SAID HERE AS THE INSTALL SAYS IT (`block-keys.ts`). A page installed before the install
      check closed carries `lead: true` on its cards or `since: seen` on a table, and each read clean and was drawn
      without. A key written as `undefined` is no key: a caller spreading a block to clear one should not be told of it.
      `of` has its own sentence below. OWN KEYS ONLY: looked up by bracket, `toString` on a block found
      `Object.prototype.toString` and the read threw where it had refused; the name is refused above as unread. */
+  /* `kindsReading` AND NOT THE TABLE, because it answers for the registered kinds too: a key a registered kind reads is
+     one only that kind may carry. */
   for (const [key, value] of Object.entries(block)) {
-    const kinds = Object.hasOwn(KEY_KINDS, key) ? KEY_KINDS[key] : undefined;
+    const kinds = kindsReading(key);
     if (value === undefined || key === 'of' || !kinds || kinds.includes(block.kind)) continue;
     unread.push({ code: 'DECLARATION_INVALID', fix: wrongKindKey(key, block.kind), at: key });
   }
@@ -826,6 +953,32 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
      its own. Only for a block that draws: a figure in a block that is not on the page is not read. */
   const values = valuesOf(deps, block);
   if (values) base.values = values;
+
+  /* THE PAGE WORDS THE INSTALL CHECKS ARE CHECKED AGAIN HERE, for a page installed under an earlier build, in the
+     install's own sentences (`kinds/words.ts`): a section's host panel, a path's short view and a roadmap's columns.
+     Whether the page is about a row is the page's to say, so a panel's word is checked here and its page in
+     `readPage`. */
+  const worded = panelFault(block.panel, null) ?? shortFault(block.short) ?? (block.kind === 'roadmap' ? roadmapFault(block) : null);
+  if (worded) return { ...base, refusals: also(worded) };
+
+  /* THE FIGURES PINNED TO HOME ARE CHOSEN BY THE RECORD, AND ANSWERED BEFORE ANY KIND READS THE BLOCK: a `stat` over
+     `figures.home` names no cells, so the stat arm below would draw it empty, and a kind module registered for `stat`
+     later would have to know this source to draw it at all. `homeFigures` reads the chosen figures as that arm does. */
+  if (block.source === 'figures.home') return homeFigures(deps, block, base, also);
+  /* AND WHAT FALLS DUE IS ONE ANSWER WHATEVER DRAWS IT: a `table`, a `timeline` and a `todo` over `deadlines` are handed
+     the same rows, built by the source, so no kind module has to learn to read across the lists. */
+  if (block.source === 'deadlines') return deadlinesBlock(deps, block, base, also);
+
+  /* A REGISTERED KIND READS ITSELF, AND IT IS ASKED BEFORE ANY ARM BELOW (`kinds/index.ts`). What every block shares is
+     already done by here: the keys nobody reads, `when:` and the page's `{{path}}` values. So a kind module is only the
+     part that is its own, and a kind that is not registered falls through to the arms below exactly as it did before
+     the registry existed. Its `validate` runs again at read, for a page installed under an earlier build of it. */
+  const registered = kindModule(block.kind);
+  if (registered) {
+    const fault = registered.validate?.(block, { stage: 'read' }) ?? null;
+    /* WITH THE KIT, which a module cannot import (`KindKit`): the sentence reader every block is read with, and today. */
+    return fault ? { ...base, refusals: also(fault) } : registered.read({ ...deps, kit: kitOf(deps) }, block, base);
+  }
 
   /* A STAT OVER A REGISTER AND NO FIGURES reads that register's rows, as a table does, and the host draws one tile a
      measure from them: the numbers a project reported are rows, and a figure per measure would be a declaration per
@@ -937,6 +1090,7 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
                draws the days its opening figure was pounds, and no walk joins a line in another currency at today. */
             walks: walks.map((w) => (recorded.past ? { ...w, past: pastIn(recorded.past, w.currency) } : w)),
             walkFx: { home, missing },
+            ...fxOf(deps),
             ...late,
             matched: walks.reduce((n, w) => n + w.steps.length, 0),
             refusals: also(...walks.flatMap((w) => w.refusals)),
@@ -983,6 +1137,7 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
       ...base,
       walk,
       ...(recorded.past ? { past: pastIn(recorded.past, walk.currency) } : {}),
+      ...fxOf(deps),
       ...late,
       ...sold,
       matched: walk.steps.length,
@@ -994,6 +1149,7 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
   if (block.source === 'sessions.live') return liveBlock(deps, block, base, also);
   if (block.source === 'actions') return actionsBlock(deps, block, base, also);
   if (block.source === 'governance.open') return openBlock(deps, block, base, also);
+  if (block.source === 'runs_on') return runsOnBlock(deps, block, base, also);
   /* A BAR OR A SPLIT OVER A GROUPED FIGURE draws the figure's parts, so a part may be a monthly share of a yearly
      cost, which a sum over the rows cannot be. The host adds what no part holds as its `unset:` row. */
   if (block.source.startsWith('metric.')) return metricBlock(deps, block, block.source.slice('metric.'.length), base, also);
@@ -1177,6 +1333,9 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
         allowed: Object.keys(schema.fields),
       }),
     };
+  /* A CARD'S PICTURE AND ITS HUE ARE FIELDS OF THE CARD'S OWN ROW, checked here where the list is in hand. */
+  const roled = roleFault(block, register, schema);
+  if (roled) return { ...base, refusals: also(roled) };
 
   /* A SIGN IS READ FROM AN ENUM AND ONE OF ITS VALUES, or the figure would carry a sign nothing decides. */
   const unsigned = (block.columns ?? []).find((c) => {
@@ -1207,6 +1366,10 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
   if (ranged) return { ...base, refusals: also(ranged) };
   const rows = read;
   const marks = path ? rows.map((r) => r.fields[path.done] === true) : null;
+  /* WHICH OF THE ROWS ARE IN THE PATH'S SHORT VIEW, beside every row up to `limit`, so both views draw from this one
+     answer (`shortOf`). */
+  const inShort = shortOf(deps, block, register, schema, rows);
+  if ('refusals' in inShort) return { ...base, refusals: also(...inShort.refusals) };
   /* A BUDGET SETS ITS ROWS AGAINST A FIGURE, read here beside them, so a limit and what was spent come from one answer.
      A GOAL IS SET AGAINST WHAT WAS LOGGED TOWARD IT the same way, the figure grouped by the row it points at. */
   const figure = block.kind !== 'progress' ? undefined : block.spent !== undefined ? { id: block.spent, at: 'spent' } : block.toward !== undefined ? { id: block.toward, at: 'toward' } : undefined;
@@ -1238,10 +1401,11 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
     /* THE OPEN STEPS, which the short view's read already counted: it asked for the open rows alone. */
     ...(short ? { open: listed.value.matched } : {}),
     ...(inherit ? { inherited: listed.value.inherited ?? 0 } : {}),
-    ...(scope ? { scopes: scopesOf(deps, rows, scope) } : {}),
+    ...(scope ? scopesOf(deps, rows, scope) : {}),
     ...ringsOf(deps, block, register, rows),
     ...nextsOf(deps, block, register, rows),
     ...(marks ? { done_now: marks, next: marks.indexOf(false) < 0 ? null : marks.indexOf(false) } : {}),
+    ...inShort,
   };
 }
 
@@ -1322,6 +1486,69 @@ function nextsOf(deps: PageDeps, block: PageBlock, register: string, rows: reado
       return typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' ? String(v) : null;
     }),
   };
+}
+
+/**
+ * The field type each card role that draws a stored value must name: a `picture` leads the card with a file the record
+ * holds, drawn through the host's `RenderOptions.file`, and a `hue` is a whole number of degrees on the colour wheel,
+ * drawn only on the card's mark (`loop/finish/contracts.md` §4.3).
+ */
+const ROLE_TYPES: Readonly<Record<string, string>> = { picture: 'file', hue: 'int' };
+
+/**
+ * Why a card's `picture` or `hue` column cannot be drawn, or `null`.
+ *
+ * THE ROW HOLDS BOTH, so the read answers them as the rows already carry them: a picture as its stored
+ * `{ sha256, mime, bytes, name }` and a hue as its number. What is checked is only that the field is the right kind of
+ * thing, because a text field as a picture is a card led by a broken image and a text field as a hue is a colour made
+ * of words. A hue outside 0 to 359 is the drawer's to leave off, one row at a time, as it leaves off a mark it cannot
+ * draw.
+ */
+function roleFault(block: PageBlock, register: string, schema: Schema): Refusal | null {
+  if (block.kind !== 'cards') return null;
+  for (const column of block.columns ?? []) {
+    const want = typeof column.as === 'string' && Object.hasOwn(ROLE_TYPES, column.as) ? ROLE_TYPES[column.as] : undefined;
+    if (want === undefined) continue;
+    const type = Object.hasOwn(schema.fields, column.field) ? schema.fields[column.field]?.type : undefined;
+    if (type === want) continue;
+    return {
+      code: 'DECLARATION_INVALID',
+      fix:
+        column.as === 'picture'
+          ? `as: picture leads a card with a file the record holds, and ${register}'s ${column.field} is ${type ?? 'no field'}. Name a file field.`
+          : `as: hue is the card's colour, a whole number of degrees from 0 to 359, and ${register}'s ${column.field} is ${type ?? 'no field'}. Name an int field.`,
+      at: 'columns',
+      allowed: Object.entries(schema.fields)
+        .filter(([, spec]) => spec.type === want)
+        .map(([field]) => field),
+    };
+  }
+  return null;
+}
+
+/**
+ * Which rows of a path are in its short view (`short:`), aligned with `rows`, or why that cannot be said.
+ *
+ * ASKED OF THE RECORD AND NOT WORKED OUT HERE: the short view's sentence and the rows already read go to `list` as one
+ * question, so a row is in the short view exactly when the record's own filter says so, and a sentence the list cannot
+ * answer is refused as a block's `where:` is. One read, of at most the rows the block drew, which `limit` bounds.
+ */
+function shortOf(
+  deps: PageDeps,
+  block: PageBlock,
+  register: string,
+  schema: Schema,
+  rows: readonly Entry[],
+): { short_now?: boolean[] } | { refusals: Refusal[] } {
+  if (block.kind !== 'steps' || block.short === undefined) return {};
+  const said = predicateOf(block.short.where, schema, deps.ctx);
+  if (said.bad.length) return { refusals: said.bad.map((r) => ({ ...r, at: 'short' })) };
+  if (rows.length === 0) return { short_now: [] };
+  const drawn: Predicate = { field: 'id', in: rows.map((r) => r.id) };
+  const kept = deps.list({ register, where: said.predicate === undefined ? drawn : { all: [said.predicate, drawn] }, limit: rows.length });
+  if (!kept.ok) return { refusals: refused(kept) ? [kept.refusal] : [] };
+  const inView = new Set(kept.value.rows.map((r) => r.id));
+  return { short_now: rows.map((r) => inView.has(r.id)) };
 }
 
 /** The field types a range's low, high and spent may be: figures, money among them. */
@@ -1417,6 +1644,17 @@ const pastIn = (points: readonly { at: string; value: number; unit?: string | nu
 function recordedOf(deps: PageDeps, block: PageBlock): { past?: { at: string; value: number; unit?: string | null }[] } | { refusal: Refusal } {
   if (block.knobs !== undefined && (!Array.isArray(block.knobs) || block.knobs.some((k) => !(KNOBS as readonly unknown[]).includes(k))))
     return { refusal: { code: 'DECLARATION_INVALID', fix: `knobs is a list of ${KNOBS.join(', ')}.`, at: 'knobs', allowed: [...KNOBS] } };
+  /* THE HORIZON KNOB'S CHOICES ARE CHECKED WITH THE KNOBS, because a list the host cannot offer is a control drawn with
+     nothing in it. How far each reaches is not checked here: the host walks no further than `horizon:` whatever a
+     reader picks, so a longer choice draws the walk the block already read. */
+  if (block.horizons !== undefined && !horizonsOk(block.horizons))
+    return {
+      refusal: {
+        code: 'DECLARATION_INVALID',
+        fix: `horizons: is a list of one to ${HORIZONS_MOST} lengths for the horizon knob, each a whole number of days or last, such as [90, 365, last].`,
+        at: 'horizons',
+      },
+    };
   if (block.recorded === undefined) return {};
   const id = typeof block.recorded === 'string' ? block.recorded.replace(/^series\./u, '') : '';
   const opening = block.opening !== null && typeof block.opening === 'object' ? block.opening.metric : null;
@@ -1457,7 +1695,8 @@ function latenessOf(deps: PageDeps, block: PageBlock): { lateness?: number | nul
  * this one. A figure that reads nothing, or less than nothing, is nothing to sell.
  */
 function sellsOf(deps: PageDeps, block: PageBlock, currency: string | null): { sells?: { label: string; value: number }[] } | { refusal: Refusal } {
-  if (block.sell === undefined) return {};
+  /* WITH NO `sell:`, A WALK THAT OFFERS THE SELL KNOB OFFERS EVERY FIGURE DECLARED `sellable` (`sellables`). */
+  if (block.sell === undefined) return sellables(deps, block, currency);
   const id = block.sell !== null && typeof block.sell === 'object' ? block.sell.metric : undefined;
   if (typeof id !== 'string' || id === '') return { refusal: { code: 'DECLARATION_INVALID', fix: 'sell: names a figure, as sell: { metric: holdings-value }.', at: 'sell' } };
   const decl = deps.metric(id);
@@ -1541,7 +1780,6 @@ function listInherited(
   return ok({ rows: [...own.value.rows, ...tail], matched: own.value.matched + global.value.matched, inherited: tail.length });
 }
 
-/** Where each row applies, as the title of its project, or `null` for a row that applies everywhere. */
 /**
  * A `bar` or a `split` over a figure grouped by a word: the reading, whose parts the host draws.
  *
@@ -1738,24 +1976,65 @@ function ringsOf(deps: PageDeps, block: PageBlock, register: string, rows: reado
   return rings.some((v) => v !== null) ? { rings } : {};
 }
 
-function scopesOf(deps: PageDeps, rows: readonly Entry[], scope: { field: string; to: string }): (string | null)[] {
+/**
+ * Where each row applies, aligned with `rows`: the title of its project and that project's mark and hue, or `null` in
+ * both for a row that applies everywhere.
+ *
+ * THE MARK IS READ FROM THE SAME ROWS AS THE TITLE, so a chip and the name beside it never come from two reads. A row
+ * that names several projects is titled by all of them and marked by the first, because a chip draws one mark.
+ */
+function scopesOf(
+  deps: PageDeps,
+  rows: readonly Entry[],
+  scope: { field: string; to: string },
+): { scopes: (string | null)[]; scope_marks: ({ mark: string | null; hue: number | null } | null)[] } {
   const said = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : typeof v === 'string' ? [v] : []);
   const ids = [...new Set(rows.flatMap((r) => said(r.fields[scope.field])))];
   const title = deps.titleOf(scope.to);
   const listed = ids.length && title ? deps.list({ register: scope.to, where: { field: 'id', in: ids }, limit: 200 }) : null;
-  const names = new Map(listed?.ok ? listed.value.rows.map((r) => [r.id, String(r.fields[title!] ?? r.id)] as const) : []);
-  return rows.map((r) => {
-    const at = said(r.fields[scope.field]);
-    return at.length ? at.map((id) => names.get(id) ?? id).join(', ') : null;
-  });
+  const found = new Map(listed?.ok ? listed.value.rows.map((r) => [r.id, r] as const) : []);
+  const identity = deps.identityOf?.(scope.to) ?? null;
+  return {
+    scopes: rows.map((r) => {
+      const at = said(r.fields[scope.field]);
+      return at.length ? at.map((id) => (found.has(id) ? String(found.get(id)!.fields[title!] ?? id) : id)).join(', ') : null;
+    }),
+    scope_marks: rows.map((r) => {
+      const first = said(r.fields[scope.field])[0];
+      return first === undefined ? null : markOf(found.get(first), identity);
+    }),
+  };
+}
+
+/**
+ * A project's mark and hue, by the fields its list names in `identity:`, or `null` in each half it does not hold.
+ *
+ * A HUE IS A WHOLE DEGREE FROM 0 TO 359 OR NOTHING, because a host draws it straight into a colour and a value outside
+ * the wheel would be a colour nobody chose. OWN PROPERTIES ONLY, as everywhere a declaration names a field.
+ */
+function markOf(row: Entry | undefined, identity: { mark?: string; accent?: string } | null): { mark: string | null; hue: number | null } {
+  const at = (field: string | undefined): Json | undefined => (row && field !== undefined && Object.hasOwn(row.fields, field) ? row.fields[field] : undefined);
+  const mark = at(identity?.mark);
+  const hue = at(identity?.accent);
+  return {
+    mark: typeof mark === 'string' && mark.trim() !== '' ? mark : null,
+    hue: typeof hue === 'number' && Number.isInteger(hue) && hue >= 0 && hue <= 359 ? hue : null,
+  };
 }
 
 /* ── activity ────────────────────────────────────────────────────────────── */
 
-/** What a feed's `where:` may ask about an event. `actor` is the kind of actor, which is what the groups are. */
+/**
+ * What a feed's `where:` may ask about an event. `actor` is the kind of actor, which is what the groups are.
+ *
+ * `list` IS THE LIST THE TARGET IS A ROW OF (`listOf`), so a page about one area draws that area's work with
+ * `list is transactions` rather than a pattern over `target`, which a row's spoken id would make a guess. It is `list`
+ * and not `register` because this schema already calls itself `activity`, and `governance.open` and `deadlines` say
+ * the same word for the same thing.
+ */
 const ACTIVITY: Schema = {
   register: 'activity',
-  fields: { actor: { type: 'enum', values: FEED_BY }, kind: { type: 'text' }, target: { type: 'text' } },
+  fields: { actor: { type: 'enum', values: FEED_BY }, kind: { type: 'text' }, target: { type: 'text' }, list: { type: 'text' } },
 };
 
 /**
@@ -1847,15 +2126,17 @@ function activityBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also
   const said = predicateOf(block.where, ACTIVITY, deps.ctx);
   if (said.bad.length) return { ...base, refusals: also(...said.bad) };
   const read = deps.activity(FEED_EVENTS);
-  const kept = read.events.filter((e) => evaluate(said.predicate, { actor: byOf(e.actor), kind: e.kind, target: e.target }, ACTIVITY));
+  const kept = read.events.filter((e) => evaluate(said.predicate, { actor: byOf(e.actor), kind: e.kind, target: e.target, list: listOf(e.target) }, ACTIVITY));
+  /* EVERY ROW SAYS ITS LIST, as the filter read it, so a host groups or links by the list without parsing `target`. */
+  const listed = (rows: FeedRow[]): FeedRow[] => rows.map((r) => ({ ...r, list: listOf(r.target) }));
   /* AN `agents` BLOCK IS THE AGENTS' WORK ONLY, one group per agent, so its `first:` counts each agent's rows. */
   if (block.kind === 'agents') {
     const theirs = kept.filter((e) => byOf(e.actor) === 'agent');
-    return { ...base, feed: agentRows(theirs, block.first), matched: theirs.length };
+    return { ...base, feed: listed(agentRows(theirs, block.first)), matched: theirs.length };
   }
   return {
     ...base,
-    feed: feedRows(kept, block.first),
+    feed: listed(feedRows(kept, block.first)),
     matched: kept.length,
     ...(block.since === 'seen' ? { seen: read.seen } : {}),
   };
@@ -2002,9 +2283,11 @@ function captureFills(predicate: Predicate | undefined, schema: Schema, title: s
  */
 /* AND WHAT IT IS ABOUT, when whoever opened it said (`body.about`), so a page per area draws that area's calls with
    `about is {{name}}`. It is the one word of a body read here, and it is a word the proposer chose to be filtered by. */
+/* AND THE LIST THAT ROW IS ON, when `about` names a row (`obligations#4`, as a rule's question does), so a module's page
+   draws its own calls with `list is obligations or transactions` and never a pattern over `about` (`listOf`). */
 const OPEN: Schema = {
   register: 'governance',
-  fields: { who: { type: 'text' }, kind: { type: 'enum', values: BODY_KINDS }, cost: { type: 'enum', values: COSTS }, about: { type: 'text' } },
+  fields: { who: { type: 'text' }, kind: { type: 'enum', values: BODY_KINDS }, cost: { type: 'enum', values: COSTS }, about: { type: 'text' }, list: { type: 'text' } },
 };
 
 /** How many questions a queue draws when a page names no `limit:`. Past this, the rest is the count. */
@@ -2029,7 +2312,9 @@ function openBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: (.
   /* READ MORE THAN WILL BE DRAWN, because a predicate over who asked can leave a page short otherwise, and
      ask for the ceiling's worth at most: the count of what is open comes back with them either way. */
   const read = deps.openQuestions(Math.max(limit, QUEUE_CEILING));
-  const kept = read.questions.filter((q) => evaluate(said.predicate, { who: q.who, kind: q.kind, cost: q.cost, about: q.about ?? null }, OPEN));
+  const kept = read.questions
+    .map((q) => ({ ...q, list: listOf(q.about) }))
+    .filter((q) => evaluate(said.predicate, { who: q.who, kind: q.kind, cost: q.cost, about: q.about ?? null, list: q.list }, OPEN));
   /* NO PREDICATE MEANS THE RECORD'S OWN COUNT, which is every open question rather than the page the read
      answered with. With one, the count is of what this page could see, and it says so by being smaller. */
   const matched = said.predicate === undefined && read.questions.length < read.open ? read.open : kept.length;
@@ -2138,7 +2423,7 @@ function liveBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: (.
   const kept = deps.sessionsLive().filter((r) => evaluate(said.predicate, r.fields, schema));
   const limit = block.limit === undefined ? 50 : Math.max(0, Math.floor(block.limit));
   const rows = kept.slice(0, limit);
-  return { ...base, rows, matched: kept.length, scopes: projectsOf(deps, rows) };
+  return { ...base, rows, matched: kept.length, ...projectsOf(deps, rows) };
 }
 
 /** A spoken id as the ladder writes a run's project: `things#1`. */
@@ -2150,23 +2435,225 @@ const SPOKEN = /^([a-z][a-z0-9_]*)#([1-9][0-9]*)$/;
  * A RUN HOLDS ITS PROJECT AS A SPOKEN ID, which a reader cannot use, so it is named here as
  * `scopesOf` names a ref, and every host draws the same name. An id that names no row is kept as it
  * was written rather than dropped. A register with its own prefix is not read, as `fill` does not.
+ *
+ * AND EACH PROJECT'S MARK AND HUE BESIDE ITS NAME (`scope_marks`), read off the same rows, so a run's card wears the
+ * chip a row of that project wears. A run whose project names no row is marked by nothing.
  */
-function projectsOf(deps: PageDeps, rows: readonly Entry[]): (string | null)[] {
+function projectsOf(deps: PageDeps, rows: readonly Entry[]): { scopes: (string | null)[]; scope_marks: ({ mark: string | null; hue: number | null } | null)[] } {
   const asked = new Map<string, Set<number>>();
   for (const r of rows) {
     const m = SPOKEN.exec(typeof r.fields.project === 'string' ? r.fields.project : '');
     if (m) asked.set(m[1]!, (asked.get(m[1]!) ?? new Set<number>()).add(Number(m[2])));
   }
   const names = new Map<string, string>();
+  const marks = new Map<string, { mark: string | null; hue: number | null }>();
   for (const [register, seqs] of asked) {
     const title = deps.titleOf(register);
     const listed = title ? deps.list({ register, where: { field: 'seq', in: [...seqs] }, limit: 200 }) : null;
-    if (listed?.ok) for (const r of listed.value.rows) names.set(`${register}#${r.seq}`, String(r.fields[title!] ?? ''));
+    const identity = deps.identityOf?.(register) ?? null;
+    if (listed?.ok)
+      for (const r of listed.value.rows) {
+        names.set(`${register}#${r.seq}`, String(r.fields[title!] ?? ''));
+        marks.set(`${register}#${r.seq}`, markOf(r, identity));
+      }
   }
-  return rows.map((r) => {
-    const at = r.fields.project;
-    return typeof at === 'string' && at !== '' ? names.get(at) || at : null;
-  });
+  const placed = (r: Entry): string | null => (typeof r.fields.project === 'string' && r.fields.project !== '' ? r.fields.project : null);
+  return {
+    scopes: rows.map((r) => {
+      const at = placed(r);
+      return at === null ? null : names.get(at) || at;
+    }),
+    scope_marks: rows.map((r) => {
+      const at = placed(r);
+      return at === null ? null : (marks.get(at) ?? { mark: null, hue: null });
+    }),
+  };
+}
+
+/* ── what a project runs on ──────────────────────────────────────────────── */
+
+/**
+ * What a `runs_on` block's `where` and columns may name about one thing a project runs on.
+ *
+ * `quiet` IS THE EVALUATOR'S AND NOT AN AUTHOR'S: it holds a word on every row that applies everywhere and nothing on
+ * the project's own, so a host fills the card's `quiet` role from it and draws the global rows faint, as it draws a run
+ * gone quiet on `sessions.live`. A declaration does not name that role (`declare.ts` `CARD_ROLES`).
+ */
+const RUNS_ON: Schema = {
+  register: 'runs_on',
+  fields: {
+    kind: { type: 'enum', values: ['key', 'tool', 'skill', 'action'] },
+    name: { type: 'text' },
+    scope: { type: 'enum', values: ['project', 'global'] },
+    state: { type: 'text' },
+    detail: { type: 'text' },
+    used_by: { type: 'text' },
+    used_at: { type: 'instant' },
+    spoken: { type: 'text' },
+    quiet: { type: 'text' },
+  },
+};
+
+/**
+ * The lists `runs_on` reads, in the order it draws them, each with what one of its rows is called there and the field
+ * said beside its name: what a key opens, how a tool is reached, which version a skill is at.
+ *
+ * NAMED BY THE AGENTS PACK'S LIST IDS (`loop/finish/agents.md` C6), and each is read only where the record holds it and
+ * places its rows in projects of the kind `about:` names: a record without the pack has none of them, and the block
+ * draws its `empty:` rather than refusing for a list somebody chose not to install.
+ */
+const RUNS_ON_LISTS = [
+  { register: 'credentials', kind: 'key', detail: 'opens' },
+  { register: 'tools', kind: 'tool', detail: 'transport' },
+  { register: 'skills', kind: 'skill', detail: 'rev' },
+] as const;
+
+/**
+ * How many rows `runs_on` reads from each list for the project, and as many again for everywhere (`inScope` reads at
+ * most 200). A tool's last use is one history read per tool row, so one block reads at most twice this many histories.
+ * The scheduled actions are the record's whole schedule, which its declarations bound.
+ */
+const RUNS_ON_EACH = 50;
+
+/**
+ * Whether an actor is a run's name as an event is signed with it, `S47`: the only actor `used_by` answers, because a
+ * person is not a run. THE PREFIX IS THE `session` LIST'S OWN (`SESSION_PREFIX`), so this and the runs it names cannot
+ * spell a run two ways.
+ */
+const isRun = (actor: string): boolean => actor.startsWith(SESSION_PREFIX) && /^[1-9][0-9]*$/u.test(actor.slice(SESSION_PREFIX.length));
+
+/**
+ * What one project runs on: its keys, tools, skills and scheduled actions, then the ones that apply everywhere, each
+ * group by name.
+ *
+ * NEARER WINS AS `inScope` DECIDES IT, the one read `context` and `inherit:` are built on, so a project's own skill hides
+ * the global one of the same name here exactly as it does for an agent working in that project, and a retired row is
+ * left out as a finished one is there.
+ *
+ * NO ROW OF A LIST IS HANDED BACK AS IT IS: each answer row is built from the fields `RUNS_ON` names, so the grant a
+ * key's row points at is used to ask who opened it and goes no further, and nothing else of the key's row travels.
+ */
+function runsOnBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: (...more: readonly Refusal[]) => Refusal[]): BlockResult {
+  if (!deps.inScope || !deps.scopeOf)
+    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read what a project runs on onto a page yet.', at: 'source' }) };
+  const about = typeof block.about === 'string' ? SPOKEN.exec(block.about) : null;
+  if (!about)
+    return {
+      ...base,
+      refusals: also({ code: 'REQUIRED_MISSING', fix: 'runs_on reads what one project runs on, and about: names that project by its row, such as things#1.', at: 'about' }),
+    };
+  const projects = about[1]!;
+  const spoken = String(block.about);
+  if (block.order?.length)
+    return {
+      ...base,
+      refusals: also({ code: 'DECLARATION_INVALID', fix: "runs_on comes the project's own first, then what applies everywhere, each by name, so it takes no order:.", at: 'order' }),
+    };
+  const unknown = (block.columns ?? []).map((c) => c.field).filter((f) => !Object.hasOwn(RUNS_ON.fields, f));
+  if (unknown.length)
+    return {
+      ...base,
+      refusals: also({ code: 'FIELD_UNKNOWN', fix: `What a project runs on has no field called ${unknown.join(', ')}.`, at: 'columns', allowed: Object.keys(RUNS_ON.fields) }),
+    };
+  const said = predicateOf(block.where, RUNS_ON, deps.ctx);
+  if (said.bad.length) return { ...base, refusals: also(...said.bad) };
+
+  const found = deps.list({ register: projects, where: { field: 'seq', is: Number(about[2]) }, limit: 1 });
+  if (!found.ok) return { ...base, refusals: refused(found) ? also(found.refusal) : also() };
+  const home = found.value.rows[0];
+  if (!home) return { ...base, refusals: also({ code: 'VALUE_MALFORMED', fix: `${spoken} is not a row of ${projects}, so there is no project to read.`, at: 'about' }) };
+
+  const scalar = (v: Json | undefined): string | null => (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' ? String(v) : null);
+  const byName = (a: Entry, b: Entry): number => {
+    const x = String(a.fields.name ?? '');
+    const y = String(b.fields.name ?? '');
+    return x < y ? -1 : x > y ? 1 : 0;
+  };
+  const own: Entry[] = [];
+  const everywhere: Entry[] = [];
+  for (const list of RUNS_ON_LISTS) {
+    const schema = deps.schemaOf(list.register);
+    if (!schema || deps.scopeOf(list.register)?.to !== projects) continue;
+    const read = deps.inScope(list.register, home.id, { open: true, limit: RUNS_ON_EACH });
+    if (!read.ok) return { ...base, refusals: refused(read) ? also(read.refusal) : also() };
+    const title = deps.titleOf(list.register) ?? '';
+    const secret = Object.keys(schema.fields).find((f) => schema.fields[f]?.type === 'secret');
+    const shaped = (r: Entry, scope: 'project' | 'global'): Entry => {
+      const used = list.kind === 'key' ? keyUse(deps, r, secret) : list.kind === 'tool' ? toolUse(deps, list.register, r) : { by: null, at: null };
+      return {
+        ...r,
+        fields: {
+          kind: list.kind,
+          name: scalar(r.fields[title]) ?? '',
+          scope,
+          state: r.state,
+          detail: scalar(r.fields[list.detail]),
+          used_by: used.by,
+          used_at: used.at,
+          spoken: r.seq === null ? r.id : `${list.register}#${r.seq}`,
+          quiet: scope === 'global' ? 'global' : null,
+        },
+      };
+    };
+    own.push(...read.value.rows.map((r) => shaped(r, 'project')).sort(byName));
+    everywhere.push(...read.value.inherited.map((r) => shaped(r, 'global')).sort(byName));
+  }
+  /* A SCHEDULED ACTION RUNS FOR ONE PROJECT OR FOR ALL OF THEM, and one that has finished runs on nothing. Its
+     declaration holds the project as the row's id; the spoken id is taken too, as the way a person would write it. */
+  const acts = { project: [] as Entry[], global: [] as Entry[] };
+  for (const a of deps.actions?.() ?? []) {
+    if (a.state === 'done') continue;
+    const scope = a.project === null ? 'global' : a.project === home.id || a.project === spoken ? 'project' : null;
+    if (scope === null) continue;
+    acts[scope].push({
+      ...actionEntry(a),
+      fields: { kind: 'action', name: a.ingest, scope, state: a.state, detail: a.next, used_by: null, used_at: null, spoken: a.ingest, quiet: scope === 'global' ? 'global' : null },
+    });
+  }
+  const all = [...own, ...acts.project.sort(byName), ...everywhere, ...acts.global.sort(byName)];
+  /* WITH THE ROW, because `seq is 3` is a sentence the grammar reads over any schema and answers from the row's column,
+     and `evaluate` throws rather than guess when it is handed only the fields. */
+  const kept = all.filter((r) => evaluate(said.predicate, r.fields, RUNS_ON, r));
+  const limit = block.limit === undefined ? 50 : Math.max(0, Math.floor(block.limit));
+  const rows = kept.slice(0, limit);
+  /* EACH ROW'S CHIP IS THE PROJECT'S OR NONE, as `scopesOf` answers a block over one of these lists. */
+  const name = scalar(home.fields[deps.titleOf(projects) ?? '']) ?? spoken;
+  const mark = markOf(home, deps.identityOf?.(projects) ?? null);
+  return {
+    ...base,
+    rows,
+    matched: kept.length,
+    scopes: rows.map((r) => (r.fields.scope === 'project' ? name : null)),
+    scope_marks: rows.map((r) => (r.fields.scope === 'project' ? mark : null)),
+  };
+}
+
+/**
+ * Who opened a key last, when that was a run, and when it was last opened by anybody; `null` in both when nobody has.
+ * The grant's id is the value of the key row's secret field, and it is asked about and never answered.
+ */
+function keyUse(deps: PageDeps, row: Entry, secret: string | undefined): { by: string | null; at: string | null } {
+  const grant = secret === undefined ? undefined : row.fields[secret];
+  const last = typeof grant === 'string' && grant !== '' ? (deps.keyOpened?.(grant) ?? null) : null;
+  return last ? { by: isRun(last.actor) ? last.actor : null, at: last.ts } : { by: null, at: null };
+}
+
+/**
+ * When a tool was last seen, as its own `seen` says, and the run that wrote that, from the row's history.
+ *
+ * THE HISTORY IS READ ONLY FOR A TOOL SEEN AT ALL, so a tool nobody has used costs no read.
+ */
+function toolUse(deps: PageDeps, register: string, row: Entry): { by: string | null; at: string | null } {
+  const seen = row.fields.seen;
+  const at = typeof seen === 'string' && seen !== '' ? seen : null;
+  if (at === null || row.seq === null || !deps.history) return { by: null, at };
+  const events = deps.history(register, `${register}#${row.seq}`);
+  const wrote = events.ok
+    ? events.value
+        .filter((e) => e.field === 'seen' || (e.field === null && e.to !== null && typeof e.to === 'object' && !Array.isArray(e.to) && Object.hasOwn(e.to, 'seen')))
+        .at(-1)
+    : undefined;
+  return { by: wrote && isRun(wrote.actor) ? wrote.actor : null, at };
 }
 
 /* ── one row's history ───────────────────────────────────────────────────── */
@@ -2398,6 +2885,11 @@ export function registersOf(decl: PageDecl, metric?: (id: string) => MetricDecl 
     const source = typeof block.source === 'string' && block.source.startsWith('register.') ? block.source.slice('register.'.length) : null;
     if (source !== null && block.kind === 'cards' && (block.columns ?? []).some((c) => c?.as === 'next' || c?.as === 'ring'))
       for (const list of beside?.stepsOf?.(source) ?? []) named.add(list.register);
+    /* A CARD'S PICTURE AND ITS HUE READ NO LIST BESIDE THE CARDS' OWN: each is a field of the card's row (`roleFault`),
+       and the source above names that list. What is named here is what a picture reads that its block does not say:
+       a gallery's picture written out as `file:contracts#2/scan` is a row of Contracts, which its answer hands over as
+       stored (`kinds/gallery.ts`), so a reader who may not open Contracts is not handed its scan. */
+    if (block.kind === 'gallery') for (const list of fileLists(block)) named.add(list);
     /* A ROW'S SCOPE IS DRAWN AS ITS PROJECT'S TITLE (`scopesOf`), and an inherited read walks the project's rows. */
     if (source !== null && (block.inherit === true || (block.columns ?? []).some((c) => c?.as === 'scope'))) {
       const scope = beside?.scopeOf?.(source);
@@ -2410,6 +2902,15 @@ export function registersOf(decl: PageDecl, metric?: (id: string) => MetricDecl 
        caller may read it is asking whether they read all of it. It is never a list's id: `declare.ts` refuses
        a register id that is not lower-case letters, digits and underscores. */
     if (typeof block.source === 'string' && WHOLE.has(block.source)) named.add(WHOLE_RECORD);
+    /* WHAT A PROJECT RUNS ON READS THE KEYS, TOOLS AND SKILLS LISTS AND THE PROJECT `about:` NAMES, each whether or not
+       this record holds it, and the scheduled actions beside them, which belong to no list and so are `*`: a key's
+       label and an action's host are held back from a member who may not read all of them, as `actions` holds them. */
+    if (block.source === 'runs_on') {
+      for (const list of RUNS_ON_LISTS) named.add(list.register);
+      const about = typeof block.about === 'string' ? SPOKEN.exec(block.about) : null;
+      if (about) named.add(about[1]!);
+      named.add(WHOLE_RECORD);
+    }
     for (const cell of block.cells ?? []) {
       /* THE FIRST COLON SEPARATES, as everywhere else: `project-owed:C:\Repos` is one project. */
       const at = cell.metric.indexOf(':');
@@ -2426,6 +2927,11 @@ export function registersOf(decl: PageDecl, metric?: (id: string) => MetricDecl 
     /* AND THE FIGURE ITS SELL KNOB OFFERS, which is a total of a list: a member who may not open Holdings is not handed
        what is in it as the amount a date control would add. */
     if (block.sell && typeof block.sell === 'object' && typeof block.sell.metric === 'string') add(metric?.(block.sell.metric)?.source);
+    /* WHAT READS ACROSS THE LISTS NAMES EVERY LIST IT MAY READ: the lists holding a deadline, the lists behind the
+       figures pinned to Home, and behind every figure a sell knob with no `sell:` offers. Without the record's lists
+       and figures to name them by (`beside`), each is named `*`, which holds it back from anybody who may not read the
+       whole record rather than listing it as prose. */
+    for (const name of acrossLists(block, beside)) named.add(name);
     /* A BAR OR A SPLIT OVER A FIGURE READS THE FIGURE'S LIST. */
     if (typeof block.source === 'string' && block.source.startsWith('metric.')) add(metric?.(block.source.slice('metric.'.length))?.source);
     /* A `when:` READS A FIGURE TOO, and a block that draws only when a number crosses a line is a
@@ -2460,8 +2966,8 @@ const TYPED = new Set(['date', 'day', 'until', 'ago', 'money', 'quantity', 'pct'
 const FIGURES = new Set(['text', 'url', 'email', 'enum', 'int', 'number', 'decimal', 'money', 'day', 'instant', 'bool', 'boolean', 'duration', 'pct']);
 
 /**
- * Every `{{path}}` a reader would see in a block, each once: in its heading, body, empty sentence and
- * authored cells, outside code spans, as a bare path or as a typed form's path argument.
+ * Every `{{path}}` a reader would see in a block, each once: in its heading, body, empty sentence, authored
+ * cells and column labels, outside code spans, as a bare path or as a typed form's path argument.
  */
 export function pathsOf(block: PageBlock): string[] {
   const authored = (block as { authored?: unknown }).authored;
@@ -2471,7 +2977,10 @@ export function pathsOf(block: PageBlock): string[] {
   const out = new Set<string>();
   /* A FIGURE'S OWN NOTE NAMES FIGURES TOO: `in {{cash-accounts}} account(s)` under Cash now. */
   const notes = (block.cells ?? []).map((c) => (c as { note?: unknown }).note);
-  for (const text of [block.heading, (block as { body?: unknown }).body, block.empty, ...cells, ...notes]) {
+  /* AND A COLUMN'S LABEL IS READ AS A HEADING IS: `Open ({{tasks.open}})` over a column was drawn with the braces in
+     it, because the heading above it was filled and the label beside it was never asked (`loop/finish/pages.md` P9). */
+  const labels = Array.isArray(block.columns) ? block.columns.map((c) => (c !== null && typeof c === 'object' ? (c as { label?: unknown }).label : undefined)) : [];
+  for (const text of [block.heading, (block as { body?: unknown }).body, block.empty, ...cells, ...notes, ...labels]) {
     if (typeof text !== 'string') continue;
     /* CODE SPANS FIRST, as the renderer lifts them: a `{{…}}` in backticks is text, not a question. */
     for (const m of text.replace(/`[^`]*`/g, ' ').matchAll(/\{\{([^{}]*)\}\}/g)) {
@@ -2489,18 +2998,27 @@ export function pathsOf(block: PageBlock): string[] {
 
 /**
  * What a path names, in `05 §7.1`'s grammar outside a template: a metric, a row's field by spoken id,
- * or a register's count. Nothing else is read: `tasks.open` and `portfolio.revenue` are not yet, and a
- * path that names none of these is `null` rather than a guess.
+ * a register's count, or how many of a register's rows are in one state. Nothing else is read:
+ * `portfolio.revenue` is a state count of a list with no such state, and so answers nothing, and a path
+ * that names none of these is `null` rather than a guess.
+ *
+ * `<list>.<value>` IS A COUNT OF THE ROWS IN THAT STATE (`tasks.open`), where the value is one of the
+ * list's `state` enum. `count` is the whole list's, so a state called `count` is read as the whole
+ * count; every other word is a state, answered only when the list's state enum holds it (`valueAt`).
+ * The list is named either way (`registersOf`), because a count of a list's rows is about that list.
  */
-function pathOf(path: string): { metric: string } | { register: string; seq: number; field: string } | { register: string; count: true } | null {
+function pathOf(
+  path: string,
+): { metric: string } | { register: string; seq: number; field: string } | { register: string; count: true } | { register: string; state: string } | null {
   const parts = path.split('.');
   if (parts.length === 1) return /^[a-z][a-z0-9_-]*$/.test(path) ? { metric: path } : null;
   if (parts.length !== 2) return null;
   const [head, tail] = parts as [string, string];
   const row = /^([a-z][a-z0-9_]*)#([1-9][0-9]*)$/.exec(head);
   if (row) return { register: row[1]!, seq: Number(row[2]), field: tail };
-  if (tail === 'count' && /^[a-z][a-z0-9_]*$/.test(head)) return { register: head, count: true };
-  return null;
+  if (!/^[a-z][a-z0-9_]*$/.test(head)) return null;
+  if (tail === 'count') return { register: head, count: true };
+  return /^[A-Za-z][A-Za-z0-9_-]*$/.test(tail) ? { register: head, state: tail } : null;
 }
 
 /** A stored value a reader may be shown: a scalar, or a money's amount and currency and nothing else. */
@@ -2536,6 +3054,16 @@ function valueAt(deps: PageDeps, path: string): Json | undefined {
     const listed = deps.list({ register: said.register, limit: 1 });
     return listed.ok ? listed.value.matched : undefined;
   }
+  /* A STATE'S COUNT IS ASKED OF THE LIST, as the whole count is, by the field the list mirrors its state onto, and only
+     for a value that field's enum holds: `tasks.opne` is nothing rather than a count of nought, which would read as
+     true. */
+  if ('state' in said) {
+    const field = schema.state;
+    const spec = field !== undefined && Object.hasOwn(schema.fields, field) ? schema.fields[field] : undefined;
+    if (field === undefined || spec?.type !== 'enum' || !(spec.values ?? []).includes(said.state)) return undefined;
+    const listed = deps.list({ register: said.register, where: { field, is: said.state }, limit: 1 });
+    return listed.ok ? listed.value.matched : undefined;
+  }
   const decl = Object.hasOwn(schema.fields, said.field) ? schema.fields[said.field] : undefined;
   if (!decl || !FIGURES.has(decl.type)) return undefined;
   const listed = deps.list({ register: said.register, where: { field: 'seq', is: said.seq }, limit: 1 });
@@ -2562,4 +3090,350 @@ function valuesOf(deps: PageDeps, block: PageBlock): Record<string, Json> | unde
  */
 export function registersOfBlock(block: PageBlock, metric?: (id: string) => MetricDecl | null, beside?: ListsBeside): string[] {
   return registersOf({ page: '', title: '', blocks: [block] }, metric, beside);
+}
+
+/* ── what a module's page reads across the lists ─────────────────────────── */
+
+/**
+ * The list a row named by its spoken id is on, `obligations` for `obligations#4`, or `null` for anything else.
+ *
+ * ONE READING FOR THREE SOURCES: a feed row's target, a question's `about` and a deadline's row are each a spoken id when
+ * they name a row, so `list is obligations` means the same thing over `activity`, `governance.open` and `deadlines`. A
+ * question whose `about` is a word rather than a row is on no list, and says `null` rather than a guess.
+ */
+function listOf(said: string | null | undefined): string | null {
+  const m = typeof said === 'string' ? SPOKEN.exec(said) : null;
+  return m ? m[1]! : null;
+}
+
+/**
+ * The record's home currency and dated rates, beside a walk as beside a bar or a split, when it holds either.
+ *
+ * SO A HOST SHOWING A WALK IN ANOTHER CURRENCY CONVERTS WITH THE RECORD'S RATES, the ones the walk itself was added up
+ * with, and never with a table of its own that could disagree with the figure above it.
+ */
+function fxOf(deps: PageDeps): { fx?: { home: string | null; rates: Rate[] } } {
+  const held = deps.ctx.fx?.();
+  return held && (held.home !== null || held.rates.length > 0) ? { fx: { home: held.home, rates: [...held.rates] } } : {};
+}
+
+/** How many lengths a forecast's horizon knob may offer: more is a list to read, not a choice to make. */
+const HORIZONS_MOST = 8;
+
+/** Whether `horizons:` is a list the knob can offer: one to `HORIZONS_MOST` lengths, each whole days or `last`. */
+function horizonsOk(said: unknown): boolean {
+  return (
+    Array.isArray(said) &&
+    said.length >= 1 &&
+    said.length <= HORIZONS_MOST &&
+    said.every((h: unknown) => h === 'last' || (typeof h === 'number' && Number.isInteger(h) && h >= 1))
+  );
+}
+
+/**
+ * Every list a figure reads, `figure` resolving the one a walk opens from.
+ *
+ * NOT ITS `source` ALONE: a cash figure rolled forward reads its moves and its checks beside its accounts, and a walk
+ * reads each list its legs walk (`money-figures.ts` `figureLists`), so a figure pinned to Home or offered to the sell
+ * knob named by its source would hand a member invited to Accounts the sum of Transactions she cannot open.
+ */
+const listsRead = (decl: MetricDecl, figure: (id: string) => MetricDecl | null): string[] =>
+  typeof decl.source === 'string' ? figureLists(decl, figure) : [];
+
+/**
+ * Whether the reader may read every list behind a figure. A host that has not said who is reading (`EvalContext.reads`
+ * absent) reads everything, and the record then holds the whole block from a reader by the lists `registersOf` names.
+ */
+const mayRead = (deps: PageDeps, decl: MetricDecl): boolean => {
+  const reads = deps.ctx.reads;
+  return reads === undefined || listsRead(decl, deps.metric).every((list) => reads(list));
+};
+
+/** How many figures a sell knob with no `sell:` reads at most, so a record with many sellable figures reads a few. */
+const SELLS_MOST = 8;
+
+/**
+ * Every figure a sell knob with no `sell:` may count as sold: each the record declares `sellable: true` and the reader
+ * may read, that holds more than nothing in the walk's own money, called by the name it is declared with.
+ *
+ * NOTHING HERE IS REFUSED. `sell:` names one figure, and its author is told when it cannot be read; a sellable figure
+ * this page never named that cannot be read, or is in another currency, is left off the knob, and the walk is right
+ * without it. A walk drawn once per currency has no one currency (`null`) and offers none, as `sellsOf` says why.
+ */
+function sellables(deps: PageDeps, block: PageBlock, currency: string | null): { sells?: { label: string; value: number }[] } {
+  if (currency === null || !deps.metrics || !Array.isArray(block.knobs) || !block.knobs.includes('sell')) return {};
+  const sells: { label: string; value: number }[] = [];
+  const offered = deps.metrics().filter((d) => d.sellable === true && mayRead(deps, d));
+  for (const decl of offered.slice(0, SELLS_MOST)) {
+    const read = deps.read(decl);
+    if (!read.ok || read.value.refusals.length) continue;
+    const worth = read.value.value;
+    if (read.value.unit === currency && typeof worth === 'number' && Number.isFinite(worth) && worth > 0)
+      sells.push({ label: typeof decl.name === 'string' && decl.name.trim() !== '' ? decl.name : decl.metric, value: worth });
+  }
+  return { sells };
+}
+
+/** How many figures Home pins at most. */
+const FIGURES_HOME_MOST = 4;
+
+/**
+ * The figures pinned to Home: every metric declaring `home:` a whole number from 1 to 9, in that order, the metric's id
+ * breaking a tie, and at most `FIGURES_HOME_MOST` of them. `reads` leaves out a figure the reader may not read.
+ *
+ * `home` IS CHECKED AGAIN HERE THOUGH THE INSTALL CHECKS IT (`declare.ts` `HOME_PLACE_MOST`), because this reads the
+ * stored JSON and not the install's answer: a place outside 1 to 9 is no place, and the figure is left off Home.
+ */
+function pinnedOf(metrics: readonly MetricDecl[], reads?: (decl: MetricDecl) => boolean): MetricDecl[] {
+  const at = (d: MetricDecl): number => {
+    const h: unknown = d.home;
+    return typeof h === 'number' && Number.isInteger(h) && h >= 1 && h <= 9 ? h : 0;
+  };
+  return metrics
+    .filter((d) => at(d) > 0 && (reads === undefined || reads(d)))
+    .sort((a, b) => at(a) - at(b) || (a.metric < b.metric ? -1 : a.metric > b.metric ? 1 : 0))
+    .slice(0, FIGURES_HOME_MOST);
+}
+
+/**
+ * A `stat` over `figures.home`: the figures the record pins to Home, each read as a `stat` reads a figure its `cells`
+ * name, and labelled by the name it is declared with.
+ *
+ * THE RECORD CHOOSES THEM AND NOT THE PAGE, so one Home written over computed sources draws the figures each use case
+ * pins (`home:` on a metric). `cells:` beside the source would be two answers to one question, so it is refused.
+ */
+function homeFigures(deps: PageDeps, block: PageBlock, base: BlockResult, also: (...more: readonly Refusal[]) => Refusal[]): BlockResult {
+  if (block.kind !== 'stat')
+    return {
+      ...base,
+      refusals: also({ code: 'DECLARATION_INVALID', fix: `figures.home is drawn by a stat block, and a ${block.kind} block has no figures to draw it with.`, at: 'source' }),
+    };
+  if (block.cells !== undefined)
+    return {
+      ...base,
+      refusals: also({
+        code: 'DECLARATION_INVALID',
+        fix: 'figures.home draws the figures this record pins to Home, so it takes no cells:. Take the cells off, or take the source off to draw the cells.',
+        at: 'cells',
+      }),
+    };
+  if (!deps.metrics)
+    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read the figures pinned to Home onto a page yet.', at: 'source' }) };
+  const pinned = pinnedOf(deps.metrics(), (d) => mayRead(deps, d));
+  /* READ BY THE STAT ARM ITSELF, handed a block of those cells and nothing else, so a pinned figure's reading, target
+     and refusal are exactly what the same figure named in `cells:` answers, and there is one reading of a cell. */
+  const cells = pinned.map((d) => ({ metric: d.metric, ...(typeof d.name === 'string' && d.name.trim() !== '' ? { label: d.name } : {}) }));
+  const read = readBlock(deps, { kind: 'stat', cells });
+  return { ...base, readings: read.readings ?? [], matched: pinned.length, refusals: also(...read.refusals) };
+}
+
+/** The days ahead a `deadlines` block reads when it names no `horizon:`. */
+const DEADLINES_HORIZON = 14;
+/** The furthest ahead it reads: a year and a day, so a yearly renewal is in reach of a page that asks for it. */
+const DEADLINES_HORIZON_MOST = 366;
+/**
+ * The rows read for each deadline field of each list, soonest first, and the most a block draws. Each list's soonest
+ * rows are read, so the soonest across all of them are exact up to this many; the lists are the record's declarations.
+ */
+const DEADLINES_READ = 200;
+
+/**
+ * What a `deadlines` block's `where` and columns may name about one thing falling due.
+ *
+ * `row` IS THE ROW'S SPOKEN ID AND `list` ITS LIST, so a page narrows with `list is tasks or services` and a host opens
+ * each row where it lives. `amount` and `direction` are empty on a list that holds no money.
+ */
+const DEADLINES: Schema = {
+  register: 'deadlines',
+  fields: {
+    list: { type: 'text' },
+    row: { type: 'text' },
+    title: { type: 'text' },
+    day: { type: 'day' },
+    amount: { type: 'money' },
+    direction: { type: 'enum', values: ['in', 'out'] },
+  },
+};
+
+/** Which field of a list is what falls due in money, and which way a row of it moves. */
+type MoneyWay = { amount: string | null; way: (fields: Record<string, Json>) => 'in' | 'out' | null };
+
+/**
+ * Every leg a cash walk on this record reads, as it was written: the walks on its pages, and the figures that read a
+ * walk (`source: forecast.runway` with `legs:`). What `moneyWayOf` learns a list's money from.
+ */
+function legsOf(deps: PageDeps): unknown[] {
+  const onPages = deps.pages().flatMap((p) =>
+    (Array.isArray(p.blocks) ? p.blocks : []).flatMap((b) => (b !== null && typeof b === 'object' && b.source === 'forecast.runway' && Array.isArray(b.from) ? (b.from as unknown[]) : [])),
+  );
+  const inFigures = (deps.metrics?.() ?? []).flatMap((m) => (m.source === 'forecast.runway' && Array.isArray(m.legs) ? [...m.legs] : []));
+  return [...onPages, ...inFigures];
+}
+
+/**
+ * Which field of a list holds what falls due and which way it moves, from what the record already declares.
+ *
+ * A CASH WALK'S LEG OVER THE LIST SAYS BOTH (`forecast.ts` `Leg`): its `amount`, and in `incoming` the field and value
+ * that mean money arriving, every other row of the leg going out. So a list the record walks is read here as the walk
+ * reads it, and no module's own word for money in is written into the kernel. A list no walk reads has its one money
+ * field as its amount, and says which way only by an enum of exactly `in` and `out`; any other way is `null`, never a
+ * guess. A list with no money field, or several and no leg to choose, has neither.
+ */
+function moneyWayOf(schema: Schema, legs: readonly unknown[]): MoneyWay {
+  const money = Object.keys(schema.fields).filter((f) => schema.fields[f]!.type === 'money');
+  const leg = legs.find(
+    (l): l is Leg =>
+      l !== null &&
+      typeof l === 'object' &&
+      (l as { register?: unknown }).register === schema.register &&
+      typeof (l as { amount?: unknown }).amount === 'string' &&
+      money.includes((l as { amount: string }).amount),
+  );
+  if (leg) {
+    const said = leg.incoming as unknown;
+    const incoming =
+      said !== null && typeof said === 'object' && typeof (said as { field?: unknown }).field === 'string' && typeof (said as { is?: unknown }).is === 'string'
+        ? (said as { field: string; is: string })
+        : null;
+    return { amount: leg.amount, way: (fields) => (incoming === null ? 'out' : fields[incoming.field] === incoming.is ? 'in' : 'out') };
+  }
+  const amount = money.length === 1 ? money[0]! : null;
+  if (amount === null) return { amount: null, way: () => null };
+  const sign = Object.keys(schema.fields).find((f) => {
+    const values = schema.fields[f]!.type === 'enum' ? (schema.fields[f]!.values ?? []) : [];
+    return values.length === 2 && values.includes('in') && values.includes('out');
+  });
+  return {
+    amount,
+    way: (fields) => {
+      const v = sign === undefined ? undefined : fields[sign];
+      return v === 'in' || v === 'out' ? v : null;
+    },
+  };
+}
+
+/** A stored money value as a reader is shown it, its amount and currency and nothing else, or `null`. */
+function moneyValue(v: Json | undefined): { amount: number; currency: string } | null {
+  return v !== null && typeof v === 'object' && !Array.isArray(v) && typeof v.amount === 'number' && typeof v.currency === 'string'
+    ? { amount: v.amount, currency: v.currency }
+    : null;
+}
+
+/**
+ * A block over `deadlines`: every row of every list the reader may read that falls due on a field the list declares
+ * `deadline: true`, is not in one of the list's `done` states, and falls due by `horizon:` days from today, overdue
+ * first and then by day.
+ *
+ * ONE ANSWER ACROSS THE LISTS, so Home says what is coming without naming a list: a task's `by`, a service's `renews`,
+ * a bill's `due`. Each row is `{ list, row, title, day, amount, direction }`, and `state` is the row's own, so a host
+ * tones it as the list's own grid does. The order is the record's, so `order:` is refused rather than ignored.
+ *
+ * A LIST THE READER MAY NOT READ IS LEFT OUT, when the host says who is reading (`EvalContext.reads`). When it does not,
+ * every list is read and `registersOf` names each, so the record holds the block from anybody who may not read them all.
+ */
+function deadlinesBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: (...more: readonly Refusal[]) => Refusal[]): BlockResult {
+  if (!deps.lists)
+    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read what falls due across its lists onto a page yet.', at: 'source' }) };
+  const horizon = block.horizon ?? DEADLINES_HORIZON;
+  if (typeof horizon !== 'number' || !Number.isInteger(horizon) || horizon < 0 || horizon > DEADLINES_HORIZON_MOST)
+    return {
+      ...base,
+      refusals: also({ code: 'OUT_OF_BOUNDS', fix: `horizon: on deadlines is a whole number of days ahead, from 0 to ${DEADLINES_HORIZON_MOST}.`, at: 'horizon' }),
+    };
+  if (block.order?.length)
+    return { ...base, refusals: also({ code: 'DECLARATION_INVALID', fix: 'deadlines come overdue first and then by day, so it takes no order:.', at: 'order' }) };
+  const unknown = (block.columns ?? []).map((c) => c.field).filter((f) => !Object.hasOwn(DEADLINES.fields, f));
+  if (unknown.length)
+    return {
+      ...base,
+      refusals: also({ code: 'FIELD_UNKNOWN', fix: `A deadline has no field called ${unknown.join(', ')}.`, at: 'columns', allowed: Object.keys(DEADLINES.fields) }),
+    };
+  const said = predicateOf(block.where, DEADLINES, deps.ctx);
+  if (said.bad.length) return { ...base, refusals: also(...said.bad) };
+  const limit = block.limit === undefined ? 50 : Math.min(DEADLINES_READ, Math.max(0, Math.floor(block.limit)));
+
+  /* TODAY IS THE RECORD'S LOCAL DAY, as every `today` a predicate names is (`metrics.ts` `clockOf`). */
+  const today = localDays(readableZone(deps.ctx.tz ?? deps.tz))(deps.ctx.asOfMs ?? deps.ctx.nowMs);
+  const last = new Date(Date.parse(`${today}T00:00:00Z`) + horizon * 86_400_000).toISOString().slice(0, 10);
+  const legs = legsOf(deps);
+  const found: { day: string; list: string; seq: number; entry: Entry }[] = [];
+  let counted = 0;
+  for (const list of deps.lists()) {
+    if (deps.ctx.reads !== undefined && !deps.ctx.reads(list.id)) continue;
+    const schema = deps.schemaOf(list.id);
+    if (!schema) continue;
+    const dated = Object.keys(schema.fields).filter((f) => schema.fields[f]!.deadline === true && schema.fields[f]!.type === 'day');
+    if (dated.length === 0) continue;
+    const money = moneyWayOf(schema, legs);
+    const title = deps.titleOf(list.id);
+    const done = list.done ?? [];
+    /* NOT FINISHED IS THE LIST'S OWN `done` STATES, read off the field it mirrors onto the state column. A row with no
+       state yet is open. */
+    const open: Predicate[] = schema.state !== undefined && done.length > 0 ? [{ field: schema.state, not_in: [...done] }] : [];
+    for (const field of dated) {
+      const got = deps.list({ register: list.id, where: { all: [{ field, lte: last }, ...open] }, limit: DEADLINES_READ, order: [{ field, dir: 'asc' }] });
+      if (!got.ok) return { ...base, refusals: refused(got) ? also(got.refusal) : also() };
+      counted += got.value.matched;
+      for (const r of got.value.rows) {
+        const day = r.fields[field];
+        if (typeof day !== 'string' || r.seq === null) continue;
+        const named = title !== null && Object.hasOwn(r.fields, title) ? r.fields[title] : undefined;
+        const amount = money.amount !== null && Object.hasOwn(r.fields, money.amount) ? moneyValue(r.fields[money.amount]) : null;
+        found.push({
+          day: day.slice(0, 10),
+          list: list.id,
+          seq: r.seq,
+          entry: {
+            id: `${r.id}:${field}`,
+            register: DEADLINES.register,
+            seq: null,
+            fields: {
+              list: list.id,
+              row: `${list.id}#${r.seq}`,
+              title: typeof named === 'string' ? named : typeof named === 'number' || typeof named === 'boolean' ? String(named) : '',
+              day: day.slice(0, 10),
+              amount,
+              direction: amount === null ? null : money.way(r.fields),
+            },
+            state: r.state,
+            version: r.version,
+            created_at: r.created_at,
+            updated_at: r.updated_at,
+            deleted_at: null,
+          },
+        });
+      }
+    }
+  }
+  /* OVERDUE FIRST AND THEN BY DAY is one order, the day's: every overdue day is before today. The list and the row's
+     number settle a tie, so two reads of one record answer the same order. */
+  found.sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : a.list < b.list ? -1 : a.list > b.list ? 1 : a.seq - b.seq));
+  const kept = found.map((f) => f.entry).filter((e) => evaluate(said.predicate, e.fields, DEADLINES));
+  /* WITH NO `where` THE COUNT IS EVERY ROW DUE, as each list counted them; with one it is the rows read that it kept. */
+  return { ...base, rows: kept.slice(0, limit), matched: said.predicate === undefined ? counted : kept.length };
+}
+
+/**
+ * The lists a block that reads across them may read, for `registersOf`: every list holding a deadline, the lists behind
+ * each figure pinned to Home, and behind each figure a sell knob with no `sell:` may offer (`listsRead`). `*` for any
+ * of them whose declarations the caller did not hand over (`beside`), so an unknown is never a licence.
+ */
+function acrossLists(block: PageBlock, beside: ListsBeside | undefined): string[] {
+  if (block.source === 'deadlines') {
+    const lists = beside?.lists?.();
+    if (!lists) return [WHOLE_RECORD];
+    return lists.filter((l) => l.fields.some((f) => f.deadline === true && f.type === 'day' && f.retired !== true)).map((l) => l.id);
+  }
+  const offers =
+    block.source === 'figures.home'
+      ? 'home'
+      : block.source === 'forecast.runway' && block.sell === undefined && Array.isArray(block.knobs) && block.knobs.includes('sell')
+        ? 'sellable'
+        : null;
+  if (offers === null) return [];
+  const metrics = beside?.metrics?.();
+  if (!metrics) return [WHOLE_RECORD];
+  const chosen = offers === 'home' ? pinnedOf(metrics) : metrics.filter((d) => d.sellable === true);
+  const figure = (id: string): MetricDecl | null => metrics.find((m) => m.metric === id) ?? null;
+  return chosen.flatMap((d) => listsRead(d, figure));
 }

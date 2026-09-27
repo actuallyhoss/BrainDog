@@ -489,7 +489,7 @@ test('A QUEUE THE RECORD ANSWERED becomes questions with the ways to answer them
   assert.ok(drawn?.type === 'block' && drawn.kind === 'queue', 'the queue was not drawn as a queue');
   const cells = (drawn as { rows: { cells: string[] }[] }).rows.map((r) => r.cells);
   assert.deepEqual(cells.map((c) => c[0]), ['q', 'opt', 'opt', 'q', 'opt', 'opt', 'more']);
-  assert.deepEqual(cells[0]?.slice(1, 5), ['SG1', 'the assistant', '3h ago', 'Question SG1?']);
+  assert.deepEqual(cells[0]?.slice(1, 5), ['SG1', 'Slash', '3h ago', 'Question SG1?']);
   /* AND THE BAND IS THE SEVENTH CELL, which is what `render/src/queue.ts` reads it from. */
   assert.deepEqual([cells[0]?.[6], cells[3]?.[6]], ['call', 'rows']);
   assert.deepEqual(cells[1]?.slice(2), ['raise', 'Raise it', 'Covers the overrun', 'true']);
@@ -640,8 +640,8 @@ test('a live feed names its reader as You, anybody else without an id, and a pac
     [
       ['You', 'deleted Tidy the backlog labels'],
       ['Someone on this record', 'suggested SG1'],
-      ['the record itself', 'installed the Team board use case'],
-      ['the record itself', 'installed the polish-log add-on'],
+      ['BrainDog', 'installed the Team board use case'],
+      ['BrainDog', 'installed the polish-log add-on'],
     ],
   );
 });
@@ -650,7 +650,7 @@ test("A TILE SAYS THE RECORD'S TARGET, not the build's, so a person's Money is n
   const decl = METRICS['out-30d']!;
   const said = (target?: unknown) =>
     blockOf({ kind: 'stat', cells: [{ metric: 'out-30d' }], readings: [{ metric: 'out-30d', reading: { value: 115_749, unit: 'GBP', rows: 7, met: true, refusals: [] }, ...(target === undefined ? {} : { target }) }], rows: [], matched: 0, refusals: [] } as never, new Map(), Date.UTC(2026, 8, 17, 12)).metrics?.[0]?.note;
-  assert.match(String(said({ lte: 250_000 })), /2,500\.00/u);
+  assert.match(String(said({ lte: 250_000 })), /Limit GBP 2,500$/u);
   assert.equal(said(), said(decl.target), 'without one, the build says its own');
 });
 

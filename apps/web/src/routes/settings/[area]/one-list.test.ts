@@ -15,17 +15,19 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-const page = readFileSync(fileURLToPath(new URL('./+page.svelte', import.meta.url)), 'utf8');
+/* EACH AREA IS ITS OWN COMPONENT since the settings split (ARC-7b), so each check reads the area it is about. */
+const people = readFileSync(fileURLToPath(new URL('./areas/People.svelte', import.meta.url)), 'utf8');
+const identityArea = readFileSync(fileURLToPath(new URL('./areas/Identity.svelte', import.meta.url)), 'utf8');
 
 test('a waiting invitation with no record level is never drawn as a record-wide read', () => {
-  assert.doesNotMatch(page, /inv\.level \?\? 'read'/u, 'a one-list invitation is listed as Reads');
-  assert.match(page, /copy\.inviteWaitingRow\(inviteGives\(inv\),/u);
+  assert.doesNotMatch(people, /inv\.level \?\? 'read'/u, 'a one-list invitation is listed as Reads');
+  assert.match(people, /copy\.inviteWaitingRow\(inviteGives\(inv\),/u);
   /* AND WHAT IT GIVES IS THE LISTS IT CARRIES, each at its own level. */
-  assert.match(page, /Object\.entries\(inv\.registers\)\.map\(\(\[id, level\]\) => `\$\{listName\(id\)\}: \$\{levelSaid\(level\)\}`\)/u);
+  assert.match(people, /Object\.entries\(inv\.registers\)\.map\(\(\[id, level\]\) => `\$\{listName\(id\)\}: \$\{levelSaid\(level\)\}`\)/u);
 });
 
 test('/settings/identity names the lists a one-list colleague holds instead of a level they do not', () => {
-  const identity = page.match(/<span class="fact-key">\{copy\.onThisRecord\}<\/span><span class="fact-value">\{([^\n]*)\}<\/span>/u)?.[1];
+  const identity = identityArea.match(/<span class="fact-key">\{copy\.onThisRecord\}<\/span><span class="fact-value">\{([^\n]*)\}<\/span>/u)?.[1];
   assert.ok(identity !== undefined, 'the identity area no longer says what you hold on this record');
   assert.ok(identity.startsWith('me.lists && me.lists.length > 0 ? namesOf(me.lists) : '), `the identity line reads only the level: ${identity}`);
 });

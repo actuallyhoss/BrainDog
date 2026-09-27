@@ -1,18 +1,22 @@
 <!--
-  The shell: a skip link, the rail or the tab bar, the palette, the toast stack, and one polite live
-  region.
+  The shell: a skip link, the rail or the tab bar, the phone's More sheet, the palette, the toast
+  stack, and one polite live region.
 
-  The live hairline across the top is the record's own state. It is two pixels and it is ALWAYS
-  there, because "a surface showing nothing must never be indistinguishable from a surface with
-  nothing to show" (19 §6) — but "always there" is not the same as "always coloured", and it was
-  built the wrong way round once. A saturated stripe across the full width of every screen, painted
-  in the one colour reserved for *this is interactive*, is a permanent alarm for the state in which
-  nothing is wrong. So the healthy state is the boundary colour, indistinguishable from the chrome
-  it sits in, and the bar takes an intent only when the connection has actually taken one.
+  THE LIVE HAIRLINE ACROSS THE TOP IS DRAWN ONLY WHILE SOMETHING IS WRONG (design SYS-5, DSN-6). It
+  was two pixels in the boundary colour on every screen at all times, on the argument that a
+  healthy state should still be visible; what it drew was a line across the top of every window
+  that said nothing. A healthy connection is the ordinary state and carries no mark. The line
+  appears while a poll stands in for a socket (dashed) and when a poll has failed (solid), each in
+  `--warn`, so the only time a person sees it is the time it has something to say.
 
   The offline signal must not cry wolf, which is a detection rule and not a styling one:
   `navigator.onLine` reports online on a LAN with no internet, so the real signal is a failed write
-  or a failed poll of `/api/version`, never the browser's guess. Once it IS detected, it is shown as what it is — writes will fail.
+  or a failed poll of `/api/version`, never the browser's guess. Once it IS detected, it is shown as
+  what it is: writes will fail.
+
+  THE PHONE HAS NO FLOATING SEARCH DISC. Below 900px search is the 44px button in each screen's
+  head bar (`PageHead.svelte`) and the first row of the More sheet; the disc sat over the header of
+  every screen, under the 44px floor, and twice on `/search`.
 -->
 <script lang="ts">
   import { apiBase, at, here } from '$lib/at.ts';
@@ -56,6 +60,8 @@
   import type PaletteView from '$lib/palette/Palette.svelte';
   import type KeymapView from '$lib/ui/Keymap.svelte';
   import { palette } from '$lib/palette/open.svelte.ts';
+  import { levelWord, openRecord } from '$lib/record/switcher.ts';
+  import { nameWords } from '$lib/record/names.ts';
   import { arrange, orderLists } from '$lib/nav.ts';
   import { navPrefs } from '$lib/nav-prefs.svelte.ts';
   import Sheet from '$lib/ui/Sheet.svelte';
@@ -90,6 +96,58 @@
      `/[id]`'s `Search` button navigated Home instead of searching. */
   let keymapOpen = $state(false);
   let moreOpen = $state(false);
+
+  /**
+   * THE MORE SHEET IS THE PHONE'S RAIL (design SYS-4, DSN-6): search at its head, the record and
+   * its switcher, the rail's groups with the rail's glyphs and counts, the current page marked, then
+   * the places the rail keeps at its foot (`PLACES`). It was a bare list of words with no glyphs, no
+   * current place, no switcher and no search.
+   *
+   * THE SWITCHER IS A DISCLOSURE, NOT A MENU. A menu is an overlay, and one opened inside a sheet is
+   * an overlay on an overlay under a thumb; the other records open in place under the record's own
+   * row instead.
+   */
+  let switching = $state(false);
+
+  /* THE SAME DOOR AND THE SAME SENTENCES AS THE RAIL'S SWITCHER (`Sidebar.svelte`): the session moves to the other
+     record and the app starts again at its Home, by a whole load, because every answer this tab holds was read from the
+     record being left. A host with no switch door says the record was not opened. `/auth/switch` is at the root, and a
+     root-relative address reaches it from the page the browser is on. */
+  let opening = false;
+  async function openOther(r: { slug: string; name: string }) {
+    if (r.name === data.index.name || opening) return;
+    opening = true;
+    const out = await openRecord((url, init) => fetch(url, init), r.slug);
+    opening = false;
+    if (out.from === 'opened') return location.assign(out.to);
+    toasts.push(out.from === 'absent' ? copy.recordNotOpened : out.fix, { intent: 'warn' });
+  }
+
+  /* COMPARED INSIDE THE RECORD, as the rail compares: the address with the base and the slug taken off. */
+  const current = (href: string) => here(page.url.pathname) === href;
+  const under = (href: string) => {
+    const where = here(page.url.pathname);
+    return where === href || where.startsWith(`${href}/`);
+  };
+
+  /* SEARCH FROM MORE IS THE PALETTE, the one surface that reaches anything in the record, opened as
+     the sheet closes rather than over it. */
+  function find() {
+    moreOpen = false;
+    palette.open = true;
+  }
+
+  /* THE RAIL'S FOOT, IN THE ORDER A PHONE READS IT (design 6.6), with the rail's glyphs. Settings
+     goes to `/settings`, which is the index of areas below 900px and opens the first area above it
+     (DSN-13), so a phone lands on the list of areas rather than inside Appearance. */
+  const PLACES = [
+    ['/packs', copy.packs, 'packs', '/packs'],
+    ['/automations', copy.automations, 'refresh', '/automations'],
+    ['/slash', nameWords.slash, 'star', '/slash'],
+    ['/vault', copy.vault, 'vault', '/vault'],
+    ['/settings', copy.settings, 'settings', '/settings'],
+    ['/audit', copy.audit, 'clock', '/audit'],
+  ] as const;
 
   /** The same sectioned grouping AND THE SAME ORDER the rail draws — one nav, not two shapes. It
       was `group(data.nav)`, so the phone's More sheet ignored an arrangement the rail honoured. */
@@ -200,7 +258,8 @@
    * The rail is the default and stays the default. A top bar is one strip that says how many pages
    * it has put behind More; the menu keeps nothing on screen and opens the whole sectioned list as
    * the sheet below. Both lean on that sheet rather than on a second nav of their own, because the
-   * sheet is already every section, every list and the four utilities, in the reader's own order.
+   * sheet is already every section, every list and the places the rail keeps at its foot, in the
+   * reader's own order.
    *
    * BELOW 900px NONE OF THIS APPLIES AND THE TAB BAR STAYS, which is §3's second condition and is
    * enforced in CSS a few rules down rather than here: a shape that let somebody put an
@@ -225,8 +284,16 @@
   });
 
   /* CLEARED ON EVERY NAVIGATION, or `data-screen` is the PREVIOUS screen's answer for exactly as
-     long as this one takes to arrive, which is the window every browser gate measures in. */
-  beforeNavigate(leaving);
+     long as this one takes to arrive, which is the window every browser gate measures in.
+
+     AND THE MORE SHEET CLOSES ON ONE, whichever of its rows started it: the sheet belongs to the
+     shell, which outlives every screen, so a row that navigated left it open over the new screen
+     unless each row closed it by hand. */
+  beforeNavigate(() => {
+    leaving();
+    moreOpen = false;
+    switching = false;
+  });
 
   /* One function, because the chord and the restore control are the same act and a second copy of
      two lines is a second place for the preference to be written differently. */
@@ -343,16 +410,16 @@
 
 <a class="skip" href="#main">Skip to content</a>
 
-<!-- The record's own state, two pixels, always there. The boundary colour while the poll answers, solid warn
-     when a poll has failed, and never from `navigator.onLine`, which reports online on a LAN with no internet. And the
-     chip must not cry wolf: one that appears and withdraws on every open is a chip nobody believes the day it is true
-     (19 §6).
+<!-- The record's own state, two pixels, drawn only when it has something to say: nothing while the poll answers,
+     solid warn when a poll has failed, and never from `navigator.onLine`, which reports online on a LAN with no
+     internet. It must not cry wolf: a line that appears and withdraws on every open is a line nobody believes the day
+     it is true (19 §6).
 
      ONE DEPARTURE FROM `50 §2.4`, AND IT IS DELIBERATE. The spec names the state `polling` whenever the fallback runs,
      and `polling` is drawn dashed in `--warn`. With the poll as the only transport that would put a warning on every
-     screen at all times, which the comment at the top of this file calls a permanent alarm for the state in which
-     nothing is wrong. So a poll that answers is `open`, a poll that fails is `offline`, and `polling` is kept for a
-     socket's fallback once there is a socket to fall back from (`loop/research-living-in-it.md` §1.4). -->
+     screen at all times, which is an alarm for the state in which nothing is wrong. So a poll that answers is `open`,
+     a poll that fails is `offline`, and `polling` is never set: it is kept for a socket's fallback once there is a
+     socket to fall back from (`loop/research-living-in-it.md` §1.4). -->
 <div class="live" data-state={live.state} aria-hidden="true"></div>
 
 {#if bare}
@@ -424,31 +491,23 @@
   </div>
 
   <div class="tab-slot">
-    <TabBar open={data.open} inbox={data.inbox} onmore={() => (moreOpen = true)} />
+    <TabBar open={data.open} inbox={data.inbox} more={moreOpen} onmore={() => (moreOpen = true)} />
   </div>
 
   <!--
-    The search button, below 900px only. At 900 and up the rail carries the same button as a row
-    at its foot.
+    THE SEARCH BUTTON OF A DESKTOP WITH NO RAIL, and nowhere else.
 
-    IT WAS THE MARK, a red disc with the dog in it, on the argument that the product's own drawing
-    is the whole affordance. On a phone that was an unlabelled red circle in the top corner, over
-    the sample bar, and nobody guesses that a logo opens search. A magnifier in a quiet raised
-    circle says what it does. It opens the palette, the one surface that reaches anything in the
-    record.
-
-    NOT AN ASSISTANT AND NOT A PANEL OF ITS OWN. There was a version of this with a prompt field and
-    four suggested questions, and it was wrong twice over: a record you talk to instead of read is
-    a different product, and a second overlay that does most of what the palette does is a second
-    place to look for one thing. The button opens the palette that already exists.
+    The rail carries search as a row at its foot, and below 900px it is the 44px button in each
+    screen's head bar. The top bar and the menu shapes have neither, so from 900px up they keep this
+    one: a magnifier in a quiet raised circle at the bottom corner, which opens the palette, the one
+    surface that reaches anything in the record. Below 900px the rule under it hides it, because the
+    tab bar is the navigation there whatever the shape says.
   -->
-  <!-- `data-shape`, BECAUSE THE RAIL IS WHAT REPLACED THIS BUTTON ABOVE 900px AND THE OTHER TWO
-       SHAPES HAVE NO RAIL. The rule below hides it only where a rail is carrying the same control at
-       its foot; on a top bar or a menu the search this product makes the primary way to reach a row
-       would otherwise have no visible control at all on a desktop. -->
-  <button type="button" class="launcher tap" data-shape={shape} onclick={() => (palette.open = true)} aria-label={copy.paletteLabel}>
-    <Icon name="search" size="l" />
-  </button>
+  {#if shape !== 'rail'}
+    <button type="button" class="launcher tap" onclick={() => (palette.open = true)} aria-label={copy.paletteLabel}>
+      <Icon name="search" size="l" />
+    </button>
+  {/if}
 
   {#if Palette}<Palette bind:open={palette.open} nav={data.nav} />{/if}
 {/if}
@@ -475,48 +534,113 @@
 </Sheet>
 
 <!--
-  THE PHONE HAD NO ROUTE TO ANY LIST.
+  MORE: THE PHONE'S RAIL, IN THE RAIL'S ORDER, WITH THE RAIL'S GLYPHS.
 
-  This iterated `data.nav` — the DECLARED pages — and stopped. The rail beside it renders those and
-  then a second group, `Lists`, holding every register, because a page can be uninstalled with the
-  pack that declared it and the collections underneath it still have to be reachable. On a phone that
-  second group did not exist, so Obligations, Services, Projects, People, Sessions, Tracks, Updates
-  and Tasks — the eight lists that hold every row in the record — were not in the navigation at all.
-  The only way to one was the palette, whose label is "Search, or run a command".
+  It carries the declared pages under their section headings AND every list, because a page can be
+  uninstalled with the pack that declared it and the lists underneath it still have to be reachable:
+  on a phone that second group once did not exist, and the lists that hold every row in the record
+  were not in the navigation at all. The headings come too, because they are a grouping over one
+  ordered list of `page` rows, and without them "Overview" and "Board" are bare words.
 
-  ON A FRESH RECORD IT WAS WORSE. One register, no declared pages: this sheet would have held Packs,
-  Vault, Settings and Audit, and nothing belonging to the person using it.
-
-  THE SECTION HEADINGS COME TOO. They are a grouping over one ordered list of `page` rows, and
-  dropping them delivered "Overview" and "Board" as bare words with no idea what they were about.
+  Every row is 44px or more and wears its glyph, and the row for the screen you are on is marked:
+  `aria-current`, the `--selected` ground and an ink glyph, as the rail marks it. A row closes the
+  sheet by navigating (`beforeNavigate` above).
 -->
 <Sheet bind:open={moreOpen} title={copy.more}>
-  <nav class="more-nav">
+  <nav class="more-nav" aria-label={copy.more}>
+    <!-- SEARCH AT THE HEAD, drawn as the field it leads to. It is a button and not an input: an input
+         here would be the sheet's first field, and `Sheet.svelte` puts the caret in the first field,
+         so every press of More would raise the keyboard over the list somebody came to read. -->
+    <button type="button" class="more-find" onclick={find}>
+      <Icon name="search" size="m" /><span class="more-find-words">{copy.searchRecord}</span>
+    </button>
+
+    <!-- THE RECORD, AND UNDER IT THE OTHER RECORDS THIS PERSON CAN OPEN. The tile is ink with the
+         ground's letter, as the rail's is; the brand red belongs to the mark. -->
+    <div class="more-record">
+      <button type="button" class="more-row more-who" aria-expanded={switching} onclick={() => (switching = !switching)}>
+        <span class="more-tile" aria-hidden="true">{(data.index.name || copy.switchRecord).slice(0, 1)}</span>
+        <span class="more-name">{data.index.name || copy.switchRecord}</span>
+        <span class="more-fold" data-open={switching ? '' : undefined}><Icon name="chevronDown" size="s" /></span>
+      </button>
+      {#if switching}
+        <ul class="more-list more-records">
+          {#each data.me.records as r}
+            {@const word = levelWord(r)}
+            {#if r.name !== data.index.name}
+              <li>
+                <button type="button" class="more-row" onclick={() => void openOther(r)}>
+                  <span class="more-tile" aria-hidden="true">{r.name.slice(0, 1)}</span>
+                  <span class="more-name">{r.name}</span>
+                  {#if word !== null}<span class="more-tally">{word}</span>{/if}
+                </button>
+              </li>
+            {/if}
+          {/each}
+          <!-- The host's own sentence when the records could not be listed, as the rail's switcher says it. -->
+          {#if data.recordsRefused}<li class="more-note">{data.recordsRefused}</li>{/if}
+          <li>
+            <a class="more-row" href={at('/settings/identity')}><Icon name="settings" size="m" /><span class="more-name">{copy.recordSettings}</span></a>
+          </li>
+          <li>
+            <a class="more-row" href={at('/start')}><Icon name="plus" size="m" /><span class="more-name">{copy.newRecord}</span></a>
+          </li>
+        </ul>
+      {/if}
+    </div>
+
     {#each grouped as [section, entries]}
-      <h2 class="more-section">{section}</h2>
-      {#each entries as entry}<a href={at(entry.href)} onclick={() => (moreOpen = false)}>{entry.title}</a>{/each}
+      <h3 class="more-section">{section}</h3>
+      <ul class="more-list">
+        {#each entries as entry}
+          <li>
+            <a
+              class="more-row"
+              href={at(entry.href)}
+              aria-current={current(entry.href) ? 'page' : undefined}
+              style={entry.hue === undefined ? undefined : `--hue:${entry.hue}`}
+            >
+              <!-- A page about a thing wears that thing's square of colour, as its rail row does. -->
+              {#if entry.hue === undefined}<Icon name={entry.icon} size="m" />{:else}<span class="more-swatch" aria-hidden="true"></span>{/if}
+              <span class="more-name">{entry.title}</span>
+            </a>
+          </li>
+        {/each}
+      </ul>
     {/each}
 
     <!-- AND THE HEADING GOES WITH THEM. `index.registers` holds only the lists that have something
-         in them, so on a young record this section is a title over nothing. -->
-    {#if data.index.registers.length > 0}
-      <h2 class="more-section">{copy.lists}</h2>
+         in them, so on a young record this section would be a title over nothing. -->
+    {#if moreLists.length > 0}
+      <h3 class="more-section">{copy.lists}</h3>
+      <ul class="more-list">
+        {#each moreLists as r}
+          <li>
+            <a class="more-row" href={at(`/r/${r.id}`)} aria-current={under(`/r/${r.id}`) ? 'page' : undefined}>
+              <Icon name={r.icon} size="m" />
+              <span class="more-name">{r.name}</span>
+              <span class="more-tally num">{r.count}</span>
+            </a>
+            <!-- And its saved views, which are the same list with a predicate: no glyph, and indented. -->
+            {#each r.views ?? [] as v}
+              <a class="more-row more-view" href={at(v.href)} aria-current={under(v.href) ? 'page' : undefined}>
+                <span class="more-name">{v.name}</span>
+              </a>
+            {/each}
+          </li>
+        {/each}
+      </ul>
     {/if}
-    {#each moreLists as r}
-      <a href={at(`/r/${r.id}`)} onclick={() => (moreOpen = false)}>
-        {r.name}<span class="more-tally num">{r.count}</span>
-      </a>
-      <!-- And its saved views, which are the same list with a predicate. -->
-      {#each r.views ?? [] as v}
-        <a class="more-view" href={at(v.href)} onclick={() => (moreOpen = false)}>{v.name}</a>
-      {/each}
-    {/each}
 
-    <hr />
-    <a href={at('/packs')} onclick={() => (moreOpen = false)}>{copy.packs}</a>
-    <a href={at('/vault')} onclick={() => (moreOpen = false)}>{copy.vault}</a>
-    <a href={at('/settings/appearance')} onclick={() => (moreOpen = false)}>{copy.settings}</a>
-    <a href={at('/audit')} onclick={() => (moreOpen = false)}>{copy.audit}</a>
+    <ul class="more-list more-places">
+      {#each PLACES as [href, label, glyph, area]}
+        <li>
+          <a class="more-row" href={at(href)} aria-current={under(area) ? 'page' : undefined}>
+            <Icon name={glyph} size="m" /><span class="more-name">{label}</span>
+          </a>
+        </li>
+      {/each}
+    </ul>
   </nav>
 </Sheet>
 
@@ -560,26 +684,28 @@
     transform: none;
   }
 
+  /* NOT DRAWN WHILE THE CONNECTION IS WELL; the two rules after this one draw it when it is not. */
   .live {
+    display: none;
     position: fixed;
     /* UNDER THE NOTCH, AND THEREFORE NEVER SEEN. `app.html` sets `viewport-fit=cover`, so a 2px
        hairline at y=0 is fifty-seven pixels above the first pixel of an iPhone 14 anybody can look
-       at: the one element in the product whose whole job is to be visible at all times was the one
-       element that never was. `env()` is 0 everywhere else, so this costs nothing on a laptop. */
+       at. `env()` is 0 everywhere else, so this costs nothing on a laptop. */
     inset-block-start: env(safe-area-inset-top);
     inset-inline: 0;
     z-index: var(--z-hint);
     block-size: 2px;
-    background: var(--line);
   }
 
   .live[data-state='polling'] {
+    display: block;
     background: repeating-linear-gradient(90deg, var(--warn) 0 8px, var(--line) 8px 16px);
   }
 
   /* WARN, NOT DANGER: a dropped connection is a condition to wait out, not a loss. Solid where
      polling is dashed, so the two states differ by shape as well as by colour. */
   .live[data-state='offline'] {
+    display: block;
     background: var(--warn);
   }
 
@@ -643,7 +769,8 @@
     padding-inline: var(--sp-3);
     background: var(--s1);
     border: 1px solid var(--line);
-    border-radius: var(--r-sm);
+    /* A pill, because it is pressed (design D-2). */
+    border-radius: var(--r-pill);
     color: var(--ink);
     font: inherit;
     font-size: var(--t-sm);
@@ -687,10 +814,9 @@
     border-radius: var(--r-md);
     overflow-y: auto;
     overscroll-behavior: contain;
-    /* Below 900px the launcher floats over the bottom-right corner of every surface, so every
-       surface ends above it: a floating button over the last row of a list hides exactly the thing
-       a long list is scrolled to the bottom to see. Above 900 the launcher is a row in the rail, and
-       the same space is the page's foot. */
+    /* THE PAGE'S FOOT, and on the top bar and menu shapes the room the search button in the bottom
+       corner needs: a floating button over the last row of a list hides exactly the thing a long
+       list is scrolled to the bottom to see. */
     padding-block-end: calc(var(--tap) + var(--sp-5));
   }
 
@@ -699,9 +825,7 @@
     display: none;
   }
 
-  /* A QUIET RAISED CIRCLE WITH A MAGNIFIER, AND IT WAS A RED ONE WITH THE LOGO. The red disc was
-     argued as "the only saturated colour on the screen", which is exactly what made it read as an
-     alert rather than as search. It is a surface a step above the page now, with the soft shadow a
+  /* A QUIET RAISED CIRCLE WITH A MAGNIFIER: a surface a step above the page, with the soft shadow a
      sheet has, because a thing that floats over the page should look like it does. */
   .launcher {
     position: fixed;
@@ -725,16 +849,6 @@
   .launcher:hover {
     background: var(--s2);
   }
-
-  /* NOT WHERE THERE IS A RAIL. At 900px and up the rail carries the palette at its foot, and the
-     disc fixed to this corner sat on top of whatever row was beneath it: four controls on
-     `/r/obligations` at 1440 by 900. Below 900 there is no rail and the button stays, in the header. */
-  @media (width >= 900px) {
-    .launcher[data-shape='rail'] {
-      display: none;
-    }
-  }
-
 
   @media (width < 900px) {
     .rail-slot {
@@ -762,82 +876,191 @@
       margin: 0;
       border: 0;
       border-radius: 0;
-      /* IT RESERVED 88px FOR A BAR THAT IS 90 ON AN IPHONE AND 56 ON A PHONE WITH NO HOME
-         INDICATOR: two pixels of the last row under the bar on one, and thirty-two pixels of
-         nothing on the other. Three files were each doing this sum and two of them got a
-         different answer, so the sum is `--tabbar` now and this adds only the breathing room it
-         always meant to add. */
-      padding-block-end: calc(var(--tabbar) + var(--sp-6));
+      /* THE LAST ROW ENDS 16px ABOVE THE TAB BAR (design 6.6). `--tabbar` is the bar and the home
+         indicator under it, summed once in `tokens.css`, so this adds only the breathing room. */
+      padding-block-end: calc(var(--tabbar) + var(--sp-4));
     }
 
     .tab-slot {
       display: block;
     }
 
-    /* THE TOP OF A PHONE, WHERE THE HEADER ALREADY KEEPS ROOM FOR IT. `PageHead` reserves 56px of
-       trailing padding below 900px and says why in its own comment — "the palette launcher is a fixed
-       header button at this width, so the title clears it" — and the launcher was at the bottom, so
-       the reservation held empty space at the top while the circle sat on the rows.
-
-       AND ON A PHONE IT COVERED THEM ALWAYS, not just at the end of a scroll. `.body`'s bottom
-       padding clears the launcher for the LAST row; a floating circle in the bottom-right corner is
-       over whatever is there the rest of the time — it took the final digit off a money figure on
-       Home and a row's own id on a register. The tab bar owns the bottom of a phone; the header owns
-       the top, and the space was already made. */
+    /* The tab bar is the navigation below 900px whatever the shape, and each screen's head bar
+       carries search, so the corner button goes with the strip it stood in for. */
     .launcher {
-      /* AND ON A PHONE IT MOVED TO THE TOP, WHICH IS WHERE THE NOTCH IS. It sat at y 8 to 48 on a
-         device whose first visible pixel is 59. */
-      inset-block-start: calc(env(safe-area-inset-top) + var(--sp-2));
-      inset-block-end: auto;
-      inset-inline-end: calc(max(env(safe-area-inset-left), env(safe-area-inset-right)) + var(--sp-3));
-      inline-size: 40px;
-      block-size: 40px;
+      display: none;
     }
   }
+
+  /* ── The More sheet ─────────────────────────────────────────────────────── */
 
   .more-nav {
     display: flex;
     flex-direction: column;
+    gap: var(--sp-1);
   }
 
-  .more-nav a {
+  /* SEARCH, DRAWN AS THE FIELD IT OPENS: a field's edge and radius, 44px, the words in `--dim`. */
+  .more-find {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
     min-block-size: var(--tap);
+    margin-block-end: var(--sp-3);
+    padding-inline: var(--sp-3);
+    background: var(--bg);
+    border: 1px solid var(--edge);
+    border-radius: var(--r-md);
+    color: var(--dim);
+    font: inherit;
+    font-size: var(--t-md);
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .more-find-words {
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .more-list {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  /* ONE ROW SHAPE FOR EVERY PLACE: a glyph, the name, and a count or a level at the end. A button
+     row (the record) and a link row look the same, because both are a place to go. */
+  .more-row {
     display: flex;
     align-items: center;
     gap: var(--sp-3);
+    inline-size: 100%;
+    min-block-size: var(--tap);
+    padding-inline: var(--sp-2);
+    background: none;
+    border: 0;
+    border-radius: var(--r-md);
     color: var(--ink);
+    font: inherit;
+    font-size: var(--t-md);
+    text-align: start;
     text-decoration: none;
+    cursor: pointer;
   }
 
-  /* The same headings the rail carries. They are a grouping over one ordered list of pages, so
-     dropping them delivered "Overview" and "Board" as bare words. */
+  /* The glyph is quiet, and ink on the row you are on, as the rail draws it (design SYS-12). */
+  .more-row > :global(.icon) {
+    flex: none;
+    color: var(--dim);
+  }
+
+  .more-row[aria-current='page'] {
+    background: var(--selected);
+  }
+
+  .more-row[aria-current='page'] > :global(.icon) {
+    color: var(--ink);
+  }
+
+  .more-name {
+    flex: 1;
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .more-tally {
+    flex: none;
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  /* The record's tile: ink with the ground's letter, the rail's own (`Sidebar.svelte`). */
+  .more-tile {
+    display: grid;
+    place-items: center;
+    flex: none;
+    inline-size: var(--icon-l);
+    block-size: var(--icon-l);
+    background: var(--ink);
+    border-radius: var(--r-sm);
+    color: var(--bg);
+    font-size: var(--t-xs);
+    font-weight: 600;
+    line-height: 1;
+  }
+
+  .more-who {
+    font-weight: 600;
+  }
+
+  .more-fold {
+    display: inline-grid;
+    flex: none;
+    color: var(--dim);
+    transition: transform var(--d-state) var(--ease-out);
+  }
+
+  .more-fold[data-open] {
+    transform: rotate(180deg);
+  }
+
+  /* The other records sit under the record's row, indented to its name. */
+  .more-records {
+    padding-inline-start: var(--sp-5);
+  }
+
+  .more-note {
+    padding: var(--sp-2);
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  /* A page about a thing: that thing's square of colour, at the glyph's size. */
+  .more-swatch {
+    flex: none;
+    inline-size: var(--icon-m);
+    block-size: var(--icon-m);
+    background: oklch(var(--mark-l) var(--mark-c) var(--hue));
+    border-radius: var(--r-sm);
+  }
+
+  /* The same headings the rail carries, and they are headings: a section title, not an eyebrow. */
   .more-section {
-    margin-block: var(--sp-4) var(--sp-1);
+    margin-block: var(--sp-4) 0;
+    padding-inline: var(--sp-2);
     color: var(--dim);
     font-size: var(--t-sm);
     font-weight: 600;
   }
 
-  .more-section:first-child {
-    margin-block-start: 0;
-  }
-
+  /* A saved view is its list looked at another way: indented under it, with no glyph of its own. */
   .more-view {
-    padding-inline-start: var(--sp-4);
+    padding-inline-start: calc(var(--sp-2) + var(--icon-m) + var(--sp-3));
     color: var(--ink2);
-    font-size: var(--t-sm);
   }
 
-  .more-tally {
-    margin-inline-start: auto;
-    color: var(--dim);
-    font-size: var(--t-xs);
+  /* The places the rail keeps at its foot, apart from the record's own by a hairline. */
+  .more-places {
+    margin-block-start: var(--sp-3);
+    padding-block-start: var(--sp-3);
+    border-block-start: 1px solid var(--line-soft);
   }
 
-  .more-nav hr {
-    inline-size: 100%;
-    border: 0;
-    border-block-start: 1px solid var(--line);
+  @media (hover: hover) and (pointer: fine) {
+    .more-row:hover {
+      background: var(--hover-wash);
+    }
+
+    .more-row[aria-current='page']:hover {
+      background: var(--selected);
+    }
   }
 
   .sr-only {

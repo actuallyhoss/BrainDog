@@ -7,6 +7,7 @@
  */
 
 import { type Column, type TableRow } from '../src/table.ts';
+import { MISSING } from '../src/format.ts';
 
 /*
  * `Column`, `TableRow`, `chunkRows` and `ariaSort` MOVED TO `../src/table.ts` AND ARE RE-EXPORTED
@@ -27,73 +28,92 @@ export { ariaSort, chunkRows, comparisonPlan, glyphColumn, intrinsicRows, TABLE_
  */
 export type OnCapture = (register: string, text: string, inherited: Record<string, string>) => void;
 
-/**
- * Every column of a row, paired with the value the phone card draws for it.
- *
- * THE CARD DROPPED A CELL WHOSE VALUE WAS EMPTY. `{#if row.cells[i + 1]}` guarded each label-and-
- * value pair, so a blank cell took its label with it and the column vanished from the card
- * entirely, and a reader cannot tell a column that is empty from a column that is not there.
- * The grid arm of the same component draws the record's own missing mark in that box and the
- * card's own header says why it must: *"EVERY COLUMN, LABELLED … nothing hidden, nothing cut."*
- * `13 §10` is that a declaration decides what a card shows; dropping a pair for the value that
- * happens to be in it is the renderer deciding, once per row, differently each time.
- *
- * `?? null` AND NOT `?? ''`, because those are two different facts and the cell body draws them
- * differently: a cell the row does not have is missing and gets the mark, a cell the author left
- * blank is blank. It is the same reading the grid arm takes, so the two arms cannot disagree.
- */
-export const cardCells = (row: TableRow, columns: readonly Column[]): CardCell[] =>
-  columns.map((column, i) => ({ column, value: row.cells[i] ?? null }));
-
-/** One column of one row, as a phone card draws it. */
-export type CardCell = { column: Column; value: string | null };
+/** One column of one row, as a phone card draws it. A card never holds an empty value, so `value` is text. */
+export type CardCell = { column: Column; value: string };
 
 /**
- * Which line of a phone card each column goes on, as indexes into `columns`. `-1` is none.
+ * Which columns a phone card may draw, as indexes into `columns`, decided once for the table. `-1` is none.
  *
- * THE CARD WAS ONE LINE PER COLUMN, AND ON A PHONE THAT WAS MOST OF THE PAGE. The first column led
- * and every other column was a label-and-value line of its own under it, so a four-column table was
- * a four-line card. Measured at 390 on the build of September 10th: `/p/money` was 6,267px against
- * 2,800px at 1440, and its forecast, "What is coming", was 1,615px for thirteen payments at 116 to
- * 144px each, `When`, `What`, `In and out` and `Balance` stacked in every one. The services table on
- * `/p/estate` was 2,329px for sixteen rows at 145px each. A running balance is the thing a phone
- * reader wants one payment at a time, and they were given a form per payment.
- *
- * SO A CARD IS TWO LINES, ARRANGED BY THE TWO RULES A TABLE ALREADY DECLARES (13 §4.2):
+ * A PHONE CARD IS THE LEAD, THE FIGURE AND AT MOST TWO UNLABELLED VALUES (design-brief §5 and §6,
+ * "Tables"; `design.md`'s hand-off to the render package). Every column with its label is a form per
+ * row on a phone, and it puts "#", ids and missing marks in front of the one thing a reader scans a
+ * list for, so a card draws only what a reader reads down the list by.
  *
  *   - the TITLE is the first column aligned to the start, because text and refs start and a
- *     quantity, a date or a count ends. It skips the register's `#`, which is aligned to the end,
- *     and a row picker, whose `hideLabel` already says it is a control and not a value;
+ *     quantity, a date or a count ends (13 §4.2);
  *   - the first line ENDS on the first figure, a column that never truncates, because a figure
- *     never truncates. Failing a figure, the first identifier, which truncates in the middle, and
- *     which is where `RowCards` has always put `#seq`;
- *   - EVERY OTHER COLUMN goes on the second line, labelled as it always was: text at its start,
- *     quantities at its end, so a running balance still reads down one edge of the list.
+ *     never truncates. A table with no figure has no mark, and nothing takes its place;
+ *   - `start` and `end` are the columns the second line may take its values from, text at its start
+ *     and quantities at its end, so a running balance still reads down one edge of the list.
  *
- * NOTHING IS DROPPED, AND THAT IS WHY THIS NEEDS NO NEW KEY. `13 §10` gives a register card three
- * declared `mobile:` fields because that card SHOWS three and leaves the rest out, and choosing what
- * to leave out is a decision only the author can make. This leaves nothing out. Every column is
- * still on the card with its label; what changed is which line it sits on, and `05 §6` is that width
- * may change layout. A block that wanted fewer columns on a phone would need `06 §1.1` to grow a key,
- * and no block needs to.
- *
- * IT TAKES THE COLUMNS AND NOT A ROW, so the arrangement is decided once for the table and is the
- * same on every card. A row whose title is missing keeps its title slot and draws the missing mark
- * there; the next column is not promoted into it. Deciding per row from what happens to be in a cell
- * is the fault `cardCells` records above, where a blank value took its column off the card.
+ * AN IDENTIFIER IS NEVER ON A CARD, and neither is a control. A column that truncates in the middle is
+ * an identifier by the table's own declaration (`Column.truncate`), and so is one headed "#"; a row
+ * picker's `hideLabel` says it is a control and not a value. The whole card is the row's target, so
+ * neither has anything to add to it.
  */
-export function cardPlan(columns: readonly Column[]): { title: number; mark: number; start: number[]; end: number[] } {
-  const first = (test: (c: Column, i: number) => boolean) => columns.findIndex((c, i) => !c.hideLabel && test(c, i));
+export type CardPlan = { title: number; mark: number; start: number[]; end: number[] };
+
+const isIdentifier = (c: Column): boolean => c.truncate === 'middle' || c.label.trim() === '#';
+
+export function cardPlan(columns: readonly Column[]): CardPlan {
+  const first = (test: (c: Column, i: number) => boolean) =>
+    columns.findIndex((c, i) => !c.hideLabel && !isIdentifier(c) && test(c, i));
   const byText = first((c) => c.align !== 'end');
   const title = byText >= 0 ? byText : first(() => true);
-  const byFigure = first((c, i) => i !== title && c.truncate === 'never');
-  const mark = byFigure >= 0 ? byFigure : first((c, i) => i !== title && c.truncate === 'middle');
+  const mark = first((c, i) => i !== title && c.truncate === 'never');
   const start: number[] = [];
   const end: number[] = [];
   columns.forEach((c, i) => {
-    if (i !== title && i !== mark) (c.align === 'end' ? end : start).push(i);
+    if (i !== title && i !== mark && !c.hideLabel && !isIdentifier(c)) (c.align === 'end' ? end : start).push(i);
   });
   return { title, mark, start, end };
+}
+
+/** How many values the second line of a phone card holds at most (design-brief §5, "A card at 390"). */
+export const CARD_VALUES = 2;
+
+/** One row's phone card: its lead, its figure and the values on its second line, every one of them there to read. */
+export type PhoneCard = { title: CardCell | null; mark: CardCell | null; start: CardCell[]; end: CardCell[] };
+
+/**
+ * A value a card can draw: text that is there, that is not the record's missing mark and that is not a
+ * row's spoken number (`#12`), which is an id a person would never say about the row in front of them.
+ */
+const drawable = (value: string | null | undefined): value is string => {
+  const t = value?.trim() ?? '';
+  return t !== '' && t !== MISSING && !/^#\d+$/u.test(t);
+};
+
+/**
+ * One row as a phone card draws it, from the table's plan.
+ *
+ * AN EMPTY VALUE IS DROPPED, NOT MARKED. On a grid a missing cell keeps its box and draws the mark,
+ * because the column is still there above it; a card has no columns to keep, so the missing mark on it
+ * would stand in for nothing (design-brief §11, "Never" 7). The second line takes the first
+ * `CARD_VALUES` values that are there, in the table's column order, so a row with a blank note shows
+ * its date and its balance rather than its date and a hole.
+ *
+ * A missing title or figure leaves its place empty rather than promoting the next column into it:
+ * the lead of every card in one list is the same column, so a reader scanning the lead edge is never
+ * reading two kinds of thing.
+ */
+export function cardCells(row: TableRow, columns: readonly Column[], plan: CardPlan = cardPlan(columns)): PhoneCard {
+  const at = (i: number): CardCell | null => {
+    const column = columns[i];
+    const value = row.cells[i];
+    return column && drawable(value) ? { column, value } : null;
+  };
+  const rest = [...plan.start, ...plan.end]
+    .sort((a, b) => a - b)
+    .map(at)
+    .filter((c): c is CardCell => c !== null)
+    .slice(0, CARD_VALUES);
+  return {
+    title: at(plan.title),
+    mark: at(plan.mark),
+    start: rest.filter((c) => c.column.align !== 'end'),
+    end: rest.filter((c) => c.column.align === 'end'),
+  };
 }
 
 /** Where the caret is, in data rows and columns. The header is not a row it can be on. */

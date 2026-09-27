@@ -59,7 +59,7 @@ const build = (slowMs = 0) => {
   const rows = () =>
     sql
       .all<{ kind: string; tier: string; status: string; code: string | null; question: string | null; predicate: string | null }>(
-        'SELECT kind, tier, status, code, question, predicate FROM call ORDER BY rowid',
+        'SELECT kind, tier, status, code, question, predicate FROM slash_call ORDER BY rowid',
       )
       .map((r) => ({ ...r }));
   return { sql, inference, record, slash, rows };
@@ -206,7 +206,7 @@ test('(6) A MODEL THAT DID NOT ANSWER IS UNREACHABLE, with one settled row and n
        1 before that change and reads 0 after it. Under `-` the row carries the prompt estimate in `tokens_in` and no
        neurons, since `MODELS` has no rate for `-`. */
     assert.equal(slash.status().asks.used, 0);
-    assert.deepEqual({ ...sql.one<{ model: string; neurons: number }>('SELECT model, neurons FROM call') }, { model: '-', neurons: 0 });
+    assert.deepEqual({ ...sql.one<{ model: string; neurons: number }>('SELECT model, neurons FROM slash_call') }, { model: '-', neurons: 0 });
   } finally {
     sql.close();
   }
@@ -227,7 +227,7 @@ test('(7) NO `call` ROW EVER HOLDS THE FILLED QUESTION OR A FIELD VALUE, on any 
     for (let i = 0; i < 5; i++) outs.push(codeOf(await slash.answer(RATE)) || 'ok');
     assert.deepEqual(outs, ['ok', 'PROPOSAL_SCHEMA', 'UNREACHABLE', 'ok', 'SLASH_BUDGET_SPENT']);
 
-    const all = sql.all('SELECT * FROM call');
+    const all = sql.all('SELECT * FROM slash_call');
     assert.equal(all.length, 4);
     const text = JSON.stringify(all);
     for (const leak of [RATE.question, 'Office rent', '500500', 'EGP'])

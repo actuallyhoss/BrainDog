@@ -100,22 +100,22 @@ for (const [where, want] of [
     assert.deepEqual(got, { live: want, list: want });
   });
 
-/* AND A METRIC READ AS OF A PAST DAY IN A ZONE FINDS ITS WINDOW'S FIRST DAY ON THE LOCAL CALENDAR.
-   `evaluateMetric` resolves through `resolvedOf` and not the exported `predicateOf`, because `endedAt`
-   reads a window's first day off its lower bound, and `predicateOf` now hands back that bound as the
-   instant the local day starts at, whose UTC date east of UTC is the day before. `created_at after -1d`
-   as of the 4th begins on the 4th, so it is a window that looks ahead and takes no as-of end: 1111, the
-   same answer the bare days give. Checked by making `evaluateMetric` call `predicateOf`: every other
-   kernel test still passed, and this read gave 1, because the start slipped to the 3rd and the window
-   was cut at the 4th. */
-test('a metric as of a past day in Tokyo reads its window start as the local day', async () => {
+/* AND A METRIC READ AS OF A PAST DAY IN A ZONE FINDS ITS WINDOW'S FIRST DAY ON THE LOCAL CALENDAR, AND
+   ENDS `created_at` AT THAT NIGHT'S LOCAL MIDNIGHT. `evaluateMetric` resolves through `resolvedOf` and not
+   the exported `predicateOf`, because `endedAt` reads a window's first day off its lower bound, and
+   `predicateOf` hands back that bound as the instant the local day starts at, whose UTC date east of UTC
+   is the day before. `created_at after -1d` as of the 5th is the local 5th, which holds the rows made at
+   01:00 and 19:00 there (10 and 100): 110. A window beginning on the as-of day took no end before
+   `loop/finish/defects.md` M17, which put the row made at 00:01 on the 6th (1000) in the night point
+   for the 5th. */
+test('a metric as of a past day in Tokyo reads its window as the local day, ended at its midnight', async () => {
   const { sql } = await recordIn('Asia/Tokyo');
   const schema: Schema = { register: 'datapoints', fields: { what: { type: 'text' }, weight: { type: 'int' }, on: { type: 'day' } } } as Schema;
-  const ctx: EvalContext = { nowMs: NOW, asOfMs: Date.UTC(2026, 8, 4, 12), tz: 'Asia/Tokyo', schemaOf: (r) => (r === 'datapoints' ? schema : null) };
+  const ctx: EvalContext = { nowMs: NOW, asOfMs: Date.UTC(2026, 8, 5, 12), tz: 'Asia/Tokyo', schemaOf: (r) => (r === 'datapoints' ? schema : null) };
   const r = evaluateMetric(sql, { ...summed('created_at after -1d') }, ctx) as { ok: boolean; value: Reading };
   sql.close();
   assert.ok(r.ok, JSON.stringify(r));
-  assert.equal(r.value.value, 1_111);
+  assert.equal(r.value.value, 110);
 });
 
 /* AND THE BUCKET THE CLOCK IS IN IS THE SAME LOCAL DAY THE WORDS NAMED. `clockOf` moved `today` to

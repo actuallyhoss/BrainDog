@@ -13,6 +13,11 @@
 
   Placement is `position: fixed` against the row's viewport rect and then clamped, because a menu
   opened on the last visible row must not open below the fold. It flips above the row instead.
+
+  UNDER A THUMB IT IS A BOTTOM ACTION SHEET, as `Menu.svelte` is and for its reasons (design SYS-4,
+  DSN-6): below 640px or with a coarse pointer, the list rises from the bottom of the screen over a
+  scrim, as a popover in the top layer, in 48px rows at 16px with a Cancel row. A panel pinned to a
+  row's rect is a panel under the finger that long-pressed the row.
 -->
 <script lang="ts">
   import type { Snippet } from 'svelte';
@@ -35,20 +40,53 @@
 
   let list = $state<HTMLElement>();
 
+  const words = { cancel: 'Cancel' };
+
+  /* The action sheet's query, `Menu.svelte`'s own: read once as the menu opens, and written onto the
+     panel as its `popover` attribute, which is what the sheet's rules key on. */
+  const SHEET = '(width < 640px), (pointer: coarse)';
+  const sheet = $derived(open && matchMedia(SHEET).matches);
+
   const items = () => [...(list?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])];
 
   /* Depends on `list`, not on a frame. The container does not exist until the `{#if}` has rendered
-     it, so an effect that only watches `open` runs one tick too early and focuses nothing — the
+     it, so an effect that only watches `open` runs one tick too early and focuses nothing: the
      menu opened with focus still on `<body>`, so the first arrow press went to the page and Enter
-     did nothing at all. Reading `list` here makes the effect wait for it. */
+     did nothing at all. Reading `list` here makes the effect wait for it. A sheet goes into the top
+     layer first, because a popover that is not showing cannot take focus. */
   $effect(() => {
     if (!open || !list) return;
+    if (sheet && typeof list.showPopover === 'function') list.showPopover();
     items()[0]?.focus();
   });
 
+  /* ONCE PER OPENING. A press on the sheet's scrim can reach both the list's click and the window's,
+     and `onclose` hands focus back to the row, which is a thing to do once. */
   function close() {
+    if (!open) return;
     open = false;
     onclose?.();
+  }
+
+  /**
+   * The popover form closes on a press anywhere else, at pointerdown, so the press also reaches
+   * what it landed on. The sheet closes on a CLICK of its scrim that began while it was open,
+   * `Menu.svelte`'s rule and its reason: closing at pointerdown let the release land on the row the
+   * scrim had covered.
+   */
+  let pressed = false;
+
+  function onPointerDown(e: PointerEvent) {
+    pressed = open && sheet;
+    if (open && !sheet && list && !list.contains(e.target as Node)) close();
+  }
+
+  function onWindowClick(e: MouseEvent) {
+    const began = pressed;
+    pressed = false;
+    if (!began || !open || !sheet || !list || e.detail === 0) return;
+    const r = list.getBoundingClientRect();
+    if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) close();
   }
 
   function onkeydown(e: KeyboardEvent) {
@@ -89,22 +127,26 @@
   });
 </script>
 
-<svelte:window onpointerdown={(e) => open && list && !list.contains(e.target as Node) && close()} />
+<svelte:window onpointerdown={onPointerDown} onclick={onWindowClick} />
 
 {#if open && at}
   <!-- `tabindex="-1"` because the container listens for keys but must never be a tab stop: the
-       items are the stops and the roving focus moves between them. -->
+       items are the stops and the roving focus moves between them. The sheet form takes no
+       coordinates: its rules place it against the bottom of the screen. -->
   <div
     bind:this={list}
     class="row-menu"
     role="menu"
     tabindex="-1"
     aria-label={label}
-    style="left:{placed.left}px; top:{placed.top}px"
+    popover={sheet ? 'manual' : undefined}
+    style={sheet ? undefined : `left:${placed.left}px; top:${placed.top}px`}
     {onkeydown}
     onclick={() => close()}
   >
     {@render children()}
+    <!-- A menu item, so the arrows reach it; the list's click closes the menu on it. -->
+    {#if sheet}<button type="button" class="row-menu-cancel" role="menuitem">{words.cancel}</button>{/if}
   </div>
 {/if}
 
@@ -113,10 +155,85 @@
     position: fixed;
     z-index: var(--z-palette);
     min-inline-size: 252px;
-    padding: 4px;
+    padding: var(--sp-1);
     background: var(--s3);
     border: 1px solid var(--edge);
     border-radius: var(--r-md);
     box-shadow: var(--e2);
+  }
+
+  /* Rendered only for a sheet; the sheet's rule below draws it. */
+  .row-menu-cancel {
+    display: none;
+  }
+
+  /* THE ACTION SHEET, `Menu.svelte`'s form: every UA default for a popover is taken back, and from
+     640px up, which only a coarse pointer reaches, it is 560px wide in the middle of the bottom edge. */
+  .row-menu[popover] {
+    inset-block: auto var(--kb);
+    inset-inline: 0;
+    inline-size: min(100%, 560px);
+    min-inline-size: 0;
+    block-size: auto;
+    max-block-size: calc(88dvh - var(--kb));
+    margin-block: 0;
+    margin-inline: auto;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: var(--sp-2) var(--sp-2) calc(var(--sp-2) + env(safe-area-inset-bottom));
+    background: var(--s1);
+    border: 0;
+    border-block-start: 1px solid var(--edge);
+    border-start-start-radius: var(--r-lg);
+    border-start-end-radius: var(--r-lg);
+    border-end-start-radius: 0;
+    border-end-end-radius: 0;
+    color: var(--ink);
+    box-shadow: var(--e3);
+    animation: row-menu-rise var(--d-enter) var(--ease-out);
+  }
+
+  .row-menu[popover]::backdrop {
+    background: var(--scrim);
+  }
+
+  /* 48px rows at 16px, whatever class the caller gave its items. */
+  .row-menu[popover] :global([role='menuitem']) {
+    min-block-size: calc(var(--tap) + var(--sp-1));
+    font-size: var(--t-md);
+  }
+
+  /* A caller's key hints are for a keyboard, and a sheet is where a thumb is. */
+  .row-menu[popover] :global(kbd) {
+    display: none;
+  }
+
+  .row-menu[popover] .row-menu-cancel {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    inline-size: 100%;
+    margin-block-start: var(--sp-2);
+    background: none;
+    border: 0;
+    border-block-start: 1px solid var(--line-soft);
+    border-radius: 0;
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--t-md);
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  @keyframes row-menu-rise {
+    from {
+      transform: translateY(24px);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .row-menu[popover] {
+      animation: none;
+    }
   }
 </style>

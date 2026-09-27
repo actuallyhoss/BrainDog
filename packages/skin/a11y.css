@@ -9,25 +9,27 @@
 @layer a11y {
   /* Nothing in this layer is reachable by a theme, because `@layer theme` is declared before it. */
 
-  /* THE RING IS THE BRAND'S SIGNATURE (DESIGN-SYSTEM 1.3, owner decision 2026-09-16). It was a
-     two-tone ink ring, which was visible and anonymous. `--accent-text` is solved for 4.5:1 as text
-     on every declared surface in both schemes, so as a 2px ring it clears the 3:1 a focus indicator
-     needs with room to spare, and the 2px offset leaves a gap of the element's own ground between
-     the ring and a filled control. Never animated: keyboard navigation through an animated ring is
-     wading (13 §9). Forced colours still replace it with `Highlight` below. */
+  /* THE RING IS INK, AND IT WAS THE BRAND'S RED. The red sits at danger's own hue, so a focused
+     control looked like a refused one, and the owner's verdict on the whole product was that it
+     read as a warning (design D-1, SYS-1). `--focus-in` is the generated ink that the theme's
+     checks hold at 3:1 against every declared surface (`packages/theme/src/checks.ts`, check E),
+     so it is a ring in every palette a record installs, and the 2px offset leaves a gap of the
+     element's own ground between the ring and a filled control, which is what `--focus-out` names.
+     Never animated: keyboard navigation through an animated ring is wading (13 §9). Forced colours
+     still replace it with `Highlight` below. */
   :focus-visible {
-    outline: 2px solid var(--accent-text);
+    outline: 2px solid var(--focus-in);
     outline-offset: 2px;
     border-radius: var(--r-sm);
   }
 
-  /* A TEXT FIELD FOCUSES AS ONE BOX: its own edge turns accent, and a soft ring sits outside it.
-     The 2px offset ring read as two outlines with a stripe of ground between them, and the owner
+  /* A TEXT FIELD FOCUSES AS ONE BOX: its own edge darkens to `--ink2`, and a soft ring sits outside
+     it. The 2px offset ring read as two outlines with a stripe of ground between them, and the owner
      called it out. The 1px outline at -1px lies exactly over the field's border, so nothing moves;
-     `--accent-text` keeps the edge at 3:1 or better on every surface, and `--focus-halo` is the
-     soft part. */
+     `--ink2` is text-strength, so the edge is plainly stronger than the `--edge` it covers, and
+     `--focus-halo` is the soft part. A select and a date are fields too, so they focus this way. */
   :is(input:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file'], [type='button'], [type='submit'], [type='reset'], [type='image']), textarea, select):focus-visible {
-    outline: 1px solid var(--accent-text);
+    outline: 1px solid var(--ink2);
     outline-offset: -1px;
     box-shadow: 0 0 0 3px var(--focus-halo);
   }

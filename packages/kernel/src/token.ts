@@ -55,9 +55,62 @@ export type TokenRow = {
   last_surface: string | null;
   expires_at: string | null;
   revoked_at: string | null;
+  /**
+   * Present on a token nobody revoked that the operator's cut-off has ended (`endedByCutOff`), so the owner's list can
+   * say why it stopped. Absent on every other row, and on every row when the listing was not handed the cut-off.
+   */
+  ended_by?: 'operator';
 };
 
 const VISIBLE = 'id, person_id, scope, reach, label, created_at, last_used_at, last_surface, expires_at, revoked_at';
+
+/**
+ * An ISO instant with its zone: `2026-09-25T12:00:00Z`, the seconds and up to three digits of fraction optional.
+ *
+ * A DATE ALONE IS NOT ONE, and neither is a time without a zone. `Date.parse` reads `2026-09-25` as midnight in UTC and
+ * `2026-09-25T12:00` as noon wherever the host happens to run, so an operator who wrote either would have ended tokens
+ * at a moment they did not name. Held to this pattern first, the value is read one way on every host.
+ */
+const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})$/;
+
+/**
+ * The operator's cut-off as milliseconds: `null` when there is none, `NaN` when it is set and cannot be read.
+ *
+ * BLANK IS UNSET. A self-host's environment file often carries a name with nothing after the `=`, and that is somebody
+ * who has not set the lever, not somebody who set it to something unreadable.
+ */
+const cutOffMs = (validFrom: string | undefined): number | null => {
+  const said = validFrom?.trim() ?? '';
+  if (said === '') return null;
+  return ISO_INSTANT.test(said) ? Date.parse(said) : Number.NaN;
+};
+
+/**
+ * Whether a host's cut-off is one this kernel reads: unset, blank, or an ISO instant with its zone.
+ *
+ * FOR THE HOST'S ONE LOG LINE AND NOTHING ELSE. An unreadable cut-off refuses every bearer (`endedByCutOff`), which is
+ * the safe way for an incident lever to fail, and the host says why once so the operator is not left reading 401s.
+ */
+export const cutOffReadable = (validFrom: string | undefined): boolean => !Number.isNaN(cutOffMs(validFrom) ?? 0);
+
+/**
+ * Whether the operator's cut-off (`TOKENS_VALID_FROM`, `53 §5.11` (c) step 3) ends a credential made at `made`.
+ *
+ * MADE BEFORE THE INSTANT IS ENDED, AND MADE AT IT IS NOT. An operator who sets it to the moment a compromise began
+ * means everything minted earlier, and a token minted in that same millisecond by the person re-minting is theirs.
+ *
+ * FAIL CLOSED. A cut-off that is set and cannot be read ends everything, and so does a row with no moment to compare,
+ * because a lever pulled in an incident that silently does nothing is worse than one that refuses too much for the
+ * few minutes it takes to correct. NOTHING IS WRITTEN: setting an earlier instant gives back every token it ended,
+ * which is how a wrong value is corrected (`53 §5.11`, "Rollback").
+ */
+export function endedByCutOff(validFrom: string | undefined, made: string | null): boolean {
+  const from = cutOffMs(validFrom);
+  if (from === null) return false;
+  const at = made === null ? Number.NaN : Date.parse(made);
+  /* `NaN` on either side is not "at or after", so both fail-closed cases fall out of the one comparison. */
+  return !(at >= from);
+}
 
 /**
  * A `reach` column as the list it stands for.
@@ -78,8 +131,17 @@ const reachOf = (column: string | null): TokenReach[] => {
   return Array.isArray(parsed) ? TOKEN_REACHES.filter((r) => parsed.includes(r)) : [];
 };
 
-type Stored = Omit<TokenRow, 'reach'> & { reach: string | null };
-const rowOf = (raw: Stored): TokenRow => ({ ...raw, reach: reachOf(raw.reach) });
+type Stored = Omit<TokenRow, 'reach' | 'ended_by'> & { reach: string | null };
+
+/**
+ * A stored row as a listing shows it, marked when the cut-off has ended it. A revoked row is not marked: somebody ended
+ * it before the operator did, and that is the reason the list already gives.
+ */
+const rowOf = (raw: Stored, validFrom?: string): TokenRow => ({
+  ...raw,
+  reach: reachOf(raw.reach),
+  ...(raw.revoked_at === null && endedByCutOff(validFrom, raw.created_at) ? { ended_by: 'operator' as const } : {}),
+});
 
 /** Ninety days. Long enough to be useful, short enough that a forgotten one stops working. */
 export const DEFAULT_DAYS = 90;
@@ -96,6 +158,14 @@ export type TokenDeps = {
   digest: (text: string) => Promise<string>;
   /** Bytes a stranger cannot guess. Injected so a fixture is deterministic. */
   random: (n: number) => Uint8Array;
+  /**
+   * The operator's cut-off, `TOKENS_VALID_FROM` on the Worker and `BRAINDOG_TOKENS_VALID_FROM` on the self-host: an ISO
+   * instant before which every token and device grant is refused (`endedByCutOff`). Absent is the epoch.
+   *
+   * THE HOST'S, HANDED IN PER CALL, because it is a fact about the deployment and not about the record: the same record
+   * opened by a test, the CLI or another host has none, and a value kept in the record would travel in its `.brain`.
+   */
+  validFrom?: string | undefined;
 };
 
 export type Minted = { id: string; bearer: string; scope: Scope; reach: TokenReach[]; expires_at: string };
@@ -186,9 +256,14 @@ export async function createToken(
   return ok({ id, bearer: `${record}.${secret}`, scope: args.scope, reach, expires_at: expires });
 }
 
-/** Every token, with a revoke button's worth of information and nothing a hash needs. */
-export const listTokens = (sql: Sql): TokenRow[] =>
-  sql.all<Stored>(`SELECT ${VISIBLE} FROM token ORDER BY created_at DESC, id`).map(rowOf);
+/**
+ * Every token, with a revoke button's worth of information and nothing a hash needs.
+ *
+ * `validFrom` IS THE HOST'S CUT-OFF, as `TokenDeps.validFrom`, and marks each token it has ended, so a token that stopped
+ * working in an incident says so on the owner's list rather than looking live.
+ */
+export const listTokens = (sql: Sql, validFrom?: string): TokenRow[] =>
+  sql.all<Stored>(`SELECT ${VISIBLE} FROM token ORDER BY created_at DESC, id`).map((raw) => rowOf(raw, validFrom));
 
 /**
  * Revoke one.
@@ -229,7 +304,8 @@ export type Verified = { id: string; person_id: string; scope: Scope; reach: Tok
  *
  * THE HASH IS COMPARED AND THE SECRET IS NEVER STORED, so this is the only way a token is recognised
  * and there is no other. A revoked or expired row verifies as nothing — not as a lesser scope, and
- * not with a warning: a credential that half works is a credential nobody replaces.
+ * not with a warning: a credential that half works is a credential nobody replaces. So does a row made
+ * before the operator's cut-off, `deps.validFrom`.
  *
  * AND THE USE IS RECORDED WITHOUT AN EVENT. `last_used_at` is what makes a listing say "this one has
  * not been used since March", which is how somebody decides what to revoke. An event per call would
@@ -255,17 +331,22 @@ export async function verifyToken(deps: TokenDeps, bearer: string, surface?: str
     person_id: string;
     scope: Scope;
     reach: string | null;
+    created_at: string;
     expires_at: string | null;
     revoked_at: string | null;
     suspended_at: string | null;
   }>(
-    `SELECT t.id AS id, t.person_id AS person_id, t.scope AS scope, t.reach AS reach, t.expires_at AS expires_at,
-            t.revoked_at AS revoked_at, p.suspended_at AS suspended_at
+    `SELECT t.id AS id, t.person_id AS person_id, t.scope AS scope, t.reach AS reach, t.created_at AS created_at,
+            t.expires_at AS expires_at, t.revoked_at AS revoked_at, p.suspended_at AS suspended_at
      FROM token t LEFT JOIN person p ON p.id = t.person_id WHERE t.hash = ?`,
     await deps.digest(secret),
   );
   if (!row || row.revoked_at || row.suspended_at) return wrong;
   if (row.expires_at && row.expires_at <= instant(deps.nowMs)) return wrong;
+  /* THE OPERATOR'S CUT-OFF ANSWERS AS AN UNKNOWN BEARER DOES, so the instant cannot be found by probing: a caller
+     learns only that this bearer does not work, and the operator who set the instant already knows why. Checked before
+     the use is written, because a refused bearer was not used. */
+  if (endedByCutOff(deps.validFrom, row.created_at)) return wrong;
 
   deps.sql.exec(
     'UPDATE token SET last_used_at = ?, last_surface = ? WHERE id = ?',

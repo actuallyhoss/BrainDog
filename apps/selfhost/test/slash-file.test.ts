@@ -96,9 +96,9 @@ test("AN OLD SELF-HOST'S spark.sqlite, WAL AND ALL, IS slash.sqlite AFTER THE FI
 
     const own = openSqlite(join(dir, 'slash.sqlite'));
     try {
-      assert.equal(own.one<{ ask_cap: number }>('SELECT ask_cap FROM settings WHERE singleton = 1')?.ask_cap, 7, 'the cap the owner chose did not survive the move');
+      assert.equal(own.one<{ ask_cap: number }>('SELECT ask_cap FROM slash_settings WHERE singleton = 1')?.ask_cap, 7, 'the cap the owner chose did not survive the move');
       assert.deepEqual(
-        own.all<{ kind: string }>('SELECT kind FROM call').map((c) => c.kind),
+        own.all<{ kind: string }>('SELECT kind FROM slash_call').map((c) => c.kind),
         ['read'],
         'the ask over the new door was not written to the moved ledger',
       );

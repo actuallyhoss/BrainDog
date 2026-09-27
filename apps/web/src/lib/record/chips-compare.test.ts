@@ -20,6 +20,10 @@
  * AND `registerHref` STILL HANDS OVER THE WIDE ADDRESS FOR THESE, which the last test holds, for the
  * reasons written above its guards in `where.ts`: the register route never reads `join`, and two
  * other test files pin the wide address.
+ *
+ * WHICH ROWS A SENTENCE ADMITS IS THE RECORD'S TO SAY, and the browser's matcher that used to answer it
+ * here is gone with the browser's engine (ARC-2). What is left is what the browser prints: a chip
+ * reads back as the clause it was spelled from, in the record's own parse.
  */
 
 import { test } from 'node:test';
@@ -27,10 +31,9 @@ import assert from 'node:assert/strict';
 
 import './fixtures/fill.ts';
 import { chipsOf, joinOf, whereOf } from './api.ts';
-import { list } from './fixtures/readers.ts';
-import { NOW, REGISTERS, ROWS } from './fixtures/sample.ts';
+import { REGISTERS, ROWS } from './fixtures/sample.ts';
 import { treeOf } from './remote.ts';
-import { compile, matches, registerHref, type Clause } from './where.ts';
+import { compile, registerHref, type Clause } from './where.ts';
 
 /** A clause as a chip, spelled the way `registerHref` spells every other one: the compiled operator, the value encoded. */
 const chipOf = (c: Clause): string => {
@@ -38,26 +41,8 @@ const chipOf = (c: Clause): string => {
   return `f=${c.field}:${c.op}:${encodeURIComponent(said)}`;
 };
 
-/** The rows a sentence admits in the sample, in `seq` order. */
-const admitted = (register: string, sentence: string): number[] =>
-  (ROWS[register] ?? [])
-    .filter((e) => matches(e, compile(register, sentence), NOW))
-    .map((e) => e.seq)
-    .sort((a, b) => a - b);
-
-/** The rows an address opens, read the way the register route reads one. */
-const opened = (register: string, query: string, join?: 'any'): { said: string; seqs: number[] } => {
-  const filters = chipsOf(new URLSearchParams(query));
-  const said = whereOf(filters, join);
-  const w = compile(register, said);
-  return {
-    said,
-    seqs: (ROWS[register] ?? [])
-      .filter((e) => matches(e, w, NOW))
-      .map((e) => e.seq)
-      .sort((a, b) => a - b),
-  };
-};
+/** The sentence an address reads as, the way the register route reads one. */
+const opened = (query: string, join?: 'any'): { said: string } => ({ said: whereOf(chipsOf(new URLSearchParams(query)), join) });
 
 test('A COMPARE CHIP READS BACK AS THE CLAUSE IT WAS SPELLED FROM, for every ordered and every text field in the mirror', () => {
   /* THE BOUNDS ARE WORDS EACH TYPE TAKES, and the sweep is over the declarations rather than a few
@@ -84,9 +69,8 @@ test('A COMPARE CHIP READS BACK AS THE CLAUSE IT WAS SPELLED FROM, for every ord
         assert.deepEqual(w.bad, [], `${register}: ${sentence} did not compile, so the sweep is not asking what it means to`);
         /* A RANGE OF DAYS IS TWO CLAUSES, `gte` AND `lte`, AND THEREFORE TWO CHIPS, which is how the
            record spells it; the two ANDed read back to the same pair. */
-        const back = opened(register, w.clauses.map(chipOf).join('&'));
+        const back = opened(w.clauses.map(chipOf).join('&'));
         assert.deepEqual(compile(register, back.said).clauses, w.clauses, `${register}: ${sentence} came back as ${back.said}`);
-        assert.deepEqual(back.seqs, admitted(register, sentence), `${register}: ${sentence} opened other rows than it admits`);
         swept += 1;
       }
     }
@@ -94,18 +78,12 @@ test('A COMPARE CHIP READS BACK AS THE CLAUSE IT WAS SPELLED FROM, for every ord
   assert.ok(swept >= 200, `only ${swept} clauses were swept, so this test stopped measuring anything`);
 });
 
-test('the two cases measured before the fix open the rows their sentences admit', () => {
-  const amount = opened('obligations', 'f=amount:gte:GBP%202400');
-  assert.equal(amount.said, 'amount at least GBP 2400');
-  assert.deepEqual(amount.seqs, admitted('obligations', 'amount at least GBP 2400'));
-  assert.equal(amount.seqs.length, 25, 'the seed moved, so the measurement in the header is stale');
+test('the two cases measured before the fix read back as their sentences', () => {
+  assert.equal(opened('f=amount:gte:GBP%202400').said, 'amount at least GBP 2400');
+  assert.equal(opened('f=what:contains:rent').said, 'what contains rent');
 
-  const rent = opened('obligations', 'f=what:contains:rent');
-  assert.equal(rent.said, 'what contains rent');
-  assert.equal(rent.seqs.length, 3, 'the seed moved, so the measurement in the header is stale');
-
-  /* AND `between` WITH ONE VALUE IS THE COMPILER'S REFUSAL, not a range that quietly lost its top. */
-  assert.match(compile('obligations', opened('obligations', 'f=amount:between:GBP%2010').said).bad.join(' '), /between takes two values/);
+  /* AND `between` WITH ONE VALUE IS THE RECORD'S REFUSAL, not a range that quietly lost its top. */
+  assert.match(compile('obligations', opened('f=amount:between:GBP%2010').said).bad.join(' '), /between takes two values/);
 });
 
 test('UNDER join=any THE CHIPS ARE JOINED WITH ", or", and read back as the or-group they came from', () => {
@@ -117,14 +95,13 @@ test('UNDER join=any THE CHIPS ARE JOINED WITH ", or", and read back as the or-g
 
   /* `due` IS THE LABEL OF THE FIELD `by`, and the chip carries the id, so the sentence it reads back
      as names `by`: the same clauses, which is what is compared. */
-  const any = opened('tasks', query, 'any');
+  const any = opened(query, 'any');
   assert.equal(any.said, 'state is open, or by before today');
   assert.deepEqual(compile('tasks', any.said).any, w.any);
-  assert.deepEqual(any.seqs, admitted('tasks', sentence));
 
   /* WITHOUT THE WORD THEY ARE ANDED, as every address written before it is. */
-  assert.equal(opened('tasks', query).said, 'state is open, by before today');
-  assert.notDeepEqual(opened('tasks', query).seqs, any.seqs, 'the seed answers the same rows either way, so this test cannot tell "and" from "or"');
+  assert.equal(opened(query).said, 'state is open, by before today');
+  assert.equal(compile('tasks', opened(query).said).any, undefined);
 });
 
 test('THE RECORD’S READER HOLDS BOTH NOW, and registerHref stays wide until the route reads the join', () => {

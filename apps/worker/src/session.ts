@@ -1,13 +1,14 @@
 /**
- * Which door a request came in by: a bearer, the session cookie, or none.
+ * Which door a request came in by: a link to one page, a bearer, the session cookie, or none.
  *
  * ITS OWN FILE, AND FREE OF `cloudflare:`, for the reason `route.ts` is: this decides whose record a request
  * reads, and a decision that can only run inside workerd is a decision nobody tests. The Worker supplies the
  * two calls it needs, the Directory's `session` and the record's `access`, and this file is the order.
  *
- * THE ORDER IS BEARER, COOKIE, NOTHING. A bearer is an agent and answers for itself. A cookie is a person, and
- * one that names no session is a 401 that clears it. A request carrying no credential at all is the same 401 with
- * no cookie to clear, whatever it asks for and whichever path names it.
+ * THE ORDER IS LINK, BEARER, COOKIE, NOTHING. A link to one page (`Authorization: Share <token>`) is a stranger holding
+ * a capability, and is handed on unchecked to the one door that reads it. A bearer is an agent and answers for itself.
+ * A cookie is a person, and one that names no session is a 401 that clears it. A request carrying no credential at all
+ * is the same 401 with no cookie to clear, whatever it asks for and whichever path names it.
  *
  * THERE WAS A FOURTH DOOR, THE PUBLIC DEMO, AND IT IS GONE (`loop/DIRECTION.md` 26, `loop/research-no-sample.md` A1).
  * A request with nothing on it read one record the deployment pinned in its `vars`, as `p_demo` at `read`. The app
@@ -20,6 +21,7 @@
  */
 
 import { clearCookie, readSid, sameOrigin, sessionContext, sessionCookie } from '@braindog/host/auth';
+import { shareOf } from '@braindog/host';
 import { OPERATION_METHOD } from '@braindog/kernel';
 import type { AuthResult, Refusal, Who } from '@braindog/ports';
 import { TOKEN_REACHES, type CallContext } from '@braindog/record';
@@ -38,6 +40,8 @@ export type Deps = {
 };
 
 export type Door =
+  /** A link to one page: the token an `Authorization: Share <token>` header carried, checked by `serveShared` and not here. */
+  | { door: 'share'; token: string }
   | { door: 'bearer' }
   | { door: 'session'; record: string; ctx: CallContext; cookie?: string }
   /** `refusal` absent on a 401 is the Worker's own sentence for "nothing presented"; a 429 has `retryAfter`. */
@@ -49,6 +53,13 @@ const SAFE = new Set(['GET', 'HEAD']);
 
 /** Which door, and with `slug`, for the record the path names. `null` is the bare `/api/<method>` it always was. */
 export async function doorOf(request: Request, deps: Deps, slug: string | null = null): Promise<Door> {
+  /* A LINK TO ONE PAGE IS ITS OWN DOOR, AND IT IS ASKED BEFORE THE BEARER'S, because the line below reads any
+     `Authorization` header as a bearer and a link is not one: `Share <token>` there was a 401 for a token nobody minted.
+     Nothing is checked here and no cookie is read, so a link reaches nobody's session; `serveShared` checks the token
+     and answers every way it does not open with one 404 (`@braindog/host`'s `share.ts`). */
+  const token = shareOf(request.headers.get('authorization'));
+  if (token !== null) return { door: 'share', token };
+
   /* ANY `Authorization` HEADER IS THE BEARER'S DOOR, an empty one included: the self-host learnt what reading
      `''` as "nothing" costs, and the bearer path answers 401 for what it does not know. */
   if (request.headers.get('authorization') !== null) return { door: 'bearer' };

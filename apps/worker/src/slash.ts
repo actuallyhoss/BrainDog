@@ -224,7 +224,7 @@ export function includedInference(env: SlashEnv, most: () => number | Promise<nu
  * read by the same `answerOf`. Every failure is a throw, which the record reads as "the rules speak".
  *
  * EACH ASK IS HELD TO THE ONE CALL THE OPERATOR'S CEILING COUNTS IT AS, `worstAsk`, AND NOT TO `INCLUDED_NEURONS_PER_CALL`.
- * The record's meter writes one `call` row a press, and `operatorCeiling` turns the month's neurons into asks at 232 each,
+ * The record's meter writes one `slash_call` row a press, and `operatorCeiling` turns the month's neurons into asks at 232 each,
  * so a press that may spend more than 232 spends past the ceiling. The package's templates never do, because each trims
  * its input to `capIn`; the press's input is the record's own reading, which has no cap and grows with the record.
  * `loop/research-batch-sixty-two-audit.md` finding 3 measured it at 300 lists: 52,310 bytes, a worst case of 272
@@ -300,12 +300,27 @@ export type SlashEngineDeps = SlashWire & {
    *
    * IT IS NOT THE RECORD'S DATABASE (`46 §2`), and it is a parameter here rather than a line reading `this.ctx.storage`
    * because `docs/46` puts the engine in its own Durable Object (`apps/worker/src/do/slash.ts`, `idFromName(rec_id)`), which
-   * has its own storage and its own `wrangler.jsonc` binding. Until that object exists the caller decides which storage the
-   * `settings` and `call` tables of `46 §4.1` are created in, and this file neither knows nor guesses.
+   * has its own storage and its own `wrangler.jsonc` binding. The caller decides which storage Slash's `slash_settings` and
+   * `slash_call` tables are created in, and this file neither knows nor guesses. Today it is the record object's own, which
+   * is why the tables carry Slash's name.
    */
   sql: Sql;
   clock: Clock;
 };
+
+/**
+ * The tiers Slash runs on the Cloud: the included model, and tier `b` where a stored one still drafts (below). Not `byo`.
+ *
+ * `byo` NAMES NO ADDRESS OF THE OWNER'S, only a model name for this host's own model. On the included model the name went
+ * to Workers AI's own table, which answered "no adapter on this host" on every pass 2 (`src/inference.ts`), while the host
+ * still counted each ask against the cap Settings said `byo` did not have; where `SLASH_ENDPOINT` is set it is the
+ * deployment's endpoint all the same, and never one the owner chose. So on every Worker the package refuses to store it, reads a
+ * record already saved on it as the included model, and the guard counts it the same way; Settings offers only the
+ * included model on the Cloud (`apps/web/src/lib/ui/slash-model.ts` `kindsOn`), which reads the same `host: 'cloud'` every
+ * Worker sends. Until the choice of an own key replaces the three tiers (C15 in `loop/finish/agents.md`), which is the
+ * next writer of this list.
+ */
+export const CLOUD_TIERS = ['a', 'b'] as const;
 
 /**
  * `@braindog/slash` over this Worker's endpoint or the included model, and this record's guarded reads, or nothing at all.
@@ -329,18 +344,20 @@ export async function workerSlashEngine(env: SlashEnv, api: () => RecordApi, dep
   if (inference === undefined) return undefined;
   const slash = await import('@braindog/slash');
   /* EVERY TIER IS PRICED ON THE INCLUDED MODEL, because every call this engine makes there is Workers AI on the operator's
-     account. `byo` has no address of the owner's to go to, and the audit's S3 read it `neurons: 0` (finding 4); tier `b`
-     is refused at the settings door on a Worker that can open no key, and a `b` stored before that still drafts here. */
-  const options = config === undefined ? { priced: ['a', 'b', 'byo'] as const } : {};
+     account. `byo` went there too before this Worker stopped running it (`CLOUD_TIERS`), and the audit's S3 read it
+     `neurons: 0` (finding 4); tier `b` is refused at the settings door on a Worker that can open no key, and a `b` stored
+     before that still drafts here. */
+  const priced = config === undefined ? { priced: ['a', 'b', 'byo'] as const } : {};
   /* NAMED BY THIS HOST, as on the self-host: the package's tier `a` status says `glm-5.3-flash` whatever `SLASH_MODEL`
      sends (`loop/research-spark-routes.md` F2), and one wrap here is what every door over this engine reads. */
   const engine = slashNamedEngine(
-    slash.createSlash({ sql: deps.sql, clock: deps.clock, inference, record: slashRecord(api()) }, options),
+    slash.createSlash({ sql: deps.sql, clock: deps.clock, inference, record: slashRecord(api()) }, { ...priced, tiers: CLOUD_TIERS }),
     slashModelNameOf(config),
   );
   /* GUARDED BY THIS HOST, as on the self-host: tier `b`'s drafts are on this Worker's endpoint and the package meters tier
-     `a` alone, and `configure` checks a grant id's shape and never the vault (`slashGuardedEngine`). */
-  const guarded = slashGuardedEngine(engine, { sql: deps.sql, clock: deps.clock, grants: () => api().kernel.grants() });
+     `a` alone, and `configure` checks a grant id's shape and never the vault (`slashGuardedEngine`). It reads the tiers
+     this Worker runs as the package does, so a record saved on `byo` is counted where the package answers it. */
+  const guarded = slashGuardedEngine(engine, { sql: deps.sql, clock: deps.clock, grants: () => api().kernel.grants(), tiers: CLOUD_TIERS });
   if (config !== undefined) return guarded;
   /* AND ON THE INCLUDED MODEL, HELD UNDER THE OPERATOR'S CEILING, outermost so its check runs before either count below
      it and with no `await` between them and the package's hold. */
@@ -398,7 +415,7 @@ const grouped = (n: number): string => String(n).replace(/\B(?=([0-9]{3})+(?![0-
  */
 function operatorCeiling(engine: Slash, deps: { sql: Sql; clock: Clock }, asks: number): Slash {
   const made = (): number =>
-    deps.sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM call WHERE model <> '-' AND ts >= ?", monthOf(deps.clock.now(), 0))?.n ?? 0;
+    deps.sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM slash_call WHERE model <> '-' AND ts >= ?", monthOf(deps.clock.now(), 0))?.n ?? 0;
   const spent = (): boolean => made() >= asks;
   const until = (): string => monthOf(deps.clock.now(), 1);
   const refused = <T>(): Result<T> =>
@@ -466,7 +483,7 @@ const KIND_NAMED: Partial<Record<string, string>> = {
  * switch that files `ask_slash` and the flag the canvas reads are one fact (`test/slash-answers.test.ts` cases 2 and 5).
  *
  * THE ENGINE IS BUILT ONCE, ON THE FIRST QUESTION, THROUGH `workerSlashEngine`, so it is the guarded one and it meters on
- * the same `settings` and `call` tables the door's engine does, in the same storage: one `ask_cap` for a person's read and
+ * the same `slash_settings` and `slash_call` tables the door's engine does, in the same storage: one `ask_cap` for a person's read and
  * an automation's question. A build that throws is let go, as `apps/selfhost/src/slash.ts` `slashAnswersFor` lets it go,
  * so the next pass builds again rather than every question after it failing on one bad import.
  *
@@ -609,7 +626,7 @@ export function workerSlashAnswers(env: SlashEnv, api: () => RecordApi, deps: Sl
  * AND THE MOUNT THIS OBJECT NEEDS IS A FIELD AND A BRANCH, in `apps/worker/src/index.ts` and nowhere else,
  * because `servesApi` is a prefix test (`route.ts:58`) and so `/api/slash/read` already reaches `Record$`.
  * A FIELD and not a local: `slashAskDoor` caches the built engine on the door it returns, so a door built per
- * request would run `createSlash`'s two `CREATE TABLE IF NOT EXISTS` and its settings insert on every question,
+ * request would run `createSlash`'s store check (`openStore`) and its settings insert on every question,
  * which is the cold path `46 §7` budgets. The branch goes in `#answer`, beside `servesMcp`'s and before
  * `serveApi`, because `fetch` only drains the body around it. The storage is this object's own until
  * `apps/worker/src/do/slash.ts` exists, which is what `SlashEngineDeps.sql`'s comment above already says.
@@ -623,7 +640,7 @@ export function workerSlashDoor(
   /* TIER `b` IS OFFERED ONLY WHERE A KEY CAN BE OPENED. With no `KEK` there is no engine either, but the door is built
      before the engine, and a `byok` handed in here is what lets the settings door store tier `b`: offering it on a Worker
      that can open nothing would save a setting every later propose refuses. `api` is not called until a propose, by which
-     time the engine is built and its `settings` table exists for `slashGrantIdOf` to read. */
+     time the engine is built and its `slash_settings` table exists for `slashGrantIdOf` to read. */
   const config = slashFromEnv(env, { operatorKey: false });
   const wire = wireOf(env, api, deps);
   /* OPENED FOR THE ASKER, NOT FOR `system`: `slashByokFor` runs the vault's own gate on `ctx` and signs the `grant.read`
@@ -653,4 +670,47 @@ export async function slashLook(api: Pick<RecordApi, 'slashTick'>): Promise<void
   } catch (e) {
     console.error('slash:', e instanceof Error ? e.message : String(e));
   }
+}
+
+/* ── erasing a person from Slash's ledger ─────────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * `eraseSlash` over this object's Slash store, or nothing where no ledger was ever built here. The ledger rows it touched.
+ *
+ * THE PACKAGE IS LOADED ONLY WHERE THERE IS A LEDGER, which is `46 §5.1` kept on this path too: a Worker that never built an
+ * engine has no `slash_call` table, nor version 1's `call`, and the erasure finishes without evaluating the module.
+ */
+export async function slashErased(sql: Sql, subjects: readonly string[]): Promise<number> {
+  if (sql.one("SELECT 1 AS n FROM sqlite_master WHERE type = 'table' AND name IN ('slash_call', 'call')") === undefined) return 0;
+  const { eraseSlash } = await import('@braindog/slash');
+  return eraseSlash(sql, subjects);
+}
+
+/**
+ * The record's `erase`, followed by `eraseSlash` over the store this object hands every Slash engine, so an erasure reaches
+ * the questions Slash kept (`loop/finish/contracts.md` §7.2). `Record$.#open` calls it once, on the record it has just built.
+ *
+ * THE RECORD CANNOT DO IT ITSELF: it has no edge to `@braindog/slash` and must not, and the kernel's cascade walks the
+ * record's own tables and names none of Slash's. So the host that holds both finishes the erasure.
+ *
+ * ONLY WHEN THE RECORD ANSWERED `ok`, so every refusal it gives (a caller who is not the owner in a browser, a subject too
+ * short) stands for the ledger too. A ledger that could not be erased is a refusal of its own and not the record's report:
+ * the record's part is done and cannot be undone, and answering the erasure whole would say something that did not happen.
+ * Asked again, the record finds nothing more and the ledger is walked again.
+ */
+export function slashErasing(api: Pick<RecordApi, 'erase'>, sql: Sql): void {
+  const erase = api.erase.bind(api);
+  api.erase = async (args, ctx) => {
+    const out = await erase(args, ctx);
+    if (!out.ok) return out;
+    try {
+      await slashErased(sql, args.subjects);
+    } catch (e) {
+      return no(
+        'INTERNAL',
+        `The record erased every value naming them, and Slash's own ledger could not be erased: ${e instanceof Error ? e.message : String(e)} Erase again once Slash answers.`,
+      );
+    }
+    return out;
+  };
 }

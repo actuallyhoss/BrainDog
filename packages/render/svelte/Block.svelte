@@ -1,6 +1,7 @@
 <!--
-  One drawn block. Dispatches on `KINDS[kind].primitive` to one of the eight primitive components —
-  never on the kind, which is why a kind a pack invented after this bundle shipped renders anyway.
+  One drawn block. Dispatches on `KINDS[kind].primitive` to one of the eight primitive components, which is why a
+  kind a pack invented after this bundle shipped renders anyway. The few kinds with a drawer and a callback of their
+  own (`inputs`, `calendar`, `link`, `gallery`, `embed` and `steps path`) are asked for by name first, below.
 
   The `<figure>` skeleton, its classes and its data attributes are the same as `toHTML`'s, so the
   two accessibility trees are equal BY CONSTRUCTION rather than by a promise the parity gate has to
@@ -20,6 +21,11 @@
   import { comparisonPlan } from '../src/table.ts';
   import Media from './p/Media.svelte';
   import Inputs from './Inputs.svelte';
+  import Calendar from './Calendar.svelte';
+  import Links from './Links.svelte';
+  import Gallery from './Gallery.svelte';
+  import Embed from './Embed.svelte';
+  import Path from './Path.svelte';
   import type { OnCapture } from './types.ts';
   import type { OnInput } from '../src/inputs.ts';
 
@@ -32,12 +38,13 @@
     oncapture,
     onreschedule,
     oninput,
+    onpath,
   }: {
     block: Block;
     opts?: RenderOptions;
     /**
-     * THREE PRIMITIVES CAN BE CHANGED AND THE OTHER FIVE CANNOT, so these callbacks cross this component
-     * and reach exactly the ones that take them: one for `grid`, three for `list` and one for `panel`.
+     * SOME DRAWERS CAN CHANGE A ROW AND THE REST CANNOT, so these callbacks cross this component and
+     * reach exactly the ones that take them, each named beside its callback below.
      *
      * THEY ARE NOT ON `RenderOptions`. Every member of that type is a READ: a resolver, a link
      * builder, a clock. Putting a write callback on it would give `toHTML` a key it can never
@@ -71,6 +78,11 @@
      * from and the text as it stands (`../src/inputs.ts`). Every keystroke; the pause before a write is the host's.
      */
     oninput?: OnInput | undefined;
+    /**
+     * A `steps path` stone pressed: the row and the state it now shows. Handed to `Path` alone, which draws each stone
+     * as a 44px toggle only when this is passed and as a picture of one otherwise.
+     */
+    onpath?: ((row: Row, done: boolean) => void) | undefined;
   } = $props();
 
   const PRIMITIVE = { panel: Panel, grid: Grid, rows: Rows, proportional: Proportional, inline: InlineRun, list: List, media: Media };
@@ -112,11 +124,26 @@
       <Table columns={comparison.columns} rows={comparison.rows} total={comparison.rows.length} label={block.heading} href={opts.href} />
     {/if}
   {:else if block.kind === 'inputs'}
-    <!-- BY KIND, THE ONE PLACE THIS COMPONENT ASKS FOR ONE, because the callback belongs to one kind on a primitive two
-         others share: handed to `Rows`, a `spec` would take a write it can never make. -->
+    <!-- BY KIND, because the callback belongs to one kind on a primitive two others share: handed to `Rows`, a `spec`
+         would take a write it can never make. -->
     <!-- AND NOT THROUGH `Rows` EVEN READ-ONLY: an inputs row is `field | label | type | value`, so `Rows` would print the
          field's id as its label and its label as its value. `Inputs` draws the spec itself, in `Rows`' classes. -->
     <Inputs {block} {opts} {oninput} />
+  {:else if block.kind === 'calendar'}
+    <!-- CALENDAR, LINK, GALLERY AND EMBED, EACH WITH A DRAWER OF ITS OWN, and the path, BY KIND AND BEFORE THE
+         PRIMITIVES, for `inputs`' reason: each sits on a primitive other kinds share, and asking here keeps a
+         primitive's component from learning a kind it has no callback for. A drawer that does not know one of these
+         kinds falls back to its primitive, which is why each is on one. -->
+    <Calendar {block} {opts} />
+  {:else if block.kind === 'link'}
+    <Links {block} {opts} />
+  {:else if block.kind === 'gallery'}
+    <Gallery {block} {opts} />
+  {:else if block.kind === 'embed'}
+    <Embed {block} {opts} />
+  {:else if block.kind === 'steps' && block.form === 'path'}
+    <!-- Here and not through `List`, because the stone's write is the path's alone and `List` has three of its own. -->
+    <Path {block} {opts} {onpath} />
   {:else if spec.primitive === 'grid'}
     <!-- BY NAME rather than through `Draw`, because the callback belongs to one primitive: handed
          to the union the other six are in, it is a prop none of them declares. -->

@@ -38,6 +38,8 @@
   import { whoDid } from '$lib/record/api.ts';
   import { installWords } from '$lib/record/actions.ts';
   import CallsOut from '$lib/ui/CallsOut.svelte';
+  import Cited from '$lib/ui/Cited.svelte';
+  import { figuresIn, reasonIn } from '$lib/cite.ts';
   import Changes from './Changes.svelte';
   import { spoken } from '../spoken.ts';
   import Proposed from './Proposed.svelte';
@@ -624,6 +626,10 @@
 
         <div class="cards" data-cells={question.options.length}>
           {#each question.options as option, i}
+            <!-- THE REASON AS IT WAS FILED, so its rows are links (`Cited`), each named by its list, since a filed question
+                 keeps no titles or values for a reader who may not read them; where the body holds no reason, the words
+                 `questionOf` made of it. -->
+            {@const because = reasonIn(about?.body, option.key) ?? option.body}
             <article class="card" data-on={highlighted === option.key ? '' : undefined}>
               <header class="card-head">
                 <span class="card-n num">{i + 1}</span>
@@ -631,19 +637,29 @@
                 <!-- Shown, never pre-selected. -->
                 {#if option.recommended}<span class="card-rec">{copy.recommended}</span>{/if}
               </header>
-              <p class="card-body">{option.body}</p>
+              <!-- AN OPTION WITH NO REASON SHOWS NONE, rather than an empty line under its name: a rule's own options
+                   carry no `because`, and a blank paragraph reads as a reason that failed to load. -->
+              {#if because.trim() !== ''}
+                <p class="card-body"><Cited text={because} figures={figuresIn(about?.body)} {now} /></p>
+              {/if}
               <!-- OFF FOR A READER WHO MAY NOT ANSWER, pointing at the sentence above the options
                    that says why. `aria-describedby` rather than a title, so the reason is read out
                    with the control and not only seen beside it, which is the shape `/decide` and
                    `/settings/people` both use. The card around it is untouched: the number, the
-                   title, the recommendation and the body are what this reader came for. -->
+                   title, the recommendation and the body are what this reader came for.
+                   THE BUTTON SAYS THE OPTION'S OWN NAME ("Per seat", not "Choose Per seat"), and the
+                   Suggested one is drawn as the primary until another is highlighted: shown, and
+                   still not chosen, because pressing it only opens the reason. ONLY THE FIRST SUGGESTED ONE: a body
+                   from an agent may mark two, and a screen has one primary. -->
               <Button
-                weight={highlighted === option.key ? 'primary' : 'quiet'}
+                weight={highlighted === option.key || (highlighted === null && option.recommended === true && question.options.find((o) => o.recommended)?.key === option.key)
+                  ? 'primary'
+                  : 'quiet'}
                 disabled={!answerable}
                 aria-describedby={answerable ? undefined : 'cannot-decide'}
                 onclick={() => choose(option.key)}
               >
-                {copy.chooseThis(option.title)}
+                {option.title}
               </Button>
             </article>
           {/each}

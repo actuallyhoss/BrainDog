@@ -1,7 +1,7 @@
 <!--
   The spoken-id resolver: `/D41`, `/SG31`, `/tasks#7`.
 
-  Resolved by the SHELL, not by a server 302 — no server renders a request here (50 §13 D17). It
+  Resolved by the SHELL, not by a server 302: no server renders a request here (50 §13 D17). It
   asks the record and replaces the address with the canonical one, so Back does not bounce.
 
   `brain.dog/D41` is a sentence one person can say to another and a string an agent can emit with no
@@ -15,6 +15,11 @@
   `governance` as `/decide` reads it and a row through `get` with the spoken id. `UNREACHABLE` and
   `UNAUTHORIZED` then sent it to the sample's question or row of the same id, a fictional studio's,
   until DIRECTION 26 removed the sample.
+
+  AND ONLY WHAT IS SHAPED LIKE A SPOKEN ID IS ASKED ABOUT. Every one-segment address inside a record
+  lands here, so `/moneyy` was answered "Nothing answers to “moneyy”" and told how ids are spelt, as
+  if the person had been reading one out. A string that is not an id's shape was never an id: it is
+  an address that leads nowhere, and it gets the same not-found screen as any other (design SYS-8).
 -->
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
@@ -25,19 +30,62 @@
   /* Imported here and nowhere in the layout, so the client stays out of the entry chunk. */
   import { createClient } from '@braindog/client';
   import { copy } from '$lib/copy.ts';
-  import { openPalette } from '$lib/palette/open.svelte.ts';
   import Empty from '$lib/ui/Empty.svelte';
   import Button from '$lib/ui/Button.svelte';
-  import Icon from '$lib/ui/Icon.svelte';
+  import NotFound from '$lib/ui/NotFound.svelte';
   import { closed, drew, opened } from '../../lib/ui/screen.svelte.ts';
 
-  const raw = $derived(decodeURIComponent(page.params.id ?? ''));
-  const bare = $derived(/^#?\d+$/.test(raw));
+  /* A MALFORMED ESCAPE IS STILL AN ADDRESS, and `decodeURIComponent` throws on one (`/%E0`), which took the whole
+     screen down to the error page for what is only a mistyped path. */
+  const decoded = (said: string): string => {
+    try {
+      return decodeURIComponent(said);
+    } catch {
+      return said;
+    }
+  };
 
+  /**
+   * What was said, from the address as the browser holds it now.
+   *
+   * THE `#n` OF `tasks#7` IS THE ADDRESS'S FRAGMENT, NOT PART OF ITS PATH. Typed into the bar it never reaches
+   * `params.id`, so the one spelling this page's header promises arrived as `tasks` and was answered as an address
+   * that leads nowhere. A fragment that is only a number is put back after a list's name, the one shape `QUALIFIED`
+   * below reads; any other fragment is a place on a page and is not part of an id.
+   */
+  const spoken = (): string => {
+    const path = decoded(page.params.id ?? '');
+    const hash = page.url.hash;
+    return /^[a-z][a-z0-9_]*$/u.test(path) && /^#\d+$/u.test(hash) ? `${path}${hash}` : path;
+  };
+
+  const raw = $derived(spoken());
+
+  /* This page's own words (contracts §11 X18). None of the titles ends in a full stop: a title is not a sentence
+     (design §6.8.5). */
+  const words = {
+    bareTitle: (said: string): string => `“${said}” could be in any of your lists`,
+    bareBody: 'A number on its own does not say which list it is in. Search for the thing by what it says instead.',
+    spokenTitle: (said: string): string => `Nothing answers to “${said}”`,
+    spokenBody: 'Nothing on this record goes by that name. Search for it by what it says instead.',
+  } as const;
+
+  const BARE = /^#?\d+$/;
   const PREFIXED = /^[A-Za-z]{1,3}\d+$/;
   const QUALIFIED = /^([a-z][a-z0-9_]*)#(\d+)$/;
 
-  type Wire = { ok: true; value: unknown } | { ok: false; refusal: { code: string; fix: string } } | { ok: false; conflict: unknown };
+  /**
+   * The three shapes a spoken id takes, and what this page does with each: `bare` is a number that names no one list,
+   * `spoken` is asked of the record, and `address` is a path that was never an id and leads nowhere.
+   */
+  const shape = $derived(BARE.test(raw) ? 'bare' : PREFIXED.test(raw) || QUALIFIED.test(raw) ? 'spoken' : 'address');
+
+  /**
+   * A refusal as this page reads it. `detail` is the transport's own words when the client keeps them apart from its
+   * sentence (AGT-4's `unreachable()`); until then they are inside `fix`, and the fold below shows whichever it has.
+   */
+  type Refusal = { code: string; fix: string; detail?: string | undefined };
+  type Wire = { ok: true; value: unknown } | { ok: false; refusal: Refusal } | { ok: false; conflict: unknown };
 
   /**
    * A refusal of a question is the record's own sentence, and so is a record that could not be asked at all.
@@ -48,53 +96,59 @@
    * are said, like any refusal of a question.
    */
   const unasked = (code: string): boolean => code === 'UNAUTHORIZED' || code === 'UNREACHABLE';
-  const missed = (out: Wire, quote: boolean): { to: null; fix: string } => ({
+  const missed = (out: Wire, quote: boolean): { to: null; refusal: Refusal | null } => ({
     to: null,
-    fix: 'refusal' in out && (quote || unasked(out.refusal.code)) ? out.refusal.fix : '',
+    refusal: 'refusal' in out && (quote || unasked(out.refusal.code)) ? out.refusal : null,
   });
 
   /** Where an id goes on the record behind this host. */
-  async function resolved(said: string): Promise<{ to: string | null; fix: string }> {
+  async function resolved(said: string): Promise<{ to: string | null; refusal: Refusal | null }> {
     const client = createClient({ base: apiBase() });
     if (/^(?:SG|D)\d+$/iu.test(said)) {
       const id = said.toUpperCase();
       const out = await client.governance({ register: id.startsWith('D') ? 'decision' : 'suggestion', id });
       if (!out.ok) return missed(out, true);
-      return { to: out.value ? `/decide/${id}` : null, fix: '' };
+      return { to: out.value ? `/decide/${id}` : null, refusal: null };
     }
-    if (!PREFIXED.test(said) && !QUALIFIED.test(said)) return { to: null, fix: '' };
     /* A ROW THE READER CANNOT NAME is not found, in the words this page already has for that. */
     const out = await client.call<{ register?: string; seq?: number | null } | null>('get', { spoken: said });
     if (!out.ok) return missed(out, false);
     const row = out.value;
-    return { to: row?.register && typeof row.seq === 'number' ? `/r/${row.register}/${row.seq}` : null, fix: '' };
+    return { to: row?.register && typeof row.seq === 'number' ? `/r/${row.register}/${row.seq}` : null, refusal: null };
   }
 
   let done = $state(false);
-  let fix = $state('');
+  let refusal = $state<Refusal | null>(null);
 
-  async function resolve(said: string) {
+  /**
+   * Ask the record, when there is something to ask.
+   *
+   * A NUMBER ON ITS OWN AND AN ADDRESS THAT IS NOT AN ID ARE ANSWERED HERE, with no call: the record has nothing to say
+   * about either, and a call made anyway would hold the screen unsettled for a question with no answer.
+   */
+  async function resolve(said: string, asked: 'bare' | 'spoken' | 'address') {
     done = false;
-    fix = '';
-    if (bare) {
+    refusal = null;
+    if (asked !== 'spoken') {
       done = true;
       return;
     }
     const began = opened();
     const out = await resolved(said);
-    if (decodeURIComponent(page.params.id ?? '') !== said) return closed(true, began);
-    closed(out.fix === '', began);
+    if (spoken() !== said) return closed(true, began);
+    closed(out.refusal === null, began);
     if (out.to) {
       await goto(at(out.to), { replaceState: true });
       return;
     }
-    fix = out.fix;
+    refusal = out.refusal;
     done = true;
   }
 
   $effect(() => {
     const said = raw;
-    untrack(() => void resolve(said));
+    const asked = shape;
+    untrack(() => void resolve(said, asked));
   });
 
   /**
@@ -103,42 +157,45 @@
    * resolves hands the claim to the screen it goes to.
    */
   $effect(() => {
-    if (done && !fix) drew('ready');
+    if (done && !refusal) drew('ready');
   });
+
+  /* THE HEADING OF EACH NOT-FOUND, which is also the tab's title. An address that is not an id has none of its own:
+     `NotFound` says its own title, and the tab says the address. */
+  const missing = $derived(shape === 'bare' ? words.bareTitle(raw) : shape === 'spoken' ? words.spokenTitle(raw) : null);
 </script>
 
 <!-- A REFUSAL IS NOT "NOTHING ANSWERS" IN THE TAB EITHER. With the sample gone a 401 draws the record's sentence
      in the body, and the title still claimed `Nothing answers to “tasks#3”` over it, about a row nobody looked up. -->
-<svelte:head><title>{titleOf(done && !fix ? `Nothing answers to “${raw}”` : raw)}</title></svelte:head>
+<svelte:head><title>{titleOf(done && !refusal ? (missing ?? raw) : raw)}</title></svelte:head>
 
-{#if done && fix}
+{#if done && refusal?.code === 'UNREACHABLE'}
   <div class="page">
-    <Empty kind="error" heading title={fix}>
-      {#snippet actions()}<Button href="/decide">{copy.decide}</Button>{/snippet}
+    <!-- THE RECORD WAS NOT ASKED, SO THE SCREEN SAYS THAT AND OFFERS THE ONE THING THAT HELPS. The client's sentence
+         carries the socket's words ("200 with a body that is not JSON"), and those are for whoever reports the
+         fault, so they fold under Details and Retry asks again. -->
+    <Empty kind="error" heading title={copy.readOffline} detail={refusal?.detail ?? refusal?.fix}>
+      {#snippet actions()}<Button weight="primary" onclick={() => void resolve(raw, shape)}>{copy.readRetry}</Button>{/snippet}
+    </Empty>
+  </div>
+{:else if done && refusal}
+  <div class="page">
+    <Empty kind="error" heading title={copy.readRefused} body={refusal?.fix}>
+      {#snippet actions()}<Button href="/">{copy.home}</Button>{/snippet}
     </Empty>
   </div>
 {:else if done}
   <div class="page">
-    <!-- `no-results`, not `error`. Nothing failed here — a string was typed and it does not name a
-         row, which is the same class of event as a search with no hits. `error` paints the heading
-         in `danger`, and spending the alarm colour on "you typed an id that doesn't exist" is how a
-         product teaches people that red means nothing in particular. -->
-    <Empty
-      kind="no-results"
-      heading
-      title={bare ? `“${raw}” could be in any of your lists.` : `Nothing answers to “${raw}”.`}
-      body={bare
-        ? 'Every list has a #1, so a number on its own does not say which. Put the list in front of it: obligations#4, or tasks#7.'
-        : 'An id is a list and a number, like obligations#4, or the short code a thing was given, like SG31.'}
-    >
-      <!-- IT SAID `Search` AND WENT HOME, beside a second button that also went home. Two controls,
-           one behaviour, and the one with the magnifying glass was named for something it did not
-           do — on the screen whose whole purpose is that somebody was looking for something. -->
-      {#snippet actions()}
-        <Button weight="primary" onclick={openPalette}><Icon name="search" size="s" />{copy.search}</Button>
-        <Button href="/">{copy.home}</Button>
-      {/snippet}
-    </Empty>
+    <!-- A NUMBER AND AN ID SAY NO MORE THAN WHAT WAS TYPED. The bodies used to teach the spelling of an id
+         ("obligations#4", "SG31"), which is a developer's notation on a screen anybody reaches; what helps a person
+         who has a thing's number and not its name is Search, which finds it by what it says. -->
+    {#if shape === 'bare'}
+      <NotFound title={missing ?? raw} body={words.bareBody} />
+    {:else if shape === 'spoken'}
+      <NotFound title={missing ?? raw} body={words.spokenBody} />
+    {:else}
+      <NotFound />
+    {/if}
   </div>
 {/if}
 

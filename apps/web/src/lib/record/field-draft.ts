@@ -10,14 +10,18 @@
  * refuses a third decimal on EGP exactly as the row page does (`field-draft.test.ts`).
  *
  * THE CURRENCY THE ROW HOLDS WINS, AND THE ONE PASSED IN IS THE FALLBACK. A list of pounds can hold one row in dinars,
- * and correcting that row's amount must not quietly move it into pounds. `GBP` is last because the row page has always
- * said it last, for a money field on a list where no row says any currency at all.
+ * and correcting that row's amount must not quietly move it into pounds. After the row come the currency the field's
+ * default is in, the list's, and the record's own (`homeCurrency()`), each one somebody chose. There was a `GBP` after
+ * them, so on a record in pounds of Egypt a box on a list with no money in it yet wrote sterling; with none of them
+ * known a money is not written, and the box says why.
  */
 
 import { exponentOf } from 'braindog-render';
 
 import { copy } from '../copy.ts';
 import { amountOf, currencyOf } from './money.ts';
+/* No cycle: `api.ts` does not import this file, directly or through another. */
+import { homeCurrency } from './api.ts';
 import type { FieldDecl, Fields } from './schema.ts';
 import { listFromDraft, listLine } from './tags.ts';
 
@@ -37,8 +41,20 @@ import { listFromDraft, listLine } from './tags.ts';
 const UNBOXED: ReadonlySet<string> = new Set(['secret', 'quantity', 'file', 'json']);
 export const editable = (f: Pick<FieldDecl, 'type'>): boolean => !UNBOXED.has(f.type);
 
-/** The currency a money box is typed in: the row's own, else the list's, else the one the row page has always used. */
-const currencyIn = (held: unknown, currency: string | null | undefined): string => currencyOf(held) ?? currency ?? 'GBP';
+/**
+ * The currency a money box is typed in: the row's own, else the field's default's, else the list's, else the record's,
+ * or `null` when nobody has chosen one. Never a literal (`loop/finish/rules.md` §13).
+ */
+const currencyIn = (f: FieldDecl, held: unknown, currency: string | null | undefined): string | null =>
+  currencyOf(held) ?? currencyOf(f.default) ?? currency ?? homeCurrency();
+
+/**
+ * WHAT A MONEY BOX SAYS WHEN NO CURRENCY IS KNOWN, this unit's own words: the record would refuse an amount without a
+ * currency, and the box takes digits alone, so the sentence says why nothing was written rather than guessing one.
+ */
+const words = {
+  noCurrency: 'Nothing says which currency this amount is in yet, so it was not written: this row has none, and neither does the record.',
+} as const;
 
 /**
  * What a `duration`'s declared unit is worth in the seconds the record stores.
@@ -83,7 +99,9 @@ export function draftOf(f: FieldDecl, held: unknown, currency: string | null | u
   if (f.type !== 'money') return String(held);
   const minor = amountOf(held);
   if (minor === null) return '';
-  return String(minor / 10 ** exponentOf(currencyIn(held, currency)));
+  /* A MONEY IN NO KNOWN CURRENCY HAS NO EXPONENT TO SHIFT BY, so the box opens on the number as it is stored. */
+  const code = currencyIn(f, held, currency);
+  return code === null ? String(minor) : String(minor / 10 ** exponentOf(code));
 }
 
 /**
@@ -97,7 +115,9 @@ export function wrongMoney(f: FieldDecl, typed: string, held: unknown, currency:
   const raw = typed.trim();
   if (raw === '') return null;
   if (!/^-?\d+(\.\d+)?$/u.test(raw)) return copy.moneyShape;
-  const exp = exponentOf(currencyIn(held, currency));
+  const code = currencyIn(f, held, currency);
+  if (code === null) return words.noCurrency;
+  const exp = exponentOf(code);
   const places = raw.includes('.') ? raw.length - raw.indexOf('.') - 1 : 0;
   return places > exp ? copy.moneyPlaces(exp) : null;
 }
@@ -130,7 +150,10 @@ export function patchOf(f: FieldDecl, typed: string | boolean, held: unknown, cu
   }
   if (f.type !== 'money') return { [f.id]: raw };
   if (raw === '') return { [f.id]: null };
-  const code = currencyIn(held, currency);
+  const code = currencyIn(f, held, currency);
+  /* NO CURRENCY IS NO MONEY, and none is made up: `wrongMoney` has already said so beside the box, and a caller that
+     did not ask it sends the text as typed, which the record refuses with its own sentence. */
+  if (code === null) return { [f.id]: raw };
   return { [f.id]: { amount: Math.round(Number(raw) * 10 ** exponentOf(code)), currency: code } };
 }
 

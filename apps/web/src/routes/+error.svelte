@@ -3,6 +3,7 @@
   import { copy } from '$lib/copy.ts';
   import Empty from '$lib/ui/Empty.svelte';
   import Button from '$lib/ui/Button.svelte';
+  import NotFound from '$lib/ui/NotFound.svelte';
   import { rid } from '$lib/data/call.ts';
 
   /* MINTED ONCE, WHEN THIS SCREEN EXISTS, and not on every render. The id names one failure; a
@@ -19,20 +20,18 @@
     the framework's words. On a thrown error it is whatever a developer typed into `error()`, which
     is the stack trace the comment here used to promise it never showed.
 
-    AND A MISTYPED URL IS NOT AN ALARM. `/[id]` answers the identical event with `no-results` and
-    says why: spending the alarm colour on "you typed an id that does not exist" is how a product
-    teaches people that red means nothing in particular. Two not-found screens, one colour now.
+    A MISTYPED URL IS NOT AN ALARM, AND IT IS ONE SCREEN WHICHEVER DOOR IT CAME THROUGH. `/[id]`
+    catches every one-segment address and this catches the rest, and they drew two different
+    not-found screens; both draw `NotFound` now, with Search and Home. The address is not its
+    title any more: under `/app/<record>/` it printed the record's slug to a person who typed a
+    page name.
 
     THE REQUEST ID BELONGS TO THE FAILURE AND NOT TO THE TYPO. The client mints an `X-Request-Id` on
-    every call and the host echoes and logs it (19 §6) — there is nothing to look up for a path
+    every call and the host echoes and logs it (19 §6); there is nothing to look up for a path
     that was never a route.
   -->
   {#if page.status === 404}
-    <Empty kind="no-results" glyph="globe" title={`There is nothing at ${page.url.pathname}.`}>
-      {#snippet actions()}
-        <Button weight="primary" href="/">{copy.home}</Button>
-      {/snippet}
-    </Empty>
+    <NotFound />
   {:else}
     <!-- AND THE ONE ID IN THE PRODUCT THAT IS REAL. `50 §2.5` mints it client-side — ten base32
          characters from `crypto.getRandomValues` — and sends it as `X-Request-Id` so both hosts can
@@ -41,7 +40,7 @@
          nothing is the worst thing to put on an error screen, because it is the one string there
          that has to mean something. Seven of those eight sites were not failures at all and no
          longer offer one. -->
-    <Empty kind="error" title={copy.screenFailed} body={copy.screenFailedBody} rid={requestId}>
+    <Empty kind="error" heading title={copy.screenFailed} body={copy.screenFailedBody} rid={requestId}>
       {#snippet actions()}
         <Button weight="primary" onclick={() => location.reload()}>{copy.tryAgain}</Button>
         <Button href="/">{copy.home}</Button>

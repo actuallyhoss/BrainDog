@@ -11,10 +11,10 @@
  * span-4 block beside a tall span-8 block leaves a hole under the short one, so three short blocks declared "beside"
  * one tall block were drawn under it (the survey's S1, measured). A rail is its own stack, so its height is its own.
  *
- * PURE, SO `node --test` READS IT WITH NO SVELTEKIT. `PageView.svelte` draws what this answers and decides nothing.
+ * PURE, SO `node --test` READS IT WITH NO SVELTEKIT. `PageBody.svelte` draws what this answers and decides nothing.
  */
 
-import { COLUMNS, type Area } from '../record/arrange.ts';
+import { COLUMNS, spanOf, type Area, type Slot } from '../record/arrange.ts';
 
 export type { Area };
 
@@ -51,6 +51,25 @@ const areaIn = (area: unknown, layout: Layout | null): Area => (layout ? named(a
 
 /** The area a drawn block sits in on this page. The app's block type does not name `area`; the page read carries it. */
 export const areaOf = (block: object, layout: Layout | null): Area => areaIn((block as { area?: unknown }).area, layout);
+
+/**
+ * A declared block's slot: its declared index `i`, its span clamped to what its KIND can survive, and `area: rail` when
+ * it sits in the rail.
+ *
+ * THE CLAMP IS FOR DECLARATIONS THAT NEVER WENT THROUGH THE ARRANGE CONTROL. A declaration arrives from a pack, and a
+ * pack is a thing a stranger wrote, so a `table` that says `span: 2` is a table somebody will read as broken; the
+ * renderer knows the floor per kind (13 §4.1's three width classes), and the page honours it rather than drawing eight
+ * columns in a sixth of a page. The control refuses below the floor instead of clamping, because a control that
+ * silently corrects you teaches nothing.
+ *
+ * NO `area` KEY FOR A MAIN BLOCK, so a page with no layout makes exactly the slots it always made, and a Done that moved
+ * nothing compares them equal. Here and not in the reader, because the page body lays blocks out with it and the
+ * arrange controls begin and add with it, and the two must agree.
+ */
+export function slotOf(block: { kind: string; span?: number | undefined; columns: readonly unknown[] }, i: number, layout: Layout | null): Slot {
+  const span = spanOf(block.kind, block.span, block.columns.length);
+  return areaOf(block, layout) === 'rail' ? { i, span, area: 'rail' } : { i, span };
+}
 
 /**
  * The blocks in each area, each in declared order.

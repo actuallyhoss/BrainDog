@@ -31,17 +31,21 @@
  * HOW A HOST LOADS IT. `SLASH_ENDPOINT` unset means the host never imports this package, registers
  * no route, and answers `{ version, slash: false }` (`46 §13` D4). Absence is the default and
  * presence is proven, which is why nothing here reads an environment variable: the decision is the
- * host's, one level up, where it can be made without loading the module it is about.
+ * host's, one level up, where it can be made without loading the module it is about. An erasure is
+ * the one other reason to load it, and a host does so only where Slash's ledger exists to erase
+ * from (`eraseSlash`, `erase.ts`).
  */
 
 import { no, ok, type Result } from '@braindog/ports';
 
 import { answering } from './answer.ts';
-import { core as makeCore, DDL } from './call.ts';
+import { core as makeCore, openStore, TIERS } from './call.ts';
 import { patterns } from './jobs.ts';
 import { palette } from './propose.ts';
 import type { CallContext, Settings, Slash, SlashDeps, Status, Tier } from './types.ts';
 
+export { eraseSlash } from './erase.ts';
+export { STORE_VERSION } from './call.ts';
 export { cite, citable, shapeOf, tokens } from './project.ts';
 export { answerSchema } from './answer.ts';
 export { ANSWER_SYSTEM, MODELS, PROMPTS, SYSTEM } from './prompts.ts';
@@ -73,18 +77,34 @@ export type {
 } from './types.ts';
 export { VERBS } from './types.ts';
 
-const TIERS: readonly Tier[] = ['a', 'b', 'byo'];
-
 /**
- * What a host says about its own money, beside the ports.
+ * What a host says about its own money and its own models, beside the ports.
  *
  * `priced` NAMES THE TIERS WHOSE CALLS THE HOST PAYS FOR IN NEURONS, and the ledger prices those rows and no others.
  * Unset is `['a']`, which is `46 §4.1`: a customer's key and a self-host endpoint are billed by whoever owns them. The
  * package cannot see that for itself, because what answers tier `byo` is whatever `SlashDeps.inference` is, and on the
  * Worker with no endpoint that is Workers AI on the operator's account (`loop/research-batch-sixty-audit.md` finding 4).
- * It is an argument and not a field of `SlashDeps` because `SlashDeps` is the ports, and this is not a port.
+ *
+ * `tiers` NAMES THE TIERS THE HOST RUNS AT ALL, and unset is all three. A tier outside it is refused at `configure`, and
+ * one already stored is read as `a`, the included model, with the row left as it was saved (`call.ts` `settings`). The
+ * Worker names `a` and `b`: `byo` asks the host's endpoint for a model the owner typed, and on the Cloud there is no
+ * endpoint of the owner's to ask (C15 in `loop/finish/agents.md`, until the own-key choice replaces the three tiers).
+ *
+ * Arguments and not fields of `SlashDeps` because `SlashDeps` is the ports, and neither of these is a port.
  */
-export type SlashOptions = { priced?: readonly Tier[] | undefined };
+export type SlashOptions = { priced?: readonly Tier[] | undefined; tiers?: readonly Tier[] | undefined };
+
+/** Each tier as a sentence names it, for the refusal that lists the ones a host runs. */
+const TIER_NAMED: Record<Tier, string> = { a: 'the included model', b: 'your own key', byo: 'your own endpoint' };
+
+/** `the included model, your own key, or your own endpoint`, for however many a host runs. */
+const namedTiers = (tiers: readonly Tier[]): string => {
+  const names = tiers.map((t) => TIER_NAMED[t]);
+  const last = names.pop();
+  if (last === undefined) return 'no model';
+  if (names.length === 0) return last;
+  return `${names.join(', ')}${names.length > 1 ? ',' : ''} or ${last}`;
+};
 
 /**
  * A grant id and not a key: `g_` and a 26-character ULID (`34 §4`).
@@ -101,8 +121,9 @@ const GRANT_ID = /^g_[0-9A-HJKMNP-TV-Z]{26}$/u;
 /**
  * Build a Slash over one record's storage.
  *
- * `46 §7`: under 5 ms, two `CREATE TABLE IF NOT EXISTS` and no network. It is called on the cold
- * path of a Durable Object, so anything expensive here is latency on the first ask of the day.
+ * `46 §7`: under 5 ms and no network. It is called on the cold path of a Durable Object, so anything
+ * expensive here is latency on the first ask of the day, which is why `openStore` reads two rows and
+ * opens no transaction on a store already at its version.
  *
  * THE MONTH IS UTC AND THE SPEC SAYS THE RECORD'S TIME ZONE. The zone lives on the record and this
  * package's `RecordApi` has no method that answers it; inventing one to make a meter roll over at
@@ -111,29 +132,20 @@ const GRANT_ID = /^g_[0-9A-HJKMNP-TV-Z]{26}$/u;
  * change when `project` grows a way to ask.
  */
 export function createSlash(deps: SlashDeps, options: SlashOptions = {}): Slash {
-  for (const statement of DDL) deps.sql.exec(statement);
-  /* BEST EFFORT, BECAUSE A DURABLE OBJECT REFUSES IT. Measured in workerd on 22 September: the two
-     `CREATE TABLE IF NOT EXISTS` run, and this statement throws `not authorized: SQLITE_AUTH` out of
-     the object's authorizer, so on the Worker every ask answered 500 before a model was called
-     (`apps/worker/test/slash-in-do.test.ts`). The directory met the same refusal first and guards
-     its pragma reads (`packages/record/src/directory.ts`), and `packages/kernel/src/migrate.ts`
-     wraps its own write the same way. Nothing in this package reads `user_version` back, so a DO
-     that never holds it loses nothing today. THE FIRST SCHEMA CHANGE TO `46 §4.1` NEEDS THE VERSION
-     IN A ROW, as `dir_meta` carries the directory's, because on the Worker this pragma will read 0
-     for ever and a migration keyed on it would run on every build. */
-  try {
-    deps.sql.exec('PRAGMA user_version = 1');
-  } catch {
-    /* the Durable Object's authorizer; see above */
-  }
+  /* NO PRAGMA, BECAUSE A DURABLE OBJECT REFUSES IT. Measured in workerd on 22 September: `PRAGMA user_version = 1` threw
+     `not authorized: SQLITE_AUTH` out of the object's authorizer, so on the Worker every ask answered 500 before a model
+     was called (`apps/worker/test/slash-in-do.test.ts`), until the statement was wrapped. The store's version is a row
+     now (`STORE_VERSION`, `slash_meta`), so nothing here asks the pragma at all. */
+  openStore(deps.sql);
   deps.sql.exec(
-    'INSERT OR IGNORE INTO settings (singleton, tier, model, grant_id, ask_cap, updated_at) VALUES (1, ?, NULL, NULL, ?, ?)',
+    'INSERT OR IGNORE INTO slash_settings (singleton, tier, model, grant_id, ask_cap, updated_at) VALUES (1, ?, NULL, NULL, ?, ?)',
     'a',
     80,
     new Date(deps.clock.now()).toISOString(),
   );
 
-  const core = makeCore(deps.sql, deps.clock, deps.inference, options.priced);
+  const tiers = options.tiers ?? TIERS;
+  const core = makeCore(deps.sql, deps.clock, deps.inference, options.priced, tiers);
   const asking = palette(core, deps.record, deps.inference);
   const pattern = patterns(core, deps.record, deps.inference);
   const automation = answering(core, deps.inference);
@@ -160,10 +172,10 @@ export function createSlash(deps: SlashDeps, options: SlashOptions = {}): Slash 
 
     const before = core.settings();
     const tier = patch.tier ?? before.tier;
-    if (!TIERS.includes(tier))
-      return no('ENUM_VALUE_UNKNOWN', 'Slash runs on the included model, your own key, or your own endpoint.', {
+    if (!tiers.includes(tier))
+      return no('ENUM_VALUE_UNKNOWN', `Slash runs on ${namedTiers(tiers)} on this host.`, {
         at: 'tier',
-        allowed: TIERS,
+        allowed: tiers,
       });
 
     const askCap = patch.ask_cap ?? before.ask_cap;
@@ -196,7 +208,7 @@ export function createSlash(deps: SlashDeps, options: SlashOptions = {}): Slash 
       updated_at: core.now(),
     };
     deps.sql.exec(
-      'UPDATE settings SET tier = ?, model = ?, grant_id = ?, ask_cap = ?, updated_at = ? WHERE singleton = 1',
+      'UPDATE slash_settings SET tier = ?, model = ?, grant_id = ?, ask_cap = ?, updated_at = ? WHERE singleton = 1',
       after.tier,
       after.model,
       after.grant_id,

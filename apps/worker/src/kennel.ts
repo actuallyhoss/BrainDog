@@ -1,0 +1,581 @@
+/**
+ * The Kennel on the Cloud: `/api/kennel/v1/`, the registry every BrainDog reads add-ons and use cases from
+ * (`loop/finish/platform.md` §4.0 K, `docs/14-KENNEL-AND-COMMUNITY.md` §1).
+ *
+ * THIS FILE READS AND WRITES AND DECIDES NOTHING. Every rule, what a submission must be, what a verdict or a yank does
+ * and how the two indexes become one, is `@braindog/declare/kennel`'s, so the self-host and a test hold the same rules
+ * with no bucket. What is here is R2 under the prefix `kennel/`, the bundled catalogue in the static assets, and who
+ * is asking.
+ *
+ * UNDER `/api/*` ON PURPOSE. The site already forwards `/api/*` to this Worker and this Worker already runs first there,
+ * so the Kennel needed no route and no `wrangler.jsonc` change. It is answered in `route()` before any record door,
+ * because it is nobody's record.
+ *
+ * READS ARE PUBLIC AND OPEN TO EVERY ORIGIN: the index, a published file, its preview and the install counts are what a
+ * self-host, the command line and anybody's browser fetch. A PUBLISHED FILE IS THE ONE ANSWER A CACHE MAY KEEP. A version
+ * is published once and never changes, so it is served `immutable`; everything else this file answers, the index and
+ * every refusal included, is `no-store`, as every other answer from this Worker is.
+ *
+ * WHO IS ASKING IS READ ONLY FOR A WRITE, AND IN THIS ORDER: an author's signature in the body names its key; the
+ * operator's bearer (`PROVISION_KEY`) opens review and yanks anything; any other bearer is read as `/api` reads one; and
+ * only then the session cookie, and only when the request comes from a page on this host (`12 §8`, the rule every
+ * cookie write here follows). A read never looks at a cookie or a header.
+ *
+ * EVERY WRITE OF `index.json` OR `review.json` IS CONDITIONAL on the version this write read, and a write that loses the
+ * race reads again and asks the rules again, up to `KENNEL_TRIES` times. The one unconditional write is the first of each
+ * file, when there was nothing to read a version from, SO TWO FIRST-EVER WRITERS OF ONE FILE CAN RACE and the later put
+ * wins whole. Closing that takes a create-only put, which R2's reference does not say it has, so it is left open for the
+ * one moment each file is born.
+ *
+ * EVERY WRITE SPENDS THE WORKER'S WRITE BUDGET FOR ITS ADDRESS FIRST (`spend`), before its body is read.
+ */
+
+import { httpStatus } from '@braindog/host';
+import { clearCookie, readSid, sameKey, sameOrigin, sessionCookie } from '@braindog/host/auth';
+import { emptyCatalogue, readCatalogue, type CatalogueIndex } from '@braindog/declare/catalogue';
+import {
+  acceptSubmission,
+  emptyPublishers,
+  emptyReview,
+  KENNEL_BASE,
+  kennelAsk,
+  listedPending,
+  mergeIndexes,
+  readPublishers,
+  readReview,
+  readSubmission,
+  readTrust,
+  readVerdict,
+  readYank,
+  reviewVerdict,
+  SUBMIT_MOST_BYTES,
+  trustIn,
+  waitingFile,
+  yankIn,
+  type Change,
+  type Identity,
+  type Publishers,
+  type Review,
+  type Yanker,
+} from '@braindog/declare/kennel';
+import { no, ok } from '@braindog/ports';
+import type { AuthResult, Refusal, Result, Who } from '@braindog/ports';
+import { seedCatalogue } from '@braindog/seed/usecases/catalogue';
+
+import type { Assets } from './catalogue.ts';
+import { op } from './oplog.ts';
+import { bearerOf, withCookie, type BearerDeps } from './session.ts';
+
+/** The part of an R2 bucket the Kennel uses, so a test hands in a map. The binding is `BLOBS`. */
+export type KennelBucket = {
+  get(key: string): Promise<{ text(): Promise<string>; etag: string } | null>;
+  /** `null` when `onlyIf` did not hold: somebody else wrote the file since it was read. */
+  put(key: string, value: string, options?: { onlyIf?: { etagMatches?: string }; httpMetadata?: { contentType?: string } }): Promise<object | null>;
+  delete(key: string): Promise<void>;
+};
+
+/** What `route()` hands the Kennel: the two bindings, the operator's key, this host's origin, and the two ways a person is known. */
+export type KennelDeps = {
+  blobs?: KennelBucket | undefined;
+  assets?: Assets | undefined;
+  operator?: string | undefined;
+  /** `https://<PUBLIC_HOST>`, the one origin a signed-in write may come from. */
+  origin: string;
+  /** The Directory's `session` flow. */
+  session: (sid: string) => Promise<AuthResult<Who>>;
+  /** The bearer path `/api` takes (`session.ts`). */
+  bearer: BearerDeps;
+  /**
+   * The Worker's write budget for the caller's address: `null` to go on, or its 429. ASKED BEFORE A WRITE READS ITS BODY,
+   * because the submit door takes no sign-in, and each signed body it reads costs three bucket reads and a signature
+   * check before the day's cap is counted. Left out, nothing is limited.
+   */
+  spend?: (request: Request) => Promise<Response | null>;
+  now?: () => Date;
+};
+
+const PREFIX = 'kennel/';
+const INDEX = 'index.json';
+const REVIEW = 'review.json';
+const PUBLISHERS = 'publishers.json';
+const COUNTS = 'counts.json';
+
+/** How many times a write that lost a race reads again before it says so. */
+export const KENNEL_TRIES = 3;
+/** A submission's body: the file's text escaped inside JSON is longer than the file, so three times the file's own cap. */
+export const SUBMIT_BODY_MOST = 3 * SUBMIT_MOST_BYTES;
+/** A yank or a trust: a few names and a reason. */
+export const SMALL_BODY_MOST = 16_384;
+/** A verdict may carry the operator's preview of every page an add-on adds. */
+export const VERDICT_BODY_MOST = 4 * 1_048_576;
+
+const IMMUTABLE = 'public, max-age=31536000, immutable';
+const JSON_FILE = { httpMetadata: { contentType: 'application/json; charset=utf-8' } };
+
+/**
+ * Where the build puts the bundled catalogue: under the app's base, and at the root before the app had one. The same
+ * two places `catalogue.ts` reads, asked here because a preview is not one of the shapes that reader answers.
+ */
+const PLACES = ['/app/catalogue/', '/catalogue/'] as const;
+
+export const servesKennel = (pathname: string): boolean => pathname === KENNEL_BASE.slice(0, -1) || pathname.startsWith(KENNEL_BASE);
+
+/* ── answers ─────────────────────────────────────────────────────────────── */
+
+type How = { open?: boolean; kept?: boolean; head?: boolean; extra?: readonly [string, string][] };
+
+/** Every answer the Kennel gives: `no-store` unless it is a published file, and open to every origin when it is a read. */
+function answer(status: number, body: string, how: How = {}): Response {
+  return new Response(how.head === true ? null : body, {
+    status,
+    headers: [
+      ['content-type', 'application/json; charset=utf-8'],
+      ['cache-control', how.kept === true ? IMMUTABLE : 'no-store'],
+      ['x-content-type-options', 'nosniff'],
+      ...(how.open === true ? ([['access-control-allow-origin', '*']] as [string, string][]) : []),
+      ...(how.extra ?? []),
+    ],
+  });
+}
+
+/** A refusal in the envelope every `/api` answer uses, with `Retry-After` when it says when. */
+function refusedWith(status: number, refusal: Refusal, how: How = {}): Response {
+  const wait = refusal.retry_after;
+  const later: [string, string][] = status === 429 && typeof wait === 'number' && Number.isSafeInteger(wait) && wait > 0 ? [['retry-after', String(wait)]] : [];
+  return answer(status, JSON.stringify({ ok: false, refusal }), { ...how, extra: [...(how.extra ?? []), ...later] });
+}
+
+/** A write's result: `{ ok: true, value }` or its refusal, at the status `/api` gives the same code. */
+function settled(out: Result<unknown>): Response {
+  if (out.ok) return answer(200, JSON.stringify({ ok: true, value: out.value }));
+  return refusedWith(httpStatus(out), 'refusal' in out ? out.refusal : { code: 'INTERNAL', fix: 'The Kennel could not say what went wrong. Ask again in a moment.' });
+}
+
+const WHAT: Refusal = {
+  code: 'ROUTE_UNKNOWN',
+  fix: 'The Kennel answers index.json, counts.json, packs/<id>/<version>.pack.json, usecases/<id>/<version>.usecase.json and their .preview.json, and takes submit and yank.',
+};
+const NO_BUCKET: Refusal = { code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog keeps no Kennel of its own: it has no BLOBS bucket, so it takes no submissions, yanks or verdicts.' };
+const NOBODY: Refusal = { code: 'UNAUTHORIZED', fix: 'Sign the file with your author key, or sign in to BrainDog here and send it from this site.' };
+const CROSS: Refusal = { code: 'FORBIDDEN', fix: "A write to the Kennel is accepted from a page on this BrainDog, or signed by its author's key.", at: 'origin' };
+const NOT_WRITE: Refusal = { code: 'FORBIDDEN', fix: 'A token that only reads or proposes publishes and yanks nothing. Use one that may write, or sign the file with your author key.', at: 'authorization' };
+const OPERATOR: Refusal = { code: 'UNAUTHORIZED', fix: 'This takes the operator key.', at: 'authorization' };
+const NO_OPERATOR: Refusal = { code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog has no operator key (PROVISION_KEY), so its Kennel has no review and no trusted publishers.' };
+
+/**
+ * One request under `/api/kennel/v1/`, answered whole. A path or a method the Kennel does not take is its 404 or 405, and
+ * a throw from a bucket or the assets is a 500 whose line names what failed and holds no body a caller sent.
+ */
+export async function serveKennel(request: Request, deps: KennelDeps): Promise<Response> {
+  const asked = kennelAsk(request.method, new URL(request.url).pathname);
+  if ('wrong' in asked)
+    return asked.wrong === 'method'
+      ? refusedWith(405, { code: 'ROUTE_UNKNOWN', fix: `This Kennel address takes ${asked.allow}.` }, { extra: [['allow', asked.allow]] })
+      : refusedWith(404, WHAT, { open: true });
+  const now = deps.now ?? (() => new Date());
+  const head = request.method === 'HEAD';
+  try {
+    if (!head && request.method !== 'GET' && deps.spend !== undefined) {
+      const over = await deps.spend(request);
+      if (over !== null) {
+        await request.body?.cancel().catch(() => undefined);
+        return over;
+      }
+    }
+    switch (asked.ask) {
+      case 'index':
+        return answer(200, JSON.stringify(mergeIndexes(await bundledIndex(deps.assets, false), await readingIndex(deps.blobs))), { open: true, head });
+      case 'counts':
+        return answer(200, await countsOf(deps.blobs, now()), { open: true, head });
+      case 'file':
+      case 'preview': {
+        const text = await fileOf(deps, asked.path);
+        return text === null
+          ? refusedWith(404, { code: 'ROUTE_UNKNOWN', fix: `The Kennel holds no ${asked.path}.` }, { open: true, head })
+          : answer(200, text, { open: true, kept: asked.ask === 'file', head });
+      }
+      case 'submit':
+        return await submit(request, deps, now);
+      case 'yank':
+        return await yank(request, deps, now);
+      case 'review':
+      case 'verdict':
+      case 'publisher':
+        return await operated(request, deps, asked.ask, now);
+    }
+  } catch (e) {
+    op({ op: 'kennel', ask: asked.ask, ok: false, error: e instanceof Error ? e.message : String(e) }, 'error');
+    return refusedWith(500, { code: 'INTERNAL', fix: 'The Kennel could not answer this just now. Ask again in a moment.' });
+  }
+}
+
+/* ── reading ─────────────────────────────────────────────────────────────── */
+
+/**
+ * A file from the bundled catalogue, or `null`. THE ASSETS ANSWER THE APP'S SHELL FOR A PATH THEY DO NOT HOLD, with a
+ * 200, so an answer that is not JSON is a file that is not there.
+ */
+async function bundledFile(assets: Assets | undefined, path: string): Promise<string | null> {
+  if (assets === undefined) return null;
+  for (const place of PLACES) {
+    try {
+      const res = await assets.fetch(new Request(`https://assets.invalid${place}${path}`));
+      if (res.ok && (res.headers.get('content-type') ?? '').includes('json')) return await res.text();
+    } catch {
+      /* An asset read that throws is a file that is not there, and the next place is asked. */
+    }
+  }
+  return null;
+}
+
+/**
+ * The deployed build's catalogue, or `null` where none is bundled.
+ *
+ * `strict` FOR A SUBMISSION, because the bundled ids are the ones no submission may take: an index that is bound and
+ * does not read is a throw, never an empty list that would let one through.
+ */
+async function bundledIndex(assets: Assets | undefined, strict: boolean): Promise<CatalogueIndex | null> {
+  const text = await bundledFile(assets, INDEX);
+  if (text === null) {
+    if (strict && assets !== undefined) throw new Error('the bundled catalogue index is not in the static assets, so no id can be held to it');
+    return null;
+  }
+  let doc: unknown;
+  try {
+    doc = JSON.parse(text);
+  } catch {
+    doc = undefined;
+  }
+  const read = readCatalogue(doc);
+  if (read.ok) return read.value;
+  if (strict) throw new Error('the bundled catalogue index does not read, so no id can be held to it');
+  return null;
+}
+
+const catalogueOf = (doc: unknown): CatalogueIndex | null => {
+  const read = readCatalogue(doc);
+  return read.ok ? read.value : null;
+};
+
+/** The Kennel's index for a reader: what R2 holds, or nothing when there is no bucket or the file does not read. */
+async function readingIndex(blobs: KennelBucket | undefined): Promise<CatalogueIndex | null> {
+  if (blobs === undefined) return null;
+  try {
+    return (await stored(blobs, INDEX, catalogueOf, () => emptyCatalogue('BrainDog Kennel'))).value;
+  } catch (e) {
+    /* A READER IS SERVED THE BUNDLED CATALOGUE ALONE, and the line says why; only a write refuses on it. */
+    op({ op: 'kennel', ask: 'index', ok: false, error: e instanceof Error ? e.message : String(e) }, 'error');
+    return null;
+  }
+}
+
+/**
+ * A published file or preview: R2 first, then the bundled catalogue, then the waiting copy the Kennel's index names.
+ *
+ * THE WAITING COPY IS ASKED LAST, and only on a miss, because it costs a read of the index: it answers only in the
+ * moment between a listing's commit and its copy, or for a copy that never landed (`Change`).
+ */
+async function fileOf(deps: KennelDeps, path: string): Promise<string | null> {
+  const blobs = deps.blobs;
+  if (blobs === undefined) return bundledFile(deps.assets, path);
+  const kept = await blobs.get(PREFIX + path);
+  if (kept !== null) return kept.text();
+  return (await bundledFile(deps.assets, path)) ?? (await waitingCopy(blobs, await readingIndex(blobs), path));
+}
+
+/** The waiting copy of a file the Kennel's index lists, or `null`. Its path is its checksum, so its bytes are the listed ones. */
+async function waitingCopy(blobs: KennelBucket, index: CatalogueIndex | null, path: string): Promise<string | null> {
+  const at = index === null ? null : listedPending(index, path);
+  const copy = at === null ? null : await blobs.get(PREFIX + at);
+  return copy === null ? null : copy.text();
+}
+
+/** `counts.json` as R2 holds it, raw, or nothing counted yet. A reader rounds (`roundCount`). */
+async function countsOf(blobs: KennelBucket | undefined, now: Date): Promise<string> {
+  const kept = blobs === undefined ? null : await blobs.get(PREFIX + COUNTS);
+  if (kept !== null) {
+    try {
+      const doc = JSON.parse(await kept.text()) as unknown;
+      const map = typeof doc === 'object' && doc !== null ? (doc as Record<string, unknown>) : {};
+      const counts = typeof map.counts === 'object' && map.counts !== null && !Array.isArray(map.counts) ? (map.counts as Record<string, unknown>) : null;
+      if (typeof map.at === 'string' && counts !== null && Object.values(counts).every((n) => typeof n === 'number' && Number.isSafeInteger(n) && n >= 0))
+        return JSON.stringify({ at: map.at, counts });
+    } catch {
+      /* A counts file that does not read counts nothing, which is what a reader is told below. */
+    }
+  }
+  return JSON.stringify({ at: now.toISOString(), counts: {} });
+}
+
+/* ── the three files ────────────────────────────────────────────────────── */
+
+type Stored<T> = { value: T; etag: string | null };
+
+/**
+ * One of the Kennel's files and the version it was read at. Absent is the empty file with no version. PRESENT AND
+ * UNREADABLE IS A THROW, so nothing is ever written over a file this build cannot read.
+ */
+async function stored<T>(blobs: KennelBucket, name: string, read: (doc: unknown) => T | null, empty: () => T): Promise<Stored<T>> {
+  const got = await blobs.get(PREFIX + name);
+  if (got === null) return { value: empty(), etag: null };
+  let doc: unknown;
+  try {
+    doc = JSON.parse(await got.text());
+  } catch {
+    doc = undefined;
+  }
+  const value = read(doc);
+  if (value === null) throw new Error(`${PREFIX}${name} does not read as the Kennel's own file, so nothing was written over it`);
+  return { value, etag: got.etag };
+}
+
+/** A file written only if it is still the version read; `false` when another write came first. */
+async function put(blobs: KennelBucket, name: string, value: unknown, etag: string | null): Promise<boolean> {
+  const text = JSON.stringify(value);
+  return (await blobs.put(PREFIX + name, text, etag === null ? JSON_FILE : { ...JSON_FILE, onlyIf: { etagMatches: etag } })) !== null;
+}
+
+type Loaded = { index: Stored<CatalogueIndex>; review: Stored<Review>; publishers: Stored<Publishers> };
+
+const loaded = async (blobs: KennelBucket): Promise<Loaded> => {
+  const [index, review, publishers] = await Promise.all([
+    stored(blobs, INDEX, catalogueOf, () => emptyCatalogue('BrainDog Kennel')),
+    stored(blobs, REVIEW, readReview, emptyReview),
+    stored(blobs, PUBLISHERS, readPublishers, emptyPublishers),
+  ]);
+  return { index, review, publishers };
+};
+
+/**
+ * A change applied in `Change`'s order: the waiting copies first, so nothing is listed before it can be fetched; the
+ * index, as the commit; the copy to the listed path, which only the write that won the commit makes; the review file
+ * after it; and the files a listing leaves behind last. `false` when the commit lost a race.
+ *
+ * THE WAITING FILE IS READ BEFORE THE COMMIT, so a listing whose file is gone refuses before anything names it. A tidying
+ * verdict, which commits no index, finds it gone when the write that listed it already copied and dropped it, and has
+ * nothing to copy. A COPY THAT FAILS AFTER THE COMMIT IS A LINE, NOT A REFUSAL: the version is listed, a reader is served
+ * its waiting copy (`fileOf`), and that copy is kept rather than dropped.
+ */
+async function applied(blobs: KennelBucket, at: Loaded, change: Change): Promise<boolean> {
+  for (const file of change.files) await blobs.put(PREFIX + file.path, file.text, JSON_FILE);
+  const waiting = change.move === null ? null : await blobs.get(PREFIX + change.move.from);
+  const moving = waiting === null ? null : await waiting.text();
+  if (change.move !== null && moving === null && change.index !== null) throw new Error(`${change.move.from} is not in the bucket, so it was not listed`);
+  if (change.index !== null) {
+    if (!(await put(blobs, INDEX, change.index, at.index.etag))) return false;
+  } else if (change.review !== null && !(await put(blobs, REVIEW, change.review(at.review.value), at.review.etag))) return false;
+  let keep: string | null = null;
+  if (change.move !== null && moving !== null) {
+    try {
+      await blobs.put(PREFIX + change.move.to, moving, JSON_FILE);
+    } catch (e) {
+      keep = change.move.from;
+      op({ op: 'kennel.copy', path: change.move.to, ok: false, error: e instanceof Error ? e.message : String(e) }, 'error');
+    }
+  }
+  if (change.index !== null && change.review !== null) await patched(blobs, change.review);
+  for (const path of change.drop) if (path !== keep) await blobs.delete(PREFIX + path);
+  return true;
+}
+
+/**
+ * The review file changed after the index already was. THE INDEX IS THE COMMIT, so this is tidying: a listed version
+ * still waiting, or a submission not yet counted, which the next verdict on it or the next day puts right.
+ */
+async function patched(blobs: KennelBucket, change: (was: Review) => Review): Promise<void> {
+  for (let tries = 0; tries < KENNEL_TRIES; tries += 1) {
+    const now = await stored(blobs, REVIEW, readReview, emptyReview);
+    if (await put(blobs, REVIEW, change(now.value), now.etag)) return;
+  }
+  op({ op: 'kennel.review', ok: false, tries: KENNEL_TRIES }, 'error');
+}
+
+/** Ask the rules over what the bucket holds and write what they say, reading again after a lost race. */
+async function changed<A>(
+  blobs: KennelBucket,
+  rule: (state: { index: CatalogueIndex; review: Review; publishers: Publishers }) => Result<Change & { answer: A }> | Promise<Result<Change & { answer: A }>>,
+): Promise<Result<A>> {
+  for (let tries = 0; tries < KENNEL_TRIES; tries += 1) {
+    const at = await loaded(blobs);
+    const out = await rule({ index: at.index.value, review: at.review.value, publishers: at.publishers.value });
+    if (!out.ok) return out as Result<A>;
+    if (await applied(blobs, at, out.value)) return ok(out.value.answer);
+  }
+  return no('RATE_LIMITED', `Other changes to the Kennel landed while this one was being written, ${KENNEL_TRIES} times over. Send it again in a moment.`, { retry_after: 5 });
+}
+
+/* ── who is asking ──────────────────────────────────────────────────────── */
+
+/**
+ * The body as JSON, or `BODY_MALFORMED`. COUNTED AS IT ARRIVES, as `@braindog/host`'s `textOf` counts an `/api` body:
+ * `Content-Length` is a claim, so it is checked first and the count is the check that holds, and reading stops at the
+ * first piece past the cap, so the rest is never held.
+ */
+async function bodyOf(request: Request, cap: number, door: string): Promise<Result<unknown>> {
+  const over = no<unknown>('BODY_MALFORMED', `${door} takes a body of at most ${cap} bytes.`, { at: 'body' });
+  if (Number(request.headers.get('content-length') ?? 0) > cap) {
+    await request.body?.cancel().catch(() => undefined);
+    return over;
+  }
+  const parts: Uint8Array[] = [];
+  let size = 0;
+  if (request.body) {
+    const reader = request.body.getReader();
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > cap) {
+        await reader.cancel().catch(() => undefined);
+        return over;
+      }
+      parts.push(value);
+    }
+  }
+  const bytes = new Uint8Array(size);
+  let at = 0;
+  for (const part of parts) {
+    bytes.set(part, at);
+    at += part.byteLength;
+  }
+  try {
+    return ok(JSON.parse(new TextDecoder().decode(bytes)) as unknown);
+  } catch {
+    return no('BODY_MALFORMED', `${door} takes a JSON object as its body.`, { at: 'body' });
+  }
+}
+
+/** Whether the bearer is the operator's key, compared in constant time. An unset key is nobody's. */
+async function isOperator(request: Request, key: string | undefined): Promise<boolean> {
+  if (key === undefined || key === '') return false;
+  const sent = /^Bearer\s+(.+)$/i.exec(request.headers.get('authorization') ?? '')?.[1]?.trim() ?? '';
+  return sent !== '' && (await sameKey(sent, key));
+}
+
+type Person = { person: string; cookie?: string } | { refused: Response };
+
+/**
+ * The person an unsigned write comes from: a bearer as `/api` reads one, or this host's session, only from a page on this
+ * host. A rotation the Directory made rides back on the answer, as it does on every other door.
+ */
+async function personOf(request: Request, deps: KennelDeps): Promise<Person> {
+  if (request.headers.get('authorization') !== null) {
+    const found = await bearerOf(request, 'api', deps.bearer);
+    if ('status' in found) return { refused: found.status === 403 ? refusedWith(403, found.refusal) : refusedWith(401, NOBODY) };
+    const principal = found.ctx.principal;
+    /* ONLY A TOKEN THAT MAY WRITE SPEAKS FOR ITS PERSON HERE. A `propose` token is an agent's, whose writes wait on
+       Decide; a submission or a yank under the person's name reaches the public registry with nobody deciding. */
+    if (principal.kind === 'token') return principal.scope !== 'write' ? { refused: refusedWith(403, NOT_WRITE) } : { person: principal.person };
+    if (principal.kind === 'person') return { person: principal.id };
+    return { refused: refusedWith(401, NOBODY) };
+  }
+  const cookie = readSid(request, 'secure');
+  if (cookie === undefined) return { refused: refusedWith(401, NOBODY) };
+  /* THE COOKIE IS READ ONLY FROM THIS HOST'S OWN PAGES, before the Directory is asked anything about it. */
+  if (!sameOrigin(request, deps.origin)) return { refused: refusedWith(403, CROSS) };
+  const out = await deps.session(cookie);
+  const carried = out.session === undefined ? undefined : out.session === 'clear' ? clearCookie('secure') : sessionCookie(out.session.sid, 'secure');
+  if (out.status === 200) return carried === undefined ? { person: out.body.person } : { person: out.body.person, cookie: carried };
+  if (out.status === 429) return { refused: withCookie(refusedWith(429, { code: 'RATE_LIMITED', fix: 'Too many sign-in checks just now. Send it again shortly.', retry_after: out.retryAfter }), carried) };
+  if (out.status === 503) return { refused: withCookie(refusedWith(503, { code: 'RECORD_UNAVAILABLE', fix: 'Sign-in is not answering just now. Send it again shortly.' }), carried) };
+  /* Expired, signed out, or sign-in off: the same 401 as nothing presented, and the cookie goes. */
+  return { refused: withCookie(refusedWith(401, NOBODY), clearCookie('secure')) };
+}
+
+/** The installed ids BrainDog keeps beyond its bundled catalogue: the built-in modules and use cases. Read once. */
+let reserved: readonly string[] | null = null;
+const reservedIds = (): readonly string[] => (reserved ??= seedCatalogue().map((e) => e.id));
+
+/* ── the writes ─────────────────────────────────────────────────────────── */
+
+async function submit(request: Request, deps: KennelDeps, now: () => Date): Promise<Response> {
+  const blobs = deps.blobs;
+  if (blobs === undefined) return refusedWith(501, NO_BUCKET);
+  const body = await bodyOf(request, SUBMIT_BODY_MOST, 'submit');
+  if (!body.ok) return settled(body);
+  const asked = readSubmission(body.value);
+  if (!asked.ok) return settled(asked);
+  const { text, signature, name } = asked.value;
+  let identity: Identity;
+  let cookie: string | undefined;
+  if (signature !== null) identity = { kind: 'key', signature, name };
+  else {
+    const who = await personOf(request, deps);
+    if ('refused' in who) return who.refused;
+    identity = { kind: 'person', id: who.person, name };
+    cookie = who.cookie;
+  }
+  const bundled = (await bundledIndex(deps.assets, true)) ?? emptyCatalogue('BrainDog');
+  /* THE VERSION BEFORE IS READ AS A READER IS SERVED IT, its waiting copy included, so a bump is never computed against
+     nothing because the last listing's copy had not landed. */
+  const readIn =
+    (index: CatalogueIndex) =>
+    async (path: string): Promise<string | null> => {
+      const kept = await blobs.get(PREFIX + path);
+      return kept !== null ? kept.text() : waitingCopy(blobs, index, path);
+    };
+  const out = await changed(blobs, (state) => acceptSubmission({ ...state, bundled, reserved: reservedIds(), read: readIn(state.index) }, text, identity, now()));
+  return withCookie(settled(out), cookie);
+}
+
+async function yank(request: Request, deps: KennelDeps, now: () => Date): Promise<Response> {
+  const blobs = deps.blobs;
+  if (blobs === undefined) return refusedWith(501, NO_BUCKET);
+  const body = await bodyOf(request, SMALL_BODY_MOST, 'yank');
+  if (!body.ok) return settled(body);
+  const asked = readYank(body.value);
+  if (!asked.ok) return settled(asked);
+  const { signature, ...which } = asked.value;
+  let by: Yanker;
+  let cookie: string | undefined;
+  if (signature !== null) by = { kind: 'key', signature };
+  else if (await isOperator(request, deps.operator)) by = { kind: 'operator' };
+  else {
+    const who = await personOf(request, deps);
+    if ('refused' in who) return who.refused;
+    by = { kind: 'person', id: who.person };
+    cookie = who.cookie;
+  }
+  const out = await changed(blobs, (state) => yankIn(state.index, { ...which, by }, now()));
+  return withCookie(settled(out), cookie);
+}
+
+/** The operator's doors: what waits, one waiting file whole, a verdict on one, and whether a publisher lists at once. */
+async function operated(request: Request, deps: KennelDeps, ask: 'review' | 'verdict' | 'publisher', now: () => Date): Promise<Response> {
+  if (deps.operator === undefined || deps.operator === '') return refusedWith(501, NO_OPERATOR);
+  if (!(await isOperator(request, deps.operator))) return refusedWith(401, OPERATOR);
+  const blobs = deps.blobs;
+  if (blobs === undefined) return refusedWith(501, NO_BUCKET);
+
+  if (ask === 'review') {
+    const review = (await stored(blobs, REVIEW, readReview, emptyReview)).value;
+    const head = request.method === 'HEAD';
+    const q = new URL(request.url).searchParams;
+    const [kind, id, version] = [q.get('kind'), q.get('id'), q.get('version')];
+    if (kind === null && id === null && version === null)
+      return answer(200, JSON.stringify({ ok: true, value: { pending: review.pending, refused: review.refused } }), { head });
+    /* ONE WAITING FILE, WHOLE, so the operator reads what a submission would install, its scripts' source included. */
+    if (kind === null || id === null || version === null)
+      return settled(no('VALUE_MALFORMED', 'A waiting file is asked for by kind, id and version together, as the review list names it.', { at: 'query' }));
+    const found = waitingFile(review, kind, id, version);
+    const kept = found === null ? null : await blobs.get(PREFIX + found.path);
+    if (found === null || kept === null) return refusedWith(404, { code: 'ROUTE_UNKNOWN', fix: `Nothing is waiting for review as ${kind} ${id} ${version}.` }, { head });
+    return answer(200, JSON.stringify({ ok: true, value: { ...found.pending, text: await kept.text() } }), { head });
+  }
+  if (ask === 'verdict') {
+    const body = await bodyOf(request, VERDICT_BODY_MOST, 'review');
+    if (!body.ok) return settled(body);
+    const verdict = readVerdict(body.value);
+    if (!verdict.ok) return settled(verdict);
+    return settled(await changed(blobs, (state) => reviewVerdict(state, verdict.value, now())));
+  }
+  const body = await bodyOf(request, SMALL_BODY_MOST, 'publisher');
+  if (!body.ok) return settled(body);
+  const trust = readTrust(body.value);
+  if (!trust.ok) return settled(trust);
+  for (let tries = 0; tries < KENNEL_TRIES; tries += 1) {
+    const at = await stored(blobs, PUBLISHERS, readPublishers, emptyPublishers);
+    if (await put(blobs, PUBLISHERS, trustIn(at.value, trust.value, now()), at.etag)) return settled(ok(trust.value));
+  }
+  return settled(no('RATE_LIMITED', `Other changes to the trusted publishers landed while this one was being written, ${KENNEL_TRIES} times over. Send it again in a moment.`, { retry_after: 5 }));
+}

@@ -236,3 +236,115 @@ test('a signed version verifies on fetch, a tampered index does not, and later v
   assert.equal(trustOf(known, 'Halden', v.signature).kind, 'known');
   assert.equal(trustOf(known, 'Halden', { ...v.signature!, key_id: other.key_id }).kind, 'changed');
 });
+
+/* ── PLT-2: what a marketplace shows (loop/finish/platform.md §4.0 C) ────── */
+
+const codeOf = (r: unknown): string | null => {
+  const x = r as { ok: boolean; refusal?: { code: string } };
+  return x.ok ? null : (x.refusal?.code ?? null);
+};
+
+test('a padded version is refused, a version listed twice is refused, and an unsigned twin of a signed version is said as stripped', async () => {
+  const { keysSignedBefore, newAuthorKey } = await import('../src/catalogue.ts');
+  assert.equal(codeOf(await publishTo(emptyCatalogue('Padded'), addon('01.0.0', [BOOKS]), () => null)), 'PACK_MALFORMED');
+  const one = { version: '1.0.0', checksum: 'a'.repeat(64), reach: {} };
+  assert.ok(!readCatalogue({ format: 1, entries: [{ kind: 'pack', id: 'ok', versions: [{ ...one, version: '01.0.0' }] }] }).ok);
+  assert.ok(!readCatalogue({ format: 1, entries: [{ kind: 'pack', id: 'ok', versions: [one, one] }] }).ok);
+  assert.equal(compareVersions('01.0.0', '1.0.0'), 0);
+
+  const key = await newAuthorKey('Halden');
+  const out = await publishTo(emptyCatalogue('Signed'), addon('1.0.0', [BOOKS, SHELF]), () => null, new Date(), key);
+  assert.ok(out.ok, JSON.stringify(out));
+  /* A version listed once never counts its own signature as an earlier one. */
+  assert.deepEqual(await keysSignedBefore(out.value.entry, '1.0.0'), []);
+  const { signature: _s, ...bare } = out.value.version;
+  const twinned = { ...out.value.entry, versions: [bare, out.value.version] };
+  assert.deepEqual(await keysSignedBefore(twinned, '1.0.0'), [key.key_id]);
+});
+
+test('categories are worked out from what a file declares, and only a BrainDog publisher makes one made by BrainDog', async () => {
+  const { BRAINDOG_PUBLISHER, categoriesOf } = await import('../src/catalogue.ts');
+  const { index } = await publishAll([file('1.0.0', [COURSES])]);
+  assert.deepEqual(index.entries[0]!.categories, ['ways-of-working']);
+  assert.equal(index.entries[0]!.publisher, undefined);
+
+  const mine = await publishTo(emptyCatalogue('Bundled'), addon('1.0.0', [BOOKS, SHELF, POLL_BOOKS]), () => null, new Date(), undefined, BRAINDOG_PUBLISHER);
+  assert.ok(mine.ok, JSON.stringify(mine));
+  assert.deepEqual(mine.value.entry.categories, ['modules', 'connectors', 'made-by-braindog']);
+  assert.deepEqual(mine.value.entry.publisher, BRAINDOG_PUBLISHER);
+  /* The file's own author line is its author's word, and makes nothing made by BrainDog. */
+  const theirs = await publishTo(emptyCatalogue('Kennel'), addon('1.0.0', [BOOKS], { author: 'BrainDog' }), () => null);
+  assert.ok(theirs.ok, JSON.stringify(theirs));
+  assert.deepEqual(theirs.value.entry.categories, ['modules']);
+
+  const of = (...decls: { kind: string; body: Record<string, unknown> }[]) =>
+    categoriesOf({ kind: 'pack', file: { pack: { declarations: decls.map((d, i) => ({ ...d, id: `${d.kind}.x${i}`, canonical: '' })) } } } as unknown as Parameters<typeof categoriesOf>[0], '');
+  assert.deepEqual(of({ kind: 'page', body: {} }, { kind: 'metric', body: {} }), ['templates']);
+  assert.deepEqual(of({ kind: 'page', body: {} }, { kind: 'block', body: {} }), ['templates', 'blocks']);
+  assert.deepEqual(of({ kind: 'theme', body: {} }), ['themes']);
+  assert.deepEqual(of({ kind: 'ingest', body: { channel: 'webhook' } }, { kind: 'ingest', body: { channel: 'email' } }), ['doors']);
+  assert.deepEqual(of({ kind: 'script', body: { egress: ['https://api.example.org'] } }), ['connectors']);
+  assert.deepEqual(of({ kind: 'script', body: { egress: [] } }), []);
+  assert.deepEqual(of({ kind: 'rule', body: { on: { every: '1d' } } }, { kind: 'rule', body: { require: 'x' } }), ['automations']);
+});
+
+test("a version's notes are its file's changes, for an add-on and a use case, and a long one is refused", async () => {
+  const noted = await publishTo(emptyCatalogue('Notes'), addon('1.0.0', [BOOKS], { changes: 'The first shelf.' }), () => null);
+  assert.ok(noted.ok, JSON.stringify(noted));
+  assert.equal(noted.value.version.notes, 'The first shelf.');
+  assert.equal(codeOf(await publishTo(emptyCatalogue('Notes'), addon('1.0.0', [BOOKS], { changes: 'A new shelf. '.repeat(40) }), () => null)), 'VALUE_MALFORMED');
+
+  const study = JSON.stringify({ ...(JSON.parse(file('1.0.0', [COURSES])) as Record<string, unknown>), changes: 'Courses, to begin with.' });
+  const read = await readShared(study);
+  assert.ok(read.ok, JSON.stringify(read));
+  assert.equal(read.value.changes, 'Courses, to begin with.');
+  const published = await publishTo(emptyCatalogue('Notes'), study, () => null);
+  assert.ok(published.ok, JSON.stringify(published));
+  assert.equal(published.value.version.notes, 'Courses, to begin with.');
+  assert.equal(codeOf(await readShared(JSON.stringify({ ...(JSON.parse(study) as Record<string, unknown>), changes: 7 }))), 'VALUE_MALFORMED');
+});
+
+test('an unlisted pack stays in the index, installable by id, and out of every listing and search', async () => {
+  const { listedEntries, MANIFEST_KEYS } = await import('../src/catalogue.ts');
+  assert.ok(MANIFEST_KEYS.includes('changes') && MANIFEST_KEYS.includes('unlisted'));
+  const out = await publishTo(emptyCatalogue('Mixed'), addon('1.0.0', [BOOKS], { unlisted: true }), () => null);
+  assert.ok(out.ok, JSON.stringify(out));
+  assert.equal(out.value.entry.unlisted, true);
+  const back = readCatalogue(JSON.parse(JSON.stringify(out.value.index)));
+  assert.ok(back.ok);
+  assert.deepEqual(back.value.entries.map((e) => e.id), ['bookshelf']);
+  assert.deepEqual(listedEntries(back.value), []);
+  assert.deepEqual(searchCatalogue(back.value, ''), []);
+  assert.deepEqual(searchCatalogue(back.value, 'bookshelf'), []);
+  assert.equal(codeOf(await publishTo(emptyCatalogue('Mixed'), addon('1.0.0', [BOOKS], { unlisted: 'yes' }), () => null)), 'PACK_MALFORMED');
+});
+
+test("search matches a category and the publisher's name, and a yanked latest is never the version offered", async () => {
+  const { catalogueUpdates, offeredVersion } = await import('../src/catalogue.ts');
+  const ingrid = { kind: 'person' as const, id: 'p_9', name: 'Ingrid' };
+  const first = await publishTo(emptyCatalogue('People'), addon('1.0.0', [BOOKS, SHELF, POLL_BOOKS]), () => null, new Date(), undefined, ingrid);
+  assert.ok(first.ok, JSON.stringify(first));
+  assert.deepEqual(searchCatalogue(first.value.index, 'ingrid').map((e) => e.id), ['bookshelf']);
+  assert.deepEqual(searchCatalogue(first.value.index, 'connectors').map((e) => e.id), ['bookshelf']);
+
+  const files = new Map([[first.value.path, addon('1.0.0', [BOOKS, SHELF, POLL_BOOKS])]]);
+  const next = await publishTo(first.value.index, addon('1.0.1', [BOOKS, SHELF, POLL_BOOKS], { summary: 'Books you own, and read.' }), (p) => files.get(p) ?? null);
+  assert.ok(next.ok, JSON.stringify(next));
+  files.set(next.value.path, addon('1.0.1', [BOOKS, SHELF, POLL_BOOKS], { summary: 'Books you own, and read.' }));
+  const yanked: CatalogueIndex = {
+    ...next.value.index,
+    entries: next.value.index.entries.map((e) => ({ ...e, versions: e.versions.map((v) => (v.version === '1.0.1' ? { ...v, yanked: { reason: 'It lost the shelf.', at: '2026-09-25T10:00:00Z' } } : v)) })),
+  };
+  const back = readCatalogue(JSON.parse(JSON.stringify(yanked)));
+  assert.ok(back.ok);
+  assert.equal(offeredVersion(back.value.entries[0]!)?.version, '1.0.0');
+  assert.equal((await catalogueUpdates(back.value, [{ id: 'bookshelf', version: '1.0.0' }], (p) => files.get(p) ?? null)).updates.length, 0);
+});
+
+test('a preview reads only in its own shape', async () => {
+  const { previewFile, readPreview } = await import('../src/catalogue.ts');
+  assert.equal(previewFile('bookshelf', '1.0.0', 'pack'), 'packs/bookshelf/1.0.0.preview.json');
+  assert.ok(readPreview({ format: 1, made_at: '2026-09-25T10:00:00Z', pages: [{ page: 'shelf', title: 'Shelf', blocks: [] }] }).ok);
+  assert.ok(!readPreview({ format: 2, made_at: '2026-09-25T10:00:00Z', pages: [] }).ok);
+  assert.ok(!readPreview({ format: 1, made_at: '2026-09-25T10:00:00Z', pages: [{ title: 'Shelf' }] }).ok);
+});

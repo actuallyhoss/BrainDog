@@ -26,6 +26,9 @@ import { instant } from './migrate.ts';
 import { SESSION_BODY } from './migrations/0002_session.ts';
 import { checkInterval, type PullDecl } from './pull.ts';
 import { scriptBody } from './script.ts';
+/* A JOB KIND'S LINT, in the file that keeps the queue which reads it, so the kind the owner approves is the kind a
+   runner is handed. */
+import { jobBody } from './jobs.ts';
 /* THE SCHEMA THE MATCHER RUNS AGAINST, so the names this file refuses and the names that fire are
    one list. See `MATCH_FIELDS`: they were two lists and they disagreed. A same-package edge, which
    `31 §2`'s order is not about. `DATE_FORMATS` used to come over it for the same reason — a
@@ -41,10 +44,17 @@ import { HOLDS, PARTS as ROLE_PARTS, aims, legacyShaped, plays, type RoleField, 
    is what two lists that disagree cost. */
 import { FREQ, shiftFrom } from './schedule.ts';
 import { pairsFault } from './pairs.ts';
+/* THE VALUES `delete:` TAKES, from the file that keeps the rule, so the check and the reader hold one list. */
+import { DELETE_RULES } from './referenced.ts';
 import { spanMs } from './vault.ts';
 import { actionsOf, callFault, flowFault, sealedAs, subjectOf } from './flow-lint.ts';
 import { BLOCK_INSTALLS, NAV_KEYS, PAGE_KEYS, PAGE_UNBUILT, keysFor, kindsReading, unreadBlockKey, unreadPageKey, wrongKindKey } from './block-keys.ts';
+/* THE KINDS THAT READ THEMSELVES, admitted into `BLOCK_KINDS` and asked to check their own blocks at install. */
+import { BLOCK_KIND_MODULES, kindModule } from './kinds/index.ts';
 import type { FlowDecl } from './rules.ts';
+/* THE FORMAT, THE WINDOW AND THE TWO FIGURES THAT ARE NOT A SUM, checked here by the same functions that read them. */
+import { isMoneyFormat, windowMs } from './metrics.ts';
+import { WALKS, WALK_SOURCE, isRolled, rolledFault, type Rolled } from './money-figures.ts';
 
 /**
  * `34-GRAMMARS` §4. Checked before an id is inlined into an index name or a JSON path.
@@ -58,8 +68,11 @@ import type { FlowDecl } from './rules.ts';
 const IDENT = /^(?!.*__)[a-z][a-z0-9_]{0,31}$/;
 
 /* `script` IS THE NINTH, and migration 12 rebuilds the CHECK that holds the database to this list. A person's or an
-   agent's code, run by a host in a sandbox and never by the record (`script.ts`, DIRECTION section 22). */
-export const KINDS = ['register', 'page', 'block', 'ingest', 'rule', 'metric', 'theme', 'digest', 'script'] as const;
+   agent's code, run by a host in a sandbox and never by the record (`script.ts`, DIRECTION section 22).
+   `job` IS THE TENTH, and migration 18 rebuilds the same CHECK again: what one run of Claude Code on the owner's own
+   machine may do, approved once in Decide and claimed from the record's queue by a runner (`jobs.ts`,
+   `loop/finish/agents.md` C13). */
+export const KINDS = ['register', 'page', 'block', 'ingest', 'rule', 'metric', 'theme', 'digest', 'script', 'job'] as const;
 export type DeclKind = (typeof KINDS)[number];
 
 export type Declaration = {
@@ -300,6 +313,12 @@ const COMPARE = ['previous', 'year_ago', 'none'] as const;
 /** `08 §2.1`, and only ever beside a date `group_by`. */
 const BUCKETS = ['day', 'week', 'month', 'quarter', 'year'] as const;
 
+/** The last place a figure may take among the Home figures (`home: 1` to this). `figures.home` in `pages.ts` draws the first of them. */
+const HOME_PLACE_MOST = 9;
+
+/** The most legs one figure over the walk may name: each is a list read whole, up to the walk's own row cap. */
+const WALK_LEGS_MOST = 12;
+
 /** Every `{ lookup: name }` inside a metric's value, however deep the operand sits. */
 function lookupsNamed(value: unknown, out = new Set<string>()): Set<string> {
   if (Array.isArray(value)) for (const v of value) lookupsNamed(v, out);
@@ -316,8 +335,8 @@ function lookupsNamed(value: unknown, out = new Set<string>()): Set<string> {
  *
  * NOTHING CHECKED ONE. `validate` deep-checked a register, a digest, a connector and a rule, and
  * returned `null` for a metric — so every key in `08 §2`'s table was advisory. A metric with no
- * `target` installed and drew a number nobody could act on; a `format` of `money` with no currency
- * reached the renderer as an unresolved figure; `compare: 'last'` fell through the evaluator's
+ * `target` installed and drew a number nobody could act on; a `format` no renderer knew reached the
+ * renderer as an unresolved figure; `compare: 'last'` fell through the evaluator's
  * if-chain and silently compared against nothing.
  *
  * `08 §2` MARKS `target` AND `window` REQUIRED IN BOLD, and `04 §5` gives the reason as the
@@ -337,15 +356,20 @@ function metricBody(decl: Declaration, installed?: Known): Refusal | null {
     bucket?: unknown;
     lookups?: unknown;
     within?: unknown;
+    where?: unknown;
+    legs?: unknown;
+    opening?: unknown;
+    home?: unknown;
+    sellable?: unknown;
   };
   const id = decl.id;
 
-  /* `register.<id>` OR `series.<id>` (`08 §2`, `25 §8`). A bare register name is the commonest
-     mistake and the evaluator reads it as neither. */
-  if (typeof body.source !== 'string' || !/^(?:register|series)\.[a-z][a-z0-9_-]*$/u.test(body.source))
+  /* `register.<id>` OR `series.<id>` (`08 §2`, `25 §8`), OR THE WALK AHEAD, `forecast.runway` (`money-figures.ts`). A
+     bare register name is the commonest mistake and the evaluator reads it as none of them. */
+  if (typeof body.source !== 'string' || (body.source !== WALK_SOURCE && !/^(?:register|series)\.[a-z][a-z0-9_-]*$/u.test(body.source)))
     return bad(
       'DECLARATION_INVALID',
-      `${id} reads ${JSON.stringify(body.source ?? null)}; a metric's source is register.<id> or series.<id>.`,
+      `${id} reads ${JSON.stringify(body.source ?? null)}; a metric's source is register.<id>, series.<id> or ${WALK_SOURCE}.`,
       'source',
     );
 
@@ -437,17 +461,66 @@ function metricBody(decl: Declaration, installed?: Known): Refusal | null {
         return bad('RATIO_MIXED_SOURCE', `${id}: both operands must share one source and one predicate.`, 'value');
     }
 
-  /* `money.<CUR>` CARRIES ITS CURRENCY. `02 §3` is why: a money figure without one is a bare
-     number, and a bare number loses the one fact that makes a total mean anything. */
+  /* `money`, OR `money.<CUR>` FROM BEFORE A FIGURE COULD LEAVE ITS CURRENCY UNSAID. `02 §3` is why a money figure is
+     never a bare number, and it is still not one: the currency is the record's home currency, else the one its rows
+     are in, else one amount per currency (`metrics.ts` `evaluateMetric`). A pack cannot know which currency the record
+     it lands on keeps, so a currency in its format was the pack author's and nobody else's (`loop/finish/modules.md`
+     C1). */
   const format = body.format;
-  const money = typeof format === 'string' && /^money\.[A-Z]{3}$/u.test(format);
-  if (!money && !(FORMATS as readonly unknown[]).includes(format))
+  if (!isMoneyFormat(format) && !(FORMATS as readonly unknown[]).includes(format))
     return bad(
       'DECLARATION_INVALID',
-      `${id}'s format is ${JSON.stringify(format ?? null)}. A metric is money.<CUR>, ${FORMATS.join(', ')}.`,
+      `${id}'s format is ${JSON.stringify(format ?? null)}. A metric is money, ${FORMATS.join(', ')}.`,
       'format',
-      [...FORMATS, 'money.<CUR>'],
+      [...FORMATS, 'money', 'money.<CUR>'],
     );
+
+  /* WHERE A FIGURE STANDS AMONG THE HOME FIGURES, AND WHETHER A FORECAST MAY SELL IT (`modules.md` C7). A place is a
+     whole number from 1 to 9 so two packs can interleave; `sellable` is `true` or absent, never `false`, so the one
+     spelling means one thing. */
+  if (body.home !== undefined && !(Number.isInteger(body.home) && (body.home as number) >= 1 && (body.home as number) <= HOME_PLACE_MOST))
+    return bad('DECLARATION_INVALID', `${id}'s home is its place among the Home figures, a whole number from 1 to ${HOME_PLACE_MOST}.`, 'home');
+  if (body.sellable !== undefined && body.sellable !== true)
+    return bad('DECLARATION_INVALID', `${id}'s sellable is true, or left out.`, 'sellable', ['true']);
+
+  /* CASH ROLLED FORWARD (`modules.md` C3) is read over a list of accounts, and its body names every field it reads. */
+  const walks = body.source === WALK_SOURCE;
+  if (isRolled(body.value)) {
+    if (walks || !String(body.source).startsWith('register.'))
+      return bad('DECLARATION_INVALID', `${id} rolls cash forward over a list of accounts, so its source is register.<id>.`, 'source');
+    const fault = rolledFault((body.value as { rolled?: unknown }).rolled);
+    if (fault) return bad('DECLARATION_INVALID', `${id}: ${fault}.`, 'value');
+    if (body.bucket !== undefined)
+      return bad('DECLARATION_INVALID', `${id} is grouped by a field of its accounts, never cut into buckets of days.`, 'bucket');
+  }
+
+  /* A FIGURE OVER THE WALK AHEAD (`modules.md` C4) reads the legs it names, and nothing a list-reading figure writes. */
+  if (!walks && (body.legs !== undefined || body.opening !== undefined))
+    return bad('DECLARATION_INVALID', `${id} names ${body.legs !== undefined ? 'legs' : 'an opening'}, which only a figure over ${WALK_SOURCE} walks.`, body.legs !== undefined ? 'legs' : 'opening');
+  if (walks) {
+    const v = body.value as { walk?: unknown; within?: unknown };
+    if (!(WALKS as readonly unknown[]).includes(v.walk))
+      return bad('DECLARATION_INVALID', `${id} is a figure over the walk, and its value is walk: ${WALKS.join(', ')}.`, 'value', [...WALKS]);
+    if (v.within === undefined ? v.walk !== 'days_to_zero' : typeof v.within !== 'string' || !windowMs(v.within))
+      return bad('DECLARATION_INVALID', `${id} says how far ahead it adds up as within: 30d, 4w or 3m.`, 'value');
+    for (const key of ['where', 'group_by', 'bucket'] as const)
+      if (body[key] !== undefined) return bad('DECLARATION_INVALID', `${id} walks its legs, and each leg says which rows it reads; a figure over the walk has no ${key}.`, key);
+    const legs = body.legs;
+    if (!Array.isArray(legs) || legs.length === 0 || legs.length > WALK_LEGS_MOST)
+      return bad('DECLARATION_INVALID', `${id} names between 1 and ${WALK_LEGS_MOST} legs to walk.`, 'legs');
+    for (const [i, leg] of legs.entries()) {
+      const l = leg as Record<string, unknown> | null;
+      if (l === null || typeof l !== 'object' || Array.isArray(l) || !['register', 'on', 'amount'].every((k) => typeof l[k] === 'string' && l[k] !== ''))
+        return bad('DECLARATION_INVALID', `${id}'s leg ${i + 1} names the list it walks, the day each row moves on and its amount: register, on and amount.`, `legs[${i}]`);
+    }
+    const opening = body.opening as { metric?: unknown } | undefined;
+    if (v.walk === 'days_to_zero' ? typeof opening?.metric !== 'string' || !METRIC_ID.test(opening.metric) : opening !== undefined)
+      return bad(
+        'DECLARATION_INVALID',
+        v.walk === 'days_to_zero' ? `${id} counts the days until the money runs out from what is held now: opening: { metric: <id> }.` : `${id} adds up movements, and only the days until zero walk from an opening.`,
+        'opening',
+      );
+  }
 
   /* `04 §5`'s own sentence, and `08 §2` marks both required in bold. */
   if (body.target === undefined || body.window === undefined)
@@ -479,7 +552,8 @@ function metricBody(decl: Declaration, installed?: Known): Refusal | null {
 
   /* THE GROUPING IS READ (`metrics.ts`'s `groupsOf`), so a well-formed one installs. Whether the
      field is a date, and so whether it takes a bucket, is the evaluator's to say: it has the schema. */
-  return installed === undefined ? null : metricFieldFault(id, body.source, body.value, body.group_by, installed);
+  if (installed === undefined) return null;
+  return figureListsFault(id, body, installed) ?? metricFieldFault(id, body.source, body.value, body.group_by, installed);
 }
 
 /** Every field a metric's value names, as `metrics.ts`'s `aggregationsOf` reads them: the first key of each aggregation. */
@@ -518,21 +592,75 @@ function valueFields(value: unknown): string[] {
  */
 function metricFieldFault(id: string, source: unknown, value: unknown, groupBy: unknown, installed: Known): Refusal | null {
   if (typeof source !== 'string' || !source.startsWith('register.')) return null;
-  const shape = installed.get(source);
-  if (shape === undefined || !Array.isArray(shape.fields)) return null;
-  /* NOT A RETIRED FIELD, which stays in the body and is dropped by `index.ts`'s `schemaOf`, so the
-     reader answers `FIELD_UNKNOWN` for it. Counting it here let `sum: 'old'` install and then fail
-     on its first read, which the checker of this change measured. */
-  const declared = (shape.fields as { id?: unknown; retired?: unknown }[])
-    .filter((f) => f?.retired !== true)
-    .map((f) => f?.id)
-    .filter((f): f is string => typeof f === 'string');
   const register = source.slice('register.'.length);
-  for (const field of valueFields(value))
+  const declared = fieldsOf(installed, register);
+  if (declared === null) return null;
+  /* A ROLLED FIGURE READS ITS ACCOUNTS' BALANCE AND DAY, which it names in `rolled` rather than as an aggregation. */
+  const rolled = isRolled(value) ? (value as { rolled: { balance: string; as_of: string } }).rolled : null;
+  for (const field of rolled ? [rolled.balance, rolled.as_of] : valueFields(value))
     if (field !== 'id' && !declared.includes(field))
       return bad('FIELD_UNKNOWN', `${id} reads ${field}, and ${register} has no field called ${field}.`, 'value', ['id', ...declared]);
   if (typeof groupBy === 'string' && !declared.includes(groupBy))
     return bad('FIELD_UNKNOWN', `${id} groups by ${groupBy}, and ${register} has no field called ${groupBy}.`, 'group_by', declared);
+  return null;
+}
+
+/**
+ * The fields a known register declares and has not retired, or `null` when it is not known or declares no fields.
+ *
+ * NOT A RETIRED FIELD, which stays in the body and is dropped by `index.ts`'s `schemaOf`, so the reader answers
+ * `FIELD_UNKNOWN` for it. Counting it here let `sum: 'old'` install and then fail on its first read, which the checker
+ * of that change measured.
+ */
+function fieldsOf(installed: Known, register: string): string[] | null {
+  const shape = installed.get(`register.${register}`);
+  if (shape === undefined || !Array.isArray(shape.fields)) return null;
+  return (shape.fields as { id?: unknown; retired?: unknown }[])
+    .filter((f) => f?.retired !== true)
+    .map((f) => f?.id)
+    .filter((f): f is string => typeof f === 'string');
+}
+
+/**
+ * A ROLLED FIGURE OR A WALK NAMING A LIST OR A FIELD NOBODY DECLARED INSTALLED CLEAN, and was refused on every read.
+ *
+ * Both read lists beyond their `source` (`money-figures.ts`): a rolled figure reads its moves and every list that
+ * restarts an account, and a walk reads the list each leg names. The rolled reader asks for every list and field before
+ * it reads a row and refuses a missing one. The walk refuses a missing list, and reads a missing field as empty on every
+ * row, which walks a cycle once, or counts every row as money out, without a word (`forecast.ts` `runway`). So this
+ * asks for each at install, in the reader's own codes, and a figure that could never be read right is never installed.
+ * Unlike a figure's `source`, nothing else at install looks at these lists, so an unknown one is refused here. A `where`
+ * inside `moves` or a leg is a sentence, which this file cannot parse against its list: it is first read when the
+ * figure is, and the install check in `index.ts` that parses a figure's own `where` (`unreadWhere`) is the place for it.
+ */
+function figureListsFault(id: string, body: { source?: unknown; value?: unknown; legs?: unknown; opening?: unknown }, installed: Known): Refusal | null {
+  /* THE FIGURE A WALK OPENS FROM IS ASKED FOR THE SAME WAY, and one step deep as the reader takes it: a walk that opens
+     from a walk is refused on every read, so it is refused here. */
+  const opens = (body.opening as { metric?: unknown } | undefined)?.metric;
+  if (body.source === WALK_SOURCE && typeof opens === 'string') {
+    const opened = installed.get(`metric.${opens}`);
+    if (opened === undefined) return bad('METRIC_UNKNOWN', `${id} walks from ${opens}, and there is no metric called ${opens}.`, 'opening');
+    if (opened.source === WALK_SOURCE) return bad('DECLARATION_INVALID', `${id} walks from a figure of what is held, and ${opens} is itself a walk.`, 'opening');
+  }
+  const named: { register: string; fields: unknown[]; at: string }[] = [];
+  if (isRolled(body.value)) {
+    const rolled = (body.value as { rolled: Rolled }).rolled;
+    named.push({ register: rolled.moves.register, fields: [rolled.moves.by, rolled.moves.on, rolled.moves.amount, rolled.moves.direction], at: 'value' });
+    for (const check of rolled.checks ?? []) named.push({ register: check.register, fields: [check.by, check.balance, check.on], at: 'value' });
+  }
+  if (body.source === WALK_SOURCE && Array.isArray(body.legs))
+    for (const [i, leg] of (body.legs as Record<string, unknown>[]).entries()) {
+      const incoming = leg.incoming as { field?: unknown } | undefined;
+      const every = leg.every as { field?: unknown } | undefined;
+      named.push({ register: String(leg.register), fields: [leg.on, leg.amount, leg.ends, leg.group, incoming?.field, every?.field], at: `legs[${i}]` });
+    }
+  for (const { register, fields, at } of named) {
+    if (!installed.has(`register.${register}`)) return bad('REGISTER_UNKNOWN', `${id} reads ${register}, and there is no register called ${register}.`, at);
+    const declared = fieldsOf(installed, register) ?? [];
+    for (const field of fields)
+      if (typeof field === 'string' && !declared.includes(field))
+        return bad('FIELD_UNKNOWN', `${id} reads ${field}, and ${register} has no field called ${field}.`, at, declared);
+  }
   return null;
 }
 
@@ -551,19 +679,26 @@ function metricFieldFault(id: string, source: unknown, value: unknown, groupBy: 
  * A COPY THAT DRIFTS IS WORSE THAN NO COPY, AND A COUNT IN PROSE IS THE FIRST THING TO DRIFT. This
  * list said "the twenty" in two refusals and in this paragraph while holding twenty-eight, because
  * every kind added since was added to the array and not to the sentence. So neither says a number now,
- * and the test walks the array rather than a list typed out beside it. A kind added to the renderer's
- * table is added here, which is how `cards`, `section`, `feed`, `diff`, `queue`, `capture` and `inputs`
- * arrived. A PACK'S OWN KIND, `block.<id>`, WAS ADMITTED HERE BY PREFIX and is refused now: `05 §2` says
+ * and the test walks the array rather than a list typed out beside it. `cards`, `section`, `feed`, `diff`, `queue`,
+ * `capture` and `inputs` were added to the renderer's table and then to this array by hand. A PACK'S OWN KIND,
+ * `block.<id>`, WAS ADMITTED HERE BY PREFIX and is refused now: `05 §2` says
  * one arrives as a `block` declaration, this build refuses every such declaration `NOT_IN_THIS_BUILD`,
  * and a page naming one installed and read its rows with nothing anywhere to draw them
  * (`loop/research-dynamic-layouts.md` §3, finding 2).
+ *
+ * A NEW KIND IS NOT WRITTEN INTO THE ARRAY: it is a module in the kernel's kind registry (`kinds/index.ts`), and every
+ * name that registry holds is admitted here as it loads. The array is the kinds `pages.ts` reads itself, and it stays
+ * as it is so nothing that already installs moves. A name in both is one kind.
  */
-const BLOCK_KINDS = [
-  'note', 'quote', 'stat', 'bar', 'gauge', 'chips', 'spec', 'params',
-  'todo', 'steps', 'timeline', 'board', 'code', 'tree', 'comparison', 'table', 'cards', 'section', 'feed', 'diff',
-  'sparkline', 'split', 'bridge', 'series', 'forecast', 'agents', 'lines', 'progress', 'queue', 'capture', 'roadmap', 'ring', 'heat',
-  'inputs',
-] as const;
+const BLOCK_KINDS: readonly string[] = [
+  ...new Set([
+    'note', 'quote', 'stat', 'bar', 'gauge', 'chips', 'spec', 'params',
+    'todo', 'steps', 'timeline', 'board', 'code', 'tree', 'comparison', 'table', 'cards', 'section', 'feed', 'diff',
+    'sparkline', 'split', 'bridge', 'series', 'forecast', 'agents', 'lines', 'progress', 'queue', 'capture', 'roadmap', 'ring', 'heat',
+    'inputs',
+    ...Object.keys(BLOCK_KIND_MODULES),
+  ]),
+];
 
 /** A register id as a block names one on its own, with no `register.` in front: the half `SOURCE` checks after the dot. */
 const REGISTER_ID = /^[a-z][a-z0-9_-]{0,31}$/u;
@@ -629,7 +764,13 @@ const TONES = ['good', 'warn', 'bad', 'info'] as const;
  */
 const SOURCE = /^(?:register|metric)\.[a-z][a-z0-9_-]{0,31}$/u;
 const BLOCK_SOURCE = /^block\.\d{1,2}$/u;
-const COMPUTED_SOURCES = ['forecast.runway', 'activity', 'sessions.live', 'actions', 'governance.open'] as const;
+/* A SOURCE MUST BE HERE AND IN `pages.ts`'s `COMPUTED`, or a block reading it is refused at install while the reader
+   stands ready (`loop/finish/contracts.md` X52). `runs_on` is a project's keys, tools, skills and actions (agents C6);
+   `deadlines` is every row due soon and `figures.home` the figures that ask a place on Home (modules C6). */
+const COMPUTED_SOURCES = [
+  'forecast.runway', 'activity', 'sessions.live', 'actions', 'governance.open',
+  'runs_on', 'deadlines', 'figures.home',
+] as const;
 
 /** A metric id as a page says it: `project-owed:Kiln` is one document read about one project. */
 const metricNamed = (said: string): string => said.split(':')[0] ?? '';
@@ -882,6 +1023,13 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
       if (kinds && !kinds.includes(kind as string))
         return bad('DECLARATION_INVALID', `${id}.${at}: ${wrongKindKey(key, kind as string)}`, `${at}.${key}`, keysFor(kind as string));
     }
+
+    /* A REGISTERED KIND CHECKS WHAT ONLY IT READS, here where the rest of its block is checked, and in the same sentence
+       the read would give (`kinds/index.ts`). The module writes the sentence about the block; this puts the page and
+       the block's place in front of it. */
+    const kindFault = kindModule(kind as string)?.validate?.(block as Readonly<Record<string, unknown>>, { stage: 'install' }) ?? null;
+    if (kindFault)
+      return bad(kindFault.code, `${id}.${at}: ${kindFault.fix}`, kindFault.at === undefined ? at : `${at}.${kindFault.at}`, kindFault.allowed);
 
     /* WHICH OF THE PAGE'S TWO COLUMNS THE BLOCK SITS IN. A page with no `layout` has one column, so a block placed in its
        rail would be drawn where nothing says there is a rail. */
@@ -2914,7 +3062,8 @@ function createFault(
  * Read by this build, so there is nothing to say about it.
  *
  * The first line is `42 §4.4`'s, and the second is the divergence between the document and the
- * code, written down rather than left to be rediscovered:
+ * code, written down rather than left to be rediscovered. A key built after them sits on a line of
+ * its own, so two units adding one each never edit the same line:
  *
  *   `id`      the code's spelling of `register:`. `ownId` has admitted both since it was written.
  *   `state`   which field is mirrored onto `entry.state`. `02 §1` settles that `state` IS mirrored
@@ -2934,6 +3083,12 @@ function createFault(
  *   `pairs`   `02 §5`'s transfer detection: the write path finds a row's other leg and marks both
  *             (`pairs.ts`). It sat on the unbuilt list below until W57-1, refused at install, so his
  *             ledger counted every move between two of his accounts as spend and as income.
+ *   `delete`  `refuse_while_referenced`, the one value (`DELETE_RULES`, `referenced.ts`): the write path refuses to
+ *             delete a row a live row still points at, naming the lists and how many rows. It sat on the unbuilt
+ *             list below until OPS-12, so an account with transactions deleted and left them pointing at nothing.
+ *   `owner_only`  `true`, or left out: a colleague who adds across the whole record does not add here, and a grant
+ *             naming the list still does (`guard` in `packages/record/src/index.ts`, `20 §1`). Keys and People are
+ *             owner-only by their role, so neither declares it.
  *
  * `rates` AND `meets` ARE NOT IN `42 §4.4` YET, and `declare.test.ts` lists what the code admits
  * that the document does not publish. They landed with the roles brief (`loop/research-shell-next.md`
@@ -2948,6 +3103,8 @@ function createFault(
 const REGISTER_KEYS = [
   'register', 'name', 'one', 'pack', 'series', 'fields', 'search', 'title', 'mobile', 'identity',
   'id', 'state', 'done', 'finished', 'icon', 'holds', 'seq_prefix', 'scopes', 'steps', 'rates', 'meets', 'pairs',
+  'delete',
+  'owner_only',
 ] as const;
 
 /**
@@ -2959,12 +3116,10 @@ const REGISTER_KEYS = [
  *   `key`             a series' idempotent upsert. `indexName` can spell `entry_k_<reg>` and no
  *                     caller ever asks it to, so re-fetching yesterday duplicates yesterday, which
  *                     is the single failure `02 §5` says `key:` exists to prevent.
- *   `delete`          `refuse_while_referenced`. `DELETE_WHILE_REFERENCED` is registered and
- *                     emitted by nothing, so an account with transactions deletes.
  *   `predicates`      named predicates. `where` refuses the `{ predicate: … }` leaf outright, so
  *                     declaring one here installs a name no predicate can reach.
  */
-const REGISTER_UNBUILT = ['key', 'delete', 'predicates', 'immutable_when'] as const;
+const REGISTER_UNBUILT = ['key', 'predicates', 'immutable_when'] as const;
 
 /**
  * The keys of a field's `repeat:` that `schedule.ts`'s `expandRepeat` reads. `42 §4.4` also publishes `byday` and
@@ -3668,6 +3823,8 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners, 
   if (decl.kind === 'theme') return themeBody(decl);
   if (decl.kind === 'ingest') return ingestBody(decl, installed);
   if (decl.kind === 'script') return scriptBody(decl);
+  /* A JOB KIND, whose every key is a promise the runner keeps or the record refuses (`jobs.ts`). */
+  if (decl.kind === 'job') return jobBody(decl);
 
   /**
    * A STANDALONE `block.<id>` DECLARATION WAS CHECKED BY NOTHING, AND IT IS DRAWN BY NOTHING.
@@ -4153,6 +4310,23 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners, 
     const fault = pairsFault(id, fields as unknown as FieldLike[], decl.body.pairs);
     if (fault) return fault;
   }
+
+  /* `delete:` TAKES THE ONE VALUE THE WRITE PATH KEEPS (`referenced.ts`). Any other would install a promise about
+     deleting that nothing reads, which is the silence the unbuilt list above exists to refuse. */
+  const deletes = decl.body.delete;
+  if (deletes !== undefined && !(DELETE_RULES as readonly unknown[]).includes(deletes))
+    return bad(
+      'DECLARATION_INVALID',
+      `${id}'s delete is ${DELETE_RULES.join(' or ')}, which keeps a row while another row points at it. ${JSON.stringify(deletes)} is not.`,
+      'delete',
+      DELETE_RULES,
+    );
+
+  /* `owner_only:` IS `true` OR LEFT OUT, NEVER `false`, so the one spelling means one thing: a record-wide "Adds only"
+     does not reach the list, and a grant naming it does (`20 §1`). The record's `guard` is what reads it. */
+  const ownerOnly = decl.body.owner_only;
+  if (ownerOnly !== undefined && ownerOnly !== true)
+    return bad('DECLARATION_INVALID', `${id}'s owner_only is true, or left out. ${JSON.stringify(ownerOnly)} is not.`, 'owner_only', ['true']);
 
   /* `state` IS ALWAYS AN ENUM (`02 §1`, `04 §5`). A `state:` naming a `text` field gives the
      register a lifecycle with no transitions the record can check, so every `move` in every rule

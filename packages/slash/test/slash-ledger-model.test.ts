@@ -64,7 +64,7 @@ const build = (fallback: Inference = canned()) => {
   assert.ok(slash.configure({ ask_cap: 80 }, OWNER).ok);
   const rows = () =>
     sql
-      .all<{ kind: string; model: string; code: string | null }>('SELECT kind, model, code FROM call ORDER BY rowid')
+      .all<{ kind: string; model: string; code: string | null }>('SELECT kind, model, code FROM slash_call ORDER BY rowid')
       .map((r) => ({ ...r }));
   return { sql, slash, rows };
 };
@@ -84,7 +84,7 @@ test('(1) A READ AND ITS PROPOSAL ON A HOST WITH SLASH_MODEL ARE BOTH UNDER THAT
     ]);
 
     /* A PROPOSE WITH NO ASK ID DRAFTS FOR ITSELF, and that drafting row is written by the same `accountRead`. */
-    sql.exec('DELETE FROM call');
+    sql.exec('DELETE FROM slash_call');
     const whole = await slash.propose('what is still open', OWNER, undefined, undefined, host([said(PREDICATE), said(PROPOSAL)], 'llama3'));
     assert.ok(whole.ok, JSON.stringify(whole));
     assert.deepEqual(rows(), [
@@ -134,7 +134,7 @@ test('(4) A COUNT OF 1e300 REACHES THE LEDGER AS A WHOLE NUMBER UNDER THE CEILIN
     const out = await slash.read('what is still open', OWNER, host([said(PREDICATE, { prompt_tokens: 1e300, completion_tokens: 1e300 })]));
     assert.ok(out.ok, JSON.stringify(out));
     const row = sql.one<Record<string, unknown>>(
-      `SELECT model, tokens_in, tokens_out, typeof(tokens_in) AS tin, typeof(tokens_out) AS tout, typeof(neurons) AS tn FROM call`,
+      `SELECT model, tokens_in, tokens_out, typeof(tokens_in) AS tin, typeof(tokens_out) AS tout, typeof(neurons) AS tn FROM slash_call`,
     );
     assert.deepEqual(
       { ...row },

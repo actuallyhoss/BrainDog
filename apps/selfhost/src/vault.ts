@@ -41,7 +41,7 @@ import {
 import type { CallContext, RecordApi, SealTarget, Sealed } from '@braindog/record';
 import { no, ok, type Result } from '@braindog/ports';
 
-import { unwrap, type KeyStore } from './keys.ts';
+import { offeredId, unwrap, type KeyStore } from './keys.ts';
 
 /** A value in the clear. Named in this file and never passed out of it but to the one answer that asked. */
 type Plaintext = Uint8Array & { readonly brand: 'Plaintext' };
@@ -128,7 +128,9 @@ function steps(api: RecordApi, store: KeyStore) {
   const open = async (by: By, body: Record<string, unknown>, hints: SessionHints): Promise<Response> => {
     const record = recordId();
     if (record === null) return vaultReply(no('NOT_IN_THIS_BUILD', NO_IDENTITY, { at: 'record' }));
-    const { kekId } = await store.current();
+    /* THE ID THE RECORD'S KEYS ARE WRAPPED UNDER, while the store still holds it, so a key opens between a new key file
+       and the re-wrap this process makes as it starts (`offeredId`). */
+    const kekId = await offeredId(store, api.kernel.wrappingKey());
     const out = await api.openForGrant({ label: text(body.label), credential: text(body.credential) }, by, hints, kekId);
     if (!out.ok) return vaultReply(out);
     const sealed = out.value;

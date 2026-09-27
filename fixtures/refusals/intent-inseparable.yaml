@@ -3,3 +3,18 @@ via:    install
 raises: packages/theme/src/checks.ts
 at:     theme.midnight.roles.dark.earn
 fix:    Move one hue, or lower the chroma of the other.
+pack: {
+    "pack": "fixture-install", "version": "1.0.0",
+    "summary": "One pack built to trip exactly one install refusal.",
+    "author": "BrainDog fixtures", "license": "MIT",
+    "declarations": [
+      { "theme": "midnight",
+        "seed": { "accent": "oklch(0.575 0.215 27)", "neutral_hue": 260 },
+        "roles": { "dark": { "earn": "oklch(0.75 0.15 75)" } } }
+    ]
+  }
+
+# THE HOUSE SEED WITH `earn` MOVED ONTO `warn`'S HUE IN DARK. `warn` is solved at hue 75 (`INTENT_HUE` in
+# `packages/theme/src/build.ts`) and this `earn` is written at 75, so the pair is inside the twenty-degree floor. No
+# check before F reads `earn`, and F reads its pairs with `earn` first, so the refusal points at `earn`. Refused at
+# `planPack` by `packages/record/src/theme-check.ts`; the code is constructed in `checks.ts`, which `raises:` names.

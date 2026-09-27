@@ -15,9 +15,13 @@
  * deserves the reason, reads it in the log.
  *
  * THE CHECKS RUN IN ONE ORDER, cheapest and least revealing first: the client data's type, its challenge, the
- * exact origin, no cross-origin frame; then the authenticator data's RP ID hash, its flags (UP always, AT on
- * registration), the key's algorithm and whether WebCrypto accepts the key; then, for an assertion, the
+ * exact origin, no cross-origin frame; then the authenticator data's RP ID hash, its flags (UP and UV always, AT
+ * on registration), the key's algorithm and whether WebCrypto accepts the key; then, for an assertion, the
  * signature, the sign count and the user handle.
+ *
+ * UV ALWAYS, BECAUSE THE OPTIONS SAY `required` AND AN OPTION IS ONLY A REQUEST. The browser is asked to verify the
+ * person (a PIN, a face, a finger), and the flag in the signed authenticator data is the only evidence it did; a
+ * relying party that asks and never checks accepts one tap on a device somebody else picked up.
  */
 
 type Bytes = Uint8Array<ArrayBuffer>;
@@ -257,6 +261,7 @@ export function clientData(
 /* ── authenticator data ───────────────────────────────────────────────── */
 
 const UP = 0x01;
+const UV = 0x04;
 const BE = 0x08;
 const BS = 0x10;
 const AT = 0x40;
@@ -345,7 +350,7 @@ export async function registration(
   const data = att.get('authData');
   if (typeof att.get('fmt') !== 'string' || !(att.get('attStmt') instanceof Map) || !(data instanceof Uint8Array)) return fail('shape');
 
-  const head = await prefix(data, expect.rpId, UP | AT);
+  const head = await prefix(data, expect.rpId, UP | UV | AT);
   if (!head.ok) return fail(head.why);
 
   /* The attested credential data: a 16-byte AAGUID, a two-byte length, the credential id, then the COSE key. */
@@ -393,7 +398,7 @@ export async function assertion(
   if (!client.ok) return fail(client.why);
 
   const data = input.authenticatorData;
-  const head = await prefix(data, expect.rpId, UP);
+  const head = await prefix(data, expect.rpId, UP | UV);
   if (!head.ok) return fail(head.why);
 
   const key = await importJwk(expect.jwk, expect.alg);

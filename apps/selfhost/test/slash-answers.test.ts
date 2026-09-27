@@ -195,7 +195,7 @@ async function stack(opts: { model?: boolean; deliver?: boolean; answer?: () => 
     const db = new DatabaseSync(join(dir, 'slash.sqlite'), { readOnly: true });
     try {
       return db
-        .prepare('SELECT model, tokens_in, tokens_out, status, code FROM call ORDER BY rowid')
+        .prepare('SELECT model, tokens_in, tokens_out, status, code FROM slash_call ORDER BY rowid')
         .all()
         .map((r) => ({ ...r }) as { model: string; tokens_in: number; tokens_out: number; status: string; code: string | null });
     } finally {

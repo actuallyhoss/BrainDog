@@ -1,54 +1,50 @@
 /**
- * The sample's answers to the app's calls, for the tests that drive the helpers and the engines over the seed.
+ * The sample's answers to the app's calls, for the tests that drive the helpers over the seed.
  *
  * A TEST IMPORTS THIS AND NOTHING SHIPPED MAY. These are `boot`, `list`, `entry`, `search`, `page`, `values`, `job` and
- * `metric` as `api.ts` answered them out of `data.ts`, with everything only they read: the sample's page engine, its
- * cash walk, its feed over the sample's ledger and its decide queue. They were the mock the app was drawn against before
- * a record could answer, and they shipped for as long as they sat beside the helpers the live screens draw with (wave
- * B2 of `loop/research-no-sample.md`). Thirty-nine test files import them, counted on 25 September: `engines.test.ts` and
- * `capture-block.test.ts` hold the kernel's pages to this engine, and the rest read the seed through it as data. Also
- * here are the sample-bound helpers no screen called (`applyFilters`, `backlinks`, `noticed`, `trackHealth`, `workingNow`,
- * `trendOf`, `figureTile` and the like), because each reads the sample's rows or its clock. `no-sample-b2.test.ts`
- * refuses any file outside a test that imports this directory.
+ * `metric` as `api.ts` answered them out of `data.ts`. They were the mock the app was drawn against before a record could
+ * answer, and they shipped for as long as they sat beside the helpers the live screens draw with (wave B2 of
+ * `loop/research-no-sample.md`). Also here are the sample-bound helpers no screen called (`applyFilters`, `backlinks`,
+ * `noticed`, `trackHealth`, `workingNow`, `trendOf`, `figureTile` and the like), because each reads the sample's rows or
+ * its clock. `no-sample-b2.test.ts` refuses any file outside a test that imports this directory.
  *
- * THE CLOCK IS THE SAMPLE'S `NOW` THROUGHOUT, because the rows are the sample's: a due date in them is only overdue on
- * the day the seed was written for.
+ * THE RECORD ANSWERS AND THIS FILE ONLY ASKS. `page`, `pages`, `readBlock`, `metric`, `values`, `list` and `applyFilters`
+ * ask a real kernel over `node:sqlite`, seeded once by `installSeed` when this module loads, and a page or a figure comes
+ * back drawn by the same `blockOf` and `tileOf` a live page draws with (`page-live.ts`). They answered out of a second
+ * engine in this app until DIRECTION §32: a cash walk, a page expander, a figure reader and a row matcher that no screen
+ * ran, and that every change to a figure or a sentence had to be made in twice (`loop/finish/architecture.md` ARC-1).
+ * Where a test was written against that engine and the kernel answers otherwise, the kernel is right.
+ *
+ * THE CLOCK IS THE SAMPLE'S `NOW` THROUGHOUT, and the kernel is opened at it, because the rows are the sample's: a due
+ * date in them is only overdue on the day the seed was written for.
  */
 
-import { day as fmtDay, money, MISSING } from 'braindog-render';
-import { barsOf, costOf, costRank, findingsFrom, isStale, stepsPercent, tallySteps, type Cost, type Part, type SeriesLine } from '@braindog/kernel';
+import { DatabaseSync } from 'node:sqlite';
+
+import { MISSING } from 'braindog-render';
+import { RAIL_PAGES, fill, findingsFrom, openRecord, type Entry as Row, type Kernel, type MetricDecl as RecordMetric, type Part } from '@braindog/kernel';
+import { installSeed } from '@braindog/seed';
 
 import {
-  CHANGED,
   NO_ROW_SAID,
   PAGE,
-  agentsTable,
-  columnHeading,
   columnsFor,
   decl,
   display,
-  feedTable,
   healthOf,
-  historyTable,
   hueOf,
   iconFor,
-  inheritedFrom,
   labelOf,
-  markColumns,
   runName,
-  signFaults,
-  sortRows,
   toRows,
   unsaidFigure,
   updatesIn,
   runsIn,
-  walkTable,
   whereOf,
   workingAt,
   workingNowAt,
   type Backlink,
   type BlockResult,
-  type FeedRow,
   type Metric,
   type NavEntry,
   type SearchHit,
@@ -59,37 +55,123 @@ import {
    own until wave C1, when the fixture's tables and `held.ts`'s were one object for the declarations and two for the
    rows, so a test that grew a list for a reader and a helper had to know which of the two each one looked in. */
 import './fill.ts';
-import { PAGES, REGISTERS, ROWS } from '../held.ts';
-import { AUDIT, DECIDED, JOBS, NEWS, NOW, OBSERVED, PEOPLE_ACCESS, PROPOSALS, QUESTIONS, QUEUE, SERIES, SUSPENDED, VIEWS } from './sample.ts';
+import { REGISTERS, ROWS } from '../held.ts';
+import { AUDIT, DECIDED, JOBS, NEWS, NOW, OBSERVED, PEOPLE_ACCESS, QUESTIONS, QUEUE, SERIES, SUSPENDED, VIEWS } from './sample.ts';
 import { copy } from '../../copy.ts';
 import { answers, terms, tokensOf, why } from '../find.ts';
-import { runway } from '../forecast.ts';
-import { resolvePages } from '../pages.ts';
-import { compile, explain, matches } from '../where.ts';
 import { METRICS } from '../declared.ts';
-import { BARE, fxNote, fxNow, meetsTarget, offTarget, noteOf, read, targetLine, targetSaid, walksNote, windowMs, withParam, type MetricDecl, type Reading } from '../metrics.ts';
-import { mixedFix } from '../money.ts';
-import { REDUCES, type Entry, type FieldDecl, type Filter, type Job, type PageBlock, type PageDecl, type Question } from '../schema.ts';
+import { fxNote, meetsTarget, offTarget, targetLine, targetSaid, windowMs, type MetricDecl, type Reading } from '../metrics.ts';
+import { blockOf, tileOf as pageTile } from '../page-live.ts';
+import { entryOf, refMapOf, type RefMap } from '../remote.ts';
+import type { Entry, Filter, Job, PageBlock, PageDecl } from '../schema.ts';
 
-/* TWO SENTENCES ONLY THIS ENGINE SAYS, so they are kept here and not in `copy.ts`, where a sentence no screen draws is a
-   dead one. The runway tile over a walk of nothing, and a movement that rounds to no per cent: "up 0%" gives a reader a
-   way and a distance of nothing. */
-const NOTHING_DATED = 'Nothing dated to walk yet.';
+/* A SENTENCE ONLY THIS FILE SAYS, so it is kept here and not in `copy.ts`, where a sentence no screen draws is a dead
+   one: a movement that rounds to no per cent. "up 0%" gives a reader a way and a distance of nothing. */
 const ABOUT_THE_SAME = 'about the same';
 
+/* ── the record every reader below asks ──────────────────────────────── */
+
+type Sql = Parameters<typeof openRecord>[0];
+
+/** A record in memory over `node:sqlite`, bound the way the kernel's own tests bind one. */
+function openSqlite(): Sql {
+  const db = new DatabaseSync(':memory:');
+  let depth = 0;
+  const sql = {
+    exec: (text: string, ...params: unknown[]) => {
+      if (params.length === 0) db.exec(text);
+      else db.prepare(text).run(...(params as never[]));
+    },
+    all: (text: string, ...params: unknown[]) => db.prepare(text).all(...(params as never[])),
+    one: (text: string, ...params: unknown[]) => db.prepare(text).get(...(params as never[])),
+    transactionSync<T>(fn: () => T): T {
+      if (depth > 0) return fn();
+      db.exec('BEGIN');
+      depth++;
+      try {
+        const value = fn();
+        db.exec('COMMIT');
+        return value;
+      } catch (e) {
+        db.exec('ROLLBACK');
+        throw e;
+      } finally {
+        depth--;
+      }
+    },
+  };
+  return sql as unknown as Sql;
+}
+
 /**
- * The cash the walk starts from, in minor units.
+ * The seeded record, opened at the sample's clock when this module loads.
  *
- * A STAND-IN, and it is named up here so that it reads as one. The record does not hold a bank
- * balance yet, and a runway seeded from a number nobody declared is a forecast that looks like a
- * fact. When an account row exists this becomes a lookup and nothing else changes.
+ * NOTHING HERE WRITES TO IT, so what it answered once is what it answers every time, and each answer below is asked for
+ * once and kept. A test that needs a record it can write to opens its own.
  */
+const RECORD: Kernel = await (async () => {
+  const k = await openRecord(openSqlite(), { now: () => NOW });
+  const seeded = await installSeed(k);
+  if (!seeded.ok) throw new Error(`the seed did not install on the fixture's record: ${JSON.stringify(seeded)}`);
+  return k;
+})();
+
+/** THE MOST ROWS ONE `list` CALL ANSWERS, which is the kernel's own ceiling, and the most calls one walk of a list makes. */
+const PER_CALL = 500;
+const CALLS = 20;
+
 /**
- * The `forecast.runway` block the record declares, or `null`.
- *
- * ONE DECLARATION, READ BY BOTH. The tile and the block were two walks over two openings, and the
- * only way two figures about one future stay in step is for there to be one of them.
+ * Every row the record answers for one question about one list, following its cursor to the end; `null` when it refuses
+ * the question. A list longer than `CALLS` pages throws rather than coming back cut short.
  */
+function walk(q: { register: string; where?: string; order?: { field: string; dir: 'asc' | 'desc' }[] }): Row[] | null {
+  const rows: Row[] = [];
+  let cursor: string | null = null;
+  for (let n = 0; n < CALLS; n++) {
+    const out = RECORD.list({ ...q, limit: PER_CALL, ...(cursor === null ? {} : { cursor }) });
+    if (!out.ok) return null;
+    rows.push(...out.value.rows);
+    cursor = out.value.cursor;
+    if (cursor === null) return rows;
+  }
+  throw new Error(`${q.register} holds more rows than ${CALLS} calls of ${PER_CALL} reach`);
+}
+
+/** Each list's rows as the record holds them, in the order they were written. */
+const WALKED = new Map<string, Row[]>();
+function rowsOf(register: string): Row[] {
+  const kept = WALKED.get(register);
+  if (kept) return kept;
+  const rows = walk({ register, order: [{ field: 'seq', dir: 'asc' }] }) ?? [];
+  WALKED.set(register, rows);
+  return rows;
+}
+
+/**
+ * The number and the name of every row of every list the sample declares, for turning the record's refs into the numbers
+ * a person says, as a live reader's `RefMap`s do. `refMapOf` also keeps each list's names in `held.ts`'s `TITLES`.
+ */
+let REFS: ReadonlyMap<string, RefMap> | null = null;
+function refs(): ReadonlyMap<string, RefMap> {
+  REFS ??= new Map(Object.keys(REGISTERS).map((register) => [register, refMapOf(register, rowsOf(register))]));
+  return REFS;
+}
+
+/** One of the record's rows as the helpers read a row: each ref as the number of the row it points at. */
+const entryFrom = (register: string, row: Row): Entry => entryOf(register, row, refs());
+
+/** One figure's reading as the record answers it, by the figure's id and its parameter, kept once asked. */
+const READINGS = new Map<string, ReturnType<Kernel['metric']> | null>();
+function readingOf(id: string): ReturnType<Kernel['metric']> | null {
+  if (READINGS.has(id)) return READINGS.get(id) ?? null;
+  const at = id.indexOf(':');
+  const template = RECORD.metricDecl(at === -1 ? id : id.slice(0, at));
+  /* A PARAMETER IS FILLED BY THE KERNEL'S OWN `fill`, which writes `within` as the record does. */
+  const said = template === null ? null : RECORD.metric(at === -1 ? template : (fill(template, null, id.slice(at + 1)) as RecordMetric));
+  READINGS.set(id, said);
+  return said;
+}
+
 /**
  * What a cash walk starts from, as the record reads it: a typed number, or a declared figure's reading.
  *
@@ -101,23 +183,19 @@ export function openingOf(
 ): { value: number | null; unit: string | null; refusal?: string; parts?: Part[]; missing?: string[]; converted?: boolean } {
   if (typeof opening === 'number') return { value: opening, unit: null };
   if (!opening || typeof opening !== 'object' || typeof opening.metric !== 'string') return { value: null, unit: null };
-  const decl = METRICS[opening.metric];
-  if (!decl) return { value: null, unit: null, refusal: `There is no metric called ${opening.metric} for the walk to start from.` };
-  const reading = read(decl, NOW);
-  if (reading.refusals.length) return { value: null, unit: null, refusal: reading.refusals[0]! };
+  const read = readingOf(opening.metric);
+  if (read === null) return { value: null, unit: null, refusal: `There is no metric called ${opening.metric} for the walk to start from.` };
+  if (!read.ok) return { value: null, unit: null, refusal: 'refusal' in read ? read.refusal.fix : `${opening.metric} could not be read.` };
+  const first = read.value.refusals[0];
+  if (first) return { value: null, unit: null, refusal: first.fix };
   /* A BALANCE IN SEVERAL CURRENCIES WITH NO RATE BETWEEN THEM IS NOT ONE AMOUNT TO START FROM: its parts are, one walk a
      currency, as the record says. */
-  if (reading.parts) return { value: null, unit: null, parts: reading.parts, missing: reading.fx?.missing ?? [] };
-  return { value: reading.value ?? 0, unit: reading.unit ?? currencyOfFormat(decl.format), converted: Boolean(reading.fx?.asOf) };
+  if (read.value.parts) return { value: null, unit: null, parts: read.value.parts, missing: read.value.fx?.missing ?? [] };
+  return { value: read.value.value ?? 0, unit: read.value.unit ?? currencyOfFormat(METRICS[opening.metric]?.format), converted: Boolean(read.value.fx?.asOf) };
 }
 
 /** `money.GBP` is sterling; any other format is not a currency. */
 const currencyOfFormat = (format: string | undefined): string | null => (format?.startsWith('money.') ? format.slice('money.'.length) : null);
-
-const declaredWalk = (): PageBlock | null => {
-  for (const decl of Object.values(PAGES)) for (const b of decl.blocks) if (b.source === 'forecast.runway') return b;
-  return null;
-};
 
 /* ── what the record noticed, on the screen it is about ──────────── */
 
@@ -222,9 +300,19 @@ export function noticed(register: string, suspended: string | null = SUSPENDED):
   };
 }
 
+/**
+ * The rows of `entries` a list's chips admit, as the record answers the sentence the chips write.
+ *
+ * THE RECORD MATCHES AND THIS KEEPS WHAT IT NAMED. `whereOf` writes the chips as the sentence a live list sends, the
+ * record lists the rows it admits, and a row is kept here when the record named its number. A sentence the record
+ * refuses admits no row, which is what an unreadable filter has always matched.
+ */
 export function applyFilters(register: string, entries: Entry[], filters: Filter[], q?: string, join?: 'any'): Entry[] {
-  const w = compile(register, whereOf(filters, join), NOW);
-  let out = filters.length ? entries.filter((e) => matches(e, w, NOW)) : entries;
+  let out = entries;
+  if (filters.length) {
+    const admitted = new Set((walk({ register, where: whereOf(filters, join) }) ?? []).map((row) => row.seq));
+    out = entries.filter((e) => admitted.has(e.seq));
+  }
 
   /**
    * THE TEXT BOX IS ONE OPERATOR, AND IT IS NOT A SCAN OVER EVERY COLUMN.
@@ -304,73 +392,17 @@ export function backlinks(register: string, seq: number, show = 5): Backlink[] {
   return out.sort((a, b) => b.total - a.total);
 }
 
-const open = (e: Entry) => e.fields.state === 'open' || e.fields.state === 'part';
-
-const days = (iso: unknown) =>
-  typeof iso === 'string' ? (Date.parse(`${iso}T12:00:00Z`) - NOW) / 86_400_000 : Infinity;
-
 /**
- * A figure, read from its DECLARATION.
+ * A figure, read by the record from its DECLARATION and drawn as the tile a live page draws.
  *
- * This was a twelve-case `switch` with `const KILN = 1` inside it, which is why there was exactly
- * one project page and why `stat` was unusable on any page an agent writes. The documents are in
- * `declared.ts` and the evaluator is in `metrics.ts`; what is left here is the two figures the
- * record computes rather than stores, and the translation from a reading into a tile.
+ * `project-owed:Kiln` is the document and the thing it is about: the parameter is everything after the FIRST colon,
+ * because a project can be called anything and a name with a colon in it is a name, not two ids. The kernel's `fill`
+ * puts the name in, as the record does for a page's cell.
  *
- * The NOTE is the target and the comparison, which is what 08 §2.2 says a figure is for: "EGP
- * 6,240,000 · target ≤ 5,000,000 · up 18% on the 30 days before it" is three facts and the second
- * is the one you act on. A bare figure is a number you look at.
+ * NO RUNWAY. This drew a cash walk as a tile out of the browser's own walk, which is gone; the record's walk is a
+ * forecast block on a page, and `readBlock` answers one.
  */
 export function metric(id: string): Metric {
-  /* THE RUNWAY, the only figure in the product that is about the future, and 08 §2.3's `running`
-     aggregation — a cumulative reducer with a stop condition. It seeds from what is liquid, applies
-     every dated movement in order, and reports the first day the balance goes under, with the row
-     that did it: "you run out on 14 November" is a number you look at, and "the Fenwick renewal is
-     what does it" is one you act on.
-
-     AND IT WALKS WHAT THE PAGE DECLARES. The tile used a module constant of GBP 42,000 while the
-     Money page's own `forecast.runway` block said GBP 5,000 — two figures about the same future,
-     8.4 times apart, neither saying which balance it rested on. There is one declaration now, and
-     the note says the figure it starts from. */
-  if (id === 'runway') {
-    const block = declaredWalk();
-    const walk = runway(openingOf(block?.opening).value ?? 0, block?.from ?? [], undefined, undefined, NOW);
-    /* AND A WALK OVER NOTHING IS NOT A RUNWAY OF OVER 180 DAYS. `tone: 'good'` is hard-coded on this
-       branch, so a record with no money in it and nothing dated to spend reported the one figure in
-       the product that is about the future as fine — out of an opening balance of zero and an empty
-       list of movements. `19 §6` again: nothing to show is not the same as nothing to worry about. */
-    if (!walk.crossed && walk.steps.length === 0 && walk.from === 0)
-      return { id, label: 'Runway', value: MISSING, note: NOTHING_DATED, href: '/p/money' };
-    if (!walk.crossed)
-      return {
-        id,
-        label: 'Runway',
-        value: `Over ${walk.horizon} days`,
-        /* "TAKES X UNDER" HAS NO OBJECT, so a reader supplies one and reads *under X* — which the
-           walk directly below it then breaks, twice, under a green tick. The floor is zero (the
-           crossing test is `balance < 0`); `X` is where the walk STARTS. Measured on a three-row
-           record: "nothing dated takes GBP 5,000.00 under" over a table showing that balance falling
-           to GBP 3,636.00 on the same day. This branch only ever renders on a small record — at
-           twelve rows the walk crosses and the tile flips — so it is week one's sentence, which is
-           the week nothing had ever looked at. */
-        note: `starts at ${money(walk.from, walk.currency ?? 'GBP')} and nothing dated takes it under`,
-        /* THE TICK NEEDS SOMETHING TO HAVE BEEN WALKED. With an opening balance declared on the page
-           and no dated movement anywhere in the record, the note is true — nothing takes it under,
-           because there is no nothing — and a green tick over it is a verdict on a walk that did not
-           happen. The sentence stays; the judgement goes. */
-        ...(walk.steps.length === 0 ? {} : { tone: 'good' as const }),
-        href: '/p/money',
-      };
-    return {
-      id,
-      label: 'Runway',
-      value: `${walk.days} days`,
-      note: `${fmtDay(walk.crossed.day)} · ${walk.crossed.label}`,
-      tone: walk.days !== null && walk.days < 45 ? 'bad' : 'warn',
-      href: walk.crossed.href,
-    };
-  }
-
   if (id === 'open-questions') {
     /* AND THIS ONE RETURNS BEFORE THE EMPTY GUARD BELOW, so it kept the tick a record with nothing
        in it has not earned: `Open questions · 0 · no more than 3 · ✓`. It is the same defect the
@@ -393,29 +425,18 @@ export function metric(id: string): Metric {
     };
   }
 
-  /* `project-owed:Kiln` — the document, and the thing it is about. The parameter is everything after
-     the FIRST colon, because a project can be called anything and a name with a colon in it is a
-     name, not two ids. */
-  const at = id.indexOf(':');
-  const base = at === -1 ? id : id.slice(0, at);
-  const template = METRICS[base];
-  if (!template)
+  const read = readingOf(id);
+  if (read === null)
     return { id, label: id, value: MISSING, note: 'no metric is declared under that name', tone: 'warn', href: '/p/money' };
-  const decl = at === -1 ? template : withParam(template, id.slice(at + 1));
-  return figureTile(id, decl, read(decl, NOW));
+  return pageTile({ metric: id, reading: read.ok ? read.value : null, ...(!read.ok && 'refusal' in read ? { refusal: read.refusal } : {}) } as never);
 }
 
 /**
- * ONE READING OF ONE DECLARATION, AS A TILE: the sample engine's half of a rule the other two engines also hold.
+ * ONE READING OF ONE DECLARATION, AS A TILE, in the words the sample's tiles were drawn in.
  *
- * IT WAS THE TAIL OF `metric` AND IS ITS OWN FUNCTION SO THAT A READING CAN BE HANDED TO IT. The
- * other two renderers of this same tile, `news-live.ts`'s `tileOf` and `page-live.ts`'s, each take a
- * reading and return a tile, so each can be driven over a reading a test wrote; this one built its
- * own out of the seed's fixed rows, so the only readings it could ever be asked about were the four
- * `things` the sample ships. The parity drive in `news-live.test.ts` needs `rows: 0` over `held: 27`,
- * which is a shape the sample's rows cannot produce, so with no seam here the third engine could only
- * be argued about rather than measured. Nothing else changed in the move: `metric` still reads the
- * declaration and calls this with `read(decl)`.
+ * IT TAKES A READING A TEST WROTE, which is what it is kept for: the parity drive in `news-live.test.ts` holds it
+ * beside `news-live.ts`'s `tileOf` and `page-live.ts`'s over one reading, `rows: 0` over `held: 27`, a shape no seeded
+ * row can produce. `metric` above draws the record's reading through `page-live.ts` and does not come here.
  */
 export function figureTile(id: string, decl: MetricDecl, reading: Reading): Metric {
   /**
@@ -542,20 +563,22 @@ export function values(): Record<string, string> {
    * The old comment got the rule right and the caller wrong: *a path is named after what it means or
    * it means whatever the first caller assumed*. So neither of these is called `oldest_overdue`, and
    * a sentence has to say which one it wants.
+   *
+   * THE RECORD ANSWERS WHICH IS OLDEST: the obligations still open, one way, due before today, earliest first.
    */
-  const oldestIn = (direction: string) =>
-    (ROWS.obligations ?? [])
-      .filter((e) => open(e) && e.fields.direction === direction && days(e.fields.due) < 0)
-      .map((e) => String(e.fields.due))
-      .sort()[0] ?? '';
+  const oldestIn = (direction: 'owed by me' | 'owed to me'): string => {
+    const out = RECORD.list({ register: 'obligations', where: `state is open or part, direction is ${direction}, due before today`, order: [{ field: 'due', dir: 'asc' }], limit: 1 });
+    const due = out.ok ? out.value.rows[0]?.fields.due : undefined;
+    return typeof due === 'string' ? due : '';
+  };
 
   return {
-    /** Money you owe, past its date — the set the `overdue` metric counts. */
-    'obligations.oldest_unpaid': oldestIn('owed_by_me'),
+    /** Money you owe, past its date: the set the `overdue` metric counts. */
+    'obligations.oldest_unpaid': oldestIn('owed by me'),
     /** Money owed to you, past its date. Statutory interest you could charge. */
-    'obligations.oldest_unrecovered': oldestIn('owed_to_me'),
-    'obligations.count': String((ROWS.obligations ?? []).length),
-    'services.count': String((ROWS.services ?? []).length),
+    'obligations.oldest_unrecovered': oldestIn('owed to me'),
+    'obligations.count': String(rowsOf('obligations').length),
+    'services.count': String(rowsOf('services').length),
     ...Object.fromEntries(
       /* EVERY FIGURE THE RECORD DECLARES, not a list of the ones some page happened to name, so a note any pack writes resolves. A
          figure with a parameter is left out, because it is only a figure once a page fills it. */
@@ -565,20 +588,47 @@ export function values(): Record<string, string> {
 }
 
 /**
- * Every page there is, which is not the same as every page DECLARED.
+ * Every page there is, which is not the same as every page DECLARED, as the record lists them.
  *
- * A declaration carrying `for:` is a template and becomes one page per row it admits — four
- * projects over one `project` declaration, where before there was a `kiln` page and no way to have
- * a second. Resolved on read rather than cached, because the rows it depends on are the record.
+ * A declaration carrying `for:` is a template and the record makes one page of it per row it admits. Each is kept here
+ * as its declaration filled with its row by the kernel's own `fill`, with `param` and `identity` naming the row, which
+ * is what a live project page carries (`page-live.ts`). The record is not written to, so the list is read once.
  */
-export const pages = (): Record<string, PageDecl> => resolvePages(PAGES, NOW);
+let PAGES_SAID: Record<string, PageDecl> | null = null;
+export const pages = (): Record<string, PageDecl> => {
+  if (PAGES_SAID) return PAGES_SAID;
+  const declared = RECORD.declarations()
+    .filter((d) => d.kind === 'page')
+    .map((d) => JSON.parse(d.body) as PageDecl);
+  const out: Record<string, PageDecl> = {};
+  for (const listed of RECORD.pages()) {
+    const about = listed.about;
+    if (about === null || about.seq === null) {
+      const written = declared.find((d) => d.page === listed.slug);
+      if (written) out[listed.slug] = written;
+      continue;
+    }
+    /* READ OFF `about` AND NOT DESTRUCTURED, because the guard above narrows `about.seq` to a number and a destructured
+       `seq` would keep the declared `number | null` that `param` and `identity` do not take. */
+    const register = about.register;
+    const seq = about.seq;
+    const row = rowsOf(register).find((r) => r.seq === seq);
+    if (!row) continue;
+    /* ONE LIST MAY CARRY TWO TEMPLATES, so the one whose filled title is the title the record listed is the one this page is. */
+    const filled = declared.filter((d) => d.for?.register === register).map((d) => fill(d, row) as PageDecl);
+    const decl = filled.find((d) => d.title === listed.title) ?? filled[0];
+    if (!decl) continue;
+    const titled = REGISTERS[register]?.title;
+    const title = titled === undefined ? '' : String(row.fields[titled] ?? '');
+    out[listed.slug] = { ...decl, page: listed.slug, param: { register, seq, title }, identity: { register, seq } };
+  }
+  PAGES_SAID = out;
+  return out;
+};
 
 export function boot() {
-  /* ONE RESOLUTION, READ TWICE. The rail below and the pen at the bottom of this function each
-     called `pages()`, and one resolution costs 0.48 ms at 26 projects against 0.05 ms on the
-     sample, measured here. Half of a millisecond is not the reason; two snapshots of the same set
-     inside one answer is, because a template expands against `ROWS` and the two lists a `boot`
-     hands the shell should not be able to disagree about what a page is. */
+  /* ONE LIST OF PAGES, READ TWICE: the rail below and the pen at the bottom of this function, which the two lists a
+     `boot` hands the shell should not be able to disagree about. */
   const resolved = Object.values(pages());
 
   /**
@@ -594,8 +644,7 @@ export function boot() {
    *
    * COUNTED PER REGISTER THE ROWS COME FROM AND PER HEADING THEY LAND UNDER, so a page somebody
    * wrote is never pushed out of the rail by rows landing in a list. The five kept are the first
-   * five rows the template admits, which is already the order the rail draws them in, because
-   * `resolvePages` numbers each page's `nav.order` by its position in that same set.
+   * five pages the record lists for the template, and the cap is the record's own `RAIL_PAGES`.
    *
    * THE HEADING IS IN THE KEY BECAUSE ONE REGISTER CAN CARRY TWO TEMPLATES, which is what a pack
    * installing a second view of a list somebody already keeps produces. Counted per register
@@ -618,12 +667,11 @@ export function boot() {
    * until a register carries more than five rows a template admits, and it is the first thing to
    * put right in that file before this rule reaches the rail a live record draws.
    */
-  const RAIL_PAGES = 5;
   const drawn = new Map<string, number>();
   const nav: NavEntry[] = [];
   for (const p of resolved) {
     if (!p.nav || p.placed === false) continue;
-    /* `identity` is set by `resolvePages` on the pages a template produced and on no others, so
+    /* `identity` is set by `pages` on the pages a template produced and on no others, so
        this counts pages about a row and leaves every declared page alone. The key is a JSON pair
        rather than two strings joined, because a section is 40 bytes of somebody's own words and
        any separator picked here is one they are allowed to type. */
@@ -748,523 +796,33 @@ export function boot() {
  */
 export const heldBy = (register: string): number => (ROWS[register] ?? []).length;
 
-/**
- * A cash walk over money in several currencies that could not be converted, as the record's `pages.ts` draws it: one walk
- * a currency, each from that currency's part of the opening, and the sentence saying why it is not one walk.
- * `null` when the walk is one.
- */
-function splitWalks(opened: ReturnType<typeof openingOf>, b: PageBlock): { walks: ReturnType<typeof runway>[]; note: string | null } | null {
-  const legs = b.from ?? [];
-  if (!Array.isArray(b.from) || (!opened.parts && opened.value === null)) return null;
-  const home = fxNow().home;
-  const whole = opened.parts ? null : runway(opened.value!, legs, b.horizon, undefined, NOW);
-  /* AN OPENING IN THE HOME CURRENCY AND A MOVEMENT WITH NO RATE INTO IT, as the record's `pages.ts` draws it: the home walk
-     of everything that converts, and each currency with no rate on its own beside it, from nothing. */
-  const lacking =
-    whole && home !== null && !opened.parts && (opened.unit === null || opened.unit === home) && whole.missing?.length
-      ? [...new Set(whole.missing.map((pair) => pair.split(' to ')[0]!))].sort()
-      : [];
-  if (lacking.length) {
-    const main = runway(opened.value!, legs, b.horizon, { except: lacking }, NOW);
-    const walks = [{ ...main, currency: main.currency ?? home }, ...lacking.map((c) => runway(0, legs, b.horizon, c, NOW))];
-    return { walks: remembered(b, walks), note: walksNote(home, whole!.missing!, walks.length) };
-  }
-  const apart =
-    opened.parts !== undefined ||
-    (whole !== null && !opened.converted && !whole.mixed.includes(BARE) && ((whole.mixed.length > 0 && whole.steps.length === 0) || (opened.unit !== null && whole.currency !== null && opened.unit !== whole.currency)));
-  if (!apart) return null;
-  const moving = whole ?? runway(0, legs, b.horizon, undefined, NOW);
-  if (moving.mixed.includes(BARE)) return null;
-  const currencies = [...new Set([...(opened.parts?.map((p) => p.currency) ?? (opened.unit ? [opened.unit] : [])), ...moving.mixed, ...(moving.currency ? [moving.currency] : [])])]
-    .filter((c) => /^[A-Z]{3}$/u.test(c))
-    .sort();
-  const walks = currencies.map((c) => runway(opened.parts ? (opened.parts.find((p) => p.currency === c)?.amount ?? 0) : opened.unit === c ? opened.value! : 0, legs, b.horizon, c, NOW));
-  if (walks.length === 0) return null;
-  const missing = [...new Set([...(opened.missing ?? []), ...(moving.missing ?? [])])].sort();
-  return { walks: remembered(b, walks), note: walksNote(home, missing, walks.length) };
-}
-
-/** Each walk of a split walk with the opening figure remembered in its currency, when the block names the series. */
-function remembered<W extends ReturnType<typeof runway>>(b: PageBlock, walks: W[]): (W & { past?: { at: string; value: number }[] })[] {
-  const points = recordedOf(b);
-  return typeof points === 'string' || points === null ? walks : walks.map((w) => ({ ...w, past: pastIn(b, points, w.currency) }));
-}
+/** Each page as the record answers `page` for it, kept once asked. */
+const OPENED = new Map<string, ReturnType<Kernel['page']>>();
 
 /**
- * The cash walk, shaped as an ordinary table block.
+ * One page, as the record reads it and a live page draws it: every block the record answered, through `blockOf`.
  *
- * Four columns, and the fourth is the reason the walk is drawn at all: the balance after each
- * movement. A list of dated amounts is the same information the register already has; the running
- * figure beside them is what makes it a forecast.
- *
- * The row that crosses carries the `bad` tone, so the eye lands on the day rather than on the
- * biggest number — those are rarely the same row, and the big number is the distraction.
+ * ONE BLOCK'S REFUSAL IS ONE BLOCK, and that is the record's rule now: its `readPage` answers a block that cannot be
+ * read as a block carrying the refusal, and `blockOf` draws the refusal's sentence.
  */
-function runwayBlock(b: PageBlock): BlockResult {
-  /* THE DECLARATION, NOT A CONSTANT. This read a module-level `OPENING` of GBP 42,000 while its own
-     page said GBP 5,000 — so the tile and the block it sat beside disagreed by 8.4 times, in the
-     one figure this product computes about the future. A block with no `opening:` gets none, and
-     the walk says so rather than inventing a balance. */
-  /* HOW FAR AHEAD IS A BUSINESS QUESTION; `limit:` IS A SCREEN QUESTION.
-     
-     This read `b.limit ? b.limit * 12 : 180`, so the horizon was twelve times however many rows fit
-     on the page — 144 days for a block declaring twelve — while the block's own `empty:` sentence
-     read "Nothing dated in the next six months." Two answers to how far the forecast looks, in one
-     declaration, and neither was the `horizon:` key `PageBlock` has always carried and nothing read.
-     
-     It mattered the moment the block started stating its total: "12 of 58" where 58 was movements
-     inside a window derived from a row count. */
-  const opened = openingOf(b.opening);
-  const split = splitWalks(opened, b);
-  if (split) {
-    const late = latenessOf(b);
-    const recorded = recordedOf(b);
-    return {
-      ...b,
-      register: undefined,
-      entries: [],
-      matched: [],
-      refusals: [...(typeof recorded === 'string' ? [recorded] : []), ...(typeof late === 'string' ? [late] : []), ...split.walks.flatMap((w) => w.refusals)],
-      walks: split.walks,
-      walkNote: split.note,
-      ...(typeof late === 'string' || late === undefined ? {} : { lateness: late, ...(typeof b.late === 'string' && METRICS[b.late]?.name ? { late_name: METRICS[b.late]!.name } : {}) }),
-      ...walkTable(split.walks[0]!, b.kind === 'bridge' || b.kind === 'forecast' ? split.walks[0]!.steps.length : b.limit, new Date(NOW).toISOString().slice(0, 10), false),
-      drawn: b.drawn ?? drawnWhen(b),
-      stale_at: new Date(NOW).toISOString(),
-      metrics: undefined,
-    };
-  }
-  const walk = runway(opened.value ?? 0, b.from ?? [], b.horizon, undefined, NOW);
-  /* A WALK THE RECORD CANNOT MAKE IS A SENTENCE, not an empty table. A cash walk over two currencies
-     produces a crossing day that looks real and is invented.
-
-     AND THE WALK'S OWN SENTENCES REACH THE BLOCK, WHICH THEY DID NOT. This read `walk.mixed` and
-     nothing else, so the refusals the walk itself produces — a horizon it cannot carry, a leg
-     pointed at something that is not money, a cycle that is not a whole number of months, a row
-     that recurs past the cap — came back to a block that drew an empty table under its own `empty:`
-     sentence instead. "Nothing is coming" and "this walk could not be made" are different facts and
-     one of them is the reason for the other. */
-  const recorded = recordedOf(b);
-  const late = latenessOf(b);
-  const refusals = [
-    ...(opened.refusal ? [opened.refusal] : []),
-    ...(typeof recorded === 'string' ? [recorded] : []),
-    ...(typeof late === 'string' ? [late] : []),
-    ...walk.refusals,
-    ...(walk.mixed.length ? [`The cash walk needs one currency: ${mixedFix(walk.mixed)}.`] : []),
-    ...(opened.unit !== null && walk.currency !== null && opened.unit !== walk.currency
-      ? [`The opening balance is in ${opened.unit} and the movements are in ${walk.currency}. A cash walk adds them, so they need one currency.`]
-      : []),
-  ];
-  return {
-    ...b,
-    register: undefined,
-    entries: [],
-    matched: [],
-    refusals,
-    ...(refusals.length ? {} : { walk }),
-    ...(refusals.length || typeof recorded === 'string' || !recorded ? {} : { past: pastIn(b, recorded, walk.currency) }),
-    ...(refusals.length || typeof late === 'string' || late === undefined ? {} : { lateness: late, ...(typeof b.late === 'string' && METRICS[b.late]?.name ? { late_name: METRICS[b.late]!.name } : {}) }),
-    /* A BRIDGE ADDS UP THE WHOLE WALK, and a forecast draws it, so each shows every movement it read rather than a slice of them. */
-    ...walkTable(walk, b.kind === 'bridge' || b.kind === 'forecast' ? walk.steps.length : b.limit, new Date(NOW).toISOString().slice(0, 10), refusals.length > 0),
-    drawn: b.drawn ?? drawnWhen(b),
-    stale_at: new Date(NOW).toISOString(),
-    metrics: undefined,
-  };
-}
-
-/**
- * A series: each figure read here, grouped as the record groups it, and lined up by the record's own `barsOf`.
- *
- * The figures are this build's readings and the arithmetic that lines them up is imported, so the
- * sample and a record draw the same bars in the same buckets.
- */
-function seriesBlock(b: PageBlock): BlockResult {
-  const got = barsOf(
-    b.series as SeriesLine[] | undefined,
-    b.back,
-    b.ahead,
-    (id) => (METRICS[id] ?? null) as never,
-    (decl) => {
-      const r = read(decl as never, NOW);
-      return r.refusals.length
-        ? { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: r.refusals[0]! } }
-        : {
-            ok: true,
-            value: {
-              groups: r.groups ?? [],
-              current: r.current ?? '',
-              value: r.value ?? null,
-              /* THE CURRENCY THE FIGURE IS IN, which is the home one once converted; its parts when it is in several. */
-              unit: r.rows === 0 || r.parts ? null : (r.unit ?? unitOfFormat((decl as { format?: string }).format)),
-              ...(r.parts ? { parts: r.parts } : {}),
-            },
-          };
-    },
-  );
-  const refusals = 'refusal' in got ? [got.refusal.fix] : [];
-  const unread = Object.keys(b).filter((k) => !READS.has(k)).map((k) => `${k}: is not a key this build reads`);
-  return {
-    ...b,
-    register: undefined,
-    columns: [],
-    entries: [],
-    matched: [],
-    refusals: [...unread, ...refusals],
-    rows: [],
-    ...('bars' in got ? { bars: got.bars } : {}),
-    shown: 'bars' in got ? got.bars.keys.length : 0,
-    total: 'bars' in got ? got.bars.keys.length : 0,
-    drawn: b.drawn ?? drawnWhen(b),
-    stale_at: new Date(NOW).toISOString(),
-    metrics: undefined,
-  };
-}
-
-/** The currency a `money.<CUR>` format names, or `null`. */
-const unitOfFormat = (format: string | undefined): string | null => (format?.startsWith('money.') ? format.slice('money.'.length) : null);
-
-/** The knobs a forecast may offer: the kernel's `KNOBS`. */
-const KNOBS = ['horizon', 'late', 'spend', 'leave', 'grow', 'drift', 'count', 'sell'];
-
-/**
- * A forecast's remembered balance before today, as the record's `recordedOf` reads it, or the sentence that stops it.
- *
- * The series is the opening figure's own, over the ninety days before today, a day with no point absent.
- */
-/**
- * Remembered points in one currency, as the record's `pastIn` draws them. The sample's points carry no unit, so each is in
- * the currency its figure's format names.
- */
-function pastIn(b: PageBlock, points: readonly { at: string; value: number }[], currency: string | null): { at: string; value: number }[] {
-  const id = typeof b.recorded === 'string' ? b.recorded.replace(/^series\./u, '') : '';
-  const unit = currencyOfFormat(METRICS[id]?.format);
-  return !currency || !unit || unit === currency ? [...points] : [];
-}
-
-function recordedOf(b: PageBlock): readonly { at: string; value: number }[] | string | null {
-  if (b.knobs !== undefined && (!Array.isArray(b.knobs) || b.knobs.some((k) => !KNOBS.includes(k)))) return `knobs is a list of ${KNOBS.join(', ')}.`;
-  if (b.recorded === undefined) return null;
-  const id = typeof b.recorded === 'string' ? b.recorded.replace(/^series\./u, '') : '';
-  const opening = b.opening !== null && typeof b.opening === 'object' ? b.opening.metric : null;
-  if (!id || id !== opening) return `recorded: names the series its opening figure is remembered in, which is ${opening ?? 'a figure this walk does not open from'}.`;
-  const DAY = 86_400_000;
-  const at = (ms: number) => new Date(ms).toISOString().slice(0, 10);
-  const from = at(NOW - 90 * DAY);
-  const to = at(NOW - DAY);
-  return (SERIES[id] ?? []).filter((p) => p.at >= from && p.at <= to);
-}
-
-/**
- * A forecast's late mark, as the record's `latenessOf` reads it, or the sentence that stops it.
- *
- * `undefined` when the block names no figure; the reading, `null` when nothing was paid, when it does.
- */
-function latenessOf(b: PageBlock): number | null | string | undefined {
-  if (b.under !== undefined && (!Number.isInteger(b.under) || b.under < 1 || b.under > 365)) return 'under: is a whole number of days between 1 and 365.';
-  if (b.late === undefined) return undefined;
-  const decl = typeof b.late === 'string' ? METRICS[b.late] : undefined;
-  if (!decl) return `There is no metric called ${String(b.late)} for the late knob to mark.`;
-  const reading = read(decl, NOW);
-  return reading.refusals.length ? reading.refusals[0]! : reading.value;
-}
-
-/**
- * Whether a block's `when:` is satisfied, given the figure it names.
- *
- * A FIGURE THAT CANNOT BE READ DOES NOT DRAW THE BLOCK. The alternative — drawing it anyway — is
- * how a red note about an overdue invoice appears on a record with no invoices at all, which is the
- * one thing a `when:` exists to prevent. A block with no `when:` always draws.
- */
-function drawnWhen(b: PageBlock): boolean {
-  if (!b.when) return true;
-  /* A `when:` NAMING A FIGURE NOBODY DECLARED DOES NOT DRAW. It is the same answer as a figure that
-     cannot be computed, and for the same reason: the block's condition is unknown, and drawing on
-     an unknown is guessing. */
-  const decl = METRICS[b.when.metric];
-  if (!decl) return false;
-  const reading = read(withParam(decl, b.when.metric), NOW);
-  /* A FIGURE IN SEVERAL CURRENCIES MEETS THE CONDITION WHEN ONE OF ITS AMOUNTS DOES, as the record reads it: money late
-     in pounds is late whatever is late in dollars. */
-  const said = reading.parts ? reading.parts.map((p) => p.amount) : reading.value === null ? [] : [reading.value];
-  const when = b.when;
-  return said.some((v) => {
-    if (when.gt !== undefined) return v > when.gt;
-    if (when.gte !== undefined) return v >= when.gte;
-    if (when.lt !== undefined) return v < when.lt;
-    if (when.lte !== undefined) return v <= when.lte;
-    if (when.is !== undefined) return v === when.is;
-    if (when.not !== undefined) return v !== when.not;
-    /* A CONDITION WITH NO TEST IN IT IS NOT A CONDITION, and drawing the block would be guessing that
-       the author meant "always". They meant something; the block waits until they say what. */
-    return false;
-  });
-}
-
-/**
- * Every key a block declaration may carry, so one it cannot is named rather than ignored.
- *
- * A list, not a type check: a declaration arrives as JSON from a pack somebody else wrote, and
- * TypeScript is not there at the moment it is read. `when:` is the one 06 §1.1 documents and this
- * build does not have — an agent writing the doc's own worked example got a block that always drew.
- */
-const READS = new Set([
-  'kind', 'heading', 'span', 'source', 'where', 'columns', 'cells', 'order', 'limit',
-  'target', 'authored', 'empty', 'tone', 'body', 'drawn', 'when', 'opening', 'from', 'horizon', 'of',
-  /* A section's two keys: `fold` starts it shut, `icon` names the glyph beside its heading. */
-  'fold', 'icon',
-  /* A feed's and a diff's keys, so a page may declare them before their bindings land. */
-  'since', 'first', 'row', 'field', 'versions',
-  /* A block that reads its project's rows and the ones it inherits from everywhere. */
-  'inherit',
-  /* A stat whose first figure is the screen's hero. */
-  'lead',
-  /* A series's lines and its reach. */
-  'series', 'back', 'ahead', 'net',
-  /* A stat or lines over readings: whether a point is a day or a week. */
-  'bucket',
-  /* A forecast's remembered figure and its knobs, its late mark and its warning reach, and the figure its sell knob offers. */
-  'recorded', 'knobs', 'late', 'under', 'sell',
-  /* A bar's or a split's row for what no part holds, and the intent each part is drawn in. */
-  'unset', 'tones',
-  /* A card grid's out-of-date rule. */
-  'stale',
-  /* A progress budget's figure of what was spent, and a goal's of what was logged toward it. */
-  'spent', 'toward',
-  /* A note whose body is a whole document. */
-  'document',
-  /* Whether each row says an agent is on it right now, and the answer that asking produces. */
-  'working', 'working_now',
-  /* A capture's list, and what a new row in it is filled with. */
-  'register', 'fills',
-]);
-
 export function page(slug: string): { page: PageDecl; blocks: BlockResult[]; values: Record<string, string> } | null {
   const decl = pages()[slug];
   if (!decl) return null;
-
-  /**
-   * SIX QUERIES, SIX INDEPENDENT FAILURES. The page route states that invariant at the top of its
-   * own file, and it was not true of the read underneath it: `readPage` maps every block in one
-   * call, so anything that threw in one of them took the whole page with it. A `where:` written as
-   * the predicate tree `docs/06-PAGES` §1.1 specifies did exactly that — `.split` on an object —
-   * and a page of five correct blocks rendered as nothing at all.
-   *
-   * A block that throws becomes a block that refuses, in the surface `draw()` already draws. The
-   * message is the thrown one because a declaration is written by somebody who can act on it.
-   */
-  const blocks = decl.blocks.map((b): BlockResult => {
-    try {
-      return readBlock(b);
-    } catch (e) {
-      return {
-        ...b,
-        register: undefined,
-        columns: [],
-        entries: [],
-        matched: [],
-        refusals: [`this block could not be read: ${e instanceof Error ? e.message : String(e)}`],
-        rows: [],
-        shown: 0,
-        total: 0,
-        drawn: b.drawn ?? drawnWhen(b),
-        stale_at: new Date(NOW).toISOString(),
-        metrics: undefined,
-      };
-    }
-  });
-
-  return { page: decl, blocks, values: values() };
+  const got = OPENED.get(slug) ?? RECORD.page(slug);
+  OPENED.set(slug, got);
+  if (!got.ok) return null;
+  return { page: decl, blocks: got.value.blocks.map((b) => blockOf(b as never, refs(), NOW)), values: values() };
 }
 
 /**
- * What a `progress` block's `spent:` or `toward:` figure read, in parts, as the record answers it beside the rows; or the
- * sentence that stops it. A limit in one currency and a figure in another are never set against each other.
+ * One block, without a page around it, as the record reads it and a live page draws it.
+ *
+ * THE RECORD'S `block`, WHICH IS WHAT A `draw` TOOL HANDS AN AGENT, answers the declaration: its rows, its figures, its
+ * walk, its feed, or the refusal that stops it. `blockOf` turns that answer into what the page draws, with every ref
+ * named from the record's own rows.
  */
-function progressFigure(b: PageBlock, rows: readonly Entry[]): { spentBy?: NonNullable<BlockResult['spentBy']>; refusal?: string } {
-  const id = b.spent ?? b.toward;
-  if (id === undefined) return {};
-  const at = b.spent === undefined ? 'toward' : 'spent';
-  const decl = METRICS[id];
-  if (!decl) return { refusal: `${at}: there is no metric called ${id}` };
-  if (typeof decl.group_by !== 'string' || decl.bucket !== undefined) return { refusal: `${at}: ${id} groups by a word, and a date cut into buckets is a series` };
-  const r = read(decl as never, NOW);
-  if (r.refusals.length) return { refusal: r.refusals[0]! };
-  const unit = r.rows === 0 ? null : unitOfFormat(decl.format);
-  const limit = b.columns?.[1]?.field;
-  const other = unit === null || limit === undefined ? undefined : rows.map((e) => currencyOfValue(e.fields[limit])).find((c) => c !== null && c !== unit);
-  if (other) return { refusal: `A row here is in ${other} and ${id} is in ${unit}, and two currencies are never set against each other.` };
-  const groups = (r.groups ?? []).map((g) => ({ key: String(g.key), value: typeof g.value === 'number' ? g.value : null }));
-  return { spentBy: { metric: id, unit, groups, ...(b.spent === undefined ? { toward: true } : {}) } };
-}
-
-const currencyOfValue = (v: unknown): string | null =>
-  typeof v === 'object' && v !== null && typeof (v as { currency?: unknown }).currency === 'string' ? (v as { currency: string }).currency : null;
-
-/** Exported for the test that holds this engine against the kernel's over the seed. */
 export function readBlock(b: PageBlock): BlockResult {
-  {
-    /* A BLOCK MAY BE SOURCED FROM A WALK, NOT ONLY A REGISTER. 05 §2 defers a `forecast` KIND to
-       post-v1 and says the primitive layer is what exists so that it can be drawn without one, so
-       this adds a source rather than a kind: `forecast.runway` fills an ordinary `table` with the
-       cash walk. Nothing about the block is new, and the day a real `forecast` kind ships, the
-       declaration that changes is the kind, not the query. */
-    if (b.source === 'forecast.runway') return runwayBlock(b);
-    if (b.source?.startsWith('metric.')) return partsBlock(b, b.source.slice('metric.'.length));
-    if (b.kind === 'series') return seriesBlock(b);
-    /* A FEED READS THE LEDGER and a diff reads one row's history, so neither is a register's rows. */
-    if (b.source === 'activity') return activityBlock(b);
-    /* WHAT IS WAITING ON A PERSON, which is the decide queue read onto a page. */
-    if (b.source === 'governance.open') return openBlock(b);
-    /* THE ONE-LINE ADD reads no rows, only what its `where:` fills a new one with. */
-    if (b.kind === 'capture') return captureBlock(b);
-    if (b.kind === 'diff') return diffBlock(b);
-    /* THE RUNS WORKING NOW are `session`'s rows in the order the kernel's `sessionsLive` gives them,
-       so a declared order would be a second answer to a question the source settles. */
-    const live = b.source === 'sessions.live';
-    if (live && b.order?.length) return computed(b, ['order: sessions.live comes the most recently seen first, so it takes no order:']);
-
-    const register = live ? SESSION : b.source?.startsWith('register.') ? b.source.slice('register.'.length) : undefined;
-    const all = live ? liveRuns() : register ? (ROWS[register] ?? []) : [];
-    const { entries: matched, refusals, own } = register
-      ? b.inherit === true
-        ? inheritFor(register, all, b)
-        : { ...filterForBlock(register, all, b), own: undefined }
-      : { entries: [], refusals: [], own: undefined };
-
-    /* WHAT THE DECLARATION SAID THAT THIS BUILD DOES NOT READ.
-       Three shapes reached here and were answered with an empty block, which is the state reserved
-       for "it asked and the answer was nothing":
-         - a `source:` that resolves to neither a register nor the walk. 06 §1.1 documents
-           `metric.<id>` and `block.<n>` and neither is implemented.
-         - a field in `columns:` that the register does not declare. The same typo in `where:` says
-           "there is no field called amounnt"; in `columns:` it drew a row of blank cells.
-         - a key the type does not carry at all — `when:` is in 06 §1.1 and is not read anywhere.
-       All three are the block's own error, so they go where `explain()` goes. */
-    const said = [...refusals];
-    if (b.source && !register) said.push(`source: ${b.source} is not a source this build reads. It reads register.<id>, forecast.runway, activity, governance.open and sessions.live`);
-    if (register) {
-      /* `seq` is a column and not a field: it is on the ROW rather than in its fields, and `toRows`
-         renders it as `#4`. Any pack may name it, so it belongs in the set a column may resolve to
-         even though no register declares it. */
-      const declared = new Set(['seq', CHANGED, ...(REGISTERS[register]?.fields ?? []).map((f) => f.id)]);
-      for (const c of b.columns ?? [])
-        if (!declared.has(c.field)) said.push(`columns: there is no field called ${c.field} on ${register}`);
-      said.push(...signFaults(register, b.columns));
-      /* WHERE A ROW APPLIES IS THE SCOPE FIELD'S TO SAY, as the kernel checks it. */
-      const scope = scopeFieldOf(register);
-      for (const c of b.columns ?? [])
-        if (c.as === 'scope' && c.field !== scope?.id)
-          said.push(
-            scope
-              ? `columns: as: scope draws where a row applies, which ${register} says in ${scope.id}, not ${c.field}`
-              : `columns: as: scope draws where a row applies, and ${register} has no field that says so`,
-          );
-    }
-    for (const key of Object.keys(b))
-      if (!READS.has(key)) said.push(`${key}: is not a key this build reads`);
-    /* OUT OF DATE IS A DAY AND A WINDOW, as the record checks it. */
-    if (b.stale !== undefined && register) {
-      const type = decl(register, b.stale?.field ?? '')?.type;
-      if ((type !== 'day' && type !== 'instant') || typeof b.stale?.after !== 'string' || windowMs(b.stale.after) === null)
-        said.push(`stale: names a day field on ${register} and a window, such as { field: as_of, after: 7d }`);
-    }
-    /* `limit:` is a READING cap, not a query cap: it says how much of the answer fits on the page.
-       The kinds that reduce are handed the whole answer (see `matched`), so a sum is a sum. */
-    const entries = matched.slice(0, b.limit ?? 50);
-    const columns = b.columns
-      ? b.columns.map((c) => ({
-          field: c.field,
-          label: columnHeading(register ?? '', c),
-          width: c.width ?? 'minmax(12ch,1fr)',
-          align: c.align ?? 'start',
-          /* A FIGURE NEVER TRUNCATES, AND WHICH COLUMNS ARE FIGURES IS THE REGISTER'S TO SAY.
-             This asked the field's NAME and matched `amount` or `cost`, so `revenue` and `rate`,
-             both declared money, were drawn as ordinary text, and a text field called `cost_centre`
-             would have been drawn as a figure. The declared type is already in scope here: the same
-             function reads `REGISTERS[register].fields` twelve lines above to name a column the
-             register does not have, and `columnsFor` has asked the type since it was written
-             (13 §4.2: a truncated figure is not shortened, it is wrong). A column over no register
-             has no declared type to ask, so it truncates as the text it is being drawn as. */
-          truncate: decl(register ?? '', c.field)?.type === 'money' ? ('never' as const) : ('end' as const),
-          /* A card's role for this column. Without it every cards block fell back to the guessed roles.
-             `scope` is not a role the renderer draws: it says what the cell holds, which is settled here. */
-          ...(c.as === undefined || (c.as === 'scope' && b.kind !== 'cards') ? {} : { as: c.as === 'scope' ? ('fact' as const) : c.as }),
-        }))
-      : [];
-    const rows = toRows(register ?? '', ringed(register, b, entries), columns, NOW);
-    (b.columns ?? []).forEach((c, i) => {
-      if (c.as !== 'scope') return;
-      entries.forEach((e, n) => {
-        const cells = rows[n]?.cells;
-        if (cells) cells[i] = absent(e.fields[c.field]) ? EVERYWHERE : (cells[i] ?? null);
-      });
-    });
-    if (register) markColumns(register, b.columns, entries, rows, (e) => provenanceOf(register, e));
-    /* A BUDGET OR A GOAL IS SET AGAINST THE PARTS OF ITS FIGURE, read here as the record reads them beside the rows. */
-    const figured = b.kind === 'progress' ? progressFigure(b, matched) : {};
-    if (figured.refusal) said.push(figured.refusal);
-    /* A RUN HOLDS ITS PROJECT AS A SPOKEN ID, and the kernel's page layer names it, so this does too. */
-    if (live)
-      (b.columns ?? []).forEach((c, i) => {
-        if (c.field !== 'project') return;
-        entries.forEach((e, n) => {
-          const cells = rows[n]?.cells;
-          if (cells) cells[i] = projectName(e.fields.project) ?? cells[i] ?? null;
-        });
-      });
-    return {
-      ...b,
-      register,
-      columns,
-      entries,
-      matched,
-      refusals: said,
-      rows,
-      /* The kernel's own test of a run gone quiet, so the two hosts dim the same runs. */
-      ...(live ? { quiet: entries.map((e) => isStale({ fields: e.fields as never, updated_at: e.created }, NOW)) } : {}),
-      /* ALIGNED WITH THE ROWS, NOT WORKED OUT WHILE DRAWING THEM. The dot used to be decided inside
-         `projectRows`, which reads the sample's own ledger, so a LIVE record drew no dot at all no
-         matter what its agents were doing. Both engines answer the question now and the drawer only
-         reads the answer. */
-      ...(b.working === true && register ? { working_now: entries.map((e) => workingNow(register, e.seq)) } : {}),
-      ...(own === undefined ? {} : { inherited: Math.max(0, entries.length - own) }),
-      ...(figured.spentBy === undefined ? {} : { spentBy: figured.spentBy }),
-      /* A KIND THAT REDUCES DRAWS THE WHOLE ANSWER, so it is never showing a slice of it. `bar`,
-         `chips` and `gauge` iterate `matched` — every row — and apply `limit:` to their GROUPS; this
-         counted `entries` for every kind alike, so the first author to write `limit: 5` on a bar
-         over 38 rows would have got "Showing 5 of 38" above a chart containing all 38. No block in
-         the seed declares one, which is the only reason it is not on screen today. */
-      shown: REDUCES.has(b.kind) ? matched.length : entries.length,
-      total: matched.length,
-      drawn: b.drawn ?? drawnWhen(b),
-      stale_at: new Date(NOW).toISOString(),
-      metrics: b.cells?.map((c) => {
-        const trend = c.trend === undefined ? undefined : trendOf(c.metric, c.trend);
-        const note = c.note === undefined ? {} : { note: noteOf(c.note, (id) => (METRICS[id] ? metric(id).value : null)) };
-        return { ...metric(c.metric), label: c.label, ...(trend ? { trend } : {}), ...note };
-      }),
-    };
-  }
-}
-
-/**
- * HOW FAR ALONG EACH CARD IS FROM THE STEPS UNDER IT, where its ring's field is empty, as the record works it out
- * (`@braindog/kernel` `steps.ts`). Only what the cells are drawn from carries it; the rows themselves are not changed.
- */
-function ringed(register: string | undefined, b: { kind: string; columns?: readonly { field: string; as?: string }[] }, entries: Entry[]): Entry[] {
-  const ring = b.kind === 'cards' ? b.columns?.find((c) => c.as === 'ring')?.field : undefined;
-  if (!register || !ring) return entries;
-  const tally = new Map<string, { done: number; total: number }>();
-  for (const [id, list] of Object.entries(REGISTERS)) {
-    const of = list.steps ? list.fields.find((f) => f.id === list.steps!.of) : undefined;
-    if (list.steps && of?.to === register) tallySteps(ROWS[id] ?? [], list.steps, tally);
-  }
-  if (tally.size === 0) return entries;
-  return entries.map((e) => {
-    const share = typeof e.fields[ring] === 'number' ? null : stepsPercent(tally.get(String(e.seq)));
-    return share === null ? e : { ...e, fields: { ...e.fields, [ring]: share } };
-  });
+  return blockOf(RECORD.block(b as never) as never, refs(), NOW);
 }
 
 /**
@@ -1283,341 +841,6 @@ export function trendOf(metricId: string, window: string, now: number = NOW): (n
   const by = new Map((SERIES[metricId] ?? []).map((p) => [p.at, p.value]));
   const trend = Array.from({ length: days }, (_, i) => by.get(at(last - (days - 1 - i) * DAY)) ?? null);
   return trend.some((v) => v !== null) ? trend : undefined;
-}
-
-/** The mock's stand-in for a compiled `where:`. The real one is one JSON tree, seven consumers. */
-function filterForBlock(register: string, entries: Entry[], b: PageBlock): { entries: Entry[]; refusals: string[] } {
-  /* THE PREDICATE IS EVALUATED, not pattern-matched. This was five `String.includes` checks, and
-     anything outside them passed every row through a filter that looked like it had worked — the
-     one failure a declarative surface must not have, because the thing writing most of these
-     declarations is an agent and an agent cannot see it. See `where.ts`. */
-  /* Compiled ONCE, not per row: resolving fields, dates and enum values against the register is
-     work that does not change between rows, and doing it inside the filter made it O(rows). */
-  const predicate = b.where ? compile(register, b.where, NOW) : null;
-  let out = predicate ? entries.filter((e) => matches(e, predicate, NOW)) : entries;
-
-  /* THERE WERE TWO HIDDEN WINDOWS HERE, keyed on register-and-kind: a `timeline` over services
-     dropped cancelled rows and anything past ninety days, and a `table` over tasks dropped done and
-     dropped ones. The argument was that they are the kind's own default rather than a filter a
-     reader chose. The argument is wrong, and it is wrong in the way this file spends most of its
-     comments warning about: the same `where:` over the same register returned different rows
-     depending on the kind, with nothing in the declaration saying so, and an agent asking a `table`
-     for closed tasks got back `total: 0` and its own "nothing matched" sentence.
-
-     Both are now written where they can be read, on the two declarations that wanted them, and both
-     produce exactly the row counts the code did — 12 and 11. A default that cannot be seen is not a
-     default, it is a second filter.
-
-*/
-  const order = b.order?.[0];
-  return {
-    entries: order ? sortRows(register, out, order.field, order.dir) : out,
-    /* CARRIED OUT, not swallowed. A predicate that could not be understood matches nothing, which
-       is the safe answer and an invisible one: the block drew a heading over a blank rectangle and
-       whoever wrote the declaration — usually an agent — learned nothing. 10 §7's fourth rule is
-       that the refusal is the teacher. */
-    refusals: predicate ? explain(predicate) : [],
-  };
-}
-
-/** The kernel's register of agent runs, which `sessions.live` reads. */
-const SESSION = 'session';
-
-/** The runs not in one of `session`'s `done` states, the most recently seen first: the kernel's `sessionsLive`. */
-const liveRuns = (): Entry[] => {
-  const done = new Set<string>(REGISTERS[SESSION]?.done ?? []);
-  return (ROWS[SESSION] ?? [])
-    .filter((e) => !done.has(String(e.fields.state ?? '')))
-    .sort((a, z) => String(z.fields.last_seen ?? '').localeCompare(String(a.fields.last_seen ?? '')));
-};
-
-/** A spoken id as the ladder writes a run's project: `things#1`. */
-const SPOKEN = /^([a-z][a-z0-9_]*)#([1-9][0-9]*)$/;
-
-/** The title of the row a spoken id names, or `undefined` when it names none, so the id is kept as written. */
-const projectName = (value: unknown): string | undefined => {
-  const m = typeof value === 'string' ? SPOKEN.exec(value) : null;
-  if (!m) return undefined;
-  const title = REGISTERS[m[1]!]?.title;
-  const name = title ? (ROWS[m[1]!] ?? []).find((e) => e.seq === Number(m[2]))?.fields[title] : undefined;
-  return absent(name) ? undefined : String(name);
-};
-
-/** What a scope cell reads for a row that applies to every project. */
-const EVERYWHERE = 'Everywhere';
-
-const absent = (v: unknown): boolean => v === null || v === undefined || v === '' || (Array.isArray(v) && v.length === 0);
-
-/** The field that says where a register's rows apply, as `packages/kernel/src/scope.ts` finds it. */
-const scopeFieldOf = (register: string): (FieldDecl & { scope?: { same?: string }; to?: string }) | undefined =>
-  (REGISTERS[register]?.fields as (FieldDecl & { scope?: { same?: string }; retired?: boolean })[] | undefined)?.find(
-    (f) => f.scope !== undefined && !f.retired,
-  );
-
-/**
- * A project's rows, then the rows that apply everywhere, as the kernel's `inScope` decides it: where
- * the register says the nearer wins, an open project row hides a global row of the same title.
- * `own` is how many of `entries`, at the front, are the project's.
- */
-function inheritFor(register: string, all: Entry[], b: PageBlock): { entries: Entry[]; refusals: string[]; own: number } {
-  const none = (refusal: string) => ({ entries: [], refusals: [refusal], own: 0 });
-  const decl = REGISTERS[register];
-  const scope = scopeFieldOf(register);
-  if (!decl || !scope) return none(`inherit: ${register} has no field that says where its rows apply, so there is nothing to inherit`);
-  const w = compile(register, b.where, NOW);
-  if (w.bad.length) return { entries: [], refusals: explain(w), own: 0 };
-  const home = w.clauses.find((c): c is Extract<typeof c, { values: string[] }> => c.field === scope.id && c.op === 'is' && c.values.length === 1);
-  if (!home) return none(`where: a block that inherits names its project, as ${scope.id} is <project>`);
-
-  const said = home.values[0]!.trim().toLowerCase();
-  const projects = scope.to ? (ROWS[scope.to] ?? []) : [];
-  const projectTitle = scope.to ? REGISTERS[scope.to]?.title : undefined;
-  const project = projects.find((p) => String(p.seq) === said || String(p.fields[projectTitle ?? ''] ?? '').toLowerCase() === said);
-  const at = (e: Entry): boolean => {
-    const v = e.fields[scope.id];
-    return project !== undefined && (Array.isArray(v) ? v.includes(project.seq) : v === project.seq);
-  };
-
-  const title = decl.title ?? '';
-  const done = new Set<string>(decl.done ?? []);
-  const open = (e: Entry): boolean => !done.has(String(e.fields[decl.state ?? ''] ?? ''));
-  const claimed = new Set(scope.scope?.same === 'nearer' ? all.filter((e) => at(e) && open(e)).map((e) => String(e.fields[title] ?? '')) : []);
-  const rest = { ...w, clauses: w.clauses.filter((c) => c !== home) };
-
-  const order = b.order?.[0];
-  const sorted = (list: Entry[]) => (order ? sortRows(register, list, order.field, order.dir ?? 'asc') : list);
-  const own = sorted(all.filter((e) => at(e) && matches(e, rest, NOW)));
-  const global = sorted(all.filter((e) => absent(e.fields[scope.id]) && matches(e, rest, NOW) && !claimed.has(String(e.fields[title] ?? ''))));
-  return { entries: [...own, ...global], refusals: [], own: own.length };
-}
-
-/**
- * A `bar` or a `split` over a grouped figure, as the record's `metricBlock` reads it: the figure's parts.
- *
- * A PART MAY BE A MONTHLY SHARE OF A YEARLY COST, which a sum over the rows cannot be. A date cut into buckets is a
- * series and not parts of a whole, so only a figure grouped by a word is drawn this way.
- */
-function partsBlock(b: PageBlock, id: string): BlockResult {
-  if (b.kind !== 'bar' && b.kind !== 'split') return computed(b, [`source: a ${b.kind} does not read a figure yet; a bar or a split does`]);
-  const decl = METRICS[id];
-  if (!decl) return computed(b, [`source: there is no metric called ${id}`]);
-  if (typeof decl.group_by !== 'string' || decl.bucket !== undefined)
-    return computed(b, [`source: a ${b.kind} over a figure draws its parts, so ${id} groups by a word, and a date cut into buckets is a series`]);
-  const r = read(decl, NOW);
-  if (r.refusals.length) return computed(b, r.refusals);
-  const groups = (r.groups ?? []).map((g) => ({ key: g.key, value: g.value, ...(g.parts ? { parts: g.parts } : {}) }));
-  return { ...computed(b, []), parts: { metric: id, value: r.value, groups, more: r.more ?? 0, unit: r.unit ?? null }, shown: groups.length, total: groups.length };
-}
-
-/** The shell every block that is not a register's rows returns, so each says only what it adds. */
-const computed =(b: PageBlock, refusals: string[]): BlockResult => ({
-  ...b,
-  register: undefined,
-  columns: [],
-  entries: [],
-  matched: [],
-  refusals,
-  rows: [],
-  shown: 0,
-  total: 0,
-  drawn: b.drawn ?? drawnWhen(b),
-  stale_at: new Date(NOW).toISOString(),
-  metrics: undefined,
-});
-
-/**
- * A `capture` over `register:`, as the sample answers it: the list a new row goes into, and what its `where:` fills
- * that row with.
- *
- * `inheritedFrom` AND NOT A SECOND COPY OF IT. The register grid's add already decides what a line typed under a
- * filter inherits, and each of its exclusions is written out there; a page's capture is the same line under the same
- * filter, so it asks the same function. The kernel's `captureBlock` answers from its own parse of the sentence, and
- * `capture-block.test.ts` holds the two to one answer over the seed.
- *
- * THE FILTER IS STILL READ, so a `where:` naming a field the list lacks is refused on the block, as the record
- * refuses it, rather than quietly filling nothing.
- */
-function captureBlock(b: PageBlock): BlockResult {
-  const register = (b as PageBlock & { register?: unknown }).register;
-  if (typeof register !== 'string' || register === '') return computed(b, ['register: a capture names the list it adds to, as register: tasks']);
-  if (!REGISTERS[register]) return computed(b, [`register: there is no register called ${register}, so a capture has nowhere to add to`]);
-  /* AT THE SAMPLE'S CLOCK, as every other read in this file: a range of one written-out day and one relative word is put
-     in order at the clock it is given, and the wall clock refused `by between today and 2026-09-20` here on the 25th
-     while the kernel, opened at the same 3 September as these rows, filled the task (`capture-block.test.ts`). */
-  const where = compile(register, b.where, NOW);
-  const said = explain(where);
-  if (said.length) return { ...computed(b, said), register };
-  const filters: Filter[] = where.clauses.flatMap((c) => (c.op === 'is' && 'values' in c ? [{ field: c.field, op: c.op, values: c.values }] : []));
-  /* EVERY VALUE `inheritedFrom` WRITES IS A STRING, an enum's or a text's, and `Fields` is the wider type of a whole row. */
-  const fills = Object.fromEntries(Object.entries(inheritedFrom(register, filters)).map(([field, value]) => [field, String(value)]));
-  return { ...computed(b, []), register, fills };
-}
-
-/**
- * The questions still open, as a `queue` block reads them: the sample's own decide queue, which is the
- * same list `/decide` draws, in the same order.
- *
- * ONE ANSWER AND NOT A SECOND ONE. The kernel's `openBlock` is the real evaluator; this is the sample's
- * copy, and it is here for the reason every other branch in this file is: the demo has no record behind
- * it, and a page that drew nothing without one would make the kind unreviewable. The two are held
- * against each other in `engines.test.ts`.
- *
- * `slash` IS WHO OPENED THEM, because the sample's proposals are all Slash's (`PROPOSALS`), and the
- * `Question` it keeps carries no author of its own.
- */
-function openBlock(b: PageBlock): BlockResult {
-  if (b.order?.length) return computed(b, ['order: governance.open comes ranked by what each question would cost to get wrong, so it takes no order:']);
-  const limit = Math.min(20, Math.max(1, Math.floor(b.limit ?? 3)));
-  /* DEAREST FIRST, AND FROM THE SAME FUNCTION THE RECORD USES. `QUEUE` is sorted by the fixture's own
-     hand-written `rank`, which is what makes the sample read like a real morning; the band is computed
-     from the proposal's body where there is one, so the sample's order and the record's are one rule
-     and not two. A question the fixture wrote with no body behind it is a judgement, which is what
-     those questions are (`weigh.ts`). */
-  const open = QUEUE.filter((q) => q.decided === undefined);
-  const band = (q: Question): Cost => costOf(PROPOSALS[q.id]?.kind ?? 'options', PROPOSALS[q.id]?.body);
-  const queue = open
-    .slice()
-    .sort((x, y) => costRank(band(x)) - costRank(band(y)) || x.opened.localeCompare(y.opened) || x.id.localeCompare(y.id))
-    .slice(0, limit)
-    .map((q) => ({
-      id: q.id,
-      who: 'slash',
-      at: q.opened,
-      kind: PROPOSALS[q.id]?.kind ?? 'options',
-      question: q.title,
-      why: q.context ?? q.cost,
-      cost: band(q),
-      options: q.options.map((o) => ({ key: o.key, label: o.title, because: o.body, recommended: o.recommended === true })),
-    }));
-  return { ...computed(b, []), queue, shown: queue.length, total: open.length };
-}
-
-/** The kinds of actor a feed groups by, the kernel's `FEED_BY`. */
-const FEED_KINDS: readonly string[] = ['agent', 'rule', 'you'];
-
-/** The kind of actor behind a ledger event, the kernel's `byOf` over this build's spelling of actors. */
-const feedByOf = (by: string): FeedRow['by'] => (by === 'you' ? 'you' : /^rule[.:]/.test(by) || by === 'system' ? 'rule' : 'agent');
-
-/**
- * A feed over the ledger: a run of events by one actor, of one kind, on one row is one row with a
- * count, and past `first:` rows a group's remainder is one row. The kernel's `feedRows`, mirrored.
- */
-function activityBlock(b: PageBlock): BlockResult {
-  /* THE THREE THINGS A FEED'S `where:` MAY ASK, each `is` or `is not`, joined by `and`. */
-  type Asked = { actor: string; kind: string; target: string };
-  const tests: ((e: Asked) => boolean)[] = [];
-  const bad: string[] = [];
-  for (const part of (b.where ?? '').split(/\s+and\s+/i).filter((p) => p.trim())) {
-    const m = /^\s*(actor|kind|target)\s+is(\s+not)?\s+(.+?)\s*$/i.exec(part);
-    if (!m) {
-      bad.push(`where: a feed asks about actor, kind or target, and "${part.trim()}" is none of them`);
-      continue;
-    }
-    const field = m[1]!.toLowerCase() as keyof Asked;
-    const values = m[3]!.split(/\s+or\s+|,\s*/i).map((v) => v.trim());
-    if (field === 'actor' && values.some((v) => !FEED_KINDS.includes(v))) bad.push('where: an actor is agent, rule or you');
-    const negate = m[2] !== undefined;
-    tests.push((e) => values.includes(e[field]) !== negate);
-  }
-  if (bad.length) return computed(b, bad);
-
-  const kept = AUDIT.filter((e) => tests.every((t) => t({ actor: feedByOf(e.by), kind: e.kind, target: e.target ?? '' })));
-  /* AN `agents` BLOCK IS THE AGENTS' WORK, one group per agent, each keeping its own rest past `first:`. The kernel's `agentRows`, mirrored. */
-  if (b.kind === 'agents') {
-    const theirs = kept.filter((e) => feedByOf(e.by) === 'agent');
-    const named = (target: string | null): string | null => {
-      const m = target === null ? null : /^([a-z][a-z0-9_]*)#([0-9]+)$/u.exec(target);
-      const title = m ? REGISTERS[m[1]!]?.title : undefined;
-      const row = m && title ? (ROWS[m[1]!] ?? []).find((e) => e.seq === Number(m[2])) : undefined;
-      const said = row && title ? row.fields[title] : undefined;
-      return typeof said === 'string' && said !== '' ? said : target;
-    };
-    const rows: FeedRow[] = [];
-    for (const e of theirs) {
-      const last = rows.at(-1);
-      if (last && last.who === e.by && last.kind === e.kind && last.target === (e.target ?? null)) last.count += 1;
-      else rows.push({ by: 'agent', who: e.by, count: 1, kind: e.kind, target: e.target ?? null, note: e.note ?? null, at: e.at, thing: named(e.target ?? null) });
-    }
-    const feed = agentsCut(rows, b.first);
-    return { ...computed(b, []), feed, ...agentsTable(feed, NOW), total: theirs.length };
-  }
-  const bursts: FeedRow[] = [];
-  for (const e of kept) {
-    const last = bursts.at(-1);
-    if (last && last.who === e.by && last.kind === e.kind && last.target === (e.target ?? null)) last.count += 1;
-    else bursts.push({ by: feedByOf(e.by), who: e.by, count: 1, kind: e.kind, target: e.target ?? null, note: e.note ?? null, at: e.at });
-  }
-  let feed = bursts;
-  if (b.first !== undefined) {
-    const cap = Math.min(50, Math.max(1, Math.floor(b.first)));
-    const taken = new Map<string, number>();
-    const rest = new Map<string, FeedRow>();
-    feed = [];
-    for (const row of bursts) {
-      const n = taken.get(row.by) ?? 0;
-      taken.set(row.by, n + 1);
-      if (n < cap) feed.push(row);
-      else {
-        const folded = rest.get(row.by);
-        if (folded) folded.count += row.count;
-        else rest.set(row.by, { by: row.by, who: null, count: row.count, kind: null, target: null, note: null, at: row.at });
-      }
-    }
-    feed.push(...rest.values());
-  }
-  /* A DEMO READER HAS NO READ MARK, so the seen row carries no time: the renderer's "not looked yet". */
-  return {
-    ...computed(b, []),
-    feed,
-    ...(b.since === 'seen' ? { seen: null } : {}),
-    ...feedTable(feed, b.since === 'seen', null, NOW),
-    total: kept.length,
-  };
-}
-
-/** Past `first` rows, one agent's remainder as one row that keeps its name, so no count is lost. */
-export function agentsCut(rows: readonly FeedRow[], first: number | undefined): FeedRow[] {
-  if (first === undefined) return [...rows];
-  const cap = Math.min(50, Math.max(1, Math.floor(first)));
-  const kept: FeedRow[] = [];
-  const taken = new Map<string, number>();
-  const rest = new Map<string, FeedRow>();
-  for (const row of rows) {
-    const who = row.who ?? '';
-    const n = taken.get(who) ?? 0;
-    taken.set(who, n + 1);
-    if (n < cap) kept.push(row);
-    else {
-      const folded = rest.get(who);
-      if (folded) folded.count += row.count;
-      else rest.set(who, { ...row, kind: null, target: null, note: null, thing: null });
-    }
-  }
-  return [...kept, ...rest.values()];
-}
-
-/**
- * A diff over one row's text field. THIS BUILD KEEPS NO FIELD HISTORY, so a row has one version, the
- * one it holds, and the block draws that version with nothing to compare it to.
- */
-function diffBlock(b: PageBlock): BlockResult {
-  const register = b.source?.startsWith('register.') ? b.source.slice('register.'.length) : undefined;
-  if (!register || !REGISTERS[register]) return computed(b, [`source: ${b.source ?? ''} is not a register this build holds`]);
-  if (!b.row) return computed(b, ['row: a diff names the row whose history it reads, as row: skills#2']);
-  if (!b.field) return computed(b, ['field: a diff names the field it compares, as field: body']);
-  const decl = REGISTERS[register]!.fields.find((f) => f.id === b.field);
-  if (!decl) return computed(b, [`field: there is no field called ${b.field} on ${register}`]);
-  if (decl.type !== 'document' && decl.type !== 'text') return computed(b, [`field: a diff compares text, and ${b.field} is ${decl.type}`]);
-  const seq = Number(/(\d+)$/.exec(b.row)?.[1]);
-  const row = (ROWS[register] ?? []).find((e) => e.seq === seq);
-  if (!row) return computed(b, [`row: ${b.row} is not a row of ${register}`]);
-  const text = row.fields[b.field];
-  const history = typeof text === 'string' ? [{ at: row.created, by: row.by, text }] : [];
-  return {
-    ...computed(b, []),
-    history,
-    ...historyTable(history, history.length),
-  };
 }
 
 /**
@@ -1642,11 +865,11 @@ function diffBlock(b: PageBlock): BlockResult {
  * NO `limit` MEANS THE WHOLE ANSWER, which every existing caller wants and which is what a count,
  * a metric and a forecast read. Paging is something a *grid* does.
  *
- * AND THE MOCK RECOMPUTES THE FILTER PER PAGE, which the real record does not. That is worth saying
- * plainly rather than hiding: this is a fidelity exercise in the SHAPE of the answer, not in its
- * cost. Its value is that it forces the head count, `⌘a`, the sort chips and the empty states to be
- * written against a PARTIAL answer — which is what `call('list', …)` will return, and what none of
- * them assumed while this returned everything.
+ * THE RECORD'S ROWS, IN THE RECORD'S ORDER. The rows are the seeded record's, each ref drawn as the
+ * number of the row it points at; the chips are matched by the record (`applyFilters`) and a sort is
+ * the record's `order`. The paging over that answer is this file's, and it is a fidelity exercise in
+ * the SHAPE of a paged answer: it makes the head count, `⌘a`, the sort chips and the empty states be
+ * written against a PARTIAL answer, which is what the record's `list` returns.
  */
 export function list(
   register: string,
@@ -1662,9 +885,9 @@ export function list(
     cursor?: string;
   } = {},
 ) {
-  const all = ROWS[register] ?? [];
+  const all = rowsOf(register).map((row) => entryFrom(register, row));
   const filtered = applyFilters(register, all, opts.filters ?? [], opts.q, opts.join);
-  const sorted = opts.sort ? sortRows(register, filtered, opts.sort.field, opts.sort.dir) : filtered;
+  const sorted = opts.sort ? inOrder(register, filtered, opts.sort) : filtered;
   const key = questionKey(register, opts);
 
   if (opts.limit === undefined)
@@ -1696,6 +919,17 @@ export function list(
     cursor: last && from + limit < sorted.length ? `${key}:${last.seq}` : null,
     stale: false,
   };
+}
+
+/**
+ * `entries` in the order the record sorts its list by `sort`, the row's number breaking a tie. A sort the record refuses
+ * leaves them as they came, which is what the list answers when it cannot be sorted.
+ */
+function inOrder(register: string, entries: Entry[], sort: { field: string; dir: 'asc' | 'desc' }): Entry[] {
+  const said = walk({ register, order: [{ field: sort.field, dir: sort.dir }, { field: 'seq', dir: 'asc' }] });
+  if (said === null) return entries;
+  const place = new Map(said.map((row, i) => [row.seq, i]));
+  return [...entries].sort((a, z) => (place.get(a.seq) ?? said.length) - (place.get(z.seq) ?? said.length));
 }
 
 /**
@@ -1751,15 +985,6 @@ const cursorAt = (rows: readonly Entry[], key: string, cursor: string): number =
   const seq = cursor.slice(at + 1);
   return rows.findIndex((e) => String(e.seq) === seq);
 };
-
-/** Who changed a row last and when, in the sample: the newest thing said about it or done to it, or who wrote it. */
-function provenanceOf(register: string, e: Entry): { by: string; at: string } {
-  const href = `/r/${register}/${e.seq}`;
-  const target = `${register}#${e.seq}`;
-  /* THE LEDGER TOO, because an agent's edit is written there whether or not it made the news. */
-  const said = [...NEWS.filter((n) => n.href === href), ...AUDIT.filter((a) => a.target === target)].sort((a, b) => (a.at < b.at ? 1 : -1))[0];
-  return said ? { by: said.by, at: said.at } : { by: e.by, at: e.created };
-}
 
 /** The same question, asked against the record's own ledger and runs, at the record's own clock. */
 export const workingNow = (register: string, seq: number, now: number = NOW): boolean =>

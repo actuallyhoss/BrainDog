@@ -1,60 +1,19 @@
 <!--
-  `/settings` — the address a person types, which used to answer with a row-id refusal.
+  `/settings`: the index of every settings area (DSN-13).
 
-  There was no page here, so `GET /settings` fell through to the `/[id]` catch-all and rendered
-  *"Nothing answers to “settings”. An id is a list and a number, like obligations#4 — or the short
-  code a thing was given…"* The in-app rail links to `/settings/appearance` and `g ,` resolves, so
-  this only ever bit a URL that was typed, bookmarked, pasted or written by an agent — which is every
-  one of those, and every one of them is somebody who already knows what they were looking for.
+  It used to redirect to the first area, because the areas had a strip of their own and a second
+  list of them would have been a second nav. On a phone that strip was the problem: it showed the
+  first few areas and cut the rest off at its edge. So below 900px this address is now the index, a
+  page of grouped rows, and each area a page with a back link to it; from 900px up the same index
+  stands beside the open area, and this address opens the first one.
 
-  IT REDIRECTS RATHER THAN LISTING. A second index of the twelve areas would be a second nav for a
-  rail that is on the screen the moment you arrive, and `19 §3`'s objection to a second door into one
-  room applies exactly. Appearance is the first area in the rail, so the address a person types lands
-  where the link they would have clicked lands.
-
-  `replaceState`, so Back returns to wherever they came from rather than to a redirect that fires
-  again.
-
-  AND IT DREW A BLANK PAGE WITH NO TITLE while the redirect ran. The effect fires after mount, so
-  for one frame or several on a cold load this route was an empty document whose tab said nothing:
-  a person who typed the address watched a blank screen and had no way to tell it from a broken one.
-  A title and one line cost nothing and are correct even if the redirect never lands, which on a
-  slow first load is a real state and not a hypothetical.
+  THE SAME SCREEN AS `/settings/<area>`, WITH NO AREA IN THE ADDRESS. That file holds `AREAS`, the
+  registry every unit adding an area writes to, and draws the index from it; drawing it here too
+  keeps one list and one screen rather than a copy of either. It reads the area from the address,
+  finds none, and draws the index, its heading, its title and its readiness itself.
 -->
 <script lang="ts">
-  import { at } from '$lib/at.ts';
-  import { goto } from '$app/navigation';
-  import { titleOf } from '$lib/title.ts';
-  import { copy } from '$lib/copy.ts';
-  import { drew } from '../../lib/ui/screen.svelte.ts';
-
-  $effect(() => {
-    void goto(at('/settings/appearance'), { replaceState: true });
-  });
-
-  /**
-   * THIS SCREEN COMPUTES ITS CONTENT SYNCHRONOUSLY, and says so.
-   *
-   * `data-screen` on `<main id="main">` is what lets anything outside the page tell a drawn screen
-   * from a shell that has fetched nothing. Four browser gates waited on `#main` having a child,
-   * with the wait swallowed by a `catch`, which is satisfied by a page heading and means nothing
-   * the day a screen fetches. `Empty` says `empty` or `refused` for the states it draws; this is
-   * the other claim, and it is true of this screen today.
-   *
-   * IT STOPS BEING AVAILABLE WHEN IT STOPS BEING TRUE. A screen that starts fetching brackets its
-   * reads with `opened()` and `closed()`, and a call still out takes the attribute away whatever
-   * this line says.
-   */
-  $effect(() => drew('ready'));
+  import Settings from './[area]/+page.svelte';
 </script>
 
-<svelte:head><title>{titleOf(copy.settings)}</title></svelte:head>
-
-<p class="going" role="status">{copy.settingsGoing}</p>
-
-<style>
-  .going {
-    padding: var(--sp-6) var(--sp-5);
-    color: var(--dim);
-  }
-</style>
+<Settings />

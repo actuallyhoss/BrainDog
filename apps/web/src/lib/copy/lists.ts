@@ -1,0 +1,280 @@
+/**
+ * A list's words: the grid on `/r`, its search, filters, sort and selection, the capture line, a row's own page,
+ * the row form, and a saved view on `/v`.
+ *
+ * AN AREA FILE OF THE COPY AGGREGATE (ARC-8). `lib/copy.ts` spreads this object into `copy`, and every screen reads a
+ * key here as `copy.<key>`. The house voice is written once, at the top of `copy.ts`. A word a screen in another
+ * area also draws is in `shell.ts`, so that rewording it is nobody's edit to another area's screen.
+ *
+ * Plain Node loads this file through the aggregate (`passkey.mjs`), so it imports only relative `.ts` files.
+ */
+
+import { article, list } from './english.ts';
+
+export const lists = {
+  rowActions: 'What you can do here',
+  editValue: (field: string) => `Change ${field.toLowerCase()}`,
+  /* WHY THIS CELL IS NOT THE EDITOR, said when somebody asks for it rather than only drawn.
+     The pencil appears on an editable cell and on no other, which answers the question for anybody
+     looking at that cell with a pointer. `e` is a keyboard binding on a sheet that advertises it
+     for every cell, so pressing it on a money or a ref did nothing at all and said nothing: the
+     silence a bound key is never allowed to answer with (19 §4). */
+  /* SAID WITHOUT SENDING ANYBODY ANYWHERE. This was "Open the row to change it", which was true while the row page
+     edited types the grid did not. The two now ask the same `editable` (`field-draft.ts`), so a cell the grid refuses
+     is a field the row refuses too, and a sentence sending the reader there sent them to a second refusal. */
+  cellNotEdited: (field: string, why: string) => `${field} is ${why}, so neither this list nor its row can change it.`,
+  /* ONE REASON PER TYPE THE GRID REFUSES, AND ONLY THOSE. The first version gave two reasons for six types, so `e`
+     on an update's `When` answered *When is a row in another list*, which was not true of an instant: a wrong sentence
+     is worse than the silence it replaced, because silence is not a claim. The grid then learnt to edit money, ref,
+     document, instant, duration and yes or no, and their reasons stayed behind as sentences explaining a refusal that
+     no longer happens. What is left is the four `editable` answers no to, which `field-draft.test.ts` holds equal. */
+  cellWhy: {
+    quantity: 'an amount and a unit held together',
+    file: 'a file rather than something typed',
+    json: 'structured data rather than one value',
+    secret: 'held by the vault and never drawn in full',
+  } as Record<string, string | undefined>,
+  /* FOR A REFUSED TYPE `cellWhy` DOES NOT NAME. Every type `editable` refuses today is named above, so this is said
+     only if that list grows and this one does not, and it is written to be true of any value a box cannot hold. */
+  cellWhyElse: 'a kind of value no box here holds',
+  /* AND A COLUMN THAT IS NOT A FIELD AT ALL. The picker and the row's verbs are controls rather
+     than values, and `e` on one of them did nothing and said nothing: `19 §4` is that the sheet
+     documents the bindings by reading them, so a key it prints for the grid has to answer wherever
+     the caret is. It became reachable the day clicking a cell started moving the caret to it. */
+  cellNoValue: 'That column is a control rather than a value, so there is nothing in it to change.',
+  setTo: (state: string) => `Set to ${state}`,
+  markArchived: 'Archived',
+  undoRow: 'Put back',
+  /* WHAT A ROW IS CALLED WHEN IT HAS NO NAME YET. `undoRowOf` puts the row's title in the control's
+     accessible name, and a row typed into the capture line has a title only if the capture WAS the
+     title; the grid falls back to `#<seq>`, which for a pending row is the negative sentinel. */
+  thisRow: 'this row',
+  undoRowOf: (row: string) => `Put ${row} back`,
+  archiveRow: (row: string) => `Archive ${row}`,
+  moreOn: (row: string) => `More on ${row}`,
+
+  /* The capture line: one field at the top of a register, and the only decision in it is the words.
+     IT SPELT THE ARTICLE ITSELF and got it wrong on two of the nine registers the seed ships. */
+  captureIn: (one: string) => `Add ${article(one)} ${one.toLowerCase()}`,
+  captureAdd: 'Add',
+
+  /* the register grid */
+  /* A NAME FOR THE SEARCH BOX. It had only a placeholder, which is not an accessible name and
+     disappears the moment somebody types — so the field announced itself right up until it had
+     content, and then stopped. */
+  searchIn: (name: string) => `Search ${name}`,
+  newRow: 'New',
+  done: 'Done',
+  /**
+   * VERB + NOUN, never "Save" or "Submit": the button says what will exist afterwards.
+   *
+   * IT WAS STATED HERE AND KEPT BY ABOUT HALF THE FILE. Fourteen labels were a bare verb or a
+   * pronoun — `Add it`, `Back`, `Edit`, `Stop`, `Archive`, `Raise it`, `Add one`, `Done`, `Defer`,
+   * `Open`, `Peek`, `Clear`, `Show me an example`, `Show them all`. Each is unambiguous while you
+   * are looking at the thing it acts on and unreadable in a list of shortcuts, a screen reader's
+   * control list, or a sentence quoting it. A CTA that needs its surroundings to mean anything is a
+   * CTA that means nothing to somebody arriving at it from the side.
+   */
+  addRow: 'Add',
+  noneChosen: 'None',
+  yes: 'Yes',
+  secretsLiveInTheVault: 'Passwords and keys go in the Vault. A row records what one opens.',
+  /* THE SAME ANSWER `/decide` GIVES TO THE SAME QUESTION. A disabled control says why it is
+     disabled, and the register's own declaration is what says which fields cannot be left out — so
+     the sentence names them rather than saying "some fields". */
+  rowRequired: (names: string[]): string =>
+    `${list(names)} cannot be left out. Fill ${names.length === 1 ? 'it' : 'them'} in, and the button turns on.`,
+  /* AND IT POINTS RATHER THAN REPEATS. A money field already prints its own sentence under itself;
+     copying that sentence into the footer put the same words on screen twice, six inches apart —
+     which is the thing `/decide` was just fixed for. This one names the field and says where the
+     reason is. */
+  rowFieldProblem: (names: string[]): string =>
+    `${list(names)} cannot be stored as typed. The reason is under the field.`,
+  /* `noFilters` WAS HERE, READING "Nothing here can be filtered yet." IT HAD NO SURFACE AND WANTS
+     NONE. The bar is drawn at eight rows (`r/[register]/+page.svelte:2195`, `ENOUGH_TO_SIFT`), and
+     what it always carries is the search box and Display; the pills come from the declared enums a
+     reader can sift on, so a list that declares none simply has none. A line announcing that is the
+     interface explaining itself, which is the rule at the top of `copy.ts`. */
+  /**
+   * WHAT THE SEARCH BOX READS, SAID WHERE A SEARCH HAS FOUND NOTHING, because that is where somebody
+   * is when it matters. It was also said under the bar on every visit, which is a screen explaining
+   * its own interface to somebody who had not asked; an empty answer is the moment they have.
+   *
+   * The box is `34 §6`'s `matches` operator over the register's `search:` fields, which is narrower
+   * than the scan it replaced — rightly, per `fts.ts` (*"an index over everything answers every query
+   * with everything"*), and at a cost: an amount, a state word or a counterparty's name that used to
+   * find rows now finds none. Enum words are recoverable from the chips in the same bar. A REF is
+   * not: `party` and `thing` have no chip and no other text surface, so *"38 rows, none matching:
+   * halden"* over a list where nine rows are Halden's is a dead end unless the screen says where the
+   * words it does read come from.
+   */
+  searchesOnly: (fields: string[]): string => `This box reads ${list(fields)}. For anything else, use the filters above.`,
+
+  /* `displayOptions` SAT ON THIS LINE HOLDING THE WORD BELOW IT. One string, two keys, and the
+     screen reads the second: `display` is the bar's button and the title of the sheet it opens
+     (`r/[register]/+page.svelte:2329` and `:2938`). `dead-copy` excused it as a menu that names its
+     sections directly, which is true of the menu and was never what the key was waiting for. */
+  display: 'Display',
+  displayNote: 'Only affects your view of this list.',
+  columns: 'Columns',
+  always: 'always',
+  showAll: 'Show every column',
+  rowMenu: 'Actions for this row',
+  archive: 'Archive the row',
+  selected: 'selected',
+  clear: 'Clear the selection',
+  /* The picker's two labels, written out rather than built by concatenation — the screenshot
+     allow-list only keeps text a developer typed into source. */
+  /* WHAT THE LIST IS ORDERED BY. It lives beside the column list because both are answers to
+     "what am I looking at", and on a phone this sheet is the only place either can be asked. */
+  sortedBy: 'Sorted by',
+  /* A DIRECTION IN THE FIELD'S OWN WORDS. An arrow on a column header sits on the thing it orders
+     and needs no more; a chip in a sheet is read alone, and nobody calls an ascending date "lowest
+     first". Six words rather than two, because a date, a number and a name each have their own. */
+  oldestFirst: 'oldest first',
+  newestFirst: 'newest first',
+  lowestFirst: 'lowest first',
+  highestFirst: 'highest first',
+  aToZ: 'A to Z',
+  zToA: 'Z to A',
+  firstAdded: 'first added',
+  lastAdded: 'last added',
+  rowOrder: 'Back to row order',
+  /** Under a row's Details: when it was added, and by whom, in the middle of a sentence. */
+  rowAddedBy: (when: string, who: string) => `${when} by ${who}`,
+  rowByYou: 'you',
+  rowBySomeone: 'someone on this record',
+  matching: 'matching',
+  /**
+   * A SAVED VIEW'S FILTER, AS THE SENTENCE A PERSON WOULD SAY.
+   *
+   * `/v/obligations.overdue` printed `state is open or part, due before today` in the id face on a
+   * grey chip: the `where` dialect, with the field ids `state` and `due`, over a list whose own
+   * columns call them Status and Due. The dialect is what an agent reads, and it stays on the
+   * control that hands one over; this is the reading line.
+   *
+   * TWO FUNCTIONS, ONE CLAUSE AND ONE SENTENCE, because `access.test.ts` renders every function in
+   * `copy` with a handful of argument shapes and counts one that renders under none of them as a
+   * sentence nobody checked. A single function over an array of clause objects was that sentence.
+   *
+   * `filterClause` takes the field's label, not its id: the caller knows the register.
+   *
+   * `has` AND `lacks` ARE THE TWO WORDS A LIST TAKES, AND BOTH CAME OUT AS `is`. A view saved on
+   * `repos:lacks:portage` read "Repositories is portage", the opposite of the filter its rows were
+   * drawn under, and `repos:has:portage` read that same line, an equality over a test for
+   * membership. Measured against the compiler the chips actually run on, the line was worse than
+   * the wrong words: `Repositories is portage` comes back "repos is a list, which cannot be asked
+   * is", so the sentence on screen was one the record refuses by name. The four operators this
+   * function knew were the four `whereOf` knew before the same two words were added to it, which is
+   * why they were missing together and why `filter-clause.test.ts` now round-trips every clause
+   * this function prints back through `compile`.
+   *
+   * ONE VALUE FOR THOSE TWO, and that is the grammar's rule rather than a narrowing chosen here.
+   * The operator looks for a single element inside a list, so `whereOf` sends `values[0]` and
+   * `where.ts` types the clause `values: [string]`. Joining the rest on ` or ` would print a
+   * sentence that compiles clean and looks for an element literally called `urgent or soon`.
+   */
+  filterClause: (label: string, values: readonly string[], op = 'in'): string =>
+    op === 'before' || op === 'after'
+      ? `${label} ${op} ${values.join(' or ')}`
+      : op === 'has' || op === 'lacks'
+        ? `${label} ${op} ${values[0] ?? ''}`
+        : `${label} is ${op === 'not-in' ? 'not ' : ''}${values.join(' or ')}`,
+  /* Every clause after the first starts lower-case when it starts with an ordinary word, so "Due"
+     joins the sentence and "VAT number" keeps its capitals. */
+  filterReads: (clauses: readonly string[]): string => {
+    const said = clauses.map((c, i) => (i > 0 && /^[A-Z][a-z]/.test(c) ? c.charAt(0).toLowerCase() + c.slice(1) : c));
+    return said.length < 2 ? (said[0] ?? '') : `${said.slice(0, -1).join(', ')}, and ${said.at(-1) ?? ''}`;
+  },
+  backToView: 'Back to the saved view',
+  rowsWord: (n: number) => (n === 1 ? 'row' : 'rows'),
+  select: 'Select',
+  deselect: 'Deselect',
+  /* THE VERBS A SELECTION IS FOR. A selection with nothing to do with it is a mode you can enter
+     and not leave usefully, which is what this one was: implemented, drawn, and consumed by
+     nothing. Verb + Noun, like every other action here. */
+  copyIds: 'Copy numbers',
+  /* THE REGISTER'S OWN WORD FOR ITS OWN COLUMN. `things` labels its state field **Status**, so a
+     hardcoded "Set state" put one field's three names on one screen — `lane` in the schema, Status
+     in the header, state on the verb, two of them visible at once. The menu's VALUES already come
+     from the declaration, which is why they were right; only the verb was typed. It is wrong the
+     first time anybody labels theirs, which is exactly what a pack author does. */
+  setState: (field: string) => `Set ${field.toLowerCase()}`,
+  archiveSelected: 'Archive them',
+  saveAsView: 'Save as a view',
+  editRow: 'Edit',
+  showExample: 'Show an example row',
+  /* `Preview` AND IT WAS `Peek`. It is printed as a keyboard hint on every list, `p peek`, which is
+     a word the product invented for a thing every other product calls a preview. */
+  peek: 'Preview the row',
+  openRow: 'Open the row',
+  copyId: 'Copy number',
+  copyLink: 'Copy link',
+  includesExample: 'includes 1 example',
+  /* `example`, THE BARE LOWER-CASE WORD, IS THE RECORD'S AND NOT THIS FILE'S. It is the tag a seeded
+     row carries in its `tags` field, declared once in `record/tags.ts` as `EXAMPLE`, and it reaches
+     a reader from the record rather than from here: `shownTags` keeps it on a plain example row and
+     the row page draws the list through `listLine` (`r/[register]/[seq]/+page.svelte:225`). The one
+     sentence this file types near it is `markExample` below, and that is a narrower thing than the
+     excuse claimed: it is the receipt chip on the single row the empty state's offer writes
+     (`r/[register]/+page.svelte:1116` into `addLanded` at `:930`), and `receipts` is emptied
+     whenever the question changes (`:270`), so no seeded example row has ever worn it. Held here as
+     well, the bare word was a second name for a value the record defines, which is how the chip and
+     the data drift apart. `dead-copy` excused it as the chip that mark would render. */
+  stale: 'Stale',
+  /* A ROW IS NAMED BY ITS NUMBER, and "no obligation CALLED #9999" is not English. `19 §642`: a row
+     "has a number you can say" — so the sentence says it the way somebody would. */
+  noSuchNumber: (one: string, seq: number | string) => `There is no ${one} numbered ${seq}`,
+  /* Row writes (lane A) */
+  writeConflict: (row: string) => `${row} was changed somewhere else first. It now shows the latest version, so check it and try again.`,
+  writeMarkSaved: 'Saved',
+  writeBulk: (landed: number, total: number, state: string) =>
+    landed === total ? `${total} ${total === 1 ? 'row' : 'rows'} set to ${state}.` : `${landed} of ${total} rows set to ${state}.`,
+  noteLabel: 'Add a note',
+  notePlaceholder: 'Write a note…',
+  noteAdd: 'Add note',
+  writeArchivedSome: (landed: number, total: number) => `${landed} of ${total} rows archived.`,
+  writeMarkRestored: 'Restored',
+  viewEmpty: 'No rows match this view yet.',
+  viewTitle: (list: string, reads: string) => `${list}: ${reads}`,
+  viewSaved: (title: string) => `Saved ${title}. It is under Views.`,
+  viewNeedsFilter: 'Filter or search the list first. What is on screen is what a view saves.',
+  /* An example row that is a real row: it is named as one, so nobody has to wonder which of these they typed. */
+  exampleTitle: (one: string) => `Example ${one}`,
+  exampleAdded: (one: string) => `Added an example ${one}. Put it back if you do not want it.`,
+  markExample: 'Example',
+  /* Lane I */
+  /**
+   * EDITING A ROW WHERE IT IS READ, which is the half this screen did not have.
+   *
+   * The page could show every field and change none of them: the one control in the header opened a
+   * toast saying the row "would open for editing". A detail screen that cannot edit is a report, and
+   * the product's own answer to "change any of it" was on the list behind it, a screen away from the
+   * row a person is looking at.
+   *
+   * ONE FIELD AT A TIME, so what is saved is what was changed: a form over eight fields sends eight
+   * values and a `version`, and the seven nobody touched are seven chances to overwrite somebody
+   * else's write with what was on screen when the page was opened.
+   */
+  /* `editValue` IS ALREADY HERE, as "Change <field>", and it says what this control does. A second
+     spelling of one sentence is the drift a copy file exists to prevent. */
+  editSave: 'Save',
+  /* A SAVE THAT CHANGES NOTHING IS NOT A WRITE. Sending it would put a line in the row's history
+     saying a field went from a value to the same value, which is a fact about a press, not the row. */
+  editNoChange: 'Nothing was changed.',
+  /* What a field the row does not carry yet says, where a value would be. It is a fact about the
+     row — the register declares the field and this row has not answered it — and not an absence. */
+  editNotSet: 'Not set',
+  /* Archive and put back, on the row itself, in the words the list already uses for the same verb. */
+  rowArchive: 'Archive',
+  rowRestore: 'Put back',
+  rowRestored: (what: string) => `${what} is back.`,
+  /* The row is archived: said on the row, because every list leaves it out and nothing else here would. */
+  rowArchivedNote: 'This row is archived. It is left out of every list until it is put back.',
+  /* What points at this row, when the record refuses that read alone: the sections are absent and the
+     reason is said once, rather than the page looking like nothing points here. */
+  linksRefused: 'What points at this row could not be read',
+  /* WHICH FIELD POINTS HERE, and only where two of one list's fields do: a milestone's page headed its choices
+     "Choices milestone 1", which is the field's id read as part of the heading. */
+  linkedThrough: (field: string) => `through ${field.toLowerCase()}`,
+} as const;

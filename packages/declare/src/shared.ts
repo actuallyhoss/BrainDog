@@ -12,7 +12,8 @@
  * context-free check, so a block kind this build does not draw is refused before a plan is shown.
  *
  * Refusals are registered codes: `PACK_OVER_CAP` for the size, `PACK_MALFORMED` for a file that is not one,
- * `SECRET_IN_PACK` for a credential, `KIND_UNKNOWN` for a kind nothing draws.
+ * `SECRET_IN_PACK` for a credential, `KIND_UNKNOWN` for a kind nothing draws, `VALUE_MALFORMED` for a `changes` that is
+ * not a short line of text.
  */
 
 import type { Result } from '@braindog/ports';
@@ -37,7 +38,26 @@ export type Shared = {
   /** The document to plan and install for that pack, with the voice and labels as its settings. */
   doc: Record<string, unknown> | null;
   bytes: number;
+  /** What this version changed, in its author's words (the file's `changes`), when it says. A catalogue lists it as the version's `notes`. */
+  changes?: string;
 };
+
+/** The most characters a file's `changes` may hold: a few sentences a person reads beside the version, never a changelog. */
+export const CHANGES_MOST = 500;
+
+/**
+ * A file's `changes`, checked: absent, or a line of text of at most `CHANGES_MOST` characters. The same check holds for a
+ * use case here and for an add-on in `publishTo`, so both say their notes the same way.
+ *
+ * CHARACTERS AND NOT BYTES, counted as code points, because the limit is what a person reads, and a sentence in Arabic
+ * or with a pound sign is no longer to them than the same sentence in plain letters.
+ */
+export function readChanges(value: unknown): Result<string | null> {
+  if (value === undefined || value === null) return ok(null);
+  if (typeof value !== 'string' || value.trim() === '' || [...value].length > CHANGES_MOST)
+    return no('VALUE_MALFORMED', `changes says what this version changed, in a line of text of at most ${CHANGES_MOST} characters.`, { at: 'changes' });
+  return ok(value.trim());
+}
 
 const isMap = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 
@@ -86,10 +106,18 @@ export async function readShared(input: unknown, source: PackSource = { kind: 'p
       at: shaped,
     });
 
-  const u = normaliseUseCase(doc);
+  /* `changes` IS THE CATALOGUE'S KEY, NOT THE USE CASE'S. It says what one version changed, so it is read here, at the
+     door every shared file walks through, and taken off before the use case's own shape is checked: the use case keeps
+     its closed list of keys, and a file that says its changes installs exactly as one that does not. */
+  const { changes: said, ...rest } = doc;
+  const changes = readChanges(said);
+  if (!changes.ok) return changes as Result<Shared>;
+  const noted = changes.value === null ? {} : { changes: changes.value };
+
+  const u = normaliseUseCase(rest);
   if (!u.ok) return u as Result<Shared>;
   const carried = useCasePack(u.value);
-  if (carried === null) return ok({ usecase: u.value, pack: null, doc: null, bytes });
+  if (carried === null) return ok({ usecase: u.value, pack: null, doc: null, bytes, ...noted });
   const pack = await normalise(carried, source);
   if (!pack.ok) return pack as Result<Shared>;
   for (const decl of pack.value.declarations) {
@@ -105,7 +133,7 @@ export async function readShared(input: unknown, source: PackSource = { kind: 'p
     if (fault?.code === 'KIND_UNKNOWN')
       return { ok: false, refusal: { ...fault, fix: kindUnknownSentence(fault.fix), at: `${decl.id}${fault.at ? `.${fault.at}` : ''}` } };
   }
-  return ok({ usecase: u.value, pack: pack.value, doc: carried, bytes });
+  return ok({ usecase: u.value, pack: pack.value, doc: carried, bytes, ...noted });
 }
 
 /**

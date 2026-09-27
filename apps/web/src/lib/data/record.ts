@@ -15,7 +15,7 @@ import { createClient, type Boot } from '@braindog/client';
 
 import { PAGE, sortRows } from '../record/api.ts';
 import { readBoot, type Booted } from '../record/boot-live.ts';
-import { declOf, entryOf, learn, namesOf, orderOf, refMapOf, targetsOf, treeOf, type Names, type RecordRow, type RefMap } from '../record/remote.ts';
+import { declOf, entryOf, learn, namesOf, orderOf, refMapOf, targetsOf, whereFor, type Names, type RecordRow, type RefMap } from '../record/remote.ts';
 import type { Entry, Filter, RegisterDecl } from '../record/schema.ts';
 import { closed, opened } from '../ui/screen.svelte.ts';
 import { labels, relabel } from '../voice.ts';
@@ -33,7 +33,7 @@ export type Said<T> = { ok: true; value: T } | { ok: false; refusal: Refusal };
  * What the list is asked: the chips, the box and the order, exactly as the address carries them.
  *
  * `join` IS THE ADDRESS WORD `join=any` (`joinOf` in `api.ts`): the chips joined by "or" rather than
- * "and". Absent is "and", which is every address written before the word existed. `treeOf` reads it
+ * "and". Absent is "and", which is every address written before the word existed. `whereFor` reads it
  * into the `where` the record is asked, so one link opens one set of rows for whoever opens it.
  */
 export type Ask = {
@@ -81,6 +81,18 @@ export async function read(work: () => Promise<boolean>): Promise<void> {
     closed(ok, at);
   }
 }
+
+/**
+ * A `where` as the list route carries it: a tree as itself, and a sentence as the JSON text of the sentence.
+ *
+ * THE ROUTE DECODES `where` AS JSON (`takes` in `packages/host/src/index.ts`), because a tree has to survive a query
+ * string, and the client writes a string into the address as the characters it holds. So `state is open`, sent bare,
+ * would reach the route as text that does not parse and be refused `VALUE_MALFORMED` before the record saw a sentence
+ * it reads. Handed to the client as an object whose JSON is the string, the sentence goes out as `"state is open"` in
+ * an address and as a string in a body, and the route decodes the one string the record's `list` takes
+ * (`Predicate | string`).
+ */
+const carried = (where: string | Record<string, unknown>): unknown => (typeof where === 'string' ? { toJSON: () => where } : where);
 
 /** The client's three-armed `Result`, as the two arms a read can have. */
 function said<T>(r: { ok: true; value: T } | { ok: false; refusal: Refusal } | { ok: false; conflict: unknown }): Said<T> {
@@ -151,13 +163,14 @@ function remote(client: ReturnType<typeof createClient>, booted: Boot): Source {
   async function ask(register: string, a: Ask, cursor: string | null, limit: number): Promise<Said<Answer>> {
     const refs = await refsFor(register);
     if (!refs.ok) return refs;
-    const where = treeOf(register, a.filters, a.q, refs.value, a.join);
+    /* THE CHIPS AS THEIR SENTENCE, which the record parses, or the tree when the box holds words (`whereFor`). */
+    const where = whereFor(register, a.filters, a.q, refs.value, a.join);
     const order = orderOf(a.sort);
     const out = said(
       await client.list({
         register,
         limit,
-        ...(where === undefined ? {} : { where }),
+        ...(where === undefined ? {} : { where: carried(where) }),
         ...(cursor === null ? {} : { cursor }),
         ...(order === undefined ? {} : { order }),
       }),

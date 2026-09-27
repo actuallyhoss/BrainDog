@@ -215,7 +215,7 @@ test('THE ASK ANSWERS ROWS OUT OF THE RECORD, over a real socket, through the en
   assert.equal(built, 1, 'the engine was built a second time');
 
   /* AND SLASH'S OWN METER SAW BOTH, in its own database and not the record's (`46 §4.1`). */
-  const metered = it.own.all<{ kind: string; status: string }>('SELECT kind, status FROM call ORDER BY rowid');
+  const metered = it.own.all<{ kind: string; status: string }>('SELECT kind, status FROM slash_call ORDER BY rowid');
   assert.deepEqual(
     metered.map((r) => `${r.kind}:${r.status}`),
     ['read:ok', 'read:ok'],
@@ -343,7 +343,7 @@ test('A CALLER WHO HOLDS NOTHING ON THE RECORD IS REFUSED BEFORE A TOKEN IS SPEN
   assert.equal(net.sent.length, 0, 'a caller who holds nothing on the record spent a model call');
 
   /* AND SLASH'S METER IS EMPTY, so nothing was charged to the record either (`46 §4.1`). */
-  assert.deepEqual(it.own.all<{ kind: string }>('SELECT kind FROM call ORDER BY rowid'), []);
+  assert.deepEqual(it.own.all<{ kind: string }>('SELECT kind FROM slash_call ORDER BY rowid'), []);
 
   /* THE OWNER ON THE SAME RECORD STILL READS IT, so the refusal above is the level and not the door. */
   const asOwner = await listen(t, engine, it.api, owner);

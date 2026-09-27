@@ -1,1753 +1,305 @@
 <!--
-  A declared page's body: the blocks, arranging them, the source view, the slice line under a cut
-  block, a forecast's scenario and the row verbs. Moved out of `/p/[slug]` whole, with nothing about
-  what it draws changed, because every later page that is a declaration (Work, Decide, Home, Inbox,
-  History, the thread template) is this component under a different reader, and each of those steps
-  was going to serialise on one 1,300 line route file (`loop/research-modules-next.md`, Brief 5).
+  A declared page, drawn: the one reader every declared page goes through, wherever it is drawn.
 
-  THE ROUTE STILL READS AND THIS DRAWS. `/p/[slug]` owns the address, the record read and its
-  `opened()` and `closed()` bracket, and hands this the answer as `got`, `null` while the read is out.
-  `reread` is the route's too, because only the route knows whether the reader is still on the page
-  the answer is for, and a write that lands here asks it for the page again without blanking it.
+  ONE READER, THREE MODES (contracts §8.2, `loop/finish/pages.md` C8). `page` is `/p/<slug>`: the head, the source,
+  Edit layout, the writes and the keys. `home` is Home's body: no head, no source and no Edit layout, and the writes stay
+  on. `preview` is a page not yet installed, drawn as it would be: inert, with no writes, no arranging and no source,
+  and with `was` it is drawn beside the page as it is now, one at a time on a phone. Home and Decide each drew a
+  declared page a second and a third way, as a flat stack of blocks with no layout; they draw it through this now.
 
-  A declared page: many bound queries, arranged. A page is a ROW, not a file, which is what makes
-  "the Money page" something a freelancer never sees and a studio does (06).
+  THIS FILE IS THE FRAME. It was 1,752 lines holding six jobs, and every page unit after it needed the one file, so it
+  is split one job to a file: `PageBody.svelte` lays the blocks out, `BlockSlot.svelte` draws one, `Arrange.svelte` is
+  Edit layout, `page-writes.ts` is every write a page makes, `SourceView.svelte` is how the page is built, and the host's
+  panels are `panels/`. What stays here is what a page is before any of those: waiting, refused, missing, its head, and
+  which of them to draw.
 
-  One request per page load, never one per block. The record object IS the query engine and storage
-  is in-process, so N block queries cost N in-thread SQLite calls and ZERO network hops. Fanning out
-  per block would be N round trips (22 §5).
-
-  Per-block error boundaries: six queries, six independent failures, and one broken query never
-  blanks a page. A block-level failure announces with `role="status"`, not `role="alert"`: ten
-  simultaneous assertive announcements is a denial of service on a screen-reader user (19 §6).
+  THE CALLER READS AND THIS DRAWS. `/p/[slug]` owns the address, the record read and its `opened()` and `closed()`
+  bracket, and hands this the answer as `got`, `null` while the read is out. `reread` is the caller's too, because only
+  the caller knows whether the reader is still on the page the answer is for, and a write that lands here asks it for
+  the page again without blanking it.
 -->
 <script lang="ts">
-  /* `at` IS THE BLOCK INDEX IN THIS FILE'S EACH BLOCKS, so the address helper goes by another name here. */
+  /* `at` IS THE BLOCK INDEX WHERE THE PAGE BODY LAYS BLOCKS OUT, so the address helper goes by another name here too. */
   import { apiBase, at as inApp } from '../at.ts';
   import { titleOf } from '$lib/title.ts';
-  import { KINDS, isKind, type Row, type RowRef } from 'braindog-render';
-  import { Block, Degraded, Markdown, Table } from 'braindog-render/svelte';
   import '$lib/blocks-charts.css';
-  import { tick, untrack } from 'svelte';
+  /* EVERY REGISTERED KIND'S STYLESHEET, with the screen that draws its blocks (`kinds/styles.ts`). */
+  import './kinds/styles.ts';
+  import { untrack } from 'svelte';
   import { goto } from '$app/navigation';
-  import { page as route } from '$app/state';
   import { copy } from '$lib/copy.ts';
-  import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
-  import { homeCurrency, hueOf, iconFor, type BlockResult } from '$lib/record/api.ts';
-  import { REGISTERS } from '$lib/record/held.ts';
-  import { symbolText } from '$lib/record/money.ts';
-  import { draw, saidPlainly, walkTables } from '$lib/record/blocks.ts';
-  import { joinsWithOr, registerHref } from '$lib/record/where.ts';
+  import { covered, typing } from '$lib/a11y/keys.svelte.ts';
+  import { hueOf, iconFor } from '$lib/record/api.ts';
+  import { Arrangement } from '$lib/record/arrange.svelte.ts';
+  import type { LiveBlock, Opened } from '$lib/record/page-live.ts';
   import type { PageBlock } from '$lib/record/schema.ts';
-  import { dogName, dogText, saveDog, type DogPage } from '$lib/dog/source.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
   import Icon from '$lib/ui/Icon.svelte';
-  import BlockBar from '$lib/ui/BlockBar.svelte';
-  import AddBlock from '$lib/ui/AddBlock.svelte';
-  import Actions from '../../routes/p/[slug]/Actions.svelte';
-  import Reporting from '../../routes/p/[slug]/Reporting.svelte';
-  import { words as actionWords } from '$lib/record/actions.ts';
-  import { Arrangement } from '$lib/record/arrange.svelte.ts';
-  import { COLUMNS, dropInto, nearestInArea, setAreaAt, spanOf as declaredSpan, type Slot } from '$lib/record/arrange.ts';
-  import { areaOf, boxesOf, layoutOf, mainSpan, splitAreas, sticks, type Run } from './layout.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { resolverOf, type LiveBlock, type LivePageDecl, type Opened } from '$lib/record/page-live.ts';
-  import type { Declared, Kept } from '$lib/record/page-write.ts';
-  import type { InputsWriter } from '$lib/record/inputs-write.ts';
-  import type { Drop } from '$lib/record/roadmap-write.ts';
-  import ActionRows from '../../routes/p/[slug]/ActionRows.svelte';
+  import Arrange, { added } from './Arrange.svelte';
+  import PageBody from './PageBody.svelte';
+  import SourceView from './SourceView.svelte';
+  import { heldNone, pageWrites, type Held } from './page-writes.ts';
+  import { words } from './words.ts';
 
   let {
     slug,
-    showSource,
     got,
-    reread,
+    mode = 'page',
+    showSource = false,
+    reread = async () => {},
+    was = null,
   }: {
     /** The page's address, which arranging writes against and a missing page names. */
     slug: string;
-    /** Whether the declaration is drawn in place of the blocks (`?src=1`). */
-    showSource: boolean;
     /** The record's answer, a page it lacks or its refusal; `null` until it answers. */
     got: Opened | null;
-    /** Reads the page again after a write, without blanking it. The route's, because the route knows the address. */
-    reread: () => Promise<void>;
+    /** Where the page is drawn: its own address, Home's body, or a preview of a page not yet installed. */
+    mode?: 'page' | 'home' | 'preview';
+    /** Whether the declaration is drawn in place of the blocks (`?src=1`). Only a `page` has a source. */
+    showSource?: boolean;
+    /** Reads the page again after a write, without blanking it. The caller's, because the caller knows the address. */
+    reread?: () => Promise<void>;
+    /** A preview's page as it is now, drawn beside the page as the change would make it. */
+    was?: LiveBlock[] | null;
   } = $props();
 
+  /* A PAGE IS THE RECORD'S BLOCKS AND NOTHING ELSE; a record that does not answer is its refusal, drawn below. */
   const live = $derived(got?.from === 'live' ? got : null);
 
-  type Writes = typeof import('$lib/record/page-write.ts');
-  type Change = (m: Writes, ref: RowRef, decl: Declared | null) => Record<string, unknown> | null;
-  /* A WAY BACK MAY LOAD WHAT IT NEEDS when it is pressed, as a tick's does, so nothing is fetched for an undo never used. */
-  type Back = (m: Writes, ref: RowRef, decl: Declared | null) => Record<string, unknown> | null | Promise<Record<string, unknown> | null>;
+  /* ── the writes ────────────────────────────────────────────────────────────
+     ONE OBJECT FOR THE WHOLE PAGE, handed to every block, and none at all on a preview, which is what makes a preview
+     inert: a block handed no write draws no control. What the writes hold between gestures is kept here, in a rune, so a
+     held row redraws where it was. */
+  let held = $state.raw<Held>(heldNone());
+  const writes = pageWrites({
+    slug: () => slug,
+    now: () => live?.now ?? null,
+    blocks: () => all,
+    base: () => apiBase(),
+    reread: () => reread(),
+    go: (to) => void goto(inApp(to)),
+    toasts,
+    state: { get: () => held, set: (next) => (held = next) },
+  });
 
-  /**
-   * The write module once a gesture has loaded it. The rows are drawn through its `keepInPlace`, and a hold exists only
-   * after a gesture, so a page nobody has touched never pulls it in.
-   */
-  let writes = $state.raw<Writes | null>(null);
-
-  /**
-   * THE ROWS SOMEBODY HAS JUST TICKED OR MOVED, per block, and the block as it was drawn when they did.
-   *
-   * A HOLD IS ABOUT ONE PAGE, so it carries the slug it was taken on and a page opened after it reads none of it. That
-   * is the register screen dropping its holds when the question changes, one layer up: a row pinned to an index on
-   * Work would otherwise be spliced into the block at the same index on Money.
-   */
-  let kept = $state.raw<{ slug: string; blocks: Map<number, { before: Row[]; held: Map<string, Kept> }> }>({ slug: '', blocks: new Map() });
-
-  /* AND THEY GO WHEN THE PAGE DOES. `/p/[slug]` keeps this component across slugs, so without this a reader who left
-     Work for Money and came back found Work's holds still standing, over rows the record has since moved on from. */
+  /* THE HOLDS GO WHEN THE PAGE DOES: `/p/[slug]` keeps this component across slugs (`page-writes.ts` `forPage`). */
   $effect.pre(() => {
     const on = slug;
-    untrack(() => {
-      if (kept.slug !== on) kept = { slug: on, blocks: new Map() };
-    });
+    untrack(() => writes.forPage(on));
   });
-
-  /** A block's segment with its held rows where they were. Untouched until something on this page is held. */
-  function keptSegment<S extends { rows: Row[] }>(at: number, segment: S): S {
-    const hold = kept.slug === slug ? kept.blocks.get(at) : undefined;
-    return writes && hold ? { ...segment, rows: writes.keepInPlace(hold.before, segment.rows, hold.held) } : segment;
-  }
-
-  /** Holds `ref` in block `at`, wearing `what`. `before` is the block as drawn now, which is the frame every place is read off. */
-  function holdRow(m: Writes, at: number, before: readonly Row[], ref: RowRef, what: Kept) {
-    const blocks = new Map(kept.slug === slug ? kept.blocks : []);
-    const prior = blocks.get(at);
-    blocks.set(at, { before: [...before], held: new Map(prior?.held).set(m.rowKey(ref), what) });
-    kept = { slug, blocks };
-  }
-
-  /**
-   * ON A LIVE PAGE A MOVED CARD AND A TICKED TASK ARE WRITES to the row each came from, named by the `ref` the page
-   * answer carried. A refusal is the record's own sentence. A write that landed, or one that met a row changed first,
-   * reads the page again without blanking it, so the card's mark goes once the row agrees with it.
-   *
-   * A WRITE THAT LANDS HOLDS ITS ROW AND SAYS SO WITH A WAY BACK. The re-read can leave the row out: a `todo` whose
-   * `where:` leaves out done rows answers without the row it just ticked (`loop/research-m4-app.md`, brief 3), and a
-   * tick with no row and no receipt is a tick somebody reverses to check. The row stays where it was, wearing `what`; the receipt's undo sends `back` at the version the write made,
-   * and the row stays put through that too, wearing `undone`.
-   */
-  async function writeRow(
-    ref: RowRef | undefined,
-    change: Change,
-    title: string,
-    hold: { at: number; before: readonly Row[]; what: Kept; back: Back; undone: Kept; said: (w: Writes['words']) => string },
-  ) {
-    if (!ref) return void toasts.push(copy.pageRowUnknown, { intent: 'warn' });
-    /* THE PAGE THE GESTURE WAS MADE ON. A write that lands after the reader has opened another page holds nothing,
-       because its place was read off a block that page does not have. */
-    const on = slug;
-    const m = await import('$lib/record/page-write.ts');
-    writes = m;
-    /* THE REGISTER AS THE RECORD DECLARES IT, so a list a pack brought is ticked and moved by its own states. */
-    const decl = await m.schemaOf(apiBase(), ref.register);
-    const patch = change(m, ref, decl);
-    if (!patch) return void toasts.push(copy.pageRowNoState, { intent: 'warn' });
-    const out = await m.updateRow(apiBase(), ref, patch, title);
-    if (out.from !== 'written') toasts.push(out.fix, { intent: 'warn' });
-    if (out.from === 'written') {
-      if (on === slug) holdRow(m, hold.at, hold.before, ref, { ...hold.what, version: out.version });
-      const made: RowRef = { ...ref, version: out.version ?? ref.version };
-      toasts.push(hold.said(m.words), { intent: 'good', undo: () => void putBack(m, made, decl, title, hold) });
-    }
-    if (out.from === 'written' || out.from === 'conflict') await reread();
-  }
-
-  /** The receipt's undo: the opposite write at the version the first one made, with the row held where it still is. */
-  async function putBack(m: Writes, ref: RowRef, decl: Declared | null, title: string, hold: { at: number; back: Back; undone: Kept }) {
-    const patch = await hold.back(m, ref, decl);
-    if (!patch) return;
-    const out = await m.updateRow(apiBase(), ref, patch, title);
-    if (out.from !== 'written') toasts.push(out.fix, { intent: 'warn' });
-    else {
-      const prior = kept.slug === slug ? kept.blocks.get(hold.at) : undefined;
-      if (prior) holdRow(m, hold.at, prior.before, ref, { ...hold.undone, version: out.version });
-    }
-    if (out.from === 'written' || out.from === 'conflict') await reread();
-  }
-
-  function moveCard(block: LiveBlock, row: Row, to: string, at: number, before: readonly Row[]) {
-    const title = row.cells[1] ?? copy.cardFallback;
-    /* A PAGE IS DRAWN ONLY OVER A LIVE ANSWER, so there is no card to move without one. This toasted "would move, and
-       nothing was saved" over the sample until DIRECTION 26; the guard now only narrows `live`, here and in the tick and
-       the capture below. */
-    if (!live) return;
-    const field = block.columns[0]?.field;
-    /* WHERE IT CAME FROM, in the screen's spelling, which is what `movePatch` takes and what the held card wears. */
-    const from = row.cells[0] ?? '';
-    /* AND THE ROW IT WAS, because the column alone put a done card back dated today: the record re-dates a move into
-       `done` that names no day, so a task finished on 1 September came back finished on the day of the undo (audit
-       sixty-five, section 2). `moveBackOf` names the day the row held, as a tick's undo does. */
-    const held = block.entries.find((e) => e.seq === row.ref?.seq && e.version === row.ref.version);
-    void writeRow(row.ref, (m, ref, decl) => (field ? m.movePatch(ref, field, to, decl) : null), title, {
-      at,
-      before,
-      what: { to },
-      back: async (_m, ref, decl) => (field ? (await import('./move-undo.ts')).moveBackOf(ref, field, to, from, decl, held) : null),
-      undone: { to: from },
-      said: (w) => w.moved(title, to),
-    });
-  }
-
-  /**
-   * An option pressed in a `queue` block takes you to the gate with that option highlighted.
-   *
-   * THE PRESS IS NOT THE ANSWER. A decision carries a reason and the reason is written on the gate,
-   * so what the press buys is the two steps of getting there: the question opened, and the option
-   * the reader already leaned to marked as leaned to rather than typed again.
-   */
-  function askGate(row: Row, option: string) {
-    const id = row.cells[1] ?? '';
-    if (id === '') return;
-    void goto(inApp(`/decide/${encodeURIComponent(id)}?option=${encodeURIComponent(option)}`));
-  }
-
-  /**
-   * Whether a capture's list can take a line from this page: the list is one this build has a declaration for.
-   *
-   * THE DECLARATION NAMES THE TITLE FIELD, and the line goes nowhere else. `captureRow` answers null on the same
-   * condition; it is asked here without importing it, because the write is loaded only when somebody presses Add,
-   * as `page-write.ts` is for the other verbs. Where this is false the capture is handed no `oncapture` and draws
-   * its one line naming the list, which is the renderer's rule: a field that cannot write is absent, not greyed.
-   */
-  const capturable = (block: LiveBlock): boolean => block.kind === 'capture' && Boolean(block.register && REGISTERS[block.register]?.title);
-
-  /**
-   * A line typed into a `capture`: one row in its list, titled with the line and filled with what the block pins.
-   *
-   * THE GRID'S OWN WRITE. `captureRow` is `capturedFields` over the block's fills, so the row is the one `/r/tasks`
-   * writes for the same line under the same filter, required fields and all, and `rowWriter` is the client that
-   * list writes through. What was filled on the reader's behalf is said once, as the grid says it. A refusal is the
-   * record's sentence; a landed row reads the page again, so a list of tasks below the field draws it.
-   */
-  async function captureLine(register: string, text: string, inherited: Record<string, string>) {
-    if (!live) return;
-    const now = live.now;
-    const [{ captureRow }, { rowWriter }] = await Promise.all([import('./capture.ts'), import('$lib/record/rows-write.ts')]);
-    const row = captureRow(register, text, inherited, now);
-    /* NO ROW IS A LIST WHOSE TITLE LEFT BETWEEN THE READ AND THE PRESS, because the page hands a capture a write only when
-       the list declares one. It toasted the sample's "but nothing was saved yet"; it is the race it is now, read again. */
-    if (!row) {
-      toasts.push(copy.writeRaced, { intent: 'warn' });
-      return void (await reread());
-    }
-    const out = await rowWriter(apiBase()).create(register, row.fields);
-    if (!out.ok) return void toasts.push(out.fix, { intent: 'warn' });
-    toasts.push(row.filled.length > 0 ? copy.markAddedFilled(row.filled) : copy.writeMarkAdded, { intent: 'good' });
-    await reread();
-  }
-
-  /**
-   * A field typed into on an `inputs` block, written to its row after a pause and the page read again (`inputs-write.ts`).
-   *
-   * THE WRITER IS LOADED ON THE FIRST KEYSTROKE, as `page-write.ts` is on the first tick, so a page nobody types into
-   * never pulls it in; keystrokes made while it loads wait on the same promise, in the order they were typed. What the
-   * record refused is kept by field and said under the block (`inputSaid`).
-   */
-  let inputsWriter: Promise<InputsWriter> | null = null;
-  let inputsKey = $state.raw<((ref: RowRef, field: string) => string) | null>(null);
-  let inputSaid = $state.raw<ReadonlyMap<string, string>>(new Map());
-  function typeInto(row: Row, value: string) {
-    if (!live) return;
-    inputsWriter ??= Promise.all([import('$lib/record/inputs-write.ts'), import('$lib/record/rows-write.ts')]).then(([m, { rowWriter }]) => {
-      inputsKey = m.keyOf;
-      const writer = rowWriter(apiBase());
-      return m.inputsWriter({
-        write: (register, seq, patch, version) => writer.update(register, seq, patch, version),
-        /* WHAT THE ROW HOLDS NOW, from the answer the page is drawing, so a money keeps its currency and a box left as it
-           opened sends nothing. SEARCHED OVER EVERY `inputs` BLOCK ON THE LIST: two blocks over one list, each with its
-           own `where:`, edit two rows, and asking only the first finds nothing for the second: a price typed there without
-           its code then goes to `inputPatch` with no currency held and is written in the home currency. */
-        held: (ref, field) =>
-          all
-            .filter((b) => b.kind === 'inputs' && b.register === ref.register)
-            .flatMap((b) => b.entries)
-            .find((e) => e.seq === ref.seq)?.fields[field],
-        reread,
-        said: (said) => (inputSaid = said),
-        /* THE RECORD'S HOME CURRENCY, AS THE KERNEL ANSWERS IT ON AN `inputs` BLOCK, so a bare figure typed into an empty
-           money box is written in it; with none set the box says to type the code (`inputs-write.ts` `home`). */
-        home: () => all.find((b) => b.kind === 'inputs' && typeof b.home === 'string')?.home ?? null,
-      });
-    });
-    void inputsWriter.then((w) => w.input(row, value));
-  }
-
-  /** The record's sentence about one drawn field of an `inputs` block, when it refused what was typed there. */
-  const saidOf = (row: Row): string | undefined => (row.ref && inputsKey ? inputSaid.get(inputsKey(row.ref, row.cells[0]?.trim() ?? '')) : undefined);
-
-  /**
-   * A task ticked done or not done, with a receipt whose undo puts the row back as it was.
-   *
-   * THE UNDO SENDS WHAT THE ROW HELD, read off the block's `entries` at the version the tick is sent at, and not the
-   * list's default not-done state: a task in `doing` ticked and undone came back `open` (audit sixty-four, section 3).
-   * `tickBackOf` says why, and why a held row the re-read left out still falls back to the default.
-   */
-  function tickTask(block: LiveBlock, row: Row, done: boolean, at: number, before: readonly Row[]) {
-    const title = row.cells[0] ?? copy.cardFallback;
-    if (!live) return;
-    const held = block.entries.find((e) => e.seq === row.ref?.seq && e.version === row.ref.version);
-    void writeRow(row.ref, (m, ref, decl) => m.tickPatch(ref, done, decl), title, {
-      at,
-      before,
-      what: { done },
-      back: async (_m, ref, decl) => (await import('./tick-undo.ts')).tickBackOf(ref, done, decl, held),
-      undone: { done: !done },
-      said: (w) => w.ticked(title, done),
-    });
-  }
-
-  /**
-   * A roadmap bar dropped on a new day, with a receipt whose undo puts back the fields the row held.
-   *
-   * THE SAME WRITE A TICK AND A MOVED CARD MAKE, and not `rescheduleRow` on its own, which sends the update and nothing
-   * else. `writeRow` is what holds the row where the reader left it, raises the receipt with its undo and reads the page
-   * again, and a drop without those is a bar that jumps back on the re-read with no word said. `reschedule` works the
-   * patch out from the block's `entries`, the row as the record stores it, and answers null for a drop that means no
-   * write, so nothing is sent and no undo is spent.
-   *
-   * THE HOLD WEARS NOTHING. A tick wears its box and a card its column, because the re-read can leave those rows out;
-   * a moved bar is still in the answer, drawn from it at its new day, and the hold only keeps its place in the table.
-   */
-  async function rescheduleBar(block: LiveBlock, row: Row, drop: Drop, at: number, before: readonly Row[]) {
-    if (!live) return;
-    const { reschedule } = await import('$lib/record/roadmap-write.ts');
-    const change = reschedule(block, row, drop);
-    if (!change) return;
-    void writeRow(row.ref, () => change.patch, change.title, {
-      at,
-      before,
-      what: {},
-      back: () => change.back,
-      undone: {},
-      said: () => change.said,
-    });
-  }
-  /* A PAGE IS THE RECORD'S BLOCKS AND NOTHING ELSE. It was the sample's page of the same slug when no record answered,
-     until DIRECTION 26; a record that does not answer is its refusal, drawn below. */
-  const result = $derived<{ page: LivePageDecl; blocks: LiveBlock[] } | undefined>(got?.from === 'live' ? got.page : undefined);
-
-  /* A `{{path}}` IS ANSWERED BY THE RECORD on the block's `values`; a missing value is `—`. `now` is the clock the rows
-     were read against, so `{{ago:}}` agrees with the dates beside it. No `hole` is handed over, so a value the record
-     cannot answer is marked and not pressable: nobody can supply a declared figure from this screen. The sample's
-     pressable hole toasted what would have been opened, and went with the sample. */
-  /* A FIGURE IN A SENTENCE READS AS MONEY, `£7,200.00` and not `GBP 7,200.00`, as the cells beside it do. */
-  const said = (text: string | null): string | null => (text === null ? null : symbolText(text, homeCurrency()));
-  const optsFor = (block: LiveBlock) => ({
-    resolve: (path: string) => said(resolverOf(block.values)(path)),
-    now: live?.now ?? Date.now(),
-    /* A forecast's knobs and its readout: arithmetic over the walk already on the page, kept in memory. */
-    scenario: true,
-    /* EVERY LINK THE RENDERER DRAWS, under the app: the record writes `/decide`, and the tab is on `/app/<slug>`. */
-    href: inApp,
-  });
-
-  /**
-   * The declared span, clamped to what the KIND can survive.
-   *
-   * A declaration arrives from a pack, and a pack is a thing a stranger wrote — so a `table` that
-   * says `span: 2` is a table somebody will read as broken. The renderer's own table knows the
-   * floor per kind (13 §4.1's three width classes), and the page honours it rather than drawing
-   * eight columns in a sixth of a page. The ARRANGE control refuses below the floor instead of
-   * clamping, because a control that silently corrects you teaches nothing; this clamp is for
-   * declarations that never went through that control.
-   */
-  const spanOf = (block: BlockResult) => declaredSpan(block.kind, block.span, block.columns.length);
 
   /* ── arranging ─────────────────────────────────────────────────────────────
-     A MODE, not an always-on affordance. Drag handles on a page you are reading are noise, and an
-     accidental drag that rewrites a row is the kind of edit nobody can attribute later. */
+     Only a page at its own address is arranged. The arrangement is held here because two parts read it: the head's
+     controls (`Arrange.svelte`) and the blocks being moved (`PageBody.svelte`). */
   const arrangement = new Arrangement();
   const arranging = $derived(arrangement.editing);
-
-  /**
-   * The block's predicate, minus the clause that restates the page.
-   *
-   * A project page filters every block by the same project, so every block header repeated `thing
-   * is Kiln` under a heading on the page called Kiln. It is the one clause the reader is certainly
-   * not missing, and it was the longest.
-   */
-  /**
-   * The predicate a reader sees, MINUS the clause that names the page they are already on.
-   *
-   * "thing is Kiln" under a heading on the Kiln page is the one fact the reader cannot be missing,
-   * and the rest of the predicate has to stay or a block of four rows reads as the whole register.
-   *
-   * The clause is now identified rather than guessed. This used to drop any clause whose text ENDED
-   * with the page title, which is a string heuristic standing in for a fact the declaration did not
-   * carry — and it was the admission that the name should never have been typed into the predicate.
-   * A resolved page knows its own parameter, so the comparison is exact.
-   */
-  /**
-   * WHERE THE BLOCK'S ROWS LIVE, at the block's own predicate.
-   *
-   * The provenance link and the `o` key both went to `/r/<register>` bare. So a block headed
-   * "Money", printing `Filter state is open, direction is owed to me` directly above the link, sent
-   * you to all 214 obligations — the reader is shown a filter, told the list is a slice, and handed
-   * a door to a different set of rows. The register reads exactly these chips from the URL and the
-   * metric tiles have used the same builder for months; the page blocks were the surface that never
-   * asked for it.
-   *
-   * `registerHref` returns the bare register when it could not read the predicate, which is the
-   * honest answer: a URL narrowed by the half of a sentence that parsed is a list that looks
-   * filtered and is not.
-   */
-  const openHref = (block: { register?: string | undefined; where?: string | undefined }): string | null =>
-    block.register ? registerHref(block.register, block.where) : null;
-
-  const param = $derived(result?.page.param);
-  /* A SENTENCE JOINED BY `, or` IS SAID WHOLE: taking the page's subject out of an or-group would leave a dangling
-     "or" and read as a narrower filter than the block draws. */
-  const whereOf = (block: { register?: string | undefined; where?: string | undefined }): string =>
-    saidPlainly(
-      block.register ?? '',
-      joinsWithOr(block.where ?? '') ? (block.where ?? '') : (block.where ?? '')
-        .split(',')
-        .map((c) => c.trim())
-        /* The page's own subject, in either spelling: by name through a `thing` ref, or by spoken id
-           through an agent run's `project`. Printing either says the page's name back to it. */
-        .filter(
-          (c) =>
-            c &&
-            !(param && [`thing is ${param.title}`, `project is ${param.register}#${param.seq}`].some((s) => s.toLowerCase() === c.toLowerCase())),
-        )
-        .join(', '),
-    );
-
-  /**
-   * The blocks in the order and at the widths currently in force, each carrying the index it had in
-   * the declaration.
-   *
-   * `slot.span` is authoritative whether or not the mode is open — it falls back to the declared
-   * span when there is no arrangement. The template read `arranging ? slot.span : spanOf(block)`
-   * once, which meant Done kept the ORDER and silently threw away every width: the layout you
-   * confirmed was not the layout you got.
-   */
-  const laid = $derived.by(() => {
-    const blocks = all;
-    const slots = arrangement.slots ?? blocks.map(slotOf);
-    return slots
-      .map((slot) => ({ slot, block: blocks[slot.i] }))
-      .filter((x): x is { slot: Slot; block: LiveBlock } => Boolean(x.block));
-  });
-
-  /* ── the main column and the rail (brief D4) ──────────────────────────────
-     A PAGE THAT DECLARES `layout` DRAWS TWO COLUMNS; every other page draws the one flow it always has, through the same
-     markup, so nothing below changes for it. `layout.ts` says why the rail is a split of the one list and never a
-     second list. */
-  const layout = $derived(result ? layoutOf(result.page) : null);
-
-  /**
-   * A declared block's slot: its declared index, its clamped span, and `area: rail` when it sits in the rail.
-   *
-   * NO `area` KEY FOR A MAIN BLOCK, so a page with no layout makes exactly the slots it always made and a Done that moved
-   * nothing compares them equal.
-   */
-  const slotOf = (b: LiveBlock, i: number): Slot => (areaOf(b, layout) === 'rail' ? { i, span: spanOf(b), area: 'rail' } : { i, span: spanOf(b) });
-
-  /** Every drawn pair with `at`, its index in `laid`, which is the index the arrangement moves by. */
-  type Laid = { slot: Slot; block: LiveBlock; at: number };
-  const pairs = $derived<Laid[]>(laid.map((x, at) => ({ ...x, at })));
-
-  /** Each area's pairs, in declared order. The slot says where a block is, because a move to the rail is a slot's. */
-  const split = $derived(splitAreas(pairs, layout, (x) => x.slot.area));
-
-  /**
-   * THE ORDER A READER MEETS THE BLOCKS IN, which is the main column and then the rail: the order the page draws them
-   * in, the order a phone stacks them in, and so the order `j` and `k` walk. On a page with no rail it is `laid`.
-   */
-  const reading = $derived(layout ? [...split.main, ...split.rail] : pairs);
-
-  /**
-   * The runs an area draws in. A boxed section and the blocks after it share one surface while reading; while arranging
-   * every block is loose, because a block being moved is a list item and a list item inside a surface inside the list
-   * is a listitem whose parent is not the list.
-   */
-  const runsOf = (list: Laid[]): Run<Laid>[] => (arranging ? [{ box: false, items: list }] : boxesOf(list, (x) => x.block));
-
-  /* WHETHER THE RAIL STAYS IN VIEW, measured, since `sticky: true` is honoured only while the rail fits (`sticks`). The
-     room is the scrolling column's height under the page head, the same `--sticky` offset the rail sticks at. */
-  let railEl = $state<HTMLElement | null>(null);
-  let railHeight = $state(0);
-  let room = $state(0);
-  $effect(() => {
-    const el = railEl;
-    if (!el || !layout?.sticky) return;
-    const scroller = el.closest('main') ?? document.documentElement;
-    const root = getComputedStyle(document.documentElement);
-    const px = (token: string) => Number.parseFloat(root.getPropertyValue(token)) || 0;
-    const measure = () => {
-      room = scroller.clientHeight - px('--sticky') - 2 * px('--sp-4');
-    };
-    measure();
-    const watch = new ResizeObserver(measure);
-    watch.observe(scroller);
-    return () => watch.disconnect();
-  });
-  const stuck = $derived(sticks(layout, railHeight, room));
-
-  /**
-   * The other area, which is where the block's move button sends it.
-   *
-   * AND FOCUS GOES WITH THE BLOCK. The block leaves one column's keyed list and is made again in the other, so the button
-   * just pressed is destroyed and keyboard focus fell to the page's body: the reader who moved a block to the rail had
-   * to tab from the top of the page to find it again. Once the page has drawn the move, the same control on the moved
-   * block takes focus, so a second press sends it back. `i` is the declared index its slot keeps, which is its id.
-   */
-  async function toOtherArea(at: number, from: 'main' | 'rail', i: number) {
-    if (!arrangement.slots) return;
-    arrangement.slots = setAreaAt(arrangement.slots, at, from === 'rail' ? 'main' : 'rail');
-    await tick();
-    document.getElementById(`b-${i + 1}`)?.querySelector<HTMLElement>('.area-move button')?.focus();
-  }
-
-  /**
-   * One step up or down inside the block's own area. `to` is the position the bar asked for within that area; the
-   * arrangement moves by `laid` index, so the step is found there. With no rail this is `at - 1` and `at + 1`.
-   */
-  function stepInArea(at: number, pos: number, to: number) {
-    arrangement.move(at, nearestInArea(arrangement.slots ?? [], at, to < pos ? -1 : 1));
-  }
-
-  function beginArrange() {
-    arrangement.begin(all.map(slotOf));
-  }
-
-  /**
-   * A block added here is resolved through the SAME page read as a declared one.
-   *
-   * The record's page answer carries live rows per block, so a seeded block gets real data the moment it
-   * exists — which is what makes "already bound and already drawing" (21 §3.3) true rather than a
-   * promise the picker makes and the page breaks.
-   */
-  function add(block: PageBlock) {
-    extra = [...extra, block];
-    arrangement.slots = [
-      ...(arrangement.slots ?? (result?.blocks ?? []).map(slotOf)),
-      { i: (result?.blocks.length ?? 0) + extra.length - 1, span: block.span ?? 12 },
-    ];
-    const named = copy.kindNames[block.kind] ?? block.kind;
-    toasts.push(copy.blockAddedLive(named));
-  }
-
-  /**
-   * ONE write, one event batch, one undo — even for four moves.
-   *
-   * 02 §8 makes an `edit` one event row per changed FIELD, all sharing one `batch` ULID, and undo is
-   * a query over that batch. Committing per drag would put four unrelated lines in the audit log
-   * for one act of tidying, and leave no single thing to undo.
-   */
-  let saving = false;
-  async function commitArrange() {
-    if (!arrangement.dirty) {
-      arrangement.cancel();
-      toasts.push(copy.arrangeNothing);
-      return;
-    }
-    /* DONE SETS THE DECLARATION, whole, and the page is read again from the record. A refusal leaves the mode open with
-       the draft in it, so Cancel still means cancel. Undo sets the body that was there before. The sample's arrangement
-       was kept in memory under a toast saying nothing was written; with no sample there is no page to arrange without a
-       record, so `live` is only narrowed here. */
-    if (!live || saving) return;
-    saving = true;
-    const title = result?.page.title ?? slug;
-    const m = await import('$lib/record/page-write.ts');
-    /* EACH BLOCK'S COLUMN GOES WITH ITS PLACE, through the one write every page uses: a page with a rail went through a
-       second one, `layout-write.ts`, while `arrangedBody` wrote order and span only. */
-    const placed = arrangement.body.map((b) => ({ i: b.block, span: b.span, ...(b.area ? { area: b.area } : {}) }));
-    const out = await m.saveArrangement(apiBase(), slug, result?.blocks.length ?? 0, placed, extra, undefined, result?.page.declared_version);
-    saving = false;
-    if (out.from !== 'written') return void toasts.push(out.fix, { intent: 'warn' });
-    arrangement.commit();
-    await reread();
-    extra = [];
-    arrangement.slots = null;
-    const before = out.before;
-    toasts.push(copy.arranged(title), {
-      undo: () =>
-        void m.setBody(apiBase(), before, undefined, out.version).then(async (back) => {
-          if (back.from !== 'written') toasts.push(back.fix, { intent: 'warn' });
-          await reread();
-        }),
-    });
-  }
-
-  /** Held while a handle is down, so the drop target knows what is moving. */
-  let dragging = $state<number | null>(null);
-
-  /* WHERE IT WILL LAND. A drag with no target shown is a drag you have to complete to find out
-     what it did, and then undo. The block under the pointer takes an accent edge on the side the
-     block will arrive, so the answer is on screen before the reader lets go.
-
-     Which edge depends on the block's own width, not on a fixed axis. A full-width block stacks,
-     so top and bottom are what "before" and "after" mean and the pointer's Y decides. A block
-     sharing its row reads left to right, so X decides. Using one axis for both puts the line on
-     the short edge of half the blocks on the page. */
-  let over = $state<{ at: number; edge: 'before' | 'after' } | null>(null);
-
-  /* `stacked` IS WHETHER THE BLOCK HAS THE WHOLE ROW, which a full-width block does and every block in the rail does,
-     since the rail is one stack whatever a block's span says. */
-  function trackDrop(e: DragEvent, at: number, stacked: boolean) {
-    if (!arranging || dragging === null) return;
-    e.preventDefault();
-    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const past = stacked ? e.clientY > r.top + r.height / 2 : e.clientX > r.left + r.width / 2;
-    over = { at, edge: past ? 'after' : 'before' };
-  }
-
-  /* A DROP ON A BLOCK IN THE OTHER COLUMN MOVES THE HELD BLOCK INTO THAT COLUMN, at the edge it was let go on. With no
-     rail it is the drag it always was: `dropInto` is `moveAt` at `dropIndex` when the two areas are the same. */
-  function drop() {
-    if (dragging !== null && over && arrangement.slots) arrangement.slots = dropInto(arrangement.slots, dragging, over.at, over.edge);
-    dragging = null;
-    over = null;
-  }
-
-  let adding = $state(false);
-
-  /**
-   * The block cursor, and the five page-scope keys the keymap has always advertised.
-   *
-   * `j k`, `↵ Esc`, `o`, `y` and `⇧E` are registered in `keys.svelte.ts` and printed on `?`, and
-   * not one of them did anything — the `<Kbd>` chips beside the block bars were advertisements for
-   * bindings that did not exist. A keymap that lists a key which does nothing is worse than one
-   * that omits it: the reader tries it, nothing happens, and now they distrust the whole sheet.
-   *
-   * It starts at -1, meaning NOWHERE. A cursor drawn on the first block before anybody has pressed
-   * a key is a selection state nobody chose, and every page opened with a red band down its first
-   * figure.
-   */
-  let cursor = $state(-1);
-
-  function onkeydown(e: KeyboardEvent) {
-    /* THE ONE TEST FOR WHETHER SOMEBODY IS TYPING, rather than a narrower copy of it. This read
-       INPUT and TEXTAREA only, so a bare key fired over an open select and inside a contenteditable
-       block. `typing()` covers both, and it is the test `keys.svelte.ts` calls the only one. */
-    if (typing()) return;
-    if (e.metaKey || e.ctrlKey) return;
-
-    /* AND NOT WHILE SOMETHING IS OPEN OVER THE PAGE. See `covered`: this is the handler the defect
-       was found on, and it was one of six with the same hole. */
-    if (covered()) return;
-
-    /* ⇧E toggles the declaration. Shift, not a bare `e`, because bare `e` means edit-in-place
-       inside a grid and a key's meaning must be a function of the object in focus rather than of
-       the page you happen to be on. */
-    if (e.shiftKey && e.key.toLowerCase() === 'e') {
-      e.preventDefault();
-      void goto(`?src=${showSource ? '0' : '1'}`, { replaceState: true, noScroll: true });
-      return;
-    }
-    if (e.altKey || e.shiftKey || showSource || arranging) return;
-    if (silenced(e)) return;
-
-    /* THE READING ORDER, so on a page with a rail `j` walks the main column and then the rail, as the page draws them. */
-    const blocks = reading;
-    if (e.key === 'j' || e.key === 'ArrowDown') {
-      e.preventDefault();
-      cursor = Math.min(cursor + 1, blocks.length - 1);
-      focusBlock();
-    } else if (e.key === 'k' || e.key === 'ArrowUp') {
-      e.preventDefault();
-      cursor = Math.max(cursor - 1, 0);
-      focusBlock();
-    } else if (e.key === 'o') {
-      const held = blocks[cursor]?.block;
-      const to = held ? openHref(held) : null;
-      if (to) {
-        e.preventDefault();
-        void goto(inApp(to));
-      }
-    } else if (e.key === 'y') {
-      const slotIndex = blocks[cursor]?.slot.i;
-      if (slotIndex !== undefined) {
-        e.preventDefault();
-        void copyBlockLink(slotIndex);
-      }
-    } else if (e.key === 'Enter') {
-      /* ENTER THE BLOCK: move real focus inside it, so the block's own keys take over.
-         
-         This is the whole reason the two altitudes exist. `j`/`k` walk blocks and the letters are
-         bare; once focus is inside a `role="grid"`, `j`/`k` walk ROWS and the same bare letters are
-         the grid's. WCAG 2.1.4's focus exception is what makes bare single letters legal at all, and
-         it is satisfied by focus actually being somewhere rather than by a variable saying it is. */
-      const held = blocks[cursor];
-      if (!held) return;
-      e.preventDefault();
-      enter(held.slot.i);
-    } else if (e.key === 'Escape') {
-      /* LEAVE IT. Focus returns to the document and the cursor stays where it was, so Escape is a
-         step back out rather than a reset — a mode you leave by losing your place is a mode people
-         stop entering. */
-      const inside = document.activeElement;
-      if (inside instanceof HTMLElement && inside !== document.body) {
-        e.preventDefault();
-        inside.blur();
-      }
-    }
-  }
-
-  /**
-   * The first thing inside a block that can take focus.
-   *
-   * A `table` block's region is `tabindex="0"` and is the right target; a `bar`'s hole row is a
-   * button; a `note` has nothing focusable at all and the block is simply scrolled to, because
-   * moving focus to a paragraph and announcing it is worse than not moving.
-   */
-  function enter(slotIndex: number) {
-    const section = document.getElementById(`b-${slotIndex + 1}`);
-    /* The block's BODY, not its bar. The bar carries a link to the register, which is the first
-       focusable descendant of the section — so an unscoped query put `↵` on "open the register",
-       which is the `o` key's job and the opposite of entering. */
-    const body = section?.querySelector<HTMLElement>('.block, .table-region');
-    const target =
-      body?.matches('[tabindex]:not([tabindex="-1"])') === true
-        ? body
-        : (body?.querySelector<HTMLElement>(
-            '[role="grid"], a[href], button:not(:disabled), [tabindex]:not([tabindex="-1"])',
-          ) ?? null);
-    if (target) target.focus();
-    else section?.scrollIntoView({ block: 'nearest' });
-  }
-
-  /** Scrolls the cursor into view under the sticky head. `.block-slot` already carries the margin. */
-  function focusBlock() {
-    const slot = reading[cursor]?.slot.i;
-    if (slot !== undefined) document.getElementById(`b-${slot + 1}`)?.scrollIntoView({ block: 'nearest' });
-  }
-
-  async function copyBlockLink(slotIndex: number) {
-    const url = `${route.url.origin}${route.url.pathname}#b-${slotIndex + 1}`;
-    try {
-      await navigator.clipboard.writeText(url);
-      toasts.push(copy.copied(copy.blockLink));
-    } catch {
-      toasts.push(copy.copyRefused, { intent: 'warn' });
-    }
-  }
-
-  /** The register the page is mostly about — what a new block binds to before you narrow it. */
-  const primary = $derived(result?.blocks.find((b) => b.register)?.register ?? 'obligations');
 
   /** Blocks added in this session. They live beside the declared ones and index past them. */
   let extra = $state<PageBlock[]>([]);
 
   /** Declared, then added. One list, so ordering and spans do not care which is which. */
-  const all = $derived([...(result?.blocks ?? []), ...extra.map((b) => resolveExtra(b))]);
-
-  /** An added block, run through the page read so it carries rows rather than a declaration. */
-  function resolveExtra(block: PageBlock): LiveBlock {
-    const template = result?.blocks.find((b) => b.register === block.source?.replace('register.', ''));
-    return {
-      ...(template ?? { rows: [], entries: [], matched: [], shown: 0, total: 0, drawn: true, stale_at: '' }),
-      ...block,
-      columns: (block.columns ?? []).map((c) => ({
-        field: c.field,
-        label: c.label ?? c.field,
-        width: c.width ?? 'minmax(12ch,1fr)',
-        align: c.align ?? ('start' as const),
-        truncate: 'end' as const,
-      })),
-      metrics: undefined,
-      register: block.source?.replace('register.', ''),
-      drawn: true,
-    } as BlockResult;
-  }
+  const all = $derived<LiveBlock[]>(live ? [...live.page.blocks, ...extra.map((b) => added(b, live.page.blocks))] : []);
 
   /**
-   * THE DECLARATION THE RECORD HOLDS, AND NOTHING ELSE.
-   *
-   * This read `PAGES` — the web app's own built-in declarations — for every page, so somebody
-   * opening "How this is built" on their own record was shown the demo's copy of it. A page the
-   * record has and the app does not fell through to the resolved answer; a page they had both of
-   * printed ours. Either way the screen labelled "source" was not the source of the page they have.
-   *
-   * SO A LIVE PAGE PRINTS THE RECORD'S ANSWER, which carries the declaration's own keys on the page
-   * and on every block — `cells`, `columns`, `order`, `target`, `body` and `authored` included,
-   * which is why printing `result.page` alone once dropped them.
-   *
-   * A PER-ROW PAGE IS STILL THE RECORD'S TEMPLATE. The record answers one page per row of the
-   * register the template walks, so `for:` comes back with it and the `{{field}}`s arrive filled
-   * with the row this page is about. That is the record's own declaration, read from the record;
-   * the app's copy of the same template is not, and this no longer reaches for it.
-   *
-   * AND THERE IS NO FALLBACK. A live answer with no blocks on it fell back to `PAGES`, so a real page
-   * the record held empty printed the seeded studio's declaration of the same slug as its source,
-   * which is the demo's copy again by a narrower door. It prints the record's page with no blocks,
-   * which is what the record holds.
+   * ⇧E toggles the declaration, on a page at its own address. Shift, not a bare `e`, because bare `e` means
+   * edit-in-place inside a grid and a key's meaning must be a function of the object in focus rather than of the page
+   * you happen to be on. The block keys are the body's (`PageBody.svelte`).
    */
-  const source = $derived<DogPage | undefined>(result ? ({ ...result.page, blocks: result.blocks } as unknown as DogPage) : undefined);
-
-  const declaration = $derived(source ? dogText(source) : '');
-
-  /** One page, one file, named as its first line names it. */
-  const dogFile = $derived(source ? dogName(source.page) : '');
-
-  /** The same bytes the screen is showing, as a file somebody can keep, diff, send and edit. */
-  function saveSource() {
-    saveDog(dogFile, declaration);
-    toasts.push(copy.exported(dogFile), { intent: 'good' });
+  function onkeydown(e: KeyboardEvent) {
+    if (mode !== 'page') return;
+    if (typing()) return;
+    if (e.metaKey || e.ctrlKey) return;
+    /* AND NOT WHILE SOMETHING IS OPEN OVER THE PAGE. See `covered`. */
+    if (covered()) return;
+    if (e.shiftKey && e.key.toLowerCase() === 'e') {
+      e.preventDefault();
+      void goto(`?src=${showSource ? '0' : '1'}`, { replaceState: true, noScroll: true });
+    }
   }
+
+  /* ── a preview beside the page as it is ─────────────────────────────────────
+     Both are drawn from 900px up, side by side; below it one at a time, chosen with the switch, and the change first,
+     because the change is what is being decided. */
+  let showing = $state<'was' | 'after'>('after');
+
+  /* EVERY ID A PREVIEW WRITES CARRIES ITS PAGE, because a change can touch several pages and a screen that previews
+     them draws one reader for each: a bare `preview-` would give the second page the first one's ids. */
+  const pre = $derived(`preview-${slug}-`);
 </script>
 
-<svelte:head><title>{titleOf(result?.page?.title)}</title></svelte:head>
+<svelte:head>
+  {#if mode === 'page'}<title>{titleOf(live?.page.page.title)}</title>{/if}
+</svelte:head>
 
 <svelte:window {onkeydown} />
 
 {#if got === null}
   <!-- Bars until the record answers. -->
-  <Waiting head />
+  <Waiting head={mode === 'page'} />
 {:else if got.from === 'refused'}
-  <div class="page said">
+  <div class="said">
     <Empty kind="error" heading title={got.fix}>
       {#snippet actions()}<Button href="/">{copy.home}</Button>{/snippet}
     </Empty>
   </div>
-{:else if !result}
-  <div class="page said">
-    <!-- A URL NAMING SOMETHING THIS RECORD DOES NOT HAVE IS A REFUSAL, and the record already has
-         the sentence for it. Nothing failed, so there is no request id to quote (`50 §13 D11`), and
-         no filter ran, so "nothing matched" is about something that did not happen. It names the
-         thing, says it is not here, and lists what is — `10 §7`'s fourth rule: the refusal is the
-         teacher. -->
-    <Empty
-      kind="error"
-      heading
-      title={copy.noSuch('page', slug)}
-      body={copy.theseExist('Pages', got.from === 'missing' ? got.held : [])}
-    >
+{:else if !live}
+  <div class="said">
+    <!-- A URL NAMING SOMETHING THIS RECORD DOES NOT HAVE IS A REFUSAL, and the record already has the sentence for it.
+         Nothing failed, so there is no request id to quote (`50 §13 D11`), and no filter ran, so "nothing matched" is
+         about something that did not happen. It names the thing, says it is not here, and lists what is: `10 §7`'s
+         fourth rule, the refusal is the teacher. -->
+    <Empty kind="error" heading title={copy.noSuch('page', slug)} body={copy.theseExist('Pages', got.from === 'missing' ? got.held : [])}>
       {#snippet actions()}<Button href="/">{copy.home}</Button>{/snippet}
     </Empty>
   </div>
-{:else}
-  <!-- `define="page"`: the rail says "1 suggested page" on every screen and this is the first place
-       somebody is looking at one. The clause carries `block` and `row` with it, which is `19 §642`'s
-       own wording and deliberate — the two nouns it leans on are the two this product defines
-       either side of it. -->
+{:else if mode === 'page'}
+  <!-- `define="page"`: the rail says "1 suggested page" on every screen and this is the first place somebody is looking
+       at one. -->
   <PageHead
-    icon={iconFor(result.page.icon, 'doc')}
-    hue={hueOf(result.page.identity)}
-    kicker={result.page.nav?.section}
-    title={result.page.title}
+    icon={iconFor(live.page.page.icon, 'doc')}
+    hue={hueOf(live.page.page.identity)}
+    kicker={live.page.page.nav?.section}
+    title={live.page.page.title}
     define="page"
   >
     {#snippet actions()}
-      {#if arranging}
-        <Button weight="quiet" onclick={() => (adding = true)}>
-          <Icon name="plus" size="s" />
-          {copy.addBlock}
-        </Button>
-        <Button weight="bare" onclick={() => arrangement.cancel()}><Icon name="close" size="s" />{copy.arrangeCancel}</Button>
-        <Button weight="primary" onclick={commitArrange}><Icon name="check" size="s" />{copy.arrangeDone}</Button>
-      {:else}
-        <!-- AUTHORING IS A DESKTOP SURFACE (13 §10), and this is the one that stayed. `Arrange` is
-             hidden below 900px and the filter beside the source link is hidden with a comment
-             calling it "a desktop affordance for the same reason the source link beside it is" —
-             the source link itself never was. On four project pages it is the ONLY header control a
-             phone gets, and what it opens is a 1,129px-wide YAML declaration in a 356px box that you
-             drag sideways to read, line by line, with lines cut mid-token. -->
+      {#if !arranging}
+        <!-- `How this page is built`, not `Source`, which a reader who does not write code reads as an origin or a
+             supplier. AUTHORING IS A DESKTOP SURFACE (13 §10): the link is not drawn below 900px. -->
         <span class="source-slot">
           <Button weight="bare" href="?src={showSource ? '0' : '1'}">
             <Icon name="code" size="s" />
-            <!-- `How this page is built` AND IT WAS `Source`. It sits top right on every page beside
-                 `Edit layout`, and `Source` is a developer's word for the thing: a reader who does
-                 not write code reads it as an origin or a supplier. Two literals in markup were
-                 also the last two on this screen, so they move to `copy.ts` with everything else. -->
             {showSource ? copy.pageBack : copy.pageSource}
           </Button>
         </span>
-        <!-- ARRANGING IS A DESKTOP SURFACE. 13 §10: "Authoring: read and approve, do not author. The
-             page builder and pack builder are desktop surfaces." A drag-to-reorder mode on a phone
-             is a mode where every gesture competes with the scroll, and the button is absent rather
-             than disabled — a control that exists and refuses is worse than one that does not. -->
-        {#if !showSource}
-          <span class="arrange-slot">
-            <Button weight="quiet" onclick={beginArrange}>
-              <Icon name="grid" size="s" />
-              {copy.arrange}
-            </Button>
-          </span>
-        {/if}
       {/if}
+      <Arrange {arrangement} {slug} page={live.page.page} declared={live.page.blocks} {all} bind:extra {showSource} {reread} />
     {/snippet}
   </PageHead>
 
-  <!-- A LIST while arranging, and nothing while reading. The blocks become a reorderable list only
-       in the mode where they are reorderable; announcing "list, 5 items" to somebody reading a page
-       is describing the furniture. -->
-  <!-- ON A PAGE WITH A RAIL EACH COLUMN IS ITS OWN LIST while arranging, named, and the page is neither. -->
-  <div class="page" role={arranging && !layout ? 'list' : undefined}>
-    {#if showSource}
-      <!-- The declaration as diffable text. A page is a row, so this is the row (19 §2). -->
-      <!-- `tabindex="0"`: it is a long scrolling code block, and a scrolling box a keyboard cannot
-           focus is a box a keyboard cannot read. Named, so tabbing into it says what it is. -->
-      <!-- THE SOURCE IS A FILE, not a box to read. A format nobody can hold is a viewer: this text
-           could not be saved, diffed, sent to somebody or edited and applied, so the one thing a
-           person could do with the page they wrote was look at it. The file is named as the
-           declaration's own first line names it, and it is the same bytes the block below shows. -->
-      <div class="source-file">
-        <Button weight="quiet" onclick={saveSource}>
-          <Icon name="download" size="s" />
-          {copy.pageSourceSave(dogFile)}
-        </Button>
+  {#if showSource}
+    <!-- The declaration as text. A page is a row, so this is the row (19 §2). -->
+    <SourceView {slug} title={live.page.page.title} />
+  {:else}
+    <PageBody mode="page" page={live.page.page} blocks={all} now={live.now} {writes} {arrangement} />
+  {/if}
+{:else if mode === 'home'}
+  <!-- HOME'S BODY: the use case's page with its layout, spans and boxes, under Home's own head. Writes stay on, so a
+       task is ticked on Home as it is on its page. -->
+  <PageBody mode="home" page={live.page.page} blocks={all} now={live.now} {writes} ids="home-" />
+{:else}
+  <!-- A PREVIEW, INERT: the page as it will be drawn, with nothing on it that writes. Its title is a heading under the
+       screen's own, and each block's name one step under that. -->
+  <section class="preview" aria-labelledby="{pre}title">
+    <h2 class="preview-title" id="{pre}title">{live.page.page.title}</h2>
+    {#if was}
+      <div class="compare" data-showing={showing}>
+        <div class="segmented compare-switch" role="group" aria-label={words.compare}>
+          <button
+            type="button"
+            class="segment"
+            data-on={showing === 'was' ? '' : undefined}
+            aria-pressed={showing === 'was'}
+            onclick={() => (showing = 'was')}>{words.now}</button
+          >
+          <button
+            type="button"
+            class="segment"
+            data-on={showing === 'after' ? '' : undefined}
+            aria-pressed={showing === 'after'}
+            onclick={() => (showing = 'after')}>{words.after}</button
+          >
+        </div>
+        <div class="compare-side" data-side="was" role="group" aria-label={words.now}>
+          <p class="compare-name" aria-hidden="true">{words.now}</p>
+          <PageBody mode="preview" page={live.page.page} blocks={was} now={live.now} writes={null} ids="{pre}was-" level={3} />
+        </div>
+        <div class="compare-side" data-side="after" role="group" aria-label={words.after}>
+          <p class="compare-name" aria-hidden="true">{words.after}</p>
+          <PageBody mode="preview" page={live.page.page} blocks={all} now={live.now} writes={null} ids="{pre}after-" level={3} />
+        </div>
       </div>
-      <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-      <pre class="source" tabindex="0" aria-label={copy.declarationOf(result.page.title)}><code
-          >{declaration}</code></pre>
     {:else}
-      <!-- ONE BLOCK, WHEREVER IT IS DRAWN. It was the body of the page's one `each`; it is a snippet so the main column,
-           the rail and a boxed run draw the same markup, and a page with no rail draws exactly what it drew before. -->
-      {#snippet slotted({ slot, block, at }: Laid)}
-        <!-- `rail` is whether the block is drawn in the rail; `pos` and `count` are its place in its own column, which is
-             what Move up and Move down step through. -->
-        {@const rail = layout !== null && slot.area === 'rail'}
-        {@const peers = rail ? split.rail : layout ? split.main : pairs}
-        {@const pos = peers.findIndex((x) => x.at === at)}
-        {@const count = peers.length}
-        {@const stacked = rail || slot.span >= COLUMNS}
-        <!-- `drawn: false` means the server evaluated `when:` and said no. A page that shows a
-             warning that does not apply teaches people to ignore warnings (06 §1). -->
-        {#if block.drawn}
-          <!-- WHAT THE BLOCK'S REGISTER HOLDS, when it holds nothing yet. 19 §6 names five empty
-               states and says collapsing them into one is the failure; a filter that matched nothing
-               and a register with nothing in it are different facts, and the second is the one
-               somebody can act on. -->
-          <!-- The register's size is known only when the block reads all of it. -->
-          {@const held = block.register && !block.where ? REGISTERS[block.register] : undefined}
-          {@const drawn = draw(
-            block,
-            held
-              ? {
-                  rows: block.total,
-                  name: held.name,
-                  ...(held.holds ? { holds: held.holds } : {}),
-                  /* WHERE THE FIRST ROW WOULD GO, and `19 §6` says the action for this state is
-                     **Add one** rather than "go and look". `?new=1` opens the list's own create
-                     form, so the button lands on the field somebody is about to type into instead
-                     of on a list of nothing with a second button on it.
-
-                     The block's own filter is deliberately NOT carried: the list is empty, and
-                     narrowing an empty list is the last thing anybody needs. */
-                  /* NOT ON AN AGENT'S RUNS, which an agent starts and a person does not type in: Agent work offered "Add the
-                     first row" under "No agent has started a run here yet". */
-                  ...(block.register === 'session' ? {} : { add: { href: `/r/${block.register}?new=1`, label: copy.addOne } }),
-                }
-              : undefined,
-          )}
-          <!-- A `div` that takes `region` or `listitem`, and NOT a `<section>`. A section is already
-               a region landmark once it is named, and ARIA does not let one be a `listitem` — so
-               while arranging, every block on the page carried a role its element could not have.
-               `div` + an explicit role says the same thing in both modes and, unlike swapping the
-               tag, does not tear the node down and drop focus when the mode changes. -->
-          <div
-            class="block-slot"
-            id="b-{slot.i + 1}"
-            aria-labelledby="h-{slot.i + 1}"
-            style="--span:{slot.span}"
-            data-arranging={arranging ? '' : undefined}
-            data-cursor={!arranging && !showSource && reading[cursor]?.slot.i === slot.i ? '' : undefined}
-            role={arranging ? 'listitem' : 'region'}
-            data-dragging={dragging === at ? '' : undefined}
-            data-drop={over && over.at === at && dragging !== at ? over.edge : undefined}
-            data-stacked={stacked ? '' : undefined}
-            draggable={arranging}
-            ondragstart={() => (dragging = at)}
-            ondragend={() => ((dragging = null), (over = null))}
-            ondragover={(e) => trackDrop(e, at, stacked)}
-            ondrop={(e) => {
-              e.preventDefault();
-              drop();
-            }}
-            onkeydown={(e) => {
-              /* `⌥↑` / `⌥↓` — WCAG 2.5.7's single-pointer alternative, and it calls the same
-                 `move` the drag calls rather than re-implementing it.
-                 
-                 No `tabindex` on the section: keydown BUBBLES from whichever control inside it has
-                 focus — the handle, a width button, Move up. A listitem that is itself a tab stop
-                 puts a stop in the sequence that does nothing when you land on it. */
-              if (!arranging || !e.altKey) return;
-              if (e.key === 'ArrowUp') { e.preventDefault(); stepInArea(at, pos, pos - 1); }
-              if (e.key === 'ArrowDown') { e.preventDefault(); stepInArea(at, pos, pos + 1); }
-            }}
-          >
-            {#if arranging}
-              <BlockBar
-                kind={block.kind}
-                span={slot.span}
-                columns={block.columns.length}
-                at={pos}
-                {count}
-                onmove={(to) => stepInArea(at, pos, to)}
-                onspan={(span) => arrangement.setSpan(at, span)}
-                onremove={() => arrangement.remove(at)}
-                widths={!rail}
-              />
-              <!-- THE KEYBOARD'S WAY ACROSS, as Move up is its way along: a drag onto the other column does the same, and
-                   WCAG 2.5.7 asks for the control that is not a drag. Only on a page with a rail, since a page without
-                   one has nowhere to send a block. -->
-              {#if layout}
-                <div class="area-move">
-                  <Button weight="bare" onclick={() => void toOtherArea(at, rail ? 'rail' : 'main', slot.i)}>
-                    <Icon name={rail ? 'back' : 'arrow'} size="s" />
-                    {rail ? copy.moveToMain : copy.moveToRail}
-                  </Button>
-                </div>
-              {/if}
-            {/if}
-            <header class="block-bar">
-              <!-- A BLOCK WITH NO AUTHORED `heading:` PRINTED ITS DIALECT ID: `spec`, `chips`, `gauge`,
-                   `params`, `tree`. `kindNames` exists for this and says why in its own header — an id is
-                   what an agent writes into a declaration, a name is what a person reads — and the two
-                   screens where a READER rather than an author is looking were the two that skipped it. -->
-              <h2 class="block-name" id="h-{slot.i + 1}">{block.heading ?? copy.kindNames[block.kind] ?? block.kind}</h2>
-              {#if block.register}
-                <!-- THE REGISTER'S NAME, not its id. This line is provenance a person reads, and
-                     it was printing `obligations` where the rest of the product says Obligations —
-                     the data model's spelling, on every block, on every page.
-
-                     The predicate stays, because without it a reader has no way to know the list is
-                     filtered and may take a block of four rows for the whole register. But the
-                     clause that names the page you are already on is dropped: "thing is Kiln" under
-                     a heading on the Kiln page is the one fact the reader cannot be missing. -->
-                <a class="block-source tap" href={inApp(openHref(block) ?? `/r/${block.register}`)} title={whereOf(block) || undefined}>
-                  {REGISTERS[block.register]?.name ?? block.register}
-                  <!-- AND IT SAYS THAT IT IS A FILTER. `/v/<view>` labels the identical string
-                       `FILTER`, so the word existed and the page blocks did not use it — leaving an
-                       unlabelled clause of machine grammar under a heading, which a reader can only
-                       take for part of the title. -->
-                  <!-- AS A GLYPH, AND THE CLAUSE IS STILL THERE (DESIGN-SYSTEM APPENDIX C5). Printed in full it
-                       read as a debug line and pushed a two-word heading onto two lines; the filter glyph
-                       says the list is narrowed, the tooltip and a screen reader get the whole clause. -->
-                  {#if whereOf(block)}
-                    <Icon name="filter" size="s" />
-                    <span class="block-where"><span class="block-where-lead">{copy.filter}</span> {whereOf(block)}</span>
-                  {/if}
-                </a>
-              {/if}
-            </header>
-
-            <!-- Never hidden and never centred: the page's shape is information, and a page that
-                 silently shrinks teaches that blocks come and go (19 §6). ONE surface for all
-                 sixteen kinds, so "nothing matched" and "this block is broken" are told apart. -->
-            {#if block.cannot}
-              <p class="block-cannot">{block.cannot}</p>
-            {:else if block.actions?.length && !block.refusals.length}
-              <ActionRows rows={block.actions} now={live?.now ?? Date.now()} />
-            {:else if drawn.refusal}
-              {@const act = drawn.refusal.action}
-              <Empty
-                compact
-                kind={drawn.refusal.kind}
-                title={drawn.refusal.title}
-                body={drawn.refusal.body}
-                lines={drawn.refusal.lines}
-              >
-                {#snippet actions()}
-                  {#if act}<Button href={act.href}>{act.label}</Button>{/if}
-                {/snippet}
-              </Empty>
-            {:else if block.kind === 'table' && walkTables(block)}
-              <!-- A TABLE OVER A WALK DRAWN ONCE PER CURRENCY: each currency's rows under its code, and why, once. -->
-              {#each walkTables(block) ?? [] as part}
-                {#each part.said as segment}{#if segment.type === 'markdown'}<div class="document"><Markdown {segment} opts={{ href: inApp }} /></div>{/if}{/each}
-                {#if part.table}<Table columns={part.table.columns} rows={part.table.rows} total={part.table.total} label={block.heading} href={inApp} />{/if}
-              {/each}
-            {:else if block.kind === 'table'}
-              <Table columns={block.columns} rows={block.rows} total={block.total} label={block.heading} href={inApp} />
-            {:else}
-              {#each drawn.segments as segment}
-                <!-- A FIGURE IS A DOOR, and the address is the metric's own: `hrefFor` derives it
-                     from the same predicate the figure is computed over, so a tile and the list it
-                     opens cannot disagree. -->
-                <!--
-                  THE TWO PRIMITIVES A READER CAN CHANGE, GIVEN SOMEWHERE TO PUT THE ANSWER.
-
-                  A friction pass ranked both: a board with fourteen cards across four columns and
-                  no way to move one was fourth of ten, and a checkbox drawn beside a task that was
-                  an `<img>` was fifth. Both had the same cause, one layer down: the primitive
-                  refuses to draw an interactive control unless the host hands it a callback, and
-                  no host ever did. So the capability was written, correct, and unreachable.
-
-                  THE TOAST IS THE BACKUP AND THE MARK ON THE CARD IS THE ANSWER, which is how
-                  `archive` works on the register list. Nothing is written: the record is not behind
-                  this screen yet, and both primitives say so on the thing that moved rather than
-                  only in a message at the other end of the screen.
-                -->
-                {#if segment.type === 'block'}
-                  <!-- A ROW SOMEBODY JUST TICKED OR MOVED IS WHERE THEY LEFT IT, and each gesture is handed the rows
-                       as drawn, because that is the list its place is found in. -->
-                  {@const shown = keptSegment(slot.i, segment)}
-                  <Block
-                    block={shown}
-                    opts={{ ...optsFor(block), cellHref: (i: number) => block.metrics?.[i]?.href ?? null }}
-                    onmove={(row, to) => moveCard(block, row, to, slot.i, shown.rows)}
-                    ontick={(row, done) => tickTask(block, row, done, slot.i, shown.rows)}
-                    onact={(row, option) => askGate(row, option)}
-                    onreschedule={(row, drop) => void rescheduleBar(block, row, drop, slot.i, shown.rows)}
-                    oncapture={capturable(block) ? captureLine : undefined}
-                    oninput={block.kind === 'inputs' && live ? typeInto : undefined}
-                  />
-                  <!-- WHAT THE RECORD REFUSED ABOUT A FIELD IS SAID UNDER ITS BLOCK, named by the field's label, until that
-                       field is written. -->
-                  {#if segment.kind === 'inputs'}
-                    {#each shown.rows as r}
-                      {@const fix = saidOf(r)}
-                      {#if fix}<p class="block-said" role="status" data-intent="bad">{r.cells[1]}: {fix}</p>{/if}
-                    {/each}
-                  {/if}{:else if segment.type === 'degraded'}<Degraded {segment} />{:else if segment.type === 'markdown'}<div class="document"><Markdown {segment} opts={{ href: inApp }} /></div>{/if}
-              {/each}
-            {/if}
-
-            <!--
-              AND IT SAYS THAT IT IS A SLICE.
-
-              `limit:` cuts the rows a block draws and nothing rendered ever admitted it. Six blocks
-              in the seed are cut today — `/p/marlow-co`'s Money shows 8 of that client's 12
-              obligations, `/p/estate`'s timeline 8 of 11, `/p/work`'s steps 5 of 8 — each under a
-              heading that reads as the complete answer to the question it asks. Invisible at nine
-              rows and a lie at four hundred.
-
-              ONE LINE FOR ALL SIXTEEN KINDS, and not the `table` primitive's own `cap` prop: four of
-              the six cut blocks are `timeline`, `steps` and `spec`, so a fix inside `Table` would
-              have covered a third of them and left the rest silent in a way that looks deliberate.
-
-              IT IS A `status`, NOT AN ASIDE. The count changes when the rows do, and somebody who
-              cannot see the list end short is exactly who needs to be told it did.
-            -->
-            <!-- THE SCHEDULED ACTIONS THIS PROJECT RUNS ON, under the agents pack's own "Runs on" heading and
-                 above its keys, tools and skills. Not while arranging: a list that fetches is not a block to move. -->
-            {#if block.kind === 'section' && block.heading === actionWords.runsOn && param && !arranging}
-              <Actions project={param.title} />
-              <!-- A PROJECT'S OWN KEY FOR ITS NUMBERS, beside what it runs on, when the record keeps a list of them. -->
-              <Reporting register={param.register} seq={param.seq} title={param.title} />
-            {/if}
-            <!-- AN ORGANISATION'S "Send numbers here": the key its projects report with, and the line that uses it. -->
-            {#if block.kind === 'section' && block.heading === copy.reportHeading && param && !arranging}
-              <Reporting register={param.register} seq={param.seq} title={param.title} />
-            {/if}
-<!--
-              EXCEPT WHERE THE BLOCK ALREADY SAID IT, BETTER. A `queue` ends in its own count of what
-              is left and that count is a door: under it this line added "Showing 3 of 8." in the same
-              breath, which is the same fact twice, and the second telling is the one with nowhere to
-              press. One kind, named, rather than a rule about kinds: every other kind is silent about
-              its own slice, which is why this line exists at all.
-            -->
-            {#if !drawn.refusal && !block.cannot && block.kind !== 'queue' && block.total > block.shown}
-              {@const to = openHref(block)}
-              <p class="block-slice" role="status">
-                {block.source === 'forecast.runway'
-                  ? copy.ofWhichWalked(block.shown, block.total, block.horizon ?? 180)
-                  : copy.ofWhichDrawn(block.shown, block.total)}.{#if to}{' '}
-                  <a class="tap" href={inApp(to)}>{copy.openTheRest(REGISTERS[block.register!]?.name ?? block.register!)}</a>
-                {/if}
-              </p>
-            {/if}
-          </div>
-        {/if}
-      {/snippet}
-
-      <!-- A COLUMN'S BLOCKS, run by run. A boxed section and the blocks after it are one surface, drawn only when one of
-           them is drawn, so a box whose every block said no to `when:` leaves no empty panel behind. -->
-      {#snippet column(list: Laid[])}
-        {#each runsOf(list) as run}
-          {#if run.box}
-            {#if run.items.some((x) => x.block.drawn)}
-              <div class="box">
-                {#each run.items as x (x.slot.i)}{@render slotted(x)}{/each}
-              </div>
-            {/if}
-          {:else}
-            {#each run.items as x (x.slot.i)}{@render slotted(x)}{/each}
-          {/if}
-        {/each}
-      {/snippet}
-
-      {#if layout}
-        <!-- TWO COLUMNS, the main one a twelve-column flow of its own so a block's `span` keeps its meaning inside it, and
-             the rail one stack. The rail is drawn only while it holds a block, so a page whose every block is in main
-             draws as one column rather than beside an empty third of the screen. -->
-        <!-- AND THE MAIN COLUMN IS DRAWN ONLY WHILE IT HOLDS ONE, so a page whose every block is in the rail does not draw
-             two thirds of the screen empty beside it; the rail then takes the row, as main does when it is alone. -->
-        {#if split.main.length > 0}
-          <div
-            class="area"
-            data-area="main"
-            style="--area-span:{mainSpan(layout)}"
-            role={arranging ? 'list' : undefined}
-            aria-label={arranging ? copy.mainColumn : undefined}
-          >
-            {@render column(split.main)}
-          </div>
-        {/if}
-        {#if split.rail.length > 0}
-          <div
-            class="area"
-            data-area="rail"
-            style="--area-span:{layout.rail}"
-            data-sticky={stuck ? '' : undefined}
-            role={arranging ? 'list' : undefined}
-            aria-label={arranging ? copy.sideRail : undefined}
-            bind:this={railEl}
-            bind:clientHeight={railHeight}
-          >
-            {@render column(split.rail)}
-          </div>
-        {/if}
-      {:else}
-        {@render column(pairs)}
-      {/if}
+      <PageBody mode="preview" page={live.page.page} blocks={all} now={live.now} writes={null} ids={pre} level={3} />
     {/if}
-  </div>
-
-  <AddBlock bind:open={adding} blocks={result?.blocks ?? []} register={primary} onadd={add} />
+  </section>
 {/if}
 
 <style>
-  /* TWELVE COLUMNS, and `span` finally means something.
-     
-     The declaration has carried `span: 1–12, default 12` since 06 §1.1 and nothing has ever read
-     it — every block rendered full width regardless. This is that key, rendered.
-
-     A FLOW, not a canvas. Blocks fill the row and wrap; there is no x, no y and no hole. 21 §3.1
-     rejected free placement on measured evidence — in Home Assistant's masonry a one-pixel height
-     difference could move a card from the leftmost column to the rightmost, and people lost their
-     spatial memory of where a control lived. A flow cannot do that: the order you declared is the
-     order you get, at every width, forever.
-
-     `align-items: start` so a half-width block beside a tall one keeps its own height instead of
-     stretching to match — a stat tile stretched to the height of the table next to it is a stat
-     tile with a hundred pixels of nothing under the figure. */
-  /* THE CAP IS FOR THE PROSE, NOT FOR THE PAGE. It used to be 1180px flat, which fitted a 1440
-     laptop exactly and then stopped: at 1920 it left 496px of the main column empty, and at 2560 it
-     left 1136px — half the screen, on a page whose whole job is to put four things side by side.
-
-     A limit is still right, because a twelfth of 2560px is not a column anybody scans, and a table
-     row two and a half thousand pixels wide is a row the eye loses on the way back. But the thing
-     that actually needs a measure is running text, and `.measure` already caps that at 72ch inside
-     the block that has it. So the page gets the width a dashboard can use and prose keeps its own
-     limit, rather than every block on every page paying for the one that reads like a paragraph. */
-  /* The same weight and colour as the register grid's own cap line, because it is the same
-     sentence about the same thing seen from the page rather than from the list. Left-aligned rather
-     than centred: it sits under content of every shape here, and a centred line under a two-row
-     `spec` block reads as a caption for it. */
-  .block-cannot {
-    margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
-  }
-
-  .block-slice {
-    margin: 0;
-    padding-block-start: var(--sp-2);
-    color: var(--dim);
-    font-size: var(--t-sm);
-  }
-
-  /* An input's refusal, under the inputs it is about, in the size the slice line under a block is said in. */
-  .block-said {
-    margin: 0;
-    padding-block-start: var(--sp-2);
-    font-size: var(--t-sm);
-  }
-
-  .page {
-    display: grid;
-    grid-template-columns: repeat(12, minmax(0, 1fr));
-    align-items: start;
-    gap: var(--sp-7) var(--sp-6);
+  /* A PAGE THAT CANNOT BE DRAWN IS ONE SENTENCE, NOT A GRID, inside the page's own gutter and cap, so it sits where the
+     page would have. */
+  .said {
     padding: var(--sp-5) var(--gutter) var(--sp-9);
     max-inline-size: var(--page-max);
   }
 
-  /* A PAGE THAT CANNOT BE DRAWN IS ONE SENTENCE, NOT A GRID. In the twelve columns the refusal took
-     the first one, 90px at 1440, and wrapped a word to a line. */
-  .page.said {
-    display: block;
-  }
-
-  /* ── the main column and the rail (brief D4) ──────────────────────────────
-     THE TWO COLUMNS ARE SPANS OF THE PAGE'S OWN TWELVE, so the rail's `4` is four of the same twelfths a block's span
-     is counted in, and the gutter between the columns is the gutter between blocks. At 1440 with the app's rail open
-     the page is about 1126px across: tracks of about 64.5px and 32px gaps, so a rail of 4 is 354px and the main column
-     740px; a rail of 3 is 258px, which still holds a card, and that is why the kernel stops at 3.
-
-     THE MAIN COLUMN IS A TWELVE-COLUMN FLOW OF ITS OWN, so `span: 6` there is half the main column, not half the page.
-     THE RAIL IS ONE STACK, and a block's span means nothing in it: every block is the rail's width, one under another,
-     each as tall as itself. That is the property a flow could not give, where a short block beside a tall one left a
-     hole under it. `align-items: start` on `.page` is what keeps the rail its own height rather than the main
-     column's, and a sticky rail depends on it: a rail stretched to the main column's height has nowhere to stick. */
-  .area {
+  .preview {
     display: grid;
-    grid-column: span var(--area-span, 12);
-    align-items: start;
-    gap: var(--sp-7) var(--sp-6);
+    gap: var(--sp-4);
     min-inline-size: 0;
   }
 
-  .area[data-area='main'] {
-    grid-template-columns: repeat(12, minmax(0, 1fr));
-  }
-
-  /* A RAIL WITH NOTHING IN IT IS NOT DRAWN, and the main column then takes the page rather than leaving a third of it
-     empty beside itself. A MAIN COLUMN WITH NOTHING IN IT is not drawn either, and the rail takes the page the same way. */
-  .area[data-area='main']:last-child,
-  .area[data-area='rail']:first-child {
-    grid-column: 1 / -1;
-  }
-
-  .area[data-area='rail'] {
-    grid-template-columns: minmax(0, 1fr);
-    /* Where it sticks, set whether or not it does: the same offset the settings page's sticky list uses, under the
-       page head, and the offset `PageView` subtracts when it measures whether the rail fits. */
-    inset-block-start: calc(var(--sticky) + var(--sp-4));
-  }
-
-  .area[data-area='rail'] .block-slot {
-    grid-column: auto;
-  }
-
-  /* STICKY ONLY WHERE THERE ARE TWO COLUMNS. Under 900px the rail follows the main column, and a rail pinned at the
-     top of a phone would cover the column it follows. */
-  @media (width >= 900px) {
-    .area[data-area='rail'][data-sticky] {
-      position: sticky;
-    }
-  }
-
-  /* A BOXED SECTION'S SURFACE: the section and the blocks after it, up to the next section, on one panel. The same
-     ladder every surface here climbs: the page is `--bg`, this is one step up at `--s1` with the hairline a lifted
-     panel has, and the cards inside it sit a step above that. `--r-lg` because it holds `--r-md` cards with padding
-     between, and a frame with the radius of what it holds reads as drawn a size too small. Inside it the blocks keep
-     their spans, as twelfths of the box. */
-  .box {
-    grid-column: 1 / -1;
-    display: grid;
-    grid-template-columns: repeat(12, minmax(0, 1fr));
-    align-items: start;
-    gap: var(--sp-5) var(--sp-6);
-    min-inline-size: 0;
-    padding: var(--sp-5);
-    background: var(--s1);
-    border: 1px solid var(--line);
-    border-radius: var(--r-lg);
-  }
-
-  .area[data-area='rail'] .box {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  /* While arranging, the block's way to the other column, under its bar and at its leading edge. */
-  .area-move {
-    display: flex;
-    margin-block-end: var(--sp-2);
-  }
-
-  /* UNDER 900px THE RAIL FOLLOWS THE MAIN COLUMN, the app's one narrow breakpoint, for the reason the page's own single
-     column gives below: the declared order is the one thing a narrow screen keeps. At 390 the page is 358px between
-     the 16px gutters, both columns take all of it, and the rail's blocks come after the main column's in the order
-     they were declared. A box drops its inner columns and a step of padding, so its blocks are 324px across rather than 308. */
-  @media (width < 900px) {
-    .area,
-    .area[data-area='main'],
-    .area[data-area='rail'] {
-      grid-column: 1 / -1;
-      grid-template-columns: minmax(0, 1fr);
-    }
-
-    .box {
-      grid-template-columns: minmax(0, 1fr);
-      padding: var(--sp-4);
-    }
-  }
-
-  .block-slot {
-    grid-column: span var(--span, 12);
-    /* Required, not decorative: the tracks are `minmax(0, 1fr)` and a grid item without it refuses
-       to shrink below its content, so one wide table pushes the whole row past the page. */
-    min-inline-size: 0;
-    /* The landing line is positioned against this. */
-    position: relative;
-  }
-
-  /* NO RULE UNDER THE HEADER. The name at the section size is what says a block starts here, and
-     a hairline under it was a second device doing the same job. The source link shares the name's
-     baseline, which is what keeps the two halves of the header together. */
-  .block-bar {
-    display: flex;
-    align-items: baseline;
-    gap: var(--sp-3);
-    margin-block-end: var(--sp-3);
-  }
-
-  /* A BLOCK NAME IS A HEADING AND SHOULD LOOK LIKE ONE. At `--t-ui` and weight 500 in `--ink2` it
-     was the same size, weight and colour as the body text underneath it, so a page of six blocks
-     read as one undifferentiated column and the eye had nothing to jump between. It is the second
-     level of the page's hierarchy — under the page title, over everything in the block — and now
-     it takes the size `Section` gives every other heading at that level. */
-  /* Section size, not page size: 20px belongs to the page title alone (DESIGN-BRIEF 4.8). */
-  .block-name {
+  .preview-title {
+    margin: 0;
     color: var(--ink);
     font-family: var(--font-ui);
-    font-size: var(--t-base);
+    font-size: var(--t-md);
     font-weight: 600;
-    letter-spacing: -0.005em;
   }
 
-  /* Every block header names its source, and `o` opens that register PRE-FILTERED to the block's
-     own `where:`. That is the down half of the two-altitude ladder, and nothing may break it. */
-  .block-source {
-    display: flex;
-    flex: none;
-    align-items: center;
-    gap: var(--sp-1);
-    margin-inline-start: auto;
-    color: var(--dim);
-    font-size: var(--t-xs);
-    text-decoration: none;
-  }
-
-  .block-source:hover {
-    color: var(--ink);
-  }
-
-  /* TWO ALTITUDES, BUILT UPWARD FROM THE FLOOR. The register name is the louder half and the
-     predicate the quieter one, and the obvious way to say that — `--dim` on both, then
-     `opacity: 0.8` on the predicate — put it under the contrast floor in light. `--dim` is solved
-     to CLEAR that floor, so any opacity on top of it spends the whole margin the theme just
-     bought; the theme was right and this call site was wrong. Raising the register name says the
-     same thing and costs nothing, because the ceiling has room and the floor does not. */
-  .block-where {
-    position: absolute;
-    inline-size: 1px;
-    block-size: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
-
-  /* The word, quieter than the clause it introduces: it is a label and the clause is the fact. */
-  .block-where-lead {
-    color: var(--dim);
-    font-size: var(--t-sm);
-  }
-
-  /* The file sits above its own text, on the leading edge of nothing else, so it reads as an action
-     ON the source rather than as part of the page the source describes. Full width for the reason
-     the `pre` below it is: neither is a block and neither has a declared span. */
-  .source-file {
-    grid-column: 1 / -1;
-    display: flex;
-    justify-content: flex-end;
+  .compare {
+    display: grid;
+    gap: var(--sp-5) var(--sp-6);
+    align-items: start;
     min-inline-size: 0;
   }
 
-  .source {
-    /* THE WHOLE WIDTH, because it is not a block. Every other child of `.page` is a block with a
-       declared span; this is the page's own source, and with no span it took one column of twelve —
-       103 pixels of `page: m` / `title: ` / `nav: { ` clipped down the left edge with fourteen
-       hundred beside it. `minmax(0, 1fr)` on the tracks is what lets a `pre` scroll instead of
-       stretching them, so the two rules are one decision. */
-    grid-column: 1 / -1;
+  .compare-switch {
+    justify-self: start;
+  }
+
+  .compare-side {
+    display: grid;
+    gap: var(--sp-3);
     min-inline-size: 0;
+  }
+
+  .compare-name {
     margin: 0;
-    padding: var(--sp-4);
-    background: var(--s1);
-    border-radius: var(--r-md);
-    color: var(--ink2);
-    font-family: var(--font-id);
+    color: var(--dim);
     font-size: var(--t-sm);
-    line-height: 1.7;
-    overflow-x: auto;
+    font-weight: 500;
   }
 
-  /* `#b-4` must not scroll underneath the sticky header. Paid once, per anchor. */
-  .block-slot {
-    scroll-margin-block-start: calc(var(--sticky) + var(--sp-4));
-  }
-
-  /* The figure's own bottom margin is the LIST's spacing, and the grid already provides it. Both
-     were applying, so every gap on a declared page was 48px where the token says 24. */
-  .block-slot :global(.block) {
-    margin-block-end: 0;
-  }
-
-  /* The cursor is a BAND on the leading edge, not a box around the block. A block is already a
-     bordered card; a second border around it reads as two nested boxes rather than as "this one".
-     The same 2px inset the register grid uses for its focused row, for the same reason. */
-  .block-slot[data-cursor] {
-    outline: 2px solid var(--accent);
-    outline-offset: var(--sp-2);
-    border-radius: var(--r-sm);
-  }
-
-  /* ── arranging ────────────────────────────────────────────────────────────
-     The block is outlined rather than lifted. A card that grows a shadow the moment a mode opens
-     tells you the mode changed the page; an outline tells you the mode changed what you can do TO
-     the page, which is the true thing. */
-  .block-slot[data-arranging] {
-    outline: 1px dashed var(--edge);
-    outline-offset: var(--sp-2);
-    border-radius: var(--r-sm);
-    cursor: grab;
-  }
-
-  /* THE LANDING LINE. A 3px accent bar on the edge the held block will arrive at, drawn with an
-     outline-style pseudo-element so it sits over the block's own border rather than moving it —
-     a border that appears on hover reflows the grid under the pointer, which makes a drag feel
-     like it is fighting you. `inset-inline` / `inset-block` so it mirrors under rtl for free. */
-  /* `--z-raise`, WHICH IS THE STEP THIS NEEDED AND DID NOT HAVE. It was a bare 1, because the
-     four names under it are a global overlay ORDER and this is not one: it is a pseudo-element
-     clearing its own sibling, `.block-slot`s border, inside one local stacking context. Naming
-     it `--z-sheet` would have put a drag-and-drop hairline at the tier of an actual bottom
-     sheet. The token now says what it is, above its own sibling and below every overlay. */
-  .block-slot[data-drop]::after {
-    content: '';
-    position: absolute;
-    z-index: var(--z-raise);
-    background: var(--accent);
-    border-radius: 999px;
-    pointer-events: none;
-  }
-
-  /* Side by side: a vertical line on the leading or trailing edge. */
-  .block-slot[data-drop='before']::after,
-  .block-slot[data-drop='after']::after {
-    inset-block: calc(var(--sp-2) * -1);
-    inline-size: 3px;
-  }
-
-  .block-slot[data-drop='before']::after {
-    inset-inline-start: calc(var(--sp-3) * -1);
-  }
-
-  .block-slot[data-drop='after']::after {
-    inset-inline-end: calc(var(--sp-3) * -1);
-  }
-
-  /* Full width: it stacks, so the line goes across the top or the bottom instead. */
-  .block-slot[data-stacked][data-drop='before']::after,
-  .block-slot[data-stacked][data-drop='after']::after {
-    inset-inline: calc(var(--sp-2) * -1);
-    inset-block: auto;
-    inline-size: auto;
-    block-size: 3px;
-  }
-
-  .block-slot[data-stacked][data-drop='before']::after {
-    inset-block-start: calc(var(--sp-3) * -1);
-  }
-
-  .block-slot[data-stacked][data-drop='after']::after {
-    inset-block-end: calc(var(--sp-3) * -1);
-  }
-
-  /* The one moving. Half-visible rather than hidden, so the row you are dragging out of does not
-     collapse and re-lay-out under the pointer. */
-  .block-slot[data-dragging] {
-    opacity: 0.45;
-    outline-style: solid;
-    outline-color: var(--accent);
-  }
-
-  /* A page being arranged is a page whose content is not the point, and the obvious way to say so —
-     `opacity: 0.65` on the block — put every word in it under the contrast floor. In a mode a
-     person is actively working in, for as long as they are in it.
-
-     It is the same mistake as `.block-where`, and the same fix: build the hierarchy by RAISING the
-     controls rather than sinking the content through the floor. The block recedes onto the sunk
-     surface, its own borders soften, and the control bar above it keeps full contrast — so the
-     blocks read as objects being moved rather than as text you are meant to be reading, and the
-     text stays readable, which it has to be to know which block you are holding.
-
-     The gate only caught this once transitions were killed. Before that, axe kept measuring the
-     opacity mid-transition and reporting a pass, which is a gate agreeing with itself. */
-  .block-slot[data-arranging] :global(.block) {
-    pointer-events: none;
-  }
-
-  .block-slot[data-arranging] :global(.block) > :global(*) {
-    background: var(--sunk);
-    border-color: color-mix(in srgb, var(--line) 55%, transparent);
-  }
-
-  /* ONE COLUMN below 900px, in declaration order.
-     
-     The corpus never wrote this rule down, so here it is with its reason. 13 §10 has two
-     breakpoints and 05 §6 allows width to change LAYOUT but never size. Collapsing to one column
-     keeps the only thing a span was ever encoding — which block comes after which — and that is
-     precisely the property masonry lost. There is no second stored layout for narrow, because a
-     second layout is a second thing to keep in sync and nobody ever does. */
   @media (width < 900px) {
-    .page {
-      grid-template-columns: minmax(0, 1fr);
+    .said {
       padding: var(--sp-4) var(--gutter) var(--sp-8);
     }
 
-    .block-slot {
-      grid-column: auto;
-    }
-
-    /* Both of them, for one reason. `13 §10`: "Authoring: read and approve, do not author. The page
-     builder and pack builder are desktop surfaces." */
-  @media (width < 900px) {
+    /* THE LINK TO THE SOURCE IS A DESKTOP AFFORDANCE, as Edit layout beside it is (13 §10). */
     .source-slot {
       display: none;
     }
-  }
 
-  .arrange-slot {
-      display: none;
-    }
-
-    /* The query a block was drawn from is PROVENANCE, and on a phone it is two lines of monospace
-       above every block competing with the block's own heading. It is a desktop affordance for the
-       same reason the source link beside it is. */
-    .block-where {
+    /* ONE AT A TIME ON A PHONE: the side the switch has not chosen is not drawn. */
+    .compare[data-showing='was'] .compare-side[data-side='after'],
+    .compare[data-showing='after'] .compare-side[data-side='was'] {
       display: none;
     }
   }
 
-  /**
-   * A STAT IN A NARROW SLOT STACKS ITS FIGURES, because a slot on this page is narrower than a
-   * phone long before the window is, and every rule below this one is keyed to the VIEWPORT.
-   *
-   * `/p/portfolio` puts a two-figure stat in a four-column slot. Measured in Chromium on the
-   * shipped record, that block is 267px wide in a 1180px window, 215px at 1024 and 174px at 900,
-   * which leaves each cell 117.7px, 91.7px and 71px. `£22,600.00` draws 123px at `--t-xl`, so
-   * 5px, 31px and 52px of it were cut off: a money figure drawn short a digit, on a laptop, on a
-   * screen whose whole job is to say how much.
-   *
-   * THE LAYOUT GATE CANNOT SEE THIS and never could. It reports an element only when it reaches
-   * past the window with nothing scrolling above it, and a figure overflowing a 117px cell in the
-   * middle of the page does neither: `main.body` scrolls, which is the excuse that gate grants on
-   * purpose so that a wide table is not a finding. Truncation inside a cell is a different defect
-   * from the page sliding sideways, and nothing was measuring it.
-   *
-   * STACKED RATHER THAN SHRUNK, AND NOTHING DROPPED. A figure longer than its tile already steps
-   * down inside it (`blocks.css` reads `--chars`), and that mark is put on a figure only above ten
-   * characters, which `£22,600.00` is exactly not. What this page has instead is room down the
-   * column: one figure a row draws the whole amount at the size every other figure on the page
-   * reads at, where two columns at that width cannot draw either of them whole. Dropping a figure
-   * behind a link was the third option and it is the worst of the three here, because both figures
-   * are already the answer to the heading above them.
-   *
-   * 288px IS THE ROW'S OWN ARITHMETIC RATHER THAN A DEVICE, and it was 280 until the same figure
-   * was drawn on Linux. Two cells of 123px with the 32px gap between them need 278px, and 280 left
-   * `£22,600.00` 0.8px in a 124px cell on Windows. The same woff2 on a hosted ubuntu image draws
-   * about 1.6 per cent wider, 125.2px, which is past that cell. `record/figure-fit.test.ts` asks
-   * for two per cent of room in the face the runner draws, so on Linux two cells need
-   * 2 x 127.7 + 32 = 287.4px. 286 was tried first and left each cell 127px, 3.1 per cent on Windows
-   * but 1.4 on Linux, which that test fails on the CI runner. 288 leaves each 128px: 3.9 per cent
-   * on Windows and about 2.2 on Linux. It stops at 288 because the phone is untouched at both ends
-   * of its range and has to stay so: the slot there is the page itself, 358px at 390 and exactly
-   * 288px at 320, and the query is strictly less than, so neither stacks and the two-up strip below
-   * is still what a phone draws.
-   *
-   * AND THE THRESHOLD IS px WHERE EVERY OTHER QUERY IN THIS SYSTEM IS rem, because the width it
-   * guards is a px width: `--t-xl` is 24px whatever the root font size is, so the figure stays
-   * 123px and a rem threshold would be the only thing that moved. Written as `17.5rem` it was
-   * measured firing on a phone. With the browser's own font size set to Large, which is a 20px root
-   * and so a 350px threshold, the slot at a 360px window is 328px and a two-figure stat stacked:
-   * that undoes the two-up strip below, for figures measured at 102.7px in a 152px cell, which were
-   * never in any danger.
-   */
-  @container (inline-size < 288px) {
-    .block-slot :global(.grid:has(> .cell:nth-child(2))) {
-      grid-template-columns: minmax(0, 1fr);
-    }
-  }
-
-  /* A stat's cells are declared, so the block cannot infer how many to draw (05 §4) — but the HOST
-     may restack what it was given, and three figures across a 358px phone breaks `GBP 4,050.00`
-     into two lines. A board on a phone stacks its lanes, which is what this still does for one. */
-  @media (width < 640px) {
-    .block-slot :global(.grid) {
-      grid-template-columns: minmax(0, 1fr);
-    }
-
-    /**
-     * AND A STAT GOES TWO-UP, BECAUSE THE REASON ABOVE STOPPED BEING TRUE OF THE PAGE IT CITED.
-     *
-     * The comment over this rule used to end "Home already does this for its own stat", and Home
-     * stacked its three figures one per row until today. It no longer does: its strip is two
-     * columns with the lead figure spanning both, because one-per-row put the question list off
-     * the first screen. `/p/money` kept stacking and paid for it the way Home had: four figures at
-     * about a hundred and ten pixels each, measured at 390 as cells 356 wide stacked from y 288 to
-     * y 716, so "Where it sits" started below the fold and the page read as four cards and nothing
-     * else.
-     *
-     * TWO COLUMNS, AND THE FIRST SPANS WHEN THE COUNT IS ODD, which is Home's shape generalised:
-     * four figures are a two-by-two, three are a lead with two beneath, one is one. The count is
-     * still the declaration's; `:first-child:nth-last-child(odd)` only reads it.
-     *
-     * `:has(> .cell)` SO A BOARD IS NOT CAUGHT. Board and stat both render `class="grid"`, and a
-     * board's lanes two-up on a phone are two columns of cards at 170px, which is a different
-     * decision from this one and nobody has taken it.
-     *
-     * NO HAIRLINES BETWEEN THEM. Space separates figures (DESIGN-BRIEF 4.6), on a phone as on a
-     * desktop.
-     */
-    .block-slot :global(.grid:has(> .cell)) {
+  /* SIDE BY SIDE FROM 900px, each half a twelve-column page of its own, and no switch, since both are in view. */
+  @media (width >= 900px) {
+    .compare {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
-    /* No rules between the figures on a phone either; the grid's gap separates them. */
-    .block-slot :global(.grid:has(> .cell)) {
-      gap: var(--sp-4) var(--sp-5);
-    }
-
-    .block-slot :global(.grid:has(> .cell) > .cell:first-child:nth-last-child(odd)) {
-      grid-column: 1 / -1;
-    }
-
-    /* A step down so `GBP 28,320.00` stays one line in half a phone, which is the rule Home's strip
-       already follows for the same width. */
-    .block-slot :global(.grid:has(> .cell) .cell-figure) {
-      font-size: var(--t-lg);
-      /* ONE AMOUNT NEVER BREAKS, because its code sits on a no-break space; a figure in several currencies breaks
-         between them rather than running out of half a phone. */
-      white-space: normal;
-    }
-
-    /* THE LEAD FIGURE STAYS THE SCREEN'S HERO on a phone, a step above the figures beside it. */
-    .block-slot :global(.block[data-form='lead'] .grid > .cell:first-child) {
-      grid-column: 1 / -1;
-    }
-
-    .block-slot :global(.block[data-form='lead'] .grid > .cell:first-child .cell-figure) {
-      font-size: var(--t-2xl);
-      /* A HERO IN SEVERAL CURRENCIES BREAKS BETWEEN THEM, never inside an amount, which keeps its code on a no-break space. */
-      white-space: normal;
-    }
-
-    /* A LEAD AND THREE OR MORE FIGURES: the rest are rows under it, the label on the left and the figure
-       at the right edge with its note beneath, so the last of them is not left alone on a row of its own
-       and none of them wraps its label to fit a third of a phone. */
-    .block-slot :global(.block[data-form='lead'] .grid:has(> .cell:nth-child(4))) {
-      grid-template-columns: minmax(0, 1fr);
-      row-gap: var(--sp-3);
-    }
-
-    .block-slot :global(.block[data-form='lead'] .grid:has(> .cell:nth-child(4)) > .cell:not(:first-child)) {
-      grid-template-areas:
-        'label glyph . figure'
-        'note note note figure';
-      /* THE LABEL IS NEVER SQUEEZED, so a figure in several currencies, which is long, breaks between its amounts instead
-         of the label going to a word a line. THE MARK SITS AGAINST ITS LABEL: it had the track after a 14ch floor, so on the
-         Guide at 390 the dot after "Steps to take" floated a third of the way across. The space between is its own track. */
-      grid-template-columns: max-content auto minmax(0, 1fr) minmax(0, auto);
-      column-gap: var(--sp-2);
-    }
-
-    .block-slot :global(.block[data-form='lead'] .grid:has(> .cell:nth-child(4)) > .cell:not(:first-child) .cell-figure) {
-      font-size: var(--t-md);
-      text-align: end;
-      /* AND THE FIGURE BREAKS BETWEEN ITS AMOUNTS, never inside one: each keeps its code on a no-break space. */
-      white-space: normal;
+    .compare-switch {
+      display: none;
     }
   }
 </style>

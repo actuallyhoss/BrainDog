@@ -10,12 +10,17 @@
  *   In       JSON. A POST needs `content-type: application/json` and `sameOrigin`, except the two
  *            operator routes, which take `Authorization: Bearer <PROVISION_KEY>` instead. The fields are
  *            the `AuthCall`'s: `{ serverKey }`, `{ credential, label? }`, `{ credential }`, `{ email }`,
- *            `{ linkToken }` or `{ claimToken }`, `{ id }`; provision takes `{ slug, email, name? }`.
+ *            `{ linkToken }` or `{ claimToken }`, `{ id }`, `{ keep }`; provision takes `{ slug, email, name? }`.
  *   200      `{ ok: true, value }`, the value being `AuthBodies[flow]`; `/auth/methods` answers `MethodsBody`.
+ *   202      `/auth/invite` alone: `{ ok: true, value: { proving: true, to } }`, a new address mailed its proof.
+ *            A host that sends no mail answers that path 501 `NOT_IN_THIS_BUILD` instead (`invite.ts`).
  *   Refused  `{ ok: false, refusal: { code, fix, at? } }` at 400, 401, 403, 404, 405 or 422, with codes
  *            already in `REFUSAL_CODES`. Every sign-in that does not sign somebody in is 401
- *            `UNAUTHORIZED`, "That did not sign you in."
- *   429      a `Retry-After` header in seconds, and `{ ok: false, retryAfter }`.
+ *            `UNAUTHORIZED`, "That did not sign you in." The one 401 that is not a failed sign-in carries
+ *            `reason: 'stale'` beside its refusal: the session is good and its last proof is more than
+ *            fifteen minutes old, so the page signs in again rather than telling somebody they failed.
+ *   429      a `Retry-After` header in seconds, and `{ ok: false, retryAfter }`. The operator's key is
+ *            locked out the same way: ten wrong keys from one address, then fifteen minutes of 429.
  *   503      `{ ok: false }`: the lockout's store failed, and a lockout that cannot count refuses.
  *   Cookie   `__Host-bd_s` on https, `bd_s` on http at a loopback name, and none on any other http
  *            origin, where `/auth/methods` says `why: 'insecure'`. One opaque id; the record is on the row.
@@ -38,18 +43,31 @@ import { INVITE_ROUTES, personName, serveInvite, type InviteDoor, type InviteFlo
 import { httpStatus } from './index.ts';
 
 export { DEVICE_ROUTES, type DeviceAsk, type DeviceDoor, type DeviceFlow, type DeviceStarted } from './device.ts';
-export { INVITE_ROUTES, type InviteDoor, type InviteFlow, type InviteSeen } from './invite.ts';
+export { INVITE_ROUTES, NO_MAIL, type InviteDoor, type InviteFlow, type InviteSeen } from './invite.ts';
 
 /* ── the account ─────────────────────────────────────────────────────────── */
 
-/** One account route: where it is, and that it needs the session cookie. Both hosts serve every row. */
-export type AccountRoute = { path: string; method: 'GET'; on: 'both'; needs: 'session'; what: string };
+/**
+ * One account route: where it is, which hosts serve it, and what it needs.
+ *
+ * `stripe` IS THE ONE NEED THAT READS NO COOKIE. Stripe's webhook carries no session and comes from no page, only a
+ * signature over the body exactly as it was sent, so its door is handed the untouched `Request` and checks that
+ * itself: a body read or parsed here first is a body the signature no longer has to match.
+ *
+ * `worker` ROWS ARE BILLING'S AND CLOSING'S, which a self-host has no use for. A host that serves a row answers it;
+ * one that does not hand `serveAccount` the row's door answers 404, and the row stays one table for both.
+ */
+export type AccountRoute = { path: string; method: 'GET' | 'POST'; on: 'both' | 'worker'; needs: 'session' | 'stripe'; what: string };
 
 /**
  * The routes that answer about a person's account rather than a record (`loop/research-scheduled-actions.md` §4.6).
  *
  * THE DIRECTORY'S, LIKE SIGN-IN, and never a record's: usage is billing, and a record cannot see its own allowance.
  * A person sees the records they own and nothing of anybody else's.
+ *
+ * THE BILLING ROWS AND CLOSING ARE DECLARED BEFORE THEY ARE BUILT (`loop/finish/ops.md` §4.0 D), so the units that
+ * build them in later workflows write a door and never a route. Until a host hands `serveAccount` that door, the
+ * row answers 404 `ROUTE_UNKNOWN`, which is what a path nobody serves already answered.
  */
 export const ACCOUNT_ROUTES: readonly AccountRoute[] = [
   { path: '/account/usage', method: 'GET', on: 'both', needs: 'session', what: 'What the records you own used between two days, and each month so far against its allowance.' },
@@ -57,47 +75,140 @@ export const ACCOUNT_ROUTES: readonly AccountRoute[] = [
      the level they actually hold there. `usage` above answers for records this person OWNS; this
      answers for every one they can open at all, which is the wider question the sidebar asks. */
   { path: '/account/records', method: 'GET', on: 'both', needs: 'session', what: 'Which records you can reach, each with its name and the level you hold there.' },
+  { path: '/account/billing', method: 'GET', on: 'worker', needs: 'session', what: 'Each record you own, whether it is paid for, and whether this host takes payment at all.' },
+  { path: '/account/billing/checkout', method: 'POST', on: 'worker', needs: 'session', what: 'A payment page for a new record, `{ slug, name?, tz? }`, or for paying again, `{ record }`.' },
+  { path: '/account/billing/portal', method: 'POST', on: 'worker', needs: 'session', what: 'The page the payment provider keeps for a record you own, `{ record }`.' },
+  { path: '/account/billing/webhook', method: 'POST', on: 'worker', needs: 'stripe', what: 'The payment provider saying a payment happened, signed over the body as it was sent.' },
+  { path: '/account/close', method: 'POST', on: 'worker', needs: 'session', what: 'Close your account, `{ email }` typed to confirm, from a sign-in in the last fifteen minutes.' },
 ];
 
-/** What a host hands `serveAccount`: its origin, the Directory's sign-in or `null` where nobody signs in, and the ledger. */
+/** A door a signed-in person's POST reaches: who they are, and the JSON object they sent. */
+export type AccountAsk = (who: Who, body: Record<string, unknown>) => Result<unknown> | Promise<Result<unknown>>;
+
+/**
+ * What a host hands `serveAccount`: its origin, the Directory's sign-in or `null` where nobody signs in, the ledger,
+ * and the doors of the rows it serves.
+ *
+ * A DOOR LEFT OUT IS A ROW THIS HOST DOES NOT SERVE, answered 404. The self-host leaves out every billing door and
+ * `close`, because it bills nobody and closes no account; the Worker hands them in as each is built.
+ *
+ * `who` AND NOT A PERSON ID for the new doors, because two of them need more than the id: closing needs `provedAt`
+ * for its fifteen minutes and `email` for the address typed to confirm, and a checkout needs the address the payment
+ * provider mails a receipt to.
+ */
 export type AccountDoor = {
   origin: string;
   auth: Auth | null;
   usage: (person: string, range: { from: string; to: string }) => Result<unknown> | Promise<Result<unknown>>;
   /** `/account/records`: every open record this person can reach, each `{ slug, name, level }`. */
   records: (person: string) => Result<unknown> | Promise<Result<unknown>>;
+  /** `GET /account/billing`: `{ records, open }`. */
+  billing?: ((who: Who) => Result<unknown> | Promise<Result<unknown>>) | undefined;
+  /** `POST /account/billing/checkout`: `{ url }` of a payment page. */
+  checkout?: AccountAsk | undefined;
+  /** `POST /account/billing/portal`: `{ url }` of the provider's page for a record this person owns. */
+  portal?: AccountAsk | undefined;
+  /** `POST /account/close`: the account closed, after the checks the door makes. */
+  close?: AccountAsk | undefined;
+  /**
+   * `POST /account/billing/webhook`: the request as it arrived, answered whole by the door.
+   *
+   * THE DOOR WRITES ITS OWN RESPONSE, status and body, because the provider reads the status and nothing else, and
+   * it must be able to answer 400 to a bad signature before anything here has an opinion about the body.
+   */
+  webhook?: ((request: Request) => Promise<Response>) | undefined;
 };
+
+/** A row this host does not serve: the same answer as a path that is no row at all. */
+const unserved = (): Response => refusal(404, { code: 'ROUTE_UNKNOWN', fix: 'There is no account route at that address.' });
+
+/** What one row does once the session is known, or `null` where this host was handed no door for it. */
+type Asked = (who: Who, body: Record<string, unknown>, url: URL) => Result<unknown> | Promise<Result<unknown>>;
+
+function askedOf(path: string, door: AccountDoor): Asked | null {
+  const { billing, checkout, portal, close } = door;
+  switch (path) {
+    case '/account/usage':
+      return (who, _body, url) => door.usage(who.person, { from: url.searchParams.get('from') ?? '', to: url.searchParams.get('to') ?? '' });
+    case '/account/records':
+      return (who) => door.records(who.person);
+    case '/account/billing':
+      return billing ? (who) => billing(who) : null;
+    case '/account/billing/checkout':
+      return checkout ? (who, body) => checkout(who, body) : null;
+    case '/account/billing/portal':
+      return portal ? (who, body) => portal(who, body) : null;
+    case '/account/close':
+      return close ? (who, body) => close(who, body) : null;
+    default:
+      return null;
+  }
+}
+
+/** The one sentence a signed-out request is told, by what it was trying to see or do. */
+function signInFor(path: string): string {
+  if (path === '/account/records') return 'Sign in to see which records you can reach.';
+  if (path === '/account/usage') return 'Sign in to see what your records used.';
+  if (path === '/account/close') return 'Sign in to close your account.';
+  return 'Sign in to see billing for the records you own.';
+}
 
 /**
  * Answer one `/account/*` request.
  *
- * THE SESSION COOKIE AND NOTHING ELSE. A bearer is an agent or the server key, and neither is a person with an
- * account. No cookie, a host where nobody signs in, or a session that has ended is 401 `UNAUTHORIZED`.
+ * THE SESSION COOKIE AND NOTHING ELSE, EXCEPT FOR THE WEBHOOK. A bearer is an agent or the server key, and neither
+ * is a person with an account. No cookie, a host where nobody signs in, or a session that has ended is 401
+ * `UNAUTHORIZED`. The webhook is the payment provider, which has no cookie, and it is handed on before anything
+ * here reads the request.
+ *
+ * A POST IS A PAGE ON THIS ORIGIN SENDING JSON, as every sign-in POST is: the cookie rides on any request a browser
+ * makes, so a page elsewhere that could POST here would be spending somebody's session on a checkout or a closing.
  */
 export async function serveAccount(request: Request, door: AccountDoor): Promise<Response> {
   const url = new URL(request.url);
   const path = url.pathname.replace(/\/+$/, '');
   const route = ACCOUNT_ROUTES.find((r) => r.path === path);
-  if (!route) return refusal(404, { code: 'ROUTE_UNKNOWN', fix: 'There is no account route at that address.' });
+  if (!route) return unserved();
   if (request.method !== route.method)
     return refusal(405, { code: 'FORBIDDEN', fix: `${route.path} is a ${route.method}.` }, [['allow', route.method]]);
 
+  /* UNTOUCHED: no cookie read, no origin asked, no byte of the body consumed. */
+  if (route.needs === 'stripe') return door.webhook ? door.webhook(request) : unserved();
+
+  const asked = askedOf(path, door);
+  if (asked === null) return unserved();
+
+  let body: Record<string, unknown> = {};
+  if (route.method === 'POST') {
+    if (!sameOrigin(request, door.origin))
+      return refusal(403, { code: 'FORBIDDEN', fix: `Your account is answered only for pages on ${door.origin}.`, at: 'origin' });
+    const parsed = isJson(request) ? await objectOf(request) : null;
+    if (!parsed) return refusal(400, { code: 'BODY_MALFORMED', fix: `${route.path} takes a JSON object, sent as application/json.` });
+    body = parsed;
+  }
+
   const mode = cookieMode(door.origin);
   const sid = mode === null ? undefined : readSid(request, mode);
-  if (!door.auth || mode === null || sid === undefined)
-    return refusal(401, { code: 'UNAUTHORIZED', fix: path === '/account/records' ? 'Sign in to see which records you can reach.' : 'Sign in to see what your records used.' });
+  if (!door.auth || mode === null || sid === undefined) return refusal(401, { code: 'UNAUTHORIZED', fix: signInFor(path) });
   const seen = await door.auth({ flow: 'session', sid });
   if (seen.status !== 200) return answered(seen, mode);
 
   /* A ROTATION REACHES THE COOKIE whatever the row below answers. */
   const kept: Header[] = seen.session === undefined ? [] : [['set-cookie', seen.session === 'clear' ? clearCookie(mode) : sessionCookie(seen.session.sid, mode)]];
-  const person = (seen.body as Who).person;
-  const out =
-    path === '/account/records'
-      ? await door.records(person)
-      : await door.usage(person, { from: url.searchParams.get('from') ?? '', to: url.searchParams.get('to') ?? '' });
+  const out = await asked(seen.body as Who, body, url);
   return reply(out.ok ? 200 : httpStatus(out), out, kept);
 }
+
+/**
+ * The three sign-up flows, declared here before the Directory has them.
+ *
+ * THEIR ROWS ARE THIS WORKFLOW'S AND THEIR FLOWS ARE THE NEXT'S (`loop/finish/contracts.md` §3.3): the table is fixed
+ * now so the sign-up screen is written against it, and until the `AuthCall` union names these three, `serveAuth`
+ * answers each row as a way in this host does not offer.
+ */
+export type SignupFlow = 'signup.start' | 'signup.verify' | 'signup.name';
+
+const SIGNUP: ReadonlySet<string> = new Set<SignupFlow>(['signup.start', 'signup.verify', 'signup.name']);
 
 /** One sign-in route: where it is, who serves it, and what it needs. */
 export type AuthRoute = {
@@ -107,8 +218,8 @@ export type AuthRoute = {
    * The `AuthCall` it becomes. `provision` is the one that is not a flow: it makes a record, then mints a claim.
    * The two device flows reach a record and never the Directory, and `device.ts` answers them.
    */
-  flow: AuthFlow | 'provision' | DeviceFlow | InviteFlow;
-  /** The server key is the self-host's, and provisioning is the Worker's; everything else is both. */
+  flow: AuthFlow | 'provision' | DeviceFlow | InviteFlow | SignupFlow;
+  /** The server key is the self-host's; provisioning and sign-up are the Worker's; everything else is both. */
   on: 'both' | 'selfhost' | 'worker';
   /** Nothing, the session cookie, or the operator's key. A route that needs a session still answers without one: 401. */
   needs: 'nothing' | 'session' | 'operator';
@@ -121,6 +232,10 @@ export type AuthRoute = {
  * ONE ROW PER FLOW, AND THE FLOW THE PLAN DID NOT NAME GOT THE SAME RULE. `claim.mint` is in the `AuthCall`
  * union and is operator only, so it is `POST /auth/claim/mint` beside provision: a claim link that expired
  * before somebody opened it can be minted again without making a second record.
+ *
+ * EXCEPT THE TWO HALVES OF AN INVITATION'S PROOF, WHICH HAVE NO ROW AND MUST NOT. `invite.prove` trusts the host to
+ * have looked the invitation up and to hand it the address that invitation was made for; routed on its own, it
+ * would mail a proof to any address anybody typed. `/auth/invite` is the one door to both (`invite.ts`).
  */
 export const AUTH_ROUTES: readonly AuthRoute[] = [
   { path: '/auth/methods', method: 'GET', flow: 'methods', on: 'both', needs: 'nothing', what: 'Which ways in this host offers, and who the cookie belongs to.' },
@@ -135,7 +250,12 @@ export const AUTH_ROUTES: readonly AuthRoute[] = [
   { path: '/auth/passkeys', method: 'GET', flow: 'passkeys', on: 'both', needs: 'session', what: 'Your passkeys, never their keys.' },
   { path: '/auth/passkey/remove', method: 'POST', flow: 'passkey.remove', on: 'both', needs: 'session', what: 'Remove one of your passkeys, the last one included.' },
   { path: '/auth/logout', method: 'POST', flow: 'logout', on: 'both', needs: 'nothing', what: 'End this session and clear the cookie.' },
+  { path: '/auth/sessions', method: 'GET', flow: 'sessions', on: 'both', needs: 'session', what: 'Every live session you have, this one marked, each by a short reference and never by its id.' },
+  { path: '/auth/logout/all', method: 'POST', flow: 'logout.all', on: 'both', needs: 'session', what: 'End your other sessions, `{ keep: "this" }`, or every one of them, `{ keep: "none" }`.' },
   { path: '/auth/switch', method: 'POST', flow: 'switch', on: 'both', needs: 'session', what: 'Open another record you are on, in this browser. `{ slug }`.' },
+  { path: '/auth/signup/start', method: 'POST', flow: 'signup.start', on: 'worker', needs: 'nothing', what: 'Ask for a record of your own: a link is mailed to prove the address. `{ email, slug, name?, tz? }`.' },
+  { path: '/auth/signup/verify', method: 'POST', flow: 'signup.verify', on: 'worker', needs: 'nothing', what: 'Spend the mailed link, once: the person is made and signed in. `{ token }`.' },
+  { path: '/auth/signup/name', method: 'GET', flow: 'signup.name', on: 'worker', needs: 'nothing', what: 'Whether a name for a new record is free, `?slug=`, and why not when it is not.' },
   { path: '/auth/claim/mint', method: 'POST', flow: 'claim.mint', on: 'worker', needs: 'operator', what: 'A new 24-hour claim link for somebody already provisioned.' },
   { path: '/auth/provision', method: 'POST', flow: 'provision', on: 'worker', needs: 'operator', what: 'A record, its Directory rows and a 24-hour claim link, handed to the operator.' },
   ...DEVICE_ROUTES,
@@ -358,12 +478,22 @@ export function sessionContext<L extends string>(
 /** What the operator's provisioning made, before the claim link is minted for it. */
 export type Provisioned = { record: string; slug: string; person: string };
 
+/** The letters a flow names by kind rather than as a link, spelled as `MailKind` in `apps/worker/src/mail.ts` spells them. */
+export type MailNotice = Extract<Mail, { kind: string }>['kind'];
+
+/** A mail that is a link and nothing else: a sign-in link or a claim link, which carry no kind. */
+type LinkMail = Exclude<Mail, { kind: string }>;
+
 /**
  * What a host hands `serveAuth`.
  *
  * `ip` IS THE HOST'S DECISION: the socket address, `cf-connecting-ip`, or a forwarded address only behind a
  * proxy the host was told to trust. `mail` is called and not awaited, so a known and an unknown address take
  * the same time to answer; it must not throw. `operator` is the Worker's, and absent everywhere else.
+ *
+ * `mail` TAKES THE LETTER'S KIND WHERE THE MAIL IS NOT A SIGN-IN LINK: an invitation's proof, or the notice that a
+ * passkey was added or removed. A mail with no kind is a sign-in or claim link, as it always was. A host with no
+ * `mail` sends nothing, and an invitation to a new address says so rather than making anybody (`invite.ts`).
  */
 export type AuthDoor = {
   on: 'selfhost' | 'worker';
@@ -372,7 +502,9 @@ export type AuthDoor = {
   auth: Auth;
   ip: string;
   open?: boolean;
-  mail?: ((to: string, link: string) => void) | undefined;
+  mail?: ((to: string, link: string, kind?: MailNotice) => void) | undefined;
+  /** The clock the operator's lockout counts by. Absent, it is the platform's own. */
+  now?: (() => number) | undefined;
   operator?:
     | {
         key: string | undefined;
@@ -416,7 +548,7 @@ const off = (): Response => refusal(404, { code: 'ROUTE_UNKNOWN', fix: 'This Bra
  * nobody in. A link already mailed at `app.brain.dog/signin#…` still works: that host 308s a page load to
  * `/app/signin`, and a browser keeps the fragment across a redirect whose `Location` carries none.
  */
-const linkOf = (origin: string, mail: Mail, next: unknown = undefined): string => {
+const linkOf = (origin: string, mail: LinkMail, next: unknown = undefined): string => {
   const back = mailedNext(next);
   const page = back ? `${origin}/app/signin?next=${encodeURIComponent(back)}` : `${origin}/app/signin`;
   return 'linkToken' in mail ? `${page}#magic=${mail.linkToken}` : `${page}#claim=${mail.claimToken}`;
@@ -472,7 +604,12 @@ function callOf(flow: AuthFlow, body: Record<string, unknown>, sid: string | und
     case 'passkey.register.options':
     case 'passkeys':
     case 'logout':
+    case 'sessions':
       return { flow, sid: sid ?? '' };
+    /* ANYTHING BUT `none` KEEPS THIS SESSION, as the Directory reads it too: a page that sent no `keep`, or a word
+       this build does not know, never signs out the browser it was pressed in. */
+    case 'logout.all':
+      return { flow, sid: sid ?? '', keep: body.keep === 'none' ? 'none' : 'this' };
     case 'key.exchange':
       return { flow, serverKey: text(body.serverKey), ip, ...presented };
     case 'passkey.register':
@@ -482,8 +619,9 @@ function callOf(flow: AuthFlow, body: Record<string, unknown>, sid: string | und
         credential: body.credential as RegistrationJSON,
         ...(typeof body.label === 'string' ? { label: body.label } : {}),
       };
+    /* A CHALLENGE IS COUNTED AGAINST THE ADDRESS ASKING FOR IT (`chal:<ip>`), so the address goes with it. */
     case 'passkey.assert.options':
-      return { flow };
+      return { flow, ip };
     case 'passkey.assert':
       return { flow, credential: body.credential as AssertionJSON, ip, ...presented };
     case 'magic.start':
@@ -496,11 +634,14 @@ function callOf(flow: AuthFlow, body: Record<string, unknown>, sid: string | und
       return { flow, sid: sid ?? '', id: text(body.id) };
     case 'switch':
       return { flow, sid: sid ?? '', slug: text(body.slug) };
-    /* THE TWO THAT ARE HANDLED BEFORE THIS AND NOT HERE. `methods` is answered above, and
-       `claim.mint` goes through `operated`, which checks the operator key first. Naming them is
-       what lets `default` be a type error rather than a 404. */
+    /* THE FOUR THAT ARE HANDLED ELSEWHERE AND NOT HERE. `methods` is answered above, `claim.mint`
+       goes through `operated`, which checks the operator key first, and the two halves of an
+       invitation's proof are called by `serveInvite` alone, after it has looked the invitation up.
+       Naming them is what lets `default` be a type error rather than a 404. */
     case 'methods':
     case 'claim.mint':
+    case 'invite.prove':
+    case 'invite.proved':
       return null;
     default:
       return unhandled(flow);
@@ -540,6 +681,10 @@ function answered(out: AuthResult, mode: CookieMode): Response {
       return reply(429, { ok: false, retryAfter: out.retryAfter }, extra);
     case 503:
       return reply(503, { ok: false }, extra);
+    /* `stale` GOES OUT BESIDE THE REFUSAL, because it is the one 401 a page answers by signing in again rather than
+       by saying the sign-in failed, and the code alone cannot tell the two apart. */
+    case 401:
+      return reply(401, { ok: false, refusal: out.refusal, ...(out.reason === 'stale' ? { reason: 'stale' } : {}) }, extra);
     default:
       return refusal(out.status, out.refusal, extra);
   }
@@ -587,15 +732,23 @@ export async function serveAuth(request: Request, door: AuthDoor): Promise<Respo
      session reaches the cookie through the same `answered`. */
   if (route.flow === 'invite') return serveInvite(body, sid, door, (out) => answered(out, mode));
 
+  /* A SIGN-UP ROW IS DECLARED AND NOT YET SERVED: the Directory has no such flow to hand it to. The unit that adds
+     the three flows to `AuthCall` removes this line, and `callOf`'s `never` then asks it for their three cases. */
+  if (SIGNUP.has(route.flow)) return off();
+
   const call = callOf(route.flow as AuthFlow, body, sid, door.ip);
   if (!call) return off();
   const out = await door.auth(call);
 
-  /* THE LINK GOES OUT WITHOUT BEING WAITED FOR, and only as a link. A send that was awaited would make a
-     known address slower to answer than an unknown one. */
+  /* THE MAIL GOES OUT WITHOUT BEING WAITED FOR. A send that was awaited would make a known address slower to answer
+     than an unknown one. A link goes out as a link, and a notice by its kind with no link at all, because a passkey
+     notice opens nothing. An invitation's proof never reaches here: only `serveInvite` asks for one, and it mails the
+     proof with the invitation beside it. */
   if (out.status === 200 && out.mail && door.mail) {
+    const mail = out.mail;
     try {
-      door.mail(out.mail.to, linkOf(door.origin, out.mail, body.next));
+      if (!('kind' in mail)) door.mail(mail.to, linkOf(door.origin, mail, body.next));
+      else if (mail.kind !== 'invite.prove') door.mail(mail.to, '', mail.kind);
     } catch {
       /* A failed send is the host's to report; the answer is the same either way. */
     }
@@ -624,19 +777,73 @@ async function methods(door: AuthDoor, mode: CookieMode | null, sid: string | un
   return answered({ ...out, body }, mode);
 }
 
+/** Ten wrong operator keys from one address are compared; the eleventh is refused, as every other lockout is. */
+const OPERATOR_TRIES = 10;
+/** How long the strikes are remembered, and how long the lock lasts once they run out. */
+const OPERATOR_WINDOW_MS = 15 * 60_000;
+/**
+ * The most addresses the lockout holds at once. Past it the address struck least recently goes first, so a flood
+ * of invented addresses costs a bounded map and never the isolate.
+ */
+const OPERATOR_HELD = 4_096;
+
+type Strikes = { n: number; first: number; until: number };
+
+/**
+ * Wrong operator keys, by the address that sent them.
+ *
+ * PER PROCESS, WHICH IS THE HONEST COST AND IS SAID HERE. The Directory's lockout (`dir_fail`) is the durable one,
+ * and it has no flow a host can ask to count a key the Directory never sees; so on the Worker this is per isolate,
+ * a brake on one sender's loop rather than a ceiling across every isolate, as the ingest budget in
+ * `apps/worker/src/route.ts` says of itself. The route never answered a wrong key with anything but 401, so any
+ * number of guesses could be sent before; now ten can, from one address to one isolate. The key, compared in
+ * constant time, stays the defence; this makes guessing it slow.
+ */
+const struck = new Map<string, Strikes>();
+
+/**
+ * One strike against `ip`, before the key is compared. `null` means go on; a number is the seconds to wait.
+ *
+ * RESERVE BEFORE COMPARE, AS THE DIRECTORY DOES (`packages/record/src/identity.ts`, `LOCKOUT`): a strike written
+ * after the comparison could be outrun by a burst of guesses sent together. A right key clears the address.
+ */
+function strike(ip: string, now: number): number | null {
+  const key = ip || 'unknown';
+  const held = struck.get(key);
+  if (held && held.until > now) return Math.ceil((held.until - now) / 1000);
+  const row: Strikes = held && now - held.first < OPERATOR_WINDOW_MS ? held : { n: 0, first: now, until: 0 };
+  row.n += 1;
+  if (row.n > OPERATOR_TRIES) row.until = now + OPERATOR_WINDOW_MS;
+  /* Deleted and set again, so the map's order is the order addresses were last struck and the oldest is first. */
+  struck.delete(key);
+  struck.set(key, row);
+  for (const oldest of struck.keys()) {
+    if (struck.size <= OPERATOR_HELD) break;
+    struck.delete(oldest);
+  }
+  return row.until > now ? Math.ceil(OPERATOR_WINDOW_MS / 1000) : null;
+}
+
 /**
  * The operator's two routes: a record and a claim link, or a claim link on its own. Worker only.
  *
  * THE KEY IS COMPARED IN CONSTANT TIME, AND AN UNSET ONE IS NO ROUTE AT ALL. The link comes back to the
  * operator in the answer and is never mailed from here: a person should hear about their record from the
  * person who made it, and the operator decides how.
+ *
+ * AND A WRONG KEY IS LOCKED OUT LIKE EVERY OTHER DOOR'S: ten, then fifteen minutes of 429 with `Retry-After`, the
+ * right key during it included, exactly as `/auth/token` answers the server key.
  */
 async function operated(request: Request, route: AuthRoute, door: AuthDoor): Promise<Response> {
   const operator = door.operator;
   if (!operator?.key) return off();
+  const now = door.now?.() ?? Date.now();
+  const wait = strike(door.ip, now);
+  if (wait !== null) return reply(429, { ok: false, retryAfter: wait }, [['retry-after', String(wait)]]);
   const bearer = /^Bearer\s+(.+)$/i.exec(request.headers.get('authorization') ?? '')?.[1]?.trim() ?? '';
   if (!bearer || !(await sameKey(bearer, operator.key)))
     return refusal(401, { code: 'UNAUTHORIZED', fix: 'This route takes the operator key.', at: 'authorization' });
+  struck.delete(door.ip || 'unknown');
   const body = isJson(request) ? await objectOf(request) : null;
   if (!body) return refusal(400, { code: 'BODY_MALFORMED', fix: `${route.path} takes a JSON object, sent as application/json.` });
 
@@ -657,8 +864,10 @@ async function operated(request: Request, route: AuthRoute, door: AuthDoor): Pro
     made = out.value;
   }
   const minted = await door.auth({ flow: 'claim.mint', email });
-  if (minted.status !== 200 || !minted.mail) return answered(minted, cookieMode(door.origin) ?? 'secure');
-  const claim = linkOf(door.origin, minted.mail);
+  if (minted.status !== 200) return answered(minted, cookieMode(door.origin) ?? 'secure');
+  const mail = minted.mail;
+  if (!mail || 'kind' in mail) return answered(minted, cookieMode(door.origin) ?? 'secure');
+  const claim = linkOf(door.origin, mail);
   const expires = (minted.body as { expires: number }).expires;
   return reply(200, { ok: true, value: made ? { ...made, claim, expires } : { claim, expires } });
 }

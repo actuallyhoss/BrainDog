@@ -43,6 +43,15 @@ const reachable = <T>(r: Result<T>): Result<T> =>
  * `previewPage` JOINED WITH ITS BRANCH (M4 wave three brief 3) for the same reason: before it, a host that routed the
  * method still left `surfaceOver`'s answer without it, measured, so `propose` with `try` on a page change would have
  * answered `NOT_IN_THIS_BUILD` over stdio and drawn the page over HTTP.
+ *
+ * `triage` JOINED WITH ITS TOOL (`loop/finish/contracts.md` §6.2), for the same lesson: an agent given the `inbox` reach
+ * works from the command line as often as over `POST /mcp`, and left off this list it would be told this record cannot
+ * file an arrival when its host can. Who may triage is still the record's to say, in its own sentence.
+ *
+ * `previewChange` JOINED WITH ITS BRANCH (`loop/finish/contracts.md` §6.3, `change_preview`), and `tryAutomation` beside it
+ * for its own (`automation_try`), for `previewPage`'s reason: each backs `propose` with `"try"`, on a bundle and on a
+ * rule change, and left off this list a stdio agent would be told this record cannot draw a change or try a rule when
+ * its host can.
  */
 const LATER = [
   'context',
@@ -56,6 +65,9 @@ const LATER = [
   'scriptTry',
   'previewPage',
   'inbox',
+  'triage',
+  'previewChange',
+  'tryAutomation',
 ] as const;
 
 export async function surfaceOver(clientFor: (ctx: Ctx) => Client): Promise<McpSurface<Ctx>> {

@@ -23,10 +23,12 @@
  */
 
 import type { Clock, Result, Sql } from '@braindog/ports';
+import type { AuthCall, AuthResult, Who } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 import { ulids } from '@braindog/kernel';
 
 import { createAuth, type AuthConfig } from './identity.ts';
+import type { DirectoryAuth, SessionAsk } from './identity.ts';
 
 export type { AuthConfig, DirectoryAuth, Reason, SessionAsk } from './identity.ts';
 
@@ -280,6 +282,52 @@ CREATE TABLE IF NOT EXISTS dir_inbound (
   record       TEXT NOT NULL
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS dir_inbound_record ON dir_inbound(record);
+
+-- THE ACCOUNT'S STATE: a mailbox not yet proved, who pays for which record, and the Stripe events already applied.
+--
+-- NEW TABLES AND NOT ONE NEW COLUMN, for the reason dir_inbound gives above: a table that does not exist is
+-- what CREATE TABLE IF NOT EXISTS is for, so every Directory at version 4 gains them on its next open and
+-- DIRECTORY_VERSION does not move. A bump would make an older Worker refuse the Directory, and the Directory is one
+-- object for every record, so rolling a Worker back would be an outage for everybody (loop/finish/ops.md 4.0 Rule 0).
+--
+-- NO CHECK ON ANY OF THEM, for the same reason: a CHECK is a list an older build cannot widen. purpose and state
+-- are checked in code, in billing() below and in the sign-up flows that write dir_pending.
+
+-- A mailbox not yet proved: a sign-up, or a new address accepting an invitation. Left out of every copy with
+-- dir_link, because a restore that revived a pending link would let it be spent after the person had given up on it.
+CREATE TABLE IF NOT EXISTS dir_pending (
+  hash       TEXT PRIMARY KEY,              -- HMAC of the link's token under the Directory's key, as dir_link
+  purpose    TEXT NOT NULL,                 -- 'signup' or 'invite', checked in code
+  email      TEXT NOT NULL,                 -- lower-cased and trimmed
+  payload    TEXT NOT NULL DEFAULT '{}',    -- signup: slug, name, tz; invite: the invitation and a name
+  expires    INTEGER NOT NULL,              -- epoch ms; 24 hours for both
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS dir_pending_expires ON dir_pending(expires);
+
+-- One row per record somebody pays for. A record with no row is not billed and never lapses: every record the
+-- operator provisioned has none, and a row is written only when a Stripe checkout for that record completes.
+CREATE TABLE IF NOT EXISTS dir_billing (
+  record       TEXT PRIMARY KEY,            -- rec_...
+  person       TEXT NOT NULL,               -- who checked out
+  customer     TEXT NOT NULL,               -- Stripe cus_...
+  subscription TEXT,                        -- Stripe sub_..., null until the first subscription event
+  price        TEXT,                        -- Stripe price_...
+  state        TEXT NOT NULL,               -- 'active', 'past_due' or 'lapsed', checked in code
+  period_end   INTEGER,                     -- epoch ms
+  lapsed_at    INTEGER,                     -- set on entering 'lapsed', cleared on 'active'
+  told         TEXT NOT NULL DEFAULT '',    -- the ladder's notices sent in this lapse: '', '0', '0,60' or '0,60,83'
+  updated_at   INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS dir_billing_customer ON dir_billing(customer);
+
+-- A webhook event already applied, by its evt_ id, so Stripe delivering one twice changes the account once.
+-- Pruned after forty days by the write that adds the next, the window dir_usage_run keeps a counted run's id for.
+CREATE TABLE IF NOT EXISTS dir_stripe_event (
+  id   TEXT PRIMARY KEY,                    -- evt_...
+  type TEXT NOT NULL,
+  at   INTEGER NOT NULL                     -- when it was first seen, epoch ms
+);
 `;
 
 export type Person = { id: string; email: string; name: string | null; created_at: string };
@@ -370,14 +418,82 @@ export type RecordUsage = {
   projects: ({ scope: string } & UsageTotals)[];
   actions: ({ scope: string; action: string } & UsageTotals)[];
   days: ({ day: string } & UsageTotals)[];
+  /** The deliveries and arrivals over the range, by action (`COUNTED_ONLY`): counted, and in none of the totals above. */
+  counted: ({ action: string } & UsageTotals)[];
 };
 
 /** Everything a person owns, summed. What `GET /account/usage` answers. */
 export type AccountUsage = { from: string; to: string; totals: UsageTotals; records: RecordUsage[] };
 
+/** What one `meterMany` did with the runs it was handed: counted new, already held, too old to count, and not runs at all. */
+export type MeterTally = { counted: number; already: number; old: number; malformed: number };
+
 const DAY_MS = 86_400_000;
 /** How long a counted run's id is kept, and so how old a run may be and still be counted. */
 const KEEP_RUNS_MS = 40 * DAY_MS;
+
+/**
+ * The most runs one `meterMany` takes: the nightly replay's batch, and the ceiling on one transaction of the one object
+ * every record shares.
+ */
+export const METER_MANY_MAX = 500;
+
+/**
+ * The actions a record's ledger counts and its allowance never limits, by the prefix of their name: a delivery the
+ * outbox sent (`deliver:notify.email`) and an arrival at an `/in` door (`in:webhook`), written by `@braindog/host`'s
+ * `deliveryRun` and `arrivalRun`.
+ *
+ * COUNTED SO THE ACCOUNT CAN SEE THEM, NEVER LIMITED, because neither is work the record chose to run: one is a notice
+ * it owes somebody and the other is a message somebody sent it. A scheduled action's run is named by its ingest and an
+ * automation's by `rule:<id>`, and both count against the allowance (`loop/finish/decisions.md` C34).
+ */
+export const COUNTED_ONLY = ['deliver:', 'in:'] as const;
+
+/** The rows the allowance is read against, as a condition: every action but the `COUNTED_ONLY` ones. */
+const LIMITED = COUNTED_ONLY.map((prefix) => `action NOT LIKE '${prefix}%'`).join(' AND ');
+
+/** A run to count, checked: its time in epoch milliseconds, or `null` for a row that is not a run. */
+const runAt = (run: RunUsage): number | null => {
+  const at = typeof run?.at === 'string' ? Date.parse(run.at) : Number.NaN;
+  const u: unknown = run?.usage;
+  const whole =
+    typeof u === 'object' &&
+    u !== null &&
+    (['runs', 'requests', 'bytes', 'ms', 'failures', 'held'] as const).every((k) => {
+      const n: unknown = (u as Record<string, unknown>)[k];
+      return typeof n === 'number' && Number.isSafeInteger(n) && n >= 0;
+    });
+  const named = (s: unknown): boolean => typeof s === 'string' && s !== '';
+  return named(run?.event) && Number.isFinite(at) && named(run?.ingest) && named(run?.scope) && whole ? at : null;
+};
+
+/**
+ * One checked run into the ledger: its id first, and its day's row only when the id was not already there. The caller
+ * holds the transaction, has pruned the ids older than the window, and has said `too old` for a run older than it.
+ */
+const countRun = (sql: Sql, record: string, run: RunUsage, at: number): 'counted' | 'already counted' => {
+  if (sql.one('SELECT 1 AS x FROM dir_usage_run WHERE record = ? AND event = ?', record, run.event)) return 'already counted';
+  const u = run.usage;
+  sql.exec('INSERT INTO dir_usage_run (record, event, at) VALUES (?, ?, ?)', record, run.event, at);
+  sql.exec(
+    `INSERT INTO dir_usage_day (record, day, scope, action, runs, requests, bytes, ms, failures, held)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT (record, day, scope, action) DO UPDATE SET
+       runs = runs + excluded.runs, requests = requests + excluded.requests, bytes = bytes + excluded.bytes,
+       ms = ms + excluded.ms, failures = failures + excluded.failures, held = held + excluded.held`,
+    record,
+    dayOf(at),
+    run.scope,
+    run.ingest,
+    u.runs,
+    u.requests,
+    u.bytes,
+    u.ms,
+    u.failures,
+    u.held,
+  );
+  return 'counted';
+};
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -479,18 +595,24 @@ export const CARRIED = [
   'dir_passkey',
   'dir_usage_day',
   'dir_usage_run',
+  /* WHO PAYS FOR WHICH RECORD, AND THE EVENTS ALREADY APPLIED. A restore that lost `dir_billing` would leave every
+     paying record unbilled and every lapsed one open, and one that lost `dir_stripe_event` would apply a redelivered
+     event a second time. */
+  'dir_billing',
+  'dir_stripe_event',
   'dir_inbound',
 ] as const;
 
 /**
- * The tables a copy leaves out: sessions, sign-in links, WebAuthn challenges and the lockout's strikes.
+ * The tables a copy leaves out: sessions, sign-in links, WebAuthn challenges, the lockout's strikes and the mailboxes
+ * not yet proved.
  *
  * CREDENTIALS THAT EXPIRE IN MINUTES TO DAYS. A restore that revived them would sign back in people who had signed out,
  * and a copy kept thirty nights would hold a session for longer than the session itself lives. Named, and not merely
  * absent from `CARRIED`, so a table added to `SCHEMA` later has to be put in one list or the other: the test reads
  * `sqlite_master` and fails for a table in neither.
  */
-export const LEFT_OUT = ['dir_session', 'dir_link', 'dir_challenge', 'dir_fail'] as const;
+export const LEFT_OUT = ['dir_session', 'dir_link', 'dir_challenge', 'dir_fail', 'dir_pending'] as const;
 
 type Carried = (typeof CARRIED)[number];
 
@@ -511,6 +633,8 @@ const COPY_ORDER: Record<Carried, string> = {
   dir_passkey: 'rowid',
   dir_usage_day: 'record, day, scope, action',
   dir_usage_run: 'record, event',
+  dir_billing: 'rowid',
+  dir_stripe_event: 'rowid',
   dir_inbound: 'token_sha256',
 };
 
@@ -541,6 +665,104 @@ const attempt = <T>(fn: () => T): T | null => {
     return null;
   }
 };
+
+/* ── billing ─────────────────────────────────────────────────────────────── */
+
+/**
+ * The states a paid record can be in, checked here because `dir_billing` carries no CHECK (see `SCHEMA`).
+ *
+ * A RECORD WITH NO ROW IS IN NONE OF THEM, and that is not a fourth state written down: it is not billed and never
+ * lapses (`loop/finish/ops.md` 4.0 Rule 1). Every record the operator provisioned is one.
+ */
+const BILLING_STATES = ['active', 'past_due', 'lapsed'] as const;
+export type BillingState = (typeof BILLING_STATES)[number];
+
+/** The days of a lapse a notice goes out on, which is what `told` records. */
+const LADDER_DAYS = [0, 60, 83] as const;
+export type LadderDay = (typeof LADDER_DAYS)[number];
+
+/** How long an applied Stripe event's id is kept, the same forty days a counted run's id is (`KEEP_RUNS_MS`). */
+const KEEP_EVENTS_MS = 40 * DAY_MS;
+
+/**
+ * The most lapsed rows one `due` answers, oldest lapse first.
+ *
+ * A CEILING ON THE NIGHT'S WALK, because the walk mails every row it is handed. Oldest first, so a row past the
+ * ceiling is reached once the rows ahead of it have left the ladder, rather than never.
+ */
+const DUE_MAX = 5_000;
+
+/** A `dir_billing` row, with the record's live name beside it: `null` for a record that is closed or has none. */
+export type BillingRow = {
+  record: string;
+  person: string;
+  customer: string;
+  subscription: string | null;
+  price: string | null;
+  state: BillingState;
+  period_end: number | null;
+  lapsed_at: number | null;
+  told: string;
+  updated_at: number;
+  slug: string | null;
+};
+
+/**
+ * What `set` is handed: the record, and whichever columns this event knows. An absent key keeps what the row holds;
+ * `null` empties the three columns that may be empty. `person` and `customer` are required the first time only.
+ */
+export type BillingSet = {
+  record: string;
+  person?: string;
+  customer?: string;
+  subscription?: string | null;
+  price?: string | null;
+  state?: BillingState;
+  period_end?: number | null;
+};
+
+/**
+ * A lapsed record the ladder walks: who paid, where to write to them, and how far the notices have got.
+ *
+ * `email` IS `null` WHEN THE PERSON WHO PAID HAS NO ACCOUNT ANY MORE, and it says so rather than being an empty
+ * string a mailer would try to send to.
+ */
+export type BillingDue = { record: string; person: string; email: string | null; slug: string | null; lapsed_at: number; told: string };
+
+/** One question of the Directory's billing group (`loop/finish/ops.md` 4.0 B). */
+export type BillingCall =
+  | { op: 'of'; record: string }
+  | { op: 'for'; person: string }
+  | { op: 'byCustomer'; customer: string }
+  | { op: 'set'; row: BillingSet }
+  | { op: 'seen'; id: string; type: string }
+  | { op: 'due'; now: number }
+  | { op: 'told'; record: string; day: LadderDay }
+  | { op: 'lapsed'; record: string };
+
+/** What each `op` answers. */
+export type BillingAnswers = {
+  of: BillingRow | null;
+  for: BillingRow[];
+  byCustomer: BillingRow[];
+  set: Result<BillingRow>;
+  seen: boolean;
+  due: BillingDue[];
+  told: Result<null>;
+  lapsed: boolean;
+};
+export type BillingAnswer = BillingAnswers[BillingCall['op']];
+
+const BILLING_COLUMNS = 'b.record AS record, b.person AS person, b.customer AS customer, b.subscription AS subscription, b.price AS price, b.state AS state, b.period_end AS period_end, b.lapsed_at AS lapsed_at, b.told AS told, b.updated_at AS updated_at';
+
+type BillingStored = Omit<BillingRow, 'slug'>;
+
+/** A nullable number column as a number or `null`, whatever form the driver handed it back in. */
+const numberOrNull = (v: unknown): number | null => (v === null || v === undefined ? null : Number(v));
+
+/** The ladder's days as `told` writes them: once each, in the order they come. */
+const toldWith = (told: string, day: LadderDay): string =>
+  [...new Set([...told.split(',').filter((d) => d !== '').map(Number), day])].sort((a, b) => a - b).join(',');
 
 /**
  * The Directory over one `Sql`.
@@ -641,6 +863,197 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig) {
   const personByEmail = (email: string): Person | null =>
     sql.one<Person>('SELECT id, email, name, created_at FROM dir_person WHERE lower(email) = lower(?)', email) ?? null;
 
+  /** Whether a record is lapsed: one indexed read, and a record with no billing row never is. */
+  const lapsedOn = (record: string): boolean =>
+    sql.one("SELECT 1 AS x FROM dir_billing WHERE record = ? AND state = 'lapsed'", record) !== undefined;
+
+  /**
+   * Sign-in, with `lapsed: true` on a `session` answer whose record is lapsed.
+   *
+   * ON THE ANSWER A BROWSER REQUEST ALREADY WAITS FOR, so a lapsed record costs the Worker no second call to the
+   * Directory: every request under `/app/<slug>` asks `session` before any record is addressed, and the doors that
+   * cap a lapsed record read the flag from there. Absent means not lapsed, which is what every other record answers.
+   */
+  const signIn = createAuth(sql, clock, auth);
+  const signInMarked = (async (call: AuthCall | SessionAsk): Promise<AuthResult> => {
+    const out = await signIn(call);
+    if (call.flow !== 'session' || out.status !== 200) return out;
+    const who = out.body as Who;
+    return who.record !== null && lapsedOn(who.record) ? { ...out, body: { ...who, lapsed: true } } : out;
+  }) as DirectoryAuth;
+
+  const billingOf = (stored: BillingStored): BillingRow => ({
+    record: stored.record,
+    person: stored.person,
+    customer: stored.customer,
+    subscription: stored.subscription ?? null,
+    price: stored.price ?? null,
+    state: stored.state,
+    period_end: numberOrNull(stored.period_end),
+    lapsed_at: numberOrNull(stored.lapsed_at),
+    told: stored.told,
+    updated_at: Number(stored.updated_at),
+    slug: slugOf(stored.record),
+  });
+
+  const billingRow = (record: string): BillingRow | null => {
+    const stored = sql.one<BillingStored>(`SELECT ${BILLING_COLUMNS} FROM dir_billing b WHERE b.record = ?`, record);
+    return stored ? billingOf(stored) : null;
+  };
+
+  /**
+   * A paid record's row, written: the first checkout makes it and every later Stripe event moves it.
+   *
+   * ENTERING `lapsed` STARTS THE LADDER AND STAYING THERE DOES NOT. `lapsed_at` is set only when it is empty and
+   * `told` goes back to nothing, so the day-0 notice is sent for this lapse; a second event saying the same thing (a
+   * redelivery, or a later invoice failing) changes neither, or the ladder would restart every time Stripe spoke.
+   * ENTERING `active` CLEARS BOTH, because a record that paid is no longer in any lapse. `past_due` leaves them as they
+   * were: it is the warning before a lapse, and a lapse already under way is not undone by one.
+   *
+   * EVERY REFUSAL HAPPENS BEFORE THE WRITE, for the reason `inbound$` gives: `transactionSync` commits whatever the
+   * function returns, refusal included.
+   */
+  const billingSet = (row: BillingSet): Result<BillingRow> =>
+    sql.transactionSync(() => {
+      if (typeof row?.record !== 'string' || row.record === '') return no<BillingRow>('VALUE_MALFORMED', 'A billing row names the record it is for.', { at: 'record' });
+      if (row.state !== undefined && !(BILLING_STATES as readonly string[]).includes(row.state))
+        return no<BillingRow>('ENUM_VALUE_UNKNOWN', `${String(row.state)} is not a billing state. A paid record is ${BILLING_STATES.join(', ')}.`, { at: 'state' });
+      for (const key of ['person', 'customer'] as const)
+        if (row[key] !== undefined && (typeof row[key] !== 'string' || row[key] === ''))
+          return no<BillingRow>('VALUE_MALFORMED', `${key} is an id, written as text.`, { at: key });
+      for (const key of ['subscription', 'price'] as const)
+        if (row[key] !== undefined && row[key] !== null && (typeof row[key] !== 'string' || row[key] === ''))
+          return no<BillingRow>('VALUE_MALFORMED', `${key} is a Stripe id written as text, or null.`, { at: key });
+      if (row.period_end !== undefined && row.period_end !== null && !Number.isSafeInteger(row.period_end))
+        return no<BillingRow>('VALUE_MALFORMED', 'period_end is a time in whole epoch milliseconds, or null.', { at: 'period_end' });
+      if (!sql.one('SELECT 1 AS x FROM dir_record WHERE id = ?', row.record))
+        return no<BillingRow>('OUT_OF_BOUNDS', `There is no record ${row.record}.`, { at: 'record' });
+      if (row.person !== undefined && !sql.one('SELECT 1 AS x FROM dir_person WHERE id = ?', row.person))
+        return no<BillingRow>('OUT_OF_BOUNDS', `There is no person ${row.person}.`, { at: 'person' });
+
+      const before = sql.one<BillingStored>(`SELECT ${BILLING_COLUMNS} FROM dir_billing b WHERE b.record = ?`, row.record);
+      const person = row.person ?? before?.person;
+      const customer = row.customer ?? before?.customer;
+      if (person === undefined || customer === undefined)
+        return no<BillingRow>('VALUE_MALFORMED', 'A record paid for the first time names who checked out and their Stripe customer.', {
+          at: person === undefined ? 'person' : 'customer',
+        });
+
+      /* A FIRST ROW IS `active` UNLESS IT SAYS OTHERWISE, because it is written when a checkout completes. */
+      const now = clock.now();
+      const state: BillingState = row.state ?? before?.state ?? 'active';
+      const entering = state !== before?.state;
+      const held = numberOrNull(before?.lapsed_at);
+      const lapsed_at = state === 'active' ? null : state === 'lapsed' && entering ? (held ?? now) : held;
+      const told = state === 'active' || (state === 'lapsed' && entering) ? '' : (before?.told ?? '');
+      const pick = <T>(given: T | undefined, kept: T | undefined): T | null => (given !== undefined ? given : (kept ?? null));
+
+      sql.exec(
+        `INSERT INTO dir_billing (record, person, customer, subscription, price, state, period_end, lapsed_at, told, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT (record) DO UPDATE SET
+           person = excluded.person, customer = excluded.customer, subscription = excluded.subscription,
+           price = excluded.price, state = excluded.state, period_end = excluded.period_end,
+           lapsed_at = excluded.lapsed_at, told = excluded.told, updated_at = excluded.updated_at`,
+        row.record,
+        person,
+        customer,
+        pick(row.subscription, before?.subscription),
+        pick(row.price, before?.price),
+        state,
+        pick(row.period_end, numberOrNull(before?.period_end) ?? undefined),
+        lapsed_at,
+        told,
+        now,
+      );
+      return ok(billingRow(row.record)!);
+    });
+
+  /**
+   * The billing group's one entry, as the doors and the night call it (`loop/finish/ops.md` 4.0 B). Not generic, so
+   * each `op` narrows the call; `billing` below gives the caller the answer its `op` asked for.
+   */
+  const billingAnswer = (call: BillingCall): BillingAnswer => {
+    switch (call.op) {
+      case 'of':
+        return billingRow(call.record);
+
+      /* OWNED, NOT REACHED, for the reason `usage` gives: billing is the owner's, so a member of somebody else's
+         record sees nothing of it here. Only records with a row: an owned record without one is unbilled, and the
+         account door says so from `recordsOf`. */
+      case 'for':
+        return sql
+          .all<BillingStored>(
+            `SELECT ${BILLING_COLUMNS} FROM dir_billing b JOIN dir_record r ON r.id = b.record
+              WHERE r.owner = ? ORDER BY r.created_at, r.id`,
+            call.person,
+          )
+          .map(billingOf);
+
+      case 'byCustomer':
+        return sql.all<BillingStored>(`SELECT ${BILLING_COLUMNS} FROM dir_billing b WHERE b.customer = ? ORDER BY b.record`, call.customer).map(billingOf);
+
+      case 'set':
+        return billingSet(call.row);
+
+      /* THE FIRST OFFER OF AN EVENT ID IS THE ONLY `true`. The check and the insert share a transaction, so two
+         deliveries of one event cannot both be told to apply it. An id that is not text cannot be remembered as
+         applied, so it is never applied: a verified Stripe event always carries one. The ids older than forty days
+         go in the same transaction, so the table holds a window and not a history. */
+      case 'seen': {
+        const id: unknown = call.id;
+        const type = typeof call.type === 'string' ? call.type : '';
+        if (typeof id !== 'string' || id === '') return false;
+        return sql.transactionSync(() => {
+          const now = clock.now();
+          sql.exec('DELETE FROM dir_stripe_event WHERE at < ?', now - KEEP_EVENTS_MS);
+          if (sql.one('SELECT 1 AS x FROM dir_stripe_event WHERE id = ?', id)) return false;
+          sql.exec('INSERT INTO dir_stripe_event (id, type, at) VALUES (?, ?, ?)', id, type, now);
+          return true;
+        });
+      }
+
+      /* EVERY LAPSED ROW WHOSE LAPSE HAS BEGUN BY `now`, oldest first and at most `DUE_MAX`. The days since the lapse
+         and which notice is next are the walk's to work out from `lapsed_at` and `told`, against its own clock. */
+      case 'due': {
+        if (!Number.isFinite(call.now)) return [];
+        return sql
+          .all<{ record: string; person: string; email: string | null; lapsed_at: number; told: string }>(
+            `SELECT b.record AS record, b.person AS person, p.email AS email, b.lapsed_at AS lapsed_at, b.told AS told
+               FROM dir_billing b LEFT JOIN dir_person p ON p.id = b.person
+              WHERE b.state = 'lapsed' AND b.lapsed_at IS NOT NULL AND b.lapsed_at <= ?
+              ORDER BY b.lapsed_at, b.record LIMIT ?`,
+            call.now,
+            DUE_MAX,
+          )
+          .map((r) => ({ record: r.record, person: r.person, email: r.email ?? null, slug: slugOf(r.record), lapsed_at: Number(r.lapsed_at), told: r.told }));
+      }
+
+      /* A NOTICE SENT, WRITTEN ONLY WHILE THE RECORD IS STILL LAPSED. A record paid for between `due` and here has
+         left the ladder and `active` has emptied `told`, so there is nothing to record and the answer is still done.
+         The same day twice is written once. */
+      case 'told': {
+        const { record, day } = call;
+        return sql.transactionSync(() => {
+          if (!(LADDER_DAYS as readonly number[]).includes(day))
+            return no<null>('ENUM_VALUE_UNKNOWN', `${String(day)} is not a day of the ladder. A notice goes out on day ${LADDER_DAYS.join(', ')}.`, { at: 'day' });
+          const row = sql.one<{ state: string; told: string }>('SELECT state, told FROM dir_billing WHERE record = ?', record);
+          if (!row) return no<null>('OUT_OF_BOUNDS', `${record} has no billing row.`, { at: 'record' });
+          if (row.state === 'lapsed') sql.exec('UPDATE dir_billing SET told = ?, updated_at = ? WHERE record = ?', toldWith(row.told, day), clock.now(), record);
+          return ok(null);
+        });
+      }
+
+      case 'lapsed':
+        return lapsedOn(call.record);
+
+      /* AN `op` THIS BUILD DOES NOT KNOW, arriving over RPC from a newer caller, answers nothing rather than throwing
+         out of the Durable Object as a bare 500. */
+      default:
+        return null;
+    }
+  };
+
   return {
     resolve,
     slugOf,
@@ -648,9 +1061,10 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig) {
 
     /**
      * Sign-in: sessions, passkeys, links, challenges and the lockout, over the five `dir_` tables
-     * above. `identity.ts` is the whole of it; this is where a host reaches it.
+     * above. `identity.ts` is the whole of it; this is where a host reaches it, with `lapsed` added to
+     * a `session` answer here (`signInMarked`), because that is billing's fact and not sign-in's.
      */
-    auth: createAuth(sql, clock, auth),
+    auth: signInMarked,
 
     /**
      * Whether a string is a name at all, and the sentence when it is not.
@@ -1073,7 +1487,7 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig) {
     /**
      * The carried tables as lines: `#dogdir <version>`, then a `#table <name>` line per table and one JSON object per row.
      *
-     * IN ONE TRANSACTION, so the nine tables are one instant of the Directory. A sign-up landing between the read of
+     * IN ONE TRANSACTION, so the carried tables are one instant of the Directory. A sign-up landing between the read of
      * `dir_person` and the read of `dir_record` would otherwise be a copy with a record whose owner it does not hold.
      */
     dump: (): string[] =>
@@ -1232,11 +1646,8 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig) {
     meter: (record: string, run: RunUsage): Result<'counted' | 'already counted' | 'too old'> =>
       sql.transactionSync(() => {
         type Counted = 'counted' | 'already counted' | 'too old';
-        const at = typeof run?.at === 'string' ? Date.parse(run.at) : Number.NaN;
-        const u = run?.usage;
-        const whole = u !== undefined && [u.runs, u.requests, u.bytes, u.ms, u.failures, u.held].every((n) => Number.isSafeInteger(n) && n >= 0);
-        const named = (s: unknown): boolean => typeof s === 'string' && s !== '';
-        if (!named(run?.event) || !Number.isFinite(at) || !named(run?.ingest) || !named(run?.scope) || !whole)
+        const at = runAt(run);
+        if (at === null)
           return no<Counted>(
             'VALUE_MALFORMED',
             "A run to count is a row of the runner's usage: an event id, a time, an action, a scope and six whole numbers.",
@@ -1248,27 +1659,37 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig) {
         const cutoff = clock.now() - KEEP_RUNS_MS;
         if (at < cutoff) return ok<Counted>('too old');
         sql.exec('DELETE FROM dir_usage_run WHERE record = ? AND at < ?', record, cutoff);
-        if (sql.one('SELECT 1 AS x FROM dir_usage_run WHERE record = ? AND event = ?', record, run.event)) return ok<Counted>('already counted');
+        return ok<Counted>(countRun(sql, record, run, at));
+      }),
 
-        sql.exec('INSERT INTO dir_usage_run (record, event, at) VALUES (?, ?, ?)', record, run.event, at);
-        sql.exec(
-          `INSERT INTO dir_usage_day (record, day, scope, action, runs, requests, bytes, ms, failures, held)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-           ON CONFLICT (record, day, scope, action) DO UPDATE SET
-             runs = runs + excluded.runs, requests = requests + excluded.requests, bytes = bytes + excluded.bytes,
-             ms = ms + excluded.ms, failures = failures + excluded.failures, held = held + excluded.held`,
-          record,
-          dayOf(at),
-          run.scope,
-          run.ingest,
-          u.runs,
-          u.requests,
-          u.bytes,
-          u.ms,
-          u.failures,
-          u.held,
-        );
-        return ok<Counted>('counted');
+    /**
+     * Count up to `METER_MANY_MAX` runs of one record in one transaction: the nightly replay's call, one per batch.
+     *
+     * EACH RUN IS COUNTED AS `meter` COUNTS IT, once by its event id, so a batch holding runs the pass already counted
+     * adds only the rest. A row in it that is not a run, or is older than the window, is tallied and passed over rather
+     * than refusing the batch, because one line an older build wrote must not leave the other runs of forty days
+     * uncounted. Only the call itself is refused: a record this Directory does not hold, or too many runs at once, both
+     * before anything is written.
+     */
+    meterMany: (record: string, runs: readonly RunUsage[]): Result<MeterTally> =>
+      sql.transactionSync(() => {
+        if (!Array.isArray(runs)) return no<MeterTally>('VALUE_MALFORMED', "Runs to count are a list of rows of the runner's usage.", { at: 'runs' });
+        if (runs.length > METER_MANY_MAX)
+          return no<MeterTally>('OUT_OF_BOUNDS', `One call counts at most ${thousands(METER_MANY_MAX)} runs, and this one hands ${thousands(runs.length)}.`, { at: 'runs' });
+        if (!sql.one('SELECT 1 AS x FROM dir_record WHERE id = ?', record))
+          return no<MeterTally>('OUT_OF_BOUNDS', `There is no record ${record}.`, { at: 'record' });
+
+        const cutoff = clock.now() - KEEP_RUNS_MS;
+        sql.exec('DELETE FROM dir_usage_run WHERE record = ? AND at < ?', record, cutoff);
+        const tally: MeterTally = { counted: 0, already: 0, old: 0, malformed: 0 };
+        for (const run of runs) {
+          const at = runAt(run);
+          if (at === null) tally.malformed++;
+          else if (at < cutoff) tally.old++;
+          else if (countRun(sql, record, run, at) === 'counted') tally.counted++;
+          else tally.already++;
+        }
+        return ok(tally);
       }),
 
     /**
@@ -1286,8 +1707,9 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig) {
       if (!allowance) return null;
       const now = clock.now();
       const until = nextMonth(now);
+      /* WHAT THE RECORD RAN, AND NOT WHAT IT WAS SENT OR SENT ON: the `COUNTED_ONLY` rows are never read against it. */
       const used = totalsOf(
-        sql.one(`SELECT ${SUMS} FROM dir_usage_day WHERE record = ? AND day >= ? AND day < ?`, record, dayOf(monthStart(now)), dayOf(until)),
+        sql.one(`SELECT ${SUMS} FROM dir_usage_day WHERE record = ? AND day >= ? AND day < ? AND ${LIMITED}`, record, dayOf(monthStart(now)), dayOf(until)),
       );
       /* AND THE RUNS A PASS HAS LET THROUGH AND NOT YET METERED, which the host counts and this cannot see. */
       used.runs += Math.max(0, Math.floor(Number(pending) || 0));
@@ -1322,7 +1744,10 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig) {
         'SELECT id, plan, closed_at FROM dir_record WHERE owner = ? ORDER BY created_at, id',
         person,
       );
-      const where = 'FROM dir_usage_day WHERE record = ? AND day >= ? AND day <= ?';
+      /* THE ALLOWANCE'S ROWS ONLY, in every total below, so a month's runs read the same here as in `mayRun`; the
+         deliveries and arrivals are `counted`, apart. */
+      const ranged = 'FROM dir_usage_day WHERE record = ? AND day >= ? AND day <= ?';
+      const where = `${ranged} AND ${LIMITED}`;
       const records = owned.map((r): RecordUsage => {
         const plan = planOf(r.plan);
         return {
@@ -1332,7 +1757,7 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig) {
           closed: r.closed_at !== null,
           month: {
             month: start.slice(0, 7),
-            used: totalsOf(sql.one(`SELECT ${SUMS} FROM dir_usage_day WHERE record = ? AND day >= ? AND day < ?`, r.id, start, resets)),
+            used: totalsOf(sql.one(`SELECT ${SUMS} FROM dir_usage_day WHERE record = ? AND day >= ? AND day < ? AND ${LIMITED}`, r.id, start, resets)),
             allowance: ALLOWANCE[plan],
             resets,
           },
@@ -1346,11 +1771,24 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig) {
           days: sql
             .all<{ day: string }>(`SELECT day, ${SUMS} ${where} GROUP BY day ORDER BY day`, r.id, range.from, range.to)
             .map((g) => ({ day: g.day, ...totalsOf(g) })),
+          counted: sql
+            .all<{ action: string }>(`SELECT action, ${SUMS} ${ranged} AND NOT (${LIMITED}) GROUP BY action ORDER BY action`, r.id, range.from, range.to)
+            .map((g) => ({ action: g.action, ...totalsOf(g) })),
         };
       });
       const totals = totalsOf({});
       for (const r of records) for (const k of Object.keys(totals) as (keyof UsageTotals)[]) totals[k] += r.totals[k];
       return ok({ from: range.from, to: range.to, totals, records });
     },
+
+    /**
+     * Who pays for which record, and whether it has lapsed: one group, in the shape `auth(call)` has, so the
+     * Worker's `Directory$` carries it as one RPC (`loop/finish/ops.md` 4.0 B).
+     *
+     * ONLY A VERIFIED STRIPE EVENT MOVES A RECORD INTO OR OUT OF A LAPSE. `set` and `seen` are called by the Worker's
+     * webhook and `told` by its night, and none by anything a person can reach; a self-host opens these tables with the rest of `SCHEMA` and never
+     * writes a row, so none of its records is ever billed or lapsed.
+     */
+    billing: <C extends BillingCall>(call: C): BillingAnswers[C['op']] => billingAnswer(call) as BillingAnswers[C['op']],
   };
 }

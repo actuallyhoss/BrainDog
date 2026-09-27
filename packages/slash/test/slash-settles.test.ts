@@ -78,7 +78,7 @@ const build = (rows: Rows, cap = 80) => {
   const calls = () =>
     sql
       .all<{ kind: string; status: string; code: string | null; model: string }>(
-        'SELECT kind, status, code, model FROM call ORDER BY rowid',
+        'SELECT kind, status, code, model FROM slash_call ORDER BY rowid',
       )
       .map((r) => ({ ...r }));
   return { sql, inference, record, slash, calls };

@@ -19,7 +19,7 @@
 import { idempotentCalls, readPublic, sendAction, type Execute, type OpenKey, type PublicRead } from '@braindog/host/actions';
 import type { RecordApi } from '@braindog/record';
 
-import { isBound, keyStoreOf, type KekBinding } from './keys.ts';
+import { isBound, keyStoreOf, offeredId, type KekBinding } from './keys.ts';
 import { openSealed } from './vault.ts';
 
 export {
@@ -78,7 +78,9 @@ export function keyOpener(api: Pick<RecordApi, 'kernel'>, bound: KekBinding | un
     if (!store) return null;
     const record = api.kernel.identity()?.id;
     if (!record) return null;
-    const { kekId } = await store.current();
+    /* THE ID THE RECORD'S KEYS ARE WRAPPED UNDER, while the store still holds it, so a key opens between a rotation and
+       this record's night (`offeredId`). */
+    const kekId = await offeredId(store, api.kernel.wrappingKey());
     const sealed = api.kernel.openGrant({ id: grant.id, kek_id: kekId }, actor);
     if (!sealed.ok) return null;
     return openSealed(store, record, sealed.value);

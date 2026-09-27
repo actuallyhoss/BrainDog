@@ -46,17 +46,24 @@ function setup() {
     known: () => Promise.resolve(false),
     person: (email, name) => Promise.resolve(d.person$(email, name)),
   };
-  const door = { on: 'worker' as const, ip: '203.0.113.9', auth: d.auth, invite };
+  /* IT SENDS MAIL, because a new address proves its mailbox first, and the name is judged before anything is sent. */
+  const mailed: string[] = [];
+  const door = { on: 'worker' as const, origin: ORIGIN, ip: '203.0.113.9', auth: d.auth, invite, mail: (_to: string, link: string) => void mailed.push(link) };
   const finish = (out: AuthResult) => new Response(JSON.stringify('body' in out ? out.body : null), { status: out.status });
   let n = 0;
   return {
     accepted,
-    /** Accept a fresh invitation for a fresh address with `name` in the body. */
+    /**
+     * Accept a fresh invitation for a fresh address with `name` in the body, and when the host asks the address to
+     * prove itself, come back with the proof the mail carried, as the page the mail opens does.
+     */
     send: async (name: unknown) => {
       const email = `p${++n}@example.com`;
       const token = `rec_01JZ8QK3F7R2M9V4XN6TCB5HAD.${email}`;
       links.set(token, email);
-      const out = await serveInvite({ inviteToken: token, accept: true, name }, undefined, door, finish);
+      const asked = await serveInvite({ inviteToken: token, accept: true, name }, undefined, door, finish);
+      const proof = /&proof=([A-Za-z0-9_-]+)$/.exec(mailed.at(-1) ?? '')?.[1] ?? '';
+      const out = asked.status === 202 ? await serveInvite({ inviteToken: token, accept: true, proof }, undefined, door, finish) : asked;
       const row = sql.one<{ name: string | null }>('SELECT name FROM dir_person WHERE lower(email) = lower(?)', email);
       return { status: out.status, body: (await out.json()) as { refusal?: { code: string; at?: string } }, row, email };
     },

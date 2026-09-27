@@ -149,7 +149,8 @@ test('an element carrying a comma is refused by name, in both languages, rather 
   const chips = chipsOf(new URL(`/r/skills?f=because:has:${encodeURIComponent(title)}`, 'http://x').searchParams);
   const said = compile('skills', whereOf(chips));
   assert.equal(said.bad.length, 1);
-  assert.match(said.bad[0] ?? '', /there is no learnings called Attach the rows a proposal read$/);
+  /* THE RECORD'S OWN SENTENCE, full stop and all, since `compile` is the record's parser (ARC-2). */
+  assert.match(said.bad[0] ?? '', /there is no learnings called Attach the rows a proposal read\.$/);
   assert.deepEqual(list('skills', { filters: chips }).entries, []);
 });
 

@@ -16,6 +16,14 @@
  * doc's figure is stale. `activity` cost 117, so it was paid for out of four descriptions that
  * were saying something the schema beside them, or the instructions above them, already said. The
  * figure now is 2,565. A tool that cannot be paid for is a tool that does not go in.
+ *
+ * 2,760, RAISED ONCE FOR `triage`, AND IT NEVER MOVES AGAIN (`loop/finish/contracts.md` §6.1, X2). The list measured
+ * 2,544 by this estimator before it, 56 under 2,600, and the tool could not be paid for out of descriptions three passes
+ * had already cut: an agent given the inbox reach files or sets aside an arrival, which is a write of its own and rides
+ * on no other tool's answer. Counted by hand with this estimator over the tool as `tools/list` serialises it, by
+ * `44-SPEC-MCP` §5.8's rule: `triage` adds 172, and `log`'s `spoken` made optional, with the clause saying so, adds 4,
+ * so the list is 2,720 of 2,760; the run's diagnostic below is the figure that holds. Everything added after it, in any
+ * workflow, is paid out of the same 2,760 by cutting words elsewhere.
  */
 
 import { test } from 'node:test';
@@ -42,7 +50,7 @@ function tokenBudget(text: string): number {
   return n;
 }
 
-const CEILING = 2_600;
+const CEILING = 2_760;
 
 const listed = async () => {
   const { surface } = stub();

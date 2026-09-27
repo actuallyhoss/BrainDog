@@ -9,49 +9,49 @@
   A host without the route (404), or no host, falls back to the record's own run events, which say
   nothing about limits because the record cannot see them. No record at all is the record's refusal:
   it drew the sample's month, counted against projects nobody has, until DIRECTION 26.
+
+  ONE READ, THROUGH `read()` (ARC-5). The page draws the month and hands waiting, refused and offline
+  to `ReadState`, so this screen fails the way every screen that reads fails, with Retry. Its two empty
+  answers keep their own sentences, because each says what will be here and why it is not yet: a host
+  with nothing to count, and a month with no runs.
 -->
 <script lang="ts">
-  import { untrack } from 'svelte';
+  import { page } from '$app/state';
   import { apiBase } from '$lib/at.ts';
   import type { Block as Drawn } from 'braindog-render';
   import { Block } from 'braindog-render/svelte';
   import '$lib/blocks-charts.css';
   import { titleOf } from '$lib/title.ts';
   import { countsOf, monthWords, readUsage, words, type Named, type UsageView } from '$lib/record/actions.ts';
+  import { read, type Result } from '$lib/data/read.svelte.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Section from '$lib/ui/Section.svelte';
   import Empty from '$lib/ui/Empty.svelte';
-  import { closed, drew, opened } from '../../lib/ui/screen.svelte.ts';
+  import ReadState from '$lib/ui/ReadState.svelte';
 
-  let from = $state<'reading' | 'ready' | 'none' | 'refused'>('reading');
-  let view = $state<UsageView | null>(null);
-  let fix = $state('');
-
-  async function load() {
-    const at = opened();
-    const out = await readUsage((url, init) => fetch(url, init), Date.now(), '', apiBase());
-    closed(out.ok !== false, at);
-    if (out.ok === true) {
-      view = out.view;
-      from = 'ready';
-    } else if (out.ok === 'none') from = 'none';
-    else {
-      fix = out.refusal.fix;
-      from = 'refused';
-    }
+  /**
+   * The month, or `null` for a host with no ledger and no run events to count.
+   *
+   * `null` IS AN ANSWER, NOT A REFUSAL. `readUsage` says `none` for a host without the route, which is a
+   * designed empty state; only its refusal is the record saying no. The raw `fetch` stays until
+   * `readUsage` reads through the client: the ledger is a host door, not a record method.
+   */
+  async function usageOf(): Promise<Result<UsageView | null>> {
+    const out = await readUsage((url, init) => fetch(url, init), Date.now(), '', apiBase(page.url));
+    if (out.ok === true) return { ok: true, value: out.view };
+    if (out.ok === 'none') return { ok: true, value: null };
+    return { ok: false, refusal: out.refusal };
   }
 
-  $effect(() => {
-    untrack(() => void load());
-  });
-  $effect(() => {
-    if (from === 'ready' && view && view.totals.runs > 0) drew('ready');
-  });
+  /* THE RECORD'S ADDRESS IS THE QUESTION, so moving to another record under the same route asks again
+     rather than drawing the last record's month under the new one's name. */
+  const usage = read(() => apiBase(page.url), usageOf, { empty: (v) => v === null || v.totals.runs === 0 });
 
   /** A block of one of the existing kinds, from rows this page worked out. */
   const block = (kind: 'bar' | 'gauge', rows: Drawn['rows']): Drawn => ({ type: 'block', kind, rows, raw: '', start: 0, end: 0 });
   const n = (v: number): string => v.toLocaleString('en-GB');
 
+  const view = $derived(usage.value);
   const weeks = $derived(view ? block('bar', view.weeks.map((w) => ({ cells: [w.label, n(w.runs)] }))) : null);
 </script>
 
@@ -68,21 +68,18 @@
   </ul>
 {/snippet}
 
-{#if from === 'refused'}
-  <div class="page">
-    <Empty kind="error" heading title={fix} />
-  </div>
-{:else if from === 'none'}
-  <PageHead icon="observe" title={words.usage} />
-  <div class="page">
-    <Empty kind="no-data-yet" heading title={words.noLedger} />
-  </div>
-{:else if from === 'ready' && view}
-  <!-- THE MONTH NAMES THE FIRST SECTION, NOT THE HEAD. Above the title it read as the page's parent,
-       which is what that line means on every other screen, and the section under it said "This
-       month" without saying which. -->
-  <PageHead icon="observe" title={words.usage} />
-  <div class="page">
+<!-- THE HEAD IN EVERY STATE, so the screen always has its one `h1` and a refusal reads as this page's,
+     not as a page of its own. -->
+<PageHead icon="observe" title={words.usage} />
+<div class="page">
+  {#if usage.state === 'waiting' || usage.state === 'refused' || usage.state === 'offline'}
+    <ReadState state={usage.state} refusal={usage.refusal} onretry={usage.reread} />
+  {:else if !view}
+    <Empty kind="no-data-yet" title={words.noLedger} />
+  {:else}
+    <!-- THE MONTH NAMES THE FIRST SECTION, NOT THE HEAD. Above the title it read as the page's parent,
+         which is what that line means on every other screen, and the section under it said "This
+         month" without saying which. -->
     <Section title={words.usageFor(monthWords(view.month))}>
       {#each view.records as r (r.name)}
         <div class="usage-record">
@@ -108,8 +105,8 @@
       <Section title={words.byProject}>{@render list(view.projects)}</Section>
       <Section title={words.byAction}>{@render list(view.actions)}</Section>
     {/if}
-  </div>
-{/if}
+  {/if}
+</div>
 
 <style>
   .page {

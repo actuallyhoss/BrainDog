@@ -208,7 +208,8 @@ test('BOOT CARRIES THE SHELL: the record, who is asking, the rail, the counts an
 
   const bo: CallContext = { principal: { kind: 'person', id: 'p_2', level: 'read' } };
   const boot = value<Boot>(await api.boot(bo));
-  assert.deepEqual(boot.record, { slug: 'the-studio', name: 'The Studio', locale: 'en' });
+  /* NO HOME CURRENCY IS CHOSEN ON THIS RECORD, and the shell is told so rather than handed a guess. */
+  assert.deepEqual(boot.record, { slug: 'the-studio', name: 'The Studio', locale: 'en', currency: null });
   assert.deepEqual(boot.me, { kind: 'person', person: 'p_2', name: 'Bo', level: 'read', prefs: {} });
   assert.equal(boot.counts.decide, 1);
   assert.equal(boot.counts.inbox, null, 'a reader was told how much waits in the inbox');

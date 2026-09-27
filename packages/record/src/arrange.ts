@@ -19,9 +19,10 @@
 
 import type { Refusal, Result } from '@braindog/ports';
 import { ok } from '@braindog/ports';
-import { conflictFault, installFault, installOrder, labelsOf, laterVersion, normalise, packIdOf, plan, plannedState, readShared, install, stagedBatch, unresolvedFault, SPEAKS, VOICE_KEYS, speakingPack, voiceOf as voiceIn, voiceSetting, voiceWrites, type Host, type Installed, type Pack, type VoiceKey } from '@braindog/declare';
+import { conflictFault, installFault, installOrder, labelsOf, laterVersion, packIdOf, plan, plannedState, readShared, install, stagedBatch, unresolvedFault, SPEAKS, VOICE_KEYS, speakingPack, voiceOf as voiceIn, voiceSetting, voiceWrites, type Host, type Installed, type Pack, type VoiceKey } from '@braindog/declare';
 import { configValue, ulids, type ConfigDecl, type Declaration, type Json, type Kernel, type PlannedRecord } from '@braindog/kernel';
 import type { FormSpec, NextSpec } from './slash.ts';
+import { normaliseChecked } from './theme-check.ts';
 
 /**
  * The record `plannedState` leaves, as `kernel.lint` reads one: each body parsed, and the pack that put it there.
@@ -543,7 +544,9 @@ export function arranger(d: ArrangeDeps) {
   async function packOf(id: string, docs: ReadonlyMap<string, Body>, holds: readonly string[], usecase: string | null): Promise<Result<Pack>> {
     const doc = docs.get(id) ?? entryOf(id)?.doc({ holds, usecase }) ?? null;
     if (!doc) return notOffered(id, 'body.packs');
-    const pack = await normalise(doc, { kind: 'local' });
+    /* THROUGH THE THEME CHECK, as `installPack` reads a document: a proposal that installs a pack is that pack's
+       install, and a palette refused there is refused here in the same words. */
+    const pack = await normaliseChecked(doc, { kind: 'local' });
     if (!pack.ok) return pack;
     if (pack.value.manifest.pack !== id)
       return refuse('VALUE_MALFORMED', `The document names its pack ${pack.value.manifest.pack}, and the proposal asks for ${id}. Make the two agree.`, 'body.doc');

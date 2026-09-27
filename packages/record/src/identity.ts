@@ -5,11 +5,11 @@
  * and the answer back into a status, a cookie and a body; everything that decides whether somebody is who they
  * say they are is here, once, for both hosts.
  *
- * NOTHING THAT OPENS ANYTHING IS STORED. A session id, a link token and a challenge are 32 random bytes that
- * live in a browser, a mailbox or a ceremony; the tables hold HMAC-SHA-256 of each under the host's key, with a
- * prefix per kind (`s:`, `l:`, `c:`) so a value minted as one can never be looked up as another. Changing the key
- * is the fleet-wide lever `12 §8` names: every session and every link stops matching at once, and no row is
- * walked.
+ * NOTHING THAT OPENS ANYTHING IS STORED. A session id, a link token, a challenge and a mailbox proof are 32 random
+ * bytes that live in a browser, a mailbox or a ceremony; the tables hold HMAC-SHA-256 of each under the host's key,
+ * with a prefix per kind (`s:`, `l:`, `c:`, `p:`) so a value minted as one can never be looked up as another.
+ * Changing the key is the fleet-wide lever `12 §8` names: every session and every link stops matching at once, and
+ * no row is walked.
  *
  * EVERY MAC IS TAKEN BEFORE ANY TRANSACTION. WebCrypto is asynchronous and `transactionSync` is not, so nothing
  * inside a transaction awaits; an `await` inside one would let another request in halfway through a write.
@@ -25,13 +25,20 @@
 
 import type { AssertionOptions, AuthBodies, AuthCall, AuthResult, Clock, Methods, PasskeyInfo, RegistrationOptions, Sql, Who } from '@braindog/ports';
 
+import { FRESH } from './index.ts';
 import { assertion, b64url, clientData, registration, same, unb64url, type Alg, type PublicJwk, type Why } from './webauthn.ts';
 
 type Key = Awaited<ReturnType<typeof crypto.subtle.importKey>>;
 type Flow = AuthCall['flow'];
+/* Read through `AuthBodies`, which `@braindog/ports` already exports from its root, whose index names neither of these two. */
+type SessionInfo = AuthBodies['sessions']['sessions'][number];
+type InviteProved = AuthBodies['invite.proved'];
 
-/** What `log` is told: a `Why` from the verifier, or one of the Directory's own. Never an address, never a token. */
-export type Reason = Why | 'session' | 'unknown' | 'key' | 'link' | 'suspended' | 'locked' | 'reserve' | 'full';
+/**
+ * What `log` is told: a `Why` from the verifier, or one of the Directory's own. Never an address, never a token.
+ * `stale` is a session whose last proof is too old for the flow it asked for, which is not a failed sign-in.
+ */
+export type Reason = Why | 'session' | 'unknown' | 'key' | 'link' | 'suspended' | 'locked' | 'reserve' | 'full' | 'stale';
 
 /**
  * What a host hands the Directory to switch sign-in on.
@@ -65,6 +72,12 @@ const DAY = 24 * 60 * MINUTE;
 const LIFE = 30 * DAY;
 const ROTATE_AFTER = DAY;
 /**
+ * NINETY DAYS FROM THE LAST PROOF, AND NO ROTATION MOVES IT. Rotation extends `LIFE` on every day of use, so without
+ * this a cookie used once a month lived for ever on one passkey tap; a stolen one would too. `authed_at` moves only
+ * when somebody proves who they are again, so this is the longest a copied cookie is any use.
+ */
+const PROOF_LIFE = 90 * DAY;
+/**
  * SIXTY SECONDS FOR THE ID A ROTATION REPLACED. The app sends `boot`, `version` and a route's calls in parallel,
  * all carrying the same cookie; the first to arrive rotates it, and the rest would be 401s if the old id died on
  * the spot (`49 §4.2` as written). A minute covers the requests already in flight and nothing longer.
@@ -73,10 +86,28 @@ const GRACE = MINUTE;
 /** Ten attempts are compared and the eleventh locks the key for fifteen minutes; older strikes are forgotten. */
 const WINDOW = 15 * MINUTE;
 const CHALLENGE_LIFE = 5 * MINUTE;
-/** Live challenges past which minting refuses: minting is not locked out, so this is what bounds the table. */
+/**
+ * Live challenges past which minting refuses, for every address together.
+ *
+ * AND THE PER-ADDRESS RULE BELOW IS WHAT KEEPS ONE ADDRESS FROM REACHING IT. Minting a sign-in challenge takes no
+ * secret, so it was locked out by nothing, and one script could hold ten thousand live challenges and answer every
+ * tenant's sign-in 503 for five minutes at a time. Now one address holds at most `CHALLENGES.most` a minute times
+ * the minutes a challenge lives, so filling the table takes many addresses rather than one.
+ */
 const CHALLENGE_CAP = 10_000;
 const MAGIC_LIFE = 15 * MINUTE;
 const CLAIM_LIFE = DAY;
+/** A mailbox proof: a day, as a claim link, because it waits on a person reading their mail. */
+const PENDING_LIFE = DAY;
+/** The most sessions `sessions` lists for one person, newest first. Each sign-in makes one, and a list is read on a phone. */
+const SESSIONS_READ = 100;
+
+/** How many strikes a lockout key takes, and over how long; the lock lasts the same length again. */
+type Rule = { most: number; window: number };
+/** A way in, or sending a link: ten in fifteen minutes (`49 §5.5`, amended below). */
+const SIGN_IN: Rule = { most: 10, window: WINDOW };
+/** Minting a passkey challenge: thirty a minute from one address, `chal:<ip>` (`loop/finish/ops.md` §4.0 C). */
+const CHALLENGES: Rule = { most: 30, window: MINUTE };
 
 /** Every value this file mints is 32 random bytes in base64url, which is 43 characters and nothing else. */
 const MINTED = /^[A-Za-z0-9_-]{43}$/;
@@ -106,27 +137,38 @@ const MINTED = /^[A-Za-z0-9_-]{43}$/;
  * sign-in of the morning would lock the office out. Clearing gives an attacker nothing: an address that can
  * succeed already holds a way in, and every secret compared here but the server key is 256 random bits. This is
  * the second departure: `49 §5.5` deletes only the `email:` key on success and leaves the IP key to expire. The
- * `mint:` and `email:` keys on sending a link are never cleared, because sending a link is not a sign-in.
+ * `mint:` key on sending a link is never cleared, because sending a link is not a sign-in.
  *
- * `?1` the key, `?2` now, `?3` now minus fifteen minutes, `?4` now plus fifteen minutes.
+ * THE `email:` KEY COUNTS MAILS SENT, AND A SPENT LINK CLEARS IT. It counted every start, for any address typed,
+ * so anybody could type somebody else's address ten times and keep them from being sent a link for fifteen minutes.
+ * Now it is reserved only when a mail is about to go, a full count sends nothing and answers exactly as an unknown
+ * address does (so it says nothing about who is here), and spending any link sent to that address clears it. It is
+ * never asked when a link is spent, so a link already in the mailbox always works.
+ *
+ * ONE STATEMENT FOR EVERY KEY, with its rule's numbers bound: `?1` the key, `?2` now, `?3` now minus the window,
+ * `?4` now plus the window, `?5` the strikes compared before the lock.
  */
 const LOCKOUT = `INSERT INTO dir_fail (key, n, first, until) VALUES (?1, 1, ?2, NULL)
 ON CONFLICT (key) DO UPDATE SET
-  n     = CASE WHEN (until IS NOT NULL AND until <= ?2) OR (until IS NULL AND first <= ?3) THEN 1 ELSE MIN(n + 1, 10) END,
+  n     = CASE WHEN (until IS NOT NULL AND until <= ?2) OR (until IS NULL AND first <= ?3) THEN 1 ELSE MIN(n + 1, ?5) END,
   first = CASE WHEN (until IS NOT NULL AND until <= ?2) OR (until IS NULL AND first <= ?3) THEN ?2 ELSE first END,
   until = CASE WHEN until IS NOT NULL AND until <= ?2 THEN NULL
                WHEN until IS NULL AND first <= ?3 THEN NULL
-               WHEN n >= 10 THEN COALESCE(until, ?4) ELSE until END
+               WHEN n >= ?5 THEN COALESCE(until, ?4) ELSE until END
 RETURNING n, until`;
 
+/** The `dir_fail` key that counts the mails sent to one address, however it was typed. */
+const mailKey = (address: string): string => `email:${address.trim().toLowerCase()}`;
+
 /**
- * A live session: by its id, or by the id it had until a rotation less than a minute ago, and only for a person
- * who is not suspended. `is_current` says which of the two matched, because only the current id may rotate.
+ * A live session: by its id, or by the id it had until a rotation less than a minute ago, only for a person who is
+ * not suspended, and only while its last proof is younger than `PROOF_LIFE` (`?3` is now minus that). `is_current`
+ * says which of the two ids matched, because only the current id may rotate.
  */
 const LIVE = `SELECT s.id_hash AS id_hash, s.person AS person, s.record AS record, s.rotated_at AS rotated_at,
        s.authed_at AS authed_at, p.email AS email, s.id_hash = ?1 AS is_current
   FROM dir_session s JOIN dir_person p ON p.id = s.person AND p.suspended_at IS NULL
- WHERE (s.id_hash = ?1 OR (s.prev_hash = ?1 AND s.prev_until > ?2)) AND s.expires > ?2`;
+ WHERE (s.id_hash = ?1 OR (s.prev_hash = ?1 AND s.prev_until > ?2)) AND s.expires > ?2 AND s.authed_at > ?3`;
 
 /**
  * The record a live name means for this person: `?1` the person, `?2` the slug. A name that is not a live slug, a
@@ -174,6 +216,21 @@ const bytes = (x: unknown) => (typeof x === 'string' ? unb64url(x) : null);
 /** A credential id: canonical base64url of 1 to 1023 bytes, which is at most 1364 characters. */
 const credentialId = (x: unknown): string | null => (typeof x === 'string' && x.length > 1 && x.length <= 1364 && unb64url(x) ? x : null);
 
+/** An email address as far as one can be told without mailing it: one `@`, a dot after it, no space, 254 characters at most. */
+const ADDRESS = /^(?=.{3,254}$)[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** The invitation and name a mailbox proof was minted with, or `null` for a payload this code did not write. */
+const pendingInvite = (payload: string): { invite: string; name: string | null } | null => {
+  let x: unknown = null;
+  try {
+    x = JSON.parse(payload);
+  } catch {
+    return null;
+  }
+  if (!isObject(x) || typeof x.invite !== 'string' || x.invite === '') return null;
+  return { invite: x.invite, name: typeof x.name === 'string' && x.name !== '' ? x.name : null };
+};
+
 /**
  * `auth(call)`, or with no config, a Directory that answers `methods` with "not configured" and every other flow
  * with 404. That is the Worker without `SESSION_SECRET`: it says why sign-in is off rather than failing.
@@ -189,7 +246,7 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
      32-byte values and takes the same time whatever either of them is. */
   const wanted: Promise<ArrayBuffer> | null = config?.key ? crypto.subtle.digest('SHA-256', encoder.encode(config.key.serverKey)) : null;
 
-  const hmac = async (kind: 's:' | 'l:' | 'c:', value: string): Promise<string> => {
+  const hmac = async (kind: 's:' | 'l:' | 'c:' | 'p:', value: string): Promise<string> => {
     const tag = new Uint8Array(await crypto.subtle.sign('HMAC', await macKey!, encoder.encode(kind + value)));
     let out = '';
     for (const b of tag) out += b.toString(16).padStart(2, '0');
@@ -232,10 +289,10 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
    * FAIL CLOSED. No row back, or a statement that threw, is a 503 and never a pass: a lockout that stops
    * counting when its table misbehaves is a lockout an attacker can switch off.
    */
-  const reserve = (flow: Flow, key: string, now: number): AuthResult | null => {
+  const reserve = (flow: Flow, key: string, now: number, rule: Rule = SIGN_IN): AuthResult | null => {
     let row: { n: number; until: number | null } | undefined;
     try {
-      row = sql.one<{ n: number; until: number | null }>(LOCKOUT, key, now, now - WINDOW, now + WINDOW);
+      row = sql.one<{ n: number; until: number | null }>(LOCKOUT, key, now, now - rule.window, now + rule.window, rule.most);
     } catch {
       row = undefined;
     }
@@ -262,12 +319,13 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
    *
    * ROTATION IS A COMPARE-AND-SET ON `rotated_at`. Two requests carrying the same day-old cookie both see a
    * rotation due; the first moves the row and the second changes nothing, answers with the row it read, and its
-   * cookie is still good for a minute as the previous id. `authed_at` is never touched: rotation is not a proof.
+   * cookie is still good for a minute as the previous id. `authed_at` is never touched: rotation is not a proof,
+   * and the new expiry is never past `PROOF_LIFE` from it, so the row goes when the proof runs out.
    */
   const current = async (sid: unknown, now: number): Promise<Found | null> => {
     const hash = await hashOf(sid);
     if (hash === null) return null;
-    const row = sql.one<Row>(LIVE, hash, now);
+    const row = sql.one<Row>(LIVE, hash, now, now - PROOF_LIFE);
     if (!row) {
       /* Expired, or its person suspended: the row can never answer again, so it goes. */
       sql.exec('DELETE FROM dir_session WHERE id_hash = ?', hash);
@@ -276,7 +334,7 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
     if (!row.is_current || now - Number(row.rotated_at) <= ROTATE_AFTER) return { row, rotated: null };
     const next = await minted();
     const moved = sql.one(
-      `UPDATE dir_session SET id_hash = ?1, prev_hash = id_hash, prev_until = ?2, rotated_at = ?3, expires = ?4
+      `UPDATE dir_session SET id_hash = ?1, prev_hash = id_hash, prev_until = ?2, rotated_at = ?3, expires = MIN(?4, authed_at + ?7)
         WHERE id_hash = ?5 AND rotated_at = ?6 RETURNING id_hash`,
       next.hash,
       now + GRACE,
@@ -284,8 +342,31 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
       now + LIFE,
       hash,
       row.rotated_at,
+      PROOF_LIFE,
     );
     return { row, rotated: moved ? { sid: next.sid } : null };
+  };
+
+  /** The MAC the found session is stored under now: the rotated one when this call rotated it. */
+  const hashNow = async (found: Found): Promise<string> => (found.rotated ? hmac('s:', found.rotated.sid) : found.row.id_hash);
+
+  /**
+   * `null` when the session proved itself within `FRESH`, or the one 401 that says it did not.
+   *
+   * A PASSKEY IS A WAY IN, SO ADDING OR REMOVING ONE ASKS FOR A RECENT PROOF, as the vault does. Without it a
+   * browser left signed in for a month, or a cookie copied off it, could add the taker's own passkey and keep the
+   * account after the cookie was gone. The rotation still rides on the answer, and the cookie is not cleared: the
+   * person is who they say they are, and signing in again is the whole of the fix.
+   */
+  const stale = (flow: Flow, found: Found, now: number): AuthResult | null => {
+    if (now - Number(found.row.authed_at) <= FRESH) return null;
+    say(flow, 'stale');
+    return {
+      status: 401,
+      reason: 'stale',
+      refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to change your passkeys. It has been more than fifteen minutes since you last did.' },
+      ...carry(found),
+    };
   };
 
   /** The record a new session opens on: one this person owns, else the first they joined, and never a closed one. */
@@ -385,7 +466,12 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
           magic: config.magic,
           /* EXACTLY ONE. With nobody in the Directory the exchange has nobody to sign in, so offering it would be a door that cannot open. */
           key: config.key !== undefined && persons() === 1,
-          firstRun: Number(sql.one<{ n: number }>('SELECT COUNT(*) AS n FROM dir_passkey')?.n ?? 0) === 0,
+          /* THIS PERSON'S PASSKEYS, NOT THE WHOLE DIRECTORY'S. On the Cloud somebody else always has one, so the
+             whole-Directory question told every newcomer they were past their first run and never led them to add
+             one. Signed out there is nobody to ask about, and "none anywhere" is the one answer still true then. */
+          firstRun: found
+            ? sql.one('SELECT 1 AS x FROM dir_passkey WHERE person = ? LIMIT 1', found.row.person) === undefined
+            : sql.one('SELECT 1 AS x FROM dir_passkey LIMIT 1') === undefined,
           me: found ? whoOf(found.row) : null,
         };
         /* A cookie that names no session is cleared here too: this is the first call the app makes. */
@@ -442,11 +528,13 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
         return { status: 200, body: outcome, session: { sid: next.sid } };
       }
 
-      /** Registration needs a live session, which stands in for attestation (`12 §8`). */
+      /** Registration needs a live session, which stands in for attestation (`12 §8`), proved within `FRESH`. */
       case 'passkey.register.options': {
         if (!rp) return off();
         const found = await current(call.sid, now);
         if (!found) return rejected(flow, 'session', { session: 'clear' });
+        const old = stale(flow, found, now);
+        if (old) return old;
         const person = found.row.person;
         const challenge = fresh();
         const hash = await hmac('c:', challenge);
@@ -465,7 +553,7 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
           ],
           timeout: 300000,
           attestation: 'none',
-          authenticatorSelection: { residentKey: 'required', userVerification: 'preferred' },
+          authenticatorSelection: { residentKey: 'required', userVerification: 'required' },
           /* The passkeys this person already has, so a device that holds one is not asked to make a second. */
           excludeCredentials: sql
             .all<{ id: string }>('SELECT id FROM dir_passkey WHERE person = ? ORDER BY created_at, id', person)
@@ -478,6 +566,8 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
         if (!rp) return off();
         const found = await current(call.sid, now);
         if (!found) return rejected(flow, 'session', { session: 'clear' });
+        const old = stale(flow, found, now);
+        if (old) return old;
         const keep = carry(found);
         const person = found.row.person;
         const cred = made(call.credential);
@@ -506,17 +596,27 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
         );
         if (!row) return rejected(flow, 'dup', keep);
         const body: PasskeyInfo = { id: v.value.id, label, alg: v.value.alg, backedUp: v.value.backedUp, createdAt: now, lastUsed: null };
-        return { status: 200, body, ...keep };
+        /* THE PERSON HEARS ABOUT A NEW WAY INTO THEIR ACCOUNT, at the address on file, so one they did not add is one they can see. */
+        return { status: 200, body, mail: { kind: 'passkey.added', to: found.row.email }, ...keep };
       }
 
+      /**
+       * A challenge for signing in, after a strike against the asking address (`chal:<ip>`, see `CHALLENGE_CAP`).
+       *
+       * NOT CLEARED BY A SUCCESS, because minting is not a sign-in: the rule is a rate, and thirty a minute is far
+       * past what a person pressing a button asks for.
+       */
       case 'passkey.assert.options': {
         if (!rp) return off();
         const challenge = fresh();
-        if (!store(await hmac('c:', challenge), 'assert', null, now)) {
+        const hash = await hmac('c:', challenge);
+        const stop = reserve(flow, `chal:${text(call.ip)}`, now, CHALLENGES);
+        if (stop) return stop;
+        if (!store(hash, 'assert', null, now)) {
           say(flow, 'full');
           return { status: 503 };
         }
-        const body: AssertionOptions = { challenge, rpId: rp.id, timeout: 300000, userVerification: 'preferred', allowCredentials: [] };
+        const body: AssertionOptions = { challenge, rpId: rp.id, timeout: 300000, userVerification: 'required', allowCredentials: [] };
         return { status: 200, body };
       }
 
@@ -566,18 +666,22 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
       }
 
       /**
-       * A sign-in link, after two reservations: one per address asking and one per address asked about.
+       * A sign-in link, after two reservations: one per address asking, and one per mailbox a link is sent to.
        *
        * AN UNKNOWN ADDRESS GETS THE SAME 200 AND NO MAIL. Sign-up is not a side door here, and an answer that
        * differed would say who has an account. The host sends the mail without waiting, so the time taken does
        * not say it either.
+       *
+       * AND SO DOES A MAILBOX THAT HAS HAD ITS FILL. The `email:` key is reserved only once a person is found, so a
+       * 429 from it would be a 429 only a known address could earn, and that is the account oracle again. A full
+       * count is the same 200 with no mail; the links already sent still work, and spending one clears the count.
        */
       case 'magic.start': {
         if (!config.magic) return off();
         const email = text(call.email).trim();
         const linkToken = fresh();
         const hash = await hmac('l:', linkToken);
-        const stop = reserve(flow, `mint:${text(call.ip)}`, now) ?? reserve(flow, `email:${email.toLowerCase()}`, now);
+        const stop = reserve(flow, `mint:${text(call.ip)}`, now);
         if (stop) return stop;
         const person = email.includes('@')
           ? sql.one<Person>('SELECT id, email FROM dir_person WHERE lower(email) = lower(?) AND suspended_at IS NULL', email)
@@ -586,6 +690,8 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
           say(flow, 'unknown');
           return { status: 200, body: {} };
         }
+        /* `reserve` has told the log why (`locked`, or `reserve` when the table failed); either way nothing is sent. */
+        if (reserve(flow, mailKey(person.email), now)) return { status: 200, body: {} };
         sql.transactionSync(() => {
           sql.exec('DELETE FROM dir_link WHERE expires <= ?', now);
           sql.exec('INSERT INTO dir_link (hash, person, purpose, expires) VALUES (?, ?, ?, ?)', hash, person.id, 'magic', now + MAGIC_LIFE);
@@ -599,6 +705,9 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
        *
        * THE PURPOSE IS PART OF THE MATCH, so a claim link presented as a sign-in link finds nothing, and neither
        * burns the other.
+       *
+       * ONLY THE ASKING ADDRESS IS STRUCK, NEVER THE MAILBOX. A link already sent is always worth spending, and
+       * spending it clears the mailbox's count of mails sent (`LOCKOUT`), so the person it reached can ask again.
        */
       case 'magic.redeem': {
         const claim = 'claimToken' in call;
@@ -621,7 +730,9 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
           );
           if (!link) return 'link';
           const person = livePerson(link.person);
-          return person ? open(person, presented, next, now, strike) : 'suspended';
+          if (!person) return 'suspended';
+          sql.exec('DELETE FROM dir_fail WHERE key = ?', mailKey(person.email));
+          return open(person, presented, next, now, strike);
         });
         if (typeof outcome === 'string') return rejected(flow, outcome);
         return { status: 200, body: outcome, session: { sid: next.sid } };
@@ -646,13 +757,91 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
         return { status: 200, body, ...carry(found) };
       }
 
-      /** Only the person's own passkeys, and the last one too: removing a lost device must never be refused. */
+      /**
+       * Only the person's own passkeys, and the last one too: removing a lost device must never be refused. It asks
+       * for a proof within `FRESH`, as adding one does, and signing in again is the whole of what that asks.
+       *
+       * AND EVERY OTHER SESSION THIS PERSON HAS ENDS WITH IT. A passkey is removed because a device was lost or
+       * taken, the sessions that device opened are among the others, and nothing records which ones they are, so
+       * all of them go; this browser, which has just proved itself, stays. In one transaction with the key, so a
+       * removal that finds no key ends nothing.
+       */
       case 'passkey.remove': {
         const found = await current(call.sid, now);
         if (!found) return rejected(flow, 'session', { session: 'clear' });
-        const gone = sql.one('DELETE FROM dir_passkey WHERE id = ? AND person = ? RETURNING id', text(call.id), found.row.person);
+        const old = stale(flow, found, now);
+        if (old) return old;
+        const mine = await hashNow(found);
+        const person = found.row.person;
+        const gone = sql.transactionSync((): boolean => {
+          if (!sql.one('DELETE FROM dir_passkey WHERE id = ? AND person = ? RETURNING id', text(call.id), person)) return false;
+          sql.exec('DELETE FROM dir_session WHERE person = ? AND id_hash <> ?', person, mine);
+          return true;
+        });
         if (!gone) return { status: 422, refusal: { code: 'OUT_OF_BOUNDS', fix: 'You have no passkey with that id.', at: 'id' }, ...carry(found) };
-        return { status: 200, body: {}, ...carry(found) };
+        return { status: 200, body: {}, mail: { kind: 'passkey.removed', to: found.row.email }, ...carry(found) };
+      }
+
+      /**
+       * Every live session this person has, newest first, this one marked (`SESSIONS_READ` at most).
+       *
+       * NO ROW'S MAC LEAVES WHOLE. `ref` is its first twelve hex, enough for a person to tell two sessions apart
+       * and useless as a cookie: a MAC is never looked up as an id, and twelve characters of one match nothing.
+       */
+      case 'sessions': {
+        const found = await current(call.sid, now);
+        if (!found) return rejected(flow, 'session', { session: 'clear' });
+        const mine = await hashNow(found);
+        const body = {
+          sessions: sql
+            .all<{ id_hash: string; record: string | null; authed_at: number; rotated_at: number }>(
+              `SELECT id_hash, record, authed_at, rotated_at FROM dir_session
+                WHERE person = ? AND expires > ? AND authed_at > ?
+                ORDER BY rotated_at DESC, id_hash LIMIT ?`,
+              found.row.person,
+              now,
+              now - PROOF_LIFE,
+              SESSIONS_READ,
+            )
+            .map(
+              (s): SessionInfo => ({
+                ref: s.id_hash.slice(0, 12),
+                current: s.id_hash === mine,
+                authedAt: Number(s.authed_at),
+                activeAt: Number(s.rotated_at),
+                record: s.record,
+              }),
+            ),
+        };
+        return { status: 200, body, ...carry(found) };
+      }
+
+      /**
+       * Sign out everywhere else (`keep: 'this'`), or everywhere (`keep: 'none'`), and say how many sessions ended.
+       *
+       * ANYTHING BUT `none` KEEPS THIS ONE, so a caller that sent nothing, or a word this build does not know, is
+       * never signed out of the browser it is pressing in. The count is of live sessions; dead rows go with them.
+       */
+      case 'logout.all': {
+        const found = await current(call.sid, now);
+        if (!found) return rejected(flow, 'session', { session: 'clear' });
+        const all = call.keep === 'none';
+        const mine = all ? '' : await hashNow(found);
+        const person = found.row.person;
+        const ended = sql.transactionSync((): number => {
+          const n = Number(
+            sql.one<{ n: number }>(
+              'SELECT COUNT(*) AS n FROM dir_session WHERE person = ? AND id_hash <> ? AND expires > ? AND authed_at > ?',
+              person,
+              mine,
+              now,
+              now - PROOF_LIFE,
+            )?.n ?? 0,
+          );
+          sql.exec('DELETE FROM dir_session WHERE person = ? AND id_hash <> ?', person, mine);
+          return n;
+        });
+        return { status: 200, body: { ended }, ...(all ? { session: 'clear' as const } : carry(found)) };
       }
 
       /**
@@ -714,6 +903,79 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
           sql.exec('INSERT INTO dir_link (hash, person, purpose, expires) VALUES (?, ?, ?, ?)', hash, person.id, 'claim', now + CLAIM_LIFE);
         });
         return { status: 200, body: { expires: now + CLAIM_LIFE }, mail: { to: person.email, claimToken } };
+      }
+
+      /**
+       * A new address accepting an invitation proves it reads that mailbox before anybody is made (`dir_pending`,
+       * purpose `invite`, a day).
+       *
+       * THE INVITATION WAS A WAY TO BECOME SOMEBODY WITHOUT PROVING ANYTHING. Whoever held the link typed nothing
+       * but a name and was made the person at the invited address, so a forwarded or leaked invitation was an
+       * account in somebody else's name. Now the host asks this first, mails the proof, and makes the person only
+       * when `invite.proved` spends it.
+       *
+       * THE HOST HAS LOOKED THE INVITATION UP, and `email` is the address it was made for: this checks only that it
+       * is an address, and counts it against the mails that address may be sent (`mailKey`), so a live invitation
+       * cannot be used to fill somebody's mailbox. With no way to send mail there is nothing to prove with, and the
+       * flow is off, as `magic.start` is.
+       */
+      case 'invite.prove': {
+        if (!config.magic) return off();
+        const email = text(call.email).trim().toLowerCase();
+        if (!ADDRESS.test(email)) return { status: 422, refusal: { code: 'VALUE_MALFORMED', fix: 'That is not an email address.', at: 'email' } };
+        const invite = text(call.invite).trim();
+        if (!invite || invite.length > 512) return { status: 422, refusal: { code: 'VALUE_MALFORMED', fix: 'Open the whole invitation link, as it was sent.', at: 'invite' } };
+        /* The host has checked the name with `personName`; this only bounds what a row may hold. */
+        const name = text(call.name).trim() || null;
+        if (name !== null && name.length > 200) return { status: 422, refusal: { code: 'VALUE_MALFORMED', fix: 'A name is at most 200 characters.', at: 'name' } };
+        const token = fresh();
+        const hash = await hmac('p:', token);
+        const stop = reserve(flow, mailKey(email), now);
+        if (stop) return stop;
+        /* THE INVITATION IS KEPT AS SENT, THE ONE VALUE HERE THAT IS NOT A MAC, because `invite.proved` hands it back
+           (`loop/finish/contracts.md` §2.6) for the host to accept. It opens nothing on its own once proving is the
+           rule: a new address still needs the proof, and a known one signs in first. The row is left out of every
+           Directory copy and goes when it is spent or a day is up. */
+        sql.transactionSync(() => {
+          sql.exec('DELETE FROM dir_pending WHERE expires <= ?', now);
+          sql.exec(
+            'INSERT INTO dir_pending (hash, purpose, email, payload, expires, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+            hash,
+            'invite',
+            email,
+            JSON.stringify({ invite, name }),
+            now + PENDING_LIFE,
+            now,
+          );
+        });
+        return { status: 200, body: {}, mail: { kind: 'invite.prove', to: email, link: token } };
+      }
+
+      /**
+       * The proof back from the mailbox, spent once: the address, the invitation it was minted for, and the name.
+       *
+       * THE HOST MAKES THE PERSON ONLY AFTER THIS, and only for the invitation named here, so a proof minted for one
+       * invitation opens no other. A dead, spent or unknown proof is the one failure body, like a link. Spending it
+       * clears the address's count of mails sent, as spending a sign-in link does.
+       */
+      case 'invite.proved': {
+        const token = call.token;
+        const hash = typeof token === 'string' && MINTED.test(token) ? await hmac('p:', token) : null;
+        if (hash === null) return rejected(flow, 'shape');
+        const spent = sql.transactionSync(() => {
+          const row = sql.one<{ email: string; payload: string }>(
+            "DELETE FROM dir_pending WHERE hash = ? AND purpose = 'invite' AND expires > ? RETURNING email, payload",
+            hash,
+            now,
+          );
+          if (row) sql.exec('DELETE FROM dir_fail WHERE key = ?', mailKey(row.email));
+          return row;
+        });
+        if (!spent) return rejected(flow, 'link');
+        const held = pendingInvite(spent.payload);
+        if (!held) return rejected(flow, 'shape');
+        const body: InviteProved = { email: spent.email, invite: held.invite, name: held.name };
+        return { status: 200, body };
       }
 
       default:

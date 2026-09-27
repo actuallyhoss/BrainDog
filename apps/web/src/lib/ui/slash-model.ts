@@ -13,11 +13,24 @@
  * (`slashFromEnv` in `packages/host/src/slash.ts`); what the owner names is the model that endpoint is asked for. Since
  * `aa763cdf` a name that is not one of the package's four routing names reaches the endpoint as typed, even where
  * `SLASH_MODEL` is set, which is the only reason a field for it is worth drawing.
+ *
+ * AND ON THE CLOUD THERE IS NO SUCH ENDPOINT, so `byo` is not offered there (`kindsOn`). The Worker answers Slash on the
+ * included model, and a name typed for `byo` went to that model's own table and failed every answer; the Worker now
+ * refuses to store `byo` and reads a record already saved on it as the included model (`CLOUD_TIERS` in
+ * `apps/worker/src/slash.ts`). Until a key of the owner's own is offered, the included model is the one choice there.
  */
 
 import type { SlashSettings, SlashSettingsPatch, SlashStatus } from '@braindog/client';
 
 export type Kind = 'a' | 'byo';
+
+/**
+ * The choices this host offers, from the `host` its `boot` named: only the included model on the Cloud, both elsewhere.
+ *
+ * ONE CHOICE IS NO CHOICE, so where this answers one kind the row is not drawn at all: the monthly limit beside it
+ * (`SlashAsks`) already names the model that answers and the limit it answers under.
+ */
+export const kindsOn = (host: unknown): readonly Kind[] => (host === 'cloud' ? ['a'] : ['a', 'byo']);
 
 /** Where the choice starts, from what the host said: the tier, and the name already in use on `byo`. */
 export type Start = { kind: Kind; typed: string };

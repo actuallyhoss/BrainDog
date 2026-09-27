@@ -121,7 +121,7 @@ const OWNER = { principal: { kind: 'person' as const, id: 'p_owner', level: 'own
 /** Pass 1 drafts the predicate, pass 2 writes the one cited proposal: `46 §5.4`'s two calls, in that order. */
 const ANSWERS = (): string[] => [
   '{"registers":["tasks"],"where":{"field":"state","is":"open"},"q":null}',
-  '{"text":"Two tasks are open and {{ref:tasks#1}} falls due first.","body_kind":"rowset","body":{"register":"tasks","rows":[{"what":"Chase {{ref:tasks#1}}"}]},"flagged":false}',
+  '{"text":"Two tasks are open and {{ref:tasks#1}} falls due first.","body_kind":"rowset","body":{"register":"tasks","rows":[{"fields":{"what":"Chase the first"},"from":["tasks#1"]}]},"flagged":false}',
 ];
 
 /** An endpoint that answers each queued completion once, with the token counts the meter bills. */
@@ -185,7 +185,7 @@ test("A REAL ASK REACHES THE PACKAGE'S ENGINE THROUGH THE WORKER'S OWN BUILDER, 
   /* AND THE ANSWER CAME FROM THE PACKAGE'S ENGINE AND NOT FROM THE RULES: two rows in Slash's OWN meter, and the record's
      own Slash still modelless, so nothing here could have come from `SlashModel.draft`. */
   assert.deepEqual(
-    own.all<{ kind: string; status: string }>('SELECT kind, status FROM call ORDER BY rowid').map((r) => `${r.kind}:${r.status}`),
+    own.all<{ kind: string; status: string }>('SELECT kind, status FROM slash_call ORDER BY rowid').map((r) => `${r.kind}:${r.status}`),
     ['read:ok', 'propose:ok'],
   );
   const reading = (await api.slash({}, OWNER)) as { ok: boolean; value: { model: string | null } };

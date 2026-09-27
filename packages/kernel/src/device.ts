@@ -17,7 +17,7 @@ import type { Result } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 
 import { instant } from './migrate.ts';
-import { DEFAULT_DAYS, createToken, revokeToken, type TokenDeps } from './token.ts';
+import { DEFAULT_DAYS, createToken, endedByCutOff, revokeToken, type TokenDeps } from './token.ts';
 
 /** `device_grant.reach`, as migration 4's CHECK has it. */
 export const REACHES = ['login', 'runner', 'export', 'import', 'pack', 'token', 'vault'] as const;
@@ -72,6 +72,12 @@ export type DeviceRow = {
   approved_by: string | null;
   approved_at: string | null;
   last_used: string | null;
+  /**
+   * Present on an approved or active grant that the operator's cut-off has ended (`TokenDeps.validFrom`), so the list
+   * says why a device stopped rather than showing it live. A grant is made when a person approves it, so that is the
+   * moment compared.
+   */
+  ended_by?: 'operator';
 };
 
 export type VaultGrant = { handle: string; scope: string; person: string; expires: string };
@@ -79,7 +85,7 @@ export type VaultGrant = { handle: string; scope: string; person: string; expire
 /** An operation bearer, checked and spent: which reach, the method it opens, and the person who approved it. */
 export type OperationGrant = { handle: string; reach: 'export' | 'import' | 'pack' | 'token'; method: Operation; person: string };
 
-type Stored = Omit<DeviceRow, 'handle'> & { id: string; code_hash: string; token_hash: string | null };
+type Stored = Omit<DeviceRow, 'handle' | 'ended_by'> & { id: string; code_hash: string; token_hash: string | null };
 
 const VISIBLE = 'id, status, reach, scope, label, ua, tries, expires, approved_by, approved_at, last_used';
 
@@ -112,7 +118,12 @@ const handleOf = async (deps: TokenDeps, id: string): Promise<string> => (await 
 
 const shown = async (deps: TokenDeps, row: Omit<Stored, 'code_hash' | 'token_hash'>): Promise<DeviceRow> => {
   const { id, ...rest } = row;
-  return { handle: await handleOf(deps, id), ...rest };
+  const live = rest.status === 'approved' || rest.status === 'active';
+  return {
+    handle: await handleOf(deps, id),
+    ...rest,
+    ...(live && endedByCutOff(deps.validFrom, rest.approved_at) ? { ended_by: 'operator' as const } : {}),
+  };
 };
 
 /** Whether a project row exists: a live row of the register that declares `scopes:`. */
@@ -250,6 +261,11 @@ export async function devicePoll(deps: TokenDeps, args: { device_code: string })
     return no('DEVICE_CODE_TRIES', 'Five wrong codes denied this request, so ask the device to start again.', { at: 'device_code' });
   if (row.status !== 'approved' || !row.approved_by)
     return no('FORBIDDEN', 'This device code has already been used. Ask the device to start again.', { at: 'device_code' });
+  /* AN APPROVAL FROM BEFORE THE OPERATOR'S CUT-OFF IS NOT EXCHANGED. A login exchange mints its token now, after the
+     instant, so a code approved inside a compromised window would otherwise come back as a token the cut-off passes.
+     The row is left as it is, so an earlier instant set to correct a mistake lets the device finish, and the sweep
+     expires it in its ten minutes either way. */
+  if (endedByCutOff(deps.validFrom, row.approved_at)) return expired;
 
   const record = deps.recordId();
   if (!record) return no('OUT_OF_BOUNDS', 'This record has no id yet, and a bearer carries the record it is for.', { at: 'record' });
@@ -332,13 +348,23 @@ export async function vaultGrant(deps: TokenDeps, bearer: string): Promise<Resul
   const wrong = no<VaultGrant>('FORBIDDEN', 'That vault grant is not one this record knows.', { at: 'vault' });
   if (!record || !secret || record !== deps.recordId()) return wrong;
 
-  const row = deps.sql.one<{ id: string; scope: string | null; approved_by: string | null; expires: string; suspended_at: string | null }>(
-    `SELECT d.id AS id, d.scope AS scope, d.approved_by AS approved_by, d.expires AS expires, p.suspended_at AS suspended_at
+  const row = deps.sql.one<{
+    id: string;
+    scope: string | null;
+    approved_by: string | null;
+    approved_at: string | null;
+    expires: string;
+    suspended_at: string | null;
+  }>(
+    `SELECT d.id AS id, d.scope AS scope, d.approved_by AS approved_by, d.approved_at AS approved_at, d.expires AS expires,
+            p.suspended_at AS suspended_at
      FROM device_grant d LEFT JOIN person p ON p.id = d.approved_by
      WHERE d.token_hash = ? AND d.reach = 'vault' AND d.status = 'active'`,
     await deps.digest(secret),
   );
   if (!row || !row.scope || !row.approved_by || row.suspended_at || row.expires <= instant(deps.nowMs)) return wrong;
+  /* THE OPERATOR'S CUT-OFF, in the same sentence as every other failure (`verifyToken`). */
+  if (endedByCutOff(deps.validFrom, row.approved_at)) return wrong;
 
   deps.sql.exec('UPDATE device_grant SET last_used = ? WHERE id = ?', instant(deps.nowMs), row.id);
   return ok({ handle: await handleOf(deps, row.id), scope: row.scope, person: row.approved_by, expires: row.expires });
@@ -358,7 +384,8 @@ export async function vaultGrant(deps: TokenDeps, bearer: string): Promise<Resul
  * grant that was used from one that ran out.
  *
  * ONE SENTENCE FOR EVERY WAY IT FAILS, as `vaultGrant` and `verifyToken` give it: spent, past its ten minutes, for
- * another record, of another reach, or approved by somebody since suspended. A caller replaying a bearer learns nothing
+ * another record, of another reach, approved by somebody since suspended, or approved before the operator's cut-off
+ * (`TokenDeps.validFrom`). A caller replaying a bearer learns nothing
  * a caller guessing one does not.
  */
 export async function operationGrant(deps: TokenDeps, bearer: string): Promise<Result<OperationGrant>> {
@@ -371,14 +398,26 @@ export async function operationGrant(deps: TokenDeps, bearer: string): Promise<R
   if (!record || !secret || record !== deps.recordId()) return wrong;
 
   const hash = await deps.digest(secret);
-  const row = deps.sql.one<{ id: string; reach: Reach; approved_by: string | null; expires: string; suspended_at: string | null }>(
-    `SELECT d.id AS id, d.reach AS reach, d.approved_by AS approved_by, d.expires AS expires, p.suspended_at AS suspended_at
+  const row = deps.sql.one<{
+    id: string;
+    reach: Reach;
+    approved_by: string | null;
+    approved_at: string | null;
+    expires: string;
+    suspended_at: string | null;
+  }>(
+    `SELECT d.id AS id, d.reach AS reach, d.approved_by AS approved_by, d.approved_at AS approved_at, d.expires AS expires,
+            p.suspended_at AS suspended_at
      FROM device_grant d LEFT JOIN person p ON p.id = d.approved_by
      WHERE d.token_hash = ? AND d.status = 'active'`,
     hash,
   );
   const now = instant(deps.nowMs);
   if (!row || !OPERATIONS.includes(row.reach) || !row.approved_by || row.suspended_at || row.expires <= now) return wrong;
+  /* THE OPERATOR'S CUT-OFF IS A SECOND BEARER TO COVER (`loop/research-w61.md` §1 item 13): on either host a bearer the
+     token table refuses falls through to here at the operation doors (`OPERATION_METHOD`), so a grant approved before
+     the instant is refused in the same sentence, and it is refused without being spent, as nothing that fails here is. */
+  if (endedByCutOff(deps.validFrom, row.approved_at)) return wrong;
 
   deps.sql.exec("UPDATE device_grant SET status = 'expired', expires = ?, last_used = ? WHERE id = ? AND status = 'active'", now, now, row.id);
   const reach = row.reach as OperationGrant['reach'];

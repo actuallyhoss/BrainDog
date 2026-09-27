@@ -184,10 +184,16 @@ test('A RULE ON THE LAST DAY OF EACH MONTH IS ARMED FOR IT, RUNS ON IT, AND IS A
     assert.equal(due(), next);
   }
 
-  /* A DRAIN THAT COMES LATE takes the turn once and is armed for the month after, not for every month it missed. */
+  /* A DRAIN THAT COMES LATE TAKES EVERY TURN IT MISSED, each as its own run, and is armed for the next one ahead. It
+     took the first and folded the rest into it until the audit of 25 September (C2): here a host back on 2 July took
+     the turn of 30 April and none of 31 May or 30 June, and said nothing. Three turns after the loop's three. */
   clock.set(Date.UTC(2027, 6, 2, 12));
   await k.drain();
-  assert.equal(made(), 4);
+  assert.equal(made(), 6);
+  assert.deepEqual(
+    sql.all<{ at: string }>("SELECT json_extract(trigger, '$.at') AS at FROM automation_run WHERE rule = 'next_rent' ORDER BY started_at, rowid").slice(-3).map((r) => r.at),
+    ['2027-04-30T08:00:00.000Z', '2027-05-31T08:00:00.000Z', '2027-06-30T08:00:00.000Z'],
+  );
   assert.equal(due(), '2027-07-31T08:00:00.000Z');
 });
 

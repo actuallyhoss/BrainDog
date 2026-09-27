@@ -189,6 +189,27 @@ const SUMMARIES: Record<FirstPartyId, string> = {
  *   the bank's pack and mints again; one on 1.5.0 to 1.8.0 holding rows in `holdings` is refused `WOULD_ORPHAN` rather
  *   than losing them. The survey that brief rests on found no record on a money-core before 1.8.0. The handover itself
  *   is still `declare`'s, and its tests make their own `hands` (`test/pack-files.ts`).
+ * - money-core 3.0.0, THE CARD ALERTS' PART OF IT: the two card wordings, `bank-card-out` and `bank-card-in`, and their
+ *   two `-sms` twins leave for `packs/card-alerts`, so a record set up with Money carries no bank's wording and no text
+ *   door it did not ask for (`loop/DIRECTION.md` section 22). Four ingests taken away. With no `hands` since the 2.4.0
+ *   entry above, a record updating retires the four, so a Shortcut token minted for a twin stops opening its door until
+ *   the owner installs `card-alerts` and mints again.
+ * - money-core 3.0.0, THE REST OF IT: one page called Money in place of Overview, Ledger and the house Home, which
+ *   retire (a page holds no rows). Cash now is rolled forward from each account's newest balance through what moved
+ *   since, and a new list, `balances`, holds the balance checks it restarts from. What repeats lives in Repeating, which
+ *   the cash walk reads at every cadence (weekly, fortnightly and twice a month join monthly, quarterly and yearly), and
+ *   an obligation's `repeats` is kept on its rows and walked no more. Obligations is called Bills and invoices, stamps
+ *   `settled` when a row is paid, and gains neutral categories beside the studio's, which stay for the rows that hold
+ *   them. An account gains `arrives`, a transaction `balance_after`, a category `match_by`. Every money figure is
+ *   `format: money`, and a money ceiling is a setting with no default. Money no longer needs People: who a row is with
+ *   is a link (`LINKS` below). Two pages taken away, so the step is a major one; every list, field and figure id stays.
+ * - estate 1.3.0: Services says a row holds who it is with, where it said a registrar, which is what a domain is held
+ *   with and not what hosting, a subscription or a certificate is. The words of `holds` change and no id moves, so the
+ *   step is a minor one. A version and not a reset because 1.2.0 is on `origin/master` (`8b8915e4`).
+ * - people 2.1.0: People says it is the list `meet` writes, `meets:` naming the field for each part, so the kernel reads
+ *   the role off the list instead of finding a list called `people` (`LEGACY` in `packages/kernel/src/roles.ts`). On a
+ *   record with no Projects the `projects` part goes with the field it names (`without` below). A key added to a list
+ *   and nothing taken away, so the step is a minor one.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.4.0',
@@ -206,19 +227,20 @@ type Body = Record<string, unknown>;
  * So "Met in" is a link and not a dependency. When the record will not hold the list it points at, the field is
  * left out of the document with every column drawn over it, and the pack installs on its own. Installing the
  * pack again once that list is there puts the field back. Work's tasks and threads say which project they are for and
- * who holds them the same way, so a homework list installs Work with no Projects and no People.
+ * who holds them the same way, so a homework list installs Work with no Projects and no People. Money says who a bill,
+ * a payment, a repeating item or an instalment is with the same way since money-core 3.0.0, so Money installs and
+ * draws on a record with People off (`loop/finish/modules.md` C12).
  */
-const LINKS: Partial<Record<FirstPartyId, readonly string[]>> = { people: ['projects'], work: ['owner', 'thing'] };
+const LINKS: Partial<Record<FirstPartyId, readonly string[]>> = { people: ['projects'], 'money-core': ['party'], work: ['owner', 'thing'] };
 
 /**
  * The id a declaration in a document is filed under: its kind's key.
  *
- * `ingest` IS HERE BEFORE ANY INGEST IS, and deliberately. `MONEY_INGESTS` in `modules/money.ts`
- * declares how a forwarded bank message becomes a ledger row, and the one thing left before it
- * installs is an arm in `index.ts`'s declaration list. Without this line that arm would file every
- * pattern under the empty string, so `firstPartyManifest(...).provides` would carry a nameless
- * member and a record comparing two versions of the pack would see one declaration replace another.
- * Five kinds reach a first-party document and this function knew four.
+ * `ingest` STAYS WHILE NO MODULE DECLARES ONE. It went in for money-core's card alerts, which left for
+ * `packs/card-alerts` at money-core 3.0.0, and `INGESTS` in `index.ts` is empty since. A pattern a
+ * module declares again reaches a document through that list, and without this arm it would be filed
+ * under the empty string, so `firstPartyManifest(...).provides` would carry a nameless member and a
+ * record comparing two versions of the pack would see one declaration replace another.
  */
 const idOf = (d: Body): string =>
   typeof d.ingest === 'string'
@@ -305,6 +327,14 @@ export function firstPartyManifest(id: FirstPartyId): PackManifest & { provides:
 const GROUPED = new Set(['bar', 'split']);
 
 /**
+ * THE KEYS A LIST DECLARES A ROLE WITH, each part naming the field that plays it (`packages/kernel/src/roles.ts`).
+ * People's `meets:` names `projects`, which is a link (`LINKS`), so on a record with no Projects the field goes and the
+ * part must go with it: the kernel refuses a role naming a field the list does not have (`FIELD_UNKNOWN`), and
+ * `projects` is a part `meet` does without, recording the person and linking nobody.
+ */
+const ROLE_KEYS = ['meets', 'rates'] as const;
+
+/**
  * A declaration with the fields in `gone` taken out, and every column and phone field drawn over them. A bar grouped by
  * a field that is gone is left out whole: "Open work by project" on a record with no projects has nothing to group by.
  */
@@ -313,6 +343,20 @@ function without(d: Body, gone: ReadonlySet<string>): Body | null {
   const out: Body = { ...d };
   if (Array.isArray(d.fields)) out.fields = (d.fields as Body[]).filter((f) => !gone.has(String(f.id)));
   if (Array.isArray(d.mobile)) out.mobile = (d.mobile as unknown[]).filter((f) => !gone.has(String(f)));
+  for (const key of ROLE_KEYS) {
+    const role = d[key];
+    if (role !== null && typeof role === 'object' && !Array.isArray(role))
+      out[key] = Object.fromEntries(Object.entries(role as Body).filter(([, field]) => !gone.has(String(field))));
+  }
+  /* A PAIRING'S `party is empty` OVER A FIELD THAT IS GONE IS TRUE OF EVERY ROW, so it is taken out of the `all` it sits
+     in and nothing the pairing matches changes. Kept, it would name a field the list no longer has, and the kernel
+     refuses such a list (`pairsFault` in `packages/kernel/src/pairs.ts`), so Money would not install with People off:
+     `transactions` pairs a transfer only when `party is empty`, and `party` is a link since money-core 3.0.0 (`LINKS`
+     above). */
+  const pairs = d.pairs as Body | undefined;
+  const all = pairs !== null && typeof pairs === 'object' && pairs.where !== null && typeof pairs.where === 'object' ? (pairs.where as Body).all : undefined;
+  if (pairs && Array.isArray(all))
+    out.pairs = { ...pairs, where: { ...(pairs.where as Body), all: (all as Body[]).filter((c) => !(typeof c.field === 'string' && gone.has(c.field) && c.empty === true)) } };
   /* A FIGURE ASKED OF A FIELD THAT IS GONE is left out whole: `project-open` counts a project's tasks, and a record with
      no projects has none to count. */
   if (typeof d.metric === 'string' && typeof d.where === 'string' && [...gone].some((f) => new RegExp(`(?:^|,\\s*)${f}\\s`, 'u').test(d.where as string)))
@@ -347,17 +391,28 @@ export function firstPartyDocument(id: string, options: DocumentOptions = {}): R
         if (links.includes(String(f.id)) && f.to !== d.register && !held.has(String(f.to))) gone.add(String(f.id));
   }
   /* A WALK'S LEG OVER A LIST THE RECORD WILL NOT HOLD IS LEFT OUT, as a link field is: Money's cash walk reads Estate's
-     services when they are there, and a person's or a founder's record without Estate still has a walk. */
+     services when they are there, and a person's or a founder's record without Estate still has a walk.
+
+     ON A FIGURE AS WELL AS A BLOCK, since money-core 3.0.0 reads the walk in figures (`legs:` on `forecast.runway`),
+     and a figure is checked at install where a block is checked when it is read: a leg over a list the record does not
+     hold is refused `REGISTER_UNKNOWN` (`figureListsFault` in `packages/kernel/src/declare.ts`), so Money would not
+     install at all. A LEG OVER THE PACK'S OWN LIST IS ALWAYS KEPT, because a caller's `holds` can leave out a list this
+     very install adds, and a walk that lost its own bills would read too high, the one direction it must never be
+     wrong in.
+
+     AND WITH NO `holds` A FIGURE WALKS ONLY THE PACK'S OWN LISTS, where a block keeps every leg as it always did. A
+     caller that does not say what the record holds is installing the document as it is, onto a record that may not
+     hold Estate, and a figure checked at install would refuse the whole pack for a leg a block would only have drawn
+     without. Such a record's tiles leave its subscriptions out until the pack is installed again for it. */
   const held = options.holds === undefined ? null : new Set(options.holds);
-  const legs = (d: Body): Body =>
-    held === null || !Array.isArray(d.blocks)
-      ? d
-      : {
-          ...d,
-          blocks: (d.blocks as Body[]).map((b) =>
-            Array.isArray(b.from) ? { ...b, from: (b.from as Body[]).filter((leg) => typeof leg.register !== 'string' || held.has(leg.register)) } : b,
-          ),
-        };
+  const own = new Set(whole.declarations.flatMap((d) => (typeof d.register === 'string' ? [d.register] : [])));
+  const walked = (from: Body[], unsaid: boolean): Body[] =>
+    from.filter((leg) => typeof leg.register !== 'string' || own.has(leg.register) || (held === null ? unsaid : held.has(leg.register)));
+  const legs = (d: Body): Body => {
+    if (Array.isArray(d.legs)) return { ...d, legs: walked(d.legs as Body[], false) };
+    if (held === null || !Array.isArray(d.blocks)) return d;
+    return { ...d, blocks: (d.blocks as Body[]).map((b) => (Array.isArray(b.from) ? { ...b, from: walked(b.from as Body[], true) } : b)) };
+  };
   const pack = {
     declarations: whole.declarations.flatMap((d) => {
       const kept = without(d, gone);

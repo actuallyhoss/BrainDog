@@ -29,6 +29,9 @@
   } from '../src/index.ts';
   /* From the module and not the root, which does not export it: the word is this drawer's and `html.ts`'s alone. */
   import { CARDS_NEXT } from '../src/cards.ts';
+  import { hueOf } from '../src/cards.ts';
+  import { pictureSrc } from '../src/gallery.ts';
+  import { hrefFor } from '../src/html.ts';
   import Text from './Text.svelte';
 
   let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
@@ -55,8 +58,19 @@
       {@const t = L.trend >= 0 ? trendOf(said(r, L.trend)) : null}
       {@const m = L.ring >= 0 ? ringOf(said(r, L.ring)) : null}
       {@const whoFace = L.who >= 0 ? initialOf(said(r, L.who)) : null}
-      <!-- The lead is the first card of a `cards lead` block and no other, told rather than inferred (05 §4). -->
-      <li class="cards-item" data-lead={block.form === 'lead' && n === 0 ? '' : undefined} data-intent={r.tone} data-quiet={isQuiet(L, r.cells) ? '' : undefined}>
+      {@const hue = L.hue >= 0 ? hueOf(said(r, L.hue)) : null}
+      {@const picture = L.picture >= 0 ? pictureSrc(r.cells[L.picture] ?? '', opts.file) : null}
+      <!-- The lead is the first card of a `cards lead` block and no other, told rather than inferred (05 §4). The hue is a
+           number the host draws the mark in, and a cell that is not one writes no style; the picture leads the card
+           where the host serves the file, hidden from a screen reader because the title under it names the card. -->
+      <li
+        class="cards-item"
+        data-lead={block.form === 'lead' && n === 0 ? '' : undefined}
+        data-intent={r.tone}
+        data-quiet={isQuiet(L, r.cells) ? '' : undefined}
+        style={hue === null ? undefined : `--hue:${hue}`}
+      >
+        {#if picture}<img class="cards-picture" src={hrefFor(opts, picture)} alt="" loading="lazy" />{/if}
         <div class="cards-head">
           {#if mark}<span class="cards-mark" aria-hidden="true">{mark}</span>
           {:else if face}<span class="cards-face" aria-hidden="true">{face}</span>{/if}

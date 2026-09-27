@@ -1,0 +1,53 @@
+name: mutate
+
+# THE GUARD TESTS, ASKED WHETHER THEY CAN FAIL (`loop/finish/ops.md` OPS-25, SC34).
+#
+# `tools/mutate.mjs` breaks each guard its `GUARDS` table names in a scratch copy of the tree, runs the tests written
+# to catch it, and is red for any guard whose tests stay green. The table is the one list of what is covered, and its
+# header has the whole argument; this file only says when it runs.
+#
+# WHEN (decisions C57): weekly, on a pull request that carries the `full-gates` label, and by hand. Not on every push:
+# a guard's test does not stop being able to fail between two commits that never touched it, and every row runs its
+# tests twice, once whole and once broken.
+#
+# IT DEPLOYS NOTHING AND WAITS FOR NOTHING. No workflow runs off this one's completion, so a red run here is a finding
+# to read and never a deploy held back or let through.
+
+on:
+  pull_request:
+    # `labeled` SO ADDING THE LABEL ASKS AT ONCE, as `gates.yml` does. Only this workflow's one job re-runs on it.
+    types: [opened, synchronize, reopened, labeled]
+  schedule:
+    # Monday, 06:30 UTC, between the Windows run and CodeQL, so the three weekly runs do not share one runner at once.
+    - cron: '30 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # The event is in the key for `gates.yml`'s reason: a pull request's push must not cancel the weekly run of master.
+  group: mutate-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+# BASH ON EVERY RUNNER, for the reason every workflow here gives: a Windows self-hosted runner would otherwise run a
+# step in PowerShell.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  mutate:
+    # A pull request runs this only when it is asked to, written as `gates.yml` writes it, so a trigger added above is
+    # included by default rather than silently skipped.
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'full-gates')
+    # SELF-HOSTED, BECAUSE THE ACCOUNT RAN OUT OF ACTIONS MINUTES (September 17th, the owner's call).
+    # Self-hosted minutes are free. Set the repository variable CI_RUNNER to ubuntu-24.04 to go back.
+    runs-on: ${{ vars.CI_RUNNER || 'self-hosted' }}
+    # A ceiling for a hang, not a budget: `tools/mutate.mjs` stops any one test file at its own `PER_RUN_MS`, and no
+    # whole run of it has been measured yet.
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: node tools/mutate.mjs

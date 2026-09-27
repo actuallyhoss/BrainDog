@@ -1,26 +1,28 @@
 name: gates
 
-# THE WHOLE TWENTY SIX, AND WHEN THEY RUN.
+# EVERY GATE, AND WHEN THEY RUN.
 #
-# It said nineteen until 16 September 2026, which was the count when this was written. The
-# registry in `run.mjs` holds twenty six. The minute figures below are the browser time as it was
-# last measured and have NOT been taken again since the count grew, so treat them as the shape of
-# the argument rather than as a current measurement.
+# Every gate `run.mjs` registers, which is why this names no count: the count this line carried
+# went stale twice. The minute figures below are the browser time as it was last measured and have
+# NOT been taken again since the registry grew, so treat them as the shape of the argument rather
+# than as a current measurement.
 #
 # `pnpm gates` is about nineteen minutes, and nearly all of it is two gates driving a headless
 # browser over a built app: `layout` is 627 page-runs (every route, at both sides of every
 # breakpoint the stylesheets declare, plus three floor widths) and `a11y` is 212 axe audits (every
-# route, two schemes, two widths, plus the site). The other twenty four are seconds.
+# route, two schemes, two widths, plus the site). The others are seconds.
 #
-# THE CHOICE, MADE EXPLICITLY: on a weekly schedule, on demand, and on a pull request only when
-# it carries the `full-gates` label. It ran on every merge to master until 16 September 2026.
+# THE CHOICE, MADE EXPLICITLY: every gate on a weekly schedule, on demand, and on a pull request
+# only when it carries the `full-gates` label; and `layout` and `a11y` alone on a push to master
+# that touches what those two read. This workflow ran on every merge to master until 16 September
+# 2026, and on none from then until OPS-1.
 #
 #   - NOT EVERY PULL REQUEST. Nineteen minutes on every push to every branch is a queue, and a
 #     queue is where `continue-on-error` gets added. The measurable cost of not doing it is that a
-#     layout or contrast regression is found after the merge rather than before — on a repository
+#     layout or contrast regression is found after the merge rather than before; on a repository
 #     with one committer and no release, that is a red master for the length of one fix, which is
 #     the cheaper of the two prices.
-#   - NOT ON EVERY MERGE TO MASTER ANY MORE, AND THIS IS A BUDGET DECISION RATHER THAN A DESIGN
+#   - NOT EVERY GATE ON EVERY MERGE TO MASTER, AND THIS IS A BUDGET DECISION RATHER THAN A DESIGN
 #     ONE. The argument for it stands and is worth keeping: master is the tree everything else is
 #     measured against, and a green master is the claim this workflow exists to keep true. What
 #     broke it was the loop pushing several times a day. Each push cancelled the run the previous
@@ -28,10 +30,17 @@ name: gates
 #     spends most of eighteen to thirty minutes each time and proves nothing at all. The owner
 #     said the Actions minutes were running short, and a check that is killed before it finishes
 #     is the worst thing to spend them on.
+#   - BUT `layout` AND `a11y` ON A PUSH TO MASTER THAT TOUCHES WHAT THEY READ (W60-10). Without it
+#     a layout or contrast regression on master was found by the Monday run, by somebody
+#     dispatching this by hand, or not until it was in front of a person. Every other gate already
+#     runs on that push, in `ci.yml` or, for `deploy-parity`, in `deploy.yml`, so these two are the
+#     whole of what master went without. The `paths` list below is what keeps it cheap: a push
+#     that changes none of their inputs cannot change their answer. A newer push still cancels an
+#     older one's run, which is right here, because the newest master is the tree worth measuring;
+#     and `deploy.yml` follows `ci` alone, so this run never holds a deploy back.
 #
-#     WHAT IS GIVEN UP, PLAINLY: a layout or contrast regression on master is now found by the
-#     Monday run, by somebody dispatching this by hand, or not until it is in front of a person.
-#     Run it with `gh workflow run gates.yml` before anything that depends on master being green.
+#     Run every gate with `gh workflow run gates.yml` before anything that depends on master being
+#     green on all of them.
 #   - THE LABEL IS THE ESCAPE HATCH, and it is a considered part of the answer rather than a
 #     hedge. A change to `apps/web/src`, `packages/skin` or `tools/gates` is exactly the change
 #     whose breakage these gates catch, and putting `full-gates` on that pull request buys the
@@ -42,14 +51,45 @@ name: gates
 #     of those arrive as a commit, so nothing above would ever notice them; Monday morning is
 #     early enough to find out before the week's work is stacked on top.
 #
-# NO `paths:` FILTER, AND THAT IS NOT AN OVERSIGHT. A docs-only commit looks skippable and is not:
-# `event-kinds`, `closed-lists` and `refusals` read the design documents as a SOURCE — the CHECK in
-# the migration, the table in `30-BLUEPRINT`, and the prose around it must all count the same forty
-# kinds — so `paths-ignore: docs/**` would be a hole precisely where the corpus contradicts itself.
-# The nineteen minutes are already paid for by the trigger list; buying them again with a filter
-# that can be wrong is a bad trade.
+# NO `paths:` FILTER ON THE FULL RUN, AND THAT IS NOT AN OVERSIGHT. A docs-only commit looks
+# skippable and is not: `event-kinds`, `closed-lists` and `refusals` read the design documents as
+# a SOURCE (the CHECK in the migration, the table in `30-BLUEPRINT`, and the prose around it must
+# all count the same kinds), so `paths-ignore: docs/**` would be a hole precisely where the corpus
+# contradicts itself. The push trigger is the one with a filter, because it runs two gates whose
+# inputs are known: their own files and their imports, the two builds they measure and everything
+# those builds read. `apps/worker/scripts/gates-workflow.test.mjs` walks those imports and is red
+# when one of them falls outside the list.
 
 on:
+  push:
+    branches: [master]
+    paths:
+      # The two builds `layout` and `a11y` measure, the self-host their record runs on, and every
+      # package those three are built from.
+      - 'apps/web/**'
+      - 'apps/site/**'
+      - 'apps/selfhost/**'
+      - 'packages/**'
+      # The web build begins by writing the catalogue from every pack (`apps/web/package.json`).
+      - 'packs/**'
+      - 'tools/catalogue/**'
+      # The runner a push run starts them through, the two gates, the helpers they import, and
+      # the budgets `lib.mjs` reads.
+      - 'tools/gates/run.mjs'
+      - 'tools/gates/layout.mjs'
+      - 'tools/gates/a11y.mjs'
+      - 'tools/gates/lib.mjs'
+      - 'tools/gates/record.mjs'
+      - 'tools/gates/routes.mjs'
+      - 'tools/gates/budgets.json'
+      # The dependencies (Chromium and axe-core among them), the compiler settings every build
+      # shares, and the setup this job runs.
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'tsconfig.base.json'
+      - '.github/actions/setup/**'
+      - '.github/workflows/gates.yml'
   pull_request:
     types: [opened, synchronize, reopened, labeled]
   schedule:
@@ -62,10 +102,13 @@ permissions:
   contents: read
 
 concurrency:
-  group: gates-${{ github.event.pull_request.number || github.ref }}
+  # THE EVENT IS IN THE KEY, so a push to master cancels only an older push's run. Keyed on the ref
+  # alone, the push trigger's two gates would cancel the Monday run or a hand dispatch of every
+  # gate on master, which is the one run of all of them master gets.
+  group: gates-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   # CANCELS SUPERSEDED MASTER RUNS TOO, which is the less obvious half. Three pushes in ten minutes
-  # would otherwise queue 57 minutes of browser to report on two trees that no longer exist; the
-  # last one is the tree, and it is the one worth the runner.
+  # would otherwise queue three browser runs to report on two trees that no longer exist; the last
+  # one is the tree, and it is the one worth the runner.
   cancel-in-progress: true
 
 # BASH ON EVERY RUNNER. A Windows self-hosted runner runs a step without a named shell in PowerShell,
@@ -78,7 +121,7 @@ defaults:
 jobs:
   gates:
     # A pull request runs this only when it is asked to. Written as "not a pull request, or
-    # labelled" so a push, a schedule and a manual dispatch need no clause of their own — a new
+    # labelled" so a push, a schedule and a manual dispatch need no clause of their own: a new
     # trigger added above is included by default rather than silently skipped.
     if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'full-gates')
     # SELF-HOSTED, BECAUSE THE ACCOUNT RAN OUT OF ACTIONS MINUTES (September 17th, the owner's call).
@@ -121,13 +164,13 @@ jobs:
           path: ~/.cache/ms-playwright
           key: ms-playwright-${{ runner.os }}-${{ steps.browser.outputs.version }}
 
-      # CHROMIUM ONLY — the four browser gates ask for `chromium` and nothing else, and installing
+      # CHROMIUM ONLY: the browser gates ask for `chromium` and nothing else, and installing
       # the other two is 300 MB nothing opens (52 §10 records the deliberate ceiling). A skipped
       # cache step has no `cache-hit` output, so on the self-hosted runner this is the step that runs.
       - if: steps.browser-cache.outputs.cache-hit != 'true'
         run: pnpm exec playwright install --with-deps chromium
 
-      # The cache holds the browser, never the system libraries it links against — those live in
+      # The cache holds the browser, never the system libraries it links against: those live in
       # the image, and a restored cache with no `install-deps` is a browser that exits before it
       # renders a page.
       - if: steps.browser-cache.outputs.cache-hit == 'true'
@@ -147,7 +190,7 @@ jobs:
       - run: pnpm --filter @braindog/web build
       - run: pnpm --filter @braindog/site build
 
-      # AND THE BUILD MUST NOT HAVE CHANGED A TRACKED FILE — the same line as `ci.yml`'s build job,
+      # AND THE BUILD MUST NOT HAVE CHANGED A TRACKED FILE, the same line as `ci.yml`'s build job,
       # and here it is load-bearing rather than tidy. Both builds start with
       # `pnpm --filter @braindog/skin theme`, which WRITES `tokens.css` and the favicons; the
       # `theme` gate below is `theme.mjs --check`. Without this line the build regenerates the
@@ -155,16 +198,23 @@ jobs:
       # that has drifted from its generator passes the one check written to catch it.
       - run: git diff --exit-code
 
-      # ALL TWENTY SIX. No `--only`, no `--except`, no `--allow-skip`: this is the job that has every
-      # prerequisite, so a skip here is a fact about the build above and is correctly red.
+      # A PUSH TO MASTER RUNS THE TWO BROWSER GATES AND NOTHING ELSE. `ci` ran every other gate on
+      # the same commit, so running them again here spends the runner to learn nothing, and the
+      # `paths` list above is written against these two alone.
+      - if: github.event_name == 'push'
+        run: pnpm gates -- --only layout,a11y
+
+      # EVERY OTHER TRIGGER RUNS ALL OF THEM. No `--only`, no `--except`: this is the job that has
+      # every prerequisite, so a skip here is a fact about the build above and is correctly red.
       # `--allow-skip deploy-parity` AND NOT AN EXCLUSION, which is the difference between "this job
       # does not ask" and "this job asks and accepts one answer". 52 §5 writes it this way on
       # purpose: the gate still runs here, still prints the sentence naming what it lacks, and is
       # still red if it fails for any reason other than having no live host to measure. Excluding it
       # would also hide the day it stops being able to run at all.
-      - run: pnpm gates -- --allow-skip deploy-parity
+      - if: github.event_name != 'push'
+        run: pnpm gates -- --allow-skip deploy-parity
 
-      # THE A11Y GATE'S OWN RUN, which it writes to `.a11y.log` — the per-route, per-scheme detail
+      # THE A11Y GATE'S OWN RUN, which it writes to `.a11y.log`: the per-route, per-scheme detail
       # behind a summary line that names counts. It is an ARTEFACT FOR A PERSON and never an
       # assertion (22 §10); nothing reads it back.
       - if: failure()

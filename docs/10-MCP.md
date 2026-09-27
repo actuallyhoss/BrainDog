@@ -34,23 +34,44 @@ an earlier revision still connects through `initialize`, and a 2026-07-28 client
 
 ## 2 · Authentication
 
-BrainDog is an OAuth 2.1 **resource server**, staged, because a resource server needs an
-authorization server and an earlier draft never named one.
+BrainDog is an OAuth 2.1 **resource server and its own authorization server**, so any MCP client
+connects by the URL `https://brain.dog/mcp` and a person's yes. Every token is an ordinary agent
+token, whichever way it was made.
 
-**Phase A ships agent tokens only.** An agent token is a long-lived bearer, scoped, revocable,
-created in the app (or minted by `braindog login` through the device grant) and shown once. This is
-the path for a headless session in a repo on a machine with no browser, and it is how tier-0
-collaboration works with zero UI.
+**Two ways to hold a token.** An agent token is a bearer, scoped, revocable, and shown once. It is
+made in the app, or by `braindog login` through the device grant, which is the path for a headless
+session in a repo on a machine with no browser; or it is made by OAuth, below, for a client that
+connects by URL. Both land in the same list under Settings, Agents, and revoking one there stops it.
 
-**Deferred, with the reason stated:** the OAuth 2.0 Protected Resource Metadata document
-(RFC 9728) at `/.well-known/oauth-protected-resource` must name an issuer, and an authorization
-server is a component with no line item in [15-ROADMAP](15-ROADMAP.md) §1b. When it is built,
-**BrainDog is its own authorization server** on `apps/worker`:
+**OAuth, as built** (`packages/host/src/oauth.ts`, the protocol; `packages/record/src/oauth.ts`, its
+store on the Directory's SQL; `apps/worker/src/oauth.ts`, the Cloud's wiring). The Cloud serves all of
+it; a self-host does not yet, and its `/mcp` still takes a token made in the app or by the device grant.
 
-- passkey or magic-link consent, PKCE, no refresh tokens for CLI clients;
-- `iss` validated per RFC 9207 before a code is redeemed; credentials issuer-bound;
-- **Client ID Metadata Documents** accepted; Dynamic Client Registration not implemented, per the
-  deprecation.
+- `POST /mcp` without a bearer answers 401 with
+  `WWW-Authenticate: Bearer resource_metadata="https://<host>/.well-known/oauth-protected-resource"`.
+  That document (RFC 9728, also at `/.well-known/oauth-protected-resource/mcp`) names the resource
+  and this host as its authorization server; `/.well-known/oauth-authorization-server` (RFC 8414)
+  names the endpoints.
+- A client is public, never given a secret, and proves itself with PKCE (`S256` only). It registers
+  at `POST /oauth/register` (RFC 7591), or its `client_id` is an `https:` address serving a **Client
+  ID Metadata Document**, read at most once a day. A redirect address is `https:`, or `http:` on
+  `127.0.0.1` or `localhost` at any port (RFC 8252).
+- `GET /oauth/authorize` checks the client and its redirect address, answering anything wrong with
+  either on a BrainDog page and never at the client's address, then holds the request ten minutes and
+  sends the browser to the consent screen, which on the Cloud is a plain page of the Worker's own at
+  `/oauth/consent` until the app draws one. `GET /oauth/request?request=<id>` is that screen's read of
+  it: the client's name, its redirect host, and the scopes it may be given.
+- The person allows it (`POST /oauth/approve`) from a browser signed in within the last fifteen
+  minutes, as a machine's six digits are approved. The token is minted by the record's own
+  `createToken`, as that person and so only by an owner, labelled with the client's name, for ninety
+  days, and sealed under a one-time code that lives sixty seconds. `POST /oauth/deny` answers the
+  client `access_denied`.
+- `POST /oauth/token` trades the code and its verifier for `{ access_token, token_type: 'Bearer',
+  expires_in, scope }`. A code is spent by being asked for, so a second use fails. Every redirect
+  carries `iss` (RFC 9207). There is no refresh token: after ninety days the client signs in again.
+- Errors at `/oauth/*` are OAuth's own `{ error, error_description }`. `/oauth/register` and
+  `/oauth/authorize` are counted per address in the Directory's lockout table and answer 429 with
+  `Retry-After` past the limit.
 
 **Every token is scoped to one record.** There is no token that reaches two records, because
 there is no code path that reaches two records: the object boundary is the security boundary.
@@ -111,9 +132,21 @@ cost more tokens than the ceiling had left (the smallest `script_try` tool measu
 script change whose body also says `"try"` is run once in the host's sandbox and answered with the writes it would
 make, filed nowhere and asked of nobody. The grammars that teach both are resources (§6).
 
+**Trying a change before it is filed.** `propose` with `"try"` beside `to` files nothing and answers what the
+change would do, `proposed: false`, in the record's own words; the agent sends it again without `try` to put it in
+front of the owner. A page is answered `page_preview`, the record's `previewPage`; a script `script_try`; a rule
+`automation_try`. Anything else, a bundle `{ declarations: [...] }` or one list or figure, is answered
+`change_preview`, the record's `previewChange` ([33-CONTRACTS](33-CONTRACTS.md) §2): the whole change installed in
+the record's rehearsal, over sample rows when `"try": { "rows": { "<list>": [ { ... } ] }, "about": "<list>#<n>" }`
+brings them, every page it makes drawn as `page` would draw it, a page per row filled over the row `about` names or
+the first there is, and every write rolled back before it answers. A bundle is tried as one call, so the pages of a
+change that brings its own lists are seen holding rows before anything is filed. None of it is a tool, so the list
+costs what it did.
+
 **What each reaches, said once:** `record_index` reads `boot()` and `version()`, `log` is `update` with an empty
 patch, `activity` reads `recentHistory()`, `money` reads seven figures through `metric()` at once, `propose` may add
-`dryRun()` or call `scriptTry()` instead, and every other tool shares its method's name
+`dryRun()` or, with `try`, call `previewPage()`, `scriptTry()`, `tryAutomation()` or `previewChange()` instead, and
+every other tool shares its method's name
 ([30-BLUEPRINT](30-BLUEPRINT.md) §5). The tools reshape an answer only to address it: a row comes back compact, as
 `{ spoken, version, state, fields }` with the id `context` uses, and a list of questions comes back without bodies. Every method takes
 `(args, ctx)` and returns the `Result<T>` envelope of [33-CONTRACTS](33-CONTRACTS.md) §2. Over HTTP a refusal is

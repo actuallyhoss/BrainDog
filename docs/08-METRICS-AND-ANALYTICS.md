@@ -39,10 +39,10 @@ compare: previous            # the same window, immediately before
 | Field | Values | Required |
 |---|---|---|
 | `name` | the display name; when absent the id stands in ([42-SPEC-DECLARE](42-SPEC-DECLARE.md) §13 D15) | no |
-| `source` | a register, **or `series.<id>`** — a time series written by a connector, [25-CONNECTORS](25-CONNECTORS.md) §8 | yes |
+| `source` | a register, **or `series.<id>`**, a time series written by a connector ([25-CONNECTORS](25-CONNECTORS.md) §8), or `forecast.runway`, the cash walk ahead (§2.7) | yes |
 | `where` | the one grammar | no (defaults to everything) |
 | `value` | an aggregation, or a **ratio** — see below. Over a `series.<id>` the legal set is `last · sum · avg · delta · min · max · trend` *(an earlier draft omitted `trend`, the one aggregation that is series-only)* | yes |
-| `format` | `money.<CUR>` · `int` · `decimal` · `pct` · `days` · `duration` · `day` (a figure that is a day: the `min` or `max` of a `day` field, kept as whole days since 1970 and drawn as `11 Sep`) | yes |
+| `format` | `money` · `money.<CUR>` · `int` · `decimal` · `pct` · `days` · `duration` · `day` (a figure that is a day: the `min` or `max` of a `day` field, kept as whole days since 1970 and drawn as `11 Sep`). `money` names no currency and is what a pack writes (§2.7); `money.<CUR>` is still read | yes |
 | `target` | what good looks like | **yes** |
 | `window` | over what period. For a register source it is the **comparison shift** — `compare` re-evaluates with `asOf = now − W`; for a `series.<id>` source it is the `at` filter ([45-SPEC-RECORD](45-SPEC-RECORD.md) §13 #3) | **yes** |
 | `compare` | `previous` · `year_ago` · `none` | no (default `previous`) |
@@ -50,6 +50,10 @@ compare: previous            # the same window, immediately before
 | `bucket` | `day` · `week` · `month` · `quarter` · `year` | only with a date `group_by` |
 | `order` | `[{ field, dir }]` — the walk order for `running` (§2.3) | only with `running` |
 | `snapshot` | `{ grain: day, into: series.<id> }` — §2.6 | no |
+| `home` | a whole number from 1 to 9: the figure's place among the record's Home figures, lowest first; the `figures.home` page source draws the first of them ([06-PAGES](06-PAGES.md) §1.1 says how many) | no |
+| `sellable` | `true`: the figure is offered to a forecast's sell control, as something that could be turned into cash | no |
+| `legs` | the lists a `forecast.runway` figure walks, each as a forecast block's `from` names one (§2.7) | with `forecast.runway` only |
+| `opening` | `{ metric: <id> }`: what a `days_to_zero` walk starts from (§2.7) | with `walk: days_to_zero` only |
 
 The evaluator is one synchronous function in `record` — `evaluateMetric(decl, ctx, kernel, sql)`,
 [45-SPEC-RECORD](45-SPEC-RECORD.md) §5.8 — called by `metric(id)`, by a page's `stat` cells and by the
@@ -265,13 +269,13 @@ is one module, `packages/kernel/src/fx.ts`, which the browser's reader imports.
 
 | | |
 |---|---|
-| **The currency a figure is added up in** | the home currency when one is set, else the currency its `format` declares |
+| **The currency a figure is added up in** | the home currency when one is set, else the one currency its rows are in, else none: one amount per currency. Never the currency a `format` declares, which is the pack author's (as built, 2026-09-25; §2.7) |
 | **No home currency** | a sum over rows in another currency, or in several, is `value: null` with `parts: [{ currency, amount }]`, one per currency, and `fx: { into, home: null, missing: [] }`. It is not a refusal, and it is never converted, even when rates would reach the declared currency: nobody chose it |
 | **A home currency, a rate missing** | the same parts, and `fx.missing` names each pair as `USD to EGP`. Nothing is added up from the rows that could be converted |
 | **Every rate there** | each row is converted at the rate as of the day its row is about (the list's first `day` field: an account's `as_of`, an obligation's `due`; today when it has none), rounded once per row, half away from zero, in each currency's own exponent. `unit` is the home currency and `fx.asOf` the newest rate used, which the tile says as "Converted at rates as of <day>" |
 | **Which rate** | the newest on or before the day; else the earliest after it (`fx.forward`); a row quoted the other way round is its inverse; a pair nobody quotes goes through one currency both are quoted against, as old as its older half, because a rates address answers everything against one base |
 | **Groups, series, walks** | every group of a grouped figure is in parts when one is; a `series` in parts answers `bars.split`, one chart a currency; the cash walk converts each movement at its day; one it cannot convert, or an opening in parts, is drawn as one walk a currency (`walks` on the block, each from that currency's part of the opening, `only` in `runway`), each under its code, with `walkFx: { home, missing }` said once under them (as built, 2026-09-17, second pass). A `bar` or `split` over rows gets the home currency and rates beside its rows (`fx`) and is converted, or drawn once per currency under its code |
-| **A target** (as built, 2026-09-17, second pass) | is declared in the figure's `format` currency. A figure converted into another currency has its target converted at the latest rate from the declared currency into that one (`rateFor` as of today; `targetInto` in `metrics.ts`), carried as `targetIn: { currency, target, asOf, forward }`, and `met` is read against it. The tile writes the line in the home currency and says "converted from GBP at the latest rate". With no such rate there is no `targetIn`, `met: null`, and no target line |
+| **A target** (as built, 2026-09-17, second pass) | is declared in the figure's `format` currency (a `format: money` figure names none, and §2.7 says what its target is read in). A figure converted into another currency has its target converted at the latest rate from the declared currency into that one (`rateFor` as of today; `targetInto` in `metrics.ts`), carried as `targetIn: { currency, target, asOf, forward }`, and `met` is read against it. The tile writes the line in the home currency and says "converted from GBP at the latest rate". With no such rate there is no `targetIn`, `met: null`, and no target line |
 | **An average, a least, a most** | converted: each row is converted at its own day's rate and rounded first, then averaged, or the least or most taken. In parts: each currency's own rows, one amount per currency (`across(..., kind)`, `partsOf(..., kind)`) |
 | **A ratio or a diff** | converted: each half is converted, then divided or subtracted, and `fx` is the two halves' together. When a half is in parts, or the halves are in two currencies with no rate, the figure is one ratio or difference per currency: each half is read again over the rows in that currency (a half with no money field, such as `count: id`, over the rows the other half's money field puts in it), and a currency with nothing to divide by has no part (`pairParts`). A ratio of money over a count is money (`rateUnit`), so a converted average invoice is in the home currency. `RATIO_MIXED_CURRENCY` is left for a ratio no currency can answer |
 | **Rates by poll** | `ratesPollPack` (`packages/seed/src/packs/rates-poll.ts`) is an ordinary `poll` pack, approved once, that writes one `fx` row a currency from a public rates address |
@@ -316,6 +320,87 @@ kind, `snapshot` ([09-ALARMS](09-ALARMS-AND-NOTIFICATIONS.md) §2), with the pre
 today is appended live and flagged, and `missing` days are counted rather than zero-filled. It is what
 turns *"the balance now"* into *"the balance over time"* without a second table. *(An earlier draft's
 heading read `snapshot: daily`, a scalar the example never had.)*
+
+## 2.7 · Money in the record's own currency, cash that moves, and the walk ahead (as built, 2026-09-25)
+
+A pack cannot know which currency the record it lands on keeps. `format: money.GBP` written by a pack's author was a
+fact about the author, so a money figure now says only that it is money, and the record says which currency. Two
+figures a money page needs are not a sum over one list at all: the cash held now, which moves with every payment
+since an account was last stated, and what the walk ahead brings in and takes out. Both are read by the same
+`evaluateMetric`, in `packages/kernel/src/money-figures.ts`, so a tile, a page, `metric` and the night's `snapshot`
+read them alike.
+
+### `format: money`
+
+| | |
+|---|---|
+| **The currency** | the home currency when one is set (the `home_currency` setting, `homeCurrency` in `packages/kernel/src/declare.ts`), else the one currency the figure's money is in, else one amount per currency in `parts`, as §2.5 says |
+| **A literal target** | is read in whichever currency the figure comes back in. A target read from a money setting counts when it was typed in the home currency and carries that currency (`liveTarget` in `declare.ts`), and a figure in another is judged against it converted at the latest rate (`verdictOf` in `metrics.ts`). A setting nobody has filled leaves the number written beside it as the target |
+| **`money.<CUR>`** | still read, for figures installed before `money` was; its currency is the one a literal target is set in |
+| **Rows that are not money** | under either spelling, `MIXED_CURRENCY` at `format`, as before |
+
+### `value: { rolled }`: cash rolled forward
+
+```yaml
+metric: cash-now
+source: register.accounts
+where: liquid is true
+value:
+  rolled:
+    balance: balance
+    as_of: as_of
+    checks:
+      - { register: balances, by: account, balance: balance, on: as_of }
+      - { register: transactions, by: account, balance: balance_after, on: on }
+    moves: { register: transactions, by: account, on: on, amount: amount, direction: direction, out: out, where: state is cleared }
+format: money
+target: { gte: 0 }
+window: 30d
+```
+
+| | |
+|---|---|
+| **Per account** | start from the latest statement of its balance on or before the day asked about: the account's own `balance` on its `as_of`, or the newest row of a `checks` list about it, whichever is later; on a tie the account's own. Then add every move in `moves` dated after that day, money in plus and money out (`direction` equal to `out`) minus. An account with no `as_of` starts before its first move |
+| **A day before every statement** | the earliest statement after it, less the moves between, so a night point for a day before an account was first stated is the same arithmetic run backwards |
+| **The figure** | the accounts the figure's own `where` admits, added up by the currency rule above, each amount at the rate as of the day asked about. `group_by` names a field of the accounts; a `bucket` is refused |
+| **`as_of`** | the reading carries the oldest statement day it used, which the tile says as "as of 3 Sep" |
+| **`compare`** | the same figure rolled to the moved clock, `previous` or `year_ago` as for any figure |
+| **Its ceiling** | `ROLLED_ACCOUNTS_MOST` accounts per reading, and at most `ROLLED_CHECKS_MOST` check lists; past the first it refuses `OUT_OF_BOUNDS` rather than adding up a subset |
+
+### `source: forecast.runway`: a figure over the walk ahead
+
+```yaml
+metric: arriving-30d
+source: forecast.runway
+legs:
+  - { register: recurring, on: next_due, amount: amount, incoming: { field: direction, is: in }, every: { field: every, months: { monthly: 1 } } }
+value: { walk: in, within: 30d }
+format: money
+target: { gte: 0 }
+window: 30d
+compare: none
+```
+
+| | |
+|---|---|
+| **`walk`** | `in`, the money arriving; `out`, the money leaving, as a positive amount; `net`, the two together, signed; `days_to_zero`, the days until the balance goes under |
+| **`within`** | how far ahead, `30d`, `4w` or `3m`; required, except that `days_to_zero` looks a year ahead without one |
+| **`legs`** | exactly what a forecast block's `from` names ([06-PAGES](06-PAGES.md)), walked by the same `runway` in `packages/kernel/src/forecast.ts`, so a tile and the forecast beside it add up the same movements. An overdue movement is in it, clamped to today |
+| **`opening`** | `{ metric: <id> }`, required by `days_to_zero` and refused elsewhere: the figure of what is held now that the walk starts from. It is never itself a walk. With no crossing inside the span the figure has no value |
+| **Currencies** | converted into the home currency as the walk converts them; with no way to add them, one amount per currency in `parts`, and `days_to_zero` has no value |
+| **Money left out** | a leg the walk cannot read in full (an unreadable day, a cycle with no factor, the recurrence cap) refuses the figure with the walk's own sentence, because one number has no room for the list the forecast block draws |
+| **Keys it refuses** | `where`, `group_by` and `bucket`: each leg says which rows it reads. A figure over a list refuses `legs` and `opening` |
+
+### Every list a figure reads
+
+A figure's `source` is no longer the whole of what it reads: a rolled figure reads its check and move lists, and a
+walk reads its legs and the figure it opens from. `figureLists` in `money-figures.ts` names every one, so whoever
+decides whether a caller may be shown a figure asks about all of them.
+
+The install asks about them too: every list a rolled figure or a walk names, and every field it names in each, must be
+declared, and a walk's `opening` must name a figure that is not itself a walk, or the declaration is refused with
+`REGISTER_UNKNOWN`, `FIELD_UNKNOWN` or `METRIC_UNKNOWN` (`figureListsFault` in `packages/kernel/src/declare.ts`). The
+`where` inside `moves` or a leg is still first read when the figure is.
 
 ## 3 · Charts are blocks bound to metrics
 

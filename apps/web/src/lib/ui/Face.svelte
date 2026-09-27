@@ -1,34 +1,60 @@
 <!--
-  A writer, as a face: a disc with the initial, and you in ink.
+  Whoever acted, as a face: a person as a monogram on their own hue, you in ink, an automation or a
+  rule as the automations glyph, Slash as its mark, and BrainDog as the mark in ink.
 
   A FACE, NOT A NAME TAG in the identifier font, so a list of agents and people reads as somebody
-  passing through rather than as a log file. One component, so a person is drawn one way wherever
+  passing through rather than as a log file. One component, so a writer is drawn one way wherever
   they turn up.
+
+  BY KIND, NOT BY NAME (design.md SYS-7). `kind` is `actor(by).kind` from `lib/record/names.ts`,
+  which knows what signed the write. A caller that hands a name alone still gets the right face for
+  the words `names.ts` itself says (`faceKindOf`), and a monogram for any other name.
 
   AN INITIAL, NOT A PHOTO. `20 §6` refuses avatar stacks on a business record, and a letter in a
   disc is a face without inventing one. It is `aria-hidden` because the name always sits beside it.
 
-  `s` is for an entry that is one line and not two (the log, a row's history), where the full disc
-  would set the line's height.
+  THREE SIZES, THE DESIGN BRIEF'S THREE (design-brief.md, `Face`): `s` is 20px, for an entry that
+  is one line and not two (a row, a row's history), where a larger disc would set the line's
+  height; `m` is 24px, a feed's; `l` is 32px, a person's own page. design.md SYS-7 gives 28 and 48
+  for the last two, and the brief is the one every screen is drawn to.
 -->
 <script lang="ts">
-  import { initialOf } from './face.ts';
+  import type { ActorKind } from '../record/names.ts';
+  import { faceKindOf, hueFor, initialOf } from './face.ts';
   import Icon from './Icon.svelte';
+  import Mark from './Mark.svelte';
 
   let {
     name,
     you = false,
     size = 'm',
-  }: { name: string; you?: boolean | undefined; size?: 's' | 'm' | undefined } = $props();
+    kind,
+    hue,
+  }: {
+    name: string;
+    you?: boolean | undefined;
+    size?: 's' | 'm' | 'l' | undefined;
+    /** What acted, as `actor(by).kind` says it; absent, the name decides as far as it can. */
+    kind?: ActorKind | undefined;
+    /** A person's hue where the caller holds one; absent, one kept from their name, so it is the same on every screen. */
+    hue?: number | null | undefined;
+  } = $props();
 
-  const glyph = $derived(/(^|\s)rule$/i.test(name.trim()) ? 'filter' : /^the record/i.test(name.trim()) ? 'rows' : /^the assistant$/i.test(name.trim()) ? 'ask' : null);
+  const drawn = $derived<ActorKind>(you ? 'you' : (kind ?? faceKindOf(name)));
+  /* THE MARK A LITTLE UNDER HALF THE DISC, in the height `Mark` takes, so its width (which follows the artwork) stays inside it. */
+  const markHeight = $derived(size === 's' ? 8 : size === 'l' ? 14 : 10);
 </script>
 
-<!-- A RULE, THE RECORD AND THE ASSISTANT ARE NOT PEOPLE, SO THEY DO NOT WEAR AN INITIAL (DESIGN-SYSTEM
-     APPENDIX C6). `R` stood for a reply rule, a renewal rule and the record itself on one screen. A
-     rule takes the glyph the inbox gives rules, the record its own list glyph, the assistant the ask. -->
-<span class="face" data-you={you ? '' : undefined} data-size={size} data-kind={glyph ? '' : undefined} aria-hidden="true"
-  >{#if glyph}<Icon name={glyph} size="s" />{:else}{initialOf(name)}{/if}</span
+<!-- AN AUTOMATION AND A RULE ARE NOT PEOPLE, SO THEY DO NOT WEAR AN INITIAL: they take the glyph the
+     rail gives Automations, which is where a person goes to find them. Slash wears its own mark, a
+     slash, and BrainDog the product's mark in ink, never in the brand's red, which a face repeated
+     down a log would spend. AN AGENT keeps its initial on the neutral disc until the agents area's
+     `AgentFace` draws it; that is the branch it takes over. -->
+<span class="face" data-kind={drawn} data-size={size} style="--hue:{hue ?? hueFor(name)}" aria-hidden="true"
+  >{#if drawn === 'automation' || drawn === 'rule'}<Icon name="refresh" size={size === 's' ? 's' : 'm'} />{:else if drawn === 'slash'}<svg
+      class="face-slash"
+      viewBox="0 0 24 24"><path d="M15.5 4.5 8.5 19.5" /></svg
+    >{:else if drawn === 'system' || drawn === 'sample'}<Mark height={markHeight} tone="inherit" />{:else}{initialOf(name)}{/if}</span
 >
 
 <style>
@@ -36,8 +62,8 @@
     display: grid;
     flex: none;
     place-items: center;
-    inline-size: 28px;
-    block-size: 28px;
+    inline-size: 24px;
+    block-size: 24px;
     background: var(--hold-wash);
     border-radius: var(--r-pill);
     color: var(--ink2);
@@ -46,14 +72,44 @@
   }
 
   .face[data-size='s'] {
-    inline-size: 22px;
-    block-size: 22px;
+    inline-size: 20px;
+    block-size: 20px;
+  }
+
+  .face[data-size='l'] {
+    inline-size: 32px;
+    block-size: 32px;
+    font-size: var(--t-sm);
+  }
+
+  /* A PERSON ON THEIR OWN HUE, as a project wears its mark: the theme's mark lightness and chroma at
+     the person's hue, washed into the ground, with the letter in ink. The letter is never drawn in
+     the hue itself, so it reads the same in both schemes whichever hue it sits on. */
+  .face[data-kind='person'] {
+    background: color-mix(in srgb, oklch(var(--mark-l) var(--mark-c) var(--hue)) 36%, var(--bg));
+    color: var(--ink);
   }
 
   /* YOU ARE THE INK DISC, NOT THE ACCENT ONE. The brand colour is kept for a short list of places
      (DESIGN-SYSTEM 1.3), and a face repeated down a log is a badge, which is not one of them. */
-  .face[data-you] {
+  .face[data-kind='you'] {
     background: var(--ink2);
     color: var(--bg);
+  }
+
+  /* SLASH AND BRAINDOG IN INK on the neutral disc, so neither is mistaken for you. */
+  .face[data-kind='slash'],
+  .face[data-kind='system'],
+  .face[data-kind='sample'] {
+    color: var(--ink);
+  }
+
+  .face-slash {
+    inline-size: 60%;
+    block-size: 60%;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.5;
+    stroke-linecap: round;
   }
 </style>

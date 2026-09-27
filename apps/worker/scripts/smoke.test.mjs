@@ -23,16 +23,19 @@
  */
 
 import { strict as assert } from 'node:assert';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { test } from 'node:test';
 
 import { pushes, siteBinding, siteConfig, wranglerConfig } from './provision-check.mjs';
 import { unflipped } from './flip-fixture.mjs';
 import { UNBOUND, boundSite } from './site-fixture.mjs';
-import { checks, judge } from './smoke.mjs';
+import { canary, checks, judge, migrationCount } from './smoke.mjs';
 
 const html = { 'content-type': 'text/html; charset=utf-8' };
 const json = { 'content-type': 'application/json' };
-const answer = (status, headers = {}) => ({ status, headers: new Headers(headers) });
+const answer = (status, headers = {}, text = '') => ({ status, headers: new Headers(headers), text });
 const staged = (name) => {
   const push = pushes().find((p) => p.name === name);
   assert.ok(push, `no push ${name}`);
@@ -50,6 +53,7 @@ test('production in push A\'s shape beside a site that does not bind it asks the
   assert.deepEqual(asked(checks(B1, 'production', UNBOUND)), [
     'GET https://app.brain.dog/app/',
     'GET https://app.brain.dog/api/boot',
+    'GET https://app.brain.dog/healthz',
     'GET https://app.brain.dog/r/x',
     'POST https://app.brain.dog/in/anything',
   ]);
@@ -64,19 +68,22 @@ test('once production\'s site binds production\'s app (push 3), production is as
   assert.deepEqual(asked(checks(B1, 'production', BOTH_BOUND)), [
     'GET https://app.brain.dog/app/',
     'GET https://app.brain.dog/api/boot',
+    'GET https://app.brain.dog/healthz',
     'GET https://brain.dog/pricing',
     'GET https://brain.dog/app/',
     'GET https://brain.dog/api/boot',
+    'GET https://brain.dog/healthz',
     'GET https://app.brain.dog/r/x',
     'POST https://app.brain.dog/in/anything',
   ]);
 });
 
-test('each flip is asked the five answers of the design, on the two names it holds', () => {
+test('each flip is asked the five answers of the design and /healthz, on the two names it holds', () => {
   assert.deepEqual(asked(checks(B1, 'alpha', ALPHA_BOUND)), [
     'GET https://alpha.brain.dog/pricing',
     'GET https://alpha.brain.dog/app/',
     'GET https://alpha.brain.dog/api/boot',
+    'GET https://alpha.brain.dog/healthz',
     'GET https://app.alpha.brain.dog/r/x',
     'POST https://app.alpha.brain.dog/in/anything',
   ]);
@@ -84,13 +91,14 @@ test('each flip is asked the five answers of the design, on the two names it hol
     'GET https://brain.dog/pricing',
     'GET https://brain.dog/app/',
     'GET https://brain.dog/api/boot',
+    'GET https://brain.dog/healthz',
     'GET https://app.brain.dog/r/x',
     'POST https://app.brain.dog/in/anything',
   ]);
 });
 
 test('each check refuses the answer the wrong Worker would give', () => {
-  const [pricing, shell, boot, legacy, door] = checks(staged('B2'), 'production', BOTH_BOUND);
+  const [pricing, shell, boot, , legacy, door] = checks(staged('B2'), 'production', BOTH_BOUND);
 
   assert.equal(judge(pricing, answer(200, html)), null);
   /* THE PRODUCT WORKER'S ANSWER AT A SITE PATH is JSON: the site's `run_worker_first` too wide, handing `/pricing` to
@@ -123,7 +131,7 @@ test('each check refuses the answer the wrong Worker would give', () => {
 });
 
 test('push A: the front door is a 308 into /app on the same name, and the Worker before that fix is told apart', () => {
-  const [shell, boot, front, door] = checks(B1, 'production', UNBOUND);
+  const [shell, boot, , front, door] = checks(B1, 'production', UNBOUND);
   assert.equal(front.headers?.accept, 'text/html', 'a page load says it wants a page, or the Worker rightly leaves it alone');
   assert.equal(judge(front, answer(308, { location: 'https://app.brain.dog/app/r/x' })), null);
   /* THE WORKER WITHOUT THE SAME-HOST REDIRECT answers `ROUTE_UNKNOWN` in JSON here, which is the site's "Open the app"
@@ -188,5 +196,69 @@ test('the real files: the deploy step reads the site by default, and asks a site
     const host = config.env[name].vars.PUBLIC_HOST;
     for (const on of binding.names.filter((n) => n !== host)) assert.ok(list.includes(`GET https://${on}/pricing`), `${name}: ${on} is the app's through the site and is not asked`);
     if (binding.names.length === 0) assert.ok(!list.some((c) => c.endsWith('/pricing')), `${name}: a site that does not bind this app is asked for /pricing`);
+  }
+});
+
+/* `/healthz` ON EVERY NAME THE APP IS ON, WITH ITS `kernel` HELD TO THE CHECKOUT (defects H4). The wrong answers that look
+   right are the site's 404 page on a shared name, which is every uptime monitor reading the marketing site, and a
+   healthy 200 from a build that is not this one. */
+test('/healthz passes only the liveness answer of this build, and names the site when the site keeps the door', () => {
+  const list = checks(staged('B2'), 'production', BOTH_BOUND, 18);
+  const health = list.find((c) => c.url === 'https://brain.dog/healthz');
+  assert.ok(health, 'brain.dog is not asked /healthz');
+  const live = (kernel) => answer(200, json, JSON.stringify({ ok: true, app: '2026.09.25+1a09462', format: 1, kernel, primitives: 1 }));
+
+  assert.equal(judge(health, live(18)), null);
+  assert.match(judge(health, live(16)) ?? '', /kernel 16.*18 migration files/);
+  assert.match(judge(health, answer(404, html)) ?? '', /site on brain\.dog does not hand \/healthz/);
+  assert.ok(judge(health, answer(404, json, '{"ok":false}')), 'a Worker older than /healthz passed');
+  assert.ok(judge(health, answer(200, json, '{"ok":false,"kernel":18}')));
+  assert.ok(judge(health, answer(200, html, '<!doctype html>')));
+
+  /* ON THE WORKER'S OWN NAME THE SITE IS NOT IN THE PATH, so the sentence does not send anybody to a site binding. */
+  const own = checks(B1, 'production', UNBOUND, 18).find((c) => c.url === 'https://app.brain.dog/healthz');
+  assert.ok(own);
+  assert.doesNotMatch(judge(own, answer(404, html)) ?? '', /site/);
+});
+
+test('the kernel count is the migration files, and nothing else in their folder', () => {
+  const repo = mkdtempSync(join(tmpdir(), 'smoke-kernel-'));
+  try {
+    const folder = join(repo, 'packages', 'kernel', 'src', 'migrations');
+    mkdirSync(folder, { recursive: true });
+    for (const file of ['0001_kernel.ts', '0002_session.ts', '0017_automation_watch.ts', 'README.md', '0003_draft.test.ts', 'index.ts'])
+      writeFileSync(join(folder, file), '');
+    assert.equal(migrationCount(repo), 3);
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
+  /* AND THE REAL FOLDER NEVER HOLDS FEWER THAN PRODUCTION RAN BEFORE THE FINISH (contracts §1.2), because a migration
+     is never taken away (contracts §1.1). */
+  assert.ok(migrationCount() >= 16);
+});
+
+/* THE SIGNED-IN HALF. It is the only check that opens a record, so its wrong answers are the ones a migration on real
+   rows or a revoked canary token give, and they have to read differently: one is the deploy, the other is not. */
+test('the canary asks the record\'s boot on the public host and tells a refused token from a record that will not open', () => {
+  const check = canary(staged('B2'), 'production', 'ops');
+  assert.equal(check.url, 'https://brain.dog/app/ops/api/boot');
+  assert.equal(check.method, 'GET');
+  assert.equal(check.canary, true);
+  assert.equal(check.headers, undefined, 'the check carries a header, and the token must be added only by smoke()');
+
+  assert.equal(judge(check, answer(200, json, '{"ok":true}')), null);
+  assert.match(judge(check, answer(401, json)) ?? '', /SMOKE_TOKEN/);
+  assert.match(judge(check, answer(503, json)) ?? '', /did not open on this build/);
+  assert.match(judge(check, answer(200, html)) ?? '', /shell/);
+  assert.ok(judge(check, answer(404, html)));
+
+  /* A SLUG THE DIRECTORY WOULD NOT HAND OUT is refused before anything is asked, and so is one that would reach a path. */
+  for (const slug of ['', 'Ops', '../api', 'ops/x', '-ops', 'o']) assert.throws(() => canary(staged('B2'), 'production', slug), /SMOKE_SLUG/, slug);
+});
+
+test('without both SMOKE_TOKEN and SMOKE_SLUG no check opens a record', () => {
+  for (const name of ['production', 'alpha']) {
+    const list = checks(staged('B2'), name, BOTH_BOUND);
+    assert.ok(list.every((c) => !c.canary && !/\/app\/[^/]+\/api\//.test(c.url)), `${name}: an unsigned check reaches a record's API`);
   }
 });

@@ -193,6 +193,22 @@ word can be found at all. **Ambiguity is `needs-review` and never a value** (§5
 that said two things is not something a `default` may answer, because the fallback would write the
 declaration's guess over a message that contradicted it. **Landed September 20th 2026.**
 
+**A `lookup` reads digits printed behind stars as a tail, and the first row it files that way waits
+for a person.** When no row's value is a whole token in the slice, a run of stars, one `-` or space,
+and three or more digits in the slice's first token name the one row whose longer value ends in
+those digits; two such rows are **ambiguous**. The stars may sit in the anchor, as in
+`between: ["***-", " "]`. A bank prints one account as `***6518` in one message and `***-518` in
+another, and this is how both reach the same row. But the digits are part of a number, not the
+number, and a transfer filed to the wrong account is wrong money: so a field found only this way
+has the outcome `tail`, and the arrival files at `proposed` at most, with the reason *Filed to
+Cairo savings by its last digits 518. Confirm it once and later ones file straight away.* Once a
+person has accepted one such arrival for that ingest, account and tail, the later ones file at
+`exact`. The confirmation is the accepted rowset itself, which carries the tail it waited on; a
+rejected one confirms nothing, and another tail on the same account waits again. A row the slice
+names by its whole value is filed as it always was. The rule is `matchLiterals` in
+`packages/extract/src/extractors.ts`; the confirmation is `confirmedTail` in
+`packages/kernel/src/ingest.ts`.
+
 **A date reads the whole token set, and the build stops being behind the grammar.** The runtime
 read four named formats — `DD/MM/YY`, `DD/MM/YYYY`, `MM/DD/YYYY`, `YYYY-MM-DD` — where
 [43-SPEC-EXTRACT](43-SPEC-EXTRACT.md) §9.3's own table also reads `9/8/26` as `D/M/YY`,
@@ -537,6 +553,13 @@ steps:
   `fields:` or accepts writes made by rules (`from_rules:`), or any `steps:` list. The inline pass cannot read any of
   these. It fires on every write of the register, it has no idea which fields changed, and it walks `then:` alone.
 
+**What installs and what runs is one table.** Each trigger and each step is one row in
+`packages/kernel/src/capabilities.ts`: whether it installs, whether a run takes it, on which hosts, and the words said
+where it does not. The lint, the runner, the record's dry run and the grammar an agent reads (`braindog:grammar/automations`,
+whose `not_in_this_build` is those rows) all read that table, so none of them says a capability the others do not. What
+the rows say today: every trigger installs and starts a run; a `call` step installs and fails the run that reaches it;
+`ask_slash` runs only on a host that answers Slash; `to:` on an `ask_person` does not install.
+
 **What the lint refuses, and why each is refused rather than ignored.** Each of these installed before September
 22nd, and each would then have done nothing.
 
@@ -546,13 +569,13 @@ steps:
 | `every:` under `15m`, or a clock it cannot read | fifteen minutes is the shortest clock the record keeps, as it is for a connector; `at:` belongs to `every: 1d`, to `every: 1w` with a `day:`, or to a clock of months. The grammar is under *The clock*, below |
 | a clock of months that does not divide the year (`5mo`, `2y`), or that leaves out its `day:` or its `at:`, or a count above one with no `month:`, or `month:` on `1mo` | each of those decides which day it runs, and none is defaulted: a missing `day:` could mean the 1st or the day it was installed, and the second moves whenever the rule is edited (`calendarFault` in `packages/kernel/src/flow-lint.ts`) |
 | two triggers in one `on:` | a run has to say which one started it |
-| `decided:` | reserved: a run's own questions resume it without a trigger |
-| `metric:`, once its id and its `crosses:` are right | nothing in this build watches a metric for a crossing, so it would install and never start: `NOT_IN_THIS_BUILD` until the start lands in the `snapshot` handler |
-| a run-path `written` rule with `once_per` whose `when:` names a day relative to today (`today`, `-7d`) | the hourly re-read that makes such a rule fire as days pass reads inline rules only: `NOT_IN_THIS_BUILD`. Written with `register:` and `then:` it is swept |
+| `late:` beside `every:` that is not a span (`6h`) | it says how late a turn may be taken, and a turn past it is recorded as skipped |
+| `metric:` naming no declared metric, a `crosses:` other than `target`, `{ lte: n }` or `{ gte: n }`, or `target` on a metric that declares none | the hourly sweep reads which side of that line the figure is on, and there would be no line |
+| `decided:` with a key other than `about:` and `option:`, an `about:` that is not a declaration id, or a `when:` beside it | the decision is narrowed by the declaration that filed the question and the answer chosen; a condition on the question's row is an `if` step |
 | a top-level `register:` on the run path | the inline pass would also run the body inside every write of that register |
 | `on: { written: { register } }` inline without `register:` beside it | the inline pass reads the top-level key and nothing else |
 | a row verb (`tag`, `set`, `move`, `note`, `run` and the rest) or a `when:` on `every`, `metric` or `manual` | those triggers have no row to act on |
-| `enabled: false`, `limits:` or `project:` on the inline path | the inline pass reads none of them, so a switch would be drawn and do nothing: `NOT_IN_THIS_BUILD` |
+| `limits:` or `project:` of the wrong shape, on either path, or more `then:` items than `limits.steps_per_run` inline | the inline pass reads `enabled`, `project` and `limits` as a run does, so every rule can be switched off |
 | `then:` and `steps:` together | one list of things |
 | more than 50 steps, counting both arms of every branch; a branch nested past 3; more than 64 answer names | the kernel's ceilings, which `limits:` may lower and never raise (`runs_per_day` at most 1,000) |
 | a `call` step naming an address, or a call that is not declared with `trigger: rule` or `both` | a step names a declared call, whose host, key and fields were approved at install, exactly as `run:` does |
@@ -560,7 +583,7 @@ steps:
 | an answer name (`as:`) that is not an identifier, or is `trigger` or `vars` | it is read back as `{{vars.<name>}}`, and those two are the run context's own keys |
 | a step that notifies, creates, suggests, runs, calls or asks about a written row with no `once_per` | the same reason `notify` has always needed it |
 | an `ask_person` with fewer than two `options:`, or the same one twice | the question is opened through the gate's own `propose`, which refuses a choice of one, so it would install and fail at every run |
-| `to:` on an `ask_person` | a question goes to the record's queue, where anyone who decides answers it, and nothing addresses one to a person yet: `NOT_IN_THIS_BUILD` |
+| `to:` on an `ask_person`, while its row in the capability table does not install | a question goes to the record's queue, where anyone who decides answers it: `NOT_IN_THIS_BUILD` |
 | `about:` on an `ask_slash` that is not a list of field ids, on a trigger with no row, naming a field the row's list does not have (`FIELD_UNKNOWN`), or naming a `secret` or `file` field | `about:` is the fields of the run's row that go with the question, and a secret or a file never leaves the record |
 | an `ask_slash` whose `question:` names a `secret` or `file` field of the row (`{{pin}}`, `{{trigger.row.pin}}`), the whole row of a list that has one (`{{trigger.row}}`), or a variable a `set_var` before it filled from one, directly or by way of another variable | the question leaves the record as surely as `about:` does. The refusal names the `set_var` where the field went in |
 | `ask_slash`, once its `question:`, `as:`, `shape:`, `choices:` and `about:` are right, on a host that does not answer one | nothing would lease the `infer.ask` job it queues, so a run would wait its day and fail with nobody asked: `NOT_IN_THIS_BUILD`, *"… no host in this build answers an automation's question to Slash. Ask a person with ask_person instead."* Which hosts answer is under *Who answers a question to Slash*, below |
@@ -606,8 +629,8 @@ rule in the seed, the packs, the docs or the fixtures carried, so any other word
 `on: hourly` used to install as an inline rule that fired on every write of its register, and is now told to write
 `on: { every: 1h }`.
 
-An arrival trigger with a `when:` is refused as `NOT_IN_THIS_BUILD`: the runner does not read one, and a filter that
-filters nothing is worse than none. A `script` step is checked for shape only, because `script.<id>` is the scripts
+An arrival trigger's `when:` is read over the first row the arrival wrote, and with no row over the top-level keys of
+its JSON body, text, numbers, true and false. A `script` step is checked for shape only, because `script.<id>` is the scripts
 brief's declaration: whether the script is installed, says `runs: { rule: true }` and is not paused is asked when a
 run reaches the step, as the table below says.
 
@@ -626,11 +649,17 @@ the transaction of whatever started it, and the next drain takes its steps.
 | Trigger | Where it is noticed | What it reads |
 |---|---|---|
 | `written` | the write path, beside the inline pass | `op:`, `fields:` (which fields this write changed), `project:` (the row's scope field), `when:`, and `once_per:`, claimed when the run starts with the marker an inline rule uses |
-| `arrival` | after `arrive` has committed, in a transaction of its own | `ingest:`, `channel:`, `state:`; never a redelivery, and never an arrival nothing verified unless the trigger says `unverified: true`. The run's row is the first row the arrival wrote |
-| `every` | a `rule` schedule row keyed `flow.every:<id>`, armed at install one interval out, at the next `at:`, or for a clock of months at its next date | taken at once when the row fires; the next turn counts from when this one was due, so an hourly rule stays on its hour. A clock of months is asked for its next date from now instead, so a drain a month late takes one turn and not one for every month it missed |
+| `written`, about time | the hourly sweep (`onTime`), for a rule with `once_per` whose `when:` names a day relative to today | `when:` over the list's rows, at most `SWEPT_ROWS` (in `packages/kernel/src/flow.ts`) a rule an hour, `project:`, and `once_per:`, with the same marker, so a row the write already started a run for starts none. `op:` and `fields:` are about writes, and a day passing writes nothing |
+| `arrival` | after `arrive` has committed, in a transaction of its own | `ingest:`, `channel:`, `state:` and `when:`; never a redelivery, and never an arrival nothing verified unless the trigger says `unverified: true`. The run's row is the first row the arrival wrote |
+| `every` | a `rule` schedule row keyed `flow.every:<id>`, armed at install one interval out, at the next `at:`, or for a clock of months at its next date; an install that changes the clock while a turn is pending arms it again from the new clock | taken at once when the row fires, and so is every turn after it the drain has also passed, each as its own run with its own instant, never folded into one. Each next turn counts from the one before, so an hourly rule stays on its hour and a monthly one on its day. Past `late:`, or past `limits.runs_per_day`, a turn is recorded and not taken, and a turn recorded that way is not counted against `runs_per_day`; past `MISSED_TURNS_CEILING` turns in one drain, the rest are said in one skipped run |
+| `metric` | the hourly sweep (`onMetrics`), which reads the figure as a page reads it | which side of the line the figure is on, kept per rule in `automation_watch` (migration 17). The first reading sets the side and starts nothing; a reading that says nothing, such as mixed currencies, keeps it; a change of side starts one run, whose trigger carries the figure's `id`, the `value` read and the `side`, `above` or `below`. At most `WATCHED_PER_SWEEP` figures an hour, the longest unread first |
+| `decided` | the kernel's `decide`, inside the decision's transaction (`onDecided`) | `about:` (the declaration that filed the question, or that a change proposes) and `option:` (the chosen answer's id, else its words exactly); once per question and rule. The run's row is the one the question's body names, which a rule's `suggest` writes as `about`, and its trigger carries the `suggestion`, the `option`'s words and `about`. A run's own `ask_person` question starts nothing here |
 | `manual` | `automationRun(rule, actor)` on the kernel | only a rule that says `on: { manual: true }` |
 
-`metric` is noticed nowhere yet, and the lint refuses it until it is.
+**A late turn is recorded, not taken, where the clock says so.** `on: { every: 1d, at: "08:00", late: 6h }`: a turn
+the drain reaches more than six hours after it was due is written as a run `cancelled` with its sentence and one step
+`{ n: 0, kind: late, state: skipped }`, which the runs list draws as Skipped. `automation_run.state` has no `skipped`,
+so no CHECK changes.
 
 **An arrival nothing verified starts nothing, unless the rule asks for it.** A webhook with a wrong token is stored
 `untriaged` and offered no pattern, and until September 22nd it still started every arrival automation on its
@@ -653,14 +682,14 @@ for in writing.
 
 | Step | What the runner does |
 |---|---|
-| any action of the table above | one step through the inline pass, against the run's row, with the rule's own name as the actor: the write path, the transitions and `create`'s bound apply as they do to an inline rule. On a run with no row, `notify` writes a note (or interrupts, when `urgent`), `suggest` opens a question, `create` makes its rows with the run as their parent, one set per run, so a monthly clock makes the next task each month (`createAlone` in `rules.ts`), and the row verbs fail the run |
+| any action of the table above | one step through the inline pass, against the run's row, with the rule's own name as the actor: the write path, the transitions and `create`'s bound apply as they do to an inline rule. On a run with no row, `notify` writes a note (or interrupts, when `urgent`), `suggest` opens a question, `create` makes its rows with the clock's turn (`<rule>@<turn>`) or else the run as their parent, one set per turn or run, so a monthly clock makes the next task each month and a turn delivered twice makes it once (`createAlone` in `rules.ts`), and its `bound:` is the most it makes in a day: on a clock, counted over the rows the turns of the twenty-four hours before this turn made, so a drain that takes three missed months in one pass makes each month's rows; anywhere else, over the rows the rule made in the last twenty-four hours; the row verbs fail the run |
 | `set_var` | fills `{{vars.…}}` and `{{trigger.…}}` into `to:` and keeps the answer; one answer holds 4 KB, all of them 64 KB |
 | `if` | reads the condition with the sentence builder over the run's row and its answers together; a field of the row wins over an answer of the same name |
 | `wait` | parks the run on its own schedule row and resumes it when the span has passed. A wait whose step row already says `done` is over and is not armed again |
 | `ask_person` | opens an `options` suggestion through the gate, by `rule:<id>`, whose body carries the run and the step, and parks the run until the end of its `wait:` (a week when it names none). A decision on it hands the chosen option's words to the run as `{{vars.<as>}}` and wakes it for the next drain; putting it off changes nothing; closing it unanswered, or the wait running out, fails the run with a sentence, and a question whose run has ended is closed with it |
 | `ask_slash` | queues one `infer.ask` outbox job, `{ run, rule, step, question, shape, choices?, about? }`, and parks the run for a day. The question is filled from the run's row with every `secret` and `file` field read as the dash, and so is a variable set from one; `about` carries the fields the step names, never one of those two types. `rule` is who asks: the host's pass refuses a job without it and calls no model, because Slash's ledger row is written as `rule.<id> step <n>` and a key is opened as `rule:<id>`. The pass acks each job one of three ways. `done` with `result.text` is the answer, held to the step's `shape:` (a number, or one of its `choices:`) and kept as `{{vars.<as>}}`. `done` with `result.failed` is the sentence of a refusal no retry mends, which ends the run on that sentence: the month's asks spent, an answer the host could not read, an answer of the wrong shape or a blank one, a job queued without its rule, and on the Worker a vault with no key labelled `slash`. `failed` is a model not reached, which the outbox's retry ladder asks again, eight attempts over about four hours, and whose last rung fails the run with a sentence instead of opening a dead letter. A `done` with neither ends the run on *"Slash answered job … with no text"*. On a host that does not answer, a rule an earlier build let install fails the run there with `NOT_IN_THIS_BUILD` before anything is queued, and the steps before it stand |
 | `script` | queues one `script.run` outbox job, the one a script's clock queues, `{ script, version, input }`, pinned to the version active now, and the run goes on to its next step without waiting. `input` is the row's `id`, `register` and `seq` and what the step's `input:` says, filled from the run; the row's fields are not copied, and a script reads them through its own `reads:`. An `input:` that reaches a `secret` or `file` field fails the run and queues nothing. `as:` keeps the job's id. The run fails there, with a sentence and nothing queued, when the script is not installed or retired or its pack is off, when it does not say `runs: { rule: true }`, and when it is paused, until somebody resumes it. When a job for the same script with the same input is still unfinished, nothing more is queued and `as:` keeps that job's id. What the script writes lands through the ordinary write path as `script:<id>@v<n>`, when a host has run it |
-| `call` | fails the run there, with a sentence saying the step is not in this build; the steps before it stand |
+| `call` | while its row in the capability table does not run, fails the run there with that row's sentence; the steps before it stand |
 
 **Who answers a question to Slash.** The record is opened with `answersSlash` where its host has a pass that asks
 Slash, and it is the same fact as `/api/version`'s `slash`, because both come out of one builder
@@ -713,7 +742,10 @@ owner's rule writing `filed; payroll {{metric.payroll}}` into each new Inbox row
 run with no row and nothing to create writes where only the owner reads, and reads every figure.
 
 **Ceilings.** `limits.runs_per_day` (at most 1,000) is counted over the last twenty-four hours, and a run past it is
-refused with a sentence and not started. A rule with `enabled: false` starts no runs.
+refused with a sentence and not started. A rule with `enabled: false` starts no runs. The inline pass reads the same
+three keys: `enabled: false` stops the rule, `project:` holds it to that project's rows, and `limits.runs_per_day`
+counts its firings over the last twenty-four hours, a firing being one row written in which it did something, so a plain write
+rule can be switched off without being retired.
 
 **Switching a rule off or retiring it stops the runs it already started.** The install that sets `enabled: false`,
 by hand or in a pack's version, the kernel's `retire`, and turning off the pack the rule belongs to, cancel every

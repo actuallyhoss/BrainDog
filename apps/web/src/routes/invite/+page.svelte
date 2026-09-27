@@ -6,13 +6,15 @@
   scanner that opens the link spends nothing.
 
   ACCEPTING SIGNS SOMEBODY IN. Signed in already, as the address the link is for, they go on the record. New here,
-  the host makes them and signs them in, and this screen then asks for a passkey, because that is how they come back.
-  An address that can already sign in is sent to sign in first.
+  the address proves it is theirs first: Accept mails a link to it and this screen says so. That link opens this page
+  again with the proof beside the invitation (`/invite#<token>&proof=<proof>`), and Accept then makes them, signs them
+  in, and asks for a passkey, because that is how they come back. An address that can already sign in is sent to sign
+  in first.
 -->
 <script lang="ts">
   import { onMount } from 'svelte';
 
-  import { acceptInvite, lookInvite, passkeyRegister, support, takeInvite, type InviteSeen, type Said } from '$lib/auth.ts';
+  import { acceptInvite, acceptProved, lookInvite, passkeyRegister, support, takeInvite, type InviteLink, type InviteSeen, type Said } from '$lib/auth.ts';
   import { copy } from '$lib/copy.ts';
   import { forget } from '$lib/record/boot-live.ts';
   import { titleOf } from '$lib/title.ts';
@@ -24,21 +26,28 @@
 
   const here = support();
 
-  let token = $state<string | null | undefined>(undefined);
+  let link = $state<InviteLink | null | undefined>(undefined);
+  const token = $derived(link === undefined ? undefined : (link?.token ?? null));
   let seen = $state<Said<InviteSeen> | null>(null);
   let busy = $state<'accept' | 'passkey' | null>(null);
   let failed = $state<string | null>(null);
   let joined = $state(false);
+  /** The address the proving link was mailed to, once Accept has asked for one. */
+  let proving = $state<string | null>(null);
   let keyAdded = $state(false);
-  /** What they typed for themselves. Only somebody new here is asked, because only a new person is made with it. */
+  /**
+   * What they typed for themselves. Only somebody new here is asked, and only before the proof: the host keeps the
+   * name with the proof and makes the person with it, so a box on the page the mail opens would go nowhere.
+   */
   let name = $state('');
+  const asksName = $derived(seen !== null && seen.ok && !seen.value.signedInAs && !link?.proof);
 
   /** The host's own sentence where it gave one, and a calm general one where it did not. */
   const sentence = (out: Said<unknown>): string => (!out.ok && 'fix' in out && typeof out.fix === 'string' && out.fix ? out.fix : copy.inviteFailed);
 
   onMount(() => {
-    token = takeInvite(location.hash, () => history.replaceState(history.state, '', `${location.pathname}${location.search}`));
-    if (token) void look(token);
+    link = takeInvite(location.hash, () => history.replaceState(history.state, '', `${location.pathname}${location.search}`));
+    if (link) void look(link.token);
   });
 
   async function look(t: string) {
@@ -57,17 +66,28 @@
    * a refused Accept leaves the tab as signed out as it was, and the sample is still the right answer for it.
    */
   async function accept() {
-    if (!token || busy) return;
+    if (!link || busy) return;
     busy = 'accept';
     failed = null;
     const at = opened();
-    const out = await acceptInvite(token, seen?.ok && !seen.value.signedInAs ? name : undefined);
+    /* THE PROOF IS SENT ONLY FOR SOMEBODY NOBODY HAS SIGNED IN: signed in, the host takes the first path, which reads
+       no proof, and the address is the session's own. */
+    const invitation = link.token;
+    const proof = link.proof && seen?.ok && !seen.value.signedInAs ? link.proof : null;
+    const out = proof !== null ? await acceptProved(invitation, proof) : await acceptInvite(invitation, asksName ? name : undefined);
     closed(true, at);
     busy = null;
-    if (out.ok) {
+    if (!out.ok) {
+      failed = sentence(out);
+      /* A PROOF THE HOST REFUSED IS DROPPED, because it was spent, ran out, or belongs to another invitation, and the
+         host's sentence says to accept again for a new one. Kept, every later press would send the same dead proof
+         and be refused the same way; dropped, the next press asks for a fresh mail and the name box comes back. */
+      if (proof !== null && out.kind === 'refused') link = { token: invitation, proof: null };
+    } else if (out.value.kind === 'proving') proving = out.value.to;
+    else {
       forget();
       joined = true;
-    } else failed = sentence(out);
+    }
   }
 
   async function addPasskey() {
@@ -106,6 +126,14 @@
         <Empty heading kind="no-results" glyph="link" title={copy.inviteNoLink} body={copy.inviteAskNew} />
       {:else if seen && !seen.ok}
         <Empty heading kind="error" title={sentence(seen)} body={copy.inviteAskNew} />
+      {:else if proving !== null}
+        <!-- A NEW ADDRESS, ASKED TO PROVE ITSELF. Nothing is made until the mailed link comes back, so this is the
+             whole of what the screen can say: where the link went, and what opening it does. -->
+        <div class="calm">
+          <span class="door-glyph"><Icon name="link" size="l" /></span>
+          <h1 class="calm-title">{copy.inviteCheckMail}</h1>
+          <p class="calm-body" role="status">{copy.inviteMailSent(proving)}</p>
+        </div>
       {:else if seen && seen.ok && !joined}
         <div class="calm">
           <span class="door-glyph"><Icon name="link" size="l" /></span>
@@ -116,14 +144,15 @@
           <h1 class="calm-title">{copy.inviteLanding}</h1>
           <p class="calm-body">{copy.inviteFor(seen.value.email)}</p>
           {#if seen.value.signedInAs}<p class="calm-body">{copy.inviteSignedInAs(seen.value.signedInAs)}</p>{/if}
+          {#if link?.proof && !seen.value.signedInAs}<p class="calm-body">{copy.inviteFromMail}</p>{/if}
         </div>
         <div class="doors">
-          <!-- ONE OPTIONAL FIELD, AND ONLY FOR SOMEBODY NOBODY HAS SIGNED IN. The host takes a name only where it
-               makes the person, so asking somebody already signed in would be a box whose answer goes nowhere.
-               Without it People drew their address where their name goes. THE TWO WORDS ARE TYPED HERE because
-               `copy.ts` was held by another change when this landed; they belong there as `inviteNameLabel`. -->
-          {#if !seen.value.signedInAs}
-            <label class="lbl" for="in-name">Your name (optional)</label>
+          <!-- ONE OPTIONAL FIELD, AND ONLY FOR SOMEBODY NOBODY HAS SIGNED IN, BEFORE THE PROOF. The host takes a
+               name only where it makes the person, so asking somebody already signed in would be a box whose answer
+               goes nowhere, and so would asking again on the page the mail opens, whose name was kept with the
+               proof. Without it People drew their address where their name goes. -->
+          {#if asksName}
+            <label class="lbl" for="in-name">{copy.inviteNameLabel}</label>
             <span class="field field-lg">
               <input id="in-name" class="field-input" type="text" autocomplete="name" bind:value={name} />
             </span>

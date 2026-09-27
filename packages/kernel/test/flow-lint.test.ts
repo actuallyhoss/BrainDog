@@ -89,11 +89,13 @@ test('A CLOCK THIS RECORD CANNOT READ IS REFUSED, not armed at a guess', () => {
   assert.equal(code(rule({ rule: 'weekly', on: { every: '1w', at: '08:00', day: 'mon' }, then: [{ stop: true }] })), null);
 });
 
-test('ONE TRIGGER PER RULE, and a trigger nobody wires yet says so', () => {
+test('ONE TRIGGER PER RULE, and every trigger there is starts', () => {
   assert.equal(code(rule({ rule: 'two', on: { every: '1h', manual: true }, then: [{ stop: true }] })), 'DECLARATION_INVALID');
   assert.equal(code(rule({ rule: 'none', on: {}, then: [{ stop: true }] })), 'DECLARATION_INVALID');
   assert.equal(code(rule({ rule: 'what', on: { hourly: true }, then: [{ stop: true }] })), 'DECLARATION_INVALID');
-  assert.equal(code(rule({ rule: 'answer', on: { decided: {} }, then: [{ stop: true }] })), 'NOT_IN_THIS_BUILD');
+  assert.equal(code(rule({ rule: 'answer', on: { decided: {} }, then: [{ stop: true }] })), null);
+  assert.equal(code(rule({ rule: 'answer', on: { decided: { option: 'Chase it', about: 'rule.late' } }, then: [{ stop: true }] })), null);
+  assert.equal(code(rule({ rule: 'answer', on: { decided: { who: 'me' } }, then: [{ stop: true }] })), 'DECLARATION_INVALID');
   assert.equal(code(rule({ rule: 'button', on: { manual: true }, then: [{ stop: true }] })), null);
 });
 
@@ -152,7 +154,7 @@ test('A CREATE ON A TRIGGER WITH NO ROW FILLS NOTHING FROM ONE, refused at insta
 
 test('A METRIC TRIGGER NAMES A METRIC THAT IS THERE', async () => {
   const crossing = rule({ rule: 'crossing', on: { metric: { id: 'cash_now', crosses: { lte: 0 } } }, then: [{ stop: true }] });
-  assert.equal(code(crossing), 'NOT_IN_THIS_BUILD');
+  assert.equal(code(crossing), null, 'the hourly sweep starts it, so its shape alone installs');
   const done = await install(crossing);
   assert.equal(done.ok, false);
   assert.equal(refusedAs(done), 'DECLARATION_UNKNOWN');
@@ -222,9 +224,11 @@ test('A CREATE INSIDE A STEP MEETS THE SAME BOUND A CREATE IN THEN DOES', () => 
   assert.equal(code(unbounded), 'CREATE_UNBOUNDED');
 });
 
-test('A RULE WITH NO TRIGGER STILL DOES WHAT IT DID, and a key the inline pass would ignore is refused rather than ignored', () => {
-  assert.equal(code(rule({ rule: 'off', register: 'obligations', enabled: false, then: [{ tag: 'x' }] })), 'NOT_IN_THIS_BUILD');
-  assert.equal(code(rule({ rule: 'scoped', register: 'obligations', project: 'p1', then: [{ tag: 'x' }] })), 'NOT_IN_THIS_BUILD');
+test('A RULE WITH NO TRIGGER STILL DOES WHAT IT DID, and the inline pass reads enabled, project and limits', () => {
+  assert.equal(code(rule({ rule: 'off', register: 'obligations', enabled: false, then: [{ tag: 'x' }] })), null);
+  assert.equal(code(rule({ rule: 'scoped', register: 'obligations', project: 'p1', then: [{ tag: 'x' }] })), null);
+  assert.equal(code(rule({ rule: 'capped', register: 'obligations', limits: { runs_per_day: 5 }, then: [{ tag: 'x' }] })), null);
+  assert.equal(code(rule({ rule: 'wide', register: 'obligations', limits: { runs_per_day: 5000 }, then: [{ tag: 'x' }] })), 'OUT_OF_BOUNDS');
   assert.equal(code(rule({ rule: 'named', register: 'obligations', name: 'Tag it', then: [{ tag: 'x' }] })), null);
 });
 

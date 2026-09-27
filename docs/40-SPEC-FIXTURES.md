@@ -1,5 +1,7 @@
 # 40 · `packages/fixtures` — specification
 
+> **Not current.** `packages/fixtures` was never built; the refusal fixtures live in `fixtures/refusals/`, the code is the truth for the rest, and only §6's `via` table is still load-bearing, read by `tools/gates/refusal-fixtures.mjs` ([00-README](00-README.md)).
+
 The text corpus every gate reads: eight reference pages, their row corpora, a pack corpus, one refusal
 fixture per code the source names, and one seed manifest. Text only — the `.brain` is never committed; it is materialised at test time through
 the real write path with an injected `Clock` and a seeded RNG ([22-FRONTEND](22-FRONTEND.md) §10,

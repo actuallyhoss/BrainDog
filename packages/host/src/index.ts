@@ -19,9 +19,10 @@ import type { Conflict, Refusal, Result } from '@braindog/ports';
 import { conflicted, refused } from '@braindog/ports';
 
 import { crashed } from './crash.ts';
+import { EXTRA_ROUTES } from './routes/index.ts';
 
 export { HINTS, hintsOf, sessionOf, withSession, type SessionHints } from './session.ts';
-export { serveVault, servesVault, VAULT_HEADERS, vaultReply, type VaultAsk, type VaultDoor, type VaultGrantSeen } from './vault.ts';
+export { serveVault, servesVault, VAULT_HEADERS, vaultReply, type VaultAsk, type VaultDoor, type VaultGrantSeen, type VaultTokenAsk } from './vault.ts';
 export { keysReply, serveKeys, servesKeys, type KeysAsk, type KeysDoor } from './keys.ts';
 /* `POST /api/slash/read` IS A DOOR AND NOT A ROW IN `ROUTES`, and `slash-ask.ts` carries the measurement: `ROUTES` is the
    record's surface, `tools/gates/guards.mjs` looks for every routed name as a method of `packages/record/src/index.ts`, and
@@ -45,6 +46,60 @@ export { freshNonce, grantAad, grantKey, NONCE_BYTES, openSealed, recordAad, sea
    `serveApi` below is the first of three places a crash is answered, and three answers to one crash is the drift this
    file's header is about. */
 export { crashed, type CrashLog, type Crashed } from './crash.ts';
+/* A SHARED LINK'S DOOR IS NOT A ROW IN `ROUTES` EITHER, for the vault's reason: its credential is `Authorization: Share
+   <token>`, which each host checks before any bearer is read, and it opens `sharedPage` and nothing else. Exported from
+   here so both hosts sign and check a link with one function; the owner's methods for links are rows in
+   `routes/shares.ts`. */
+export {
+  deriveShareKey,
+  linkOpened,
+  NO_SHARE_KEY,
+  opensShare,
+  readShareToken,
+  serveShared,
+  servesShared,
+  SHARE_INFO,
+  SHARE_TOKEN_MOST,
+  sharedNone,
+  shareOf,
+  shareToken,
+  withShareLinks,
+  type ShareClaim,
+  type ShareClosed,
+  type ShareContext,
+  type SharedDoor,
+  type SharedLink,
+  type ShareLink,
+  type ShareOpened,
+  type ShareRow,
+  type ShareSigner,
+} from './share.ts';
+/* A RUNNER'S BEARER IS NOT A ROW IN `ROUTES` EITHER, and its methods are (`routes/agents.ts`): what is shared here
+   is how a host turns the bearer into the runner's context, which both hosts ask where a bearer on `/api` is not a
+   token's, and the wait a claim may be held for. Exported from here, for the vault's reason, so neither host can reach
+   one without the other. */
+export { CLAIM_ASKS_MOST, CLAIM_EVERY_MS, CLAIM_WAIT_MOST_MS, claimIdle, claimWaitMs, holdClaim, runnerContext } from './jobs.ts';
+/* THE VAULT PASSPHRASE'S HOST HALF, for the vault's reason: both hosts derive the key from a passphrase and wrap the
+   record key under it with one function, so a record exported from one opens on the other with the same passphrase.
+   Its two methods are rows in `routes/vault-passphrase.ts`, answered through `withVaultPassphrase`. */
+export {
+  openUnderPassphrase,
+  PASSPHRASE_ITERATIONS,
+  PASSPHRASE_LEAST,
+  PASSPHRASE_MOST,
+  PASSPHRASE_SALT_BYTES,
+  passphraseOf,
+  unlockedKey,
+  withVaultPassphrase,
+  wrapUnderPassphrase,
+  type PassphraseMethods,
+  type PassphraseRewrap,
+  type PassphraseUnlock,
+  type RecordWrapping,
+  type RootKeys,
+  type VaultPassphrase,
+  type WrappingChange,
+} from './passphrase.ts';
 
 /**
  * What one argument IS, so the text a stranger typed becomes the value the handler was written for.
@@ -121,7 +176,13 @@ export type Route = {
   takes?: Readonly<Record<string, ArgType>>;
 };
 
-export const ROUTES: readonly Route[] = [
+/**
+ * The rows written in this file. NOBODY ADDS ONE HERE ANY MORE: a new route is a row in `routes/<unit>.ts`, registered in
+ * `routes/index.ts`, beside its record method in `packages/record/src/methods/<unit>.ts` (`loop/finish/contracts.md` §0
+ * point 5). These stay where they are, because moving every one of them would be a diff every reader has to check for a
+ * changed group and nothing would be gained by it.
+ */
+const CORE_ROUTES: readonly Route[] = [
   { name: 'boot', group: 'READ+', writes: false, what: 'What this record holds, and how many rows are in each register.' },
   { name: 'schema', group: 'READ+', writes: false, what: 'What one register holds: its fields, their types, and what each may take.',
     takes: { register: 'text' } },
@@ -203,17 +264,18 @@ export const ROUTES: readonly Route[] = [
     takes: { usecase: 'text', title: 'text', summary: 'text', version: 'text', audience: 'text', author: 'text', examples: 'json', step: 'text', nav: 'json', signals: 'json', skills: 'json' } },
   { name: 'actions', group: 'READ+', writes: false, what: "Every scheduled action: what it calls, how often, whether it is paused and why, and this month's runs." },
   /* THE AUTOMATIONS, READ BY THE CANVAS AND BY AN AGENT THROUGH ONE METHOD (`loop/research-shell-automations.md` §5). With
-     no `rule` it is the list; with one it is that automation with its last ten runs, each step's outcome beside it. */
-  { name: 'automations', group: 'READ+', writes: false, what: 'Every automation: what starts it, when it runs next and how its runs went; or one, with its last ten runs step by step.',
-    takes: { rule: 'text' } },
+     no `rule` it is the list; with one it is that automation with its last ten runs, each step's outcome beside it, and
+     `before` and `limit` page that rule's older runs (`loop/finish/contracts.md` §2.2, X10: widened, not a new row). */
+  { name: 'automations', group: 'READ+', writes: false, what: 'Every automation: what starts it, when it runs next and how its runs went; or one, with its last ten runs step by step, and older runs a page at a time.',
+    takes: { rule: 'text', before: 'text', limit: 'integer' } },
   /* THE SCRIPTS, WHICH NOTHING LISTED. `resumeScript` was routed and no read named what it could resume: `actions` stops at
      `pull`, `call` and `poll`. Held by the record to the lists each script reads and writes. */
   { name: 'scripts', group: 'READ+', writes: false, what: 'Every installed script: what it may read, write and fetch, whether it is paused, its last run and its refused runs in a row.' },
   { name: 'planPack', group: 'ADMIN', writes: false, what: 'What installing a pack would do to this record. It writes nothing.',
     takes: { doc: 'json', source: 'json' } },
   { name: 'slash', group: 'ADMIN', writes: false, what: 'What Slash noticed about how this BrainDog is used, and the arrangement proposals it would file. It writes nothing.' },
-  { name: 'slashPropose', group: 'ADMIN', writes: true, what: "Put Slash's proposals on Decide, through propose's checks. Given asked, a description of what to build, it drafts the lists, figures and pages that description needs instead. It changes nothing until the owner accepts one.",
-    takes: { asked: 'text' } },
+  { name: 'slashPropose', group: 'ADMIN', writes: true, what: "Put Slash's proposals on Decide, through propose's checks. Given asked, a description of what to build, and page, the page it is about, it files what slashDraft would answer for it instead. It changes nothing until the owner accepts one.",
+    takes: { asked: 'text', page: 'text' } },
   { name: 'slashDaily', group: 'ADMIN', writes: true, what: 'Whether Slash looks once a day on its own and puts what it finds on Decide. On unless the owner turns it off.' },
   { name: 'slashForm', group: 'ADMIN', writes: true, what: "Ask Slash's model for a first plan from what the owner said a project is, and put it on Decide as rows. Nothing is made until the owner accepts it.",
     takes: { usecase: 'text', said: 'text' } },
@@ -272,7 +334,7 @@ export const ROUTES: readonly Route[] = [
   { name: 'erase', group: 'ADMIN', writes: true, what: 'Erase a person: every value naming them, in one transaction, and one event that names them only as a hash.' },
   { name: 'deleteRecord', group: 'ADMIN', writes: true, what: 'Delete this record, with its name typed to confirm. There is no undo.' },
   { name: 'markRead', group: 'DATA', writes: true, what: 'How far you have read, named as an event. A person only, and never an event of its own.' },
-  { name: 'setPref', group: 'DATA', writes: true, what: 'Your own rail: its order, or the pages hidden from it. A person only, and not an event.' },
+  { name: 'setPref', group: 'DATA', writes: true, what: 'One of your own settings: the rail order, the pages hidden from it, the navigation shape, whether new pages are suggested, or what you dismissed. A person only, and not an event.' },
   /* A PHONE ASKING TO BE TOLD, AND TELLING IT TO STOP (brief W58-2). READ+ because they are verbs over no row, as `boot`
      and `whoami` are; POSTs because each keeps or removes a `push_sub` row. Only a person's own, and never an event. */
   { name: 'subscribePush', group: 'READ+', writes: true, what: 'This browser asks to be told when something needs you. A person only, their own, and not an event.' },
@@ -294,6 +356,9 @@ export const ROUTES: readonly Route[] = [
   { name: 'saveView', group: 'ADMIN', writes: true, what: 'Save the way this list is being looked at, under a name. Saving over one replaces it.' },
   { name: 'retireView', group: 'ADMIN', writes: true, what: 'Take a saved view off a list. Its rows are untouched: a view is a question, not a row.' },
 ];
+
+/** Every route: the rows above, then the ones under `routes/` (`routes/index.ts`). */
+export const ROUTES: readonly Route[] = [...CORE_ROUTES, ...EXTRA_ROUTES];
 
 /**
  * The two vault methods that CARRY sealed material are DELIBERATELY NOT HERE.
@@ -334,6 +399,14 @@ export const UNROUTED = [
 ] as const;
 
 const BY_NAME = new Map(ROUTES.map((r) => [r.name, r]));
+
+/* A NAME ROUTED TWICE IS ONE ROW HIDING ANOTHER. `BY_NAME` keeps the later row, so with the table in two places now a row
+   under `routes/` reusing a name here would publish one group and verb and serve another. Thrown at load, as the
+   `UNROUTED` check below is, so neither host starts with it. */
+if (BY_NAME.size !== ROUTES.length) {
+  const twice = ROUTES.find((r, i) => ROUTES.findIndex((s) => s.name === r.name) !== i)?.name;
+  throw new TypeError(`${twice} is in ROUTES twice. Each method is routed once, in this file or under routes/.`);
+}
 
 /**
  * The list above is a promise, and this is the thing that keeps it.
@@ -640,6 +713,17 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     saveView: (a, ctx) => api.saveView(a as never, ctx as never),
     retireView: (a, ctx) => api.retireView(a as never, ctx as never),
   };
+  /* THE ROWS UNDER `routes/` ARE WIRED BY THEIR NAMES, since each names a record method of the same name
+     (`routes/index.ts`), so a unit adding one writes no line here. The surface is structural, so the method is looked up
+     when it is called; a record that has not got it answers `NOT_IN_THIS_BUILD`, as `scriptTry` does above, rather than a
+     500 from calling a function that is not there. The name comes from the table, never from a caller. */
+  for (const route of EXTRA_ROUTES)
+    handlers[route.name] = async (a, ctx) => {
+      const method = (api as unknown as Record<string, unknown>)[route.name];
+      return typeof method === 'function'
+        ? (method as Handler).call(api, a, ctx)
+        : { ok: false, refusal: { code: 'NOT_IN_THIS_BUILD', fix: `This BrainDog cannot answer ${route.name} yet, so nothing was read or written.` } };
+    };
   /* The table and the wiring, checked against each other where they are both in scope — so adding a
      route to one without the other throws at start rather than 404ing in production. */
   for (const route of ROUTES)

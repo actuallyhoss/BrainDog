@@ -30,7 +30,7 @@ const NOW = Date.UTC(2026, 8, 24, 12);
 const ID = 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD';
 const DAY = 86_400_000;
 const WITHHELD = 'filed; payroll --withheld--';
-const FILLED = 'filed; payroll GBP 5200.00';
+const FILLED = 'filed; payroll GBP 5,200.00';
 
 const list = (id: string, name: string, fields: Record<string, unknown>[]): Declaration => ({
   id: `register.${id}`,
@@ -172,6 +172,6 @@ test('A RUN THAT WRITES NO ROW ANYBODY ELSE READS still reads the figure: a cloc
   time.advance(DAY);
   await k.drain();
   const said = sql.all<{ note: string }>("SELECT note FROM event WHERE kind = 'note' AND actor = 'rule:tell'").map((r) => r.note);
-  assert.deepEqual(said, [`payroll GBP 5200.00`], JSON.stringify(runsOf(sql, 'tell')));
+  assert.deepEqual(said, [`payroll GBP 5,200.00`], JSON.stringify(runsOf(sql, 'tell')));
   sql.close();
 });

@@ -45,6 +45,8 @@
      the app and cannot be reached from here. The register's receipt chip says the same words. */
   const NOT_SAVED = 'Not saved';
   const BOARD = 'Board';
+  /** The name of each card's lane control, which says what choosing a lane in it does. */
+  const MOVE_TO = 'Move to';
 
   const live = $derived(Boolean(onmove));
   const columns = $derived(columnsOf(block.rows));
@@ -179,6 +181,9 @@
    */
   function onkeydown(e: KeyboardEvent) {
     if (e.ctrlKey || e.metaKey) return;
+    /* A CARD'S LANE CONTROL KEEPS ITS OWN KEYS. Its arrows choose a lane, which is the platform's contract for a select,
+       and the board taking them would move the card and the caret while the reader was only looking through the list. */
+    if (e.target instanceof HTMLSelectElement) return;
 
     const shift = e.shiftKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight');
     const alt = e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown');
@@ -279,8 +284,9 @@
     to rebuild all four, hold pointer capture, and then decide on every `pointermove` whether the
     reader meant to drag a card or to scroll the page, which is a judgement it gets wrong on
     exactly the surface that matters, `#main` being the app's one scroll container. What it would
-    buy is touch, which native DnD does not do; what it would not buy is a board a keyboard user can
-    use, and that is the half of this that was never optional.
+    buy is touch, which native DnD does not do, and each card's "Move to" select below buys that
+    without a gesture to misread; what it would not buy is a board a keyboard user can use, and that
+    is the half of this that was never optional.
 
     `svelte-ignore` because the linter cannot see through the ternary and reads `tabindex` on a
     non-interactive role as the mistake it usually is. Every value it can actually take here is -1
@@ -363,6 +369,26 @@
               : undefined}
           >
             {@render cardBody(card.row, card.moved)}
+            {#if live}
+              <!--
+                THE TOUCH PATH. HTML drag and drop does nothing under a finger, so on a phone the board's one action did
+                not exist; each card carries its lanes as a native select, which every touch screen opens as its own
+                picker, and choosing one calls the same `commit` a drop and `⇧→` do. Its 44px is the host's select rule,
+                because a select draws no `::before` for `tap` to grow; `tap` is here for a host that draws it another
+                way. It is a tab stop only beside the card that holds the board's one, so a keyboard
+                walking the board meets it there and nowhere else, and a pointer that can drag still can.
+              -->
+              <select
+                class="board-move tap"
+                aria-label={MOVE_TO}
+                tabindex={card.at === focus ? 0 : -1}
+                onchange={(e) => void commit(card.at, e.currentTarget.value)}
+              >
+                {#each columns as col (col)}
+                  <option value={col} selected={col === lane.name}>{valueWord(col, true)}</option>
+                {/each}
+              </select>
+            {/if}
           </div>
         {/each}
       </div>

@@ -355,15 +355,18 @@ export async function runInQuickJs(decl: ScriptDecl, host: CtxHost): Promise<Scr
       return undefined;
     },
 
-    list: (register, where) => {
+    /* THE OPTIONS CROSS AS THE SCRIPT WROTE THEM, AND THE HOST READS THEM (`CtxHost.list`), as the Worker hands its own
+       to the same reader. None handed at all, from a prelude that sends two arguments, is no options. */
+    list: (register, where, options) => {
       charge();
       const name = text(register);
       if (!decl.reads.includes(name) || host.list === undefined)
         throw refuse({ code: 'FORBIDDEN', why: `${decl.id} read ${name}, which is not in its reads.` });
       const list = host.list.bind(host);
       const filter = json(where);
+      const asked = options === undefined ? null : json(options);
       charge();
-      return deferred(async () => JSON.stringify(await list(name, filter)));
+      return deferred(async () => JSON.stringify(await list(name, filter, asked)));
     },
 
     get: (spoken) => {

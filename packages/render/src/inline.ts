@@ -11,6 +11,8 @@
  */
 
 import { MISSING, TYPED, formatTyped, magnitudeOf, type TypedForm } from './format.ts';
+import { canonical } from './glyphs/aliases.ts';
+import { GLYPH_NAMES } from './glyphs/names.ts';
 
 export type Inline =
   | { type: 'text'; text: string }
@@ -22,12 +24,62 @@ export type Inline =
   | { type: 'path'; path: string; resolved: string | null }
   | { type: 'typed'; form: TypedForm; arg: string; text: string; link?: 'day' | 'row' }
   | { type: 'evidence'; kind: 'verified' | 'inferred' | 'estimate' | 'unknown'; source?: string }
+  /**
+   * A glyph named in the text, `{{icon:rocket}}`. `name` is always one `GLYPH_NAMES` holds: the name
+   * as written when it is one, else the glyph its alias stands for. A name the set does not hold is
+   * `unresolved` instead, so no drawer is ever handed a name it has to doubt.
+   */
+  | { type: 'icon'; name: string }
   /** Anything that looked like a token and was not. Drawn as the author's text, dotted. */
   | { type: 'unresolved'; text: string };
 
 export type Resolve = (path: string) => string | null | undefined;
 
-export type InlineOptions = { resolve?: Resolve; now?: number };
+export type InlineOptions = {
+  resolve?: Resolve;
+  now?: number;
+  /**
+   * The drawing for a glyph name, as SVG path data in a 24 box, or `null` for none.
+   *
+   * THE RENDERER SHIPS NO GLYPH ART (05 §3, invariant 2), so the host answers this. Absent, or
+   * answering `null`, an inline glyph is drawn as a named, empty `data-glyph` span and a glyph slot
+   * stays as empty as it has always been; with an answer, both draw the path in `currentColor`. The
+   * web app answers from its own drawings and the set; a host that wants the same art without the app
+   * can answer from `braindog-render/glyphs`.
+   */
+  icon?: (name: string) => string | null;
+};
+
+/**
+ * The name a glyph is drawn by, for a name a document wrote, or `null` when there is no such glyph.
+ *
+ * THE NAME AS WRITTEN WINS when the set holds it, so `home` stays the app's own drawing rather than
+ * becoming the core's `house`; only a name the set does not hold is looked up as an alias. Both steps
+ * ask a `Set` and an `Object.hasOwn`, never `in`, so `constructor` is no glyph at all.
+ */
+export function glyphName(name: string): string | null {
+  const n = name.trim();
+  if (GLYPH_NAMES.has(n)) return n;
+  const alias = canonical(n);
+  return GLYPH_NAMES.has(alias) ? alias : null;
+}
+
+/**
+ * The path data to draw `name` with, or `null` when it names no glyph or the host has no drawing for
+ * it. The one question both drawers ask, for an inline glyph, a section's glyph and a chip's, so the
+ * two renderers cannot come to different answers about the same slot. An empty answer is no answer.
+ */
+export function glyphPath(name: string, opts: InlineOptions): string | null {
+  const known = glyphName(name);
+  const d = known === null ? null : (opts.icon?.(known) ?? null);
+  return d ? d : null;
+}
+
+/* WHAT FOLLOWS AN INLINE GLYPH IS HELD TO IT, so a line never ends on a glyph and starts again with the
+   word it belongs to. A space after it becomes a no-break space; anything else that touches it gets
+   a word joiner in front, because a browser may break on either side of an inline picture. */
+const NO_BREAK_SPACE = String.fromCharCode(0x00a0);
+const WORD_JOINER = String.fromCharCode(0x2060);
 
 const EVIDENCE = ['verified', 'inferred', 'estimate', 'unknown'] as const;
 
@@ -55,6 +107,13 @@ function braced(body: string, opts: InlineOptions): Inline {
   const colon = body.indexOf(':');
   if (colon > 0) {
     const form = body.slice(0, colon).trim();
+    /* `icon` IS NOT A TYPED FORM. A typed form formats a value, and a glyph has no value to format:
+       its argument is a name and never a path, so `{{icon:rocket}}` is not read as the path `rocket`.
+       An unknown name is the author's text, dotted, like any other token that was not one. */
+    if (form === 'icon') {
+      const name = glyphName(body.slice(colon + 1));
+      return name === null ? { type: 'unresolved', text: body.trim() } : { type: 'icon', name };
+    }
     if ((TYPED as readonly string[]).includes(form)) {
       const raw = body.slice(colon + 1).trim();
       // An argument may be a path instead of a literal: a literal starts with a digit or `-`, a
@@ -158,8 +217,15 @@ function tokens(text: string, opts: InlineOptions): Inline[] {
       const close = endOfPath(i + 2);
       if (close !== -1) {
         push();
-        out.push(braced(text.slice(i + 2, close), opts));
+        const node = braced(text.slice(i + 2, close), opts);
+        out.push(node);
         i = close + 2;
+        if (node.type === 'icon' && i < text.length) {
+          if (text[i] === ' ') {
+            buf = NO_BREAK_SPACE;
+            i++;
+          } else buf = WORD_JOINER;
+        }
         continue;
       }
     }
@@ -279,6 +345,11 @@ export function text(nodes: Inline[]): string {
           return n.text;
         case 'evidence':
           return n.source ? `${n.kind}: ${n.source}` : n.kind;
+        /* NOTHING, because the words beside a glyph carry what it means, and this projection is also
+           read for numbers: a trend, a split and a bar parse it, and a glyph's name is no part of any
+           figure. The drawn glyph still names itself, with its own `aria-label`. */
+        case 'icon':
+          return '';
         case 'unresolved':
           return n.text;
       }

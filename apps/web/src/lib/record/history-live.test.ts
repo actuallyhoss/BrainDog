@@ -118,8 +118,8 @@ test('WHO DID IT IS SAID BY NAME, and never as a person\'s id: You, the name the
   assert.deepEqual(whoDid(other, me, names), { name: 'Ada Lovelace', you: false, person: true });
   assert.deepEqual(whoDid(stranger, me, names), { name: 'Someone on this record', you: false, person: true });
   assert.deepEqual(whoDid(stranger, null), { name: 'Someone on this record', you: false, person: true });
-  assert.equal(whoDid('rule.renewal', me).name, 'renewal rule');
-  assert.equal(whoDid('agent:claude', me).name, 'claude');
+  assert.equal(whoDid('rule.renewal', me).name, 'Renewal');
+  assert.equal(whoDid('agent:claude', me).name, 'Claude');
   assert.equal(whoDid('you', null).you, true, 'the sample\'s own writes are not the reader\'s');
 });
 

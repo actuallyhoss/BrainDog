@@ -90,7 +90,7 @@ export async function load({ url, fetch }): Promise<Shell & { slash: boolean }> 
     shell.lists = shell.lists.map((l) => ({ ...l, name: voice.listNamed(words, l.id, l.name) }));
   }
 
-  /* A RECORD WITH ZERO REGISTERS HAS NO LEGAL SCREEN — 19 §6, which is also why screen one has no
+  /* A RECORD WITH ZERO REGISTERS HAS NO LEGAL SCREEN (19 §6), which is also why the prompt has no
      skip. Every other route would draw a nav with nothing in it, an empty state for a register that
      does not exist, or a table of a schema nobody declared; the shell itself has nothing to put in
      the rail. So there is one destination, and this is what sends people to it.
@@ -105,8 +105,12 @@ export async function load({ url, fetch }): Promise<Shell & { slash: boolean }> 
      `/signin` IS EXEMPT FOR THE OPPOSITE REASON. It is the screen a person opens when the record
      in front of them is not the one they want, and an empty record is the likeliest moment to
      want another: sending it to onboarding answers a question nobody asked and takes away the one
-     control that could have fixed it. */
-  const declared = booted.from === 'live' ? booted.boot.registers.length : null;
+     control that could have fixed it.
+
+     THE KERNEL'S OWN `session` LIST IS NOT ONE OF THEM. Every record declares it at open (migration 0002), so a count
+     that included it was never zero and this redirect never fired: a fresh record opened on an empty Home instead of
+     the prompt (`loop/finish/modules.md` MOD-6). What is counted is the lists a person or a pack declared. */
+  const declared = booted.from === 'live' ? booted.boot.registers.filter((r) => r.id !== 'session').length : null;
   if (declared === 0 && !spared) redirect(307, at('/start', url.pathname));
 
   /* AND THE RECORDS THIS PERSON CAN REACH, WHICH `boot` CANNOT ANSWER: it names the record you are

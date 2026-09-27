@@ -3,14 +3,16 @@
  *
  * `loop/research-shell-scripts.md` is the design and this package is its Brief 1: the contract
  * types, the ceilings, the prelude that builds `ctx` inside the sandbox, and the QuickJS runner the
- * self-host will bind. It knows no kernel, no host and no network. Everything a script can reach is
+ * self-host binds. It knows no kernel, no host and no network. Everything a script can reach is
  * a function the caller hands in as a `CtxHost`, and every rule in section 5 of that design is
  * enforced on THIS side of the boundary, before the host function is called, so a script that
  * rewrites its own `ctx` has rewritten nothing that decides anything.
  *
- * NOTHING ELSE IMPORTS THIS YET, AND THAT IS DELIBERATE. Whether scripts run hosted at all is still
- * a question in front of the owner (`loop/research-shell-docs.md`, first finding), so the package is
- * built so it can be deleted in one directory if the answer is no.
+ * BOTH HOSTS RUN IT, AND ONLY THE HOSTS IMPORT IT. The self-host evaluates the prelude and the
+ * source in QuickJS (`./quickjs`, `apps/selfhost/src/script.ts`); the Cloud loads the same prelude
+ * into a Worker (`apps/worker/src/script.ts`); `@braindog/host` takes its types for the runner both
+ * build. The record never imports it: the kernel is rank 7 to this package's 12 (`31-STACK`), so it
+ * holds the answer's shape structurally (`kernel/src/script-run.ts`) and its own ceilings.
  *
  * NO NEW REFUSAL CODE. Section 5 of the design says the existing ones cover a script, and for every
  * rule this package enforces one does. A script that throws its own error is not a rule of ours
@@ -24,6 +26,11 @@
  * What a declaration may ask for at most, section 5 of the design. A declaration over one is
  * refused before anything runs rather than clamped, because a clamped limit is a script that
  * behaves differently from what its author read in the install diff.
+ *
+ * THE KERNEL REFUSES THE SAME AT INSTALL (`SCRIPT_CEILINGS` in `kernel/src/script.ts`), so this
+ * check is the second one, for a script installed before the kernel checked and for a host handed a
+ * declaration from anywhere. The two are copies, because the kernel may not import this package and
+ * this package depends on nothing, and `packages/mcp/test/script.test.ts` holds them equal.
  */
 export const CEILINGS = {
   cpu_ms: 1_000,
@@ -112,7 +119,12 @@ export type HostResponse = {
  */
 export interface CtxHost {
   fetch(request: HostRequest): Promise<HostResponse>;
-  list?(register: string, where: Json): Promise<Json[]>;
+  /**
+   * THE HOST READS `options`, NOT THIS PACKAGE: it is `ctx.record.list`'s third argument as the script wrote it, or
+   * `null` when it wrote none. So both hosts take the one option, `includeDeleted` as true or false, and refuse anything
+   * else in the same words (`scriptReads` in `@braindog/host/script`). A deleted row comes back with `deleted_at` set.
+   */
+  list?(register: string, where: Json, options: Json): Promise<Json[]>;
   /**
    * THE HOST CHECKS `reads` FOR A `get`, AND IT IS HANDED THE LIST SO IT CANNOT FORGET TO. A spoken
    * id (`S42`) names its register through a prefix only the record can resolve, so this package

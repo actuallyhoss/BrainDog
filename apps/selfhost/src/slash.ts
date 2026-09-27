@@ -37,7 +37,7 @@ import {
 } from '@braindog/host/slash';
 import { slashAskDoor, type SlashAskDoor } from '@braindog/host';
 import type { SlashAnswer } from '@braindog/host/slash-answers';
-import type { Clock, Sql } from '@braindog/ports';
+import { no, type Clock, type Sql } from '@braindog/ports';
 import type { CallContext, RecordApi, SlashModel } from '@braindog/record';
 import type { Slash } from '@braindog/slash';
 
@@ -79,7 +79,7 @@ export type SlashEngineDeps = {
    *
    * IT IS NOT THE RECORD'S DATABASE (`46 §2`), and it is a parameter here rather than a second file opened beside
    * `record.sqlite` because the caller is the one that already owns this process's files: `server.ts` takes `options.file`,
-   * and where the `settings` and `call` tables of `46 §4.1` live is that same decision. This file neither knows the path nor
+   * and where Slash's `slash_settings` and `slash_call` tables live is that same decision. This file neither knows the path nor
    * guesses one.
    */
   sql: Sql;
@@ -125,7 +125,7 @@ export async function slashEngineFor(
  *
  * THE ENGINE IS BUILT ONCE, ON THE FIRST QUESTION, THROUGH `slashEngineFor`, so it is the guarded one: tiers `b` and
  * `byo` spend the one `ask_cap` a person's read does (Q2's default, built in Brief C). A second engine beside the door's,
- * over the same Slash SQLite, because both read `settings` and `call` on every ask and hold nothing of their own. A build
+ * over the same Slash SQLite, because both read `slash_settings` and `slash_call` on every ask and hold nothing of their own. A build
  * that throws is let go, so the next pass builds again rather than every question after it failing on one bad import.
  *
  * EACH QUESTION IS ASKED ON A WIRE SIGNED `rule:<id>`, so the vault's `grant.read` for the owner's `slash` key names the
@@ -222,7 +222,7 @@ export function slashDoor(
   /* TIER `b` IS OFFERED ONLY WHERE A KEY CAN BE OPENED, which on this host is a key store: without one `keyOpener`
      answers `null` for every grant, and a `byok` handed in here is what lets the settings door store tier `b`, so
      offering it would save a setting every later propose refuses. `SLASH_KEY` does not make a host able to open the
-     owner's key and so does not count. The grant id is read on each propose, after the engine that made the `settings`
+     owner's key and so does not count. The grant id is read on each propose, after the engine that made the `slash_settings`
      table has been built, so a grant the owner names or revokes counts on the next ask.
      AND IT IS OPENED FOR THE ASKER, NOT FOR `system`. `slashByokFor` runs the vault's own gate on `ctx` and signs the
      `grant.read` with the asker's id; before it, a read colleague with a fifty-minute-old proof proposed on the owner's key
@@ -241,4 +241,48 @@ export function slashDoor(
       : slashAskerEngine(engine, (actor) => slashInferenceOf(config, wireOf(config, api, store, actor)));
   };
   return slashAskDoor(origins, build, byok);
+}
+
+/* ── erasing a person from Slash's ledger ─────────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * `eraseSlash` over this process's Slash SQLite, or nothing where no ledger was ever built in it. The ledger rows it touched.
+ *
+ * THE PACKAGE IS LOADED ONLY WHERE THERE IS A LEDGER, which is `46 §5.1` kept on this path too: a self-host with no endpoint
+ * never built an engine, so its Slash file holds no `slash_call` table, nor version 1's `call`, and the erasure finishes
+ * without evaluating the module. The Worker has the same two functions over its own storage (`apps/worker/src/slash.ts`).
+ */
+export async function slashErased(sql: Sql, subjects: readonly string[]): Promise<number> {
+  if (sql.one("SELECT 1 AS n FROM sqlite_master WHERE type = 'table' AND name IN ('slash_call', 'call')") === undefined) return 0;
+  const { eraseSlash } = await import('@braindog/slash');
+  return eraseSlash(sql, subjects);
+}
+
+/**
+ * The record's `erase`, followed by `eraseSlash` over the Slash SQLite this process hands every engine, so an erasure
+ * reaches the questions Slash kept (`loop/finish/contracts.md` §7.2). `server.ts` calls it once, on the record it built.
+ *
+ * THE RECORD CANNOT DO IT ITSELF: it has no edge to `@braindog/slash` and must not, and the ledger is not even in the
+ * record's file here but beside it. So the host that holds both finishes the erasure.
+ *
+ * ONLY WHEN THE RECORD ANSWERED `ok`, so every refusal it gives (a caller who is not the owner in a browser, a subject too
+ * short) stands for the ledger too. A ledger that could not be erased is a refusal of its own and not the record's report:
+ * the record's part is done and cannot be undone, and answering the erasure whole would say something that did not happen.
+ * Asked again, the record finds nothing more and the ledger is walked again.
+ */
+export function slashErasing(api: Pick<RecordApi, 'erase'>, sql: Sql): void {
+  const erase = api.erase.bind(api);
+  api.erase = async (args, ctx) => {
+    const out = await erase(args, ctx);
+    if (!out.ok) return out;
+    try {
+      await slashErased(sql, args.subjects);
+    } catch (e) {
+      return no(
+        'INTERNAL',
+        `The record erased every value naming them, and Slash's own ledger could not be erased: ${e instanceof Error ? e.message : String(e)} Erase again once Slash answers.`,
+      );
+    }
+    return out;
+  };
 }

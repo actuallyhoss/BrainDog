@@ -1,8 +1,9 @@
 /**
- * Turn 1 of the first run, "Who are you?", read without a model (`loop/research-modular.md` §2.2).
+ * The name in the first run's one sentence, "Who are you?", read without a model (`loop/research-modular.md`
+ * §2.2); the rest of the sentence is read by `start/propose.ts`.
  *
- * DETERMINISTIC ON PURPOSE, and for longer than the business turn will be: the answer becomes the
- * first People row, and a wrong guess about a name is worse than no guess. So a name is only taken
+ * DETERMINISTIC ON PURPOSE: the answer becomes the first People row, and a wrong guess about a name is
+ * worse than no guess. So a name is only taken
  * where the sentence puts one unmistakably, and everything after it is kept verbatim as the bio.
  * The screen shows what was heard before anything is written, so a miss costs one edit.
  *
@@ -65,16 +66,21 @@ export function withChip(text: string, chip: string): string {
  */
 export function introduce(heard: Heard, email: string | null, packs: readonly { id: string; disabled_at: string | null }[] | null): Introduction | null {
   if (!heard.name) return null;
-  const people = packs?.find((p) => p.id === 'people');
+  const people = packs?.find((p) => p.id === PEOPLE);
   if (!people || people.disabled_at !== null) return null;
   return { name: heard.name, ...(email ? { email } : {}), where: 'onboarding' };
 }
 
 /**
- * The same person as a demo row, with the bio in `note`.
+ * THE PEOPLE MODULE AND ITS LIST, BY THE ONE ID THEY SHARE. The first run asks whether it is on before it meets the
+ * person, and writes the person into it by hand where `meet` refuses; both read the id from here.
+ */
+export const PEOPLE = 'people';
+
+/**
+ * The same person as a plain entry, with the bio in `note`, for a People list `meet` refuses to write.
  *
- * WITHOUT `met`: a waiting row holds scalar fields only, and `met` is a list. `meet` writes that
- * line on a live record.
+ * WITHOUT `met`: `met` is a list of where somebody was met, and `meet` is what writes that line.
  */
 export function personRow(asked: Introduction, bio: string): Record<string, string> {
   return { name: asked.name, ...(asked.email ? { email: asked.email } : {}), ...(bio ? { note: bio } : {}) };

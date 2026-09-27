@@ -14,7 +14,7 @@ import './fixtures/fill.ts';
 import { REGISTERS, columnsFor, display, sortRows } from './api.ts';
 import { list, applyFilters } from './fixtures/readers.ts';
 import { ROWS, NOW } from './fixtures/sample.ts';
-import { compile, explain, matches } from './where.ts';
+import { compile, explain } from './where.ts';
 import type { Entry } from './schema.ts';
 
 const rows = (...fields: Record<string, unknown>[]): Entry[] =>
@@ -323,22 +323,13 @@ test('`is <a date>` ON A DATE FIELD MATCHED NOTHING, ON EVERY REGISTER, ALWAYS',
   const rows2 = rows({ due: '2026-09-03' }, { due: '2026-09-14' }, { due: null });
   assert.deepEqual(seqs(applyFilters('obligations', rows2, [{ field: 'due', op: 'is', values: ['2026-09-03'] }])), [1]);
 
-  /* A relative literal, which is the thing somebody actually types. */
+  /* A relative literal, which is the thing somebody actually types, read as the day itself and kept in its word. The
+     rows each of the three operators admits are the record's to count (ARC-2). */
   const said = compile('obligations', 'due is today');
   assert.deepEqual(explain(said), [], 'the clause was not understood');
-  assert.deepEqual(rows2.filter((e) => matches(e, said, NOW)).map((e) => e.seq), [1]);
-
-  /* AND THE THREE OPERATORS AGREE ABOUT THE DAY THEY NAME. `34 §6`: before and after are exclusive
-     of it, so the three partition the field exactly — every row with a date lands in one of them. */
-  const before = compile('obligations', 'due before today');
-  const after = compile('obligations', 'due after today');
-  const dated = rows2.filter((e) => e.fields.due !== null);
-  const parts = [before, said, after].map((c) => dated.filter((e) => matches(e, c, NOW)).length);
-  assert.equal(parts.reduce((n, x) => n + x, 0), dated.length, `the three operators cover ${parts.join('+')} of ${dated.length} dated rows`);
-
-  /* A row with no date is in none of them. Counting it would put rows with no due date into an
-     overdue list, which is a list somebody acts on. */
-  for (const c of [before, said, after]) assert.equal(matches(rows2[2]!, c, NOW), false);
+  assert.deepEqual(said.clauses, [{ field: 'due', op: 'on', day: 'today' }]);
+  assert.deepEqual(compile('obligations', 'due before today').clauses, [{ field: 'due', op: 'before', day: 'today' }]);
+  assert.deepEqual(compile('obligations', 'due after today').clauses, [{ field: 'due', op: 'after', day: 'today' }]);
 });
 
 test('`is not <a date>` IS NOT `is <a date>`', () => {
@@ -358,16 +349,11 @@ test('`is not <a date>` IS NOT `is <a date>`', () => {
   assert.deepEqual(explain(is), []);
   assert.deepEqual(explain(isNot), []);
   assert.notDeepEqual(is, isNot, '`is not` compiles to the same clause as `is`');
+  assert.deepEqual(is.clauses, [{ field: 'due', op: 'on', day: '2026-09-14' }]);
+  assert.deepEqual(isNot.clauses, [{ field: 'due', op: 'not on', day: '2026-09-14' }]);
 
-  const yes = some.filter((e) => matches(e, is, NOW)).map((e) => e.seq);
-  const no = some.filter((e) => matches(e, isNot, NOW)).map((e) => e.seq);
-  assert.deepEqual(yes, [2]);
-  /* A row with no date is not the named day, so it is in the negation — `34 §6`: every positive
-     operator is false on a missing value, and `not` is how a person says "and the empty ones". */
-  assert.deepEqual(no, [1, 3]);
-  assert.equal(yes.length + no.length, some.length, 'the two do not partition the rows');
-
-  /* The same through the URL shape, which is where it was reachable. */
+  /* The same through the URL shape, which is where it was reachable. A row with no date is not the named day, so it is
+     in the negation: `34 §6`, every positive operator is false on a missing value. */
   assert.deepEqual(seqs(applyFilters('obligations', some, [{ field: 'due', op: 'not-in', values: ['2026-09-14'] }])), [1, 3]);
 });
 
@@ -378,7 +364,7 @@ test('and an enum whose value is the word `today` is untouched', () => {
   assert.deepEqual(seqs(applyFilters('obligations', some, [{ field: 'state', op: 'in', values: ['open'] }])), [1]);
   const said = compile('obligations', 'state is open');
   assert.deepEqual(explain(said), []);
-  assert.deepEqual(some.filter((e) => matches(e, said, NOW)).map((e) => e.seq), [1]);
+  assert.deepEqual(said.clauses, [{ field: 'state', op: 'is', values: ['open'] }]);
 });
 
 test('AN INSTANT CELL IS BANDED, NOT TRUNCATED TO ITS DAY', () => {

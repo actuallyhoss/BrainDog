@@ -42,9 +42,10 @@
   import { palette } from '../palette/open.svelte.ts';
   import Menu from './Menu.svelte';
   import RowMenu from './RowMenu.svelte';
-  import Kbd from './Kbd.svelte';
   import { toasts } from './toast.svelte.ts';
   import { levelWord, openRecord, type SwitcherRow } from '../record/switcher.ts';
+  import { nameWords } from '../record/names.ts';
+  import type { Shell } from '../record/boot-live.ts';
 
   let {
     nav,
@@ -71,6 +72,42 @@
     icons?: boolean | undefined;
     ontoggle?: (() => void) | undefined;
   } = $props();
+
+  /**
+   * THE WORDS THE RAIL SAYS ITSELF, kept beside the one component that says them (design DSN-11). The fallback name is
+   * what a record with no name and no owner this caller can name is called, and the other two are the Lists fold.
+   */
+  const words = {
+    unnamed: 'My BrainDog',
+    moreLists: (n: number) => `Show ${n} more`,
+    fewerLists: 'Show fewer',
+  } as const;
+
+  /**
+   * THE HEAD ALWAYS NAMES THE RECORD, beside its tile. It read "Switch record" and nothing else on a record with no name,
+   * the seeded one included, so the first thing on every screen at 1440 was a verb where the name of the place belongs
+   * (design SYS-12). The fallback is the owner's first name, then "My BrainDog".
+   *
+   * THE OWNER'S NAME IS THE SHELL'S, READ WHERE THE RAIL ALREADY READS THE ADDRESS. `boot` names people by id to the
+   * owner, so the caller is the only owner this screen can put a name to; a colleague on an unnamed record reads the
+   * fallback rather than a name guessed from somebody else's row.
+   */
+  const ownerFirst = $derived.by(() => {
+    const shell = page.data as unknown as Partial<Shell>;
+    const me = shell.me;
+    if (!me?.owner || !shell.names || !Object.hasOwn(shell.names, me.person)) return '';
+    return (shell.names[me.person] ?? '').trim().split(/\s+/u)[0] ?? '';
+  });
+  const recordName = $derived(record.trim() || ownerFirst || words.unnamed);
+
+  /**
+   * A LONG LISTS GROUP FOLDS AFTER EIGHT. Lists run off the fold on any record that keeps a dozen of them, with the rail
+   * cut mid-row and nothing below the cut said to exist (design SYS-12). Eight are drawn, then one row that shows the rest;
+   * the list you are in is drawn wherever it sits, so the rail never loses "here". Per visit, since it is a glance and
+   * not an arrangement: `railShut` already keeps the whole group folded for somebody who wants it gone.
+   */
+  const LISTS_SHOWN = 8;
+  let listsAll = $state(false);
 
   /**
    * ANOTHER RECORD OPENS IN THIS BROWSER: the session moves to it, and the app starts again at Home, reading only that record.
@@ -113,9 +150,9 @@
 
   const flyAt = (target: EventTarget | null) => {
     const el = (target as HTMLElement | null)?.closest?.('[data-label]');
-    /* THE UTILITY STRIP ASKS FOR THIS AT BOTH WIDTHS, because four glyphs in a row at the foot are
-       icon-only even when the rail is open. Everything else says its own name until it stops. */
-    if (!el || !(icons || el.classList.contains('util'))) return (fly = null);
+    /* ONLY THE NARROW RAIL ASKS FOR THIS. Every row of the open rail says its own name, the foot's included, since the
+       glyph strip that was icon-only at both widths became labelled rows in "More". */
+    if (!el || !icons) return (fly = null);
     const box = el.getBoundingClientRect();
     fly = { label: el.getAttribute('data-label') ?? '', y: Math.round(box.top + box.height / 2) };
   };
@@ -179,10 +216,41 @@
   const sections = $derived(arrange(shown, arrangement));
   const lists = $derived(orderLists(registers, arrangement));
 
+  /**
+   * A GROUP WITH AN OVERVIEW OPENS IT FROM ITS HEADING, so "Overview" is not a row under it.
+   *
+   * Money, Projects and Work each declare their first page as "Overview", so the open rail read "Overview" three times,
+   * each under the name that already said which one it was (design SYS-12). The heading is the section's name, and the
+   * section's name is what a person calls that page, so the heading is the link and the page leaves the rows. The
+   * narrow rail has no headings to press, so there the Overview stays a row with its glyph.
+   *
+   * THE DECLARED TITLE IS THE TEST, because it is the only thing that marks a section's own page: a page declares a
+   * title and a section and nothing that says "I am this section's front".
+   */
+  const OVERVIEW = 'overview';
+  const groups = $derived(
+    sections.map(([section, entries]) => {
+      const lead = icons || entries.length < 2 ? undefined : entries.find((e) => e.title.trim().toLowerCase() === OVERVIEW);
+      return { section, entries, lead, rows: lead ? entries.filter((e) => e !== lead) : entries };
+    }),
+  );
+  const leads = $derived(new Set(groups.flatMap((g) => (g.lead ? [g.lead.href] : []))));
+
   /* THE FLAT LIST IN RENDER ORDER, and it is derived FROM what renders rather than beside it. The
      two were computed separately and disagreed, which is how a move came to be calculated against a
-     list nobody could see. One of them has to be the other's source. */
-  const ordered = $derived(sections.flatMap(([, entries]) => entries));
+     list nobody could see. One of them has to be the other's source. A heading's Overview stays in
+     it, so a move keeps the Overview's place in the arrangement; `move` and `toTop` step over it. */
+  const ordered = $derived(groups.flatMap((g) => g.entries));
+
+  /* THE LISTS DRAWN: the first eight, then the rest once asked, and always the one you are in. The narrow rail draws
+     them all, for the reason it folds no section: there is no row there to ask with. */
+  const listsShown = $derived(
+    icons || listsAll ? lists : lists.filter((r, i) => i < LISTS_SHOWN || inside(page.url.pathname).startsWith(`/r/${r.id}`)),
+  );
+  const listsHidden = $derived(lists.length - listsShown.length);
+  /* THE ROW STAYS WHILE THERE IS SOMETHING TO SHOW OR TO FOLD AGAIN, and never offers "Show 0 more" when the list you
+     are in was the only one past eight. */
+  const listsFold = $derived(!icons && (listsAll ? lists.length > LISTS_SHOWN : listsHidden > 0));
 
   /**
    * Move one item, one place, WITHIN ITS SECTION.
@@ -197,7 +265,8 @@
     const me = list[from];
     if (!me) return;
     let to = from + delta;
-    while (to >= 0 && to < list.length && list[to]!.section !== me.section) to += delta;
+    /* A HEADING'S OVERVIEW IS NOT A NEIGHBOUR: swapping with it moves nothing a reader can see. */
+    while (to >= 0 && to < list.length && (list[to]!.section !== me.section || leads.has(list[to]!.href))) to += delta;
     if (to < 0 || to >= list.length) return;
     const next = [...list];
     next[from] = next[to]!;
@@ -212,7 +281,7 @@
     const me = list.find((e) => e.href === href);
     if (!me) return;
     const rest = list.filter((e) => e.href !== href);
-    const at = rest.findIndex((e) => e.section === me.section);
+    const at = rest.findIndex((e) => e.section === me.section && !leads.has(e.href));
     rest.splice(at === -1 ? rest.length : at, 0, me);
     remember(rest.map((e) => e.href));
     focusItem(href);
@@ -303,6 +372,9 @@
      one list this rail draws without asking `arrange` for it. */
   const listsShut = $derived(!icons && shut.has(copy.lists) && !registers.some((r) => under(`/r/${r.id}`)));
 
+  /* THE FOOT'S "MORE" FOLDS BY THE SAME RULE, and opens itself on any of its four places. */
+  const moreShut = $derived(!icons && shut.has(copy.more) && ['/audit', '/packs', '/vault', '/settings'].every((area) => !under(area)));
+
   /* AND THE SECTION ITSELF GOES WHEN THERE IS NOTHING UNDER IT. A heading over an empty group is a
      fold that opens onto nothing, which is worse than the eight links it replaced. */
   const anyList = $derived(registers.length > 0);
@@ -321,29 +393,21 @@
   onfocusout={() => (fly = null)}
 >
   <!--
-    THE RECORD SWITCHER, AND IT HAS MOVED TO THE FOOT.
+    THE RECORD SWITCHER, WHICH IS ALSO THE RAIL'S HEAD.
 
-    It sat at the top of the rail, in the first position anybody's eye lands on, drawn as the
-    largest thing in the column — and it is the least-pressed control in it. Most people have one
-    record and will press this never; the three rows it was pushing down are the three surfaces
-    whose absence would make this a different product. The name of the thing you are inside is
-    still worth showing, so it keeps its tile and its name; it keeps them at the bottom, where
-    every other product puts the identity you rarely change.
-
-    NO LOCKUP EITHER WAY. The mark is the red circle in the corner, where it is an affordance
-    rather than a caption.
+    The record is the scope of every row under it, so its name heads the column beside its tile, and
+    the tile is one of the few places the brand's colour belongs (design D-1). Most people have one
+    record and will open this menu never, so it is drawn as a name rather than as a control that
+    shouts; pressing it still lists every record this person can reach.
   -->
   {#snippet switcher()}
     <Menu label={copy.switchRecord}>
       {#snippet trigger()}
-        <span class="record" data-label={record || copy.switchRecord}>
-          {#if record}
-            <span class="record-avatar" aria-hidden="true">{record.slice(0, 1)}</span>
-            <span class="record-name">{record}</span>
-          {:else}
-            <!-- A RECORD WITH NO NAME YET still needs a trigger that says what it does, or the button is empty. -->
-            <span class="record-name">{copy.switchRecord}</span>
-          {/if}
+        <!-- THE NAME, ALWAYS, BESIDE ITS TILE (`recordName`). The menu itself is still labelled "Switch record", which is
+             what it does; the trigger says where you are. -->
+        <span class="record" data-label={recordName}>
+          <span class="record-avatar" aria-hidden="true">{recordName.slice(0, 1)}</span>
+          <span class="record-name">{recordName}</span>
           <Icon name="chevronDown" size="s" />
         </span>
       {/snippet}
@@ -397,7 +461,9 @@
       {#if refused}<p class="mi-note">{refused}</p>{/if}
       <hr class="mi-rule" />
       <a class="mi" role="menuitem" href={at('/settings/identity')}><Icon name="settings" size="s" />{copy.recordSettings}</a>
-      <a class="mi" role="menuitem" href={at('/start')}><Icon name="plus" size="s" />{copy.newRecord}</a>
+      <!-- NO "New record" HERE UNTIL THE HOST SAYS THIS PERSON MAY MAKE ONE (`loop/finish/modules.md` MOD-6). It opened
+           this record's own `/start`, which answered "This BrainDog is already made.", because only the operator can
+           make a record today; `boot` carries no answer to "may this person make one", so the item is absent. -->
     </Menu>
   {/snippet}
 
@@ -429,7 +495,9 @@
   </div>
 
   <!-- The spine. Home, Decide and Inbox are the three surfaces whose absence would make this a
-       different product, so no pack may add to it, reorder it or badge it. -->
+       different product, so no pack may add to it, reorder it or badge it. Slash and Automations
+       follow them: they were two glyphs in a strip at the foot that nobody could tell apart, and
+       they are what fits the record to how a person works (design SYS-12). -->
   <ul class="group spine">
     <li>
       <a class="item tap" href={at('/')} data-label={said('home')} aria-current={here('/') ? 'page' : undefined}>
@@ -456,6 +524,18 @@
       <a class="item tap" href={at('/inbox')} data-label={said('inbox')} aria-current={under('/inbox') ? 'page' : undefined}>
         <Icon name="inbox" size="m" /><span class="item-name">{said('inbox')}</span>
         {#if inbox}<span class="tally num">{inbox}</span>{/if}
+      </a>
+    </li>
+    <li>
+      <!-- ITS LABEL IS ITS NAME, and its tooltip says what it is, since Slash is not a word a person uses about their
+           own work. The tooltip is `title` and not the accessible name, so the name read aloud is the name on screen. -->
+      <a class="item tap" href={at('/slash')} data-label={nameWords.slash} title={copy.slashRail} aria-current={under('/slash') ? 'page' : undefined}>
+        <Icon name="star" size="m" /><span class="item-name">{nameWords.slash}</span>
+      </a>
+    </li>
+    <li>
+      <a class="item tap" href={at('/automations')} data-label={copy.automations} aria-current={under('/automations') ? 'page' : undefined}>
+        <Icon name="refresh" size="m" /><span class="item-name">{copy.automations}</span>
       </a>
     </li>
   </ul>
@@ -487,12 +567,12 @@
               <span class="item-name">{label}</span>
             </a>
     {/snippet}
-    {#each sections as [section, entries]}
+    {#each groups as { section, entries, lead, rows }}
       {#if entries.length === 1}
-        <!-- A SECTION OF ONE IS A ROW, NOT A FOLDER. Money, Services and Work each declare one page,
-             so the rail drew a folding heading over a single row three times, `Money` then
-             `Overview`, `Services` then `Renewals`, which is the look of a file tree. A section
-             holding one page is that page, named by its section, and there is nothing to fold. -->
+        <!-- A SECTION OF ONE IS A ROW, NOT A FOLDER. A section that declares one page drew a folding
+             heading over a single row, `Services` then `Renewals`, which is the look of a file tree.
+             A section holding one page is that page, named by its section, and there is nothing to
+             fold. -->
         <ul class="group solo">
           <li>{@render navItem(entries[0]!, section)}</li>
         </ul>
@@ -500,7 +580,9 @@
       <!--
         THE HEADING IS THE CONTROL. A separate chevron beside it would be a second target the width
         of a glyph, on a row that is already exactly the right size to press, and `19 §3` gives the
-        rail a right-click menu for the per-item verbs rather than a column of controls.
+        rail a right-click menu for the per-item verbs rather than a column of controls. The one
+        exception is a section with an Overview, whose name opens that page (`groups`), so its fold
+        is the mark alone, grown to a whole target by `.tap`.
 
         `aria-expanded` ON A BUTTON INSIDE THE HEADING, not on the heading itself: a `<h2>` is not
         interactive and giving it a role would take the heading out of the document outline, which
@@ -519,25 +601,31 @@
            heading whose text is hidden is a heading with no accessible name, which is a defect
            rather than a narrow rail. A rule says the one thing left to say at this width, that
            these rows belong together, and claims nothing it cannot draw. -->
+      <!-- A HEADING THAT OPENS ITS OVERVIEW IS TWO CONTROLS, the fold's mark and the name, because one press cannot both
+           fold a section and open its page. The fold keeps the section's name in its text, hidden, so it is announced
+           "Money, expanded, button" and `railShut`'s probe still reads which sections are folded by name. -->
       {#if icons}
         <hr class="sep" />
       {:else}
-      <h2 class="section">
+      <h2 class="section" data-opens={lead ? '' : undefined}>
         <button
           type="button"
-          class="fold"
+          class="fold tap"
           aria-expanded={!folded}
           onclick={() => fold(section)}
         >
           <span class="fold-mark" aria-hidden="true" data-shut={folded ? '' : undefined}>
             <Icon name="chevronDown" size="s" />
           </span>
-          {section}
+          {#if lead}<span class="fold-name">{section}</span>{:else}{section}{/if}
         </button>
+        {#if lead}
+          <a class="section-link tap" href={at(lead.href)} aria-current={here(lead.href) ? 'page' : undefined}>{section}</a>
+        {/if}
       </h2>
       {/if}
       <ul class="group" data-shut={folded ? '' : undefined} inert={folded || undefined} aria-hidden={folded || undefined}>
-        {#each entries as entry}
+        {#each rows as entry}
           <li>
             {@render navItem(entry, entry.title)}
           </li>
@@ -553,7 +641,7 @@
       <hr class="sep" />
     {:else}
     <h2 class="section">
-      <button type="button" class="fold" aria-expanded={!listsShut} onclick={() => fold(copy.lists)}>
+      <button type="button" class="fold tap" aria-expanded={!listsShut} onclick={() => fold(copy.lists)}>
         <span class="fold-mark" aria-hidden="true" data-shut={listsShut ? '' : undefined}>
           <Icon name="chevronDown" size="s" />
         </span>
@@ -565,7 +653,7 @@
       <!-- Every list this rail is given, and it is given only the ones that hold something: the
            filter is on `index.registers` in `api.ts`, because the phone's More sheet draws the same
            list and the two must not be able to disagree. -->
-      {#each lists as r}
+      {#each listsShown as r}
         <li>
           <a class="item tap" href={at(`/r/${r.id}`)} data-label={r.name} aria-current={under(`/r/${r.id}`) ? 'page' : undefined}>
             <Icon name={r.icon} size="m" />
@@ -586,6 +674,16 @@
           {/each}
         </li>
       {/each}
+      {#if listsFold}
+        <!-- THE REST OF THE LISTS, ASKED FOR IN WORDS. It says how many are behind it, so the fold is a count and not a
+             cliff, and it turns back into "Show fewer" once they are out. -->
+        <li>
+          <button type="button" class="item tap" aria-expanded={listsAll} onclick={() => (listsAll = !listsAll)}>
+            <Icon name="more" size="m" />
+            <span class="item-name">{listsAll ? words.fewerLists : words.moreLists(listsHidden)}</span>
+          </button>
+        </li>
+      {/if}
     </ul>
     {/if}
 
@@ -612,24 +710,22 @@
   </div>
 
   <!--
-    THE FOOT: ONE ROW, ONE STRIP, AND THE RECORD YOU ARE IN.
-
-    It was five full-width rows carrying Audit, Packs, Vault, Settings and Search, and the count is
-    the whole point. A friction pass counted thirty-four items of navigation on every screen, in a
-    scroller whose content did not fit its own height, and four of those items were utilities
-    nobody opens twice a day drawn at exactly the weight of the lists that hold the record. Four
-    rows are one strip now, and nothing was taken away: each glyph is its own target, says its name
-    on hover and on focus, and still wears `aria-current` on the screen you are looking at.
+    THE FOOT: SEARCH, THEN "MORE".
 
     SEARCH KEEPS ITS ROW. It is the one control here somebody presses all day, and it is the reason
-    the disc fixed to the bottom-right corner could be taken off a desktop — that disc sat on top of
-    whatever row happened to be beneath it, four controls' worth at 1440 by 900. `⌘K` still opens
-    the same surface from anywhere, and the row does not print the chord: a key cap in the rail
-    reads as a tool for people who already know the keys.
+    the disc fixed to the bottom-right corner could be taken off a desktop: that disc sat on top of
+    whatever row happened to be beneath it. `⌘K` still opens the same surface from anywhere, and the
+    row does not print the chord, because a key cap in the rail reads as a tool for people who
+    already know the keys.
+
+    "MORE" IS THE TOOLS NOBODY OPENS TWICE A DAY, AS LABELLED ROWS. They were six 16px glyphs in one
+    strip (a clock, a star, a grid, two arrows, a shield, sliders), and nobody could tell History,
+    Slash, Add-ons, Automations, Vault and Settings apart without hovering each one (design SYS-12).
+    Slash and Automations went up to the spine; the four left are rows that say their names, in a
+    group that folds like any other, under the heading the phone's sheet already uses for them.
 
     THE PROVENANCE SURFACE IS STILL HERE, which is worth saying because it was once reachable only
-    by `⌘K`: this list opened with an empty `<li>` where the audit belonged. "What happened to this
-    record" is not an advanced feature.
+    by `⌘K`. "What happened to this record" is not an advanced feature.
   -->
   <div class="foot">
     <ul class="group">
@@ -640,16 +736,41 @@
       </li>
     </ul>
 
-    <div class="utils">
-      <!-- SLASH SITS WITH THE TOOLS THAT SHAPE THE RECORD, beside Packs. Its label is its name, and its tooltip and spoken
-           name say what it is, since Slash is not a word a person uses about their business. -->
-      {#each [['/audit', copy.audit, 'clock', '/audit', copy.audit], ['/slash', 'Slash', 'star', '/slash', copy.slashRail], ['/packs', copy.packs, 'packs', '/packs', copy.packs], ['/automations', copy.automations, 'refresh', '/automations', copy.automations], ['/vault', copy.vault, 'vault', '/vault', copy.vault], ['/settings/appearance', copy.settings, 'settings', '/settings', copy.settings]] as const as [href, label, glyph, area, said]}
-        <a class="util tap" href={at(href)} data-label={label} aria-label={said} title={said} aria-current={under(area) ? 'page' : undefined}>
-          <Icon name={glyph} size="m" />
+    {#if icons}
+      <hr class="sep" />
+    {:else}
+      <h2 class="section">
+        <button type="button" class="fold tap" aria-expanded={!moreShut} onclick={() => fold(copy.more)}>
+          <span class="fold-mark" aria-hidden="true" data-shut={moreShut ? '' : undefined}>
+            <Icon name="chevronDown" size="s" />
+          </span>
+          {copy.more}
+        </button>
+      </h2>
+    {/if}
+    <ul class="group" data-shut={moreShut ? '' : undefined} inert={moreShut || undefined} aria-hidden={moreShut || undefined}>
+      <li>
+        <a class="item tap" href={at('/audit')} data-label={copy.audit} aria-current={under('/audit') ? 'page' : undefined}>
+          <Icon name="clock" size="m" /><span class="item-name">{copy.audit}</span>
         </a>
-      {/each}
-    </div>
-
+      </li>
+      <li>
+        <a class="item tap" href={at('/packs')} data-label={copy.packs} aria-current={under('/packs') ? 'page' : undefined}>
+          <Icon name="packs" size="m" /><span class="item-name">{copy.packs}</span>
+        </a>
+      </li>
+      <li>
+        <a class="item tap" href={at('/vault')} data-label={copy.vault} aria-current={under('/vault') ? 'page' : undefined}>
+          <Icon name="vault" size="m" /><span class="item-name">{copy.vault}</span>
+        </a>
+      </li>
+      <li>
+        <!-- SETTINGS OPENS ON APPEARANCE AND IS "HERE" ON EVERY AREA, as the glyph it replaces was. -->
+        <a class="item tap" href={at('/settings/appearance')} data-label={copy.settings} aria-current={under('/settings') ? 'page' : undefined}>
+          <Icon name="settings" size="m" /><span class="item-name">{copy.settings}</span>
+        </a>
+      </li>
+    </ul>
   </div>
 
   <!-- EVERY ITEM IS A KEY THAT ALREADY EXISTS, the same rule the row menu follows: the menu is not
@@ -668,13 +789,15 @@
   >
     {#if menuFor}
       {@const entry = menuFor}
+      <!-- NO KEY CAPS IN THE MENU. `⌥↑` and `⌥↓` still move the focused row, and the `?` sheet is where they are said
+           (design-brief §4, `Kbd`). -->
       <button class="mi" role="menuitem" type="button" onclick={() => move(entry.href, -1)}>
         <Icon name="arrowUp" size="s" />
-        <span class="mi-name">{copy.moveUp}</span><Kbd keys="⌥↑" />
+        <span class="mi-name">{copy.moveUp}</span>
       </button>
       <button class="mi" role="menuitem" type="button" onclick={() => move(entry.href, 1)}>
         <Icon name="arrowDown" size="s" />
-        <span class="mi-name">{copy.moveDown}</span><Kbd keys="⌥↓" />
+        <span class="mi-name">{copy.moveDown}</span>
       </button>
       <button class="mi" role="menuitem" type="button" onclick={() => toTop(entry.href)}>
         <Icon name="star" size="s" />
@@ -733,8 +856,8 @@
     background: var(--sunk);
   }
 
-  /* THE HEAD OF THE RAIL, WHICH USED TO BE THE RECORD SWITCHER. One control, at the edge the rail
-     ends at, so the biggest thing at the top of the column is the work rather than the chrome. */
+  /* THE HEAD OF THE RAIL: the record's name beside its tile, which is also the switcher, and the
+     width control at the edge the rail ends at. */
   .top {
     display: flex;
     align-items: center;
@@ -747,17 +870,15 @@
     min-inline-size: 0;
   }
 
-  /* A CONTROL, not a caption, and now the largest thing in the rail.
+  /* THE RECORD'S NAME HEADS THE RAIL, a step above the rows and at a title's weight.
 
-     The first build drew it as letterspaced grey small caps under the logo — the shape of a label,
-     so nobody would ever click it, sized as if the record's name were a footnote to the product's.
-     It is the other way round. The record is what you are in and what you switch between; the
-     product is what you opened once. So it gets the display face at 17px, a 28px tile with the
-     record's initial, and the 44px height of a real target. */
+     The first build drew it as letterspaced grey small caps under the logo, the shape of a label,
+     sized as if the record's name were a footnote to the product's. It is the other way round: the
+     record is what you are in, and the product is what you opened once. So it is the body step at
+     600 beside a 20px tile with the record's initial, on the 44px height of a real target. */
   .record {
     display: flex;
     align-items: center;
-    gap: var(--sp-3);
     gap: var(--sp-2);
     min-block-size: var(--tap);
     padding: 0 var(--sp-2);
@@ -765,8 +886,8 @@
     border-radius: var(--r-sm);
     color: var(--ink);
     font-family: var(--font-ui);
-    font-size: var(--t-sm);
-    font-weight: 500;
+    font-size: var(--t-base);
+    font-weight: 600;
     transition:
       background var(--d-state) var(--ease-out),
       border-color var(--d-state) var(--ease-out);
@@ -816,21 +937,20 @@
     color: var(--dim);
   }
 
+  /* EVERY RECORD'S TILE IS DRAWN THE ONE WAY, in the menu as at the head, because it is the same
+     mark for the same thing. `--t-xs` is the step `Face.svelte` uses for every letter in a tile. */
   .mi-avatar {
     display: grid;
     place-items: center;
-    inline-size: 20px;
-    block-size: 20px;
+    inline-size: var(--icon-l);
+    block-size: var(--icon-l);
     flex: none;
-    background: var(--accent-wash);
+    background: var(--accent);
     border-radius: var(--r-sm);
-    color: var(--accent-text);
-    font-family: var(--font-display);
-    /* `--t-xs`, the same step `Face.svelte` and `.cards-mark`/`.cards-face` in blocks.css use for
-       every other letter-in-a-tile mark in the app, 28px tiles included — one step covers the
-       whole range down to this 20px tile too. */
+    color: var(--accent-ink);
+    font-family: var(--font-ui);
     font-size: var(--t-xs);
-    font-weight: 700;
+    font-weight: 600;
     line-height: 1;
   }
 
@@ -860,27 +980,26 @@
   }
 
   .mi-rule {
-    margin: 4px 0;
+    margin: var(--sp-1) 0;
     border: 0;
     border-block-start: 1px solid var(--line);
   }
 
+  /* THE RECORD TILE WEARS THE ACCENT, one of the few places it may (design D-1). It was ink, the
+     same fill as every "on" control, so the one mark that says which record this is read as one
+     more switch. */
   .record-avatar {
     display: grid;
     place-items: center;
-    inline-size: 20px;
-    block-size: 20px;
+    inline-size: var(--icon-l);
+    block-size: var(--icon-l);
     flex: none;
-    background: var(--ink);
+    background: var(--accent);
     border-radius: var(--r-sm);
-    color: var(--bg);
+    color: var(--accent-ink);
     font-family: var(--font-ui);
-    /* 14px sat exactly between `--t-sm` (13) and `--t-base` (15) with no house rule to break the
-       tie either way, so this follows the other 28px letter-in-a-tile marks in the app
-       (`Face.svelte`, `.cards-mark`/`.cards-face` in blocks.css) onto `--t-xs`, the step they all
-       already use for this exact tile size. */
     font-size: var(--t-xs);
-    font-weight: 700;
+    font-weight: 600;
     line-height: 1;
   }
 
@@ -897,7 +1016,7 @@
 
   /* Indented to where a glyph would be, so the name lines up with the names above it and the row
      reads as belonging to the one before it rather than following it. */
-  /* `.item.view` AND NOT `.view`: `.item` is declared further down with `padding: 0 var(--sp-3)` at
+  /* `.item.view` AND NOT `.view`: `.item` is declared further down with `padding: 0 var(--sp-2)` at
      the same specificity, so the indent lost and every saved view sat flush against the rail edge. */
   .item.view {
     padding-inline-start: calc(var(--sp-2) * 2 + var(--icon-m));
@@ -939,11 +1058,11 @@
    * pointer into it. The spine and the foot are pinned, so the part that gets cut is the part that
    * varies per customer: their own lists.
    *
-   * FOUR LAYERS, NO SCRIPT. Two `local` gradients scroll with the content and sit ON TOP of two
-   * fixed shadows — so at the top of the list the first gradient covers the first shadow, and both
-   * uncover themselves as you scroll. It is Komarov's technique and it is the only pure-CSS way to
-   * make a shadow that knows whether there is anything past the edge; the alternative is a scroll
-   * listener that has to be right on resize, on zoom, and on every nav change.
+   * THE CLIPPED EDGE FADES, AND THE SCROLL DRIVES IT, NOT SCRIPT (design SYS-12). The scroller's own
+   * block timeline moves two fade lengths, the table region's technique in `lib/blocks.css`: the far
+   * edge fades until the end is reached, the near edge once the list has left the start. A rail that
+   * fits has no timeline, both lengths stay 0, and nothing fades. A row cut in half at the fold reads
+   * as a broken screen; a row fading into the ground reads as "more below".
    */
   .scroll {
     flex: 1;
@@ -955,13 +1074,66 @@
        arrow buttons down the middle of the navigation. */
     scrollbar-width: thin;
     scrollbar-color: transparent transparent;
-    /* The covers are the RAIL's ground, `--sunk`. They were `--bg`, a different colour, so the edges
-       of the scroller drew visible bands across the rows instead of hiding the shadows. */
-    background:
-      linear-gradient(var(--sunk) 30%, transparent) top / 100% 20px no-repeat local,
-      linear-gradient(transparent, var(--sunk) 70%) bottom / 100% 20px no-repeat local,
-      linear-gradient(color-mix(in srgb, var(--ink) 10%, transparent), transparent) top / 100% 8px no-repeat scroll,
-      linear-gradient(transparent, color-mix(in srgb, var(--ink) 10%, transparent)) bottom / 100% 8px no-repeat scroll;
+  }
+
+  @property --rail-fade-start {
+    syntax: '<length>';
+    inherits: false;
+    initial-value: 0px;
+  }
+
+  @property --rail-fade-end {
+    syntax: '<length>';
+    inherits: false;
+    initial-value: 0px;
+  }
+
+  @keyframes rail-edges {
+    0% {
+      --rail-fade-start: 0px;
+      --rail-fade-end: var(--sp-7);
+    }
+
+    4% {
+      --rail-fade-start: var(--sp-7);
+    }
+
+    96% {
+      --rail-fade-end: var(--sp-7);
+    }
+
+    100% {
+      --rail-fade-start: var(--sp-7);
+      --rail-fade-end: 0px;
+    }
+  }
+
+  /* THE MASK READS ONLY ALPHA, so any opaque token draws the kept part; `--ink` is one. */
+  @supports (animation-timeline: scroll()) {
+    .scroll {
+      mask-image: linear-gradient(
+        to bottom,
+        transparent,
+        var(--ink) var(--rail-fade-start),
+        var(--ink) calc(100% - var(--rail-fade-end)),
+        transparent
+      );
+      animation: rail-edges linear both;
+      animation-timeline: scroll(self block);
+    }
+  }
+
+  /* A BROWSER WITHOUT SCROLL TIMELINES KEEPS THE OLD SIGNAL: two `local` covers in the rail's ground
+     scroll with the content over two fixed shadows, so each shadow shows only while something is
+     past its edge (Komarov's technique). */
+  @supports not (animation-timeline: scroll()) {
+    .scroll {
+      background:
+        linear-gradient(var(--sunk) 30%, transparent) top / 100% 20px no-repeat local,
+        linear-gradient(transparent, var(--sunk) 70%) bottom / 100% 20px no-repeat local,
+        linear-gradient(color-mix(in srgb, var(--ink) 10%, transparent), transparent) top / 100% 8px no-repeat scroll,
+        linear-gradient(transparent, color-mix(in srgb, var(--ink) 10%, transparent)) bottom / 100% 8px no-repeat scroll;
+    }
   }
 
   /* The bar appears only while the pointer is over the list, which is when it is any use. */
@@ -1020,6 +1192,58 @@
     transform: rotate(-90deg);
   }
 
+  /**
+   * A HEADING THAT OPENS ITS OVERVIEW: the fold's mark, then the name as a link the rest of the row
+   * wide. The fold shrinks to its mark and `.tap` grows it to a whole target; the name it still
+   * carries is clipped rather than removed, so the button keeps its accessible name and the `prefs`
+   * gate's `railShut` probe still reads the section from it.
+   */
+  .section[data-opens] {
+    display: flex;
+    align-items: center;
+  }
+
+  .section[data-opens] .fold {
+    flex: none;
+    inline-size: auto;
+    padding-inline-end: 0;
+  }
+
+  .fold-name {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .section-link {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    min-inline-size: 0;
+    min-block-size: var(--ctl-h-sm);
+    padding-inline: var(--sp-2);
+    border-radius: var(--r-sm);
+    color: inherit;
+    text-decoration: none;
+    transition:
+      background var(--d-state) var(--ease-out),
+      color var(--d-state) var(--ease-out);
+  }
+
+  .section-link:hover {
+    background: var(--hover-wash);
+    color: var(--ink);
+  }
+
+  /* THE OVERVIEW IS "HERE" ON ITS HEADING the way any other page is on its row. */
+  .section-link[aria-current='page'] {
+    background: var(--selected);
+    color: var(--ink);
+  }
+
   .scroll .section:first-child {
     margin-block-start: var(--sp-2);
   }
@@ -1049,7 +1273,7 @@
   }
 
   .item:hover {
-    background: var(--s2);
+    background: var(--hover-wash);
     color: var(--ink);
   }
 
@@ -1057,18 +1281,19 @@
     color: var(--ink2);
   }
 
-  /* "HERE" IS A RAISED PILL IN INK, AND IT WAS THE MARK'S RED. A red word on a red wash was the
-     loudest thing in the rail on every screen, and the place you already are is the one row that
-     needs no shouting. A lifted surface says "you are here" the way a tab does. */
+  /* "HERE" IS THE SELECTED SURFACE WITH AN INK GLYPH, AND IT WAS THE MARK'S RED. The glyph of the
+     current row took the accent, the same red as an overdue dot in the table beside the rail, so
+     "you are here" and "this is late" were one colour on every screen (design SYS-1, D-1).
+     `--selected` is the one surface for what is on or current, mixed into the ground so it darkens
+     in light and lightens in dark, and it comes after `:hover` so the current row keeps it under
+     the pointer. */
   .item[aria-current='page'] {
-    background: var(--s2);
+    background: var(--selected);
     color: var(--ink);
   }
-  /* THE GLYPH OF THE PLACE YOU ARE IN TAKES THE ACCENT, AND NOTHING ELSE IN THE ROW DOES
-     (DESIGN-SYSTEM 1.3). The row stays a neutral lifted surface with an ink label; the one small
-     mark of the brand's colour is how "here" reads at a glance down a rail of grey glyphs. */
+
   .item[aria-current='page'] :global(.icon) {
-    color: var(--accent-text);
+    color: var(--ink);
   }
 
   /* Only the glyph takes it. The label stays `ink` so the row still reads as a row, and a rail of
@@ -1128,16 +1353,17 @@
     color: inherit;
   }
 
-  /* DRAWN AS A RAIL ROW, NOT A BOXED NOTICE. The glyph and the accent word already say something
-     is waiting; a wash and a border on top of them made it the loudest thing in the rail. */
+  /* DRAWN AS A RAIL ROW, NOT A BOXED NOTICE, and on a rail row's measures. The glyph and the action
+     word already say something is waiting; a wash and a border on top of them made it the loudest
+     thing in the rail. */
   .pen {
     display: flex;
     align-items: center;
-    gap: 10px;
-    min-block-size: 32px;
+    gap: var(--sp-2);
+    min-block-size: var(--rail-item-h);
     margin-block-start: var(--sp-5);
-    padding: var(--sp-1) var(--sp-3);
-    border-radius: var(--r-md);
+    padding: var(--sp-1) var(--sp-2);
+    border-radius: var(--r-sm);
     color: var(--ink2);
     font-size: var(--t-ui);
     font-weight: 500;
@@ -1158,8 +1384,10 @@
     flex: 1;
   }
 
+  /* THE ACTION WORD IS INK AT A TITLE'S WEIGHT. It was the accent, which belongs only to the mark,
+     the record tile, /start, /signin and `::selection` (design D-1). */
   .pen-action {
-    color: var(--accent-text);
+    color: var(--ink);
     font-weight: 600;
   }
 
@@ -1167,39 +1395,10 @@
     padding-block-start: var(--sp-2);
   }
 
-  /* FOUR UTILITIES ON ONE ROW, each an equal share of the width so the strip reads as one control
-     with four positions rather than four things that happen to be beside each other. */
-  .utils {
-    display: flex;
-    gap: var(--sp-1);
-  }
-
-  .util {
-    display: grid;
-    flex: 1;
-    place-items: center;
-    min-block-size: var(--ctl-h);
-    border-radius: var(--r-sm);
-    color: var(--dim);
-    text-decoration: none;
-    transition:
-      background var(--d-state) var(--ease-out),
-      color var(--d-state) var(--ease-out);
-  }
-
-  .util:hover {
-    background: var(--hover-wash);
-    color: var(--ink);
-  }
-
-  /* The same raised pill the rows wear, because it is the same fact: this is where you are. */
-  .util[aria-current='page'] {
-    background: var(--s2);
-    color: var(--ink);
-  }
-
-  .util[aria-current='page'] :global(.icon) {
-    color: var(--accent-text);
+  /* THE FOOT'S "MORE" HEADING SITS CLOSER THAN A SECTION IN THE SCROLLER DOES, because Search is
+     directly above it and the foot is pinned: every step of space here is a row the lists lose. */
+  .foot .section {
+    margin-block-start: var(--sp-2);
   }
 
   .who {
@@ -1263,8 +1462,7 @@
 
   .rail[data-icons] .item,
   .rail[data-icons] .pen,
-  .rail[data-icons] .record,
-  .rail[data-icons] .util {
+  .rail[data-icons] .record {
     /* `relative`, so the clipped name below anchors to its own row rather than escaping to the
        viewport, and so the count has a corner to sit in. */
     position: relative;
@@ -1296,8 +1494,8 @@
     position: absolute;
     inset-block-start: var(--sp-1);
     inset-inline-end: var(--sp-1);
-    inline-size: 6px;
-    block-size: 6px;
+    inline-size: var(--dot);
+    block-size: var(--dot);
     background: var(--tone, var(--dim));
     border-radius: var(--r-pill);
     overflow: hidden;
@@ -1323,10 +1521,6 @@
 
   .rail[data-icons] .record :global(.icon) {
     display: none;
-  }
-
-  .rail[data-icons] .utils {
-    flex-direction: column;
   }
 
   /**

@@ -54,7 +54,12 @@ test('THE ROUTE TABLE IS THE CONTRACT, pinned row by row', () => {
       'GET /auth/passkeys both',
       'POST /auth/passkey/remove both',
       'POST /auth/logout both',
+      'GET /auth/sessions both',
+      'POST /auth/logout/all both',
       'POST /auth/switch both',
+      'POST /auth/signup/start worker',
+      'POST /auth/signup/verify worker',
+      'GET /auth/signup/name worker',
       'POST /auth/claim/mint worker',
       'POST /auth/provision worker',
       'POST /auth/device both',
@@ -68,6 +73,7 @@ test('every flow has one route, named by the rule, and only reads are GETs', () 
   const flows: AuthFlow[] = [
     'methods', 'session', 'key.exchange', 'passkey.register.options', 'passkey.register', 'passkey.assert.options',
     'passkey.assert', 'magic.start', 'magic.redeem', 'passkeys', 'passkey.remove', 'logout', 'switch', 'claim.mint',
+    'sessions', 'logout.all',
   ];
   for (const flow of flows) {
     const rows = AUTH_ROUTES.filter((r) => r.flow === flow);
@@ -82,7 +88,9 @@ test('every flow has one route, named by the rule, and only reads are GETs', () 
     assert.equal(rows[0]?.needs, 'nothing', 'a device has no credential yet');
   }
   assert.equal(new Set(AUTH_ROUTES.map((r) => r.path)).size, AUTH_ROUTES.length, 'two routes share a path');
-  assert.deepEqual(AUTH_ROUTES.filter((r) => r.method === 'GET').map((r) => r.flow), ['methods', 'session', 'passkeys']);
+  assert.deepEqual(AUTH_ROUTES.filter((r) => r.method === 'GET').map((r) => r.flow), ['methods', 'session', 'passkeys', 'sessions', 'signup.name']);
+  /* AN INVITATION'S PROOF HAS NO ROUTE OF ITS OWN: routed alone, it would mail a proof to any address typed. */
+  for (const flow of ['invite.prove', 'invite.proved'] as const) assert.equal(AUTH_ROUTES.filter((r) => r.flow === flow).length, 0, `${flow} is routed`);
   for (const r of AUTH_ROUTES.filter((x) => x.needs === 'operator')) assert.equal(r.on, 'worker', `${r.path} is an operator route off the Worker`);
 });
 

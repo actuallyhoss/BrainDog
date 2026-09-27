@@ -1,16 +1,20 @@
 <!--
-  `/search?q=` — the structured fallback when the palette's ranked list was not enough.
+  `/search?q=`: the structured fallback when the palette's ranked list was not enough.
 
   `19 §2` NAMES THIS A SPINE SCREEN AND THE ROUTE DIRECTORY HAD NONE. The palette caps its record
   hits and, with a round-robin handing one per source per round, a small cap across nine sources is
-  often one row per list. Without somewhere to overflow to, that cap had to be silent — and it was:
+  often one row per list. Without somewhere to overflow to, that cap had to be silent, and it was:
   eight hits, no count, no "and N more", on the surface `19 §4` makes the primary way to reach a row.
 
   IT IS THE SAME QUERY, GROUPED RATHER THAN RANKED. The palette interleaves so the first screenful
   spans the record; this keeps each list whole with its own count, because a person who has come here
   has already decided the ranked answer was not the one they wanted.
 
-  THE ANSWER IS THE RECORD'S, through `search-live.ts`, and the sample's when there is no record here.
+  AND THE SAME RESULT (design SYS-13). A hit is the palette's `Result`: its glyph, its title and one
+  line saying where it sits. It was a title with a row number a column away from it, which is an id
+  where a person reads and a thousand pixels between two halves of one thing at 1440.
+
+  THE ANSWER IS THE RECORD'S, through `search-live.ts`, and a record that turns the search away says why.
 
   THE QUERY IS IN THE URL because it is what you are looking at (`19 §5`), which also makes a result
   page a thing you can send somebody. The field writes it back with `replaceState`, throttled, for
@@ -32,7 +36,13 @@
   import Icon from '$lib/ui/Icon.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Section from '$lib/ui/Section.svelte';
+  import Result from '$lib/palette/Result.svelte';
   import { closed, drew, opened } from '../../lib/ui/screen.svelte.ts';
+
+  /* THIS SCREEN'S OWN WORDS, beside it rather than in the copy aggregate, which this unit does not hold. */
+  const words = {
+    showAll: (n: number) => `Show all ${n.toLocaleString('en')}`,
+  } as const;
 
   const q = $derived(route.url.searchParams.get('q') ?? '');
 
@@ -73,15 +83,28 @@
   const shown = $derived(shownState(q, answer, answeredFor));
 
   /* TEN A LIST. Enough to recognise the one you meant, few enough that nine matching lists is a page
-     rather than a scroll — and every list carries the door to its own remainder. */
+     rather than a scroll, and every list carries the way to its own remainder. */
   const PER_LIST = 10;
+
+  /* THE GROUPS OPENED IN PLACE, by their heading. A list's remainder is its own screen, filtered by
+     what was typed; the decisions and the pages have no such screen, and every one of them that
+     matched is already in hand (`search-live.ts` matches both in full), so "Show all" draws the rest
+     here instead.
+
+     HELD WITH THE QUERY IT WAS OPENED FOR, because a group opened for one search is not a request to
+     draw every decision the next search finds: typing a new word folds every group back to ten. */
+  let whole = $state<{ q: string; kinds: ReadonlySet<string> }>({ q: '', kinds: new Set() });
+  const isWhole = (kind: string): boolean => whole.q === q && whole.kinds.has(kind);
+  function openGroup(kind: string) {
+    whole = { q, kinds: new Set([...(whole.q === q ? whole.kinds : []), kind]) };
+  }
 
   /* THROTTLED `replaceState`, which `19 §5` asks for by name: *"pushState for discrete intent so
      Back undoes a filter, throttled replaceState for typing"*. A history entry per keystroke makes
      Back a character-by-character rewind of something nobody thinks of as navigation.
 
      AND IT IS CANCELLED WHEN THE PAGE GOES. Typing here and clicking Home inside the 150 ms landed
-     on `/?q=…` — the home screen wearing a query it has no box for. A pending write to a URL
+     on `/?q=…`, the home screen wearing a query it has no box for. A pending write to a URL
      belongs to the page that scheduled it and to no other. */
   let pending: ReturnType<typeof setTimeout> | undefined;
   onDestroy(() => clearTimeout(pending));
@@ -146,7 +169,7 @@
          the record. -->
     <Empty kind="no-data-yet" glyph="search" title={copy.searchWaiting} body={copy.searchWhere} />
   {:else if shown === 'waiting'}
-    <!-- Bars until the first answer, so the sample never shows over a live record. -->
+    <!-- Bars until the first answer, holding the shape the results will take. -->
     <Waiting />
   {:else if shown === 'refused' && answer?.from === 'refused'}
     <Empty kind="error" title={answer.fix}>
@@ -161,43 +184,36 @@
     </Empty>
   {:else}
     {#each found.groups as group}
+      {@const all = isWhole(group.kind)}
       <Section title={group.kind} count={group.total}>
         <!--
-          A CAPPED GROUP SAYS SO WHETHER OR NOT IT HAS A DOOR.
+          EVERY CAPPED GROUP OFFERS THE REST, whether or not it has a screen of its own (design DSN-10).
 
           This was `group.href && group.total > PER_LIST`, and the questions group's `href` is `null`
-          by construction — `/decide` is not a filtered list. So with fourteen matching decisions the
-          page drew *Decide 14*, ten rows, and nothing: four rows dropped in silence, on the screen
-          built because the palette dropped rows in silence. Latent on the shipped seed and live from
-          the eleventh decision.
+          by construction, because `/decide` is not a filtered list. So with fourteen matching
+          decisions the page drew *Decide 14*, ten rows, and nothing: four rows dropped in silence, on
+          the screen built because the palette dropped rows in silence.
 
-          The door is still a link where there is one. Where there is not, the same fact is a
-          sentence — which is all the reader needed: not *where the rest is*, but *that there is a
-          rest*.
+          A list's rest is that list, filtered by what was typed, which also holds the rows past the
+          record's ceiling on a search. The decisions and the pages are all in hand, so theirs opens
+          here, and the count on the button is what it will draw.
         -->
         {#snippet aside()}
-          {#if group.total > PER_LIST}
-            {#if group.href}
-              <a class="all" href={at(group.href)}>{copy.allIn(group.total, group.kind)}<Icon name="arrow" size="s" /></a>
-            {:else}
-              <span class="all all-noway">{copy.showingOf(PER_LIST, group.total)}</span>
-            {/if}
+          {#if group.href && group.total > PER_LIST}
+            <Button weight="bare" href={group.href}>{words.showAll(group.total)}</Button>
+          {:else if !group.href && !all && group.hits.length > PER_LIST}
+            <Button weight="bare" onclick={() => openGroup(group.kind)}>{words.showAll(group.hits.length)}</Button>
           {/if}
         {/snippet}
-        <ul class="ledger">
-          {#each group.hits.slice(0, PER_LIST) as hit (hit.href)}
+        <ul class="hits">
+          {#each all ? group.hits : group.hits.slice(0, PER_LIST) as hit (hit.href)}
             <li>
-              <a class="line hit" href={at(hit.href)}>
-                <span class="line-main">
-                  <span class="line-title">{hit.title}</span>
-                </span>
-                {#if hit.spoken}<span class="hit-id">{hit.spoken}</span>{/if}
-                <!-- WHY IT IS HERE, and this page needed it more than the palette did. `nordhaven`
-                     draws four services named after none of it, because `services.provider` is
-                     declared searchable — and this column showed the state instead. The palette got
-                     the fix and the results page, which is where somebody goes when the palette's
-                     ranked list was not enough, did not. -->
-                <span class="line-when">{hit.why ?? hit.detail}</span>
+              <!-- THE PALETTE'S RESULT, AND WHY IT IS HERE AS ITS LINE. `nordhaven` draws four services
+                   named after none of it, because `services.provider` is declared searchable, and the
+                   reason is what makes that readable. A row the record sends with nothing beside its
+                   title says the list it is in, which is what a person calls it (design SYS-3). -->
+              <a class="hit" href={at(hit.href)}>
+                <Result icon={hit.icon} title={hit.title} line={hit.why ?? (hit.detail || hit.kind)} />
               </a>
             </li>
           {/each}
@@ -208,66 +224,56 @@
 </div>
 
 <style>
-  /* THE SAME PLACE AND NOT THE SAME AFFORDANCE. A count that is not a link must not be underlined,
-     coloured as one, or take the pointer — `13 §5.2`: a control is a control, and the corollary is
-     that a thing which is not one may not dress as one. */
-  .all-noway {
-    color: var(--dim);
-    text-decoration: none;
-    cursor: default;
+  /**
+   * ROWS ON THE PAGE WITH A HAIRLINE BETWEEN THEM AND NOTHING AROUND THEM (design brief §5).
+   *
+   * At desktop width the rows reach a step past the text column on both sides, so a title lines up
+   * with the heading above it and the hover wash has somewhere to be. On a phone they do not: that
+   * step put every divider 4px from the screen's edge while the field and the words sat on the 16px
+   * gutter, and a phone has no hover for the step to make room for.
+   */
+  .hits {
+    margin: 0 calc(-1 * var(--sp-3));
+    padding: 0;
+    list-style: none;
   }
 
-  /* A RESULT LEADS WITH WHAT IT IS CALLED. The group heading already names the kind, so the type
-     glyph and a fixed id column down the left only pushed every title a sixth of the way across. The
-     id follows as a quiet column, and why it matched closes the row. */
+  .hits > li + li {
+    border-block-start: 1px solid var(--line-soft);
+  }
+
+  /* A TABLE ROW WITH A FINE POINTER, 44px WITH A COARSE ONE, AND 56px ON A PHONE, where `Result`
+     draws the title over its line. What the row shows is `Result`'s; this is only the link around it. */
   .hit {
-    grid-template-columns: minmax(0, 1fr) auto minmax(8ch, auto);
+    display: flex;
+    align-items: center;
+    min-block-size: var(--table-row-h);
+    padding: var(--sp-1) var(--sp-3);
+    color: var(--ink);
+    text-decoration: none;
+    transition: background var(--d-state) var(--ease-out);
   }
 
-  /* A stored state is a word a person reads, so it starts as one: `Live`, beside `Open question`. */
-  .hit .line-when::first-letter {
-    text-transform: uppercase;
+  @media (hover: hover) and (pointer: fine) {
+    .hit:hover {
+      background: var(--hover-wash);
+    }
   }
 
-  .hit-id {
-    color: var(--dim);
-    font-size: var(--t-sm);
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-  }
-
-  /* A BLOCK, SO THE ELLIPSIS IS AT THE END. `rows.css` makes this cell a flex row packed to the end,
-     and a sentence longer than the column overflowed out of its START: a skill's trigger read
-     ". It adds the outline and kerning checks", with its first half cut off and no mark that it was. */
-  .hit :global(.line-when) {
-    display: block;
-    max-inline-size: 36ch;
-    overflow: hidden;
-    text-align: end;
-    text-overflow: ellipsis;
-  }
-
-  /* ON A PHONE, ONE LINE OF TITLE AND A SECOND OF FACTS, rather than the three-line spine card. */
-  @media (width < 640px) {
+  @media (pointer: coarse) {
     .hit {
-      grid-template-columns: auto minmax(0, 1fr);
-      gap: var(--sp-1) var(--sp-3);
+      min-block-size: var(--tap);
+    }
+  }
+
+  @media (width < 640px) {
+    .hits {
+      margin-inline: 0;
     }
 
-    .hit .line-main {
-      grid-column: 1 / -1;
-      grid-row: 1;
-    }
-
-    .hit-id {
-      grid-column: 1;
-      grid-row: 2;
-    }
-
-    .hit :global(.line-when) {
-      grid-column: 2;
-      grid-row: 2;
-      text-align: start;
+    .hit {
+      min-block-size: var(--row-h-2);
+      padding-inline: 0;
     }
   }
 
@@ -276,10 +282,10 @@
     flex-direction: column;
     gap: var(--sp-4);
     padding: var(--sp-5) var(--gutter) var(--sp-9);
-    max-inline-size: 1360px;
+    max-inline-size: var(--page-max);
   }
 
-  /* The register's own search field, which is where this shape comes from — one box, one icon
+  /* The register's own search field, which is where this shape comes from: one box, one icon
      inside the label, and the input taking the rest. */
   .field {
     display: flex;
@@ -302,12 +308,14 @@
     border: 0;
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-ui);
+    /* SIXTEEN PIXELS AT EVERY WIDTH, as every input in the product is (design brief §5), so a phone
+       does not zoom the page when the field is pressed. */
+    font-size: var(--t-md);
   }
 
   /* The ring is not deleted, it MOVES to the box that looks like the field: `.field:focus-within`
      below tints the border, so the state change is still visible and belongs to the right element.
-     `css-rules` caught this the moment the route existed, which is the gate doing its job — the
+     `css-rules` caught this the moment the route existed, which is the gate doing its job: the
      first version stripped the outline with no reason beside it. */
   .field-input:focus-visible {
     /* focus-ok: the caret indicates focus, and `.field:focus-within` carries the state change for
@@ -317,19 +325,4 @@
   }
 
   /* `.field:focus-within` is `controls.css`'s, shared with every field. */
-
-  /* The same shape a capped backlink list uses on a row page: a count and an arrow, at the end of
-     the heading it belongs to. */
-  .all {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--sp-1);
-    color: var(--dim);
-    font-size: var(--t-xs);
-    text-decoration: none;
-  }
-
-  .all:hover {
-    color: var(--ink);
-  }
 </style>

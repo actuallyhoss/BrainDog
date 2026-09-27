@@ -1,17 +1,41 @@
 <!--
   The header of every body surface: a title, a count, one primary action, and the filters.
 
-  The title is `page.title` else `register.name` — NEVER an id. `register`, `predicate` and
+  The title is `page.title` else `register.name`, NEVER an id. `register`, `predicate` and
   `projection` are internal vocabulary and where a draft leaked them into UI copy, that is a defect
-  (19 §9).
+  (19 §9). NOR DOES AN ID FOLLOW IT: the head took an `id` and printed it after every title, which
+  is how "SG5" came to sit after a question on Decide. A person reads a name here, and an id lives
+  in a row's Details and in "Copy link" (design SYS-3).
 
   The count says `n of N`, and when examples are in the figure it says so: a metric counts example
   rows and admits it, because the alternative is a money page reading "Due in 30 days · EGP 0"
   directly above a table containing one obligation due in 30 days (19 §6).
+
+  TWO SHAPES, ONE ON EACH SIDE OF 900px (design SYS-4, DSN-6).
+
+  From 900px up the head is one sticky bar: the kicker over a 20px title, the count, and the actions
+  at the right. It is opaque `--bg` at rest and turns translucent, with a hairline, only once
+  something has scrolled under it; a head drawn translucent over nothing was a lighter band across
+  the top of every screen.
+
+  Below 900px the head is a phone's. A `--sticky` (52px) bar stays at the top: the back link on a
+  detail page (a chevron and the parent's name), the title on one line once the large title has
+  scrolled away, and a 44px search button, which is where the floating search disc went (none on
+  `/search`, which is the search). Under it the large 24px title and the actions scroll away with
+  the page. The old head stayed pinned whole at this width, and a decision's two-line title and its
+  action row held 235px of an 844px screen with the content sliding under it.
+
+  A KICKER WITH `back` IS A LINK. A detail page's kicker named its parent ("Money", "Decide",
+  "Settings") as a `<p>`, and on a phone, with no rail, the only way back was the browser. With
+  `back` the kicker links there at 1440 and is the bar's back link on a phone.
 -->
 <script lang="ts">
   import Icon from './Icon.svelte';
   import Define from './Define.svelte';
+  import { at, here } from '../at.ts';
+  import { copy } from '../copy.ts';
+  import { palette } from '../palette/open.svelte.ts';
+  import { page } from '$app/state';
   import type { Noun } from '$lib/define.svelte.ts';
   import type { IconName } from './icons.ts';
   import type { Snippet } from 'svelte';
@@ -22,8 +46,8 @@
     total,
     atLeast,
     kicker,
+    back,
     actions,
-    id,
     icon,
     hue,
     define,
@@ -44,8 +68,14 @@
      * introduces. The `+` is the whole of the difference.
      */
     atLeast?: boolean | undefined;
+    /** The parent's name on a detail page, or the section a page sits in. */
     kicker?: string | undefined;
-    id?: string | undefined;
+    /**
+     * Where the kicker's parent is, as an app path (`'/decide'`, `` `/r/${list}` ``). Given, the
+     * kicker is a link there at 1440 and the back link in the phone's bar; left out, the kicker is
+     * words only and the phone's bar has no back link.
+     */
+    back?: string | undefined;
     /**
      * A load-bearing noun this heading is the first sight of, explained once and never again.
      *
@@ -72,21 +102,74 @@
     io.observe(mark);
     return () => io.disconnect();
   });
+
+  /**
+   * WHETHER THE LARGE TITLE HAS GONE UNDER THE PHONE'S BAR, which is when the bar says the title.
+   *
+   * The root is the screen less the bar's own height at its top, so the title counts as gone the
+   * moment its last line slides under the bar rather than once it has left the screen. Only a title
+   * that left UPWARDS counts: `rootBounds` is that shrunken screen, and a heading below it has not
+   * been scrolled past. From 900px up the bar is not drawn, its height is zero and nothing reads
+   * `past`.
+   */
+  let bar = $state<HTMLElement>();
+  let heading = $state<HTMLElement>();
+  let past = $state(false);
+
+  $effect(() => {
+    if (!bar || !heading) return;
+    const io = new IntersectionObserver(
+      (seen) => {
+        const last = seen.at(-1);
+        if (last) past = !last.isIntersecting && last.boundingClientRect.top < (last.rootBounds?.top ?? 0);
+      },
+      { rootMargin: `-${bar.offsetHeight}px 0px 0px 0px` },
+    );
+    io.observe(heading);
+    return () => io.disconnect();
+  });
+
+  /* THE SEARCH BUTTON IS NOT DRAWN ON `/search`, which is the search: two ways to one place side by
+     side read as two places. Compared inside the record, as the tab bar compares (`lib/at.ts`). */
+  const searching = $derived(here(page.url.pathname) === '/search');
 </script>
 
 <div bind:this={mark} aria-hidden="true"></div>
+<!--
+  THE PHONE'S BAR, hidden from 900px up. It is not inside `.head` because it has to stay when the
+  head scrolls away, and a sticky element sticks only inside its parent's box.
+
+  Its title repeats the `h1` for the eye once the `h1` has gone, so it is hidden from a screen
+  reader, which has already met the heading and would hear the title twice.
+-->
+<div class="head-bar" bind:this={bar} data-under={under ? '' : undefined} data-past={past ? '' : undefined}>
+  {#if kicker && back}
+    <a class="back tap" href={at(back)}>
+      <span class="back-mark"><Icon name="chevron" size="l" /></span><span class="back-name">{kicker}</span>
+    </a>
+  {/if}
+  <p class="bar-title" dir="auto" aria-hidden="true">{title}</p>
+  {#if !searching}
+    <button type="button" class="find tap" aria-label={copy.paletteLabel} onclick={() => (palette.open = true)}>
+      <Icon name="search" size="l" />
+    </button>
+  {/if}
+</div>
 <header class="head" data-under={under ? '' : undefined}>
   <div class="head-main">
     <div class="head-titles">
-      {#if kicker}<p class="kicker">{kicker}</p>{/if}
-      <!-- The `dir="auto"` is on a SPAN around the title, not on the `h1`, and the difference is
-           the whole rule: the title came from whoever typed it, the id chip beside it is ours. An
-           Arabic title in an English paragraph puts its own full stop on the wrong end and has to
-           be fixed — but `.title` is a flex row, so putting the attribute on the `h1` resolved the
-           FLEX direction too and swung our own id chip to the other side of the heading. Chrome
-           keeps the UI's direction; data follows its own. See the note in `blocks.css`. -->
+      {#if kicker && back}
+        <a class="kicker kicker-link tap" href={at(back)}>{kicker}</a>
+      {:else if kicker}
+        <p class="kicker">{kicker}</p>
+      {/if}
+      <!-- The `dir="auto"` is on a SPAN around the title, not on the `h1`: the title came from
+           whoever typed it, the glyph beside it is ours. An Arabic title in an English paragraph
+           puts its own full stop on the wrong end and has to be fixed, and the attribute on the
+           `h1` would resolve the direction of our own glyph too. Chrome keeps the UI's direction;
+           data follows its own. See the note in `blocks.css`. -->
       <div class="title-row">
-        <h1 class="title">
+        <h1 class="title" bind:this={heading}>
           <!-- ONLY WITH A HUE. A page about one thing wears that thing's coloured mark; a grey glyph
                before every other heading only repeated the rail and read as admin navigation. -->
           {#if icon && hue !== undefined}
@@ -95,7 +178,6 @@
             </span>
           {/if}
           <span dir="auto">{title}</span>
-          {#if id}<span class="title-id">{id}</span>{/if}
         </h1>
         <!--
           A COUNT OF NOTHING OVER AN EMPTY STATE IS THE SAME FACT TWICE, and the zero is the half that
@@ -160,6 +242,11 @@
     font-size: var(--t-sm);
   }
 
+  /* THE PHONE'S BAR IS A PHONE'S. The rule below 900px draws it. */
+  .head-bar {
+    display: none;
+  }
+
   .head {
     position: sticky;
     inset-block-start: 0;
@@ -173,18 +260,37 @@
     /* One gutter for the head and the content under it (DESIGN-SYSTEM 3.1), so a title and its
        list share a left edge. It was 24 here and 32 on every page. */
     padding: var(--sp-5) var(--gutter) var(--sp-3);
-    /* 92, NOT 82. At 82 the words scrolling under a phone's two-line head read through it between
-       the buttons ("system" under Edit the row), which is noise, not depth. The blur still softens
-       what passes under. */
-    background: color-mix(in srgb, var(--bg) 92%, transparent);
-    backdrop-filter: blur(12px);
+    /* OPAQUE AT REST (design SYS-5). Translucent over nothing, it was a lighter band across the top
+       of every screen; it turns translucent below, once something has scrolled under it. */
+    background: var(--bg);
     /* Transparent rather than absent, so the head does not grow a pixel when the rule appears. */
     border-block-end: 1px solid transparent;
-    transition: border-color var(--d-state) var(--ease-out);
+    transition:
+      border-color var(--d-state) var(--ease-out),
+      background var(--d-state) var(--ease-out);
   }
 
   .head[data-under] {
     border-block-end-color: var(--line);
+  }
+
+  /**
+   * TRANSLUCENT ONCE SOMETHING IS UNDER IT, from 900px up and only under a fine pointer.
+   *
+   * 92, NOT 82: at 82 the words scrolling under a two-line head read through it between the
+   * buttons, which is noise, not depth; the blur still softens what passes under.
+   *
+   * NOT UNDER A COARSE POINTER, because `backdrop-filter` makes the head the box a fixed descendant
+   * is placed against. A menu in the head's actions opens as an action sheet under a coarse pointer;
+   * `Menu.svelte` lifts it into the top layer, which no filter reaches, but in a browser without
+   * popovers it is a fixed panel, and inside a filtered head it would sit at the bottom of the head
+   * rather than of the screen. Below 900px the head is not sticky and nothing scrolls under it.
+   */
+  @media (width >= 900px) and (pointer: fine) {
+    .head[data-under] {
+      background: color-mix(in srgb, var(--bg) 92%, transparent);
+      backdrop-filter: blur(12px);
+    }
   }
 
   .head-main {
@@ -202,10 +308,27 @@
      house style of a report; the reference product has none, and the kicker reads as the words
      it is rather than as a label stamped on the page. */
   .kicker {
+    display: block;
+    inline-size: fit-content;
     margin-block-end: 2px;
     color: var(--dim);
     font-size: var(--t-sm);
     font-weight: 400;
+  }
+
+  /* A LINK IN THE KICKER'S OWN VOICE: quiet until it is pointed at, when it says it goes somewhere
+     with ink and the house underline (`--link`, design 6.2). Never the accent. */
+  .kicker-link {
+    text-decoration: none;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .kicker-link:hover {
+      color: var(--link);
+      text-decoration: underline;
+      text-decoration-color: color-mix(in srgb, var(--ink) 40%, transparent);
+      text-underline-offset: 3px;
+    }
   }
 
   .title-row {
@@ -216,12 +339,10 @@
     min-inline-size: 0;
   }
 
-  /* Geist at 20/600, the one title size on every screen (DESIGN-SYSTEM 2.2). It was Poppins at 24
-     everywhere except Home, which overrode it: two type systems in one product.
+  /* Geist at 20/600 from 900px up, and the phone's large title at 24/600 below it (design 6.2).
 
-     A BLOCK AND NOT A FLEX ROW, so a title that wraps is text that wraps. As a flex row the title's
-     span became a box as wide as the line, and a two-line title on a phone left its `#1` stranded at
-     the far edge of an empty column. Inline, the id follows the last word it belongs to. */
+     A BLOCK AND NOT A FLEX ROW, so a title that wraps is text that wraps, with its glyph inline
+     before the first word. */
   .title {
     display: block;
     min-inline-size: 0;
@@ -242,17 +363,6 @@
     vertical-align: -0.15em;
     color: oklch(var(--mark-l) var(--mark-c) var(--hue));
   }
-
-  .title-id {
-    margin-inline-start: var(--sp-2);
-    color: var(--dim);
-    font-size: var(--t-sm);
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-    font-weight: 400;
-    letter-spacing: 0;
-  }
-
 
   /* Beside the title on its baseline, and quieter than it. At 20px on the far right it read as a
      second, unlabelled figure. */
@@ -289,14 +399,121 @@
 
 
   @media (width < 900px) {
+    /**
+     * THE BAR: `--sticky` tall below the notch, and nothing sticky on a phone is taller.
+     *
+     * AND THE NOTCH IS PAID HERE, ONCE. `app.html` sets `viewport-fit=cover`, so the top of every
+     * screen is under the status bar; padding rather than an inset, so the bar's own ground fills
+     * the notch strip the way a native screen does, and it costs nothing where the inset is zero.
+     * The large title below it pays nothing, because it starts under the bar.
+     *
+     * OPAQUE: the page slides under it from the first pixel scrolled, and the one-line title in it
+     * has to read over whatever passes; and a filter here would be the box a menu's fixed action
+     * sheet is placed against in a browser without popovers (see the `.head` rule above).
+     */
+    .head-bar {
+      position: sticky;
+      inset-block-start: 0;
+      z-index: var(--z-sheet);
+      display: flex;
+      align-items: center;
+      gap: var(--sp-2);
+      block-size: calc(var(--sticky) + env(safe-area-inset-top));
+      /* A gutter less 12px at each end: the search button's 20px glyph sits 12px inside its 44px
+         box, so its far edge lands on the gutter line the title below ends on. */
+      padding: env(safe-area-inset-top) calc(var(--gutter) - var(--sp-3)) 0;
+      background: var(--bg);
+      border-block-end: 1px solid transparent;
+      transition: border-color var(--d-state) var(--ease-out);
+    }
+
+    .head-bar[data-under] {
+      border-block-end-color: var(--line);
+    }
+
+    /* The back link: a chevron and the parent's name, 44px tall, never more than two fifths of the
+       bar, so the title beside it keeps room to be read. */
+    .back {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--sp-1);
+      flex: 0 1 auto;
+      min-inline-size: 0;
+      max-inline-size: 40%;
+      min-block-size: var(--tap);
+      padding-inline-end: var(--sp-2);
+      color: var(--ink);
+      font-size: var(--t-md);
+      font-weight: 500;
+      text-decoration: none;
+    }
+
+    /* The shared chevron points on; a back link points the other way, in the reading direction. */
+    .back-mark {
+      display: inline-grid;
+      flex: none;
+      scale: -1 1;
+    }
+
+    .back-mark:dir(rtl) {
+      scale: none;
+    }
+
+    .back-name {
+      min-inline-size: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* The title on one line, and only once the large one has gone under the bar. */
+    .bar-title {
+      flex: 1 1 auto;
+      min-inline-size: 0;
+      margin: 0;
+      overflow: hidden;
+      font-size: var(--t-md);
+      font-weight: 600;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      opacity: 0;
+      transition: opacity var(--d-state) var(--ease-out);
+    }
+
+    .head-bar[data-past] .bar-title {
+      opacity: 1;
+    }
+
+    .find {
+      display: grid;
+      place-items: center;
+      flex: none;
+      margin-inline-start: auto;
+      inline-size: var(--tap);
+      block-size: var(--tap);
+      padding: 0;
+      background: none;
+      border: 0;
+      border-radius: var(--r-pill);
+      color: var(--ink);
+      cursor: pointer;
+    }
+
+    /* The large title and what goes with it scroll away with the page; only the bar stays. */
     .head {
-      /* The palette launcher is a fixed header button at this width, so the title clears it.
-         AND THE NOTCH. `app.html` sets `viewport-fit=cover`, so at scroll top the `h1` of every
-         screen in the product was behind the status bar. Padding rather than an inset, so the
-         head's own translucent blurred background fills the notch strip the way a native screen
-         does, and so it costs nothing on a device where the inset is zero. */
-      padding: calc(var(--sp-3) + env(safe-area-inset-top)) var(--gutter) var(--sp-2);
-      padding-inline-end: 56px;
+      position: static;
+      z-index: auto;
+      padding: var(--sp-2) var(--gutter) var(--sp-3);
+      border-block-end: 0;
+    }
+
+    .title {
+      font-size: var(--t-xl);
+    }
+
+    /* The bar carries the way back on a phone, so the kicker's link is not said twice. */
+    .kicker-link {
+      display: none;
     }
 
     .head-main {
@@ -307,23 +524,16 @@
     /**
      * THE TITLE TAKES ITS OWN WIDTH, AND WHAT FOLLOWS IT WRAPS ONLY IF IT HAS TO.
      *
-     * Below 900px this forced the title onto a line of its own whenever the head carried an action,
-     * on the argument that a control needs a row of its own at phone width. Measured at 390 in the
-     * production build, that stranded the register's count alone at the left of a second row with
-     * `New item` in the middle of it, while `Money`, `38` and the button together are about 230px
-     * of a 322px line. Home's date is the case the rule was for, and it still gets its second row:
-     * `flex-basis: auto` is the title's own width, so an action that does not fit beside it wraps,
-     * and `margin-inline-start: auto` below puts it at the end of the line it lands on.
-     *
-     * An earlier pass took the same rule off heads that carry only a count, for the same reason.
+     * `flex-basis: auto` is the title's own width, so an action that does not fit beside it wraps
+     * to a line of its own, and `margin-inline-start: auto` puts the actions at the end of whichever
+     * line they land on.
      */
     .head-titles {
       flex: 1 1 auto;
     }
 
-
     .head-actions {
-      flex-basis: 100%;
+      margin-inline-start: auto;
     }
 
     /* AND THE SHORTCUT HINT GOES, because below 900px there is no keyboard to press it with. It is

@@ -98,9 +98,10 @@ async function addPasskey(d: Directory, sid: string, key: TestKey, label?: strin
 }
 
 async function passkeyIn(d: Directory, key: TestKey, o: { person: string | null; signCount: number; sid?: string; ip?: string }) {
-  const options = ok(await d.auth({ flow: 'passkey.assert.options' })).body;
+  const ip = o.ip ?? nextIp();
+  const options = ok(await d.auth({ flow: 'passkey.assert.options', ip })).body;
   const signed = await authenticate(key, { rpId: RP_ID, origin: ORIGIN, challenge: options.challenge, signCount: o.signCount, person: o.person });
-  return d.auth({ flow: 'passkey.assert', credential: asJSON.assertion(signed), ip: o.ip ?? nextIp(), ...(o.sid === undefined ? {} : { sid: o.sid }) });
+  return d.auth({ flow: 'passkey.assert', credential: asJSON.assertion(signed), ip, ...(o.sid === undefined ? {} : { sid: o.sid }) });
 }
 
 /** Every cell of every `dir_` table, as text. */
@@ -212,8 +213,11 @@ test('A ROTATION RIDES ON WHATEVER ANSWER THE CALL ENDS WITH, or the browser kee
   const { clock, d } = setup();
   const sid = sidOf(await keyIn(d));
   clock.set(NOW + DAY + 1);
+  /* A day-old cookie has a day-old proof, so registering is refused as stale: a 401 that is not a sign-in failure,
+     which still has to carry the id the same call rotated. */
   const failed = await d.auth({ flow: 'passkey.register', sid, credential: { id: 'AAAA', response: { clientDataJSON: '', attestationObject: '' } } });
-  notYou(failed);
+  assert.equal(failed.status, 401);
+  assert.equal('reason' in failed && failed.reason, 'stale');
   const s = failed.session;
   assert.ok(s && s !== 'clear', 'a failed registration dropped the rotated id');
   ok(await d.auth({ flow: 'session', sid: s.sid }));
@@ -458,12 +462,13 @@ test('AN UNKNOWN ADDRESS GETS THE SAME ANSWER AND NO MAIL, so the form says noth
   }
   assert.equal(sql.all('SELECT 1 FROM dir_link').length, 1, 'an unknown address left a link row');
 
-  /* And the per-address lockout applies to an address nobody has, exactly as to one somebody has. The
-     window is let pass first, so the strikes above are forgotten and each address starts from none. */
+  /* And a mailbox that has been sent its ten answers exactly as an address nobody has: the same 200, no mail, never
+     a 429 only a known address could earn. The window is let pass first, so the mail above is forgotten. */
   clock.set(NOW + 15 * MINUTE);
+  for (let i = 0; i < 10; i++) assert.ok(ok(await d.auth({ flow: 'magic.start', email: 'ada@example.com', ip: nextIp() })).mail, `mail ${i + 1} was not sent`);
   for (const email of ['ada@example.com', 'nobody@example.com']) {
-    for (let i = 0; i < 10; i++) ok(await d.auth({ flow: 'magic.start', email, ip: nextIp() }));
-    assert.equal((await d.auth({ flow: 'magic.start', email, ip: nextIp() })).status, 429, email);
+    const full = await d.auth({ flow: 'magic.start', email, ip: nextIp() });
+    assert.deepEqual({ ...full }, { status: 200, body: {} }, email);
   }
   /* And the per-asker one, whatever address is asked about. */
   /* Ten starts per fifteen minutes (49 §8), and a sent link never clears the count: sending is not a sign-in. */
@@ -513,7 +518,7 @@ test('A CHALLENGE IS FOR ONE CEREMONY AND ONE PERSON', async () => {
   assert.equal(reasons(lines).at(-1), 'challenge');
 
   /* A sign-in challenge answered as a registration. */
-  const signing = ok(await d.auth({ flow: 'passkey.assert.options' })).body.challenge;
+  const signing = ok(await d.auth({ flow: 'passkey.assert.options', ip: nextIp() })).body.challenge;
   const wrongCeremony = await register(KEYS.es256, { rpId: RP_ID, origin: ORIGIN, challenge: signing });
   notYou(await d.auth({ flow: 'passkey.register', sid: adaSid, credential: asJSON.registration(wrongCeremony) }));
   assert.equal(reasons(lines).at(-1), 'challenge');
@@ -532,10 +537,10 @@ test('TEN THOUSAND LIVE CHALLENGES ARE THE CEILING, and expiry makes room again'
     for (let i = 0; i < 10_000; i++)
       sql.exec("INSERT INTO dir_challenge (hash, purpose, person, expires) VALUES (?, 'assert', NULL, ?)", `filler-${i}`, NOW + 5 * MINUTE);
   });
-  assert.deepEqual({ ...(await d.auth({ flow: 'passkey.assert.options' })) }, { status: 503 });
+  assert.deepEqual({ ...(await d.auth({ flow: 'passkey.assert.options', ip: nextIp() })) }, { status: 503 });
   assert.equal(reasons(lines).at(-1), 'full');
   clock.set(NOW + 5 * MINUTE);
-  ok(await d.auth({ flow: 'passkey.assert.options' }));
+  ok(await d.auth({ flow: 'passkey.assert.options', ip: nextIp() }));
   assert.equal(sql.one<{ n: number }>('SELECT COUNT(*) AS n FROM dir_challenge')?.n, 1, 'expired challenges were not pruned');
 });
 
@@ -558,7 +563,7 @@ test('THE OPTIONS ARE EXACTLY WHAT THE BROWSER IS HANDED', async () => {
       ],
       timeout: 300000,
       attestation: 'none',
-      authenticatorSelection: { residentKey: 'required', userVerification: 'preferred' },
+      authenticatorSelection: { residentKey: 'required', userVerification: 'required' },
       excludeCredentials: [],
     },
   );
@@ -566,9 +571,9 @@ test('THE OPTIONS ARE EXACTLY WHAT THE BROWSER IS HANDED', async () => {
   const again = ok(await d.auth({ flow: 'passkey.register.options', sid })).body;
   assert.deepEqual(again.excludeCredentials, [{ type: 'public-key', id: KEYS.es256.id }], 'the passkey already held is not excluded');
 
-  const signIn = ok(await d.auth({ flow: 'passkey.assert.options' })).body;
+  const signIn = ok(await d.auth({ flow: 'passkey.assert.options', ip: nextIp() })).body;
   assert.match(signIn.challenge, /^[A-Za-z0-9_-]{43}$/);
-  assert.deepEqual({ ...signIn, challenge: '' }, { challenge: '', rpId: RP_ID, timeout: 300000, userVerification: 'preferred', allowCredentials: [] });
+  assert.deepEqual({ ...signIn, challenge: '' }, { challenge: '', rpId: RP_ID, timeout: 300000, userVerification: 'required', allowCredentials: [] });
 });
 
 test('A PASSKEY, END TO END: registered behind a session, then signing in on its own, ES256 and RS256', async () => {
@@ -617,7 +622,7 @@ test('a passkey is refused when it is a duplicate, unknown, or made for somebody
 test('REGISTRATION NEEDS A LIVE SESSION, which is the attestation', async () => {
   const { d, lines } = setup();
   notYou(await d.auth({ flow: 'passkey.register.options', sid: 'A'.repeat(43) }), true);
-  const options = ok(await d.auth({ flow: 'passkey.assert.options' })).body;
+  const options = ok(await d.auth({ flow: 'passkey.assert.options', ip: nextIp() })).body;
   const made = await register(KEYS.es256, { rpId: RP_ID, origin: ORIGIN, challenge: options.challenge });
   notYou(await d.auth({ flow: 'passkey.register', sid: 'A'.repeat(43), credential: asJSON.registration(made) }), true);
   assert.deepEqual(reasons(lines), ['session', 'session']);
@@ -689,7 +694,7 @@ test('WITHOUT A KEY TO TAKE MACS UNDER, SIGN-IN SAYS SO AND DOES NOTHING', async
   const d = createDirectory(sql, fixedClock(NOW));
   value(d.person$('ada@example.com'));
   assert.deepEqual(ok(await d.auth({ flow: 'methods' })).body, { configured: false, passkey: false, magic: false, key: false, firstRun: false, me: null });
-  for (const r of [await keyIn(d), await d.auth({ flow: 'passkey.assert.options' }), await d.auth({ flow: 'magic.start', email: 'ada@example.com', ip: nextIp() })]) {
+  for (const r of [await keyIn(d), await d.auth({ flow: 'passkey.assert.options', ip: nextIp() }), await d.auth({ flow: 'magic.start', email: 'ada@example.com', ip: nextIp() })]) {
     assert.equal(r.status, 404);
     assert.equal('refusal' in r && r.refusal.code, 'ROUTE_UNKNOWN');
   }
@@ -704,7 +709,7 @@ test('each way in is off until the host turns it on, and methods says which are 
   );
   for (const r of [
     await keyIn(d),
-    await d.auth({ flow: 'passkey.assert.options' }),
+    await d.auth({ flow: 'passkey.assert.options', ip: nextIp() }),
     await d.auth({ flow: 'magic.start', email: 'ada@example.com', ip: nextIp() }),
   ])
     assert.equal(r.status, 404);

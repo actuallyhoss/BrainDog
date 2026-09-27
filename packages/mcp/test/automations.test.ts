@@ -221,7 +221,8 @@ test('WHAT THE DRY RUN SAYS OF A STEP THAT WAITS ON SOMEBODY ELSE IS WHAT A REAL
   /* THE RECORD'S SENTENCE IS A COPY OF A FACT IN `flow.ts`, so it is held to a run of the real runner here. It went red
      the day Brief C built `ask_person`, as it said it would: the run read `waiting` where `failed` was expected. So an
      ask of a person is said as the question Decide shows and the wait the runner arms, and the grammar no longer lists
-     it; a `call` still stops the run, and an ask of Slash, which no host answers yet, is refused at install. */
+     it; a `call` parks the run on its answer, and an ask of Slash, which this host does not answer, is refused at
+     install. */
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
   const asks = { rule: 'asks', on: { manual: true }, steps: [{ ask_person: { question: 'Go?', options: ['yes', 'no'], as: 'go' } }] };
@@ -249,8 +250,8 @@ test('A script STEP RUNS ON IN THIS BUILD, so the grammar no longer lists it wit
      `startScript`) and the record's dry run say so. This resource still listed `script` under `not_in_this_build` and
      said a run that reaches one "fails there", so an agent reading it would not file the step a pack ships (Work's
      `rule.close_follow_ups`). Measured red first: the run below reached `done` with one `script.run` queued, and the
-     grammar's list read ["call","script","ask_slash"]. A `call` stays listed: `flow.ts` still fails a run that
-     reaches one with NOT_IN_THIS_BUILD. */
+     grammar's list read ["call","script","ask_slash"]. A `call` left the list too once `flow.ts` parked a run on its
+     answer, and a question put to one member once `decide` held it to them, so on this host only `ask_slash` stays. */
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
   const tidy = { id: 'script.tidy', kind: 'script' as const, body: { script: 'tidy', runs: { rule: true }, egress: [], keys: [], reads: [], writes: [], source: 'export default async function run(ctx) {}' } as never };
@@ -265,9 +266,9 @@ test('A script STEP RUNS ON IN THIS BUILD, so the grammar no longer lists it wit
   const grammar = value<{ steps: Record<string, string>; not_in_this_build: { steps: string[] }; not_in_this_build_says: string }>(
     await tools(api).read('braindog:grammar/automations', owner),
   );
-  assert.deepEqual(grammar.not_in_this_build.steps, ['call', 'ask_slash']);
-  assert.doesNotMatch(grammar.not_in_this_build_says, /script/u, grammar.not_in_this_build_says);
-  assert.match(grammar.not_in_this_build_says, /A call step installs, and a run that reaches it fails there/u);
+  assert.deepEqual(grammar.not_in_this_build.steps, ['ask_slash']);
+  assert.doesNotMatch(grammar.not_in_this_build_says, /script|call/u, grammar.not_in_this_build_says);
+  assert.match(grammar.not_in_this_build_says, /An ask_slash step is refused at install/u);
   /* WHAT THE STEP DOES, IN THE DRY RUN'S TERMS: it goes on without waiting, `as:` holds the queued run's id and not the
      script's answer, and the three things that stop it are each on the script's own row. */
   assert.match(grammar.steps.script!, /goes on without waiting/u);
@@ -297,7 +298,7 @@ test('ON A HOST THAT ANSWERS SLASH, NEITHER THE DRY RUN NOR THE GRAMMAR SAYS ask
   const grammar = value<{ not_in_this_build: { triggers: string[]; steps: string[] }; not_in_this_build_says: string }>(
     await tools(api).read('braindog:grammar/automations', owner),
   );
-  assert.deepEqual(grammar.not_in_this_build, { triggers: ['metric', 'decided'], steps: ['call'] });
+  assert.deepEqual(grammar.not_in_this_build, { triggers: [], steps: [] });
   assert.doesNotMatch(grammar.not_in_this_build_says, /ask_slash/u, grammar.not_in_this_build_says);
   sql.close();
 });
@@ -488,7 +489,7 @@ test('braindog:grammar/automations IS LISTED FOR ANY CALLER WHO READS, and its n
     answers: VARS_CEILING,
     shortest_clock: `${FLOOR_MS / 60_000}m`,
   });
-  assert.deepEqual(grammar.not_in_this_build, { triggers: ['metric', 'decided'], steps: ['call', 'ask_slash'] });
+  assert.deepEqual(grammar.not_in_this_build, { triggers: [], steps: ['ask_slash'] });
 
   /* A STUB ANSWERS IT TOO, since it is this package's own text asked of `version`, which every surface has. */
   assert.ok((await tools(stub().surface).resources({ who: 'agent' })).some((r) => r.uri === 'braindog:grammar/automations'));
@@ -508,8 +509,9 @@ test('EVERY EXAMPLE IN THE GRAMMAR INSTALLS ON A REAL RECORD AND DRY-RUNS, so th
 });
 
 test('THE GRAMMAR\'S ask_person STEP INSTALLS AS WRITTEN, so an agent copying it is not refused', async () => {
-  /* IT CARRIED `"to":"<person>"`, which the lint refuses as not in this build, and no test installed it: the examples
-     above are whole rules and this is one step. Measured red first: NOT_IN_THIS_BUILD at steps[0].ask_person.to. */
+  /* IT CARRIED `"to":"<person>"` while the lint refused `to:` as not in this build, and no test installed it: the
+     examples above are whole rules and this is one step. Measured red first: NOT_IN_THIS_BUILD at
+     steps[0].ask_person.to. It carries `to` again now that a question can be put to one member, and still installs. */
   const { sql, api } = await record();
   const grammar = contents(await readOver(api, 'braindog:grammar/automations', agent)) as { steps: Record<string, string> };
   const written = grammar.steps.ask_person!;

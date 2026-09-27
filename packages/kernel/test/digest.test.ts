@@ -60,7 +60,7 @@ const RULE_URGENT: Declaration = {
     on: 'create',
     when: 'state is open',
     once_per: ['row'],
-    then: [{ notify: { say: 'Payment failed on {what}', urgent: true } }],
+    then: [{ notify: { say: 'Payment failed on {{what}}', urgent: true } }],
   } as never,
 };
 

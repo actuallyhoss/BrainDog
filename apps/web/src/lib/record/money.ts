@@ -18,6 +18,7 @@
  */
 
 import { isMoney, type MoneyValue } from './schema.ts';
+import { homeCurrency } from './api.ts';
 
 export type { MoneyValue };
 
@@ -47,7 +48,7 @@ export const currencyOf = (value: unknown): string | null => (isMoney(value) ? v
  * a list of two units, one of which is money; `GBP and no currency` is a list with a hole in it.
  *
  * SPELLED HERE AND NOT IMPORTED, because `metrics.ts` imports this module and a constant cannot
- * travel back up that edge without an import cycle. `forecast.ts` reads it from `metrics.ts`.
+ * travel back up that edge without an import cycle.
  *
  * AND THE WEB'S SECOND COPY IS ALREADY GONE, which this paragraph went on describing as future work
  * for two commits after it happened. `metrics.ts` deleted its own literal and re-exports this one, so
@@ -107,8 +108,8 @@ export function total(values: Iterable<unknown>): Total {
      AND THE BARE ROWS GO INTO THE SET, which they did not: this refused over them and then left them
      out of the sentence, so a column of one sterling row and one plain number printed "these rows
      are in GBP, and two currencies are never added" — one currency named, two claimed, and no word
-     for the rows somebody has to go and fix. `metrics.ts` and `forecast.ts` both mark theirs, and
-     the kernel writes `no unit` into the same sentence; this was the summing site that did not. */
+     for the rows somebody has to go and fix. `metrics.ts` marks its own, and the kernel writes
+     `no unit` into the same sentence; this was the summing site that did not. */
   const mixed = seen.size > 1 || (bare && seen.size > 0) ? [...seen, ...(bare ? [BARE] : [])].sort() : [];
   /* A MIXED TOTAL IS IN NO CURRENCY. Returning the first one seen would hand a caller that only
      checks `currency` a code to print beside a figure that is a sum of two — which is the exact
@@ -196,8 +197,8 @@ export function total(values: Iterable<unknown>): Total {
  * one unitless row to any of those and it refuses. So a null in the set is a precondition of the
  * sentence, `units.every(isCurrencyUnit)` is therefore always false where the record says it, and the
  * *currencies* half of this mirror has no counterpart in the record's money arm to be held against.
- * It is live here regardless: `api.ts` prints it over `runway`'s `mixed`, which is two codes and no
- * bare row. The test pins that half against the wording alone and says which cases those are.
+ * It is live here regardless: `blocks.ts` prints it over a total of a money column, which can be two
+ * codes and no bare row. The test pins that half against the wording alone and says which cases those are.
  */
 export const mixedFix = (mixed: readonly string[]): string => {
   const named = mixed.filter((u) => u !== BARE && u !== '');
@@ -242,47 +243,40 @@ export function merge(totals: readonly Total[]): Total {
 
 /* ── drawing an amount ──────────────────────────────────────────────────── */
 
+/** How English writes a currency in one of its two displays, or `undefined`; it throws on a code the runtime refuses. */
+const written = (currency: string, currencyDisplay: 'symbol' | 'narrowSymbol'): string | undefined =>
+  new Intl.NumberFormat('en', { style: 'currency', currency, currencyDisplay }).formatToParts(0).find((p) => p.type === 'currency')?.value;
+
 /**
- * The symbol a currency is written with, or `null` when the runtime knows none beyond its code.
+ * The symbol a currency is written with, or `null` when it has none of its own and is written by its code.
  *
  * A DRAWING DECISION. `money()` in `braindog-render` still writes `GBP 28,320.00`, code first, and
  * everything that reads figures back out of text reads that. What changes is only the glyphs a
  * screen sets: the record's home currency is written the way a person writes it, `£28,320.00`, and
  * any other currency keeps its code beside the symbol so two currencies never look alike.
+ *
+ * A CURRENCY ENGLISH WRITES BY ITS CODE HAS NO SYMBOL HERE, even where the runtime knows a narrow one. The narrow
+ * display alone gave `E£` for EGP, where English writes `EGP`, as it writes `CHF` and `KWD`, and the contract for
+ * money on a screen says a currency with no symbol keeps its code first (contracts §8.3, "how money is written"). A
+ * currency that does have one is drawn with its narrow form, `$` rather than `CA$`, because the code after every
+ * figure that is not in the home currency already says which dollar it is.
  */
 export function symbolOf(currency: string): string | null {
   try {
-    const part = new Intl.NumberFormat('en', { style: 'currency', currency, currencyDisplay: 'narrowSymbol' })
-      .formatToParts(0)
-      .find((p) => p.type === 'currency')?.value;
-    return part && part.toUpperCase() !== currency.toUpperCase() ? part : null;
+    if (written(currency, 'symbol')?.toUpperCase() === currency.toUpperCase()) return null;
+    const narrow = written(currency, 'narrowSymbol');
+    return narrow && narrow.toUpperCase() !== currency.toUpperCase() ? narrow : null;
   } catch {
     return null;
   }
 }
 
 /**
- * The currency most of a record's money is in, or `null` when it holds no money.
- *
- * Read from the values rather than set as a constant, because a constant pinned to sterling is the
- * bug `currencyFor` was written to remove. A tie goes to the code first in alphabetical order, so
- * the answer does not depend on the order rows were read in.
- */
-export function homeOf(values: Iterable<unknown>): string | null {
-  const counts = new Map<string, number>();
-  for (const value of values) {
-    const c = currencyOf(value);
-    if (c) counts.set(c, (counts.get(c) ?? 0) + 1);
-  }
-  let best: string | null = null;
-  for (const [c, n] of [...counts].sort(([a], [b]) => a.localeCompare(b)))
-    if (best === null || n > counts.get(best)!) best = c;
-  return best;
-}
-
-/**
  * An amount in parts: the whole and the fraction apart, so a figure can set its pence quieter, and
- * `iso` present only when the currency is not the home one or has no symbol.
+ * `iso` present only when the currency has a symbol and is not the home one.
+ *
+ * A CURRENCY WITH NO SYMBOL KEEPS ITS CODE IN FRONT, as part of `lead` (`EGP 58,185.54`), home or not: the code is
+ * the only mark it has, so it belongs to the figure, and a second code after it would say the currency twice.
  *
  * `text` is the output of `money()`. Anything that is not a figure `money()` wrote comes back `null`.
  */
@@ -295,22 +289,67 @@ export function drawn(text: string, home: string | null): Drawn | null {
   if (!m) return null;
   const [, currency, minus, whole, fraction] = m as unknown as [string, string, string, string, string | undefined];
   const symbol = symbolOf(currency);
-  const foreign = currency !== home || symbol === null;
   return {
-    lead: `${minus}${symbol ?? ''}`,
+    lead: symbol === null ? `${currency} ${minus}` : `${minus}${symbol}`,
     whole,
     fraction: fraction ?? '',
-    iso: foreign ? currency : null,
+    iso: symbol !== null && currency !== home ? currency : null,
   };
 }
 
-/** A sentence with every figure `money()` wrote in it redrawn the same way, as plain text. */
-export function symbolText(text: string, home: string | null): string {
+/**
+ * A sentence with every figure `money()` wrote in it redrawn the same way, as plain text.
+ *
+ * `headline` IS A FIGURE STANDING ON ITS OWN, a tile's, where a fraction of all zeros is dropped: "£33,850" and
+ * "EGP 58,185", because ".00" under a headline is width a phone does not have and says nothing a round figure does not
+ * (contracts §8.3). A fraction that is not all zeros is part of the figure and stays.
+ */
+export function symbolText(text: string, home: string | null, headline = false): string {
   return text.replace(/\b[A-Z]{3} −?[\d,]+(?:\.\d+)?/gu, (hit) => {
     const d = drawn(hit, home);
     if (!d) return hit;
-    if (d.lead.replace('−', '') === '') return hit;
+    const fraction = headline && /^\.0+$/u.test(d.fraction) ? '' : d.fraction;
     /* THE CODE STAYS WITH ITS AMOUNT, so a line of amounts in several currencies breaks between them and never inside one. */
-    return `${d.lead}${d.whole}${d.fraction}${d.iso ? ` ${d.iso}` : ''}`;
+    return `${d.lead}${d.whole}${fraction}${d.iso ? ` ${d.iso}` : ''}`;
   });
+}
+
+/* ── money in a sentence the record stored ─────────────────────────────── */
+
+/** An amount as a sentence may hold one: a code, a minus of either kind, the whole grouped or not, and any fraction. */
+const STORED = /\b([A-Z]{3}) ([−-]?)(\d{1,3}(?:,\d{3})+|\d+)(\.\d+)?/gu;
+
+/**
+ * The runtime's tender list, which is the list the record refuses a money value against (`currencies.ts` says why it is
+ * asked of `Intl` and never kept here).
+ */
+const TENDER: ReadonlySet<string> = new Set(Intl.supportedValuesOf('currency'));
+
+/** The digits of a whole, grouped in threes: `2400` and `2,400` are both `2,400`. */
+const grouped = (whole: string): string => whole.replace(/,/gu, '').replace(/\B(?=(?:\d{3})+$)/gu, ',');
+
+/**
+ * A sentence the record stored, with every amount in it drawn as a screen draws one: `£2,400.00` in the record's own
+ * currency, `$4,800.00 USD` in any other, `−£39.00` for money out, and `EGP 58,185.54` for a currency written by its code
+ * (contracts §8.3, "how money is written").
+ *
+ * AT THE READER, NOT IN THE ROUTE. Home's feed, History, Decide's titles and options and a notification all print words
+ * somebody else wrote, so the module that reads them (`news-live.ts`, `governance.ts`, the audit reader) hands them on
+ * through here, and no screen formats money of its own.
+ *
+ * A SENTENCE STORED BEFORE THE KERNEL GROUPED ITS FIGURES READS THE SAME. A rule filled `GBP 2400.00` and `GBP -39.00`
+ * until `moneyWords` became the kernel's `moneyText`, and a record keeps every sentence it wrote; so the digits are
+ * grouped again and a hyphen in front of them is read as the minus it was, and `symbolText` then draws the figure. Only
+ * a code the runtime lists as tender is touched: `ISO 4217` in a sentence is the name of a standard, not four thousand
+ * of anything.
+ *
+ * `home` IS `homeCurrency()` unless a caller holds another, as `Money`'s prop of the same name is. That default is why
+ * this module imports `api.ts`, which imports it back: neither reads the other at load, only inside a call, so the cycle
+ * leaves no binding unset when it is read.
+ */
+export function moneyInText(text: string, home: string | null = homeCurrency()): string {
+  const spoken = text.replace(STORED, (hit, currency: string, minus: string, whole: string, fraction: string | undefined) =>
+    TENDER.has(currency) ? `${currency} ${minus ? '−' : ''}${grouped(whole)}${fraction ?? ''}` : hit,
+  );
+  return symbolText(spoken, home);
 }

@@ -3,7 +3,7 @@
  *
  * Everything past this is scoped to the component that owns it. What is here is what an element
  * IS before anybody styles it — box sizing, the body face and rhythm, headings on the display
- * face, links in the accent, and the two rules that make figures and Arabic set correctly.
+ * face, links in ink, and the two rules that make figures and Arabic set correctly.
  *
  * Deliberately NOT here: `html, body { overflow: hidden }`. The record app is a single scroll
  * container by design and the marketing site is a document that scrolls; a shared base that picks
@@ -49,10 +49,15 @@
     margin: 0;
   }
 
+  /* A LINK IS INK WITH A QUIET UNDERLINE, AND IT WAS THE ACCENT. Red underlined words ("Open Money
+     for the rest", "Browse add-ons") sat beside red overdue dots and read as the same fact (design
+     SYS-1). The underline is what says "link", so it carries the affordance at 40% of the ink and
+     firms up under the pointer; the colour says nothing a sentence has not already said. */
   a {
-    color: var(--accent-text);
-    text-decoration-color: color-mix(in srgb, var(--accent-text) 40%, transparent);
-    text-underline-offset: 0.18em;
+    color: var(--link);
+    text-decoration-color: color-mix(in srgb, var(--link) 40%, transparent);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
   }
 
   a:hover {

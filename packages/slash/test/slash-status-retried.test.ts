@@ -66,7 +66,7 @@ const build = () => {
   const rows = () =>
     sql
       .all<{ model: string; tokens_in: number; tokens_out: number; status: string; code: string | null }>(
-        'SELECT model, tokens_in, tokens_out, status, code FROM call ORDER BY rowid',
+        'SELECT model, tokens_in, tokens_out, status, code FROM slash_call ORDER BY rowid',
       )
       .map((r) => ({ ...r }));
   return { sql, slash, rows };

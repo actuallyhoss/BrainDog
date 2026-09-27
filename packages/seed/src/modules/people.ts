@@ -5,7 +5,12 @@
  * figures and pages sit in one file. `index.ts` composes them and keeps every export it had.
  */
 
+import type { MeetsFields } from '@braindog/kernel';
+
 import { gbp, type Fields, type SeedPage, type SeedRegister } from './base.ts';
+
+/** People's one list, which also says it is the list `meet` writes. */
+type PeopleRegister = SeedRegister & { meets: MeetsFields };
 
 /* ── people ───────────────────────────────────────────────────────────────── */
 
@@ -18,7 +23,7 @@ export const PEOPLE: Fields[] = [
   { name: 'S. Marchetti', role: 'contractor', rate: gbp(62_000), email: 'sm@marchetti.example', note: 'Backend, two days a week', handles: ['git:smarchetti'], met: ['2026-08-27 · commit 8b1e4d0 in portage', '2026-09-02 · commit c47d19e in portage'] },
 ];
 
-export const PEOPLE_REGISTERS: Record<string, SeedRegister> = {
+export const PEOPLE_REGISTERS: Record<string, PeopleRegister> = {
   people: {
     id: 'people',
     name: 'People',
@@ -28,6 +33,13 @@ export const PEOPLE_REGISTERS: Record<string, SeedRegister> = {
     title: 'name',
     mobile: ['name', 'role', 'rate'],
     pack: 'people',
+    /* THE LIST `meet` WRITES, SAID BY THE LIST, since People 2.1.0. Before it the kernel found this list by its id,
+       `people`, and each part by a field of the same name (`LEGACY` in `packages/kernel/src/roles.ts`), which is the
+       kernel knowing a pack's list by name. Declared, the kernel reads the role off this key, checks every part at
+       install, and falls back on the name only for a record still on People 2.0.0 or earlier, until its next update.
+       `projects` is the one part that goes when the record holds no Projects: `packs/first-party.ts` drops it with the
+       `projects` field it names, so a student's People still installs and `meet` records a person and links nobody. */
+    meets: { name: 'name', email: 'email', handles: 'handles', projects: 'projects', met: 'met', merged_into: 'merged_into' },
     fields: [
       { id: 'name', type: 'text', required: true, search: true },
       /* Optional, because a person an agent meets in a commit has no role until somebody gives one.

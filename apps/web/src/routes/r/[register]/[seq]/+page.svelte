@@ -1,13 +1,18 @@
 <!--
   One row.
 
-  A label is VISIBLE, always. A placeholder is not a label — it disappears exactly when a user needs
-  it, and it fails contrast in most themes (06 §8). Every field below carries its own label whether
-  or not it has a value.
+  A label is VISIBLE, always. A placeholder is not a label: it disappears exactly when a user needs
+  it, and it fails contrast in most themes (06 §8). A set field is a fact with its label; an unset
+  one is a chip that says its label and opens its field.
 
-  `#125` is the number you can say out loud, and it is per-register, which is why renaming a register
-  is refused: `register.obligations → register.bills` renames a spoken id, and `#125` in a note would
-  stop resolving. Change the display name instead; it is free.
+  THE ROW'S NUMBER LIVES IN DETAILS AND NOWHERE ELSE (design SYS-3). It is per-list, which is why
+  renaming a list's id is refused and its display name is free, and it is what `y` copies; a person
+  reading the page reads the title, the figure and where the row stands, never an id after them.
+
+  TWO SHAPES (design DSN-14). Below 640px a fact is its label above its value; from 640px the label
+  sits in a column capped at 16ch. At every width the pencil that opens a field sits in one trailing
+  44px column, so every pencil on the page shares an edge. The hero figure is `--t-2xl` and
+  `--t-xl` below 900px, and never wraps.
 -->
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
@@ -15,7 +20,7 @@
   import { titleOf } from '$lib/title.ts';
   import { listLine } from '$lib/record/tags.ts';
   import { amountOf, currencyOf } from '$lib/record/money.ts';
-  import { relative, since, TONES } from 'braindog-render';
+  import { since, TONES } from 'braindog-render';
   import { Document } from 'braindog-render/svelte';
   import { page } from '$app/state';
   import { copy } from '$lib/copy.ts';
@@ -46,6 +51,8 @@
   import type { FieldDecl, Fields } from '$lib/record/schema.ts';
   import { closed, drew, opened } from '../../../../lib/ui/screen.svelte.ts';
   import { choicesOf, stateSaid } from './lead.ts';
+  import { addedSaid, daySaid, dueSaid, rowWords } from './said.ts';
+  import { actor, listName, nameWords } from '$lib/record/names.ts';
 
   const id = $derived(page.params.register ?? '');
   const seq = $derived(Number(page.params.seq));
@@ -86,15 +93,8 @@
      from the sample's walk everywhere else. That walk is gone with the sample (DIRECTION 26). */
   let linked = $state<Linked | null>(null);
   let links: LinkReader | null = null;
-  /* A ROW THAT POINTS HERE LEADS WITH WHAT IT IS, NOT ITS NUMBER (DESIGN-SYSTEM rule 7, appendix C7). The
-     relation arrives with `#` first; the column and every row's cell at that index move to the end. */
-  const idLast = <R extends { columns: { field: string }[]; rows: { cells: (string | null)[] }[] }>(rel: R): R => {
-    const at = rel.columns.findIndex((c) => c.field === 'seq');
-    if (at < 0) return rel;
-    const moved = <T,>(list: readonly T[]): T[] => [...list.slice(0, at), ...list.slice(at + 1), list[at]!];
-    return { ...rel, columns: moved(rel.columns), rows: rel.rows.map((r) => ({ ...r, cells: moved(r.cells) })) };
-  };
-
+  /* A ROW THAT POINTS HERE LEADS WITH WHAT IT IS AND CARRIES NO NUMBER: its columns are `columnsFor`'s, which draws
+     none by default (design SYS-3), and each row still opens by its own link. */
   const incoming = $derived(linked?.from === 'live' ? linked.groups : []);
 
   /* THE ROW AND ITS HISTORY, IN ONE BRACKET, so `data-screen` never appears between the two reads. An
@@ -232,7 +232,10 @@
     problem = null;
   }
 
-  /** The header's own control: the row's title is the field somebody means by "edit the row". */
+  /**
+   * The header's own control, "Edit": the row's title is the field somebody means by "edit the row". The title is not
+   * listed as a fact while it holds a value, so opening it lists it, with its box, until the edit ends (`listed`).
+   */
   function editTitle() {
     if (!live) return;
     const fields = readableFields(id);
@@ -382,7 +385,8 @@
 
   const stateValue = $derived(decl?.state ? String(row?.fields[decl.state] ?? '') : '');
   const tone = $derived(decl?.done?.includes(stateValue) ? ('good' as const) : undefined);
-
+  /* THE ROW IS IN ONE OF ITS LIST'S FINISHED STATES: "Paid", "Cleared", "Done". */
+  const done = $derived(tone === 'good');
 
   /* A `document` is an argument, not a figure, so it never sits in the field list beside a date and
      a currency — it gets the room prose needs (05 §7.1). */
@@ -397,30 +401,49 @@
    *
    * The page opened on a list of labelled fields, one per line, which is how a database shows a
    * record and not how anybody reads an invoice. A person opening one wants three things first: how
-   * much, where it stands, and when. So the first money field is the page's figure, the state is a
-   * word in its tone with its glyph, and the deadline sits beside it with how far off it is. The tone
-   * is the list's own (`toneOf`), so a row drawn late in the list is drawn late here.
+   * much, where it stands, and when. So the first money field is the page's figure, the tone is said
+   * in words beside its dot, the state is its word, the deadline sits after them as its date, and the
+   * row's age closes the line with its label. The tone is the list's own (`toneOf`), so a row drawn
+   * late in the list is drawn late here.
    *
-   * A FIELD SHOWN HERE IS NOT SHOWN TWICE. The list below keeps everything else, and keeps these too
-   * when they are empty, because "Not set" is a fact about the row that the lead has no room for.
+   * A FIELD SHOWN HERE IS NOT SHOWN TWICE. The facts below keep everything else, and an empty field
+   * is a chip under them rather than a row saying "Not set".
    */
+  const unsetValue = (v: unknown) => v === null || v === undefined || v === '' || (Array.isArray(v) && listLine(v) === null);
   const figureField = $derived(shortFields.find((f) => f.type === 'money'));
   const dueField = $derived(shortFields.find((f) => (f as { deadline?: boolean }).deadline === true));
   const figure = $derived(figureField && row ? amountOf(row.fields[figureField.id]) : null);
   const leadTone = $derived(row ? (toneOf(id, row, clock) ?? tone) : undefined);
   const due = $derived(dueField && row ? row.fields[dueField.id] : undefined);
-  const hasLead = $derived(figure !== null || stateValue !== '');
+  /* LATE OR CLOSE, IN WORDS, beside the dot `toneOf` coloured: "Overdue by 38 days", "Due in 3 days". A finished row
+     is never late, and a date far enough off to carry no tone is said as its date alone. */
+  const lateTone = $derived(!done && (leadTone === 'bad' || leadTone === 'warn') ? leadTone : undefined);
+  const late = $derived(lateTone && typeof due === 'string' ? dueSaid(due, clock) : null);
+  /* THE DAY A FINISHED ROW FINISHED, which the record writes into the list's `finished` field: "Paid 2 Sep". A list
+     that declares none says the state word alone, since any other date would be a guess at when it happened. */
+  const finishedDay = $derived(done && decl?.finished && row ? row.fields[decl.finished] : undefined);
+  const finishedOn = $derived(typeof finishedDay === 'string' && finishedDay !== '' ? daySaid(finishedDay, clock) : null);
   const leadIds = $derived(
-    new Set([figure !== null ? figureField?.id : undefined, due ? dueField?.id : undefined, stateValue ? decl?.state : undefined].filter((x): x is string => Boolean(x))),
+    new Set(
+      [figure !== null ? figureField?.id : undefined, due ? dueField?.id : undefined, stateValue ? decl?.state : undefined, finishedOn ? decl?.finished : undefined].filter(
+        (x): x is string => Boolean(x),
+      ),
+    ),
   );
-  const listed = $derived(shortFields.filter((f) => !leadIds.has(f.id)));
+  /* THE TITLE IS THE HEAD, SO IT IS NOT A FACT AS WELL. It is listed only while it is empty, when its chip is the way
+     to it, or while the head's Edit has it open, when its row holds the box. */
+  const titled = $derived(Boolean(decl && row && !unsetValue(row.fields[decl.title])));
+  const listed = $derived(shortFields.filter((f) => !leadIds.has(f.id) && (f.id !== decl?.title || !titled || editing === f.id)));
 
-  /* TWO OR MORE EMPTY FIELDS FOLD INTO ONE LINE (DESIGN-SYSTEM APPENDIX C10). A person with four unset
-     fields was a column of four "Not set" rows, each with a rule under it; the line names them, and on
-     a record you can write to each name opens its field. */
-  const unsetValue = (v: unknown) => v === null || v === undefined || v === '' || (Array.isArray(v) && listLine(v) === null);
+  /* EVERY EMPTY FIELD IS A CHIP, in one wrapping row under the facts (design SYS-10). A person with four unset fields
+     was a column of four "Not set" rows, then one line of names with a separator trailing the last; a chip names its
+     field, wraps whole, and on a row you can write to it opens that field. */
   const unsetFields = $derived(row ? listed.filter((f) => unsetValue(row.fields[f.id]) && editing !== f.id) : []);
-  const shownFields = $derived(unsetFields.length >= 2 ? listed.filter((f) => !unsetFields.includes(f)) : listed);
+  const shownFields = $derived(listed.filter((f) => !unsetFields.includes(f)));
+  /* A DOCUMENT WITH NO PROSE IS ONE OF THOSE CHIPS TOO, after the short fields, and its slot is drawn only while it
+     holds prose or its box is open. */
+  const writtenDocuments = $derived(row ? documents.filter((f) => !unsetValue(row.fields[f.id]) || editing === f.id) : []);
+  const unset = $derived([...unsetFields, ...documents.filter((f) => !writtenDocuments.includes(f))]);
 
   /* EVERY VALUE IN A ROW'S PROSE IS A HOLE UNTIL PAGES READ THEM. The sample's own values answered them off the
      row, and pressing one said what would have happened; neither has a record behind it (DIRECTION 26). */
@@ -433,10 +456,10 @@
   };
 
   /**
-   * `y` COPIES THE ID AND `⇧Y` THE LINK, which is what the grid does and what the button beside the
-   * number does.
+   * `y` COPIES THE ID AND `⇧Y` THE LINK, which is what the grid does; the button beside the number in
+   * Details copies the link.
    *
-   * The route had no key listener at all while its own header carried `<kbd>y</kbd>` — so the one
+   * The route had no key listener at all while its own header carried `<kbd>y</kbd>`, so the one
    * screen where somebody most wants a row's spoken id to paste into a message advertised the key
    * for it and ignored every press. `19 §4`'s whole argument for a registry is that the sheet
    * documents what is bound BY READING IT, so a printed key that does nothing is the drift the
@@ -482,7 +505,7 @@
 {:else if got?.from === 'refused'}
   <div class="page">
     <Empty kind="error" heading title={got.fix}>
-      {#snippet actions()}<Button href="/r/{id}">Back to {decl?.name ?? id}</Button>{/snippet}
+      {#snippet actions()}<Button href="/r/{id}">Back to {listName(id)}</Button>{/snippet}
     </Empty>
   </div>
 {:else if !decl || !row}
@@ -496,21 +519,18 @@
       heading
       title={decl ? copy.noSuchNumber(decl.one, seq) : copy.noSuch('list', id)}
     >
-      {#snippet actions()}<Button href="/r/{id}">Back to {decl?.name ?? id}</Button>{/snippet}
+      {#snippet actions()}<Button href="/r/{id}">Back to {listName(id)}</Button>{/snippet}
     </Empty>
   </div>
 {:else}
-  <PageHead
-    icon={iconFor(decl?.icon, 'rows')}
-    kicker={decl.name}
-    title={String(row.fields[decl.title] ?? '')}
-    id={`#${row.seq}`}
-  >
+  <!-- THE LIST'S NAME IS THE WAY BACK: a link above the title from 900px, and the chevron in the
+       phone's bar below it. No number follows the title (design SYS-3); it is in Details. -->
+  <PageHead icon={iconFor(decl?.icon, 'rows')} kicker={listName(id)} back={`/r/${id}`} title={String(row.fields[decl.title] ?? '')}>
     {#snippet actions()}
-      <!-- `Copy id` WAS THE FIRST ACTION IN THIS HEADER, AND IT LIVES BESIDE THE ID NOW. A row's page
-           led with a developer verb: the first control a person saw on an invoice was the one that
-           puts `obligations#1` on the clipboard, ahead of anything that does something to the
-           invoice. It is in Details, next to the id it copies, and it keeps its key. -->
+      <!-- `Copy id` WAS THE FIRST ACTION IN THIS HEADER, AND IT LIVES BESIDE THE NUMBER NOW. A row's
+           page led with a developer verb: the first control a person saw on an invoice was the one
+           that puts `obligations#1` on the clipboard, ahead of anything that does something to the
+           invoice. Details holds the number and its "Copy link", and `y` still copies the id. -->
       <Button weight="quiet" onclick={editTitle}>{copy.editRow}</Button>
       <!-- ARCHIVE IS THE LIST'S OWN VERB, on the row itself: a row that can be archived in one
            place and not the other is two products. `Put back` stands where `Archive` was for as
@@ -535,26 +555,35 @@
          field, and ended short of the header's right edge. -->
     <div class="split">
       <section class="fields">
-        {#if hasLead && row && decl}
-          <section class="lead" aria-label={decl.one}>
-            {#if figure !== null && figureField}
-              <p class="lead-figure num">
-                <Money minor={figure} currency={currencyOf(row.fields[figureField.id]) ?? ''} weight="strong" />
-              </p>
-            {/if}
-            <p class="lead-line">
-              {#if stateValue}
-                <span class="lead-state" data-intent={leadTone}>
-                  {#if leadTone}<span class="glyph" role="img" aria-label={TONES[leadTone].label}>{TONES[leadTone].glyph}</span>{/if}
-                  <span class="lead-word">{stateSaid(decl, stateValue)}</span>
-                </span>
-              {/if}
-              {#if due && dueField}
-                <span class="lead-due">{labelOf(dueField)} {display(id, dueField.id, due, clock, names)} <span class="rel">{relative(String(due), clock)}</span></span>
-              {/if}
+        <section class="lead" aria-label={decl.one}>
+          {#if figure !== null && figureField}
+            <p class="lead-figure num">
+              <Money minor={figure} currency={currencyOf(row.fields[figureField.id]) ?? ''} weight="strong" />
             </p>
-          </section>
-        {/if}
+          {/if}
+          <!-- THE TONE IN WORDS BESIDE ITS DOT, THEN THE STATE, THE DATE AND THE AGE, each a whole item that wraps whole.
+               A late row's dot sits beside how late it is, so a red dot is never beside "Open"; the state keeps its own
+               word after it, and carries the dot itself only when nothing is late. -->
+          <p class="lead-line">
+            {#if late && lateTone}
+              <span class="lead-state" data-intent={lateTone}>
+                <span class="glyph" role="img" aria-label={TONES[lateTone].label}>{TONES[lateTone].glyph}</span>
+                <span class="lead-late">{late}</span>
+              </span>
+            {/if}
+            {#if stateValue}
+              <span class="lead-state" data-intent={late ? undefined : leadTone}>
+                {#if !late && leadTone}<span class="glyph" role="img" aria-label={TONES[leadTone].label}>{TONES[leadTone].glyph}</span>{/if}
+                <span class="lead-word">{stateSaid(decl, stateValue)}</span>
+                {#if finishedOn}<span class="lead-day">{finishedOn}</span>{/if}
+              </span>
+            {/if}
+            {#if due && dueField}
+              <span class="lead-due">{labelOf(dueField)} {dueField.type === 'day' ? daySaid(String(due), clock) : display(id, dueField.id, due, clock, names)}</span>
+            {/if}
+            <span class="lead-age">{addedSaid(row.created, clock)}</span>
+          </p>
+        </section>
         <dl class="field-list">
           {#each shownFields as f}
             {@const value = row.fields[f.id]}
@@ -604,7 +633,7 @@
                     {:else if f.type === 'ref'}
                       <div class="field">
                         <input class="field-input num" type="text" inputmode="numeric" bind:value={draft} />
-                        {#if f.to}<span class="edit-unit">{REGISTERS[f.to]?.name ?? f.to}</span>{/if}
+                        {#if f.to}<span class="edit-unit">{listName(f.to)}</span>{/if}
                       </div>
                     {:else}
                       <div class="field"><input class="field-input" type="text" bind:value={draft} /></div>
@@ -630,17 +659,18 @@
                     />
                   {/if}
                 {:else}
-                  {#if unsetValue(value)}
-                    <span class="missing">{copy.editNotSet}</span>
-                  {:else if f.type === 'money'}
+                  <!-- ONLY A SET FIELD IS A FACT, so the value is always there: an empty one is a chip under the facts,
+                       except while its box is open, when it is drawn here and never reaches this branch. -->
+                  {#if f.type === 'money'}
                     <Money minor={amountOf(value) ?? 0} currency={currencyOf(value) ?? ''} weight="strong" />
                   {:else if f.id === decl.state}
                     <Chip label={stateSaid(decl, String(value))} {tone} />
                   {:else if identityOf(id, f.id, value, names)}
                     <IdentityMark identity={identityOf(id, f.id, value, names)!} size="md" />
                   {:else if f.type === 'day'}
-                    {display(id, f.id, value, clock, names)}
-                    <span class="rel">{relative(String(value), clock)}</span>
+                    <!-- A DAY AS A SENTENCE SAYS IT, "2 Sep" inside this year and "2 Sep 2025" outside it, and not
+                         followed by a second, relative reading of the same day. -->
+                    {daySaid(String(value), clock)}
                   {:else if id === 'session' && f.id === 'project' && spokenRow(value, names)}
                     <!-- A RUN'S PROJECT IS HELD AS A SPOKEN ID. It reads as the project, and opens it. -->
                     <a href={at(spokenRow(value, names)!.href)}>{spokenRow(value, names)!.label}</a>
@@ -649,34 +679,55 @@
                   {:else}
                     {display(id, f.id, value, clock, names)}
                   {/if}
-                  {#if live && editable(f)}
-                    <button type="button" class="edit-field tap" aria-label={copy.editValue(labelOf(f))} onclick={() => startEdit(f)}>
-                      <Icon name="edit" size="s" />
-                    </button>
-                  {/if}
                 {/if}
               </dd>
+              <!-- THE PENCIL IS ITS OWN CELL IN THE TRAILING COLUMN, so every pencil on the page shares one edge
+                   whatever the value beside it holds. A `dd`, because a `dl`'s groups hold nothing else. -->
+              {#if live && editable(f) && editing !== f.id}
+                <dd class="field-pencil">
+                  <button type="button" class="edit-field tap" aria-label={copy.editValue(labelOf(f))} onclick={() => startEdit(f)}>
+                    <Icon name="edit" size="s" />
+                  </button>
+                </dd>
+              {/if}
             </div>
           {/each}
         </dl>
-        {#if unsetFields.length >= 2}
-          <p class="unset">
-            <span class="unset-lead">{copy.editNotSet}</span>
-            <span class="unset-names">{#each unsetFields as f, i (f.id)}{#if live && editable(f)}<button type="button" class="unset-name tap" aria-label={copy.editValue(labelOf(f))} onclick={() => startEdit(f)}>{labelOf(f)}</button>{:else}<span class="unset-name">{labelOf(f)}</span>{/if}{#if i < unsetFields.length - 1}<span class="unset-sep" aria-hidden="true">·</span>{/if}{/each}</span>
-          </p>
+        <!-- WHAT THE ROW HAS NOT ANSWERED, one pill each in one wrapping row, and on a row you can write to each opens its
+             field. The list is named for a screen reader, since the pills alone do not say they are empty. -->
+        {#if unset.length > 0}
+          <ul class="unset" aria-label={copy.editNotSet}>
+            {#each unset as f (f.id)}
+              <li>
+                {#if live && editable(f)}
+                  <button type="button" class="unset-chip tap" aria-label="{rowWords.add} {labelOf(f).toLowerCase()}" onclick={() => startEdit(f)}>
+                    <Icon name="plus" size="s" /><span>{labelOf(f)}</span>
+                  </button>
+                {:else}
+                  <span class="unset-chip">{labelOf(f)}</span>
+                {/if}
+              </li>
+            {/each}
+          </ul>
         {/if}
         <!-- A FIELD THIS LIST DOES NOT HAVE YET, added to every row of it. -->
         <AddField register={id} {live} {owner} onadded={() => (got = got && { ...got })} />
 
         <!-- A `document` field is the dialect, drawn by the same interpreter a declared page uses.
              The read view IS the renderer, so what you are looking at is the artefact (22 §8). -->
-        <!-- A DOCUMENT THE ROW DOES NOT CARRY YET IS STILL A FIELD THE REGISTER DECLARES. The slot
-             was drawn only where there was already prose, so on a row with none this was the one
-             field on the screen with no way in: not empty, absent, and indistinguishable from a
-             register that declares no document at all. -->
-        {#each documents as f}
+        <!-- A DOCUMENT THE ROW DOES NOT CARRY YET IS STILL A FIELD THE LIST DECLARES, so it is a chip in the row
+             above, like every other unset field, and pressing it opens its box here. The pencil of one that holds
+             prose sits at its head, beside the label it changes, and not under the prose. -->
+        {#each writtenDocuments as f (f.id)}
           <article class="document-slot">
-            <h2 class="doc-label">{labelOf(f)}</h2>
+            <div class="doc-head">
+              <h2 class="doc-label">{labelOf(f)}</h2>
+              {#if live && editing !== f.id}
+                <button type="button" class="edit-field tap" aria-label={copy.editValue(labelOf(f))} onclick={() => startEdit(f)}>
+                  <Icon name="edit" size="s" />
+                </button>
+              {/if}
+            </div>
             {#if editing === f.id}
               <form
                 class="editor"
@@ -693,29 +744,20 @@
               </form>
               {#if problem}<p class="edit-why">{problem}</p>{/if}
             {:else}
-              {#if row.fields[f.id]}
-                <!-- `hole` IS WHAT MAKES A HOLE PRESSABLE. Without it the renderer draws a marked
-                     span rather than a `<button>` nobody wrote a handler for; with it, this screen
-                     owns what pressing one does. No `dayHref`: there is no calendar in this build,
-                     and a date that links to one is an anchor to the error page.
-                     A value the record cannot answer is not pressable: nobody can supply a declared
-                     figure from this screen, so it is marked and left alone. That is the rule the
-                     page screen states beside its own `opts`, and a hole in a row's prose is the
-                     same hole in the same dialect. -->
-                <Document src={String(row.fields[f.id])} opts={{ resolve, link, now: clock, href: at }} />
-              {:else}
-                <p class="missing">{copy.editNotSet}</p>
-              {/if}
-              {#if live}
-                <button type="button" class="edit-field tap" aria-label={copy.editValue(labelOf(f))} onclick={() => startEdit(f)}>
-                  <Icon name="edit" size="s" />
-                </button>
-              {/if}
+              <!-- `hole` IS WHAT MAKES A HOLE PRESSABLE. Without it the renderer draws a marked
+                   span rather than a `<button>` nobody wrote a handler for; with it, this screen
+                   owns what pressing one does. No `dayHref`: there is no calendar in this build,
+                   and a date that links to one is an anchor to the error page.
+                   A value the record cannot answer is not pressable: nobody can supply a declared
+                   figure from this screen, so it is marked and left alone. That is the rule the
+                   page screen states beside its own `opts`, and a hole in a row's prose is the
+                   same hole in the same dialect. -->
+              <Document src={String(row.fields[f.id])} opts={{ resolve, link, now: clock, href: at }} />
             {/if}
           </article>
         {/each}
 
-        {#each incoming.map(idLast) as rel}
+        {#each incoming as rel}
           {@const twice = incoming.filter((r) => r.name === rel.name).length > 1}
           <!-- One section per RELATION, not per register: two fields of one register can point at
                the same place and mean different things — an update's `track` is what it is about
@@ -751,15 +793,15 @@
              into an agent. The counter goes; the History underneath is the version, in words. -->
         <h2 class="side-title">Details</h2>
         <dl class="meta">
-          <dt>Number</dt>
-          <!-- THE NUMBER YOU SAY, AND THE BUTTON THAT COPIES THE WHOLE ID. `#12` is what the header
-               prints and what a person reads out; `obligations#12` is what lands on the clipboard,
-               because pasted into a message it has to name the list too. `y` still copies it, and
-               the `?` sheet lists the key rather than a chip beside the button. -->
+          <dt>{nameWords.number}</dt>
+          <!-- THE ROW'S NUMBER, AND THE BUTTON THAT COPIES ITS LINK. This is the one place the number is
+               printed (design SYS-3), bare and without the `#` that made it read as an id. The link is
+               what a person pastes into a message and what opens the row for whoever follows it; `y`
+               still copies the id and `⇧Y` the link, and the `?` sheet lists both keys. -->
           <dd class="id-line">
-            <span class="number">#{row.seq}</span>
-            <button type="button" class="copy-id tap" onclick={() => clipboard.putSpoken(id, row.seq)}>
-              <Icon name="copy" size="s" /><span>{copy.copyId}</span>
+            <span class="number num">{row.seq}</span>
+            <button type="button" class="copy-id tap" onclick={() => clipboard.putLink(id, row.seq)}>
+              <Icon name="copy" size="s" /><span>{copy.copyLink}</span>
             </button>
           </dd>
           <dt>Added</dt>
@@ -784,10 +826,12 @@
           <h2 class="side-title">History</h2>
           <ol class="history">
             {#each history as e}
-              {@const who = whoDid(e.by, me || null, people)}
+              <!-- WHO, BY `actor`, SO THE FACE IS DRAWN BY KIND: a rule wears the automations glyph and BrainDog its
+                   mark, never a monogram. The name is printed as `actor` says it, since "de Vries" is not a typo. -->
+              {@const who = actor(e.by, me || null, people)}
               <li>
-                <Face name={who.name} you={who.you} size="s" />
-                <span class="history-by">{who.name.charAt(0).toUpperCase() + who.name.slice(1)}</span>
+                <Face name={who.name} kind={who.kind} size="s" />
+                <span class="history-by">{who.name}</span>
                 <span class="history-note">{e.note}</span>
                 <span class="history-when">{since(e.at, clock)}</span>
               </li>
@@ -823,16 +867,23 @@
     cursor: pointer;
   }
 
-  .copy-id:hover {
-    background: var(--hover-wash);
+  /* A WASH ONLY UNDER A MOUSE: on a phone a tapped control would keep it after the finger lifted (design-brief §6). */
+  @media (hover: hover) and (pointer: fine) {
+    .copy-id:hover {
+      background: var(--hover-wash);
+    }
   }
 
-  /* THE CONTROL THAT OPENS A FIELD, beside the value it changes. `.tap` is the invisible 44 x 44
-     hit box: a 16px glyph in a padded span is a 16px target to a finger. */
+  /* THE CONTROL THAT OPENS A FIELD, as wide as the trailing column it sits in, so every pencil's glyph
+     lands on one vertical line. `.tap` is the invisible 44 x 44 hit box: a 16px glyph in a short
+     button is a 16px target to a finger. */
   .edit-field {
     display: inline-flex;
     align-items: center;
-    padding: 0 var(--sp-1);
+    justify-content: center;
+    inline-size: var(--tap);
+    block-size: var(--ctl-h-sm);
+    padding: 0;
     background: none;
     border: 0;
     border-radius: var(--r-sm);
@@ -840,9 +891,11 @@
     cursor: pointer;
   }
 
-  .edit-field:hover {
-    background: var(--hover-wash);
-    color: var(--ink2);
+  @media (hover: hover) and (pointer: fine) {
+    .edit-field:hover {
+      background: var(--hover-wash);
+      color: var(--ink2);
+    }
   }
 
   /* The box and its two buttons: in a line where there is room, wrapped where there is not. */
@@ -860,10 +913,11 @@
     padding-inline: var(--sp-3);
     background: var(--s1);
     border: 1px solid var(--line);
-    border-radius: var(--r-lg);
+    border-radius: var(--r-md);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-ui);
+    /* 16px IN EVERY BOX AT EVERY WIDTH (design-brief §5), because a phone zooms the page when a smaller one takes focus. */
+    font-size: var(--t-md);
   }
 
   .edit-area {
@@ -961,7 +1015,7 @@
     align-items: center;
     gap: var(--sp-1);
     margin-block-start: var(--sp-2);
-    color: var(--accent-text);
+    color: var(--link);
     font-size: var(--t-sm);
   }
 
@@ -987,11 +1041,18 @@
 
   /* A FACT AND NOT A FIELD. The class was field, which controls.css gives to a text-input wrapper, so
      every row of this list wore an input box: a surface, a border and a radius, eight boxes that read
-     as a form to fill in. The name is the fix; nothing here fights the input style. */
+     as a form to fill in. The name is the fix; nothing here fights the input style.
+
+     TWO SHAPES, AND THE PHONE'S IS WRITTEN FIRST (design DSN-14). Below 640px the label sits above its
+     value, because a 16ch label column left a value 170px to wrap in at 390 and broke paths and
+     dates mid-word (design SYS-10). The pencil's 44px column trails at every width, so no pencil moves with its value. */
   .fact {
     display: grid;
-    grid-template-columns: minmax(0, 16ch) minmax(0, 1fr);
-    gap: var(--sp-4);
+    grid-template-columns: minmax(0, 1fr) var(--tap);
+    grid-template-areas:
+      'label pencil'
+      'value pencil';
+    gap: var(--sp-1) var(--sp-2);
     align-items: baseline;
     padding: var(--sp-3) 0;
     border-block-end: 1px solid var(--line);
@@ -1001,24 +1062,27 @@
     border-block-end: 0;
   }
 
-  /* Sentence case, at body size, at the same weight as a column header. A field label is a WORD
-     YOU READ — "Direction", "Amount", "Due" — not a category stamp, and small letterspaced caps
-     make eight of them in a column read as a form to be filled rather than a row to be understood.
-     Same decision as the table header in blocks.css, held here so the two agree. */
+  /* Sentence case, at the size of a label above a fact. A field label is a WORD YOU READ
+     ("Direction", "Amount", "Due"), not a category stamp, and small letterspaced caps make eight of
+     them in a column read as a form to be filled rather than a row to be understood. */
   .field-label {
+    grid-area: label;
     color: var(--dim);
     font-size: var(--t-sm);
-    font-weight: 600;
+    font-weight: 500;
     letter-spacing: 0;
   }
 
   .field-value {
+    grid-area: value;
     display: flex;
+    flex-wrap: wrap;
     align-items: baseline;
     gap: var(--sp-2);
+    min-inline-size: 0;
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-ui);
+    font-size: var(--t-md);
     overflow-wrap: anywhere;
   }
 
@@ -1027,50 +1091,72 @@
     font-variant-numeric: tabular-nums;
   }
 
-  .rel,
-  .missing {
-    color: var(--dim);
-    font-size: var(--t-xs);
-  }
-
-  /* The same two tracks a fact has, so "Not set" sits in the label column. */
-  .unset {
-    display: grid;
-    grid-template-columns: minmax(0, 16ch) minmax(0, 1fr);
-    gap: var(--sp-4);
-    align-items: baseline;
+  .field-pencil {
+    grid-area: pencil;
+    align-self: center;
     margin: 0;
-    padding-block: var(--sp-3);
-    border-block-start: 1px solid var(--line);
-    color: var(--dim);
-    font-size: var(--t-sm);
   }
 
-  .unset-lead {
-    font-weight: 600;
+  /* FROM 640px THE LABEL HAS ITS OWN COLUMN, capped at 16ch so a long label wraps inside it rather
+     than pushing every value along, and the value reads at the body size the reader chose. */
+  @media (width >= 640px) {
+    .fact {
+      grid-template-columns: minmax(0, 16ch) minmax(0, 1fr) var(--tap);
+      grid-template-areas: 'label value pencil';
+      gap: var(--sp-4);
+    }
+
+    .field-value {
+      font-size: var(--t-ui);
+    }
   }
 
-  .unset-names {
+  /* THE FIELDS THE ROW HAS NOT ANSWERED, as pills that wrap whole, with no separator to trail the
+     last one onto a line of its own. */
+  .unset {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--sp-1) var(--sp-2);
+    gap: var(--sp-2);
+    margin: 0;
+    padding: var(--sp-3) 0 0;
+    border-block-start: 1px solid var(--line);
+    list-style: none;
   }
 
-  .unset-name {
-    padding: 0;
+  .unset-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+    min-block-size: var(--ctl-h-sm);
+    padding: 0 var(--sp-3);
     background: none;
-    border: 0;
-    color: var(--ink2);
+    border: 1px dashed var(--edge);
+    border-radius: var(--r-pill);
+    color: var(--dim);
     font: inherit;
+    font-size: var(--t-sm);
+    text-align: start;
+    /* A PILL WRAPS WHOLE onto the next line, and only a label longer than the row wraps inside it. */
+    max-inline-size: 100%;
   }
 
-  button.unset-name {
+  button.unset-chip {
+    color: var(--ink2);
     cursor: pointer;
   }
 
-  button.unset-name:hover {
-    color: var(--ink);
-    text-decoration: underline;
+  /* A FINGER NEEDS ROOM BETWEEN TWO PILLS as well as the 44px `.tap` gives each (design-brief §3). */
+  @media (pointer: coarse) {
+    .unset {
+      gap: var(--sp-3);
+    }
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    button.unset-chip:hover {
+      background: var(--hover-wash);
+      color: var(--ink);
+    }
   }
 
   .document-slot {
@@ -1078,17 +1164,33 @@
   }
 
   /* Prose gets a reading measure; a table, a grid and a ledger get the room. Width is a property of
-     the block KIND, not of the page — the third time that family of bug was paid for (13 §4.1). */
+     the block KIND, not of the page: the third time that family of bug was paid for (13 §4.1).
+
+     AND A NOTE'S OWN HEADINGS SIT UNDER THE PAGE'S, never over them: a note's first heading was set at
+     `--t-xl` under a head titled at `--t-lg`, so the row's prose outranked the row (design-brief §5). */
   .document-slot :global(.document > h1) {
     margin-block: var(--sp-5) var(--sp-2);
-    font-size: var(--t-xl);
-    letter-spacing: -0.026em;
+    font-size: var(--t-md);
+    letter-spacing: 0;
   }
 
   .document-slot :global(.document > h2) {
-    margin-block: var(--sp-6) var(--sp-3);
-    font-size: var(--t-md);
-    letter-spacing: -0.012em;
+    margin-block: var(--sp-5) var(--sp-2);
+    font-size: var(--t-base);
+    letter-spacing: 0;
+  }
+
+  /* The note's label and its pencil on one line, the pencil at the edge every fact's pencil shares. */
+  .doc-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-2);
+    margin-block-end: var(--sp-3);
+  }
+
+  .doc-head .doc-label {
+    margin-block-end: 0;
   }
 
   .document-slot :global(.document > h1:first-child) {
@@ -1149,10 +1251,10 @@
     padding-inline: var(--sp-3);
     background: var(--s1);
     border: 1px solid var(--line);
-    border-radius: var(--r-lg);
+    border-radius: var(--r-md);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-ui);
+    font-size: var(--t-md);
   }
 
   .note-input:hover {
@@ -1221,36 +1323,56 @@
     }
   }
 
-  /* The row's figure, its state and its date, above the fields. See `figureField` for why. */
+  /* The row's figure, its state and its date, above the fields. See `figureField` for why. The lead
+     is a container so the figure can answer the room it has, not the width of the window. */
   .lead {
     display: grid;
     gap: var(--sp-2);
     margin-block-end: var(--sp-6);
+    container-type: inline-size;
   }
 
+  /* THE HERO IS `--t-xl` ON A PHONE AND `--t-2xl` FROM 900px (design DSN-14), and it never wraps: a
+     figure broken between its symbol and its digits is two figures. `--t-3xl` is the entry
+     screens' title and nothing else's. */
   .lead-figure {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-3xl);
+    font-size: var(--t-xl);
     font-weight: 600;
     letter-spacing: var(--tr-tight);
-    line-height: var(--lh-3xl);
+    line-height: var(--lh-tight);
+    white-space: nowrap;
   }
 
-  /* The code in front of the figure at half its size, the way every headline figure sets it — `em`
-     rather than a fixed step, so it stays half of `.lead-figure` (`--t-3xl`) specifically and not
-     a size that happens to look right today. Matches `.cell-figure`/`.cards-figure .amount-code`
-     in blocks.css. */
+  @media (width >= 900px) {
+    .lead-figure {
+      font-size: var(--t-2xl);
+    }
+  }
+
+  /* A FIGURE THAT DOES NOT FIT SHRINKS ONE STEP BEFORE ANYTHING ELSE (design-brief §6), which on the
+     narrowest phone is what keeps a long foreign amount from pushing the page sideways. */
+  @container (inline-size < 20rem) {
+    .lead-figure {
+      font-size: var(--t-lg);
+    }
+  }
+
+  /* The code in front of the figure at half its size, the way every headline figure sets it: `em`
+     rather than a fixed step, so it stays half of `.lead-figure` at whichever step it is drawn.
+     Matches `.cell-figure`/`.cards-figure .amount-code` in blocks.css. */
   .lead-figure :global(.code) {
     font-size: 0.5em;
     font-weight: 600;
   }
 
+  /* EACH ITEM WRAPS WHOLE, with a gap and no separator, so no line below the first opens on a dot. */
   .lead-line {
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
-    gap: var(--sp-2) var(--sp-4);
+    gap: var(--sp-1) var(--sp-3);
     margin: 0;
     color: var(--ink2);
   }
@@ -1274,9 +1396,18 @@
     text-transform: uppercase;
   }
 
-  .lead-due .rel {
-    margin-inline-start: var(--sp-1);
+  /* HOW LATE, THE DAY A FINISHED ROW FINISHED AND THE DEADLINE never break inside themselves, so
+     "Overdue by 38 days" is never "Overdue by" over "38 days". */
+  .lead-late,
+  .lead-day,
+  .lead-due {
+    white-space: nowrap;
+  }
+
+  /* The age closes the line, a step quieter than the facts before it. */
+  .lead-age {
     color: var(--dim);
+    font-size: var(--t-sm);
   }
 
   /* A declared value in sentence case, in the stylesheet, so the text stays the record's own word. */

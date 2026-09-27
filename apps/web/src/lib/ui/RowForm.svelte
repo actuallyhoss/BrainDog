@@ -11,18 +11,18 @@
   values and a select beyond, because four buttons is a glance and nine is a wall. `ref` is a select
   over the target register's rows, titled by the target's own `title` field, because a person picks
   "Halden Type Co" and never `people#1`. `money` puts the currency outside the input, since the
-  currency is a property of the record and not something you type. `secret` is refused outright: a
+  currency is one somebody chose and not something you type. `secret` is refused outright: a
   credential never goes in a row, and the vault is a different surface with different rules.
 
-  Nothing here writes. It is a mock-up, and the submit reports that in the toast rather than
-  pretending — a form that looks live and silently discards what you typed is worse than one that
-  says so.
+  Nothing here writes. What was typed goes out through `taken`, in the shapes the record stores, to
+  the screen that owns the submit.
 -->
 <script lang="ts">
   import { currencyFor, labelOf, readableFields } from '../record/api.ts';
   import { REGISTERS, refOptions } from '../record/held.ts';
   import type { FieldDecl, Fields } from '../record/schema.ts';
   import { exponentOf } from 'braindog-render';
+  import { amountWrong, currencyTypedIn, moneyTyped } from './money-typed.ts';
   import { copy } from '../copy.ts';
   import { valueSaid } from '../voice.ts';
   import { firstAsks } from '../first-run.ts';
@@ -167,18 +167,11 @@
   const pick = (f: FieldDecl): string => typed[f.id] ?? firstOf(f);
 
   /**
-   * WHAT A PERSON HAS TYPED INTO A MONEY FIELD, and whether the record would take it.
+   * WHAT A PERSON TYPES INTO A MONEY FIELD IS HELD AS TEXT AND CHECKED AS THEY TYPE IT. The input
+   * once took anything: `1234.56abc-12` was accepted and displayed as typed, and so was `4800.499`, a
+   * fraction of a penny, which is the exact bug minor units exist to stop. `money-typed.ts` says what
+   * the record would refuse, and in which currency the amount goes.
    *
-   * THIS IS THE ONE PLACE MONEY IS TYPED INTO THIS PRODUCT, and the input took anything:
-   * `1234.56abc-12` was accepted and displayed as typed, and so was `4800.499` — a fraction of a
-   * penny, which is the exact bug minor units exist to stop. `coerce.ts` refuses both, correctly and
-   * later; a person who finds out at submit has typed a whole row first.
-   *
-   * THE EXPONENT IS THE CURRENCY'S. Two decimals is most currencies and not all of them: `JPY 1250`
-   * is 1,250 yen and `KWD 1.250` is one and a quarter dinars, and a field that assumed two would
-   * refuse the second and silently mangle the first.
-   */
-  /**
    * AND EVERY OTHER FIELD IS HELD TOO, which it was not.
    *
    * ONLY `money` WAS BOUND. Every text box, date, number and document on this form was uncontrolled
@@ -214,6 +207,13 @@
   let ticked = $state<Record<string, boolean>>({});
 
   /**
+   * THE CURRENCY THIS LIST'S ROWS ARE IN, one of the currencies a new amount can go in. The field's
+   * declared currency comes before it and the record's own after it (`money-typed.ts`); it was the
+   * only one read, and `'GBP'` stood in for the rest.
+   */
+  const listed = (f: FieldDecl): string | null => currencyFor(register, f.id);
+
+  /**
    * The typed values, in the shapes the record stores, handed back to whoever owns the submit.
    *
    * A `money` IS AN AMOUNT AND A CURRENCY and the box holds only the amount, so it is put back
@@ -233,8 +233,10 @@
       const raw = (typed[f.id] ?? '').trim();
       if (raw === '') continue;
       if (f.type === 'money') {
-        const exp = exponentOf(currencyFor(register, f.id) ?? 'GBP');
-        out[f.id] = { amount: Math.round(Number(raw) * 10 ** exp), currency: currencyFor(register, f.id) ?? 'GBP' };
+        /* NOTHING IS WRITTEN FOR AN AMOUNT THE RECORD WOULD REFUSE, a missing currency among them: the
+           sentence under the box says why, and the button is disabled while it is there. */
+        const money = moneyTyped(f, raw, listed(f));
+        if (money !== null) out[f.id] = money;
         continue;
       }
       out[f.id] = f.type === 'int' || f.type === 'decimal' ? Number(raw) : raw;
@@ -242,14 +244,7 @@
     taken = out;
   });
 
-  const wrong = (f: FieldDecl): string | null => {
-    const raw = (typed[f.id] ?? '').trim();
-    if (raw === '') return null;
-    const exp = exponentOf(currencyFor(register, f.id) ?? 'GBP');
-    if (!/^-?\d+(\.\d+)?$/.test(raw)) return copy.moneyShape;
-    const places = raw.includes('.') ? raw.length - raw.indexOf('.') - 1 : 0;
-    return places > exp ? copy.moneyPlaces(exp) : null;
-  };
+  const wrong = (f: FieldDecl): string | null => amountWrong(f, typed[f.id] ?? '', listed(f));
 
   /**
    * WHAT THE REGISTER ITSELF SAYS CANNOT BE LEFT OUT, and is.
@@ -388,18 +383,21 @@
           {#each options(f) as o}<option value={String(o.value)}>{o.label}</option>{/each}
         </select>
       {:else if f.type === 'money'}
+        <!-- The currency is printed rather than typed, and it is THE ONE THE AMOUNT WILL BE WRITTEN
+             IN: the field's declared currency, else its rows', else the record's own. A free-text
+             currency box is how two of them end up added together; a constant is how one of them
+             ends up wearing the other's code. With none known no code is drawn, and an amount
+             typed here is not written: the sentence under the box says so. The placeholder shows
+             that currency's own places, so a yen box does not invite the decimals it refuses. -->
+        {@const unit = currencyTypedIn(f, listed(f))}
         <div class="field money">
-          <!-- The currency is printed rather than typed, and it is READ FROM THE FIELD'S OWN ROWS
-               rather than from a constant. A free-text currency box is how two of them end up added
-               together; a constant is how one of them ends up wearing the other's code. A field
-               whose rows disagree shows no code at all, which is the honest state of that field. -->
-          {#if currencyFor(register, f.id)}<span class="money-unit">{currencyFor(register, f.id)}</span>{/if}
+          {#if unit}<span class="money-unit">{unit}</span>{/if}
           <input
             class="field-input num"
             id={id(f)}
             type="text"
             inputmode="decimal"
-            placeholder="0.00"
+            placeholder={unit ? (0).toFixed(exponentOf(unit)) : '0'}
             required={f.required}
             bind:value={typed[f.id]}
             aria-invalid={wrong(f) ? 'true' : undefined}

@@ -28,6 +28,7 @@ import { no, ok } from '@braindog/ports';
 
 import { existingRow, routeTo, type Confidence, type IngestDeps } from './ingest.ts';
 import { instant } from './migrate.ts';
+import { keepCursor } from './pull.ts';
 import { attempt } from './tx.ts';
 
 /** One extracted row, as `43 §4.1` hands it over. */
@@ -137,7 +138,7 @@ export function applyPage(deps: PageDeps, page: PulledPage, transaction: <T>(fn:
     const held = deps.sql.one<{ id: string }>("SELECT id FROM inbox_raw WHERE channel = 'pull' AND sha256 = ?", page.raw.sha256);
     /* THESE BYTES ARRIVED BEFORE, so whatever was done with them the first time stands. */
     if (!held || held.id !== raw) {
-      storeCursor(deps, ingest, page.cursor);
+      keepCursor(deps.sql, ingest, page.cursor);
       return ok<PageWrote>({ wrote: 0, kept: page.rows.length });
     }
 
@@ -184,32 +185,11 @@ export function applyPage(deps: PageDeps, page: PulledPage, transaction: <T>(fn:
       at,
     );
 
-    storeCursor(deps, ingest, page.cursor);
+    /* THE CURSOR MOVES WITH EVERY PAGE, through `keepCursor` in `pull.ts`, the file whose `finishPull`
+       writes the one a run ends on, so the page and the finish keep one shape on one row. */
+    keepCursor(deps.sql, ingest, page.cursor);
     return ok<PageWrote>({ wrote: wrote.length, kept });
   });
-}
-
-/**
- * The cursor, onto the connector's schedule row.
- *
- * WRITTEN PER PAGE AND NOT AT THE END, because the point of a cursor is the run that does not
- * reach the end: a lease that expires at page nine resumes at page nine, and one written only on
- * success resumes at page one and re-fetches eight pages it already wrote.
- */
-function storeCursor(deps: Pick<PageDeps, 'sql'>, ingest: string, cursor: unknown): void {
-  const row = deps.sql.one<{ id: string; payload: string }>(
-    "SELECT id, payload FROM schedule WHERE kind = 'pull' AND key = ?",
-    ingest,
-  );
-  if (!row) return;
-  let payload: Record<string, unknown>;
-  try {
-    payload = JSON.parse(row.payload) as Record<string, unknown>;
-  } catch {
-    return;
-  }
-  payload.cursor = cursor;
-  deps.sql.exec('UPDATE schedule SET payload = ? WHERE id = ?', JSON.stringify(payload), row.id);
 }
 
 /**

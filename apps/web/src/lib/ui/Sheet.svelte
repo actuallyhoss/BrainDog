@@ -1,11 +1,17 @@
 <!--
-  A `<dialog>`: a 480px drawer above 900px, a sheet on a phone.
+  A `<dialog>`: a 480px drawer from 640px up, and below it a bottom sheet that is as tall as what it
+  holds, up to 88dvh, with a grab handle and a head on one line (design SYS-4, DSN-6).
 
-  Its body is `88dvh − var(--kb)` and its bottom edge sits `var(--kb)` up, so the active field is
-  not underneath the keyboard. `--kb` is written by `$lib/a11y/keyboard.ts`, which the shell starts;
-  this sentence used to be here with nothing behind it, and the term subtracted zero for the life of
-  the build. `overlays` is a counter, and Esc closes ONE layer per press and stops rather than
-  falling through (19 §4).
+  THE PHONE SHEET FITS ITS CONTENT. It was always 88% of the screen, so a Display sheet of six
+  options was two thirds empty panel. Its height now comes from what is in it, capped at
+  `88dvh - var(--kb)`, and its bottom edge sits `var(--kb)` up, so the active field is not
+  underneath the keyboard. `--kb` is written by `$lib/a11y/keyboard.ts`, which the shell starts.
+  `overlays` is a counter, and Esc closes ONE layer per press and stops rather than falling through
+  (19 §4).
+
+  NO ID AFTER THE TITLE. The sheet took an `id` and printed it in the identifier face beside the
+  title, which is where a peeked row showed "#12". A person reads a name there; the id lives in the
+  row's Details and in "Copy link" (design SYS-3).
 
   Open is longer than close, always: a panel opens in 280ms and closes in 160ms. Opening is
   something you watch; closing is something you have already decided about (13 §9).
@@ -20,7 +26,6 @@
     open = $bindable(false),
     title,
     subtitle,
-    id,
     onclose,
     children,
     footer,
@@ -28,8 +33,7 @@
     open?: boolean | undefined;
     title: string;
     subtitle?: string | undefined;
-    id?: string | undefined;
-    /** For a caller whose open state is derived from something else — a peeked row's seq, say. */
+    /** For a caller whose open state is derived from something else, a peeked row's number, say. */
     onclose?: (() => void) | undefined;
     children: Snippet;
     footer?: Snippet | undefined;
@@ -50,8 +54,7 @@
    * control, which is a link to that row: the route changes, the sheet is destroyed mid-open, and
    * from then on `?`, `/`, `g h`, `j`, `k` and `n` do nothing on every screen in the product, while
    * the modified chords keep working because they are tested before the guard. It reads as "some
-   * of the keyboard broke". The layout's own More sheet works around it by hand, closing itself on
-   * every link, which is the workaround that says the mechanism is wrong.
+   * of the keyboard broke".
    */
   let held = false;
 
@@ -143,21 +146,61 @@
     if (outside) close();
   }
 
+  /**
+   * THE GRAB HANDLE PULLS, BECAUSE A HANDLE THAT DOES NOT MOVE IS A DRAWING OF ONE.
+   *
+   * A phone sheet shows a handle at its top edge, and the first thing a thumb does with it is pull
+   * it down. So a pull moves the sheet with the finger, and letting go past `LET_GO` closes it
+   * through the same `close()` Escape and the backdrop use; short of it, the sheet goes back.
+   *
+   * ONLY THE HANDLE'S STRIP TAKES THE PULL, not the head. Pointer capture sends the release to the
+   * element that captured it, so a head that captured would swallow the click of its own Close
+   * button. The strip holds nothing a person presses, and it is hidden from 640px up, where the
+   * sheet is a drawer with no handle to pull.
+   */
+  const LET_GO = 80;
+  let pulled = $state(0);
+  let from: number | null = null;
+
+  function grab(e: PointerEvent) {
+    from = e.clientY;
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  }
+
+  function pull(e: PointerEvent) {
+    if (from !== null) pulled = Math.max(0, e.clientY - from);
+  }
+
+  function drop() {
+    if (from === null) return;
+    from = null;
+    if (pulled > LET_GO) close();
+    pulled = 0;
+  }
 </script>
 
-<dialog bind:this={el} class="sheet" onclick={onbackdrop} oncancel={(e) => (e.preventDefault(), close())} onclose={closed}>
+<dialog
+  bind:this={el}
+  class="sheet"
+  style="--pulled: {pulled}px"
+  onclick={onbackdrop}
+  oncancel={(e) => (e.preventDefault(), close())}
+  onclose={closed}
+>
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="sheet-grab" aria-hidden="true" onpointerdown={grab} onpointermove={pull} onpointerup={drop} onpointercancel={drop}>
+    <span class="sheet-grab-bar"></span>
+  </div>
+
+  <!-- ONE LINE: the title and its Close, centred on each other. A title that does not fit ends in
+       an ellipsis rather than pushing Close down to a second row. -->
   <header class="sheet-head">
-    <div>
-      <h2 class="sheet-title">
-        {title}
-        {#if id}<span class="sheet-id">{id}</span>{/if}
-      </h2>
-      {#if subtitle}<p class="sheet-sub">{subtitle}</p>{/if}
-    </div>
+    <h2 class="sheet-title">{title}</h2>
     <button type="button" class="sheet-close tap" onclick={close} aria-label={copy.close}>
       <Icon name="close" size="m" />
     </button>
   </header>
+  {#if subtitle}<p class="sheet-sub">{subtitle}</p>{/if}
 
   <!-- `tabindex="0"` because this is the scrolling box, and a scrolling box that a keyboard cannot
        reach is content a keyboard cannot read. The sheet that proved it was the KEYMAP: forty
@@ -237,55 +280,67 @@
     }
   }
 
+  /* THE HANDLE IS A PHONE'S, so the drawer from 640px up has none; the rule below 640px shows it. */
+  .sheet-grab {
+    display: none;
+  }
+
   .sheet-head {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: var(--sp-3);
-    padding: var(--sp-4) var(--sp-4) var(--sp-3);
+    padding: var(--sp-3) var(--sp-3) var(--sp-2) var(--sp-4);
   }
 
+  /* The element holding the words carries the ellipsis, and it is a block, not the flex row. */
   .sheet-title {
-    display: flex;
-    align-items: baseline;
-    gap: var(--sp-2);
+    flex: 1;
+    min-inline-size: 0;
+    margin: 0;
+    overflow: hidden;
     font-size: var(--t-lg);
-    letter-spacing: -0.02em;
-  }
-
-  .sheet-id {
-    color: var(--dim);
-    font-family: var(--font-id);
-    font-size: var(--t-sm);
-    font-weight: 400;
+    font-weight: 600;
+    line-height: var(--lh-tight);
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .sheet-sub {
-    margin-block-start: 2px;
+    margin: 0;
+    padding: 0 var(--sp-4) var(--sp-3);
     color: var(--dim);
     font-size: var(--t-sm);
   }
 
+  /* A round glyph button, and a pill because it is pressed (design D-2). `--ctl-h` is 44 under a
+     coarse pointer, and `.tap` grows the box to 44 where it is 32. */
   .sheet-close {
-    margin-inline-start: auto;
+    flex: none;
     display: flex;
     align-items: center;
     justify-content: center;
     inline-size: var(--ctl-h);
     block-size: var(--ctl-h);
     background: none;
-    border: 1px solid transparent;
-    border-radius: var(--r-sm);
+    border: 0;
+    border-radius: var(--r-pill);
     color: var(--dim);
     cursor: pointer;
+    transition: background var(--d-state) var(--ease-out);
   }
 
-  .sheet-close:hover {
-    border-color: var(--line);
-    color: var(--ink);
+  @media (hover: hover) and (pointer: fine) {
+    .sheet-close:hover {
+      background: var(--hover-wash);
+      color: var(--ink);
+    }
   }
 
+  /* `min-block-size: 0` so a sheet capped at 88dvh scrolls its body instead of growing past the cap:
+     a flex item will not shrink below its content without it. */
   .sheet-body {
-    flex: 1;
+    flex: 1 1 auto;
+    min-block-size: 0;
     padding: var(--sp-4);
     overflow-y: auto;
   }
@@ -322,21 +377,26 @@
       inset-block-start: auto;
       inset-inline: 0;
       inline-size: 100vw;
-      block-size: calc(88dvh - var(--kb));
+      /* AS TALL AS WHAT IT HOLDS, and never taller than 88dvh less the keyboard. `auto` beats the
+         UA's `fit-content` only because the drawer's definite height above is taken back here. */
+      block-size: auto;
+      max-block-size: calc(88dvh - var(--kb));
       /**
        * AND THE BOTTOM EDGE MOVES, WHICH SHRINKING THE HEIGHT ON ITS OWN DOES NOT DO.
        *
-       * `block-size: calc(88dvh - var(--kb))` was here alone and reads like the whole fix. It is
-       * half of one. A `position: fixed` box is laid out against the LAYOUT viewport, which iOS
-       * does not shrink for the keyboard, so `inset-block-end: 0` kept the bottom of the sheet
-       * pinned under the keyboard and the height it lost came off the TOP.
+       * A `position: fixed` box is laid out against the LAYOUT viewport, which iOS does not shrink
+       * for the keyboard, so `inset-block-end: 0` kept the bottom of the sheet pinned under the
+       * keyboard and the height it lost came off the TOP.
        *
-       * Measured at 390x844 with a 336px keyboard: with the height alone the sheet runs from y=437
-       * to y=844 and only 71px of it is inside the 508px a person can see. With this line it runs
-       * from y=101 to y=508 and the footer sits on the keyboard's top edge, which is where a
-       * submit button belongs.
+       * Measured at 390x844 with a 336px keyboard, when the sheet was a fixed 88dvh: with the
+       * height alone it ran from y=437 to y=844 and only 71px of it was inside the 508px a person
+       * can see. With this line it ran from y=101 to y=508 and the footer sat on the keyboard's
+       * top edge, which is where a submit button belongs.
        */
       inset-block-end: var(--kb);
+      /* THE PULL. `--pulled` is how far the handle has been drawn down, written on the element as
+         it moves, and `translate` composes with the `rise` animation's `transform`. */
+      translate: 0 var(--pulled);
       border-inline-start: 0;
       border-block-start: 1px solid var(--edge);
       border-start-start-radius: var(--r-lg);
@@ -359,6 +419,36 @@
        * right in both directions and costs a few pixels on the side away from the notch.
        */
       padding-inline: max(env(safe-area-inset-left), env(safe-area-inset-right));
+    }
+
+    /* A 24px strip across the top, so a thumb finds it, holding a short pill a person reads as
+       "this pulls". `touch-action: none` keeps the pull from scrolling the page underneath. */
+    .sheet-grab {
+      display: grid;
+      place-items: center;
+      flex: none;
+      block-size: var(--sp-5);
+      touch-action: none;
+      cursor: grab;
+    }
+
+    .sheet-grab-bar {
+      inline-size: var(--sp-6);
+      block-size: var(--sp-1);
+      background: var(--edge);
+      border-radius: var(--r-pill);
+    }
+
+    /* The handle's strip is the head's top padding on a phone, so it is not paid twice. */
+    .sheet-head {
+      padding-block-start: 0;
+    }
+
+    /* THE FOOTER'S BUTTONS SHARE ITS WIDTH ON A PHONE, so the one primary is a full-width target
+       under a thumb, and two buttons are two halves of one row. A sentence beside them keeps its
+       own width and wraps above them. */
+    .sheet-foot > :global(.btn) {
+      flex: 1 1 auto;
     }
 
     .sheet[open] {

@@ -1,16 +1,12 @@
 /**
- * The seam between this app and the record.
+ * The id a person can quote when something failed, and nothing else.
  *
- * `50 §2.5` names this file and gives it four exports — `call`, `write`, `opId` and `rid`. Only the
- * last one is here, and that is deliberate: the app is still a mock over a seeded record, so a
- * `call()` that nothing calls would be the exact shape of thing this codebase keeps finding and
- * deleting. What is here is what is USED. The rest arrives with the host it would talk to.
- *
- * `50 §1` settles the import question the repository currently answers two ways: the web app's
- * runtime imports are `svelte`, `braindog-render`, `@braindog/where` and `@braindog/declare`, and
- * "never `ports`, `kernel`, `record`, `mcp`, `slash`, or another app". The seam is a FILE INSIDE THE
- * APP, not a package — so `packages/client`, which exists in this tree and is imported by nothing,
- * is an unspecified addition and not the thing that belongs here.
+ * `50 §2.5` names this file as the seam between the app and the record and gives it four exports:
+ * `call`, `write`, `opId` and `rid`. The seam was built somewhere else. Every screen reads and writes
+ * the record through `@braindog/client`, from a reader or writer module of its own (`lib/data/record.ts`,
+ * `lib/record/*-live.ts`, `lib/record/*-write.ts`), because the client carries the route table as a
+ * value and this file is reachable from the root error page. So only `rid` is here: a `call()` that
+ * nothing calls would be the exact shape of thing this codebase keeps finding and deleting.
  */
 
 /**

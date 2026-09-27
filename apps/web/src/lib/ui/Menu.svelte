@@ -1,9 +1,11 @@
 <!--
-  A menu button: a trigger, and a list that opens under it.
+  A menu button: a trigger, and a list that opens under it with a fine pointer, or rises from the
+  bottom of the screen under a thumb (below).
 
-  NOT a `<dialog>` and not a sheet. A menu is a short list of things to do to the thing you clicked,
-  and it belongs next to that thing — a modal for six items takes the whole screen away to offer you
-  a choice you could have made in place. Sheets are for content; menus are for verbs.
+  NOT a `<dialog>` and not a `Sheet`. A menu is a short list of things to do to the thing you
+  clicked, and with a mouse it belongs next to that thing: a modal for six items takes the whole
+  screen away to offer you a choice you could have made in place. Sheets are for content; menus are
+  for verbs.
 
   The keyboard contract is the one every platform's menu has and the reason this is a component
   rather than a `<details>`: Enter/Space/Down opens and lands on the first item, Up opens and lands
@@ -20,6 +22,17 @@
   Closing returns focus to the trigger, ALWAYS. A menu that drops focus on the body leaves a
   keyboard user at the top of the document, which is the single most common way a custom menu is
   worse than the native one it replaced.
+
+  UNDER A THUMB IT IS A BOTTOM ACTION SHEET, NOT A POPOVER (design SYS-4, DSN-6). Below 640px, or
+  with a coarse pointer at any width, a list the size of a trigger opened under the finger that
+  pressed it, and its rows were menu rows sized for a mouse. There the same list rises from the
+  bottom of the screen over a scrim, in 48px rows at 16px, with a Cancel row at its foot. The items,
+  the keys and the roles are the same in both forms; only the placing differs.
+
+  THE SHEET IS A POPOVER IN THE TOP LAYER, which is the one place a fixed panel is placed against
+  the screen whatever it sits inside. A menu lives in toolbars and bars that have their own stacking
+  order, and a panel fixed to the bottom of the screen inside one of them would be drawn in that
+  order, under the tab bar.
 -->
 <script lang="ts">
   import type { Snippet } from 'svelte';
@@ -42,6 +55,22 @@
   let root = $state<HTMLElement>();
   let button = $state<HTMLButtonElement>();
   let list = $state<HTMLElement>();
+
+  const words = { cancel: 'Cancel' };
+
+  /**
+   * WHEN THE MENU IS AN ACTION SHEET: below 640px, or under a coarse pointer at any width (design
+   * 6.3). Read once each time the menu opens, so a menu never changes form while it is open, and
+   * written onto the panel as its `popover` attribute, which is what the sheet's rules key on.
+   */
+  const SHEET = '(width < 640px), (pointer: coarse)';
+  const sheet = $derived(open && matchMedia(SHEET).matches);
+
+  /* INTO THE TOP LAYER ONCE THE PANEL EXISTS. `list` is bound when the `{#if}` renders it, so this
+     runs once per opening. A browser without popovers draws the same panel fixed in place. */
+  $effect(() => {
+    if (sheet && list && typeof list.showPopover === 'function') list.showPopover();
+  });
 
   const items = () => [...(list?.querySelectorAll<HTMLElement>('[role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"]') ?? [])];
 
@@ -77,7 +106,8 @@
    * changed.
    */
   function place() {
-    if (!list) return;
+    /* An action sheet is placed by its own rule, against the screen, and has no trigger to clear. */
+    if (!list || sheet) return;
     list.style.setProperty('--menu-shift', '0px');
     list.style.setProperty('--menu-lift', '0px');
     list.style.setProperty('--menu-room', 'none');
@@ -175,11 +205,36 @@
   /** Pointerdown, not click: a click that lands on a control elsewhere should close this AND press
       that, which is what people expect and what a click-phase handler gets wrong. */
   function onPointerDown(e: PointerEvent) {
-    if (open && root && !root.contains(e.target as Node)) close(false);
+    pressed = open && sheet;
+    if (open && !sheet && root && !root.contains(e.target as Node)) close(false);
+  }
+
+  /**
+   * AN ACTION SHEET CLOSES ON A PRESS OF ITS SCRIM, AND ON THE CLICK, NOT THE POINTERDOWN.
+   *
+   * The opposite of the popover's rule above, and for its reason turned round: over a scrim there is
+   * nothing underneath to press, and closing on pointerdown took the panel away before the release,
+   * so the click landed on whatever row the scrim had been covering. The test is geometry, as the
+   * `Sheet`'s backdrop is, because a press on a popover's backdrop may be reported on the popover
+   * itself. `e.detail > 0` keeps real presses: a keyboard's click is at (0, 0).
+   *
+   * ONLY A PRESS THAT BEGAN WHILE THE SHEET WAS OPEN. The click that opens the menu reaches this
+   * window listener too, after the trigger's handler has opened it and the panel has been drawn,
+   * and its point is the trigger, which is outside the panel: without `pressed` the sheet closed on
+   * the same click that opened it.
+   */
+  let pressed = false;
+
+  function onWindowClick(e: MouseEvent) {
+    const began = pressed;
+    pressed = false;
+    if (!began || !open || !sheet || !list || e.detail === 0) return;
+    const r = list.getBoundingClientRect();
+    if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) close();
   }
 </script>
 
-<svelte:window onpointerdown={onPointerDown} />
+<svelte:window onpointerdown={onPointerDown} onclick={onWindowClick} />
 
 <div class="menu-root" bind:this={root}>
   <button
@@ -204,10 +259,14 @@
       role="menu"
       tabindex="-1"
       aria-label={label}
+      popover={sheet ? 'manual' : undefined}
       onkeydown={onListKey}
       onclick={onListClick}
     >
       {@render children()}
+      <!-- A MENU ITEM, SO THE ARROWS REACH IT AND THE MENU'S ROLE HOLDS ONLY ITEMS. The list's own
+           click handler closes the menu on it, as on any verb, and returns focus to the trigger. -->
+      {#if sheet}<button type="button" class="menu-cancel" role="menuitem">{words.cancel}</button>{/if}
     </div>
   {/if}
 </div>
@@ -274,7 +333,7 @@
     inset-inline-end: 0;
   }
 
-  /* No `opacity: 0` in a start state — see Sheet.svelte. A stalled animation must leave something
+  /* No `opacity: 0` in a start state, see Sheet.svelte. A stalled animation must leave something
      readable behind, and a menu 4px too high is readable. */
   @keyframes menu-in {
     from {
@@ -282,8 +341,87 @@
     }
   }
 
+  /* Hidden in the popover form; the sheet's rule below draws it. It is only rendered for a sheet. */
+  .menu-cancel {
+    display: none;
+  }
+
+  /**
+   * THE ACTION SHEET: the same panel, against the bottom of the screen.
+   *
+   * `[popover]` rather than the `@media` query, because the attribute is what the script set when
+   * it read that query at open, so the form and the markup cannot disagree. Every UA default for a
+   * popover (centred with `margin: auto`, `fit-content` on both axes, a border and `Canvas`) is
+   * taken back here. From 640px up, which only a coarse pointer reaches, it is a 560px sheet in the
+   * middle of the bottom edge rather than one as wide as a tablet.
+   */
+  .menu[popover] {
+    position: fixed;
+    inset-block: auto var(--kb);
+    inset-inline: 0;
+    inline-size: min(100%, 560px);
+    min-inline-size: 0;
+    block-size: auto;
+    max-block-size: calc(88dvh - var(--kb));
+    margin-block: 0;
+    margin-inline: auto;
+    translate: none;
+    padding: var(--sp-2) var(--sp-2) calc(var(--sp-2) + env(safe-area-inset-bottom));
+    background: var(--s1);
+    border: 0;
+    border-block-start: 1px solid var(--edge);
+    border-start-start-radius: var(--r-lg);
+    border-start-end-radius: var(--r-lg);
+    border-end-start-radius: 0;
+    border-end-end-radius: 0;
+    color: var(--ink);
+    box-shadow: var(--e3);
+    animation: menu-rise var(--d-enter) var(--ease-out);
+  }
+
+  .menu[popover]::backdrop {
+    background: var(--scrim);
+  }
+
+  /* 48px ROWS AT 16px, whatever class the caller gave its items: a row sized for a mouse is a miss
+     under a thumb. `--tap` and a step of space make the 48. */
+  .menu[popover] :global([role^='menuitem']) {
+    min-block-size: calc(var(--tap) + var(--sp-1));
+    font-size: var(--t-md);
+  }
+
+  /* A caller's key hints are for a keyboard, and a sheet is where a thumb is. */
+  .menu[popover] :global(kbd) {
+    display: none;
+  }
+
+  /* Cancel is the last row, apart from the verbs by a hairline, and it is not one of them. */
+  .menu[popover] .menu-cancel {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    inline-size: 100%;
+    margin-block-start: var(--sp-2);
+    background: none;
+    border: 0;
+    border-block-start: 1px solid var(--line-soft);
+    border-radius: 0;
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--t-md);
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  @keyframes menu-rise {
+    from {
+      transform: translateY(24px);
+    }
+  }
+
   @media (prefers-reduced-motion: reduce) {
-    .menu {
+    .menu,
+    .menu[popover] {
       animation: none;
     }
   }

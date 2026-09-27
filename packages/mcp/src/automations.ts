@@ -8,30 +8,62 @@
  * any `src/`. So the numbers below are copies, and `test/automations.test.ts` holds each one to `STEP_CEILING`,
  * `DEPTH_CEILING`, `RUNS_PER_DAY_CEILING`, `VARS_CEILING` and `FLOOR_MS`, and installs both examples on a real record.
  *
- * IT SAYS WHAT DOES NOT RUN YET. A `metric` or `decided` trigger is refused at install, and so is an `ask_slash` step on
- * a host that does not answer Slash, and a `call` step installs so the canvas can draw it and fails the run that reaches
- * it. An agent told only the grammar would file a rule with a call in it, and the owner would accept a run that stops
- * there. The same test holds that list to what a real run of the runner does. `ask_person` runs: its question opens in
- * Decide and the answer wakes the run. On a host that answers Slash, `ask_slash` runs too, and that host is served
- * `ANSWERED_GRAMMAR` below.
+ * IT SAYS WHAT DOES NOT RUN YET, AND READS THAT FROM THE KERNEL'S ONE TABLE (`capabilities.ts`, through
+ * `@braindog/record/automations`), which the lint and the runner read too. So `not_in_this_build` and its sentence are
+ * never a list written here by hand: this file once listed `script` after `e6010208` made the runner queue the script
+ * and go on, and an agent reading it would not file the step Work's `rule.close_follow_ups` is built on. A step whose
+ * row installs and does not run is said as one that fails the run that reaches it, as `call` was until the runner
+ * parked a run on its answer; one whose row does not install, or does not on this host (`ask_slash` where nothing
+ * answers Slash), as refused at install. On a host that answers Slash that host is served `ANSWERED_GRAMMAR` below.
  *
- * `script` LEFT THAT LIST WITH `e6010208`, which made `flow.ts`'s `startScript` queue the script's run and go on, and
- * this file still listed it and said the run "fails there": an agent reading it would not file the step
- * Work's `rule.close_follow_ups` is built on. Its entry below says what the record's dry run says (`said` in
- * `packages/record/src/automations.ts`): the run does not wait, `as:` is the queued run's id and not the script's
- * answer, and the three things that stop it are each on the script's own row.
+ * A `call` AND A QUESTION PUT TO ONE MEMBER ARE SAID AS THE RUNNER TAKES THEM (`flow.ts`): the run waits up to a day on
+ * a call and reads into its JSON answer by path, and `ask_person`'s `to:` holds the answer to that member or an owner
+ * (`govern.ts`'s `decide`). `propose` says how a body is tried over a sample before anybody accepts it.
+ *
+ * THE `script` ENTRY SAYS WHAT THE RECORD'S DRY RUN SAYS (`said` in `packages/record/src/automations.ts`): the run does
+ * not wait, `as:` is the queued run's id and not the script's answer, and the three things that stop it are each on the
+ * script's own row.
  */
+
+import { CAPABILITIES, notInThisBuild, serves, type Capability } from '@braindog/record/automations';
+
+/** How the sentence names one row: a trigger, a step, or one key of a step. */
+const named = (c: Capability): string => {
+  if (c.of === 'trigger') return `a ${c.name} trigger`;
+  const [verb, key] = c.name.split('.');
+  const article = /^[aeiou]/u.test(verb ?? '') ? 'an' : 'a';
+  return key === undefined ? `${article} ${c.name} step` : `the ${key}: key of ${article} ${verb} step`;
+};
+
+const joined = (items: readonly string[]): string => (items.length < 2 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} and ${items.at(-1)!}`);
+const opening = (text: string): string => `${text.slice(0, 1).toUpperCase()}${text.slice(1)}`;
+
+/**
+ * What the grammar says does not run, on a host that answers Slash or one that does not, from the table's rows: what is
+ * refused at install, then what installs and fails the run that reaches it.
+ */
+function unbuiltSaid(answersSlash: boolean): string {
+  const refused = CAPABILITIES.filter((c) => !c.installs || !serves(c, answersSlash)).map(named);
+  const failing = CAPABILITIES.filter((c) => c.installs && serves(c, answersSlash) && !c.runs).map(named);
+  const said: string[] = [];
+  if (refused.length > 0) said.push(`${opening(joined(refused))} ${refused.length === 1 ? 'is' : 'are'} refused at install`);
+  if (failing.length > 0)
+    said.push(
+      `${opening(joined(failing))} ${failing.length === 1 ? 'installs, and a run that reaches it fails' : 'install, and a run that reaches one fails'} there with a sentence, after taking every step before it`,
+    );
+  return said.length > 0 ? said.join('. ') : 'Every trigger and step above installs and runs';
+}
 
 export const AUTOMATION_GRAMMAR = {
   declaration: { id: 'rule.<name>', kind: 'rule', body: 'the keys below' },
   propose:
-    'propose body_kind change with body {"to":{"id":"rule.<name>","kind":"rule","body":{...}}}. The answer carries dry_run: path, what starts it, and each step as a line. Nothing runs until the owner accepts it on Decide',
+    'propose body_kind change with body {"to":{"id":"rule.<name>","kind":"rule","body":{...}}}. The answer carries dry_run: path, what starts it, and each step as a line. Nothing runs until the owner accepts it on Decide. Add "try":{"sample":{"row":"<row id, or its fields>","payload":"<what arrived, or a figure\'s value>","at":"<instant>"}} to a rule that runs as a run and the steps are taken over the sample, rolled back, and answered as automation_try, each step done, would, waiting, failed or skipped; nothing is filed or sent',
   body: {
     rule: 'the name, as in the id: lower-case letters, digits, - and _ (required)',
     name: 'the words its card shows',
     on: 'exactly one trigger; see triggers. Absent means a write to the register below, inside the write',
     register: 'only with no on: and a then: list, for a rule that runs inside the write',
-    when: 'a condition on the row, for a write trigger, in the sentence form list takes',
+    when: 'a condition in the sentence form list takes: on the written row for a write trigger; on the row an arrival files, or on the top-level keys of its JSON body when it files none. A write trigger whose when names a day relative to today (today, -7d) and that says once_per is read again each hour, one run per row and key',
     steps: 'the list of steps; see steps (required, or then:)',
     then: 'the older flat list of actions, which runs inside the write; never beside steps',
     once_per: '["entry"] or field ids: what makes one firing. Required when a write trigger notifies, creates, suggests, runs, calls or asks',
@@ -43,28 +75,29 @@ export const AUTOMATION_GRAMMAR = {
   triggers: {
     written: '{"written":{"register":"<id>","op":["create","update","delete"],"fields":["<field>"],"from_rules":false}}: a row was written. op, fields and from_rules are optional, and any of them makes it run after the write',
     arrival: '{"arrival":{"ingest":"<id>","channel":"webhook","state":["untriaged"],"unverified":false}}: something arrived at a door, each key optional. A redelivery starts nothing, and an arrival nothing verified starts nothing unless unverified is true',
-    every: '{"every":"1h"}, no more often than every 15m; {"every":"1d","at":"08:00"}; {"every":"1w","at":"08:00","day":"mon"}',
+    every:
+      '{"every":"1h"}, no more often than every 15m; {"every":"1d","at":"08:00"}; {"every":"1w","at":"08:00","day":"mon"}; {"every":"1mo","day":"last","at":"09:00"}. Every turn missed while the host was away is taken, each as its own run; "late":"6h" beside every records a turn reached later than that as skipped instead',
+    metric:
+      '{"metric":{"id":"<metric>","crosses":{"lte":0}}}: read each hour; a run starts when the figure moves to the other side of the line, and the first reading only sets the side. crosses is target, {"lte":n} or {"gte":n}, n in the figure\'s own units (minor units for money). The run reads {{trigger.value}} and {{trigger.side}}, above or below',
+    decided:
+      '{"decided":{"about":"rule.<name>","option":"<answer>"}}: a question in Decide was decided, once per question. about is the declaration that filed or proposes it and option the chosen answer\'s words, each optional. The run reads {{trigger.option}} and the row the question is about as {{trigger.row.<field>}}',
     manual: '{"manual":true}: a person presses Run now in the app. No agent and no token can press it',
   },
   steps: {
     if: '{"if":"<condition>","then":[...],"else":[...]}: a branch, read over the row and the answers so far',
     set_var: '{"set_var":{"name":"<answer>","to":"<text>"}}: keep a value as an answer',
     wait: '{"wait":"2h"}: a number and one of m, h, d or w',
-    call: '{"call":{"ingest":"<declared call>","as":"<answer>"}}: a declared call, never an address',
+    call: '{"call":{"ingest":"<declared call>","as":"<answer>"}}: a declared call, never an address. The run waits up to 1d for its answer and keeps it under as as the JSON it came back as, so {{vars.<answer>.<path>}} reads into it: {{vars.a.rate}} is 48.5 from {"rate":48.5}. A refused, held or failed call stops the run with its sentence. A call that sends fields of a row needs a trigger with that row; one that sends none may run on a clock',
     script:
       '{"script":{"id":"<script>","input":{"<name>":"<text>"},"as":"<answer>"}}: starts the script and goes on without waiting for it; what it writes lands when this host runs it. as keeps the id of its queued run, never what the script answers. The run stops here if the script is not installed, does not say runs: { rule: true }, or is paused',
     ask_slash: '{"ask_slash":{"question":"<text>","as":"<answer>","shape":"text"}}: shape is text, number or choice, and choice needs choices',
-    ask_person: '{"ask_person":{"question":"<text>","options":["yes","no"],"as":"<answer>","wait":"2d"}}: two options or more, each once. The question opens in Decide, where anyone who decides answers it; the run waits 7d when wait is left out, and stops if nobody answers',
+    ask_person: '{"ask_person":{"question":"<text>","options":["yes","no"],"as":"<answer>","wait":"2d","to":"<member>"}}: two options or more, each once. The question opens in Decide. to is optional: the id of one member, typed or filled from a field of the row, and only that member or an owner answers it; without to, anyone who decides answers it. The run waits 7d when wait is left out, and stops if nobody answers',
     actions:
-      'every action a rule has: {"tag":"x"} {"untag":"x"} {"set":{"field":"f","to":"v"}} {"move":"<state>"} {"link":{"field":"f","to":{"register":"r","by":"f","value":"v"}}} {"note":"text"} {"notify":{"say":"text"}} {"schedule":{"in":"14d","note":"text"}} {"create":{"register":"r","bound":10,"fields":{}}} {"suggest":{"question":"q","options":["a","b"]}} {"run":"<declared call>"} {"stop":true}. tag, untag, set, move, link, note, schedule and run act on a row, so a clock or a button cannot use them',
+      'every action a rule has: {"tag":"x"} {"untag":"x"} {"set":{"field":"f","to":"v"}} {"move":"<state>"} {"link":{"field":"f","to":{"register":"r","by":"f","value":"v"}}} {"note":"text"} {"notify":{"say":"text"}} {"schedule":{"in":"14d","note":"text"}} {"create":{"register":"r","bound":10,"fields":{}}} {"suggest":{"question":"q","options":["a","b"]}} {"run":"<declared call>"} {"stop":true}. tag, untag, set, move, link, note, schedule and run act on a row, so a clock, a figure or a button cannot use them. A create with no row to stand on counts its bound over a day, not a run',
   },
-  context: 'any text in a step may read {{trigger.row.<field>}}, {{trigger.body.<path>}} of a JSON arrival, {{trigger.kind}} and {{vars.<answer>}}',
-  not_in_this_build: {
-    triggers: ['metric', 'decided'],
-    steps: ['call', 'ask_slash'],
-  },
-  not_in_this_build_says:
-    'a metric or decided trigger, and an ask_slash step, are refused at install. A call step installs, and a run that reaches it fails there with a sentence, after taking every step before it',
+  context: 'any text in a step may read {{trigger.row.<field>}}, {{trigger.body.<path>}} of a JSON arrival, {{trigger.kind}}, {{vars.<answer>}} and {{vars.<answer>.<path>}} of a call\'s answer. Braces are always two: one brace around a word fills nothing and is refused at install, and so is {{vars.<answer>}} in a rule that runs inside the write, which has no run',
+  not_in_this_build: notInThisBuild(false),
+  not_in_this_build_says: unbuiltSaid(false),
   limits: {
     steps: 50,
     depth: 3,
@@ -99,8 +132,8 @@ export const AUTOMATION_GRAMMAR = {
 } as const;
 
 /**
- * The same grammar on a host that answers Slash, which `version` says as `slash: true`: `ask_slash` is taken out of what
- * does not run, and the sentence about it goes with it.
+ * The same grammar on a host that answers Slash, which `version` says as `slash: true`: what does not run is read from
+ * the same table for that host, so `ask_slash` is not in it and the sentence says nothing of it.
  *
  * MEASURED BEFORE THIS, ON A RECORD OPENED WITH `answersSlash: true`: a rule asking Slash installed and parked on its
  * question, and this resource still listed `ask_slash` under `not_in_this_build` and said it "is refused at install". An
@@ -119,7 +152,6 @@ export const ANSWERED_GRAMMAR = {
     ask_slash:
       '{"ask_slash":{"question":"<text>","about":["<field>"],"as":"<answer>","shape":"text"}}: shape is text, number or choice, and choice needs choices. about is optional: the fields of the run\'s row that go with the question, so it needs a trigger with a row, and a secret or file field is refused in about and in the question alike. The run waits 1d for this host\'s model to answer, and stops if none comes',
   },
-  not_in_this_build: { triggers: AUTOMATION_GRAMMAR.not_in_this_build.triggers, steps: ['call'] },
-  not_in_this_build_says:
-    'a metric or decided trigger is refused at install. A call step installs, and a run that reaches it fails there with a sentence, after taking every step before it',
+  not_in_this_build: notInThisBuild(true),
+  not_in_this_build_says: unbuiltSaid(true),
 } as const;

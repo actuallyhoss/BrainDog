@@ -9,26 +9,27 @@
  * THE OR-GROUP IS NOT A FLAG OVER `clauses`, AND THIS FILE HOLDS THE READERS THAT SAY WHY. `clauses`
  * is read as a conjunction by nine lines outside `where.ts`, and three of them would say something
  * wrong about an "or": a window's end added into it (`endedAt`), one disjunct taken for a block's
- * project, a new row filled from both sides. So the group is `any`, beside `clauses`, which `matches`
- * reads and those lines do not, and the two in `metrics.ts` that would call a dated group undated read
- * it too. The record is driven, not described, as `where-compare.test.ts` drives it.
+ * project, a new row filled from both sides. So the group is `any`, beside `clauses`, which those lines
+ * do not read. The record is driven, not described, as `where-compare.test.ts` drives it.
+ *
+ * WHICH ROWS A GROUP ADMITS IS THE RECORD'S ANSWER ALONE since ARC-2: the browser's matcher and its
+ * figure engine are gone, and `compile` is the record's own parser. So the browser's half of each case
+ * below is the shape `compile` hands its readers, and its refusals, which are the record's word for word.
  */
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 
-import { fill, openRecord, type Kernel } from '@braindog/kernel';
+import { openRecord, type Kernel } from '@braindog/kernel';
 import { installSeed } from '@braindog/seed';
 
-import { NOW, ROWS } from './fixtures/sample.ts';
+import { NOW } from './fixtures/sample.ts';
 import { saidPlainly } from './blocks.ts';
-import { read as readAt, withParam } from './metrics.ts';
-import { compile, matches, registerHref } from './where.ts';
+import { withParam } from './metrics.ts';
+import { compile, registerHref } from './where.ts';
 /* THE SAMPLE'S ROW NAMES, which a live tab learns from the record and this test asks the mirror about by name. */
 import './fixtures/fill.ts';
-/* THE SAMPLE'S ROWS READ AT THE SAMPLE'S CLOCK, which `read` took for granted and now takes from its caller. */
-const read: typeof readAt = (decl, now = NOW) => readAt(decl, now);
 
 function openSqlite(): Parameters<typeof openRecord>[0] {
   const db = new DatabaseSync(':memory:');
@@ -75,35 +76,33 @@ const askRecord = async (register: string, where: string): Promise<Answer> => {
   return { refused: null, seqs: out.value.rows.map((r) => r.seq ?? -1).sort((a, b) => a - b) };
 };
 
-const askBrowser = (register: string, sentence: string): Answer => {
+/** What the browser's `compile` says of a sentence: the record's first refusal, or nothing. */
+const askBrowser = (register: string, sentence: string): { refused: string | null } => {
   const w = compile(register, sentence);
-  return w.bad.length
-    ? { refused: w.bad[0] ?? '', seqs: [] }
-    : { refused: null, seqs: (ROWS[register] ?? []).filter((e) => matches(e, w, NOW)).map((e) => e.seq).sort((a, b) => a - b) };
+  return { refused: w.bad.length ? (w.bad[0] ?? '') : null };
 };
 
+/** The record's rows, having checked the browser reads the sentence as the or-group it is. */
 async function agree(register: string, sentence: string): Promise<Answer> {
   const theirs = await askRecord(register, sentence);
-  const ours = askBrowser(register, sentence);
+  const w = compile(register, sentence);
   assert.equal(
-    ours.refused === null,
+    w.bad.length === 0,
     theirs.refused === null,
-    `${register}: "${sentence}": the record ${theirs.refused === null ? 'answered' : `refused: ${theirs.refused}`}, the browser ${ours.refused === null ? 'answered' : `refused: ${ours.refused}`}`,
+    `${register}: "${sentence}": the record ${theirs.refused === null ? 'answered' : `refused: ${theirs.refused}`}, the browser ${w.bad.length === 0 ? 'read it' : `refused: ${w.bad[0]}`}`,
   );
-  assert.deepEqual(ours.seqs, theirs.seqs, `${register}: "${sentence}" drew different rows`);
+  if (theirs.refused === null) assert.ok(w.any, `${register}: "${sentence}" is no or-group to the browser`);
   return theirs;
 }
 
-const seqsWhere = (register: string, sentence: string): number[] => askBrowser(register, sentence).seqs;
-
 /* ── the probe ───────────────────────────────────────────────────────────── */
 
-test('THE PROBE: open or overdue is the union of the two, in both engines, as the same rows', async () => {
+test('THE PROBE: open or overdue is the union of the two, on the record, and an or-group to the browser', async () => {
   const said = await agree('obligations', 'state is open, or due before today');
   assert.equal(said.refused, null);
   /* THE UNION AND NOT EITHER HALF, measured on the seed: 24 open, 14 overdue, 3 both. */
-  const open = seqsWhere('obligations', 'state is open');
-  const overdue = seqsWhere('obligations', 'due before today');
+  const open = (await askRecord('obligations', 'state is open')).seqs;
+  const overdue = (await askRecord('obligations', 'due before today')).seqs;
   const union = [...new Set([...open, ...overdue])].sort((a, b) => a - b);
   assert.deepEqual(said.seqs, union);
   assert.ok(said.seqs.length > open.length && said.seqs.length > overdue.length, 'the group drew no more than one of its halves');
@@ -129,7 +128,7 @@ test('THE SHAPE: `clauses` stays the conjunction and the or-group is `any`, one 
   ]);
 });
 
-test('EVERY OR-GROUP OVER THE SEED admits the same rows in both engines', async () => {
+test('EVERY OR-GROUP OVER THE SEED is answered by the record and read as a group by the browser', async () => {
   for (const [register, sentence] of [
     ['obligations', 'state is open, or due before today'],
     ['obligations', 'state is open, OR due before today'],
@@ -169,49 +168,13 @@ test('A LINK FROM AN OR-GROUP OPENS THE LIST WIDE, because no chip carries an or
   assert.equal(registerHref('obligations', 'state is open, or due before today'), '/r/obligations');
 });
 
-test('A TILE OVER A DATED OR-GROUP IS NOT CALLED TIMELESS, and one over a fixed date says so', () => {
-  const base = { metric: 'test', name: 'Test', source: 'register.obligations', value: { sum: 'amount' }, target: { lte: 1 }, window: '30d', compare: 'previous' } as const;
-  /* `today` MOVES WITH THE CLOCK, so the window before is a different question and is measured. */
-  const moving = read({ ...base, where: 'state is open, or due before today' });
-  assert.doesNotMatch(moving.unmeasured ?? '', /nothing here is dated/, `a tile over a dated or-group was told: ${moving.unmeasured}`);
-  /* AND IT IS MEASURED, NOT MERELY SPARED THE WRONG EXCUSE. With `resolvedAt` reading `clauses` alone the
-     group resolved to `[]` at both clocks and the tile read `delta: null` under "this asks about one fixed
-     date", which the line above lets through; measured on the seed it is `delta: 0`, 15,960,400 at both
-     clocks, because no row that is not open fell due in the thirty days between them. */
-  assert.equal(moving.unmeasured, null, `a tile over a dated or-group was told: ${moving.unmeasured}`);
-  assert.equal(moving.delta, 0);
-  /* A WRITTEN-OUT DAY DOES NOT, and the sentence under the tile names the day rather than denying one. */
-  const fixed = read({ ...base, where: 'state is open, or due before 2026-10-01' });
-  assert.match(fixed.unmeasured ?? '', /one fixed date/, `a tile over a fixed-date or-group was told: ${fixed.unmeasured}`);
-  /* AND AN OR-GROUP THAT NAMES NO DAY IS STILL UNDATED. */
-  const undated = read({ ...base, where: 'state is open, or state is part' });
-  assert.match(undated.unmeasured ?? '', /nothing here is dated/);
-});
-
-test('A PARAMETER INSIDE AN OR-GROUP IS NOT THE SCOPE, in the browser as in the record, and the two agree', async () => {
-  /* `withParam` SPLIT THE SENTENCE ON THE COMMA AFTER `compile` HAD LEARNED `, or`, the kernel's `scopeOf` twin. Measured
-     over the seed with Kiln as the parameter, before the repair:
-
-       thing is {{it}}, or state is paid    within 'thing is Kiln'       rows 18, held 10
-       state is paid, or thing is {{it}}    within ' or thing is Kiln'   rows 18, held 0
-
-     The second compiled its scope to nothing, so `held === 0` beside eighteen matched rows, which `api.ts` reads as a list
-     nobody has written to. An alternative widens the rows rather than naming which rows the figure is about, so `held`
-     is the whole register, which is what the record answers for the same template through `fill`. */
-  const k: Kernel = await record;
+test('A PARAMETER INSIDE AN OR-GROUP IS NOT THE SCOPE', () => {
+  /* `withParam` SPLIT THE SENTENCE ON THE COMMA AFTER THE GRAMMAR HAD LEARNED `, or`, the kernel's `scopeOf` twin, and
+     took ' or thing is Kiln' for a scope. An alternative widens the rows rather than naming which rows the figure is
+     about, so there is no scope, which is what the record answers for the same template through `fill`. */
   const base = { metric: 'm', name: 'M', source: 'register.obligations', value: { count: 'id' }, target: { lte: 99 }, window: '30d', compare: 'none' } as const;
-  for (const where of ['thing is {{it}}, or state is paid', 'state is paid, or thing is {{it}}']) {
-    const decl = withParam({ ...base, where }, 'Kiln');
-    assert.equal(decl.within, undefined, `${where}: an alternative is not a scope`);
-    const web = read(decl);
-    assert.deepEqual(web.refusals, [], `${where}: ${web.refusals.join('; ')}`);
-    assert.equal(web.held, (ROWS.obligations ?? []).length, `${where}: the whole register`);
-    assert.ok(web.held >= web.rows, `${where}: held ${web.held} under rows ${web.rows}`);
-    const kernel = k.metric(fill({ ...base, where }, null, 'Kiln') as never);
-    assert.ok(kernel.ok, `${where}, the record: ${JSON.stringify(kernel)}`);
-    assert.equal(web.rows, kernel.value.rows, `${where}: what the predicate matched`);
-    assert.equal(web.held, kernel.value.held, `${where}: how many rows the list holds`);
-  }
+  for (const where of ['thing is {{it}}, or state is paid', 'state is paid, or thing is {{it}}'])
+    assert.equal(withParam({ ...base, where }, 'Kiln').within, undefined, `${where}: an alternative is not a scope`);
   /* AND A CONJUNCTION STILL NARROWS, with `or` between one field's values beside the parameter. */
   assert.equal(withParam({ ...base, where: 'thing is {{it}}, state is open or part' }, 'Kiln').within, 'thing is Kiln');
 });

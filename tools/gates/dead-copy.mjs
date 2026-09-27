@@ -39,6 +39,12 @@
  * SO THE LIST OF MODULES IS THE THING TO EXTEND, not the one constant. Each entry names the object
  * it exports, because that is how a use of its keys is written, and the allow-list is qualified the
  * same way so two modules cannot excuse each other's sentences by accident.
+ *
+ * AND `copy.ts` IS AN AGGREGATE NOW (ARC-8). It types no sentence: its object spreads one object per
+ * web area, each exported by a file under `lib/copy/`, and a use of any of their keys is still
+ * written `copy.<key>`. So the gate follows each spread to the file its import names and reads that
+ * file's object as though it were written inside `copy`. The module list did not grow, because the
+ * area files are one module's sentences typed in several places, not a second policy.
  */
 
 import { readFile, readdir } from 'node:fs/promises';
@@ -55,6 +61,9 @@ import { skipDir } from './lib.mjs';
  * its absence is printed and the run goes on: the negative fixtures under `negative/` are two-file
  * trees that have never had one, and a gate that could only run against the whole app is a gate
  * whose own test cannot exist.
+ *
+ * `copy.ts`'s area files are not listed here: they are found through its spreads (below), so an area
+ * file added to the aggregate is read the day its spread line lands, with no edit to this gate.
  */
 const MODULES = [
   { object: 'copy', file: 'copy.ts', required: true },
@@ -234,27 +243,82 @@ export default async function deadCopy(root = process.env.BRAINDOG_GATE_ROOT ?? 
    * which is how every module here is written and is checked rather than assumed: a module whose
    * object cannot be found that way is a finding of its own rather than a silent zero.
    */
-  const bodies = new Map();
-  const unreadable = [];
-  for (const m of defined) {
-    const source = sources.get(m.at) ?? '';
-    const opened = source.search(new RegExp(String.raw`^export const ${m.object}\b`, 'mu'));
-    if (opened < 0) {
-      unreadable.push(m);
-      continue;
-    }
+  const bodyOf = (source, object) => {
+    const opened = source.search(new RegExp(String.raw`^export const ${object}\b`, 'mu'));
+    if (opened < 0) return null;
     const rest = source.slice(opened);
     /* BOTH SPELLINGS OF THE END, because `copy.ts` closes with `} as const;` and the first
        version of this looked only for `};`, found neither, and read each file to its last line: a
        function's parameters four hundred lines below the object were counted as sentences. */
     const closed = rest.search(/^\}(?: as const)?;$/mu);
-    bodies.set(m.at, closed < 0 ? rest : rest.slice(0, closed));
-  }
+    return closed < 0 ? rest : rest.slice(0, closed);
+  };
 
+  /**
+   * A SPREAD IN THE OBJECT IS FOLLOWED TO THE FILE THAT TYPES IT (ARC-8).
+   *
+   * `copy` is `{ ...shell, ...lists, ... }`, and each name is an object another file exports. The
+   * module's own relative imports say which file, so the spread is read there, with the same pattern
+   * and the same two-space rule, and each key it holds is named `copy.<key>`, because that is how a
+   * screen writes a use of it. A key typed straight into the module's object still counts, which is
+   * how the negative fixtures are written.
+   *
+   * EVERY FILE THE OBJECT IS TYPED IN IS ITS HOME. The aggregate and its area files are one object
+   * written in several places, so none of them is a renderer of it: an area file naming a key of
+   * `copy` in its own code would be the object describing itself.
+   *
+   * A SPREAD THIS CANNOT FOLLOW IS A FINDING, for the reason printed below about a module whose object
+   * cannot be found: a spread of a name no relative import brings in, or of a file with no such
+   * object in it, is a set of sentences this gate would otherwise pass over in silence.
+   *
+   * AND A KEY TYPED IN TWO OF THOSE FILES IS A FINDING, the one shape the split made possible. While
+   * `copy` was one object a second `x:` was a type error; across two spreads TypeScript takes the later
+   * one without a word, so the other sentence is typed, reviewed and shipped and reaches no screen. By
+   * name it looked rendered, because both are `copy.x`, so it is caught here and kept out of `entries`.
+   */
+  const unreadable = [];
+  const twice = [];
   const entries = [];
-  for (const m of defined)
-    for (const k of (bodies.get(m.at) ?? '').matchAll(/^ {2}(?:['"]([^'"]+)['"]|([A-Za-z_$]\w*))\s*:/gmu))
-      entries.push({ ...m, key: k[1] ?? k[2], name: `${m.object}.${k[1] ?? k[2]}` });
+  const defs = new Set(defined.map((m) => m.at));
+  for (const m of defined) {
+    const source = sources.get(m.at) ?? '';
+    const body = bodyOf(source, m.object);
+    if (body === null) {
+      unreadable.push(`${m.file}: no \`export const ${m.object}\` in it, so none of its sentences were checked`);
+      continue;
+    }
+    const imported = new Map();
+    for (const i of source.matchAll(/import\s*\{([^}]*)\}\s*from\s*['"](\.{1,2}\/[^'"\n]+)['"]/gu))
+      for (const named of i[1].split(',')) {
+        const local = named.trim().split(/\s+as\s+/u).at(-1);
+        if (local) imported.set(local, resolve(dirname(m.at), i[2]));
+      }
+    const homes = new Set([m.at]);
+    const typed = [{ at: m.at, body }];
+    for (const s of body.matchAll(/^ {2}\.\.\.([A-Za-z_]\w*)\s*,?\s*$/gmu)) {
+      const at = imported.get(s[1]);
+      const area = at === undefined ? null : bodyOf(sources.get(at) ?? '', s[1]);
+      if (at === undefined || area === null) {
+        unreadable.push(`${m.file}: spreads \`...${s[1]}\`, and no relative import of it leads to an \`export const ${s[1]}\`, so none of its sentences were checked`);
+        continue;
+      }
+      homes.add(at);
+      defs.add(at);
+      typed.push({ at, body: area });
+    }
+    const typedIn = new Map();
+    for (const t of typed)
+      for (const k of t.body.matchAll(/^ {2}(?:['"]([^'"]+)['"]|([A-Za-z_$]\w*))\s*:/gmu)) {
+        const key = k[1] ?? k[2];
+        const first = typedIn.get(key);
+        if (first !== undefined) {
+          twice.push(`${m.object}.${key}: typed in ${relative(root, first)} and in ${relative(root, t.at)}, and only one of the two can reach a screen`);
+          continue;
+        }
+        typedIn.set(key, t.at);
+        entries.push({ object: m.object, homes, key, name: `${m.object}.${key}` });
+      }
+  }
 
   /* THE NAME AS A USE OF IT IS WRITTEN, which is what the allow-list and both reports are keyed on.
      This held a bare key while there was one module to hold, and a bare key across two is a name
@@ -263,13 +327,14 @@ export default async function deadCopy(root = process.env.BRAINDOG_GATE_ROOT ?? 
   const names = entries.map((e) => e.name);
 
   const dead = [];
-  for (const { object, key, at, name } of entries) {
+  for (const { object, key, homes, name } of entries) {
     const used = new RegExp(String.raw`\b${object}\.${key}\b|\b${object}\[['"]${key}['"]\]`);
     let found = false;
     for (const [f, s] of sources) {
-      /* ITS OWN FILE IS NOT A RENDERER, AND ONLY ITS OWN. The other module is an ordinary file a
-         route reaches, so a key of this one named there is a use like any other. */
-      if (f === at || !reachable.has(f)) continue;
+      /* ITS OWN FILES ARE NOT RENDERERS, AND ONLY ITS OWN: the module and the area files it spreads.
+         The other module is an ordinary file a route reaches, so a key of this one named there is a
+         use like any other. */
+      if (homes.has(f) || !reachable.has(f)) continue;
       if (used.test(s)) {
         found = true;
         break;
@@ -290,8 +355,7 @@ export default async function deadCopy(root = process.env.BRAINDOG_GATE_ROOT ?? 
      the first version of this line counted `copy.ts` on one side and not the other, so a two-file
      fixture reported "3 of 2". If the two ever read the same the reachability walk has
      stopped narrowing anything, which is either good news or a resolver quietly matching nothing, and
-     from outside those look identical. */
-  const defs = new Set(defined.map((m) => m.at));
+     from outside those look identical. `defs` holds the area files too, since they define. */
   const renderers = [...reachable].filter((f) => !defs.has(f)).length;
   console.log(
     `  dead-copy: ${names.length} sentences, ${dead.length} unrendered (${ALLOWED.size} known), over ${renderers} of ${files.length - defs.size} files a route reaches`,
@@ -300,11 +364,19 @@ export default async function deadCopy(root = process.env.BRAINDOG_GATE_ROOT ?? 
   /* A MODULE WHOSE OBJECT COULD NOT BE FOUND IS A FINDING AND NOT A ZERO, and this gate proved its
      own point while it was being written: a stray byte in the pattern made both modules unreadable,
      every body came out empty, and the line it printed was `0 sentences, 0 unrendered`, which reads
-     exactly like a clean run. That is the shape this gate exists to catch, one level up. */
+     exactly like a clean run. That is the shape this gate exists to catch, one level up.
+
+     AND NOW IT FAILS THE RUN. It was printed and the run went on, with the summary's count as the
+     only other sign. An aggregate that cannot follow one of its spreads loses one area's sentences
+     and still prints a large, healthy-looking count, so the finding has to turn the run red. */
   if (unreadable.length) {
     console.error('\n  a copy module this gate could not read:');
-    for (const m of unreadable)
-      console.error(`      ${m.file}: no \`export const ${m.object}\` in it, so none of its sentences were checked`);
+    for (const why of unreadable) console.error(`      ${why}`);
+  }
+
+  if (twice.length) {
+    console.error('\n  a sentence typed twice, so one of them is read by nobody:');
+    for (const why of twice) console.error(`      ${why}`);
   }
 
   if (unexpected.length) {
@@ -325,7 +397,7 @@ export default async function deadCopy(root = process.env.BRAINDOG_GATE_ROOT ?? 
   if (gone.length && names.length > ALLOWED.size)
     console.log(`      (${gone.length} allow-listed key(s) no longer defined: ${gone.join(', ')})`);
 
-  if (unexpected.length || revived.length) return 1;
+  if (unexpected.length || revived.length || unreadable.length || twice.length) return 1;
 }
 
 /* AND IT IS STILL A SCRIPT, because `self-test` spawns it at two seeded trees with

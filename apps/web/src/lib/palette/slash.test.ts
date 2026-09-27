@@ -17,7 +17,7 @@ import assert from 'node:assert/strict';
 import type { Reading, SlashProposal, SlashStatus } from '@braindog/client';
 
 import { copy } from '../copy.ts';
-import { capLine, drawProposal, drawReading, offersSlash, pass2Refused, secondPass, slashWords, whereWords } from './slash.ts';
+import { capLine, drawProposal, drawReading, FIGURES_TRACE, offersSlash, pass2Refused, secondPass, slashWords, whereWords } from './slash.ts';
 
 const ASK = { slash: true, prefix: null, text: 'which invoices are late', pending: false, places: 0 };
 
@@ -126,25 +126,40 @@ test('A DRAFT THAT DID NOT FIT IS A KEYWORD SEARCH, and the drawing says which o
  * The markup cannot be held here; these are the four decisions it makes, each of which `23 §6` or `23 §8` states as a rule.
  */
 
+const FIGURES = { 'ref:tasks#1': { kind: 'row', register: 'tasks', seq: 1, title: 'Invoice Acme' } };
+
 const PROPOSAL: SlashProposal = {
-  text: 'Two invoices are open. [tasks#1] is the older.',
+  text: 'Two invoices are open. {{ref:tasks#1}} is the older.',
   citations: ['tasks#1', 'tasks#12'],
   verbs: ['decide', 'defer', 'dismiss'],
   body_kind: 'options',
-  body: { options: [] },
+  body: { options: [], figures: FIGURES },
   model: 'glm-5.3',
   filed: 'SG14',
   read: READING.read,
 };
 
-test('PASS 2 IS ASKED ONLY WHEN PASS 1 FOUND ROWS: zero rows is zero inference (`23 §6`)', () => {
+test('PASS 2 IS ASKED ONLY WHEN PASS 1 FOUND ROWS OR A FIGURE: nothing found is zero inference (`23 §6`)', () => {
   assert.equal(secondPass(READING), true);
   assert.equal(secondPass({ ...READING, rows: [] }), false);
+  /* A FIGURE READ IS SOMETHING TO TALK ABOUT, so "why is runway four months" is asked on when no row matched. */
+  const figured = { ...READING, rows: [], read: [{ register: FIGURES_TRACE, rows: 1, predicate: '["runway-months"]' }, ...READING.read] };
+  assert.equal(secondPass(figured), true);
+  /* AND THE FOLD SAYS IT IN WORDS, never as a list's id. */
+  assert.equal(drawReading(figured).fold[0], slashWords.figuresLine(1));
+});
+
+test('A ROW IS DRAWN BY ITS TITLE, never by the spoken id the host puts in front of it', () => {
+  const drawn = drawReading({ ...READING, rows: [{ id: 'r_1', register: 'tasks', seq: 1, spoken: 'tasks#1', summary: 'tasks#1 | Invoice Acme | open', fields: {} }] });
+  assert.equal(drawn.rows[0]?.title, 'Invoice Acme');
 });
 
 test('A PROPOSAL IS DRAWN WITH ITS MODEL IN THE FOOTER, ALWAYS, and with a way to Decide what it filed', () => {
   const drawn = drawProposal(PROPOSAL);
   assert.equal(drawn.text, PROPOSAL.text);
+  /* THE FIGURES TRAVEL WITH THE SENTENCE, so `Cited` draws the brace as the row it names. */
+  assert.deepEqual(drawn.figures, FIGURES);
+  assert.doesNotMatch(slashWords.decide, /SG/u);
   assert.equal(drawn.footer, slashWords.drawnBy('glm-5.3'));
   assert.match(drawn.footer, /glm-5\.3/u);
   assert.equal(drawn.decide, '/decide/SG14');

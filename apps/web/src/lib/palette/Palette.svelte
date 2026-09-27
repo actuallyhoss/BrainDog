@@ -1,18 +1,12 @@
 <!--
-  The palette: a PANEL down one edge that reaches OBJECTS, not a box in the middle that reaches
-  screens.
+  The palette: a centred dialog that reaches OBJECTS, not only the screens they live on.
 
-  IT WAS A 680px CENTRED DIALOG and that is the wrong shape for what is in it. This surface lists
-  every command, every page, every saved list, every figure, every open question, the rows you
-  changed last and every row the record answers with. In a centred box that is a column of
-  thirty-two rows with two thirds of the screen dimmed and empty, and the page you are navigating
-  FROM hidden underneath it. So it is now full height, hard against the inline end, at two thirds
-  of the width: the room is what lets a question's whole sentence, a figure's reading and a row's
-  reason sit on the line beside the name instead of being cut at an ellipsis, and the height is
-  what lets the groups be read rather than scrolled. The remaining third still shows the page you
-  came from, which is what makes it read as a panel on the app rather than a modal over it.
-  the old tool's command palette (`C:\Tools\legacy`, `loop/research-brain-study.md`) is the reference
-  and its own comment makes the same argument in the same words.
+  A 640px DIALOG 12vh FROM THE TOP, AND THE WHOLE SCREEN ON A PHONE (design SYS-13). It was a panel
+  two thirds of the width, pinned to the inline end, and at 1440 it cut the page title in half and
+  read as a second app beside the first. Centred and narrow, it sits over the page as one question
+  being asked of it; on a phone the field is in the top bar and the results fill what is left. Each
+  result is a glyph, a title and one line saying where it sits (`Result.svelte`), so the width a
+  result needs is the width of its title and not of a row of columns.
 
   AND THE OBJECTS COME FIRST IN IT. The groups used to be ranked commands, destinations, pages,
   figures, decisions, with everything the record answered with underneath all of them, so typing
@@ -30,12 +24,10 @@
   out. The rule is enforced there, in `commands()`, so nothing in this file can add a row that
   fails it. This file applies the same standing rule to the objects it draws.
 
-  EVERY ROW PRINTS ITS BINDING, AND THE LEGEND IS GONE. Grossman et al. (CHI 2007) measured the
-  opposite of the obvious: the strongest visual hotkey feedback produced LESS hotkey use than a
-  plain control, 50 per cent against 57.1. What a footer full of keys teaches is nothing, because
-  nobody is looking at the footer. The moment a person is actually looking is the result row they
-  are about to press, so the key is printed there, read from the keymap registry so it cannot drift
-  from what is bound. The `?` sheet is still where the whole map lives.
+  NO KEY IS PRINTED ON THE SURFACE, and no legend of them under it (design SYS-13). A key on every
+  row and a grammar in a mono footer read as a tool for the people who wrote it. A row with a
+  binding shows it in a tooltip when a mouse rests on it at desktop width, read from the keymap
+  registry so it cannot drift from what is bound, and the `?` sheet is where the whole map lives.
 
   Prefixes work in EVERY mode: `>` commands, `#` rows, `@` people, `/` pages and registers, none is
   everything ranked. GitHub's palette has one grammar per mode and a second opener that fast-paths
@@ -53,7 +45,7 @@
   import { apiBase, at } from '../at.ts';
   import { goto, invalidateAll } from '$app/navigation';
   import { page } from '$app/state';
-  import { TONES, since } from 'braindog-render';
+  import { since } from 'braindog-render';
   import { copy } from '../copy.ts';
   import { terms, tokensOf } from '../record/find.ts';
   import { BINDINGS, overlays } from '../a11y/keys.svelte.ts';
@@ -65,6 +57,8 @@
   import Kbd from '../ui/Kbd.svelte';
   import Icon from '../ui/Icon.svelte';
   import type { IconName } from '../ui/Icon.svelte';
+  import Result from './Result.svelte';
+  import { listName } from '../record/names.ts';
   import { commands, type Act, type Creation } from './admit.ts';
   import { addRow, creation, offered, words as createWords } from './create.ts';
   import type { List, Recent } from '../record/palette.ts';
@@ -72,6 +66,7 @@
   import type { Metric } from '../record/api.ts';
   import { latest } from './latest.ts';
   import { capLine, drawProposal, drawReading, offersSlash, pass2Refused, secondPass, slashWords, type Drawn, type DrawnProposal } from './slash.ts';
+  import Cited from '../ui/Cited.svelte';
   import type { SlashStatus } from '@braindog/client';
 
   let { open = $bindable(false), nav }: { open?: boolean; nav: NavEntry[] } = $props();
@@ -87,8 +82,7 @@
     value?: string | undefined;
     tone?: 'good' | 'warn' | 'bad' | 'info' | undefined;
     icon?: IconName | undefined;
-    spoken?: string | undefined;
-    /** A binding id from the registry, printed on the trailing edge. Never a key spelled here. */
+    /** A binding id from the registry, shown in the row's hover tooltip at desktop width. Never a key spelled here. */
     binding?: string | undefined;
     act?: Act | undefined;
     /**
@@ -156,7 +150,9 @@
   let slash = $state<{ q: string; question: string; drawn: Drawn | null; fix: string | null; second: Second | null } | null>(null);
   const slashShown = $derived(slash !== null && slash.q === q ? slash : null);
   const unreached = (e: unknown) => ({ ok: false as const, refusal: { code: 'UNREACHABLE', fix: e instanceof Error ? e.message : String(e) } });
-  const client = () => import('@braindog/client').then(({ createClient }) => createClient({ base: page.url.origin }));
+  /* THE RECORD ON SCREEN, AT ITS OWN BASE. `page.url.origin` asked `/api/slash/*` at the bare host, which on the Cloud is
+     no record at all: every ask from `/app/<slug>/…` went to the root and never reached the record it was typed on. */
+  const client = () => import('@braindog/client').then(({ createClient }) => createClient({ base: apiBase() }));
   const slashAsk = latest((question: string) =>
     client()
       .then((c) => c.slashRead(question))
@@ -256,7 +252,7 @@
   /** The rows changed last and the figures, read once each time a live palette opens. */
   let extra = $state<{ recent: Recent[]; figures: Metric[] } | null>(null);
 
-  /** Which register `@` narrows to. Named once, so the footer's promise and the filter cannot drift. */
+  /** Which register `@` narrows to. Named once, so the filter and the overflow row's door cannot drift. */
   const PEOPLE = 'people';
 
   /**
@@ -317,32 +313,27 @@
   const rankOf = (group: string): number => RANK[group] ?? (REGISTER_NAMES.has(group) ? 1 : 5);
 
   /**
-   * HOW MANY ROWS THE PANEL DRAWS, and it is not the twenty a centred box could hold.
-   *
-   * Twenty was the cap while the surface was 680 by 620: past that the list was a scroller with no
-   * end in sight, so the cut was kinder than the scroll. Full height at two thirds of the width
-   * shows about thirty rows without moving, and the groups below the fold are ones a reader can
-   * see the shape of. The cut is still there, because a palette that draws the whole record is a
-   * register in a costume.
+   * HOW MANY ROWS THE PALETTE DRAWS, and the cut is there because a palette that draws the whole
+   * record is a register in a costume. Past it, the overflow row is the door to `/search`, which
+   * keeps each list whole with its own count.
    */
   const CAP = 60;
 
   /**
    * AND HOW MANY OF THEM THE RECORD GETS, which used to be twelve.
    *
-   * Twelve was `50 §5.5` step 3's number for a box that could show twenty rows in total. The panel
-   * is not that box, and `search()`'s own default is twenty-four: the round-robin hands one hit per
-   * source per round, so across nine sources a smaller budget is frequently one row per list, which
-   * is the defect the rotation was added to fix showing up again at the cap.
+   * `search()`'s own default is twenty-four: the round-robin hands one hit per source per round, so
+   * across nine sources a smaller budget is frequently one row per list, which is the defect the
+   * rotation was added to fix showing up again at the cap.
    */
   const RECORD_CAP = 24;
 
   /**
    * WHAT IS WAITING ON YOU, capped.
    *
-   * A decision with nothing typed is the one thing in the record that is about today, and the
-   * panel has the height to say so. It is a cut and not the whole queue because a queue longer
-   * than the panel is a screen: `/decide` is the door, and it is one row up in this same list.
+   * A decision with nothing typed is the one thing in the record that is about today, so the
+   * palette opens on it. It is a cut and not the whole queue because a queue longer than the
+   * palette is a screen: `/decide` is the door, and it is one row up in this same list.
    */
   const OPEN_CAP = 6;
 
@@ -445,10 +436,9 @@
       return (slashShown.drawn?.rows ?? []).map((r) => ({
         id: `s-${r.id}`,
         title: r.title,
-        detail: listNamed.get(r.register)?.name ?? REGISTERS[r.register]?.name ?? r.register,
+        detail: listNamed.get(r.register)?.name ?? listName(r.register),
         href: r.href,
         group: copy.slashFound,
-        spoken: r.spoken,
         icon: listNamed.get(r.register)?.icon ?? 'rows',
       }));
     const needle = text.toLowerCase();
@@ -493,7 +483,7 @@
     const spoken = SPOKEN.exec(text.toUpperCase());
     const qualified = QUALIFIED.exec(text);
     if (spoken) out.push({ id: 'spoken', title: text.toUpperCase(), detail: copy.openById, href: `/${text.toUpperCase()}`, group: copy.records, icon: 'arrow' });
-    if (qualified) out.push({ id: 'qualified', title: text, detail: `${listNamed.get(qualified[1]!)?.name ?? REGISTERS[qualified[1]!]?.name ?? qualified[1]} row`, href: `/r/${qualified[1]}/${qualified[2]}`, group: copy.records, icon: 'arrow' });
+    if (qualified) out.push({ id: 'qualified', title: text, detail: `${listNamed.get(qualified[1]!)?.name ?? listName(qualified[1]!)} row`, href: `/r/${qualified[1]}/${qualified[2]}`, group: copy.records, icon: 'arrow' });
 
     // Strict-prefix aliases outrank fuzzy matching. It is the only verified mechanism found that
     // keeps a growing action index from rotting (19 §7).
@@ -515,7 +505,7 @@
       const adding = every.find((c) => c.act === 'add');
       if (adding && live.creation) {
         const made = live.creation;
-        const list = addNamed.get(made.register) ?? REGISTERS[made.register]?.name ?? made.register;
+        const list = addNamed.get(made.register) ?? listName(made.register);
         out.push({ id: adding.id, title: createWords.row(list, made.title), href: null, group: createWords.group, icon: adding.icon, act: adding.act, creation: made });
       }
       const exact = admitted.filter((c) => starts(c.title) && c.title.toLowerCase().startsWith(needle));
@@ -598,7 +588,7 @@
      */
     if (prefix === null && text === '' && isLive) {
       for (const r of extra?.recent ?? [])
-        out.push({ id: `n-${r.target}`, title: r.title, detail: `${r.list} · ${since(r.at, shell.now ?? Date.now())}`, href: r.href, group: RECENT, spoken: r.spoken, icon: r.icon, complete: r.title });
+        out.push({ id: `n-${r.target}`, title: r.title, detail: `${r.list} · ${since(r.at, shell.now ?? Date.now())}`, href: r.href, group: RECENT, icon: r.icon, complete: r.title });
     }
 
     /**
@@ -606,18 +596,18 @@
      *
      * `search()` reaches the decisions the moment two characters are in the box, and before that
      * the panel listed nine destinations and said nothing about the four questions the record is
-     * actually holding. That is the whole argument for the height: a command surface that opens on
-     * an inventory of the record is a different object from one that opens on a menu of screens.
+     * actually holding. A command surface that opens on what the record is waiting for is a
+     * different object from one that opens on a menu of screens.
      *
      * Only with an empty query, because past that `search()` is already answering and a second
      * source for the same rows would draw each of them twice.
      */
     if (prefix === null && text === '')
       for (const question of (isLive ? (shell.questions ?? []) : []).slice(0, OPEN_CAP))
-        out.push({ id: `q-${question.id}`, title: question.title, detail: OPEN_QUESTION, href: `/decide/${question.id}`, group: copy.decide, spoken: question.id, icon: 'decide', complete: question.title });
+        out.push({ id: `q-${question.id}`, title: question.title, detail: OPEN_QUESTION, href: `/decide/${question.id}`, group: copy.decide, icon: 'decide', complete: question.title });
 
-    /* `@` IS PEOPLE, AND IT MATCHED NOTHING. The footer of this palette prints `@ people` and this
-       file's own header says the prefix works in every mode, and every branch that produces a row
+    /* `@` IS PEOPLE, AND IT MATCHED NOTHING. This file's own header says the prefix works in every
+       mode, and every branch that produces a row
        was guarded on a prefix that is not `@`, so typing a colleague's name behind it fell straight
        through to "Nothing matches". The record has a people register; the search already reaches it;
        the only thing missing was the register this prefix narrows to. */
@@ -648,19 +638,20 @@
       drawn = kept.length;
       /* GROUPED BY THE LIST THEY CAME OUT OF, not under one heading reading "Rows". Eight registers,
          the decisions and the pages all arrived as one undifferentiated block, so a person scanning
-         for a person had to read every obligation on the way. The width is what makes this pay:
-         `search()` round-robins across the sources, so the groups are short and all of them fit. */
+         for a person had to read every obligation on the way. `search()` round-robins across the
+         sources, so the groups are short. */
       for (const hit of kept)
         out.push({
           id: `h-${hit.href}`,
           title: hit.title,
           /* AND WHY IT IS IN THE LIST, when the title does not contain what was typed. `services`
              declares its provider searchable, so `nordhaven` now reaches three domains named after
-             none of it: useful, and unreadable without the reason. */
-          detail: hit.why ?? hit.detail,
+             none of it: useful, and unreadable without the reason. A row the record sends with
+             nothing beside its title says the list it is in, where its number used to stand, because
+             a list's name is something a person reads and a number is not (design SYS-13). */
+          detail: hit.why ?? (hit.detail || hit.kind),
           href: hit.href,
           group: hit.kind,
-          spoken: hit.spoken,
           icon: hit.icon,
           complete: hit.title,
         });
@@ -768,18 +759,14 @@
   const flat = $derived([...groups.flatMap(([, r]) => r), ...(overflow ? [overflow] : [])]);
 
   /**
-   * THE KEY A ROW PRINTS COMES OUT OF THE REGISTRY, never out of this file.
+   * THE KEY A ROW'S TOOLTIP SHOWS COMES OUT OF THE REGISTRY, never out of this file.
    *
    * `19 §4` makes the keymap "a registry the dispatcher consults" so that the `?` sheet documents
-   * the bindings by reading them and cannot drift. A palette row printing a key it spelled itself
+   * the bindings by reading them and cannot drift. A palette row showing a key it spelled itself
    * would be the second list that rule exists to prevent, and it is the list that goes stale first,
    * because a row is edited far more often than a binding.
    */
   const keyFor = (id: string | undefined): string | undefined => (id === undefined ? undefined : BINDINGS.find((b) => b.id === id)?.key);
-
-  /* The two the panel itself owns, on the row rather than in a footer: see the header. */
-  const RUN = keyFor('palette-run') ?? '↵';
-  const COMPLETE = keyFor('palette-complete') ?? '⇥';
 
   /**
    * THE ID A ROW ANSWERS TO, so that `aria-activedescendant` has something to point at.
@@ -887,7 +874,7 @@
    * and nothing was saved. The guard stays for a press that raced a refusal.
    */
   async function add(c: Creation) {
-    const list = addNamed.get(c.register) ?? REGISTERS[c.register]?.name ?? c.register;
+    const list = addNamed.get(c.register) ?? listName(c.register);
     if (!isLive) return;
     let out: Awaited<ReturnType<typeof addRow>>;
     try {
@@ -952,10 +939,10 @@
    * A modal `<dialog>` does not do this on its own, and the absence reads as the app being stuck:
    * the surface behind is visibly inert, so the first thing anybody tries is clicking it, and
    * nothing happening is the only feedback they get. Esc has always worked, which is exactly why
-   * this went unnoticed by whoever wrote it. It matters more now than it did: the panel leaves a
-   * third of the page showing, which is a third of a page somebody will aim at.
+   * this went unnoticed by whoever wrote it. A 640px dialog leaves most of a desktop screen dimmed
+   * around it, and all of that is somewhere a pointer will aim.
    *
-   * The test is GEOMETRY, not `e.target === el`. A click on the panel's own padding also targets
+   * The test is GEOMETRY, not `e.target === el`. A click on the dialog's own padding also targets
    * the dialog, so identity would close it when somebody clicks the gap beside the query.
    * `e.detail > 0` keeps real pointer clicks only: activating a button with the keyboard dispatches
    * a click whose coordinates are (0, 0), which is outside every rect on screen.
@@ -990,22 +977,20 @@
     <!--
       A WAY OUT A THUMB CAN REACH.
 
-      The only dismiss affordances were `Esc` and a click outside, and below 640px the panel is
-      `100vw x 100dvh`, so `onbackdrop`'s "is this click outside the rect" test can never be true.
-      Measured: six taps at the edges and corners, all six left it open. The `<kbd>Esc</kbd>` beside
-      the query is a label, not a control, and a phone has no Esc. So the app's only search, and the
-      phone's only route to several places, was a screen you could enter and not leave except by
-      choosing a result you did not want or using the OS back gesture.
+      The only dismiss affordances were `Esc` and a click outside, and below 640px the palette is
+      the whole screen, so `onbackdrop`'s "is this click outside the rect" test can never be true,
+      and a phone has no Esc. So the app's only search, and the phone's only route to several
+      places, was a screen you could enter and not leave except by choosing a result you did not
+      want or using the OS back gesture.
 
       `19 §4` gives Esc the job of closing "the topmost layer, one per press"; this is the same verb
-      for the pointer that has no Esc key. The `<kbd>` stays for the keyboard that does, and hides
-      under a coarse pointer where it is advice nobody can take.
+      for the pointer that has no Esc key. With a fine pointer on a wide screen it is not drawn:
+      Esc and the dimmed page around the dialog are both there, and no key is printed to say so.
     -->
     <!-- THE COUNT, ANNOUNCED AND VISIBLE. `13 §7` asks for a debounced `role="status"`; a reader who
          can see the list still benefits from knowing twelve of forty-eight are on screen, and a
          reader who cannot has nothing else to tell them the list changed. -->
     <p class="p-count" role="status">{announced}</p>
-    <kbd class="p-esc">Esc</kbd>
     <button type="button" class="p-close tap" onclick={() => (open = false)} aria-label={copy.close}>
       <Icon name="close" size="m" />
     </button>
@@ -1051,7 +1036,9 @@
       {:else if slashShown.drawn === null}
         <p class="p-none" role="status">{copy.slashAsking}</p>
       {:else}
-        {#if slashShown.drawn.rows.length === 0}<p class="p-none">{copy.slashNothing}</p>{/if}
+        <!-- NO ROW IS NOT NOTHING WHEN A FIGURE WAS READ: pass 2 is asked on that figure (`secondPass`), and a line saying
+             nothing answers would sit above the answer it gives. -->
+        {#if slashShown.drawn.rows.length === 0 && slashShown.second === null}<p class="p-none">{copy.slashNothing}</p>{/if}
         <!-- PASS 2, UNDER THE ROWS AND NEVER INSTEAD OF THEM (`23 §7`): the rows were drawn by code before any of this was
              written, which is the only reason the budget sentence below can be true. -->
         {#if slashShown.second}
@@ -1060,11 +1047,22 @@
               <p class="p-slash-said">{slashShown.second.refused.fix}</p>
               {#if slashShown.second.refused.without}<p class="p-slash-said">{slashShown.second.refused.without}</p>{/if}
             {:else if slashShown.second.drawn}
-              {#if slashShown.second.drawn.text}<p class="p-slash-text">{slashShown.second.drawn.text}</p>{/if}
-              {#if slashShown.second.drawn.decide}
-                <a class="p-slash-decide" href={at(slashShown.second.drawn.decide)} onclick={() => (open = false)}
-                  >{slashWords.decide(slashShown.second.drawn.decide.slice('/decide/'.length))}</a
+              <!-- SLASH'S SENTENCE WITH ITS BRACES DRAWN, never printed (`Cited`): a row is a link to the row, a figure is
+                   the figure. Following a link leaves the palette, as following any of its rows does; the listener is on
+                   the paragraph because the links are `Cited`'s, and a link's click and its Enter both arrive here. -->
+              {#if slashShown.second.drawn.text}
+                <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
+                <p
+                  class="p-slash-text"
+                  onclick={(e) => {
+                    if (e.target instanceof Element && e.target.closest('a')) open = false;
+                  }}
                 >
+                  <Cited text={slashShown.second.drawn.text} figures={slashShown.second.drawn.figures} />
+                </p>
+              {/if}
+              {#if slashShown.second.drawn.decide}
+                <a class="p-slash-decide tap" href={at(slashShown.second.drawn.decide)} onclick={() => (open = false)}>{slashWords.decide}</a>
               {/if}
               <!-- `23 §8`: EVERY ANSWER Slash GIVES CARRIES THE MODEL IN ITS FOOTER, ALWAYS. `drawProposal` never leaves it empty. -->
               <p class="p-slash-model">{slashShown.second.drawn.footer}</p>
@@ -1074,7 +1072,7 @@
           </section>
         {/if}
         <details class="p-slash-fold">
-          <summary>{copy.slashFold}</summary>
+          <summary class="p-slash-summary tap">{copy.slashFold}</summary>
           <ul>
             {#each slashShown.drawn.fold as line}<li>{line}</li>{/each}
           </ul>
@@ -1090,18 +1088,16 @@
     {/if}
   </div>
 
-  <!-- THE GRAMMAR, AND NOT THE KEYS. What is left down here is what the query box accepts, which is
-       a thing you read once before typing; the keys moved onto the rows, where somebody is looking.
-       `@ people` goes when the record has no people register, because a prefix that narrows to a
-       list this record does not hold is an instruction that cannot be followed. -->
-  <footer class="p-foot">
-    <!-- `23 §8` AT 80 %: ONE LINE, HERE, ONCE A MONTH. Not a chip, not a modal, and gone for the month once hidden. -->
-    {#if capShown && slashStatus}
+  <!-- A FOOTER ONLY WHEN THERE IS SOMETHING TO SAY IN IT. It held the query grammar in the identifier face,
+       `> commands · # rows · @ people · / pages`, on every open, which read as a tool for the people who built it
+       (design SYS-13). The prefixes still work for whoever knows them; nothing on this surface teaches them now. -->
+  <!-- `23 §8` AT 80 %: ONE LINE, HERE, ONCE A MONTH. Not a chip, not a modal, and gone for the month once hidden. -->
+  {#if capShown && slashStatus}
+    <footer class="p-foot">
       <span class="p-cap">{slashWords.capLine(slashStatus.asks.used, slashStatus.asks.cap, slashStatus.asks.resets)}</span>
       <button type="button" class="p-cap-hide tap" onclick={dismissCapLine}>{slashWords.capDismiss}</button>
-    {/if}
-    <span class="p-hint">&gt; commands · # rows{listNamed.has(PEOPLE) ? ' · @ people' : ''} · / pages</span>
-  </footer>
+    </footer>
+  {/if}
 </dialog>
 
 {#snippet result(row: Row)}
@@ -1118,40 +1114,17 @@
     onmouseenter={() => (cursor = index)}
     onclick={() => run(row)}
   >
-    {#if row.icon}<Icon name={row.icon} size="m" />{/if}
-    <span class="p-title">{row.title}</span>
-    {#if row.spoken}<span class="p-spoken">{row.spoken}</span>{/if}
-    <!-- THE GLYPH TRAVELS WITH THE TONE, always. `13 §5.1`: colour never carries meaning alone, and
-         under simulated dichromacy the four intent hues collapse, which is not a tuning problem but
-         an inescapable one (`13 §2.3`): five hues held to the same contrast target against the same
-         ground necessarily have the same luminance. `Chip` has enforced this since it was written
-         and this row drew a bare `data-intent` on a figure's reading, so a figure that is off target
-         and one that is on it looked the same to somebody who does not see red and green apart. The
-         `a11y` gate's own `intent-without-glyph` rule caught it, over 191 pages. -->
-    {#if row.value}
-      <span class="p-value" data-intent={row.tone}>
-        {#if row.tone}<span class="p-glyph" role="img" aria-label={TONES[row.tone].label}>{TONES[row.tone].glyph}</span>{/if}
-        {row.value}
-      </span>
-    {/if}
-    {#if row.detail}<span class="p-detail">{row.detail}</span>{/if}
-    <!-- THE BINDING, ON THE ROW. Grossman et al. found a legend teaches nothing because nobody is
-         looking at it; this is the moment somebody is. The row's own binding is always printed, and
-         the two the panel owns are printed on the row the cursor is on, which is the row about to
-         be run. -->
-    <span class="p-keys">
-      {#if bound}<Kbd keys={bound} />{/if}
-      {#if index === cursor}
-        <Kbd keys={RUN} />
-        {#if row.complete !== undefined}<Kbd keys={COMPLETE} />{/if}
-      {/if}
-    </span>
+    <Result icon={row.icon} title={row.title} line={row.detail} value={row.value} tone={row.tone} />
+    <!-- THE BINDING, IN A TOOLTIP AND NEVER ON THE SURFACE (design SYS-13). It is drawn only while a mouse rests on the
+         row at desktop width (the style block says when), and it is `aria-hidden` so the key is not read out as part of
+         the option's name: the `?` sheet is where a screen reader hears the keymap. -->
+    {#if bound}<span class="p-tip" aria-hidden="true"><Kbd keys={bound} /></span>{/if}
   </button>
 {/snippet}
 
 <style>
-  /* THE KEY IS ADVICE FOR A KEYBOARD, AND THE BUTTON IS FOR A THUMB. Exactly one of them is on
-     screen at a time, so the head never carries two ways to say the same thing. */
+  /* THE BUTTON IS FOR A THUMB, and a fine pointer on a wide screen has Esc and the dimmed page
+     around the dialog, so it is drawn only where neither is to hand. */
   .p-close {
     display: none;
   }
@@ -1172,10 +1145,6 @@
   }
 
   @media (pointer: coarse), (width < 640px) {
-    .p-esc {
-      display: none;
-    }
-
     .p-close {
       display: inline-flex;
       align-items: center;
@@ -1192,80 +1161,55 @@
   }
 
   /**
-   * A PANEL DOWN THE EDGE, NOT A BOX IN THE MIDDLE.
+   * A 640px DIALOG, CENTRED, 12vh FROM THE TOP (design SYS-13), and the whole screen below 640px.
    *
-   * It was `min(680px, 100vw - 16px)` by `min(72dvh, 620px)`, floating over the centre, which is
-   * what a command palette looks like everywhere and is wrong for this one. This surface lists the
-   * commands, the pages, the saved lists, the figures, the open questions, the rows you changed
-   * last and whatever the record answers with: in a 680px box that is a column with two thirds of
-   * a 1440px screen dimmed and empty beside it, and the page you are navigating FROM completely
-   * hidden.
-   *
-   * Two thirds of the width, full height, hard against the inline end. Floored so it is still a
-   * panel on a small laptop and capped so it does not become the whole page on an ultrawide. The
-   * width buys the row: a question's whole sentence, a figure's reading and target, a hit's reason
-   * for being in the list, all on the line beside the name instead of behind an ellipsis. The
-   * height buys the groups. And the third of the page still showing is what makes it read as a
-   * panel on the app rather than a modal over it.
-   *
-   * COLUMNS ARE NOT TAKEN, and the reason is the keyboard. Slash flows its groups into CSS columns,
-   * which the browser decides and the DOM does not record, so its arrow keys have to measure every
-   * row's bounding box on every press to work out what is above what. That is a real mechanism and
-   * it is not this change; a column layout without it would put `↓` on the row to the right.
+   * It was a panel two thirds of the width, full height, hard against the inline end, and at 1440 it
+   * cut the page title in half. A result is now a glyph, a title and one line, which needs the width
+   * of a title and not of a row of columns, so the dialog is the width of a reading column and the
+   * page stays whole around it. Its height is its content's, up to what leaves the same 12vh free
+   * below it, and past that the list scrolls inside it.
    *
    * THE EXPLICIT SIZES ARE NOT REDUNDANT: see `Sheet.svelte`. The UA stylesheet gives `<dialog>` a
-   * `height: fit-content` that beats the stretch two insets ask for, and a
-   * `max-height: calc(100% - 6px - 2em)` and matching `max-width` that leave a dead strip of dimmed
-   * page along two edges.
+   * `max-height: calc(100% - 6px - 2em)`, a matching `max-width` and an automatic margin on both
+   * axes, and each of those would move or cut the dialog this places.
    */
   .palette {
     position: fixed;
-    inset-block: 0;
-    inset-inline-end: 0;
-    inset-inline-start: auto;
+    inset-block-start: 12vh;
+    inset-block-end: auto;
+    inset-inline: 0;
     z-index: var(--z-palette);
     display: flex;
     flex-direction: column;
-    inline-size: clamp(560px, 66vw, 1100px);
-    max-inline-size: 100%;
-    block-size: 100dvh;
-    max-block-size: 100dvh;
-    margin: 0;
+    inline-size: 640px;
+    max-inline-size: calc(100% - 2 * var(--gutter));
+    block-size: auto;
+    max-block-size: 76dvh;
+    margin-block: 0;
+    margin-inline: auto;
     padding: 0;
     background: var(--s1);
-    border: 0;
-    border-inline-start: 1px solid var(--line);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
     color: var(--ink);
     box-shadow: var(--e3);
     overflow: hidden;
   }
 
+  /* NO ENTRANCE. It used to slide in from the edge; it is opened from the keyboard far more often
+     than from anything else, and nothing moves when something is opened from the keyboard (design
+     brief §3, Motion). It is there on the frame the key is pressed. */
   .palette:not([open]) {
     display: none;
   }
 
   .palette[open] {
     display: flex;
-    animation: slide-in var(--d-enter) var(--ease-spring);
-  }
-
-  /* No `opacity: 0` in a start state: see Sheet.svelte. A CSS animation stays pending until its
-     first rendered frame, and a dialog entering the top layer with sixty rows in it can wait a
-     while for one. A stalled slide is a panel 24px out of place; a stalled fade is no panel, and
-     this is the one surface somebody reaches for a hundred times a day. */
-  @keyframes slide-in {
-    from {
-      transform: translateX(24px);
-    }
   }
 
   /* `--scrim`, not a colour. This and `Sheet.svelte` each wrote their own `color-mix` over
      `black`, six per cent apart: two strengths of the same *behind*, and neither of them chosen.
-     `colour-grep` was blind to both, because a colour with a name is not hex.
-
-     IT DIMS A THIRD OF THE SCREEN NOW RATHER THAN ALL OF IT, because the panel covers the rest.
-     That is the point of the shape and not a side effect: the page you came from stays legible
-     beside the list you are searching it with. */
+     `colour-grep` was blind to both, because a colour with a name is not hex. */
   .palette::backdrop {
     background: var(--scrim);
   }
@@ -1281,10 +1225,11 @@
   }
 
   /* The state change the input gave up. It is the row that looks like a field, so it is the row
-     that should say it is live, and a border warming to the accent is a change a person reads
-     without it reading as an error. */
+     that says it is live, and it says it the way every focused field in the product does: its edge
+     darkens to `--ink2` (`a11y.css`). It was the accent, and a red rule under the query read as a
+     validation error before anything had been typed (design SYS-1). */
   .p-head:focus-within {
-    border-block-end-color: var(--accent);
+    border-block-end-color: var(--ink2);
     color: var(--ink2);
   }
 
@@ -1323,14 +1268,6 @@
     color: var(--dim);
   }
 
-  .p-esc {
-    padding: 1px 6px;
-    border: 1px solid var(--line);
-    border-radius: var(--r-sm);
-    font-family: var(--font-id);
-    font-size: var(--t-xs);
-  }
-
   /**
    * THE BOX THAT SCROLLS IS THE LISTBOX, AND FOR A MOMENT IT WAS THE WRAPPER AROUND IT.
    *
@@ -1347,7 +1284,7 @@
     flex: 1;
     flex-direction: column;
     /* A flex child's floor is its content, so without this the list cannot be shorter than its rows
-       and the panel grows instead of scrolling. */
+       and the dialog grows past its cap instead of scrolling. */
     min-block-size: 0;
   }
 
@@ -1364,18 +1301,18 @@
     font-weight: 500;
   }
 
-  /* `--ctl-h`, BECAUSE THESE ARE THE PHONE'S ROUTE TO SEVERAL PLACES. 38px, adjacent, with no gap
-     between neighbours, in one scroller, on a surface whose whole job is to get somebody somewhere.
-     `05 §6`: the pointer decides, and on a fine one this is still 32. */
+  /* A MENU ROW WITH A FINE POINTER, 44px WITH A COARSE ONE, AND 56px ON A PHONE, where a result is
+     two lines (`Result.svelte`) and is the phone's route to several places (design brief §6). What
+     the row draws is `Result`'s; this is the box the arrow keys and the pointer walk. */
   .p-row {
+    position: relative;
     display: flex;
     align-items: center;
-    gap: var(--sp-3);
     inline-size: 100%;
-    min-block-size: var(--ctl-h);
-    padding: 0 var(--sp-2);
+    min-block-size: var(--row-h);
+    padding: var(--sp-1) var(--sp-2);
     border: 0;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-md);
     background: none;
     color: var(--ink2);
     font: inherit;
@@ -1383,72 +1320,48 @@
     cursor: pointer;
   }
 
-  /* The cursor row takes the rail's "here": `s2` and full ink, no accent wash. */
-  .p-row[data-cursor] {
-    background: var(--s2);
-    color: var(--ink);
+  @media (pointer: coarse) {
+    .p-row {
+      min-block-size: var(--tap);
+    }
   }
 
-  .p-row[data-cursor] :global(.icon) {
+  @media (width < 640px) {
+    .p-row {
+      min-block-size: var(--row-h-2);
+    }
+  }
+
+  /* The cursor row is the current thing, and the current thing is `--selected` everywhere in the
+     product (design brief §3): opaque and mixed into the ground, so it shows in both schemes. */
+  .p-row[data-cursor] {
+    background: var(--selected);
+  }
+
+  .p-row[data-cursor] :global(.result-glyph) {
     color: var(--ink2);
   }
 
-  /* A CAP, NOT A `flex: none`. A question's title is a whole sentence and the panel has the room for
-     most of one; what it must not do is push the reading and the reason off the end of the row. */
-  .p-title {
-    flex: 0 1 auto;
-    max-inline-size: 60ch;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .p-spoken {
-    flex: none;
-    padding: 0 5px;
-    background: var(--sunk);
-    border: 1px solid var(--line);
+  /* THE HOVER TOOLTIP, and the only place a key reaches this surface: a small raised mark at the
+     row's trailing edge, drawn only where a mouse can rest on the row at desktop width. */
+  .p-tip {
+    display: none;
+    position: absolute;
+    inset-inline-end: var(--sp-2);
+    inset-block-start: 50%;
+    padding: var(--sp-1) var(--sp-2);
+    background: var(--s2);
     border-radius: var(--r-sm);
+    box-shadow: var(--e1);
     color: var(--dim);
-    font-family: var(--font-id);
     font-size: var(--t-xs);
+    transform: translateY(-50%);
   }
 
-  /* A FIGURE'S READING, IN THE INTENT IT WAS MEASURED AGAINST. `data-intent` is `blocks.css`'s
-     map and the only place an intent becomes a colour; with no tone declared the figure is ordinary
-     text, which is right, because a number with no verdict on it is not news. */
-  /* The glyph rides the value's own colour and sits tight against it: it is one reading, not a
-     figure with a badge next to it. Sized in `em` for the same reason it inherits the colour — it
-     is a slightly quieter mark on `.p-value`'s own size, not a fixed size of its own, and
-     `.p-value` itself is not fixed to one `--t-*` step everywhere this row renders. */
-  .p-glyph {
-    margin-inline-end: 3px;
-    font-size: 0.9em;
-  }
-
-  .p-value {
-    flex: none;
-    color: var(--tone, var(--ink));
-    font-variant-numeric: tabular-nums;
-  }
-
-  .p-detail {
-    flex: 1;
-    color: var(--dim);
-    font-size: var(--t-sm);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  /* Pushed to the trailing edge, and it keeps its place when it is empty so the rows do not shuffle
-     as the cursor moves down them. */
-  .p-keys {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-1);
-    margin-inline-start: auto;
-    flex: none;
+  @media (hover: hover) and (pointer: fine) and (width >= 900px) {
+    .p-row:hover .p-tip {
+      display: block;
+    }
   }
 
   .p-none {
@@ -1456,10 +1369,13 @@
     color: var(--dim);
   }
 
+  /* EVERY LINE SLASH'S ANSWER DRAWS BREAKS WHERE IT MUST (`overflow-wrap: anywhere`): a predicate over a long value, a
+     row's title or a model's name can be one unbroken word, and at 390px one of those would push the panel sideways. */
   .p-slash-where {
     margin: 0;
     padding: var(--sp-3) var(--sp-4) 0;
     color: var(--ink2);
+    overflow-wrap: anywhere;
   }
 
   .p-slash-label {
@@ -1473,12 +1389,18 @@
     font-size: var(--t-sm);
   }
 
+  /* A 44px TARGET ON A COARSE POINTER through `.tap`, whose hit box grows past the line it sits on. */
+  .p-slash-summary {
+    cursor: pointer;
+  }
+
+  /* WORDS IN THE UI FACE, not the identifier face: a fold line is a sentence about a list, and nobody wrote it as code. */
   .p-slash-fold ul {
     margin: var(--sp-2) 0 0;
     padding: 0;
     list-style: none;
-    font-family: var(--font-id);
     font-size: var(--t-xs);
+    overflow-wrap: anywhere;
   }
 
   .p-slash-second {
@@ -1495,19 +1417,25 @@
     max-inline-size: var(--measure);
     color: var(--ink2);
     line-height: var(--lh-body);
+    overflow-wrap: anywhere;
   }
 
+  /* A LINK IS INK WITH ITS UNDERLINE (design brief §10), never the brand's red, and a 44px target through `.tap`. */
   .p-slash-decide {
     align-self: flex-start;
-    color: var(--accent);
+    color: var(--link);
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, var(--ink) 40%, transparent);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
   }
 
-  /* RECEDED, SMALL, MONO (`23 §8`), and still there on every proposal. */
+  /* RECEDED AND SMALL (`23 §8`), and still there on every proposal. */
   .p-slash-model {
     margin: 0;
     color: var(--dim);
-    font-family: var(--font-id);
     font-size: var(--t-xs);
+    overflow-wrap: anywhere;
   }
 
   .p-cap {
@@ -1525,41 +1453,48 @@
     cursor: pointer;
   }
 
+  /* THE FOOTER WRAPS (defects U4). The line and the button that hides it sat on one row that could
+     not break, so a long sentence had nowhere to go but past the edge; now the button drops under
+     the sentence when the two do not fit side by side. */
   .p-foot {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: var(--sp-2);
+    gap: var(--sp-1) var(--sp-2);
     padding: var(--sp-2) var(--sp-4);
     border-block-start: 1px solid var(--line);
     color: var(--dim);
     font-size: var(--t-xs);
   }
 
-  .p-hint {
-    margin-inline-start: auto;
-    font-family: var(--font-id);
-  }
-
-  /* THE PHONE HAS NO THIRD OF A PAGE TO SPARE. Below 640 the panel is the screen, which is what it
-     already was, and the only thing the new shape changes is that it no longer has a corner. */
+  /**
+   * ON A PHONE THE PALETTE IS THE SCREEN, with the field in a top bar `--sticky` tall (design brief
+   * §6), because a dialog floating over 390px would be a narrower screen inside the screen.
+   *
+   * EACH INSET IS PAID HERE, ONCE. The top one is under the bar, because the palette sits in the top
+   * layer and nothing of the shell's padding reaches it; the bottom one and the keyboard (`--kb`,
+   * which `a11y/keyboard.ts` writes while one is up) are at the end of the list, so its last row can
+   * still be scrolled clear of both.
+   */
   @media (width < 640px) {
     .palette {
-      inline-size: 100vw;
-      border-inline-start: 0;
+      inset-block: 0;
+      inline-size: 100%;
+      max-inline-size: 100%;
+      block-size: 100dvh;
+      max-block-size: 100dvh;
+      padding-block-start: env(safe-area-inset-top, 0px);
+      border: 0;
+      border-radius: 0;
     }
 
-    .p-title {
-      max-inline-size: none;
+    .p-head {
+      block-size: var(--sticky);
+      padding-block: 0;
     }
 
-    /* The keys are advice for a keyboard that is not there, and they cost the row the width its
-       detail needs. `05 §6`: the pointer decides. */
-    .p-keys {
-      display: none;
-    }
-
-    .p-hint {
-      display: none;
+    #palette-list {
+      padding-block-end: calc(var(--kb) + env(safe-area-inset-bottom, 0px) + var(--sp-2));
     }
   }
 </style>

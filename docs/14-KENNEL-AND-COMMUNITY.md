@@ -8,53 +8,69 @@ So this document is about distribution, and the marketplace is one instrument in
 
 ---
 
-## 1 · The Kennel is an index, not a platform
+## 1 · The Kennel is an index over files, with a door to publish through
 
-> **A pack is a file, so the marketplace is an index over files.** — [ADR-047](16-DECISIONS.md)
+> **A pack is a file, so the marketplace is an index over files.** [ADR-047](16-DECISIONS.md)
 
-The precedent, measured on 2026-08-31:
+That stays true, and it is why the Kennel is small. The best extension ecosystems in this kind of tool are
+an index and the files it points at (Obsidian's community plugins are two JSON files in one public
+repository; Homebrew's taps are the same shape), and BrainDog's catalogue format was already that: an
+`index.json` over immutable files, each version held to its checksum and, when its author signed it, to
+their key.
+
+What changed is who can add to the index. It was a folder bundled into each web build from this
+repository's `packs/`, so nobody but a committer could publish, and a new version waited for a deploy.
+The Kennel is the same index served by the app itself, with a door anybody can submit through and the
+operator's review between that door and the listing.
+
+### What it is
 
 | | |
 |---|---|
-| Obsidian community **plugins** | **7,145** |
-| Obsidian community **themes** | **719** |
-| The entire mechanism | **two JSON files in one public GitHub repo, submitted by pull request** |
+| Where | `/api/kennel/v1/` on every host: `brain.dog/api/kennel/v1/` on the Cloud, and the same paths on a self-host. It sits under `/api/*`, which the site already forwards to the app, so it needed no DNS and no new route |
+| What it answers | `index.json` (the catalogue format, unchanged), each published file at `packs/<id>/<version>.pack.json` or `usecases/<id>/<version>.usecase.json`, the `.preview.json` beside it, and `counts.json`. Every read is public, to every origin, and a published file is served as immutable |
+| The index | BrainDog's own catalogue, bundled with the deployed build, then everything listed from outside. An id the bundled catalogue holds, or that BrainDog's built-in modules and use cases install under, is BrainDog's: no submission may take it |
+| Storage | the Cloud's existing R2 bucket, under `kennel/`: the Kennel's index, the review file, the trusted publishers, the counts, and the files. No table, no migration, no new binding |
+| Publishing | `POST submit` with the file. The publisher is the author's key when the file is signed (the Ed25519 signature a catalogue already verifies), or the person signed in to BrainDog on that host. An id belongs to whoever published it first: a later version comes from the same person, or is signed by the same key or one it rotated to |
+| Checks | the door a record installs through (size, credentials, shape, block kinds), a title, no manifest key outside `MANIFEST_KEYS`, versions that only move forward and are bumped as far as what they change, a daily limit per publisher, and a ceiling on how many wait at once. The record itself stays lenient about manifest keys; the Kennel is where a key nothing reads is refused by name |
+| Review | a submission from a publisher the operator has not trusted waits, and the operator lists it or refuses it with a reason. `GET review` lists what waits, and `GET review?kind=&id=&version=` answers one waiting file whole, so every script's source is read before it is listed. A listed version says when it was reviewed, and may carry a preview of its pages the operator made, never one its author drew. With no `PROVISION_KEY`, the review doors answer `NOT_IN_THIS_BUILD` |
+| Yanking | a version's key, its publisher or the operator takes a version back with a reason. It stays downloadable by its exact version, so a record that holds it keeps working, and a reader never offers it again |
+| A self-host | answers the same paths from its own catalogue folder first and the public Kennel second (`BRAINDOG_KENNEL`, `off` for none), keeping the public index for `KENNEL_KEEP_MS`. With the Kennel off or unreachable, its folder answers alone. It takes no submissions itself |
+| Install | still URL, git ref, file or paste. **The index is a convenience, never a gate**: every install is the record's own plan, approved by its owner, whatever it came from |
 
-That is the best-in-class extension ecosystem in personal-knowledge tooling, and its
-infrastructure is two JSON files. Homebrew's taps are the same shape. There is no reason to build
-more than this, and several reasons not to.
+The rules are one module, `packages/declare/src/kennel.ts`, which `apps/worker/src/kennel.ts` and
+`apps/selfhost/src/kennel.ts` only read from and write to.
 
-```json
-// kennel/packs.json
-{
-  "id": "freelancer-uk",
-  "name": "Freelancer (UK)",
-  "author": "someone",
-  "repo": "https://github.com/someone/braindog-freelancer-uk",
-  "manifest": "https://raw.githubusercontent.com/.../freelancer-uk.pack.yaml",
-  "provides": ["register.invoices", "register.clients", "page.invoicing", "metric.unpaid-90d"],
-  "requires": { "format": 1, "primitives": 1, "packs": { "money-core": "^1" } },
-  "summary": "Invoices, clients, and UK statutory late-payment interest."
-}
-```
+A read answers the file itself. A write, and each of the operator's review doors, answers in the envelope
+every `/api` answer uses: `{ ok: true, value }`, where a submission's value is `{ state, kind, id, version }`,
+or `{ ok: false, refusal }`. On the Cloud every write first spends the caller's address from the same
+per-minute write budget the record doors use, before its body is read.
 
-| Property | How |
-|---|---|
-| Submission | a pull request adding one object |
-| Review | one person, plus a **schema check in CI** that installs the pack into a throwaway record and asserts it validates |
-| Trust | packs are readable text and the diff is shown before it applies — including every host a declared `source:` will call ([ADR-025](16-DECISIONS.md)). Plus install counts and attribution |
-| Install | URL, git ref, or paste. **The index is a convenience, never a gate** — nothing is trapped behind approval |
-| Hosting | GitHub Pages. Cost: zero |
+### The default the owner has not yet ruled on
+
+[ADR-031](16-DECISIONS.md) put the Kennel after gate 2, and ADR-047 described it as pull requests to a
+public repository. The Kennel as built follows the default `loop/finish/platform.md` §5 sets until the
+owner rules:
+
+- **Now, not after gate 2**, because the direction asks for a registry and for publishing your own packs.
+- **A publish door, not pull requests.** The index format is the same either way, so only the door would
+  change if the owner prefers pull requests.
+- **Anyone with an author key or a BrainDog account may submit, and nothing from outside is listed until
+  the operator has looked at it**, except from a publisher the operator has said is trusted. The operator
+  reviews with the key the Cloud already has for provisioning (`PROVISION_KEY`).
+- **No Kennel signing key.** Authors sign with their own keys and the operator's listing says it was
+  reviewed, so no single lost key forges every pack.
+- **Scripts in a pack from outside are allowed.** They run in the sandbox on the installing record's
+  allowance, every calls-out line is approved at install, and the operator reads the source at review.
+- **A self-host reads the public Kennel** unless `BRAINDOG_KENNEL=off`.
 
 ### Refused, each with the reason
 
 | Refused | Because |
 |---|---|
 | **Paid packs in v1** | tax, VAT, refunds, chargebacks and moderation are a company, not a feature. Revisit only when a pack author asks |
-| Running a pack's code | there is none to run |
 | Remote assets in packs | an image URL is an exfiltration channel with a record id in the query string |
-| Ratings and reviews | a five-star system over twelve packs is theatre. Install counts and the diff |
-| A submission portal | a pull request is a submission portal that already exists and already has identity |
+| Ratings and reviews | a star system over a handful of packs is theatre. Install counts, rounded down as `roundCount` says them, and the plan's diff instead |
 
 ---
 

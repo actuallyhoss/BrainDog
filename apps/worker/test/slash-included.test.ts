@@ -138,7 +138,7 @@ test('THE DOOR BUILDS THE INCLUDED ENGINE, and each call is a ledger row billed 
   const own = openSqlite();
   const ai = fakeAi([
     '{"registers":["tasks"],"where":{"field":"state","is":"open"},"q":null}',
-    '{"text":"One task is open, {{ref:tasks#1}}.","body_kind":"rowset","body":{"register":"tasks","rows":[{"what":"Chase {{ref:tasks#1}}"}]},"flagged":false}',
+    '{"text":"One task is open, {{ref:tasks#1}}.","body_kind":"rowset","body":{"register":"tasks","rows":[{"fields":{"what":"Chase the first"},"from":["tasks#1"]}]},"flagged":false}',
   ]);
   const door = workerSlashDoor(switchedOn(ai), () => api, { sql: own, clock }, new Set());
   const engine = await door.engine!();
@@ -147,7 +147,7 @@ test('THE DOOR BUILDS THE INCLUDED ENGINE, and each call is a ledger row billed 
   assert.ok(out.ok, `refused: ${JSON.stringify(out)}`);
   assert.equal(ai.runs.length, 2);
   assert.deepEqual(
-    own.all<{ kind: string; tier: string; model: string; neurons: number }>('SELECT kind, tier, model, neurons FROM call ORDER BY rowid').map((r) => ({ ...r })),
+    own.all<{ kind: string; tier: string; model: string; neurons: number }>('SELECT kind, tier, model, neurons FROM slash_call ORDER BY rowid').map((r) => ({ ...r })),
     [
       { kind: 'read', tier: 'a', model: 'glm-5.3-flash', neurons: 12 },
       { kind: 'propose', tier: 'a', model: 'glm-5.3-flash', neurons: 12 },
@@ -185,7 +185,7 @@ test('A BAD ANSWER IS BILLED AND ENDS THE RUN: prose from the included model is 
   assert.equal(!out.ok && 'refusal' in out ? out.refusal.code : 'not refused', 'ANSWER_UNREADABLE', JSON.stringify(out));
   assert.equal(ai.runs.length, 1);
   assert.deepEqual(
-    own.all<{ model: string; tokens_in: number; tokens_out: number; neurons: number }>('SELECT model, tokens_in, tokens_out, neurons FROM call').map((r) => ({ ...r })),
+    own.all<{ model: string; tokens_in: number; tokens_out: number; neurons: number }>('SELECT model, tokens_in, tokens_out, neurons FROM slash_call').map((r) => ({ ...r })),
     [{ model: 'glm-5.3-flash', tokens_in: 700, tokens_out: 60, neurons: 12 }],
   );
   sql.close();

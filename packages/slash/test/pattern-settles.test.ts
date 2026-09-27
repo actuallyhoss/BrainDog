@@ -67,7 +67,7 @@ const build = (filing: 'throw' | 'refuse', index: 'answer' | 'refuse' = 'answer'
   const slash = createSlash({ sql, clock: fixedClock(NOW), inference, record });
   const calls = () =>
     sql
-      .all<{ kind: string; status: string; code: string | null; model: string }>('SELECT kind, status, code, model FROM call ORDER BY rowid')
+      .all<{ kind: string; status: string; code: string | null; model: string }>('SELECT kind, status, code, model FROM slash_call ORDER BY rowid')
       .map((r) => ({ ...r }));
   return { sql, inference, slash, calls };
 };

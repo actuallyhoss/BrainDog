@@ -12,10 +12,16 @@
  *
  * A THROW IS RESERVED FOR THE NETWORK, because that is the one failure the record has no opinion
  * about — and even then it comes back as a refusal, so a caller has exactly one branch to write.
+ *
+ * A METHOD ADDED FROM NOW ON IS TYPED FROM `@braindog/host/types`, as `call<Answer<'x'>>('x', args)`,
+ * so its answer is declared once, in the record, and not a second time below. The shapes written out
+ * here are the older half and stay until each moves with the test that holds it (see "The wire shapes").
  */
 
 import type { Refusal, Result } from '@braindog/ports';
 import { ROUTES } from '@braindog/host';
+import type { Answer } from '@braindog/host/types';
+import type { ShareClosed, ShareLink, ShareRow } from '@braindog/host';
 
 export type ClientOptions = {
   /**
@@ -35,14 +41,25 @@ export type ClientOptions = {
 };
 
 /**
- * The wire shapes, written here because this is the side that reads them.
+ * The wire shapes, written here before the record's could be named from this side.
  *
- * THEY ARE NOT IMPORTED FROM `@braindog/record`. `31 §2` gives this package two edges, `ports` and
- * `host`, and the record is neither: the client sits above a route TABLE, which is a list of names,
- * and the shapes behind those names are the contract it is asserting rather than a type it is
- * borrowing. `apps/selfhost/test/client.test.ts` is where the two sides are held together, because
- * only an app may name a runtime and the check needs a server to answer.
+ * THEY WERE WRITTEN OUT A SECOND TIME, AND THE COPY IS THE COST. `31 §2` gives this package two edges,
+ * `ports` and `host`, and the record is neither, so every answer was declared twice and only
+ * `apps/selfhost/test/client.test.ts` held the two equal: a field the record renamed reached the app
+ * as a failed integration test, never as a type error. `host` depends on the record, so
+ * `@braindog/host/types` re-exports its answer types, type-only, and a method added from now on names
+ * its answer from there (`Answer<'x'>`) and writes no shape here.
+ *
+ * THE ONES BELOW STAY UNTIL EACH MOVES WITH ITS TEST. `client.test.ts` holds them against a running
+ * server, because only an app may name a runtime and the check needs a server to answer, and
+ * rewriting all of them by reading, with nothing run, is where a build breaks.
  */
+
+/**
+ * A person's own settings, key by key: the record's `Prefs`, named through `boot`'s answer so that `setPref`'s keys and
+ * `Boot.me.prefs` are one declaration, the record's, and a key it adds is a key this side takes.
+ */
+type Prefs = NonNullable<Answer<'boot'>['me']['prefs']>;
 
 /** `boot`, and `now` is the record's own instant. See `Boot` in `@braindog/record`. */
 export type Boot = {
@@ -55,16 +72,21 @@ export type Boot = {
   /** Open suggestions, newest first, each with its question: what waits on a person. */
   waiting?: { id: string; body_kind: string; opened_by: string; opened_at: string; question?: string }[];
   /* OPTIONAL TOO, for the same reason: a host older than the layout's reads answers without them. */
-  /** The record's own name, or `null` for one that was never provisioned. */
-  record?: { slug: string; name: string; locale: string } | null;
+  /**
+   * The record's own name, or `null` for one that was never provisioned.
+   *
+   * `currency` is the home currency a person chose, `null` when nobody has: every amount is written on its terms. ABSENT
+   * FROM A HOST OLDER THAN THE FIELD, which a reader tells from `null` (nobody chose) by the key not being there.
+   */
+  record?: { slug: string; name: string; locale: string; currency?: string | null } | null;
   /** Who is asking: the person behind the call, their name, and what they hold on the record. */
   me?: {
     kind: 'person' | 'token' | 'system';
     person: string | null;
     name: string | null;
     level: string | null;
-    /** A person's own rail, as `setPref` kept it: the order and the pages hidden. Absent for anybody else. */
-    prefs?: { 'nav.order'?: string[]; 'nav.hidden'?: string[] };
+    /** A person's own settings, as `setPref` kept them, key by key: the record's `Prefs`. Absent for anybody else. */
+    prefs?: Prefs;
   };
   /** Each person on the record by name, by id: sent only to a caller who may read the membership list or People. */
   names?: Record<string, string>;
@@ -93,8 +115,16 @@ export type Boot = {
     /** `updated_at`, when that row last changed, picks the rail's five; absent from a host older than it. */
     about?: { register: string; seq: number | null; updated_at?: string } | null;
   }[];
-  /** How many questions wait on a person, and how many arrivals wait in the inbox: `null` when the caller may not see it. */
-  counts?: { decide: number; inbox: number | null; decided?: number };
+  /**
+   * How many questions wait on a person, how many arrivals wait in the inbox, and how many ever arrived: `null` when the
+   * caller may not see it. `arrived` is absent from a host older than the field.
+   */
+  counts?: { decide: number; inbox: number | null; decided?: number; arrived?: number | null };
+  /**
+   * The holding pen, as the record's `PenItem`s: what the record would add if somebody asked, each with the whole
+   * declaration accepting it writes. Empty for a caller who is offered nothing; absent from a host older than the field.
+   */
+  pen?: Answer<'boot'>['pen'];
   /** What changed since the caller last read, as `whatsNew` answers. */
   whatsNew?: WhatsNew;
 };
@@ -743,12 +773,22 @@ export function createClient(options: ClientOptions) {
   return {
     call,
     /* THE TWO KEY DOORS. A browser session, no bearer, this origin, and an owner whose last proof is under
-       fifteen minutes old, which the record decides. `12 §6` rules 2, 3 and 9. */
+       fifteen minutes old, which the record decides. `12 §6` rules 2, 3 and 9. While the vault is behind its
+       passphrase each carries `passphrase` too, and without it the answer is `REQUIRED_MISSING` at `passphrase`; a
+       wrong one is `WRONG_KEY`, and past the kernel's `PASSPHRASE_TRIES` the answer is `RATE_LIMITED` with `retry_after`. */
     /** Put a key in, or replace the value of one named by `credential`. The host seals it; the record never sees it. */
-    putKey: (args: { label: string; value: string; opens?: string; kind?: string; project?: string; credential?: string }) =>
+    putKey: (args: { label: string; value: string; opens?: string; kind?: string; project?: string; credential?: string; passphrase?: string }) =>
       hostDoor<KeyPut>('keys/put', args as unknown as Record<string, unknown>),
     /** Read one key back, once, by its label or by its spoken id. */
-    openKey: (args: { label?: string; credential?: string }) => hostDoor<KeyOpened>('keys/open', args as unknown as Record<string, unknown>),
+    openKey: (args: { label?: string; credential?: string; passphrase?: string }) =>
+      hostDoor<KeyOpened>('keys/open', args as unknown as Record<string, unknown>),
+    /* THE VAULT PASSPHRASE (`12 §6`, "The optional second factor"). VAULT, as the key doors are: an owner in a browser,
+       proved in the last fifteen minutes. The answer's `on` is whether the vault is behind a passphrase now; the
+       passphrase itself goes in the body and is taken off by the host before the record is called. */
+    /** Put the vault behind a passphrase. Forgotten, no key in it opens again, and nobody can open it for its owner. */
+    setVaultPassphrase: (passphrase: string) => call<Answer<'setVaultPassphrase'>>('setVaultPassphrase', { passphrase }),
+    /** Take the passphrase off the vault, with that passphrase. A wrong one counts towards the same limit. */
+    clearVaultPassphrase: (passphrase: string) => call<Answer<'clearVaultPassphrase'>>('clearVaultPassphrase', { passphrase }),
     /**
      * Ask Slash one question, pass 1 of `46 §5.4`: the predicate it drafted, the rows that answered it, and what it read.
      * A browser session and this origin, like the key doors. 501 `NOT_IN_THIS_BUILD` on a host with no model behind it,
@@ -885,6 +925,12 @@ export function createClient(options: ClientOptions) {
     invitations: () => call<Invitation[]>('invitations'),
     revokeInvite: (args: { id: string }) => call<{ id: string; revoked_at: string }>('revokeInvite', args as Record<string, unknown>),
     removeMember: (args: { person: string; why?: string }) => call<unknown>('removeMember', args as Record<string, unknown>),
+    /**
+     * Stop somebody without taking them off, or let them back in with `suspended: false`. Everything they held is kept,
+     * and the answer is where they now stand: `suspended_at` is when they were stopped, or `null`.
+     */
+    suspendMember: (args: { person: string; suspended: boolean }) =>
+      call<Answer<'suspendMember'>>('suspendMember', args as Record<string, unknown>),
     /** `reach` opens something beyond the scope, and only an owner's whole-record token uses it: `['inbox']` reads the money inbox. */
     createToken: (args: { scope: TokenRow['scope']; label?: string; days?: number; reach?: TokenReach[] }) =>
       call<MintedToken>('createToken', args as Record<string, unknown>),
@@ -923,9 +969,12 @@ export function createClient(options: ClientOptions) {
     markRead: (upTo?: Cursor) =>
       call<{ upTo: Cursor; seen_at: unknown }>('markRead', upTo === undefined ? {} : { upTo }),
     log: (args: { register: string; seq: number; note?: string }) => call<unknown>('log', args as Record<string, unknown>),
-    /** The reader's own rail: `nav.order` or `nav.hidden`, a list of addresses, or `null` to take it away. */
-    setPref: (key: 'nav.order' | 'nav.hidden', value: string[] | null) =>
-      call<{ key: string; value: string[] | null }>('setPref', { key, value }),
+    /**
+     * One of the reader's own settings, in the shape its key takes (`Prefs`): the rail's `nav.order` and `nav.hidden`,
+     * `nav.shape`, `pen.suggest` or `pen.dismissed`, or `null` to take it away. A wrong shape is refused by key.
+     */
+    setPref: <K extends keyof Prefs>(key: K, value: NonNullable<Prefs[K]> | null) =>
+      call<{ key: K; value: NonNullable<Prefs[K]> | null }>('setPref', { key, value }),
     /**
      * This browser asks to be told, with what `PushSubscription.toJSON()` gave, passed as it is: the record takes that
      * shape, `expirationTime` included, so nothing between the browser and the record reshapes a key.
@@ -996,6 +1045,51 @@ export function createClient(options: ClientOptions) {
     }) => call<SavedView>('saveView', args as Record<string, unknown>),
     /** Take one saved view off a list. The rows are untouched: a view is a question, not a row. */
     retireView: (args: { register: string; id: string }) => call<ViewRetired>('retireView', args as Record<string, unknown>),
+
+    /* THE COMMENTS (`docs/20-COLLABORATION.md` §5). A thread is on a row, named as it is spoken (`tasks#3`), or on a
+       question or a decision (`suggestion:SG5`, `decision:D4`, or the name the record handed this caller for one).
+       `comments` is READ+; `comment` and `resolveComment` are DATA, and a Reads colleague may make both. A thing the
+       caller cannot see is answered as a thing that is not there. */
+    /** Every comment and reply on one thing, oldest first, each comment with how it was resolved. */
+    comments: (on: string) => call<Answer<'comments'>>('comments', { on }),
+    /** Say something about one thing, or reply under a comment on it with `reply_to`, in 280 characters or fewer. */
+    comment: (args: { on: string; body: string; reply_to?: string }) => call<Answer<'comment'>>('comment', args as Record<string, unknown>),
+    /** Resolve a comment with the reason. Its author may, and so may somebody who may change what it is on. */
+    resolveComment: (args: { id: string; as: 'addressed' | 'wont-fix' | 'incorrect'; why: string }) =>
+      call<Answer<'resolveComment'>>('resolveComment', args as Record<string, unknown>),
+
+    /* SHARED LINKS TO ONE PAGE. The first three are ADMIN, so a browser session at owner; their answers are
+       `@braindog/host`'s, because the host signs the link into `openShare`'s and the record never holds the key. */
+    /** Open a read-only link to one page, for `days` from 1 to 90 (30 unless said). The link is in the answer once. */
+    openShare: (args: { slug: string; days?: number }) => call<ShareLink>('openShare', args as Record<string, unknown>),
+    /** Close one link for good. Sharing the page again makes a new link. */
+    closeShare: (id: string) => call<ShareClosed>('closeShare', { id }),
+    /** The links this record opened, newest first, open and closed. Never a link itself. */
+    shares: () => call<ShareRow[]>('shares'),
+    /**
+     * The page one link opens, read-only, asked with `Authorization: Share <token>` and no other credential.
+     *
+     * NOT THROUGH `call`, because the link is the credential and `call` would send this client's bearer beside it. AND A
+     * 404 IS THE LINK NOT OPENING, never an unreachable host: every way a link fails is that one bare 404, so it comes
+     * back as `PAGE_UNKNOWN` with the sentence a person holding it can act on.
+     */
+    sharedPage: async (token: string): Promise<Result<unknown>> => {
+      let res: Response;
+      try {
+        res = await doFetch(`${base}/api/sharedPage`, { method: 'GET', headers: { authorization: `Share ${token}` } });
+      } catch (e) {
+        return { ok: false, refusal: unreachable(e instanceof Error ? e.message : String(e)) };
+      }
+      if (res.status === 404)
+        return { ok: false, refusal: { code: 'PAGE_UNKNOWN', fix: 'This link does not open a page. It may have been closed or have run out, so ask whoever sent it for a new one.' } };
+      let body: unknown;
+      try {
+        body = await res.json();
+      } catch {
+        return { ok: false, refusal: unreachable(`${res.status} with a body that is not JSON`) };
+      }
+      return answered<unknown>(res.status, body);
+    },
   };
 }
 

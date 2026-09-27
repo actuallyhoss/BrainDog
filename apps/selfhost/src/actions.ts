@@ -28,7 +28,7 @@ import { Readable } from 'node:stream';
 import { idempotentCalls, readPublic, refusedAddress, sendAction, type Execute, type OpenKey, type Pin, type PublicRead, type Send as SendVia } from '@braindog/host/actions';
 import type { RecordApi } from '@braindog/record';
 
-import { unwrap, type KeyStore } from './keys.ts';
+import { offeredId, unwrap, type KeyStore } from './keys.ts';
 import type { WebhookPost } from './server.ts';
 
 export {
@@ -77,7 +77,9 @@ export function keyOpener(api: Pick<RecordApi, 'kernel'>, store: KeyStore | unde
     if (!store) return null;
     const record = api.kernel.identity()?.id;
     if (!record) return null;
-    const { kekId } = await store.current();
+    /* THE ID THE RECORD'S KEYS ARE WRAPPED UNDER, while the store still holds it, so a key opens between a new key file
+       and the re-wrap this process makes as it starts (`offeredId`). */
+    const kekId = await offeredId(store, api.kernel.wrappingKey());
     const sealed = api.kernel.openGrant({ id: grant.id, kek_id: kekId }, actor);
     if (!sealed.ok) return null;
     const held = sealed.value;

@@ -190,9 +190,9 @@ test('A STEP THAT WOULD WRITE A SECRET INTO A FIELD A CALL SENDS IS REFUSED AT I
 test('WHAT COPIES NO SECRET INSTALLS: a word nothing fills, and fields that may leave', async () => {
   const { k, sql } = await record();
   for (const [what, decl] of [
-    /* ON THE INLINE PATH NOTHING FILLS `{{trigger.…}}` (`rules.ts`'s `fill` reads `{{field}}` alone), and nothing fills a
-       tag at all, so both write the braces as typed. */
-    ['inline: set party from trigger.row.token, which the pass leaves as typed', inline([{ set: { field: 'party', to: '{{trigger.row.token}}' } }, { run: 'paid_hook' }])],
+    /* ON THE INLINE PATH NOTHING FILLS A TAG, so it writes the braces as typed. A `set` from `{{trigger.…}}` there, which
+       the pass leaves as typed too, is no longer a case of this test: the lint refuses it as a hole nothing fills
+       (`flow-lint.ts`'s `holeIn`, `loop/finish/defects.md` A8). */
     ['inline: tag {{token}}, which no fill reads', inline([{ tag: '{{token}}' }, { run: 'tags_hook' }])],
     /* THE `rowFill = false` BRANCH OF `hiddenIn`, ON THE RUN PATH. The run fills a tag from `{{vars.…}}` and
        `{{trigger.…}}` only, and the pass does not fill it, so `{{token}}` is tagged as typed. */

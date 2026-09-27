@@ -28,7 +28,7 @@
  * amended the list shrinks.
  */
 
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -104,8 +104,21 @@ export default function routerGroups(
     });
 
   /* ── the route table, as data. The handlers are never called. ─────────────── */
+
+  /* TWO HALVES SINCE ARC-6: `index.ts`'s own rows, and one file of rows per unit under `routes/`, which `index.ts`
+     concatenates after its own (`loop/finish/contracts.md` §0 point 5). A tree with no `routes/` folder has no rows
+     there, and that is not a finding: `index.ts` is the file that must be there, and `read` still throws without it. */
   const host = read('packages/host/src/index.ts');
-  const routes = [...host.matchAll(/\{ name: '([a-zA-Z]+)', group: '([A-Z+]+)',/g)].map((m) => ({ name: m[1], group: m[2] }));
+  const routesDir = join(root, 'packages', 'host', 'src', 'routes');
+  const extra = existsSync(routesDir)
+    ? readdirSync(routesDir)
+        .filter((name) => name.endsWith('.ts') && !name.endsWith('.test.ts'))
+        .sort()
+        .map((name) => read('packages/host/src/routes', name))
+    : [];
+  const routes = [host, ...extra].flatMap((text) =>
+    [...text.matchAll(/\{ name: '([a-zA-Z]+)', group: '([A-Z+]+)',/g)].map((m) => ({ name: m[1], group: m[2] })),
+  );
   if (routes.length === 0) findings.push('packages/host/src/index.ts has no route table this gate can read');
 
   const unrouted = [...(/export const UNROUTED = \[([^\]]*)\]/.exec(host)?.[1] ?? '').matchAll(/'([a-zA-Z]+)'/g)].map((m) => m[1]);

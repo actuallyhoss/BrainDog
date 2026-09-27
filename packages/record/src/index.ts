@@ -19,7 +19,6 @@ import type { Clock, Refusal, Result, Scheduler, Snapshot, Snapshots, Sql } from
 import { PRIMITIVES_VERSION } from 'braindog-render';
 import {
   install,
-  normalise,
   plan,
   uninstall,
   type Host,
@@ -30,6 +29,7 @@ import {
 import { isDuplicate, matchLiterals, normalise as normaliseText, parseDate, scanDates, scanDecimals, scanInts, scanMoney, type CurrencyTable } from '@braindog/extract';
 import { fixOf, no, ok } from '@braindog/ports';
 import { backfillSpeaks } from './speaks.ts';
+import { normaliseChecked } from './theme-check.ts';
 import type { EraseReport, EraseRequest } from '@braindog/kernel';
 import type { InvitationRow } from '@braindog/kernel';
 import type { Backlinks } from '@braindog/kernel';
@@ -105,6 +105,8 @@ import { arranger, carryUpdate, speakingNow, writeVoice, type CatalogueEntry } f
 import { useCases, type ExportArgs } from './usecase.ts';
 import { catalogueDrafts, describedPresses, drawnVersions, FORM_SAID_MOST, formedRows, fromModel, growsDrafts, noticeUsage, pageShowsAgents, readUsage, SLASH_ASKED_MOST, SLASH_OPEN_CAP, stableKey, type CatalogueOffer, type Offered, type SlashDraft, type SlashModel } from './slash.ts';
 import { grammarOf } from './grammar.ts';
+import { askedFault, describe, DESCRIBED_NO_MODEL, DESCRIBED_NO_PREVIEW, draftedOf, pageFault, previewerOf, type SlashDescribed, type SlashDrafted, type SlashPreviewer } from './slash.ts';
+import { describedGrammar } from './grammar.ts';
 import {
   BODY_DEPTH,
   SAID_DEPTH,
@@ -118,16 +120,27 @@ import {
   scripts as listScripts,
   subjectOf as flowSubject,
 } from './automations.ts';
+import { RUNS_PAGE_MOST } from './automations.ts';
 import { historyCursors, type HistoryCursors } from './history-cursor.ts';
 import { handleOf, isHandle, spokenOf } from './question-handles.ts';
 import { dropPushSub, readPushSub, savePushSub } from './push.ts';
 import { REPORT_BYTES_MOST, REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, REPORT_ROWS_MOST, REPORT_ROWS_PER_MINUTE, REPORT_WINDOW_MS, reportBindingOf, reportedFields, reportedRows, reportLabel, type ReportBinding } from './report.ts';
+import type { Directory } from './directory.ts';
+import { methods } from './methods/index.ts';
+import { methods as jobMethods } from './jobs.ts';
+import { PEN_DISMISSED_MOST, penFor, type PenItem } from './emergent.ts';
+import { methods as previewChangeMethods } from './methods/preview-change.ts';
 
 export type { CatalogueEntry, FigureTest, Grows, RowIo } from './arrange.ts';
 export { formedRows, fromModel, growsDrafts, noticeUsage, readUsage, FORM_SAID_MOST, SLASH_ASKED_MOST, SLASH_OPEN_CAP, type CatalogueOffer, type FormField, type FormList, type FormSpec, type NextSpec, type Noticed, type SlashDraft, type SlashFormInput, type SlashModel, type SlashModelInput, type Usage } from './slash.ts';
 export type { ExportArgs, PlannedPack } from './usecase.ts';
 export type { Automation, AutomationRow, AutomationRun, Said as AutomationSaid, ScriptRow } from './automations.ts';
 export { REPORT_BYTES_MOST, REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, REPORT_ROWS_MOST, REPORT_ROWS_PER_MINUTE, REPORT_WINDOW_MS, reportBindingOf, reportedFields, reportedRows, reportLabel, type ReportBinding } from './report.ts';
+export type { UsedBy, UsedByRun } from './methods/agents.ts';
+export type { AutomationVersion, Checked as AutomationChecked, Switched as AutomationSwitched } from './methods/automations.ts';
+export type { PenItem } from './emergent.ts';
+export { PREVIEW_DECLARATIONS_MOST, PREVIEW_SAMPLE_ROWS_A_LIST, PREVIEW_SAMPLE_ROWS_MOST, type ChangePreviewed, type PreviewChangeArgs, type PreviewedPage } from './preview-change.ts';
+export { SAMPLE_ROWS_MOST, SLASH_REPAIRS_MOST, type DescribedDraft, type SlashDecl, type SlashDrafted, type SlashPreview, type SlashPreviewedPage, type SlashPreviewer, type SlashRows } from './slash.ts';
 
 /**
  * What proves a caller is the sender an ingest expects, as the record can answer it today.
@@ -250,6 +263,15 @@ export type Principal =
    * the caller sent. Absent is no reach, which is every token minted before it existed.
    */
   | { kind: 'token'; id: string; scope: Scope; person: string; level: Level | null; reach?: readonly TokenReach[] | undefined }
+  /**
+   * A machine that runs jobs: a device grant of reach `runner` (`packages/kernel/src/device.ts`), built by a host from
+   * that verified grant and never from anything the caller sent (`loop/finish/agents.md` C13).
+   *
+   * NO LEVEL AND NO SCOPE, BECAUSE IT HOLDS NEITHER. It claims a queued job, reports on it and reads whether it was
+   * stopped, and `allows` refuses it every rung of the ladder, so every guard in this file refuses it too. Only the
+   * JOBS methods (`record/src/jobs.ts`) admit it, by asking for it by kind.
+   */
+  | { kind: 'runner'; id: string; name: string }
   | { kind: 'system'; id: string };
 
 export type CallContext = {
@@ -309,8 +331,13 @@ export type CallContext = {
   session?: SessionHints | undefined;
 };
 
-/** How recent a session's last proof must be for the vault and for approving a device: `12 §6`, `33 §10`. */
-const FRESH = 15 * 60_000;
+/**
+ * How recent a session's last proof must be for the vault and for approving a device: `12 §6`, `33 §10`.
+ *
+ * EXPORTED FOR THE FILES UNDER `methods/`, so a method that asks for a recent proof asks this one window and none
+ * declares its own (`loop/finish/contracts.md` §2.7).
+ */
+export const FRESH = 15 * 60_000;
 
 /**
  * What a host with no store of copies answers (`33 §1` port 9). The Worker is one: its nightly copy is sealed to a key
@@ -528,6 +555,11 @@ export function allows(ctx: CallContext, need: Need, nameOf: (list: string) => s
     return { code: 'FORBIDDEN', fix: `This bearer was approved for one ${ctx.operation} and reaches nothing else. Sign in, or start the device again for this.`, at: 'operation' };
   const p = ctx.principal;
   if (p.kind === 'system') return null;
+  /* A RUNNER REACHES NO RUNG, and this is the one place that says so for every guard: `guard`, `scoped`, `readable`,
+     `vault` and `admin` all come here. What a runner may do is claim, report on and stop a job, which the JOBS methods
+     admit by the principal's kind and nothing on this ladder does. */
+  if (p.kind === 'runner')
+    return { code: 'FORBIDDEN', fix: 'A runner claims and runs jobs, and reaches nothing else on the record.', at: 'principal' };
 
   /* NOTHING ON THE RECORD REACHES NOTHING ON THE RECORD. A caller with only register-scoped rows
      arrives here with `level: null` for anything not scoped to one of them.
@@ -646,6 +678,28 @@ export function reaches(ctx: CallContext, register: string): Refusal | null {
 export type Page<T> = { rows: T[]; matched: number; cursor: string | null };
 
 /**
+ * The keys `setPref` takes. A closed list, so a typo is refused rather than kept for ever (`loop/finish/contracts.md` §7.3).
+ *
+ * THE RAIL'S TWO, THE NAVIGATION'S SHAPE AND THE HOLDING PEN'S TWO. Each is the person's own and follows them to every
+ * device, which a cookie or `localStorage` cannot do, and `29 §4` says a dismissal is terminal on every device. The
+ * browser may keep a first-paint copy of `nav.shape` and `pen.suggest`, written from these and never read as the truth.
+ */
+export const PREF_KEYS = ['nav.order', 'nav.hidden', 'nav.shape', 'pen.suggest', 'pen.dismissed'] as const;
+export type PrefKey = (typeof PREF_KEYS)[number];
+/**
+ * What each key holds, key by key. `nav.order` and `nav.hidden` are addresses (`/p/money`); `nav.shape` is a side rail, a
+ * bar across the top or one menu; `pen.dismissed` is the ids of what the pen offered and the person turned down
+ * (`PenItem.id`, and the navigation shape's `shape:<shape>:<reason>`), newest last. `pen.suggest` absent is on.
+ */
+export type Prefs = {
+  'nav.order'?: string[];
+  'nav.hidden'?: string[];
+  'nav.shape'?: 'rail' | 'bar' | 'menu';
+  'pen.suggest'?: boolean;
+  'pen.dismissed'?: string[];
+};
+
+/**
  * What `boot` answers, and why the record's own instant is on it.
  *
  * THE CLOCK IS A PROPERTY OF THE ANSWER, not of the reader. A record is opened with an injected
@@ -661,11 +715,6 @@ export type Page<T> = { rows: T[]; matched: number; cursor: string | null };
  * disagreeing with its own contract. A long session needs no second read: the offset between the
  * record's instant and the reader's is constant, and the reader's own clock ticks.
  */
-/** The keys `setPref` takes. A closed list, so a typo is refused rather than kept for ever. */
-export const PREF_KEYS = ['nav.order', 'nav.hidden'] as const;
-export type PrefKey = (typeof PREF_KEYS)[number];
-export type Prefs = { [K in PrefKey]?: string[] };
-
 export type Boot = {
   registers: { id: string; name: string; count: number }[];
   /** ISO 8601, UTC. The instant the record answered as of. */
@@ -674,15 +723,21 @@ export type Boot = {
   sessions: LiveRun[];
   /** Open suggestions the caller may see, newest first: what waits on a person. */
   waiting: Waiting[];
-  /** The record's own name, which the shell draws above everything else. `null` before it is provisioned. */
-  record: { slug: string; name: string; locale: string } | null;
+  /**
+   * The record's own name, which the shell draws above everything else. `null` before it is provisioned.
+   *
+   * `currency` IS THE HOME CURRENCY A PERSON CHOSE, `null` when nobody has, and every amount on a screen is written on
+   * its terms (`loop/finish/contracts.md` §7.4). It is the kernel's `homeCurrency`, the one every figure is added up in,
+   * so the shell never names a currency the figures do not.
+   */
+  record: { slug: string; name: string; locale: string; currency: string | null } | null;
   /** Who is asking: the person behind the call, the name they gave, and what they hold on the record. */
   me: {
     kind: 'person' | 'token' | 'system';
     person: string | null;
     name: string | null;
     level: Level | null;
-    /** What this person arranged for themselves (`setPref`): the rail's order and the pages hidden from it. A person only. */
+    /** What this person arranged for themselves (`setPref`), key by key as `Prefs` says. A person only. */
     prefs?: Prefs;
   };
   /**
@@ -704,8 +759,20 @@ export type Boot = {
    *
    * COUNTS AND NOT LISTS. `waiting` is capped for the first paint and a rail badge is the whole number. The inbox holds
    * whatever was sent in, so only an owner is told how much; anybody else gets `null`, which is not zero.
+   *
+   * `arrived` IS EVERY ARRIVAL EVER RECEIVED, whatever became of it, so a screen can tell a record nothing was ever sent
+   * to from one whose inbox was emptied. The owner's, as `inbox` is; `null` for anybody else.
    */
-  counts: { decide: number; inbox: number | null; decided: number };
+  counts: { decide: number; inbox: number | null; decided: number; arrived: number | null };
+  /**
+   * The holding pen: what this record would add if somebody asked, strongest first and at most `PEN_MOST`
+   * (`emergent.ts`). Placed by nobody: each item carries the whole declaration accepting it would write.
+   *
+   * THE OWNER'S AND A WHOLE-RECORD READER'S, and empty for anybody else, because an item is a page over a list and a
+   * reader held to some lists is not offered the rest. Empty too when the person turned `pen.suggest` off, and an item
+   * whose id is in their `pen.dismissed` is never answered again.
+   */
+  pen: PenItem[];
   /** What changed since the caller last read, exactly as `whatsNew` answers with no cursor. */
   whatsNew: WhatsNew;
   /**
@@ -975,6 +1042,16 @@ export type RecordDeps = {
    */
   invitations?: (() => string | null) | undefined;
   /**
+   * The operator's cut-off, `TOKENS_VALID_FROM` on the Worker and `BRAINDOG_TOKENS_VALID_FROM` on the self-host: an ISO
+   * instant before which every token and device grant this record issued is refused (`TokenDeps.validFrom`, `53 §5.11`).
+   *
+   * A CALLBACK READ AT EACH CALL, AND THE HOST'S, because it is a fact about the deployment and not about the record: the
+   * operator sets it in an incident without the record being opened again, and the same record opened by a test or the
+   * CLI has none. Absent is the epoch. It reaches the grant readers below and the owner's two listings, which mark what
+   * it ended, so a token that stopped working says why rather than looking live.
+   */
+  validFrom?: (() => string | undefined) | undefined;
+  /**
    * What this host offers to install: packs, and use cases with the modules they build on.
    *
    * THE HOST'S AND NEVER THE RECORD'S, because the record names no use case. A host with none still takes a
@@ -1011,6 +1088,14 @@ export type RecordDeps = {
    * `true` when the one thing keeping it shut is a proof older than the vault allows, which changes what the run is told.
    */
   tryScript?: ((draft: { record: { id: string; tz: string }; body: Record<string, unknown>; input: unknown; reads: { list(register: string, where: unknown): Promise<unknown[]>; get(spoken: string): Promise<unknown> }; owner: boolean; stale: boolean; asker: string }) => Promise<unknown>) | undefined;
+  /**
+   * The Directory, where this host keeps it in the same process as the record, for the methods under `methods/`.
+   *
+   * ABSENT ON A HOST WHOSE DIRECTORY IS ANOTHER OBJECT. The Worker's Directory is its own Durable Object, reached by RPC
+   * and never from inside a record, so methods are handed `null` there, and one that needs the Directory refuses
+   * `NOT_IN_THIS_BUILD` rather than guessing.
+   */
+  directory?: Directory | undefined;
 };
 
 /** What `invite` says when the host never said it can take invitations. */
@@ -1101,7 +1186,7 @@ export async function createRecordApi(deps: RecordDeps) {
   return { ...api(kernel, deps, cursors), kernel };
 }
 
-function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler' | 'build' | 'snapshots' | 'destroy' | 'invitations' | 'catalogue' | 'readAddress' | 'slashModel' | 'slashMeter' | 'catalogueOffers' | 'tryScript' | 'answersSlash'>, cursors: HistoryCursors) {
+function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler' | 'build' | 'snapshots' | 'destroy' | 'invitations' | 'catalogue' | 'readAddress' | 'slashModel' | 'slashMeter' | 'catalogueOffers' | 'tryScript' | 'answersSlash' | 'directory' | 'validFrom'>, cursors: HistoryCursors) {
   const { sql, clock, scheduler, build, snapshots, destroy, invitations } = deps;
   /**
    * The page declaration served at a slug, and its version: the one named exactly, or else the one whose name slugs to it
@@ -1248,7 +1333,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const held =
       register !== undefined && Object.hasOwn(ctx.levels ?? {}, register) ? ctx.levels?.[register] : undefined;
     const at: CallContext =
-      held === undefined || ctx.principal.kind === 'system'
+      held === undefined || ctx.principal.kind === 'system' || ctx.principal.kind === 'runner'
         ? ctx
         : { ...ctx, principal: { ...ctx.principal, level: held } };
 
@@ -1275,7 +1360,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const binding = reportKeyOf(ctx);
     if (binding !== null) return reportOnly(binding);
     const p = ctx.principal;
-    if (p.kind === 'system' || p.level !== null) return guard(ctx, need);
+    if (p.kind === 'system' || p.kind === 'runner' || p.level !== null) return guard(ctx, need);
 
     /* A LEVEL THIS RECORD DOES NOT PUBLISH IS NOT ONE. Only the index-max grant used to reach
        `allows`, and an unrecognised value sorts below every real one, so it never got there. Every
@@ -1469,7 +1554,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * record is not narrowed by a credential they were never issued. Who they are was settled by `vault(ctx)`
    * before this is asked.
    */
-  const keyFor = (by: { label: string } | { credential: string }, grant: VaultGrant | null): Entry | null => {
+  const keyFor = (by: { label: string } | { credential: string }, grant: Pick<VaultGrant, 'scope'> | null): Entry | null => {
     const within = (row: Entry | null): row is Entry => {
       if (!row || row.register !== KEYS || row.deleted_at) return false;
       if (grant === null) return true;
@@ -1500,7 +1585,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * there is, so the only way they can miss is by naming one that is not there, which is `REF_UNKNOWN` and a
    * sentence they can act on.
    */
-  const unreached = <T>(grant: VaultGrant | null): Result<T> =>
+  const unreached = <T>(grant: Pick<VaultGrant, 'scope'> | null): Result<T> =>
     grant === null
       ? no<T>('REF_UNKNOWN', 'This record holds no key by that name.', { at: 'credential' })
       : no<T>(
@@ -1731,83 +1816,19 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * the kernel's own check of a rowset; all are filed as `slash`, which may suggest and write nothing else (`kernel/slash.ts`).
    * A draft already asked, in any state, is not asked again, so a dismissal holds; no more than `SLASH_OPEN_CAP` wait at once.
    *
-   * `described` IS WHAT THE OWNER TYPED ON THE SLASH PAGE (`slash.ts` `SlashModelInput.asked`, brief D2). It is the owner
-   * asking, so it reaches the model on a record of any age, as `slashForm` does, through the same `slashAsked` hold; and
-   * only what the model drafted from it is filed, never the rules' drafts, the catalogue's or a use case's growth, which
-   * would take the slots on Decide the description was pressed for (`test/slash-asked.test.ts`).
+   * WHAT THE OWNER DESCRIBED IS FILED BY `slashFileDescribed` BELOW, through this file's `slashFiling`, and never here: a
+   * description files only what the model drafted from it and what then drew clean, never the rules' drafts, the
+   * catalogue's or a use case's growth, which would take the slots on Decide it was pressed for (`test/slash-asked.test.ts`).
    */
   type SlashFiled = { by: string; filed: { id: string; question: string; by: string }[]; skipped: { question: string; why: string }[]; dropped: string[]; large: boolean };
   /** A description's asks before the spend: Decide full, the same words still waiting, presses sent together (`slash.ts`). */
-  const presses = describedPresses<SlashFiled>();
-  const slashFile = async (described?: string, ctx?: CallContext): Promise<SlashFiled> => {
-    const r = slashReading(ctx);
-    const drawn = drawnVersions(sql);
-    let drafts: SlashDraft[] = described === undefined ? r.drafts : [];
-    let by = 'rules';
-    const dropped: string[] = [];
-    let large = false;
-    const model = deps.slashModel;
-    const fell = described === undefined ? "Slash's own rules drafted these." : 'nothing was drafted from what you described.';
-    if (!model && described !== undefined) dropped.push('Slash builds from a description only with a model, and this BrainDog has none set up, so nothing was drafted from it.');
-    const waits = model && described !== undefined ? presses.held(described, r.waiting.length, (k) => r.asked.get(k)?.status === 'open') : null;
-    if (waits !== null) return { by, filed: [], skipped: [], dropped: [waits], large };
-    if (model && (r.quiet === null || described !== undefined)) {
-      try {
-        const asked = await slashAsked<Parameters<SlashModel['draft']>[0]>(
-          'draft',
-          {
-            usage: r.usage,
-            noticed: r.noticed,
-            rules: r.drafts.map(({ question, body_kind, body }) => ({ question, body_kind, body })),
-            offered: r.offered.map(({ id, kind, title }) => ({ id, kind, title })),
-            kinds: ['pack', 'settings', 'arrange', 'change'],
-            most: SLASH_OPEN_CAP,
-            ...(described === undefined ? {} : { asked: described }),
-            ...(r.partial ? { partial: true as const } : {}),
-          },
-          (input) => model.draft(input),
-        );
-        if ('spent' in asked) dropped.push(`${asked.spent} ${fell.charAt(0).toUpperCase()}${fell.slice(1)}`);
-        else {
-          const got = fromModel(asked.raw, model.name, SLASH_OPEN_CAP, drawn, described !== undefined);
-          dropped.push(...got.dropped);
-          if (got.drafts.length > 0) {
-            drafts = got.drafts;
-            by = model.name;
-          } else dropped.push(`The model proposed nothing Slash could use, so ${fell}`);
-        }
-      } catch (e) {
-        /* A PRESS THE INCLUDED MODEL'S CEILING TURNED AWAY WAS NEVER ASKED, and said "did not answer" it read as a model
-           that might answer next time. `loop/research-batch-sixty-four-audit.md` finding 5: at 300 lists the prompt is
-           51,152 bytes and the Worker's `NotSent` refuses it before the binding, on this press and every one after, until
-           the record shrinks. The refusal's own fix is the operator's ceiling, which the owner cannot raise, so he is told
-           only what is true for him. `sent: false` alone is not enough: the endpoint's `SlashKeyClosedError` carries it
-           too, and a key that would not open is not a record too large (`test/slash-declined.test.ts`). */
-        large = model.name === 'included' && typeof e === 'object' && e !== null && (e as { sent?: unknown }).sent === false;
-        dropped.push(large ? `This BrainDog is too large for the included model to read, so ${fell}` : `The model did not answer, so ${fell}`);
-      }
-    }
-    if (deps.catalogueOffers && described === undefined) {
-      try {
-        const on = new Map(r.usage.packs.map((p) => [p.id, p.on]));
-        drafts = [...drafts, ...catalogueDrafts(await deps.catalogueOffers(kernel.packs().map((p) => ({ ...p, on: on.get(p.id) ?? true }))))];
-      } catch {
-        dropped.push('The catalogue could not be read, so no update from it was asked about.');
-      }
-    }
-    /* WHAT A USE CASE GROWS INTO, once the figures it names say so: asked whatever the record's age (`growsDrafts`). */
-    const usedOn = new Map(r.usage.packs.map((p) => [p.id, p.on]));
-    const packsOn = new Set(kernel.packs().filter((p) => usedOn.get(p.id) ?? true).map((p) => p.id));
-    /* NOT FOR A PARTIAL READING: a figure is read over the whole record, and what it says grew may be a list she cannot read. */
-    if (described === undefined && !r.partial)
-      drafts = [
-        ...drafts,
-        ...growsDrafts(deps.catalogue ?? [], (id) => packsOn.has(id), (metric) => {
-          const decl = kernel.metricDecl(metric);
-          const read = decl ? kernel.metric(decl) : null;
-          return read?.ok && typeof read.value.value === 'number' ? read.value.value : null;
-        }),
-      ];
+  const presses = describedPresses<Result<SlashFiled>>();
+
+  /**
+   * Drafts put on Decide as `slash`, in order: none already asked, in any state, and none past `SLASH_OPEN_CAP` waiting.
+   * The one loop both paths file through, so a description is held to the cap and to a dismissal exactly as a press is.
+   */
+  const slashFiling = async (drafts: readonly SlashDraft[], r: ReturnType<typeof slashReading>) => {
     const filed: { id: string; question: string; by: string }[] = [];
     const filedKeys: string[] = [];
     const skipped: { question: string; why: string }[] = [];
@@ -1842,9 +1863,181 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       filed.push({ id: put.value.id, question: d.question, by: d.by });
       filedKeys.push(key);
     }
-    if (described !== undefined) presses.filed(described, filedKeys);
+    return { filed, filedKeys, skipped };
+  };
+
+  const slashFile = async (ctx?: CallContext): Promise<SlashFiled> => {
+    const r = slashReading(ctx);
+    const drawn = drawnVersions(sql);
+    let drafts: SlashDraft[] = r.drafts;
+    let by = 'rules';
+    const dropped: string[] = [];
+    let large = false;
+    const model = deps.slashModel;
+    const fell = "Slash's own rules drafted these.";
+    if (model && r.quiet === null) {
+      try {
+        const asked = await slashAsked<Parameters<SlashModel['draft']>[0]>(
+          'draft',
+          {
+            usage: r.usage,
+            noticed: r.noticed,
+            rules: r.drafts.map(({ question, body_kind, body }) => ({ question, body_kind, body })),
+            offered: r.offered.map(({ id, kind, title }) => ({ id, kind, title })),
+            kinds: ['pack', 'settings', 'arrange', 'change'],
+            most: SLASH_OPEN_CAP,
+            ...(r.partial ? { partial: true as const } : {}),
+          },
+          (input) => model.draft(input),
+        );
+        if ('spent' in asked) dropped.push(`${asked.spent} ${fell.charAt(0).toUpperCase()}${fell.slice(1)}`);
+        else {
+          const got = fromModel(asked.raw, model.name, SLASH_OPEN_CAP, drawn);
+          dropped.push(...got.dropped);
+          if (got.drafts.length > 0) {
+            drafts = got.drafts;
+            by = model.name;
+          } else dropped.push(`The model proposed nothing Slash could use, so ${fell}`);
+        }
+      } catch (e) {
+        /* A PRESS THE INCLUDED MODEL'S CEILING TURNED AWAY WAS NEVER ASKED, and said "did not answer" it read as a model
+           that might answer next time. `loop/research-batch-sixty-four-audit.md` finding 5: at 300 lists the prompt is
+           51,152 bytes and the Worker's `NotSent` refuses it before the binding, on this press and every one after, until
+           the record shrinks. The refusal's own fix is the operator's ceiling, which the owner cannot raise, so he is told
+           only what is true for him. `sent: false` alone is not enough: the endpoint's `SlashKeyClosedError` carries it
+           too, and a key that would not open is not a record too large (`test/slash-declined.test.ts`). */
+        large = model.name === 'included' && typeof e === 'object' && e !== null && (e as { sent?: unknown }).sent === false;
+        dropped.push(large ? `This BrainDog is too large for the included model to read, so ${fell}` : `The model did not answer, so ${fell}`);
+      }
+    }
+    if (deps.catalogueOffers) {
+      try {
+        const on = new Map(r.usage.packs.map((p) => [p.id, p.on]));
+        drafts = [...drafts, ...catalogueDrafts(await deps.catalogueOffers(kernel.packs().map((p) => ({ ...p, on: on.get(p.id) ?? true }))))];
+      } catch {
+        dropped.push('The catalogue could not be read, so no update from it was asked about.');
+      }
+    }
+    /* WHAT A USE CASE GROWS INTO, once the figures it names say so: asked whatever the record's age (`growsDrafts`). */
+    const usedOn = new Map(r.usage.packs.map((p) => [p.id, p.on]));
+    const packsOn = new Set(kernel.packs().filter((p) => usedOn.get(p.id) ?? true).map((p) => p.id));
+    /* NOT FOR A PARTIAL READING: a figure is read over the whole record, and what it says grew may be a list she cannot read. */
+    if (!r.partial)
+      drafts = [
+        ...drafts,
+        ...growsDrafts(deps.catalogue ?? [], (id) => packsOn.has(id), (metric) => {
+          const decl = kernel.metricDecl(metric);
+          const read = decl ? kernel.metric(decl) : null;
+          return read?.ok && typeof read.value.value === 'number' ? read.value.value : null;
+        }),
+      ];
+    const { filed, skipped } = await slashFiling(drafts, r);
     return { by, filed, skipped, dropped, large };
   };
+
+  /**
+   * The declaration a description is about, as the model is handed it (`SlashModelInput.page`), or the refusal a page
+   * she cannot open gets.
+   *
+   * A PAGE DRAWN PER ROW HAS NO DECLARATION OF ITS OWN, so it is its template's: the one page declaration whose `for:`
+   * reads the list that row lives in. Two templates over one list cannot be told apart from the row's page, so that page
+   * is refused, and the template is named by its own slug instead, which is accepted while she can read its list.
+   */
+  const describedPage = (slug: string, ctx: CallContext): Result<{ id: string; body: unknown }> => {
+    const bare = slug.startsWith('page.') ? slug.slice('page.'.length) : slug;
+    const shown = kernel.pages().filter((p) => seesPage(ctx, p));
+    const about = shown.find((p) => p.slug === bare)?.about ?? null;
+    const templates = kernel.declarations().flatMap((d) => {
+      if (d.kind !== 'page') return [];
+      const body = JSON.parse(d.body) as { for?: { register?: unknown } };
+      const over = body.for?.register;
+      return typeof over === 'string' && readable(ctx, over) === null ? [{ id: d.id, over, body }] : [];
+    });
+    if (about !== null) {
+      const over = templates.filter((t) => t.over === about.register);
+      if (over.length === 1) return ok({ id: over[0]!.id, body: over[0]!.body });
+    }
+    const named = arrangement.declaration(bare, [...shown.filter((p) => p.about === null), ...templates.map((t) => ({ slug: t.id.slice('page.'.length) }))]);
+    return named.ok ? ok({ id: String(named.value.id), body: named.value.body }) : named;
+  };
+
+  /**
+   * A description drafted, tried and repaired (`describe` in `slash.ts`), filing nothing: what `slashDraft` answers, and
+   * what `slashFileDescribed` then files.
+   *
+   * THE MODEL IS HANDED THE GRAMMARS IT DRAFTS IN, the page the description is about, and the reading of the record the
+   * press has always had. `kinds` is `change` alone, the one kind a description files. Every ask goes through
+   * `slashAsked`, so each one, the repairs included, is held and settled in Slash's ledger against `ask_cap`.
+   *
+   * NOTHING IS ASKED WHERE NOTHING COULD BE TRIED: with no model, or on a record whose `previewChange` is not there,
+   * the answer is the one sentence that says so and no ask is spent.
+   */
+  const slashDescribed = async (
+    asked: string,
+    page: string | undefined,
+    ctx: CallContext,
+    preview: SlashPreviewer | null,
+    r: ReturnType<typeof slashReading> = slashReading(ctx),
+  ): Promise<Result<SlashDescribed>> => {
+    const about = page === undefined ? null : describedPage(page, ctx);
+    if (about !== null && !about.ok) return about;
+    const model = deps.slashModel;
+    if (!model) return ok({ by: 'rules', drafts: [], dropped: [DESCRIBED_NO_MODEL], large: false });
+    if (preview === null) return ok({ by: 'rules', drafts: [], dropped: [DESCRIBED_NO_PREVIEW], large: false });
+    return ok(
+      await describe({
+        name: model.name,
+        ask: (input) => slashAsked('draft', input, (i) => model.draft(i)),
+        input: {
+          usage: r.usage,
+          noticed: r.noticed,
+          rules: r.drafts.map(({ question, body_kind, body }) => ({ question, body_kind, body })),
+          offered: r.offered.map(({ id, kind, title }) => ({ id, kind, title })),
+          kinds: ['change'],
+          most: SLASH_OPEN_CAP,
+          asked,
+          ...(r.partial ? { partial: true as const } : {}),
+          grammar: describedGrammar(),
+          ...(about === null ? {} : { page: about.value }),
+        },
+        drawn: drawnVersions(sql),
+        preview,
+      }),
+    );
+  };
+
+  /**
+   * What the owner described, drafted and tried, and the drafts that drew clean filed on Decide: what `slashDraft` would
+   * answer, filed (`loop/finish/contracts.md` §2.4).
+   *
+   * THE SPEND IS CHECKED FIRST: with Decide full, or the same words already filed and still waiting, the model is not asked
+   * (`describedPresses`). Only a filing path asks this, since `slashDraft` files nothing and so fills no slot.
+   */
+  const slashFileDescribed = async (asked: string, page: string | undefined, ctx: CallContext, preview: SlashPreviewer | null): Promise<Result<SlashFiled>> => {
+    const r = slashReading(ctx);
+    const waits = deps.slashModel ? presses.held(asked, r.waiting.length, (k) => r.asked.get(k)?.status === 'open') : null;
+    if (waits !== null) return ok({ by: 'rules', filed: [], skipped: [], dropped: [waits], large: false });
+    const described = await slashDescribed(asked, page, ctx, preview, r);
+    if (!described.ok) return described;
+    const { by, drafts, dropped, large } = described.value;
+    const { filed, filedKeys, skipped } = await slashFiling(drafts, r);
+    presses.filed(asked, filedKeys);
+    return ok({ by, filed, skipped, dropped, large });
+  };
+
+  /**
+   * `slashDraft`'s whole path, handed to `methods/slash-draft.ts` as `RecordDeps.slashDescribed`, since that file is
+   * handed the record's guards and not its model or its ledger.
+   *
+   * PRESSES OF ONE DESCRIPTION SENT TOGETHER SHARE ONE ANSWER, as a filing press's do, so a double press asks once. `who`
+   * carries the page too, because the same words about two pages are two drafts.
+   */
+  const drafting = describedPresses<Result<SlashDrafted>>();
+  const slashDrafted = (args: { asked: string; page?: string }, ctx: CallContext, preview: SlashPreviewer | null): Promise<Result<SlashDrafted>> =>
+    drafting.once(args.asked, JSON.stringify([ctx.principal.id, ctx.levels ?? null, ctx.registers ?? null, args.page ?? null]), async () => {
+      const got = await slashDescribed(args.asked, args.page, ctx, preview);
+      return got.ok ? ok(draftedOf(got.value)) : got;
+    });
 
   /**
    * WHETHER SLASH RUNS ON ITS OWN, and the day it last did. Kept as Slash's own two prefs (`pref`, person `slash`): the
@@ -2814,7 +3007,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   /** Whether the caller reads the record as a whole, rather than the registers they were invited to. */
   const wholeRecord = (ctx: CallContext): boolean =>
     ctx.principal.kind === 'system' ||
-    (ctx.principal.level !== null && (ctx.registers === undefined || ctx.registers === '*'));
+    (ctx.principal.kind !== 'runner' && ctx.principal.level !== null && (ctx.registers === undefined || ctx.registers === '*'));
 
   /**
    * One event as this caller may see it, or `null` when they may not.
@@ -3384,24 +3577,31 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     return Object.fromEntries(kernel.members().flatMap((m) => (typeof m.name === 'string' && m.name.trim() !== '' ? [[m.person_id, m.name.trim()]] : [])));
   };
 
-  const shellFor = (ctx: CallContext): Pick<Boot, 'record' | 'me' | 'pages' | 'counts' | 'whatsNew' | 'names'> => {
+  const shellFor = (ctx: CallContext): Pick<Boot, 'record' | 'me' | 'pages' | 'counts' | 'pen' | 'whatsNew' | 'names'> => {
     const p = ctx.principal;
     const person = p.kind === 'person' ? p.id : p.kind === 'token' ? p.person : null;
     const identity = kernel.identity();
     /* EVERY OPEN QUESTION, NOT A PAGE OF THEM: a count read off two hundred rows said 200 to a queue of 206. */
     const open = kernel.openSuggestions();
+    /* THE PERSON'S OWN PREFERENCES, READ ONCE. `me.prefs` answers them to the person, and the pen reads a token's person's
+       too, because a dismissal is the person's whichever door they came in by. */
+    const prefs: Prefs = person === null ? {} : (kernel.prefsOf(person) as Prefs);
+    /* EVERY INSTALLED PAGE, READ ONCE: the rail below is the ones this caller may open, and the pen asks of all of them
+       which lists a page already reads and which slugs are taken. */
+    const every = kernel.pages();
     return {
-      record: identity ? { slug: identity.slug, name: identity.name, locale: identity.locale } : null,
+      record: identity ? { slug: identity.slug, name: identity.name, locale: identity.locale, currency: kernel.homeCurrency() } : null,
       me: {
-        kind: p.kind,
+        /* A RUNNER NEVER BOOTS, since `scoped` refuses it before this is read, so `Boot.me.kind` keeps its three and a
+           principal that is neither a person nor a token reads as the record's own, with no level. */
+        kind: p.kind === 'person' || p.kind === 'token' ? p.kind : 'system',
         person,
         name: person === null ? null : (kernel.members().find((m) => m.person_id === person)?.name ?? null),
-        level: p.kind === 'system' ? null : p.level,
-        ...(p.kind === 'person' ? { prefs: kernel.prefsOf(p.id) as Prefs } : {}),
+        level: p.kind === 'person' || p.kind === 'token' ? p.level : null,
+        ...(p.kind === 'person' ? { prefs } : {}),
       },
       /* THE SAME FILTER `pages` RUNS, and the register list stays behind for the same reason. */
-      pages: kernel
-        .pages()
+      pages: every
         .filter((page) => seesPage(ctx, page))
         /* THE ONE LIST A PAGE DRAWS, when it draws one this caller reads, so a saved view sits under its list in the rail.
            A name the kernel gives a read across the whole record is not a list (`*`, a character no register id holds). */
@@ -3429,7 +3629,20 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         decided: readsEveryList(ctx)
           ? kernel.governanceCount('decision')
           : ((all) => (all.ok ? all.value.filter((row) => !holds(ctx, row)).length : 0))(kernel.governance('decision', { every: true })),
+        /* EVERY ARRIVAL, IN WHATEVER STATE, for the owner `inbox` is told to: one grouped read of the six states. */
+        arrived: allows(ctx, 'owner') === null ? Object.values(kernel.inboxCounts()).reduce((n, c) => n + c, 0) : null,
       },
+      /* THE HOLDING PEN, to a person or their token who reads every list (`readsEveryList`, the owner among them), unless
+         they turned it off. A reader held to some lists is offered nothing, because every item is a page over a list. */
+      pen:
+        person !== null && readsEveryList(ctx) && prefs['pen.suggest'] !== false
+          ? penFor({
+              kernel,
+              reads: (list) => readable(ctx, list) === null,
+              pages: every,
+              dismissed: new Set(Array.isArray(prefs['pen.dismissed']) ? prefs['pen.dismissed'] : []),
+            })
+          : [],
       whatsNew: newsFor(ctx),
       ...((names) => (names === null ? {} : { names }))(namesFor(ctx)),
     };
@@ -3765,7 +3978,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     async list(
       args: {
         register: string;
-        where?: Predicate;
+        /* A SENTENCE OR A TREE, AS THE KERNEL TAKES IT. `kernel.list` reads both, and this signature named the tree
+           alone, so the web turned a person's chips into a tree for a record that reads the chips' own words
+           (`loop/finish/architecture.md` ARC-2). */
+        where?: Predicate | string;
         limit?: number;
         cursor?: string | null;
         /* THE ORDER REACHES THE KERNEL, and it did not. `kernel.list` grew one; this signature did
@@ -3809,8 +4025,16 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          that knows which fields a caller actually filtered on.
 
          AFTER THE GUARD, so a refused read is not evidence about anything, and outside the answer,
-         so counting never changes what comes back. */
-      for (const field of unindexed(args.register, args.where))
+         so counting never changes what comes back.
+
+         A SENTENCE IS READ WITH `where`'S OWN PARSER FIRST, so a filter written in words counts its scans as a tree does.
+         A ref naming no row reads as no row here, since only the fields matter to the count; a sentence the parser
+         refuses counts nothing, because the kernel refuses the same read below. */
+      const where = args.where;
+      const schema = typeof where === 'string' ? kernel.schemaOf(args.register) : null;
+      const said = typeof where === 'string' && schema !== null ? parseWhere(where, schema, { nowMs: clock.now(), absent: 'no-row' }) : null;
+      const tree = typeof where === 'string' ? (said !== null && said.bad.length === 0 ? said.predicate : undefined) : where;
+      for (const field of unindexed(args.register, tree))
         kernel.observe([{ kind: 'query.scan', subject: `${args.register}.${field}` }]);
 
       /* AND THAT THE REGISTER WAS READ AT ALL. `24 §4.2` lists "register never read, page never
@@ -4044,19 +4268,33 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * else the rules'. Never one already asked, and never more than `SLASH_OPEN_CAP` waiting.
      *
      * `asked` IS THE OWNER'S OWN DESCRIPTION of what they want built, typed on the Slash page, and the model drafts from it.
+     * `page` is the page it is about. What is filed is what `slashDraft` would answer for the same words: every draft
+     * tried with `previewChange` and mended at most `SLASH_REPAIRS_MOST` times, and only those that drew clean
+     * (`slashFileDescribed`).
+     *
+     * `this` IS THE RECORD, whose `previewChange` is a method under `methods/` this object is not handed any other way
+     * (`previewerOf`); the host calls every method on the record, and so does every caller in this tree.
      */
     async slashPropose(args: Record<string, unknown> | undefined, ctx: CallContext) {
       const stop = admin(ctx, 'ask Slash to put questions on Decide');
       if (stop) return { ok: false as const, refusal: stop };
-      const extra = stray((args ?? {}) as Record<string, unknown>, ['asked']);
+      const extra = stray((args ?? {}) as Record<string, unknown>, ['asked', 'page']);
       if (extra) return { ok: false as const, refusal: extra };
       const asked = args?.asked;
-      if (asked !== undefined && (typeof asked !== 'string' || asked.trim() === '' || asked.trim().length > SLASH_ASKED_MOST))
-        return no('VALUE_MALFORMED', `asked is what you want Slash to build, in a sentence or a few, at most ${SLASH_ASKED_MOST} characters.`, { at: 'asked' });
-      const text = asked?.trim();
-      if (text === undefined) return tail(ok(await slashFile(undefined, ctx)));
-      const who = JSON.stringify([ctx.principal.id, ctx.levels ?? null, ctx.registers ?? null]);
-      return tail(ok(await presses.once(text, who, () => slashFile(text, ctx))));
+      const page = args?.page;
+      if (asked === undefined && page !== undefined)
+        return no('REQUIRED_MISSING', 'page names the page a description is about, so it comes with asked, what you want Slash to build.', { at: 'asked' });
+      const unasked = asked === undefined ? null : askedFault(asked);
+      if (unasked) return { ok: false as const, refusal: unasked };
+      const unpaged = page === undefined ? null : pageFault(page);
+      if (unpaged) return { ok: false as const, refusal: unpaged };
+      if (typeof asked !== 'string') return tail(ok(await slashFile(ctx)));
+      const text = asked.trim();
+      const about = typeof page === 'string' ? page.trim() : undefined;
+      const who = JSON.stringify([ctx.principal.id, ctx.levels ?? null, ctx.registers ?? null, about ?? null]);
+      const preview = previewerOf(this, ctx);
+      const out = await presses.once(text, who, () => slashFileDescribed(text, about, ctx, preview));
+      return out.ok ? tail(out) : out;
     },
 
     /**
@@ -4619,8 +4857,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          the value, so a member held to `append` on Money, refused `list money`, read "link payee" for a name that was
          there and "nothing bears that name" for one that was not. Refused on both paths, so a body cannot be reshaped
          from `then:` to `steps:` to be answered, and with `guard`'s own sentence, which `list` gives her already. */
+      /* A CREATE ON THE RUN PATH IS HELD TO THE RUNG A CREATE NEEDS, NOT TO READING (`loop/finish/defects.md` A11). The run
+         path is said and not walked (`said`), so nothing of the list a create writes into is looked up, and a member who
+         may add rows to Money and not read them was refused the account of her own rule. A `link` still reads its
+         target on either path, and a create inside the write is still held to reading, since the kernel's walk runs
+         over the rule's own rows there. */
+      const run = flowPath(body) === 'run';
       for (const reached of listsReached(body)) {
-        const out = guard(ctx, 'read', reached.register);
+        const out = guard(ctx, run && reached.at.endsWith('.create.register') ? 'append' : 'read', reached.register);
         if (out) return { ok: false as const, refusal: { ...out, at: reached.at } };
       }
       if (flowPath(body) === 'run') {
@@ -4730,7 +4974,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         kind: p.kind,
         id: p.kind === 'system' ? 'system' : p.id,
         person: p.kind === 'token' ? p.person : p.kind === 'person' ? p.id : null,
-        level: p.kind === 'system' ? 'owner' : p.level,
+        level: p.kind === 'system' ? 'owner' : p.kind === 'runner' ? null : p.level,
         scope: p.kind === 'token' ? p.scope : null,
         /* WHICH REGISTERS, when the caller is held to some of them. `null` is "all of them", which
            is a different answer from "none" and the two must never be one value. */
@@ -4820,11 +5064,17 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     },
 
     /**
-     * One thing this person arranged for themselves: `nav.order`, the rail's order, or `nav.hidden`, the pages taken
-     * out of it. Each is a list of addresses, and `null` takes it away. `boot` answers them on `me.prefs`.
+     * One thing this person arranged for themselves, one key of `PREF_KEYS` at a time: `nav.order`, the rail's order;
+     * `nav.hidden`, the pages taken out of it; `nav.shape`, a rail, a bar or a menu; `pen.suggest`, whether the holding
+     * pen offers anything; `pen.dismissed`, what it offered and they turned down. `null` takes a key away. `boot` answers
+     * them on `me.prefs`.
      *
      * A PERSON, NOT A TOKEN, and not an event, for the reasons a read mark is neither: it is about somebody's own
      * screen, and it is not the record's history. Any level may, since it changes nothing anybody else sees.
+     *
+     * EACH KEY HAS ITS OWN SHAPE, AND A WRONG ONE IS REFUSED IN THAT KEY'S WORDS, before anything is kept. A dismissal list
+     * keeps the newest `PEN_DISMISSED_MOST` and lets the oldest go, because the pen appends one id at a time and a list
+     * that refused its next id would make Dismiss stop working; the list it walks is bounded by the body the host admits.
      */
     async setPref(args: { key: string; value: unknown }, ctx: CallContext) {
       const stop = guard(ctx, 'read');
@@ -4834,12 +5084,29 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (extra) return { ok: false as const, refusal: extra };
       if (!PREF_KEYS.includes(args?.key as PrefKey))
         return no('VALUE_MALFORMED', `key is one of ${PREF_KEYS.join(' or ')}.`, { at: 'key', allowed: PREF_KEYS });
+      const key = args.key as PrefKey;
       const value = args.value;
-      if (value !== null && !(Array.isArray(value) && value.length <= 500 && value.every((v) => typeof v === 'string' && v.startsWith('/') && v.length <= 300)))
-        return no('VALUE_MALFORMED', 'value is a list of at most 500 addresses, each starting with /, or null to take it away.', { at: 'value' });
-      const kept = value === null ? null : [...new Set(value as string[])];
-      kernel.setPref(ctx.principal.id, args.key, kept);
-      return ok({ key: args.key, value: kept });
+      const texts = (v: unknown, most: number, fits: (s: string) => boolean): v is string[] =>
+        Array.isArray(v) && v.length <= most && v.every((s) => typeof s === 'string' && s.length <= 300 && fits(s));
+      let kept: Prefs[PrefKey] | null = null;
+      if (value !== null && (key === 'nav.order' || key === 'nav.hidden')) {
+        if (!texts(value, 500, (s) => s.startsWith('/')))
+          return no('VALUE_MALFORMED', `${key} is a list of at most 500 addresses, each starting with /, or null to take it away.`, { at: 'value' });
+        kept = [...new Set(value)];
+      } else if (value !== null && key === 'nav.shape') {
+        if (value !== 'rail' && value !== 'bar' && value !== 'menu')
+          return no('VALUE_MALFORMED', 'nav.shape is rail, bar or menu, or null to take it away.', { at: 'value', allowed: ['rail', 'bar', 'menu'] });
+        kept = value as 'rail' | 'bar' | 'menu';
+      } else if (value !== null && key === 'pen.suggest') {
+        if (typeof value !== 'boolean') return no('VALUE_MALFORMED', 'pen.suggest is true or false, or null to take it away.', { at: 'value' });
+        kept = value;
+      } else if (value !== null && key === 'pen.dismissed') {
+        if (!texts(value, Number.POSITIVE_INFINITY, (s) => s.trim() !== ''))
+          return no('VALUE_MALFORMED', 'pen.dismissed is a list of the ids of what was dismissed, each 1 to 300 characters, or null to take it away.', { at: 'value' });
+        kept = [...new Set(value)].slice(-PEN_DISMISSED_MOST);
+      }
+      kernel.setPref(ctx.principal.id, key, kept);
+      return ok({ key, value: kept });
     },
 
     /**
@@ -5324,7 +5591,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const stop = admin(ctx, 'read a plan for a pack');
       if (stop) return { ok: false as const, refusal: stop };
 
-      const pack = await normalise(args?.doc, args?.source ?? { kind: 'local' });
+      const pack = await normaliseChecked(args?.doc, args?.source ?? { kind: 'local' });
       if (!pack.ok) return pack;
       const diff = await plan(pack.value, installedState(ctx));
       /* A PACK POINTING AT A LIST NOTHING HOLDS IS REFUSED AT THE PLAN, and not only at the install,
@@ -5355,7 +5622,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (approve !== undefined && (!Array.isArray(approve) || approve.some((l) => typeof l !== 'string')))
         return no('VALUE_MALFORMED', 'approve is the list of lines the plan calls out, as it printed them.', { at: 'approve' });
 
-      const pack = await normalise(args.doc, args.source ?? { kind: 'local' });
+      const pack = await normaliseChecked(args.doc, args.source ?? { kind: 'local' });
       if (!pack.ok) return pack;
       const state = installedState(ctx);
       const diff = await plan(pack.value, state);
@@ -5472,20 +5739,36 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * from both (SEC-4). It is `sees` over the kernel's walk now, the question Decide asks, so an arrival rule is placed
      * by the list its door writes (`rowRegisterOf`), as Decide places it, where this read it as a rule with no row.
      */
-    async automations(args: { rule?: string } | undefined, ctx: CallContext) {
+    async automations(args: { rule?: string; before?: string; limit?: number } | undefined, ctx: CallContext) {
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false as const, refusal: stop };
-      const extra = stray((args ?? {}) as Record<string, unknown>, ['rule']);
+      const extra = stray((args ?? {}) as Record<string, unknown>, ['rule', 'before', 'limit']);
       if (extra) return { ok: false as const, refusal: extra };
       const shown = (id: string, body: Record<string, unknown>): boolean => sees(ctx, liveTouches(id, body));
       const named = args?.rule;
-      if (named === undefined) return ok(listAutomations(sql, clock.now(), shown));
+      /* `before` AND `limit` PAGE ONE RULE'S RUNS, AND ONLY THAT (`loop/finish/contracts.md` §2.2, X10). The list of every
+         automation carries no runs to page, so either key without `rule` is a key this call does not take there. */
+      if (named === undefined) {
+        for (const key of ['before', 'limit'] as const)
+          if (args?.[key] !== undefined)
+            return no('FIELD_UNKNOWN', `${key} pages one automation's runs, so it goes with rule. Without rule this call takes nothing, and answers every automation you can read.`, { at: key, allowed: ['rule'] });
+        return ok(listAutomations(sql, clock.now(), shown));
+      }
       if (typeof named !== 'string' || named === '') return no('VALUE_MALFORMED', 'An automation is named by its id, such as chase or rule.chase.', { at: 'rule' });
-      const found = oneAutomation(sql, named, clock.now());
+      const limit = args?.limit;
+      if (limit !== undefined && !(Number.isInteger(limit) && limit >= 1 && limit <= RUNS_PAGE_MOST))
+        return no('VALUE_MALFORMED', `limit is how many runs one page holds, a whole number from 1 to ${RUNS_PAGE_MOST}.`, { at: 'limit' });
+      const before = args?.before;
+      if (before !== undefined && (typeof before !== 'string' || before === '')) return no('VALUE_MALFORMED', 'before is the id of a run, as the last page named it under older.', { at: 'before' });
+      const found = oneAutomation(sql, named, clock.now(), { before, limit });
       if (found === null || !shown(found.id, found.body)) {
         const id = named.startsWith('rule.') ? named : `rule.${named}`;
         return no('DECLARATION_UNKNOWN', `There is no automation called ${id}${id.endsWith('.') ? '' : '.'}`, { at: 'rule' });
       }
+      /* A `before` THAT IS NO RUN OF THIS RULE IS SAID, not answered as an empty page, which would read as "no older runs".
+         Asked only once the rule is shown, so it tells nothing about a rule the caller may not read. */
+      if (before !== undefined && !sql.one<{ y: number }>('SELECT 1 AS y FROM automation_run WHERE id = ? AND rule = ?', before, found.rule))
+        return no('REF_UNKNOWN', `before is ${before}, and ${found.id} has no run by that id.`, { at: 'before' });
       return ok(found);
     },
 
@@ -5725,8 +6008,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         return no('VALUE_MALFORMED', 'version is the whole number the declaration was read at, or 0 when there was none.', { at: 'version' });
 
       /* WRAPPED AS A ONE-DECLARATION PACK, because that is where the reading of a document lives.
-         A second parser for the in-app form would be a second grammar. */
-      const one = await normalise(
+         A second parser for the in-app form would be a second grammar. And through the theme check,
+         because a theme set here and a theme installed from a file are one declaration, and the
+         kernel checks a theme's shape and never its palette (`theme-check.ts`). */
+      const one = await normaliseChecked(
         {
           pack: 'in-app',
           version: '0.0.0',
@@ -5830,6 +6115,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     async invite(args: { person?: string; email?: string; name?: string; level?: Level; registers?: Record<string, Level>; why?: string }, ctx: CallContext) {
       const stop = admin(ctx);
       if (stop) return { ok: false as const, refusal: stop };
+      /* A SIGN-IN IN THE LAST FIFTEEN MINUTES, as deleting the record asks. Inviting somebody or changing what they hold
+         is who can reach everything here, so a browser left signed in for a month, or a cookie copied off it, must not
+         be enough to hand the record to a stranger. `provedAt` is set only from a session row, so an agent's token and
+         the self-host's server key are judged by `admin` above and never by this. */
+      if (ctx.provedAt !== undefined && clock.now() - ctx.provedAt > FRESH)
+        return { ok: false as const, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to invite somebody or change what they can do. Nothing was changed.', at: 'principal' } };
       /* AN ADDRESS AND NO PERSON IS AN INVITATION (`30 §5`, `12 §3`): a single-use link for that one address, good
          for 24 hours, handed back once to copy. Nothing is mailed, by this or by anything. */
       if (!args?.person && typeof args?.email === 'string') {
@@ -5933,6 +6224,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     async createToken(args: CreateTokenArgs, ctx: CallContext) {
       const stop = admin(ctx, undefined, 'createToken');
       if (stop) return { ok: false as const, refusal: stop };
+      /* AND A SIGN-IN IN THE LAST FIFTEEN MINUTES, for the reason `invite` gives: a token is the record's reach handed to
+         a machine for as long as it lives, so a stale session is not enough to mint one. */
+      if (ctx.provedAt !== undefined && clock.now() - ctx.provedAt > FRESH)
+        return { ok: false as const, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to make a token. Nothing was made.', at: 'principal' } };
       /* AND MINTING NEEDS A CREDENTIAL OF ITS OWN, which is not true of any other ADMIN method here.
          A self-host with no `BRAINDOG_TOKEN` treats an unauthenticated request as the owner — right
          for one person on one machine, where the process binds loopback and the machine is the
@@ -6033,11 +6328,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       );
     },
 
-    /** Every token, with a revoke button's worth of information and never the hash. */
+    /**
+     * Every token, with a revoke button's worth of information and never the hash. A token the operator's cut-off has
+     * ended carries `ended_by: 'operator'` (`RecordDeps.validFrom`), so the owner sees why it stopped.
+     */
     async listTokens(ctx: CallContext) {
       const stop = admin(ctx, 'list the tokens this record has issued');
       if (stop) return { ok: false as const, refusal: stop };
-      return ok(kernel.listTokens());
+      return ok(kernel.listTokens(deps.validFrom?.()));
     },
 
     /** Revoke one. The second call says the same as the first. */
@@ -6080,11 +6378,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       return tail(await kernel.deviceApprove(actorOf(ctx), args ?? ({} as never)));
     },
 
-    /** Every device grant, named by its handle and never by the id the device polls with. */
+    /**
+     * Every device grant, named by its handle and never by the id the device polls with. One the operator's cut-off has
+     * ended carries `ended_by: 'operator'`, as `listTokens` marks a token.
+     */
     async listDevices(ctx: CallContext): Promise<Result<DeviceRow[]>> {
       const stop = admin(ctx, 'list the devices signed in to this record');
       if (stop) return { ok: false as const, refusal: stop };
-      return ok(await kernel.deviceList());
+      return ok(await kernel.deviceList(deps.validFrom?.()));
     },
 
     /** Revoke one by its handle. A login grant takes its token with it; the session that approved it stays. */
@@ -6548,14 +6849,24 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       return tail(await kernel.deviceStart({ ...(args ?? ({} as never)), ...(scope === undefined ? {} : { scope }) }));
     },
 
-    /** The device asks again, and once approved takes its bearer, once. INTERNAL, for `/auth/device/token`. */
+    /**
+     * The device asks again, and once approved takes its bearer, once. INTERNAL, for `/auth/device/token`.
+     *
+     * THE HOST'S CUT-OFF GOES DOWN WITH IT (`RecordDeps.validFrom`): a code approved before the instant is not exchanged,
+     * because a login exchange mints its token now and the token would otherwise pass a cut-off its approval did not.
+     */
     async devicePoll(args: { device_code: string }): Promise<Result<DeviceWaiting | Exchanged>> {
-      return tail(await kernel.devicePoll(args ?? ({} as never)));
+      return tail(await kernel.devicePoll(args ?? ({} as never), deps.validFrom?.()));
     },
 
-    /** A vault-grant bearer, checked before the host opens a key for an agent. INTERNAL, and no route reaches it. */
+    /**
+     * A vault-grant bearer, checked before the host opens a key for an agent. INTERNAL, and no route reaches it.
+     *
+     * THE HOST'S CUT-OFF (`RecordDeps.validFrom`) IS READ HERE, so neither host's key door has to carry it: a grant
+     * approved before it is refused as a grant nobody made (`TokenDeps.validFrom` in the kernel).
+     */
     async vaultGrant(bearer: string): Promise<Result<VaultGrant>> {
-      return kernel.vaultGrant(bearer);
+      return kernel.vaultGrant(bearer, deps.validFrom?.());
     },
 
     /**
@@ -6564,9 +6875,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * WHAT THE HOST DOES WITH THE ANSWER is the whole of the rule: `{ principal: { kind: 'person', id: person, level },
      * operation: method, credentialed: true }`, with `level` read from the record as for a session, and that context
      * handed to `method` and to nothing else. `admin` admits it there, and `allows` refuses it everywhere.
+     *
+     * THE HOST'S CUT-OFF, as for `vaultGrant`: an operation approved before it is refused, unspent.
      */
     async operationGrant(bearer: string): Promise<Result<OperationGrant>> {
-      return kernel.operationGrant(bearer);
+      return kernel.operationGrant(bearer, deps.validFrom?.());
     },
 
     /** The key this record's exports are signed with, for the hosts' key doors, or `null` with no signer. INTERNAL. */
@@ -6588,20 +6901,47 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * kernel's `depositGrant`, in one transaction with the row. The row keeps the index: its label, what it opens,
      * its kind, and for a new key its project. A key already there, named outright or found by its label within
      * reach, rotates its grant rather than becoming a second row saying the same thing.
+     *
+     * AND A THIRD CALLER, WHICH ADDS AND NEVER REPLACES: an agent's login token at `/api/vault/deposit`
+     * (`loop/finish/agents.md` C1), admitted only when the host passes `agentDeposit`, which it sets on that one path
+     * and never from anything in a request. The token needs `write` on the keys list; the key goes to the project its
+     * run is in, or to no project when the run is in none, and it is signed by that run. A label already within that
+     * reach is refused, because replacing a value is rotation and rotation still needs a vault grant or the owner: a
+     * login token that leaks can add a key and can never swap one.
      */
     async depositGrant(
       args: { label?: unknown; opens?: unknown; kind?: unknown; project?: unknown; credential?: unknown },
       by: VaultGrant | CallContext,
       hints: SessionHints,
       seal: (target: SealTarget) => Promise<Result<Sealed>>,
+      opts?: { agentDeposit?: true | undefined },
     ): Promise<Result<Deposited>> {
-      /* WHICH OF THE TWO IS ASKING. A context has a principal and a grant has a scope; nothing else tells them
-         apart, and `principal` is the one a grant can never grow. */
+      /* WHICH OF THE THREE IS ASKING. A context has a principal and a grant has a scope; nothing else tells them
+         apart, and `principal` is the one a grant can never grow. A context is an agent's only when it is a token's
+         AND the host said this is the agent door.
+
+         AND THAT DOOR TAKES A TOKEN AND NOTHING ELSE. Anything else the host hands down with the flag is refused here
+         rather than sent on to the vault gate, because `allows` admits a `system` context on every rung, so a host
+         whose bearer check answered with its own server key's context would have given that key the owner's reach:
+         naming the project, naming the key, and replacing its value. */
       const ctx = 'principal' in by ? by : null;
       const grant = 'principal' in by ? null : by;
-      if (ctx) {
+      const agent = ctx !== null && opts?.agentDeposit === true && ctx.principal.kind === 'token' ? ctx : null;
+      if (opts?.agentDeposit === true && agent === null)
+        return no('FORBIDDEN', 'This door adds a key for a login token, and the bearer sent is not one.', { at: 'principal' });
+      if (ctx && agent === null) {
         const stop = vault(ctx);
         if (stop) return { ok: false as const, refusal: stop };
+      }
+      if (agent) {
+        const stop = guard(agent, 'write', KEYS);
+        if (stop) return { ok: false as const, refusal: stop };
+        /* THE BODY NAMES NEITHER, because either one would be a way out of the reach this path is held to: a project
+           puts the key somewhere the run is not, and a key named outright is a replacement by another name. */
+        if (args?.project !== undefined || args?.credential !== undefined)
+          return no('VALUE_MALFORMED', "An agent's key goes to its run's project, so a deposit by a login token names no project and no key.", {
+            at: args?.project !== undefined ? 'project' : 'credential',
+          });
       }
       const label = typeof args?.label === 'string' ? args.label.trim() : '';
       if (!label || label.length > 120)
@@ -6611,12 +6951,45 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (args.kind !== undefined && !(GRANT_KINDS as readonly unknown[]).includes(args.kind))
         return no('ENUM_VALUE_UNKNOWN', 'That is not a kind of key.', { at: 'kind', allowed: GRANT_KINDS });
 
+      /* AN AGENT'S REACH IS ITS RUN'S PROJECT, found or opened by the ladder as every write of that token is, and
+         held as the row id a key's `project` holds, so it compares as a vault grant's scope does: a project reaches
+         its own keys, and `*` the keys of no project. Resolved after the checks above, so a malformed deposit opens
+         no run. */
+      let reach: Pick<VaultGrant, 'scope'> | null = grant;
+      let signer: string | null = null;
+      let origin: string | null = null;
+      if (agent) {
+        const found = runFor(agent, hints, 'opened: key deposit');
+        if (!found.ok) return tail(found as Result<never>);
+        const at = projectOf(found.value.run);
+        const home = at === null ? null : (kernel.get(at)?.id ?? null);
+        reach = { scope: home ?? '*' };
+        signer = found.value.spoken;
+        const ran = (field: string): string | null => {
+          const v = found.value.run.fields[field];
+          return typeof v === 'string' && v.trim() !== '' ? v.trim() : null;
+        };
+        const who = ran('agent') ?? hints.agent ?? 'An agent';
+        const where = ran('host') ?? hints.host ?? null;
+        origin = `${where === null ? who : `${who} on ${where}`}, ${signer}`.slice(0, 280);
+      }
+
       /* THE ROW THIS IS ABOUT: the one named, or the one of that label within reach. Naming a row is how a screen
          says "replace THIS key's value" without a label being the identity of anything, and a name that is not
          reached is refused rather than quietly creating a second row beside it. */
       const named = typeof args.credential === 'string' ? args.credential.trim() : '';
-      const row = named === '' ? keyFor({ label }, grant) : keyFor({ credential: named }, grant);
-      if (named !== '' && row === null) return unreached(grant);
+      const row = named === '' ? keyFor({ label }, reach) : keyFor({ credential: named }, reach);
+      if (named !== '' && row === null) return unreached(reach);
+      /* NEW KEYS ONLY FOR AN AGENT'S LOGIN TOKEN. The sentence names the two ways a value is replaced, and says
+         nothing about the key but that its label is taken within this reach, which the agent already knew. */
+      if (agent && row !== null)
+        return tail(
+          no<Deposited>(
+            'FORBIDDEN',
+            "Replacing a key's value needs a vault grant for its project (braindog login <host> --vault <project>) or the owner on the Keys screen.",
+            { at: 'label' },
+          ),
+        );
       const opens = said || (typeof row?.fields.opens === 'string' ? row.fields.opens : '');
       if (!opens) return no('REQUIRED_MISSING', 'A new key says what it opens, such as a host or an account.', { at: 'opens' });
 
@@ -6636,16 +7009,20 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (!sealed.ok) return sealed;
 
       const declares = (field: string) => kernel.register(KEYS)?.fields.some((f) => f.id === field && !f.retired) === true;
-      /* WHERE A NEW KEY BELONGS. An agent's key goes in the grant's own project, and a person says which one, by
-         spoken id or by row id; either way what is stored is the row id a key's `project` field holds, so the
-         door's later scope comparisons are like with like. Neither names a project for a key that already exists. */
+      /* WHERE A NEW KEY BELONGS. An agent's key goes in its grant's own project, or its run's when it came by a login
+         token, and a person says which one, by spoken id or by row id; either way what is stored is the row id a
+         key's `project` field holds, so the door's later scope comparisons are like with like. None names a project
+         for a key that already exists. */
       const asked = typeof args.project === 'string' ? args.project.trim() : '';
-      const project = grant !== null ? (grant.scope === '*' ? null : grant.scope) : asked === '' ? null : (kernel.get(asked)?.id ?? asked);
+      const project =
+        reach !== null ? (reach.scope === '*' ? null : reach.scope) : asked === '' ? null : (kernel.get(asked)?.id ?? asked);
       const fields: Patch = {
         label,
         opens,
         ...(declares('kind') ? { kind } : {}),
         ...(row === null && project !== null ? { project } : {}),
+        /* WHERE AN AGENT'S KEY CAME FROM, in the words a person reads on the row: the agent, its machine and its run. */
+        ...(origin !== null && declares('origin') ? { origin } : {}),
       };
       const s = sealed.value;
       const out = kernel.depositGrant(
@@ -6658,7 +7035,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         },
         /* An agent's deposit is signed by its run, and a person's by the person: a person's name on an agent's
            act is the attribution a run replaces, and an agent's name on a person's act is the same mistake back. */
-        { actor: ctx ? actorOf(ctx) : vaultActor(hints) },
+        { actor: signer ?? (ctx ? actorOf(ctx) : vaultActor(hints)) },
       );
       if (!out.ok) return tail(out);
       return tail(ok({ credential: kernel.nameOf(out.value.entry.id), label, version: out.value.grant.version, rotated: version > 1 }));
@@ -6953,6 +7330,23 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
             slash: build?.slash ?? false,
           });
     },
+
+    /* AND THE METHODS WRITTEN UNDER `methods/`, one file per unit (`methods/index.ts` says how one is added). Each is
+       handed the guards above rather than a copy of them, so a method there is held to the same ladder as every method
+       in this file; the `guards` gate reads those files as it reads this one, and refuses a name two files both define,
+       since the later one would win here without a word. */
+    ...methods({ kernel, sql, guard, scoped, readable, admin, vault, named, no, tail, directory: deps.directory ?? null, clock }),
+    /* AND THE JOB METHODS, WHICH ARE `jobs.ts`'S AND NOT UNDER `methods/` (`loop/finish/contracts.md` §2.8): the owner's, in a
+       browser, and a runner's, for a machine enrolled as one. Handed the same guards, so the owner's are held to `admin`
+       as every ADMIN method here is, and a runner's admit the one principal every guard above refuses. */
+    ...jobMethods({ kernel, sql, guard, scoped, readable, admin, vault, named, no, tail, directory: deps.directory ?? null, clock }),
+    /* AND `previewChange`, WHICH IS UNDER `methods/` BUT SPREAD HERE, as `jobs.ts` is, because it is handed the functions
+       above that hold a page to its reader as well as the guards: a change is drawn through `page`'s own reader and held
+       as `page` and `previewPage` hold a block, never by a second copy of who may see what (`methods/preview-change.ts`). */
+    ...previewChangeMethods(
+      { kernel, sql, guard, scoped, readable, admin, vault, named, no, tail, directory: deps.directory ?? null, clock },
+      { heldBlock, shellOf, heldBy, unplaced, whereHeld, seesPage, readsEveryList },
+    ),
   };
 }
 

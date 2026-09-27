@@ -1,22 +1,35 @@
 name: ci
 
-# 52 §2's `ci.yml`, less most of the browser: install, typecheck, the whole suite and every gate
-# that reads source in `check`, and in `build` the app and the site built, plus the gates that
-# read that build and are quick enough to wait for (`self-test`, `bundle`, `prefs`, `keys`, `passkey`,
-# `queue`). `layout` and `a11y` are `gates.yml`'s, and the reason for the split is at the top of that
-# file and beside the `--only` list below. The counts this line used to carry (fourteen and five) were
-# twenty and seven by 22 September, so it names the gates that are elsewhere rather than counting.
+# 52 §2's `ci.yml`, less most of the browser. `test` typechecks and tests the whole tree in four
+# legs, `gates` runs every gate that reads source, and `build` builds the app and the site,
+# dry-runs both production deploys, and runs the gates that read that build and are quick enough to
+# wait for (`self-test`, `bundle`, `prefs`, `keys`, `passkey`, `queue`). `layout` and `a11y` are
+# `gates.yml`'s, and the reason for the split is at the top of that file and beside the `--only`
+# list below. It names the gates that are elsewhere rather than counting them, because a count here
+# goes stale the day a gate is added. `windows`, on a pull request labelled `full-gates` only, runs
+# the kernel, self-host and CLI tests on Windows through `windows.yml`, which also runs them weekly.
 #
-# WHAT THIS COSTS IS THE POINT OF IT. The suite is 1,308 tests in about 90 seconds and the source
-# gates are greps; the two browser gates alone are 627 page-runs and 212 audits, about nineteen
-# minutes. A single workflow carrying both is one that gets cancelled, ignored, or made
-# `continue-on-error` within a month — and a check nobody waits for is a check that is not run.
+# FOUR LEGS AND A GATES JOB, BECAUSE ONE JOB COULD NO LONGER HOLD A WORKFLOW'S WORTH OF TESTS. The
+# single `check` job that did all of this took 19 min 13 s in run 35931879146 on 24 September, the
+# next run was killed at its 20-minute ceiling in the middle of the gates with nothing hung, and
+# `loop/finish/ops.md` (OPS-1) records the last run before this split at 23 min 44 s against a
+# ceiling of 30. A finish workflow lands three areas' worth of new tests at once, so that ceiling
+# would have been reached by the tree growing rather than by anything hanging. Split, each leg has
+# a ceiling of its own, and a red leg names the part of the tree it covers.
+#
+# ON ONE SELF-HOSTED RUNNER THE LEGS QUEUE rather than run side by side, and the split still holds
+# there: the ceiling is per leg, so a slow leg is no longer a timeout for the whole suite.
+#
+# WHAT THIS COSTS IS THE POINT OF IT. The source gates are greps; the two browser gates alone are
+# 627 page-runs and 212 audits, about nineteen minutes. A single workflow carrying both is one that
+# gets cancelled, ignored, or made `continue-on-error` within a month, and a check nobody waits for
+# is a check that is not run.
 #
 # ACTIONS ARE PINNED TO A MAJOR, which is 52 §8's rule and not the strongest one available. A major
 # tag is mutable: `actions/checkout@v4` is whatever the tag points at this morning, so a compromised
 # publisher reaches this repository without a commit here. A 40-character SHA closes that and costs
 # an update mechanism, because a pinned digest is a digest nobody bumps. The mechanism is
-# `.github/renovate.json5`, which has `pinDigests: true` for the `github-actions` manager — turn
+# `.github/renovate.json5`, which has `pinDigests: true` for the `github-actions` manager: turn
 # Renovate on and the four tags below become digests with the tag beside them in a comment, kept
 # current by a pull request rather than by somebody remembering. Until then a major tag from
 # `actions/*` and `pnpm/*` is the exposure this repository has accepted, and it is written down here
@@ -26,8 +39,8 @@ on:
   push:
     branches: [master]
   # 52 §2 says `on: push, pull_request` with no branch filter. A bare `push:` beside
-  # `pull_request:` runs this twice for every commit on a branch that has a pull request open —
-  # same commit, same result, twice the minutes — so `push` is master alone and the branch's runs
+  # `pull_request:` runs this twice for every commit on a branch that has a pull request open
+  # (same commit, same result, twice the minutes), so `push` is master alone and the branch's runs
   # come from the pull request.
   pull_request:
 
@@ -49,7 +62,16 @@ defaults:
     shell: bash
 
 jobs:
-  check:
+  test:
+    # FOUR LEGS OVER THE WORKSPACES, AND EVERY WORKSPACE IN EXACTLY ONE OF THEM.
+    # `apps/worker/scripts/ci-workflow.test.mjs` reads the legs below against `pnpm-workspace.yaml`
+    # and is red when a workspace sits in no leg or in two, or a leg names a folder that holds no
+    # workspace, so a package added tomorrow cannot go untested here without a run saying so. That
+    # test runs in the `apps` leg, which is how the check reaches every push.
+    #
+    # THE ROOT `pnpm test` IS UNCHANGED. It still runs every workspace and then the links test in one
+    # command, so a full run at a desk is the union of these four legs and nothing else.
+    name: test ${{ matrix.leg }}
     # PINNED, NOT `ubuntu-latest`. GitHub rolls that label to a new image about once a year and the
     # rollout is silent; the same commit then compiles against a different libc, a different browser
     # build and a different font set. `gates.yml` is where that actually changes a measurement, and
@@ -58,25 +80,88 @@ jobs:
     # SELF-HOSTED, BECAUSE THE ACCOUNT RAN OUT OF ACTIONS MINUTES (September 17th, the owner's call).
     # Self-hosted minutes are free. Set the repository variable CI_RUNNER to ubuntu-24.04 to go back.
     runs-on: ${{ vars.CI_RUNNER || 'self-hosted' }}
-    # 52 §7 budgets this workflow at 20 minutes, and it is a ceiling for a hang, not a budget. It no longer runs in about
-    # five: on GitHub's runners the test step and the gates took 19 min 13 s in run 35931879146 on 24 September, and the
-    # next run (35934713449, two packs and their tests added) was killed at 20 minutes in the middle of the gates with
-    # nothing hung. So the ceiling is 30, still far short of the six hours it exists to stop.
-    timeout-minutes: 30
+    # PER LEG, AND A CEILING FOR A HANG RATHER THAN A BUDGET. 52 §7 budgets the workflow at 20
+    # minutes, and OPS-1 set 25 for each leg: a leg holds part of what the single job ran in
+    # 19 min 13 s, so a leg has room to grow by a workflow of tests, and 25 is still far short of the
+    # six hours the ceiling exists to stop.
+    timeout-minutes: 25
+    strategy:
+      # A RED LEG DOES NOT CANCEL THE OTHER THREE. Each answers for a different part of the tree, and
+      # a run that stops at the first red names one problem when there are four, which costs four
+      # runs: the argument `run.mjs` makes for reporting every gate rather than stopping at one.
+      fail-fast: false
+      matrix:
+        # `dirs` ARE FOLDERS, NOT PACKAGE NAMES, because the folder is what `pnpm-workspace.yaml`
+        # lists and what a person adding a package creates. `packs/*/` is expanded by the shell in
+        # the step below, so a new pack joins its leg with no line here; the trailing slash is what
+        # keeps `packs/README.md` out of it, since a glob ending in `/` matches folders alone.
+        include:
+          # The kernel and what sits under it.
+          - leg: kernel
+            dirs: 'packages/ports packages/where packages/kernel packages/declare packages/extract packages/dog'
+          # The record, its hosts and agents, and the packs, which are declarations over the record.
+          - leg: record
+            dirs: 'packages/record packages/host packages/mcp packages/client packages/slash packages/seed packages/script packages/connect packs/*/'
+          # The app and what draws it. `apps/web/src/lib/record/figure-fit.test.ts` launches chromium.
+          - leg: web
+            dirs: 'apps/web packages/render packages/theme packages/skin'
+            browser: true
+          # The hosts, the CLI and the site. The links test rides here because `docs/` is not a
+          # workspace, so no filter reaches it.
+          - leg: apps
+            dirs: 'apps/worker apps/selfhost apps/cli apps/site'
+            links: true
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
 
-      # FIRST, and for the reason `run.mjs` gives about its own first gate: a type error invalidates
-      # every result under it, and `svelte-check` over `apps/web` is the half of the tree the other
-      # steps exercise least directly.
-      - run: pnpm typecheck
+      # ONE `--filter` PER FOLDER, WRITTEN ONCE FOR THE STEPS BELOW. A folder that holds no workspace
+      # is red here, by name, rather than left to a filter that selects nothing, where a leg could
+      # pass having tested less than it names. No workspace folder has a space in its name, so the
+      # list survives the shell's word split.
+      - name: Choose this leg's workspaces
+        env:
+          DIRS: ${{ matrix.dirs }}
+        run: |
+          filters=''
+          for dir in $DIRS; do
+            dir="${dir%/}"
+            if [ ! -f "$dir/package.json" ]; then echo "::error::$dir holds no package.json, so the ${{ matrix.leg }} leg would test nothing there"; exit 1; fi
+            filters="$filters --filter ./$dir"
+          done
+          echo "The ${{ matrix.leg }} leg:$filters"
+          echo "FILTERS=$filters" >> "$GITHUB_ENV"
 
-      # THE SITE'S CROP TESTS LAUNCH CHROMIUM, and a hosted image has none cached (the first run on
-      # ubuntu-latest, 22 September, failed four tests on a missing chrome-headless-shell). On studio-pc
-      # this found the browser already installed and cost a second.
-      - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm test
+      # FIRST, and for the reason `run.mjs` gives about its own first gate: a type error invalidates
+      # every result under it. Over this leg's workspaces only, so the four legs together typecheck
+      # what the root `pnpm typecheck` does, and `gates` below leaves the `typecheck` gate out.
+      - run: pnpm -r $FILTERS run typecheck
+
+      # ONLY WHERE A TEST LAUNCHES CHROMIUM, and a hosted image has none cached (the first run on
+      # ubuntu-latest, 22 September, failed four tests on a missing chrome-headless-shell). On
+      # studio-pc this found the browser already installed and cost a second. On a hosted image, a
+      # leg that gains a browser test without this flag is red with Playwright's own sentence naming
+      # the missing browser; on studio-pc it passes on the browser already there.
+      - if: matrix.browser
+        run: pnpm exec playwright install --with-deps chromium
+
+      # ONE WORKSPACE AT A TIME, as the root `pnpm test` runs them, so a leg is the same run a desk
+      # makes of those folders.
+      - run: pnpm -r --workspace-concurrency=1 $FILTERS run test
+      - if: matrix.links
+        run: node --test docs/test/links.test.mjs
+
+  gates:
+    # A JOB OF ITS OWN, so the greps no longer wait for the whole suite, and a red gate and a red
+    # test arrive as two named failures rather than one.
+    # SELF-HOSTED, BECAUSE THE ACCOUNT RAN OUT OF ACTIONS MINUTES (September 17th, the owner's call).
+    # Self-hosted minutes are free. Set the repository variable CI_RUNNER to ubuntu-24.04 to go back.
+    runs-on: ${{ vars.CI_RUNNER || 'self-hosted' }}
+    # No run of this job on its own has been measured yet. It is a leg's ceiling, for a hang.
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
 
       # THE GATES THAT READ SOURCE. Named as an exclusion rather than as a list of them, because a
       # list of what to run stops running the gate somebody adds tomorrow and says nothing about it;
@@ -84,8 +169,9 @@ jobs:
       # which `run.mjs` makes red under CI. The failure that arrives is then a sentence naming the
       # gate rather than a green run that checked one thing fewer than it claims.
       #
-      # `typecheck` is excluded because it is the step above — `run.mjs` runs it first, and running
-      # `svelte-check` over `apps/web` twice in one job is a minute spent to learn nothing.
+      # `typecheck` is excluded because every leg of `test` runs it over its own workspaces, and the
+      # four legs together are the gate's `pnpm -r run typecheck`. Running `svelte-check` over
+      # `apps/web` again here is a minute spent to learn nothing.
       #
       # `bundle`, `keys`, `prefs`, `layout`, `a11y`, `passkey` and `queue` all read `apps/web/build`,
       # and this job does not build. **`passkey` and `queue` joined that list on 21 September and it
@@ -107,16 +193,19 @@ jobs:
       # and that is `build` below for the six it can afford and `gates.yml` for the rest. Building
       # here as well would pay for the same Vite builds twice in one push on a single runner.
       #
-      # `deploy-parity` joins the excluded list for a different reason than the other eight: they
-      # need a build this job does not do, and it needs a LIVE HOST, which only `deploy.yml` has.
+      # `deploy-parity` joins the excluded list for a different reason than the others: they need a
+      # build this job does not do, or run in `test`, and it needs a LIVE HOST, which only
+      # `deploy.yml` has. `ci-workflow.test.mjs` holds the whole list to that account: every name
+      # left out here is `typecheck`, in `build`'s `--only` list below, in `gates.yml`'s push run, or
+      # `deploy-parity`.
       - run: pnpm gates -- --except typecheck,bundle,keys,prefs,layout,a11y,passkey,queue,self-test,deploy-parity
 
   build:
-    # A SECOND JOB RATHER THAN FIVE MORE STEPS, because it answers a different question and can
-    # answer it at the same time. `check` asks whether the tree is correct; this asks whether it
-    # still produces a product — and until `gates.yml` runs on merge, nothing else on a pull request
-    # does. `adapter-static` with `strict: true` fails here when a route quietly stops prerendering,
-    # which is the defect that ships as a blank page rather than as an error.
+    # A JOB OF ITS OWN, because it answers a different question and can answer it at the same time.
+    # `test` and `gates` ask whether the tree is correct; this asks whether it still produces a
+    # product, and on a pull request without the `full-gates` label nothing else does.
+    # `adapter-static` with `strict: true` fails here when a route quietly stops prerendering, which
+    # is the defect that ships as a blank page rather than as an error.
     # SELF-HOSTED, BECAUSE THE ACCOUNT RAN OUT OF ACTIONS MINUTES (September 17th, the owner's call).
     # Self-hosted minutes are free. Set the repository variable CI_RUNNER to ubuntu-24.04 to go back.
     runs-on: ${{ vars.CI_RUNNER || 'self-hosted' }}
@@ -124,7 +213,8 @@ jobs:
     # for the site, and six gates that read them. The job took 2 min 39 s on studio-pc on 21
     # September before the gates were added, and the first three (`bundle`, `passkey`, `queue`) measured 6.4 s in `gates.yml` run
     # 35587734418. `self-test`, `prefs` and `keys` add about 4.5 minutes (measured once), which is
-    # why the ceiling moved from 15 to 20: a ceiling for a hang, not a budget.
+    # why the ceiling moved from 15 to 20: a ceiling for a hang, not a budget. The two dry runs
+    # (OPS-1) have not been measured in this job yet.
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -137,7 +227,7 @@ jobs:
       #
       # Both builds begin with `pnpm --filter @braindog/skin theme`, which WRITES `tokens.css` and
       # the favicons. So a committed palette that no longer matches the generator is quietly
-      # repaired here — and the `theme` gate, which is `theme.mjs --check`, then compares the
+      # repaired here, and the `theme` gate, which is `theme.mjs --check`, then compares the
       # regenerated file against itself and passes. That is a gate measuring its own output: the
       # drift it exists to catch is invisible to it in exactly the workflow that is supposed to
       # catch it.
@@ -147,16 +237,36 @@ jobs:
       # reviewed.
       - run: git diff --exit-code
 
+      # AND BOTH PRODUCTION DEPLOYS, DRY. `wrangler deploy --dry-run` bundles the Worker and reads
+      # its `wrangler.jsonc` the way `deploy.yml` will, and uploads nothing. Without it the first
+      # time `wrangler` itself reads the production block of either config is the deploy, and the
+      # site deploys after the app has already gone live (`deploy.yml`), so a site config `wrangler`
+      # refuses would be found with the app half shipped. After the diff check, because the dry run
+      # reads the assets the builds above wrote; into `$RUNNER_TEMP`, so its bundle lands outside
+      # the tree rather than among the files the diff check reads.
+      #
+      # NO CLOUDFLARE CREDENTIAL IN THE STEP. This workflow runs on every pull request, the runner
+      # may be a PC with a token in its environment, and a dry run needs none. The `unset` makes
+      # that true of the process as well as of this file, which names no secret at all.
+      - name: Dry-run the app's production deploy
+        run: |
+          unset CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID
+          pnpm --filter ./apps/worker exec wrangler deploy --dry-run --env production --outdir "$RUNNER_TEMP/worker"
+      - name: Dry-run the site's production deploy
+        run: |
+          unset CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID
+          pnpm --filter ./apps/site exec wrangler deploy --dry-run --env production --outdir "$RUNNER_TEMP/site"
+
       # THE BROWSER, WHICH IS ALREADY ON studio-pc. `passkey` and `queue` launch chromium. The
       # install found it in %LOCALAPPDATA%\ms-playwright and took one second in the 21 September
       # `gates.yml` run; the step is here for the day CI_RUNNER points back at a hosted image, where
       # it is a download of about 150 MB and a minute or two with no cache.
       - run: pnpm exec playwright install --with-deps chromium
 
-      # THE GATES THAT READ THIS BUILD, WHICH `check` HAS TO EXCLUDE BECAUSE IT DOES NOT BUILD.
+      # THE GATES THAT READ THIS BUILD, WHICH `gates` HAS TO EXCLUDE BECAUSE IT DOES NOT BUILD.
       #
-      # A LIST AND NOT AN EXCLUSION, and `check`'s argument against lists does not reach it. A gate
-      # added tomorrow that needs a build is still selected by `check`'s exclusion, `run.mjs` refuses
+      # A LIST AND NOT AN EXCLUSION, and `gates`'s argument against lists does not reach it. A gate
+      # added tomorrow that needs a build is still selected by `gates`'s exclusion, `run.mjs` refuses
       # it there for want of the build, and a refusal under CI is red. So a new gate cannot go unrun
       # because it is missing from this list: the run that would have skipped it is red and names it.
       #
@@ -172,3 +282,20 @@ jobs:
       # proven on 22 September by a desk run of all four, green. `run.mjs` runs a selection in
       # registry order, so `self-test` runs first whatever order the list is written in.
       - run: node tools/gates/run.mjs --only self-test,bundle,prefs,keys,passkey,queue
+
+  windows:
+    # THE KERNEL, THE SELF-HOST AND THE CLI ON WINDOWS, which is the owner's own machine and which
+    # no other job here is sure to run on, since each follows `vars.CI_RUNNER` (`loop/finish/ops.md`
+    # OPS-25, SC33). The steps are `windows.yml`'s, called
+    # rather than copied, because that file also runs them weekly on a schedule of its own: a
+    # schedule on this workflow would make every weekly run a production deploy through
+    # `deploy.yml`, which is the reason it is not here.
+    #
+    # ON A PULL REQUEST THAT CARRIES `full-gates`, AND NOWHERE ELSE (decisions C57). A hosted Windows
+    # minute is billed at twice a Linux one on a private repository, so it is not spent on every
+    # push; on a push to master there is no pull request, and the job is skipped rather than red.
+    # The label is read when a run starts, so one added to an open pull request takes effect from
+    # its next push: `labeled` is not in this workflow's triggers, because there it would re-run
+    # every job above on every label anybody adds.
+    if: contains(github.event.pull_request.labels.*.name, 'full-gates')
+    uses: ./.github/workflows/windows.yml

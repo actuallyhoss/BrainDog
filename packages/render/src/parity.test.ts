@@ -345,3 +345,104 @@ test('A TILE\'S DOOR GOES THROUGH IT TOO, although only the Svelte drawer draws 
   const tile = tree(render(Hosted, { props: { block, opts: { href: under, cellHref: () => '/p/money' } } }).body);
   assert.deepEqual(hrefsOf(tile), ['/app/acme/p/money']);
 });
+
+/* ── calendar, link, gallery and embed, the two card roles, a path's short view and a board's touch move ───────── */
+
+/**
+ * THE SHAPES THE FOUR NEWER KINDS AND THE TWO ROLES TAKE, drawn by both renderers with a host that serves files, so a
+ * gallery's picture and a card's are in both trees. Every one of them is held to one tree after the two controls only
+ * the Svelte drawer can draw are taken off, and the test after the loop pins those two down so the strip cannot grow.
+ */
+const DRAWN: Record<string, string> = {
+  'a calendar over two months, a crowded day, a tone and a row with no day':
+    '```calendar | Dates\nKiln launch | 2026-09-12\nPrinter call | 12 Sep 2026 | warn\n[Site](/r/things/2) | 2026-09-12\nQuote | 2026-09-12\nRenewal | 2026-10-03T09:00:00Z\nSomeday | soon\n```',
+  'a calendar with no day that reads': '```calendar\nSomeday | soon\n```',
+  'a calendar with nothing on it': '```calendar\n```',
+  'links of every kind of address, and one with none': '```link | Useful\nThe spec | https://www.example.com/spec | read first\nWrite to us | mailto:hello@example.com\nThe plan | /p/plan\nNo address |  | later\n |  https://example.org\n```',
+  'a gallery of a picture, a file that is not one, a file the host cannot serve and a caption alone':
+    '```gallery\nThe glaze | file:parts#2/photo\nThe quote | quote.pdf\nNot served | file:parts#3/scan\nJust words | \n```',
+  'a gallery with nothing in it': '```gallery\n```',
+  'an embed of a video': '```embed\nhttps://www.youtube.com/watch?v=dQw4w9WgXcQ | The launch film | 16:9\n```',
+  'an embed of a map, untitled and square': '```embed\nhttps://www.google.com/maps/embed?pb=!1m18 |  | 1:1\n```',
+  'cards with a hue, one that is not a turn, and a picture': '```cards\ntitle | mark: Project | hue | picture\nKiln | Kiln | 120 | file:parts#2/photo\nSite | Site | 999 | \n```',
+  'a path with a short view': '```steps path | The path\nshort | This week\nSample the fit | maker | done short\nBox quote | printer | next short\nPick a board |  | \nShip it |  | \nmore | 2\n```',
+  'a path whose short view holds every stone': '```steps path\nshort | This week\nA |  | next short\nB |  | short\n```',
+};
+
+/** A host that serves the files of `parts#2` and nothing else, as a path of its own. */
+const SERVES = { file: (row: string, field: string) => (row === 'parts#2' ? `/files/${row}/${field}` : null) };
+
+/** The switch and the Load button, the two things only the Svelte drawer draws, taken off so the rest can be held equal. */
+const noLocalControls = (t: string): string =>
+  t
+    .replace(/<div [^>]*class="path-switch"[^>]*>(?:<button [^>]*>[^<]*<\/button>)*<\/div>/u, '')
+    .replace(/<button [^>]*class="embed-load"[^>]*>[^<]*<\/button>/u, '');
+
+/**
+ * SVELTE CLOSES A VOID TAG `<img ... />` WHERE THE MIRROR WRITES `<img ...>`, two spellings a parser reads as one
+ * (`dynamic-forms.test.ts` says the same). `tree` sorts the attributes only of a tag that ends in a bare `>`, so a
+ * gallery's picture and a card's would be compared unsorted on one side and sorted on the other.
+ */
+const unslashed = (h: string): string => h.replace(/\s*\/>/gu, '>');
+
+for (const [name, src] of Object.entries(DRAWN)) {
+  test(`the two renderers draw one tree: ${name}`, () => {
+    const block = page(src);
+    const svelte = tree(unslashed(render(Hosted, { props: { block, opts: SERVES } }).body));
+    const html = tree(unslashed(toHTML([block], SERVES)));
+    assert.equal(noLocalControls(svelte), noLocalControls(html));
+  });
+}
+
+test('THE SWITCH AND THE LOAD BUTTON ARE THE WHOLE OF THE DIFFERENCE, each drawn once in the app and never in the mirror', () => {
+  const path = page(DRAWN['a path with a short view']!);
+  const app = tree(render(Block, { props: { block: path } }).body);
+  const mirror = tree(toHTML([path]));
+  const views = [...app.matchAll(/<button [^>]*class="path-view"[^>]*>([^<]*)<\/button>/gu)];
+  assert.deepEqual(views.map((m) => m[1]), ['This week', 'Everything']);
+  assert.ok(views[0]![0].includes('aria-pressed="true"'), 'the short view is the one drawn first');
+  assert.ok(views[1]![0].includes('aria-pressed="false"'));
+  assert.doesNotMatch(mirror, /path-switch|<button/u, 'a static mirror offers no switch it cannot turn');
+  /* THE SHORT VIEW ON BOTH: its two stones, and a line for the two it left out, before the count of the rest. */
+  for (const t of [app, mirror]) {
+    assert.equal((t.match(/<li [^>]*data-short[^>]*>/gu) ?? []).length, 2, t);
+    assert.match(t, /<p class="path-rest">2 more for when there's room<\/p><p class="path-more">2 more<\/p>/u);
+  }
+
+  const video = page(DRAWN['an embed of a video']!);
+  const loads = tree(render(Block, { props: { block: video } }).body).match(/<button [^>]*class="embed-load"[^>]*>[^<]*<\/button>/gu) ?? [];
+  assert.equal(loads.length, 1);
+  assert.match(loads[0]!, />Load from YouTube</u);
+  const drawn = tree(toHTML([video]));
+  assert.doesNotMatch(drawn, /<button|<iframe/u, 'a facade in the mirror loads nothing and offers nothing to press');
+  assert.match(drawn, /<a class="embed-open" href="https:\/\/www\.youtube\.com\/watch\?v=dQw4w9WgXcQ" rel="noreferrer">Open on YouTube<\/a>/u);
+  assert.doesNotMatch(tree(render(Block, { props: { block: video } }).body), /<iframe/u, 'nothing is framed before a press');
+});
+
+test('A BOARD CARD CARRIES A "Move to" SELECT OF ITS LANES only where the host can move it, on its own lane', () => {
+  const block = page('```board\nDoing | Write the notes | Claude\nDone | Fix login | Codex\nDoing | Proof | Amara\n```');
+  const Movable = Block as unknown as Component<{ block: BlockSegment; onmove: (row: unknown, to: string) => void }>;
+  const live = tree(render(Movable, { props: { block, onmove: () => {} } }).body);
+  const selects = [...live.matchAll(/<select [^>]*>(.*?)<\/select>/gu)];
+  assert.equal(selects.length, 3, 'one a card');
+  for (const [whole] of selects) assert.ok(whole.includes('aria-label="Move to"') && whole.includes('class="board-move tap"'), whole);
+  const chosen = selects.map(([, options]) => /<option [^>]*selected[^>]*value="([^"]*)"|<option [^>]*value="([^"]*)"[^>]*selected/u.exec(options ?? ''));
+  assert.deepEqual(chosen.map((m) => m?.[1] ?? m?.[2]), ['Doing', 'Doing', 'Done'], 'each select opens on the lane its card is in');
+  assert.equal(selects.filter(([whole]) => whole.includes('tabindex="0"')).length, 1, 'one tab stop across the board');
+  assert.doesNotMatch(tree(render(Block, { props: { block } }).body), /<select/u, 'with nowhere to move to, nothing moves');
+});
+
+test('A STONE IS A TOGGLE NAMED FOR ITS STEP only where the host can write it, and a picture of one otherwise', () => {
+  const block = page('```steps path\nSample the fit | maker | done\nBox quote | printer | next\nPick a board |  | \n```');
+  const Pressable = Block as unknown as Component<{ block: BlockSegment; onpath: (row: unknown, done: boolean) => void }>;
+  const live = tree(render(Pressable, { props: { block, onpath: () => {} } }).body);
+  const stones = [...live.matchAll(/<button [^>]*>/gu)].map((m) => m[0]);
+  assert.equal(stones.length, 3);
+  assert.deepEqual(
+    stones.map((s) => [/aria-label="([^"]*)"/u.exec(s)?.[1], /aria-checked="([^"]*)"/u.exec(s)?.[1]]),
+    [['Sample the fit', 'true'], ['Box quote', 'false'], ['Pick a board', 'false']],
+  );
+  for (const s of stones) assert.ok(s.includes('role="checkbox"') && s.includes('tap'), s);
+  assert.match(live, /<span class="path-next">Next<\/span>/u, 'the next stone still says so in a word');
+  assert.doesNotMatch(tree(render(Block, { props: { block } }).body), /<button/u);
+});

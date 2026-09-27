@@ -51,6 +51,9 @@ importers:
       braindog-render:
         specifier: workspace:*
         version: link:../../packages/render
+      esbuild:
+        specifier: 0.28.1
+        version: 0.28.1
 
   apps/selfhost:
     dependencies:
@@ -308,6 +311,9 @@ importers:
       '@braindog/ports':
         specifier: workspace:*
         version: link:../ports
+      '@braindog/theme':
+        specifier: workspace:*
+        version: link:../theme
       '@braindog/where':
         specifier: workspace:*
         version: link:../where
@@ -369,6 +375,8 @@ importers:
         version: link:../ports
 
   packs/bank-hsbc-eg: {}
+
+  packs/card-alerts: {}
 
   packs/count-cash: {}
 

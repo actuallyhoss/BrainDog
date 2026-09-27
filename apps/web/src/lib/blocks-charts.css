@@ -9,8 +9,27 @@
  * screen that draws a chart and costs the rest nothing. The bundle gate's entry CSS row is what
  * measured it: 8.3 KB on September 11th, 12.7 KB before this split.
  *
- * The rules are unchanged. The one rule of `blocks.css` holds here too: no colour is written, every
- * value is a role a theme maps, and an intent reaches the DOM only through the map in `blocks.css`.
+ * The one rule of `blocks.css` holds here too: no colour is written, every value is a role a theme
+ * maps, and an intent reaches the DOM only through the map in `blocks.css`.
+ *
+ * THE ONE PRIMARY SERIES IS `--series-1`, AND NOTHING IN A CHART IS RED. The forecast, the net line and
+ * a `lines` block's current measure were drawn in the accent, which is the brand's red at danger's own
+ * hue, so a healthy balance read as an alarm (design D-1, SYS-1). They take `--series-1`, the info hue,
+ * and this file names that token and never `--info`, so the day the primary series changes it changes in
+ * `tokens.css` alone (contracts §8.3, §11 X40). A crossing below a line the owner set is `warn`, and the
+ * renderer puts the warn glyph beside it, so it is never told by colour alone.
+ *
+ * EVERY MARK IN A CHART STANDS AT 3:1 AGAINST THE GROUND, IN BOTH SCHEMES. A bar or a stem is a figure
+ * drawn, so it takes `--dim` or stronger, a neutral as firm as secondary text (design SYS-5); a ring's
+ * track and a zero rule are what the marks are read against, so they are `--edge`, which the theme holds
+ * at 3:1 against every surface (check D, `packages/theme/src/checks.ts`). The quietest marks, a split's or
+ * a ring's fourth part and the baseline a forecast's knob leaves behind, are `--faint`, which check C holds
+ * at the same 3:1. The see-through mixes of ink the bars were drawn in fell below that floor in the house's
+ * light scheme (design §2.16), and the `--line` hairline under them is a decorative line that no check
+ * holds to that floor.
+ *
+ * A NEW CHART KIND IS NOT ADDED HERE: a registered kind (`lib/page/kinds/`) styles itself in `kinds/<kind>.css`,
+ * which arrives with the same screens this file does.
  */
 
 @layer components {
@@ -158,11 +177,19 @@
     text-decoration: none;
   }
 
-  .split-label a:hover,
   .split-label a:focus-visible {
     color: var(--ink);
     text-decoration: underline;
     text-decoration-color: var(--line);
+  }
+
+  /* HOVER ONLY WHERE THERE IS ONE, for the reason the forecast's knobs give below. */
+  @media (hover: hover) and (pointer: fine) {
+    .split-label a:hover {
+      color: var(--ink);
+      text-decoration: underline;
+      text-decoration-color: var(--line);
+    }
   }
 
   /* AND A LEGEND'S NAME IS A TARGET, so on a thumb it is one. The same rule and the same trick as
@@ -231,8 +258,10 @@
     transition: background var(--d-state) var(--ease-out);
   }
 
-  button.split-hole:hover {
-    background: var(--s2);
+  @media (hover: hover) and (pointer: fine) {
+    button.split-hole:hover {
+      background: var(--hover-wash);
+    }
   }
 
   @media (pointer: coarse) {
@@ -274,12 +303,12 @@
   }
 
   .bridge-bar[data-move='down'] {
-    fill: color-mix(in srgb, var(--ink2) 40%, transparent);
+    fill: var(--dim);
   }
 
   .bridge-zero {
     fill: none;
-    stroke: var(--line);
+    stroke: var(--edge);
     stroke-width: 1px;
   }
 
@@ -369,8 +398,9 @@
   }
 
   /* ── series: bars by bucket ───────────────────────────────────────────────
-     Money in stands on the zero rule in `earn`, money out hangs under it in a quiet neutral, and the
-     net is the one accent line. The current bucket is faint; a bucket still to come is an outline.
+     Money in stands on the zero rule in `earn`, money out hangs under it in `--dim`, a second series
+     either way is `--ink2`, and the net is the one primary series. The current bucket is faint inside a
+     solid edge; a bucket still to come is a wash inside a dashed one.
      The words, the two axis figures and the bucket labels are HTML, so nothing stretches. */
   .block[data-kind='series'] {
     container-type: inline-size;
@@ -402,7 +432,7 @@
     inline-size: 10px;
     block-size: 10px;
     border-radius: 2px;
-    background: color-mix(in srgb, var(--ink2) 55%, transparent);
+    background: var(--ink2);
   }
 
   .series-key[data-dir='in'][data-step='0'] .series-swatch {
@@ -410,13 +440,13 @@
   }
 
   .series-key[data-dir='out'][data-step='0'] .series-swatch {
-    background: color-mix(in srgb, var(--ink2) 40%, transparent);
+    background: var(--dim);
   }
 
   .series-key[data-net] .series-swatch {
     block-size: 2px;
     border-radius: 0;
-    background: var(--accent);
+    background: var(--series-1);
   }
 
   .series-plot {
@@ -451,12 +481,12 @@
 
   .series-zero {
     fill: none;
-    stroke: var(--line);
+    stroke: var(--edge);
     stroke-width: 1px;
   }
 
   .series-bar {
-    fill: color-mix(in srgb, var(--ink2) 55%, transparent);
+    fill: var(--ink2);
     stroke: none;
   }
 
@@ -465,11 +495,15 @@
   }
 
   .series-bar[data-dir='out'][data-step='0'] {
-    fill: color-mix(in srgb, var(--ink2) 40%, transparent);
+    fill: var(--dim);
   }
 
+  /* THE CURRENT BUCKET SO FAR: its fill is faint because the bucket is not over, so a solid edge in `--dim` is what
+     keeps its height readable against the page, as the dashed edge does for the two states below. */
   .series-bar[data-state='partial'] {
     fill-opacity: 0.45;
+    stroke: var(--dim);
+    stroke-width: 1px;
   }
 
   /* THE CURRENT BUCKET WITH MONEY STILL DUE IN IT: faint as so far, inside the dashed edge of what is expected. */
@@ -490,14 +524,14 @@
 
   .series-net {
     fill: none;
-    stroke: var(--accent);
+    stroke: var(--series-1);
     stroke-width: 1.5px;
     stroke-linejoin: round;
   }
 
   .series-dot {
     fill: none;
-    stroke: var(--accent);
+    stroke: var(--series-1);
     stroke-width: 6px;
     stroke-linecap: round;
   }
@@ -683,9 +717,11 @@
     display: none;
   }
 
-  .lines-toggle:hover,
-  .forecast-toggle:hover {
-    color: var(--ink2);
+  @media (hover: hover) and (pointer: fine) {
+    .lines-toggle:hover,
+    .forecast-toggle:hover {
+      color: var(--ink2);
+    }
   }
 
   @media (pointer: coarse) {
@@ -772,8 +808,8 @@
   }
 
 /* ── lines: a measure over time, and the period before it ─────────────────
-     The current line is the one accent series; a second current line is the quiet ink; the period before is a
-     dashed line in `dim`, under both. The lead figure sits above in ink with its change beside it, never
+     The current line is the one primary series, `--series-1`; a second current line is the quiet ink; the period
+     before is a dashed line in `dim`, under both. The lead figure sits above in ink with its change beside it, never
      coloured, because a rise is not a verdict. Every word is HTML, placed along the chart by `--at`. */
   .block[data-kind='lines'] {
     container-type: inline-size;
@@ -852,7 +888,7 @@
 
   .lines-key[data-step='0']:not([data-was]) .lines-swatch,
   .lines-readout-value[data-step='0']:not([data-was]) .lines-swatch {
-    border-block-start-color: var(--accent);
+    border-block-start-color: var(--series-1);
   }
 
   .lines-key[data-was] .lines-swatch,
@@ -883,7 +919,7 @@
   }
 
   .lines-line[data-step='0']:not([data-was]) {
-    stroke: var(--accent);
+    stroke: var(--series-1);
     stroke-width: 2px;
   }
 
@@ -901,7 +937,7 @@
   }
 
   .lines-end[data-step='0'] {
-    stroke: var(--accent);
+    stroke: var(--series-1);
   }
 
   /* THE TOP AND THE BOTTOM OF THE VALUE AXIS: the highest above the chart's near corner, the lowest inside it. */
@@ -946,7 +982,7 @@
     padding: var(--sp-2) var(--sp-3);
     margin-inline-start: var(--sp-2);
     border: 1px solid var(--line);
-    border-radius: var(--r-sm);
+    border-radius: var(--r-md);
     background: var(--s1);
     box-shadow: var(--e2);
     color: var(--ink);
@@ -1019,8 +1055,8 @@
   }
 
   /* ── forecast: the cash walk as a line ────────────────────────────────────
-     The balance is the one accent series: solid where it was remembered, dashed where it is walked.
-     Stems stand on the zero rule, up in `earn` and down in a quiet neutral. The crossing is the warn
+     The balance is the one primary series, `--series-1`: solid where it was remembered, dashed where it is
+     walked. Stems stand on the zero rule, up in `earn` and down in `--dim`. The crossing is the warn
      intent with its glyph; the lowest point a dim dot; the baseline a faint mark once a knob moved.
      Every word sits in HTML over the chart, placed along it by `--at`. */
   .block[data-kind='forecast'] {
@@ -1064,7 +1100,7 @@
 
   .forecast-zero {
     fill: none;
-    stroke: var(--line);
+    stroke: var(--edge);
     stroke-width: 1px;
   }
 
@@ -1079,7 +1115,7 @@
 
   .forecast-past,
   .forecast-future {
-    stroke: var(--accent);
+    stroke: var(--series-1);
   }
 
   .forecast-future {
@@ -1102,7 +1138,7 @@
   }
 
   .forecast-stem[data-move='down'] {
-    stroke: color-mix(in srgb, var(--ink2) 55%, transparent);
+    stroke: var(--dim);
   }
 
   .forecast-low,
@@ -1143,7 +1179,7 @@
     padding: var(--sp-2) var(--sp-3);
     margin-inline-start: var(--sp-2);
     border: 1px solid var(--line);
-    border-radius: var(--r-sm);
+    border-radius: var(--r-md);
     background: var(--s1);
     box-shadow: var(--e2);
     color: var(--ink);
@@ -1250,10 +1286,12 @@
     font-size: var(--t-xs);
   }
 
+  /* A SLIDER IN A CHART IS THE HOUSE'S SLIDER. `controls.css` draws every range, an ink thumb on an `--edge` track,
+     and `--ctl-h` is the 44px control height under a thumb, so this rule only gives it the knob's width. It used to
+     paint the browser's slider in the accent, which put the brand's red on a control that only asks a question. */
   .forecast-range {
     inline-size: 100%;
     min-block-size: var(--ctl-h);
-    accent-color: var(--accent);
   }
 
   .forecast-segs,
@@ -1263,6 +1301,9 @@
     gap: var(--sp-1);
   }
 
+  /* EVERYTHING A KNOB OFFERS TO PRESS IS A PILL, as every button in the product is (design §6.2), edged in `--edge`,
+     a control's boundary, rather than the hairline between rows. What is chosen takes `--selected`, the one "on"
+     ground: `--s2` sat on the light page at almost its own colour, so a chosen horizon did not show. */
   .forecast-seg,
   .forecast-chip,
   .forecast-reset {
@@ -1271,35 +1312,56 @@
     gap: var(--sp-2);
     min-block-size: var(--ctl-h);
     padding-inline: var(--sp-3);
-    border: 1px solid var(--line);
-    border-radius: var(--r-sm);
-    background: var(--s1);
+    border: 1px solid var(--edge);
+    border-radius: var(--r-pill);
+    background: transparent;
     color: var(--ink2);
     font: inherit;
     font-size: var(--t-sm);
+    text-align: start;
     cursor: pointer;
     transition: background var(--d-state) var(--ease-out);
   }
 
-  .forecast-seg:hover,
-  .forecast-chip:hover,
-  .forecast-reset:hover {
-    background: var(--s2);
+  /* HOVER ONLY WHERE THERE IS ONE: a phone keeps `:hover` on the last thing tapped, so a pill pressed with a thumb
+     would stay washed after the finger left it and read as chosen (design brief §6, "Touch"). */
+  @media (hover: hover) and (pointer: fine) {
+    .forecast-seg:hover,
+    .forecast-chip:hover,
+    .forecast-reset:hover {
+      background: var(--hover-wash);
+    }
   }
 
   .forecast-seg[aria-pressed='true'],
   .forecast-chip[aria-pressed='true'] {
-    background: var(--s2);
+    background: var(--selected);
     color: var(--ink);
   }
 
-  .forecast-chip[aria-pressed='true'] .forecast-chip-label {
+  /* STRUCK THROUGH MEANS LEFT OUT OF THE WALK, IN BOTH KNOBS, which press the opposite way round over one list: in
+     "Leave out" a pressed chip is left out, and in "What counts" a pressed chip is counted, so there it is the chip
+     NOT pressed that is struck. Striking every pressed chip crossed out exactly what "What counts" was counting.
+     "What counts" is the knob whose chips sit in a group of their own (`role="group"`, one for money in and one for
+     money out); "Leave out" puts its chips straight into its knob's group. */
+  .forecast-chips:not([role]) > .forecast-chip[aria-pressed='true'] .forecast-chip-label,
+  .forecast-chips[role='group'] > .forecast-chip[aria-pressed='false'] .forecast-chip-label {
     text-decoration: line-through;
   }
 
+  .forecast-chip-label {
+    min-inline-size: 0;
+    overflow-wrap: anywhere;
+  }
+
+  /* A SIGNED FIGURE IS ONE WORD. The design review found a chip at 390 with its minus at the end of one line and its
+     figure on the next (design SYS-9): the amount could break wherever the chip ran out of room. Now the label gives
+     way instead. */
   .forecast-chip-amount {
+    flex: none;
     color: var(--dim);
     font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
 
   @media (pointer: coarse) {
@@ -1317,8 +1379,15 @@
       block-size: 160px;
     }
 
-    /* A MONTH IN THREE, so the names do not run into each other on a phone. */
-    .forecast-tick:not(:nth-child(3n + 1)) {
+    /* EVERY MONTH, EVERY OTHER OR EVERY THIRD, BY HOW MANY THERE ARE, so the names do not run into each other on a
+       phone and no month is left alone on its axis. Every third was the rule for any walk, so a walk that crossed two
+       or three month starts kept only the first, one name under a whole chart. Up to six each keeps its name; from
+       seven to twelve every other one does; past twelve, every third. */
+    .forecast-ticks:has(> .forecast-tick:nth-child(7)):not(:has(> .forecast-tick:nth-child(13))) > .forecast-tick:nth-child(even) {
+      display: none;
+    }
+
+    .forecast-ticks:has(> .forecast-tick:nth-child(13)) > .forecast-tick:not(:nth-child(3n + 1)) {
       display: none;
     }
 
@@ -1331,6 +1400,33 @@
       min-inline-size: 0;
     }
 
+    /* A CHIP ON A PHONE IS A ROW: the name at the start, the signed figure at the end, one hairline between rows and
+       nothing round the list (design §6.8 rule 6). A column of pills would be a box per line, with the chosen ones
+       filled in, so "What counts", where nearly everything is chosen, would draw as a solid panel. A row needs no
+       fill to say its state: the strike through a name is what says it is left out. The height is left to the
+       rules above, so a thumb still gets 44px. */
+    .forecast-chips {
+      flex-direction: column;
+      flex-wrap: nowrap;
+      gap: 0;
+    }
+
+    .forecast-chip {
+      justify-content: space-between;
+      inline-size: 100%;
+      padding-inline: 0;
+      border: 0;
+      border-radius: 0;
+    }
+
+    .forecast-chip + .forecast-chip {
+      border-block-start: 1px solid var(--line-soft);
+    }
+
+    .forecast-chip[aria-pressed] {
+      background: transparent;
+    }
+
     .forecast-readout {
       max-inline-size: 12rem;
     }
@@ -1338,9 +1434,11 @@
 
   /* ── ring: a 64px dial with its figure in the centre, the rows beside it ──
      The same colour rule as `split`: a part is a neutral step, darkest first, and only a row with a tone is drawn in
-     its intent, so four parts are told apart by their place and their dot rather than by a hue. One row of progress
-     is the quiet ink a card's ring fills in. The circles carry presentation attributes from `src/ring.ts` so a page
-     without these rules still draws an outline; every rule here wins over them. */
+     its intent, so four parts are told apart by their place and their dot rather than by a hue. The track is
+     `--edge`, so the whole a ring is measured against shows against the page, and one row of progress fills it in
+     the ink of a first part, which stands clear of that track where the quieter `--ink2` only just did. The
+     circles carry presentation attributes from `src/ring.ts` so a page without these rules still draws an
+     outline; every rule here wins over them. */
   .ring {
     flex-direction: row;
     flex-wrap: wrap;
@@ -1368,7 +1466,7 @@
   }
 
   .ring-track {
-    stroke: var(--s2);
+    stroke: var(--edge);
     stroke-opacity: 1;
   }
 
@@ -1377,10 +1475,6 @@
     stroke: var(--ink);
     stroke-opacity: 1;
     background: var(--ink);
-  }
-
-  .ring[data-form='progress'] .ring-arc {
-    stroke: var(--ink2);
   }
 
   .ring-arc[data-step='1'],
@@ -1483,11 +1577,12 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* ── heat: twelve weeks by weekday, four washes of the info role ──────────
+  /* ── heat: twelve weeks by weekday, four washes of the one series ─────────
      The cells arrive week by week, Monday first, and flow down seven rows and across `--weeks` columns, so no cell
      carries a position. A GAP AND A ZERO ARE NOT THE SAME DAY (`days.ts`): a day nobody wrote is an outline, a day
-     counted empty is the second surface, and a busy day is one of four washes of `--info` over the page, the last
-     the role itself. A day still to come is not drawn at all. Today is outlined in the ink. */
+     counted empty is the second surface, and a busy day is one of four washes of `--series-1` over the page, the
+     last the series itself, the hue the other charts here draw their one primary series in. A day still to come
+     is not drawn at all. Today is outlined in the ink. */
   .block[data-kind='heat'] {
     container-type: inline-size;
   }
@@ -1526,19 +1621,19 @@
   }
 
   .heat-day[data-wash='1'] {
-    background: color-mix(in srgb, var(--info) 25%, transparent);
+    background: color-mix(in srgb, var(--series-1) 25%, transparent);
   }
 
   .heat-day[data-wash='2'] {
-    background: color-mix(in srgb, var(--info) 50%, transparent);
+    background: color-mix(in srgb, var(--series-1) 50%, transparent);
   }
 
   .heat-day[data-wash='3'] {
-    background: color-mix(in srgb, var(--info) 75%, transparent);
+    background: color-mix(in srgb, var(--series-1) 75%, transparent);
   }
 
   .heat-day[data-wash='4'] {
-    background: var(--info);
+    background: var(--series-1);
   }
 
   .heat-day[data-today] {

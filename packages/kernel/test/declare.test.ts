@@ -703,14 +703,16 @@ test('and a source is a register or a series, not a bare name', () => {
     assert.equal(refusedWith(metric({ source })), 'DECLARATION_INVALID', `${String(source)} is not a source`);
 });
 
-test('and money carries its currency, because 02 §3 says a bare number is not money', () => {
-  /* A `format` of `money` with no currency reaches the renderer as an unresolved figure — and
-     `02 §3`'s whole argument is that a bare number loses the one fact that makes a total mean
-     anything. */
+test('and money names its currency on the record, not in the format, because 02 §3 says a bare number is not money', () => {
+  /* A `format` of `money` is added up in the record's home currency, else the one its rows are in, else one amount per
+     currency (`metrics.ts` `evaluateMetric`), so it is never a bare number. A pack cannot know which currency the
+     record it lands on keeps, which is why the format no longer has to say one (`loop/finish/modules.md` C1).
+     `money.<CUR>` is still read, and a code that is not three capitals is still refused. */
+  assert.equal(refusedWith(metric({ format: 'money' })), null);
   assert.equal(refusedWith(metric({ format: 'money.EGP' })), null);
   for (const format of ['int', 'decimal', 'pct', 'days', 'duration'])
     assert.equal(refusedWith(metric({ format })), null, `${format} is a format`);
-  for (const format of ['money', 'money.gbp', 'money.GB', 'currency', 'number', undefined])
+  for (const format of ['money.gbp', 'money.GB', 'currency', 'number', undefined])
     assert.equal(refusedWith(metric({ format })), 'DECLARATION_INVALID', `${String(format)} is not a format`);
 });
 

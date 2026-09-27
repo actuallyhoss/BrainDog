@@ -629,20 +629,45 @@ that arrived from someone else's API is exactly the kind that most needs to stat
 
 **The alarm was never the problem.** Twenty connectors are twenty rows in `schedule`, and the alarm
 is `MIN(due_at)`. **The egress is the problem, and the `outbox` in
-[01-ARCHITECTURE](01-ARCHITECTURE.md) §2 already solves it** — `kind: pull.fetch`, drained by the
-Worker. A `pull` row has three states — `pending · firing · paused` — and its first `due_at` at install is
-`now`: the first run happens on install. A fire writes one outbox row carrying
-`{ ingest_id, declaration_version, grant_id }` and nothing more; the Worker leases it and hands it to
-`runPull(job, deps)`, which fetches the sealed grant through the record's `sealedGrant`, unwraps the
-connector DEK with `KeyStore`, writes each page through `applyPull` and **acks itself**. `deps` is
-`{ http, keyStore, clock, record }`, the last a three-method slice of the record (`sealedGrant · applyPull ·
-ackOutbox`), so connect never sees a key at rest and the record never makes the call
-([47-SPEC-CONNECT](47-SPEC-CONNECT.md) §5.1; [45-SPEC-RECORD](45-SPEC-RECORD.md) §5.11). Three additions:
+[01-ARCHITECTURE](01-ARCHITECTURE.md) §2 already solves it:** `kind: pull.fetch`. A `pull` row has three
+states, `pending · firing · paused`, and its first `due_at` at install is `now`: the first run happens on
+install. A fire (`firePull`, `packages/kernel/src/pull.ts`) writes one outbox row carrying the ingest, the
+cursor it last saw and the id of the key it sends, and nothing more. The key is the one the connector's
+`fetch.auth.grant` names, or its top-level `grant` when the auth block names none, by label or id; the fire
+writes the id, because the vault opens a key only for a job that names it by id.
+
+The host's pass leases the row, and the record's `prepareAction` opens the sealed key under that lease
+(`sealedGrant`), reads the connector's cursor and slot off its schedule row, and hands the host a `Paged`.
+The host's `pagedRunner` (`packages/host/src/connector.ts`) runs it through `runPull(job, deps)`, which
+unwraps the connector DEK with `KeyStore`, writes each page through the record's `applyPage` and **acks
+itself**. `deps` is `{ http, keys, clock, record, extract, currencies, lookup }`, and `record` is
+connect's `RecordApi`, a slice of the record (`applyPull · ackOutbox`), so connect never sees a key at rest and the
+record never makes the call ([47-SPEC-CONNECT](47-SPEC-CONNECT.md) §5.1; [45-SPEC-RECORD](45-SPEC-RECORD.md)
+§5.11).
+
+**The ack finishes the run.** `finishPull` (`packages/kernel/src/pull.ts`), called from the `pull.fetch`
+branch of `ack()` in `packages/kernel/src/outbox.ts` and inside the ack's transaction, reads what the runner
+carried back:
+
+| The run ended | What the record writes |
+|---|---|
+| `ok`, or `review` | the cursor the run ended on (a review hands back the one it started from, so nothing moves past the page a person has to see), the slot it counted to, and the next `due_at` the ack carries: the next slot plus the jitter below |
+| `partial` (`max_pages` or `rows_per_run` reached with pages left) | the half-read window and the page it stopped on, and a `due_at` `RESUME_MS` away (`packages/connect/src/run.ts`), so the next alarm resumes it |
+| `failed` | the cursor only. The outbox's `retry` ladder runs it again, no sooner than the provider's `Retry-After` |
+| `paused` | the row paused, the key stale, the owner told (the table below) |
+
+The cursor and the slot are what the next `prepareAction` hands the runner, so a windowed connector moves
+one window further on each run, and each slot is counted from the last one rather than from whenever the
+alarm rang. A `due_at` moves only a row that is still `pending`: one somebody paused, or whose declaration
+was retired, while its run was out stays as they left it. **A refresh token the provider rotated** is
+resealed by the runner at the grant's next version and stored as that version whatever the run's outcome,
+because it is the only credential that still works. A host that acks with no finish on it (a row released
+unrun, a job whose declaration has gone) finishes the job and writes none of this. Three additions:
 
 | Addition | Why |
 |---|---|
-| **Jitter is mandatory and deterministic** | twenty connectors declaring `every: 1h` become due at the same instant → one wake → twenty runs in one Worker invocation. At `max_pages: 50` that is **1,000 subrequests — exactly the Workers Paid ceiling, and 20× the Free ceiling of 50.** Derive it from `hash(record_id ‖ ingest_id)` so it is **stable**: random jitter makes *"why was there a gap at 04:00"* unanswerable. There is **one** formula and it is connect's — `jitterSeconds(recordId, ingestId, every)`, a SHA-256 over `record_id ‖ 0x1F ‖ ingest_id` modulo a window of `every / 10` clamped to 30 s–15 min — and the record writes the `due_at` the ack carries back ([47-SPEC-CONNECT](47-SPEC-CONNECT.md) §4.8) |
-| **The Worker leases a bounded batch** | ≤5 runs per invocation, `lease_size × max_pages ≤ 200`. Jitter prevents the pile-up; the lease cap survives jitter being wrong |
+| **Jitter is mandatory and deterministic** | twenty connectors declaring `every: 1h` become due at the same instant → one wake → twenty runs in one Worker invocation. At `max_pages: 50` that is **1,000 subrequests: exactly the Workers Paid ceiling, and 20× the Free ceiling of 50.** Derive it from `hash(record_id ‖ ingest_id)` so it is **stable**: random jitter makes *"why was there a gap at 04:00"* unanswerable. The offset falls in a window of `every / 10` clamped to 30 s–15 min, and **the record and connect each compute it with a hash of their own**. The record's is FNV-1a over `record_id ‖ 0x1F ‖ ingest_id` (`jitterMs`, `packages/kernel/src/pull.ts`): a fire re-arms its row at `now + every` plus that offset, and `call`, `poll` and the retry ladder take the same arithmetic over more names: the pack and the action, or the job's kind and id (`actionJitterMs`, `packages/kernel/src/actions.ts`). Connect's is SHA-256 over the same bytes (`jitterSeconds`, `packages/connect/src/when.ts`): a paged run that ends `ok` or `review` counts its next slot from the last slot and adds that offset, and the record writes the `due_at` its ack carries over the one the fire set ([47-SPEC-CONNECT](47-SPEC-CONNECT.md) §4.8) |
+| **The Worker runs a bounded batch** | at most `ALARM_RUNS` runs an alarm (`apps/worker/src/actions.ts`), each reserving two subrequests for every page it may fetch plus its tail before it starts (`reserveFor`, `packages/kernel/src/actions.ts`), from one budget of `SUBREQUESTS` per invocation (`packages/host/src/actions.ts`). A run that would not fit goes back unrun and the alarm rings again. Jitter prevents the pile-up; the budget survives jitter being wrong |
 | **A minimum interval, refused at install** | 15 minutes, or any declared provider floor. Banks are hard-floored at **6 hours by law** — SCA-RTS Art 36(5), *"no more than four times in a 24-hour period"* |
 
 **The runner for `pull`, `call` and `poll`, as built September 15th 2026.** The kernel's `runActions(execute)`
@@ -650,17 +675,19 @@ claims the due rows of the three kinds, leases up to five `pull.fetch` jobs, and
 executor the host passes in, so the record never makes the call. The request names its key by id and label,
 and the host opens it outside the record. The jitter is `actionJitterMs(record, pack, action, every)`, this
 section's window with the pack added to what is hashed, so two packs that declare the same action name land
-apart. Every run writes one `pull` event with its usage. A `pull` it runs is read through the ingest
-pipeline's `extract:`; paging and `map:` stay with connect. The self-host runs it on its timer. The Worker's
-alarm does not run it yet ([09-ALARMS](09-ALARMS-AND-NOTIFICATIONS.md) §1).
+apart. Every run writes one `pull` event with its usage. A `pull` that names one address is one request,
+read through the ingest pipeline's `extract:` or `map:`; one whose `fetch:` says how to page or where its
+rows are is a connector, and the same pass hands it to the connector runner above rather than sending it.
+**The alarm runs these.** The Worker runs the pass from the record's own alarm, after the drain (`#act`,
+`apps/worker/src/index.ts`), and the self-host runs it on its tick (`apps/selfhost/src/server.ts`).
 
 ### What the user sees
 
 | Failure | Behaviour |
 |---|---|
-| **401/403** | `fatal_when` — **never retried.** `grant.stale_at` is set, the ingest's `schedule` row is set `state = 'paused'`, one urgent item. The urgent list already contains *"a credential expiring inside 48 hours"*; extend it to one that just failed |
-| **429** | honour `Retry-After` **when present** — GitHub sends it, **Stripe does not document it**, **Cloudflare puts the delay in the message body**, **Sentry publishes no numbers at all.** So the fallback backoff is the real mechanism |
-| **A provider 500s for a day** | the `retry` ladder — `2^attempts` minutes to a 6 h cap, `dead` at the eighth failed ack, the one ladder of [09-ALARMS](09-ALARMS-AND-NOTIFICATIONS.md) §1 — then `paused` with **one** item — deduped by `once_per: [ingest, day]`, because a connector failing hourly must not notify hourly |
+| **401/403** | **never retried.** The run ends `paused` (`PULL_AUTH_REJECTED`), and its ack sets `grant.stale_at` on the key the job sent, sets the connector's `schedule` row `state = 'paused'`, and tells the owner once through the urgent notification path, naming the connector and the key's label; a host that wired no notification path keeps the sentence as a `note` event. `resumeAction` is the only way it starts again |
+| **429** | the `retry` ladder, and `Retry-After` is honoured **when present**: the retry waits for the later of its rung and that instant, held to the ladder's six-hour bound. Another `error_when` status honours it only when the declaration says `on_error.honour: retry_after`. GitHub sends it, **Stripe does not document it**, **Cloudflare puts the delay in the message body**, **Sentry publishes no numbers at all**, so the backoff is the real mechanism |
+| **A provider 500s for a day** | the `retry` ladder of [09-ALARMS](09-ALARMS-AND-NOTIFICATIONS.md) §1 (`backoffMs`, doubling minutes to a six-hour bound), and `dead` when a job reaches `CEILING` failures (`packages/kernel/src/outbox.ts`), which opens one `change` suggestion asking whether to retry it or change what produces it. The connector is not paused: while a job is out or on the ladder its row fires no second one, and once a job is dead the row's next turn queues a fresh one |
 | **One provider of several fails** | **only the providers that answered are replaced.** The predecessor's company ledger keeps the last Mercury rows through a Mercury outage rather than blanking them beside live Stripe rows — a partial refresh is not an empty one |
 | **A re-sync meets a row a person edited** | the person's field wins. `event.actor` on the field's last write decides, so a hand-set category survives every sync — the predecessor's `pinned` column, generalised in [07-INGEST](07-INGEST-AND-RULES.md) §6 |
 | **`expect:` fails** | do not write, **do not advance the cursor**, keep the raw response, raise one item naming assertion, expected and actual |

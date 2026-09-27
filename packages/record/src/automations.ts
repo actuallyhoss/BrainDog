@@ -17,8 +17,14 @@
  * day they part.
  */
 
-import { REFUSED_IN_A_ROW } from '@braindog/kernel';
+import { CAPABILITIES, REFUSED_IN_A_ROW, capability, serves } from '@braindog/kernel';
 import type { Sql } from '@braindog/ports';
+
+/* THE KERNEL'S ONE CAPABILITY TABLE, HANDED ON FOR THE GRAMMAR AN AGENT READS (`packages/mcp/src/automations.ts`).
+   `@braindog/mcp` depends on this package and not on the kernel, and `31 §2` forbids reaching into another package by a
+   relative path, so the grammar takes the table from here, at `@braindog/record/automations`: what installs and what
+   runs is one row, whichever of the lint, the runner, this dry run or the grammar reads it. */
+export { CAPABILITIES, capability, notInThisBuild, serves, type Capability, type Hosts } from '@braindog/kernel';
 
 type Body = Record<string, unknown>;
 
@@ -52,23 +58,29 @@ export function subjectOf(body: Body): string | null {
 /* ── what a body would do ───────────────────────────────────────────── */
 
 /**
- * The steps that hand off to somebody else and do not come back in this build. `flow.ts` fails a run that reaches a
- * `call` with `NOT_IN_THIS_BUILD`, after taking every step before it, and on a host that does not answer Slash the lint
- * refuses `ask_slash` at install, because nothing there serves the question it would queue. `ask_person` is not here: it
- * opens its question in Decide and the decision wakes the run (Brief C). Nor is `ask_slash` where the host answers it
- * (`said`'s `answersSlash`): the run parks on the step and the model's answer wakes it.
+ * The steps that do not run on every host this build ships, read from the kernel's one table (`capabilities.ts`), which
+ * the lint and the runner read too: a step whose row does not run (`flow.ts` fails a run that reaches it with
+ * `NOT_IN_THIS_BUILD`, after taking every step before it), and one that runs only on a host that answers Slash, which
+ * the lint refuses at install elsewhere. `ask_person` is not here: it opens its question in Decide and the decision
+ * wakes the run (Brief C). Nor is `script`: `flow.ts`'s `startScript` queues the script's run and the run goes on.
  *
- * NOR IS `script`, SINCE 24 SEPTEMBER. `flow.ts`'s `startScript` queues the script's run and the run goes on, and this
- * list still named it after the runner stopped failing it: the dry run of Work's `rule.close_follow_ups` ended its one
- * step with "Not in this build: a run stops here", on a record where the same rule ran to `done` and closed the task's
- * follow-ups (`apps/selfhost/test/follow-ups.test.ts`). An owner reading that would have refused the one automation
- * the pack ships.
+ * A LIST WRITTEN BY HAND HERE WENT STALE ONCE ALREADY: it named `script` after the runner stopped failing it, and the dry
+ * run of Work's `rule.close_follow_ups` ended its one step with "Not in this build: a run stops here", on a record
+ * where the same rule ran to `done` (`apps/selfhost/test/follow-ups.test.ts`). Read from the table, it moves when the
+ * row does.
  *
- * SAID IN THE DRY RUN BECAUSE THE DRY RUN IS NOT THE LINT. `call` installs so that the canvas can draw it, and an agent
- * told only "would call" files the rule, the owner accepts it, and the first run fails at that step while its author
- * reads the dry run as a promise. The test that holds this list runs a real one.
+ * SAID IN THE DRY RUN BECAUSE THE DRY RUN IS NOT THE LINT. A step whose row installs and does not run is one the canvas
+ * can still draw, and an agent told only what it would do files the rule, the owner accepts it, and the first run fails
+ * at that step while its author reads the dry run as a promise. `call` was such a step until the runner learned to
+ * queue it and park the run on its answer.
  */
-export const WAITS_ON_OTHERS: readonly string[] = ['call', 'ask_slash'];
+export const WAITS_ON_OTHERS: readonly string[] = CAPABILITIES.filter((c) => c.of === 'step' && !c.name.includes('.') && (!c.runs || c.hosts !== 'every')).map((c) => c.name);
+
+/** Whether a step's row says a run takes it on this host. A verb the table does not hold is the lint's to refuse. */
+const runsHere = (verb: string, slash: boolean): boolean => {
+  const row = capability(verb);
+  return row === undefined || (row.runs && serves(row, slash));
+};
 
 const NOT_BUILT = ' Not in this build: a run stops here, after the steps before it.';
 const NOT_INSTALLED = ' Not in this build: a rule with this step is refused at install.';
@@ -76,6 +88,8 @@ const NOT_INSTALLED = ' Not in this build: a rule with this step is refused at i
 const ASK_PERSON_WAIT = '7d';
 /** `flow.ts`'s `ASK_SLASH_WAIT_MS` as a span, copied likewise and held by `automations-slash.test.ts`. */
 const ASK_SLASH_WAIT = '1d';
+/** `flow.ts`'s `CALL_WAIT_MS` as a span, copied likewise: how long a run waits on a call's answer. */
+const CALL_WAIT = '1d';
 
 export type Said = {
   path: 'inline' | 'run';
@@ -198,23 +212,37 @@ function started(body: Body): string {
       const by = typeof spec.channel === 'string' ? ` by ${spec.channel}` : '';
       const state = Array.isArray(spec.state) ? ` and is left ${listed(spec.state)}` : '';
       const verified = spec.unverified === true ? 'whether or not its sender was verified' : 'from a sender that was verified';
-      return `When something arrives${at}${by}${state}, ${verified}. A redelivery starts nothing.`;
+      /* THE KERNEL READS `when:` OVER THE ROW THE ARRIVAL WROTE, or with no row over its JSON body's top-level keys
+         (`flow.ts`'s `onArrival`), so the sentence says both. */
+      const when = body.when === undefined ? '' : `, if ${words(body.when)} of the row it files, or of the body when it files none`;
+      return `When something arrives${at}${by}${state}, ${verified}${when}. A redelivery starts nothing.`;
     }
     case 'every': {
+      /* HOW LATE A TURN MAY BE TAKEN, where the clock says: a later one is recorded as skipped (`flow.ts`'s `onClock`). */
+      const late = typeof on.late === 'string' ? ` A turn reached more than ${on.late} late is skipped and said.` : '';
       const monthly = calendarSaid(on);
-      if (monthly !== null) return monthly;
+      if (monthly !== null) return `${monthly}${late}`;
       const at = typeof on.at === 'string' ? ` at ${on.at}` : '';
       const day = typeof on.day === 'string' ? ` on ${on.day}` : '';
-      return `Every ${words(on.every)}${at}${day}.`;
+      return `Every ${words(on.every)}${at}${day}.${late}`;
     }
     case 'manual':
       return 'When somebody presses Run now in the app. No agent and no token can press it.';
     case 'metric': {
+      /* READ EACH HOUR, AND A CROSSING IS A CHANGE OF SIDE (`flow.ts`'s `onMetrics`): the first reading only sets the
+         side, which the sentence says, since a rule whose figure is already past the line starts nothing until it
+         comes back and crosses again. */
       const spec = isObject(on.metric) ? on.metric : {};
-      return `When ${words(spec.id)} crosses ${words(spec.crosses)}. Nothing in this build watches a figure for that.`;
+      const line = spec.crosses === 'target' ? 'its target' : isObject(spec.crosses) && 'gte' in spec.crosses ? `${words(spec.crosses.gte)}, going either way` : isObject(spec.crosses) && 'lte' in spec.crosses ? `${words(spec.crosses.lte)}, going either way` : words(spec.crosses);
+      return `When the figure ${words(spec.id)} crosses ${line}, read each hour. The first reading only says which side it is on.`;
     }
-    default:
-      return 'When a decision is taken. Nothing in this build starts a rule that way.';
+    default: {
+      /* ONCE PER QUESTION DECIDED (`flow.ts`'s `onDecided`), narrowed by the declaration that filed it and the answer. */
+      const spec = isObject(on.decided) ? on.decided : {};
+      const about = typeof spec.about === 'string' ? ` that ${spec.about} put there` : '';
+      const option = typeof spec.option === 'string' ? `, and the answer is ${JSON.stringify(spec.option)}` : '';
+      return `When a question in Decide${about} is decided${option}. The run reads the row the question is about, where it names one.`;
+    }
   }
 }
 
@@ -294,8 +322,11 @@ function stepLines(step: unknown, depth: number, out: string[], slash: boolean):
   if ('set_var' in s) return line(`Keep ${JSON.stringify(words(spec('set_var').to))} as ${words(spec('set_var').name)}.`);
   if ('wait' in s) return line(`Wait ${words(s.wait)}.`);
   if ('call' in s) {
+    /* WHAT THE RUNNER DOES WITH IT (`flow.ts`): the run waits on the answer, up to a day, and a call the host stops ends
+       the run with the host's sentence. The day is `CALL_WAIT_MS`, copied for the reason the waits above are. */
     const as = spec('call').as === undefined ? '' : `, and keep its answer as ${words(spec('call').as)}`;
-    return line(`Call ${words(spec('call').ingest)}, a declared call${as}.${NOT_BUILT}`);
+    if (!runsHere('call', slash)) return line(`Call ${words(spec('call').ingest)}, a declared call${as}.${NOT_BUILT}`);
+    return line(`Call ${words(spec('call').ingest)}, a declared call${as}. The run waits up to ${CALL_WAIT} for the answer, and stops here without one.`);
   }
   if ('script' in s) {
     /* WHAT THE RUNNER DOES, NOT WHAT THE STEP'S NAME PROMISES. The first cut of this line said "keep its answer", and
@@ -310,7 +341,7 @@ function stepLines(step: unknown, depth: number, out: string[], slash: boolean):
   if ('ask_slash' in s) {
     const ask = spec('ask_slash');
     const asked = `Ask Slash ${JSON.stringify(words(ask.question))}, and keep the answer as ${words(ask.as)}.`;
-    if (!slash) return line(`${asked}${NOT_INSTALLED}`);
+    if (!runsHere('ask_slash', slash)) return line(`${asked}${NOT_INSTALLED}`);
     /* WHERE THE HOST ANSWERS, WHAT LEAVES THE RECORD, because that is the question the owner accepting it is asked. The
        run sends `about:`'s fields, and the question as `flow.ts`'s `ask` fills it from the row, so a field the braces
        name goes out in the question's own words. Less any secret or file field in both, which this line cannot see
@@ -323,11 +354,14 @@ function stepLines(step: unknown, depth: number, out: string[], slash: boolean):
     return line(`${asked} The run waits up to ${ASK_SLASH_WAIT} for this host's model to answer, and stops here without one. The question goes with ${goes}.`);
   }
   if ('ask_person' in s) {
-    /* IN DECIDE, WHERE ANYONE WHO DECIDES ANSWERS IT: nothing addresses a question to one person, and the lint refuses
-       `to:` for that reason, so the line names no person. */
+    /* IN DECIDE, WHERE ANYONE WHO DECIDES ANSWERS IT, unless `to:` puts it to one member, whom `govern.ts`'s `decide`
+       holds it to with an owner beside them. The line says that and names nobody: `to:` is an id, or a hole the run fills
+       from the row, and neither is a name a person reads. */
     const ask = spec('ask_person');
     const wait = typeof ask.wait === 'string' ? ask.wait : ASK_PERSON_WAIT;
-    return line(`Ask in Decide ${JSON.stringify(words(ask.question))}, ${listed(ask.options)}, and keep the answer as ${words(ask.as)}. If nobody answers within ${wait}, the run stops here.`);
+    /* `to:` IS SAID ONLY WHERE ITS ROW INSTALLS; where it does not, the line says what the lint will say. */
+    const to = ask.to === undefined ? '' : capability('ask_person.to')?.installs === true ? ' Only the one member it is put to, or an owner, answers it.' : NOT_INSTALLED;
+    return line(`Ask in Decide ${JSON.stringify(words(ask.question))}, ${listed(ask.options)}, and keep the answer as ${words(ask.as)}. If nobody answers within ${wait}, the run stops here.${to}`);
   }
   if ('tag' in s) return line(`Tag the row ${words(s.tag)}.`);
   if ('untag' in s) return line(`Take the tag ${words(s.untag)} off the row.`);
@@ -340,7 +374,15 @@ function stepLines(step: unknown, depth: number, out: string[], slash: boolean):
   if ('note' in s) return line(`Note on the row: ${words(s.note)}`);
   if ('notify' in s) return line(`Tell the owner: ${words(spec('notify').say)}${spec('notify').urgent === true ? ' At once, as an interrupt.' : ''}`);
   if ('schedule' in s) return line(`In ${words(spec('schedule').in)}, come back to the row: ${words(spec('schedule').note)}`);
-  if ('create' in s) return line(`Create up to ${words(spec('create').bound)} rows in ${words(spec('create').register)}.`);
+  if ('create' in s) {
+    /* THE LIST AND WHAT IT FILLS, which is what the owner accepting it is asked (`loop/finish/defects.md` A11): the fields
+       by name, since their values are filled when the run takes the step and a dry run reads no row. */
+    const create = spec('create');
+    const filled = isObject(create.fields) ? Object.keys(create.fields) : [];
+    const fields = filled.length === 0 ? '' : `, filling ${filled.length === 1 ? filled[0] : `${filled.slice(0, -1).join(', ')} and ${filled.at(-1)}`}`;
+    const crossed = Array.isArray(create.each) && create.each.length > 0 ? `, one for each ${create.each.map(words).join(' and ')} the row holds` : '';
+    return line(`Create up to ${words(create.bound)} rows in ${words(create.register)}${crossed}${fields}.`);
+  }
   if ('suggest' in s) return line(`Ask on Decide ${JSON.stringify(words(spec('suggest').question))}, ${listed(spec('suggest').options)}.`);
   if ('run' in s) return line(`Send the declared call ${words(s.run)}.`);
   if ('stop' in s) return line('Stop, and take no further step.');
@@ -412,10 +454,23 @@ export type AutomationRun = {
   steps: { n: number; kind: string; state: string; answer: string | null; at: string }[];
 };
 
-export type Automation = AutomationRow & { body: Body; runs: AutomationRun[] };
+/**
+ * One automation with a page of its runs, newest first. `older` is the run to pass as `before` for the page after this
+ * one, or `null` when this page reaches the first run the record keeps.
+ */
+export type Automation = AutomationRow & { body: Body; runs: AutomationRun[]; older: string | null };
 
 /** How many runs one automation shows. The brief's ten: the list is for reading what just happened, not an archive. */
 export const RUNS_SHOWN = 10;
+
+/**
+ * The most runs one page holds when a caller asks for more than `RUNS_SHOWN`: each run carries its steps, read one query
+ * a run, so a page is held to what one answer should cost. Older runs are the next page's.
+ */
+export const RUNS_PAGE_MOST = 50;
+
+/** Which page of an automation's runs to read: those started before the run `before`, at most `limit` of them. */
+export type RunsPage = { before?: string | undefined; limit?: number | undefined };
 
 type Declared = { id: string; version: number; body: string; pack_id: string | null };
 
@@ -482,18 +537,35 @@ export function automations(sql: Sql, nowMs: number, shown: (id: string, body: B
     .map((d) => row(sql, d, nowMs).row);
 }
 
-/** One live rule, by `chase` or `rule.chase`, with its body and its last runs, newest first; `null` when there is none. */
-export function automation(sql: Sql, named: string, nowMs: number): Automation | null {
+/**
+ * One live rule, by `chase` or `rule.chase`, with its body and a page of its runs, newest first; `null` when there is
+ * none.
+ *
+ * THE PAGE IS KEYED BY A RUN, NOT BY A NUMBER OF RUNS SKIPPED. Runs are started while somebody reads the list, and an
+ * offset counted from the newest would show a run twice or skip one as they arrive; the runs before a named run are
+ * the same runs however many start after it. Ordered as the first page always was, by when each started and then by
+ * the order the table holds them, so two runs of one instant keep one order. A `before` that names no run of this rule
+ * reads as no page at all, and the caller refuses it first (`automations` in `index.ts`).
+ */
+export function automation(sql: Sql, named: string, nowMs: number, page: RunsPage = {}): Automation | null {
   const id = named.startsWith('rule.') ? named : `rule.${named}`;
   const d = sql.one<Declared>(`SELECT id, version, body, pack_id FROM declaration WHERE id = ? AND ${LIVE}`, id);
   if (!d) return null;
   const { row: shown, body } = row(sql, d, nowMs);
-  const runs = sql
-    .all<Omit<AutomationRun, 'steps' | 'trigger'> & { trigger: string }>(
-      'SELECT id, version, state, trigger, actor, started_at, finished_at, say FROM automation_run WHERE rule = ? ORDER BY started_at DESC, rowid DESC LIMIT ?',
-      shown.rule,
-      RUNS_SHOWN,
-    )
+  const limit = Math.min(Math.max(1, Math.floor(page.limit ?? RUNS_SHOWN)), RUNS_PAGE_MOST);
+  /* ONE MORE THAN THE PAGE, so whether an older page exists is read here and not asked again. */
+  const read = sql.all<Omit<AutomationRun, 'steps' | 'trigger'> & { trigger: string }>(
+    page.before === undefined
+      ? 'SELECT id, version, state, trigger, actor, started_at, finished_at, say FROM automation_run WHERE rule = ? ORDER BY started_at DESC, rowid DESC LIMIT ?'
+      : `SELECT r.id, r.version, r.state, r.trigger, r.actor, r.started_at, r.finished_at, r.say
+           FROM automation_run r JOIN automation_run b ON b.id = ? AND b.rule = r.rule
+          WHERE r.rule = ? AND (r.started_at < b.started_at OR (r.started_at = b.started_at AND r.rowid < b.rowid))
+          ORDER BY r.started_at DESC, r.rowid DESC LIMIT ?`,
+    ...(page.before === undefined ? [shown.rule, limit + 1] : [page.before, shown.rule, limit + 1]),
+  );
+  const older = read.length > limit ? (read[limit - 1]?.id ?? null) : null;
+  const runs = read
+    .slice(0, limit)
     .map((r) => {
       /* THE TRIGGER BY ITS KIND. The run row keeps the whole of what started it, the row id and the arrival id among it,
          and those are the run's to read, not a list's. */
@@ -510,7 +582,7 @@ export function automation(sql: Sql, named: string, nowMs: number): Automation |
         steps: sql.all<AutomationRun['steps'][number]>('SELECT n, kind, state, answer, at FROM automation_step WHERE run = ? ORDER BY n', r.id),
       };
     });
-  return { ...shown, body, runs };
+  return { ...shown, body, runs, older };
 }
 
 /* ── the installed scripts, and how their runs went ────────────────── */

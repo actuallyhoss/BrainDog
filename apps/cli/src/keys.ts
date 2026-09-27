@@ -3,6 +3,12 @@
  * one command, through the host's key doors, under a vault grant (`loop/research-agent-path.md` §5.7,
  * `docs/48-SPEC-CLI.md` §2).
  *
+ * `put` WITH NO VAULT GRANT TO USE SENDS THE LOGIN INSTEAD (`loop/finish/agents.md` C1). The deposit door takes a
+ * `write` token too, and the record puts the key in this run's project as a NEW key: a label already there is refused
+ * with the sentence that names the two ways a value is replaced. So an agent that finds a key can put it away on a
+ * machine that was never given a vault grant, and a login that leaks can add a key and never swap one. `exec` reads a
+ * key back, and that still takes a vault grant and nothing else.
+ *
  * THE VALUE IS NEVER AN ARGUMENT. `put` reads it from standard input, because an argument is kept in shell history
  * and shown in every process list.
  *
@@ -28,7 +34,7 @@ import { statSync } from 'node:fs';
 import { win32 } from 'node:path';
 import { parseArgs } from 'node:util';
 
-import { hostKey, inTheClear, readHosts } from './http.ts';
+import { hostKey, inTheClear, readHosts, target } from './http.ts';
 import type { Answering } from './json.ts';
 
 /** A key in the clear. */
@@ -161,7 +167,8 @@ const aFile = (path: string): boolean => {
   }
 };
 
-type Door = { key: string; base: string; bearer: string; scope: string };
+/** Where a request goes and what it carries: a vault grant for `scope`, or, for `put` alone, the login (`login`). */
+type Door = { key: string; base: string; bearer: string; scope: string; login: boolean };
 type Answer = { status: number; body: Record<string, unknown> | null };
 
 /**
@@ -187,8 +194,31 @@ export const spawnInherit: Spawner = (command, args, vars, verbatim) =>
     });
   });
 
+/**
+ * The host and the bearer a command uses, or the one sentence that says why there is none.
+ *
+ * A VAULT GRANT FIRST: the one `--vault` names, or the one live grant kept for the host. `put` alone, with no `--vault`
+ * and no grant to take, then uses the login every other command sends (`BRAINDOG_TOKEN`, or the hosts file's), because
+ * the deposit door takes a login to add a new key. A grant named with `--vault` is that grant or the sentence about it,
+ * never the login in its place, since whoever named one meant to replace a value with it.
+ */
+function doorFor(flags: { host?: string | undefined; vault?: string | undefined }, io: KeysIo, mayLogin: boolean): Door | string {
+  const granted = grantDoor(flags, io);
+  if (typeof granted !== 'string' || flags.vault !== undefined || !mayLogin) return granted;
+  let to;
+  try {
+    to = target(flags.host, io.env, io.file, (io.now ?? Date.now)());
+  } catch (e) {
+    return e instanceof Error ? e.message : granted;
+  }
+  if (to.token) return { key: to.key, base: to.base, bearer: to.token, scope: '', login: true };
+  /* NEITHER IS KEPT, and the sentence still names a vault grant, which is what `tools scan` reads to say why a key it
+     found was kept by name only. */
+  return `No vault grant or login is kept for ${to.key}. Run braindog login ${to.key}.`;
+}
+
 /** The host and the vault grant a command uses, or the one sentence that says why there is none. */
-function doorFor(flags: { host?: string | undefined; vault?: string | undefined }, io: KeysIo): Door | string {
+function grantDoor(flags: { host?: string | undefined; vault?: string | undefined }, io: KeysIo): Door | string {
   let hosts;
   try {
     hosts = readHosts(io.file);
@@ -219,7 +249,7 @@ function doorFor(flags: { host?: string | undefined; vault?: string | undefined 
   const until = typeof held.expires === 'string' ? Date.parse(held.expires) : Number.NaN;
   if (!(until > (io.now ?? Date.now)()))
     return `The vault grant for ${scope} on ${key} has expired. Run braindog login ${key} --vault ${scope}.`;
-  return { key, base: url.origin, bearer: held.value, scope };
+  return { key, base: url.origin, bearer: held.value, scope, login: false };
 }
 
 async function answerOf(res: Response): Promise<Answer> {
@@ -235,7 +265,12 @@ async function answerOf(res: Response): Promise<Answer> {
 /** The one sentence for an answer that is not a success: the host's own where it sent one. */
 function refusedLine(door: Door, answer: Answer): string {
   const refusal = answer.body?.ok === false && isObject(answer.body.refusal) ? answer.body.refusal : null;
-  if (answer.status === 401) return `${door.key} did not take the vault grant. Run braindog login ${door.key} --vault ${door.scope}.`;
+  /* A LOGIN THE HOST DID NOT KNOW IS ANSWERED IN THE VAULT GRANT'S WORDS, `at: 'vault'`, because the door asks for a grant
+     first and cannot tell which of the two was meant; this side knows it sent the login. */
+  if (answer.status === 401 || (door.login && refusal?.at === 'vault'))
+    return door.login
+      ? `${door.key} did not take the login. Run braindog login ${door.key}, or braindog login ${door.key} --vault <project>.`
+      : `${door.key} did not take the vault grant. Run braindog login ${door.key} --vault ${door.scope}.`;
   if (typeof refusal?.fix === 'string' && refusal.fix) return refusal.fix.slice(0, 300);
   return `${door.key} answered in a way this command does not recognise.`;
 }
@@ -374,7 +409,7 @@ export async function keys(args: string[], io: KeysIo): Promise<number> {
     }
   }
 
-  const door = doorFor(values, io);
+  const door = doorFor(values, io, verb === 'put');
   if (typeof door === 'string') {
     io.say(door);
     return REFUSED;

@@ -40,7 +40,7 @@ export const words = {
   someProject: 'A project',
   days: (n: number) => `${n} days`,
   sealed: 'Sealed',
-  indexOnly: 'Index only',
+  indexOnly: 'Value not kept here',
   opened: (n: number) => (n === 0 ? 'never opened' : n === 1 ? 'opened once' : `opened ${n} times`),
   lastOpened: (when: string) => `last ${when}`,
   noKeys: 'No keys yet.',

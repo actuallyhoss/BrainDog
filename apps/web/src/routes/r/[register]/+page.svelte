@@ -1,16 +1,17 @@
 <!--
   A register: one typed collection, all of it.
 
-  The grid is CSS grid with DECLARED column tracks, not a `<table>`, and that is a measured decision
-  rather than a taste one. At 8 columns in Chrome 151, `<table>` layout scales superlinearly —
-  26.9 / 59.6 / 149 / 318 / 790 ms across 500 / 1k / 2k / 5k / 10k rows — and `content-visibility`
-  does not work on table rows, by spec and by measurement. Grid with chunked CV takes 5,000 rows to
-  0.6 ms of layout (22 §4).
-
   No virtualisation at any size. Rows arrive in keyset pages into chunks, the DOM caps at 2,000 with
   a visible cap line, and the way past it is a filter or an export. Virtualisation breaks
   find-in-page, breaks the scrollbar as a position cue, and only HIDES the measured wall, which is
   DOM construction (13 §4.3).
+
+  THIS FILE HOLDS THE ADDRESS, THE READ, THE STATE AND EVERY WRITE, AND `parts/` DRAWS THEM. The list
+  screen was one file of four thousand lines, and every change to how the bar or the grid looks was
+  made in the same file as the paging and the writes, beside them. Each part now takes props and
+  callbacks and keeps nothing a write depends on, so a write is found in this file and nowhere else,
+  and a part can be redrawn without reading one. What turns on nothing but its arguments is
+  `parts/list.ts`, where plain Node can reach it.
 -->
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
@@ -18,16 +19,12 @@
   import { onDestroy, tick, untrack } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
-  import { MISSING, symbolFigure, type Tone } from 'braindog-render';
-  import { Table } from 'braindog-render/svelte';
-  import { declaredValue } from '$lib/record/where.ts';
   import { copy } from '$lib/copy.ts';
-  import { valueSaid } from '$lib/voice.ts';
   import * as clipboard from '$lib/clipboard.ts';
   import * as pref from '$lib/pref.ts';
   import { covered, silenced, typing as isTyping } from '$lib/a11y/keys.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { chipsOf, columnsFor, currencyFor, seqWidth, dirOf, display, DOM_CAP, iconFor, identityFor, identityOf, labelOf, readableFields, toRows, type Filter, whereOf } from '$lib/record/api.ts';
+  import { chipsOf, columnsFor, currencyFor, DOM_CAP, iconFor, identityFor, labelOf, toRows, type Filter, whereOf } from '$lib/record/api.ts';
   /* Type only, so the client's route table stays out of this chunk. */
   import { joinNames, type Names } from '$lib/record/remote.ts';
   import { open, read, type Boot, type Refusal } from '$lib/data/record.ts';
@@ -35,28 +32,29 @@
   import { searchable } from '$lib/record/find.ts';
   import type { Entry, Fields, RegisterDecl } from '$lib/record/schema.ts';
   import { saidPlainly } from '$lib/record/blocks.ts';
-  import IdentityMark from '$lib/ui/IdentityMark.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
-  import Menu from '$lib/ui/Menu.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
-  import RowCards from '$lib/ui/RowCards.svelte';
   import { rowsAsCards } from '$lib/ui/body.svelte.ts';
   import { CapLine } from 'braindog-render/svelte';
-  import Second from '$lib/ui/Second.svelte';
-  import Sheet from '$lib/ui/Sheet.svelte';
-  import RowMenu from '$lib/ui/RowMenu.svelte';
-  import RowForm from '$lib/ui/RowForm.svelte';
   import BindBlock from '$lib/ui/BindBlock.svelte';
   import Icon from '$lib/ui/Icon.svelte';
-  import Kbd from '$lib/ui/Kbd.svelte';
-  import Chip from '$lib/ui/Chip.svelte';
   import { drew } from '../../../lib/ui/screen.svelte.ts';
   import { capturedFields, holdInPlace, inverseOf, rowWriter, type Held, type RowWriter, type Wrote } from '$lib/record/rows-write.ts';
-  import { draftOf, editable, patchOf, unchanged, unitOf, wrongMoney } from '$lib/record/field-draft.ts';
+  import { draftOf, editable, patchOf, unchanged, wrongMoney } from '$lib/record/field-draft.ts';
   import { spentPutBacks, type Change } from './put-back.ts';
-  import { currencyOf } from '$lib/record/money.ts';
+  import { chipOn, dropChip, filterableOf, listedOf, nextSort, toggleChip, weighed, type Receipt } from './parts/list.ts';
+  import CaptureLine from './parts/CaptureLine.svelte';
+  import ChipsBar from './parts/ChipsBar.svelte';
+  import ListEmpty from './parts/ListEmpty.svelte';
+  import BulkBar from './parts/BulkBar.svelte';
+  import ListCards from './parts/ListCards.svelte';
+  import ListTable from './parts/ListTable.svelte';
+  import ListRowMenu from './parts/ListRowMenu.svelte';
+  import RowPeek from './parts/RowPeek.svelte';
+  import DisplayMenu from './parts/DisplayMenu.svelte';
+  import FieldAdd from './parts/FieldAdd.svelte';
 
 
   const id = $derived(page.params.register ?? '');
@@ -124,8 +122,6 @@
   /** What the sheet's form holds, so the submit can put the row somewhere rather than describing it. */
   let taken = $state<Fields>({});
   let displayOpen = $state(false);
-  /* The phone's filter sheet: every enum field and Clear, behind one button beside Display. */
-  let filterOpen = $state(false);
   let bindOpen = $state(false);
 
   /**
@@ -167,69 +163,10 @@
     pref.write({ columns: all });
   }
 
-/**
-   * A LEADING COLUMN FOR THE SELECTION, and it is a column rather than a decoration on the id.
-   *
-   * The selection model was keyboard-only: `x`, `⇧x`, `⌘a`, `Esc` and nothing else — no way to pick
-   * a row with a mouse or a finger at all, on the one screen that is a list of rows. It could not
-   * go inside the `#` cell, which is 9ch wide because the spoken id is what that column is FOR and
-   * it truncates in the middle; a checkbox in front of it would take the prefix.
-   *
-   * The control is `tabindex="-1"` on purpose. A grid is a composite widget with exactly one tab
-   * stop — at 500 rows a focusable control per row is 500 tab stops — so the keyboard path stays
-   * `x`, which the `?` sheet already advertises, and the pointer path is this.
-   */
   /**
-   * WHAT JUST HAPPENED TO A ROW, DRAWN WHERE THE ROW WAS.
-   *
-   * IT WAS A SET OF ARCHIVED SEQUENCES AND THE ROW LEFT THE SCREEN. That is the single change with
-   * the most evidence behind it in `loop/REWORK.md`: of eighty-five human writes over thirteen days
-   * in the record this product is modelled on, **thirteen reversed the write immediately before
-   * them, and twelve of those landed inside five seconds**, across four different verbs. They had
-   * one cause. The row vanished, so the only way to check you had hit the right one was to do the
-   * opposite and look.
-   *
-   * A ROW IN THIS MAP IS DRAWN WHERE IT ALREADY WAS, whatever its state now is, wearing a chip that
-   * says what happened and offering the inverse. It stays until the QUESTION changes, because the
-   * next question is a new screen and a receipt for a row that is no longer in the answer is a row
-   * the reader did not ask for.
-   *
-   * A DESTRUCTIVE ACTION IS UNDONE, NEVER CONFIRMED. A confirmation dialog asks its question before
-   * anything has happened, when the reader knows the least they ever will about it, and the answer
-   * is always yes, which is why people stop reading them. The receipt gives back the one thing a
-   * dialog cannot: the row, named in the past tense, still where it was.
+   * WHAT JUST HAPPENED TO EACH ROW ON THIS SCREEN, by number: the chip it wears and the way back.
+   * `Receipt` (`parts/list.ts`) is why a row keeps its place and says what happened instead of leaving.
    */
-  type Receipt = {
-    /** One or two words in the past tense. `Archived`, `Restored`, `Undone`. */
-    mark: string;
-    /* `Tone` FROM THE RENDERER, not a fifth vocabulary written here. `13 §5.1` is that meaning may
-       not live in styling alone, and `Chip` enforces it: there is no way to draw a tone in this
-       app without its glyph, so the word and the glyph carry the meaning and the hue agrees. */
-    intent?: Tone | undefined;
-    /**
-     * THE SAME FACT IN THE WIDTH THE GRID HAS, and it is absent for most receipts because most of
-     * them already fit.
-     *
-     * The `act` column is `11ch` and `truncate: 'never'`, sized for two icon verbs or for
-     * `Put back` beside a two-word mark. `markNeeds` is a sentence: on obligations it reads
-     * "Needs which way, amount, due, status" and came out of the cell as "Needs whic", clipped,
-     * immediately after the most common write in the product.
-     *
-     * IT IS NOT A TRUNCATION, IT IS A DIFFERENT SENTENCE FOR A SURFACE THAT ALREADY SAYS THE REST.
-     * The grid draws every declared field as a column and an unfilled one as an em dash, so which
-     * fields a row still wants is on the row four times over. The card draws three `mobile:`
-     * fields and cannot say it, which is why the card gets the long form and this one does not.
-     */
-    short?: string | undefined;
-    /**
-     * The inverse. Absent when there is nothing to put back, which a receipt still records.
-     *
-     * `undefined` IS ALLOWED AS WELL AS ABSENT because a live change builds its inverse from the row as the
-     * screen held it, and a row the screen was not holding has no values to go back to: `putBackOf` answers
-     * `undefined` then, and the chip draws without `Put back` rather than with one that writes nothing.
-     */
-    undo?: (() => void) | undefined;
-  };
   let receipts = $state(new Map<number, Receipt>());
 
   /**
@@ -695,37 +632,8 @@
     columnsFor(id, decl)
       .filter((c) => !hidden.has(c.field))
       .map((c) => (c.field === decl?.state ? { ...c, tone: true } : c))
-      .map((c) => weighed(c, c.field === decl?.title)),
+      .map((c) => weighed(c, c.field === decl?.title, result.entries)),
   );
-
-  /**
-   * THE FREE SPACE GOES WHERE THE WORDS ARE, and it went to the title whatever the title held.
-   *
-   * Every flexible column took `1fr` and the title `3fr`, so Skills gave a name column of
-   * `review-pr` 530px and cut "Before merging a bran…" at 200px beside it, and Keys cut "What it
-   * opens" the same way. A flexible track now takes an `fr` for every ten characters of the longest
-   * value in the rows in hand, from one to four, and the title never less than three. Still a
-   * DECLARED track list, which `Table` needs for `content-visibility`: the rows decide the numbers
-   * once, and layout never measures a cell.
-   */
-  function weighed<C extends { field: string; width: string }>(c: C, isTitle: boolean): C {
-    /* THE SPOKEN ID GIVES WAY. On Keys an 11ch column held `#6` in 102px while "Fenwick Cloud
-       recovery codes" was cut beside it. It takes the digits the rows in hand have (`seqWidth`). */
-    if (c.field === 'seq') return { ...c, width: seqWidth(result.entries) };
-    const track = /^minmax\(([^,]+),\s*[\d.]+fr\)$/.exec(c.width);
-    if (!track) return c;
-    let longest = 0;
-    for (const e of result.entries.slice(0, 200)) {
-      const v = e.fields[c.field];
-      if (typeof v === 'string' && v.length > longest) longest = v.length;
-    }
-    const fr = Math.min(4, Math.max(isTitle ? 3 : 1, Math.ceil(longest / 10)));
-    /* And a title that fits is not cut to feed a column that will be cut anyway: its floor is its
-       longest value, up to thirty characters. A `ch` here is wider than an average letter, so the
-       floor is a little generous, which is the side to be wrong on. */
-    const floor = isTitle && longest > 0 ? `max(${track[1]}, ${Math.min(30, longest)}ch)` : track[1];
-    return { ...c, width: `minmax(${floor}, ${fr}fr)` };
-  }
 
   const columns = $derived([
     ...(siftable
@@ -869,7 +777,7 @@
   const rows = $derived(toRows(id, result.entries.slice(0, DOM_CAP), columns, now, result.names ?? undefined));
 
   /**
-   * WHAT A READER CAN ORDER THE LIST BY, and what each direction is CALLED.
+   * WHAT A READER CAN ORDER THE LIST BY. What each direction is called is `wayOf` (`parts/list.ts`).
    *
    * THE SELECTION BOX IS NOT A FIELD and orders nothing, so it is not in the list. It offered
    * "Select" as a sort key for exactly as long as it took to look.
@@ -877,25 +785,17 @@
    * BY NAME AND NOT BY INDEX. This was `columns.slice(1)`, which is the picker's position rather
    * than the picker, and the picker is drawn only once the list is long enough to act on in bulk:
    * below that, `slice(1)` silently dropped the spoken id from the sort list instead.
-   *
-   * And the direction is named in the field's own terms. A column header can get away with an arrow
-   * because the arrow sits on the thing it orders; a chip in a sheet is read on its own, and
-   * "Due ↑ lowest first" is a sentence about a date that nobody says. `19 §9`'s rule is that the
-   * product speaks the reader's words, and the reader's word for an ascending day is *oldest*.
    */
   /* `act` IS A COLUMN OF CONTROLS, NOT OF VALUES, and Display on a phone offered to sort by it:
      "Sorted by" listed seven options and the last was `What you can do here`, which is the label of
      the row-actions column. There is nothing in it to put in an order. */
   const sortable = $derived(columns.filter((c) => c.field !== 'select' && c.field !== 'act'));
 
-  const wayOf = (field: string): readonly [string, string] => {
-    if (field === 'seq') return [copy.firstAdded, copy.lastAdded];
-    const type = decl?.fields.find((f) => f.id === field)?.type;
-    if (type === 'day' || type === 'instant') return [copy.oldestFirst, copy.newestFirst];
-    if (type === 'money' || type === 'int' || type === 'decimal' || type === 'duration')
-      return [copy.lowestFirst, copy.highestFirst];
-    return [copy.aToZ, copy.zToA];
-  };
+  /** A header pressed, or a row of Display's "Sorted by": the same toggle, into the same parameter. */
+  const sortBy = (field: string) => setParam((p) => p.set('sort', nextSort(sort, field)));
+
+  /** Display's way back to the register's own order, which Clear filters also gave at the cost of every chip. */
+  const unsort = () => setParam((p) => p.delete('sort'));
 
   /**
    * Archive one row: no dialog, and the row does not move.
@@ -1256,32 +1156,17 @@
     commitEdit();
   }
 
-  /**
-   * WHICH BOX A TYPE TAKES IN A CELL. The types this grid already edited keep the boxes they had; the ones it gains
-   * take the row page's, so a value new to the grid is typed here the way it is typed there.
-   *
-   * A MONEY AND A DURATION ARE TEXT WITH A DECIMAL KEYPAD, not `number`, because a number box hands back an empty
-   * string for anything it cannot parse and `wrongMoney` would then be judging nothing. A ref is the number a person
-   * says, so a numeric keypad. A url and an email take the browser's own box for the keyboard it brings, where the
-   * row page types both as plain text; the value either box hands back is the text as typed, so the patch is the same.
-   */
-  function boxOf(type: string | undefined): { type: string; inputmode: 'decimal' | 'numeric' | undefined } {
-    if (type === 'day') return { type: 'date', inputmode: undefined };
-    if (type === 'int' || type === 'decimal') return { type: 'number', inputmode: undefined };
-    if (type === 'money' || type === 'duration') return { type: 'text', inputmode: 'decimal' };
-    if (type === 'ref') return { type: 'text', inputmode: 'numeric' };
-    if (type === 'url' || type === 'email') return { type, inputmode: undefined };
-    return { type: 'text', inputmode: undefined };
-  }
-
   /** The editor's keys. Escape cancels; Enter commits where Enter is not a new line, and ⌘Enter commits everywhere. */
   function cellKeys(e: KeyboardEvent, enterCommits: boolean) {
     e.stopPropagation();
     if (e.key === 'Enter' && (enterCommits || e.metaKey || e.ctrlKey)) commitEdit();
-    else if (e.key === 'Escape') {
-      cancelled = true;
-      editing = null;
-    }
+    else if (e.key === 'Escape') cancelEdit();
+  }
+
+  /** Escape in a cell: the editor closes, and `cancelled` tells the blur that follows that it is not a commit. */
+  function cancelEdit() {
+    cancelled = true;
+    editing = null;
   }
 
   function commitEdit() {
@@ -1421,17 +1306,10 @@
 
   const peekedEntry = $derived(peeked === null ? undefined : rowAt(peeked));
 
-  /** Only INDEXED fields are offered, in declaration order, at most eight. A filter on an unindexed
-      field is a promise the storage cannot keep at 5,000 rows. */
-
+  /** Only INDEXED fields are offered, in declaration order, at most eight (`filterableOf`). */
   const filterable = $derived(filterableOf(decl?.fields ?? []));
   /* The fields the bar filters by: every declared enum a reader can sift on. */
   const enums = $derived(filterable.filter((f) => f.type === 'enum'));
-
-  /** The offer itself, read by the bar and by the pills' counts, so the two are one list. */
-  function filterableOf(fields: RegisterDecl['fields']): RegisterDecl['fields'] {
-    return fields.filter((f) => f.index).slice(0, 8);
-  }
 
   /**
    * HOW MANY ROWS HOLD EACH PILL'S VALUE, printed quietly beside its word.
@@ -1489,11 +1367,6 @@
    */
   const searched = $derived(searchable(id).map(labelOf));
 
-  const kindOf = (f: { type: string }): 'search' | 'sort' =>
-    f.type === 'money' || f.type === 'int' || f.type === 'decimal' || f.type === 'day' || f.type === 'instant'
-      ? 'sort'
-      : 'search';
-
   function setParam(mutate: (p: URLSearchParams) => void) {
     const next = new URLSearchParams(page.url.searchParams);
     mutate(next);
@@ -1534,45 +1407,11 @@
     }, 150);
   }
 
-/**
-   * A value is SELECTED when the filter includes it, and a `not-in` filter includes nothing.
-   *
-   * The test used to be `values.includes(value)` with no regard for the operator, so the URL a
-   * declared metric hands the reader — `?f=state:not-in:cancelled`, the one that opens "Cost per
-   * year" — drew `cancelled` as the value being shown. Fifteen live rows on screen, and the control
-   * above them saying the one word none of them held.
-   */
-  const isOn = (field: string, value: string): boolean => {
-    const f = filters.find((x) => x.field === field);
-    if (!f) return false;
-    /* A SEGMENT SAYS WHAT YOU ARE LOOKING AT, so under a `not-in` filter it is on when the value is
-       NOT excluded — which is what the grid underneath it shows. Reading `values.includes` for both
-       operators drew `cancelled` as the selected state on the one URL a metric tile hands the
-       reader, with fifteen live rows under it and not one cancelled. */
-    /* COMPARED AS THE FIELD DECLARES IT, so a link written before there was one canonical spelling
-       still lights the control it named. Every URL this build writes carries the declared value; a
-       bookmark from before does not, and a bookmark is exactly the thing that outlives a fix. */
-    const held = f.values.map((v) => declaredValue(id, field, v));
-    const want = declaredValue(id, field, value);
-    return f.op === 'not-in' ? !held.includes(want) : held.includes(want);
-  };
+  /** Whether a pill is on, read as the field declares it and by its operator (`chipOn`). */
+  const isOn = (field: string, value: string): boolean => chipOn(id, filters, field, value);
 
-  /**
-   * Toggling KEEPS THE OPERATOR. It always wrote `:in:`, so one press on a neighbouring segment of a
-   * `not-in` filter turned exclusion into inclusion and pulled the excluded rows back in — silently,
-   * and in the direction that adds rows to a figure somebody had just clicked through to check.
-   */
-  const toggleFilter = (field: string, value: string) =>
-    setParam((p) => {
-      const existing = p.getAll('f').filter((v) => !v.startsWith(`${field}:`));
-      const at = filters.find((f) => f.field === field);
-      const op = at?.op ?? 'in';
-      const current = at?.values ?? [];
-      const values = current.includes(value) ? current.filter((v) => v !== value) : [...current, value];
-      p.delete('f');
-      for (const v of existing) p.append('f', v);
-      if (values.length) p.append('f', `${field}:${op}:${values.join(',')}`);
-    });
+  /** A pill pressed, as a history entry, keeping the filter's operator (`toggleChip`). */
+  const toggleFilter = (field: string, value: string) => setParam((p) => toggleChip(p, filters, field, value));
 
   /**
    * A LIST CLAUSE, WHICH THE PILLS CANNOT DRAW AND THE BAR THEREFORE DREW NOTHING FOR AT ALL.
@@ -1597,25 +1436,12 @@
    *
    * THE CLAUSE ITSELF IS THE CONTROL, because it is the only honest one: its field's name, the
    * operator, and the element it is looking for. Pressing it takes it off, which is what
-   * `aria-pressed` on every segment in this bar already promises.
-   *
-   * THE INDEX RATHER THAN THE TEXT, so taking one off is exact. Rebuilding the chip from the parsed
-   * filter would have to spell the value back the way the URL held it, and `chipsOf` deliberately
-   * keeps a value's colons: `handles:has:git:jokonkwo` rebuilt and compared would match, and a
-   * value the encoder had spelled differently would not, leaving a chip that cannot be pressed off.
+   * `aria-pressed` on every segment in the bar already promises. `listedOf` keeps each clause's
+   * place in the address, so taking one off is exact.
    */
-  const listed = $derived(
-    filters
-      .map((f, at) => ({ f, at, field: decl?.fields.find((d) => d.id === f.field) }))
-      .filter((c) => (c.f.op === 'has' || c.f.op === 'lacks') && c.field?.type === 'list'),
-  );
+  const listed = $derived(listedOf(filters, decl));
 
-  const dropFilter = (at: number) =>
-    setParam((p) => {
-      const rest = p.getAll('f').filter((_, i) => i !== at);
-      p.delete('f');
-      for (const v of rest) p.append('f', v);
-    });
+  const dropFilter = (at: number) => setParam((p) => dropChip(p, at));
 
   function onkeydown(e: KeyboardEvent) {
     /* AND NOT WHILE SOMETHING IS OPEN OVER THE PAGE. See `covered`: this handler is one of six on
@@ -1849,10 +1675,8 @@
   }
 
   /* ── the verbs a selection is FOR ──────────────────────────────────────────
-     The anchor-extend model was implemented, drawn, and consumed by nothing: a selection you can
-     make and cannot use is a mode you enter and cannot leave usefully. Three verbs, and the first
-     of them is the one that actually works here — a mock has no write path, and the rule for that
-     is the app's own: say what it would have done, once, in the toast. */
+     Copy the numbers, move the state, archive: three verbs, drawn by `parts/BulkBar.svelte` and
+     each done here, on the rows the reader is looking at. */
 
   /**
    * THE SELECTION, CUT TO THE ANSWER ON SCREEN.
@@ -2144,17 +1968,6 @@
     atLeast={!whole && !truncated && drawn < DOM_CAP}
     total={denominator}
   >
-    <!--
-      THE FILTER DRAWER IS GONE, AND THE CHIPS ARE THE FILTER.
-
-      It rendered `filterable.filter((f) => f.type === 'enum')` — the SAME expression as the
-      segmented controls in the toolbar — as checkboxes, behind a scrim, over the identical six
-      controls still visible underneath it. The bar wraps, so the chips are never hidden at any
-      width: the drawer was duplication everywhere, always, and pressing Filter took a person to a
-      second copy of what they were already looking at.
-
-      A drawer earns its place when there are more fields than fit. At six there is nothing to fit.
-    -->
     {#snippet actions()}
       <!-- ON A PHONE THE FIELD IS THE WAY IN, AND THIS GOES. The capture field and this button both
            started a row, one under the other, and on a phone the button took a line of its own over
@@ -2176,639 +1989,104 @@
         <Button onclick={refresh}>{copy.tryAgain}</Button>
       </p>
     {/if}
-    <!--
-      CAPTURE, FIRST ON THE PAGE.
-
-      IT WAS A MODAL BEHIND A BUTTON, asking for every declared field. The add is the most frequent
-      write a person makes to a list and it was the most expensive one on this screen: a press, a
-      dialog, a form, a submit, a dismissal. This is a press and a return key.
-
-      THE SUBMIT CONTROL IS INSIDE THE FIELD AND ONLY EXISTS ONCE THERE IS SOMETHING TO ADD, which
-      is the one place a button of this kind is not clutter: it appears exactly when it can do
-      something, so it is never a control a reader has to learn to ignore.
-
-      `form` AND `type="submit"` RATHER THAN A KEYDOWN HANDLER, because Enter in a single-field form
-      is the platform's own behaviour and a phone's keyboard prints "Go" for it without being asked.
-
-      ABOVE THE SEARCH AND THE FILTERS, because it is the one thing here that does not act on the
-      rows below it. AND NOTHING UNDER IT: a sentence sat there on every visit saying what a new row
-      would still be missing or take from the filter. The row says what it is missing once it
-      exists, in its cells and its receipt; said in advance, over the list, it was the screen
-      explaining itself.
-    -->
+    <!-- CAPTURE, FIRST ON THE PAGE, above the search and the filters because it is the one thing here
+         that does not act on the rows below it. Not on the arrival itself, where the New button in
+         the head is the way in. -->
     {#if !arriving}
-      <form
-        class="capture"
-        onsubmit={(e) => {
-          e.preventDefault();
-          captureRow();
-        }}
-      >
-        <label class="capture-label" for="capture">{copy.captureIn(decl.one)}</label>
-        <div class="capture-field">
-          <Icon name="plus" size="m" />
-          <input
-            id="capture"
-            class="capture-input"
-            type="text"
-            autocomplete="off"
-            bind:value={capture}
-            placeholder={copy.captureIn(decl.one)}
-          />
-          <!-- Present only once there is something to add. -->
-          {#if capture.trim()}<button type="submit" class="capture-go">{copy.captureAdd}</button>{/if}
-        </div>
-      </form>
+      <CaptureLine one={decl.one} bind:value={capture} {captureRow} />
     {/if}
 
-    <!-- THE BAR APPEARS WHEN THERE IS SOMETHING TO SIFT. Below eight rows it was a search box, six
-         chips and a keyboard strip standing over a list you could already read — and on the first
-         run it stood over the one row somebody had just typed. -->
-    {#if siftable || q || filters.length}
-    <div class="bar">
-      <label class="field">
-        <Icon name="search" size="s" />
-        <!-- A NAME, NOT A PLACEHOLDER. The input sits in a `<label>` whose only other child is an
-             `aria-hidden` icon, so its accessible name came from the placeholder alone — which
-             disappears the moment somebody types, taking the name with it. Every search box in the
-             product had the same shape. -->
-        <input
-          class="field-input"
-          type="search"
-          aria-label={copy.searchIn(decl.name)}
-          placeholder="Search {decl.name.toLowerCase()}"
-          value={q}
-          oninput={(e) => setQuery((e.currentTarget as HTMLInputElement).value)}
-        />
-      </label>
-
-      <!-- EVERYTHING AFTER THE SEARCH BOX, IN ONE BOX, so a phone can scroll the chips without
-           scrolling the search away. On a laptop this is `display: contents` and the bar is the
-           single row it always was. -->
-      <div class="bar-rest">
-      <!--
-        THREE FIELDS OF PILLS DO NOT FIT ONE ROW. Services filters by kind, cycle and status, ten pills
-        that measured 928px beside a 242px search in a 1126px bar at 1440, so the last group and
-        Display wrapped to a second row, and on a phone the strip clipped its own last word. With
-        three or more fields each field is one control instead: its name, the values chosen in it,
-        and a menu of every value with its count. Two fields still fit, and stay pills, where every
-        choice is visible without a press.
-      -->
-      <!--
-        ON A PHONE THE FIELDS ARE ONE BUTTON AND A SHEET. Three field menus, Clear filters and Display
-        measured past 390 on Services with one filter on, so Clear and Display were reached by
-        scrolling the bar sideways, and a control nobody knows is there is a control that is not
-        there. Filter names what is chosen, the sheet holds every field and Clear, and Display sits
-        beside it: two controls that fit any phone, with nothing out of sight.
-      -->
-      {#if rowsAsCards() && enums.length}
-        {@const chosen = enums.flatMap((f) => (f.values ?? []).filter((value) => isOn(f.id, value)).map((value) => valueSaid(f, value)))}
-        <button
-          type="button"
-          class="sift sift-sheet tap"
-          data-on={chosen.length ? '' : undefined}
-          aria-haspopup="dialog"
-          onclick={() => (filterOpen = true)}
-        >
-          <Icon name="filter" size="s" />
-          <span class="sift-name">{copy.filter}</span>
-          {#if chosen.length}<span class="sift-chosen">{chosen.join(', ')}</span>{/if}
-        </button>
-      {:else if enums.length >= 3}
-        {#each enums as f}
-          {@const chosen = (f.values ?? []).filter((value) => isOn(f.id, value))}
-          <Menu label={labelOf(f)}>
-            {#snippet trigger()}
-              <span class="sift" data-on={chosen.length ? '' : undefined}>
-                <span class="sift-name">{labelOf(f)}</span>
-                {#if chosen.length}<span class="sift-chosen">{chosen.map((value) => valueSaid(f, value)).join(', ')}</span>{/if}
-                <span class="sift-open"><Icon name="chevron" size="s" /></span>
-              </span>
-            {/snippet}
-            {#each f.values ?? [] as value}
-              {@const on = isOn(f.id, value)}
-              <button
-                type="button"
-                class="mi"
-                role="menuitemcheckbox"
-                aria-checked={on ? 'true' : 'false'}
-                onclick={() => toggleFilter(f.id, value)}
-              >
-                <span class="mi-tick">{#if on}<Icon name="check" size="s" />{/if}</span>
-                <span class="mi-name">{valueSaid(f, value)}</span>
-                <span class="segment-n">{facets.get(f.id)?.get(value) ?? 0}</span>
-              </button>
-            {/each}
-          </Menu>
-        {/each}
-      {:else}
-        {#each filterable.filter((f) => f.type === 'enum') as f}
-          <div class="segmented" role="group" aria-label={labelOf(f)}>
-            {#each f.values ?? [] as value}
-              {@const on = isOn(f.id, value)}
-              <!-- `aria-pressed`, BECAUSE THE STATE WAS ONLY A COLOUR. A raised white segment says
-                   "this filter is on" to whoever can see it and nothing at all to anybody else — and
-                   which filters are on is the whole of what the grid underneath is showing. `data-on`
-                   is the style hook; this is the fact. `RowForm`'s own segmented control has carried it
-                   since it was written, so the two were a pair that had drifted. -->
-              <button
-                type="button"
-                class="segment"
-                data-on={on ? '' : undefined}
-                aria-pressed={on ? 'true' : 'false'}
-                onclick={() => toggleFilter(f.id, value)}
-              >
-                <span class="segment-word">{valueSaid(f, value)}</span>
-                <span class="segment-n">{facets.get(f.id)?.get(value) ?? 0}</span>
-              </button>
-            {/each}
-          </div>
-        {/each}
-      {/if}
-
-      <!-- A LIST CLAUSE, AS THE ONE CONTROL A LIST CAN HAVE. See `listed`: there is no declared set
-           to draw pills from, so the clause is the chip and pressing it takes it off. It sits after
-           the pills and before Clear because it is the narrowing a reader did not choose here: it
-           arrived in the address, from a block, a metric or a saved view. -->
-      {#each listed as c (c.at)}
-        <button type="button" class="sift listed tap" data-on aria-pressed="true" onclick={() => dropFilter(c.at)}>
-          <span class="sift-name">{c.field ? labelOf(c.field) : c.f.field} {c.f.op}</span>
-          <span class="sift-chosen">{c.f.values[0] ?? ''}</span>
-          <Icon name="close" size="s" />
-        </button>
-      {/each}
-
-      {#if (q || filters.length) && !(rowsAsCards() && enums.length)}
-        <Button weight="bare" href="/r/{id}"><Icon name="close" size="s" />{copy.clearFilters}</Button>
-      {/if}
-
-      <!-- DISPLAY WAS A KEY AND NOTHING ELSE. `v` opens this sheet, the keymap sheet prints it, and
-           on a phone neither of those is reachable — so which columns you see and, now, what the
-           list is sorted by were both unreachable on the device where the table that carries them
-           is `display: none`. `19 §4` makes the key an accelerator OVER a visible control; there was
-           no control to accelerate.
-
-           IT IS IN THE BAR, which appears at eight rows. Below that there is nothing to sort and
-           nothing worth hiding, and the bar's own comment already argues why standing a strip of
-           controls over a list you can read at a glance is worse than not having them. -->
-      <!-- AT THE END OF THE BAR, where a keyboard strip used to stand. It printed four bindings
-           to every visitor on every visit, `j k` move, `p` peek, Enter open and archive: a screen
-           explaining its own interface to people who had not asked. The bindings are untouched.
-           The `?` sheet lists them by reading the registry, and the row menu prints each verb's
-           key beside it, which is where somebody learning them is already looking. -->
-      <span class="bar-end">
-        <!-- SAVE AS A VIEW WAS `⌥V` AND NOTHING ELSE, which is the same hole Display had: a chord a
-             phone cannot type, over a function that was written and reachable from no surface, and
-             the sentence for the button sat in `copy.ts` with the dead-copy gate excusing it as
-             unbuilt. It is shown only while a filter or a search is on because `saveView()`
-             answers every other press with `viewNeedsFilter`, and `19 §6` has a control that cannot
-             act be absent rather than a button that says no. It stands before Display because both
-             are about the list as a whole, and Display stays last as the one that changes how it
-             looks. On a phone with filters it lives in the filter sheet instead, beside Clear, for
-             the reason Clear does. -->
-        {#if (q || filters.length) && !(rowsAsCards() && enums.length)}
-          <Button weight="bare" onclick={() => void saveView()}><Icon name="plus" size="s" />{copy.saveAsView}</Button>
-        {/if}
-        <Button weight="bare" onclick={() => (displayOpen = true)}>
-          <Icon name="settings" size="s" />{copy.display}
-        </Button>
-      </span>
-      </div>
-    </div>
-    {/if}
+    <!-- THE BAR, which draws itself only while there is something to sift, and the phone's filter
+         sheet behind its one button. Which filters are on is the address, read and written here. -->
+    <ChipsBar
+      shown={siftable || q !== '' || filters.length > 0}
+      register={id}
+      name={decl.name}
+      {q}
+      filtered={q !== '' || filters.length > 0}
+      {enums}
+      {listed}
+      {facets}
+      {isOn}
+      {toggleFilter}
+      {dropFilter}
+      {setQuery}
+      saveView={() => void saveView()}
+      ondisplay={() => (displayOpen = true)}
+    />
 
     {#if rows.length === 0}
-      <!-- THE QUERY IS QUOTED VERBATIM, in its own line and in the id face, rather than folded into
-           the title as a curly-quoted fragment of a sentence. That is where a predicate stops being
-           checkable: a reader cannot tell a filter they typed from one the app built. `Empty` has
-           had the prop and the styling for it since it was written and no call site passed it.
-
-           AND BOTH HALVES OF IT, because both narrowed the list. It read `q || whereOf(filters)`,
-           which dropped every active chip the moment a search term existed: at `?q=zzz&f=state:in:paid`
-           the `paid` chip reads `aria-pressed="true"` on screen and the sentence underneath said
-           "38 rows, none matching: zzz". Half a query quoted verbatim is the same failure the
-           paragraph above describes, committed by the line below it.
-
-           VERBATIM IS THE READER'S WORDS, NOT THE COLUMN'S. `whereOf` builds the sentence the
-           evaluator reads, so it spells the stored value — `direction is owed_to_me` — and the chip
-           the reader actually pressed says "owed to me". Quoting the storage would show them a
-           filter they never set. The typed search term passes through exactly as typed, because
-           that one IS their words. -->
-      <Empty
-        kind={emptyKind}
-        glyph={emptyKind === 'no-data-yet' ? iconFor(decl.icon, 'rows') : undefined}
-        title={emptyKind === 'no-results'
-          ? `${result.total} rows, none matching:`
-          : emptyKind === 'cleared'
-            ? 'Nothing outstanding.'
-            : `Nothing in ${decl.name} yet.`}
-        query={emptyKind === 'no-results' ? [q, saidPlainly(id, whereOf(filters))].filter(Boolean).join(' · ') : undefined}
-        body={emptyKind === 'no-data-yet'
-          ? decl.holds ? `${decl.name} holds ${decl.holds}.` : undefined
-          : emptyKind === 'no-results' && q
-            ? copy.searchesOnly(searched)
-            : undefined}
-      >
-        {#snippet actions()}
-          {#if emptyKind === 'no-results'}
-            <Button href="/r/{id}">{copy.clearFilters}</Button>
-          {:else if emptyKind === 'no-data-yet'}
-            <!-- NO "Add the first row" HERE ANY MORE. The capture line sits directly above and the New
-                 button beside the title, so an empty list drew three ways to add a row and two filled
-                 buttons. The one offer only this state can make is the example. -->
-            <!-- IT ADDS THE EXAMPLE ROW, through the same `create` and the same inference the capture line
-                 uses: an empty list offering to show you what a row looks like, and answering with a sentence
-                 about what it would have done, is the defect this phase exists to remove. It is a REAL row,
-                 named as an example and wearing `Put back`, so nobody has to wonder which of these they typed. -->
-            <Button onclick={addExample}>{copy.showExample}</Button>
-          {/if}
-        {/snippet}
-      </Empty>
+      <ListEmpty kind={emptyKind} register={id} {decl} size={result.total} {q} {filters} {searched} {addExample} />
     {:else}
-      <!-- Below 640px the default body is CARDS over the register's three declared `mobile:` fields,
-           and the table is one `v` away. A saved view is the same list with a different predicate and
-           had only the table, so the two behaved differently on one device — which is what made this
-           a component rather than markup.
-
-           ONE BODY AT A TIME, AND NOW IN THE DOM RATHER THAN ONLY IN THE STYLESHEET. Both bodies
-           were built at every width and one was hidden: at 2,614 rows this document held 4,001 rows
-           and 102,681 nodes — two thousand of them cards no pixel was showing — and took eight
-           seconds to settle. `13 §4.3` caps the DOM at 2,000 and it was being paid twice, once
-           invisibly. `05 §6`'s rule is that a width query never changes a control's SIZE; which of
-           two bodies exists is layout, which is exactly what width decides. -->
       <!-- THE VERBS BELONG TO THE LIST, NOT TO ONE OF ITS TWO BODIES. Putting the branch in the
            markup rather than in the stylesheet swallowed this into the card arm, so a desktop
-           selection raised no bulk bar at all — which is the whole reason the branch had to be
+           selection raised no bulk bar at all, which is the whole reason the branch had to be
            measured rather than assumed. It sits above the rows it acts on in both. -->
       {#if picked.length > 0}
-        <div class="picked-bar" role="toolbar" aria-label="{picked.length} {copy.selected}">
-          <span class="picked-n num">{picked.length}</span>
-          <span class="picked-word">{copy.selected}</span>
-          <Button weight="quiet" onclick={() => void copyIds()}>
-            <Icon name="copy" size="s" />{copy.copyIds}
-          </Button>
-          {#if states.length}
-            <Menu label={copy.setState(stateLabel)}>
-              {#snippet trigger()}<span class="picked-verb"><Icon name="edit" size="s" />{copy.setState(stateLabel)}</span>{/snippet}
-              {#each states as state}
-                <button
-                  class="mi"
-                  role="menuitem"
-                  type="button"
-                  onclick={() => void setPickedState(state)}
-                >
-                  <span class="mi-name">{saidInLine(decl?.state ?? '', state)}</span>
-                </button>
-              {/each}
-            </Menu>
-          {/if}
-          <Button weight="quiet" onclick={archiveSelected}>
-            <Icon name="archive" size="s" />{copy.archiveSelected}
-          </Button>
-          <button type="button" class="picked-clear" onclick={() => (selected = new Set())}>{copy.clear}</button>
-        </div>
+        <BulkBar
+          count={picked.length}
+          {decl}
+          {states}
+          {stateLabel}
+          {saidInLine}
+          {copyIds}
+          {setPickedState}
+          {archiveSelected}
+          onclear={() => (selected = new Set())}
+        />
       {/if}
 
+      <!-- ONE BODY AT A TIME, IN THE DOM: cards below 640px (`ListCards` says why), the grid above.
+           `body` wraps both, so the observer finds whichever sentinel is drawn and `showRow` finds
+           whichever row is new. -->
       <div class="body-slot" bind:this={body}>
       {#if rowsAsCards()}
-      <RowCards register={id} entries={result.entries.slice(0, DOM_CAP)} {now} names={result.names ?? undefined} picked={selected}>
-        {#snippet action(e)}
-          <!--
-            THE RECEIPT, ON THE ARM THAT IS THE ONLY ONE A PHONE EVER SEES.
-
-            `receiptFor` has been drawn by the grid since it was written. Below 640px the grid is
-            `display: none` and the cards are the one place, and they drew none of it: a row typed
-            into the capture line on a phone appeared at the top of the list with no chip and no
-            `Put back`, so the receipt that says what just happened to it was on the one body
-            nobody was looking at.
-
-            The same `Chip` and the same `undo` the grid renders, so there is one receipt and not
-            a touch copy of one.
-          -->
-          <!-- THE ROW'S VERBS, REACHABLE BY THUMB. Every one of them existed and every one was a
-               key: peek `p`, copy `y`, copy link `⇧Y`, archive `⌫`, select `x`. On the device
-               with no keyboard that made a register a list you could read and open and nothing
-               else — eight capabilities, none of them reachable. It opens the SAME `RowMenu` the
-               keyboard opens, so there is one set of verbs rather than a touch copy of them, and
-               each item still prints the key that replaces it. -->
-          <button
-            type="button"
-            class="card-more"
-            aria-label="{copy.rowMenu} #{e.seq}"
-            onclick={(ev) => openCardMenu(e.seq, ev.currentTarget)}
-          >
-            <!-- `m`, AND IT WAS `s`: a 12px box of a 24-unit path at `stroke-width: 1.6`, so each dot
-                 was 0.8 CSS pixels in `--dim`, on the only touch route to a row's eight verbs. In both
-                 schemes the column read as an empty cell beside the card. -->
-            <Icon name="more" size="m" />
-          </button>
-        {/snippet}
-        {#snippet note(e)}
-          {@const said = receiptFor(e.seq)}
-          {#if said}
-            {@const name = display(id, decl.title, e.fields[decl.title]) ?? copy.thisRow}
-            <Chip label={said.mark} tone={said.intent} />
-            {#if said.undo}
-              <button
-                type="button"
-                class="card-undo tap"
-                aria-label={copy.undoRowOf(name)}
-                onmousedown={(ev) => ev.preventDefault()}
-                onclick={(ev) => {
-                  ev.stopPropagation();
-                  said.undo?.();
-                }}>{copy.undoRow}</button>
-            {/if}
-          {/if}
-        {/snippet}
-      </RowCards>
-
-      <!-- THE VERBS, above the rows they act on and nowhere else. It appears with the selection and
-           goes with it: a permanently visible bulk bar is a row of disabled controls, which tells
-           you a thing exists and refuses to say why it will not work. -->
-
-      <!-- AND THE CAP LINE COMES WITH THE BODY. `Table` draws its own outside the grid, so the
-           phone could see it while the table was merely hidden; with the table gone from the
-           document, the card list has to say it. -->
-
-      <!-- The card list's own sentinel, for the reason `Table` has one: with the grid absent from
-           the document there is nothing else for the observer to watch, and a phone would stop at
-           page one with no way to ask for page two. -->
-      <!-- A SENTINEL MEANS "THERE MAY BE MORE". A list whose answer arrived in one page has none,
-           and neither does one at the cap — the line above says why it stopped. `Table` takes the
-           same signal as the absence of `onmore`. -->
-      {#if cursor !== null && loaded < DOM_CAP}
-        <div class="sentinel" aria-hidden="true"></div>
-      {/if}
+        <ListCards
+          register={id}
+          entries={result.entries.slice(0, DOM_CAP)}
+          {now}
+          names={result.names ?? undefined}
+          {selected}
+          {decl}
+          more={cursor !== null && loaded < DOM_CAP}
+          {receiptFor}
+          {openCardMenu}
+        />
       {:else}
-      <div class="table-slot" data-picking={selected.size > 0 ? '' : undefined}>
-        <!--
-          THE THING THE ROW BELONGS TO, IN FRONT OF WHAT THE ROW IS.
-
-          `columnsFor` caps the default projection at ten and `thing` is not in Money's, so the
-          desktop grid of the first list in the rail was thirty-eight rows of grey with no way at all
-          to see which project any of them was about. The mark went into `#`, the one column every
-          projection has; `#` ends the row now, and the mark came with the title instead, because
-          colour saying which project is read where the eye starts.
-
-          The mark is a shape before it is a colour, which is `13 §5.1` met by the mark itself, and
-          the label is the project's NAME because a screen reader told "black diamond" has been told
-          the shape and not the thing.
-        -->
-        {#snippet ownMark(seq: number)}
-          {@const own = identityFor(id, rowAt(seq)?.fields ?? {}, result.names ?? undefined)}
-          <!-- THE MARK ON A ROW THAT HAS JUST ARRIVED, and it is drawn whether or not the register has an
-               identity: `ownMark` renders on every title cell and the project's glyph only on some, so hanging
-               this off that one would have marked new rows on Money and on nothing else. It is `aria-hidden`
-               because the row already says what happened to it in words, in the chip one cell over — this is
-               for the eye finding the row, and a second announcement of the same fact is noise. `showRow`
-               finds the row by this attribute, so what is scrolled to and what is marked cannot disagree. -->
-          {#if fresh.has(seq)}<span class="fresh" data-fresh={seq} aria-hidden="true"></span>{/if}
-          {#if own}<span
-              class="row-mark thing-glyph"
-              data-shape={own.mark}
-              style={own.retired ? undefined : `--hue:${own.hue}`}
-              data-retired={own.retired ? '' : undefined}
-              role="img"
-              aria-label={own.name}></span>{:else if anyMark}<span class="thing-glyph" data-shape="" aria-hidden="true"></span>{/if}
-        {/snippet}
-        <!-- ONE ROW HAS NOTHING TO SORT. `onsort` is optional and the table draws a plain label
-             without it, so eight header buttons over a single row — each announcing
-             `aria-sort="none"` — become eight headings. -->
-        <Table
+        <ListTable
+          register={id}
+          {decl}
           {columns}
           {rows}
           total={rowCount}
-          cap={DOM_CAP}
-          {...cursor === null ? {} : { onmore: more }}
-          label={decl.name}
-          href={at}
           {sort}
-          selected={selectedKeys}
+          {selected}
+          {selectedKeys}
           bind:focus
+          {editing}
+          bind:editValue
+          bind:editTicked
+          {fresh}
+          {anyMark}
+          names={result.names ?? undefined}
+          onmore={cursor === null ? undefined : more}
+          onsort={result.entries.length < 2 ? undefined : sortBy}
           onactivate={(row) => goto(at(`/r/${id}/${row.key.split('#')[1]}`))}
-          {...result.entries.length < 2
-            ? {}
-            : {
-                onsort: (field: string) =>
-                  setParam((p) => p.set('sort', `${field}:${sort?.field === field && sort.dir === 'asc' ? 'desc' : 'asc'}`)),
-              }}
-        >
-          {#snippet cellSnippet(row, column, value)}
-            {@const seq = Number(row.key.split('#')[1])}
-            {@const ident = identityOf(id, column.field, rowAt(seq)?.fields[column.field], result.names ?? undefined)}
-            {@const isTitle = column.field === decl.title}
-            {@const isEnum = fieldOf(column.field)?.type === 'enum'}
-            {#if column.field === 'select'}
-              <button
-                type="button"
-                class="pick tap"
-                tabindex="-1"
-                data-on={selected.has(seq) ? '' : undefined}
-                aria-label="{selected.has(seq) ? copy.deselect : copy.select} {display(id, decl.title, rowAt(seq)?.fields[decl.title]) ?? `#${seq}`}"
-                onclick={(e) => {
-                  /* The cell activates the row. Without this, picking one opened it. */
-                  e.stopPropagation();
-                  toggleSelect(seq, e.shiftKey);
-                }}
-              >
-                {#if selected.has(seq)}<Icon name="check" size="s" />{/if}
-              </button>
-            {:else if editing?.seq === seq && editing.field === column.field}
-              <!--
-                THE CELL BECOMES THE EDITOR, in the box the value is already drawn in.
-
-                `autofocus` IS RIGHT HERE AND WRONG ALMOST EVERYWHERE ELSE. The rule against it is
-                about a caret moving on page load, before the reader has decided anything; this
-                element exists only because they just asked for it, and an editor that opens without
-                the caret in it is an editor that costs a second gesture to use.
-
-                ENTER COMMITS AND ESCAPE CANCELS, and blurring commits too: a person who clicks away
-                has finished with the cell, and throwing their typing away for it is the behaviour
-                every spreadsheet taught them not to expect. `stopPropagation` on the keys, or the
-                grid's own handler reads them as navigation and the caret leaves mid-word.
-
-                IT COMMITS ON LEAVING THE ROW, NOT ON LEAVING THE FIELD, and the difference is a bug no screenshot
-                can hold. `blur` fires when focus moves anywhere at all, including to the row's own verbs one cell
-                over — so pressing `Put back` beside a cell you were editing committed the edit on the way to
-                undoing it, and clicking the pencil of the next cell along wrote the first before opening the
-                second. `focusout` carries where focus WENT, so focus landing inside the same row leaves the
-                editor open and everything else commits, which is the rule a person already holds: you have
-                finished with a row when you leave the row.
-              -->
-              {@const f = fieldOf(column.field)}
-              {#if f?.type === 'enum'}
-                <!-- svelte-ignore a11y_autofocus -->
-                <select
-                  class="cell-edit"
-                  autofocus
-                  bind:value={editValue}
-                  onclick={(e) => e.stopPropagation()}
-                  onchange={commitEdit}
-                  onfocusout={leftTheRow}
-                  onkeydown={(e) => {
-                    e.stopPropagation();
-                    if (e.key === 'Escape') {
-                      cancelled = true;
-                      editing = null;
-                    }
-                  }}
-                >
-                  {#each f.values ?? [] as v}<option value={v}>{valueSaid(f, v)}</option>{/each}
-                </select>
-              {:else if f?.type === 'bool'}
-                <!-- A YES OR NO IS A TOGGLE, and the press is the edit: it commits on change, as the menu above does,
-                     so there is nothing to type and nothing to confirm. Escape before the press still leaves it. -->
-                <!-- svelte-ignore a11y_autofocus -->
-                <input
-                  class="cell-tick"
-                  type="checkbox"
-                  autofocus
-                  aria-label={labelOf(f)}
-                  bind:checked={editTicked}
-                  onclick={(e) => e.stopPropagation()}
-                  onchange={commitEdit}
-                  onfocusout={leftTheRow}
-                  onkeydown={(e) => cellKeys(e, true)}
-                />
-              {:else if f?.type === 'document'}
-                <!-- A DOCUMENT KEEPS ITS LINE BREAKS. A one-line box drops every newline in the value it is handed,
-                     so the prose would be flattened by opening it; here Enter is a new line and ⌘Enter commits. -->
-                <!-- svelte-ignore a11y_autofocus -->
-                <textarea
-                  class="cell-edit"
-                  rows="1"
-                  autofocus
-                  bind:value={editValue}
-                  onclick={(e) => e.stopPropagation()}
-                  onfocusout={leftTheRow}
-                  onkeydown={(e) => cellKeys(e, false)}
-                ></textarea>
-              {:else}
-                {@const box = boxOf(f?.type)}
-                <span class="cell-box">
-                  <!-- THE CURRENCY THE AMOUNT GOES BACK IN, drawn beside the box because the box holds the amount alone. -->
-                  {#if f?.type === 'money'}<span class="cell-unit">{currencyOf(shownValue(seq, column.field)) ?? listCurrency(column.field) ?? 'GBP'}</span>{/if}
-                  <!-- svelte-ignore a11y_autofocus -->
-                  <input
-                    class="cell-edit"
-                    autofocus
-                    type={box.type}
-                    inputmode={box.inputmode}
-                    bind:value={editValue}
-                    onclick={(e) => e.stopPropagation()}
-                    onfocusout={leftTheRow}
-                    onkeydown={(e) => cellKeys(e, true)}
-                  />
-                  <!-- AND THE UNIT A DURATION IS TYPED IN, after the number as the cell draws it: `2 h` opens on `2` beside `h`. -->
-                  {#if f?.type === 'duration'}<span class="cell-unit">{unitOf(f)}</span>{/if}
-                </span>
-              {/if}
-            {:else if column.field === 'act'}
-              <!--
-                THE ROW'S OWN VERBS, AND ITS RECEIPT, IN THE CELL THE ROW ALREADY HAS.
-
-                `tabindex="-1"` ON EVERY CONTROL, like the picker two cells over and for the same
-                reason: a grid is a composite widget with exactly one tab stop, so at five hundred
-                rows a focusable control per row is fifteen hundred tab stops. The keyboard path is
-                the one the `?` sheet already advertises and this is the pointer path.
-
-                `stopPropagation` ON EVERY ONE, because the cell activates the row: without it,
-                archiving a row opened it on the way out.
-              -->
-              {@const said = receiptFor(seq)}
-              {@const name = display(id, decl.title, rowAt(seq)?.fields[decl.title]) ?? `#${seq}`}
-              {#if said}
-                <span class="said">
-                  <Chip label={said.short ?? said.mark} tone={said.intent} />
-                  {#if said.undo}
-                    <!-- IT REFUSES FOCUS ON MOUSEDOWN, which is the third of the three rules and the one that
-                         reads as superstition until it is measured. A press is mousedown, then focus, then
-                         mouseup, then click — so the focus that a press moves happens BEFORE the click it is
-                         part of. Undoing an edit from a cell you were typing in therefore committed that edit
-                         first, from the focusout the press itself caused, and the undo then put back a value
-                         that had just been overwritten by the gesture meant to discard it. Preventing the
-                         default on mousedown keeps focus where it is; the click still fires. -->
-                    <button
-                      type="button"
-                      class="verb"
-                      tabindex="-1"
-                      aria-label={copy.undoRowOf(name)}
-                      onmousedown={(e) => e.preventDefault()}
-                      onclick={(e) => {
-                        e.stopPropagation();
-                        said.undo?.();
-                      }}>{copy.undoRow}</button>
-                  {/if}
-                </span>
-              {:else}
-                <span class="verbs">
-                  <button
-                    type="button"
-                    class="verb icon tap"
-                    tabindex="-1"
-                    aria-label={copy.archiveRow(name)}
-                    onmousedown={(e) => e.preventDefault()}
-                    onclick={(e) => {
-                      e.stopPropagation();
-                      archive(seq);
-                    }}><Icon name="archive" size="s" /></button>
-                  <button
-                    type="button"
-                    class="verb icon tap"
-                    tabindex="-1"
-                    aria-label={copy.moreOn(name)}
-                    onclick={(e) => {
-                      e.stopPropagation();
-                      openCardMenu(seq, e.currentTarget);
-                    }}><Icon name="more" size="s" /></button>
-                </span>
-              {/if}
-            {:else if ident}
-              <IdentityMark identity={ident} />
-            {:else if column.field === 'seq'}
-              <!-- EVERY ROW HERE HAS A NUMBER THE RECORD GAVE IT. The guard that hid the `#-1` a row
-                   typed against the sample wore went with `pending` (`loop/research-no-sample.md` B1).
-              --><span class="row-seq">{value}</span>
-            {:else if value === null}
-              <!-- AN EMPTY CELL DRAWS NOTHING. A dash in every gap was a column of marks that meant
-                   nothing; only a title says so, because a row with no name needs words to be found. -->
-              {#if isTitle}{@render ownMark(seq)}<span class="missing">Not set</span>{/if}
-            {:else if editableHere(column.field)}
-              <!--
-                THE POINTER PATH, AND IT WAS KEYBOARD ONLY. `e` has been on the `?` sheet since the
-                grid was written, so the capability existed for anybody who already knew it was
-                there, which is nobody on their first afternoon.
-
-                THE PENCIL IS A BUTTON AND NOT A DOUBLE CLICK. A double click is what a spreadsheet
-                taught everybody and it is invisible: nothing on the screen says the gesture exists,
-                and a single click on this cell already means what it means everywhere else here,
-                open the row. Two meanings on one target would make the list dangerous to browse.
-                A control that is drawn is a control somebody finds.
-
-                IT APPEARS ON HOVER AND ON KEYBOARD FOCUS AND TAKES NO SPACE OTHERWISE. A permanent
-                glyph in every cell of every row is a column of noise over the data somebody came to
-                read, and a capability that says so nowhere is a capability nobody uses.
-
-                `tabindex="-1"`, LIKE THE PICKER TWO CELLS OVER. A grid is a composite widget with
-                exactly one tab stop; at five hundred rows and eight editable columns a focusable
-                control per cell is four thousand tab stops. The keyboard path is `e`, which the `?`
-                sheet has advertised since the grid was written.
-              -->
-              <span class="cell-said">{#if isTitle}{@render ownMark(seq)}{/if}{#if isEnum}<span class="enum">{copy.valueWord(value)}</span>{:else}{symbolFigure(value) ?? value}{/if}<button
-                  type="button"
-                  class="cell-pen"
-                  tabindex="-1"
-                  aria-label={copy.editValue(labelOf(fieldOf(column.field)!))}
-                  onclick={(e) => {
-                    e.stopPropagation();
-                    openEditor(seq, column.field);
-                  }}
-                ><Icon name="edit" size="s" /></button></span>
-            {:else}{#if isTitle}{@render ownMark(seq)}{/if}{#if isEnum}<span class="enum">{copy.valueWord(value)}</span>{:else}{symbolFigure(value) ?? value}{/if}{/if}
-          {/snippet}
-        </Table>
-      </div>
+          {rowAt}
+          {fieldOf}
+          {editableHere}
+          {shownValue}
+          {listCurrency}
+          {receiptFor}
+          {toggleSelect}
+          {openEditor}
+          {commitEdit}
+          {cancelEdit}
+          {leftTheRow}
+          {cellKeys}
+          {archive}
+          {openCardMenu}
+        />
       {/if}
 
       <!--
@@ -2832,76 +2110,13 @@
       {/if}
       </div>
     {/if}
-
-    <!--
-      THE ARRIVAL'S SECOND LIST, UNDER THE ROW IT FOLLOWS, AND IT USED TO COME FIRST.
-
-      The comment that stood over it read "AND ON THE RUN SCREEN TWO IS ABOUT, IT COMES FIRST", and
-      what that produced was measured: after a first row from `/start`, `?first=1` drew this panel,
-      its heading, a paragraph and four cards for other lists ABOVE the bar and the list, and the
-      person's own row landed at y 944 on an 844px screen whose usable area ends at 788 above the tab
-      bar. `19 §6` calls this screen "the register, with their one row in it", and the one row was
-      the one thing on it they could not see. The panel is the second step, so it sits after the
-      first.
-
-      ON THE ARRIVAL ITSELF, THE ONLY LIST WITH ANYTHING IN IT IS THIS ONE. `?first=1` is a claim
-      about the moment: somebody has just written their first row and been sent here, so on a
-      genuine first run `held` is one register, and it is this one. Passing the seeded record's
-      eight would describe a record that person does not have.
-    -->
-    {#if arriving}
-      <!-- AND THE LISTS IT ALREADY HAS WITH ROWS IN THEM. A list added on the way to this one (Services
-           brings Projects) was offered again as a card for something already done. -->
-      <Second held={[id, ...(page.data.index?.registers ?? []).map((r: { id: string }) => r.id)]} register={id} first />
-    {/if}
+    <!-- NO SECOND SCREEN UNDER THE LIST (`loop/finish/modules.md` MOD-6). The first run's "One kind of thing is a
+         list" panel and its Money, Services and Projects tiles went with the one-row path that led here; a list with
+         nothing in it draws its own empty state. -->
   </div>
 
-  <!-- SCREEN 2 OF THE FIRST RUN, inline under the register they just made (19 §6). It shows itself
-       only while the record holds exactly one register with something in it, so nothing has to
-       remember a dismissal and nothing can get stuck showing it.
-
-       IT IS ABOVE THE TABLE ON THE RUN IT IS ABOUT. `19 §6` calls screen two "the register, with
-       their one row in it, and the second choice offered inline" — and rendering it after the table
-       put it below however many rows the register holds, which on any record with history is a
-       scroll away from the row it is talking about. -->
-  {#if !arriving}
-    <!-- AND OFF IT, THE CONDITION IS THE RECORD'S OWN SHAPE: registers that HOLD something. It was
-         `Object.keys(REGISTERS)` — every register declared, whether or not a row had ever been
-         written to it — which is the count that made this unreachable. -->
-    <Second held={(booted?.registers ?? []).filter((r) => r.count > 0).map((r) => r.id)} register={id} first={false} />
-  {/if}
-
-  <!-- Peek: a drawer, with the list still visible, for triage. It needs a VISIBLE affordance —
-       Linear's own docs admit the flaw that Peek can only be launched with the keyboard shortcut,
-       and users do not press `?` to discover what they do not know exists (19 §4). -->
-  <Sheet
-    open={peeked !== null}
-    title={String(peekedEntry?.fields[decl.title] ?? '')}
-    id={peeked !== null ? `#${peeked}` : undefined}
-    onclose={() => peek(null)}
-  >
-    {#if peekedEntry}
-      <!-- FORMATTED, through the same `display` every other surface goes through.
-
-           This drew `peekedEntry.fields[f.id]` straight out of the row, which is how the drawer
-           came to show `amount 480000`, `party 1` and `due 2026-07-27` beside a table showing
-           `GBP 4,800.00`, `Halden Type Co` and `27 Jul 2026` for the same row. Money in minor units
-           on a screen a person reads is the one formatting bug this product cannot ship, and a
-           `ref` rendered as the integer it is stored as is a row nobody can identify.
-
-           Labels go through `labelOf` for the same reason: the drawer was printing raw field ids. -->
-      <dl class="peek">
-        {#each readableFields(id) as f}
-          <dt>{labelOf(f)}</dt>
-          <dd dir={dirOf(id, f.id)}>{display(id, f.id, peekedEntry.fields[f.id], now, result.names ?? undefined) ?? MISSING}</dd>
-        {/each}
-      </dl>
-    {/if}
-    {#snippet footer()}
-      <Button weight="primary" href="/r/{id}/{peeked}"><Icon name="external" size="s" />{copy.openRow}</Button>
-      <Button weight="bare" onclick={() => peek(null)}><Icon name="close" size="s" />{copy.close}</Button>
-    {/snippet}
-  </Sheet>
+  <!-- Peek: a drawer, with the list still visible, for triage. `?row=7` is which row. -->
+  <RowPeek register={id} seq={peeked} entry={peekedEntry} title={decl.title} {now} names={result.names ?? undefined} {peek} />
 
   <!-- Put this filter on a page as a block. `⌥B`, and it was a toast until now.
 
@@ -2915,280 +2130,58 @@
     says={saidPlainly(id, whereOf(filters)) || (q ? `matching “${q}”` : copy.everything)}
   />
 
-  <!-- Display options: what YOU see, never what the record says. `v`. -->
-  <Sheet bind:open={displayOpen} title={copy.display}>
-    <p class="display-note">{copy.displayNote}</p>
-    <div class="filter-groups">
-      <!--
-        SORT LIVED ON THE COLUMN HEADERS AND THE COLUMNS ARE GONE BELOW 640px.
+  <!-- Display options: what YOU see, never what the record says. `v`, and Display in the bar. -->
+  <DisplayMenu
+    bind:open={displayOpen}
+    register={id}
+    {decl}
+    {sortable}
+    canSort={result.entries.length > 1}
+    {sort}
+    {hidden}
+    {sortBy}
+    {unsort}
+    {hide}
+    {showAll}
+  />
 
-        Every header on this table is a sort button announcing `aria-sort`, which is the right place
-        for it and is why the drawer's old "Due sorts on the column" sentence was deleted rather than
-        corrected. But a card list has no headers, so on a phone the whole capability went with them:
-        thirty-eight obligations in whatever order the record returned, with no way to ask for the
-        oldest.
-
-        SAME PARAMETER, SAME TOGGLE. It writes `?sort=<field>:<dir>` and flips direction on the field
-        already sorted, exactly as `onsort` does — so a sort set here and a sort set by clicking a
-        header are the same fact, and the URL still carries it (`19 §5`: which rows you are looking
-        at, and in what order, is shareable).
-
-        Two rows or fewer and there is nothing to order, which is the same test the table applies
-        before it wires `onsort` at all.
-      -->
-      {#if result.entries.length > 1}
-        <fieldset class="filter-group">
-          <legend class="filter-legend">{copy.sortedBy}</legend>
-          <div class="filter-values">
-            {#each sortable as c}
-              {@const on = sort?.field === c.field}
-              {@const way = wayOf(c.field)}
-              <button
-                type="button"
-                class="filter-value"
-                data-on={on ? '' : undefined}
-                aria-pressed={on ? 'true' : 'false'}
-                onclick={() =>
-                  setParam((p) => p.set('sort', `${c.field}:${on && sort?.dir === 'asc' ? 'desc' : 'asc'}`))}
-              >
-                <!-- THE ARROW IS THE DIRECTION AND THE BOX IS THE STATE. A pressed chip that does
-                     not say which way it went is half an answer, and `13 §5.1` will not let the
-                     raised background carry it alone. -->
-                <span class="filter-box" aria-hidden="true">{on ? (sort?.dir === 'asc' ? '↑' : '↓') : ''}</span>
-                {c.label}
-                {#if on}<span class="locked">{sort?.dir === 'asc' ? way[0] : way[1]}</span>{/if}
-              </button>
-            {/each}
-          </div>
-        </fieldset>
-      {/if}
-
-      <!-- NOT ON A PHONE. Below 640px the register draws cards, and a card shows the declaration's
-           `mobile:` fields rather than the columns chosen here, so this section toggled six columns
-           that were not drawn: fifteen controls in a sheet whose one useful act on a phone is
-           choosing a sort. -->
-      <fieldset class="filter-group columns-group">
-        <legend class="filter-legend">{copy.columns}</legend>
-        <div class="filter-values">
-          {#each columnsFor(id) as c}
-            {@const locked = c.field === 'seq' || c.field === decl.title}
-            <button
-              type="button"
-              class="filter-value"
-              data-on={!hidden.has(c.field) ? '' : undefined}
-              aria-pressed={!hidden.has(c.field) ? 'true' : 'false'}
-              disabled={locked}
-              onclick={() => hide(c.field, !hidden.has(c.field))}
-            >
-              <span class="filter-box" aria-hidden="true">{hidden.has(c.field) ? '' : '✓'}</span>
-              {c.label}
-              {#if locked}<span class="locked">{copy.always}</span>{/if}
-            </button>
-          {/each}
-        </div>
-      </fieldset>
-    </div>
-
-    {#snippet footer()}
-      <Button weight="primary" onclick={() => (displayOpen = false)}><Icon name="check" size="s" />{copy.done}</Button>
-      {#if hidden.size > 0}
-        <Button weight="bare" onclick={() => showAll()}>{copy.showAll}</Button>
-      {/if}
-      <!-- A SORT YOU CANNOT UNDO IS A TRAP. The only other way back to the register's own order was
-           Clear filters, which also throws away the search and every chip. -->
-      {#if sort}
-        <Button weight="bare" onclick={() => setParam((p) => p.delete('sort'))}>{copy.rowOrder}</Button>
-      {/if}
-    {/snippet}
-  </Sheet>
-
-  <!-- The phone's filter sheet. The same fields and values as the bar's menus, as the Display sheet's
-       rows, each with its count, and Clear beside Done so undoing every filter is in the same place
-       as setting one. -->
-  {#if rowsAsCards() && enums.length}
-    <Sheet bind:open={filterOpen} title={copy.filter}>
-      <div class="filter-groups">
-        {#each enums as f}
-          <fieldset class="filter-group">
-            <legend class="filter-legend">{labelOf(f)}</legend>
-            <div class="filter-values">
-              {#each f.values ?? [] as value}
-                {@const on = isOn(f.id, value)}
-                <button
-                  type="button"
-                  class="filter-value"
-                  data-on={on ? '' : undefined}
-                  aria-pressed={on ? 'true' : 'false'}
-                  onclick={() => toggleFilter(f.id, value)}
-                >
-                  <span class="filter-box" aria-hidden="true">{on ? '✓' : ''}</span>
-                  {valueSaid(f, value)}
-                  <span class="filter-n">{facets.get(f.id)?.get(value) ?? 0}</span>
-                </button>
-              {/each}
-            </div>
-          </fieldset>
-        {/each}
-      </div>
-
-      {#snippet footer()}
-        <Button weight="primary" onclick={() => (filterOpen = false)}><Icon name="check" size="s" />{copy.done}</Button>
-        {#if q || filters.length}
-          <Button weight="bare" href="/r/{id}"><Icon name="close" size="s" />{copy.clearFilters}</Button>
-          <!-- The sheet closes first so the toast and the page it opens are not behind it. -->
-          <Button
-            weight="bare"
-            onclick={() => {
-              filterOpen = false;
-              void saveView();
-            }}><Icon name="plus" size="s" />{copy.saveAsView}</Button
-          >
-        {/if}
-      {/snippet}
-    </Sheet>
-  {/if}
-
-  <!-- The filter drawer. The bar above holds the enum filters because they are the ones worth a
-       permanent control; everything else declared `indexed:` lives here, so the bar stays one line
-       on a register with eight filterable fields.
-
-       ONLY INDEXED FIELDS ARE OFFERED. A filter on an unindexed field is a promise the storage
-       cannot keep at five thousand rows, and a control that gets slower the more rows you have is a
-       control that breaks exactly when the register becomes worth filtering. -->
-  <RowMenu
+  <!-- One row's verbs: `⇧F10`, the context-menu key, and the ⋯ on a grid row or a card. -->
+  <ListRowMenu
     open={menuOpen}
-    at={menuAt}
-    label={copy.rowMenu}
+    rect={menuAt}
+    row={menuRow}
+    register={id}
+    {decl}
+    {states}
+    {selected}
+    {rowAt}
+    {saidInLine}
     onclose={() => (menuAt = null)}
-  >
-    {#if menuRow}
-      {@const seq = menuRow.seq}
-      <!-- A glyph per verb. The rail's menu has always had them and this one never did, so four
-           rows of identical grey text carried the whole distinction between opening a row and
-           throwing it away. -->
-      <a class="mi" role="menuitem" href={at(`/r/${id}/${seq}`)}>
-        <Icon name="external" size="s" />
-        <span class="mi-name">{copy.openRow}</span><Kbd keys="↵" />
-      </a>
-      <!-- THE REGISTER'S OWN STATES, WHICH THIS MENU DID NOT CARRY.
-           Five verbs, and the one a person reaches for most on a list of obligations was not among
-           them: the only way to move a row's state was to select it and use the bulk bar, which is
-           three presses to change one row. The values come from the declaration rather than from a
-           list typed here, so a pack that adds a state gets a menu item.
+    {setRowState}
+    {peek}
+    {toggleSelect}
+    {copyId}
+    {copyLink}
+    {archive}
+  />
 
-           NOT THE STATE IT IS ALREADY IN. An item that sets a row to where it already is does
-           nothing and looks like it did something, and `19 §6`'s rule for a control that cannot act
-           is that it is absent rather than greyed.
-
-           AND THEY COME SECOND, RIGHT AFTER OPEN. They were items six to eight, under Peek, Copy
-           id, Copy link and Select, so the verbs that change an invoice were below the tab bar on an
-           844px phone when the menu opened from the first card, while two developer verbs sat above
-           them. The copy verbs now come last, before Archive, which keeps its own rule. -->
-      {#if states.length > 0}
-        <hr class="mi-rule" />
-        {#each states.filter((v) => v !== rowAt(seq)?.fields[decl.state ?? '']) as state}
-          <button class="mi" role="menuitem" type="button" onclick={() => setRowState(seq, state)}>
-            <Icon name="check" size="s" />
-            <span class="mi-name">{copy.setTo(saidInLine(decl?.state ?? '', state))}</span>
-          </button>
-        {/each}
-        <hr class="mi-rule" />
-      {/if}
-      <button class="mi" role="menuitem" type="button" onclick={() => peek(seq)}>
-        <Icon name="eye" size="s" />
-        <span class="mi-name">{copy.peek}</span><Kbd keys="p" />
-      </button>
-      <!-- AND THE ONE VERB THAT UNLOCKS THE OTHER FOUR. Selection was `x` alone, so the bulk bar —
-           copy ids, set state, archive them — could not be reached at all without a keyboard. One
-           row selected is enough to make it appear, and the bar takes it from there. -->
-      <button class="mi" role="menuitem" type="button" onclick={() => toggleSelect(seq, false)}>
-        <Icon name="check" size="s" />
-        <span class="mi-name">{selected.has(seq) ? copy.deselect : copy.select}</span><Kbd keys="x" />
-      </button>
-      <button class="mi" role="menuitem" type="button" onclick={() => void copyId(seq)}>
-        <Icon name="copy" size="s" />
-        <span class="mi-name">{copy.copyId}</span><Kbd keys="y" />
-      </button>
-      <button class="mi" role="menuitem" type="button" onclick={() => void copyLink(seq)}>
-        <Icon name="link" size="s" />
-        <span class="mi-name">{copy.copyLink}</span><Kbd keys="⇧Y" />
-      </button>
-      <hr class="mi-rule" />
-      <button class="mi" role="menuitem" type="button" onclick={() => archive(seq)}>
-        <Icon name="archive" size="s" />
-        <span class="mi-name">{copy.archive}</span><Kbd keys="⌫" />
-      </button>
-    {/if}
-  </RowMenu>
-
-  <!-- The new-row drawer. Every control in it comes from the register's own field declarations —
-       see RowForm — so a pack that adds a field gets a form field, and nobody writes a second copy
-       of the schema in markup. -->
-  <Sheet bind:open={createOpen} onclose={closeCreate} title="{copy.newRow} {decl.one}">
-    <!-- No `autofocus` here: `Sheet` puts the caret in the first field after `showModal()`, which is
-         the only moment it can, and it does it for every sheet that carries one. -->
-    <!--
-      `form` HERE, AND NOT INSIDE `RowForm`. The control that decides what a row IS belongs to the
-      screen that owns the row, and the screen that owns it is the one that can put it somewhere.
-      `RowForm` used to be a `<form>` with `preventDefault` on submit, which swallowed Enter in
-      every field of every new-row sheet in the product: the one key a person presses when they have
-      finished typing, answered by nothing at all.
-    -->
-    <form
-      id="new-row"
-      onsubmit={(e) => {
-        e.preventDefault();
-        addTypedRow();
-      }}
-    >
-      <RowForm register={id} bind:problems bind:taken />
-    </form>
-    {#snippet footer()}
-      <!-- A DISABLED CONTROL SAYS WHY IT IS DISABLED, which is `/decide`'s answer to the same
-           question and was not this one's. The button was live with every required field empty and
-           answered the press with "nothing was written" — true of every submit here, and silent
-           about the actual reason. `aria-describedby` points at the sentence so the greying is not
-           the only cue. -->
-      {#if problems.length > 0}<p class="drawer-why" id="new-row-why">{problems[0]}</p>{/if}
-      <!-- `type="submit"` AND `form`, WHICH IS WHAT MAKES ENTER WORK. `Button` defaults to
-           `type="button"`, and this control lives in the Sheet's footer snippet, outside the form
-           it submits: a form whose only submit control is elsewhere and unassociated has no submit
-           button at all, and a browser refuses implicit submission on a form with more than one
-           text field. Obligations draws four. So `RowForm` ceasing to swallow Enter bought nothing
-           on this screen until the button said which form it belongs to.
-
-           AND NO `onclick`, WHICH ADDED THE ROW TWICE. It carried `onclick={addTypedRow}` as well,
-           so one press ran the handler and then submitted `#new-row`, whose `onsubmit` runs the
-           same handler: two rows, `#-1` and `#-2`, and two identical toasts. Enter did it too, by
-           firing a click at the default button. The submit path is the one that has to exist for
-           Enter, so it is the only one. -->
-      <Button
-        weight="primary"
-        type="submit"
-        form="new-row"
-        disabled={problems.length > 0 || writing}
-        aria-describedby={problems.length > 0 ? 'new-row-why' : undefined}
-      >
-        {copy.addRow} {decl.one}
-      </Button>
-      <Button weight="bare" onclick={() => (createOpen = false)}>{copy.close}</Button>
-    {/snippet}
-  </Sheet>
+  <!-- The new-row drawer, every declared field in front of the reader. `n`, and New in the head. -->
+  <FieldAdd
+    bind:open={createOpen}
+    register={id}
+    one={decl.one}
+    bind:problems
+    bind:taken
+    {writing}
+    {addTypedRow}
+    {closeCreate}
+  />
 
 {/if}
 
 <style>
-  /* The same sentence-under-a-dead-button treatment `/decide` uses, and the same colour: this is a
-     rule the register declared, not an error the person made. */
-  .drawer-why {
-    /* Its own line above the buttons, not a third column beside them. */
-    flex-basis: 100%;
-    margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-xs);
-    line-height: 1.5;
-  }
-
+  /* EVERY OTHER RULE THIS SCREEN DRAWS IS IN THE PART THAT DRAWS ITS MARKUP (`parts/`), because a
+     `<style>` block styles only what its own file writes. What is left here is the page's frame. */
   .page {
     display: flex;
     flex-direction: column;
@@ -3209,485 +2202,8 @@
     font-size: var(--t-xs);
   }
 
-  /* THE SAME WRAP `/audit` TOOK, in a commit whose comment names the measurement — "Five of those
-     in one unwrapping track reached 335px inside a 320px screen". The register's bar has the
-     identical shape and was not fixed with it: at 320 `dropped` ran off the edge of `/r/tasks` and
-     the app panel scrolled sideways by 30px. */
-  .bar {
-    flex-wrap: wrap;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--sp-2);
-  }
-
-  /* NOT A BOX ABOVE 640px. The chips, Clear and Display are children of the bar exactly as they
-     were before the phone needed them grouped; `contents` removes the wrapper from layout. */
-  .bar-rest {
-    display: contents;
-  }
-
-  /**
-   * THE FILTERS ARE PILLS: one rounded track on a raised surface, and the chosen value a lighter pill
-   * in it with its word in ink. `controls.css` asks for the state to be a SHAPE and not a shade, and
-   * this keeps that, drawn round rather than as a box of boxes. Scoped to this screen, so every other
-   * segmented control keeps the shared rule.
-   *
-   * THE COUNT SITS BESIDE THE WORD AND QUIETER THAN IT, so a pill says what it holds before it is
-   * pressed. The weight does not change when a pill is chosen, so the bar does not shift under the
-   * pointer. Sentence case is the stylesheet's, on the first letter, so the word stays the one the
-   * record stores and the empty state quotes.
-   */
-  .segmented {
-    background: var(--s1);
-    border-radius: var(--r-sm);
-  }
-
-  .segment {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--sp-2);
-    border-radius: var(--r-sm);
-    color: var(--ink2);
-    font-weight: 500;
-  }
-
-  /* 44 under a thumb is `--ctl-h`'s; under a mouse the pill sits inside a track the height of the
-     search box beside it. */
-  @media (pointer: fine) {
-    .segment {
-      min-block-size: calc(var(--ctl-h) - 6px);
-    }
-  }
-
-  .segment[data-on] {
-    background: var(--s3);
-    color: var(--ink);
-    font-weight: 500;
-  }
-
-  .segment-word,
-  .enum {
-    display: inline-block;
-  }
-
-  .segment-word::first-letter,
-  .enum::first-letter {
-    text-transform: uppercase;
-  }
-
-  .segment-n {
-    color: var(--dim);
-    font-size: var(--t-xs);
-    font-variant-numeric: tabular-nums;
-  }
-
-  /* A FIELD AS ONE CONTROL, drawn as the pills' own track: the same surface, radius and height, its
-     name in the second ink, and what is chosen in it in ink after the name. */
-  .sift {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--sp-2);
-    min-block-size: var(--ctl-h);
-    padding: 0 var(--sp-2) 0 var(--sp-3);
-    background: var(--s1);
-    border-radius: var(--r-sm);
-    color: var(--ink2);
-    font-weight: 500;
-    white-space: nowrap;
-  }
-
-  :global(.menu-trigger):hover .sift,
-  .sift[data-on] {
-    background: var(--s3);
-  }
-
-  .sift-chosen {
-    color: var(--ink);
-  }
-
-  /* The phone's one filter control is a real button, so it sheds the button's own box, and what is
-     chosen gives way with an ellipsis before Display is pushed off the screen. */
-  .sift-sheet {
-    min-inline-size: 0;
-    border: 0;
-    font: inherit;
-    font-weight: 500;
-    cursor: pointer;
-  }
-
-  .sift-sheet .sift-chosen {
-    min-inline-size: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  /* A LIST CLAUSE IS A PILL THAT IS ALREADY ON, drawn in the same track as the rest of the bar so it
-     reads as one of them rather than as a message. A repository is a URL and a handle is
-     `git:jokonkwo`, so the element gives way with an ellipsis before Display is pushed off a phone,
-     which is the same treatment the phone's own filter button gets and for the same reason. */
-  .listed {
-    min-inline-size: 0;
-    border: 0;
-    font: inherit;
-    font-weight: 500;
-    cursor: pointer;
-  }
-
-  .listed .sift-chosen {
-    min-inline-size: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .filter-n {
-    margin-inline-start: auto;
-    color: var(--dim);
-    font-size: var(--t-xs);
-    font-variant-numeric: tabular-nums;
-  }
-
-  .sift-open {
-    display: inline-flex;
-    color: var(--dim);
-    rotate: 90deg;
-  }
-
-  .mi-tick {
-    display: inline-flex;
-    inline-size: var(--sp-4);
-    color: var(--ink);
-  }
-
-  /* The search box is a pill too, so the bar is one family of shapes. */
-  .bar > .field {
-    background: var(--s1);
-    border-radius: var(--r-sm);
-  }
-
-  /* Display ends the bar: it changes how the list looks, not what it holds. */
-  .bar-end {
-    margin-inline-start: auto;
-  }
-
-  /* The menu rows: the same 34px, the same tint-on-hover, and each printing the key it stands in
-     for — so using the menu teaches the key that replaces it. */
-  .mi {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-3);
-    inline-size: 100%;
-    min-block-size: 34px;
-    padding: 0 var(--sp-3);
-    background: none;
-    border: 0;
-    border-radius: var(--r-sm);
-    color: var(--ink2);
-    font: inherit;
-    font-size: var(--t-ui);
-    text-align: start;
-    text-decoration: none;
-    cursor: pointer;
-  }
-
-  /* THE MENU IS A KEYBOARD CHEAT SHEET ON A DEVICE WITH NO KEYBOARD. Six of its nine items printed a
-     chip, `Enter`, `p`, `y`, `Shift+Y`, `x` and the delete glyph, to somebody holding a phone.
-     `/start` hid its digit badges under a coarse pointer for exactly this reason in the thirtieth
-     pass and the same rule was never applied here. The bindings are untouched; what goes is the
-     advertisement to a reader who cannot press them. */
-  @media (pointer: coarse) {
-    .mi :global(kbd) {
-      display: none;
-    }
-  }
-
-  .mi:hover,
-  .mi:focus-visible {
-    background: var(--hover-wash);
-    color: var(--ink);
-  }
-
-  .mi-name {
-    flex: 1;
-  }
-
-  .mi-rule {
-    margin: 4px 0;
-    border: 0;
-    border-block-start: 1px solid var(--line);
-  }
-
-  /* Above the rows it acts on, and only while there is a selection: a permanently visible bulk bar
-     is a row of disabled controls, which tells you a thing exists and refuses to say why it will
-     not work. It wraps rather than scrolls, so the verbs survive a phone. */
-  /**
-   * THE CARD'S TRAILING CONTROL, which exists only where the cards do.
-   *
-   * `--ctl-h` for the width and the card's own 56px for the height, so the target is the full height
-   * of the row it acts on rather than a 44px button with dead edges above and below it. `13 §10`:
-   * the card IS the row on this device, and half a row that does nothing when tapped is worse than
-   * no control.
-   */
-  @media (width < 640px) {
-    /* THE `Put back` BESIDE A RECEIPT ON A CARD. `.verb` is the grid's, sized for a row 34px tall
-     and a fine pointer; this one is under a thumb, so it takes `--tap` from `.tap` and reads as a
-     word rather than as an icon. */
-  .card-undo {
-    display: inline-flex;
-    align-items: center;
-    padding: 0 var(--sp-2);
-    background: none;
-    border: 0;
-    color: var(--ink2);
-    font: inherit;
-    font-size: var(--t-sm);
-    text-decoration: underline;
-    text-underline-offset: 3px;
-    cursor: pointer;
-  }
-
-  .card-more {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      inline-size: var(--ctl-h);
-      flex: none;
-      padding: 0;
-      background: none;
-      border: 0;
-      border-radius: var(--r-md);
-      /* `--ink2`, and it was `--dim`: the one touch route to a row's eight verbs, drawn in the
-         quietest ink the palette has, read as an empty cell beside every card. */
-      color: var(--ink2);
-      cursor: pointer;
-    }
-
-    .card-more:hover {
-      background: var(--s2);
-      color: var(--ink);
-    }
-  }
-
-  @media (width >= 640px) {
-    .card-more {
-      display: none;
-    }
-  }
-
-  .picked-bar {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--sp-2);
-    margin-block-end: var(--sp-3);
-    padding: var(--sp-2) var(--sp-3);
-    background: var(--s1);
-    border-radius: var(--r-md);
-    color: var(--ink2);
-    font-size: var(--t-sm);
-  }
-
-  .picked-word {
-    margin-inline-end: var(--sp-2);
-  }
-
-  .picked-verb {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--sp-2);
-  }
-
-  .picked-n {
-    color: var(--ink);
-    font-weight: 500;
-    font-variant-numeric: tabular-nums;
-  }
-
-  /* The pointer's way in. It is `tabindex="-1"` — a grid has one tab stop — so it never takes focus
-     and never needs a focus ring; the keyboard path is `x`, which the `?` sheet advertises. */
-  /* ── editing a value where it is drawn ────────────────────────────────── */
-
-  /* A MONEY'S CURRENCY BESIDE ITS BOX, and the box takes what is left of the cell. */
-  .cell-box {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-1);
-    min-inline-size: 0;
-  }
-
-  .cell-unit {
-    flex: none;
-    color: var(--ink2);
-    font-size: var(--t-ui);
-  }
-
-  .cell-tick {
-    margin: 0;
-    accent-color: var(--accent);
-  }
-
-  /* THE EDITOR IS THE CELL, so it takes the cell's box and none of its own. A control that grew the
-     row would push every row below it down the instant somebody started typing, which is the one
-     thing a list must not do while a person is reading it. */
-  .cell-edit {
-    resize: none;
-    inline-size: 100%;
-    min-inline-size: 0;
-    padding: 0 2px;
-    background: var(--s1);
-    border: 1px solid var(--accent);
-    border-radius: var(--r-sm);
-    color: var(--ink);
-    font: inherit;
-    font-size: var(--t-ui);
-  }
-
-  /**
-   * THE CELL IS THE BOX, AND THE PENCIL FLOATS OVER IT.
-   *
-   * This was an `inline-flex` holding the value and the pencil side by side, and the pencil is
-   * invisible at rest rather than absent, so it took width the whole time. `.td` truncates with an
-   * ellipsis, the flex row was wider than the column, and every editable cell on the busiest list
-   * in the product painted a stray `..` after a value that fitted perfectly well: thirty-eight rows
-   * times four editable columns, all day, on the screen a person spends the most time on. Nobody
-   * saw it because two dim dots at 55% ink read as part of the typeface.
-   *
-   * OUT OF FLOW, AND THE ROOM FOR IT IS MADE ONLY WHILE IT IS THERE. Three arrangements and each
-   * costs something: in flow costs every cell a pencil's width of its own text, for ever; out of
-   * flow with the room always reserved costs the same width the same way, and turned `owed to me`
-   * into `owed to ...` on every row; out of flow with the room made on hover costs an ellipsis on
-   * ONE cell while a pointer is on it. The paragraph below argues against reflowing the COLUMN
-   * under the cursor, which none of these does: the column is a grid track and its width is set by
-   * the header.
-   */
-  /* THE THING'S HUE, AND IT IS NOT A LITERAL. `oklch(L C h)` where `h` is the row's frozen accent
-     and `L`/`C` are the theme's two mark constants, generated per scheme and solved so every hue
-     clears 3:1 on every surface. A retired thing keeps its mark and loses its claim on a hue, so
-     `--hue` is withheld AND `--dim` is set: an unset `--hue` makes the `oklch()` invalid, and an
-     invalid declaration is a dropped one, which would leave the mark the same ink as the id. */
-  .row-mark {
-    color: oklch(var(--mark-l) var(--mark-c) var(--hue));
-  }
-
-  .row-mark[data-retired] {
-    color: var(--dim);
-  }
-
-  /* The spoken id at the end of the row, quiet, in the face that says it is an identifier. */
-  .row-seq {
-    color: var(--dim);
-    font-family: var(--font-id);
-    font-size: var(--t-xs);
-  }
-
-  .cell-said {
-    position: relative;
-    display: block;
-    min-inline-size: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  /* The room, made when the pencil appears and not before. */
-  :global(.td):hover .cell-said,
-  :global(.td):focus-within .cell-said {
-    padding-inline-end: var(--sp-4);
-  }
-
-  /* PRESENT IN THE TREE AND INVISIBLE UNTIL IT IS WANTED. `opacity` and not `display: none`, because
-     a control removed from the box changes the cell's width the moment a pointer enters it, and a
-     column that reflows under the cursor is a column you cannot click accurately. */
-  .cell-pen {
-    position: absolute;
-    inset-block: 0;
-    inset-inline-end: 0;
-    display: grid;
-    flex: none;
-    place-items: center;
-    padding: 0;
-    background: none;
-    border: 0;
-    color: var(--ink2);
-    opacity: 0;
-    cursor: pointer;
-    transition: opacity var(--d-state) var(--ease-out);
-  }
-
-  /* `:global(.td)`, BECAUSE THE CELL IS DRAWN BY `Table` AND NOT BY THIS FILE. Svelte scopes a
-     selector to the component that wrote it, so `.td:hover .cell-pen` matched nothing and compiled
-     to an unused rule: the pencil was in the tree, at zero opacity, for ever. The child half stays
-     scoped, which is what keeps this from reaching any other cell in the product. */
-  :global(.td):hover .cell-pen,
-  :global(.td):focus-within .cell-pen,
-  .cell-pen:focus-visible {
-    opacity: 0.55;
-  }
-
-  .cell-pen:hover,
-  .cell-pen:focus-visible {
-    color: var(--ink);
-    opacity: 1;
-  }
-
-  /* A 44px HIT BOX UNDER A THUMB, ONLY ONCE THE PENCIL IS SHOWING. Measured at 768 on a tablet it
-     was 12px wide. Always on, the box would lie invisibly over the cell's words and turn a tap on
-     the row into an edit, so it arrives with the pencil: when the cell holds focus. */
-  @media (pointer: coarse) {
-    :global(.td):focus-within .cell-pen::before {
-      content: '';
-      position: absolute;
-      inset: min(0px, calc((100% - var(--tap)) / 2));
-    }
-  }
-
-  /**
-   * THE ROW THAT JUST ARRIVED, MARKED FOR A MOMENT.
-   *
-   * A BAR AT THE HEAD OF THE ROW AND NOT A WASH OVER IT. A tinted row competes with the row's own tone, which is
-   * the declared deadline state and means something; this is a rule in the accent, in the gutter where nothing
-   * else is drawn, so the two cannot be confused. It fades rather than blinks: the point is to be findable for
-   * the second somebody's eye takes to arrive, not to demand attention it has already got.
-   *
-   * IT ANIMATES ONCE BECAUSE IT IS MOUNTED ONCE. `fresh` is cleared in `$effect.pre`, before the list redraws, so
-   * the element exists for one continuous stretch rather than being rebuilt mid-animation — which is the failure
-   * the map's own comment records.
-   */
-  .fresh {
-    display: inline-block;
-    inline-size: var(--dot);
-    block-size: var(--dot);
-    margin-inline-end: var(--sp-2);
-    background: var(--info-fill);
-    border-radius: var(--r-pill);
-    vertical-align: middle;
-    animation: fresh-in var(--d-enter) var(--ease-out);
-  }
-
-  @keyframes fresh-in {
-    from {
-      opacity: 0;
-      transform: scaleY(0.4);
-    }
-  }
-
-  /* UNDER `prefers-reduced-motion` THE MARK STAYS AND THE MOVEMENT GOES. It is the thing that says which row is
-     new, so deleting it would take the answer with the animation. */
-  @media (prefers-reduced-motion: reduce) {
-    .fresh {
-      animation: none;
-    }
-  }
-
-  /* ── capture, and the verbs on the row ────────────────────────────────── */
-
-  /* ONE LINE, AND IT LOOKS LIKE ONE. The label is for a screen reader and for nobody else: the
-     field's own placeholder says the same words, and a visible label above a single-field form
-     turns one line into three. */
-  .capture {
-    margin: 0;
-  }
-
+  /* THE HEAD'S NEW BUTTON, which a phone does without: the capture line under it starts a row in
+     fewer presses. It stays on the arrival (`data-alone`), where the capture line is not drawn. */
   .new-row {
     display: contents;
   }
@@ -3698,368 +2214,9 @@
     }
   }
 
-  .capture-label {
-    position: absolute;
-    inline-size: 1px;
-    block-size: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
-
-  /* ONE FRIENDLY FIELD: a rounded line on the first raised surface with a plus at its head, which
-     is the shape "add" has in every list a person has used. */
-  /* ONE HEIGHT FOR THE WHOLE HEAD (DESIGN-SYSTEM APPENDIX C8). This was 47px over a 34px search and
-     32px filters, three sizes of box in two rows; it is `--ctl-h` now, 32 under a mouse and 44 under
-     a thumb, with the radius every control has. */
-  .capture-field {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    min-block-size: var(--ctl-h);
-    padding-inline: var(--sp-3) var(--sp-1);
-    background: var(--s1);
-    border: 1px solid var(--line);
-    border-radius: var(--r-sm);
-    color: var(--dim);
-    transition: border-color var(--d-state) var(--ease-out);
-  }
-
-  .capture-field:hover {
-    border-color: var(--edge);
-  }
-
-  /* THE RING IS ON THE BOX AND NOT ON THE INPUT, because the submit control is inside the box: a
-     ring around the text alone would draw a line between the field and its own button. It is the
-     same move `/search` makes for the same reason. */
-  /* The ring itself is `controls.css`'s, shared with every field. */
-
-  .capture-input {
-    flex: 1;
-    align-self: stretch;
-    /* OVER THE BOX'S TWO BORDERS, so the field a thumb presses is the box's full `--ctl-h` and not 42px inside it. The
-       input draws nothing of its own, so nothing moves. */
-    margin-block: -1px;
-    min-inline-size: 0;
-    padding-block: 0;
-    background: none;
-    border: 0;
-    color: var(--ink);
-    font: inherit;
-    font-size: var(--t-ui);
-  }
-
-  .capture-input:focus-visible {
-    /* focus-ok: the caret indicates focus, and `.capture-field:focus-within` above carries the
-       state change for the box the reader actually sees. */
-    outline: none;
-    box-shadow: none;
-  }
-
-  .capture-go {
-    min-block-size: var(--ctl-h-sm);
-    padding: 0 var(--sp-3);
-    background: var(--ink);
-    border: 1px solid var(--ink);
-    border-radius: var(--r-sm);
-    color: var(--bg);
-    font-size: var(--t-sm);
-    font-weight: 500;
-    cursor: pointer;
-  }
-
-  /* 48x24 MEASURED AT 390, on the primary write action of the register. It is drawn only once
-     there is something to add, which is why no gate has ever measured it: the scan runs over a
-     page at rest and this button does not exist then. */
-  @media (pointer: coarse) {
-    .capture-go {
-      min-block-size: var(--tap);
-    }
-  }
-
-  /* THE VERBS ARE QUIET UNTIL THE ROW IS. A column of controls at full contrast on every row of a
-     list is a column that competes with the data for the reader's eye, and the data is what they
-     came for. They come up on hover and on keyboard focus, and they are always in the accessibility
-     tree, so nothing is hidden from anybody who is not using a pointer. */
-  .verbs,
-  .said {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--sp-2);
-    justify-content: flex-end;
-  }
-
-  .verb {
-    padding: 1px var(--sp-2);
-    background: none;
-    border: 0;
-    border-radius: var(--r-sm);
-    color: var(--ink2);
-    font-size: var(--t-xs);
-    cursor: pointer;
-  }
-
-  .verb.icon {
-    display: grid;
-    place-items: center;
-    padding: var(--sp-1);
-    color: var(--dim);
-  }
-
-  .verb:hover,
-  .verb:focus-visible {
-    background: var(--hover-wash);
-    color: var(--ink);
-  }
-
-  /* UNDER A MOUSE THEY ARE NOT THERE UNTIL THE ROW IS, which the comment over `.verbs` has always
-     said and no rule ever did. They come up with the row's hover, the keyboard caret and focus
-     inside the row. Only where there is a hover: a finger has none, so a touch screen keeps them
-     drawn, and a phone has the card's menu. The keyboard's route never went through them; they are
-     `tabindex="-1"` and every verb is a key the `?` sheet lists. The picker goes the same way while
-     nothing is selected, and comes back on every row once something is. */
-  @media (hover: hover) and (pointer: fine) {
-    .verbs,
-    .table-slot:not([data-picking]) .pick:not([data-on]) {
-      transition: opacity var(--d-state) var(--ease-out);
-    }
-
-    :global(.tr:not(:hover, :focus-within, [data-focused])) .verbs,
-    .table-slot:not([data-picking]) :global(.tr:not(:hover, :focus-within, [data-focused]) .pick:not([data-on])) {
-      opacity: 0;
-    }
-  }
-
-  .pick {
-    display: grid;
-    place-items: center;
-    inline-size: 16px;
-    block-size: 16px;
-    padding: 0;
-    background: none;
-    border: 1px solid var(--edge);
-    border-radius: var(--r-sm);
-    color: var(--accent-ink);
-    cursor: pointer;
-  }
-
-  .pick[data-on] {
-    background: var(--accent);
-    border-color: var(--accent-edge);
-  }
-
-  .picked-clear {
-    background: none;
-    border: 0;
-    padding: 0;
-    color: inherit;
-    font: inherit;
-    text-decoration: underline;
-    text-underline-offset: 0.18em;
-    cursor: pointer;
-  }
-
-  .peek {
-    display: grid;
-    grid-template-columns: minmax(0, 12ch) minmax(0, 1fr);
-    gap: var(--sp-2) var(--sp-3);
-    margin: 0;
-  }
-
-  .filter-groups {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-5);
-  }
-
-  .filter-group {
-    margin: 0;
-    padding: 0;
-    border: 0;
-  }
-
-  .filter-legend {
-    margin-block-end: var(--sp-2);
-    padding: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
-    font-weight: 500;
-  }
-
-  .filter-values {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-
-  /* A full-width row, not a chip. Eight values in a wrapped chip cloud is a shape you have to scan;
-     a column of rows with the boxes aligned is a shape you can run your eye down. */
-  .filter-value {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-3);
-    min-block-size: 34px;
-    padding: 0 var(--sp-2);
-    background: none;
-    border: 0;
-    border-radius: var(--r-sm);
-    color: var(--ink2);
-    font: inherit;
-    text-align: start;
-    cursor: pointer;
-    transition: background var(--d-state) var(--ease-out);
-  }
-
-  /* 44 UNDER A THUMB, AND BOTH OF THESE WERE MEASURED AT 390 AND FOUND SHORT. `.filter-value` is
-     358x34 and is the only way to sort a list or hide a column on a phone; `.mi` is 34. Neither
-     has ever been measured by `layout.mjs`, because both live inside a sheet the gate does not
-     open, and the gate is right that a page at rest is what it measures. `13 §7` is the rule. */
-  @media (pointer: coarse) {
-    .filter-value,
-    .mi {
-      min-block-size: var(--tap);
-    }
-  }
-
-  .filter-value:hover {
-    background: var(--hover-wash);
-    color: var(--ink);
-  }
-
-  .filter-value[data-on] {
-    color: var(--ink);
-    font-weight: 500;
-  }
-
-  .filter-box {
-    display: grid;
-    place-items: center;
-    inline-size: 17px;
-    block-size: 17px;
-    flex: none;
-    border: 1px solid var(--edge);
-    border-radius: var(--r-sm);
-    color: var(--accent-ink);
-    font-size: var(--t-xs);
-    line-height: 1;
-  }
-
-  .filter-value[data-on] .filter-box {
-    background: var(--accent);
-    border-color: var(--accent);
-  }
-
-  .display-note {
-    margin-block-end: var(--sp-4);
-    color: var(--dim);
-    font-size: var(--t-sm);
-  }
-
-  .locked {
-    margin-inline-start: auto;
-    color: var(--dim);
-    font-size: var(--t-xs);
-  }
-
-  .peek dt {
-    color: var(--dim);
-    font-size: var(--t-sm);
-    font-weight: 500;
-  }
-
-  .peek dd {
-    margin: 0;
-    color: var(--ink);
-    font-size: var(--t-ui);
-    overflow-wrap: anywhere;
-  }
-
-
   @media (width < 900px) {
     .page {
       padding: var(--sp-4) var(--gutter) var(--sp-8);
-    }
-  }
-
-  @media (width < 640px) {
-    .columns-group {
-      display: none;
-    }
-
-    .table-slot {
-      display: none;
-    }
-
-    /**
-     * THE BAR STOPS WRAPPING AND STARTS SCROLLING, because wrapping put the first row of the list
-     * below the fold on every phone in the product.
-     *
-     * Measured at 390 by 844, `/r/obligations` drew, in order: a note card, the heading, the
-     * subtitle, the count, New item, the search box, two chip groups, Display, one sentence about
-     * what the search box searches, the capture field, and one sentence about what a row may be
-     * missing. Eleven things. The first invoice began at 700px and the reader had to scroll to
-     * learn the screen had any rows on it at all.
-     *
-     * `flex-wrap: wrap` is right on a laptop, where the bar is one line and the wrap is the
-     * safety net. On a phone every child is close to the full width, so wrap is not a safety net,
-     * it is the layout: five rows of controls standing over the thing they control. A row of chips
-     * that scrolls sideways is what a phone does with a filter bar, it costs one row instead of
-     * five, and nothing is hidden, which is the difference between this and a drawer.
-     *
-     * The panel itself must not scroll sideways: `min-inline-size: 0` on the flex child is what
-     * keeps the overflow inside the bar. Without it the bar sizes to its content and takes the app
-     * with it, which is the 30px sideways scroll the comment above `.bar` records fixing once.
-     */
-    /**
-     * AND THEN THE SEARCH BOX SCROLLED WITH THE CHIPS, WHICH IS WHY IT HAS A LINE OF ITS OWN NOW.
-     *
-     * The first version of this made the whole bar one sideways scroller and gave the search box a
-     * floor. The floor was on the wrapper, so the input measured 62px and read `Searcl`; moving it
-     * to the input gave 96px and `Search mor`. A floor cannot win, because the placeholder is
-     * "Search" plus the register's own name and `Search services` is longer than `Search money`.
-     * And the comment that gave the box its floor said it was "the one thing that never scrolls out
-     * of reach", which was true only while nobody scrolled.
-     *
-     * So the search box takes the bar's first line at full width and the chips, Clear and Display
-     * share a second line that is the only thing that scrolls. Two lines instead of the five that
-     * wrapping gave, and the search box is always the whole width of the phone.
-     */
-    .bar {
-      flex-wrap: wrap;
-      min-inline-size: 0;
-    }
-
-    .bar > .field {
-      flex: 1 1 100%;
-    }
-
-    .bar-rest {
-      display: flex;
-      flex: 1 1 100%;
-      flex-wrap: nowrap;
-      align-items: center;
-      gap: var(--sp-2);
-      min-inline-size: 0;
-      overflow-x: auto;
-      overscroll-behavior-x: contain;
-      scrollbar-width: none;
-      /* Room for the shadow of the last chip, and a scroll that ends flush rather than clipped. */
-      padding-block-end: var(--sp-1);
-    }
-
-    .bar-rest::-webkit-scrollbar {
-      display: none;
-    }
-
-    .bar-rest > * {
-      flex: 0 0 auto;
-    }
-
-    /* The one control allowed to shrink, so a long list of chosen values ends in an ellipsis
-       inside the phone rather than past its edge. */
-    .bar-rest > .sift-sheet,
-    .bar-rest > .listed {
-      flex: 0 1 auto;
     }
   }
 </style>

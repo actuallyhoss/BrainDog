@@ -121,7 +121,7 @@ for (const fixture of family) {
         const ts = new Date(NOW).toISOString();
         for (let i = 0; i < settings.asks; i++)
           sql.exec(
-            `INSERT INTO call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status)
+            `INSERT INTO slash_call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status)
              VALUES (?, ?, 'propose', ?, 'glm-5.3-flash', 1, 1, 1, 1, 'ok')`,
             `seed${i}`,
             ts,

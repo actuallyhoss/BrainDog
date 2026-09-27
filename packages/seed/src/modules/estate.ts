@@ -34,7 +34,10 @@ export const ESTATE_REGISTERS: Record<string, SeedRegister> = {
     icon: 'service',
     name: 'Services',
     one: 'service',
-    holds: 'a renewal date, a registrar and a cost, so the record can tell you what is due in October',
+    /* WHO A SERVICE IS WITH, AND NOT A REGISTRAR, since estate 1.3.0. A registrar is what a domain is held with, and
+       Services holds hosting, subscriptions and certificates as well, so the line named one kind of provider as if it
+       were all of them, and `tools/gates/shell-words.mjs` had to exempt it as a use-case word in the core. */
+    holds: 'a renewal date, who it is with and a cost, so the record can tell you what is due in October',
     title: 'name',
     mobile: ['name', 'cost', 'renews'],
     state: 'state',

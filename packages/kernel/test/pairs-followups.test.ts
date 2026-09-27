@@ -124,12 +124,11 @@ const partners = (k: Kernel, ids: Record<string, string>): Record<string, string
 
 /* ─────────────── one: a mark renamed by an update ─────────────── */
 
-/* TODO UNTIL `carryPins` LANDS IN `index.ts`, which another agent owned when this file did. The repair is held66's
-   `settleRedeclared` half: `carryPins`, called when the old declaration's mark differs from the new one's, writes his
-   word on the old field onto the new one before the pass settles under it, and reads the actor from `pinnedBy`, which
-   is in `pairs.ts` already. Measured without it: DINNER pairs with OMAR and reads `moved: true`, Spent 0.00 against
-   20,000.00. The two tests below that pass without it are the guards that keep `carryPins` from carrying too much. */
-const CARRY = 'needs carryPins in index.ts settleRedeclared (held66)';
+/* THE REPAIR IS `pairs.ts`'s `carryPins`, which `settleRedeclared` asks when the old declaration's mark differs from the
+   new one's, before the old mark is unpaired: it finds his word on the old field, with the actor `pinnedBy` reads, and
+   the kernel writes it onto the new field in his name before the pass settles under it. Measured without it: DINNER
+   pairs with OMAR and reads `moved: true`, Spent 0.00 against 20,000.00. The two tests below that passed without it are
+   the guards that keep `carryPins` from carrying too much. */
 
 /** The two ways an install arrives, as `pairs-on-update.test.ts` drives them. */
 const PATHS: Record<string, (k: Kernel, decl: Declaration) => Promise<void>> = {
@@ -146,7 +145,7 @@ const PATHS: Record<string, (k: Kernel, decl: Declaration) => Promise<void>> = {
 };
 
 for (const [path, update] of Object.entries(PATHS)) {
-  test(`ONE (${path}): HIS WORD ON THE OLD MARK IS HIS WORD ON THE NEW ONE when an update renames it, either way he said it`, { todo: CARRY }, async () => {
+  test(`ONE (${path}): HIS WORD ON THE OLD MARK IS HIS WORD ON THE NEW ONE when an update renames it, either way he said it`, async () => {
     const { k, sql } = await ledger(LEDGER({ life: 'done', where: UNNAMED, mark: 'transfer' }));
     /* The checker's case: dinner on the card, and Omar paying him back into CIB the next day, which the bank pairs. */
     const ids = write(k, [
@@ -198,7 +197,7 @@ test('ONE: A MARK NOBODY PINNED IS NOT CARRIED, so the rows the old mark paired 
   sql.close();
 });
 
-test('ONE: RENAMED THERE AND BACK, HIS LATER WORD IS THE ONE CARRIED, not the older one still in the first field', { todo: CARRY }, async () => {
+test('ONE: RENAMED THERE AND BACK, HIS LATER WORD IS THE ONE CARRIED, not the older one still in the first field', async () => {
   /* MEASURED BEFORE THE REPAIR, by the checker of this change: `transfer` to `moved` carried his "not a transfer", he
      then ticked dinner on `moved`, and the update back to `transfer` kept the old false there because somebody had
      already spoken on `transfer`. His tick was lost and dinner read as spent, EGP 20,000.00. */

@@ -24,12 +24,10 @@ const OWNER = 'p_01M1KJ7RG0OWNER0000000000';
 const NO_NAMES: ReadonlyMap<string, string> = new Map();
 
 test('AN ID IS NOT A NAME, and the composition this screen shipped turned one into a worse id', () => {
-  /* What the actor column ran: `named(actorOf(e.by))`. `actorOf` has no branch for a person, so it
-     hands the id back, and capitalising its first letter mangles it. Quoted so the repair cannot be
-     undone by reaching for `actorOf` again. */
-  assert.equal(actorOf(DECIDER), DECIDER);
-  const shipped = actorOf(DECIDER).charAt(0).toUpperCase() + actorOf(DECIDER).slice(1);
-  assert.equal(shipped, 'P_01M1KJ7RG0TYYA0AX15QPGJJ4');
+  /* What the actor column ran: `named(actorOf(e.by))`, when `actorOf` handed a person's id back and
+     capitalising its first letter mangled it. `actorOf` words through `names.ts`'s `actor` now, so
+     reaching for it again says Someone on this record rather than the id. */
+  assert.equal(actorOf(DECIDER), copy.feedSomeone);
 
   const said = actorSaid(DECIDER, null, NO_NAMES);
   assert.equal(said.name, copy.feedSomeone);
@@ -59,10 +57,10 @@ test('THE READER IS YOU, whichever spelling the ledger wrote them in', () => {
   assert.equal(targetSaid(`person:${OWNER}`, OWNER, NO_NAMES)?.name, copy.feedYou);
 });
 
-test('AN ACTOR THAT IS NOT A PERSON KEEPS ITS WORDS, and still leads with a capital', () => {
-  assert.equal(actorSaid('system', null, NO_NAMES).name, 'The record itself');
-  assert.equal(actorSaid('slash', null, NO_NAMES).name, 'The assistant');
-  assert.equal(actorSaid('rule.renewal', null, NO_NAMES).name, 'Renewal rule');
+test('AN ACTOR THAT IS NOT A PERSON IS SAID BY ITS NAME, and still leads with a capital', () => {
+  assert.equal(actorSaid('system', null, NO_NAMES).name, 'BrainDog');
+  assert.equal(actorSaid('slash', null, NO_NAMES).name, 'Slash');
+  assert.equal(actorSaid('rule.renewal', null, NO_NAMES).name, 'Renewal');
   assert.equal(actorSaid('agent:claude', null, NO_NAMES).name, 'Claude');
   for (const by of ['system', 'slash', 'rule.renewal', 'agent:claude'])
     assert.equal(actorSaid(by, null, NO_NAMES).person, false, `${by} was read as a person`);

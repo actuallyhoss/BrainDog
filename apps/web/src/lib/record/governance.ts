@@ -19,6 +19,8 @@ import { money } from 'braindog-render';
 import { costOf, costRank } from '@braindog/kernel';
 
 import { copy } from '../copy.ts';
+import { citedWords, figuresIn } from '../cite.ts';
+import { moneyInText } from './money.ts';
 import { labels, relabel } from '../voice.ts';
 import { callsOutOf, type CallOut } from './actions.ts';
 import type { Question } from './schema.ts';
@@ -119,16 +121,25 @@ const isRow = (v: unknown): v is Row => typeof v === 'object' && v !== null && !
  *
  * An `options` body offers its options; every other kind is accepted or rejected, which are the two
  * words `decide` takes for it.
+ *
+ * EVERY SENTENCE HERE WAS STORED BY SOMEBODY ELSE AND IS DRAWN AS WORDS. Slash's braces become words (`citedWords`), so
+ * no screen that prints an option prints `{{ref:…}}`: what a brace stands for where the body keeps `figures`, and words
+ * of its own where it does not, which is every question Slash files, because a filed question is shown to readers who
+ * may not read the rows it cites (`packages/slash/src/propose.ts`). Money written into a sentence as "GBP 2400.00" is
+ * drawn in the record's currency (`moneyInText`, design §5). The options card on `/decide/<id>` draws the reasons again
+ * with their links (`Cited`), from the body; everything else reads these words.
  */
 export function questionOf(row: Row, asked: string | undefined, rank: number): Question {
   const id = String(row.id);
   const body = isRow(row.body) ? row.body : {};
+  const figures = figuresIn(body);
+  const said = (v: unknown): string => moneyInText(citedWords(text(v), figures));
   const options =
     row.body_kind === 'options' && Array.isArray(body.options)
       ? body.options.filter((o): o is Row => isRow(o) && typeof o.id === 'string').map((o) => ({
           key: String(o.id),
-          title: text(o.label) || String(o.id),
-          body: text(o.because),
+          title: said(o.label) || String(o.id),
+          body: said(o.because),
           ...(o.recommended === true ? { recommended: true } : {}),
         }))
       : [
@@ -136,9 +147,10 @@ export function questionOf(row: Row, asked: string | undefined, rank: number): Q
           { key: 'reject', title: copy.rejectIt, body: '' },
         ];
   /* THE REASONING IS THE QUESTION'S, written by whoever opened it (`body.context`), and it is drawn above the options. */
-  const context = text(body.context).trim();
+  const context = said(body.context).trim();
   const band = costOf(text(row.body_kind), row.body);
-  return { id, title: asked?.trim() || id, cost: '', band, rank, opened: text(row.opened_at), options, ...(context ? { context } : {}) };
+  const title = moneyInText(asked?.trim() ?? '');
+  return { id, title: title || id, cost: '', band, rank, opened: text(row.opened_at), options, ...(context ? { context } : {}) };
 }
 
 /**

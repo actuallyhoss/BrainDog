@@ -2,12 +2,21 @@
   "$schema": "../../node_modules/wrangler/config-schema.json",
 
   /* ===========================================================================================
-     THE MARKETING SITE — THE ONLY THING HERE THAT IS ACTUALLY A SEPARATE STATIC DEPLOYMENT.
+     THE MARKETING SITE, AND SINCE THE ONE-DOMAIN FLIP THE ADDRESS THE APP IS REACHED THROUGH.
 
-     `apps/web` ships inside the Worker version as `assets` (33 §7); this does not, because it
-     answers a different hostname and has nothing to do with a record. It is three prerendered
-     pages — `/`, `/pricing`, `/changelog` — built with `strict: true` so a route that quietly
-     stopped prerendering fails the build rather than shipping blank (`apps/site/svelte.config.js`).
+     ONE DOMAIN (`loop/DIRECTION.md` §26). This Worker holds `brain.dog` as its Custom Domain and
+     answers everything on it: the site's own pages from its assets, and the app's doors (`/app`,
+     `/api/*`, `/auth/*`, `/account/*`, `/mcp`, `/in/*` and OAuth's `/oauth/*`, with the build id,
+     OAuth's metadata under `/.well-known/` and `/healthz` beside them) handed to the app Worker
+     through the `APP` binding. `run_worker_first` below is the exact list. `app.brain.dog` is the
+     app's legacy name: a browser opening it is sent here, and its API doors still answer there
+     (`apps/worker/wrangler.jsonc`, production's routes).
+
+     IT IS STILL A DEPLOYMENT OF ITS OWN. `apps/web` ships inside the app Worker's version as
+     `assets` (33 §7); this does not, because it holds no record and a copy change here must never
+     be the reason the record is down. Its pages are the prerendered routes under `src/routes`,
+     built with `strict: true` so a route that quietly stopped prerendering fails the build rather
+     than shipping blank (`apps/site/svelte.config.js`).
 
      A SCRIPT THAT RUNS FOR THE APP'S DOORS AND FOR NOTHING ELSE. This paragraph said the site had
      no `main` because a script here would never execute on the happy path "and executes on every
@@ -48,8 +57,8 @@
   "compatibility_date": "2026-09-01",
 
   /* The site's whole job is to arrive at one address. A `workers.dev` copy is a second URL for the
-     same three pages, indexable, with no canonical tag — a self-inflicted duplicate-content
-     problem on the one page whose job is to be found. */
+     same pages, indexable, with no canonical tag: a self-inflicted duplicate-content problem on the
+     one page whose job is to be found. */
   "workers_dev": false,
   "preview_urls": false,
 
@@ -71,37 +80,32 @@
   "assets": {
     "directory": "build",
     "not_found_handling": "404-page",
-    "run_worker_first": ["/app", "/app/*", "/api/*", "/auth/*", "/account/*", "/mcp", "/mcp/", "/in/*", "/.well-known/braindog-build", "/healthz"]
+    "run_worker_first": ["/app", "/app/*", "/api/*", "/auth/*", "/account/*", "/mcp", "/mcp/", "/in/*", "/oauth/*", "/.well-known/braindog-build", "/.well-known/oauth-protected-resource", "/.well-known/oauth-protected-resource/*", "/.well-known/oauth-authorization-server", "/healthz"]
   },
 
-  /* Two environments for symmetry with `apps/worker/wrangler.jsonc`, and because the alternative
-     is a marketing change that can only be seen after it is public. `routes` is an inheritable
-     key, so — exactly as in the Worker's config — it is declared per environment and never at the
-     top level, or `--env alpha` would claim the apex.
+  /* Two environments for symmetry with `apps/worker/wrangler.jsonc`. Only production is deployed
+     today; `alpha` is kept for a future rehearsal (below). `routes` is an inheritable key, so, exactly
+     as in the Worker's config, it is declared per environment and never at the top level, or
+     `--env alpha` would claim the apex.
 
      `assets` IS ALSO INHERITABLE, and alpha overrides it: an `assets` key inside an environment
      replaces the top-level one. Alpha serves `build-alpha`, the same pages built with
      `BRAINDOG_ENV=alpha` so its accent is its own; production keeps `build`. */
   "env": {
-    /* THERE IS AN ALPHA SITE NOW, AND THE REASON THERE WAS NOT IS GONE.
-       This said: "two Workers cannot share one Custom Domain. `alpha.brain.dog` belongs to the
-       RECORD." True while the record answered `alpha.brain.dog`, and the record has moved to
-       `app.alpha.brain.dog` — so the name is free, and the scheme is one label per surface with the
-       environment in front of it:
+    /* PRODUCTION IS THE ONE ENVIRONMENT DEPLOYED. It holds `brain.dog`, the one domain, and hands
+       the app's routes to `braindog-production`. The app keeps no name of its own beyond
+       `app.brain.dog`, which sends a browser to `brain.dog` (`loop/DIRECTION.md` §26).
 
-         brain.dog              app.brain.dog              mcp.brain.dog
-         alpha.brain.dog        app.alpha.brain.dog        mcp.alpha.brain.dog
-
-       THE PARAGRAPH IT REPLACES ALSO ARGUED THE SITE DOES NOT NEED ONE, and that argument was
-       weaker than it read: "a marketing page has no state, so the failure a rehearsal exists to
-       catch cannot happen to it." A rehearsal is not only about data. A marketing site's failures
-       are a broken link, a claim the product does not back, and a page that reads wrong at 390px,
-       and every one of those is easier to see on a real hostname than in a preview URL nobody
-       shares. It also costs nothing: the pages are the same pages in alpha's palette.
+       `env.alpha` BELOW IS KEPT ONLY FOR A FUTURE REHEARSAL, AND IT IS NOT DEPLOYED. Its app Worker,
+       `braindog-alpha`, was deleted on 25 September (`loop/DIRECTION.md` §27), so an alpha site
+       deployed now would hand every door to a service that does not exist. `deploy.yml` runs its
+       alpha steps only when the repository variable `DEPLOY_ALPHA` is `true`, so that variable stays
+       unset while the app Worker is gone. The block stays so that a rehearsal, the day one is wanted
+       again, needs the app Worker recreated and nothing rewritten here.
 
        THE APEX, AND `www` IS NOT HERE. A Worker can hold several Custom Domains, but this one's code
        runs only for the app's doors, and widening it to move `www` to the apex would be writing a
-       request handler for a redirect Cloudflare performs at the edge for free. The `www` → apex
+       request handler for a redirect Cloudflare performs at the edge for free. The `www` to apex
        redirect is a single dashboard Redirect Rule; REPORT.md §1 has it as a numbered step. */
     "production": {
       "routes": [{ "pattern": "brain.dog", "custom_domain": true }],
@@ -114,12 +118,19 @@
        everything the move adds lives in the site's version, so undoing it is `wrangler rollback`.
 
        `run_worker_first` IS THE LIST OF DOORS THE APP HAS BUILT, AND ONLY THOSE. A built door left
-       off it answers the site's 404 page on `alpha.brain.dog` and nothing fails at deploy time;
+       off it answers the site's 404 page on the site's own name and nothing fails at deploy time;
        `/a`, `/s` and `/ws` are in the app's own list and unbuilt, so they stay the site's 404 page
        here. `/mcp/` is listed beside `/mcp` because `servesMcp` accepts the slash and an MCP client
        configured with it reached the site's 404 page in the survey (section 2.6). The bare `/auth`,
-       `/api`, `/in` and `/account` are not listed, as A2's zone routes did not list them. The build
-       id is named alone, not `/.well-known/*`, because `security.txt` is the site's.
+       `/api`, `/in` and `/account` are not listed, as A2's zone routes did not list them. The Worker
+       claims `/.well-known/braindog-build` and the OAuth `.well-known` paths by name, never
+       `/.well-known/*`, because `security.txt` is the site's.
+
+       OAUTH IS A DOOR OF THE APP (`loop/finish/agents.md` C4): `/oauth/*` is where an MCP client
+       registers, sends the person's browser to sign in and trades its code, and the metadata it
+       discovers from `/mcp`'s 401 is the protected resource's (with its `/mcp` form under it, as
+       RFC 9728 inserts a resource's path) and the authorization server's. `oauth.ts` in the app
+       answers every path under them, a 404 in OAuth's words for one that names nothing.
 
        `/healthz` IS THE APP'S LIVENESS ANSWER (deb5b703), matched in its `src/index.ts` ahead of
        every predicate in `src/route.ts`, and it was off this list for a wave: `alpha.brain.dog/healthz`
@@ -135,7 +146,7 @@
       "assets": {
         "directory": "build-alpha",
         "not_found_handling": "404-page",
-        "run_worker_first": ["/app", "/app/*", "/api/*", "/auth/*", "/account/*", "/mcp", "/mcp/", "/in/*", "/.well-known/braindog-build", "/healthz"]
+        "run_worker_first": ["/app", "/app/*", "/api/*", "/auth/*", "/account/*", "/mcp", "/mcp/", "/in/*", "/oauth/*", "/.well-known/braindog-build", "/.well-known/oauth-protected-resource", "/.well-known/oauth-protected-resource/*", "/.well-known/oauth-authorization-server", "/healthz"]
       },
       "services": [{ "binding": "APP", "service": "braindog-alpha" }]
     }

@@ -20,14 +20,14 @@
 
 import type { Result } from '@braindog/ports';
 import { install, normalise, plan, type Applied, type Installed } from '@braindog/declare';
-import { KERNEL_WRITTEN, type Declaration, type FieldDecl, type Json, type Kernel } from '@braindog/kernel';
+import { KERNEL_WRITTEN, type Declaration, type FieldDecl, type IngestDecl, type Json, type Kernel } from '@braindog/kernel';
 
 import { AGENTS_PACK, AGENTS_REGISTERS, RUNS_ON, agentsPackDocument } from './packs/agents.ts';
 
 export { AGENTS_PACK, AGENTS_PAGES, AGENTS_REGISTERS, RUNS_ON, agentsPackDocument, type PackManifest } from './packs/agents.ts';
 export { FIRST_PARTY, FIRST_PARTY_VERSIONS, crossPack, firstPartyDocument, firstPartyManifest, type DocumentOptions, type FirstPartyId } from './packs/first-party.ts';
 export * from './modules/base.ts';
-export { ACCOUNTS, CATEGORIES, INSTALLMENTS, MONEY_INGESTS, MONEY_SMS_INGESTS, OBLIGATIONS, RECURRING_ITEMS, SNAPSHOTS, TRANSACTIONS, cashSeries, nightOf, snapshotRows, type SeedIngest } from './modules/money.ts';
+export { ACCOUNTS, CATEGORIES, INSTALLMENTS, OBLIGATIONS, RECURRING_ITEMS, SNAPSHOTS, TRANSACTIONS, cashSeries, nightOf, snapshotRows } from './modules/money.ts';
 export { SERVICES } from './modules/estate.ts';
 export { PROJECTS_SAID, THINGS } from './modules/portfolio.ts';
 export { PEOPLE } from './modules/people.ts';
@@ -39,8 +39,6 @@ import {
   CATEGORIES,
   INSTALLMENTS,
   MONEY_HOME_SETTING,
-  MONEY_INGESTS,
-  MONEY_SMS_INGESTS,
   MONEY_METRICS,
   MONEY_PAGES,
   MONEY_REGISTERS,
@@ -50,7 +48,6 @@ import {
   SNAPSHOTS,
   TRANSACTIONS,
   targetConfigOf,
-  type SeedIngest,
 } from './modules/money.ts';
 export { MONEY_HOME_SETTING, MONEY_TARGET_SETTINGS, targetConfigOf } from './modules/money.ts';
 import { ESTATE_METRICS, ESTATE_PAGES, ESTATE_REGISTERS, SERVICES } from './modules/estate.ts';
@@ -228,30 +225,29 @@ export const automationDeclarations = (): Declaration[] =>
       : { id: `rule.${String(body.rule)}`, kind: 'rule' as const, body: body as never },
   );
 
+/** A pattern as a first-party module declares one: an ingest, filed under the pack its `pack:` names. */
+export type ModuleIngest = IngestDecl & { pack?: string };
+
 /**
- * How a forwarded message becomes a row: the patterns the modules ship with.
+ * How a forwarded message becomes a row: the patterns the first-party modules ship with, and today they ship none.
  *
- * DECLARED, VALID, TESTED, AND INSTALLED BY NOTHING, which is the hole this closes. `MONEY_INGESTS`
- * was read only by `test/money.test.ts`, which installs it by hand before it forwards anything, so
- * every assertion there held while the record `installSeed` actually opens carried no pattern at
- * all. Measured on a seeded record before this line: nought declarations of kind `ingest`, and an
- * bank's card alert posted at the arrival path was stored, hashed, left `untriaged` and wrote
- * nothing, which is correct behaviour and an empty ledger beside a full inbox.
+ * THE LAST TWO LEFT AT money-core 3.0.0. money-core carried a card alert's two wordings, `bank-card-out` and
+ * `bank-card-in`, and since 1.7.0 their webhook twins `-sms`, and this spread all four into `packDocument()`, every
+ * first-party document and the sample. So every record set up with Money held an English bank alert's wording and a
+ * text door for it, whether its owner banked by card, by cash or not at all, which `loop/DIRECTION.md` section 22 names
+ * as a use case the shell may not carry ("a bank SMS pattern"). They are `packs/card-alerts` now, a file a record
+ * installs when it wants them, as one Egyptian bank's six went to `packs/bank-hsbc-eg` at money-core 1.8.0.
  *
- * AND THE SAME EIGHT READINGS AS WEBHOOKS, since money-core 1.7.0, because his bank's messages reach him as
- * text on a phone that forwards no mail. Before `MONEY_SMS_INGESTS` was spread here, an SMS his Shortcut posted at
- * `bank-from-out-sms` answered 404 on every record the product had set up
- * (`packages/host/test/ingest-shortcut.test.ts` (7)). A twin matches nothing until an owner mints its token.
+ * THE LIST STAYS, AND EMPTY, because it is still the one road from a module into a record for a pattern that names no
+ * bank and no country: `packDocument()` spreads it, `installSeed` installs it with the lists it writes into, and
+ * `test/pack.test.ts` holds the two to the same count. A module that declares a pattern again puts it here and nowhere
+ * else. Typed here rather than by money-core's own name, so that nothing in this file depends on money-core declaring a
+ * pattern at all.
  *
- * money-core's ONLY, SINCE 1.8.0: the two card wordings and their twins. One Egyptian bank's six and their twins are a
- * pack of their own, a file under `packs/`, and this is what `packDocument()` and every first-party document are built
- * from, so a starter use case no longer carries them.
- *
- * AND THE SAMPLE NO LONGER CARRIES THEM EITHER, since 25 September. `installSeed` spread that pack's twelve in beside
- * these, because the tests that forward the bank's lines forwarded them into the sample; those tests install the pack
- * file on the record now (`test/pack-files.ts`), and the sample is a London studio, which has no Cairo bank.
+ * THE SAMPLE CARRIES NO PATTERN EITHER. A test that forwards a card alert installs `packs/card-alerts` on its record, as
+ * the tests that forward the Egyptian bank's lines install that pack's file (`test/pack-files.ts`).
  */
-export const INGESTS: Record<string, SeedIngest> = { ...MONEY_INGESTS, ...MONEY_SMS_INGESTS };
+export const INGESTS: Record<string, ModuleIngest> = {};
 
 export const ingestDeclarations = (): Declaration[] =>
   Object.values(INGESTS).map((body) => ({ id: `ingest.${body.ingest}`, kind: 'ingest' as const, body: body as never }));
@@ -324,8 +320,8 @@ export function packDocument(): Record<string, unknown> {
       ...Object.values(METRICS),
       ...Object.values(RULES),
       /* A PATTERN IS SPREAD AS IT STANDS, where a register had to be respelled: `normalise` reads a
-         declaration's kind off its FIRST key, and `MONEY_INGESTS` already writes `ingest:` first,
-         so the document form and the stored form of an ingest are the same object. */
+         declaration's kind off its FIRST key, and a pattern in `INGESTS` writes `ingest:` first, so
+         the document form and the stored form of an ingest are the same object. */
       ...Object.values(INGESTS),
       /* A RULE AND THE SCRIPT IT STARTS, each already in the document form with its kind first. */
       ...AUTOMATIONS,

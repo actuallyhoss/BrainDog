@@ -1,5 +1,5 @@
 /**
- * The fifteen tools, which are the whole of what an agent sees.
+ * The tools, which are the whole of what an agent sees.
  *
  * THE COUNT IS THE DESIGN. `10-MCP` §4 puts a budget on it: the tool list is in every turn of every
  * session, so one more tool costs every conversation for ever. So the record's own vocabulary
@@ -76,6 +76,14 @@
  * before the owner is asked. It is a branch of `propose`'s, not a tool, for `script_try`'s reason, so the list costs
  * what it did; `budget.test.ts` holds that.
  *
+ * AND `triage` IS THE SIXTEENTH, THE ONE TOOL THE CEILING WAS RAISED FOR (`loop/finish/contracts.md` §6.1, X2). An
+ * agent could read the inbox and act on none of it, because filing and setting aside were the owner's in a browser; the
+ * record now admits a token its owner gave the `inbox` reach, and every other token is refused in the record's own
+ * sentence. Nothing it says could ride on another tool's answer, as `dry_run` and `script_try` do, because it is a write
+ * of its own, and no description had a clause left to give: the three passes above already cut them to what the schema
+ * and the instructions do not say. So `budget.test.ts`'s ceiling went from 2,600 to 2,760, once, and never moves again.
+ * The list measured 2,544 by that test's estimator before it, and the test's diagnostic is the count that holds after.
+ *
  * AND THE RESOURCES ARE NOT TOOLS, which is the other half of the same argument. A resource list is
  * fetched when it is wanted, so the per-register variability, one `schema/<register>` each, costs
  * nothing in a turn that does not ask for it.
@@ -106,7 +114,7 @@ type Row = { state?: string | null; fields: Record<string, unknown> };
  * command line it is nothing the tools look at, because the bearer travels in the request. The tools
  * hand it on and never read it, which is what keeps authorisation in one place: the record.
  *
- * THE LAST NINE ARE OPTIONAL, BECAUSE A HOST MAY NOT ANSWER THEM. The record answers the first four
+ * THE ONES MARKED `?` ARE OPTIONAL, BECAUSE A HOST MAY NOT ANSWER THEM. The record answers the first four
  * of them since build step 16, and a host older than that does not. The command line offers only
  * the routes its client knows, so it still works against an older host. Without one, its tool
  * refuses with what to do instead, and its resource is not listed.
@@ -168,10 +176,30 @@ export type McpSurface<C> = {
    */
   previewPage?(args: { body: Record<string, unknown> }, ctx: C): Answer;
   /**
-   * What arrived and no rule filed, in one state or all of them, with a count for each. The record's own rung, which today
-   * is the owner and no token, and optional for the command line's reason above: its surface is a fixed list.
+   * A whole change drawn as it would stand, every page it makes over sample rows if it brings any, installed in the
+   * record's rehearsal and kept nowhere (the record's `previewChange`, `loop/finish/contracts.md` §2.4). READ+, and
+   * optional for `scriptTry`'s reason: it backs only `propose`'s `try` on a bundle, or on one list or figure, and a surface
+   * without it answers that `NOT_IN_THIS_BUILD`.
+   */
+  previewChange?(args: { to: unknown; rows?: unknown; about?: unknown }, ctx: C): Answer;
+  /**
+   * An automation body's steps taken by the real runner over a sample, everything they wrote rolled back and nothing
+   * sent (the record's `tryAutomation`, `loop/finish/contracts.md` §2.2). READ+, and optional for `scriptTry`'s reason: it
+   * backs only `propose`'s `try` on a rule change, and a surface without it answers that `NOT_IN_THIS_BUILD`.
+   */
+  tryAutomation?(args: { body: Record<string, unknown>; sample?: unknown }, ctx: C): Answer;
+  /**
+   * What arrived and no rule filed, in one state or all of them, with a count for each. The record's own rung, which is
+   * the owner and a token its owner gave the `inbox` reach, and optional for the command line's reason above: its surface
+   * is a fixed list.
    */
   inbox?(args: { state?: string }, ctx: C): Answer;
+  /**
+   * One arrival filed as a row in a list, or set aside (`loop/finish/contracts.md` §2.3, the record's `triage`). DATA,
+   * and it admits a token only when its owner gave it the `inbox` reach. Optional for the command line's reason above:
+   * both HTTP hosts hand `serveMcp` the whole record, and `apps/cli/src/surface.ts` routes it once its client knows it.
+   */
+  triage?(args: { arrival: string; register?: string; fields?: Args; ignore?: boolean; note?: string }, ctx: C): Answer;
   /**
    * Every figure the record declares that this caller may read, whatever pack declared it, and whether it is read about
    * one thing (`param`, asked as `<id>:<value>`). READ+, the record's `figures`. Without it the record's methods name a
@@ -230,7 +258,7 @@ export type Tool = {
 
 const str = (description: string) => ({ type: 'string', description });
 const int = (description: string) => ({ type: 'integer', description });
-/* `required` is left out when empty: it is fifteen tools' worth of tokens that say nothing. */
+/* `required` is left out when empty: in every tool that has none, it is tokens that say nothing. */
 const obj = (properties: Record<string, unknown>, required: string[] = []) => ({
   type: 'object',
   properties,
@@ -268,7 +296,7 @@ export const TOOLS: readonly Tool[] = [
     /* THE GRAMMAR IS SAID ONCE, in the argument that takes it. It was in both, and a client shows a
        model the description and the schema together, so the three forms were read twice for 27
        tokens in every turn of every session. */
-    /* AND ONE FIGURE, WHICH PAID FOR ITSELF IN A CLAUSE AND NOT A TOOL. The count is fifteen and a sixteenth cost
+    /* AND ONE FIGURE, WHICH PAID FOR ITSELF IN A CLAUSE AND NOT A TOOL. The count was fifteen and a sixteenth cost
        91 to 117 tokens each time one was measured; this clause, the one in `spoken` and `record_index`'s cost 16, and
        the list measured 2,528 before and 2,544 after. A figure's id is a bare lowercase name, which no row form is. */
     description: 'One row or figure, by the id a person says out loud.',
@@ -398,7 +426,14 @@ export const TOOLS: readonly Tool[] = [
   {
     name: 'log',
     description: 'Append one note to a row, changing nothing about it.',
-    input: obj({ spoken: str('register#number, or a prefixed id such as LN7.'), note: str('One sentence, for the next reader.') }, ['spoken', 'note']),
+    /* A NOTE ABOUT NOTHING IN PARTICULAR IS ONE CALL (`loop/finish/gaps.md` 1.6.2). It needed a row, so an agent first
+       asked `context` for its session's id, or wrote something to open one, and then logged on it: two calls for what
+       the old tool's `brain_log` did in one. Left out, the note goes on the caller's own session, and `log` in `tools`
+       below says how. */
+    input: obj(
+      { spoken: str('register#number, or a prefixed id such as LN7. Omit for your own session.'), note: str('One sentence, for the next reader.') },
+      ['note'],
+    ),
     writes: true,
   },
   {
@@ -435,6 +470,25 @@ export const TOOLS: readonly Tool[] = [
         where: str('Where you met them, such as commit 4464966 in braindog.'),
       },
       ['where'],
+    ),
+    writes: true,
+  },
+  {
+    name: 'triage',
+    /* THE DESCRIPTION IS THE CONTRACT'S, WORD FOR WORD (`loop/finish/contracts.md` §6.2), and the site's list of tools
+       reads `TOOLS` rather than a copy. Who may call it is not said here: the record refuses every token without the
+       `inbox` reach in one sentence that names what it lacks, which teaches better than a clause every turn pays for.
+       `ignore` says nothing beside its name, because "or set it aside" in the description already has. */
+    description: 'File one arrival from the inbox as a row in a list, or set it aside. braindog:inbox lists them.',
+    input: obj(
+      {
+        arrival: str('Its id in braindog:inbox.'),
+        register: str('The list it goes in.'),
+        fields: { type: 'object', description: 'Field ids to values. Omit to title the row from the arrival.' },
+        ignore: { type: 'boolean' },
+        note: str('One sentence a person reads in six weeks.'),
+      },
+      ['arrival'],
     ),
     writes: true,
   },
@@ -568,6 +622,22 @@ const unbuilt = (name: string, instead: string): Result<never> => ({
   refusal: { code: 'NOT_IN_THIS_BUILD', fix: `This record does not answer ${name} yet. ${instead}` },
 });
 
+/** The most hits one search answers, whatever `limit` asked: the clamp in the kernel's `fts.ts` search. */
+const SEARCH_MOST = 100;
+
+/**
+ * What a search that matched more rows than it answered says about the rest.
+ *
+ * THE CALLER'S OWN LIMIT IS SAID AS THE CALLER'S (defects G3). This said "the record answers at most" whatever number
+ * came back, so an agent that sent `limit: 5` read that the record stops at five and had no reason to ask for more, and
+ * one that sent no limit read twenty, the default, where the record gives up to a hundred. Only a full hundred is the
+ * record's own cap, and only then is narrowing the one way on.
+ */
+const fewer = (total: number, showing: number, asked: boolean): string =>
+  showing >= SEARCH_MOST
+    ? `${String(total)} rows matched and the record answers at most ${String(SEARCH_MOST)}. Narrow the question.`
+    : `${String(total)} rows matched and ${asked ? 'your limit' : 'the default limit'} kept this answer to ${String(showing)}. Send a limit up to ${String(SEARCH_MOST)}, or narrow the question.`;
+
 /**
  * The sentences `context` adds to the record's briefing, for an agent arriving from the old tool.
  *
@@ -592,7 +662,7 @@ const teaching = (briefing: Record<string, unknown>): string[] => {
   return [
     session
       ? `A note about nothing in particular goes on your own session: log on ${session}.`
-      : 'A note about nothing in particular goes on your own session: your first write, or handoff, opens it, then log on its S id.',
+      : 'A note about nothing in particular goes on your own session: log it with no spoken, which opens the session as handoff would.',
     ...(tasks
       ? [
           `A task's lane is its agent field, and the person's own lane is where it is empty: list tasks where "agent is empty".`,
@@ -687,6 +757,8 @@ const FIXED: readonly Resource[] = [
   resource('automations', 'Every automation: what starts it, when it runs next, and how its runs went this month.'),
   resource('arrangement', 'How this BrainDog is arranged: its packs, what else is on offer, its voice and settings, its pages, and what waits.'),
   resource('grammar/page', 'What a page declaration may contain, with one that installs.'),
+  resource('grammar/register', "What a list declaration may contain: its keys, each field's keys, and one that installs."),
+  resource('grammar/metric', 'What a figure declaration may contain, with one that installs.'),
   resource('grammar/proposals', 'The bodies that change what this BrainDog is: pack, settings and arrange.'),
   resource('grammar/script', 'What a script declaration may contain, what its ctx can reach, its limits, and two that install.'),
   resource('grammar/automations', 'What an automation may say: its triggers, its steps, its limits, what does not run yet, and two that install.'),
@@ -713,8 +785,11 @@ export const TEMPLATES = [
  * The tool layer holds NO logic of its own beyond addressing: every refusal a caller sees comes from
  * the record, with the sentence the record wrote. A second set of checks here would be a second set
  * to keep in step, and the one that drifted would be the one an agent reads.
+ *
+ * `origin` IS THE ADDRESS THE HOST SERVES THE APP AT, such as `https://brain.dog`, handed down by `handle`. It is read
+ * for one thing, the `decide` link on a filed question, and left out it is no link at all.
  */
-export function tools<C>(surface: McpSurface<C>) {
+export function tools<C>(surface: McpSurface<C>, origin?: string) {
   /* KEPT FOR THE LIFE OF THESE TOOLS, which is one answer: `rpc.ts` is the one caller outside the tests, and it builds
      them for each message. A schema the caller may not read is not kept, and that register's rows are named
      `register#number`. */
@@ -975,6 +1050,54 @@ export function tools<C>(surface: McpSurface<C>) {
   };
 
   /**
+   * A rule change whose steps are taken now over a sample and filed nowhere: `propose` with `"try": {"sample": {...}}`, or
+   * `"try": true` for a clock or a button, which need none (`loop/finish/contracts.md` §6.3, `automation_try`).
+   *
+   * THE REAL RUNNER, ROLLED BACK. The record lints the body as an install would, then runs it inside its rehearsal, so
+   * the agent reads each step as done, would, waiting, failed or skipped in the runner's own words, and a call, a script,
+   * a question or a notice is said as what a live run would do and never sent. Nothing is filed, so nobody is asked; the
+   * agent sends the change again without `try` to put it in front of the owner, as it does after `script_try`.
+   */
+  const automationTry = async (body: Record<string, unknown>, rule: Record<string, unknown>, ctx: C): Answer => {
+    const said = body.try;
+    if (said !== true && !(isObject(said) && Object.keys(said).every((k) => k === 'sample')))
+      return { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: 'try is true, or {"sample": {...}} to start the rule from a row, an arrival or a figure.', at: 'body.try' } };
+    if (!surface.tryAutomation) return unbuilt('a trial', 'Send the change without try, and the owner reads what it would do in Decide.');
+    const tried = await surface.tryAutomation({ body: rule, ...(isObject(said) && said.sample !== undefined ? { sample: said.sample } : {}) }, ctx);
+    return tried.ok ? { ok: true, value: { automation_try: tried.value, proposed: false } } : tried;
+  };
+
+  /**
+   * A whole change drawn as it would stand and filed nowhere: `propose` with `"try": true`, or `"try": {"rows": ...,
+   * "about": ...}` to draw it over sample rows, on a change whose `to` is a bundle, or one list or figure
+   * (`loop/finish/contracts.md` §6.3, `change_preview`).
+   *
+   * A BUNDLE COULD NOT BE TRIED AT ALL. `try` read one page or one script, so a launch desk's lists, figures and pages
+   * were filed and accepted a piece at a time before any page of it was seen holding a row
+   * (`packages/mcp/test/compose-page.test.ts`). The record installs the whole change in its rehearsal and throws it away,
+   * so the agent reads every page the change makes, filled over the row it names or the first one there is, in the
+   * record's own words, and nobody is asked; it sends the change again without `try` to put it in front of the owner.
+   */
+  const rehearsed = async (body: Record<string, unknown>, ctx: C): Answer => {
+    const said = body.try;
+    if (said !== true && !(isObject(said) && Object.keys(said).every((k) => k === 'rows' || k === 'about')))
+      return {
+        ok: false,
+        refusal: { code: 'VALUE_MALFORMED', fix: 'try is true, or {"rows": {...}, "about": "list#1"} to draw the change over sample rows.', at: 'body.try' },
+      };
+    if (!surface.previewChange) return unbuilt('a preview', 'Send the change without try, and the owner sees it drawn in Decide.');
+    const drawn = await surface.previewChange(
+      {
+        to: body.to,
+        ...(isObject(said) && said.rows !== undefined ? { rows: said.rows } : {}),
+        ...(isObject(said) && said.about !== undefined ? { about: said.about } : {}),
+      },
+      ctx,
+    );
+    return drawn.ok ? { ok: true, value: { change_preview: drawn.value, proposed: false } } : drawn;
+  };
+
+  /**
    * A script change run now in the host's sandbox and filed nowhere: `propose` with `"try": true`, or `"try": {"input":
    * ...}` to hand it what a door would have, beside `to` (`loop/research-shell-scripts.md` section 7).
    *
@@ -985,15 +1108,15 @@ export function tools<C>(surface: McpSurface<C>) {
   const trial = async (body: Record<string, unknown>, ctx: C): Answer => {
     const page = pageIn(change(body));
     if (page !== null) return preview(body, page, ctx);
+    /* A RULE CHANGE IS TRIED BY THE RUNNER (`automationTry` above), before a script's reading of `try` is asked. */
+    const rule = ruleIn(change(body));
+    if (rule !== null) return automationTry(body, rule, ctx);
+    /* ANYTHING ELSE IS DRAWN WHOLE BY THE RECORD'S REHEARSAL (`rehearsed` above): a bundle, or one list or figure. */
+    const script = scriptIn(change(body));
+    if (script === null) return rehearsed(body, ctx);
     const said = body.try;
     if (said !== true && !(isObject(said) && Object.keys(said).every((k) => k === 'input')))
       return { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: 'try is true, or {"input": ...} to hand the script what a door would.', at: 'body.try' } };
-    const script = scriptIn(change(body));
-    if (script === null)
-      return {
-        ok: false,
-        refusal: { code: 'VALUE_MALFORMED', fix: 'Only a script or a page change can be tried. Send this one without try to propose it.', at: 'body.try' },
-      };
     if (!surface.scriptTry) return unbuilt('a trial', 'Send the change without try, and the owner reads the source in Decide.');
     const tried = await surface.scriptTry({ body: script, ...(isObject(said) && said.input !== undefined ? { input: said.input } : {}) }, ctx);
     return tried.ok ? { ok: true, value: { script_try: tried.value, proposed: false } } : tried;
@@ -1058,6 +1181,40 @@ export function tools<C>(surface: McpSurface<C>) {
     const out: Named[] = [];
     for (const id of new Set(await drawnIds())) if (NAMED.test(id) && (await surface.metric({ metric: id }, ctx)).ok) out.push({ id, param: false });
     return out;
+  };
+
+  /**
+   * A filed question with the address where the person answers it: `<origin>/app/<slug>/decide/<id>`
+   * (`loop/finish/contracts.md` §6.3, agents C3).
+   *
+   * AN AGENT THAT PROPOSED COULD SAY ONLY "I PUT A QUESTION IN YOUR QUEUE". Deciding is the person's, in the app, and no
+   * token reaches it (ADR-060), so the one useful thing to hand them is the link to the question itself, which the agent
+   * can now pass on in its own reply.
+   *
+   * THE ORIGIN IS THE HOST'S AND THE SLUG IS THE RECORD'S. The host hands the address it is served at to `handle`, and
+   * this package never guesses one, so a transport that hands none answers as before, with no `decide`. The slug is
+   * `boot`'s `record`, asked only after a filing succeeded; a record that names none answers without it too. An answer
+   * that already carries `decide` keeps its own.
+   */
+  const decideAt = async (answer: Result<unknown>, ctx: C): Promise<Result<unknown>> => {
+    /* AN EMPTY ID IS NO QUESTION TO LINK TO. The record answers `''` for the handle it could not find (`filedAs`), and
+       a link ending in `/decide/` would land on the queue while saying it named this question. */
+    if (
+      origin === undefined ||
+      !answer.ok ||
+      !isObject(answer.value) ||
+      typeof answer.value.id !== 'string' ||
+      answer.value.id === '' ||
+      answer.value.decide !== undefined
+    )
+      return answer;
+    const id = answer.value.id;
+    const boot = await surface.boot(ctx);
+    const record = boot.ok ? (boot.value as { record?: unknown }).record : undefined;
+    const slug = isObject(record) && typeof record.slug === 'string' && record.slug !== '' ? record.slug : null;
+    if (slug === null) return answer;
+    const at = `${origin.replace(/\/+$/, '')}/app/${encodeURIComponent(slug)}/decide/${encodeURIComponent(id)}`;
+    return { ok: true, value: { ...answer.value, decide: at } };
   };
 
   const run: Record<string, (args: Args, ctx: C) => Answer> = {
@@ -1165,7 +1322,7 @@ export function tools<C>(surface: McpSurface<C>) {
         );
       if (matched === null) return { ok: true, value: rows };
       const total = Object.values(matched).reduce((a, b) => a + b, 0);
-      return { ok: true, value: { rows, matched: total, showing: rows.length, ...(total > rows.length ? { more: `${String(total)} rows matched and the record answers at most ${String(rows.length)}. Narrow the question.` } : {}) } };
+      return { ok: true, value: { rows, matched: total, showing: rows.length, ...(total > rows.length ? { more: fewer(total, rows.length, args.limit !== undefined) } : {}) } };
     },
 
     history: async (args, ctx) => {
@@ -1231,7 +1388,7 @@ export function tools<C>(surface: McpSurface<C>) {
           : args.body_kind === 'change'
             ? change(args.body)
             : args.body;
-      const filed = await surface.propose({ ...args, ...(body === undefined ? {} : { body }) } as never, ctx);
+      const filed = await decideAt(await surface.propose({ ...args, ...(body === undefined ? {} : { body }) } as never, ctx), ctx);
       if (!filed.ok || !isObject(filed.value) || args.body_kind !== 'change' || !isObject(body)) return filed;
       const rule = ruleIn(body);
       if (rule !== null && surface.dryRun) {
@@ -1285,6 +1442,15 @@ export function tools<C>(surface: McpSurface<C>) {
       const note = String(args.note ?? '').trim();
       if (!note)
         return { ok: false, refusal: { code: 'REQUIRED_MISSING', fix: 'A note is one sentence, and this one is empty.', at: 'note' } };
+      /**
+       * NO ROW IS THE CALLER'S OWN SESSION, AND IT IS THE RECORD'S `handoff` WITH THE NOTE ALONE. That is the one method
+       * that finds a token's run, or opens it on its first write, inside the same transaction as the write, so a note is
+       * one call whether or not the run exists yet. It appends the line to the run's notes and keeps it in the run's
+       * history, which is where a note about nothing in particular was always taught to go (`teaching` above). A person
+       * names a run from the app, so the record refuses one here in its own sentence, as `handoff` does.
+       */
+      if (args.spoken === undefined || args.spoken === null)
+        return surface.handoff ? surface.handoff({ note }, ctx) : unbuilt('log with no row', 'Name the row the note is about in spoken.');
       const at = await locate(args.spoken, ctx);
       if (!at.ok) return at;
       return surface.update({ ...at.value, patch: {}, note }, ctx);
@@ -1298,6 +1464,22 @@ export function tools<C>(surface: McpSurface<C>) {
     meet: async (args, ctx) =>
       surface.meet ? surface.meet(args, ctx) : unbuilt('meet', 'If there is a people register, add the person there with create.'),
 
+    /**
+     * THE ARGUMENTS GO TO THE RECORD AS SENT, and who may triage is the record's to say: a token without the `inbox` reach
+     * is refused there in one sentence naming what it lacks, and a field it does not take is named in `FIELD_UNKNOWN`.
+     *
+     * THE ROW IT FILED IS NAMED AS EVERY OTHER TOOL NAMES A ROW. The record answers the arrival's id and state beside the
+     * row it became, whole, so the row is made compact here with its register's prefix, and the agent reads `LN8` where
+     * `create` would have said `LN8` for the same row.
+     */
+    triage: async (args, ctx) => {
+      if (!surface.triage) return unbuilt('triage', 'Read braindog:inbox, and tell the person what is waiting there.');
+      const settled = await surface.triage(args as never, ctx);
+      if (!settled.ok || !isObject(settled.value) || !isEntry(settled.value.entry)) return settled;
+      const entry = settled.value.entry;
+      if (!prefixes.has(entry.register)) await learnPrefix(entry.register, ctx);
+      return { ok: true, value: { ...settled.value, entry: compact(entry, prefixes.get(entry.register) ?? '') } };
+    },
   };
 
   /**
@@ -1352,7 +1534,9 @@ export function tools<C>(surface: McpSurface<C>) {
       const arranged = surface.arrangement;
       if (!arranged) return unbuilt(uri, 'Read braindog:boot instead.');
       if (head === 'arrangement' && !rest) return arranged({}, ctx);
-      if (head === 'grammar' && (rest === 'page' || rest === 'proposals')) return arranged({ grammar: rest }, ctx);
+      /* THE RECORD'S OWN GRAMMARS (`packages/record/src/grammar.ts`), all but its `rule`: a rule is said in full by
+         `grammar/automations` above, this package's text, and a second rule grammar here would be two to keep in step. */
+      if (head === 'grammar' && (rest === 'page' || rest === 'register' || rest === 'metric' || rest === 'proposals')) return arranged({ grammar: rest }, ctx);
       if (head === 'declaration' && NAMED.test(rest)) return arranged({ page: rest }, ctx);
     }
     const named = NAMED.test(rest);

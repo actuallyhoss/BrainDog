@@ -1,6 +1,7 @@
 /**
- * An invitation, end to end, over a real socket: the owner mints a link, a stranger opens it, becomes a person,
- * signs in, and reaches the record at the level it named. And every way the link must do less.
+ * An invitation, end to end, over a real socket: the owner mints a link, a stranger opens it and is told this host
+ * cannot prove a new address, because it sends no mail; signed in by a claim link instead, they accept it and reach
+ * the record at the level it named. And every way the link must do less.
  *
  * NOTHING SECRET ANYWHERE. The link's token is in exactly one body, the mint's answer, and in no log line.
  */
@@ -11,6 +12,8 @@ import { randomBytes } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+
+import { NO_MAIL } from '@braindog/host/auth';
 
 import { start } from '../src/server.ts';
 import { asJSON, register, testKeys } from '../../../packages/record/test/fixtures/webauthn/authenticator.ts';
@@ -80,6 +83,7 @@ async function stack(o: { token?: string | null } = {}) {
   };
 
   return {
+    running,
     call,
     keyIn,
     passkey,
@@ -101,7 +105,7 @@ async function stack(o: { token?: string | null } = {}) {
   };
 }
 
-test('THE WHOLE INVITATION: minted by the owner, opened by a stranger, who signs in and reaches the record once', async () => {
+test('THE WHOLE INVITATION: minted by the owner, opened by a stranger who cannot prove a new address here, then accepted signed in, once', async () => {
   const s = await stack();
   try {
     const ada = await s.keyIn();
@@ -122,14 +126,36 @@ test('THE WHOLE INVITATION: minted by the owner, opened by a stranger, who signs
     assert.equal((listed.body?.value as unknown as unknown[]).length, 1);
     assert.equal((await s.call('/auth/invite', { body: { inviteToken: early.token } })).status, 401);
 
-    /* LOOKED AT, then accepted, by nobody signed in. */
+    /* LOOKED AT, then accepted, by nobody signed in: A NEW ADDRESS PROVES ITS MAILBOX FIRST, and this host sends no
+       mail, so it says so in one sentence and makes nobody. The link is not spent. */
     const seen = await s.call('/auth/invite', { body: { inviteToken: token } });
     assert.equal(seen.status, 200, seen.raw);
-    assert.deepEqual(seen.body?.value, { email: 'Bo@Example.com', expires_at: '2026-09-06T12:00:00.000Z', signedInAs: null });
-    const accepted = await s.call('/auth/invite', { body: { inviteToken: token, accept: true } });
+    /* AND IT SAYS WHAT IT OPENS before anybody accepts: the record by its name, and the level the owner minted it at. */
+    assert.deepEqual(seen.body?.value, {
+      email: 'Bo@Example.com',
+      expires_at: '2026-09-06T12:00:00.000Z',
+      record: 'The Studio',
+      level: 'write',
+      lists: [],
+      signedInAs: null,
+    });
+    const unproved = await s.call('/auth/invite', { body: { inviteToken: token, accept: true } });
+    assert.equal(unproved.status, 501, unproved.raw);
+    assert.equal(unproved.body?.refusal?.code, 'NOT_IN_THIS_BUILD');
+    assert.equal(unproved.body?.refusal?.fix, NO_MAIL);
+    assert.equal(unproved.sid, undefined, 'a session was made for an address nobody proved');
+    assert.equal((await s.call('/auth/invite', { body: { inviteToken: token } })).status, 200, 'refusing to prove the address spent the link');
+
+    /* SIGNED IN THE WAY THIS HOST DOES HAVE, a claim link the operator hands over, the same link is accepted. */
+    assert.ok(s.running.directory.person$('Bo@Example.com').ok);
+    const claim = await s.running.directory.auth({ flow: 'claim.mint', email: 'Bo@Example.com' });
+    assert.ok(claim.status === 200 && claim.mail && 'claimToken' in claim.mail, JSON.stringify(claim.status));
+    const redeemed = await s.call('/auth/magic/redeem', { body: { claimToken: claim.mail.claimToken } });
+    assert.equal(redeemed.status, 200, redeemed.raw);
+    const bo = redeemed.sid ?? assert.fail('no session for the new person');
+    const accepted = await s.call('/auth/invite', { sid: bo, body: { inviteToken: token, accept: true } });
     assert.equal(accepted.status, 200, accepted.raw);
     assert.equal(accepted.body?.value?.email, 'Bo@Example.com');
-    const bo = accepted.sid ?? assert.fail('no session for the new person');
 
     /* ON THE RECORD at the level named, and not an owner. */
     assert.equal((await s.call('/api/create', { sid: bo, body: { register: 'notes', fields: {} } })).status !== 401, true);

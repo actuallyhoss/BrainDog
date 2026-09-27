@@ -2,10 +2,14 @@
  * The register list's question in the record's grammar, and the record's answer in the app's.
  *
  * PURE, AND THAT IS WHY IT IS A FILE OF ITS OWN. The screen asks in the address's words: chips like
- * `state:in:open`, a search box, a column to order by. The record answers in its own: a `where`
- * tree, and rows whose refs hold the target row's ULID. Everything that translates between the two
- * is here, with no network and no runes, so `remote.test.ts` can hold it against the mock and
- * against the kernel itself over `node:sqlite`.
+ * `state:in:open`, a search box, a column to order by. The record reads a `where` as a sentence or
+ * as a tree, and answers with rows whose refs hold the target row's ULID. Everything that translates
+ * between the two is here, with no network and no runes, so `remote.test.ts` can hold it against the
+ * kernel itself over `node:sqlite`.
+ *
+ * THE CHIPS GO AS THE SENTENCE `whereOf` WRITES, and the record parses it (`sentenceOf`). The tree
+ * is kept for the one question a sentence cannot put, the search box beside the chips (`whereFor`),
+ * and for the readers that join a `where` with another under `all` (`treeOf`).
  *
  * THE DECLARATION IS READ FROM `REGISTERS`, which `learn` below fills from the record's answer to
  * `schema`, for the lists this build ships as well as for the ones it does not. The seed's copy was
@@ -17,11 +21,13 @@
  * the app and none of them is handed the answer they came from.
  */
 
+import { KERNEL_FIELDS, parseWhere, quoteValue } from '@braindog/where';
+
 import { identityOfRow, whereOf, type Identity } from './api.ts';
 import { REGISTERS, seqTitled, TITLES } from './held.ts';
 import { searchable, terms } from './find.ts';
 import type { Entry, Fields, Filter, RegisterDecl } from './schema.ts';
-import { compile, declaredValue } from './where.ts';
+import { declaredValue, schemaOf } from './where.ts';
 import { labels, relabelInto } from '../voice.ts';
 
 /** One register's rows, by the ULID the record stores a ref as, and back again. */
@@ -234,41 +240,36 @@ function declares(register: string, field: string, word: string): boolean {
 const COMPARE = new Set(['gt', 'gte', 'lt', 'lte', 'between', 'contains']);
 
 /**
- * A compare chip as the record's leaf, read by the sentence's own compiler and not by a second one.
+ * A compare chip as the record's leaf, for the tree `treeOf` builds.
  *
- * THEY ALL FELL TO THE LAST LINE OF `leafOf` AND BECAME `is`. Measured against the seed in a real
- * kernel over every ordered and text field `ORDER` declares (`remote-compare.test.ts`): 189 of 241
- * compare chips opened other rows on the record than on the sample. A money bound went over as the
- * text `GBP 2400` and was refused `MONEY_LITERAL_NEEDS_CURRENCY`, since the record takes
- * `{ amount, currency }`; an int or a decimal went over as a string and was refused
- * `VALUE_MALFORMED`; and a day or a `contains` became `is`, which answered no rows, the one answer
- * indistinguishable from a filter that worked.
+ * THEY ALL FELL TO THE LAST LINE OF `leafOf` AND BECAME `is` once, and a money bound sent as the text
+ * `GBP 2400` is refused `MONEY_LITERAL_NEEDS_CURRENCY`, since the record's tree takes
+ * `{ amount, currency }`. So a number, a money or a quantity is read by the RECORD'S OWN PARSER,
+ * `parseWhere`, over the one-clause sentence `whereOf` writes for the chip: the literal is the
+ * record's, and no second reader of `GBP 2400.50` lives here.
  *
- * `compile` ALREADY READS THE WORDS INTO THE COLUMN'S UNITS: a money bound is its minor units with
- * the currency beside them, a quantity its number with the unit, and those are the halves the
- * record's literal is made of. Parsing `GBP 2400.50` a second time here would be a third reader of
- * the same words, and this file exists because two readers of one address disagreed.
+ * A DAY KEEPS ITS WORD (`today`, `+30d`), as `before` and `after` in `leafOf` do, because the record
+ * resolves a word in a tree against its own clock, and a view saved with the word keeps meaning
+ * today tomorrow. `due:between:today,+30d` goes over as its two ends under `all`, which is how the
+ * record spells a range of days. A `contains` is its needle, which needs no reading at all.
  *
- * A DAY KEEPS ITS WORD (`today`, `+30d`), as `before` and `after` above do, because the record
- * resolves it against its own clock. A typed `due:between:today,+30d` compiles to two clauses, and
- * goes over as both of them under `all`.
- *
- * A CHIP THE SENTENCE REFUSES GOES OVER AS IT WAS TYPED, so the record refuses it in its own words
+ * A CHIP THE PARSER REFUSES GOES OVER AS IT WAS TYPED, so the record refuses it in its own words
  * rather than this file quietly dropping the clause and opening a wider list than the chip says.
  */
-function comparedOf(register: string, f: Filter): Tree {
-  const w = compile(register, whereOf([f]));
-  if (w.bad.length || w.clauses.length === 0) return { field: f.field, [f.op]: f.op === 'between' ? f.values : (f.values[0] ?? '') };
-  /* THE BOUND SAYS WHICH LITERAL IT IS, not the declaration: this app's field types stop short of
-     `quantity`, and a list the record declares may still hold one. */
-  const literal = (b: { n: number; currency?: string; unit?: string }): unknown =>
-    b.currency !== undefined ? { amount: b.n, currency: b.currency } : b.unit !== undefined ? { value: b.n, unit: b.unit } : b.n;
-  const leaves: Tree[] = w.clauses.map((c) => {
-    if ('day' in c) return { field: c.field, [c.op]: c.day };
-    if ('bounds' in c) return { field: c.field, [c.op]: c.op === 'between' ? c.bounds.map(literal) : literal(c.bounds[0]!) };
-    return { field: c.field, [c.op]: c.values[0] };
-  });
-  return leaves.length === 1 ? leaves[0]! : { all: leaves };
+function comparedLeaf(register: string, f: Filter): Tree {
+  const typed: Tree = { field: f.field, [f.op]: f.op === 'between' ? f.values : (f.values[0] ?? '') };
+  if (f.op === 'contains') return typed;
+  const declared = REGISTERS[register]?.fields.find((x) => x.id === f.field)?.type;
+  const type = declared ?? (Object.hasOwn(KERNEL_FIELDS, f.field) ? KERNEL_FIELDS[f.field] : undefined);
+  if (type === 'day' || type === 'instant') {
+    const [low, high] = f.values;
+    if (f.op !== 'between') return typed;
+    return low !== undefined && high !== undefined ? { all: [{ field: f.field, gte: low }, { field: f.field, lte: high }] } : typed;
+  }
+  /* THE CLOCK DECIDES NOTHING HERE: every dated field has gone over above as its word, so no day reaches the parser,
+     and `nowMs` is only the argument `parseWhere` requires. */
+  const read = parseWhere(whereOf([f]), schemaOf(register), { nowMs: Date.now() });
+  return read.bad.length === 0 && read.predicate !== undefined ? (read.predicate as Tree) : typed;
 }
 
 /**
@@ -276,7 +277,7 @@ function comparedOf(register: string, f: Filter): Tree {
  *
  * THE OPERATORS ARE `whereOf`'S, read the same way. `in` of one value is `is`, `not-in` of one is
  * `not`, `before` and `after` take their first value, and the six compare words go through
- * `comparedOf` above. Anything else is `is` with its first value, which is how `whereOf` reads an
+ * `comparedLeaf` above. Anything else is `is` with its first value, which is how `whereOf` reads an
  * operator it does not name.
  *
  * `not-on` IS `not` OF ITS FIRST VALUE, AND IT USED TO FALL TO THAT LAST LINE AND BECOME `is`.
@@ -285,7 +286,7 @@ function comparedOf(register: string, f: Filter): Tree {
  * sample drew all 40 obligations and the chip on a record drew none, because nothing is due today.
  *
  * A LONE WORD THE FIELD DOES NOT HOLD MAY BE THE QUESTION ABOUT ABSENCE: `is empty`, `is set`, and
- * their negations, in the order `where.ts` checks them, declared values first.
+ * their negations, in the order the record's parser checks them, declared values first.
  *
  * `has` AND `lacks` KEEP THEIR OWN WORDS, AND THEY USED TO FALL TO THE LAST LINE AND BECOME `is`.
  * Both engines refuse that by name, "repos is a list, which cannot be asked is", so the one chip
@@ -298,7 +299,7 @@ function comparedOf(register: string, f: Filter): Tree {
  */
 function leafOf(register: string, f: Filter, refs: Refs): Tree {
   const one = f.values[0] ?? '';
-  if (COMPARE.has(f.op)) return comparedOf(register, f);
+  if (COMPARE.has(f.op)) return comparedLeaf(register, f);
   if (f.op === 'before' || f.op === 'after') return { field: f.field, [f.op]: one };
   if (f.op === 'has' || f.op === 'lacks') return { field: f.field, [f.op]: valueOf(register, f.field, one, refs) };
 
@@ -330,6 +331,11 @@ function leafOf(register: string, f: Filter, refs: Refs): Tree {
  * seed, `state is open, or due before today` admits other tasks than the two chips ANDed, and the
  * record drew the AND. The search box's words stay outside the group and ANDed with it, which is
  * what `applyFilters` does on the sample: it filters the chips' answer by the box afterwards.
+ *
+ * A TREE, AND NOT THE SENTENCE `sentenceOf` WRITES, FOR TWO KINDS OF READER. The box asks for each
+ * word in ANY of several fields beside chips that are ANDed, and a sentence joins its conditions one
+ * way or the other, never both. And a saved view (`views-live.ts`) or a bulk write (`rows-write.ts`)
+ * joins this `where` with another under `all`, which a sentence cannot sit inside.
  */
 export function treeOf(register: string, filters: readonly Filter[], q: string, refs: Refs, join?: 'any'): Tree | undefined {
   const chips: Tree[] = filters.map((f) => leafOf(register, f, refs));
@@ -341,6 +347,53 @@ export function treeOf(register: string, filters: readonly Filter[], q: string, 
   }
   if (nodes.length === 0) return undefined;
   return nodes.length === 1 ? nodes[0] : { all: nodes };
+}
+
+/**
+ * The words the record reads without parsing, from the words an address carries: a ref as the target row's ULID.
+ *
+ * A REF IS THE ONE VALUE THE RECORD'S SENTENCE CANNOT READ AS A CHIP WRITES IT. A chip carries the row's number
+ * (`thing:in:1`), because a link should not break when a row is renamed, and the record's parser reads a row id, a
+ * spoken id and a name, never a bare number. So the number, or the name, becomes the ULID the walk behind this answer
+ * found for it (`valueOf`), which the record reads first and exactly. Every other value goes as the chip spells it,
+ * because the record reads a label, a declared value and a relative day itself.
+ *
+ * ONE VALUE IS QUOTED WHERE ITS BARE WORDS WOULD NOT READ BACK AS IT (`quoteValue`, the record's own rule): a text
+ * holding a comma, an `or` or a leading `not` is one value to the record rather than two clauses or a negation. A lone
+ * `empty`, `set` or `present` stays bare, so the record asks the field whether it declares the word before reading the
+ * question about absence, in that order, as it does for a person typing it. Several values of one chip are joined by
+ * `or` and cannot be quoted one by one, so they go bare, as `whereOf` writes them.
+ */
+function spokenFor(register: string, f: Filter, refs: Refs): Filter {
+  const held = f.values.map((v) => valueOf(register, f.field, v, refs));
+  const one = held.length === 1 ? held[0] : undefined;
+  const quotes = f.op === 'in' || f.op === 'not-in' || f.op === 'is' || f.op === 'has' || f.op === 'lacks' || f.op === 'contains';
+  if (one === undefined || !quotes || (f.op !== 'contains' && Object.hasOwn(ABSENCE, norm(one)))) return { ...f, values: held };
+  return { ...f, values: [quoteValue(one)] };
+}
+
+/**
+ * The chips as the sentence the record parses, or `undefined` when there is none.
+ *
+ * THE SENTENCE `whereOf` ALREADY WRITES, which is the one a link, a tile and a saved address already mean. The record
+ * reads it with its own parser, so a chip means on this screen exactly what the same words mean in a page's `where:`,
+ * a rule's `when:` and an agent's `list`; this file no longer turns a compare chip into a tree through a second reading
+ * of the grammar. `join` is `join=any`, written as `, or` between the chips.
+ */
+export function sentenceOf(register: string, filters: readonly Filter[], refs: Refs, join?: 'any'): string | undefined {
+  if (filters.length === 0) return undefined;
+  return whereOf(filters.map((f) => spokenFor(register, f, refs)), join);
+}
+
+/**
+ * The `where` the register list asks with: the chips' sentence, or the tree when the search box holds words.
+ *
+ * TWO SHAPES, BECAUSE THE RECORD TAKES ONE `where` AND THE BOX CANNOT BE SAID IN A SENTENCE: each of its words is looked
+ * for in any of the list's searchable fields, beside chips that are ANDed (`treeOf` has the rest). With nothing in the
+ * box, which is every link, tile and saved address, the chips go as words and the record parses them.
+ */
+export function whereFor(register: string, filters: readonly Filter[], q: string, refs: Refs, join?: 'any'): string | Tree | undefined {
+  return terms(q) ? treeOf(register, filters, q, refs, join) : sentenceOf(register, filters, refs, join);
 }
 
 /**

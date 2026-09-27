@@ -1,5 +1,7 @@
 # 41 · packages/kernel — specification
 
+> **Not current.** This is the plan the kernel was built from, and the kernel has long outgrown it; the truth is the code in `packages/kernel/src` and its migrations in `packages/kernel/src/migrations/`, with the sections a gate reads in [30-BLUEPRINT](30-BLUEPRINT.md) ([00-README](00-README.md)).
+
 The record's core: the one migration that creates the twenty-seven tables and the four header tables, the write
 path of [30-BLUEPRINT](30-BLUEPRINT.md) §4 with the exact SQL of every step, counters, events, `entry_fts`, the
 schedule rows a date field derives, purge, erase, and the `.brainl` export and import. Everything the record owns

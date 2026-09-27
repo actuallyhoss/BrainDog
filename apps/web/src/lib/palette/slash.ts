@@ -18,7 +18,16 @@ import { exponentOf, yesno } from 'braindog-render';
 import type { Reading, SlashProposal, SlashStatus, SlashWhere } from '@braindog/client';
 
 import { copy } from '../copy.ts';
+import { figuresIn, summaryTitle, words as citeWords } from '../cite.ts';
+import { listName } from '../record/names.ts';
 import { atCap, nearCap, resetsWords } from '../ui/slash-asks.ts';
+
+/**
+ * The fold's line for the figures an ask read, as the engine writes it (`FIGURES_TRACE` in
+ * `packages/slash/src/propose.ts`, restated because the web may not import the engine). It is not a register, so the fold
+ * says it in its own words, and it is a reason to ask pass 2 when no row answered.
+ */
+export const FIGURES_TRACE = '@figures';
 
 /**
  * The question the row would ask, or `null` when there is no row.
@@ -128,13 +137,17 @@ export function drawReading(r: Reading): Drawn {
     q: r.q,
     rows: r.rows.map((row) => ({
       id: row.id,
-      title: row.summary,
+      /* THE TITLE AND NEVER THE SPOKEN ID: the host's summary reads `tasks#1 | Invoice Acme | open`, and an id is an
+         address, not a name. A row with no title is named by its list. */
+      title: summaryTitle(row.summary, row.spoken) || citeWords.rowIn(listName(row.register)),
       spoken: row.spoken,
       register: row.register,
       href: `/r/${encodeURIComponent(row.register)}/${row.seq}`,
     })),
     fold: [
-      ...r.read.filter((t) => !(t.register === 'grant' && t.predicate === 'refused')).map((t) => copy.slashFoldLine(t.register, t.rows, traced(t.predicate))),
+      ...r.read
+        .filter((t) => !(t.register === 'grant' && t.predicate === 'refused'))
+        .map((t) => (t.register === FIGURES_TRACE ? slashWords.figuresLine(t.rows) : copy.slashFoldLine(t.register, t.rows, traced(t.predicate)))),
       copy.slashGrantRefused,
     ],
   };
@@ -152,8 +165,10 @@ export const slashWords = {
   /* `23 §8`'s footer: receded, small, and naming the model on every output. */
   drawnBy: (model: string) => `Drawn by ${model}`,
   noModel: 'Drawn by a model this host did not name',
-  decide: (id: string) => `Decide ${id}`,
+  /* THE VERB AND WHAT IT OPENS, AND NO ID: `Decide SG14` read an address aloud (design brief §9). */
+  decide: 'Open the proposal in Decide',
   without: 'Everything above this line was drawn without it.',
+  figuresLine: (n: number) => (n === 1 ? 'figures: 1 read' : `figures: ${n.toLocaleString('en')} read`),
   capLine: (used: number, cap: number, resets: string) =>
     `Slash has used ${used} of this month's ${cap} asks. The count resets on ${resetsWords(resets)}.`,
   capDismiss: 'Hide until next month',
@@ -162,11 +177,23 @@ export const slashWords = {
 /**
  * Whether to ask for a proposal at all. ZERO ROWS IS ZERO INFERENCE (`23 §6`): the engine already answers a zero-row
  * propose without calling the model, but the palette asking is still a request, a held ask and a `query` body with
- * nothing to say, for a question the record already answered with *Nothing in the record answers that.*
+ * nothing to say, for a question the record already answered with *Nothing in the record answers that.* A FIGURE READ IS
+ * A ROW'S EQUAL HERE: "why is runway four months" may match no row and still have its figure to talk about.
  */
-export const secondPass = (r: Reading): boolean => r.rows.length > 0;
+export const secondPass = (r: Reading): boolean =>
+  r.rows.length > 0 || r.read.some((t) => t.register === FIGURES_TRACE && t.rows > 0);
 
-export type DrawnProposal = { text: string; verbs: SlashProposal['verbs']; decide: string | null; footer: string };
+/**
+ * `text` IS SLASH'S SENTENCE WITH ITS BRACES IN IT, and `figures` what each stands for; `Cited.svelte` draws the two
+ * together, so the palette never prints a brace and never formats a figure itself.
+ */
+export type DrawnProposal = {
+  text: string;
+  figures: Record<string, unknown>;
+  verbs: SlashProposal['verbs'];
+  decide: string | null;
+  footer: string;
+};
 
 /**
  * A `Proposal`, as the palette draws it under the rows.
@@ -182,6 +209,7 @@ export function drawProposal(p: SlashProposal): DrawnProposal {
   const model = typeof p.model === 'string' ? p.model.trim() : '';
   return {
     text: p.text,
+    figures: figuresIn(p.body),
     verbs: [...p.verbs],
     decide: p.filed === null ? null : `/decide/${encodeURIComponent(p.filed)}`,
     footer: model === '' ? slashWords.noModel : slashWords.drawnBy(model),

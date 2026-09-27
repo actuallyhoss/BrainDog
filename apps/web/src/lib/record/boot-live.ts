@@ -19,6 +19,7 @@ import { railRoom } from '@braindog/kernel';
 import { useCaseName } from '@braindog/seed/usecases/names';
 
 import { iconFor, setupSaid, whoDid, type NavEntry } from './api.ts';
+import { learnHome } from './api.ts';
 /* THE BUILT-IN ADD-ONS' NAMES AND LISTS: a line about an add-on names it from here. It read the sample's `PACKS`, which
    carried the same six and the sample's two made-up add-ons, until wave C1 (`modules.ts`). */
 import { moduleOf } from './modules.ts';
@@ -27,6 +28,8 @@ import { copy } from '../copy.ts';
 import type { SwitcherRow } from './switcher.ts';
 import { noteOf } from './history-live.ts';
 import type { NewsItem, PageDecl, Person, Question } from './schema.ts';
+import type { Level } from './schema.ts';
+import { levelsFrom } from './may.ts';
 import type { IconName } from '../ui/icons.ts';
 
 export type Fetch = NonNullable<ClientOptions['fetch']>;
@@ -46,6 +49,11 @@ type ShellBase = {
     slug: string;
     name: string;
     locale: string;
+    /**
+     * THE RECORD'S HOME CURRENCY AS ITS `boot` SAID IT (`Boot.record.currency`), `null` where nobody has chosen one or
+     * the host is older than the field. `homeCurrency()` in `api.ts` answers this same value, kept as the shell is built.
+     */
+    currency: string | null;
     registers: { id: string; name: string; count: number; icon: IconName; views: { key: string; name: string; href: string }[] }[];
   };
   /** The rail's pages; `tabs` when the page's declaration asked for its nav section to be drawn as tabs. */
@@ -84,6 +92,15 @@ export type Shell = ShellBase & {
      * them for the owner of an empty record. This is the fact the fallback threw away.
      */
     lists: string[] | null;
+    /**
+     * THE LEVEL THE CALLER HOLDS ON EACH LIST, by id, as `boot` answers it (`me.levels`), which `may` reads (`may.ts`).
+     *
+     * `level` SAYS THE WHOLE RECORD AND `lists` SAYS WHICH, and neither says what a colleague may do on one list: a
+     * record-wide appender with `read` on Tasks, or a bookkeeper with `write` on Expenses and `read` on the rest. The
+     * owner-only lists are already left out for a record-wide appender, so the app asks and never works it out. Absent
+     * from a host older than the field, rather than guessed.
+     */
+    levels?: Readonly<Record<string, Level>>;
     /** A person's own rail on this record (`nav-prefs.svelte.ts`). Absent for a token. */
     prefs?: { 'nav.order'?: string[]; 'nav.hidden'?: string[] };
   };
@@ -563,6 +580,9 @@ export function layoutOf(b: Boot): Shell {
       slug: record?.slug ?? '',
       name: record?.name ?? '',
       locale: record?.locale ?? 'en',
+      /* THE CURRENCY A PERSON CHOSE, KEPT WHERE EVERY FIGURE ASKS FOR IT (`learnHome`), and never counted from the rows.
+         A refused `boot` has no record, so its shell says none and forgets the last record's. */
+      currency: learnHome(record?.currency ?? null),
       /* THE LISTS THAT HOLD SOMETHING, the sample's rule, and an icon from the declaration this build knows.
          A LIST WITH A SAVED VIEW STAYS EVEN AT ZERO ROWS: the rail nests a view under its list and drops it from
          Views by matching against these, so dropping the list here strands the view under the generic heading.
@@ -584,6 +604,7 @@ export function layoutOf(b: Boot): Shell {
       owner: level === 'owner',
       records: record ? [{ slug: record.slug, name: record.name, level }] : [],
       lists: held,
+      ...((levels) => (levels === null ? {} : { levels }))(levelsFrom((b.me as Record<string, unknown> | undefined)?.levels)),
       ...(b.me?.prefs ? { prefs: b.me.prefs } : {}),
     },
     people: [],

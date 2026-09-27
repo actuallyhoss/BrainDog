@@ -3,7 +3,8 @@
  *
  * WHY THIS FILE EXISTS. Wave thirty's backlog read `account` as `INSERT OR REPLACE` for every caller and asked whether a read
  * or a proposal could overwrite the owner's settings (tier, cap, model) or reset the month's counter. Measured, it cannot:
- * `account` names one table, `call`, and replaces by `call.id` alone. Every id it is handed is either the hold `reserve` wrote
+ * `account` names one table, `slash_call`, and settles by `slash_call.id` alone, and since `defects.md` S14 only an id the
+ * ledger itself minted settles over a row that is there. Every id it is handed is either the hold `reserve` wrote
  * for that same model call or a fresh `mint()` (`src/propose.ts`, `src/jobs.ts`), and the `ask_id` a pass 2 quotes is only
  * ever read with a `SELECT`, never passed back as the id of a new row. The settings singleton is written in two places, both
  * in `src/index.ts` and neither of them here: `INSERT OR IGNORE` once at build and `UPDATE ... SET` on named columns in
@@ -13,10 +14,10 @@
  * to also write `INSERT OR REPLACE INTO settings (singleton, updated_at)`, the clobber the backlog feared, the first two fail
  * with `ask_cap` back at 80 and the byo owner's `tier` and `model` back at `a` and null. With `release` made to delete by id
  * alone, so that it removes the settled row and not only the hold, all three fail: the quoted pass 2 finds no read row,
- * drafts again, and makes a model call nobody asked for.
+ * drafts again, and makes a model call nobody asked for. Both were measured when the tables were `settings` and `call`.
  *
- * A COLLIDING ID CANNOT REACH `OR REPLACE`. Pinned to one id, the calls failed first at `reserve`, whose plain `INSERT` throws
- * `UNIQUE constraint failed: call.id` before any model is called, so the hold is what stops two calls settling onto one row.
+ * A COLLIDING ID CANNOT REACH A SETTLED ROW. Pinned to one id, the calls failed first at `reserve`, whose plain `INSERT`
+ * throws a `UNIQUE` constraint before any model is called, so the hold is what stops two calls settling onto one row.
  */
 
 import assert from 'node:assert/strict';
@@ -61,11 +62,11 @@ const build = () => {
   const clock = fixedClock(NOW);
   const inference = canned();
   const slash = createSlash({ sql, clock, inference, record: fakeRecord() });
-  const settingsRow = () => ({ ...sql.one<Record<string, unknown>>('SELECT * FROM settings WHERE singleton = 1') });
+  const settingsRow = () => ({ ...sql.one<Record<string, unknown>>('SELECT * FROM slash_settings WHERE singleton = 1') });
   const calls = () =>
     sql
       .all<{ id: string; kind: string; status: string; question: string | null; predicate: string | null }>(
-        'SELECT id, kind, status, question, predicate FROM call ORDER BY rowid',
+        'SELECT id, kind, status, question, predicate FROM slash_call ORDER BY rowid',
       )
       .map((r) => ({ ...r }));
   return { sql, clock, inference, slash, settingsRow, calls };
@@ -149,7 +150,7 @@ test('ONE ROW PER MODEL CALL, and pass 2 on an ask_id does not replace the read 
 
     /* The meter counts reads and proposals on tier a, not patterns: four, and nothing held is left counted. */
     assert.equal(slash.status().asks.used, 4);
-    assert.equal(sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM call WHERE code = 'SLASH_PENDING'")?.n, 0);
+    assert.equal(sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM slash_call WHERE code = 'SLASH_PENDING'")?.n, 0);
   } finally {
     sql.close();
   }

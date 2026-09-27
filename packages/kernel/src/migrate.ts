@@ -33,6 +33,8 @@ import inferAsk0013 from './migrations/0013_infer_ask.ts';
 import push0014 from './migrations/0014_push.ts';
 import tokenReach0015 from './migrations/0015_token_reach.ts';
 import slash0016 from './migrations/0016_slash.ts';
+import automationWatch0017 from './migrations/0017_automation_watch.ts';
+import jobs0018 from './migrations/0018_jobs.ts';
 
 export type Migration = { version: number; slug: string; sql: string };
 
@@ -54,6 +56,8 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 14, slug: 'push', sql: push0014 },
   { version: 15, slug: 'token_reach', sql: tokenReach0015 },
   { version: 16, slug: 'slash', sql: slash0016 },
+  { version: 17, slug: 'automation_watch', sql: automationWatch0017 },
+  { version: 18, slug: 'jobs', sql: jobs0018 },
 ];
 
 /**
@@ -73,6 +77,10 @@ export const MIGRATIONS: readonly Migration[] = [
  * Migration 14 adds `push_sub`, `local`, so no file carries it.
  * Migration 15 adds one nullable column to `token`, which is `local`, so no file carries it either.
  * Migration 16 renames the assistant to Slash in the values of rows and changes no table or column.
+ * Migration 17 adds `automation_watch`, `local`, so no file carries it, and two indexes, which no file carries either.
+ * Migration 18 rebuilds `declaration` with one more kind, keeping every column, and `job` with no CHECK on its kind and
+ * one new nullable column; an older file carries only the kinds it still takes, and `job` is `local`, so no file carries
+ * it.
  */
 export const FORMAT_VERSION = 1 as const;
 

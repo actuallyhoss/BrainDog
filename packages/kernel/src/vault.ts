@@ -693,6 +693,186 @@ export function rotateDue(sql: Sql, deps: VaultDeps, payload: string): number | 
   return span === null ? null : deps.nowMs + span;
 }
 
+/* ── the vault passphrase: the record's own key behind a second factor ──── */
+
+/**
+ * How the record's own key is wrapped now, as a host needs it to open or re-wrap that key. Never the key.
+ *
+ * ONLY THE `record` ROW. A passphrase guards the key a person's credentials are sealed under, and nothing else:
+ * the connector key stays on the root key because a scheduled run has nobody there to type anything (ADR-052), and
+ * the signing key stays on it because the nightly copy is signed with nobody there either (`12 §6`).
+ *
+ * `beside` IS THE ROOT KEY THE RECORD'S OTHER KEYS ARE WRAPPED UNDER, or `null` when none names one. A host taking
+ * the passphrase off wraps the record key under that one while it still holds it, so the record never names two root
+ * keys at once, which is the state `api/keys.ts` refuses to leave behind and `openGrant` would answer `WRONG_KEY` to.
+ */
+export type RecordWrapping = {
+  wrapped: Uint8Array;
+  nonce: Uint8Array;
+  wrapped_by: 'kek' | 'passphrase';
+  kek_id: string | null;
+  salt: Uint8Array | null;
+  beside: string | null;
+};
+
+/**
+ * One re-wrap of the record's key, as a host made it: under a key derived from the passphrase, with the salt it was
+ * derived with, or back under a root key, with that key's id.
+ *
+ * THE SAME TWO SHAPES `packages/host/src/passphrase.ts` BUILDS, written out again here because the kernel may not
+ * import the host. The step reaches the record's method through `withVaultPassphrase`, which types it loosely, so no
+ * compiler holds the two copies together: `rewrapRecordKey` checks every field it writes before it writes it.
+ */
+export type WrappingChange =
+  | { to: 'passphrase'; wrapped: Uint8Array; nonce: Uint8Array; salt: Uint8Array }
+  | { to: 'kek'; wrapped: Uint8Array; nonce: Uint8Array; kek_id: string };
+
+/** PBKDF2's salt, `12 §6`: sixteen random bytes, held in `vault_key.salt` beside the one wrapping it salts. */
+export const PASSPHRASE_SALT_BYTES = 16;
+
+/**
+ * Wrong passphrases compared before the vault waits, and how long it waits: the limits sign-in keeps for a wrong
+ * key or link (`dir_fail`, whose strikes and `WINDOW` are bound in `packages/record/src/identity.ts`).
+ *
+ * THE RECORD'S OWN `auth_fail`, NOT THE DIRECTORY'S, because the record is the one place both hosts can count in the
+ * same object as the compare, and the Directory is another object on the Cloud. `auth_fail` is a local table, so the
+ * count never travels in an export.
+ */
+export const PASSPHRASE_TRIES = 10;
+export const PASSPHRASE_WAIT_MS = 15 * 60_000;
+
+/** The one `auth_fail` key a passphrase is counted under. */
+const STRIKES = 'vault:passphrase';
+
+/**
+ * One strike reserved, before anything is compared: the first opens a window of `PASSPHRASE_WAIT_MS`, and the strike
+ * past `PASSPHRASE_TRIES` locks the vault for that long from then. The count stops one past the limit, so waiting out a lock
+ * is never pushed further away by asking again. `?1` the key, `?2` now plus the wait, `?3` the tries.
+ */
+const RESERVE = `INSERT INTO auth_fail (key, n, until) VALUES (?1, 1, ?2)
+ON CONFLICT (key) DO UPDATE SET
+  n     = MIN(n + 1, ?3 + 1),
+  until = CASE WHEN n = ?3 THEN ?2 ELSE until END
+RETURNING n, until`;
+
+/** The record key's wrapping, or `null` for a record made before its host had a key store. */
+export function recordWrapping(sql: Sql): RecordWrapping | null {
+  const row = sql.one<{ wrapped: Uint8Array; nonce: Uint8Array; wrapped_by: string; kek_id: string | null; salt: Uint8Array | null }>(
+    "SELECT wrapped, nonce, wrapped_by, kek_id, salt FROM vault_key WHERE purpose = 'record'",
+  );
+  if (!row) return null;
+  const beside =
+    sql.one<{ kek_id: string }>(
+      "SELECT kek_id FROM vault_key WHERE purpose <> 'record' AND wrapped_by = 'kek' AND kek_id IS NOT NULL ORDER BY purpose LIMIT 1",
+    )?.kek_id ?? null;
+  return {
+    wrapped: row.wrapped,
+    nonce: row.nonce,
+    wrapped_by: row.wrapped_by === 'passphrase' ? 'passphrase' : 'kek',
+    kek_id: row.kek_id ?? null,
+    salt: row.salt ?? null,
+    beside,
+  };
+}
+
+const bytesOf = (x: unknown, length?: number): boolean =>
+  x instanceof Uint8Array && x.length > 0 && (length === undefined || x.length === length);
+
+/**
+ * Swap the record key's one wrapping for the one a host made, in one transaction with one `grant.rotate` event.
+ *
+ * EXACTLY ONE WRAPPING, BEFORE AND AFTER (`12 §6`, "the optional second factor"). The row the root key could open is
+ * overwritten by the row only the passphrase opens, in the statement that writes it, so from the commit on there is
+ * no copy in the record that the operator's key opens. Taking the passphrase off is the same statement the other way.
+ *
+ * A COMPARE-AND-SET ON THE VERY WRAPPING THE HOST WAS HANDED, inside the transaction that sets it: how it was wrapped
+ * and the nonce it was wrapped with (`heldNonce`, from `recordWrapping`). The host re-wrapped the key it was handed
+ * and awaited its own crypto in between, so a second change that landed first leaves the row as that change left it,
+ * and this one is answered as a conflict to be asked again. The nonce is in the compare because every wrapping draws a
+ * new one: a slow change made against an old passphrase would otherwise still see `wrapped_by = 'passphrase'` after
+ * that passphrase was taken off and a new one put on, and take the new one off. The key itself never changes, only its
+ * wrapping, so no credential is re-sealed (`api/keys.ts` says the same of a root key rotation).
+ */
+export function rewrapRecordKey(
+  sql: Sql,
+  deps: Pick<VaultDeps, 'mint' | 'nowMs' | 'actor'>,
+  change: WrappingChange,
+  heldNonce: Uint8Array,
+  transaction: <T>(fn: () => T) => T,
+): Result<{ wrapped_by: 'kek' | 'passphrase' }> {
+  type Done = { wrapped_by: 'kek' | 'passphrase' };
+  if (!bytesOf(change.wrapped) || !bytesOf(change.nonce))
+    return no<Done>('VALUE_MALFORMED', 'A re-wrapped key carries its wrapped bytes and their nonce, as bytes.', { at: 'wrapped' });
+  if (change.to === 'passphrase' && !bytesOf(change.salt, PASSPHRASE_SALT_BYTES))
+    return no<Done>('VALUE_MALFORMED', `A key wrapped under a passphrase carries the ${PASSPHRASE_SALT_BYTES}-byte salt it was derived with.`, { at: 'salt' });
+  if (change.to === 'kek' && (typeof change.kek_id !== 'string' || change.kek_id === ''))
+    return no<Done>('VALUE_MALFORMED', 'A key wrapped under a root key names that key by its id.', { at: 'kek_id' });
+
+  const from = change.to === 'passphrase' ? 'kek' : 'passphrase';
+  const at = instant(deps.nowMs);
+  return attempt(sql, transaction, () => {
+    const moved = sql.all<{ purpose: string }>(
+      `UPDATE vault_key SET wrapped = ?, nonce = ?, wrapped_by = ?, kek_id = ?, salt = ?, rewrapped_at = ?
+        WHERE purpose = 'record' AND wrapped_by = ? AND nonce = ?
+        RETURNING purpose`,
+      change.wrapped,
+      change.nonce,
+      change.to,
+      change.to === 'kek' ? change.kek_id : null,
+      change.to === 'passphrase' ? change.salt : null,
+      at,
+      from,
+      heldNonce,
+    );
+    if (moved.length === 0) {
+      const now = sql.one<{ wrapped_by: string }>("SELECT wrapped_by FROM vault_key WHERE purpose = 'record'");
+      const by = sql.one<{ actor: string }>("SELECT actor FROM event WHERE target = 'vault_key:record' ORDER BY rowid DESC LIMIT 1");
+      return clash<Done>(0, { wrapped_by: now?.wrapped_by ?? null }, by?.actor ?? 'system');
+    }
+    /* A KIND THAT EXISTS: `grant.rotate`, on the record key, saying which wrapping it left and which it went to. The
+       salt and the bytes are not in it, because the event log is read by more people than the vault is. */
+    sql.exec(
+      "INSERT INTO event (id, ts, actor, kind, target, target_kind, field, from_v, to_v) VALUES (?, ?, ?, 'grant.rotate', 'vault_key:record', 'vault_key', 'wrapped_by', ?, ?)",
+      deps.mint(),
+      at,
+      deps.actor,
+      from,
+      change.to,
+    );
+    return ok<Done>({ wrapped_by: change.to });
+  });
+}
+
+/**
+ * Reserve one strike before a passphrase is compared: the whole seconds to wait while the vault is locked, or `null`
+ * to go on and compare.
+ *
+ * RESERVED BEFORE THE COMPARE, AS SIGN-IN DOES, so a compare that is never reported back still counted. A right
+ * passphrase clears the count (`passphraseCleared`); a request refused for another reason before anything was compared
+ * hands its strike back (`passphraseRefund`). FAIL CLOSED: a count that cannot be read or written locks for the whole
+ * wait, because a limit that stops when its table misbehaves is a limit anybody can switch off.
+ */
+export function passphraseStrike(sql: Sql, nowMs: number): number | null {
+  try {
+    sql.exec('DELETE FROM auth_fail WHERE key = ? AND until <= ?', STRIKES, instant(nowMs));
+    const row = sql.one<{ n: number; until: string }>(RESERVE, STRIKES, instant(nowMs + PASSPHRASE_WAIT_MS), PASSPHRASE_TRIES);
+    if (!row) return Math.ceil(PASSPHRASE_WAIT_MS / 1000);
+    return Number(row.n) > PASSPHRASE_TRIES ? Math.max(1, Math.ceil((Date.parse(row.until) - nowMs) / 1000)) : null;
+  } catch {
+    return Math.ceil(PASSPHRASE_WAIT_MS / 1000);
+  }
+}
+
+/** The passphrase was right: the count starts again from nothing. */
+export function passphraseCleared(sql: Sql): void {
+  sql.exec('DELETE FROM auth_fail WHERE key = ?', STRIKES);
+}
+
+/** Nothing was compared after all: the strike reserved for it is handed back, and a lock is never lifted by it. */
+export function passphraseRefund(sql: Sql): void {
+  sql.exec('UPDATE auth_fail SET n = n - 1 WHERE key = ? AND n > 0 AND n <= ?', STRIKES, PASSPHRASE_TRIES);
+}
+
 /* ── the small parts ─────────────────────────────────────────────────────── */
 
 /**

@@ -9,7 +9,7 @@ replies: [
     {
       "text": "The rent is {{pct:-46.3}} of what is open, {{ref:obligations#7}}.",
       "body_kind": "options",
-      "body": { "options": [{ "id": "a", "label": "Pay the rent first", "because": "It is {{ref:obligations#7}}." }] },
+      "body": { "options": [{ "id": "a", "label": "Pay the rent first", "because": "It is {{ref:obligations#7}}." }, { "id": "b", "label": "Pay the accountant first", "because": "It is due later." }] },
       "flagged": false
     }
   ]
@@ -37,3 +37,8 @@ replies: [
 # the proposal fails on the percentage alone and not on having no rows. Measured on September 22nd
 # 2026 by `packages/slash/test/refusals-ask.test.ts`: with the span swapped for
 # `{{obligations#7.amount}}`, a figure a row holds, the same reply is filed as `SG1`.
+#
+# THE SECOND OPTION WAS ADDED WHEN AN OPTIONS BODY GAINED ITS OWN SCHEMA (two to four options, each
+# with an id, a label and a reason; `BODIES` in `packages/slash/src/prompts.ts`), so the body passes
+# that check and the percentage is still the one fault. The measurement above is of the one-option
+# reply before it.

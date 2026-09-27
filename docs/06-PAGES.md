@@ -60,13 +60,24 @@ between alternatives and a comma between clauses. `has` and `lacks` are the two 
 so nothing is translated in either direction and a page prints the sentence the record takes back. `has not` is
 read as `lacks` and never printed, the way `is present` is read as `is set`.
 
-**The other form is the source view, and it is a summary rather than a round trip.** What a person
-opens as *"how this is built"* — and downloads as `<page>.dog`, one page to one file — is printed by
-`apps/web/src/lib/dog/source.ts`, which is the reference for that form. It flattens a column list to
-bare field names, `cells:` to metric ids, `order:` to `due asc`, and prints `where:` as the sentence
-the record holds. **`label`, `width`, `align`, `link`, `tone_when` and `as` are not in it**, so it is
-text to read, diff and send, not text to feed back in as a declaration: everything it prints is true,
-and it does not print everything. A page is the `.dog`; the whole record is a `.brain`
+**The other form is the source view, and it is the stored declaration, whole.** What a person opens
+as *"how this is built"*, downloads as `<page>.dog` (one page to one file) and writes with
+`braindog page pull` is the body the record holds for the page, read through `arrangement({ page })`
+(`apps/web/src/lib/dog/read.ts`) and printed by `dogText` in `packages/dog`, which is the reference
+for the form. **It is lossless**: `parseDog` reads the file back to the same body, key for key, so a
+file edited and applied changes exactly what was edited and nothing else. It is terse where terse is
+exact. A column that is only its field prints bare (`columns: [client, amount]`), as does a cell that
+is only its metric; an order prints as `[due asc]`; `where:` prints as the sentence the record holds;
+a flat list or a flat set of keys prints in brackets, `[a, b]` and `{ section: Money, order: 20 }`;
+anything deeper (a column with `tone_when`, a `where` tree, authored rows) prints as one line of JSON
+after its key. Text that would read back as something else, such as `"2024"` or `"true"`, is quoted,
+and text with line breaks is a `|` block under its key. Page keys come first in the order `page title
+for nav icon tone layout requires blocks`, and a block's in the order `kind heading area span source
+register row where when columns cells order limit`, each followed by the rest alphabetically. A page
+made for each row of a list has no declaration of its own, so its source is its template's, which
+`sourceOf` names as `template` and `braindog page pull` says it wrote. Every file the first version of
+the format wrote still parses, except one holding `authored: N rows`, because that version only
+counted the rows. A page is the `.dog`; the whole record is a `.brain`
 ([03-DOG-FORMAT](03-DOG-FORMAT.md) §1).
 
 Four properties worth naming:
@@ -143,11 +154,11 @@ the table.
 | `area` | `main \| rail`: which of the page's two columns the block sits in. Refused on a page with no `layout` | `main` | no |
 | `heading` | text. On a `section` it is the section, drawn as a heading | — | `section` |
 | `span` | int, 1–12 | 12 | no |
-| `source` | `register.<id>` · `metric.<id>` (on a `bar` or `split`, a figure grouped by a word, whose parts it draws; any other kind refuses it) · `block.<n>` (another block on this page) · `activity` (what was done in the record, with the kind of actor; a `feed`'s) · `sessions.live` (the runs working now) · `actions` (the record's scheduled actions, one row each). On a `section` it is what the count counts; on a `diff`, the register whose row it reads | — | `table`, `cards`, `feed`, `diff` |
+| `source` | `register.<id>` · `metric.<id>` (on a `bar` or `split`, a figure grouped by a word, whose parts it draws; any other kind refuses it) · `block.<n>` (another block on this page) · `activity` (what was done in the record, with the kind of actor; a `feed`'s) · `sessions.live` (the runs working now) · `actions` (the record's scheduled actions, one row each) · `runs_on` (what one project runs on, the project named by `about:`) · `deadlines` (what falls due across the lists, overdue first) · `figures.home` (the figures pinned to Home, on a `stat`). On a `section` it is what the count counts; on a `diff`, the register whose row it reads | — | `table`, `cards`, `feed`, `diff` |
 | `where` | a predicate — [02-DATA-MODEL](02-DATA-MODEL.md) §6. On a `capture`, what a new row is filled with: each `is` of one value on an enum or a text field, at the top of the predicate or under a top-level `all`, other than the title. A set (`is open or doing`), a date and a link are never filled in, because each would be a value nobody chose | every row | no |
 | `register` | a register id, which the page `requires`. On a `capture`, the list a new row is added to; a `capture` takes no `source`, because it reads no row. On `inputs`, the list whose one row it edits, and it takes no `source` either | — | `capture`, `inputs` |
 | `when` | `{ metric: <id>, <op>: v }` — evaluated at render, never compiled | always drawn | no |
-| `columns` | `[{ field, label?, width?, align?: start \| end, link?: bool (**specified and not built**: no evaluator reads it, and a row that has somewhere to go is already a link in whole), tone_when? (**specified and not built**: no evaluator reads it, and a row's tone comes from its register's state field, not from its block), as? }]`. `as` is the column's role on a `cards` block: `title \| figure \| fact \| trend \| ring \| who \| when \| mark \| next \| reply`, one figure and at most three facts. `next` names a field of the list whose rows are steps of the cards' rows (`steps:` on that list), and the block answers `nexts`, aligned with `rows`: that field of the first step under each card that is not done, in the order the steps declare, `null` for a card with no open step. `reply` is a field drawn under the card's title in a quieter voice, the second opinion under a note. Absent, the first text column is the title, the first figure that never truncates is the figure, and the rest are facts. On a `table` or a `cards` block, `as: scope` on the register's scope field draws where the row applies instead: the project's name, or Everywhere `sign: { field, minus }` on a money column writes each figure with `+` or `−`, `−` where the enum `field` holds `minus`: a word on the figure, never a colour. A column whose `field` is `changed`, on a register with no field of that name, says who changed the row last and the day, from its history. | — | `table`, `cards` |
+| `columns` | `[{ field, label?, width?, align?: start \| end, link?: bool (**specified and not built**: no evaluator reads it, and a row that has somewhere to go is already a link in whole), tone_when? (**specified and not built**: no evaluator reads it, and a row's tone comes from its register's state field, not from its block), as? }]`. `as` is the column's role on a `cards` block: `title \| figure \| fact \| trend \| ring \| who \| when \| mark \| next \| reply`, one figure and at most three facts. `next` names a field of the list whose rows are steps of the cards' rows (`steps:` on that list), and the block answers `nexts`, aligned with `rows`: that field of the first step under each card that is not done, in the order the steps declare, `null` for a card with no open step. `reply` is a field drawn under the card's title in a quieter voice, the second opinion under a note. Absent, the first text column is the title, the first figure that never truncates is the figure, and the rest are facts. On a `table` or a `cards` block, `as: scope` on the register's scope field draws where the row applies instead: the project's name, or Everywhere. The block answers `scopes`, those names aligned with `rows`, and `scope_marks` beside them: `{ mark, hue }` of the project, read from the fields its list names in `identity:` (either `null` when the project holds none), or `null` for a row that applies everywhere. `sign: { field, minus }` on a money column writes each figure with `+` or `−`, `−` where the enum `field` holds `minus`: a word on the figure, never a colour. A column whose `field` is `changed`, on a register with no field of that name, says who changed the row last and the day, from its history. | — | `table`, `cards` |
 | `inherit` | bool. On a block over a register with a scope field ([02-DATA-MODEL](02-DATA-MODEL.md) §5), the rows of the project its `where` names, then the rows that apply everywhere. A project's row hides a global row of the same title where the field says `same: nearer`; otherwise both show. The project is named in `where` as `project is {{name}}` | `false` | no |
 | `order` | `[{ field, dir: asc \| desc }]` | the first indexed date descending, else `seq` descending ([29-EMERGENT-PAGES](29-EMERGENT-PAGES.md) §5) | no |
 | `limit` | int | 50, at most 500 | no |
@@ -162,6 +173,8 @@ the table.
 | `knobs` | a list of `horizon · late · spend · leave`. On a `forecast`, the what-ifs a reader may move: the horizon, clients paying later, spending the record does not know, and leaving out a large movement. They are arithmetic over the walk on the page, in memory, never in the address and never written | no knobs | no |
 | `late` | a metric id. On a `forecast`, the figure its late knob marks as "on average so far: N days", read from paid rows as a fact rather than a guess | no mark | no |
 | `under` | int, 1–365. On a `forecast`, say under the chart "Cash goes under in N days" when the walk goes under within this many days | never said | no |
+| `horizon` | int, days. On a `forecast`, how far ahead the walk reads, or `last` for its last dated movement (`forecast.ts` `runway`). Over `deadlines`, how many days ahead of today a row may fall due, 0 to 366 | 180 on a `forecast`, 14 over `deadlines` | no |
+| `horizons` | a list of lengths, each a whole number of days or `last` (the walk's last dated movement), at most `HORIZONS_MOST` of them (`pages.ts`). On a `forecast`, the lengths its horizon knob offers | the knob's own | no |
 | `unset` | text. On a `bar` or `split`, the label of a last row holding what no part does (rows with no value in the grouped field, or the figure less its parts), linked to those rows; absent, those rows are not drawn apart | not drawn apart | no |
 | `tone` | intent | — | no |
 | `body` | markdown in the dialect | — | `note` |
@@ -170,6 +183,7 @@ the table.
 | `since` | `seen`, the reader's read mark. On a `feed`, the rows after it are new; the evaluator writes the `seen` row where it falls, with an empty time when the reader has no mark yet | absent: nothing is new | no |
 | `first` | int, 1–50. On a `feed` or `agents`, the most rows it draws, newest first, a collapsed burst being one row; what is past it goes in one last row per group, so no count loses anything. On a `steps` block, the short view: the first `n` rows not done, with `matched` still the whole count, so "N more" is `matched` less the rows; refused over a list that does not declare `steps:`, where no row is known to be done | every row | no |
 | `row` | a spoken id, interpolatable: `'{{spoken}}'` on a template. On a `diff`, the row whose history it reads. On `inputs`, the row it edits | on `inputs`, the list's first row | `diff` |
+| `about` | a spoken id, interpolatable: `'{{spoken}}'` on a template. Over `runs_on`, the project whose keys, tools, skills and actions it reads. Read by a `table` and a `cards` block | none | a block over `runs_on` |
 | `lead` | bool. On a `stat`, its first figure is the screen's one hero figure; on `cards`, the first card is drawn two tracks wide; on a `note`, its body is the page's opening sentence, said with the plural and nought rules a figure's note has | `false` | no |
 | `range` | bool. On a `progress` over a register, each row is a band from its low to its high on one scale shared by the rows (the largest high), what was spent marked on it, and a total line. It names four columns in order: the label, what was spent, the low and the high, the last three number or money fields in one currency | `false` | no |
 | `tiles` | bool. On a `queue`, one tile per question, showing its recommended option as what it is | `false` | no |
@@ -182,9 +196,9 @@ the table.
 evaluated at render like `when`. **It is specified and not built.** No evaluator reads it: the app's
 declared-page path builds a column from `field`, `label`, `width`, `align` and `as`, deriving
 `truncate` from the register, and the kernel's page layer calls `where.evaluate` only to filter
-`activity`, `actions` and `sessions.live`. A row's tone is `toneOf`'s, from the register's state
-field and its declared deadline field, so a declared page wears the same tone the register's own
-grid draws.
+the rows of a computed source, such as `activity`, `sessions.live` or `runs_on`. A row's tone is
+`toneOf`'s, from the register's state field and its declared deadline field, so a declared page
+wears the same tone the register's own grid draws.
 
 A `cards` block lays one card per row in a grid that fills its container at 17rem a card, one column
 on a narrow one; the title opens the row. A `section` is a full-width heading with a count aside, and
@@ -213,13 +227,48 @@ row: '{{spoken}}', field: body, versions: 5, empty: … }` on a skill's page, an
 kind for a document field in a proposed change. `sessions.live` is the runs working now: the rows of
 the kernel's `session` register not in one of its `done` states, the most recently seen first, so its
 `where` and columns name that register's fields and it takes no `order`. A run holds its project as a
-spoken id, `things#1`, so the block's `scopes` name each run's project by its title, and a host draws
-that name. A run not heard from within the kernel's `STALE_MS` is drawn dimmed, through the cards'
-`quiet` role, which the evaluator writes and a declaration does not. `actions` is the record's
-scheduled actions, one row each and the same list as the `actions` read: its `where` and columns name
-`ingest`, `channel`, `project`, `host`, `every`, `key`, `state`, `next`, `last_at`, `last_outcome`,
-`last_status`, `last_note`, `runs` and `failures`, a key is its label, and it takes no `order`. All four
-sources are computed by the kernel (`pages.ts`), alongside `forecast.runway`.
+spoken id, `things#1`, so the block's `scopes` name each run's project by its title and its
+`scope_marks` carry that project's mark and hue, and a host draws both. A run not heard from within
+the kernel's `STALE_MS` is drawn dimmed, through the cards' `quiet` role, which the evaluator writes
+and a declaration does not. `actions` is the record's scheduled actions, one row each and the same
+list as the `actions` read: its `where` and columns name `ingest`, `channel`, `project`, `host`,
+`every`, `key`, `state`, `next`, `last_at`, `last_outcome`, `last_status`, `last_note`, `runs` and
+`failures`, a key is its label, and it takes no `order`. These sources, and the ones below, are
+computed by the kernel (`pages.ts`, `COMPUTED`), alongside `forecast.runway`.
+
+`runs_on` is what one project runs on, read as `{ source: runs_on, about: '{{spoken}}', empty: … }` on the
+project's page: its keys, tools, skills and scheduled actions, then the ones that apply everywhere, each group by
+name. It reads whichever of the lists `credentials`, `tools` and `skills` the record holds and places in projects of
+the list `about:` names, so a page over it needs no `requires` for them, and on a record without them and with no
+scheduled action for the project or for everywhere it draws its `empty:`. Nearer wins as it does for an agent in
+that project: where the list says `same: nearer`, a project's own tool or skill hides a global one of the same name,
+and a row in one of its list's `done` states, such as a retired key, is left out. Its `where` and columns name
+`kind` (`key`, `tool`, `skill` or `action`), `name`, `scope` (`project` or `global`), `state`, `detail` (what a
+key opens, a tool's transport, a skill's version, an action's next run), `used_by`, `used_at`, `spoken` (the row's
+own id, or an action's) and `quiet`, and it takes no `order`. `used_by` is the run, `S47`, that last opened a key or last wrote a tool's `seen`, and `null`
+when that was not a run; `used_at` is when the key was last opened or the tool last seen. A key's sealed value and
+its grant never reach the answer. Every row that applies everywhere carries a word in `quiet`, so a host draws it
+faint, and the block answers `scopes` and `scope_marks` for the project's own rows and `null` for the rest. Because
+it draws scheduled actions, which belong to no list, a reader who may not read the whole record is held the block.
+
+**What a module's page reads across the lists.** `deadlines` is what falls due, read as `{ source: deadlines,
+horizon: 14, empty: … }` by a `table`, a `timeline` or a `todo`: every row of every list the reader may read that
+falls due on a `day` field the list declares `deadline: true`, is not in one of the list's `done` states, and falls
+due within `horizon` days of today (the record's local day), overdue first and then by day. Each row is
+`{ list, row, title, day, amount, direction }`: `row` is the row's spoken id, `tasks#12`, and `list` its list, so
+`where: list is tasks or services` narrows it; `amount` is the money due and `direction` is `in` or `out`, both
+`null` on a list with no money. Which field is the amount and which way it moves is read from what the record
+already declares: a cash walk's leg over the list names both (`amount`, and `incoming` for money arriving, every
+other row of the leg going out); otherwise the list's one money field is the amount, and only an enum of exactly
+`in` and `out` says the way. It takes no `order`. `figures.home` is the figures pinned to Home, drawn by a `stat`
+with no `cells`: every metric that declares `home:` a whole number from 1 to 9, in that order, at most
+`FIGURES_HOME_MOST` of them (`pages.ts`), each read and labelled as a `cells:` figure is. Both are named in `registersOf` by the lists they read, so a reader who
+may not read one of them is held the block. `activity` and `governance.open` answer `list` on each row too, the
+list of the row its `target` or its question's `about` names (`null` when it names none), and each `where` reads it:
+`{ source: activity, where: "list is transactions" }`, `{ source: governance.open, where: "list is obligations" }`.
+A `forecast` with the `sell` knob and no `sell:` offers every figure the reader may read that declares
+`sellable: true`, in the walk's own money, and a `forecast` answers `fx`, the record's home currency and dated rates,
+as a `bar` and a `split` do.
 
 **A kind that adds its rows up reads the whole match, or refuses.** `bar`, `chips`, `gauge`, `heat`,
 `progress` and `split` over a register read up to 200 rows whatever their `limit` (on these, `limit`

@@ -93,7 +93,8 @@ export type ScriptCall =
       body: string | null;
       key: string | null;
     }
-  | { op: 'list'; register: string; where: Json }
+  /** `options` is `ctx.record.list`'s third argument as the script wrote it, or `null`: `scriptReads` reads it. */
+  | { op: 'list'; register: string; where: Json; options: Json }
   | { op: 'get'; spoken: string };
 
 /** The record's answer to one call: the value, or the sentence the script's promise is rejected with. */
@@ -148,8 +149,14 @@ export class ScriptOutbound extends WorkerEntrypoint<Wired, Linked> {
 
 /** The loaded Worker's `env.RECORD`: `ctx.record.list` and `ctx.record.get`, answered by the record's object. */
 export class ScriptRecord extends WorkerEntrypoint<Wired, Linked> {
-  async list(run: string, register: string, where: string): Promise<string> {
-    const reply = await home(this.env, this.ctx.props).script(run, { op: 'list', register, where: JSON.parse(where) as Json });
+  /* `options` IS ABSENT FROM A MODULE THAT SENDS TWO ARGUMENTS, and that is no options, as `runInQuickJs` reads it. */
+  async list(run: string, register: string, where: string, options?: string): Promise<string> {
+    const reply = await home(this.env, this.ctx.props).script(run, {
+      op: 'list',
+      register,
+      where: JSON.parse(where) as Json,
+      options: options === undefined ? null : (JSON.parse(options) as Json),
+    });
     if ('error' in reply) throw new Error(reply.error);
     return JSON.stringify(reply.ok);
   }
@@ -224,7 +231,7 @@ export class ScriptRuns {
     if (call.op === 'list') {
       if (!decl.reads.includes(call.register) || turn.read === undefined)
         return refuse({ code: 'FORBIDDEN', why: `${decl.id} read ${call.register}, which is not in its reads.` });
-      return { ok: await turn.read.list(call.register, call.where) };
+      return { ok: await turn.read.list(call.register, call.where, call.options) };
     }
     if (call.op === 'get') {
       /* THE REGISTER OF A SPOKEN ID IS THE RECORD'S TO RESOLVE, as in `runInQuickJs`: the reads that `turn.read` was
@@ -345,7 +352,7 @@ export default class extends WorkerEntrypoint {
       write: (register, fields) => { writes.push({ op: 'create', register, fields: JSON.parse(fields) }); },
       update: (spoken, patch, version) => { writes.push({ op: 'update', spoken, patch: JSON.parse(patch), version }); },
       log: (words) => { lines.push(words); },
-      list: (register, where) => record.list(run, register, where),
+      list: (register, where, options) => record.list(run, register, where, options),
       get: (spoken) => record.get(run, spoken),
     };
     if (typeof source.default !== 'function') return { invalid: true, log: '' };

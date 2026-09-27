@@ -8,10 +8,11 @@
  * rent`, which the record has answered since `2023a1c0`, came back from here as *"that is not
  * something a filter can say"*. The grammar under both has had `gt gte lt lte between` all along.
  *
- * SO THE RECORD IS DRIVEN, NOT DESCRIBED, as `where.test.ts` and `engines.test.ts` drive it: a real
- * SQLite record with the seed installed, every sentence asked of `k.list` and of `compile`/`matches`,
- * and the two answers held to the same rows, or to the same refusal in the same words. `data.ts` and
- * `installSeed` number the seed by position, so `seq` is one identity on both sides.
+ * SO THE RECORD IS DRIVEN, NOT DESCRIBED: a real SQLite record with the seed installed, every sentence
+ * asked of `k.list` and of `compile`, and the two held to the same verdict, or to the same refusal in
+ * the same words. The rows are the record's alone since ARC-2, which deleted the browser's matcher and
+ * made `compile` the record's own parser; what the browser still owns is reading the sentence the same
+ * way, and refusing it in the same words.
  */
 
 import { test } from 'node:test';
@@ -25,8 +26,8 @@ import { quoteValue } from '@braindog/where';
 import './fixtures/fill.ts';
 import { whereWords } from '../palette/slash.ts';
 import { NOW } from './fixtures/sample.ts';
-import { REGISTERS, ROWS } from './held.ts';
-import { compile, matches, registerHref } from './where.ts';
+import { REGISTERS } from './held.ts';
+import { compile, registerHref } from './where.ts';
 
 function openSqlite(): Parameters<typeof openRecord>[0] {
   const db = new DatabaseSync(':memory:');
@@ -77,23 +78,22 @@ const askRecord = async (register: string, where: unknown): Promise<Answer> => {
   return { refused: null, seqs: seqs.sort((a, b) => a - b) };
 };
 
-const askBrowser = (register: string, sentence: string): Answer => {
+/** What the browser's `compile` says of a sentence: the first refusal, or nothing. */
+const askBrowser = (register: string, sentence: string): { refused: string | null } => {
   const w = compile(register, sentence, NOW);
-  return w.bad.length
-    ? { refused: w.bad[0] ?? '', seqs: [] }
-    : { refused: null, seqs: (ROWS[register] ?? []).filter((e) => matches(e, w, NOW)).map((e) => e.seq).sort((a, b) => a - b) };
+  return { refused: w.bad.length ? (w.bad[0] ?? '') : null };
 };
 
-/** Both engines asked one sentence, and held to one answer. */
+/** Both asked one sentence and held to one verdict, and the record's rows handed back. */
 async function agree(register: string, sentence: string): Promise<Answer> {
   const theirs = await askRecord(register, sentence);
   const ours = askBrowser(register, sentence);
   assert.equal(
     ours.refused === null,
     theirs.refused === null,
-    `${register}: "${sentence}": the record ${theirs.refused === null ? 'answered' : `refused: ${theirs.refused}`}, the browser ${ours.refused === null ? 'answered' : `refused: ${ours.refused}`}`,
+    `${register}: "${sentence}": the record ${theirs.refused === null ? 'answered' : `refused: ${theirs.refused}`}, the browser ${ours.refused === null ? 'read it' : `refused: ${ours.refused}`}`,
   );
-  assert.deepEqual(ours.seqs, theirs.seqs, `${register}: "${sentence}" drew different rows`);
+  if (theirs.refused !== null) assert.equal(ours.refused, theirs.refused, `${register}: "${sentence}": the browser's refusal is not the record's`);
   return theirs;
 }
 
@@ -163,7 +163,7 @@ test('A RANGE WITH ONE DAY WRITTEN OUT AND ONE RELATIVE IS ORDERED ON THE RECORD
      written-out day and one relative word do not. With the mirror's `NOW` on 3 September and the wall
      clock on the 24th, `due between today and 2026-09-20` was four rows in the record and "today is
      past 2026-09-20" here, and the reverse sentence was refused by the record and answered, empty,
-     here. `matches` is handed the record's clock by every caller in this app, so the check is too. */
+     here. `compile` takes the clock it is handed, so the check is made on the record's. */
   const said = await agree('obligations', 'due between today and 2026-09-20');
   assert.equal(said.refused, null);
   assert.ok(said.seqs.length > 0, 'the range found nothing, so it proves nothing about rows');
@@ -210,13 +210,12 @@ test('A VALUE AN ENUM DECLARES IS STILL A VALUE, whatever words it starts with',
      This one goes red under that same mutation, on the first `bad` it reads. */
   REGISTERS.counts = { id: 'counts', name: 'Counts', title: 'size', fields: [{ id: 'size', type: 'enum', values: ['one', 'more_than_one'] }] } as never;
   try {
-    const row = { seq: 1, fields: { size: 'more_than_one' } } as never;
     const is = compile('counts', 'size is more than one');
     assert.deepEqual(is.bad, []);
-    assert.equal(matches(row, is, NOW), true);
+    assert.deepEqual(is.clauses, [{ field: 'size', op: 'is', values: ['more_than_one'] }]);
     const not = compile('counts', 'size is not more than one');
     assert.deepEqual(not.bad, []);
-    assert.equal(matches(row, not, NOW), false);
+    assert.deepEqual(not.clauses, [{ field: 'size', op: 'is not', values: ['more_than_one'] }]);
     /* AND A WORD IT DOES NOT DECLARE IS AN ORDER, which an enum cannot take, as in the record. */
     assert.match(compile('counts', 'size is more than two').bad[0] ?? '', /size is a enum, and more than is not something a enum can be asked/);
   } finally {
@@ -261,21 +260,21 @@ test('A QUANTITY IS ORDERED WITH ITS UNIT, in both engines, though no seed regis
     return out.ok ? out.value.rows.map((r) => String(r.fields.what)).sort().join(' ') : `refused ${'refusal' in out ? out.refusal.fix : ''}`;
   };
   REGISTERS.weights = WEIGHTS as never;
-  ROWS.weights = HELD.map((fields, i) => ({ seq: i + 1, version: 1, created: '', fields })) as never;
   try {
+    /* THE BROWSER READS THE BOUNDS, AND THE RECORD COUNTS THE ROWS (ARC-2). */
     const ours = (sentence: string): string => {
       const w = compile('weights', sentence);
-      return w.bad.length ? `refused ${w.bad[0]}` : (ROWS.weights ?? []).filter((e) => matches(e, w, NOW)).map((e) => String(e.fields.what)).sort().join(' ');
+      return w.bad.length ? `refused ${w.bad[0]}` : JSON.stringify(w.clauses.map((c) => ('bounds' in c ? c.bounds : null)));
     };
-    for (const [sentence, rows] of [
-      ['weight at least 5 kg', 'b c'],
-      ['weight is more than 5kg', 'c'],
-      ['weight less than 5 kg', 'a'],
-      ['weight at most 5 lb', 'd'],
-      ['weight between 0.5 kg and 5 kg', 'a b'],
+    for (const [sentence, rows, bounds] of [
+      ['weight at least 5 kg', 'b c', [[{ n: 5, unit: 'kg' }]]],
+      ['weight is more than 5kg', 'c', [[{ n: 5, unit: 'kg' }]]],
+      ['weight less than 5 kg', 'a', [[{ n: 5, unit: 'kg' }]]],
+      ['weight at most 5 lb', 'd', [[{ n: 5, unit: 'lb' }]]],
+      ['weight between 0.5 kg and 5 kg', 'a b', [[{ n: 0.5, unit: 'kg' }, { n: 5, unit: 'kg' }]]],
     ] as const) {
       assert.equal(theirs(sentence), rows, `the record on "${sentence}"`);
-      assert.equal(ours(sentence), rows, `the browser on "${sentence}"`);
+      assert.equal(ours(sentence), JSON.stringify(bounds), `the browser on "${sentence}"`);
     }
     for (const [sentence, says] of [
       ['weight at least 5', /weight is a quantity, and 5 with no unit is not one/],
@@ -287,7 +286,6 @@ test('A QUANTITY IS ORDERED WITH ITS UNIT, in both engines, though no seed regis
     }
   } finally {
     delete REGISTERS.weights;
-    delete ROWS.weights;
   }
 });
 

@@ -40,10 +40,10 @@ import {
   type Pack,
   type PackSource,
 } from '@braindog/declare';
-import { normalise } from '@braindog/declare';
 import type { Kernel } from '@braindog/kernel';
 
 import type { CatalogueEntry } from './arrange.ts';
+import { normaliseChecked, themeFault } from './theme-check.ts';
 
 type Body = Record<string, unknown>;
 
@@ -281,6 +281,10 @@ export function useCases(d: UseCaseDeps) {
     if (given === undefined) return refuse('REQUIRED_MISSING', 'Send the use-case file as text, or its document as doc.', 'text');
     const shared = await readShared(given, args.source ?? { kind: 'paste' });
     if (!shared.ok) return shared as Result<Body>;
+    /* THE FILE'S OWN PACK WAS NORMALISED INSIDE `readShared`, where no theme is checked, so it is checked here: a
+       palette the install will refuse is refused at the plan a person reads before pressing it. */
+    const painted = shared.value.pack === null ? null : await themeFault(shared.value.pack);
+    if (painted) return { ok: false, refusal: painted };
     const u = shared.value.usecase;
 
     const states = kernel.packStates();
@@ -325,7 +329,7 @@ export function useCases(d: UseCaseDeps) {
            planned as an update, and left out of the plan when it would change nothing. The person chooses whether it goes. */
         const relabelled = s.disabled_at === null ? args.modules?.[m] : undefined;
         if (!isMap(relabelled)) continue;
-        const pack = await normalise(relabelled, { kind: 'local' });
+        const pack = await normaliseChecked(relabelled, { kind: 'local' });
         if (!pack.ok) return pack as Result<Body>;
         if (pack.value.manifest.pack !== m) return refuse('VALUE_MALFORMED', `The document sent for ${m} is the pack ${pack.value.manifest.pack}.`, `modules.${m}`);
         const diff = await plan(pack.value, state);
@@ -335,7 +339,7 @@ export function useCases(d: UseCaseDeps) {
       const offered = args.modules?.[m] ?? d.catalogue.find((e) => e.id === m)?.doc({ holds: holds(state), usecase: null }) ?? null;
       if (!isMap(offered))
         return refuse('DECLARATION_UNKNOWN', `${u.title} builds on ${m}, which this host cannot offer by name. Install ${m} from Add-ons first, then plan this again.`, `modules`);
-      const pack = await normalise(offered, { kind: 'local' });
+      const pack = await normaliseChecked(offered, { kind: 'local' });
       if (!pack.ok) return pack as Result<Body>;
       if (pack.value.manifest.pack !== m) return refuse('VALUE_MALFORMED', `The document sent for ${m} is the pack ${pack.value.manifest.pack}.`, `modules.${m}`);
       await step(m, 'module', pack.value, offered);

@@ -104,7 +104,7 @@ test('A DIRECTORY DUMPED AND LOADED INTO AN EMPTY ONE RESOLVES THE NAME, KNOWS T
   assert.equal(value<{ totals: { runs: number } }>(to.d.usage(from.ada, { from: '2026-09-01', to: '2026-09-30' })).totals.runs, 1);
 
   // The passkey signs Ada in on the loaded Directory, which is the proof that the public half and its person came back.
-  const options = ok(await to.d.auth({ flow: 'passkey.assert.options' })).body;
+  const options = ok(await to.d.auth({ flow: 'passkey.assert.options', ip: '203.0.113.10' })).body;
   const signed = await authenticate(KEYS.es256, { rpId: RP_ID, origin: ORIGIN, challenge: options.challenge, signCount: 1, person: from.ada });
   const into = ok(await to.d.auth({ flow: 'passkey.assert', credential: asJSON.assertion(signed), ip: '203.0.113.10' }));
   assert.equal((into.body as { person: string }).person, from.ada);

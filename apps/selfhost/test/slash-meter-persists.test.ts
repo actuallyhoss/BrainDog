@@ -69,7 +69,7 @@ test('AN ASK SURVIVES A RESTART: the call ledger the month is metered from is on
     assert.ok(existsSync(beside), `Slash kept nothing beside the record: ${beside} does not exist after two asks and two restarts`);
     const own = openSqlite(beside);
     try {
-      const calls = own.all<{ kind: string; tier: string }>('SELECT kind, tier FROM call ORDER BY ts');
+      const calls = own.all<{ kind: string; tier: string }>('SELECT kind, tier FROM slash_call ORDER BY ts');
       assert.deepEqual(
         calls.map((c) => c.kind),
         ['read', 'read'],

@@ -1,0 +1,49 @@
+<!--
+  An address that leads to nothing on this record, drawn inside the shell with Search and Home (design SYS-8, DSN-12).
+
+  ONE SCREEN FOR BOTH DOORS A MISTYPED ADDRESS COMES THROUGH. A path that is one segment long reaches `routes/[id]`, the
+  spoken-id resolver, before anything else can answer it, and every other unmatched path reaches `+error.svelte` at 404.
+  They said the same thing in two sets of words with two sets of buttons, and one of them printed the whole address,
+  record slug and all, as its title. Both draw this now, so the answer does not depend on how many slashes were typed.
+
+  NOT AN ALARM. `no-results`, not `error`: nothing failed, a string was typed and it names nothing, which is the same
+  class of event as a search with no hits. Spending the danger colour on it is how a product teaches people that red
+  means nothing in particular, and `error` would also settle the screen as refused.
+
+  SEARCH OPENS THE PALETTE AND HOME GOES HOME. The Search button once went home beside a second button that also went
+  home, on the one screen whose whole purpose is that somebody was looking for something.
+
+  THE GLYPH IS `globe`, THE APP'S OWN, because its path ships with the app: a glyph from the rest of the set would fetch
+  that whole set for the one picture on a screen somebody reached by mistake.
+-->
+<script lang="ts">
+  import { copy } from '../copy.ts';
+  import { openPalette } from '../palette/open.svelte.ts';
+
+  import Button from './Button.svelte';
+  import Empty from './Empty.svelte';
+  import Icon from './Icon.svelte';
+
+  /* This screen's own words, in a `words` object in the module that draws them (contracts §11 X18). */
+  const words = {
+    title: 'Nothing is at this address',
+    body: 'It may have moved, or a letter may be out of place. Search for what you were after, or start again from Home.',
+  } as const;
+
+  let {
+    title = words.title,
+    body = words.body,
+  }: {
+    /** The screen's heading, when the caller knows more than "nothing is here": a number that names no one list. */
+    title?: string;
+    /** One sentence on what to do next. */
+    body?: string;
+  } = $props();
+</script>
+
+<Empty kind="no-results" heading glyph="globe" {title} {body}>
+  {#snippet actions()}
+    <Button weight="primary" onclick={openPalette}><Icon name="search" size="s" />{copy.search}</Button>
+    <Button href="/">{copy.home}</Button>
+  {/snippet}
+</Empty>

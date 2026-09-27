@@ -148,8 +148,8 @@ async function hosted(kind: string) {
     call,
     runs: () => (sql.exec("SELECT state, say FROM automation_run WHERE rule = 'rate' ORDER BY rowid").toArray() as { state: string; say: string | null }[]).map((r) => ({ ...r })),
     calls: () => {
-      const has = sql.exec("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'call'").toArray().length > 0;
-      return has ? (sql.exec('SELECT model, status, code FROM call ORDER BY rowid').toArray() as { model: string; status: string; code: string | null }[]).map((r) => ({ ...r })) : [];
+      const has = sql.exec("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'slash_call'").toArray().length > 0;
+      return has ? (sql.exec('SELECT model, status, code FROM slash_call ORDER BY rowid').toArray() as { model: string; status: string; code: string | null }[]).map((r) => ({ ...r })) : [];
     },
     /** Every alarm the platform would fire now, never more than ten; a rung an hour out is left where it is. */
     settle: async (): Promise<void> => {

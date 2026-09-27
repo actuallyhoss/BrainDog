@@ -1,5 +1,5 @@
 /**
- * Home's and History's reads against the record: figures as tiles, what is new, marking it read, and the log.
+ * Home's and History's reads against the record: what is new, marking it read, and the log; and a figure as a tile.
  */
 
 import { test } from 'node:test';
@@ -13,7 +13,7 @@ import { figureTile } from './fixtures/readers.ts';
 import { forget, readBoot, type Fetch } from './boot-live.ts';
 import { METRICS } from './declared.ts';
 import { hrefFor } from './metrics.ts';
-import { HOME_FIGURES, LOG_PAGE, homeFigures, markAll, readHome, readLog, tileOf } from './news-live.ts';
+import { LOG_PAGE, markAll, readHome, readLog, tileOf } from './news-live.ts';
 import { liveWords, tileOf as pageTile } from './page-live.ts';
 
 const BASE = 'http://record.test';
@@ -52,7 +52,7 @@ const line = (over: Record<string, unknown>) => ({
 });
 
 test("a figure is the record's reading in the declaration's words, and one that cannot be read says so", () => {
-  const id = HOME_FIGURES[0];
+  const id = 'owed-to-you';
   const decl = METRICS[id]!;
   const tile = tileOf(id, { value: 1_250_000, unit: 'GBP', rows: 4, met: true, refusals: [] });
   assert.equal(tile.label, decl.name);
@@ -137,34 +137,20 @@ test('a zero the predicate does say something about keeps its verdict and its do
   assert.notEqual(nothing.note, liveWords.unsaid, 'a list holding nothing is not a field nobody filled in');
 });
 
-test('Home asks for what is new and its three figures together, and leaves out a figure it may not read', async () => {
-  const { io, sent } = host((url) => {
-    if (url.pathname === '/api/whatsNew')
-      return json(200, { ok: true, value: { events: [line({ rowid: 5, register: 'obligations', seq: 2, title: 'Rent' })], upTo: 5, sinceCapped: false } });
-    if (url.searchParams.get('metric') === 'overdue') return json(404, { ok: false, refusal: { code: 'METRIC_UNKNOWN', fix: 'There is no metric called overdue.' } });
-    return json(200, { ok: true, value: { value: 100, unit: 'GBP', rows: 1, met: true, refusals: [] } });
-  });
+/* HOME ASKS NO FIGURE OF ITS OWN (shell.md USE-2). It asked Money's three of every record holding `obligations`, which
+   is the web knowing one pack by its list; what leads Home now is the page the record declares. */
+test('Home asks for what is new and for no figure, whatever lists the record holds', async () => {
+  const { io, sent } = host((url) =>
+    url.pathname === '/api/whatsNew'
+      ? json(200, { ok: true, value: { events: [line({ rowid: 5, register: 'obligations', seq: 2, title: 'Rent' })], upTo: 5, sinceCapped: false } })
+      : json(200, { ok: true, value: { value: 100, unit: 'GBP', rows: 1, met: true, refusals: [] } }),
+  );
   const out = await readHome(BASE, 'p_1', io);
   assert.equal(out.from, 'live');
   if (out.from !== 'live') return;
-  assert.deepEqual(out.tiles.map((t) => t.id), ['owed-to-you', 'due-30d']);
   assert.deepEqual(out.news.items.map((i) => [i.by, i.text]), [['you', 'Added Rent']]);
   assert.equal(out.news.upTo, 5);
-  assert.equal(sent.length, 4);
-});
-
-test('A RECORD WITHOUT MONEY IS NOT ASKED FOR MONEY FIGURES, and a declared Home asks for none', async () => {
-  assert.deepEqual(homeFigures([{ id: 'obligations' }, { id: 'people' }], false), HOME_FIGURES);
-  assert.deepEqual(homeFigures([{ id: 'courses' }, { id: 'assignments' }], false), []);
-  assert.deepEqual(homeFigures([{ id: 'obligations' }], true), []);
-
-  const { io, sent } = host((url) =>
-    url.pathname === '/api/whatsNew' ? json(200, { ok: true, value: { events: [], upTo: 1, sinceCapped: false } }) : json(404, { ok: false, refusal: { code: 'METRIC_UNKNOWN', fix: 'No.' } }),
-  );
-  const out = await readHome(BASE, 'p_1', io, homeFigures([{ id: 'courses' }], false));
-  assert.equal(out.from, 'live');
-  if (out.from === 'live') assert.deepEqual(out.tiles, []);
-  assert.equal(sent.length, 1, 'only what is new was asked for');
+  assert.deepEqual(sent.map((s) => new URL(s.url).pathname), ['/api/whatsNew'], 'only what is new was asked for');
 });
 
 /* NO RECORD IS A REFUSAL NOW, NOT THE SAMPLE (DIRECTION 26): Home drew the studio's figures and its "since you were
@@ -208,7 +194,7 @@ test('A MEMBER HELD TO ONE LIST MARKS WITH THE CURSOR SHE WAS HANDED, and it goe
         ? json(200, { ok: true, value: { upTo, seen_at: '2026-09-15T09:00:00.000Z' } })
         : json(200, { ok: true, value: { registers: [], now: '2026-09-15T12:00:00.000Z' } }),
   );
-  const home = await readHome(BASE, 'p_9', io, []);
+  const home = await readHome(BASE, 'p_9', io);
   assert.equal(home.from, 'live');
   if (home.from !== 'live') return;
   assert.equal(home.news.upTo, upTo);

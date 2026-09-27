@@ -25,7 +25,7 @@ const build = (index = INDEX, rows = ROWS) => {
   const slash = createSlash({ sql, clock, inference, record });
   const calls = () =>
     sql.all<{ kind: string; status: string; code: string | null; tier: string; model: string; neurons: number; filed: string | null; question: string | null }>(
-      'SELECT kind, status, code, tier, model, neurons, filed, question FROM call ORDER BY rowid',
+      'SELECT kind, status, code, tier, model, neurons, filed, question FROM slash_call ORDER BY rowid',
     );
   return { sql, clock, inference, record, slash, calls };
 };
@@ -137,7 +137,7 @@ test('tier a out of asks refuses before any model call', async () => {
   const { sql, slash, inference } = build();
   for (let i = 0; i < 80; i++)
     sql.exec(
-      `INSERT INTO call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status)
+      `INSERT INTO slash_call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status)
        VALUES (?, '2026-11-03T00:00:00.000Z', 'propose', 'a', 'glm-5.3-flash', 1, 1, 1, 1, 'ok')`,
       `c${i}`,
     );
@@ -215,7 +215,7 @@ test('a recommendation keeps its tick only when its reason names a row', async (
   assert.equal(cleared.ok && cleared.value.filed, 'SG2');
 });
 
-test('a rowset row with nothing behind it is dropped and counted, and the rest are filed', async () => {
+test('a rowset row with nothing behind it is dropped and counted, and the rest are filed with their sources beside them', async () => {
   const { slash, record, inference } = build();
   inference.say(PREDICATE);
   inference.say(
@@ -224,7 +224,10 @@ test('a rowset row with nothing behind it is dropped and counted, and the rest a
       body_kind: 'rowset',
       body: {
         register: 'tasks',
-        rows: [{ what: 'Chase the rent, {{ref:obligations#7}}' }, { what: 'Call the bank' }],
+        rows: [
+          { fields: { what: 'Chase the rent' }, from: ['obligations#7'] },
+          { fields: { what: 'Call the bank' }, from: ['obligations#99'] },
+        ],
       },
       flagged: false,
     }),
@@ -232,8 +235,36 @@ test('a rowset row with nothing behind it is dropped and counted, and the rest a
   const out = await slash.propose('what should I do', OWNER);
 
   assert.equal(out.ok, true);
-  const body = record.filed[0]?.body as { rows: unknown[]; dropped: number };
-  assert.equal(body.rows.length, 1);
+  const body = record.filed[0]?.body as { rows: Record<string, unknown>[]; from: string[][]; dropped: number };
+  /* THE ROW IS ITS FIELDS AND NOTHING ELSE, so accepting it writes no citation into the record (S3). */
+  assert.deepEqual(body.rows, [{ what: 'Chase the rent' }]);
+  assert.deepEqual(body.from, [['obligations#7']]);
+  assert.equal(body.dropped, 1);
+});
+
+test('a rowset row that carries a brace in a field is dropped, because accepting it would write the brace', async () => {
+  const { slash, record, inference } = build();
+  inference.say(PREDICATE);
+  inference.say(
+    JSON.stringify({
+      text: 'Two rows follow from {{ref:obligations#7}}.',
+      body_kind: 'rowset',
+      body: {
+        register: 'tasks',
+        rows: [
+          { fields: { what: 'Chase {{ref:obligations#7}}' }, from: ['obligations#7'] },
+          { fields: { what: 'Chase the accountant' }, from: ['{{ref:obligations#8}}'] },
+        ],
+      },
+      flagged: false,
+    }),
+  );
+  const out = await slash.propose('what should I do', OWNER);
+
+  assert.equal(out.ok, true);
+  const body = record.filed[0]?.body as { rows: Record<string, unknown>[]; from: string[][]; dropped: number };
+  assert.deepEqual(body.rows, [{ what: 'Chase the accountant' }]);
+  assert.deepEqual(body.from, [['obligations#8']]);
   assert.equal(body.dropped, 1);
 });
 
@@ -252,11 +283,41 @@ test('a digit the model typed refuses the whole proposal, and nothing is filed',
 test('a body with no citation at all is not filed', async () => {
   const { slash, record, inference } = build();
   inference.say(PREDICATE);
-  inference.say(options({ text: 'Both of these are worth doing.', body: { options: [{ id: 'a', label: 'Do it' }] } }));
+  inference.say(
+    options({
+      text: 'Both of these are worth doing.',
+      body: {
+        options: [
+          { id: 'a', label: 'Do it', because: 'It is worth doing.' },
+          { id: 'b', label: 'Wait', because: 'Nothing presses.' },
+        ],
+      },
+    }),
+  );
   const out = await slash.propose('what is still open', OWNER);
 
   assert.equal(codeOf(out), 'PROPOSAL_NO_ROWS');
   assert.equal(record.filed.length, 0);
+});
+
+test('an option with no id is refused by its own schema, and nothing is filed', async () => {
+  const { slash, record, inference, calls } = build();
+  inference.say(PREDICATE);
+  inference.say(
+    options({
+      body: {
+        options: [
+          { label: 'Pay the rent first', because: 'It is the larger, {{ref:obligations#7}}.' },
+          { id: 'b', label: 'Pay the accountant first', because: 'It is due later.' },
+        ],
+      },
+    }),
+  );
+  const out = await slash.propose('what is still open', OWNER);
+
+  assert.equal(codeOf(out), 'PROPOSAL_SCHEMA');
+  assert.equal(record.filed.length, 0);
+  assert.equal(calls().find((c) => c.kind === 'propose')?.code, 'PROPOSAL_SCHEMA');
 });
 
 test('the model is named on every answer, and the fold travels with it', async () => {

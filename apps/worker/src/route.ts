@@ -24,6 +24,8 @@ import { fixOf, type Result, type Snapshot } from '@braindog/ports';
 import type { CallContext } from '@braindog/record';
 import { badSlug } from '@braindog/record/directory';
 
+import { op } from './oplog.ts';
+
 /** The address half of a bearer. Checked as a shape, never as a credential — that is the record's. */
 const REC_ID = /^rec_[0-9A-HJKMNP-TV-Z]{26}$/;
 
@@ -84,6 +86,27 @@ export const servesMcp = (pathname: string): boolean => /^\/+mcp\/*$/.test(pathn
  * whether the payload was verified, which decides only whether the stored row may match (`12 §3`).
  */
 export const servesIn = (pathname: string): boolean => /^\/+in(?:\/|$)/.test(pathname);
+
+/**
+ * `/oauth/*`: OAuth 2.1's endpoints, with BrainDog as its own authorization server (`loop/finish/agents.md` C4), and the
+ * consent page this Worker draws until the app has its own (`oauth.ts`).
+ *
+ * A PREFIX AND NOT A LIST, for `servesIn`'s reason: which endpoints exist is `@braindog/host/oauth`'s to say, and a path
+ * under the prefix that names none is its 404 in OAuth's words, never the app shell's 200. It is the Directory's
+ * business and never a record's until a person allows an app, so no record is addressed to answer it.
+ */
+export const servesOAuth = (pathname: string): boolean => /^\/+oauth(?:\/|$)/.test(pathname);
+
+/**
+ * The OAuth metadata an MCP client discovers from `/mcp`'s 401: the protected resource's (RFC 9728), at the root and
+ * under the resource's own path, and the authorization server's (RFC 8414).
+ *
+ * THESE NAMES AND NOT `/.well-known/*`, as `servesBuild` is one name and not the prefix: `security.txt` is the site's,
+ * and the site forwards exactly these (`apps/site/wrangler.jsonc`). Anything under the protected resource's name is
+ * this Worker's, because RFC 9728 inserts the resource's path there; a path that is not `/mcp` is answered 404.
+ */
+export const servesOAuthMeta = (pathname: string): boolean =>
+  /^\/+\.well-known\/+oauth-(?:authorization-server\/*|protected-resource(?:\/.*)?)$/.test(pathname);
 
 /**
  * `/.well-known/braindog-build`: which version of this Worker is answering, and no record is asked.
@@ -207,13 +230,16 @@ export async function restoredOf(out: Response, by: string): Promise<Restored | 
   return { bookmark: said.value.bookmark, kept: typeof said.value.kept === 'string' ? said.value.kept : null, by };
 }
 
-/** `restore.pitr` on the object that came back, and a line in the tail when it could not be written. */
+/**
+ * `restore.pitr` on the object that came back, and an `op: 'restore'` line when it could not be written: the record is
+ * back at `bookmark` either way, and the line is the only place the missing event is said.
+ */
 async function written(args: Restored, restored: (args: Restored) => Promise<Result<unknown>>): Promise<void> {
   try {
     const wrote = await restored(args);
-    if (!wrote.ok) console.error(`restore: the record is back at ${args.bookmark} and restore.pitr was refused: ${fixOf(wrote)}`);
+    if (!wrote.ok) op({ op: 'restore', ok: false, bookmark: args.bookmark, why: 'refused', fix: fixOf(wrote) }, 'error');
   } catch (e) {
-    console.error(`restore: the record is back at ${args.bookmark} and restore.pitr was not written: ${e instanceof Error ? e.message : String(e)}`);
+    op({ op: 'restore', ok: false, bookmark: args.bookmark, why: 'thrown', error: e instanceof Error ? e.message : String(e) }, 'error');
   }
 }
 
@@ -373,7 +399,7 @@ export function atRoot(request: Request, rest: string): Request {
  * `/app/fonts/geist.woff2` under a wildcard `Accept` were measured going to `brain.dog`, another origin, which a
  * same-origin fetch cannot follow.
  *
- * AND A SLUG'S `/api` IS A DOOR TOO, WHICH THE ROOT'S LIST DOES NOT SEE. `/app/<slug>/api/<method>` is none of the six
+ * AND A SLUG'S `/api` IS A DOOR TOO, WHICH THE ROOT'S LIST DOES NOT SEE. `/app/<slug>/api/<method>` is none of the doors'
  * prefixes, so on the old host it was a 308 whatever the `Accept`, and `hostGet`'s `GET /api/slash/status`, which
  * `apiBase()` sends under the slug, would have failed in every tab left open across push B. The public host never
  * showed it only because it spares all of `/app`.
@@ -384,7 +410,9 @@ export function legacyRedirect(request: Request, legacy: string | undefined, pub
   const url = new URL(request.url);
   const host = url.host.toLowerCase();
   const path = url.pathname;
-  if (servesApi(path) || servesMcp(path) || servesIn(path) || servesAuth(path) || servesAccount(path) || servesBuild(path)) return null;
+  /* OAUTH IS A DOOR, AND ITS AUTHORIZE AND CONSENT ARE PAGE LOADS: a browser sent there by an app asks for HTML, and a
+     308 to `/app/oauth/...` would hand the person the app shell instead of the sign-in they came for. */
+  if (servesApi(path) || servesMcp(path) || servesIn(path) || servesAuth(path) || servesAccount(path) || servesBuild(path) || servesOAuth(path) || servesOAuthMeta(path)) return null;
   const app = appPath(path);
   if (app !== null && servesApi(app.rest)) return null;
   if (!/text\/html/i.test(request.headers.get('accept') ?? '')) return null;

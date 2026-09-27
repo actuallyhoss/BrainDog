@@ -9,16 +9,19 @@
   ON A HOST WITH NO MODEL, ON THE SAMPLE, OR ON TIER `b`, NOTHING. `SlashAsks` says the no-model sentence once, and a second
   one here would be the same sentence twice in one area. Tier `b` is not offered (F6), and `startOf` is `null` there.
 
-  A REFUSAL IS SHOWN AS IT CAME (`13 §6`), under the field. `byo` is offered on both hosts, as §4 of the brief says: the
-  settings door's 501 is for tier `b` only (`unsettled` in `packages/host/src/slash-ask.ts`), which this row never sends, so
-  what can come back here is the engine's own `VALUE_MALFORMED` or `FORBIDDEN`, and those are drawn word for word.
+  AND NOTHING ON THE CLOUD, where the included model is the only choice (`kindsOn`): one radio button chooses nothing, and
+  `SlashAsks` already names that model and its monthly limit. The status is not even asked for there.
+
+  A REFUSAL IS SHOWN AS IT CAME (`13 §6`), under the field. The settings door's 501 is for tier `b` only (`unsettled` in
+  `packages/host/src/slash-ask.ts`), which this row never sends, so what can come back here is the engine's own
+  `VALUE_MALFORMED` or `FORBIDDEN`, and those are drawn word for word.
 -->
 <script lang="ts">
   import { apiBase } from '../at.ts';
   import { onMount } from 'svelte';
   import { page } from '$app/state';
   import { createClient } from '@braindog/client';
-  import { modelSaid, patchOf, startOf, words, type Kind, type Start } from '$lib/ui/slash-model.ts';
+  import { kindsOn, modelSaid, patchOf, startOf, words, type Kind, type Start } from '$lib/ui/slash-model.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import Section from '$lib/ui/Section.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -34,13 +37,14 @@
   let refusal = $state('');
 
   const patch = $derived(start ? patchOf(start, kind, typed) : null);
+  const kinds = $derived(kindsOn(page.data.host));
 
   /* Neither door reads or writes a record row, so no conflict comes back; the sentence is here so the type is whole. */
   const fixOf = (out: { refusal: { fix: string } } | { conflict: unknown }): string =>
     'refusal' in out ? out.refusal.fix : 'Something changed while this was open. Try again.';
 
   onMount(() => {
-    if (!page.data.live || page.data.slash !== true || !owner) return;
+    if (!page.data.live || page.data.slash !== true || !owner || kindsOn(page.data.host).length < 2) return;
     client = createClient({ base: apiBase() });
     /* A STATUS REFUSAL IS `SlashAsks`'s TO SHOW, under its heading, and it asks the same door. Drawing it here too would put
        one refusal on the screen twice; this row just stays away. */
@@ -76,12 +80,12 @@
   }
 </script>
 
-{#if page.data.live && owner && start}
+{#if page.data.live && owner && start && kinds.length > 1}
   <Section title={words.legend}>
     <form class="model-form" onsubmit={save} novalidate>
       <fieldset class="kinds">
         <legend class="visually-hidden">{words.legend}</legend>
-        {#each ['a', 'byo'] as const as value (value)}
+        {#each kinds as value (value)}
           <label class="kind">
             <input type="radio" name="slash-kind" {value} bind:group={kind} disabled={saving} aria-describedby="slash-kind-{value}" />
             <span class="kind-words">

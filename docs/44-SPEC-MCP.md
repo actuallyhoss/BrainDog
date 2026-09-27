@@ -316,7 +316,7 @@ record answers, which is every result above but one, and `public` for `server/di
 reads nothing and is the same for every caller. The resource list is held for a minute rather than an hour because it
 names pages, and a page appears when its row does.
 
-### 4.4 · The fifteen tools, and what each reaches
+### 4.4 · The tools, and what each reaches
 
 | Tool | Reaches | Arguments | Writes |
 |---|---|---|---|
@@ -329,12 +329,13 @@ names pages, and a page appears when its row does.
 | `history` | `history({ register, seq })` | `spoken`, qualified or prefixed | no |
 | `activity` | `recentHistory({ limit? })` | `limit?` | no |
 | `governance` | `governance(args)` | `register?`, `id?`, `status?`, `limit?`, `cursor?` | no |
-| `propose` | `propose(args)`; `dryRun` after a rule change is filed; `scriptTry` instead of filing, for a script change carrying `try` | `question`, `body_kind`, `body` | yes |
+| `propose` | `propose(args)`; `dryRun` after a rule change is filed; `scriptTry` instead of filing, for a script change carrying `try`; `boot` after a filing, for the `decide` link | `question`, `body_kind`, `body` | yes |
 | `create` | `create({ register, fields, note? })` | the same | yes |
 | `update` | `update({ register, seq, patch, version?, note? })` | `spoken`, `patch`, `version?`, `note?` | yes |
-| `log` | `update({ register, seq, patch: {}, note })` | `spoken`, `note` | yes |
+| `log` | `update({ register, seq, patch: {}, note })`, or `handoff({ note })` when `spoken` is left out | `spoken?`, `note` | yes |
 | `handoff` | `handoff(args)` | `next?`, `tried?`, `note?`, `doing?`, `state?` (`idle`, `handoff` or `done`) | yes |
 | `meet` | `meet(args)` | `name?`, `email?`, `handle?`, `where` | yes |
+| `triage` | `triage(args)` | `arrival`, `register?`, `fields?`, `ignore?`, `note?` | yes |
 
 Fourteen of these are the fourteen of `loop/research-agent-path.md` §1.5. Five tools left to pay for the three that
 plan added (`context`, `handoff`, `meet`): `pages`, `page` and `metric` were already resources (§4.7); `credentials`
@@ -348,6 +349,12 @@ of `src/index.ts`):
   picking up after another does not yet know which row to ask about. It takes a `limit` and no cursor, and answers
   `{ events }` with the record's cursor taken off, because an argument the tool does not take is one a model will try
   to send. It cost 117 tokens.
+- **`triage`**, listed last, files one arrival from the inbox as a row in a list, or sets it aside
+  (`loop/finish/contracts.md` §6.2). It is the record's `triage`, which admits a person as filing in the app does and a
+  token only when its owner gave it the `inbox` reach; every other token is refused `FORBIDDEN` in the record's
+  sentence, relayed unchanged. The row it files comes back compact, as `create`'s would. It could not be paid for by
+  cutting descriptions, so it is the one tool §7's ceiling was raised for, once, to 2,760. The command line routes it
+  (`apps/cli/src/surface.ts`), so it answers over stdio as over `POST /mcp`.
 
 A second, **`money`** (`4da40586`), joined and then left in `48ac43a1` (`loop/research-m3-dynamic.md` section 3,
 B6). It read the seven figures that money-core declares, by id, through `metric`, and when none answered it refused
@@ -383,10 +390,12 @@ The tool layer holds no checks of its own beyond addressing:
   `index.ts`, with `additionalProperties: false` and `required` left out when empty. The record refuses a wrong field
   by name (`FIELD_UNKNOWN`, `ENUM_VALUE_UNKNOWN`, with `allowed`), which teaches better than a protocol error would.
 - **A tool the surface does not answer** is `NOT_IN_THIS_BUILD` with a sentence saying what to do instead (§2).
-- **Any other name** is `ROUTE_UNKNOWN`, with the fifteen in `allowed`. The lookup is `Object.hasOwn`, because the
+- **Any other name** is `ROUTE_UNKNOWN`, with every tool's name in `allowed`. The lookup is `Object.hasOwn`, because the
   name comes from the caller and every name on `Object.prototype` would otherwise be found and called.
 - **A note** is an `update` with an empty patch, so it answers to the same permission and lands in the same history.
-  An empty note is `REQUIRED_MISSING` at `note`.
+  An empty note is `REQUIRED_MISSING` at `note`. A note with no `spoken` goes on the caller's own session: it is the
+  record's `handoff` with the note alone, which finds the token's run, or opens it, in the same write, so a note about
+  nothing in particular is one call. A surface without `handoff` is `NOT_IN_THIS_BUILD`.
 
 What the tools do to an answer, which is the other thing this layer does. Each is written up where it is done in
 `index.ts`:
@@ -403,9 +412,12 @@ What the tools do to an answer, which is the other thing this layer does. Each i
   when there are none. The ids are the surface's `figures` when it answers one, and otherwise those drawn on the
   pages `boot` lists, which `boot` holds to the same filter `pages` runs.
 - **`search`** answers each hit as `{ spoken, title }`, and, over a record that counts its matches, as
-  `{ rows, matched, showing, more? }`, where `more` is a sentence whenever fewer rows came back than matched: past the
-  default `limit` of twenty as well as at the record's cap of a hundred, since `matched` counts every live match
-  whatever the limit. A record from before the count answers the bare list, which is relayed as it was.
+  `{ rows, matched, showing, more? }`, where `more` is a sentence whenever fewer rows came back than matched, since
+  `matched` counts every live match whatever the limit. It names what held the answer back: the caller's own `limit`,
+  or the default of twenty when none was sent, each with the offer of a limit up to a hundred; only a full hundred is
+  said as the record's cap, where narrowing the question is the one way on. A record from before the count answers the
+  bare list, which is relayed as it was.
+- **`triage`** answers the record's `{ id, state, entry, already }`, with `entry`, the row it filed, made compact.
 - **`governance`** lists each question without its `body` and without its empty fields; one asked for by `id` is
   whole.
 - **`context`** carries `teach`, one to three sentences on where a loose note goes, what a task's lane is and how to
@@ -415,6 +427,10 @@ And what `propose` does before and after it files:
 
 - **A `rowset`** that leaves out `register` is given the one register every row's `at` names, and a new `body` for a
   row of `skills` that does not raise `rev` is given `rev + 1`, so `skills sync` picks it up.
+- **A filing** that succeeds gains `decide`, the address where the person answers it:
+  `<origin>/app/<slug>/decide/<id>`. The origin is the host's, handed to `handle` as its fourth argument, and the slug is `boot`'s
+  `record`, read after the filing; a transport that hands no origin, or a record that names no slug, answers without
+  it. An answer that already carries `decide` keeps its own. A `try` is filed nowhere, so it has none.
 - **A `change`** that leaves out `declaration_id` takes it from `to.id`.
 - **A rule change** is filed, and then the record's `dryRun` of the rule is added to the answer as `dry_run`, the same
   account Decide reads; a body the record refuses is refused in its words and never previewed, and a dry run that is
@@ -705,10 +721,19 @@ What an install does change is read, never pushed:
 
 ### 5.7 · MRTR on `propose`
 
-**Not built.** `rpc.ts` renders `propose` as it renders every tool (§5.4): the record's answer as JSON, carrying the
-suggestion's id, and `dry_run` or `script_try` when §4.4 adds one. No result carries `resultType`, and
-`inputResponses` is not read. What follows is the design, kept for the day a person can reach MCP and answer in the
-client (10 §5).
+**Off, behind `const MRTR = false` in `rpc.ts`.** `rpc.ts` renders `propose` as it renders every tool (§5.4): the
+record's answer as JSON, carrying the suggestion's id, its `decide` link when the host handed an origin (§4.4), and
+`dry_run` or `script_try` when §4.4 adds one. No result carries `resultType`. The input-required shape is answered only
+to a request whose `_meta` carries the client capability the 2026-07-28 revision names for it, and that name could not
+be confirmed from the specification's own text, which this repository does not hold; the `requests` of kind
+`decision` below are this project's design, not a kind the revision is known to name. So the shape stays off and the
+`decide` link carries the person to the question instead. The day the name is confirmed, `tools/call` reads it and
+`MRTR` turns true.
+
+Step 3 below is built: a `propose` carrying `inputResponses`, in the request's params or among its arguments, is
+answered `LEVEL_REQUIRED` at `inputResponses` with step 3's `fix` before any call, and no second suggestion is opened.
+The refusal carries no `wanted`, because a refusal's shape (`Refusal` in `@braindog/ports`) has none. The rest is the
+design, kept for the day a capability for it exists (10 §5).
 
 1. `propose` arguments validated (§5.3); `api.propose(args, ctx)` called; the suggestion row exists when it returns.
 2. `ok` with `{ id }` renders as the MRTR shape: `{ resultType: 'input_required', requests: [{ id, kind: 'decision',
@@ -763,7 +788,7 @@ instructions, the resource descriptions and the templates are ASCII.
 
 `budget.test.ts` calls `handle` with `tools/list` over the stub surface and counts the result with `tokenBudget`,
 serialised as a transport sends it. It prints the total, the bytes and the instructions' count as a test diagnostic,
-and fails when the total is over 2,600, the instructions over 400, or any description at 200 or more. It also holds
+and fails when the total is over 2,760, the instructions over 400, or any description at 200 or more. It also holds
 everything a client shows a model to plain ASCII: the tool list, the instructions, the resource descriptions the stub
 surface lists and the templates. And it holds the instructions to a currency's own decimals: no "divide by 100", and
 `JPY 0` and `KWD 3` both named. There is no gate script and no fixture: the tool list names no register, so there is
@@ -852,9 +877,9 @@ counted once for this revision, by the same estimator over the same result.
 
 | Item | Ceiling | Measured | How |
 |---|---|---|---|
-| `tools/list` result: `tools[]`, `instructions`, `ttlMs`, `cacheScope` | **≤ 2,600** | **2,544**, 8,641 bytes | `budget.test.ts` |
-| The fifteen tool objects alone, the `tools` array serialised by itself | reported | 2,130 | the same count over `tools` |
-| One tool description | < 200 | 12 (`update`) to 60 (`context`) | `budget.test.ts` asserts the ceiling for each of the fifteen |
+| `tools/list` result: `tools[]`, `instructions`, `ttlMs`, `cacheScope` | **≤ 2,760** | **2,544**, 8,641 bytes, before `triage`; 2,720 with it, counted by hand | `budget.test.ts` |
+| The tool objects alone, the `tools` array serialised by itself | reported | 2,130, before `triage` | the same count over `tools` |
+| One tool description | < 200 | 12 (`update`) to 60 (`context`) | `budget.test.ts` asserts the ceiling for each |
 | One tool object: name, description, `inputSchema`, `annotations` | reported | 79 (`record_index`) to 295 (`propose`) | |
 | `INSTRUCTIONS` | ≤ 400 | 400 | `budget.test.ts` |
 | `record_index` response | ≤ 500 | 450, 1,318 bytes, over the seed's nineteen registers and the 25 figures its pages draw | a real record with `@braindog/seed`'s declarations installed; no test asserts it |
@@ -862,9 +887,11 @@ counted once for this revision, by the same estimator over the same result.
 | `resources/list` | none | not in any turn; fetched when wanted | |
 
 *The first six rows measured on 24 September 2026, after `get` and `record_index` learned figures (audit sixty-two
-finding 2); the rest on 22 September. The headroom under 2,600 is 56 tokens, and under 400 for the instructions it is
-none. The `record_index` row is the one to watch: its figures are ids, but a record whose pages draw a hundred of
-them, or a host answering `figures` for a pack of many, takes it past 500.*
+finding 2); the rest on 22 September. What `triage` and `log`'s row-less `spoken` add was counted by hand with §5.8's
+estimator over the serialised tool list, 172 and 4, so 2,720 and 40 under the ceiling; `budget.test.ts`'s diagnostic
+is the figure that holds. Under 400 for the
+instructions there is no headroom. The `record_index` row is the one to watch: its figures are ids, but a record whose
+pages draw a hundred of them, or a host answering `figures` for a pack of many, takes it past 500.*
 
 **The `list` row is a target this build does not meet.** 10 §4 set 2,000 for "25 rows, projected, not whole
 documents". The record's default page is 50 rows, not 25 (`kernel.list` clamps to 1 to 500 with 50 as the default,
@@ -881,7 +908,9 @@ Home page for what leads. Their own ceiling moved from 300 to 400. Two more tool
 `activity`, which cost 117, and 2,565 after it, once four descriptions gave back what they said twice; `money` cost
 91, nine descriptions gave that back, and its leaving took the list from 2,597 to 2,520. Figures came back in
 clauses on `record_index` and `get` and not as a tool, for 16 tokens, 2,528 to 2,544. Automations and `script_try` cost the list nothing, because the one rides
-on `propose`'s answer and the other on its body, and their grammars are resources. One more clause in a description is
+on `propose`'s answer and the other on its body, and their grammars are resources. **2,760 since `triage`**, the one
+tool the ceiling was raised for (`loop/finish/contracts.md` §6.1): a write of its own rides on no other tool's answer,
+and 56 tokens could not hold it. It moves once and never again. One more clause in a description is
 a clause out of another, and the test is the arbiter. The instructions are counted inside the figure, because every
 token of them sits in the context every turn.
 
@@ -1046,10 +1075,10 @@ the documents that still cite the earlier decision.
 | D2 | **The token estimator** is §5.8's six-class run heuristic, copied into `budget.test.ts`, and the ceilings of §7 are ceilings on its count. Its calibration against `o200k_base` is not built | `budget.test.ts` |
 | D3 | **No `list_changed`.** Nothing in `tools/list` changes on an install, and what does change is read when it is wanted (§5.6) | `rpc.ts`, `CAPABILITIES` |
 | D4 | **`INSTRUCTIONS`** is §4.6's text, sent with `initialize`, `server/discover` and every `tools/list` | `instructions.ts`, `rpc.ts` |
-| D5 | **The 2,600 includes the instructions**, and no tool description names a register, so the list is the same for every record | `budget.test.ts`, §4.5 |
+| D5 | **The 2,760 includes the instructions**, and no tool description names a register, so the list is the same for every record. It was 2,600 until `triage`, and was raised once for it (§7) | `budget.test.ts`, §4.5 |
 | D6 | **`_meta.session` is the one `_meta` key that reaches the record.** `handle` reads no `_meta`. `serveMcp` hands `_meta.session` to the host's `session` option, which checks it with `hintsOf` (§4.2), and reads `io.modelcontextprotocol/protocolVersion` only to hold the version header to it | `http.ts`, `packages/host/src/session.ts` |
 | D7 | **Two error vocabularies.** A protocol failure is a JSON-RPC number (§6.1). Everything the record refuses, and every refusal this package makes on its behalf, is an error result inside HTTP 200 carrying the refusal whole; a conflict is `VERSION_STALE` with `current` and `actor`. An argument outside the published schema is not a protocol error here: the record refuses the field by name | `rpc.ts`, `render` |
-| D8 | **MRTR on `propose` is not built.** `propose` answers like every other tool (§5.7) | `rpc.ts` |
+| D8 | **MRTR on `propose` is off, behind `const MRTR = false`.** The client capability the 2026-07-28 revision names for an input-required answer could not be confirmed from the specification's text, so `propose` answers like every other tool, with the `decide` link to the question in the app; a `propose` carrying `inputResponses` is refused `LEVEL_REQUIRED` before any call (§5.7) | `rpc.ts`, `MRTR` and `DECIDES_NOT`; `index.ts`, `decideAt` |
 | D9 | **Types.** `McpSurface<C>` is structural, `Result` and `refused` come from `@braindog/ports`, and `src/` imports nothing of the record, so the same tools run in process and over `@braindog/client` | `index.ts` |
 | D10 | **Resources** are `braindog:<path>`, split and never resolved: thirteen fixed and six templates, each fixed address and each figure read before it is listed, with the ttl of §4.7. `decisions` is `governance({ register: 'suggestion' })`; the script and automation grammars are this package's text behind `version()` | `index.ts` |
 | D11 | **No refusal list.** A VAULT, JOBS or ADMIN method name is `ROUTE_UNKNOWN` like any other name that is not a tool, and the record refuses every token at those groups (§6.2) | `index.ts`, `call` |
@@ -1065,11 +1094,18 @@ the documents that still cite the earlier decision.
 
 - [x] `packages/mcp` holds the five source files, the grammar file, the test helper and the fourteen test files of
       §3, and `src/` imports only `@braindog/ports` and this package's own files.
-- [x] `TOOLS` has fifteen entries in §4.4's order, each input schema written by hand.
+- [x] `TOOLS` has §4.4's entries in its order, `triage` last, each input schema written by hand.
 - [x] `handle` answers the nine methods of `METHODS`; `server/discover` carries `cacheScope: 'public'` and
       `tools/list` carries `cacheScope: 'private'`.
-- [x] `budget.test.ts` holds `tools/list` at or under 2,600 tokens by `tokenBudget` (measured at 2,528), each
-      description under 200 and `INSTRUCTIONS` at or under 400 (measured at 400), all in plain ASCII.
+- [x] `budget.test.ts` holds `tools/list` at or under 2,760 tokens by `tokenBudget` (2,544 measured before `triage`,
+      the diagnostic's figure after), each description under 200 and `INSTRUCTIONS` at or under 400 (measured at 400),
+      all in plain ASCII.
+- [x] An inbox-reach token triages over `POST /mcp`; any other token is refused in the record's words.
+- [ ] The same over stdio. `surfaceOver` lists `triage`, and routes it once `@braindog/client`'s table names the
+      method; until then the tool answers `NOT_IN_THIS_BUILD` from the command line.
+- [x] A filed `propose` carries `decide` wherever the transport hands `handle` its origin; MRTR is off (D8).
+- [ ] `serveMcp`, both hosts and the command line's stdio hand `handle` their origin, so every filed `propose` carries
+      `decide`. Until then a filing answers as before, without it.
 - [x] stdio in `apps/cli` and `POST /mcp` on both hosts serve the same `handle`; every HTTP answer carries
       `Cache-Control: no-store`, and no body carries an exception message.
 - [x] The record answers `context`, `handoff` and `sessionsLive`, so their tools and resources are live.
@@ -1077,8 +1113,8 @@ the documents that still cite the earlier decision.
 - [x] The command line's surface offers every optional method its client routes, `actions` among them.
 - [ ] The tokenizer calibration of §9 is built.
 - [ ] A default `list` page is at or under 10 §4's 2,000 tokens (§7 measured 5,380).
-- [ ] 45 agrees with this document. Its §2 still counts sixteen tools (45-SPEC-RECORD:159), and so does 10-MCP
-      (lines 72, 97 and 129); both predate `48ac43a1`.
+- [x] 45 §2 and 10-MCP count the tools as `TOOLS` holds them. They counted one more from `48ac43a1` until `triage`
+      joined.
 
 ---
 

@@ -25,6 +25,7 @@ import { clash, no, ok } from '@braindog/ports';
 import { approvalLines, egressOf, keyNamed, runnerCannotOpen, type Egress } from './actions.ts';
 import { instant } from './migrate.ts';
 import { point } from './metrics.ts';
+import { pairsReads, type PairsDecl } from './pairs.ts';
 import { ACROSS, ANY_LIST, touches, type Resolve } from './reach.ts';
 import { egressChanged } from './script.ts';
 import { slashMayWrite } from './slash.ts';
@@ -473,6 +474,11 @@ function checkBody(deps: GovernDeps, kind: BodyKind, body: Record<string, unknow
         fix: `about is ${JSON.stringify(about)}; it is the thing the question is about, as a page filters by it, in at most ${ABOUT_BYTES} bytes: a name such as Box, or a spoken id such as parts#2.`,
         at: 'body.about',
       };
+    /* `to` IS ONE MEMBER'S ID OR NOTHING, because `decide` compares it with the actor as it stands (`heldTo`); a blank
+       one would put a question to nobody, which only an owner could then answer. */
+    const to = body.to;
+    if (to !== undefined && (typeof to !== 'string' || to.trim() === '' || to !== to.trim()))
+      return { code: 'VALUE_MALFORMED', fix: `to is ${JSON.stringify(to)}; it is the id of the one member the question is put to.`, at: 'body.to' };
     return null;
   }
 
@@ -524,7 +530,8 @@ function checkBody(deps: GovernDeps, kind: BodyKind, body: Record<string, unknow
      cannot read, which is right for egress and says nothing about whether the batch installs. */
   const to = resolveTo(deps.sql, body);
   if (!to.ok) return 'refusal' in to ? to.refusal : missing('to');
-  const wrong = shapeFault(to.value.to) ?? namesFault(deps.sql, { ...body, to: to.value.to });
+  /* A WHOLE BODY IS ASKED WHAT A RETIRE IS ASKED (`retiresRead`); a field-level change was asked it in `retireIn`. */
+  const wrong = shapeFault(to.value.to) ?? namesFault(deps.sql, { ...body, to: to.value.to }) ?? (fieldLevel(body.to) ? null : retiresRead(deps.sql, to.value.to));
   if (wrong) return wrong;
 
   /* AND ITS PREDICTION, IF IT CARRIES ONE — checked here rather than at acceptance, for the reason
@@ -727,6 +734,82 @@ const LIST_ROLES = ['title', 'state', 'finished'] as const;
 const ROLE_SAID: Record<(typeof LIST_ROLES)[number], string> = { title: 'title', state: 'state', finished: 'finished day' };
 
 /**
+ * The keys of a list's body that name its fields inside an object, and what each reads them for, as the refusal says it.
+ *
+ * `LIST_ROLES` WAS THE WHOLE OF THIS, AND THESE THREE WERE MISSING (defects L1). A retire of the field a list's `steps`
+ * names as `done` installed, and the list lost its steps without a word; `scopes` the same. The install's lint reads a
+ * retired field as present for those two, because `retired` keeps its value on every row, so nothing after this caught
+ * it. A `pairs` field it does refuse, but only at install, after somebody was asked and accepted.
+ */
+const LIST_PARTS = ['steps', 'scopes', 'pairs'] as const;
+type ListPart = (typeof LIST_PARTS)[number];
+const PART_READS: Record<ListPart, string> = {
+  steps: 'tell which row each of its rows is a step of, and when it is done',
+  scopes: 'list the repositories and folders of each project',
+  pairs: 'find the two legs of a transfer',
+};
+
+/**
+ * Each field a list body's `steps`, `scopes` or `pairs` names, with the key that names it.
+ *
+ * `fields` ARE THE ONES A `pairs` WITH NO `date` RUNS ITS WINDOW OVER, its list's sole live day field, so they are the
+ * live list's when there is one: read over a body that retires that day, the window would find no day and name nothing.
+ * A part installed malformed names nothing here, and the install's own lint is what refuses it.
+ */
+function partsNaming(body: Record<string, unknown>, fields: readonly Record<string, unknown>[]): Map<string, ListPart> {
+  const named = new Map<string, ListPart>();
+  const put = (part: ListPart, ids: readonly unknown[]): void => {
+    for (const id of ids) if (typeof id === 'string' && !named.has(id)) named.set(id, part);
+  };
+  if (isMap(body.steps)) put('steps', [body.steps.of, body.steps.done, body.steps.order]);
+  if (isMap(body.scopes)) put('scopes', Object.values(body.scopes));
+  const pairs = body.pairs;
+  if (isMap(pairs) && Array.isArray(pairs.on) && pairs.on.every((x) => typeof x === 'string'))
+    put('pairs', pairsReads(pairs as unknown as PairsDecl, fields as unknown as Parameters<typeof pairsReads>[1]));
+  return named;
+}
+
+/** Why `id` cannot be retired from `name` while its `part` names it, in the words the owner reads it by, then `then`. */
+const partHolds = (id: string, part: ListPart, name: string, then: string): string =>
+  `${id} is a field ${name}'s ${part} reads to ${PART_READS[part]}, so it cannot be retired. ${then}`;
+
+/**
+ * The first field a whole list body retires that the body still reads by, as a refusal, or `null`.
+ *
+ * A WHOLE BODY COULD DO WHAT A RETIRE MAY NOT (`loop/BACKLOG.md`, defects L1): `retired: true` on the title, or on the
+ * field `steps`, `scopes` or `pairs` names, installed as any other edit, and the list lost what that field held up. So
+ * each list a change installs is asked what `retireIn` asks, for every field it retires that the live list does not.
+ * A field already retired on the live list is left as it is, so a list filed again as it stands is not refused for a
+ * field it lost before this check existed.
+ */
+function retiresRead(sql: Sql, to: unknown): Refusal | null {
+  for (const d of declared(to)) {
+    const body = d.body;
+    if (d.kind !== 'register' || !isMap(body) || !Array.isArray(body.fields)) continue;
+    const list = typeof body.id === 'string' ? body.id : String(d.id ?? '').slice('register.'.length);
+    const live = liveList(sql, list);
+    const liveFields = (live && Array.isArray(live.body.fields) ? live.body.fields : []).filter(isMap);
+    const was = new Set(liveFields.filter((f) => f.retired === true).map((f) => f.id));
+    const going = (body.fields as unknown[]).filter(isMap).filter((f) => f.retired === true && !was.has(f.id)).map((f) => String(f.id));
+    if (going.length === 0) continue;
+    const name = typeof body.name === 'string' ? body.name : list;
+    const parts = partsNaming(body, live ? liveFields : (body.fields as unknown[]).filter(isMap));
+    for (const id of going) {
+      const role = LIST_ROLES.find((k) => body[k] === id);
+      if (role !== undefined)
+        return {
+          code: 'OUT_OF_BOUNDS',
+          fix: `${id} is the ${ROLE_SAID[role]} of ${name}, so it cannot be retired. Name another ${ROLE_SAID[role]} in the same change, or keep ${id}.`,
+          at: 'body.to',
+        };
+      const part = parts.get(id);
+      if (part !== undefined) return { code: 'OUT_OF_BOUNDS', fix: partHolds(id, part, name, `Change its ${part} in the same change, or keep ${id}.`), at: 'body.to' };
+    }
+  }
+  return null;
+}
+
+/**
  * The first move of an enum staying on the list that needs `id` filled, or `null` when no move does. An enum retired in
  * the same change is not asked, whichever order the two are named in.
  */
@@ -781,6 +864,8 @@ function retireIn(sql: Sql, to: { retire: unknown }, named: unknown): Result<{ t
   /* ONCE EACH, because the mark below lands on this copy: a field named twice read its own mark on the second pass and
      was refused as "already retired" while the live list held it as live as ever. */
   const going = new Set(retiring as string[]);
+  /* READ BEFORE THE FIRST MARK, so a `pairs` with no `date` still finds the day it runs over. */
+  const parts = partsNaming(live.body, fields);
   for (const id of going) {
     const held = fields.find((f) => f.id === id);
     if (!held) return no('FIELD_UNKNOWN', `${name} has no field called ${id}.`, { at: 'body.to.retire.fields' });
@@ -804,6 +889,10 @@ function retireIn(sql: Sql, to: { retire: unknown }, named: unknown): Result<{ t
       return no('OUT_OF_BOUNDS', `${id} is what ${move.field} needs filled to leave ${move.from} on ${name}, so it cannot be retired. Propose the whole list to change that move first.`, {
         at: 'body.to.retire.fields',
       });
+    /* NOR ONE ITS `steps`, `scopes` OR `pairs` READS, for the reason `LIST_PARTS` gives. */
+    const part = parts.get(id);
+    if (part !== undefined)
+      return no('OUT_OF_BOUNDS', partHolds(id, part, name, `Propose the whole list to change its ${part} first.`), { at: 'body.to.retire.fields' });
     held.retired = true;
   }
   return ok({ to: { id: `register.${list}`, kind: 'register', body: { ...live.body, fields } }, version: live.version });
@@ -1033,7 +1122,7 @@ function aboutOthers(sql: Sql, named: string, bundle: { id?: unknown; kind?: unk
         code: 'VALUE_MALFORMED',
         fix:
           was === null
-            ? `This change is filed as a change to ${named}, and ${String(d.id)} in it replaces one that reads a figure no live metric declares, which names no list, so nothing here can say whose that is. Propose ${String(d.id)} as a change of its own.`
+            ? `This change is filed as a change to ${named}, and ${String(d.id)} in it replaces one that reads a figure no live metric declares, or names no list at all, so it belongs to the whole record and not to ${named}. Propose ${String(d.id)} as a change of its own.`
             : whole(was)
               ? `This change is filed as a change to ${named}, and ${String(d.id)} in it replaces one that reads across the whole record, so whoever reads ${named} would be asked to change what everybody reads. Propose ${String(d.id)} as a change of its own.`
               : `This change is filed as a change to ${named}, and ${String(d.id)} in it replaces one that reads register.${was}, so whoever reads ${named} would be asked to change what ${was} shows. Propose ${String(d.id)} as a change of its own.`,
@@ -1132,16 +1221,22 @@ function pageOfOthers(
  * §2), while `pageOfOthers` refused the same figure redefined from the same question. The rule is now the one
  * `pageOfOthers` keeps: an unknown is not a licence. A body that names a list besides its dead figure is judged by that
  * list, since the page is already shown to whoever reads it and the dead figure draws nothing.
+ *
+ * AND AN INSTALLED BODY THAT NAMES NO LIST AND NO FIGURE IS THE OWNER'S, and answers `null` too (defects S4). It
+ * answered `undefined`, which the caller reads as "about no other list", so a page of prose, a digest with no list in
+ * it or a theme was replaced from one list's question, and Decide showed the whole-record change as a change to that
+ * list to a colleague who decides only on it. A body nobody's list places is the whole record's, and only whoever
+ * reads the whole record is asked about it, when it is proposed under its own name.
  */
 function replacedAbout(sql: Sql, id: string, list: string, fields: ReadonlySet<string>): string | null | undefined {
   const was = liveBody(sql, id);
   if (was === undefined) return undefined;
-  const { lists, unknown } = touches(id, was, {
+  const { lists } = touches(id, was, {
     figure: (figure) => [liveBody(sql, `metric.${figure}`)],
     door: (door) => liveBody(sql, `ingest.${door}`),
     fields: (of) => (of === list ? fields : fieldsOf(liveBody(sql, `register.${of}`))),
   });
-  if (lists.size === 0 && unknown.size > 0) return null;
+  if (lists.size === 0) return null;
   return [...lists].find((l) => l !== list);
 }
 
@@ -1446,6 +1541,53 @@ export type Verdict =
    */
   | { rule: 'additive' };
 
+/** One approved line as a suggestion holds it: what accept reads of it before anything is armed. */
+type SentLine = { key?: unknown; paged?: unknown; channel?: unknown; ingest?: unknown };
+
+/**
+ * The vault labels one approved line sends, each to be looked up alone.
+ *
+ * A SCRIPT'S LINE HOLDS ITS KEYS JOINED, "a, b", because `Egress.key` is one string (`scriptEgress` in `actions.ts`), and
+ * accept looked the joined text up as one label, so a script that sends two keys could never be accepted: the answer
+ * was "Add the key called "a, b"" (shell S16). So a script's labels are read from the declaration being accepted,
+ * whose `keys` is the list, and every other line's key is the one label it always was. A script line whose declaration
+ * is not in what is installed falls back to its one string, which refuses rather than passes.
+ */
+function labelsSent(out: unknown, install: unknown): string[] {
+  if (!isMap(out)) return [];
+  const key = out.key;
+  if (typeof key !== 'string') return [];
+  if (out.channel === 'script') {
+    const script = declared(install).find((d) => d.kind === 'script' && isMap(d.body) && d.body.script === out.ingest);
+    const body = script === undefined ? undefined : script.body;
+    const keys = isMap(body) ? body.keys : undefined;
+    if (Array.isArray(keys) && keys.length > 0 && keys.every((k) => typeof k === 'string')) return keys as string[];
+  }
+  return [key];
+}
+
+/**
+ * Why `actor` may not answer a question put to one member, or `null` when they may.
+ *
+ * A QUESTION AN AUTOMATION PUT TO ONE MEMBER (`ask_person`'s `to:`) IS THEIRS AND AN OWNER'S. The run waits on that
+ * person's answer, and the owner is the one who can always step in; anybody else who can read the queue answering it
+ * would move the run on a choice the rule never asked them for. A dismissal is held to the same people, since it ends
+ * the run's wait as surely as a pick does. Putting it off is not an answer and is left to anyone who sees it.
+ *
+ * A RULE AND THE SYSTEM ARE LET THROUGH, because what they send here is the run withdrawing its own question
+ * (`flow.ts`'s `release`), never a pick. The person is named by the name they gave, never by an id or an address.
+ */
+function heldTo(deps: GovernDeps, row: { id: string; body_kind: BodyKind; body: string }, actor: string): string | null {
+  if (row.body_kind !== 'options') return null;
+  const to = parse(row.body)?.to;
+  if (typeof to !== 'string' || to === '' || actor === to) return null;
+  if (actor.startsWith('rule:') || actor === 'system') return null;
+  const owner = deps.sql.one<{ y: number }>("SELECT 1 AS y FROM member WHERE person_id = ? AND register = '*' AND level = 'owner' LIMIT 1", actor);
+  if (owner) return null;
+  const name = deps.sql.one<{ name: string | null }>('SELECT name FROM person WHERE id = ?', to)?.name?.trim();
+  return `This question was put to ${name ? name : 'one member'}, so only they or an owner answer it.`;
+}
+
 /**
  * The gate.
  *
@@ -1492,6 +1634,9 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
       at: 'status',
       allowed: ['open'],
     });
+
+  const held = heldTo(deps, row, actor);
+  if (held !== null) return no<Decided>('FORBIDDEN', held, { at: 'to' });
 
   /* THE RULE IS CHECKED HERE, NOT ONLY WHERE IT IS SENT. The gate is the one place every acceptance passes, so a caller
      that sent `rule` for a required field would otherwise have a person's accept without a person. Past this it is an
@@ -1624,7 +1769,8 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
         const resolved = resolveTo(deps.sql, body);
         if (!resolved.ok) return resolved as Result<Decided>;
         install = resolved.value.to;
-        const wrong = shapeFault(install) ?? namesFault(deps.sql, { ...body, to: install }) ?? deps.fits?.(install) ?? null;
+        const wrong =
+          shapeFault(install) ?? namesFault(deps.sql, { ...body, to: install }) ?? (fieldLevel(body.to) ? null : retiresRead(deps.sql, install)) ?? deps.fits?.(install) ?? null;
         if (wrong) return { ok: false, refusal: wrong };
         /* A WHOLE BODY IS HELD TO THE VERSION IT WAS FILED AGAINST. A change filed before the stamp existed carries none,
            and is installed as it always was rather than refused for a number nobody wrote. */
@@ -1651,9 +1797,7 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
       /* A PATTERN'S TOO, since it files the same lines: an ingest polling on a key the vault does not hold is the same
          approved clock that pauses on its first run (`egress-digest-pattern.test.ts`). */
       if ((row.body_kind === 'change' || row.body_kind === 'pattern') && Array.isArray(body.egress))
-        for (const out of body.egress as { key?: unknown; paged?: unknown }[]) {
-          const label = typeof out?.key === 'string' ? out.key : null;
-          if (label === null) continue;
+        for (const { out, label } of (body.egress as unknown[]).flatMap((out) => labelsSent(out, install).map((label) => ({ out: out as SentLine, label })))) {
           const key = keyNamed(deps.sql, label);
           if (key === null)
             return no<Decided>('REQUIRED_MISSING', `Add the key called "${label}" to the vault, then accept.`, { at: 'body.egress' });

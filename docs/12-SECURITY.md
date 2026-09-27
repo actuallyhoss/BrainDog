@@ -235,7 +235,9 @@ and zeroised in the same transaction.** From that point there is exactly one wra
 the operator does not hold its key. Disabling the passphrase is the same operation in reverse and
 requires the passphrase.
 
-Decrypting any key then requires the passphrase in-session.
+Decrypting any key a person deposited then requires the passphrase in-session. A connector's keys are
+not among them: they are sealed under the connector DEK, which stays on the KEK because a scheduled run
+has nobody there to type anything, so for those the answer to the first question below stays *yes*.
 
 This is the honest trade, stated in the UI rather than in a whitepaper:
 
@@ -247,6 +249,43 @@ This is the honest trade, stated in the UI rather than in a whitepaper:
 Default off, because a founder locking themselves out of their own hosting credentials is a more
 likely disaster than us reading them. Offered prominently, with the consequence in the same
 sentence as the switch.
+
+*(Built September 26th 2026, `loop/finish/platform.md` §4.0 V.)* Two VAULT methods,
+`setVaultPassphrase({ passphrase })` and `clearVaultPassphrase({ passphrase })`, held to rule 2's gate: an
+owner in a browser, proved in the last fifteen minutes, and every token refused. Each host answers them
+through `withVaultPassphrase` (`packages/host/src/passphrase.ts`), which takes the passphrase off the
+arguments before the record is called and hands the record's method a step instead, so the record is
+handed wrapped bytes and a salt and never the passphrase or a key. The details:
+
+- **Only the record DEK moves** (`vault_key` purpose `record`). The connector DEK and the signing key
+  stay on the KEK, so connector pulls and the signed nightly copy run as before. What stops is anything
+  that opens a key a person deposited with nobody present: a scheduled call or a signed digest post that
+  names such a key, and every agent's vault grant, which is told the vault is behind a passphrase.
+- **The derivation** is PBKDF2-SHA-256 over the passphrase normalised to NFC, `PASSPHRASE_ITERATIONS`
+  rounds and a fresh salt of `PASSPHRASE_SALT_BYTES` in `vault_key.salt`; the DEK is wrapped with
+  AES-256-GCM under the derived key with the same additional data it has under the KEK,
+  `record_id ‖ 0x1F ‖ "record"`. A new passphrase is at least `PASSPHRASE_LEAST` characters. Where the
+  runtime refuses that many rounds in one call, the host computes the same PBKDF2 bytes one HMAC at a
+  time, so a passphrase set on one host opens on the other.
+- **One transaction, one wrapping.** The swap is a compare-and-set on the row's `wrapped_by` and its
+  `nonce`, which every wrapping draws afresh: the KEK's wrapping is overwritten by the passphrase's in
+  the statement that writes it, and a second change that landed first, even one that went off and back
+  on again, is answered as a conflict. It writes one `grant.rotate` event on `vault_key:record`,
+  field `wrapped_by`, from one wrapping to the other, and never the salt or the bytes. A root key
+  rotation (`rewrapKeys`) leaves a passphrase row alone. Taking the passphrase off wraps the DEK under
+  the root key the record's other keys are under while the host still holds it.
+- **The key doors take it.** While the passphrase is on, `/api/keys/put` and `/api/keys/open` carry
+  `passphrase` in their body; without it the answer is `REQUIRED_MISSING` at `passphrase`. The record's
+  INTERNAL `unlockVault` puts rule 2's gate first and then calls the host's step, and the DEK that step
+  opens stays in the host for the one request and is zero-filled after it.
+- **A wrong passphrase is `WRONG_KEY` and is counted** before it is compared, in the record's own
+  `auth_fail` under the limits sign-in keeps: `PASSPHRASE_TRIES` wrong ones in a window, then
+  `RATE_LIMITED` with `Retry-After` for `PASSPHRASE_WAIT_MS`. Putting a passphrase on compares nothing
+  and is not counted; taking it off and every key opened or put with it are.
+- **Export, the nightly copy and a restore carry the passphrase's wrapping and its salt**, sealed, so a
+  record restored from its own file opens with the same passphrase. What the passphrase cannot reach is
+  a copy made before it was turned on: that copy still holds the wrapping the KEK opens, for as long as
+  it is kept, and a statement cannot reach what the database engine keeps of a page it has freed.
 
 ### What a grant row holds
 
@@ -296,7 +335,7 @@ FOR" is structural rather than remembered.
    **proven at bind**, never assumed. When a provider rotates a refresh token mid-run, connect re-seals
    it (version + 1) and the record stores it from the ack with one `grant.rotate` event — the previous
    version kept as `prev_ciphertext`.
-9. **An agent's keys go through two doors, under a vault grant and nothing else.** `POST /api/vault/deposit`
+9. **An agent's keys go through two doors, under a vault grant, except that a login token may add a new key.** `POST /api/vault/deposit`
    and `POST /api/vault/open` take as their bearer a device grant of reach `vault`, approved by a person for
    one project or for `*`, the keys of no project; 30 days for a project and 7 for `*`. The bearer is checked
    with `vaultGrant`, which never accepts a login token, and a key whose row's project is not the grant's
@@ -321,6 +360,18 @@ FOR" is structural rather than remembered.
    person, and the value leaves in the same one answer with `no-store`. The Keys screen is the only caller:
    it puts a key in, replaces one row's value, and reveals one for thirty seconds, clearing the clipboard after
    sixty. `/api/vault/deposit` and `/api/vault/open` are unchanged and still refuse a page, whatever its origin.)*
+   *(Amended September 25th 2026, `loop/finish/agents.md` C1: an agent may ADD a key with its login token, and only
+   add one. `POST /api/vault/deposit` also takes `Authorization: Bearer <rec>.<token>`, a live token of scope `write`
+   on the keys list, checked as every `/api` bearer is, and only when the bearer is not a vault grant. Its body is
+   `{ label, opens, kind?, value }`; a `project` or a `credential` in it is `VALUE_MALFORMED`, because the key goes to
+   the project the token's run is in, as the session ladder resolves it, or to no project when the run is in none. A
+   label already within that reach is `403 FORBIDDEN`, whose sentence names the two ways a value is replaced: a vault
+   grant for its project (`braindog login <host> --vault <project>`) or the owner on the Keys screen. So a login token that leaks can add a
+   key and never swap one, and rotation keeps needing a vault grant or the owner. The host sets the record's
+   `agentDeposit` flag on this path alone, never from a body; the answer is the one a grant's deposit gets, with
+   `no-store`, the events are `grant.add` and `create`, signed by the run, and the row's origin reads
+   `<agent> on <machine>, S<n>`. `POST /api/vault/open` still takes a vault grant and nothing else. `braindog keys put`
+   sends the vault grant when one is held and the login otherwise, and `braindog tools scan` deposits through it.)*
    *(Added September 15th 2026, `loop/research-agent-path.md` step 18. `tools/gates/secret-grep.mjs` holds
    the value's shapes in the three files that may name it, and follows a call to a function in the same file
    whose return type names the brand.)*

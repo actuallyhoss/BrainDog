@@ -136,10 +136,10 @@ test('WHAT COPIES NO SECRET INTO A FIELD THAT MAY LEAVE STILL INSTALLS', async (
     ['run: into another secret field', steps([{ set: { field: 'spare', to: '{{pin}}' } }])],
     ['run: into a file field', steps([{ set: { field: 'scan', to: '{{trigger.row.pin}}' } }])],
     ['inline: into another secret field', inline([{ set: { field: 'spare', to: '{{pin}}' } }])],
-    /* THE WORDS AS TYPED: the run fills a tag from `{{vars.…}}` and `{{trigger.…}}` only, and the inline pass fills a
-       `set` from the row's own `{{field}}` only, so neither of these reads `pin`. */
+    /* THE WORDS AS TYPED: the run fills a tag from `{{vars.…}}` and `{{trigger.…}}` only, so this does not read `pin`.
+       An inline `set` of the run's braces was a case here too, and the lint now refuses it as a hole nothing fills
+       (`flow-lint.ts`'s `holeIn`, `loop/finish/defects.md` A8). */
     ['run: a tag of the braces', steps([{ tag: '{{pin}}' }])],
-    ['inline: a set of the run\'s braces', inline([{ set: { field: 'note', to: '{{trigger.row.pin}}' } }])],
     ['run: a variable set plainly again before the write', steps([{ set_var: { name: 'p', to: '{{pin}}' } }, { set_var: { name: 'p', to: '{{what}}' } }, { set: { field: 'note', to: '{{vars.p}}' } }])],
     ['run: fields that may leave', steps([{ set: { field: 'note', to: '{{what}} {{trigger.row.what}}' } }])],
   ] as const) {

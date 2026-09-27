@@ -65,7 +65,7 @@ const build = (inference: Inference) => {
   const slash = createSlash({ sql, clock: fixedClock(NOW), inference, record: fakeRecord() });
   const rows = () =>
     sql
-      .all<{ kind: string; model: string; code: string | null }>('SELECT kind, model, code FROM call ORDER BY rowid')
+      .all<{ kind: string; model: string; code: string | null }>('SELECT kind, model, code FROM slash_call ORDER BY rowid')
       .map((r) => ({ ...r }));
   return { sql, slash, rows };
 };

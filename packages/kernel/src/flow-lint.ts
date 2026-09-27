@@ -12,20 +12,29 @@
  * nothing on it, which is the failure this tree keeps recording: a declaration that looks complete, installs, and is
  * read by nothing.
  *
- * THE RUNNER IS `flow.ts`, AND THIS FILE REFUSES WHAT IT WOULD NOT DO. `ask_person` runs (Brief C), so its shape is
- * held here to what the runner and the gate accept: two options or more, each once, since `propose` refuses a choice
- * of one, and no `to:`, since nothing addresses a question to one person. `ask_slash` is held to its shape and to what
- * its question may carry, and no further: whether THIS host answers the `infer.ask` job it queues is a fact about the
- * host, which a context-free lint cannot know, so that refusal is `unserved` in `index.ts`, beside `stranded`, and
- * `slashAskAt` below is what it asks. A `script` step runs since 24 September: `flow.ts`'s `startScript` queues the
- * script's run and the run goes on, and whether the script is installed, says `runs: { rule: true }` and is not paused
- * is asked there, when a run reaches the step, because a pause is a fact of the moment and no install can know it. A
- * `call` step still installs and fails at the run with a sentence, which is why the lint is strict about everything it
- * CAN know now.
+ * THE RUNNER IS `flow.ts`, AND THIS FILE REFUSES WHAT IT WOULD NOT DO. What installs and what runs is one row each in
+ * `capabilities.ts`, which this file, the runner and the grammar an agent reads all ask, so none of the three says a
+ * capability the others do not. `ask_person` runs (Brief C), so its shape is held here to what the runner and the gate
+ * accept: two options or more, each once, since `propose` refuses a choice of one; its `to:` is its row's to allow.
+ * `ask_slash` is held to its shape and to what its question may carry, and no further: whether THIS host answers the
+ * `infer.ask` job it queues is a fact about the host, which a context-free lint cannot know, so that refusal is
+ * `unserved` in `index.ts`, beside `stranded`, and `slashAskAt` below is what it asks. A `script` step runs since 24
+ * September: `flow.ts`'s `startScript` queues the script's run and the run goes on, and whether the script is
+ * installed, says `runs: { rule: true }` and is not paused is asked there, when a run reaches the step, because a pause
+ * is a fact of the moment and no install can know it. A `call` step runs too: the runner queues the declared call and
+ * parks the run on its answer (`flow.ts`). A step whose row installs and does not run fails at the run with its row's
+ * sentence, which is why the lint is strict about everything it CAN know now.
+ *
+ * EVERY TRIGGER STARTS. `metric` is read by the hourly sweep and starts a run on a change of side (`flow.ts`'s
+ * `onMetrics`), `decided` by the decision (`onDecided`), an arrival's `when:` over the row it wrote or its body, a
+ * run-path rule about a relative day by the same hourly sweep that re-reads an inline one (`onTime`), and a clock may
+ * say `late:`. The inline path reads `enabled`, `project` and `limits` (`rules.ts`'s `runRules`), so every rule can be
+ * switched off.
  */
 
 import type { Refusal } from '@braindog/ports';
 
+import { capability } from './capabilities.ts';
 import { CALENDAR_STEPS, calendarOf, isMonthDay, monthsIn, MONTHS, timeOf } from './clock.ts';
 import type { Known } from './declare.ts';
 import { nextOccurrence } from './digest.ts';
@@ -103,11 +112,24 @@ const NAME = /^[a-z][a-z0-9_]{0,31}$/;
 const RESERVED: readonly string[] = ['trigger', 'vars'];
 
 /**
- * A `when:` that names a day relative to today. A copy of the test `rulesAboutTime` in `index.ts` uses to pick the rules
- * it re-reads each hour, exported so that function can import it: until it does, the two are held together by hand, and
- * an edit to one that misses the other lets the lint and the sweep disagree about which rules are about time.
+ * A `when:` that names a day relative to today: what picks the rules the hourly sweep re-reads, inline ones in
+ * `index.ts`'s `rulesAboutTime` and run-path ones in `flow.ts`'s `onTime`. One pattern, imported by both, so the lint,
+ * the inline sweep and the run-path sweep cannot disagree about which rules are about time.
  */
 export const RELATIVE_DAY = /\b(?:today|yesterday|tomorrow)\b|[+-]\d+[dwmy]\b/u;
+
+/** A metric's id as a declaration takes it (`declare.ts`'s `METRIC_ID`): money-core's figures are `cash-now` and the like. */
+const METRIC_ID = /^[a-z][a-z0-9_-]{0,31}$/u;
+
+/**
+ * The refusal of a trigger or a step key whose row in `capabilities.ts` does not install, or `null` where it does.
+ * `lead` is the sentence's own subject, and the row's words finish it.
+ */
+function unbuilt(name: string, lead: string, at: string, advice = ''): Refusal | null {
+  const row = capability(name);
+  if (row === undefined || row.installs) return null;
+  return bad('NOT_IN_THIS_BUILD', `${lead}, and ${row.says}.${advice === '' ? '' : ` ${advice}`}`, at);
+}
 
 const DAY_MS = 86_400_000;
 const WEEK_MS = 7 * DAY_MS;
@@ -587,6 +609,11 @@ function unkeptIn(id: string, verb: string, step: Record<string, unknown>, here:
   for (const text of texts)
     for (const m of text.matchAll(RUN_PATH)) {
       if (m[1] !== 'vars') continue;
+      /* A PATH WITH AN EMPTY PART NAMES NO ANSWER, and is said as the hole it is. Read as a name, `{{vars..x}}` was
+         refused for keeping no answer called nothing, a sentence with a gap where the name goes (`loop/finish/defects.md`
+         A8). */
+      if (m[2]!.split('.').some((part) => part === ''))
+        return hole(id, m[0], here, 'it names no answer', 'A path is vars. and the name an as: keeps, then any path into it, as {{vars.total}} or {{vars.a.rate}}.');
       const name = m[2]!.split('.')[0]!;
       if (kept.has(name)) continue;
       return anywhere.has(name)
@@ -605,6 +632,46 @@ function unkeptIn(id: string, verb: string, step: Record<string, unknown>, here:
     }
   return null;
 }
+
+/**
+ * The refusal for a hole nothing fills: the spelling, where it is, and why, in one sentence for every kind of hole.
+ *
+ * ONE SENTENCE, because each of these installed and then wrote its braces, or a dash, where a value was meant, and a
+ * person reading one refusal learns to read them all (`loop/finish/defects.md` A8, A9).
+ */
+function hole(id: string, spelled: string, at: string, why: string, fix: string): Refusal {
+  return bad('DECLARATION_INVALID', `${id} holds ${spelled} at ${at}, and ${why}, so nothing would fill it. ${fix}`, at);
+}
+
+/**
+ * A run's path or a lone single-brace word in a text the rule writes, where nothing fills it, or `null`.
+ *
+ * AN INLINE RULE HAS NO RUN, so `{{vars.q}}` and `{{trigger.row.x}}` in its `then:` are left as typed by the pass
+ * (`rules.ts`'s `filling`, which reads them only with a run's paths beside it), and the row got the braces. Measured by
+ * the audit behind `loop/finish/defects.md` A8: an inline `{{vars.q}}` installed and wrote itself into the note.
+ *
+ * A LONE `{what}` IS FILLED BY NOTHING ON EITHER PATH. Every fill in this tree reads two braces, so one brace reaches the
+ * outbox as typed (A9). Only a single word in single braces is taken as a hole: a text may hold braces for its own
+ * reasons, as a JSON sample in a note does, and a word alone in them is the one shape that reads as a field meant.
+ */
+function holeIn(id: string, decl: FlowDecl): Refusal | null {
+  const inline = pathOf(decl) === 'inline';
+  for (const { action, at } of actionsOf(decl))
+    for (const { where, value } of fillSites(action, at)) {
+      if (typeof value !== 'string') continue;
+      if (inline) {
+        const run = value.match(new RegExp(RUN_PATH.source))?.[0];
+        if (run !== undefined)
+          return hole(id, run, where, 'a rule that runs inside the write has no run to read it from', 'Give the rule steps: and on: { written: { register } } to run it as a run.');
+      }
+      const lone = value.match(LONE_BRACE)?.[0];
+      if (lone !== undefined) return hole(id, lone, where, 'nothing in this record fills one brace', `Write {${lone}}, with two braces, to fill it.`);
+    }
+  return null;
+}
+
+/** One word, or `kind:word`, in single braces with no brace either side: the hole A9 names. */
+const LONE_BRACE = /(?<!\{)\{\w+(?::\w+)?\}(?!\})/;
 
 /**
  * Where the first `ask_slash` step of a body sits, as `steps[1]` or `steps[0].then[2]`, or `null` when it asks nothing.
@@ -749,20 +816,23 @@ export function flowFault(id: string, body: Record<string, unknown>, installed?:
         : bad('REQUIRED_MISSING', `${id} names no register and no trigger, so nothing would ever start it. Give it register: or on:.`, 'register');
     if (written && written.register !== body.register)
       return bad('DECLARATION_INVALID', `${id} is about ${body.register} and runs on writes to ${written.register}. One rule, one register.`, 'on.written.register');
-    /* THREE KEYS THE INLINE PASS WOULD READ AS NOTHING. `enabled: false` would keep firing, `limits` would never count,
-       and `project` would fire for every project's rows. Refused until the pass reads them, because a switch that is
-       drawn and does nothing is worse than no switch. */
-    for (const key of ['project', 'limits'] as const)
-      if (body[key] !== undefined)
-        return bad('NOT_IN_THIS_BUILD', `${id} runs inside the write, and the inline pass does not read ${key}: yet. Give it a trigger other than a plain write, or drop ${key}:.`, key);
-    if (body.enabled === false)
-      return bad('NOT_IN_THIS_BUILD', `${id} runs inside the write, and the inline pass does not read enabled: yet. Retire the rule to stop it.`, 'enabled');
+    /* THE INLINE PASS READS `enabled`, `project` AND `limits` (`rules.ts`'s `runRules`), so they are held to the shapes
+       the run path holds them to. They were refused here as `NOT_IN_THIS_BUILD` while the pass read none of them, and a
+       plain write rule could be retired and never switched off. `steps_per_run` counts the items of `then:`. */
+    const scoped = projectFault(id, body.project);
+    if (scoped) return scoped;
+    const limitedInline = limitsFault(id, body.limits);
+    if (limitedInline) return limitedInline;
+    const most = isObject(body.limits) && typeof body.limits.steps_per_run === 'number' ? body.limits.steps_per_run : STEP_CEILING;
+    if (Array.isArray(body.then) && body.then.length > most)
+      return bad('OUT_OF_BOUNDS', `${id} declares ${body.then.length} actions and limits itself to ${most}. Raise the limit or cut one.`, 'limits.steps_per_run');
     /* THE FIGURE LINT IS ASKED HERE AND NOT INSIDE `inlineFault`, so that it runs at install and nowhere else.
        `rules.ts` also asks `inlineFault` of each item the inline pass acts, and skips the item on NOT_IN_THIS_BUILD,
        so putting it there would change what the pass does to a body stored before this lint, which is a separate
        decision. Before this line the inline rule installed and wrote `{{metric.total}}` into the row as typed, since
-       the inline pass fills no figure. */
-    return inlineFault(id, decl, installed) ?? figureFault(id, body, 'inline', installed);
+       the inline pass fills no figure. A hole nothing fills, a run's path here or one brace anywhere, is asked last,
+       after the figure, so `{{metric.total}}` keeps the sentence that names figures (`holeIn`). */
+    return inlineFault(id, decl, installed) ?? figureFault(id, body, 'inline', installed) ?? holeIn(id, decl);
   }
 
   /* A RUN KEEPS ITS REGISTER IN ITS TRIGGER. A top-level `register` is what the inline pass selects by, so a clock rule
@@ -776,29 +846,18 @@ export function flowFault(id: string, body: Record<string, unknown>, installed?:
 
   if (body.on === undefined)
     return bad('REQUIRED_MISSING', `${id} names no register and no trigger, so nothing would ever start it. Give it on:.`, 'on', TRIGGERS);
-  if (body.project !== undefined && (typeof body.project !== 'string' || body.project === ''))
-    return bad('DECLARATION_INVALID', `${id}'s project: is the id of a project.`, 'project');
+  const scoped = projectFault(id, body.project);
+  if (scoped) return scoped;
   const limited = limitsFault(id, body.limits);
   if (limited) return limited;
 
   const rowless = ROWLESS.includes(trigger);
   if (rowless && body.when !== undefined)
     return bad('DECLARATION_INVALID', `${id} is started by ${trigger}, which has no row for when: to be about. Put the condition in an if step.`, 'when');
-  /* AN ARRIVAL'S `when:` WOULD BE READ AGAINST THE RAW PAYLOAD, and the runner does not read it: a run starts for every
-     arrival its `ingest`, `channel` and `state` admit. Refused rather than installed as a filter that filters nothing. */
-  if (trigger === 'arrival' && body.when !== undefined)
-    return bad('NOT_IN_THIS_BUILD', `${id} is started by an arrival, and the runner does not read when: on one yet. Narrow it with ingest:, channel: or state:, or test the row in an if step.`, 'when');
-  /* A RULE ABOUT TIME IS RE-READ EACH HOUR ONLY ON THE INLINE PATH. `rulesAboutTime` hands every such rule to
-     `applyRule`, which finds its rows by the top-level `register:`, and a run-path rule has none: measured on 22
-     September, a rule saying `due before today` with `once_per` installed here, its row went past due, and a sweep
-     by hand started nothing. Refused until the sweep starts runs; without `once_per` the sweep skips an inline rule
-     too, so that body reads on writes alone on either path and is let through. */
-  if (trigger === 'written' && Array.isArray(body.once_per) && body.once_per.length > 0 && RELATIVE_DAY.test(JSON.stringify(body.when ?? '')))
-    return bad(
-      'NOT_IN_THIS_BUILD',
-      `${id} names a day relative to today in when:, and only a rule that runs inside the write is read again as the days pass. Write it with register: and then:, and no op:, fields:, from_rules: or steps:.`,
-      'when',
-    );
+  /* A DECISION IS NARROWED BY ITS OWN KEYS, `about:` and `option:`, and the row it names, where it names one, is read by
+     an `if` step. A `when:` beside them would be a second filter nobody could tell apart from the first. */
+  if (trigger === 'decided' && body.when !== undefined)
+    return bad('DECLARATION_INVALID', `${id} is started by a decision, which about: and option: narrow. Put a condition on its row in an if step.`, 'when');
 
   /* THE WALK: shape, verbs, depth, count and names, over `then` or `steps` alike, since on this path `then` is a flat
      list of steps. */
@@ -864,7 +923,9 @@ export function flowFault(id: string, body: Record<string, unknown>, installed?:
       const verb = verbs[0]!;
       if (rowless && ROW_VERBS.includes(verb))
         return bad('DECLARATION_INVALID', `${id} is started by ${trigger}, which has no row, and ${here} is ${verb}, which acts on one.`, here);
-      const fault = stepFault(id, verb, step, here, subjectOf(decl), installed, names);
+      /* THE STEP'S OWN KEYS FIRST, THEN ITS ROW IN `capabilities.ts`, as a trigger's are: a row that does not install
+         refuses the step here, so flipping the row is the whole change and no second list is kept in this walk. */
+      const fault = stepFault(id, verb, step, here, subjectOf(decl), installed, names) ?? unbuilt(verb, `${id}'s ${here} is ${verb}`, `${here}.${verb}`);
       if (fault) return fault;
       /* A CREATE NEEDS NO ROW, BUT WHAT IT CROSSES OR COPIES FROM ONE DOES (`rowlessCreate`). An arrival is left to the
          runner, since whether one brings a row is the door's to say at the run. */
@@ -990,8 +1051,9 @@ export function flowFault(id: string, body: Record<string, unknown>, installed?:
 
   /* ONCE_PER ON A TRIGGER ABOUT A ROW, as `notify` has always needed on the inline path: a run that asks or calls on
      every write of a row is the same question sent again each time somebody fixes a typo. A trigger with no row has no
-     tuple to be once per, and each of its fires is already one event. */
-  if (!rowless && trigger !== 'arrival' && !(Array.isArray(body.once_per) && body.once_per.length > 0)) {
+     tuple to be once per, and each of its fires is already one event; so is a decision, whose run is keyed by the
+     question it answers (`flow.ts`'s `onDecided`). */
+  if (!rowless && trigger !== 'arrival' && trigger !== 'decided' && !(Array.isArray(body.once_per) && body.once_per.length > 0)) {
     const loud = firstVerb(body.steps ?? body.then, ONCE);
     if (loud) return bad('REQUIRED_MISSING', `${id} ${loud}s about a row and declares no once_per, so it would do it on every write of the row.`, 'once_per');
   }
@@ -1017,7 +1079,12 @@ export function flowFault(id: string, body: Record<string, unknown>, installed?:
   /* A FIGURE IS NAMED AT INSTALL, as a trigger's `metric.id` is. Measured on 24 September before this was asked:
      `{{metric.nope}}` installed and wrote `x —`, and `{{metric:total}}` wrote the same dash, into a row nobody would
      trace back to the rule. */
-  return choice(body.steps ?? body.then, body.steps !== undefined ? 'steps' : 'then') ?? fillFault(id, decl, installed) ?? figureFault(id, body, 'run', installed);
+  return (
+    choice(body.steps ?? body.then, body.steps !== undefined ? 'steps' : 'then') ??
+    fillFault(id, decl, installed) ??
+    figureFault(id, body, 'run', installed) ??
+    holeIn(id, decl)
+  );
 }
 
 /**
@@ -1171,6 +1238,23 @@ function fillFault(id: string, decl: FlowDecl, installed?: Known): Refusal | nul
     }
     for (const { where, value, field, into } of fillSites(action, at)) {
       if (typeof value === 'string') continue;
+      /* A MONEY FIELD IS FILLED FROM A MONEY VALUE, which is the one thing it reads. Held to text, a create could never
+         fill one: the list refuses words where it takes `{ amount, currency }`, so the lint's only offer failed every
+         run. The pass hands a value that is not text on as written (`rules.ts`'s `expand`), and a run fills the strings
+         inside it first, so `amount: '{{vars.cents}}'` reaches the list as the digits it reads. */
+      if (field !== undefined && isMoneyValue(value) && moneyInto(installed, into, field)) {
+        /* ON THE INLINE PATH NOTHING FILLS TEXT INSIDE A VALUE. The pass hands the object on as written, so an amount of
+           `{{amount}}` would reach the list as its braces and fail every write. There the amount is a whole number, or
+           its digits as text. */
+        const amount = (value as { amount: unknown }).amount;
+        if (pathOf(decl) === 'inline' && typeof amount === 'string' && !/^-?\d+$/u.test(amount.trim()))
+          return bad(
+            'DECLARATION_INVALID',
+            `${id} creates a ${into} row at ${at} with ${field}.amount ${JSON.stringify(amount)}, and a rule that runs inside the write fills nothing inside a money value. Write the amount in minor units, as 4800, or give the rule steps: so a run fills it.`,
+            `${where}.amount`,
+          );
+        continue;
+      }
       const quotable = typeof value === 'number' || typeof value === 'boolean';
       if (field !== undefined)
         return quotable
@@ -1182,6 +1266,25 @@ function fillFault(id: string, decl: FlowDecl, installed?: Known): Refusal | nul
     }
   }
   return null;
+}
+
+/** A money value as a create writes one: an amount, as a whole number or as text a run fills, and a currency. */
+const isMoneyValue = (value: unknown): boolean =>
+  isObject(value) &&
+  Object.keys(value).length === 2 &&
+  (Number.isInteger(value.amount) || typeof value.amount === 'string') &&
+  typeof value.currency === 'string' &&
+  /^[A-Za-z]{3}$/.test(value.currency);
+
+/**
+ * Whether `field` of `into` takes money, or may: `true` where the list is not known, since the list then answers for
+ * the value when the create is taken, as it answers for any other.
+ */
+function moneyInto(installed: Known | undefined, into: string | undefined, field: string): boolean {
+  if (installed === undefined || into === undefined) return true;
+  const fields = fieldsOf(installed, into);
+  if (fields === undefined) return true;
+  return fields.some((f) => f.id === field && f.type === 'money');
 }
 
 function firstVerb(list: unknown, among: readonly string[]): string | null {
@@ -1196,6 +1299,10 @@ function firstVerb(list: unknown, among: readonly string[]): string | null {
     }
   }
   return null;
+}
+
+function projectFault(id: string, project: unknown): Refusal | null {
+  return project !== undefined && (typeof project !== 'string' || project === '') ? bad('DECLARATION_INVALID', `${id}'s project: is the id of a project.`, 'project') : null;
 }
 
 function limitsFault(id: string, limits: unknown): Refusal | null {
@@ -1232,14 +1339,20 @@ function triggerFault(id: string, on: unknown, installed?: Known): Refusal | nul
   }
   if (!isObject(on)) return bad('DECLARATION_INVALID', `${id}'s on: is one trigger, such as { every: 1h }.`, 'on', TRIGGERS);
   const named = Object.keys(on).filter((k) => (TRIGGERS as readonly string[]).includes(k));
-  const stray = Object.keys(on).find((k) => !(TRIGGERS as readonly string[]).includes(k) && !((k === 'at' || k === 'day' || k === 'month') && 'every' in on));
+  const stray = Object.keys(on).find((k) => !(TRIGGERS as readonly string[]).includes(k) && !((k === 'at' || k === 'day' || k === 'month' || k === 'late') && 'every' in on));
   if (stray !== undefined) return bad('DECLARATION_INVALID', `${id}'s on: has no trigger called ${stray}.`, `on.${stray}`, TRIGGERS);
   if (named.length !== 1)
     return bad('DECLARATION_INVALID', `${id}'s on: names ${named.length === 0 ? 'no trigger' : named.join(' and ')}, and a rule is started by exactly one.`, 'on', TRIGGERS);
   const kind = named[0]!;
   const value = on[kind];
   const at = `on.${kind}`;
+  /* THE SHAPE FIRST, SO A WRONG ID OR A WRONG BOUND IS TOLD WHAT IS WRONG WITH IT, and then the trigger's row in
+     `capabilities.ts`, which says whether this build starts it at all. */
+  return shapeFault(id, kind, value, on, at, installed) ?? unbuilt(kind, `${id} is started by ${kind}`, at);
+}
 
+/** One trigger's own keys, by its kind. */
+function shapeFault(id: string, kind: string, value: unknown, on: Record<string, unknown>, at: string, installed?: Known): Refusal | null {
   switch (kind) {
     case 'written': {
       if (!isObject(value) || typeof value.register !== 'string' || value.register === '')
@@ -1276,7 +1389,15 @@ function triggerFault(id: string, on: unknown, installed?: Known): Refusal | nul
     case 'every': {
       /* THE CLOCK GRAMMAR IS `pull.ts`'s, AND SO IS THE FLOOR. `m` is minutes here, as on a connector, and fifteen of
          them is the shortest clock anything in this record keeps: a run every minute is a meter nobody meant to buy. */
-      const { at: time, day, month } = on as { at?: unknown; day?: unknown; month?: unknown };
+      const { at: time, day, month, late } = on as { at?: unknown; day?: unknown; month?: unknown; late?: unknown };
+      /* `late:` IS HOW LATE A TURN MAY BE TAKEN: one the drain reaches later than that after it was due is recorded as
+         skipped and not taken (`flow.ts`'s `onClock`), on a clock of months as on any other. */
+      if (late !== undefined && (typeof late !== 'string' || intervalMs(late) === null))
+        return bad(
+          'DECLARATION_INVALID',
+          `${id}'s late: is ${JSON.stringify(late)}, and it is a span, a number and one of m, h, d or w: a turn reached later than that after it was due is recorded and not taken. Write 6h.`,
+          'on.late',
+        );
       /* A CLOCK OF MONTHS IS `clock.ts`'s AND IS READ BEFORE THE INTERVAL, because `mo` is not a unit `intervalMs` has
          and never should be: a month is no number of milliseconds. Measured on 25 September, `1mo` was refused here as
          not a clock, and a bill on the last day of each month could only be carried forward by hand. */
@@ -1310,7 +1431,10 @@ function triggerFault(id: string, on: unknown, installed?: Known): Refusal | nul
       return null;
     }
     case 'metric': {
-      if (!isObject(value) || typeof value.id !== 'string' || !NAME.test(value.id))
+      /* READ BY THE HOURLY SWEEP (`flow.ts`'s `onMetrics`), which keeps the side of the line the figure was last read on
+         in `automation_watch` and starts one run when it changes. The line is in the figure's own units, minor units
+         for money, since that is what a reading answers. */
+      if (!isObject(value) || typeof value.id !== 'string' || !METRIC_ID.test(value.id))
         return bad('DECLARATION_INVALID', `${id}'s metric: names the id of a declared metric.`, `${at}.id`);
       const crosses = value.crosses;
       const bound =
@@ -1319,20 +1443,28 @@ function triggerFault(id: string, on: unknown, installed?: Known): Refusal | nul
           : false;
       if (crosses !== 'target' && !bound)
         return bad('DECLARATION_INVALID', `${id}'s crosses: is target, { lte: n } or { gte: n }.`, `${at}.crosses`);
-      if (installed !== undefined && !installed.has(`metric.${value.id}`))
+      const figure = installed?.get(`metric.${value.id}`) as { target?: unknown } | undefined;
+      if (installed !== undefined && figure === undefined)
         return bad('DECLARATION_UNKNOWN', `${id} watches ${value.id}, and there is no metric called ${value.id}.`, `${at}.id`);
-      /* NOTHING STARTS IT YET. The four starts are `onWritten`, `onArrival`, `onClock` and the button, and each skips
-         every trigger but its own: this body linted clean and was read by nothing. The start belongs where a metric
-         is read on a clock, the `snapshot` handler in `index.ts`, and until it lands the rule is refused here. The
-         checks above stay first, so a wrong id or a wrong bound is still told what is wrong with it. */
-      return bad(
-        'NOT_IN_THIS_BUILD',
-        `${id} is started by metric ${value.id} crossing a line, and nothing in this build watches a metric for that, so it would install and never start.`,
-        at,
-      );
+      /* `target` IS THE FIGURE'S OWN LINE, so a figure that declares none gives the sweep nothing to read a side of, and
+         the rule would install and never start. */
+      if (installed !== undefined && crosses === 'target' && !isObject(figure?.target))
+        return bad('DECLARATION_INVALID', `${id} watches ${value.id} cross its target, and ${value.id} declares no target. Give it one, or write crosses: { lte: n } or { gte: n }.`, `${at}.crosses`);
+      return null;
     }
-    case 'decided':
-      return bad('NOT_IN_THIS_BUILD', `${id} is started by a decision, which §4.1 reserves: a run's own asks resume it without this trigger.`, at);
+    case 'decided': {
+      /* A DECISION ON A QUESTION IN DECIDE (`flow.ts`'s `onDecided`), once per question. `about:` is the declaration that
+         filed or proposes it, and `option:` one answer by its id or its words exactly: a rule's `suggest` options are
+         words whose ids are their places (`o1`, `o2`), so its author writes the words. */
+      if (!isObject(value)) return bad('DECLARATION_INVALID', `${id}'s decided: is { about, option }, each optional.`, at, ['about', 'option']);
+      const odd = Object.keys(value).find((k) => k !== 'about' && k !== 'option');
+      if (odd !== undefined) return bad('DECLARATION_INVALID', `${id}'s decided: has no ${odd}.`, `${at}.${odd}`, ['about', 'option']);
+      if (value.about !== undefined && (typeof value.about !== 'string' || !/^[a-z]+\.[a-z0-9_-]+$/u.test(value.about)))
+        return bad('DECLARATION_INVALID', `${id}'s decided.about is the id of a declaration, such as rule.chase.`, `${at}.about`);
+      if (value.option !== undefined && (typeof value.option !== 'string' || value.option.trim() === ''))
+        return bad('DECLARATION_INVALID', `${id}'s decided.option is one answer's words, as the question offers it.`, `${at}.option`);
+      return null;
+    }
     case 'manual':
       return value === true ? null : bad('DECLARATION_INVALID', `${id}'s manual: is true.`, at);
   }
@@ -1453,10 +1585,17 @@ function stepFault(
       if (fault) return fault;
       if (!Array.isArray(spec.options) || spec.options.length === 0 || spec.options.some((o) => typeof o !== 'string' || o === ''))
         return bad('DECLARATION_INVALID', `${id} asks a person at ${at} and offers no answers. options: is a list of at least one.`, `${at}.ask_person.options`);
-      /* `to:` WOULD BE DRAWN AND DO NOTHING. The runner opens the question in the record's one queue, which everyone who
-         decides reads, and nothing in this build addresses a suggestion to one person. */
-      if (spec.to !== undefined)
-        return bad('NOT_IN_THIS_BUILD', `${id} asks ${JSON.stringify(spec.to)} at ${at}, and a question goes to the record's queue, where anyone who decides answers it. Drop to:.`, `${at}.ask_person.to`);
+      /* `to:` IS ITS OWN ROW IN `capabilities.ts`, which says whether this build addresses a question to one person. Where
+         it does not, `to:` would be drawn and do nothing, since the runner opens the question in the record's one queue. */
+      if (spec.to !== undefined) {
+        const unaddressed = unbuilt('ask_person.to', `${id} asks ${JSON.stringify(spec.to)} at ${at}`, `${at}.ask_person.to`, 'Drop to:.');
+        if (unaddressed) return unaddressed;
+        /* ONE MEMBER, BY THE ID THE RECORD HOLDS FOR THEM, or a hole the run fills with one (`{{trigger.row.owner}}`).
+           Whether that id is a member is asked when the run reaches the step (`flow.ts`'s `ask`), since who is a member
+           changes after install. */
+        if (typeof spec.to !== 'string' || spec.to.trim() === '')
+          return bad('DECLARATION_INVALID', `${id}'s ${at}.ask_person.to is the id of the one member the question is put to.`, `${at}.ask_person.to`);
+      }
       return spec.wait === undefined ? null : span(spec.wait, `${at}.ask_person.wait`);
     }
     case 'wait':

@@ -1,10 +1,10 @@
 /**
  * What a use case installs, made for one record on one day (`loop/research-spark.md` S10 and S13).
  *
- * EXAMPLE ROWS BELONG TO THE USE CASE, NOT TO THE MODULE. A first-party module carries the sample studio's
- * rows (Kiln, Halden Type Co, a brand-system invoice), which is right for the sample and wrong for anybody
- * else. A module a use case installs carries that use case's examples for it, or none: a student's record is
- * never handed a type foundry's projects and clients.
+ * NOTHING IS INSTALLED AS AN EXAMPLE (`loop/finish/modules.md` C11). A document built here carries no example
+ * rows unless it is asked for them (`examples: true`), for a preview to draw or a test to hold a page against.
+ * Asked, the rows belong to the use case, not to the module: a first-party module's own are the sample studio's
+ * (Kiln, Halden Type Co), so a student's record is never handed a type foundry's projects and clients.
  *
  * A LINK IS NOT A DEPENDENCY. People points at Projects only to say where somebody was met, so People goes in
  * without Projects when the record will not hold them (`firstPartyDocument`'s `holds`).
@@ -49,11 +49,20 @@ export type ModuleOptions = {
   today: string;
   /** The lists the record will hold once this module is in, so a link to a list it will not hold is left out. */
   holds?: Iterable<string>;
+  /**
+   * `true` for a document that carries example rows: the use case's for the module, or the module's own with no use
+   * case. Left out, the module carries none (`loop/finish/modules.md` C11), and the first run never passes it.
+   */
+  examples?: boolean;
 };
 
 /**
- * A first-party module as this use case installs it: its examples, or none, with their days counted from today.
- * With no use case, the module as it always was, the sample's rows included. `null` for an id that is not one.
+ * A first-party module as this use case installs it, with no rows in it. `null` for an id that is not one.
+ *
+ * NOTHING IS WRITTEN AS AN EXAMPLE (`loop/DIRECTION.md` §26, `loop/finish/modules.md` C11). A module used to carry the
+ * use case's example rows, and with no use case the sample studio's (Kiln, Halden), so the first run's "Start from a
+ * list" planted a type foundry's clients in a student's record. A document asked for with `examples: true` still
+ * carries them, for a preview to draw or a test to hold a page against; nothing that writes to a record asks for one.
  */
 export function moduleDocument(u: UseCase | null, id: string, options: ModuleOptions): Body | null {
   /* THE AGENTS PACK IS A MODULE TOO, so a sentence that mentions agents adds it rather than saying it is not here. It
@@ -62,7 +71,9 @@ export function moduleDocument(u: UseCase | null, id: string, options: ModuleOpt
   const bare = firstPartyDocument(id);
   if (!bare) return null;
   const mine = new Set(((bare.declarations ?? []) as Body[]).flatMap((d) => (typeof d.register === 'string' ? [d.register] : [])));
-  const seeds = u === null ? undefined : (MODULE_EXAMPLES[u.usecase] ?? []).filter((s) => mine.has(String(s.register)));
+  /* `undefined` IS THE MODULE'S OWN ROWS to `firstPartyDocument`, so it is asked for only when examples are. */
+  const seeds =
+    options.examples !== true ? [] : u === null ? undefined : (MODULE_EXAMPLES[u.usecase] ?? []).filter((s) => mine.has(String(s.register)));
   const doc = firstPartyDocument(id, { ...(options.holds === undefined ? {} : { holds: options.holds }), ...(seeds === undefined ? {} : { seeds }) });
   if (!doc) return null;
   const targets = u === null ? {} : (MODULE_TARGETS[u.usecase] ?? {});
@@ -103,7 +114,7 @@ export function moduleManifest(id: string): { requires: readonly string[]; provi
 
 /**
  * WHAT A USE CASE FORMS AROUND WHAT THE PERSON SAID, by its id: the guide's plan for a podcast, a shop or an app
- * (`guide-kinds.ts`). A use case not listed, or a sentence that names nothing it knows, forms nothing and keeps its examples.
+ * (`guide-kinds.ts`). A use case not listed, or a sentence that names nothing it knows, forms nothing.
  */
 const FORMS: Readonly<Record<string, (said: string) => FormedPlan | null>> = { guide: formGuide };
 
@@ -139,21 +150,29 @@ export function claimedBy(u: UseCase, said: string): (span: { at: number; text: 
 export const forms = (u: UseCase): boolean => Object.hasOwn(FORMS, u.usecase);
 
 /**
- * The pack a use case carries, with its voice as settings and its examples' days counted from today, or `null`. Given what
- * the person said, a use case that forms around it carries that plan as its examples instead of its own (`formedFor`).
+ * The pack a use case carries, with its voice as settings, or `null`. Its only rows are the plan formed from what the
+ * person said (`formedFor`), each tagged `formed`, with its days counted from today.
+ *
+ * THE USE CASE'S OWN EXAMPLES ARE NOT CARRIED (`loop/finish/modules.md` C11): a Personal record arrived holding 56 rows,
+ * every one in pounds, which its owner then had to find and clear (`loop/finish/modules.md` §2.5, counted from
+ * `personal.ts`). `examples: true` carries them for a preview or a test,
+ * and a formed plan still wins over them, because it is what the person asked for.
  */
-export function carriedDocument(u: UseCase, today: string, said?: string | null): Body | null {
+export function carriedDocument(u: UseCase, today: string, said?: string | null, options: { examples?: boolean } = {}): Body | null {
   const formed = formedFor(u, said);
-  if (!formed) return useCaseDocument(u.usecase, today);
+  if (!formed) {
+    const doc = useCaseDocument(u.usecase, today);
+    return doc && options.examples !== true ? withoutRows(doc) : doc;
+  }
   const doc = useCaseDocument(u.usecase, '1970-01-01');
   if (!doc) return null;
   return dated({ ...doc, seeds: formedSeeds(formed.seeds) }, today);
 }
 
 /**
- * THE SAME PLAN, WRITTEN AFTER THE PACK IS IN. Where a model is configured, onboarding installs the use case's lists with no
- * rows and asks the model for a plan (`slashForm`). When it forms nothing, these are the rows the pack's seeds would have
- * been, tagged as the install tags them, with the links to make once they are in, so the templates stand exactly as before.
+ * THE SAME PLAN, AS ROWS TO WRITE ONCE THE PACK IS IN: the rows formed from what the person said, tagged as the install
+ * tags them, with the links to make once they are in. A sentence that forms nothing plants nothing, because the use
+ * case's own examples are never written (`carriedDocument`).
  */
 export function plantedRows(u: UseCase, today: string, said?: string | null): { rows: { register: string; fields: Body }[]; links: ExampleLink[] | undefined } {
   const doc = carriedDocument(u, today, said);

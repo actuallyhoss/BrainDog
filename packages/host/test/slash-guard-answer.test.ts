@@ -9,7 +9,7 @@
  * with the fake engine called once where the cap allowed none.
  *
  * THE ENGINE IS A FAKE AND THE LEDGER IS REAL. `@braindog/slash` gains `answer` in Brief B, beside this, so the package
- * has none to wrap yet; the guard reads Slash's own `settings` and `call` tables, so those are the package's DDL on real
+ * has none to wrap yet; the guard reads Slash's own `slash_settings` and `slash_call` tables, so those are the package's DDL on real
  * SQLite, imported by a relative path as `slash.test.ts` imports `createSlash`.
  */
 
@@ -33,7 +33,7 @@ function ledger(tier: 'a' | 'b' | 'byo', askCap: number, reads: number) {
   const sql = openSqlite();
   for (const statement of DDL) sql.exec(statement);
   sql.exec(
-    'INSERT INTO settings (singleton, tier, model, grant_id, ask_cap, updated_at) VALUES (1, ?, ?, ?, ?, ?)',
+    'INSERT INTO slash_settings (singleton, tier, model, grant_id, ask_cap, updated_at) VALUES (1, ?, ?, ?, ?, ?)',
     tier,
     tier === 'a' ? null : 'llama3:8b',
     tier === 'b' ? 'g_01JZ8QK3F7R2M9V4XN6TCB5HAE' : null,
@@ -42,7 +42,7 @@ function ledger(tier: 'a' | 'b' | 'byo', askCap: number, reads: number) {
   );
   for (let i = 0; i < reads; i++)
     sql.exec(
-      `INSERT INTO call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status, predicate)
+      `INSERT INTO slash_call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status, predicate)
        VALUES (?, ?, 'read', ?, 'glm-5.3-flash', 10, 10, 0, 5, 'ok', '{}')`,
       `c_${i}`,
       new Date(NOW - 60_000).toISOString(),
@@ -108,7 +108,7 @@ test("an answer's own ledger row, kind read with no predicate, is spent from the
      `drafted()` counts it, and the tier `b` exemption for a stored `ask_id` does not, since it needs a predicate. */
   const { guarded, reached, sql } = guardOf('b', 1, 0);
   sql.exec(
-    `INSERT INTO call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status, question)
+    `INSERT INTO slash_call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status, question)
      VALUES ('c_answer', ?, 'read', 'b', 'glm-5.3-flash', 10, 10, 0, 5, 'ok', 'rule.rate step 2')`,
     new Date(NOW - 1_000).toISOString(),
   );

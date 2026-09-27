@@ -11,6 +11,12 @@
  * what lets `secret-grep` follow them to a sink. The Directory stores only their MACs and never sends mail, so a
  * raw value leaves it in exactly two fields: `session.sid`, which becomes the cookie, and `mail`, which the host
  * delivers and never prints.
+ *
+ * AND A FIFTH, WHICH `secret-grep` DOES NOT FOLLOW BY NAME: the proof that a new address is somebody's own mailbox.
+ * The shared contract names it `link` in the `mail` that carries it out and `token` in the `invite.proved` call
+ * that spends it (`loop/finish/contracts.md` §2.6), so neither spelling is one of the four above. It opens less
+ * than they do (it makes nobody a person on its own: the invitation it was minted for has to come back beside it),
+ * it is spent once, and it dies in a day.
  */
 
 import type { Refusal } from './index.ts';
@@ -41,6 +47,9 @@ export type AssertionJSON = {
  *
  * A PRESENTED `sid` ON A SIGN-IN IS DELETED BEFORE THE NEW SESSION IS WRITTEN. That is the fixation defence: a
  * cookie planted before sign-in never becomes a signed-in cookie.
+ *
+ * A PASSKEY CHALLENGE CARRIES `ip` TOO, because minting one is locked out per address (`chal:<ip>`, thirty a
+ * minute). Without it one script could fill the Directory's live challenges and hold every tenant's sign-in at 503.
  */
 export type AuthCall =
   | { flow: 'methods'; sid?: string }
@@ -48,7 +57,7 @@ export type AuthCall =
   | { flow: 'key.exchange'; serverKey: string; ip: string; sid?: string }
   | { flow: 'passkey.register.options'; sid: string }
   | { flow: 'passkey.register'; sid: string; credential: RegistrationJSON; label?: string }
-  | { flow: 'passkey.assert.options' }
+  | { flow: 'passkey.assert.options'; ip: string }
   | { flow: 'passkey.assert'; credential: AssertionJSON; ip: string; sid?: string }
   | { flow: 'magic.start'; email: string; ip: string }
   | { flow: 'magic.redeem'; linkToken: string; ip: string; sid?: string }
@@ -59,7 +68,18 @@ export type AuthCall =
   /** Open another record this person is on, in this browser: the session row's record moves, and the cookie does not. */
   | { flow: 'switch'; sid: string; slug: string }
   /** Operator only: the host checks who is asking before this reaches the Directory. */
-  | { flow: 'claim.mint'; email: string };
+  | { flow: 'claim.mint'; email: string }
+  /** Every live session this person has, this one marked. */
+  | { flow: 'sessions'; sid: string }
+  /** End this person's other sessions (`keep: 'this'`), or all of them, this one included (`keep: 'none'`). */
+  | { flow: 'logout.all'; sid: string; keep: 'this' | 'none' }
+  /**
+   * A new address accepting an invitation proves the mailbox first. The host has already looked the invitation up,
+   * and `email` is the address it was made for; this mints the proof and hands it back in `mail`.
+   */
+  | { flow: 'invite.prove'; email: string; invite: string; name?: string }
+  /** The proof coming back from the mailbox, spent once: the host makes the person only after this answers. */
+  | { flow: 'invite.proved'; token: string };
 
 export type AuthFlow = AuthCall['flow'];
 
@@ -70,7 +90,8 @@ export type AuthFlow = AuthCall['flow'];
  * holds one opaque id rather than an id and a slug. `null` when the person reaches no open record yet.
  *
  * `provedAt` IS WHEN THEY LAST PROVED IT, in epoch milliseconds: a passkey, a link or the server key. Rotation
- * never moves it, which is what lets the vault ask for a proof in the last fifteen minutes.
+ * never moves it, which is what lets the vault and the passkey flows ask for a proof in the last fifteen minutes,
+ * and what ends a session ninety days after it however often it has rotated.
  */
 export type Who = { person: string; email: string; record: string | null; provedAt: number };
 
@@ -82,7 +103,12 @@ export type Methods = {
   magic: boolean;
   /** The server key is offered, and this Directory holds at most one person, so it would be accepted. */
   key: boolean;
-  /** No passkey exists anywhere yet, so the screen leads with the way that does not need one. */
+  /**
+   * The screen leads with the way that does not need a passkey. Signed in, it is whether THIS PERSON has none yet,
+   * so a newcomer on a Cloud where others have passkeys is still offered to add one first. Signed out nobody is
+   * known, so it is whether the Directory holds none at all: the one case where a passkey button could sign
+   * nobody in.
+   */
   firstRun: boolean;
   me: Who | null;
 };
@@ -97,7 +123,14 @@ export type PasskeyInfo = {
   lastUsed: number | null;
 };
 
-/** `PublicKeyCredentialCreationOptions`, JSON-safe, exactly as the browser half passes it on. */
+/**
+ * `PublicKeyCredentialCreationOptions`, JSON-safe, exactly as the browser half passes it on.
+ *
+ * USER VERIFICATION IS `required`, IN BOTH CEREMONIES, AND THE VERIFIER CHECKS THE UV FLAG. `preferred` lets a
+ * passkey be one tap on a device somebody else is holding; `required` asks for the device's PIN, face or
+ * fingerprint as well. A platform passkey (Windows Hello, iCloud Keychain, Google Password Manager) always verifies;
+ * a security key with no PIN set is refused, and the Recovery screen says what to do about it.
+ */
 export type RegistrationOptions = {
   challenge: string;
   rp: { id: string; name: 'BrainDog' };
@@ -105,7 +138,7 @@ export type RegistrationOptions = {
   pubKeyCredParams: readonly [{ type: 'public-key'; alg: -7 }, { type: 'public-key'; alg: -257 }];
   timeout: 300000;
   attestation: 'none';
-  authenticatorSelection: { residentKey: 'required'; userVerification: 'preferred' };
+  authenticatorSelection: { residentKey: 'required'; userVerification: 'required' };
   excludeCredentials: { type: 'public-key'; id: string }[];
 };
 
@@ -114,12 +147,36 @@ export type AssertionOptions = {
   challenge: string;
   rpId: string;
   timeout: 300000;
-  userVerification: 'preferred';
+  userVerification: 'required';
   allowCredentials: readonly [];
 };
 
-/** A link for the host to deliver. The host builds the URL; the Directory never knows the origin a link is read on. */
-export type Mail = { to: string; linkToken: string } | { to: string; claimToken: string };
+/**
+ * Something for the host to deliver. The host builds every URL; the Directory never knows the origin a link is read on.
+ *
+ * THE FIRST TWO ARE LINKS AND CARRY NO `kind`, as they always have: a sign-in link and a claim link. The arms with a
+ * `kind` name the letter (`MailKind` in `apps/worker/src/mail.ts`). `invite.prove` carries the raw proof in `link`,
+ * which the host puts in the URL it mails; the two passkey notices carry nothing that opens anything, and tell the
+ * person that their way in changed, so a change they did not make is one they hear about.
+ */
+export type Mail =
+  | { to: string; linkToken: string }
+  | { to: string; claimToken: string }
+  | { kind: 'invite.prove'; to: string; link: string }
+  | { kind: 'passkey.added' | 'passkey.removed'; to: string };
+
+/**
+ * One live session, as its person sees it in Settings.
+ *
+ * `ref` IS THE FIRST TWELVE HEX OF THE SESSION'S MAC, enough to tell two apart and useless for opening either: a
+ * MAC cannot be presented as a cookie, and twelve characters of one cannot be looked up as it. It changes when the
+ * session rotates. `activeAt` is when it last rotated, which a session does on its first use after a day, so it is
+ * the last day it was used; `authedAt` is its last proof. `record` is the record it opens on, `null` for none.
+ */
+export type SessionInfo = { ref: string; current: boolean; authedAt: number; activeAt: number; record: string | null };
+
+/** What `invite.proved` answers: the proved address, the invitation the proof was minted for, and the name typed then. */
+export type InviteProved = { email: string; invite: string; name: string | null };
 
 /**
  * The answer.
@@ -130,10 +187,16 @@ export type Mail = { to: string; linkToken: string } | { to: string; claimToken:
  *
  * EVERY SIGN-IN FAILURE IS THE SAME 401: `UNAUTHORIZED`, "That did not sign you in." The reason goes to the
  * Directory's log callback and never into this value.
+ *
+ * `reason: 'stale'` IS THE ONE 401 THAT IS NOT A SIGN-IN FAILURE. The session is good and its last proof is more
+ * than fifteen minutes old, so changing a passkey asks for a fresh one. It says so, because the person is who they
+ * say they are and needs to know to sign in again rather than that something failed; its refusal is
+ * `NEEDS_BROWSER_SESSION`, the vault's code for the same fact, and the cookie is kept.
  */
 export type AuthResult<B = unknown> =
   | { status: 200; body: B; session?: { sid: string } | 'clear'; mail?: Mail }
-  | { status: 401 | 403 | 404 | 422; refusal: Refusal; session?: { sid: string } | 'clear' }
+  | { status: 401; refusal: Refusal; reason?: 'stale'; session?: { sid: string } | 'clear' }
+  | { status: 403 | 404 | 422; refusal: Refusal; session?: { sid: string } | 'clear' }
   | { status: 429; retryAfter: number; session?: { sid: string } | 'clear' }
   | { status: 503; session?: { sid: string } | 'clear' };
 
@@ -153,6 +216,11 @@ export type AuthBodies = {
   logout: Record<string, never>;
   switch: Who;
   'claim.mint': { expires: number };
+  sessions: { sessions: SessionInfo[] };
+  /** How many sessions were ended: the others, or with `keep: 'none'` this one too. */
+  'logout.all': { ended: number };
+  'invite.prove': Record<string, never>;
+  'invite.proved': InviteProved;
 };
 
 /** `auth(call)`, typed so the body matches the flow that was asked. */

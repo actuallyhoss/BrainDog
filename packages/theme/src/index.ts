@@ -94,10 +94,23 @@ import { build, HIGH_CONTRAST_PROFILE, HOUSE_PROFILE, type Seed } from './build.
  * of the two schemes. A number that agrees with a direction does not discharge it. The read that
  * was actually asked for is `loop/research-site-reference.md`, and `apps/site/DESIGN-NOTES.md` is
  * the second pass over the same sources.
+ *
+ * EIGHT · 2026-09-25, THE GROUND GOES COOL (`loop/finish/design.md` D-3). Hue 75 made the dark
+ * ground a brown-black and the light one a cream, and the direction asks for a near-black cool
+ * ground. `neutralHue` moves to 260, a slate, under the same 0.004 chroma cap
+ * `HOUSE_PROFILE.groundC` already holds: the cap is what keeps a cool ground from turning into the
+ * mint §FOUR removed. Solved when it was chosen, dark `bg` is #121314 and `sunk` #0B0C0E, light
+ * `bg` #F4F6F8. The seed's accent does not move. The roles solved against the ground move by about
+ * one code value a channel (dark `danger` #E5665B to #E5675C), and the accent fill at its worst,
+ * on dark `s3`, went from 3.05:1 to 3.03:1, still over check R's floor of 3.
+ *
+ * AND §FIVE AND §SEVEN SAY HUE 6, WHICH IS NOT THE SEED. The accent has been hue 27, the mark's own,
+ * since 2026-09-21 (`theme.test.ts` holds it within two degrees of the mark). The lightness and
+ * chroma argument in §SEVEN is unchanged by that.
  */
 export const HOUSE_SEED: Seed = {
   accent: 'oklch(0.575 0.215 27)',
-  neutralHue: 75,
+  neutralHue: 260,
   space: 4,
   radius: { sm: 6, md: 8, lg: 12 },
   density: 'comfortable',

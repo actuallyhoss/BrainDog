@@ -1,0 +1,26 @@
+/**
+ * The kernel's extensions: every method written under `api/`, gathered into what `makeKernel` returns.
+ *
+ * ONE FILE PER UNIT, AND THIS FILE IS ONLY A LIST. A new kernel method is `api/<unit>.ts`, exporting
+ * `extension(parts: KernelParts)` that returns the methods it adds; it is registered here with one import line and one
+ * spread line, both inside the `EXTENSIONS` block, so two units adding methods in one workflow touch two lines of this
+ * file and no line of `index.ts` (`loop/finish/contracts.md` §0 point 5 and §2.1).
+ *
+ * `Kernel` STAYS `ReturnType<typeof makeKernel>`, and `makeKernel` returns `{ ...kernel, ...extensions(parts) }`, so a
+ * method added here is typed on every caller with no line written anywhere else. A name the kernel already has is
+ * refused when the record opens, because the spread would otherwise hide the kernel's method without a word.
+ */
+
+import type { KernelParts } from '../parts.ts';
+
+/* EXTENSIONS: the imports, one line per file under this folder, named for the file. */
+import { extension as rehearse } from './rehearse.ts';
+/* END EXTENSIONS */
+
+export function extensions(parts: KernelParts) {
+  return {
+    /* EXTENSIONS: the spreads, one line per file, in the order of the imports above. */
+    ...rehearse(parts),
+    /* END EXTENSIONS */
+  };
+}

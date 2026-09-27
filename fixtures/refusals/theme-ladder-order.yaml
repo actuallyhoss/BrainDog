@@ -3,3 +3,18 @@ via:    install
 raises: packages/theme/src/checks.ts
 at:     theme.midnight.roles.dark.s2
 fix:    Order the surface ladder one way.
+pack: {
+    "pack": "fixture-install", "version": "1.0.0",
+    "summary": "One pack built to trip exactly one install refusal.",
+    "author": "BrainDog fixtures", "license": "MIT",
+    "declarations": [
+      { "theme": "midnight",
+        "seed": { "accent": "oklch(0.575 0.215 27)", "neutral_hue": 260 },
+        "roles": { "dark": { "s2": "#000000" } } }
+    ]
+  }
+
+# THE HOUSE SEED WITH `s2` PAINTED BLACK IN DARK, below `s1`, so the ladder turns back at `s2`. Every role checks A
+# to G measure against a surface is lighter than that surface in dark, so a darker `s2` only widens those pairs, and
+# check H is the first to refuse. Refused at `planPack` by `packages/record/src/theme-check.ts`; the code is
+# constructed in `checks.ts`, which `raises:` names.

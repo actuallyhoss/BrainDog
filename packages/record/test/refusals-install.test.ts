@@ -1,5 +1,5 @@
 /**
- * The `via: install` runner: sixteen fixtures, thirteen driven and three skipped by name.
+ * The `via: install` runner: every fixture in the family, each driven through the file it names.
  *
  * `40 §6` puts this family in `record/test`, *"composing `declare`'s plan and `theme`'s checks exactly
  * as `planPack` does"*. Until this file nothing drove it: `tools/refusals/run-via.mjs install` printed
@@ -9,13 +9,15 @@
  *
  * THE RUNNER DRIVES THE FILE THE FIXTURE NAMES, which is the call the write runner made first: a
  * runner one layer above the raiser goes green the day the layer between them starts answering for
- * itself. Eight of the thirteen name `packages/declare/src/index.ts`, whose `plan` and `install` are
+ * itself. Eight name `packages/declare/src/index.ts`, whose `plan` and `install` are
  * pure over an `Installed` and a `Host`; those are driven there, with `Installed` built from the
- * fixture's `installed:` and `facts:` and a `Host` that stages nothing. The other five name the kernel
+ * fixture's `installed:` and `facts:` and a `Host` that stages nothing. Five name the kernel
  * (`packages/kernel/src/declare.ts` for four, `index.ts` for `GROUP_BY_CARDINALITY`), whose checks
  * read the `declaration` and `entry` tables, so those are driven through a real record:
  * `createRecordApi` over `openSqlite()`, `installed:` put in through `planPack` and `installPack` as a
  * person would, `facts.rows` written as rows, and then `pack:` planned and installed the same way.
+ * The three that name `packages/theme/src/checks.ts` go through the record too, because the record is
+ * what calls the palette checks (`src/theme-check.ts`), at the plan, before anything reaches the kernel.
  *
  * AND THE PURE DRIVER IS NOT A SHORTCUT AROUND THE RECORD, it is the only way to say two of its
  * facts. `FORMAT_OUT_OF_RANGE` and `PRIMITIVES_OUT_OF_RANGE` cite the record's format and the
@@ -38,15 +40,14 @@
  *               `distinct` is in that list and no fixture here needs it: the one code about values,
  *               `GROUP_BY_CARDINALITY`, is driven on its ref arm, where the values are rows.
  *
- * ─── THE THREE THAT ARE NOT DRIVEN ─────────────────────────────────────────────────────────────
+ * ─── THE THREE THEME CODES ─────────────────────────────────────────────────────────────────────
  *
- * `contrast-floor`, `intent-inseparable` and `theme-ladder-order` name `packages/theme/src/checks.ts`,
- * and nothing on the install path calls it: neither `packages/record` nor `packages/declare` lists
- * `@braindog/theme`, so a pack carrying a theme below the contrast floor installs clean on both hosts
- * (`loop/research-via-runners.md` §2 finding 3). That is a gap in the code and not in the fixtures, and
- * wiring it is a dependency added to a package the Worker bundles, which is a decision and not a
- * runner's. They are skipped by name below, so the family count still covers all sixteen and a skip
- * is printed rather than silent.
+ * `contrast-floor`, `intent-inseparable` and `theme-ladder-order` were skipped by name here while
+ * nothing on the install path called `packages/theme/src/checks.ts`, and a pack carrying a theme
+ * below the contrast floor installed clean on both hosts (`loop/research-via-runners.md` §2 finding 3).
+ * `@braindog/record` now takes `@braindog/theme` and reads every pack through `src/theme-check.ts`, so
+ * they are driven like the rest. `theme-install.test.ts` drives the same three through `installPack`
+ * and `setDeclaration` as well, and holds the three doors to one sentence.
  */
 
 import { test } from 'node:test';
@@ -78,14 +79,6 @@ const json = <T>(keys: Keys, key: string, where: string): T | undefined => {
   }
 };
 
-/* THE THREE THEME CODES, BY FILE NAME, with the sentence that says why. A fourth name here is a
-   fixture somebody chose not to drive, and it has to be written down to be skipped. */
-const UNREACHED = new Map([
-  ['contrast-floor.yaml', 'raised in packages/theme/src/checks.ts, which nothing on the install path calls'],
-  ['intent-inseparable.yaml', 'raised in packages/theme/src/checks.ts, which nothing on the install path calls'],
-  ['theme-ladder-order.yaml', 'raised in packages/theme/src/checks.ts, which nothing on the install path calls'],
-]);
-
 /**
  * THE ONE FIXTURE A PACK CANNOT CARRY TO ITS OWN CODE, and it goes in through the app instead.
  *
@@ -106,21 +99,23 @@ const IN_APP = new Set(['dependency-unresolved.yaml']);
 
 const DECLARE = 'packages/declare/src/index.ts';
 const KERNEL = new Set(['packages/kernel/src/declare.ts', 'packages/kernel/src/index.ts']);
+const THEME = 'packages/theme/src/checks.ts';
 
 const family: Fixture[] = familyOf('install');
 
 /* THE COUNT IS ASSERTED SO THAT A SEVENTEENTH CANNOT ARRIVE UNDRIVEN. Twenty until the five
    `ACTION_` codes were measured to be `lint` and refiled (6065b04e), fifteen after, and sixteen
    since `create-foreign-register` moved in here from `lint`, where no pack alone could reach it. */
-test('every install fixture in the corpus is driven here or skipped by name, and there are sixteen', () => {
+test('every install fixture in the corpus is driven here, and there are sixteen', () => {
   assert.equal(family.length, 16);
   for (const f of family) {
-    if (UNREACHED.has(f.name)) continue;
     assert.ok(f.keys.has('pack'), `${f.name} carries no \`pack:\`, so nothing drives it`);
     const raises = f.keys.get('raises')!;
-    assert.ok(raises === DECLARE || KERNEL.has(raises), `${f.name} raises ${raises}, and this runner drives ${DECLARE} and the kernel only`);
+    assert.ok(
+      raises === DECLARE || KERNEL.has(raises) || raises === THEME,
+      `${f.name} raises ${raises}, and this runner drives ${DECLARE}, the kernel and ${THEME} only`,
+    );
   }
-  for (const name of UNREACHED.keys()) assert.ok(family.some((f) => f.name === name), `${name} is skipped by name and is not in the family`);
 });
 
 async function normalised(doc: unknown, where: string): Promise<Pack> {
@@ -267,9 +262,8 @@ async function throughRecord(fixture: Fixture, where: string): Promise<Answer> {
 
 for (const fixture of family) {
   const where = `fixtures/refusals/${fixture.name}`;
-  const skip = UNREACHED.get(fixture.name);
 
-  test(`${fixture.name} raises ${fixture.keys.get('code')} from the install path`, { skip: skip ?? false }, async () => {
+  test(`${fixture.name} raises ${fixture.keys.get('code')} from the install path`, async () => {
     const raises = fixture.keys.get('raises')!;
     const answer = raises === DECLARE ? await throughDeclare(fixture, where) : await throughRecord(fixture, where);
 

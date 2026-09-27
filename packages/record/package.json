@@ -14,6 +14,7 @@
     "@braindog/extract": "workspace:*",
     "@braindog/kernel": "workspace:*",
     "@braindog/ports": "workspace:*",
+    "@braindog/theme": "workspace:*",
     "@braindog/where": "workspace:*",
     "braindog-render": "workspace:*"
   },

@@ -3,11 +3,11 @@
  * real kernel, and this app's sample engine, which draws the demo. Tasks label `backlog` as **Later** and `review` as
  * **To check**, and a sentence may say either label in any case, with an underscore for the space or two spaces for one.
  *
- * THREE READINGS OF ONE WORD, and each had its own matcher. `compile` and `matches` read the filter, `declaredValue`
- * turns the word into what a URL and the live reader carry, and `inheritedFrom` decides what a capture line under the
- * filter writes. Batch twenty-six's checkers found the last two disagreeing with the kernel: `declaredValue` never read
- * a label at all, and `inheritedFrom` folded case but not the kernel's runs of spaces and underscores, so `state is
- * to_check` filled `review` on a record and nothing on the demo.
+ * THREE READINGS OF ONE WORD, and each had its own matcher. `compile` reads the filter (through the record's own
+ * parser since ARC-2), `declaredValue` turns the word into what a URL and the live reader carry, and `inheritedFrom`
+ * decides what a capture line under the filter writes. Batch twenty-six's checkers found the last two disagreeing with
+ * the kernel: `declaredValue` never read a label at all, and `inheritedFrom` folded case but not the kernel's runs of
+ * spaces and underscores, so `state is to_check` filled `review` on a record and nothing on the demo.
  */
 
 import { test } from 'node:test';
@@ -19,9 +19,8 @@ import { NOW, installSeed } from '@braindog/seed';
 
 import './fixtures/fill.ts';
 import { readBlock } from './fixtures/readers.ts';
-import { ROWS } from './fixtures/sample.ts';
 import type { PageBlock } from './schema.ts';
-import { compile, declaredValue, matches } from './where.ts';
+import { compile, declaredValue } from './where.ts';
 
 type Sql = Parameters<typeof openRecord>[0];
 
@@ -80,15 +79,16 @@ const titles = (rows: readonly { fields: Record<string, unknown> }[]): string[] 
 for (const [said, stored] of SPELLINGS) {
   const where = `state is ${said}`;
 
-  test(`${JSON.stringify(where)} NAMES THE SAME TASKS IN BOTH ENGINES`, async () => {
+  /* THE BROWSER'S MATCHER IS GONE (ARC-2), so the browser's half of this pair is what `compile` hands its readers: the
+     record's own parse, which names the stored value. */
+  test(`${JSON.stringify(where)} IS ${stored} TO THE RECORD, AND TO compile`, async () => {
     const k = await kernel;
     const out = k.list({ register: 'tasks', where, limit: 500 }) as { ok: boolean; value: { rows: KernelRow[] } };
     assert.ok(out.ok, JSON.stringify(out));
+    assert.ok(out.value.rows.length > 0, 'the seed keeps tasks in both states, so an empty answer proves nothing');
     const w = compile('tasks', where);
     assert.deepEqual(w.bad, []);
-    const sample = (ROWS.tasks ?? []).filter((e) => matches(e, w, NOW));
-    assert.ok(out.value.rows.length > 0, 'the seed keeps tasks in both states, so an empty answer proves nothing');
-    assert.deepEqual(titles(sample), titles(out.value.rows));
+    assert.deepEqual(w.clauses, [{ field: 'state', op: 'is', values: [stored] }]);
   });
 
   test(`${JSON.stringify(said)} IS ${stored} TO declaredValue, AS IT IS TO THE KERNEL'S SENTENCE`, async () => {

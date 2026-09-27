@@ -1,0 +1,427 @@
+{
+  "pack": "card-alerts",
+  "version": "1.0.0",
+  "title": "Card alerts",
+  "summary": "Reads a card alert that names the card's last four digits into Money as a transaction, forwarded by mail or posted as a text message.",
+  "author": "BrainDog",
+  "license": "MIT",
+  "requires": {
+    "format": 1,
+    "primitives": 1,
+    "packs": {
+      "money-core": ">=3.0.0 <4.0.0"
+    }
+  },
+  "declarations": [
+    {
+      "ingest": "bank-card-out",
+      "pack": "card-alerts",
+      "channel": "email",
+      "match": {
+        "all": [
+          {
+            "field": "body",
+            "contains": "debited"
+          },
+          {
+            "field": "body",
+            "contains": "card ending"
+          },
+          {
+            "none": [
+              {
+                "field": "body",
+                "contains": "credited"
+              }
+            ]
+          }
+        ]
+      },
+      "skip": [
+        {
+          "when": {
+            "field": "body",
+            "contains": "refund"
+          },
+          "reason": "A refund is money coming back, and this pattern reads a charge."
+        },
+        {
+          "when": {
+            "field": "body",
+            "contains": "your pin"
+          },
+          "reason": "A PIN reminder carries the card digits and moves no money."
+        },
+        {
+          "when": {
+            "field": "body",
+            "contains": "balance is"
+          },
+          "reason": "A balance alert is a position, not a movement."
+        }
+      ],
+      "extract": {
+        "what": {
+          "text": {
+            "between": [
+              "at ",
+              " on "
+            ]
+          }
+        },
+        "direction": {
+          "enum": {
+            "map": {
+              "debited": "out"
+            }
+          }
+        },
+        "on": {
+          "date": {
+            "format": "DD/MM/YY",
+            "after": " on "
+          }
+        },
+        "amount": {
+          "money": {
+            "after": "debited "
+          }
+        },
+        "account": {
+          "lookup": {
+            "register": "accounts",
+            "by": "last4",
+            "after": "ending "
+          }
+        }
+      },
+      "writes": {
+        "register": "transactions",
+        "confidence": "exact"
+      },
+      "dedupe": {
+        "near": {
+          "on": [
+            "amount",
+            "account"
+          ],
+          "day": "on",
+          "prefix": {
+            "field": "what",
+            "chars": 12
+          }
+        }
+      },
+      "on_conflict": "skip"
+    },
+    {
+      "ingest": "bank-card-in",
+      "pack": "card-alerts",
+      "channel": "email",
+      "match": {
+        "all": [
+          {
+            "field": "body",
+            "contains": "credited"
+          },
+          {
+            "field": "body",
+            "contains": "card ending"
+          },
+          {
+            "none": [
+              {
+                "field": "body",
+                "contains": "debited"
+              }
+            ]
+          }
+        ]
+      },
+      "skip": [
+        {
+          "when": {
+            "field": "body",
+            "contains": "refund"
+          },
+          "reason": "A refund is money coming back, and this pattern reads a charge."
+        },
+        {
+          "when": {
+            "field": "body",
+            "contains": "your pin"
+          },
+          "reason": "A PIN reminder carries the card digits and moves no money."
+        },
+        {
+          "when": {
+            "field": "body",
+            "contains": "balance is"
+          },
+          "reason": "A balance alert is a position, not a movement."
+        }
+      ],
+      "extract": {
+        "what": {
+          "text": {
+            "between": [
+              "from ",
+              " on "
+            ]
+          }
+        },
+        "direction": {
+          "enum": {
+            "map": {
+              "credited": "in"
+            }
+          }
+        },
+        "on": {
+          "date": {
+            "format": "DD/MM/YY",
+            "after": " on "
+          }
+        },
+        "amount": {
+          "money": {
+            "after": "credited "
+          }
+        },
+        "account": {
+          "lookup": {
+            "register": "accounts",
+            "by": "last4",
+            "after": "ending "
+          }
+        }
+      },
+      "writes": {
+        "register": "transactions",
+        "confidence": "exact"
+      },
+      "dedupe": {
+        "near": {
+          "on": [
+            "amount",
+            "account"
+          ],
+          "day": "on",
+          "prefix": {
+            "field": "what",
+            "chars": 12
+          }
+        }
+      },
+      "on_conflict": "skip"
+    },
+    {
+      "ingest": "bank-card-out-sms",
+      "pack": "card-alerts",
+      "channel": "webhook",
+      "match": {
+        "all": [
+          {
+            "field": "body",
+            "contains": "debited"
+          },
+          {
+            "field": "body",
+            "contains": "card ending"
+          },
+          {
+            "none": [
+              {
+                "field": "body",
+                "contains": "credited"
+              }
+            ]
+          }
+        ]
+      },
+      "skip": [
+        {
+          "when": {
+            "field": "body",
+            "contains": "refund"
+          },
+          "reason": "A refund is money coming back, and this pattern reads a charge."
+        },
+        {
+          "when": {
+            "field": "body",
+            "contains": "your pin"
+          },
+          "reason": "A PIN reminder carries the card digits and moves no money."
+        },
+        {
+          "when": {
+            "field": "body",
+            "contains": "balance is"
+          },
+          "reason": "A balance alert is a position, not a movement."
+        }
+      ],
+      "extract": {
+        "what": {
+          "text": {
+            "between": [
+              "at ",
+              " on "
+            ]
+          }
+        },
+        "direction": {
+          "enum": {
+            "map": {
+              "debited": "out"
+            }
+          }
+        },
+        "on": {
+          "date": {
+            "format": "DD/MM/YY",
+            "after": " on "
+          }
+        },
+        "amount": {
+          "money": {
+            "after": "debited "
+          }
+        },
+        "account": {
+          "lookup": {
+            "register": "accounts",
+            "by": "last4",
+            "after": "ending "
+          }
+        }
+      },
+      "writes": {
+        "register": "transactions",
+        "confidence": "exact"
+      },
+      "dedupe": {
+        "near": {
+          "on": [
+            "amount",
+            "account"
+          ],
+          "day": "on",
+          "prefix": {
+            "field": "what",
+            "chars": 12
+          }
+        }
+      },
+      "on_conflict": "skip",
+      "verify": {
+        "kind": "path"
+      }
+    },
+    {
+      "ingest": "bank-card-in-sms",
+      "pack": "card-alerts",
+      "channel": "webhook",
+      "match": {
+        "all": [
+          {
+            "field": "body",
+            "contains": "credited"
+          },
+          {
+            "field": "body",
+            "contains": "card ending"
+          },
+          {
+            "none": [
+              {
+                "field": "body",
+                "contains": "debited"
+              }
+            ]
+          }
+        ]
+      },
+      "skip": [
+        {
+          "when": {
+            "field": "body",
+            "contains": "refund"
+          },
+          "reason": "A refund is money coming back, and this pattern reads a charge."
+        },
+        {
+          "when": {
+            "field": "body",
+            "contains": "your pin"
+          },
+          "reason": "A PIN reminder carries the card digits and moves no money."
+        },
+        {
+          "when": {
+            "field": "body",
+            "contains": "balance is"
+          },
+          "reason": "A balance alert is a position, not a movement."
+        }
+      ],
+      "extract": {
+        "what": {
+          "text": {
+            "between": [
+              "from ",
+              " on "
+            ]
+          }
+        },
+        "direction": {
+          "enum": {
+            "map": {
+              "credited": "in"
+            }
+          }
+        },
+        "on": {
+          "date": {
+            "format": "DD/MM/YY",
+            "after": " on "
+          }
+        },
+        "amount": {
+          "money": {
+            "after": "credited "
+          }
+        },
+        "account": {
+          "lookup": {
+            "register": "accounts",
+            "by": "last4",
+            "after": "ending "
+          }
+        }
+      },
+      "writes": {
+        "register": "transactions",
+        "confidence": "exact"
+      },
+      "dedupe": {
+        "near": {
+          "on": [
+            "amount",
+            "account"
+          ],
+          "day": "on",
+          "prefix": {
+            "field": "what",
+            "chars": 12
+          }
+        }
+      },
+      "on_conflict": "skip",
+      "verify": {
+        "kind": "path"
+      }
+    }
+  ]
+}

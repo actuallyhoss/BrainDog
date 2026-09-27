@@ -19,13 +19,17 @@
  *
  * NO VALUE IS NAMED HERE, as in `vault.ts`. The body is parsed and handed whole to the host's key module, which is
  * where a plaintext may exist. NOTHING HERE LOGS.
+ *
+ * NOR THE VAULT PASSPHRASE, which the body also carries while the vault is behind one (`12 §6`, "The optional second
+ * factor"). The host's key module hands it to `unlockedKey` (`passphrase.ts`), whose step the record's `unlockVault`
+ * calls after the vault gate, and the record is told only whether it opened the record key.
  */
 
 import type { Refusal, Result } from '@braindog/ports';
 
 import { httpStatus } from './index.ts';
 import { sessionOf, type SessionHints } from './session.ts';
-import { VAULT_HEADERS } from './vault.ts';
+import { retryAfter, VAULT_HEADERS } from './vault.ts';
 
 /** One checked request: the session as the host resolved it, the run the caller names, and the body, unread. */
 export type KeysAsk<C> = { ctx: C; hints: SessionHints; body: Record<string, unknown> };
@@ -62,7 +66,7 @@ function reply(status: number, payload: object, extra: readonly Header[] = []): 
 const refusal = (status: number, refused: Refusal, extra: readonly Header[] = []): Response => reply(status, { ok: false, refusal: refused }, extra);
 
 /** A result as the door answers it, with the status every other route gives it. */
-export const keysReply = (out: Result<unknown>): Response => reply(httpStatus(out), out);
+export const keysReply = (out: Result<unknown>): Response => reply(httpStatus(out), out, retryAfter(out));
 
 /** The one sentence every bearer gets here, and it is the record's own. */
 const NO_BEARER: Refusal = {

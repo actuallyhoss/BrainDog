@@ -57,7 +57,29 @@ export type Transports = {
    * that sentence rather than a 403.
    */
   push?: { vapid: Vapid | string; subject: string; send: PushSend; target: PushTargetOf } | undefined;
+  /**
+   * Counts one job this host sent, in the account's ledger and never against its allowance: `Record$.countDelivery` on
+   * the Worker. Asked only once a send has succeeded; absent, nothing is counted.
+   */
+  counted?: ((job: OutboxRow) => Promise<unknown>) | undefined;
 };
+
+/**
+ * A job that was sent, counted.
+ *
+ * AFTER THE SEND AND NEVER INSTEAD OF IT, AND IT NEVER THROWS. The job was sent, so a count that failed must not fail the
+ * job: the ladder would send it again, and the person would get the same mail twice for the sake of a number. A job
+ * that sent nothing (a push whose subscription is gone, a person who unsubscribed) is not counted, because counting it
+ * would say something was delivered that was not. The line names the kind and the id and nothing of the payload.
+ */
+async function count(transports: Transports, job: OutboxRow): Promise<void> {
+  if (!transports.counted) return;
+  try {
+    await transports.counted(job);
+  } catch (e) {
+    console.error(`deliveries: ${job.kind} ${job.id} was sent and not counted: ${e instanceof Error ? e.message : String(e)}`);
+  }
+}
 
 /**
  * The header a signed post carries: `sha256=` and the lower-case hex HMAC-SHA256 of the raw body, keyed by the secret.
@@ -270,6 +292,7 @@ export function makeDeliver(transports: Transports): Deliver {
       if (Array.isArray(to) && to.length > MAX_RECIPIENTS)
         throw new Error(`a notify.email goes to at most ${MAX_RECIPIENTS} addresses, and this one names ${to.length}`);
       await transports.email({ from, to, subject, text: text(payload.text) });
+      await count(transports, job);
       return;
     }
 
@@ -307,6 +330,7 @@ export function makeDeliver(transports: Transports): Deliver {
       /* THE STATUS IS THE ANSWER. A deliverer that treated 500 as delivered would ack a job that
          never arrived, and the row would be `done` for ever with nothing on the other end. */
       if (!out.ok) throw new Error(`the endpoint answered ${out.status}`);
+      await count(transports, job);
       return;
     }
 
@@ -337,7 +361,10 @@ export function makeDeliver(transports: Transports): Deliver {
       if (!endpoint) throw new Error('a push goes to an https address on a public host');
       /* NOTHING FROM THE PAYLOAD BUT THE ID, AND NOTHING FROM THE RECORD BUT THE ADDRESS: the push has no body (`vapid.ts`). */
       const { status } = await send(endpoint, await pushHeaders(vapid, endpoint, subject));
-      if (status >= 200 && status < 300) return;
+      if (status >= 200 && status < 300) {
+        await count(transports, job);
+        return;
+      }
       /* 404 AND 410 ARE THE SERVICE SAYING THE SUBSCRIPTION IS GONE (RFC 8030 §7.3): the app was removed, the
          permission revoked, the browser reset. Retrying that eight times is eight requests to be told the same, so it
          is delivered, with the one fact the record needs to stop asking. A 403, a 429 or a 5xx says nothing about the

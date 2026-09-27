@@ -278,7 +278,7 @@ test('A PROPOSAL ARRIVES FROM THE PACKAGE\'S ENGINE ONTO A REAL RECORD\'S DECIDE
 
   const answers = [
     '{"registers":["tasks"],"where":{"field":"state","is":"open"},"q":null}',
-    '{"text":"Two tasks are open and {{ref:tasks#1}} falls due first.","body_kind":"rowset","body":{"register":"tasks","rows":[{"what":"Chase {{ref:tasks#1}}"}]},"flagged":false}',
+    '{"text":"Two tasks are open and {{ref:tasks#1}} falls due first.","body_kind":"rowset","body":{"register":"tasks","rows":[{"fields":{"what":"Chase the first"},"from":["tasks#1"]}]},"flagged":false}',
   ];
   const net = endpoint(() => usedCompletion(answers.shift() ?? '{}', { prompt_tokens: 700, completion_tokens: 60 }));
 
@@ -313,7 +313,7 @@ test('A PROPOSAL ARRIVES FROM THE PACKAGE\'S ENGINE ONTO A REAL RECORD\'S DECIDE
   assert.equal(reading.value.model, null);
 
   /* TWO CALLS, TWO ROWS IN SLASH'S OWN METER (`46 §4.1`), the endpoint answered both, and each row names the model the host sent. */
-  const metered = own.all<{ kind: string; status: string; model: string }>('SELECT kind, status, model FROM call ORDER BY rowid');
+  const metered = own.all<{ kind: string; status: string; model: string }>('SELECT kind, status, model FROM slash_call ORDER BY rowid');
   assert.deepEqual(metered.map((row) => `${row.kind}:${row.status}:${row.model}`), ['read:ok:small', 'propose:ok:small']);
   assert.equal(net.sent.length, 2);
 
@@ -392,7 +392,7 @@ test('TIER b ASKS WITH THE KEY ITS SETTING NAMES AND THE MODEL ITS OWNER TYPED, 
   for (const what of ['Invoice Acme', 'Invoice Beta']) assert.ok((await api.create({ register: 'tasks', fields: { what, state: 'open' } }, owner)).ok);
   const answers = [
     '{"registers":["tasks"],"where":{"field":"state","is":"open"},"q":null}',
-    '{"text":"Two tasks are open and {{ref:tasks#1}} is first.","body_kind":"rowset","body":{"register":"tasks","rows":[{"what":"Chase {{ref:tasks#1}}"}]},"flagged":false}',
+    '{"text":"Two tasks are open and {{ref:tasks#1}} is first.","body_kind":"rowset","body":{"register":"tasks","rows":[{"fields":{"what":"Chase the first"},"from":["tasks#1"]}]},"flagged":false}',
   ];
   const net = endpoint(() => usedCompletion(answers.shift() ?? '{}', { prompt_tokens: 700, completion_tokens: 60 }));
   const opened: string[] = [];

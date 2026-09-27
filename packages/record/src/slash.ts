@@ -22,8 +22,8 @@
  */
 
 import type { FigureTest, Grows } from './arrange.ts';
-import type { Sql } from '@braindog/ports';
-import type { Kernel } from '@braindog/kernel';
+import type { Refusal, Result, Sql } from '@braindog/ports';
+import type { Json, Kernel } from '@braindog/kernel';
 import { labelSetting, voiceSetting } from '@braindog/declare';
 
 const DAY_MS = 86_400_000;
@@ -744,6 +744,19 @@ export type SlashModelInput = {
    * have the model conclude nothing from a count or an absence, which over a partial reading would be false.
    */
   partial?: true;
+  /**
+   * THE GRAMMARS A DESCRIPTION IS DRAFTED IN, present whenever `asked` is (`describedGrammar` in `grammar.ts`). The
+   * instructions named grammars and the record sent none of them, so a list's keys were learnt from the refusals Decide
+   * showed the owner (`loop/finish/defects.md` G1).
+   */
+  grammar?: { page: unknown; register: unknown; metric: unknown; rule: unknown };
+  /** The page a description is about, as it is declared (a page drawn per row is its template's declaration). */
+  page?: { id: string; body: unknown };
+  /**
+   * PRESENT ON A REPAIR ASK ONLY: the drafts the record refused, as the model answered them, and every refusal with its
+   * `at` path, so the model answers those drafts again, mended. At most `SLASH_REPAIRS_MOST` per press (`describe`).
+   */
+  repair?: { drafts: readonly unknown[]; refusals: readonly { at: string; fix: string }[] };
 };
 
 /**
@@ -847,7 +860,7 @@ const DESCRIBED_BUILDS: ReadonlySet<string> = new Set(['register', 'rule', 'metr
  * `input:` hands it the row, so a rule starting one on each new Payroll row was filed under a description until it was
  * added here (`test/slash-asked.test.ts`).
  */
-const REACHES_OUT: Readonly<Record<string, string>> = {
+export const REACHES_OUT: Readonly<Record<string, string>> = {
   run: 'run something beyond the record',
   call: 'call out beyond the record',
   ask_slash: "send rows to Slash's model",
@@ -858,7 +871,9 @@ const REACHES_OUT: Readonly<Record<string, string>> = {
 function reachesOut(value: unknown, depth = 0): string | null {
   if (value === null || typeof value !== 'object' || depth > 32) return null;
   for (const [k, v] of Object.entries(value)) {
-    if (!Array.isArray(value) && k in REACHES_OUT) return k;
+    /* `Object.hasOwn` AND NOT `in`, because the key is the model's: `in` finds `toString` on every object, so a step
+       keyed `toString` would be read as a verb that reaches out, and its sentence would name a function. */
+    if (!Array.isArray(value) && Object.hasOwn(REACHES_OUT, k)) return k;
     const inner = reachesOut(v, depth + 1);
     if (inner !== null) return inner;
   }
@@ -968,47 +983,291 @@ export function fromModel(
   drawn?: (id: string) => number,
   described = false,
 ): { drafts: SlashDraft[]; dropped: string[] } {
-  const list = Array.isArray(raw) ? raw : Array.isArray((raw as { drafts?: unknown })?.drafts) ? (raw as { drafts: unknown[] }).drafts : null;
-  if (list === null) return { drafts: [], dropped: ['The model did not answer a list of proposals.'] };
+  const list = draftsIn(raw);
+  if (list === null) return { drafts: [], dropped: [NOT_A_LIST] };
   const drafts: SlashDraft[] = [];
   const dropped: string[] = [];
   for (const [i, x] of list.entries()) {
-    const d = x as { question?: unknown; body_kind?: unknown; body?: unknown };
-    if (typeof d?.question !== 'string' || !d.question.trim() || d.question.length > QUESTION_MAX) {
-      dropped.push(`Proposal ${i + 1} had no question, or one over ${QUESTION_MAX} characters.`);
+    const one = modelDraft(x, i + 1, name, drawn, described);
+    if ('why' in one) {
+      dropped.push(one.why);
       continue;
-    }
-    if (d.body_kind !== 'pack' && d.body_kind !== 'settings' && d.body_kind !== 'arrange' && d.body_kind !== 'change') {
-      dropped.push(`Proposal ${i + 1} was a ${String(d.body_kind)} proposal, and Slash files only pack, settings, arrange and change.`);
-      continue;
-    }
-    if (d.body === null || typeof d.body !== 'object' || Array.isArray(d.body)) {
-      dropped.push(`Proposal ${i + 1} had no body.`);
-      continue;
-    }
-    if (described && d.body_kind !== 'change') {
-      dropped.push(`Proposal ${i + 1} was a ${d.body_kind} proposal, and from a description Slash files only a change that builds a list, a figure, a page or a rule.`);
-      continue;
-    }
-    let body = d.body as Record<string, unknown>;
-    let question = d.question.trim();
-    if (d.body_kind === 'change') {
-      const built = changeBody(body, i + 1, drawn, described);
-      if (!built.ok) {
-        dropped.push(built.why);
-        continue;
-      }
-      body = built.body;
-      if (built.says.length > 0) question = `${question} ${built.says.join(' ')}`;
     }
     if (drafts.length >= most) {
       dropped.push(`Proposal ${i + 1} was past the ${most} Slash files at once.`);
       continue;
     }
-    drafts.push({ key: stableKey(body), question, body_kind: d.body_kind, body, by: name });
+    drafts.push(one.draft);
   }
   return { drafts, dropped };
 }
+
+const NOT_A_LIST = 'The model did not answer a list of proposals.';
+
+/** The drafts a model answered, `{ drafts: [...] }` or the bare list, or `null` for anything else. */
+const draftsIn = (raw: unknown): unknown[] | null =>
+  Array.isArray(raw) ? raw : Array.isArray((raw as { drafts?: unknown })?.drafts) ? (raw as { drafts: unknown[] }).drafts : null;
+
+/**
+ * One item of a model's answer as a draft, or why it is dropped, numbered `n` in the sentence. `fromModel` and
+ * `describe` both read an answer through this, so a description's repair round holds a draft exactly as its first ask.
+ */
+function modelDraft(x: unknown, n: number, name: string, drawn: ((id: string) => number) | undefined, described: boolean): { draft: SlashDraft } | { why: string } {
+  const d = x as { question?: unknown; body_kind?: unknown; body?: unknown };
+  if (typeof d?.question !== 'string' || !d.question.trim() || d.question.length > QUESTION_MAX)
+    return { why: `Proposal ${n} had no question, or one over ${QUESTION_MAX} characters.` };
+  if (d.body_kind !== 'pack' && d.body_kind !== 'settings' && d.body_kind !== 'arrange' && d.body_kind !== 'change')
+    return { why: `Proposal ${n} was a ${String(d.body_kind)} proposal, and Slash files only pack, settings, arrange and change.` };
+  if (d.body === null || typeof d.body !== 'object' || Array.isArray(d.body)) return { why: `Proposal ${n} had no body.` };
+  if (described && d.body_kind !== 'change')
+    return { why: `Proposal ${n} was a ${d.body_kind} proposal, and from a description Slash files only a change that builds a list, a figure, a page or a rule.` };
+  let body = d.body as Record<string, unknown>;
+  let question = d.question.trim();
+  if (d.body_kind === 'change') {
+    const built = changeBody(body, n, drawn, described);
+    if (!built.ok) return { why: built.why };
+    body = built.body;
+    if (built.says.length > 0) question = `${question} ${built.says.join(' ')}`;
+  }
+  return { draft: { key: stableKey(body), question, body_kind: d.body_kind, body, by: name } };
+}
+
+/* ── a description, drafted, tried and repaired (`loop/finish/pages.md` C3) ──── */
+
+/**
+ * The most repair asks one press makes, after the first ask, and every one is held and settled in Slash's ledger against
+ * `ask_cap` like any other ask (`slashAsked` in `index.ts`).
+ */
+export const SLASH_REPAIRS_MOST = 2;
+
+/** The most sample rows a draft may carry for one list, and the most lists: the preview draws them and nothing files them. */
+export const SAMPLE_ROWS_MOST = 5;
+const SAMPLE_LISTS_MOST = 20;
+
+/** A list id as the kernel takes one, so a model's sample rows never name a key an object already has. */
+const LIST_ID = /^[a-z][a-z0-9_]{0,31}$/u;
+
+/** One declaration as a `change` carries it. */
+export type SlashDecl = { id: string; kind: string; body: Record<string, unknown> };
+
+/** Sample rows by list id, drawn in a preview and never filed. */
+export type SlashRows = Record<string, Record<string, Json>[]>;
+
+/**
+ * A page `previewChange` drew (`PreviewedPage`, `loop/finish/contracts.md` §2.4), carried to the caller as it came. Read
+ * here only for its id and each block's refusals, so nothing else of its shape is written twice.
+ */
+export type SlashPreviewedPage = { id: string; blocks: readonly { refusals?: readonly Refusal[] }[]; [key: string]: unknown };
+export type SlashPreview = { pages: SlashPreviewedPage[] };
+
+/** `previewChange` asked as the person pressing: one change and its sample rows drawn inside a rehearsal, nothing kept. */
+export type SlashPreviewer = (change: { to: unknown; rows?: SlashRows }) => Promise<Result<SlashPreview>>;
+
+/** One ask of the model, as `slashAsked` makes it: its raw answer, or the meter's refusal. A model that failed throws. */
+export type SlashAsk = (input: SlashModelInput) => Promise<{ raw: unknown } | { spent: string }>;
+
+/** A draft from a description, with the rows it would be drawn over and what it drew. */
+export type DescribedDraft = SlashDraft & { rows: SlashRows; preview: SlashPreview };
+
+/** `slashDraft`'s answer (`loop/finish/contracts.md` §2.4). `SlashDraft` is the arranger's draft and is another type. */
+export type SlashDrafted = {
+  by: string;
+  drafts: { question: string; change: { to: SlashDecl | { declarations: SlashDecl[] } }; rows: SlashRows; preview: SlashPreview }[];
+  dropped: string[];
+};
+
+/** What `describe` answers: the drafts that drew clean, why each other one went, and whether the record was too large to send. */
+export type SlashDescribed = { by: string; drafts: DescribedDraft[]; dropped: string[]; large: boolean };
+
+/** What every sentence ends on when a description came to nothing. */
+export const DESCRIBED_NOTHING = 'nothing was drafted from what you described.';
+
+/** The sentence a description gets on a record with no model. */
+export const DESCRIBED_NO_MODEL = 'Slash builds from a description only with a model, and this BrainDog has none set up, so nothing was drafted from it.';
+
+/** The sentence a description gets on a record that cannot draw a change before it lands, where nothing is asked. */
+export const DESCRIBED_NO_PREVIEW = 'This BrainDog cannot draw a change before it lands yet, so the model was not asked and nothing was drafted from what you described.';
+
+/**
+ * `asked`, checked: text of a sentence or a few, at most `SLASH_ASKED_MOST` characters once trimmed.
+ *
+ * CHARACTERS ARE CODE POINTS, as the contract counts them (`loop/finish/contracts.md` §2.4, defects P11). `length` counts
+ * UTF-16 units, so a description written in an alphabet outside the first plane was refused at half the bound.
+ */
+export function askedFault(asked: unknown): Refusal | null {
+  const text = typeof asked === 'string' ? asked.trim() : '';
+  if (text === '' || [...text].length > SLASH_ASKED_MOST)
+    return { code: 'VALUE_MALFORMED', fix: `asked is what you want Slash to build, in a sentence or a few, at most ${SLASH_ASKED_MOST} characters.`, at: 'asked' };
+  return null;
+}
+
+/** `page`, checked for being a slug at all; whether the caller may read it is the record's question. */
+export function pageFault(page: unknown): Refusal | null {
+  if (typeof page === 'string' && page.trim() !== '') return null;
+  return { code: 'VALUE_MALFORMED', fix: 'page is the slug of the page the description is about, such as desk.', at: 'page' };
+}
+
+/**
+ * `previewChange` on the record `api`, asked as `ctx`, or `null` on a record that has not got it.
+ *
+ * LOOKED UP WHEN IT IS CALLED, as the host looks up a row's method (`handlersFor`), because it is a sibling method under
+ * `methods/` and neither `index.ts` nor a method file is handed the other's. `null` stops a description before the model
+ * is asked: a draft nothing can try is a draft nothing can repair, and an ask spent on it is spent for nothing.
+ */
+export function previewerOf(api: unknown, ctx: unknown): SlashPreviewer | null {
+  const method = (api as Record<string, unknown> | null)?.previewChange;
+  if (typeof method !== 'function') return null;
+  return async (change) => (await (method as (args: unknown, ctx: unknown) => Promise<unknown>).call(api, change, ctx)) as Result<SlashPreview>;
+}
+
+/**
+ * A model's sample rows for one draft, kept to `SAMPLE_ROWS_MOST` a list and `SAMPLE_LISTS_MOST` lists, or none.
+ *
+ * `Object.fromEntries` AND A LIST ID, because the keys are the model's: assigning `out[list]` for a list called
+ * `__proto__` would set the object's prototype rather than name a list.
+ */
+function sampleRows(raw: unknown): SlashRows {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const kept: [string, Record<string, Json>[]][] = [];
+  for (const [list, rows] of Object.entries(raw as Record<string, unknown>)) {
+    if (kept.length >= SAMPLE_LISTS_MOST) break;
+    if (!LIST_ID.test(list) || !Array.isArray(rows)) continue;
+    const plain = rows.filter((r): r is Record<string, Json> => r !== null && typeof r === 'object' && !Array.isArray(r)).slice(0, SAMPLE_ROWS_MOST);
+    if (plain.length > 0) kept.push([list, plain]);
+  }
+  return Object.fromEntries(kept);
+}
+
+/**
+ * Everything the record refused about one drawn draft: the lint's refusal, or each block that drew nothing, each with the
+ * path the model reads it by. An empty list is a draft that previews clean.
+ */
+function faultsOf(seen: Result<SlashPreview>): { at: string; fix: string }[] {
+  if (!seen.ok) return [{ at: ('refusal' in seen ? seen.refusal.at : undefined) ?? 'to', fix: 'refusal' in seen ? seen.refusal.fix : 'The change could not be drawn.' }];
+  const faults: { at: string; fix: string }[] = [];
+  for (const page of seen.value.pages)
+    for (const [i, block] of page.blocks.entries())
+      for (const r of block.refusals ?? []) faults.push({ at: `${page.id}.blocks[${i}]${r.at === undefined ? '' : `.${r.at}`}`, fix: r.fix });
+  return faults;
+}
+
+/**
+ * A draft as the model answered it, handed back in a repair so it mends its own words.
+ *
+ * `said` IS THE MODEL'S OWN QUESTION, NOT THE DRAFT'S. The draft's carries the line the record adds about what it replaces
+ * (`changeBody`'s `says`), and a model handed that back answers it again, so the record would add its line a second time.
+ */
+const answered = (d: SlashDraft & { rows: SlashRows }, said: string): unknown => ({
+  question: said,
+  body_kind: d.body_kind,
+  body: { to: d.body.to },
+  ...(Object.keys(d.rows).length === 0 ? {} : { rows: d.rows }),
+});
+
+const opening = (text: string): string => `${text.charAt(0).toUpperCase()}${text.slice(1)}`;
+
+/**
+ * A description drafted by the model, each draft tried with `previewChange`, and what it refused handed back to be mended.
+ *
+ * THE RECORD FILED WHATEVER PASSED `fromModel` FROM ONE ASK, WITH NO GRAMMAR IN IT (`loop/finish/pages.md` R5), so a
+ * page naming a field its list lacks reached Decide and was found wrong when the owner accepted it. Now every draft is
+ * drawn first, inside a rehearsal that keeps nothing, and every refusal goes back once as `repair`: at most
+ * `SLASH_REPAIRS_MOST` repair asks, each through `ask`, which holds and settles it in Slash's ledger. A draft still
+ * refused after the last is dropped with the record's own sentence, and one that draws clean is kept as it drew.
+ *
+ * NOTHING HERE WRITES. `preview` rolls back everything it drew, and the caller files what is kept, or only shows it.
+ */
+export async function describe(deps: {
+  name: string;
+  ask: SlashAsk;
+  input: SlashModelInput;
+  drawn: (id: string) => number;
+  preview: SlashPreviewer;
+  most?: number;
+}): Promise<SlashDescribed> {
+  const most = deps.most ?? SLASH_OPEN_CAP;
+  const dropped: string[] = [];
+  const clean: DescribedDraft[] = [];
+  let refused: { draft: SlashDraft & { rows: SlashRows }; said: string; faults: { at: string; fix: string }[] }[] = [];
+  let large = false;
+  let stopped = false;
+  for (let asks = 0; asks <= SLASH_REPAIRS_MOST && (asks === 0 || refused.length > 0); asks++) {
+    const input: SlashModelInput =
+      asks === 0 ? deps.input : { ...deps.input, repair: { drafts: refused.map((r) => answered(r.draft, r.said)), refusals: refused.flatMap((r) => r.faults) } };
+    let raw: unknown;
+    try {
+      const got = await deps.ask(input);
+      if ('spent' in got) {
+        dropped.push(asks === 0 ? `${got.spent} ${opening(DESCRIBED_NOTHING)}` : `${got.spent} So what the record refused was not mended.`);
+        stopped = asks === 0;
+        break;
+      }
+      raw = got.raw;
+    } catch (e) {
+      /* A PRESS THE INCLUDED MODEL'S CEILING TURNED AWAY WAS NEVER ASKED, and is said as a record too large, not as a model
+         that might answer next time (`index.ts` `slashFile` keeps the full account of why). */
+      large = asks === 0 && deps.name === 'included' && typeof e === 'object' && e !== null && (e as { sent?: unknown }).sent === false;
+      dropped.push(
+        asks > 0
+          ? 'The model did not answer the repair, so what the record refused was not mended.'
+          : large
+            ? `This BrainDog is too large for the included model to read, so ${DESCRIBED_NOTHING}`
+            : `The model did not answer, so ${DESCRIBED_NOTHING}`,
+      );
+      stopped = asks === 0;
+      break;
+    }
+    const list = draftsIn(raw);
+    if (list === null) dropped.push(NOT_A_LIST);
+    const next: typeof refused = [];
+    const cleanBefore = clean.length;
+    for (const [i, x] of (list ?? []).entries()) {
+      const one = modelDraft(x, i + 1, deps.name, deps.drawn, true);
+      if ('why' in one) {
+        dropped.push(one.why);
+        continue;
+      }
+      if (clean.some((c) => c.key === one.draft.key)) continue;
+      /* NO MORE ARE TRIED THAN MAY BE FILED, because each try is a rehearsal that installs the change and draws its pages,
+         and an answer is bounded only by the model's own length, so an answer of many small pages would be as many
+         rehearsals in one ask. An ask tries at most `most` drafts, the ones already clean counted, as `fromModel` keeps. */
+      if (clean.length + next.length >= most) {
+        dropped.push(`Proposal ${i + 1} was past the ${most} Slash files at once.`);
+        continue;
+      }
+      const draft = { ...one.draft, rows: sampleRows((x as { rows?: unknown }).rows) };
+      let seen: Result<SlashPreview>;
+      try {
+        seen = await deps.preview({ to: draft.body.to, ...(Object.keys(draft.rows).length === 0 ? {} : { rows: draft.rows }) });
+      } catch {
+        seen = { ok: false, refusal: { code: 'INTERNAL', fix: 'The record could not draw this change.', at: 'to' } };
+      }
+      const faults = faultsOf(seen);
+      if (seen.ok && faults.length === 0) clean.push({ ...draft, preview: seen.value });
+      else next.push({ draft, said: (x as { question: string }).question.trim(), faults });
+    }
+    /* A REPAIR THAT MENDED NOTHING AND ANSWERED NOTHING keeps the drafts it was handed, so each is still dropped below with
+       the record's own sentence rather than vanishing from what the owner is told. */
+    if (asks > 0 && next.length === 0 && clean.length === cleanBefore) break;
+    refused = next;
+  }
+  for (const r of refused) dropped.push(`"${r.draft.question}" was dropped, because the record refused it: ${r.faults[0]?.fix ?? 'it would not draw.'}`);
+  const drafts = clean;
+  if (drafts.length === 0 && !stopped) dropped.push(`The model proposed nothing Slash could use, so ${DESCRIBED_NOTHING}`);
+  return { by: drafts.length > 0 ? deps.name : 'rules', drafts, dropped, large };
+}
+
+/** What `describe` kept, as `slashDraft` answers it: the question, the change, the rows and what it drew. */
+export const draftedOf = (d: SlashDescribed): SlashDrafted => ({
+  by: d.by,
+  drafts: d.drafts.map((x) => ({
+    question: x.question,
+    change: { to: x.body.to as SlashDecl | { declarations: SlashDecl[] } },
+    rows: x.rows,
+    preview: x.preview,
+  })),
+  dropped: d.dropped,
+});
 
 /** What a body is about, for recognising it once asked: the pack it names, the use case, or the pages it adds. */
 export function stableKey(body: Record<string, unknown>): string {

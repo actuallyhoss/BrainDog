@@ -18,10 +18,17 @@
  *
  * A STEP THAT ASKS HANDS OFF AND PARKS, AND THE ANSWER IS WHAT WAKES IT (Brief C). `ask_person` opens an `options`
  * suggestion whose body names the run and the step, and the kernel's `decide` hands the pick to `answerStep` in the
- * decision's own transaction. `ask_slash` queues one `infer.ask` outbox row, and the outbox's `ack` hands the model's
- * text to `answerStep` in the ack's transaction. Either way the step row says `waiting` and holds what it is waiting on,
- * the suggestion or the job, and the run's schedule row is armed for the end of the wait: a wake that finds the step
- * still `waiting` is the wait running out, and fails the run with a sentence.
+ * decision's own transaction; with `to:` the question is put to one member, whom `govern.ts`'s `decide` holds it to.
+ * `ask_slash` queues one `infer.ask` outbox row, and the outbox's `ack` hands the model's text to `answerStep` in the
+ * ack's transaction. A `call` queues its declared call as one `pull.fetch` row naming the run and the step
+ * (`actions.ts`'s `queueCall`), and the ack of that job hands back the provider's answer, or the sentence it stopped on,
+ * the same way. Each time the step row says `waiting` and holds what it is waiting on, the suggestion or the job, and
+ * the run's schedule row is armed for the end of the wait: a wake that finds the step still `waiting` is the wait
+ * running out, and fails the run with a sentence.
+ *
+ * A CALL'S ANSWER IS KEPT AS ITS JSON, so a later step reads into it: `{{vars.a.rate}}` is 48.5 when the call answered
+ * `{"rate":48.5}` under `as: a`. It is held to `VAR_BYTES`, as every answer is, and an answer that is not JSON is kept as
+ * its text.
  *
  * ASKING SLASH IS SERVED ONLY WHERE THE HOST SAYS SO (`FlowDeps.answersSlash`, the record's `answersSlash` option). A
  * host that leases no `infer.ask` job leaves the question `pending` for its day and the run fails having asked nobody,
@@ -31,23 +38,34 @@
  *
  * A `script` STEP STARTS A SCRIPT AND DOES NOT WAIT FOR IT (`startScript`). It queues the same `script.run` row a clock
  * queues, for a script that says `runs: { rule: true }`, and the run goes on to its next step; what the script writes
- * lands through `finishScript` when a host has run it, and its answer does not come back into the run. A `call` STEP IS
- * STILL NOT IN THIS BUILD: a run that reaches one fails there with a sentence, and the lint lets it install so that the
- * canvas can draw it.
+ * lands through `finishScript` when a host has run it, and its answer does not come back into the run.
+ *
+ * WHETHER A STEP RUNS AT ALL IS ITS ROW IN `capabilities.ts`, which the lint and the grammar read too. A step whose row
+ * installs and does not run fails the run that reaches it with the row's sentence, after the steps before it, and one
+ * whose row does not serve this host (`ask_slash` where nothing answers Slash) the same way.
+ *
+ * A RUN CAN BE TRIED (`flow-try.ts`): the same steps, taken over a sample inside the kernel's `rehearse`, with the body
+ * handed in as `FlowDeps.trial` in place of an installed version, and everything it wrote rolled back.
+ *
+ * EVERY TRIGGER STARTS A RUN, each where its fact is known: a write (`onWritten`), an arrival (`onArrival`), a clock's
+ * turn (`onClock`), a button (`automationRun` in `index.ts`), a figure crossing a line (`onMetrics`, from the hourly
+ * sweep), a decision in Decide (`onDecided`, inside the decision), and a relative day passing over a row (`onTime`,
+ * from the same sweep).
  */
 
 import type { Refusal, Result, Sql } from '@braindog/ports';
 import { fixOf, no, ok, refused } from '@braindog/ports';
 import { compile, evaluate, type Predicate, type Schema } from '@braindog/where';
 
-import { meter, type Metered } from './actions.ts';
+import { meter, RULE_CALLS_PER_DAY, type CallQueued, type Metered } from './actions.ts';
+import { capability, serves } from './capabilities.ts';
 import { calendarOf, nextCalendar } from './clock.ts';
 import { dayIn } from './finished.ts';
-import { nextOccurrence } from './digest.ts';
-import { RUN_PATH, RUNS_PER_DAY_CEILING, passFilled, pathOf, sealedAs, triggerOf } from './flow-lint.ts';
+import { localParts, nextOccurrence } from './digest.ts';
+import { RELATIVE_DAY, RUN_PATH, RUNS_PER_DAY_CEILING, passFilled, pathOf, sealedAs, triggerOf } from './flow-lint.ts';
 import type { Entry } from './index.ts';
 import { instant } from './migrate.ts';
-import { predicateOf, type EvalContext } from './metrics.ts';
+import { evaluateMetric, predicateOf, type EvalContext, type MetricDecl } from './metrics.ts';
 import { FIGURE, WITHHELD } from './figure.ts';
 import { enqueue } from './outbox.ts';
 import { intervalMs } from './pull.ts';
@@ -98,6 +116,14 @@ export const ASK_PERSON_WAIT = '7d';
  * `pending`, which without a bound would park the run for the ninety days a run is kept.
  */
 export const ASK_SLASH_WAIT_MS = DAY_MS;
+/**
+ * How long a run waits on a call's answer before it stops: a day, the contract's bound (`loop/finish/contracts.md` §4.1).
+ *
+ * THE LADDER USUALLY ANSWERS FIRST. A call the provider refuses, or one the record holds, answers at once with its
+ * sentence, and eight failed attempts end in about four hours with theirs (`outbox.ts`'s `deadLetter`). This is for a
+ * host that leases no `pull.fetch` at all, which would otherwise park the run for the ninety days a run is kept.
+ */
+export const CALL_WAIT_MS = DAY_MS;
 
 /** The keys of the two kinds of `rule` schedule row this file owns. A rule's own reminders are `<rule>:<row>`. */
 export const runKey = (run: string): string => `flow.run:${run}`;
@@ -118,9 +144,24 @@ export type FlowDeps = {
   tz: string;
   /**
    * Put a question of options in front of the record's people, through the gate's own `propose`. `about` goes on the
-   * suggestion's body, which is how `decide` finds the run it answers.
+   * suggestion's body, which is how `decide` finds the run it answers. `to` is the one member the question is put to,
+   * where the step names one; `decide` holds the answer to them or an owner.
    */
-  ask: (question: string, options: readonly string[], actor: string, about: { run: string; step: number }) => Result<{ id: string }>;
+  ask: (question: string, options: readonly string[], actor: string, about: { run: string; step: number; to?: string }) => Result<{ id: string }>;
+  /**
+   * Queue a `call` step's declared call, naming the run and the step so its answer comes back to them
+   * (`actions.ts`'s `queueCall`, with the record's action dependencies). `entry` is the run's row, whose `sends:` fields
+   * go, or `null` where the run has none.
+   *
+   * OPTIONAL, because the record's action dependencies are the kernel's to hand, and a runner built without them fails
+   * the step with a sentence rather than parking a run on a call nobody queued.
+   */
+  call?: ((ingest: string, a: { rule: string; entry: Entry | null; run: string; step: number }) => CallQueued) | undefined;
+  /**
+   * A body being tried rather than a version installed (`flow-try.ts`): the run takes its steps from this, and is never
+   * stopped for a rule that is not live, since a body being tried is one nobody has installed yet.
+   */
+  trial?: FlowDecl | undefined;
   /** Close a question nobody will read the answer to, as `wont-fix` with the reason. A question already closed is left. */
   withdraw: (suggestion: string, actor: string, why: string) => void;
   /**
@@ -139,7 +180,18 @@ export type Installed = { id: string; version: number; body: FlowDecl };
 
 /** What started a run, as the run row keeps it and `{{trigger.…}}` reads it. */
 export type RunTrigger = {
-  kind: 'written' | 'arrival' | 'every' | 'manual';
+  kind: 'written' | 'arrival' | 'every' | 'manual' | 'metric' | 'decided';
+  /** A `metric` trigger's figure, the value read, and the side of the line it was read on (`onMetrics`). */
+  id?: string;
+  value?: number;
+  side?: Side;
+  /**
+   * A `decided` trigger's question, the words of the answer chosen, and the declaration that filed or proposes it, or
+   * `null` where none did (`onDecided`). The row the question names is the run's row, as `entry` and `register`.
+   */
+  suggestion?: string;
+  option?: string;
+  about?: string | null;
   /**
    * The instant of the run's turn: when a clock's turn was due, and when anything else started the run. `startRun`
    * stamps it, and `{{trigger.day}}` is its date in the record's zone (`context`). A run started before the stamp has
@@ -226,10 +278,9 @@ export function underChain<R>(sql: Sql, chain: Chain | null, fn: () => R): R {
  * the case `startScript` shares a job in without a merge: two runs whose steps queued the same job both answer it, and
  * the chain is the deeper depth and both lists of runs.
  *
- * NO INDEX ON `answer`, so this reads every script step the record keeps, once per finished script run. The checker
- * measured 8.7 ms a finished script at 90,000 runs, beside a sandbox (a Dynamic Worker on the Worker) that the same
- * finish waits on, and the steps are pruned with their runs after ninety days. The index wants a migration, and the
- * list of migrations is `migrate.ts`'s, which this change did not reach.
+ * READ BY `automation_step_answer`, the index migration 17 made, so it finds the steps by the job's id. Before it this
+ * read every script step the record keeps, once per finished script run: the checker measured 8.7 ms a finished
+ * script at 90,000 runs.
  */
 export function chainOfJob(sql: Sql, job: string): Chain | null {
   const runs = sql.all<{ rule: string; trigger: string; depth: number }>(
@@ -266,7 +317,11 @@ type RunRow = {
   actor: string;
 };
 
-type Vars = Record<string, string | number | boolean | null>;
+/**
+ * A run's answers by name. Most are text, a number or a flag; a call's answer is the JSON it came back as, so a path
+ * reads into it (`reached`).
+ */
+type Vars = Record<string, unknown>;
 
 /**
  * What a question to Slash reads for each variable a `set_var` filled from a field that never leaves the record: the
@@ -474,6 +529,24 @@ function sealedAgain(deps: FlowDeps, run: string, program: Op[], scope: Record<s
   return out;
 }
 
+/**
+ * The variables one run holds from a secret or file field: what its column keeps under `-sealed` while it is parked,
+ * and, once it has finished and `finish` has written its answers alone, the same worked out again from its steps
+ * (`sealedAgain`). What a tried run's answer holds back (`flow-try.ts`), since a `set_var`'s step row keeps the value it
+ * set, whatever that value came from.
+ */
+export function sealedOfRun(deps: FlowDeps, run: string): Set<string> {
+  const r = deps.sql.one<RunRow>('SELECT id, rule, version, trigger, state, step, vars, depth, project, actor FROM automation_run WHERE id = ?', run);
+  if (!r) return new Set();
+  const held = unpack(r.vars).sealed;
+  if (held !== null) return new Set(held);
+  const decl = deps.trial ?? pinned(deps.sql, r.rule, r.version);
+  if (!decl) return new Set();
+  const trigger = JSON.parse(r.trigger) as RunTrigger;
+  const row = trigger.entry ? (deps.entry(trigger.entry) ?? (trigger.deleted === true ? deletedRow(deps.sql, trigger.entry) : null)) : null;
+  return sealedAgain(deps, run, plan(decl.steps ?? decl.then), context(deps, trigger, row), row);
+}
+
 const isObject = (x: unknown): x is Record<string, unknown> => x !== null && typeof x === 'object' && !Array.isArray(x);
 
 /* ── what is installed ──────────────────────────────────────────────── */
@@ -576,7 +649,11 @@ const VERBS = [
   'tag', 'untag', 'set', 'move', 'link', 'note', 'notify', 'schedule', 'create', 'suggest', 'run', 'stop',
 ] as const;
 
-export type Op = { verb: string; step: Record<string, unknown>; to: number };
+/**
+ * One place in a plan: its verb, the step as declared, where an `if` or a `jump` goes, and `at`, where the step sits in
+ * the declared tree (`steps[1].then[0]`), which is how a lint refusal and a tried run name a step.
+ */
+export type Op = { verb: string; step: Record<string, unknown>; to: number; at: string };
 
 /**
  * The steps as one flat list, with a branch as a conditional jump.
@@ -585,29 +662,32 @@ export type Op = { verb: string; step: Record<string, unknown>; to: number };
  * edited tree points somewhere else; an index into the plan of a pinned version cannot. An `if` jumps to its `else`
  * when it is false, and the last step of a `then` that has an `else` is followed by a `jump` past it. A plan has no
  * loops, so each place is reached at most once and is the step row's key.
+ *
+ * `root` IS WHAT THE LIST IS CALLED IN THE BODY, `steps` or `then`, so `at` reads as the lint's own paths do.
  */
-export function plan(list: unknown): Op[] {
+export function plan(list: unknown, root = 'steps'): Op[] {
   const out: Op[] = [];
-  const walk = (steps: unknown) => {
+  const walk = (steps: unknown, at: string) => {
     if (!Array.isArray(steps)) return;
-    for (const step of steps) {
+    for (const [i, step] of steps.entries()) {
       if (!isObject(step)) continue;
+      const here = `${at}[${i}]`;
       if ('if' in step) {
-        const branch: Op = { verb: 'if', step, to: -1 };
+        const branch: Op = { verb: 'if', step, to: -1, at: here };
         out.push(branch);
-        walk(step.then);
+        walk(step.then, `${here}.then`);
         if (step.else === undefined) branch.to = out.length;
         else {
-          const jump: Op = { verb: 'jump', step, to: -1 };
+          const jump: Op = { verb: 'jump', step, to: -1, at: here };
           out.push(jump);
           branch.to = out.length;
-          walk(step.else);
+          walk(step.else, `${here}.else`);
           jump.to = out.length;
         }
-      } else out.push({ verb: VERBS.find((v) => v in step) ?? 'unknown', step, to: -1 });
+      } else out.push({ verb: VERBS.find((v) => v in step) ?? 'unknown', step, to: -1, at: here });
     }
   };
-  walk(list);
+  walk(list, root);
   return out;
 }
 
@@ -641,8 +721,11 @@ export function startRun(
   const name = `rule.${rule.id}`;
   if (rule.body.enabled === false) return no('OUT_OF_BOUNDS', `${name} is switched off (enabled: false), so it starts no runs.`, { at: 'enabled' });
   const limit = rule.body.limits?.runs_per_day ?? RUNS_PER_DAY_CEILING;
+  /* A TURN RECORDED AND NOT TAKEN (`skipTurn`, its one `late` step) IS NOT A RUN THE DAY COUNTS: a drain that records
+     five late turns and then reaches one on time would otherwise refuse the one it was meant to take. */
   const today = deps.sql.one<{ n: number }>(
-    'SELECT count(*) AS n FROM automation_run WHERE rule = ? AND started_at > ?',
+    `SELECT count(*) AS n FROM automation_run WHERE rule = ? AND started_at > ?
+       AND NOT EXISTS (SELECT 1 FROM automation_step s WHERE s.run = automation_run.id AND s.n = 0 AND s.kind = 'late')`,
     rule.id,
     instant(deps.nowMs - DAY_MS),
   )?.n ?? 0;
@@ -651,6 +734,17 @@ export function startRun(
       at: 'limits.runs_per_day',
     });
 
+  const id = openRun(deps, rule, trigger, o);
+  if (o.arm !== false) wake(deps, id, deps.nowMs);
+  return ok({ run: id });
+}
+
+/**
+ * The run's row, `pending` at its first step, with the instant of its turn stamped on its trigger. `startRun` asks
+ * whether the rule may start one before this; a tried run (`flow-try.ts`) is not a start the day counts, and is
+ * written by this alone, inside a rehearsal that takes it out again.
+ */
+export function openRun(deps: FlowDeps, rule: Installed, trigger: RunTrigger, o: { actor: string; depth?: number }): string {
   const id = deps.mint();
   deps.sql.exec(
     `INSERT INTO automation_run (id, rule, version, trigger, state, step, vars, depth, project, actor, started_at)
@@ -664,8 +758,7 @@ export function startRun(
     o.actor,
     instant(deps.nowMs),
   );
-  if (o.arm !== false) wake(deps, id, deps.nowMs);
-  return ok({ run: id });
+  return id;
 }
 
 /**
@@ -753,6 +846,10 @@ export function onArrival(
     if (spec.state !== undefined && !spec.state.includes(a.state)) continue;
     const row = a.wrote[0] === undefined ? null : deps.entry(a.wrote[0]);
     if (rule.body.project !== undefined && (row === null || deps.projectOf(row) !== rule.body.project)) continue;
+    /* `when:` IS READ OVER THE ROW THE ARRIVAL WROTE, as a write trigger reads it over the written row, and with no row
+       over the top-level keys of the arrival's JSON body. The lint refused it as `NOT_IN_THIS_BUILD` until this read it:
+       a filter that filtered nothing. */
+    if (rule.body.when !== undefined && !(row ? holds(deps, rule.body.when, row) : bodyHolds(deps, rule.body.when, a.raw))) continue;
     startRun(
       deps,
       rule,
@@ -777,37 +874,322 @@ export function firstDue(body: FlowDecl, nowMs: number, tz: string): number | nu
   return nowMs + ms;
 }
 
+/** The most turns one drain records for a clock that fell behind, oldest first. The rest are said in one skipped run. */
+export const MISSED_TURNS_CEILING = 12;
+
 /**
- * A clock rule's turn: one run, taken now, and the next turn.
+ * A clock rule's turn, and every turn after it the drain has also passed: each one recorded, and the next turn ahead.
  *
- * THE NEXT TURN COUNTS FROM WHEN THIS ONE WAS DUE, not from when the drain reached it, so an hourly rule stays on the
- * hour it was installed at rather than walking later by however late each alarm was. A rule retired or edited off its
- * clock ends the row, as a digest whose declaration is gone does.
+ * NEVER FOLDED. The first form took the turn it was handed and asked the clock for its next turn from now, so a host that
+ * was off from 31 January to 2 May made the January task and none of February's, March's or April's, and said nothing
+ * (the audit of 25 September, C2). Each turn from when this one was due up to now is now its own run, stamped with its
+ * own instant, or, where the clock says `late:` and the turn is later than that, a run recorded as skipped and not
+ * taken (`skipTurn`). Past `MISSED_TURNS_CEILING` turns, the rest are not taken either, and one skipped run says how
+ * many and from when, so a clock of fifteen minutes back from a week away is not a thousand runs in one drain.
+ *
+ * EACH NEXT TURN COUNTS FROM THE TURN BEFORE IT, not from when the drain reached it, so an hourly rule stays on the hour
+ * it was installed at and a monthly one on its day. A clock of months is asked the calendar from the turn and never
+ * given a length to add: thirty days from the 31st of January is the 2nd of March, and from there the date would walk a
+ * day or two further off with every month. A rule retired or edited off its clock ends the row, as a digest whose
+ * declaration is gone does.
  */
 export function onClock(deps: FlowDeps, rule: string, dueAt: string): number | null {
   const found = installed(deps.sql).find((r) => r.id === rule);
   if (!found || triggerOf(found.body) !== 'every') return null;
+  const on = found.body.on as { every: string; at?: string; day?: string; late?: string };
+  const calendar = calendarOf(on);
+  const ms = calendar === null ? intervalMs(on.every) : null;
+  const after = (turn: number): number | null =>
+    calendar !== null
+      ? nextCalendar(calendar, turn, deps.tz)
+      : typeof on.at === 'string'
+        ? nextOccurrence({ at: on.at, ...(typeof on.day === 'string' ? { day: on.day } : {}) }, turn, deps.tz)
+        : ms === null
+          ? null
+          : turn + ms;
+
   /* THE TURN IS WHEN IT WAS DUE, NOT WHEN THE DRAIN GOT TO IT. A host that was off over the first of the month takes
      that turn on the third, and the task it makes is the first's; stamped with the drain's instant, `{{trigger.day}}`
-     would have moved a rent due on the first to the day the machine came back. */
-  const turn = Date.parse(dueAt);
-  const started = startRun(deps, found, { kind: 'every', ...(Number.isFinite(turn) ? { at: instant(turn) } : {}) }, { actor: `rule:${rule}`, arm: false });
+     would have moved a rent due on the first to the day the machine came back. A row with no readable instant is taken
+     as due now. */
+  const due = Date.parse(dueAt);
+  let turn = Number.isFinite(due) ? due : deps.nowMs;
+  for (let taken = 0; turn <= deps.nowMs && taken < MISSED_TURNS_CEILING; taken++) {
+    takeTurn(deps, found, turn);
+    const next = after(turn);
+    if (next === null) return null;
+    turn = next;
+  }
+  if (turn <= deps.nowMs) {
+    /* PAST THE CEILING, THE TURNS LEFT ARE SAID AND NOT TAKEN, in one run, and the clock is armed for its next turn
+       after now. For a clock of a length the next turn keeps its phase; the calendar and a time of day are asked from
+       now, which is where they fall next anyway. */
+    const from = turn;
+    const next = ms !== null && calendar === null && typeof on.at !== 'string' ? turn + Math.ceil((deps.nowMs - turn + 1) / ms) * ms : after(deps.nowMs);
+    const left = ms !== null && calendar === null && typeof on.at !== 'string' ? Math.floor((deps.nowMs - from) / ms) + 1 : null;
+    if (found.body.enabled !== false)
+      skipTurn(
+        deps,
+        found,
+        from,
+        `rule.${rule} had missed more turns than one pass takes (${MISSED_TURNS_CEILING}), so ${left === null ? 'the turns' : `${left} ${left === 1 ? 'turn' : 'turns'}`} from ${turnSaid(deps, from)} to now were recorded and not taken.`,
+      );
+    return next;
+  }
+  return turn;
+}
+
+/**
+ * One turn of a clock: a run taken now, or, past the clock's `late:` or its day's `runs_per_day`, a run recorded as
+ * skipped. A rule switched off takes nothing and records nothing, since `startRun` refuses it and a turn it never meant
+ * to take is not missed.
+ */
+function takeTurn(deps: FlowDeps, rule: Installed, turn: number): void {
+  if (rule.body.enabled === false) return;
+  const late = (rule.body.on as { late?: unknown }).late;
+  const lateMs = typeof late === 'string' ? intervalMs(late) : null;
+  if (lateMs !== null && deps.nowMs - turn > lateMs) {
+    skipTurn(deps, rule, turn, `rule.${rule.id}'s turn due ${turnSaid(deps, turn)} was reached ${spanOf(deps.nowMs - turn)} late, past its late: ${String(late)}, so it was recorded and not taken.`);
+    return;
+  }
+  const started = startRun(deps, rule, { kind: 'every', at: instant(turn) }, { actor: `rule:${rule.id}`, arm: false });
   if (started.ok) {
     const at = advance(deps, started.value.run);
     if (at !== null) wake(deps, started.value.run, at);
+    return;
   }
-  const on = found.body.on as { every: string; at?: string; day?: string };
-  /* A CLOCK OF MONTHS IS ASKED THE CALENDAR AGAIN, FROM NOW, and never given a length to add: thirty days from the 31st
-     of January is the 2nd of March, and from there the date walks a day or two further off with every month. */
-  const calendar = calendarOf(on);
-  if (calendar !== null) return nextCalendar(calendar, deps.nowMs, deps.tz);
-  if (typeof on.at === 'string') return nextOccurrence({ at: on.at, ...(typeof on.day === 'string' ? { day: on.day } : {}) }, deps.nowMs, deps.tz);
-  const ms = intervalMs(on.every);
-  if (ms === null) return null;
-  let next = Date.parse(dueAt) + ms;
-  if (!Number.isFinite(next)) next = deps.nowMs + ms;
-  while (next <= deps.nowMs) next += ms;
-  return next;
+  /* A TURN THE DAY'S CEILING REFUSED IS RECORDED TOO, with the refusal's sentence. A drain that takes every missed turn
+     can reach `runs_per_day` inside one pass, and a turn dropped there without a row is the silent fold this replaced. */
+  skipTurn(deps, rule, turn, fixOf(started));
+}
+
+/**
+ * A turn recorded and not taken: a run `cancelled` with its sentence, and one step `{ n: 0, kind: 'late', state:
+ * 'skipped' }`, which the runs list draws as Skipped.
+ *
+ * `cancelled` AND NOT A STATE OF ITS OWN, because `automation_run.state`'s CHECK has none for it and a rebuild would cost
+ * a migration (`loop/finish/contracts.md` X13); the step row is what tells it from a run somebody stopped. Written
+ * without `startRun`, so `runs_per_day` never refuses the record of a turn, and `startRun` does not count it, so a
+ * record of a turn never spends the day of a turn that is taken. Finished through `finish`, so it writes the free
+ * metered line every cancelled run writes.
+ */
+function skipTurn(deps: FlowDeps, rule: Installed, turn: number, say: string): void {
+  const id = deps.mint();
+  const project = rule.body.project ?? null;
+  const actor = `rule:${rule.id}`;
+  const trigger = JSON.stringify({ kind: 'every', at: instant(turn) });
+  deps.sql.exec(
+    `INSERT INTO automation_run (id, rule, version, trigger, state, step, vars, depth, project, actor, started_at)
+     VALUES (?, ?, ?, ?, 'pending', 0, '{}', 0, ?, ?, ?)`,
+    id,
+    rule.id,
+    rule.version,
+    trigger,
+    project,
+    actor,
+    instant(deps.nowMs),
+  );
+  record(deps, id, 0, 'late', 'skipped', null);
+  finish(deps, { id, rule: rule.id, version: rule.version, trigger, state: 'pending', step: 0, vars: '{}', depth: 0, project, actor }, 'cancelled', say);
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/**
+ * When a turn was due, as a person reads it in the record's zone: "22 Sep at 13:00", with the year when it is not this
+ * one. The runs list prints a skipped run's sentence as it is, and time on screen is never an ISO instant. A zone the
+ * runtime does not know is read as UTC, as `dayIn` reads it.
+ */
+function turnSaid(deps: FlowDeps, ms: number): string {
+  const partsOf = (t: number): ReturnType<typeof localParts> => {
+    try {
+      return localParts(t, deps.tz);
+    } catch {
+      return localParts(t, 'UTC');
+    }
+  };
+  const at = partsOf(ms);
+  const now = partsOf(deps.nowMs);
+  const year = at.year === now.year ? '' : ` ${at.year}`;
+  const two = (n: number): string => String(n).padStart(2, '0');
+  return `${at.day} ${MONTHS[at.month] ?? ''}${year} at ${two(at.hour)}:${two(at.minute)}`;
+}
+
+/** How late a turn was, in the largest whole unit a person reads it in. */
+function spanOf(ms: number): string {
+  const [n, unit] = ms >= DAY_MS ? [Math.floor(ms / DAY_MS), 'day'] : ms >= 3_600_000 ? [Math.floor(ms / 3_600_000), 'hour'] : [Math.max(1, Math.floor(ms / 60_000)), 'minute'];
+  return `${n} ${unit}${n === 1 ? '' : 's'}`;
+}
+
+/* ── the figure, the decision and the day ───────────────────────────── */
+
+/** The side of its line a watched figure was read on. `above` takes the line itself for `gte`, `below` for `lte`. */
+export type Side = 'above' | 'below';
+
+/** How many `metric` triggers one hourly sweep reads, the longest unread first, so every one is read in its turn. */
+export const WATCHED_PER_SWEEP = 200;
+
+/**
+ * The side of the line a figure stands on now, and the value read, or `null` for a reading that says nothing: no such
+ * figure, a `target` it does not declare, or a refusal or a value it could not work out (`MIXED_CURRENCY` is the
+ * ordinary one). The line is in the figure's own units, minor units for money, since that is what a reading answers.
+ */
+function sideOf(deps: FlowDeps, id: string, crosses: unknown): { value: number; side: Side } | null {
+  const found = deps.sql.one<{ body: string }>("SELECT body FROM declaration WHERE id = ? AND kind = 'metric' AND superseded_at IS NULL AND retired = 0", `metric.${id}`);
+  if (!found) return null;
+  const decl = JSON.parse(found.body) as MetricDecl;
+  const read = evaluateMetric(deps.sql, decl, deps.rules().ctx);
+  if (!read.ok || read.value.value === null) return null;
+  /* A MONEY FIGURE ADDED UP OUT OF THE CURRENCY IT DECLARES CARRIES ITS TARGET CONVERTED (`targetIn`), and that is the
+     line its value is read against, as the page reads `met`. With no rate to convert it, `met` is `null` and the
+     declared target is in another currency than the value, so the reading says nothing and the side is kept. */
+  if (crosses === 'target' && read.value.met === null) return null;
+  const line = crosses === 'target' ? (read.value.targetIn?.target ?? decl.target) : crosses;
+  if (!isObject(line)) return null;
+  const value = read.value.value;
+  if (typeof line.gte === 'number') return { value, side: value >= line.gte ? 'above' : 'below' };
+  if (typeof line.lte === 'number') return { value, side: value <= line.lte ? 'below' : 'above' };
+  return null;
+}
+
+/**
+ * The hourly read of every figure a `metric` trigger watches: the first reading sets its side and starts nothing, a
+ * reading that says nothing keeps the side it had, and a change of side starts one run with trigger `{ kind: 'metric',
+ * id, value, side }`. Answers how many runs it started.
+ *
+ * THE SIDE IS KEPT IN `automation_watch` (migration 17), per rule and per figure, because one reading says where a
+ * figure is and nothing about whether it moved. A rule edited to watch another figure keys a new row, so its first
+ * reading of that figure starts nothing either. `at` is when the figure was last read, and the sweep reads the longest
+ * unread first, so past `WATCHED_PER_SWEEP` every rule is still read in its turn.
+ *
+ * BEFORE THIS NOTHING READ `on.metric`. `onWritten`, `onArrival`, `onClock` and the button were the four starts, each
+ * skipping every trigger but its own, so the lint refused the trigger as `NOT_IN_THIS_BUILD` rather than let it install
+ * and never start.
+ */
+export function onMetrics(deps: FlowDeps, rules: readonly Installed[]): number {
+  const specOf = (rule: Installed) => (rule.body.on as Extract<Trigger, { metric: unknown }>).metric;
+  /* A WATCH NO RULE HOLDS ANY MORE IS DELETED BEFORE THE READ, so the table keeps one row per installed rule that
+     watches a figure, and the read below is no longer than that. A rule retired, or edited to watch another figure or
+     off its `metric` trigger, left its row behind, and every such edit made the hourly read one row longer. A rule
+     switched off keeps its row, so switching it back on does not start again from a first reading. */
+  const held = new Set(rules.filter((r) => triggerOf(r.body) === 'metric').map((r) => `${r.id}\n${specOf(r).id}`));
+  const kept = new Map<string, { rule: string; key: string; side: string | null; at: string }>();
+  for (const w of deps.sql.all<{ rule: string; key: string; side: string | null; at: string }>('SELECT rule, key, side, at FROM automation_watch'))
+    if (held.has(`${w.rule}\n${w.key}`)) kept.set(`${w.rule}\n${w.key}`, w);
+    else deps.sql.exec('DELETE FROM automation_watch WHERE rule = ? AND key = ?', w.rule, w.key);
+  const watching = rules.filter((r) => triggerOf(r.body) === 'metric' && r.body.enabled !== false);
+  if (watching.length === 0) return 0;
+  const lastRead = (rule: Installed): string => kept.get(`${rule.id}\n${specOf(rule).id}`)?.at ?? '';
+  let started = 0;
+  for (const rule of [...watching].sort((a, b) => lastRead(a).localeCompare(lastRead(b))).slice(0, WATCHED_PER_SWEEP)) {
+    const spec = specOf(rule);
+    const was = kept.get(`${rule.id}\n${spec.id}`);
+    const now = sideOf(deps, spec.id, spec.crosses);
+    /* A READING THAT SAYS NOTHING IS STILL A READ, and its time is kept with the side it had, or none. Left with no row,
+       such a rule sorted first every hour, and past `WATCHED_PER_SWEEP` of them no other figure was read again. */
+    deps.sql.exec(
+      `INSERT INTO automation_watch (rule, key, side, at) VALUES (?, ?, ?, ?)
+       ON CONFLICT (rule, key) DO UPDATE SET side = coalesce(excluded.side, side), at = excluded.at`,
+      rule.id,
+      spec.id,
+      now?.side ?? null,
+      instant(deps.nowMs),
+    );
+    if (now === null || !was || was.side === null || was.side === now.side) continue;
+    /* THE SIDE IS KEPT EVEN WHEN THE RUN IS REFUSED, since the figure did cross: a rule at its day's ceiling is not
+       started a day late by a crossing that is over. */
+    if (startRun(deps, rule, { kind: 'metric', id: spec.id, value: now.value, side: now.side }, { actor: `rule:${rule.id}` }).ok) started++;
+  }
+  return started;
+}
+
+/**
+ * A decision just taken in Decide: start every rule its `decided` trigger admits, once per question and rule.
+ *
+ * `about` IS THE DECLARATION THAT FILED OR PROPOSES THE QUESTION (`index.ts` reads it from the suggestion), and `option`
+ * matches the chosen answer's id, else its words exactly: a rule's `suggest` options are words whose ids are their
+ * places (`o1`, `o2`), so a rule's author writes the words. `row` is the row the question names, which the run reads
+ * as `{{trigger.row.<field>}}` and acts on, or `null` for a question about no row.
+ *
+ * CALLED IN THE DECISION'S OWN TRANSACTION, so a decision that rolls back starts nothing; the run is armed for now and
+ * its steps are the drain's, as every trigger's are, so a person's press never runs a rule's writes. ONCE PER QUESTION:
+ * the claim is a marker, as `once_per` is, so a question decided again (a change re-filed and accepted) starts nothing
+ * more. A question a run's own `ask_person` asked is that run's answer and starts nothing here (`answerStep`).
+ */
+export function onDecided(
+  deps: FlowDeps,
+  rules: readonly Installed[],
+  d: { suggestion: string; option: { id: string; label: string }; about: string | null; row: Entry | null; actor: string },
+): void {
+  for (const rule of rules) {
+    if (triggerOf(rule.body) !== 'decided') continue;
+    const spec = (rule.body.on as Extract<Trigger, { decided: unknown }>).decided ?? {};
+    if (spec.about !== undefined && spec.about !== d.about) continue;
+    if (spec.option !== undefined && spec.option !== d.option.id && spec.option !== d.option.label) continue;
+    if (rule.body.project !== undefined && (d.row === null || deps.projectOf(d.row) !== rule.body.project)) continue;
+    const key = JSON.stringify([rule.id, 'decided', d.suggestion]);
+    if (!marker(deps.sql, deps.mint, deps.nowMs, key, { rule: rule.id, suggestion: d.suggestion }, false)) continue;
+    const trigger: RunTrigger = {
+      kind: 'decided',
+      suggestion: d.suggestion,
+      option: d.option.label,
+      about: d.about,
+      ...(d.row ? { entry: d.row.id, register: d.row.register } : {}),
+    };
+    /* A REFUSAL IS THE DAY'S CEILING OR A SWITCHED-OFF RULE, and the marker goes back, as `onWritten` gives one back. */
+    if (!startRun(deps, rule, trigger, { actor: d.actor }).ok) deps.sql.exec("DELETE FROM schedule WHERE kind = 'rule' AND key = ?", key);
+  }
+}
+
+/** How many rows one run-path rule about a relative day has read each hour, as `rulesAboutTime` reads an inline one. */
+export const SWEPT_ROWS = 1000;
+
+/**
+ * The hourly re-read of a run-path `written` rule whose `when:` names a day relative to today and which says
+ * `once_per`: one run per row its `when:` now holds for and per `once_per` key, claimed with the marker the inline pass
+ * writes, so a row the write already started a run for starts none here. Answers how many runs it started.
+ *
+ * `when:`, `project:` AND `once_per:` ARE READ; `op:`, `fields:` and `from_rules:` are not, because they say which writes
+ * start the rule and a day passing writes nothing. `due before today` becomes true of a bill nobody touched, and a rule
+ * read only on writes would never see it.
+ *
+ * MEASURED BEFORE THIS, on 22 September: such a rule installed, its row went past due, and a sweep by hand started
+ * nothing, because the hourly re-read handed every rule to `applyRule`, which finds rows by a top-level `register:` and
+ * a run-path rule has none. The lint then refused the body as `NOT_IN_THIS_BUILD` until this read it.
+ */
+export function onTime(deps: FlowDeps, rules: readonly Installed[]): number {
+  let started = 0;
+  for (const rule of rules) {
+    if (triggerOf(rule.body) !== 'written' || rule.body.enabled === false || rule.body.when === undefined) continue;
+    if (!rule.body.once_per?.length || !RELATIVE_DAY.test(JSON.stringify(rule.body.when))) continue;
+    const register = (rule.body.on as Extract<Trigger, { written: unknown }>).written.register;
+    const schema = deps.schemaOf(register);
+    if (!schema) continue;
+    const said = predicateOf(rule.body.when, schema, deps.rules().ctx);
+    if (said.bad.length) continue;
+    const w = compile(said.predicate, schema);
+    if (w.bad.length) continue;
+    for (const { id } of deps.sql.all<{ id: string }>(
+      `SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL AND (${w.sql}) ORDER BY seq, rowid LIMIT ?`,
+      register,
+      ...w.params,
+      SWEPT_ROWS,
+    )) {
+      const entry = deps.entry(id);
+      if (!entry) continue;
+      if (rule.body.project !== undefined && deps.projectOf(entry) !== rule.body.project) continue;
+      const key = onceKey({ rule: rule.id, once_per: rule.body.once_per } as RuleDecl, entry);
+      if (key === null || !marker(deps.sql, deps.mint, deps.nowMs, key, { rule: rule.id, entry: entry.id }, false)) continue;
+      /* A REFUSAL IS THE DAY'S CEILING OR A SWITCHED-OFF RULE: the marker goes back, and this rule's rows wait for the
+         next hour rather than each being refused in turn. */
+      if (!startRun(deps, rule, { kind: 'written', entry: entry.id, register }, { actor: 'system' }).ok) {
+        deps.sql.exec("DELETE FROM schedule WHERE kind = 'rule' AND key = ?", key);
+        break;
+      }
+      started++;
+    }
+  }
+  return started;
 }
 
 /* ── taking the steps ───────────────────────────────────────────────── */
@@ -822,12 +1204,13 @@ export function onClock(deps: FlowDeps, rule: string, dueAt: string): number | n
 export function advance(deps: FlowDeps, id: string): number | null {
   const run = deps.sql.one<RunRow>('SELECT id, rule, version, trigger, state, step, vars, depth, project, actor FROM automation_run WHERE id = ?', id);
   if (!run || (run.state !== 'pending' && run.state !== 'running' && run.state !== 'waiting')) return null;
-  const off = stopped(deps.sql, run.rule);
+  /* A BODY BEING TRIED IS NOBODY'S LIVE VERSION, so neither question is asked of the table for it (`FlowDeps.trial`). */
+  const off = deps.trial ? null : stopped(deps.sql, run.rule);
   if (off !== null) {
     finish(deps, run, 'cancelled', off);
     return null;
   }
-  const decl = pinned(deps.sql, run.rule, run.version);
+  const decl = deps.trial ?? pinned(deps.sql, run.rule, run.version);
   if (!decl) {
     finish(deps, run, 'failed', `rule.${run.rule} version ${run.version}, which this run started under, is not in the record.`);
     return null;
@@ -843,6 +1226,9 @@ export function advance(deps: FlowDeps, id: string): number | null {
   const last = subject === null && trigger.deleted === true && trigger.entry ? deletedRow(deps.sql, trigger.entry) : null;
   const read = (): Entry | null => subject ?? last;
   const actor = `rule:${run.rule}`;
+  /* WHAT A `create` WITH NO ROW NAMES AS ITS PARENT: the turn on a clock, so a turn delivered twice makes one row, and the
+     run anywhere else (`rules.ts`'s `createAlone`). */
+  const parent = trigger.kind === 'every' && typeof trigger.at === 'string' ? `${run.rule}@${trigger.at}` : id;
   const metric = figures(deps, () => landsOf(program, read()));
   const scope = () => ({ vars, trigger: context(deps, trigger, read()), metric });
   /* A COLUMN WITH NO `-sendable` IS REBUILT BEFORE THE FIRST STEP, not at the question. A `set_var` taken after the wake
@@ -954,14 +1340,32 @@ export function advance(deps: FlowDeps, id: string): number | null {
         continue;
       }
 
-      /* SLASH IS NOT ASKED ON A HOST THAT WOULD NOT ANSWER: a question queued for nobody waits its day and fails, having
-         asked nobody. Checked before anything is queued, for a rule that became live without meeting `unserved`. */
-      if (op.verb === 'ask_slash' && !deps.answersSlash)
-        return fail(
-          i,
-          op.verb,
-          `rule.${run.rule} reached an ask_slash step, and no host in this build answers an automation's question to Slash (NOT_IN_THIS_BUILD). The steps before it were taken.`,
-        );
+      /* A STEP THIS BUILD OR THIS HOST DOES NOT RUN FAILS THE RUN HERE, by its row in `capabilities.ts`, before anything
+         is queued. Slash is not asked on a host that would not answer: a question queued for nobody waits its day and
+         fails, having asked nobody, and this is for a rule that became live without meeting `unserved`. */
+      const can = capability(op.verb);
+      if (can !== undefined && (!can.runs || !serves(can, deps.answersSlash)))
+        return fail(i, op.verb, `rule.${run.rule} reached ${op.verb === 'ask_slash' ? 'an' : 'a'} ${op.verb} step, and ${can.says} (NOT_IN_THIS_BUILD). The steps before it were taken.`);
+
+      if (op.verb === 'call') {
+        /* THE SECOND TIME A CALL IS REACHED IS THE END OF ITS WAIT, as for an ask: the answer moves the run past the step
+           before the drain comes back (`answerStep`), so a wake that finds the row still `waiting` had no answer. */
+        const was = deps.sql.one<{ state: string }>('SELECT state FROM automation_step WHERE run = ? AND n = ?', id, i)?.state;
+        if (was === 'done') {
+          i = saved(i + 1);
+          continue;
+        }
+        const ingest = String((step.call as { ingest?: unknown }).ingest ?? '');
+        if (was === 'waiting') return fail(i, 'call', `rule.${run.rule} called ${ingest} at step ${i + 1}, and no answer came back within a day, so the run stopped there.`);
+        if (!deps.call) return fail(i, 'call', `rule.${run.rule} reached a call step, and this host wired no way to send one (NOT_IN_THIS_BUILD). The steps before it were taken.`);
+        /* THE RUN'S LIVE ROW AND NOT ONE A DELETE LEFT, so a call about a deleted row sends nothing of it: `queueCall`
+           refuses a call that sends fields when there is no row to send them from. */
+        const queued = deps.call(ingest, { rule: run.rule, entry: subject, run: id, step: i });
+        if (queued.outcome !== 'queued' || queued.job === undefined) return fail(i, 'call', queued.say);
+        record(deps, id, i, 'call', 'waiting', queued.job);
+        deps.sql.exec("UPDATE automation_run SET state = 'waiting', step = ?, vars = ? WHERE id = ?", i, pack(vars, kept, unsent, sealedVars), id);
+        return deps.nowMs + CALL_WAIT_MS;
+      }
 
       if (op.verb === 'ask_person' || op.verb === 'ask_slash') {
         /* THE SECOND TIME AN ASK IS REACHED IS THE END OF ITS WAIT, as for `wait`. An answer moves the run past the
@@ -988,9 +1392,6 @@ export function advance(deps: FlowDeps, id: string): number | null {
         deps.sql.exec("UPDATE automation_run SET state = 'waiting', step = ?, vars = ? WHERE id = ?", i, pack(vars, kept, unsent, sealedVars), id);
         return deps.nowMs + asked.waitMs;
       }
-
-      if (op.verb === 'call')
-        return fail(i, op.verb, `rule.${run.rule} reached a call step, and a step that waits on a call is not in this build (NOT_IN_THIS_BUILD). The steps before it were taken.`);
 
       if (op.verb === 'script') {
         const started = startScript(deps, run.rule, step, i, read(), paths());
@@ -1055,7 +1456,7 @@ export function advance(deps: FlowDeps, id: string): number | null {
           op.verb,
           `rule.${run.rule}'s ${op.verb} at step ${i + 1} reads ${handed.secret}, which holds what a secret or file field holds, and such a field is copied only into another secret or file field. The step was not taken; the steps before it were.`,
         );
-      const acted = act(deps, run.rule, op.verb, handed.action as RuleAction, subject, id, actor, subject === null ? last : null, by);
+      const acted = act(deps, run.rule, op.verb, handed.action as RuleAction, subject, id, actor, subject === null ? last : null, by, parent);
       if (!acted.ok) return fail(i, op.verb, acted.say);
       if (op.verb === 'set' || op.verb === 'tag') mark(unsent, op.verb, wrote);
       record(deps, id, i, op.verb, 'done', acted.answer);
@@ -1099,6 +1500,7 @@ function act(
   actor: string,
   gone: Entry | null,
   run: RunFill,
+  parent: string,
 ): { ok: true; stop: boolean; answer: string | null } | { ok: false; say: string } {
   const r = deps.rules();
   if (verb === 'stop') return { ok: true, stop: true, answer: null };
@@ -1122,11 +1524,12 @@ function act(
         ok: false,
         say: `rule.${rule}'s ${verb} step acts on ${gone.seq === null ? gone.id : `${gone.register}#${gone.seq}`}, which was deleted, and a step does not write to a deleted row.`,
       };
-    /* A CREATE MAKES A ROW AND NEEDS NONE TO STAND ON, so it is taken here, keyed on the run (`createAlone` says why).
-       Sent on to the sentence below, a create on a weekly or monthly clock installed and failed every turn (measured on
-       25 September, `clock-monthly.test.ts`). Its fields reach here as typed (`handOn`), so the create fills them once. */
+    /* A CREATE MAKES A ROW AND NEEDS NONE TO STAND ON, so it is taken here, keyed on the clock's turn or the run
+       (`createAlone` says why). Sent on to the sentence below, a create on a weekly or monthly clock installed and failed
+       every turn (measured on 25 September, `clock-monthly.test.ts`). Its fields reach here as typed (`handOn`), so the
+       create fills them once. */
     if ('create' in action) {
-      const grown = createAlone(r, rule, action.create, batch, run);
+      const grown = createAlone(r, rule, action.create, batch, run, parent);
       const first = grown.refusals[0];
       if (first) return { ok: false, say: first.fix };
       return { ok: true, stop: false, answer: null };
@@ -1227,6 +1630,25 @@ function startScript(
     )
     .find((r) => JSON.stringify((JSON.parse(r.payload) as { input?: unknown }).input) === same);
   if (waiting) return { ok: true, job: waiting.id };
+  /* AT MOST `RULE_CALLS_PER_DAY` RUNS A DAY THAT RULES START, AS THE APPROVAL LINE SAYS: `scriptEgress` in `actions.ts`
+     prints that ceiling as "when a rule runs it, at most ... a day" for every script with `runs: { rule: true }`, and
+     nothing counted them, so a bulk change to many rows could start as many sandboxes. Counted by the UTC day, as a
+     call is (`queueCall`),
+     over the jobs a rule's `script` step queued, which are the ones a step row answers; a clock's run and a door's are
+     the script's own and are not counted here. A job shared by two steps (above) is one run and counted once. */
+  const day = instant(deps.nowMs).slice(0, 10);
+  const today =
+    deps.sql.one<{ n: number }>(
+      `SELECT count(*) AS n FROM outbox o WHERE o.kind = 'script.run' AND o.created >= ? AND json_extract(o.payload, '$.script') = ?
+         AND EXISTS (SELECT 1 FROM automation_step s WHERE s.answer = o.id AND s.kind = 'script')`,
+      day,
+      name,
+    )?.n ?? 0;
+  if (today >= RULE_CALLS_PER_DAY)
+    return {
+      ok: false,
+      say: `rule.${rule} starts script.${name} at step ${n + 1}, and rules have started script.${name} ${RULE_CALLS_PER_DAY} times today, the most a day. Nothing was queued, and rules can start it again tomorrow; the steps before it were taken.`,
+    };
   return { ok: true, job: enqueue(deps.sql, deps.mint, deps.nowMs, 'script.run', { script: name, version: found.version, input }) };
 }
 
@@ -1252,7 +1674,7 @@ function ask(
   row: Entry | null,
   actor: string,
 ): { ok: true; holds: string; waitMs: number } | { ok: false; say: string } {
-  const spec = step[verb] as { question: string; options?: string[]; wait?: string; about?: string[]; shape?: string; choices?: string[] };
+  const spec = step[verb] as { question: string; options?: string[]; wait?: string; about?: string[]; shape?: string; choices?: string[]; to?: unknown };
   /* A QUESTION TO SLASH IS FILLED FROM THE ROW WITH ITS SECRET AND FILE FIELDS TAKEN OUT, both fills, since the
      question leaves the record as surely as `about:` does. The lint refuses a question that names one, and this is the
      second line, for a rule an earlier build let install or one written into the table. Measured with the switch on
@@ -1285,7 +1707,20 @@ function ask(
   if (verb === 'ask_person') {
     const waitMs = intervalMs(spec.wait ?? ASK_PERSON_WAIT);
     if (waitMs === null) return { ok: false, say: `rule.${rule} waits ${JSON.stringify(spec.wait)} for an answer at step ${n + 1}, and a span is a number and one of m, h, d or w.` };
-    const opened = deps.ask(question, spec.options ?? [], actor, { run, step: n });
+    /* `to:` PUTS THE QUESTION TO ONE MEMBER, by the id the record holds for them, filled from the run as the question
+       is so that `{{trigger.row.owner}}` can name one. Asked here, when the run reaches the step, because who is a
+       member changes after install: somebody removed or suspended since would be handed a question nobody may answer,
+       as only they or an owner may (`govern.ts`'s `decide`). The sentence does not repeat the id, which is not a name
+       a person reads. */
+    const to = spec.to === undefined ? undefined : String(fill(spec.to, scope)).trim();
+    if (to !== undefined) {
+      const member = deps.sql.one<{ id: string }>(
+        'SELECT m.person_id AS id FROM member m JOIN person p ON p.id = m.person_id WHERE m.person_id = ? AND p.suspended_at IS NULL LIMIT 1',
+        to,
+      );
+      if (!member) return { ok: false, say: `rule.${rule} puts its question at step ${n + 1} to one member, and nobody the record holds by that id is a member now, so nothing was asked.` };
+    }
+    const opened = deps.ask(question, spec.options ?? [], actor, { run, step: n, ...(to === undefined ? {} : { to }) });
     if (!opened.ok) return { ok: false, say: `rule.${rule} could not ask its question at step ${n + 1}: ${fixOf(opened)}` };
     return { ok: true, holds: opened.value.id, waitMs };
   }
@@ -1337,17 +1772,19 @@ export function answerStep(deps: FlowDeps, a: { run: string; step: number; by: s
   const run = deps.sql.one<RunRow>('SELECT id, rule, version, trigger, state, step, vars, depth, project, actor FROM automation_run WHERE id = ?', a.run);
   if (!run || run.state !== 'waiting' || run.step !== a.step) return ok(null);
   const row = deps.sql.one<{ kind: string; state: string; answer: string | null }>('SELECT kind, state, answer FROM automation_step WHERE run = ? AND n = ?', a.run, a.step);
-  if (!row || row.state !== 'waiting' || row.answer !== a.by || (row.kind !== 'ask_person' && row.kind !== 'ask_slash')) return ok(null);
+  if (!row || row.state !== 'waiting' || row.answer !== a.by || (row.kind !== 'ask_person' && row.kind !== 'ask_slash' && row.kind !== 'call')) return ok(null);
 
   const stop = (say: string): Result<null> => {
     finish(deps, run, 'failed', say);
     record(deps, run.id, a.step, row.kind, 'failed', null);
     return ok(null);
   };
-  if (a.failed !== undefined || a.answer === undefined) return stop(a.failed ?? `rule.${run.rule}'s question at step ${a.step + 1} came back with no answer.`);
+  if (a.failed !== undefined || a.answer === undefined)
+    return stop(a.failed ?? `rule.${run.rule}'s ${row.kind === 'call' ? 'call' : 'question'} at step ${a.step + 1} came back with no answer.`);
 
-  const decl = pinned(deps.sql, run.rule, run.version);
+  const decl = deps.trial ?? pinned(deps.sql, run.rule, run.version);
   const spec = (decl ? plan(decl.steps ?? decl.then)[a.step]?.step[row.kind] : undefined) as { as?: string; shape?: string; choices?: string[] } | undefined;
+  if (row.kind === 'call') return answerCall(deps, run, a.step, a.answer, spec, stop);
   if (!spec || typeof spec.as !== 'string') return stop(`rule.${run.rule} version ${run.version} has no ask at step ${a.step + 1} to answer.`);
 
   /* SLASH'S TEXT IS HELD TO THE SHAPE THE STEP ASKED FOR. A person picks from the options, which `decide` has already
@@ -1383,6 +1820,42 @@ export function answerStep(deps: FlowDeps, a: { run: string; step: number; by: s
 }
 
 /**
+ * A call's answer, handed to the run waiting on it (`answerStep` above, for the ack of a `call` step's job).
+ *
+ * KEPT AS THE JSON IT CAME BACK AS, under `as:`, so `{{vars.a.rate}}` reads 48.5 from `{"rate":48.5}`; an answer that is
+ * not JSON is kept as its text. HELD TO `VAR_BYTES` BEFORE IT IS READ, as every answer is, and past it the run stops with
+ * the size in its sentence rather than keeping half a document. A step with no `as:` keeps nothing, and the run goes on.
+ *
+ * THE NAME IS TAKEN OFF WHAT IT HELD BEFORE (`-sealed`, `-sendable`), as an ask's answer takes it off: the variable now
+ * holds what the provider said, not the secret a `set_var` of the same name may once have held, so a step after it
+ * may write it and a question to Slash may carry it. What the call sent is the row's `sends:` fields alone, which
+ * `queueCall` holds to the ones that may leave, so nothing the run holds as a secret reached the provider.
+ */
+function answerCall(deps: FlowDeps, run: RunRow, step: number, answer: string, spec: { as?: unknown } | undefined, stop: (say: string) => Result<null>): Result<null> {
+  if (spec === undefined) return stop(`rule.${run.rule} version ${run.version} has no call at step ${step + 1} to answer.`);
+  const stored = unpack(run.vars);
+  let vars = stored.vars;
+  let sealed = stored.sealed;
+  if (typeof spec.as === 'string') {
+    if (answer.length > VAR_BYTES) return stop(`rule.${run.rule}'s call at step ${step + 1} answered ${answer.length} characters, and one answer holds ${VAR_BYTES}.`);
+    let value: unknown = answer;
+    try {
+      value = JSON.parse(answer);
+    } catch {
+      /* Text stays text: a provider that answers a word is read by its word. */
+    }
+    vars = { ...vars, [spec.as]: value };
+    if (stored.kept) delete stored.kept[spec.as];
+    sealed = sealed?.filter((name) => name !== spec.as) ?? null;
+    if (JSON.stringify(vars).length > VARS_BYTES) return stop(`rule.${run.rule}'s answers passed ${VARS_BYTES} characters at step ${step + 1}.`);
+  }
+  record(deps, run.id, step, 'call', 'done', answer.slice(0, VAR_BYTES));
+  deps.sql.exec("UPDATE automation_run SET state = 'pending', step = ?, vars = ? WHERE id = ?", step + 1, pack(vars, stored.kept, stored.unsent, sealed), run.id);
+  wake(deps, run.id, deps.nowMs);
+  return ok(null);
+}
+
+/**
  * Let go of what a run's waiting ask still holds, as the run ends: the question comes out of the queue, and a Slash
  * job nobody has leased yet comes out of the outbox.
  *
@@ -1396,14 +1869,17 @@ export function answerStep(deps: FlowDeps, a: { run: string; step: number; by: s
  */
 function release(deps: FlowDeps, run: RunRow, say: string | null): void {
   const held = deps.sql.all<{ kind: string; answer: string | null }>(
-    "SELECT kind, answer FROM automation_step WHERE run = ? AND state = 'waiting' AND kind IN ('ask_person', 'ask_slash')",
+    "SELECT kind, answer FROM automation_step WHERE run = ? AND state = 'waiting' AND kind IN ('ask_person', 'ask_slash', 'call')",
     run.id,
   );
   for (const h of held) {
     if (h.answer === null) continue;
     if (h.kind === 'ask_person') deps.withdraw(h.answer, `rule:${run.rule}`, say ?? `rule.${run.rule}'s run ended before this was answered.`);
     else {
-      deps.sql.exec("DELETE FROM outbox WHERE id = ? AND kind = 'infer.ask' AND state IN ('pending', 'failed')", h.answer);
+      /* A CALL NOBODY HAS SENT YET GOES THE SAME WAY AS A QUESTION NOBODY HAS ASKED: its post would answer a run that is
+         over. One a host holds is left to its ack, which finds the run no longer waiting and retries nothing
+         (`outbox.ts`). */
+      deps.sql.exec("DELETE FROM outbox WHERE id = ? AND kind = ? AND state IN ('pending', 'failed')", h.answer, h.kind === 'call' ? 'pull.fetch' : 'infer.ask');
       deps.sql.exec("DELETE FROM schedule WHERE kind = 'retry' AND key = ?", `outbox:${h.answer}`);
     }
   }
@@ -1469,6 +1945,35 @@ export function cancelRun(deps: FlowDeps, id: string, actor: string): Result<{ r
   deps.sql.exec("DELETE FROM schedule WHERE kind = 'rule' AND key = ? AND state = 'pending'", runKey(id));
   finish(deps, run, 'cancelled', `Cancelled by ${actor}.`);
   return ok({ run: id, state: 'cancelled' });
+}
+
+/**
+ * Start a finished run again: a new run of the rule as it is installed now, with the trigger the first one had.
+ *
+ * THE SAME TRIGGER, ITS TURN INCLUDED, so a clock's turn tried again is that turn (a `create` keyed on it finds the row
+ * the first run made, and makes none twice), and a written row's run reads that row as it stands now. The chain a
+ * script's write started it in is not carried: this run is somebody's press, not a write under that chain. The version
+ * is today's, since the point of trying again is usually that the rule was mended; `startRun` asks whether it is on and
+ * under its day's ceiling, as for any start, and the run is armed for the next drain.
+ *
+ * ONLY A RUN THAT HAS FINISHED. One still going is cancelled first or left to finish; trying it again beside itself
+ * would be two runs taking the same steps on the same row.
+ */
+export function retryRun(deps: FlowDeps, id: string, actor: string): Result<{ run: string }> {
+  const run = deps.sql.one<RunRow>('SELECT id, rule, version, trigger, state, step, vars, depth, project, actor FROM automation_run WHERE id = ?', id);
+  if (!run) return no('OUT_OF_BOUNDS', `There is no run ${id}.`, { at: 'run' });
+  if (run.state === 'pending' || run.state === 'running' || run.state === 'waiting')
+    return no('TRANSITION_ILLEGAL', `Run ${id} of rule.${run.rule} is still ${run.state}. Cancel it first, or let it finish.`, { at: 'run', allowed: ['done', 'failed', 'cancelled'] });
+  const rule = installed(deps.sql).find((r) => r.id === run.rule);
+  if (!rule) return no('DECLARATION_UNKNOWN', `rule.${run.rule} is not installed as an automation that runs as a run any more, so its run cannot be started again.`, { at: 'run' });
+  let trigger: RunTrigger;
+  try {
+    trigger = JSON.parse(run.trigger) as RunTrigger;
+  } catch {
+    return no('VALUE_MALFORMED', `Run ${id} of rule.${run.rule} kept no trigger this build can read, so it cannot be started again.`, { at: 'run' });
+  }
+  const { chain: _chain, ...same } = trigger;
+  return startRun(deps, rule, same, { actor });
 }
 
 /** A hundred finished runs older than ninety days, and their steps, at a time. The hourly sweep takes the next hundred. */
@@ -1810,6 +2315,29 @@ function test(deps: FlowDeps, cond: Predicate | string, subject: Entry | null, v
   return { yes: evaluate(said.predicate, values, schema, (subject ?? {}) as Readonly<Record<string, unknown>>) };
 }
 
+/**
+ * A `when:` on an arrival that wrote no row, read over the top-level keys of its JSON body: each key a value of the
+ * type it holds, as `test` types a run's answers. A body that is not a JSON object has no keys, and holds nothing.
+ *
+ * ONLY THE TOP LEVEL, AND ONLY WHAT IS TEXT, A NUMBER, TRUE OR FALSE, because the sentence builder reads fields, and a
+ * nested object has no sentence a person would write about it; `{{trigger.body.<path>}}` in an `if` step reads deeper.
+ */
+function bodyHolds(deps: FlowDeps, when: string | Predicate, raw: string): boolean {
+  const text = deps.sql.one<{ body: string | null }>('SELECT body FROM inbox_raw WHERE id = ?', raw)?.body;
+  let body: unknown = null;
+  try {
+    body = typeof text === 'string' ? JSON.parse(text) : null;
+  } catch {
+    return false;
+  }
+  if (!isObject(body)) return false;
+  const keys: Vars = {};
+  for (const [key, value] of Object.entries(body))
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') keys[key] = value;
+  const said = test(deps, when, null, keys);
+  return said.bad === undefined && said.yes;
+}
+
 /** A `when:` on a write trigger, read the way the inline pass reads one: compiled, against the row as stored. */
 function holds(deps: FlowDeps, when: string | Predicate, entry: Entry): boolean {
   const schema = deps.schemaOf(entry.register);
@@ -1820,5 +2348,23 @@ function holds(deps: FlowDeps, when: string | Predicate, entry: Entry): boolean 
   const w = compile(said.predicate, schema);
   if (w.bad.length) return false;
   return Boolean(deps.sql.one(`SELECT 1 AS x FROM entry WHERE id = ? AND (${w.sql})`, entry.id, ...w.params));
+}
+
+/**
+ * Why the live rule would not start for `trigger`, or `null` where it would: its `project:` and its `when:`, read as
+ * `onWritten`, `onArrival` and `onDecided` read them.
+ *
+ * FOR A TRY AND NOTHING ELSE (`flow-try.ts`). A try hands the runner a sample, and without this the Try panel would
+ * show steps taken for a row the live rule skips. The trigger's own keys (`op:`, `fields:`, `channel:`) are not read
+ * here, because the try builds its trigger from the body and they hold by construction.
+ */
+export function wouldSkip(deps: FlowDeps, body: FlowDecl, trigger: RunTrigger): string | null {
+  const row = trigger.entry === undefined ? null : deps.entry(trigger.entry);
+  const reads = trigger.kind === 'written' || trigger.kind === 'arrival' || trigger.kind === 'decided';
+  if (reads && body.project !== undefined && (row === null || deps.projectOf(row) !== body.project))
+    return `The live rule would not start for this sample, because it is not in project ${body.project}.`;
+  if (body.when === undefined || (trigger.kind !== 'written' && trigger.kind !== 'arrival')) return null;
+  const yes = row ? holds(deps, body.when, row) : trigger.arrival !== undefined && bodyHolds(deps, body.when, trigger.arrival);
+  return yes ? null : 'The live rule would not start for this sample, because its when: does not hold for it.';
 }
 

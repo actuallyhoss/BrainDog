@@ -866,6 +866,35 @@ the next propose sent it to `SLASH_ENDPOINT` as the bearer.
   answers `null` for a key whose wrap has no `kek_id`, so a passphrase-wrapped key is not opened and the call is
   `UNREACHABLE`, rather than refused up front in the 5.5-3 sentence.
 
+### 5.10 · The record's described path: `slashDraft` and `slashPropose({ asked })` *(as built, September 2026)*
+
+Not this package: the record's own Slash (`packages/record/src/slash.ts`), which shares only the wire and the ledger with
+it, as `packages/host/src/slash.ts` says in its header. It is written here because a description is where a person meets
+both, and the spend is this package's ledger.
+
+1. The owner types what they want built, and may name the page it is about. `slashDraft({ asked, page? })` and
+   `slashPropose({ asked, page? })` take the same two, `asked` at most `SLASH_ASKED_MOST` characters counted in code
+   points once trimmed.
+2. Nothing is asked where nothing could be tried: with no model, or on a record without `previewChange`, the answer is
+   one sentence and no ask is spent. `slashPropose` also asks nothing while Decide is full or the same words are already
+   filed and waiting (`describedPresses`).
+3. The model is handed the reading of use, `kinds: ['change']`, the words, the page's declaration (a page drawn per row
+   is its template's), and `grammar`: the page, list, figure and rule grammars of `packages/record/src/grammar.ts`
+   ([34-GRAMMARS](34-GRAMMARS.md) §2.5). `SLASH_INSTRUCTIONS` name those grammars as they are sent and no other.
+4. What it answers is held as a description always was (`fromModel`): only a `change`, never an ingest, never a rule that
+   runs, calls, starts a script or asks Slash, and a line naming what it would replace. A draft may carry sample rows,
+   at most `SAMPLE_ROWS_MOST` a list.
+5. Each draft is drawn with `previewChange` as the person asking, over its sample rows, inside a rehearsal that keeps
+   nothing. A lint refusal, or a block that drew nothing, is a refusal.
+6. Every refusal goes back once as `repair: { drafts, refusals: { at, fix }[] }`, and the model answers those drafts
+   again. At most `SLASH_REPAIRS_MOST` repair asks follow the first; a draft still refused is dropped with the record's
+   sentence.
+7. Every ask, the repairs included, goes through the record's `slashAsked`: held against `ask_cap` before the model is
+   called and settled after, one ledger row an ask, through the same meter a press and a read at the palette use.
+8. `slashDraft` answers the drafts that drew clean, each with its change, its rows and what it drew, and files nothing.
+   `slashPropose` files those same drafts on Decide as Slash's questions, through the checks every Slash question
+   passes.
+
 ## 6 · Refusals and errors
 
 | Code | Raised | `fix` a person reads |

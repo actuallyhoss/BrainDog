@@ -22,7 +22,8 @@
 import type { Result, Sql } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 
-import { actionJitterMs } from './actions.ts';
+import { actionJitterMs, keyNamed } from './actions.ts';
+import { finishPull, pullFinishOf, type PullFinished } from './pull.ts';
 
 /**
  * What the DDL's `CHECK` admits. Another is a migration, which is the point of the check.
@@ -108,12 +109,15 @@ export function lease(sql: Sql, deps: AckDeps, kinds: readonly OutboxKind[], n: 
      with `attempts` 8, a dead letter addressed to a run that had already stopped. `done` with the expiry counted, as
      the failed ack counts it, because a host was handed it.
 
-     BEFORE THE DEAD-LETTER SWEEP BELOW, or a job on its last rung is dead-lettered for a run that is over. */
-  for (const row of sql.all<{ id: string; payload: string }>(
-    "SELECT id, payload FROM outbox WHERE kind = 'infer.ask' AND state = 'leased' AND leased_until < ?",
+     BEFORE THE DEAD-LETTER SWEEP BELOW, or a job on its last rung is dead-lettered for a run that is over.
+
+     AND A CALL A `call` STEP MADE, whose post on the owner's key is as unwanted once its run is over. A `pull.fetch` that
+     names no run is a scheduled action or a rule's `run:`, and is left to the reclaim as it always was. */
+  for (const row of sql.all<{ id: string; kind: string; payload: string }>(
+    "SELECT id, kind, payload FROM outbox WHERE kind IN ('infer.ask', 'pull.fetch') AND state = 'leased' AND leased_until < ?",
     iso(nowMs),
   ))
-    if (!awaited(sql, row.id, row.payload)) finishUnawaited(sql, row.id, 1);
+    if ((row.kind === 'infer.ask' || runOf(row.payload) !== null) && !awaited(sql, row.id, row.payload)) finishUnawaited(sql, row.id, 1);
 
   /* AN EXPIRED LEASE THAT HAS RUN OUT OF LADDER IS DEAD, and this runs first so the claim below
      cannot hand it out again. Without it a deliverer that never acks — crashed, or simply slower
@@ -172,6 +176,12 @@ export function lease(sql: Sql, deps: AckDeps, kinds: readonly OutboxKind[], n: 
 export const CEILING = 8;
 
 /**
+ * The longest any one rung waits: six hours. The backoff's bound, and the furthest a provider's
+ * `Retry-After` may push a connector's retry, whatever instant it names.
+ */
+const RUNG_CAP_MS = 6 * 3_600_000;
+
+/**
  * The backoff both ladders use: doubling minutes, capped at six hours.
  *
  * THE CAP IS A BOUND AND NOT A RUNG. At the ceiling of eight, `attempts` reaches 7 and the longest
@@ -179,7 +189,7 @@ export const CEILING = 8;
  * deliberate rather than dead: the bound is what keeps the wait finite if the ceiling ever rises,
  * and moving the doubling to reach it would change every wait a person has already learned.
  */
-export const backoffMs = (attempts: number): number => Math.min(2 ** attempts * 60_000, 6 * 3_600_000);
+export const backoffMs = (attempts: number): number => Math.min(2 ** attempts * 60_000, RUNG_CAP_MS);
 
 /**
  * Hand a leased row back, unrun, for the next invocation to take.
@@ -194,6 +204,7 @@ export const backoffMs = (attempts: number): number => Math.min(2 ** attempts * 
  * A QUESTION NO RUN IS WAITING ON IS FINISHED INSTEAD, with its attempt count as it was. `release()` deletes a pending
  * Slash job only at the moment its run ends, so one handed back to `pending` after that was a job nothing would ever
  * delete, and the next lease posted it: one more question asked for a run already `cancelled` (wave fifty's checker).
+ * A call a `call` step made is finished the same way, since `release()` deletes it only as its run ends too.
  */
 export function unlease(sql: Sql, args: { id: string; leasedUntil: string }): void {
   const row = sql.one<{ kind: string; payload: string }>(
@@ -201,7 +212,7 @@ export function unlease(sql: Sql, args: { id: string; leasedUntil: string }): vo
     args.id,
     args.leasedUntil,
   );
-  if (row?.kind === 'infer.ask' && !awaited(sql, args.id, row.payload)) {
+  if (row && (row.kind === 'infer.ask' || (row.kind === 'pull.fetch' && runOf(row.payload) !== null)) && !awaited(sql, args.id, row.payload)) {
     finishUnawaited(sql, args.id, 0);
     return;
   }
@@ -277,6 +288,13 @@ export type AckDeps = {
    * business (`flow.ts`'s `answerStep`), and this file only knows that a job came back.
    */
   answerRun?: (a: { run: string; step: number; by: string; answer?: string; failed?: string }) => void;
+  /**
+   * The one notification path, urgent, for the ack of a connector run whose key was refused.
+   *
+   * INJECTED FOR THE SAME REASON AGAIN: routing a notice is `digest.ts`'s. A host that wired none still
+   * pauses the connector, and the pause is kept as a `note` event (`finishPull`).
+   */
+  notify?: ((said: { actor: string; say: string; because?: string }) => void) | undefined;
 };
 
 /**
@@ -343,6 +361,15 @@ export function ack(sql: Sql, deps: AckDeps, args: Ack): Result<null> {
       at: 'kind',
     });
 
+  /* A PAGED CONNECTOR'S RUN FINISHES HERE, in the ack's transaction and on either side of the ladder: the cursor, the
+     next due instant, the pause and a rotated key are what the runner carried back, and until `finishPull` existed this
+     ack marked the job finished and dropped all four (`pull.ts`). BEHIND THE FENCE, so a stale lease writes none of
+     them. An ack with no finish on it is the older contract (`release`, `prepareAction`'s drops) and writes nothing
+     here. What `failed` needs from it, the provider's `Retry-After`, is read below where the retry is armed. */
+  const pulled: PullFinished | null = row.kind === 'pull.fetch' ? pullFinishOf(args.result) : null;
+  if (pulled !== null)
+    finishPull({ sql, mint: deps.mint, nowMs: deps.nowMs, notify: deps.notify, keyOf: (name) => keyNamed(sql, name) }, { payload: row.payload }, pulled);
+
   if (args.state === 'done') {
     sql.exec("UPDATE outbox SET state = 'done', leased_until = NULL WHERE id = ?", args.id);
 
@@ -365,6 +392,24 @@ export function ack(sql: Sql, deps: AckDeps, args: Ack): Result<null> {
               ? { run: asked.run, step: asked.step, by: args.id, answer: said.text }
               : { run: asked.run, step: asked.step, by: args.id, failed: `Slash answered job ${args.id} with no text, so the run stopped at step ${asked.step + 1}.` },
         );
+      return ok(null);
+    }
+
+    /* A CALL A RUN WAITS ON HANDS THE RUN ITS ANSWER, in this transaction, as a question to Slash does above. The job
+       carries the run and the step (`queueCall`), and `finishAction` puts the provider's answer on the ack, or the
+       sentence the call stopped on: a held month, a refused key, a declaration gone. Where the run is no longer waiting
+       on this job, `answerStep` changes nothing, so a call whose rule was switched off while it was out is answered
+       into nothing. A job with no run on it is a call no step waits on, and this passes it by. */
+    const waits = row.kind === 'pull.fetch' ? runOf(row.payload) : null;
+    if (waits !== null && deps.answerRun) {
+      const said = args.result as { answer?: unknown; failed?: unknown } | undefined;
+      deps.answerRun(
+        typeof said?.failed === 'string' && said.failed.trim() !== ''
+          ? { ...waits, by: args.id, failed: said.failed }
+          : typeof said?.answer === 'string'
+            ? { ...waits, by: args.id, answer: said.answer }
+            : { ...waits, by: args.id, failed: `The call the run made at step ${waits.step + 1} came back with no answer, so the run stopped there.` },
+      );
       return ok(null);
     }
 
@@ -420,7 +465,10 @@ export function ack(sql: Sql, deps: AckDeps, args: Ack): Result<null> {
      after it cancels the run, so the step row alone passed a cancelled run's job straight through; and a run still
      waiting whose step names another job is not waiting on this one. `lease()` and `unlease()` read the same pair
      through `awaited`, since a host that never acks and one that hands the job back reach the same run. */
-  if (row.kind === 'infer.ask' && !awaited(sql, args.id, row.payload)) {
+  /* AND A CALL A RUN MADE, FOR THE SAME REASON: a run that stopped while its call was out is answered by nothing, so a
+     retry would be one more post on the owner's key for a run already over. A call no step made carries no run, and walks
+     the ladder as it always has. */
+  if ((row.kind === 'infer.ask' || (row.kind === 'pull.fetch' && runOf(row.payload) !== null)) && !awaited(sql, args.id, row.payload)) {
     finishUnawaited(sql, args.id, 1);
     return ok(null);
   }
@@ -460,12 +508,19 @@ export function ack(sql: Sql, deps: AckDeps, args: Ack): Result<null> {
        holds and it is what differs between two jobs failing at the same moment. */
     const wait = backoffMs(attempts);
     const spread = actionJitterMs(deps.recordId ?? 'self', row.kind, args.id, wait);
+    /* AND NO SOONER THAN THE PROVIDER SAID. A connector answered 429 with `Retry-After` carries that instant back, and
+       a rung that came round first would be one more request the provider has already said it will refuse. The later
+       of the two wins, and the provider's is held to the ladder's own six-hour bound, because an instant a stranger's
+       server chose is not one this record waits on for a week. */
+    const ladder = deps.nowMs + wait + spread;
+    const asked = pulled?.notBefore ?? null;
+    const due = asked === null ? ladder : Math.max(ladder, Math.min(asked, deps.nowMs + RUNG_CAP_MS));
     sql.exec(
       `INSERT INTO schedule (id, due_at, kind, key, payload, state, attempts)
        VALUES (?, ?, 'retry', ?, ?, 'pending', 0)
        ON CONFLICT (kind, key) DO UPDATE SET due_at = excluded.due_at, payload = excluded.payload, state = 'pending', attempts = 0`,
       deps.mint(),
-      iso(deps.nowMs + wait + spread),
+      iso(due),
       `outbox:${args.id}`,
       JSON.stringify({ outbox: args.id, attempt: attempts }),
     );
@@ -506,8 +561,8 @@ export function ack(sql: Sql, deps: AckDeps, args: Ack): Result<null> {
  * job's id. A test of that clause would have to write a step row no code writes.
  */
 function awaited(sql: Sql, id: string, payload: string): boolean {
-  const asked = JSON.parse(payload) as { run?: unknown; step?: unknown };
-  if (typeof asked.run !== 'string' || typeof asked.step !== 'number') return false;
+  const asked = runOf(payload);
+  if (asked === null) return false;
   return (
     sql.one<{ n: number }>(
       `SELECT 1 AS n FROM automation_run r JOIN automation_step s ON s.run = r.id AND s.n = r.step
@@ -517,6 +572,21 @@ function awaited(sql: Sql, id: string, payload: string): boolean {
       id,
     ) !== undefined
   );
+}
+
+/**
+ * The run and the step a job was queued for, or `null` for a job no run waits on: an `infer.ask` always names both, and
+ * a `pull.fetch` names them only when a `call` step queued it (`actions.ts`'s `queueCall`). A payload that is not JSON
+ * names neither.
+ */
+function runOf(payload: string): { run: string; step: number } | null {
+  let said: { run?: unknown; step?: unknown };
+  try {
+    said = JSON.parse(payload) as typeof said;
+  } catch {
+    return null;
+  }
+  return said !== null && typeof said === 'object' && typeof said.run === 'string' && typeof said.step === 'number' ? { run: said.run, step: said.step } : null;
 }
 
 /**
@@ -542,18 +612,16 @@ function deadLetter(
   /* A QUESTION AN AUTOMATION ASKED ENDS ITS RUN INSTEAD. "Retry it, or change what produces it" has nothing to retry:
      the run it would answer has stopped waiting by the time a person reads it, so the run fails here with the error as
      its sentence, and the run is the item the owner sees. Both ends of the ladder come through here, an eighth failed
-     ack and an eighth abandoned lease. */
-  if (job.kind === 'infer.ask') {
-    const asked = JSON.parse(job.payload) as { run?: unknown; step?: unknown };
-    if (typeof asked.run === 'string' && typeof asked.step === 'number' && deps.answerRun) {
-      deps.answerRun({
-        run: asked.run,
-        step: asked.step,
-        by: job.id,
-        failed: `Slash could not be reached after ${job.attempts} attempts (${job.error}), so the run stopped at step ${asked.step + 1}.`,
-      });
-      return;
-    }
+     ack and an eighth abandoned lease. A call a `call` step made ends its run the same way. */
+  const asked = job.kind === 'infer.ask' || job.kind === 'pull.fetch' ? runOf(job.payload) : null;
+  if (asked !== null && deps.answerRun) {
+    const who = job.kind === 'infer.ask' ? 'Slash' : 'The call';
+    deps.answerRun({
+      ...asked,
+      by: job.id,
+      failed: `${who} could not be reached after ${job.attempts} attempts (${job.error}), so the run stopped at step ${asked.step + 1}.`,
+    });
+    return;
   }
   openChangeSuggestion(sql, deps, {
     declarationId: 'kernel.outbox',

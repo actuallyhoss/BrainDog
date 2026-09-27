@@ -10,8 +10,9 @@
  * the addresses of the pages it does have.
  *
  * A LIVE PAGE IS DRAWN FROM THE ANSWER AND NOTHING ELSE. Each block the record sent becomes the shape
- * the page's drawing already reads. A block this build cannot draw from that answer carries one plain
- * sentence instead, and is never filled from anything the record did not send.
+ * the page's drawing already reads, except a block whose kind is registered (`lib/page/kinds/index.ts`),
+ * which keeps the answer whole and is drawn from it by its own module. A block this build cannot draw from
+ * that answer carries one plain sentence instead, and is never filled from anything the record did not send.
  *
  * THE DECLARATIONS ARE THE SEED'S COPY, as they are for the list and the row (`remote.ts` says why):
  * a register's labels, a metric's format and target line.
@@ -46,6 +47,8 @@ import { format, fxNote, hrefFor, leadOf, noteOf, partsShown, partsText, targetS
 import { entryOf, learn, namesOf, refMapOf, targetsOf, type RecordRow, type RefMap } from './remote.ts';
 import { REDUCES, SUMS, type PageBlock, type PageDecl } from './schema.ts';
 import { compile } from './where.ts';
+import { drawerOf } from '../page/kinds/index.ts';
+import type { BlockResult as Answer } from '@braindog/kernel';
 
 export type Fetch = NonNullable<ClientOptions['fetch']>;
 
@@ -691,6 +694,21 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
   const cannot: LiveBlock = { ...shell, cannot: liveWords.cannot };
 
   if (refusals.length || drawn === false) return shell;
+  /* A REGISTERED KIND IS DRAWN FROM THE ANSWER AS THE RECORD SENT IT (`lib/page/kinds/index.ts`), so nothing below
+     translates it: the answer rides on the block whole, and its module narrows what it reads. The shell still carries
+     what every block's frame reads, the heading, the source's list and the count of what was drawn against what matched,
+     so the page's head and its "showing N of M" line need nothing from the module. A refused block and one whose
+     `when:` said no returned above, and are drawn as every other kind's are. */
+  if (drawerOf(kind)) {
+    const register = registerOf(b);
+    return {
+      ...shell,
+      ...(register && REGISTERS[register] ? { register } : {}),
+      shown: got.length,
+      total: Math.max(matched, got.length),
+      answer: b as unknown as Answer,
+    };
+  }
   /* A LEAD NOTE IS THE SCREEN'S ONE SENTENCE, SAID BY `noteOf`'S RULES (`leadOf`): a clause whose every figure is nought
      goes, and `N thing(s)` is one thing or several. Before this the body went to the renderer as written, which filled
      each figure and left the rest alone, so the first line of a desk read "1 essential step(s) done" (measured at HEAD

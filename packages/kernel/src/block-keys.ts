@@ -9,9 +9,12 @@
  * on a `cards` block and `first: 3` on a `steps` block installed and read clean while no code for either kind looked at
  * them. So the install now refuses exactly what the read would, from this list, and the read refuses per kind too.
  *
- * IT IMPORTS NOTHING, so `declare.ts` and `pages.ts` both import it and neither has to import the other, whose own
- * imports reach half the kernel.
+ * IT IMPORTS ONLY THE KIND REGISTRY, so `declare.ts` and `pages.ts` both import it and neither has to import the other,
+ * whose own imports reach half the kernel. The registry (`kinds/index.ts`) is read here once, when this file loads, and
+ * that is why a kind module never imports this file at run time: it would be asked for its keys before it had any.
  */
+
+import { BLOCK_KIND_MODULES } from './kinds/index.ts';
 
 /**
  * A table's own entry for `key`, never one `Object.prototype` lends it. Looked up by bracket, a key named `constructor`
@@ -42,6 +45,10 @@ const GENERAL = [
  * LEFT GENERAL ON PURPOSE: `opening`, `from` and `horizon` are read by whatever kind sits over `forecast.runway`, and a
  * `table` over it is written in the app's own tests; `cells` turns any block into figures; `target`, `inherit`,
  * `working` and `when` are read over any register. Narrowing one of those would refuse a page the read draws.
+ *
+ * THESE ARE THE KINDS `pages.ts` READS ITSELF. A kind in the registry names its own keys on its module, and
+ * `READ_BY` below is this table with those added, so a registered kind's key is never written in two places. Ask
+ * `kindsReading`, which reads both, rather than this table.
  */
 export const KEY_KINDS: Readonly<Record<string, readonly string[]>> = {
   lead: ['stat', 'cards', 'note'],
@@ -69,11 +76,32 @@ export const KEY_KINDS: Readonly<Record<string, readonly string[]>> = {
   late: ['forecast'],
   under: ['forecast'],
   sell: ['forecast'],
+  horizons: ['forecast'],
   versions: ['diff'],
   field: ['diff'],
   row: ['diff', 'inputs'],
   of: ['ring'],
 };
+
+/**
+ * `KEY_KINDS` with every registered kind's own keys added (`kinds/index.ts`), which is what the install and the read
+ * both refuse from.
+ *
+ * A KEY THE TABLE ALREADY HAS IS SHARED, not taken: a registered kind that reads `back` joins the kinds that read it.
+ * A key every block may carry is left general, because naming it on one kind would refuse it on the rest. Built in a
+ * `Map`, so a module's key is never a property name an object already has.
+ */
+const READ_BY: Readonly<Record<string, readonly string[]>> = (() => {
+  const by = new Map<string, string[]>(Object.entries(KEY_KINDS).map(([key, kinds]) => [key, [...kinds]]));
+  for (const [kind, registered] of Object.entries(BLOCK_KIND_MODULES))
+    for (const key of registered.keys) {
+      if ((GENERAL as readonly string[]).includes(key)) continue;
+      const kinds = by.get(key) ?? [];
+      if (!kinds.includes(kind)) kinds.push(kind);
+      by.set(key, kinds);
+    }
+  return Object.fromEntries(by);
+})();
 
 /**
  * THE KEYS AN ANSWER CARRIES, BECAUSE A BLOCK THAT CAME OUT OF THE READ CAN GO BACK IN. `block()` is a public call and
@@ -100,16 +128,16 @@ export const ANSWER_KEYS: readonly string[] = [
  * Every key a block may be DECLARED with. An answer's keys are not among them: `{ kind: cards, next: what }` installed
  * clean and drew nothing, because `next` is what a steps block answers, not a word a block is written with.
  */
-export const BLOCK_INSTALLS: ReadonlySet<string> = new Set([...GENERAL, ...Object.keys(KEY_KINDS)]);
+export const BLOCK_INSTALLS: ReadonlySet<string> = new Set([...GENERAL, ...Object.keys(READ_BY)]);
 
 /** Every key a block may carry and the read will not refuse by name: what it is declared with, and what a read answered. */
 export const BLOCK_READS: ReadonlySet<string> = new Set([...BLOCK_INSTALLS, ...ANSWER_KEYS]);
 
 /** The keys a block of this kind may be declared with, for a refusal's `allowed`. */
-export const keysFor = (kind: string): string[] => [...GENERAL, ...Object.keys(KEY_KINDS).filter((k) => KEY_KINDS[k]!.includes(kind))];
+export const keysFor = (kind: string): string[] => [...GENERAL, ...Object.keys(READ_BY).filter((k) => READ_BY[k]!.includes(kind))];
 
-/** The kinds that read `key`, when only some do. */
-export const kindsReading = (key: string): readonly string[] | undefined => own(KEY_KINDS, key);
+/** The kinds that read `key`, when only some do, registered kinds included. */
+export const kindsReading = (key: string): readonly string[] | undefined => own(READ_BY, key);
 
 /**
  * WHAT TO WRITE INSTEAD of a block key nobody reads, for the words an author reaches for first. A refusal that names
@@ -147,7 +175,7 @@ const WRONG_KIND: Readonly<Record<string, string>> = {
 
 /** The sentence for a key this kind does not read, naming the kinds that do. */
 export function wrongKindKey(key: string, kind: string): string {
-  const kinds = own(KEY_KINDS, key) ?? [];
+  const kinds = own(READ_BY, key) ?? [];
   const said = kinds.length === 1 ? kinds[0] : `${kinds.slice(0, -1).join(', ')} and ${kinds.at(-1)}`;
   return `${key}: is read by ${said} blocks, and a ${kind} block does nothing with it. ${own(WRONG_KIND, key) ?? 'Take it off.'}`;
 }

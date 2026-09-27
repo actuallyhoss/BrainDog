@@ -445,8 +445,10 @@ test('THE LINT REFUSES WHAT THE RUNNER COULD NOT DO WITH AN ASK', async () => {
   /* THE GATE TAKES A CHOICE OF TWO OR MORE, so a question of one installed and failed at every run. */
   assert.equal(await one({ ask_person: { question: 'Pay?', options: ['yes'], as: 'a' } }), 'OUT_OF_BOUNDS');
   assert.equal(await one({ ask_person: { question: 'Pay?', options: ['yes', 'yes'], as: 'a' } }), 'OUT_OF_BOUNDS');
-  /* A QUESTION GOES TO THE RECORD'S QUEUE, and nothing in this build addresses one to a person. */
-  assert.equal(await one({ ask_person: { question: 'Pay?', options: ['yes', 'no'], as: 'a', to: 'p_2' } }), 'NOT_IN_THIS_BUILD');
+  /* A QUESTION MAY BE PUT TO ONE MEMBER BY THEIR ID, which the run asks about when it reaches the step, since who is a
+     member changes after install; a `to:` that names nobody is refused here. */
+  assert.equal(await one({ ask_person: { question: 'Pay?', options: ['yes', 'no'], as: 'a', to: 'p_2' } }), null);
+  assert.equal(await one({ ask_person: { question: 'Pay?', options: ['yes', 'no'], as: 'a', to: '' } }), 'DECLARATION_INVALID');
   /* `about` IS FIELDS OF THE ROW, so a clock has none, a field the list lacks is named, and a secret never goes. Those
      are told first, and a well-made ask of Slash is then refused as not in this build, since this record's host has not
      said it answers one. */

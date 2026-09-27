@@ -8,9 +8,9 @@
  * record without Money that door opens nothing, and the picker's order was the order of the person who wrote it.
  *
  * WHAT A PERSON COULD SEE OF THE FIRST ONE, MEASURED ON 23 SEPTEMBER: nothing yet. Every figure the seed declares names
- * a list (seven sources, all `register.`), and the sample engine's tile returns before it reads a refused figure's
- * link. So the `/p/money` fallback was a default waiting for the first figure that reads something other than a list,
- * and the cases below hand the live tiles such a figure to hold them to the answer before one ships.
+ * a list (seven sources, all `register.`). So the `/p/money` fallback was a default waiting for the first figure that
+ * reads something other than a list, and the cases below hand the live tiles such a figure to hold them to the answer
+ * before one ships.
  */
 
 import { test } from 'node:test';
@@ -21,7 +21,7 @@ import { fileURLToPath } from 'node:url';
 import './fixtures/fill.ts';
 import { COMMON_CURRENCIES, OFFERED_CURRENCIES, OTHER_CURRENCIES, currencyChoices } from './currencies.ts';
 import { METRICS } from './declared.ts';
-import { hrefFor, read, type MetricDecl } from './metrics.ts';
+import { hrefFor, type MetricDecl } from './metrics.ts';
 import { tileOf as homeTile } from './news-live.ts';
 import { tileOf as pageTile } from './page-live.ts';
 
@@ -44,20 +44,6 @@ test('A FIGURE WHOSE SOURCE NAMES NO LIST HAS NO DOOR, where it used to be hande
   assert.equal(hrefFor(unlisted('unlisted')), null);
   /* AND A FIGURE THAT NAMES ONE STILL OPENS IT: the derived link is the whole point of `hrefFor`. */
   assert.match(hrefFor(METRICS['estate-year']!) ?? '', /^\/r\/services\?/u);
-});
-
-test('A FIGURE REFUSED FOR HAVING NO LIST CARRIES NO LINK, and one refused over a list it has opens that list', () => {
-  const none = read(unlisted('unlisted'));
-  assert.notDeepEqual(none.refusals, [], 'the figure is refused, which is the path that hard-coded Money');
-  assert.equal(none.href, undefined);
-  assert.equal('href' in none, false, 'the key is left off, as the live tiles leave it off an empty figure');
-
-  /* REFUSED FOR ITS WINDOW, OVER A LIST THE RECORD HAS. The four refusals further down `read` already linked to the
-     figure's own rows; this one, the first, linked to Money whatever the figure was about. */
-  const { window: _w, ...windowless } = METRICS['estate-year']!;
-  const refused = read(windowless as MetricDecl);
-  assert.notDeepEqual(refused.refusals, []);
-  assert.equal(refused.href, hrefFor(METRICS['estate-year']!));
 });
 
 test('HOME’S TILE AND A PAGE’S TILE LEAVE THE DOOR OFF A FIGURE WITH NO LIST, and keep it on one that has', () => {

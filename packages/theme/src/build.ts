@@ -98,6 +98,12 @@ export type Profile = {
   /** Where a chip or a bar wants to sit, per scheme, when the 3:1 floor leaves it room. */
   fillL: Record<Scheme, number>;
   /**
+   * One intent's fill band, where it may not share the others'. Omitted, every fill aims at
+   * `fillL`. Either way, a band that misses `intentFill` on the worst surface is solved onto that
+   * floor instead.
+   */
+  fillLOf?: Partial<Record<(typeof INTENTS)[number], Partial<Record<Scheme, number>>>>;
+  /**
    * Where each intent WANTS to sit, per scheme, when separability leaves it a choice.
    *
    * Without this the search returns the first clearing palette, which is an arbitrary one: the
@@ -128,9 +134,18 @@ export const HOUSE_PROFILE: Profile = {
   // hoped for. The mark sits at chroma 0.18; the fill band sits at 0.233 — the product's original,
   // fully saturated red — so the dark `danger` chip is always a step more insistent than the accent
   // it shares a hue with. Green and amber gamut-clamp below the band on their own, which is why one
-  // pair of numbers serves all four.
+  // pair of numbers serves all four, bar the light warn fill, which `fillLOf` moves below.
   fillChroma: 0.233,
   fillL: { dark: 0.623, light: 0.56 },
+  /* THE LIGHT WARN FILL WAS MUSTARD, AND THE FILL IS THE HALF OF THE WARN PAIR THAT CAN MOVE.
+     At the shared light band, 0.56, amber clamps to #9C6900, which the design review read as brown
+     on the due-soon dots. A fill only owes 3:1 to the darkest light surface, so warn aims at the
+     dark scheme's own band instead: #B37900 against dark's #B47900, one amber in both schemes, 3.11:1 on the cool light `sunk` when solved on 25 September. The warn TEXT role
+     stays where check F puts it: with `danger` held at 4.5:1, every lighter warn text measured on
+     that day came within 10 of `danger` to a deuteranope (5.7 at 4.5:1, 9.8 at 6:1), so the 7:1
+     brown is the lightest warn text the four-intent floor allows, and the tab badge, which is drawn
+     in the text role (`TabBar.svelte`), keeps it. */
+  fillLOf: { warn: { light: 0.62 } },
   /**
    * DARKER AND COOLER THAN THE DEFAULT LADDER. The default puts dark `bg` at L 0.241, a warm
    * charcoal. The house sits where the product it is measured against sits, `bg` at L 0.168, and
@@ -148,7 +163,9 @@ export const HOUSE_PROFILE: Profile = {
        as paper rather than grey. `sunk` moves with it so the rail stays one decisive step below. */
     light: { sunk: 0.94, bg: 0.972, s1: 0.982, s2: 0.991, s3: 1 },
   },
-  /* 2026-09-16: a grey that is not cold, not a tint anyone can name. At 0.004 no hue is visible. */
+  /* 2026-09-16: a grey, not a tint anyone can name. The cap is what lets the seed's cool neutral hue
+     (`HOUSE_SEED` in `index.ts`, its §EIGHT) lean the ground toward slate without turning it into
+     the mint that file's §FOUR removed. */
   groundC: { dark: 0.004, light: 0.004 },
   prefer: {
     dark: { earn: 7, warn: 8.5, danger: 5, info: 6 },
@@ -591,8 +608,10 @@ export function buildScheme(seed: Seed, profile: Profile, scheme: Scheme): Palet
      is a shape and not a paragraph. Each aims at the scheme's fill band and is pushed away from the
      ground only if it fails the 3:1 floor there — solving for exactly 3:1 instead produces the
      darkest legal chip, which is how `bad` ended up two shades off the mark it is meant to echo. */
-  const fill = (h: number) => {
-    const band = gamutMap({ L: profile.fillL[scheme], C: profile.fillChroma, H: h });
+  const fill = (k: (typeof INTENTS)[number]) => {
+    const h = INTENT_HUE[k];
+    const L = profile.fillLOf?.[k]?.[scheme] ?? profile.fillL[scheme];
+    const band = gamutMap({ L, C: profile.fillChroma, H: h });
     return contrast(quantise(band), worst) >= profile.intentFill
       ? hex(band)
       : hex(solveL(profile.intentFill, profile.fillChroma, h, worst, dir));
@@ -610,10 +629,10 @@ export function buildScheme(seed: Seed, profile: Profile, scheme: Scheme): Palet
     warn: chosen.warn,
     danger: chosen.danger,
     info: chosen.info,
-    'earn-fill': fill(INTENT_HUE.earn),
-    'warn-fill': fill(INTENT_HUE.warn),
-    'danger-fill': fill(INTENT_HUE.danger),
-    'info-fill': fill(INTENT_HUE.info),
+    'earn-fill': fill('earn'),
+    'warn-fill': fill('warn'),
+    'danger-fill': fill('danger'),
+    'info-fill': fill('info'),
     accent,
     'accent-edge': accentEdge,
     'accent-text': accentText,

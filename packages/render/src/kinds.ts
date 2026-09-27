@@ -162,6 +162,11 @@ export type KindSpec = {
  * shape-checked — and then re-exported as `Record<Kind, KindSpec>`, because `as const` alone narrows
  * each entry to its own literal type and `KINDS[kind].ordered` stops compiling for the kinds that do
  * not set it.
+ *
+ * THIS TABLE IS THE RENDERER'S REGISTRY OF KINDS, and a new kind is one row here, one line apiece in the kernel's
+ * registry (`packages/kernel/src/kinds/index.ts`) and the app's (`apps/web/src/lib/page/kinds/index.ts`), and a
+ * module beside each of those two. The sentences that count the kinds, here and in the documents, are brought up to
+ * date by the integrator, so a row is added without touching one.
  */
 const TABLE = {
   /* Prose and emphasis */

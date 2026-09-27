@@ -1,0 +1,63 @@
+name: windows
+
+# THE KERNEL, THE SELF-HOST AND THE CLI, ON WINDOWS (`loop/finish/ops.md` OPS-25, SC33).
+#
+# Every other job in this repository runs on `vars.CI_RUNNER`, which the audit of 25 September found set to Linux
+# (`loop/finish/ops.md` SC33), and the owner's daily machine is Windows. A path joined with the wrong separator, a file still open when it is renamed, a line ending that changes a
+# checksum, a shell the script assumed: each of those is found on his machine or not at all. The workspaces below are
+# the ones that touch his disk (the kernel's SQLite file, the self-host's folder, the CLI's profile and hooks), so they
+# are the ones run here.
+#
+# WHEN IT RUNS (decisions C57): on a pull request that carries the `full-gates` label, through the `windows` job in
+# `ci.yml`, which calls this file; weekly on its own schedule; and by hand. Not on every push, because a hosted Windows
+# minute is billed at twice a Linux one on a private repository, and that is the owner's money.
+#
+# THE SCHEDULE LIVES HERE AND NOT IN `ci.yml`, AND THAT IS THE REASON THIS IS A FILE OF ITS OWN. `deploy.yml` deploys
+# master whenever a `ci` run on master succeeds, whatever started it. A weekly trigger on `ci.yml` would therefore be a
+# weekly production deploy nobody asked for; and with the other jobs held back on the schedule it would deploy a master
+# whose own push had gone red, on the strength of the Windows tests alone. A run of this workflow deploys nothing.
+#
+# ONE COPY OF THE JOB. `ci.yml` calls this file rather than repeating the steps, so the pull-request run and the weekly
+# run are the same run.
+
+on:
+  workflow_call:
+  schedule:
+    # Monday, 06:00 UTC: an hour after `gates.yml`'s weekly run and an hour before `codeql.yml`'s.
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# BASH, AND IT MATTERS MOST HERE. A Windows runner runs a step with no named shell in PowerShell, and the steps below
+# are written for bash. A called workflow does not inherit the caller's defaults, so this says it again.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  tests:
+    # `windows-latest` BY DEFAULT, with a lever. The account has run out of hosted minutes before (September 17th, the
+    # owner's call to go self-hosted), and a Windows machine of his own registered as a runner is free. Set the
+    # repository variable WINDOWS_RUNNER to its label to use it. Not pinned to an image year, as `ci.yml` asks of its
+    # Linux image: what this asks is whether the tests pass on the Windows people have, and that is the current one.
+    runs-on: ${{ vars.WINDOWS_RUNNER || 'windows-latest' }}
+    # A ceiling for a hang, not a budget. No run of this job has been measured yet.
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+
+      # ONE STEP PER WORKSPACE, AND EACH RUNS WHATEVER THE ONE BEFORE IT SAID, so a red run names every part that failed
+      # rather than the first. `--dir` rather than `--filter`: a folder that is not a workspace is an error, where a
+      # filter that matches nothing would pass having tested nothing. Each is the workspace's own `test` script, so
+      # this is the run a person makes at a desk in that folder.
+      - name: Test the kernel
+        run: pnpm --dir packages/kernel run test
+      - name: Test the self-host
+        if: ${{ !cancelled() }}
+        run: pnpm --dir apps/selfhost run test
+      - name: Test the CLI
+        if: ${{ !cancelled() }}
+        run: pnpm --dir apps/cli run test

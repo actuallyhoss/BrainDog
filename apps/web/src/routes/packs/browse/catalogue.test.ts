@@ -129,7 +129,7 @@ test('an add-on is fetched by its kind, verified with its signature, and stands 
   const got = await catalogueText(fetcher, entry, entry.versions[0]!);
   assert.ok(got.ok && got.signature?.key_id === key.key_id);
   assert.equal(signedWords(got.ok ? got.signature : null), `Signed by key ${key.key_id}`);
-  assert.equal(signedWords(null), 'Unsigned');
+  assert.equal(signedWords(null), 'Not checked');
 
   const forged = { ...entry.versions[0]!, signature: { ...entry.versions[0]!.signature!, sig: entry.versions[1]!.signature!.sig } };
   const bad = await catalogueText(fetcher, entry, forged);

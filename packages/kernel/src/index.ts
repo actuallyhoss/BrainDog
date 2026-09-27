@@ -149,10 +149,18 @@ import {
   onClock,
   onWritten,
   pruneRuns,
+  retryRun as retryFlowRun,
   startRun,
   type FlowDeps,
 } from './flow.ts';
+import { trialTrigger, tryRun, type Tried, type TrySample } from './flow-try.ts';
+import { extension as rehearsal } from './api/rehearse.ts';
 import { pathOf, rowRegisterOf, slashAskAt, subjectOf, tagsRefusal, tagsRefusing, tagsShape, triggerOf } from './flow-lint.ts';
+import { onDecided, onMetrics, onTime } from './flow.ts';
+import { RELATIVE_DAY } from './flow-lint.ts';
+import { capability } from './capabilities.ts';
+import { carryPins } from './pairs.ts';
+import { pruneFirings } from './rules.ts';
 import { runway, type Leg, type Runway } from './forecast.ts';
 import { arrive, day, exponentOf, propose, shapeOf, type Arrival, type Arrived, type IngestDecl, type IngestDeps, type NumberReaders } from './ingest.ts';
 import { analyse, observe, type Analysis, type Observation } from './observe.ts';
@@ -232,6 +240,8 @@ import {
   type ScopesDecl,
   type Whereabouts,
 } from './scope.ts';
+import type { AppendedEvent, KernelParts, ListQuery, Listed } from './parts.ts';
+import { extensions } from './api/index.ts';
 
 export { FORMAT_VERSION, KERNEL_MIGRATION, MIGRATIONS, canon, checksum, statements } from './migrate.ts';
 export { checkBrainl, keyIdOf, b64url, manifestBytes, signBrainl, type Signature, type Signer } from './brainl.ts';
@@ -252,6 +262,11 @@ export { ACROSS, ANY_LIST, touches, type Resolve as ReachResolve, type Touched }
    its place as an index into this flat plan (`automation_run.step`), so reading the declared tree instead counted steps
    the run had already taken and arms it had already left (wave thirty-nine's checker, on f7c88f98). */
 export { plan as runPlan, type Op as RunOp } from './flow.ts';
+/* FOR THE RECORD'S `tryAutomation` AND THE AGENT'S `automation_try`, which hand this shape on as it is. */
+export type { Tried, TriedStep, TrySample } from './flow-try.ts';
+/* FOR THE RECORD'S DRY RUN AND THE GRAMMAR AN AGENT READS, which say what installs and what runs from the rows the lint
+   and the runner read (`capabilities.ts`). */
+export { CAPABILITIES, capability, notInThisBuild, serves, type Capability, type Hosts } from './capabilities.ts';
 export { isUlid, ulids, ulidTime } from './ids.ts';
 export { digest, indexesFor, indexName, jcs, registerOfIndex, validate as validateDeclaration, KINDS } from './declare.ts';
 export { ftsQuery, projectedText } from './fts.ts';
@@ -539,6 +554,8 @@ export type RegisterDecl = {
   steps?: StepsDecl;
   /** How two rows are the two legs of one transfer, found by the write path and marked on both (`pairs.ts`). */
   pairs?: PairsDecl;
+  /** A list a record-wide "Adds only" does not reach, as Keys and People are by their roles (`20 §1`). */
+  owner_only?: true;
 };
 
 export type Entry = {
@@ -1517,9 +1534,38 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       /* AN AUTOMATION ON A CLOCK IS ARMED AS A CONNECTOR IS, and one interval out rather than now: a connector's first
          fetch proves its key, and an automation's first run proves nothing a person asked for at the moment of
          install. It is a `rule` row keyed `flow.every:<id>`, which `0011_automation_run.ts` says the reason for. */
+      /* AND A CLOCK EDITED WHILE ITS TURN IS PENDING IS ARMED AGAIN, from the new clock. `arm` moves only a row that is
+         done or failed, for the reason above, so a rule edited from day 1 to day 15 fired once more on the 1st (the
+         audit of 25 September, C3). The row keeps the clock it was armed from (`clock`, `late:` left out, since how late a
+         turn may be taken moves no turn), and a pending row whose clock differs is re-armed. A row armed before it kept
+         one is re-armed where its turn is not a turn of the clock as it now stands, which a clock with a time of day
+         can say and a bare length cannot; either way it learns its clock. */
       if (decl.kind === 'rule' && pathOf(body as FlowDecl) === 'run' && triggerOf(body as FlowDecl) === 'every') {
         const at = firstDue(body as FlowDecl, clock.now(), tz);
-        if (at !== null) arm('rule', clockKey(bare), { every: bare }, at);
+        const on = (body.on ?? {}) as Record<string, unknown>;
+        const said = jcs({ every: on.every ?? null, at: on.at ?? null, day: on.day ?? null, month: on.month ?? null } as unknown as Json);
+        const key = clockKey(bare);
+        const held = sql.one<{ state: string; payload: string; due_at: string }>("SELECT state, payload, due_at FROM schedule WHERE kind = 'rule' AND key = ?", key);
+        if (at !== null && held?.state === 'pending') {
+          let kept: unknown;
+          try {
+            kept = (JSON.parse(held.payload) as { clock?: unknown }).clock;
+          } catch {
+            kept = undefined;
+          }
+          const due = Date.parse(held.due_at);
+          const moved =
+            typeof kept === 'string' ? kept !== said : typeof on.at === 'string' && Number.isFinite(due) && firstDue(body as FlowDecl, due - 1, tz) !== due;
+          if (moved)
+            sql.exec(
+              "UPDATE schedule SET due_at = ?, payload = ?, attempts = 0 WHERE kind = 'rule' AND key = ? AND state = 'pending'",
+              instant(at),
+              JSON.stringify({ every: bare, clock: said }),
+              key,
+            );
+          else if (typeof kept !== 'string')
+            sql.exec("UPDATE schedule SET payload = ? WHERE kind = 'rule' AND key = ? AND state = 'pending'", JSON.stringify({ every: bare, clock: said }), key);
+        } else if (at !== null) arm('rule', key, { every: bare, clock: said }, at);
       }
 
       /* A METRIC WITH `snapshot:` REMEMBERS ITS OWN READINGS. Five past midnight, so the day it is
@@ -2347,13 +2393,15 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
    */
   function unserved(batch: readonly Declaration[]): Refusal | null {
     if (opts.answersSlash === true) return null;
+    /* THE WORDS ARE THE STEP'S ROW IN `capabilities.ts`, which the runner fails a run with and the grammar lists by. */
+    const says = capability('ask_slash')!.says;
     for (const d of batch) {
       if (d.kind !== 'rule') continue;
       const at = slashAskAt(d.body as unknown as FlowDecl);
       if (at !== null)
         return {
           code: 'NOT_IN_THIS_BUILD',
-          fix: `${d.id} asks Slash at ${at}, and no host in this build answers an automation's question to Slash. Ask a person with ask_person instead.`,
+          fix: `${d.id} asks Slash at ${at}, and ${says}. Ask a person with ask_person instead.`,
           at: `${at}.ask_slash`,
         };
     }
@@ -2641,42 +2689,9 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     return null;
   }
 
-  function list(q: {
-    register: string;
-    /**
-     * Structured, or as the sentence a person and an agent write.
-     *
-     * BOTH FORMS OR IT IS TWO LANGUAGES. `direction is owed to me, state is open` is what goes in a
-     * declaration; the tree is what the compiler reads. One accepted here and the other not would
-     * make a block's `where:` and a caller's `where:` different things with the same name.
-     */
-    where?: Predicate | string;
-    /**
-     * What to sort by, and it had no way to be said.
-     *
-     * `list` ordered by `updated_at DESC, id DESC` and took no order at all, so a page block
-     * declaring `order:` was sorted by whatever read it afterwards, over the page it had already
-     * been handed. That is a different answer from the one it asked for: "the five largest" is not
-     * "five arbitrary rows, sorted". The register grid has the same hole one level up.
-     *
-     * THE SQL COMES FROM `where`, not from a path built here. `31 §2` is explicit that this package
-     * imports `jsonPath` so the index and the predicate are the same string; an `ORDER BY` is the
-     * third place that has to hold, and `fieldSql` is now exported for it.
-     */
-    order?: { field: string; dir?: 'asc' | 'desc' }[];
-    limit?: number;
-    cursor?: string | null;
-    includeDeleted?: boolean;
-    /**
-     * Which registers the caller reads, so a ref into one she cannot is not looked up. Absent is all.
-     *
-     * THE RECORD GUARDS THE REGISTER BEING LISTED AND NOTHING ELSE, and the ref's lookups read the
-     * whole record. So a member invited to Jobs alone, filtering by `client`, was told `ok 0` for a
-     * client that exists on the Clients list she cannot read and `REF_UNKNOWN` for one that does not.
-     * The kernel cannot know who is asking; the caller that does passes this.
-     */
-    reads?: (register: string) => boolean;
-  }): Result<{ rows: Entry[]; cursor: string | null; matched: number }> {
+  /* THE QUESTION'S SHAPE IS `ListQuery` IN `parts.ts`, with the reasons for each of its keys, so an extension handed
+     `list` and this function read one type. */
+  function list(q: ListQuery): Result<Listed> {
     const barred = schemaRefusal(state);
     if (barred) return barred;
     if (!registers.has(q.register))
@@ -4041,6 +4056,10 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       const note = decl.pairs ? `${decl.name} pairs its rows another way from this install.` : `${decl.name} no longer pairs its rows.`;
       if (was?.pairs && was.pairs.mark !== decl.pairs?.mark) {
         const old = pairingOf(id, was, was.pairs);
+        /* WHAT A PERSON SAID ON THE OLD MARK IS WRITTEN ON THE NEW ONE FIRST, signed by them (`pairs.ts`'s `carryPins`),
+           before the old mark is unpaired, so the pass below reads it as their word. Without it a renamed mark read
+           Spent 0.00 against 20,000 (`pairs-followups.test.ts`). */
+        if (decl.pairs) carryPins(pairingOf(id, decl, decl.pairs), was.pairs.mark, decl.pairs.mark);
         /* A MARK THE NEW DECLARATION RETIRED IS LEFT AS IT STANDS, since no reader counts by it; `_pair` still goes. */
         const live = decl.fields.some((f) => f.id === was.pairs!.mark && f.retired !== true);
         for (const r of sql.all<{ id: string }>("SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL AND json_extract(fields, '$._pair') IS NOT NULL", id))
@@ -4116,19 +4135,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
    * `MAX(event.rowid)` is the record's version, so this is not audit theatre: it is how "what
    * changed since I last looked" is a range scan rather than a diff of two snapshots.
    */
-  function appendEvent(e: {
-    kind: string;
-    target: string;
-    register: string;
-    actor: string;
-    note?: string | undefined;
-    at: string;
-    batch?: string | undefined;
-    field?: string | null | undefined;
-    from?: Json | undefined;
-    to?: Json | undefined;
-    opId?: string | undefined;
-  }): string {
+  function appendEvent(e: AppendedEvent): string {
     const id = mint();
     /* `30 §3`: a model suggests, proposes and predicts, and writes nothing else into the log. */
     slashMayWrite(e.actor, e.kind);
@@ -4631,12 +4638,17 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
        `cascade: false` is what stops a size run generating a size run. */
     generate: (register, patch, actor, batch, stamp) =>
       write(register, null, patch, { actor, batch, cascade: false, stamp }),
-    suggest: (question, options, actor) =>
+    /* `about` IS THE ROW THE RULE ASKED ABOUT, on the body, where Decide's queue and a `decided` rule's run read it. */
+    suggest: (question, options, actor, about) =>
       openSuggestion(governDeps(), actor, {
         question,
         body_kind: 'options',
         body: {
-          options: options.map((label, i) => ({ id: `o${i + 1}`, label, because: 'a rule put this in front of you' })),
+          ...(about === undefined ? {} : { about }),
+          /* A RULE'S OPTION CARRIES NO REASON, because a rule declares none. "a rule put this in front of you" sat under
+             every one of them and said how the question arrived, not why to pick the option. `because` stays an empty
+             string rather than going, since `govern.ts` refuses an option without one, and Decide draws no line for it. */
+          options: options.map((label, i) => ({ id: `o${i + 1}`, label, because: '' })),
           requires_reason: true,
         },
       }),
@@ -4650,6 +4662,8 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     entry: (id) => byId(id),
     mint,
     nowMs: clock.now(),
+    /* FOR THE INLINE PASS'S `project:`, the same reading a run's is (`projectOfRow`). */
+    projectOf: projectOfRow,
   });
 
   /**
@@ -4661,6 +4675,16 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
    */
   let flowDepth = 0;
 
+  /**
+   * The project a row belongs to, by its list's scope field, or `null` for a global row: what a rule's `project:` is
+   * compared with, on the run path and inline alike. A declaration so `rulesDeps`, written above it, can name it.
+   */
+  function projectOfRow(entry: Entry): string | null {
+    const f = scopeFieldOf(registers.get(entry.register)?.fields ?? []);
+    const value = f ? entry.fields[f.id] : undefined;
+    return typeof value === 'string' && value !== '' ? value : null;
+  }
+
   /** What the automation runner reads and writes through: the rule pass's own dependencies, and a row's project. */
   const flowDeps = (): FlowDeps => ({
     sql,
@@ -4670,11 +4694,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     entry: (id) => byId(id),
     schemaOf: (register) => (registers.has(register) ? schemaOf(register) : null),
     note: (actor, text) => noteEvent(sql, mint, clock.now(), actor, text),
-    projectOf: (entry) => {
-      const f = scopeFieldOf(registers.get(entry.register)?.fields ?? []);
-      const value = f ? entry.fields[f.id] : undefined;
-      return typeof value === 'string' && value !== '' ? value : null;
-    },
+    projectOf: projectOfRow,
     tz: recordIdentity(sql)?.tz ?? 'UTC',
     /* THROUGH THE GATE'S OWN `propose`, as a rule's `suggest` goes, so a run's question is a suggestion like any other:
        the same checks, the same `suggest` event, the same queue. The run and the step ride on the body, which is what
@@ -4688,7 +4708,20 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
           requires_reason: true,
           run: about.run,
           step: about.step,
+          /* THE ONE MEMBER THE STEP PUTS IT TO, on the body beside the run, because the body is what `govern.ts`'s
+             `decide` and the queue's order both read. */
+          ...(about.to === undefined ? {} : { to: about.to }),
         },
+      }),
+    /* A RUN'S CALL IS QUEUED BY THE SAME `queueCall` A RULE'S IS, with the run and the step on the job, so the ack hands
+       the answer back to the step that waits on it (`outbox.ts`'s `ack`). */
+    call: (ingest, a) =>
+      queueCall(actionDeps(), {
+        ingest,
+        rule: a.rule,
+        entry: a.entry,
+        typeOf: (field) => (a.entry !== null && registers.has(a.entry.register) ? schemaOf(a.entry.register).fields[field]?.type : undefined),
+        run: { run: a.run, step: a.step },
       }),
     withdraw: (suggestion, actor, why) => void decide(governDeps(), suggestion, { resolved_as: 'wont-fix', reason: why }, actor),
     answersSlash: opts.answersSlash === true,
@@ -4700,12 +4733,35 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
    * HERE AND NOT IN `govern.ts`'s `decide`, because this is the one door every decision comes through and the gate is
    * the record's own, knowing nothing of runs; and inside `decide`'s own `attempt`, so a decision that rolls back never
    * moved the run. A put-off question is not an answer and changes nothing.
+   *
+   * AND A DECISION ON ANY OTHER QUESTION STARTS THE RULES WHOSE `decided` TRIGGER ADMITS IT (`flow.ts`'s `onDecided`), in
+   * the same transaction, so a decision that rolls back starts nothing. `about` is the declaration that filed the
+   * question (`rule:<id>` opened it) or that a change proposes, and the run's row is the one the body's `about` names,
+   * as a rule's `suggest` writes it.
    */
-  const answered = (id: string, verdict: Verdict): void => {
+  const answered = (id: string, verdict: Verdict, actor: string): void => {
     if ('defer' in verdict) return;
-    const body = sql.one<{ body: string }>('SELECT body FROM suggestion WHERE id = ?', id)?.body;
-    const parsed = body === undefined ? null : (JSON.parse(body) as { run?: unknown; step?: unknown; options?: { id?: unknown; label?: unknown }[] });
-    if (typeof parsed?.run !== 'string' || typeof parsed.step !== 'number') return;
+    const row = sql.one<{ body: string; opened_by: string }>('SELECT body, opened_by FROM suggestion WHERE id = ?', id);
+    const body = row?.body;
+    const parsed =
+      body === undefined
+        ? null
+        : (JSON.parse(body) as { run?: unknown; step?: unknown; options?: { id?: unknown; label?: unknown }[]; about?: unknown; declaration_id?: unknown });
+    if (typeof parsed?.run !== 'string' || typeof parsed.step !== 'number') {
+      if (!('decide' in verdict) || parsed === null || row === undefined) return;
+      const flows = installedFlows(sql);
+      if (!flows.some((f) => triggerOf(f.body) === 'decided')) return;
+      const chosen = verdict.decide.option;
+      const label = parsed.options?.find((o) => o.id === chosen)?.label;
+      onDecided(flowDeps(), flows, {
+        suggestion: id,
+        option: { id: chosen, label: typeof label === 'string' ? label : chosen },
+        about: typeof parsed.declaration_id === 'string' ? parsed.declaration_id : row.opened_by.startsWith('rule:') ? `rule.${row.opened_by.slice('rule:'.length)}` : null,
+        row: typeof parsed.about === 'string' ? get(parsed.about) : null,
+        actor,
+      });
+      return;
+    }
     const at = { run: parsed.run, step: parsed.step, by: id };
     if ('decide' in verdict) {
       const label = parsed.options?.find((o) => o.id === verdict.decide.option)?.label;
@@ -5053,10 +5109,13 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     /* A DEVICE GRANT past its time, or silent for fourteen days, is let go in the same hour. */
     transaction(() => deviceSweep(tokenDeps()));
     rulesAboutTime();
+    figuresWatched();
     /* A FINISHED AUTOMATION RUN IS KEPT NINETY DAYS, and its metered event after that: one line per run, as §4.5 asks.
        Here and not in the `purge` handler alone, because this is the one function both the hourly row and `purge()` by
        hand run; the first cut put it in the handler, and a sweep by hand left every old run in place. */
     transaction(() => pruneRuns(sql, clock.now()));
+    /* AND AN INLINE RULE'S COUNTED FIRINGS once a day old, which no `runs_per_day` reads any more (`rules.ts`). */
+    transaction(() => pruneFirings(sql, clock.now()));
     return { ...out, sessions };
   }
 
@@ -5065,14 +5124,27 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
    * touched, and a rule that runs only when a row is written would never see it. So each hour every rule whose
    * `when:` names a day relative to today, and which fires once per what it is about (`once_per`), is read
    * over its rows as a bulk apply: its marker keeps it to once, and a bulk apply queues no calls.
+   *
+   * INLINE RULES BY `applyRule`, AND RUN-PATH ONES BY `flow.ts`'s `onTime`, which starts one run per row and key with
+   * the same marker. The run-path ones were handed to `applyRule` too, which finds rows by a top-level `register:` they
+   * have none of, so they were refused in silence and the lint refused them at install. One `RELATIVE_DAY` picks both.
    */
   function rulesAboutTime() {
-    const RELATIVE = /\b(?:today|yesterday|tomorrow)\b|[+-]\d+[dwmy]\b/u;
     const rules = sql
       .all<{ body: string }>("SELECT body FROM declaration WHERE kind = 'rule' AND superseded_at IS NULL AND retired = 0")
       .map((r) => JSON.parse(r.body) as RuleDecl)
-      .filter((r) => Array.isArray(r.once_per) && r.once_per.length > 0 && RELATIVE.test(JSON.stringify(r.when ?? '')));
+      .filter((r) => pathOf(r as FlowDecl) === 'inline' && Array.isArray(r.once_per) && r.once_per.length > 0 && RELATIVE_DAY.test(JSON.stringify(r.when ?? '')));
     for (const rule of rules) transaction(() => applyRule(rulesDeps(), rule, { limit: 1000 }));
+    transaction(() => onTime(flowDeps(), installedFlows(sql)));
+  }
+
+  /**
+   * THE HOURLY READ OF EVERY FIGURE A `metric` TRIGGER WATCHES (`flow.ts`'s `onMetrics`): a change of side since the
+   * last reading starts one run. In the sweep, as `rulesAboutTime` is, so the hourly row and `purge()` by hand read them
+   * alike.
+   */
+  function figuresWatched() {
+    transaction(() => onMetrics(flowDeps(), installedFlows(sql)));
   }
 
   /**
@@ -6538,7 +6610,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     decide: (id: string, verdict: Verdict, actor: string): Result<Decided> =>
       attempt(sql, transaction, () => {
         const out = decide(governDeps(), id, verdict, actor);
-        if (out.ok) answered(id, verdict);
+        if (out.ok) answered(id, verdict, actor);
         return out;
       }),
 
@@ -7192,6 +7264,14 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
 
     registers: () => registers,
     register: (id: string) => registers.get(id),
+    /**
+     * A live list as `@braindog/where` reads it, or `null` for a list this record does not hold.
+     *
+     * FOR A CALLER THAT PARSES A SENTENCE ITSELF. The record's `list` reads which fields a caller's sentence filters on,
+     * to count a scan, and `parseWhere` needs the list's fields, their types and which one the state mirrors to read a
+     * sentence at all. Only this closure builds that shape, so it is handed out rather than built a second time.
+     */
+    schemaOf: (register: string): Schema | null => (registers.has(register) ? schemaOf(register) : null),
 
     /**
      * The declaration state, as a plan is built from it.
@@ -7611,6 +7691,61 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
 
     /** Stop a run that has not finished. A run cancelled while it waits does not resume. */
     cancelRun: (run: string, actor: string) => transaction(() => cancelRun(flowDeps(), run, actor)),
+
+    /** Start a finished run again, under the rule as installed now, with the trigger the first one had (`flow.ts`). */
+    retryRun: (run: string, actor: string) => transaction(() => retryFlowRun(flowDeps(), run, actor)),
+
+    /**
+     * Take an automation's steps over a sample, and say what each did, with nothing kept (`flow-try.ts`).
+     *
+     * INSIDE `rehearse` AND NOWHERE ELSE, so the sample row, the run, its steps and whatever they queued all roll back
+     * together (`loop/finish/contracts.md` §2.1). HERE AND NOT UNDER `api/`, because the runner's dependencies are this
+     * closure's `flowDeps` and `KernelParts` does not carry them; `parts` is read when this is called, after it is built.
+     * The body is linted by the caller first (`checkAutomation`); the runner meets a body it cannot read as a failed step.
+     */
+    tryAutomation: (body: FlowDecl, sample: TrySample, actor: string): Result<Tried> =>
+      rehearsal(parts).rehearse(() => {
+        const trial: FlowDeps = { ...flowDeps(), trial: body };
+        const io = { get: (ref: string) => get(ref), create: (register: string, fields: Patch, by: string) => write(register, null, fields, { actor: by }) };
+        const trigger = trialTrigger(trial, body, sample, io, actor);
+        return trigger.ok ? tryRun(trial, body, trigger.value, actor) : trigger;
+      }),
   };
-  return kernel;
+
+  /**
+   * The closure's own functions, for the methods written under `api/` (`parts.ts` says why each is there).
+   *
+   * THE SAME FUNCTIONS AND NOT COPIES, so an extension's write is this record's write, with every check, event and rule
+   * the kernel's own methods get.
+   */
+  const parts: KernelParts = {
+    sql,
+    clock,
+    mint,
+    transaction,
+    write: kernel.write,
+    get,
+    list,
+    register: kernel.register,
+    declarations: kernel.declarations,
+    evalContext,
+    appendEvent,
+    observe: kernel.observe,
+    reload,
+    depth: () => depth,
+    caches: {
+      save: () => ({ registers, prefixes, planned }),
+      restore: (saved) => {
+        ({ registers, prefixes, planned } = saved as { registers: Map<string, RegisterDecl>; prefixes: Map<string, string>; planned: PlannedRecord | null });
+      },
+    },
+  };
+
+  /* AN EXTENSION NEVER HIDES A METHOD OF THE KERNEL'S. The spread below lets the later name win without a word, so a
+     file under `api/` that reused a name would quietly replace the method every caller already relies on. Asked once per
+     record opened, over the handful of names the extensions add. */
+  const added = extensions(parts);
+  for (const name of Object.keys(added))
+    if (Object.hasOwn(kernel, name)) throw new TypeError(`${name} is a kernel method and an extension, and the extension would hide it. Rename the extension.`);
+  return { ...kernel, ...added };
 }

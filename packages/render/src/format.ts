@@ -138,6 +138,75 @@ export const pct = (value: number): string =>
 
 export const integer = (value: number): string => signed(value, (n) => n.toLocaleString(NUM));
 
+/**
+ * A FIGURE READ BACK INTO ITS PARTS, so a chart can say it shorter without losing what it is written in.
+ *
+ * Every figure this package or its host hands a chart has one of these shapes: `GBP −1,299.00` (`money`),
+ * `−£1,299.00` (`symbolFigure`), `+£850.00`, `$4,800.00 USD`, or a bare `11200`. The unit in front is a
+ * code and a space, or a currency sign with at most two capitals before it (`£`, `US$`, `CA$`), so a word
+ * with a number in it (`Q3`) is not read as money. A sign written both before and after the unit is not a
+ * figure anybody wrote on purpose, and is left alone. A hyphen is read as the minus it stands for.
+ */
+const FIGURE_PARTS = /^([+−-]?)([A-Z]{3} |[A-Z]{0,2}\p{Sc})?([−-]?)(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d+))?( [A-Z]{3})?$/u;
+
+type FigureParts = { sign: string; unit: string; inner: string; whole: string; minor: string; code: string };
+
+function figureParts(text: string): FigureParts | null {
+  const m = FIGURE_PARTS.exec(text.trim());
+  if (!m || (m[1] && m[3])) return null;
+  const minus = (s: string | undefined): string => (s === '-' ? MINUS : (s ?? ''));
+  return { sign: minus(m[1]), unit: m[2] ?? '', inner: minus(m[3]), whole: m[4]!.replaceAll(',', ''), minor: m[5] ?? '', code: m[6] ?? '' };
+}
+
+/** Whole digits with a comma every three, by the string and never through a float, so no digit of a large amount moves. */
+const grouped = (digits: string): string => digits.replace(/^0+(?=\d)/u, '').replace(/\B(?=(\d{3})+(?!\d))/gu, ',');
+
+/**
+ * A BAR'S VALUE, GROUPED: `11200` is drawn `11,200` and `£11,200.00` is drawn `£11,200` (design SYS-2).
+ *
+ * A bar is read against the bars beside it, so a zero minor part is noise down the whole column and is
+ * dropped; a minor part that is not zero is part of the amount and stays. The unit, the sign and a code
+ * after the figure stay where they were written. Text that is not one figure comes back unchanged: a
+ * bar's value cell is the author's, and a sentence in it is not this function's to rewrite.
+ */
+export function barFigure(text: string): string {
+  const p = figureParts(text);
+  if (!p) return text;
+  const minor = /^0*$/u.test(p.minor) ? '' : `.${p.minor}`;
+  return `${p.sign}${p.unit}${p.inner}${grouped(p.whole)}${minor}${p.code}`;
+}
+
+/** The steps a chart's axis counts in. British usage: a thousand is `k`, a million `m`, a billion `bn`. */
+const COMPACT = ['', 'k', 'm', 'bn', 'tn'] as const;
+
+/**
+ * AN AXIS LABEL, COMPACT: `£31,240.55` is drawn `£31k`, `−£1,600.00` is `−£1.6k`, `GBP 850.40` is
+ * `GBP 850` (design SYS-2; contracts §8.3, "how money is written").
+ *
+ * An axis label says where a scale reaches, not what an amount is, and the amounts themselves are in the
+ * chart's numbers beside it. So it keeps one decimal below ten of a step (`£1.6k`) and whole steps above
+ * (`£31k`), and it keeps the unit the figure was written in, so an axis in pounds still reads as pounds.
+ *
+ * THE STEP IS CHOSEN AFTER THE ROUNDING, which is the order `bytes` learned: choosing first would say
+ * `999,700` as `1,000k`. Rounded to nothing, the sign goes too, because `−£0` is not a reading anybody
+ * wants. Text that is not one figure comes back unchanged.
+ */
+export function axisFigure(text: string): string {
+  const p = figureParts(text);
+  if (!p) return text;
+  let n = Number(`${p.whole}.${p.minor || '0'}`);
+  let i = 0;
+  for (;;) {
+    const said = n >= 10 ? Math.round(n) : Math.round(n * 10) / 10;
+    if (said < 1_000 || i === COMPACT.length - 1) {
+      const body = `${said.toLocaleString(NUM, { maximumFractionDigits: 1 })}${COMPACT[i] ?? ''}`;
+      return said === 0 ? `${p.unit}${body}${p.code}` : `${p.sign}${p.unit}${p.inner}${body}${p.code}`;
+    }
+    n /= 1_000;
+    i += 1;
+  }
+}
+
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 const DAY = /^(\d{4})-(\d{2})-(\d{2})$/;

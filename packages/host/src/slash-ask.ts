@@ -139,7 +139,7 @@ export type SlashAskDoor<C> = {
  * build it drifts the same way a rule about how to open a key does.
  *
  * BUILT ON THE FIRST ASK AND NOT AT BOOT. `46 §5.1` has the host `import()` the package only when an endpoint is
- * configured, and `createSlash` writes two tables and the settings singleton into Slash's own SQLite (`46 §7`,
+ * configured, and `createSlash` brings Slash's store to its version and writes the settings singleton into Slash's own SQLite (`46 §7`,
  * under 5 ms), so it wants the object's storage and the record that is already open rather than a cold start.
  *
  * AND A REJECTED PROMISE IS NOT A CACHED ANSWER, which `apps/worker/src/index.ts` `#record()` states the cost of
@@ -407,7 +407,7 @@ function unsettled(patch: Record<string, unknown>, byok: boolean): Response | nu
 /* ── the record's own two asks, on the ledger every other ask settles in ─────────────────────────────── */
 
 export type SlashLedgerDeps = {
-  /** Slash's own SQLite, the one the app handed `createSlash`, holding the `settings` and `call` tables of `46 §4.1`. */
+  /** Slash's own SQLite, the one the app handed `createSlash`, holding its `slash_settings` and `slash_call` tables. */
   sql: Sql;
   clock: { now(): number };
   /**
@@ -432,10 +432,10 @@ export type SlashLedgerDeps = {
  * `ask_cap: 3` through the real engine: 3 model calls, `status()` reading 3 used, and the read after them refused.
  *
  * THE ROW IS `kind = 'read'` WITH NO PREDICATE, which is how the package already settles an ask that is not the palette's
- * (`answer.ts`, an automation's question), and the tier is the settings' tier as that row's is. So whichever count the
- * engine's `status()` reads, the package's own on tier `a` or the host's `drafted()` on `b` and `byo`, already sees it, and
- * `46 §4.1`'s CHECK needs no new kind. A `draft` kind of its own is the package's to add, with the version row
- * `createSlash` says the first schema change needs; until then `question` says which ask a row was.
+ * (`answer.ts`, an automation's question), and the tier is the one the engine reads, as that row's is. So whichever count
+ * the engine's `status()` reads, the package's own on tier `a` or the host's `drafted()` on `b` and `byo`, already sees it,
+ * and `46 §4.1`'s CHECK needs no new kind. A `draft` kind of its own is the package's to add, as a step under its
+ * `STORE_VERSION` (`packages/slash/src/call.ts`); until then `question` says which ask a row was.
  *
  * NO `await` BETWEEN THE CHECK AND THE HOLD, for the reason `packages/slash/src/call.ts` `reserve` gives: the hold is the
  * row the next ask's count includes, so two presses in flight cannot both pass the last ask of the month. The engine is
@@ -456,7 +456,8 @@ export function slashRecordMeter(deps: SlashLedgerDeps): SlashMeter {
       const engine = await deps.engine();
       /* NO ENGINE IS NO LEDGER, AND NO LEDGER IS NO SPEND: the record reads a refusal as "the rules draft". */
       if (engine === undefined) return { ok: false, refusal: { code: 'NOT_IN_THIS_BUILD', fix: 'Slash has no ledger on this host to count the ask in.' } };
-      const asks = (engine.status() as { asks?: { used?: unknown; cap?: unknown; resets?: unknown } } | undefined)?.asks;
+      const status = engine.status() as { tier?: unknown; asks?: { used?: unknown; cap?: unknown; resets?: unknown } } | undefined;
+      const asks = status?.asks;
       if (typeof asks?.used !== 'number' || typeof asks.cap !== 'number')
         return { ok: false, refusal: { code: 'INTERNAL', fix: "Slash's count of this month's asks could not be read, so its model was not asked." } };
       if (asks.used >= asks.cap)
@@ -467,12 +468,14 @@ export function slashRecordMeter(deps: SlashLedgerDeps): SlashMeter {
             fix: `This month's Slash asks are spent until ${typeof asks.resets === 'string' ? asks.resets.slice(0, 10) : 'next month'}.`,
           },
         };
-      const tier = deps.sql.one<{ tier: string }>('SELECT tier FROM settings WHERE singleton = 1')?.tier ?? 'a';
+      /* THE TIER THE ENGINE READS AND NOT THE ONE THE ROW HOLDS. Where a host does not run a stored tier the package reads it
+         as `a` (`SlashOptions.tiers`), and a row written under the stored one would sit outside the count `status()` is. */
+      const tier = typeof status?.tier === 'string' ? status.tier : 'a';
       const id = mint();
       const at = () => new Date(deps.clock.now()).toISOString();
       const t0 = deps.clock.now();
       deps.sql.exec(
-        `INSERT INTO call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status, code, question)
+        `INSERT INTO slash_call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status, code, question)
          VALUES (?, ?, 'read', ?, ?, 0, 0, 0, 0, 'error', 'SLASH_PENDING', ?)`,
         id,
         at(),
@@ -490,7 +493,7 @@ export function slashRecordMeter(deps: SlashLedgerDeps): SlashMeter {
             const rate = deps.rate;
             const neurons = rate === undefined ? 0 : Math.round((usage.in * rate.in) / 1e6 + (usage.out * rate.out) / 1e6);
             deps.sql.exec(
-              'UPDATE call SET ts = ?, tokens_in = ?, tokens_out = ?, neurons = ?, ms = ?, status = ?, code = ? WHERE id = ?',
+              'UPDATE slash_call SET ts = ?, tokens_in = ?, tokens_out = ?, neurons = ?, ms = ?, status = ?, code = ? WHERE id = ?',
               at(),
               usage.in,
               usage.out,
@@ -505,7 +508,7 @@ export function slashRecordMeter(deps: SlashLedgerDeps): SlashMeter {
           release: () => {
             if (done) return;
             done = true;
-            deps.sql.exec("DELETE FROM call WHERE id = ? AND code = 'SLASH_PENDING'", id);
+            deps.sql.exec("DELETE FROM slash_call WHERE id = ? AND code = 'SLASH_PENDING'", id);
           },
         },
       };

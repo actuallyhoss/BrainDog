@@ -9,17 +9,26 @@
  *   1. Somebody signed in. Their address must be the invitation's, and they go on the record.
  *   2. Nobody signed in, and the address already has a sign-in on this host. They sign in first and open the link
  *      again, because a link that signed somebody in as an existing person would be a way into their other records.
- *   3. Nobody signed in, and the address is new here. The person is made, with the name the page sent if it sent
- *      one, put on the record and given a session, and the page asks them to add a passkey so they can come back.
+ *   3. Nobody signed in, and the address is new here. The address proves it is somebody's own mailbox first: the
+ *      accept answers `202 { proving: true, to }` and a link is mailed to the invited address. That link opens this
+ *      page again with the proof beside the invitation, and accepting with both makes the person, with the name the
+ *      page sent when it asked, puts them on the record and gives them a session. The page then asks them to add a
+ *      passkey so they can come back.
  *
- * NOTHING HERE LOGS, and nothing is mailed. The token is in one request body and nowhere else.
+ * PATH 3 MADE THE PERSON AT ONCE, AND THAT WAS AN ACCOUNT IN SOMEBODY ELSE'S NAME. Whoever held the link typed a name
+ * and became the person at the invited address, so a forwarded or leaked invitation signed a stranger in as the
+ * invitee (`loop/finish/ops.md` §6.2). A host that cannot send mail cannot prove anything, so it says so in one
+ * sentence and makes nobody.
+ *
+ * NOTHING HERE LOGS. The invitation is in request bodies and in the one mail that proves the address, and nowhere else.
  *
  * NO VALUE IS IMPORTED FROM `auth.ts`, which imports this file, for the reason `device.ts` gives.
  */
 
-import type { Auth, AuthResult, Methods, Refusal, Result, Who } from '@braindog/ports';
+import type { Auth, AuthBodies, AuthResult, Methods, Refusal, Result, Who } from '@braindog/ports';
+import type { Level } from '@braindog/record';
 
-import type { AuthRoute } from './auth.ts';
+import type { AuthDoor, AuthRoute } from './auth.ts';
 import { httpStatus } from './index.ts';
 
 /** The one flow. It is not an `AuthCall`: the Directory hears only the calls it already knows. */
@@ -32,8 +41,8 @@ export const INVITE_ROUTES: readonly AuthRoute[] = [
 
 /** The host's half: the record the token names, and the Directory. In process on the self-host. */
 export type InviteDoor = {
-  /** The live invitation behind a token: the address it is for, and when it runs out. */
-  look(token: string): Promise<Result<{ email: string; expires_at: string }>>;
+  /** The live invitation behind a token: the address it is for, when it runs out, and what it opens. */
+  look(token: string): Promise<Result<InviteLook>>;
   /**
    * Spend it for a verified person, and give them the record in the Directory.
    *
@@ -148,8 +157,29 @@ export function personName(raw: unknown): Result<string | null> {
   return { ok: true, value: name.replace(SPACE_RUN, '$1') };
 }
 
-/** The part of a host's `AuthDoor` this route reads. */
-type Door = { on: 'selfhost' | 'worker'; ip: string; auth: Auth; invite?: InviteDoor | undefined };
+/**
+ * The part of a host's `AuthDoor` this route reads.
+ *
+ * `origin` AND `mail` ARE FOR PATH 3 ALONE: the proof is mailed as a link to this origin's invitation page. A door
+ * with no `mail` proves nothing, and path 3 answers `NO_MAIL`.
+ */
+type Door = { on: 'selfhost' | 'worker'; origin: string; ip: string; auth: Auth; invite?: InviteDoor | undefined; mail?: AuthDoor['mail'] };
+
+/** What path 3 says on a host that cannot send mail, whose Directory therefore proves no address. */
+export const NO_MAIL =
+  'This BrainDog cannot send mail, so a new address cannot be proved here. Ask the owner to invite an address that can already sign in.';
+
+/** What a proof that is spent, run out, or minted for another invitation or address is told. */
+const PROOF_GONE = 'That link from your mail has been used, has run out, or is for another invitation. Accept again to be sent a new one.';
+
+/**
+ * The page a proof is mailed to: the invitation's own page, with the invitation and the proof in the fragment.
+ *
+ * BOTH IN THE FRAGMENT, for the reason the invitation link keeps its token there: a fragment never reaches a server,
+ * a log or a link scanner's request. The page reads the two, clears the address, and posts them together on a press.
+ * `&proof=` cannot appear inside either value, which are base64url.
+ */
+const proofLink = (origin: string, inviteToken: string, proof: string): string => `${origin}/app/invite#${inviteToken}&proof=${proof}`;
 
 type Header = readonly [string, string];
 
@@ -173,8 +203,53 @@ function joinedSlug(value: unknown): string | null {
   return typeof slug === 'string' && slug !== '' ? slug : null;
 }
 
-/** What the page is told before anybody accepts: the address, when it runs out, and who is signed in. */
-export type InviteSeen = { email: string; expires_at: string; signedInAs: string | null };
+/**
+ * What the record answers about a link before anybody accepts it: `acceptInvite({ token })` with no person
+ * (`loop/finish/contracts.md` §2.5).
+ *
+ * WHAT IT OPENS, SAID BEFORE THE PRESS. The page could say only the address and the date, so somebody accepted a record
+ * they could not name, at a level they had not been told, and found out what they held by opening it. `record` is the
+ * record's own name, `null` for one never named; `level` is what the link gives on the whole record, `null` where it
+ * gives named lists alone; `lists` is each list it gives something on, by the list's name, with the level there.
+ *
+ * THE THREE ARE OPTIONAL HERE AND ONLY HERE. A record older than them answers the address and the date alone, and on the
+ * Worker that answer crosses an RPC whose type is a cast, so this type says what can arrive and `InviteSeen` says what
+ * the page is always sent.
+ */
+export type InviteLook = {
+  email: string;
+  expires_at: string;
+  record?: string | null;
+  level?: Level | null;
+  lists?: { id: string; name: string; level: Level }[];
+};
+
+/** What the page is told before anybody accepts: the address, when it runs out, what it opens, and who is signed in. */
+export type InviteSeen = {
+  email: string;
+  expires_at: string;
+  record: string | null;
+  level: Level | null;
+  lists: { id: string; name: string; level: Level }[];
+  signedInAs: string | null;
+};
+
+/**
+ * The page's answer, built field by field from the record's.
+ *
+ * WHAT AN OLDER RECORD LEFT OUT IS SENT AS ITS EMPTY VALUE, never as a key that is not there, which the page would read
+ * as `undefined` and draw as a record with no name.
+ */
+function seenOf(look: InviteLook, signedInAs: string | null): InviteSeen {
+  return {
+    email: look.email,
+    expires_at: look.expires_at,
+    record: look.record ?? null,
+    level: look.level ?? null,
+    lists: look.lists ?? [],
+    signedInAs,
+  };
+}
 
 /**
  * Answer `/auth/invite`. `serveAuth` has matched the route, checked the origin and read the body, and has already
@@ -197,14 +272,14 @@ export async function serveInvite(
 
   const found = await invite.look(token);
   if (!found.ok) return reply(httpStatus(found), found);
-  const { email, expires_at } = found.value;
+  const { email } = found.value;
 
   const seen = sid === undefined ? null : await door.auth({ flow: 'session', sid });
   const live = seen !== null && seen.status === 200 ? (seen as Extract<AuthResult, { status: 200 }>) : null;
   const who = live ? (live.body as Who) : null;
 
   if (body.accept !== true) {
-    const value: InviteSeen = { email, expires_at, signedInAs: who?.email ?? null };
+    const value = seenOf(found.value, who?.email ?? null);
     return live ? finish({ ...live, body: value }) : reply(200, { ok: true, value });
   }
 
@@ -248,10 +323,49 @@ export async function serveInvite(
       at: 'passkey',
     });
 
-  /* THE NAME IS READ HERE AND NOWHERE EARLIER, because path 3 is the only one that makes a person, and it is refused
-     before the person is made and before the link is spent, so a refused name costs the person a retry and nothing
-     else. */
+  /* 3b. THE PROOF CAME BACK FROM THE MAILBOX, beside the invitation it was minted for. */
+  if (typeof body.proof === 'string' && body.proof !== '') return provedThen(body.proof, token, email, door, invite, finish);
+
+  /* 3a. PROVE THE MAILBOX FIRST. THE NAME IS READ HERE, because path 3 is the only one that makes a person: it is
+     refused before anything is mailed, so a refused name costs the person a retry and nothing else, and a name that
+     passes is carried in the proof and made with the person when the proof comes back. */
+  const send = door.mail;
+  if (!send) return refusal(501, { code: 'NOT_IN_THIS_BUILD', fix: NO_MAIL, at: 'email' });
   const asked = personName(body.name);
+  if (!asked.ok) return reply(httpStatus(asked), asked);
+  const proving = await door.auth({ flow: 'invite.prove', email, invite: token, ...(asked.value ? { name: asked.value } : {}) });
+  /* A DIRECTORY THAT SENDS NO MAIL answers the flow as a way in it does not offer, which is this host's own sentence. */
+  if (proving.status === 404) return refusal(501, { code: 'NOT_IN_THIS_BUILD', fix: NO_MAIL, at: 'email' });
+  if (proving.status !== 200) return finish(proving);
+  const mail = proving.mail;
+  if (!mail || !('link' in mail)) return reply(503, { ok: false });
+  try {
+    send(mail.to, proofLink(door.origin, token, mail.link), 'invite.prove');
+  } catch {
+    /* A failed send is the host's to report, as a sign-in link's is; the page says where the link was sent. */
+  }
+  return reply(202, { ok: true, value: { proving: true, to: mail.to } });
+}
+
+/**
+ * Path 3's second half: spend the proof, then make the person, put them on the record and sign them in.
+ *
+ * THE PROOF IS FOR THIS INVITATION AND THIS ADDRESS, OR IT OPENS NOTHING. The Directory hands back the invitation the
+ * proof was minted for and the address it was mailed to; either differing from what the page sent and the link names
+ * is one refusal, in the same words as a proof that was spent or ran out. It is spent either way, which costs the
+ * person one more mail, and a proof minted for one invitation never opens another.
+ */
+async function provedThen(proof: string, token: string, email: string, door: Door, invite: InviteDoor, finish: (out: AuthResult) => Response): Promise<Response> {
+  const spent = await door.auth({ flow: 'invite.proved', token: proof });
+  if (spent.status === 401) return refusal(401, { code: 'UNAUTHORIZED', fix: PROOF_GONE, at: 'proof' });
+  if (spent.status !== 200) return finish(spent);
+  const held = spent.body as AuthBodies['invite.proved'];
+  if (held.invite !== token || held.email.toLowerCase() !== email.toLowerCase())
+    return refusal(401, { code: 'UNAUTHORIZED', fix: PROOF_GONE, at: 'proof' });
+
+  /* THE NAME TYPED WHEN THE PROOF WAS ASKED FOR, held to the same rule again: the Directory kept it as it was sent,
+     and this is the last place it is read before it is somebody's name. */
+  const asked = personName(held.name);
   if (!asked.ok) return reply(httpStatus(asked), asked);
   const made = await invite.person(email, asked.value ?? undefined);
   if (!made.ok) return reply(httpStatus(made), made);

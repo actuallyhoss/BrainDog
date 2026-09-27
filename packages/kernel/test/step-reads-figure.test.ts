@@ -133,7 +133,7 @@ test('A MONEY FIGURE IS WRITTEN IN ITS CURRENCY AS A MONEY FIELD IS, and an id w
   assert.ok(k.create('items', { what: 'Kiln', n: 2 }, { actor: 'p_1' }).ok);
   clock.advance(15 * MIN);
   await k.drain();
-  assert.deepEqual(notes(sql, 'rule:cash'), ['cash GBP 1234.50 and 2'], JSON.stringify(runs(sql, 'cash')));
+  assert.deepEqual(notes(sql, 'rule:cash'), ['cash GBP 1,234.50 and 2'], JSON.stringify(runs(sql, 'cash')));
 });
 
 test('AN if AND A notify READ IT WITH NO EXTRA STEP, on a clock that has no row', async () => {

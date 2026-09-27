@@ -84,7 +84,9 @@ test('THE LEDGER HOLDS WHAT MOVED, and each payment names the promise it dischar
 
 test('A TRANSFER IS NOT SPENDING, AND A PENDING ROW IS NOT A FACT, and the figure leaves both out', async () => {
   const k = await seeded();
-  const since = day(-31);
+  /* SPENT'S OWN WINDOW, `on after -30d`: `after` does not include its own day, so the thirty days are the ones after
+     day -30. This said `day(-31)` and counted a day the figure does not (`loop/finish/defects.md` M16). */
+  const since = day(-30);
   const counted = TRANSACTIONS.filter((t) => t.state === 'cleared' && t.transfer !== true && t.direction === 'out' && String(t.on) > since);
   const expected = counted.reduce((n, t) => n + minor(t.amount), 0);
 
@@ -92,10 +94,8 @@ test('A TRANSFER IS NOT SPENDING, AND A PENDING ROW IS NOT A FACT, and the figur
   assert.ok(read.ok, sayOf(read));
   assert.equal(read.value.value, expected);
 
-  /* THE NUMBER THE SAME WINDOW GIVES WITHOUT THE TWO CLAUSES, measured by taking them off the figure
-     and running this file: GBP 15,892.02 against GBP 8,428.02, so nearly half of what it reported was
-     not spending at all. The GBP 7,464.00 of difference is the transfer into the reserve, the payment
-     that cleared the company card, and the stand deposit the bank has not settled. */
+  /* THE NUMBER THE SAME WINDOW GIVES WITHOUT THE TWO CLAUSES, which is higher by the payment that cleared the company
+     card and the stand deposit the bank has not settled: neither is spending. */
   const naive = TRANSACTIONS.filter((t) => t.direction === 'out' && String(t.on) > since).reduce((n, t) => n + minor(t.amount), 0);
   assert.ok(naive > expected, 'the sample has no transfer and no pending row inside the window, so this proves nothing');
 });
@@ -128,12 +128,13 @@ test('THE RULE FILES WHAT IT CAN AND THE FIGURE COUNTS WHAT IS LEFT, which is th
   assert.equal(read.value.value, left, 'the figure and the rows disagree about what is uncategorised');
 });
 
-test('THE LEDGER PAGE OPENS WITH NO BLOCK REFUSED, and its table draws the rows the register holds', async () => {
+/* THE LEDGER'S TABLE IS ON THE MONEY PAGE SINCE money-core 3.0.0, which is one page where Overview and Ledger were two. */
+test('THE MONEY PAGE OPENS WITH NO BLOCK REFUSED, and What moved draws the newest rows the register holds', async () => {
   const k = await seeded();
-  const page = opened(k, 'ledger');
+  const page = opened(k, 'money');
   for (const b of page.blocks) assert.deepEqual(b.refusals, [], `${String(b.heading)}: ${JSON.stringify(b.refusals)}`);
 
   const moved = page.blocks.find((b) => b.heading === 'What moved');
   assert.ok(moved, 'the page has no What moved');
-  assert.equal((moved.rows ?? []).length, 12, 'the newest twelve, as the block asks for');
+  assert.equal((moved.rows ?? []).length, 10, 'the newest ten, as the block asks for');
 });

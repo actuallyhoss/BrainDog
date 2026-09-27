@@ -1,0 +1,111 @@
+/*
+ * THE ROWS EVERY SETTINGS AREA SHARES (DSN-13).
+ *
+ * Each area is its own component with its own styles (ARC-7b), so every area that draws a sentence
+ * with its switch, or a label with its field and button, carried its own copy of that rule, and the
+ * copies had drifted apart. One shape each lives here, and an area uses it by writing the class; it
+ * keeps no copy of the rule.
+ *
+ * `+page.svelte` IMPORTS THIS FILE, SO IT IS GLOBAL, AND EVERY RULE IS HELD UNDER `.settings-place`.
+ * A stylesheet a route imports stays in the document after the person leaves the route, so a bare
+ * `.field-row` here would reach any screen that used the same word later. `.settings-place` is the
+ * element `+page.svelte` draws around the index and the area, and nothing else in the app writes it.
+ *
+ * THE CLASSES, for an area's markup:
+ *
+ *   `.setting-row`         a sentence and the control it governs, on one line: the sentence first, the
+ *                          control (a switch, usually) right after the sentence's measure, never at the
+ *                          far edge of a wide page.
+ *   `.field-row`           a labelled field: `.field-row-label` above, then `.field-row-controls` holding
+ *                          the `.field` and its button at one height, the button on the field's baseline.
+ *   `.setting-help`        the one line of help under a sentence or a field.
+ *   `.wide-only`           not drawn below 900px (the index's Keyboard row; a desktop-only control).
+ */
+
+/* THE SWITCH SITS BESIDE ITS SENTENCE. The sentence's track was `minmax(0, var(--measure))`, which is
+   always the whole measure, so a short sentence left its switch 72ch away across empty page (design
+   SYS-11). `fit-content` makes the track as wide as the sentence and no wider than the measure. */
+.settings-place .setting-row {
+  display: grid;
+  grid-template-columns: fit-content(var(--measure)) auto;
+  /* TOP-ALIGNED, so a sentence of three lines keeps its switch by its first line rather than its middle. */
+  align-items: start;
+  justify-content: start;
+  column-gap: var(--sp-5);
+}
+
+/* THE SWITCH'S MIDDLE ON THE SENTENCE'S FIRST LINE, whatever height the pointer gives the switch. The
+   switch is `--ctl-h` tall and a line of the sentence is shorter, so the sentence is the one moved:
+   it starts half the difference down. Pulling the switch up by a negative margin instead lifted it
+   out of its own row and over whatever stood above it. `1lh` is the sentence's own line, at its own
+   size, so this holds for every size an area writes its sentence in. */
+.settings-place .setting-row > p {
+  margin: 0;
+  padding-block-start: max(0px, (var(--ctl-h) - 1lh) / 2);
+}
+
+/* LABEL ABOVE, 8PX TO THE FIELD (design-brief §5, A form). */
+.settings-place .field-row {
+  display: grid;
+  gap: var(--sp-2);
+  max-inline-size: var(--measure);
+}
+
+.settings-place .field-row-label {
+  color: var(--ink2);
+  font-size: var(--t-sm);
+  font-weight: 500;
+}
+
+/* ONE HEIGHT FOR THE FIELD AND ITS BUTTON. A `.field-lg` is 44px at every width while a button is
+   `--ctl-h`, so under a mouse the field stood taller than the button beside it (design §2.12). Here
+   both start at `--ctl-h`, which is itself 44 under a coarse pointer, and the button sits on the
+   field's baseline. The field takes the room; the button keeps its label's width. */
+.settings-place .field-row-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-2);
+}
+
+.settings-place .field-row-controls .field {
+  flex: 1 1 16rem;
+  min-block-size: var(--ctl-h);
+}
+
+.settings-place .field-row-controls .btn {
+  flex: none;
+  min-block-size: var(--ctl-h);
+}
+
+/* THE INPUT FILLS ITS FIELD INSIDE THE BORDER, under a mouse only. The field's own 1px border is inside
+   its `--ctl-h`, so a full-height input made it two pixels taller than the button. */
+@media (pointer: fine) {
+  .settings-place .field-row-controls .field-input {
+    min-block-size: calc(var(--ctl-h) - 2px);
+  }
+}
+
+/* AND UNDER A THUMB THE BUTTON MEETS THE FIELD INSTEAD. There the input keeps the whole 44, because it
+   is the target a thumb has to hit (`controls.css` gives `.field-input` `--ctl-h` for that reason), so
+   the field around it is the input plus its two border pixels, and the button takes the same height. */
+@media (pointer: coarse) {
+  .settings-place .field-row-controls .btn {
+    min-block-size: calc(var(--ctl-h) + 2px);
+  }
+}
+
+.settings-place .setting-help {
+  margin-block: var(--sp-1) 0;
+  margin-inline: 0;
+  max-inline-size: var(--measure);
+  color: var(--dim);
+  font-size: var(--t-sm);
+  line-height: var(--lh-body);
+}
+
+@media (width < 900px) {
+  .settings-place .wide-only {
+    display: none;
+  }
+}

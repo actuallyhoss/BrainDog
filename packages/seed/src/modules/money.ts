@@ -12,9 +12,17 @@
  * `recurring`, `installments` and `snapshots` are what make a ledger readable once it exists: what
  * money is for, what comes round without anybody deciding again, what is being paid off in parts, and
  * what the whole position was on a night nobody was looking.
+ *
+ * MONEY-CORE 3.0.0 IS ONE PAGE OVER THE SAME LISTS (`loop/finish/modules.md` R-M, C12). The page leads with the money
+ * there is, rolled forward from each account's newest balance through what has moved since; then how long it lasts and
+ * what comes in and goes out over thirty days, which are the same walk the forecast draws; then the past, read from
+ * `transactions`, which is where money that moved lives. Repeating money has one home, `recurring`, walked at every
+ * cadence. Every list id, enum value and figure id a record already holds stays (`declare/src/index.ts`, `ID_RENAMED`),
+ * because a pack update may rename a word and never an id.
  */
 
-import type { IngestDecl, RegisterDecl } from '@braindog/kernel';
+import type { Leg, RatesFields, RegisterDecl } from '@braindog/kernel';
+import type { Predicate } from '@braindog/where';
 
 import { LOOKUPS, OPEN, day, gbp, type Fields, type SeedMetric, type SeedPage, type SeedRegister, type SeedRule } from './base.ts';
 
@@ -26,15 +34,15 @@ const HAND_OBLIGATIONS: Fields[] = [
   { what: 'Illustration, July set', party: 3, direction: 'owed_by_me', amount: gbp(135_000), due: day(-2), state: 'open', thing: 1, category: 'contractors', note: '' },
   { what: 'Corporation tax, payment on account', party: null, direction: 'owed_by_me', amount: gbp(1_910_000), due: day(4), state: 'open', thing: null, category: 'tax', note: 'HMRC reference on the letter, not here.' },
   { what: 'Invoice 2026-049: type licensing', party: 1, direction: 'owed_to_me', amount: gbp(96_000), due: day(11), state: 'open', thing: 1, category: 'licensing', note: '' },
-  { what: 'Accountant, year-end fee', party: 4, direction: 'owed_by_me', amount: gbp(145_000), due: day(19), state: 'part', thing: null, category: 'professional', repeats: 'yearly', note: 'Half paid in June.' },
-  { what: 'Backend contract, September', party: 6, direction: 'owed_by_me', amount: gbp(496_000), due: day(27), state: 'open', thing: 3, category: 'contractors', repeats: 'monthly', note: '' },
+  { what: 'Accountant, year-end fee', party: 4, direction: 'owed_by_me', amount: gbp(145_000), due: day(19), state: 'part', thing: null, category: 'professional', note: 'Half paid in June.' },
+  { what: 'Backend contract, September', party: 6, direction: 'owed_by_me', amount: gbp(496_000), due: day(27), state: 'open', thing: 3, category: 'contractors', note: '' },
   { what: 'Invoice 2026-038: discovery', party: 2, direction: 'owed_to_me', amount: gbp(180_000), due: day(-71), state: 'paid', thing: 2, category: 'client_work', settled: day(-41), note: 'Paid 24 July.' },
   { what: 'Invoice 2026-035: brand refresh', party: 1, direction: 'owed_to_me', amount: gbp(620_000), due: day(-96), state: 'paid', thing: 2, category: 'client_work', settled: day(-51), note: '' },
-  { what: 'Studio insurance, annual', party: null, direction: 'owed_by_me', amount: gbp(38_400), due: day(41), state: 'open', thing: null, category: 'insurance', repeats: 'yearly', note: '' },
-  { what: 'VAT quarter to 31 Aug', party: null, direction: 'owed_by_me', amount: gbp(742_000), due: day(63), state: 'open', thing: null, category: 'tax', repeats: 'quarterly', note: '' },
+  { what: 'Studio insurance, annual', party: null, direction: 'owed_by_me', amount: gbp(38_400), due: day(41), state: 'open', thing: null, category: 'insurance', note: '' },
+  { what: 'VAT quarter to 31 Aug', party: null, direction: 'owed_by_me', amount: gbp(742_000), due: day(63), state: 'open', thing: null, category: 'tax', note: '' },
   { what: 'Conference stand, deposit', party: null, direction: 'owed_by_me', amount: gbp(250_000), due: day(88), state: 'open', thing: 1, category: 'events', note: 'Refundable to 30 days out.' },
   { what: 'Invoice 2026-051: newsletter setup', party: 2, direction: 'owed_to_me', amount: gbp(75_000), due: day(33), state: 'open', thing: 3, category: 'client_work', note: '' },
-  { what: 'Illustration, August set', party: 3, direction: 'owed_by_me', amount: gbp(118_000), due: day(15), state: 'open', thing: 1, category: 'contractors', repeats: 'monthly', note: '' },
+  { what: 'Illustration, August set', party: 3, direction: 'owed_by_me', amount: gbp(118_000), due: day(15), state: 'open', thing: 1, category: 'contractors', note: '' },
 ];
 
 /** A fixed-seed LCG, so the generated tail is the same grid every time it is opened. */
@@ -72,7 +80,7 @@ function generatedObligations(count: number): Fields[] {
     const owedToMe = r() > 0.62;
     const dueIn = Math.round((r() - 0.35) * 320);
     // A record where half the rows are three months past their date is not a record anybody keeps.
-    // The further past a date a row is, the likelier it was settled — which is what makes the few
+    // The further past a date a row is, the likelier it was settled, which is what makes the few
     // that ARE still open mean something on Home.
     const paid = dueIn < -45 ? r() > 0.08 : dueIn < -10 ? r() > 0.45 : false;
     /* THE DRAWS STAY IN THEIR ORDER, so every row keeps the values it had before it had a category. */
@@ -98,21 +106,14 @@ function generatedObligations(count: number): Fields[] {
 }
 
 /**
- * The rows that repeat, written after the generated tail so every earlier row keeps its number.
+ * Every dated promise the sample holds, each one amount on one day.
  *
- * The storefront payout is money in that arrives every month without an invoice, so the walk has a
- * recurring income as well as recurring costs, and the rent is the one fixed cost every studio has.
+ * NO ROW HERE REPEATS, SINCE money-core 3.0.0. Five of these said `repeats` and the storefront payout and the rent were
+ * two more rows written only to repeat, so each was the same money as a row of `RECURRING_ITEMS` below and the walk had
+ * to choose which list to believe. The pattern lives in `recurring` now; the rows here are this cycle's bill or invoice,
+ * and each repeating item's `next_due` is the cycle after it, so no payment is in both lists.
  */
-const RECURRING: Fields[] = [
-  { what: 'Kiln storefront payout', party: null, direction: 'owed_to_me', amount: gbp(93_000), due: day(12), state: 'open', thing: 1, note: '', category: 'licensing', repeats: 'monthly' },
-  { what: 'Studio rent', party: null, direction: 'owed_by_me', amount: gbp(165_000), due: day(28), state: 'open', thing: null, note: '', category: 'premises', repeats: 'monthly' },
-];
-
-export const OBLIGATIONS: Fields[] = [
-  ...HAND_OBLIGATIONS,
-  ...generatedObligations(24),
-  ...RECURRING,
-];
+export const OBLIGATIONS: Fields[] = [...HAND_OBLIGATIONS, ...generatedObligations(24)];
 
 /* ── accounts ────────────────────────────────────────────────────────────── */
 
@@ -127,7 +128,7 @@ export const ACCOUNTS: Fields[] = [
   /* NOT UPDATED FOR OVER A WEEK, so the page shows what an out-of-date balance looks like. */
   { name: 'Tax reserve', kind: 'bank', balance: gbp(2_400_000), as_of: day(-9), liquid: true, last4: '7730' },
   /* THE ONE A CARD ALERT NAMES. Four digits nothing else in the sample repeats, so the `lookup:` in
-     `MONEY_INGESTS` has exactly one row to find and the pattern's test is not passing by luck. */
+     `packs/card-alerts` has exactly one row to find on a record that installs it. */
   { name: 'Company card', kind: 'card', balance: gbp(-124_000), as_of: day(-2), liquid: false, last4: '4471' },
 ];
 
@@ -139,16 +140,14 @@ export const ACCOUNTS: Fields[] = [
  * `obligations.category` IS AN ENUM AND THIS IS A REGISTER, and the two are deliberately not the same
  * kind of thing yet. An enum is a pack's list: a person cannot add "Childcare" to it without a new
  * declaration. A ledger is the opposite case, because the categories somebody actually uses are
- * discovered over the first month and half of them are theirs alone. So the names below are the enum's
- * names, one for one, and a later pass can move `obligations` onto the register with a mapping that is
- * already written. Two lists that disagree would be the failure; two lists that agree row for row are
- * one list waiting for a migration.
+ * discovered over the first month and half of them are theirs alone. The rows below are the sample
+ * studio's, and they are the studio's values of the enum, one for one.
  *
- * `match` IS THE COUNTERPARTY EXACTLY AS THE BANK WRITES IT, and it is what `txn-categorise` links on.
- * One string per category, because a rule's `link:` is an equality against one stored value and the
- * record has no substring test a declaration can reach (`contains` is not in the sentence grammar, and
- * `derive:` is published and unbuilt). Five of the ten carry one, and the three merchants no category
- * names stay uncategorised, which is what the Ledger page counts and what a person fixes in one tap.
+ * `match` IS THE COUNTERPARTY AS THE BANK WRITES IT, and it is what `txn-categorise` links on. `match_by`
+ * says how much of the description it must be (the whole of it unless a row says otherwise), which the
+ * rule's `link` honours once it reads the field. Five of these carry one, and the three merchants no
+ * category names stay uncategorised, which is what the Money page leaves in Uncategorised and what a
+ * person fixes in one tap.
  */
 export const CATEGORIES: Fields[] = [
   { name: 'Client work', direction: 'in', state: 'live', note: 'Invoiced work, whatever it was called on the invoice.' },
@@ -180,7 +179,7 @@ const HAND_TRANSACTIONS: Fields[] = [
   { what: 'HMRC VAT QUARTER TO 31 MAY', on: day(-84), direction: 'out', amount: gbp(688_000), account: 2, category: 6, state: 'cleared', note: 'Out of the reserve, which is what the reserve is for.' },
   { what: 'PELL & VINE, HALF THE YEAR-END FEE', on: day(-72), direction: 'out', amount: gbp(72_500), account: 1, party: 4, category: 7, state: 'cleared', note: 'The other half is owed on the 22nd.' },
   /* ONE TRANSFER, TWO ROWS, ONE DAY. Nothing was earned and nothing was spent; the money is in a
-     different account. Both legs are marked, and every figure on the Ledger page leaves them out.
+     different account. Both legs are marked, and every figure over the ledger leaves them out.
 
      THE RECORD WOULD PAIR THEM, through `transactions`' `pairs:`, if they arrived unmarked, as a
      bank's two lines do (`test/money-pairs.test.ts`). THE MARK IS STILL TYPED HERE because a second
@@ -249,24 +248,33 @@ export const TRANSACTIONS: Fields[] = [...HAND_TRANSACTIONS, ...generatedTransac
  * once and a person reading that list is short eleven months of rent. A repeating item belongs in its
  * own list, where `next_due` moves as each one goes out and `ends` says when it stops.
  *
- * THREE FREQUENCIES AND NOT FIVE, because `LOOKUPS.per_month` knows three. A weekly or fortnightly row
- * would be counted at nothing a month by every figure that reads the table, which is worse than
- * refusing it: the importer leaves weekly and fortnightly rows out for the same reason
- * (`loop/research-switch.md` §4).
+ * EVERY CADENCE IS BOTH WALKED AND COUNTED A MONTH. The cash walk steps a month, a quarter
+ * and a year in calendar months, a week and a fortnight in seven-day weeks, and twice a month on the 1st and the
+ * 15th (`CASH_LEGS`), and `LOOKUPS.per_month` holds each one's monthly share, so no value is walked by one reader and
+ * counted at nothing a month by another.
+ *
+ * THE CYCLE AFTER THE BILL. The backend contract, the VAT, the insurance, the accountant and the illustration set each
+ * have this cycle's amount in `OBLIGATIONS` as a bill with a due day, so each pattern here starts at the cycle after
+ * it and no payment is walked twice.
  */
 export const RECURRING_ITEMS: Fields[] = [
   { what: 'Studio rent', direction: 'out', amount: gbp(165_000), every: 'monthly', next_due: day(28), started: day(-640), account: 1, category: 5, state: 'live', note: '' },
   { what: 'Fenwick Cloud, Workers plan', direction: 'out', amount: gbp(4_200), every: 'monthly', next_due: day(9), started: day(-410), account: 3, category: 4, thing: 1, state: 'live', note: '' },
   { what: 'Kiln storefront payout', direction: 'in', amount: gbp(93_000), every: 'monthly', next_due: day(12), started: day(-300), account: 1, category: 2, thing: 1, state: 'live', note: 'Money in that arrives without an invoice.' },
-  { what: 'Backend contract, S. Marchetti', direction: 'out', amount: gbp(496_000), every: 'monthly', next_due: day(27), started: day(-120), account: 1, party: 6, category: 3, thing: 3, state: 'live', note: 'Two days a week.' },
-  { what: 'VAT', direction: 'out', amount: gbp(742_000), every: 'quarterly', next_due: day(63), started: day(-730), account: 2, category: 6, state: 'live', note: '' },
-  { what: 'Studio insurance', direction: 'out', amount: gbp(38_400), every: 'yearly', next_due: day(41), started: day(-690), account: 1, category: 7, state: 'live', note: '' },
+  { what: 'Backend contract, S. Marchetti', direction: 'out', amount: gbp(496_000), every: 'monthly', next_due: day(57), started: day(-120), account: 1, party: 6, category: 3, thing: 3, state: 'live', note: 'Two days a week.' },
+  { what: 'VAT', direction: 'out', amount: gbp(742_000), every: 'quarterly', next_due: day(154), started: day(-730), account: 2, category: 6, state: 'live', note: '' },
+  { what: 'Studio insurance', direction: 'out', amount: gbp(38_400), every: 'yearly', next_due: day(406), started: day(-690), account: 1, category: 7, state: 'live', note: '' },
   /* A ROW THAT IS PAST ITS DAY AND STILL LIVE, so `recurring-missed` has something to say and the page
      is not a list where every item is in the happy state. */
   { what: 'Ledger Post, sending plan', direction: 'out', amount: gbp(3_900), every: 'monthly', next_due: day(-4), started: day(-220), account: 3, category: 4, thing: 3, state: 'live', note: '' },
   /* AND ONE THAT HAS STOPPED, so Status is worth a column: the Hobnail plan was cancelled in July and
      the row stays, because a figure about last spring still needs it. */
   { what: 'Hobnail plan', direction: 'out', amount: gbp(2_900), every: 'monthly', next_due: day(-58), started: day(-500), ends: day(-58), account: 3, category: 4, thing: 4, state: 'ended', note: 'Cancelled with the Tallow wind-down.' },
+  /* WRITTEN AFTER THE ROWS ABOVE, so every one of them keeps its number: the two patterns whose bills said `repeats`
+     and had no row here, and one that comes round every week, so the page draws a cadence that is not a month. */
+  { what: 'Accountant, year-end fee', direction: 'out', amount: gbp(145_000), every: 'yearly', next_due: day(384), started: day(-700), account: 1, party: 4, category: 7, state: 'live', note: '' },
+  { what: 'Illustration, monthly set', direction: 'out', amount: gbp(118_000), every: 'monthly', next_due: day(45), started: day(-90), account: 1, party: 3, category: 3, thing: 1, state: 'live', note: '' },
+  { what: 'Studio cleaning', direction: 'out', amount: gbp(4_500), every: 'weekly', next_due: day(2), started: day(-200), account: 1, category: 5, state: 'live', note: '' },
 ];
 
 /* ── paid in parts ───────────────────────────────────────────────────────── */
@@ -400,56 +408,59 @@ export const SNAPSHOTS: Fields[] = snapshotRows();
 export const AVAILABLE = { id: 'available', label: 'Available after', type: 'money' } as const;
 
 /**
- * A register as Money declares it: a seed register that may also say how its rows pair.
+ * A register as Money declares it: a seed register that may also say how its rows pair, or that it holds the rates.
  *
- * WIDENED HERE AND NOT IN `base.ts`, because `transactions` is the one register any module pairs and the kernel's own
- * `RegisterDecl` already carries the shape, so the type is the kernel's and cannot drift from what `pairs.ts` checks.
+ * WIDENED HERE AND NOT IN `base.ts`, because `transactions` is the one register any module pairs and `fx` the one that
+ * holds rates, and the kernel's own types carry both shapes, so neither can drift from what `pairs.ts` and `roles.ts`
+ * check.
  */
-type MoneyRegister = SeedRegister & { pairs?: RegisterDecl['pairs'] };
+type MoneyRegister = SeedRegister & { pairs?: RegisterDecl['pairs']; rates?: RatesFields };
 
 export const MONEY_REGISTERS: Record<string, MoneyRegister> = {
   obligations: {
     id: 'obligations',
     /**
-     * `Money`, AND IT WAS `Obligations`.
+     * `Bills and invoices`, SINCE money-core 3.0.0, AND IT WAS `Money`.
      *
-     * IT IS THE FIRST WORD A STRANGER READS AFTER THEIR FIRST ACTION, and it was a word the
-     * product never showed them. The first-run screen offers five cards and the first is **Money**,
-     * "What you owe, and what you are owed"; choosing it landed on a screen whose largest type said
-     * *Obligations*, defined nowhere. A friction pass measured the whole first run and put this one
-     * word above the other twenty-nine together, for that reason: every other tax word is met by
-     * somebody already oriented, and this one is met by somebody who has just been told what they
-     * were choosing and finds it renamed.
+     * MONEY IS THE MODULE AND ITS PAGE NOW, and this list is one part of it: a dated amount somebody is to pay or be
+     * paid, once. What moved is `transactions`, what comes round is `recurring`, and what is held is `accounts`, so a
+     * list called Money beside a page called Money named two things with one word.
      *
      * THE ID IS UNTOUCHED. `obligations` is what the URL says, what a predicate says, and what an
      * agent writes, and `19 §9`'s rule is the one Slack follows rather than the one Notion follows:
      * the interface says the word a person would say, for life, and the API keeps its own. Renaming
      * the id would be a migration; renaming the label is a label.
      */
-    name: 'Money',
+    name: 'Bills and invoices',
     icon: 'obligation',
     /* `item`, because half of these are owed to you and half by you: `bill` is wrong for an invoice
        you sent and `invoice` is wrong for a tax payment. */
     one: 'item',
-    holds: 'what you owe and what you are owed, with a date and a currency',
+    holds: 'the bills you are to pay and the invoices you are to be paid, each with a day and a currency',
     title: 'what',
-    /* WHICH WAY THE MONEY GOES, on the one screen that could not say. A card shows three declared
-       fields and these were `what`, `amount`, `due` — so a phone rendered `Corporation tax, payment
-       on account · GBP 19,100.00 · 7 Sep 2026` in a card identical to an invoice somebody owes YOU,
-       and nothing on it said which. Direction is the fact a reader cannot recover from anything else
-       on the card; a due date is one row-tap away, and lateness still reads, because the card wears
-       the row's tone. */
-    mobile: ['what', 'amount', 'direction'],
+    /* THE DAY IT FALLS DUE, on the one screen that had no room for it (`loop/finish/design.md` §5). A card shows three
+       declared fields, and a bill's card that leaves out its due day leaves out the one fact a person scanning a list of
+       bills is looking for. Which way the money goes is the sign on the amount, which the card draws from the row. */
+    mobile: ['what', 'amount', 'due'],
     state: 'state',
     done: ['paid', 'written_off'],
+    /**
+     * THE DAY A BILL WAS PAID IS WRITTEN BY THE RECORD WHEN IT IS MARKED PAID, SINCE money-core 3.0.0.
+     *
+     * `settled` was a field nothing wrote outside the sample's own rows, so every figure that asked when money was paid
+     * (how late clients pay, what went out each month) read a day no live record held. `finished:` is the kernel's key
+     * for exactly that (`packages/kernel/src/finished.ts`): it stamps the day a row enters a done state, keeps a day the
+     * write names, and empties it when the row is reopened.
+     */
+    finished: 'settled',
     pack: 'money-core',
     fields: [
       { id: 'what', label: 'Description', type: 'text', required: true, search: true },
       /* `Who`, AND IT WAS `Party`. A column header is read at a glance by somebody scanning for a
-         name, and `Party` is a legal word for the same thing that reads as a social event. */
+         name, and `Party` is a legal word for the same thing that reads as a social event.
+         A LINK AND NOT A DEPENDENCY, since money-core 3.0.0 (`LINKS` in `packs/first-party.ts`): on a record without
+         People the field is left out and Money installs without it. */
       { id: 'party', label: 'Who', type: 'ref', to: 'people', index: true },
-      /* `Which way`, AND IT WAS `Direction`. The values already read as English: "owed by me" and
-         "owed to me". The header above them was the only abstract word in the pair. */
       /* MONEY IN AND MONEY OUT, and the ids stay: direction is a property of an amount, never the frame,
          and a person reads which way it goes rather than who owes whom. */
       {
@@ -463,52 +474,75 @@ export const MONEY_REGISTERS: Record<string, MoneyRegister> = {
       },
       { id: 'amount', type: 'money', required: true },
       { id: 'due', type: 'day', index: true, deadline: true, required: true, remind: ['-7d', '0d'] },
-      /* `Status`, AND IT WAS `State` — here and on services, sessions, threads and tasks.
-         `columnsFor` draws every indexed field and `labelOf` falls back to the id, so five of the
-         six lists that carry this concept headed the column `State` while `things` labelled its
-         own `Status` at the declaration two hundred lines down. One concept, two headers, and the
-         reader meets both inside a minute: `copy.ts` had already caught the same split from the
-         other side, where a hardcoded "Set state" put a field's three names on one screen.
-         `Status` is the word every product the reader has already used says, and it is the one the
-         record was half saying. The field id stays `state`, which is what a predicate says, what
-         `done:` lists and what `05 §254` makes a path a page can hold. */
-      { id: 'state', label: 'Status', type: 'enum', values: ['open', 'part', 'paid', 'written_off'], index: true, required: true },
+      /* `Status`, AND IT WAS `State`, here and on services, sessions, threads and tasks: `Status` is the word
+         every product the reader has already used says. The field id stays `state`, which is what a predicate
+         says, what `done:` lists and what `05 §254` makes a path a page can hold. `part` READS "Part paid",
+         because a bill half paid is what the value means and "part" alone is half a phrase. */
+      {
+        id: 'state',
+        label: 'Status',
+        type: 'enum',
+        values: ['open', 'part', 'paid', 'written_off'],
+        labels: { open: 'Open', part: 'Part paid', paid: 'Paid', written_off: 'Written off' },
+        index: true,
+        required: true,
+      },
       { id: 'thing', label: 'Project', type: 'ref', to: 'things', index: true },
       { id: 'note', type: 'text' },
-      /* WHAT IT IS FOR, so a page can say where the money goes. Indexed, because a page groups by it
-         and a list filters on it. Money in is client work or licensing; the rest is spending. */
+      /**
+       * WHAT IT IS FOR, so a page can say where the money goes. Indexed, because a page groups by it
+       * and a list filters on it.
+       *
+       * THE NEUTRAL WORDS COME FIRST, SINCE money-core 3.0.0, because they are what anybody's bills are for: a
+       * household's, a student's and a company's alike. The eleven that follow them were one design studio's cost lines,
+       * and they stay values of the field, because a row that holds one keeps its word through an update
+       * (`carried`) and an enum value taken away would leave that row holding a value its list no longer says.
+       */
       {
         id: 'category',
         type: 'enum',
-        values: ['client_work', 'licensing', 'contractors', 'tax', 'software', 'premises', 'professional', 'production', 'insurance', 'events', 'other'],
+        values: [
+          'home', 'food', 'transport', 'health', 'fun', 'pay', 'subscriptions', 'tax', 'other',
+          'client_work', 'licensing', 'contractors', 'software', 'premises', 'professional', 'production', 'insurance', 'events',
+        ],
         labels: {
+          home: 'Home',
+          food: 'Food',
+          transport: 'Transport',
+          health: 'Health',
+          fun: 'Fun',
+          pay: 'Pay',
+          subscriptions: 'Subscriptions',
+          tax: 'Tax',
+          other: 'Other',
           client_work: 'Client work',
           licensing: 'Licensing',
           contractors: 'Contractors',
-          tax: 'Tax',
           software: 'Software',
           premises: 'Premises',
           professional: 'Professional fees',
           production: 'Production',
           insurance: 'Insurance',
           events: 'Events',
-          other: 'Other',
         },
         index: true,
       },
-      /* THE DAY IT WAS PAID, which is not the day it was due. How late each client pays is the gap. */
+      /* THE DAY IT WAS PAID, which is not the day it was due. How late each client pays is the gap. The record writes
+         it when the row is marked paid (`finished:` above). */
       { id: 'settled', label: 'Paid on', type: 'day' },
-      /* HOW OFTEN IT COMES ROUND. The cash walk reads it, so a monthly bill is spent every month. */
+      /**
+       * HOW OFTEN A BILL SAID IT CAME ROUND, KEPT ON ITS ROWS AND WALKED NO MORE, SINCE money-core 3.0.0.
+       *
+       * What repeats lives in `recurring`, and the cash walk reads it there at every cadence. A bill that also said
+       * `repeats` was the same money twice: the the old tool import writes each repeating stream as a bill carrying
+       * `repeats` and as a row of `recurring` (`packs/legacy-import/adapter.ts`), so a walk over both counted every
+       * salary and every rent twice. So the walk takes a bill once, on its due day, when it does not repeat, and leaves
+       * a repeating one to its row in `recurring`. The field stays, because rows hold it and an id is for ever.
+       */
       { id: 'repeats', type: 'enum', values: ['none', 'monthly', 'quarterly', 'yearly'] },
       /**
-       * THE LAST DAY A REPEATING ROW MOVES MONEY ON, SINCE money-core 2.4.0, and the cash walk takes nothing after it.
-       *
-       * Both engines learned to stop a leg on an end in `5d4bbf8b` (`Leg.ends` in `packages/kernel/src/forecast.ts`),
-       * and the the old tool import writes one only where this list declares the field. Until it did, a bill the old tool
-       * says ends on 10 November walked 10 December and every month to the horizon on `/p/money`, and the only thing
-       * that ever closed it was the import's retire pass the night after the day went by
-       * (`test/money-ends.test.ts`). Inclusive, and a day rather than a month, because the old tool's `ends_on` is the
-       * last payday. Empty is no end, which is every row a person writes by hand.
+       * THE LAST DAY A REPEATING ROW MOVED MONEY ON, SINCE money-core 2.4.0. Kept, as `repeats` is, for the rows and the
+       * import that write it; the walk reads the same field on `recurring`, where a repeating item keeps it.
        */
       { id: 'ends', label: 'Ends', type: 'day' },
     ],
@@ -532,12 +566,21 @@ export const MONEY_REGISTERS: Record<string, MoneyRegister> = {
        * THE FOUR DIGITS A BANK MESSAGE NAMES THE ACCOUNT BY, and nothing else in this record could.
        *
        * `transactions.account` is a required ref, and the only thing an alert says about which account
-       * moved is *"your card ending 4471"*. Without this field the `lookup:` form in `MONEY_INGESTS`
-       * below has no `by:` to resolve against, so every forwarded message would land in `review` for a
-       * field the message plainly carried. NOT REQUIRED and not unique: a cash box has no digits, and
-       * two cards from one bank can share four.
+       * moved is *"your card ending 4471"*. Without this field a pattern's `lookup:` (the card alerts in
+       * `packs/card-alerts`, a bank's own pack) has no `by:` to resolve against, so every forwarded message would land
+       * in `review` for a field the message plainly carried. NOT REQUIRED and not unique: a cash box has no digits,
+       * and two cards from one bank can share four.
        */
       { id: 'last4', label: 'Last four digits', type: 'text' },
+      /**
+       * THE DAY MONEY ON ITS WAY LANDS, SINCE money-core 3.0.0: a payout in transit, a transfer sent and not yet in.
+       *
+       * Such money is not cash yet, so its account does not count as cash, and it was in no walk either: a payout
+       * landing on Friday was money the forecast never saw. An account that does not count as cash and says when it
+       * arrives is walked as money in on that day (`CASH_LEGS`). Empty is money that is not on its way anywhere, which is
+       * every card and every account that is cash.
+       */
+      { id: 'arrives', label: 'Arrives', type: 'day' },
     ],
   },
 
@@ -560,6 +603,10 @@ export const MONEY_REGISTERS: Record<string, MoneyRegister> = {
     title: 'currency',
     mobile: ['currency', 'rate', 'as_of'],
     pack: 'money-core',
+    /* THE LIST THE KERNEL CONVERTS BY, SAID BY THE LIST, SINCE money-core 3.0.0 (`packages/kernel/src/roles.ts`). Before
+       it the kernel read the rates off whatever list was called `fx`, by four fixed field names, and a record reaches
+       that reading now only until its next update. */
+    rates: { currency: 'currency', base: 'base', rate: 'rate', as_of: 'as_of' },
     fields: [
       { id: 'currency', type: 'text', required: true, index: true, search: true },
       { id: 'base', label: 'Base currency', type: 'text', required: true, index: true },
@@ -601,8 +648,22 @@ export const MONEY_REGISTERS: Record<string, MoneyRegister> = {
         index: true,
         required: true,
       },
-      /* THE COUNTERPARTY EXACTLY AS THE BANK WRITES IT, which is what `txn-categorise` links on. */
+      /* THE COUNTERPARTY AS THE BANK WRITES IT, which is what `txn-categorise` links on. */
       { id: 'match', label: 'Matches', type: 'text', index: true },
+      /**
+       * HOW MUCH OF A DESCRIPTION `match` MUST BE, SINCE money-core 3.0.0: the whole of it, how it starts, or anywhere
+       * in it. A bank writes one shop as `FENWICK CLOUD` on Monday and `FENWICK CLOUD LTD 4471` on Friday, and an
+       * equality files the first and leaves the second for a person. `exact` is the default and what every category
+       * before this meant, so nothing a record already files moves.
+       */
+      {
+        id: 'match_by',
+        label: 'How it matches',
+        type: 'enum',
+        values: ['exact', 'starts', 'contains'],
+        labels: { exact: 'The whole description', starts: 'How it starts', contains: 'Anywhere in it' },
+        default: 'exact',
+      },
       /* `Most a month`, AND IT WAS `No more than, a month`. A page prints its own `where:` back using
          each field's label, and the sentence grammar splits clauses on commas, so a label with a
          comma in it could not be typed or pasted back: `no more than: categories has no field called
@@ -630,6 +691,9 @@ export const MONEY_REGISTERS: Record<string, MoneyRegister> = {
     one: 'transaction',
     holds: 'money that has moved, with the day it moved, the account it moved through and what it was for',
     title: 'what',
+    /* THE DAY IT MOVED BESIDE THE AMOUNT. A card holds three fields (`RowCards`, and `declOf` in `remote.ts` draws its
+       own three in place of any other count), and a payment's card without its amount is a list nobody can read, so the
+       account it moved through is one tap away on the row rather than on the card. */
     mobile: ['what', 'amount', 'on'],
     state: 'state',
     done: ['cleared', 'void'],
@@ -638,8 +702,8 @@ export const MONEY_REGISTERS: Record<string, MoneyRegister> = {
      * THE TWO LEGS OF A TRANSFER ARE FOUND BY THE RECORD (`packages/kernel/src/pairs.ts`, `02 §5`): the same amount in the
      * same currency, one leg out and one in, two different accounts, within four days. Both are marked `transfer` and
      * each names the other in `_pair`, so a person sees why a row stopped counting and can undo it. An import writes a
-     * move between one person's accounts as two ordinary rows, and until this a person marked both or every Ledger
-     * figure counted the move once as spend and once as income (`test/money-pairs.test.ts`: GBP 4,000.00 spent, before).
+     * move between one person's accounts as two ordinary rows, and until this a person marked both or every figure over
+     * the ledger counted the move once as spend and once as income (`test/money-pairs.test.ts`: GBP 4,000.00 spent, before).
      *
      * `abs(amount)` AND NO `currency` ENTRY, because the currency is inside the money and this register has no field of
      * that name: `abs()` on a money compares its size and its currency together.
@@ -732,6 +796,15 @@ export const MONEY_REGISTERS: Record<string, MoneyRegister> = {
       },
       { id: 'amount', type: 'money', required: true },
       { ...AVAILABLE },
+      /**
+       * WHAT THE BANK SAID THE ACCOUNT HELD AFTER THIS MOVED, SINCE money-core 3.0.0: the balance a statement line or a
+       * bank message prints beside a movement. Not `available`, which is a card's limit left, not what an account holds.
+       *
+       * IT RESTARTS CASH NOW FOR ITS ACCOUNT. `cash-now` rolls each account forward from the newest thing anybody said
+       * it held, and a movement that says the balance after it is one of those statements, so a bank pack that reads it
+       * keeps the figure true without anybody typing a balance. Optional, because most ways a row arrives never say.
+       */
+      { id: 'balance_after', label: 'Balance after', type: 'money' },
       /* REQUIRED, because a movement with no account is a number nobody can reconcile. */
       { id: 'account', type: 'ref', to: 'accounts', index: true, required: true },
       { id: 'category', type: 'ref', to: 'categories', index: true },
@@ -746,7 +819,7 @@ export const MONEY_REGISTERS: Record<string, MoneyRegister> = {
       /**
        * MOVING MONEY BETWEEN YOUR OWN ACCOUNTS IS NOT SPENDING IT, and a ledger that counts it as
        * spending reports the same month twice. The mark is a field rather than a category, because a
-       * transfer has no category: it is not for anything. Every figure on the Ledger page says
+       * transfer has no category: it is not for anything. Every figure of spending and income says
        * `transfer is false`, and the default is false so a row nobody marks is counted.
        *
        * THE RECORD SETS IT ON BOTH LEGS OF A MOVE IT CAN SEE, through `pairs:` above, and a person sets
@@ -763,13 +836,17 @@ export const MONEY_REGISTERS: Record<string, MoneyRegister> = {
   /**
    * WHAT COMES ROUND WITHOUT ANYBODY DECIDING AGAIN. `next_due` is the only date, because a repeating
    * item is not a list of dates: it is a pattern, and the dates are what the forecast walks from it.
+   *
+   * THE ONE HOME OF REPEATING MONEY, SINCE money-core 3.0.0. It was deliberately not walked while `obligations.repeats`
+   * was, so a salary typed here never reached Cash ahead; now the walk reads this list and a bill's `repeats` is kept
+   * and not walked (`CASH_LEGS`).
    */
   recurring: {
     id: 'recurring',
     name: 'Repeating',
     icon: 'refresh',
     one: 'repeating item',
-    holds: 'the money that comes in and goes out every month without anybody deciding again',
+    holds: 'the money that comes in and goes out on a cadence, weekly to yearly, without anybody deciding again',
     title: 'what',
     mobile: ['what', 'amount', 'next_due'],
     state: 'state',
@@ -787,9 +864,18 @@ export const MONEY_REGISTERS: Record<string, MoneyRegister> = {
         required: true,
       },
       { id: 'amount', type: 'money', required: true, qualifies: 'every' },
-      /* THREE, AND THEY ARE `LOOKUPS.per_month`'S THREE. A frequency the factor table does not know is
-         counted at nothing a month by every figure that reads this list, which is a silent zero. */
-      { id: 'every', label: 'How often', type: 'enum', values: ['monthly', 'quarterly', 'yearly'], index: true, required: true },
+      /* THE VALUES ARE `LOOKUPS.per_month`'S AND THE WALK'S. A frequency the factor table does not know is
+         counted at nothing a month by every figure that reads this list, which is a silent zero, and one the walk does
+         not know moves once and is said. So a value goes into this list, the table and `CASH_LEGS` together. */
+      {
+        id: 'every',
+        label: 'How often',
+        type: 'enum',
+        values: ['weekly', 'fortnightly', 'twice_monthly', 'monthly', 'quarterly', 'yearly'],
+        labels: { weekly: 'Every week', fortnightly: 'Every two weeks', twice_monthly: 'Twice a month', monthly: 'Every month', quarterly: 'Every quarter', yearly: 'Every year' },
+        index: true,
+        required: true,
+      },
       { id: 'next_due', label: 'Next', type: 'day', index: true, deadline: true, required: true, remind: ['-3d', '0d'] },
       { id: 'started', label: 'Since', type: 'day' },
       /* Empty means it does not stop, which is the normal case and is why there is no `forever` value. */
@@ -841,6 +927,33 @@ export const MONEY_REGISTERS: Record<string, MoneyRegister> = {
       { id: 'category', type: 'ref', to: 'categories', index: true },
       { id: 'thing', label: 'Project', type: 'ref', to: 'things', index: true },
       { id: 'note', type: 'text' },
+    ],
+  },
+
+  /**
+   * WHAT AN ACCOUNT HELD ON A DAY, AS SOMETHING OTHER THAN A PERSON TYPING IT SAID, SINCE money-core 3.0.0.
+   *
+   * A BALANCE TYPED ONTO THE ACCOUNT IS ONE STATEMENT AND IT GOES STALE THE DAY IT IS TYPED. A statement, a bank
+   * message that prints the balance, or a count of the cash box each says the same kind of thing on a later day, and
+   * `cash-now` restarts an account from the newest of them and adds only what moved after it. Kept as rows rather than
+   * written over the account, so the day each was true stays and a figure can be read as of any night.
+   */
+  balances: {
+    id: 'balances',
+    name: 'Balance checks',
+    icon: 'money',
+    one: 'balance check',
+    holds: 'what an account held on a day, as a statement, a bank message or a count said it',
+    title: 'source',
+    mobile: ['account', 'balance', 'as_of'],
+    pack: 'money-core',
+    fields: [
+      { id: 'account', type: 'ref', to: 'accounts', index: true, required: true },
+      { id: 'balance', type: 'money', required: true },
+      { id: 'as_of', label: 'As of', type: 'day', index: true, required: true },
+      /* WHAT SAID IT: a statement, a bank's message, a count. The title, because a list of checks is read by where each
+         came from. */
+      { id: 'source', label: 'Said by', type: 'text', search: true },
     ],
   },
 
@@ -898,7 +1011,7 @@ export const MONEY_REGISTERS: Record<string, MoneyRegister> = {
        * REFUSAL: `unreadable` looks at `default` and nothing else, and a rule runs after an install
        * that never happens; even if it ran, the only template `fill` reaches is `{{on}}`, the
        * STORED day, so the old rows would read `2026-08-04` in a list whose new rows read
-       * `4 Aug 2026` — one list, two spellings of one title. `derived: true` is the kernel's own
+       * `4 Aug 2026`: one list, two spellings of one title. `derived: true` is the kernel's own
        * flag, set by nothing today, and it refuses every write, so the seed could not fill it.
        *
        * SO THE NIGHT IS NAMED BY WHOEVER WRITES IT, and every writer here does. `on` is required
@@ -936,91 +1049,43 @@ export const MONEY_HOME_SETTING = {
 } as const;
 
 /**
- * The code an arrival pattern falls back on when the message names none, written once for both.
+ * THE FORMAT OF EVERY MONEY FIGURE, AND IT NAMES NO CURRENCY, SINCE money-core 3.0.0 (`loop/finish/modules.md` C1).
  *
- * NOT THE SETTING ABOVE, FOR THE PARAGRAPH ABOVE: the setting is allowed to be unanswered and this
- * is not, because `money.currency` is required of the form and a pattern with no code reads no
- * money at all. It is a FALLBACK either way, never an override: wherever `@braindog/record` has
- * wired `scanMoney`, a code the bank prints beside the figure wins over this one, so what this
- * decides is only what an alert that prints a bare number is read as. Sterling, because the bank
- * these two patterns are written against is a British one and prints one.
+ * Every figure here said `money.GBP`, read off the sample's rows, because until then the record refused a money figure
+ * whose format named no currency. So a record in Egyptian pounds read "no more than £50,000.00" under figures about its
+ * own money, and a record in one other currency and no home currency chosen read its cash one currency at a time. A
+ * `money` figure is added up in the record's home currency when one is set, else in the one currency its rows are in,
+ * else one amount per currency (`evaluateMetric`), which is the currency somebody chose and never the pack author's.
  */
-export const HOME_CURRENCY = 'GBP';
-
-/**
- * THE CURRENCY EVERY FIGURE BELOW IS WRITTEN IN, READ OFF THE ROWS RATHER THAN TYPED AGAIN.
- *
- * NINETEEN FIGURES SPELLED IT OUT AND THAT WAS NINETEEN STATEMENTS OF ONE FACT. The fact is the
- * sample's: `gbp` is what every money row in this module is built with, so the currency the figures
- * declare is now the currency the rows carry, by construction. A pack re-issued over rows in another
- * currency moves one line instead of nineteen, and a twentieth figure that spells a currency out is
- * caught by `test/money.test.ts` rather than read past.
- *
- * WHAT THE DECLARED CURRENCY DOES ON A RECORD THAT DOES NOT HOLD IT, MEASURED, because it is more
- * than a label. A money figure is added up in the home currency when one is chosen and in the
- * currency its format declares when none is (`packages/kernel/src/metrics.ts:597`, `into: held.home
- * ?? declared`), and the browser's reader has the same line at `apps/web/src/lib/record/metrics.ts:937`.
- * So on a founder record holding one account of USD 24,604.47, no home currency chosen, `cash-now`
- * answered
- *
- *     declared GBP   {"value":null,"unit":null,"rows":1,"parts":[{"currency":"USD","amount":2460447}],"into":"GBP"}
- *     no currency    {"value":2460447,"unit":"USD","rows":1,"met":true}
- *
- * which is a record with ONE currency and no number at all, because a sum in a currency the figure is
- * not added up in is read out one currency at a time even when there is only one. Two records alike
- * but for that code, each with a single account and the night fired at the hour it was armed for,
- * wrote: one GBP account, one row in `snapshots`; one USD account, none, because the night skips a figure whose
- * `value` is `null` (`packages/kernel/src/index.ts:3538`). The Ledger's night-by-night history
- * therefore never starts on a record whose one currency is not this one.
- *
- * AND THE VERDICT GOES THE SAME WAY, ZERO INCLUDED. On a record holding two currencies, with a home
- * currency set and a rate for the other, `cash-now` converted to the same figure both ways, and `met` was `null` with
- * sterling declared against `false` without it: a target is in the declared currency, and with no
- * rate from sterling there is nothing to carry the bound across, so the one figure that says whether
- * the owner is in the red says nothing about it.
- *
- * NONE OF THAT IS REACHABLE FROM THIS FILE, which is why the currency stays. The record refuses a
- * money figure whose format names no currency (`DECLARATION_INVALID`, *"A metric is money.<CUR>"*,
- * measured through `k.install`), and it is right to: a money figure without a currency is a bare
- * number. What is wrong is the FALLBACK, in the two lines named above, and a pack cannot mend it.
- */
-const SAMPLE_MONEY = `money.${gbp(0).currency}`;
-
-/**
- * THE WAY THE BANK A PERSON FORWARDS FROM WRITES A DAY, and it is a declaration rather than a sniff.
- *
- * `29/08/26` AND `08/29/26` ARE BOTH REAL DAYS and nothing in either string says which, so `43 §4.3`
- * makes the format part of the pattern: an extractor that decided by looking at the numbers would be
- * right most of the time and wrong about every date before the thirteenth. A payment filed five
- * months out is a row that still looks ordinary, which is why there is no guessing arm.
- *
- * AND IT BELONGS IN A SETTING RATHER THAN HERE, because which way a bank writes a date is a fact
- * about the bank and not about the record: one person may bank in three currencies and more than one country.
- * The form for that is `{{config:bank_day_format}}` beside `home_currency` above, and it is not
- * reachable this batch: a setting is filled only where a PACK is planned and installed
- * (`declare`'s `filledWith`), and `installSeed` hands its ingest declarations to `kernel.install`
- * unfilled, so a placeholder would be refused at the door with `FIELD_UNKNOWN`. Measured, before
- * this line was reverted to a constant. The one line that unblocks it is `ingestDeclarations()` in
- * `packages/seed/src/index.ts` running `fillConfig` over these settings' values.
- */
-const BANK_DAY_FORMAT = 'DD/MM/YY';
+const MONEY = 'money';
 
 /**
  * THE TARGETS A PERSON CHANGES LATER, AS SETTINGS OF MONEY. A figure's target was fixed the day Money went in, so somebody
  * whose rent went up could not move "no more than" without reinstalling. Each of these is a setting of the pack, a sum of
  * money or a number of days, and the figure names it (`target.setting`): the record reads the setting each time the figure
- * is read, so a change holds the figure to it at once. The default is the figure's own target, or the use case's.
+ * is read, so a change holds the figure to it at once.
+ *
+ * A MONEY CEILING STARTS EMPTY, SINCE money-core 3.0.0, and empty is no target: the figure has no verdict until a person
+ * types a sum. The sums that were here, GBP 50,000.00 owed in thirty days among them, were one studio's sizes in one
+ * currency, and a pack cannot know either the size or the currency of the record it lands on (`loop/finish/modules.md`
+ * C1). The sum a person types is held in the record's home currency (`liveTarget` in `packages/kernel/src/declare.ts`).
+ * A number of days is no currency's, so its default stays the figure's own.
  */
 export const MONEY_TARGET_SETTINGS: Readonly<Record<string, { setting: string; type: 'money' | 'number'; label: string }>> = {
-  /* `most_out_30d` IS THE KEY AND THE WORDS ARE ONLY WORDS, so this label follows its figure. See the
-     comment on `out-30d` itself: the claim that renaming it would lose a saved ceiling was measured
-     and is false, `test/money.test.ts` holds it, and the ceiling caps what is OWED inside the thirty
-     days rather than everything that leaves. */
+  /* `most_out_30d` IS THE KEY AND THE WORDS ARE ONLY WORDS, so this label follows its figure: a saved ceiling is kept
+     under the key whatever the label says (`test/money.test.ts`), and the ceiling caps what is OWED inside the thirty
+     days rather than everything that leaves, which is `leaving-30d`'s. */
   'out-30d': { setting: 'most_out_30d', type: 'money', label: 'Most owed by you in 30 days' },
+  'leaving-30d': { setting: 'most_leaving_30d', type: 'money', label: 'Most going out in 30 days' },
   'every-month-out': { setting: 'most_out_every_month', type: 'money', label: 'Most going out every month' },
   'every-month-by-category': { setting: 'most_on_one_category', type: 'money', label: 'Most a month on one category' },
+  'spent-by-category-month': { setting: 'most_spent_on_one_category', type: 'money', label: 'Most spent on one category in a month' },
+  'spent-30d': { setting: 'most_spent_30d', type: 'money', label: 'Most spent in 30 days' },
   'due-30d': { setting: 'most_due_30d', type: 'money', label: 'Most due in 30 days' },
   'owed-to-you': { setting: 'most_owed_to_you', type: 'money', label: 'Most owed to you at once' },
+  'owed-by-you': { setting: 'most_owed_by_you', type: 'money', label: 'Most owed by you at once' },
+  'installments-left': { setting: 'most_left_in_parts', type: 'money', label: 'Most left to pay in parts' },
+  'installments-due-30d': { setting: 'most_parts_due_30d', type: 'money', label: 'Most in parts due in 30 days' },
   'days-late-in': { setting: 'most_days_late', type: 'number', label: 'Most days money in may be late' },
 };
 
@@ -1029,43 +1094,169 @@ export const TARGET_NOTE = 'Held to this as soon as it is saved.';
 
 type Decl = Record<string, unknown>;
 const boundOf = (target: Decl): number | null => (typeof target.lte === 'number' ? target.lte : typeof target.gte === 'number' ? target.gte : null);
-const currencyOf = (d: Decl): string | undefined => (typeof d.format === 'string' ? /^money\.([A-Z]{3})$/u.exec(d.format)?.[1] : undefined);
 
-/** A figure whose target is one of Money's settings, naming it; any other declaration as it was. */
+/**
+ * A figure whose target is one of Money's settings, naming it; any other declaration as it was.
+ *
+ * A MONEY TARGET NEEDS NO NUMBER TO NAME ITS SETTING, because it has none until a person types one. A number of days
+ * does: it is the default the setting starts at.
+ */
 export function withTargetSetting(d: Decl): Decl {
   const said = typeof d.metric === 'string' ? MONEY_TARGET_SETTINGS[d.metric] : undefined;
   const target = d.target as Decl | undefined;
-  if (!said || !target || boundOf(target) === null || (said.type === 'money' && currencyOf(d) === undefined)) return d;
+  if (!said || !target || (said.type === 'number' && boundOf(target) === null)) return d;
   return { ...d, target: { ...target, setting: said.setting } };
 }
 
-/** The settings a set of declarations' targets are held to, each starting at the target it replaces. */
+/**
+ * The settings a set of declarations' targets are held to. A number of days starts at the target it replaces; a sum of
+ * money starts empty, which the record reads as no target, since a sum is in a currency and the pack knows none.
+ */
 export function targetConfigOf(declarations: readonly Decl[]): Record<string, Decl> {
   const config: Record<string, Decl> = {};
   for (const d of declarations) {
     const target = d.target as Decl | undefined;
     const said = typeof d.metric === 'string' ? MONEY_TARGET_SETTINGS[d.metric] : undefined;
-    const bound = target ? boundOf(target) : null;
-    if (!said || !target || target.setting !== said.setting || bound === null) continue;
-    config[said.setting] = { type: said.type, label: said.label, note: TARGET_NOTE, default: said.type === 'money' ? { amount: bound, currency: currencyOf(d) } : bound };
+    if (!said || !target || target.setting !== said.setting) continue;
+    const bound = boundOf(target);
+    config[said.setting] = { type: said.type, label: said.label, note: TARGET_NOTE, ...(said.type === 'number' && bound !== null ? { default: bound } : {}) };
   }
   return config;
 }
 
+/**
+ * EVERY LIST ON THIS RECORD THAT HOLDS A DATED AMOUNT, WRITTEN ONCE, and walked by everything that walks: Cash ahead,
+ * the next thirty days under it, and the figures that read a walk (`runway-days`, `arriving-30d`, `leaving-30d`). One
+ * array cannot drift from itself, so the chart, the bridge and the tiles over it cross zero on the same day.
+ *
+ * ABOVE THE FIGURES AND NOT BESIDE THE PAGE, because the figures name it now and a `const` is not there to be read
+ * before the line that makes it.
+ *
+ * REPEATING MONEY IS WALKED FROM `recurring` ALONE, SINCE money-core 3.0.0. The obligations leg walked `repeats` while
+ * `recurring` sat out, and each was right about half the record: the sample wrote its streams as bills, and the Sam
+ * Brain import writes each stream twice, as a bill that repeats monthly and as a line in `recurring`
+ * (`packs/legacy-import/adapter.ts`). Walking both counts every stream twice on that record; walking only bills left a
+ * salary typed into `recurring` out of every walk. So a bill is walked once, on its day, and a stream is walked where it
+ * is a stream.
+ */
+const CASH_LEGS: Leg[] = [
+  {
+    register: 'obligations',
+    on: 'due',
+    amount: 'amount',
+    /* ONE-OFFS ONLY: a bill that says it repeats is walked as its line in `recurring`, and walking the bill as well
+       would spend it twice. Its own day still stands, so it is not dropped from anything that lists what falls due. */
+    where: `${OPEN}, repeats is not monthly or quarterly or yearly`,
+    incoming: { field: 'direction', is: 'owed_to_me' },
+  },
+  {
+    register: 'recurring',
+    on: 'next_due',
+    amount: 'amount',
+    where: 'state is live',
+    incoming: { field: 'direction', is: 'in' },
+    /* EVERY CADENCE THE LIST OFFERS, SO NONE MOVES ONCE AND STOPS. Twice a month is the first and the fifteenth, the days
+       a pay run of that kind keeps. */
+    every: {
+      field: 'every',
+      months: { monthly: 1, quarterly: 3, yearly: 12 },
+      weeks: { weekly: 1, fortnightly: 2 },
+      twice: { twice_monthly: [1, 15] },
+    },
+    /* THE ROW'S OWN END, SO THE WALK STOPS WHERE THE LINE DOES: the kernel stops on `ends` only when the leg names it. */
+    ends: 'ends',
+  },
+  {
+    register: 'installments',
+    on: 'due',
+    amount: 'amount',
+    /* `state is open` AND THE PAID PARTS STAY OUT, the way a settled bill does: the money
+       already moved and Cash now is standing on the far side of it. */
+    where: 'state is open',
+    incoming: { field: 'direction', is: 'in' },
+    /* EACH PART SAYS WHICH PLAN IT IS IN, so Cash ahead can count a plan in or out whole. Its parts are titled
+       `Proofing press, 3 of 8`, a different label every part, and the count control offers only what moves more than
+       once (`streamsOf` in `packages/render/src/forecast.ts`), so without this no plan was offered at all. */
+    group: 'plan',
+    /* NO `every:`, AND THAT IS THE WHOLE TRAP OF THIS REGISTER. An instalment row is already one
+       dated part, so a frequency over the top of it would charge the proofing press eight times
+       eight. `INSTALLMENTS` in this file is `[1..8].map`, one row a payment, for exactly this
+       reason. */
+  },
+  {
+    /* MONEY ON ITS WAY, LANDING ON THE DAY THE ACCOUNT SAYS (`accounts.arrives`). Such an account does not count as cash
+       yet, so Cash now leaves it out and this leg brings it in on its day. BANK ACCOUNTS ONLY, because a leg says money
+       in by one field equalling one word, and a card's balance on its way is a debt, not a payout. */
+    register: 'accounts',
+    on: 'arrives',
+    amount: 'balance',
+    where: 'liquid is false, arrives is set, kind is bank',
+    incoming: { field: 'kind', is: 'bank' },
+  },
+  {
+    /* A SUBSCRIPTION IS WALKED FROM THE LIST THAT HOLDS IT, where a record holds one; a record without it installs Money
+       with this leg left out (`firstPartyDocument`). */
+    register: 'services',
+    on: 'renews',
+    amount: 'cost',
+    where: 'state is not cancelled',
+    every: { field: 'cycle', months: { monthly: 1, yearly: 12, two_yearly: 24 } },
+  },
+];
+
+/**
+ * THE REPEATING LINES A MONTHLY FIGURE COUNTS: live, going the one way, and not past their last day.
+ *
+ * `ends` EMPTY, OR ON OR AFTER TODAY, which is the other side of `recurring-ended`'s `ends before today`. That rule moves
+ * a line that has ended to `ended` on the hourly sweep, and until it has, `state is live` alone counted the line at its
+ * full monthly share (`loop/finish/defects.md` M2). A line's last day is its own, so a line ending today still counts.
+ *
+ * THE TREE AND NOT THE SENTENCE, because the sentence joins its conditions with a comma or with a comma and `or`, never
+ * both (`packages/where/src/sentence.ts`, `conditionsOf`), and this is two conditions and a choice between two more. The
+ * kernel reads the tree for a figure as it reads a sentence, a relative day included (`metrics.ts` `resolveRelative`).
+ */
+const LIVE_LINES = (direction: 'in' | 'out'): Predicate => ({
+  all: [
+    { field: 'state', is: 'live' },
+    { field: 'direction', is: direction },
+    { any: [{ field: 'ends', empty: true }, { field: 'ends', after: 'yesterday' }] },
+  ],
+});
+
 const DECLARED_METRICS: Record<string, SeedMetric> = {
-  /* WHAT IS IN THE BANK, the headline the owner asked for: "the money i have, not the money im
-     due/owed". Liquid accounts only, and remembered daily so the page can draw how it has moved. */
+  /**
+   * WHAT IS IN THE BANK, the headline the owner asked for: "the money i have, not the money im
+   * due/owed". Liquid accounts only, and remembered daily so the page can draw how it has moved.
+   *
+   * ROLLED FORWARD, SINCE money-core 3.0.0, AND IT WAS A SUM OF WHAT WAS TYPED. An account's `balance` is what somebody
+   * said it held on its `as_of`, and every payment since was a row in `transactions` this figure never read, so it
+   * stood still while the money moved. Now each account starts from the newest thing anybody said it held (its own
+   * balance, a balance check, or a movement that printed the balance after it) and adds every cleared move dated after
+   * that day (`packages/kernel/src/money-figures.ts`, `readRolled`). A transfer moves cash between accounts, so it is
+   * counted here though no figure of spending counts it. The reading's `as_of` is the oldest start it used.
+   */
   'cash-now': {
     metric: 'cash-now',
     name: 'Cash now',
     source: 'register.accounts',
     where: 'liquid is true',
-    value: { sum: 'balance' },
-    format: SAMPLE_MONEY,
+    value: {
+      rolled: {
+        balance: 'balance',
+        as_of: 'as_of',
+        checks: [
+          { register: 'balances', by: 'account', balance: 'balance', on: 'as_of' },
+          { register: 'transactions', by: 'account', balance: 'balance_after', on: 'on' },
+        ],
+        moves: { register: 'transactions', by: 'account', on: 'on', amount: 'amount', direction: 'direction', out: 'out', where: 'state is cleared' },
+      },
+    },
+    format: MONEY,
     target: { gte: 0 },
     window: '30d',
     compare: 'none',
     snapshot: { grain: 'day', into: 'series.cash-now' },
+    home: 1,
   },
 
   /* HOW MANY ACCOUNTS CASH NOW ADDS UP, AND THE OLDEST DAY ONE OF THEM WAS TRUE: the line under the
@@ -1095,22 +1286,69 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
   },
 
   /**
-   * THE NEXT THIRTY DAYS, AND LATE MONEY IS STILL COMING. A calendar month shrinks to nothing on the
-   * 29th, and `before` is exclusive, so the month's last day could not be said anyway.
+   * HOW LONG THE MONEY LASTS: the days from today until the walk from Cash now first goes under, over a year.
    *
-   * AND THESE TWO WERE CALLED "Coming in, 30 days" AND "Going out, 30 days", WHICH ARE THE BRIDGE'S
-   * OWN WORDS. Measured on the shipped record, drawn: the tile read GBP 9,090.00 coming in and the
-   * bridge two blocks under it read GBP 11,490.00; the tile read GBP 38,880.00 going out and the
-   * bridge read GBP 42,741.00. Same page, same thirty days, same three words, GBP 2,400.00 and
-   * GBP 3,861.00 apart, because a figure reads ONE register (`MetricDecl.source`) and the walk
-   * beside it reads three: the parts of a plan and the subscriptions are dated money no figure on
-   * this page can reach.
+   * A FIGURE WITH A VALUE HAS ALREADY GONE UNDER INSIDE THE YEAR IT WALKS, and one that stays above zero has no value and
+   * no verdict, so the target is the whole year: any crossing misses it, and the page says so in words only when it
+   * does. The walk is Cash ahead's own (`CASH_LEGS`), so the figure and the chart under it cross on the same day.
+   */
+  'runway-days': {
+    metric: 'runway-days',
+    name: 'Days the money lasts',
+    /* MONEY'S BY NAME, because a figure over the walk reads no one list and the first-party split files a declaration
+       by the list it reads (`firstPartyManifest`): unnamed, the walk figures would go to no pack at all. */
+    pack: 'money-core',
+    source: 'forecast.runway',
+    legs: CASH_LEGS,
+    opening: { metric: 'cash-now' },
+    value: { walk: 'days_to_zero', within: '365d' },
+    format: 'days',
+    target: { gte: 365 },
+    window: '30d',
+    compare: 'none',
+    home: 2,
+  },
+
+  /**
+   * WHAT COMES IN AND GOES OUT OVER THE NEXT THIRTY DAYS, AS THE WALK COUNTS IT, SINCE money-core 3.0.0.
    *
-   * SO THE TILE SAYS WHICH PART IT IS, rather than claiming a whole it cannot count. `Owed to you`
-   * and `Owed by you` are this predicate read out loud (`direction is owed to me`), and they are
-   * the words the register's own `owed-to-you` and `owed-by-you` figures already use. Measured
-   * again after the rename: the tile is the bridge's obligations leg to the penny, in and out, and
-   * `test/money.test.ts` reads both off the DRAWN page and holds them there.
+   * THE TILES READ THE WALK THE BRIDGE AND THE FORECAST DRAW, over the same legs, so none of them can disagree. Before
+   * this a figure read one list and the walk beside it read three, and the page said "Coming in" twice over two numbers
+   * GBP 2,400.00 apart; the tiles were renamed to the one list they could count ("Owed to you, 30 days") rather than
+   * made right. A figure over `forecast.runway` adds up the walk's own steps (`packages/kernel/src/money-figures.ts`,
+   * `readWalk`), so money late in is still coming and money late out is still leaving, both on today.
+   */
+  'arriving-30d': {
+    metric: 'arriving-30d',
+    name: 'Coming in, 30 days',
+    pack: 'money-core',
+    source: 'forecast.runway',
+    legs: CASH_LEGS,
+    value: { walk: 'in', within: '30d' },
+    format: MONEY,
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  'leaving-30d': {
+    metric: 'leaving-30d',
+    name: 'Going out, 30 days',
+    pack: 'money-core',
+    source: 'forecast.runway',
+    legs: CASH_LEGS,
+    value: { walk: 'out', within: '30d' },
+    format: MONEY,
+    target: {},
+    window: '30d',
+    compare: 'none',
+  },
+
+  /**
+   * WHAT BILLS AND INVOICES ALONE BRING IN AND TAKE OUT OVER THIRTY DAYS. Not on the Money page since money-core 3.0.0,
+   * where the walk figures above count every list; kept, because use cases' pages draw them and a figure id is for ever.
+   * The name says which part of the money it counts, so it never wears the walk's words. `before` is exclusive, so the
+   * thirtieth day is `before +31d`.
    */
   'in-30d': {
     metric: 'in-30d',
@@ -1118,7 +1356,7 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
     source: 'register.obligations',
     where: `${OPEN}, direction is owed to me, due before +31d`,
     value: { sum: 'amount' },
-    format: SAMPLE_MONEY,
+    format: MONEY,
     target: { gte: 0 },
     window: '30d',
     compare: 'none',
@@ -1127,13 +1365,9 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
   /**
    * THE OTHER SIDE OF `in-30d`, AND THE COMMENT ABOVE IT IS THIS ONE'S TOO.
    *
-   * ITS CEILING WAS LEFT READING "Most going out in 30 days" BECAUSE A SETTING WAS SAID TO BE FOUND BY
-   * THE WORDS IT WAS SAVED UNDER, AND IT IS NOT. A saved value is written under `most_out_30d`, the
-   * key this figure names in `target.setting`, and the label is text the settings screen prints beside
-   * the box: `packConfig` reads the values by key and takes the words from whichever manifest the
-   * record last installed. Measured through the real door, `normalise`, `plan`, `install`, on a record
-   * holding a GBP 1,110.00 ceiling: the sum survives the label changing under it, both ways. So the
-   * words follow the figure, and `test/money.test.ts` keeps that a measurement rather than a memory.
+   * A SETTING IS FOUND BY ITS KEY, NOT BY THE WORDS IT WAS SAVED UNDER. A saved value is written under `most_out_30d`,
+   * the key this figure names in `target.setting`, and the label is text the settings screen prints beside the box, so
+   * the words follow the figure and a ceiling saved under older words is kept (`test/money.test.ts`).
    */
   'out-30d': {
     metric: 'out-30d',
@@ -1141,65 +1375,52 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
     source: 'register.obligations',
     where: `${OPEN}, direction is owed by me, due before +31d`,
     value: { sum: 'amount' },
-    format: SAMPLE_MONEY,
-    target: { lte: 5_000_000 },
+    format: MONEY,
+    target: {},
     window: '30d',
     compare: 'none',
   },
 
   /**
    * WHAT GOES OUT EVERY MONTH WITHOUT ANYBODY DECIDING AGAIN: each repeating cost at its monthly
-   * share, so a yearly insurance is a twelfth and a quarterly VAT bill is a third.
+   * share, so a yearly insurance is a twelfth, a quarterly VAT bill a third and a weekly cleaner 52/12.
    *
-   * THERE WERE TWO FIGURES FOR THIS AND THEY DISAGREED ON THE SHIPPED SAMPLE. Measured: this one
-   * read 1041616 off `obligations.repeats` while `recurring-out-month` read 919633 off `recurring`,
-   * the first on Overview as *Every month* and the second on Ledger as *Repeating, out*, two clicks
-   * apart. Two figures that should agree and do not is worse than one figure missing, because
-   * nothing on either screen says which of them the record means. The duplicate pair is gone and
-   * this is the one answer.
+   * IT READS `recurring`, SINCE money-core 3.0.0, AND IT READ `obligations.repeats`. The case for `recurring` was
+   * always good (a repeating item has `next_due` that moves and `ends` that stops it, and the importer writes that
+   * list) and it was held back because no use case seeded `recurring`, so the figure answered zero on every demo
+   * record. Nothing is written as an example any more (`loop/finish/modules.md` C11), so a demo record is not a reason,
+   * and the walk reads `recurring` too: the figure, the split under it and Cash ahead now read one list.
    *
-   * IT READS `obligations`, AND THAT IS A HOLDING POSITION RATHER THAN A VERDICT. The argument for
-   * `recurring` is good: an obligation carrying `repeats` is one dated amount wearing a frequency,
-   * a repeating item has `next_due` that moves and `ends` that stops it, and the importer writes
-   * that list, so a real imported record has the better data in `recurring`. It was pointed there
-   * and then pointed back, because a SEEDED record has the opposite problem and the switch was
-   * measured to cost more than it bought: no use case seeds `recurring`, so all three of these
-   * figures answered zero on every demo record, and they cannot simply be reseeded because
-   * `recurring.category` is a ref to the categories register while `obligations.category` is a
-   * closed enum, no seed row anywhere writes a ref, and `usecase-install.test.ts` rightly refuses a
-   * bill with no category. Moving the figures is a one-line change; moving the seeds behind them
-   * needs ref resolution in the installer and a decision about which of the two shapes a category
-   * really is. That decision is recorded in `loop/BACKLOG.md` and is not a thing to settle inside
-   * an unrelated repair.
+   * A LINE THAT HAS ENDED IS OUT, ON ITS OWN DAY AND NOT ONLY WHEN THE SWEEP MOVES IT (`LIVE_LINES`).
    *
    * THE IDS STAY, and that is deliberate: `MONEY_TARGET_SETTINGS` holds a person's ceiling under
-   * this name, the personal use case overrides its target under this name, and the Overview's
-   * series names it. Changing what a figure reads is a change to the figure; changing its id is a
+   * this name, the personal use case overrides its target under this name, and the series on the Money page
+   * names it. Changing what a figure reads is a change to the figure; changing its id is a
    * change to everything pointing at it.
    */
   'every-month-out': {
     metric: 'every-month-out',
     name: 'Every month',
-    source: 'register.obligations',
-    where: 'state is not written off, direction is owed by me, repeats is monthly or quarterly or yearly',
-    value: { sum: { product: ['amount', { lookup: 'per_month', by: 'repeats' }] } },
+    source: 'register.recurring',
+    where: LIVE_LINES('out'),
+    value: { sum: { product: ['amount', { lookup: 'per_month', by: 'every' }] } },
     lookups: { per_month: LOOKUPS.per_month! },
-    format: SAMPLE_MONEY,
-    target: { lte: 1_500_000 },
+    format: MONEY,
+    target: {},
     window: '30d',
     compare: 'none',
   },
 
   /* WHAT COMES IN EVERY MONTH, the other side of `every-month-out`: a pay day, a retainer, each at its monthly share.
-     The series counts it in every month ahead, as it counts what goes out. */
+     The series counts it in every month ahead, as it counts what goes out, and it ends where that one does. */
   'every-month-in': {
     metric: 'every-month-in',
     name: 'Every month, in',
-    source: 'register.obligations',
-    where: 'state is not written off, direction is owed to me, repeats is monthly or quarterly or yearly',
-    value: { sum: { product: ['amount', { lookup: 'per_month', by: 'repeats' }] } },
+    source: 'register.recurring',
+    where: LIVE_LINES('in'),
+    value: { sum: { product: ['amount', { lookup: 'per_month', by: 'every' }] } },
     lookups: { per_month: LOOKUPS.per_month! },
-    format: SAMPLE_MONEY,
+    format: MONEY,
     target: { gte: 0 },
     window: '30d',
     compare: 'none',
@@ -1212,7 +1433,7 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
     source: 'register.obligations',
     where: `${OPEN}, direction is owed to me, due before today`,
     value: { sum: 'amount' },
-    format: SAMPLE_MONEY,
+    format: MONEY,
     target: { lte: 0 },
     window: '30d',
     compare: 'none',
@@ -1232,34 +1453,39 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
     compare: 'none',
   },
 
-  /* WHAT GOES OUT EVERY MONTH, BY WHAT IT IS FOR: each repeating cost at its monthly share, grouped by category. What
-     no category holds is the whole less the parts, which the page draws as its own row. */
+  /* WHAT GOES OUT EVERY MONTH, BY WHAT IT IS FOR: each repeating cost at its monthly share, grouped by category, over
+     the list `every-month-out` reads, so the parts and the whole are one set of rows. */
   'every-month-by-category': {
     metric: 'every-month-by-category',
     name: 'Every month, by category',
-    source: 'register.obligations',
-    where: 'state is not written off, direction is owed by me, repeats is monthly or quarterly or yearly',
-    value: { sum: { product: ['amount', { lookup: 'per_month', by: 'repeats' }] } },
+    source: 'register.recurring',
+    where: LIVE_LINES('out'),
+    value: { sum: { product: ['amount', { lookup: 'per_month', by: 'every' }] } },
     lookups: { per_month: LOOKUPS.per_month! },
     group_by: 'category',
-    format: SAMPLE_MONEY,
-    target: { lte: 1_500_000 },
+    format: MONEY,
+    target: {},
     window: '30d',
     compare: 'none',
   },
 
-  /* MONEY THAT MOVED, MONTH BY MONTH, by the day it was paid rather than the day it was due; and money still
-     to move, by the day it is due. The series on the Money page draws the first for the months behind
-     and the second for the months ahead. */
+  /**
+   * MONEY THAT MOVED, MONTH BY MONTH, READ FROM WHAT MOVED, SINCE money-core 3.0.0.
+   *
+   * THESE READ PAID BILLS BY THEIR `settled` DAY, AND NOTHING WROTE THAT DAY. `obligations` declared no `finished:`, so
+   * `settled` was a field only the sample's rows held and a live record's history was empty however much money it had
+   * moved. What moved is `transactions`, cleared and not between your own accounts, the same two clauses every figure of
+   * spending counts by. Thirteen months back, so the twelve the series draws are whole and the current one is so far.
+   */
   'in-by-month': {
     metric: 'in-by-month',
-    name: 'Paid in, by month',
-    source: 'register.obligations',
-    where: 'state is paid, direction is owed to me, settled after -7m',
+    name: 'Money in, by month',
+    source: 'register.transactions',
+    where: 'state is cleared, transfer is false, direction is in, on after -13m',
     value: { sum: 'amount' },
-    group_by: 'settled',
+    group_by: 'on',
     bucket: 'month',
-    format: SAMPLE_MONEY,
+    format: MONEY,
     target: { gte: 0 },
     window: '30d',
     compare: 'none',
@@ -1267,14 +1493,46 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
 
   'out-by-month': {
     metric: 'out-by-month',
-    name: 'Paid out, by month',
-    source: 'register.obligations',
-    where: 'state is paid, direction is owed by me, settled after -7m',
+    name: 'Money out, by month',
+    source: 'register.transactions',
+    where: 'state is cleared, transfer is false, direction is out, on after -13m',
     value: { sum: 'amount' },
-    group_by: 'settled',
+    group_by: 'on',
     bucket: 'month',
-    format: SAMPLE_MONEY,
+    format: MONEY,
     target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  /* WHAT WAS LEFT EACH MONTH: money in less money out over the same rows, the amount signed by its direction
+     (`LOOKUPS.sign`), so the two halves are one reading and cannot be read over two different sets. */
+  'net-by-month': {
+    metric: 'net-by-month',
+    name: 'Left over, by month',
+    source: 'register.transactions',
+    where: 'state is cleared, transfer is false, on after -13m',
+    value: { sum: { product: ['amount', { lookup: 'sign', by: 'direction' }] } },
+    lookups: { sign: LOOKUPS.sign! },
+    group_by: 'on',
+    bucket: 'month',
+    format: MONEY,
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  /* WHERE THIS MONTH'S MONEY WENT, BY WHAT IT WAS FOR: spending since the first of the month, grouped by category. A
+     ceiling is the most a person means to spend on any one thing in a month. */
+  'spent-by-category-month': {
+    metric: 'spent-by-category-month',
+    name: 'Spent this month, by category',
+    source: 'register.transactions',
+    where: 'state is cleared, transfer is false, direction is out, on at least bom',
+    value: { sum: 'amount' },
+    group_by: 'category',
+    format: MONEY,
+    target: {},
     window: '30d',
     compare: 'none',
   },
@@ -1289,7 +1547,7 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
     value: { sum: 'amount' },
     group_by: 'due',
     bucket: 'month',
-    format: SAMPLE_MONEY,
+    format: MONEY,
     target: { gte: 0 },
     window: '30d',
     compare: 'none',
@@ -1303,7 +1561,7 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
     value: { sum: 'amount' },
     group_by: 'due',
     bucket: 'month',
-    format: SAMPLE_MONEY,
+    format: MONEY,
     target: { gte: 0 },
     window: '30d',
     compare: 'none',
@@ -1315,10 +1573,10 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
     source: 'register.obligations',
     where: `${OPEN}, direction is owed to me`,
     value: { sum: 'amount' },
-    format: SAMPLE_MONEY,
-    /* A receivable book is good when it is SMALL, because every pound in it is a pound somebody
-       else is holding. The target is the ceiling on that, not a sales goal. */
-    target: { lte: 2_000_000 },
+    format: MONEY,
+    /* A receivable book is good when it is SMALL, because every sum in it is money somebody
+       else is holding. The target is the ceiling on that, not a sales goal, and a person sets it. */
+    target: {},
     window: '30d',
     compare: 'none',
   },
@@ -1329,7 +1587,7 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
    * `snapshots` stores `cash`, `owed_to_me`, `owed_by_me` and `net` on one row, and three of the four
    * had a figure behind them: `cash-now` reads the accounts, `owed-to-you` sums the receivable book,
    * and the net is the arithmetic over both. The payable book had `overdue`, which is only the part
-   * already late — GBP 10,540 of a book several times that — so anything filling a snapshot had to
+   * already late (GBP 10,540 of a book several times that), so anything filling a snapshot had to
    * add the register up itself, which is a second answer to a question the record is supposed to own.
    *
    * IT IS `owed-to-you`'S CLAUSE WITH THE DIRECTION TURNED ROUND, deliberately word for word: two
@@ -1342,12 +1600,12 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
     source: 'register.obligations',
     where: `${OPEN}, direction is owed by me`,
     value: { sum: 'amount' },
-    format: SAMPLE_MONEY,
+    format: MONEY,
     /* A CEILING, AND THE RECORD INSISTS ON ONE: `METRIC_NEEDS_TARGET_OR_WINDOW` refuses a figure with
-       neither, in those words — *a number with no target is decoration*. GBP 60,000 is roughly what
-       is in the bank plus what is owed to you on this record; past that the book has stopped being a
-       supplier's credit and become a cash problem, which is the only reading of it worth a colour. */
-    target: { lte: 6_000_000 },
+       neither, in those words: *a number with no target is decoration*. Past some sum the book stops being a
+       supplier's credit and becomes a cash problem, and that sum is the person's, in their currency, so it is a
+       setting that starts empty. */
+    target: {},
     window: '30d',
     compare: 'none',
   },
@@ -1360,8 +1618,8 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
        overdue bill was in this tile and in Overdue at once and the two could not be added. */
     where: `${OPEN}, direction is owed by me, due after yesterday, due before +31d`,
     value: { sum: 'amount' },
-    format: SAMPLE_MONEY,
-    target: { lte: 2_500_000 },
+    format: MONEY,
+    target: {},
     window: '30d',
   },
 
@@ -1370,7 +1628,7 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
      you owe. Those are not the same problem, and the sum is not a quantity. */
   overdue: {
     metric: 'overdue',
-    /* WHAT THIS ONE IS ABOUT, and the word alone was not it. `direction is owed by me` — this is
+    /* WHAT THIS ONE IS ABOUT, and the word alone was not it. `direction is owed by me`: this is
        money YOU are late paying, and the saved view called "Overdue" is everything late in both
        directions. Two clicks apart, one word, two sets: a person reading `GBP 10,540` under
        "Overdue" and then opening the view was looking at a different question with no way to know. */
@@ -1378,7 +1636,7 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
     source: 'register.obligations',
     where: `${OPEN}, direction is owed by me, due before today`,
     value: { sum: 'amount' },
-    format: SAMPLE_MONEY,
+    format: MONEY,
     /* Zero, and it is the one target in the record that is not a judgement call. */
     target: { lte: 0 },
     window: '30d',
@@ -1403,8 +1661,8 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
     source: 'register.transactions',
     where: 'state is cleared, transfer is false, direction is out, on after -30d',
     value: { sum: 'amount' },
-    format: SAMPLE_MONEY,
-    target: { lte: 1_500_000 },
+    format: MONEY,
+    target: {},
     window: '30d',
     compare: 'previous',
   },
@@ -1415,13 +1673,13 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
     source: 'register.transactions',
     where: 'state is cleared, transfer is false, direction is in, on after -30d',
     value: { sum: 'amount' },
-    format: SAMPLE_MONEY,
+    format: MONEY,
     target: { gte: 0 },
     window: '30d',
     compare: 'previous',
   },
 
-  /* WHAT NOBODY HAS SAID THE PURPOSE OF. The one number on the Ledger page that is a job rather than a
+  /* WHAT NOBODY HAS SAID THE PURPOSE OF. The one figure over what moved that is a job rather than a
      fact, and the reason `txn-categorise` is worth declaring: it is what is left after the rule ran. */
   'txn-uncategorised': {
     metric: 'txn-uncategorised',
@@ -1436,12 +1694,9 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
   },
 
   /* ── what comes round ────────────────────────────────────────────────────
-     `recurring-out-month` and `recurring-in-month` WERE HERE AND THEY ARE GONE, because they were a
-     second name for `every-month-out` and `every-month-in` over the same rows. They were written
-     when those two read `obligations.repeats`, as the pair that read the list a repeating item
-     actually lives in; the two readings disagreed by 121983 on the shipped sample, and the repair
-     was for one of the pair to stop existing rather than for both to keep answering. The surviving
-     ids are the ones the pages, the target settings and the personal use case already name. */
+     ONE NAME PER READING. `every-month-out` and `every-month-in` read `recurring`, the list a repeating item lives in,
+     and there is no second pair over the same rows; the ids are the ones the page, the target settings and the
+     personal use case already name. */
 
   /* ── paid in parts ───────────────────────────────────────────────────────
      What is left of every plan, and what falls due inside the month. Both are sums of the rows, never
@@ -1453,8 +1708,8 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
     source: 'register.installments',
     where: 'state is open, direction is out',
     value: { sum: 'amount' },
-    format: SAMPLE_MONEY,
-    target: { lte: 2_000_000 },
+    format: MONEY,
+    target: {},
     window: '30d',
     compare: 'none',
   },
@@ -1470,8 +1725,8 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
        carried the clause already. */
     where: 'state is open, direction is out, due before +31d',
     value: { sum: 'amount' },
-    format: SAMPLE_MONEY,
-    target: { lte: 1_000_000 },
+    format: MONEY,
+    target: {},
     window: '30d',
     compare: 'none',
   },
@@ -1516,12 +1771,12 @@ export const MONEY_RULES: Record<string, SeedRule> = {
    * ledger somebody abandons: the third time `FENWICK CLOUD` arrives, being asked what it is for is an
    * insult. What the rule cannot reach is what the figure counts, so nothing is hidden by it.
    *
-   * IT MATCHES THE WHOLE DESCRIPTION, EXACTLY. `link:` is an equality against one stored value, and a
-   * substring test is not reachable from a declaration in this build: `contains` is one of the
-   * nineteen operators and is not in the sentence grammar, and `derive: { normalise }` is published
-   * and read by nothing. So a category's `match` is the counterparty as the bank writes it, and a
-   * merchant that arrives under two spellings needs two categories or a person. That is a real limit
-   * and it is written here rather than discovered.
+   * IT MATCHES THE WHOLE DESCRIPTION, EXACTLY, until `link:` reads how each category asks to be matched.
+   * `link:` is an equality against one stored value, so a category's `match` is the counterparty as the
+   * bank writes it, and a merchant that arrives under two spellings needs two categories or a person.
+   * `categories.match_by` (since money-core 3.0.0) is where a category says "how it starts" or "anywhere
+   * in it", and a rule that files by it reads it there; until then every category is matched whole,
+   * which is what `exact`, its default, says.
    *
    * `once_per: [entry]` means once a row, ever. A category cleared by hand afterwards stays cleared,
    * which is `32-PARITY` §3.2's rule that a field a person set is never overwritten by a rule.
@@ -1562,29 +1817,22 @@ export const MONEY_RULES: Record<string, SeedRule> = {
     once_per: ['entry', 'next_due'],
   },
   /**
-   * A SCHEDULE WHOSE LAST DAY HAS GONE, MOVED RATHER THAN FILTERED AROUND.
+   * A SCHEDULE WHOSE LAST DAY HAS GONE, MOVED AS WELL AS FILTERED AROUND.
    *
    * NOTHING IN THE TREE EVER FLIPPED `state` WHEN `ends` PASSED, and every reader of `recurring`
-   * paid for it. Measured on the shipped record plus one row shaped the way the importer writes
-   * them: "Every month, by what it is for" on `/p/ledger` counted a pass that stopped on 3 March
-   * 2026 at its full GBP 249.00 a month, for ever, inside a GBP 6,940.00 total.
+   * paid for it: a line that stopped in March was counted at its full monthly share for ever by
+   * every block and figure that read `state is live`.
    *
-   * THE FILTER REPAIR CANNOT BE WRITTEN, WHICH IS THREE MEASUREMENTS AND NOT A PREFERENCE. Only the
-   * first of the three is an assertion in `test/money.test.ts`; the other two are read at the lines
-   * named here, and saying which is which is the difference between a measurement and a claim.
-   * `ends is empty or ends after today` is refused by the record, because `or` reads over the VALUES
-   * of one field and `empty` is not a value a day can hold. The same thing as a tree
-   * (`{ any: [...] }`) compiles in the kernel and is refused by the browser's mirror, which returns
-   * one refusal and no clauses for a `where:` that is not a string
-   * (`apps/web/src/lib/record/where.ts:533`), so the block would draw nought rows and a refusal. And
-   * `ends is empty` alone drops exactly the rows still running, because the importer skips a stream
-   * that ended before the export and so writes `ends` only when it is ahead
+   * THE MONTHLY FIGURES FILTER ON `ends` AS WELL, SINCE money-core 3.0.0 (`LIVE_LINES`), in the tree
+   * form, because the sentence cannot join a choice to the other clauses. A block or a list a person
+   * filters by hand reads the sentence, so the row is moved too: `ends is empty` alone would drop
+   * exactly the rows still running, because the importer writes `ends` only when it is ahead
    * ("It ended before the export" in `packs/legacy-import/adapter.ts`).
    *
-   * SO THE REPAIR IS WHERE THE ROW IS. `rulesAboutTime` (`packages/kernel/src/index.ts:3475`) sweeps
+   * SO THE ROW IS MOVED WHERE IT IS. `rulesAboutTime` (`packages/kernel/src/index.ts`) sweeps
    * hourly every rule whose `when:` names a relative day and which declares `once_per`, so this one
    * is re-read as time passes rather than only when somebody writes the row, and one `move` puts the
-   * split, the register page and every future reader right at once with no grammar change.
+   * register page and every other reader right at once.
    *
    * IT ACTS INSTEAD OF ASKING, for the reason `installment-due-soon` tells instead of asking: a
    * schedule that says it stopped in March has nothing left to decide, and a question whose answer
@@ -1605,303 +1853,34 @@ export const MONEY_RULES: Record<string, SeedRule> = {
   },
 };
 
-/* ── how a bank message becomes a row ────────────────────────────────────── */
+/* ── the page ────────────────────────────────────────────────────────────── */
 
 /**
- * A DECLARATION THE SEED HAD NONE OF, AND `/in/*` IS ABOUT TO MAKE THAT VISIBLE.
+ * WHAT FALLS DUE THIS WEEK, AS ONE BLOCK A USE CASE'S HOME TAKES, SINCE money-core 3.0.0.
  *
- * Every `ingest:` in this tree was a poll — `packs/rates-poll.ts` and `usecases/founder-poll.ts`, both
- * of them a URL the runner fetches on a clock. Nothing declared how to read a message somebody
- * FORWARDS, so once the inbound route lands, every bank alert a person sends arrives, is hashed, is stored,
- * and sits `untriaged` for ever: correct behaviour, and an empty ledger beside a full inbox.
- *
- * AN ARRIVAL NOBODY UNDERSTANDS IS STILL STORED, and nothing here weakens that. `arrive` stores the
- * raw before it looks for a pattern and stores it again when it finds none; these two only add the
- * case where it does find one. A third wording, a second bank, or a message with no amount in it
- * lands exactly where it lands today, which is somewhere a person can see it.
- *
- * TWO DECLARATIONS AND NOT ONE, because the merchant sits in a different place in each wording — *at*
- * FENWICK CLOUD for a charge, *from* NILE REALTY for a payment in — and `first:` over both anchors
- * would file the row at `proposed` the moment a message happened to carry both words, which writes
- * NOTHING and opens a suggestion instead. `43 §5.3`: two arms yielding is `chosen`, and `chosen` is
- * not `exact`. Splitting on the verb in `match:` keeps every field a straight read.
- *
- * AND THE VERB IS READ RATHER THAN ASSUMED. `direction` is required on `transactions` and the only
- * form that could state a constant is `default:`, which files at `defaulted` and therefore at
- * `proposed` — so the enum map holds the one word the `match:` has already guaranteed is in the body.
- * A declaration that cannot say "this is a payment out" without an `enum` of one is a real limit of
- * the closed vocabulary, and it is written here rather than discovered.
+ * It was the second block of money-core's own `home` page, which retired with the house Home: a record's Home is its
+ * use case's `home-<id>` page, else the default Home, which names no list (`loop/finish/modules.md` C8). The founder's
+ * Home takes this block by reference (`usecases/founder.ts`), so the window, the columns and the order stay one
+ * declaration and cannot drift from each other.
  */
-export type SeedIngest = IngestDecl & { pack?: string };
-
-/** What a charge alert says money went to, and what a credit alert says it came from. */
-const MERCHANT_OUT = { text: { between: ['at ', ' on '] } } as const;
-const MERCHANT_IN = { text: { between: ['from ', ' on '] } } as const;
-
-/**
- * The day, the amount and the account, which are the same three reads in either direction.
- *
- * THE AMOUNT IS ANCHORED AND THE REASON IS IN THE SAMPLE: an unanchored `{ money: { currency } }`
- * over *"Your card ending 4471 was debited GBP 42.99"* reads the card digits as forty-four pounds
- * seventy-one, because `4471` is a number and the declared currency is a fallback that would dress it
- * as one. Something has to sit between the digits and the figure, and the first candidate after it
- * is the right one.
- *
- * AND IT WAS THE LITERAL `GBP`, ON A PACK WHOSE HOME CURRENCY IS A SETTING. Measured on a record:
- * an alert debiting 42.99 in a currency other than sterling, at FENWICK CLOUD on 2026-08-29, came back
- * `review — bank-card-out could not read amount, on out of this one`, because an anchor that is
- * nowhere in the text yields no slices at all and `DD/MM/YY` reads no ISO day. A person who banks in
- * three currencies had two of them unreadable, and the third was only readable by accident of the
- * pack having been written in it.
- *
- * SO THE ANCHOR IS THE VERB, which each pattern's `match:` has already guaranteed is in the body,
- * and the declared code is a FALLBACK and never an override. `scanMoney` takes the code the bank
- * prints beside the figure whenever there is one, *because it is the one that moved the money*, and
- * falls back to the declared code only when the text names none. So the same alert now comes back
- * `matched` at `exact` with its own code and 42.99 on it, and a sterling alert reads sterling.
- *
- * AND THE FALLBACK IS THE ONE NAMED CONSTANT `HOME_CURRENCY` ABOVE, shared by both patterns rather
- * than typed once in each, so the two cannot drift apart. It is NOT read off `MONEY_HOME_SETTING`,
- * and that is the paragraph above `HOME_CURRENCY`: the setting is allowed to stand unanswered and a
- * pattern with no code reads no money at all, so the two questions have to be answered separately.
- */
-const movement = (verb: 'debited' | 'credited') =>
-  ({
-    on: { date: { format: BANK_DAY_FORMAT, after: ' on ' } },
-    amount: { money: { after: `${verb} `, currency: HOME_CURRENCY } },
-    account: { lookup: { register: 'accounts', by: 'last4', after: 'ending ' } },
-  }) as const;
-
-/**
- * The alerts that recognise themselves and are not movements.
- *
- * `07 §2` NAMES A REFUND AND A PIN REMINDER IN THE SAME BREATH, and the reason is that both match a
- * pattern written for a bank's alerts: a refund carries the charge wording and moves money the other
- * way, and a PIN reminder carries the card digits and moves none. Skipped is not dropped — the bytes
- * and the reason are both in `inbox_raw`, which is the only way a wrong skip is ever found.
- */
-export const NOT_A_MOVEMENT: NonNullable<SeedIngest['skip']> = [
-  { when: { field: 'body', contains: 'refund' }, reason: 'A refund is money coming back, and this pattern reads a charge.' },
-  { when: { field: 'body', contains: 'your pin' }, reason: 'A PIN reminder carries the card digits and moves no money.' },
-  { when: { field: 'body', contains: 'balance is' }, reason: 'A balance alert is a position, not a movement.' },
-];
-
-/**
- * The same movement twice, in two wordings — `07 §2`'s reason for the near form.
- *
- * A BANK SENDS ONE PAYMENT AS AN SMS AND AGAIN IN A STATEMENT MAIL, and the two are not the same
- * bytes, so the raw's own hash cannot catch it. Same account, same amount, the day within one either
- * way, and the first twelve characters of the description equal: `FENWICK CLOUD LTD` and
- * `FENWICK CLOUD` are one charge, and two rows for it is a month counted twice.
- */
-export const SAME_MOVEMENT: NonNullable<SeedIngest['dedupe']> = { near: { on: ['amount', 'account'], day: 'on', prefix: { field: 'what', chars: 12 } } };
-
-export const MONEY_INGESTS: Record<string, SeedIngest> = {
-  'bank-card-out': {
-    ingest: 'bank-card-out',
-    pack: 'money-core',
-    channel: 'email',
-    /**
-     * THE VERB IS PART OF THE MATCH, so the `enum` below cannot miss. `contains` is case-folded
-     * (`where`'s own `fold`), so the capitals a bank uses are not part of the declaration.
-     *
-     * AND THE OTHER VERB IS PART OF IT TOO, BECAUSE SPLITTING ON ONE DID NOT MAKE THE TWO PATTERNS
-     * EXCLUSIVE. Measured: a body carrying `debited`, `credited` and `card ending` satisfied both
-     * `match:` clauses, `arrive` took the first declared, which is this one, and the arrival was
-     * written as a payment OUT at `exact` with the credit half never read. A wrong sign at `exact`
-     * is the worst outcome this layer has: `exact` is the confidence that opens no suggestion,
-     * stores no reason and puts the row straight in the book, so nothing downstream doubts it and
-     * the ledger looks ordinary.
-     *
-     * `none:` IS WHAT MAKES THEM EXCLUSIVE, and a message naming both now matches neither. It lands
-     * `untriaged`, which is where a wording nothing recognises already lands: the bytes are stored,
-     * a person sees it, and the third such arrival earns a drafted pattern. What goes with it is
-     * that the ORDER these two are declared in stops deciding anything.
-     *
-     * AND THE `none` GROUP IS NESTED INSIDE THE `all` LIST RATHER THAN WRITTEN BESIDE IT, which
-     * reads like a style choice and is not. `where`'s `quantifierOf` is `'all' in g ? 'all' : 'any'
-     * in g ? 'any' : 'none'` and `childrenOf` matches it, so a group carrying TWO quantifier keys
-     * is read as the first one and the rest of the object is dropped without a word. Measured:
-     * written as `{ all: [...], none: [...] }` this pattern still claimed a message naming both
-     * verbs, at `exact`, because only the `all` leg was ever evaluated. `compile` does not refuse
-     * the shape either, so nothing anywhere says so. One quantifier per object, always.
-     */
-    match: {
-      all: [{ field: 'body', contains: 'debited' }, { field: 'body', contains: 'card ending' }, { none: [{ field: 'body', contains: 'credited' }] }],
-    },
-    skip: NOT_A_MOVEMENT,
-    extract: {
-      what: MERCHANT_OUT,
-      direction: { enum: { map: { debited: 'out' } } },
-      ...movement('debited'),
-    },
-    writes: { register: 'transactions', confidence: 'exact' },
-    dedupe: SAME_MOVEMENT,
-    on_conflict: 'skip',
-  },
-  'bank-card-in': {
-    ingest: 'bank-card-in',
-    pack: 'money-core',
-    channel: 'email',
-    /* AND THE SAME EXCLUSION FROM THE OTHER SIDE. Both arms carry it, because one arm refusing the
-       other's verb would only move which of the two claims an ambiguous message. */
-    match: {
-      all: [{ field: 'body', contains: 'credited' }, { field: 'body', contains: 'card ending' }, { none: [{ field: 'body', contains: 'debited' }] }],
-    },
-    skip: NOT_A_MOVEMENT,
-    extract: {
-      what: MERCHANT_IN,
-      direction: { enum: { map: { credited: 'in' } } },
-      ...movement('credited'),
-    },
-    writes: { register: 'transactions', confidence: 'exact' },
-    dedupe: SAME_MOVEMENT,
-    on_conflict: 'skip',
-  },
-
-  /* ONE EGYPTIAN BANK'S SIX WORDINGS WERE HERE UNTIL money-core 1.8.0, and they are a pack file under `packs/` now,
-     unchanged but for `pack:`. They read one bank in one country, so every record set up as Personal, Founder or Small business
-     carried them (`loop/DIRECTION.md` section 22). The two above stay because nothing in them names a bank: `card
-     ending 4471 was debited` is a shape written against fixtures, not against one bank's text. */
+export const DUE_THIS_WEEK: Readonly<Record<string, unknown>> = {
+  kind: 'table',
+  heading: 'Due this week',
+  span: 12,
+  source: 'register.obligations',
+  where: 'state is open or part, due before +8d',
+  columns: [
+    { field: 'what', label: 'Description', width: 'minmax(14ch,1fr)' },
+    { field: 'party', label: 'Who', width: 'minmax(10ch,18ch)' },
+    { field: 'amount', label: 'Amount', width: '15ch', align: 'end', sign: { field: 'direction', minus: 'owed_by_me' } },
+    { field: 'due', label: 'Due', width: '13ch', align: 'end' },
+  ],
+  order: [{ field: 'due', dir: 'asc' }],
+  limit: 6,
+  empty: 'Nothing is due this week.',
 };
 
-/** A `bank-*` pattern as its webhook twin `<id>-sms`: the same reading, behind a path token. */
-export type SmsIngest = SeedIngest & { verify: { kind: 'path' } };
-
-/**
- * Each mail pattern in `mail` as its webhook twin, keyed `<id>-sms`. NO LONGER EXPORTED: the bank pack built its twins
- * with this while it was TypeScript here, and once its builder left `src` on 25 September nothing outside this module
- * called it. The pack's file still holds twins of exactly this shape, written out.
- */
-const smsTwins =(mail: Record<string, SeedIngest>): Record<string, SmsIngest> =>
-  Object.fromEntries(
-    Object.values(mail).map((m) => {
-      const ingest = `${m.ingest}-sms`;
-      const twin: SmsIngest = { ...m, ingest, channel: 'webhook', verify: { kind: 'path' } };
-      return [ingest, twin];
-    }),
-  );
-
-/**
- * THE SAME WORDINGS, ARRIVING AS WHAT THEY ARE: TEXT MESSAGES A PHONE SHORTCUT POSTS. The bodies
- * `loop/research-bank-real.md` measured are text messages an iOS Shortcut posts on, and every pattern
- * above is `channel: email`, so the only way any of them reached a record was a mail forwarder the phone
- * does not have. Measured on
- * 22 September through the Worker-shaped door in `packages/host/test/ingest-shortcut.test.ts`: the SMS
- * posted at a `bank-*` id answered 404, because `ingestVerify` answers `null` for a mail pattern.
- *
- * TWINS AND NOT A CHANNEL LIST, for the reason `declare.ts` gives above `verifyFault`: a list would change
- * `07 §3`'s `channel:`, and a twin is one more declaration of a shape that already exists. Each is BUILT
- * from its mail pattern rather than written out, so the two cannot drift: a wording fixed above is fixed
- * for the SMS in the same edit, and `money-ipn.test.ts`, which drives every key of `MONEY_INGESTS` by
- * mail, still drives every reading these twins make.
- *
- * `verify: { kind: path }` AND NOTHING MORE. The token is minted by an owner (`ingestMint` in
- * `packages/record/src/index.ts`), shown once, and kept as its digest; a declaration is exported and shown
- * to every agent, so the grammar refuses a token written here. Until one is minted every arrival at a twin
- * is stored `untriaged` and none is matched, which is `12 §3` for a door nobody has vouched for yet.
- *
- * NOT IN `MONEY_INGESTS`, AND IN THE PACK SINCE money-core 1.7.0. `INGESTS` in `packages/seed/src/index.ts`
- * is the one road from this file into a record, and it spreads both. Putting them in `MONEY_INGESTS` instead
- * would break `money-ipn.test.ts`'s rule that every key there has a mail wording, because a webhook twin
- * never claims mail.
- */
-export const MONEY_SMS_INGESTS: Record<string, SmsIngest> = smsTwins(MONEY_INGESTS);
-
-/**
- * EVERY LIST ON THIS RECORD THAT HOLDS A DATED AMOUNT, WRITTEN ONCE.
- *
- * TWO BLOCKS ON `/p/money` WALK THESE, "Cash ahead" over 365 days and "The next 30 days" under it,
- * and until this constant existed they walked two copies of the same array. That is not a tidiness
- * argument: `ca30d210` had to add the `installments` leg twice, once to each copy, and its own
- * message says why it did the second one as well as the first, that two blocks on one screen
- * disagreeing by GBP 1,350.00 about the same month is worse than either number alone. The next leg
- * anybody adds gets no such choice, because one array cannot drift from itself.
- *
- * `recurring` IS DELIBERATELY NOT HERE, and the argument is on the "Cash ahead" block below rather
- * than copied up here, because that is where it was measured.
- */
-const CASH_LEGS = [
-  {
-    register: 'obligations',
-    on: 'due',
-    amount: 'amount',
-    where: 'state is open or part',
-    incoming: { field: 'direction', is: 'owed_to_me' },
-    every: { field: 'repeats', months: { monthly: 1, quarterly: 3, yearly: 12 } },
-    /* THE ROW'S OWN END, SO THE WALK STOPS WHERE THE LINE DOES (money-core 2.4.0). Named here and not only declared on
-       the list, because a field no leg names is a field no walk reads: the kernel stops on `ends` only when the leg
-       says which field holds it. Both blocks on `/p/money` read this one array, so both stop on the same day. */
-    ends: 'ends',
-  },
-  {
-    register: 'services',
-    on: 'renews',
-    amount: 'cost',
-    where: 'state is not cancelled',
-    every: { field: 'cycle', months: { monthly: 1, yearly: 12, two_yearly: 24 } },
-  },
-  {
-    register: 'installments',
-    on: 'due',
-    amount: 'amount',
-    /* `state is open` AND THE PAID PARTS STAY OUT, the way a settled obligation does: the money
-       already moved and Cash now is standing on the far side of it. */
-    where: 'state is open',
-    incoming: { field: 'direction', is: 'in' },
-    /* EACH PART SAYS WHICH PLAN IT IS IN, so Cash ahead can count a plan in or out whole. Its parts are titled
-       `Proofing press, 3 of 8`, a different label every part, and the count control offers only what moves more than
-       once (`streamsOf` in `packages/render/src/forecast.ts`), so without this no plan was offered at all. */
-    group: 'plan',
-    /* NO `every:`, AND THAT IS THE WHOLE TRAP OF THIS REGISTER. An instalment row is already one
-       dated part, so a frequency over the top of it would charge the proofing press eight times
-       eight. `INSTALLMENTS` in this file is `[1..8].map`, one row a payment, for exactly this
-       reason. */
-  },
-];
-
 export const MONEY_PAGES: Record<string, SeedPage> = {
-  /**
-   * THE HOUSE HOME, AS A DECLARED PAGE (`loop/research-spark.md` S13). A record with no use case draws the page called
-   * `home` on Home, the way a use case's record draws `home-<use case>`: the three figures, then what is due this week.
-   * No `nav`, because Home is already on the rail. It is Money's, because every block reads Money's lists, so a record
-   * without Money keeps the plain Home with only what needs deciding. The sample draws its own Home, unchanged.
-   */
-  home: {
-    page: 'home',
-    title: 'Home',
-    icon: 'home',
-    requires: ['register.obligations', 'register.people'],
-    pack: 'money-core',
-    blocks: [
-      {
-        kind: 'stat',
-        heading: 'Right now',
-        span: 12,
-        cells: [
-          { metric: 'owed-to-you', label: 'Owed to you' },
-          { metric: 'due-30d', label: 'Due in 30 days' },
-          { metric: 'overdue', label: 'Overdue to pay' },
-        ],
-      },
-      {
-        kind: 'table',
-        heading: 'Due this week',
-        span: 12,
-        source: 'register.obligations',
-        where: 'state is open or part, due before +8d',
-        columns: [
-          { field: 'what', label: 'Description', width: 'minmax(14ch,1fr)' },
-          { field: 'party', label: 'Who', width: 'minmax(10ch,18ch)' },
-          { field: 'amount', label: 'Amount', width: '15ch', align: 'end', sign: { field: 'direction', minus: 'owed_by_me' } },
-          { field: 'due', label: 'Due', width: '13ch', align: 'end' },
-        ],
-        order: [{ field: 'due', dir: 'asc' }],
-        limit: 6,
-        empty: 'Nothing is due this week.',
-      },
-    ],
-  },
   /**
    * MONEY IS A FINANCE PAGE, NOT A LEDGER OF WHO OWES WHOM (`loop/DIRECTION.md` §2, `research-modules.md`
    * §2.1). It leads with the money there is, then how long it lasts, then what comes in and goes out;
@@ -1910,201 +1889,42 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
    * "i want the headlines to be the money i have, not the money im due/owed" (the owner, in Sam
    * Brain's own Money screen). So the hero figure is Cash now, read from the accounts, and every walk
    * on this page starts from that same figure rather than from a balance typed into the page.
+   *
+   * ONE PAGE, SINCE money-core 3.0.0, AND IT WAS THREE: Overview, Ledger, and the house Home (`loop/finish/modules.md`
+   * MOD-4). Overview looked ahead over bills, Ledger looked back over payments, and a person asking what happened to
+   * their money had to know which of the two answered it. A page holds no rows, so the two that retire take nothing
+   * with them. IT NEEDS NO PEOPLE: who a row is with is a link (`LINKS` in `packs/first-party.ts`), and no block here
+   * reads it, so Money installs and draws on a record with People off.
    */
   money: {
     page: 'money',
-    title: 'Overview',
+    title: 'Money',
     nav: { section: 'Money', order: 10 },
     icon: 'money',
-    requires: ['register.obligations', 'register.accounts', 'register.people'],
+    requires: ['register.accounts', 'register.obligations', 'register.transactions', 'register.recurring', 'register.installments', 'register.categories'],
     pack: 'money-core',
     blocks: [
       {
-        /* THE HERO, AND THREE FIGURES BESIDE IT. Cash now carries its twelve weeks as a line; the other
-           three are what is owed either way inside thirty days, and what goes out every month without
-           anybody deciding again.
-           THE TWO THIRTY-DAY TILES DO NOT WEAR THE BRIDGE'S WORDS, and `in-30d`'s comment has the
-           measurement: a figure reads one register, the bridge walks three, so a tile labelled
-           "Coming in, 30 days" over the bridge's "Coming in" was one screen giving two answers. */
+        /* WHAT YOU HAVE, THEN HOW LONG IT LASTS, THEN WHAT MOVES IN THE NEXT THIRTY DAYS. The figures after it read the one walk
+           "Cash ahead" and "The next 30 days" draw below (`CASH_LEGS`), so a tile and the chart under it cannot give two
+           answers about the same month. Cash now carries its twelve weeks as a line. */
         kind: 'stat',
         lead: true,
-        heading: 'Right now',
+        heading: 'What you have',
         span: 12,
         cells: [
           { metric: 'cash-now', label: 'Cash now', trend: '12w', note: 'in {{cash-accounts}} account(s), as of {{cash-as-of}}' },
-          { metric: 'in-30d', label: 'Owed to you, 30 days' },
-          { metric: 'out-30d', label: 'Owed by you, 30 days' },
-          { metric: 'every-month-out', label: 'Every month' },
+          { metric: 'runway-days', label: 'Lasts until' },
+          { metric: 'arriving-30d', label: 'Coming in, 30 days' },
+          { metric: 'leaving-30d', label: 'Going out, 30 days' },
         ],
       },
       {
-        /* HOW LONG THE MONEY LASTS: cash remembered up to today, then the walk from Cash now, a repeating row
-           spent every time it comes round. A reader can ask what if clients pay later, what if there is
-           spending the record does not know, or what if a large movement does not happen; the answer is
-           arithmetic over the same walk, and nothing is written. Every movement is in the fold under it. */
-        kind: 'forecast',
-        heading: 'Cash ahead',
-        span: 12,
-        source: 'forecast.runway',
-        opening: { metric: 'cash-now' },
-        recorded: 'cash-now',
-        /**
-         * THE LEGS ARE THE LISTS THAT HOLD A DATED AMOUNT (`CASH_LEGS`), and `installments` was not
-         * among them.
-         *
-         * Measured on the shipped record before the leg was added: six open parts, four of the
-         * proofing press going out at GBP 1,875.00 and two of the Halden licence coming in at
-         * GBP 2,400.00, GBP 2,700.00 net out inside ninety days, in the register and in no walk.
-         * A runway that is too high is the direction this block must never be wrong in, because a
-         * person reads it to decide what to shut down.
-         *
-         * AND `recurring` IS DELIBERATELY NOT A LEG, WHICH IS A MEASUREMENT AND NOT AN OVERSIGHT.
-         * Adding it moved the crossing day from 30 October to 1 October, and GBP 98,224.00 of the
-         * GBP 99,196.00 it added was a second copy of money the obligations leg already walks:
-         * Studio rent, the Kiln storefront payout, the Marchetti backend contract, VAT and the
-         * studio insurance are one amount on one day at one cycle written in both lists, step for
-         * step and total for total. The walk reads the obligations copy for the reason
-         * `every-month-out` reads it: no use case seeds `recurring`, so a walk pointed there is a
-         * walk that answers nothing on every record but this one. Which of the two shapes a
-         * repeating cost really lives in is the seed question already parked in `loop/BACKLOG.md`,
-         * and `test/money.test.ts` builds the leg and asserts the overlap so this stays a number.
-         */
-        from: CASH_LEGS,
-        horizon: 365,
-        /* GROWTH, RATE DRIFT AND COUNTING A PLAN OR A STREAM, as well as the first four. Drift draws a slider only for a pair
-           some step was converted through, so a record in one currency sees none. `sell` is not here, because the
-           figure it would offer is what somebody holds, and that list is the holdings pack's: money-core names no
-           other pack (`test/money-core-names-no-pack.test.ts`), and a sell knob with no `sell:` figure draws nothing. */
-        knobs: ['horizon', 'late', 'spend', 'leave', 'grow', 'drift', 'count'],
-        /* THE LATE KNOB MARKS HOW LATE MONEY HAS COME IN, and the chart says how many days are left when the
-           walk goes under inside a month. */
-        late: 'days-late-in',
-        under: 30,
-        empty: 'Nothing dated in the next twelve months.',
-      },
-      {
-        /* THE NEXT THIRTY DAYS AS ARITHMETIC: cash now, plus what arrives, less what leaves, and where
-           that lands. It walks what the block above it walks, over a shorter horizon.
-           THE SAME LEGS MEANS THE SAME ARRAY NOW, not a second copy held level by a test. The two
-           blocks sit one above the other on one screen, so a leg in one and not the other is two
-           answers about the same thirty days, GBP 1,350.00 apart on this record, which is what
-           `ca30d210`'s own message was about. `test/money.test.ts` still asserts that both blocks
-           hand back the one array, because somebody pasting a copy back in is the thing `CASH_LEGS`
-           is defending against. */
-        kind: 'bridge',
-        heading: 'The next 30 days',
-        span: 5,
-        source: 'forecast.runway',
-        opening: { metric: 'cash-now' },
-        from: CASH_LEGS,
-        horizon: 30,
-        empty: 'Nothing dated in the next 30 days.',
-      },
-      {
-        /* WHERE THE MONEY OWED INSIDE THIRTY DAYS GOES, by what it is for.
-           IT IS `out-30d` BROKEN UP AND NOTHING WIDER, which is worth saying under a bridge that
-           walks three lists: measured on the drawn page, these rows add to GBP 38,880.00, the same
-           figure the tile above shows, and the GBP 375.00 of instalment parts and GBP 111.00 of
-           subscriptions inside the same thirty days are in neither. A `split` reads one register,
-           so that is a limit of the block and not an omission in the filter.
-           SO THE HEADING WEARS THE TILE'S WORDS AND NOT THE BRIDGE'S, which is `491e7e05`'s rename
-           reaching the third block that spoke about these same thirty days. "Where it goes, next 30
-           days" claimed the whole of what leaves, over rows that are one register and one direction,
-           and it sat between a tile reading GBP 38,880.00 and a bridge reading GBP 42,741.00 while
-           naming neither of them. THE DAYS STAY IN THE WORDS, because `owed-by-you` and `owed-to-you`
-           are this same predicate with no date at all and are called exactly "Owed by you" and "Owed
-           to you" (Home draws the second one): without the days this heading claims that book. */
-        kind: 'split',
-        heading: 'Owed by you, 30 days, by what it is for',
-        span: 7,
-        source: 'register.obligations',
-        where: 'state is open or part, direction is owed by me, due before +31d',
-        columns: [{ field: 'category' }, { field: 'amount' }],
-        limit: 6,
-        unset: 'Uncategorised',
-        empty: 'Nothing to pay in the next 30 days.',
-      },
-      {
-        /* MONTH BY MONTH: what was paid in and out in the six months to now, and what is due in the three
-           after, with what was left each month as a line. The current month is so far, and the months
-           ahead are what is due once plus what repeats at its monthly share, in every one of them. */
-        kind: 'series',
-        heading: 'In and out, by month',
-        span: 12,
-        series: [
-          { metric: 'in-by-month', then: 'in-due-by-month', each: 'every-month-in', label: 'Money in' },
-          { metric: 'out-by-month', then: 'out-due-by-month', each: 'every-month-out', label: 'Money out', dir: 'out' },
-        ],
-        back: 6,
-        ahead: 3,
-        net: true,
-        empty: 'Nothing paid or due in these months.',
-      },
-      {
-        /* A NOTE THAT DRAWS ONLY WHEN IT IS TRUE, and says what is due, never what to do about it. */
-        kind: 'note',
-        tone: 'warn',
-        heading: 'Late to you',
-        span: 12,
-        body: 'Money you are owed has gone past its date: {{late-in}} in all.',
-        when: { metric: 'late-in', gt: 0 },
-      },
-      {
-        kind: 'note',
-        tone: 'bad',
-        heading: 'Late to pay',
-        span: 12,
-        body: 'Money you owe has gone past its date: {{overdue}} in all. Statutory interest may be due; the terms are in the contract.',
-        when: { metric: 'overdue', gt: 0 },
-      },
-      {
-        /* WHAT IS STILL TO COME IN AND GO OUT, IN ONE LIST BY DATE. The amount carries its own sign, so which way a
-           row's money goes is a property of the row rather than the table it sits in, and the last column says who
-           changed the row last, from its history. */
-        kind: 'table',
-        heading: 'Coming in and going out',
-        span: 12,
-        source: 'register.obligations',
-        where: 'state is open or part',
-        columns: [
-          { field: 'what', label: 'Description', width: 'minmax(14ch,1fr)' },
-          { field: 'amount', label: 'Amount', width: '15ch', align: 'end', sign: { field: 'direction', minus: 'owed_by_me' } },
-          { field: 'due', label: 'Due', width: '13ch', align: 'end' },
-          { field: 'changed', label: 'Changed by', width: '18ch' },
-        ],
-        order: [{ field: 'due', dir: 'asc' }],
-        empty: 'Nothing is coming in or going out.',
-        /* THE NEXT DOZEN BY DATE, so the charts after it stay near; the list holds the rest. */
-        limit: 12,
-      },
-      {
-        /* WHERE THE LAST YEAR'S MONEY WENT, from the rows that say when they were paid. */
-        kind: 'bar',
-        heading: 'Paid out, last 12 months',
-        span: 7,
-        source: 'register.obligations',
-        where: 'state is paid, direction is owed by me, settled after -12m',
-        columns: [{ field: 'category' }, { field: 'amount' }],
-        limit: 8,
-        /* WHAT NO CATEGORY HOLDS IS SAID, LAST, and opens those rows so they can be given one. */
-        unset: 'Uncategorised',
-        empty: 'Nothing paid out in the last 12 months.',
-      },
-      {
-        /* WHAT GOES OUT EVERY MONTH, by what it is for, at each cost's monthly share, and what no category holds. */
-        kind: 'split',
-        heading: 'Every month',
-        span: 5,
-        source: 'metric.every-month-by-category',
-        limit: 6,
-        unset: 'Uncategorised',
-        empty: 'Nothing repeats every month.',
-      },
-      {
-        /* WHERE THE MONEY IS, one card an account, with the day each balance was true. */
+        /* WHERE THE MONEY IS, one card an account, with the day each balance was true. SECOND AND NOT LAST, because a
+           fresh record's first job is to say what is in the bank, and every figure above reads from it. */
         kind: 'cards',
         heading: 'Accounts',
-        span: 12,
+        span: 8,
         source: 'register.accounts',
         columns: [
           { field: 'name', as: 'title' },
@@ -2117,53 +1937,149 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
         stale: { field: 'as_of', after: '7d' },
         empty: 'No accounts yet. Add what is in the bank and this page starts from it.',
       },
-    ],
-  },
-
-  /**
-   * THE LEDGER IS THE PAGE ABOUT WHAT HAPPENED, and Overview is the page about what is going to. They
-   * are separate because they answer different questions with different rows: Overview walks forward
-   * from a balance over promises, and this one looks back over payments that have cleared. Putting
-   * both on one page was what made the old Money page a list of everything and an answer to nothing.
-   *
-   * EVERY BLOCK LEAVES OUT TRANSFERS AND ANYTHING STILL PENDING, the same two clauses the figures
-   * carry, so a total on this page and the tile above it are about the same set of rows.
-   */
-  ledger: {
-    page: 'ledger',
-    title: 'Ledger',
-    nav: { section: 'Money', order: 20 },
-    icon: 'rows',
-    requires: ['register.transactions', 'register.accounts', 'register.categories', 'register.recurring', 'register.installments', 'register.snapshots'],
-    pack: 'money-core',
-    blocks: [
       {
-        kind: 'stat',
-        lead: true,
-        heading: 'Last 30 days',
-        span: 12,
-        cells: [
-          { metric: 'spent-30d', label: 'Spent' },
-          { metric: 'received-30d', label: 'Received' },
-          /* THE SAME FIGURE OVERVIEW LEADS WITH, under the word this page uses for it. Two tiles
-             two clicks apart that mean one thing now read one number, which is what they did not. */
-          { metric: 'every-month-out', label: 'Repeating, out', note: '{{every-month-in}} coming in' },
-          { metric: 'txn-uncategorised', label: 'Without a category' },
-        ],
+        /* THE FIRST BALANCE IS ADDED HERE, beside the accounts it joins, and not from a link at the foot of the page that
+           leaves it. */
+        kind: 'capture',
+        heading: 'Add an account',
+        span: 4,
+        register: 'accounts',
       },
       {
-        /* A NOTE THAT DRAWS ONLY WHEN THERE IS SOMETHING TO DO, and says what is true rather than what
-           to do about it. The rule has already filed what it could; this is the remainder. */
+        /* WHAT A RULE OR AN AGENT HAS ASKED ABOUT MONEY, answered where it is shown, three at a time, and the rest are in
+           Decide. No `empty:` of its own: with nothing waiting the queue says its own line (`QUEUE_CLEARED` in
+           `packages/render/src/queue.ts`). */
+        kind: 'queue',
+        heading: 'Waiting on you',
+        span: 12,
+        source: 'governance.open',
+        where: 'list is obligations or transactions or accounts or recurring or installments',
+        limit: 3,
+      },
+      {
+        /* HOW LONG THE MONEY LASTS: cash remembered up to today, then the walk from Cash now, a repeating row
+           spent every time it comes round. A reader can ask what if clients pay later, what if there is
+           spending the record does not know, or what if a large movement does not happen; the answer is
+           arithmetic over the same walk, and nothing is written. Every movement is in the fold under it. */
+        kind: 'forecast',
+        heading: 'Cash ahead',
+        span: 12,
+        source: 'forecast.runway',
+        opening: { metric: 'cash-now' },
+        recorded: 'cash-now',
+        /* THE LEGS ARE THE LISTS THAT HOLD A DATED AMOUNT (`CASH_LEGS`), the one array the tiles above walk too. A runway
+           that is too high is the direction this block must never be wrong in, because a person reads it to decide what
+           to shut down, so every list that moves money on a day is a leg: bills, what repeats, instalments, money on its
+           way, and subscriptions where Estate is held. */
+        from: CASH_LEGS,
+        /* A YEAR DRAWN FIRST, AND UP TO FIVE AND TO THE LAST DATED MOVEMENT OFFERED, because an instalment plan or a loan
+           can run a decade and a quarter is too short to see one end. */
+        horizon: 365,
+        horizons: [90, 180, 365, 730, 1825, 'last'],
+        /* COUNTING A PLAN OR A STREAM IN OR OUT IS ONE CONTROL, `count`, and `leave` is folded into it: two controls over
+           the same streams with opposite meanings was one question asked two ways. Drift draws a slider only for a pair
+           some step was converted through, so a record in one currency sees none. `sell` offers what a pack declares
+           `sellable` (the holdings pack's figures), and draws nothing on a record that holds none. */
+        knobs: ['horizon', 'late', 'spend', 'count', 'grow', 'drift', 'sell'],
+        /* THE LATE KNOB MARKS HOW LATE MONEY HAS COME IN, and the chart says how many days are left when the
+           walk goes under inside a month. */
+        late: 'days-late-in',
+        under: 30,
+        empty: 'Nothing dated in the next twelve months.',
+      },
+      {
+        /* THE NEXT THIRTY DAYS AS ARITHMETIC: cash now, plus what arrives, less what leaves, and where
+           that lands. It walks what the block above it walks, over a shorter horizon, and it is the same array,
+           so a leg in one and not the other cannot become two answers about the same thirty days. */
+        kind: 'bridge',
+        heading: 'The next 30 days',
+        span: 5,
+        source: 'forecast.runway',
+        opening: { metric: 'cash-now' },
+        from: CASH_LEGS,
+        horizon: 30,
+        empty: 'Nothing dated in the next 30 days.',
+      },
+      {
+        /* WHERE THIS MONTH'S MONEY WENT, BY WHAT IT WAS FOR, from what moved and not from what was promised: the clauses
+           of `spent-by-category-month`, cleared and not between your own accounts. What no category holds is said last
+           and opens those rows, so the hole is a job and not a gap. */
+        kind: 'split',
+        heading: "Where this month's money went",
+        span: 7,
+        source: 'register.transactions',
+        where: 'state is cleared, transfer is false, direction is out, on at least bom',
+        columns: [{ field: 'category' }, { field: 'amount' }],
+        limit: 6,
+        unset: 'Uncategorised',
+        empty: 'Nothing has gone out this month.',
+      },
+      {
+        /* WHAT FALLS DUE IN THE NEXT THIRTY DAYS, ACROSS MONEY'S LISTS THAT HOLD A DUE DAY, overdue first and then by
+           day, in the order the record gives (`deadlines`). The amount carries its own sign, so which way a row's money
+           goes is a property of the row rather than the table it sits in. */
+        kind: 'table',
+        heading: 'Coming up',
+        span: 12,
+        source: 'deadlines',
+        where: 'list is obligations or recurring or installments',
+        horizon: 30,
+        columns: [
+          { field: 'title', label: 'Description', width: 'minmax(14ch,1fr)' },
+          { field: 'amount', label: 'Amount', width: '15ch', align: 'end', sign: { field: 'direction', minus: 'out' } },
+          { field: 'day', label: 'Due', width: '13ch', align: 'end' },
+        ],
+        limit: 12,
+        empty: 'Nothing falls due in the next 30 days.',
+      },
+      {
+        /* NOTES THAT DRAW ONLY WHEN THEY ARE TRUE, and say what is late, never what the law says about it: a page
+           everybody's Money draws does not speak for one country's courts. */
         kind: 'note',
         tone: 'warn',
-        heading: 'Rows with no category',
+        heading: 'Late to you',
         span: 12,
-        body: '{{txn-uncategorised}} payments in the last three months say nothing about what they were for, so the chart below leaves them in Uncategorised.',
-        when: { metric: 'txn-uncategorised', gt: 0 },
+        body: 'Money you are owed has gone past its date: {{late-in}} in all.',
+        when: { metric: 'late-in', gt: 0 },
       },
       {
-        /* WHAT MOVED, NEWEST FIRST. The amount carries its own sign from the row, and the last column
-           says who wrote it, so a row a rule categorised and a row a person typed are told apart. */
+        kind: 'note',
+        tone: 'bad',
+        heading: 'Late to pay',
+        span: 12,
+        body: 'Money you owe has gone past its date: {{overdue}} in all.',
+        when: { metric: 'overdue', gt: 0 },
+      },
+      {
+        /* MONTH BY MONTH: what moved in and out in the twelve months to now, read from `transactions`, and what is due in
+           the three after, with what was left each month as a line. The current month is so far, and the months ahead
+           are what is due once plus what repeats at its monthly share, in every one of them. */
+        kind: 'series',
+        heading: 'In and out, by month',
+        span: 12,
+        series: [
+          { metric: 'in-by-month', then: 'in-due-by-month', each: 'every-month-in', label: 'Money in' },
+          { metric: 'out-by-month', then: 'out-due-by-month', each: 'every-month-out', label: 'Money out', dir: 'out' },
+        ],
+        back: 12,
+        ahead: 3,
+        net: true,
+        empty: 'Nothing moved or due in these months.',
+      },
+      {
+        /* WHAT GOES OUT EVERY MONTH, by what it is for, at each line's monthly share: the parts of `every-month-out`, over
+           the same rows. */
+        kind: 'split',
+        heading: 'Every month',
+        span: 12,
+        source: 'metric.every-month-by-category',
+        limit: 6,
+        unset: 'Uncategorised',
+        empty: 'Nothing repeats every month.',
+      },
+      {
+        /* WHAT MOVED, NEWEST FIRST. The amount carries its own sign from the row. Ten, so the page stays a page; the list
+           holds the rest, and the table's own link opens it. */
         kind: 'table',
         heading: 'What moved',
         span: 12,
@@ -2177,79 +2093,19 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
           { field: 'on', label: 'Date', width: '13ch', align: 'end' },
         ],
         order: [{ field: 'on', dir: 'desc' }],
-        limit: 12,
+        limit: 10,
         empty: 'Nothing has moved yet. Add what left the bank and this page starts from it.',
       },
       {
-        /* WHERE THE YEAR'S MONEY WENT, from rows that cleared rather than from rows somebody meant to
-           pay. `Uncategorised` is drawn last and opens those rows, so the hole is a job and not a gap. */
-        kind: 'bar',
-        heading: 'Where it went, 12 months',
-        span: 7,
-        source: 'register.transactions',
-        where: 'state is cleared, transfer is false, direction is out, on after -12m',
-        columns: [{ field: 'category' }, { field: 'amount' }],
-        limit: 8,
-        unset: 'Uncategorised',
-        empty: 'Nothing has gone out in the last 12 months.',
-      },
-      {
-        /* MONTHLY ITEMS ONLY, and the heading is why. A quarterly and a yearly row summed beside a
-           monthly one is three units added together, which is the mistake `LOOKUPS.per_month` exists
-           to stop; the figure above draws all three at their monthly share, and this draws the ones
-           whose amount is already a month. */
-        kind: 'split',
-        heading: 'Every month, by what it is for',
-        span: 5,
-        source: 'register.recurring',
-        where: 'state is live, direction is out, every is monthly',
-        columns: [{ field: 'category' }, { field: 'amount' }],
-        limit: 6,
-        unset: 'Uncategorised',
-        empty: 'Nothing repeats every month.',
-      },
-      {
-        /* SIX AND SIX, AND IT WAS SEVEN AND FIVE. Both of these are three-column tables, and
-           `floorFor` gives a table two twelfths a column: the five below was clamped UP to six in
-           silence, which pushed 7 + 6 past twelve, wrapped, and left the row above this pair four
-           twelfths short of the page. Two halves is the only pair of survivable spans that tiles. */
-        kind: 'table',
-        heading: 'Still to pay, in parts',
-        span: 6,
-        source: 'register.installments',
-        /* `direction is out` WAS MISSING AND THE TABLE LISTED RECEIPTS UNDER THE WORD PAY. Measured on
-           the shipped record: six open parts drawn under this heading, four of the proofing press
-           going out at GBP 1,875.00 and two of the Halden licence coming IN at GBP 2,400.00, the two
-           of them drawn without the minus the outgoing rows wear because `sign:` reads the very field
-           the filter did not. Four rows is what is still to pay. Both figures over this list,
-           `installments-left` and `installments-due-30d`, already carry the clause, and the second one
-           carries a comment about the day it was added to a figure that had added a payment to a
-           receipt; the table under the same word was left out of that repair. */
-        where: 'state is open, direction is out',
-        columns: [
-          { field: 'what', label: 'Description', width: 'minmax(14ch,1fr)' },
-          { field: 'amount', label: 'Amount', width: '15ch', align: 'end', sign: { field: 'direction', minus: 'out' } },
-          { field: 'due', label: 'Due', width: '13ch', align: 'end' },
-        ],
-        order: [{ field: 'due', dir: 'asc' }],
-        limit: 8,
-        empty: 'Nothing is being paid in parts.',
-      },
-      {
-        /* THE LAST WEEK OF NIGHTS. Four figures across one row is the shape a snapshot has, and a
-           person reading a week of them can see which of the four moved. */
-        kind: 'table',
-        heading: 'Night by night',
-        span: 6,
-        source: 'register.snapshots',
-        columns: [
-          { field: 'on', label: 'Date', width: '13ch' },
-          { field: 'cash', label: 'Cash', width: '14ch', align: 'end' },
-          { field: 'net', label: 'Net', width: '14ch', align: 'end' },
-        ],
-        order: [{ field: 'on', dir: 'desc' }],
-        limit: 7,
-        empty: 'No night has been recorded yet. The first is the night after Money goes in.',
+        /* WHAT RULES AND AGENTS DID TO MONEY, from the record's own log, so a payment a rule filed or a balance an agent
+           wrote is seen where the money is and not only in History. */
+        kind: 'feed',
+        heading: 'What agents and rules did',
+        span: 12,
+        source: 'activity',
+        where: 'actor is agent or rule, list is transactions or obligations or accounts',
+        first: 5,
+        empty: 'Nothing has been changed here by a rule or an agent yet.',
       },
     ],
   },

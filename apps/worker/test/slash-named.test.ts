@@ -54,7 +54,7 @@ const TASKS = {
 
 const DRAFT = '{"registers":["tasks"],"where":{"field":"state","is":"open"},"q":null}';
 const PROPOSAL =
-  '{"text":"Two tasks are open and {{ref:tasks#1}} is first.","body_kind":"rowset","body":{"register":"tasks","rows":[{"what":"Chase {{ref:tasks#1}}"}]},"flagged":false}';
+  '{"text":"Two tasks are open and {{ref:tasks#1}} is first.","body_kind":"rowset","body":{"register":"tasks","rows":[{"fields":{"what":"Chase the first"},"from":["tasks#1"]}]},"flagged":false}';
 
 /** An endpoint that answers a draft and then a proposal, over and over, and keeps every request it was sent. */
 const endpoint = () => {
@@ -105,24 +105,24 @@ async function stack() {
   return { api, net, opened, grant: bound.value.id, call, close: () => (sql.close(), own.close()) };
 }
 
-test("STATUS NAMES WHAT THIS WORKER SENDS: SLASH_MODEL on the included tier, the owner's own name once they choose one", async () => {
+test("STATUS NAMES WHAT THIS WORKER SENDS: SLASH_MODEL on the included tier, and byo is no tier this Worker runs", async () => {
   const s = await stack();
   const a = await s.call('status');
   assert.equal(a.status, 200, a.raw);
   assert.equal(a.value['tier'], 'a');
   assert.equal(a.value['model'], 'llama3', 'status named the package routing name, not what this deployment runs');
 
-  /* `byo` NEEDS NO KEY OF THE OWNER'S, so it is the tier that isolates the model name from the key. The owner's name goes
-     out as typed and the status says so; `SLASH_MODEL` is this host's answer for tier `a` and has no say here. */
+  /* `byo` IS NOT RUN ON THE CLOUD (`CLOUD_TIERS` in `src/slash.ts`): it names no address of the owner's, only a model name
+     for this Worker's own endpoint. The save is refused in the engine's words, and the included tier answers on. The
+     owner's own model name still reaches the endpoint on tier `b`, which the next case holds. */
   const set = await s.call('settings', { tier: 'byo', model: 'gpt-4o-mini' });
-  assert.equal(set.status, 200, set.raw);
-  assert.equal((await s.call('status')).value['model'], 'gpt-4o-mini');
+  assert.equal(set.status, 422, set.raw);
+  assert.match(set.raw, /ENUM_VALUE_UNKNOWN/u);
+  assert.equal((await s.call('status')).value['model'], 'llama3');
   const out = await s.call('propose', { question: 'Which tasks are open?' });
   assert.equal(out.status, 200, out.raw);
   assert.equal(out.value['body_kind'], 'rowset');
-  /* THE DRAFT IS THE HOST'S OWN CALL on every tier (`propose.ts` hands the owner's model to the proposal alone), so it goes
-     as `llama3`; the proposal is the owner's. */
-  assert.deepEqual([s.net.model(0), s.net.model(1)], ['llama3', 'gpt-4o-mini']);
+  assert.deepEqual([s.net.model(0), s.net.model(1)], ['llama3', 'llama3']);
   s.close();
 });
 

@@ -25,12 +25,33 @@
  * page above lists open records only, which is how the two objects `loop/research-restore.md` §5
  * measured outlived their record. So after the copies, the Directory is asked which records closed
  * before the cutoff, and each one's prefix is emptied.
+ *
+ * AND LAST, THE LEDGER IS MADE EQUAL TO THE EVENTS. Every run a record metered is a `pull` event in it,
+ * and the Directory's usage ledger is told of each by the pass that ran it, which can die between the
+ * two or be refused. So each record hands the Directory its last forty days of runs again
+ * (`replayUsage`), and a run already counted adds nothing, which makes a night that replays twice the
+ * same as one that replays once.
  */
+
+import type { Replayed } from '@braindog/host/actions';
 
 import { FINAL_KEPT_MS } from './destroy.ts';
 
-/** What one night came to. `53 §5.1` step 4's `walk.done`, in the fields this build can fill. */
-export type Walked = { records: number; backups: number; failed: number; expired: number; expiryFailed: number; ms: number };
+/**
+ * What one night came to. `53 §5.1` step 4's `walk.done`, in the fields this build can fill.
+ *
+ * `replay` IS THERE ONLY WHEN THE WALK WAS HANDED ONE: the runs the ledger counted new, the runs it would not take, and
+ * the records whose replay failed outright.
+ */
+export type Walked = {
+  records: number;
+  backups: number;
+  failed: number;
+  expired: number;
+  expiryFailed: number;
+  ms: number;
+  replay?: { counted: number; lost: number; failed: number } | undefined;
+};
 
 /** A page of record ids and the cursor to the next, absent at the end. The Directory's keyset shape, for both lists. */
 type Page = { ids: readonly string[]; cursor?: string | undefined };
@@ -51,6 +72,12 @@ export type Walk = {
   closed?: ((cutoff: number, cursor?: string) => Promise<Page>) | undefined;
   /** Empties one closed record's prefix and answers how many objects went: `expireFinal` over the bucket. */
   expire?: ((record: string) => Promise<number>) | undefined;
+  /**
+   * One record's metered runs from the last forty days, handed to the Directory's ledger again: `Record$.meterReplay`.
+   * `null` is a record with nothing to replay. ABSENT, NOTHING IS REPLAYED AND THE CLOSING LINE SAYS NOTHING ABOUT IT,
+   * for the reason `expire` is optional.
+   */
+  replay?: ((record: string) => Promise<Replayed | null>) | undefined;
   now: () => number;
 };
 
@@ -114,15 +141,39 @@ export async function nightlyWalk(o: Walk): Promise<Walked> {
     );
   }
 
+  /* AND LAST, EACH RECORD'S RUNS INTO THE LEDGER AGAIN. Last because a count that waits a night is still a count, and a
+     copy or an expiry that waits is a promise broken; a second page through the records rather than a step beside each
+     copy, for the reason the expiry above is one. A record's replay that throws is its own line and never the rest's. */
+  const replay = o.replay;
+  if (replay) {
+    const tally = { counted: 0, lost: 0, failed: 0 };
+    out.replay = tally;
+    await each(o.records, async (record) => {
+      try {
+        const again = await replay(record);
+        if (again === null) return;
+        tally.counted += again.counted;
+        tally.lost += again.lost;
+        if (again.lost > 0) o.moan?.(`walk ${record} replay lost=${String(again.lost)} of ${String(again.runs)} runs`);
+        if (again.reached === 'ceiling') o.moan?.(`walk ${record} replay stopped after ${String(again.walked)} events, before the forty days ended`);
+      } catch (e) {
+        tally.failed++;
+        o.moan?.(`walk ${record} replay=failed: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    });
+  }
+
   out.ms = o.now() - began;
   /* THE EXPIRY'S TWO FIELDS ONLY WHEN IT RAN. `expired_objects=0` from a walk that was never handed
-     the Directory's `closedBefore` would read, the morning after, as a night when nothing was due. */
+     the Directory's `closedBefore` would read, the morning after, as a night when nothing was due. The replay's fields
+     likewise. */
   const expiry = expire ? ` expired_objects=${String(out.expired)} expiry_failed=${String(out.expiryFailed)}` : '';
-  const done = `walk.done records=${String(out.records)} backups=${String(out.backups)} backups_failed=${String(out.failed)}${expiry} ms=${String(out.ms)}`;
+  const replayed = out.replay ? ` replayed_runs=${String(out.replay.counted)} replay_lost=${String(out.replay.lost)} replay_failed=${String(out.replay.failed)}` : '';
+  const done = `walk.done records=${String(out.records)} backups=${String(out.backups)} backups_failed=${String(out.failed)}${expiry}${replayed} ms=${String(out.ms)}`;
   /* WRITTEN ON EVERY NIGHT, INCLUDING AN EMPTY ONE. A Directory with no records and a Directory
      that answered nothing look identical in a log made only of per-record lines. */
   o.say?.(done);
-  if (out.failed > 0 || out.expiryFailed > 0) o.moan?.(done);
+  if (out.failed > 0 || out.expiryFailed > 0 || (out.replay !== undefined && (out.replay.failed > 0 || out.replay.lost > 0))) o.moan?.(done);
   return out;
 }
 

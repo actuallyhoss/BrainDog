@@ -166,8 +166,8 @@ test('nothing a reader was invited to read is hidden from them', () => {
 
   /* THE OPTION BODIES STAY. A gate that greys its buttons and takes the options with them has told a
      reader the question exists and nothing about it. */
-  assert.match(page, /<p class="card-body">\{option\.body\}<\/p>/u, 'the option bodies no longer read the way this test assumes');
-  const bodyAt = page.indexOf('<p class="card-body">{option.body}</p>');
+  assert.match(page, /<p class="card-body"><Cited text=\{because\}/u, 'the option bodies no longer read the way this test assumes');
+  const bodyAt = page.indexOf('<p class="card-body"><Cited text={because}');
   const optionsAt = page.indexOf('{#each question.options as option, i}');
   assert.ok(optionsAt >= 0 && bodyAt > optionsAt, 'the option loop no longer reads the way this test assumes');
   assert.doesNotMatch(page.slice(optionsAt, bodyAt), /answerable/u, 'an option’s body is drawn only for a reader who may answer');

@@ -291,9 +291,10 @@ test('THE WALK THAT BUILDS THE REF MAP HAPPENS ONCE PER REGISTER, however many t
   assert.equal(asked('list', 'things'), 1);
   assert.equal(asked('list', 'obligations'), 4, 'a read of the asked register was skipped');
 
-  /* AND THE MAP IS READ IN BOTH DIRECTIONS: a ref named by its number goes out as the target's own id. */
+  /* AND THE MAP IS READ IN BOTH DIRECTIONS: a ref named by its number goes out as the target's own id, inside the
+     chips' sentence, which the route decodes as the JSON string it is sent as. */
   const filtered = sent.filter((r) => r.name === 'list' && r.params.get('register') === 'obligations')[2];
-  assert.deepEqual(JSON.parse(filtered?.params.get('where') ?? 'null'), { field: 'party', is: AMARA });
+  assert.equal(JSON.parse(filtered?.params.get('where') ?? 'null'), `party is ${AMARA}`);
 
   /* A COUNT IS ONE ROW, because only `matched` is read off it. */
   const counting = sent.filter((r) => r.name === 'list' && r.params.get('register') === 'obligations')[3];

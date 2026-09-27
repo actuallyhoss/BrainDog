@@ -57,7 +57,7 @@ import type {
   RegisterDecl,
 } from '../schema.ts';
 
-export { LOOKUPS, NOW, TODAY } from '@braindog/seed';
+export { NOW, TODAY } from '@braindog/seed';
 
 /**
  * The sample's daily series, as a record's snapshots would hold them: ninety days of `cash-now`,

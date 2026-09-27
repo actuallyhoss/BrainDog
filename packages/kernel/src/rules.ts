@@ -28,7 +28,7 @@ import { ok, refused } from '@braindog/ports';
 import { jsonPath, compile, type Predicate, type Schema } from '@braindog/where';
 
 import type { Entry } from './index.ts';
-import { exponentOf } from './ingest.ts';
+import { moneyText } from './ingest.ts';
 import { sealedEver } from './declare.ts';
 import { instant } from './migrate.ts';
 import { spanMs } from './vault.ts';
@@ -85,20 +85,24 @@ export type RuleAction =
  * is a rule that grew a trigger rather than a ninth kind: the rules already installed in somebody's record are
  * automations the canvas can open, with no migration and no second engine doing the same job.
  *
- * ONE KEY, and `every` is the only one with companions (`at`, `day`, `month`). A body naming two triggers is refused
- * rather than read as "either", because nothing downstream could say which one started a run.
+ * ONE KEY, and `every` is the only one with companions (`at`, `day`, `month`, `late`). A body naming two triggers is
+ * refused rather than read as "either", because nothing downstream could say which one started a run.
  *
  * `day` IS A WEEKDAY ON A WEEKLY CLOCK AND A DAY OF THE MONTH ON A CLOCK OF MONTHS (`every: 1mo`, `3mo`, `1y`): `mon` to
  * `sun` there, and 1 to 31 or `last` here, which is why it is a number or a word. `month` is the month a clock of more
- * than one month counts from (`clock.ts`).
+ * than one month counts from (`clock.ts`). `late` is a span: a turn the drain reaches later than that after it was due
+ * is recorded as skipped and not taken (`flow.ts`'s `onClock`).
+ *
+ * `metric` STARTS A RUN WHEN ITS FIGURE CHANGES SIDE of the line `crosses` draws (`target` is the figure's own), read by
+ * the hourly sweep. `decided` starts one when a question in Decide is decided: `about` narrows it to the questions one
+ * declaration filed or proposes, and `option` to one answer, by its id or its words.
  */
 export type Trigger =
   | { written: { register: string; op?: ('create' | 'update' | 'delete')[]; fields?: string[]; from_rules?: boolean } }
   | { arrival: { ingest?: string; channel?: 'webhook' | 'email' | 'paste' | 'api' | 'pull'; state?: string[] } }
-  | { every: string; at?: string; day?: string | number; month?: string }
+  | { every: string; at?: string; day?: string | number; month?: string; late?: string }
   | { metric: { id: string; crosses: 'target' | { lte: number } | { gte: number } } }
-  /** Reserved. A run's own asks resume it without this, and the lint refuses it as not in this build. */
-  | { decided: { automation?: string } }
+  | { decided: { about?: string; option?: string } }
   | { manual: true };
 
 /**
@@ -218,8 +222,19 @@ export type RulesDeps = {
     batch: string,
     stamp: Record<string, string>,
   ) => Result<Entry>;
-  /** A question through the gate. It writes a suggestion and changes nothing else. */
-  suggest: (question: string, options: string[], actor: string) => Result<{ id: string }>;
+  /**
+   * A question through the gate. It writes a suggestion and changes nothing else.
+   *
+   * `about` IS THE ROW THE QUESTION IS ABOUT, as `<register>#<seq>` (or the row's id where it has no number), kept on the
+   * suggestion's body. Decide's queue reads it (`pages.ts`'s `QueueQuestion.about`), and a run a `decided` trigger starts
+   * from the answer reads that row as `{{trigger.row.<field>}}`. Absent for a question no row asked.
+   */
+  suggest: (question: string, options: string[], actor: string, about?: string) => Result<{ id: string }>;
+  /**
+   * The project a row belongs to, by its list's scope field, or `null` for a global row. The inline pass reads it for a
+   * rule that says `project:`; a caller without it runs no such rule, since a row it cannot place is not the project's.
+   */
+  projectOf?: (entry: Entry) => string | null;
   schedule: (key: string, payload: unknown, pending: boolean) => boolean;
   /**
    * Queue one call a rule runs (`actions.ts`'s `queueCall`), or leave it out.
@@ -273,7 +288,19 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
   const sealedHere = (): Set<string> => (sealed ??= sealedOf(deps.sql, fired.register));
 
   for (const rule of order(deps.rules(fired.register))) {
+    /* THE THREE KEYS THE LINT USED TO REFUSE HERE, READ. `enabled: false` stops the rule, `project:` holds it to one
+       project's rows, and `limits.runs_per_day` to that many firings in the last twenty-four hours, as a run's is
+       counted. Before this the lint refused all three on the inline path as `NOT_IN_THIS_BUILD`, so a plain write rule
+       could be retired and never switched off. */
+    if (rule.enabled === false) continue;
+    if (rule.project !== undefined && (deps.projectOf?.(fired.entry) ?? null) !== rule.project) continue;
     if (!matches(deps, schema, rule, fired.entry)) continue;
+    const perDay = rule.limits?.runs_per_day;
+    if (perDay !== undefined && firedToday(deps, rule.rule) >= perDay) {
+      out.suppressed.push(rule.rule);
+      observe(deps.sql, deps.nowMs, [{ kind: 'write.refused', subject: `${fired.register}.rule.${rule.rule}.limits.runs_per_day:OUT_OF_BOUNDS` }]);
+      continue;
+    }
 
     /* THE MARKER IS CLAIMED FIRST AND KEPT LAST. Claimed here, because the schedule table's unique
        index is what makes "once" hold against two passes at once and a second mechanism would be a
@@ -521,7 +548,9 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
       /* FILLED AFTER THE WRITE, from the row as the write left it, which is what the question has always read. */
       const question = said(ask.question, `${ask.at}.suggest.question`, 'a question in the queue');
       if (question === null) continue;
-      const opened = deps.suggest(question, ask.options, `rule:${rule.rule}`);
+      /* AND IT NAMES ITS ROW, so Decide can say which one and a `decided` rule's run can read it. */
+      const about = fired.entry.seq === null ? fired.entry.id : `${fired.entry.register}#${fired.entry.seq}`;
+      const opened = deps.suggest(question, ask.options, `rule:${rule.rule}`, about);
       if (refused(opened)) out.refused.push(opened.refusal);
       else happened = true;
     }
@@ -546,6 +575,9 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
        whose bound refused it, kept its marker for ever — so filling in the sizes, or fixing the
        bound, could never take effect. A rule that did nothing has not fired. */
     if (key !== null && !happened) deps.sql.exec("DELETE FROM schedule WHERE kind = 'rule' AND key = ?", key);
+    /* A FIRING IS COUNTED ONLY WHERE THE RULE DID SOMETHING, as the marker is kept only then: a rule that did nothing has
+       not fired, and should not spend its day on it. */
+    if (happened && perDay !== undefined) countFiring(deps, rule.rule, fired.batch);
 
     if (did.length) out.fired.push({ rule: rule.rule, actions: did });
     if (stop) {
@@ -702,14 +734,23 @@ function rowValue(head: string, tail: string | undefined, row: Entry, nowMs: num
   return String(value);
 }
 
-/** Money as a sentence writes it, in the currency's own decimals: `GBP 1234.50`, `JPY 129900`. */
-const moneyWords = (m: { amount: number; currency: string }): string => `${m.currency} ${(m.amount / 10 ** exponentOf(m.currency)).toFixed(exponentOf(m.currency))}`;
+/**
+ * Money as a sentence writes it: `GBP 1,234.50`, `JPY 129,900`, `GBP −39.00`.
+ *
+ * THE KERNEL'S ONE `moneyText`, AND NOT A SECOND SPELLING OF IT. This wrote `toFixed` with no grouping and a hyphen for
+ * a minus, so every question, note and patch a rule filled stored `GBP 2400.00` while a digest (`digest.ts`) wrote the
+ * same amount `GBP 2,400.00`, and a screen printed the first verbatim. One function now writes money into every
+ * sentence the record keeps: code first, grouped, the currency's own decimals and a true minus. A screen draws it in the
+ * record's currency (`moneyInText` in the web's `lib/record/money.ts`); the kernel may not import the renderer that
+ * draws figures, which is why `moneyText` lives in `ingest.ts` beside the exponent table it reads.
+ */
+const moneyWords = (m: { amount: number; currency: string }): string => moneyText(m.amount, m.currency);
 
 /**
  * `{{metric.<id>}}` as a run's fill writes it: the figure read as a page reads it (`evaluateMetric` with the record's
  * rates), in its own unit, or the dash where the record holds no such figure or the figure refuses to be read.
  *
- * MONEY IS WRITTEN AS A MONEY FIELD IS, `GBP 1234.50`, so a sentence holding `{{amount}}` and `{{metric.cash-now}}`
+ * MONEY IS WRITTEN AS A MONEY FIELD IS, `GBP 1,234.50`, so a sentence holding `{{amount}}` and `{{metric.cash-now}}`
  * says both the same way. The survey's brief wrote `1234.50 GBP`; that is the quantity order (`3 h`), and a note that
  * put the currency first for the row and last for the figure would read as two kinds of number. Money in several
  * currencies that no rate adds up is each amount, as a page writes it (`pages.ts`'s `valueAt`).
@@ -822,6 +863,44 @@ function expand(deps: RulesDeps, name: string, spec: CreateSpec, from: Standing)
       at: 'bound',
     });
 
+  /* WITH NO ROW TO STAND ON, THE BOUND IS A DAY'S, as the grammar says it. On a row the bound caps one matrix, and the
+     row's `once_per` keeps it to one matrix a row; a clock or a button has no row, so a bound per run capped nothing
+     that mattered: the audit of 25 September (C6) had `bound: 1` on a fifteen-minute clock make 200 rows in 50 hours.
+     Counted over the rows this rule made in any list, read by the `_rule` the unique index leads with, less the ones
+     this parent made, so a turn taken again finds its own rows and not a spent day.
+
+     A CLOCK'S DAY IS THE DAY BEFORE ITS TURN, NOT BEFORE THE WALL CLOCK. A drain that comes back after three months off
+     takes every missed monthly turn in one pass (`flow.ts`'s `onClock`), all at one wall instant, so a day counted by
+     `created_at` let the first turn make its row and refused every later one: the missed months' tasks (C2) still not
+     made, only now failed with a sentence. A clocked parent is `<rule>@<turn>`, the turn an ISO instant, and every ISO
+     instant sorts as its time does, so the rows whose parent falls between this turn less a day and this turn are the
+     ones the turns of that day made. Anything else (a button, an arrival) has no turn and is counted by when its rows
+     were made. */
+  if (from.entry === null) {
+    const turn = from.parent.startsWith(`${name}@`) ? Date.parse(from.parent.slice(name.length + 1)) : NaN;
+    const made =
+      (Number.isFinite(turn)
+        ? deps.sql.one<{ n: number }>(
+            "SELECT count(*) AS n FROM entry WHERE json_extract(fields, '$._rule') = ? AND json_extract(fields, '$._parent') > ? AND json_extract(fields, '$._parent') < ?",
+            name,
+            `${name}@${instant(turn - DAY_MS)}`,
+            from.parent,
+          )
+        : deps.sql.one<{ n: number }>(
+            "SELECT count(*) AS n FROM entry WHERE json_extract(fields, '$._rule') = ? AND json_extract(fields, '$._parent') <> ? AND created_at > ?",
+            name,
+            from.parent,
+            instant(deps.nowMs - DAY_MS),
+          )
+      )?.n ?? 0;
+    if (made + tuples.length > bound)
+      return nothing({
+        code: 'OUT_OF_BOUNDS',
+        fix: `${name} has made ${made} ${made === 1 ? 'row' : 'rows'} in the day before this ${Number.isFinite(turn) ? 'turn' : 'run'} with no row to stand on, and its bound of ${bound} is the most it makes in a day that way. Nothing was created.`,
+        at: 'bound',
+      });
+  }
+
   /* A SECRET OR FILE FIELD IS COPIED INTO NO ROW THIS MAKES, unless into a field of the other list that never leaves
      either. Crossing one copies its values whatever the fields say, into `{{each.0}}` and into the `_each` every
      generated row carries, so that is refused first. Checked before anything is written, for the bound's reason: a
@@ -893,7 +972,7 @@ type CreateSpec = { register: string; each?: string[]; bound: number; fields: Re
 
 /**
  * Where a create stands: the row that fired it, or none, and the id its rows name as their `_parent`. On a row the parent
- * is the row; with no row it is the run (`createAlone`).
+ * is the row; with no row it is the clock's turn or the run (`createAlone`).
  */
 type Standing = { entry: Entry | null; parent: string; register: string | null; batch: string; run?: RunFill };
 
@@ -905,14 +984,17 @@ type Standing = { entry: Entry | null; parent: string; register: string | null; 
  * the only thing that reached `expand`. So a rule could not make the next task each month, which is the one thing a
  * monthly clock with a create is for (`clock-monthly.test.ts`).
  *
- * THE RUN IS THE PARENT. `expand` makes a tuple once per parent, and on a row the parent is the row. A clock has none,
- * and a parent of the rule alone would make the first month's task and then find it already there every month after;
- * the run is one per turn, so each turn makes its row, and the same run taken again from its create after a drain died
- * between the write and the save finds the row it made (`clock-create.test.ts`). The bound, the ceiling and the refusal
- * of a copied secret are `expand`'s, as they are on a row.
+ * THE TURN IS THE PARENT ON A CLOCK, AND THE RUN ANYWHERE ELSE. `expand` makes a tuple once per parent, and on a row the
+ * parent is the row. A clock has none, and a parent of the rule alone would make the first month's task and then find
+ * it already there every month after. The run was the parent at first, one per turn, and the audit of 25 September
+ * (C5) delivered one turn twice and got two rows: two runs, two parents. So a clocked run passes `parent` as
+ * `<rule>@<turn>` (`flow.ts`'s `advance`), and two runs of one turn find each other's row. A button or an arrival has no
+ * turn, so its run stays the parent, and the same run taken again from its create after a drain died between the write
+ * and the save finds the row it made (`clock-create.test.ts`). The bound, the ceiling and the refusal of a copied secret
+ * are `expand`'s, as they are on a row.
  */
-export function createAlone(deps: RulesDeps, rule: string, spec: CreateSpec, run: string, by?: RunFill): { refusals: Refusal[]; grew: boolean } {
-  return expand(deps, rule, spec, { entry: null, parent: run, register: null, batch: run, ...(by ? { run: by } : {}) });
+export function createAlone(deps: RulesDeps, rule: string, spec: CreateSpec, run: string, by?: RunFill, parent: string = run): { refusals: Refusal[]; grew: boolean } {
+  return expand(deps, rule, spec, { entry: null, parent, register: null, batch: run, ...(by ? { run: by } : {}) });
 }
 
 /**
@@ -961,6 +1043,47 @@ export function marker(sql: Sql, mint: () => string, nowMs: number, key: string,
     pending ? 'pending' : 'done',
   );
   return true;
+}
+
+/**
+ * The key of one firing of an inline rule that declares `limits.runs_per_day`. `flow.` because a rule's id cannot hold
+ * a dot, so no reminder (`<rule>:<row>`) and no `once_per` key (a JSON array) can fall in the range `firedToday` reads.
+ */
+const FIRED = 'flow.fired:';
+const firedFrom = (rule: string): string => `${FIRED}${rule}:`;
+/** The first key past every key of `firedFrom(rule)`: `;` is the character after `:`. */
+const firedTo = (rule: string): string => `${FIRED}${rule};`;
+
+/**
+ * How many times an inline rule fired in the last twenty-four hours, as a run's day is counted (`flow.ts`'s `startRun`).
+ *
+ * A `schedule` ROW PER FIRING, DONE AND NEVER DUE, for the reason `once_per` is one: the table's unique `(kind, key)`
+ * index is the one this reads by, and an inline firing leaves no run row to count. Only a rule that declares the limit
+ * writes one, at most its limit a day, and `pruneFirings` takes them once a day old.
+ */
+export function firedToday(deps: Pick<RulesDeps, 'sql' | 'nowMs'>, rule: string): number {
+  return (
+    deps.sql.one<{ n: number }>(
+      "SELECT count(*) AS n FROM schedule WHERE kind = 'rule' AND key >= ? AND key < ? AND due_at > ?",
+      firedFrom(rule),
+      firedTo(rule),
+      instant(deps.nowMs - DAY_MS),
+    )?.n ?? 0
+  );
+}
+
+/**
+ * ONE KEY PER FIRING, NOT PER BATCH. Keyed by the batch alone, a batch that fired the rule on every row it wrote was
+ * counted as one firing, so `runs_per_day` held nothing back from a bulk write. A minted id makes every
+ * firing its own row; a batch that rolls back takes its rows with it, since they are written inside it.
+ */
+function countFiring(deps: RulesDeps, rule: string, batch: string): void {
+  marker(deps.sql, deps.mint, deps.nowMs, `${firedFrom(rule)}${batch}:${deps.mint()}`, {}, false);
+}
+
+/** Every firing counted more than a day ago, which no limit reads any more. The hourly sweep calls it. */
+export function pruneFirings(sql: Sql, nowMs: number): void {
+  sql.exec("DELETE FROM schedule WHERE kind = 'rule' AND key >= ? AND key < ? AND due_at <= ?", FIRED, 'flow.fired;', instant(nowMs - DAY_MS));
 }
 
 /* ── what it would do ─────────────────────────────────────────── */

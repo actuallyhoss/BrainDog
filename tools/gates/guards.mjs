@@ -42,6 +42,16 @@
  *
  *   c · Every method has one at all, before anything else in its body reads an argument.
  *
+ *   d · No method name is written in two of the record's files. The surface is `index.ts`'s methods and then every
+ *       file under `methods/`, spread into one object, so the later of two same-named methods wins without a word and
+ *       the guard this gate read may be on the one nobody calls.
+ *
+ * WHERE IT READS, SINCE THE TABLE AND THE SURFACE ARE IN MORE THAN ONE FILE. Routes are the rows of
+ * `packages/host/src/index.ts` and of every file under `packages/host/src/routes/`; methods are those of
+ * `packages/record/src/index.ts` and of every file under `packages/record/src/methods/`
+ * (`loop/finish/contracts.md` §0 point 5). A folder that is not there holds nothing, which is a tree from before the
+ * folders existed, and not a finding: the two index files are what must be there.
+ *
  * WHAT IT DOES NOT CHECK, SAID OUT LOUD. It reads the FIRST guard call and not the whole body, so a
  * method that guards correctly and then does something wider is green here. It also cannot tell
  * `guard(ctx, 'read')` from `guard(ctx, 'write')`: which LEVEL a method needs is a decision per
@@ -49,7 +59,7 @@
  * The group is the coarse fact, and the coarse fact is the one that was wrong.
  */
 
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -78,6 +88,32 @@ const read = (root, ...parts) => {
     return null;
   }
 };
+
+/**
+ * Every `.ts` file of one folder but its tests, sorted, as `{ file, text }` with `file` repository-relative, or none
+ * when the folder is not there.
+ *
+ * AN ABSENT FOLDER IS NOT A FINDING, and that is the difference from `read` above. The index files are the table and the
+ * surface, and losing one is losing the gate's subject; `routes/` and `methods/` are where rows and methods written
+ * since ARC-6 live, and a tree that has none (every seeded tree under `negative/` written before them) has nothing
+ * there to check.
+ */
+const folder = (root, ...parts) => {
+  let names;
+  try {
+    names = readdirSync(join(root, ...parts));
+  } catch (err) {
+    if (err?.code !== 'ENOENT') throw err;
+    return [];
+  }
+  return names
+    .filter((name) => name.endsWith('.ts') && !name.endsWith('.test.ts'))
+    .sort()
+    .map((name) => ({ file: [...parts, name].join('/'), text: read(root, ...parts, name) ?? '' }));
+};
+
+/** A route row, in the one-line shape both halves of the table are written in. */
+const ROW = /\{ name: '([a-zA-Z]+)', group: '([A-Z+]+)',/g;
 
 /**
  * ONE LIST, SHARED BY DATA AND `READ+`, BECAUSE THEY SHARE ONE REQUIREMENT.
@@ -148,15 +184,17 @@ export default function guards(
 ) {
   const findings = [];
 
-  /* ── the route table, as data ────────────────────────────────────────────── */
+  /* ── the route table, as data: `index.ts`'s rows, then each file under `routes/` ── */
   const host = read(root, 'packages', 'host', 'src', 'index.ts');
   const routes =
     host === null
       ? []
-      : [...host.matchAll(/\{ name: '([a-zA-Z]+)', group: '([A-Z+]+)',/g)].map((m) => ({
-          name: m[1],
-          group: m[2],
-        }));
+      : [host, ...folder(root, 'packages', 'host', 'src', 'routes').map((f) => f.text)].flatMap((text) =>
+          [...text.matchAll(ROW)].map((m) => ({
+            name: m[1],
+            group: m[2],
+          })),
+        );
 
   /**
    * NO ROUTE TABLE IS A FINDING ON PURPOSE, AND THIS IS THE PLACE TO SAY WHY, because the line reads
@@ -180,20 +218,34 @@ export default function guards(
   /* FOUR SPACES AND THEN A NAME, which is the indentation of the returned object's own methods and of
      nothing else in the file: the guard helpers sit at two, and everything inside a body at six or
      more. Anchoring on the shape rather than on a list is what makes a method added tomorrow visible
-     to this gate without anybody remembering to add it. */
-  const starts =
-    surface === null
-      ? []
-      : [...surface.matchAll(/^ {4}(?:async )?([a-zA-Z]+)\(/gm)].map((m) => ({
-          name: m[1],
-          at: m.index,
-        }));
+     to this gate without anybody remembering to add it. A file under `methods/` is written in the same
+     shape, a function returning an object of methods at four spaces, and is read the same way, each
+     file on its own so that no body runs on into the next file's. */
+  const surfaces =
+    surface === null ? [] : [{ file: 'packages/record/src/index.ts', text: surface }, ...folder(root, 'packages', 'record', 'src', 'methods')];
 
   const bodies = new Map();
-  starts.forEach((m, i) => {
-    const end = i + 1 < starts.length ? starts[i + 1].at : surface.length;
-    bodies.set(m.name, surface.slice(m.at, end));
-  });
+  const homes = new Map();
+  for (const { file, text } of surfaces) {
+    const starts = [...text.matchAll(/^ {4}(?:async )?([a-zA-Z]+)\((.*)$/gm)].map((m) => ({
+      name: m[1],
+      at: m.index,
+      /* A LINE ENDING IN `;` IS A CALL AT FOUR SPACES (a helper's body can hold one), NOT A METHOD, so it
+         is never a name `d` compares. It is still a start, as every match always was. */
+      defines: !m[2].trimEnd().endsWith(';'),
+    }));
+    starts.forEach((m, i) => {
+      const end = i + 1 < starts.length ? starts[i + 1].at : text.length;
+      bodies.set(m.name, text.slice(m.at, end));
+      if (!m.defines) return;
+      /* d · THE SAME NAME DEFINED IN TWO FILES. Within one file a second match is a helper's own shape and
+         the last one read is kept, as it always was; across two it is two methods, and the spread keeps one. */
+      const home = homes.get(m.name);
+      if (home !== undefined && home !== file)
+        findings.push(`${m.name} is a method in ${home} and in ${file}, and the record's surface keeps only one of them`);
+      homes.set(m.name, file);
+    });
+  }
 
   /** The first authorisation call in a body, ignoring the comments that explain why it is that one. */
   const guardOf = (body) => {

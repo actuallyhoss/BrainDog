@@ -237,6 +237,33 @@ blocks:
 Every rule reads only from declarations that already exist. **No new schema, and no inference from
 row content.**
 
+### As built (September 2026)
+
+T1 with T6 is built in the record, not in the kernel and not in the browser:
+`packages/record/src/emergent.ts` (`penFor`), answered on `boot` as `pen` (`45 §5.3`).
+
+- **What is offered.** One `PenItem` per list the caller reads that holds a row and that no installed
+  page reads, strongest first (the most rows), at most `PEN_MOST`. Only a person, or their token, who
+  reads every list is offered anything, and nothing while their `pen.suggest` preference is `false`.
+- **What an item is.** `{ id, kind: 'page', register, title, why, change: { to } }`: `id` is
+  `page:<list>`, `why` is one sentence ("Parts has 7 rows and no page yet."), and `change.to` is the
+  whole page declaration accepting it writes, which passes `kernel.lint` before it is answered.
+- **What the page holds.** `origin: derived`, `derived_from` and `requires` naming the list, then a
+  `stat` of up to `PEN_FIGURES_MOST` figures whose `source` is the list (T6; a figure that takes a
+  parameter is left out), then a `table` of its first `PEN_COLUMNS_MOST` fields that are not `secret`,
+  `document`, `json`, `list` or retired, ordered by the first indexed `day` descending else by `seq`
+  descending, `limit: 50`, `empty: Nothing in <name> yet.` A list with no such field is offered
+  nothing, so a secret is never a column. The slug is the list's id, or `<id>-rows` when that is taken.
+- **Where it would sit.** `nav: { section: <list name>, order: <last in that section> + 10 }`, offered
+  and not written: the system still never writes nav order (§2).
+- **Dismiss is terminal on every device**, as §4 asks: the id goes into the person's own
+  `pen.dismissed` preference in the record (`setPref`, at most `PEN_DISMISSED_MOST`, the oldest let go
+  first), and an id there is never answered again.
+
+A proposed page carries no `header:` and no `filters:`: both are refused at install as keys this build
+draws nowhere (`kernel/src/block-keys.ts` `PAGE_UNBUILT`), so the header above is not written into it.
+T2 to T5, and `kind: 'block'` and `kind: 'column'` items, are not built here.
+
 ---
 
 ## 6 · When they conflict

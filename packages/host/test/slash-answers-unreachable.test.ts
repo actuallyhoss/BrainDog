@@ -38,7 +38,7 @@ function slashAt(tier: 'a' | 'b' | 'byo') {
   const sql = openSqlite();
   const slash = createSlash({ sql, clock: fixedClock(NOW), inference: DOWN, record: {} as never });
   sql.exec(
-    'UPDATE settings SET tier = ?, model = ?, grant_id = ?, ask_cap = 3',
+    'UPDATE slash_settings SET tier = ?, model = ?, grant_id = ?, ask_cap = 3',
     tier,
     tier === 'a' ? null : 'llama3:8b',
     tier === 'b' ? 'g_01JZ8QK3F7R2M9V4XN6TCB5HAE' : null,
@@ -60,7 +60,7 @@ for (const tier of ['a', 'b', 'byo'] as const)
     assert.deepEqual(said, ['UNREACHABLE', 'UNREACHABLE', 'UNREACHABLE', 'UNREACHABLE', 'ok']);
 
     /* THE ROWS STAY, so a month of outages is still in the ledger, under the mark for a row that called nothing. */
-    const rows = sql.all<{ model: string; status: string; code: string | null }>('SELECT model, status, code FROM call ORDER BY id');
+    const rows = sql.all<{ model: string; status: string; code: string | null }>('SELECT model, status, code FROM slash_call ORDER BY id');
     assert.deepEqual(
       rows.filter((r) => r.code === 'UNREACHABLE').map((r) => [r.model, r.status]),
       Array.from({ length: 4 }, () => ['-', 'error']),

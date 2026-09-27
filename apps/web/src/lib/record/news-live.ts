@@ -1,11 +1,16 @@
 /**
- * Home's and History's reads against the record: the figures, what is new, and the log.
+ * Home's and History's reads against the record: what is new, and the log; and one figure as a tile, which the palette
+ * draws.
  *
  * A ROUTE-ONLY MODULE, loaded by the two screens that read it, like `page-live.ts`: the client carries the route table
  * as a value.
  *
  * EVERY REFUSAL IS THE RECORD'S OWN SENTENCE. `UNREACHABLE` and `UNAUTHORIZED` with no slug used to draw the sample's
  * figures, feed and log; there is no sample now (DIRECTION 26). A live answer is drawn from the answer and nothing else.
+ *
+ * EVERY SENTENCE THE RECORD STORED IS HANDED ON THROUGH `moneyInText`. The kernel writes an amount into a sentence the
+ * way a program reads it, "GBP 2,400.00", and a screen prints it the way a person does, "£2,400.00" in the home
+ * currency and "$4,800.00 USD" in any other (design.md §5, DSN-4). So the feed and the log leave here already spoken.
  */
 
 import { createClient, type Cursor, type EventLine } from '@braindog/client';
@@ -18,18 +23,8 @@ import { actorFor, forget, newsOf, readBoot, type Fetch } from './boot-live.ts';
 import { METRICS } from './declared.ts';
 import { noteOf } from './history-live.ts';
 import { format, fxNote, hrefFor, offTarget, partsText, targetLine } from './metrics.ts';
+import { moneyInText } from './money.ts';
 import type { AuditEvent, NewsItem } from './schema.ts';
-
-/** The three figures Home leads with, in the order it draws them. */
-export const HOME_FIGURES = ['owed-to-you', 'due-30d', 'overdue'] as const;
-
-/**
- * THE FIGURES HOME ASKS A RECORD FOR, AND NONE WHERE THEY CANNOT BE WORKED OUT. The three read Money's obligations,
- * so a record without that list (a student's) was asked for three figures it refuses every time. A use case that
- * declares its own Home asks for none: that page says what leads.
- */
-export const homeFigures = (lists: readonly { id: string }[], declared: boolean): readonly string[] =>
-  !declared && lists.some((l) => l.id === 'obligations') ? HOME_FIGURES : [];
 
 /**
  * A reading as the kernel's `metrics.ts` sends one, and only the keys read here.
@@ -51,6 +46,11 @@ const refusalOf = (out: { ok: false; refusal: Said } | { ok: false; conflict: un
 /**
  * One figure as a tile, the way a live `stat` block draws one (`page-live.ts`).
  *
+ * THE PALETTE DRAWS IT NOW, AND HOME DOES NOT. Home asked Money's three figures of every record holding `obligations`,
+ * which is the web knowing one pack by the name of its list; a Home that leads with figures declares a `stat` block,
+ * and the page reader draws it. The history below is Home's, and it is kept because the rule it bought still holds
+ * for every figure the palette draws.
+ *
  * THE VERDICT IS THE RECORD'S (`met`), and a figure over an empty list carries none, because a tick over an empty list
  * is a verdict on nothing. The label, the format and the target line are the declaration's.
  *
@@ -71,10 +71,9 @@ const refusalOf = (out: { ok: false; refusal: Said } | { ok: false; conflict: un
  *
  * AND THERE IS A THIRD STATE BETWEEN THOSE TWO, which `unsaidFigure` in `api.ts` answers for every engine that draws
  * this tile: a list that HOLDS rows where not one of them carries the field the figure reduces over. `page-live.ts` had
- * it and this file did not, so driven over `projects-earning` at `rows: 0, held: 27` — his own record, 27 projects
- * imported and `revenue` unset on all of them — Home answered `tone: "good"` with a door into a list of no rows and the
- * target line "never below zero", where the declared page answered no verdict, no door and the sentence. Home is the
- * first screen he opens, so it is the worst of the three places to have got this wrong.
+ * it and this file did not, so driven over `projects-earning` at `rows: 0, held: 27` (his own record, 27 projects
+ * imported and `revenue` unset on all of them), Home answered `tone: "good"` with a door into a list of no rows and the
+ * target line "never below zero", where the declared page answered no verdict, no door and the sentence.
  *
  * THE RULE IS ASKED, NOT READ A SECOND TIME. `50 §1` is this tree's bill for the same rule written twice; the reason
  * three engines diverged here at all is that the state was written on one of them. `news-live.test.ts` drives one
@@ -108,22 +107,23 @@ export function tileOf(id: string, r: Reading | null): Metric {
 /** `upTo` is the record's cursor for the newest line: a rowid for the owner, `e.<id>` for a member held to named lists. */
 export type News = { items: NewsItem[]; upTo: Cursor | null; sinceCapped: boolean };
 
-export type HomeRead = { from: 'live'; tiles: Metric[]; news: News } | { from: 'refused'; fix: string };
+export type HomeRead = { from: 'live'; news: News } | { from: 'refused'; fix: string };
 
 /**
- * Home's figures and what is new, asked together.
+ * What is new on Home, and nothing else.
  *
- * A FIGURE THE RECORD WILL NOT WORK OUT FOR THIS CALLER IS LEFT OUT. A figure over a register somebody may not read is
- * `METRIC_UNKNOWN` to them, and a tile saying so would name the figure the refusal exists to withhold.
+ * NO FIGURE IS ASKED HERE. What leads Home is a page the record declares (`home-<use case>`, else `home`), drawn by
+ * the page reader with its own figures; a record that declares none has no figure this file could name without
+ * knowing a pack (shell.md USE-2).
  */
-export async function readHome(base: string, me: string | null, io?: Fetch, asked: readonly string[] = HOME_FIGURES): Promise<HomeRead> {
+export async function readHome(base: string, me: string | null, io?: Fetch): Promise<HomeRead> {
   const client = createClient({ base, ...(io ? { fetch: io } : {}) });
-  const [news, ...figures] = await Promise.all([client.whatsNew(), ...asked.map((id) => client.metric(id))]);
+  const news = await client.whatsNew();
   if (!news.ok) return { from: 'refused', fix: refusalOf(news).fix };
+  const names = news.value.events.some((e) => e.actor.startsWith('p_') && e.actor !== me) ? await namesFor(base, io) : new Map<string, string>();
   return {
     from: 'live',
-    tiles: figures.flatMap((out, i) => (out.ok ? [tileOf(asked[i]!, out.value as Reading)] : [])),
-    news: { items: newsOf(news.value.events, me, news.value.events.some((e) => e.actor.startsWith('p_') && e.actor !== me) ? await namesFor(base, io) : new Map()), upTo: news.value.upTo, sinceCapped: news.value.sinceCapped },
+    news: { items: newsOf(news.value.events, me, names).map((item) => ({ ...item, text: moneyInText(item.text) })), upTo: news.value.upTo, sinceCapped: news.value.sinceCapped },
   };
 }
 
@@ -182,7 +182,7 @@ export async function readLog(base: string, me: string | null, io?: Fetch, befor
       by: actorFor(e.actor, me),
       kind: e.kind,
       ...(target === undefined ? {} : { target }),
-      note: e.note ?? (e.register !== null ? noteOf(e.register, e) : ''),
+      note: moneyInText(e.note ?? (e.register !== null ? noteOf(e.register, e) : '')),
       version: at,
     });
   }

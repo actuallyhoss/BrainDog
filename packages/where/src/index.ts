@@ -528,28 +528,31 @@ const CONTAINS_MAX = 40;
 const MAX_DEPTH = 3;
 
 /**
- * SIXTY-FOUR VALUES A CHUNK, AND IT BOUNDS THE STATEMENT'S SHAPE RATHER THAN ITS PARAMETER COUNT.
+ * SIXTY-FOUR VALUES, WHICH IS WHERE A LIST STOPS BINDING ONE PARAMETER A VALUE.
  *
- * Three documents publish the number and none of them was implemented. `34 §1.10`'s limits table:
- * *"`IN` chunk | 64 values a chunk, bounds the statement's shape; the 100-parameter ceiling is the
- * adapter's (33 §1), not the grammar's"*. `02 §6` says *"chunked at 64 values"* in the operator
- * table, and `38 §5` step 3 writes the algorithm out: slice at 64, one group per slice, `in` slices
- * joined with OR and `not_in` slices with AND, one parenthesis around them when there is more than
- * one. A list of 250 came out of here as a single OR chain of 250 terms.
+ * Three documents publish the number: `34 §1.10`'s limits table, `02 §6`'s operator table, and
+ * `38 §5` step 3, which writes the algorithm out: slice at 64, one group per slice, `in` slices joined
+ * with OR and `not_in` slices with AND, one parenthesis around them when there is more than one. A
+ * list of 250 once came out of here as a single OR chain of 250 terms, and an unbounded OR chain is
+ * an unbounded expression tree, which meets the Durable Object's expression depth
+ * (`DO_LIMITS.exprDepth`), the one ceiling `guard` cannot count because counting it needs a parser.
  *
- * IT DOES NOT LOWER THE PARAMETER COUNT AND IT IS NOT MEANT TO. `38 §5` step 3 and `38 §7` both say
- * so in as many words, and this build's emitted form makes it plainer still: each value carries its
- * own currency qualifier, so a chunk of 64 holds the same 64 or 128 placeholders whether it is one
- * group or four. The ceiling that a 250-value list actually meets is the ADAPTER's hundred, which
- * `33 §1` counts before `prepare` and refuses `TOO_MANY_PARAMS` at 101, and `38 §4.4` is explicit
- * that this function is not the layer that owes it: *"`compile` neither counts nor refuses;
- * `params.length` is on the result."* So the count is published on the result and the chunk is what
- * is enforced here.
+ * CHUNKING NEVER LOWERED THE PARAMETER COUNT, and the count is what a long list actually meets: the
+ * adapter's hundred (`DO_LIMITS.variableNumber`), which the Durable Object refuses at 101 and `guard`
+ * refuses as `TOO_MANY_PARAMS` wherever a host runs its statements through `guarded`. So above this
+ * many values a field whose values carry no qualifier binds the whole list as ONE parameter instead
+ * (`inJson` below), and a 300-value `in` on a text field is one `?`.
+ * At or below it nothing changed: one bound value a member, the string this file always produced.
  *
- * WHAT THE CHUNK BUYS IS THE ONE THING A GRAMMAR CAN PROMISE ABOUT ITS OUTPUT: a bounded shape. An
- * unbounded OR chain is an unbounded expression tree, and the expression depth a Durable Object
- * allows is 100 and is the one ceiling `30 §13` says nothing guards, on the argument that the
- * compiler's output is bounded by construction. It was not.
+ * MONEY AND QUANTITY STILL CHUNK, AND THEIR CEILING IS THE HUNDRED. Each of their values is a pair,
+ * a number and the currency or unit it is in, and both halves are bound: an `in` of n money values
+ * binds 2n parameters, and a `not_in` binds 2n plus one for each distinct currency. `kernel.list`'s
+ * first-page statement binds the register and the limit beside them, so counted from that statement a
+ * money `in` of 49 values is exactly 100 parameters and a fiftieth is `TOO_MANY_PARAMS`; a paged or
+ * sorted page binds its cursor too and stops sooner. A chunk of 64 pairs is therefore never reached
+ * through a list, and the chunk stays for the shape's sake. Lifting the hundred for them means
+ * comparing both halves of each element inside the subquery, which is a different shape from
+ * `inJson`'s and is not built.
  */
 const IN_CHUNK = 64;
 
@@ -559,6 +562,34 @@ const chunk = (clauses: string[]): string[][] => {
   for (let i = 0; i < clauses.length; i += IN_CHUNK) out.push(clauses.slice(i, i + IN_CHUNK));
   return out;
 };
+
+/**
+ * A LONG LIST AS ONE BOUND PARAMETER: `lhs IN (SELECT value FROM json_each(?))`, the list bound as
+ * one JSON text.
+ *
+ * `30 §7`'s `IN` row names this as the upgrade, and `38 §10`'s fifth ponytail records why: a predicate
+ * could bind about ninety-five literal values in total (`38 §7`) before the adapter refused the
+ * statement, so a filter that worked on a short list became a refusal on a long one.
+ *
+ * IT ANSWERS THE SAME ROWS AS THE `=` CHAIN IT REPLACES. `json_each` reads a JSON string out as TEXT
+ * and a JSON number as a number, as a string and a number bound on their own arrive, and its `value`
+ * column carries no affinity, so a `json_extract` read on the left compares with no conversion
+ * either side: `2` is not `"2"` here any more than it was there. A bool arrives as the
+ * 1 or 0 `bind` made of it, which is what `json_extract` reads a stored `true` or `false` as. A column
+ * on the left (`seq`, the mirrored `state`) applies its affinity to the subquery's values as it did to
+ * a bound one, because SQLite treats `a IN (SELECT b ...)` as `a = b` when it chooses an affinity.
+ *
+ * THE ONE PARAMETER IS BOUNDED BY SIZE, NOT BY COUNT. One bound text may weigh `DO_LIMITS.length`,
+ * and a list sent to `/api` or `/mcp` arrives in a body those doors cap at a mebibyte
+ * (`API_BODY_MOST_BYTES` in `packages/host`, `MAX_BODY_BYTES` in `packages/mcp`). A list too heavy for
+ * one text is the driver's refusal, as a statement over the hundred was before.
+ *
+ * A NUMBER THAT IS NOT FINITE NEVER COMES HERE, because `JSON.stringify` writes it as `null`, and a
+ * `NULL` inside `NOT IN` makes the answer NULL for every row the list does not hold. `compile` keeps
+ * such a list on the chain, where the value is bound on its own and `guard` refuses it by name.
+ */
+const inJson = (lhs: string, values: readonly (string | number)[], put: (v: string | number) => string): string =>
+  `${lhs} IN (SELECT value FROM json_each(${put(JSON.stringify(values))}))`;
 
 const byteLength = (text: string): number => new TextEncoder().encode(text).length;
 
@@ -1124,9 +1155,30 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
         /* AND `IS NOT NULL` HERE TOO, for the reason the `is` branch above gives at length: a
            positive operator is false on a missing value, and a bare `=` inside a `none:` group is
            NULL rather than false and takes the row with it. */
+        /* ABOVE `IN_CHUNK` VALUES, WITH NO CURRENCY OR UNIT TO CARRY, THE LIST IS ONE PARAMETER. See
+           `inJson`. Each value still decides its own granularity: the ones naming a bare day are one
+           list compared with the date part and the rest are another compared whole, so an `in` over
+           an instant binds at most two parameters however long it is. The two are ORed, and `not_in`
+           negates them together, which is the De Morgan the chunks below rely on as well. Every value
+           here was bound by `bind`, so none is `null`, and the finite check keeps `JSON.stringify` from
+           writing one (see `inJson`), so `NOT IN` over the list is two-valued. */
+        if (!QUALIFIER[decl.type] && bounds.length > IN_CHUNK && bounds.every((b) => typeof b === 'string' || Number.isFinite(b))) {
+          const whole = bounds.filter((b) => !asDay(decl.type, b));
+          const days = bounds.filter((b) => asDay(decl.type, b));
+          /* WRITTEN IN THE ORDER IT IS BOUND, whole first, because `put` pushes in call order and the
+             placeholders are read in string order. */
+          const lists = [
+            ...(whole.length ? [inJson(path, whole, put)] : []),
+            ...(days.length ? [inJson(`substr(${path}, 1, 10)`, days, put)] : []),
+          ];
+          const hit = lists.length === 1 ? lists[0]! : `(${lists.join(' OR ')})`;
+          return op === 'in' ? `(${path} IS NOT NULL AND ${hit})` : `(${path} IS NULL OR NOT (${hit}))`;
+        }
         /* AND THE CLAUSES GO OUT IN SLICES OF SIXTY-FOUR, which is `IN_CHUNK`'s paragraph above and
            `38 §5` step 3's algorithm. One slice compiles to exactly the string this branch used to
-           produce, so the shape only changes for the lists that were unbounded. */
+           produce. Past one slice only money and quantity reach here, and a list holding a number
+           that is not finite, since every other long list left through `inJson` above; `IN_CHUNK`'s
+           paragraph states the hundred money and quantity meet first. */
         if (op === 'in') {
           const each = list.map((v, i) => `(${at(i)} = ${put(bounds[i]!)}${qualifier(field, decl.type, v, put)})`);
           const slices = chunk(each).map((s) => `(${s.join(' OR ')})`);

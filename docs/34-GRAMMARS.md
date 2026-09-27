@@ -241,7 +241,7 @@ JS, runs the compiled SQL over the same rows, and asserts the two sets are equal
 ## 2 · The dialect — what an agent writes into a `document`
 
 Fenced blocks with a positional row grammar, `{{path}}` interpolation with eight typed forms, and inline evidence
-tags. Sixteen kinds ([05-BLOCKS-AND-THEMES](05-BLOCKS-AND-THEMES.md) §2). The renderer rules are 05 §7.4; this
+tags. The kinds are the rows of `KINDS` in `packages/render/src/kinds.ts` ([05-BLOCKS-AND-THEMES](05-BLOCKS-AND-THEMES.md) §2). The renderer rules are 05 §7.4; this
 section is the syntax under them. The record's `dialect()` answers from its own `DIALECT` constant, kept equal to
 `render`'s kinds by the `closed-lists` gate — `record` never imports `render`.
 
@@ -254,8 +254,7 @@ segment     = drawn-block | markdown ;              (* a flat scan: the next fen
 drawn-block = fence info NL { row NL } fence ;      (* EOF closes an open block as a fence would *)
 fence       = "```" ;
 info        = kind [ ws "|" ws heading [ ws "|" ws tone ] ] ;   (* regex ^(?<kind>[a-z]+)(\s*\|\s*(?<heading>.*))?$ — then the heading is row-split *)
-kind        = "note" | "quote" | "stat" | "bar" | "gauge" | "chips" | "spec" | "params"
-            | "todo" | "steps" | "timeline" | "board" | "code" | "tree" | "comparison" | "table" ;
+kind        = ? a key of KINDS in packages/render/src/kinds.ts ? ;   (* 05 §2's table; never a copy kept here *)
 row         = cell { ws "|" ws cell } [ ws "|" ws tone ] ;
 cell        = { char - "|" - NL | "\|" | "\\" } ;   (* \| is a literal pipe, \\ a literal backslash *)
 tone        = "good" | "warn" | "bad" | "info"      (* the four words *)
@@ -289,6 +288,12 @@ after splitting**, and a substituted value is never re-parsed — so a value con
 | `tree` | indentation-significant | two spaces per level; rows are not split |
 | `comparison` | header row, then rows | the header fixes the column count |
 | `table` | **page-only** | rows come from `source:` with declared `columns:`; a `table` fence in a write-up degrades |
+| `calendar` | one per dated row | title · day · *tone*; the day is `YYYY-MM-DD`, an instant, or `D Mon YYYY` as `day()` writes it, and a row whose day does not read is named under the calendar, never placed |
+| `link` | one per link | title · url · *note*; the url is `https:`, `mailto:` or a path of this BrainDog, and any other degrades the block (`DIALECT_ARITY`) |
+| `gallery` | one per tile | caption · file; the file is `file:<list>#<seq>/<field>`, drawn only where the host resolves it to a path of its own, or a file's name |
+| `embed` | **page-only**, one | url · *title* · *aspect*; the url one of `EMBED_PROVIDERS`, the aspect `16:9`, `4:3`, `1:1` or `9:16`, and any other degrades the block |
+| `steps path` | one per stone | title · detail · mark, the mark `done`, `next` or blank, then `short` when the stone is in the short view; first and at most once `short · label`, the view's name; last and at most once `more · N` |
+| `cards` | **page-only**, a header row then one per card | the header names each column's role from `title figure fact trend ring who when mark next reply hue picture quiet`; `hue` is a whole number from 0 to 359 and `picture` a file as `gallery` names one, and neither is printed |
 
 Under-arity leaves the trailing cells absent. Over-arity, or a kind this build does not draw, degrades the block to its
 visible fence with one line above it naming the kind and the row (`DIALECT_ARITY`, `DIALECT_KIND_UNKNOWN`). **A
@@ -339,6 +344,20 @@ no `expand`: kinds expansion is `declare`'s — so a first-party kind and a pack
 list per primitive (`parts children rows columns{field,label,width,align} empty value accepts`) is `declare`'s schema;
 `render` has no dependencies and validates nothing. `$<name>` binds to a key in `accepts:` and nothing else,
 substituted as a whole node, never spliced into a string. `PRIMITIVES_VERSION = 1` at stage 0.
+
+### 2.5 · The declaration grammars the record serves *(as built, September 2026)*
+
+`packages/record/src/grammar.ts` says what a declaration may contain, once, so an agent or Slash's model is not taught
+one refusal at a time. `GRAMMARS` names them and `arrangement({ grammar })` answers each: `page`, `register` (every key
+of a list and of a field, `FIELD_TYPES` from the kernel), `metric` (`AGGREGATIONS` from the kernel), `rule` (the triggers
+and the steps a rule may take inside the record, by the names in `kernel/src/capabilities.ts`, and none of the verbs that
+reach out, which `REACHES_OUT` in `packages/record/src/slash.ts` keeps) and `proposals`. Each carries one declaration
+that installs. They are references and not validators: the kernel's lint decides, and
+`packages/record/test/slash-grammars.test.ts` holds each key list to the `allowed` of the lint's own refusal, each rule
+trigger and step to the capability table, and installs each example. MCP serves `page`, `register`, `metric` and
+`proposals` as `braindog:grammar/<name>`; a rule is `braindog:grammar/automations`, the MCP package's own text.
+A description to Slash carries the page, register, metric and rule grammars in its input as `grammar`
+([46-SPEC-SLASH](46-SPEC-SLASH.md) §5.10).
 
 ---
 
@@ -448,6 +467,7 @@ checked-in fixtures LF so the same hash comes out on Windows and Linux CI ([31-S
 | Aggregations | 11 | `sum count avg min max delta median distinct last running trend` | 08 §2 |
 | Combinators | 3 | `ratio diff product` | 08 §2 |
 | `derive:` combinators | 7 | `sum diff product ratio band via normalise` | 02 §5 |
+| A register's `delete:` values | 1 | `refuse_while_referenced` | 42 §4.4 |
 | Rule actions | 11 | `set untag move schedule suggest link notify tag create run stop` | 07 §6 |
 | Extractors | 10 + 3 | `after before between money date text int decimal enum lookup` · `first nth default` | 07 §3 |
 | Notification fields | 6 | `tone say because to key urgent` | 09 §4 |

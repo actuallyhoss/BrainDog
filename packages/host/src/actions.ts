@@ -27,8 +27,12 @@
 
 import { reserveFor, type Budget, type PagedRun } from '@braindog/kernel';
 import type { RecordApi } from '@braindog/record';
+import { METER_MANY_MAX, type COUNTED_ONLY } from '@braindog/record/directory';
 
 type Kernel = RecordApi['kernel'];
+
+/** A name prefix the Directory counts and never limits, so a prefix it drops fails here rather than counting a delivery as a run. */
+type CountedPrefix = (typeof COUNTED_ONLY)[number];
 
 /** The executor `runActions` is handed. */
 export type Execute = Parameters<Kernel['runActions']>[0];
@@ -347,9 +351,270 @@ export function pass(flight?: InFlight): Admissions & { settle: () => void } {
   };
 }
 
-/** Every run a pass metered, into the ledger, in order. A run the ledger already holds adds nothing there. */
-export async function meterPass(meter: Ledger['meter'], record: string, usage: readonly Metered[]): Promise<void> {
-  for (const run of usage) await meter(record, run);
+/** How many times one write to the ledger is tried before the count is left to the nightly replay. */
+export const METER_TRIES = 3;
+
+/**
+ * Whether the ledger said no: a `Result` refusal (the Directory in this process) or a bare `Refusal` (the Worker's
+ * `Directory$`, which answers `null` for counted). Anything else, `undefined` included, is a write that landed.
+ */
+const refusedBy = (answer: unknown): boolean =>
+  typeof answer === 'object' &&
+  answer !== null &&
+  (('ok' in answer && answer.ok === false) || (!('ok' in answer) && 'code' in answer && typeof answer.code === 'string'));
+
+/** The ledger's answer to one write, tried up to `METER_TRIES` times, or `undefined` when every try threw or was refused. */
+async function tried<T>(write: () => T | Promise<T>): Promise<{ answer: T } | undefined> {
+  for (let n = 0; n < METER_TRIES; n++) {
+    try {
+      const answer = await write();
+      if (!refusedBy(answer)) return { answer };
+    } catch {
+      /* A THROW IS THE NETWORK OR A DIRECTORY RESTARTING, and the next try is the whole of the answer to it. */
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Every run a pass metered, into the ledger, in order, answering how many the ledger would not take.
+ *
+ * A REFUSED OR THROWN WRITE IS TRIED AGAIN, and one that still fails does not stop the runs after it. Before this, the
+ * answer was ignored and the first throw left the pass, so one bad moment of the Directory's lost every run behind it,
+ * and nothing counted them again. A run the ledger already holds adds nothing there, which is what makes a second try
+ * safe; one that is still not counted after its tries is the nightly replay's (`replayUsage`), and the caller says so.
+ */
+export async function meterPass(meter: Ledger['meter'], record: string, usage: readonly Metered[]): Promise<number> {
+  let lost = 0;
+  for (const run of usage) if ((await tried(() => meter(record, run))) === undefined) lost++;
+  return lost;
+}
+
+/* ── counting what the record did not choose to run ─────────────────────── */
+
+/**
+ * A delivery or an arrival as a row the Directory counts and never limits: an action named with one of the Directory's
+ * `COUNTED_ONLY` prefixes (`deliver:notify.email`, `in:webhook`).
+ *
+ * `event` IS WHAT MAKES IT COUNT ONCE: the outbox job's id for a delivery, the stored arrival's for an arrival, each
+ * prefixed like the action so neither can meet a run's event id in `dir_usage_run`. A job sent again after a lost ack
+ * is counted once, and so is an arrival the record answers with the stored row it already held.
+ */
+function countedRun(o: { prefix: CountedPrefix; id: string; name: string; at: number; requests: number; bytes: number }): Metered {
+  return {
+    event: `${o.prefix}${o.id}`,
+    at: new Date(o.at).toISOString(),
+    ingest: `${o.prefix}${o.name}`,
+    channel: o.prefix.slice(0, -1),
+    scope: 'global',
+    outcome: 'ok',
+    usage: { runs: 1, requests: o.requests, bytes: o.bytes, ms: 0, failures: 0, held: 0 },
+  };
+}
+
+/** One outbox job the host sent, to count: one request, by its kind. */
+export function deliveryRun(job: { id: string; kind: string }, at: number): Metered {
+  return countedRun({ prefix: 'deliver:', id: job.id, name: job.kind, at, requests: 1, bytes: 0 });
+}
+
+/**
+ * One arrival at an `/in` door, to count: its bytes, by its channel. `null` when the record's answer stored nothing,
+ * which is a refusal, and a refusal is not an arrival.
+ */
+export function arrivalRun(answer: unknown, arrival: { channel: string; body: string }, at: number): Metered | null {
+  if (typeof answer !== 'object' || answer === null || !('ok' in answer) || answer.ok !== true || !('value' in answer)) return null;
+  const value = answer.value;
+  const raw = typeof value === 'object' && value !== null && 'raw' in value && typeof value.raw === 'string' ? value.raw : '';
+  if (raw === '') return null;
+  return countedRun({ prefix: 'in:', id: raw, name: arrival.channel, at, requests: 0, bytes: new TextEncoder().encode(arrival.body).length });
+}
+
+/* ── the replay ─────────────────────────────────────────────────────────── */
+
+const DAY_MS = 86_400_000;
+
+/** How far back the replay reads: the forty days the Directory keeps a counted run's id, and so the most it can count. */
+export const REPLAY_WINDOW_MS = 40 * DAY_MS;
+
+/** Events read from the log at once. */
+const REPLAY_READ = 500;
+
+/**
+ * The most events one replay walks, of every kind, newest first.
+ *
+ * A CEILING ON THE NIGHT'S WORK FOR ONE RECORD. The log holds every write, not only runs, so a busy record's forty days
+ * can be far more events than runs; past this the older runs are left uncounted and the answer says `ceiling`.
+ */
+export const REPLAY_EVENTS_MAX = 200_000;
+
+/** What one replay came to: events read, runs found, runs the ledger counted new, runs it would not take, and where it stopped. */
+export type Replayed = { walked: number; runs: number; counted: number; lost: number; reached: 'start' | 'window' | 'ceiling' };
+
+/** One line of the record's log, as `eventsBefore` hands it over. */
+type LogLine = ReturnType<Kernel['eventsBefore']>[number];
+
+/**
+ * The declarations a metered run's event targets, and how the ledger names each: an action by its ingest, a script by
+ * its id, and a rule's run as `rule:<id>`, which is the name `flow.ts` gives the run it meters.
+ */
+const METERED_TARGETS = [
+  { target: 'declaration:ingest.', name: '' },
+  { target: 'declaration:script.', name: '' },
+  { target: 'declaration:rule.', name: 'rule:' },
+] as const;
+
+const USAGE_KEYS = ['runs', 'requests', 'bytes', 'ms', 'failures', 'held'] as const;
+
+/**
+ * A metered run's `pull` event as the row the pass would have handed the ledger, or `null` for any other line.
+ *
+ * THE SAME EVENT ID, so a run the pass already counted is `already counted` and the replay adds nothing for it. A usage
+ * number an older build did not write is `0`; one that is there and is not a whole number leaves the line out.
+ */
+function meteredOf(line: LogLine): Metered | null {
+  if (line.kind !== 'pull' || line.target === null) return null;
+  const to = line.to;
+  if (typeof to !== 'object' || to === null || Array.isArray(to)) return null;
+  const spec = METERED_TARGETS.find((t) => line.target?.startsWith(t.target));
+  const id = spec === undefined ? '' : line.target.slice(spec.target.length);
+  if (spec === undefined || id === '') return null;
+  const said = to.usage;
+  if (typeof said !== 'object' || said === null || Array.isArray(said) || typeof to.outcome !== 'string') return null;
+  const usage = { runs: 0, requests: 0, bytes: 0, ms: 0, failures: 0, held: 0 };
+  for (const key of USAGE_KEYS) {
+    const n = said[key];
+    if (n === undefined) continue;
+    if (typeof n !== 'number' || !Number.isSafeInteger(n) || n < 0) return null;
+    usage[key] = n;
+  }
+  return {
+    event: line.id,
+    at: line.ts,
+    ingest: `${spec.name}${id}`,
+    channel: typeof to.channel === 'string' ? to.channel : '',
+    scope: typeof to.scope === 'string' && to.scope !== '' ? to.scope : 'global',
+    /* THE KERNEL'S OWN WORD, written by `meter` from its closed list; the ledger does not read it. */
+    outcome: to.outcome as Metered['outcome'],
+    usage,
+  };
+}
+
+/**
+ * The last forty days of a record's metered runs, read from its own log and handed to the Directory's ledger again.
+ *
+ * WHAT MAKES A LOST COUNT A LATE ONE. A pass killed between its runs and its meter, a ledger write that failed all its
+ * tries, and every automation run (whose `pull` event `flow.ts` writes and no pass hands on) are all events in the
+ * record, so reading them back is the whole repair. The Directory keeps every counted run's id for the same forty days,
+ * so a run already counted adds nothing, and the replay can run every night, or twice, and leave the ledger equal to
+ * the events.
+ *
+ * NEWEST FIRST, a read at a time, stopping at the first read whose every line is older than the window rather than at
+ * the first old line, because the log's order is the order lines were written and nothing makes that the order of their
+ * times. `meter` is the Directory's `meterMany`, and each batch is tried as a pass's write is.
+ */
+export async function replayUsage(o: {
+  record: string;
+  read: Kernel['eventsBefore'];
+  meter: (record: string, runs: readonly Metered[]) => unknown;
+  now: number;
+}): Promise<Replayed> {
+  const since = o.now - REPLAY_WINDOW_MS;
+  const out: Replayed = { walked: 0, runs: 0, counted: 0, lost: 0, reached: 'start' };
+  let batch: Metered[] = [];
+  const flush = async (): Promise<void> => {
+    if (batch.length === 0) return;
+    const runs = batch;
+    batch = [];
+    const said = await tried(() => o.meter(o.record, runs));
+    if (said === undefined) out.lost += runs.length;
+    else out.counted += countedIn(said.answer);
+  };
+
+  let before: number | null = null;
+  walk: for (;;) {
+    const lines = o.read(before, REPLAY_READ);
+    let recent = false;
+    for (const line of lines) {
+      if (out.walked >= REPLAY_EVENTS_MAX) {
+        out.reached = 'ceiling';
+        break walk;
+      }
+      out.walked++;
+      const at = Date.parse(line.ts);
+      if (Number.isFinite(at) && at < since) continue;
+      recent = true;
+      const run = meteredOf(line);
+      if (run === null) continue;
+      out.runs++;
+      batch.push(run);
+      if (batch.length >= METER_MANY_MAX) await flush();
+    }
+    const last = lines.at(-1);
+    if (last === undefined || lines.length < REPLAY_READ) break;
+    if (!recent) {
+      out.reached = 'window';
+      break;
+    }
+    before = last.rowid;
+  }
+  await flush();
+  return out;
+}
+
+/** How many runs a `meterMany` answer says it counted new: its tally's `counted`, whether it came as a `Result` or bare. */
+function countedIn(answer: unknown): number {
+  if (typeof answer !== 'object' || answer === null) return 0;
+  const tally: unknown = 'ok' in answer && 'value' in answer ? answer.value : answer;
+  return typeof tally === 'object' && tally !== null && 'counted' in tally && typeof tally.counted === 'number' ? tally.counted : 0;
+}
+
+/* ── automations at the allowance ───────────────────────────────────────── */
+
+/**
+ * The name an automation's hold is asked under, which is the subject of the sentence its runs carry: "This automation is
+ * waiting until" the first of next month, then what the record used up, both as the Directory's `mayRun` words them.
+ */
+export const AUTOMATION_HELD = 'This automation';
+
+/**
+ * How long one answer about automations is kept before the Directory is asked again.
+ *
+ * ONE DIRECTORY FOR EVERY RECORD, and a record's alarm fires on every write it drains, so asking at every alarm would put
+ * each busy record's every write on the one object all of them share. A record that reaches its allowance is held
+ * within this long of the replay that counts it; one that is let off at the turn of the month is let off within it too.
+ */
+export const RUNS_HOLD_EVERY_MS = 15 * 60_000;
+
+/**
+ * An automation's hold, asked of the same ledger and in the same words an action's pass asks (`loop/finish/decisions.md`
+ * C34), kept for `RUNS_HOLD_EVERY_MS`. One per record's runtime, like `IN_FLIGHT`.
+ *
+ * A QUESTION THAT THROWS HOLDS NOTHING and is asked again the next time: a Directory that cannot be reached never stops
+ * a record's automations on its own say-so.
+ */
+export function runsHold(every = RUNS_HOLD_EVERY_MS): (record: string, mayRun: Ledger['mayRun'], now: number) => Promise<Hold> {
+  let asked: { at: number; hold: Hold } | null = null;
+  return async (record, mayRun, now) => {
+    if (asked === null || now - asked.at >= every) {
+      try {
+        asked = { at: now, hold: await mayRun(record, AUTOMATION_HELD, 0) };
+      } catch {
+        asked = null;
+      }
+    }
+    return asked !== null && asked.hold !== null && asked.hold.until > now ? asked.hold : null;
+  };
+}
+
+/**
+ * Hands the kernel the hold its automation runs wait under: a pending run is not started while `until` is ahead, and
+ * its row says why, which is the kernel's `holdRuns`.
+ *
+ * THROUGH AN OPTIONAL METHOD, so a kernel that has no `holdRuns` yet runs every automation as it always has, and this
+ * line needs no change on the day it gains one.
+ */
+export function holdAutomations(kernel: Kernel, hold: Hold): void {
+  (kernel as unknown as { holdRuns?: ((hold: Hold) => void) | undefined }).holdRuns?.(hold);
 }
 
 /* ── which addresses are refused ────────────────────────────────────────── */

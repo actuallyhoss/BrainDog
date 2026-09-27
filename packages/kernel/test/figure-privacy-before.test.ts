@@ -89,13 +89,13 @@ test('V1: A BOOKKEEPER INVITED TO INBOX AFTER A RUN READS NO PAYROLL IN THE NOTE
   const invited = k.invite('p_1', { person: 'p_bea', email: 'bea@example.test', name: 'Bea', registers: { inbox: 'read' } });
   assert.ok(invited.ok, why(invited));
   const after = await noteOf(k, 'inbox', 'Receipt from the courier');
-  assert.doesNotMatch(String(k.get(before.id)?.fields.note), /5200/, 'Bea, invited to Inbox alone, reads the payroll in the row written before she came');
+  assert.doesNotMatch(String(k.get(before.id)?.fields.note), /5,?200/u, 'Bea, invited to Inbox alone, reads the payroll in the row written before she came');
   assert.equal(before.note, WITHHELD);
   assert.equal(after.note, WITHHELD);
   /* AND THE ROW'S HISTORY SAYS THE SAME, since it holds what was written. */
   const history = sql.all<{ to_v: string | null }>("SELECT to_v FROM event WHERE target = ? AND to_v IS NOT NULL", `entry:${before.id}`).map((e) => e.to_v ?? '');
   assert.ok(history.some((v) => v.includes('--withheld--')), `the history holds no note: ${history.join(' | ')}`);
-  assert.ok(!history.some((v) => v.includes('5200')), history.join(' | '));
+  assert.ok(!history.some((v) => /5,?200/u.test(v)), history.join(' | '));
   sql.close();
 });
 
@@ -115,7 +115,7 @@ test('A FIGURE OVER THE LIST IT IS WRITTEN INTO IS WRITTEN, members or not, sinc
   const made = k.create('salaries', { what: 'Bo', pay: { amount: 100000, currency: 'GBP' } }, { actor: 'p_1' });
   assert.ok(made.ok, why(made));
   await k.drain();
-  assert.equal(k.get(made.value.id)?.fields.note, 'filed; payroll GBP 6200.00');
+  assert.equal(k.get(made.value.id)?.fields.note, 'filed; payroll GBP 6,200.00');
   sql.close();
 });
 
@@ -132,6 +132,6 @@ test('A RUN THAT WRITES NO ROW still reads the figure: a clock that only tells t
   clock.advance(DAY);
   await k.drain();
   const said = sql.all<{ note: string }>("SELECT note FROM event WHERE kind = 'note' AND actor = 'rule:tell'").map((r) => r.note);
-  assert.deepEqual(said, ['payroll GBP 5200.00']);
+  assert.deepEqual(said, ['payroll GBP 5,200.00']);
   sql.close();
 });

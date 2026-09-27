@@ -18,35 +18,21 @@ import { DatabaseSync } from 'node:sqlite';
 import { openRecord, type Declaration } from '@braindog/kernel';
 
 import './fixtures/fill.ts';
-import { currencyFor, display } from './api.ts';
-import { metric, page, readBlock, values } from './fixtures/readers.ts';
+import { currencyFor, display, homeCurrency, learnHome } from './api.ts';
+import { layoutOf, refusedShell } from './boot-live.ts';
+import { patchOf, wrongMoney } from './field-draft.ts';
 import { resolverOf } from './page-live.ts';
-import { PAGES } from './fixtures/sample.ts';
-import { toSegments, walkTables } from './blocks.ts';
 import { NOW } from './fixtures/sample.ts';
 import { ROWS } from './held.ts';
-import { BARE, amountOf, currencyOf, drawn, homeOf, merge, mixedFix, symbolText, total } from './money.ts';
-import { BARE as METRICS_BARE, currenciesRead, fxNote, read as readAt, targetSaid, withFx, type MetricDecl } from './metrics.ts';
-import { copy } from '../copy.ts';
+import { BARE, amountOf, currencyOf, drawn, merge, mixedFix, symbolText, total } from './money.ts';
+import { BARE as METRICS_BARE, currenciesRead, targetSaid, type MetricDecl } from './metrics.ts';
 import { METRICS } from './declared.ts';
-import { runway as walkAt } from './forecast.ts';
-import type { Entry } from './schema.ts';
-/* THE SAMPLE'S ROWS WALKED AT THE SAMPLE'S CLOCK, which `runway` took for granted and now takes from its caller. */
-const runway: typeof walkAt = (opening, legs, horizon, only, now = NOW) => walkAt(opening, legs, horizon, only, now);
-
-/* THE SAMPLE'S ROWS READ AT THE SAMPLE'S CLOCK, which `read` took for granted and now takes from its caller. */
-const read: typeof readAt = (decl, now = NOW) => readAt(decl, now);
+import type { Entry, FieldDecl } from './schema.ts';
 
 const gbp = (amount: number) => ({ amount, currency: 'GBP' });
 const eur = (amount: number) => ({ amount, currency: 'EUR' });
 
 /* ── the arithmetic ──────────────────────────────────────────────────────── */
-
-/* The legs the record declares. A test that hardcoded two registers would be testing a different
-   function from the one the product runs. */
-const LEGS = Object.values(PAGES)
-  .flatMap((p) => p.blocks)
-  .find((b) => b.source === 'forecast.runway')!.from!;
 
 /** One money column and nothing else, which is all the mixed-unit refusal needs to be asked. */
 const TAKINGS: Declaration = {
@@ -172,8 +158,8 @@ test('AND THE SENTENCE SAYS SO, in the words the RECORD uses', async () => {
      GBP, and two currencies are never added"* — one currency named, two claimed, and nothing about
      the rows that have no currency at all, which is the thing somebody has to go and fix.
      `metrics.ts` puts `BARE` in the set for exactly this and says why (*"the marker has to read as
-     English there rather than as a currency code"*), `forecast.ts` does the same for the cash walk,
-     and the kernel writes `no unit` into the same sentence. This was the site that did not. */
+     English there rather than as a currency code"*), and the kernel writes `no unit` into the same
+     sentence. This was the site that did not. */
   const t = total([gbp(100), 250]);
   assert.equal(mixedFix(t.mixed), 'these rows are in GBP and no unit, and two units are never added');
 
@@ -237,8 +223,8 @@ test('AND THE SENTENCE SAYS SO, in the words the RECORD uses', async () => {
  * all, because every set whose units are all non-null goes to `fx.ts` and comes back in parts. So the
  * *currencies* half of `mixedFix` has no counterpart in the record's money arm, and the two assertions
  * below that pin it are pinning the wording alone. They say so rather than looking like more of the
- * differential than they are. That half is not dead in the browser: `api.ts` writes it over `runway`'s
- * `mixed`, which is two codes and no unitless row.
+ * differential than they are. That half is not dead in the browser: `blocks.ts` writes it over a total
+ * of a money column, which can be two codes and no unitless row.
  */
 test('AND EVERY BRANCH OF THE SENTENCE, not the two that could be lined up in a table', async () => {
   /* THREE ENTRIES, SO THE MARK IS NOT THE SECOND THING IN THE SENTENCE. Both copies build the list as
@@ -336,14 +322,11 @@ test('amountOf and currencyOf read the value, not its shape', () => {
   assert.equal(amountOf({ amount: 41 }), null);
 });
 
-/* ── the screens ─────────────────────────────────────────────────────────── */
-
 /**
- * Put one euro row into a register for the length of one test, then put it back.
+ * Put one euro row into a register the app has learnt for the length of one test, then put it back.
  *
- * It COPIES A ROW THE READER ALREADY MATCHES and changes only the money, because a euro row that
- * falls outside the predicate proves nothing — the tile would read cleanly and the test would pass
- * for the wrong reason.
+ * It COPIES A ROW OF THE KIND THE TEST IS ABOUT and changes only the money, so the euro row is one
+ * the form would be asked to print beside the sterling ones.
  */
 function withEuro<T>(register: string, field: string, like: (e: Entry) => boolean, fn: () => T): T {
   const before = [...(ROWS[register] ?? [])];
@@ -362,148 +345,11 @@ function withEuro<T>(register: string, field: string, like: (e: Entry) => boolea
 
 const TODAY = new Date(NOW).toISOString().slice(0, 10);
 
-/** An open, overdue payable — which is what `overdue` and the "Owed by you" bar both read. */
+/** An open, overdue payable. */
 const overduePayable = (e: Entry) =>
   e.fields.direction === 'owed_by_me' &&
   (e.fields.state === 'open' || e.fields.state === 'part') &&
   String(e.fields.due) < TODAY;
-
-test('A TILE OVER TWO CURRENCIES SHOWS EACH AMOUNT IN ITS OWN, never the sum and never a blank', () => {
-  const decl = METRICS.overdue;
-  assert.ok(decl, 'the overdue metric is gone, so this test is vacuous');
-  const clean = read(decl);
-  assert.ok(clean.value !== null, 'the tile does not read at all, so parts prove nothing');
-
-  withEuro('obligations', 'amount', overduePayable, () => {
-    const out = read(decl);
-    assert.equal(out.value, null, 'a sterling total and a euro row came back as one figure');
-    assert.deepEqual(out.parts, [
-      { currency: 'EUR', amount: 123_400 },
-      { currency: 'GBP', amount: clean.value },
-    ]);
-    assert.equal(out.shown, `EUR 1,234.00 · ${clean.shown}`);
-    assert.deepEqual(out.refusals, []);
-    assert.equal(fxNote(out), copy.figureNoHome);
-    /* THE TILE ON THE SCREEN is the parts and the reason. */
-    const tile = metric('overdue');
-    assert.equal(tile.value, out.shown);
-    assert.equal(tile.note, copy.figureNoHome);
-  });
-});
-
-test('WITH A HOME CURRENCY AND A RATE IT IS ONE FIGURE, converted as of the rate’s day; without the rate it names the pair', () => {
-  const decl = METRICS.overdue!;
-  const clean = read(decl);
-  withEuro('obligations', 'amount', overduePayable, () => {
-    const put = withFx(() => ({ home: 'GBP', rates: [] }));
-    try {
-      const lacking = read(decl);
-      assert.equal(lacking.value, null);
-      assert.deepEqual(lacking.fx?.missing, ['EUR to GBP']);
-      assert.equal(fxNote(lacking), copy.figureNoRate('EUR to GBP'));
-    } finally {
-      put();
-    }
-    const back = withFx(() => ({ home: 'GBP', rates: [{ currency: 'EUR', base: 'GBP', rate: 0.855, as_of: '2020-01-01' }] }));
-    try {
-      const out = read(decl);
-      /* EUR 1,234.00 at 0.855 is GBP 1,055.07, rounded once. */
-      assert.equal(out.value, (clean.value ?? 0) + 105_507);
-      assert.equal(out.unit, 'GBP');
-      assert.equal(out.parts, undefined);
-      assert.equal(out.fx?.asOf, '2020-01-01');
-      assert.match(metric('overdue').note, /Converted at rates as of 1 Jan 2020\./u);
-    } finally {
-      back();
-    }
-  });
-});
-
-test('and a sum whose format disagrees with its rows is said in the rows’ currency rather than relabelled', () => {
-  // `format: money.GBP` says how to WRITE the figure; the rows are what it is a figure of. Printing
-  // the rows' number under the declaration's code is the quiet version of getting this wrong.
-  const decl: MetricDecl | undefined = METRICS.overdue;
-  assert.ok(decl, 'the overdue metric is gone');
-  assert.ok(decl.format?.startsWith('money.'), 'this test needs a money-formatted metric');
-  /* AND THE FIGURE NOW CARRIES ITS NUMBER RATHER THAN BEING PARTED. Until 21 September a sum whose
-     rows hold one currency the declaration does not name came back `value: null` with a single part,
-     because `into` fell back to the declared code and the sum then looked like a sum across two.
-     With that fallback gone the figure is a figure in the currency its rows are in, and `shown` is
-     unchanged: the screen said GBP before and says GBP now. */
-  const out = read({ ...decl, format: 'money.JPY' });
-  assert.equal(out.value, 1_054_000);
-  assert.equal(out.unit, 'GBP');
-  assert.equal(out.parts, undefined);
-  assert.match(out.shown, /^GBP /u);
-  /* AND SO IS AN AVERAGE: the rows' own currency, never relabelled. */
-  const avg = read({ ...decl, value: { avg: 'amount' }, format: 'money.JPY' });
-  assert.equal(avg.value, 527_000);
-  assert.equal(avg.unit, 'GBP');
-  assert.equal(avg.parts, undefined);
-  assert.match(avg.shown, /^GBP /u);
-});
-
-test('A BAR OVER TWO CURRENCIES IS ONE BAR A CURRENCY, each under its code', () => {
-  const block = page('money')?.blocks.find((b) => b.heading === 'Owed by you, 30 days, by what it is for');
-  assert.ok(block, 'the bar is gone; this test is about the bar');
-
-  withEuro('obligations', 'amount', overduePayable, () => {
-    const again = page('money')?.blocks.find((b) => b.heading === 'Owed by you, 30 days, by what it is for');
-    const segments = toSegments(again!);
-    const charts = segments.filter((seg) => 'rows' in seg) as { rows: { cells: string[] }[] }[];
-    assert.equal(charts.length, 2, 'one chart a currency');
-    assert.ok(charts[0]!.rows.every((r) => /^EUR /u.test(r.cells[1] ?? '')), 'the euro chart holds only euros');
-    assert.ok(charts[1]!.rows.every((r) => /^GBP /u.test(r.cells[1] ?? '')), 'the sterling chart holds only pounds');
-    const said = JSON.stringify(segments);
-    assert.ok(said.includes(copy.inCurrency('EUR')) && said.includes(copy.inCurrency('GBP')), 'each chart says its currency');
-
-    /* AND ONE CHART, CONVERTED, once there is a home currency and a rate. */
-    const back = withFx(() => ({ home: 'GBP', rates: [{ currency: 'EUR', base: 'GBP', rate: 0.855, as_of: '2020-01-01' }] }));
-    try {
-      const one = toSegments(page('money')!.blocks.find((b) => b.heading === 'Owed by you, 30 days, by what it is for')!);
-      assert.equal(one.filter((seg) => 'rows' in seg).length, 1);
-      assert.ok(JSON.stringify(one).includes(copy.figureConverted('1 Jan 2020')));
-    } finally {
-      back();
-    }
-  });
-});
-
-test('THE CASH WALK OVER TWO CURRENCIES WALKS IN THE HOME ONE, and names the rate it lacks', () => {
-  withEuro('obligations', 'amount', overduePayable, () => {
-    let back = withFx(() => ({ home: 'GBP', rates: [] }));
-    try {
-      const walk = runway(500_000, LEGS);
-      assert.deepEqual(walk.steps, []);
-      assert.match(walk.refusals.at(-1) ?? '', /no rate yet from EUR to GBP/u);
-    } finally {
-      back();
-    }
-    back = withFx(() => ({ home: 'GBP', rates: [{ currency: 'EUR', base: 'GBP', rate: 0.855, as_of: '2020-01-01' }] }));
-    try {
-      const walk = runway(500_000, LEGS);
-      assert.equal(walk.currency, 'GBP');
-      assert.ok(walk.steps.some((st) => st.delta === -105_507), 'the euro movement was walked in pounds');
-    } finally {
-      back();
-    }
-  });
-});
-
-test('THE CASH WALK REFUSES RATHER THAN INVENTING A CROSSING DAY', () => {
-  // A crossing computed from two currencies is a real-looking date on which nothing happens.
-  const clean = runway(500_000, LEGS);
-  assert.ok(clean.steps.length > 0);
-  assert.equal(clean.currency, 'GBP');
-
-  withEuro('obligations', 'amount', overduePayable, () => {
-    const walk = runway(500_000, LEGS);
-    assert.deepEqual(walk.mixed, ['EUR', 'GBP']);
-    assert.deepEqual(walk.steps, [], 'the walk added two currencies and produced a crossing anyway');
-    assert.equal(walk.crossed, null);
-    assert.equal(walk.days, null);
-  });
-});
 
 /* ── the currency of a field ─────────────────────────────────────────────── */
 
@@ -537,81 +383,54 @@ test('a sentence redraws its figures, and a currency with no symbol keeps its co
   assert.equal(symbolText('costs ZZZ 12.00', 'GBP'), 'costs ZZZ 12.00');
 });
 
-test('the home currency is the one most of the money is in, and none when there is none', () => {
-  assert.equal(homeOf([gbp(1), eur(1), gbp(2)]), 'GBP');
-  assert.equal(homeOf([1, 'x']), null);
-  assert.equal(homeOf([eur(1), gbp(1)]), 'EUR');
+test('A CURRENCY ENGLISH WRITES BY ITS CODE IS SAID ONCE, code first, home or not', () => {
+  assert.deepEqual(drawn('EGP 58,185.54', 'EGP'), { lead: 'EGP ', whole: '58,185', fraction: '.54', iso: null });
+  assert.deepEqual(drawn('EGP 1,299.00', 'GBP'), { lead: 'EGP ', whole: '1,299', fraction: '.00', iso: null });
+  assert.equal(symbolText('EGP 58,185.54 in the bank', 'EGP'), 'EGP 58,185.54 in the bank');
 });
 
-test('A CASH WALK OVER TWO CURRENCIES WITH NO RATE IS ONE WALK A CURRENCY, each under its code, and the reason said once', () => {
-  const liquid = (e: Entry) => e.fields.liquid === true || e.fields.liquid === undefined;
-  withEuro('accounts', 'balance', liquid, () => {
-    const cash = read(METRICS['cash-now']!);
-    assert.deepEqual(cash.parts?.map((p) => p.currency), ['EUR', 'GBP'], 'the opening is in two currencies, so this test is about a split walk');
-    const block = page('money')?.blocks.find((b) => b.heading === 'Cash ahead');
-    assert.ok(block, 'the Cash ahead forecast is gone; this test is about it');
-    assert.deepEqual(block.refusals, []);
-    assert.equal(block.walk, undefined, 'never one walk across two currencies');
-    assert.deepEqual(block.walks?.map((w) => w.currency), ['EUR', 'GBP']);
-    assert.equal(block.walks?.[0]?.from, 123_400, 'the euro walk starts from the euro part');
-    assert.equal(block.walks?.[1]?.from, cash.parts?.find((p) => p.currency === 'GBP')?.amount, 'the sterling walk starts from the sterling part');
-    assert.equal(block.walkNote, copy.figureNoHome);
-    const text = JSON.stringify(toSegments(block));
-    assert.match(text, /In EUR/u);
-    assert.match(text, /In GBP/u);
-  });
+test('A HEADLINE DROPS A FRACTION OF ALL ZEROS, and a sentence keeps its pence', () => {
+  assert.equal(symbolText('GBP 33,850.00', 'GBP', true), '£33,850');
+  assert.equal(symbolText('EGP 58,185.00', 'EGP', true), 'EGP 58,185');
+  assert.equal(symbolText('GBP 33,850.50', 'GBP', true), '£33,850.50', 'a fraction that is not all zeros is part of the figure');
+  assert.equal(symbolText('GBP 33,850.00', 'GBP'), '£33,850.00');
 });
 
-test('A TABLE OVER A CASH WALK IN TWO CURRENCIES IS ONE TABLE A CURRENCY, not the first currency alone', () => {
-  const liquid = (e: Entry) => e.fields.liquid === true || e.fields.liquid === undefined;
-  withEuro('accounts', 'balance', liquid, () => {
-    const forecast = page('money')?.blocks.find((b) => b.heading === 'Cash ahead');
-    assert.ok(forecast, 'the Cash ahead forecast is gone; this test is about it');
-    const { knobs: _knobs, late: _late, under: _under, recorded: _recorded, ...decl } = PAGES.money!.blocks.find((b) => b.heading === 'Cash ahead')!;
-    const block = readBlock({ ...decl, kind: 'table', limit: 3 } as never);
-    assert.deepEqual(block.walks?.map((w) => w.currency), ['EUR', 'GBP']);
-    const tables = walkTables(block);
-    assert.ok(tables, 'a table over a split walk is drawn apart');
-    const drawnTables = tables.filter((t) => t.table);
-    assert.equal(drawnTables.length, 2, 'every currency has its table');
-    assert.match(JSON.stringify(tables[0]!.said), /In EUR/u);
-    assert.match(JSON.stringify(tables[1]!.said), /In GBP/u);
-    assert.match(JSON.stringify(drawnTables[0]!.table!.rows[0]), /1,234\.00/u, 'the euro table opens from the euro part');
-    assert.ok(drawnTables[1]!.table!.rows.length <= 4, 'each is cut to limit: after its opening row');
-    assert.ok(JSON.stringify(tables.at(-1)!.said).includes(copy.figureNoHome.split(' ').slice(0, 3).join(' ')), 'the reason is said once, after the tables');
-    assert.equal(walkTables(forecast), null, 'a forecast is drawn through the dialect');
-  });
+/**
+ * THE HOME CURRENCY IS THE ONE THE RECORD SAID IN `boot`, never a count of the rows this tab holds.
+ *
+ * `fill.ts` has put the sample's rows in `held.ts` for this file, and most of their money is sterling, so the count
+ * `homeCurrency()` used to be would answer GBP here. On a live tab those rows are not there and it answered null, so
+ * every figure in the record's own currency kept its code after it.
+ */
+test('THE HOME CURRENCY IS THE ONE THE RECORD SAID, and the shell and the figures agree on it', () => {
+  const now = new Date(NOW).toISOString();
+  const record = (currency: string | null) => ({ slug: 'nile', name: 'Nile', locale: 'en', currency });
+  assert.equal(homeCurrency(), null, "the record's currency was counted from the rows this tab holds");
+
+  assert.equal(layoutOf({ registers: [], now, record: record('EGP') }).index.currency, 'EGP');
+  assert.equal(homeCurrency(), 'EGP', 'the shell and the figures name two currencies');
+
+  assert.equal(layoutOf({ registers: [], now, record: record(null) }).index.currency, null);
+  assert.equal(homeCurrency(), null, "a record with no currency chosen is drawn in the last one's");
+
+  layoutOf({ registers: [], now, record: record('EGP') });
+  assert.equal(refusedShell({ code: 'FORBIDDEN', fix: 'This record is not yours to read.' }).index.currency, null);
+  assert.equal(homeCurrency(), null, "a record that refused is drawn in the last one's currency");
 });
 
-test('A WALK SPLIT BY CURRENCY DRAWS EACH ITS REMEMBERED CASH, AND ONE SET OF KNOBS under the last walk moves them all', () => {
-  const liquid = (e: Entry) => e.fields.liquid === true || e.fields.liquid === undefined;
-  withEuro('accounts', 'balance', liquid, () => {
-    const block = page('money')?.blocks.find((b) => b.heading === 'Cash ahead');
-    assert.ok(block, 'the Cash ahead forecast is gone; this test is about it');
-    assert.deepEqual(block.walks?.map((w) => w.currency), ['EUR', 'GBP']);
-    assert.deepEqual(block.walks?.[0]?.past, [], 'the remembered cash is sterling, so the euro walk has none');
-    assert.ok((block.walks?.[1]?.past?.length ?? 0) > 0, 'the sterling walk draws the cash remembered in sterling');
-    const forecasts = toSegments(block).filter((s) => s.type === 'block' && s.kind === 'forecast') as { rows: { cells: string[] }[] }[];
-    assert.equal(forecasts.length, 2);
-    const kinds = forecasts.map((f) => f.rows.map((r) => r.cells[0]?.trim()));
-    assert.deepEqual(kinds.map((k) => k.includes('knobs')), [false, true], 'the knobs are drawn once, under the last walk');
-    assert.deepEqual(kinds.map((k) => k.includes('group')), [true, true], 'and both walks read them');
-    assert.deepEqual(kinds.map((k) => k.includes('past')), [false, true]);
-    const groups = forecasts.map((f) => f.rows.find((r) => r.cells[0]?.trim() === 'group')!.cells.slice(1, 3).map((c) => c.trim()));
-    assert.equal(groups[0]![0], groups[1]![0], 'one group');
-    assert.deepEqual(groups.map((g) => g[1]), ['EUR', 'GBP']);
-  });
-});
-
-test('“LATE TO YOU” DRAWS WHEN WHAT IS LATE IS IN TWO CURRENCIES, and says each amount', () => {
-  const late = (e: Entry) => e.fields.direction === 'owed_to_me' && (e.fields.state === 'open' || e.fields.state === 'part') && String(e.fields.due) < TODAY;
-  withEuro('obligations', 'amount', late, () => {
-    assert.ok(read(METRICS['late-in']!).parts, 'what is late is in parts, so this test is about a note over parts');
-    const block = page('money')?.blocks.find((b) => b.heading === 'Late to you');
-    assert.ok(block, 'the Late to you note is gone; this test is about it');
-    assert.equal(block.drawn, true, 'a note over parts drew nothing');
-    assert.match(values()['late-in'] ?? '', /EUR\s1,234\.00\s·\sGBP/u);
-  });
+test('A MONEY BOX ON A ROW WITH NO CURRENCY TYPES IN ONE SOMEBODY CHOSE, and with none chosen it writes nothing', () => {
+  const amount: FieldDecl = { id: 'amount', type: 'money' };
+  learnHome('EGP');
+  try {
+    assert.deepEqual(patchOf(amount, '12.50', null, null), { amount: { amount: 1250, currency: 'EGP' } }, "the record's currency was passed over");
+    const owed: FieldDecl = { ...amount, default: { amount: 0, currency: 'KWD' } };
+    assert.deepEqual(patchOf(owed, '1.25', null, null), { amount: { amount: 1250, currency: 'KWD' } }, "the field's own default was passed over");
+  } finally {
+    learnHome(null);
+  }
+  assert.notEqual(wrongMoney(amount, '12.50', null, null), null, 'an amount in no currency was let through to the record');
+  assert.deepEqual(patchOf(amount, '12.50', null, null), { amount: '12.50' }, 'a currency nobody chose was written');
 });
 
 test('A NOTE QUOTING A FIGURE THE RECORD SENT IN PARTS writes each amount', () => {
@@ -624,7 +443,7 @@ test('A TARGET TYPED IN THE HOME CURRENCY IS SAID AS TYPED, and one converted sa
   const decl = { ...METRICS['out-30d']!, target: { lte: 2_000_000 } } as MetricDecl;
   const typed = targetSaid(decl, { unit: 'EGP', targetIn: { currency: 'EGP', target: { lte: 2_000_000 }, asOf: '2026-09-17', forward: false, stale: false, from: 'EGP' } });
   const converted = targetSaid(decl, { unit: 'EGP', targetIn: { currency: 'EGP', target: { lte: 2_000_000 }, asOf: '2026-09-17', forward: false, stale: false } });
-  assert.ok(typed.includes('20,000.00'), typed);
+  assert.ok(typed.includes('20,000'), typed);
   assert.ok(!typed.includes('converted'), typed);
   assert.ok(converted.includes('GBP'), converted);
 });

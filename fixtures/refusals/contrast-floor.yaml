@@ -3,3 +3,19 @@ via:    install
 raises: packages/theme/src/checks.ts
 at:     theme.midnight.roles.dark.faint
 fix:    Move faint further from the ground.
+pack: {
+    "pack": "fixture-install", "version": "1.0.0",
+    "summary": "One pack built to trip exactly one install refusal.",
+    "author": "BrainDog fixtures", "license": "MIT",
+    "declarations": [
+      { "theme": "midnight",
+        "seed": { "accent": "oklch(0.575 0.215 27)", "neutral_hue": 260 },
+        "roles": { "dark": { "faint": "#000000" } } }
+    ]
+  }
+
+# THE HOUSE SEED, WHICH CLEARS EVERY FLOOR IN BOTH PROFILES (`HOUSE_SEED` in `packages/theme/src/index.ts`, and
+# `theme.test.ts` holds it there), WITH ONE ROLE LAID OVER IT: `faint` painted black in the dark scheme, on a ground
+# that is nearly black itself. Checks A and B read no `faint`, so check C is the first to refuse, and it points at the
+# role it asks to move. Refused at `planPack` by `packages/record/src/theme-check.ts`, which is where a pack's
+# palette is checked; the code is constructed in `checks.ts`, which `raises:` names.

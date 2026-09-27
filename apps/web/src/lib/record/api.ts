@@ -18,10 +18,11 @@
 
 import { agentDoing, day as fmtDay, diffRows, money, relative, shortDay, since, integer, MISSING } from 'braindog-render';
 import type { Column, TableRow } from 'braindog-render/svelte';
-import { ruleName, useCaseName } from '@braindog/seed/usecases/names';
+import { useCaseName } from '@braindog/seed/usecases/names';
 import { STALE_MS, type Bars, type MeasureSeries, type Part, type QueueQuestion, type Rate } from '@braindog/kernel';
+import type { BlockResult as Answer } from '@braindog/kernel';
 
-import { amountOf, currencyOf, homeOf } from './money.ts';
+import { amountOf, currencyOf } from './money.ts';
 import { isGlyph, type IconName } from '../ui/icons.ts';
 import { copy } from '../copy.ts';
 import { PAGES, REGISTERS, ROWS, TITLES } from './held.ts';
@@ -33,6 +34,8 @@ import type { MetricDecl } from './metrics.ts';
 import type { Entry, Fields, Filter, FieldDecl, PackInfo, PageBlock, RegisterDecl } from './schema.ts';
 import type { CallOut } from './actions.ts';
 import { listLine } from './tags.ts';
+/* No cycle: `names.ts` reads `held.ts` and the copy, never this file. */
+import { actor, nameWords } from './names.ts';
 
 /* THE DECLARATIONS EVERY HELPER BELOW READS, which are `held.ts`'s and not a copy: a list the record taught this tab is
    the list a cell here is drawn from. */
@@ -58,13 +61,25 @@ export function currencyFor(register: string, field: string): string | null {
 }
 
 /**
- * The currency most of this record's money is in, which a screen writes with its symbol alone.
- * A function, not a constant: `ROWS` is declared later in this module and read through an import
- * cycle, so computing it at load threw before `ROWS` existed and took sixteen test files with it.
+ * The record's home currency, which a screen writes with its symbol alone: the one its `boot` said, or `null` where
+ * nobody has chosen one.
+ *
+ * IT WAS A COUNT OF THE ROWS, AND A COUNT IS A GUESS. This answered the currency most of `ROWS` was in, and `ROWS` is
+ * `held.ts`'s, which nothing fills in a shipped tab, so on a live record it could only answer null: a figure in the
+ * record's own currency kept its code after it ("£33,850.00 GBP"), and an empty money box fell through to sterling.
+ * The record knows the answer, the `home_currency` a person chose, and says it in `boot` (`Boot.record.currency`).
+ * `layoutOf` (`boot-live.ts`) keeps it here as it builds the shell, so this is the booted shell's currency and never a
+ * second reading of anything.
  */
-let home: string | null | undefined;
-export const homeCurrency = (): string | null =>
-  (home ??= homeOf(Object.values(ROWS).flatMap((rows) => rows.flatMap((e) => Object.values(e.fields)))));
+let home: string | null = null;
+export const homeCurrency = (): string | null => home;
+
+/**
+ * Keep the currency a record's `boot` said, and answer it, so the shell's `index.currency` and `homeCurrency()` are one
+ * value. A shell over a refusal says none, so a record opened after another is never drawn in the first one's money;
+ * and what is not a three-letter code is no currency at all, rather than a code printed beside every figure.
+ */
+export const learnHome = (currency: string | null): string | null => (home = currency !== null && /^[A-Z]{3}$/u.test(currency) ? currency : null);
 
 /* ── values ──────────────────────────────────────────────────────────────── */
 
@@ -421,7 +436,23 @@ export function seqWidth(entries: readonly { seq: number }[]): string {
   return `${Math.max(8, String(top).length + 6)}ch`;
 }
 
-export function columnsFor(register: string, declared?: RegisterDecl): Column[] {
+/**
+ * THE ROW'S NUMBER, AS A COLUMN SOMEBODY ASKS FOR AND NO LIST DRAWS BY DEFAULT (design.md SYS-3). Every list opened on a
+ * "#" column, so every line began with an identifier a person had not asked about and the title they came for sat
+ * second. The number still belongs to the row, and Display offers it under the name a person uses for it.
+ */
+export const numberColumn = (): Column => ({ field: 'seq', label: nameWords.number, width: WIDTH.seq!, align: 'end', truncate: 'middle' });
+
+/**
+ * HOW MANY FIELDS A LIST OPENS ON AT MOST. It was ten columns with the number counted among them; the number left the
+ * default and the fields kept their nine, so no list grew a column when it went.
+ */
+const FIELD_COLUMNS = 9;
+
+/**
+ * The columns a list opens on, and with `number` set, the row's number after them, which is how Display offers it.
+ */
+export function columnsFor(register: string, declared?: RegisterDecl, number = false): Column[] {
   /* THE BUILT-IN DECLARATION FIRST, then the one the record sent: a list a pack brought, or one somebody made, is not in
      `REGISTERS`, and without its own declaration here it drew rows with no cells in them. */
   const r = REGISTERS[register] ?? declared;
@@ -446,12 +477,9 @@ export function columnsFor(register: string, declared?: RegisterDecl): Column[] 
    */
   for (const f of r.fields) if (f.qualifies !== undefined && wanted.has(f.qualifies)) wanted.add(f.id);
 
-  const cols: Column[] = [
-    // The spoken id truncates in the MIDDLE if it ever has to, keeping prefix and suffix.
-    { field: 'seq', label: '#', width: WIDTH.seq!, align: 'end', truncate: 'middle' },
-  ];
+  const cols: Column[] = [];
   for (const f of r.fields) {
-    if (!wanted.has(f.id) || cols.length >= 10) continue;
+    if (!wanted.has(f.id) || cols.length >= FIELD_COLUMNS) continue;
     cols.push({
       field: f.id,
       label: labelOf(f),
@@ -465,6 +493,9 @@ export function columnsFor(register: string, declared?: RegisterDecl): Column[] 
       truncate: f.type === 'money' ? 'never' : 'end',
     });
   }
+  /* THE NUMBER GOES LAST, where the list screen and a saved view already move it: a list keeps what you look up at the
+     end of the row and what you read at its start. */
+  if (number) cols.push(numberColumn());
   return cols;
 }
 
@@ -1300,6 +1331,12 @@ export type BlockResult = PageBlock & {
   spentBy?: { metric: string; unit: string | null; groups: { key: string; value: number | null }[]; toward?: boolean };
   /** On a live record: the record's own title for each row a ref on this block points at, so a group is never named from the sample. */
   names?: Names;
+  /**
+   * THE RECORD'S OWN ANSWER, KEPT WHOLE, on a block whose kind is registered (`lib/page/kinds/index.ts`). Such a kind is
+   * drawn from this and from nothing above it: `page-live.ts` translates no key of it into this type, so a new kind
+   * costs no line in this file or in the reader. Absent on every kind `blocks.ts` draws itself.
+   */
+  answer?: Answer | undefined;
 };
 
 /** The kernel's `FeedRow` (`packages/kernel/src/pages.ts`), which this engine must agree with. */
@@ -1413,7 +1450,7 @@ export type Parts = {
   unit?: string | null;
 };
 
-/** An agent as a person reads its name: `agent:claude` is Claude. A run (`S42`) and the assistant are said as `actorOf` says them. */
+/** An agent as a person reads its name: `agent:claude` is Claude. A run (`S42`) and Slash are said as `actorOf` says them. */
 const agentNamed = (who: string): string => {
   const named = actorOf(who);
   return /^agent:/u.test(who) ? named.charAt(0).toUpperCase() + named.slice(1) : named;
@@ -1442,21 +1479,17 @@ export const feedWho = (who: string, me: string | null, names: ReadonlyMap<strin
   return said.you && me === null ? actorOf(who) : said.name;
 };
 
-/** A person's id as the record signs a write with it: `p_` and a ULID. */
-const PERSON_ID = /^p_[0-9A-Z]{20,}$/u;
-
 /**
  * WHO DID IT, BY NAME WHERE THE RECORD HAS ONE. A row's page printed `p_01M2PAZ…` under Added and down its History, and
- * the id ran over "just now" beside it. The reader is You; a person the record names is that name; any other person is
- * Someone on this record; a rule, an agent, the assistant and the record itself are said as `actorOf` says them.
+ * the id ran over "just now" beside it. The words are `names.ts`'s `actor`, the one rule for saying an actor: the
+ * reader is You, a person the record names is that name, any other person is Someone on this record, and Slash, BrainDog,
+ * an agent and an automation are each said by name. `person` is whether the subject is somebody at all, which the
+ * screens that word "Added by" and filter by person need apart from the name.
  */
 export function whoDid(who: string, me: string | null, names: ReadonlyMap<string, string> = new Map()): { name: string; you: boolean; person: boolean } {
-  /* THE SAMPLE SIGNS THE READER'S OWN WRITES `you`. */
-  if ((me !== null && me !== '' && who === me) || who === 'you') return { name: copy.feedYou, you: true, person: true };
-  const named = names.get(who);
-  if (named) return { name: named, you: false, person: true };
-  if (PERSON_ID.test(who)) return { name: copy.feedSomeone, you: false, person: true };
-  return { name: actorOf(who), you: false, person: false };
+  const said = actor(who, me, names);
+  const you = said.kind === 'you';
+  return { name: said.name, you, person: you || said.kind === 'person' };
 }
 
 /**
@@ -1614,7 +1647,7 @@ export function workingNowAt(
   return runs.some((run) => run.fields.agent === touch.by && workingAt(run, now));
 }
 
-/** `You, 3 Sep` or `Reply rule, 9 Sep`: who changed a row last, and the day. */
+/** `You, 3 Sep` or `Reply, 9 Sep`: who changed a row last, and the day. */
 export const changedText = (by: string, at: string): string => {
   const who = actorOf(by);
   return `${who.charAt(0).toUpperCase()}${who.slice(1)}, ${shortDay(at.slice(0, 10))}`;
@@ -1652,25 +1685,15 @@ export function markColumns(
   });
 }
 
-export const actorOf = (by: string): string => {
-  const rule = /^rule\.(.+)$/.exec(by);
-  if (rule) return ruleName(rule[1]!) ?? `${rule[1]!.replace(/[._-]/g, ' ')} rule`;
-  /* THE TWO ACTORS THAT ARE NEITHER PEOPLE NOR RULES. `30 §3` closes the grammar at five shapes and
-     two of them are bare words: `slash` is the assistant — *"only ever on `suggest`, `propose` or
-     `predict`, never on a row write"* — and `system` is *"migrations, purges, the scheduler itself,
-     the dead-letter suggestion"*.
-
-     They arrived on this screen the day the ledger gained a nightly backup and a proposal, and they
-     arrived as themselves: a filter chip reading `system` beside one reading `You`. `19 §9` is
-     about exactly that — the schema's word on a surface a person reads — and *who backed up my
-     record* is answered by "the record itself", not by a principal name. */
-  if (by === 'system') return 'the record itself';
-  if (by === 'slash') return 'the assistant';
-  /* AN AGENT BY ITS NAME: a token's write with no run is signed `agent:claude` (`30 §3`), and Home said "Agent:claude". */
-  const agent = /^agent:(.+)$/u.exec(by);
-  if (agent) return agent[1]!;
-  return by;
-};
+/**
+ * An actor in words, for a caller holding no names and no reader: `names.ts`'s `actor`, by name.
+ *
+ * `you` STAYS `you`, because it is the token the sample signs the reader's own writes with, and Home's feed and a
+ * track's thread still test `who === 'you'` to draw the reader's face in ink. Every other actor is its name, and a
+ * person's id is Someone on this record here as it is in `whoDid`, so reaching for this one can no longer put an id on
+ * a screen.
+ */
+export const actorOf = (by: string): string => (by === 'you' ? by : actor(by).name);
 
 export type SearchHit = {
   title: string;

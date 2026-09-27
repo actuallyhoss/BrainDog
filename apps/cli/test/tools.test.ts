@@ -115,14 +115,16 @@ async function stubRecord(t: After, o: { project?: boolean; register?: boolean }
 
 type Call = { args: string[]; cwd: string };
 
-async function setup(t: After, o: { project?: boolean; grant?: boolean; register?: boolean } = {}) {
+/* `login: false` IS A MACHINE HOLDING NO LOGIN AT ALL, since `keys put` deposits with the login when there is no vault
+   grant (`loop/finish/agents.md` C1), so the name-only path is now the one with neither. The stub reads no bearer. */
+async function setup(t: After, o: { project?: boolean; grant?: boolean; register?: boolean; login?: boolean } = {}) {
   const host = await stubRecord(t, o);
   const dir = mkdtempSync(join(tmpdir(), 'braindog-tools-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const home = join(dir, 'home');
   const top = join(dir, 'repo');
   for (const d of [home, top]) mkdirSync(d, { recursive: true });
-  const env = { XDG_CONFIG_HOME: join(dir, 'config'), BRAINDOG_HOST: host.base, BRAINDOG_TOKEN: TOKEN };
+  const env: Record<string, string> = { XDG_CONFIG_HOME: join(dir, 'config'), BRAINDOG_HOST: host.base, ...(o.login === false ? {} : { BRAINDOG_TOKEN: TOKEN }) };
   const grant = fakeGrant();
   if (o.grant) saveHosts(hostsPath(env), { default: hostKey(host.base), hosts: { [hostKey(host.base)]: { vault: { [SCOPE]: { value: grant, expires: LATER } } } } });
   const out: string[] = [];
@@ -256,8 +258,8 @@ test('SCAN WITH A VAULT GRANT: a key-named env value and a secret header are dep
   nowhere(h, [token, auth]);
 });
 
-test('SCAN WITHOUT A VAULT GRANT: the keys are recorded by name only, nothing is deposited, and one sentence says why', async (t) => {
-  const h = await setup(t, { project: true });
+test('SCAN WITH NEITHER A VAULT GRANT NOR A LOGIN: the keys are recorded by name only, nothing is deposited, and one sentence says why', async (t) => {
+  const h = await setup(t, { project: true, login: false });
   const token = fakeValue();
   const auth = fakeValue();
   h.mcp({
@@ -276,7 +278,7 @@ test('SCAN WITHOUT A VAULT GRANT: the keys are recorded by name only, nothing is
 });
 
 test('THE NO-GRANT SENTENCE IS SAID ONCE PER HOST, forgotten once a vault grant is kept, and said once again when there is none', async (t) => {
-  const h = await setup(t, { project: true });
+  const h = await setup(t, { project: true, login: false });
   const token = fakeValue();
   const auth = fakeValue();
   const key = hostKey(h.base);

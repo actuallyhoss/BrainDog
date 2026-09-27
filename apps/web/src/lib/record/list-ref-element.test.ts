@@ -14,22 +14,26 @@
  * `learnings` title in the seed contains a comma"*, which is measured below and is three of seven,
  * not seven of seven. Either way the number is the address those three elements have, and refusing
  * it left one shipped `list<ref>` field partly unfilterable on the sample alone.
+ *
+ * THE ROWS A CLAUSE ADMITS ARE THE RECORD'S TO COUNT (`remote.test.ts` asks it), and the browser's
+ * matcher that counted them here went with the browser's engine (ARC-2). What `compile` answers now is
+ * the record's own parse, so these cases ask which element a sentence names.
  */
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { chipsOf, whereOf } from './api.ts';
-import { NOW, REGISTERS, ROWS } from './fixtures/sample.ts';
-import { compile, matches, registerHref } from './where.ts';
+import { REGISTERS, ROWS } from './fixtures/sample.ts';
+import { compile, registerHref, type Clause } from './where.ts';
 /* THE SAMPLE'S ROW NAMES, which a live tab learns from the record and this test asks the mirror about by name. */
 import './fixtures/fill.ts';
 
-/** The seqs of the rows of `register` a sentence admits, in order. */
-const rowsFor = (register: string, sentence: string): number[] => {
+/** The clauses a sentence says, refused or not. */
+const clausesFor = (register: string, sentence: string): Clause[] => {
   const w = compile(register, sentence);
   assert.deepEqual(w.bad, [], `the sentence was refused: ${sentence}`);
-  return (ROWS[register] ?? []).filter((e) => matches(e, w, NOW)).map((e) => e.seq).sort((a, b) => a - b);
+  return w.clauses;
 };
 
 /** A minted URL read back the way the register page reads one: chips, then the sentence they mean. */
@@ -38,30 +42,18 @@ const backThrough = (href: string): string => {
   return whereOf(chipsOf(new URLSearchParams(at === -1 ? '' : href.slice(at + 1))));
 };
 
-test('A LIST OF REFS IS ASKED BY ROW NUMBER TOO, and the sample answers the rows the record answers', () => {
-  /* The rows the seed's own `because` column says cite learnings#4. `remote.test.ts` drove the same
-     two seqs out of a running record for the same chip, so this is the sample's half of that pair
-     rather than a second opinion about the seed. */
-  const held = (ROWS.skills ?? [])
-    .filter((e) => Array.isArray(e.fields.because) && (e.fields.because as unknown[]).includes(4))
-    .map((e) => e.seq)
-    .sort((a, b) => a - b);
-  assert.deepEqual(held, [1, 4], 'the seed no longer has exactly skills#1 and #4 citing learnings#4');
-
-  assert.deepEqual(rowsFor('skills', 'because has 4'), held);
-  assert.deepEqual(
-    rowsFor('skills', 'because lacks 4'),
-    (ROWS.skills ?? []).map((e) => e.seq).filter((seq) => !held.includes(seq)).sort((a, b) => a - b),
-    'a row citing nothing lacks everything',
-  );
+test('A LIST OF REFS IS ASKED BY ROW NUMBER TOO, and names the row the record names', () => {
+  assert.deepEqual(clausesFor('skills', 'because has 4'), [{ field: 'because', op: 'has', values: ['4'] }]);
+  assert.deepEqual(clausesFor('skills', 'because lacks 4'), [{ field: 'because', op: 'lacks', values: ['4'] }]);
+  /* A LEADING ZERO IS THE SAME ADDRESS, since the number is compared as a number. */
+  assert.deepEqual(clausesFor('skills', 'because has 04'), [{ field: 'because', op: 'has', values: ['4'] }]);
 });
 
 test('AND A NUMBER THAT NAMES NO ROW IS STILL THE REFUSAL IT WAS, in the record’s own sentence', () => {
-  /* The refusal is the reason the number could be taught at all: `allowed` admits a ref's `seq` on
-     the scalar path and refuses one that names nothing, so `thing is 99` is a refusal and not a
-     comparison against the characters `99`. This is that rule, one element type along. */
-  assert.deepEqual(compile('skills', 'because has 999').bad, ['because has 999: there is no learnings called 999']);
-  assert.deepEqual(compile('skills', 'because has 0').bad, ['because has 0: there is no learnings called 0']);
+  /* The refusal is the reason the number could be taught at all: a number that names nothing is a
+     refusal and not a comparison against the characters `999`. */
+  assert.deepEqual(compile('skills', 'because has 999').bad, ['because has 999: there is no learnings called 999.']);
+  assert.deepEqual(compile('skills', 'because has 0').bad, ['because has 0: there is no learnings called 0.']);
 });
 
 test('THREE OF THE SEVEN TITLES CANNOT BE SAID IN A SENTENCE AT ALL, which is what the number is for', () => {
@@ -97,7 +89,7 @@ test('THE MINTED CHIP COMES BACK AS ONE CLAUSE OVER THE SAME ROWS, whatever the 
       const sentence = `${field} has ${row.seq}`;
       const said = backThrough(registerHref(register, sentence));
       assert.equal(compile(register, said).clauses.length, 1, `the chip for "${sentence}" came back as ${said}`);
-      assert.deepEqual(rowsFor(register, said), rowsFor(register, sentence), `the chip for "${sentence}" opens a different list`);
+      assert.deepEqual(clausesFor(register, said), clausesFor(register, sentence), `the chip for "${sentence}" opens a different list`);
     }
   }
 });

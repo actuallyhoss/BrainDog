@@ -14,8 +14,8 @@
  *
  * Refused and never misread, but most amounts a business asks about are over a thousand of something. So a value is
  * printed as it is typed: digits, a point and a hyphen-minus, and a money as its code and its amount in the currency's
- * own places. Each case below is asked three ways, the predicate itself to the record, and the printed words to the
- * record and to the browser, and all three must find the same rows.
+ * own places. Each case below is asked three ways: the predicate itself and the printed words to the record, which must
+ * find the same rows, and the printed words to the browser's `compile`, which must read back the predicate's bounds.
  */
 
 import { test } from 'node:test';
@@ -27,8 +27,8 @@ import { installSeed } from '@braindog/seed';
 import type { SlashWhere } from '@braindog/client';
 
 import '../record/fixtures/fill.ts';
-import { NOW, ROWS } from '../record/fixtures/sample.ts';
-import { compile, matches } from '../record/where.ts';
+import { NOW } from '../record/fixtures/sample.ts';
+import { compile } from '../record/where.ts';
 import { whereWords } from './slash.ts';
 
 function openSqlite(): Parameters<typeof openRecord>[0] {
@@ -76,10 +76,25 @@ const recordSeqs = (k: Kernel, register: string, where: unknown): string => {
   return out.value.rows.map((r) => r.seq ?? -1).sort((a, b) => a - b).join(' ');
 };
 
-const browserSeqs = (register: string, sentence: string): string => {
+/**
+ * The bounds the browser reads out of a sentence, or its refusal.
+ *
+ * THE BROWSER NO LONGER COUNTS ROWS (ARC-2): `compile` is the record's parser, and what it hands its readers is the
+ * clause. So the browser's half of this pair is that the printed words come back as the bounds the predicate holds.
+ */
+const browserBounds = (register: string, sentence: string): string => {
   const w = compile(register, sentence);
   if (w.bad.length) return `refused: ${w.bad.join('; ')}`;
-  return (ROWS[register] ?? []).filter((e) => matches(e, w, NOW)).map((e) => e.seq).sort((a, b) => a - b).join(' ');
+  return JSON.stringify(w.clauses.map((c) => [c.field, c.op, 'bounds' in c ? c.bounds : null]));
+};
+
+/** The same, from the predicate the words were printed from. */
+const leafBounds = (leaf: SlashWhere): string => {
+  const node = leaf as unknown as Record<string, unknown>;
+  const op = Object.keys(node).find((k) => k !== 'field') ?? '';
+  const v = node[op];
+  const one = (x: unknown) => (typeof x === 'number' ? { n: x } : { n: (x as { amount: number }).amount, currency: (x as { currency: string }).currency });
+  return JSON.stringify([[node.field, op, Array.isArray(v) ? v.map(one) : [one(v)]]]);
 };
 
 /* EVERY ORDERED OPERATOR, over a money, a negative money, a whole number and a duration, each at or past a thousand. */
@@ -96,7 +111,7 @@ const PRINTED: [string, SlashWhere, string][] = [
   ['things', { field: 'progress', gte: 50.5 }, 'progress is at least 50.5'],
 ];
 
-test('EVERY CLAUSE PRINTED OVER A VALUE PAST A THOUSAND TYPES BACK, into the record and into the browser, as the same rows', async () => {
+test('EVERY CLAUSE PRINTED OVER A VALUE PAST A THOUSAND TYPES BACK, into the record as the same rows and into the browser as the same bounds', async () => {
   const k = await record;
   for (const [register, leaf, words] of PRINTED) {
     const said = whereWords(leaf);
@@ -104,7 +119,7 @@ test('EVERY CLAUSE PRINTED OVER A VALUE PAST A THOUSAND TYPES BACK, into the rec
     const asked = recordSeqs(k, register, leaf);
     assert.doesNotMatch(asked, /^refused/, `${register}: the predicate itself was refused, so this proves nothing: ${asked}`);
     assert.equal(recordSeqs(k, register, said), asked, `${register}: "${said}" typed back into the record`);
-    assert.equal(browserSeqs(register, said), asked, `${register}: "${said}" typed back into the browser`);
+    assert.equal(browserBounds(register, said), leafBounds(leaf), `${register}: "${said}" typed back into the browser`);
   }
 });
 

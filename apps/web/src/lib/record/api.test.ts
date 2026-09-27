@@ -946,12 +946,13 @@ test('A LIST THE BUILT-IN SAMPLE DOES NOT KNOW TAKES ITS COLUMNS FROM THE DECLAR
     id: 'suppliers', name: 'Suppliers', one: 'Supplier', title: 'name', mobile: ['name', 'city', 'name'] as const,
     fields: [{ id: 'name', type: 'text' as const }, { id: 'city', type: 'text' as const }, { id: 'notes', type: 'text' as const }],
   };
-  assert.deepEqual(columnsFor('suppliers', declared as never).map((c) => c.field), ['seq', 'name', 'city']);
+  assert.deepEqual(columnsFor('suppliers', declared as never).map((c) => c.field), ['name', 'city']);
   assert.deepEqual(columnsFor('tasks', declared as never), columnsFor('tasks'), 'a built-in list took a declaration over its own');
 });
 
 test('the # column is 8ch for short ids and widens with the digits of the highest id in hand', () => {
-  assert.equal(columnsFor('obligations').find((c) => c.field === 'seq')?.width, '8ch');
+  assert.equal(columnsFor('obligations').find((c) => c.field === 'seq'), undefined, 'a list opened on its rows\' numbers');
+  assert.equal(columnsFor('obligations', undefined, true).find((c) => c.field === 'seq')?.width, '8ch');
   assert.equal(seqWidth([]), '8ch');
   assert.equal(seqWidth([{ seq: 7 }, { seq: 42 }]), '8ch');
   assert.equal(seqWidth([{ seq: 999 }, { seq: 3 }]), '9ch');
@@ -1158,7 +1159,7 @@ test('COMING IN AND GOING OUT SIGN THEIR AMOUNTS AND SAY WHO CHANGED EACH ROW LA
   });
   /* THE NEWEST THING SAID ABOUT A ROW IS WHO CHANGED IT: a rule matched Halden's reply on 2026-041. */
   const halden = table.rows.find((r) => r.key === 'obligations#1')!;
-  assert.match(String(halden.cells[changed]), /^Reply rule, \d{1,2} [A-Z][a-z]{2}$/u);
+  assert.match(String(halden.cells[changed]), /^Reply, \d{1,2} [A-Z][a-z]{2}$/u);
   const other = table.rows.find((r) => r.key !== 'obligations#1')!;
   assert.match(String(other.cells[changed]), /^You, \d{1,2} [A-Z][a-z]{2}$/u);
 
@@ -1196,15 +1197,15 @@ test('EVERY MONTH IS SPLIT BY WHAT IT IS FOR, at monthly shares, and what no cat
 test('a first-party rule acts under its name, and any other rule by its id in words', async () => {
   const { actorOf } = await import('./api.ts');
   assert.equal(actorOf('rule.invoice-late'), 'Chase late payments');
-  assert.equal(actorOf('rule.renewal'), 'renewal rule');
-  assert.equal(actorOf('rule.late-reply'), 'late reply rule');
+  assert.equal(actorOf('rule.renewal'), 'Renewal');
+  assert.equal(actorOf('rule:late-reply'), 'Late reply');
 });
 
 test("Student's Assignments list shows the course of each by default", async () => {
   const { useCase } = await import('@braindog/seed/usecases');
   const decl = ((useCase('student')?.pack?.declarations ?? []) as Record<string, unknown>[]).find((d) => d.register === 'assignments');
   assert.ok(decl);
-  assert.deepEqual(columnsFor('assignments', decl as never).map((c) => c.field), ['seq', 'what', 'state', 'course', 'due']);
+  assert.deepEqual(columnsFor('assignments', decl as never).map((c) => c.field), ['what', 'state', 'course', 'due']);
 });
 
 /* ── the rail, at the scale he actually keeps ────────────────────────────── */

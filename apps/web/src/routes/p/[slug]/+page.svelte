@@ -23,8 +23,8 @@
   const showSource = $derived(route.url.searchParams.get('src') === '1');
 
   /**
-   * WHERE THE PAGE CAME FROM: the record's `page` answer, the sample when there is no record here, the
-   * record saying it has no such page, or the record's own sentence. Nothing draws until it answers.
+   * WHERE THE PAGE CAME FROM: the record's `page` answer, the record saying it has no such page, or the
+   * record's own sentence. Nothing draws until it answers.
    */
   let got = $state<Opened | null>(null);
   let reader: ReturnType<typeof pageReader> | null = null;
@@ -53,7 +53,7 @@
   }
 
   /**
-   * DRAWN ONCE THE READ HAS ANSWERED, live, the sample, or a page the record does not have. The read is
+   * DRAWN ONCE THE READ HAS ANSWERED, live or a page the record does not have. The read is
    * bracketed by `opened()` and `closed()`, so a call still out takes `data-screen` away whatever this
    * says; `Empty` says `refused` for the state it draws.
    */

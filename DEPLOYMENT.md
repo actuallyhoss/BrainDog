@@ -172,6 +172,100 @@ the shipped product rather than a half-labelled alpha one, and there is nothing 
 moves forward from a `master` that has been green, and nothing else can reach it — non-production
 branch builds are off, so a branch cannot take the hostname.
 
+## Rolling back
+
+`.github/workflows/deploy.yml` undoes a red deploy by itself when undoing it is safe, and holds when
+it is not. What it does, in order:
+
+1. **Before Deploy**, the step "Record what is live" saves the app's and the site's live version ids
+   (`wrangler deployments status --json --env production`, in `apps/worker` and in `apps/site`) and
+   the sha the live app was built from (the tail of `https://$DEPLOY_HOST/.well-known/braindog-build`)
+   as `APP_PREVIOUS`, `SITE_PREVIOUS` and `LIVE_SHA`. Anything it cannot learn is left empty.
+2. **After a red Parity or Smoke**, the step "Decide whether to roll back" runs
+   `node apps/worker/scripts/rollback.mjs decide`, which reads `git diff --name-only` from `LIVE_SHA`
+   to the deployed sha and prints one of two lines:
+   - `ROLL`: the app goes back to `APP_PREVIOUS`, and after a red Smoke the site goes back to
+     `SITE_PREVIOUS` too. After a red Parity the site was never deployed, so it is left alone. The
+     next two steps run `wrangler rollback <version> --env production`.
+   - `HOLD`: nothing is rolled back, and the line says why. It holds when a file under
+     `packages/kernel/src/migrations/` changed (every record that opened on the new build has run
+     the migration, and the build before refuses a record newer than it knows), when the
+     `migrations` block of `apps/worker/wrangler.jsonc` changed (the version before does not carry
+     the new Durable Object class), when `DIRECTORY_VERSION` in `packages/record/src/directory.ts`
+     changed (an older Worker refuses the newer Directory, which serves every record), and when
+     anything it needs is unknown.
+3. **The run stays red either way.** A deploy that was undone is still a deploy that did not work.
+
+**After a HOLD**, the bad version is live and the fix goes forward: a new branch, a pull request,
+green checks, a merge. If a record itself is broken, restore it to the copy taken before the push
+(Settings > Backups on that record), and writes since that copy are lost.
+
+**By hand**, when the automatic step could not act (a version was not recorded, or `wrangler`
+refused), find the version that served before and put it back:
+
+```
+cd apps/worker
+pnpm exec wrangler deployments list --env production
+pnpm exec wrangler rollback <version-id> --env production --message "<why>"
+curl -s https://brain.dog/healthz                  # "app" names the sha you rolled back to
+```
+
+The same two commands in `apps/site` roll the marketing site back. Three things to know first:
+
+- **Never after a kernel migration, a Durable Object class migration or a `DIRECTORY_VERSION`
+  change**, for the reasons the HOLD line gives. Read `git diff --name-only <live sha> <bad sha>`
+  before rolling back by hand.
+- **`wrangler` asks before putting back a version whose secrets have changed since it was
+  deployed**, and in a runner it answers yes by itself. If the old version cannot run with the
+  secrets as they are now, say no and fix forward.
+- **A hand rollback lasts until the next green `ci` on `master`**, because `deploy.yml` deploys the
+  app and the site again from there. `git revert` of the bad commit is what keeps one.
+
+**The signed-in half of Smoke** asks `boot` on one record with a read token, which is the only
+question that sees a migration refusing real rows. It is off until the operator sets it up once:
+make a record for it (for example `ops`), mint a read token on it with
+`braindog token create --name smoke --scope read --host https://brain.dog/app/ops`, and store the token as the
+GitHub secret `SMOKE_TOKEN` and the record's name as the variable `SMOKE_SLUG`. Unset, Smoke prints
+that the half was skipped. A token that expires turns Smoke red with a 401 that names `SMOKE_TOKEN`,
+and that red rolls the deploy back like any other, so mint the next token (`--days` sets how long it
+lives) before this one lapses.
+
+## Pushing a workflow
+
+A workflow's changes reach production as one push. With a live record on production, every push
+goes like this.
+
+**Once, before the first push:**
+
+1. Add a required reviewer to the `production` environment (the repository's Settings >
+   Environments > production > Required reviewers), so no merge deploys without a press.
+2. Run the restore drill once against last night's copy of the live record, so "restore from last
+   night" below is known to work: `node apps/cli/scripts/restore-drill.mjs <night.brainl.age> --identity <file>`,
+   with the identity file kept outside this repository.
+3. Optionally, the canary record and `SMOKE_TOKEN` above.
+
+**Every push:**
+
+1. The workflow lands on a branch `finish/wN` as a pull request labelled `full-gates`. `ci.yml` and
+   `gates.yml` run there, and the repair goes on until both are green. Nothing deploys from a branch.
+2. If anything under `packages/kernel/src/migrations/` changed, rehearse it on last night's copy of
+   the live record against the deployed sha, which is the tail of
+   `curl -s https://brain.dog/.well-known/braindog-build`:
+   `node apps/cli/scripts/migration-rehearsal.mjs <night.brainl.age> --identity <file> --deployed <sha>`.
+   FAIL stops the merge.
+3. Take a restore point: Settings > Backups > "Back up now" on the live record, and
+   `braindog export -o <record>-<date>.brainl` on your own machine.
+4. Merge. `ci` runs on `master`, `deploy.yml` waits for the reviewer's approval, then Deploy, Parity,
+   the site, Smoke (with the signed-in half when it is set up).
+5. **Red before anything irreversible** (no kernel migration, no Durable Object class migration, no
+   `DIRECTORY_VERSION` change in the diff): the app, and the site after a red Smoke, go back to the
+   recorded versions by themselves. **Red after one**: the run holds and says why; the fix goes
+   forward on a new branch. If the live record itself is broken, restore it from Settings > Backups
+   to the restore point of step 3.
+6. For fifteen minutes, watch `pnpm exec wrangler tail --env production --format json` in
+   `apps/worker` for lines with `"op":"crash"`, `"op":"refuse"` or `"op":"mail"`. Then open the
+   live record on a phone and on a laptop: Home, Money, one write, one search, one sign-in.
+
 ## What is not automated, and should be
 
 - **The marketing site has no build project.** Both `alpha.brain.dog` and now `brain.dog` were
@@ -181,5 +275,3 @@ branch builds are off, so a branch cannot take the hostname.
 - **The `www` redirect is a dashboard rule and is in no file here.** It is one Redirect Rule, and
   the rest of this document exists because a setting that lives only in a dashboard is a setting
   nobody can review. Its terms: `https://www.*` to `https://${1}`, 301, query string preserved.
-- **Nothing in CI runs `wrangler deploy --dry-run`**, so a binding removed from `wrangler.jsonc`
-  fails at deploy time rather than at pull-request time.

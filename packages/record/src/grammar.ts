@@ -1,18 +1,37 @@
 /**
- * What a page body and an arrangement may contain, as one compact read (`loop/research-spark.md` S12).
+ * What a page, a list, a figure, a rule and an arrangement may contain, each as one compact read (`loop/research-spark.md`
+ * S12, `loop/finish/pages.md` C3).
  *
  * THE LINT WAS THE ONLY TEACHER. An agent learned a page's grammar one refusal at a time, and each try was a
- * turn. This is the same grammar said once: every key, its bounds, and one page that installs. It is a
- * reference and not a validator: the install's own lint still decides, and a test holds the block kinds here
- * to the list that lint refuses against.
+ * turn. This is the same grammar said once: every key, its bounds, and one declaration that installs. It is a
+ * reference and not a validator: the install's own lint still decides. `test/arrange.test.ts` holds the block kinds here
+ * to the list that lint refuses against, and `test/slash-grammars.test.ts` holds the other key lists the same way and
+ * installs each example.
+ *
+ * EVERY DESCRIPTION HANDS SLASH THE GRAMMARS OF WHAT IT MAY BUILD (`describedGrammar`). Its instructions named
+ * `grammar/register`, `grammar/metric` and `grammar/rule` while the record served only the page grammar and put none of
+ * them in what the model was sent, so a model learned a list's keys from the refusals Decide then showed the owner
+ * (`loop/finish/defects.md` G1). The rule grammar here is what a rule may do INSIDE the record, because a description never builds one that
+ * reaches out (`REACHES_OUT` in `slash.ts`); an agent reads `braindog:grammar/automations`, which is the MCP package's
+ * own text, for every step.
  */
 
 import type { Result } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 import { KINDS } from 'braindog-render';
 import { VOICE_KEYS } from '@braindog/declare';
+import { AGGREGATIONS, CAPABILITIES, FIELD_TYPES } from '@braindog/kernel';
 
-export const GRAMMARS = ['page', 'proposals'] as const;
+import { REACHES_OUT } from './slash.ts';
+
+/**
+ * The grammars `arrangement({ grammar })` answers, in the order a refusal names them.
+ *
+ * `rule` IS HERE BESIDE THE TWO `loop/finish/contracts.md` §6.4 NAMES, by `loop/finish/gaps.md`'s ruling on defects G1: Slash is never
+ * told to read a grammar nothing serves, and SLS-1 drafts rules against this one. MCP serves `register` and `metric` as
+ * resources and not `rule`, because its own `grammar/automations` already says a rule in full.
+ */
+export const GRAMMARS = ['page', 'register', 'metric', 'rule', 'proposals'] as const;
 
 const PAGE = {
   declaration: { id: 'page.<slug>', kind: 'page', body: 'the page body below' },
@@ -38,7 +57,17 @@ const PAGE = {
     where: 'a filter, such as state is open, or a predicate tree. On a capture, what the new row is preset with: about is parts#2 presets a link',
     register: 'the list a capture adds to, or the list whose one row inputs edits',
     row: "on inputs, the row it edits by its id, such as checks#1; the list's first row when it says nothing",
-    columns: '[{field, label?}], 1 to 16; on cards, as: title, figure, fact, trend, ring, who, when, mark, next (the first open step under the card, from the list whose steps: {of, done, order?} names it) or reply (a quieter line under the title, such as a second opinion)',
+    columns: '[{field, label?}], 1 to 16; on cards, as: title, figure, fact, trend, ring, who, when, mark, next (the first open step under the card, from the list whose steps: {of, done, order?} names it), reply (a quieter line under the title, such as a second opinion), hue (a whole-number field from 0 to 359, drawn only on the card\'s mark) or picture (a file field the card leads with)',
+    over_a_list: {
+      calendar: 'columns [title field, day or instant field]; back and ahead are whole months either side of this one, 0 to 12, defaults 2 and 0; at most 500 rows, and no limit',
+      link: 'columns [title field, url field, note field?]; a url is https, mailto or a path of this BrainDog',
+      gallery: 'columns [caption field, file field]; limit at most 24',
+      embed: 'authored rows only, one: cells [url, title?, aspect?]; the url a YouTube, Vimeo, Loom, Figma or Google Maps address, the aspect 16:9 (the default), 4:3, 1:1 or 9:16',
+    },
+    back: 'on a calendar, whole months before this one; series, stat and lines read it too',
+    ahead: 'on a calendar, whole months after this one; a series reads it too',
+    panel: "actions or reporting, on a section of a page with for: the host draws that part of the row's page under the section's heading",
+    short: '{where, label}: on steps, the short view: the rows the sentence keeps, named by a label of at most 24 bytes',
     order: '[{field, dir: asc or desc}], 1 to 3',
     limit: 'rows, 0 to 500',
     cells: '[{metric, label?, note?}], 1 to 6, the figures a stat draws',
@@ -52,6 +81,7 @@ const PAGE = {
     tiles: "true on a queue: one tile per question, with its recommended option's shows ({swatch: [#rrggbb]}, {figure: text} or {file: {row, field}}). A question's body.about names what it is about, and where: about is <name> reads it",
     when: '{metric}: drawn only when that figure calls for it',
   },
+  paths: '{{<metric>}} in any text is that figure, {{<list>.count}} how many rows the list has, {{<list>.<value>}} how many are in that value of its state, and {{icon:<glyph>}} a glyph',
   example: {
     id: 'page.reading',
     kind: 'page',
@@ -78,8 +108,202 @@ const PAGE = {
   to_change_one: 'Read arrangement with page for its declaration, change the body, and propose body_kind change with {"to": that declaration}.',
 };
 
+/**
+ * A list's grammar. `body` and `rare` together are every key the lint reads on a register, and `field` every key it reads
+ * on a field: the test installs a list with a key that is not one and holds both halves to the `allowed` its refusal
+ * names, so a key the kernel learns is a red test here until it is said.
+ */
+const REGISTER = {
+  declaration: { id: 'register.<id>', kind: 'register', body: 'the list body below' },
+  body: {
+    id: 'the list id: lower-case letters, digits and single underscores, starting with a letter, at most 32 (required). register is another spelling of it',
+    register: 'the same id as id; write one of the two',
+    name: 'what a person calls the list, such as Parts',
+    one: 'one row of it in words, such as part',
+    title: 'the field that names a row (required)',
+    fields: '1 to 64 fields, each as field below (required)',
+    search: 'the fields search reads: text, document, enum, url, email or a list of text',
+    state: 'the enum field that says where a row is, such as open or done',
+    done: 'the state values that mean finished, drawn ticked',
+    finished: 'a day field filled when a row enters a done state; needs state',
+    steps: '{of: <ref field>, done: <bool field>, order?: <number, day or text field>}: each row is a step of the row its of field points at, done when its done field is true',
+    icon: 'a glyph name for the rail',
+    holds: 'one line saying what the list holds',
+    seq_prefix: "# or a capital letter and up to three capitals or digits: the start of a row's spoken id, such as P for P12. D, SG and S are the record's own",
+    mobile: 'the few fields the phone view keeps, such as [what, amount, due]',
+    delete: 'refuse_while_referenced: a row another row points at is not deleted',
+    owner_only: 'true: somebody who may add to the whole record does not add here unless the list is named to them',
+  },
+  rare: {
+    pack: 'the pack that ships the list; a list Slash builds leaves it off',
+    identity: '{mark: <enum field>, accent: <int field>}: each row carries a mark and one accent hue',
+    series: 'true for a list of dated facts, such as a rate each day, rather than of things with names',
+    scopes: "{repos?, folders?}: on the one list whose rows are projects, the list-of-text fields naming each one's places",
+    rates: 'on the one list holding the rates a money figure converts by, the field that plays each part',
+    meets: 'on the one list meet writes people into, the field that plays each part',
+    pairs: 'transfer detection: the fields the record matches two legs of one move by',
+  },
+  field: {
+    id: 'lower-case letters, digits and single underscores; never id, seq, register, created_at, updated_at, deleted_at, version, spoken or title, and never starting with _ (required)',
+    type: `one of ${FIELD_TYPES.join(', ')} (required)`,
+    of: 'on a list, the type of each item, such as text',
+    values: 'on an enum, its values',
+    labels: 'on an enum, the words a person reads for some of its values: {owed_to_me: Money in}',
+    to: 'on a ref, the list it points at',
+    required: 'true: a row must have it',
+    required_when: '{field, is}: required while another field of the row holds that value',
+    default: 'the value a new row starts with',
+    unique: 'true: no two live rows hold the same value',
+    immutable: 'true: set once, when the row is made',
+    index: 'true: kept in an index, for a list filtered by it often',
+    min: 'the least: UTF-8 bytes on text and documents, the value on numbers',
+    max: 'the most, the same way; it lowers the type\'s own ceiling and never raises it',
+    label: 'what a person reads for the field, when it is not the id with _ as a space',
+    search: 'true: the search box reads it',
+    deadline: 'true on a day field: the day the row is due',
+    remind: 'on a day or instant field, offsets to be told before it, such as ["-1d"]; hours only on an instant',
+    repeat: '{freq, interval?, count?, until?, workday?} on a day or instant field: the day comes again',
+    transitions: "on the state field, for each value the values it may move to: {open: {to: [done], requires?: [<fields filled first>], by?: decide}}",
+    by: 'decide: once the row is made, only an accepted proposal changes it',
+    redact: 'true: the audit log keeps no value of it',
+    retired: 'true: kept and no longer drawn or written',
+    scope: '{} on the one ref to the project list: the project a row belongs to',
+    qualifies: 'the field that makes an amount readable',
+    unit: 'on a duration, how it is said',
+    derived: "the record's own; never write it",
+  },
+  example: {
+    id: 'register.parts',
+    kind: 'register',
+    body: {
+      id: 'parts',
+      name: 'Parts',
+      one: 'part',
+      title: 'what',
+      search: ['what'],
+      fields: [
+        { id: 'what', type: 'text', required: true },
+        { id: 'state', type: 'enum', values: ['open', 'done'] },
+        { id: 'due', type: 'day', deadline: true },
+      ],
+      state: 'state',
+      done: ['done'],
+    },
+  },
+};
+
+/**
+ * A figure's grammar. The kernel has no unknown-key check on a metric body, so there is no `allowed` to hold these keys
+ * to; what the test holds is the aggregations, read from the kernel's own `AGGREGATIONS`, and the example, which installs
+ * over the register example above.
+ */
+const METRIC = {
+  declaration: { id: 'metric.<id>', kind: 'metric', body: 'the figure body below' },
+  body: {
+    metric: 'the id: a lower-case letter, then lower-case letters, digits, - and _, at most 32 (required)',
+    name: 'what a person calls it',
+    source: 'register.<id> (required)',
+    where: 'the rows it reads, as a list filter says it, such as state is open',
+    value: `one aggregation, {<aggregation>: <field>}, the aggregation one of ${AGGREGATIONS.join(', ')}; count counts id. Or {ratio: {of: {...}, per: {...}}} or {diff: {of, per}}, both halves over the same rows (required)`,
+    format: 'money, int, decimal, pct, days, duration or day (required)',
+    target: "{gte: n} or {lte: n}, in the figure's own units, minor units for money: a number with no target is decoration (required)",
+    window: 'how far back it compares, such as 30d, 4w or 3m (required)',
+    compare: 'previous, year_ago or none',
+    group_by: 'one field; created_at or updated_at groups by when rows were written',
+    bucket: 'with a day group_by: day, week, month, quarter or year',
+    lookups: '{<table>: {<value>: <factor>}}: at most 8 tables a value may multiply by',
+    home: 'its place among the Home figures, 1 to 9',
+    sellable: 'true: a forecast may offer it',
+  },
+  never: 'within, which the reader works out from where',
+  example: {
+    id: 'metric.parts-open',
+    kind: 'metric',
+    body: {
+      metric: 'parts-open',
+      name: 'Parts still open',
+      source: 'register.parts',
+      where: 'state is open',
+      value: { count: 'id' },
+      format: 'int',
+      target: { lte: 5 },
+      window: '30d',
+      compare: 'previous',
+    },
+  },
+};
+
+/**
+ * What a trigger and a step of a rule do, by the name `CAPABILITIES` (`kernel/src/capabilities.ts`) keeps them under.
+ *
+ * THE NAMES ARE THE TABLE'S AND THE WORDS ARE HERE. `RULE` below lists only the rows the table holds, so a name it drops
+ * leaves the grammar with it, and a name it gains is a red test (`slash-grammars.test.ts`) until it is said here.
+ */
+const TRIGGER_SAYS: Readonly<Record<string, string>> = {
+  written: '{"written":{"register":"<id>","op":["create","update","delete"],"fields":["<field>"]}}: a row was written; op and fields are optional',
+  arrival: '{"arrival":{"ingest":"<id>"}}: something arrived at a door the record already has',
+  every: '{"every":"1d","at":"08:00"}, {"every":"1w","at":"08:00","day":"mon"} or {"every":"1mo","day":"last","at":"09:00"}; never more often than every 15m',
+  metric: '{"metric":{"id":"<metric>","crosses":{"lte":0}}}: a figure moved to the other side of a line; crosses is target, {"lte":n} or {"gte":n}',
+  decided: '{"decided":{"about":"rule.<name>","option":"<answer>"}}: a question on Decide was decided',
+  manual: '{"manual":true}: a person presses Run now',
+};
+
+const STEP_SAYS: Readonly<Record<string, string>> = {
+  if: '{"if":"<condition>","then":[...],"else":[...]}',
+  set_var: '{"set_var":{"name":"<answer>","to":"<text>"}}',
+  wait: '{"wait":"2h"}: m, h, d or w',
+  ask_person: '{"ask_person":{"question":"<text>","options":["yes","no"],"as":"<answer>","wait":"2d","to":"<member id>"}}: opens on Decide; to is optional',
+  tag: '{"tag":"x"}',
+  untag: '{"untag":"x"}',
+  set: '{"set":{"field":"f","to":"v"}}',
+  move: '{"move":"<state>"}',
+  link: '{"link":{"field":"f","to":{"register":"r","by":"f","value":"v"}}}',
+  note: '{"note":"text"}',
+  notify: '{"notify":{"say":"text"}}',
+  schedule: '{"schedule":{"in":"14d","note":"text"}}',
+  create: '{"create":{"register":"r","bound":10,"fields":{}}}',
+  suggest: '{"suggest":{"question":"q","options":["a","b"]}}',
+  stop: '{"stop":true}',
+};
+
+/** Every step the table holds that a description may build: none that reaches out, and no one key of a step. */
+const inside = (name: string): boolean => !name.includes('.') && !Object.hasOwn(REACHES_OUT, name);
+
+const RULE = {
+  declaration: { id: 'rule.<name>', kind: 'rule', body: 'the keys below' },
+  body: {
+    rule: 'the name, as in the id: lower-case letters, digits, - and _ (required)',
+    name: 'the words its card shows',
+    on: 'exactly one trigger, below. Leave it off for a rule that runs inside a write to register',
+    register: 'with no on:, the list whose writes run it, inside the write, with then:',
+    when: 'a condition as a list filter says it, read on the row the trigger names',
+    steps: 'the steps below, in order (required, or then:)',
+    then: 'the older flat list of steps, run inside the write; never beside steps',
+    once_per: '["entry"] or field ids: what makes one firing. Required when a write trigger notifies, creates or suggests',
+    enabled: 'false stops it starting',
+    project: 'a project id: only rows of that project start it',
+    limits: '{"runs_per_day","steps_per_run"}, whole numbers that only lower the record ceilings',
+    priority: 'a number; lower runs first among rules inside one write',
+  },
+  triggers: Object.fromEntries(CAPABILITIES.filter((c) => c.of === 'trigger').map((c) => [c.name, TRIGGER_SAYS[c.name] ?? c.name])),
+  steps: Object.fromEntries(CAPABILITIES.filter((c) => c.of === 'step' && inside(c.name)).map((c) => [c.name, STEP_SAYS[c.name] ?? c.name])),
+  on_the_row: 'tag, untag, set, move, link, note and schedule act on a row, so a rule started by a clock, a figure or a button cannot use them',
+  context: 'any text in a step may read {{trigger.row.<field>}}, {{trigger.kind}} and {{vars.<answer>}}',
+  from_a_description: `never ${Object.keys(REACHES_OUT).join(', ')}: each reaches beyond the record, and is asked for on its own`,
+  example: {
+    id: 'rule.monday-look',
+    kind: 'rule',
+    body: {
+      rule: 'monday-look',
+      name: 'Monday look at what is open',
+      on: { every: '1w', at: '08:00', day: 'mon' },
+      steps: [{ notify: { say: 'Look at what is still open before the week starts.' } }],
+    },
+  },
+};
+
 const PROPOSALS = {
-  change: '{"to":{"id":"page.<slug>","kind":"page","body":{...}}}: a page, new or changed',
+  change: '{"to":{"id":"page.<slug>","kind":"page","body":{...}}}: one declaration, new or changed, such as a page, a list, a figure or a rule; or {"to":{"declarations":[...]}} for several that belong together',
   pack: '{"install":"<id from offer or updates>"}, {"enable":"<id>"} or {"disable":"<id>"}; install may carry "doc", a pack document the catalogue lacks, and never one for a pack it offers; {"file":<a .usecase.json document>} installs a shared use case and the modules it names. A pack on at an older version is updated',
   settings: '{"pack":"<id>","values":{"<setting>":<value or null for its default>}}, or {"voice":{"<key>":"<line>"}} for the use case on',
   arrange: {
@@ -93,8 +317,26 @@ const PROPOSALS = {
   answered_by: 'the owner, in Decide. Nothing changes until they accept, and a pack is planned again then.',
 };
 
+const SERVED: Readonly<Record<(typeof GRAMMARS)[number], unknown>> = { page: PAGE, register: REGISTER, metric: METRIC, rule: RULE, proposals: PROPOSALS };
+
 export function grammarOf(name: string): Result<unknown> {
-  if (name === 'page') return ok(PAGE);
-  if (name === 'proposals') return ok(PROPOSALS);
-  return no('ENUM_VALUE_UNKNOWN', `There is no grammar called ${name}. Ask for page or proposals.`, { at: 'grammar', allowed: GRAMMARS });
+  if ((GRAMMARS as readonly string[]).includes(name)) return ok(SERVED[name as (typeof GRAMMARS)[number]]);
+  return no('ENUM_VALUE_UNKNOWN', `There is no grammar called ${name}. Ask for ${GRAMMARS.slice(0, -1).join(', ')} or ${GRAMMARS.at(-1)!}.`, {
+    at: 'grammar',
+    allowed: GRAMMARS,
+  });
 }
+
+/**
+ * The grammars a description is drafted in, handed to Slash's model beside what the owner typed (`SlashModelInput.grammar`).
+ *
+ * THE KINDS A DESCRIPTION MAY BUILD (`DESCRIBED_BUILDS` in `slash.ts`), and not `proposals`, because from a
+ * description only a `change` is filed. They are the same objects `arrangement({ grammar })` answers, so the model and an
+ * agent read one text.
+ */
+export const describedGrammar = (): { page: unknown; register: unknown; metric: unknown; rule: unknown } => ({
+  page: PAGE,
+  register: REGISTER,
+  metric: METRIC,
+  rule: RULE,
+});

@@ -92,7 +92,7 @@ test('A PRESS ON THE WORKER WRITES A LEDGER ROW AND IS REFUSED PAST THE OPERATOR
   assert.equal(ai.runs(), 3, `5 presses and the daily look under a ceiling of three asks made ${ai.runs()} included calls`);
   const rows = c.storages
     .get(REC)!
-    .sql.exec('SELECT kind, model, tokens_in, tokens_out, neurons, status, code, question FROM call ORDER BY id')
+    .sql.exec('SELECT kind, model, tokens_in, tokens_out, neurons, status, code, question FROM slash_call ORDER BY id')
     .toArray() as { kind: string; model: string; tokens_in: number; tokens_out: number; neurons: number; status: string; code: string | null; question: string }[];
   assert.equal(rows.length, 3, JSON.stringify(rows));
   for (const r of rows) {

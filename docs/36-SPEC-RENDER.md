@@ -9,7 +9,7 @@ Derives from [05-BLOCKS-AND-THEMES](05-BLOCKS-AND-THEMES.md) §1–§7, [34-GRAM
 ## 1 · Purpose and boundary
 
 **Does.** Takes a `document` string in the dialect of 34 §2 and returns segments (`parse`) or HTML (`toHTML`).
-Draws the thirty-four kinds over the eight primitives. Resolves `{{path}}` through a function the caller supplies.
+Draws the thirty-eight kinds over the eight primitives. Resolves `{{path}}` through a function the caller supplies.
 Formats money, dates, quantities and references one way. Never renders nothing: a malformed block becomes a
 visible fence with one line above it (05 §3 invariant 1).
 
@@ -42,7 +42,7 @@ export function render(markdown: string, opts?: RenderOptions): string;      // 
 
 export const PRIMITIVES_VERSION: 1;
 export const PRIMITIVES: readonly ['panel', 'grid', 'rows', 'proportional', 'inline', 'list', 'table', 'media'];
-export const KINDS: Readonly<Record<Kind, KindSpec>>;                          // thirty-four entries, §4
+export const KINDS: Readonly<Record<Kind, KindSpec>>;                          // thirty-eight entries, §4
 export function diffRows(before: string, after: string): string[];           // a `diff` fence's rows, §5.9
 
 export type { Segment, Markdown, Block, Degraded, Row, Inline, Kind, KindSpec, Primitive,
@@ -67,7 +67,7 @@ type LinkRef =
 | `parse` | fence scan, row split, tone, arity, inline tokens | never throws; every string yields a `Segment[]` (fuzz-tested, §9) |
 | `toHTML` | resolves, formats, escapes, emits | throws nothing of its own; an exception from `opts.resolve` or `opts.link` propagates — the host owns them |
 | `render` | `toHTML(parse(s), opts)` | as above |
-| `KINDS` | the thirty-four kinds as data | — |
+| `KINDS` | the thirty-eight kinds as data | — |
 | `diffRows` | two texts as `- `, `+ ` and two-space rows, by a longest-common-run line diff over what differs between their shared head and tail | never throws; past 250,000 cells the changed middle is drawn as taken out and put back whole |
 | `PRIMITIVES` | the eight primitive names, in 05 §1 order | — |
 | `PRIMITIVES_VERSION` | `1` at stage 0 (31 §6) | — |
@@ -136,7 +136,7 @@ interface KindSpec {
 }
 ```
 
-`KINDS`, thirty-four, counted:
+`KINDS`, thirty-eight, counted:
 
 | Kind | Primitive | Cells, in order | Arity | Tone | Row cap | Flags |
 |---|---|---|---|---|---|---|
@@ -166,13 +166,17 @@ interface KindSpec {
 | `tree` | media | — verbatim | 0 | no | — | |
 | `comparison` | table | the header row's count | n | no | — | |
 | `table` | table | — | 0 | no | — | pageOnly |
-| `cards` | grid | the first row names each column's role (`title figure fact trend ring who when mark quiet`); one row per card | the header's count | yes | — | pageOnly · header |
+| `cards` | grid | the first row names each column's role (`title figure fact trend ring who when mark next reply hue picture quiet`); one row per card | the header's count | yes | none | pageOnly · header; `hue` is written on the card as `--hue` for the host to draw the mark in and `picture` leads the card through `RenderOptions.file`, and neither is printed |
 | `section` | panel | glyph · count · fold | 3 | no | 1 | pageOnly |
 | `feed` | list | by (`agent rule you`, or `seen`) · who · count · what · when | 5 | yes | — | pageOnly |
 | `diff` | media | — verbatim, each row marked `- `, `+ ` or two spaces | 0 | no | — | |
 | `agents` | list | who · count · what (empty on the row that folds an agent's rest) · when | 4 | yes | none | pageOnly |
 | `queue` | list | a row per part: `q · id · who · when · question · why · cost`, `opt · id · key · label · because · recommended`, `more · n` | 7 | yes | none | pageOnly |
 | `capture` | panel | a row per part: `into · register · label · where` once and first, `set · field · value` for each value a new row inherits | 4 | no | none | pageOnly; the heading is the field's prompt and never a caption; the field and its Add only with the Svelte `Block`'s `oncapture`, and without it the list's name, a link where `where` is a path |
+| `calendar` | list | title · day (`YYYY-MM-DD`, an instant, or `D Mon YYYY`) | 2 | yes | none | every month from the first row's to the last row's as a table of weeks, Monday first, over `days.ts`'s `monthGrid`, each day naming three rows and counting the rest, then an agenda of every day that holds anything; a row whose day does not read is named under it |
+| `link` | list | title · url · note (optional) | 3 | no | none | the url `https:`, `mailto:` or a path of this BrainDog, anything else degrades; the host under the title, nothing fetched |
+| `gallery` | grid | caption · file (`file:<list>#<seq>/<field>` or a file's name) | 2 | no | none | a picture only through `RenderOptions.file` and only at a path of the host's own |
+| `embed` | panel | url · title · aspect (the last two optional) | 3 | no | 1 | pageOnly; the url one of `EMBED_PROVIDERS`, framed at the provider's own embed address; a facade in both drawers, and the frame only after the Svelte drawer's Load is pressed |
 | `inputs` | rows | field · label · type · value, a row a field of one record row | 4 | no | — | pageOnly; the control follows the field's declared type (text, url and email as themselves; money, number, share and duration as text with the decimal keypad; day as a date; yes or no as a checkbox handing the host `true` or `false`; `enum:a,b` as a select); a bad field id, a field twice, or a type nobody types into degrades; the controls only with `RenderOptions.oninput`, and without it a `spec` of the values |
 
 ```ts
@@ -207,7 +211,7 @@ type Inline =
 Invariants, each a test in §9:
 
 1. Every non-blank input line belongs to exactly one segment. `Degraded.source` is the block's lines verbatim, both fences included.
-2. `Block.kind` is one of the thirty-four and is never `table`; it is `cards`, `section` or `feed` only when `parse` was called with `{ page: true }`.
+2. `Block.kind` is one of the thirty-eight and is never `table`; it is `cards`, `section` or `feed` only when `parse` was called with `{ page: true }`.
 3. For a split kind, `Row.cells.length ≤ KINDS[kind].cells.length`; for `comparison`, ≤ the header row's count.
 4. `Row.tone === 'hole'` only when `Block.kind === 'bar'`.
 5. `Block.rows.length ≤ KINDS[kind].rows` where a cap is set.

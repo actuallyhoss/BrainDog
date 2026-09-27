@@ -12,7 +12,8 @@
  *   1. POST only: 405, `Allow: POST`. GET and DELETE are how earlier revisions opened a stream and ended a session.
  *   2. Any `Origin`: 403. Only a browser page sends one, and no page is served this endpoint. There is no CORS.
  *   3. A body that is not `application/json`: 415.
- *   4. No caller: 401, `WWW-Authenticate: Bearer`. The host checks the bearer and hands over the context.
+ *   4. No caller: 401, `WWW-Authenticate: Bearer`, naming the OAuth metadata when the host has it. The host checks
+ *      the bearer and hands over the context.
  *   5. Over the cap: 413, on `Content-Length` and again on the bytes as they arrive.
  *   6. Not JSON: 400, -32700.
  *   7. The headers that mirror the body, against the body: 400, -32022 or -32020.
@@ -74,8 +75,16 @@ export function gate(request: Request): Response | null {
   return null;
 }
 
-/** Step 4. One word and nothing else: a 401 says only that the credential did not work. */
-export const unauthorized = (): Response => json(401, failure(null, RPC.unauthorized, 'UNAUTHORIZED'), [['www-authenticate', 'Bearer']]);
+/**
+ * Step 4. One word and nothing else: a 401 says only that the credential did not work.
+ *
+ * AND, WHEN THE HOST HAS ONE, WHERE TO GET ONE. `metadataUrl` is the protected resource's metadata (RFC 9728 §5.1),
+ * `https://<host>/.well-known/oauth-protected-resource`, and an MCP client that holds no token starts OAuth from it
+ * (`loop/finish/agents.md` C4). The host builds the address from its own configured name, never from the request, so
+ * the header cannot be steered by a caller; without it the challenge is the bare `Bearer` it always was.
+ */
+export const unauthorized = (metadataUrl?: string): Response =>
+  json(401, failure(null, RPC.unauthorized, 'UNAUTHORIZED'), [['www-authenticate', metadataUrl === undefined ? 'Bearer' : `Bearer resource_metadata="${metadataUrl}"`]]);
 
 /**
  * The body's bytes, or `null` above the cap.

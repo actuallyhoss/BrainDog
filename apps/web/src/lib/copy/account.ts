@@ -1,0 +1,673 @@
+/**
+ * The account's words: settings and every area in it, the vault, signing in, an invitation, usage, backups and
+ * History.
+ *
+ * AN AREA FILE OF THE COPY AGGREGATE (ARC-8). `lib/copy.ts` spreads this object into `copy`, and every screen reads a
+ * key here as `copy.<key>`. The house voice is written once, at the top of `copy.ts`. A word a screen in another
+ * area also draws is in `shell.ts`, so that rewording it is nobody's edit to another area's screen.
+ *
+ * ONE BLOCK PER UNIT. A unit adding account words adds them in a block of its own under a comment naming it, so
+ * two units writing here in one workflow never share a line (`loop/finish/contracts.md` §8.1).
+ *
+ * Plain Node loads this file through the aggregate (`passkey.mjs`), so it imports only relative `.ts` files.
+ */
+
+export const account = {
+  /**
+   * THE SLOGAN, AND THERE IS ONE. Not a description of the product, which the sentence under it
+   * does; a thing a person remembers. It is the README's headline, the marketing site's, and this,
+   * and the three are the same five words on purpose: a product with three taglines has none.
+   *
+   * It read "Everything about your business that isn't code." for the life of the build, which is a
+   * definition rather than a promise, and it was rendered nowhere.
+   */
+  tagline: 'Give your business a memory',
+  shownInNav: (title: string) => `${title} is back in your nav.`,
+  showAgain: 'Show again',
+  hiddenPages: 'Hidden from your nav',
+  hiddenPagesHint: 'A hidden page stays in the record, in search and in the palette. Show it again and it returns to the place it had.',
+  hiddenNone: 'Nothing is hidden',
+  hiddenNoneWhy: 'Right-click a page in the nav, or press Shift+F10 on it, and choose Hide.',
+  perPerson: 'Kept for you on this record, on every device you sign in on.',
+  promoted: (title: string) => `${title} is in your nav, at the end of its section.`,
+  recordOpenSignIn: 'Sign in again to open another record.',
+
+  /* The chip on a row that has just been acted on. One word, in the past tense, so the row says
+     what happened to it where the row is rather than in a toast at the other end of the screen. */
+  densityPreview: 'How a list looks',
+  sourcesAdd: 'New sources arrive the way new lists do: with an add-on, or set up by an agent you connect.',
+  sourcesAddGo: 'Browse add-ons',
+  densityPreviewRows: ['Invoice 2026-041, brand system', 'Studio insurance, annual', 'VAT quarter to 31 Aug'],
+
+  /**
+   * WHAT A LEVEL MEANS, IN ONE CELL. There were two: a chip printing the enum (`write`) and, three
+   * inches away, a sentence collapsing three levels into two with a ternary — so S. Marchetti's row
+   * read `write` … `Read only`, two cells contradicting each other about who can change the
+   * business record. The chip was also the schema's spelling, lower-cased, on the one screen where
+   * a person decides who to trust.
+   */
+  levelMeans: {
+    owner: 'Can change everything, and invite people',
+    decide: 'Can change rows, and answer questions',
+    write: 'Can add and change rows',
+    /* `20 §1`: `append` is *"`create`, `propose` and `log` — and no read … an appender sees nothing,
+       **not even what it filed**"*. "Not the rest" said the opposite — that they can read their own
+       submissions — which is wrong in the PERMISSIVE direction, on the control that decides who can
+       see somebody's business. */
+    append: 'Can add rows, and read nothing',
+    read: 'Can read, cannot change',
+  } as Record<string, string>,
+  auditHolds: 'Every change to this record shows up here, with who made it and when.',
+  export: 'Export the record',
+  /* The two questions an audit log exists to answer, as the labels of the two controls. */
+  auditWho: 'Who',
+  auditWhat: 'What kind of change',
+  /* A DAY-ONE SENTENCE, because this is now the `no-data-yet` title and the filtered case has its
+     own. "Nothing in the log matches that" was drawn for both, so an empty record and a filter that
+     missed said the same thing — and the empty record has not been asked anything. */
+  auditNone: 'Nothing in the log yet',
+  /* WHAT THE VERSION IS FOR, rather than what it is. Every change moves it by one, so it names a
+     moment — which is the only thing anybody does with it. */
+  /* THE DAY FILTER, on the screen the restore setting sends somebody to with the words "find the
+     moment". It had no way to narrow by when at all. */
+  auditWhen: 'Day',
+  auditAnyDay: 'Any day',
+  auditVersion: (n: string): string =>
+    `This record is at version ${n}. Every change moves it by one, so a version is a way of naming a moment.`,
+  verifyFile: 'Check an exported file',
+  /* WHAT DELETING DOES, said instead of a one-word heading that states no fact. `Danger` was over
+     `Delete this record` over `Delete the studio` — three lines, two of them the same sentence, and
+     the two disagreeing about what the record is called. */
+  deleteWhat: (record: string): string =>
+    `Deleting ${record} removes every list, page and row in it. It cannot be undone.`,
+  deleteRecord: (record: string): string => `Delete ${record}`,
+  holdingPen: 'Not placed. Nothing moved.',
+
+  /* settings */
+  /* `appearance` WAS THE FIRST LINE OF THIS SECTION AND THE SCREEN NEVER READ IT. Settings names its
+     own areas: `{ id: 'appearance', label: 'Appearance', icon: 'sun' }` is typed into
+     `settings/[area]/+page.svelte:473` with the other seven. `dead-copy` excused the key as an area
+     id being title-cased, and nothing title-cases anything there. The label being in the route and
+     not here is a finding about that file rather than a reason to keep a second copy of the word. */
+  scheme: 'Colour scheme',
+  schemeLight: 'Light',
+  schemeSystem: 'System',
+  schemeDark: 'Dark',
+  textSize: 'Text',
+  textSmall: 'Small',
+  textNormal: 'Normal',
+  textLarge: 'Large',
+  density: 'Density',
+  densityCompact: 'Compact',
+  densityComfortable: 'Comfortable',
+  densityRoomy: 'Roomy',
+  characterKeys: 'Character keys',
+  /* IT SAID "Single letters act on the focused list", WHICH NAMED NEITHER THE SCOPE NOR THE COST.
+     Nothing has to be focused: `?`, `/` and `g` act anywhere, and `j` moves a page's block cursor
+     from nowhere. So a reader deciding whether to turn this off was told it affected one list, and
+     what it actually takes is the help sheet, the palette shortcut and every goto. The sentence a
+     person needs before pressing Off is what stops working and what does not. */
+  characterKeysHint:
+    'Off silences every shortcut that is a single letter, digit or punctuation mark, including ? for this list, / for the palette and g to go somewhere. Shortcuts that use Ctrl or Alt keep working.',
+
+  /* the record's own colour */
+
+  accentTitle: 'Accent',
+  /* IT DESCRIBED THE GENERATOR: "Every surface, ink and boundary is solved from it against the same
+     contrast floors, so a colour that would be unreadable is refused rather than approximated." True,
+     and a sentence about how the palette is computed, under a row of swatches somebody is choosing
+     between. What it does for them is the same fact from their side, including the refusal, which
+     is the one thing a swatch press can do that they would not expect. */
+  accentHint:
+    'The colour this record is. The other colours on screen are worked out from it, and one that would leave text hard to read is refused.',
+  accentHouse: 'House',
+  accentSet: (name: string) => `${name} is this record's colour.`,
+  accentReset: 'Back to the house colour.',
+  /* `/settings` REDIRECTS, AND DREW NOTHING WHILE IT DID. One line, so the frame before the
+     redirect lands is a page rather than a blank document with no title. */
+  settingsGoing: 'Opening Appearance.',
+  /**
+   * THE PALETTE THAT SHIPPED AND COULD NOT BE TURNED ON.
+   *
+   * `packages/theme` solves a second palette against a higher contrast floor and `theme.mjs` writes
+   * it into `house.css` behind `html[data-theme='hc']`, byte-compared on every build. Nothing in
+   * the app ever set that attribute, so it was sixteen checks' worth of work that no reader could
+   * reach. What stood in its way was the record accent, which was being written into the same
+   * attribute and read by nothing.
+   *
+   * NAMED FOR WHAT IT DOES AND NOT FOR THE STANDARD IT MEETS. "WCAG AAA" is a fact about a document
+   * somebody else wrote; "more contrast" is a fact about the screen in front of you (`19 §9`).
+   */
+  contrast: 'More contrast',
+  /* "A second palette, solved against a higher floor" was the comment above, said to the reader.
+     What they get is the second sentence it already had, in the words of what they see. */
+  contrastHint: 'Makes text and edges stand out more, and keeps the accent you chose.',
+
+  /* the settings areas `19 §2` says an earlier draft dropped */
+  /* AND SO DOES THIS ONE. **Who can see this record · 4** stood over four rows, one of which is an
+     invitation that has not been accepted, at level `append`, which reads nothing — so three of the
+     four could see the record and the fourth could not, for two independent reasons, both printed
+     within two hundred pixels of the heading counting them. */
+  whoCanSee: 'People on this record',
+  /* `19 §9` bans `ceiling` and `scope` by name and says: say WHAT THEY CAN SEE. And it says the
+     thing this line exists for — a level here is over the whole record, not one list. */
+  /**
+   * IT ASSERTED TWO RULES THAT CANNOT BOTH BE TRUE, and each half was a real one.
+   *
+   * *"A level here covers every list. Nobody is added to a new list until you add them."* The first
+   * clause is `45 §5.1` step 3 — the `'*'` row fills every register without one of its own, new
+   * ones included. The second is `20 §1`'s *"a new register, entity or page is private until
+   * granted"*. Both are true **of different rows of the matrix**: the `'*'` grant covers everything,
+   * and somebody with no `'*'` row holds exactly the lists they were named on. The screen drew one
+   * level per person, so there was no matrix for either clause to be about, and the sentence read as
+   * a contradiction because on that screen it was one.
+   */
+  accessScope: 'A level here covers every list, including ones added later. Give somebody a different level on one list and it replaces it, for that list only.',
+  /* THE WHOLE OF THIS AREA AT ONE PERSON. A level, an exception, a removal and an erasure are all
+     one person measured against another, so on a record whose only person is you there is nothing
+     for any of them to say: five greyed segments, two hints about the greying, and a red erasure
+     aimed at the reader. This sentence and the invitation below it are what is left, and everything
+     else comes back the day there is somebody to compare with. */
+  onlyPerson: 'You are the only person on this record.',
+  levelFor: (name: string) => `What ${name} can do`,
+  /* NOT A SIXTH LEVEL. `member` is a ROW that may not exist, and "no row" is a different answer from
+     the lowest rung — `members.ts` shipped both wrong readings of that before settling on `null`. */
+  noRecordLevel: 'No access',
+  noRecordLevelMeans: 'Nothing on this record itself. Only the lists named below, and nothing that is added later.',
+  addException: 'Different on one list',
+  removeException: 'Back to their level',
+  suspendedSince: (ago: string) => `stopped ${ago}`,
+  /* THE READ MARK, WHICH `20 §6` PUTS ON THE *WORTH BUILDING* SIDE of its table: "who has seen the
+     thing that binds them", against live cursors and avatar stacks on the other. A decision binds
+     people who were not in the room, so whether they have looked is the question a record can
+     answer and a chat cannot — and this screen showed what everybody MAY do and nothing about
+     whether any of them had been. */
+  lastLooked: (ago: string) => `last looked ${ago}`,
+  /* NOT "never" ON ITS OWN, WHICH READS AS AN ACCUSATION and is ambiguous besides: somebody whose
+     invitation is still out has also never looked, and that is a different sentence. This one is
+     only ever drawn for somebody who has accepted. */
+  neverLooked: 'has not opened it',
+  removeAccess: 'Remove',
+  /* `LEVEL_REQUIRED`'s own fix sentence, verbatim (45 §5.6). */
+  lastOwner: 'A record keeps at least one owner.',
+  /* THE ONE ACTION THAT REMOVES YOUR OWN WAY BACK. `45 §5.6` gives every level change one method,
+     and another owner can still do this to you — which is what a second owner is for. What is
+     refused is doing it to yourself, alone, from the screen you would then be locked out of. */
+  ownLevel: 'You cannot change your own level here. Another owner can.',
+  inviteTitle: 'Invite somebody',
+  inviteHow: 'The link is single-use, good for 24 hours, and bound to the one address you send it to.',
+  invitePerson: 'Invite a person',
+  erasePerson: 'Erase a person',
+  eraseWhat: 'Everything one person wrote, removed from sixteen places in one go. It cannot be undone.',
+
+  /* recovery — the way back in */
+  passkeys: 'Passkeys',
+  passkeyHow: 'A passkey is how you get back in. Keep more than one, on more than one device.',
+  noPasskeys: 'No passkey yet',
+  /**
+   * `13 §5.2`: be specific about what will be here. On this screen that sentence is the stakes —
+   * AND THE STAKES DEPEND ON THE DEPLOYMENT.
+   *
+   * There was one sentence, ungated: *"Without one, the only way back into this record is an email
+   * link."* The magic-link SECTION four blocks down is gated on `AUTH_METHODS.magic`, with a comment
+   * quoting `49 §5.6` — *"so the screen never offers it"* — but the gate was on the section and not
+   * on this. With no passkeys and no SMTP the screen read "the only way back in is an email link"
+   * and then nothing, because the block that would have explained the link had deleted itself.
+   *
+   * That is the hole `19 §2` names by name — *"left a passkey-primary product with no designed way
+   * back in"* — reopened inside the fix for it, on the one screen where believing a false promise
+   * costs the record. `49 §5.7` has the self-host answer, and it is a person rather than a link.
+   */
+  noPasskeysWhy: (magic: boolean) =>
+    magic
+      ? 'Without one, the only way back into this record is an email link.'
+      : 'This server cannot send an email link, so without a passkey there is no way back in on your own. Ask whoever runs it.',
+  addPasskey: 'Add a passkey',
+  addedWhen: (ago: string) => `added ${ago}`,
+  remove: 'Remove',
+  lastPasskey: 'This is your only passkey, so it cannot be removed. Add a second one first.',
+  /* A passkey the host holds with no name, which is every one this browser adds. */
+  passkeyUnnamed: 'Passkey',
+  passkeysUnread: 'Your passkeys could not be read just now.',
+  passkeyNotRemoved: 'That passkey was not removed. Try again.',
+  magicLink: 'If you lose them all',
+  /* `49 §5.6`. It is the ONLY other way in — there are no recovery codes anywhere in this product,
+     and saying so is kinder than letting somebody look for them. */
+  magicHow:
+    'A link is emailed to the address on this record. It lasts fifteen minutes and works once. There are no recovery codes.',
+  lockout: 'After too many tries',
+  /* `49 §5.5`: ten strikes, fifteen minutes, sticky, fail-closed. */
+  lockoutHow: 'Ten failed attempts locks sign-in for fifteen minutes. Waiting is the only way through it.',
+
+  /* export — `03 §1`'s three layers, and the two containers `03 §2.1` keeps apart */
+  yourData: 'The whole record',
+  /* IT IS A SQLITE FILE AND THAT IS THE WHOLE TRICK (`03 §2`): `sqlite3 portfolio.brain "select …"`
+     works with no SDK and no reader of ours. The screen says it as "any database tool", because the
+     format's name means nothing to most of the people reading it. */
+  exportWhat: 'One file with everything in it, readable by any database tool.',
+  /* `03 §1`: the three layers are addressable independently, and the governance layer alone IS a
+     pack. A product whose only exit is all-or-nothing has three exits it is not offering. */
+  takeAway: 'Part of it',
+  takeAwayWhat: 'The way you work and the rows you have written are separate things, and either can leave on its own.',
+  exportPack: 'Export the way you work',
+  exportRows: 'Export the rows only',
+
+  /* identity — `33 §10`: login is account-level, so this lives outside the record */
+  you: 'You',
+  signedInAs: 'Signed in as',
+  onThisRecord: 'On this record',
+  identityOutside:
+    'Your sign-in belongs to you rather than to this record, so it is the same across every record you hold.',
+  yourRecords: 'Records you can open',
+  thisOne: 'you are here',
+
+  /* agents — `12 §6.1`'s device grants. The heading counts every row beneath it, denied ones included,
+     so it names machines rather than connections. */
+  machines: 'Machines',
+  /* `13 §5.2`: an empty list the person fills from a machine carries the command that fills it. */
+  noDevices: 'No machine has asked yet',
+  /* `backup` AND IT WAS `sealed copy` AND `snapshot`, WHICH ARE TWO WORDS FOR ONE IDEA. A friction
+     pass found them competing on the same screen: `/decide` said "The newest sealed copy is from
+     2026-09-02" and a card beside it was titled `Snapshot`. Neither is the word a person uses, and
+     having two of them means a reader who learns one still meets the other.
+
+     THE SEALING IS NOT LOST, it moves to where it is the point: the sentence about the key, three
+     screens down, where somebody is being told why a copy can be proved to be theirs. Above that,
+     what they want to know is that there is a backup and how old it is. */
+  noSnapshots: 'No backup yet',
+  noSnapshotsWhy: 'A backup is the whole record at one moment, kept so you can go back to it.',
+  /* The kernel's six. `approved` is the seconds between the press and the machine's next poll, and a
+     denied row is kept: "I said no to a request I did not make" is the line this table exists for. */
+  deviceState: {
+    pending: 'waiting for you',
+    approved: 'approved, waiting for the machine',
+    active: 'connected',
+    expired: 'ran out of time',
+    denied: 'turned away',
+    revoked: 'revoked',
+  } as Record<string, string>,
+
+  /* WHAT IT MAY REACH, with its life, because that difference is the whole decision. `19 §9` keeps
+     every word from the schema off the screen. A vault grant's life depends on its scope. */
+  reachMeans: {
+    login: 'sign in as you, for ninety days',
+    runner: 'do work for you on this machine, for ninety days',
+    export: 'take one copy of this record, once, in the next ten minutes',
+    import: 'load rows into this record, once, in the next ten minutes',
+    pack: 'install one add-on, once, in the next ten minutes',
+    token: 'make one more key, once, in the next ten minutes',
+    vault: 'open the keys of one project, for thirty days',
+    vaultAll: 'open the keys that belong to no project, for seven days',
+  } as Record<string, string>,
+
+  /* The code entry: the `verification_uri` every device flow prints. */
+  approveTitle: 'Approve a machine',
+  codeLabel: 'The six digits it is showing',
+  codeGo: 'Approve',
+  codeEmpty: 'Type the six digits the machine is showing.',
+  codeShort: (n: number) => `That is ${n} digit${n === 1 ? '' : 's'}. A code is six.`,
+  codeLong: (n: number) => `That is ${n} digits. A code is six.`,
+  codeOther: 'A code is six digits, and this has something else in it.',
+  /* The record says no more than this about a miss, so neither does the screen: no count of tries. */
+  codeWrong: 'No machine is waiting with that code.',
+  codeTries: 'Five wrong codes turned away every waiting machine. Start again on the machine.',
+  codeExpired: 'That code ran out of time. Run braindog login again on the machine.',
+  signInAgainWhy: 'Approving a machine needs a sign-in from the last fifteen minutes.',
+  approvedNow: (label: string, means: string) => `${label} is approved. It can ${means}.`,
+  unnamedMachine: 'A machine with no name',
+
+  /* the tokens — `12 §3`: listed with a revoke button, and never the token itself */
+  tokens: 'Tokens',
+  noKeys: 'Nothing can act as you',
+  /* `19 §9` again: what it can do, said as what it can do. There is no `admin` (ADR-060). */
+  keyCan: {
+    read: 'can read, and change nothing',
+    propose: 'can read and suggest, and change nothing itself',
+    write: 'can read and change rows',
+  } as Record<string, string>,
+  endsWhen: (when: string) => `ends ${when}`,
+  unnamedToken: 'A token with no name',
+  /* A REPORT KEY IN THE TOKENS LIST (`record/device.ts` `reportKeyOf`): its name and the one thing it can do. */
+  reportKeyNamed: (name: string | null) => (name ? `Report key for ${name}` : 'A report key'),
+  reportKeyCan: (list: string) => (list ? `can send numbers to ${list}, and nothing else` : 'can do nothing, because it is bound to no list'),
+
+  /* Connect an agent: a write token for ninety days, its bearer shown once. */
+  connectTitle: 'Connect an agent',
+  connectLabel: 'Name the machine',
+  connectGo: 'Connect',
+  /* THE INBOX, OFF UNTIL THE OWNER TURNS IT ON (DIRECTION section 30, P2). What it opens, and what it still cannot do. */
+  connectInbox: 'May read the inbox',
+  connectInboxHint: 'May read the inbox: the bank texts and other arrivals no rule has filed yet. It cannot file or archive them.',
+  onNewMachine: 'On a new machine',
+  inClaudeCode: 'In Claude Code',
+
+  /* ingest — `25 §9` draws this screen */
+  sources: 'Where rows come in from',
+  sourcesHow: 'Each of these fetches on its own schedule. Everything they add is logged.',
+  /* `25 §9`'s own blockquote, and it outranks the screen it is on. */
+  staleShows: 'A figure fed by one of these shows a gap and says it is stale rather than holding yesterday’s number.',
+
+  /* notifications — `09` specifies the mechanism and no settings, so this reports */
+  whenWeInterrupt: 'When this record interrupts you',
+  batchByDefault: 'Most things wait for your summary. Only urgent ones interrupt.',
+  quietHours: 'Quiet hours',
+  quietHoursAre: '22:00 to 08:00 in this record’s timezone. Anything not urgent waits until they end.',
+  urgentKinds: 'Urgent',
+  /* WHAT THE RECORD ITSELF RAISES, AND THEN WHAT A RULE DOES. This said "a payment failing, a domain expiring inside 7
+     days" as if they were the product's own, and the kernel raises neither: `notify` in `digest.ts` interrupts for what
+     a rule declares `urgent: true`, and what it raises by itself is two things: a vault credential two days from
+     expiry (`vault.ts`), and a scheduled action held back, paused because its key is missing or refused or stopped at
+     its daily limit of calls from rules (`actions.ts`, whose `notify` the kernel routes with `urgent: true`). The first
+     rewrite named only the credential, and the checker found the action's three call sites. A payment and a domain
+     are what one use case's rules might say, not what BrainDog does. */
+  urgentKindsAre: 'A credential in the vault expiring inside 48 hours, a scheduled action held back because its key is missing or it reached its daily limit, and anything a rule marks urgent. Each rule says so itself, and adding a pack shows which of its rules would interrupt you.',
+  interruptCap: 'At most',
+  interruptCapIs: 'One urgent interruption an hour.',
+  unreadCount: 'Unread',
+  unreadCountIs: 'One number, on the record, in one place.',
+  /* IT POINTED AT A SCREEN THAT DOES NOT EXIST. "Change the rule that raises it" is a route this
+     product has not got: there is no rules screen, no link, and nothing in the nav that reaches
+     one. Advice a reader cannot follow is worse than no advice, because they go looking. What is
+     true is that a rule raised it and the rule is named on the row itself. */
+  /* "THERE IS NO SWITCH HERE" STOPPED BEING TRUE WHEN THE DEVICE ROW BELOW LANDED ON THE SAME SCREEN. What still has no
+     switch is muting one kind of interruption, which is what this sentence was always about. */
+  muteAtSource: 'There is no switch that mutes one of these. Each is raised by a rule, and the rule is named on the row.',
+
+  /* notifications on this device: Web Push, `loop/research-living-in-it.md` W58-4, drawn only where the host has a key.
+     THE LINE NEVER SAYS WHAT HAPPENED, because a push passes through a push service nobody here runs (`09 §3`). */
+  pushTitle: 'Notifications on this device',
+  pushHow: 'When something in this record interrupts you, this device shows one line, and pressing it opens BrainDog. The line never says what happened: the record tells you once it is open.',
+  pushTurnOn: 'Turn on for this device',
+  pushTurnOff: 'Turn off for this device',
+  pushAsking: 'Asking the browser',
+  pushIsOn: 'This device is told when something interrupts you.',
+  pushIsOff: 'This device is not told.',
+  pushDenied: 'This browser blocks notifications from BrainDog. Allow them in the browser’s settings for this site, then turn this on again.',
+  pushDismissed: 'Nothing was turned on, because the browser’s question was closed without an answer.',
+  pushUnsupported: 'This browser cannot show notifications from BrainDog. On an iPhone or iPad, add BrainDog to the Home Screen and turn this on from there.',
+  pushNoService: 'The browser’s push service did not answer, so nothing was turned on. Try again in a minute.',
+  pushNoRoute: 'This record cannot keep a device’s address yet, so nothing was turned on.',
+  pushNotSent: 'The record was not reached, so nothing was turned on. Try again once you are online.',
+  /* WHAT OPENING THE ROW SAYS WHEN THE BROWSER WOULD NOT ANSWER WHETHER IT IS SUBSCRIBED. Off is the safe reading: a press
+     then subscribes, or finds the one already held under the same key and sends it again, so nothing is doubled. */
+  pushUnread: 'This browser did not say whether this device is already told, so this starts as off.',
+
+  /* backups — `53 §5.4` */
+  kept: 'What is kept',
+  /* ONE SENTENCE SAID BOTH HOSTS' POLICIES AND WAS RIGHT ON NEITHER: "nightly, at 03:00. The 30
+     newest are kept." `53 §4` gives Cloud `17 3 * * *` UTC and *"the 30 newest dated keys plus
+     `latest`"*; `49 §5.13` gives a self-host 02:00 UTC plus `hash(slug) mod 60` minutes and thirty
+     files.
+
+     THIS COMMENT USED TO END "and Cloud's real promise is the bigger one, any point in thirty
+     days", and that is the belief that put a restore control on a screen where nothing restores.
+     `apps/worker/src/index.ts` hands the record no `snapshots` port, so on Cloud the nightly copies
+     are all there is and the app cannot even list them. See `restoreCloud`. */
+  /* navigation — `29 §4`'s one global switch, which `19 §2` says is why this area exists */
+  suggestPages: 'Suggest new pages',
+  suggestPagesHint: 'When a list grows or you keep asking the same question, this record offers a page for it. Nothing is ever placed for you. An offer sits in the list below until you promote it.',
+  suggestOff: 'Not offering anything',
+  suggestOffWhy: 'Pages you have already placed are untouched. Turn this back on and the record starts offering again.',
+  perDevice: 'This setting is remembered on this device.',
+
+  /* The shape of the navigation — `19 §3`'s table, in the words a reader would use for each one.
+     The labels name the THING and not the setting: somebody choosing between these is picking
+     where their navigation lives, so "Sidebar" and "Top bar" are the answer and "Rail" is ours. */
+  navShape: 'Where your navigation lives',
+  navShapeHint: 'The sidebar holds a list of any length, in sections you arrange. A top bar holds a few entries in one strip and puts the rest behind More. The menu keeps nothing on screen and opens the whole list when you ask for it.',
+  navShapeRail: 'Sidebar',
+  navShapeBar: 'Top bar',
+  navShapeMenu: 'Menu',
+  /* AND THE ONE CONDITION THAT IS NOT A TASTE. A narrow screen keeps the tab bar whatever this
+     says, and a reader who picks a top bar and then opens their phone deserves to have been told
+     rather than to find out. It says what happens and not why the software does it. */
+  navShapeOnPhone: 'On a phone, BrainDog uses the tab bar.',
+
+  /* THE DESIGN AGENT'S OWN RECOMMENDATION, `19 §3`: the design agent reads the record and answers
+     with one shape and one sentence of why. The sentence itself comes from `design/nav-shape.ts`;
+     these are the verbs around it, never applied on their own and Dismiss is terminal. */
+  navShapeRecommend: 'A shape that might suit this record better',
+  navShapeRecommendAccept: (label: string) => `Switch to ${label}`,
+  navShapeRecommendDismiss: 'Dismiss',
+
+  /* the signing key — `53 §4` puts the public half on the export screen, and `03 §4` says why */
+  theSignature: 'How anybody checks a copy is yours',
+  /* AND ON A RECORD THERE IS NO KEY TO SHOW YET. The value under this heading is the sample's, kept
+     in `fixtures/sample.ts` with the rest of the synthetic record, and it was drawn on every record: an
+     invented key presented as that record's own, which no reader could tell by looking. `boot` does
+     not carry the real one and `03 §4`'s well-known URL is served by none of the three apps, so a
+     record gets the fact that its files are signed and the absence said plainly. */
+  /* THE CHECK, RUN IN THIS BROWSER over a file somebody picks: the same `checkBrainl` an import runs before it writes
+     a row. It proves the file is whole and signed by the key inside it, and not whose key that is, so it says no more. */
+  fileChecked: (name: string) =>
+    `${name} is whole and signed. Every table matches its own manifest, and the signature holds for the key inside the file.`,
+  fileFailed: (name: string, fix: string) => `${name} did not pass. ${fix}`,
+  fileUnread: (name: string) => `${name} could not be read as text. Only a .brainl file can be checked here.`,
+  theSignatureNotHere: 'Every export and every backup is signed. The public half of the key that signs them is not shown here yet, so there is nothing on this screen to hand to somebody checking a copy.',
+
+  /* deletion (`02 §9`): browser session, re-authenticated, the slug typed */
+  /* THE ONE LINE THAT INVITED A REVERSAL WAS THE LINE THE HOST REFUSES FOR EVER. This read *"A
+     final copy is kept for the rest of today, in case you change your mind within the hour. Within
+     thirty days nothing of this record is left anywhere."* Changing your mind here means making the
+     record again at the same name, and `Directory.prepare` (`apps/worker/src/index.ts`) answers a
+     slug whose claim reads `released` with *"was the name of another record and is never given out
+     again"*. Deleting burns the name, permanently, and neither sentence on the screen said so.
+
+     AND THE COPY IT PROMISED IS NOT TAKEN. `deleteRecord` (`packages/record/src/index.ts`) calls
+     `destroy()` and nothing else, and the Worker's `destroy` deletes the alarm, deletes every byte
+     and closes the names. The nightly R2 copy that landed this batch (`apps/worker/src/snapshots.ts`)
+     is the cron's and is read by nobody in the app: no `snapshots` port is handed to the record, so
+     restoring answers `NOT_IN_THIS_BUILD`. There is nothing here he can go back to.
+
+     WHAT `53 §5.9`'s DAY +30 IS DOING OFF THIS SCREEN. Pruning runs inside `take`, for records the
+     Directory still lists, and a deleted record is not listed, so this screen is not the place to
+     assert where the last byte is. What is left is the cost he can act on before he presses it.
+
+     `deleteWhat` carries "It cannot be undone" one line above this, in the section whose own comment
+     condemns *"three lines, two of them the same sentence"*, so this one does not say it twice. */
+  deleteCosts:
+    'The name is given up for good, and no record here can use it again. Nothing is kept to go back to, so export a copy first if you want the rows.',
+  typeSlug: (slug: string) => `Type ${slug} to confirm`,
+
+  keptCloud: (n: number) => `A backup of the whole record every night. The ${n} newest are kept, plus the latest.`,
+  keptSelfHost: (n: number) => `A backup of the whole record every night, on this machine. The ${n} newest are kept.`,
+  snapshotFailed: 'Nothing kept',
+  download: 'Download',
+  rowsAndSize: (rows: number, size: string) => `${rows.toLocaleString('en')} rows · ${size}`,
+  snapshotNow: 'Back up now',
+  theKey: 'The key',
+  /* `49 §8` asks for exactly this line. */
+  /**
+   * IT TOLD SOMEBODY TO BACK UP A KEY IT WOULD NOT SHOW THEM.
+   *
+   * The section had no button, no link and no value in it: *"Back that key up somewhere else, or
+   * the copies cannot be opened"* over an empty box. `49 §8` asks for the sentence and the sentence
+   * is right; a screen that gives an instruction and then withholds the one thing needed to follow
+   * it is the same defect as a control that does nothing.
+   *
+   * WHERE THE KEY IS IS THE HONEST ANSWER, and on a self-host it is a file on their own disk rather
+   * than anything this screen could print. `12 §8` keeps the age identity outside the product on
+   * purpose, so the fix is not to reveal it here; it is to say where it lives.
+   */
+  theKeyIs:
+    'These copies are sealed with a key that is not inside them, and this record cannot show it to you: it is kept outside the product on purpose.',
+  theKeyWhere:
+    'On a self-host it is the key file you made when you set the record up. Copy that file somewhere else, or these backups cannot be opened.',
+  restore: 'Going back',
+  /**
+   * AND WHERE THE RECORD ITSELF REFUSED, THE SCREEN SAID IT COULD DO THE MOST DESTRUCTIVE THING ON IT.
+   *
+   * On a hosted record `snapshots()` comes back `NOT_IN_THIS_BUILD`, the Kept section above draws
+   * that refusal instead of a list, and this section went on drawing *"Any point in the last thirty
+   * days"* over a `Restore to a time` button whose one act is `restore` with an empty bookmark,
+   * answered by the same refusal as a toast. Two sentences on one screen, four lines apart, saying
+   * opposite things about whether this record can be recovered.
+   *
+   * IT DOES NOT REPEAT THE REFUSAL, which is already on the screen and already says to export.
+   * What it adds is the part the refusal leaves out: a copy is being kept, it is kept out of this
+   * app's reach (`53 §5.4`), and going back to one is a thing to ask for.
+   */
+  restoreNotHere:
+    'Nothing on this screen can put this record back to how it was. What is kept of it is kept where this app cannot reach it, so going back to a copy is asked for rather than pressed.',
+
+  /* billing — nothing to bill on a self-host (23 §8: one line in Settings) */
+  billing: 'Billing',
+  billingSelfHost: 'This record runs on your own machine. There is nothing to bill and no subscription to lapse.',
+
+  /* On a live record the rest of Settings writes to it, so only the device half is said. */
+  keptOnDevice: 'The settings above are kept on this device.',
+
+  /* ── the front door · `/signin` ───────────────────────────────────────────────────────────────
+
+     One sentence per state of `lib/signin.ts`, and calm throughout: a closed passkey sheet or a
+     lockout is something that happened, not something that went wrong. Nothing here names a way in
+     the host has not offered, because the screen never draws one. Its own word, `signIn`, is in
+     `shell.ts`, because the palette says it too. */
+  signInLede: 'Sign in to open your record.',
+  checkingWays: 'Checking how this server signs you in',
+  withPasskey: 'Sign in with a passkey',
+  /* The mechanism and not the gesture: "Use Face ID" is wrong on a laptop, and the browser names the
+     gesture itself a moment later. */
+  waitingForPasskey: 'Waiting for your passkey',
+  passkeyCancelled: 'Sign-in was cancelled. Nothing changed.',
+  /* ANOTHER WAY IN IS NAMED ONLY WHEN THE SCREEN DRAWS ONE: a server that offers passkeys alone was
+     told to try a way in that does not exist. */
+  passkeyUnusable: (others: boolean) =>
+    others
+      ? 'This browser cannot use a passkey here. Use one of the other ways in below, or open this page in a browser that supports passkeys.'
+      : 'This browser cannot use a passkey here. Open this page in a browser that supports passkeys.',
+  emailLink: 'Email me a sign-in link',
+  emailLabel: 'Email',
+  emailLike: 'you@example.com',
+  sendLink: 'Send me a link',
+  sendingLink: 'Sending the link',
+  linkSentTitle: 'Check your email',
+  /* The host answers alike for an address it does not know, so this cannot say the link was sent. */
+  linkSentBody: (email: string) => `If ${email} can sign in here, a link is on its way. It works once, for fifteen minutes.`,
+  useAnotherEmail: 'Use a different email',
+  serverKeyWay: 'Sign in with the server key',
+  serverKeyLabel: 'Server key',
+  /* Where the credential goes, said to the person handing it over: one request, and nowhere after. */
+  serverKeyHint: 'The key you started your server with. It is sent once and never kept in this browser.',
+  /* Two full literals for the toggle's two states, which is `copy.ts`'s own rule about a toggle. */
+  showToken: 'Show',
+  hideToken: 'Hide',
+  signingIn: 'Signing you in',
+  rejectedTitle: 'That did not sign you in',
+  rejectedNext: (others: boolean) => (others ? 'Try again, or use another way in below.' : 'Try again.'),
+  closedTitle: 'The server could not check that just now',
+  closedNext: 'Nobody was let in. Try again in a minute.',
+  lockedTitle: (minutes: number) => `Sign-in is paused for ${minutes === 1 ? 'a minute' : `${minutes} minutes`}`,
+  lockedWhy: 'There were too many tries. Waiting is the only way through it.',
+  linkLandingTitle: 'Your sign-in link is here',
+  claimLandingTitle: 'Your record is ready to claim',
+  useLink: 'Sign in with this link',
+  claimRecord: 'Claim your record',
+  linkExpiredTitle: 'That link has expired or was already used',
+  linkExpiredWhy: (kind: 'magic' | 'claim', canAsk: boolean) =>
+    kind === 'claim'
+      ? 'Ask whoever set up your record for a new one.'
+      : canAsk
+        ? 'A link works once, for fifteen minutes. Ask for a new one below.'
+        : 'A link works once, for fifteen minutes.',
+  unreachableTitle: 'The server did not answer',
+  unreachableWhy: 'Check your connection, then try again.',
+  /* After a press of Try again that came back the same, so the press visibly did something. */
+  unreachableStill: (at: string) => `Asked again at ${at}, and it still did not answer. Check your connection, then try again.`,
+  askAgain: 'Try again',
+  noHostTitle: 'There is nothing to sign in to here',
+  noHostWhy: 'This copy of BrainDog runs without a server, so there is no record behind it.',
+  openTitle: 'This server lets you straight in',
+  openWhy: 'It was started without a key, so anyone on this computer can open the record.',
+  openYourRecord: 'Open your record',
+  /* What the hosted app says until its sign-in is switched on, to whoever opens it: a fact and a
+     promise. */
+  notConfiguredTitle: 'Sign-in is not open here yet',
+  notConfiguredWhy: 'When it opens, this is where you will sign in to your record.',
+  insecureTitle: 'Sign-in needs a secure address',
+  insecureWhy: "Open this page over https, or at localhost on the server's own computer.",
+  signedInTitle: 'You are signed in',
+  /* Every screen reads the record once somebody is signed in. */
+  signedInReads: 'Every screen now reads this record.',
+  /* NOT "AS SOMEONE ELSE". The screen cannot tell whose a link is until it is spent, and the owner pasting his own
+     sign-in link into a tab he is already in was told he would be someone else. Spending any link needs this screen
+     signed out first, whoever it belongs to, so that is all it says. */
+  linkWaitsSignedIn: 'A link arrived, and you are already signed in. To use it, sign out first.',
+  addPasskeyHere: 'Add a passkey on this device',
+  /* SAID BY THE WAY HE CAME IN. "Without the key" is the self-host's server key, and it was said after a claim link
+     too, to an owner on the Cloud who had never seen a key (`loop/research-first-sign-in.md` friction 9). `null` is a
+     session that was already there when the screen opened, so it cannot say how, and names neither. */
+  addPasskeyWhy: (via: 'passkey' | 'key' | 'link' | null) =>
+    via === 'key'
+      ? 'Add one now, so next time you can sign in without the key.'
+      : via === 'link'
+        ? 'Add one now, so next time you can sign in without a link.'
+        : 'Add one now, so next time this device signs you in on its own.',
+  addingPasskey: 'Waiting for your device',
+  passkeyAdded: 'Passkey added. Next time, sign in with it.',
+  passkeyNotAdded: 'Nothing was added.',
+  passkeyExists: 'This device already has a passkey for this record.',
+  passkeyFailed: 'The passkey was not added. Try again.',
+  openBrainDog: 'Open BrainDog',
+  signOut: 'Sign out',
+  signingOut: 'Signing out',
+  signedOut: 'You are signed out.',
+  signOutFailed: 'You are still signed in. Try again.',
+  levelMoved: (name: string, to: string) => `${name} is set to ${to} across this record.`,
+  accessRemoved: (name: string) => `${name} no longer has access to this record.`,
+  exceptionRemoved: (list: string, to: string) => `${list} is back to ${to}.`,
+  exceptionAdded: (name: string, list: string, level: string) => `${name} is set to ${level} on ${list}.`,
+  exceptionList: 'List',
+  exceptionLevel: 'Level',
+  exceptionAdd: 'Add',
+  exceptionCancel: 'Cancel',
+  peopleUnrouted: 'This record does not list its people yet.',
+  /* Lane F: backups, putting a copy back, erasing a person and deleting the record */
+  backedUp: (id: string) => `Backed up. The copy is ${id}.`,
+  sizeOnDisk: (size: string) => `${size} on disk`,
+  restoreThis: 'Restore this copy',
+  restoreLive: 'Put the record back to one of the copies above. What it holds now is kept as a copy first.',
+  restoreConfirm: (id: string) => `Put the record back to ${id}? Everything written since then is replaced.`,
+  keepAsIs: 'Keep it as it is',
+  restoredTo: (id: string, kept: string) => `The record is back to ${id}. What it held before is kept as ${kept}.`,
+  eraseWho: 'Name or email',
+  eraseBasis: 'Legal basis',
+  eraseWhichPerson: 'Person on this record',
+  eraseNobody: 'Not on this record',
+  eraseNow: 'Erase for good',
+  erasedRows: (rows: number) => `Erased. ${rows} ${rows === 1 ? "row no longer holds" : "rows no longer hold"} them, and the log keeps only that it happened.`,
+  recordDeleted: (record: string) => `${record} is deleted. You can close this tab.`,
+  /* Lane G: inviting somebody with a link the owner sends, and opening that link */
+  inviteEmailLabel: 'Their email',
+  inviteLevelLabel: 'What they can do',
+  inviteMaking: 'Making a link',
+  inviteNoMail: 'No email is sent. Copy the link and send it to them yourself.',
+  inviteLinkReady: (email: string) => `This link is for ${email}. It is shown once, so copy it now.`,
+  inviteCopyLink: 'Copy link',
+  inviteLinkLabel: 'the invitation link',
+  inviteDone: 'Done',
+  invitesWaiting: 'Waiting to be used',
+  inviteWaitingRow: (level: string, until: string) => `${level} · good until ${until}`,
+  inviteWithdraw: 'Withdraw',
+  inviteWithdrawn: (email: string) => `The link for ${email} no longer works.`,
+  invitePageTitle: 'Invitation',
+  inviteLanding: 'You have been invited to a record',
+  inviteFor: (email: string) => `This invitation is for ${email}.`,
+  inviteSignedInAs: (email: string) => `You are signed in as ${email}.`,
+  inviteAccept: 'Accept',
+  inviteAccepting: 'Accepting',
+  inviteJoined: 'You are on the record',
+  inviteKeepWay: 'Add a passkey now, so you can sign in again on this device.',
+  inviteNoLink: 'This invitation link is cut short',
+  inviteChecking: 'Checking the link',
+  inviteFailed: 'That did not work. Open the link again, or ask for a new one.',
+  inviteAskNew: 'Ask the person who sent it for a new link.',
+  inviteSignInFirst: 'Sign in',
+  /* OPS-7: a new address proves it is somebody's own mailbox before an invitation makes them anybody */
+  inviteNameLabel: 'Your name (optional)',
+  inviteCheckMail: 'Check your mail',
+  inviteMailSent: (email: string) => `A link to finish accepting is on its way to ${email}. Open it to prove the address is yours. It works once, within a day.`,
+  inviteFromMail: 'You opened the link from your mail. Accept to join the record.',
+  /* A key taken out of service from the vault screen: the bytes go, the row stays. */
+  keyRevoked: (label: string) => label + ' is out of service. Its row stays, because what it opened is a fact.',
+} as const;

@@ -23,7 +23,8 @@ import { tickPatch } from '../record/page-write.ts';
 import type { Entry, Fields } from '../record/schema.ts';
 import { tickBackOf } from './tick-undo.ts';
 
-const VIEW = readFileSync(new URL('./PageView.svelte', import.meta.url), 'utf8');
+/* THE PAGE'S WRITES, which `PageView.svelte` held until it was split and `page-writes.ts` holds now. */
+const VIEW = readFileSync(new URL('./page-writes.ts', import.meta.url), 'utf8');
 
 const NOW = Date.parse('2026-09-24T10:00:00Z');
 const OWNER = { actor: 'p_1' };
@@ -97,7 +98,7 @@ function held(k: Kernel, register: string, seq: number): Entry {
 
 /**
  * The page's gesture and then the receipt's undo, both as real writes: the tick at the version the page read, and the
- * way back at the version the tick answered with, which is what `putBack` in `PageView.svelte` sends. Answers the row as
+ * way back at the version the tick answered with, which is what `putBack` in `page-writes.ts` sends. Answers the row as
  * it ends and the patch the undo sent.
  */
 function tickThenUndo(k: Kernel, register: string, decl: typeof TASKS | typeof CHORES, seq: number, done: boolean) {
@@ -159,13 +160,13 @@ test('an undo pressed after somebody else changed the task is a conflict and not
 
 test("the tick's receipt builds its undo from the row the page held, through tickBackOf", () => {
   const at = VIEW.indexOf('function tickTask(');
-  assert.ok(at >= 0, 'PageView has no tickTask, so this sweep proves nothing');
+  assert.ok(at >= 0, 'the page writes have no tickTask, so this sweep proves nothing');
   const body = VIEW.slice(at, VIEW.indexOf('\n  }\n', at));
   /* THE OLD UNDO, which is the list's default state and never the row's own. */
   assert.doesNotMatch(body, /tickPatch\(ref, !done/u, 'the tick still undoes with the default not-done state');
   assert.match(body, /tickBackOf\(/u, 'the tick does not build its undo through tickBackOf');
   /* THE ROW READ OFF `entries` HAS TO REACH tickBackOf. Checked by mutation: with `tickBackOf(ref, done, decl, undefined)`
-     in PageView, a sweep that only looked for `.entries` and `tickBackOf(` stayed green while every undo went back to
+     in the page's writes, a sweep that only looked for `.entries` and `tickBackOf(` stayed green while every undo went back to
      the default state, because the lookup was still there and simply unused. */
   const read = /const (\w+) = block\.entries\.find\(/u.exec(body);
   assert.ok(read, "the tick does not read the row it held from the block's entries");

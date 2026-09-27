@@ -44,9 +44,12 @@ export type RunSandbox = (decl: ScriptDecl, host: CtxHost) => Promise<ScriptAnsw
 export type GrantOf = (label: string) => ScriptGrant | null;
 export type ScriptGrant = { id: string; label: string; opens: string };
 
-/** `ctx.record.list` and `ctx.record.get` for one run, already held to its `reads`. */
+/**
+ * `ctx.record.list` and `ctx.record.get` for one run, already held to its `reads`. `options` is `list`'s third argument
+ * as the script wrote it, or `null`, and `listOptions` reads it.
+ */
 export type ScriptReads = {
-  list(register: string, where: Json): Promise<Json[]>;
+  list(register: string, where: Json, options?: Json): Promise<Json[]>;
   get(spoken: string): Promise<Json>;
 };
 
@@ -112,6 +115,30 @@ function namesSealed(where: unknown, sealed: Set<string>): string | null {
 }
 
 /**
+ * `ctx.record.list`'s third argument, read: `{ includeDeleted: true }` asks for the rows a person deleted as well as the
+ * live ones, each deleted one with `deleted_at` set, which is how a script tells the two apart.
+ *
+ * WHY A SCRIPT ASKS AT ALL. A pack that copies rows in from a provider has to know which ones a person already threw
+ * away, or it writes each of them again on its next run: mercury's ledger read live rows only and put back every
+ * transaction he deleted (`loop/finish/defects.md` M6).
+ *
+ * ANYTHING ELSE IS REFUSED, NOT READ AS NO OPTIONS. A script that meant to ask for its deleted rows and misspelled the
+ * question would be answered the live rows alone, and would write the deleted ones back without a word. The record's
+ * `list` refuses an `includeDeleted` that is not true or false for the same reason; this refuses first, in the
+ * script's own terms, and refuses a key the record would have passed over.
+ */
+function listOptions(script: string, register: string, options: Json): { includeDeleted?: boolean } {
+  if (options === null) return {};
+  const refused = new Error(
+    `${script} listed ${register} with the options ${JSON.stringify(options)}, and a script's list takes {"includeDeleted":true} or nothing, so nothing was read.`,
+  );
+  if (typeof options !== 'object' || Array.isArray(options)) throw refused;
+  for (const [key, value] of Object.entries(options)) if (key !== 'includeDeleted' || typeof value !== 'boolean') throw refused;
+  const asked = options['includeDeleted'];
+  return typeof asked === 'boolean' ? { includeDeleted: asked } : {};
+}
+
+/**
  * The reads a script's `ctx.record` is built from, on either host: the record's own `list` and `get`, asked as the
  * script's actor with its `reads` as the ceiling.
  *
@@ -127,7 +154,7 @@ export function scriptReads(api: Pick<RecordApi, 'kernel' | 'list' | 'get'>): (s
   return (s) => {
     const as: CallContext = { principal: { kind: 'system', id: s.scripted.actor }, registers: s.scripted.decl.reads };
     return {
-      list: async (register, where) => {
+      list: async (register, where, options = null) => {
         /* A SENTENCE IS REFUSED BEFORE THE TREE IS WALKED, because `namesSealed` cannot see into one and the record's
            `list` reads a string as a sentence. Measured before this line (`script-reads.test.ts`, the audit of wave
            thirty-six, finding 7): `token is set`, `token is empty` and `token is <grant id>` each answered which client
@@ -141,8 +168,11 @@ export function scriptReads(api: Pick<RecordApi, 'kernel' | 'list' | 'get'>): (s
         const sealed = namesSealed(where, sealedOf(api, register));
         if (sealed !== null)
           throw new Error(`${s.scripted.script} filtered ${register} on ${sealed}, which is a secret, and a script may not ask what a secret field holds.`);
-        const page = await api.list({ register, ...(where === null ? {} : { where: where as never }) }, as);
+        const asked = listOptions(s.scripted.script, register, options);
+        const page = await api.list({ register, ...(where === null ? {} : { where: where as never }), ...asked }, as);
         if (!page.ok) throw new Error(fixOf(page));
+        /* A DELETED ROW IS HANDED OVER AS A LIVE ONE IS, WITH ITS SECRETS OFF. Deleting a row keeps its fields, so a
+           deleted client still holds its grant id, and `unsealed` is asked of every row whichever it is. */
         return page.value.rows.map((row) => unsealed(api, row));
       },
       get: async (spoken) => {

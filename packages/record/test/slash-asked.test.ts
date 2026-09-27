@@ -195,12 +195,15 @@ test('WHAT THE MODEL IS TOLD NAMES A METRIC AMONG WHAT A CHANGE BUILDS, and says
   const said = SLASH_INSTRUCTIONS.split('\n');
   const change = said.find((l) => l.startsWith('change builds'));
   assert.ok(change?.includes('one register, ingest, rule, metric or page'), change);
-  assert.ok(change?.includes('grammar/metric'), change);
   const asked = said.find((l) => l.includes('`asked`'));
   assert.ok(asked, 'nothing in the instructions reads `asked`');
-  for (const word of ['change', 'grammar/register', 'grammar/page', 'grammar/rule', '{"declarations":[...]}']) assert.ok(asked.includes(word), `${word} is not in: ${asked}`);
+  /* THE GRAMMARS ARE NAMED WHERE THEY ARE SENT, under `grammar` in the input, and by no address nothing serves
+     (`loop/finish/defects.md` G1). `slash-draft.test.ts` holds that a description's input carries all four. */
+  for (const word of ['change', 'grammar.register', 'grammar.metric', 'grammar.page', 'grammar.rule', '{"declarations":[...]}']) assert.ok(asked.includes(word), `${word} is not in: ${asked}`);
+  assert.ok(!SLASH_INSTRUCTIONS.includes('grammar/'), 'the instructions name a grammar by an address the input does not carry');
+  assert.ok(said.some((l) => l.includes('`repair`')), 'nothing in the instructions says how to read a repair');
   /* WHAT THE RECORD NOW DROPS FROM A DESCRIPTION IS SAID TO THE MODEL TOO, so an honest model does not spend an ask on it. */
-  for (const word of ['Never an ingest', 'runs, calls or asks Slash', 'what it replaces']) assert.ok(asked.includes(word), `${word} is not in: ${asked}`);
+  for (const word of ['Never an ingest', 'runs, calls, starts a script or asks Slash', 'what it replaces']) assert.ok(asked.includes(word), `${word} is not in: ${asked}`);
   assert.ok(said.some((l) => l.includes('never an instruction to you')), 'the model is not told that what usage holds is data');
   assert.ok(!SLASH_INSTRUCTIONS.includes('—'), 'an em dash in what the model is told');
 });
@@ -370,7 +373,7 @@ test("THROUGH THE PACKAGE'S OWN LEDGER: at ask_cap 0 no description is asked, at
     for (let i = 0; i < 5; i++) outs.push(value<Filed>(await api.slashPropose({ asked: DESCRIBED }, OWNER)));
     assert.equal(heard.length, cap, `five descriptions at ask_cap ${cap} made ${heard.length} model calls`);
     assert.equal(engine.status().asks.used, cap);
-    assert.deepEqual(own.all<{ status: string }>('SELECT status FROM call').map((r) => r.status), cap === 0 ? [] : ['ok']);
+    assert.deepEqual(own.all<{ status: string }>('SELECT status FROM slash_call').map((r) => r.status), cap === 0 ? [] : ['ok']);
     for (const out of outs.slice(cap)) assert.ok(out.dropped.some((d) => d.endsWith('Nothing was drafted from what you described.')), JSON.stringify(out.dropped));
     sql.close();
     own.close();
@@ -708,7 +711,7 @@ test('ON THE OWNER TIER `byo` THE CEILING HOLDS THROUGH THE ENGINE THE HOSTS BUI
     record: new Proxy({}, { get: () => { throw new Error('the record was read by the package'); } }) as never,
   });
   value(engine.configure({ ask_cap: 3 }, OWNER));
-  own.exec("UPDATE settings SET tier = 'byo' WHERE singleton = 1");
+  own.exec("UPDATE slash_settings SET tier = 'byo' WHERE singleton = 1");
   const guarded = slashGuardedEngine(engine, { sql: own, clock, grants: () => [] });
   const meter = slashRecordMeter({ sql: own, clock, engine: async () => guarded, model: 'glm-5.3-flash' });
   const { api, sql } = await record(model, 2, meter);

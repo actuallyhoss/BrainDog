@@ -8,7 +8,7 @@ replies: [
     {
       "text": "Both of these are worth doing.",
       "body_kind": "options",
-      "body": { "options": [{ "id": "a", "label": "Do it" }] },
+      "body": { "options": [{ "id": "a", "label": "Do it", "because": "It is worth doing." }, { "id": "b", "label": "Wait", "because": "Nothing presses." }] },
       "flagged": false
     }
   ]
@@ -29,3 +29,7 @@ replies: [
 # THE TWO REPLIES ARE PASS 1 AND PASS 2. The second carries no digit and no braces anywhere, so the
 # citation check passes it and the palette refuses it one step later for citing nothing, which is
 # the step this code belongs to. `packages/slash/test/refusals-ask.test.ts` drives it.
+#
+# IT OFFERS TWO OPTIONS, EACH WITH AN ID, A LABEL AND A REASON, because an options body is checked
+# against its own schema first (`BODIES` in `packages/slash/src/prompts.ts`), and a body that failed
+# it would be `PROPOSAL_SCHEMA`, one step before the step this code belongs to.

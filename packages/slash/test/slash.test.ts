@@ -1,5 +1,5 @@
 /**
- * `createSlash`, `status` and `configure`: the two tables, the meter and the one door a credential
+ * `createSlash`, `status` and `configure`: the store, the meter and the one door a credential
  * could walk in through.
  *
  * THE LAST GROUP IS THE POINT OF THIS FILE. `46 §1` boundary 3 says the package never sees a
@@ -24,18 +24,18 @@ const build = () => {
   return { sql, clock, inference, record, slash: createSlash({ sql, clock, inference, record }) };
 };
 
-test('createSlash makes the two tables, one settings row, and says nothing on a second call', () => {
+test('createSlash makes the store under Slash\'s own names, one settings row and its version row, and says nothing on a second call', () => {
   const { sql, clock, inference, record } = build();
   const tables = sql.all<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name");
   assert.deepEqual(
     tables.map((t) => t.name),
-    ['call', 'settings'],
+    ['slash_call', 'slash_meta', 'slash_settings'],
   );
-  assert.equal(sql.one<{ n: number }>('SELECT COUNT(*) AS n FROM settings')?.n, 1);
-  assert.equal(sql.one<{ user_version: number }>('PRAGMA user_version')?.user_version, 1);
+  assert.equal(sql.one<{ n: number }>('SELECT COUNT(*) AS n FROM slash_settings')?.n, 1);
+  assert.equal(sql.one<{ value: string }>("SELECT value FROM slash_meta WHERE key = 'version'")?.value, '2');
 
   createSlash({ sql, clock, inference, record });
-  assert.equal(sql.one<{ n: number }>('SELECT COUNT(*) AS n FROM settings')?.n, 1);
+  assert.equal(sql.one<{ n: number }>('SELECT COUNT(*) AS n FROM slash_settings')?.n, 1);
 });
 
 test('createSlash costs no network and no model call', () => {
@@ -56,7 +56,7 @@ test('the meter counts tier a asks in this month, reads and proposals alike, and
   const { sql, slash } = build();
   const put = (kind: string, tier: string, ts: string): void =>
     sql.exec(
-      `INSERT INTO call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status)
+      `INSERT INTO slash_call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status)
        VALUES (?, ?, ?, ?, 'glm-5.3-flash', 1, 1, 1, 1, 'ok')`,
       `${kind}${tier}${ts}`,
       ts,
@@ -101,7 +101,7 @@ test('tier b needs a grant, and a grant is an id the vault holds', () => {
 
 /**
  * THE ONE THAT MATTERS. A key pasted into the grant box is a plaintext credential arriving in a
- * package that is supposed never to hold one, and it would then sit in `settings.grant_id` until
+ * package that is supposed never to hold one, and it would then sit in `slash_settings.grant_id` until
  * somebody exported the database.
  */
 test('a key pasted where a grant id belongs is refused, and nothing is stored', () => {
@@ -110,7 +110,7 @@ test('a key pasted where a grant id belongs is refused, and nothing is stored', 
   const out = slash.configure({ tier: 'b', model: 'claude-x', grant_id: key }, OWNER);
   assert.equal(codeOf(out), 'VALUE_MALFORMED');
   assert.equal(refused(out) ? out.refusal.at : '', 'grant_id');
-  const stored = JSON.stringify(sql.all('SELECT * FROM settings'));
+  const stored = JSON.stringify(sql.all('SELECT * FROM slash_settings'));
   assert.equal(stored.includes(key), false);
   assert.equal(stored.includes('sk-'), false);
 });
@@ -122,7 +122,7 @@ test('tier b stores the grant id, the model, and no key', () => {
     OWNER,
   );
   assert.equal(out.ok, true);
-  const row = sql.one<{ tier: string; model: string; grant_id: string }>('SELECT * FROM settings');
+  const row = sql.one<{ tier: string; model: string; grant_id: string }>('SELECT * FROM slash_settings');
   assert.equal(row?.tier, 'b');
   assert.equal(row?.model, 'claude-sonnet-4-6');
   assert.equal(row?.grant_id, 'g_01JRQ8Z0X1Y2Z3A4B5C6D7E8F9');

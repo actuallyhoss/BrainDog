@@ -14,15 +14,15 @@
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
   import { titleOf } from '$lib/title.ts';
-  import { MISSING, since } from 'braindog-render';
+  import { since } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import { homePage, said } from '$lib/voice.svelte.ts';
   import { homeSlugOf } from '$lib/voice.ts';
-  import { homeCurrency, actorOf, type Metric } from '$lib/record/api.ts';
+  import { homeCurrency, actorOf } from '$lib/record/api.ts';
   import type { News } from '$lib/record/news-live.ts';
   import type { LiveBlock } from '$lib/record/page-live.ts';
   import { landing } from '$lib/record/landing.ts';
-  import { drawn, symbolText } from '$lib/record/money.ts';
+  import { moneyInText, symbolText } from '$lib/record/money.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Section from '$lib/ui/Section.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -54,14 +54,13 @@
   /* THE MARK IS THE RECORD'S (`member.seen_at`), and `whatsNew` answers only what is after it. A mark kept on this
      device filtered the sample's feed, which had no record to keep one; it went with the sample (DIRECTION 26). */
   let feed = $state<News | null>(null);
-  let tiles = $state<Metric[] | null>(null);
 
   /**
-   * HOME AS THE RECORD'S USE CASE DECLARES IT (`loop/research-spark.md` S13). A use case names its Home as the page
-   * `home-<use case>`, and that page is drawn here in place of the house figures, which read Money and asked a
-   * student's record for three figures it refuses. A record with no use case draws the house Home's own page, `home`,
-   * which Money declares. A record that holds neither page draws the Home below. Nothing is drawn in its place until
-   * the record has said which.
+   * HOME AS THE RECORD DECLARES IT (`loop/research-spark.md` S13). A use case names its Home as the page
+   * `home-<use case>`; a record with no use case draws the house Home's own page, `home`, when a pack declares one. What
+   * leads, figures included, is that page's to say: Home asks no figure of its own, because every figure it could name
+   * belongs to a pack (shell.md USE-2). A record that holds neither page draws what needs you and what is new, and
+   * nothing is drawn in the page's place until the record has said which.
    *
    * ONLY A PAGE THE RECORD HOLDS IS ASKED FOR. A use case may declare no Home page (a reading club shared as a file), and
    * asking for `home-<use case>` anyway logged a refusal on every Home load. `boot` names every page, so the use case's
@@ -70,7 +69,9 @@
   const declares = $derived(homeSlugOf(homePage(), data.pages));
   let declared = $state<{ blocks: LiveBlock[]; now: number } | null>(null);
   let asking = $state(false);
-  const news = $derived(feed ?? { items: data.whatsNew, upTo: data.upTo, sinceCapped: data.sinceCapped });
+  /* THE SHELL'S FEED IS SPOKEN THE WAY `readHome` SPEAKS ITS OWN, so a sentence holding an amount does not change its
+     spelling ("GBP 2,400.00", then "£2,400.00") when the fresh answer lands (design.md §5, DSN-4). */
+  const news = $derived(feed ?? { items: data.whatsNew.map((item) => ({ ...item, text: moneyInText(item.text) })), upTo: data.upTo, sinceCapped: data.sinceCapped });
 
   const fresh = $derived(news.items);
   const capped = $derived(news.sinceCapped);
@@ -82,7 +83,6 @@
     if (data.refused) return;
     const me = data.me.person;
     const slug = declares;
-    const lists = data.lists;
     /* UNTRACKED, or the effect reads the pending count it writes, and every answer opens the read again. */
     const at = untrack(opened);
     let ok = false;
@@ -92,12 +92,10 @@
       .then((got) => {
         declared = got?.from === 'live' ? { blocks: got.page.blocks, now: got.now } : null;
         asking = false;
-        /* THE FIGURES ARE ASKED FOR ONLY WHEN NO PAGE SAYS WHAT LEADS, so a record without Money's `home` is not asked twice. */
-        return import('$lib/record/news-live.ts').then((m) => m.readHome(apiBase(), me, undefined, m.homeFigures(lists, declared !== null)));
+        return import('$lib/record/news-live.ts').then((m) => m.readHome(apiBase(), me));
       })
       .then((out) => {
         if (out.from !== 'live') return;
-        tiles = out.tiles;
         feed = out.news;
         ok = true;
       })
@@ -117,26 +115,8 @@
      reads them from the record. */
   const needCount = $derived(data.questions.length);
 
-  const cells = $derived(tiles ?? []);
-
   /* WHERE A COLLEAGUE WHO HOLDS LISTS AND NOT THE RECORD LANDS (`landing.ts`), and `null` for everybody else. */
   const lands = $derived(landing(data));
-
-  /**
-   * A QUALIFIER'S STATE PHRASE, and only that phrase, takes the metric's tone.
-   *
-   * "should be nothing, up 15% on the 30 days before" colours "up 15%". A note with no such phrase
-   * says its state with the 6px dot in front of it instead, so a figure over its target still says
-   * so without the figure itself turning red.
-   */
-  const STATE = /\b(?:up|down) [\d.,]+%|\boverdue\b|\blapsing\b/iu;
-  function qualifier(note: string) {
-    const text = symbolText(note, homeCurrency()).replaceAll(' · ', ', ');
-    const m = STATE.exec(text);
-    return m
-      ? { before: text.slice(0, m.index), phrase: m[0], after: text.slice(m.index + m[0].length) }
-      : { before: text, phrase: '', after: '' };
-  }
 
   /**
    * THIS SCREEN COMPUTES ITS CONTENT SYNCHRONOUSLY, and says so, through `data-screen` on
@@ -185,36 +165,9 @@
     {:else}
     <!-- THE EXAMPLES SETTING UP PLANTED, offered once they are all that is left to explain, and loudly once rows of the owner's own sit beside them. -->
     {#if data.live}<ClearExamples />{/if}
-    <!--
-      THE FIGURES LEAD. A person opens this to find out where the money is. All of them are one size:
-      no figure is louder than another, and state lives in the qualifier line under each.
-    -->
+    <!-- THE DECLARED PAGE LEADS, figures and all, when the record holds one; Home draws no figure of its own. -->
     {#if declared}
       <DeclaredHome blocks={declared.blocks} now={declared.now} />
-    {:else if cells.length > 0 && !asking}
-      <Section title={said('right_now')}>
-        <!-- Up to four across; three figures take thirds rather than leaving a fourth track empty. -->
-        <div class="stats" style="--cols:{Math.min(4, Math.max(3, cells.length))}">
-          {#each cells as m (m.id)}
-            {@const parts = drawn(m.value, homeCurrency())}
-            {@const q = qualifier(m.note)}
-            {@const toned = m.tone === 'bad' || m.tone === 'warn' || m.tone === 'good'}
-            <svelte:element this={m.href ? 'a' : 'div'} class="stat" href={m.href ? at(m.href) : undefined} data-intent={m.tone}>
-              <span class="stat-label">{m.label}</span>
-              <span class="stat-figure num">
-                {#if !m.value}{MISSING}{:else if parts}{parts.lead}{parts.whole}<span class="stat-minor"
-                    >{parts.fraction}</span
-                  >{#if parts.iso}<span class="stat-code">{parts.iso}</span>{/if}{:else}{m.value}{/if}
-              </span>
-              <span class="stat-note">
-                {#if toned && !q.phrase && m.tone !== 'good'}<span class="dot" aria-hidden="true"></span>{/if}{q.before}{#if q.phrase}<span
-                    class="stat-state">{q.phrase}</span
-                  >{/if}{q.after}
-              </span>
-            </svelte:element>
-          {/each}
-        </div>
-      </Section>
     {/if}
 
     <!-- A DECLARED HOME SAYS WHAT IS DUE ITSELF, so this is only the questions waiting, and only when there are some. -->
@@ -364,7 +317,7 @@
     grid-template-columns: minmax(0, 1fr) 360px;
     gap: var(--sp-7);
     max-inline-size: var(--page-max);
-    /* The head's own inline padding, so the figures start under the title. */
+    /* The head's own inline padding, so the first column starts under the title. */
     padding: var(--sp-5) var(--gutter) var(--sp-9);
   }
 
@@ -374,84 +327,6 @@
     flex-direction: column;
     gap: var(--sp-7);
     min-inline-size: 0;
-  }
-
-  /* ── right now ────────────────────────────────────────────────────────── */
-
-  .stats {
-    display: grid;
-    grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
-    gap: var(--sp-6);
-  }
-
-  .stat {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-1);
-    min-inline-size: 0;
-    color: var(--ink);
-    text-decoration: none;
-  }
-
-  .stat-label {
-    color: var(--dim);
-    font-size: var(--t-sm);
-  }
-
-  a.stat:hover .stat-label {
-    color: var(--ink2);
-  }
-
-  .stat-figure {
-    color: var(--ink);
-    font-size: var(--t-xl);
-    font-weight: 500;
-    letter-spacing: -0.02em;
-    white-space: nowrap;
-  }
-
-  .stat-minor {
-    color: var(--dim);
-  }
-
-  .stat-code {
-    margin-inline-start: var(--sp-1);
-    color: var(--dim);
-    font-size: var(--t-xs);
-    font-weight: 400;
-    letter-spacing: 0;
-  }
-
-  .stat-note {
-    color: var(--dim);
-    font-size: var(--t-xs);
-  }
-
-  .stat[data-intent='bad'] {
-    --tone: var(--danger);
-  }
-
-  .stat[data-intent='warn'] {
-    --tone: var(--warn);
-  }
-
-  .stat[data-intent='good'] {
-    --tone: var(--earn);
-  }
-
-  .stat-state {
-    color: var(--tone, var(--dim));
-  }
-
-  .dot {
-    display: inline-block;
-    flex: none;
-    inline-size: var(--dot);
-    block-size: var(--dot);
-    margin-inline-end: var(--sp-2);
-    border-radius: var(--r-pill);
-    background: var(--tone, var(--dim));
-    vertical-align: 0.1em;
   }
 
   /* ── what needs you ───────────────────────────────────────────────────── */
@@ -659,7 +534,7 @@
 
   /* ── narrower ─────────────────────────────────────────────────────────── */
 
-  /* ONE COLUMN below this: the figures first, then what needs you, then the feed, which is the
+  /* ONE COLUMN below this: the declared page first, then what needs you, then the feed, which is the
      reading order a phone should have had all along. */
   @media (width < 1180px) {
     .page {
@@ -673,14 +548,8 @@
     }
   }
 
-  /* On a phone the figures go two across, and a row's age drops under its amount so the title keeps
-     the width. */
+  /* On a phone a row's age drops under its amount so the title keeps the width. */
   @media (width < 640px) {
-    .stats {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: var(--sp-5) var(--sp-4);
-    }
-
     .need {
       grid-template-columns: var(--icon-m) minmax(0, 1fr) auto;
       grid-template-areas:

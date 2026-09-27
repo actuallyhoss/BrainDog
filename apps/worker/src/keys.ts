@@ -10,13 +10,16 @@
  *
  * THE ROOT KEY COMES ONLY FROM `env.KEK`. A secret put with `wrangler secret put KEK --env <environment>` arrives as a
  * string; a Secrets Store binding of the same name is read with `get()`. Either way the value is 32 bytes written as
- * 64 hex characters or as base64url, it is decoded once, imported as a key that cannot be exported, and the bytes are
- * zero-filled. With no binding there is no store, and every door and every provisioning behaves as it did before.
+ * 64 hex characters or as base64url, or two such keys separated by a space while a rotation is under way, and each is
+ * decoded once, imported as a key that cannot be exported, and its bytes zero-filled. With no binding there is no
+ * store, and every door and every provisioning behaves as it did before.
  *
  * NOTHING HERE LOGS, and nothing here is a place a value leaves. The one sentence this file throws names no byte.
  * Every unwrapped value goes by one of `secret-grep`'s own names, `kek`, `root`, `dek`, `pkcs8` or `plain`, so a
  * line that ever sends one to a log, an error or a response is a line that gate sees.
  */
+
+import type { RecordWrapping, RootKeys } from '@braindog/host';
 
 /** What a record stores about one wrapped key. The kernel writes it and never reads inside it. */
 export type WrappedKey = {
@@ -69,31 +72,69 @@ async function fingerprint(root: Uint8Array): Promise<string> {
 }
 
 /**
+ * The most root keys one secret holds: the current one, and the one it replaced while records still hold rows wrapped
+ * under it (`53 §5.6`). A third would be a rotation begun before the last one's old key was retired (step 7), which
+ * leaves two old keys and one slot the runbook keeps for them.
+ */
+export const ROOT_KEYS = 2;
+
+/**
  * The Worker's store over `env.KEK`, or `null` when nothing is bound.
  *
  * A BOUND VALUE THAT IS NOT 32 BYTES IS A REFUSAL, NEVER AN ABSENT STORE. Treating it as unbound would provision
  * records without keys while the owner believes the key store is on, and those records stay keyless for good.
  *
- * `byId` KNOWS ONE ID, as the self-host's does: `KEK_PREV` is not read yet, so a record wrapped under another root
- * key answers `WRONG_KEY` rather than a store claiming to hold a key it does not have.
+ * ONE KEY, OR TWO SEPARATED BY A SPACE, AND THE FIRST IS CURRENT (`loop/finish/contracts.md` §9). During a rotation the
+ * secret holds the new key and then the old one, so `current` wraps under the new key at once while `byId` still opens
+ * every row wrapped under the old, until the nightly walk has re-wrapped each record (`rewrap.ts`). One secret rather
+ * than a second binding, so none of this function's callers changes and a Secrets Store binding carries the pair as
+ * easily as a Worker secret does. A row wrapped under a key the secret no longer holds still answers `WRONG_KEY`,
+ * rather than a store claiming to hold a key it does not have.
  */
 export async function keyStoreOf(bound: KekBinding | undefined): Promise<KeyStore | null> {
   if (!isBound(bound)) return null;
   const kek = typeof bound === 'string' ? bound : await bound.get();
   if (kek.trim() === '') return null;
-  const root = decode(kek);
-  if (root === null || root.length !== KEY_BYTES)
-    throw new Error('The key store secret is not 32 bytes written as hex or base64url, so no key was made, sealed or opened.');
+  const roots = kek.trim().split(/\s+/).map(decode);
   try {
-    const kekId = await fingerprint(root);
-    const key = await crypto.subtle.importKey('raw', root, 'AES-GCM', false, ['encrypt', 'decrypt']);
+    /* A VALUE THAT IS NOT KEYS IS REFUSED AS THAT FIRST, so a sentence pasted with spaces in it is called what it is
+       rather than counted as keys; only a value of whole keys is counted. */
+    if (roots.some((root) => root === null || root.length !== KEY_BYTES))
+      throw new Error('The key store secret is not 32 bytes written as hex or base64url, so no key was made, sealed or opened.');
+    if (roots.length > ROOT_KEYS)
+      throw new Error('The key store secret holds more than two keys, where it takes the current one and the one before it separated by a space, so no key was made, sealed or opened.');
+    const held: { kekId: string; key: Key }[] = [];
+    for (const root of roots) {
+      if (root === null) continue;
+      const kekId = await fingerprint(root);
+      if (held.some((h) => h.kekId === kekId)) continue;
+      held.push({ kekId, key: await crypto.subtle.importKey('raw', root, 'AES-GCM', false, ['encrypt', 'decrypt']) });
+    }
+    const [current] = held;
+    /* The split of a value that is not blank is never empty, so this is the compiler's question and not a case. */
+    if (current === undefined) return null;
     return {
-      current: () => Promise.resolve({ kekId, key }),
-      byId: (id) => Promise.resolve(id === kekId ? key : null),
+      current: () => Promise.resolve(current),
+      byId: (id) => Promise.resolve(held.find((h) => h.kekId === id)?.key ?? null),
     };
   } finally {
-    root.fill(0);
+    for (const root of roots) root?.fill(0);
   }
+}
+
+/**
+ * The key id to offer a record's `openGrant` and `openForGrant`: the one its `vault_key` rows are wrapped under while
+ * this store holds it, and the current one otherwise.
+ *
+ * WHY NOT ALWAYS THE CURRENT ONE. The record refuses `WRONG_KEY` when the id offered is not the id its rows name
+ * (`packages/kernel/src/vault.ts`, `openGrant`), and a record keeps the old id from a rotation until its night. Offering
+ * the current id in that window refused every stored credential on the Cloud, although `byId` could open them all
+ * (`loop/research-w61.md` §1 item 8). A record wrapped under a key this store does not hold is offered the current id,
+ * so its refusal names both.
+ */
+export async function offeredId(store: KeyStore, wrapping: string | null): Promise<string> {
+  if (wrapping !== null && (await store.byId(wrapping)) !== null) return wrapping;
+  return (await store.current()).kekId;
 }
 
 /** `utf8(record_id) ‖ 0x1F ‖ utf8(purpose)`, `12 §6` and `47 §4.6`. */
@@ -125,6 +166,34 @@ export async function unwrap(store: KeyStore, record: string, purpose: Purpose, 
   } catch {
     return null;
   }
+}
+
+/**
+ * This store over one record, as the vault passphrase's steps take it (`RootKeys` in `packages/host/src/passphrase.ts`).
+ *
+ * `open` OPENS ONLY A KEY THE ROOT KEY WRAPPED. A record key behind a passphrase names no root key, and this store has
+ * nothing to open it with, which is the point of the passphrase. `close` wraps under `under`, the root key the record's
+ * other keys are under, while this store still holds it, and under the current one otherwise, so taking a passphrase
+ * off between a rotation and the record's night leaves the record naming one root key and not two.
+ */
+export function rootKeysOf(store: KeyStore, record: string): RootKeys {
+  return {
+    record,
+    open: (held: RecordWrapping) =>
+      held.wrapped_by !== 'kek' || held.kek_id === null
+        ? Promise.resolve(null)
+        : unwrap(store, record, 'record', { wrapped: held.wrapped, nonce: held.nonce, kek_id: held.kek_id, wrapped_by: 'kek' }),
+    close: async (recordKey, under) => {
+      const held = under === null ? null : await store.byId(under);
+      if (under === null || held === null) {
+        const fresh = await wrap(store, record, 'record', recordKey);
+        return { wrapped: fresh.wrapped, nonce: fresh.nonce, kek_id: fresh.kek_id };
+      }
+      const nonce = random(NONCE_BYTES);
+      const sealed = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce, additionalData: aad(record, 'record') }, held, recordKey);
+      return { wrapped: new Uint8Array(sealed), nonce, kek_id: under };
+    },
+  };
 }
 
 /** Which of the two things `generateKey` returns this one is: narrowed, not cast, as the self-host does. */

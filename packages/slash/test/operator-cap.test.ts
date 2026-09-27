@@ -57,7 +57,7 @@ const build = (inference: Inference, options?: SlashOptions) => {
   const sql = openSqlite();
   /* THE SECOND ARGUMENT IS NEW, and the red run passed it to a `createSlash` that took one: ignored, as JavaScript does. */
   const slash = createSlash({ sql, clock: fixedClock(NOW), inference, record: fakeRecord() }, options);
-  const rows = () => sql.all<Row>('SELECT kind, tier, model, tokens_in, tokens_out, neurons, code, question FROM call ORDER BY ts, rowid').map((r) => ({ ...r }));
+  const rows = () => sql.all<Row>('SELECT kind, tier, model, tokens_in, tokens_out, neurons, code, question FROM slash_call ORDER BY ts, rowid').map((r) => ({ ...r }));
   return { sql, slash, rows };
 };
 

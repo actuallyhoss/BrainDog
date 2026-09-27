@@ -7,7 +7,8 @@
  *
  * A KEY FOUND IN A CONFIG GOES TO THE VAULT OR NOWHERE (question 4). A key-named or key-shaped env or header value is
  * deposited through `braindog keys put`, the one door, and the row keeps `NAME=credentials#N`. Any other entry keeps
- * its NAME only. When there is no vault grant to deposit with, the row keeps the name and the value is dropped.
+ * its NAME only. With no vault grant, `keys put` deposits with the login as a new key in this run's project; when
+ * neither is kept, or the door refuses, the row keeps the name and the value is dropped.
  * No sentence here quotes a value, and no value is written to a row, a lock file, or a proposal.
  *
  * A ROW THAT DIFFERS IS NOT OVERWRITTEN. The change is proposed as a rowset update, once per shape of the config.
@@ -148,6 +149,11 @@ export type Depositor = (ask: { label: string; opens: string }, given: string) =
 /**
  * A depositor over `braindog keys put`, the one door a key goes in by. The value is handed to it as its standard
  * input and to nothing else; its one line of output never quotes a value.
+ *
+ * NO GRANT IS NEEDED TO PUT A KEY AWAY (`loop/finish/agents.md` C1). `keys put` uses the vault grant kept for the host
+ * when there is one, and otherwise the login this scan already reads the record with, which the door takes to add a
+ * NEW key in this run's project. A key whose label is already there is refused with the rotation sentence, which names
+ * a vault grant, and is then counted with the keys kept by name only.
  */
 export function depositor(o: { file: string; env: Env; host: string; headers: Record<string, string>; signal?: AbortSignal }): Depositor {
   return async (ask, given) => {

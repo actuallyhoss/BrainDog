@@ -295,12 +295,12 @@ test('THE SENTENCE IS THE ONE SOMEBODY READS IN SIX WEEKS, and a missing value i
     fields: { what: 'Invoice 41', amount: { amount: 480_000, currency: 'GBP' }, due: '2026-09-08', tags: ['a', 'b'] },
   } as never as Entry;
 
-  assert.equal(fillTemplate('{{what}} is {{money:amount}}', row, NOW), 'Invoice 41 is GBP 4800.00');
+  assert.equal(fillTemplate('{{what}} is {{money:amount}}', row, NOW), 'Invoice 41 is GBP 4,800.00');
   assert.equal(fillTemplate('{{id}}', row, NOW), 'obligations#41');
   assert.equal(fillTemplate('{{until:due}}', row, NOW), 'in 3 days');
   assert.equal(fillTemplate('{{tags}}', row, NOW), 'a, b');
   assert.equal(fillTemplate('{{party}}', row, NOW), '—');
-  assert.equal(fillTemplate('{{amount}}', row, NOW), 'GBP 4800.00', 'money says its currency however it is asked for');
+  assert.equal(fillTemplate('{{amount}}', row, NOW), 'GBP 4,800.00', 'money says its currency however it is asked for');
 });
 
 /* ── stop ────────────────────────────────────────────────────────────────── */
@@ -1047,7 +1047,7 @@ test('AND A SPAN THIS RECORD CANNOT READ DOES NOT INSTALL', async () => {
 
 test('a rule writes an amount in its currency\'s own decimals', () => {
   const row = { id: 'e_1', register: 'bills', seq: 1, fields: { yen: { amount: 129_900, currency: 'JPY' }, dinar: { amount: 1_500, currency: 'KWD' }, pounds: { amount: 129_900, currency: 'GBP' } } } as unknown as Entry;
-  assert.equal(fillTemplate('{{money:yen}} {{dinar}} {{pounds}}', row), 'JPY 129900 KWD 1.500 GBP 1299.00');
+  assert.equal(fillTemplate('{{money:yen}} {{dinar}} {{pounds}}', row), 'JPY 129,900 KWD 1.500 GBP 1,299.00');
 });
 
 test('A RULE ABOUT TIME IS READ AGAIN EACH HOUR, so a row that goes late untouched is asked about once', async () => {

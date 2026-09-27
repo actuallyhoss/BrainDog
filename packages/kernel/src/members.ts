@@ -372,21 +372,25 @@ export function remove(deps: MemberDeps, by: string, person: string, why?: strin
  *
  * THE LAST OWNER CANNOT BE SUSPENDED, for the reason they cannot be removed: a record with nobody
  * who can decide is a record nobody can un-suspend them from.
+ *
+ * IT ANSWERS WHERE THE PERSON NOW STANDS, `{ person, suspended_at }` (`loop/finish/contracts.md` §2.5,
+ * `suspendMember`), so People can draw "stopped" from the answer instead of reading every member again,
+ * and a retried call learns the instant the first one wrote rather than a bare yes.
  */
-export function suspend(deps: MemberDeps, by: string, person: string, on: boolean, why?: string): Result<null> {
+export function suspend(deps: MemberDeps, by: string, person: string, on: boolean, why?: string): Result<Suspended> {
   const row = deps.sql.one<{ id: string; suspended_at: string | null }>(
     'SELECT id, suspended_at FROM person WHERE id = ?',
     person,
   );
-  if (!row) return no<null>('OUT_OF_BOUNDS', `There is nobody called ${person} in this record.`, { at: 'person' });
+  if (!row) return no<Suspended>('OUT_OF_BOUNDS', `There is nobody called ${person} in this record.`, { at: 'person' });
 
   const held = deps.sql.all<{ register: string; level: Level }>('SELECT register, level FROM member WHERE person_id = ?', person);
   if (on && counts(deps.sql, person) && owners(deps.sql) <= 1)
-    return no<null>('LEVEL_REQUIRED', 'A record keeps one owner who can act. Make somebody else an owner first.', { at: 'person' });
+    return no<Suspended>('LEVEL_REQUIRED', 'A record keeps one owner who can act. Make somebody else an owner first.', { at: 'person' });
 
   /* THE SECOND CALL SAYS WHAT THE FIRST SAID. Suspending somebody already suspended is not an error,
      and answering one is how a caller that lost its reply learns to be afraid of retrying. */
-  if (Boolean(row.suspended_at) === on) return ok(null);
+  if (Boolean(row.suspended_at) === on) return ok({ person, suspended_at: row.suspended_at });
 
   const at = instant(deps.nowMs);
   deps.sql.exec('UPDATE person SET suspended_at = ? WHERE id = ?', on ? at : null, person);
@@ -407,8 +411,35 @@ export function suspend(deps: MemberDeps, by: string, person: string, on: boolea
    */
   for (const row of held)
     event(deps, at, by, on ? 'access.revoke' : 'access.grant', person, row.register, on ? null : row.level, on ? row.level : null, why ?? null);
-  return ok(null);
+  return ok({ person, suspended_at: on ? at : null });
 }
+
+/** What `suspend` answers: the person, and the instant they were stopped, or `null` while they are not. */
+export type Suspended = { person: string; suspended_at: string | null };
+
+/**
+ * What a stopped member is told at every door that turns them away, word for word on both hosts.
+ *
+ * ONE SENTENCE, AND IT SAYS WHAT HAPPENED. `access` answers `null` for a stopped person as it does for a stranger, so each
+ * door said its own words for "not on this record": the Worker "You are not on this record.", the self-host "This
+ * credential does not reach this record.". Neither is true of somebody an owner has stopped for a fortnight, and both
+ * send them looking for a fault in their sign-in. Their rows are kept, so the sentence says what brings them back.
+ */
+export const STOPPED = 'An owner of this record has stopped your access for now. Ask them to let you back in.';
+
+/**
+ * Whether this person is on the record and stopped: a `member` row, and a `person` row whose `suspended_at` is set.
+ *
+ * ASKED ONLY AFTER `access` HAS ANSWERED `null`, to choose between `STOPPED` and a door's own sentence. It gives nobody
+ * anything: a stopped person is refused either way, and the question is only which words they read. Somebody removed
+ * and then stopped holds no `member` row, is not on the record, and reads the door's own sentence.
+ */
+export const stopped = (sql: Sql, person: string): boolean =>
+  (sql.one<{ n: number }>(
+    `SELECT count(*) AS n FROM member m JOIN person p ON p.id = m.person_id
+      WHERE m.person_id = ? AND p.suspended_at IS NOT NULL`,
+    person,
+  )?.n ?? 0) > 0;
 
 /**
  * How many owners can actually act.
@@ -416,9 +447,9 @@ export function suspend(deps: MemberDeps, by: string, person: string, on: boolea
  * SUSPENDED IS NOT AN OWNER, and counting them was a way to leave a record with none. Suspension
  * never deletes the `member` row, so with two owners both suspensions passed the last-owner guard
  * one at a time — and the record then had two owner rows, neither of whom may do anything. Every
- * route answered 403 with a sentence about the caller's credential, `suspendMember` is not in the
- * route table, and `import` refuses a record that is not empty: there was no way back in short of
- * raw SQL on the file.
+ * route answered 403 with a sentence about the caller's credential, nobody left could call
+ * `suspendMember` to lift it, and `import` refuses a record that is not empty: there was no way back
+ * in short of raw SQL on the file.
  *
  * IT IS THE SAME PREDICATE `ownerId()` USES, which is the point: the question "is there an owner"
  * has to have one answer, or the guard protects a different thing from the one that reads it.

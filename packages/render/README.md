@@ -57,7 +57,7 @@ a theme swap can never break a page, and an agent can never make a page ugly.
 
 ---
 
-## Thirty-four kinds over eight primitives
+## Thirty-eight kinds over eight primitives
 
 Kinds are declarations over primitives, so primitives compose and kinds do not have to. `cards`,
 `section` and `feed` are page-only: a page's evaluator writes their rows and passes
@@ -69,12 +69,12 @@ and never a disabled field.
 
 | Primitive | Is | Kinds |
 |---|---|---|
-| `panel` | a bounded region with a tone and a nested document | `note` `quote` `section` `capture` |
-| `grid` | *n* cells of label and figure | `stat` `board` `cards` `heat` |
+| `panel` | a bounded region with a tone and a nested document | `note` `quote` `section` `capture` `embed` |
+| `grid` | *n* cells of label and figure | `stat` `board` `cards` `heat` `gallery` |
 | `rows` | label · value · note, one per line | `spec` `params` `inputs` |
 | `proportional` | rows whose number drives a drawn magnitude | `bar` `gauge` `sparkline` `split` `bridge` `series` `lines` `progress` `forecast` `ring` |
 | `inline` | a run of pills | `chips` |
-| `list` | title · detail · optional state marker; on a `todo`, up to two more facts as one quiet line under the title | `todo` `steps` `timeline` `feed` `agents` `queue` `roadmap` |
+| `list` | title · detail · optional state marker; on a `todo`, up to two more facts as one quiet line under the title | `todo` `steps` `timeline` `feed` `agents` `queue` `roadmap` `calendar` `link` |
 | `table` | real columns, a header, per-column alignment | `comparison` `table` |
 | `media` | a figure with a caption | `code` `tree` `diff` |
 
@@ -102,12 +102,35 @@ by weekday ending on the week of `RenderOptions.now`, the cells written week by 
 position of their own: the host flows them into seven rows and `--weeks` columns, and on a phone hides the first
 four weeks. A day nobody wrote is a gap and never a zero, and a day still to come carries `data-future` and no wash.
 
+A `calendar` row is `title | day`, and a tone. Every month from the first row's to the last row's is drawn as a
+table of weeks, Monday first, each day naming its first three rows and counting the rest (`+2`), then an agenda of
+every day that holds anything. Nothing is hidden behind a control, so the app, the mirror and the digest draw the
+same months; a busy day carries `data-count`, which a host drawing a month as a strip of days puts a dot on.
+
+A `link` row is `title | url | note`. The address is an `https:` one, a `mailto:` or a path of this BrainDog, and any
+other degrades the block. The host is drawn under the title, and nothing is fetched: no favicon, no preview.
+
+A `gallery` row is `caption | file`. The file is `file:<list>#<seq>/<field>`, turned into an address only by the host's
+`RenderOptions.file` and drawn only where that address is the host's own; anything else in the cell is the file's name.
+
+An `embed` is one authored row, `url | title | aspect`, and page-only. The address must be one of `EMBED_PROVIDERS`
+(YouTube, Vimeo, Loom, Figma, Google Maps), framed through the provider's own embed address, and the aspect is `16:9`,
+`4:3`, `1:1` or `9:16`. Both drawers draw a facade; only the Svelte one adds a Load button, and only a press puts a
+sandboxed frame on the page.
+
+A card's column may be its `hue`, a whole number from 0 to 359 written on the card as `--hue` for the host to draw its
+mark in, or its `picture`, a file as a gallery names one, which the card leads with. A `steps path` may name a short
+view in a first row, `short | This week`, and mark each stone in it with `short` after its mark: the short view is drawn
+first with how many more there are, and the Svelte drawer adds the switch to every stone. With `onpath` passed to
+`Block`, each stone is a 44px toggle; with `onmove`, each card on a board carries a "Move to" select, which is how a
+card moves under a finger.
+
 A board is a **grid of lists**. A roadmap is a **list with dates**. A risk matrix is a **grid of
 inlines**. Which is why a third party can add a kind without asking a designer: a kind is not code,
 it is a named composition of primitives shipped as data, and `PRIMITIVES_VERSION` is the integer a
 consumer checks.
 
-**The primitive set is the real API surface.** Eight is reviewable; thirty-four kinds plus unbounded
+**The primitive set is the real API surface.** Eight is reviewable; thirty-eight kinds plus unbounded
 third-party kinds is not. Adding a primitive is easy; renaming or removing one breaks every pack ever
 written, so ship fewer than you think you need.
 

@@ -51,7 +51,7 @@ const status = (n: number) => (): Response => new Response(`{"error":"no, ${FAKE
 function slash() {
   const sql = openSqlite();
   const engine = createSlash({ sql, clock: fixedClock(NOW), inference: { complete: async () => assert.fail('the fallback was asked') }, record: {} as never });
-  const rows = () => sql.all<{ model: string; status: string; code: string | null }>('SELECT model, status, code FROM call ORDER BY rowid').map((r) => ({ ...r }));
+  const rows = () => sql.all<{ model: string; status: string; code: string | null }>('SELECT model, status, code FROM slash_call ORDER BY rowid').map((r) => ({ ...r }));
   return { engine, rows, close: () => sql.close() };
 }
 

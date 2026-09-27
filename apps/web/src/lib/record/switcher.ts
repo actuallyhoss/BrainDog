@@ -47,7 +47,10 @@ export const levelWord = (row: SwitcherRow): string | null => (row.level === nul
 const isAnswer = (v: unknown): v is Answer<unknown> =>
   typeof v === 'object' && v !== null && 'ok' in v && ((v as { ok: unknown }).ok === true ? 'value' in v : 'refusal' in v);
 
-const unreachable = (): Answer<never> => ({ ok: false, refusal: { code: 'UNREACHABLE', fix: 'This host answered nothing recognisable.' } });
+/* ONE SENTENCE FOR EVERY TRANSPORT FAILURE, THE SAME ONE A SCREEN SAYS (design SYS-8). This said "This host answered
+   nothing recognisable.", which is the transport's view of the fault and nothing a person can act on; it was drawn as
+   content wherever the list of records is shown. */
+const unreachable = (): Answer<never> => ({ ok: false, refusal: { code: 'UNREACHABLE', fix: copy.readOffline } });
 
 /**
  * `GET /account/records`, read as the host's envelope.

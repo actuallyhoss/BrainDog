@@ -122,12 +122,15 @@ test('WITH NO LIMIT DECLARED THE CEILING HOLDS, so one answer cannot hold the re
   assert.match(lastSay(r.sql), new RegExp(`${WRITES_CEILING + 1} writes`));
 });
 
-test('A limits.writes DECLARED ABOVE THE CEILING IS HELD TO THE CEILING, because the kernel installs any whole number', async () => {
-  const r = await record(gold({ limits: { writes: 5_000 } }));
-  const metered = finishScript(r.deps, prepared(r), { writes: creates(WRITES_CEILING + 1), log: '', usage: USAGE });
-  assert.equal(metered.outcome, 'refused');
-  assert.equal(golds(r.sql), 0);
-  assert.match(lastSay(r.sql), new RegExp(`limits\\.writes of 5000 is held to the ${WRITES_CEILING}`));
+test('A limits.writes DECLARED ABOVE THE CEILING IS REFUSED AT INSTALL, so it is never approved and then refused at every run', async () => {
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  assert.ok(k.createRecord({ id: ID, slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_1' } }).ok);
+  const out = await k.install([GOLD_EGP, gold({ limits: { writes: WRITES_CEILING + 1 } })]);
+  assert.equal(out.ok, false);
+  assert.equal((out as { refusal: { code: string } }).refusal.code, 'OUT_OF_BOUNDS');
+  assert.match(fixOf(out), new RegExp(`limits\\.writes is ${WRITES_CEILING + 1}; the most a script may ask for is ${WRITES_CEILING}\\.`));
+  sql.close();
 });
 
 /* ── finding 6: an update with no version ──────────────────────────────────── */

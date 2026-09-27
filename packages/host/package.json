@@ -12,7 +12,8 @@
     "./script": "./src/script.ts",
     "./script-try": "./src/script-try.ts",
     "./slash": "./src/slash.ts",
-    "./slash-answers": "./src/slash-answers.ts"
+    "./slash-answers": "./src/slash-answers.ts",
+    "./types": "./src/types.ts"
   },
   "dependencies": {
     "@braindog/connect": "workspace:*",

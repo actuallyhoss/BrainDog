@@ -189,11 +189,11 @@ test('registration refuses CBOR it will not read as cbor', async () => {
   );
   assert.equal(await registerWhy({ tail: new Uint8Array([0]) }), 'cbor', 'a byte after the COSE key with no ED flag');
   assert.equal(
-    await registerWhy({ flags: FLAG.UP | FLAG.AT | FLAG.ED, tail: encode([1]) }),
+    await registerWhy({ flags: FLAG.UP | FLAG.UV | FLAG.AT | FLAG.ED, tail: encode([1]) }),
     'cbor',
     'extensions that are not a map',
   );
-  assert.equal(await registerWhy({ flags: FLAG.UP | FLAG.AT | FLAG.ED, tail: encode(new Map([['credProps', true]])) }), 'ok', 'real extensions');
+  assert.equal(await registerWhy({ flags: FLAG.UP | FLAG.UV | FLAG.AT | FLAG.ED, tail: encode(new Map([['credProps', true]])) }), 'ok', 'real extensions');
 });
 
 test('registration refuses the wrong ceremony, challenge and origin, in that order', async () => {
@@ -217,11 +217,13 @@ test('registration refuses a passkey made for another relying party as rpid', as
   assert.equal(await registerWhy({ rpId: 'example' }), 'rpid', 'the parent domain is not this relying party');
 });
 
-test('registration needs user presence and attested credential data, and consistent backup bits', async () => {
-  assert.equal(await registerWhy({ flags: FLAG.AT }), 'flags', 'no user presence');
-  assert.equal(await registerWhy({ flags: FLAG.UP }), 'flags', 'no attested credential data');
-  assert.equal(await registerWhy({ flags: FLAG.UP | FLAG.AT | FLAG.BS }), 'flags', 'backed up but not backup-eligible');
-  const synced = await register(KEYS.es256, { rpId: V.rpId, origin: V.origin, challenge: CHALLENGE, flags: FLAG.UP | FLAG.AT | FLAG.BE | FLAG.BS });
+test('registration needs user presence, user verification and attested credential data, and consistent backup bits', async () => {
+  assert.equal(await registerWhy({ flags: FLAG.UV | FLAG.AT }), 'flags', 'no user presence');
+  /* The options say `required`, and an option is only a request: the signed flag is what says the device asked. */
+  assert.equal(await registerWhy({ flags: FLAG.UP | FLAG.AT }), 'flags', 'present but not verified');
+  assert.equal(await registerWhy({ flags: FLAG.UP | FLAG.UV }), 'flags', 'no attested credential data');
+  assert.equal(await registerWhy({ flags: FLAG.UP | FLAG.UV | FLAG.AT | FLAG.BS }), 'flags', 'backed up but not backup-eligible');
+  const synced = await register(KEYS.es256, { rpId: V.rpId, origin: V.origin, challenge: CHALLENGE, flags: FLAG.UP | FLAG.UV | FLAG.AT | FLAG.BE | FLAG.BS });
   const v = await registration(synced, { ...EXPECT, challenge: CHALLENGE });
   assert.ok(v.ok && v.value.backedUp, 'a synced passkey is not reported as backed up');
 });
@@ -253,6 +255,7 @@ test('an assertion is refused for the wrong ceremony, challenge, origin and rely
   assert.equal(await assertWhy({ client: { crossOrigin: true } }), 'origin');
   assert.equal(await assertWhy({ rpId: 'evil.example' }), 'rpid');
   assert.equal(await assertWhy({ flags: FLAG.UV }), 'flags', 'verified but not present');
+  assert.equal(await assertWhy({ flags: FLAG.UP }), 'flags', 'present but not verified');
   assert.equal(
     await assertWhy({}, {}, KEYS.es256, (a) => ({ ...a, authenticatorData: a.authenticatorData.subarray(0, 30) })),
     'shape',
@@ -269,8 +272,9 @@ test('an assertion is refused unless the signature is over exactly what was sent
   for (const key of [KEYS.es256, KEYS.rs256]) {
     const name = key.alg === -7 ? 'ES256' : 'RS256';
     assert.equal(await assertWhy({}, {}, key, (a) => ({ ...a, signature: flip(a.signature, a.signature.length - 1) })), 'sig', `${name}: a flipped bit`);
-    /* The UV bit changed after signing: the flags still pass, the signature no longer covers them. */
-    assert.equal(await assertWhy({}, {}, key, (a) => ({ ...a, authenticatorData: flip(a.authenticatorData, 32, FLAG.UV) })), 'sig', `${name}: authData moved`);
+    /* The BE bit changed after signing: the flags still pass (eligible without backed up is consistent), and the
+       signature no longer covers them. Not UP or UV, because clearing either one fails as flags before the signature. */
+    assert.equal(await assertWhy({}, {}, key, (a) => ({ ...a, authenticatorData: flip(a.authenticatorData, 32, FLAG.BE) })), 'sig', `${name}: authData moved`);
     assert.equal(
       await assertWhy({}, {}, key, (a) => ({ ...a, clientDataJSON: clientJSON({ type: 'webauthn.get', challenge: CHALLENGE, origin: V.origin }) })),
       'sig',

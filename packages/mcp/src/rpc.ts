@@ -98,6 +98,34 @@ const SERVER = { name: 'braindog', version: '0.0.0' };
 const CAPABILITIES = { tools: {}, resources: {}, prompts: {} };
 
 /**
+ * Whether `propose` answers in the input-required shape of the 2026-07-28 revision's multi round-trip requests.
+ *
+ * OFF, BECAUSE NO CLIENT CAPABILITY FOR IT COULD BE CONFIRMED (`loop/finish/contracts.md` §6.3, agents C3). The
+ * contract turns the input-required answer on only when a request's `_meta` carries the capability the revision names
+ * for it, and the name has to be read in the specification's own text, which this repository does not hold. The shape
+ * `44-SPEC-MCP` §5.7 drew (one request of kind `decision`) is this project's design, not a kind the revision is known to
+ * name. So nothing reads this switch yet, and a filed question answers as every tool does, with its `decide` link; the
+ * day the name is confirmed, the branch in `tools/call` reads it and this turns true.
+ */
+export const MRTR = false;
+
+/**
+ * The answer to a `propose` that carries `inputResponses`: a retry that thinks it is answering the question it filed.
+ *
+ * REFUSED BEFORE ANY CALL, SO NO SECOND QUESTION IS FILED. Deciding is a rung no token reaches (ADR-060), so whatever the
+ * client collected from the person in its own window is not the person's decision on this record; the record's answer is
+ * the one they give in the app, at the `decide` link the first answer carried (`44-SPEC-MCP` §5.7 step 3).
+ */
+const DECIDES_NOT: Result<never> = {
+  ok: false,
+  refusal: {
+    code: 'LEVEL_REQUIRED',
+    fix: "Deciding is a person's act and no token holds it; the suggestion waits in the Decide queue of the app.",
+    at: 'inputResponses',
+  },
+};
+
+/**
  * The version an `initialize` is answered with, or `null` for none.
  *
  * THE ONE ASKED FOR, OR THE NEWEST OLDER ONE. A client that names a revision this server does not know
@@ -116,8 +144,12 @@ export function negotiate(asked: unknown): (typeof VERSIONS)[number] | null {
  * NEVER THROWS. A throw below the dispatch becomes `-32603` with the word `internal` and a reference,
  * and the reference and the error go to the host's log. No exception text crosses the wire, because
  * an exception message can carry a row's value or a path.
+ *
+ * `origin` IS WHERE THE HOST SERVES THE APP, `https://brain.dog` or a self-host's own address, and only a host knows it:
+ * the tools put it in front of a filed question's `decide` link and read it for nothing else. Left out, as a caller
+ * built before it passes nothing, a filed question answers without the link.
  */
-export async function handle<C>(message: unknown, surface: McpSurface<C>, ctx: C): Promise<Reply | null> {
+export async function handle<C>(message: unknown, surface: McpSurface<C>, ctx: C, origin?: string): Promise<Reply | null> {
   if (Array.isArray(message)) return fail(null, RPC.invalid, 'Send one message at a time; a batch is not accepted.');
   if (!isObject(message)) return fail(null, RPC.invalid, 'A message is a JSON object.');
 
@@ -135,7 +167,7 @@ export async function handle<C>(message: unknown, surface: McpSurface<C>, ctx: C
   if (!isObject(params)) return fail(id, RPC.params, 'params is an object.');
 
   try {
-    return await dispatch(id, message.method, params, surface, ctx);
+    return await dispatch(id, message.method, params, surface, ctx, origin);
   } catch (e) {
     const ref = crypto.randomUUID();
     console.error('mcp', ref, message.method, e);
@@ -143,8 +175,15 @@ export async function handle<C>(message: unknown, surface: McpSurface<C>, ctx: C
   }
 }
 
-async function dispatch<C>(id: Id, method: string, params: Record<string, unknown>, surface: McpSurface<C>, ctx: C): Promise<Reply> {
-  const mcp = tools(surface);
+async function dispatch<C>(
+  id: Id,
+  method: string,
+  params: Record<string, unknown>,
+  surface: McpSurface<C>,
+  ctx: C,
+  origin: string | undefined,
+): Promise<Reply> {
+  const mcp = tools(surface, origin);
 
   switch (method) {
     case 'initialize': {
@@ -181,6 +220,10 @@ async function dispatch<C>(id: Id, method: string, params: Record<string, unknow
       if (typeof params.name !== 'string')
         return fail(id, RPC.params, 'tools/call needs the name of a tool.', { allowed: TOOLS.map((t) => t.name) });
       if (!isObject(args)) return fail(id, RPC.params, "arguments is an object of the tool's fields.");
+      /* THE REVISION SENDS `inputResponses` ON A RETRY OF THE ORIGINAL REQUEST, and a client may put it in the request's
+         params or among the tool's arguments, so both places are read. */
+      if (params.name === 'propose' && (Object.hasOwn(params, 'inputResponses') || Object.hasOwn(args, 'inputResponses')))
+        return answer(id, render(DECIDES_NOT));
       return answer(id, render(await mcp.call(params.name, args, ctx)));
     }
 

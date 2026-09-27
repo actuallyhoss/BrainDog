@@ -16,7 +16,12 @@
  *
  * ZERO ROWS MEANS NO SECOND CALL. `23 §6`: if nothing matched, the rows were the answer, and asking
  * a model to talk about an empty list is how a product starts inventing. `propose` on an ask that
- * found nothing returns the `query` body and makes no `Inference` call at all.
+ * found nothing, no row and no figure, returns the `query` body and makes no `Inference` call at all.
+ *
+ * A FIGURE OR A TOTAL IS CITED AND NEVER TYPED. The draft may name up to three of the figures the
+ * record keeps, and the host reads them with the rows; `sumsOf` adds up the rows read; the model is
+ * handed both as braces it may copy (`figureLines`), and every brace in what it answers is kept on the
+ * answer's body as what it stood for (`figuresOf`), so the palette draws a figure and never a brace.
  *
  * THE ASKER'S PRINCIPAL PROJECTS AND SLASH'S PRINCIPAL FILES. Every read runs under `ctx`, so the
  * record's own scoping decides what the model may be shown, and the record never has to trust this
@@ -28,15 +33,27 @@ import { no, ok, refused, type Refusal, type Result } from '@braindog/ports';
 import { compile, type Schema } from '@braindog/where';
 
 import type { Core } from './call.ts';
-import { PROMPTS } from './prompts.ts';
-import { citable, cite, firstBytes, isRecord } from './project.ts';
+import { BODIES, PROMPTS, type AnsweredKind } from './prompts.ts';
+import {
+  checkSchema,
+  citable,
+  cite,
+  figuresOf,
+  firstBytes,
+  isRecord,
+  type Allowed,
+  type FigureName,
+  type Figured,
+  type ProjectedFigure,
+  type Sum,
+} from './project.ts';
 import type {
   CallContext,
-  Citable,
   Inference,
   Projection,
   ProjectionRegister,
   ProjectionRow,
+  ProjectQuery,
   Proposal,
   Reading,
   ReadTrace,
@@ -56,6 +73,21 @@ const GRANT: ReadTrace = { register: 'grant', rows: 0, predicate: 'refused' };
 
 /** `12 §5`: the register that holds credentials is not one Slash reads, whoever names it. */
 const FORBIDDEN_REGISTERS = new Set(['grant']);
+
+/**
+ * The fold's line for the figures an ask read, beside the registers' lines.
+ *
+ * NOT A REGISTER ID, AND IT CANNOT BE ONE: a register's id starts with a letter (`34 §4`), so a pack's own list can never
+ * be mistaken for this line. `rows` is how many figures were read and `predicate` their ids. The palette draws it in its
+ * own words (`apps/web/src/lib/palette/slash.ts`, `FIGURES_TRACE`), and asks pass 2 on it when no row answered.
+ */
+export const FIGURES_TRACE = '@figures';
+
+/** Figures one ask may read: as many as the predicate prompt asks for (`PREDICATE_USER`), and a model that names more is cut here. */
+const FIGURES_ASKED = 3;
+
+/** Figures the predicate prompt lists by name, at most. A record keeping more lists its first, in the record's order. */
+const FIGURES_LISTED = 40;
 
 /** An ask is one question, and 400 bytes of it. `11 §6`'s conversation budget, spent in one place. */
 const ASK_BYTES = 400;
@@ -146,18 +178,34 @@ export const indexLines = (registers: readonly ProjectionRegister[]): string =>
     .join('\n');
 
 /**
- * Money, printed for the model to read: `EGP 5,005.00`.
+ * A currency's own decimals: GBP 2, JPY 0, KWD 3.
  *
- * `ponytail:` THE EXPONENT IS TWO FOR EVERY CURRENCY, which is wrong for the handful that have
- * none. `JPY 1299` printed as `JPY 12.99` is a figure off by a hundred in a prompt, and the guard
- * against it reaching a person is `cite`: a quoted amount has to match a row's minor units exactly,
- * and `1299 JPY` is what the row holds either way. Swap for the exponent table of `34 §2.3` when a
- * record with a zero-exponent currency exists to test it against.
+ * ISO 4217's MINOR UNITS, RESTATED FROM `EXPONENT` IN `packages/kernel/src/ingest.ts` (and `braindog-render`'s, which a
+ * test holds equal to it), because this package depends on neither and adding a dependency for one lookup is the wrong
+ * trade. NOT `Intl`'s DIGITS: those are CLDR's, which print IQD with none where ISO and the record keep three, and ALL,
+ * IRR, LBP and a handful more with none where both keep two, so an amount would reach the model a hundredfold or a
+ * thousandfold off. A code the table does not name is two, as it is in both copies.
+ */
+const EXPONENT: Readonly<Record<string, number>> = {
+  CLF: 4, UYW: 4,
+  BHD: 3, IQD: 3, JOD: 3, KWD: 3, LYD: 3, OMR: 3, TND: 3,
+  BIF: 0, CLP: 0, DJF: 0, GNF: 0, ISK: 0, JPY: 0, KMF: 0, KRW: 0,
+  PYG: 0, RWF: 0, UGX: 0, UYI: 0, VND: 0, VUV: 0, XAF: 0, XOF: 0, XPF: 0,
+};
+const decimalsOf = (currency: string): number => EXPONENT[currency.toUpperCase()] ?? 2;
+
+/**
+ * Money, printed for the model to read: `EGP 5,005.00`, `JPY 1,299`, `KWD 1.500`.
+ *
+ * SHIFTED BY THE CURRENCY'S OWN DECIMALS AND NEVER BY A HUNDRED. Every amount was divided by a hundred, so `JPY 1299`
+ * reached the model as `JPY 12.99`, and a total handed to it as a brace to quote was a figure it would talk about a
+ * hundredfold wrong. The brace it quotes is still checked against minor units by `cite`, whatever this prints.
  */
 const THOUSANDS = /\B(?=([0-9]{3})+(?![0-9]))/gu;
 const printMoney = (amount: number, currency: string): string => {
-  const [units = '0', cents = '00'] = (Math.abs(amount) / 100).toFixed(2).split('.');
-  return `${currency} ${amount < 0 ? '-' : ''}${units.replace(THOUSANDS, ',')}.${cents}`;
+  const places = decimalsOf(currency);
+  const [units = '0', minor = ''] = (Math.abs(amount) / 10 ** places).toFixed(places).split('.');
+  return `${currency} ${amount < 0 ? '-' : ''}${units.replace(THOUSANDS, ',')}${places === 0 ? '' : `.${minor}`}`;
 };
 
 /** One field's value as the model reads it: money as `EGP 5,005.00`, a quantity with its unit, the rest as text. */
@@ -182,18 +230,58 @@ export const printRows = (rows: readonly ProjectionRow[]): string[] =>
         .join(' · ')}`,
   );
 
+/** `%FIGURES%` on the predicate prompt: `id: name` for each figure the record keeps, or `none`. */
+export const figureNameLines = (figures: readonly FigureName[]): string =>
+  figures.length === 0 ? 'none' : figures.slice(0, FIGURES_LISTED).map((f) => `${f.id}: ${f.name}`).join('\n');
+
+const CURRENCY = /^[A-Z]{3}$/u;
+
+/** A figure's reading as the model reads it: money spelled as the rows spell it, anything else with its unit. */
+const figureValue = (f: ProjectedFigure): string => {
+  if (f.value === null) return 'not known';
+  if (f.unit !== null && CURRENCY.test(f.unit)) return printMoney(Math.round(f.value), f.unit);
+  return f.unit === null ? String(f.value) : `${f.value} ${f.unit}`;
+};
+
+/**
+ * `%FIGURES%` on the proposal prompt: each figure read and each total, as the brace that cites it and what it reads.
+ *
+ * THE BRACE IS PRINTED WHOLE so the model copies it rather than builds it: a total's id carries its currency, and a model
+ * left to spell `{{sum:…}}` from parts is a model that will one day spell a total nobody worked out.
+ */
+export const figureLines = (figures: readonly ProjectedFigure[], sums: readonly Sum[]): string => {
+  const lines = [
+    ...figures.map((f) => `{{${f.id}}} = ${figureValue(f)}, ${f.name}`),
+    ...sums.map(
+      (s) =>
+        `{{sum:${s.id}}} = ${s.currency === null ? String(s.amount) : printMoney(s.amount, s.currency)}, the total of ${s.field} over the ${s.rows.length} rows of ${s.register} above`,
+    ),
+  ];
+  return lines.length === 0 ? 'none' : lines.join('\n');
+};
+
 /** A `Schema` for `where`'s compiler, out of what the projection index says the register holds. */
 const schemaOf = (register: ProjectionRegister): Schema => ({
   register: register.id,
   fields: Object.fromEntries(register.fields.map((f) => [f.id, { type: f.type }])),
 });
 
-/** What pass 1 drafted, as pass 2 reads it back off the `call` row. */
+/**
+ * What pass 1 drafted, as pass 2 reads it back off the `call` row.
+ *
+ * `figures` IS THE IDS OF THE FIGURES THE QUESTION IS ABOUT, and it is written to the row only when there are some, so a
+ * draft that names none reads back exactly as every draft did before figures were read.
+ */
 type Drafted = {
   registers: string[];
   where: Where | null;
   q: string | null;
+  figures: string[];
 };
+
+/** The draft as the `call` row's `predicate` column holds it: keys sorted, `figures` only when it names one. */
+const draftText = (d: Drafted): string =>
+  canon({ registers: d.registers, where: d.where, q: d.q, ...(d.figures.length === 0 ? {} : { figures: d.figures }) });
 
 /** What the `read` row for a drafting call says: the draft, what was read under it, and how the call went. */
 type Drew = Drafted & {
@@ -208,7 +296,10 @@ type Drew = Drafted & {
 type Read = Drew & {
   rows: ProjectionRow[];
   shown: ProjectionRegister[];
-  allowed: Citable;
+  allowed: Allowed;
+  /** The figures the record read for this ask (`figures` is their ids, as drafted), and the totals over its rows. */
+  readings: readonly ProjectedFigure[];
+  sums: readonly Sum[];
 };
 
 /**
@@ -265,6 +356,7 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
     let registers: string[];
     let where: Where | null;
     let q: string | null;
+    let figures: string[];
     /* Known before the rows are asked for on pass 1 only; pass 2 takes it off the projection. */
     let named: ProjectionRegister[] | undefined;
     let model = '-';
@@ -276,6 +368,7 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
       registers = stored.registers.filter((id) => !FORBIDDEN_REGISTERS.has(id));
       where = stored.where;
       q = stored.q;
+      figures = stored.figures;
     } else {
       const index = await record.project({ registers: [], budget: { tokens: 400 } }, ctx);
       if (!index.ok) return index;
@@ -286,20 +379,26 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
           registers: [],
           where: null,
           q: null,
+          figures: [],
           read: [GRANT],
           rows: [],
           shown: [],
           allowed: citable(EMPTY),
+          readings: [],
+          sums: [],
           model: '-',
           usage: { in: 0, out: 0 },
           ms: 0,
           status: 'nothing',
         });
+      /* THE FIGURES THE RECORD KEEPS, BY NAME, and only where the host lists them: a projection that carries none is a
+         prompt that says `none`, and a model that names a figure anyway has it dropped in `readBack`. */
+      const keeps = ((index.value as Figured).index.figures ?? []).slice(0, FIGURES_LISTED);
 
       const drafter = naming(host);
       const ran = await core.run({
         id: 'predicate',
-        slots: { '%INDEX%': indexLines(known), '%QUESTION%': question },
+        slots: { '%INDEX%': indexLines(known), '%FIGURES%': figureNameLines(keeps), '%QUESTION%': question },
         inference: drafter.inference,
       });
       model = drafter.sent() ?? ran.model;
@@ -309,8 +408,9 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
          or came back ungrammatical, costs the ask its filter and not its answer: the keywords still
          search, and a second model call to fix the first one doubles the bill for one question. */
       if (refused(ran.out)) code = ran.out.refusal.code;
-      const drafted = readBack(ran.out.ok ? ran.out.value : {}, known, question);
+      const drafted = readBack(ran.out.ok ? ran.out.value : {}, known, keeps, question);
       const wanted = drafted.where;
+      figures = drafted.figures;
 
       const asked = drafted.registers.length > 0 ? known.filter((r) => drafted.registers.includes(r.id)) : known;
       /* A PREDICATE THE GRAMMAR REFUSES IS DROPPED AND NEVER RETURNED (`46 §6`, the grammar row). The
@@ -339,6 +439,7 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
       registers,
       where,
       q,
+      figures,
       read,
       model,
       usage,
@@ -349,15 +450,17 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
     const drafting = stored === undefined ? hold : undefined;
     if (drafting !== undefined) accountRead(drew([GRANT], UNSETTLED), question, drafting);
 
-    const rows = await record.project(
-      {
-        registers,
-        ...(where === null ? {} : { where }),
-        ...(q === null ? {} : { q }),
-        budget: { tokens: 6000 },
-      },
-      ctx,
-    );
+    /* `figures` GOES ONLY WHEN THE DRAFT NAMES ONE, so a record whose host reads no figures is asked exactly what it was
+       asked before. Built as a value and not written in the call, because `ProjectQuery` is the port's shape and the
+       figures are the host's addition to it (`Figured`). */
+    const asking: ProjectQuery & { budget: { tokens: number }; figures?: string[] } = {
+      registers,
+      ...(where === null ? {} : { where }),
+      ...(q === null ? {} : { q }),
+      ...(figures.length === 0 ? {} : { figures }),
+      budget: { tokens: 6000 },
+    };
+    const rows = await record.project(asking, ctx);
     /* THE RECORD'S REFUSAL IS STILL THE ANSWER, and the row says it was what ended the ask. A model's own fault, a
        predicate that came back ungrammatical, stays the row's code, because the row is about the call. */
     if (!rows.ok) {
@@ -371,20 +474,29 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
       rows: rows.value.rows.filter((row) => row.register === id).length,
       predicate: where === null ? 'all' : printed,
     }));
+    /* ONLY THE FIGURES IT ASKED FOR, whatever the projection carried, so a host that answers more cannot widen what the
+       model is shown past what the draft named. */
+    const readings = ((rows.value as Figured).figures ?? []).filter((f) => figures.includes(f.id));
+    if (readings.length > 0) read.push({ register: FIGURES_TRACE, rows: readings.length, predicate: canon(readings.map((f) => f.id)) });
     read.push(GRANT);
 
+    const shown = named ?? rows.value.index.registers.filter((r) => !FORBIDDEN_REGISTERS.has(r.id));
+    const allowed = citable({ ...rows.value, figures: readings } as Figured, shown);
     return ok({
       registers,
       where,
       q,
+      figures,
       read,
       rows: rows.value.rows,
-      shown: named ?? rows.value.index.registers.filter((r) => !FORBIDDEN_REGISTERS.has(r.id)),
-      allowed: citable(rows.value),
+      shown,
+      allowed,
+      readings,
+      sums: [...allowed.sums.values()],
       model,
       usage,
       ms,
-      status: rows.value.rows.length === 0 ? 'nothing' : 'ok',
+      status: rows.value.rows.length === 0 && readings.length === 0 ? 'nothing' : 'ok',
       ...(code === undefined ? {} : { code }),
     });
   };
@@ -409,9 +521,9 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
       status: it.code === undefined ? it.status : 'error',
       code: it.code,
       question,
-      /* THE WHOLE DRAFT AND NOT ONLY THE `where:`. Pass 2 needs the registers and the keywords as
+      /* THE WHOLE DRAFT AND NOT ONLY THE `where:`. Pass 2 needs the registers, the keywords and the figures as
          well, and re-drafting them is the second model call this shape exists to avoid. */
-      predicate: canon({ registers: it.registers, where: it.where, q: it.q }),
+      predicate: draftText(it),
       read: it.read,
     });
     return askId;
@@ -456,8 +568,10 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
     const earlier =
       askId === undefined
         ? undefined
-        : core.sql.one<{ question: string; predicate: string | null }>(
-            "SELECT question, predicate FROM call WHERE id = ? AND kind = 'read'",
+        : /* `slash_call` IS THE LEDGER'S NAME SINCE C15 (`loop/finish/contracts.md` §7.2): `call.ts` renames the table
+             `call` to it at build, idempotently. */
+          core.sql.one<{ question: string; predicate: string | null }>(
+            "SELECT question, predicate FROM slash_call WHERE id = ? AND kind = 'read'",
             askId,
           );
     const asked = firstBytes((earlier?.question ?? question).trim(), ASK_BYTES);
@@ -501,8 +615,10 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
 
     /* ZERO ROWS, ZERO INFERENCE (`23 §6`). No account row either: nothing was called, and spending an
        ask on a question the record answered by itself is a meter that bills for a model that never
-       ran. The `query` body carries the predicate, so the client can still draw and save the view. */
-    if (it.rows.length === 0)
+       ran. The `query` body carries the predicate, so the client can still draw and save the view.
+       A FIGURE READ IS AN ANSWER THE MODEL MAY TALK ABOUT, so "why is runway four months" goes on to the model when no
+       row matched and the figure did. */
+    if (it.rows.length === 0 && it.readings.length === 0)
       return ok({
         text: '',
         citations: [],
@@ -530,7 +646,7 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
     const proposer = naming(engine);
     const ran = await core.run({
       id: 'propose',
-      slots: { '%INDEX%': indexLines(it.shown), '%QUESTION%': asked },
+      slots: { '%INDEX%': indexLines(it.shown), '%FIGURES%': figureLines(it.readings, it.sums), '%QUESTION%': asked },
       inference: proposer.inference,
       model: s.tier === 'a' ? undefined : (s.model ?? undefined),
       trim: {
@@ -556,7 +672,7 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
         status,
         code,
         question: asked,
-        predicate: canon({ registers: it.registers, where: it.where, q: it.q }),
+        predicate: draftText(it),
         read: trimmedRead(it.read, kept.rows),
         filed,
       });
@@ -573,9 +689,27 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
 
     const answer = ran.out.value;
     const kind = String(answer['body_kind']);
+    /* THE REPLY'S SCHEMA NAMES THE KINDS IN `BODIES` AND ITS HAND CHECK ALREADY HELD THE ANSWER TO THEM. This arm is what
+       happens when the two disagree, which is a bug in this package rather than in the model's answer. */
+    if (!isAnswered(kind)) {
+      account('error', 'PROPOSAL_SCHEMA');
+      return no('PROPOSAL_SCHEMA', `Slash answered with a ${kind} body, which the palette does not file.`, {
+        at: 'body_kind',
+        allowed: Object.keys(BODIES),
+      });
+    }
     const said = isRecord(answer['body']) ? answer['body'] : {};
+    /* THE BODY AGAINST ITS OWN KIND'S SCHEMA, which `core.run` could not do: the reply's schema offers the provider every
+       shape in `BODIES`, and `checkSchema` reads no `anyOf`. `at` names the place under `body`, as the reply's own check does.
+       A QUERY'S BODY IS NOT HELD TO IT, because nothing the model put there is kept: the engine writes a query's body out
+       of its own draft, and refusing a cited answer over keys that are thrown away would cost the asker the answer. */
+    const shaped = kind === 'query' ? null : checkSchema(BODIES[kind], said, 'body');
+    if (shaped) {
+      account('refused', shaped.code);
+      return { ok: false, refusal: shaped };
+    }
 
-    const checked = checkText(String(answer['text']), said, kind, it.allowed);
+    const checked = checkText(String(answer['text']), said, kind, it.allowed, it.rows);
     if (!checked.ok) {
       account('refused', refused(checked) ? checked.refusal.code : undefined);
       return checked;
@@ -586,25 +720,27 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
       return no('PROPOSAL_NO_ROWS', 'A proposal names the rows behind it, or it is not filed.');
     }
 
+    /* WHAT EVERY BRACE STANDS FOR, ON THE ANSWER'S BODY, so the palette draws it without a second read (`DrawnFigure`).
+       A query's body is the draft, as it is with no rows. */
+    const figures = figuresOf(checked.value.said, it.allowed, it.shown);
+    const drawn = kind === 'query' ? { ...body, figures } : { ...checked.value.body, figures };
+    /* NOTHING IS FILED WITH `figures`, which hold the titles and values of the rows and figures cited. What the record
+       shows a filed question to is not what the asker could read: it holds a rowset back only from a reader who cannot
+       read the list it names, and an options question that names no list from a reader who does not read the whole
+       record (`holds` in `packages/record/src/index.ts`), which a member holding one list at `append` still does. Filed
+       with its figures, either would hand her titles and amounts from a list she cannot read. So the filed body carries
+       the braces and not what they stand for: Decide draws each one in words of its own (`cite.ts`), and the palette
+       draws the whole answer from this reply, which goes to the asker alone. */
+    const filing = checked.value.body;
+
     let filed: string | null = null;
     if (kind === 'options' || kind === 'rowset') {
-      const put = await record.propose(
-        { question: asked, body_kind: kind, body: checked.value.body, op_id: callId },
-        SLASH_CTX,
-      );
+      const put = await record.propose({ question: asked, body_kind: kind, body: filing, op_id: callId }, SLASH_CTX);
       if (!put.ok) {
         account('refused', refused(put) ? put.refusal.code : undefined);
         return put;
       }
       filed = put.value.id;
-    } else if (kind !== 'query') {
-      /* THE SCHEMA ADMITS THREE BODIES AND THE HAND CHECK ALREADY SAID SO. This arm is what happens
-         when the two disagree, which is a bug in this package rather than in the model's answer. */
-      account('error', 'PROPOSAL_SCHEMA');
-      return no('PROPOSAL_SCHEMA', `Slash answered with a ${kind} body, which the palette does not file.`, {
-        at: 'body_kind',
-        allowed: ['query', 'options', 'rowset'],
-      });
     }
 
     account('ok', undefined, filed ?? undefined);
@@ -612,8 +748,8 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
       text: checked.value.text,
       citations: checked.value.citations,
       verbs: VERBS_FOR[kind] ?? [],
-      body_kind: kind === 'options' ? 'options' : kind === 'rowset' ? 'rowset' : 'query',
-      body: checked.value.body,
+      body_kind: kind,
+      body: drawn,
       model: used,
       filed,
       read: trimmedRead(it.read, kept.rows),
@@ -631,17 +767,28 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
  * strings that may name registers this record has not got. Both are narrowed here, where the answer
  * to "it is not one of ours" is to drop it rather than to refuse.
  */
-const readBack = (out: Record<string, unknown>, known: readonly ProjectionRegister[], question: string): Drafted => {
-  const named = Array.isArray(out['registers'])
-    ? (out['registers'] as unknown[]).filter((r): r is string => typeof r === 'string')
-    : [];
+const readBack = (
+  out: Record<string, unknown>,
+  known: readonly ProjectionRegister[],
+  keeps: readonly FigureName[],
+  question: string,
+): Drafted => {
+  const named = strings(out['registers']);
   /* THE VAULT IS DROPPED BEFORE THE CALL AND NOT REFUSED AFTER IT (`46 §5.4` step 5). A model naming
      `grant` has guessed a register id, which is not misconduct; projecting it would be. */
   const registers = known.filter((r) => named.includes(r.id)).map((r) => r.id);
   const where = registers.length > 0 && isRecord(out['where']) ? (out['where'] as Where) : null;
   const q = typeof out['q'] === 'string' && out['q'].trim() !== '' ? out['q'] : where === null ? question : null;
-  return { registers, where, q };
+  /* A FIGURE THE RECORD DID NOT LIST IS DROPPED, as a register it has not got is: the list is the record's, and a model
+     that guessed an id has guessed, which is not a reason to read anything. */
+  const asked = strings(out['figures']);
+  const figures = keeps.filter((f) => asked.includes(f.id)).map((f) => f.id).slice(0, FIGURES_ASKED);
+  return { registers, where, q, figures };
 };
+
+const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((s): s is string => typeof s === 'string') : []);
+
+const isAnswered = (kind: string): kind is AnsweredKind => Object.hasOwn(BODIES, kind);
 
 /** The `call` row's `predicate` column, read back as the draft pass 1 stored. */
 const storedDraft = (text: string): Drafted | undefined => {
@@ -653,11 +800,10 @@ const storedDraft = (text: string): Drafted | undefined => {
   }
   if (!isRecord(parsed)) return undefined;
   return {
-    registers: Array.isArray(parsed['registers'])
-      ? (parsed['registers'] as unknown[]).filter((r): r is string => typeof r === 'string')
-      : [],
+    registers: strings(parsed['registers']),
     where: isRecord(parsed['where']) ? (parsed['where'] as Where) : null,
     q: typeof parsed['q'] === 'string' ? parsed['q'] : null,
+    figures: strings(parsed['figures']).slice(0, FIGURES_ASKED),
   };
 };
 
@@ -666,9 +812,10 @@ const storedDraft = (text: string): Drafted | undefined => {
  *
  * ROWS ARE DROPPED FROM THE LAST REGISTER FIRST, because that is the end the printer trimmed. The
  * alternative, scaling every register down proportionally, reports counts no register contributed.
+ * The figures' line is not a register and is never trimmed: the printer cuts rows and nothing else.
  */
 const trimmedRead = (read: readonly ReadTrace[], kept: number): ReadTrace[] => {
-  const registers = read.filter((r) => r.register !== 'grant');
+  const registers = read.filter((r) => r.register !== 'grant' && r.register !== FIGURES_TRACE);
   const total = registers.reduce((n, r) => n + r.rows, 0);
   if (kept >= total) return [...read];
   let left = kept;
@@ -677,8 +824,42 @@ const trimmedRead = (read: readonly ReadTrace[], kept: number): ReadTrace[] => {
     left -= take;
     return { ...r, rows: take };
   });
+  out.push(...read.filter((r) => r.register === FIGURES_TRACE));
   out.push(GRANT);
   return out;
+};
+
+/** A row's source as the model may write it, `obligations#7` or `{{ref:obligations#7}}`, as the spoken id alone. */
+const spokenOf = (from: string): string => {
+  const t = from.trim();
+  const inner = t.startsWith('{{') && t.endsWith('}}') ? t.slice(2, -2).trim() : t;
+  return inner.startsWith('ref:') ? inner.slice('ref:'.length).trim() : inner;
+};
+
+const DIGITS = /[0-9]+/gu;
+
+/**
+ * Whether one proposed row's fields hold only what its sources hold, and no citation text.
+ *
+ * A BRACE IN A FIELD IS REFUSED, because it would be written into the row on accept, which is the defect the rowset shape
+ * exists to end (S3). A MONEY VALUE IS ONE A ROW HOLDS, exactly, by `cite`'s rule for a quoted amount. A RUN OF DIGITS IN
+ * A WORD IS ONE ITS SOURCES SAY, so "Chase invoice 42" stands over a row titled "Invoice 42" and a due date copied from
+ * its source stands, while a date or a number the model worked out has nothing behind it.
+ */
+const fieldsHold = (fields: Record<string, unknown>, sources: readonly ProjectionRow[], allowed: Allowed): boolean => {
+  const said = sources.map((r) => `${r.summary} ${JSON.stringify(r.fields)}`).join(' ');
+  for (const value of Object.values(fields)) {
+    if (typeof value === 'string') {
+      if (value.includes('{{') || value.includes('}}')) return false;
+      for (const run of value.match(DIGITS) ?? []) if (!said.includes(run)) return false;
+    } else if (typeof value === 'number') {
+      /* A NUMBER IS DIGITS WITHOUT THE QUOTES, and held to the same rule: one its sources say, or none. */
+      for (const run of String(value).match(DIGITS) ?? []) if (!said.includes(run)) return false;
+    } else if (isRecord(value) && typeof value['amount'] === 'number' && typeof value['currency'] === 'string') {
+      if (!allowed.money.has(`${value['amount']} ${value['currency']}`)) return false;
+    }
+  }
+  return true;
 };
 
 /**
@@ -689,25 +870,42 @@ const trimmedRead = (read: readonly ReadTrace[], kept: number): ReadTrace[] => {
  * nothing; an option whose reason names no row is a recommendation with no evidence, and the answer
  * is to stop recommending it while keeping the option a person may still choose. The `rowset` case
  * is the same shape: the row with nothing behind it is dropped and the rest are filed.
+ *
+ * THE BODY HAS PASSED ITS KIND'S SCHEMA BEFORE THIS RUNS (`BODIES`), so an option is `{ id, label, because }` and a row
+ * is `{ fields, from }` here, and what is left to check is what a schema cannot say. `said` is every text the answer
+ * carries a brace in, for `figuresOf`.
+ *
+ * A ROWSET FILES ITS FIELDS AS ITS ROWS AND ITS SOURCES BESIDE THEM. The kernel writes each of `rows` as it stands on
+ * accept (`govern.ts`), so a row's `from` cannot ride inside it; `from[i]` is the spoken ids behind `rows[i]`, which the
+ * kernel does not read and which is kept for a screen to draw beside the row.
  */
 const checkText = (
   text: string,
   body: Record<string, unknown>,
-  kind: string,
-  allowed: Citable,
-): Result<{ text: string; citations: string[]; body: Record<string, unknown> }> => {
+  kind: AnsweredKind,
+  allowed: Allowed,
+  read: readonly ProjectionRow[],
+): Result<{ text: string; citations: string[]; body: Record<string, unknown>; said: string[] }> => {
   const head = cite(text, allowed);
   if (!head.ok) return head;
   const citations = [...head.value.citations];
+  const said = [text];
   const add = (found: readonly string[]): void => {
     for (const id of found) if (!citations.includes(id)) citations.push(id);
   };
 
-  if (kind === 'options' && Array.isArray(body['options'])) {
+  if (kind === 'options') {
     const options: Record<string, unknown>[] = [];
-    for (const raw of body['options'] as unknown[]) {
+    const ids = new Set<string>();
+    for (const raw of Array.isArray(body['options']) ? body['options'] : []) {
       if (!isRecord(raw)) continue;
       const option = { ...raw };
+      /* ONE ID PER OPTION, because the id is what a decision records as its answer: two options under one id are one
+         answer drawn twice, and whichever was pressed, the record would say the other. */
+      const id = String(option['id']).trim();
+      if (id === '' || ids.has(id))
+        return no('PROPOSAL_SCHEMA', "The model's answer gave two options the same id, or one none. Nothing was filed; ask again.", { at: 'body.options' });
+      ids.add(id);
       let cited = 0;
       for (const key of ['label', 'because']) {
         const value = option[key];
@@ -715,6 +913,7 @@ const checkText = (
         const checked = cite(value, allowed);
         if (!checked.ok) return checked;
         add(checked.value.citations);
+        said.push(value);
         if (key === 'because') cited = checked.value.citations.length;
       }
       /* `recommended` NEEDS A REASON WITH A ROW IN IT (`23 §6`). Recommending on an uncited reason is
@@ -722,30 +921,40 @@ const checkText = (
       if (option['recommended'] === true && cited === 0) option['recommended'] = false;
       options.push(option);
     }
-    return ok({ text, citations, body: { ...body, options } });
+    return ok({ text, citations, body: { options }, said });
   }
 
-  if (kind === 'rowset' && Array.isArray(body['rows'])) {
-    const rows: unknown[] = [];
+  if (kind === 'rowset') {
+    const register = String(body['register']);
+    /* THE VAULT IS NEVER WRITTEN THROUGH SLASH, as it is never read: a row proposed into it is a credential a model
+       made up, filed for a person to accept. */
+    if (FORBIDDEN_REGISTERS.has(register))
+      return no('PROPOSAL_SCHEMA', 'Slash does not propose rows for the vault. Nothing was filed.', { at: 'body.register' });
+    const bySpoken = new Map(read.map((r) => [r.spoken, r] as const));
+    const rows: Record<string, unknown>[] = [];
+    const from: string[][] = [];
     let dropped = 0;
-    for (const raw of body['rows'] as unknown[]) {
-      if (!isRecord(raw)) {
+    for (const raw of Array.isArray(body['rows']) ? body['rows'] : []) {
+      const fields = isRecord(raw) && isRecord(raw['fields']) ? raw['fields'] : null;
+      const sources = isRecord(raw) ? strings(raw['from']).map(spokenOf).filter((s) => allowed.spoken.has(s)) : [];
+      const behind = sources.flatMap((s) => {
+        const row = bySpoken.get(s);
+        return row ? [row] : [];
+      });
+      if (fields === null || Object.keys(fields).length === 0 || behind.length === 0 || !fieldsHold(fields, behind, allowed)) {
         dropped++;
         continue;
       }
-      let cited = 0;
-      for (const value of Object.values(raw)) {
-        if (typeof value !== 'string') continue;
-        const checked = cite(value, allowed);
-        if (!checked.ok) return checked;
-        add(checked.value.citations);
-        cited += checked.value.citations.length;
-      }
-      if (cited === 0) dropped++;
-      else rows.push(raw);
+      const cited = [...new Set(sources)];
+      add(cited);
+      rows.push(fields);
+      from.push(cited);
     }
-    return ok({ text, citations, body: { ...body, rows, ...(dropped === 0 ? {} : { dropped }) } });
+    /* NOTHING LEFT IS NOTHING FILED, and said so here: the record would refuse an empty rowset as a body missing its
+       rows, which is a sentence about the shape when the fault is that no row had anything behind it. */
+    if (rows.length === 0) return no('PROPOSAL_NO_ROWS', 'No row Slash proposed had a row behind it, so none was filed.');
+    return ok({ text, citations, body: { register, rows, from, ...(dropped === 0 ? {} : { dropped }) }, said });
   }
 
-  return ok({ text, citations, body });
+  return ok({ text, citations, body: {}, said });
 };

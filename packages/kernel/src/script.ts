@@ -12,24 +12,37 @@
  * THE VERSION IS PINNED AT FIRE TIME. A new version is a new declaration row, and a run queued at ten and leased at
  * ten past must run the source whose egress and keys the owner approved at ten, not whatever was accepted between.
  *
- * WHAT THIS FILE DOES NOT CHECK, AND WHY. `@braindog/script` holds the ceilings (`CEILINGS`, `SOURCE_BYTES`) and
- * `checkDecl`, and `31-STACK` section 2 puts it at rank 12 with the kernel at 7, so the kernel may not import it. The
- * numbers are not copied here either: two copies of a ceiling is how one of them becomes wrong. So this file refuses
- * every SHAPE a header can get wrong, and a limit over its ceiling installs and is refused by `checkDecl` when the run
- * starts. Closing that gap is moving the constants below the kernel, which is a change to the package order.
+ * THE CEILINGS LIVE HERE, BELOW THE SANDBOX, SO INSTALL CAN REFUSE WHAT A RUN WOULD. `@braindog/script` is rank 12 and
+ * the kernel rank 7 (`31-STACK` section 2), so the kernel may not import the sandbox's numbers, and this file used to
+ * check only a header's shape: a script asking for more than a ceiling installed, was put in front of the owner to
+ * approve, and was then refused `OUT_OF_BOUNDS` by `checkDecl` at every run (defects A10). So `SCRIPT_CEILINGS` and
+ * `SCRIPT_SOURCE_BYTES` are the record's, and a header over one is refused before anybody is asked to approve it. The
+ * sandbox keeps its own `CEILINGS` because it depends on no package, and `packages/mcp/test/script.test.ts` holds its
+ * numbers, the grammar's and these to one another.
  */
 
 import type { Refusal, Sql } from '@braindog/ports';
 
 import { enqueue } from './outbox.ts';
-import { originOf, type Egress } from './actions.ts';
+import { meter, originOf, RULE_CALLS_PER_DAY, type Egress } from './actions.ts';
 import { checkInterval, FLOOR_MS, intervalMs, jitterMs } from './pull.ts';
+
+/**
+ * The most a declaration's `limits` may ask for: design section 5.
+ *
+ * A LIMIT OVER ITS CEILING IS REFUSED, NOT CLAMPED, as the sandbox refuses it: a clamped limit is a script that behaves
+ * differently from what its author read in the install diff.
+ */
+export const SCRIPT_CEILINGS = { cpu_ms: 1_000, fetches: 20, wall_ms: 30_000, writes: 1_000 } as const;
+
+/** 64 KB of source, as UTF-8. A script is a few lines that fetch and reshape; a bundle is not one. */
+export const SCRIPT_SOURCE_BYTES = 64 * 1024;
 
 /** What a `script` declaration's body holds. Every key is one the sandbox or the record enforces; there is no other. */
 export type ScriptBody = {
   script: string;
   title?: string;
-  /** At least one. `every` is a schedule row; `door` is an ingest whose `then:` names this script; `rule` lets a rule `run:` it. */
+  /** At least one. `every` is a schedule row; `door` is an ingest whose verified arrivals start it (`startAtDoor`); `rule` lets a rule's `script` step start it. */
   runs: { every?: string; door?: string; rule?: true };
   /** Literal `https://` origins, compared as origins. Printed in the install diff, one line per script. */
   egress: string[];
@@ -154,11 +167,17 @@ export function scriptBody(decl: { id: string; body: Record<string, unknown> }):
         return bad('DECLARATION_INVALID', `${id} limits ${name}, and a script's limits are ${LIMITS.join(', ')}.`, `limits.${name}`);
       if (!Number.isInteger(value) || (value as number) < 1)
         return bad('DECLARATION_INVALID', `${id}'s limits.${name} is a whole number above zero.`, `limits.${name}`);
+      /* THE SANDBOX'S OWN WORDS AND CODE, so a header refused here reads as the run would have been refused. */
+      const most = SCRIPT_CEILINGS[name as (typeof LIMITS)[number]];
+      if ((value as number) > most)
+        return bad('OUT_OF_BOUNDS', `${id}'s limits.${name} is ${String(value)}; the most a script may ask for is ${most}.`, `limits.${name}`);
     }
   }
 
   if (typeof body.source !== 'string' || body.source.trim() === '')
     return bad('DECLARATION_INVALID', `${id} has no source. A script is the code in source: and the header above it.`, 'source');
+  if (new TextEncoder().encode(body.source).length > SCRIPT_SOURCE_BYTES)
+    return bad('OUT_OF_BOUNDS', `${id}'s source is over ${SCRIPT_SOURCE_BYTES / 1024} KB.`, 'source');
   return null;
 }
 
@@ -175,8 +194,12 @@ export type ScriptDeps = {
   outbox: (payload: ScriptRun) => string;
 };
 
-/** The `script.run` payload. The input is `null` on a schedule; a door's arrival and a rule's copied fields are Brief 3's. */
-export type ScriptRun = { script: string; version: number; input: unknown };
+/**
+ * The `script.run` payload. The input is `null` on a schedule, a rule's copied fields from a rule (`startScript` in
+ * `flow.ts`), and the arrival's `{ body, headers }` from a door, whose id rides beside it as `door` so a day's starts
+ * can be counted (`startAtDoor`). The run reads `script`, `version` and `input` only (`prepareScript`).
+ */
+export type ScriptRun = { script: string; version: number; input: unknown; door?: string };
 
 export const scriptDeps = (sql: Sql, at: { recordId: string; nowMs: number; mint: () => string }): ScriptDeps => ({
   sql,
@@ -231,6 +254,94 @@ export function fireScript(deps: ScriptDeps, row: { id: string; key: string }, s
   );
   if (!busy) deps.outbox({ script: script.script, version: script.version, input: null });
   return next;
+}
+
+/**
+ * How many runs one script's door may start in a rolling day: the bound a rule-started script is approved under.
+ *
+ * A DOOR IS A STRANGER'S WAY IN, AND EVERY RUN IS SANDBOX TIME AND FETCHES AGAINST SOMEBODY'S API. The host's door holds
+ * its own rate and size (`@braindog/host/ingest`), and that bounds what is stored; this bounds what is spent after it.
+ * Past it the arrival is still stored and matched as ever, the script is not started, and the day's first arrival
+ * turned away says so on the script, once.
+ */
+export const DOOR_RUNS_PER_DAY = RULE_CALLS_PER_DAY;
+
+const DAY_MS = 86_400_000;
+
+/** What a verified arrival hands the scripts on its door: the door, and the body and headers the host stored. */
+export type DoorArrival = { door: string; body: string; headers: Record<string, string> };
+
+/**
+ * Queue one `script.run` for every active script whose `runs.door` is this arrival's door, and answer the jobs queued.
+ *
+ * THE CALLER HAS DECIDED THE ARRIVAL IS VERIFIED AND NEW (`arrive` in `ingest.ts`): an unverified arrival starts
+ * nothing, and a redelivery of bytes already seen started its scripts the first time. Called inside the arrival's own
+ * transaction, so a stored arrival and its queued runs land together or not at all.
+ *
+ * THE VERSION IS THE ONE ACTIVE NOW, pinned into the payload as a clock's fire pins it. A PAUSED SCRIPT IS NOT STARTED
+ * (its pause is already said on it, and `startScript` in `flow.ts` holds a rule to the same), and neither is one whose
+ * arrival, with its headers, is over `bodyMost` bytes, the size an arrival is extracted from at all, which it says.
+ *
+ * THE WALK IS BOUNDED BY THE SCRIPTS INSTALLED ON THIS DOOR, one SELECT, and each start by `DOOR_RUNS_PER_DAY`.
+ */
+export function startAtDoor(sql: Sql, at: { mint: () => string; nowMs: number }, arrival: DoorArrival, bodyMost: number): string[] {
+  const scripts = sql.all<{ version: number; body: string }>(
+    `SELECT version, body FROM declaration WHERE kind = 'script' AND superseded_at IS NULL AND retired = 0
+       AND json_extract(body, '$.runs.door') = ? ORDER BY id`,
+    arrival.door,
+  );
+  if (scripts.length === 0) return [];
+
+  const since = new Date(at.nowMs - DAY_MS).toISOString();
+  /* A START TURNED AWAY IS A `held` RUN ON THE SCRIPT, metered as an action's own daily cap is (`meter` in `actions.ts`):
+     free, counted as held, and the script's last outcome with its sentence. A plain note would not do, because a `pull`
+     event with no `to_v` is how a resume breaks a script's refused streak (`pauseAfterRefusals`), so each arrival turned
+     away would have reset the count that pauses a script that keeps failing. */
+  const say = (script: string, note: string): void => {
+    meter(
+      { sql, mint: at.mint, nowMs: at.nowMs },
+      { ingest: script, channel: 'script', host: null, project: undefined, status: null, outcome: 'held', requests: 0, bytes: 0, ms: 0, failures: 0, actor: `ingest:${arrival.door}` },
+      note,
+    );
+  };
+  /* MEASURED AS THE QUEUED ROW HOLDS IT, the body and headers written out as JSON, which is longer than the body alone:
+     a body of line breaks doubles once each is escaped. The row is written inside the arrival's transaction, so a run
+     too big to queue must be turned away here and not by a failed insert that would take the stored arrival with it. */
+  const input = { body: arrival.body, headers: arrival.headers };
+  const tooBig = new TextEncoder().encode(JSON.stringify(input)).length > bodyMost;
+
+  const queued: string[] = [];
+  for (const row of scripts) {
+    let body: Partial<ScriptBody>;
+    try {
+      body = JSON.parse(row.body) as Partial<ScriptBody>;
+    } catch {
+      continue;
+    }
+    const name = typeof body.script === 'string' ? body.script : null;
+    if (name === null) continue;
+    if (sql.one<{ state: string }>("SELECT state FROM schedule WHERE kind = 'script' AND key = ?", name)?.state === 'paused') continue;
+    if (tooBig) {
+      say(name, `An arrival at ${arrival.door} was over ${bodyMost} bytes with its headers, so it did not start ${name}. It is stored in the inbox.`);
+      continue;
+    }
+    const today =
+      sql.one<{ n: number }>(
+        `SELECT count(*) AS n FROM outbox WHERE kind = 'script.run' AND created >= ?
+           AND json_extract(payload, '$.script') = ? AND json_extract(payload, '$.door') IS NOT NULL`,
+        since,
+        name,
+      )?.n ?? 0;
+    if (today >= DOOR_RUNS_PER_DAY) {
+      const full = `${arrival.door} has started ${name} ${DOOR_RUNS_PER_DAY} times in the past day, the most it may, so later arrivals are stored without starting it until fewer have.`;
+      const told = sql.one("SELECT 1 AS x FROM event WHERE kind = 'pull' AND target = ? AND note = ? AND ts >= ? LIMIT 1", `declaration:script.${name}`, full, since);
+      if (!told) say(name, full);
+      continue;
+    }
+    const run: ScriptRun = { script: name, version: row.version, input, door: arrival.door };
+    queued.push(enqueue(sql, at.mint, at.nowMs, 'script.run', run));
+  }
+  return queued;
 }
 
 /**

@@ -113,6 +113,15 @@ const SHAPES: Readonly<Record<string, { rows: string[][] }>> = {
   /* A HEAT GRID IS DRAWN ONLY AROUND A DAY IN ITS TWELVE WEEKS, and the sweep renders with this machine's clock,
      so the first row is today. The second stays generic, which is the row named under the grid as unread. */
   heat: { rows: [[new Date().toISOString().slice(0, 10), '3'], [HOSTILE, HOSTILE]] },
+  /* A CALENDAR PLACES ONLY A ROW WHOSE DAY READS, so the first row is today and its title is hostile, which is the
+     title written into a month's cell and into the agenda; the second stays generic, the row named under it as unread. */
+  calendar: { rows: [[HOSTILE, new Date().toISOString().slice(0, 10)], [HOSTILE, HOSTILE]] },
+  /* A LINK'S ADDRESS HAS TO BE ONE, or the block degrades before any anchor is drawn. The title and the note, the cells
+     written into the anchor and beside it, stay hostile. */
+  link: { rows: [[HOSTILE, 'https://example.com/a', HOSTILE]] },
+  /* AN EMBED IS ONE ROW WHOSE ADDRESS IS A PROVIDER'S, or it degrades: two generic rows are over its row cap and a
+     hostile address is nobody's. The title, the one cell drawn into the facade, stays hostile. */
+  embed: { rows: [['https://youtu.be/dQw4w9WgXcQ', HOSTILE, '16:9']] },
 };
 
 /** `table` is bound to a register rather than to authored rows, so it has no fence to be hostile in. */
@@ -152,7 +161,7 @@ test('NO CELL BECOMES MARKUP, on any of the kinds there are', () => {
   /* The count is the guard on the guard: a kind quietly dropped from the loop is a kind nobody
      sweeps, and the number in the comment above would go on reading as though it had been. */
   assert.equal(drew, Object.keys(KINDS).length - NO_FENCE.size);
-  assert.equal(drew, 33);
+  assert.equal(drew, 37);
 });
 
 /**

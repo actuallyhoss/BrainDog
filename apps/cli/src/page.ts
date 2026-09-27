@@ -1,65 +1,40 @@
 /**
- * `braindog page pull|push|check`: a page's declaration as a file, one page to one file, in the
- * terse dialect `@braindog/dog` prints and parses (`docs/06-PAGES.md` §1).
+ * `braindog page pull|push|check`: a page's declaration as a file, one page to one file, in the dialect
+ * `@braindog/dog` prints and parses (`docs/06-PAGES.md` §1).
  *
- * PULL AND PUSH ARE ONE DIALECT, TWO DIRECTIONS. `pull` asks the record for a page and writes what
- * `dogText` prints; `push` reads that text back with `parseDog` and sends it through `setDeclaration`,
- * the same door the app's own editor uses — "the same lint a pack gets." `check` runs the parse and
- * the kernel's own validation locally and sends nothing at all: it is how somebody finds out a `.dog`
- * file is broken before it is anybody else's problem.
+ * THE FILE IS WHAT THE RECORD HOLDS. `pull` reads the stored declaration through `arrangement({ page })`, the read an
+ * agent makes before it proposes a change to a page, and writes `dogText` of its body: the same bytes the app's source
+ * view shows and downloads, because both read the answer with `storedOf` and print it with `dogText`. It used to cut
+ * the page's live answer down to a short list of keys, which wrote a summary nobody could push back without losing
+ * the rest of the page. A page made for each row of a list has no declaration of its own, so its template's is
+ * written, and the command says so.
  *
- * `push` IS GATED WHERE THIS FILE HAS NO SAY. `setDeclaration` is an ADMIN route, and
- * `packages/record/src/index.ts`'s `admin()` refuses any `token` principal outright — "Open this
- * from the app; a token cannot change what this record is" — and every bearer this CLI holds,
- * `braindog login` included, is a token to the record. So `push` is built exactly as asked and will
- * be refused with that sentence until the record grows a door for a proven session that is not a
- * browser cookie, the way `/api/keys/put` and `/api/keys/open` are a door around the vault's own
- * gate. That is a change to `packages/record` and `packages/host`, neither of which this file owns.
+ * `push` sends what `parseDog` read through `setDeclaration`, the same door the app's own editor uses, "the same lint a
+ * pack gets." `check` runs the parse and the kernel's own validation locally and sends nothing at all: it is how
+ * somebody finds out a `.dog` file is broken before it is anybody else's problem.
+ *
+ * `push` IS GATED WHERE THIS FILE HAS NO SAY. `setDeclaration` is an ADMIN route, and `packages/record/src/index.ts`'s
+ * `admin()` refuses any `token` principal outright ("Open this from the app; a token cannot change what this record
+ * is"), and every bearer this CLI holds, `braindog login` included, is a token to the record (ADR-060). So `push` is
+ * built exactly as asked and is refused with that sentence until the record grows a door for a proven session that is
+ * not a browser cookie. That is a change to `packages/record` and `packages/host`, neither of which this file owns.
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
-import { dogName, dogText, parseDog, type DogBlock, type DogPage } from '@braindog/dog';
-import { validateDeclaration, type Json } from '@braindog/kernel';
+import { dogName, dogText, parseDog, storedOf, type DogParsed } from '@braindog/dog';
+import { validateDeclaration } from '@braindog/kernel';
 
 import { refuse } from './json.ts';
 import { connect, type AgentIo } from './skills.ts';
 
-/** The keys `DogBlock` prints. Anything else on a live answer is a reading, a row count or a value the record computed, never declared. */
-const BLOCK_KEYS = ['kind', 'heading', 'span', 'source', 'where', 'columns', 'cells', 'order', 'target', 'limit', 'empty', 'authored', 'body'] as const;
+/** A file the parser refused, said with its name and the line, so the person can go straight to it. */
+const unread = (file: string, no: Extract<DogParsed, { ok: false }>): string => `${file}, line ${String(no.line)}: ${no.fix}`;
 
-const isObject = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
-
-/**
- * A live `page` answer, cut to the shape `dogText` reads.
- *
- * `client.page(slug)` ANSWERS `readPage`'S RESULT: the declaration's own keys, spread at the top,
- * plus `blocks` where each one carries what the kernel read on it — `rows`, `matched`, `readings`,
- * `values` and the rest. None of those are printed, because `DogBlock` does not carry them; cutting
- * to `BLOCK_KEYS` here is the same cut `dogText`'s own field access already makes silently, done
- * explicitly so a computed key never rides along into the text by accident.
- */
-function dogPageOf(answer: unknown): DogPage | null {
-  if (!isObject(answer) || typeof answer.page !== 'string' || typeof answer.title !== 'string' || !Array.isArray(answer.blocks)) return null;
-  const blocks: DogBlock[] = answer.blocks.map((raw) => {
-    const b = isObject(raw) ? raw : {};
-    const cut: Record<string, unknown> = {};
-    for (const key of BLOCK_KEYS) if (b[key] !== undefined) cut[key] = b[key];
-    return { ...cut, kind: typeof b.kind === 'string' ? b.kind : '' } as DogBlock;
-  });
-  const page: DogPage = { page: answer.page, title: answer.title, blocks };
-  if (isObject(answer.for) && typeof answer.for.register === 'string')
-    page.for = { register: answer.for.register, ...(typeof answer.for.where === 'string' ? { where: answer.for.where } : {}) };
-  if (isObject(answer.nav) && typeof answer.nav.section === 'string' && typeof answer.nav.order === 'number')
-    page.nav = { section: answer.nav.section, order: answer.nav.order };
-  if (Array.isArray(answer.requires)) page.requires = answer.requires.filter((r): r is string => typeof r === 'string');
-  return page;
-}
-
-/** What `setDeclaration` and `validateDeclaration` both read: the page's own document, JSON-clean. */
-const rawBodyOf = (page: DogPage): Record<string, Json> => JSON.parse(JSON.stringify(page)) as Record<string, Json>;
+/** The page a body declares. `parseDog` and `storedOf` both refuse a body whose `page` is not text. */
+const nameOf = (body: { page?: unknown }): string => (typeof body.page === 'string' ? body.page : '');
 
 const USAGE = 'braindog page takes pull <slug>, push <file> or check <file>, and --host and --out where a verb takes them.';
 
@@ -91,20 +66,26 @@ async function pull(args: string[], io: AgentIo): Promise<number> {
   const at = await connect(values.host, io);
   if (typeof at === 'number') return at;
 
-  const answer = await at.client.page(slug);
+  const answer = await at.client.call('arrangement', { page: slug });
   if (!answer.ok) return refuse(io, answer);
-  const dogPage = dogPageOf(answer.value);
-  if (!dogPage) {
-    io.say(`${slug} came back in a shape this build does not recognise as a page.`);
+  const stored = storedOf(answer.value, slug);
+  if ('fix' in stored) {
+    io.say(stored.fix);
     return 1;
   }
 
-  const text = dogText(dogPage);
-  const file = resolve(io.cwd, values.out ?? dogName(dogPage.page));
-  writeFileSync(file, `${text}\n`);
-  io.out(`${dogPage.page} written to ${file}.`);
-  /* ONE PAGE, ONE FILE, and those are the two facts a caller needs to open what was written. */
-  io.answer?.({ value: { page: dogPage.page, file } });
+  const name = nameOf(stored.body);
+  const file = resolve(io.cwd, values.out ?? dogName(name));
+  /* `dogText` ENDS WITH ITS OWN LINE BREAK, so the file is the bytes the app shows, with nothing added here. */
+  writeFileSync(file, dogText(stored.body));
+  io.out(
+    stored.template === null
+      ? `${name} written to ${file}.`
+      : `${slug} is one of the pages ${name} makes, one for each row, so ${name}'s source was written to ${file}.`,
+  );
+  /* ONE PAGE, ONE FILE, and those are the two facts a caller needs to open what was written, with the version a later
+     change is read against and, for a page made from a template, the template's name. */
+  io.answer?.({ value: { page: name, file, version: stored.version, ...(stored.template === null ? {} : { template: stored.template }) } });
   return 0;
 }
 
@@ -132,17 +113,19 @@ async function push(args: string[], io: AgentIo): Promise<number> {
   }
   const parsed = parseDog(text);
   if (!parsed.ok) {
-    io.say(parsed.fix);
+    io.say(unread(file, parsed));
     return 1;
   }
 
   const at = await connect(values.host, io);
   if (typeof at === 'number') return at;
 
-  const out = await at.client.call('setDeclaration', { body: rawBodyOf(parsed.value) });
+  /* THE BODY AS READ, WHOLE: the file is the declaration, so there is nothing to cut or fill in before it is sent. */
+  const out = await at.client.call('setDeclaration', { body: parsed.value });
   if (!out.ok) return refuse(io, out);
-  io.out(`${parsed.value.page} pushed to ${at.to.key}.`);
-  io.answer?.({ value: { page: parsed.value.page, host: at.to.key } });
+  const name = nameOf(parsed.value);
+  io.out(`${name} pushed to ${at.to.key}.`);
+  io.answer?.({ value: { page: name, host: at.to.key } });
   return 0;
 }
 
@@ -169,19 +152,21 @@ async function check(args: string[], io: AgentIo): Promise<number> {
   }
   const parsed = parseDog(text);
   if (!parsed.ok) {
-    io.say(parsed.fix);
+    io.say(unread(file, parsed));
     return 1;
   }
 
-  /* NO `installed` MAP: `check` runs with no connection at all, so `DEPENDENCY_UNRESOLVED` — a
-     `requires` that names a register nobody has installed — is not asked about here. Everything
-     else `pageBody` checks is answerable from the file alone. */
-  const fault = validateDeclaration({ id: `page.${parsed.value.page}`, kind: 'page', body: rawBodyOf(parsed.value) });
+  /* NO `installed` MAP: `check` runs with no connection at all, so `DEPENDENCY_UNRESOLVED` (a `requires` that names a
+     register nobody has installed) is not asked about here. Everything else `pageBody` checks is answerable from the
+     file alone. */
+  const name = nameOf(parsed.value);
+  const fault = validateDeclaration({ id: `page.${name}`, kind: 'page', body: parsed.value });
   if (fault) {
     io.say(fault.fix);
     return 1;
   }
-  io.out(`${parsed.value.page} reads as a page. Nothing was sent.`);
-  io.answer?.({ value: { page: parsed.value.page, blocks: parsed.value.blocks.length } });
+  const blocks = parsed.value.blocks;
+  io.out(`${name} reads as a page. Nothing was sent.`);
+  io.answer?.({ value: { page: name, blocks: Array.isArray(blocks) ? blocks.length : 0 } });
   return 0;
 }

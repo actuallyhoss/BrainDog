@@ -220,7 +220,7 @@ test('THE SAME CAP AND THE SAME LEDGER AS A READ: presses spend the month, are p
   assert.equal(asked.length, 3, `25 presses at ask_cap 3 made ${asked.length} included calls`);
   assert.equal(engine.status().asks.used, 3, 'the presses were not counted where every other ask is');
   const rows = own.all<{ kind: string; tier: string; model: string; tokens_in: number; tokens_out: number; neurons: number; status: string; code: string | null }>(
-    'SELECT kind, tier, model, tokens_in, tokens_out, neurons, status, code FROM call ORDER BY id',
+    'SELECT kind, tier, model, tokens_in, tokens_out, neurons, status, code FROM slash_call ORDER BY id',
   );
   assert.equal(rows.length, 3);
   for (const r of rows) {

@@ -7,6 +7,9 @@
 <script lang="ts">
   import type { Inline, RenderOptions } from '../src/index.ts';
   import { MISSING, holeLabel, hrefFor } from '../src/index.ts';
+  /* From the module and not the root, because it is the drawers' shared question and not something a
+     host asks: the host answers `opts.icon` and never calls this. */
+  import { glyphPath } from '../src/inline.ts';
   import Self from './Text.svelte';
 
   let { nodes, opts = {} }: { nodes: Inline[]; opts?: RenderOptions } = $props();
@@ -23,6 +26,11 @@
   const onHole = (path: string | null) => {
     if (typeof opts.hole === 'function') opts.hole(path);
   };
+
+  /* A GLYPH AMONG WORDS NAMES ITSELF, with the host's art as `glyphSvg` in src/html.ts draws it, and
+     without the art it is the same named span with nothing in it, so the words around it never move.
+     The markup below has no whitespace between its tags on purpose: a line break there is a space the
+     other renderer does not draw. */
 </script>
 
 {#each nodes as node}
@@ -54,5 +62,18 @@
         >{node.kind}{#if node.source}: {node.source}{/if}</span
       >
     {/if}
+  {:else if node.type === 'icon'}
+    {@const d = glyphPath(node.name, opts)}
+    {#if d}<svg
+        class="glyph-inline"
+        role="img"
+        aria-label={node.name}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.6"
+        stroke-linecap="round"
+        stroke-linejoin="round"><path {d} /></svg
+      >{:else}<span class="glyph-inline" data-glyph={node.name} role="img" aria-label={node.name}></span>{/if}
   {:else if node.type === 'unresolved'}<span class="unresolved">{node.text}</span>{/if}
 {/each}

@@ -13,6 +13,7 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import * as clipboard from '../clipboard.ts';
+  import { copy } from '../copy.ts';
   import type { Snippet } from 'svelte';
 
   import Icon from './Icon.svelte';
@@ -33,6 +34,7 @@
     lines,
     compact = false,
     glyph,
+    detail,
   }: {
     kind: EmptyKind;
     title: string;
@@ -60,25 +62,43 @@
     /**
      * Inside a frame that already has one.
      *
-     * A block draws its own border and heading, so the full column here would be a second title
-     * under the first. Compact keeps the glyph and the words on one row: the same five designed
-     * states rather than a sixth shape that drifts from them.
+     * A block draws its own heading, so the full column here would be a second title under the
+     * first. Compact is one line at the body size with its action, and no glyph: the same five
+     * designed states rather than a sixth shape that drifts from them. Inside a `Section` it is
+     * compact whether or not this is passed (the style block below says how).
      */
     compact?: boolean;
-    /** The kind's glyph, replaced when the screen knows a truer one: a broken invite is a link. */
+    /** The glyph of the screen's subject, drawn only on the whole-screen form: a broken invite is a link. */
     glyph?: IconName | undefined;
+    /**
+     * The technical reason, folded under "Details" and never the content.
+     *
+     * A PERSON TOLD "200 WITH A BODY THAT IS NOT JSON" HAS BEEN TOLD NOTHING THEY CAN ACT ON, and that string was the
+     * title of the not-found screen (design SYS-8). The sentence says what happened in their words; this keeps the
+     * transport's words one press away for whoever reports the fault.
+     */
+    detail?: string | undefined;
   } = $props();
 
-  /* One glyph per kind. Five states were designed as five different things and then drawn as one
-     paragraph in five colours, so the difference between "nothing here yet" and "you cannot see
-     this" was carried by the sentence alone. */
-  const GLYPH: Record<EmptyKind, IconName> = {
-    'no-data-yet': 'rows',
+  /**
+   * One glyph per kind, and none for `no-data-yet`.
+   *
+   * Five states were designed as five different things and then drawn as one paragraph in five colours, so the
+   * difference between "nothing here yet" and "you cannot see this" was carried by the sentence alone.
+   *
+   * NOTHING-YET HAS NO GLYPH OF ITS OWN BECAUSE IT HAS NO SUBJECT OF ITS OWN. It was the three-line menu glyph, so
+   * Automations, Machines, Usage, Slash and Home all drew a hamburger beside their first-use sentence (design SYS-8);
+   * a whole screen passes the glyph of what will be there, and one that passes none draws the sentence alone.
+   */
+  const GLYPH: Record<EmptyKind, IconName | null> = {
+    'no-data-yet': null,
     'no-results': 'search',
     cleared: 'check',
     'no-permission': 'lock',
     error: 'alert',
   };
+
+  const shown = $derived(glyph ?? GLYPH[kind]);
 
   /**
    * THE HALF OF THE READINESS CONTRACT THAT COSTS NO ROUTE ANYTHING.
@@ -116,7 +136,7 @@
 </script>
 
 <div class="empty" data-kind={kind} class:compact>
-  <span class="empty-glyph" aria-hidden="true"><Icon name={glyph ?? GLYPH[kind]} size="l" /></span>
+  {#if shown && !compact}<span class="empty-glyph" aria-hidden="true"><Icon name={shown} size="xl" /></span>{/if}
   {#if heading}
     <h1 class="empty-title">{title}</h1>
   {:else}
@@ -151,6 +171,12 @@
     <pre class="empty-prompt"><code>{agentPrompt}</code></pre>
   {/if}
   {#if actions}<div class="empty-actions">{@render actions()}</div>{/if}
+  {#if detail}
+    <details class="empty-details">
+      <summary class="empty-summary tap">{copy.readDetails}</summary>
+      <p class="empty-reason">{detail}</p>
+    </details>
+  {/if}
 </div>
 
 <style>
@@ -221,22 +247,29 @@
   }
 
   /**
-   * COMPACT WAS A SMALLER GLYPH AND A SMALLER TITLE, AND NOTHING ELSE.
+   * ONE LINE AT THE BODY SIZE, ITS ONE ACTION, AND NO GLYPH.
    *
    * `19 §6` Partial asks a block's empty state for "one line naming what belongs there, and the
-   * register link". This dropped the frame and shrank two things, and still drew the glyph, the
-   * title, the body and a full-weight button in a column — 243px per block. On `/p/money` over an
-   * empty Obligations list that is four of them, three verbatim identical, each ending in its own
-   * *Add the first row*: **996px of the same three sentences**, on the screen somebody sees the hour
-   * they install the product. The page did not shrink either — sixteen controls at thirty-eight rows
-   * and sixteen at zero.
+   * register link". The first compact form dropped the frame, shrank the glyph and the title, and
+   * still drew them with the body and a full-weight button in a column, so an empty money page
+   * repeated the same three sentences once per block. The second kept a 20px glyph and a 500-weight
+   * title beside it, which is still a heading's weight on a line that is not one.
    *
-   * ONE ROW: glyph, sentence, and the action at the trailing edge. The body goes, because the body
-   * is the register's `holds:` sentence and it is already on the register's own screen — which is
-   * where the action leads, and where `19 §6` puts the full state. The agent line goes with it for
-   * the same reason: four copies of one prompt is not four times the help.
+   * So the sentence is `--t-base` at 400 in the secondary ink, under a section title of the same
+   * size at 600, with the action at the trailing edge. The body goes, because the body is the
+   * register's `holds:` sentence and it is already on the register's own screen, which is where
+   * the action leads. The agent line goes with it for the same reason: four copies of one prompt is
+   * not four times the help.
+   *
+   * INSIDE A `Section` THIS IS THE FORM WHETHER OR NOT THE CALLER SAID `compact`. The whole-screen
+   * form belongs to a state that IS the screen, and a section is never that. The settings areas
+   * never passed the flag, so "No passkey yet." drew at 16px 600 with the menu glyph under a 14px
+   * section title and read as the heading, with the heading as its caption (design SYS-8).
+   * `Section` emits `section.section` and nothing else does, so the ancestor selector names exactly
+   * the case and no caller has to be edited to be right.
    */
-  .empty.compact {
+  .empty.compact,
+  :global(section.section) .empty {
     flex-direction: row;
     align-items: center;
     /* WRAPPING, because an `error` block keeps its lines and they are the content. One clause per
@@ -249,36 +282,52 @@
     border: 0;
   }
 
-  .empty.compact .empty-glyph {
-    flex: none;
-    inline-size: 20px;
-    block-size: 20px;
-    margin-block-end: 0;
-  }
-
-  .empty.compact .empty-title {
+  .empty.compact .empty-title,
+  :global(section.section) .empty .empty-title {
+    color: var(--ink2);
     font-family: inherit;
-    font-size: var(--t-ui);
-    font-weight: 500;
+    font-size: var(--t-base);
+    font-weight: 400;
     letter-spacing: normal;
   }
 
   /* THE FRAME IS GONE AND SO IS THE COLUMN, so the parts that only made sense stacked go too. The
      refusal lines stay: on an `error` block they are the whole content, and a block that cannot say
-     which clause it failed on is the silence this component exists to break. */
+     which clause it failed on is the silence this component exists to break. The glyph is not drawn
+     at all when `compact` is passed; this hides the one a section's empty state was handed. */
   .empty.compact .empty-body,
   .empty.compact .empty-agent,
-  .empty.compact .empty-prompt {
+  .empty.compact .empty-prompt,
+  :global(section.section) .empty .empty-glyph,
+  :global(section.section) .empty .empty-body,
+  :global(section.section) .empty .empty-agent,
+  :global(section.section) .empty .empty-prompt {
     display: none;
   }
 
-  .empty.compact .empty-actions {
+  /* EXCEPT A REFUSAL'S BODY, WHICH IS THE RECORD'S OWN SENTENCE. The Vault's Keys and Machines sections draw "not
+     yours" as the title and the record's reason and remedy ("Ask an owner to raise your access.") as the body, and
+     a section that hid it would say a door is shut without saying who holds the key. It takes its own line under the
+     title, as the refusal lines do. */
+  :global(section.section) .empty:is([data-kind='no-permission'], [data-kind='error']) .empty-body {
+    display: block;
+    flex-basis: 100%;
+  }
+
+  .empty.compact .empty-actions,
+  :global(section.section) .empty .empty-actions {
+    margin-block-start: 0;
     margin-inline-start: auto;
   }
 
   .empty.compact .empty-lines,
   .empty.compact .empty-query,
-  .empty.compact .empty-rid {
+  .empty.compact .empty-rid,
+  .empty.compact .empty-details,
+  :global(section.section) .empty .empty-lines,
+  :global(section.section) .empty .empty-query,
+  :global(section.section) .empty .empty-rid,
+  :global(section.section) .empty .empty-details {
     flex-basis: 100%;
   }
 
@@ -319,6 +368,26 @@
     flex-wrap: wrap;
     gap: var(--sp-2);
     margin-block-start: var(--sp-2);
+  }
+
+  /* THE REASON IS QUIET AND WRAPS, as `ReadState`'s is. It is there for whoever reports the fault,
+     so it sits under the action in the secondary ink, and an address or a path inside it breaks
+     rather than pushing the page sideways at 320. */
+  .empty-details {
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  .empty-summary {
+    inline-size: fit-content;
+    cursor: pointer;
+  }
+
+  .empty-reason {
+    margin-block: var(--sp-1) 0;
+    margin-inline: 0;
+    max-inline-size: var(--measure);
+    overflow-wrap: anywhere;
   }
 
   /* THE TITLE STAYS INK IN EVERY KIND. The glyph carries the tone; a whole sentence in the alarm

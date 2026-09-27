@@ -65,6 +65,7 @@ export type RecordApi = {
   // READ+ — 16
   page(args: { slug: string }, ctx: CallContext): Promise<Result<PageData>>;
   previewPage(args: { body: Record<string, unknown> }, ctx: CallContext): Promise<Result<PageData>>;   // added September 24th 2026: a body installed nowhere, drawn as `page` draws one; writes nothing
+  previewChange(args: PreviewChangeArgs, ctx: CallContext): Promise<Result<ChangePreviewed>>;          // added September 26th 2026: a whole change installed in a rehearsal, every page it makes drawn, nothing kept
   metric(args: { id: string }, ctx: CallContext): Promise<Result<MetricResult>>;
   schema(args: { register: string }, ctx: CallContext): Promise<Result<unknown>>;
   dialect(args: Record<string, never>, ctx: CallContext): Promise<Result<DialectLine[]>>;
@@ -509,6 +510,24 @@ Steps 4–6 are `tail()`; every method that writes through the kernel ends with 
    `MAX(COALESCE(seen_at,''), (SELECT ts FROM e WHERE rowid = 999))` is `null`. An unknown id now
    leaves the mark where it was, which is what "never moves it back" has to mean.*
 
+**`setPref({ key, value })`** *(as built, September 2026)*
+
+1. `guard(ctx, 'read')`, then a `person` only: a token is `FORBIDDEN` at `principal`. Any key but
+   `key` and `value` is `FIELD_UNKNOWN`.
+2. `key` is one of `PREF_KEYS` (`packages/record/src/index.ts`), else `VALUE_MALFORMED` at `key` with
+   the keys in `allowed`. Each key has its own shape, and a wrong one is `VALUE_MALFORMED` at `value` in
+   that key's words:
+
+   | Key | Shape |
+   |---|---|
+   | `nav.order`, `nav.hidden` | at most 500 addresses, each starting with `/` and at most 300 characters, kept once each |
+   | `nav.shape` | `rail`, `bar` or `menu` |
+   | `pen.suggest` | `true` or `false`; absent is on |
+   | `pen.dismissed` | ids of what the holding pen offered and the person dismissed (`PenItem.id`, and the navigation shape's `shape:<shape>:<reason>`), each 1 to 300 characters; the newest `PEN_DISMISSED_MOST` are kept and the oldest let go |
+
+3. `null` takes the key away. Kept in `pref` (migration 9) against the person; not an event.
+   `value: { key, value }` as kept. `boot` answers every key on `me.prefs`.
+
 ### 5.3 · READ+
 
 **`page(slug)`**
@@ -593,6 +612,14 @@ A self-host started without a key, or a Worker with no `SESSION_SECRET`, answers
 the same answer an ended session gets, so the app reads `signIn` instead and skips that read where it is `false`
 (50 §5.13). *(`signIn` added September 16th 2026.)* It is
 not yet one transaction. A session's briefing comes from `context`, not `boot`.
+
+*As built, September 2026 (`loop/finish/contracts.md` §7.4):* `me.prefs` is every key the person set with
+`setPref` (§5.2), key by key, to a person only. `counts.arrived` is every arrival the record ever received,
+whatever became of it, to the owner, and `null` to anybody else. `pen` is the holding pen (`29 §5`, "As
+built"): at most `PEN_MOST` items, strongest first, each `{ id, kind, register, title, why, change: { to } }`
+with the whole declaration accepting it writes, built in `packages/record/src/emergent.ts`. It is offered
+only to a person, or their token, who reads every list, is empty while their `pen.suggest` is `false`, and
+never answers an id in their `pen.dismissed`.
 
 **`views({ register? })`** — `scoped(ctx, 'read')` first, then `guard(ctx, 'read', register)` when one is named; any
 other key is `FIELD_UNKNOWN`. `SELECT register, id, name, filter, search, sort, columns, created_by, created_at,
@@ -730,6 +757,23 @@ person. No `tail()`: a view arms nothing.
 **`retireView({ register, id })`** — `admin(ctx)`; `DELETE FROM view WHERE register = ? AND id = ?` → `{ register, id,
 retired: true }`. No row → `VIEW_UNKNOWN` at `id` with the names the register does have. The rows themselves are
 untouched, because a view is a question and not a row.
+
+**`slashDraft({ asked, page? })`** *(as built, September 2026, `loop/finish/contracts.md` §2.4)*: `admin(ctx)`, in
+`packages/record/src/methods/slash-draft.ts`; any other key is `FIELD_UNKNOWN`, no `asked` is `REQUIRED_MISSING`, and
+`asked` must be text of 1 to `SLASH_ASKED_MOST` characters once trimmed, counted in code points (`VALUE_MALFORMED`).
+`page` is the slug the description is about; its declaration goes to the model, a page drawn per row being its
+template's, and a page the caller cannot open is `PAGE_UNKNOWN` before anything is asked. With no model, or on a record
+whose `previewChange` is not there, the answer is one sentence in `dropped` and nothing is asked. Otherwise the model is
+handed the reading `slashPropose` hands it, `kinds: ['change']`, the words, the page, and `grammar` with the page, list,
+figure and rule grammars (`describedGrammar` in `grammar.ts`). Each draft is held as a description's always was
+(`fromModel`'s rules: a change, no ingest, no rule that reaches out), carries at most `SAMPLE_ROWS_MOST` sample rows a
+list, and is drawn with `previewChange` as the caller; a lint refusal or a block that drew nothing goes back to the model
+as `repair: { drafts, refusals: { at, fix }[] }`, at most `SLASH_REPAIRS_MOST` times, and a draft still refused is dropped
+with the record's sentence. Every ask goes through `slashAsked`, so it is held and settled in Slash's ledger against
+`ask_cap`, and that row is all the method writes. Answer `SlashDrafted`: `{ by, drafts: { question, change: { to }, rows,
+preview: { pages } }[], dropped }`. **`slashPropose({ asked, page? })`** files what `slashDraft` would answer for the same
+words, through the same checks as every Slash question (`SLASH_OPEN_CAP`, asked before), after `describedPresses` has
+said whether the model may be asked at all.
 
 ### 5.7 · The rules pass (`rules.ts`) — step 9 of the write path, run here through the kernel's hook
 
@@ -1034,6 +1078,7 @@ ok; `httpStatus` over one `Result` per row of §4.2; `kernel.refused()` set → 
 | `meet` | in `test/meet.test.ts`: somebody new is added, signed by the run and linked to its project; somebody already there is matched and gains the line and the handle and nothing else; with People switched off it is `REGISTER_UNKNOWN` and nothing is written, a run included; a stray key is `FIELD_UNKNOWN`, a `read` token and a token that does not reach `people` are `FORBIDDEN`, and a person in the app links no project |
 | `page` | `share` on its slug → ok; a `when: false` block → no rows; `empty` filled |
 | `previewPage` | in `test/preview-page.test.ts`: over three task rows a proposed `table` of `register.tasks` answers three rows; a member invited to another list gets that block with no rows, no `source` and one `FORBIDDEN`, and her own list's block drawn; an unknown block kind is the lint's `KIND_UNKNOWN`, an unknown `requires` its `DEPENDENCY_UNRESOLVED`, and to the member a list she cannot read and one nobody declared are one answer, in `requires` and in a block's `source` alike, where a `where` over a field Tasks lacks draws the same held block as one over a field it has; `total_changes()`, the declaration count and the observation count are the same before and after; routed as a POST |
+| `previewChange` | in `test/preview-change.test.ts`: the launch desk's Desk and part pages with the lists and figures they read and the pad's notes, tried in one call over sample rows, draw the Desk and a part page over the first part, and Numbers with its own in a second call draws too (the whole desk is more than one call takes); afterwards the declaration count, the record's version, the observation count and the list cache are what they were, and the desk's lists answer `REGISTER_UNKNOWN`; `about` fills the part page over the part it names; a change to an installed page answers the page as it stands in `was`; a member invited to Notes alone has the block over Tasks held and her Notes block drawn, and is refused a list she cannot read in `rows` before anything is linted; a lint refusal's `at` names its declaration; more than `PREVIEW_DECLARATIONS_MOST` declarations is `OUT_OF_BOUNDS` |
 | `boot` pages | in `test/boot-about.test.ts`: a `for:` page over two projects is two pages, each with `about: { register: 'projects', seq }`; a written page has `about: null`; a member who cannot read Projects is sent no page about one |
 | `project` budget | `budget.tokens: 500` → `used ≤ 500`, cut at the first row that does not fit; no `document` body; a `series` register contributes no rows; `{ metric }` → `rows: []` and the metric |
 | `whoami` | a token → its person's `levels` and `registers`; no session row is opened |

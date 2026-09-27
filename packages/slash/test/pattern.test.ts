@@ -25,7 +25,7 @@ const build = () => {
   const slash = createSlash({ sql, clock: fixedClock(NOW), inference, record });
   const calls = () =>
     sql.all<{ kind: string; status: string; code: string | null; filed: string | null; read: string }>(
-      'SELECT kind, status, code, filed, read FROM call ORDER BY rowid',
+      'SELECT kind, status, code, filed, read FROM slash_call ORDER BY rowid',
     );
   return { sql, inference, record, slash, calls };
 };

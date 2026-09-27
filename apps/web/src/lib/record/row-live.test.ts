@@ -167,7 +167,7 @@ for (const seq of [390, 1440])
       [teachers]: { id: teachers, name: 'Teachers', title: 'name', fields: [{ id: 'name', type: 'text' }] },
     });
     assert.deepEqual(await rowReader(BASE, io).read(register, seq), { from: 'live', entry: null, names: new Map() });
-    assert.equal(sentence(register, seq), `There is no course #${seq}.`);
+    assert.equal(sentence(register, seq), `There is no course numbered ${seq}`);
     /* AND THE BUTTON UNDERNEATH IS LABELLED FROM THE SAME DECLARATION, so *Back to Courses* now agrees
        with the sentence above it instead of denying it. */
     assert.equal(REGISTERS[register]?.name, 'Courses');
@@ -191,7 +191,7 @@ test('a list the record will not declare still says the list is not there, becau
   const { io } = host((url) => (url.pathname === '/api/get' ? json(200, { ok: true, value: null }) : json(404, { ok: false, refusal: { code: 'REGISTER_UNKNOWN', fix: `There is no register called ${register}.` } })));
   assert.deepEqual(await rowReader(BASE, io).read(register, 390), { from: 'live', entry: null, names: new Map() });
   assert.equal(REGISTERS[register], undefined);
-  assert.equal(sentence(register, 390), 'There is no list called rl_nope.');
+  assert.equal(sentence(register, 390), 'There is no list called rl_nope');
 });
 
 /* NO RECORD IS A REFUSAL NOW, NOT THE SAMPLE (DIRECTION 26). Under these three the page drew `entry('services', 2)`,

@@ -111,7 +111,7 @@ test('S3 A PRESS NEVER SPENDS MORE THAN THE ASK THE CEILING COUNTS IT AS: on 300
   for (const w of ai.worst) assert.ok(w <= 232, `a press may spend ${w} neurons and the ceiling counts every call at 232`);
   assert.equal(ai.worst.length, 0, 'the press and the daily look on 300 lists are both past 232, so neither is sent');
   /* AND NOTHING LEFT BEHIND IN THE LEDGER: a call never sent is released, so it spends none of the month's asks. */
-  const rows = c.storages.get(REC)!.sql.exec('SELECT count(*) AS n FROM call').toArray() as { n: number }[];
+  const rows = c.storages.get(REC)!.sql.exec('SELECT count(*) AS n FROM slash_call').toArray() as { n: number }[];
   assert.equal(rows[0]?.n, 0, JSON.stringify(rows));
   t.mock.timers.reset();
 

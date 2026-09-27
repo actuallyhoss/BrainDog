@@ -13,8 +13,8 @@
  * ONE escape function, used on every value, and the only inline `style` values in the output are
  * custom properties holding numbers this file formats itself, never a colour or a length. This said
  * three of them, `--cells`, `--magnitude` and `--at`, long after `--chars`, `--cols`, `--fill` and
- * `--limit` had joined; `roadmap` adds `--tracks`, `--track`, `--lines` and `--line`, `heat` adds `--weeks`, and a
- * range adds `--from` and `--to`.
+ * `--limit` had joined; `roadmap` adds `--tracks`, `--track`, `--lines` and `--line`, `heat` adds `--weeks`, a
+ * range adds `--from` and `--to`, and a card's `hue` adds `--hue`, a whole number `hueOf` read as digits.
  *
  * ONE EXCEPTION, NAMED: `--swatch`, on an option's visual, holds a colour from the record, because which lining a
  * choice is IS a colour (`05 §5`). It holds six hex digits `queue.ts` checked on the way in and nothing else, it is
@@ -23,6 +23,7 @@
 
 import { KINDS, SPARKLINE_POINT, TONES, type Kind } from './kinds.ts';
 import { inline, magnitudeOfCell, text as plain, type Inline, type InlineOptions } from './inline.ts';
+import { glyphPath } from './inline.ts';
 import { MISSING, day, figureChars, leadingCode, symbolFigure, symbolText, valueWord } from './format.ts';
 import { CARDS_NEXT, CARDS_NONE, FOLD_HIDE, FOLD_SHOW, TREND, cardLayout, counted, initialOf, isQuiet, markOf, ringDash, ringOf, trendOf } from './cards.ts';
 import { FEED_EARLIER, feedNew, feedPlan } from './feed.ts';
@@ -45,6 +46,12 @@ import { DIFF_GLYPHS, DIFF_WORDS, diffFolded, diffPlan, type DiffLine } from './
 import { ROADMAP_DUE, ROADMAP_FROM, ROADMAP_NONE, ROADMAP_PAINT, ROADMAP_WHAT, roadmapLane, roadmapLines, roadmapPlan, roadmapRow, roadmapSentence, roadmapShare, roadmapSkipped, roadmapToday } from './roadmap.ts';
 import { RING_NONE, RING_OF, RING_PAINT, RING_STEP_OPACITY, ringPlan } from './ring.ts';
 import { HEAT_DAY, HEAT_NONE, HEAT_VALUE, heatLines, heatOutside, heatPlan, heatSkipped, heatTitle } from './heat.ts';
+import { CALENDAR_NONE, WEEKDAYS, calendarMore, calendarPlan, calendarSkipped } from './calendar.ts';
+import { LINKS_NONE, linkPlan } from './links.ts';
+import { GALLERY_NONE, galleryPlan, pictureSrc } from './gallery.ts';
+import { EMBED_NONE, embedOpen, embedPlan } from './embed.ts';
+import { hueOf } from './cards.ts';
+import { pathRest, pathShort } from './path.ts';
 import type { Block, Degraded, Markdown, Row, Segment } from './parse.ts';
 
 export type RenderOptions = InlineOptions & {
@@ -130,6 +137,25 @@ export const escape = (s: string): string =>
 /** Two decimals, always, so the value is a number and the assertion over it is one regex. */
 const magnitude = (v: number): string => Math.max(0, Math.min(1, v)).toFixed(2);
 
+/**
+ * A glyph, drawn from the path data the host answered (`RenderOptions.icon`): one 24 box, stroked in
+ * `currentColor` with the app's own stroke, so it takes the colour of the words around it and never
+ * one of its own. NO `width` OR `height` ON THE TAG: the host's stylesheet sizes it, 1em in a line of
+ * text and the slot's size in a slot, because a literal size is how a glyph stops following the type.
+ * `Text.svelte`, `Section.svelte` and `p/Inline.svelte` draw the same element with the same attributes.
+ */
+const glyphSvg = (d: string, attrs = ''): string =>
+  `<svg${attrs} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="${escape(d)}"></path></svg>`;
+
+/**
+ * A glyph slot's drawing, or nothing: the host's art for a name the set holds, else the slot stays
+ * empty, as it was before any host could answer, and the stylesheet draws what it always drew there.
+ */
+const slotArt = (name: string, o: RenderOptions): string => {
+  const d = glyphPath(name, o);
+  return d ? glyphSvg(d) : '';
+};
+
 function renderInline(nodes: Inline[], opts: RenderOptions): string {
   return nodes
     .map((n) => {
@@ -163,6 +189,13 @@ function renderInline(nodes: Inline[], opts: RenderOptions): string {
               ? `<button type="button" class="hole">unknown</button>`
               : `<span class="hole">unknown</span>`
             : `<span class="evidence" data-evidence="${n.kind}"${n.source ? ` title="${escape(n.source)}"` : ''}>${n.kind}${n.source ? `: ${escape(n.source)}` : ''}</span>`;
+        case 'icon': {
+          // A glyph in a sentence names itself, because it stands among the words. Without the host's
+          // art it is the same named span with nothing in it, so the words around it never move.
+          const d = glyphPath(n.name, opts);
+          const named = ` class="glyph-inline" role="img" aria-label="${escape(n.name)}"`;
+          return d ? glyphSvg(d, named) : `<span class="glyph-inline" data-glyph="${escape(n.name)}" role="img" aria-label="${escape(n.name)}"></span>`;
+        }
         case 'unresolved':
           return `<span class="unresolved">${escape(n.text)}</span>`;
       }
@@ -223,6 +256,7 @@ const toneGlyph = (tone?: string): string => {
 function panel(b: Block, o: RenderOptions): string {
   if (b.kind === 'section') return section(b, o);
   if (b.kind === 'capture') return capture(b, o);
+  if (b.kind === 'embed') return embed(b, o);
   if (b.kind === 'quote') {
     const r = b.rows[0] ?? { cells: [] };
     return `<blockquote class="panel">${cell('quote-text', r.cells[0], o)}${r.cells[1] ? `<cite class="quote-by">${escape(r.cells[1])}</cite>` : ''}</blockquote>`;
@@ -271,6 +305,7 @@ function numbersFold(kind: string, heads: readonly string[], rows: readonly (rea
 function grid(b: Block, o: RenderOptions): string {
   if (b.kind === 'cards') return cards(b, o);
   if (b.kind === 'heat') return heat(b, o);
+  if (b.kind === 'gallery') return gallery(b, o);
   if (b.kind === 'board') {
     const columns = [...new Set(b.rows.map((r) => r.cells[0] ?? ''))];
     const body = columns
@@ -401,7 +436,7 @@ function inlinePrimitive(b: Block, o: RenderOptions): string {
     .filter((r) => (r.cells[1] ?? '') !== '' && (r.cells[2] ?? '') !== '')
     .map(
       (r) =>
-        `<span class="pill"${toneAttrs(r.tone)}><span class="pill-glyph" data-glyph="${escape(r.cells[0] ?? '')}" aria-hidden="true"></span><span class="pill-figure num">${escape(r.cells[1] ?? '')}</span><span class="pill-word">${escape(valueWord(r.cells[2] ?? ''))}</span>${toneGlyph(r.tone)}</span>`,
+        `<span class="pill"${toneAttrs(r.tone)}><span class="pill-glyph" data-glyph="${escape(r.cells[0] ?? '')}" aria-hidden="true">${slotArt(r.cells[0] ?? '', o)}</span><span class="pill-figure num">${escape(r.cells[1] ?? '')}</span><span class="pill-word">${escape(valueWord(r.cells[2] ?? ''))}</span>${toneGlyph(r.tone)}</span>`,
     )
     .join('');
   return `<div class="inline">${body}</div>`;
@@ -413,6 +448,8 @@ function list(b: Block, o: RenderOptions): string {
   if (b.kind === 'queue') return queue(b, o);
   if (b.kind === 'roadmap') return roadmap(b, o);
   if (b.kind === 'steps' && b.form === 'path') return path(b, o);
+  if (b.kind === 'calendar') return calendar(b, o);
+  if (b.kind === 'link') return links(b, o);
   const spec = KINDS[b.kind];
   const tag = spec.ordered ? 'ol' : 'ul';
   const body = b.rows
@@ -439,22 +476,30 @@ function list(b: Block, o: RenderOptions): string {
  * numbered list and the connecting line is one rule on `data-mark` away. A done stone's tick is an image named "done",
  * as `todo`'s box is where it cannot be pressed; the next one is said in a word, because the whole form exists so a
  * reader can find it without reading every row; a later one has no marker text at all.
+ *
+ * A PATH WITH A SHORT VIEW IS DRAWN AS THAT VIEW, its stones alone and a line saying how many more there are for when
+ * there is room (`pathShort`). The switch to every stone is the Svelte drawer's, because it is state in a component and
+ * this has none; every other part of the two trees is the same. A stone in the short view carries `data-short`, so a
+ * host drawing every stone can still show which ones the view holds.
  */
 function path(b: Block, o: RenderOptions): string {
   const plan = pathPlan(b.rows);
-  const body = plan.stones
-    .map(({ row: r, mark }) => {
+  const short = pathShort(plan);
+  const stones = short ? plan.stones.filter((s) => s.short) : plan.stones;
+  const body = stones
+    .map(({ row: r, mark, short: held }) => {
       const marker =
         mark === 'done'
           ? `<span class="item-marker" role="img" aria-label="${PATH_DONE}">${TONES.good.glyph}</span>`
           : mark === 'next'
             ? `<span class="item-marker"><span class="path-next">${PATH_NEXT}</span></span>`
             : `<span class="item-marker"></span>`;
-      return `<li class="item" data-mark="${mark}">${marker}${cell('item-title', r.cells[0], o)}${cell('item-detail', r.cells[1], o)}</li>`;
+      return `<li class="item" data-mark="${mark}"${held ? ' data-short=""' : ''}>${marker}${cell('item-title', r.cells[0], o)}${cell('item-detail', r.cells[1], o)}</li>`;
     })
     .join('');
+  const rest = short ? `<p class="path-rest">${escape(pathRest(plan.stones.length - stones.length))}</p>` : '';
   const more = plan.more > 0 ? `<p class="path-more">${escape(pathMore(plan.more))}</p>` : '';
-  return `<ol class="list" data-kind="steps" data-form="path">${body}</ol>${more}`;
+  return `<ol class="list" data-kind="steps" data-form="path">${body}</ol>${rest}${more}`;
 }
 
 /**
@@ -753,7 +798,14 @@ function cards(b: Block, o: RenderOptions): string {
       /* THE LEAD IS TOLD, NEVER INFERRED (05 §4): the first card of a `cards lead` block, and the host's grid decides
          what two tracks are, so a phone's one column keeps it one card wide. */
       const leading = b.form === 'lead' && n === 0 ? ' data-lead=""' : '';
-      return `<li class="cards-item"${leading}${toneAttrs(r.tone)}${quiet}><div class="cards-head">${lead}${name}${toneGlyph(r.tone)}${when}</div>${reply}${middle}${facts}${next}${who}</li>`;
+      /* THE HUE IS A NUMBER ON THE CARD AND NOTHING ELSE, which the host draws the mark in; a cell that is not a turn
+         from 0 to 359 writes no style at all. THE PICTURE LEADS THE CARD where the host serves the file, and is hidden
+         from a screen reader because the title under it names the card. */
+      const hue = L.hue >= 0 ? hueOf(said(r, L.hue)) : null;
+      const tinted = hue === null ? '' : ` style="--hue:${hue}"`;
+      const src = L.picture >= 0 ? pictureSrc(r.cells[L.picture] ?? '', o.file) : null;
+      const picture = src ? `<img class="cards-picture" src="${escape(hrefFor(o, src))}" alt="" loading="lazy">` : '';
+      return `<li class="cards-item"${leading}${toneAttrs(r.tone)}${quiet}${tinted}>${picture}<div class="cards-head">${lead}${name}${toneGlyph(r.tone)}${when}</div>${reply}${middle}${facts}${next}${who}</li>`;
     })
     .join('');
   return `<ul class="cards-grid">${body}</ul>`;
@@ -766,7 +818,7 @@ function cards(b: Block, o: RenderOptions): string {
  */
 function section(b: Block, o: RenderOptions): string {
   const [glyph = '', count = '', fold = ''] = b.rows[0]?.cells ?? [];
-  const mark = glyph ? `<span class="sec-glyph" data-glyph="${escape(glyph)}" aria-hidden="true"></span>` : '';
+  const mark = glyph ? `<span class="sec-glyph" data-glyph="${escape(glyph)}" aria-hidden="true">${slotArt(glyph, o)}</span>` : '';
   const n = counted(plain(inline(count, o))) ? `<span class="sec-count num">${renderInline(inline(count, o), o)}</span>` : '';
   const title = b.heading ? `<h2 class="sec-title">${mark}${renderInline(inline(b.heading, o), o)}${n}</h2>` : '';
   const toggle =
@@ -1273,6 +1325,110 @@ function heat(b: Block, o: RenderOptions): string {
   return `<div class="heat" style="--weeks:${plan.weeks}"><div class="heat-grid" role="img" aria-label="${escape(plan.name)}">${cells}</div>${table}${skipped}${outside}</div>`;
 }
 
+/**
+ * `calendar`: every month from the first row's to the last row's as a grid of weeks, Monday first, each day naming its
+ * first rows and counting the rest, then an agenda of the days that hold anything (`src/calendar.ts` over
+ * `src/days.ts`). `svelte/Calendar.svelte` is this function's twin.
+ *
+ * A MONTH IS A TABLE, because it is one: a caption naming the month, a head naming the weekdays, and a row a week,
+ * which a screen reader walks by row and column as a sighted reader scans one. A day of the month either side is an
+ * empty cell marked `data-outside`, so the columns hold. A busy day carries `data-count`, which is what a host drawing
+ * the month as a strip of days on a phone puts a dot on, and the agenda under it says every row of every day.
+ */
+function calendar(b: Block, o: RenderOptions): string {
+  const said = (r: Row, i: number): string => plain(inline(r.cells[i] ?? '', o));
+  const plan = calendarPlan(b.rows, roadmapToday(o.now));
+  const skipped = plan.skipped.length ? `<p class="calendar-skipped">${escape(calendarSkipped(plan.skipped.map((i) => said(b.rows[i]!, 0) || MISSING)))}</p>` : '';
+  if (plan.empty) return `<div class="calendar"><p class="calendar-empty">${escape(CALENDAR_NONE)}</p>${skipped}</div>`;
+  const item = (r: Row): string => `<li class="calendar-item"${toneAttrs(r.tone)}>${cell('calendar-title', r.cells[0] || MISSING, o)}${toneGlyph(r.tone)}</li>`;
+  const items = (rows: readonly Row[]): string => (rows.length ? `<ul class="calendar-items">${rows.map(item).join('')}</ul>` : '');
+  const head = `<thead><tr>${WEEKDAYS.map((d) => `<th scope="col" abbr="${d.long}">${d.short}</th>`).join('')}</tr></thead>`;
+  const months = plan.months
+    .map(
+      (m) =>
+        `<table class="calendar-month"><caption class="calendar-caption">${escape(m.label)}</caption>${head}<tbody>${m.weeks
+          .map(
+            (week) =>
+              `<tr>${week
+                .map((c) =>
+                  c.inside
+                    ? `<td class="calendar-cell"${c.today ? ' data-today=""' : ''}${c.count ? ` data-count="${c.count}"` : ''}><span class="calendar-num num">${c.num}</span>${items(c.items)}${
+                        c.more ? `<span class="calendar-more">${escape(calendarMore(c.more))}</span>` : ''
+                      }</td>`
+                    : '<td class="calendar-cell" data-outside=""></td>',
+                )
+                .join('')}</tr>`,
+          )
+          .join('')}</tbody></table>`,
+    )
+    .join('');
+  const agenda = `<ol class="calendar-agenda">${plan.days
+    .map((d) => `<li class="calendar-day"${d.today ? ' data-today=""' : ''}><span class="calendar-date num">${escape(d.said)}</span>${items(d.items)}</li>`)
+    .join('')}</ol>`;
+  return `<div class="calendar">${months}${agenda}${skipped}</div>`;
+}
+
+/**
+ * `link`: a list of addresses, each titled, with the host it leaves for under the title and a note after
+ * (`src/links.ts`). `svelte/Links.svelte` is this function's twin.
+ *
+ * ON THE LIST'S OWN CLASSES, so a host that styles a `todo` draws a list of links as a list before it has a rule of
+ * its own for one. The title is the anchor's words and nothing else, as plain text: a title written as a link of its
+ * own would be an anchor inside an anchor. An address that leaves this BrainDog tells the page it came from nothing.
+ */
+function links(b: Block, o: RenderOptions): string {
+  const lines = linkPlan(b.rows);
+  if (lines.length === 0) return `<p class="links-empty">${escape(LINKS_NONE)}</p>`;
+  const body = lines
+    .map((l) => {
+      const words = escape(plain(inline(l.title, o)) || MISSING);
+      const title = l.href ? `<a class="item-title" href="${escape(hrefFor(o, l.href))}"${l.away ? ' rel="noreferrer"' : ''}>${words}</a>` : `<span class="item-title">${words}</span>`;
+      const host = l.host ? `<span class="item-detail link-host">${escape(l.host)}</span>` : '';
+      const note = l.note ? `<span class="item-meta link-note">${renderInline(inline(l.note, o), o)}</span>` : '';
+      return `<li class="item">${title}${host}${note}</li>`;
+    })
+    .join('');
+  return `<ul class="list" data-kind="link">${body}</ul>`;
+}
+
+/**
+ * `gallery`: a tile a row, the picture where the host serves the file and the file's name where it is not a picture,
+ * with the caption under either (`src/gallery.ts`). `svelte/Gallery.svelte` is this function's twin.
+ *
+ * THE PICTURE HAS NO TEXT OF ITS OWN, because the caption beside it is its name; a page's writer captions a picture
+ * with the file's name when its list gave it none. It loads lazily, because a gallery is the one block that can put
+ * two dozen pictures on a page at once.
+ */
+function gallery(b: Block, o: RenderOptions): string {
+  const tiles = galleryPlan(b.rows, o.file);
+  if (tiles.length === 0) return `<p class="gallery-empty">${escape(GALLERY_NONE)}</p>`;
+  return `<ul class="gallery">${tiles
+    .map(
+      (t) =>
+        `<li class="gallery-item">${t.src ? `<img class="gallery-picture" src="${escape(hrefFor(o, t.src))}" alt="" loading="lazy">` : ''}${
+          t.name ? `<span class="gallery-file">${escape(t.name)}</span>` : ''
+        }${t.caption ? cell('gallery-caption', t.caption, o) : ''}</li>`,
+    )
+    .join('')}</ul>`;
+}
+
+/**
+ * `embed`: a video, a design or a map from one of `EMBED_PROVIDERS`, drawn as a facade (its title, whose it is, and a
+ * link to the original), sized by `data-aspect` (`src/embed.ts`). `svelte/Embed.svelte` is this function's twin.
+ *
+ * NO FRAME, EVER, and that is the point of a facade in a copy with no script: the mirror and the digest cannot load
+ * one, and a frame on a page before anybody asked for it would tell the provider who is reading. The Svelte drawer adds
+ * a Load button to this same tree, and only a press there puts the frame on the page.
+ */
+function embed(b: Block, o: RenderOptions): string {
+  const plan = embedPlan(b.rows);
+  if (!plan) return `<p class="embed-empty">${escape(EMBED_NONE)}</p>`;
+  const title = plan.title ? `<p class="embed-title">${renderInline(inline(plan.title, o), o)}</p>` : '';
+  return `<div class="embed" data-provider="${plan.provider.id}" data-aspect="${plan.aspect}"><div class="embed-facade">${title}<p class="embed-from">${escape(plan.provider.name)}</p></div><a class="embed-open" href="${escape(
+    hrefFor(o, plan.url),
+  )}" rel="noreferrer">${escape(embedOpen(plan.provider.name))}</a></div>`;
+}
+
 const PRIMITIVE_RENDERERS ={ panel, grid, rows, proportional, inline: inlinePrimitive, list, table, media } as const;
 
 /* ── segments ─────────────────────────────────────────────────────────────── */
@@ -1298,11 +1454,15 @@ function block(b: Block, o: RenderOptions): string {
 
 /**
  * A degraded block shows exactly what the author typed, with the reason above it. It never renders
- * wrong and never renders nothing — a dropped block must read as feedback, and when the author is
- * an agent this is the only feedback channel that exists (05 §3).
+ * wrong and never renders nothing: a dropped block must read as feedback, and when the author is an
+ * agent this is the only feedback channel that exists (05 §3).
+ *
+ * The same tree as `svelte/Degraded.svelte`, whose comment says why it is a quiet note: the reason,
+ * then the source under `degraded-source`, which wraps inside its column rather than scrolling like a
+ * `media` code block. The mirror has no Fix button because it has no host to hand the press to.
  */
 function degraded(d: Degraded): string {
-  return `<figure class="block block-degraded" data-code="${d.code}"><figcaption class="degraded-fix">${escape(d.fix)}</figcaption><pre class="media"><code>${escape(d.raw)}</code></pre></figure>`;
+  return `<figure class="block block-degraded" data-code="${d.code}"><figcaption class="degraded-fix">${escape(d.fix)}</figcaption><pre class="degraded-source"><code>${escape(d.raw)}</code></pre></figure>`;
 }
 
 /**

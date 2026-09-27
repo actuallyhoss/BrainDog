@@ -359,14 +359,44 @@ Write:
    { bytes } })` — the writer cannot choose the key. Return `{ sha256, mime, bytes }`; the `file` value is then
    written through `create`/`update` by the caller.
 
-### 5.6 · `GET /s/<token>`
+### 5.6 · A shared link: `/app/s/<token>` and `Authorization: Share <token>`
 
-1. `p = await shareToken(env).verify(token)`; `null` or `exp < now` → **404** bare — a wrong capability looks like nothing.
-2. `r = await stub(p.rec).call('page', { slug: p.slug }, { auth: { kind: 'share', id: p.id, slug: p.slug }, now, surface: 'web' })`.
-   The record refuses a closed share (`share.close` is terminal — 20 §2) and applies the link's projection as
-   `ctx.scope` (20 §1). A refusal → **404**.
-3. Serve the shell from `ASSETS` unchanged; the shell fetches `/api/pages/:slug` with the same token in
-   `Authorization: Share <token>`, and the Worker treats `Share` exactly as steps 1–2, for `page` only. Two lines.
+COL-3, `loop/finish/platform.md` §4.0 H. The page a person opens is `/app/s/<token>`, which is the app's shell like any
+page under `/app`; the shell reads the page with `GET /api/sharedPage` and `Authorization: Share <token>`. Nothing is
+served at a bare `/s/*`, which the site does not forward.
+
+**What is built and what is not.** The hosts' half is built: the token, both hosts' door and the signing of a new link
+(steps 1 and 3, and the hosts' lines of steps 2 and 4). The record's half is specified here and is not in the tree yet:
+the `share` principal, its branch of `allows`, and `openShare`, `closeShare`, `shares` and `sharedPage` in
+`packages/record/src/methods/shares.ts`, with their rows in `packages/host/src/routes/shares.ts` registered in the
+same change. Every sentence below that says what the record writes, answers or refuses describes that half. Until it
+lands, no link is made and every link answers the 404.
+
+1. **The token** is `<record id>.<base64url(JCS({ id, slug, exp }))>.<base64url(HMAC-SHA-256)>`, `exp` in whole seconds,
+   the MAC over `<record id>.<claim>` under `HKDF-SHA-256(KEK, info 'braindog/share')`. The Worker derives the key from
+   the current half of `KEK` (`apps/worker/src/share.ts`), so a rotation closes every link made before it. The
+   self-host takes the key its key store derives from the key file with the same info, handed to `start` as
+   `shareKey`; a process given none derives it from its session key instead, which ties its links to
+   `BRAINDOG_SESSION_SECRET` when that is set. Sign and check are `packages/host/src/share.ts`, shared by both hosts.
+   A host with no key makes no link and opens none.
+2. **Opening one.** `POST /api/openShare` `{ slug, days? }` from the owner's session reaches the record, which writes
+   `share.open` (`target: 'share:<id>'`, `field: <slug>`, `to_v` the instant it stops opening) and answers
+   `{ id, slug, expires_at }`; the Worker's `recordApi` signs that into `token` and `url` (`https://<PUBLIC_HOST>/app/s/<token>`)
+   on its way out, and the self-host's `withShareLinks` does the same for the origin it serves. With no key it refuses
+   `NOT_IN_THIS_BUILD` before the record writes anything. `closeShare { id }` writes `share.close`, which is for good,
+   and `shares` lists them, never a token. All three are ADMIN.
+3. **Reading one**, in `recordApi`: `doorOf` (`apps/worker/src/session.ts`) reads the `Share` scheme before it reads
+   any `Authorization` header as a bearer, and hands the token on as its own door, reading no cookie. Then the path
+   must be `/api/sharedPage` at the root, the MAC and `exp` must hold, and the Directory must know the record; then one
+   read of `RL_READ` keyed `share:<id>`, when it is bound (a binding that throws lets the link through, as it does every
+   other caller); then the record, with the principal
+   `{ kind: 'share', id, slug }` and nothing else. The record answers the page as the owner who opened the link could
+   read it now, one level deep, with no row ids, no value pointing at another row or page, and nothing that writes. It
+   draws the page without writing the `page.render` line an owner's own open writes, so a stranger's reads are not
+   counted as the owner opening the page.
+4. **Every refusal is 404 with no body**: a bad byte, an expired or closed link, a record the Directory does not hold, a
+   name in the path, an owner who lost the page or is no longer an owner, and anything else the record refuses. The one
+   other answer is the budget's 429, given only after the MAC holds.
 
 ### 5.7 · `GET /ws` — the live channel (22 §5, ADR-044)
 

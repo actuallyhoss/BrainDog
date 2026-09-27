@@ -3,7 +3,8 @@
  * is read at, the money and duration helpers, and the named factor tables.
  */
 
-import type { FieldDecl, Json } from '@braindog/kernel';
+import type { FieldDecl, Json, Leg } from '@braindog/kernel';
+import type { Predicate } from '@braindog/where';
 
 /** What a row holds, before the record has given it a number. */
 export type Fields = Record<string, Json | number | null | undefined>;
@@ -114,8 +115,13 @@ export const stamp = (offsetHours: number): string => new Date(NOW + offsetHours
  */
 export const LOOKUPS: Record<string, Record<string, number>> = {
   per_year: { monthly: 12, yearly: 1, two_yearly: 0.5 },
-  /* The monthly share of a repeating amount. `none` is absent, so a one-off is not in a monthly figure. */
-  per_month: { monthly: 1, quarterly: 1 / 3, yearly: 1 / 12 },
+  /* The monthly share of a repeating amount. `none` is absent, so a one-off is not in a monthly figure.
+     A WEEK AND A FORTNIGHT ARE SHARES OF A YEAR, NOT OF A MONTH: fifty-two weeks and twenty-six fortnights make a year,
+     so a weekly amount is 52/12 of itself a month, and four would drop a week every quarter. Twice a month is two. */
+  per_month: { weekly: 52 / 12, fortnightly: 26 / 12, twice_monthly: 2, monthly: 1, quarterly: 1 / 3, yearly: 1 / 12 },
+  /* WHICH WAY AN AMOUNT MOVES A NET, for a figure that adds money in and takes money out over one list in one reading:
+     money-core's `net-by-month`. The amount stays positive on the row and `direction` carries the sign. */
+  sign: { in: 1, out: -1 },
 };
 
 /**
@@ -143,12 +149,32 @@ export const LOOKUPS: Record<string, Record<string, number>> = {
 export type SeedMetric = {
   metric: string;
   name: string;
+  /** `register.<id>`, or `forecast.runway` for a figure over the cash walk ahead. */
   source: string;
-  where?: string;
+  /** A sentence, or the tree the sentence compiles to where one sentence cannot say it (`money.ts` `LIVE_LINES`). */
+  where?: string | Predicate;
   value: unknown;
   format?: string;
-  /** `setting` names a setting of the pack the target is read from, each time the figure is read (`liveTarget`). */
-  target?: ({ lte: number } | { gte: number }) & { setting?: string };
+  /**
+   * `setting` names a setting of the pack the target is read from, each time the figure is read (`liveTarget`).
+   *
+   * A TARGET MAY BE A SETTING AND NO NUMBER, which is a money ceiling nobody has set: the figure has no verdict until a
+   * person types one, in the record's own currency, because a pack cannot know which currency that is.
+   */
+  target?: { lte?: number; gte?: number; setting?: string };
+  /** A walk's legs, the same shape a forecast block's `from:` names, on a `forecast.runway` figure only. */
+  legs?: readonly Leg[];
+  /** The figure a `days_to_zero` walk starts from: what is held now. */
+  opening?: { metric: string };
+  /** Its place among the record's Home figures, 1 to 9, lowest first. */
+  home?: number;
+  /** Offered to a forecast's sell control as something that could be sold for cash. */
+  sellable?: true;
+  /**
+   * The pack it ships in, where its `source` cannot say: a figure over `forecast.runway` reads no one list, so the
+   * first-party split (`packs/first-party.ts`) would otherwise file it with the declarations no single pack holds.
+   */
+  pack?: string;
   window?: string;
   compare?: 'previous' | 'none';
   /** The factor tables a `product` reads, carried with the figure so a pack installs them with it. */

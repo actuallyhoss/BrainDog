@@ -58,7 +58,12 @@ export type Failure =
   | { kind: 'cancelled' }
   /** This authenticator already holds a passkey for this record. */
   | { kind: 'exists' }
-  | { kind: 'unsupported' };
+  | { kind: 'unsupported' }
+  /**
+   * Signed in, and the last proof is more than fifteen minutes old, for a change that asks for a recent one. Not a
+   * failed sign-in: `fix` is the host's sentence, and signing in again is the whole of the answer.
+   */
+  | { kind: 'stale'; fix: string | null };
 
 export type Said<T> = { ok: true; value: T } | ({ ok: false } & Failure);
 
@@ -139,6 +144,8 @@ async function call(io: Io, path: string, body?: Record<string, unknown>): Promi
     /* A proxy in front of a host that is down, which is the host being unreachable and not absent. */
     if (res.status === 502 || res.status === 504) return { ok: false, kind: 'unreachable' };
     if (res.status === 404) return { ok: false, kind: 'absent' };
+    /* THE ONE 401 THAT IS NOT A FAILURE: the host marks it `reason: 'stale'` beside its refusal. */
+    if (res.status === 401 && env?.reason === 'stale') return { ok: false, kind: 'stale', fix: fixOf(env.refusal) };
     if (res.ok && env?.ok === true) return { ok: true, value: env.value };
     if (env?.ok === false || res.status === 401 || res.status === 403 || res.status === 422)
       return { ok: false, kind: 'refused', fix: fixOf(env?.refusal) };
@@ -221,16 +228,33 @@ export async function passkeySignIn(io: Io = live()): Promise<Said<Who>> {
   return signedIn(call(io, '/auth/passkey/assert', { credential: credential.value }));
 }
 
+/**
+ * Run a change to a way in, and when the host answers `stale`, sign in again with a passkey and run it once more.
+ *
+ * THE EXISTING WAY BACK, AND NOT A NEW ONE. A passkey sign-in on a page already signed in replaces the session with
+ * one proved now, which is how the actions panel signs in again without leaving (`lib/page/panels/Actions.svelte`).
+ * Where no passkey can be asked for, or the person closes the sheet, the `stale` answer goes back as it came, with
+ * the host's sentence, and the screen says it.
+ */
+async function afresh<T>(io: Io, run: () => Promise<Said<T>>): Promise<Said<T>> {
+  const first = await run();
+  if (first.ok || first.kind !== 'stale' || !io.credentials) return first;
+  const proved = await passkeySignIn(io);
+  return proved.ok ? run() : first;
+}
+
 /** Add a passkey for the person signed in, on this device. */
 export async function passkeyRegister(io: Io = live()): Promise<Said<PasskeyInfo>> {
-  const asked = await call(io, '/auth/passkey/register/options', {});
-  if (!asked.ok) return asked;
-  const credential = await creation(io, asked.value as RegistrationOptions);
-  if (!credential.ok) return credential;
-  const out = await call(io, '/auth/passkey/register', { credential: credential.value });
-  if (!out.ok) return out;
-  const info = passkeyOf(out.value);
-  return info ? { ok: true, value: info } : { ok: false, kind: 'refused', fix: null };
+  return afresh(io, async (): Promise<Said<PasskeyInfo>> => {
+    const asked = await call(io, '/auth/passkey/register/options', {});
+    if (!asked.ok) return asked;
+    const credential = await creation(io, asked.value as RegistrationOptions);
+    if (!credential.ok) return credential;
+    const out = await call(io, '/auth/passkey/register', { credential: credential.value });
+    if (!out.ok) return out;
+    const info = passkeyOf(out.value);
+    return info ? { ok: true, value: info } : { ok: false, kind: 'refused', fix: null };
+  });
 }
 
 /** Trade the self-host's server key for a session. The key goes in this one body and is not kept. */
@@ -268,7 +292,43 @@ export async function passkeys(io: Io = live()): Promise<Said<PasskeyInfo[]>> {
 }
 
 export async function removePasskey(id: string, io: Io = live()): Promise<Said<null>> {
-  return done(call(io, '/auth/passkey/remove', { id }));
+  return afresh(io, () => done(call(io, '/auth/passkey/remove', { id })));
+}
+
+/** One live session, as Settings lists it. `ref` tells two apart and opens neither; `record` is `null` for none. */
+export type SessionInfo = { ref: string; current: boolean; authedAt: number; activeAt: number; record: string | null };
+
+function sessionOf(v: unknown): SessionInfo | null {
+  if (!isObj(v) || typeof v.ref !== 'string') return null;
+  return {
+    ref: v.ref,
+    current: v.current === true,
+    authedAt: typeof v.authedAt === 'number' ? v.authedAt : 0,
+    activeAt: typeof v.activeAt === 'number' ? v.activeAt : 0,
+    record: typeof v.record === 'string' ? v.record : null,
+  };
+}
+
+/** Every live session the person signed in has, this one marked `current`. */
+export async function sessions(io: Io = live()): Promise<Said<SessionInfo[]>> {
+  const out = await call(io, '/auth/sessions');
+  if (!out.ok) return out;
+  const rows = isObj(out.value) && Array.isArray(out.value.sessions) ? out.value.sessions : null;
+  if (!rows) return { ok: false, kind: 'refused', fix: null };
+  return { ok: true, value: rows.map(sessionOf).filter((s): s is SessionInfo => s !== null) };
+}
+
+/**
+ * Sign out everywhere else, or everywhere, and answer how many sessions ended.
+ *
+ * `this` BY DEFAULT, because the press is made in a browser somebody is using: ending that one too is a choice the
+ * screen has to ask for by name, and the host reads anything but `none` the same way.
+ */
+export async function signOutEverywhere(keep: 'this' | 'none' = 'this', io: Io = live()): Promise<Said<number>> {
+  const out = await call(io, '/auth/logout/all', { keep });
+  if (!out.ok) return out;
+  const ended = isObj(out.value) && typeof out.value.ended === 'number' ? out.value.ended : null;
+  return ended === null ? { ok: false, kind: 'refused', fix: null } : { ok: true, value: ended };
 }
 
 /**
@@ -286,14 +346,24 @@ export function takeLink(hash: string, clear: () => void): Link | null {
   return token ? { kind: m[1] === 'claim' ? 'claim' : 'magic', token } : null;
 }
 
+/** An invitation link as the page reads it: the invitation, and the proof beside it when the link came from a mail. */
+export type InviteLink = { token: string; proof: string | null };
+
+/** What separates the invitation from its proof in a mailed link. Neither is base64url's alphabet, so it cannot be inside either. */
+const PROOF = '&proof=';
+
 /**
- * Read an invitation's token off `/invite#<token>`, once, clearing the address first for the reason `takeLink` gives.
+ * Read an invitation off `/invite#<token>`, or off `/invite#<token>&proof=<proof>` when the link came from the mail
+ * that proves a new address, once, clearing the address first for the reason `takeLink` gives.
  */
-export function takeInvite(hash: string, clear: () => void): string | null {
-  const token = hash.replace(/^#/, '').trim();
-  if (!token) return null;
+export function takeInvite(hash: string, clear: () => void): InviteLink | null {
+  const raw = hash.replace(/^#/, '').trim();
+  if (!raw) return null;
   clear();
-  return token;
+  const at = raw.indexOf(PROOF);
+  const token = (at < 0 ? raw : raw.slice(0, at)).trim();
+  const proof = at < 0 ? '' : raw.slice(at + PROOF.length).trim();
+  return token ? { token, proof: proof || null } : null;
 }
 
 /** What an invitation says before anybody accepts it: the address it is for, when it runs out, and who is signed in. */
@@ -312,14 +382,35 @@ export async function lookInvite(token: string, io: Io = live()): Promise<Said<I
 }
 
 /**
- * Accept it: the person signed in, or a new person made and signed in, is put on the record.
+ * What accepting answered: on the record and signed in, or a new address that must prove its mailbox first, with
+ * the address the link was sent to.
+ */
+export type Accepted = { kind: 'joined'; who: Who } | { kind: 'proving'; to: string };
+
+async function acceptedOf(asked: Promise<Said<unknown>>): Promise<Said<Accepted>> {
+  const out = await asked;
+  if (!out.ok) return out;
+  const v = out.value;
+  if (isObj(v) && v.proving === true && typeof v.to === 'string') return { ok: true, value: { kind: 'proving', to: v.to } };
+  const who = whoOf(v);
+  return who ? { ok: true, value: { kind: 'joined', who } } : { ok: false, kind: 'refused', fix: null };
+}
+
+/**
+ * Accept it: the person signed in is put on the record, or a new address is sent a link that proves it.
  *
  * `name` IS WHAT THEY TYPED FOR THEMSELVES, and a blank box sends no field. This posted the token alone, so the name
  * the host, the Directory and the record's mirror were all ready to take was never sent by anything. What a name may
  * be is the host's to decide (`packages/host/src/invite.ts`, `personName`), and its refusal comes back as a sentence.
+ * For a new address the host keeps the name with the proof, and makes the person with it when the proof comes back.
  */
-export async function acceptInvite(token: string, name?: string, io: Io = live()): Promise<Said<Who>> {
-  return signedIn(call(io, '/auth/invite', { inviteToken: token, accept: true, ...(name?.trim() ? { name } : {}) }));
+export async function acceptInvite(token: string, name?: string, io: Io = live()): Promise<Said<Accepted>> {
+  return acceptedOf(call(io, '/auth/invite', { inviteToken: token, accept: true, ...(name?.trim() ? { name } : {}) }));
+}
+
+/** Accept with the proof the mail carried: the new person is made, put on the record and signed in. */
+export async function acceptProved(token: string, proof: string, io: Io = live()): Promise<Said<Accepted>> {
+  return acceptedOf(call(io, '/auth/invite', { inviteToken: token, accept: true, proof }));
 }
 
 /* ── the browser half of WebAuthn ────────────────────────────────────────────────────────────────
