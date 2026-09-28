@@ -68,7 +68,8 @@ export const shell = {
   packs: 'Add-ons',
   vault: 'Vault',
   settings: 'Settings',
-  audit: 'History',
+  /* ACTIVITY, AND IT WAS HISTORY: the owner's old tool called the same screen Activity, and it is a row of the flat nav now. */
+  audit: 'Activity',
   automations: 'Automations',
   /* AGT-23's screen, named in the rail and in the phone's More sheet. */
   jobs: 'Jobs',
@@ -77,13 +78,8 @@ export const shell = {
   arrangeCancel: 'Cancel',
   moveUp: 'Move up',
   moveDown: 'Move down',
-  /* The nav's own two, which the arrange verbs above do not cover: a rail is sectioned, so "top"
-     means the top of the section, and "hide" is the nav's word for removing a row without deleting
-     the page behind it (19 §3). */
-  moveToTop: 'Move to top',
-  hide: 'Hide',
-  /* HIDING A PAGE AND BRINGING IT BACK. Kept for the person on a record, on every device, and on this device with none. */
-  hiddenFromNav: (title: string) => `${title} is hidden from your nav.`,
+  /* HIDING A PAGE AND BRINGING IT BACK, which Settings, Navigation does since the rail became one flat list with no
+     menu of its own on each row. */
   hiddenCount: (n: number) => (n === 1 ? '1 page hidden' : `${n} pages hidden`),
   showHidden: 'Show',
 
@@ -217,6 +213,15 @@ export const shell = {
   shareSetup: 'Share this setup',
   /* THE RAIL'S STAR, said in plain words beside its name (`lib/ui/Sidebar.svelte`). */
   slashRail: 'Slash: suggestions to fit this BrainDog to how you use it',
+  /* THE FLAT NAV'S OWN ROWS (`flatNav` in `lib/nav.ts`): the screen every record opens on, the page it opened on before,
+     and Slash's row under More, named for what it offers rather than by its own name. */
+  today: 'Today',
+  overview: 'Overview',
+  suggestions: 'Suggestions',
+  /* The phone's More sheet, over what the rail keeps under its own More. */
+  otherPages: 'Other pages',
+  /* The search button at the head of the rail, which says its two keys where the pointer rests on it. */
+  searchKeys: 'Search (press / or Ctrl K)',
 
   /* MONEY IS AN INTEGER IN MINOR UNITS, and this is the one place a person types one. The sentence
      says what to do rather than what is wrong: "not a number" is a verdict, and "digits and at most
@@ -416,7 +421,7 @@ export const shell = {
   editCancel: 'Cancel',
   searchDecided: 'Decided',
   proposalKind: (kind: string): string =>
-    ({ page: 'Page', register: 'List', ingest: 'Rule for what comes in', theme: 'Look', metric: 'Measure', digest: 'Summary', rule: 'Rule', block: 'Block' })[kind] ??
+    ({ page: 'Page', register: 'List', ingest: 'Rule for what comes in', theme: 'Look', metric: 'Measure', digest: 'Summary', rule: 'Rule', block: 'Page part' })[kind] ??
     kind.charAt(0).toUpperCase() + kind.slice(1),
   arrangeAdds: 'Adds',
   /* WHAT AN UPDATE HANDS TO ANOTHER PACK, which stays live: said apart from what it takes away, because a door the owner's

@@ -21,9 +21,11 @@ export const words = {
   asked: 'Asked on Decide. The owner reads the same plan there.',
   openDecide: 'Open it on Decide',
   fromTo: (from: string, to: string) => `${from} to ${to}`,
+  /* WHAT AN UPDATE'S ROW SAYS: the versions it moves between are in its tooltip, for whoever wants them. */
+  updateAvailable: 'Update available',
   /* INSTALL FROM. */
   fromBlurb: 'A use case or an add-on somebody shared: a file, an https address, a file in a GitHub repository, or its text pasted in.',
-  address: 'An https address, or git:owner/repo@ref:path',
+  address: 'An https address, or a file in a GitHub repository',
   addressHint: 'The host reads it, so a site that blocks browsers still works.',
   read: 'Read it',
   reading: 'Reading',

@@ -1,0 +1,296 @@
+/**
+ * Today, read from the record: what needs you, who is working, what changed since you last looked, and money at a
+ * glance. The screen every record opens on (`routes/+page.svelte`).
+ *
+ * THROUGH THE RECORD'S OWN READS AND NOTHING ELSE. `boot` says which lists the record holds, who is working and what is
+ * new since the reader's mark; `previewPage` answers the queue of open questions ranked as every queue is, and the runs
+ * with the project each is placed in; `list` answers the tasks and the bills; `metric` the cash. A read that is refused
+ * leaves its section out rather than failing the screen, because a record without Money has no money to glance at and
+ * a member who may not read Decide has no questions to be shown.
+ *
+ * A ROUTE-ONLY MODULE, like `news-live.ts`: the client carries the route table as a value. The fetch is handed in, so
+ * a test drives every branch without a socket, and the parts that turn answers into rows are pure and exported.
+ */
+
+import { createClient, type Boot, type Cursor, type EventLine } from '@braindog/client';
+import type { QueueQuestion } from '@braindog/kernel';
+import { money } from 'braindog-render';
+
+import type { Fetch } from './boot-live.ts';
+import { moneyInText } from './money.ts';
+
+/** A task that needs you: past its day, due today, or marked urgent. */
+export type TaskRow = { seq: number; what: string; due: string | null; project: string | null; why: 'late' | 'today' | 'urgent'; agent: string | null };
+
+/** A run an agent has open now: who, what it says it is doing, where, and when it was last heard from. */
+export type RunRow = { seq: number | null; agent: string; doing: string; project: string | null; seen: string | null };
+
+/** One kind of change since the reader's mark: how many, called what, and the activity filtered to it. */
+export type SinceRow = { key: string; label: string; count: number; href: string };
+
+/** One figure of cash: a book's name, or `null` for the whole; the amount as a screen writes it. */
+export type CashLine = { label: string | null; amount: string };
+
+/** A bill or an invoice coming up, with its amount signed by which way the money goes. */
+export type DueRow = { seq: number; what: string; amount: string | null; out: boolean; due: string | null; late: boolean };
+
+export type Today = {
+  now: number;
+  /** `null` when the record holds no tasks list. */
+  tasks: TaskRow[] | null;
+  /** At most three, ranked as every queue is, with their options. */
+  questions: QueueQuestion[];
+  /** How many questions are open in all. */
+  open: number;
+  runs: RunRow[];
+  since: { rows: SinceRow[]; total: number; capped: boolean };
+  /** What the read mark is moved to when the reader leaves: the newest line this screen held. */
+  upTo: Cursor | null;
+  /** `null` when the record holds no money. */
+  money: { cash: CashLine[]; books: CashLine[]; due: DueRow[] } | null;
+};
+
+export type TodayRead = { ok: true; value: Today } | { ok: false; refusal: { code: string; fix: string } };
+
+type Row = { id: string; seq: number | null; fields: Record<string, unknown> };
+type Client = ReturnType<typeof createClient>;
+
+/** How many open questions Today answers in place; the rest are a link to Decide. */
+export const QUESTIONS_SHOWN = 3;
+
+/* A SENTENCE `where` GOES OUT AS THE JSON TEXT OF THE SENTENCE (`carried` in `lib/data/record.ts` says why). */
+const carried = (where: string): unknown => ({ toJSON: () => where });
+
+const text = (v: unknown): string => (typeof v === 'string' ? v : '');
+const isRow = (v: unknown): v is Row => typeof v === 'object' && v !== null && typeof (v as Row).id === 'string';
+
+/** The reader's own day, `YYYY-MM-DD`, in their zone: a task due today is due on the day on their wall. */
+export function dayOf(now: number): string {
+  const d = new Date(now);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** An amount the record holds, `{ amount, currency }`, as a screen writes it. */
+export function amountSaid(v: unknown): string | null {
+  if (typeof v !== 'object' || v === null) return null;
+  const { amount, currency } = v as { amount?: unknown; currency?: unknown };
+  return typeof amount === 'number' && typeof currency === 'string' ? moneyInText(money(amount, currency)) : null;
+}
+
+/* ── what needs you ─────────────────────────────────────────────────────── */
+
+/**
+ * The tasks that need you, late first, then today's, then the urgent ones with no day yet come, each once.
+ *
+ * `due` AND `urgent` ARE TWO READS, because a task is here for either reason and the record answers one predicate a
+ * read. A task in both is drawn once, under the day, which is the more pressing of the two facts.
+ */
+export function tasksOf(due: readonly Row[], urgent: readonly Row[], today: string, projects: ReadonlyMap<string, string>): TaskRow[] {
+  const seen = new Set<number>();
+  const out: TaskRow[] = [];
+  const add = (r: Row, why: TaskRow['why']) => {
+    if (r.seq === null || seen.has(r.seq)) return;
+    seen.add(r.seq);
+    const by = text(r.fields.by).slice(0, 10) || null;
+    out.push({
+      seq: r.seq,
+      what: text(r.fields.what) || `#${r.seq}`,
+      due: by,
+      project: projects.get(text(r.fields.thing)) ?? null,
+      why,
+      agent: text(r.fields.agent) || null,
+    });
+  };
+  for (const r of due) {
+    const by = text(r.fields.by).slice(0, 10);
+    if (by !== '') add(r, by < today ? 'late' : 'today');
+  }
+  for (const r of urgent) add(r, 'urgent');
+  const rank = { late: 0, today: 1, urgent: 2 } as const;
+  return out.sort((a, b) => rank[a.why] - rank[b.why] || (a.due ?? '').localeCompare(b.due ?? ''));
+}
+
+/* ── since you were last here ───────────────────────────────────────────── */
+
+/* WHAT A CHANGE THAT IS NOT ABOUT A ROW IS CALLED, in the plural a count reads with. Kinds that say the same thing to a
+   person share a line: a question asked and a question proposed are both a question somebody put to you. */
+const KIND_WORDS: Record<string, string> = {
+  decide: 'Decisions made',
+  supersede: 'Decisions replaced',
+  suggest: 'Questions asked',
+  propose: 'Questions asked',
+  resolve: 'Questions closed',
+  install: 'Add-ons changed',
+  uninstall: 'Add-ons changed',
+  upgrade: 'Add-ons changed',
+  retire: 'Add-ons changed',
+  declare: 'Pages changed',
+  arrive: 'Things that came in',
+  match: 'Things that came in',
+  extract: 'Things that came in',
+  pull: 'Things that came in',
+  'access.grant': 'Access changed',
+  'access.revoke': 'Access changed',
+  'share.open': 'Links shared',
+  'share.close': 'Links shared',
+  export: 'Backups',
+  import: 'Imports',
+};
+
+/* AN AGENT'S RUN SAYS IT IS STILL THERE EVERY FEW MINUTES, and those lines are the machinery of Working now, not news. */
+const QUIET = new Set(['session']);
+
+const keyWords = (k: string): string => (k.startsWith('grant.') ? 'Keys used or changed' : (KIND_WORDS[k] ?? 'Other changes'));
+
+/**
+ * What changed since the reader's mark, counted by kind: a row's changes by the list it is on ("Tasks"), anything else
+ * by what it was ("Decisions made"). Each count opens the activity filtered to it. Most first.
+ */
+export function sinceOf(events: readonly Pick<EventLine, 'kind' | 'register'>[], lists: ReadonlyMap<string, string>): SinceRow[] {
+  const rows = new Map<string, SinceRow>();
+  for (const e of events) {
+    if (e.register !== null && QUIET.has(e.register)) continue;
+    const onRow = e.register !== null;
+    const label = onRow ? (lists.get(e.register!) ?? e.register!) : keyWords(e.kind);
+    const key = onRow ? `list:${e.register}` : `kind:${label}`;
+    const had = rows.get(key);
+    if (had) had.count += 1;
+    else
+      rows.set(key, {
+        key,
+        label,
+        count: 1,
+        href: onRow ? `/audit?list=${encodeURIComponent(e.register!)}` : `/audit?kind=${encodeURIComponent(e.kind)}`,
+      });
+  }
+  return [...rows.values()].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+}
+
+/* ── money ──────────────────────────────────────────────────────────────── */
+
+type Reading = { value: number | null; unit: string | null; held?: number; rows?: number; parts?: { currency: string; amount: number }[]; groups?: { key: string; value: number | null; parts?: { currency: string; amount: number }[] }[] };
+
+/** One figure, or one line a currency when it is held in several that were not added up. */
+export function cashOf(r: Pick<Reading, 'value' | 'unit' | 'parts'>, label: string | null): CashLine[] {
+  if (r.parts && r.parts.length > 0) return r.parts.map((p) => ({ label, amount: moneyInText(money(p.amount, p.currency)) }));
+  if (typeof r.value === 'number' && r.unit) return [{ label, amount: moneyInText(money(Math.round(r.value), r.unit)) }];
+  return [];
+}
+
+/* ── the read ───────────────────────────────────────────────────────────── */
+
+async function rows(client: Client, register: string, where: string | null, order: { field: string; dir: 'asc' | 'desc' } | null, limit: number): Promise<Row[]> {
+  const out = await client.list({ register, limit, ...(where ? { where: carried(where) } : {}), ...(order ? { order: [order] } : {}) });
+  return out.ok ? (out.value.rows as unknown[]).filter(isRow) : [];
+}
+
+async function names(client: Client, register: string, field: string): Promise<Map<string, string>> {
+  const got = await rows(client, register, null, null, 500);
+  return new Map(got.map((r) => [r.id, text(r.fields[field])]));
+}
+
+/** The queue and the runs, drawn by the record as a page it holds nowhere: one read, ranked as every queue is. */
+async function drawn(client: Client): Promise<{ questions: QueueQuestion[]; runs: RunRow[] }> {
+  const body = {
+    page: 'today',
+    title: 'Today',
+    blocks: [
+      { kind: 'queue', heading: 'Needs you', source: 'governance.open', limit: QUESTIONS_SHOWN },
+      {
+        kind: 'table',
+        heading: 'Working now',
+        source: 'sessions.live',
+        where: 'state is active',
+        columns: [{ field: 'agent' }, { field: 'doing' }, { field: 'last_seen' }],
+        limit: 8,
+      },
+    ],
+  };
+  const out = await client.call<{ blocks?: unknown }>('previewPage', { body });
+  if (!out.ok) return { questions: [], runs: [] };
+  const blocks = (Array.isArray(out.value.blocks) ? out.value.blocks : []) as { kind?: string; queue?: unknown; rows?: unknown; scopes?: unknown; refusals?: unknown[] }[];
+  const queue = blocks.find((b) => b.kind === 'queue');
+  const table = blocks.find((b) => b.kind === 'table');
+  const questions = queue && Array.isArray(queue.queue) ? (queue.queue as QueueQuestion[]).filter((q) => Array.isArray(q.options)) : [];
+  const scopes = table && Array.isArray(table.scopes) ? (table.scopes as (string | null)[]) : [];
+  const runs = table && Array.isArray(table.rows)
+    ? (table.rows as unknown[]).filter(isRow).map((r, i) => ({
+        seq: r.seq,
+        agent: text(r.fields.agent) || 'other',
+        doing: text(r.fields.doing),
+        project: scopes[i] ?? (text(r.fields.project) || null),
+        seen: text(r.fields.last_seen) || null,
+      }))
+    : [];
+  return { questions, runs };
+}
+
+async function tasksFor(client: Client, held: ReadonlySet<string>, today: string): Promise<TaskRow[] | null> {
+  if (!held.has('tasks')) return null;
+  const live = 'state is not done or dropped';
+  const [due, urgent, projects] = await Promise.all([
+    rows(client, 'tasks', `${live}, by before +1d`, { field: 'by', dir: 'asc' }, 25),
+    rows(client, 'tasks', `${live}, priority is urgent`, null, 15),
+    held.has('things') ? names(client, 'things', 'name') : Promise.resolve(new Map<string, string>()),
+  ]);
+  return tasksOf(due, urgent, today, projects);
+}
+
+async function moneyFor(client: Client, held: ReadonlySet<string>, books: number, today: string): Promise<Today['money']> {
+  if (!held.has('accounts')) return null;
+  const [now, byBook, bookNames, due] = await Promise.all([
+    client.metric('cash-now'),
+    books >= 2 ? client.metric('cash-by-book') : Promise.resolve(null),
+    books >= 2 ? names(client, 'books', 'name') : Promise.resolve(new Map<string, string>()),
+    held.has('obligations') ? rows(client, 'obligations', 'state is open or part', { field: 'due', dir: 'asc' }, 5) : Promise.resolve([]),
+  ]);
+  const cash = now.ok ? cashOf(now.value as Reading, null) : [];
+  const groups = byBook?.ok ? ((byBook.value as Reading).groups ?? []) : [];
+  const bookLines = groups.flatMap((g) => cashOf({ value: g.value, unit: (byBook!.ok ? (byBook!.value as Reading).unit : null), parts: g.parts ?? [] }, bookNames.get(g.key) || 'In no book'));
+  return {
+    cash,
+    books: bookLines,
+    due: due.flatMap((r) =>
+      r.seq === null
+        ? []
+        : [{ seq: r.seq, what: text(r.fields.what) || `#${r.seq}`, amount: amountSaid(r.fields.amount), out: r.fields.direction === 'owed_by_me', due: text(r.fields.due).slice(0, 10) || null, late: text(r.fields.due).slice(0, 10) !== '' && text(r.fields.due).slice(0, 10) < today }],
+    ),
+  };
+}
+
+/** Today, read whole. Only a refused `boot` refuses the screen; every other read leaves its section out. */
+export async function readToday(base: string, io?: Fetch, at?: number): Promise<TodayRead> {
+  const client = createClient({ base, ...(io ? { fetch: io } : {}) });
+  const booted = await client.boot();
+  if (!booted.ok) {
+    const said = 'refusal' in booted ? booted.refusal : { code: 'VERSION_STALE', fix: 'The record changed while it was being read.' };
+    return { ok: false, refusal: { code: said.code, fix: said.fix } };
+  }
+  const b: Boot = booted.value;
+  /* THE RECORD'S CLOCK, as every other screen reads "today" and "late" against, unless a caller holds another. */
+  const said = Date.parse(b.now);
+  const now = at ?? (Number.isFinite(said) ? said : Date.now());
+  const held = new Set(b.registers.map((r) => r.id));
+  const lists = new Map(b.registers.map((r) => [r.id, r.name]));
+  const books = b.registers.find((r) => r.id === 'books')?.count ?? 0;
+  const [queue, tasks, cash] = await Promise.all([
+    drawn(client).catch(() => ({ questions: [], runs: [] })),
+    tasksFor(client, held, dayOf(now)).catch(() => null),
+    moneyFor(client, held, books, dayOf(now)).catch(() => null),
+  ]);
+  const events = b.whatsNew?.events ?? [];
+  const since = sinceOf(events, lists);
+  return {
+    ok: true,
+    value: {
+      now,
+      tasks,
+      questions: queue.questions,
+      open: b.counts?.decide ?? (b.waiting ?? []).length,
+      runs: queue.runs,
+      since: { rows: since, total: since.reduce((n, r) => n + r.count, 0), capped: b.whatsNew?.sinceCapped ?? false },
+      upTo: b.whatsNew?.upTo ?? null,
+      money: cash,
+    },
+  };
+}

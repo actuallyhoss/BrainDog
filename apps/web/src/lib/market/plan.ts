@@ -28,13 +28,14 @@ const count = (v: unknown): number => (typeof v === 'number' && Number.isFinite(
 /** The sheet's own words. The buttons' verbs follow `design.md` §6.4: the verb and its object. */
 export const words = {
   install: (name: string) => `Install ${name}`,
-  update: (name: string, to: string) => `Update ${name} to ${to}`,
+  /* NO VERSION NUMBERS ON THE BUTTONS OR THE PARTS: a person updates an add-on, and "1.2.0 to 1.3.0" is the add-on's
+     bookkeeping, not theirs. */
+  update: (name: string) => `Update ${name}`,
   reinstall: (name: string) => `Install ${name} again`,
-  downgrade: (name: string, to: string) => `Go back to ${name} ${to}`,
+  downgrade: (name: string) => `Go back to the earlier ${name}`,
   updateAll: (n: number) => (n === 1 ? 'Update 1 add-on' : `Update all ${n}`),
   updateAllTitle: (n: number) => (n === 1 ? 'One update' : `${n} updates`),
-  fromTo: (from: string, to: string) => `${from} to ${to}`,
-  version: (v: string) => `Version ${v}`,
+  updateAvailable: 'Update available',
   notNow: 'Not now',
   stops: "What stops this install",
   adds: 'Adds',
@@ -184,7 +185,7 @@ function diffPart(d: Body, name: (id: string) => string): { part: Part; stops: s
   const part: Part = {
     key: id,
     title,
-    move: installed && installed !== version ? words.fromTo(installed, version) : words.version(version),
+    move: installed && installed !== version ? words.updateAvailable : '',
     sections: [
       ...section('adds', words.adds, list(d.adds).map((a) => row(name(text(a.id)), a.handed === true ? words.handed : text(a.summary) || null))),
       ...section('changes', words.changes, list(d.changes).map((c) => row(name(text(c.id)), text(c.summary) || null))),
@@ -230,7 +231,7 @@ function sharedParts(plan: Body, name: (id: string) => string): { parts: Part[];
     return {
       key: text(p.id),
       title: text(p.title) || name(text(p.id)),
-      move: installed && installed !== version ? words.fromTo(installed, version) : words.version(version),
+      move: installed && installed !== version ? words.updateAvailable : '',
       sections: [
         ...section('adds', words.adds, named(p.adds)),
         ...section('changes', words.changes, strings(p.changes).map((c) => row(c))),
@@ -285,9 +286,9 @@ export function sheetOf(diff: unknown, nameOf: (id: string) => string): Sheet | 
   }
   const approve =
     head.direction === 'upgrade'
-      ? words.update(head.title, head.version)
+      ? words.update(head.title)
       : head.direction === 'downgrade'
-        ? words.downgrade(head.title, head.version)
+        ? words.downgrade(head.title)
         : head.direction === 'reinstall'
           ? words.reinstall(head.title)
           : words.install(head.title);

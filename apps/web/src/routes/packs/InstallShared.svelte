@@ -215,7 +215,7 @@
     <textarea id="from-paste" class="field-input from-text" rows="6" spellcheck="false" bind:value={pasted}></textarea>
     <Button weight="bare" type="submit" disabled={busy || !client || pasted.trim() === ''}>{words.readPasted}</Button>
   </form>
-  {#if said}<p class="from-said" role="status">{said.fix}{#if said.code}<span class="from-code">{copy.refusalCode(said.code)}</span>{/if}</p>{/if}
+  {#if said}<p class="from-said" role="status" title={said.code ? copy.refusalCode(said.code) : undefined}>{said.fix}</p>{/if}
   {#if filed !== null}<p class="from-said" role="status">{words.asked}{#if filed}{' '}<a class="tap" href={at(`/decide/${filed}`)}>{words.openDecide}</a>{/if}</p>{/if}
 </div>
 
@@ -304,12 +304,6 @@
     margin: 0;
     color: var(--ink2);
     font-size: var(--t-sm);
-  }
-
-  .from-code {
-    color: var(--dim);
-    font-family: var(--font-id);
-    font-size: var(--t-xs);
   }
 
   .from-voice {

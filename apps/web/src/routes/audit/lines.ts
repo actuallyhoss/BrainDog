@@ -25,6 +25,8 @@ import type { AuditEvent } from '../../lib/record/schema.ts';
  * `nameWords` is: each is a piece of a sentence this file builds, and none is read anywhere else.
  */
 export const historyWords = {
+  /* THE ONE LIST TODAY'S COUNT OPENED THE LOG ON (`?list=`), said over the filters so the narrowing is never silent. */
+  onlyList: (name: string) => `Only ${name}`,
   since: 'Since you last looked',
   sinceNothing: 'Nothing new since you last looked',
   sinceNewest: (n: number): string => `Since you last looked, the newest ${n.toLocaleString('en')}`,

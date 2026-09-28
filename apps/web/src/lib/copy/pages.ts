@@ -28,8 +28,8 @@ export const pages = {
   moveToMain: 'Move to main',
   mainColumn: 'Main column',
   sideRail: 'Side rail',
-  removeBlock: 'Remove this block',
-  addBlock: 'Add a block',
+  removeBlock: 'Remove from this page',
+  addBlock: 'Add to this page',
   showMe: 'Show me',
   asA: 'Draw it as',
   onPage: 'On the page',
@@ -48,7 +48,7 @@ export const pages = {
    */
   willAdd: (name: string, span: number) =>
     `Adds a ${name} to the end of the page, ${span === 12 ? 'the full width' : `${span} twelfths wide`}.`,
-  blockLink: 'a link to this block',
+  blockLink: 'a link to this part of the page',
 
   /* The picker groups by PURPOSE, because somebody adding a block knows they want to show a list
      and does not know that `todo` and `timeline` share a primitive while `chips` does not. */

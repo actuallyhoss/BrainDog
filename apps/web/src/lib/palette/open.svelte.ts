@@ -11,9 +11,18 @@
  * in a place nothing can typecheck; a rune in a module is the same state the shell already had, with
  * one more reader.
  */
-export const palette = $state({ open: false });
+export const palette = $state({ open: false, seed: '' });
 
 /** Open it. The one verb a page needs, so no page has to know how the shell holds it. */
 export function openPalette(): void {
+  palette.open = true;
+}
+
+/**
+ * Open it with words already in its field: what somebody typed into Today's ask bar, so the search, the "Add to" line
+ * and Slash's question are all answered for it without typing it twice.
+ */
+export function openPaletteWith(seed: string): void {
+  palette.seed = seed;
   palette.open = true;
 }

@@ -387,7 +387,7 @@ export const account = {
      its daily limit of calls from rules (`actions.ts`, whose `notify` the kernel routes with `urgent: true`). The first
      rewrite named only the credential, and the checker found the action's three call sites. A payment and a domain
      are what one use case's rules might say, not what BrainDog does. */
-  urgentKindsAre: 'A credential in the vault expiring inside 48 hours, a scheduled action held back because its key is missing or it reached its daily limit, and anything a rule marks urgent. Each rule says so itself, and adding a pack shows which of its rules would interrupt you.',
+  urgentKindsAre: 'A credential in the vault expiring inside 48 hours, a scheduled action held back because its key is missing or it reached its daily limit, and anything a rule marks urgent. Each rule says so itself, and adding an add-on shows which of its rules would interrupt you.',
   interruptCap: 'At most',
   interruptCapIs: 'One urgent interruption an hour.',
   unreadCount: 'Unread',

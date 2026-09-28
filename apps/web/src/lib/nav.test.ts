@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { arrange, orderLists, withOrder } from './nav.ts';
+import { arrange, flatNav, isHere, orderLists, tabsOf, withOrder } from './nav.ts';
 
 type Entry = { section: string; href: string; order: number };
 
@@ -81,4 +81,57 @@ test('THE LISTS FOLLOW THE ARRANGEMENT TOO, and a list it does not name keeps it
 
 test("A SHARED ORDER GOES FIRST, AND WHAT THE READER HAD ARRANGED STAYS BEHIND IT", () => {
   assert.deepEqual(withOrder(['/r/courses', '/r/assignments'], ['/p/money', '/r/assignments', '/r/people']), ['/r/courses', '/r/assignments', '/p/money', '/r/people']);
+});
+
+/* ── the flat list ─────────────────────────────────────────────────────── */
+
+type Page = { title: string; href: string; icon: string; row?: boolean };
+const page = (title: string, href: string, row = false): Page => ({ title, href, icon: 'doc', ...(row ? { row: true } : {}) });
+const WORDS = { today: 'Today', activity: 'Activity', decide: 'Decide' };
+
+/** The founder's sections as the record declares them, a project's own page and a book's own page among them. */
+const FOUNDER: [string, Page[]][] = [
+  ['Dashboard', [page('Dashboard', '/p/dashboard'), page('Northwind Labs Ltd', '/p/org-1', true)]],
+  ['Money', [page('Money', '/p/money'), page('Personal', '/p/book-1', true)]],
+  ['People', [page('People', '/p/people')]],
+  ['Projects', [page('Overview', '/p/projects'), page('Northwind app', '/p/project-1', true)]],
+  ['Work', [page('Work', '/p/work'), page('Board', '/p/work-board')]],
+  ['Services', [page('Services', '/p/services')]],
+];
+
+test('THE FOUNDER`S NAV IS ONE FLAT LIST OF SEVEN AT MOST: Today, the three sections a day runs through, Activity, then the rest', () => {
+  const flat = flatNav(FOUNDER, 0, WORDS);
+  assert.deepEqual(
+    flat.main.map((i) => i.label),
+    ['Today', 'Work', 'Projects', 'Money', 'Activity', 'People', 'Services'],
+  );
+  /* Each section opens on its lead page, the Overview where there is one, and never on a row's own page. */
+  assert.deepEqual(flat.main.find((i) => i.label === 'Projects')?.href, '/p/projects');
+  /* Today stands in for the Dashboard, which is under More with nothing else pushed there. */
+  assert.deepEqual(flat.more.map((i) => i.label), ['Dashboard']);
+  /* A section's other pages are under More too, and a project's, a book's or an organisation's own page is not. */
+  assert.deepEqual(flat.pages.map((p) => p.href), ['/p/work-board']);
+});
+
+test('DECIDE IS A ROW ONLY WHILE SOMETHING WAITS, with its count, and what no longer fits folds under More', () => {
+  const flat = flatNav(FOUNDER, 3, WORDS);
+  assert.equal(flat.main.length, 7);
+  assert.deepEqual(flat.main.map((i) => i.label), ['Today', 'Work', 'Projects', 'Money', 'Activity', 'Decide', 'People']);
+  assert.equal(flat.main.find((i) => i.key === 'decide')?.count, 3);
+  assert.deepEqual(flat.more.map((i) => i.label), ['Services', 'Dashboard']);
+});
+
+test('A RECORD WITH SECTIONS THE LIST DOES NOT NAME KEEPS THEM, in the reader`s order, and a project`s page is still here on it', () => {
+  const flat = flatNav([['Coursework', [page('Coursework', '/p/coursework')]], ['Reading', [page('Reading', '/p/reading')]]], 0, WORDS);
+  assert.deepEqual(flat.main.map((i) => i.label), ['Today', 'Coursework', 'Reading', 'Activity']);
+  const projects = flatNav(FOUNDER, 0, WORDS).main.find((i) => i.label === 'Projects')!;
+  assert.ok(isHere(projects, '/p/project-1'));
+  assert.ok(!isHere(projects, '/p/money'));
+  const today = flatNav(FOUNDER, 0, WORDS).main[0]!;
+  assert.ok(isHere(today, '/') && !isHere(today, '/audit'));
+});
+
+test('THE PHONE`S TABS ARE THE FIRST FIVE, with Decide beside Today while something waits on it', () => {
+  assert.deepEqual(tabsOf(flatNav(FOUNDER, 0, WORDS).main).map((i) => i.label), ['Today', 'Work', 'Projects', 'Money', 'Activity']);
+  assert.deepEqual(tabsOf(flatNav(FOUNDER, 2, WORDS).main).map((i) => i.label), ['Today', 'Decide', 'Work', 'Projects', 'Money']);
 });
