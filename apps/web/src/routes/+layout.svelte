@@ -61,14 +61,12 @@
   import type KeymapView from '$lib/ui/Keymap.svelte';
   import { palette } from '$lib/palette/open.svelte.ts';
   import { levelWord, openRecord } from '$lib/record/switcher.ts';
-  import { nameWords } from '$lib/record/names.ts';
-  import { arrange, orderLists } from '$lib/nav.ts';
+  import { OVERVIEW, arrange, flatNav, isHere, orderLists, placeOf, tabsOf } from '$lib/nav.ts';
   import { navPrefs } from '$lib/nav-prefs.svelte.ts';
-  import { BAR_SPINE, spineOf, type SpineKey } from '$lib/spine.ts';
+  import { spineOf } from '$lib/spine.ts';
   import { said } from '$lib/voice.svelte.ts';
-  import type { NavEntry } from '$lib/record/api.ts';
   import Sheet from '$lib/ui/Sheet.svelte';
-  import Icon from '$lib/ui/Icon.svelte';
+  import Icon, { type IconName } from '$lib/ui/Icon.svelte';
   import LapseBanner from '$lib/ui/LapseBanner.svelte';
   import Pull from '$lib/ui/Pull.svelte';
   import { untrack } from 'svelte';
@@ -143,83 +141,54 @@
     palette.open = true;
   }
 
-  /* THE RAIL'S FOOT, IN THE ORDER A PHONE READS IT (design 6.6), with the rail's glyphs. Settings
-     goes to `/settings`, which is the index of areas below 900px and opens the first area above it
-     (DSN-13), so a phone lands on the list of areas rather than inside Appearance. */
-  /* SLASH AND AUTOMATIONS LEFT THIS LIST FOR THE SPINE'S ROWS AT THE SHEET'S HEAD (`spineRows`), where the rail keeps
-     them. USAGE JOINED IT (MOD-25): `/usage` was a page nothing on a phone reached but the address bar. Its word is
-     written here rather than read from `record/actions.ts`, whose `words.usage` it matches, because importing that
-     module would carry the record's usage reader into the shell's entry chunk for one word. */
-  const USAGE = 'Usage';
-  const PLACES = [
-    ['/packs', copy.packs, 'packs', '/packs'],
-    ['/jobs', copy.jobs, 'play', '/jobs'],
-    ['/usage', USAGE, 'observe', '/usage'],
-    ['/vault', copy.vault, 'vault', '/vault'],
-    ['/settings', copy.settings, 'settings', '/settings'],
-    ['/audit', copy.audit, 'clock', '/audit'],
-  ] as const;
-
-  /** The same sectioned grouping AND THE SAME ORDER the rail draws — one nav, not two shapes. It
-      was `group(data.nav)`, so the phone's More sheet ignored an arrangement the rail honoured. */
+  /** The same order the rail draws, one nav and not two shapes. */
   /* A SAVED VIEW DRAWN UNDER ITS LIST is not drawn again under Views. The palette still reads every page in `data.nav`. */
-  /* AND A TABBED SECTION'S PAGE PAST THE RAIL'S BUDGET IS THE STRIP'S, NOT THE RAIL'S (`cut`, PGS-18): the page's own
-     tabs read `data.nav` whole, and every bar here reads this. */
+  /* AND A TABBED SECTION'S PAGE PAST THE RAIL'S BUDGET IS THE STRIP'S, NOT THE RAIL'S (`cut`, PGS-18). */
   const railNav = $derived.by(() => {
     const placed = new Set(data.index.registers.flatMap((r) => (r.views ?? []).map((v) => v.href)));
     return data.nav.filter((n) => !n.cut && !placed.has(n.href));
   });
-  /* THE SPINE, ONE RULE FOR THE THREE BARS (`spine.ts`). A shell no record answered has no `counts`, and is read from the
-     two numbers it does carry. */
+  /* THE SPINE'S RULE FOR INBOX (`spine.ts`): it is a row under More once anything has arrived. A shell no record answered
+     has no `counts`, and is read from the two numbers it does carry. */
   const spine = $derived(spineOf(data.counts ?? { decide: data.open, inbox: data.inbox }));
+  /* THE TOOLS UNDER MORE, IN THE ORDER A PHONE READS THEM, with the rail's glyphs and the rail's words (`Sidebar.svelte`).
+     Slash's page is Suggestions there, and Inbox joins once anything has arrived (`spineOf`). USAGE IS HERE (MOD-25): its
+     word is written out rather than read from `record/actions.ts`, which would carry the usage reader into the entry
+     chunk for one word. Settings goes to `/settings`, the index of areas below 900px (DSN-13). */
+  const USAGE = 'Usage';
+  const places = $derived([
+    ...(spine.includes('inbox') ? ([['/inbox', said('inbox'), 'inbox']] as const) : []),
+    ['/slash', copy.suggestions, 'star'],
+    ['/automations', copy.automations, 'refresh'],
+    ['/jobs', copy.jobs, 'play'],
+    ['/packs', copy.packs, 'packs'],
+    ['/vault', copy.vault, 'vault'],
+    ['/usage', USAGE, 'observe'],
+    ['/settings', copy.settings, 'settings'],
+  ] as const);
+
   /* THE PERSON'S OWN RAIL, as `boot` answered it, before anything draws it (`nav-prefs.svelte.ts`). */
   $effect.pre(() => navPrefs.adopt(data.me.prefs, apiBase()));
   /* A PAGE HIDDEN FROM THE RAIL IS HIDDEN FROM THE TOP BAR AND THE MORE SHEET TOO: one nav, not two. */
   const grouped = $derived(arrange(railNav.filter((e) => !navPrefs.hidden.includes(e.href)), navPrefs.order));
+  const hiddenCount = $derived(railNav.filter((e) => navPrefs.hidden.includes(e.href)).length);
   /* THE PHONE'S LISTS IN THE RAIL'S ORDER, from the same preference (`orderLists`). */
   const moreLists = $derived(orderLists(data.index.registers, navPrefs.order));
 
   /**
-   * THE SHEET'S SECTIONS, BY THE RAIL'S TWO RULES (`Sidebar.svelte`'s `groups`, MOD-25).
-   *
-   * A SECTION OF ONE PAGE IS ONE ROW, named by its section: a heading over a single row is the look of a file tree, and
-   * the rail stopped drawing it. A SECTION WITH AN OVERVIEW OPENS IT FROM ITS HEADING, so the sheet no longer reads
-   * "Overview" under Money, under Projects and under Work, a run of one word that said which page only by what sat
-   * above it. The declared title is the test, as it is the rail's, because nothing else marks a section's front page.
+   * THE FLAT LIST, ONE RULE FOR THE RAIL, THE TOP BAR, THE TAB BAR AND THE SHEET (`flatNav` in `lib/nav.ts`): Today, the
+   * sections a day runs through, Activity, Decide while something waits, seven at most, and everything else under More.
    */
-  const OVERVIEW = 'overview';
-  const moreGroups = $derived(
-    grouped.map(([section, entries]) => {
-      const lead = entries.length < 2 ? undefined : entries.find((e) => e.title.trim().toLowerCase() === OVERVIEW);
-      return { section, entries, lead, rows: lead ? entries.filter((e) => e !== lead) : entries };
-    }),
-  );
+  const flat = $derived(flatNav(grouped, data.open, { today: copy.today, activity: copy.audit, decide: said('decide') }));
+  const tabs = $derived(tabsOf(flat.main));
+  /* WHAT THE TOP BAR SAYS IS UNDER MORE: the sections and pages that are not rows, and the lists. */
+  const behind = $derived(flat.more.length + flat.pages.length + moreLists.length);
 
-  /**
-   * THE SPINE AT THE SHEET'S HEAD, in the rail's order and with the rail's glyphs. The tab bar carries Home, Decide and
-   * Inbox (`BAR_SPINE`), so on a phone the sheet leads with the rest of the spine, Slash and Automations, which sat at
-   * its foot among the places nobody opens twice a day. The menu shape above 900px has no tab bar and no other nav, so
-   * there the bar's three are drawn too (`data-bar`, hidden below 900px where the tab bar has them).
-   */
-  const SPINE_ROW = {
-    home: ['/', () => said('home'), 'home'],
-    decide: ['/decide', () => said('decide'), 'decide'],
-    inbox: ['/inbox', () => said('inbox'), 'inbox'],
-    slash: ['/slash', () => nameWords.slash, 'star'],
-    automations: ['/automations', () => copy.automations, 'refresh'],
-  } as const satisfies Record<SpineKey, readonly [string, () => string, string]>;
-  const spineRows = $derived(
-    spine.filter((key) => shape === 'menu' || !BAR_SPINE.has(key)).map((key) => {
-      const [href, label, glyph] = SPINE_ROW[key];
-      /* The rail's counts ride on the same two rows: what is open to decide and what has arrived. */
-      const count = key === 'decide' ? data.open : key === 'inbox' ? data.inbox : 0;
-      return { key, href, label: label(), glyph, count, bar: BAR_SPINE.has(key) };
-    }),
-  );
+  /* WHERE THE READER IS, for the sheet's rows: the Overview is a place of its own, so Today is not marked on it too. */
+  const place = $derived(placeOf(here(page.url.pathname), page.url.searchParams));
 
-  /* `g 1`–`9` COUNT WHAT IS ON SCREEN. This indexed the raw list, so after a reorder the digit
-     printed beside a rail row and the row the digit opened were different pages. */
-  const numbered = $derived(grouped.flatMap(([, entries]) => entries));
+  /* `g 1`–`9` COUNT WHAT IS ON SCREEN: the rows of the flat list, in the order drawn. */
+  const numbered = $derived(flat.main);
   /* REMEMBERED, because a rail somebody folded is a rail they want folded on the next page too —
      and `app.html` has always read this cookie before first paint, so a remembered fold costs no
      flash. Nothing wrote it until now. */
@@ -482,21 +451,23 @@
         <Sidebar
           icons={railIcons}
           ontoggle={toggleRail}
-          nav={railNav}
+          main={flat.main}
+          more={flat.more}
+          pages={flat.pages}
+          hidden={hiddenCount}
           pen={data.pen}
           record={data.index.name}
           records={data.me.records}
           refused={data.recordsRefused}
           registers={data.index.registers}
           {spine}
-          open={data.open}
           inbox={data.inbox}
         />
       </div>
     {:else}
       <div class="bar-slot">
         {#if shape === 'bar'}
-          <TopBar entries={numbered} {spine} open={data.open} inbox={data.inbox} onmore={() => (moreOpen = true)} />
+          <TopBar entries={flat.main} {behind} onmore={() => (moreOpen = true)} />
         {:else}
           <!--
             THE MENU SHAPE IS ONE BUTTON AND NOTHING ELSE, which is the whole of what it promises:
@@ -540,7 +511,7 @@
   </div>
 
   <div class="tab-slot">
-    <TabBar {spine} open={data.open} inbox={data.inbox} more={moreOpen} onmore={() => (moreOpen = true)} />
+    <TabBar {tabs} more={moreOpen} onmore={() => (moreOpen = true)} />
   </div>
 
   <!--
@@ -590,7 +561,7 @@
   on a phone that second group once did not exist, and the lists that hold every row in the record
   were not in the navigation at all. The headings come too, because they are a grouping over one
   ordered list of `page` rows, and without them "Board" is a bare word. A section's Overview is its
-  heading, not a row, and a section of one page is one row (`moreGroups`), both as the rail draws them.
+  heading, not a row. It draws the flat list first, then what the rail keeps under More (`flatNav`).
 
   Every row is 44px or more and wears its glyph, and the row for the screen you are on is marked:
   `aria-current`, the `--selected` ground and an ink glyph, as the rail marks it. A row closes the
@@ -638,54 +609,43 @@
       {/if}
     </div>
 
-    <!-- THE REST OF THE SPINE, FIRST, as the rail draws it above every section (`spineRows`). -->
+    <!-- THE FLAT LIST, AS THE RAIL DRAWS IT (`flatNav`). On a phone the tab bar carries the first five and this carries all
+         of them, so a row past the fifth is one press from any screen. -->
     <ul class="more-list more-spine">
-      {#each spineRows as row (row.key)}
-        <li data-bar={row.bar ? '' : undefined}>
-          <a class="more-row" href={at(row.href)} aria-current={(row.key === 'home' ? current(row.href) : under(row.href)) ? 'page' : undefined}>
-            <Icon name={row.glyph} size="m" /><span class="more-name">{row.label}</span>
-            {#if row.count > 0}<span class="more-tally num">{row.count}</span>{/if}
+      {#each flat.main as item (item.key)}
+        <li>
+          <a class="more-row" href={at(item.href)} aria-current={isHere(item, place) ? 'page' : undefined}>
+            <Icon name={item.icon as IconName} size="m" /><span class="more-name">{item.label}</span>
+            {#if item.count}<span class="more-tally num">{item.count}</span>{/if}
           </a>
         </li>
       {/each}
     </ul>
 
-    {#snippet placeRow(entry: NavEntry, label: string)}
-      <a
-        class="more-row"
-        href={at(entry.href)}
-        aria-current={current(entry.href) ? 'page' : undefined}
-        style={entry.hue === undefined ? undefined : `--hue:${entry.hue}`}
-      >
-        <!-- A page about a thing wears that thing's square of colour, as its rail row does. -->
-        {#if entry.hue === undefined}<Icon name={entry.icon} size="m" />{:else}<span class="more-swatch" aria-hidden="true"></span>{/if}
-        <span class="more-name">{label}</span>
-      </a>
-    {/snippet}
-
-    {#each moreGroups as { section, entries, lead, rows }}
-      {#if entries.length === 1}
-        <!-- A SECTION OF ONE IS A ROW, NOT A FOLDER, named by its section as the rail names it. -->
-        <ul class="more-list more-solo">
-          <li>{@render placeRow(entries[0]!, section)}</li>
-        </ul>
-      {:else}
-        <!-- A HEADING THAT OPENS ITS OVERVIEW IS A LINK THE HEIGHT OF A ROW, marked with the chevron that says it goes
-             somewhere, and it stays a heading so a screen reader still walks the sheet by its sections. -->
-        <h3 class="more-section">
-          {#if lead}
-            <a class="more-head" href={at(lead.href)} aria-current={current(lead.href) ? 'page' : undefined}
-              >{section}<Icon name="chevron" size="s" /></a
-            >
-          {:else}{section}{/if}
-        </h3>
-        <ul class="more-list">
-          {#each rows as entry}
-            <li>{@render placeRow(entry, entry.title)}</li>
-          {/each}
-        </ul>
-      {/if}
-    {/each}
+    <!-- AND WHAT IS UNDER MORE ON THE RAIL: the page the record opened on before Today, the sections that did not fit, and
+         a section's other pages. A project's own page is on the Projects page, not here. -->
+    <h3 class="more-section">{copy.otherPages}</h3>
+    <ul class="more-list">
+      <li>
+        <a class="more-row" href={at(OVERVIEW)} aria-current={place === OVERVIEW ? 'page' : undefined}>
+          <Icon name="observe" size="m" /><span class="more-name">{copy.overview}</span>
+        </a>
+      </li>
+      {#each flat.more as item (item.key)}
+        <li>
+          <a class="more-row" href={at(item.href)} aria-current={isHere(item, place) ? 'page' : undefined}>
+            <Icon name={item.icon as IconName} size="m" /><span class="more-name">{item.label}</span>
+          </a>
+        </li>
+      {/each}
+      {#each flat.pages as entry (entry.href)}
+        <li>
+          <a class="more-row" href={at(entry.href)} aria-current={current(entry.href) ? 'page' : undefined}>
+            <Icon name={entry.icon} size="m" /><span class="more-name">{entry.title}</span>
+          </a>
+        </li>
+      {/each}
+    </ul>
 
     <!-- AND THE HEADING GOES WITH THEM. `index.registers` holds only the lists that have something
          in them, so on a young record this section would be a title over nothing. It is the record's
@@ -712,9 +672,9 @@
     {/if}
 
     <ul class="more-list more-places">
-      {#each PLACES as [href, label, glyph, area]}
+      {#each places as [href, label, glyph] (href)}
         <li>
-          <a class="more-row" href={at(href)} aria-current={under(area) ? 'page' : undefined}>
+          <a class="more-row" href={at(href)} aria-current={under(href) ? 'page' : undefined}>
             <Icon name={glyph} size="m" /><span class="more-name">{label}</span>
           </a>
         </li>
@@ -1101,15 +1061,6 @@
     font-size: var(--t-sm);
   }
 
-  /* A page about a thing: that thing's square of colour, at the glyph's size. */
-  .more-swatch {
-    flex: none;
-    inline-size: var(--icon-m);
-    block-size: var(--icon-m);
-    background: oklch(var(--mark-l) var(--mark-c) var(--hue));
-    border-radius: var(--r-sm);
-  }
-
   /* The same headings the rail carries, and they are headings: a section title, not an eyebrow. */
   .more-section {
     margin-block: var(--sp-4) 0;
@@ -1117,34 +1068,6 @@
     color: var(--dim);
     font-size: var(--t-sm);
     font-weight: 600;
-  }
-
-  /* THE HEADING THAT OPENS ITS SECTION'S OVERVIEW: the heading's words and size, a whole row's height to press, and the
-     chevron after the name so it reads as a door and not as a label. Ink on the page it opens, as a row is marked. */
-  .more-head {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--sp-1);
-    min-block-size: var(--tap);
-    color: inherit;
-    text-decoration: none;
-  }
-
-  .more-head[aria-current='page'] {
-    color: var(--ink);
-  }
-
-  /* A section of one sits apart from the list above it by a section's space, since it has no heading to do that. */
-  .more-solo {
-    margin-block-start: var(--sp-4);
-  }
-
-  /* THE TAB BAR'S THREE, drawn only for the menu shape, which above 900px has nothing else; below 900px the tab bar is
-     on screen whatever the shape, so the sheet does not draw them twice. */
-  @media (width < 900px) {
-    .more-spine > [data-bar] {
-      display: none;
-    }
   }
 
   /* A saved view is its list looked at another way: indented under it, with no glyph of its own. */
@@ -1167,10 +1090,6 @@
 
     .more-row[aria-current='page']:hover {
       background: var(--selected);
-    }
-
-    .more-head:hover {
-      color: var(--ink);
     }
   }
 

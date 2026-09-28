@@ -1095,6 +1095,8 @@ export type NavEntry = {
   icon: IconName;
   /** The frozen hue of the row this page is about, when it is about one. */
   hue?: number | undefined;
+  /** A page made from a template, one per row (a project's own page): the flat nav leaves it to its list's page. */
+  row?: true | undefined;
 };
 
 /**

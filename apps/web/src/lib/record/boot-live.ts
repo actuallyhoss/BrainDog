@@ -603,6 +603,8 @@ export function layoutOf(b: Boot): Shell {
             icon: iconFor(p.icon ?? undefined, 'doc'),
             ...((p.nav as { tabs?: unknown }).tabs === true ? { tabs: true as const } : {}),
             ...(kept.has(p) ? {} : { cut: true as const }),
+            /* A PAGE ONE ROW MADE, which the flat nav leaves to its list's own page (`flatNav`). */
+            ...(p.about ? { row: true as const } : {}),
           },
         ]
       : [],

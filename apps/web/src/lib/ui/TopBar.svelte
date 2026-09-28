@@ -1,5 +1,5 @@
 <!--
-  The top bar: one horizontal strip, the spine and then as much of your nav as fits.
+  The top bar: one horizontal strip, the flat list the rail draws (`flatNav`), and More.
 
   IT IS OFFERED AND NEVER DEFAULTED, and that is the whole of why it is allowed to exist. `19 §3`
   argues at length that a nav which is a QUERY over `page` rows — variable in length, sectioned,
@@ -22,99 +22,43 @@
   import { at, here as inside } from '../at.ts';
   import { page } from '$app/state';
   import { copy } from '../copy.ts';
-  import { said } from '../voice.svelte.ts';
-  import type { NavEntry } from '../record/api.ts';
-  import Icon from './Icon.svelte';
-  import type { SpineKey } from '../spine.ts';
+  import { isHere, placeOf, type FlatItem } from '../nav.ts';
+  import Icon, { type IconName } from './Icon.svelte';
 
   let {
     entries,
-    spine = ['home', 'decide', 'inbox'],
-    open = 0,
-    inbox = 0,
+    behind = 0,
     onmore,
   }: {
-    /** The declared nav, flat, in the reader's own arranged order. */
-    entries: NavEntry[];
-    /** The spine as `spineOf` reads it, so this bar and the rail never disagree about Decide and Inbox (PGS-18). */
-    spine?: readonly SpineKey[] | undefined;
-    open?: number | undefined;
-    inbox?: number | undefined;
+    /** The flat list (`flatNav`), the same rows the rail and the tab bar draw. */
+    entries: readonly FlatItem[];
+    /** How many places are under More, said on its button: the condition this shape shipped under. */
+    behind?: number | undefined;
     onmore?: (() => void) | undefined;
   } = $props();
 
-  /**
-   * HOW MANY ENTRIES THE STRIP CARRIES, AND IT IS A CONSTANT RATHER THAN A MEASUREMENT.
-   *
-   * A bar that measured itself would hide a different number of pages at every window size, so the
-   * one sentence this shape owes its reader — how many are behind More — would change while they
-   * dragged the window, and the number they were told last would be the number they remember. The
-   * count is the honest part of this shape, so it is the part that does not move.
-   *
-   * FOUR, WHICH IS §3'S OWN NUMBER: *"A freelancer has four entries."* That is the record this
-   * shape suits, and at four nothing is behind More at all. The width it has to survive is 900, the
-   * narrowest this is ever drawn at, and four names beside the three spine rows and More fit there
-   * with the names intact.
-   */
-  const SHOWN = 4;
-
-  const shown = $derived(entries.slice(0, SHOWN));
-  const hidden = $derived(Math.max(0, entries.length - SHOWN));
-
-  /* COMPARED INSIDE THE RECORD. `page.url` is the address as it came, `/app/acme/decide`, and these links are written
-     `/decide`, so the comparison reads the address with the base and the slug taken off (`lib/at.ts`). */
-  const here = (href: string) => inside(page.url.pathname) === href;
-  const under = (href: string) => inside(page.url.pathname) === href || inside(page.url.pathname).startsWith(`${href}/`);
+  /* COMPARED INSIDE THE RECORD, the address with the base and the slug taken off (`lib/at.ts`). */
+  const path = $derived(placeOf(inside(page.url.pathname), page.url.searchParams));
 </script>
 
 <nav class="topbar" aria-label="Record">
-  <!-- The spine. Home, Decide and Inbox are the three surfaces whose absence would make this a
-       different product, so they are first and no pack may add to them, reorder them or badge them.
-       Decide and Inbox are drawn once they have been used, by the rail's own rule (`spine.ts`, PGS-18). -->
-  <a class="bar-item spine tap" href={at('/')} aria-current={here('/') ? 'page' : undefined}>
-    <Icon name="home" size="m" /><span class="bar-name">{said('home')}</span>
-  </a>
-  {#if spine.includes('decide')}
-    <a class="bar-item spine tap" href={at('/decide')} aria-current={under('/decide') ? 'page' : undefined}>
-      <Icon name="decide" size="m" /><span class="bar-name">{said('decide')}</span>
-      <!-- NAMED, NOT ONLY COLOURED (13 §5.1), the same fix as the rail's: `--tone` alone left this
-           the one element in the bar whose meaning was carried by colour and nothing else. -->
-      {#if open}<span class="tally num" data-intent="warn">{open}<Icon name="decide" size="s" title={copy.openQuestions} /></span>{/if}
-    </a>
-  {/if}
-  {#if spine.includes('inbox')}
-    <a class="bar-item spine tap" href={at('/inbox')} aria-current={under('/inbox') ? 'page' : undefined}>
-      <Icon name="inbox" size="m" /><span class="bar-name">{said('inbox')}</span>
-      {#if inbox}<span class="tally num">{inbox}</span>{/if}
-    </a>
-  {/if}
-
-  <span class="bar-rule" aria-hidden="true"></span>
-
-  <!-- Declared. The order is the reader's, the same arrangement the rail and the sheet both draw,
-       and the section headings are the thing a single strip cannot carry: they are in the sheet. -->
-  {#each shown as entry}
-    <a class="bar-item tap" href={at(entry.href)} aria-current={here(entry.href) ? 'page' : undefined}>
-      <span class="bar-name">{entry.title}</span>
+  <!-- THE FLAT LIST, at most seven, so it fits the 900px this shape is ever drawn at with its names intact. -->
+  {#each entries as item (item.key)}
+    <a class="bar-item tap" href={at(item.href)} aria-current={isHere(item, path) ? 'page' : undefined}>
+      <Icon name={item.icon as IconName} size="m" /><span class="bar-name">{item.label}</span>
+      {#if item.count}<span class="tally num" data-intent="warn">{item.count}<Icon name="decide" size="s" title={copy.openQuestions} /></span>{/if}
     </a>
   {/each}
 
-  <!--
-    AND THE COUNT, WHICH IS THE CONDITION THIS SHAPE SHIPPED UNDER.
-
-    The chip is the number and the accessible name is the sentence, because a reader who cannot see
-    the chip is the reader most likely to be surprised by a nav that is not all here. With nothing
-    hidden there is no chip and no sentence: More still opens the sheet, which holds the lists and
-    the utilities that were never in the strip to begin with.
-  -->
+  <!-- AND THE COUNT OF WHAT IS UNDER MORE, as its accessible name, so a reader is never surprised by a nav that is not all here. -->
   <button
     type="button"
     class="bar-item bar-more tap"
-    aria-label={hidden ? copy.navBehindMore(hidden) : undefined}
+    aria-label={behind ? copy.navBehindMore(behind) : undefined}
     onclick={() => onmore?.()}
   >
     <span class="bar-name">{copy.more}</span>
-    {#if hidden}<span class="tally num">{hidden}</span>{/if}
+    {#if behind}<span class="tally num">{behind}</span>{/if}
     <Icon name="chevronDown" size="s" />
   </button>
 </nav>
@@ -171,15 +115,6 @@
     text-overflow: ellipsis;
   }
 
-  /* The spine keeps its glyphs and the declared entries do not: three icons at the head of the
-     strip are a landmark, and eight are a row of pictures. */
-  .bar-rule {
-    flex: 0 0 auto;
-    inline-size: 1px;
-    block-size: var(--sp-5);
-    margin-inline: var(--sp-2);
-    background: var(--line);
-  }
 
   .bar-more {
     /* AT THE END, ALWAYS, and never squeezed out by the names in front of it. It is the only way to

@@ -1,14 +1,10 @@
 <!--
-  Below 900px the sidebar becomes a tab bar. Not a shrunken desktop.
+  Below 900px the rail becomes a tab bar. Not a shrunken desktop.
 
-  The declared nav CANNOT be a tab bar: it varies in length and the user reorders it. So the tab bar
-  carries the SPINE and a sheet carries the rest: Home, Decide, Inbox and More. Search is the 44px
-  button in each screen's head bar (`PageHead.svelte`) and the first row of More, never a fifth tab:
-  a command surface in a tab slot looks like another place to go (19 §3). A new place is a row in
-  More and in the rail, never a fifth tab (design 6.6).
-
-  DECIDE AND INBOX ARE HERE ONCE THEY HAVE BEEN USED (`spine.ts`, PGS-18), as they are in the rail, and the tabs present
-  share the bar evenly.
+  THE SAME FLAT LIST AS THE RAIL (`flatNav` in `lib/nav.ts`), its first five rows (`tabsOf`), and More for the rest: the
+  owner's old tool carried the same six places in its tab bar as in its header, and a place whose glyph or word differs
+  between the two is a place learnt twice. Decide moves up beside Today while something waits on it, with its count.
+  Search is the 44px button in each screen's head bar (`PageHead.svelte`) and the first row of More, never a tab.
 
   Safe-area insets are paid exactly once, on the fixed elements only. Paying twice is a real, easy bug.
 -->
@@ -16,64 +12,37 @@
   import { at, here as inside } from '../at.ts';
   import { page } from '$app/state';
   import { copy } from '../copy.ts';
-  import { said } from '../voice.svelte.ts';
-  import Icon from './Icon.svelte';
-  import { BAR_SPINE, type SpineKey } from '../spine.ts';
+  import Icon, { type IconName } from './Icon.svelte';
+  import { isHere, placeOf, type FlatItem } from '../nav.ts';
 
   let {
-    spine = ['home', 'decide', 'inbox'],
-    open = 0,
-    inbox = 0,
+    tabs,
     more = false,
     onmore,
   }: {
-    /** The spine as `spineOf` reads it, so this bar and the rail never disagree about Decide and Inbox (PGS-18). */
-    spine?: readonly SpineKey[];
-    open?: number;
-    inbox?: number;
+    /** The tabs, as `tabsOf` reads them from the flat list. */
+    tabs: readonly FlatItem[];
     /** Whether the More sheet is open, said on the tab that opens it. */
     more?: boolean;
     onmore?: () => void;
   } = $props();
 
-  /* COMPARED INSIDE THE RECORD. `page.url` is the address as it came, `/app/acme/decide`, and these links are written
-     `/decide`, so the comparison reads the address with the base and the slug taken off (`lib/at.ts`). */
-  const here = (href: string) => inside(page.url.pathname) === href;
-  /* A DECISION IS STILL DECIDE, and an arrival still the inbox: the tab stays marked on the screens under it, as the
-     rail's rows do (`Sidebar.svelte`'s `under`). Home is exact, because every address is under `/`. */
-  const under = (href: string) => {
-    const where = inside(page.url.pathname);
-    return where === href || where.startsWith(`${href}/`);
-  };
-  /* THE TABS PRESENT, MORE INCLUDED, which is how many columns the bar splits evenly: a young record's Home and More
-     are two halves, not two quarters with a gap where Decide and Inbox will be. */
-  const shown = $derived(spine.filter((k) => BAR_SPINE.has(k)));
+  /* COMPARED INSIDE THE RECORD, the address with the base and the slug taken off (`lib/at.ts`). */
+  const path = $derived(placeOf(inside(page.url.pathname), page.url.searchParams));
 </script>
 
-<nav class="tabs" aria-label="Record" style={`--tabs:${shown.length + 1}`}>
-  <a class="tab tap" href={at('/')} aria-current={here('/') ? 'page' : undefined}>
-    <Icon name="home" size="l" /><span>{said('home')}</span>
-  </a>
-  {#if shown.includes('decide')}
-    <a class="tab tap" href={at('/decide')} aria-current={under('/decide') ? 'page' : undefined}>
+<nav class="tabs" aria-label="Record" style={`--tabs:${tabs.length + 1}`}>
+  {#each tabs as tab (tab.key)}
+    <a class="tab tap" href={at(tab.href)} aria-current={isHere(tab, path) ? 'page' : undefined}>
       <span class="badge-slot">
-        <Icon name="decide" size="l" />
-        {#if open}<span class="badge" data-intent="warn">{open}</span>{/if}
+        <Icon name={tab.icon as IconName} size="l" />
+        {#if tab.count}<span class="badge" data-intent="warn" aria-label={`${tab.count} ${copy.openQuestions}`}>{tab.count}</span>{/if}
       </span>
-      <span>{said('decide')}</span>
+      <span class="tab-name">{tab.label}</span>
     </a>
-  {/if}
-  {#if shown.includes('inbox')}
-    <a class="tab tap" href={at('/inbox')} aria-current={under('/inbox') ? 'page' : undefined}>
-      <span class="badge-slot">
-        <Icon name="inbox" size="l" />
-        {#if inbox}<span class="badge">{inbox}</span>{/if}
-      </span>
-      <span>{said('inbox')}</span>
-    </a>
-  {/if}
+  {/each}
   <button type="button" class="tab tap" aria-haspopup="dialog" aria-expanded={more} onclick={onmore}>
-    <Icon name="more" size="l" /><span>{copy.more}</span>
+    <Icon name="more" size="l" /><span class="tab-name">{copy.more}</span>
   </button>
 </nav>
 
@@ -84,7 +53,7 @@
     inset-inline: 0;
     z-index: var(--z-sheet);
     display: grid;
-    grid-template-columns: repeat(var(--tabs, 4), 1fr);
+    grid-template-columns: repeat(var(--tabs, 4), minmax(0, 1fr));
     background: var(--sunk);
     border-block-start: 1px solid var(--line);
     padding-block-end: env(safe-area-inset-bottom);
@@ -105,6 +74,7 @@
     align-items: center;
     justify-content: center;
     gap: 3px;
+    min-inline-size: 0;
     min-block-size: var(--tab-h);
     padding: var(--sp-1);
     border: 0;
@@ -128,6 +98,14 @@
 
   .badge-slot {
     position: relative;
+  }
+
+  /* SIX TABS ON A 320px PHONE ARE 53px EACH, so a long section name ends in an ellipsis rather than pushing its neighbours. */
+  .tab-name {
+    max-inline-size: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .badge {

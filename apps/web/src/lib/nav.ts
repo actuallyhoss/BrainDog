@@ -120,3 +120,106 @@ export function withOrder(carried: readonly string[], arrangement: readonly stri
   const named = new Set(carried);
   return [...carried, ...arrangement.filter((href) => !named.has(href))];
 }
+
+/* ── the flat list ─────────────────────────────────────────────────────── */
+
+/**
+ * One row of the flat nav: where it goes, what it says, its glyph, a count when it carries one, and the addresses that
+ * mean "you are here" on it (`near`), each compared as itself or anything under it (`exact` for Today's `/`).
+ */
+export type FlatItem = { key: string; href: string; label: string; icon: string; count?: number; near: readonly string[]; exact?: true };
+
+/** The words the fixed rows say, handed in so this module stays pure and the words stay in `copy`. */
+export type FlatWords = { today: string; activity: string; decide: string };
+
+/**
+ * The flat nav: the rows drawn in the one list, the sections that did not fit (drawn under More), and the other pages of
+ * every section that are not a row's own page (also under More).
+ */
+export type Flat<T> = { main: FlatItem[]; more: FlatItem[]; pages: T[] };
+
+/**
+ * THE MOST ROWS THE LIST HOLDS, Today, Activity and Decide included. The owner's old tool had six in one bar and read them
+ * without thinking; past seven a list is something to read rather than to glance at.
+ */
+export const FLAT_MOST = 7;
+
+/* THE SECTIONS A FOUNDER'S DAY RUNS THROUGH COME FIRST, the ones a record may also hold come after them, and a section
+   Today stands in for goes under More. A section none of these name sits after the first three, in the reader's order. */
+const FIRST = ['work', 'projects', 'money'];
+const AFTER = ['people', 'services'];
+const UNDER = ['dashboard', 'views'];
+
+const plainOf = (s: string): string => s.trim().toLowerCase();
+
+/** The page a section opens on: its Overview when it has one, else its first page that is not a row's own. */
+function leadOf<T extends { title: string; row?: boolean | undefined }>(entries: readonly T[]): T | undefined {
+  return entries.find((e) => plainOf(e.title) === 'overview') ?? entries.find((e) => !e.row) ?? entries[0];
+}
+
+function sectionItem<T extends { href: string; icon: string }>(section: string, lead: T, entries: readonly T[]): FlatItem {
+  return { key: `section:${section}`, href: lead.href, label: section, icon: lead.icon, near: entries.map((e) => e.href) };
+}
+
+/**
+ * The declared sections, in the reader's arrangement (`arrange`), as one flat list.
+ *
+ * ONE ROW A SECTION, opening on its lead page, so a project's own page is never a row: the Projects page lists them.
+ * Today leads, Activity and Decide follow the first sections (Decide only while something waits on it), and the list
+ * stops at `FLAT_MOST`: what does not fit is a row under More, the sections that come last going first.
+ */
+export function flatNav<T extends { title: string; href: string; icon: string; row?: boolean | undefined }>(
+  sections: readonly (readonly [string, readonly T[]])[],
+  open: number,
+  words: FlatWords,
+): Flat<T> {
+  const rows = sections.flatMap(([section, entries]) => {
+    const lead = leadOf(entries);
+    return lead ? [{ section, lead, entries, item: sectionItem(section, lead, entries) }] : [];
+  });
+  const rank = (section: string, list: readonly string[]) => list.indexOf(plainOf(section));
+  const first = rows.filter((r) => rank(r.section, FIRST) >= 0).sort((a, b) => rank(a.section, FIRST) - rank(b.section, FIRST));
+  const others = rows.filter((r) => rank(r.section, FIRST) < 0 && rank(r.section, AFTER) < 0 && rank(r.section, UNDER) < 0);
+  const after = rows.filter((r) => rank(r.section, AFTER) >= 0).sort((a, b) => rank(a.section, AFTER) - rank(b.section, AFTER));
+  const under = rows.filter((r) => rank(r.section, UNDER) >= 0);
+
+  const today: FlatItem = { key: 'today', href: '/', label: words.today, icon: 'home', near: ['/'], exact: true };
+  const activity: FlatItem = { key: 'activity', href: '/audit', label: words.activity, icon: 'clock', near: ['/audit'] };
+  const decide: FlatItem[] = open > 0 ? [{ key: 'decide', href: '/decide', label: words.decide, icon: 'decide', count: open, near: ['/decide'] }] : [];
+
+  const body = [...first, ...others];
+  let room = FLAT_MOST - 2 - decide.length;
+  const bodyIn = body.slice(0, Math.max(0, room));
+  room -= bodyIn.length;
+  const afterIn = after.slice(0, Math.max(0, room));
+  const shown = new Set([...bodyIn, ...afterIn]);
+
+  const main = [today, ...bodyIn.map((r) => r.item), activity, ...decide, ...afterIn.map((r) => r.item)];
+  const more = [...body, ...after, ...under].filter((r) => !shown.has(r)).map((r) => r.item);
+  /* THE OTHER PAGES A SECTION HOLDS, a Board beside Work, and never a row's own page (`row`), which its list's page opens. */
+  const pages = rows.flatMap((r) => r.entries.filter((e) => e !== r.lead && !e.row));
+  return { main, more, pages };
+}
+
+/** The page the record opened on before Today, kept under More at a word in the query (`routes/+page.svelte`). */
+export const OVERVIEW = '/?overview';
+
+/** Where the reader is, for the rows to compare against: the address inside the record, and the Overview as its own place. */
+export const placeOf = (path: string, search: URLSearchParams): string => (path === '/' && search.has('overview') ? OVERVIEW : path);
+
+/** Whether `path`, read inside the record, is on this row: one of its addresses or one under it, or exactly `/` for Today. */
+export function isHere(item: Pick<FlatItem, 'near' | 'exact'>, path: string): boolean {
+  return item.near.some((h) => path === h || (!item.exact && path.startsWith(`${h}/`)));
+}
+
+/**
+ * The phone's tab bar: the flat list's first five rows, with Decide moved up beside Today while something waits on it.
+ * The rest are behind More with everything else.
+ */
+export function tabsOf(main: readonly FlatItem[], most = 5): FlatItem[] {
+  const decide = main.find((i) => i.key === 'decide');
+  const rest = main.filter((i) => i !== decide);
+  const [lead, ...tail] = rest;
+  const ordered = lead === undefined ? [] : decide ? [lead, decide, ...tail] : rest;
+  return ordered.slice(0, most);
+}
