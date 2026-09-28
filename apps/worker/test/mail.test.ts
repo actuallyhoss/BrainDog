@@ -9,7 +9,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { isMailKind, letterOf, sendMail, type MailKind } from '../src/mail.ts';
+import { existsSync } from 'node:fs';
+
+import { isMailKind, letterOf, POSTAL, recordLetter, sendMail, type MailKind } from '../src/mail.ts';
 
 const KINDS: MailKind[] = [
   'signin',
@@ -25,7 +27,13 @@ const KINDS: MailKind[] = [
   'lapse.90',
   'lapse.back',
   'welcome',
+  'email.change',
+  'email.changed',
+  'usage.notice',
 ];
+
+/** The kinds whose letter is a link, and so carries the one button. */
+const LINKED: MailKind[] = ['signin', 'signup.verify', 'signup.known', 'invite.prove', 'email.change', 'lapse.0', 'lapse.60', 'lapse.83', 'lapse.back', 'welcome'];
 
 const ADDRESS = 'ada@example.test';
 const LINK = 'https://brain.dog/app/signin#magic=abc';
@@ -97,6 +105,88 @@ test('EVERY KIND HAS A LETTER, in text and HTML, with a footer that says it is f
     assert.ok(!`${letter.subject}${letter.text}${letter.html}`.includes(EM_DASH), kind);
   }
   assert.equal(isMailKind('newsletter'), false);
+});
+
+test('EVERY LETTER WEARS THE ONE PAGE: the mark from brain.dog, a card of at most 600, a preheader, a dark scheme, and the postal footer', () => {
+  for (const kind of KINDS) {
+    const { html, text } = letterOf(kind, { link: LINK, record: 'Acme', until: '2 Dec 2026', support: 'support@brain.dog', say: 'Acme has used 80% of its allowance.' });
+    /* The header's mark is an absolute https image the site serves, and the file is there to serve. */
+    assert.match(html, /<img src="https:\/\/brain\.dog\/email\/mark\.png" width="36" height="28" alt=""/u, kind);
+    assert.match(html, /max-width:600px/u, kind);
+    assert.match(html, /<div style="display:none;[^"]*">[^<&]+&#847;/u, kind);
+    assert.match(html, /@media \(prefers-color-scheme:dark\)\{/u, kind);
+    assert.match(html, /<meta name="color-scheme" content="light dark">/u, kind);
+    assert.ok(html.includes(POSTAL), kind);
+    assert.ok(text.endsWith(POSTAL), kind);
+    /* Email-client safe: no stylesheet to fetch, no web font, no script, and every image absolute. */
+    assert.doesNotMatch(html, /<link\b|@import|@font-face|<script/u, kind);
+    for (const [, src] of html.matchAll(/<img src="([^"]*)"/gu)) assert.match(src!, /^https:\/\//u, kind);
+    /* One prominent button where the letter is a link, drawn for Outlook too, and none where it is not. */
+    const buttons = [...html.matchAll(/class="bd-btn"/gu)].length;
+    assert.equal(buttons, LINKED.includes(kind) ? 1 : 0, kind);
+    if (LINKED.includes(kind)) assert.match(html, /<v:roundrect [^>]*href="https:\/\/brain\.dog\/app\/signin#magic=abc"/u, kind);
+  }
+  assert.ok(existsSync(new URL('../../site/static/email/mark.png', import.meta.url)), 'apps/site/static/email/mark.png is served as https://brain.dog/email/mark.png');
+});
+
+test('THE BUTTON SAYS WHAT IT DOES, and a link that works once also shows itself under it as text', () => {
+  const button = (kind: MailKind, vars = {}) => /<a href="[^"]*" target="_blank" style="display:inline-block;[^"]*">([^<]*)<\/a>/u.exec(letterOf(kind, { link: LINK, ...vars }).html)?.[1];
+  assert.equal(button('signin'), 'Sign in to BrainDog');
+  assert.equal(button('signup.verify'), 'Finish making your record');
+  assert.equal(button('invite.prove'), 'Accept the invitation');
+  assert.equal(button('email.change'), 'Confirm this address');
+  assert.equal(button('welcome', { record: 'Acme' }), 'Open Acme');
+  assert.equal(button('lapse.0'), 'Open your record');
+  assert.match(letterOf('signin', { link: LINK }).html, /Or paste this link into your browser:<br><a href="https:\/\/brain\.dog\/app\/signin#magic=abc"/u);
+  assert.doesNotMatch(letterOf('welcome', { link: LINK, record: 'Acme' }).html, /Or paste this link/u);
+});
+
+test('THE WELCOME READS WITHOUT "OPEN IT HERE": the button says it, and the text puts the link on its own line', () => {
+  const letter = letterOf('welcome', { record: 'Acme', link: 'https://brain.dog/app/acme/start' });
+  assert.ok(letter.text.startsWith('Acme is ready.\n\nhttps://brain.dog/app/acme/start\n\n'), letter.text);
+  assert.doesNotMatch(letter.html, /Open it here/u);
+});
+
+test("A RECORD'S OWN MAIL IS DRAWN IN THE SAME PAGE: a digest's sections, figures and rows, and plain text with no markup", () => {
+  const source = [
+    '# Monday',
+    '',
+    '## Cash',
+    '',
+    '```stat',
+    'Cash | £10,540.00',
+    '```',
+    '',
+    '## Overdue',
+    '',
+    '```table',
+    'Who | Amount',
+    'Pell & Vine | £400.00',
+    'A \\| B <b> | £12.00',
+    '```',
+    '',
+  ].join('\n');
+  const letter = recordLetter('Monday', source, 'digest.monday', 'support@brain.dog');
+  assert.equal(letter.subject, 'Monday');
+  /* The dialect's own title is the subject, said once in the card. */
+  assert.equal([...letter.html.matchAll(/>Monday</gu)].length, 2, 'the <title> and the <h1>');
+  assert.match(letter.html, /<h2[^>]*>Cash<\/h2>/u);
+  assert.match(letter.html, /font-size:28px[^>]*>£10,540\.00<\/p>/u);
+  assert.match(letter.html, />Pell &amp; Vine<\/td>/u);
+  assert.match(letter.html, />A \| B &lt;b&gt;<\/td>/u);
+  assert.match(letter.html, /sent because a digest on a BrainDog record you own is set to mail this address\./u);
+  assert.match(letter.html, /mailto:support@brain\.dog/u);
+  assert.doesNotMatch(letter.text, /```|^#/mu);
+  assert.ok(letter.text.startsWith('Monday\n\nCash\n----\n\nCash: £10,540.00\n\nOverdue\n-------\n\nWho  |  Amount\nPell & Vine  |  £400.00\nA | B <b>  |  £12.00\n\n'), letter.text);
+  assert.ok(letter.text.endsWith(`Write to support@brain.dog with any question.\n${POSTAL}`));
+  assert.ok(!`${letter.subject}${letter.text}${letter.html}`.includes(EM_DASH));
+});
+
+test('AN URGENT NOTICE IS ITS SENTENCE AND ITS REASON: the sentence is the title, and the text keeps both', () => {
+  const letter = recordLetter('Invoice 12 is 30 days overdue', 'Invoice 12 is 30 days overdue\n\nThe rule chase asked for it.');
+  assert.ok(letter.text.startsWith('Invoice 12 is 30 days overdue\n\nThe rule chase asked for it.\n\nThis mail is from BrainDog, sent because a BrainDog record you own has something that needs you now.'));
+  assert.match(letter.html, /<h1[^>]*>Invoice 12 is 30 days overdue<\/h1><p class="bd-ink2"[^>]*>The rule chase asked for it\.<\/p><\/td>/u);
+  assert.doesNotMatch(letter.text, /Write to/u);
 });
 
 test('THE FOOTER NAMES WHERE TO WRITE ONLY WHEN THERE IS AN ADDRESS: empty names none', () => {

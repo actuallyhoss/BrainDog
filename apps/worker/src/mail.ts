@@ -2,8 +2,14 @@
  * Every mail the Worker sends a person, and the one function that sends it (`loop/finish/ops.md` 4.0 F).
  *
  * ONE MODULE, SO THE LETTERS CANNOT DRIFT. Sign-in, sign-up, an invitation's proof, a passkey notice, the lapse ladder
- * and the welcome after payment each write their words here and nowhere else, as text and as simple HTML, with the
- * same footer naming what the mail is. A caller hands over a kind and the few values its letter needs.
+ * and the welcome after payment each write their words here and nowhere else, as text and as HTML, with the same
+ * footer naming what the mail is. A caller hands over a kind and the few values its letter needs. A record's own mail
+ * (a digest, an urgent notice) is written by the kernel and drawn in the same page here, by `recordLetter`, so every
+ * mail BrainDog sends wears one layout.
+ *
+ * THE HTML IS WRITTEN FOR MAIL CLIENTS, NOT BROWSERS: tables for layout, every style inline, no web font, the one image
+ * an absolute https URL on brain.dog, a button Outlook can draw, and a dark scheme in a media query that a client
+ * which ignores it simply never sees. The colours are the house theme's, generated into `mail-palette.ts`.
  *
  * `sendMail` NEVER THROWS. A mail is sent beside an answer (inside `ctx.waitUntil`) or by the nightly walk, and neither
  * may be broken by a transport that refused: the caller reads `false` and decides whether to try again. Every send
@@ -14,6 +20,7 @@
  * hand it an object literal for the binding.
  */
 
+import { MAIL_PALETTE } from './mail-palette.ts';
 import { op } from './oplog.ts';
 
 /** Every mail this Worker sends, by what it is for. The lapse kinds name the day of the ladder they belong to. */
@@ -261,7 +268,8 @@ function partsOf(kind: MailKind, v: { [K in keyof MailVars]-?: string }): { subj
       return {
         subject: 'Your BrainDog record is ready',
         parts: [
-          { say: v.record ? `${v.record} is ready. Open it here:` : 'Your record is ready. Open it here:' },
+          /* "OPEN IT HERE:" WENT WITH THE BARE LINK IT POINTED AT: the letter now has a button saying the same. */
+          { say: v.record ? `${v.record} is ready.` : 'Your record is ready.' },
           ...link,
           ...(v.asked ? [{ say: `The name ${v.asked} was taken before the payment went through, so the record was made as ${v.record || 'the next free name'}.` }] : []),
         ],
@@ -277,10 +285,201 @@ function partsOf(kind: MailKind, v: { [K in keyof MailVars]-?: string }): { subj
 }
 
 /**
+ * What the one button in a letter says: its verb and object, never "Click here". Only a letter with a link has one.
+ */
+function actionOf(kind: MailKind, record: string): string {
+  switch (kind) {
+    case 'signin':
+    case 'signup.known':
+      return 'Sign in to BrainDog';
+    case 'signup.verify':
+      return 'Finish making your record';
+    case 'invite.prove':
+      return 'Accept the invitation';
+    case 'email.change':
+      return 'Confirm this address';
+    default:
+      return record ? `Open ${record}` : 'Open your record';
+  }
+}
+
+/* ── the page every mail is drawn in ─────────────────────────────────────── */
+
+/** Where BrainDog lives, and the mark every letter's header shows, served by the site (`apps/site/static/email/`). */
+const HOME = 'https://brain.dog';
+const MARK_SRC = `${HOME}/email/mark.png`;
+
+/** Who sends BrainDog's mail, and where post reaches them: the last line of every footer. */
+export const POSTAL = 'Quartz Apps LLC, c/o Cloud Peak Law, 1309 Coffeen Ave STE 1200, Sheridan, WY 82801';
+
+/**
+ * THE SYSTEM'S OWN FACE, because a mail cannot load one. Geist first for the reader who has it installed, then each
+ * platform's interface font, so the letter reads like the device it is on rather than like a web page that failed.
+ */
+const FONT = `'Geist',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif`;
+
+const L = MAIL_PALETTE.light;
+const D = MAIL_PALETTE.dark;
+
+/**
+ * The enhancements a client may take or leave: a narrower card on a phone, and the dark scheme.
+ *
+ * EVERYTHING HERE IS ALSO SAID INLINE IN LIGHT, so a client that strips `<style>` (Gmail on some accounts, most
+ * webmail in a forward) shows the light letter whole. `[data-ogsc]` and `[data-ogsb]` are how Outlook.com marks its
+ * own dark mode, which reads no media query.
+ */
+const STYLE = (() => {
+  const dark = (p: string): string =>
+    [
+      `${p}.bd-ground{background-color:${D.sunk} !important}`,
+      `${p}.bd-card{background-color:${D.s1} !important;border-color:${D.line} !important}`,
+      `${p}.bd-ink{color:${D.ink} !important}`,
+      `${p}.bd-ink2{color:${D.ink2} !important}`,
+      `${p}.bd-dim,${p}.bd-dim a{color:${D.dim} !important}`,
+      `${p}.bd-rule{border-color:${D.line} !important}`,
+      `${p}.bd-btn{background-color:${D.ink} !important}`,
+      `${p}.bd-btn a{color:${D.bg} !important}`,
+      `${p}.bd-cell{border-color:${D.line} !important}`,
+    ].join('');
+  return (
+    '<style>' +
+    ':root{color-scheme:light dark;supported-color-schemes:light dark}' +
+    'body{margin:0;padding:0;-webkit-text-size-adjust:100%;text-size-adjust:100%}' +
+    'a{text-decoration-thickness:1px;text-underline-offset:3px}' +
+    '@media only screen and (max-width:620px){' +
+    '.bd-outer{padding:24px 16px 32px !important}' +
+    '.bd-pad{padding:28px 24px !important}' +
+    '.bd-h1{font-size:20px !important;line-height:26px !important}' +
+    '.bd-btn-wrap{width:100% !important}' +
+    '.bd-btn a{display:block !important}' +
+    '}' +
+    `@media (prefers-color-scheme:dark){${dark('')}}` +
+    dark('[data-ogsc] ') +
+    dark('[data-ogsb] ') +
+    '</style>'
+  );
+})();
+
+/** Text as HTML inside the page: escaped, and nothing else. */
+const h = (value: string): string => escaped(value);
+
+/** One paragraph of the letter's body. */
+const para = (text: string): string =>
+  `<p class="bd-ink2" style="margin:0 0 16px;font-family:${FONT};font-size:16px;line-height:24px;color:${L.ink2}">${h(text)}</p>`;
+
+/** A quieter paragraph under the button: what to do if the mail was not expected, a note beside the point. */
+const aside = (text: string): string =>
+  `<p class="bd-dim" style="margin:0 0 12px;font-family:${FONT};font-size:14px;line-height:21px;color:${L.dim}">${h(text)}</p>`;
+
+/**
+ * THE ONE BUTTON, BULLETPROOF. Everywhere but Outlook for Windows it is a padded link painted as an ink pill; Outlook
+ * draws no padding on a link and no radius on anything, so it gets a VML round rectangle of its own, sized from the
+ * label because VML cannot size to its text. Both are one link to the same address, and the whole pill is the target.
+ */
+const button = (label: string, href: string): string => {
+  const width = Math.min(520, Math.max(180, Math.round(label.length * 8.6 + 56)));
+  return (
+    `<table role="presentation" class="bd-btn-wrap" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 24px;border-collapse:separate">` +
+    `<tr><td class="bd-btn" align="center" bgcolor="${L.ink}" style="border-radius:999px;background-color:${L.ink}">` +
+    `<!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${h(href)}" style="height:46px;v-text-anchor:middle;width:${width}px" arcsize="50%" stroke="f" fillcolor="${L.ink}"><w:anchorlock/><center style="color:${L.s3};font-family:Segoe UI,Arial,sans-serif;font-size:16px;font-weight:600">${h(label)}</center></v:roundrect><![endif]-->` +
+    `<!--[if !mso]><!-->` +
+    `<a href="${h(href)}" target="_blank" style="display:inline-block;padding:13px 28px;font-family:${FONT};font-size:16px;line-height:20px;font-weight:600;color:${L.s3};text-decoration:none;border-radius:999px;mso-hide:all">${h(label)}</a>` +
+    `<!--<![endif]-->` +
+    `</td></tr></table>`
+  );
+};
+
+/** For a link that works once: the address itself under the button, for the client that will not follow a button. */
+const fallback = (href: string): string =>
+  `<p class="bd-dim" style="margin:0 0 20px;font-family:${FONT};font-size:13px;line-height:20px;color:${L.dim}">` +
+  `Or paste this link into your browser:<br>` +
+  `<a href="${h(href)}" target="_blank" style="color:${L.dim};text-decoration:underline;word-break:break-all">${h(href)}</a></p>`;
+
+/** A hairline across the card, between what the letter is for and what is beside the point. */
+const rule = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td class="bd-rule" style="border-top:1px solid ${L.line};font-size:0;line-height:0;padding:0 0 20px">&nbsp;</td></tr></table>`;
+
+/**
+ * THE PREHEADER: the line a mailbox shows beside the subject, hidden in the letter itself. Padded with zero-width
+ * joiners and spaces so the client does not fill the rest of the preview with the letter's first words again.
+ */
+const preheader = (text: string): string =>
+  `<div style="display:none;max-height:0;max-width:0;overflow:hidden;opacity:0;mso-hide:all;font-size:1px;line-height:1px;color:${L.bg}">` +
+  `${h(text)}${'&#847;&zwnj;&nbsp;'.repeat(60)}</div>`;
+
+/** What a page is made of: the subject as its title, the preheader, the body's HTML, and the footer's lines. */
+type Page = { subject: string; preheader: string; body: string; why: string; support: string };
+
+/**
+ * The page every mail is drawn in: the mark and the name, a white card on a soft ground, and a quiet footer.
+ *
+ * 600 WIDE AT MOST, THE WIDTH EVERY CLIENT SHOWS WHOLE, and on a phone the card fills the screen less a 16 gutter.
+ * Outlook for Windows ignores `max-width`, so it gets a fixed 600 table in a conditional comment.
+ */
+function page(p: Page): string {
+  const footer = [
+    `<p style="margin:0 0 8px">${h(`This mail is from BrainDog, sent ${p.why}.`)}</p>`,
+    ...(p.support
+      ? [`<p style="margin:0 0 8px">Write to <a href="mailto:${h(p.support)}" style="color:${L.dim};text-decoration:underline">${h(p.support)}</a> with any question.</p>`]
+      : []),
+    `<p style="margin:0">${h(POSTAL)}</p>`,
+  ].join('');
+  return (
+    '<!doctype html>' +
+    '<html lang="en" dir="ltr" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">' +
+    '<head>' +
+    '<meta charset="utf-8">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+    '<meta name="x-apple-disable-message-reformatting">' +
+    '<meta name="format-detection" content="telephone=no,address=no,email=no,date=no,url=no">' +
+    '<meta name="color-scheme" content="light dark">' +
+    '<meta name="supported-color-schemes" content="light dark">' +
+    `<title>${h(p.subject)}</title>` +
+    '<!--[if mso]><noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript><![endif]-->' +
+    STYLE +
+    '</head>' +
+    `<body class="bd-ground" style="margin:0;padding:0;background-color:${L.bg};word-spacing:normal">` +
+    preheader(p.preheader) +
+    `<table role="presentation" class="bd-ground" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${L.bg}" style="background-color:${L.bg}">` +
+    `<tr><td class="bd-outer" align="center" style="padding:40px 16px 48px">` +
+    '<!--[if mso]><table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" align="center"><tr><td><![endif]-->' +
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;margin:0 auto">` +
+    /* THE HEADER: the red mark and the name beside it, a link home. The mark's alt is empty because the name says it. */
+    `<tr><td style="padding:0 8px 24px">` +
+    `<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>` +
+    `<td style="vertical-align:middle"><a href="${HOME}" target="_blank"><img src="${MARK_SRC}" width="36" height="28" alt="" style="display:block;width:36px;height:28px;border:0;outline:none"></a></td>` +
+    `<td style="vertical-align:middle;padding-left:10px;font-family:${FONT};font-size:19px;line-height:28px;font-weight:600;letter-spacing:-0.01em">` +
+    `<a class="bd-ink" href="${HOME}" target="_blank" style="color:${L.ink};text-decoration:none">BrainDog</a></td>` +
+    `</tr></table></td></tr>` +
+    /* THE CARD: the letter itself. */
+    `<tr><td>` +
+    `<table role="presentation" class="bd-card" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${L.s3}" style="background-color:${L.s3};border:1px solid ${L.line};border-radius:12px;border-collapse:separate">` +
+    `<tr><td class="bd-pad" style="padding:40px 40px 28px">` +
+    `<h1 class="bd-ink bd-h1" style="margin:0 0 16px;font-family:${FONT};font-size:22px;line-height:28px;font-weight:600;letter-spacing:-0.01em;color:${L.ink}">${h(p.subject)}</h1>` +
+    p.body +
+    `</td></tr></table>` +
+    `</td></tr>` +
+    /* THE FOOTER: who sent it and why, where to write, and where post reaches the company. */
+    `<tr><td class="bd-dim" style="padding:24px 8px 0;font-family:${FONT};font-size:12px;line-height:18px;color:${L.dim}">${footer}</td></tr>` +
+    `</table>` +
+    '<!--[if mso]></td></tr></table><![endif]-->' +
+    `</td></tr></table>` +
+    '</body></html>'
+  );
+}
+
+/** The footer's lines as plain text, under a letter's own: why it was sent, where to write, and where post goes. */
+const textFooter = (why: string, support: string): string =>
+  [`This mail is from BrainDog, sent ${why}.`, ...(support ? [`Write to ${support} with any question.`] : []), POSTAL].join('\n');
+
+/**
  * A kind's letter, with every value in it made safe: a line of text, and escaped in the HTML.
  *
  * THE FOOTER NAMES WHAT THE MAIL IS, and where to write once `SUPPORT_ADDRESS` is set; while it is empty the footer
  * names no address at all (`loop/finish/contracts.md` 8.4, "support address").
+ *
+ * THE LINK IS THE BUTTON. What comes before it is the letter's body; what comes after it is quieter, under a hairline,
+ * because it is the sentence for the person who did not ask. A link that works once also shows itself as text under
+ * the button, for the client that will not follow one.
  */
 export function letterOf(kind: MailKind, vars: MailVars = {}): Letter {
   const v = {
@@ -293,25 +492,155 @@ export function letterOf(kind: MailKind, vars: MailVars = {}): Letter {
     say: flat(vars.say),
   };
   const { subject, parts } = partsOf(kind, v);
-  const footer: Part[] = [
-    { say: `This mail is from BrainDog, sent ${WHY[kind]}.` },
-    ...(v.support ? [{ say: `Write to ${v.support} with any question.` }] : []),
-  ];
   const line = (p: Part): string => ('say' in p ? p.say : p.link);
   /* A BLANK LINE BETWEEN PARAGRAPHS, AS THE SIGN-IN LETTER HAS ALWAYS HAD, and the footer's lines together under them. */
-  const text = [parts.map(line).join('\n\n'), footer.map(line).join('\n')].join('\n\n');
-  const para = (p: Part): string =>
-    'say' in p ? `<p>${escaped(p.say)}</p>` : `<p><a href="${escaped(p.link)}">${escaped(p.link)}</a></p>`;
-  const support = v.support ? `<p>Write to <a href="mailto:${escaped(v.support)}">${escaped(v.support)}</a> with any question.</p>` : '';
-  const html = [
-    '<!doctype html><html><body>',
-    ...parts.map(para),
-    '<hr>',
-    `<p><small>This mail is from BrainDog, sent ${escaped(WHY[kind])}.</small></p>`,
-    support,
-    '</body></html>',
-  ].join('');
+  const text = [parts.map(line).join('\n\n'), textFooter(WHY[kind], v.support)].join('\n\n');
+
+  const at = parts.findIndex((p) => 'link' in p);
+  const body = parts
+    .map((p, i) => {
+      if ('link' in p) return button(actionOf(kind, v.record), p.link) + (NEEDS_LINK.has(kind) ? fallback(p.link) : '');
+      if (at === -1 || i < at) return para(p.say);
+      return (i === at + 1 ? rule : '') + aside(p.say);
+    })
+    .join('');
+  const first = parts.find((p): p is { say: string } => 'say' in p)?.say ?? '';
+  const html = page({ subject: flat(subject), preheader: first, body, why: WHY[kind], support: v.support });
   return { subject: flat(subject), text, html };
+}
+
+/* ── a record's own mail ─────────────────────────────────────────────────── */
+
+/**
+ * A line of the kernel's block dialect (`packages/kernel/src/digest.ts` `render`) as the cells it holds: split on the
+ * pipes that are not escaped, and each cell's `\|` and `\\` read back as the characters they stand for.
+ */
+const cellsOf = (row: string): string[] =>
+  (row.match(/(?:\\.|[^|])+/gu) ?? []).map((cell) => cell.trim().replace(/\\(.)/gu, '$1'));
+
+/** A heading line of the dialect, `# name` or `## section`, as its level and its words. */
+const headingOf = (line: string): { level: number; words: string } | null => {
+  const m = /^(#{1,3})\s+(.*)$/u.exec(line);
+  return m ? { level: m[1]!.length, words: m[2]!.trim() } : null;
+};
+
+/** One block of the dialect: a paragraph, a heading, a single figure, or a table of rows. */
+type Chunk = { kind: 'para'; lines: string[] } | { kind: 'heading'; level: number; words: string } | { kind: 'stat' | 'table'; rows: string[][] };
+
+/** The dialect read into blocks. A fence that never closes runs to the end, which is where the kernel would have closed it. */
+function chunksOf(source: string): Chunk[] {
+  const out: Chunk[] = [];
+  const lines = source.replace(/\r\n?/gu, '\n').split('\n');
+  let para: string[] = [];
+  const endPara = (): void => {
+    if (para.length > 0) out.push({ kind: 'para', lines: para });
+    para = [];
+  };
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
+    const fence = /^```(stat|table)\s*$/u.exec(line.trim());
+    if (fence) {
+      endPara();
+      const rows: string[][] = [];
+      for (i++; i < lines.length && lines[i]!.trim() !== '```'; i++) if (lines[i]!.trim() !== '') rows.push(cellsOf(lines[i]!));
+      out.push({ kind: fence[1] as 'stat' | 'table', rows });
+      continue;
+    }
+    const heading = headingOf(line.trim());
+    if (heading) {
+      endPara();
+      out.push({ kind: 'heading', ...heading });
+      continue;
+    }
+    if (line.trim() === '') endPara();
+    else para.push(line.trim());
+  }
+  endPara();
+  return out;
+}
+
+/** The dialect as plain text a person reads: no fences and no hashes, a figure as "label: value", a row as cells. */
+function plainOf(chunks: Chunk[]): string {
+  return chunks
+    .map((c) => {
+      if (c.kind === 'para') return c.lines.join('\n');
+      if (c.kind === 'heading') return c.level === 1 ? c.words : `${c.words}\n${'-'.repeat(Math.min(c.words.length, 60))}`;
+      if (c.kind === 'stat') return c.rows.map((r) => (r.length > 1 ? `${r[0]}: ${r.slice(1).join(' ')}` : (r[0] ?? ''))).join('\n');
+      return c.rows.map((r) => r.join('  |  ')).join('\n');
+    })
+    .filter((s) => s !== '')
+    .join('\n\n');
+}
+
+/** The dialect as the card's body: a section title, a large figure, or a table of hairline rows. */
+function htmlOf(chunks: Chunk[]): string {
+  const cell = (text: string, head: boolean): string =>
+    `<td class="${head ? 'bd-dim' : 'bd-ink2'} bd-cell" style="padding:8px 12px 8px 0;border-bottom:1px solid ${L.line};font-family:${FONT};font-size:${head ? 13 : 14}px;line-height:20px;${head ? 'font-weight:500;' : ''}color:${head ? L.dim : L.ink2};text-align:left;vertical-align:top">${h(text)}</td>`;
+  return chunks
+    .map((c) => {
+      /* THE ATTRIBUTION UNDER A MODEL'S PROSE (`digest.ts` `sendDigest`, "Slash" after a dash) is a byline, set quieter
+         than the prose it names so the record's own figures below read as the record's. */
+      if (c.kind === 'para' && c.lines.length === 1 && /^\p{Pd}\s/u.test(c.lines[0]!)) return aside(c.lines[0]!);
+      if (c.kind === 'para') return para(c.lines.join(' '));
+      if (c.kind === 'heading')
+        return `<h2 class="bd-ink" style="margin:24px 0 8px;font-family:${FONT};font-size:16px;line-height:22px;font-weight:600;color:${L.ink}">${h(c.words)}</h2>`;
+      if (c.kind === 'stat')
+        return c.rows
+          .map(
+            (r) =>
+              `<p class="bd-ink" style="margin:0 0 16px;font-family:${FONT};font-size:28px;line-height:34px;font-weight:600;font-variant-numeric:tabular-nums;color:${L.ink}">${h(r.length > 1 ? r.slice(1).join(' ') : (r[0] ?? ''))}</p>`,
+          )
+          .join('');
+      if (c.rows.length === 0) return '';
+      const [head, ...rows] = c.rows;
+      const tr = (r: string[], isHead: boolean): string => `<tr>${r.map((t) => cell(t, isHead)).join('')}</tr>`;
+      return (
+        `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px;border-collapse:collapse">` +
+        tr(head!, true) +
+        rows.map((r) => tr(r, false)).join('') +
+        `</table>`
+      );
+    })
+    .join('');
+}
+
+/**
+ * Why a record's mail was sent, the footer's first sentence: a digest by the mark the kernel gives it
+ * (`because: 'digest.<id>'`), and anything else as the urgent notice it is.
+ */
+const recordWhy = (because: string): string =>
+  because.startsWith('digest.')
+    ? 'because a digest on a BrainDog record you own is set to mail this address'
+    : 'because a BrainDog record you own has something that needs you now';
+
+/**
+ * A mail a record wrote (a digest, an urgent notice), in the same page as every letter above.
+ *
+ * THE KERNEL'S WORDS ARE KEPT WHOLE. The body is its block dialect, drawn: a heading as a heading, a figure large, a
+ * table as rows with hairlines, a paragraph as itself. The dialect's first `# name` is the subject already, so the card
+ * does not say it twice. Every word is escaped; the record wrote them and a person may have typed any of them.
+ */
+export function recordLetter(subject: string, source: string, because = '', support = ''): Letter {
+  const title = flat(subject);
+  const chunks = chunksOf(source);
+  /* THE CARD'S TITLE IS THE SUBJECT, so a body that opens with the same words (a digest's `# name`, a notice's own
+     sentence) does not say them twice in the HTML. The text keeps them: it has no title of its own. */
+  const top = chunks[0];
+  const said = top?.kind === 'para' && top.lines.join(' ') === title;
+  /* A digest with prose opens with the prose and its attribution, and its `# name` comes after them, so the title is
+     dropped wherever it is and not only at the top. */
+  const card = (said ? chunks.slice(1) : chunks).filter((c) => !(c.kind === 'heading' && c.level === 1 && c.words === title));
+  const why = recordWhy(because);
+  const text = [plainOf(chunks), textFooter(why, flat(support))].filter((s) => s !== '').join('\n\n');
+  const first = card.find((c) => c.kind === 'para');
+  const html = page({
+    subject: title,
+    preheader: first?.kind === 'para' ? first.lines.join(' ') : title,
+    body: htmlOf(card),
+    why,
+    support: flat(support),
+  });
+  return { subject: title, text, html };
 }
 
 /** One message as the `send_email` binding takes it, with the sender's display name. */

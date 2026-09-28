@@ -186,6 +186,12 @@ const OUT = {
       mercury: 'the home page names the Mercury pack twice, in `lib/copy/home.ts`: the inbox example ("connect Stripe and Mercury") and the packs line, exactly as it names Stripe, Money and Work.',
     },
   },
+  'apps/worker/src/mail.ts': {
+    why: 'the footer of every mail names who sends it, as the legal pages do (1 hit).',
+    words: {
+      quartz: '`POSTAL`, "Quartz Apps LLC, c/o Cloud Peak Law, ...": the company that runs BrainDog, printed under every letter as the sender a mail law asks for, never a branch on a use case.',
+    },
+  },
   'packages/seed/src/packs/changelog.ts': {
     why: 'a module\'s own changelog, read on its detail page: prose about what shipped, not a branch on a use case (2 hits).',
     words: {
