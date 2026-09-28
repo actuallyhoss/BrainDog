@@ -268,9 +268,6 @@ CREATE TABLE member (                       -- 20-COLLABORATION §1 said the cei
   seen_at   TEXT,                           -- the READ MARK. Written with MAX() only, so a late device
                                             --   never moves it back; not an entry row, so a read is
                                             --   never a write to the record — 32-PARITY §2.1. markRead writes it (§5)
-  row_where TEXT,                           -- from kernel migration 19: one `where` (34 §1, as JSON text) narrowing a
-                                            --   list grant to the rows it matches; NULL is every row, never set on '*';
-                                            --   one that cannot be read reaches no row. No CHECK: `invite` reads it first
   PRIMARY KEY (person_id, register)
 );
 
@@ -390,6 +387,11 @@ CREATE TABLE dog_sig      (alg TEXT NOT NULL CHECK (alg = 'ed25519'), key_id TEX
 -- KEK-wrapped key opens nothing without the KEK, and a restored record must open its own vault (12 §8). `dog_section` lists an
 -- omitted table as `local`, so a reader tells omitted from missing.
 ```
+
+The block above is migration 1, verbatim, so a column added later is named here and not in it. `member.row_where TEXT`
+joins in kernel migration 19: one `where` (34 §1, as JSON text) narrowing a list grant to the rows it matches. NULL is
+every row, it is never set on `'*'`, and one that cannot be read reaches no row. It has no CHECK, because `invite` reads
+it against its list first.
 
 Five things worth naming, because they are decisions rather than transcription:
 

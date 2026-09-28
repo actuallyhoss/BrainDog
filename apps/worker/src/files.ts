@@ -277,5 +277,5 @@ async function give(request: Request, blobs: FileBucket | undefined, record: str
     'content-type': object.httpMetadata?.contentType ?? 'application/octet-stream',
     'content-length': String(object.size),
   };
-  return new Response('body' in object ? object.body : null, { status: 200, headers });
+  return new Response('body' in object ? (object as R2ObjectBody).body : null, { status: 200, headers });
 }
