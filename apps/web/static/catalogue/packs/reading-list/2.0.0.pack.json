@@ -1,0 +1,74 @@
+{
+  "pack": "reading-list",
+  "version": "2.0.0",
+  "title": "Reading list",
+  "summary": "Books and articles to read, what you are reading now, and a line on each one you finish.",
+  "changes": "readings no longer declares a field named title: the kernel keeps that name for the record's own. It is now name, still what each row is titled by.",
+  "author": "BrainDog",
+  "license": "Apache-2.0",
+  "requires": { "format": 1, "primitives": 1, "packs": {} },
+  "declarations": [
+    {
+      "register": "readings",
+      "name": "Readings",
+      "title": "name",
+      "fields": [
+        { "id": "name", "type": "text", "required": true },
+        { "id": "by", "type": "text" },
+        { "id": "kind", "type": "enum", "values": ["book", "article", "paper"], "default": "book" },
+        { "id": "state", "type": "enum", "values": ["queued", "reading", "finished"], "default": "queued" },
+        { "id": "finished", "type": "day" },
+        { "id": "thoughts", "type": "text" }
+      ]
+    },
+    {
+      "page": "reading",
+      "title": "Reading",
+      "nav": { "section": "Reading", "order": 10 },
+      "icon": "doc",
+      "requires": ["register.readings"],
+      "blocks": [
+        {
+          "kind": "table",
+          "heading": "Reading now",
+          "span": 12,
+          "source": "register.readings",
+          "where": "state is reading",
+          "columns": [
+            { "field": "name", "label": "Title", "width": "minmax(20ch,1fr)" },
+            { "field": "by", "label": "By", "width": "20ch" }
+          ],
+          "limit": 20,
+          "empty": "Nothing is being read."
+        },
+        {
+          "kind": "table",
+          "heading": "Queued",
+          "span": 12,
+          "source": "register.readings",
+          "where": "state is queued",
+          "columns": [
+            { "field": "name", "label": "Title", "width": "minmax(20ch,1fr)" },
+            { "field": "kind", "label": "Kind", "width": "12ch" }
+          ],
+          "limit": 50,
+          "empty": "Nothing is queued."
+        },
+        {
+          "kind": "table",
+          "heading": "Finished",
+          "span": 12,
+          "source": "register.readings",
+          "where": "state is finished",
+          "columns": [
+            { "field": "name", "label": "Title", "width": "minmax(20ch,1fr)" },
+            { "field": "finished", "label": "Finished", "width": "14ch", "align": "end" }
+          ],
+          "order": [{ "field": "finished", "dir": "desc" }],
+          "limit": 50,
+          "empty": "Nothing is finished yet."
+        }
+      ]
+    }
+  ]
+}

@@ -1139,8 +1139,30 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.0.0",
+      "latest": "2.0.0",
       "versions": [
+        {
+          "version": "2.0.0",
+          "checksum": "8a20783a652b811bc953fa8b90cc925f85b2b5be2597c4a4fb93e71a8998f940",
+          "bytes": 2580,
+          "published_at": "2026-09-28T18:47:57.489Z",
+          "bump": "major",
+          "reach": {
+            "modules": [],
+            "lists": [
+              "Readings"
+            ],
+            "pages": [
+              "Reading"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "readings no longer declares a field named title: the kernel keeps that name for the record's own. It is now name, still what each row is titled by.",
+          "preview": true
+        },
         {
           "version": "1.0.0",
           "checksum": "ec913afa6d39af120552b5081a2a110d305655fad6844dab4dfeba3115a4ebfa",

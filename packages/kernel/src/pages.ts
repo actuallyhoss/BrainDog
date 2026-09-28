@@ -1266,6 +1266,11 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
       };
   }
 
+  /* A HOLE STILL IN THE `where` IS A FIELD THE PAGE'S ROW HOLDS NOTHING IN, since only a template page is filled and
+     `fill` leaves a hole it has no value for. A skill with no `because` yet has no learnings behind it, which is the
+     block's `empty:` sentence and not a refusal naming a row called `{{because}}`. */
+  if (typeof block.where === 'string' && /\{\{\w+\}\}/.test(block.where)) return { ...base, refusals: also() };
+
   const said = predicateOf(block.where, schema, deps.ctx);
   if (said.bad.length) return { ...base, refusals: also(...said.bad) };
 

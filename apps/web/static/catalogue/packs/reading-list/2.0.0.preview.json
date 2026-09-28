@@ -1,0 +1,101 @@
+{
+  "format": 1,
+  "made_at": "2026-09-28T18:47:57.489Z",
+  "pages": [
+    {
+      "blocks": [
+        {
+          "columns": [
+            {
+              "field": "name",
+              "label": "Title",
+              "width": "minmax(20ch,1fr)"
+            },
+            {
+              "field": "by",
+              "label": "By",
+              "width": "20ch"
+            }
+          ],
+          "empty": "Nothing is being read.",
+          "heading": "Reading now",
+          "kind": "table",
+          "limit": 20,
+          "source": "register.readings",
+          "span": 12,
+          "where": "state is reading",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        },
+        {
+          "columns": [
+            {
+              "field": "name",
+              "label": "Title",
+              "width": "minmax(20ch,1fr)"
+            },
+            {
+              "field": "kind",
+              "label": "Kind",
+              "width": "12ch"
+            }
+          ],
+          "empty": "Nothing is queued.",
+          "heading": "Queued",
+          "kind": "table",
+          "limit": 50,
+          "source": "register.readings",
+          "span": 12,
+          "where": "state is queued",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        },
+        {
+          "columns": [
+            {
+              "field": "name",
+              "label": "Title",
+              "width": "minmax(20ch,1fr)"
+            },
+            {
+              "align": "end",
+              "field": "finished",
+              "label": "Finished",
+              "width": "14ch"
+            }
+          ],
+          "empty": "Nothing is finished yet.",
+          "heading": "Finished",
+          "kind": "table",
+          "limit": 50,
+          "order": [
+            {
+              "dir": "desc",
+              "field": "finished"
+            }
+          ],
+          "source": "register.readings",
+          "span": 12,
+          "where": "state is finished",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        }
+      ],
+      "icon": "doc",
+      "nav": {
+        "order": 10,
+        "section": "Reading"
+      },
+      "page": "reading",
+      "requires": [
+        "register.readings"
+      ],
+      "title": "Reading",
+      "read_at": "2026-09-28T18:47:57.489Z",
+      "declared_version": 1
+    }
+  ]
+}

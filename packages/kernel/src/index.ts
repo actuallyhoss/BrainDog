@@ -6365,13 +6365,21 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         const { untouched, touched } = untouchedExamples();
         const batch = w.batch ?? mint();
         let cleared = 0;
-        let kept = touched;
-        for (const row of untouched) {
-          const out = write(row.register, row.id, { deleted_at: true }, { ...w, batch, note: w.note ?? 'Cleared the examples' });
-          if (out.ok) cleared++;
-          else kept++;
+        /* IN PASSES, because an example another example still links to is refused while that one stands: the founder's
+           organisation names its account, and the account came first. Each pass clears what it can, and a row still
+           refused when a pass clears nothing is kept. */
+        let left = [...untouched];
+        for (let more = true; more && left.length; ) {
+          const refused: typeof left = [];
+          for (const row of left) {
+            const out = write(row.register, row.id, { deleted_at: true }, { ...w, batch, note: w.note ?? 'Cleared the examples' });
+            if (out.ok) cleared++;
+            else refused.push(row);
+          }
+          more = refused.length < left.length;
+          left = refused;
         }
-        return ok({ cleared, kept });
+        return ok({ cleared, kept: touched + left.length });
       }),
 
     /** Every https origin an active `pull`, `call` or `poll` names. A host's executor sends to these and nothing else. */
