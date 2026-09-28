@@ -107,6 +107,9 @@ try {
     format: 'esm',
     target: 'node24',
     define: { __BUILD__: JSON.stringify(tuple) },
+    // A COMMONJS DEPENDENCY STILL CALLS require() INSIDE AN ESM FILE. `yaml` asks for `process` that way, and esbuild's
+    // shim throws "Dynamic require is not supported" unless a real `require` is in scope, so the bundle makes one.
+    banner: { js: "import { createRequire as __braindogRequire } from 'node:module';\nconst require = __braindogRequire(import.meta.url);" },
     plugins: [ownEntry],
     logLevel: 'warning',
   });
