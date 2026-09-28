@@ -404,12 +404,12 @@
            billing list says `open: false`, every other billing door answers `NOT_IN_THIS_BUILD` naming this setting,
            and the sign-up page asks nothing. `test` or `live` is on, and must agree with the prefix of the
            `STRIPE_SECRET_KEY` secret (`sk_test_` or `sk_live_`) or every billing door refuses, naming both. */
-        "BILLING": "",
+        "BILLING": "test",
         /* THE STRIPE PRICES OF THE TWO PLANS, `price_...`, one per environment. Empty, and that plan is not sold: Cloud
            at $12 a month and Cloud Plus at $29, the words in `HOSTED_PLANS` (`src/billing.ts`) and the choice in
            `apps/site/src/lib/plans.ts`. What a card is charged is whatever the Stripe price says. */
-        "STRIPE_PRICE_HOSTED": "",
-        "STRIPE_PRICE_PLUS": "",
+        "STRIPE_PRICE_HOSTED": "price_1UKiDwPop5yzbTmmSBwLkuFa",
+        "STRIPE_PRICE_PLUS": "price_1UKiEhPop5yzbTmmOMMwOGJP",
         /* THE SIGN-UP PAGE'S TURNSTILE WIDGET (OPS-17). Empty, and sign-up runs on the Directory's lockouts alone; the
            secret half is `TURNSTILE_SECRET`, named at the end of this file. */
         "TURNSTILE_SITE_KEY": "",
@@ -610,7 +610,7 @@
            alone; the site's `LAUNCH` flags mirror this value, and a site test holds them equal (`loop/finish/contracts.md` §9). */
         "BILLING": "",
         /* THE STRIPE PRICES OF CLOUD AND CLOUD PLUS, as alpha's comment says, from the live mode of his Stripe account. */
-        "STRIPE_PRICE_HOSTED": "",
+        "STRIPE_PRICE_HOSTED": "price_1UKmaqPop5yzbTmmSOx5842B",
         "STRIPE_PRICE_PLUS": "",
         /* THE SIGN-UP PAGE'S TURNSTILE WIDGET, as alpha's comment says. */
         "TURNSTILE_SITE_KEY": "",
