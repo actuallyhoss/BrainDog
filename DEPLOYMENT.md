@@ -370,6 +370,12 @@ as a note once `OPS_RECORD` is set. The one alert that pushes is the uptime chec
 Cloudflare offers a notification on a query, `crash` and `refuse` move to it first, because they
 are the two that cannot wait until morning.
 
+*(29 September 2026: it does now. Notifications lists "Workers Observability > Alert Policy", which mails
+when an alert saved under Observability > Alerts fires (`status` FIRING_FAILED), so `crash` and `refuse`
+can move to it: save each as an Observability alert, then add that policy to your email. Set up so far:
+"BrainDog: Cloudflare incident", major and critical incidents, to admin@brain.dog. No Worker has a Workers
+Builds trigger any more; deploys go through the pipeline or by hand.)*
+
 **The uptime check, for you to create.** `https://brain.dog/healthz` answers 200 and
 `{"ok":true,...}` from the Worker alone, without waking a record or the Directory
 (`apps/worker/src/health.ts`), and the site hands the path to the app Worker
