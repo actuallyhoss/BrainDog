@@ -19,6 +19,7 @@
   import { page as route } from '$app/state';
   import { untrack } from 'svelte';
   import { titleOf } from '$lib/title.ts';
+  import { apiBase } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
   import { day, money, since } from 'braindog-render';
   import { fieldSaid, readShared, words, type SharedBlock, type SharedRead, type SharedReading } from '$lib/record/share-write.ts';
@@ -39,7 +40,9 @@
   async function read(asked: string) {
     const at = opened();
     got = null;
-    const out = await readShared(globalThis.location.origin, asked);
+    /* `/s/<token>` names no record (`RECORDLESS` in `lib/at.ts`), so `apiBase()` answers the bare origin here, the
+       same address `globalThis.location.origin` named, through the one function the rest of the app reads it by. */
+    const out = await readShared(apiBase(), asked);
     /* An answer for a link somebody has already left draws nothing. */
     if ((route.params.token ?? '') !== asked) return closed(true, at);
     now = Date.now();

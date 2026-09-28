@@ -322,9 +322,9 @@ export const FOUNDER = {
             source: 'sessions.live',
             where: 'state is active',
             columns: [
-              { field: 'agent', as: 'who' },
-              { field: 'doing', as: 'title' },
-              { field: 'last_seen', as: 'when' },
+              { field: 'agent', label: 'Agent' },
+              { field: 'doing', label: 'Doing' },
+              { field: 'last_seen', label: 'Last seen' },
             ],
             limit: 6,
           },

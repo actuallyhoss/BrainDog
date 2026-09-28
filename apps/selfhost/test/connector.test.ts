@@ -366,7 +366,7 @@ test('A HELD RECORD FETCHES NOTHING, and the row goes back rather than staying l
   assert.equal(out.held, 1);
   assert.equal(out.ran, 0);
   /* NOTHING IS CHARGED FOR A RUN THAT DID NOT HAPPEN. */
-  assert.deepEqual(out.usage[0]?.usage, { runs: 0, requests: 0, bytes: 0, ms: 0, failures: 0, held: 1 });
+  assert.deepEqual(out.usage[0]?.usage, { runs: 0, requests: 0, bytes: 0, ms: 0, failures: 0, held: 1, cpu_ms: 0 });
   /* AND THE ROW GOES BACK. A held run never acks, so a pass that left it leased would turn "you are
      at your allowance" into "this connector stopped" for as long as the lease lasted. */
   assert.equal(sql.one<{ state: string }>("SELECT state FROM outbox WHERE kind = 'pull.fetch'")?.state, 'done');

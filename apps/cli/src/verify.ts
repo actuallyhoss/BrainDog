@@ -28,7 +28,7 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { DatabaseSync } from 'node:sqlite';
+import type { DatabaseSync } from 'node:sqlite';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 
@@ -201,7 +201,7 @@ async function verifyCopy(file: string, path: string, bytes: Buffer, key: string
     container: 'dog',
     /* `PRAGMA user_version`, the `.brain` format revision, is the big-endian integer at offset 60 of the header. */
     format: bytes.length >= 64 ? bytes.readUInt32BE(60) : 0,
-    ...countsOf(path),
+    ...(await countsOf(path)),
     manifest: 'ok',
     signature: { valid: true, key_id, pinned },
     produced: { at: signed_at, by: record },
@@ -214,10 +214,17 @@ async function verifyCopy(file: string, path: string, bytes: Buffer, key: string
 /**
  * How many tables and rows a copy holds, read with the file opened read-only and immutable so checking it writes
  * nothing beside it. A copy SQLite will not open is counted as empty: its signature has already been checked.
+ *
+ * `node:sqlite` IS IMPORTED HERE, NOT AT THE TOP OF THE FILE, because `main.ts` imports `verify` statically for
+ * every command this CLI runs. A top-level `import { DatabaseSync } from 'node:sqlite'` would load the experimental
+ * module, and Node prints its `ExperimentalWarning` to stderr, on `braindog login` and every other command that
+ * never touches a self-host copy. Loading it only when a copy is actually being counted keeps that warning off
+ * everything else.
  */
-function countsOf(path: string): { tables: number; rows: number } {
+async function countsOf(path: string): Promise<{ tables: number; rows: number }> {
   let db: DatabaseSync | undefined;
   try {
+    const { DatabaseSync } = await import('node:sqlite');
     const at = pathToFileURL(path);
     at.searchParams.set('immutable', '1');
     db = new DatabaseSync(at, { readOnly: true });

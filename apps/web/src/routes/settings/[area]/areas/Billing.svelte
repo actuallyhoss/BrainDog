@@ -4,6 +4,7 @@
 -->
 <script lang="ts">
   import { copy } from '$lib/copy.ts';
+  import { at } from '$lib/at.ts';
   import { words as actionWords } from '$lib/record/actions.ts';
   import { read } from '$lib/data/read.svelte.ts';
   import { billingLine, hostedHere, paymentPage, planLine, readBilling, stateLine, type BilledRecord } from '../../billing.ts';
@@ -62,8 +63,9 @@
     going = r.record;
     const out = await paymentPage(kind, r.record);
     if (out.ok) {
-      /* LEAVING FOR STRIPE, and `going` stays set, so the button keeps saying so until the page is gone. */
-      location.assign(out.value);
+      /* LEAVING FOR STRIPE, and `going` stays set, so the button keeps saying so until the page is gone. Stripe's
+         own host, so `at()` hands it back unchanged; the argument still starts with `at(` (rules.md §7). */
+      location.assign(at(out.value));
       return;
     }
     going = null;

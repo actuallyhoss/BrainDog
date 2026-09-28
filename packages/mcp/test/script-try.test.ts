@@ -112,7 +112,7 @@ test('A DRAFT RUNS AND WRITES NOTHING: the writes it would make come back, and t
   assert.equal(counted[0]!.channel, 'script');
   assert.equal(counted[0]!.ingest, 'fx-rate');
   assert.equal(counted[0]!.outcome, 'ok');
-  assert.deepEqual(counted[0]!.usage, { runs: 1, requests: 1, bytes: counted[0]!.usage.bytes, ms: counted[0]!.usage.ms, failures: 0, held: 0 });
+  assert.deepEqual(counted[0]!.usage, { runs: 1, requests: 1, bytes: counted[0]!.usage.bytes, ms: counted[0]!.usage.ms, failures: 0, held: 0, cpu_ms: counted[0]!.usage.cpu_ms });
   assert.ok(counted[0]!.usage.bytes > 0);
 });
 
@@ -205,7 +205,7 @@ test('A SANDBOX THAT THROWS IS THE HOST: counted as a failure that cost no run, 
   await assert.rejects(trial({ record: { id: REC, tz: 'UTC' }, body: body(), grantOf: null }), /the loader did not start/);
   assert.equal(books.counted.length, 1);
   assert.equal(books.counted[0]!.outcome, 'failed');
-  assert.deepEqual(books.counted[0]!.usage, { runs: 0, requests: 0, bytes: 0, ms: 0, failures: 1, held: 0 });
+  assert.deepEqual(books.counted[0]!.usage, { runs: 0, requests: 0, bytes: 0, ms: 0, failures: 1, held: 0, cpu_ms: 0 });
 });
 
 test('ONE ID FOR A TRIAL: the job its fetches are sent for is the event the ledger counts, and no loader id is handed over', async () => {

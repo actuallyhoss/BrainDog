@@ -57,7 +57,8 @@ export function parseYaml(text: string): Result<Json> {
     return no('PACK_MALFORMED', `Line ${at.replace(':', ', column ')}: ${fault.message}`, { at, detail: fault.code });
   }
   if (docs.length !== 1) {
-    const at = docs.length > 1 ? where(docs[1]!.range[0]) : '0:0';
+    const second = docs.length > 1 ? docs[1] : undefined;
+    const at = second?.range ? where(second.range[0]) : '0:0';
     return no('PACK_MALFORMED', `A YAML file here holds exactly one document, and this one holds ${docs.length}. Put each in a file of its own.`, { at });
   }
   return toJson(docs[0]!.contents, 0, where);

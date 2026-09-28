@@ -875,11 +875,12 @@ test('A ROW SAYS WHICH THING IT BELONGS TO, and every list was grey because noth
   assert.equal(identityFor('nosuchregister', {}), null, 'a register that does not exist threw or answered');
 
   /* FIRST MATCH IN DECLARED ORDER, and that is the register's choice and not this function's.
-     `obligations` declares `party -> people` BEFORE `thing -> things`, and the walk lands on the
-     project because `people` declares no identity, not because anything here prefers projects. */
+     `obligations` declares `party -> people` BEFORE `thing -> things` BEFORE `book -> books` (the
+     book ref money-core 3.1.0 added to every booked list), and the walk lands on the project
+     because `people` declares no identity, not because anything here prefers projects. */
   const decl = REGISTERS.obligations!;
   const refs = decl.fields.filter((f) => f.type === 'ref' && f.to).map((f) => f.to);
-  assert.deepEqual(refs, ['people', 'things'], 'the ordering this case rests on has changed');
+  assert.deepEqual(refs, ['people', 'things', 'books'], 'the ordering this case rests on has changed');
   assert.equal(identityFor('obligations', first('obligations'))?.name, 'Marlow & Co');
 
   /* AND A REF THAT POINTS AT NO ROW IS NOT A GLYPH. A row can name a thing that was deleted. */

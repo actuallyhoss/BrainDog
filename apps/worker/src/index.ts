@@ -2253,7 +2253,11 @@ async function runnerOf(request: Request, env: Env, slug: string | null): Promis
   const deps = bearerDeps(env);
   if (!(await deps.knows(record))) return null;
   if (slug !== null && (deps.named === undefined || (await deps.named(slug)) !== record)) return null;
-  const ctx = (await held(env, record, (object) => object.runner(bearer))) as unknown as CallContext | null;
+  /* `.runner`'S TYPE IS A CAST, not `object`'s: the stub's own RPC typing recurses through `CallContext`'s union
+   * past TypeScript's instantiation depth, so the one property read that reaches it is pinned to the signature
+   * `runner` is declared with above, and every other call through `object` stays checked as it was. */
+  const runner = (object: DurableObjectStub<Record$>) => (object as unknown as { runner: (bearer: string) => Promise<CallContext | null> }).runner(bearer);
+  const ctx = await held(env, record, runner);
   return ctx === null ? null : { record, ctx };
 }
 

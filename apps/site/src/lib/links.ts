@@ -27,12 +27,12 @@ export const MCP = 'https://brain.dog/mcp';
 export const FEED = '/changelog.xml';
 
 /**
- * The support address a person writes to. Empty until `decisions.md` item 14 routes `support@brain.dog`
- * (SIT-4, contracts §12.2 O12/X39): every reader — mail footers, Settings > About, `/support` here and
- * `security.txt`'s Contact — shows nothing while it is empty, and this stays equal to the Worker's
- * `SUPPORT_ADDRESS`, the one source for the app and the mail, once production sets it.
+ * The support address a person writes to. `decisions.md` item 14 (SIT-4, contracts §12.2 O12/X39) now
+ * routes `support@brain.dog`: every reader (mail footers, Settings > About, `/support` here and
+ * `security.txt`'s Contact) shows it, and this stays equal to the Worker's `SUPPORT_ADDRESS` in
+ * `apps/worker/wrangler.jsonc`'s production environment, the one source for the app and the mail.
  */
-export const SUPPORT_EMAIL = '';
+export const SUPPORT_EMAIL = 'support@brain.dog';
 
 /** The build instructions, which is what a self-hoster is actually sent to. */
 export const BUILD: string | null = null;

@@ -22,6 +22,7 @@
 
 <script lang="ts">
   import { copy } from '$lib/copy.ts';
+  import { at } from '$lib/at.ts';
   /* Type only, so the client's route table stays out of this chunk. */
   import type { Shell } from '$lib/record/boot-live.ts';
   import { hostedHere, lapseLines, paymentPage, thisRecord } from '../../routes/settings/billing.ts';
@@ -57,7 +58,8 @@
     going = true;
     const out = await paymentPage('checkout', here.record);
     if (out.ok) {
-      location.assign(out.value);
+      /* Stripe's own host, so `at()` hands it back unchanged; the argument still starts with `at(` (rules.md §7). */
+      location.assign(at(out.value));
       return;
     }
     going = false;

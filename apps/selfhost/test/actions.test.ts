@@ -343,7 +343,7 @@ test('A HELD RUN SENDS NOTHING: no name resolved, no key opened, no request, and
   assert.equal(net.calls.length, 0);
   assert.equal(opened, 0);
   assert.deepEqual(dns.asked, []);
-  assert.deepEqual(run.usage.map((u) => u.usage), [{ runs: 0, requests: 0, bytes: 0, ms: 0, failures: 0, held: 1 }]);
+  assert.deepEqual(run.usage.map((u) => u.usage), [{ runs: 0, requests: 0, bytes: 0, ms: 0, failures: 0, held: 1, cpu_ms: 0 }]);
   assert.equal(sql.one<{ note: string }>("SELECT note FROM event WHERE kind = 'pull' ORDER BY ts DESC, id DESC LIMIT 1")?.note, say);
 
   /* AND WHAT THE PASS METERED GOES TO THE LEDGER, run by run, in order. */

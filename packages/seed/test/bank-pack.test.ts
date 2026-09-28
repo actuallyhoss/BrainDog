@@ -143,7 +143,7 @@ test('MONEY-CORE DECLARES NO BANK WORDING, and the twelve it handed until 2.4.0 
 test('THE PACK DECLARES THE TWELVE AND THE BALANCE READING, needs money-core 3.0.0 or later before 4.0.0, and is not a first-party module', async () => {
   const doc = bankHsbcEgFile() as unknown as Doc;
   assert.equal(doc.pack, 'bank-hsbc-eg');
-  assert.equal(doc.version, '1.4.0');
+  assert.equal(doc.version, '1.5.0');
   assert.deepEqual(ingestsOf(doc), [...HSBC, 'ingest.bank-balance', 'ingest.bank-balance-sms', 'ingest.bank-not-mine-sms'].sort());
   /* `<3.0.0` SINCE 1.0.1, because the caret it had at 1.0.0 admits no 2.0.0. THE FLOOR MOVES TO 3.0.0 AT 1.4.0, because
      `bank-balance` and its webhook twin read `register.accounts`' `balance_after` and money-core's own balances,

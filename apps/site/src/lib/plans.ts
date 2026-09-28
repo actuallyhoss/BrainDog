@@ -78,7 +78,7 @@ export const PLANS: readonly Plan[] = [
     for: 'For busy teams, or records with lots of agents and automations.',
     href: `${SIGNUP}?plan=plus`,
     external: true,
-    allowance: { credits: 400, runs: 60_000, requests: 600_000, gb: 5, hours: 200 },
+    allowance: { credits: 400, runs: 75_000, requests: 750_000, gb: 5, hours: 250 },
   },
 ];
 

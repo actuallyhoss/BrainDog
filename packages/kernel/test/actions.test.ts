@@ -295,11 +295,11 @@ test('EVERY RUN IS METERED from the first: runs, requests, bytes, run time and f
 
   assert.deepEqual(
     meters(sql, 'ping').map(({ note: _, ...m }) => m),
-    [{ channel: 'call', host: 'hooks.example.test', status: 200, outcome: 'ok', scope: 'studio', usage: { runs: 1, requests: 1, bytes: 11, ms: 3, failures: 0, held: 0 } }],
+    [{ channel: 'call', host: 'hooks.example.test', status: 200, outcome: 'ok', scope: 'studio', usage: { runs: 1, requests: 1, bytes: 11, ms: 3, failures: 0, held: 0, cpu_ms: 0 }, answer: { status: 200, body: 'balance 120', cut: false } }],
   );
   assert.deepEqual(
     meters(sql, 'balance').map(({ note: _, ...m }) => m),
-    [{ channel: 'poll', host: 'api.example.test', status: 200, outcome: 'changed', scope: 'global', usage: { runs: 1, requests: 1, bytes: 11, ms: 3, failures: 0, held: 0 } }],
+    [{ channel: 'poll', host: 'api.example.test', status: 200, outcome: 'changed', scope: 'global', usage: { runs: 1, requests: 1, bytes: 11, ms: 3, failures: 0, held: 0, cpu_ms: 0 } }],
   );
 
   /* AND THE PASS HANDS EVERY RUN BACK, by its event's id, which is what the Directory's ledger counts once. */
@@ -325,7 +325,7 @@ test('AT THE PLAN’S LIMIT A RUN WAITS FOR THE NEXT MONTH: nothing is sent, not
   assert.equal(asked.length, 1);
   assert.deepEqual(
     meters(sql, 'ping').map((m) => ({ outcome: m.outcome, usage: m.usage, note: m.note })),
-    [{ outcome: 'held', usage: { runs: 0, requests: 0, bytes: 0, ms: 0, failures: 0, held: 1 }, note: say }],
+    [{ outcome: 'held', usage: { runs: 0, requests: 0, bytes: 0, ms: 0, failures: 0, held: 1, cpu_ms: 0 }, note: say }],
   );
   assert.deepEqual(run.usage.map((m) => [m.outcome, m.usage.held]), [['held', 1]]);
   assert.equal(row(sql, 'call', 'ping')?.state, 'pending', 'a held action was paused, so somebody would have to resume it');
