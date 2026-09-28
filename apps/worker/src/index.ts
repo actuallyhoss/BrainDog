@@ -240,6 +240,8 @@ type Env = {
    * sender, which Email Service refuses as `E_FIELD_MISSING` (`deliver.ts`).
    */
   MAIL_FROM?: string;
+  /** Where a reader of any mail may write with a question, named in its footer. Empty, and the footer names none. */
+  SUPPORT_ADDRESS?: string;
   /** The app's host name: the cookie's origin, the passkeys' relying party, and what a cookie write must come from. */
   PUBLIC_HOST?: string;
   /**
@@ -2141,6 +2143,7 @@ async function drainOutbox(env: Env, id: string): Promise<void> {
       : {}),
     ...(env.EMAIL === undefined ? {} : { email: (m: Mail) => env.EMAIL!.send(m) }),
     from: env.MAIL_FROM || env.AUTH_MAIL_FROM,
+    support: env.SUPPORT_ADDRESS,
     /* EVERY JOB THAT WAS SENT, COUNTED IN THE ACCOUNT'S LEDGER AND NEVER LIMITED, by the record's own object, which knows
        the record id the ledger is keyed by. The kind and the id cross the RPC and nothing of the payload does. */
     counted: (job) => record.countDelivery({ id: job.id, kind: job.kind }),

@@ -41,7 +41,17 @@ test('AN EMAIL IS SENT WITH WHAT THE ROW SAYS, from the sender this deployment n
   const deliver = makeDeliver({ email: async (m) => void sent.push(m), from: 'notify@brain.example' });
 
   await deliver(job('notify.email', { to: 'ada@example.com', subject: 'Monday', text: '2 overdue' }));
-  assert.deepEqual(sent, [{ from: 'notify@brain.example', to: 'ada@example.com', subject: 'Monday', text: '2 overdue' }]);
+  assert.equal(sent.length, 1);
+  const mail = sent[0] as Record<string, string>;
+  assert.deepEqual(Object.keys(mail).sort(), ['from', 'html', 'subject', 'text', 'to']);
+  assert.equal(mail.from, 'notify@brain.example');
+  assert.equal(mail.to, 'ada@example.com');
+  assert.equal(mail.subject, 'Monday');
+  // The record's words first, then the footer that says what the mail is and who sent it.
+  assert.ok(mail.text!.startsWith('2 overdue\n\nThis mail is from BrainDog, sent '), mail.text);
+  assert.match(mail.text!, /Quartz Apps LLC, c\/o Cloud Peak Law/u);
+  assert.match(mail.html!, /<h1[^>]*>Monday<\/h1>/u);
+  assert.match(mail.html!, />2 overdue<\/p>/u);
 
   // A row with no recipient is a dead letter, not an email to nobody.
   assert.match(await threw(() => deliver(job('notify.email', { subject: 'Monday' }))), /recipient and a subject/);

@@ -26,10 +26,14 @@ import type { LeasedSeal, OutboxKind, OutboxRow } from '@braindog/kernel';
 import { fixOf, type Result } from '@braindog/ports';
 
 import { unwrap, type KeyStore } from './keys.ts';
+import { recordLetter } from './mail.ts';
 import { pushHeaders, type PushSend, type Vapid } from './vapid.ts';
 
-/** One message as Email Service takes it: `to` is one address or up to fifty, and `from` is required. */
-export type Mail = { from: string; to: string | string[]; subject: string; text: string };
+/**
+ * One message as Email Service takes it: `to` is one address or up to fifty, and `from` is required. The text and the
+ * HTML say the same thing, drawn by `recordLetter` in the page every BrainDog mail wears.
+ */
+export type Mail = { from: string; to: string | string[]; subject: string; text: string; html: string };
 
 /** The key a post names, opened, or the sentence that says why it was not. Never both, and the secret never logged. */
 export type Opened = { ok: true; secret: Uint8Array } | { ok: false; why: string };
@@ -46,6 +50,8 @@ export type Transports = {
    * for. Blank or absent, and no notification mail is sent, because Email Service refuses a message without one.
    */
   from?: string | undefined;
+  /** Where a reader may write with a question, named in the mail's footer: `SUPPORT_ADDRESS`. Blank, and it names none. */
+  support?: string | undefined;
   /** `fetch`, narrowed to what a webhook needs: the address, the raw body, and the headers that go with it. */
   post?: ((url: string, body: string, headers: Record<string, string>) => Promise<{ ok: boolean; status: number }>) | undefined;
   /** How a named signing key is opened. Absent, and a post that names one is refused rather than sent bare. */
@@ -323,7 +329,10 @@ export function makeDeliver(transports: Transports): Deliver {
       if (!to || !subject) throw new Error('a notify.email needs a recipient and a subject');
       if (Array.isArray(to) && to.length > MAX_RECIPIENTS)
         throw new Error(`a notify.email goes to at most ${MAX_RECIPIENTS} addresses, and this one names ${to.length}`);
-      await transports.email({ from, to, subject, text: text(payload.text) });
+      /* THE RECORD'S WORDS, DRAWN IN THE HOUSE LETTER: its block dialect as headings, figures and rows in the HTML, and
+         as plain lines in the text, each with the footer that says what the mail is. */
+      const letter = recordLetter(subject, text(payload.text), text(payload.because), transports.support ?? '');
+      await transports.email({ from, to, subject: letter.subject, text: letter.text, html: letter.html });
       await count(transports, job);
       return;
     }
