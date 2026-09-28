@@ -385,7 +385,7 @@
         /* EMPTY FALLS BACK TO AUTH_MAIL_FROM: mail.ts reads it for everything but a sign-in link (OPS-28). */
         "MAIL_FROM": "",
         /* EMPTY FALLS BACK TO THE GENERIC FOOTER: mail.ts reads it for the address a reader is told to write to (OPS-28). */
-        "SUPPORT_ADDRESS": "",
+        "SUPPORT_ADDRESS": "support@brain.dog",
         /* AND THE ONE WORD THAT LETS A KEYLESS RECORD BE MADE ON PURPOSE. Empty is the default and
            the default is a refusal: with no `KEK` bound, `/auth/provision` answers
            `NOT_IN_THIS_BUILD` rather than making a record that can never seal a grant, because a
@@ -591,7 +591,7 @@
         /* EMPTY FALLS BACK TO AUTH_MAIL_FROM: mail.ts reads it for everything but a sign-in link (OPS-28). */
         "MAIL_FROM": "",
         /* EMPTY FALLS BACK TO THE GENERIC FOOTER: mail.ts reads it for the address a reader is told to write to (OPS-28). */
-        "SUPPORT_ADDRESS": "",
+        "SUPPORT_ADDRESS": "support@brain.dog",
         /* AND THE ONE WORD THAT LETS A KEYLESS RECORD BE MADE ON PURPOSE. Empty is the default and
            the default is a refusal: with no `KEK` bound, `/auth/provision` answers
            `NOT_IN_THIS_BUILD` rather than making a record that can never seal a grant, because a

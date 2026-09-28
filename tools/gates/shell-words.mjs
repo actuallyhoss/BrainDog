@@ -181,8 +181,8 @@ const OUT = {
   'apps/site': {
     why: 'the public site is prose about the product, not code that runs a record (5 hits).',
     words: {
-      egypt: 'the changelog entry at `routes/changelog/entries.ts:317` says `Egyptian pounds` about a currency fix that shipped.',
-      sam: 'two changelog titles, at `routes/changelog/entries.ts:200` and `:354`, name the the old tool import as history.',
+      egypt: 'the changelog entry at `routes/changelog/entries.ts:580` says `Egyptian pounds` about a currency fix that shipped.',
+      sam: 'two changelog titles, at `routes/changelog/entries.ts:463` and `:617`, name the the old tool import as history.',
       mercury: 'the home page names the Mercury pack twice, in `lib/copy/home.ts`: the inbox example ("connect Stripe and Mercury") and the packs line, exactly as it names Stripe, Money and Work.',
     },
   },

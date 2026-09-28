@@ -86,6 +86,160 @@ export type Entry = {
  * checker only requires that a day never reappears after it has ended.
  */
 export const ENTRIES: Entry[] = [
+  /* THE FINISH LANDED AS A FEW LARGE COMMITS, NOT ONE PER THING. W1, W2 and W3 were each committed whole
+     (`c651475b`, `daba3453`, `4c204b5c`, `bfe14e39`), and an anchor must be unique, so each of those commits
+     carries one entry naming what a person notices most, and the rest of that workflow is not written up
+     here. W3 especially: one commit, so one entry, until its work has commits of its own to anchor to. */
+  {
+    date: '2026-09-28',
+    kind: 'shipped',
+    title: 'Your phone keeps a copy to read offline, and a Cloud account can be closed',
+    body:
+      'A phone keeps a read copy of the record for a week, so it opens without a signal and refreshes when you pull down. ' +
+      'An owner can close their Cloud account from Settings, and a webhook can require a signature before anything it sends is matched. ' +
+      'This site gained documentation for using the app, connecting agents and building packs.',
+    commits: ['bfe14e39'],
+  },
+  {
+    date: '2026-09-28',
+    kind: 'fixed',
+    title: 'The command line installed as one file starts again',
+    body:
+      'The single-file command line failed as soon as it was run, because a library bundled inside it asked for something the bundle did not provide. ' +
+      'It starts now.',
+    commits: ['21c13d03'],
+  },
+  {
+    date: '2026-09-28',
+    kind: 'shipped',
+    title: 'Add-ons, people and comments in the app, and pages you change by describing them',
+    body:
+      'Add-ons can be browsed, searched, installed and updated from inside the app. ' +
+      'You can invite people from Settings and comment on a row. ' +
+      'Describe a change to a page and Slash draws it beside the page as it is, for you to keep or drop.',
+    commits: ['4c204b5c', 'df828225'],
+  },
+  {
+    date: '2026-09-28',
+    kind: 'shipped',
+    title: 'Connecting an agent is rebuilt, and one command sets a machine up',
+    body:
+      'Connecting an agent is one flow that ends on a consent screen before it gets any access. ' +
+      'One command sets a machine up from the record’s address, and every item shows which scope it belongs to. ' +
+      'History says what happened in words, and bank merchants get clean names and a category.',
+    commits: ['daba3453'],
+  },
+  {
+    date: '2026-09-27',
+    kind: 'changed',
+    title: 'A calmer look, a layout made for the phone, and agents that connect by address',
+    body:
+      'The app has a cool ground, a light scheme, quieter controls, and a layout built for the phone as well as the desk. ' +
+      'Any MCP client can connect with the record’s address and a sign-in. ' +
+      'The command line installs as a single file.',
+    commits: ['c651475b', 'a4a4a008', '684d58f1', '8a67667d', 'b8753a5a'],
+  },
+  {
+    date: '2026-09-27',
+    kind: 'shipped',
+    title: 'Card alerts joins the catalogue, and more packs show a preview first',
+    body:
+      'A card alert naming the card’s last four digits, forwarded by mail or sent as a text, is read into Money as a transaction. ' +
+      'The roadmap and project brief packs show a preview before you install them.',
+    commits: ['a65709a9'],
+  },
+  {
+    date: '2026-09-26',
+    kind: 'changed',
+    title: 'This site describes the finished product, with a page for Slash and the Cloud plans',
+    body:
+      'Every section under the home page’s opening is rebuilt: Slash, agents deciding, the inbox, pages, and why the record is yours. ' +
+      'Slash has a page of its own. ' +
+      'Pricing shows the two Cloud plans, with Slash counted in credits and extra usage off unless you turn it on.',
+    commits: ['72ec4007', '6db58337'],
+  },
+  {
+    date: '2026-09-25',
+    kind: 'changed',
+    title: 'No sample record and no demo: every screen reads your own record',
+    body:
+      'Screens that used to fall back to sample rows now read the live record, or say why they cannot. ' +
+      'The first run, the palette, packs and automations start from what the record holds.',
+    commits: ['1cde2795', 'c777e8f8', '1af90b95', '59aef3d4', 'b2b90d09'],
+  },
+  {
+    date: '2026-09-25',
+    kind: 'shipped',
+    title: 'A page can have a side rail, lead cards, steps, tiles and inputs',
+    body:
+      'A page lays out a main column and a side rail. ' +
+      'It draws lead cards, a path of steps, tiles, ranges against spend, and inputs that write as you type.',
+    commits: ['352e928f', 'fc9f9323', '2313d8d1'],
+  },
+  {
+    date: '2026-09-25',
+    kind: 'shipped',
+    title: 'Payouts, bank transactions, counting cash and a roadmap, as packs you install',
+    body:
+      'A pack is published to the catalogue and installs from the app or the command line. ' +
+      'Stripe payouts, bank transactions, counting cash, a live feed and a roadmap page are packs now. ' +
+      'Roadmap bars drag to a new start, with undo.',
+    commits: ['3d65e48a', 'e6d73bbd', 'c01cda50', '5c332af4', 'e54bc0fb'],
+  },
+  {
+    date: '2026-09-25',
+    kind: 'shipped',
+    title: 'An agent can be allowed to read the money inbox',
+    body:
+      'Settings can create access for an agent that reads the money inbox, off unless you ask for it. ' +
+      'Every other agent is still refused the inbox.',
+    commits: ['f487bf78', 'd41ec831', 'eb9169a3'],
+  },
+  {
+    date: '2026-09-25',
+    kind: 'shipped',
+    title: 'The forecast can sell on a set day, leave a line out, or let a figure drift',
+    body:
+      'Forecast steps carry their own currency and group, and can sell on a given day. ' +
+      'The money page groups installments by the plan they belong to.',
+    commits: ['94b799fb', 'cc7dc9b6', '4ab05e35'],
+  },
+  {
+    date: '2026-09-25',
+    kind: 'shipped',
+    title: 'An automation on a clock or a button can create a row each time',
+    body:
+      'A clock or a button that creates makes its row on each turn, within a limit. ' +
+      'The canvas offers monthly and yearly clocks with a day, a time and a month.',
+    commits: ['30f2d191', 'fb39de12', '0384af07', 'de44c368'],
+  },
+  {
+    date: '2026-09-25',
+    kind: 'fixed',
+    title: 'Money inputs never guess a currency',
+    body:
+      'A bare figure in an empty money box asks for its currency instead of assuming one. ' +
+      'A comma is read the app’s way, a range’s total is summed exactly, and a range mixing units is refused.',
+    commits: ['96c9ae9b', 'cce1734e', 'f62b2ee0'],
+  },
+  {
+    date: '2026-09-25',
+    kind: 'fixed',
+    title: 'Slash drafts only from what the person asking can read',
+    body:
+      'What Slash is told about a record is held to what the person asking can read. ' +
+      'A draft cannot give away rows, counts or gaps they could not see.',
+    commits: ['fa2f11eb'],
+  },
+  {
+    date: '2026-09-25',
+    kind: 'fixed',
+    title: 'The check that keeps keys out of the record is harder to fool',
+    body:
+      'It sees through invisible characters, reads link, email and structured fields, and runs in linear time. ' +
+      'A word shaped like a key is refused as a list option.',
+    commits: ['1a094625'],
+  },
   {
     date: '2026-09-25',
     kind: 'changed',
@@ -105,6 +259,115 @@ export const ENTRIES: Entry[] = [
       'A self-host reads its model from SLASH_ENDPOINT, SLASH_MODEL and SLASH_KEY, and ignores the SPARK_ names it read before. ' +
       'Rename them by hand, or the host runs as if no model were configured.',
     commits: ['bb960c22', '62fabc69'],
+  },
+  {
+    date: '2026-09-24',
+    kind: 'shipped',
+    title: 'Notifications on your phone, turned on per device',
+    body:
+      'Settings turns on notifications for one device, and a phone can add BrainDog to its Home Screen. ' +
+      'A notification says only that something needs you. ' +
+      'The record tells you what once it is open.',
+    commits: ['77436a14', '4a5a2135', 'a4111719', '317ae743'],
+  },
+  {
+    date: '2026-09-24',
+    kind: 'shipped',
+    title: 'Slash answers with an included model on the Cloud',
+    body:
+      'Slash’s included model is switched on, and each record gets a monthly allowance the Cloud enforces over any owner’s own cap. ' +
+      'When a record is too large for it, Slash says so plainly.',
+    commits: ['4e701b15', '1cdc6721', '70e45882', '250e0f41', '60f7c15b'],
+  },
+  {
+    date: '2026-09-24',
+    kind: 'shipped',
+    title: 'Put back after every change you make on a list',
+    body:
+      'Every live write on a list offers Put back, and a done task keeps its finished day when it is put back. ' +
+      'A ticked task stays where it was until you leave the page, and the grid edits every type the row page edits.',
+    commits: ['b935a4df', 'efb1c10a', '6fa38569', 'dd209664', '131189a4', '2ceb3be9'],
+  },
+  {
+    date: '2026-09-24',
+    kind: 'shipped',
+    title: 'Filters say more than, at least, between, and or',
+    body:
+      'A filter can compare a figure: more than, at least, less than, at most and between. ' +
+      'Conditions can be joined with or, and the filter chips say so.',
+    commits: ['3187be5a', '19973508', 'b1ee1b43', '2ba9a9b2'],
+  },
+  {
+    date: '2026-09-24',
+    kind: 'shipped',
+    title: 'Ring, heat and roadmap blocks, and a block made from a saved view',
+    body:
+      'A page can draw a ring, a heat map or a roadmap. ' +
+      'A block can be made from a list or a saved view, and a filtered list can be saved as a view.',
+    commits: ['4657589b', 'e19fdabc', '80411b3a', '387e4d1a'],
+  },
+  {
+    date: '2026-09-24',
+    kind: 'shipped',
+    title: 'A page an agent proposes is drawn in Decide before anyone accepts it',
+    body:
+      'Decide shows the page an agent proposes, drawn, before anybody accepts it. ' +
+      'An agent can see the drawing through MCP too, and retiring a field always waits in Decide.',
+    commits: ['511ef8f9', 'f9a5e778', '6822aab5'],
+  },
+  {
+    date: '2026-09-24',
+    kind: 'shipped',
+    title: 'The inbox is read by state, and an arrival can go back to it',
+    body:
+      'The inbox shows its arrivals by state, with a count for each. ' +
+      'A filed or archived arrival can be sent back to the inbox.',
+    commits: ['9815021f', 'add7d97b'],
+  },
+  {
+    date: '2026-09-24',
+    kind: 'shipped',
+    title: 'An automation step can read one of the record’s figures',
+    body:
+      'A step can fill in any figure the record declares at the moment it runs. ' +
+      'A rule naming a figure it cannot read is refused at install.',
+    commits: ['b251eb7f', 'd2c77fb3'],
+  },
+  {
+    date: '2026-09-24',
+    kind: 'fixed',
+    title: 'A move between your own accounts is no longer counted as spending',
+    body:
+      'The two cleared legs of a transfer are paired, so Spent stops counting money moved between your own accounts. ' +
+      'A client’s payment is never hidden as half of a move.',
+    commits: ['baf7048a', '57bf4ff7', '974319fb', '5dc5a7c6', '56b35c41'],
+  },
+  {
+    date: '2026-09-24',
+    kind: 'fixed',
+    title: 'The forecast walks month ends and ending lines correctly',
+    body:
+      'A yearly bill on 28 February stays on the 28th, and only a real month end walks to the last day. ' +
+      'A repeating line whose end is still ahead stops walking on its last day.',
+    commits: ['befd5f44', '48eeaf4c', '5d4bbf8b', 'f91fc4d3'],
+  },
+  {
+    date: '2026-09-24',
+    kind: 'fixed',
+    title: 'A damaged search index no longer stops a record opening',
+    body:
+      'The index is rebuilt when the record opens, or the record opens without search. ' +
+      'A restore that never finished no longer leaves the record down.',
+    commits: ['151295ca', 'd529c68d', '7c6c8634'],
+  },
+  {
+    date: '2026-09-24',
+    kind: 'changed',
+    title: 'A crash answers with a reference, and an oversized request is refused',
+    body:
+      'A request that crashes answers with a reference and logs the reason. ' +
+      'A body over one megabyte is refused as it arrives.',
+    commits: ['fbb45373'],
   },
   {
     date: '2026-09-23',
