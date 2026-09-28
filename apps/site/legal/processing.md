@@ -2,7 +2,7 @@ DRAFT for review, not in force.
 
 # Data Processing Addendum
 
-Last updated: 2026-09-28
+Last updated: 2026-09-29
 
 ## The short version
 
@@ -10,13 +10,13 @@ Last updated: 2026-09-28
 - We keep it confidential, keep it secure, and tell you if something goes wrong.
 - We use a short list of companies to run BrainDog, listed below. We tell you before we add one, and you can object.
 - You can export, erase and delete your data yourself, at any time.
-- When you leave, your data is deleted, and gone from backups 30 days later.
+- When you leave, your data is deleted, and nothing of it remains 30 days later.
 
 ## Who this is between
 
 This addendum is between Quartz Apps LLC, a Wyoming limited liability company whose post goes to c/o Cloud Peak Law, 1309 Coffeen Ave STE 1200, Sheridan, WY 82801, United States ("we" or "us"), and the business that uses BrainDog ("you").
 
-It is part of the [Terms of Service](/legal/terms), and it applies whenever you use BrainDog for a business and we process personal data for you. By accepting the Terms for a business, you accept this addendum too. If you'd like a copy signed by both of us, write to privacy@brain.dog. [owner: confirm you will countersign on request]
+It is part of the [Terms of Service](/legal/terms), and it applies whenever you use BrainDog for a business and we process personal data for you. By accepting the Terms for a business, you accept this addendum too. If you'd like a copy signed by both of us, write to support@brain.dog. [owner: confirm you will countersign on request]
 
 Words like "personal data", "controller", "processor", "data subject" and "personal data breach" mean what they mean in the GDPR and the UK GDPR. If this addendum and the Terms disagree about personal data, this addendum wins.
 
@@ -36,13 +36,13 @@ If the law makes us process your data in some other way, we will tell you first,
 
 You are responsible for having a lawful reason to put personal data in your records, and for telling the people it is about.
 
-We don't sell your personal data, share it for advertising, use it to train AI models, or combine it with data from other customers. Each record is its own database.
+We don't sell your personal data, share it for advertising, use it to train AI models, or combine it with data from other customers. Each record is its own database, never shared with another customer's.
 
 ## Confidentiality
 
 Only the people who run BrainDog for us can reach your data, and only when they need to. Each of them is bound to keep it confidential.
 
-We open a record only to support you, fix a fault, keep BrainDog safe, or follow the law. Every time we do, we record who did it and why.
+We open a record only to support you, fix a fault, keep BrainDog safe, or follow the law.
 
 ## Security
 
@@ -52,7 +52,7 @@ We keep your data secure with the measures in Annex 2. We may improve them over 
 
 You agree that we may use the sub-processors listed in Annex 3. Each is bound by a written contract that protects your data at least as well as this addendum, and we remain responsible for them.
 
-Before we add or replace a sub-processor, we will email the owners of your records at least 30 days ahead. [owner: confirm 30 days] If you object on reasonable data protection grounds, tell us at privacy@brain.dog within that time. We will try to find a way forward. If we can't, you may end the Terms for the affected records, and we'll refund any time you've paid for and not used. [owner: confirm this refund]
+Before we add or replace a sub-processor, we will email the owners of your records at least 30 days ahead. [owner: confirm 30 days] If you object on reasonable data protection grounds, tell us at support@brain.dog within that time. We will try to find a way forward. If we can't, you may end the Terms for the affected records, and we'll refund any time you've paid for and not used. [owner: confirm this refund]
 
 Services you choose to connect, such as your own model provider or the services your connections call, are not our sub-processors. You choose them, and your own agreement with each of them applies.
 
@@ -62,7 +62,7 @@ Most requests from the people in your records can be met in BrainDog itself:
 
 - **Access and portability:** export the whole record, at any time, as one file.
 - **Correction:** edit the row.
-- **Erasure:** an owner can erase a person from a record in Settings. Their details are removed from the live record at once, and from backups 30 days later.
+- **Erasure:** an owner can erase a person from a record in Settings. Their details are removed from the live record and its files at once, and from nightly backups 30 days later. Copies an owner took by hand, and the copy taken before a restore, keep them until those copies are replaced or the record is deleted.
 
 If a person asks us directly about your record, we will pass the request to you and not answer it ourselves, unless the law requires us to. If you need more help, ask us, and we will help as far as we reasonably can.
 
@@ -78,13 +78,13 @@ Telling you about a breach is not an admission of fault.
 
 - **At any time**, an owner can export the whole record, and delete it.
 - **When a plan ends**, the record becomes read-only and can still be exported. After 90 days it is deleted, unless it is paid for again. We email you before that happens.
-- **After deletion**, we keep one sealed final copy for 30 days, and then nothing of the record remains, in backups or anywhere else. [owner: confirm 30 days for the final copy]
+- **After deletion**, every other copy is deleted at once, and we keep one sealed final copy for 30 days. Then nothing of the record remains, in backups or anywhere else. [owner: confirm 30 days for the final copy]
 
 We keep data longer only where the law requires it.
 
 ## Audits
 
-Our security model and our security policy are published, and the BrainDog software is open source, so you can check how it works. We will answer your reasonable written questions about how we protect your data, once a year or after a breach. If a regulator requires more, we will work with you on it in good faith, at your cost. [owner: confirm no on-site audits]
+Our security page is published, and the BrainDog software is open source, so you can check how it works. [owner: true only once the repository is public (LAUNCH.repo)] We will answer your reasonable written questions about how we protect your data, once a year or after a breach. If a regulator requires more, we will work with you on it in good faith, at your cost. [owner: confirm no on-site audits]
 
 ## Transfers out of the UK and the EU
 
@@ -113,30 +113,32 @@ This addendum lasts as long as we process personal data for you, and ends when y
 
 ## Annex 2: Security measures
 
-- **Isolation.** Every record is its own database. No table holds two customers, and no request can address two records.
+- **Isolation.** Every record is its own database. No table holds two customers' records, and no request can address two records.
 - **Sign-in.** Passkeys first, with a one-time emailed link as the fallback. No passwords. Opening saved keys, restoring a copy, deleting a record and letting a new app in all need a sign-in within the last 15 minutes. Repeated failed attempts are locked out.
 - **Access for agents.** Keys can read, propose or write, and nothing more. No key can open saved keys, erase data, restore or delete. Keys from approved apps expire after 90 days, and we can end every key at once if we must.
-- **Saved keys.** Sealed before they are stored, under a key belonging to the record, which is itself sealed under a root key held only by our servers. An optional vault passphrase takes that root key out of the path.
+- **Saved keys.** Sealed before they are stored, under a key belonging to the record, which is itself sealed under a root key held only by our servers. An optional vault passphrase takes that root key out of the path for the keys people open; it is used only while a key is being opened and never stored. Keys a scheduled connection uses stay under the root key, so they can run with nobody there. An export leaves the secret values out.
 - **Encryption.** Data travels over HTTPS. Data at rest is encrypted by Cloudflare. Nightly backups are sealed to a key kept outside Cloudflare, so a stored copy alone opens nothing.
-- **Backups.** Every record copied nightly, with the last 30 kept. A failed night is recorded and raised.
-- **Accountability.** Every change in a record says who or which agent made it. Every time we open a record, we record who and why.
+- **Backups.** Every record copied nightly, with the last 30 kept. Copies an owner takes by hand are kept apart, up to 30. A failed night is recorded and raised.
+- **Accountability.** Every change in a record says who or which agent made it.
 - **Slash.** Slash has no way to write to a record by itself: its drafts wait for a person to accept them. It never sees saved keys.
 - **Logs.** Our own log lines record what kind of request was made and how it ended, and are written not to carry your content or keys.
-- **The code.** Open source, with a published security policy and a way to report weaknesses privately.
+- **The code.** Open source, with a published security page and a private way to report weaknesses.
 
 ## Annex 3: Sub-processors
 
 **Cloudflare, Inc.** (USA)
 
-- Hosting and running BrainDog (Workers, Durable Objects, Queues): all data in your records.
+- Hosting and running BrainDog, including your scripts (Workers, Durable Objects, Queues): all data in your records.
 - File and backup storage (R2): attached files and sealed nightly backups.
-- The AI model behind Slash (Workers AI, through AI Gateway): the parts of your record a question or daily check needs. Prompts and answers are not kept at the gateway.
+- The AI models behind Slash and search by meaning (Workers AI, through AI Gateway): the parts of your record a question, daily check, daily email or filing draft needs, and the text the search index is built from. Each call asks the gateway not to keep prompts or answers.
 - Sending email (Email Service): sign-in links, notices, and the daily email and alerts you asked for.
+- Receiving email (Email Routing): the email you forward to a record's address.
+- Usage counts (Workers Analytics Engine), if turned on: the kind of each request and a scrambled record ID, never content. [owner: off until TELEMETRY is bound]
 - Bot checks at sign-up (Turnstile): browser and connection details.
 
 **Stripe, Inc.** (USA)
 
-- Payments, subscriptions and invoices: your billing contact and payment details. Stripe never receives what's in your records.
+- Payments, subscriptions and invoices: your billing contact and payment details, and each paid record's name and web address. Stripe never receives what's in your records.
 
 [owner: name the inbox provider support@brain.dog is routed to, if support mail may carry personal data from records]
 

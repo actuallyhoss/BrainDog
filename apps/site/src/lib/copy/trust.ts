@@ -29,15 +29,15 @@ export const trust = {
       /* NOT WRITTEN HERE. The legal texts are OPS-27's (W3), drafted in `apps/site/legal/` and his to
          approve; a marketing redesign does not invent a legal term. Before `LAUNCH.legal` the index
          says so in one sentence; after it, it lists the three pages below. */
-      body: 'The Terms of Service, the Privacy Policy and the list of processors are published on this page before sign-up opens, and each says when it last changed.',
+      body: 'The Terms of Service, the Privacy Policy and the Data Processing Addendum are published on this page before sign-up opens, and each says when it last changed.',
       live: 'The terms you agree to when you make a hosted record, how your data is handled, and who handles it for us.',
     },
     /* One entry per text in `apps/site/legal/`, by its file name, which is also its address under
-       `/legal/`. `acceptable-use` and `refunds` are drafted there too and not drawn before W4. */
+       `/legal/`. Fair use and refunds are sections of the Terms, not texts of their own. */
     texts: {
       terms: { title: 'Terms of Service', description: 'The terms of a hosted BrainDog record.' },
       privacy: { title: 'Privacy Policy', description: 'What BrainDog keeps about you, why, and for how long.' },
-      processing: { title: 'Processors', description: 'The companies that process data for BrainDog, and what each one does.' },
+      processing: { title: 'Data Processing Addendum', description: 'How BrainDog handles personal data for a business, and the companies that help run it.' },
     },
     /* The one sentence an unpublished text's page says. The page exists so a strict prerender passes
        and carries `noindex`, and nothing links to it. */

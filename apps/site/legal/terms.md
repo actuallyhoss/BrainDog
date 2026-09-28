@@ -2,7 +2,7 @@ DRAFT for review, not in force.
 
 # Terms of Service
 
-Last updated: 2026-09-28
+Last updated: 2026-09-29
 
 ## The short version
 
@@ -11,14 +11,14 @@ Last updated: 2026-09-28
 - You can export the whole record as one file at any time, even if a payment has failed.
 - Slash, the assistant, can be wrong. Nothing it writes goes into your record until a person accepts it.
 - Agents you connect act with the access you give them, and you're responsible for what they do.
-- Follow the [Acceptable use policy](/legal/acceptable-use). We may suspend an account that breaks it.
+- Use BrainDog fairly (see "Using BrainDog fairly" below). We may suspend an account that doesn't.
 - BrainDog comes as it is, and our liability is limited as far as the law allows.
 
 ## Who we are
 
 These terms are an agreement between you and **Quartz Apps LLC**, a Wyoming limited liability company whose post goes to c/o Cloud Peak Law, 1309 Coffeen Ave STE 1200, Sheridan, WY 82801, United States ("we" or "us"). We run BrainDog at brain.dog.
 
-By making an account or using BrainDog, you agree to these terms, the [Acceptable use policy](/legal/acceptable-use), the [Privacy policy](/legal/privacy) and the [Refund policy](/legal/refunds). If you use BrainDog for a business, the [Data processing addendum](/legal/processing) is part of these terms too. If you don't agree, please don't use BrainDog.
+By making an account or using BrainDog, you agree to these terms. The [Privacy policy](/legal/privacy) says how we handle your information. If you use BrainDog for a business, the [Data processing addendum](/legal/processing) is part of these terms too. If you don't agree, please don't use BrainDog.
 
 ## What BrainDog is
 
@@ -53,7 +53,7 @@ BrainDog is only offered as a hosted service at brain.dog. These terms cover tha
 You can connect AI agents, such as Claude, Codex, Cursor or any other MCP client, and your own programs.
 
 - **You choose what each one can do.** A key can read, propose or write, and nothing more. You grant it, and you can take it back at any time in Settings.
-- **Keys don't last forever.** A key an app gets by asking you to approve it lasts 90 days.
+- **Keys don't last forever.** A key an app gets by asking you to approve it lasts 90 days. A key you make yourself lasts 90 days unless you choose another length, up to a year.
 - **Some things always need a person.** No key can open your saved keys, answer a decision, invite anybody, export the record, erase data, restore a copy or delete the record. Those need someone signed in, in a browser.
 - **Everything an agent writes is recorded under its name**, so you can see what it did and undo it.
 - **You're responsible for your agents.** An agent acts for you. What it does with the access you gave it counts as what you did, under these terms.
@@ -76,9 +76,9 @@ You own what you put in your record. You're responsible for it, and for having t
 
 We don't sell your content, we don't use it for advertising, and we don't use it to train AI models.
 
-The licence ends when you delete the content or the record, except for backups until they expire (30 days) and anything the law makes us keep.
+The licence ends when you delete the content or the record, except for copies of the record until they are deleted (see "Keeping BrainDog running") and anything the law makes us keep.
 
-**Sharing a page.** You can make a link to one page. Anyone with that link can see that page, so share it with care.
+**Sharing a page.** You can make a link to one page. Anyone with that link can see that page, so share it with care. A link works for 30 days unless you choose another length, up to 90, and you can close it early in Settings.
 
 **Packs.** If you publish a pack to BrainDog's public catalogue, anyone can see it and install it. You give us the same licence to host and share it there, and you confirm it holds nothing private and no one else's work without permission. [owner: confirm publishing packs is open to customers at launch]
 
@@ -92,7 +92,7 @@ You can connect your record to other services, and forward email and webhooks in
 
 ## Using BrainDog fairly
 
-The [Acceptable use policy](/legal/acceptable-use) says what isn't allowed. It is part of these terms. In short, don't:
+Don't:
 
 - break the law, or help anyone else to;
 - attack, overload or probe BrainDog, or try to reach a record that isn't yours;
@@ -100,33 +100,42 @@ The [Acceptable use policy](/legal/acceptable-use) says what isn't allowed. It i
 - use BrainDog to send spam or to store or spread malware;
 - pretend to be BrainDog, Quartz or our staff.
 
-If you find a security problem, please tell us at security@brain.dog before telling anyone else. Our security policy says how, and what we promise in return.
+If you find a security problem, please tell us at support@brain.dog before telling anyone else. The security page on brain.dog says what to include. Test only against a record that is yours.
 
 ## Plans and prices
 
 - **Cloud** is US$12 a month for each record. **Cloud Plus** is US$29 a month for each record.
 - Each plan includes a monthly amount of Slash credits, automation and script runs, requests to other services, data fetched and script time. The pricing page (brain.dog/pricing) lists them. People, pages, lists and history are never counted.
-- Allowances reset on the first of each month. What you don't use doesn't carry over.
+- Allowances reset on the first of each month (UTC). What you don't use doesn't carry over.
 - When you reach an allowance, work that needs more waits for the next month, and your record tells you what is waiting.
 
 **Slash credits.** One question or one draft uses one credit, however long Slash works on it. Slash's own daily check, your daily email and learning how to file things never use your credits.
 
-**Credit packs.** You can buy packs of extra credits. They are used after the month's credits run out, and they don't expire while the record exists. Credits have no cash value, and can't be sold, transferred or moved to another record. When a record is deleted, its unused credits end with it. [owner: confirm packs are not refunded once any credit is used]
+**Credit packs.** [owner: the pricing page offers credit packs and extra usage, but billing.ts sells only the two plans today; keep these two paragraphs only once both are built] You can buy packs of extra credits. They are used after the month's credits run out, and they don't expire while the record exists. Credits have no cash value, and can't be sold, transferred or moved to another record. When a record is deleted, its unused credits end with it. [owner: confirm packs are not refunded once any credit is used]
 
 **Extra usage.** Extra usage is off until you turn it on. If you turn it on, you set a monthly cap, and we charge for usage past your plan at the prices on the pricing page, and never past your cap.
 
 ## Payment
 
 - Payments are handled by Stripe. We never see your card number.
+- There is no free plan and no free trial.
 - Plans are billed monthly in advance, from the day you pay. Extra usage is billed after the month it was used. [owner: confirm when extra usage is billed]
 - Prices are in US dollars. [owner: tax is off until Stripe Tax is turned on; say whether prices include or exclude tax]
-- You can change plan or cancel at any time from Settings. A change of plan takes effect straight away. [owner: confirm how Stripe prorates a mid-month change] A cancellation takes effect at the end of the period you've paid for.
+- You can change plan or cancel at any time from Settings, on Stripe's own page. A change of plan takes effect straight away. [owner: confirm how the Stripe customer portal prorates a mid-month change] A cancellation takes effect at the end of the period you've paid for, and the record then becomes read-only (see below). [owner: set the customer portal to cancel at the end of the period, not at once]
 - We may change our prices. We'll tell you by email at least 30 days before a new price applies to you. If you don't agree, you can cancel before it does.
-- Refunds follow the [Refund policy](/legal/refunds).
+- Refunds are covered in the next section.
+
+## Refunds
+
+- Cancelling stops the next payment. We don't refund the rest of a month you've paid for, a move to a smaller plan, or unused allowances or credits.
+- If we charged you by mistake, or twice, write to support@brain.dog and we'll refund it.
+- If the law gives you a right to a refund, such as a consumer's right to cancel in the UK or the EU, nothing here takes it away.
+
+[owner: confirm this refund stance, and whether UK and EU consumers are asked at checkout to give up the 14-day right to cancel]
 
 ## If a payment fails, or your plan ends
 
-- **Payment failed.** Your record keeps working while Stripe tries your card again and emails you. Update your card in Settings to fix it.
+- **Payment failed.** Your record keeps working while Stripe tries your card again. Update your card in Settings to fix it.
 - **Plan ended.** If the plan is cancelled, or a payment still hasn't gone through after Stripe's tries, the record becomes **read-only**. Its people and agents can still read it, and nothing new runs: no connectors, automations, scripts or Slash.
 - **You can always export.** An owner can export the whole record at any time while it is read-only. We never hold your data back to make you pay.
 - **Before we delete it, we tell you.** We email the payer and every owner when the record becomes read-only, and again 60 days and 83 days later.
@@ -134,32 +143,33 @@ If you find a security problem, please tell us at security@brain.dog before tell
 
 ## Export and leaving
 
-You can export your whole record, at any time, from Settings, as one file you keep. The file is in an open format, and the software that reads it is open source. Your saved keys travel in it sealed, so the file alone opens none of them.
+An owner can export the whole record, at any time, from Settings, as one file you keep. The file is plain text, one line per row, so ordinary tools can read it, and it is signed so you can check it is whole. The secret values of your saved keys are left out of it and their names are kept, so a file that goes astray opens nothing.
 
 ## Deleting a record or closing your account
 
-- An owner can delete a record in Settings, by typing its name. It is deleted straight away. We keep one sealed final copy for 30 days in case you change your mind that day, and then nothing of it remains. [owner: confirm 30 days for the final copy]
+- An owner can delete a record in Settings, by typing its name. It is deleted straight away, with every copy of it except one sealed final copy, which we keep for 30 days in case it was deleted by mistake. Then that is deleted too, and nothing of the record remains. [owner: confirm 30 days for the final copy, and whether we restore a deleted record on request]
 - You can close your account in Settings. If you're the only owner of a record that is still open, delete it or make somebody else its owner first.
+- **Closing your account doesn't cancel a plan you pay for.** Cancel it in Settings first. If you've already closed your account, write to support@brain.dog and we'll cancel it.
 - Closing your account removes you from BrainDog. Records you were a member of keep their own history, which each record's owner can erase.
 - The [Privacy policy](/legal/privacy) says what each of these removes, and when.
 
 ## Our part of BrainDog
 
-The BrainDog software is open source. Its licences (Apache License 2.0, and MIT for the renderer) give you rights to the code, and these terms don't take them away. These terms cover the hosted service at brain.dog.
+The BrainDog software is open source. [owner: true only once the repository is public (LAUNCH.repo)] Its licences (Apache License 2.0, and MIT for the renderer) give you rights to the code, and these terms don't take them away. These terms cover the hosted service at brain.dog.
 
 The BrainDog name, logo and look belong to Quartz Apps LLC. Don't use them in a way that suggests we made or endorse something we didn't.
 
 ## Keeping BrainDog running
 
-- We copy every record every night, sealed, and keep the last 30 copies.
+- We copy every record every night, sealed, and keep the last 30 nightly copies. An owner can also take a copy by hand, and a copy is taken before any restore. We keep up to 30 of those as well, until newer ones replace them or the record is deleted.
 - We work to keep BrainDog available, but we don't promise it will never be down, slow or lose something. Keep your own export of anything you can't afford to lose.
 - BrainDog changes over time: we may add, change or remove features. If we remove something you pay for, we'll tell you first.
-- **What we can see.** Your record's rows are not end-to-end encrypted, because the service has to read them to show your pages and answer your agents. We look inside a record only to support you, keep BrainDog safe or follow the law, and every time we do, we record why. The [Privacy policy](/legal/privacy) says exactly what we can and can't read.
+- **What we can see.** Your record's rows are not end-to-end encrypted, because the service has to read them to show your pages and answer your agents. We look inside a record only to support you, keep BrainDog safe or follow the law. The [Privacy policy](/legal/privacy) says exactly what we can and can't read.
 
 ## Suspending and ending
 
 - **You** can stop using BrainDog at any time, delete a record, and close your account.
-- **We** may suspend or close an account, or make a record read-only, if you break these terms or the Acceptable use policy, if the law requires it, or to protect people or BrainDog. Where we can, we tell you first and why, and give you the chance to export your record.
+- **We** may suspend or close an account, or make a record read-only, if you break these terms, if the law requires it, or to protect people or BrainDog. Where we can, we tell you first and why, and give you the chance to export your record.
 - **If we ever close BrainDog**, we'll tell every owner at least 60 days before, so you can export your records.
 
 ## Changes to these terms
@@ -201,8 +211,5 @@ If you use BrainDog for a business, you'll cover our reasonable costs if someone
 
 ## Contact
 
-- Help, billing and complaints: support@brain.dog
-- Privacy: privacy@brain.dog
-- Security problems: security@brain.dog
-- Abuse of BrainDog by someone else: abuse@brain.dog
+- Help, billing, privacy, security problems, abuse and complaints: support@brain.dog
 - Post: Quartz Apps LLC, c/o Cloud Peak Law, 1309 Coffeen Ave STE 1200, Sheridan, WY 82801, United States
