@@ -13,29 +13,29 @@
  * earlier Money nothing would walk the row, and the payout would be in no figure at all until it landed.
  *
  * WHY A SCRIPT. A pull's `map:` cannot put the currency into a row's name, so every currency lands on one name and the
- * last one on the page overwrites the rest (`stripe.test.ts`, the first test, measured). And the payouts are a second
- * address and a sum, which a pull cannot join to the first.
+ * last one on the page overwrites the rest. And the payouts are a second address and a sum, which a pull cannot join
+ * to the first.
  *
  * STRIPE'S AMOUNTS ARE ALREADY IN MINOR UNITS, which is what a money field holds, so they pass through as integers. The
  * currency comes lower case and is upper-cased. Stripe documents a few currencies whose API unit is not the ISO one;
  * this pack passes those through as Stripe sends them.
  *
  * IN TRANSIT AND PENDING, NEVER PAID. A payout that is `pending` has left the available balance and is not in transit
- * yet, and while this pack asked for `in_transit` alone it was in no row, so cash read short by it for up to a day
- * (`loop/finish/defects.md` M4). It is summed under the same name as one in transit, so no row is renamed. A payout
- * that is `paid` is never counted: by then it is in the bank's own balance. Between the bank crediting it and Stripe
- * marking it paid, the same money can show in both places for up to an hour; the next run takes it off here.
+ * yet, so it is asked for too, or cash would read short by it for up to a day. It is summed under the same name as one
+ * in transit. A payout that is `paid` is never counted: by then it is in the bank's own balance. Between the bank
+ * crediting it and Stripe marking it paid, the same money can show in both places for up to an hour; the next run
+ * takes it off here.
  *
  * ONLY THE NAMES THIS SCRIPT WRITES ARE ITS OWN. It lists accounts whose name starts "Stripe", and a row a person
  * keeps under a name like "Stripe reserve" is left exactly as it is. A kind or a currency that is gone from Stripe's
  * answer goes to zero rather than standing at whatever it last was.
  *
  * ONE ROW A PERSON TYPED BEFORE THE PACK IS TAKEN OVER, NOT COUNTED BESIDE IT. A record kept by hand often holds the
- * Stripe balance as "Stripe" or "Stripe USD", and the first run then wrote "Stripe available USD" beside it, so Cash
- * now counted the same money twice (`loop/finish/defects.md` M3). A row named exactly that, and no other, is renamed
- * to the available row of its currency and kept by Stripe's figure from then on, once, and the log says so. Its
- * currency is the one its name gives, or else the one its balance was typed in. A row this pack already keeps under
- * that name wins, and the hand row is left as it is, with a line in the log.
+ * Stripe balance as "Stripe" or "Stripe USD", and writing "Stripe available USD" beside it would have Cash now count
+ * the same money twice. A row named exactly that, and no other, is renamed to the available row of its currency and
+ * kept by Stripe's figure from then on, once, and the log says so. Its currency is the one its name gives, or else the
+ * one its balance was typed in. A row this pack already keeps under that name wins, and the hand row is left as it
+ * is, with a line in the log.
  *
  * EVERY ROW IN ONE BOOK, WHEN THE PACK IS TOLD WHICH. The `book` setting (1.2.0) files each row this script writes in
  * that book of money-core's, so a company's balance is on the company's page; left at 0 it files none.

@@ -11,7 +11,9 @@
     "./a11y.css": "./a11y.css",
     "./house.css": "./house.css",
     "./mark.ts": "./mark.ts",
-    "./alpha.css": "./alpha.css"
+    "./alpha.css": "./alpha.css",
+    "./blocks.css": "./blocks.css",
+    "./blocks-charts.css": "./blocks-charts.css"
   },
   "files": [
     "tokens.css",
@@ -19,6 +21,8 @@
     "a11y.css",
     "house.css",
     "alpha.css",
+    "blocks.css",
+    "blocks-charts.css",
     "mark.ts"
   ],
   "scripts": {

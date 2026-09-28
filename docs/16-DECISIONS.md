@@ -1091,6 +1091,24 @@ twelve packs is theatre, and a platform with a moderation queue is a company bef
 **Would reverse it:** a pack author asking to be paid — which brings Stripe Connect, tax and
 refunds, and is a company decision, not a format one.
 
+**Amended September 28th 2026, as built, on the default `loop/finish/platform.md` §5 item 1 sets
+until the owner rules.** The Kennel is built now, before gate 2, because the direction asks for a
+registry and for publishing your own packs. It is the same format (an `index.json` over immutable
+files, each held to its checksum and, when signed, to its author's key) with a publish door in
+place of pull requests: `POST /api/kennel/v1/submit` on the app's own host, taking a file signed by
+its author's Ed25519 key or sent by a person signed in to BrainDog. A submission from a publisher the
+operator has not trusted waits for the operator's review before it is listed, and the operator
+reviews with the provisioning key the Cloud already has (`PROVISION_KEY`), with the waiting file,
+every script's source in it, open to read in full first. There is no Kennel signing key, so no single lost key forges every pack; a listed
+version says when it was reviewed. Storage is the existing R2 bucket under `kennel/`, with no table,
+migration, binding, refusal code or event kind. The refusals stand: no paid packs, no ratings or
+reviews (install counts rounded down instead), no remote assets. A submission portal is the one
+refusal this reverses, as a door and not a portal: there is no account, profile or form beyond the
+file itself. The rules are `packages/declare/src/kennel.ts`, the Cloud's door
+`apps/worker/src/kennel.ts`, the self-host's reader `apps/selfhost/src/kennel.ts`, and
+[14-KENNEL](14-KENNEL-AND-COMMUNITY.md) §1 says it whole. **The pull-request model stays open to
+the owner:** the index format is the same either way, so only the door would change.
+
 ---
 
 ## ADR-048 · A pack install is never auto-approved, and packs never auto-update
@@ -1306,6 +1324,23 @@ everything else is `FORBIDDEN` with the fix sentence ([53-SPEC-OPERATIONS](53-SP
 ransom, which is the one thing the format exists to make impossible.
 
 **Would reverse it:** nothing about the guarantee; the 90-day figure moves with storage cost.
+
+**Amended September 28th 2026, as built (OPS-8, OPS-13, OPS-14, OPS-15; OPS-28 records it).** The
+billing state is the Directory's `dir_billing` table, one row per record somebody pays for, with
+`state` in `active`, `past_due` and `lapsed`, `lapsed_at`, and `told`, the notices already sent in
+this lapse. Only a verified Stripe webhook event writes it, so a record with no row, which is every
+record nobody pays for through Stripe, is never capped and never deleted. While `lapsed` the Worker
+caps every person at `read` and every token at `scope ∩ {read}` on the app, `/api` and `/mcp`
+alike, refuses each write `403 FORBIDDEN` with "Read-only until billing resumes. Export is
+available.", and lets the owner export. Connectors, inference and digests pause; reminders still
+deliver. The ladder runs in the nightly walk, one notice a night at most, the earliest still owed:
+day 0, day 60 and day 83 by mail to the payer and every owner, and a deletion at day 90
+(`LAPSE_DELETES_DAYS`) only for a row that is still `lapsed` when asked again, whose three notices
+all went, by the walk's one clock. The deletion keeps one final copy for `FINAL_KEPT_DAYS`, thirty
+days, and the day-90 letter names the day it expires. **One departure from iteration 2's
+mechanism:** a lapsed record starts no scheduled run at all and writes no per-run held event; the
+lapse sentence, on the banner and in every refused write, is the record's one message
+([53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md) §5.10, §13 #6).
 
 ---
 
@@ -1540,7 +1575,9 @@ against the allowance, because the record cannot see the Directory; overage char
 provider exists (research-scheduled-actions §4.8).
 
 **Would reverse it:** a price per run rather than per record, which would move the allowance from the plan
-to an invoice line; or the owner choosing a different allowance, which changes `ALLOWANCE` and nothing else.
+to an invoice line; or the owner choosing a different allowance, which changes `ALLOWANCE`
+(`packages/record/src/directory.ts`, one row per plan: hosted and plus) and the pricing page's figures in
+`apps/site/src/lib/plans.ts`, which `plans.test.ts` holds to it.
 
 ---
 

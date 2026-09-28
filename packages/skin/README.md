@@ -13,6 +13,7 @@ tokens.css   the @layer statement, the faces, the scale, spacing, radius, motion
 base.css     element defaults: box sizing, body face, headings, links, tabular figures, Arabic
 a11y.css     the focus ring, forced colours, the target floor
 house.css    GENERATED — do not edit. `pnpm theme`
+blocks.css   the block markup contract both apps draw against; blocks-charts.css carries its chart kinds
 mark.ts      the artwork, as path data
 ```
 

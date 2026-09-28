@@ -193,7 +193,8 @@ test('(6) verify: IS READ WHERE IT IS WRITTEN: a path token on a webhook, and no
     assert.match(put.refusal?.fix ?? '', why);
   };
   await refused({ channel: 'email', verify: { kind: 'path' } }, /only a webhook/u);
-  await refused({ channel: 'webhook', verify: { kind: 'hmac_sha256', header: 'x-signature' } }, /hmac_sha256 is not built/u);
+  /* A signature with no key behind it (DOR-3): the HMAC is built now, and one naming no vault label verifies nothing. */
+  await refused({ channel: 'webhook', verify: { kind: 'hmac_sha256', header: 'x-signature' } }, /names no key/u);
   await refused({ channel: 'webhook', verify: { kind: 'path', token: 'tk_written_into_the_declaration' } }, /never in a declaration/u);
   await refused({ channel: 'webhook', verify: 'path' }, /\{ kind: path \}/u);
   assert.ok((await k.install(twins('bank-from-out-sms'))).ok, 'the one shape that is built was refused');

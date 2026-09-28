@@ -148,12 +148,15 @@
       <div class="item">
         <label class="label" for="script-title">{words.title}</label>
         <div class="field" data-wrong={faultAt('title') ? '' : undefined}>
-          <input id="script-title" class="field-input" type="text" autocomplete="off" bind:value={draft.title} />
+          <!-- THE HELP LINE IS WHERE A FAULT IS SAID, so the field names it (`aria-describedby`) and a screen reader hears
+               the fault with the field, not only as a line somewhere under it. -->
+          <input id="script-title" class="field-input" type="text" autocomplete="off" aria-describedby="script-title-help" aria-invalid={faultAt('title') ? 'true' : undefined} bind:value={draft.title} />
         </div>
-        <p class="help" class:wrong={faultAt('title') !== null}>{faultAt('title') ?? words.titleHelp}</p>
+        <p class="help" id="script-title-help" class:wrong={faultAt('title') !== null}>{faultAt('title') ?? words.titleHelp}</p>
       </div>
 
-      <fieldset class="item">
+      <!-- WHAT STARTS IT IS A GROUP OF CHOICES WITH ONE FAULT BETWEEN THEM, so the group carries the fault's id. -->
+      <fieldset class="item" aria-describedby={faultAt('starts') ? 'script-starts-fault' : undefined}>
         <legend class="label">{words.starts}</legend>
         <p class="sub" id="script-every">{words.every}</p>
         <div class="segmented" role="group" aria-labelledby="script-every">
@@ -188,13 +191,25 @@
             <span class="switch-track"></span>
           </button>
         </div>
-        {#if faultAt('starts')}<p class="help wrong">{faultAt('starts')}</p>{/if}
+        {#if faultAt('starts')}<p class="help wrong" id="script-starts-fault">{faultAt('starts')}</p>{/if}
       </fieldset>
 
       <div class="item">
         <label class="label" for="script-egress">{words.egress}</label>
-        <textarea id="script-egress" class="lines" rows="3" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" data-wrong={faultAt('egress') ? '' : undefined} bind:value={draft.egress}></textarea>
-        <p class="help" class:wrong={faultAt('egress') !== null}>{faultAt('egress') ?? words.egressHelp}</p>
+        <textarea
+          id="script-egress"
+          class="lines"
+          rows="3"
+          autocomplete="off"
+          autocapitalize="off"
+          spellcheck="false"
+          inputmode="url"
+          aria-describedby="script-egress-help"
+          aria-invalid={faultAt('egress') ? 'true' : undefined}
+          data-wrong={faultAt('egress') ? '' : undefined}
+          bind:value={draft.egress}
+        ></textarea>
+        <p class="help" id="script-egress-help" class:wrong={faultAt('egress') !== null}>{faultAt('egress') ?? words.egressHelp}</p>
       </div>
 
       <fieldset class="item">
@@ -236,6 +251,7 @@
         id="script-source"
         class="code"
         aria-describedby="script-source-help"
+        aria-invalid={faultAt('source') ? 'true' : undefined}
         autocomplete="off"
         autocapitalize="off"
         spellcheck="false"

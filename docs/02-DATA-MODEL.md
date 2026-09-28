@@ -998,6 +998,16 @@ value. A state change is the `state` kind, for the `state` field alone. `record_
 `MAX(event.rowid)`, and the live channel's changelog is `SELECT DISTINCT target FROM event WHERE rowid > ?`
 — `event` is append-only and per-mutation, so no second table is needed.
 
+**The three-minute grace window, the one line that is rewritten.** An update by the row's creator within three
+minutes of its `created_at` writes no `edit`: it rewrites the row's `create` line to the row as it now stands, so
+the history says the row was created as it ended up, and typos fixed a moment later do not pile up. The line keeps
+its `id`, `ts`, `batch` and `op_id` and moves to the end of the log (a new `rowid`), so `record_version` still moves
+and the live channel still sees it. Nothing another actor read is ever folded: the fold happens only while the
+`create` is the row's one line and is signed by the same actor, nothing another actor signed shares its batch, and no
+other member's read mark (`member.seen_at`) has reached it. A rule's, an ingest's or a script's write, a state move,
+a delete or restore, a write carrying a note or an `op_id`, and any write on a register that declares `pairs:` always
+leave their lines. The kernel keeps the rule in `write` in `packages/kernel/src/index.ts`, beside the per-field lines.
+
 Two consequences worth stating:
 
 1. **`grant.read` is an event.** Every decryption of a credential is logged with the actor. A

@@ -47,9 +47,9 @@ const GOLD = 'https://api.gold.test';
 const ENTRY = `
 import { DurableObject } from 'cloudflare:workers';
 import { sendAction } from '@braindog/host/actions';
-import { ScriptOutbound, ScriptRecord, ScriptRuns, runScript } from '../src/script.ts';
+import { ScriptOutbound, ScriptRecord, ScriptRuns, ScriptTail, runScript } from '../src/script.ts';
 
-export { ScriptOutbound, ScriptRecord };
+export { ScriptOutbound, ScriptRecord, ScriptTail };
 
 export class Rec extends DurableObject {
   runs = new ScriptRuns();
@@ -458,4 +458,20 @@ export default async function run(ctx) {
   assert.deepEqual(answer.writes, [{ op: 'create', register: 'series.gold', fields: { value: 1 } }], JSON.stringify(answer));
   assert.match(answer.log ?? '', /A trial opens no key for an agent/);
   assert.deepEqual(sent, []);
+});
+
+/**
+ * `ScriptTail` IS EXPORTED FROM THE TEST'S MAIN MODULE ABOVE, next to `ScriptOutbound` and `ScriptRecord` (SCR-4), so
+ * `LOADER.load`'s `tails` option is one this suite's Worker actually carries, and every run above already went through
+ * it. This case is the one that says so directly: the platform's own tail is loaded, and the run still answers clean
+ * and closes its slot, so the door `tails` opens does not leave a run waiting on a report that never lands locally.
+ */
+test('with ScriptTail exported, LOADER.load takes the tails option and a run still answers clean and closes its slot', async () => {
+  const { answer, open } = await run(GOLD_RATE);
+  assert.equal(answer.threw, undefined, answer.threw);
+  assert.equal(answer.refused, undefined, JSON.stringify(answer.refused));
+  assert.deepEqual(answer.writes, [
+    { op: 'create', register: 'series.gold', fields: { at: '2026-09-22T12:00:00.000Z', value: 4321, heard: 'Bearer --redacted--' } },
+  ]);
+  assert.equal(open, 0, 'the run was closed when it answered, tail and all');
 });

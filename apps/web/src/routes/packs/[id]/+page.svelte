@@ -27,7 +27,6 @@
   import Icon from '$lib/ui/Icon.svelte';
   import { HOME_CURRENCY_SETTING } from '@braindog/kernel';
   import { currencyChoices } from '$lib/record/currencies.ts';
-  import RatesForm from './RatesForm.svelte';
   import { settingChoices } from './said.ts';
   import {
     UNITS,
@@ -44,6 +43,7 @@
     type ConfigDecl,
     type Draft,
     type PackConfig,
+    type PackState,
     type Source,
     type Unit,
   } from '$lib/record/packs.ts';
@@ -56,6 +56,7 @@
   import { closed, drew, opened } from '../../../lib/ui/screen.svelte.ts';
   import { moduleName } from '@braindog/seed/usecases/names';
   import { SPEAKS } from '$lib/voice.ts';
+  import { words as market } from '$lib/market/words.ts';
 
   const id = $derived(String(page.params.id));
   const pack = $derived(firstPartyModules().find((p) => p.id === id));
@@ -148,9 +149,12 @@
     if (String(page.params.id) !== want) return closed(true, at);
     source = chosen.source;
     alone = chosen.alone;
+    installed = null;
+    turnSaid = '';
     if (chosen.first.ok) {
       show(chosen.first.value);
       from = 'ready';
+      void readHeld(chosen.source, want);
     } else {
       refusal = chosen.first.refusal.fix;
       unknown = chosen.first.refusal.code === 'DECLARATION_UNKNOWN';
@@ -163,6 +167,44 @@
     const want = id;
     untrack(() => void load(want));
   });
+
+  /* ── on or off ─────────────────────────────────────────────────────────── */
+
+  /**
+   * WHETHER THIS ADD-ON IS ON (`installed`), read beside its settings, so its own page carries the same switch its row on /packs does
+   * (design.md §2.8: the page had "no version, switch or uninstall"). `null` until the record answers, and the switch is
+   * not drawn until then, because a switch that guesses is a switch that lies.
+   */
+  let installed = $state<PackState | null>(null);
+  let turning = $state(false);
+  /** The record's sentence when it refused the switch; the cascade that answers a dependent is offered on /packs. */
+  let turnSaid = $state('');
+
+  async function readHeld(s: Source, want: string) {
+    const got = await s.packs();
+    if (got.ok && String(page.params.id) === want) installed = got.value.find((p) => p.id === want) ?? null;
+  }
+
+  /** One press of the switch. Off is undone, never asked, as on /packs: the same call puts it back. */
+  async function turn() {
+    const s = source;
+    const h = installed;
+    if (!s || !h || turning) return;
+    const on = h.disabled_at !== null;
+    turning = true;
+    turnSaid = '';
+    try {
+      const out = on ? await s.enable(h.id) : await s.disable(h.id);
+      if (!out.ok) {
+        turnSaid = out.refusal.fix;
+        return;
+      }
+      if (!on && out.value.changed) toasts.push(copy.packTurnedOffNamed([name]), { undo: () => void turn() });
+      await readHeld(s, h.id);
+    } finally {
+      turning = false;
+    }
+  }
   $effect(() => {
     if (from === 'ready') drew('ready');
   });
@@ -262,10 +304,33 @@
     </Empty>
   </div>
 {:else if from === 'ready' && settings}
-  <PageHead icon="packs" kicker={copy.packs} back="/packs" title={name} />
+  <PageHead icon="packs" kicker={copy.packs} back="/packs" title={name}>
+    {#snippet actions()}
+      {#if installed}
+        <button
+          type="button"
+          class="switch"
+          role="switch"
+          aria-checked={installed.disabled_at === null}
+          aria-label={copy.packSwitch(name)}
+          disabled={turning}
+          onclick={() => void turn()}
+        ><span class="switch-track"></span></button>
+      {/if}
+    {/snippet}
+  </PageHead>
 
   <div class="page">
-    {#if pack}<p class="blurb">{pack.blurb}</p>{/if}
+    <!-- WHAT IT DOES, THEN WHICH VERSION AND WHETHER IT IS ON: the head's switch says the state to a screen reader, and
+         this line says it in words, so off is never colour alone. -->
+    <div class="lead">
+      {#if pack}<p class="blurb">{pack.blurb}</p>{/if}
+      <p class="about">
+        {#if settings.version}<span class="num">{market.versionOf(settings.version)}</span>{/if}
+        {#if installed?.disabled_at}<span>{copy.packTurnedOff}</span>{/if}
+      </p>
+      <p class="turn-said" role="status">{turnSaid}</p>
+    </div>
 
     {#if entries.length}
       <Section title={words.settings}>
@@ -453,14 +518,29 @@
         </form>
       </Section>
       {#if HOME_CURRENCY_SETTING in settings.config}
+        <!-- EXCHANGE RATES ARE A PRESET OF THE NEW-ACTION SHEET (USE-5), reached by its address (`contracts.md` X57).
+             This page drew a form written for one pack, which it imported by name; now it links to the same sheet
+             every scheduled action is made on, filled in for a rate. It stays offered once one is set up, because each
+             currency is an action of its own and a second currency is the same press again. -->
         <Section title={copy.ratesHeading}>
-          <RatesForm home={typeof settings.values[HOME_CURRENCY_SETTING] === 'string' ? String(settings.values[HOME_CURRENCY_SETTING]) : ''} />
+          <p class="rates-why">{copy.ratesWhy}</p>
+          <div class="settings-actions">
+            <Button weight="quiet" href={at('/automations?new=action&preset=rates')}>{copy.ratesSetUp}</Button>
+          </div>
         </Section>
       {/if}
     {:else}
       <!-- A PAGE THAT WAS ONE SENTENCE. An add-on with no settings still adds things, and this is
-           where somebody comes to find out what they were. -->
-      <Empty kind="no-data-yet" glyph="settings" title={copy.packNothingToSet} body={copy.packNothingToSetWhy} />
+           where somebody comes to find out what they were. Nothing to set is a quiet line under its
+           own heading, never a whole-screen state with a glyph above what the add-on does bring. -->
+      <Section title={words.settings}>
+        <Empty
+          kind="no-data-yet"
+          compact
+          title={copy.packNothingToSet}
+          body={pack && (pack.registers.length || pack.pages.length) ? copy.packNothingToSetWhy : undefined}
+        />
+      </Section>
     {/if}
     {#if pack && (pack.registers.length || pack.pages.length)}
       <Section title={copy.installDiff} count={pack.registers.length + pack.pages.length}>
@@ -500,11 +580,38 @@
     max-inline-size: 820px;
   }
 
+  .lead {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+  }
+
   .blurb {
     max-inline-size: 62ch;
     color: var(--ink2);
     font-size: var(--t-ui);
     line-height: 1.6;
+  }
+
+  /* META WRAPS AS WHOLE ITEMS, with space between them and no separator glyph to lead a wrapped line. */
+  .about {
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: var(--sp-3);
+    margin: 0;
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  .about:empty,
+  .turn-said:empty {
+    display: none;
+  }
+
+  .turn-said {
+    margin: 0;
+    color: var(--ink2);
+    font-size: var(--t-sm);
   }
 
   .settings {
@@ -516,6 +623,15 @@
   .when {
     color: var(--dim);
     font-size: var(--t-sm);
+  }
+
+  .rates-why {
+    max-inline-size: 62ch;
+    margin-block: 0 var(--sp-3);
+    margin-inline: 0;
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    text-wrap: pretty;
   }
 
   /* The label in a column of its own, so a form of seven reads down one edge. */

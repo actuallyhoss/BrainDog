@@ -26,7 +26,7 @@ test('a script step says it keeps the id of its queued run, not an answer', () =
 test('the inspector names the field as the id of the queued run, with no answer in it', () => {
   const as = scriptAs();
   assert.ok(as);
-  assert.equal(as.label, 'Keep the queued run id as');
+  assert.equal(as.label, 'Call its run');
   assert.doesNotMatch(as.label, /answer/u);
 });
 

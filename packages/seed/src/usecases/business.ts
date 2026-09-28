@@ -1,9 +1,10 @@
 /**
  * Small business: the first-party setup onboarding made before use cases existed (`loop/research-spark.md` §4).
  *
- * IT CARRIES NO VOICE AND NO LIST. Its modules are whichever first-party packs the sentence names, which
- * is what onboarding already did, and it speaks in the house voice. It is in the catalogue so the
- * arranger can say "this reads like a business" as plainly as it says "student".
+ * IT CARRIES NO LIST. Its modules are whichever first-party packs the sentence names, which is what onboarding
+ * already did, and it speaks in the house voice but for three lines of Home that name what a business is owed and
+ * owes (PGS-24). It is in the catalogue so the arranger can say "this reads like a business" as plainly as it says
+ * "student".
  *
  * ITS PACK IS ONE PAGE, ITS HOME, SINCE 1.2.0 (MOD-18). Money's own Home retired with money-core 3.0.0, and a record
  * whose use case declares no `home-<id>` falls back to the house Home, which leads with nothing a business asks
@@ -39,8 +40,10 @@ export const BUSINESS_EXAMPLES = [
  */
 export const BUSINESS = {
   usecase: 'business',
-  /* 1.2.0 BECAUSE IT GAINS A PACK AND A PAGE, its own Home, where it had none: a declaration added is a minor step. */
-  version: '1.2.0',
+  /* 1.2.0 BECAUSE IT GAINS A PACK AND A PAGE, its own Home, where it had none: a declaration added is a minor step.
+     1.3.0 BECAUSE IT GAINS A VOICE, three of Home's lines said as a business says them (PGS-24), each a new setting a
+     person can change at /packs. */
+  version: '1.3.0',
   title: 'Small business',
   summary: 'What your clients owe you and what you owe, the hosting and subscriptions you run on, the people involved and the work.',
   author: 'BrainDog',
@@ -53,6 +56,13 @@ export const BUSINESS = {
     'hosting', 'subscriptions', 'contractors', 'accountant', 'vat', 'bookkeeping', 'retainer', 'foundry',
   ],
   modules: [],
+  /* THE HOUSE VOICE BUT FOR HOME'S LINES ABOUT MONEY: the house words are written for every kind of person, and a
+     business's week is invoices, bills and renewals. */
+  voice: {
+    coming_up: 'Falling due',
+    nothing_due: 'No invoice, bill or renewal falls due in the next two weeks.',
+    fills_with: 'What you are owed, what you owe, the questions waiting on you and what changed while you were away show up here as your lists fill.',
+  },
   skills: [],
   pack: {
     pack: 'usecase-business',
@@ -104,5 +114,18 @@ export const BUSINESS = {
         ],
       },
     ],
+  },
+};
+
+/**
+ * WHAT THE MODULES SAY TO A SMALL BUSINESS, by module and then by the module's own words (`MODULE_NAMES` in
+ * `install.ts`). A business is not given the plain words the other use cases get: money it is owed is an invoice, and a
+ * bakery reads "Late invoices" as its own where a person would read somebody else's record. So Money's late note names
+ * the invoices it counts.
+ */
+export const BUSINESS_NAMES: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  'money-core': {
+    'Late to you': 'Late invoices',
+    'Money you are owed has gone past its date: {{late-in}} in all.': 'Invoices have gone past their date unpaid: {{late-in}} in all.',
   },
 };

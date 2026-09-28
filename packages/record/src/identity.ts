@@ -24,7 +24,7 @@
  */
 
 import type {
-  AssertionOptions, AuthBodies, AuthCall, AuthResult, Clock, Methods, PasskeyInfo, RegistrationOptions, SignupCall, SignupName, SignupVerified, Sql, Who,
+  AccountCall, AssertionOptions, AuthBodies, AuthCall, AuthResult, Clock, Methods, PasskeyInfo, RegistrationOptions, SignupCall, SignupName, SignupVerified, Sql, Who,
 } from '@braindog/ports';
 import { ulids } from '@braindog/kernel';
 
@@ -188,6 +188,28 @@ const ON_RECORD = `SELECT s.record FROM dir_slug s
     WHERE s.slug = ?2 AND s.released_at IS NULL`;
 
 /**
+ * Every way in a person had, gone: their passkeys, sessions, unspent links and challenges, the proofs still pending for
+ * their address, and the count of mails sent to it. The sign-in half of closing an account (OPS-21), run inside the
+ * Directory's transaction by `closeAccount` (`directory.ts`), which then takes their memberships and their row.
+ *
+ * HERE, BECAUSE THESE ARE SIGN-IN'S TABLES and this file is the one that knows every one of them and how the lockout
+ * spells an address. The address keys are lower-cased as `mailKey` and `dir_pending` store them. A lockout keyed by
+ * a network address is left, because it counts a place and not a person.
+ */
+export function signInForgotten(sql: Sql, person: string, email: string): { passkeys: number; sessions: number } {
+  const count = (table: string): number => Number(sql.one<{ n: number }>(`SELECT COUNT(*) AS n FROM ${table} WHERE person = ?`, person)?.n ?? 0);
+  const passkeys = count('dir_passkey');
+  const sessions = count('dir_session');
+  sql.exec('DELETE FROM dir_passkey WHERE person = ?', person);
+  sql.exec('DELETE FROM dir_session WHERE person = ?', person);
+  sql.exec('DELETE FROM dir_link WHERE person = ?', person);
+  sql.exec('DELETE FROM dir_challenge WHERE person = ?', person);
+  sql.exec('DELETE FROM dir_pending WHERE email = ?', email.trim().toLowerCase());
+  sql.exec('DELETE FROM dir_fail WHERE key = ?', mailKey(email));
+  return { passkeys, sessions };
+}
+
+/**
  * A typed name as the slug it could be, lower-cased, or `null` when no slug is spelt that way.
  *
  * ASCII BEFORE IT IS LOWERED. `toLowerCase` folds the Kelvin sign to `k` and more besides, so a name no slug can be
@@ -205,7 +227,7 @@ const slugTyped = (x: unknown): string | null => {
 export type SessionAsk = { flow: 'session'; sid: string; slug?: string };
 
 /** `Auth`, and the named `session` beside it. Assignable to `Auth`, so every host that holds one is unchanged. */
-export type DirectoryAuth = <C extends AuthCall | SessionAsk | SignupCall>(call: C) => Promise<AuthResult<AuthBodies[C['flow']]>>;
+export type DirectoryAuth = <C extends AuthCall | SessionAsk | SignupCall | AccountCall>(call: C) => Promise<AuthResult<AuthBodies[C['flow']]>>;
 
 type Row = { id_hash: string; person: string; record: string | null; rotated_at: number; authed_at: number; email: string; is_current: number };
 type Found = { row: Row; rotated: { sid: string } | null };

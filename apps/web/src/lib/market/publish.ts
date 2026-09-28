@@ -1,0 +1,182 @@
+/**
+ * Publishing from the app: a use case from `/packs/share` and a page shared as a template from its menu, each sent to
+ * the Kennel as the signed-in person (`POST /api/kennel/v1/submit`, contracts §3 platform K), and what a share changes
+ * since the version it counts on from.
+ *
+ * THE SESSION IS WHO PUBLISHES. The body is `{ text }` and nothing else: no signature, because the app holds no author
+ * key, and no publisher name, because the Kennel names the file by its `author` line and otherwise by the person the
+ * session belongs to. The cookie goes because the request comes from a page on this host, which is the only way the
+ * Kennel reads one.
+ *
+ * A SELF-HOST TAKES NO SUBMISSIONS and answers with a sentence naming the Kennel it reads, which the screen says as it
+ * is, as it says every other refusal: this file never guesses a host's reason.
+ *
+ * PLAIN NODE LOADS THIS FILE: its one value import is relative, and the catalogue's readers are imported only when a
+ * diff is asked for, so a page's menu does not carry the declare package for a button nobody pressed.
+ */
+
+import type { Changes } from '@braindog/declare/catalogue';
+
+import { KENNEL_AT } from './counts.ts';
+
+type Fetcher = (input: string, init?: RequestInit) => Promise<Response>;
+
+/** The browser's own fetch, called through a function so it is never invoked detached from the window. */
+export const kennelFetch: Fetcher = (input, init) => globalThis.fetch(input, init);
+
+export type EntryKind = 'pack' | 'usecase';
+
+/** What the Kennel answers a submission with: listed at once for a trusted publisher, or waiting for the operator. */
+export type Submitted = { state: 'listed' | 'review'; kind: EntryKind; id: string; version: string };
+
+export const publishWords = {
+  publish: 'Publish to the Kennel',
+  publishing: 'Publishing',
+  listed: (title: string, version: string): string => `${title} ${version} is listed in the Kennel:`,
+  review: (title: string, version: string): string => `${title} ${version} is waiting for review, and is listed once it is read:`,
+  seeIt: 'see it in Browse.',
+  seeBrowse: 'Browse shows it then.',
+  unreached: 'BrainDog could not reach the Kennel. Try again in a moment.',
+  unread: 'The Kennel answered in a way this version of BrainDog does not read.',
+  /* WHAT A SHARE CHANGES, read from `changesBetween` in `@braindog/declare/catalogue`. */
+  kinds: { register: 'list', page: 'page', rule: 'automation', metric: 'figure', script: 'script', ingest: 'door', theme: 'theme', block: 'block' } as Record<string, string>,
+  part: 'part',
+  added: (kind: string, title: string): string => `Adds the ${kind} ${title}`,
+  removed: (kind: string, title: string): string => `Takes out the ${kind} ${title}`,
+  changed: (kind: string, title: string): string => `Changes the ${kind} ${title}`,
+  needs: (name: string): string => `Needs ${name} too`,
+  needsNoMore: (name: string): string => `No longer needs ${name}`,
+  callsNew: (host: string): string => `Calls out to ${host}, which it did not before`,
+  callsNoMore: (host: string): string => `No longer calls out to ${host}`,
+  examples: (from: number, to: number): string => `${to} example ${to === 1 ? 'row' : 'rows'}, where it had ${from}`,
+  words: 'Its words, labels or skills changed',
+} as const;
+
+/* ── sending ────────────────────────────────────────────────────────────── */
+
+/** The Kennel's answer read: `{ ok: true, value }` with a state this build knows, or the refusal's own sentence. */
+export function answerOf(doc: unknown): { ok: true; value: Submitted } | { ok: false; fix: string } {
+  const d = typeof doc === 'object' && doc !== null ? (doc as Record<string, unknown>) : null;
+  if (d?.ok === false) {
+    const refusal = d.refusal as { fix?: unknown } | undefined;
+    return { ok: false, fix: typeof refusal?.fix === 'string' && refusal.fix !== '' ? refusal.fix : publishWords.unread };
+  }
+  const v = d?.ok === true && typeof d.value === 'object' && d.value !== null ? (d.value as Record<string, unknown>) : null;
+  if (!v || (v.state !== 'listed' && v.state !== 'review') || (v.kind !== 'pack' && v.kind !== 'usecase') || typeof v.id !== 'string' || typeof v.version !== 'string')
+    return { ok: false, fix: publishWords.unread };
+  return { ok: true, value: { state: v.state, kind: v.kind, id: v.id, version: v.version } };
+}
+
+/** Send one file to the Kennel as the signed-in person. One call per press; the screen guards the press. */
+export async function submitToKennel(fetcher: Fetcher, text: string): Promise<{ ok: true; value: Submitted } | { ok: false; fix: string }> {
+  let res: Response;
+  try {
+    res = await fetcher(`${KENNEL_AT}submit`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'content-type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+  } catch {
+    return { ok: false, fix: publishWords.unreached };
+  }
+  let doc: unknown;
+  try {
+    doc = await res.json();
+  } catch {
+    return { ok: false, fix: res.ok ? publishWords.unread : publishWords.unreached };
+  }
+  return answerOf(doc);
+}
+
+/** The sentence a submission ends in, up to its link: listed, or waiting for review. */
+export const publishedSaid = (s: Submitted & { title: string }): string => (s.state === 'listed' ? publishWords.listed(s.title, s.version) : publishWords.review(s.title, s.version));
+
+/** The link's own words. A waiting file is not in the index yet, so its link is Browse itself. */
+export const publishedLink = (s: Submitted): string => (s.state === 'listed' ? publishWords.seeIt : publishWords.seeBrowse);
+
+/**
+ * Where the link goes: the listing's detail page once it is listed (`listingHref` in `listing.ts`, written out here so a
+ * page's menu does not load the built-in use cases that file reads), else Browse.
+ */
+export const publishedHref = (s: Submitted): string =>
+  s.state === 'listed' ? `/packs/browse/${encodeURIComponent(s.id)}${s.kind === 'pack' ? '?kind=pack' : ''}` : '/packs/browse';
+
+/* ── reading the Kennel ─────────────────────────────────────────────────── */
+
+const partsOf = (v: string): [number, number, number] | null => {
+  const m = /^(\d+)\.(\d+)\.(\d+)$/u.exec(v);
+  return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
+};
+
+/** One version published in the Kennel, whole, or `null` when it holds none by that number (or cannot be reached). */
+export async function publishedText(fetcher: Fetcher, kind: EntryKind, id: string, version: string): Promise<string | null> {
+  const path = kind === 'pack' ? `packs/${encodeURIComponent(id)}/${encodeURIComponent(version)}.pack.json` : `usecases/${encodeURIComponent(id)}/${encodeURIComponent(version)}.usecase.json`;
+  try {
+    const res = await fetcher(`${KENNEL_AT}${path}`, { credentials: 'same-origin', headers: { accept: 'application/json' } });
+    return res.ok ? await res.text() : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The version a new file goes out as: a patch on from the newest the Kennel lists under this id, or `first` when it
+ * lists none. A Kennel that cannot be read leaves `first`, and a version it already holds is refused there with its own
+ * sentence.
+ */
+export async function nextVersion(fetcher: Fetcher, kind: EntryKind, id: string, first = '1.0.0'): Promise<string> {
+  let doc: unknown;
+  try {
+    const res = await fetcher(`${KENNEL_AT}index.json`, { credentials: 'same-origin', headers: { accept: 'application/json' } });
+    if (!res.ok) return first;
+    doc = await res.json();
+  } catch {
+    return first;
+  }
+  const entries = typeof doc === 'object' && doc !== null && Array.isArray((doc as { entries?: unknown }).entries) ? ((doc as { entries: unknown[] }).entries as Record<string, unknown>[]) : [];
+  const entry = entries.find((e) => typeof e === 'object' && e !== null && e.kind === kind && e.id === id);
+  const listed = entry?.versions;
+  const versions = Array.isArray(listed) ? (listed as { version?: unknown }[]) : [];
+  const later = (a: [number, number, number], b: [number, number, number]): boolean => (a[0] - b[0] || a[1] - b[1] || a[2] - b[2]) > 0;
+  let newest: [number, number, number] | null = null;
+  for (const v of versions) {
+    const p = typeof v === 'object' && v !== null && typeof v.version === 'string' ? partsOf(v.version) : null;
+    if (p && (!newest || later(p, newest))) newest = p;
+  }
+  const floor = partsOf(first);
+  if (!newest || (floor && later(floor, newest))) return first;
+  return `${newest[0]}.${newest[1]}.${newest[2] + 1}`;
+}
+
+/* ── what changed ───────────────────────────────────────────────────────── */
+
+/**
+ * What a file changes against the one it counts on from, read through the door each came in by (`readCatalogueFile`)
+ * and compared declaration by declaration (`changesBetween`), so the screen says what the Kennel will say. `before` of
+ * `null` is a first version: everything in it is added.
+ */
+export async function changesSince(before: string | null, after: string): Promise<{ ok: true; changes: Changes } | { ok: false; fix: string }> {
+  const { readCatalogueFile, changesBetween } = await import('@braindog/declare/catalogue');
+  const now = await readCatalogueFile(after);
+  if (!now.ok) return { ok: false, fix: 'refusal' in now ? now.refusal.fix : publishWords.unread };
+  const was = before === null ? null : await readCatalogueFile(before);
+  /* A BASELINE THAT NO LONGER READS (a file from an older build) is compared as nothing, so the screen still says what goes out. */
+  return { ok: true, changes: changesBetween(was?.ok ? was.value : null, now.value) };
+}
+
+/** Each change as one line a person reads. `nameOf` turns a module's id into its name. */
+export function changeLines(c: Changes, nameOf: (module: string) => string): string[] {
+  const kind = (k: string): string => (Object.hasOwn(publishWords.kinds, k) ? (publishWords.kinds[k] as string) : publishWords.part);
+  return [
+    ...c.added.map((n) => publishWords.added(kind(n.kind), n.title)),
+    ...c.changed.map((n) => publishWords.changed(kind(n.kind), n.title)),
+    ...c.removed.map((n) => publishWords.removed(kind(n.kind), n.title)),
+    ...c.modules.added.map((m) => publishWords.needs(nameOf(m))),
+    ...c.modules.removed.map((m) => publishWords.needsNoMore(nameOf(m))),
+    ...c.hosts.added.map(publishWords.callsNew),
+    ...c.hosts.removed.map(publishWords.callsNoMore),
+    ...(c.examples.from === c.examples.to ? [] : [publishWords.examples(c.examples.from, c.examples.to)]),
+    ...(c.words ? [publishWords.words] : []),
+  ];
+}

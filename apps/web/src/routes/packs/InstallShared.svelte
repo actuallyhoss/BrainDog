@@ -75,7 +75,7 @@
       return;
     }
     const f = file.value;
-    const id = f.kind === 'usecase' ? f.shared.usecase.usecase : f.file.pack.manifest.id;
+    const id = f.kind === 'usecase' ? f.shared.usecase.usecase : f.file.pack.manifest.pack;
     last = {
       text,
       source,

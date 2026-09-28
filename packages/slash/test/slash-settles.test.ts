@@ -141,7 +141,7 @@ test('(4) A PROPOSE WITH NO ask_id DRAFTS THROUGH THE SAME PATH: its drafting ca
   }
 });
 
-test('(5) A PROPOSAL WHOSE MODEL ANSWERED AND WHOSE FILING THEN THREW IS SETTLED, AND COUNTED', async () => {
+test('(5) A PROPOSAL WHOSE MODEL ANSWERED AND WHOSE FILING THEN THREW IS SETTLED, AND ITS READ IS COUNTED', async () => {
   const { sql, inference, record, slash, calls } = build('answer');
   try {
     inference.say(PREDICATE);
@@ -157,7 +157,9 @@ test('(5) A PROPOSAL WHOSE MODEL ANSWERED AND WHOSE FILING THEN THREW IS SETTLED
       { kind: 'read', status: 'ok', code: null, model: 'glm-5.3-flash' },
       { kind: 'propose', status: 'error', code: 'RECORD_UNAVAILABLE', model: 'glm-5.3-flash' },
     ]);
-    assert.equal(slash.status().asks.used, 2);
+    /* THE PROPOSAL ROW IS STILL WRITTEN, SETTLED AND AUDITABLE; IT IS NOT COUNTED. One question is one ask
+       (`contracts.md` §7.5): the `read` above is this question's ask, and pass 2's own row is no longer a second. */
+    assert.equal(slash.status().asks.used, 1);
   } finally {
     sql.close();
   }

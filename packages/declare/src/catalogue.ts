@@ -31,10 +31,10 @@
 
 import type { Result } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
-import { digest, jcs, validateDeclaration, type Json, type PageResult } from '@braindog/kernel';
+import { digest, fillConfig, jcs, readConfig, validateDeclaration, type Json, type PageResult } from '@braindog/kernel';
 
 import { credentialKey, credentialValue, NESTED_MOST, nestedPast } from './credentials.ts';
-import { egressOf, FIRST_PARTY_LISTS, normalise, type Pack, type PackSource } from './index.ts';
+import { egressOf, FIRST_PARTY_LISTS, normalise, type Pack, type PackDeclaration, type PackSource } from './index.ts';
 import { CHANGES_MOST, kindUnknownSentence, readChanges, readShared, SHARED_MOST_BYTES, type Shared } from './shared.ts';
 import { MODULE_LISTS, MODULES } from './usecase.ts';
 import {
@@ -177,7 +177,7 @@ export type CatalogueEntry = {
  * The closed list of keys an add-on's manifest may say, which the SDK and the Kennel hold a file to. The record itself
  * stays lenient and reads what it knows. `unlisted` is decisions.md C41's flag: a pack named for one person or one bank.
  */
-export const MANIFEST_KEYS = ['pack', 'version', 'title', 'summary', 'changes', 'author', 'license', 'requires', 'provides', 'declarations', 'seeds', 'config', 'extends', 'adds', 'note', 'unlisted'] as const;
+export const MANIFEST_KEYS = ['pack', 'version', 'title', 'summary', 'changes', 'author', 'license', 'requires', 'provides', 'declarations', 'seeds', 'config', 'extends', 'hands', 'adds', 'note', 'unlisted'] as const;
 
 export const PREVIEW_FORMAT = 1;
 
@@ -366,6 +366,16 @@ export function reachOf(file: Shared | PackFile | CatalogueFile): Reach {
   const s = subjectOf(file);
   const decls = s.pack?.declarations ?? [];
   const of = (kind: string) => decls.filter((d) => d.kind === kind).map(titleOf);
+  /* CALLS_OUT IS READ OFF THE FILLED BODY, NOT THE FILE'S OWN, so a declaration that reads a setting through
+     `{{config:<key>}}` (mercury 1.0.0's `every: {{config:every}}` and `auth.grant: {{config:grant}}`) shows the
+     setting's own default in Browse rather than the placeholder verbatim. `readConfig` is the kernel's check over
+     the manifest's `config:` map, the same coercion a plan runs before writing a value; a manifest whose settings
+     the kernel refuses fills nothing, and the raw body is read exactly as it always was. */
+  const settings = readConfig(s.pack?.manifest.config);
+  const defaults: Record<string, Json> = settings.ok
+    ? Object.fromEntries(Object.entries(settings.value).flatMap(([key, decl]) => (decl.default === undefined ? [] : [[key, decl.default]])))
+    : {};
+  const filled = Object.keys(defaults).length === 0 ? decls : decls.map((d) => ({ ...d, body: fillConfig(d.body, defaults) as PackDeclaration['body'] }));
   return {
     modules: [...s.modules],
     lists: of('register'),
@@ -373,7 +383,7 @@ export function reachOf(file: Shared | PackFile | CatalogueFile): Reach {
     rules: of('rule'),
     examples: s.pack?.seeds.length ?? 0,
     skills: s.skills,
-    calls_out: decls.flatMap((d) => {
+    calls_out: filled.flatMap((d) => {
       const e = egressOf(d);
       return e ? [{ host: e.host, line: e.line, key: e.key }] : [];
     }),

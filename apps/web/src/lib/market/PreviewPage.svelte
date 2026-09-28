@@ -80,19 +80,17 @@
     background: var(--bg);
   }
 
+  /* NO EDGE AND NO FILL OF ITS OWN: a card's drawing well is the one surface (`ListingCard.svelte`), and a second box
+     inside it is the nesting design.md §2.8 found on this screen. */
   .small {
     block-size: 180px;
     overflow: hidden;
-    border: 1px solid var(--line-soft);
-    border-radius: var(--r-md);
-    background: var(--bg);
     pointer-events: none;
   }
 
   /* HALF SIZE BY TRANSFORM, laid out at twice the card's width so the blocks wrap as they would on a real page. */
   .shrink {
     inline-size: 200%;
-    padding: var(--sp-3);
     transform: scale(0.5);
     transform-origin: top left;
   }

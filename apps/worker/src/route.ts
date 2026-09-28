@@ -339,21 +339,64 @@ export function appPath(pathname: string): AppPath | null {
  *
  * MEASURED ON PRODUCTION ON 23 SEPTEMBER: NONE OF THEM ON ANY ANSWER, the shell and the sign-in page included. They are
  * set here because this is the only place certain to reach a page: whether `apps/web/static/_headers` survives a
- * response fetched through the `ASSETS` binding was not measured. `frame-ancestors 'none'` is the whole policy on
- * purpose, because a `script-src` needs the shell's two inline scripts hashed through `kit.csp` first, and HSTS is a
- * zone setting whose `max-age` browsers never give back. None of the four touches the passkey ceremony, which runs in
- * the top-level page and posts to its own origin, where `same-origin` still sends both `Origin` and `Referer`.
+ * response fetched through the `ASSETS` binding was not measured. HSTS is not among them, because it is a zone setting
+ * whose `max-age` browsers never give back. None of the four touches the passkey ceremony, which runs in the top-level
+ * page and posts to its own origin, where `same-origin` still sends both `Origin` and `Referer`.
+ *
+ * THE POLICY IS THE ONE THE PAGE ALREADY CARRIES (`pagePolicy`), so it names the very hashes of the build it rides on
+ * and no deploy of the Worker can fall out of step with a build of the app. `path` is the address asked for, which
+ * decides whether Turnstile stays in it; without one the page keeps its own policy whole, Turnstile included, which is
+ * the looser of the two and never the one that blanks the sign-up page.
  *
  * A NEW RESPONSE AND NEVER THE ONE HANDED IN, because the runtime refuses to change the headers of a response a
  * binding returned ("Can't modify immutable headers"), and `test/shell-headers.test.ts` hands in one that refuses too.
  */
-export function asPage(out: Response): Response {
-  const page = new Response(out.body, out);
-  page.headers.set('content-security-policy', "frame-ancestors 'none'");
+export async function asPage(out: Response, path?: string): Promise<Response> {
+  const html = /^text\/html\b/i.test(out.headers.get('content-type') ?? '');
+  /* ONLY A PAGE IS READ, and it is a few kilobytes. The same bytes go back out, so nothing is decoded and encoded again. */
+  const bytes = html && out.body !== null ? await out.arrayBuffer() : null;
+  const page = new Response(bytes ?? out.body, out);
+  const policy = !html
+    ? `${FILE_POLICY}; frame-ancestors 'none'`
+    : pagePolicy(bytes === null ? '' : new TextDecoder().decode(bytes), path === undefined || SIGNUP.test(path));
+  page.headers.set('content-security-policy', policy);
   page.headers.set('x-frame-options', 'DENY');
   page.headers.set('x-content-type-options', 'nosniff');
   page.headers.set('referrer-policy', 'same-origin');
   return page;
+}
+
+/** Cloudflare Turnstile's origin, for its script and its frame, which only the sign-up page loads. */
+const TURNSTILE = 'https://challenges.cloudflare.com';
+
+/** The one page that may keep Turnstile: sign-up takes no record name, so it has no slug in front. */
+const SIGNUP = /^\/app\/signup\/?$/;
+
+/**
+ * The policy on a file beside the pages: a script, a stylesheet, a font or an image. Nothing inline runs in any of
+ * them, and an SVG opened on its own is a document that could, so it is the strictest there is.
+ */
+const FILE_POLICY = "default-src 'self'; object-src 'none'; base-uri 'none'";
+
+/**
+ * The header for a page: the policy SvelteKit wrote into its `<meta>` (`kit.csp` in `apps/web/svelte.config.js`),
+ * with Turnstile's origin taken out unless `turnstile`, and `frame-ancestors 'none'`, which a meta tag cannot carry.
+ *
+ * A PAGE WITH NO META, OR NO BODY TO READ, GETS `frame-ancestors 'none'` ALONE. That is a HEAD, or a 304 whose headers
+ * a browser may lay over the page it kept; that page's own meta still holds its scripts to the hashes. A policy
+ * without them would refuse the shell's inline scripts and leave an empty screen, which is worse than no
+ * `script-src`, and `apps/web/test/csp.test.ts` fails a build whose shell lacks the meta.
+ *
+ * The self-host keeps the same rule in `apps/selfhost/src/shell.ts`, where there is no sign-up to keep Turnstile for.
+ */
+export function pagePolicy(html: string, turnstile: boolean): string {
+  const own = /<meta http-equiv="content-security-policy" content="([^"]*)"/i.exec(html)?.[1];
+  if (own === undefined) return "frame-ancestors 'none'";
+  const kept = own
+    .split(';')
+    .map((directive) => directive.trim().split(/\s+/).filter((source) => turnstile || source !== TURNSTILE).join(' '))
+    .filter((directive) => directive !== '');
+  return [...kept, "frame-ancestors 'none'"].join('; ');
 }
 
 /**
@@ -562,10 +605,11 @@ export type CloudIngestDeps = {
   /**
    * Which record a forwarded message is for. Absent, and this deployment takes no mail at all.
    *
-   * OPTIONAL BECAUSE THE DIRECTORY CANNOT ANSWER IT YET, and optional is the honest way to say so:
-   * `serveIngest` answers 404 for the whole `/in/email/*` surface when a door offers no `inbound`,
-   * the way `/auth/provision` answers `off()` with no operator key set. The day the Directory has
-   * the index, wiring it here is the whole of the Worker's change.
+   * OPTIONAL BECAUSE A DOOR WITH NO INDEX IS STILL A DOOR: `serveIngest` answers 404 for the whole
+   * `/in/email/*` surface when a door offers no `inbound`, the way `/auth/provision` answers `off()`
+   * with no operator key set. The Worker supplies one, the Directory's `recordFor` (`arrivals` in
+   * `index.ts`), so it takes mail both ways: a forwarder's `POST /in/email/<token>` and the message
+   * Email Routing hands its `email()` handler (`email.ts`), which goes through this same door.
    */
   inbound?: InboundIndex;
 };
@@ -615,7 +659,7 @@ const TOKEN_DIGEST = /^[0-9a-f]{64}$/;
  * one arrival whose path names no record (`49 §5.16` step 2), so the digest of the token is the
  * address: `deps.inbound` is asked, and whatever it answers is put through the same two refusals a
  * webhook's path segment goes through before it can become an argument to `idFromName`. A
- * deployment that supplies no index takes no mail, which is every deployment in this build.
+ * deployment that supplies no index takes no mail; the Worker supplies the Directory's.
  *
  * THE SELF-HOST HOLDS ONE DIGEST AND THE CLOUD HOLDS AN INDEX OF THEM, and that is the only
  * difference between the two halves. A self-host serves one record, so `inbound` there is a

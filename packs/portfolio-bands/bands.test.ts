@@ -22,11 +22,16 @@
  * the two labels one importer writes and required that importer's use case. Three probes were run against the file
  * as it stood, and all three failed: its text held the import's label for the base case; on a record holding Portfolio and a
  * `datapoints` list from a pack of somebody else's, it was refused `OUT_OF_BOUNDS`, "portfolio-bands needs
- * usecase-founder ^1.0.0, and this record has none"; and `./fill.ts` was `ERR_MODULE_NOT_FOUND`. The tests under
- * "The fill" and "What it leans on" are those probes, grown.
+ * usecase-founder ^1.0.0, and this record has none"; and there was no way to give it other names. The tests under
+ * "The settings" and "What it leans on" are those probes, grown.
  *
- * THE LAST TEST IS THE WHOLE PATH on a self-host: the pack filled, planned and installed as the owner would install
- * it, beside Portfolio and the founder's lists, then due, leased, run in QuickJS, and its writes applied by the record.
+ * 2.0.0 TAKES THE NAMES AS SETTINGS (`loop/finish/platform.md` PLT-12). 1.0.0 shipped a `fill` and a `fill.ts` that
+ * rewrote one line of the script before install, so a person needed TypeScript in the app to set the pack up. The two
+ * sides are `list` settings now, the script reads them from `ctx.config`, and the checks `fill.ts` made run in the
+ * script, where a setting a person changes later is checked as well.
+ *
+ * THE LAST TEST IS THE WHOLE PATH on a self-host: the pack planned and installed as the owner would install it, its
+ * names set, beside Portfolio and the founder's lists, then due, leased, run in QuickJS, and its writes applied by the record.
  * The fixture tests before it hand the script a double, which is enough for the arithmetic and says nothing about
  * whether the predicate trees it sends are ones the record accepts.
  */
@@ -45,8 +50,6 @@ import { firstPartyDocument } from '../../packages/seed/src/index.ts';
 import type { CtxHost, Json, ScriptAnswer, ScriptDecl, ScriptWrite } from '../../packages/script/src/index.ts';
 import { runInQuickJs } from '../../packages/script/src/quickjs.ts';
 
-import { fillBands, MEASURES_LINE, type BandsSpec } from './fill.ts';
-
 const HERE = new URL('./', import.meta.url);
 const SOURCE = readFileSync(new URL('bands.js', HERE), 'utf8');
 const PACK_FILE = new URL('portfolio-bands.pack.json', HERE);
@@ -59,15 +62,20 @@ const template = (): Record<string, unknown> => JSON.parse(readFileSync(PACK_FIL
 const scriptOf = (doc: Record<string, unknown>): ScriptBody => (doc as PackDoc).declarations.find((d) => typeof d.script === 'string') as ScriptBody;
 const SCRIPT = scriptOf(template());
 
-/** What the file itself says, filled: one name a side, neither of them anybody's import. */
-const EXAMPLE: BandsSpec = { now: ['Monthly recurring revenue'], base: ['Monthly recurring revenue in a year'] };
+/** The two settings as `ctx.config` holds them. */
+type Names = { now: Json; base: Json };
+
+/** What the file itself says, as its settings' defaults: one name a side, neither of them anybody's import. */
+const EXAMPLE: Names = { now: ['Monthly recurring revenue'], base: ['Monthly recurring revenue in a year'] };
 
 /**
  * THE MEASURES THE FIXTURES ARE NAMED BY, and a second name for the forecast, because a record that has been fed for a
  * while holds one number under an old name and a new one, and the bands must take either.
  */
-const SPEC: BandsSpec = { now: 'Takings a month', base: ['Takings a month in a year', 'Forecast takings'] };
-const FILLED = fillBands(template(), SPEC);
+const SPEC: Names = { now: ['Takings a month'], base: ['Takings a month in a year', 'Forecast takings'] };
+
+/** The line of the script that reads the settings through their checks, which one test takes the checks off. */
+const CHECKED = 'const measures = measuresOf(ctx.config);';
 
 const NOW = '2026-09-24T06:00:00.000Z';
 
@@ -120,8 +128,11 @@ function recordOf(projects: Project[], now = 'Takings a month', base = 'Takings 
   return { things, datapoints };
 }
 
-/** A host double. `where` is ignored, so the script's own filtering is what is under test; the last test sends it. */
-const hostOf = (rows: Record<string, Row[]>): CtxHost => ({
+/**
+ * A host double holding the pack's settings as `config`. `where` is ignored, so the script's own filtering is what is
+ * under test; the last test sends it.
+ */
+const hostOf = (rows: Record<string, Row[]>, config: Names | Record<string, Json> = SPEC): CtxHost => ({
   fetch: async () => {
     throw new Error('the bands fetch nothing');
   },
@@ -129,9 +140,10 @@ const hostOf = (rows: Record<string, Row[]>): CtxHost => ({
   now: () => NOW,
   tz: 'UTC',
   input: null,
+  config: config as Json,
 });
 
-const declOf = (source = scriptOf(FILLED).source): ScriptDecl => ({
+const declOf = (source = SOURCE): ScriptDecl => ({
   id: SCRIPT.script,
   version: 1,
   egress: SCRIPT.egress,
@@ -162,89 +174,85 @@ test('THE PACK CARRIES bands.js AS ITS SOURCE, byte for byte, so the file a pers
   assert.deepEqual(SCRIPT.writes, ['revenue_bands']);
 });
 
-/* ── The fill ──────────────────────────────────────────────────────────────────────────────────── */
+/* ── The settings ──────────────────────────────────────────────────────────────────────────────── */
 
-test('the file reads clean as an add-on somebody opens from disk, says what a person fills, and names nobody’s import', async () => {
+test('the file reads clean as an add-on somebody opens from disk, takes its two names as settings, and names nobody’s import', async () => {
   const text = readFileSync(PACK_FILE, 'utf8');
   const file = await readPackFile(text);
   assert.ok(file.ok, fixOf(file));
   assert.equal(file.value.pack.manifest.pack, 'portfolio-bands');
-  assert.deepEqual(Object.keys((file.value.doc.fill ?? {}) as object), ['now', 'base']);
+  /* NO `fill` LEFT, so nothing in the app has to rewrite the file before it is installed. */
+  assert.equal('fill' in file.value.doc, false, 'the file still carries fill marks');
+  const config = (template() as { config: Record<string, { type: string; default: Json }> }).config;
+  assert.deepEqual(Object.keys(config), ['now', 'base']);
+  assert.deepEqual([config.now!.type, config.base!.type], ['list', 'list']);
+  assert.deepEqual({ now: config.now!.default, base: config.base!.default }, EXAMPLE);
   /* THE FIRST CUT COMPILED IN TWO LABELS, the the old tool import's names for the base case, as `git grep` found them at
-     `772c0be1`. They are not quoted here, so the same grep over `packs/` now answers nothing. What holds the file to
-     naming no measure of its own is the next test: the shipped file is its example filled, and the example's names are
-     the only ones in it. */
-  assert.deepEqual(JSON.parse(SOURCE.split('\n').find((l) => l.startsWith(MEASURES_LINE))!.slice(MEASURES_LINE.length, -1)), EXAMPLE);
+     `772c0be1`. They are not quoted here, so the same grep over `packs/` now answers nothing. The source names no
+     measure at all: the example's names are the settings' defaults and nowhere else. */
+  for (const name of [...(EXAMPLE.now as string[]), ...(EXAMPLE.base as string[])]) assert.equal(SOURCE.includes(name), false, `bands.js names ${name}`);
+  assert.ok(SOURCE.includes(CHECKED), 'bands.js no longer reads its settings through measuresOf');
 });
 
-test('the file as it ships, with its marks taken off, is its own example filled', () => {
-  const { fill: _marks, ...shipped } = template();
-  assert.equal(JSON.stringify(shipped), JSON.stringify(fillBands(template(), EXAMPLE)));
+test('WITH NOTHING SET, THE DEFAULTS BAND A RECORD NAMED THE WAY THE FILE SAYS', async () => {
+  const { things, datapoints } = recordOf(STUDIO, 'Monthly recurring revenue', 'Monthly recurring revenue in a year');
+  /* Kiln's forecast is under a name the defaults do not hold, so it adds no headroom: $6,250 less $2,750. */
+  const a = await runInQuickJs(declOf(), hostOf({ things, datapoints, revenue_bands: [] }, EXAMPLE));
+  assert.deepEqual(writesOf(a), [created('now', 1_100_000, 'USD'), created('next', 350_000, 'USD'), created('later', 800_000, 'USD')]);
 });
 
-test('FILLED, THE FILE CHANGES IN THE ONE LINE AND NOWHERE ELSE, and a name is a string whatever it holds', async () => {
-  const { fill: _marks, ...shipped } = template();
-  const blanked = (doc: Record<string, unknown>): string => {
-    const d = structuredClone(doc);
-    const s = scriptOf(d);
-    s.source = s.source.split('\n').filter((line) => !line.startsWith(MEASURES_LINE)).join('\n');
-    return JSON.stringify(d);
-  };
-  assert.equal(blanked(FILLED), blanked(shipped));
-  assert.ok(scriptOf(FILLED).source.includes(`${MEASURES_LINE}{"now":["Takings a month"],"base":["Takings a month in a year","Forecast takings"]};`));
-
-  /* A QUOTE, A BACKSLASH AND A LINE BREAK, the three things that end a string written by hand, and the run still
-     matches the reading by its name rather than failing to parse. */
+test('A NAME IS MATCHED AS THE TEXT IT IS, whatever it holds', async () => {
+  /* A QUOTE, A BACKSLASH AND A LINE BREAK, the three things that ended a name written into the script by hand. */
   const odd = 'Kiln\'s "take"\\a\nmonth';
-  const doc = fillBands(template(), { now: odd, base: 'Forecast' });
   const { things, datapoints } = recordOf([{ name: 'Kiln', lane: 'building', monthly: [10, 'USD'], base: [30, 'USD'] }], odd, 'Forecast');
-  const a = await runInQuickJs(declOf(scriptOf(doc).source), hostOf({ things, datapoints, revenue_bands: [] }));
+  const a = await runInQuickJs(declOf(), hostOf({ things, datapoints, revenue_bands: [] }, { now: [odd], base: ['Forecast'] }));
   assert.deepEqual(writesOf(a).slice(0, 2), [created('now', 1_000, 'USD'), created('next', 2_000, 'USD')]);
 });
 
-test('A FILL THAT WOULD DRAW THE WRONG BAR IS REFUSED BEFORE ANYBODY INSTALLS IT', () => {
-  const refused = (spec: BandsSpec, why: RegExp) => assert.throws(() => fillBands(template(), spec), why);
-  refused({ now: [], base: 'Forecast' }, /at least one now measure/);
-  refused({ now: 'Takings', base: '   ' }, /at least one base measure/);
-  refused({ now: ['Takings', 'Forecast'], base: 'Forecast' }, /named as both now and base/);
-  refused({ now: 'Takings', base: 'Takings, forecast' }, /begins with Takings and a comma/);
-  refused({ now: 'Takings, today', base: 'Takings' }, /begins with Takings and a comma/);
+test('NAMES THAT WOULD DRAW THE WRONG BAR STOP THE RUN WITH A SENTENCE, and nothing is written', async () => {
+  const { things, datapoints } = recordOf(STUDIO);
+  const refused = async (config: Record<string, Json>, why: RegExp) => {
+    const a = await runInQuickJs(declOf(), hostOf({ things, datapoints, revenue_bands: [] }, config));
+    assert.ok('refused' in a, `${JSON.stringify(config)} ran: ${JSON.stringify(a)}`);
+    assert.match(a.refused.why, why);
+  };
+  await refused({}, /at least one now name/);
+  await refused({ now: [], base: ['Forecast'] }, /at least one now name/);
+  await refused({ now: ['Takings'], base: ['   '] }, /at least one base name/);
+  await refused({ now: ['Takings', 'Forecast'], base: ['Forecast'] }, /named as both now and base/);
+  await refused({ now: ['Takings'], base: ['Takings, forecast'] }, /begins with Takings and a comma/);
+  await refused({ now: ['Takings, today'], base: ['Takings'] }, /begins with Takings and a comma/);
   /* AND BOTH TRAPS IN ANOTHER CASE, because the record's `starts` folds case (`fold` in `packages/where/src/index.ts`),
-     so a list asked for `takings` answers every reading of `Takings` too. Measured on a record with the fill's checks
+     so a list asked for `takings` answers every reading of `Takings` too. Measured on a record with the checks
      comparing exact text: a forecast typed once under `takings` and fifty daily readings of `Takings` after it, and
      `later` fell from 800,000 to 0 on a run that wrote without a word, the page-of-fifty failure `bands.js` describes,
      reached again through the case of one letter. The same with `TAKINGS, today` and `takings`. */
-  refused({ now: 'Takings', base: 'takings' }, /one name to the record/);
-  refused({ now: 'TAKINGS, today', base: 'takings' }, /begins with takings and a comma/);
-  /* A repeat on one side is one name, not a refusal: it matches the same readings either way. */
-  assert.ok(scriptOf(fillBands(template(), { now: ['Takings', ' Takings '], base: 'Forecast' })).source.includes('{"now":["Takings"],'));
+  await refused({ now: ['Takings'], base: ['takings'] }, /one name to the record/);
+  await refused({ now: ['TAKINGS, today'], base: ['takings'] }, /begins with takings and a comma/);
 
-  /* AND A SOURCE WITH NO LINE TO FILL, OR TWO, IS NOT FILLED SOMEWHERE ELSE. */
-  const without = template();
-  scriptOf(without).source = SOURCE.replace(MEASURES_LINE, 'const MEASURED = ');
-  assert.throws(() => fillBands(without, EXAMPLE), /0 lines starting const MEASURES =/);
-  const twice = template();
-  scriptOf(twice).source = `${SOURCE}\n${MEASURES_LINE}{};`;
-  assert.throws(() => fillBands(twice, EXAMPLE), /2 lines starting const MEASURES =/);
+  /* A repeat on one side is one name, not a refusal: it matches the same readings either way. */
+  const twice = await runInQuickJs(declOf(), hostOf({ things, datapoints, revenue_bands: [] }, { now: ['Takings a month', ' Takings a month '], base: SPEC.base }));
+  assert.deepEqual(writesOf(twice), [created('now', 1_100_000, 'USD'), created('next', 625_000, 'USD'), created('later', 800_000, 'USD')]);
 });
 
-test('WHAT THE TWO NAME CHECKS STOP, run with the checks taken off: the forecast is read as today, and the headroom is gone', async () => {
-  /* THE LINE WRITTEN BY HAND, as a fill without its checks would write it, over one project that takes $1,250 and is
-     forecast at $4,000. The honest split is $1,250 now and $2,750 next. */
-  const bypass = (now: string[], base: string[]) => SOURCE.split('\n').map((l) => (l.startsWith(MEASURES_LINE) ? `${MEASURES_LINE}${JSON.stringify({ now, base })};` : l)).join('\n');
+test('WHAT THE NAME CHECKS STOP, run with the checks taken off: the forecast is read as today, and the headroom is gone', async () => {
+  /* THE SETTINGS READ AS THEY ARE, as a script without `measuresOf` would read them, over one project that takes
+     $1,250 and is forecast at $4,000. The honest split is $1,250 now and $2,750 next. */
+  assert.ok(SOURCE.includes(CHECKED));
+  const unchecked = declOf(SOURCE.replace(CHECKED, 'const measures = { now: ctx.config.now, base: ctx.config.base };'));
   const kiln = (base: string) => {
     const { things, datapoints } = recordOf([{ name: 'Kiln', lane: 'building', monthly: [1_250, 'USD'] }], 'Takings');
     datapoints.push(row('datapoints', { name: `${base}, Kiln`, value: 4_000, unit: 'USD', thing: things[0]!.id, at: '2026-09-21T10:00:00.000Z', source: 'typed' }));
     return { things, datapoints, revenue_bands: [] };
   };
   /* ONE NAME ON BOTH SIDES: both readings are `now`, the later one (the forecast) wins, and there is no base. */
-  const same = await runInQuickJs(declOf(bypass(['Takings'], ['Takings'])), hostOf(kiln('Takings')));
+  const same = await runInQuickJs(unchecked, hostOf(kiln('Takings'), { now: ['Takings'], base: ['Takings'] }));
   assert.deepEqual(writesOf(same), [created('now', 400_000, 'USD'), created('next', 0, 'USD'), created('later', 0, 'USD')]);
   /* A FORECAST NAMED AFTER TODAY AND A COMMA: `Takings, forecast, Kiln` begins `Takings, `, so it is the same. */
-  const comma = await runInQuickJs(declOf(bypass(['Takings'], ['Takings, forecast'])), hostOf(kiln('Takings, forecast')));
+  const comma = await runInQuickJs(unchecked, hostOf(kiln('Takings, forecast'), { now: ['Takings'], base: ['Takings, forecast'] }));
   assert.deepEqual(writesOf(comma), [created('now', 400_000, 'USD'), created('next', 0, 'USD'), created('later', 0, 'USD')]);
-  /* AND FILLED THROUGH THE CHECKS, the same record under two names that cannot be confused splits as it should. */
-  const honest = await runInQuickJs(declOf(bypass(['Takings'], ['Forecast'])), hostOf(kiln('Forecast')));
+  /* AND THROUGH THE CHECKS, the same record under two names that cannot be confused splits as it should. */
+  const honest = await runInQuickJs(declOf(), hostOf(kiln('Forecast'), { now: ['Takings'], base: ['Forecast'] }));
   assert.deepEqual(writesOf(honest), [created('now', 125_000, 'USD'), created('next', 275_000, 'USD'), created('later', 0, 'USD')]);
 });
 
@@ -327,12 +335,15 @@ const DIARY = {
 
 type Planned = { ok: boolean; refusal?: { code: string; fix: string; at?: string } };
 
-async function recordWith(...docs: unknown[]): Promise<{ put: (doc: unknown) => Promise<Planned>; close: () => void }> {
+type Diff = { planHash: string; approve: string[]; config: { key: string; type: string; value: Json; from: string }[] };
+
+async function recordWith(...docs: unknown[]): Promise<{ plan: (doc: unknown) => Promise<Planned & { value?: { diff: Diff } }>; put: (doc: unknown) => Promise<Planned>; close: () => void }> {
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(Date.parse(NOW)) });
   const owner: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'owner' } };
+  const plan = async (doc: unknown) => (await api.planPack({ doc, source: { kind: 'local' } } as never, owner)) as Planned & { value?: { diff: Diff } };
   const put = async (doc: unknown): Promise<Planned> => {
-    const p = (await api.planPack({ doc, source: { kind: 'local' } } as never, owner)) as Planned & { value?: { diff: { planHash: string; approve: string[] } } };
+    const p = await plan(doc);
     if (!p.ok) return p;
     return (await api.installPack({ doc, source: { kind: 'local' }, planHash: p.value!.diff.planHash, approve: p.value!.diff.approve } as never, owner)) as Planned;
   };
@@ -340,7 +351,7 @@ async function recordWith(...docs: unknown[]): Promise<{ put: (doc: unknown) => 
     const r = await put(doc);
     assert.ok(r.ok, JSON.stringify(r.refusal));
   }
-  return { put, close: () => sql.close() };
+  return { plan, put, close: () => sql.close() };
 }
 
 test('IT REQUIRES PORTFOLIO, AND DATAPOINTS FROM WHICHEVER PACK DECLARES THEM, and names no use case', async () => {
@@ -363,9 +374,26 @@ test('IT REQUIRES PORTFOLIO, AND DATAPOINTS FROM WHICHEVER PACK DECLARES THEM, a
   bare.close();
 });
 
+test('AN UPDATE FROM 1.0.0 NAMES BOTH SETTINGS AS DEFAULT, so the owner sets his own names before he presses update', async () => {
+  /* 1.0.0 AS THE CATALOGUE PUBLISHED IT, its measures written into the script by a fill and no settings declared. */
+  const was = JSON.parse(readFileSync(new URL('../../apps/web/static/catalogue/packs/portfolio-bands/1.0.0.pack.json', import.meta.url), 'utf8')) as Record<string, unknown>;
+  const r = await recordWith(firstPartyDocument('portfolio', { seeds: [] }), DIARY, was);
+  const planned = await r.plan(template());
+  assert.ok(planned.ok, JSON.stringify(planned.refusal));
+  assert.deepEqual(
+    planned.value!.diff.config.map((c) => [c.key, c.type, c.from, c.value]),
+    [
+      ['now', 'list', 'default', EXAMPLE.now],
+      ['base', 'list', 'default', EXAMPLE.base],
+    ],
+  );
+  assert.ok((await r.put(template())).ok);
+  r.close();
+});
+
 /* ── The whole path ────────────────────────────────────────────────────────────────────────────── */
 
-test('THE WHOLE PATH ON A SELF-HOST: filled, installed, due, run, applied, and drawn as one split', async () => {
+test('THE WHOLE PATH ON A SELF-HOST: installed, its names set, due, run, applied, and drawn as one split', async () => {
   const { start } = await import('../../apps/selfhost/src/server.ts');
   const { FIRST_PARTY } = await import('../../packages/seed/src/index.ts');
   const { useCaseDocument } = await import('../../packages/seed/src/usecases/index.ts');
@@ -404,7 +432,10 @@ test('THE WHOLE PATH ON A SELF-HOST: filled, installed, due, run, applied, and d
     const before = api.kernel.declarations().map((d) => d.id);
     assert.ok(before.includes('register.datapoints') && before.includes('register.things'));
     assert.equal(before.includes('register.revenue_bands') || before.includes(`script.${SCRIPT.script}`), false, 'the bands are already declared');
-    await put(FILLED);
+    await put(template());
+    /* THE OWNER'S NAMES, SET ON THE PACK'S PAGE AFTER INSTALL. A run reads the settings as they stand when it is leased,
+       so nothing is installed again. */
+    said(await api.setPackConfig({ id: 'portfolio-bands', values: SPEC }, owner));
 
     for (const p of STUDIO) {
       const thing = said(await api.create({ register: 'things', fields: { name: p.name, lane: p.lane } }, owner)) as { id: string };

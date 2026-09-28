@@ -126,13 +126,27 @@ export const stray = (apps, derived) =>
  * `/nowhere` is in `MAY_REFUSE`: it is the not-found screen, audited on purpose rather than by
  * accident.
  *
+ * THE HUB'S TABS AND A NEW AUTOMATION ARE EXTRAS FOR THE SAME REASON. `/automations` draws each kind
+ * that runs by itself under one path, picked by `?tab=`, so the tree yields one address and every tab
+ * but the first went unaudited; and `/automations/[id]` is sampled with an id no record has, so the
+ * canvas was audited only as "not found" until `new` opened it with its trigger card, its sticky bar
+ * and the keys a card answers. The counts in the paragraph above were measured before these extras.
+ *
  * `tree` IS WHICH APP'S ROUTES A SURFACE IS A PASS OVER, and it is not `name`: four of the five
  * surfaces are builds of `apps/web`, three of them variant records of it, and a check that confused
  * the surface with the tree would look for `/settings/billing` in the marketing site.
  */
 export async function surfaces(root = join(import.meta.dirname, '..', '..')) {
   const derived = {
-    web: await routesOf(join(root, 'apps', 'web'), ['/p/kiln', '/t/3', '/nowhere']),
+    web: await routesOf(join(root, 'apps', 'web'), [
+      '/p/kiln',
+      '/t/3',
+      '/nowhere',
+      '/automations?tab=scheduled',
+      '/automations?tab=scripts',
+      '/automations?tab=doors',
+      '/automations/new',
+    ]),
     site: await routesOf(join(root, 'apps', 'site')),
   };
 

@@ -20,7 +20,7 @@ prefers, and hosted is never required.*
 
 ---
 
-## 1 · The nine kinds, and the list is CLOSED
+## 1 · The kinds, and the list is CLOSED
 
 | Kind | Is | Declares |
 |---|---|---|
@@ -33,10 +33,12 @@ prefers, and hosted is never required.*
 | `theme` | token values only | colour roles, scales, density — never CSS |
 | `digest` | scheduled output | schedule, sections (each `as:` a kind, `omit_when_empty:` to drop an empty one), channel |
 | `script` | a person's or an agent's code, never run by the record | `runs:` (a clock, a door, a rule), `egress:` origins, vault `keys:`, the registers it `reads:` and `writes:`, `limits:`, `source:`. A fire writes one `script.run` outbox row and a host runs it in a sandbox (`packages/kernel/src/script.ts`) |
+| `job` | what one run of Claude Code on the owner's own machine may do, never run by the record | `title`, `prompt` (with `%arg%` slots), `args`, `repo`, `tools` (named file tools, the record's own tools, and `Bash(<command>)`, never `Bash` alone), `turns`, `permission` (never `bypassPermissions`), `writes`, `pack`. A run is a `job` row naming the kind, claimed by a runner the owner enrolled (`packages/kernel/src/jobs.ts`) |
 
-The kernel holds itself to this list in `KINDS` (`packages/kernel/src/declare.ts`), and kernel migration 12
-rebuilt the database's `CHECK` to the same nine. A tenth kind means a tenth schema, a tenth validator and a
-tenth way to be insecure. **If it does not fit these nine, it is an agent, or a person's or an agent's script, attached to a door or a
+The kernel holds itself to this list in `KINDS` (`packages/kernel/src/declare.ts`), and the database's `CHECK`
+is rebuilt to the same list whenever it grows: migration 12 for `script` (`0012_script.ts`) and migration 18 for
+`job` (`0018_jobs.ts`). Another kind means another schema, another validator and another way to be insecure.
+**If it does not fit these, it is an agent, or a person's or an agent's script, attached to a door or a
 schedule, run in a metered sandbox BrainDog hosts or anywhere outside, and writing through the
 same API anything else uses.**
 
@@ -46,7 +48,9 @@ draws and an agent edits through MCP. The automations are built as a composition
 their own: a `rule` can carry a trigger and steps, linted at install (`packages/kernel/src/flow-lint.ts`,
 [07-INGEST-AND-RULES](07-INGEST-AND-RULES.md)). A script was settled the other way
 ([research-shell-scripts.md](../loop/research-shell-scripts.md) §0): it is the ninth kind, added in
-the same commit as the automations runner, which is why this heading said eight until then.*
+the same commit as the automations runner, which is why this heading said eight until then. `job` followed the
+same way (`loop/finish/agents.md` C13): a kind of run is approved once in Decide, and nothing a run carries widens
+it. The heading no longer says a number, because `KINDS` is where the number is kept.*
 
 The closure is load-bearing rather than tidy: the security argument in §7 is an *enumeration*,
 and an enumeration only works over a finite list.
@@ -97,21 +101,33 @@ pasted into a chat window. The YAML is read by one parser — `yaml`, the accept
 
 ### The manifest, key by key
 
-Every key, typed. The install-time schema check in §5 validates against this table, so a manifest
-key that is not here is refused by name.
+Every key, typed. **The record is lenient and the Kennel is strict.** A record reads the keys it
+knows and passes over any other, so a file an older or newer build wrote still installs, and an
+update a record already holds never breaks on a key (`normalise` in `packages/declare/src/index.ts`).
+The closed list is `MANIFEST_KEYS` (`packages/declare/src/catalogue.ts`): the Kennel refuses a
+submitted add-on that says any key outside it with `PACK_MALFORMED`, naming the key
+(`acceptSubmission` in `packages/declare/src/kennel.ts`), and `braindog pack check` warns on one
+before anything is sent (`strayKeys` in `apps/cli/src/scratch.ts`).
 
 | Key | Type | Required |
 |---|---|---|
-| `pack` | the pack id — `^[a-z][a-z0-9-]{1,63}$` ([34-GRAMMARS](34-GRAMMARS.md) §4), globally unique in the Kennel | required |
+| `pack` | the pack id, `^[a-z][a-z0-9-]{1,63}$` ([34-GRAMMARS](34-GRAMMARS.md) §4), unique in the Kennel, where an id belongs to whoever published it first and BrainDog's own ids are kept for it | required |
 | `version` | semver | required |
-| `summary` | string, ≤ 140 characters | required |
-| `author` | string | required |
-| `license` | an SPDX identifier | required |
-| `declarations` | a list of one or more, each one of the nine kinds | required |
+| `title` | string, the name a catalogue lists it under, cut to 80 characters; the id when absent (`readPackFile` in `packages/declare/src/catalogue.ts`). The Kennel refuses a file with none | optional; the Kennel requires it |
+| `summary` | string, not blank | required |
+| `changes` | string, at most 500 characters: what this version changed, read into the catalogue version's `notes` | optional |
+| `author` | string, not blank; a name that says BrainDog is refused at the Kennel | required |
+| `license` | string, not blank; an SPDX identifier by convention, not checked | required |
+| `declarations` | a list, each one of the kinds in §1; left out or empty only when the pack `extends` or `adds` something, since a pack that changes nothing is refused `PACK_MALFORMED` | required |
 | `requires` | `{ format: <int>, primitives: <int>, packs: { <pack id>: <semver range> } }` — the `.brain` format revision and the `PRIMITIVES_VERSION` the declarations need, and the packs they depend on. **Never an app version: the app has no semver** ([31-STACK](31-STACK.md) §6) | optional |
 | `seeds` | `[{ register, fields, note? }]` — the example rows: at most eight per register, own registers only, no `ref`/`secret`/`file` values; marked by the value `example` in the register's declared `tags` field, applied through the write path with `cascade = false`, and counted on their own line in the diff (§3) — [42-SPEC-DECLARE](42-SPEC-DECLARE.md) §5.5 | optional |
 | `provides` | **derived** — the `kind.id` of every declaration. It may be written out for a reader, and if it is, it must equal the derived list — `PROVIDES_MISMATCH` otherwise | derived |
 | `adds` | `[{ page, block, after?, note? }]`, at most 16: blocks this pack adds to another pack's page. `page` is the page's id (`page.project`), `block` is one block as the page's own would say it, and `after` is the heading of the page's block it goes after, else it goes last. Kept in the manifest and never written into the page's declaration, so either pack updates without losing the other's addition, and uninstalling or turning off this pack takes it away ([06-PAGES](06-PAGES.md) §4). The plan says "adds a block to <page> from <pack>"; a page the record lacks plans as unresolved and is refused `PAGE_UNKNOWN` | optional |
+| `config` | `{ <key>: { type, values?, max?, default?, label?, note? } }`: the settings an owner fills at `/packs/<id>`, read back as `{{config:<key>}}`; the types are `CONFIG_TYPES` in `packages/kernel/src/declare.ts`, `list` among them. The notes below say how each is read | optional |
+| `extends` | `{ <list id>: { fields?, values? } }`: optional fields and enum values this pack lays on lists other packs own, such as `register.people: { values: { role: [family] } }` (`Manifest.extends` in `packages/declare/src/index.ts`) | optional |
+| `hands` | `{ <declaration id>: <pack id> }`: declarations this version stops declaring and gives to another pack, so a list with rows can leave a pack. The record reads it, and it is in `MANIFEST_KEYS` | optional |
+| `note` | string, a reader's comment kept and never interpreted | optional |
+| `unlisted` | `true`: installable by id and updated like any other, and left out of every listing, for a pack named for one person or one bank (`CatalogueEntry.unlisted`) | optional |
 
 *(Amended September 15th 2026 for modularity: the manifest gains one more optional key, `config:`, a
 closed subset of field types (no `ref`, `secret` or `file`) that a pack declares and an owner fills
@@ -167,7 +183,7 @@ touching anything** — naming both packs and the exact id. No half-installed st
 ## 3 · Install
 
 ```
-$ braindog pack install https://kennel.brain.dog/p/freelancer-uk
+$ braindog pack install freelancer-uk --from https://brain.dog/api/kennel/v1/
 ```
 
 ```
@@ -193,8 +209,9 @@ $ braindog pack install https://kennel.brain.dog/p/freelancer-uk
 Four properties of that screen, each deliberate:
 
 1. **The diff is shown before it applies.** A pack is readable text, so a truthful diff is
-   possible — this is the entire trust model, and it is why packs may not contain code. You
-   cannot diff a binary's intentions.
+   possible. This is the entire trust model, and it is why nothing a pack declares runs inside the
+   record: a pack's `script` runs in a host's sandbox, and every host it calls out to is a line of the
+   plan (`calls_out`). You cannot diff a binary's intentions.
 2. **Row counts are stated, and seeds are counted separately.** A pack physically cannot *read* a
    row at install time, so "0 rows read" is a guarantee. But a pack **does** write its worked
    example rows — [06-PAGES](06-PAGES.md) §4 calls that example *"the difference between a record
@@ -226,16 +243,24 @@ Four properties of that screen, each deliberate:
 
 ### Sources, in order of trust and none of them privileged
 
-| Source | Example |
-|---|---|
-| Kennel index | `braindog pack install freelancer-uk` |
-| Any URL | `braindog pack install https://…/x.pack.yaml` |
-| Git ref | `braindog pack install git:owner/repo@v2` |
-| Paste | paste the text into the installer — *CLI: later* ([48-SPEC-CLI](48-SPEC-CLI.md) §10) |
-| Local file | `braindog pack install ./my.pack.yaml` |
+| Source | In the app | From a terminal |
+|---|---|---|
+| The Kennel ([14-KENNEL](14-KENNEL-AND-COMMUNITY.md) §1) | Add-ons, browsed and searched (`apps/web/src/lib/market/listing.ts`) | `braindog pack install freelancer-uk --from https://brain.dog/api/kennel/v1/`; `braindog pack search` reads the Kennel when no `--from` is named |
+| BrainDog's own catalogue, bundled with the build | Add-ons, beside the Kennel's | `braindog pack install freelancer-uk`, which reads the host's `/app/catalogue/` |
+| Any https address | "Install from anywhere" at `/packs`; the host fetches it (`fetchShared`), and refuses a private or local address | not yet: the terminal takes an id or a file |
+| A git ref | the same box, as `git:<owner>/<repo>@<ref>:<path>`, read as that file raw on GitHub | not yet |
+| A file | the same box, a file on this computer | `braindog pack install ./my.pack.json`, JSON or YAML |
+| Paste | the same box, the text pasted in | not yet |
 
-The Kennel is a **convenience, never a gate**. Nothing is trapped behind approval, which is the
-single most important property Obsidian's ecosystem has and a curated app store does not.
+The app's box is `apps/web/src/routes/packs/InstallShared.svelte`, and the terminal's command is
+`apps/cli/src/catalogue.ts`. Every source ends in the same plan: the owner in a browser approves it
+on the plan sheet, and anybody else's install, the terminal's included, is filed on Decide as a
+`pack` proposal for the owner to read and accept.
+
+The Kennel is a **convenience, never a gate**. Being *listed* there waits for the operator's review
+when the publisher is not trusted, but *installing* never waits for anybody but the record's owner:
+a file from an address, a git ref, a disk or a paste installs exactly as a listed one does. That is
+the single most important property Obsidian's ecosystem has and a curated app store does not.
 
 ---
 
@@ -404,7 +429,7 @@ first-party pack goes through the same pack API as anyone else's.
 The measurable form of this rule, which belongs in CI rather than in a code review:
 
 ```
-test: the kernel contains no declaration of any of the nine kinds
+test: the kernel contains no declaration of any of the kinds in §1
       — except register.session, the one named exception (02-DATA-MODEL §1), whose rows are the agents
 test: uninstalling every pack leaves a record with a working nav and zero active declarations (retired rows stay — §4)
 test: every shipped pack round-trips through export → import → export to an identical canonical logical dump (33-CONTRACTS §9)
@@ -502,6 +527,10 @@ the prior record.
 A BrainDog pack is a YAML file describing capability, installed from a URL or a git ref, indexed
 in a public repo, and no code runs. **A Claude Agent Skill is a Markdown file describing
 capability, installed from a URL or a git ref, indexed in a public repo, and no code runs.**
+
+*(Amended September 28th 2026, as built: a pack is a JSON or YAML file, indexed by the Kennel
+rather than a public repository ([14-KENNEL](14-KENNEL-AND-COMMUNITY.md) §1), and a pack may carry
+a `script`, which runs in a host's sandbox and never in the record (§1). The shape is the same.)*
 
 Measured on 2026-08-31:
 

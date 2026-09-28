@@ -13,6 +13,7 @@
   import Section from '$lib/ui/Section.svelte';
   import Button from '$lib/ui/Button.svelte';
   import { settingsState, type AreaProps } from '../settings-state.svelte.ts';
+  import StateRow from './StateRow.svelte';
 
   let { shell }: AreaProps = $props();
 
@@ -70,7 +71,43 @@
       if (checkInput) checkInput.value = '';
     }
   }
+
+  /**
+   * THE WORDS THIS AREA'S ROWS ADD (DSN-18). Each way out of the record is a row now, titled by what
+   * leaves, with the one sentence that tells it apart and the button that takes it; the sentences the
+   * area already had stay in `copy` and are read where they were.
+   */
+  const words = {
+    oneFile: 'Everything, in one file',
+    checkLine: 'Checked in this browser against its own manifest and signature. The file is sent nowhere.',
+    checkGo: 'Check a file',
+    wayTitle: 'The way you work',
+    wayLine: 'Your lists, pages, metrics and rules, without a single row of what you wrote in them.',
+    rowsTitle: 'The rows',
+    rowsLine: 'Every row you have written, without the lists and pages around them.',
+    setupTitle: 'A setup somebody else can install',
+    setupLine: 'Published as an add-on, with your rows left out.',
+    notHereYet: 'Not on this host yet',
+  };
 </script>
+
+<!-- THE ONE ACTION EACH ROW OFFERS, declared here so a row whose action is the owner's is handed
+     none at all for a colleague, rather than an empty slot at the end of the row. -->
+{#snippet exportWhole()}
+  <Button disabled={exporting !== null} aria-busy={exporting === 'record'} onclick={() => takeCopy('record')}>{copy.export}</Button>
+{/snippet}
+{#snippet exportPack()}
+  <Button disabled={exporting !== null} aria-busy={exporting === 'pack'} onclick={() => takeCopy('pack')}>{copy.exportPack}</Button>
+{/snippet}
+{#snippet exportRows()}
+  <Button disabled={exporting !== null} aria-busy={exporting === 'rows'} onclick={() => takeCopy('rows')}>{copy.exportRows}</Button>
+{/snippet}
+{#snippet checkOne()}
+  <Button disabled={checking} aria-busy={checking} onclick={() => checkInput?.click()}>{words.checkGo}</Button>
+{/snippet}
+{#snippet shareOne()}
+  <Button href="/packs/share">{copy.shareSetup}</Button>
+{/snippet}
 
 <Section title={copy.yourData}>
   <!-- THE WHOLE CONTENT OF THIS SCREEN WAS TWO DEAD BUTTONS, on the page that carries the
@@ -101,27 +138,19 @@
   {#if !anOwner}
     <p class="hint">{levelWords.ownersOnly}</p>
   {/if}
-  <div class="row-actions">
-    {#if anOwner}
-    <Button
-      disabled={exporting !== null}
-      aria-busy={exporting === 'record'}
-      onclick={() => takeCopy('record')}
-    >{copy.export}</Button>
-    {/if}
-    <!-- A REAL CHECK, IN THIS BROWSER. It said what it would do, on a record as on the sample; it runs the
-         import's own `checkBrainl` now: the format line, every table against its manifest, then the signature. -->
-    <Button weight="bare" disabled={checking} aria-busy={checking} onclick={() => checkInput?.click()}>{copy.verifyFile}</Button>
-    <input
-      bind:this={checkInput}
-      class="file-pick"
-      type="file"
-      accept=".brainl"
-      tabindex="-1"
-      aria-hidden="true"
-      onchange={(e) => void checkFile(e.currentTarget.files?.[0])}
-    />
-  </div>
+  <StateRow icon="download" title={words.oneFile} line={copy.exportWhat} action={anOwner ? exportWhole : undefined} />
+  <!-- A REAL CHECK, IN THIS BROWSER. It said what it would do, on a record as on the sample; it runs the
+       import's own `checkBrainl` now: the format line, every table against its manifest, then the signature. -->
+  <StateRow icon="check" title={copy.verifyFile} line={words.checkLine} action={checkOne} />
+  <input
+    bind:this={checkInput}
+    class="file-pick"
+    type="file"
+    accept=".brainl"
+    tabindex="-1"
+    aria-hidden="true"
+    onchange={(e) => void checkFile(e.currentTarget.files?.[0])}
+  />
   {#if checkSaid}
     <p class="hint checked" data-intent={checkSaid.tone} role="status">
       <span class="glyph" role="img" aria-label={TONES[checkSaid.tone].label}>{TONES[checkSaid.tone].glyph}</span>
@@ -141,26 +170,13 @@
      half: your lists, pages, metrics and rules without a single row of your business in it. -->
 <Section title={copy.takeAway}>
   <p class="hint">{copy.takeAwayWhat}</p>
-  <div class="row-actions">
-    <!-- THE SAME LADDER AS THE WHOLE COPY ABOVE: a slice of the record is still the record.
-         `Share setup` stays, because it is a link to a screen that explains itself. -->
-    {#if anOwner}
-    <Button
-      weight="quiet"
-      disabled={exporting !== null}
-      aria-busy={exporting === 'pack'}
-      onclick={() => takeCopy('pack')}
-    >{copy.exportPack}</Button>
-    <Button
-      weight="bare"
-      disabled={exporting !== null}
-      aria-busy={exporting === 'rows'}
-      onclick={() => takeCopy('rows')}
-    >{copy.exportRows}</Button>
-    {/if}
-    <!-- THE ARRANGEMENT, NOT THE ROWS: a use case somebody else can install (`loop/research-spark.md` S14). -->
-    <Button weight="bare" href="/packs/share">{copy.shareSetup}</Button>
-  </div>
+  <!-- THE SAME LADDER AS THE WHOLE COPY ABOVE: a slice of the record is still the record, so a
+       colleague is shown both rows and handed neither button. `Share this setup` stays for everybody,
+       because it is a link to a screen that explains itself. -->
+  <StateRow icon="skill" title={words.wayTitle} line={words.wayLine} action={anOwner ? exportPack : undefined} />
+  <StateRow icon="rows" title={words.rowsTitle} line={words.rowsLine} action={anOwner ? exportRows : undefined} />
+  <!-- THE ARRANGEMENT, NOT THE ROWS: a use case somebody else can install (`loop/research-spark.md` S14). -->
+  <StateRow icon="packs" title={words.setupTitle} line={words.setupLine} action={shareOne} />
 </Section>
 <!--
   THE KEY THAT MAKES A YEAR-OLD BACKUP CHECKABLE, and this screen is where four documents put
@@ -186,7 +202,7 @@
   verifying come back together, the day there is a real key to stand beside them.
 -->
 <Section title={copy.theSignature}>
-  <p class="hint">{copy.theSignatureNotHere}</p>
+  <StateRow icon="key" title={words.notHereYet} line={copy.theSignatureNotHere} />
 </Section>
 
 <style>
@@ -209,14 +225,5 @@
     color: var(--dim);
     font-size: var(--t-sm);
     line-height: var(--lh-body);
-  }
-
-  /* WRAPPING, for the reason `/audit`'s segmented bar already wraps: two buttons that do not fit
-     are two buttons off the edge. At 320 "Export the rows only" ended at x=406 in a 320px screen. */
-  .row-actions {
-    flex-wrap: wrap;
-    display: flex;
-    gap: var(--sp-2);
-    margin-block-start: var(--sp-3);
   }
 </style>

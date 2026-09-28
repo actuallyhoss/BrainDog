@@ -59,52 +59,72 @@
   <p class="silenced">{copy.keymapSilenced}</p>
 {/if}
 
-{#each groups as [scope, bindings]}
-  <section class="scope">
-    <h3 class="scope-title"><Icon name={GLYPH[scope]} size="s" />{TITLE[scope]}</h3>
-    <dl class="keys">
+<!--
+  ONE TABLE, SO ONE EDGE (design.md §2, the keymap at 1440, MOD-25). Each scope was its own grid whose key column was
+  as wide as that scope's longest chord, so the words started at a different x in every group and the sheet read as
+  several tables set one under another. One table shares one key column across every scope, and the words start at
+  one x from the first row to the last. A scope's name is a header row over its rows (`scope="rowgroup"`), so a screen
+  reader still hears which place a key belongs to.
+-->
+<table class="keys" aria-label={copy.keymap}>
+  {#each groups as [scope, bindings]}
+    <tbody class="scope">
+      <tr>
+        <th class="scope-title" colspan="2" scope="rowgroup"><span class="scope-name"><Icon name={GLYPH[scope]} size="s" />{TITLE[scope]}</span></th>
+      </tr>
       {#each bindings as binding}
-        <dt class:off={silenced && binding.bare}><Kbd keys={binding.key} /></dt>
-        <dd>
-          {binding.label}{#if silenced && binding.bare}<span class="tag">{copy.keymapRowOff}</span>{/if}
-        </dd>
+        <tr>
+          <td class="key" class:off={silenced && binding.bare}><Kbd keys={binding.key} /></td>
+          <td class="does">
+            {binding.label}{#if silenced && binding.bare}<span class="tag">{copy.keymapRowOff}</span>{/if}
+          </td>
+        </tr>
       {/each}
-    </dl>
-  </section>
-{/each}
+    </tbody>
+  {/each}
+</table>
 
 <style>
-  .scope + .scope {
-    margin-block-start: var(--sp-5);
+  .keys {
+    inline-size: 100%;
+    border-collapse: collapse;
   }
 
+  /* The space between scopes is the header row's own, above its name, so the first scope starts at the table's top. */
   .scope-title {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    margin-block-end: var(--sp-2);
+    padding-block: var(--sp-5) var(--sp-2);
     color: var(--dim);
     font-family: var(--font-ui);
     font-size: var(--t-sm);
     font-weight: 600;
+    text-align: start;
   }
 
-  .keys {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    gap: var(--sp-2) var(--sp-3);
-    margin: 0;
-    align-items: baseline;
+  .scope:first-child .scope-title {
+    padding-block-start: 0;
   }
 
-  dt {
-    justify-self: start;
+  .scope-name {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
   }
 
-  dd {
-    margin: 0;
+  /* THE KEY COLUMN IS AS WIDE AS THE LONGEST CHORD IN THE WHOLE SHEET and no wider, so the words beside it start at one
+     x and take the rest. */
+  .key {
+    inline-size: 1%;
+    padding-block: var(--sp-1);
+    padding-inline-end: var(--sp-3);
+    white-space: nowrap;
+    vertical-align: baseline;
+  }
+
+  .does {
+    padding-block: var(--sp-1);
     color: var(--ink2);
     font-size: var(--t-sm);
+    vertical-align: baseline;
   }
 
   /* THE MARK IS NOT COLOUR ALONE. A silenced row is dimmed AND carries the word, because
@@ -116,7 +136,7 @@
     font-size: var(--t-sm);
   }
 
-  dt.off {
+  .key.off {
     opacity: 0.45;
   }
 

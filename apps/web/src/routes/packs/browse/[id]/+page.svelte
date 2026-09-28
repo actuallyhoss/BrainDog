@@ -64,7 +64,15 @@
   let states = $state.raw<PackState[] | null>(null);
   let recordRefused = $state<string | null>(null);
 
-  const listing = $derived(listingsOf({ kennel, counts }).find((l) => l.key === listingKey(kind, id)) ?? null);
+  /* AN ADDRESS WITH NO `?kind=` IS READ AS A USE CASE FIRST, for the links written before add-ons had pages, and then as
+     whatever else goes by that id: `/packs/browse/launch-desk` said "nothing here by that name" for an add-on the
+     catalogue lists (design.md §2.8). A kind that is said is kept to. */
+  const listing = $derived.by(() => {
+    const all = listingsOf({ kennel, counts });
+    const exact = all.find((l) => l.key === listingKey(kind, id));
+    if (exact || page.url.searchParams.has('kind')) return exact ?? null;
+    return all.find((l) => l.id === id) ?? null;
+  });
   const entry = $derived(listing ? entryOf(kennel, listing) : null);
   const u = $derived(listing?.kind === 'usecase' && listing.source === 'bundled' ? useCase(listing.id) : undefined);
   const latest = $derived(listing ? latestOf(listing) : null);
@@ -264,7 +272,9 @@
 
 <svelte:head><title>{titleOf(listing?.title ?? copy.browseTitle)}</title></svelte:head>
 
-<PageHead icon="packs" title={listing?.title ?? copy.browseTitle} />
+<!-- THE WAY BACK IS THE HEAD'S: a kicker at 1440 and the back link in the phone's bar, on the gutter like every detail
+     page's, where a bare button above the lead sat off it (design.md §2.8). -->
+<PageHead icon="packs" kicker={copy.browseTitle} back="/packs/browse" title={listing?.title ?? copy.browseTitle} />
 
 {#snippet act()}
   {#if filed !== null}
@@ -277,20 +287,26 @@
 {/snippet}
 
 <div class="page">
-  <Button weight="bare" href="/packs/browse"><Icon name="back" size="s" />{copy.browseAll}</Button>
-
   {#if !listing}
-    {#if looked}<Empty kind="no-results" title={words.missing} body={words.missingBody} />{/if}
+    {#if looked}
+      <Empty kind="no-results" title={words.missing} body={words.missingBody}>
+        {#snippet actions()}<Button href="/packs/browse">{copy.browseAll}</Button>{/snippet}
+      </Empty>
+    {/if}
   {:else}
     {#if recordRefused}<Empty kind="error" title={recordRefused} />{/if}
 
+    <!-- IT LEADS WITH WHAT IT DOES AND ITS ONE BUTTON (design.md DSN-17); who made it and whether that is vouched for
+         follow on one line, and its version, licence and signature are the Details section's. -->
     <section class="lead" aria-label={copy.useCaseFor}>
-      <p class="for">{words.kinds[listing.kind]}{#if listing.count !== null}{' · '}{words.installs(listing.count)}{/if}</p>
       <p class="summary">{listing.summary}</p>
-      <p class="meta"><Icon name={listing.source === 'bundled' || latest?.signature || latest?.reviewed ? 'check' : 'info'} size="s" />{publisherWords}</p>
-      {#if listing.source === 'kennel'}<p class="meta key"><Icon name={latest?.signature ? 'key' : 'info'} size="s" />{signedWords(latest?.signature)}</p>{/if}
       {#if said}<p class="trust" data-loud={said.loud ? '' : undefined} role={said.loud ? 'alert' : undefined}>{#if said.loud}<Icon name="alert" size="s" />{/if}{said.text}</p>{/if}
       <div class="act wide-only">{@render act()}</div>
+      <p class="meta">
+        <span>{words.kinds[listing.kind]}</span>
+        <span class="with-icon"><Icon name={listing.source === 'bundled' || latest?.signature || latest?.reviewed ? 'check' : 'info'} size="s" />{publisherWords}</span>
+        {#if listing.count !== null}<span class="num">{words.installs(listing.count)}</span>{/if}
+      </p>
       {#if refused}
         <p class="said" role="status">{refused.fix}{#if refused.code}<span class="code">{copy.refusalCode(refused.code)}</span>{/if}</p>
         <!-- A THEME PACK REFUSED AT INSTALL OFFERS "Fix and install" (GAP-3): the editor side, staging and the failing
@@ -312,6 +328,7 @@
       />
     {/if}
 
+    <!-- SECTIONS, NOT PANELS: a heading and what it heads, on the page's own ground, so the drawing is the one surface. -->
     <section class="panel drawing" aria-labelledby="d-pages">
       <h2 class="panel-h" id="d-pages">{words.pages}</h2>
       {#if u}
@@ -390,7 +407,7 @@
         <ol class="versions">
           {#each listing.versions as v (v.version)}
             <li data-yanked={v.yanked ? '' : undefined}>
-              <span class="v">{v.version}</span>
+              <span class="v num">{v.version}</span>
               <span class="quiet">{v.bump ? words.bump[v.bump] : words.first}{#if v.published_at}{' · '}{words.published(v.published_at)}{/if}</span>
               {#if v.notes}<span class="notes">{v.notes}</span>{/if}
               {#if v.yanked}<span class="quiet">{words.yanked(v.yanked.reason)}</span>{/if}
@@ -400,13 +417,18 @@
         </ol>
       </section>
 
-      <section class="panel" aria-labelledby="d-needs">
-        <h2 class="panel-h" id="d-needs">{words.requires}</h2>
+      <section class="panel" aria-labelledby="d-details">
+        <h2 class="panel-h" id="d-details">{words.details}</h2>
         <dl class="facts">
-          <dt>{words.addsModules}</dt>
-          <dd>{(reach ?? latest?.reach)?.modules.map(moduleTitle).join(', ') || words.requiresNothing}</dd>
+          {#if latest}<dt>{words.version}</dt><dd class="num">{latest.version}</dd>{/if}
           <dt>{words.licence}</dt>
           <dd>{listing.license}</dd>
+          {#if listing.source === 'kennel'}
+            <dt>{words.signature}</dt>
+            <dd class="with-icon"><Icon name={latest?.signature ? 'key' : 'info'} size="s" />{signedWords(latest?.signature)}</dd>
+          {/if}
+          <dt>{words.addsModules}</dt>
+          <dd>{(reach ?? latest?.reach)?.modules.map(moduleTitle).join(', ') || words.requiresNothing}</dd>
         </dl>
       </section>
     </div>
@@ -422,7 +444,7 @@
     align-items: flex-start;
     gap: var(--sp-4);
     padding: var(--sp-5) var(--gutter) var(--sp-9);
-    max-inline-size: 1100px;
+    max-inline-size: var(--page-max);
     min-inline-size: 0;
   }
 
@@ -438,30 +460,48 @@
     max-inline-size: 70ch;
   }
 
-  .for,
-  .meta,
   .quiet,
   .said {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 6px;
+    gap: var(--sp-2);
     margin: 0;
     color: var(--dim);
     font-size: var(--t-sm);
   }
 
+  /* META WRAPS AS WHOLE ITEMS, with space between them and no separator glyph to lead a wrapped line. */
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: var(--sp-4);
+    row-gap: var(--sp-1);
+    margin: 0;
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  .with-icon {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+  }
+
+  /* WHAT IT DOES, FIRST AND LARGEST: the page's lead sentence at the section-title size. */
   .summary {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-base);
-    line-height: 1.6;
+    font-size: var(--t-md);
+    line-height: var(--lh-body);
+    text-wrap: pretty;
   }
 
   .trust {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--sp-2);
     margin: 0;
     color: var(--ink2);
     font-size: var(--t-sm);
@@ -479,18 +519,21 @@
   }
 
   .act {
-    margin-block-start: var(--sp-2);
+    margin-block: var(--sp-2);
   }
 
   .drawing {
     inline-size: 100%;
+    margin-block-start: var(--sp-4);
   }
 
+  /* TWO COLUMNS OF SECTIONS FROM 640PX, one on a phone, with the section gap between them and no edge around any. */
   .grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--sp-4);
+    gap: var(--sp-6) var(--sp-7);
     inline-size: 100%;
+    margin-block-start: var(--sp-4);
   }
 
   .panel {
@@ -498,17 +541,14 @@
     flex-direction: column;
     gap: var(--sp-3);
     min-inline-size: 0;
-    padding: var(--sp-4);
-    border: 1px solid var(--line-soft);
-    border-radius: var(--r-md);
-    background: var(--bg);
   }
 
+  /* A SECTION TITLE, as `Section.svelte` draws one: the body face at the section size, 600, in ink. */
   .panel-h {
     font-family: var(--font-ui);
-    font-size: var(--t-sm);
+    font-size: var(--t-md);
     font-weight: 600;
-    color: var(--ink2);
+    color: var(--ink);
   }
 
   .facts {
@@ -523,7 +563,7 @@
 
   .facts dt {
     color: var(--dim);
-    font-weight: 600;
+    font-weight: 500;
   }
 
   .facts dd {
@@ -545,7 +585,7 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 6px;
+    gap: var(--sp-2);
     color: var(--ink2);
     font-size: var(--t-sm);
   }
@@ -568,7 +608,7 @@
   .versions li {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--sp-1);
   }
 
   .versions li[data-yanked] .v {
@@ -576,10 +616,11 @@
     color: var(--dim);
   }
 
+  /* A VERSION IS A FIGURE, in tabular figures of the body face and never the identifier face (design-brief §11.4). */
   .v {
     color: var(--ink);
-    font-family: var(--font-id);
     font-size: var(--t-sm);
+    font-weight: 500;
   }
 
   .notes {
@@ -599,7 +640,7 @@
 
     .facts {
       grid-template-columns: minmax(0, 1fr);
-      gap: 2px;
+      gap: var(--sp-1);
     }
 
     .facts dd {
@@ -611,13 +652,14 @@
     }
 
     /* THE BUTTON STICKS TO THE BOTTOM OF THE SCREEN, above the tab bar and the home indicator (`--tabbar`), for as long
-       as the page scrolls: it is last in the page so a sticky bottom holds it there, and settles under the last panel. */
+       as the page scrolls: it is last in the page so a sticky bottom holds it there, and settles under the last section.
+       Its bar is the button and a step of space each side, no taller than `--sticky`. */
     .narrow-only {
       position: sticky;
       inset-block-end: var(--tabbar, env(safe-area-inset-bottom));
       display: flex;
       inline-size: 100%;
-      padding-block: var(--sp-3);
+      padding-block: var(--sp-1);
       background: var(--bg);
       border-block-start: 1px solid var(--line-soft);
     }

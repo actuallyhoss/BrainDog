@@ -12,7 +12,8 @@
  * did they say", which is the only question anybody asks six months later.
  *
  * A REASON IS REQUIRED AND IS NEVER A DROPDOWN. `requires_reason` is on every options body and the
- * gate enforces it for every kind: a decision with no sentence is a decision nobody can revisit.
+ * gate enforces it for every kind: a decision with no sentence is a decision nobody can revisit. The one exception is
+ * a light question a rule or Slash opened, answered in one press (`oneAnswer`), and even that decision carries a sentence.
  *
  * AND THERE IS A THIRD VERB. `defer` is neither yes nor no — it is "not now, and here is when to ask
  * me again", and it writes no event because deferring is not a thing that happened to the record. A
@@ -28,7 +29,8 @@ import { point } from './metrics.ts';
 import { pairsReads, type PairsDecl } from './pairs.ts';
 import { ACROSS, ANY_LIST, touches, type Resolve } from './reach.ts';
 import { egressChanged } from './script.ts';
-import { slashMayWrite } from './slash.ts';
+import { SLASH, slashMayWrite } from './slash.ts';
+import { costOf } from './weigh.ts';
 import { askOf, retypedBody, retypeShapeFault } from './api/retype.ts';
 
 /** The three tables that are read like registers and are not registers. */
@@ -1631,6 +1633,31 @@ function heldTo(deps: GovernDeps, row: { id: string; body_kind: BodyKind; body: 
   return `This question was put to ${name ? name : 'one member'}, so only they or an owner answer it.`;
 }
 
+/** The decision's sentence when a light question is answered in one press and the chosen option says no reason of its own. */
+const ONE_PRESS_REASON = 'Answered in one press: a light question a rule or Slash asked, and answering it changes nothing else.';
+
+/**
+ * The sentence a light question is decided with when nobody wrote one, or `null` when this question owes a reason.
+ *
+ * LIGHT IS TWO FACTS AND NEITHER IS THE PROPOSER'S TO CLAIM. The band is computed from what accepting would do
+ * (`costOf`), and only `call`, a judgement with nothing attached, qualifies. The opener is the row's own `opened_by`:
+ * a rule (`rule:<id>`) or Slash, the two that ask many small questions on their own. A person's or an agent's question
+ * still asks why, because that is somebody asking somebody, and the sentence is the answer they are owed.
+ *
+ * THE SENTENCE IS THE CHOSEN OPTION'S OWN `because`, said to be the option's and not the decider's, so a decision cited
+ * later reads as what it was. An option id that is not on the question gets the plain sentence, and the check that
+ * follows refuses it by name.
+ */
+function oneAnswer(deps: GovernDeps, id: string, bodyKind: BodyKind, raw: string, option: string): string | null {
+  const body = parse(raw);
+  if (!body || costOf(bodyKind, body) !== 'call') return null;
+  const by = deps.sql.one<{ by: string }>('SELECT opened_by AS by FROM suggestion WHERE id = ?', id)?.by ?? '';
+  if (!by.startsWith('rule:') && by !== SLASH) return null;
+  const picked = ((body.options ?? []) as { id?: unknown; because?: unknown }[]).find((o) => o?.id === option);
+  const because = typeof picked?.because === 'string' ? picked.because.trim() : '';
+  return because === '' ? ONE_PRESS_REASON : `Answered in one press, for the option's own reason: ${because}`;
+}
+
 /**
  * The gate.
  *
@@ -1714,10 +1741,19 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
     return ok({ decision: null, suggestion: id, status: 'resolved', wrote: [] });
   }
 
-  const { option, reason } = verdict.decide ?? { option: '', reason: '' };
-  /* THE REASON IS NOT OPTIONAL. A decision with no sentence is a decision nobody can revisit, and
-     the whole point of writing it down is that somebody will want to. */
-  if (!reason?.trim()) return no<Decided>('REQUIRED_MISSING', 'A decision carries the reason for it.', { at: 'reason' });
+  const { option } = verdict.decide ?? { option: '' };
+  let reason = verdict.decide?.reason;
+  /* THE REASON IS NOT OPTIONAL, EXCEPT ON A LIGHT QUESTION. A decision with no sentence is a decision nobody can
+     revisit, and the whole point of writing it down is that somebody will want to. But a question a rule or Slash
+     opened whose band is `call` (`weigh.ts`) changes no row, declaration, access or money when it is answered: the
+     other button tomorrow undoes it. Asking a sentence for that teaches people to type "ok", which is the failure 20 §3
+     warns of, so it is answered in one press (decisions C25). Every other question still refuses without one, and the
+     decision still carries a sentence, because `decision.reason` is what renders wherever it is cited. */
+  if (!reason?.trim()) {
+    const light = oneAnswer(deps, id, row.body_kind, row.body, option);
+    if (light === null) return no<Decided>('REQUIRED_MISSING', 'A decision carries the reason for it.', { at: 'reason' });
+    reason = light;
+  }
   if (!option?.trim()) return no<Decided>('REQUIRED_MISSING', 'A decision names what was chosen.', { at: 'option' });
 
   const body = parse(row.body);

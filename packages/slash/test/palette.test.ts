@@ -135,10 +135,11 @@ test('an ask is one question and 400 bytes of it', async () => {
 
 test('tier a out of asks refuses before any model call', async () => {
   const { sql, slash, inference } = build();
+  /* `read`, NOT `propose`: only `read` and `pattern` meter an ask now (`call.ts`'s `asksUsed`). */
   for (let i = 0; i < 80; i++)
     sql.exec(
       `INSERT INTO slash_call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status)
-       VALUES (?, '2026-11-03T00:00:00.000Z', 'propose', 'a', 'glm-5.3-flash', 1, 1, 1, 1, 'ok')`,
+       VALUES (?, '2026-11-03T00:00:00.000Z', 'read', 'a', 'glm-5.3-flash', 1, 1, 1, 1, 'ok')`,
       `c${i}`,
     );
   const out = await slash.read('what is open', OWNER);

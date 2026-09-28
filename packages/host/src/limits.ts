@@ -137,6 +137,12 @@ export type RateLimitBinding = { limit(options: { key: string }): Promise<{ succ
  * AN ABSENT BINDING LIMITS NOTHING. Production binds both (`apps/worker/wrangler.jsonc`, OPS-4); `alpha` and a test's
  * `bundled()` bind neither, and answer exactly as they did before.
  *
+ * THE PRICE PAGE STATES THE MONTH, NOT THE MINUTE. `/pricing` shows each plan's monthly allowance (runs, requests,
+ * data fetched, script time and Slash credits), read from `apps/site/src/lib/plans.ts`, which `plans.test.ts` holds
+ * to the Directory's `ALLOWANCE`; past it an action waits for the first of next month. These per-minute budgets are
+ * no plan's allowance: they are the same on every plan, stop a caller in a loop, and a refusal from them says when to
+ * ask again, so a person reading the price page is promised nothing they limit.
+ *
  * SIXTY SECONDS TO WAIT, BECAUSE THE BINDING SAYS ONLY YES OR NO. Its answer carries no reset time, and sixty is the
  * `period` the binding is declared with: the longest the refusal can last, which is the honest bound to send.
  *

@@ -285,6 +285,29 @@ const DECLARED: Record<string, Version> = {
       "Spending and budgets move into Money, so `register.spending`, `register.budgets` and `page.spending` are gone, and `page.home-personal` is rebuilt to show what you have, bills this week, budget left, projects and goals -> b9d9129104f32581",
     ],
   },
+  'personal@2.1.0': {
+    holds: `
+      extends.register.people.role.adviser extends.register.people.role.family extends.register.people.role.friend
+      extends.register.people.role.landlord extends.register.people.role.tradesperson
+      metric.logged-by-goal metric.logged-this-week-by-goal metric.put-by-by-goal metric.saved-toward-goals
+      page.goals page.home-personal page.my-project
+      register.goal_log register.goals register.project_steps register.put_by register.savings_goals
+      setting.holds_obligations setting.holds_people setting.holds_things setting.label_goal_log setting.label_goals
+      setting.label_obligations setting.label_people__role__accountant setting.label_people__role__client
+      setting.label_people__role__collaborator setting.label_people__role__contractor setting.label_project_steps setting.label_put_by
+      setting.label_savings_goals setting.label_things setting.label_things__lane__building setting.label_things__lane__earning
+      setting.label_things__lane__parked setting.label_things__lane__retired setting.label_things__revenue setting.lk_10103af7
+      setting.lk_1d01726f setting.lk_303a3cce setting.lk_4f9bf906 setting.lk_666e92eb setting.lk_91a285a5 setting.lk_d66e361a
+      setting.lk_f625eca1 setting.one_obligations setting.one_things setting.shared_version setting.speaks setting.voice_home
+      setting.voice_lists setting.voice_needs_you setting.voice_nothing_needs_you setting.voice_right_now setting.voice_since_away
+      setting.voice_add_first setting.voice_fills_with setting.voice_inbox_clear setting.voice_no_questions
+      setting.voice_nothing_due setting.voice_nothing_now setting.voice_overdue setting.voice_record_empty
+    `,
+    declares: '3683b158aeed6965',
+    history: [
+      "Home, Decide, the Inbox and the add buttons now speak in your use case's own words: `setting.voice_add_first`, `setting.voice_fills_with`, `setting.voice_inbox_clear`, `setting.voice_no_questions`, `setting.voice_nothing_due`, `setting.voice_nothing_now`, `setting.voice_overdue` and `setting.voice_record_empty` -> 3683b158aeed6965",
+    ],
+  },
   'student@1.2.0': {
     holds: `
       page.home-student page.studies register.assignments register.courses register.study_sessions
@@ -321,6 +344,22 @@ const DECLARED: Record<string, Version> = {
     declares: 'cef74e3cf79aaa37',
     history: [
       "`page.home-student` is rebuilt, and `setting.voice_lists` now reads My lists in place of the word Student used before -> cef74e3cf79aaa37",
+    ],
+  },
+  'student@1.4.0': {
+    holds: `
+      page.home-student page.studies
+      register.assignments register.courses register.study_sessions
+      setting.label_assignments setting.label_courses setting.label_study_sessions setting.one_assignments setting.one_courses
+      setting.one_study_sessions setting.shared_version setting.speaks setting.voice_home setting.voice_lists setting.voice_needs_you
+      setting.voice_nothing_needs_you setting.voice_right_now setting.voice_since_away
+      setting.voice_add_first setting.voice_coming_up setting.voice_fills_with setting.voice_inbox_clear setting.voice_new_row
+      setting.voice_no_questions setting.voice_nothing_due setting.voice_nothing_now setting.voice_overdue setting.voice_pen_waits
+      setting.voice_record_empty
+    `,
+    declares: 'c0df0a7904145c86',
+    history: [
+      "Home, Decide, the Inbox and the add buttons now speak in your use case's own words: `setting.voice_add_first`, `setting.voice_coming_up`, `setting.voice_fills_with`, `setting.voice_inbox_clear`, `setting.voice_new_row`, `setting.voice_no_questions`, `setting.voice_nothing_due`, `setting.voice_nothing_now`, `setting.voice_overdue`, `setting.voice_pen_waits` and `setting.voice_record_empty` -> c0df0a7904145c86",
     ],
   },
   'founder@1.3.2': {
@@ -407,6 +446,23 @@ const DECLARED: Record<string, Version> = {
       "`page.home-founder` leads with What you have, by book or organisation, and the week's numbers; `page.dashboard` renames Datapoints to Numbers and lists to Lists; `page.organisation` lists its projects -> 62cf765a92427d27",
     ],
   },
+  'founder@1.8.0': {
+    holds: `
+      metric.datapoints-30d
+      page.dashboard page.home-founder page.organisation page.project
+      register.datapoints register.organisations
+      setting.shared_version setting.speaks setting.voice_home setting.voice_lists setting.voice_needs_you
+      setting.voice_nothing_needs_you setting.voice_right_now setting.voice_since_away
+      setting.voice_coming_up setting.voice_fills_with setting.voice_inbox_clear setting.voice_no_questions
+      setting.voice_nothing_now setting.voice_nothing_waiting setting.voice_overdue setting.voice_pen_waits
+      setting.voice_working_now
+    `,
+    declares: 'b78dfb33a2490526',
+    history: [
+      "`page.dashboard` and `page.project` open with one sentence said from their figures first and keep a rail; `Send numbers here` on `page.organisation` and `page.project` says `panel: reporting` -> 3755a69ec8c3ff98",
+      "Home, Decide, the Inbox and the add buttons now speak in your use case's own words: `setting.voice_working_now`, `setting.voice_coming_up`, `setting.voice_overdue`, `setting.voice_nothing_now`, `setting.voice_nothing_waiting`, `setting.voice_fills_with`, `setting.voice_no_questions`, `setting.voice_inbox_clear` and `setting.voice_pen_waits` -> b78dfb33a2490526",
+    ],
+  },
   'team@2.3.0': {
     holds: `
       page.agent-work page.cycles page.home-team page.project register.cycle_plan register.cycles
@@ -488,6 +544,25 @@ const DECLARED: Record<string, Version> = {
       "`register.cycle_days` and `setting.label_cycle_days` land so a cycle's length is a record's own choice and not always fourteen days -> a67b18591483c33e",
     ],
   },
+  'team@2.7.0': {
+    holds: `
+      page.agent-work page.cycles page.home-team page.project
+      register.cycle_days register.cycle_plan register.cycles
+      setting.holds_people setting.holds_tasks setting.label_cycle_days setting.label_cycle_plan setting.label_cycles
+      setting.label_people setting.label_people__role__collaborator setting.label_tasks setting.label_tasks__state__backlog
+      setting.label_tasks__state__doing setting.label_tasks__state__open setting.label_tasks__state__review setting.one_tasks
+      setting.shared_version setting.speaks setting.voice_home setting.voice_lists setting.voice_needs_you
+      setting.voice_nothing_needs_you setting.voice_right_now setting.voice_since_away
+      setting.voice_add_first setting.voice_coming_up setting.voice_fills_with setting.voice_inbox_clear
+      setting.voice_no_questions setting.voice_nothing_now setting.voice_nothing_waiting setting.voice_overdue
+      setting.voice_pen_waits setting.voice_working_now
+    `,
+    declares: 'aae35cd290866704',
+    history: [
+      "`page.project` takes Projects' rail and opening sentence -> 53410df0154d63a0",
+      "Home, Decide, the Inbox and the add buttons now speak in your use case's own words: `setting.voice_add_first`, `setting.voice_coming_up`, `setting.voice_fills_with`, `setting.voice_inbox_clear`, `setting.voice_no_questions`, `setting.voice_nothing_now`, `setting.voice_nothing_waiting`, `setting.voice_overdue`, `setting.voice_pen_waits` and `setting.voice_working_now` -> aae35cd290866704",
+    ],
+  },
   'guide@1.2.0': {
     holds: `
       metric.guide-choices-made metric.guide-choices-open metric.guide-idea-left metric.guide-idea-reached
@@ -536,6 +611,25 @@ const DECLARED: Record<string, Version> = {
       "`rule.guide_milestone_passed` and `rule.guide_milestone_open` land so a milestone whose day has come or gone is asked about rather than sitting silent -> 03af08efcd82cbc4",
     ],
   },
+  'guide@1.4.0': {
+    holds: `
+      metric.guide-choices-made metric.guide-choices-open metric.guide-idea-left metric.guide-idea-reached metric.guide-milestones
+      metric.guide-milestones-reached metric.guide-steps-agents metric.guide-steps-blocked metric.guide-steps-done
+      metric.guide-steps-done-7d metric.guide-steps-done-by-week metric.guide-steps-open
+      page.guide page.home-guide page.milestone
+      register.choices register.milestones register.resources register.steps
+      rule.guide_milestone_open rule.guide_milestone_passed
+      setting.label_choices setting.label_milestones setting.label_resources setting.label_steps setting.shared_version setting.speaks
+      setting.start_next_milestone setting.voice_home setting.voice_lists setting.voice_needs_you setting.voice_nothing_needs_you
+      setting.voice_right_now setting.voice_since_away
+      setting.voice_add_first setting.voice_coming_up setting.voice_fills_with setting.voice_new_row setting.voice_no_questions
+      setting.voice_nothing_due setting.voice_nothing_now setting.voice_overdue setting.voice_pen_waits setting.voice_record_empty
+    `,
+    declares: '4504c6606816acae',
+    history: [
+      "Home, Decide, the Inbox and the add buttons now speak in your use case's own words: `setting.voice_add_first`, `setting.voice_coming_up`, `setting.voice_fills_with`, `setting.voice_new_row`, `setting.voice_no_questions`, `setting.voice_nothing_due`, `setting.voice_nothing_now`, `setting.voice_overdue`, `setting.voice_pen_waits` and `setting.voice_record_empty` -> 4504c6606816acae",
+    ],
+  },
   /** SMALL BUSINESS NOW CARRIES A PACK: it had none before, so this is its first entry and not a reset. */
   'business@1.2.0': {
     holds: `
@@ -545,6 +639,17 @@ const DECLARED: Record<string, Version> = {
     declares: 'f897dcb6d0161fe1',
     history: [
       "Small business now carries a pack: `page.home-business` shows what you have, what is due this week and what needs your call -> f897dcb6d0161fe1",
+    ],
+  },
+  'business@1.3.0': {
+    holds: `
+      page.home-business
+      setting.shared_version setting.speaks
+      setting.voice_coming_up setting.voice_fills_with setting.voice_nothing_due
+    `,
+    declares: '8aff433fb66740ab',
+    history: [
+      "Home now speaks in your use case's own words: `setting.voice_coming_up`, `setting.voice_fills_with` and `setting.voice_nothing_due` -> 8aff433fb66740ab",
     ],
   },
 };

@@ -120,6 +120,12 @@
     box-shadow: inset 0 2px 0 0 var(--ink);
   }
 
+  /* MORE IS INK WHILE ITS SHEET IS UP, so the tab that raised it says so, without the bar a place wears: the sheet is
+     over the screen, and the screen under it is still the place marked. */
+  .tab[aria-expanded='true'] {
+    color: var(--ink);
+  }
+
   .badge-slot {
     position: relative;
   }

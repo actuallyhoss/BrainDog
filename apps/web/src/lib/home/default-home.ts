@@ -16,9 +16,27 @@ import type { LiveBlock } from '../record/page-live.ts';
 import { words } from './words.ts';
 
 /** The headings a use case's voice may say its own way, with the house line each falls back to. */
-export type HomeVoice = { rightNow: string; needsYou: string; sinceAway: string };
+export type HomeVoice = {
+  rightNow: string;
+  needsYou: string;
+  sinceAway: string;
+  workingNow: string;
+  comingUp: string;
+  overdue: string;
+  nothingWaiting: string;
+  nothingDue: string;
+};
 
-const HOUSE: HomeVoice = { rightNow: words.rightNow, needsYou: words.needsYou, sinceAway: words.sinceAway };
+const HOUSE: HomeVoice = {
+  rightNow: words.rightNow,
+  needsYou: words.needsYou,
+  sinceAway: words.sinceAway,
+  workingNow: words.workingNow,
+  comingUp: words.comingUp,
+  overdue: words.overdue,
+  nothingWaiting: words.nothingWaiting,
+  nothingDue: words.nothingDue,
+};
 
 /** How far ahead "Coming up" looks, in days (modules MOD-8). */
 export const COMING_UP_DAYS = 14;
@@ -38,11 +56,11 @@ export function defaultHome(voice: HomeVoice = HOUSE): { page: string; title: st
       /* THE FIGURES A PACK ASKED A PLACE ON HOME FOR (`home: 1..9`), at most four; hidden below when none did. */
       { kind: 'stat', heading: voice.rightNow, source: 'figures.home' },
       /* ANSWERED WHERE THEY ARE SHOWN (MOD-9): the page's writes are on, so a queue draws `QueueAnswer`. */
-      { kind: 'queue', heading: voice.needsYou, source: 'governance.open', limit: NEEDS_YOU_LIMIT, empty: words.nothingWaiting },
+      { kind: 'queue', heading: voice.needsYou, source: 'governance.open', limit: NEEDS_YOU_LIMIT, empty: voice.nothingWaiting },
       /* THE RUNS STILL WORKING, one line each with the agent's face; hidden below when none is. */
       {
         kind: 'table',
-        heading: words.workingNow,
+        heading: voice.workingNow,
         source: 'sessions.live',
         where: 'state is active',
         columns: [
@@ -55,12 +73,12 @@ export function defaultHome(voice: HomeVoice = HOUSE): { page: string; title: st
       /* WHAT FALLS DUE, overdue first and then by day, as the record orders it; Home splits the overdue rows out. */
       {
         kind: 'timeline',
-        heading: words.comingUp,
+        heading: voice.comingUp,
         source: 'deadlines',
         horizon: COMING_UP_DAYS,
         columns: [{ field: 'day' }, { field: 'title' }, { field: 'amount', sign: { field: 'direction', minus: 'out' } }],
         limit: 12,
-        empty: words.nothingDue,
+        empty: voice.nothingDue,
       },
       /* WHAT CHANGED SINCE THE READER'S MARK, which Home stamps when they leave, never when they open it. */
       { kind: 'feed', heading: voice.sinceAway, source: 'activity', since: 'seen', first: 8, empty: words.nothingNew },
@@ -109,7 +127,7 @@ function pick(b: LiveBlock, at: readonly number[], heading?: string): LiveBlock 
  * become a block of their own, headed Overdue, drawn just before the rest: a late row is not one more line in a dated
  * list. A block with no late rows is drawn as the record answered it.
  */
-export function homeBlocks(blocks: readonly LiveBlock[], now: number): LiveBlock[] {
+export function homeBlocks(blocks: readonly LiveBlock[], now: number, voice: HomeVoice = HOUSE): LiveBlock[] {
   const today = dayOf(now);
   const out: LiveBlock[] = [];
   for (const b of blocks) {
@@ -127,7 +145,7 @@ export function homeBlocks(blocks: readonly LiveBlock[], now: number): LiveBlock
         (typeof day === 'string' && day.slice(0, 10) < today ? late : rest).push(n);
       });
       if (late.length > 0) {
-        out.push(pick(b, late, words.overdue));
+        out.push(pick(b, late, voice.overdue));
         if (rest.length > 0) out.push(pick(b, rest));
         continue;
       }

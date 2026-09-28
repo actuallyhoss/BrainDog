@@ -108,45 +108,61 @@ export const home = {
     },
 
     /**
-     * THE BLOCKS, DRAWN AS A PAGE. Five of the kinds a page is made of, each over rows the Personal and
-     * Team records really have: the Lisbon goal (GBP 420.00 of 900.00), the week's three bills, the
-     * team's tickets by state, and a thirty-day cash figure worked from the three accounts and every
-     * bill and the pay day due inside a month (3,474.16 less 1,157.49 plus 2,450.00).
+     * THE BLOCKS, DRAWN AS A PAGE BY THE PRODUCT'S OWN RENDERER. `page.src` is dialect text (docs/05 §2),
+     * drawn by `lib/app/Page.svelte` through `braindog-render`, so the band shows what a record's page
+     * with these rows draws rather than a picture of one.
+     *
+     * EVERY FIGURE AGREES WITH THE PERSONAL AND TEAM EXAMPLES in the window above (`lib/examples/`),
+     * dated `DRAWN_ON`, Monday 28 September 2026. The Personal Home leaves GBP 1,312.40 after the
+     * week's GBP 878.99 of bills, so its accounts hold GBP 2,191.39; less the GBP 1,148.99 of bills
+     * due inside thirty days and plus the GBP 2,450.00 pay day, that is GBP 3,492.40. The Lisbon goal,
+     * the three bills due this week and their days are the Personal example's, September is the month
+     * in progress, and the tickets are the Team example's board.
      */
     pages: {
       title: 'Make the pages you actually check.',
+      /* The block kinds are `KINDS` in `packages/render/src/kinds.ts`; moving and asking for them are
+         docs/06 and docs/29. */
       lead:
         'Put figures, charts, boards, calendars and tables on a page, all reading from your lists. ' +
         'Drag them around yourself, or tell Slash what you want to see.',
-      cash: { title: 'Cash in 30 days', value: 'GBP 4,766.67', note: 'after bills and pay day' },
-      goal: { title: 'Trip to Lisbon', value: 'GBP 420.00', of: 'of GBP 900.00', pct: 47 },
-      spend: {
-        title: 'Spending by month',
-        bars: [
-          ['Jun', 612],
-          ['Jul', 540],
-          ['Aug', 701],
-          ['Sep', 588],
-          ['Oct', 455],
-        ] as [string, number][],
-      },
-      week: {
-        title: 'Due this week',
-        days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-        items: [
-          { day: 1, what: 'Streaming subscription', amount: 'GBP 10.99' },
-          { day: 2, what: 'Phone contract', amount: 'GBP 18.00' },
-          { day: 5, what: 'Rent', amount: 'GBP 850.00' },
+      page: {
+        src: `~~~stat
+Cash in 30 days | GBP 3,492.40 | after bills and pay day
+Trip to Lisbon | GBP 420.00 | of GBP 900.00 put by
+~~~
+
+~~~series | Spending by month
+Month | in: Spent | state
+May | GBP 612.00
+June | GBP 540.00
+July | GBP 701.00
+August | GBP 588.00
+September | GBP 455.00 | partial
+~~~
+
+~~~comparison | Due this week
+What | Amount | Due
+Streaming subscription | GBP 10.99 | 30 Sep
+Phone contract | GBP 18.00 | 1 Oct
+Rent | GBP 850.00 | 4 Oct
+~~~
+
+~~~board | Tickets
+To do | Search filters | Omar
+To do | Export to CSV | Lena
+Doing | Onboarding emails | Maya
+Review | Invite links | Lena
+~~~`,
+        /* Figures beside the chart, then the table beside the board, on the page's twelve columns. */
+        layout: [
+          { at: 0, cols: 4 },
+          { at: 1, cols: 8 },
+          { at: 2, cols: 6 },
+          { at: 3, cols: 6 },
         ],
       },
-      board: {
-        title: 'Tickets',
-        columns: [
-          { name: 'To do', cards: ['Agree what goes in the next cycle'] },
-          { name: 'In progress', cards: ['Write the release notes'] },
-          { name: 'In review', cards: ['Fix the sign-in link that expires too soon'] },
-        ],
-      },
+      /* The first-party packs are `FIRST_PARTY` in `packages/seed/src/packs/first-party.ts`. */
       packsLine: 'Or start from a pack: Money, Work, Studies, People, Stripe, Mercury, Holdings and more.',
     },
 

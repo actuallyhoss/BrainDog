@@ -29,16 +29,6 @@ export const palette = {
   searchWhere: 'Every list, every decision, and every page, by the words in them.',
   allMatches: (n: number, q: string) => `All ${n.toLocaleString('en')} matches for “${q}”`,
   showingOf: (shown: number, total: number) => (shown >= total ? `${shown}` : `${shown} of ${total}`),
-  /**
-   * ONE SCREEN, ONE NOUN FOR ITS OWN SUBJECT, AND IT USED TO HAVE TWO.
-   *
-   * `/jobs/<id>` drew the kicker `Job` and the tab title `Job` over a refusal reading "There is no
-   * run called j_9K4A" and a button reading "Stop the run", and the register it is reached from is
-   * called Agent runs with `one: 'run'`. A reader who followed "Watch the run" arrived somewhere
-   * headed Job. `job` stays in the address, in the field on a session row and in the type, because
-   * those are handles; the two words on the screen are not.
-   */
-  run: 'Run',
   /* `Stopped.` IS THE ASSISTANT'S, NOT THE TRANSPORT'S, whatever its position in this block says.
      `23 §7` Cancel: Escape stops the answer instantly and the typed text survives, and the toast is
      this word. So it is absent for the same reason `askBrainDog` is, which `23 §3.1` settles: with no
@@ -136,8 +126,9 @@ export const palette = {
     /* AND IT SAYS WHAT TO DO ABOUT IT. The clause was a description of the idea, standing between the
        title and the figures; what a reader meeting a page needs is that it is theirs to change. Where
        its figures come from is how the software works, and it was cut for that. It names no control,
-       because Edit layout is absent on a phone. */
-    page: 'yours to change: add, move or take away anything on it',
+       because Edit layout is absent on a phone. AND "YOURS TO CHANGE" WAS STILL A SENTENCE ABOUT THE SCREEN, not
+       about the page: what a page is to its reader is what it gathers (MOD-24). */
+    page: 'one screen that gathers what you keep an eye on: figures, tables and notes',
     block: 'one piece of a page: a table, a figure, a note',
   } as const,
   /* Phase 1's last reads: what a question found by `/search` on a record says beside its title. */

@@ -129,9 +129,9 @@
     border-radius: 8px;
     color: var(--accent-ink);
     font-family: var(--font-display);
-    font-size: 15px;
+    font-size: var(--t-md);
     font-weight: 600;
-    box-shadow: inset 0 -2px 0 rgb(0 0 0 / 0.18);
+    box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--ink) 18%, transparent);
   }
 
   .prompt {
@@ -208,7 +208,7 @@
     border-radius: 50%;
     color: var(--accent-text);
     font-family: var(--font-display);
-    font-size: 12px;
+    font-size: var(--t-xs);
     font-weight: 600;
   }
 

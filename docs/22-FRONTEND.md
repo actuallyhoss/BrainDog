@@ -76,7 +76,7 @@ kind.** 100 kinds is 22.2 KB in one chunk; splitting adds a request per block an
 | Stack | Verdict |
 |---|---|
 | **Svelte 5 + SvelteKit 2** | **Recommended.** Wins on the specific thing: `render()` from `svelte/server` is a **pure function** `(Component, props) → {head, body}` — no framework server, no request context, no adapter. The identical renderer runs in a Worker, in Node, and in Vitest, which is exactly what the nine-port self-host constraint demands ([31-STACK](31-STACK.md) §5). Scoped `<style>` with `css: 'external'` gives one stylesheet and a linter that can attribute every declaration to a file |
-| Server-rendered HTML + htmx/Alpine | **Rejected.** The 16 kinds have *local* interactive state — sort, filter, expand, row focus, inline edit. htmx returns HTML fragments, so **every sort of a 500-row table is a network round trip.** Measured: client sort of 5,000 rows is **1.9 ms**; server-rendering the replacement is **9.05 ms CPU and 72.4 KB gzip.** It makes the cheap thing expensive. Also htmx 4.0.0 was tagged three days ago and sits on `next` while `latest` is 2.0.10 — adopting a foundation mid-rewrite is a bad solo trade. And Alpine has **no server renderer**, so declared pages could not SSR |
+| Server-rendered HTML + htmx/Alpine | **Rejected.** The block kinds have *local* interactive state — sort, filter, expand, row focus, inline edit. htmx returns HTML fragments, so **every sort of a 500-row table is a network round trip.** Measured: client sort of 5,000 rows is **1.9 ms**; server-rendering the replacement is **9.05 ms CPU and 72.4 KB gzip.** It makes the cheap thing expensive. Also htmx 4.0.0 was tagged three days ago and sits on `next` while `latest` is 2.0.10 — adopting a foundation mid-rewrite is a bad solo trade. And Alpine has **no server renderer**, so declared pages could not SSR |
 | **SolidStart** | **Strongest runner-up, rejected on three practical grounds.** 3.6× smaller and genuinely the best fit for a 5,000-row grid. But it shipped 2.0.1 → 2.0.4 in six days; it **requires a Babel pass** (esbuild alone silently produces wrong output); and it has no scoped-CSS story equivalent to Svelte's, so "no component writes a colour" gets harder to enforce per file |
 | React 19 | **Rejected.** 50.9 KB brotli for zero functional benefit. Its ecosystem advantage evaporates because §4 concludes you should not use a table library, and CodeMirror is framework-agnostic |
 | Astro islands | **Rejected specifically on shape.** Every page is dynamic and per-customer, so nothing prerenders — and **each server island is its own HTTP request** with props capped at 2,048 bytes before degrading to an uncacheable POST. The literal opposite of "6 blocks must not be 6 round trips" |
@@ -190,7 +190,7 @@ type:
 
 | | |
 |---|---|
-| **The primitive set is the real API surface** you version and document | 8 primitives is reviewable; 16 kinds plus unbounded third-party kinds is not |
+| **The primitive set is the real API surface** you version and document | 8 primitives is reviewable; the kinds in render's `TABLE` plus unbounded third-party kinds is not |
 | `requires: { primitives: 1 }` in the pack manifest — an integer compared against `PRIMITIVES_VERSION` ([31-STACK](31-STACK.md) §6), which is `1` at stage 0; the record refuses when its own is lower (`PRIMITIVES_OUT_OF_RANGE`) | lets the **server refuse the install**, so the failure lands in the agent's response at install time, not on the customer's screen at 7am |
 | Self-host parity is free | no code shipped means no per-customer build |
 

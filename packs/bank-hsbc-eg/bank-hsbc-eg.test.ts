@@ -162,10 +162,11 @@ const text = (k: Kernel, body: string, sha256: string): Arrived => said<Arrived>
    write money-core 3.0.0's `balances`; the balance a `From HSBC:` line prints lands in 3.0.0's `balance_after`; and each
    merchant name loses its acquirer's prefix (`strip`). So the floor moves to 3.0.0, the first Money with both lists.
    1.3.1 IS KEPT BESIDE THIS FILE as `bank-hsbc-eg-1.3.1.json`, byte for byte as it shipped, because the tests that drive a
-   record on money-core 1.8.0 taking the bank's wordings need the last version that installs there. */
-test('THE FILE IS bank-hsbc-eg 1.4.0, on money-core 3.0.0 or later before 4.0.0, with the fifteen', () => {
+   record on money-core 1.8.0 taking the bank's wordings need the last version that installs there.
+   1.5.0 ADDS A TITLE AND A `changes` LINE and nothing a record reads, so every pattern here is 1.4.0's. */
+test('THE FILE IS bank-hsbc-eg 1.5.0, on money-core 3.0.0 or later before 4.0.0, with the fifteen', () => {
   const doc = file();
-  assert.deepEqual([doc.pack, doc.version], ['bank-hsbc-eg', '1.4.0']);
+  assert.deepEqual([doc.pack, doc.version], ['bank-hsbc-eg', '1.5.0']);
   const frozen = JSON.parse(readFileSync(new URL('./bank-hsbc-eg-1.3.1.json', import.meta.url), 'utf8')) as { version: string; requires: { packs: unknown } };
   assert.deepEqual([frozen.version, frozen.requires.packs], ['1.3.1', { 'money-core': '>=1.8.0 <4.0.0' }]);
   assert.deepEqual((doc.requires as { packs: unknown }).packs, { 'money-core': '>=3.0.0 <4.0.0' });
@@ -189,7 +190,7 @@ test('INSTALLED FROM THE FILE: fifteen patterns, nothing refused, and the same f
   assert.deepEqual(diff.conflicts, []);
   assert.deepEqual(diff.adds.map((a) => a.id).sort(), FIFTEEN);
   await put(api, file());
-  assert.equal(api.kernel.packs().find((p) => p.id === 'bank-hsbc-eg')?.version, '1.4.0');
+  assert.equal(api.kernel.packs().find((p) => p.id === 'bank-hsbc-eg')?.version, '1.5.0');
   const opened = said<{ pack: { manifest: { pack: string } } }>(await readPackFile(readFileSync(PACK_FILE, 'utf8')));
   assert.equal(opened.pack.manifest.pack, 'bank-hsbc-eg');
   sql.close();

@@ -1,8 +1,9 @@
 {
   "pack": "roadmap",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "title": "Roadmap",
   "summary": "Your dated tasks on one time axis: work with an effort as a window, a due day as a line, and either dragged to a new date.",
+  "changes": "Nothing a person sees changed. Each version says what it changed in a line like this one.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {

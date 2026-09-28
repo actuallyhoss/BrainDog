@@ -62,6 +62,7 @@ test('THE ROUTE TABLE IS THE CONTRACT, pinned row by row', () => {
       'GET /auth/signup/name worker',
       'POST /auth/claim/mint worker',
       'POST /auth/provision worker',
+      'POST /auth/suspend worker',
       'POST /auth/device both',
       'POST /auth/device/token both',
       'POST /auth/invite both',
@@ -73,7 +74,7 @@ test('every flow has one route, named by the rule, and only reads are GETs', () 
   const flows: AuthFlow[] = [
     'methods', 'session', 'key.exchange', 'passkey.register.options', 'passkey.register', 'passkey.assert.options',
     'passkey.assert', 'magic.start', 'magic.redeem', 'passkeys', 'passkey.remove', 'logout', 'switch', 'claim.mint',
-    'sessions', 'logout.all',
+    'sessions', 'logout.all', 'suspend',
   ];
   for (const flow of flows) {
     const rows = AUTH_ROUTES.filter((r) => r.flow === flow);

@@ -1,0 +1,21 @@
+{
+  "rows": [
+    {
+      "list": "items",
+      "fields": {
+        "name": "Check the test runs"
+      }
+    }
+  ],
+  "expect": [
+    {
+      "list": "items",
+      "count": 3
+    },
+    {
+      "row": 1,
+      "field": "state",
+      "is": "open"
+    }
+  ]
+}

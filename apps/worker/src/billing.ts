@@ -51,8 +51,8 @@ import {
  * The plans this Worker sells, each with the words a person reads and the setting that holds its Stripe price.
  *
  * THE WORDS ARE THE SITE'S, SAID AGAIN HERE BECAUSE AN APP CANNOT IMPORT ANOTHER: `apps/site/src/lib/plans.ts` is where
- * every price is chosen ("$12" and "$29", "a month, per record"), and SIT-9's test of that file is the one to hold these
- * two strings to it (`loop/finish/contracts.md` §8.4); until it lands, nothing does. What a person is charged is the
+ * every price is chosen ("$12" and "$29", "a month, per record"), and `apps/site/src/lib/plans.test.ts` holds these
+ * names and prices to it (`loop/finish/contracts.md` C8). What a person is charged is the
  * Stripe price the setting names, so a change of price is made in Stripe, in that file, and here, together.
  *
  * `directory` IS THE PLAN THE DIRECTORY METERS THE RECORD UNDER (`PLANS` and `ALLOWANCE` in

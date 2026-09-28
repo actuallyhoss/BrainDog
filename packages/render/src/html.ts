@@ -1343,11 +1343,15 @@ function heat(b: Block, o: RenderOptions): string {
       }></span>`;
     })
     .join('');
-  const table = numbersFold(
-    'heat',
-    [HEAT_DAY, HEAT_VALUE],
-    heatLines(plan).map((l) => [l.day, l.count]),
-  );
+  /* A FOLD, NOT A TABLE STANDING OPEN, since a day's count was only in `title`, which a finger cannot hover
+     (`pages.md` §2.5 rank 11). `lines-numbers` and `lines-toggle` are the classes the `lines` block's own fold
+     already carries and `packages/skin/blocks-charts.css` already styles, reused rather than repeated under a
+     `heat-` name; the table inside keeps `heat-table`, its own. */
+  const table = `<details class="lines-numbers"><summary class="lines-toggle">${LINES_NUMBERS}</summary><table class="heat-table"><thead><tr>${[HEAT_DAY, HEAT_VALUE]
+    .map((h) => `<th scope="col">${escape(h)}</th>`)
+    .join('')}</tr></thead><tbody>${heatLines(plan)
+    .map((l) => `<tr><th scope="row">${escape(l.day)}</th><td class="num">${escape(l.count)}</td></tr>`)
+    .join('')}</tbody></table></details>`;
   return `<div class="heat" style="--weeks:${plan.weeks}"><div class="heat-grid" role="img" aria-label="${escape(plan.name)}">${cells}</div>${table}${skipped}${outside}</div>`;
 }
 

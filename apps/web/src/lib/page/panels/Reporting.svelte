@@ -1,7 +1,7 @@
 <!--
   Send numbers here: a key a project reports its numbers with, and the one line that uses it.
 
-  UNDER AN ORGANISATION'S "Send numbers here" AND A PROJECT'S "Runs on". The key is bound to the row the page is about
+  UNDER AN ORGANISATION'S OR A PROJECT'S "Send numbers here". The key is bound to the row the page is about
   (`lib/record/reporting.ts`), made by the owner and shown once, then listed by name with when it was last used and a
   Revoke. A record with no list of readings draws nothing here at all, and a reader who cannot make keys still sees
   the line, with the record's own sentence about why there is no button.
@@ -12,8 +12,8 @@
   THE KEYS ARE READ AGAIN when the reader comes back to the tab and every half minute while it is in view, so a key
   the project has just used stops saying it never was.
 
-  A HOST PANEL (`panel-of.ts`): drawn under a section that declares `panel: reporting` or `panel: actions`, or under
-  either old heading, by the page reader's `BlockSlot.svelte` only, so nothing here reaches the entry chunk.
+  A HOST PANEL (`panel-of.ts`): drawn under a section that declares `panel: reporting`, by the page reader's
+  `BlockSlot.svelte` only, so nothing here reaches the entry chunk.
 -->
 <script lang="ts">
   import { untrack } from 'svelte';

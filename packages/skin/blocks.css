@@ -1,0 +1,3395 @@
+/**
+ * The host's half of the markup contract.
+ *
+ * `braindog-render/svelte` ships no CSS. It emits a `<figure>` per block carrying its kind, its
+ * primitive and its tone, and a `<span>` per cell named for the cell it is. Everything below draws
+ * against that and nothing else, which is what lets a pack invent a kind after this file shipped.
+ *
+ * THE ONE RULE OF THIS FILE: no colour is written here. Every value is a semantic role a theme maps
+ * (13 §2.1), and the four intents reach the DOM only through the one mapping block below.
+ *
+ * The motif, stated once so it stays consistent: CONTENT RISES, CHROME AND CONTROLS SINK. A block
+ * steps up the surface ladder; an id chip, a field and a focus band are cut into it. Depth is a
+ * luminance ladder and never a blur — translucency behind a column of small tabular digits is a
+ * measurable legibility cost with no information gain, and it puts every figure's contrast at the
+ * mercy of whatever scrolls under it (13 §2.1).
+ *
+ * A KIND REGISTERED IN `lib/page/kinds/` IS NOT STYLED HERE. It brings `kinds/<kind>.css`, loaded with the screens
+ * that draw blocks (`kinds/styles.ts`), so a new kind adds no rule to the sheet every screen waits on. The kinds drawn
+ * before the registry keep their rules below.
+ */
+
+@layer components {
+  /* ── bidirectional text ───────────────────────────────────────────────────
+     Every cell in the block system is its own bidi paragraph.
+
+     A cell holds one value, and Unicode resolves the direction of the NEUTRAL characters in it —
+     spaces, the `—` in an invoice title, a trailing full stop, brackets — from the paragraph
+     around them. A cell that inherits the page's paragraph therefore renders an Arabic party name
+     with its punctuation on the wrong end, in an app whose UI never left English. The text is not
+     merely aligned oddly. It is in the wrong ORDER, and the reader cannot tell that we did it
+     rather than whoever typed it.
+
+     `plaintext` says: take this element's paragraph direction from its own first strong character.
+     "Invoice 2026-041" starts with a Latin I and reads left to right; "فاتورة 2026" starts with an
+     Arabic letter and reads right to left; both then place their own neutrals correctly, side by
+     side in one column, with no locale setting anywhere.
+
+     IT IS ON EVERY CELL, not just the prose ones, and that is deliberate. A cell this file's own
+     code built — "GBP 4,800.00", "27 Jul 2026" — leads with a strong Latin character and resolves
+     exactly as it does today, so the rule cannot change a machine-formatted value. One that is all
+     digits and neutrals has no strong character at all and falls back to the element's `direction`,
+     which is the UI's. The rule only ever fires where it is needed.
+
+     It is `unicode-bidi` and not `dir="auto"` because these cells arrive as a pipe-delimited
+     dialect string: there is no per-cell attribute to hang metadata on without versioning the
+     dialect, and this is a rendering concern rather than a data one. The two are otherwise
+     equivalent here — CSS Writing Modes resolves `text-align: start` against the PARAGRAPH
+     direction under `plaintext`, so this flips a right-to-left cell's alignment exactly as the
+     attribute would. Measured, not assumed: an Arabic title in this grid sits flush right and
+     truncates on its left.
+
+     THAT FLIP IS KEPT, and it is the one judgement call in this rule. A grid earns its keep from a
+     stable column edge, and mixing alignments inside one column costs some of that. But a cell
+     reads from its own start or it does not read, and the ellipsis has to land where the text ran
+     out — flush-left Arabic with the ellipsis on the right is a sentence trimmed from the front.
+     Every mature bilingual product resolves this the same way, and so does this one. */
+
+  .cell-label,
+  .cell-figure,
+  .cell-note,
+  .card-title,
+  .card-detail,
+  .item-title,
+  .item-detail,
+  .item-meta,
+  .item-state,
+  .prop-label,
+  .prop-value,
+  .prop-note,
+  .sparkline-label,
+  .sparkline-figure,
+  .split-label,
+  .split-value,
+  .split-note,
+  .progress-label,
+  .progress-note,
+  .bridge-label,
+  .bridge-value,
+  .bridge-note,
+  .quote-text,
+  .quote-by,
+  .row-label,
+  .row-value,
+  .row-note,
+  .pill-word,
+  .pill-figure,
+  .measure,
+  /* A `ul` is a block container, so `plaintext` on it resolves nothing — each `li` is its own
+     bidi paragraph and has to say so itself. */
+  .prose-list > li,
+  /* A board's column heading is a GROUP KEY: the value the rows were grouped by, which is a party
+     name or a project as often as it is a state. It is data, not a heading we wrote. */
+  .board-head,
+  .td,
+  .th {
+    unicode-bidi: plaintext;
+  }
+
+  /* ── the intent map ──────────────────────────────────────────────────────
+     The ONLY place an intent becomes a colour. A component cannot render `warn` without going
+     through here, and the glyph is emitted by the renderer, not by a call site (13 §2.3). */
+
+  [data-intent='good'] {
+    --tone: var(--earn);
+    --tone-fill: var(--earn-fill);
+  }
+  [data-intent='warn'] {
+    --tone: var(--warn);
+    --tone-fill: var(--warn-fill);
+  }
+  [data-intent='bad'] {
+    --tone: var(--danger);
+    --tone-fill: var(--danger-fill);
+  }
+  [data-intent='info'] {
+    --tone: var(--info);
+    --tone-fill: var(--info-fill);
+  }
+
+  /* AN INTENT ON A ROW OR A FIGURE IS A DOT, NOT A SYMBOL (DESIGN-BRIEF 4.1). The renderer still emits
+     the glyph with its name for a screen reader; what is drawn is one 6px mark in the intent's fill,
+     and the word beside it (a date, a state) carries the meaning in text. */
+  .glyph {
+    display: inline-block;
+    flex: none;
+    inline-size: var(--dot);
+    block-size: var(--dot);
+    border-radius: var(--r-pill);
+    background: var(--tone-fill, var(--faint));
+    color: transparent;
+    line-height: var(--dot);
+    overflow: hidden;
+    text-indent: 100%;
+    white-space: nowrap;
+    vertical-align: middle;
+  }
+
+  /* ── the block frame ────────────────────────────────────────────────────
+     Width is a property of the KIND, not of the page, and this is the third time that family of bug
+     has been paid for. `measure` for prose; the room for tables; its own content for short drawn
+     blocks (13 §4.1). */
+
+  .block {
+    margin: 0 0 var(--sp-5);
+  }
+
+  .measure {
+    max-inline-size: var(--measure);
+  }
+
+  /* A HEADING IS A NAME, in ink at the step under a section and in sentence case. It was a dim
+     kicker, which put a caption over the block rather than a name on it. The sentence goes in the
+     body. */
+  .block-head {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin-block-end: var(--sp-3);
+    color: var(--ink);
+    font-size: var(--t-base);
+    font-weight: 600;
+  }
+
+  /* ── panel: note, quote ─────────────────────────────────────────────────── */
+
+  /* AN INLINE CALLOUT (DESIGN-BRIEF 4.9): the raised surface and nothing else. No stripe down the
+     leading edge, no tinted ground, no border in the dark; the intent is the mark at top left. */
+  .panel {
+    margin: 0;
+    padding: var(--sp-3) var(--sp-4);
+    background: var(--s1);
+    border: 1px solid transparent;
+    border-radius: var(--r-md);
+    color: var(--ink2);
+    font-size: var(--t-base);
+  }
+
+  :root[data-scheme='light'] .panel {
+    border-color: var(--line);
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root:not([data-scheme='dark']) .panel {
+      border-color: var(--line);
+    }
+  }
+
+  .panel p + p {
+    margin-block-start: var(--sp-3);
+  }
+
+  /* A CALLOUT'S GUTTER. The mark sits beside the first line rather than above it, because a note is
+     one sentence and a glyph on a line of its own turns it into two. The paragraphs keep their own
+     block flow — a grid here would break `measure`'s reading width. */
+  .panel[data-marked] {
+    position: relative;
+    padding-inline-start: calc(var(--sp-4) + var(--icon-m) + var(--sp-2));
+  }
+
+  .panel-glyph {
+    position: absolute;
+    inset-inline-start: var(--sp-4);
+    inset-block-start: var(--sp-3);
+    inline-size: var(--icon-m);
+    color: var(--tone, var(--ink2));
+    font-variant-emoji: text;
+    line-height: inherit;
+    text-align: center;
+  }
+
+  /* A quote is prose, so it keeps the reading measure a note's panel has, rather than running the
+     width of a 1440 page. */
+  blockquote.panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    max-inline-size: var(--measure);
+    font-size: var(--t-md);
+    color: var(--ink);
+  }
+
+  .quote-by {
+    font-size: var(--t-sm);
+    font-style: normal;
+    color: var(--dim);
+  }
+
+  /* `note lead` IS THE PAGE'S OPENING SENTENCE, said from its figures, so it is set as the one sentence
+     on the screen rather than as a callout: no raised surface and no hairline, in ink at the step above
+     a card's name. Boxed, it was one more panel in a column of blocks, and the line meant to be read
+     first was dressed exactly like a footnote. A tone keeps its mark, so the gutter stays where a mark
+     sits and goes only where none does. */
+  .block[data-kind='note'][data-form='lead'] .panel {
+    max-inline-size: var(--measure);
+    padding-inline-end: 0;
+    background: none;
+    border-color: transparent;
+    color: var(--ink);
+    font-size: var(--t-lg);
+    line-height: var(--lh-tight);
+  }
+
+  .block[data-kind='note'][data-form='lead'] .panel:not([data-marked]) {
+    padding-inline-start: 0;
+  }
+
+  /* ── grid: stat, board ──────────────────────────────────────────────────
+     `--cells` comes from the declaration. A layout primitive must be TOLD how many things it
+     contains and must never infer the count from the space available (05 §4). */
+
+  /* NO BOX, AND THE CELLS ARE DIVIDED BY A RULE. A surface, a border and a shadow round every
+     strip of figures made a page of blocks a stack of panels; hairlines between the cells on the
+     page's own ground read as one object with parts. */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(var(--cells), minmax(0, 1fr));
+  }
+
+  /* NO BOX AND NO RULES BETWEEN THE FIGURES (DESIGN-BRIEF 4.6). Space separates the stats; a board's
+     lanes keep their hairline further down, because a lane is a column and not a figure. */
+  .grid:has(> .cell) {
+    gap: var(--sp-5) var(--sp-6);
+  }
+
+  .cell {
+    display: grid;
+    grid-template-areas:
+      'label glyph'
+      'figure figure'
+      'note note';
+    /* `max-content` puts the glyph immediately after the label rather than at the far edge of the
+       cell: a tone belongs to the thing it qualifies, and half a column away it belongs to nothing.
+
+       AND `max-content` IS A TRACK THAT CAN NEVER WRAP, which is why it is `fit-content` now. A
+       `max-content` column is as wide as its content on one line, whatever the cell is. On a phone,
+       where `/p/money` lays four figures out two-up in 178px cells, `HOW LONG THE MONEY LASTS` in
+       uppercase tracking is wider than the cell: the label pushed the grid past its box and
+       `.grid { overflow: hidden }` clipped it to `HOW LONG THE MONEY LA`, and clipped the note
+       spanning under it with it. `fit-content(100%)` is identical when the label fits, so the glyph
+       still sits right after it, and wraps it when it does not. */
+    grid-template-columns: fit-content(100%) minmax(0, 1fr);
+    /* Rows pack to the top, so a figure sits on the same line as its neighbours whatever the note under it wraps to. */
+    align-content: start;
+    align-items: center;
+    row-gap: var(--sp-1);
+    column-gap: var(--sp-2);
+    padding-block: var(--sp-2);
+  }
+
+  /* A FIGURE THAT IS A DOOR SAYS SO WITHOUT SHOUTING. Underlining a tile would make a dashboard
+     look like a list of links; what it gets is the same hover surface every other openable thing in
+     the product gets, and the focus ring the sheet already defines. The colour does not change,
+     because the figure's tone is what its colour is FOR. */
+  /* The hover wash needs room round the words, so a linked figure borrows it from the gap. */
+  a.cell {
+    margin-inline: calc(-1 * var(--sp-3));
+    padding-inline: var(--sp-3);
+    border-radius: var(--r-md);
+    color: inherit;
+    text-decoration: none;
+  }
+
+  a.cell:hover {
+    background: var(--hover-wash);
+  }
+
+  a.cell:active {
+    background: var(--s2);
+  }
+
+  /* A LINKED FIGURE IS A TARGET, so under a thumb it is 44 tall. A lead stat's rows measured 40 at 390, the only thing
+     on the page a finger opens that fell short of the floor (pages §2.5, stat lead). */
+  @media (pointer: coarse) {
+    a.cell {
+      min-block-size: var(--tap);
+    }
+  }
+
+  .cell-label {
+    grid-area: label;
+    color: var(--dim);
+    font-size: var(--t-sm);
+    font-weight: 400;
+  }
+
+  .cell .glyph {
+    grid-area: glyph;
+    justify-self: start;
+  }
+
+  /* Tabular figures on a PROPORTIONAL face. A monospace face gives the thousands separator a full
+     cell, so EGP 2,869 renders as EGP 2 , 869 at display size (13 §3.2). */
+  .cell-figure {
+    grid-area: figure;
+    color: var(--ink);
+    font-size: var(--t-xl);
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    line-height: 1.25;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* A CURRENCY CODE IN FRONT OF AN AMOUNT, present and quiet. `leadingCode` in `braindog-render`
+     decides what counts as one; this is how it looks wherever an amount is drawn, a step smaller
+     than the figure and in the quiet ink, and half the size in front of a headline figure.
+
+     `em` ON PURPOSE, both here and in the override below: `.amount-code` rides whatever figure it
+     is set beside, which is a different `--t-*` step depending on which block draws it. A fixed
+     token would hold the code still while the figure it fronts moved a whole step, which breaks
+     the "a step smaller" relationship this component exists to keep. */
+  .amount-code {
+    color: var(--dim);
+    font-size: 0.85em;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+  }
+
+  /* HALF THE FIGURE, AND NEVER UNDER THE SMALLEST STEP. A code with no symbol in front of it (EGP) is the whole of what
+     says the currency, and half of a figure the fit has already stepped down came to 8 to 10px at 390. */
+  .cell-figure .amount-code {
+    font-size: max(var(--t-xs), 0.5em);
+    font-weight: 500;
+  }
+
+  .cell-note {
+    grid-area: note;
+    color: var(--dim);
+    font-size: var(--t-xs);
+  }
+
+  /* A FIGURE IS ALWAYS INK, even when it is wrong. The dot beside the label says so and the note
+     under the figure says why; a red number is the loudest thing on a page and says the least. */
+  .cell[data-intent] .cell-figure {
+    color: var(--ink);
+  }
+
+  /* A STAT'S TREND sits under its figure, a small line in the quiet ink with a dot on the last
+     point. The row it takes exists only in a cell that has one, so a strip where one figure has a
+     trend and three do not keeps its figures on one line and its notes under them. */
+  .cell:has(> .cell-trend) {
+    grid-template-areas:
+      'label glyph'
+      'figure figure'
+      'trend trend'
+      'note note';
+  }
+
+  .cell-trend {
+    grid-area: trend;
+    inline-size: 100%;
+    max-inline-size: 120px;
+    block-size: 28px;
+    overflow: visible;
+  }
+
+  /* One line and one dot, for every small trend the renderer draws (`stat`, `sparkline`). */
+  .trend-line {
+    fill: none;
+    stroke: var(--dim);
+    stroke-width: 1.5px;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .trend-end {
+    stroke: var(--ink2);
+    stroke-width: 5px;
+    stroke-linecap: round;
+  }
+
+  /* `stat lead`: the first figure is the screen's one hero figure (DESIGN-SYSTEM 2.2). The others
+     stay the size they are, so the lead reads as the answer and the rest as its detail. */
+  /* THE HERO STEPS DOWN INSIDE ITS OWN CELL rather than running into the next one: a balance in the millions, in
+     pounds with its code, is wider than a quarter of the page at the hero size. */
+  .block[data-form='lead'] .cell:first-child {
+    container-type: inline-size;
+  }
+
+  .block[data-form='lead'] .cell:first-child .cell-figure {
+    font-size: min(var(--t-2xl), 10cqi);
+    letter-spacing: -0.025em;
+  }
+
+  /* A LONG HERO ALSO TAKES THE FIT EVERY LONG FIGURE TAKES (design SYS-9: no stat figure is ever cut). The step above
+     outranks the fit below, so a hero the renderer marked as long kept a tenth of its cell whatever its length, and by
+     the fit's own estimate of 0.62 of the size a character, seventeen characters at a tenth of a cell run past it. So a
+     marked hero is the smaller of the two, and never grows past either. No floor here, unlike the fit below: the hero
+     keeps the size it would have had, and only a figure too long for it steps down. */
+  .block[data-form='lead'] .cell:first-child .cell-figure[data-fit] {
+    font-size: min(var(--t-2xl), 10cqi, calc(100cqi / (var(--chars) * 0.62)));
+  }
+
+  /* A FIGURE LONGER THAN ITS TILE STEPS DOWN INSIDE IT, rather than running into the next tile: a balance in two or three
+     currencies on a Home column of four. The renderer marks such a figure and says the length of its longest amount
+     (`figureChars`), which never breaks inside itself; a figure any tile holds carries no mark and keeps its size. */
+  .block[data-kind='stat'] .cell {
+    container-type: inline-size;
+  }
+
+  .cell-figure[data-fit] {
+    /* The renderer says the length on the figure itself; this is only what a figure marked without one would use. */
+    --chars: 16;
+    /* NEVER BELOW A READABLE SIZE. Six figures in one row at 1024 stepped down to 11px; the floor is the body's reading size,
+       and a figure that still does not fit wraps between its amounts (` · `) instead of shrinking further. The row itself
+       goes three by two before that point (below). */
+    font-size: max(var(--t-md), min(var(--t-xl), calc(100cqi / (var(--chars) * 0.62))));
+  }
+
+  /* FIGURES WRAP TO MORE ROWS BEFORE THEY SHRINK. The block is its own container, so a stat in a narrow column of a wide
+     page answers its own width, not the viewport's. Five figures or more go three across below 960px (a Dashboard at 1024
+     beside the rail), and four or more go two by two below 608px. */
+  /* NAMED, because every cell inside it is a container too (for the figure's own fit, above), and an unnamed query from a
+     label or a figure would ask its cell rather than the block. The rows below ask the block by this name. */
+  .block[data-kind='stat'] {
+    container: stat / inline-size;
+  }
+
+  /* 960px AND NOT 60rem, FOR THE REASON THE FOUR-ACROSS STEP BELOW GIVES. It is the same width at a 16px root, but at
+     Chrome's "Small", a 12px root, 60rem was 720px, and a 722px slot drew five `£16,570.00` cells of 118.8px for 123.2px
+     of ink, 4.4px cut; 258 readings across the laptop's full-width range came out cut or short of their two per cent.
+     No declared page has five figures, so the record could not show it and `record/figure-fit.test.ts` draws one. */
+  @container (inline-size < 960px) {
+    .grid:has(> .cell:nth-child(5)) {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  /* 608px AND NOT 30rem, BECAUSE FOUR FIGURES ACROSS A LAPTOP'S FULL-WIDTH SLOT WERE CUT ON LINUX. This step was a phone's,
+     at 30rem, and a 900px window gives a full-width block 586px: four cells of 122.5px beside three 32px gaps.
+     `£38,880.00` and `£10,416.16` on `/p/money` and `/p/ledger` draw 123.2px of Geist on Windows, already 0.7px over,
+     and the same woff2 on a hosted ubuntu image draws about 1.6 per cent wider, so the CI runner measured them cut by
+     2.7px. Four figures of 123.2px with two per cent to spare need 4 x 125.7 + 96 = 599px; 608px, which was 38rem, leaves
+     each cell 128px and so 3.9 per cent of room on Windows and about 2.2 on Linux. Below it they go two by two, as on a
+     phone, and at no size smaller than they were. `record/figure-fit.test.ts` holds the two per cent.
+
+     AND IT IS 608px, NOT 38rem, BECAUSE THE FIGURE IT GUARDS IS A px WIDTH. `--t-xl` is 24px at any root, so the 123.2px
+     of ink does not move when a reader sets her browser's text smaller, and a rem step was the only thing that did. At
+     Chrome's "Small", a 12px root, 38rem was 456px, the 586px slot went back to four across, and the test measured
+     `£38,880.00` and `£10,416.16` 0.7px over their 122.5px cells, which is this defect again. `PageView.svelte`'s money
+     step is px for the same reason and says so at more length. */
+  @container (inline-size < 608px) {
+    .grid:has(> .cell:nth-child(4)) {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  /**
+   * UNDER 480px OF BLOCK, A STAT IS ROWS: THE LABEL ON THE LEFT AND THE FIGURE ON THE RIGHT (design SYS-9).
+   *
+   * Tiles side by side in a phone's width either cut a figure or step it down until it no longer reads as the answer,
+   * and the design review found three figures cut at 390. In a row the figure's track never goes narrower than the
+   * figure's longest unbreakable run: the label keeps its one line while there is room and wraps when there is not,
+   * and a figure in several currencies breaks between its amounts rather than running past the edge. So no figure is
+   * cut at any width.
+   *
+   * px AND NOT rem, FOR THE REASON THE TWO STEPS ABOVE GIVE: the figures it guards are px wide at any root, so a rem
+   * threshold would be the only thing that moved when a reader sets her text smaller.
+   *
+   * THE LEAD'S FIRST FIGURE KEEPS ITS OWN LINE. It is the screen's one hero figure, so it stays label over figure at
+   * the hero size and the figures after it are the rows under it.
+   */
+  @container stat (inline-size < 480px) {
+    .block[data-kind='stat'] .grid:has(> .cell) {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0;
+    }
+
+    /* The label's track may shrink and wrap the label, and the figure's never goes under the figure's own minimum, its
+       longest unbreakable run, so the figure is never the thing that is cut. The row's hairline is the one every list
+       in the product draws between its rows. */
+    .block[data-kind='stat'] .cell {
+      grid-template-areas:
+        'label glyph figure'
+        'note note note';
+      grid-template-columns: minmax(0, auto) auto minmax(auto, 1fr);
+      align-items: baseline;
+      column-gap: var(--sp-2);
+      padding-block: var(--sp-3);
+      border-block-end: 1px solid var(--line-soft);
+    }
+
+    .block[data-kind='stat'] .cell:has(> .cell-trend) {
+      grid-template-areas:
+        'label glyph figure'
+        'trend trend trend'
+        'note note note';
+    }
+
+    .block[data-kind='stat'] .cell:last-child {
+      border-block-end: 0;
+    }
+
+    /* The wash of a linked figure stays inside the row, so nothing reaches into the page's gutter. */
+    .block[data-kind='stat'] a.cell {
+      margin-inline: 0;
+      padding-inline: 0;
+    }
+
+    .block[data-kind='stat'] .cell .glyph {
+      align-self: center;
+    }
+
+    .block[data-kind='stat'] .cell-figure {
+      justify-self: end;
+      font-size: var(--t-lg);
+      font-weight: 600;
+      text-align: end;
+    }
+
+    .block[data-kind='stat'][data-form='lead'] .cell:first-child {
+      grid-template-areas:
+        'label glyph'
+        'figure figure'
+        'note note';
+      grid-template-columns: fit-content(100%) minmax(0, 1fr);
+    }
+
+    .block[data-kind='stat'][data-form='lead'] .cell:first-child:has(> .cell-trend) {
+      grid-template-areas:
+        'label glyph'
+        'figure figure'
+        'trend trend'
+        'note note';
+    }
+
+    .block[data-kind='stat'][data-form='lead'] .cell:first-child .cell-figure {
+      justify-self: start;
+      text-align: start;
+    }
+  }
+
+  .board-col {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    padding: var(--sp-3);
+  }
+
+  /* The same hairline the stat cells use. Four stacks of cards floating on one surface with nothing
+     between them is four stacks, not four columns — the eye has to infer the boundary from where
+     the cards happen to end, which is exactly what fails when one column is empty. */
+  .board-col + .board-col {
+    border-inline-start: 1px solid var(--line-soft);
+  }
+
+  .board-head {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    padding-block-end: var(--sp-1);
+    color: var(--dim);
+    font-family: var(--font-ui);
+    font-size: var(--t-sm);
+    font-weight: 500;
+  }
+
+  .board-count {
+    color: var(--dim);
+    font-size: var(--t-xs);
+    font-weight: 400;
+    letter-spacing: 0;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Scoped to the lane: `.card` is a common name, and a page's own card must not inherit a board's.
+     A board card is a raised surface with no border; the lane's hairline is the structure. */
+  .board-col .card {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: var(--sp-2) var(--sp-3);
+    background: var(--s1);
+    border-radius: var(--r-sm);
+  }
+
+  .board-col .card-title {
+    color: var(--ink);
+    font-size: var(--t-sm);
+  }
+
+  /* ── board: the move ────────────────────────────────────────────────────
+     A card is draggable only where the host passed `onmove`, so every rule below describes a board
+     that can actually be changed. A board that cannot draws none of these attributes at all. */
+
+  .board-col .card[draggable='true'] {
+    cursor: grab;
+    /* The pointer picks up the CARD, not the words in it: a native drag that begins as a text
+       selection drags the sentence and leaves the card sitting where it was. */
+    user-select: none;
+  }
+
+  .board-col .card[data-carrying] {
+    cursor: grabbing;
+    opacity: 0.45;
+  }
+
+  /* THE COLUMN THAT WOULD TAKE IT, and only while a drop there would do something: the card's own
+     column stays dark, which is how "this changes nothing" gets said without a message. An inset
+     ring rather than a border, so no column changes width and the four stacks do not shift under
+     the card being carried. */
+  /**
+   * THE TINT IS THE HOVER WASH PAINTED OVER THE COLUMN, as a background-image layer over whatever
+   * ground the column has, so the drop target reads against the columns beside it without a second
+   * strength of any tint, and never in the brand's red, which a block does not wear (design D-1).
+   */
+  .board-col[data-drop] {
+    background-image: linear-gradient(var(--hover-wash), var(--hover-wash));
+    box-shadow: inset 0 0 0 1px var(--edge);
+  }
+
+  /* NOT SAVED, IN WORDS: the register's receipt chip, in the one place a card has room for it.
+     Untoned on purpose, because a word carries its own meaning and needs no hue to do it. */
+  .board-col .card-mark {
+    align-self: start;
+    margin-block-start: var(--sp-1);
+    padding: 1px 6px;
+    background: var(--hold-wash);
+    border-radius: var(--r-sm);
+    color: var(--ink2);
+    font-size: var(--t-xs);
+    font-weight: 500;
+    line-height: 1.35;
+    white-space: nowrap;
+  }
+
+  .board-col .card-detail {
+    color: var(--dim);
+    font-size: var(--t-xs);
+  }
+
+  /* THE TOUCH PATH, A CARD'S LANES AS A NATIVE SELECT (`p/Grid.svelte`), drawn quiet because a pointer that can drag
+     rarely needs it: the card's last line, in the small step and the second ink, on a hairline edge. No rule sized it,
+     so it was the browser's own select at whatever height the platform chose; under a thumb it is 44 by 44, since a
+     select draws no `::before` for `.tap` to grow. */
+  .board-move {
+    align-self: start;
+    max-inline-size: 100%;
+    min-block-size: var(--ctl-h-sm);
+    margin-block-start: var(--sp-1);
+    padding-inline: var(--sp-2);
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    color: var(--ink2);
+    font: inherit;
+    font-size: var(--t-xs);
+  }
+
+  @media (pointer: coarse) {
+    .board-move {
+      min-block-size: var(--tap);
+      min-inline-size: var(--tap);
+    }
+  }
+
+  /**
+   * A BOARD IN A NARROW SLOT IS A GROUPED LIST (design SYS-9): each lane's heading with its count, then its cards as
+   * rows with a hairline between them, and no box round any of them.
+   *
+   * Stacked on a phone, the lanes kept everything that made them columns (the design review found three screens of
+   * boxed cards): a raised card inside a padded lane, and the lane's leading rule, which on a stacked lane is a stray
+   * line down the left of nothing. The block answers its own width, named so a query from inside a lane asks the board.
+   */
+  .block[data-kind='board'] {
+    container: board / inline-size;
+  }
+
+  /* A LANE KEEPS ROOM FOR A TITLE, and a board with more lanes than its slot holds scrolls inside itself. Six lanes in
+     1000px were 165px each at 1440, and every title wrapped to three lines (design §2.11, Board). The page never
+     scrolls sideways; the block does, as a wide table's region does, and below 30rem the lanes stack anyway. */
+  .block[data-kind='board'] .grid {
+    grid-template-columns: repeat(var(--cells), minmax(13rem, 1fr));
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+  }
+
+  @container board (inline-size < 30rem) {
+    .block[data-kind='board'] .grid {
+      grid-template-columns: minmax(0, 1fr);
+      row-gap: var(--sp-5);
+    }
+
+    .block[data-kind='board'] .board-col {
+      gap: 0;
+      padding: 0;
+    }
+
+    .block[data-kind='board'] .board-col + .board-col {
+      border-inline-start: 0;
+    }
+
+    .block[data-kind='board'] .board-head {
+      padding-block-end: var(--sp-2);
+    }
+
+    .block[data-kind='board'] .board-col .card {
+      gap: var(--sp-1);
+      padding: var(--sp-2) 0;
+      background: none;
+      border-block-end: 1px solid var(--line-soft);
+      border-radius: 0;
+    }
+
+    .block[data-kind='board'] .board-col .card:last-child {
+      border-block-end: 0;
+    }
+
+    .block[data-kind='board'] .board-col .card-title {
+      font-size: var(--t-base);
+    }
+  }
+
+  /* ── cards: one card per row ─────────────────────────────────────────────
+     `auto-fill` over 17rem, so a lane of one card keeps a card's width rather than stretching across
+     the page, and `min()` so a container narrower than one card is one column, not a sideways
+     scroll. No breakpoint: the grid answers its container, which is 05 §6's rule for width.
+     `cards-grid` and not `cards`, because the register's phone list and `/decide` already own that
+     name, and a rule here is global. */
+
+  .cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(17rem, 100%), 1fr));
+    align-items: start;
+    gap: 0 var(--sp-5);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  /* A CARD IS ONE SURFACE, and nothing inside it is boxed: the head, the figure and the facts sit on
+     the card's own ground with air between them. `start` above, so a short card is its own height
+     rather than the height of the tallest one beside it. */
+  .cards-item {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+    min-inline-size: 0;
+    /* No box: space and one soft hairline above, so a run of cards reads as a list set in columns
+       rather than a wall of identical rounded panels. */
+    padding: var(--sp-4) 0;
+    border-block-start: 1px solid var(--line-soft);
+  }
+
+  .cards-item:has(.cards-title a):hover .cards-title {
+    text-decoration: underline;
+    text-decoration-color: var(--edge);
+    text-underline-offset: 3px;
+  }
+
+  /* A RUN NOT HEARD FROM LATELY, dimmed and not hidden, so it still says what it was doing. */
+  .cards-item[data-quiet] {
+    opacity: 0.6;
+  }
+
+  .cards-head {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-inline-size: 0;
+  }
+
+  .cards-mark,
+  .cards-face {
+    display: grid;
+    flex: none;
+    place-items: center;
+    inline-size: 28px;
+    block-size: 28px;
+    color: var(--ink2);
+    font-size: var(--t-xs);
+    font-weight: 500;
+    line-height: 1;
+  }
+
+  /* A MARK IS SQUARE AND A FACE IS ROUND, so a project and a person are told apart by shape, which
+     holds in every theme and for every reader where a hue would not. */
+  .cards-mark {
+    background: var(--s2);
+    border-radius: var(--r-sm);
+  }
+
+  .cards-face {
+    background: var(--hold-wash);
+    border-radius: var(--r-pill);
+  }
+
+  .cards-who .cards-face {
+    inline-size: 22px;
+    block-size: 22px;
+  }
+
+  /* THE UI FACE, NAMED. An `h3` takes the display face from the skin, and that face is for 20px and
+     up; a card's name is body size, so it takes the face every other name in a list takes. */
+  .cards-title {
+    flex: 1;
+    min-inline-size: 0;
+    margin: 0;
+    color: var(--ink);
+    font-family: var(--font-ui);
+    font-size: var(--t-base);
+    font-weight: 500;
+    letter-spacing: -0.005em;
+    overflow-wrap: anywhere;
+  }
+
+  .cards-title a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  /* The whole card is the target, drawn from the link rather than by wrapping the card in one,
+     because a link may not hold another and a fact can be a link. On `::before`, because a touch target
+     is measured as the element and its `::before`. */
+  .cards-title a::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+  }
+
+  .cards-when {
+    flex: none;
+    color: var(--dim);
+    font-size: var(--t-xs);
+    white-space: nowrap;
+  }
+
+  .cards-body {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2) var(--sp-4);
+  }
+
+  .cards-figure {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-inline-size: 0;
+  }
+
+  .cards-figure .cards-value {
+    color: var(--ink);
+    font-size: var(--t-xl);
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    line-height: 1.25;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* `em`, same reasoning as `.cell-figure .amount-code` above: half the size of whichever figure
+     it fronts, not a fixed step. */
+  .cards-figure .amount-code {
+    font-size: 0.5em;
+    font-weight: 500;
+  }
+
+  .cards-label {
+    color: var(--dim);
+    font-size: var(--t-xs);
+  }
+
+  /* The line takes what the figure leaves, down to a width at which it is still a shape. */
+  .cards-trend {
+    flex: 1 1 6rem;
+    min-inline-size: 5rem;
+    block-size: 28px;
+    overflow: visible;
+  }
+
+  .cards-trend-line {
+    fill: none;
+    stroke: var(--dim);
+    stroke-width: 1.5px;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .cards-trend-end {
+    stroke: var(--ink2);
+    stroke-width: 5px;
+    stroke-linecap: round;
+  }
+
+  /* THE RING SITS BESIDE ITS NUMBER, which is printed, so the arc is a picture of a figure the
+     reader already has and never the only place it is said. */
+  .cards-ring {
+    display: grid;
+    grid-template-areas:
+      'mark value'
+      'mark label';
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    column-gap: var(--sp-2);
+  }
+
+  .cards-ring-mark {
+    grid-area: mark;
+    inline-size: 28px;
+    block-size: 28px;
+  }
+
+  .cards-ring .cards-value {
+    grid-area: value;
+    color: var(--ink);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .cards-ring .cards-label {
+    grid-area: label;
+  }
+
+  .cards-ring-track {
+    fill: none;
+    stroke: var(--s2);
+    stroke-width: 4;
+  }
+
+  .cards-ring-fill {
+    fill: none;
+    stroke: var(--ink2);
+    stroke-width: 4;
+    stroke-linecap: round;
+  }
+
+  .cards-facts {
+    display: grid;
+    gap: var(--sp-1);
+    margin: 0;
+  }
+
+  /* A LABEL AND ITS VALUE READ AS A PAIR (DESIGN-SYSTEM APPENDIX C9). They sat at opposite edges of a
+     340px card, so "Kind" and "Method" were 300px apart and a two-line "Next" was right-aligned prose.
+     The labels share a column the width of the longest one, and the value starts beside it. */
+  .cards-facts {
+    grid-template-columns: max-content minmax(0, 1fr);
+    column-gap: var(--sp-3);
+  }
+
+  .cards-fact {
+    display: contents;
+    font-size: var(--t-sm);
+  }
+
+  .cards-fact dt {
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  .cards-fact dd {
+    min-inline-size: 0;
+    margin: 0;
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    overflow-wrap: anywhere;
+  }
+
+  /* WHERE A ROW APPLIES, AS A CHIP (agents C8): drawn by `packages/render/svelte/p/Table.svelte` and `Cards.svelte` in a
+     column `as: scope`, the render package's twin of `lib/ui/ScopeChip.svelte`. A pill on the wash, the project's mark
+     in its own hue or the globe, then the name. */
+  .scope-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+    min-inline-size: 0;
+    max-inline-size: 100%;
+    min-block-size: var(--ctl-h-sm);
+    padding-inline: var(--sp-2);
+    background: var(--hold-wash);
+    border-radius: var(--r-pill);
+    color: var(--ink2);
+    font-size: var(--t-xs);
+    font-weight: 500;
+    line-height: var(--lh-tight);
+    vertical-align: middle;
+  }
+
+  .scope-glyph {
+    flex: none;
+    inline-size: var(--icon-s);
+    block-size: var(--icon-s);
+  }
+
+  .scope-mark {
+    flex: none;
+    color: oklch(var(--mark-l) var(--mark-c) var(--hue));
+  }
+
+  .scope-name {
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .cards-who {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    color: var(--ink2);
+    font-size: var(--t-sm);
+  }
+
+  .cards-empty {
+    margin: 0;
+    color: var(--dim);
+  }
+
+  /* THE REPLY IS THE LINE UNDER THE HEAD and the next step the card's last word before who is on it.
+     Both are sentences somebody wrote, so they wrap at the card's edge rather than trimming, and the
+     reply sits a step quieter than the name it answers. */
+  .cards-reply,
+  .cards-next {
+    margin: 0;
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    overflow-wrap: anywhere;
+  }
+
+  .cards-next {
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  /* `cards lead`: THE FIRST CARD IS TWO TRACKS WIDE WHERE THE GRID HAS TWO, and one where it has one.
+     The renderer only marks the card (05 §4, told and never inferred), so the host has to know how
+     many tracks there are, and the grid cannot say. `span 2` in a grid of one track makes an
+     implicit second track: measured in a 560px block, the tracks came out 470px and 66px and the
+     cards after the lead fell into them by turns, one 470px wide and the next 66. So the block is
+     its own container and the span waits for a width that holds two 17rem tracks and the gap:
+     34rem plus 24px, which is at most 36rem at any root of 12px or more. Between the two widths
+     the lead is one card wide for a few pixels, which is the safe side to be wrong on. */
+  .block[data-kind='cards'][data-form='lead'] {
+    container-type: inline-size;
+  }
+
+  @container (inline-size >= 36rem) {
+    .cards-item[data-lead] {
+      grid-column: span 2;
+    }
+  }
+
+  .cards-item[data-lead] .cards-title {
+    font-size: var(--t-lg);
+  }
+
+  /* A CARD'S `hue` IS ITS MARK'S COLOUR AND NOTHING ELSE (pages C4, 05 §5's one identity accent): the renderer writes
+     `--hue` on the card only for a whole number from 0 to 359, and the mark is drawn in the identity formula every
+     other mark in the app uses (`IdentityMark.svelte`). Never the card's edge, its ground or its ring, so a hue never
+     reads as a tone. Asked of the card's own attribute and not of the inherited property, because `--hue` inherits: a
+     page drawn for a project may carry that project's hue above the block, and every card without one of its own would
+     wear it. */
+  .cards-item[style*='--hue'] > .cards-head > .cards-mark {
+    color: oklch(var(--mark-l) var(--mark-c) var(--hue));
+  }
+
+  /* A CARD'S `picture` LEADS IT at 16:9, cut to fit, on the well a missing picture would leave, so a card whose file
+     has not loaded yet is the same height as it will be. The title under it names the card. */
+  .cards-picture {
+    display: block;
+    inline-size: 100%;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    border-radius: var(--r-md);
+    background: var(--sunk);
+  }
+
+  /* ── section: a heading for the blocks after it ──────────────────────────
+     A group on a page is a heading and air, never a box: `--t-md` semibold in sentence case, which is
+     every section title in the product (design §6.2) and a step above a block's name, the count on its
+     baseline, and the fold a pill at the end of the line. */
+
+  .sec {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--sp-2) var(--sp-3);
+    padding-block-start: var(--sp-4);
+  }
+
+  .sec-title {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-2);
+    margin: 0;
+    color: var(--ink);
+    font-family: var(--font-ui);
+    font-size: var(--t-md);
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    line-height: var(--lh-tight);
+  }
+
+  .sec-count {
+    color: var(--dim);
+    font-size: var(--t-sm);
+    font-weight: 500;
+    letter-spacing: 0;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* THE SLOT DRAWS ONLY WHAT THE HOST DREW INTO IT (`RenderOptions.icon`). The renderer ships no glyph art, so a
+     section whose name the host has no drawing for keeps an empty slot, and an empty slot takes no room rather than
+     holding a blank square. With a drawing it is `--icon-l` in the heading's own colour, and its block margins take
+     back what it stands above the heading's line, so the heading is as tall as it was without it. */
+  .sec-glyph {
+    display: none;
+  }
+
+  .sec-glyph:has(> svg) {
+    display: inline-flex;
+    align-self: center;
+    flex: none;
+    inline-size: var(--icon-l);
+    block-size: var(--icon-l);
+    margin-block: calc((1lh - var(--icon-l)) / 2);
+  }
+
+  .sec-glyph > svg {
+    display: block;
+    inline-size: 100%;
+    block-size: 100%;
+  }
+
+  .sec-fold {
+    margin-inline-start: auto;
+  }
+
+  .sec-toggle {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: var(--ctl-h-sm);
+    padding-inline: var(--sp-2);
+    background: none;
+    border-radius: var(--r-sm);
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    font-weight: 500;
+    list-style: none;
+    cursor: pointer;
+  }
+
+  .sec-toggle::-webkit-details-marker {
+    display: none;
+  }
+
+  .sec-toggle:hover {
+    background: var(--s2);
+    color: var(--ink);
+  }
+
+  /* One word at a time: the control says what pressing it does, and the other word leaves the
+     accessibility tree along with the screen. */
+  .sec-fold[open] .sec-show,
+  .sec-fold:not([open]) .sec-hide {
+    display: none;
+  }
+
+  @media (pointer: coarse) {
+    .sec-toggle {
+      min-block-size: var(--tap);
+    }
+  }
+
+  /* A SECTION ON A DECLARED PAGE IS ITS OWN HEADING. The page draws a bar naming every block, and a
+     section's name is the section, which it already draws, so the bar goes and the words are said
+     once. The page's styles are not in a layer, so only an important declaration here outranks
+     them. The region keeps its name: a reference to a hidden heading still reads its text. */
+  .block-slot:has(> .block[data-kind='section']) > .block-bar {
+    display: none !important;
+  }
+
+  /* A FOLDED SECTION FOLDS THE BLOCKS AFTER IT, up to the next section. CSS cannot ask which section
+     is nearest, so this asks two questions it can: is there a folded section before this block with
+     no open section after it, or a folded, open, folded run with no open section after that. It is
+     exact until a page folds three sections with open ones between them. Nothing folds while the
+     page is being arranged, because a block nobody can see is a block nobody can move. */
+  .block-slot:has(> .block[data-kind='section'] .sec-fold:not([open]))
+    ~ .block-slot:not([data-arranging], :has(> .block[data-kind='section'])):not(
+      .block-slot:has(> .block[data-kind='section'] .sec-fold:not([open]))
+        ~ .block-slot:has(> .block[data-kind='section']):not(:has(.sec-fold:not([open])))
+        ~ *
+    ),
+  .block-slot:has(> .block[data-kind='section'] .sec-fold:not([open]))
+    ~ .block-slot:has(> .block[data-kind='section']):not(:has(.sec-fold:not([open])))
+    ~ .block-slot:has(> .block[data-kind='section'] .sec-fold:not([open]))
+    ~ .block-slot:not([data-arranging], :has(> .block[data-kind='section'])):not(
+      .block-slot:has(> .block[data-kind='section'] .sec-fold:not([open]))
+        ~ .block-slot:has(> .block[data-kind='section']):not(:has(.sec-fold:not([open])))
+        ~ .block-slot:has(> .block[data-kind='section'] .sec-fold:not([open]))
+        ~ .block-slot:has(> .block[data-kind='section']):not(:has(.sec-fold:not([open])))
+        ~ *
+    ) {
+    display: none;
+  }
+
+  /* ── feed: what happened, grouped by who did it ──────────────────────────
+     the old tool's "Since you last looked": a list without a box, the count leading every row, and
+     full ink only on what is new. The block is its own container, so a narrow slot moves the time
+     under the words without a breakpoint. */
+
+  .feed {
+    display: grid;
+    gap: var(--sp-4);
+    container-type: inline-size;
+  }
+
+  .feed-head {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-2);
+    margin: 0 0 var(--sp-1);
+    color: var(--ink);
+    font-family: var(--font-ui);
+    font-size: var(--t-sm);
+    font-weight: 600;
+  }
+
+  .feed-tally,
+  .feed-new {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .feed-tally {
+    color: var(--dim);
+    font-weight: 500;
+  }
+
+  .feed-new {
+    color: var(--ink);
+  }
+
+  .feed-rows {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .feed-row {
+    display: grid;
+    grid-template-columns: 3ch auto minmax(0, 1fr) auto;
+    align-items: baseline;
+    gap: var(--sp-1) var(--sp-3);
+    min-block-size: var(--row-h);
+    padding-block: var(--sp-2);
+    border-block-end: 1px solid var(--line-soft);
+    font-size: var(--t-ui);
+  }
+
+  .feed-row:last-child {
+    border-block-end: 0;
+  }
+
+  /* THE COUNT IS WHAT IS READ FIRST, so it leads, in tabular figures down one edge. */
+  .feed-count {
+    color: var(--dim);
+    font-weight: 500;
+    text-align: end;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* A face is round and a rule's mark is square, so the two are told apart by shape. */
+  .feed-face {
+    display: grid;
+    place-items: center;
+    align-self: center;
+    inline-size: 20px;
+    block-size: 20px;
+    background: var(--s2);
+    border-radius: var(--r-pill);
+    color: var(--ink2);
+    font-size: var(--t-xs);
+    font-weight: 500;
+    line-height: 1;
+  }
+
+  .feed-group[data-by='rule'] .feed-face {
+    background: var(--s3);
+    border-radius: var(--r-sm);
+  }
+
+  /* Nobody named is a gap in the column, not an empty circle. */
+  .feed-face:empty {
+    visibility: hidden;
+  }
+
+  .feed-what {
+    min-inline-size: 0;
+    color: var(--ink2);
+    overflow-wrap: anywhere;
+  }
+
+  .feed-who {
+    color: var(--ink2);
+    font-weight: 500;
+  }
+
+  .feed-what > .glyph {
+    margin-inline-start: var(--sp-1);
+  }
+
+  /* NEW IS BRIGHTER, and the head's "N new" and the line below say it in words as well. */
+  .feed-row[data-new] .feed-count {
+    color: var(--ink);
+  }
+
+  .feed-row[data-new] .feed-who {
+    color: var(--ink);
+  }
+
+  .feed-when {
+    color: var(--dim);
+    font-size: var(--t-xs);
+    white-space: nowrap;
+  }
+
+  /* The row above already draws the rule, so the words sit under it rather than between two. */
+  .feed-seen {
+    padding-block: var(--sp-3) var(--sp-1);
+    color: var(--dim);
+    font-size: var(--t-xs);
+  }
+
+  .feed-empty {
+    max-inline-size: var(--measure);
+    margin: 0;
+    color: var(--dim);
+  }
+
+  @container (inline-size < 30rem) {
+    .feed-row {
+      grid-template-columns: 3ch auto minmax(0, 1fr);
+    }
+
+    .feed-when {
+      grid-column: 3;
+    }
+  }
+
+  /* ── queue: what is waiting on you ───────────────────────────────────────
+     One card a question, because a question is read whole: who asked, what they are asking, why, and
+     the ways to answer it. The options are a list rather than a row of buttons, so a long reason sits
+     under the words it belongs to and the recommendation is read beside its own option and no other. */
+
+  /* THE BLOCK IS ITS OWN CONTAINER, so a queue answers the width of the slot it was placed in rather
+     than the width of the window. A queue at `span: 6` on a wide screen is as narrow as the same
+     queue on a phone, and it is the block that has to fit. */
+  .queue {
+    display: grid;
+    gap: var(--sp-3);
+    container-type: inline-size;
+  }
+
+  .queue-card {
+    display: grid;
+    gap: var(--sp-2);
+    padding: var(--sp-4);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    background: var(--s1);
+  }
+
+  .queue-by {
+    display: flex;
+    gap: var(--sp-2);
+    align-items: baseline;
+    margin: 0;
+    font-size: var(--t-xs);
+    color: var(--dim);
+  }
+
+  .queue-who {
+    color: var(--ink2);
+    font-weight: 500;
+  }
+
+  /* THE BAND SITS AT THE END OF THE BY-LINE, pushed there rather than placed there, because it is
+     the one thing on that line that is about the card's PLACE in the list rather than about the
+     card. Quiet, in the same pill as `queue-rec`, for the same reason: a ranking that shouts is a
+     ranking that decides.
+
+     THE WORD CARRIES IT AND THE COLOUR DOES NOT. Four bands on four colours would be a legend a
+     reader has to learn and an a11y failure the moment one of them is the only difference, so the
+     dearest band takes weight and the darker ink, and the other three are identical. `data-cost` is
+     matched rather than the English, so a translated label still weights the right card. */
+  .queue-cost {
+    margin-inline-start: auto;
+    padding-inline: var(--sp-2);
+    border-radius: var(--r-pill);
+    background: var(--s3);
+    color: var(--ink2);
+    white-space: nowrap;
+  }
+
+  .queue-cost[data-cost='undo'] {
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  .queue-question {
+    margin: 0;
+    font-size: var(--t-lg);
+    line-height: var(--lh-tight);
+    color: var(--ink);
+  }
+
+  .queue-why {
+    max-inline-size: var(--measure);
+    margin: 0;
+    color: var(--ink2);
+  }
+
+  /* THREE COLUMNS SHARED BY EVERY OPTION: the way to answer, the recommendation, the reason. The
+     tracks are declared once here and each option borrows them with `subgrid`, so the buttons line
+     up down one edge and the reasons start at one x no matter how long any of them is.
+
+     THE REASON USED TO SIT UNDER ITS OPTION, on a row of its own, and the note for it said reading
+     across would pull the options out of line. That is true of a flow layout and not of a grid: a
+     shared track holds them in line by construction. It cost three lines per option, so one card
+     with three ways to answer was four hundred pixels and `/p/agents` opened on the queue and
+     nothing else, which is the page that is supposed to say what the agents are doing.
+
+     AND THE RECOMMENDATION SITS AGAINST THE OPTION IT NAMES. Pushed to the far edge of a wide block it
+     was a word a reader had to track thirteen hundred pixels to attach to anything, which is a label
+     that has stopped labelling. */
+  .queue-options {
+    display: grid;
+    grid-template-columns: max-content max-content minmax(0, 1fr);
+    gap: var(--sp-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .queue-option {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
+    gap: var(--sp-1) var(--sp-3);
+    align-items: baseline;
+  }
+
+  /* EACH PART NAMES ITS OWN COLUMN, because an option with no recommendation would otherwise slide
+     its reason into the recommendation's track and the reasons would go ragged down the card. */
+  .queue-act,
+  .queue-label {
+    grid-column: 1;
+  }
+
+  /* AN ANSWER IS A PILL (design D-2, and design.md §4's Decide row, MOD-25), the shape `QueueAnswer.svelte` already
+     gave the answerable queue, so the read-only renderer's options and the ones on Home are one drawing. A long option
+     wraps inside its pill rather than pushing the card sideways at 390. */
+  .queue-act {
+    justify-self: start;
+    min-block-size: var(--ctl-h);
+    padding-inline: var(--sp-4);
+    border: 1px solid var(--line);
+    border-radius: var(--r-pill);
+    background: var(--s2);
+    color: var(--ink);
+    font: inherit;
+    text-align: start;
+    overflow-wrap: anywhere;
+    cursor: pointer;
+  }
+
+  .queue-act:hover {
+    background: var(--hover-wash);
+  }
+
+  /* THE SUGGESTED OPTION IS THE PRIMARY, drawn as every primary button is (`Button.svelte`'s `primary`: an ink fill with
+     the ground's letters), and the "Suggested" word stays beside it so the suggestion is said and not only shaded. It
+     is still not pressed for anybody: the fill says which one, and the press is the reader's. NOT WHILE IT IS THE ONE
+     BEING ANSWERED (`data-on`): `QueueAnswer.svelte` draws that on the selected ground, and ground-coloured letters on
+     it would vanish. */
+  .queue-option[data-recommended] > .queue-act:not([data-on]) {
+    background: var(--ink);
+    border-color: var(--ink);
+    color: var(--bg);
+  }
+
+  .queue-option[data-recommended] > .queue-act:not([data-on]):hover {
+    background: var(--primary-hover);
+    border-color: var(--primary-hover);
+  }
+
+  .queue-label {
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  /* THE WORD BESIDE THE PRIMARY. What an agent suggests is worth saying and is not worth pre-pressing, so the option's
+     pill is filled (above) and this quiet label names why, rather than the option reading as already chosen. */
+  .queue-rec {
+    grid-column: 2;
+    justify-self: start;
+    padding-inline: var(--sp-2);
+    border-radius: var(--r-pill);
+    background: var(--s3);
+    color: var(--ink2);
+    font-size: var(--t-xs);
+  }
+
+  .queue-because {
+    grid-column: 3;
+    max-inline-size: var(--measure);
+    color: var(--dim);
+    font-size: var(--t-xs);
+  }
+
+  .queue-more,
+  .queue-empty {
+    max-inline-size: var(--measure);
+    margin: 0;
+    color: var(--dim);
+  }
+
+  /* AND UNDER IT AGAIN WHEN THE BLOCK IS NARROW, because three tracks in a phone's width leaves the
+     reason about a hundred pixels and a reason nobody can read is worse than a reason below its
+     option. The width is the BLOCK's and not the window's: a queue at `span: 6` on a wide screen is
+     as narrow as the same queue on a phone, and it is the block that has to fit. */
+  @container (inline-size < 34rem) {
+    .queue-options {
+      grid-template-columns: max-content minmax(0, 1fr);
+    }
+
+    .queue-because {
+      grid-column: 1 / -1;
+    }
+  }
+
+  /* AND A COUNT THAT LEADS SOMEWHERE LOOKS LIKE IT DOES. It is an `<a>` only when the evaluator said
+     where the rest are; dimmed like the sentence beside it, underlined so it reads as the door it is. */
+  a.queue-more {
+    display: inline-block;
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+
+  a.queue-more:hover,
+  a.queue-more:focus-visible {
+    color: var(--ink);
+  }
+
+  /* AN OPTION'S VISUAL IS ITS OWN BOX, on the first track above the option's words, because the three
+     tracks are shared by every option (above) and a box beside the label would push the buttons out
+     of their one edge. Above the words it reads as a sample laid over its name. */
+  .queue-option > .queue-visual {
+    grid-column: 1;
+    justify-self: start;
+  }
+
+  .queue-visual {
+    display: flex;
+    gap: 2px;
+    min-inline-size: 0;
+  }
+
+  /* THE ONE COLOUR ON THE PAGE THAT NO THEME CHOSE (05 §5, "a colour from data is drawn only inside
+     its option's box"). `--swatch` is set on this chip and nowhere else, so nothing around it can
+     inherit it, and this is the only rule that reads it. The hairline is the theme's, so a swatch
+     the colour of the surface under it is still a chip rather than a hole. And forced colours leave
+     it alone, because in that mode every background is repainted and the lining a person is asked
+     to choose would be drawn as no colour at all. */
+  .queue-swatch {
+    flex: none;
+    inline-size: 20px;
+    block-size: 20px;
+    background: var(--swatch);
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    forced-color-adjust: none;
+  }
+
+  .queue-figure {
+    padding-inline: var(--sp-2);
+    border-radius: var(--r-pill);
+    background: var(--s2);
+    color: var(--ink);
+    font-size: var(--t-sm);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .queue-file {
+    display: block;
+    inline-size: 4rem;
+    aspect-ratio: 1;
+    object-fit: cover;
+    border-radius: var(--r-sm);
+    background: var(--s2);
+  }
+
+  /* `queue tiles`: A TILE A QUESTION, SIDE BY SIDE WHERE THEY FIT, each led by what its recommended
+     option is. The tracks answer the queue's own width, as the cards grid does, and the count of what
+     is left spans them all rather than sitting in a tile's place. */
+  .queue:has(> .queue-tile) {
+    grid-template-columns: repeat(auto-fill, minmax(min(16rem, 100%), 1fr));
+    align-items: start;
+  }
+
+  .queue:has(> .queue-tile) > .queue-more {
+    grid-column: 1 / -1;
+  }
+
+  /* THE LEADING VISUAL FILLS THE TILE'S WIDTH: the swatches share it, the figure is the tile's
+     largest type, the file is a picture at the tile's width. It is the same box an option draws,
+     only larger, so the colour is still inside its option's box. */
+  .queue-tile > .queue-visual {
+    margin-block: calc(var(--sp-4) * -1) var(--sp-1);
+    margin-inline: calc(var(--sp-4) * -1);
+    overflow: hidden;
+    border-start-start-radius: var(--r-lg);
+    border-start-end-radius: var(--r-lg);
+  }
+
+  .queue-tile > .queue-visual > .queue-swatch {
+    flex: 1;
+    inline-size: auto;
+    block-size: 4.5rem;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .queue-tile > .queue-visual > .queue-figure {
+    padding: var(--sp-4);
+    flex: 1;
+    border-radius: 0;
+    font-size: var(--t-xl);
+    font-weight: 500;
+  }
+
+  .queue-tile > .queue-visual > .queue-file {
+    flex: 1;
+    inline-size: 100%;
+    aspect-ratio: 16 / 9;
+    border-radius: 0;
+  }
+
+  .queue-suggested {
+    margin: 0;
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    font-weight: 500;
+  }
+
+  /* THE WAYS TO ANSWER ARE FOLDED AND SAY SO IN WORDS, a pill like a section's fold, because the tile
+     has to be read before it is answered and the recommendation must not stand in for the choice. */
+  .queue-ways > .queue-options {
+    margin-block-start: var(--sp-2);
+  }
+
+  .queue-ways-toggle {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: var(--ctl-h-sm);
+    padding-inline: var(--sp-2);
+    border-radius: var(--r-sm);
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    font-weight: 500;
+    list-style: none;
+    cursor: pointer;
+  }
+
+  .queue-ways-toggle::-webkit-details-marker {
+    display: none;
+  }
+
+  .queue-ways-toggle:hover {
+    background: var(--s2);
+    color: var(--ink);
+  }
+
+  @media (pointer: coarse) {
+    .queue-ways-toggle {
+      min-block-size: var(--tap);
+    }
+  }
+
+  /* ── capture: the one-line add ───────────────────────────────────────────
+     The register's own add line, as a block: one rounded field on the first raised surface, the Add
+     inside its edge once there is text. The same box, border and height the grid's line draws in
+     `/r/[register]`, so a person who has added a row there recognises this one, and the focus ring is
+     `controls.css`'s `.capture-field:focus-within`, on the box and not the input, because the button
+     is inside the box and a ring round the text alone would cut the field off from its own Add. */
+
+  .capture {
+    margin: 0;
+  }
+
+  .capture-field {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-block-size: var(--ctl-h);
+    padding-inline: var(--sp-3) var(--sp-1);
+    background: var(--s1);
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    transition: border-color var(--d-state) var(--ease-out);
+  }
+
+  .capture-field:hover {
+    border-color: var(--edge);
+  }
+
+  .capture-input {
+    flex: 1;
+    align-self: stretch;
+    margin-block: -1px;
+    min-inline-size: 0;
+    padding-block: 0;
+    background: none;
+    border: 0;
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--t-ui);
+  }
+
+  .capture-input:focus-visible {
+    /* focus-ok: `.capture-field:focus-within` in `controls.css` draws the ring on the box the reader sees. */
+    outline: none;
+    box-shadow: none;
+  }
+
+  .capture-add {
+    min-block-size: var(--ctl-h-sm);
+    padding: 0 var(--sp-3);
+    background: var(--ink);
+    border: 1px solid var(--ink);
+    border-radius: var(--r-sm);
+    color: var(--bg);
+    font-size: var(--t-sm);
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  /* The register's line was measured at 48 by 24 at 390 and taken to `--tap` for a thumb; this is that line. */
+  @media (pointer: coarse) {
+    .capture-add {
+      min-block-size: var(--tap);
+    }
+  }
+
+  /* WHERE NOTHING CAN WRITE, ONE DIM LINE naming the list, as the queue's count is drawn: a door
+     underlined where it leads somewhere, words where it does not. */
+  .capture-elsewhere {
+    max-inline-size: var(--measure);
+    margin: 0;
+    color: var(--dim);
+  }
+
+  a.capture-where {
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+
+  a.capture-where:hover,
+  a.capture-where:focus-visible {
+    color: var(--ink);
+  }
+
+  /* ── diff: before and after ──────────────────────────────────────────────
+     Track changes rather than a patch: a skill is prose, so its lines are in the UI face and wrap
+     inside the box, and a phone never scrolls one sideways. What was taken out keeps its words,
+     dimmed and struck, with a minus beside it; what was put in sits on the held wash in ink with a
+     plus. Each mark's name is its word, and red stays for danger. */
+
+  .diff {
+    display: grid;
+    gap: var(--sp-2);
+  }
+
+  .diff-sum {
+    margin: 0;
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  .diff-lines {
+    padding-block: var(--sp-2);
+    background: var(--s1);
+    border-radius: var(--r-md);
+    overflow: hidden;
+  }
+
+  .diff-line {
+    display: grid;
+    grid-template-columns: 1.5em minmax(0, 1fr);
+    padding-inline: var(--sp-2) var(--sp-3);
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    line-height: var(--lh-body);
+    text-decoration: none;
+  }
+
+  .diff-mark {
+    color: var(--dim);
+    text-align: center;
+  }
+
+  /* Pre-wrap keeps a line's own indentation, an empty line keeps its height, and a line of prose
+     wraps at a reading measure while its wash still spans the box. */
+  .diff-text {
+    max-inline-size: var(--measure);
+    min-block-size: 1lh;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .diff-line[data-op='add'] {
+    background: var(--hold-wash);
+    color: var(--ink);
+  }
+
+  .diff-line[data-op='add'] .diff-mark {
+    color: var(--ink);
+  }
+
+  .diff-line[data-op='del'] .diff-text {
+    color: var(--dim);
+    text-decoration: line-through;
+  }
+
+  .diff-toggle {
+    display: flex;
+    align-items: center;
+    min-block-size: var(--ctl-h);
+    padding-inline: calc(var(--sp-2) + 1.5em) var(--sp-3);
+    color: var(--dim);
+    font-size: var(--t-sm);
+    list-style: none;
+    cursor: pointer;
+  }
+
+  .diff-toggle::-webkit-details-marker {
+    display: none;
+  }
+
+  .diff-toggle:hover {
+    background: var(--hover-wash);
+    color: var(--ink2);
+  }
+
+  @media (pointer: coarse) {
+    .diff-toggle {
+      min-block-size: var(--tap);
+    }
+  }
+
+  /* ── rows: spec, params ─────────────────────────────────────────────────── */
+
+  /* UNBOXED, like the ledger and the table: rows on the page's own ground with a hairline between
+     each. The overflow stays clipped so a value that will not wrap cannot widen the page. */
+  .rows {
+    overflow: hidden;
+  }
+
+  .row {
+    display: grid;
+    grid-template-columns: minmax(9ch, 22ch) minmax(0, 1fr) minmax(0, auto);
+    gap: var(--sp-3);
+    align-items: baseline;
+    padding: var(--sp-2) var(--sp-3);
+    min-block-size: var(--row-h);
+    font-size: var(--t-ui);
+    border-block-end: 1px solid var(--line-soft);
+  }
+
+  .row:last-child {
+    border-block-end: 0;
+  }
+
+  .row-label {
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  /* A FIGURE NEVER WRAPS. `GBP 14.00` broken across two lines is not a narrower figure, it is a
+     currency on one line and a number on another — the same class of wrong as truncating one. The
+     track can be narrow; the value inside it stays whole and the row grows instead. */
+  .row-value {
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .row-note {
+    color: var(--dim);
+    font-size: var(--t-sm);
+    text-align: end;
+  }
+
+  /**
+   * THREE TRACKS DO NOT FIT ON A PHONE, AND THE MIDDLE ONE GOT ZERO.
+   *
+   * `minmax(9ch, 22ch) minmax(0, 1fr) minmax(0, auto)` is a desktop track list with no rule under
+   * it. At 390 the label took 190px, the note 110px and `1fr` collapsed to ZERO — and `.row-value`
+   * is `white-space: nowrap` with visible overflow, so the value printed straight over the note
+   * beside it: `redirect → kiln.example` (159px of text in a 0px box) reading as
+   * `redirect →okilm.exam` across `Nordhaven Registry`. Four rows of `/p/estate` were illegible,
+   * and at 320 the same collapse cut `GBP 14.00` to `GBP 1` on two project pages.
+   *
+   * The comment three rules up says the row "grows instead" when the track is narrow. A `1fr` track
+   * does not grow — it takes what is left, and there was nothing left.
+   *
+   * SO THE ROW BECOMES TWO LINES, which is `13 §10`'s own answer to this shape everywhere else in
+   * the product: the label leads, the value and the note share the line under it. Nothing truncates
+   * and nothing overlaps, because nothing is competing for one track.
+   */
+  @media (width < 640px) {
+    .row {
+      grid-template-columns: minmax(0, 1fr) minmax(0, auto);
+      gap: var(--sp-1) var(--sp-3);
+      align-items: baseline;
+    }
+
+    .row-label {
+      grid-column: 1 / -1;
+    }
+
+    .row-note {
+      text-align: end;
+    }
+  }
+
+  /* ── inputs: a few fields of one row to type into ──────────────────────────
+     Where the host cannot write, `inputs` is a spec and the rules above draw it. Where it can, each
+     field is a label holding its control, laid on the spec's own tracks, so the same block reads the
+     same whether or not it can be typed into and a label lines up with a spec's label above it. The
+     box is `capture`'s: the raised surface, the hairline, the control height. */
+  .inputs {
+    display: grid;
+  }
+
+  .inputs-field {
+    display: grid;
+    grid-template-columns: minmax(9ch, 22ch) minmax(0, 1fr);
+    gap: var(--sp-3);
+    align-items: center;
+    padding: var(--sp-2) var(--sp-3);
+    border-block-end: 1px solid var(--line-soft);
+    cursor: text;
+  }
+
+  .inputs-field:last-child {
+    border-block-end: 0;
+  }
+
+  .inputs-field:has(> .inputs-check) {
+    cursor: pointer;
+  }
+
+  .inputs-label {
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  .inputs-box {
+    min-inline-size: 0;
+    min-block-size: var(--ctl-h);
+    padding-inline: var(--sp-3);
+    background: var(--s1);
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--t-ui);
+    font-variant-numeric: tabular-nums;
+    transition: border-color var(--d-state) var(--ease-out);
+  }
+
+  .inputs-box:hover {
+    border-color: var(--edge);
+  }
+
+  /* A CHECKBOX IS ITS OWN SIZE AT THE START OF ITS TRACK. It is drawn by `controls.css`, an ink fill
+     when ticked like every checked control, and no longer asks the browser for a fill in the brand's
+     red (design D-1). */
+  .inputs-check {
+    justify-self: start;
+    inline-size: 18px;
+    block-size: 18px;
+    margin: 0;
+  }
+
+  .inputs-empty {
+    max-inline-size: var(--measure);
+    margin: 0;
+    color: var(--dim);
+  }
+
+  @media (pointer: coarse) {
+    .inputs-box {
+      min-block-size: var(--tap);
+    }
+  }
+
+  /* On a phone the label leads and the control takes the line under it, as a spec's row does. */
+  @media (width < 640px) {
+    .inputs-field {
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--sp-1);
+    }
+  }
+
+  /* AND THREE LINES ON THE NARROWEST PHONE. Two tracks still fit at 390; at 320 the value and the
+     note were sharing 250px and `redirect → kiln.example` needed 159 of it on its own. A value that
+     may not wrap needs a line that is not shared. */
+  @media (width < 400px) {
+    .row {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .row-note {
+      text-align: start;
+    }
+  }
+
+  /* ── proportional: bar, gauge ───────────────────────────────────────────── */
+
+  /* THE ROWS HANG THEIR PADDING INTO THE GUTTER, so a bar's label starts where the section title
+     over it starts. The 8px is there for the hole's dashed box and the hover wash, and inside the
+     column it pushed every label in by 8px from every heading on the page. */
+  .prop {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+    margin-inline: calc(-1 * var(--sp-2));
+  }
+
+  .prop-row {
+    display: grid;
+    grid-template-columns: minmax(9ch, 20ch) minmax(0, 1fr) auto auto auto;
+    gap: var(--sp-3);
+    align-items: center;
+    padding: var(--sp-1) var(--sp-2);
+    min-block-size: var(--row-h);
+    border: 0;
+    border-radius: var(--r-sm);
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: start;
+  }
+
+  .prop-track {
+    position: relative;
+    block-size: 4px;
+    border-radius: var(--r-pill);
+    background: var(--s2);
+    overflow: hidden;
+  }
+
+  /* AN UNTONED BAR IS INK, NOT THE ACCENT. A `bar` block is a magnitude comparison — eight rows of
+     "who you owe, largest first" — and painting all eight in the brand colour spends the one loud
+     thing on the screen on the fact that a list is a list. The bar earns a colour only when the row
+     it belongs to carries an intent; otherwise it is a dark neutral and the LENGTH does the work,
+     which is the only channel a bar chart actually has. */
+  .prop-track::after {
+    content: '';
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: 0;
+    inline-size: calc(var(--magnitude) * 100%);
+    border-radius: var(--r-pill);
+    background: var(--tone-fill, color-mix(in srgb, var(--ink2) 40%, transparent));
+  }
+
+  .prop-label {
+    color: var(--ink2);
+    font-size: var(--t-sm);
+  }
+
+  /* AND A PART'S NAME IS A TARGET, so on a thumb it is one. Measured at 61x17 on `/p/work` below
+     640: "No project", the row a `bar` block draws for what belongs to no part, which opens exactly
+     those rows. A name that opens a list is not a link inside a sentence, so neither WCAG 2.5.8 nor
+     `13 §7` exempts it. `.tap`'s trick grows the hit box without moving the word, and the row grows
+     with it so the box stays inside its own row rather than taking the press meant for the row
+     above. The same rule a split legend's name takes in `blocks-charts.css`. */
+  @media (pointer: coarse) {
+    .prop-row {
+      min-block-size: var(--tap);
+    }
+
+    .prop-label a {
+      position: relative;
+    }
+
+    .prop-label a::before {
+      content: '';
+      position: absolute;
+      inset: min(0px, calc((100% - var(--tap)) / 2)) 0;
+    }
+  }
+
+  .prop-value {
+    color: var(--ink);
+    font-size: var(--t-sm);
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+  }
+
+  .prop-note {
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  /* The hole is the only row that is a button: it opens the register filtered to exactly those
+     rows, because an unknown is a task somebody has to close (05 §7.5). */
+  .prop-row[data-hole] {
+    cursor: pointer;
+    border: 1px dashed var(--edge);
+    transition: background var(--d-state) var(--ease-out);
+  }
+
+  .prop-row[data-hole]:hover {
+    background: var(--s2);
+  }
+
+  /* AND IT IS 44 UNDER A THUMB. `--row-h` is 34 comfortable and 30 compact, and this is the only
+     row of a chart that is a control. Below 640 the two-line rule further down already carries it
+     past the floor; above it, a coarse pointer is a tablet and nothing has ever measured one,
+     because `layout.mjs` runs its target rule below 640 only. `05 §6`: density follows the
+     pointer, never the width. `button.` because the same class is a plain `div` wherever the host
+     cannot act on the hole. */
+  @media (pointer: coarse) {
+    button.prop-row {
+      min-block-size: var(--tap);
+    }
+  }
+
+  /**
+   * FIVE TRACKS DO NOT FIT ON A PHONE, AND THE ONE THAT GAVE WAY WAS THE CHART.
+   *
+   * `minmax(9ch, 20ch) minmax(0, 1fr) auto auto auto` is a desktop track list, and it had no rule
+   * under it at any width. The label, the value, the note and the tone glyph all size to their
+   * content; `minmax(0, 1fr)` is the only track that can yield, and `minmax(0, 1fr)` is
+   * `.prop-track`, which is the bar.
+   *
+   * Measured against the shipped build at 390, in a 342px row: the tracks compute to
+   * `107.6px 0px 98.2px 88.2px 0px`. **The bar is exactly zero pixels wide in every row of every
+   * `bar` and `gauge` block on `/`, `/p/*` and `/s/*`** — the chart is gone and a row of numbers
+   * is left, which is the one thing a chart is not. The same at 360, 320 and 430, so it is not a
+   * narrow-phone edge case, it is every phone. A row with no drawable value is worse again: with
+   * four children instead of five the value lands in the collapsed track and `GBP 900.00` renders
+   * in 9.4px.
+   *
+   * It never overflowed, which is why nothing caught it: a grid that answers a narrow container by
+   * squeezing a track to zero stays inside the viewport, and `layout.mjs` counts a right edge.
+   *
+   * SO THE ROW BECOMES TWO LINES, which is exactly what `.row` one hundred lines up does with the
+   * same shape and for the same reason: the label leads, and the bar, the value, the note and the
+   * glyph share the line under it. At 390 that gives the bar 108px of a 342px row, and the note
+   * stops being clipped as well (88.2px of a string that needs 104.6). No new breakpoint: 640 is
+   * already in the sweep, and each new one costs `layout.mjs` two more passes over every route.
+   *
+   * FOUR TRACKS AND NOT THREE, because the glyph is the fifth child when a row carries a tone and
+   * absent when it does not. Given three tracks it wrapped to a line of its own, 229px wide,
+   * under the value. The empty fourth track costs one 8px gap on rows without a glyph, which is
+   * the cheaper of the two mistakes.
+   */
+  @media (width < 640px) {
+    .prop-row {
+      grid-template-columns: minmax(0, 1fr) auto auto auto;
+      gap: var(--sp-1) var(--sp-2);
+    }
+
+    .prop-label {
+      grid-column: 1 / -1;
+    }
+
+    .prop-track {
+      grid-column: 1;
+    }
+  }
+
+  /* ── inline: chips ──────────────────────────────────────────────────────── */
+
+  /* A RUN OF COUNTS, SET AS FIGURES AND NOT AS BOXES. Each was a tinted box with 12px of padding
+     and an empty 6px glyph slot, so `22 open` began 26px in from the heading over it; in the light
+     scheme the tint all but vanished and the counts floated in blotches. Now the figure starts on
+     the heading's edge, at a size that ranks it above its word, and the space between pairs is
+     what separates them. A tone still draws its dot, before the figure. */
+  .inline {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--sp-2) var(--sp-6);
+  }
+
+  .pill {
+    position: relative;
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--sp-2);
+    white-space: nowrap;
+  }
+
+  .pill-glyph {
+    align-self: center;
+    inline-size: var(--dot);
+    block-size: var(--dot);
+    border-radius: var(--r-pill);
+    background: var(--tone-fill, var(--faint));
+    flex: none;
+  }
+
+  /* An unknown glyph draws no glyph and takes no room: every pill in a run loses it alike, so the
+     figures still line up with each other and with the heading (05 §3 invariant 2). */
+  .pill-glyph:not([data-glyph]),
+  .pill-glyph[data-glyph=''] {
+    display: none;
+  }
+
+  /* A CHIP WHOSE NAME THE HOST DREW shows the drawing in place of the dot, `--icon-m` in the chip's own colour. */
+  .pill-glyph:has(> svg) {
+    inline-size: var(--icon-m);
+    block-size: var(--icon-m);
+    border-radius: 0;
+    background: none;
+  }
+
+  .pill-glyph > svg {
+    display: block;
+    inline-size: 100%;
+    block-size: 100%;
+  }
+
+  .pill-figure {
+    color: var(--ink);
+    font-size: var(--t-lg);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .pill-word {
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  /**
+   * ONE DOT A CHIP, AND IT LEADS (design SYS-9). A toned chip carries two marks: the glyph slot before the figure, which
+   * draws a dot in the tone when its name has no drawing, and the tone's own glyph after the word, which is the one with
+   * a name for a screen reader. Both drew, and "• 2 clients •" read as a run of bullets with a stray one at the end.
+   *
+   * So the tone's glyph moves to the front, where the comment over `.inline` says the dot goes, and where the slot is
+   * already drawing a dot it is hidden from sight and kept for a screen reader. A slot drawing a picture is not empty,
+   * so beside one the tone keeps its dot.
+   */
+  .pill > .glyph {
+    order: -1;
+    align-self: center;
+  }
+
+  .pill:has(> .pill-glyph[data-glyph]:not([data-glyph='']):empty) > .glyph {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* ── list: todo, steps, timeline ────────────────────────────────────────── */
+
+  .list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: step;
+    /* No box, the way `.rows` has none; the hairlines between items are the structure. */
+    overflow: hidden;
+  }
+
+  /**
+   * AN ITEM IS NAMED AREAS, AND THE TITLE ALWAYS HAS ITS LINE (design SYS-9).
+   *
+   * It was four tracks on one line, `auto minmax(0, 1fr) minmax(0, auto) auto`, and the detail's track could crush the
+   * title, which is how the design review found "Waiting on you" broken at 1440; a task's quiet line was a fifth child
+   * with no track of its own, and under 400px a two-track override set it in the next row's first column, where the next
+   * task's box belongs. Now the first line is the marker, the title and the state at the end, and the detail and the quiet line
+   * after it (a task's due date and who changed it) each go under the title, from its start. So a long detail never
+   * crowds the title, at any width, and nothing needs a breakpoint to say so.
+   *
+   * THE TITLE KEEPS 16ch, `min()` so a slot narrower than that still fits. The state's track is its words' own width
+   * and wraps before it overlaps anything.
+   *
+   * ROW GAP IS ZERO and the lines under the title carry their own 4px, because the template names three rows and an
+   * item without a detail would otherwise keep the gaps of rows it does not draw. An empty cell takes no line at all.
+   *
+   * SCOPED TO `.list`. A bare `.item` in this layer reached every component that names a row "item", the rail first,
+   * which had to undo it. The renderer only ever emits one inside a list.
+   */
+  .list > .item {
+    display: grid;
+    grid-template-areas:
+      'marker title state'
+      '. detail detail'
+      '. meta meta';
+    grid-template-columns: auto minmax(min(16ch, 100%), 1fr) auto;
+    gap: 0 var(--sp-3);
+    align-items: baseline;
+    padding: var(--sp-2) var(--sp-3);
+    min-block-size: var(--row-h);
+    font-size: var(--t-ui);
+    border-block-end: 1px solid var(--line-soft);
+  }
+
+  /* A list with no marker (a plain list, numbered steps) starts its title on the list's own edge, rather than one gap
+     in from an empty column. */
+  .list > .item:not(:has(> .item-marker)) {
+    grid-template-areas:
+      'title state'
+      'detail detail'
+      'meta meta';
+    grid-template-columns: minmax(min(16ch, 100%), 1fr) auto;
+  }
+
+  .list > .item > .item-marker {
+    grid-area: marker;
+  }
+
+  .list > .item > .item-title {
+    grid-area: title;
+  }
+
+  .list > .item > .item-state {
+    grid-area: state;
+    justify-self: end;
+  }
+
+  .list > .item > .item-detail {
+    grid-area: detail;
+    margin-block-start: var(--sp-1);
+  }
+
+  .list > .item > .item-meta {
+    grid-area: meta;
+    margin-block-start: var(--sp-1);
+  }
+
+  .list > .item > :is(.item-detail, .item-meta, .item-state):empty {
+    display: none;
+  }
+
+  .list > .item:last-child {
+    border-block-end: 0;
+  }
+
+  .list[data-kind='steps'] > .item {
+    counter-increment: step;
+  }
+
+  .list[data-kind='steps'] .item-title::before {
+    content: counter(step) '  ';
+    color: var(--dim);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .item-title {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-inline-size: 0;
+    color: var(--ink);
+  }
+
+  /* A TASK'S TITLE IS A LINE OF TEXT, NOT A ROW OF BOXES (MOD-25, `p-work-1440.png`). As a flex container every inline
+     part of it (a link, a chip, the working dot) became a flex item that shrank to its longest word, so a title with a
+     link in it stood one word a line and the quiet line under it ran into the words. Set as text it wraps as a
+     sentence does, and a word longer than the track breaks rather than pushing out of it. The working dot keeps its
+     space from the literal one `List.svelte` writes after it. */
+  .list[data-kind='todo'] > .item > .item-title {
+    display: block;
+    overflow-wrap: anywhere;
+  }
+
+  .item-detail {
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  /* A TASK'S DUE DATE AND WHO CHANGED IT LAST, the renderer's one quiet line under a todo (and a link's note, which
+     uses the same line). It was drawn in the row's own size and ink as a fifth child of a four-track row, so it wrapped
+     into the next row's first column. */
+  .item-meta {
+    color: var(--dim);
+    font-size: var(--t-sm);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .item-state {
+    color: var(--dim);
+    font-size: var(--t-xs);
+    font-variant-numeric: tabular-nums;
+    text-align: end;
+  }
+
+  .item-marker {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    inline-size: 17px;
+    block-size: 17px;
+    border: 1px solid var(--edge);
+    border-radius: var(--r-sm);
+    color: var(--on-ink);
+    font-size: var(--t-xs);
+    font-variant-numeric: tabular-nums;
+    align-self: center;
+  }
+
+  /* THE SAME BOX, WHETHER OR NOT IT CAN ACT. `List` draws a `<button>` where the host gave it
+     somewhere to put the answer and a `<span>` where it did not, and a user-agent button arrives
+     wearing its own face: a system colour behind it and its own padding inside. Nothing on the
+     screen may move when a callback appears, so the control is reset back to the drawing it
+     replaced. Colour and size are the rule above's, at higher specificity. */
+  button.item-marker {
+    appearance: none;
+    padding: 0;
+    background-color: transparent;
+    cursor: pointer;
+  }
+
+  /* A TICKED BOX IS AN INK FILL WITH THE GROUND SHOWING THROUGH AS THE TICK, as every checked control in the product is
+     (`controls.css`). Red means danger and nothing else, and a done task is not in danger (design D-1). */
+  .item-marker[data-done='yes'] {
+    background-color: var(--on);
+    border-color: var(--on);
+  }
+
+  /* A LEADING DATE SITS IN A FIXED TRACK, so every title in the list starts at one x whatever the date says: "3d ago"
+     and "2 Sep 2025" were each as wide as their words, and the titles beside them started at a different place on
+     every row. 11ch of the row's size is room for the longest date the product writes ("2 Sep 2025", ten characters)
+     set a step smaller; a date an author wrote longer than that wraps inside the track rather than running into the
+     title. The tone travels with the title. */
+  .list[data-kind='timeline'] > .item {
+    grid-template-columns: 11ch minmax(min(16ch, 100%), 1fr) auto;
+  }
+
+  .list[data-kind='timeline'] .item-marker {
+    justify-content: start;
+    align-self: baseline;
+    inline-size: auto;
+    block-size: auto;
+    min-inline-size: 0;
+    border: 0;
+    border-radius: 0;
+    color: var(--dim);
+    font-size: var(--t-xs);
+    overflow-wrap: anywhere;
+  }
+
+  /* `steps path`: A STONE A STEP, the stones in a column of their own and the line drawn through its
+     middle behind them, so the hairlines between rows go and the line is the structure. The column is
+     as wide as the word "Next", so every stone is centred on the same x whether it holds a tick, the
+     word or nothing. A step's number goes too: the stone says where it is. The detail goes under the
+     step's title, as every list item's does. */
+  .list[data-kind='steps'][data-form='path'] > .item {
+    position: relative;
+    grid-template-columns: 3.5rem minmax(min(16ch, 100%), 1fr) auto;
+    border-block-end: 0;
+    counter-increment: none;
+  }
+
+  .list[data-kind='steps'][data-form='path'] .item-title::before {
+    content: none;
+  }
+
+  .list[data-kind='steps'][data-form='path'] > .item::before {
+    content: '';
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: calc(var(--sp-3) + 1.75rem - 1px);
+    inline-size: 2px;
+    background: var(--line);
+  }
+
+  /* THE LINE STARTS AND ENDS AT A STONE'S MIDDLE, which is half a line under the row's padding and
+     not half the row: a step's detail takes a second line, and at 50% the first stone sat 3px above
+     where the line began (measured at 390, a row of 60.5px). */
+  .list[data-kind='steps'][data-form='path'] > .item:first-child::before {
+    inset-block-start: calc(var(--sp-2) + 0.5lh);
+  }
+
+  .list[data-kind='steps'][data-form='path'] > .item:last-child::before {
+    inset-block-end: auto;
+    block-size: calc(var(--sp-2) + 0.5lh);
+  }
+
+  .list[data-kind='steps'][data-form='path'] > .item:only-child::before {
+    content: none;
+  }
+
+  /* A LATER STONE IS THE LIST'S EMPTY BOX, round; a DONE one is a ticked box, the ink fill every
+     checked control wears (as `todo`'s is), with its step muted; the NEXT one is the word, in ink on
+     the page's ground, with its step at full weight, because finding it without reading every row is
+     what the form is for. Each stone has a ground, so the line passes behind it. */
+  .list[data-form='path'] .item-marker {
+    position: relative;
+    justify-self: center;
+    border-radius: var(--r-pill);
+    background: var(--bg);
+  }
+
+  .list[data-form='path'] > .item[data-mark='done'] > .item-marker {
+    background: var(--on);
+    border-color: var(--on);
+    font-variant-emoji: text;
+  }
+
+  .list[data-form='path'] > .item[data-mark='done'] .item-title {
+    color: var(--dim);
+  }
+
+  .list[data-form='path'] > .item[data-mark='next'] > .item-marker {
+    inline-size: auto;
+    block-size: auto;
+    border: 0;
+  }
+
+  .path-next {
+    display: inline-block;
+    padding: 1px var(--sp-2);
+    border: 1px solid var(--ink);
+    border-radius: var(--r-pill);
+    background: var(--bg);
+    color: var(--ink);
+    font-size: var(--t-xs);
+    font-weight: 500;
+  }
+
+  .list[data-form='path'] > .item[data-mark='next'] .item-title {
+    font-weight: 500;
+  }
+
+  /* THE STEPS THE SHORT VIEW LEFT OUT, said as a count under the last stone, dim like the queue's. */
+  .path-more {
+    margin: 0;
+    padding-block: var(--sp-1) 0;
+    padding-inline: calc(var(--sp-3) + 3.5rem + var(--sp-3)) var(--sp-3);
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  /* ── table: comparison, and the register grid's body ────────────────────── */
+
+  /* ROWS BECOME CARDS BELOW 640px — `13 §10`. Above it the cards do not exist and the table does;
+     below it, the other way round. There is never a moment where both are half-visible, which is
+     the same rule `RowCards` keeps for a register. */
+  .table-cards {
+    display: none;
+  }
+
+  @media (width < 640px) {
+    /* NO BOX ROUND THE LIST, the way the grid has none. Rows on the page's own ground with a
+       hairline between them read as a list; a raised card holding more cards read as a form. */
+    .table-cards {
+      display: block;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .table-cards li + li .table-card {
+      border-block-start: 1px solid var(--line-soft);
+    }
+
+    .table-card {
+      inline-size: 100%;
+      background: none;
+      border: 0;
+      font: inherit;
+      text-align: start;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      /* 44px on both axes, and a card is taller than that anyway. */
+      min-block-size: 56px;
+      /* `--sp-2` ABOVE AND BELOW, AND IT WAS `--sp-3`. Twelve pixels each side framed a card of four
+         lines; around the two it has now they were two fifths of it. `--sp-2` is what `RowCards`
+         pads the register's two-line card with, and the 56px floor above is unchanged. */
+      padding: var(--sp-2) var(--sp-1);
+      /* No bar down the leading edge any more. The glyph at the head of the title says late or
+         settled, with a name for a screen reader, and a coloured edge on a row with no box round it
+         read as an alert strip. */
+      color: var(--ink);
+      font-size: var(--t-ui);
+      text-decoration: none;
+    }
+
+    /**
+     * TWO LINES, AND IT WAS ONE LINE PER COLUMN.
+     *
+     * The first column led and every other column was a label-and-value line of its own, so a
+     * four-column table was a four-line card. Measured at 390 on the build of September 10th:
+     * `/p/money` was 6,267px against 2,800px at 1440, its forecast 1,615px for thirteen payments at
+     * 116 to 144px each, and the services table on `/p/estate` 2,329px for sixteen rows at 145px.
+     *
+     * Now the title and the figure share the first line and at most two more values are the second,
+     * unlabelled: text at its start, quantities at its end. Which column goes where is
+     * `cardPlan` in `braindog-render`, read from the alignment and truncation the table declares;
+     * this only draws it. Which values a card draws is `cardCells` (05 §6).
+     */
+    .table-card-head {
+      display: flex;
+      align-items: baseline;
+      gap: var(--sp-3);
+    }
+
+    /* A card grows, so a long title wraps rather than truncating, and `anywhere` so a title that is
+       one long word, an address or a file name, breaks instead of pushing the figure off the card. */
+    .table-card-lead {
+      flex: 1;
+      min-inline-size: 0;
+      display: flex;
+      align-items: baseline;
+      gap: var(--sp-2);
+      color: var(--ink);
+      font-weight: 500;
+      overflow-wrap: anywhere;
+    }
+
+    /* On a card the lead is a flex line rather than a truncating cell, so the glyph is simply the
+       first item on it — no gutter to reserve and nothing to absolutely position. */
+    .table-card-lead .td-glyph {
+      position: static;
+      flex: none;
+    }
+
+    /* A FIGURE IS NOT TRUNCATED HERE, AND NOT BROKEN EITHER. `GBP −19,100.00` split over two lines
+       is a figure somebody reads as two, so the title beside it is the one that gives way. */
+    .table-card-mark {
+      flex: none;
+      color: var(--ink);
+      font-variant-numeric: tabular-nums;
+      text-align: end;
+      white-space: nowrap;
+    }
+
+    /* An identifier ends the line the way `#seq` ends a register's card, in the id face and quiet. */
+    .table-card-mark[data-truncate='middle'] {
+      color: var(--dim);
+      font-family: var(--font-id);
+      font-size: var(--t-xs);
+    }
+
+    /* The figure's column name, for a screen reader only. `Table` says why beside the markup. */
+    .table-card-name {
+      position: absolute;
+      inline-size: 1px;
+      block-size: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    .table-card-rest {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 0 var(--sp-3);
+      font-size: var(--t-sm);
+    }
+
+    .table-card-start,
+    .table-card-end {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 0 var(--sp-3);
+      min-inline-size: 0;
+    }
+
+    /* Quantities keep to the end of the line even when the text before them wraps, so a running
+       balance reads down one edge of the list the way it reads down a column of the grid. */
+    .table-card-end {
+      margin-inline-start: auto;
+      justify-content: flex-end;
+    }
+
+    .table-card-pair {
+      display: flex;
+      align-items: baseline;
+      gap: var(--sp-1);
+      min-inline-size: 0;
+    }
+
+    .table-card-value {
+      min-inline-size: 0;
+      color: var(--ink2);
+      font-variant-numeric: tabular-nums;
+      overflow-wrap: anywhere;
+    }
+
+    /* A figure on the second line is kept whole for the reason the first line's is. */
+    .table-card-pair[data-truncate='never'] .table-card-value {
+      overflow-wrap: normal;
+      white-space: nowrap;
+    }
+
+    .table-region {
+      display: none;
+    }
+  }
+
+  /* NO BOX. The rows sit on whatever the table sits on with a hairline between each, so the list
+     is the shape of its rows rather than of a card holding them. A border, a fill and a shadow round
+     a list of invoices is a large part of what made the register read as a spreadsheet in a page.
+
+     `--tr-h` IS THE ROW: the reader's density plus room. `--row-h` is 30, 34 or 40, sized for a line
+     of text with nothing round it; a row somebody points at wants air above and below the words, and
+     at Comfortable this lands on 44, the size of a target. Density still moves it by the same steps. */
+  .table-region {
+    --tr-h: var(--table-row-h);
+    overflow: auto;
+  }
+
+  /* A TABLE WIDER THAN ITS SPACE SAYS SO AT THE EDGE IT IS CUT, as the settings strip does (4.7).
+     At 768 a list scrolled sideways inside itself with its last columns sliced mid-word and nothing
+     to say there was more. Hiding columns would drop a field the reader chose in Display, so the
+     columns stay and the clipped edge fades instead.
+
+     THE SCROLL DRIVES IT, NOT SCRIPT. The region's own inline scroll timeline moves the two fade
+     widths: the far edge fades until the end is reached, the near edge once it has left the start.
+     A region that does not overflow has no timeline, the animation does not apply, and both widths
+     stay 0, so a table that fits is drawn exactly as before. A browser without scroll timelines
+     draws no fade, which is the old behaviour and not a broken one. */
+  @property --edge-start {
+    syntax: '<length>';
+    inherits: false;
+    initial-value: 0px;
+  }
+
+  @property --edge-end {
+    syntax: '<length>';
+    inherits: false;
+    initial-value: 0px;
+  }
+
+  @keyframes table-edges {
+    0% {
+      --edge-start: 0px;
+      --edge-end: var(--sp-7);
+    }
+
+    4% {
+      --edge-start: var(--sp-7);
+    }
+
+    96% {
+      --edge-end: var(--sp-7);
+    }
+
+    100% {
+      --edge-start: var(--sp-7);
+      --edge-end: 0px;
+    }
+  }
+
+  @supports (animation-timeline: scroll()) {
+    .table-region {
+      --edge-dir: to right;
+      mask-image: linear-gradient(
+        var(--edge-dir),
+        transparent,
+        black var(--edge-start),
+        black calc(100% - var(--edge-end)),
+        transparent
+      );
+      animation: table-edges linear both;
+      animation-timeline: scroll(self inline);
+    }
+
+    .table-region:dir(rtl) {
+      --edge-dir: to left;
+    }
+  }
+
+  /* AND NEVER UNDER 44 UNDER A THUMB. A tablet at 768 draws the table, not the cards, and measured
+     40px rows: a row is the target that opens the row. Density still moves it above the floor. */
+  @media (pointer: coarse) {
+    .table-region {
+      --tr-h: max(var(--table-row-h), var(--tap));
+    }
+  }
+
+  /* AS WIDE AS ITS COLUMNS, AND NEVER NARROWER THAN ITS SPACE. It was only as wide as the region, so
+     a grid whose tracks came to 1002px in a 736px region at 768 laid its rows out past the row box,
+     and each `.rowgroup`, whose `content-visibility` contains paint, clipped them at 736: scrolling
+     sideways showed the header and blank rows under it. The table now takes the header's width. */
+  .table {
+    inline-size: max-content;
+    min-inline-size: 100%;
+    font-size: var(--t-ui);
+  }
+
+  .tr {
+    display: grid;
+    grid-template-columns: var(--cols);
+    align-items: center;
+    min-block-size: var(--tr-h);
+    border-block-end: 1px solid var(--line-soft);
+  }
+
+  /* THE HEADER IS A QUIET LINE OF NAMES, NOT A BAND. A column header is a word you read once and
+     then navigate by, so it is small, dim and in sentence case over the same hairline every row has.
+     The sunk fill with a full-strength edge under it was the loudest thing in the table and said the
+     least; uppercase would cost about 15% of reading speed for the privilege of looking like a
+     spreadsheet.
+
+     IT NO LONGER STICKS, because it never did. The region is its own scroll container and grows to
+     its rows, so nothing ever scrolled under the header: `sticky` was inert and its fill was the band. */
+  .th-row {
+    min-block-size: 32px;
+    border-block-end-color: var(--line);
+  }
+
+  /* THE CONTAINING BLOCK FOR THE COLUMN'S HIDDEN NAME. `.th-name` is absolutely positioned, and its
+     containing block was the sticky header row. When the header stopped sticking the name's
+     containing block became `<body>`, outside the region's scroll container, so every hidden name
+     past the edge stretched the whole document: 1,310px at a 900px window, measured. */
+  .th {
+    position: relative;
+    padding: var(--sp-1) var(--sp-3);
+    color: var(--dim);
+    font-size: var(--t-xs);
+    font-weight: 500;
+    letter-spacing: 0;
+  }
+
+  /* A column whose cells are a control, not a value: the header keeps its NAME and does not show
+     it. An empty header is an unnamed button in the tab order and an empty `columnheader` in the
+     tree — two findings the accessibility gate raised the moment one existed. */
+  .th-name {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .th-sort {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    cursor: pointer;
+  }
+
+  .th[aria-sort='ascending'] .th-sort::after {
+    content: ' ↑';
+  }
+
+  .th[aria-sort='descending'] .th-sort::after {
+    content: ' ↓';
+  }
+
+  /* THE ROWS NEVER WIDEN THE TABLE. Sized to their content, a long title let the flexible column grow
+     to 1520px at every width, 1440 included. A zero width with a full minimum gives the group no say in
+     the table's width and then fills it; `contain: inline-size` should do the same and, measured in
+     Chromium beside `content-visibility`, did not. */
+  .rowgroup {
+    content-visibility: auto;
+    inline-size: 0;
+    min-inline-size: 100%;
+  }
+
+  .td {
+    padding: 0 var(--sp-3);
+    color: var(--ink);
+    line-height: var(--tr-h);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* THE POINTER SAYS SO ONLY WHERE A PRESS DOES SOMETHING. `Table` draws `data-acts` on a cell whose
+     row has an `onactivate`, which is the register grid and a saved view; a declared page supplies
+     none, so every cell of every table on `/p/*` used to answer a click by calling nothing. The
+     handlers are gone from those and this is the half a reader sees before pressing. */
+  .td[data-acts] {
+    cursor: pointer;
+  }
+
+  [data-align='end'] {
+    text-align: end;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* THE TONE'S GUTTER, in the column that holds the glyph, and only in a table that has a tone to
+     put there.
+
+     A toned row's glyph sits at the head of that cell; if the space were not reserved on every
+     row, the marked rows would indent by an em and the column's left edge would go ragged — which
+     scans as several columns rather than one column with marks in it. Scoped to `[data-toned]` so a
+     table with no intent in it pays nothing for the gutter it would never use. */
+  .table[data-toned] .td[data-glyph] {
+    position: relative;
+    padding-inline-start: calc(var(--sp-3) + var(--dot) + var(--sp-2));
+  }
+
+  .td-glyph {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: var(--sp-3);
+    display: inline-flex;
+    align-items: center;
+    /* Drawn as the row's one dot; the glyph's text stays for a screen reader only. */
+    inline-size: var(--dot);
+    overflow: hidden;
+    color: transparent;
+    white-space: nowrap;
+    /* The cell sets `line-height: var(--row-h)` to centre one line of text. An absolutely positioned
+       box takes its own line box and inherited that height, which pushed the glyph below the middle
+       of the row — visible as a mark sitting under its own row rather than in it. */
+    line-height: 1;
+  }
+
+  .td-glyph::before {
+    content: '';
+    flex: none;
+    inline-size: var(--dot);
+    block-size: var(--dot);
+    border-radius: var(--r-pill);
+    background: var(--tone-fill, var(--faint));
+  }
+
+  /* A TABLE ON A PAGE STARTS ON THE HEADING'S EDGE AND ENDS ON THE PAGE'S. Every cell kept 12px of
+     padding on both sides, so a block's first column began 12px in from the section title over it
+     and its last figure stopped 12px short of the edge the stats above it end on. The outer cells
+     lose the outer padding; the gap between columns is unchanged. A toned table's dot takes the
+     first 6px and the words follow it.
+
+     NOT THE REGISTER GRID (`.table-slot`), whose rows are pressable and washed on hover and focus:
+     there the padding is the inside of that wash, and text against its edge would read as clipped. */
+  :not(.table-slot) > .table-region .th:first-child,
+  :not(.table-slot) > .table-region .td:first-child {
+    padding-inline-start: 0;
+  }
+
+  :not(.table-slot) > .table-region .th:last-child,
+  :not(.table-slot) > .table-region .td:last-child {
+    padding-inline-end: 0;
+  }
+
+  :not(.table-slot) > .table-region .table[data-toned] .td[data-glyph]:first-child,
+  :not(.table-slot) > .table-region .table[data-toned]:has(.td[data-glyph]:first-child) .th:first-child {
+    padding-inline-start: calc(var(--dot) + var(--sp-2));
+  }
+
+  :not(.table-slot) > .table-region .td[data-glyph]:first-child .td-glyph {
+    inset-inline-start: 0;
+  }
+
+  /* AN IDENTIFIER IS QUIET, in the id face, as a register's `#seq` and a card's already are. Only an
+     identifier truncates in the middle, so the declaration already says which cells these are; a
+     backlink table and a saved view ended every row on `#6` in full ink, the loudest cell in it. */
+  .td[data-truncate='middle'] {
+    color: var(--dim);
+    font-family: var(--font-id);
+    font-size: var(--t-xs);
+  }
+
+  /* A figure NEVER truncates. A truncated figure is not shortened, it is wrong (13 §4.2). */
+  .td[data-truncate='never'] {
+    overflow: visible;
+    text-overflow: clip;
+  }
+
+  /* A WASHED ROW IS ROUNDED AND LOSES THE HAIRLINES AT ITS EDGES. Hover, the caret and a
+     selection are each a shape laid over the list, and a rounded wash with a rule through its foot
+     and another across its head reads as a box that did not close. The rule over its head is the
+     previous row's, which is what `:has` reaches back for. */
+  .rowgroup .tr {
+    position: relative;
+  }
+
+  .rowgroup .tr:is(:hover, [data-focused], [aria-selected='true']) {
+    border-radius: var(--r-sm);
+    border-block-end-color: transparent;
+  }
+
+  .rowgroup .tr:has(+ .tr:is(:hover, [data-focused], [aria-selected='true'])) {
+    border-block-end-color: transparent;
+  }
+
+  /* Hover is a POINTER affordance and nothing more — it says "this row is a thing you can click".
+     It is deliberately weaker than the focus band below, which is the one that carries state. */
+  .rowgroup .tr:hover {
+    background: var(--hover-wash);
+  }
+
+  /* A persistent focus band, not hover: hover does not help a keyboard user and does not survive a
+     glance away. */
+  .tr[data-focused] {
+    background: var(--s2);
+  }
+
+  /* THE KEYBOARD'S PLACE IS THE FOCUS RING EVERY CONTROL WEARS, in `--focus-in` and never the brand's
+     red (design D-1), and only while the grid has focus: at rest the caret row is the raised surface
+     and nothing louder. Inset, because the rows are packed and a ring outside one would sit on the
+     next. */
+  .table-region:focus-within .rowgroup .tr[data-focused] {
+    outline: 2px solid var(--focus-in);
+    outline-offset: -2px;
+  }
+
+  /* THE TONE'S COLOUR IS DROPPED ON A SELECTED ROW, AND THE SHAPE IS NOT.
+
+     Dropping the colour costs nothing, which is the whole argument of `13 §5.1`: the glyph carries
+     the meaning and the colour is the second channel. ✓ · ⚠ · ⊘ · ⓘ are four different marks before
+     they are four different colours, and on the one row in the grid that is tinted for another
+     reason entirely, one channel saying one thing is better than two saying two. */
+  .rowgroup .tr[aria-selected='true'] :is(.td-glyph, .td[data-tone]) {
+    color: var(--ink2);
+  }
+
+  /* A SELECTED row is tinted, and a focused one keeps its band. They are different facts — "one of
+     the four I am about to act on" and "where the keyboard is" — and they are drawn with different
+     channels so both can be true at once.
+
+     AFTER the focus rule, deliberately. `[data-focused]` sets a background of its own, so with the
+     selection rule written above it the focused row silently lost its tint: select three, walk to
+     the third, and the count said three while two were shaded. The band survives either way because
+     it is a box-shadow. */
+  .rowgroup .tr[aria-selected='true'] {
+    background: var(--s2);
+  }
+
+  /* THE COLUMN THAT CARRIES THE TONE SAYS IT IN THE TONE'S COLOUR, AS TEXT, WITH NOTHING BEHIND IT.
+     `⊘ open` in the danger role reads as one word with its mark; the same word over a tint of its own
+     colour measures under the body floor, which is why this is ink and not a capsule. The glyph is
+     the first channel and the colour the second, so the row still reads without seeing red.
+
+     IT REPLACES A BAR. A toned row wore two pixels of `--tone-fill` down its leading edge, which on
+     a list with no box round it read as an alert strip and said nothing the glyph did not. The last
+     row keeps its hairline too: with no border round the list, it is the line the list ends on. */
+  /* AND THEN THE WORD WENT BACK TO INK. An overdue list is mostly overdue rows, and `Open` in the
+     danger role down the whole column read as an alarm on every line; the dot in the same cell is
+     the colour channel, it carries the tone's name for a screen reader, and one mark per row is
+     calmer than two saying the same thing. */
+  .tr[data-intent] .td[data-tone] {
+    color: var(--ink2);
+  }
+
+  .missing {
+    color: var(--dim);
+  }
+
+  .cap-line {
+    padding: var(--sp-3);
+    color: var(--dim);
+    font-size: var(--t-sm);
+    text-align: center;
+  }
+
+  /* ── media: code, tree ──────────────────────────────────────────────────── */
+
+  .media {
+    margin: 0;
+    padding: var(--sp-3) var(--sp-4);
+    background: var(--s1);
+    border-radius: var(--r-md);
+    color: var(--ink2);
+    font-family: var(--font-id);
+    font-size: var(--t-sm);
+    line-height: 1.6;
+    overflow-x: auto;
+    tab-size: 2;
+  }
+
+  .media[data-lang]::before {
+    content: attr(data-lang);
+    display: block;
+    margin-block-end: var(--sp-2);
+    color: var(--dim);
+    font-size: var(--t-xs);
+  }
+
+  /* ── the visible fence ──────────────────────────────────────────────────
+     A QUIET NOTE, NOT AN ALARM (05 §3; design SYS-9). Nothing on it failed, so it has no border, no red
+     and no warning glyph: the reason first, as the parser's plain sentence, then what was written,
+     small, in the identifier face, in `--dim` on the sunk ground. The source WRAPS inside its column
+     rather than scrolling like a `.media` code block, so a long line never pushes a phone page
+     sideways. `Degraded.svelte` and `toHTML` write the same two classes. */
+  .degraded-fix {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2);
+    margin-block-end: var(--sp-2);
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    overflow-wrap: anywhere;
+  }
+
+  .degraded-source {
+    margin: 0;
+    padding: var(--sp-2) var(--sp-3);
+    background: var(--sunk);
+    border-radius: var(--r-md);
+    color: var(--dim);
+    font-family: var(--font-id);
+    font-size: var(--t-xs);
+    line-height: 1.6;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .degraded-action {
+    margin-inline-start: auto;
+    min-block-size: var(--ctl-h-sm);
+    padding: 0 var(--sp-2);
+    background: var(--s1);
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    color: var(--ink);
+    font-size: var(--t-xs);
+    cursor: pointer;
+  }
+
+  .needs-client {
+    padding: var(--sp-3) var(--sp-4);
+    background: var(--s1);
+    border-radius: var(--r-md);
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  /* ── inline values ──────────────────────────────────────────────────────── */
+
+  .figure,
+  .typed {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .typed[data-form='money'],
+  .typed[data-form='pct'] {
+    font-weight: 500;
+  }
+
+  /* A GLYPH NAMED AMONG WORDS (`{{icon:rocket}}`) is 1em, so it follows the type it sits in, in the words' colour.
+     Only the drawn glyph takes room; the named, empty span a host with no art gets is nothing on the line. */
+  svg.glyph-inline {
+    display: inline-block;
+    inline-size: 1em;
+    block-size: 1em;
+    vertical-align: -0.125em;
+  }
+
+  /* A hole is an affordance, never a tag: it is the thing that fixes it. `font: inherit` sits it in
+     the document's own type wherever it renders, and `0.92em` is deliberately relative to that
+     inherited size rather than a fixed step — a `--t-*` token here would win over `font: inherit`
+     for the size half of it and defeat the point of inheriting the rest. */
+  .hole {
+    padding: 1px var(--sp-2);
+    background: var(--s1);
+    border: 1px dashed var(--edge);
+    border-radius: var(--r-sm);
+    color: var(--ink2);
+    font: inherit;
+    font-size: 0.92em;
+    cursor: pointer;
+  }
+
+  .evidence {
+    padding: 1px var(--sp-1);
+    border-radius: 3px;
+    background: var(--sunk);
+    color: var(--dim);
+    font-size: var(--t-xs);
+    letter-spacing: 0;
+  }
+
+  .evidence[data-evidence='verified'] {
+    color: var(--earn);
+  }
+
+  .unresolved {
+    border-block-end: 1px dotted var(--edge);
+    color: var(--dim);
+  }
+
+  /**
+   * A DOCUMENT'S HEADINGS SIT UNDER THE PAGE'S OWN (design SYS-9). A document is drawn inside a page that already has a
+   * title and section titles, so its `#` is a section title's size at most and never the display face: `h1` is a
+   * section title (`--t-md` semibold), `h2` the body step, and `h3` and `h4` the label step in the quiet ink. It had
+   * margins and nothing else, so a note's `#` took the skin's heading size and face and sat larger than the page it
+   * was written on.
+   */
+  .document > :is(h1, h2, h3, h4) {
+    margin-block: var(--sp-5) var(--sp-2);
+    color: var(--ink);
+    font-family: var(--font-ui);
+    font-weight: 600;
+    letter-spacing: -0.005em;
+  }
+
+  .document > h1 {
+    font-size: var(--t-md);
+  }
+
+  .document > h2 {
+    font-size: var(--t-base);
+  }
+
+  .document > :is(h3, h4) {
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  .document > :is(h1, h2, h3, h4):first-child {
+    margin-block-start: 0;
+  }
+
+  .document > p,
+  .prose-list {
+    margin-block: 0 var(--sp-3);
+    color: var(--ink2);
+  }
+
+  .prose-list {
+    padding-inline-start: var(--sp-4);
+  }
+
+  /* Inline code sized off the paragraph it sits in, not a fixed step: prose in this app renders at
+     more than one `--t-*` size depending on where `.document` is mounted, and a monospace face
+     already reads larger than a proportional one at the same size, so `0.9em` of whatever the
+     surrounding text is doing is the relationship that actually wants keeping. */
+  .document code {
+    padding: 1px 5px;
+    background: var(--sunk);
+    border-radius: 3px;
+    font-family: var(--font-id);
+    font-size: 0.9em;
+  }
+
+  .document hr {
+    margin-block: var(--sp-5);
+    border: 0;
+    border-block-start: 1px solid var(--line);
+  }
+
+  /* ── progress range: a budget as bands against what was spent ────────────
+     On `progress`'s own row and track (`blocks-charts.css`), so the label, the figure and the track
+     keep the places a goal gives them; the range in words takes the place a goal's share has. Each
+     rule names the form, so it outranks the goal's rule it changes in whichever order the two sheets
+     load. The track is one scale for the block, the band runs from the low estimate to the high and
+     the mark is what was spent, so an overspend is found by its place, past the band's end, and the
+     intent's colour only repeats it. */
+
+  /* AN EMPTY BAND BY DEFAULT, which each drawn track replaces in its own `style`. Declared here as
+     well because `css-rules` reads only the first custom property of a `style` attribute: the track
+     writes `--from:…;--to:…`, and `--to` was reported as a token nothing declares (measured). */
+  .progress[data-form='range'] {
+    --from: 0;
+    --to: 0;
+  }
+
+  .progress[data-form='range'] .progress-range {
+    grid-area: share;
+    color: var(--dim);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .progress[data-form='range'] .progress-track {
+    block-size: 8px;
+    margin-block: var(--sp-1);
+    overflow: visible;
+  }
+
+  .progress-band {
+    position: absolute;
+    inset-block: 0;
+    inset-inline: calc(var(--from) * 100%) calc((1 - var(--to)) * 100%);
+    border-radius: var(--r-pill);
+    background: var(--edge);
+  }
+
+  /* The mark stands 4px proud of the track on each side, so it reads over the band as well as
+     past it, and it is 2px wide and centred on its figure. */
+  .progress-at {
+    position: absolute;
+    inset-block: -4px;
+    inset-inline-start: calc(var(--at) * 100% - 1px);
+    inline-size: 2px;
+    border-radius: 1px;
+    background: var(--tone, var(--ink));
+  }
+
+  /* THE TOTAL IS A LINE UNDER THE ROWS, added up by the drawer from them, so it has no track: a
+     band for the sum would be drawn on a scale the rows set and read as one more line of the budget. */
+  .progress[data-form='range'] > .progress-row[data-total] {
+    margin-block-start: var(--sp-1);
+    padding-block-start: var(--sp-2);
+    border-block-start: 1px solid var(--line);
+  }
+
+  .progress[data-form='range'] > .progress-row[data-total] > .progress-label {
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  /* IN A NARROW SLOT THE LABEL TAKES A LINE OF ITS OWN, and what was spent and the range share the line under it. At
+     390 the spent figure and the nowrap "GBP 1,000.00 to GBP 1,500.00" were two `auto` tracks beside the label, which
+     left the label about 50px and "Total" none (pages §2.5, progress range). The figure keeps its width and the range
+     wraps before it would push anything out. The block answers its own width, as the charts do. */
+  .block[data-kind='progress'] {
+    container-type: inline-size;
+  }
+
+  @container (inline-size < 30rem) {
+    .progress[data-form='range'] > .progress-row {
+      grid-template-areas:
+        'label label'
+        'figure share'
+        'track track'
+        'left note';
+      grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    .progress[data-form='range'] .progress-range {
+      text-align: end;
+      white-space: normal;
+    }
+  }
+
+  /* A PATH'S VIEW SWITCH (PGS-13): "<label> · Everything" as a segmented control, `packages/render/svelte/Path.svelte`'s
+     own markup. The stones under it already reach 44px through `.tap`; this is the switch above them. */
+  .path-switch {
+    display: flex;
+    gap: var(--sp-1);
+    margin-block-end: var(--sp-2);
+  }
+
+  .path-view {
+    min-block-size: var(--ctl-h-sm);
+  }
+
+  @media (pointer: coarse) {
+    .path-view {
+      min-block-size: var(--tap);
+    }
+  }
+}

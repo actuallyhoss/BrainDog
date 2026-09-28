@@ -101,6 +101,8 @@ const GATES = [
      a claim, and those claims went stale unnoticed until this read them. Beside `closed-lists` because that gate
      already holds the spelled-out block-kind counts, and this one reads the digits beside it. */
   ['docs-counts', call(join(here, 'docs-counts.mjs'))],
+  /* AND WHAT A TELEMETRY POINT MAY CARRY (`08 §5`, `51 §5.18`, `loop/finish/ops.md` OPS-23): one writeDataPoint( under apps/, its Blobs and Doubles labelled by 08 §5's columns, and none of the never-written words. */
+  ['telemetry-allowlist', call(join(here, 'telemetry-allowlist.mjs'))],
   /* THE NINETY-NINE REFUSAL CODES, which had no `RefusalCode` type and so no list at all. A code is
      the one part of a refusal a caller can branch on, and `10 §7` builds the agent contract on it:
      the refusal teaches, and it teaches from a code stable across versions. Beside `event-kinds`

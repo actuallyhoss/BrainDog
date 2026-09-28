@@ -24,7 +24,7 @@
     label,
     id,
   }: {
-    value?: string;
+    value?: string | undefined;
     /** The field's name, which the button and the preview are announced by. */
     label: string;
     /** The id a `<label for>` points at, given to the button. */

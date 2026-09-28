@@ -1,0 +1,128 @@
+{
+  "pack": "pad",
+  "version": "1.1.0",
+  "title": "Pad",
+  "summary": "Notes beside the work, with a second opinion from Slash written under each one.",
+  "changes": "Nothing a person sees changed. Each version says what it changed in a line like this one.",
+  "author": "BrainDog",
+  "license": "Apache-2.0",
+  "requires": {
+    "format": 1,
+    "primitives": 1,
+    "packs": {}
+  },
+  "declarations": [
+    {
+      "register": "notes",
+      "name": "Notes",
+      "one": "note",
+      "holds": "thoughts written down beside the work, and a second opinion under each one",
+      "title": "text",
+      "fields": [
+        {
+          "id": "text",
+          "label": "Note",
+          "type": "text",
+          "required": true,
+          "search": true
+        },
+        {
+          "id": "about",
+          "label": "About",
+          "type": "ref"
+        },
+        {
+          "id": "reply",
+          "label": "Second opinion",
+          "type": "text",
+          "search": true
+        }
+      ]
+    },
+    {
+      "rule": "pad_second_opinion",
+      "name": "Write a second opinion under each note",
+      "on": {
+        "written": {
+          "register": "notes",
+          "op": [
+            "create",
+            "update"
+          ],
+          "fields": [
+            "text",
+            "reply"
+          ]
+        }
+      },
+      "when": "reply is empty",
+      "once_per": [
+        "entry",
+        "text"
+      ],
+      "steps": [
+        {
+          "ask_slash": {
+            "question": "Give a short second opinion on this note, in two or three plain sentences: what it gets right, and what it may be missing. The note: {{trigger.row.text}}",
+            "as": "opinion"
+          }
+        },
+        {
+          "set": {
+            "field": "reply",
+            "to": "{{vars.opinion}}"
+          }
+        }
+      ]
+    },
+    {
+      "page": "pad",
+      "title": "Pad",
+      "nav": {
+        "section": "Pad",
+        "order": 10
+      },
+      "icon": "doc",
+      "requires": [
+        "register.notes"
+      ],
+      "blocks": [
+        {
+          "kind": "section",
+          "heading": "The pad",
+          "source": "register.notes",
+          "empty": "Nothing on the pad yet."
+        },
+        {
+          "kind": "capture",
+          "heading": "A thought",
+          "register": "notes",
+          "span": 12
+        },
+        {
+          "kind": "cards",
+          "span": 12,
+          "source": "register.notes",
+          "columns": [
+            {
+              "field": "text",
+              "as": "title"
+            },
+            {
+              "field": "reply",
+              "as": "reply"
+            }
+          ],
+          "order": [
+            {
+              "field": "seq",
+              "dir": "desc"
+            }
+          ],
+          "limit": 6,
+          "empty": "Nothing on the pad yet. Write a thought above, and a second opinion is written under it."
+        }
+      ]
+    }
+  ]
+}

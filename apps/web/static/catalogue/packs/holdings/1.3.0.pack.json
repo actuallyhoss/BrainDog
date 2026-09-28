@@ -1,0 +1,250 @@
+{
+  "pack": "holdings",
+  "version": "1.3.0",
+  "title": "Holdings",
+  "summary": "What you hold rather than spend: certificates, policies and commodities, with what each one cost, and what they cost together.",
+  "changes": "Nothing it writes changed. The add-on has a title of its own, its script opens with a comment saying what it does, and each version says what it changed in a line like this one.",
+  "author": "BrainDog",
+  "license": "MIT",
+  "requires": {
+    "format": 1,
+    "primitives": 1,
+    "packs": {
+      "money-core": ">=2.0.0"
+    }
+  },
+  "declarations": [
+    {
+      "register": "holdings",
+      "name": "Holdings",
+      "icon": "money",
+      "one": "holding",
+      "holds": "what you hold rather than spend: certificates, policies and commodities, with what each one cost and when it matures",
+      "title": "label",
+      "mobile": [
+        "label",
+        "qty",
+        "unit_cost"
+      ],
+      "pack": "holdings",
+      "fields": [
+        {
+          "id": "label",
+          "label": "Description",
+          "type": "text",
+          "required": true,
+          "search": true
+        },
+        {
+          "id": "kind",
+          "label": "Type",
+          "type": "enum",
+          "values": [
+            "certificate",
+            "policy",
+            "commodity",
+            "other"
+          ],
+          "index": true,
+          "required": true,
+          "search": true
+        },
+        {
+          "id": "qty",
+          "label": "How many",
+          "type": "decimal",
+          "min": 0,
+          "required": true,
+          "qualifies": "unit_cost"
+        },
+        {
+          "id": "unit_cost",
+          "label": "Cost each",
+          "type": "money",
+          "required": true
+        },
+        {
+          "id": "cost",
+          "label": "What it cost",
+          "type": "money"
+        },
+        {
+          "id": "acquired_on",
+          "type": "day",
+          "index": true
+        },
+        {
+          "id": "matures_on",
+          "type": "day",
+          "index": true
+        },
+        {
+          "id": "note",
+          "type": "text"
+        },
+        {
+          "id": "tags",
+          "type": "list",
+          "of": "text"
+        }
+      ]
+    },
+    {
+      "rule": "holdings_cost",
+      "pack": "holdings",
+      "on": {
+        "written": {
+          "register": "holdings",
+          "op": [
+            "create",
+            "update"
+          ],
+          "fields": [
+            "qty",
+            "unit_cost"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "script": {
+            "id": "holdings_cost",
+            "as": "costing"
+          }
+        }
+      ]
+    },
+    {
+      "script": "holdings_cost",
+      "title": "Work out what a holding cost, how many times what one cost: when either is written, and once a day for any holding still without one",
+      "pack": "holdings",
+      "runs": {
+        "rule": true,
+        "every": "1d"
+      },
+      "egress": [],
+      "keys": [],
+      "reads": [
+        "holdings"
+      ],
+      "writes": [
+        "holdings"
+      ],
+      "source": "/**\n * What each holding cost: its quantity times what one unit cost, written into `cost` in the unit cost's currency.\n *\n * STARTED WITH A ROW'S ID when its quantity or unit cost changes, it costs that row. Started with no id, once a day,\n * it costs every holding whose `cost` is still empty, so rows written before the add-on was installed are costed too.\n * A row missing either number, or already holding the same cost, is left as it is.\n */\nexport default async function run(ctx) {\n  const id = ctx.input && ctx.input.id;\n  const rows = id ? [await ctx.record.get(id)] : await ctx.record.list('holdings', { field: 'cost', empty: true });\n  for (const row of rows) {\n    if (!row) continue;\n    const qty = row.fields.qty;\n    const each = row.fields.unit_cost;\n    if (typeof qty !== 'number' || !each || typeof each.amount !== 'number' || typeof each.currency !== 'string') continue;\n    const cost = { amount: Math.round(qty * each.amount), currency: each.currency };\n    const had = row.fields.cost;\n    if (had && had.amount === cost.amount && had.currency === cost.currency) continue;\n    ctx.update('holdings#' + row.seq, { cost }, row.version);\n  }\n}\n"
+    },
+    {
+      "metric": "holdings-value",
+      "name": "Holdings value",
+      "pack": "holdings",
+      "source": "register.holdings",
+      "where": "cost is set",
+      "value": {
+        "sum": "cost"
+      },
+      "format": "money.GBP",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none",
+      "sellable": true
+    },
+    {
+      "metric": "holdings-count",
+      "name": "Holdings",
+      "pack": "holdings",
+      "source": "register.holdings",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "holdings-costed",
+      "name": "Holdings costed",
+      "pack": "holdings",
+      "source": "register.holdings",
+      "where": "cost is set",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "page": "holdings",
+      "title": "Holdings",
+      "pack": "holdings",
+      "nav": {
+        "section": "Money",
+        "order": 30
+      },
+      "icon": "money",
+      "requires": [
+        "register.holdings"
+      ],
+      "blocks": [
+        {
+          "kind": "stat",
+          "lead": true,
+          "heading": "What you hold",
+          "span": 12,
+          "cells": [
+            {
+              "metric": "holdings-value",
+              "label": "Holdings value",
+              "note": "what was paid for {{holdings-costed}} of {{holdings-count}} holding(s), one amount per currency"
+            }
+          ]
+        },
+        {
+          "kind": "table",
+          "heading": "Everything you hold",
+          "span": 12,
+          "source": "register.holdings",
+          "columns": [
+            {
+              "field": "label",
+              "width": "minmax(18ch,2fr)"
+            },
+            {
+              "field": "kind"
+            },
+            {
+              "field": "qty"
+            },
+            {
+              "field": "unit_cost"
+            },
+            {
+              "field": "cost"
+            },
+            {
+              "field": "acquired_on"
+            },
+            {
+              "field": "matures_on"
+            }
+          ],
+          "order": [
+            {
+              "field": "acquired_on",
+              "dir": "desc"
+            }
+          ],
+          "limit": 100,
+          "empty": "Nothing held yet. A certificate, a policy or a lot of a commodity goes here with what it cost."
+        }
+      ]
+    }
+  ]
+}

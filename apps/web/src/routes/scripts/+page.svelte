@@ -147,7 +147,10 @@
                     {#if r.log !== null}
                       <details class="run-log">
                         <summary class="run-log-head tap">{words.showLog(since(r.at, now()))}</summary>
-                        <pre class="log">{r.log}</pre>
+                        <!-- A LONG LOG SCROLLS INSIDE ITSELF (`.log`'s block size), and a box with nothing focusable in it cannot
+                             be scrolled from the keyboard, so the box itself takes focus. -->
+                        <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+                        <pre class="log" tabindex="0">{r.log}</pre>
                       </details>
                     {/if}
                   </li>

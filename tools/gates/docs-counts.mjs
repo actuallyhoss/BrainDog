@@ -181,9 +181,6 @@ const CLAIMS = {
  * makes a line true deletes its entry here in the same change, and the gate is red until it does.
  */
 const DEBT = [
-  { file: 'README.md', line: 38, said: '22 gates', owner: 'OPS-26, which rewrites the README' },
-  { file: 'README.md', line: 109, said: '22 gates', owner: 'OPS-26, which rewrites the README' },
-  { file: 'docs/10-MCP.md', line: 312, said: 'six templates', owner: 'AGT-19, with defects T7' },
   {
     file: 'docs/16-DECISIONS.md',
     line: 1255,

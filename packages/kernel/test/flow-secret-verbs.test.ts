@@ -151,6 +151,12 @@ const FIXTURES: Record<string, Fixture> = {
   ask_slash: { copies: [(t) => ({ ask_slash: { question: t, as: 'rate' } })], rowFilled: true, atRun: 'asks' },
   ask_person: { copies: [(t) => ({ ask_person: { question: t, options: ['yes', 'no'], as: 'a' } })], rowFilled: true, atRun: 'cleans' },
   wait: { none: 'a wait holds a span and no text' },
+  meet: {
+    copies: [(t) => ({ meet: { name: t, where: 'mail' } }), (t) => ({ meet: { email: 'a@b.example', where: t } })],
+    rowFilled: true,
+    atRun: 'refuses',
+  },
+  run_job: { copies: [(t) => ({ run_job: { kind: 'job.notes', args: { topic: t } } })], rowFilled: true, atRun: 'refuses' },
 };
 
 /** The run's spellings of `pin`, each with the steps it needs before it. */
@@ -249,8 +255,10 @@ test('NO FALSE POSITIVE: a list with no secret field, and a text field holding t
           await k.drain();
           const r = sql.one<{ state: string; say: string | null }>("SELECT state, say FROM automation_run WHERE rule = 'copy'");
           const settled = f.atRun === 'cleans' ? 'waiting' : 'done';
-          /* A `move` ON A LIST WITH NO STATES, AND A `link` TO NOTHING, ARE THE PASS'S OWN NO-OPS AND NOT THIS CHECK. */
-          if (r?.state !== settled && !(verb === 'move' || verb === 'link')) failed.push(`${register} ${verb} ${text}: the run is ${r?.state} ${r?.say ?? ''}`);
+          /* A `move` ON A LIST WITH NO STATES, AND A `link` TO NOTHING, ARE THE PASS'S OWN NO-OPS AND NOT THIS CHECK. A
+             `meet` with no list playing `meets:` and a `run_job` of a kind nobody approved fail on their own sentences,
+             which the line after this holds to being some other sentence than the copy check's. */
+          if (r?.state !== settled && !(verb === 'move' || verb === 'link' || verb === 'meet' || verb === 'run_job')) failed.push(`${register} ${verb} ${text}: the run is ${r?.state} ${r?.say ?? ''}`);
           if (/secret or file field/.test(r?.say ?? '')) failed.push(`${register} ${verb} ${text}: ${r?.say}`);
           sql.close();
         }

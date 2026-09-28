@@ -9,7 +9,7 @@
  * Decide as rowsets until she trusts it; a colleague's is filed as a `pattern` proposal for the owner to answer.
  */
 
-import { createClient, type InboxPage } from '@braindog/client';
+import { createClient } from '@braindog/client';
 
 import { declarationOf, type Draft, type Json } from './draft.ts';
 
@@ -53,7 +53,7 @@ export async function readSamples(base: string, ids: readonly string[]): Promise
     const client = createClient({ base });
     let cursor: number | null = null;
     for (let page = 0; page < PAGES_MOST && found.size < wanted.size; page += 1) {
-      const out = await client.call<InboxPage>('inbox', { state: 'all', limit: PAGE, ...(cursor === null ? {} : { cursor }) });
+      const out = await client.inbox({ state: 'all', limit: PAGE, ...(cursor === null ? {} : { cursor }) });
       if (!out.ok) return { ok: false, fix: fixOf(out) };
       for (const a of out.value.arrivals)
         if (wanted.has(a.id)) found.set(a.id, { key: a.id, channel: a.channel, from: a.from, subject: a.subject, body: a.body ?? '' });

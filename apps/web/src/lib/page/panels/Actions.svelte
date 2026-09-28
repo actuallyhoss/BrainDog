@@ -9,8 +9,8 @@
   refusals offer Sign in again, as Settings, agents does, and resume once signed in. A held action says
   the Directory's sentence and points at usage. No red anywhere: paused is `warn`.
 
-  A HOST PANEL (`panel-of.ts`): drawn under a section that declares `panel: actions`, or under the old "Runs on"
-  heading, by the page reader's `BlockSlot.svelte`, and by Settings, ingest, with every action. Imported by those two
+  A HOST PANEL (`panel-of.ts`): drawn under a section that declares `panel: actions` by the page reader's
+  `BlockSlot.svelte`, and by Settings, ingest, with every action. Imported by those two
   only, so nothing here reaches the entry chunk.
 -->
 <script lang="ts">

@@ -40,7 +40,7 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
-import { SOURCE, DOCS, BUILD, site } from '../src/lib/copy.ts';
+import { SOURCE, DOCS, BUILD, LAUNCH, site } from '../src/lib/copy.ts';
 
 const SRC = new URL('../src/', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
 
@@ -106,22 +106,37 @@ const INSTALL = [
    serves at `/cli/install.sh` (`apps/cli/README.md`), which is published with the product (`loop/DIRECTION.md` §33). */
 const OWN_INSTALL = /https:\/\/brain\.dog\/cli\/install\.(sh|ps1)/;
 
-test('no install command reaches the reader but the site’s own', () => {
+/**
+ * THE PACKAGES `LAUNCH` SAYS ARE ON NPM (`src/lib/launch.ts`), by the names their `package.json` gives them:
+ * `apps/cli` is `braindog-cli` and `packages/render` is `braindog-render`. The day the owner flips `cli` or
+ * `render`, a sentence naming that package and the command installing it may reach the reader, and not before.
+ * Every other name stays refused whatever the flags say, because nothing else is published.
+ */
+const PUBLISHED = [LAUNCH.cli ? 'braindog-cli' : null, LAUNCH.render ? 'braindog-render' : null].filter((name) => name !== null);
+
+/** The line with every published package name taken out, so what is left is what nobody can install. */
+const unpublished = (line) => PUBLISHED.reduce((rest, name) => rest.replaceAll(name, ' '), line);
+
+/** An install line is allowed when it is the site's own, or when it installs a package `LAUNCH` says is published. */
+const installs = (line) => OWN_INSTALL.test(line) || PUBLISHED.some((name) => new RegExp(`\\b${name}\\b`).test(line));
+
+test('no install command reaches the reader but the site’s own and the published packages’', () => {
   for (const pattern of INSTALL) {
-    const found = hits(pattern).filter((line) => !OWN_INSTALL.test(line));
+    const found = hits(pattern).filter((line) => !installs(line));
     assert.deepEqual(found, [], `${pattern} matches ${found.length} line(s) under apps/site/src:\n${found.join('\n')}`);
   }
 });
 
 /**
  * A PACKAGE NAME IN A SENTENCE IS AN INSTALL COMMAND WITH THE VERB LEFT OFF. The workspace names are
- * fine in an import, which `spoken()` removes, and nowhere a reader sees them.
+ * fine in an import, which `spoken()` removes, and nowhere a reader sees them until `LAUNCH` says the
+ * package is on npm.
  */
 test('no unpublished package is named to the reader', () => {
   const PACKAGE = /@braindog\/[a-z]|\bbraindog-(render|mcp|cli|selfhost|kernel|record)\b/;
-  const named = SAID.filter(([, text]) => PACKAGE.test(text)).map(([at, text]) => `${at}: ${text}`);
+  const named = SAID.filter(([, text]) => PACKAGE.test(unpublished(text))).map(([at, text]) => `${at}: ${text}`);
   assert.deepEqual(named, [], `copy.ts names a package nobody can install:\n${named.join('\n')}`);
-  const drawn = hits(PACKAGE);
+  const drawn = hits(PACKAGE).filter((line) => PACKAGE.test(unpublished(line)));
   assert.deepEqual(drawn, [], `a route or component names a package nobody can install:\n${drawn.join('\n')}`);
 });
 

@@ -72,6 +72,8 @@ export const CAPABILITIES: readonly Capability[] = [
   },
   { name: 'ask_person', of: 'step', installs: true, runs: true, hosts: 'every', says: '' },
   { name: 'ask_person.to', of: 'step', installs: true, runs: true, hosts: 'every', says: '' },
+  { name: 'meet', of: 'step', installs: true, runs: true, hosts: 'every', says: '' },
+  { name: 'run_job', of: 'step', installs: true, runs: true, hosts: 'every', says: '' },
   { name: 'tag', of: 'step', installs: true, runs: true, hosts: 'every', says: '' },
   { name: 'untag', of: 'step', installs: true, runs: true, hosts: 'every', says: '' },
   { name: 'set', of: 'step', installs: true, runs: true, hosts: 'every', says: '' },

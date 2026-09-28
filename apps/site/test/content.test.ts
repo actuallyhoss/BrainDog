@@ -25,18 +25,10 @@ import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 
 const BUILD = new URL('../build/', import.meta.url);
-const SEED = new URL('../../../packages/seed/src/index.ts', import.meta.url);
-/* THE REGISTERS LIVE IN ONE FILE PER MODULE since the seed was split, so the declarations are read from all of them. */
-const MODULES = new URL('../../../packages/seed/src/modules/', import.meta.url);
-const seedSource = (): string =>
-  readdirSync(MODULES)
-    .filter((name) => name.endsWith('.ts'))
-    .sort()
-    .map((name) => readFileSync(new URL(name, MODULES), 'utf8'))
-    .join('\n');
 
 /**
- * Every document the static adapter writes, under the names it writes them.
+ * The documents a build must have written for these checks to mean anything: one per page the header and the
+ * footer name, the home page and the 404.
  *
  * `404.html` IS ONE OF THEM. It was left out while it had a test of its own three tests down, but
  * that test reads three lines of its shell and nothing else, so the page a stranger is most likely
@@ -44,9 +36,21 @@ const seedSource = (): string =>
  * backtick, a dead href or a missing picture. It is prerendered from `src/routes/404` through the
  * same layout as the rest, so it carries the same nav, the same footer and the same risks.
  */
-const PAGES = ['index.html', 'pricing.html', 'agents.html', 'changelog.html', 'legal.html', '404.html'] as const;
+const REQUIRED = [
+  'index.html',
+  'slash.html',
+  'agents.html',
+  'packs.html',
+  'pricing.html',
+  'docs.html',
+  'changelog.html',
+  'support.html',
+  'security.html',
+  'legal.html',
+  '404.html',
+] as const;
 
-const absent = PAGES.filter((page) => !existsSync(new URL(page, BUILD)));
+const absent = REQUIRED.filter((page) => !existsSync(new URL(page, BUILD)));
 
 const NO_BUILD =
   absent.length === 0
@@ -54,17 +58,17 @@ const NO_BUILD =
     : `apps/site/build is missing ${absent.join(', ')}. Run "pnpm --filter @braindog/site build" first: ` +
       'these checks read the served bytes, and a check with nothing to read is a pass that means nothing.';
 
-const NO_SEED = existsSync(SEED)
-  ? null
-  : 'packages/seed/src/index.ts is not readable from here, and it is where the registers are declared.';
-
-/* The use cases are declared apart from the registers, and one check below imports them rather
-   than reading them as text, so it needs its own reason to stand down. */
-const USECASES = new URL('../../../packages/seed/src/usecases/index.ts', import.meta.url);
-
-const NO_USECASES = existsSync(USECASES)
-  ? null
-  : 'packages/seed/src/usecases is not readable from here, and it is where the pages and the lists a setup ships are declared.';
+/**
+ * EVERY PAGE THE BUILD WROTE, not a list of them typed here. The site grew pages for each kind of person, the
+ * docs, the packs and the legal texts, and a list kept by hand is the list that leaves the newest page out, so
+ * the checks below walk `build/` for every `.html` outside SvelteKit's own `_app/`.
+ */
+const PAGES: readonly string[] = NO_BUILD
+  ? []
+  : readdirSync(BUILD, { recursive: true, encoding: 'utf8' })
+      .map((rel) => rel.replaceAll('\\', '/'))
+      .filter((rel) => rel.endsWith('.html') && !rel.startsWith('_app/'))
+      .sort();
 
 /** `{ skip: reason }` or nothing, because `exactOptionalPropertyTypes` refuses `{ skip: undefined }`. */
 const when = (reason: string | null): { skip: string } | Record<string, never> => (reason ? { skip: reason } : {});
@@ -133,12 +137,17 @@ test('no em dash reaches the reader', when(NO_BUILD), () => {
 });
 
 /**
- * NOTHING ON THIS SITE RENDERS MARKDOWN. Every string reaches the page through a Svelte expression,
- * so a backtick in the source is a backtick on the page, and four sentences shipped with one.
+ * NOTHING ON THE SITE'S OWN PAGES RENDERS MARKDOWN. Every copy string reaches the page through a Svelte
+ * expression, so a backtick in the source is a backtick on the page, and four sentences shipped with one.
+ *
+ * THE DOCS DO RENDER IT, and a page teaching the dialect shows its fences, backticks and all, as code. So code
+ * is left out of what this reads: a `<pre>` block and an inline `<code>` are the one place a backtick is the
+ * thing being shown, and the copy files never draw one.
  */
-test('no backtick reaches the reader', when(NO_BUILD), () => {
+test('no backtick reaches the reader outside code', when(NO_BUILD), () => {
   for (const page of PAGES) {
-    const hits = around(readable(read(page)), '`');
+    const words = readable(read(page).replace(/<(pre|code)\b[^>]*>[\s\S]*?<\/\1>/gi, ' '));
+    const hits = around(words, '`');
     assert.equal(hits.length, 0, `${page} shows ${hits.length} literal backtick(s): ${hits.join(' | ')}`);
   }
 });
@@ -181,6 +190,11 @@ test('every href goes somewhere', when(NO_BUILD), () => {
       // Somebody else's server answers for these, and this test does not reach the network.
       if (/^[a-z][a-z0-9+.-]*:/i.test(href) || href.startsWith('//')) continue;
 
+      /* A FIGURE INSIDE THE DRAWN APP ANSWERS `#go:<page>`, which the window catches to open another page of
+         the same example (`src/lib/app/page.ts`), so it is no anchor on this page. `examples.test.ts` holds
+         each one to a page the example has. */
+      if (href.startsWith('#go:')) continue;
+
       if (href.startsWith('#')) {
         assert.equal(ids.has(href.slice(1)), true, `${where}, and no element on that page carries the id`);
         continue;
@@ -208,7 +222,11 @@ test('every href goes somewhere', when(NO_BUILD), () => {
  */
 test('the marketing pages name no licence, and /legal names both', when(NO_BUILD), () => {
   const LICENCE = /\bApache\b|\bMIT\b/;
-  for (const page of ['index.html', 'pricing.html']) {
+  /* THE PAGES THAT SELL: the home page, Slash, pricing and the pages for each kind of person. The docs may name
+     a licence where a reader looks one up, and a pack's page shows the licence its author chose. */
+  const selling = PAGES.filter((page) => ['index.html', 'slash.html', 'pricing.html'].includes(page) || page.startsWith('for/'));
+  assert.equal(selling.length >= 3, true, `only ${selling.join(', ')} of the selling pages are in the build`);
+  for (const page of selling) {
     const hit = LICENCE.exec(readable(read(page)));
     assert.equal(hit, null, `${page} names a licence: ${hit ? around(readable(read(page)), hit[0]).join(' | ') : ''}`);
   }
@@ -230,69 +248,19 @@ test('every page links GitHub and the legal page', when(NO_BUILD), () => {
 });
 
 /**
- * THE REGISTERS THE COPY NAMES BY EXAMPLE ARE REGISTERS THAT EXIST, AND THE WORD IS NOT USED UNTAUGHT.
+ * THE HOME PAGE DOES NOT USE THE WORD `register`.
  *
- * One sentence on the home page taught a stranger the word `register` by naming three of them, and
- * for some time one of the three was `domains`, which has never been a register in this product:
- * `domain` is one of four values of the `kind` field on `services`. That is the cheapest class of
- * defect to catch and the one that keeps recurring, because the registers get renamed in the seed
- * and the marketing copy is not next to them.
- *
- * THE SENTENCE LEFT THE PAGE ON 2026-09-22, AND THIS CHECK USED TO THROW WHEN IT DID. The
- * mechanism band opened on it, which asked a reader to learn a word of the product's plumbing before anything
- * else in the band, and `loop/research-site-now.md` ranked taking it out as part of the page's
- * value-first rewrite. The throw was right for the page it was written for: the sentence going
- * missing while the word stayed would leave a stranger reading a term nobody had defined. So that
- * is what it asks now. If `register` is on the home page, the sentence that teaches it must be too,
- * and every example it names must be declared. If neither is there, there is nothing to get wrong.
+ * One sentence on the home page once taught a stranger the word by naming three of them, and this checked
+ * each against the registers the seed declared. The sentence left on 2026-09-22 (`loop/research-site-now.md`
+ * ranked a word of the product's plumbing on the first screen as the fault), and since 26 September the
+ * product on the page is drawn from the example records in `src/lib/examples/`, which name no register and
+ * are checked by `examples.test.ts`. So the half of the old check that walked the seed went, and what is
+ * left is the half a reader meets: a word nobody on the page has defined.
  */
-test('every register the copy names by example is one the seed declares', when(NO_BUILD ?? NO_SEED), () => {
+test('the home page does not use the word register', when(NO_BUILD), () => {
   const page = prose(read('index.html'));
-  const sentence = /A register is a typed collection:([^.]*)\./.exec(page);
-  if (!sentence) {
-    const used = /\bregisters?\b/i.exec(page);
-    assert.equal(
-      used,
-      null,
-      `index.html says "${used?.[0]}" and no longer teaches what one is: ${used ? around(page, used[0]).join(' | ') : ''}`,
-    );
-    return;
-  }
-
-  const source = seedSource();
-  const blocks = [...source.matchAll(/^export const [A-Z_]*REGISTERS\b/gm)].map((m) => {
-    const rest = source.slice(m.index ?? 0);
-    const closes = rest.indexOf('\nexport const ', 1);
-    return closes === -1 ? rest : rest.slice(0, closes);
-  });
-  assert.notEqual(blocks.length, 0, 'packages/seed/src/modules no longer exports any REGISTERS, so this check reads nothing');
-  const block = blocks.join('\n');
-
-  /* The id, the name a person is shown and the singular, at the indentation a register declares
-     them at. Field declarations sit two levels deeper and are deliberately out of reach. */
-  const declared = new Set<string>();
-  for (const m of block.matchAll(/^ {2}([a-z_]+): \{$/gm)) declared.add(m[1] ?? '');
-  for (const m of block.matchAll(/^ {4}name: '([^']+)',$/gm)) declared.add((m[1] ?? '').toLowerCase());
-  for (const m of block.matchAll(/^ {4}one: '([^']+)',$/gm)) {
-    declared.add(m[1] ?? '');
-    declared.add(`${m[1] ?? ''}s`);
-  }
-  assert.equal(declared.size > 8, true, `only ${declared.size} register words parsed out of the seed; its shape has changed`);
-
-  const named = (sentence[1] ?? '')
-    .split(/,|\band\b/)
-    .map((word) => word.trim().toLowerCase())
-    .filter((word) => word.length > 0);
-  assert.equal(named.length >= 2, true, `the teaching sentence names ${named.length} register(s): "${sentence[0]}"`);
-
-  for (const word of named) {
-    assert.equal(
-      declared.has(word),
-      true,
-      `the home page teaches "${word}" as a register and packages/seed declares no such thing. ` +
-        `The seed declares: ${[...declared].sort().join(', ')}`,
-    );
-  }
+  const used = /\bregisters?\b/i.exec(page);
+  assert.equal(used, null, `index.html says "${used?.[0]}", which nothing on the page teaches: ${used ? around(page, used[0]).join(' | ') : ''}`);
 });
 
 /**
@@ -365,7 +333,7 @@ const USE_CASES = [
   ['student', 'Student'],
   ['founder', 'Solo founder'],
   ['team', 'Team'],
-  ['guide', 'New project'],
+  ['project', 'New project'],
 ] as const;
 
 test('the home page names all five use cases, each with a control of its own', when(NO_BUILD), () => {
@@ -376,111 +344,6 @@ test('the home page names all five use cases, each with a control of its own', w
     assert.match(words, new RegExp(`\\b${title}\\b`), `index.html no longer names the ${title} use case`);
     assert.match(html, new RegExp(`\\sid="uc-${id}"`), `index.html has no control for the ${title} use case (id="uc-${id}")`);
   }
-});
-
-/**
- * EVERY PAGE AND EVERY LIST THE RAIL SAYS A RECORD HOLDS IS ONE THE SETUP ACTUALLY SHIPS.
- *
- * `copy.ts` states this contract over `arrange.cases` itself: `holds` is the pages and the lists
- * that setup ships, each under the name the record itself gives it, so a reader can check this list
- * against the screen they get after Make my record. That is about forty names typed by hand beside
- * a seed that renames things, and nothing measured them. An audit found two wrong: the Personal
- * rail listed both `Money` and `Bills` for the one register, and the Team rail listed `Work`.
- *
- * IT IMPORTS THE SEED INSTEAD OF READING IT AS TEXT, which is what every other seed check in this
- * file does, and the reason is that these names are not written in the seed. `Bills` is the
- * `obligations` register of `money-core`, declared as `Money` and renamed by the `labels` map the
- * Personal use case carries. A regex would have to reimplement `pagesOf`, `listsOf`, the label
- * overrides and the module expansion, and a reimplementation of the thing under test is not a test
- * of it. This does not make the site depend on the seed: the site's own rule is about what the
- * BUNDLE may reach for, and `apps/site` still builds with `packages/seed` deleted. A test may know
- * more than a bundle may.
- *
- * WHAT COUNTS AS SHIPPED, per case: the title of its own Home page, the titles of the pages it
- * declares, the names of the lists it declares, and the same two out of every first-party module it
- * installs, with every list name put through that use case's `labels` first.
- *
- * A NAV SECTION IS NOT A PAGE, and leaving sections out is exactly what catches the second of the
- * two. `Work` is a heading over two pages titled Overview and Board. A reader told their record
- * holds Work goes looking for it and finds neither, which is the whole defect this measures.
- *
- * ONE DIRECTION ONLY. `holds` is an editorial shortlist and not an inventory: Personal also ships
- * `Project steps` and `Exchange rates`, and the rail is right not to recite them. So every name in
- * `holds` must be shipped, and not every shipped name need be in `holds`.
- */
-test('every page and list the rail says a record holds is one the seed ships', when(NO_USECASES), async () => {
-  /* The shapes this reads out of the three modules. Written out rather than inferred because a
-     check that reaches into a sibling package should say what it expects to find there, and go
-     red at the cast when that changes rather than quietly measuring nothing. */
-  type Body = Record<string, unknown>;
-  type Seeded = { usecase: string; modules: readonly string[]; labels: Record<string, string>; pack: { declarations?: readonly Body[] } | null };
-  type Seed = { useCase: (id: string) => Seeded | undefined; pagesOf: (u: Seeded) => readonly { page: string; title: string }[]; listsOf: (u: Seeded) => readonly { id: string; name: string }[] };
-  type Share = { modulesToInstall: (u: Seeded) => readonly string[] };
-  type Packs = { FIRST_PARTY: readonly string[]; firstPartyDocument: (id: string) => { declarations: readonly Body[] } };
-  type Copy = { site: { arrange: { cases: readonly { id: string; holds: readonly string[] }[] } } };
-
-  const seed = (await import(USECASES.href)) as Seed;
-  const share = (await import(new URL('share.ts', USECASES).href)) as Share;
-  const packs = (await import(new URL('../packs/first-party.ts', USECASES).href)) as Packs;
-  const { site } = (await import(new URL('../src/lib/copy.ts', import.meta.url).href)) as Copy;
-
-  /** Every name a reader could meet on the rail after this use case is installed. */
-  const shipped = (u: Seeded): Set<string> => {
-    const names = new Set<string>();
-
-    /* Home is not in `pagesOf`: it REPLACES the house Home rather than adding a rail entry. The
-       rail still names it, as `Day to day`, `Today` and `Your project`, so it is counted here. */
-    const home = (u.pack?.declarations ?? []).find((d) => d.page === `home-${u.usecase}`);
-    if (typeof home?.title === 'string') names.add(home.title);
-
-    for (const page of seed.pagesOf(u)) names.add(page.title);
-    for (const list of seed.listsOf(u)) names.add(u.labels[list.id] ?? list.name);
-
-    for (const id of share.modulesToInstall(u)) {
-      assert.equal(
-        packs.FIRST_PARTY.includes(id),
-        true,
-        `the ${u.usecase} setup installs a module named "${id}" that packs/first-party.ts does not ` +
-          'declare, so this check cannot see what that module ships and would pass by not looking',
-      );
-      for (const d of packs.firstPartyDocument(id).declarations) {
-        const register = typeof d.register === 'string' ? d.register : null;
-        if (register !== null && d.page === undefined && d.rule === undefined) {
-          names.add(u.labels[register] ?? (typeof d.name === 'string' ? d.name : register));
-        }
-        /* A `for:` page is drawn once per row and titled out of the row (`{{name}}`), so it has no
-           one name a rail could print. */
-        if (typeof d.page === 'string' && d.for === undefined && typeof d.title === 'string') names.add(d.title);
-      }
-    }
-    return names;
-  };
-
-  const cases = site.arrange.cases;
-  assert.equal(cases.length, USE_CASES.length, `copy.ts arranges ${cases.length} cases and the home page names ${USE_CASES.length}`);
-
-  const wrong: string[] = [];
-  for (const one of cases) {
-    const u = seed.useCase(one.id);
-    if (!u) {
-      wrong.push(`the rail offers a case called "${one.id}" and the seed declares no such use case`);
-      continue;
-    }
-    assert.equal(one.holds.length > 0, true, `the ${one.id} case holds nothing, so this check has nothing to read for it`);
-
-    const ships = shipped(u);
-    assert.equal(ships.size > 0, true, `the ${one.id} setup ships no pages and no lists at all; the seed's shape has changed under this check`);
-
-    for (const name of one.holds) {
-      if (ships.has(name)) continue;
-      wrong.push(
-        `the ${one.id} rail says a record holds "${name}", and that setup ships no page and no list ` +
-          `under that name. It ships: ${[...ships].sort().join(', ')}`,
-      );
-    }
-  }
-
-  assert.equal(wrong.length, 0, `${wrong.length} name(s) on the rail are not things a record will have:\n  - ${wrong.join('\n  - ')}`);
 });
 
 /**

@@ -4,9 +4,9 @@
  * JITTER IS MANDATORY AND DETERMINISTIC, and both halves of that are load-bearing (`25 §9`). Twenty
  * connectors declaring `every: 1h` become due at the same instant, which is one wake and twenty
  * runs in one Worker invocation — at `max_pages: 50` that is a thousand subrequests, exactly the
- * Paid ceiling and twenty times the Free one. So the due instant is spread. And it is spread by a
- * hash of the record and the ingest rather than by a random number, because *"why was there a gap
- * at 04:00"* has to have an answer, and with random jitter it does not.
+ * Paid ceiling and twenty times the Free one. So the due instant is spread. And it is spread by
+ * arithmetic over the record and the ingest rather than by a random number, because *"why was
+ * there a gap at 04:00"* has to have an answer, and with random jitter it does not.
  *
  * THE WINDOW CEILING IS THE START OF THE CURRENT GRAIN AND NOT THE CURRENT INSTANT. A `day` series
  * fetched at 14:00 would otherwise write eleven hours of a day into the row that means the whole
@@ -21,7 +21,6 @@
 
 import { GRAINS, parseDuration, type Cursor, type FetchDecl, type Grain, type Window } from './index.ts';
 
-const utf8 = new TextEncoder();
 const pad = (n: number, width = 2): string => String(n).padStart(width, '0');
 
 /* ── The zone ────────────────────────────────────────────────────────────────────────────────── */
@@ -92,22 +91,29 @@ export function startOfGrainMs(ms: number, grain: Grain, tz: string): number {
 
 /* ── Jitter ──────────────────────────────────────────────────────────────────────────────────── */
 
-const JITTER_FLOOR_S = 30;
-const JITTER_CEILING_S = 900;
+const JITTER_FLOOR_MS = 30_000;
+const JITTER_CEILING_MS = 15 * 60_000;
 
 /**
- * `47 §4.8`: `u32be(sha256(record ‖ 0x1F ‖ ingest)[0..4]) mod clamp(every / 10, 30 s, 15 min)`.
+ * FNV-1a over `record ‖ 0x1F ‖ ingest`, modulo a tenth of the interval clamped between thirty
+ * seconds and fifteen minutes: the kernel's `jitterMs` (`packages/kernel/src/pull.ts`), the same
+ * arithmetic over the same two names, so it answers the same offset.
  *
- * IT IS A PROMISE AND `47 §2` DECLARES IT SYNCHRONOUS (`§13` D19). `crypto.subtle.digest` is the
- * only SHA-256 a package may reach for — `31 §1` bans `node:crypto` here — and it is async. The
- * alternative was forty lines of hand-written SHA-256 in a connector, which is a primitive
- * reimplemented to satisfy a signature, and the only caller is already `async`.
+ * ONE FORMULA, BECAUSE BOTH SIDES SET THE SAME ROW. The record fires a connector and arms its next
+ * run with its own offset, and this runner's finish then sets the due instant it counted
+ * (`finishPull`). A SHA-256 here spread the same connector by a different amount from the one the
+ * record used, so which of the two a run landed on depended on which wrote last. It is written out
+ * here and not imported because the kernel sits below this package (`31 §2`), and it is arithmetic
+ * rather than a digest, so it is synchronous as `47 §2` wants it (`§13` D19).
  */
-export async function jitterSeconds(recordId: string, ingestId: string, everyS: number): Promise<number> {
-  const digest = await crypto.subtle.digest('SHA-256', utf8.encode(`${recordId}\u001f${ingestId}`));
-  const head = new DataView(digest).getUint32(0, false);
-  const window = Math.min(Math.max(Math.floor(everyS / 10), JITTER_FLOOR_S), JITTER_CEILING_S);
-  return head % window;
+export function jitterMs(recordId: string, ingestId: string, everyMs: number): number {
+  let h = 0x811c9dc5;
+  for (const ch of `${recordId}\u001f${ingestId}`) {
+    h ^= ch.codePointAt(0) ?? 0;
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  const window = Math.min(Math.max(Math.floor(everyMs / 10), JITTER_FLOOR_MS), JITTER_CEILING_MS);
+  return h % window;
 }
 
 /**
@@ -121,6 +127,9 @@ export async function jitterSeconds(recordId: string, ingestId: string, everyS: 
  * `at:` RE-ANCHORS RATHER THAN ADDING. `every` is a multiple of 24 h when `at` is declared, so
  * adding it preserves the wall clock — except across a zone change, where it slips by an hour and
  * stays slipped. Re-reading the declared wall time on the day it landed on puts it back.
+ *
+ * STILL A PROMISE, though nothing in it waits any more, so the run that awaits it and a refusal a
+ * caller reads as a rejection are the contract they were when the jitter was a digest.
  */
 export async function nextDue(
   decl: FetchDecl,
@@ -147,8 +156,7 @@ export async function nextDue(
     while (next <= now) next = zonedToMs({ ...wallAt(next + everyMs, tz), hour: Number(h), minute: Number(m), second: 0 }, tz);
   }
 
-  const jitter = await jitterSeconds(recordId, ingestId, Math.floor(everyMs / 1000));
-  return { slot: next, dueAt: next + jitter * 1000 };
+  return { slot: next, dueAt: next + jitterMs(recordId, ingestId, everyMs) };
 }
 
 /* ── The window ──────────────────────────────────────────────────────────────────────────────── */

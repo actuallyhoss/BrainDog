@@ -17,8 +17,9 @@
  *
  * A REFUSAL THAT ASKS FOR A REASON SAYS SO, as `wants: 'reason'`. A question answered where it is shown
  * (`lib/page/QueueAnswer.svelte`) sends the option alone and lets the kernel decide whether a reason is owed
- * (`govern.ts` `decide`, which refuses `REQUIRED_MISSING` at `reason` today for every question). The card opens its one
- * reason line on that answer and on no other, so it never asks for a sentence the record would not have wanted.
+ * (`govern.ts` `decide`, which refuses `REQUIRED_MISSING` at `reason` for every question except a light one a rule or
+ * Slash opened, MOD-29). The card opens its one reason line on that answer and on no other, so it never asks for a
+ * sentence the record would not have wanted.
  *
  * THERE WAS A FOURTH, `gone`, for a 401 or an unreachable host at an address with no slug, which is where the sample
  * was drawn. Neither Decide screen told it from `refused`, both print the `fix`, and with no sample an address with

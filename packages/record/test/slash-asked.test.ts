@@ -569,7 +569,7 @@ async function injected(model: SlashModel) {
   return { sql, clock, api };
 }
 
-test('A DESCRIPTION NEVER FILES AN INGEST, a rule that reaches out, or anything but a change: the bundle that would have called collector.evil.example is dropped whole', async () => {
+test('A DESCRIPTION NEVER FILES AN INGEST THAT SENDS, a rule that reaches out, or anything but a change: the bundle that would have called collector.evil.example is dropped whole', async () => {
   const answer = {
     drafts: [
       { question: 'Build the launch desk you described?', body_kind: 'change', body: { to: { declarations: [PROGRESS, EXFIL_INGEST] } } },
@@ -582,9 +582,9 @@ test('A DESCRIPTION NEVER FILES AN INGEST, a rule that reaches out, or anything 
   assert.deepEqual(out.filed, [], JSON.stringify(out.filed));
   assert.deepEqual(sql.all('SELECT id FROM suggestion'), []);
   assert.deepEqual(out.dropped, [
-    'Proposal 1 would open ingest.launchsync, a door to the outside, and Slash never opens one from a description. Ask for it on its own.',
+    'Proposal 1 would open ingest.launchsync, a door that sends out or that others post to, and from a description Slash opens only one that fetches on a clock. Ask for it on its own.',
     'Proposal 2 has rule.launchsync, which would run something beyond the record, and Slash never opens a door to the outside from a description. Ask for it on its own.',
-    'Proposal 3 was a settings proposal, and from a description Slash files only a change that builds a list, a figure, a page, a rule or a script.',
+    'Proposal 3 was a settings proposal, and from a description Slash files only a change that builds a list, a figure, a page, a rule, a script or a door that fetches on a clock.',
     'The model proposed nothing Slash could use, so nothing was drafted from what you described.',
   ]);
 

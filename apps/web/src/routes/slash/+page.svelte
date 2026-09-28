@@ -23,6 +23,7 @@
   import { drawProposal, drawReading, pass2Refused, secondPass, slashWords, type Drawn, type DrawnProposal } from '$lib/palette/slash.ts';
   import { askedLately, askWords, ASKS_FETCHED, type AskedLine } from '$lib/palette/slash-ask.ts';
   import Cited from '$lib/ui/Cited.svelte';
+  import SlashOut from '$lib/ui/SlashOut.svelte';
   import { titleOf } from '$lib/title.ts';
   import { read } from '$lib/data/record.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
@@ -34,6 +35,7 @@
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import SlashDaily from '$lib/ui/SlashDaily.svelte';
+  import SlashMark from './SlashMark.svelte';
   import { drew } from '../../lib/ui/screen.svelte.ts';
 
   let client: SlashClient | null = null;
@@ -44,6 +46,15 @@
   let asked = $state<Asked | null>(null);
 
   const suggestions = $derived(reading ? suggestionsOf(reading) : []);
+  /* WHAT SLASH SUGGESTED AND WHAT YOU ANSWERED, drawn apart (DSN-18): the first is still to act on, the second is done. */
+  const stillOpen = $derived(suggestions.filter((s) => s.state !== 'answered'));
+  const settled = $derived(suggestions.filter((s) => s.state === 'answered'));
+
+  /* THE WORDS THIS SCREEN ADDS for the answered list; the rest are `slash.ts`'s. */
+  const pageWords = {
+    answeredTitle: 'What you answered',
+    allAnswered: 'You have answered everything Slash suggested. What it notices next is drafted here.',
+  };
 
   /**
    * THE DESCRIBE FIELD (`loop/research-dynamic-layouts.md` §6 brief D2, `loop/finish/pages.md` PGS-12) is `AskPage`, the
@@ -87,7 +98,7 @@
    * SHOWN ONLY WHERE THE HOST HAS A MODEL, the same fact the palette's Slash row stands on: without one the field is
    * absent, not disabled (`23 §8`).
    */
-  type Second = { drawn: DrawnProposal | null; refused: { fix: string; without: string | null } | null };
+  type Second = { drawn: DrawnProposal | null; refused: { fix: string; without: string | null; spent?: boolean } | null };
   type Answered = { question: string; drawn: Drawn | null; fix: string | null; second: Second | null };
 
   let door: ReturnType<typeof createClient> | null = null;
@@ -184,6 +195,16 @@
   {#if phase === 'refused'}
     <Empty kind="no-permission" title={fix} />
   {:else if phase === 'ready' && reading}
+    <!-- SLASH FIRST, WITH A FACE (DSN-18). The screen is the product's manager and it opened on a form with no
+         one behind it: the mark, what Slash does and what drafts for it now come before anything to press. -->
+    <div class="slash-intro">
+      <SlashMark />
+      <div class="slash-intro-words">
+        <p class="slash-lede">{words.lede}</p>
+        <p class="slash-by">{draftedBy(reading, asked)}</p>
+      </div>
+    </div>
+
     {#if modelHere}
       <Section title={askWords.title}>
         <form
@@ -240,6 +261,7 @@
                   {#if answer.second.refused}
                     <p class="slash-said">{answer.second.refused.fix}</p>
                     {#if answer.second.refused.without}<p class="slash-said">{answer.second.refused.without}</p>{/if}
+                    {#if answer.second.refused.spent}<SlashOut />{/if}
                   {:else if answer.second.drawn}
                     {#if answer.second.drawn.text}
                       <p class="slash-text"><Cited text={answer.second.drawn.text} figures={answer.second.drawn.figures} /></p>
@@ -290,11 +312,6 @@
       {/if}
     {/if}
 
-    <div class="slash-intro">
-      <p class="slash-lede">{words.lede}</p>
-      <p class="slash-by">{draftedBy(reading, asked)}</p>
-    </div>
-
     {#if reading.model !== null}
       <!-- THE DESCRIPTION'S DRAFTS ARE DRAWN HERE, as a page's own "Change this page" draws them (PGS-12): each as the
            pages it would make, beside the pages as they are, kept, asked on Decide or dropped from here. -->
@@ -311,7 +328,7 @@
     {#if nothingYet(reading)}
       <!-- A NEW RECORD HAS NOTHING UNDER EITHER HEADING, so it gets one sentence of what Slash will do, and the reason it is
            quiet when the record is young. -->
-      <Empty kind="no-data-yet" title={words.emptyTitle} body={reading.quiet === null ? words.emptyBody : `${reading.quiet} ${words.emptyBody}`} />
+      <Empty kind="no-data-yet" glyph="star" title={words.emptyTitle} body={reading.quiet === null ? words.emptyBody : `${reading.quiet} ${words.emptyBody}`} />
     {:else}
     <Section title={words.noticed}>
       {#if reading.noticed.length === 0}
@@ -328,11 +345,11 @@
     <Section title={words.suggests}>
       {#if reading.quiet !== null}
         <p class="slash-said">{reading.quiet}</p>
-      {:else if suggestions.length === 0}
-        <p class="slash-said">{words.suggestsNone}</p>
+      {:else if stillOpen.length === 0}
+        <p class="slash-said">{suggestions.length === 0 ? words.suggestsNone : pageWords.allAnswered}</p>
       {:else}
         <ul class="slash-list">
-          {#each suggestions as s (s.question)}
+          {#each stillOpen as s (s.question)}
             <li class="slash-suggestion" data-state={s.state}>
               <span class="slash-question">{s.question}</span>
               {#if s.href}
@@ -350,6 +367,22 @@
         {/if}
       {/if}
     </Section>
+
+    <!-- AND WHAT YOU ANSWERED, UNDER ITS OWN HEADING (DSN-18). An answered suggestion was drawn dimmed among the open
+         ones, so what Slash suggested and what the owner already settled read as one list. Each still opens its
+         question on Decide, where the answer is. -->
+    {#if settled.length > 0}
+      <Section title={pageWords.answeredTitle} count={settled.length}>
+        <ul class="slash-list">
+          {#each settled as s (s.question)}
+            <li class="slash-suggestion" data-state={s.state}>
+              <span class="slash-question">{s.question}</span>
+              {#if s.href}<a class="slash-link" href={at(s.href)}>{words.open}</a>{/if}
+            </li>
+          {/each}
+        </ul>
+      </Section>
+    {/if}
     {/if}
 
     {#if reading.daily}<SlashDaily daily={reading.daily} />{/if}
@@ -378,10 +411,19 @@
     max-inline-size: 820px;
   }
 
+  /* THE MARK BESIDE WHAT SLASH DOES, on the lede's first line, and the lede kept to the measure. */
   .slash-intro {
+    display: flex;
+    align-items: start;
+    gap: var(--sp-4);
+  }
+
+  .slash-intro-words {
     display: flex;
     flex-direction: column;
     gap: var(--sp-2);
+    min-inline-size: 0;
+    max-inline-size: var(--measure);
   }
 
   .slash-lede {

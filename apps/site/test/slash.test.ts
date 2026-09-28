@@ -21,18 +21,28 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 
 import { ENTRIES } from '../src/routes/changelog/entries.ts';
 
 const BUILD = new URL('../build/', import.meta.url);
-const PAGES = ['index.html', 'pricing.html', 'agents.html', 'changelog.html', 'legal.html', '404.html'] as const;
+const REQUIRED = ['index.html', 'slash.html', 'pricing.html', 'agents.html', 'changelog.html', '404.html'] as const;
 
-const absent = PAGES.filter((page) => !existsSync(new URL(page, BUILD)));
+const absent = REQUIRED.filter((page) => !existsSync(new URL(page, BUILD)));
 const when =
   absent.length === 0
     ? {}
     : { skip: `apps/site/build is missing ${absent.join(', ')}. Run "pnpm --filter @braindog/site build" first.` };
+
+/* EVERY PAGE THE BUILD WROTE, walked rather than listed, as `content.test.ts` does: the docs and the pages for
+   each kind of person are pages a stranger reads too, and a list typed here would leave the newest out. */
+const PAGES: readonly string[] =
+  absent.length === 0
+    ? readdirSync(BUILD, { recursive: true, encoding: 'utf8' })
+        .map((rel) => rel.replaceAll('\\', '/'))
+        .filter((rel) => rel.endsWith('.html') && !rel.startsWith('_app/'))
+        .sort()
+    : [];
 
 const NAMED: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
 

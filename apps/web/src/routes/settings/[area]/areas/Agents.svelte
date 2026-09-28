@@ -2,7 +2,7 @@
   Settings > Agents: connecting an agent three ways, approving a machine, everything that is connected, and what Slash
   may do on its own (`loop/finish/agents.md` AGT-8).
 
-  THREE WAYS IN, EACH A CARD. Any MCP client takes the record's address and signs in through OAuth, which the owner
+  THREE WAYS IN, ONE UNDER ANOTHER. Any MCP client takes the record's address and signs in through OAuth, which the owner
   allows on `/connect`; Claude Code with its hooks and skills is one install line and one `braindog setup`, which
   shows six digits to approve here; a script or a server is given a key, shown once, with the header it is sent in.
 
@@ -527,8 +527,9 @@
     padding-block: var(--sp-3);
   }
 
+  /* THE SOFT HAIRLINE A LIST'S ROWS ARE PARTED BY everywhere (design 6.5), and not `--line`, which is a field's edge. */
   .who + .who {
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--line-soft);
   }
 
   /* THE NAME, WHAT IS KNOWN ABOUT IT UNDER THE NAME, AND THE CONTROL AT THE END OF BOTH. The head was
@@ -565,7 +566,7 @@
      pushing the row past the edge at 320. */
   .who-name {
     color: var(--ink);
-    font-weight: 600;
+    font-weight: 500;
     overflow-wrap: anywhere;
   }
 
@@ -653,19 +654,16 @@
     letter-spacing: 0.18em;
   }
 
-  /* THE PACKS SCREEN'S PLAN, drawn the same way where an agent is connected. */
+  /* WHAT THE ADD-ON WOULD ADD, as label and value on the page with nothing round them: a filled, bordered panel
+     inside a section is the box in a box design 6.8.6 rules out. */
   .plan {
     display: grid;
     grid-template-columns: minmax(6ch, max-content) minmax(0, 1fr);
     gap: var(--sp-1) var(--sp-4);
     margin: 0;
-    padding: var(--sp-3);
-    background: var(--sunk);
-    border: 1px solid var(--line);
-    border-radius: var(--r-sm);
     color: var(--ink2);
     font-size: var(--t-sm);
-    line-height: 1.6;
+    line-height: var(--lh-body);
   }
 
   .plan dt {
@@ -742,12 +740,12 @@
     gap: var(--sp-2);
   }
 
-  /* THE THREE WAYS IN, one card each and one under another at every width: each holds a line too long to share a
-     row with a second card's, and a card that is the whole width is the phone's layout already. */
+  /* THE THREE WAYS IN, one under another at every width, each holding a line too long to share a row with another's.
+     UNBOXED, as the rows below them are: each was a bordered card inside the section, the box in a box design 6.8.6
+     rules out, so a way in is now a block with a soft hairline above the next one. */
   .doors {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-3);
     margin: 0;
     padding: 0;
     list-style: none;
@@ -758,9 +756,15 @@
     flex-direction: column;
     gap: var(--sp-2);
     min-inline-size: 0;
-    padding: var(--sp-4);
-    border: 1px solid var(--line);
-    border-radius: var(--r-md);
+    padding-block: var(--sp-4);
+  }
+
+  .door:first-child {
+    padding-block-start: 0;
+  }
+
+  .door + .door {
+    border-block-start: 1px solid var(--line-soft);
   }
 
   .door-title {

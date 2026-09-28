@@ -40,7 +40,7 @@ export { slashRecordMeter, type SlashLedgerDeps } from './slash-ask.ts';
    no principal, and answers 202 rather than a `Result`. It is exported from this file for the same reason
    the vault, key and session doors are: both hosts import one module to get the whole surface, and a door
    one host can find and the other cannot is exactly the drift this file's header is about. */
-export { messageHeaders, serveIngest, servesIngest, type IngestArrival, type IngestChannel, type IngestDoor, type IngestPath, type IngestVerify } from './ingest.ts';
+export { EMAIL_LIMIT, FILES_HEADER, messageHeaders, serveIngest, servesIngest, type IngestArrival, type IngestChannel, type IngestDoor, type IngestFile, type IngestPath, type IngestVerify } from './ingest.ts';
 export { freshNonce, grantAad, grantKey, NONCE_BYTES, openSealed, recordAad, seal, type Bytes, type DerivedKey } from './sealing.ts';
 /* `crashed` IS EXPORTED FOR THE OTHER TWO DOORS, the Worker's router and the self-host's outer catch (W60-6, W60-7).
    `serveApi` below is the first of three places a crash is answered, and three answers to one crash is the drift this

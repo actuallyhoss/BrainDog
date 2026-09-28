@@ -25,9 +25,10 @@ that exists as a table row.
 So this is not a new kind. **`ingest` gains a `fetch:` block when `channel: pull`, and the eight
 pack kinds stay eight.**
 
-*(Revised September 22nd 2026. A connector is still not a new kind. The kinds became nine for another reason:
-`script`, a person's or an agent's code, joined them in kernel migration 12 under DIRECTION §22. §12 says how a
-script stands beside a connector, and why neither replaces the other.)*
+*(Revised September 22nd 2026. A connector is still not a new kind. The kinds grew for other reasons: `script`, a
+person's or an agent's code, joined them in kernel migration 12 under DIRECTION §22, and `job` since; `KINDS` in
+`packages/kernel/src/declare.ts` is the list. §12 says how a script stands beside a connector, and why neither
+replaces the other.)*
 
 ### But the price is real, and it is not the schema
 
@@ -666,7 +667,7 @@ unrun, a job whose declaration has gone) finishes the job and writes none of thi
 
 | Addition | Why |
 |---|---|
-| **Jitter is mandatory and deterministic** | twenty connectors declaring `every: 1h` become due at the same instant → one wake → twenty runs in one Worker invocation. At `max_pages: 50` that is **1,000 subrequests: exactly the Workers Paid ceiling, and 20× the Free ceiling of 50.** Derive it from `hash(record_id ‖ ingest_id)` so it is **stable**: random jitter makes *"why was there a gap at 04:00"* unanswerable. The offset falls in a window of `every / 10` clamped to 30 s–15 min, and **the record and connect each compute it with a hash of their own**. The record's is FNV-1a over `record_id ‖ 0x1F ‖ ingest_id` (`jitterMs`, `packages/kernel/src/pull.ts`): a fire re-arms its row at `now + every` plus that offset, and `call`, `poll` and the retry ladder take the same arithmetic over more names: the pack and the action, or the job's kind and id (`actionJitterMs`, `packages/kernel/src/actions.ts`). Connect's is SHA-256 over the same bytes (`jitterSeconds`, `packages/connect/src/when.ts`): a paged run that ends `ok` or `review` counts its next slot from the last slot and adds that offset, and the record writes the `due_at` its ack carries over the one the fire set ([47-SPEC-CONNECT](47-SPEC-CONNECT.md) §4.8) |
+| **Jitter is mandatory and deterministic** | twenty connectors declaring `every: 1h` become due at the same instant → one wake → twenty runs in one Worker invocation. At `max_pages: 50` that is **1,000 subrequests: exactly the Workers Paid ceiling, and 20× the Free ceiling of 50.** Derive it from `hash(record_id ‖ ingest_id)` so it is **stable**: random jitter makes *"why was there a gap at 04:00"* unanswerable. The offset falls in a window of `every / 10` clamped to 30 s–15 min, and **the record and connect compute it with the same arithmetic**: FNV-1a over `record_id ‖ 0x1F ‖ ingest_id` (`jitterMs`, `packages/kernel/src/pull.ts`, and connect's copy, `jitterMs`, `packages/connect/src/when.ts`). Every next run is counted from the last slot, not from when the alarm rang (`packages/kernel/src/slot.ts`), and `call`, `poll` and the retry ladder take the same arithmetic over more names: the pack and the action, or the job's kind and id (`actionJitterMs`, `packages/kernel/src/actions.ts`). A paged run that ends `ok` or `review` counts its next slot from the last slot and adds that offset, and the record writes the `due_at` its ack carries over the one the fire set ([47-SPEC-CONNECT](47-SPEC-CONNECT.md) §4.8) |
 | **The Worker runs a bounded batch** | at most `ALARM_RUNS` runs an alarm (`apps/worker/src/actions.ts`), each reserving two subrequests for every page it may fetch plus its tail before it starts (`reserveFor`, `packages/kernel/src/actions.ts`), from one budget of `SUBREQUESTS` per invocation (`packages/host/src/actions.ts`). A run that would not fit goes back unrun and the alarm rings again. Jitter prevents the pile-up; the budget survives jitter being wrong |
 | **A minimum interval, refused at install** | 15 minutes, or any declared provider floor. Banks are hard-floored at **6 hours by law** — SCA-RTS Art 36(5), *"no more than four times in a 24-hour period"* |
 
@@ -753,6 +754,36 @@ statutory decision window, requires **zero initial capital**, and — surprising
 can be one**. Cheaper still is being a registered agent of a principal AISP. None of that changes
 the recommendation.)*
 
+### 10.1 · What Money does instead: cash rolled forward from what the record knows
+
+*(Written September 28th 2026, from what the code does: `packages/seed/src/modules/money.ts` and
+[08-METRICS-AND-ANALYTICS](08-METRICS-AND-ANALYTICS.md), `value: { rolled }`.)*
+
+There is still no bank connection, and Money does not wait for one. **Cash now** is rolled forward
+from whatever the record has been told. Each liquid account starts from the newest thing anybody said
+it held: its own balance on its `as_of` day, a row of `balances` (a balance check), or a transaction
+that printed the balance after it (`balance_after`), whichever is latest. Every cleared transaction
+dated after that day is then added, money in plus and money out minus, and a transfer counts because
+it moves cash between accounts. The figure says the oldest day it started from ("as of 3 Sep"), so a
+stale account shows as stale rather than as wrong. One arithmetic serves the whole figure, the figure
+for each book, and the runway and the thirty days in and out that are walked from it.
+
+So each way money reaches the record makes the figure better, and none of them is a bank API:
+
+- **Typed**: a transaction or a balance check written by hand, on the page or in the palette.
+- **Counted**: the `count-cash` add-on keeps what is actually in a cash box or an account as a
+  balance check, and writes the difference from what the record thought into the ledger.
+- **Read from a message, through a door**: `card-alerts` reads a card alert forwarded by mail or
+  posted as a text message into a transaction, and `bank-hsbc-eg` reads one bank's alert mails and
+  texts, each with the balance it prints, so every alert also restarts its account. These are add-ons
+  a person chooses to install, as the revision above asks: the seed's `bank-from-out-sms` ingest is
+  gone from `packages/seed`.
+- **Pulled with a key the person holds**: `mercury` and `stripe` fetch balances and movements on a
+  schedule through a key in the vault, where a provider offers one to its own customer.
+
+**CSV and OFX paste, the recommendation above, is not built yet.** It would be one more door into
+the same `transactions` list, and the roll above would read it with no change.
+
 ---
 
 ## 11 · What this changes elsewhere
@@ -760,10 +791,10 @@ the recommendation.)*
 | # | Document | Change |
 |---|---|---|
 | 1 | **[04-PACKS](04-PACKS.md) §7** | *"A pack CANNOT make an outbound call of any kind"* is now false. It becomes *"…except a declared `source:` whose origin is printed in the install diff and whose credential a human attached."* **Do not let a reader discover this** |
-| 2 | **[15-ROADMAP](15-ROADMAP.md) §6** | its admission test — *"everything here is additive: it fits the eight kinds, the one grammar and the pack format **without changing them**"* — **rejects this feature as written.** Connectors change the security enumeration. Amend the test or place connectors outside Phase C explicitly |
+| 2 | **[15-ROADMAP](15-ROADMAP.md) §6** | its admission test — *"everything here is additive: it fits the declaration kinds, the one grammar and the pack format **without changing them**"* — **rejects this feature as written.** Connectors change the security enumeration. Amend the test or place connectors outside Phase C explicitly |
 | 3 | [02-DATA-MODEL](02-DATA-MODEL.md) §1 | `metric_point` is a kernel table — done; the kernel is twenty-seven |
 | 4 | [17-OPEN-QUESTIONS](17-OPEN-QUESTIONS.md) Q13 | **Answered (b), [ADR-052](16-DECISIONS.md):** connector grants live under a second, KEK-wrapped DEK — the `connector` row of `vault_key` — so the Worker can decrypt a grant unattended with the passphrase on; [12-SECURITY](12-SECURITY.md) §7 carries the row and the bind screen says it in words. *This document asked the question; it is no longer open* |
-| 5 | [04-PACKS](04-PACKS.md) §1 and §7 | *Added September 22nd 2026.* A `script` is the ninth kind, and it calls out as an action does: its egress is a line in the install diff the owner approves (§12). 04 §1 already says so; the enumeration of §7 gains the script's line beside `source:` |
+| 5 | [04-PACKS](04-PACKS.md) §1 and §7 | *Added September 22nd 2026.* A `script` is a kind of its own (`KINDS` in `packages/kernel/src/declare.ts`), and it calls out as an action does: its egress is a line in the install diff the owner approves (§12). 04 §1 already says so; the enumeration of §7 gains the script's line beside `source:` |
 
 ---
 
@@ -772,19 +803,20 @@ the recommendation.)*
 *Added September 22nd 2026, and revised the same day for wave thirty-seven, checked against
 `packages/kernel/src/script.ts`, `script-run.ts`, `actions.ts` (`scriptEgress`), `packages/script`,
 `packages/host/src/script.ts`, `packages/host/src/script-try.ts`, `packages/mcp/src/index.ts` and both hosts at
-`d23ac77d`.*
+`d23ac77d`, and checked again on September 28th against the same files, `packages/kernel/src/ingest.ts` (the door)
+and `packages/kernel/src/flow.ts` (the rule's step).*
 
 The owner's rule of that day ([DIRECTION §22](../loop/DIRECTION.md)): BrainDog is the shell. The code ships
 primitives, doors in and out, schedules, scripts, registers, pages, automations and the vault, and never a use case.
-A gold rate or a bank's SMS is something a person or an agent builds on those. For this document that settles three
-things.
+A currency rate or a message a payment provider posts is something a person or an agent builds on those. For this
+document that settles three things.
 
 **Never a script in the core.** No script ships in `packages/`: `packages/seed` declares none, and the two scripts
-the MCP grammar shows (`gold-rate`, `bank-sms`, in `packages/mcp/grammars/script.ts`) are text served at
+the MCP grammar shows (`usd-eur`, `payment-hook`, in `packages/mcp/grammars/script.ts`) are text served at
 `braindog:grammar/script` for an agent writing one, installed only by that package's own test.
 
 **A person's or an agent's script is record content.** It is a declaration of kind `script`, versioned,
-attributable and retirable like the other eight, held in one record or in a pack somebody chooses to install. An
+attributable and retirable like every other kind, held in one record or in a pack somebody chooses to install. An
 agent files it through `propose` as a `change`, and the owner accepts it in Decide, where its egress is printed and
 approved like an action's. Every row it writes says `script:<id>@v<n>` wrote it. It runs hosted, in a sandbox
 BrainDog meters per account (QuickJS on a self-host, [49-SPEC-SELFHOST](49-SPEC-SELFHOST.md) §5.23; a Dynamic Worker
@@ -803,7 +835,7 @@ of being code:
 | Sends | one grant, by label | the vault labels in `keys:`, each only to the host its vault entry says it opens, checked at every fetch (`keyRefused`; a fetch elsewhere is `FORBIDDEN` and refuses the run). A key with no `egress:` to go to is refused at install, and so is the vault's `slash` key (`FORBIDDEN` at `keys[i]`) |
 | Reads the record | no | the registers in `reads:`, with every secret field taken off and a filter on one refused |
 | Writes | the rows its mapping makes, into one register or series | creates and updates into the registers in `writes:`, applied together after the run, all or none |
-| Starts | on its schedule | on `runs.every`, no more often than every fifteen minutes (`ACTION_INTERVAL_TOO_SHORT`), first due at a jitter and not at once. a rule's `script` step starts one that says `runs.rule: true`, and every verified arrival at its `runs.door` queues one run with `input: { body, headers }`, at most `doorRunsPerDay()` a day (`startAtDoor` in `kernel/src/script.ts`) |
+| Starts | on its schedule | on `runs.every`, no more often than every fifteen minutes (`ACTION_INTERVAL_TOO_SHORT`), first due at a jitter and not at once. A rule's `script` step starts one that says `runs.rule: true`, queuing the same `script.run` a clock does and going on without waiting (`startScript` in `kernel/src/flow.ts`), and every verified arrival at its `runs.door` queues one run with `input: { body, headers }` in the arrival's own transaction, at most `doorRunsPerDay()` a day (`startAtDoor` in `kernel/src/script.ts`, called from `arrive` in `kernel/src/ingest.ts`). A paused script is started by neither |
 | The install diff says | `CALLS OUT <host> · every … · grant "…"` (§7 rule 9) | `CALLS OUT <hosts> · every … · key "…"`, and when it both reads and fetches, a second sentence: *"<id> reads <lists> and may send what it reads to <hosts>."* Reading and fetching together is the one way a script can carry the record out, and that sentence is the owner's one chance to see it |
 | Ends short | the seven `PULL_*` codes (§9) | `PULL_ORIGIN_REFUSED`, `OUT_OF_BOUNDS`, `FORBIDDEN`, `DECLARATION_INVALID`, or the script's own throw with no code. The run's note says only that it did not finish; the reason goes in its log, which only an owner who reads every list the script touched is shown. Three refused runs in a row of the installed version pause it until the owner resumes it |
 | Tried before it is proposed | not by `script_try`, which takes a script only | yes, on request: `script_try` runs the draft now in the same sandbox, answers the writes it would make, its log and any refusal, and writes and files nothing |

@@ -280,7 +280,7 @@ export function finishScript(deps: ScriptRunDeps, s: Scripted, answer: ScriptAns
     return meter(deps, { ...base, outcome: 'dropped', requests: 0, bytes: 0, ms: 0, failures: 0 }, answer.say);
   }
 
-  const spent = { requests: answer.usage.fetches, bytes: answer.usage.bytes, ms: answer.usage.wall_ms };
+  const spent = { requests: answer.usage.fetches, bytes: answer.usage.bytes, ms: answer.usage.wall_ms, cpu_ms: answer.usage.cpu_ms };
   /* THE NOTE IS THE RECORD'S WORDS AND THE WHY GOES IN THE LOG. A refusal's reason quotes what the script chose: its
      thrown message, a register name it made up, a value the write path quoted back. The note is on a line every
      whole-record reader sees, and `logOf` holds the log to the owner who reads every list the script touched; measured

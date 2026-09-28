@@ -292,6 +292,30 @@ templates-in-the-visual-editor problem was closed *"no intent to fix"*, then dis
 **`template` selector** — one new control type retired a whole class of bail-outs. Institutionalise
 it: **a construct that repeatedly falls to the raw row is a missing control type.**
 
+### 3.8 Editing a page as a file: `.dog` v2
+
+The in-app text-with-preview lens of §3.1 is one way to a page's own text. The other is a file, `braindog page pull
+<slug>` writing `<slug>.dog` in the lossless dialect of [06-PAGES](06-PAGES.md) §9 (`packages/dog`): the stored
+declaration's exact JSON body, printed in a fixed key order with terse sugar preserved (`columns: [client, amount]`
+stays bare, a sentence prints as itself), so a page pulled, edited by hand or by an agent, and checked (`braindog
+page check <file>`, the same lint the app runs) round-trips without losing a rail, a lead sentence or a tab. What it
+does not do is push itself: `braindog page push <file>` is refused to a bearer token ([ADR-060](16-DECISIONS.md),
+unamended: no ADMIN method is ever held by a token), because applying an edited declaration is the same act as
+accepting one in the app, and needs the same proof a browser session gives. A `.dog` file is therefore pulled and
+checked from anywhere, but applied only by opening it in `SourceView` (§3.1's text lens) and pressing Save, or by an
+owner's session.
+
+A page's body also carries `{{icon:<name>}}` inline, a glyph and never a path
+([05-BLOCKS-AND-THEMES](05-BLOCKS-AND-THEMES.md) §7.2): typed in a `note`'s markdown or any other body text the same
+way a typed interpolation is, and drawn 1em high in the words' own colour by whatever the host answers
+`RenderOptions.icon` with, so the builder's live preview and a pulled `.dog` file show the same rocket before the
+same word.
+
+The four newest kinds (`calendar`, `link`, `gallery`, `embed`) need no builder work of their own beyond what A7
+already gives every kind: their keys (`panel`, `short`, and each kind's own columns and cells,
+[06-PAGES](06-PAGES.md) §1.1) generate a form from the same schema the parser validates against, so a new kind
+neither special-cases the inspector nor waits for one.
+
 ---
 
 ## 4 · The query builder
@@ -810,6 +834,30 @@ pattern built from three samples is a hypothesis.**
 suggestion: *"3 fields missing in the last 4 messages from Orange."* One click pins that message as a
 new sample and reopens the builder.
 
+### As built (September 28th 2026)
+
+The builder is `/inbox/pattern` (`apps/web/src/routes/inbox/pattern/+page.svelte`, with
+`apps/web/src/lib/pattern/`), and the record's half is `tryPattern` and `anchorsFor`
+(`packages/record/src/pattern.ts`). It opens from an Inbox group of alike arrivals ("Make a rule from
+these") and from a `pattern` proposal on Decide ("Open in the builder").
+
+- **Samples** are the arrivals named plus any pasted in, at most `SAMPLES_MOST` of them, and the screen
+  counts them. An arrival erased since is left out with a sentence saying so.
+- **The table** is one column per sample, each cell the typed value `tryPattern` read through the
+  kernel's own extractor, the raw text behind it on hover or a long press, and a chip per field saying
+  in how many samples it was read. `tryPattern` writes nothing. A `map:` field is listed and not read.
+- **Fixing** is by pointing: select the words in a sample, and `anchorsFor` offers ways to find them
+  again, cut from the sample itself and scored against every sample, best first, at most
+  `ANCHORS_MOST`. A way can be used, added as another way, followed by a fallback, or turned into a
+  condition of the match. There is still no field anywhere to type a pattern.
+- **Saving** by the owner installs the rule at `proposed` (`setDeclaration`), so what it reads waits on
+  Decide as rowsets, the kernel's holding tray, and the screen says how many of them were accepted
+  ("7 of 10 accepted") until she presses "Trust it now", which reinstalls it at `exact`. Anybody else's
+  save files a `pattern` proposal carrying the rule and its samples.
+
+Not built: the rot suggestion above ("3 fields missing in the last 4 messages"). A pattern that stops
+reading a field is not yet noticed by anything but the person reading its rows.
+
 ---
 
 ## 9 · The pack builder
@@ -900,6 +948,51 @@ control" is explicitly one-way: *"You won't be able to convert this back into a 
 And borrow Home Assistant's deprecation discipline (Home Assistant ADR-0021): a deprecation runs **≥6 months**; if a
 migration is possible it is **required**; and **a failed migration must raise a visible issue saying
 what happened and what to do** — not a silent skip.
+
+### As built (September 28th 2026)
+
+There is no baseline diff and no checkbox list yet. Settings' "Export the way you work" downloads every
+list, page, metric and rule without a row, but as an export file, not a pack
+(`apps/web/src/routes/settings/[area]/areas/Export.svelte`). What is built is three smaller routes to
+a pack or a use case:
+
+- **A page shared as a template.** A page's menu has "Share as a template" (`apps/web/src/lib/ui/ShareMenu.svelte`),
+  which makes a pack of that page alone (`apps/web/src/lib/market/template.ts`). It goes out as the
+  record stores it, never with its rows. **Scrubbing to inputs is automatic and narrow:** every literal
+  in a filter that names something of this record (a row, a person, or a project on its scope field)
+  becomes a text setting read back as `{{config:<key>}}`, its default the literal, so the pack installs
+  and draws as it does here and whoever installs it picks their own at `/packs/<id>`. One literal used
+  in three filters is one setting. `requires` names the lists the page reads, on the page and, on the
+  manifest, the installed packs holding them. The sheet shows what the pack adds and calls out to and
+  the page's headings as drawn now, then Download or Publish.
+- **A use case shared.** `/packs/share` writes the file with the record (`exportUseCase`, which writes
+  nothing), says what it changes against the version it counts on from, draws it as Browse would offer
+  it, and has Download and "Publish to the Kennel" (`apps/web/src/lib/market/publish.ts`).
+- **An add-on written by hand**, with the terminal: `braindog pack new`, `check` (the install-time
+  checks in a scratch record, plus a warning on any manifest key outside `MANIFEST_KEYS`), `test` (the
+  rows in its `.test.json` against its expectations), `preview` (a scratch BrainDog serving it) and
+  `publish` (`apps/cli/src/catalogue.ts`, `scratch.ts`, `kennel.ts`). `brain.dog/build` walks it
+  through (`apps/site/src/routes/build/`).
+
+**Versioning is computed, as the table says, and enforced where a version is published**, not chosen
+from a read-only field. `changesBetween` in `packages/declare/src/catalogue.ts` classifies a change:
+taking away a list, a page, a module or a field a record may hold rows in is major; adding a
+declaration, a module or a host it calls out to is minor; anything else, a changed page or rule or
+only words, is a patch. Publishing a
+version bumped less than its changes need is refused with the version to use instead, in a folder
+and at the Kennel alike, and `braindog pack diff` and `usecase diff` say the least bump before
+anything is sent. `/packs/share` offers the next patch or minor after the version last shared.
+
+**Publish** sends the file to the Kennel as the signed-in person, and the answer is "listed" for a
+trusted publisher or "waiting for review" otherwise ([14-KENNEL](14-KENNEL-AND-COMMUNITY.md) §1). The
+file is still the artefact, and installing still takes an address, a git ref, a file or a paste
+([04-PACKS](04-PACKS.md) §3).
+
+**The install side**: an installed pack pins its version, and an update is the same plan an install
+is, drawn on one plan sheet with every setting kept or reset said (`apps/web/src/lib/market/PlanSheet.svelte`).
+"Update all" at `/packs` reads every plan first, shows them on the one sheet, and installs them in
+order on one press (`apps/web/src/routes/packs/+page.svelte`). Uninstalling keeps every row
+([04-PACKS](04-PACKS.md) §4); the "keep or delete the rows" question and "take control" are not built.
 
 ---
 

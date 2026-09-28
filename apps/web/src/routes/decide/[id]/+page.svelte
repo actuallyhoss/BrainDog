@@ -370,7 +370,7 @@
     fix = '';
     part = null;
     committed = said;
-    toasts.push(copy.decisionRecorded(a.title, a.question), { intent: 'good' });
+    toasts.push(copy.decisionRecorded(a.title), { intent: 'good' });
     if (accepting && out.from === 'written' && had) {
       applied = appliedLines(out.applied ?? {}, accepting.body);
       await invalidateAll();

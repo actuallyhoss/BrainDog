@@ -244,6 +244,62 @@ jobs:
           SMOKE_TOKEN: ${{ secrets.SMOKE_TOKEN }}
           SMOKE_SLUG: ${{ vars.SMOKE_SLUG }}
 
+      # AND THEN ONE SCRIPT, RUN IN THE CLOUD SANDBOX ON THE OPERATOR'S CANARY RECORD (SCR-4). Every question above is
+      # answered the same by a Worker with no `LOADER` binding, and such a Worker meters every script run "no sandbox"
+      # and runs nothing, so a deploy that dropped `worker_loaders` from `wrangler.jsonc` was green here while every
+      # person's scripts stopped. This asks `scriptTry` for a fixture that only logs one sentence, and goes red unless
+      # that sentence comes back: a "no sandbox" answer, a refusal or any other status all fail the deploy. A trial
+      # writes nothing to the record and is metered as one run on its plan.
+      #
+      # THE CANARY IS `OPS_RECORD`, READ FROM PRODUCTION'S VARS IN `apps/worker/wrangler.jsonc`, AND NO SECOND VARIABLE
+      # NAMES IT. Empty, the step says the smoke was skipped and passes, which is the state until the owner makes one.
+      # Set, `SMOKE_TOKEN` must be a token on that record at `propose` or above, since `scriptTry` refuses a read token;
+      # a token on any other record fails here and says so, rather than trying the script somewhere else.
+      #
+      # NO ROLLBACK FOLLOWS IT. The version before this one ran on the same config, so putting it back would not bring a
+      # sandbox back; the run goes red and the fix is the binding. It prints the CPU time the loader reported, when it
+      # reported any, which is the one witness that the tail in `apps/worker/src/script.ts` is heard on the platform.
+      - name: Sandbox smoke
+        run: |
+          node --input-type=module <<'JS'
+          import { pathToFileURL } from 'node:url';
+          const { wranglerConfig } = await import(pathToFileURL('apps/worker/scripts/provision-check.mjs').href);
+          const record = String(wranglerConfig().env?.production?.vars?.OPS_RECORD ?? '').trim();
+          if (record === '') {
+            console.log('The sandbox smoke is skipped: OPS_RECORD is empty in apps/worker/wrangler.jsonc, so there is no canary record to run a script on.');
+            process.exit(0);
+          }
+          const fail = (why) => {
+            console.error(`The sandbox smoke failed on ${record}: ${why}`);
+            process.exit(1);
+          };
+          const token = process.env.SMOKE_TOKEN ?? '';
+          if (!token.startsWith(`${record}.`)) fail('SMOKE_TOKEN is not a token on this record, so the sandbox cannot be asked. Mint one there at propose or above and set it again.');
+          const said = 'The sandbox ran this deploy smoke.';
+          const body = { script: 'deploy_smoke', runs: { rule: true }, egress: [], keys: [], reads: [], writes: [], source: `export default (ctx) => { ctx.log(${JSON.stringify(said)}); };` };
+          let status = 0;
+          let text = '';
+          try {
+            const answer = await fetch(`https://${process.env.DEPLOY_HOST}/api/scriptTry`, {
+              method: 'POST',
+              headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+              body: JSON.stringify({ body }),
+              signal: AbortSignal.timeout(30_000),
+            });
+            status = answer.status;
+            text = await answer.text();
+          } catch (e) {
+            fail(`the host did not answer: ${e instanceof Error ? e.message : String(e)}`);
+          }
+          if (/no sandbox/i.test(text)) fail('the fixture was metered "no sandbox", so this deploy has no LOADER binding and no script anywhere will run.');
+          if (status !== 200 || !text.includes(said)) fail(`it answered ${status} without the fixture's log: ${text.slice(0, 400)}`);
+          const cpu = /"cpu_ms":\s*(\d+)/.exec(text)?.[1];
+          console.log(`The sandbox ran a script on ${record} and answered its log. The loader reported ${cpu === undefined || cpu === '0' ? 'no CPU time' : `${cpu} ms of CPU time`}.`);
+          JS
+        env:
+          SMOKE_TOKEN: ${{ secrets.SMOKE_TOKEN }}
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+
       # A RED PARITY OR SMOKE PUTS BACK WHAT WAS LIVE, UNLESS PUTTING IT BACK WOULD BREAK MORE. Before
       # this, a red step left the bad version serving every record. `rollback.mjs decide` reads what
       # `Record what is live` kept and the diff from that sha to this one, and holds when a kernel

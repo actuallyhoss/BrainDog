@@ -984,6 +984,21 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
     }
     const register = routed.to;
 
+    /* AN EMAIL'S KEPT ATTACHMENTS RIDE ON `x-braindog-files`, and the row this arrival files is where a person reads
+       them next: copied on here, beside the arrival itself, so nobody has to find the arrival to see what it came
+       with (`gaps.md` §1.2). Only a field the register itself declares `file`, or a list of them, is filled, and only
+       one extraction did not already fill: a message read into a `file` field of its own has said which file it means. */
+    const kept = keptFiles(headers['x-braindog-files']);
+    const firstKept = kept[0];
+    if (firstKept !== undefined) {
+      const fields = deps.schemaOf(register)?.fields ?? {};
+      for (const [field, decl] of Object.entries(fields)) {
+        if (Object.hasOwn(extracted, field)) continue;
+        if (decl.type === 'file') extracted[field] = firstKept;
+        else if (decl.type === 'list' && decl.of === 'file') extracted[field] = kept;
+      }
+    }
+
     /* `43 §5.1` STEP 7, ALL THREE LEVELS. A field the pattern could not read is `needs-review`; a
        field it CHOSE between two forms, or DEFAULTED in because the payload did not carry one, is
        `proposed` — read by the record, not sent by anybody, and therefore a thing a person should
@@ -2143,6 +2158,34 @@ export function day(text: string, format: string): string | null {
 
 const lower = (headers: Record<string, string>): Record<string, string> =>
   Object.fromEntries(Object.entries(headers).map(([k, v]) => [k.toLowerCase(), v]));
+
+/**
+ * `@braindog/host`'s `x-braindog-files` header (`FILES_HEADER`, `IngestFile[]`), read structurally and never
+ * imported: `packages/host` depends on this package (`31 §16`) and an import back would be a cycle. Only a KEPT
+ * file, one with a `sha256`, is one this record can ever open again; the rest are named on the arrival alone.
+ */
+const KEPT_SHA256 = /^[0-9a-f]{64}$/;
+
+function keptFiles(header: string | undefined): { name: string; mime: string; bytes: number; sha256: string }[] {
+  if (typeof header !== 'string' || header === '') return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(header);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(parsed)) return [];
+  const out: { name: string; mime: string; bytes: number; sha256: string }[] = [];
+  for (const f of parsed as unknown[]) {
+    if (f === null || typeof f !== 'object') continue;
+    const { name, mime, bytes, sha256 } = f as Record<string, unknown>;
+    if (typeof sha256 !== 'string' || !KEPT_SHA256.test(sha256)) continue;
+    if (typeof name !== 'string' || name === '' || typeof mime !== 'string' || mime === '') continue;
+    if (typeof bytes !== 'number' || !Number.isInteger(bytes) || bytes < 0) continue;
+    out.push({ name, mime, bytes, sha256 });
+  }
+  return out;
+}
 
 /** What a refusal from the pipeline looks like when it is about the declaration rather than a row. */
 export const badIngest = (fix: string, at: string): Refusal => ({ code: 'DECLARATION_INVALID', fix, at });

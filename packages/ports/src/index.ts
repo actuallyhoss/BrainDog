@@ -450,3 +450,4 @@ export type {
   PasskeyInfo, RegistrationJSON, RegistrationOptions, SessionInfo, Who,
 } from './auth.ts';
 export type { SignupCall, SignupName, SignupVerified } from './auth.ts';
+export type { AccountCall, AccountClosed, Suspended } from './auth.ts';

@@ -143,8 +143,15 @@ export const FOUNDER = {
      1.7.0 BECAUSE HOME LEADS WITH THE MONEY THERE IS AND NOT WITH WHO OWES WHOM (MOD-18): What you have, by book
      once there are two, Lasts until, the numbers of the week as lines, then what is due, lapsing and working now.
      `page.home-founder` now requires `register.books`, which money-core 3.1.0 holds, so it is a minor step as
-     1.5.0 was. Datapoints are called Numbers, the lists are Lists, and an organisation's page lists its projects. */
-  version: '1.7.0',
+     1.5.0 was. Datapoints are called Numbers, the lists are Lists, and an organisation's page lists its projects.
+
+     1.8.0 BECAUSE THE PAGES ARE LAID OUT AND NAME THEIR PANELS (PGS-22): the Dashboard and a project's page open with
+     one sentence said from their figures and keep a rail beside the main column, and "Send numbers here" on an
+     organisation and on a project says `panel: reporting`, so the key a project sends its numbers with is drawn by
+     that name and not by the heading's English. A page somebody arranged in their own record keeps its arrangement:
+     the update is offered, never forced. In the same unreleased version, the voice says more of the record its own
+     way, Home's empty lines and Decide's among them (PGS-24), each a new setting a person can change at /packs. */
+  version: '1.8.0',
   title: 'Solo founder',
   summary: 'The organisations you run, the money across them, and the numbers your projects report.',
   author: 'BrainDog',
@@ -165,6 +172,16 @@ export const FOUNDER = {
     nothing_needs_you: 'Nothing needs your call',
     since_away: 'While you were building',
     lists: 'Lists',
+    /* THE REST OF THE LINES, direct and about the work (PGS-24): a call to make, what shipped, what reports a number. */
+    working_now: 'Agents at work',
+    coming_up: 'Due soon',
+    overdue: 'Late',
+    nothing_now: 'Nothing needs your call. Back to building.',
+    nothing_waiting: 'No call is waiting on you.',
+    fills_with: 'Your numbers, the calls waiting on you and what shipped while you were building show up here as your projects report.',
+    no_questions: 'No call waiting',
+    inbox_clear: 'Nothing new has come in',
+    pen_waits: 'When there is a way to fit this to how you run your projects, it waits here until you keep it or say no.',
   },
   skills: [
     { name: 'datapoint-reporter', trigger: 'when a project ships a number worth watching, to post it as a datapoint' },
@@ -324,8 +341,27 @@ export const FOUNDER = {
         title: 'Dashboard',
         nav: { section: 'Dashboard', order: 10 },
         icon: 'observe',
+        /* EACH ORGANISATION'S BALANCE IN THE RAIL, SINCE 1.8.0, beside the numbers, which want the width for their tiles
+           and their lines. At a phone's width the rail comes after the main column. */
+        layout: { rail: 4 },
         requires: ['register.datapoints', 'register.organisations', 'register.accounts', 'register.obligations'],
         blocks: [
+          /* THE OPENING SENTENCE, SAID FROM THE NUMBERS OF THE LAST THIRTY DAYS (`datapoints-30d`, which leaves the
+             example out). Both are held to the one figure, so exactly one of them draws. */
+          {
+            kind: 'note',
+            lead: true,
+            span: 12,
+            when: { metric: 'datapoints-30d', gte: 1 },
+            body: 'Your projects reported {{datapoints-30d}} number(s) in the last thirty days.',
+          },
+          {
+            kind: 'note',
+            lead: true,
+            span: 12,
+            when: { metric: 'datapoints-30d', lt: 1 },
+            body: "No project has reported a number in the last thirty days. A project's page has the key it sends them with.",
+          },
           {
             kind: 'stat',
             heading: 'Across your organisations',
@@ -345,6 +381,7 @@ export const FOUNDER = {
             kind: 'bar',
             heading: 'Balance by organisation',
             span: 12,
+            area: 'rail',
             source: 'register.organisations',
             columns: [{ field: 'name' }, { field: 'accounts' }],
             empty: 'No organisation lists an account yet. Open one and add the accounts it holds.',
@@ -432,7 +469,9 @@ export const FOUNDER = {
             limit: 10,
             empty: 'Nothing has been reported for {{name}} yet.',
           },
-          { kind: 'section', heading: 'Send numbers here', icon: 'observe', span: 12 },
+          /* `panel: reporting` NAMES THE KEY AND THE POLL FORM the app draws under this section (`panel-of.ts`), so a
+             person or Slash renaming the heading keeps them. */
+          { kind: 'section', heading: 'Send numbers here', icon: 'observe', span: 12, panel: 'reporting' },
         ],
       },
       {
@@ -451,7 +490,9 @@ export const FOUNDER = {
         blocks: [
           ...(projectTemplate(HOLDS).blocks as Record<string, unknown>[]),
           ...numbers('thing is {{name}}', 'When a number is reported for {{name}}, it shows here. Examples are left out.', 'Each measure draws a line once it is reported for {{name}}.'),
-          { kind: 'section', heading: 'Send numbers here', icon: 'observe', span: 12 },
+          /* IN THE MAIN COLUMN UNDER THE PROJECT'S NUMBERS, and the one place on the page the key is drawn: "Runs on" in
+             the rail draws the scheduled actions alone (`BlockSlot.svelte`). */
+          { kind: 'section', heading: 'Send numbers here', icon: 'observe', span: 12, panel: 'reporting' },
         ],
       },
     ],
@@ -477,3 +518,15 @@ export const FOUNDER_EXAMPLES = [
   { register: 'tracks', fields: { name: 'Launch the annual plan', state: 'open', opened: '-12d' } },
   { register: 'tasks', fields: { what: 'Write the pricing page copy', state: 'open', by: '+4d' } },
 ];
+
+/**
+ * WHAT THE MODULES SAY TO A FOUNDER, by module and then by the module's own words (`MODULE_NAMES` in `install.ts`). A
+ * founder is not given the plain words the other use cases get: money owed to one of their organisations is an invoice,
+ * and saying so is the business's voice and not somebody else's. So Money's late note names the invoices it counts.
+ */
+export const FOUNDER_NAMES: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  'money-core': {
+    'Late to you': 'Late invoices',
+    'Money you are owed has gone past its date: {{late-in}} in all.': 'Invoices have gone past their date unpaid: {{late-in}} in all.',
+  },
+};

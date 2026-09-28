@@ -1,8 +1,9 @@
 {
   "pack": "card-alerts",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "title": "Card alerts",
   "summary": "Reads a card alert that names the card's last four digits into Money as a transaction, forwarded by mail or posted as a text message.",
+  "changes": "Nothing it reads or writes changed. Each version says what it changed in a line like this one.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": {

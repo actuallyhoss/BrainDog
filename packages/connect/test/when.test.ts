@@ -16,7 +16,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  jitterSeconds, nextDue, rfc3339, startOfGrainMs, wallClock, watermarkAfter, windowFor, zonedToMs,
+  jitterMs, nextDue, rfc3339, startOfGrainMs, wallClock, watermarkAfter, windowFor, zonedToMs,
   type Cursor, type FetchDecl,
 } from '../src/index.ts';
 
@@ -91,33 +91,40 @@ test('the start of a grain is read in the record zone and not in UTC', () => {
 
 /* STABLE, SO "WHY WAS THERE A GAP AT 04:00" HAS AN ANSWER. Random jitter makes that question
    unanswerable for ever, which is the cost nobody prices in when they reach for `Math.random`. */
-test('the same record and ingest always get the same jitter', async () => {
-  const a = await jitterSeconds('rec_1', 'ingest_a', 3600);
-  assert.equal(await jitterSeconds('rec_1', 'ingest_a', 3600), a);
-  assert.notEqual(await jitterSeconds('rec_1', 'ingest_b', 3600), a);
-  assert.notEqual(await jitterSeconds('rec_2', 'ingest_a', 3600), a);
+test('the same record and ingest always get the same jitter', () => {
+  const a = jitterMs('rec_1', 'ingest_a', 3_600_000);
+  assert.equal(jitterMs('rec_1', 'ingest_a', 3_600_000), a);
+  assert.notEqual(jitterMs('rec_1', 'ingest_b', 3_600_000), a);
+  assert.notEqual(jitterMs('rec_2', 'ingest_a', 3_600_000), a);
+});
+
+/* ONE FORMULA ON BOTH SIDES OF THE ROW (DOR-5). The kernel's `jitterMs` in `pull.ts` arms the
+   connector with this same arithmetic, and the number below is what it answers for these names. A
+   runner that spread the run by a different amount set a due instant the record did not agree with. */
+test('the jitter is the kernel\'s own arithmetic, to the millisecond', () => {
+  assert.equal(jitterMs('rec_1', 'ingest_a', 3_600_000), 271_822);
 });
 
 /* AND THE SEPARATOR IS THERE FOR A REASON. Without `0x1F`, record `ab` with ingest `c` and record
    `a` with ingest `bc` hash the same, and two connectors that should be spread fire together. */
-test('the record and the ingest cannot run together into one string', async () => {
-  assert.notEqual(await jitterSeconds('ab', 'c', 3600), await jitterSeconds('a', 'bc', 3600));
+test('the record and the ingest cannot run together into one string', () => {
+  assert.notEqual(jitterMs('ab', 'c', 3_600_000), jitterMs('a', 'bc', 3_600_000));
 });
 
-test('the jitter window is every/10, clamped to thirty seconds and fifteen minutes', async () => {
-  const spread = async (everyS: number): Promise<number> => {
+test('the jitter window is every/10, clamped to thirty seconds and fifteen minutes', () => {
+  const spread = (everyMs: number): number => {
     let top = 0;
-    for (let i = 0; i < 400; i += 1) top = Math.max(top, await jitterSeconds('rec_1', `ingest_${String(i)}`, everyS));
+    for (let i = 0; i < 400; i += 1) top = Math.max(top, jitterMs('rec_1', `ingest_${String(i)}`, everyMs));
     return top;
   };
   /* 1 h / 10 is 6 min, which is `25 §9`'s "twenty hourly connectors land across six minutes". */
-  assert.ok(await spread(3600) <= 360, 'an hourly connector jittered past six minutes');
-  assert.ok(await spread(3600) > 300, 'an hourly connector never used most of its window');
+  assert.ok(spread(3_600_000) < 360_000, 'an hourly connector jittered past six minutes');
+  assert.ok(spread(3_600_000) > 300_000, 'an hourly connector never used most of its window');
   /* 15 min / 10 is 90 s, and the floor does not bite. A day is 2.4 h, and the ceiling does. */
-  assert.ok(await spread(900) <= 90);
-  assert.ok(await spread(86_400) <= 900, 'a daily connector jittered past the fifteen-minute ceiling');
+  assert.ok(spread(900_000) < 90_000);
+  assert.ok(spread(86_400_000) < 900_000, 'a daily connector jittered past the fifteen-minute ceiling');
   /* The floor: 5 min / 10 is 30 s exactly, and anything under it still gets thirty. */
-  assert.ok(await spread(60) <= 30);
+  assert.ok(spread(60_000) < 30_000);
 });
 
 /* ── The next slot ───────────────────────────────────────────────────────────────────────────── */

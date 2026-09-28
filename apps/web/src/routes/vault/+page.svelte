@@ -1,9 +1,11 @@
 <!--
   Keys: who is asking to open them, what they are, and which machines may.
 
-  THREE SECTIONS, IN THE ORDER OF URGENCY, as the old tool's Access screen asks it. A request waiting for
+  FOUR SECTIONS, IN THE ORDER OF URGENCY, as the old tool's Access screen asks it. A request waiting for
   its six digits is time-boxed, so it leads, and it is drawn only while there is one. Then the Keys
-  index, then the machines holding a vault grant, each with Revoke.
+  index, then the vault passphrase that guards them (`Passphrase.svelte`, an owner's only), then the
+  machines holding a vault grant, each with Revoke. While the passphrase is on, opening or putting a
+  key asks for it, and it goes with that one request and is not kept.
 
   NEVER A VALUE, A CODE OR A HANDLE. A key row says whether a value is sealed, how often it was opened
   and when; the six digits are typed here and never printed; a machine is named by its label.
@@ -30,8 +32,9 @@
   import { copy } from '$lib/copy.ts';
   import { CODE_DIGITS, type Answer, type DeviceRow } from '$lib/record/device.ts';
   import {
-    answerLine, approve, asks, daysFor, holders, keysOf, lastUsers, namesOf, reconnectOf, reprove, revoke, runPath, scopeName, words,
-    type GrantState, type KeyRow, type ProjectMark, type UsedByRun,
+    answerLine, approve, asks, daysFor, holders, keysOf, lastUsers, lockOf, namesOf, reconnectOf, reprove, revoke, runPath, scopeName,
+    wantsPassphrase, withPassphrase, words,
+    type GrantState, type KeyRow, type Lock, type ProjectMark, type UsedByRun,
   } from '$lib/record/vault.ts';
   import { words as actionWords } from '$lib/record/actions.ts';
   import { read } from '$lib/data/record.ts';
@@ -47,6 +50,9 @@
   import Sheet from '$lib/ui/Sheet.svelte';
   import { closed, drew, opened } from '../../lib/ui/screen.svelte.ts';
   import { countSaid, machinesTellOf, mayAct, saidOf, tellOf, words as tells, type Said } from './said.ts';
+  import Menu from '$lib/ui/Menu.svelte';
+  import PassField from './PassField.svelte';
+  import Passphrase from './Passphrase.svelte';
 
   /**
    * Whether the record has answered yet. THERE IS NO THIRD STATE: this screen drew the sample's grants and keys,
@@ -137,12 +143,31 @@
       forConnectors = connectorGrants(grants.ok ? grants.value : []);
       void whoOpened();
       from = 'live';
+      /* THE PASSPHRASE IS ASKED ABOUT ONLY FOR A PERSON WHO MAY ACT HERE: its two methods are the vault gate's, as the
+         machines read is, so anyone that read refused would be refused this too, and it would say nothing new. */
+      if (mayAct(devices)) void probe();
       reconnect();
       /* The screen has an answer if either half answered; a screen refused both halves is a refused screen. */
       return devices.kind === 'held' || index.kind === 'held';
     });
   });
   $effect(() => drew('ready'));
+
+  /* WHAT A KEY'S "…" MENU IS CALLED TO A SCREEN READER, by the key's name, as a flow card's menu is (`flow.ts`). */
+  const moreFor = (label: string) => `More for: ${label}`;
+
+  /* ── the passphrase ── */
+
+  /**
+   * WHETHER THE VAULT IS BEHIND A PASSPHRASE, which decides whether opening or putting a key asks for it. `lockOf` says
+   * how it is found out; a key door that answers "type the passphrase" also moves it to on, so a vault turned on from
+   * another tab since this one read it asks at the next press rather than failing twice.
+   */
+  let lock = $state<Lock>({ state: 'reading' });
+  async function probe() {
+    if (!client) return;
+    lock = await lockOf(client);
+  }
 
   /* ── the code ── */
   let typed = $state('');
@@ -239,7 +264,7 @@
    * bearer, and want an owner whose last sign-in is under fifteen minutes old, which is the record's own rule.
    */
   let sheet = $state<{ mode: 'add' } | { mode: 'replace'; row: KeyRow } | null>(null);
-  const blank = () => ({ label: '', opens: '', kind: 'api_token', project: '', value: '', connector: false });
+  const blank = () => ({ label: '', opens: '', kind: 'api_token', project: '', value: '', connector: false, passphrase: '' });
 
   /**
    * WHICH KEYS A SCHEDULED CONNECTOR CAN OPEN, by grant id, from `listGrants`' `sealed_under`.
@@ -357,18 +382,25 @@
     sheetSaid = '';
     const at = opened();
     /* `sealed_under` ONLY WHEN THE TOGGLE IS ON, so a key for a person sends the body it always sent. */
-    const under = form.connector ? { sealed_under: 'connector' } : {};
+    const under = form.connector ? { sealed_under: 'connector' as const } : {};
+    /* THE PASSPHRASE GOES WITH THIS ONE REQUEST and is emptied from the sheet whatever comes back (`12 §6`). */
+    const unlock = withPassphrase(lock, form.passphrase);
+    form.passphrase = '';
     const args =
       sheet.mode === 'add'
-        ? { label: form.label, opens: form.opens, kind: form.kind, value: form.value, ...(form.project === '' ? {} : { project: form.project }), ...under }
-        : { label: sheet.row.label, opens: sheet.row.opens, credential: sheet.row.id, value: form.value, ...under };
+        ? { label: form.label, opens: form.opens, kind: form.kind, value: form.value, ...(form.project === '' ? {} : { project: form.project }), ...under, ...unlock }
+        : { label: sheet.row.label, opens: sheet.row.opens, credential: sheet.row.id, value: form.value, ...under, ...unlock };
     const out = await client.putKey(args);
     closed(true, at);
     saving = false;
     if (!out.ok) {
+      /* A VAULT TURNED ON SINCE THIS SCREEN ASKED says so here, and the sheet grows the field it needs. */
+      if (wantsPassphrase(out)) lock = { state: 'on' };
       sheetSaid = 'refusal' in out ? out.refusal.fix : copy.writeRaced;
       return;
     }
+    /* THE FIRST KEY GIVES THE RECORD A KEY OF ITS OWN, which is what a passphrase is put on, so the switch asks again. */
+    if (lock.state === 'none') void probe();
     toasts.push(mode === 'add' ? words.keyAdded(out.value.label) : words.keyReplaced(out.value.label), { intent: 'good' });
     form = blank();
     sheet = null;
@@ -383,24 +415,63 @@
   }
 
   /**
+   * THE SHEET THAT ASKS FOR THE PASSPHRASE BEFORE A KEY IS OPENED, while the vault is behind one. The passphrase goes
+   * with the one request it was typed for and the field is emptied whatever comes back, so nothing on this screen
+   * holds it between two keys.
+   */
+  let asking = $state<KeyRow | null>(null);
+  let askPass = $state('');
+  let askSaid = $state('');
+  function openAsk(k: KeyRow) {
+    askPass = '';
+    askSaid = '';
+    asking = k;
+  }
+  function shutAsk() {
+    asking = null;
+    askPass = '';
+    askSaid = '';
+  }
+  function askGo(e?: SubmitEvent) {
+    e?.preventDefault();
+    if (asking === null || askPass === '') return;
+    void revealKey(asking, askPass);
+  }
+
+  /**
    * ONE KEY, READ BACK ONCE. The record counts it as a `grant.read`, so revealing is an act and not an address:
    * nothing here is reachable by a URL, nothing is written into the query string, and nothing is kept.
    */
-  async function revealKey(k: KeyRow) {
+  async function revealKey(k: KeyRow, passphrase = '') {
     if (!acts || !client) {
       refuse();
       return;
     }
     if (revealing !== '') return;
-    revealing = k.id;
-    const at = opened();
-    const out = await client.openKey({ credential: k.id });
-    closed(true, at);
-    revealing = '';
-    if (!out.ok) {
-      toasts.push('refusal' in out ? out.refusal.fix : copy.writeRaced, { intent: 'warn' });
+    /* BEHIND A PASSPHRASE, REVEAL ASKS FOR IT FIRST, in a sheet of its own, rather than sending a request it knows the
+       record will refuse. */
+    if (lock.state === 'on' && passphrase === '') {
+      openAsk(k);
       return;
     }
+    revealing = k.id;
+    const at = opened();
+    const out = await client.openKey({ credential: k.id, ...withPassphrase(lock, passphrase) });
+    closed(true, at);
+    revealing = '';
+    askPass = '';
+    if (!out.ok) {
+      const fix = 'refusal' in out ? out.refusal.fix : copy.writeRaced;
+      if (wantsPassphrase(out)) {
+        lock = { state: 'on' };
+        openAsk(k);
+      }
+      /* A REFUSAL WHILE THE SHEET IS UP IS SAID IN IT, a wrong passphrase above all, so the next try is one field away. */
+      if (asking !== null) askSaid = fix;
+      else toasts.push(fix, { intent: 'warn' });
+      return;
+    }
+    shutAsk();
     forget();
     shown = { id: k.id, label: out.value.label, value: out.value.value, left: HIDE_S };
     ticker = setInterval(() => {
@@ -500,16 +571,24 @@
     {/if}
     <ul class="whos">
       {#each keys as k (k.id)}
-        <li class="who">
+        <!--
+          ONE ROW ANATOMY, THE KEYS LIST'S (design 2.14, SYS-6): the name on line one; where it applies, what it opens and
+          how often it was opened on line two; one visible verb and a "…" menu at the end. The scope chip lived on the
+          name's line and wrapped under it on some rows and not others, so it now always leads line two. A key whose
+          value is kept elsewhere says nothing about it, rather than a phrase on every row: it simply has no Reveal.
+        -->
+        <li class="who key">
           <div class="who-head">
             <Icon name="key" size="s" />
             <span class="who-name">{k.label}</span>
-            <ScopeChip scope={k.scope} />
-            <span class="who-detail">
-              {k.sealed ? words.sealed : words.indexOnly}{#if k.sealed}{' · '}{counts ? words.opened(k.opened) : countSaid(counted)}{#if counts && k.lastOpened}{', '}{words.lastOpened(since(k.lastOpened, Date.now()))}{/if}{/if}
-            </span>
           </div>
-          {#if k.opens}<p class="who-why">{k.opens}</p>{/if}
+          <p class="key-meta">
+            <ScopeChip scope={k.scope} />
+            {#if k.opens}<span class="key-opens">{k.opens}</span>{/if}
+            {#if k.sealed}<span
+                >{words.sealed}{#if counts}{', '}{words.opened(k.opened)}{#if k.lastOpened}{', '}{words.lastOpened(since(k.lastOpened, Date.now()))}{/if}{:else}{' · '}{countSaid(counted)}{/if}</span
+              >{/if}
+          </p>
           {#if lastBy.get(k.id)}
             {@const u = lastBy.get(k.id)!}
             {@const href = runPath(u.run)}
@@ -531,22 +610,36 @@
               </div>
             </div>
           {/if}
-          <div class="who-do">
-            {#if acts && k.grant && k.sealed}
-              <!-- ONLY WHERE THERE IS SOMETHING SEALED TO OPEN: an index row points at no grant. -->
-              <Button weight="quiet" disabled={revealing === k.id} onclick={() => void revealKey(k)}>
-                {revealing === k.id ? words.revealing : words.reveal}
-              </Button>
-            {/if}
-            {#if acts}<Button weight="quiet" onclick={() => openReplace(k)}>{words.replace}</Button>{/if}
-            {#if acts && k.grant && k.sealed}
-              <Button weight="bare" tone="bad" onclick={() => void retireKey(k)}>{copy.revokeKey}</Button>
-            {/if}
-          </div>
+          {#if acts}
+            <div class="who-do">
+              {#if k.grant && k.sealed}
+                <!-- ONLY WHERE THERE IS SOMETHING SEALED TO OPEN: an index row points at no grant. -->
+                <Button weight="quiet" disabled={revealing === k.id} onclick={() => void revealKey(k)}>
+                  {revealing === k.id ? words.revealing : words.reveal}
+                </Button>
+              {/if}
+              <!-- REPLACE AND REVOKE IN THE KEY'S OWN MENU (design 2.14): six bordered "Replace value" buttons down the
+                   page were the loudest thing on it, and neither is what a person comes to the vault to do most. -->
+              <Menu label={moreFor(k.label)} align="end">
+                {#snippet trigger()}
+                  <span class="more-trigger"><Icon name="more" size="s" /><span class="vh">{moreFor(k.label)}</span></span>
+                {/snippet}
+                <button type="button" class="mi" role="menuitem" onclick={() => openReplace(k)}>{words.replace}</button>
+                {#if k.grant && k.sealed}
+                  <button type="button" class="mi" role="menuitem" data-tone="bad" onclick={() => void retireKey(k)}>{copy.revokeKey}</button>
+                {/if}
+              </Menu>
+            </div>
+          {/if}
         </li>
       {/each}
     </ul>
   </Section>
+
+  <!-- THE PASSPHRASE BESIDE THE KEYS IT GUARDS, and only for a person who may act here: it is an owner's decision. -->
+  {#if acts}
+    <Passphrase {lock} {client} onturn={(next) => (lock = next)} />
+  {/if}
 
   <Section title={words.mayOpen} count={holding.length}>
     {#if machinesTell}
@@ -616,6 +709,11 @@
         <input class="field-input" id="key-value" type="password" autocomplete="off" spellcheck="false" bind:value={form.value} />
       </div>
 
+      <!-- WHILE THE VAULT IS BEHIND A PASSPHRASE the key is sealed only with it, so the sheet asks for it here. -->
+      {#if lock.state === 'on'}
+        <PassField id="key-passphrase" label={words.passField} hint={words.keyPassHint} autocomplete="current-password" bind:value={form.passphrase} />
+      {/if}
+
       <!-- THE WHOLE LINE IS THE TARGET, the box and its words, so a thumb on a phone finds it at the tap height. -->
       <label class="field-toggle" for="key-connector">
         <input id="key-connector" type="checkbox" bind:checked={form.connector} />
@@ -629,6 +727,19 @@
       <Button weight="primary" type="submit" form="key-form" disabled={saving}>{saving ? words.saving : words.save}</Button>
     {/snippet}
   </Sheet>
+
+  <Sheet open={asking !== null} title={asking ? words.askTitle(asking.label) : words.passField} subtitle={words.askHint} onclose={shutAsk}>
+    <form class="key-form" id="ask-form" onsubmit={askGo} novalidate>
+      <PassField id="ask-passphrase" label={words.passField} autocomplete="current-password" bind:value={askPass} invalid={askSaid !== ''} />
+      {#if askSaid}<p class="code-said" data-intent="bad" role="status">{askSaid}</p>{/if}
+    </form>
+    {#snippet footer()}
+      <Button weight="quiet" onclick={shutAsk}>{words.cancel}</Button>
+      <Button weight="primary" type="submit" form="ask-form" disabled={revealing !== '' || askPass === ''}>
+        {revealing !== '' ? words.revealing : words.askGo}
+      </Button>
+    {/snippet}
+  </Sheet>
 </div>
 
 <style>
@@ -637,7 +748,8 @@
     flex-direction: column;
     gap: var(--sp-5);
     padding: var(--sp-5) var(--gutter) var(--sp-9);
-    max-inline-size: 1000px;
+    /* THE PAGE'S CAP IS THE TOKEN EVERY SCREEN SHARES (design 6.7), not a width of its own. */
+    max-inline-size: var(--page-max);
   }
 
   /* The rows are Settings' rows: unboxed, a hairline between them, the controls at the end of the line. */
@@ -674,8 +786,8 @@
     margin-block: var(--sp-2);
   }
 
-  /* ON A PHONE THE ACTIONS STAY AT THE END and sit level with the name, so a key is still one block
-     beside its button rather than a button on a line of its own. */
+  /* ON A PHONE THE ACTIONS STAY AT THE END and sit level with the name, Reveal and the "…" beside each other, so a key
+     is still one block beside its verb rather than a button on a line of its own. */
   @media (width < 640px) {
     .who {
       align-items: start;
@@ -684,13 +796,12 @@
 
     .who > .who-do {
       grid-row: 1 / span 3;
-      flex-direction: column;
-      align-items: stretch;
     }
   }
 
+  /* THE SOFT HAIRLINE A LIST'S ROWS ARE PARTED BY everywhere (design 6.5), and not `--line`, which is a field's edge. */
   .who + .who {
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--line-soft);
   }
 
   .who-head {
@@ -700,9 +811,102 @@
     gap: var(--sp-2);
   }
 
+  /* A NAME ONE LONG WORD WIDE, a host name most of all, breaks rather than pushing the row past the edge at 320. */
   .who-name {
+    min-inline-size: 0;
     color: var(--ink);
-    font-weight: 600;
+    font-weight: 500;
+    overflow-wrap: anywhere;
+  }
+
+  /* A KEY'S LINE TWO, the Keys list's: where it applies first, so the chip starts every row's second line and never
+     wraps under the name on one row and not the next, then what it opens, then how often it was opened. */
+  .key-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-1) var(--sp-2);
+    margin: 0;
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  .key-opens {
+    min-inline-size: 0;
+    color: var(--ink2);
+    overflow-wrap: anywhere;
+  }
+
+  .key > .who-do {
+    align-items: center;
+    flex-wrap: nowrap;
+  }
+
+  /* THE "…" TRIGGER: the size of a control at a desk and of a thumb under one. `Menu` puts it in a `.tap` button. */
+  .more-trigger {
+    display: grid;
+    place-items: center;
+    inline-size: var(--ctl-h);
+    block-size: var(--ctl-h);
+    border-radius: var(--r-sm);
+    color: var(--dim);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .more-trigger:hover {
+      background: var(--hover-wash);
+      color: var(--ink);
+    }
+  }
+
+  /* A label for a screen reader only, scoped here because there is no global one. */
+  .vh {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* A MENU'S ROW, as a flow card's menu draws one; `Menu` makes them 48px rows at 16px when it rises as a sheet. */
+  .mi {
+    display: flex;
+    align-items: center;
+    inline-size: 100%;
+    min-block-size: var(--ctl-h);
+    padding: 0 var(--sp-3);
+    background: none;
+    border: 0;
+    border-radius: var(--r-sm);
+    color: var(--ink2);
+    font: inherit;
+    font-size: var(--t-ui);
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .mi:hover,
+  .mi:focus-visible {
+    background: var(--hover-wash);
+    color: var(--ink);
+  }
+
+  /* RED ONLY UNDER THE POINTER OR THE FOCUS, as a destructive item is drawn in every menu (`FlowCard`). */
+  .mi[data-tone='bad']:hover,
+  .mi[data-tone='bad']:focus-visible {
+    color: var(--danger);
+  }
+
+  @media (pointer: coarse) {
+    .more-trigger {
+      inline-size: var(--tap);
+      block-size: var(--tap);
+    }
+
+    .mi {
+      min-block-size: var(--tap);
+    }
   }
 
   .who-detail {

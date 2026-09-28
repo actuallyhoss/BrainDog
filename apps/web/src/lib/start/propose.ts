@@ -122,7 +122,10 @@ export function propose(sentence: string, ctx: ProposeContext): Proposal {
      is counted again among the ones proposed; a client the sentence did not fill completely is not written, and the
      invoice then points at nobody rather than at the wrong entry. */
   const complete = read.declined === null ? writable(read) : [];
-  const rows = complete.map((r) => {
+  /* TYPED TO THE WIDER SHAPE `rows` LEAVES AS (a `register` of any string, `fields` of any value), rather than let
+     inference narrow it to `complete`'s own rows: `payDayRow`'s `'recurring'` row pushed below is a different
+     register and a wider `fields` than any of those. */
+  const rows: { register: string; fields: Record<string, unknown>; party?: number }[] = complete.map((r) => {
     const to = r.party === undefined ? undefined : read.rows[r.party];
     const party = to === undefined ? -1 : complete.indexOf(to);
     return { register: r.register, fields: { ...r.fields }, ...(party < 0 ? {} : { party }) };

@@ -2,10 +2,11 @@
   One question from a `queue` block, answered where it is shown (`loop/finish/contracts.md` §8.3, modules C9): on Home,
   Money, Work, a project's page and the Agents page, a press on an option is the answer, and nobody is sent to Decide.
 
-  THE OPTION GOES ALONE AND THE KERNEL DECIDES WHETHER IT OWES A REASON (`answerQuestion` with no `reason`). Today it
-  always does (`govern.ts` `decide`, `REQUIRED_MISSING` at `reason`), so the card then opens one line under itself,
-  "Why? (one line)", focused, and Enter sends it with the option already chosen. The day the owner rules that a light
-  question takes one press (modules O1, MOD-29), the same card answers in one press and nothing here changes.
+  THE OPTION GOES ALONE AND THE KERNEL DECIDES WHETHER IT OWES A REASON (`answerQuestion` with no `reason`). A light
+  question a rule or Slash opened (band `call`) is answered in one press, through `govern.ts`'s `oneAnswer`; every
+  other question still refuses `REQUIRED_MISSING` at `reason`, so the card then opens one line under itself,
+  "Why? (one line)", focused, and Enter sends it with the option already chosen. Nothing here changes for either case:
+  the card sends the option alone and opens the reason line only when the record asks for one.
 
   WHO ASKED IS A FACE AND A NAME: `proposer` words the signer the way every other screen does (`names.ts` `actor`), with
   the reader and the people `boot` named from the shell, so a card says "Claude", "A rule: chase late payments" or

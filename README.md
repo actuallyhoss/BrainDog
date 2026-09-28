@@ -9,125 +9,107 @@ A company knows a great deal that never reaches its codebase. What it is owed an
 renews on Tuesday. Which key opens which account. Who decided the thing nobody can remember
 deciding. That knowledge usually lives in one person's head, six spreadsheets and a Slack thread.
 
-BrainDog keeps it in one database instead. Typed, append-only, and yours.
+BrainDog keeps it in one record instead: typed, append-only, and yours.
 
 Your agents get a key to it. Claude, Codex and Cursor read and write the same rows you do, over MCP,
-and every row records who wrote it and when. Nothing is edited in place, so nothing is quietly lost.
-You can ask what the record said last Tuesday and it will tell you.
+and every row says who wrote it and when. Nothing is edited in place, so nothing is quietly lost.
+Ask what the record said last Tuesday and it will tell you.
 
-One SQLite file per record. Apache-2.0, and it runs on your own machine if you want it to.
+## What it is
 
-```
+- **Typed rows.** Money has an amount, a currency and a date. Domains have renewal dates. "What is
+  due in October" is a question with an answer, not a search.
+- **One record every agent shares.** Over MCP, with the permissions you give each token. An agent
+  proposes; you decide in the app, and the decision becomes a numbered row with its reason.
+- **A history that cannot be rewritten**, by anyone, including you. There is one write path and the
+  event log is append-only by construction ([docs/30-BLUEPRINT.md](docs/30-BLUEPRINT.md) §4).
+- **Extensions are data.** A pack declares lists, pages, metrics and rules as readable text with no
+  code in it, so every extension is a file you can read and diff before it is applied.
+- **Your data is a file.** One SQLite file per record (`.brain`), and a signed line-per-row dump
+  (`.brainl`). Export is never withheld, on any plan, in any state.
+
+## Two ways to run it
+
+**Hosted, at [brain.dog](https://brain.dog).** One record per customer, on Cloudflare. Nothing to
+install but the command line, if you want your agents on it.
+
+**On your own machine.** The same packages run as one Node process over `node:sqlite`. You need
+Node 24.13 or later and pnpm:
+
+```sh
 git clone https://github.com/actuallyhoss/braindog
 cd braindog
 pnpm install
-pnpm test
+pnpm --filter @braindog/web build
+node apps/selfhost/src/main.ts init <record name> --owner <your email>
+node apps/selfhost/src/main.ts
 ```
 
-Node 24 or newer, and pnpm. `BUILD.md` has the rest.
+[BUILD.md](BUILD.md) has the rest, and [docs/49-SPEC-SELFHOST.md](docs/49-SPEC-SELFHOST.md) every
+setting the server reads.
 
----
+### The container
 
-## Status
+The self-host also builds as one image, the server and the app it serves, with the record in a
+volume:
 
-**Being built in the open, and not finished.** The kernel works and the browser client is complete
-against a synthetic record; the wiring between them is the current job. `REPORT.md` is the honest
-running account of what is built, what is left, and the defects found this week. Read that before
-depending on any of this.
+```sh
+docker build -f apps/selfhost/Dockerfile -t braindog .
+docker run --rm -v braindog:/data braindog node apps/selfhost/src/main.ts init <record name> --owner <your email>
+docker run -d -v braindog:/data -p 8080:8080 --env-file braindog.env braindog
+```
 
-Today: 1,364 tests, 22 gates, 54 specification documents in `docs/`.
+Nothing that opens the record is baked into the image. The env file names the server key and the
+address to listen on; without them the server answers only from inside the container.
 
-## What makes it different from a folder of markdown
+## The command line
 
-**It is typed.** Money has an amount, a currency and a date. Quantities have units. Domains have
-renewal dates. So "what is due in October" is a question with an answer, rather than a search.
+`braindog` signs a machine in to a record, serves that record to an agent over MCP, keeps keys out of
+an agent's hands while letting its commands use them, and moves a record in and out as a file. It
+needs Node 24.13 or later.
 
-**Every agent sees the same rows.** Over MCP, with the same permissions you have. No vendor is going
-to build you the screen that shows what you pay its competitors.
+```sh
+curl -fsSL https://brain.dog/cli/install.sh | sh     # macOS and Linux
+irm https://brain.dog/cli/install.ps1 | iex          # Windows, in PowerShell
+braindog setup https://brain.dog/app/<your record>
+```
 
-**Decisions are rows.** An agent lays out the options and never picks one. You pick, and it becomes a
-numbered row with a reason attached that nothing can quietly edit later.
+`setup` signs in, adds the Claude Code hooks, places the Agent Skill and registers the MCP server.
+[apps/cli/README.md](apps/cli/README.md) covers each part.
 
-**The history cannot be rewritten, including by you.** There is one write path and the log is
-append-only by construction. Of four comparable products surveyed, three ship a mutable history, and
-one of those has a *Clear revision history* button whose result "cannot be retrieved". See
-[docs/20-COLLABORATION.md](docs/20-COLLABORATION.md) §9.
+### For agents
 
-## Your data
+[skills/braindog/SKILL.md](skills/braindog/SKILL.md) is the Agent Skill: what BrainDog is to an
+agent, how it connects (`https://brain.dog/mcp` with a token, or `braindog mcp`), what to read first,
+the rules it keeps, and the refusals it will meet. `braindog install` places it in each Claude Code
+profile.
 
-| | |
-|---|---|
-| **`.brain`** | one SQLite file per record. `sqlite3 portfolio.brain "select …"` works with no library and no permission |
-| **`.brainl`** | the same content as a canonical dump, one JSON row per line, signed |
-| **a pack** | registers, pages, metrics and rules as readable text. A way of working you can share, with no code in it |
-
-Export is never withheld, on any plan, in any state. That is the point of the file formats being
-boring.
-
-## Extending it
-
-**Extensions are data. Where data is not enough, the extension is an agent, never a script.**
-
-A pack declares registers, pages, metrics and rules. It contains no code, so there is no sandbox to
-secure and every extension is a file you can read and diff. The worst a bad pack achieves is a
-misleading page, plus one scheduled GET to a host named in the diff if it declares a connector. You
-see both before anything is applied.
-
-## Architecture
-
-One kernel, three runtimes. The record is a SQLite Durable Object per customer on Cloudflare, or one
-Node process over `node:sqlite` if you run it yourself, from the same packages. The frontend is a
-static SvelteKit app that talks to either.
-
-Everything is reachable three ways from one route table so they cannot drift: HTTP, an MCP server,
-and a typed client.
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset=".github/media/write-path-dark.svg">
-  <img src=".github/media/write-path-light.svg" width="830"
-       alt="The write path. A write whose op_id has been seen replays its first result and stops. Inside one synchronous transaction: resolve, lock, pinned, coerce, validate and transition run first, and nothing above that line has written a row; then persist, pairs, project, event, rules, schedule and outbox. A refusal is recorded by observe, outside the transaction so it survives the rollback. Arm and wake run last, outside it.">
-</picture>
-
-Every write takes that path, and the event is appended in the same transaction as the row it
-describes. That is what "append-only by construction" means here. There is no hash chain and there
-are no triggers; there is one writer, and the history is a table nothing deletes from.
-[docs/30-BLUEPRINT.md](docs/30-BLUEPRINT.md) §4 specifies each step, and `REPORT.md` says which of
-them are built.
-
-## Repository
+## Where things are
 
 | | |
 |---|---|
-| `docs/` | 54 numbered specification documents. The source of truth, and nothing is designed twice |
-| `packages/kernel` | the write path, the ledger, types, filters, metrics, rules, the vault index |
-| `packages/render` | the block dialect and the renderer (MIT, published separately) |
-| `packages/theme` | solves a whole palette from one seed against contrast floors |
+| `docs/` | the numbered specification documents, and the source of truth. [docs/00-README.md](docs/00-README.md) is the index |
+| `packages/kernel` | the write path, the ledger, types, filters, metrics and rules |
+| `packages/render` | the block dialect and its renderers, published separately as `braindog-render` under MIT |
 | `apps/web` | the record's own interface |
-| `apps/site` | the marketing site |
 | `apps/worker` | the Cloudflare host |
-| `apps/selfhost` | the Node host |
-| `tools/gates` | 22 gates, each tested against a seeded violation. 28 of those |
+| `apps/selfhost` | the Node host, and the container |
+| `apps/cli` | the command line |
+| `apps/site` | the site at brain.dog |
+| `packs/` | the packs a record can install |
+| `tools/gates` | the source checks every change passes |
 
-## Running it
+## Contributing and security
 
-`brain.dog/app` is production and `alpha.brain.dog/app` is the deployment this repository builds on
-every push to `master`, each handed over by its own site on the same name (the old `app.brain.dog` and
-`app.alpha.brain.dog` still answer, and send a page load there). They run the same Worker and the same frontend; alpha wears a different accent and
-says its name in the tab, so nobody confuses the two windows.
-[DEPLOYMENT.md](DEPLOYMENT.md) records every build setting both of them run under, including the one
-environment variable the whole deployment identity hangs on, because otherwise that lives in a
-dashboard and a dashboard is not reviewable.
-
-## Contributing
-
-`CONTRIBUTING.md` covers the build, the tests, the gates, and the house style, which is unusual and
-worth reading before your first pull request. `SECURITY.md` is how to report a vulnerability.
+[CONTRIBUTING.md](CONTRIBUTING.md) covers the build, the tests, the gates and the house style, which
+is worth reading before a first pull request. [SECURITY.md](SECURITY.md) is how to report a
+vulnerability, and [docs/12-SECURITY.md](docs/12-SECURITY.md) is the security model in full.
 
 ## Licence
 
-BrainDog is open source under the Apache License 2.0 (`LICENSE`), except `packages/render`, which
-is under the MIT License (`packages/render/LICENSE`) so the block dialect can be embedded anywhere.
-`LICENSING.md` explains the split.
+BrainDog is open source under the Apache License 2.0 ([LICENSE](LICENSE)), except `packages/render`,
+which is under the MIT License ([packages/render/LICENSE](packages/render/LICENSE)) so the block
+dialect can be embedded anywhere. [LICENSING.md](LICENSING.md) explains the split.
 
 The software is provided as is, without warranty of any kind, express or implied. See the licence
 texts for the full terms.

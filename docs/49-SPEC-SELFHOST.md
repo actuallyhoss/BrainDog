@@ -53,7 +53,7 @@ type Config = {
   port: number;            // PORT                 default 8080
   sqlite: 'node:sqlite' | 'better-sqlite3';       // BRAINDOG_SQLITE   default 'node:sqlite'
   origin: string;          // BRAINDOG_ORIGIN      default `http://localhost:${port}` — magic-link URLs, rpId, CSRF
-  smtp?: { url: URL; from: string };              // BRAINDOG_SMTP_URL smtps://u:p@host:465 | smtp://u:p@host:587 ; BRAINDOG_SMTP_FROM
+  smtp?: { url: URL; from: string };              // BRAINDOG_SMTP_URL smtps://u:p@host:465 | smtp://u:p@host:587 ; BRAINDOG_MAIL_FROM (amended by OPS-19)
 };
 
 type HostDeps = { clock: Clock; keys: KeyStore; dispatch: Dispatch; http: Http; blobs: (recId: RecordId) => Blobs;
@@ -192,6 +192,14 @@ else is ignored with one log line.
 | `k_share` | `hkdfSync('sha256', kek, '', 'braindog/share', 32)` — HMAC key for share tokens (§4.9) |
 
 The raw buffer is zero-filled after the three derivations. `byId(id)` answers the current key or `null`.
+
+*Amended September 28th 2026 (OPS-16; OPS-28 records it).* During a rotation the previous key sits beside the key file
+as `<file>.prev`, the same 32 bytes and mode. `openKeyStore` opens both: `current()` is the key file, and `byId`
+answers either id, so every row wrapped under the old key still opens. The first start that finds a `.prev` re-wraps
+every record's keys under the current one before anything is served (`rewrapAtStart`), and says so. Unless
+`BRAINDOG_SESSION_SECRET` is set, the session key is derived from the key file, so a new key file signs everybody out,
+which the boot line also says. Retiring the old key is deleting `<file>.prev` ([53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md)
+§5.6).
 
 ### 4.5 · `caps`
 
@@ -364,7 +372,9 @@ handful of typos from one address over a month added up to a lock.
 1. `POST /auth/magic/start { email }`: reserve `mint:<ip>`, then `email:<addr>`. A live person with that address
    gets a `magic` link; none → the same 200 `{}` and no mail (no enumeration; sign-up is closed on a self-host,
    §13 #15). With no mail transport the route is 404 and `/auth/methods` says `magic: false`, so the screen never
-   offers it. This host has no SMTP yet, so today it is always off here, and a link is never printed instead.
+   offers it, and a link is never printed instead. *Amended by OPS-19:* with `BRAINDOG_SMTP_URL` and
+   `BRAINDOG_MAIL_FROM` set, the host sends through §5.20's client, `magic` is true, and an invitation's mailbox proof
+   works too; with either unset it stays off, and notification mail waits in the outbox, said once at each start.
 2. `t` = 32 random bytes, base64url; `INSERT INTO dir_link (hash, person, purpose, expires)` with the HMAC of `t`,
    `'magic'` and `now + 15 min`. The host sends `<origin>/app/signin#magic=<t>` without waiting for the send, so a
    known and an unknown address answer in the same time. A fragment never reaches a server, a log or a link
@@ -518,6 +528,22 @@ options: [{ id: 'retry', label: 'Run it now' }, { id: 'ignore', label: 'Ignore' 
 — the visible item 12 §8 requires. `POST /api/snapshot` is `take('manual')`; `GET /api/snapshots` is `list()`;
 `GET /api/snapshots/:id` streams the file with `Content-Disposition: attachment`.
 
+*Amended September 28th 2026 against the tree (OPS-19 and the restore work; OPS-28 records it).* Three things above
+are not what was built:
+
+- **The clock.** The nightly copy falls due once a day at `BRAINDOG_BACKUP_AT`, `03:20` UTC by default
+  (`src/backup.ts`), and is caught up on start when the machine was off at that time; it is not `02:00` plus a hash of
+  the slug. The same clock copies the Directory, `VACUUM INTO <data>/directory-snapshots/<time>Z-nightly.sqlite`,
+  thirty kept, because a Directory lost is every record whole and unreachable. Thirty nightly copies are kept apart
+  from the thirty a person takes.
+- **The signature is detached.** Each copy gets `<id>.brain.sig` beside it, signed by the record's signing key, and
+  `braindog verify <copy>` checks the `.brain` against it (`src/snapshots.ts`, `apps/cli/src/verify.ts`).
+- **`restore(id)` restores.** It keeps the record as a `before-restore` copy, puts the copy's tables back in one
+  transaction without the credentials the live record has ended, rebuilds the search index and writes one
+  `restore.pitr` event; a copy written by other migrations is refused `OUT_OF_BOUNDS` and changes nothing. Settings >
+  Backups draws it, for the owner, from a sign-in within fifteen minutes. `braindog init <slug> --from <file.brainl>` is
+  the restore into a fresh directory (`src/restore.ts`) ([53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md) §5.5 (c)).
+
 ### 5.14 · The live channel — phase 2 polls
 
 `GET /api/version` → `api.version(ctx)` (33 §4), `no-store`: `version` is `MAX(event.rowid)` (41 §2, 30 §1) to an owner who reads every list, and to anybody else an unordered 53-bit hash of the id of the newest event line they are shown, or `0`, which a poller compares for change and never scans from. `/ws` answers 404 so the client falls back to 15 s
@@ -612,6 +638,14 @@ stay at the root and are answered before the shell is reached, and `/app/<slug>/
 3. `MAIL FROM:<from>` 250 · `RCPT TO:<to>` 250 · `DATA` 354.
 4. Headers `From`, `To`, `Subject` (RFC 2047 `=?utf-8?B?…?=` when non-ASCII), `Date`, `Message-ID: <ulid@host>`, `MIME-Version: 1.0`, `Content-Type: text/plain; charset=utf-8`, `Content-Transfer-Encoding: base64`; body base64 in 76-column CRLF lines — no line can start with `.`, so no dot-stuffing; terminate `\r\n.\r\n` → 250; `QUIT` → 221.
 5. Any 4xx/5xx → throw `SmtpError { code }`; socket timeout 30 s; one message per connection. `html` is ignored (§10).
+
+*Amended September 28th 2026 (OPS-19; OPS-28 records it).* Built as `src/smtp.ts` over `node:net` and `node:tls`
+with no dependency, configured by `BRAINDOG_SMTP_URL` and `BRAINDOG_MAIL_FROM` and off unless both are set. The
+password is read once and never written anywhere: not in a line on stderr, not in an error the retry ladder stores,
+not in the boot summary, which names the host and port alone. A server's reply text is never quoted either, since it
+may echo an address; an error names the stage and the status. A header value holding a line break is refused before
+it is written, and one `notify.email` names at most fifty addresses. It sends words only; the Worker's letters add
+HTML.
 
 ### 5.21 · `Http.fetch` — the connector's fetch
 

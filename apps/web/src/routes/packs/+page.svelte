@@ -36,10 +36,13 @@
   import { read } from '$lib/data/record.ts';
   import { actionOf, listingsOf, type ListingKind } from '$lib/market/listing.ts';
   import PlanSheet from '$lib/market/PlanSheet.svelte';
+  import { words as market } from '$lib/market/words.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import Menu from '$lib/ui/Menu.svelte';
+  import Sheet from '$lib/ui/Sheet.svelte';
   import { drew } from '../../lib/ui/screen.svelte.ts';
   import { hostedHere } from '../settings/billing.ts';
   import InstallShared from './InstallShared.svelte';
@@ -124,6 +127,23 @@
   }
 
   /* ── installed ─────────────────────────────────────────────────────────── */
+
+  /**
+   * THE ADD-ON WHOSE CONTENTS THE SHEET IS SHOWING. A row says what an add-on is in one line; what it brings, list by
+   * list and page by page, is a press on its "…" away, so the list stays one row per add-on at every width.
+   */
+  let addsFor = $state<string | null>(null);
+  let addsOpen = $state(false);
+  const addsState = $derived(installed.find((s) => s.id === addsFor) ?? null);
+
+  function showAdds(id: string) {
+    addsFor = id;
+    addsOpen = true;
+  }
+
+  /** The second line of a row: off said as off, else what the add-on is for, else the lists it keeps. */
+  const lineOf = (state: PackState): string =>
+    state.disabled_at !== null ? copy.packTurnedOff : (byId.get(state.id)?.blurb ?? state.registers.map(listName).join(', '));
 
   /**
    * One press of a switch, or of the button a refusal offered.
@@ -429,8 +449,9 @@
 </PageHead>
 
 <div class="page">
-  <!-- WHAT A PACK IS, SAID ONCE, WHERE THE WORD IS FIRST MET. -->
-  <p class="blurb">{copy.packBlurb}</p>
+  <!-- WHAT A PACK IS, SAID ONCE, WHERE THE WORD IS FIRST MET. An empty record hears it from the empty state instead,
+       so the first screen never says the same sentence twice. -->
+  {#if !(tab === 'installed' && states && installed.length === 0)}<p class="blurb">{copy.packBlurb}</p>{/if}
 
   <div class="tabs segmented" role="tablist" aria-label={words.tabsLabel} tabindex="-1" onkeydown={tabKey}>
     {#each TABS as t (t)}
@@ -466,39 +487,47 @@
 </div>
 
 {#snippet installedTab()}
-  <!-- A RECORD WITH NOTHING INSTALLED IS THE ORDINARY FIRST STATE OF THIS SCREEN, and the sentence points at browse. -->
+  <!-- A RECORD WITH NOTHING INSTALLED IS THE ORDINARY FIRST STATE OF THIS SCREEN: what an add-on is, and the one press
+       that finds one. -->
   {#if states && installed.length === 0}
-    <Empty kind="no-data-yet" title={copy.noPacksYet} body={copy.noPacksBody} />
+    <Empty kind="no-data-yet" glyph="packs" title={copy.noPacksYet} body={copy.packBlurb}>
+      {#snippet actions()}<Button href="/packs/browse">{words.browse}</Button>{/snippet}
+    </Empty>
   {/if}
-  <div class="rows">
+  <!-- ONE ROW PER ADD-ON (design.md §4): its name and one line, its switch, and one "…" holding Settings, What this adds
+       and Uninstall, destructive last. One column on a phone, two at 900px and up, a hairline under each row. -->
+  <ul class="installed">
     {#each installed as state (state.id)}
       {@const pack = byId.get(state.id)}
       {@const off = state.disabled_at !== null}
       {@const block = blocks[state.id]}
-      <!-- OFF IS DIMMED AND SAID, NEVER ABSENT. Its rows are still in the record, and this row is the only way back to them. -->
-      <article class="pack" data-off={off ? '' : undefined}>
-        <header class="pack-head">
-          <h2 class="pack-name">{nameOf(state.id)}</h2>
-          {#if off}<span class="pack-off">{copy.packTurnedOff}</span>{/if}
-          {#if state.version}<span class="pack-version">{state.version}</span>{/if}
-          <button
-            type="button"
-            class="switch"
-            role="switch"
-            aria-checked={!off}
-            aria-label={copy.packSwitch(nameOf(state.id))}
-            disabled={busy !== null}
-            onclick={() => turn(state.id, off)}
-          ><span class="switch-track"></span></button>
-        </header>
-        {#if pack}<p class="pack-blurb">{pack.blurb}</p>{/if}
-        <ul class="pack-gives">
-          {#each state.registers as r (r)}<li><Icon name="rows" size="s" />{listName(r)}</li>{/each}
-          {#each pack?.pages ?? [] as p (p)}<li><Icon name="doc" size="s" />{PAGES[p]?.title ?? p}</li>{/each}
-        </ul>
+      {@const name = nameOf(state.id)}
+      <!-- OFF IS SAID, NEVER ABSENT. Its rows are still in the record, and this row is the only way back to them. -->
+      <li class="addon" data-off={off ? '' : undefined}>
+        <a class="addon-main" href={at(`/packs/${state.id}`)}>
+          <span class="addon-name">{name}</span>
+          <span class="addon-line">{lineOf(state)}</span>
+        </a>
+        <button
+          type="button"
+          class="switch"
+          role="switch"
+          aria-checked={!off}
+          aria-label={copy.packSwitch(name)}
+          disabled={busy !== null}
+          onclick={() => turn(state.id, off)}
+        ><span class="switch-track"></span></button>
+        <Menu label={market.more(name)} align="end">
+          {#snippet trigger()}<span class="more"><Icon name="more" size="s" /><span class="vh">{market.more(name)}</span></span>{/snippet}
+          <a class="mi" role="menuitem" href={at(`/packs/${state.id}`)}>{packWords.settings}</a>
+          <button type="button" class="mi" role="menuitem" onclick={() => showAdds(state.id)}>{copy.installDiff}</button>
+          {#if pack}
+            <button type="button" class="mi" role="menuitem" data-tone="bad" disabled={busy !== null} onclick={() => uninstall(state.id, pack.name)}>{copy.uninstall}</button>
+          {/if}
+        </Menu>
         <!-- WHAT STOPPED THE SWITCH, AND THE ONE THING TO PRESS NEXT. The cascade is that press, never the first. -->
         {#if block}
-          <p class="pack-said" role="status">
+          <p class="addon-said" role="status">
             {#if block.kind === 'required'}
               <span>{copy.packNeededBy(block.also.map(nameOf))}</span>
               <Button weight="quiet" tone="bad" disabled={busy !== null} onclick={() => turn(block.id, false, block.also)}>{copy.packOffTogether(block.also.length)}</Button>
@@ -512,17 +541,25 @@
             {/if}
           </p>
         {/if}
-        <footer class="pack-foot">
-          <!-- EVERY INSTALLED ADD-ON HAS THIS, catalogued or not: whether it declares settings is the page's to say. -->
-          <Button weight="bare" href="/packs/{state.id}">{packWords.settings}</Button>
-          {#if pack}
-            <Button weight="bare" tone="bad" disabled={busy !== null} onclick={() => uninstall(state.id, pack.name)}>{copy.uninstall}</Button>
-          {/if}
-        </footer>
-      </article>
+      </li>
     {/each}
-  </div>
+  </ul>
   {#if live}<p class="aside"><a class="tap" href={at('/packs/share')}>{copy.shareSetup}</a></p>{/if}
+
+  <!-- WHAT ONE ADD-ON BRINGS, each list and page a row that opens it. Settings says the same on the add-on's own page. -->
+  <Sheet bind:open={addsOpen} title={copy.installDiff} subtitle={addsState ? nameOf(addsState.id) : undefined} onclose={() => (addsFor = null)}>
+    {#if addsState}
+      {@const pages = byId.get(addsState.id)?.pages ?? []}
+      {#if addsState.registers.length + pages.length === 0}
+        <p class="aside">{market.addsNothing}</p>
+      {:else}
+        <ul class="adds">
+          {#each addsState.registers as r (r)}<li><a class="adds-row" href={at(`/r/${r}`)}><Icon name="rows" size="s" />{listName(r)}</a></li>{/each}
+          {#each pages as p (p)}<li><a class="adds-row" href={at(`/p/${p}`)}><Icon name="doc" size="s" />{PAGES[p]?.title ?? p}</a></li>{/each}
+        </ul>
+      {/if}
+    {/if}
+  </Sheet>
 {/snippet}
 
 {#snippet updatesTab()}
@@ -534,21 +571,20 @@
     <div class="all">
       <Button weight="primary" disabled={busy !== null || !client} onclick={() => void showAll()}>{busy === 'all' ? words.planning : words.updateAll}</Button>
     </div>
-    <ul class="rows">
+    <!-- THE SAME ROW AS AN INSTALLED ADD-ON: its name, the versions it moves between, and its one press. -->
+    <ul class="installed">
       {#each updates as u (u.key)}
         {@const s = said[u.key]}
-        <li class="pack update">
-          <header class="pack-head">
-            <h2 class="pack-name">{u.title}</h2>
-            <span class="pack-version">{words.fromTo(u.from, u.to)}</span>
-          </header>
-          <footer class="pack-foot">
-            <Button weight="quiet" disabled={busy !== null || !client} onclick={() => void showPlan(u)}>{busy === u.key ? words.planning : words.seePlan}</Button>
-          </footer>
+        <li class="addon update">
+          <span class="addon-main">
+            <span class="addon-name">{u.title}</span>
+            <span class="addon-line num">{words.fromTo(u.from, u.to)}</span>
+          </span>
+          <Button disabled={busy !== null || !client} onclick={() => void showPlan(u)}>{busy === u.key ? words.planning : words.seePlan}</Button>
           {#if s && 'filed' in s}
-            <p class="pack-said" role="status">{words.asked}{#if s.filed}{' '}<a class="tap" href={at(`/decide/${s.filed}`)}>{words.openDecide}</a>{/if}</p>
+            <p class="addon-said" role="status">{words.asked}{#if s.filed}{' '}<a class="tap" href={at(`/decide/${s.filed}`)}>{words.openDecide}</a>{/if}</p>
           {:else if s}
-            <p class="pack-said" role="status">{s.fix}{#if s.code}<span class="code">{copy.refusalCode(s.code)}</span>{/if}</p>
+            <p class="addon-said" role="status">{s.fix}{#if s.code}<span class="code">{copy.refusalCode(s.code)}</span>{/if}</p>
           {/if}
         </li>
       {/each}
@@ -568,7 +604,7 @@
     flex-direction: column;
     gap: var(--sp-5);
     padding: var(--sp-5) var(--gutter) var(--sp-9);
-    max-inline-size: 1100px;
+    max-inline-size: var(--page-max);
   }
 
   /* One sentence saying what the things on this screen are, in the person's words. */
@@ -597,70 +633,122 @@
     min-inline-size: 0;
   }
 
-  /* ROWS, NOT A WALL OF CARDS (DESIGN-SYSTEM APPENDIX C13): an add-on is a row, its name, version and switch on the first
-     line, what it is under it, and its links at the trailing edge, with a hairline between rows as every list has. */
-  .rows {
-    display: flex;
-    flex-direction: column;
+  /* ROWS, NOT A WALL OF CARDS (design.md §4, the add-ons row): an add-on is one 56px row, its name over one line of what
+     it is, then its switch and its "…", with a hairline under each row and nothing around the list. From 900px the rows
+     flow into two columns, so a record with a dozen add-ons reads as a list and not a scroll. */
+  .installed {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    column-gap: var(--sp-6);
     max-inline-size: var(--page-max);
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
-  .pack {
+  .addon {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    column-gap: var(--sp-6);
-    row-gap: var(--sp-1);
-    align-items: start;
-    padding-block: var(--sp-4);
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    column-gap: var(--sp-2);
+    min-block-size: var(--row-h-2);
     border-block-end: 1px solid var(--line-soft);
   }
 
-  .pack > :global(*) {
-    grid-column: 1;
+  .update {
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
-  .pack > .pack-head {
-    grid-column: 1 / -1;
+  /* THE NAME AND ITS LINE ARE ONE TARGET, the add-on's own page, so a thumb anywhere on the words opens it. */
+  .addon-main {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+    min-inline-size: 0;
+    padding-block: var(--sp-2);
+    color: inherit;
+    text-decoration: none;
   }
 
-  .pack-head {
+  .addon-name,
+  .addon-line {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .addon-name {
+    color: var(--ink);
+    font-size: var(--t-base);
+    font-weight: 500;
+  }
+
+  .addon-line {
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  /* OFF, AND STILL HERE. The name steps down to secondary ink and the line says "Turned off"; nothing is faded below
+     the contrast a person needs to read it, and the switch keeps full strength because it is the way back. */
+  .addon[data-off] .addon-name {
+    color: var(--ink2);
+  }
+
+  .more {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    inline-size: var(--ctl-h);
+    min-block-size: var(--ctl-h);
+    color: var(--ink2);
+  }
+
+  .vh {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .mi {
     display: flex;
     align-items: center;
-    gap: var(--sp-2);
+    inline-size: 100%;
+    min-block-size: var(--ctl-h);
+    padding: 0 var(--sp-3);
+    background: none;
+    border: 0;
+    border-radius: var(--r-sm);
+    color: var(--ink2);
+    font: inherit;
+    font-size: var(--t-ui);
+    text-align: start;
+    text-decoration: none;
+    cursor: pointer;
   }
 
-  .pack-name {
-    margin-inline-end: auto;
-    font-family: var(--font-ui);
-    font-size: var(--t-base);
-    font-weight: 600;
+  .mi:hover,
+  .mi:focus-visible {
+    background: var(--hover-wash);
+    color: var(--ink);
   }
 
-  /* The switch pulls in on the block axis only, so at 390px its track stays inside the 16px gutter. */
-  .pack-head .switch {
-    margin-block: calc(var(--sp-2) * -1);
+  /* RED ONLY UNDER THE POINTER OR THE FOCUS: at rest Uninstall is one more item, last in the menu. */
+  .mi[data-tone='bad']:hover,
+  .mi[data-tone='bad']:focus-visible {
+    color: var(--danger);
   }
 
-  /* OFF, AND STILL HERE. The contents dim; the switch and what stopped it do not, because they are what a person reads next. */
-  .pack[data-off] :is(.pack-name, .pack-version, .pack-blurb, .pack-gives) {
-    opacity: 0.55;
-  }
-
-  .pack-off {
-    color: var(--dim);
-    font-size: var(--t-xs);
-    font-weight: 600;
-  }
-
-  .pack-said {
+  .addon-said {
     display: flex;
+    grid-column: 1 / -1;
     flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-2);
     margin: 0;
+    padding-block-end: var(--sp-3);
     color: var(--ink2);
     font-size: var(--t-sm);
   }
@@ -671,47 +759,24 @@
     font-size: var(--t-xs);
   }
 
-  .pack-version {
-    color: var(--dim);
-    font-size: var(--t-xs);
-    font-variant-numeric: tabular-nums;
-  }
-
-  .pack-blurb {
-    color: var(--dim);
-    font-size: var(--t-ui);
-  }
-
-  .pack-gives {
+  /* WHAT ONE ADD-ON BRINGS, as rows in the sheet: a glyph and a name, each opening what it names. */
+  .adds {
     display: flex;
-    flex-wrap: wrap;
-    gap: var(--sp-2);
+    flex-direction: column;
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
-  /* THE BODY FACE. These are the names of lists and pages, which a person reads as words. */
-  .pack-gives li {
+  .adds-row {
     display: flex;
     align-items: center;
-    gap: var(--sp-1);
-    color: var(--dim);
-    font-size: var(--t-sm);
-  }
-
-  .pack > .pack-foot {
-    grid-column: 2;
-    grid-row: 2 / span 2;
-    display: flex;
-    gap: var(--sp-1);
-    flex-wrap: wrap;
-    justify-content: end;
-    margin-inline-end: calc(var(--sp-3) * -1);
-  }
-
-  .update > .pack-foot {
-    grid-row: 2;
+    gap: var(--sp-2);
+    min-block-size: var(--tap);
+    border-block-end: 1px solid var(--line-soft);
+    color: var(--ink);
+    font-size: var(--t-base);
+    text-decoration: none;
   }
 
   .all {
@@ -724,7 +789,15 @@
     font-size: var(--t-sm);
   }
 
-  /* AT 390PX the tabs are one full-width segmented control, each tab a third of it, and every row is one column. */
+  @media (hover: hover) and (pointer: fine) {
+    .addon-main:hover .addon-name {
+      text-decoration: underline;
+      text-decoration-color: color-mix(in srgb, var(--ink) 40%, transparent);
+      text-underline-offset: 3px;
+    }
+  }
+
+  /* AT 390PX the tabs are one full-width segmented control, each tab a third of it; the rows are one column already. */
   @media (width < 640px) {
     .tabs {
       align-self: stretch;
@@ -734,26 +807,22 @@
       flex: 1 1 0;
       min-inline-size: 0;
     }
-
-    .pack {
-      grid-template-columns: minmax(0, 1fr);
-    }
-
-    .pack > .pack-foot {
-      grid-column: 1;
-      grid-row: auto;
-      justify-content: start;
-      margin-inline: calc(var(--sp-3) * -1) 0;
-    }
-
-    .update > .pack-foot {
-      grid-row: auto;
-    }
   }
 
+  /* On a phone a row's name is read at the phone's body size, as every card's first line is. */
   @media (width < 900px) {
     .page {
       padding: var(--sp-4) var(--gutter) var(--sp-8);
+    }
+
+    .addon-name {
+      font-size: var(--t-md);
+    }
+  }
+
+  @media (width >= 900px) {
+    .installed {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
 </style>

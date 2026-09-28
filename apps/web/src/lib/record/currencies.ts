@@ -3,8 +3,7 @@
  *
  * A HOME CURRENCY WAS TYPED AS A CODE, and a code somebody half remembers ("LE", "EGY") is no home currency at all, so
  * every figure quietly stayed in parts. The setting is still `text` in the manifest, which is what an agent or the
- * command line writes, and this list is only what the settings screen offers (`routes/packs/[id]` and its
- * `RatesForm.svelte`).
+ * command line writes, and this list is only what the settings screen offers (`routes/packs/[id]`).
  *
  * MEMBERSHIP IS `Intl`'S ANSWER AND NOT THIS FILE'S, which is `02 §3` rule 1. Whether three letters are a currency is
  * `Intl.supportedValuesOf('currency')`, the runtime's tender list, and it is the list `coerce.ts` refuses a `money`
@@ -79,8 +78,7 @@ const CODE = /^[A-Z]{3}$/u;
  *
  * AND A HELD CODE THE PICKER OFFERS LEADS THE COMMON GROUP, common or not, and leaves the other group, so a record at
  * `NZD` is offered `NZD` first and once. Two options with one value is a select that reports whichever it met first.
- * The settings screen passes the home currency it holds, and the rates form passes the same, so both lead with the
- * record's own money.
+ * The settings screen passes the home currency it holds, so it leads with the record's own money.
  */
 export function currencyChoices(held: string): { common: readonly string[]; other: readonly string[] } {
   const code = held.trim().toUpperCase();

@@ -164,7 +164,7 @@
     <Empty kind="no-data-yet" title={words.none} body={words.noneWhy} />
   {:else}
     {#if repo}
-      <p class="context"><a class="back-all" href={at('/jobs')}>{words.allJobs}</a></p>
+      <p class="context"><a class="back-all tap" href={at('/jobs')}>{words.allJobs}</a></p>
     {/if}
     {#if rows.length === 0}
       <Empty kind="no-results" compact title={words.noneFor(repo ?? '')} />
@@ -185,7 +185,7 @@
           {#each rows as r (r.id)}
             {@const said = statusOf(r.status, r.lost, r.cancel)}
             <tr data-live={isLive(r.status) ? '' : undefined}>
-              <th scope="row" class="run-name"><a href={at(`/jobs/${encodeURIComponent(r.id)}`)}>{runName(r)}</a></th>
+              <th scope="row" class="run-name"><a class="tap" href={at(`/jobs/${encodeURIComponent(r.id)}`)}>{runName(r)}</a></th>
               <td>
                 <span class="status" data-intent={said.tone ?? undefined}>
                   {#if isLive(r.status)}<span class="pulse" aria-hidden="true"></span>{/if}
@@ -500,8 +500,11 @@
     font-size: var(--t-sm);
   }
 
+  /* IN INK AND NOT RED: a run that changes files is a fact to choose by, not a failure or a loss, and red is kept for
+     those (design 6.8.2). */
   .kind-writes {
-    color: var(--danger);
+    color: var(--ink);
+    font-weight: 500;
   }
 
   .arg {
@@ -516,8 +519,9 @@
     font-size: var(--t-sm);
   }
 
+  /* SIXTEEN PIXELS IN EVERY FIELD (design 6.6): under that a phone zooms the page on focus and it stays zoomed. */
   .arg .field-input {
-    font-size: var(--t-base);
+    font-size: var(--t-md);
     scroll-margin-block-start: calc(var(--sticky) + var(--sp-4));
   }
 </style>

@@ -1,7 +1,10 @@
 # Deployment
 
-Every setting that decides what a deployment *is*, written down — because until this file existed
-the answer lived in a dashboard, and a dashboard is not reviewable.
+Every setting that decides what a deployment *is*, written down, because a setting that lives only in
+a dashboard is a setting nobody can review. What an operator does to a running deployment (the nightly
+walk, backups, restores, key rotation, incidents, deletion) is in
+[docs/53-SPEC-OPERATIONS.md](docs/53-SPEC-OPERATIONS.md); this file is what the deployment is, what it
+is configured with, and how a change reaches it.
 
 ## The hosts
 
@@ -9,12 +12,12 @@ One label per surface, with the environment in front of it.
 
 | Host | What runs there | Deployed by | State |
 |---|---|---|---|
-| **`brain.dog`** | `apps/site`, the marketing site; and the app, `apps/worker`, under `/app` and on its doors, handed over by the site's `APP` service binding | `wrangler deploy --env production`, by hand for now | **live** |
+| **`brain.dog`** | `apps/site`, the marketing site; and the app, `apps/worker`, under `/app` and on the doors `run_worker_first` lists in `apps/site/wrangler.jsonc`, handed over by the site's `APP` service binding | `.github/workflows/deploy.yml`, after a green `ci` on `master` and the reviewer's press | **live** |
 | **`www.brain.dog`** | nothing: a 301 to the apex | a Redirect Rule, not a Worker | live |
-| **`app.brain.dog`** | `apps/worker` with `apps/web`'s `build/` as its asset directory, as the legacy host since push 4: a page load is a 308 to `brain.dog/app`, and `/api/*`, `/mcp` and `/in/*` are served where they stand | Workers Builds `braindog-production`, on every push to `release` | live, legacy |
+| **`app.brain.dog`** | the production app Worker as the legacy host: a page load is a 308 to `brain.dog/app`, and `/api/*`, `/mcp` and `/in/*` are served where they stand | the same `deploy.yml` run, since it is a Custom Domain of that Worker | live, legacy |
 | **`mcp.brain.dog`** | reserved | nothing | not claimed |
-| **`alpha.brain.dog`** | `apps/site`, the same bytes; and alpha's app under `/app` and on its doors, through the alpha site's `APP` binding | `braindog-site-alpha`, deployed by hand for now | live |
-| **`app.alpha.brain.dog`** | the record, built as **BrainDog Alpha**, as the legacy host since push 2, the same way | Workers Builds `braindog-alpha`, on every push to `master` | live, legacy |
+| **`alpha.brain.dog`** | `apps/site`, the same bytes; and alpha's app under `/app` and on its doors, through the alpha site's `APP` binding | `deploy.yml`'s alpha steps when the variable `DEPLOY_ALPHA` is `true`, otherwise by hand | live |
+| **`app.alpha.brain.dog`** | alpha's app Worker, built as **BrainDog Alpha**, as the legacy host, the same way | the same | live, legacy |
 | **`mcp.alpha.brain.dog`** | reserved | nothing | not claimed |
 
 **The app lives on `brain.dog` since push 4 of the one-domain move** (`loop/research-one-domain-binding.md`
@@ -22,18 +25,14 @@ section 4, `loop/research-push-4.md`). The site keeps `brain.dog` as its Custom 
 script first on the app's doors, which it hands to `braindog-production` through a service binding,
 so no zone route is written. `PUBLIC_HOST` is `brain.dog`, so sign-in, the CSRF origin and the device
 flow are all there; `app.brain.dog` stays the app Worker's Custom Domain for the tokens and `/in/`
-addresses handed out on it, and a device start there is refused. Alpha is the same on its own names
-since push 2.
+addresses handed out on it, for at least the 90 days a token lives (to about 23 December 2026) and
+until every `/in/` address handed out there is re-minted. A device start there is refused. Alpha is
+the same on its own names since push 2.
 
-`mcp.*` is deliberately unclaimed, and both names now resolve to nothing, which is the honest
-answer for a service that is not built. `mcp.brain.dog` used to answer 525: a `*.brain.dog` CNAME
-was claiming it, and every other name in the zone with it. A wildcard means no name is ever
-unclaimed. It is gone.
-
-The MCP transport is not built, and pointing that hostname at the Worker would answer an MCP
-address with the app's shell. `apps/web`'s first-run screen does print
-`claude mcp add --transport http braindog https://mcp.brain.dog`, which is a command nobody can run,
-and that is a defect filed in `loop/BACKLOG.md` rather than a reason to claim the name.
+`mcp.*` is deliberately unclaimed, and both names resolve to nothing. The MCP door is
+`https://brain.dog/mcp`, a path on the app's own host like every other door, so there is no service
+for a second name to point at. `mcp.brain.dog` used to answer 525: a `*.brain.dog` CNAME was claiming
+it, and every other name in the zone with it. A wildcard means no name is ever unclaimed. It is gone.
 
 **`brain.dog` was blocked on three A records, and they are gone.** The apex carried
 `172.239.193.194`, `172.236.103.15` and `172.234.212.77`, all proxied, all pointing at an origin
@@ -57,8 +56,10 @@ Measured after the change: `brain.dog` 200 serving `apps/site`, `/pricing` and `
 an unknown path 404 rather than the shell, `www.brain.dog` 301 to the apex, `alpha.brain.dog`,
 `app.brain.dog` and `app.alpha.brain.dog` all 200, both `mcp.*` names absent.
 
-`wrangler.jsonc` holds both environments; `wrangler deploy --env alpha --dry-run` and
-`--env production --dry-run` are what check them without deploying.
+`apps/worker/wrangler.jsonc` and `apps/site/wrangler.jsonc` each hold both environments. `ci`'s
+`build` job dry-runs both production deploys on every push, with no Cloudflare token in its
+environment, and `wrangler deploy --env alpha --dry-run` or `--env production --dry-run` checks one
+by hand without deploying.
 
 ## What the zone does, beyond DNS
 
@@ -90,54 +91,141 @@ It is one switch and it is a decision about training data as well as about assis
 it the owner's rather than this repository's. The per-crawler toggles cannot be used while the
 zone-level setting is on: the dashboard says so in a tooltip on every row it governs.
 
-## Why Workers Builds and not a GitHub Action
+## How a change reaches production
 
-**No API token passes through anybody.** Cloudflare's GitHub App builds from the repository and
-mints its own short-lived build token; nothing is stored in GitHub secrets, nothing is copied into a
-terminal, and there is no long-lived credential to rotate or leak. `deploy.yml` is written and
-unlanded for exactly this reason — it needs `CLOUDFLARE_API_TOKEN` in a `production` environment,
-and a workflow that fails on every merge is worse than one that is not there.
+**One route, and it is `.github/workflows/deploy.yml`.** Nothing else deploys production: not a
+laptop, not a Workers Builds project, not a push to a branch. The route, in order:
 
-The cost is that the build configuration lives in Cloudflare's dashboard rather than in this
-repository, which is what the rest of this file is for.
+1. A change lands on `master` by a merged pull request (a workflow's changes come as one, labelled
+   `full-gates`; "Pushing a workflow" below).
+2. `ci` runs on `master`. `deploy.yml` starts off `ci`'s completion (`workflow_run`) and only when it
+   succeeded, at the commit `ci` measured rather than at the head of `master`.
+3. The `deploy` job names the `production` environment, so it waits there for the required
+   reviewer's press (below). Deploys queue one at a time and are never cancelled half way.
+4. On the runner (`vars.CI_RUNNER`, self-hosted by default), in order: the shell is built; "Record
+   what is live" saves the live version ids and sha for a rollback; Deploy (`wrangler deploy --env
+   production --var BRAINDOG_BUILD:<id>`); Parity (`deploy-parity` against the live host); the
+   marketing site is built and deployed; Smoke, with its signed-in half when `SMOKE_TOKEN` is set;
+   the sandbox smoke, when `OPS_RECORD` is set.
+5. A red Parity or Smoke rolls back what is safe to roll back and holds what is not ("Rolling back"
+   below). Alpha follows last, only when `DEPLOY_ALPHA` is `true`, and its failure never turns the
+   production run red.
 
-## `braindog-alpha` — the settings, verbatim
+**No Workers Builds.** Earlier revisions of this file described two Workers Builds projects,
+`braindog-alpha` on `master` and `braindog-production` on `release`, deploying from Cloudflare's own
+build token. They are not how anything deploys now, and a build project left connected would deploy
+past `ci` and past the reviewer on its own branch. In the dashboard, Workers & Pages >
+`braindog-production` and `braindog-alpha` > Settings > Build: the Git connection should read
+**not connected**. If either still shows a repository, disconnect it. That check is the owner's,
+because it cannot be read from this repository.
 
-| Setting | Value |
-|---|---|
-| Repository | `actuallyhoss/BrainDog` |
-| Production branch | `master` |
-| Root directory | `/apps/worker` |
-| Build command | `pnpm install --frozen-lockfile && BRAINDOG_ENV=alpha pnpm --filter @braindog/web build` |
-| Deploy command | `npx wrangler deploy --env alpha` |
-| Non-production branch command | `npx wrangler versions upload` |
-| Build token | Cloudflare's own |
+**`BRAINDOG_ENV=alpha` is the whole of alpha's identity.** `apps/web/vite.config.ts` reads it,
+refuses a value that is not a deployment, substitutes `__BRAINDOG_ENV__` as a literal, and aliases
+`@braindog/skin/house.css` to `alpha.css`: the accent, the `ALPHA` badge beside the mark,
+`· BrainDog Alpha` in the tab, and `mark-alpha.svg` as the favicon. `deploy.yml`'s alpha steps set it
+for alpha's two builds. Production is the absence of it: `env.ts` falls back to production, so a build
+that loses its `define` renders the shipped product rather than a half-labelled alpha one.
 
-**`BRAINDOG_ENV=alpha` is the whole of the deployment's identity.** `apps/web/vite.config.ts` reads
-it, refuses a value that is not a deployment, substitutes `__BRAINDOG_ENV__` as a literal, and
-aliases `@braindog/skin/house.css` to `alpha.css`. Everything downstream follows from that one
-variable: the accent, the `ALPHA` badge beside the mark, `· BrainDog Alpha` in the tab, and
-`mark-alpha.svg` as the favicon. Drop it and the build is production wearing alpha's hostname —
-which is the one confusion the whole environment mechanism exists to prevent.
+## The reviewer
 
-A non-production branch uploads a **version** and does not deploy it, so a branch cannot take the
-hostname. That is the setting that makes "builds for non-production branches" safe to leave on.
+The `production` environment carries a required reviewer, so no merge deploys without a person
+pressing Approve. It is set once: the repository's Settings > Environments > `production` > Required
+reviewers, the owner's account, and "Prevent self-review" left off so the owner can approve his own
+merge. The `deploy` job then shows "Waiting" until the press, and a run nobody approves within 30
+days expires without deploying. The environment is also where `CLOUDFLARE_API_TOKEN` lives, so the
+token reaches this one job and no other workflow.
+
+## What the deploy reads from GitHub
+
+| Name | Kind | Where | Meaning |
+|---|---|---|---|
+| `CLOUDFLARE_API_TOKEN` | secret | environment `production` | a token scoped to deploy Workers on the account and nothing else (12 §8) |
+| `CLOUDFLARE_ACCOUNT_ID` | variable | repository | the account; empty, and `deploy` is skipped rather than red |
+| `DEPLOY_HOST` | variable | repository | `brain.dog`, the host Parity and Smoke ask; empty, and `deploy` is skipped |
+| `SMOKE_TOKEN` | secret | environment `production` | a token on the canary record, `propose` or above; unset, the signed-in half of Smoke and the sandbox smoke say they were skipped |
+| `SMOKE_SLUG` | variable | repository | the canary record's slug, the same record `OPS_RECORD` names |
+| `DEPLOY_ALPHA` | variable | repository | `true` deploys alpha after production; anything else leaves alpha alone |
+| `CI_RUNNER` | variable | repository | the runner label for `ci`, `gates` and `deploy`; unset is `self-hosted` |
+| `WINDOWS_RUNNER` | variable | repository | the Windows leg's runner (`windows.yml`); unset is `windows-latest` |
+| `IMAGE_PUSH` | variable | repository | `true` lets `image.yml` push the self-host image to ghcr.io |
+
+## The Worker's secrets, variables and bindings
+
+Every name the production Worker reads, and what it does when the name is unset. Variables live in
+`env.production.vars` in `apps/worker/wrangler.jsonc`, so a change to one is a reviewed commit;
+secrets never appear in any file and are put with `wrangler secret put <NAME> --env production` in
+`apps/worker`, the value typed at the prompt and never as an argument. Every name is optional: an
+unset one switches its feature off and says so, and none is under `secrets.required`, because that
+key fails the first deploy of an environment while the secret is unset.
+
+| Name | Kind | Unset means | Set means |
+|---|---|---|---|
+| `SESSION_SECRET` | secret | `/auth/methods` says `not-configured` and every other `/auth` route is 404 | 32 characters or more; every session, link and challenge hash is an HMAC under it, so a new value signs everybody out (53 §5.11 (c)) |
+| `TOKENS_VALID_FROM` | secret | no cut-off | an ISO instant with its zone, such as `2026-09-25T12:00:00Z`; every token, device grant and operation grant made before it is refused `UNAUTHORIZED`. An unreadable value refuses every bearer and writes one `cut-off` line (53 §5.11 (c)) |
+| `PROVISION_KEY` | secret | `/auth/provision`, `/auth/claim/mint` and `/auth/suspend` are 404 | the operator's bearer for those three doors, locked out on a wrong key like any other |
+| `KEK` | secret, or a Secrets Store binding of the same name | `/api/vault/*` answers `NOT_IN_THIS_BUILD`, and `/auth/provision` refuses rather than make a keyless record | 32 bytes as 64 hex characters or base64url. During a rotation it holds two keys, the new one, a space, and the old one (53 §5.6). There is no `KEK_PREV` |
+| `VAPID_PRIVATE` | secret | Web Push stays `pending` | the private half of `VAPID_PUBLIC` |
+| `STRIPE_SECRET_KEY` | secret | every billing door answers `NOT_IN_THIS_BUILD` naming it | `sk_test_...` while `BILLING` is `test`, `sk_live_...` only once the owner says so |
+| `STRIPE_WEBHOOK_SECRET` | secret | the webhook refuses | the `whsec_...` Stripe shows for the endpoint `https://brain.dog/account/billing/webhook` |
+| `TURNSTILE_SECRET` | secret | sign-up runs on the Directory's lockouts alone | the secret half of `TURNSTILE_SITE_KEY`; `signup.start` checks the widget's answer with it |
+| `BILLING` | variable | `''`: billing is off, sign-up says it is not open, nothing is charged or capped | `test` or `live`, and it must agree with `STRIPE_SECRET_KEY`'s prefix or every billing door refuses, naming both |
+| `STRIPE_PRICE_HOSTED`, `STRIPE_PRICE_PLUS` | variables | that plan is not sold | the `price_...` of Hosted ($12 a month) and of Cloud Plus, from the same Stripe mode as the key |
+| `TURNSTILE_SITE_KEY` | variable | no widget on the sign-up page | the public half of the Turnstile widget |
+| `OPS_RECORD` | variable | the walk writes its summary nowhere, and the sandbox smoke is skipped | the operator's canary record id, `rec_...`: the night's note goes there (53 §5.1) |
+| `AUTH_MAIL_FROM` | variable | no sign-in links, no sign-up, no invitation proof | the sender for sign-in mail, on a domain Email Service sends for; production is `hello@brain.dog` |
+| `MAIL_FROM` | variable, not yet in `wrangler.jsonc` | notification and account mail goes from `AUTH_MAIL_FROM` | the sender for notification, lapse and account mail |
+| `SUPPORT_ADDRESS` | variable, not yet in `wrangler.jsonc` | every mail's footer says to contact whoever runs this BrainDog | the address support mail reaches, named in every mail's footer |
+| `AGE_RECIPIENT` | variable | the walk refuses every record's copy and says why | the age recipient every nightly copy is sealed to; its identity lives outside Cloudflare (53 §8) |
+| `PUBLIC_HOST`, `RP_ID`, `LEGACY_HOSTS` | variables | no cookie origin, no passkeys, no legacy host | `brain.dog`, `brain.dog`, `app.brain.dog` |
+| `PROVISION_WITHOUT_KEYS` | variable | a record is never made without keys | `yes` lets `/auth/provision` make a keyless record on purpose |
+| `VAPID_PUBLIC` | variable | no push | Web Push's public key, handed to every browser that subscribes |
+| `SLASH_INCLUDED`, `SLASH_INCLUDED_MONTH_NEURONS`, `AI_GATEWAY` | variables | no included model | the included Slash model, one record's monthly ceiling in neurons, and the AI Gateway id |
+| `BRAINDOG_BUILD` | variable, set by the deploy | the tuple's `app` is empty | `<date>+<sha>`, passed as `--var` by `deploy.yml` |
+| `RECORD`, `DIRECTORY` | Durable Object bindings | (required) | the record and the Directory |
+| `INGRESS` | queue `braindog-ingress` | (required) | the outbox doorbell |
+| `BLOBS` | R2 bucket `braindog-blobs` | the nightly walk throws; files answer 501 | copies, files and final copies |
+| `EMAIL` | `send_email` | no mail of any kind | Email Service |
+| `AI`, `LOADER` | Workers AI; Worker Loader | no included model; no script runs ("no sandbox") | |
+| `RL_READ`, `RL_WRITE` | `ratelimits` | no limit | 600 reads and 120 writes a minute per caller on `/api` and `/mcp` |
+| `TELEMETRY` | Analytics Engine `braindog_telemetry`, drafted and commented | no telemetry | one point per request (see "Alerts") |
+
+Alpha has the same names under `env.alpha`, with its own values and its own secrets, so a session or
+a subscription made on one is refused by the other.
+
+## The self-host's environment
+
+The self-host reads its settings from its environment, usually an env file (53 §2.4). None is
+required but the data directory.
+
+| Name | Unset means | Set means |
+|---|---|---|
+| `BRAINDOG_DATA` | `/data` | the data directory |
+| `BRAINDOG_KEK_FILE` | `<data>/kek`, made on first run | the root key file, 32 bytes, 0600. `<file>.prev` beside it during a rotation (53 §5.6) |
+| `BRAINDOG_SESSION_SECRET` | the session key is derived from the key file, so a new key file signs everybody out | the session key, kept apart from the root key |
+| `BRAINDOG_TOKENS_VALID_FROM` | no cut-off | as the Worker's `TOKENS_VALID_FROM` |
+| `BRAINDOG_TOKEN` | no server key | a private single-user instance's owner bearer |
+| `BRAINDOG_SMTP_URL`, `BRAINDOG_MAIL_FROM` | no mail: no sign-in links, no invitation proof, notification mail waits in the outbox | `smtps://user:pass@host:465`, or `smtp://...:587` with STARTTLS required, and the sender |
+| `BRAINDOG_BACKUP_AT` | `03:20` | the UTC time of day the nightly copy falls due |
+| `BRAINDOG_ORIGIN` | `http://localhost:<port>` | the public origin: sign-in links, the passkeys' relying party, the CSRF check |
+| `BRAINDOG_HOST` | `127.0.0.1` without a token, `0.0.0.0` with one | the interface to listen on |
+| `BRAINDOG_TRUST_PROXY` | the socket's address is the caller's | `1`: the last `X-Forwarded-For` entry is, behind a proxy you run |
+| `PORT` | `8080` | |
 
 ## Resources the deploy needs to already exist
 
-`wrangler deploy` fails on a binding whose resource is missing, and says which. Both queues are
-created:
+`wrangler deploy` fails on a binding whose resource is missing, and says which. Created:
 
-- `braindog-ingress-alpha` — the alpha outbox
-- `braindog-ingress` — production's, created ahead of the deployment that will need it
+- the queues `braindog-ingress-alpha` and `braindog-ingress`
+- the R2 buckets `braindog-blobs-alpha` and `braindog-blobs`
 
-Durable Object migrations are in `wrangler.jsonc` and apply themselves on deploy.
+Durable Object migrations are in `wrangler.jsonc` and apply themselves on deploy. A new class is
+`new_sqlite_classes`, a rename `transferred_classes`, and never `deleted_classes`.
 
 ## Checking a deployment without opening a browser
 
 ```
 curl -s -o /dev/null -w '%{http_code}\n' https://brain.dog/app/           # 200, the shell
-curl -s https://brain.dog/healthz                                          # {"ok":true,"app":...}
+curl -s https://brain.dog/healthz                                          # {"ok":true,"app":...,"format":...,"kernel":...,"primitives":...}
 curl -s https://brain.dog/api/health                                       # a typed refusal, not a 500
 curl -s -H 'authorization: Bearer rec_0000000000000000000000000.x' https://brain.dog/api/boot
 ```
@@ -152,25 +240,6 @@ address is one of ours before it addresses anything, and opening the Directory r
 `PRAGMA user_version` unguarded on a platform whose SQLite authorizer refuses `PRAGMA`. The tenant
 map was unreachable on this host and nothing said so, because the only way to reach that line is to
 present a credential the host has never issued. The revision lives in a `dir_meta` row now.
-
-## `braindog-production` — the settings, verbatim
-
-| Setting | Value |
-|---|---|
-| Repository | `actuallyhoss/BrainDog` |
-| Production branch | **`release`** |
-| Builds for non-production branches | **off** |
-| Root directory | `/apps/worker` |
-| Build command | `pnpm install --frozen-lockfile && pnpm --filter @braindog/web build` |
-| Deploy command | `npx wrangler deploy --env production` |
-
-**No `BRAINDOG_ENV`, and that absence is the setting.** Production is the absence of an environment
-rather than one of them — `env.ts` fails to production, so a build that loses its `define` renders
-the shipped product rather than a half-labelled alpha one, and there is nothing here to lose.
-
-**A production deploy is a merge somebody makes**, not a push they forgot was a push: `release` only
-moves forward from a `master` that has been green, and nothing else can reach it — non-production
-branch builds are off, so a branch cannot take the hostname.
 
 ## Rolling back
 
@@ -221,14 +290,17 @@ The same two commands in `apps/site` roll the marketing site back. Three things 
 - **A hand rollback lasts until the next green `ci` on `master`**, because `deploy.yml` deploys the
   app and the site again from there. `git revert` of the bad commit is what keeps one.
 
-**The signed-in half of Smoke** asks `boot` on one record with a read token, which is the only
-question that sees a migration refusing real rows. It is off until the operator sets it up once:
-make a record for it (for example `ops`), mint a read token on it with
-`braindog token create --name smoke --scope read --host https://brain.dog/app/ops`, and store the token as the
-GitHub secret `SMOKE_TOKEN` and the record's name as the variable `SMOKE_SLUG`. Unset, Smoke prints
-that the half was skipped. A token that expires turns Smoke red with a 401 that names `SMOKE_TOKEN`,
-and that red rolls the deploy back like any other, so mint the next token (`--days` sets how long it
-lives) before this one lapses.
+**The signed-in half of Smoke** asks `boot` on one record with a token, which is the only question
+that sees a migration refusing real rows, and the sandbox smoke runs one script there, which is the
+only witness that the Worker Loader is bound. Both are off until the operator sets up the canary
+once: make a record for it (for example `ops`), put its `rec_...` id in `OPS_RECORD` in
+`env.production.vars` (the nightly note goes there too), mint a token on it with
+`braindog token create --name smoke --scope propose --host https://brain.dog/app/ops` (`propose`,
+because the sandbox smoke's `scriptTry` refuses a read token), and store the token as the GitHub
+secret `SMOKE_TOKEN` and the record's slug as the variable `SMOKE_SLUG`. Unset, each prints that it
+was skipped. A token that expires turns Smoke red with a 401 that names `SMOKE_TOKEN`, and that red
+rolls the deploy back like any other, so mint the next token (`--days` sets how long it lives)
+before this one lapses.
 
 ## Pushing a workflow
 
@@ -237,11 +309,12 @@ goes like this.
 
 **Once, before the first push:**
 
-1. Add a required reviewer to the `production` environment (the repository's Settings >
-   Environments > production > Required reviewers), so no merge deploys without a press.
-2. Run the restore drill once against last night's copy of the live record, so "restore from last
-   night" below is known to work: `node apps/cli/scripts/restore-drill.mjs <night.brainl.age> --identity <file>`,
-   with the identity file kept outside this repository.
+1. Add the required reviewer to the `production` environment ("The reviewer" above), so no merge
+   deploys without a press.
+2. Run the restore drill against last night's copy of the live record, so "restore from last night"
+   below is known to work: `node apps/cli/scripts/restore-drill.mjs <night.brainl.age> --identity <file>`,
+   with the identity file kept outside this repository. After that it is monthly, and the morning
+   check reports the last one's date (53 §5.1, §5.4).
 3. Optionally, the canary record and `SMOKE_TOKEN` above.
 
 **Every push:**
@@ -266,12 +339,66 @@ goes like this.
    `apps/worker` for lines with `"op":"crash"`, `"op":"refuse"` or `"op":"mail"`. Then open the
    live record on a phone and on a laptop: Home, Money, one write, one search, one sign-in.
 
+## Alerts
+
+Every line the Worker writes is one JSON object with `op` first (`apps/worker/src/oplog.ts`), and
+Workers Logs keeps them (`observability.enabled` in `apps/worker/wrangler.jsonc`). A line carries a
+code, an id and a shape, never a value, so each alert below is a saved query over fields: in the
+dashboard, Workers & Pages > `braindog-production` > Observability > Query Builder, set the
+filters, pick the window, and save it under the alert's name. Seven, and each names the runbook in
+`docs/53-SPEC-OPERATIONS.md` that answers it.
+
+| Alert | Filters | Fires when | Runbook |
+|---|---|---|---|
+| Crash | `op` = `crash` | any row in 15 min | find the `ref` the person was shown, read `where` and `error`; if it started with a deploy, "Rolling back" above; more than one door, 53 §5.11 |
+| Migration refusal | `op` = `refuse` | any row in 15 min | 53 §5.3 |
+| Failed snapshot | `op` = `walk`, `backup` = `failed` | any row | 53 §5.4 |
+| Erasure open | `op` = `walk`, `erase_open` > 0 | any row: an `erase.r2` row pending longer than a day, dead, or done with its object still in the bucket | 53 §5.8 |
+| Dead outbox row | `op` = `outbox`, `state` = `dead`, `kind` != `erase.r2` | 3 or more records in 24 h (a provider, not a customer) | 53 §5.15 |
+| Connector paused | `op` = `outbox`, `kind` = `pull.fetch`, `http` in 401, 403 | 3 or more records on one `ingest` in 24 h: a provider changed | 53 §5.12 |
+| KEK straggler | `op` = `walk.done`, `stragglers` > 0 | two nights in a row | 53 §5.6 |
+
+`erase.r2` has its own row rather than riding "Dead outbox row", because 53 §2.3 asked only for a
+dead one, and a deletion that sits pending for days is the same broken promise to a person who
+asked to be forgotten. The walk counts both in `erase_open` (`apps/worker/src/nightly.ts`).
+
+**The notification to wire.** Cloudflare's Notifications (Account > Notifications) showed no type
+that fires on a Workers Logs query when this was written (28 September 2026; look again), so the
+seven are read by a person: the morning check of 53 §5.1 step 5 opens each saved query, and a red
+row opens its runbook. The nightly ones also reach the ops record, where the walk writes its summary
+as a note once `OPS_RECORD` is set. The one alert that pushes is the uptime check below. When
+Cloudflare offers a notification on a query, `crash` and `refuse` move to it first, because they
+are the two that cannot wait until morning.
+
+**The uptime check, for you to create.** `https://brain.dog/healthz` answers 200 and
+`{"ok":true,...}` from the Worker alone, without waking a record or the Directory
+(`apps/worker/src/health.ts`), and the site hands the path to the app Worker
+(`apps/site/wrangler.jsonc`), so it is the one address that says the Worker is up. In the dashboard,
+zone `brain.dog` > Traffic > Health Checks > Create: HTTPS, host `brain.dog`, path `/healthz`,
+expected code 200, response body containing `"ok":true`, every 60 seconds from more than one
+region, two retries. Then Notifications > Add > Health Checks, to your email. Health Checks need a
+paid plan on the zone; on the free plan, any outside HTTP monitor with the same address, body and
+interval does the same job.
+
+**Telemetry.** Off until you bind it (H5). `TELEMETRY` is drafted and commented in
+`apps/worker/wrangler.jsonc`; uncommented, and with `SESSION_SECRET` set, the Worker writes one
+Analytics Engine point per request to `braindog_telemetry` (`apps/worker/src/telemetry.ts`): which
+door, which kind of client, the record method, the refusal code or the status class, the
+milliseconds, and the record id hashed under a key that changes every month. Never a value; the
+`telemetry-allowlist` gate holds the list. It is read with Analytics Engine's SQL API, and kept
+three months.
+
 ## What is not automated, and should be
 
-- **The marketing site has no build project.** Both `alpha.brain.dog` and now `brain.dog` were
-  deployed by hand, with `wrangler deploy --env alpha` and `--env production`. That is fine once and
-  wrong as a habit: the site is then whatever somebody last pushed from a laptop, and the apex is the
-  one hostname where that shows. Two projects are wanted, matching the Worker's pair.
 - **The `www` redirect is a dashboard rule and is in no file here.** It is one Redirect Rule, and
   the rest of this document exists because a setting that lives only in a dashboard is a setting
   nobody can review. Its terms: `https://www.*` to `https://${1}`, 301, query string preserved.
+- **The Stripe endpoint is made in Stripe's dashboard.** Developers > Webhooks > Add endpoint,
+  `https://brain.dog/account/billing/webhook`, in the same mode as `STRIPE_SECRET_KEY`; its signing
+  secret is `STRIPE_WEBHOOK_SECRET`. One per mode and per environment.
+- **The restore drill and the KEK rotation are a person's.** The Worker holds no age identity, so
+  nothing but the monthly drill ever opens a production copy, and the walk cannot know when that
+  last happened; the date lives in the ops record's `drill` note (53 §5.1 step 5, §5.4).
+- **`MAIL_FROM` and `SUPPORT_ADDRESS` are read and not yet set.** Both fall back as the table above
+  says. Setting them is two lines in `env.production.vars`, and `SUPPORT_ADDRESS` needs a mailbox, or
+  an Email Routing rule to one, before it is named in every letter.

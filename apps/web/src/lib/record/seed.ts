@@ -139,7 +139,9 @@ function matches(field: FieldDecl, want: Want, decl: RegisterDecl): boolean {
     case 'url':
       return field.type === 'url';
     case 'file':
-      return field.type === 'file';
+      /* `FieldType` EXCLUDES 'file' ON PURPOSE (`schema.ts`'s own note: no register this app draws declares one), the
+         same reason `isFile` in `field-draft.ts` casts to compare against it. */
+      return (field.type as string) === 'file';
     default:
       return true;
   }

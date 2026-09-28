@@ -160,7 +160,7 @@ platforms, which paints an intent in a colour no theme chose and no validator me
 | | |
 |---|---|
 | `toHTML(segments, opts)` | framework-free. Serves exports, tests, the mirror and a digest email |
-| `braindog-render/svelte` | the same markup as components, for an app that hydrates |
+| `braindog-render/svelte` | the same markup as components, for an app that hydrates. 0.1.0 does not publish it: the components import `../src/*.ts` and need `svelte-package` to ship, so it is a workspace entry for now |
 
 They are not two implementations of a guess. The Svelte components emit the same `<figure>` skeleton,
 the same classes and the same data attributes as `toHTML`, so **their accessibility trees are equal by

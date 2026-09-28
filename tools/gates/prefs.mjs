@@ -557,7 +557,7 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
         const value = typeof said === 'function' ? said(drew) : said;
         /* `@record` IS WHAT THE RECORD KEEPS FOR THE PERSON, and never goes in the cookie. */
         const { '@record': kept, ...cookie } = value;
-        const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+        const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce', bypassCSP: true });
         /* THE COOKIE, NOT A CLICK. `50 §4.7` has the shell read `bd_pref` in a one-statement inline
            script before first paint, so setting it is exactly what the product does. It keeps this
            gate about whether the preference REACHES the DOM rather than about the control that sets it,

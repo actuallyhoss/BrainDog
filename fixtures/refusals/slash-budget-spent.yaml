@@ -23,6 +23,6 @@ settings: { "tier": "a", "ask_cap": 80, "asks": 80 }
 # a different subject with a different repair ("Raise the ceiling for this job, or send fewer
 # rows."). `30 §6` files the code as "an ask past `ask_cap` this month", and this is that site.
 #
-# NO `replies:`, BECAUSE THE CLAIM IS THAT NONE IS ASKED FOR. `settings:` puts eighty propose calls
+# NO `replies:`, BECAUSE THE CLAIM IS THAT NONE IS ASKED FOR. `settings:` puts eighty reads
 # on a meter capped at eighty, and `packages/slash/test/refusals-ask.test.ts` asserts the canned
 # model saw zero calls, which is this comment's first paragraph checked rather than stated.

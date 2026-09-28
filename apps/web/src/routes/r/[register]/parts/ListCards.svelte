@@ -19,8 +19,6 @@
   import RowCards from '$lib/ui/RowCards.svelte';
   import Chip from '$lib/ui/Chip.svelte';
   import Icon from '$lib/ui/Icon.svelte';
-  import ScopeChip from '$lib/ui/ScopeChip.svelte';
-  import { scopeOf } from '$lib/record/scope-move.ts';
   import type { Receipt } from './list.ts';
 
   let {
@@ -83,9 +81,8 @@
   -->
   {#snippet note(e)}
     {@const said = receiptFor(e.seq)}
-    {@const where = scopeOf(register, e.fields, names)}
-    <!-- WHERE THE ROW APPLIES, on the phone's card as on the grid (agents C8). -->
-    {#if where !== undefined}<ScopeChip scope={where} />{/if}
+    <!-- WHERE THE ROW APPLIES IS NOT HERE: `RowCards` draws the scope chip in the card's detail slot, so a scoped row
+         is two lines like any other and a saved view's cards wear it too (design DSN-16). -->
     {#if said}
       {@const name = display(register, decl.title, e.fields[decl.title]) ?? copy.thisRow}
       <Chip label={said.mark} tone={said.intent} />
@@ -123,23 +120,23 @@
    */
   @media (width < 640px) {
     /* THE `Put back` BESIDE A RECEIPT ON A CARD. `.verb` is the grid's, sized for a row 34px tall
-     and a fine pointer; this one is under a thumb, so it takes `--tap` from `.tap` and reads as a
-     word rather than as an icon. */
-  .card-undo {
-    display: inline-flex;
-    align-items: center;
-    padding: 0 var(--sp-2);
-    background: none;
-    border: 0;
-    color: var(--ink2);
-    font: inherit;
-    font-size: var(--t-sm);
-    text-decoration: underline;
-    text-underline-offset: 3px;
-    cursor: pointer;
-  }
+       and a fine pointer; this one is under a thumb, so it takes `--tap` from `.tap` and reads as a
+       word rather than as an icon. */
+    .card-undo {
+      display: inline-flex;
+      align-items: center;
+      padding: 0 var(--sp-2);
+      background: none;
+      border: 0;
+      color: var(--ink2);
+      font: inherit;
+      font-size: var(--t-sm);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      cursor: pointer;
+    }
 
-  .card-more {
+    .card-more {
       display: flex;
       align-items: center;
       justify-content: center;
@@ -155,9 +152,13 @@
       cursor: pointer;
     }
 
-    .card-more:hover {
-      background: var(--s2);
-      color: var(--ink);
+    /* A WASH ONLY UNDER A MOUSE: a tapped button on a phone kept it after the finger lifted (design brief 6.6,
+       nothing hover-only and nothing stuck on hover). */
+    @media (hover: hover) and (pointer: fine) {
+      .card-more:hover {
+        background: var(--hover-wash);
+        color: var(--ink);
+      }
     }
   }
 

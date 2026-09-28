@@ -5,13 +5,32 @@
     {
       "kind": "pack",
       "id": "bank-hsbc-eg",
-      "title": "bank-hsbc-eg",
+      "title": "HSBC Egypt alerts",
       "summary": "Reads HSBC Egypt alert mails and text messages into Money as transactions, each with the balance it prints, and a message that only prints a balance as a balance check.",
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.4.0",
+      "latest": "1.5.0",
       "versions": [
+        {
+          "version": "1.5.0",
+          "checksum": "deff978e5e52e5352540ebd7fa86ba1a2f05bba9b36ad23ff1014ff525b11771",
+          "bytes": 55484,
+          "published_at": "2026-09-28T15:05:40.127Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Nothing it reads or writes changed. The add-on has a title of its own now, and each version says what it changed in a line like this one."
+        },
         {
           "version": "1.4.0",
           "checksum": "d5f75176d1e28a10afe4e2b6d9f3d978c186882181498877a5dbd11a96617601",
@@ -85,8 +104,27 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.0.0",
+      "latest": "1.1.0",
       "versions": [
+        {
+          "version": "1.1.0",
+          "checksum": "6f81bd8a57001ca26e2c1c14f0bc212d64ac5fbb38f2b448ad3d77f5b372de98",
+          "bytes": 9242,
+          "published_at": "2026-09-28T15:05:40.127Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Nothing it reads or writes changed. Each version says what it changed in a line like this one."
+        },
         {
           "version": "1.0.0",
           "checksum": "4781062cdd96af2945cc44a36ebb93fe476424ac873b166e231ca484429f6266",
@@ -124,8 +162,34 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.1.0",
+      "latest": "1.2.0",
       "versions": [
+        {
+          "version": "1.2.0",
+          "checksum": "3eeb23e56548a5f8430552608d89c14c2be661d2b2c1e0e017bfff7063b8fa01",
+          "bytes": 12251,
+          "published_at": "2026-09-28T15:05:40.127Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Cash counts"
+            ],
+            "pages": [
+              "Cash counts"
+            ],
+            "rules": [
+              "Write the difference of each count"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Nothing it writes changed. The script opens with a comment that says what it does and nothing else, and each version says what it changed in a line like this one.",
+          "preview": true
+        },
         {
           "version": "1.1.0",
           "checksum": "027554c11c0da97a0b18dc4068d5c64dea7b6675a9d32c3067e31a21d8749576",
@@ -242,6 +306,10 @@
                 "key": "Example stats (read only)"
               }
             ]
+          },
+          "yanked": {
+            "reason": "Set a poll up from Settings",
+            "at": "2026-09-28T15:05:40.127Z"
           }
         }
       ],
@@ -257,14 +325,83 @@
     },
     {
       "kind": "pack",
+      "id": "hello",
+      "title": "Hello",
+      "summary": "A list of things to do and a page showing what is still open: the smallest useful add-on, in the shape braindog pack new starts every one.",
+      "author": "BrainDog",
+      "license": "Apache-2.0",
+      "audience": "addon",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "21b6bdbe1b58df1ac7edb36fb8d862a792e54e4f71a14ff1eff51fced7bd3877",
+          "bytes": 2268,
+          "published_at": "2026-09-28T15:05:40.127Z",
+          "bump": null,
+          "reach": {
+            "modules": [],
+            "lists": [
+              "Items"
+            ],
+            "pages": [
+              "Hello"
+            ],
+            "rules": [],
+            "examples": 2,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "A record with seeds and no tags field refused its own rule with FIELD_UNKNOWN, like the CLI starter this pack copies; items now declares tags.",
+          "preview": true
+        }
+      ],
+      "categories": [
+        "modules",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      }
+    },
+    {
+      "kind": "pack",
       "id": "holdings",
-      "title": "holdings",
+      "title": "Holdings",
       "summary": "What you hold rather than spend: certificates, policies and commodities, with what each one cost, and what they cost together.",
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.2.0",
+      "latest": "1.3.0",
       "versions": [
+        {
+          "version": "1.3.0",
+          "checksum": "3e2967a9c15644173364b927ad186d97c1a13bdc34f8be5eecfbdc1728075247",
+          "bytes": 6918,
+          "published_at": "2026-09-28T15:05:40.127Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Holdings"
+            ],
+            "pages": [
+              "Holdings"
+            ],
+            "rules": [
+              "holdings_cost"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Nothing it writes changed. The add-on has a title of its own, its script opens with a comment saying what it does, and each version says what it changed in a line like this one.",
+          "preview": true
+        },
         {
           "version": "1.2.0",
           "checksum": "384884804f7d7bb2baa0033f8a1fab2e26a9e526dc8ec98a516426842c0f6831",
@@ -331,12 +468,43 @@
       "kind": "pack",
       "id": "launch-desk",
       "title": "Launch desk",
-      "summary": "A desk for launching a thing in parts: where it stands in one sentence, each part with its next step, the calls waiting on you, a pad beside it, and a price check.",
+      "summary": "A desk for launching a thing in parts: where it stands in one sentence, each part in its own colour and picture with its next step, the steps on a calendar by the day they are due, the calls waiting on you, a pad beside it, and a price check.",
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.1.0",
+      "latest": "2.0.0",
       "versions": [
+        {
+          "version": "2.0.0",
+          "checksum": "9a164ad10d8dabe292aad311a65fb129f7b5c0c5673cfec0028fc4bf68c57c2c",
+          "bytes": 27192,
+          "published_at": "2026-09-28T15:05:40.127Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "pad"
+            ],
+            "lists": [
+              "Parts",
+              "Steps",
+              "Helpers",
+              "Budget lines",
+              "Price check",
+              "Lessons"
+            ],
+            "pages": [
+              "Desk",
+              "{{name}}",
+              "Numbers"
+            ],
+            "rules": [
+              "Add the three costs of the price check together, and the least price they allow"
+            ],
+            "examples": 1,
+            "skills": [],
+            "calls_out": []
+          }
+        },
         {
           "version": "1.1.0",
           "checksum": "175ade31da3fe53ed512c2d69704b5eae499ac79a93ff1c5c35e84b6c162e06a",
@@ -444,6 +612,57 @@
     },
     {
       "kind": "pack",
+      "id": "mercury",
+      "title": "Mercury",
+      "summary": "Reads the balance of every Mercury account from api.mercury.com, once an hour or as often as its setting says, into Money's accounts, and its last thirty days of transactions into the ledger.",
+      "author": "BrainDog",
+      "license": "MIT",
+      "audience": "addon",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "427afc04ebd60a5da9475d5fcdebd6baaf8cda67657de51aa33f59d07ed0480d",
+          "bytes": 19779,
+          "published_at": "2026-09-28T15:05:40.127Z",
+          "bump": null,
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "api.mercury.com",
+                "line": "CALLS OUT api.mercury.com · every 1h · grant \"Mercury (read only)\"",
+                "key": "Mercury (read only)"
+              },
+              {
+                "host": "api.mercury.com",
+                "line": "CALLS OUT api.mercury.com · every 1h · key \"Mercury (read only)\" to the host its vault entry opens",
+                "key": "Mercury (read only)"
+              }
+            ]
+          },
+          "notes": "Mercury under its own id, one a record, in place of mercury-company. The key's label and how often it asks are settings on this pack's page, so nothing is filled in before it is installed."
+        }
+      ],
+      "categories": [
+        "connectors",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      }
+    },
+    {
+      "kind": "pack",
       "id": "mercury-company",
       "title": "Mercury",
       "summary": "Reads the balance of every Mercury account from api.mercury.com every 1h, into Money's accounts, and its last thirty days of transactions into the ledger.",
@@ -479,6 +698,10 @@
                 "key": "Mercury (read only)"
               }
             ]
+          },
+          "yanked": {
+            "reason": "Replaced by Mercury",
+            "at": "2026-09-28T15:05:40.127Z"
           }
         },
         {
@@ -508,6 +731,10 @@
                 "key": "Mercury (read only)"
               }
             ]
+          },
+          "yanked": {
+            "reason": "Replaced by Mercury",
+            "at": "2026-09-28T15:05:40.127Z"
           }
         },
         {
@@ -537,6 +764,10 @@
                 "key": "Mercury (read only)"
               }
             ]
+          },
+          "yanked": {
+            "reason": "Replaced by Mercury",
+            "at": "2026-09-28T15:05:40.127Z"
           }
         },
         {
@@ -566,6 +797,10 @@
                 "key": "Mercury (read only)"
               }
             ]
+          },
+          "yanked": {
+            "reason": "Replaced by Mercury",
+            "at": "2026-09-28T15:05:40.127Z"
           }
         },
         {
@@ -590,6 +825,10 @@
                 "key": null
               }
             ]
+          },
+          "yanked": {
+            "reason": "Replaced by Mercury",
+            "at": "2026-09-28T15:05:40.127Z"
           }
         }
       ],
@@ -611,8 +850,31 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.0.0",
+      "latest": "1.1.0",
       "versions": [
+        {
+          "version": "1.1.0",
+          "checksum": "cb1b48f5bd8a6f4d742d52166fd37d7ba68acaa31828b2b41b1571f5376f2431",
+          "bytes": 2960,
+          "published_at": "2026-09-28T15:05:40.127Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [],
+            "lists": [
+              "Notes"
+            ],
+            "pages": [
+              "Pad"
+            ],
+            "rules": [
+              "Write a second opinion under each note"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Nothing a person sees changed. Each version says what it changed in a line like this one."
+        },
         {
           "version": "1.0.0",
           "checksum": "6ac6384a72f3c8d9fb237dc6daf6ef31cdacd099e7644e705ef5b8e53b966f7f",
@@ -655,8 +917,31 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.0.0",
+      "latest": "2.0.0",
       "versions": [
+        {
+          "version": "2.0.0",
+          "checksum": "6bd4824cdc85b36cfbe5a3c5ac67e6d8b926be7d793fc15cf294b097d5731899",
+          "bytes": 14059,
+          "published_at": "2026-09-28T15:05:40.127Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "portfolio"
+            ],
+            "lists": [
+              "Revenue bands"
+            ],
+            "pages": [
+              "Revenue bands"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "The two reading names are settings now, set on this pack's page, where the file used to be filled in with them before it was installed."
+        },
         {
           "version": "1.0.0",
           "checksum": "34d12a976b6f3f96a2f9c842c2e902e2d5d60eb7f0eb30d940af40212d956040",
@@ -698,8 +983,29 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.1.0",
+      "latest": "1.2.0",
       "versions": [
+        {
+          "version": "1.2.0",
+          "checksum": "8edd88552c834a9639d27fea9c003b9c380e114bd66f7a6a3118a97198c057f0",
+          "bytes": 4315,
+          "published_at": "2026-09-28T15:05:40.127Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "portfolio"
+            ],
+            "lists": [],
+            "pages": [
+              "Briefs"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Nothing a person sees changed. Each version says what it changed in a line like this one."
+        },
         {
           "version": "1.1.0",
           "checksum": "2ee5290fdf121f0e094609d883cc2aa886003bf20d1528eab178b1d2b83ca671",
@@ -782,6 +1088,10 @@
                 "key": null
               }
             ]
+          },
+          "yanked": {
+            "reason": "Set a poll up from Settings",
+            "at": "2026-09-28T15:05:40.127Z"
           }
         },
         {
@@ -804,6 +1114,10 @@
                 "key": null
               }
             ]
+          },
+          "yanked": {
+            "reason": "Set a poll up from Settings",
+            "at": "2026-09-28T15:05:40.127Z"
           }
         }
       ],
@@ -866,8 +1180,30 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.0.0",
+      "latest": "1.1.0",
       "versions": [
+        {
+          "version": "1.1.0",
+          "checksum": "4747e92deb8c0a294ed72d2d467fc77eb8a74e3badca5acf5020dd0fb1277eba",
+          "bytes": 1439,
+          "published_at": "2026-09-28T15:05:40.127Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "work"
+            ],
+            "lists": [],
+            "pages": [
+              "Roadmap"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Nothing a person sees changed. Each version says what it changed in a line like this one.",
+          "preview": true
+        },
         {
           "version": "1.0.0",
           "checksum": "0905fd621cdb8cc1d5338f0caec869a77c19b68e4d2b3ed6b8e85c6efed28f68",
@@ -902,14 +1238,78 @@
     },
     {
       "kind": "pack",
+      "id": "standup",
+      "title": "Standup",
+      "summary": "One message every morning about the work: what moved since yesterday, what is blocked, and what agents finished. A morning with none of the three sends nothing.",
+      "author": "BrainDog",
+      "license": "Apache-2.0",
+      "audience": "addon",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "e0ce2c838885432f8196e9521d73159da41dcedfff8600cf52c2533b43131db2",
+          "bytes": 2076,
+          "published_at": "2026-09-28T15:05:40.127Z",
+          "bump": null,
+          "reach": {
+            "modules": [
+              "work"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "The first version."
+        }
+      ],
+      "categories": [
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      }
+    },
+    {
+      "kind": "pack",
       "id": "stripe",
       "title": "Stripe",
       "summary": "Reads the Stripe balance, available and pending, and the payouts on their way to the bank from api.stripe.com every hour, into Money's accounts.",
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.2.0",
+      "latest": "1.3.0",
       "versions": [
+        {
+          "version": "1.3.0",
+          "checksum": "a3d105bebcbbc0131a1a2c801a467fb8a649bf9805da2d2b4d329db33afaf322",
+          "bytes": 12343,
+          "published_at": "2026-09-28T15:05:40.127Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "api.stripe.com",
+                "line": "CALLS OUT api.stripe.com · every 1h · key \"stripe\" to the host its vault entry opens",
+                "key": "stripe"
+              }
+            ]
+          },
+          "notes": "Nothing it reads or writes changed. The script opens with a comment that says what it does and nothing else, and each version says what it changed in a line like this one."
+        },
         {
           "version": "1.2.0",
           "checksum": "00c02cb1ff0f550a575a6e8730955eabe06b3b1f1cd99c72ca9fecfd7ba5c51d",
@@ -1009,6 +1409,45 @@
       ],
       "categories": [
         "connectors",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      }
+    },
+    {
+      "kind": "pack",
+      "id": "week-in-money",
+      "title": "Week in money",
+      "summary": "One message every Monday morning: cash now, what fell due in the week in both directions, and what money arrived, opened by two sentences from Slash where the host has Slash.",
+      "author": "BrainDog",
+      "license": "Apache-2.0",
+      "audience": "addon",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "43a0b6267be5b267df7fb101b7064d7fb42f23e73c757aeb6e4dc1e98e013aa5",
+          "bytes": 2555,
+          "published_at": "2026-09-28T15:05:40.127Z",
+          "bump": null,
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "The first version."
+        }
+      ],
+      "categories": [
         "made-by-braindog"
       ],
       "publisher": {

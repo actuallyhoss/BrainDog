@@ -93,6 +93,8 @@ export class FlowDraft {
   /** State, so that `sent` quietens the button: `dirty` reads it, and a plain field would not tell anything it moved. */
   #opened = $state('');
   #undo = $state.raw<Draft[]>([]);
+  /** What `undo()` took off the canvas, newest last, so `redo()` can put it back; spent by `#keep()`. */
+  #redo = $state.raw<Draft[]>([]);
   /** Set when the inspector opens on a card, and spent by the first edit there. */
   #fresh = false;
   /**
@@ -125,6 +127,7 @@ export class FlowDraft {
     this.version = body ? version : null;
     this.#opened = body && version !== null ? JSON.stringify(bodyOf(this.draft)) : '';
     this.#undo = [];
+    this.#redo = [];
     this.#held = new Set();
     this.selected = null;
     this.dragging = null;
@@ -215,6 +218,10 @@ export class FlowDraft {
     return this.#undo.length > 0;
   }
 
+  get canRedo() {
+    return this.#redo.length > 0;
+  }
+
   proposal() {
     return proposalOf(this.draft, this.version);
   }
@@ -229,13 +236,23 @@ export class FlowDraft {
 
   #keep() {
     this.#undo = [...this.#undo.slice(-(UNDO_DEPTH - 1)), this.draft];
+    this.#redo = [];
   }
 
   undo() {
     const back = this.#undo.at(-1);
     if (!back) return;
     this.#undo = this.#undo.slice(0, -1);
+    this.#redo = [...this.#redo.slice(-(UNDO_DEPTH - 1)), this.draft];
     this.draft = back;
+  }
+
+  redo() {
+    const forward = this.#redo.at(-1);
+    if (!forward) return;
+    this.#redo = this.#redo.slice(0, -1);
+    this.#undo = [...this.#undo.slice(-(UNDO_DEPTH - 1)), this.draft];
+    this.draft = forward;
   }
 
   #apply(out: Moved, key: string, where: string): boolean {

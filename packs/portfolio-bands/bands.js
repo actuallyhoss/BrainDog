@@ -1,7 +1,7 @@
 /**
  * The revenue bands: what the projects take a month now, and the room left in their forecasts next and later.
  *
- * THE RULE (`loop/research-legacy-keeps.md` section 3). `now` is every project's latest monthly revenue, retired
+ * THE RULE. `now` is every project's latest monthly revenue, retired
  * ones that still pay included. A project's headroom is `max(0, base - now)`, where `base` is its base-case forecast
  * of monthly revenue a year out. Headroom on a project being earned from or built is `next`; on one that is parked it
  * is `later`; a retired project has none. One amount per currency, because two currencies are never added.
@@ -9,18 +9,26 @@
  * WHICH LANE IS WHICH BAND IS THE TABLE BELOW, and it is the one place to change it. The lanes are Portfolio's own
  * four (`packages/seed/src/modules/portfolio.ts`), so the table names nothing a particular record or import brought.
  *
- * WHICH READING IS `now` AND WHICH IS `base` IS THE FILL'S, NOT THIS FILE'S. The first cut compiled in the two labels
- * one importer wrote, so a record whose readings were named anything else ran every day and wrote three zeros, and a
- * shared pack carried one person's wording (`loop/research-legacy-parity.md` row 34, brief B5). `MEASURES` is the
- * one line `fill.ts` writes: each side is a list, because one number can arrive under an old name and a new one, and a
- * reading is matched on the name whole or on the name followed by ", " and the project, which is how a record names a
- * reading when the Dashboard draws one tile a name. The project itself is the `thing` the reading points at.
+ * WHICH READING IS `now` AND WHICH IS `base` IS THE OWNER'S, NOT THIS FILE'S. They are the pack's two `list` settings,
+ * set on its page and read from `ctx.config` on every run, so a record whose readings are named anything else sets its
+ * own names and nobody edits this file. A first cut compiled in the two labels one importer wrote, and a record whose
+ * readings were named anything else ran every day and wrote three zeros. Each side is a list, because one number can
+ * arrive under an old name and a new one, and a reading is matched on the name whole or on the name followed by ", "
+ * and the project, which is how a record names a reading when the Dashboard draws one tile a name. The project itself
+ * is the `thing` the reading points at.
+ *
+ * NAMES THAT WOULD DRAW THE WRONG BAR STOP THE RUN WITH A SENTENCE (`measuresOf`), because a setting says what each
+ * name is and never how the two sides stand to each other. Each of these would run every day, say `ok`, and draw the
+ * wrong bar:
+ *   - a side with no name matches nothing, so every band is zero;
+ *   - one name on both sides is counted as `now` and never as `base`, because `bandsOf` asks `now` first;
+ *   - a name that is another's name, a comma and more (`Takings` and `Takings, forecast`) is the same trap one step
+ *     removed: a forecast reading named `Takings, forecast, Kiln` begins `Takings, `, which is how a reading of
+ *     `Takings` names its project;
+ *   - and either of those in another case, because the record's `starts` folds ASCII case, so a list asked for
+ *     `takings` answers every reading of `Takings` as well.
  */
 
-const MEASURES = {"now":["Monthly recurring revenue"],"base":["Monthly recurring revenue in a year"]};
-
-const NOW = MEASURES.now;
-const BASE = MEASURES.base;
 const LANES = { earning: 'next', building: 'next', parked: 'later' };
 const BANDS = ['now', 'next', 'later'];
 const REGISTER = 'revenue_bands';
@@ -43,6 +51,36 @@ const minor = (value, currency) => Math.round(value * 10 ** (DIGITS[currency] ??
 
 const measureOf = (name, measures) => measures.some((m) => name === m || name.startsWith(`${m}, `));
 
+/* THE NAMES ARE COMPARED AS THE RECORD COMPARES THEM, and its `starts` folds ASCII case. Compared as exact text,
+   `Takings` and `takings` passed, and the list asked for the forecast answered every reading of today as well: fifty of
+   them written after a forecast typed once took `later` from 800,000 to 0 on a run that said nothing. */
+const fold = (s) => s.replace(/[A-Z]/g, (c) => c.toLowerCase());
+
+/**
+ * The two sides of names from the settings, each trimmed and said once, or a thrown sentence saying why they would draw
+ * the wrong bar. Thrown, so the run fails with that sentence and writes nothing, rather than writing a bar that is wrong.
+ */
+export function measuresOf(config) {
+  const side = (name) => {
+    const given = config?.[name];
+    const list = (Array.isArray(given) ? given : typeof given === 'string' ? [given] : []).map((n) => String(n).trim()).filter((n) => n !== '');
+    if (list.length === 0) throw new Error(`The bands need at least one ${name} name, set on this pack's page, or every band is zero.`);
+    return [...new Set(list)];
+  };
+  const now = side('now');
+  const base = side('base');
+  for (const a of now)
+    for (const b of base) {
+      if (a === b) throw new Error(`${a} is named as both now and base, so it would be counted as now and never as the forecast.`);
+      if (fold(a) === fold(b))
+        throw new Error(`${a} and ${b} are one name to the record, which matches a name whatever its case, so the forecast is read beside every reading of today and fifty of those push it out of what the run reads.`);
+      const [short, long] = a.length < b.length ? [a, b] : [b, a];
+      if (fold(long).startsWith(`${fold(short)}, `))
+        throw new Error(`${long} begins with ${short} and a comma, which is how a reading of ${short} names its project, so the two cannot be told apart.`);
+    }
+  return { now, base };
+}
+
 /** The reading's currency, or `null` when its unit is not three letters and it cannot be money. */
 const currencyOf = (r) => {
   const unit = String(r.fields.unit ?? '').trim().toUpperCase();
@@ -58,10 +96,11 @@ const later = (a, b) => {
 };
 
 /**
- * The three bands per currency, in minor units, from the projects and their readings, and what could not be counted.
- * Pure, so the rule is one function a reader can check against section 3 without the record around it.
+ * The three bands per currency, in minor units, from the projects, their readings and the two sides of names
+ * `measuresOf` answered, and what could not be counted. Pure, so the rule is one function a reader can check without
+ * the record around it.
  */
-export function bandsOf(things, readings) {
+export function bandsOf(things, readings, { now: NOW, base: BASE }) {
   const latest = new Map();
   for (const r of readings) {
     /* THE SEED'S EXAMPLE ROWS ARE LEFT OUT, as every dashboard over datapoints leaves them out. */
@@ -105,15 +144,16 @@ export function bandsOf(things, readings) {
 }
 
 export default async function run(ctx) {
+  const measures = measuresOf(ctx.config);
   const things = await ctx.record.list('things');
   if (things.length >= PAGE)
     ctx.log(`The record answered a full page of ${PAGE} projects and may hold more, so the bands may be short by the rest.`);
 
   const readings = [];
   for (const t of things)
-    for (const measures of [NOW, BASE]) readings.push(...(await ctx.record.list('datapoints', { all: [{ field: 'thing', is: t.id }, named(measures)] })));
+    for (const side of [measures.now, measures.base]) readings.push(...(await ctx.record.list('datapoints', { all: [{ field: 'thing', is: t.id }, named(side)] })));
 
-  const { bands, said } = bandsOf(things, readings);
+  const { bands, said } = bandsOf(things, readings, measures);
   for (const line of said) ctx.log(line);
 
   /* ONE ROW A BAND AND A CURRENCY, UPDATED IN PLACE, so the split draws today's bar and not every day's bars summed.

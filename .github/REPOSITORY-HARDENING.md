@@ -146,7 +146,7 @@ Target: `master`. Enforcement: active.
 
 ## 9 · Publishing
 
-- [ ] **npm trusted publishing configured** for `braindog-render` and `braindog-cli`, bound to this
+- [ ] **npm trusted publishing configured** for `braindog-render` and `braindog`, bound to this
       repository and to `tag.yml`. Provenance is then automatic and needs no `--provenance` flag.
 - [ ] **No classic npm token exists** on the maintainer's npm account. Delete any that do; a token
       that exists is a token that can be stolen, and trusted publishing means none is needed.

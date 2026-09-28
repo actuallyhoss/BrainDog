@@ -40,9 +40,9 @@ Nothing else in this document may break those two keystrokes.
 
 | Screen | Address | Job |
 |---|---|---|
-| Record home | `/` | What needs you, and what changed while you were away |
+| Record home | `/` | What needs you, who is working, what is coming and what happened while you were away, as one page drawn through `PageView` (`routes/+page.svelte`). It draws the speaking use case's `home-<id>` page, else the record's own `home` page, else the house page (`lib/home/default-home.ts`): **Right now**, the figures a pack pinned to Home (`figures.home`), hidden when none is; **What needs you**, the open questions, each answered where it is shown and then drawn as one line saying what was chosen, by whom and when (no Put back, because a decision is final, [20-COLLABORATION](20-COLLABORATION.md)), and its count the door to Decide; **Working now**, each live agent run on one line with its face, hidden when none is; **Coming up**, what falls due in the next two weeks, overdue first; **Since you were away**, what changed since the read mark, which moves when the person leaves Home and never when they open it. A lead line is built from the page's own counts ("3 things need you. Claude is on 2."). The title is the voice's word for Home or the record's name, with the day as a quiet line above it. A record with lists and nothing pinned, waiting or due says "Nothing needs you right now." and what will fill the page; a record with no lists is sent to Onboarding. Home listens, so an agent's or another tab's write redraws it without a reload |
 | **Palette** | overlay, `⌘K` | The one command surface. Never a page. **Slash** is its fallback row when a model is configured — Slash names the assistant, never the palette |
-| Decide | `/decide` | Every open question, ranked by cost of being wrong (§8 risk 6), dearest first, with the band named on each card and on its gate. On a live record the list is the record's open suggestions, read through the client's `governance` call, and an answer is sent with `decide` once its reason is written; with no record behind the host (`UNREACHABLE` or `UNAUTHORIZED`) it draws the sample questions, and any other refusal draws the record's own fix. A `rowset` proposal that updates rows shows each changed field on its card: the render package's diff for a document or long text, and before and after for the rest, drawn the same way from the record's rows or the sample's, whether the proposal names a row by its spoken id or by its internal id. A row it would create is drawn as it was. **Decided** names each decision's option by its label, from the suggestion it settled |
+| Decide | `/decide` | Every open question, ranked by cost of being wrong (§8 risk 6), dearest first, with the band named on each card and on its gate. On a live record the list is the record's open suggestions, read through the client's `governance` call, and an answer is sent with `decide` once its reason is written; with no record behind the host (`UNREACHABLE` or `UNAUTHORIZED`) it draws the sample questions, and any other refusal draws the record's own fix. A `rowset` proposal that updates rows shows each changed field on its card: the render package's diff for a document or long text, and before and after for the rest, drawn the same way from the record's rows or the sample's, whether the proposal names a row by its spoken id or by its internal id. A row it would create is drawn as it was. **Decided** names each decision's option by its label, from the suggestion it settled. Grouping the queue by what each question is about is in the address (`?group=about`, `routes/decide/grouping.ts`), replaced rather than pushed, so the grouped view can be sent and survives a reload. Under the queue, **Coming back to you** lists the questions put off, each with the day it returns and why, and **How the calls went** lists the decisions made with a prediction and whether it came true, did not, could not be checked, or is still waiting for its day; both are read from `governance` (`routes/decide/views.ts`), with no method of their own. A light question, one a rule or Slash opened whose answer changes nothing but itself, is answered in one press with no reason asked, and the decision says it was answered in one press, with the option's own reason when it gives one; anything else still asks why ([20-COLLABORATION](20-COLLABORATION.md) §3). The same questions are answered in place on every page that draws a `queue` block (`lib/page/QueueAnswer.svelte`), Home among them, with whoever asked drawn by a name and a face and never an id |
 | The gate | `/decide/SG23` | One question, its options, one decider, a mandatory reason. On a live record the question is read by its id through `governance`, and choosing or parking it calls `decide` with the reason; a refusal stays under the button in the record's own words. A `rowset` proposal that updates rows draws **What changes** above the options, field by field, as its card does. A `change` that calls out draws **Calls other services** above the options, the same lines as the Packs diff and the estimate, with one sentence saying accepting approves them and declining runs none; Accept and Decline are that approval. A suggestion no longer open is drawn settled: the option chosen, who decided, when, and the reason, from the decision that settled it. The record keeps no link between the two rows, so the decision is found as the one that recorded an option the suggestion offers, after it opened, oldest first |
 | Inbox | `/inbox` | Raw arrivals that matched no pattern, with arrival times |
 | Search | `/search?q=` | The structured fallback when the palette's ranked list was not enough |
@@ -50,7 +50,7 @@ Nothing else in this document may break those two keystrokes.
 | Packs | `/packs` · `/packs/browse` · `/packs/<id>` | Installed · the Kennel · one pack's settings. Every installed card links to **Settings**. `/packs/<id>` is a form generated from `packConfig`: text and money in a field (money's currency printed beside it, from the setting's value or default, and checked for its decimal places), an enum of up to four values as a segmented choice and a longer one as a select, bool as a switch, day as a date, duration as a whole number and a unit. **Save** sends `setPackConfig` with only the values that moved; **Reset** sends `null` for one setting. It says once that a change takes effect the next time the add-on is installed or updated. A pack that calls other services lists each scheduled action in its diff under **Calls other services**, one line each: what it does, the host, how often, the key by label and the fields it sends, then one sentence of the runs a month they add against the hosted 15,000, or with no limit on a self-host, and one sentence that installing asks once and none of them runs until then. **Install** on such a pack opens its plan and says it would ask once to approve those calls; the demo saves nothing and says so. `installPack` takes the plan's `approve` lines in the same press. An add-on with no settings draws no settings section. A refusal naming a setting is drawn beside it and any other under Save; `NEEDS_BROWSER_SESSION` and `FORBIDDEN` also offer **Sign in again**, as Settings, agents does, and send the same values once signed in. The demo draws sample settings for Money and says nothing was saved |
 | Settings | `/settings/<area>` | identity · **recovery** · **people & sharing** · agents · ingest · theme · keyboard · **navigation** · notifications · backups · billing · export. **`recovery` and `people & sharing` were missing from an earlier draft** — the first left a passkey-primary product with no designed way back in, and the second left [20-COLLABORATION](20-COLLABORATION.md)'s 5-person × 14-register access matrix with no screen anywhere in 24 documents. `navigation` was missing too: it holds the *Suggest new pages* switch that [29-EMERGENT-PAGES](29-EMERGENT-PAGES.md) §4 places there. `agents` is three sections, in this order. **Approve a machine** is the six-digit field, the `verification_uri` of every device flow, where a device code or an **operation grant** (one named operation, ten minutes) is approved with `deviceApprove`; a sign-in older than fifteen minutes is sent to sign in again. **Machines** lists `listDevices` by label, what each may reach and when it was last seen, revoked by handle and never showing a code. **Tokens** lists `listTokens` with Revoke, and *Connect an agent* mints a ninety-day write token whose bearer is shown once beside `braindog login <origin>` and the `claude mcp add-json` line. When the agents add-on is not installed, the same *What this adds* plan the Packs screen draws follows it, from `planPack`; with the same **Calls other services** lines and estimate; Install sends that plan's `planHash` to `installPack`, and Not now changes nothing. The approval and Revoke are the functions `/vault` calls. The demo draws sample rows and approves nothing ([12-SECURITY](12-SECURITY.md) §3, §6.1). `export` ends in the danger area: **Delete this record** — `deleteRecord`, re-authentication, the slug typed to confirm ([02-DATA-MODEL](02-DATA-MODEL.md) §9) |
 | Usage | `/usage` | Scheduled actions this month: runs, requests, bytes and failures per project and per action, as lists without boxes, and one `bar` per week. It reads `GET /account/usage` for this month first; on a plan with a limit it draws a `gauge` of runs against the allowance, the day it starts again, and, when the plan held a run, that actions are waiting until then. A 404, or no host, falls back to the record's `actions` read, which says nothing about limits. No record (`UNREACHABLE` or `UNAUTHORIZED`) draws the sample; a record with neither read says it does not report usage yet; any other refusal is the record's own sentence. A held action on "Runs on" links here |
-| Onboarding | `/start` | Pack selection, then one capture. **Not a tour** |
+| Onboarding | `/start` | One question and one accept, specified in §6: "Who are you?" answered in a sentence, a preview of the BrainDog it makes with nothing written, and **Make it mine**, which installs it and lands on Home. **Not a tour**, and not pack selection. A fresh record opens here, because the root layout sends any record with no lists of its own to it (the kernel's `session` list does not count). A colleague who holds lists and not the record, and an owner whose record is already made, are told so before the question, with the way back |
 | Audit | `/audit` | Every write, by whom, against which version |
 | **Job** | `/jobs/<id>` | A tier-C run: the route opens the palette in job mode over the shell — never a page. The view polls `jobEvents({ id, after })`; the list is `listJobs` ([23-ASSISTANT-UI](23-ASSISTANT-UI.md) §3.1) |
 
@@ -71,6 +71,13 @@ Nothing else in this document may break those two keystrokes.
 | Page source | `/p/money?src=1` — the declaration as diffable text |
 | Block focus | `/p/money#b-4` — addressable, shareable, and what an agent quotes |
 | Shared page | `/s/<token>` — signed, read-only, **and a landing page** |
+
+One reader draws a declared page everywhere it appears, `apps/web/src/lib/page/PageView.svelte`, split by job
+(the head, the layout, one block's chrome, arranging, every write, the source view) and taken with `mode`: `page`
+(`/p/<slug>`, everything on), `home` (Home's body, no head, no source, no Edit layout, writes stay on) or `preview`
+(Decide's proposal and Slash's draft, inert, no writes, no arrange, no source, a "Now · After" switch when a
+change's `was` is given). A block's own phone drawing is [05-BLOCKS-AND-THEMES](05-BLOCKS-AND-THEMES.md) §2's; what
+each of the four newest kinds does at 390 (`calendar`, `link`, `gallery`, `embed`) is that same table's.
 
 ---
 
@@ -453,134 +460,83 @@ Copy rules: be **specific about what will be here** when data is there; CTA labe
 Noun**, never "Get Started"; the CTA is a real button or link so it joins the tab order; and no
 flippant language, especially in an error.
 
-### The canonical first run — and it must work with no model and no packs
+### The canonical first run: one question, one accept, and no model needed
 
-**An earlier draft specified the first screen three incompatible ways** across this file,
-[06-PAGES](06-PAGES.md) §4 and [13-UI](13-UI.md) §5.1 — one of them putting an autofocused text
-field on the same screen as a checkbox list, and one of them making *"the product's core loop"* a
-capture field whose typed rows come from **Slash, which [23-ASSISTANT-UI](23-ASSISTANT-UI.md) §2
-cuts from v1 and §3 makes absent on every self-host.** A first run that depends on an absent
-component is not a first run. This section is now the only specification of it.
+*(Rewritten September 28th 2026 to say what `/start` does, from `loop/finish/modules.md` MOD-6 and
+[DIRECTION](../loop/DIRECTION.md) §6, §9 and §26. The earlier design, three screens with a row typed
+by hand on the first, pack selection on the second and one worked example row in every list, and the
+dated notes that amended it, are replaced by what follows. What survives of it is named at the end.
+This section is still the only specification of the first run; [13-UI](13-UI.md) §5.1 points here.)*
 
-*(Amended September 15th 2026 for `DIRECTION.md` §9: one turn precedes screen 1, "Who are you?",
-answered in a sentence, deterministic like the screen below, and written directly as the person's own
-row in People, with no diff to approve. It is a different question from screen 1's, which stays about
-the business, so the two are not merged into one field. `loop/research-modular.md` §2 has the flow.)*
+**The question.** One screen: the mark, "Who are you?", one field with the caret in it ("Your name,
+and what you want to keep here") and four chips that add words to it, one for each of the four people
+the product is for ([DIRECTION](../loop/DIRECTION.md) §11): "I'm a student", "I run a few companies",
+"I'm part of a team" and "I'm starting something new". **Show my BrainDog** reads the sentence, with
+no model (`apps/web/src/lib/start/propose.ts`): the name by `lib/who.ts`, and what the BrainDog is
+for, the modules it keeps and its first entries by `lib/shape.ts` and the use-case arranger. The same
+words always give the same proposal. A sentence in any language is accepted: one these rules cannot
+read is a proposal with nothing heard, which offers every module to turn on by hand and keeps the
+words as the person's note. It is never refused.
 
-*(Built September 15th 2026. `/start` opens on "Who are you?": one field with the caret in it and four
-chips that append words. A quarter of a second after typing stops it says what it heard, "Got it,
-you're Sam.", with an edit button, and screen 1 appears under it. Adding screen 1's row also meets
-the person: `meet({ name, email, where: 'onboarding' })` on a live record, or a waiting People row
-marked *Not saved* on the demo. With People off the name is still said back, no row is written, and
-nothing reports that as a failure.)*
+**The preview, with nothing written.** The sentence shrinks to one line, pressed to edit it, and
+under it:
 
-*(Built September 15th 2026, turn 2, from `loop/research-modules.md` §5. Under "Who are you?" the
-screen asks "What's your business?", answered in a sentence and read by keyword and pattern rules with
-no model (`apps/web/src/lib/shape.ts`). As typing pauses, two columns say what was heard and what the
-record will hold. **Make my record** turns on the first-party lists the sentence names, with Projects
-whenever another list points at it and People whenever turn 1 heard a name; writes only the rows the
-sentence fills, so an invoice needs an amount typed with its currency and a day; and meets the person
-from turn 1 in the same press. A sentence in another language is declined, not guessed at. Screen 1
-below is kept one press away, as "Start from a list instead".)*
+- **What I heard**: the name, and each phrase with what it became. An amount typed with no currency
+  is said back as not kept.
+- **Your BrainDog**: the use case it makes, with a chip for each use case to choose another; its
+  pages, each opening as the record would draw it (`routes/start/PagesPreview.svelte`), and its Home,
+  drawn with examples that say none of them is saved; the entries formed from the sentence; and
+  **What it keeps**, a switch for each module, where a module the chosen use case stands on stays on
+  and says why.
+- The currency, asked only when Money is kept and the sentence typed none.
+- **Remind me on this phone**, offered only where what it keeps has due dates and the host can ring
+  the phone.
 
-*(Amended September 15th 2026. On a live record, a first-party list the sentence names and the record
-lacks is now added, not only named: its own pack document is planned and installed with that plan's
-hash, every list after the ones it points at (Projects first, and People before Money, since an
-invoice is to somebody), and its example rows arrive marked `example`. A list whose plan or install is
-refused is said in one sentence, "Money was not added: ...", and nothing is made in it. The demo holds
-every first-party list already, so it is unchanged.)*
+**One press.** **Make it mine** writes it all through the install path Browse uses
+(`routes/start/accept.ts`: the use case's shared file, planned and installed through `planShared` and
+`installShared`), in this order, because each step reads what the one before it made: the lists; the
+person's own People row, through `meet`, before any client the sentence named; the record's currency,
+once Money is in; then the sentence's entries. With People off, the name is said back and kept
+nowhere, and People is never turned back on behind somebody who turned it off. It lands on Home with
+"Your BrainDog is ready." A refusal is said in the person's words ("Money was not added.") with the
+record's own sentence under Details; whatever went in stays in, and pressing again writes only what
+was not made. There is no second screen and no one-row form: a list with nothing in it draws its own
+empty state.
 
-> **Where this goes (September 22nd 2026, [DIRECTION §22](../loop/DIRECTION.md)).** Onboarding
-> proposes lists and fields from the person's own words, with no fixed kinds: the sentence goes to
-> Slash, or to a rule set a pack brings, and what comes back is a proposed list with the fields it
-> heard, which the person accepts. The three notes above describe the build as it stands and are
-> the thing to replace, not the design. Measured at `da9326d6`, `apps/web/src/lib/shape.ts:65` is a
-> `LEXICON` of fixed word lists mapped to the first-party packs (domains and subscriptions turn on
-> `estate`, invoices and VAT turn on `money-core`), which is a list of use cases living in the app.
+**Where a model answers.** A business no use case fits is drafted for: Slash drafts lists, figures
+and pages made for what was said (`slashDraft`), drawn over its sample rows under "Made for what you
+said", and the same one press files and accepts them. The sample rows are never written. Without a
+model none of this is drawn, and nothing above depends on it.
 
-**Screen 1 — one row, typed by hand.** Not pack selection, not a capture box, not a dashboard.
+**Before the question.** On a new record whose person has no passkey yet, where the host offers
+passkeys and the browser can make one, the first thing asked is a passkey, and "Not now" leaves it
+for Settings, recovery (`routes/start/PasskeyFirst.svelte`). Somebody signed in and on no record is
+asked for a name for one and sent to pay for it (`routes/start/NoRecord.svelte`). A colleague who
+holds lists and not the record, and an owner whose record is already made, are told so before the
+question, with the way back.
 
-```
-   What do you want to stop forgetting?
+**What survives of the earlier design**, and still holds:
 
-   ○ Something I owe, or am owed          → obligations
-   ○ A domain or a subscription renewing  → services
-   ○ A decision I keep re-making          → decisions
+1. **No model, no agent, no MCP required.** Everything but the drafting paragraph above works on a
+   fresh self-host with no endpoint configured.
+2. **Nothing to approve.** Installing an add-on means reading a plan written in the language of
+   lists and nav order ([04-PACKS](04-PACKS.md) §3), and a brand-new person is never asked to read
+   one before they have a record: the preview is in their words, and one press accepts it.
+3. **No skip.** A record with no lists has no other screen to show, so the root layout sends it here
+   (`routes/+layout.ts`), and the kernel's own `session` list is not counted as one.
+4. **Not a tour, and no product words.** Tutorials *"interrupt users who are attempting to do
+   something else … don't tend to be memorable, and they also don't result in better task
+   performance"*, the paradox of the active user, so the first run is one question. The words *pack*,
+   *row*, *register* and *module* are not on the screen.
 
-   ─────────────────────────────────────────────────────────────
-   A record holds typed rows. Pick one kind and add a real one —
-   you can add the rest later, and delete this one.
-```
-
-> **Corrected September 22nd 2026 ([DIRECTION §22](../loop/DIRECTION.md)).** The three kinds above
-> are the screen as first drawn, and two of them are one owner's use cases. Screen 1 asks for one
-> thing the person wants to keep, in their own words, and proposes a list with the fields it heard;
-> no kind is fixed in advance. The rest of this section holds for whatever list that proposal makes.
-
-One choice installs **one** register, and lands the user in **the row form for it**, focused, with a
-real due date pre-filled to a plausible value they can overwrite. **Their first act is typing one
-true fact about their own business**, and it takes under thirty seconds.
-
-Three properties that matter:
-
-1. **No pack vocabulary on screen one.** The word *pack* does not appear until the user goes looking
-   for a second register. `register` is defined in place, in one clause, the first time it is used —
-   see §9.
-2. **No model, no agent, no MCP required.** Everything above works on a fresh self-host with no
-   endpoint configured.
-3. **Nothing to approve.** Selecting a *pack* means reading an install diff written in the language
-   of metrics and nav order ([04-PACKS](04-PACKS.md) §3), and asking a brand-new user to approve
-   four schema reviews before they have seen one of their own rows is worse than a tour.
-
-**Screen 2 — the register, with their one row in it, and the second choice offered inline.** Pack
-selection lives *here*, after there is something to compare against, and it is optional forever.
-
-**And what happens if they pick nothing:** there is no such state. Screen 1 has no skip, because a
-record with zero registers has no legal screen — a defect an earlier draft left open.
-
-**Then, the four mechanisms that survive** — and *survive* is literal: a fifth was written here and
-is now deleted, because it was the capture-first onboarding this section's own preamble rejects.
-It read *"the first screen after pack selection is a capture… Slash proposes typed rows"*, which is
-the mechanism that **depends on a component v1 does not ship and self-host does not have.** It was
-listed as surviving in the same section that deleted it:
-
-1. **Onboarding is pack selection, not a tour.** Tutorials *"interrupt users who are attempting to
-   do something else … don't tend to be memorable, and they also don't result in better task
-   performance"* — the paradox of the active user. `/start` is a choice screen.
-2. **Every pack register ships exactly one worked example row, marked `example`** — the value
-   `example` in the register's declared `tags` field, so the mark is data and travels
-   ([02-DATA-MODEL](02-DATA-MODEL.md) §1; [04-PACKS](04-PACKS.md) §2) — visibly chipped, and
-   removable record-wide in one undoable action.
-
-   **It is excluded from digests and notifications, and NOT from the metrics on the page it sits
-   on.** An earlier draft excluded it from everything, which produced the incoherent first screen
-   with data on it: a money page reading `Due in 30 days · EGP 0 · target ≤ 5,000,000` **directly
-   above a table containing one obligation due in 30 days.** Two individually-correct rules, one
-   page that looks broken at the exact moment it is supposed to teach.
-
-   So: a metric counts example rows and **says so** — `EGP 5,000 · includes 1 example` — and
-   clearing the examples updates it. Nothing scheduled or notified ever counts them, because a
-   reminder about a fake obligation is a different and worse failure.
-3. **Every empty register offers the agent route**, because the buyer already has agents:
-
-   ```
-   Nothing in Domains yet.
-   Domains hold a renewal date, a registrar and a cost, so the record can tell you
-   what's due in October.
-
-     [ Add one ]   [ Ask Slash to find them ]
-
-     Or from any session:  "read my brain, then add every domain I own with its renewal date"
-   ```
-
-   That third line is the unlock: it turns an empty register into a one-sentence prompt for a tool
-   the customer is already running. The middle button, *Ask Slash to find them*, is **absent without a
-   model** ([23-ASSISTANT-UI](23-ASSISTANT-UI.md) §8); the other two lines are what a fresh self-host
-   shows.
-4. **Home, in an empty record, shows what it becomes — once**, dimmed, labelled *"This is what Home
-   looks like with your data in it"*, dismissed forever on one click. Marked **"example"**, never
-   with a sparkle badge: across 13 experiments *"participants trusted people and organizations less
-   when their use of AI was disclosed"*, so the badge imposes the cost without buying anything.
+5. **Home shows what it becomes before it is made, and marks its examples as examples.** The earlier
+   design wrote one worked example row into every list and drew an empty Home dimmed with sample
+   data. Now no path writes a sample row ([DIRECTION](../loop/DIRECTION.md) §26): the preview draws
+   the Home and pages the BrainDog will have, with examples that say none of them is saved, and the
+   use case's own example rows are taken out of its file before it is installed. Marked in words,
+   never with a sparkle badge: across a set of experiments *"participants trusted people and
+   organizations less when their use of AI was disclosed"*, so the badge imposes the cost without
+   buying anything.
 
 ### Error, and partial failure
 

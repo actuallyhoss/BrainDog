@@ -11,8 +11,10 @@ export const STUDENT = {
   /* 1.2.1 BECAUSE HOME'S EMPTY TITLE LOSES ITS FULL STOP. A title ends without one everywhere else, and a record is
      offered the words only when the version goes up.
      1.3.0: Home leads with Add homework, then what is due this week, the week's study as a strip and the study streak;
-     the lists are "My lists", not "Notebooks"; and the pack plants no example course (`loop/finish/modules.md` MOD-17). */
-  version: '1.3.0',
+     the lists are "My lists", not "Notebooks"; and the pack plants no example course (`loop/finish/modules.md` MOD-17).
+     1.4.0: the voice says more of the record the way a student hears it, Home's empty lines, the add verb and the
+     pen's line among them (PGS-24). Each is a new setting a person can change at /packs, so a minor step. */
+  version: '1.4.0',
   title: 'Student',
   summary: 'Your courses, what is due and when, and how each piece of work went.',
   author: 'BrainDog',
@@ -35,6 +37,19 @@ export const STUDENT = {
     /* "My lists", AND IT WAS "Notebooks": a notebook is a thing a student writes in, and the rail's word is for the
        lists the record keeps, so it read as though the record held their notes (`loop/finish/modules.md` MOD-17). */
     lists: 'My lists',
+    /* THE REST OF WHAT A STUDENT READS, SAID AS A STUDENT HEARS IT (PGS-24): what is due, work, a course. Nothing here
+       names an invoice, a payment or a balance, and nothing is "overdue". */
+    coming_up: 'Due soon',
+    overdue: 'Late',
+    nothing_now: 'Nothing is due right now.',
+    nothing_due: 'Nothing is due in the next two weeks. A good time to get ahead.',
+    fills_with: 'What is due, what you are working on and how each piece of work went show up here as you add your courses.',
+    record_empty: 'Nothing here yet',
+    no_questions: 'Nothing to decide',
+    inbox_clear: 'Nothing new has come in',
+    new_row: 'Add',
+    add_first: 'Add the first one',
+    pen_waits: 'When there is a way to fit this to how you study, it waits here until you keep it or say no.',
   },
   /* THE LISTS' OWN WORDS, SO A STUDENT CAN CALL THEM WHAT THEIR SCHOOL DOES: Modules, Coursework, Revision. Kept as the
      pack's settings (S8), so they are renamed at /packs/usecase-student and travel with a shared copy. */
@@ -250,5 +265,17 @@ export const STUDENT = {
     ],
     /* NO `seeds` SINCE 1.3.0 (`loop/finish/modules.md` C11): a student's record holds only what the student wrote, and
        an example course was one more thing to find and clear. */
+  },
+};
+
+/**
+ * WHAT THE MODULES SAY TO A STUDENT, by module and then by the module's own words (`MODULE_NAMES` in `install.ts`),
+ * laid over the plain words every use case but a business's gets. A student who adds Work is keeping their homework,
+ * so the page and its place on the rail say so.
+ */
+export const STUDENT_NAMES: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  work: {
+    Work: 'Homework',
+    'Open work by project': 'Open homework by project',
   },
 };

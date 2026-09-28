@@ -1,0 +1,79 @@
+/**
+ * What the drawn page decides, as plain functions: where a segment sits, where an in-window link goes,
+ * and which of a page's questions are still open.
+ *
+ * KEPT OUT OF `Page.svelte` for the reason the renderer keeps its plans out of its drawers: none of it
+ * is markup, and a function a Node test can import is a function somebody can check without a DOM.
+ */
+import { kindSpec, parse, type Block, type Segment } from 'braindog-render';
+import type { Span } from '../examples/types.ts';
+
+/**
+ * THE PREFIX OF A LINK THAT STAYS INSIDE THE WINDOW. A figure's `cellHref` answers `#go:<page-id>`,
+ * which the page catches and hands to `go` instead of letting the browser follow it, so pressing a
+ * tile opens another page of the drawn app and the reader's own page never moves.
+ */
+export const GO = '#go:';
+
+/** The page an in-window link opens, or `null` for a link that is not one. */
+export const goTarget = (href: string | null): string | null =>
+  href !== null && href.startsWith(GO) && href.length > GO.length ? href.slice(GO.length) : null;
+
+/** The widths a span may take, narrowest first. */
+const COLS: readonly Span['cols'][] = [3, 4, 6, 8, 12];
+
+/**
+ * Where a segment sits: the span `layout` gives it, or its kind's `minSpan` rounded up to a width
+ * the grid draws. Prose and a degraded fence take the whole row, because both are read as text and
+ * a quarter of a page is no measure for a paragraph.
+ */
+export function spanOf(segment: Segment, at: number, layout: readonly Span[] = []): Span {
+  const set = layout.find((s) => s.at === at);
+  if (set) return set;
+  const min = segment.type === 'block' ? (kindSpec(segment.kind)?.minSpan ?? 12) : 12;
+  return { at, cols: COLS.find((c) => c >= min) ?? 12 };
+}
+
+/** The question a queue row belongs to: its second cell, on a question and on each of its options alike. */
+const questionOf = (cells: readonly string[]): string => (cells[1] ?? '').trim();
+
+/** Whether a row is a question or one of its options, and so can be answered away. */
+const answerable = (cells: readonly string[]): boolean => {
+  const word = (cells[0] ?? '').trim();
+  return word === 'q' || word === 'opt';
+};
+
+/**
+ * A queue with the questions already answered here taken out, options and all.
+ *
+ * AN ANSWERED QUESTION LEAVES THE QUEUE, as it leaves Decide in the product, rather than staying with
+ * its buttons greyed: a control that can no longer act is absent (`19 §6`). When the last one goes,
+ * the queue's drawer says its own sentence for an empty queue.
+ */
+export function withoutAnswered(block: Block, answered: ReadonlySet<string>): Block {
+  if (block.kind !== 'queue' || answered.size === 0) return block;
+  return { ...block, rows: block.rows.filter((r) => !(answerable(r.cells) && answered.has(questionOf(r.cells)))) };
+}
+
+/** The ids of every question the queues of a page's source ask, in order. */
+export function questionsIn(src: string): string[] {
+  const ids: string[] = [];
+  for (const s of parse(src, { page: true })) {
+    if (s.type !== 'block' || s.kind !== 'queue') continue;
+    for (const r of s.rows) if ((r.cells[0] ?? '').trim() === 'q') ids.push(questionOf(r.cells));
+  }
+  return ids;
+}
+
+/** A question's words and the label of the option pressed, read off the block that drew them. */
+export function answerOf(block: Block, question: string, option: string): { question: string; label: string } {
+  let asked = '';
+  let label = option;
+  for (const r of block.rows) {
+    if (questionOf(r.cells) !== question) continue;
+    const word = (r.cells[0] ?? '').trim();
+    if (word === 'q') asked = (r.cells[4] ?? '').trim();
+    else if (word === 'opt' && (r.cells[2] ?? '').trim() === option) label = (r.cells[3] ?? '').trim() || option;
+  }
+  return { question: asked, label };
+}

@@ -173,8 +173,6 @@ export async function openActions(io: Fetch, base = ''): Promise<Opened> {
 /* ── one row, said ──────────────────────────────────────────────────────── */
 
 export const words = {
-  /* THE OLD HEADING this list was found under before a section named its panel (`panel-of.ts` reads it for those). */
-  runsOn: 'Runs on',
   heading: 'Scheduled actions',
   everywhere: 'For every project',
   resume: 'Resume',
@@ -197,7 +195,6 @@ export const words = {
   waitingFallback: 'Waiting for next month. This record has used its allowance for this month.',
   /* The usage page. */
   usage: 'Usage',
-  usageFor: (month: string) => `Scheduled actions in ${month}`,
   byProject: 'By project',
   byAction: 'By action',
   overTime: 'Runs by week',

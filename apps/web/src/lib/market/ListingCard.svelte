@@ -1,6 +1,7 @@
 <!--
-  One listing as a card on browse (`listing.ts`): a small drawing, then the title, one line of what it is for, who
-  published it and whether that is vouched for, how many records hold it, and what it calls out to.
+  One listing as a card on browse (`listing.ts`): a small drawing, then the title, two lines of what it does, what it
+  calls out to when it calls anywhere, who published it and whether that is vouched for, how many records hold it, and
+  the one cue that says what its page will offer.
 
   THE DRAWING IS THE BEST ONE THERE IS. A built-in use case's rail and Home are the caller's (`drawing`, today's
   `Preview.svelte`, which reads the use case's own declarations); an add-on whose version has a trusted preview draws its
@@ -41,6 +42,9 @@
   });
 </script>
 
+<!-- ONE SURFACE PER CARD (design.md §4, the catalogue row): the drawing is the card's only filled shape, and the words sit
+     under it on the page's own ground, so no box ever holds another box. What it does leads; what it calls out to follows
+     when it calls anywhere; the version, licence and signature are the detail page's. -->
 <li class="card">
   <div class="drawing">
     {#if drawing}
@@ -58,28 +62,23 @@
   </div>
 
   <div class="text">
-    <header class="head">
-      <h2 class="title"><a class="link tap" {href}>{listing.title}</a></h2>
-      <span class="kind">{words.kinds[listing.kind]}</span>
-    </header>
+    <h2 class="title"><a class="link" {href}>{listing.title}</a></h2>
     <p class="summary">{listing.summary}</p>
-    <ul class="facts">
-      <li>
-        <Icon name={verified ? 'check' : 'info'} size="s" />
-        {words.by(listing.publisher?.name ?? listing.author)}{#if verified}<span class="verified">{' · '}{verified === 'reviewed' ? words.reviewed : words.verified}</span>{/if}
-      </li>
-      {#if listing.count !== null}<li><Icon name="people" size="s" />{words.installs(listing.count)}</li>{/if}
-      <!-- A BUILT-IN'S CALLS ARE SAID ON ITS DETAIL PAGE, read from its file there; the index computed a catalogue
-           entry's when it was listed, so only that one is said on the card. -->
-      {#if listing.source === 'kennel'}
-        <li data-calls={hosts.length > 0 ? '' : undefined}><Icon name={hosts.length > 0 ? 'globe' : 'check'} size="s" />{hosts.length > 0 ? words.callsOut(hosts) : words.callsNothing}</li>
-      {/if}
-      {#if action?.kind === 'installed'}
-        <li class="held"><Icon name="check" size="s" />{words.installed}</li>
-      {:else if action?.kind === 'update'}
-        <li class="held"><Icon name="refresh" size="s" />{words.update(action.to)}</li>
-      {/if}
-    </ul>
+    <!-- A BUILT-IN'S CALLS ARE SAID ON ITS DETAIL PAGE, read from its file there; the index computed a catalogue entry's
+         when it was listed, so only that one is said on the card, and only when it calls somewhere. -->
+    {#if listing.source === 'kennel' && hosts.length > 0}
+      <p class="calls"><Icon name="globe" size="s" />{words.callsOut(hosts)}</p>
+    {/if}
+    <p class="meta">
+      <span>{words.kinds[listing.kind]}</span>
+      <span>{words.by(listing.publisher?.name ?? listing.author)}{#if verified}{' · '}{verified === 'reviewed' ? words.reviewed : words.verified}{/if}</span>
+      {#if listing.count !== null}<span class="num">{words.installs(listing.count)}</span>{/if}
+    </p>
+    <!-- THE ONE CUE: what the detail page's button will say. The card is the link, so this is words on it, not a second
+         control; "Installed" and an update say what the record holds. -->
+    <span class="cue" data-held={action?.kind === 'installed' ? '' : undefined}>
+      {#if action?.kind === 'installed'}<Icon name="check" size="s" />{words.installed}{:else if action?.kind === 'update'}{words.update(action.to)}{:else if action?.kind === 'turn-on'}{words.turnOn(listing.title)}{:else}{words.installCue}{/if}
+    </span>
   </div>
 </li>
 
@@ -90,39 +89,31 @@
     flex-direction: column;
     gap: var(--sp-3);
     min-inline-size: 0;
-    padding: var(--sp-4);
-    border: 1px solid var(--line-soft);
     border-radius: var(--r-md);
-    background: var(--bg);
   }
 
-  .card:hover {
-    border-color: var(--line);
-  }
-
+  /* THE DRAWING IS THE CARD'S ONE SURFACE: a well in `--sunk`, rounded, with no edge, so what is drawn inside it (a Home
+     in miniature, a page at half size, or the names of what it adds) never sits in a second box. */
   .drawing {
     min-inline-size: 0;
+    padding: var(--sp-3);
+    border-radius: var(--r-md);
+    background: var(--sunk);
   }
 
   .text {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-2);
+    align-items: flex-start;
+    gap: var(--sp-1);
     min-inline-size: 0;
-  }
-
-  .head {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: var(--sp-2);
   }
 
   .title {
     font-family: var(--font-ui);
     font-size: var(--t-base);
     font-weight: 600;
+    line-height: var(--lh-tight);
   }
 
   /* THE WHOLE CARD IS THE LINK'S TARGET, by stretching the title's link over it, so the title is the one thing a screen
@@ -146,61 +137,90 @@
   }
 
   .card:has(.link:focus-visible) {
-    outline: 1px solid var(--ink2);
-    box-shadow: 0 0 0 3px var(--focus-halo);
-    outline-offset: -1px;
+    outline: 2px solid var(--focus-in);
+    outline-offset: 2px;
   }
 
-  .kind,
   .quiet {
     margin: 0;
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
   }
 
+  /* WHAT IT DOES, IN TWO LINES, because one cut most summaries off before their verb. */
   .summary {
     display: -webkit-box;
     overflow: hidden;
     margin: 0;
     color: var(--ink2);
     font-size: var(--t-sm);
-    line-height: 1.5;
+    line-height: var(--lh-body);
     -webkit-box-orient: vertical;
-    -webkit-line-clamp: 1;
-    line-clamp: 1;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
   }
 
-  .facts,
+  .calls {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--t-sm);
+    overflow-wrap: anywhere;
+  }
+
+  /* META WRAPS AS WHOLE ITEMS, with space between them and no separator glyph to lead a wrapped line. */
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: var(--sp-3);
+    margin: 0;
+    color: var(--dim);
+    font-size: var(--t-xs);
+  }
+
   .names {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: var(--sp-1);
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
-  .facts li,
   .names li {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
-    gap: 6px;
-    color: var(--dim);
-    font-size: var(--t-xs);
-  }
-
-  .names li {
+    gap: var(--sp-2);
     color: var(--ink2);
     font-size: var(--t-sm);
   }
 
-  .verified,
-  .held {
-    color: var(--ink2);
+  /* A PILL THAT READS AS THE PRESS THE DETAIL PAGE OFFERS, in the secondary button's shape; the card is its target. */
+  .cue {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+    margin-block-start: var(--sp-2);
+    padding-block: var(--sp-1);
+    padding-inline: var(--sp-3);
+    border: 1px solid var(--edge);
+    border-radius: var(--r-pill);
+    color: var(--ink);
+    font-size: var(--t-sm);
+    font-weight: 500;
   }
 
-  .facts li[data-calls] {
-    color: var(--ink2);
+  .cue[data-held] {
+    border-color: transparent;
+    padding-inline: 0;
+    color: var(--dim);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .card:hover .cue:not([data-held]) {
+      background: var(--hover-wash);
+    }
   }
 </style>

@@ -21,11 +21,12 @@ export const automations = {
   /* THE FACT THE SCREEN CANNOT HIDE, as the mail section states its own: only the digest is kept, so nothing reads the
      token back, and a blank where a value would go reads as "you have none". */
   doorsUnknown: 'This screen cannot show a token the record already has. Only a fingerprint of it is kept, so if you no longer have it, make a new one and the old one stops working.',
-  doorsReading: 'Reading the doors this record declares.',
-  /* THE EMPTY STATE SAYS WHO ADDS ONE AND HOW, because nothing on this screen can: a door is a declaration, and a
-     declaration arrives as a change somebody approves. The prompt is the one to hand an agent. */
-  doorsNone: 'No door declared yet',
-  doorsNoneWhy: 'An agent adds one by proposing a change that declares an ingest with channel webhook and verify kind path, naming the list it writes to. Once the change is approved, the door is listed here with a button that makes its address.',
+  doorsReading: 'Reading the web addresses this record takes things in at.',
+  /* THE EMPTY STATE SAYS WHAT FILLS IT AND WHO ADDS ONE, because nothing on this screen can: a door arrives as a
+     change somebody approves. It said "an ingest with channel webhook and verify kind path", which is the file's
+     spelling and not the person's (MOD-24); those words stay in the prompt, which is handed to an agent. */
+  doorsNone: 'Nothing is posted in yet',
+  doorsNoneWhy: 'Things a phone, a script or another service posts to this record, each written to the list you name. Ask an agent to set one up, and approve the change it proposes on Decide.',
   doorsPrompt: 'read my record, then propose a webhook door with verify kind path for what I want posted in, and name the list it writes to',
   doorsWrites: (list: string) => `Writes to ${list}.`,
   doorsHeld: 'An address is in use. Making a new one stops the old one working.',
@@ -54,4 +55,15 @@ export const automations = {
   doorsNoToken: 'This host answered without a token in it, so nothing was shown. Try again, and if it happens twice nothing has been changed.',
   doorsNoRead: 'This host does not list its doors yet, so none can be shown here. Updating it brings the list.',
   doorsFreshWhy: 'Making an address needs a sign-in from the last fifteen minutes, because whoever holds it can write into this record.',
+
+  /* ── the automation editor's footer (`routes/automations/[id]`, EDT-4) ── */
+  /* SAID IN THE LIVE LINE AFTER AN UNDO, by the button or by Mod+Z, since the card that moved back says nothing. */
+  flowUndone: 'Undid the last change.',
+  /* THE SAME, AFTER A REDO, by the button or by Mod+Shift+Z / Mod+Y (EDT-4). */
+  flowRedone: 'Redid the last change.',
+  /* A NEW ONE THAT STARTS ON A PRESS: its trigger says "When you press Run now", and the button only exists once there
+     is something saved to run, so the footer says where it will be. */
+  flowRunAfterSave: 'Run now appears here once it is saved.',
+  /* MORE THAN ONE THING HOLDS THE SAVE BACK, and each is said on the card it is about. */
+  flowFaultsOnCards: (n: number) => `${n} things, each said on its card.`,
 } as const;

@@ -355,7 +355,7 @@ test('INSTALL IS A DRY RUN BY DEFAULT, and with --apply keeps a copy, keeps othe
 
   const again = await run(['install', '--apply', '--config-dir', profile], env, '');
   assert.ok(again.stdout.startsWith(`${file} already runs both BrainDog hooks. Nothing to change.`));
-  assert.deepEqual(readdirSync(profile).sort(), ['settings.json', 'settings.json.bak']);
+  assert.deepEqual(readdirSync(profile).sort(), ['settings.json', 'settings.json.bak', 'skills']);
 
   /* A settings file that is not JSON is left alone, and its text is not quoted. */
   const broken = folder('claude');

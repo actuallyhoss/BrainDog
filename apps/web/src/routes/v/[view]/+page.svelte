@@ -46,6 +46,7 @@
   import { page } from '$app/state';
   import { CapLine, Table } from 'braindog-render/svelte';
   import { copy } from '$lib/copy.ts';
+  import { said } from '$lib/voice.svelte.ts';
   import { DOM_CAP, iconFor, columnsFor, seqWidth, display, labelOf, toRows, whereOf, type Filter } from '$lib/record/api.ts';
   import { REGISTERS } from '$lib/record/held.ts';
   import Icon from '$lib/ui/Icon.svelte';
@@ -445,7 +446,7 @@
       >
         {#snippet actions()}
           {#if total === 0}
-            <Button weight="primary" href="/r/{register}?new=1">{copy.addOne}</Button>
+            <Button weight="primary" href="/r/{register}?new=1">{said('add_first')}</Button>
           {:else if narrowed}
             <Button href="/v/{key}">{copy.backToView}</Button>
           {:else}

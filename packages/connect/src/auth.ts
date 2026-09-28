@@ -483,7 +483,66 @@ export async function applyAuth(
   token: string | null,
   nowMs: number,
 ): Promise<ResolvedRequest> {
-  const auth = decl.auth;
+  return authorised(decl.auth, grant, req, token, nowMs);
+}
+
+/* ── A scheduled call's key ──────────────────────────────────────────────────────────────────── */
+
+/**
+ * The ways a record's `call` or `poll` sends its one key, as its declaration names them: connect's
+ * `bearer`, `header`, `query_param` and `basic`, with `query` for `query_param` (`loop/finish/
+ * contracts.md`, "call and poll `auth.kind`"). The kernel keeps the same four (`ACTION_AUTH_KINDS`).
+ */
+export type CallAuth = { kind: 'bearer' | 'basic' } | { kind: 'header' | 'query'; name: string };
+
+/**
+ * A call's key as the fields the four kinds read.
+ *
+ * A CALL'S KEY IS ONE STRING IN THE VAULT, where a connector's grant is an object of fields. So the
+ * string is the `token`, and for `basic` it is also the pair it spells, `user:password`, split at
+ * the first colon because a password may hold one and a user name may not (RFC 7617). A key that
+ * is itself a JSON object of string fields is read as a grant is (`grantFields`), so a key added
+ * for a connector sends the same way from a call.
+ */
+function callFields(key: string): Record<string, string> {
+  if (key.trimStart().startsWith('{')) {
+    try {
+      return grantFields(utf8.encode(key));
+    } catch {
+      /* NOT A GRANT, so it is a token that happens to start with a brace. */
+    }
+  }
+  const colon = key.indexOf(':');
+  return colon < 0 ? { token: key } : { token: key, username: key.slice(0, colon), password: key.slice(colon + 1) };
+}
+
+/**
+ * A scheduled call's key, onto its request: the executor's one way to send it (`packages/host/src/actions.ts`).
+ *
+ * THROUGH `authorised`, THE SAME LINES A CONNECTOR'S PAGE GOES THROUGH, so a call sets `Authorization`
+ * in the one place in the tree that does, and a header the declaration may not set is refused here
+ * as it is for a connector. A key that does not hold what its kind reads (a `basic` key with no
+ * colon) throws `PULL_AUTH_REJECTED`, which the executor answers as a key that cannot be sent.
+ */
+export async function authoriseCall(auth: CallAuth, key: string, req: ResolvedRequest, nowMs: number): Promise<ResolvedRequest> {
+  const grant: Grant = { id: '', version: 1, fields: callFields(key) };
+  const decl: AuthDecl =
+    auth.kind === 'header'
+      ? { kind: 'header', grant: '', name: auth.name }
+      : auth.kind === 'query'
+        ? { kind: 'query_param', grant: '', name: auth.name }
+        : { kind: auth.kind, grant: '' };
+  return authorised(decl, grant, req, null, nowMs);
+}
+
+/** `applyAuth`'s work, over the auth block alone, so a call that has no `FetchDecl` goes through the same lines. */
+async function authorised(
+  auth: AuthDecl,
+  grant: Grant,
+  req: ResolvedRequest,
+  token: string | null,
+  nowMs: number,
+): Promise<ResolvedRequest> {
   const headers = { ...req.headers };
   const url = new URL(req.url.href);
   const out = (): ResolvedRequest =>

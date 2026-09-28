@@ -96,11 +96,17 @@
     min-inline-size: 0;
   }
 
+  /* THE ENTRY SCREENS' ONE TITLE (DSN-18): this stands where /start's question and sign up's title stand, in the same
+     `signin/Entry.svelte` frame, so it takes their size and face rather than a smaller one of its own. */
   .own-h {
     color: var(--ink);
-    font-size: var(--t-xl);
+    font-family: var(--font-display);
+    font-size: var(--t-3xl);
     font-weight: 600;
-    line-height: var(--lh-tight);
+    letter-spacing: -0.03em;
+    line-height: var(--lh-3xl);
+    text-wrap: balance;
+    overflow-wrap: anywhere;
   }
 
   .own-why,

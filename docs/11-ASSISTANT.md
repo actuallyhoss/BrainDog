@@ -96,8 +96,10 @@ Full architecture, costs, the terms-of-service position and the runner protocol:
 | Draft prose and blocks | send an email, move money, or delete |
 | Explain a figure by naming its source rows | act on a schedule without a human having approved the rule |
 
-The enforcement is architectural, not a prompt instruction: **Slash runs in a separate Durable
-Object with no write RPC.** There is no write path to compromise. A perfect jailbreak of the model
+The enforcement is architectural, not a prompt instruction: **Slash is handed no write method.** It
+runs inside the record's own object, its store in that object's storage (`loop/finish/agents.md` §5 item 10), and
+the only record it can reach is `slashRecord`'s (`packages/host/src/slash.ts`): `project` to read and `propose` to
+file, and nothing that writes a row. There is no write path to compromise. A perfect jailbreak of the model
 yields a proposal, and a proposal is a row in `suggestion` that a human has to accept — filed once,
 by `record.propose`; an `infer.*` ack carries a tier-A result back and files nothing itself
 ([46-SPEC-SLASH](46-SPEC-SLASH.md) §5; [45-SPEC-RECORD](45-SPEC-RECORD.md) §5). A write from a

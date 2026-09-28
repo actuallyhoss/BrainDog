@@ -1,7 +1,7 @@
 # 44 · packages/mcp: specification
 
-The agent surface of [10-MCP](10-MCP.md), typed to the file: fifteen fixed tools, nineteen kinds of resource (thirteen
-fixed addresses and six templates), the server `instructions`, and the JSON-RPC 2.0 core that carries them,
+The agent surface of [10-MCP](10-MCP.md), typed to the file: the fixed tools of `TOOLS`, the resources of `RESOURCES` (fixed addresses) and `TEMPLATES`
+(the addresses a client fills in), all three in `src/index.ts`, the server `instructions`, and the JSON-RPC 2.0 core that carries them,
 hand-rolled over the `Result` envelope of [33-CONTRACTS](33-CONTRACTS.md) §2, with the token budget of 10 §4 asserted
 by a test. Two transports wrap the core: stdio in `apps/cli` and streamable HTTP at `POST /mcp` on both hosts
 (`loop/research-agent-path.md` §1). Ninth in the build order of [35-SPEC-OVERVIEW](35-SPEC-OVERVIEW.md) §4. Mode:
@@ -15,7 +15,7 @@ ponytail.
 parsed JSON-RPC 2.0 message and returns one reply, or `null` for a notification, which is never answered and never
 runs anything. It answers `initialize` with the instructions and a negotiated protocol version; `server/discover` with the
 versions, the capabilities and the instructions; `ping`; `tools/list`
-with the fifteen tools and the instructions again; `tools/call`; `resources/list`, `resources/templates/list` and
+with the tools and the instructions again; `tools/call`; `resources/list`, `resources/templates/list` and
 `resources/read`; and `prompts/list`, which is empty for now. The tools and resources are `tools(surface)` in
 `src/index.ts`, over `McpSurface<C>`, a structural type naming only the record methods the tools call. A `Result`
 becomes an MCP result: a value as its JSON, a refusal as an error result carrying the refusal, a conflict as
@@ -516,8 +516,10 @@ because a client that skipped the first still reads the others.
 
 ### 4.7 · Resources
 
-Scheme `braindog:`, then a path. Nineteen kinds: thirteen fixed addresses and six templates. Seventeen are each
-backed by one record method (ADR-018 by construction). The other two, `grammar/script` and `grammar/automations`, are
+Scheme `braindog:`, then a path: the fixed addresses of `RESOURCES` and the templates of `TEMPLATES`, which
+`resources/list` and `resources/templates/list` answer as they stand, so no count is written here. Every one but two is backed by a record
+method (ADR-018 by construction); `inbox` and `inbox/{state}` are `inbox()`, and `grammar/ingest` is `arrangement()`
+as the other declaration grammars are. The other two, `grammar/script` and `grammar/automations`, are
 this package's own text, and each is asked of `version()` first, which is `guard(ctx, 'read')`, so the permission
 ladder still decides who reads them and a surface of any age can serve them.
 
@@ -877,27 +879,34 @@ counted once for this revision, by the same estimator over the same result.
 
 | Item | Ceiling | Measured | How |
 |---|---|---|---|
-| `tools/list` result: `tools[]`, `instructions`, `ttlMs`, `cacheScope` | **≤ 2,760** | **2,544**, 8,641 bytes, before `triage`; 2,720 with it, counted by hand | `budget.test.ts` |
+| `tools/list` result: `tools[]`, `instructions`, `ttlMs`, `cacheScope` | **≤ 2,760** | **2,544**, 8,641 bytes, before `triage`; 2,720 with it; **2,751**, 9,343 bytes, with `list`'s `fields` | `budget.test.ts` |
 | The tool objects alone, the `tools` array serialised by itself | reported | 2,130, before `triage` | the same count over `tools` |
 | One tool description | < 200 | 12 (`update`) to 60 (`context`) | `budget.test.ts` asserts the ceiling for each |
 | One tool object: name, description, `inputSchema`, `annotations` | reported | 79 (`record_index`) to 295 (`propose`) | |
 | `INSTRUCTIONS` | ≤ 400 | 400 | `budget.test.ts` |
 | `record_index` response | ≤ 500 | 450, 1,318 bytes, over the seed's nineteen registers and the 25 figures its pages draw | a real record with `@braindog/seed`'s declarations installed; no test asserts it |
-| A `list` page, the default of 50 rows | ≤ 2,000 | **5,380**, 14,517 bytes, for fifty `obligations` rows: over | the same record with seventy `obligations` rows; no test asserts it |
+| A `list` page, the default of 20 rows | ≤ 2,000 | **1,728**, 4,745 bytes, for twenty seeded `tasks` (3,018 for all 27 before); 2,287 for twenty `obligations`: over | a real record with `@braindog/seed` installed, the whole JSON-RPC answer; no test asserts it |
 | `resources/list` | none | not in any turn; fetched when wanted | |
 
 *The first six rows measured on 24 September 2026, after `get` and `record_index` learned figures (audit sixty-two
 finding 2); the rest on 22 September. What `triage` and `log`'s row-less `spoken` add was counted by hand with §5.8's
-estimator over the serialised tool list, 172 and 4, so 2,720 and 40 under the ceiling; `budget.test.ts`'s diagnostic
-is the figure that holds. Under 400 for the
+estimator over the serialised tool list, 172 and 4, so 2,720 and 40 under the ceiling. `list`'s `fields` argument cost
+37 and saying "predicate" once in `list`'s description gave 6 back, so 2,751 and 9 under, counted on 28 September
+through `handle` over the stub surface; `budget.test.ts`'s diagnostic is the figure that holds. The `list` page row was
+counted the same day. Under 400 for the
 instructions there is no headroom. The `record_index` row is the one to watch: its figures are ids, but a record whose
 pages draw a hundred of them, or a host answering `figures` for a pack of many, takes it past 500.*
 
-**The `list` row is a target this build does not meet.** 10 §4 set 2,000 for "25 rows, projected, not whole
-documents". The record's default page is 50 rows, not 25 (`kernel.list` clamps to 1 to 500 with 50 as the default,
-which the `list` tool's `limit` argument now says), and a compact row carries every field, about 108 tokens a row on
-the seed's obligations. Nothing here projects a row to its title and state. Until something does, an agent that
-wants a short answer passes a `limit`.
+**The `list` row is met on the Work list, and not on every register.** 10 §4 set 2,000 for "25 rows, projected, not
+whole documents". A `list` row is leaner than a compact row (`listed` in `index.ts`): no `updated_at`, which the page's
+order already says and `get` still answers; no `state` beside a field that holds the same value; no empty field; and a
+text or document field past 280 characters cut there, with `clipped: true` on the row, unless the call names the field
+in `fields`. That took the seed's four projects from 1,624 tokens to 822, because one project's note is 2,368
+characters. It was not enough for 25 rows: counted as a transport sends it, every quote escaped inside the text
+block, 25 seeded tasks cost 2,094. So the tool sends `limit: 20` when the call names none, and says "Default 20"; the
+record's own default stays 50 and its ceiling 500. Twenty `obligations` still cost 2,287, because each carries a money
+object, a ref and two days: a register of rows that dense wants a smaller `limit` from the agent, and a page projected
+to its title and state is the next step if one is ever needed.
 
 **2,600, where an earlier revision set 1,800.** That ceiling was set for eight tools. The agent path needs fourteen,
 because `context`, `handoff` and `meet` are what an agent does every session (`loop/research-agent-path.md` §1.5),
@@ -950,11 +959,11 @@ and each case is named for what it holds.
 | File | Holds |
 |---|---|
 | `packages/mcp/test/rpc.test.ts` | `handle` over `stub.ts`. `initialize` negotiates, and an older client gets the newest version at or below its own. `server/discover` answers without reading the record, with `cacheScope: 'public'`. `ping`, and `prompts/list` as an empty list. `tools/list` is the fifteen, with the instructions and the read-only ones marked, and reads nothing. Each tool reaches its method with the transport's context. A value is compact JSON, a refusal is carried whole, and a conflict carries the current row and who changed it. An unknown tool, or a name off `Object.prototype`, runs nothing. A throw is `-32603` and a reference, with no exception text. A notification returns `null`, and the id is echoed exactly. A batch or a malformed message is `-32600`, an unknown method `-32601`, and parameters of the wrong shape `-32602`. Resources are listed, templated and read with their `ttlMs`, and an address that is not there, or is refused, is `-32002` |
-| `packages/mcp/test/mcp.test.ts` | the tools and resources over a real record. The count is fifteen, and there is no vault tool. Each tool says whether it writes. A row is addressed as a person says it, by `register#number`, by a prefixed id or by the row id a ref holds, and `S1` is the run; `update`, `log` and `history` take a prefixed id. A row is compact. `record_index` is the registers and the version. `governance` lists without bodies. A change takes its `declaration_id` from `to`, and a rowset names its register from `at` and raises a skill's `rev`. A refusal names what to send instead, and a stale write comes back as a conflict. `context` and `handoff` answer through the record, and so does `meet`; what a host does not answer is `NOT_IN_THIS_BUILD`. The five tools that left answer as any unknown name does. A `read` token reads through every tool and writes through none. Every resource listed reads, and what a surface cannot answer is not listed. A page is withheld for the level held, no metric is advertised that the record says does not exist, and a skill is read by its name |
+| `packages/mcp/test/mcp.test.ts` | the tools and resources over a real record. The count is `TOOLS`' own, sixteen with `triage`, and there is no vault tool. Each tool says whether it writes. A row is addressed as a person says it, by `register#number`, by a prefixed id or by the row id a ref holds, and `S1` is the run; `update`, `log` and `history` take a prefixed id. A row is compact. `record_index` is the registers and the version. `governance` lists without bodies. A change takes its `declaration_id` from `to`, and a rowset names its register from `at` and raises a skill's `rev`. A refusal names what to send instead, and a stale write comes back as a conflict. `context` and `handoff` answer through the record, and so does `meet`; what a host does not answer is `NOT_IN_THIS_BUILD`. The five tools that left answer as any unknown name does. A `read` token reads through every tool and writes through none. Every resource listed reads, and what a surface cannot answer is not listed. A page is withheld for the level held, no metric is advertised that the record says does not exist, and a skill is read by its name |
 | `packages/mcp/test/index.test.ts` | every advertised tool reaches a method, asked over the wire; a surface with nothing optional darkens exactly `context`, `activity`, `handoff` and `meet`, and the resources go the same way; `credentials` is not a tool; the refusal for a name that is not a tool lists the fifteen |
 | `packages/mcp/test/activity.test.ts` | `activity` is a tool; its `limit` is the record's; a line's address replaces its parts and empty fields do not travel; a line about no row keeps `target`; a caller held to one register sees only its lines; a host without `recentHistory` says so |
-| `packages/mcp/test/money-out.test.ts` | there is no `money` tool: fifteen tools, no `MONEY_FIGURES` export, and a call by that name is refused `ROUTE_UNKNOWN` without reading the record; the source names no figure id of money-core, in code or in a comment; a pack's page and each figure it draws are offered as resources, and a figure over two currencies with no rate answers one amount per currency and no sum |
-| `packages/mcp/test/figures.test.ts` | audit sixty-two's M1 over money-core as it ships: `get` of a figure's id answers the record's reading, one amount per currency and no sum, for every figure the removed `money` tool read; `record_index` names figures and `get` answers each one it names; a figure's id goes to `metric` and a row to `get`; a figure the record refuses is `VALUE_MALFORMED` at `spoken` naming the row forms and `record_index`; a surface answering `figures` is listed whole, less what `metric` refuses; still fifteen tools. One case is a `todo`: every declared figure named, which waits on the record's `figures` |
+| `packages/mcp/test/money-out.test.ts` | there is no `money` tool: `TOOLS` holds sixteen, none of them `money`, no `MONEY_FIGURES` export, and a call by that name is refused `ROUTE_UNKNOWN` without reading the record; the source names no figure id of money-core, in code or in a comment; a pack's page and each figure it draws are offered as resources, and a figure over two currencies with no rate answers one amount per currency and no sum |
+| `packages/mcp/test/figures.test.ts` | audit sixty-two's M1 over money-core as it ships: `get` of a figure's id answers the record's reading, one amount per currency and no sum, for every figure the removed `money` tool read; `record_index` names figures and `get` answers each one it names; a figure's id goes to `metric` and a row to `get`; a figure the record refuses is `VALUE_MALFORMED` at `spoken` naming the row forms and `record_index`; a surface answering `figures` is listed whole, less what `metric` refuses; still sixteen tools, `TOOLS`' own count. One case is a `todo`: every declared figure named, which waits on the record's `figures` |
 | `packages/mcp/test/list-ref.test.ts` | `list` filtered by a ref reads the spoken id, the name and the row id alike; a ref that names nothing is refused |
 | `packages/mcp/test/teaching.test.ts` | the three sentences `context` teaches, the same on the resource, and no example row outside a project |
 | `packages/mcp/test/actions.test.ts` | `braindog:actions` is listed on a real record with each key by label only; a surface without `actions` does not list it |
@@ -1047,6 +1056,7 @@ pass left open (`loop/BACKLOG.md`).
 | `7b6fd267` | the `activity` tool, over `recentHistory`: fifteen tools |
 | `4da40586`, `ed4d421c` | the `money` tool, and `list_rows`: sixteen tools |
 | `48ac43a1` | the `money` tool leaves the core, and `MONEY_FIGURES` with it: fifteen tools again (§4.4) |
+| AGT-5 (W1b), not a commit of its own | `triage` and `braindog:inbox`, `inbox/{state}`: sixteen tools |
 | `d7fb19bf` | the sentences `context` teaches |
 | `837b01c7`, `6ec8011d` | `braindog:automations`, `automation/{id}` and `grammar/automations`, and the dry run on a rule change |
 | `eafe8c20` | `braindog:grammar/script` |
@@ -1080,7 +1090,7 @@ the documents that still cite the earlier decision.
 | D7 | **Two error vocabularies.** A protocol failure is a JSON-RPC number (§6.1). Everything the record refuses, and every refusal this package makes on its behalf, is an error result inside HTTP 200 carrying the refusal whole; a conflict is `VERSION_STALE` with `current` and `actor`. An argument outside the published schema is not a protocol error here: the record refuses the field by name | `rpc.ts`, `render` |
 | D8 | **MRTR on `propose` is off, behind `const MRTR = false`.** The client capability the 2026-07-28 revision names for an input-required answer could not be confirmed from the specification's text, so `propose` answers like every other tool, with the `decide` link to the question in the app; a `propose` carrying `inputResponses` is refused `LEVEL_REQUIRED` before any call (§5.7) | `rpc.ts`, `MRTR` and `DECIDES_NOT`; `index.ts`, `decideAt` |
 | D9 | **Types.** `McpSurface<C>` is structural, `Result` and `refused` come from `@braindog/ports`, and `src/` imports nothing of the record, so the same tools run in process and over `@braindog/client` | `index.ts` |
-| D10 | **Resources** are `braindog:<path>`, split and never resolved: thirteen fixed and six templates, each fixed address and each figure read before it is listed, with the ttl of §4.7. `decisions` is `governance({ register: 'suggestion' })`; the script and automation grammars are this package's text behind `version()` | `index.ts` |
+| D10 | **Resources** are `braindog:<path>`, split and never resolved: the fixed addresses of `RESOURCES` and the templates of `TEMPLATES`, each fixed address and each figure read before it is listed, with the ttl of §4.7. `decisions` is `governance({ register: 'suggestion' })`; the script and automation grammars are this package's text behind `version()` | `index.ts` |
 | D11 | **No refusal list.** A VAULT, JOBS or ADMIN method name is `ROUTE_UNKNOWN` like any other name that is not a tool, and the record refuses every token at those groups (§6.2) | `index.ts`, `call` |
 | D12 | **Transport shape.** stdio and `POST /mcp` around one `handle`. Over HTTP: `POST` only, no `Origin`, JSON only, a bearer before the body, 1 MB, and the mirrored headers held to the body; a notification is 202 and `-32601` is 404; `no-store` and `nosniff` on every answer; no session id, and nothing streamed (§5.1) | `http.ts`, `apps/cli/src/stdio.ts` |
 | D13 | **There is no handler factory.** An earlier revision specified `createMcpHandler(api, opts)`. The code has `handle(message, surface, ctx)`, which both transports share, and `serveMcp(request, surface, ctx, options)`, to which a host passes the record's API after the bearer check `/api` uses, or `null` for a caller it does not know | `rpc.ts`, `http.ts`, both hosts |
@@ -1111,8 +1121,12 @@ the documents that still cite the earlier decision.
 - [x] The record answers `context`, `handoff` and `sessionsLive`, so their tools and resources are live.
 - [x] The record answers `meet` (build step 16), so its tool is live. A host older than that refuses it `NOT_IN_THIS_BUILD`.
 - [x] The command line's surface offers every optional method its client routes, `actions` among them.
-- [ ] The tokenizer calibration of §9 is built.
-- [ ] A default `list` page is at or under 10 §4's 2,000 tokens (§7 measured 5,380).
+- [x] The tokenizer calibration of §9 is left out on purpose, as D2 records: it needs a real
+      `o200k_base` tokenizer, which is a dependency outside the workspace (`loop/BACKLOG.md`), and the estimator's
+      ceilings hold without it. The bias §5.8 claims is the design's, stated and not asserted; if the calibration is
+      ever built and the band fails, the estimator's body is replaced and its signature kept.
+- [x] A default `list` page is at or under 10 §4's 2,000 tokens on the seeded Work list: twenty tasks, 1,728
+      (§7), with long text cut at 280 characters and `clipped: true` unless `fields` names it.
 - [x] 45 §2 and 10-MCP count the tools as `TOOLS` holds them. They counted one more from `48ac43a1` until `triage`
       joined.
 

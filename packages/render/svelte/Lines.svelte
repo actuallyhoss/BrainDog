@@ -57,8 +57,11 @@
         {/each}
       </svg>
       {#if point}
+        <!-- THE READOUT TURNS AT THE MIDDLE, to whichever side has more room. At 0.6 a readout of 11rem or more beside a
+             point just past the middle of a half-width slot ran off the plot's end; a narrow slot does not flip at all,
+             because the host's stylesheet slides it inside the plot instead. -->
         <span class="lines-rule" style="--at:{point.at}" aria-hidden="true"></span>
-        <div class="lines-readout" style="--at:{point.at}" data-flip={Number(point.at) > 0.6 ? '' : undefined} aria-hidden="true">
+        <div class="lines-readout" style="--at:{point.at}" data-flip={Number(point.at) > 0.5 ? '' : undefined} aria-hidden="true">
           <span class="lines-readout-day">{point.label}</span>
           {#each plan.lines as l, k}
             <span class="lines-readout-value" data-was={l.was ? '' : undefined} data-step={l.step}><span class="lines-swatch"></span><span class="lines-readout-name">{l.label}</span><span class="num">{point.values[k]}</span></span>

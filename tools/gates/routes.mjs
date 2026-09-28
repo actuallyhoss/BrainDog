@@ -12,7 +12,7 @@
  */
 
 import { readdir } from 'node:fs/promises';
-import { join, relative } from 'node:path';
+import { basename, join, relative } from 'node:path';
 
 import { skipDir } from './lib.mjs';
 
@@ -53,6 +53,7 @@ const SAMPLES = {
     'export',
     'delete',
   ],
+  '[name]': 'terms',
   '[track]': '2',
   /* THE VIEW THE GATES' RECORD SAVES (`record.mjs` `VIEW`). It was `obligations.overdue`, the sample's view, which the
      gates reached by taking the record away so the app fell back to the sample; with the sample gone that address is
@@ -69,13 +70,24 @@ const SAMPLES = {
  *  under. `people` is a pack the seeded record holds: the seed writes no `pack` row, so a pack is
  *  known by the `pack:` its declarations carry, and `braindog-starter` is only the document's name.
  *
- *  `/jobs/[id]` NOW READS THE RECORD, and `j_none` settles `empty` ("There is no run called j_none on
- *  this record") rather than drawing a refusal: the sample's `j_7Q2F` went with the sample (DIRECTION
- *  26), and an id naming no run is the calm not-found empty, not a failure. */
+ *  `/jobs/[id]` NOW READS THE RECORD, and `j_none` settles `empty` ("This run is not on this record")
+ *  rather than drawing a refusal: the sample's `j_7Q2F` went with the sample (DIRECTION
+ *  26), and an id naming no run is the calm not-found empty, not a failure.
+ *
+ *  TWO APPS SHARE ONE PATTERN STRING. `/packs/[id]` is both the record app's pack detail (`people`, a
+ *  pack the seeded record holds) and the site's public listing (`lib/packs/catalogue.ts`'s `listed()`,
+ *  which draws only a public, non-withdrawn entry). They are not the same id, so this row is keyed by
+ *  app (the last segment of `appRoot`) rather than by a single value.
+ *
+ *  A ROUTE WITH TWO DYNAMIC SEGMENTS needs one sample per segment, not one for the whole pattern:
+ *  `/docs/[section]/[slug]` is keyed by segment name (`'[section]'`, `'[slug]'`) instead, so `[slug]`
+ *  here does not collide with `SAMPLES['[slug]']`'s `'money'`, which is `/p/[slug]`'s. Both key shapes
+ *  are plain objects; a segment key always starts with `[`, which is how the lookup tells them apart. */
 const BY_ROUTE = {
   '/jobs/[id]': 'j_none',
-  '/packs/[id]': 'people',
+  '/packs/[id]': { web: 'people', site: 'bank-hsbc-eg' },
   '/scripts/[id]': 'no-script',
+  '/docs/[section]/[slug]': { '[section]': 'start', '[slug]': 'welcome' },
 };
 
 async function walk(dir, out = []) {
@@ -95,6 +107,7 @@ async function walk(dir, out = []) {
  * stopped checking part of the app.
  */
 export async function routesOf(appRoot, extra = []) {
+  const app = basename(appRoot);
   const dirs = await walk(join(appRoot, 'src', 'routes'));
   const routes = [];
   const unsampled = [];
@@ -113,7 +126,13 @@ export async function routesOf(appRoot, extra = []) {
         filled = filled.map((f) => [...f, s]);
         continue;
       }
-      const sample = BY_ROUTE[pattern] ?? SAMPLES[s];
+      const byRoute = BY_ROUTE[pattern];
+      /* A PLAIN OBJECT IS A KEYED OVERRIDE, not a sample itself: by segment name (`'[section]'`,
+         `'[slug]'`, for a route with more than one dynamic segment) or by app (`web`/`site`, for a
+         pattern string two apps share). The two key shapes never collide, so one chain reads both;
+         a miss on every key falls back to `SAMPLES[s]`. */
+      const keyed = byRoute !== null && typeof byRoute === 'object' && !Array.isArray(byRoute);
+      const sample = keyed ? (byRoute[s] ?? byRoute[app] ?? SAMPLES[s]) : (byRoute ?? SAMPLES[s]);
       if (sample === undefined) {
         missing = s;
         break;

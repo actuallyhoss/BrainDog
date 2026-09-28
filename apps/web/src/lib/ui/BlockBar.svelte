@@ -235,4 +235,19 @@
     opacity: 0.35;
     cursor: not-allowed;
   }
+
+  /* A THUMB'S TARGETS, on a touch screen of 900 and up, where the bar is drawn (below 900 it is hidden). A width was
+     22px tall and a move or remove 26px square, the only controls on an arranged page a finger could miss (pages §2.5,
+     BlockBar). They follow their base rules, so the pointer's rule is the one that holds. */
+  @media (pointer: coarse) {
+    .width {
+      min-block-size: var(--tap);
+      min-inline-size: var(--tap);
+    }
+
+    .icon-btn {
+      inline-size: var(--tap);
+      block-size: var(--tap);
+    }
+  }
 </style>

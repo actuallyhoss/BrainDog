@@ -14,6 +14,8 @@
   import '@braindog/skin/house.css';
   import '@braindog/skin/base.css';
   import '@braindog/skin/a11y.css';
+  import '@braindog/skin/blocks.css';
+  import '@braindog/skin/blocks-charts.css';
   import '../app.css';
 
   import { afterNavigate } from '$app/navigation';

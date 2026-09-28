@@ -158,7 +158,7 @@ const routeCss = ['apps/web/src/lib/page/PageView.svelte', 'apps/web/src/lib/pag
   .map(componentCss)
   .join('\n');
 const shellCss = componentCss('apps/web/src/routes/+layout.svelte');
-const blocksCss = read('apps/web/src/lib/blocks.css');
+const blocksCss = read('packages/skin/blocks.css');
 
 /**
  * THE CASCADE IN SOURCE ORDER, because layer order is established by the opening statement of

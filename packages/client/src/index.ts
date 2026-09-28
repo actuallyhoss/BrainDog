@@ -183,12 +183,33 @@ export type InboxLine = {
   to: string;
   subject: string;
   body: string | null;
-  state: 'untriaged' | 'review';
+  /** Where it is: `untriaged` and `review` wait, `matched` was filed, `ignored` was archived. See `InboxState`. */
+  state: InboxState;
   reason: string | null;
+  /**
+   * Who filed or archived it, when a person or an agent's run did, and the row a filing made with the version Put back
+   * archives it at. Absent while it waits, and on one a rule filed. See `ArrivalSettlement` in `@braindog/kernel`.
+   */
+  settled?: {
+    by: string;
+    at: string;
+    row: { id: string; register: string; seq: number | null; version: number; archived: boolean } | null;
+  };
 };
 
-/** `inbox`: one page of what arrived and no rule filed, newest first, and the cursor for the page below it. */
-export type InboxPage = { arrivals: InboxLine[]; cursor: number | null };
+/** The states `inbox` reads arrivals in, as `INBOX_STATES` in `@braindog/kernel` names them. */
+export type InboxState = 'untriaged' | 'review' | 'skipped' | 'matched' | 'proposed' | 'ignored';
+
+/**
+ * `inbox`: one page of the arrivals in the state asked for, newest first, the cursor for the page below it, how many are
+ * in each state, and how many a rule filed this week. `counts` and `ruledThisWeek` are absent from an older host.
+ */
+export type InboxPage = {
+  arrivals: InboxLine[];
+  cursor: number | null;
+  counts?: Record<InboxState, number>;
+  ruledThisWeek?: number;
+};
 
 /**
  * One figure as `figures` lists it: never its reading, which `metric` answers. `format` is how the declaration says to
@@ -472,6 +493,8 @@ export type Member = {
   /** `null` is nothing on the record itself, which is not `read`. */
   level: Level | null;
   scoped: { register: string; level: Level }[];
+  /** One `where` per list grant, narrowing what that register's rows the member reads (`CallContext.wheres` in `@braindog/kernel`). */
+  wheres?: Record<string, unknown>;
   seen_at: string | null;
   suspended_at: string | null;
 };
@@ -656,6 +679,12 @@ export type SlashStatus = {
   provider?: SlashProvider | null;
   model: string;
   asks: { used: number; cap: number; resets: string; capped?: boolean };
+  /**
+   * The background allowance (digest prose, pattern drafts, embeddings), exact for a busy month: `packages/host/src/
+   * slash.ts`'s status door reads it off `backgroundMeter(...).spent(monthStart)` and its own `cap`, in place of the
+   * `60` the web used to carry as its own copy of `BACKGROUND_JOBS_MONTH`. Absent on a host built before this field.
+   */
+  background?: { used: number; cap: number };
 };
 
 /**
@@ -942,11 +971,22 @@ export function createClient(options: ClientOptions) {
     /** The record's log, newest first. `cursor` is the one the page above answered with. */
     recentHistory: (args: { cursor?: Cursor | null; limit?: number } = {}) =>
       call<HistoryPage>('recentHistory', args as Record<string, unknown>),
-    /** What arrived and no rule filed, newest first. An owner's read; `cursor` is the one the page above answered with. */
-    inbox: (args: { cursor?: number; limit?: number } = {}) => call<InboxPage>('inbox', args as Record<string, unknown>),
-    /** Settle one arrival: file it on a list, with the fields it should carry, or ignore it with a note. DATA. */
-    triage: (args: { arrival: string; register?: string; fields?: Record<string, unknown>; ignore?: true; note?: string }) =>
-      call<Answer<'triage'>>('triage', args as Record<string, unknown>),
+    /**
+     * The arrivals in one state, newest first: left out, what waits; `matched` what was filed, `ignored` what was
+     * archived, `all` every state. An owner's read, or a token's with the `inbox` reach; `cursor` is the one the page
+     * above answered with.
+     */
+    inbox: (args: { state?: InboxState | 'all'; cursor?: number; limit?: number } = {}) => call<InboxPage>('inbox', args as Record<string, unknown>),
+    /**
+     * Settle one arrival: file it on a list with the fields it should carry (`register`), archive it (`ignore`), or put a
+     * filed or archived one back in the inbox (`back`, with the filed row's `version`). Exactly one of the three. DATA.
+     */
+    triage: (
+      args:
+        | { arrival: string; register: string; fields?: Record<string, unknown>; note?: string }
+        | { arrival: string; ignore: true }
+        | { arrival: string; back: true; version?: number },
+    ) => call<Answer<'triage'>>('triage', args as Record<string, unknown>),
     /** Which runs used a key or a tool, the one that used it last first, by the row's spoken name. READ+. */
     usedBy: (args: { spoken: string }) => call<Answer<'usedBy'>>('usedBy', args as Record<string, unknown>),
     /** Queue a job of a declared kind for a runner to take. */
@@ -1041,6 +1081,7 @@ export function createClient(options: ClientOptions) {
       name?: string;
       level?: Level;
       registers?: Record<string, Level>;
+      wheres?: Record<string, unknown>;
       why?: string;
     }) => call<Member>('invite', args as Record<string, unknown>),
     /* AN ADDRESS, NOT A PERSON: a single-use link good for 24 hours, handed back once. Nothing is mailed. */

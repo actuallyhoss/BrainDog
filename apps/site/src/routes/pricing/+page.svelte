@@ -5,19 +5,26 @@
    * TWO PLANS, WHAT EACH INCLUDES, AND WHAT MORE COSTS, on the owner's ask of 26 September
    * (`loop/DIRECTION.md` §33): "include the credits/usages offered on the plans, show extra usage
    * pricings, add another extended plan". Every figure is read from `plans.ts`, which is the one file
-   * to edit when a price or an allowance changes.
+   * to edit when a price or an allowance changes, and which `plans.test.ts` holds to the Worker's own
+   * `HOSTED_PLANS` and `ALLOWANCE`. Every sentence is read from `copy/pricing.ts`.
+   *
+   * NO PRE-LAUNCH VARIANT. The site describes the product as it is on launch day and is not deployed with
+   * this copy before then (`loop/DIRECTION.md` §33), so the buttons go to sign-up and no line says what
+   * is not open yet.
    *
    *   plans     the two cards, each with its allowance.
    *   usage     the full table, allowances first and then what else differs.
    *   extra     the price of each unit past the plan, off until the owner turns it on.
-   *   faq       the six questions a buyer asks before paying.
+   *   faq       the questions a buyer asks before paying.
    */
   import Icon from '$lib/Icon.svelte';
   import { SIGNUP, site } from '$lib/copy.ts';
-  import { EXTRA, PACKS, PLANS, USAGE } from '$lib/plans.ts';
+  import { EXTRA, PACKS, PLANS } from '$lib/plans.ts';
 
   const p = site.pricing;
   const cols = PLANS.map((x) => x.name);
+  /** An allowance's name, for the extra-usage row that extends it, so the two lists say one name. */
+  const nameOf = (key: string): string => p.usage.find((u) => u.key === key)?.name ?? '';
 </script>
 
 <svelte:head>
@@ -52,20 +59,20 @@
             class="btn btn-lg"
             class:btn-primary={plan.id === 'cloud'}
             href={plan.href}
-            rel={plan.external ? 'external' : undefined}>{plan.cta}<Icon name="arrow" size="s" /></a
+            rel={plan.external ? 'external' : undefined}>{p.plans[plan.id].cta}<Icon name="arrow" size="s" /></a
           >
 
           <div class="inc">
             <h3 class="inc-title">{p.included}</h3>
             <ul class="inc-list">
-              {#each USAGE as u (u.key)}
-                <li><span>{u.name}</span><b class="num">{u.unit(plan.allowance[u.key])}</b></li>
+              {#each p.usage as u (u.key)}
+                <li><span>{u.name}</span><b class="num">{u.amount(plan.allowance[u.key])}</b></li>
               {/each}
             </ul>
           </div>
 
           <ul class="plan-points">
-            {#each plan.points as point (point)}
+            {#each p.plans[plan.id].points as point (point)}
               <li><span class="tick"><Icon name="check" size="s" /></span>{point}</li>
             {/each}
           </ul>
@@ -84,14 +91,14 @@
 
     <div class="table" role="table" aria-labelledby="usage-title">
       <div class="trow thead" role="row">
-        <span class="cell term" role="columnheader"><span class="sr">What</span></span>
+        <span class="cell term" role="columnheader"><span class="sr">{p.what}</span></span>
         {#each cols as c (c)}<span class="cell" role="columnheader">{c}</span>{/each}
       </div>
-      {#each USAGE as u (u.key)}
+      {#each p.usage as u (u.key)}
         <div class="trow" role="row">
           <span class="cell term" role="rowheader"><b>{u.name}</b><small>{u.said}</small></span>
           {#each PLANS as plan (plan.id)}
-            <span class="cell num" role="cell"><span class="of" aria-hidden="true">{plan.name}</span>{u.unit(plan.allowance[u.key])}</span>
+            <span class="cell num" role="cell"><span class="of" aria-hidden="true">{plan.name}</span>{u.amount(plan.allowance[u.key])}</span>
           {/each}
         </div>
       {/each}
@@ -127,8 +134,8 @@
         <h3 class="need-title">{p.extraUsageTitle}</h3>
         <p class="need-lead">{p.extraLead}</p>
         <ul class="extra-list">
-          {#each EXTRA as e (e.name)}
-            <li><span class="e-name">{e.name}</span><span class="e-price num">{e.price}</span><span class="e-per">{e.per}</span></li>
+          {#each EXTRA as e (e.key)}
+            <li><span class="e-name">{nameOf(e.key)}</span><span class="e-price num">{e.price}</span><span class="e-per">{e.per}</span></li>
           {/each}
         </ul>
       </div>
@@ -185,7 +192,7 @@
     text-wrap: pretty;
   }
 
-  /* ── The three cards ─────────────────────────────────────────────────── */
+  /* ── The two cards ───────────────────────────────────────────────────── */
 
   .plans {
     display: grid;
@@ -436,8 +443,8 @@
     background: var(--accent);
     border-radius: 7px;
     color: var(--accent-ink);
-    font-family: var(--font-display);
-    font-size: 13px;
+    font-family: var(--font-ui);
+    font-size: var(--t-sm);
   }
 
   .packs {
@@ -467,7 +474,7 @@
   .pack-price {
     color: var(--ink);
     font-family: var(--font-display);
-    font-size: 40px;
+    font-size: var(--t-3xl);
     font-weight: 600;
     letter-spacing: -0.04em;
     line-height: 1;

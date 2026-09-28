@@ -20,8 +20,20 @@
   import Icon from '$lib/ui/Icon.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import { settingsState, type AreaProps } from '../settings-state.svelte.ts';
+  import StateRow from './StateRow.svelte';
 
   let { shell }: AreaProps = $props();
+
+  /**
+   * THE TITLES OF THIS AREA'S ROWS (DSN-18). What a host does not do was three paragraphs, identical on
+   * both hosts; each is a row now, titled by the state it is in, and the paragraph's one sentence that
+   * matters is the row's line. The sentences stay in `copy`.
+   */
+  const words = {
+    notHereYet: 'Not on this host yet',
+    keyOutside: 'Kept outside BrainDog',
+    askForIt: 'Asked for, not pressed',
+  };
 
   /* THE OWNER QUESTION IS SHARED with every area that has an owner's control (`settings-state.svelte.ts`).
      `shared` and not the `s` the other areas use, because `s` is each copy in the Kept count below. */
@@ -123,6 +135,12 @@
   }
 </script>
 
+<!-- WHERE THIS HOST KEEPS NO COPY A PERSON CAN REACH, THE ONE THING THEY CAN TAKE IS AN EXPORT, and it
+     is the owner's, as the export itself is. -->
+{#snippet exportInstead()}
+  <Button href="/settings/export">{copy.export}</Button>
+{/snippet}
+
 <!--
   `53 §5.4`: "Three mechanisms, one contract: nightly, sealed, thirty kept, restorable." And
   `03 §6` on why this is not the Export area: "A snapshot is not an export: it is a full copy
@@ -135,7 +153,11 @@
   <!-- "The 30 newest are kept" IS A SENTENCE ABOUT A LIST THAT HAS SOME. On a record whose
        first backup has not run it describes a policy over nothing, above nothing. -->
   {#if copiesFrom === 'refused'}
-    <p class="hint" role="status">{copiesSaid}</p>
+    <!-- NOT ON THIS HOST YET, AS A ROW, with the record's own sentence as its line and the one way
+         out that does exist on every host, the export, as its action (DSN-18). -->
+    <div role="status">
+      <StateRow icon="archive" title={words.notHereYet} line={copiesSaid} action={anOwner ? exportInstead : undefined} />
+    </div>
   {:else if copyLines.length === 0}
     <Empty kind="no-data-yet" title={copy.noSnapshots} body={copy.noSnapshotsWhy} />
   {:else}
@@ -207,8 +229,9 @@
        no button, no link and no value: "Back that key up somewhere else, or the copies cannot
        be opened" over an empty box. `12 §8` keeps the age identity outside the product on
        purpose, so the fix is not to print it here; it is to say where it already is. -->
-  <p class="hint">{copy.theKeyIs}</p>
-  <p class="hint">{copy.theKeyWhere}</p>
+  <!-- ONE ROW, AND THE HOST'S HALF OF THE ANSWER AS ITS LINE. The two sentences were two paragraphs on
+       both hosts, and the second is only true on a self-host, where the key is a file its owner made. -->
+  <StateRow icon="key" title={words.keyOutside} line={shell.host === 'cloud' ? copy.theKeyIs : copy.theKeyWhere} />
 </Section>
 
 <!--
@@ -235,10 +258,10 @@
   <!-- THE RECORD'S OWN ANSWER, AND NOTHING UNTIL IT ARRIVES. There were four answers, and the
        two that were not the record's came from the sample's `DEPLOYMENT.kind`: which host the
        build thought it was on, drawn for as long as the read took and for the sample always. -->
-  {#if copiesFrom !== 'reading'}
-    <p class="hint" role={copiesFrom === 'refused' ? 'status' : undefined}>
-      {copiesFrom === 'refused' ? copy.restoreNotHere : copy.restoreLive}
-    </p>
+  {#if copiesFrom === 'refused'}
+    <StateRow icon="history" title={words.askForIt} line={copy.restoreNotHere} />
+  {:else if copiesFrom === 'live'}
+    <p class="hint">{copy.restoreLive}</p>
   {/if}
   {#if restoring}
     <div class="danger">

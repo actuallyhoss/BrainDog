@@ -67,6 +67,7 @@ import {
   type ScheduleKind,
 } from './schedule.ts';
 import { ack, enqueue, lease, unlease, type Ack, type AckDeps, type OutboxKind } from './outbox.ts';
+import { embedJob } from './embed.ts';
 import { ERASED, eraseSubjects, subjectsOf, type EraseReport, type EraseRequest } from './erase.ts';
 import { leasedPushTarget, ownersPushSubs, pushSubOf, settlePush, type PushSettled, type PushTarget } from './push.ts';
 import { access, invite, members, remove, type Level as MemberLevel, type Member, type MemberDeps, suspend } from './members.ts';
@@ -168,10 +169,11 @@ import { pruneFirings } from './rules.ts';
 import { runway, type Leg, type Runway } from './forecast.ts';
 import { WALK_SOURCE } from './money-figures.ts';
 import { referencedBy } from './referenced.ts';
-import { sweepJobs } from './jobs.ts';
+import { createJob, sweepJobs } from './jobs.ts';
 import { arrive, day, exponentOf, propose, shapeOf, type Arrival, type Arrived, type IngestDecl, type IngestDeps, type NumberReaders } from './ingest.ts';
 import { analyse, observe, type Analysis, type Observation } from './observe.ts';
 import { applyPull, firePull, type PullDecl, type PullDeps } from './pull.ts';
+import { firstSlotMs } from './slot.ts';
 import { activeScript, egressChanged, fireScript, firstDueMs, scriptDeps } from './script.ts';
 import { finishScript, prepareScript, resumeScript, type ScriptRunDeps, type ScriptRunner } from './script-run.ts';
 import { applyPage, writePoints, type MetricPoint, type PageWrote, type PulledPage } from './fetched.ts';
@@ -738,6 +740,24 @@ export type InboxLine = {
   body: string | null;
   state: InboxState;
   reason: string | null;
+  /**
+   * Who filed or archived it, when a person or an agent's run did (`settledBy`), and the row a filing made. Absent on an
+   * arrival that waits, and on one a rule moved: that one has no settlement to take back, so nothing offers Put back.
+   */
+  settled?: ArrivalSettlement;
+};
+
+/**
+ * A person's or a run's filing or archiving, as `returnArrival` would take it back: the actor that signed the `state`
+ * event, when, and for a filing the row it made with the `version` a return archives it at.
+ *
+ * THE ROW'S VERSION TRAVELS WITH IT because `returnArrival` archives the row compare-and-set: a reader that puts an
+ * arrival back names the version it saw, and a row edited since answers the conflict instead of being buried.
+ */
+export type ArrivalSettlement = {
+  by: string;
+  at: string;
+  row: { id: string; register: string; seq: number | null; version: number; archived: boolean } | null;
 };
 
 /**
@@ -1553,11 +1573,11 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
          `now` AND NOT `now + every`, because a connector nobody has run is a connector nobody knows
          works: the first fetch is the one that tells you the credential is right. */
       if (decl.kind === 'ingest' && body.channel === 'pull' && typeof body.every === 'string')
-        arm('pull', bare, { ingest: bare }, clock.now());
+        arm('pull', bare, { ingest: bare }, firstSlotMs(body, tz, clock.now()));
       /* A `call` OR A `poll` IS ARMED THE SAME WAY AND FROM THE SAME MOMENT, for the same reason: the first run
          is the one that says the key and the address are right (`loop/DIRECTION.md` §0b). */
       if (decl.kind === 'ingest' && (body.channel === 'call' || body.channel === 'poll') && typeof body.every === 'string')
-        arm(body.channel as 'call' | 'poll', bare, { ingest: bare }, clock.now());
+        arm(body.channel as 'call' | 'poll', bare, { ingest: bare }, firstSlotMs(body, tz, clock.now()));
       /* A CALL ONLY A RULE RUNS HAS NO CLOCK, and it still gets its row: the row is what pausing, resuming and the list
          read. Its one scheduled turn finds nothing to send and marks it done. */
       else if (decl.kind === 'ingest' && body.channel === 'call' && body.trigger === 'rule')
@@ -2564,7 +2584,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         if (step === null || typeof step !== 'object') continue;
         const here = `${at}[${i}]`;
         const s = step as Record<string, unknown>;
-        for (const verb of ['set_var', 'ask_slash', 'ask_person', 'call', 'script']) {
+        for (const verb of ['set_var', 'ask_slash', 'ask_person', 'call', 'script', 'run_job']) {
           const spec = s[verb] as { name?: unknown; as?: unknown } | undefined;
           const named = verb === 'set_var' ? spec?.name : spec?.as;
           if (typeof named === 'string') answers.add(named);
@@ -3696,6 +3716,60 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       const entry = byId(current.id, true)!;
       reproject(entry);
       rediary(entry);
+
+      /* THE GRACE WINDOW (decision C26): the creator's own edits in a row's first three minutes replace each other in
+         history instead of each leaving a line, so a typo fixed a moment after it was typed is not a permanent row on a
+         store that cannot forget. The fold rewrites the row's `create` line to the row as it now stands and writes no
+         `edit`, so however many times he fixes it in those minutes, the history says it was created as it ended up.
+
+         NOTHING ANOTHER ACTOR READ IS EVER FOLDED, and each check below closes one way somebody else could have read it.
+         The row's only line is its `create`, signed by this same actor: a second line means somebody or something has
+         already answered the row. Nothing another actor signed shares the create's batch: a rule that acted on what was
+         created read it. No other member's read mark has reached the create: `markRead` is how the record knows who
+         read how far, and a person who has seen the line keeps seeing the line they saw.
+
+         AND SOME WRITES ARE NEVER FOLDED, whoever makes them. A mechanism's write, because the window is for a person's
+         (or his agent's) fiddling and not for a rule's. A move, a delete and a restore, because a move is the one edit a
+         register declares rules about and the other two are their own kinds. A write carrying a note, which is something
+         said about that write, and one carrying an `op_id`, which lives on the first line of the write a replay finds.
+         And any write on a list that pairs, because `pairs.ts`'s `pinnedBy` reads who set a mark from these lines, and
+         a fold would turn his `edit` of it into a `create` that holds the default.
+
+         THE LINE MOVES TO THE END OF THE LOG. `MAX(event.rowid)` is the record's version and the live channel reads
+         `rowid > ?`, so a fold that rewrote the line where it stood would be a change no open screen could see. Its `id`,
+         `ts`, `batch` and `op_id` are kept, so everything that names the line still finds it. Every read here is bounded:
+         two lines of one row by the target index, and the lines written since the create, at most three minutes of the
+         record, by the time index. */
+      const GRACE_MS = 3 * 60_000;
+      const lines =
+        !deleting &&
+        !isMechanism(w.actor) &&
+        w.note === undefined &&
+        w.opId === undefined &&
+        !decl.pairs &&
+        (!decl.state || nextState === current.state) &&
+        Date.parse(now) - Date.parse(current.created_at) < GRACE_MS
+          ? sql.all<{ id: string; actor: string; kind: string; ts: string; batch: string | null }>(
+              'SELECT id, actor, kind, ts, batch FROM event WHERE target = ? ORDER BY rowid LIMIT 2',
+              `entry:${current.id}`,
+            )
+          : [];
+      const made = lines.length === 1 ? lines[0] : undefined;
+      if (
+        made !== undefined &&
+        made.kind === 'create' &&
+        made.actor === w.actor &&
+        !sql.one('SELECT 1 AS n FROM event WHERE ts >= ? AND batch = ? AND actor <> ? LIMIT 1', made.ts, made.batch ?? made.id, w.actor) &&
+        !sql.one('SELECT 1 AS n FROM member WHERE person_id <> ? AND seen_at >= ? LIMIT 1', w.actor, made.ts)
+      ) {
+        /* The same check `appendEvent` makes of every line, since this write's line is the one it would have appended. */
+        slashMayWrite(w.actor, 'edit');
+        const shape = Object.fromEntries(Object.entries(merged).map(([k, v]) => [k, shown(register, k, v) ?? null])) as Json;
+        sql.exec('UPDATE event SET rowid = (SELECT MAX(rowid) + 1 FROM event), to_v = ? WHERE id = ?', written(shape), made.id);
+        const changed = touched.filter((key) => JSON.stringify(current.fields[key] ?? null) !== JSON.stringify(merged[key] ?? null));
+        handedNotice(decl, entry, changed, w.actor);
+        return ok(rules(entry, register, w, w.batch ?? made.batch ?? made.id, { op: 'update', changed }));
+      }
 
       /* ONE ROW PER CHANGED FIELD, and this is the difference between a history and an activity
          feed. A ledger that says a row was edited and not WHAT changed cannot answer the only
@@ -4891,6 +4965,25 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         run: { run: a.run, step: a.step },
       }),
     withdraw: (suggestion, actor, why) => void decide(governDeps(), suggestion, { resolved_as: 'wont-fix', reason: why }, actor),
+    /* A RUN'S `meet` IS `people.ts`'s `meet`, the one `kernel.meet` calls, as the rule and in the run's project, so a person a rule met is matched, dated and offered for merging as one an agent met. */
+    meet: (args, a) => {
+      const role = meetsRole(registers.values());
+      const list = role === null ? undefined : { ...role, declaredFields: registers.get(role.register)?.fields ?? [] };
+      return meetPerson(
+        {
+          sql,
+          nowMs: clock.now(),
+          list,
+          project: () => a.project,
+          nameOf,
+          write: (ref, patch, version) => write(role?.register ?? '', ref, patch, version === undefined ? { actor: a.actor } : { actor: a.actor, version }),
+          propose: (p) => openSuggestion(governDeps(), a.actor, p),
+        },
+        args,
+      );
+    },
+    /* A RUN'S `run_job` IS THE JOBS DOOR'S OWN `createJob` (`api/jobs.ts`), with the same check that `about` is a row. */
+    job: (a) => createJob(tokenDeps(), { kind: a.kind, args: a.args, ...(a.about === null ? {} : { about: a.about }) }, (spoken) => get(spoken) !== null),
     answersSlash: opts.answersSlash === true,
     held: runsHeld,
   });
@@ -5029,6 +5122,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     outbox: (payload) => enqueue(sql, mint, clock.now(), 'pull.fetch', payload),
     /* THE KEY A CONNECTOR NAMES, BY LABEL OR ID, resolved as a call's is, so the job carries its id (`firePull`). */
     keyOf: (name) => keyNamed(sql, name),
+    tz: recordIdentity(sql)?.tz ?? 'UTC',
   });
 
   /** The connector declaration a `pull` row is about, or `null` when it has been retired. */
@@ -5296,6 +5390,12 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     transaction(() => pruneRuns(sql, clock.now()));
     /* AND AN INLINE RULE'S COUNTED FIRINGS once a day old, which no `runs_per_day` reads any more (`rules.ts`). */
     transaction(() => pruneFirings(sql, clock.now()));
+    /* AND THE ROWS WHOSE WORDS CHANGED ARE QUEUED FOR THEIR VECTORS, a hundred at most in one `infer.embed` job, and
+       only while no other is out (`embed.ts`). Last, so a row the purge above deleted is never sent to a model. */
+    transaction(() => {
+      const job = embedJob(sql, clock.now());
+      if (job) enqueue(sql, mint, clock.now(), 'infer.embed', job);
+    });
     return { ...out, sessions };
   }
 
@@ -5766,13 +5866,13 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
    * (`test/arrival-return.test.ts`, the last case). An event that did not put the arrival where it is now says nothing
    * about how it got there.
    */
-  const settledBy = (id: string, state: string): { from: string; batch: string | null } | undefined => {
-    const last = sql.one<{ from_v: string | null; to_v: string | null; batch: string | null }>(
-      "SELECT from_v, to_v, batch FROM event WHERE target = ? AND kind = 'state' ORDER BY rowid DESC LIMIT 1",
+  const settledBy = (id: string, state: string): { from: string; batch: string | null; actor: string; ts: string } | undefined => {
+    const last = sql.one<{ from_v: string | null; to_v: string | null; batch: string | null; actor: string; ts: string }>(
+      "SELECT from_v, to_v, batch, actor, ts FROM event WHERE target = ? AND kind = 'state' ORDER BY rowid DESC LIMIT 1",
       `inbox_raw:${id}`,
     );
     if (!last || last.to_v !== written(state) || last.from_v === null) return undefined;
-    return { from: JSON.parse(last.from_v) as string, batch: last.batch };
+    return { from: JSON.parse(last.from_v) as string, batch: last.batch, actor: last.actor, ts: last.ts };
   };
 
   /**
@@ -5787,6 +5887,27 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       settled.batch,
     );
     return made ? byId(made.target.slice('entry:'.length), true) : null;
+  };
+
+  /**
+   * An arrival's `settled` for `inboxBefore`: who filed or archived it and the row a filing made, or nothing when it
+   * waits or a rule moved it. A spread, so a line with no settlement carries no key at all.
+   *
+   * ONLY THE TWO STATES A PERSON OR A RUN SETTLES INTO ARE ASKED, so a page of what waits reads no events, and a page of
+   * what was filed reads two small indexed lookups a line, bounded by the page's own limit.
+   */
+  const settlementOf = (id: string, state: string): { settled?: ArrivalSettlement } => {
+    if (state !== 'matched' && state !== 'ignored') return {};
+    const settled = settledBy(id, state);
+    if (!settled) return {};
+    const row = state === 'matched' ? filedAs(id) : null;
+    return {
+      settled: {
+        by: settled.actor,
+        at: settled.ts,
+        row: row ? { id: row.id, register: row.register, seq: row.seq, version: row.version, archived: row.deleted_at !== null } : null,
+      },
+    };
   };
 
   /**
@@ -6484,8 +6605,39 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
                "review, or else untriaged", which was true only while the inbox could be asked for nothing else. */
             state: r.state as InboxState,
             reason: r.reason,
+            ...settlementOf(r.id, r.state),
           };
         });
+    },
+
+    /**
+     * How many arrivals a rule filed since `since`, an instant: `matched` arrivals that arrived then or later and whose
+     * newest `state` event did not put them there, which is what `settledBy` reads as a rule's filing.
+     *
+     * ONE COUNT, NOT A PAGE READ AND COUNTED BY ITS READER, so the Inbox's "Filed by rules this week" is the record's
+     * number and not a sum over the page a screen happened to hold.
+     */
+    inboxRuledSince: (since: string): number =>
+      Number(
+        sql.one<{ n: number }>(
+          `SELECT COUNT(*) AS n FROM inbox_raw r
+            WHERE r.state = 'matched' AND r.ts >= ?
+              AND COALESCE((SELECT e.to_v FROM event e WHERE e.target = 'inbox_raw:' || r.id AND e.kind = 'state' ORDER BY e.rowid DESC LIMIT 1), '') <> ?`,
+          since,
+          written('matched'),
+        )?.n ?? 0,
+      ),
+
+    /**
+     * One arrival's settlement, as `inboxBefore` gives it on its line: who filed or archived it and the row a filing
+     * made. `null` when there is no such arrival, when it waits, or when a rule moved it.
+     *
+     * THE RECORD ASKS IT BEFORE A PUT BACK, so the caller's right to archive the filed row is checked against that row's
+     * own list before `returnArrival` archives it.
+     */
+    arrivalSettlement: (id: string): ArrivalSettlement | null => {
+      const raw = sql.one<{ state: string }>('SELECT state FROM inbox_raw WHERE id = ?', id);
+      return raw ? (settlementOf(id, raw.state).settled ?? null) : null;
     },
 
     /**

@@ -51,7 +51,7 @@ export const decide = {
   yourReason: 'Your reason',
   /* WHY THE COMMIT IS REFUSING, said where the refusal is. A decision is immutable once made, so the
      reason is the whole of what anybody reading it in six weeks will have. */
-  reasonRequired: 'A decision is kept for ever and cannot be edited. Write why, and the button turns on.',
+  reasonRequired: 'A decision is kept for ever and cannot be edited, so it needs a reason. Write why you chose it.',
   reasonHint: 'Why this one, in a sentence somebody can read in six weeks.',
   reasonNudge: 'That will not mean anything in six weeks. Keep it anyway?',
   commit: 'Record the decision',
@@ -60,7 +60,9 @@ export const decide = {
   immutable: 'A decision cannot be edited once it is made.',
   noQuestions: 'Nothing waits on you',
   lastDecided: 'The last one was decided',
-  decisionRecorded: (option: string, id: string) => `${option} is recorded as the decision on ${id}.`,
+  /* THE QUESTION IS NOT SAID. Its callers used to pass the question's id, `SG2`, and an id is never a word a person
+     reads (MOD-24); the toast stands over the question it answers, so the option alone is the whole sentence. */
+  decisionRecorded: (option: string) => `${option} is recorded as the decision.`,
   parkedUntil: (on: string) => `Parked until ${on}.`,
   changedSince: 'A row this would change has changed since it was proposed. Nothing was written.',
   fileIt: 'File it as a row',

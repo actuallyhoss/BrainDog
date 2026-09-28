@@ -104,8 +104,10 @@ export const PERSONAL = {
      only when the version goes up.
      2.0.0: the `spending` and `budgets` lists and the Spending page went, since Money's ledger and categories carry
      them; every money figure is in the record's own currency; Home is rebuilt over Money (`loop/finish/modules.md`
-     MOD-17). Major, because two lists and a page go. No record holds Personal to lose their rows (modules.md O6). */
-  version: '2.0.0',
+     MOD-17). Major, because two lists and a page go. No record holds Personal to lose their rows (modules.md O6).
+     2.1.0: the voice says more of the record its own way, Home's empty lines and Decide's and the Inbox's among them
+     (PGS-24). Each is a new setting a person can change at /packs, so a minor step. */
+  version: '2.1.0',
   title: 'Personal',
   summary: 'Your money and bills, what you are saving for, and the projects and goals you care about.',
   author: 'BrainDog',
@@ -127,6 +129,15 @@ export const PERSONAL = {
     nothing_needs_you: 'Nothing needs you right now',
     since_away: 'Since you last looked',
     lists: 'My lists',
+    /* THE REST OF THE LINES, warm and plain (PGS-24): a bill, a plan, something you are saving toward. */
+    overdue: 'Running late',
+    nothing_now: 'Nothing needs you right now. Enjoy your day.',
+    nothing_due: 'No bill or plan falls due in the next two weeks.',
+    fills_with: 'Bills coming up, what you are saving toward and what changed since you last looked show up here as your lists fill.',
+    record_empty: 'Nothing here yet',
+    no_questions: 'Nothing to decide',
+    inbox_clear: 'Nothing new has come in',
+    add_first: 'Add the first one',
   },
   /* A PERSON'S WORDS OVER MONEY, PROJECTS AND PEOPLE, and over this pack's own lists so a shared copy can rename them.
      A bill's category is one of Money's closed values, so each value a person's bills fall in is given a person's word:
@@ -588,11 +599,33 @@ export const PERSONAL_TARGETS: Readonly<Record<string, { lte: number } | { gte: 
 };
 
 /**
- * WHAT MONEY'S FIGURES ARE CALLED FOR ONE PERSON, where a business's words would read as somebody else's record. The
- * forecast's late knob is called by the figure it marks, so "Money in arrives late by" becomes a person's pay.
+ * WHAT MONEY SAYS TO ONE PERSON, by module and then by the module's own words or a figure's metric id (`MODULE_NAMES`
+ * in `install.ts`), laid over the plain words every use case but a business's gets. A person's Money is what they have,
+ * what their pay and bills do and what they spent, so its page says that and not a studio's in and out. The forecast's
+ * late knob is called by the figure it marks, so "Money in arrives late by" becomes a person's pay.
+ *
+ * NOT "Bills this week" OVER MONEY'S "Coming up", which reads thirty days ahead and holds pay days as well as bills: a
+ * relabel changes words and not what a block reads, so the heading says what is under it. The week's bills are on this
+ * use case's own Home (`home-personal`).
  */
-export const PERSONAL_NAMES: Readonly<Record<string, string>> = {
-  'days-late-in': 'Pay comes in late by',
+export const PERSONAL_NAMES: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  'money-core': {
+    'days-late-in': 'Pay comes in late by',
+    'What you have': 'What I have',
+    'What you have, by book': 'What I have, by book',
+    'Cash now': 'In my accounts',
+    'Coming up': 'Bills and pay coming up',
+    'Nothing falls due in the next 30 days.': 'No bill or pay day falls in the next 30 days.',
+    "Where this month's money went": 'Spent this month',
+    'Nothing has gone out this month.': 'Nothing spent this month yet.',
+    'In and out, by month': 'Pay and spending, by month',
+    'Money in': 'Pay',
+    'Money out': 'Spent',
+    'Being chased': 'Still waiting for',
+    'Late to pay': 'Bills gone late',
+    'Money you owe has gone past its date: {{overdue}} in all.': 'Bills have gone past their date: {{overdue}} in all.',
+    'Most days money in may be late': 'Most days pay may be late',
+  },
 };
 
 /**

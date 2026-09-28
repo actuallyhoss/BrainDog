@@ -236,8 +236,12 @@ export const capLine = (s: SlashStatus, dismissed: string | null): boolean =>
  * A refusal on pass 2, drawn under the rows. The `fix` is shown as it came (`13 §6`). ONLY A SPENT BUDGET adds the second
  * sentence, because only there is it true in the sense `23 §8` means: the rows above were found by code and the proposal
  * is what the missing ask would have bought.
+ *
+ * `spent` IS RUNNING OUT, SAID WITH ITS TWO WAYS ON (`loop/finish/agents.md` AGT-29): where it is true the caller draws
+ * `SlashOut` under the sentences, "Use your own key" and "Settings", so a person at the cap is shown what to press and
+ * not only told to wait.
  */
-export const pass2Refused = (r: { code: string; fix: string }): { fix: string; without: string | null } => ({
-  fix: r.fix,
-  without: r.code === 'SLASH_BUDGET_SPENT' ? slashWords.without : null,
-});
+export const pass2Refused = (r: { code: string; fix: string }): { fix: string; without: string | null; spent: boolean } => {
+  const spent = r.code === 'SLASH_BUDGET_SPENT';
+  return { fix: r.fix, without: spent ? slashWords.without : null, spent };
+};

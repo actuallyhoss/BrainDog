@@ -24,7 +24,11 @@ import { compile, INBOX_RAW, INBOX_RAW_REFUSES, jsonPath, type Predicate } from 
 import { FIELD_TYPES, coerce, isAbsent, isCurrencyCode, looksLikeCredential, measure, range, type FieldDecl, type Json } from './coerce.ts';
 import { instant } from './migrate.ts';
 import { SESSION_BODY } from './migrations/0002_session.ts';
-import { checkInterval, type PullDecl } from './pull.ts';
+import { checkInterval, intervalMs, type PullDecl } from './pull.ts';
+/* A SCHEDULED ACTION'S KEY AND CLOCK, read by the runner from the same lists this file checks against (DOR-5). */
+import { ACTION_AUTH_KINDS, reservedKeyHeader } from './actions.ts';
+import { timeOf } from './clock.ts';
+import { isZone } from './slot.ts';
 import { scriptBody } from './script.ts';
 /* A JOB KIND'S LINT, in the file that keeps the queue which reads it, so the kind the owner approves is the kind a
    runner is handed. */
@@ -1797,8 +1801,17 @@ const SKIP_REASON_MOST = 120;
  * (`packages/host/src/ingest.ts`). Mail is verified by the forwarder's own `Authentication-Results`, and `pull`, `call`
  * and `poll` are fetched by the record itself, so a `verify:` on any of them would be a promise nothing keeps.
  *
- * `hmac_sha256` IS REFUSED BY NAME AND NOT AS A TYPO. The door compares one, but its key is a grant, and nothing yet
- * binds a grant to an ingest; a declaration naming it would install and verify nothing, which is the fault above.
+ * A SIGNATURE NAMES ITS KEY BY THE VAULT LABEL, AND BY NOTHING ELSE (DOR-3). `hmac_sha256` was refused by name until
+ * a door could open a key: nothing bound a grant to an ingest, so a declaration naming one installed and verified
+ * nothing, which is the fault above. `ingestVerify` in `packages/record/src/index.ts` now finds the key the label
+ * names, the host opens it and checks the raw body (`packages/host/src/ingest.ts`), and `stripe` and `github` are the
+ * same check in the shapes those two senders sign. A label that looks like a key is refused for the token's reason
+ * below: a key pasted into `key:` would be a credential in every export, plan and diff at once.
+ *
+ * `tolerance` IS STRIPE'S ALONE, because Stripe is the one sender here that signs the time along with the body. GitHub
+ * signs the body and nothing else, and neither does a bare HMAC, so a tolerance on either would be a promise nothing
+ * keeps. The same bytes sent again are one arrival whatever the window (`kernel.arrive` keys on their digest), so what
+ * the window refuses is a body signed long ago and posted again with a new time nobody could have signed.
  *
  * AND THE TOKEN IS NEVER IN A DECLARATION. A declaration is exported, planned, diffed and shown to every agent that reads
  * `arrangement`, so a token written here would be a credential in all of those at once. `{ kind: path }` says a token is
@@ -1822,13 +1835,63 @@ function verifyFault(id: string, channel: string, verify: unknown): Refusal | nu
   if (channel !== 'webhook')
     return bad('DECLARATION_INVALID', `${id} arrives by ${channel}, and only a webhook is verified at its door. Take verify out, or declare channel: webhook.`, 'verify');
   const kind = verify !== null && typeof verify === 'object' && !Array.isArray(verify) ? (verify as { kind?: unknown }).kind : undefined;
-  if (kind === 'hmac_sha256')
-    return bad('DECLARATION_INVALID', `${id}'s verify names hmac_sha256, and hmac_sha256 is not built: nothing binds its key to an ingest yet. Use { kind: path }.`, 'verify', ['path']);
-  if (kind !== 'path') return bad('DECLARATION_INVALID', `${id}'s verify is { kind: path }.`, 'verify', ['path']);
+  if ((SIGNED_KINDS as readonly unknown[]).includes(kind)) return signedFault(id, kind as string, verify as Record<string, unknown>);
+  if (kind !== 'path')
+    return bad('DECLARATION_INVALID', `${id}'s verify is { kind: path }, or a signature: { kind: hmac_sha256, stripe or github, key: <vault label> }.`, 'verify', VERIFY_KINDS);
   const stray = Object.keys(verify as object).find((k) => k !== 'kind');
   if (stray === 'token')
     return bad('DECLARATION_INVALID', `${id}'s verify carries a token, and a token is never in a declaration: it is minted and shown once. Keep { kind: path }.`, 'verify');
   if (stray !== undefined) return bad('DECLARATION_INVALID', `${id}'s verify declares ${stray}, and { kind: path } takes nothing else.`, 'verify', ['kind']);
+  return null;
+}
+
+/** The three signatures a webhook door checks over the raw body, beside the path token (DOR-3). */
+const SIGNED_KINDS = ['hmac_sha256', 'stripe', 'github'] as const;
+
+/** Every `verify.kind` there is, for the refusal's `allowed` list. */
+const VERIFY_KINDS: readonly string[] = ['path', ...SIGNED_KINDS];
+
+/** What a signed `verify:` may say. `tolerance` is refused below on anything but Stripe. */
+const SIGNED_KEYS: readonly string[] = ['kind', 'header', 'key', 'tolerance'];
+
+/** A header name as HTTP spells one. The host asks for it in any case, so the case written here does not matter. */
+const HEADER_NAME = /^[A-Za-z0-9-]{1,64}$/u;
+
+/** The vault's own ceiling on a label (`depositGrant` in `packages/record/src/index.ts`), so any label it takes fits. */
+const KEY_LABEL_MOST = 120;
+
+/**
+ * The widest window a Stripe door may ask for, in milliseconds: an hour, twelve times Stripe's own five minutes.
+ *
+ * A CEILING BECAUSE THE WINDOW IS THE WHOLE OF THE REPLAY DEFENCE. A body Stripe signed is good for as long as the
+ * window says, and a declaration asking for a year would make every event Stripe ever sent a working post.
+ */
+const TOLERANCE_MOST_MS = 3_600_000;
+
+/**
+ * The fault in a signed `verify:`, or `null`: a key named by its vault label, a header if the sender's is not the usual
+ * one, and a tolerance on Stripe's alone. The label is checked for shape here and for presence at the door, where a
+ * key nobody has added verifies nothing and every arrival is stored `untriaged` (`ingestVerify`).
+ */
+function signedFault(id: string, kind: string, verify: Record<string, unknown>): Refusal | null {
+  const stray = Object.keys(verify).find((k) => !SIGNED_KEYS.includes(k));
+  if (stray === 'token' || stray === 'secret')
+    return bad('DECLARATION_INVALID', `${id}'s verify carries a ${stray}, and a secret is never in a declaration. Put it in the vault and name it: key: <vault label>.`, 'verify');
+  if (stray !== undefined) return bad('DECLARATION_INVALID', `${id}'s verify declares ${stray}, and { kind: ${kind} } takes a key, a header and nothing else.`, 'verify', SIGNED_KEYS);
+  const key = verify.key;
+  if (typeof key !== 'string' || key.trim() === '')
+    return bad('DECLARATION_INVALID', `${id}'s verify names no key. Add the signing secret to the vault, then name it here: key: <vault label>.`, 'verify');
+  if (key.length > KEY_LABEL_MOST) return bad('DECLARATION_INVALID', `${id}'s verify key is a vault label, at most ${KEY_LABEL_MOST} characters.`, 'verify');
+  if (looksLikeCredential(key))
+    return bad('DECLARATION_INVALID', `${id}'s verify key looks like the secret itself, and a secret is never in a declaration. Put it in the vault and name it by its label.`, 'verify');
+  if (verify.header !== undefined && (typeof verify.header !== 'string' || !HEADER_NAME.test(verify.header)))
+    return bad('DECLARATION_INVALID', `${id}'s verify header is the name of the header the signature arrives in, such as X-Signature.`, 'verify');
+  if (verify.tolerance === undefined) return null;
+  if (kind !== 'stripe')
+    return bad('DECLARATION_INVALID', `${id}'s verify is ${kind}, which signs no time, so a tolerance would check nothing. Take tolerance out.`, 'verify');
+  const ms = typeof verify.tolerance === 'string' ? intervalMs(verify.tolerance) : null;
+  if (ms === null || ms < 1_000 || ms > TOLERANCE_MOST_MS)
+    return bad('DECLARATION_INVALID', `${id}'s verify tolerance is how far a signature's time may be from now, from 1s to 60m, such as 5m.`, 'verify');
   return null;
 }
 
@@ -2193,6 +2256,15 @@ function ingestBody(decl: Declaration, installed?: Known): Refusal | null {
   if (body.channel === 'pull') {
     const said = intervalFault(decl.body as unknown as PullDecl);
     if (said) return said;
+    const clocked = decl.body as { every?: unknown; at?: unknown; tz?: unknown; fetch?: { schedule?: unknown; page?: unknown; read?: unknown } | null };
+    const fetched = clocked.fetch !== null && typeof clocked.fetch === 'object' ? clocked.fetch : undefined;
+    const twice = scheduleFault(id, clocked, fetched?.schedule);
+    if (twice) return twice;
+    /* A ZONE ALONE MEANS SOMETHING ONLY TO A CONNECTOR THAT PAGES, whose window's days are counted in it (`prepareAction`
+       hands it over as the run's zone). One request fills `{since}` and `{until}` with instants, which have no zone. */
+    const paged = fetched !== undefined && (fetched.page !== undefined || fetched.read !== undefined);
+    const clock = clockFault(id, clocked, { runs: true, zoneAlone: paged });
+    if (clock) return clock;
   }
 
   if (body.channel === 'call' || body.channel === 'poll') return actionFault(decl, body.channel, installed);
@@ -2286,7 +2358,7 @@ function stringLeaves(node: unknown, at: string, out: [string, string][] = []): 
 function actionFault(decl: Declaration, channel: 'call' | 'poll', installed?: Known): Refusal | null {
   const body = decl.body as {
     url?: unknown; grant?: unknown; every?: unknown; floor?: unknown; body?: unknown; project?: unknown;
-    writes?: { register?: unknown }; trigger?: unknown; sends?: unknown;
+    writes?: { register?: unknown }; trigger?: unknown; sends?: unknown; auth?: unknown; at?: unknown; tz?: unknown;
   };
   const id = decl.id;
 
@@ -2337,6 +2409,15 @@ function actionFault(decl: Declaration, channel: 'call' | 'poll', installed?: Kn
   /* THE AUTHORITY AS WRITTEN, up to the first character that ends it for a URL parser. A backslash ends
      it too, because the WHATWG parser reads one as a slash on https. */
   const authority = body.url.slice('https://'.length).split(/[/?#\\]/)[0] ?? '';
+  /* CHECKED BEFORE `fillConfig` EVER RUNS, on the pack's own unfilled body: a host built from a setting is a host
+     nobody approved (docs/04 §7), so `{{config:host}}` is refused here whether or not a value has been chosen, and
+     never reaches the `new URL` parse below. */
+  if (/\{\{\s*config\s*:/i.test(authority))
+    return bad(
+      'ACTION_HOST_COMPUTED',
+      `${id}'s host reads a {{config:...}} setting, and a host is literal, with no placeholder: a setting fills the body, never the address.`,
+      'url',
+    );
   let parsed: URL | null = null;
   try {
     parsed = new URL(body.url);
@@ -2360,6 +2441,8 @@ function actionFault(decl: Declaration, channel: 'call' | 'poll', installed?: Kn
   const keyless = channel === 'poll' && body.grant === undefined;
   if (!keyless && (typeof body.grant !== 'string' || body.grant.trim() === '' || body.grant.length > 40))
     return bad('ACTION_GRANT_MISSING', `${id} names no key. Write grant: and the label of the key in the vault it sends.`, 'grant');
+  const sending = authFault(id, body.auth, keyless);
+  if (sending) return sending;
 
   /* A CALL ONLY A RULE RUNS HAS NO CLOCK, and one that wrote a clock anyway would read as running on it. */
   if (trigger === 'rule') {
@@ -2371,6 +2454,8 @@ function actionFault(decl: Declaration, channel: 'call' | 'poll', installed?: Kn
     const interval = intervalFault({ ingest: String((decl.body as { ingest?: unknown }).ingest ?? id), every: body.every, ...(typeof body.floor === 'string' ? { floor: body.floor } : {}) });
     if (interval) return interval;
   }
+  const clock = clockFault(id, body, { runs: trigger !== 'rule', zoneAlone: false });
+  if (clock) return clock;
 
   if (body.project !== undefined && (typeof body.project !== 'string' || body.project === ''))
     return bad('DECLARATION_INVALID', `${id}'s project is the id of the project it runs for, or absent for the whole record.`, 'project');
@@ -2412,6 +2497,124 @@ function intervalFault(decl: PullDecl): Refusal | null {
     said.refusal.fix,
     said.refusal.at ?? 'every',
   );
+}
+
+/** A query parameter a key may go in, as a form names one. */
+const QUERY_NAME = /^[A-Za-z0-9_.~-]{1,64}$/u;
+
+/** The words a person reaching for a secret would write inside `auth:`, each refused with the vault's sentence. */
+const AUTH_SECRETS: readonly string[] = ['token', 'secret', 'password', 'value', 'key'];
+
+/**
+ * How a `call` or a `poll` sends its key: `auth: { kind: header, name: X-Api-Key }`, `{ kind: query, name: api_key }`,
+ * `{ kind: basic }`, or absent for a bearer, which is what a bare `grant:` has always meant (DOR-5).
+ *
+ * THE KEY ITSELF IS STILL NAMED BY `grant:` AND BY NOTHING HERE. `auth:` says only where it goes, so the install diff
+ * that names the key names it once, and a secret written into `auth:` is refused with the vault's sentence rather than
+ * read as a name.
+ *
+ * A HEADER THE REQUEST SETS ITSELF IS REFUSED HERE, with the list connect's auth builder refuses again at run time
+ * (`reservedKeyHeader`): `Authorization` is a bearer written the long way round, and `Cookie` or `Host` would be the
+ * key steering the request rather than riding on it.
+ */
+function authFault(id: string, auth: unknown, keyless: boolean): Refusal | null {
+  if (auth === undefined) return null;
+  if (keyless) return bad('DECLARATION_INVALID', `${id} sends no key, so it takes no auth. Name the key with grant:, or take auth out.`, 'auth');
+  const kinds = ACTION_AUTH_KINDS as readonly string[];
+  if (auth === null || typeof auth !== 'object' || Array.isArray(auth))
+    return bad('DECLARATION_INVALID', `${id}'s auth is { kind: bearer, header, query or basic }, with a name for a header or a query.`, 'auth', kinds);
+  const said = auth as { kind?: unknown; name?: unknown };
+  const stray = Object.keys(said).find((k) => k !== 'kind' && k !== 'name');
+  if (stray !== undefined && AUTH_SECRETS.includes(stray))
+    return bad('DECLARATION_INVALID', `${id}'s auth carries a ${stray}, and a secret is never in a declaration. Put it in the vault and name it with grant:.`, `auth.${stray}`);
+  if (stray === 'grant') return bad('DECLARATION_INVALID', `${id} names its key with grant: beside auth, not inside it.`, 'auth.grant');
+  if (stray !== undefined) return bad('DECLARATION_INVALID', `${id}'s auth declares ${stray}, and auth takes a kind and a name and nothing else.`, `auth.${stray}`);
+  if (typeof said.kind !== 'string' || !kinds.includes(said.kind))
+    return bad('DECLARATION_INVALID', `${JSON.stringify(said.kind ?? null)} is not a way ${id} can send its key.`, 'auth.kind', kinds);
+  if (said.kind !== 'header' && said.kind !== 'query') {
+    if (said.name !== undefined)
+      return bad('DECLARATION_INVALID', `${id} sends its key as ${said.kind}, which goes in no header or parameter of its own. Take name out.`, 'auth.name');
+    return null;
+  }
+  const where = said.kind === 'header' ? 'header' : 'query parameter';
+  if (typeof said.name !== 'string' || said.name === '')
+    return bad('DECLARATION_INVALID', `${id} sends its key in a ${where} and does not say which. Write name: beside kind.`, 'auth.name');
+  if (looksLikeCredential(said.name))
+    return bad('DECLARATION_INVALID', `${id}'s auth name looks like the key itself, and a key is never in a declaration. Name the ${where} it goes in.`, 'auth.name');
+  if (said.kind === 'header') {
+    if (!HEADER_NAME.test(said.name))
+      return bad('DECLARATION_INVALID', `${id}'s auth name is the name of the header the key goes in, such as X-Api-Key.`, 'auth.name');
+    if (reservedKeyHeader(said.name))
+      return bad('DECLARATION_INVALID', `${id} puts its key in ${said.name}, which the request sets itself. Use kind: bearer for Authorization, or name a header of the provider's own.`, 'auth.name');
+    return null;
+  }
+  if (!QUERY_NAME.test(said.name))
+    return bad('DECLARATION_INVALID', `${id}'s auth name is the query parameter the key goes in, such as api_key.`, 'auth.name');
+  return null;
+}
+
+/**
+ * `at:` and `tz:` on a scheduled action: the time of day each run belongs to, and the zone it is read in (DOR-5).
+ *
+ * A TIME OF DAY REPEATS ONLY ON WHOLE DAYS. `every: 6h` with `at: 07:00` names a time the next run cannot keep, so it is
+ * refused rather than read as one of the two. A ZONE WITH NO TIME changes nothing about when a call or a poll runs,
+ * which counts intervals, and is refused as a promise nothing keeps; a paged pull's window is counted in it, so it may
+ * name one alone (`zoneAlone`). A ZONE THIS RUNTIME CANNOT READ is refused here and not found at the first run.
+ */
+function clockFault(id: string, body: { every?: unknown; at?: unknown; tz?: unknown }, o: { runs: boolean; zoneAlone: boolean }): Refusal | null {
+  if (body.tz !== undefined) {
+    if (typeof body.tz !== 'string' || body.tz === '' || body.tz.length > 64 || !isZone(body.tz))
+      return bad('DECLARATION_INVALID', `${id}'s tz is the name of a time zone, such as Africa/Cairo or Europe/London.`, 'tz');
+    if (body.at === undefined && !o.zoneAlone)
+      return bad('DECLARATION_INVALID', `${id} names a zone and no time of day, so the zone changes nothing. Write at: beside it, such as 07:00, or take tz out.`, 'tz');
+  }
+  if (body.at === undefined) return null;
+  if (!o.runs)
+    return bad('DECLARATION_INVALID', `${id} runs only when a rule runs it, so it has no time of day. Write trigger: both to run it on a clock as well.`, 'at');
+  if (timeOf(body.at) === null) return bad('DECLARATION_INVALID', `${id}'s at is a time of day from 00:00 to 23:59, such as 07:00.`, 'at');
+  const every = typeof body.every === 'string' ? intervalMs(body.every) : null;
+  if (every === null || every % DAY_MS !== 0)
+    return bad('DECLARATION_INVALID', `${id} runs at ${String(body.at)} every ${String(body.every)}, and a time of day repeats only on whole days. Write every: 1d, 2d or 1w.`, 'every');
+  return null;
+}
+
+/** A day, in the milliseconds `intervalMs` answers. */
+const DAY_MS = 86_400_000;
+
+/** What a connector's `fetch.schedule` may say (`25 §3.2`). */
+const SCHEDULE_KEYS: readonly string[] = ['every', 'at', 'tz', 'jitter'];
+
+/**
+ * A connector's `fetch.schedule`, against the declaration's own `every` and `at` (DOR-5).
+ *
+ * ONE INTERVAL, WRITTEN ONCE. The record fires a pull from `every`, and the connector counted its next slot from
+ * `fetch.schedule.every`, so a declaration that said `every: 1h` and `schedule: { every: 15m }` was floor-checked on one
+ * and run on the other. `prepareAction` now hands the runner `every` as its schedule, and a `fetch.schedule` that says
+ * anything else is refused here, so what the owner approved is the only interval there is.
+ */
+function scheduleFault(id: string, body: { every?: unknown; at?: unknown; tz?: unknown }, schedule: unknown): Refusal | null {
+  if (schedule === undefined) return null;
+  if (schedule === null || typeof schedule !== 'object' || Array.isArray(schedule))
+    return bad('DECLARATION_INVALID', `${id}'s fetch.schedule is { every }, the same interval as every:. Write every: alone.`, 'fetch.schedule');
+  const said = schedule as { every?: unknown; at?: unknown; tz?: unknown; jitter?: unknown };
+  const stray = Object.keys(said).find((k) => !SCHEDULE_KEYS.includes(k));
+  if (stray !== undefined)
+    return bad('DECLARATION_INVALID', `${id}'s fetch.schedule declares ${stray}, and a schedule says every, at, tz: record and jitter: auto.`, `fetch.schedule.${stray}`, SCHEDULE_KEYS);
+  /* `25 §3.2`'s TWO FIXED WORDS. The zone is the record's unless the action names its own at the top, and jitter is never
+     off (`25 §9`), so each key has one value it may say. */
+  if (said.tz !== undefined && (said.tz !== 'record' || body.tz !== undefined))
+    return bad('DECLARATION_INVALID', `${id}'s fetch.schedule.tz is record, which is the zone when tz: names none. Name another zone once, as tz:.`, 'fetch.schedule.tz');
+  if (said.jitter !== undefined && said.jitter !== 'auto')
+    return bad('DECLARATION_INVALID', `${id}'s fetch.schedule.jitter is auto: a scheduled fetch is always spread, so it is never off.`, 'fetch.schedule.jitter');
+  if (said.every !== undefined && said.every !== body.every)
+    return bad(
+      'DECLARATION_INVALID',
+      `${id} says every ${String(body.every)} and fetch.schedule.every ${String(said.every)}, and they are one interval. Write it once, as every:.`,
+      'fetch.schedule.every',
+    );
+  if (said.at !== undefined && said.at !== body.at)
+    return bad('DECLARATION_INVALID', `${id} says at ${String(body.at)} and fetch.schedule.at ${String(said.at)}, and they are one time of day. Write it once, as at:.`, 'fetch.schedule.at');
+  return null;
 }
 
 

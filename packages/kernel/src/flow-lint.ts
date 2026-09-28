@@ -66,7 +66,7 @@ const SHAPES = ['text', 'number', 'choice'] as const;
 /** Every action a rule had before steps, closed. The inline pass's dispatch has one arm for each. */
 export const ACTIONS = ['tag', 'untag', 'set', 'move', 'link', 'note', 'notify', 'schedule', 'create', 'suggest', 'run', 'stop'] as const;
 /** The verbs only a step has. */
-const FLOW = ['if', 'set_var', 'script', 'call', 'ask_slash', 'ask_person', 'wait'] as const;
+const FLOW = ['if', 'set_var', 'script', 'call', 'ask_slash', 'ask_person', 'wait', 'meet', 'run_job'] as const;
 /**
  * Every verb a rule or a step may name. Exported so that `flow-secret-verbs.test.ts` asks each one what it does with a
  * secret, and a verb added here without an answer there fails that test.
@@ -83,8 +83,11 @@ const ROW_VERBS: readonly string[] = ['tag', 'untag', 'set', 'move', 'link', 'no
 /** Triggers with no subject row. `arrival` is left out: a matched arrival writes rows, and §4.1 has its run read them. */
 const ROWLESS: readonly string[] = ['every', 'metric', 'manual'];
 
-/** The verbs §3 says need `once_per` on a trigger about a row: notifies, creates, calls or asks. */
-const ONCE: readonly string[] = ['notify', 'create', 'suggest', 'run', 'call', 'ask_slash', 'ask_person'];
+/**
+ * The verbs §3 says need `once_per` on a trigger about a row: notifies, creates, calls or asks, and a job started, which
+ * runs Claude Code on the owner's machine and would otherwise start again each time somebody fixes a typo in the row.
+ */
+const ONCE: readonly string[] = ['notify', 'create', 'suggest', 'run', 'call', 'ask_slash', 'ask_person', 'run_job'];
 
 /**
  * Field types whose value never leaves the record with a question: `ask_slash`'s `about:` is refused them here, and
@@ -108,6 +111,12 @@ export const sealedAs = (field: { type?: unknown; of?: unknown } | undefined): s
 
 /** A name a step's answer lands under, read back as `{{vars.<name>}}`. */
 const NAME = /^[a-z][a-z0-9_]{0,31}$/;
+/** The keys of a `meet` step: `people.ts`'s `MeetArgs`, one of the first three and always `where`. */
+const MEET_KEYS: readonly string[] = ['name', 'email', 'handle', 'where'];
+/** The keys of a `run_job` step. */
+const RUN_JOB_KEYS: readonly string[] = ['kind', 'args', 'as'];
+/** A kind of job by its declaration id, as `jobs.ts`'s `KIND_ID` reads one, so the lint refuses no id the queue takes. */
+const JOB_KIND = /^job\.[a-z][a-z0-9_-]{0,31}$/u;
 /** `trigger` and `vars` are the run context's own two keys, so a var called either would shadow the path to itself. */
 const RESERVED: readonly string[] = ['trigger', 'vars'];
 
@@ -472,8 +481,15 @@ export function passFilled(path: readonly string[]): boolean {
  * none: `untag` writes back words the row already has, less one; `run` and `call` send the call's declared fields,
  * which `queueCall` holds to the ones that may leave; `if` is read and not written; `set_var` is carried, and followed
  * into every verb here that writes it out; `ask_slash` has its own checks below; `stop` and `wait` carry nothing.
+ * `meet` writes a person every reader of People sees, and `run_job` hands its arguments to a machine and a model.
  */
-const COPIERS: readonly string[] = ['move', 'link', 'note', 'notify', 'schedule', 'create', 'suggest', 'script', 'ask_person'];
+const COPIERS: readonly string[] = ['move', 'link', 'note', 'notify', 'schedule', 'create', 'suggest', 'script', 'ask_person', 'meet', 'run_job'];
+
+/**
+ * The verbs whose every text the runner fills from the row's own `{{field}}` as well as the run's paths (`flow.ts`'s
+ * `handedText`), so the row's spellings are read in all of them, not only in the texts `passFilled` names.
+ */
+const ROW_FILLED: readonly string[] = ['meet', 'run_job'];
 
 /** Where a text of a step goes, as a refusal names it, from its path inside the step. */
 function placeOf(path: readonly string[], spec: Record<string, unknown>): string {
@@ -481,6 +497,8 @@ function placeOf(path: readonly string[], spec: Record<string, unknown>): string
   if (path[0] === 'create' && path[1] === 'fields' && path.length === 3) return `${path[2]} of the ${String(spec.register)} row it creates`;
   if (path[0] === 'suggest' && path[1] === 'options') return 'an answer it offers in the queue';
   if (path[0] === 'script' && path[1] === 'input') return `the input ${path[2]} it hands a script`;
+  if (path[0] === 'run_job' && path[1] === 'args') return `the argument ${path[2]} it hands a job`;
+  if (path[0] === 'meet') return path[1] === 'where' ? 'where it says the person was met' : `the ${path[1]} of the person it meets`;
   const named: Record<string, string> = {
     note: 'a note',
     'notify.say': 'a notification',
@@ -542,7 +560,7 @@ function copyFault(
   };
   collect(step[verb], [verb]);
   for (const { path, text } of texts) {
-    const rowFill = passFilled(path) || path.join('.') === 'ask_person.question';
+    const rowFill = passFilled(path) || path.join('.') === 'ask_person.question' || ROW_FILLED.includes(verb);
     if (!t.run && !passFilled(path)) continue;
     if (path[0] === 'ask_person' && path[1] !== 'question') continue;
     /* INTO A FIELD OF THE OTHER LIST THAT NEVER LEAVES EITHER, which no reader of it can see. */
@@ -578,7 +596,8 @@ function copyFault(
 function keptBy(verb: string, step: Record<string, unknown>): string | null {
   const spec = step[verb];
   if (!isObject(spec)) return null;
-  const name = verb === 'set_var' ? spec.name : verb === 'script' || verb === 'call' || verb === 'ask_slash' || verb === 'ask_person' ? spec.as : undefined;
+  const name =
+    verb === 'set_var' ? spec.name : verb === 'script' || verb === 'call' || verb === 'ask_slash' || verb === 'ask_person' || verb === 'run_job' ? spec.as : undefined;
   return typeof name === 'string' ? name : null;
 }
 
@@ -1055,7 +1074,8 @@ export function flowFault(id: string, body: Record<string, unknown>, installed?:
      question it answers (`flow.ts`'s `onDecided`). */
   if (!rowless && trigger !== 'arrival' && trigger !== 'decided' && !(Array.isArray(body.once_per) && body.once_per.length > 0)) {
     const loud = firstVerb(body.steps ?? body.then, ONCE);
-    if (loud) return bad('REQUIRED_MISSING', `${id} ${loud}s about a row and declares no once_per, so it would do it on every write of the row.`, 'once_per');
+    if (loud)
+      return bad('REQUIRED_MISSING', `${id} ${loud === 'run_job' ? 'starts a job' : `${loud}s`} about a row and declares no once_per, so it would do it on every write of the row.`, 'once_per');
   }
 
   /* A CHOICE IS BETWEEN TWO OR MORE, EACH ONCE, because the gate's `propose` refuses anything less and the runner opens
@@ -1597,6 +1617,46 @@ function stepFault(
           return bad('DECLARATION_INVALID', `${id}'s ${at}.ask_person.to is the id of the one member the question is put to.`, `${at}.ask_person.to`);
       }
       return spec.wait === undefined ? null : span(spec.wait, `${at}.ask_person.wait`);
+    }
+    case 'meet': {
+      /* WHO, AND WHERE THEY WERE MET, as `people.ts`'s `meet` is told. Each is text, typed or filled from the run; whether
+         a hole fills with anything, and whether an email reads as one, is the run's to find, since a counterparty is
+         empty on one row and not the next. What the list playing `meets:` can keep (a handle needs `handles`) is asked
+         there too, because People is a module the owner may switch off after this rule installs. */
+      if (!isObject(spec)) return bad('DECLARATION_INVALID', `${id}'s ${at}.meet is { name, email, handle, where }.`, `${at}.meet`, MEET_KEYS);
+      const odd = Object.keys(spec).find((k) => !MEET_KEYS.includes(k));
+      if (odd !== undefined) return bad('DECLARATION_INVALID', `${id}'s ${at}.meet has no ${odd}.`, `${at}.meet.${odd}`, MEET_KEYS);
+      const wrong = MEET_KEYS.find((k) => spec[k] !== undefined && typeof spec[k] !== 'string');
+      if (wrong !== undefined) return bad('DECLARATION_INVALID', `${id}'s ${at}.meet.${wrong} is text.`, `${at}.meet.${wrong}`);
+      if (spec.name === undefined && spec.email === undefined && spec.handle === undefined)
+        return bad('REQUIRED_MISSING', `${id} meets somebody at ${at} and says nothing of who. Give it a name, an email or a handle.`, `${at}.meet`);
+      return text(spec.where, `${at}.meet.where`, 'the words saying where the person was met');
+    }
+    case 'run_job': {
+      /* THE KIND BY ITS ID, AND ITS ARGUMENTS AS TEXT. Whether the kind is approved is asked when a run reaches the step
+         (`flow.ts`'s `startJob`), as a script's is, since a kind can be retired after this installs. Where this install
+         knows the kind, its arguments are held to the kind's own here, so a rule the run would fail on every time is
+         refused before anybody accepts it. */
+      if (!isObject(spec)) return bad('DECLARATION_INVALID', `${id}'s ${at}.run_job is { kind, args, as }.`, `${at}.run_job`, RUN_JOB_KEYS);
+      const odd = Object.keys(spec).find((k) => !RUN_JOB_KEYS.includes(k));
+      if (odd !== undefined) return bad('DECLARATION_INVALID', `${id}'s ${at}.run_job has no ${odd}.`, `${at}.run_job.${odd}`, RUN_JOB_KEYS);
+      if (typeof spec.kind !== 'string' || !JOB_KIND.test(spec.kind))
+        return bad('DECLARATION_INVALID', `${id}'s ${at}.run_job.kind is the id of a kind of job the owner approved, such as job.weekly-notes.`, `${at}.run_job.kind`);
+      const args = spec.args;
+      if (args !== undefined && (!isObject(args) || Object.values(args).some((v) => typeof v !== 'string')))
+        return bad('DECLARATION_INVALID', `${id}'s ${at}.run_job.args is a map of the kind's argument ids to text.`, `${at}.run_job.args`);
+      const kind = installed?.get(spec.kind);
+      if (kind !== undefined) {
+        const ids = Array.isArray(kind.args) ? kind.args.flatMap((a) => (isObject(a) && typeof a.id === 'string' ? [a.id] : [])) : [];
+        const given = isObject(args) ? Object.keys(args) : [];
+        const stray = given.find((k) => !ids.includes(k));
+        if (stray !== undefined)
+          return bad('FIELD_UNKNOWN', `${id} hands ${spec.kind} ${stray} at ${at}, and ${spec.kind} asks for nothing called ${stray}.`, `${at}.run_job.args.${stray}`, ids);
+        const missing = ids.find((k) => !given.includes(k));
+        if (missing !== undefined)
+          return bad('REQUIRED_MISSING', `${id} starts ${spec.kind} at ${at} without ${missing}, which ${spec.kind} asks for. Give it under args.`, `${at}.run_job.args`, ids);
+      }
+      return spec.as === undefined ? null : named(spec.as, `${at}.run_job.as`);
     }
     case 'wait':
       return span(spec, `${at}.wait`);

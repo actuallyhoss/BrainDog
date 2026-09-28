@@ -106,7 +106,7 @@ test('EVERY PROFILE IS READ BEFORE ANY IS WRITTEN: a malformed third profile lea
   writeFileSync(c.settings, '{ "hooks": {} }');
   const lines = installEvery([a.dir, b.dir, c.dir], [], { apply: true, replace: REPLACE, scripts, home });
   for (const p of [a, b]) {
-    assert.deepEqual(readdirSync(p.dir).sort(), ['.claude.json', '.claude.json.bak', 'settings.json', 'settings.json.bak']);
+    assert.deepEqual(readdirSync(p.dir).sort(), ['.claude.json', '.claude.json.bak', 'settings.json', 'settings.json.bak', 'skills']);
     assert.ok(!readFileSync(p.settings, 'utf8').includes('session-start.ps1'));
     assert.ok(!readFileSync(p.claudeJson, 'utf8').includes('brain-mcp.mjs'));
   }
@@ -121,7 +121,7 @@ test('A STALE .tmp FROM AN EARLIER FAILED RUN, read-only as that run made it, do
 
   const lines = installInto(a.dir, { apply: true, replace: REPLACE, scripts, home });
   assert.ok(lines.includes(`The file as it was is kept at ${a.claudeJson}.bak.`), lines.join('\n'));
-  assert.deepEqual(readdirSync(a.dir).sort(), ['.claude.json', '.claude.json.bak', 'settings.json', 'settings.json.bak']);
+  assert.deepEqual(readdirSync(a.dir).sort(), ['.claude.json', '.claude.json.bak', 'settings.json', 'settings.json.bak', 'skills']);
   assert.ok(!readFileSync(a.claudeJson, 'utf8').includes('brain-mcp.mjs'));
 });
 
@@ -129,7 +129,7 @@ test('THE SAME FILE NAMED TWICE is written once, from one reading', () => {
   const home = folder('home');
   const a = profile(join(home, '.claude-a'));
   const lines = installEvery([a.dir], [a.settings], { apply: true, replace: REPLACE, scripts, home });
-  assert.deepEqual(readdirSync(a.dir).sort(), ['.claude.json', '.claude.json.bak', 'settings.json', 'settings.json.bak']);
+  assert.deepEqual(readdirSync(a.dir).sort(), ['.claude.json', '.claude.json.bak', 'settings.json', 'settings.json.bak', 'skills']);
   assert.equal(lines.filter((l) => l === `Changed ${a.settings}:`).length, 1, lines.join('\n'));
 });
 

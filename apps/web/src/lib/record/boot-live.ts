@@ -27,7 +27,7 @@ import { learnHome } from './api.ts';
 import { learnPages, REGISTERS } from './held.ts';
 import { copy } from '../copy.ts';
 import type { SwitcherRow } from './switcher.ts';
-import { noteOf } from './history-live.ts';
+import { declaredOf, noteOf } from './history-live.ts';
 import type { NewsItem, PageDecl, Person, Question } from './schema.ts';
 import type { Level } from './schema.ts';
 import { levelsFrom } from './may.ts';
@@ -379,6 +379,10 @@ function textOf(e: EventLine): string {
   }
   if (e.kind === 'suggest' && e.title) return `Asked: ${e.title}`;
   if (e.kind === 'decide' && e.title) return copy.feedDecided(e.title, null);
+  if (e.kind === 'declare') {
+    const said = declaredOf(e.target, e.note);
+    if (said !== null) return said;
+  }
   const pack = packText(e) ?? exportText(e) ?? accessText(e);
   if (pack) return pack;
   return sentence(e.note ?? e.kind.replace(/[._]/gu, ' '));

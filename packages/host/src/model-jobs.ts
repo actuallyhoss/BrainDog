@@ -1,7 +1,7 @@
 /**
- * The pass that serves the record's model jobs on either host: lease the `infer.draft` and `infer.prose` rows, answer
- * each through the Slash engine the host hands in, and ack each in the shape `packages/kernel/src/outbox.ts`'s `ack`
- * reads. `loop/finish/platform.md` §4.0 J, `loop/finish/contracts.md` X8.
+ * The pass that serves the record's model jobs on either host: lease the `infer.draft`, `infer.prose` and `infer.embed`
+ * rows, answer each through the Slash engine the host hands in, and ack each in the shape `packages/kernel/src/outbox.ts`'s
+ * `ack` reads. `loop/finish/platform.md` §4.0 J, `loop/finish/contracts.md` X8.
  *
  * ONE PASS FOR BOTH HOSTS, AND THE RECORD STAYS THE JUDGE. The Worker calls this from `alarm()` as `#model`, after `#ask`,
  * and the self-host from `poll`, after its asks. The kernel files a draft through its one gate in the ack's transaction and
@@ -13,7 +13,8 @@
  *   - a draft with `signal: 'ingest.unmatched'` is the same, its samples found by the shape its `subject` names;
  *   - any other `signal` (`search.empty`, `write.refused`, `query.scan`, dormant) is acked with no model call as a
  *     two-way `options` question carrying the finding's own sentence, so every finding reaches Decide at no cost.
- * A digest's prose is acked as `{ text }`, and `''` sends the digest as figures.
+ * A digest's prose is acked as `{ text }`, and `''` sends the digest as figures. An embedding is acked as
+ * `{ model, dims, vectors }`, one vector for each text the hourly sweep queued, which the kernel writes to `entry_vec`.
  *
  * METERED ON THE BACKGROUND ALLOWANCE, NEVER ON HIS ASKS. The daily look, an automation's question, a digest's prose and a
  * pattern's draft share `BACKGROUND_ASKS_MONTH` (60) a month; his 80 are his own (`packages/slash/src/types.ts`). The pass
@@ -56,6 +57,24 @@ const RECORD_CTX: CallContext = { principal: { kind: 'system', id: 'slash' } };
  */
 const RETRIED: ReadonlySet<string> = new Set(['UNREACHABLE', 'SLASH_BUDGET_SPENT']);
 
+/**
+ * How much of a month's background allowance embeddings may never touch: half of it, kept for the digest prose and the
+ * pattern drafts. A record that changes every hour would otherwise spend the month on its index by the tenth, and his
+ * digests would go out as figures for the rest of it. A month with half left lets embeddings use the rest, a hundred
+ * rows a call, so a large record's first index is built over a few months rather than all at once.
+ */
+const EMBED_KEPT_SHARE = 0.5;
+
+/** A batch of embeddings as the pass acks it: `@braindog/ports`'s `Embeddings` less the usage the engine's ledger keeps. */
+export type ModelJobEmbeddings = { model: string; dims: number; vectors: Int8Array[] };
+
+/**
+ * What a host's engine adds when it can embed: `embed`, over the same engine and ledger as `draft` and `prose`, so each
+ * call is a `slash_call` row of kind `embed` and `backgroundMeter` counts it. ABSENT, `infer.embed` is never leased and
+ * its one job waits `pending` for a host that has it, which the sweep reads before it queues another.
+ */
+export type ModelJobEmbed = { embed?: ((texts: readonly string[]) => Promise<Result<ModelJobEmbeddings>>) | undefined };
+
 /** The three kernel methods this pass calls, and not the kernel. */
 export type ModelJobsKernel = Pick<Kernel, 'leaseOutbox' | 'ackOutbox' | 'tail'>;
 
@@ -77,7 +96,7 @@ export type ModelJobMeter = {
 
 export type ModelJobsDeps = {
   /** What answers the jobs, or `undefined` where the host has no model: then nothing is leased and the jobs wait. */
-  inference: ModelJobInference | undefined;
+  inference: (ModelJobInference & ModelJobEmbed) | undefined;
   meter: ModelJobMeter;
   now: () => number;
   /** The alarm, tailed once after an ack landed, so a `failed` ack's retry row is armed. Absent, the host tails it. */
@@ -106,7 +125,8 @@ const warn = (line: string): void => console.error(line);
  * A DIGEST'S PROSE AND A DRAFT FOR THE RECORD ARE THE ROWS COUNTED. `digestProse` settles a `prose` row and `draftPattern`
  * a `pattern` row with nothing in `filed`, because the kernel files it in the ack (`packages/slash/src/jobs.ts`). A press
  * that filed its pattern carries the filed id and is his ask, not this; a press the checks refused has no id either and is
- * counted here too, which errs on the side a cap should. `-` is a model never reached, which costs nothing and is not counted.
+ * counted here too, which errs on the side a cap should. An `embed` row is one embedding job, a hundred rows in one call.
+ * `-` is a model never reached, which costs nothing and is not counted.
  *
  * NO LEDGER YET IS NOTHING SPENT. The engine creates the table on its first call, so a host that has not built it has
  * spent nothing this month; any other failure to count is read as spent, so a count nobody can read never lets a call through.
@@ -118,7 +138,7 @@ export function backgroundMeter(sql: Pick<Sql, 'one'>, cap = BACKGROUND_JOBS_MON
       try {
         return (
           sql.one<{ n: number }>(
-            "SELECT COUNT(*) AS n FROM slash_call WHERE kind IN ('pattern', 'prose') AND filed IS NULL AND model <> '-' AND ts >= ?",
+            "SELECT COUNT(*) AS n FROM slash_call WHERE kind IN ('pattern', 'prose', 'embed') AND filed IS NULL AND model <> '-' AND ts >= ?",
             since,
           )?.n ?? 0
         );
@@ -238,8 +258,23 @@ async function settleProse(inference: ModelJobInference, job: OutboxRow): Promis
   return refusedAck(out, { state: 'done', result: { text: '' } });
 }
 
-async function settle(api: ModelJobsApi, inference: ModelJobInference, job: OutboxRow, log: (line: string) => void): Promise<Settled> {
+/**
+ * What one embedding job comes to: the vectors for its texts, in their order, which the kernel writes to `entry_vec` by
+ * position. A refusal no retry mends writes nothing, and the next sweep queues the same rows again from the record's text.
+ */
+async function settleEmbed(embed: NonNullable<ModelJobEmbed['embed']>, job: OutboxRow): Promise<Settled> {
+  const texts = payloadOf(job)?.texts;
+  /* A JOB NOBODY CAN READ HAS NOTHING TO EMBED, and a retry reads the same bytes: done, with nothing on it. */
+  if (!Array.isArray(texts) || texts.length === 0 || !texts.every((t) => typeof t === 'string')) return { state: 'done' };
+  const out = await embed(texts as string[]);
+  if (out.ok) return { state: 'done', result: { model: out.value.model, dims: out.value.dims, vectors: out.value.vectors } };
+  return refusedAck(out, { state: 'done' });
+}
+
+async function settle(api: ModelJobsApi, inference: ModelJobInference & ModelJobEmbed, job: OutboxRow, log: (line: string) => void): Promise<Settled> {
   try {
+    if (job.kind === 'infer.embed')
+      return inference.embed ? await settleEmbed(inference.embed, job) : { state: 'failed', error: 'This host has no model to embed with.' };
     if (job.kind === 'infer.prose') return await settleProse(inference, job);
     return await settleDraft(api, inference, job, log);
   } catch (e) {
@@ -253,7 +288,8 @@ async function settle(api: ModelJobsApi, inference: ModelJobInference, job: Outb
  * THE JOBS ARE ANSWERED TOGETHER AND NOT IN TURN, for `serveAsks`'s reason: `INFER_LEASE_MS` is 120 seconds and a model
  * call may take thirty, so the fifth of five in turn would be acked after its lease. Each is acked as it settles.
  *
- * `infer.embed` IS NOT LEASED HERE YET. It is the next unit's (PLT-11, W3), and until its engine exists the rows wait.
+ * THE DRAFTS AND THE PROSE ARE LEASED FIRST, and `infer.embed` takes what room they leave, only where the host can embed
+ * and only while more than `EMBED_KEPT_SHARE` of the month is left: a digest never waits behind the index.
  *
  * AN ACK THAT WILL NOT LAND IS LOGGED AND NOT A REASON TO ABANDON THE REST: the lease expires and the job is reclaimed.
  */
@@ -269,13 +305,15 @@ export async function serveModelJobs(api: ModelJobsApi, deps: ModelJobsDeps): Pr
     /* THE JOBS WAIT, AND THE LINE SAYS WHY, once a month: leasing nothing leaves them `pending`, off the retry ladder. */
     if (told.get(meter) !== month) {
       told.set(meter, month);
-      log(`Slash's background allowance of ${meter.cap} model jobs is spent until ${monthOf(now, 1).slice(0, 10)}, so the record's pattern drafts and digest prose wait until then.`);
+      log(`Slash's background allowance of ${meter.cap} model jobs is spent until ${monthOf(now, 1).slice(0, 10)}, so the record's pattern drafts, digest prose and embeddings wait until then.`);
     }
     return false;
   }
 
   const n = Math.min(MODEL_JOBS_PER_PASS, left);
-  const jobs = api.kernel.leaseOutbox(['infer.draft', 'infer.prose'], n);
+  const asked = api.kernel.leaseOutbox(['infer.draft', 'infer.prose'], n);
+  const room = Math.min(n, left - Math.ceil(meter.cap * EMBED_KEPT_SHARE)) - asked.length;
+  const jobs = inference.embed && room > 0 ? [...asked, ...api.kernel.leaseOutbox(['infer.embed'], room)] : asked;
   let acked = 0;
 
   await Promise.all(

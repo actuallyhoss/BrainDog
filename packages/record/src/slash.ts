@@ -22,8 +22,9 @@
  */
 
 import type { FigureTest, Grows } from './arrange.ts';
+import { subjectOf } from './automations.ts';
 import type { Refusal, Result, Sql } from '@braindog/ports';
-import type { Json, Kernel } from '@braindog/kernel';
+import type { Json, Kernel, Tried } from '@braindog/kernel';
 import { coerce } from '@braindog/kernel';
 import { labelSetting, voiceSetting } from '@braindog/declare';
 
@@ -755,7 +756,7 @@ export type SlashModelInput = {
    * instructions named grammars and the record sent none of them, so a list's keys were learnt from the refusals Decide
    * showed the owner (`loop/finish/defects.md` G1).
    */
-  grammar?: { page: unknown; register: unknown; metric: unknown; rule: unknown };
+  grammar?: { page: unknown; register: unknown; metric: unknown; rule: unknown; ingest?: unknown };
   /** The page a description is about, as it is declared (a page drawn per row is its template's declaration). */
   page?: { id: string; body: unknown };
   /**
@@ -857,18 +858,31 @@ const BUILDS: ReadonlySet<string> = new Set(['register', 'ingest', 'rule', 'metr
 const aKind = (kind: string): string => `${/^[aeiou]/u.test(kind) ? 'an' : 'a'} ${kind}`;
 
 /**
- * WHAT A DESCRIPTION MAY BUILD: `BUILDS` WITHOUT THE INGEST. `loop/research-audit-2026-09-25-layouts.md` finding 14 filed an
- * abused model's answer to "A desk for my launch" as one change holding `ingest.launchsync`, a call to
+ * WHAT A DESCRIPTION MAY BUILD: `BUILDS`, EACH HELD TO WHAT IT MAY REACH. `loop/research-audit-2026-09-25-layouts.md`
+ * finding 14 filed an abused model's answer to "A desk for my launch" as one change holding `ingest.launchsync`, a call to
  * collector.evil.example sending payroll's names and salaries, under the question "Build the launch desk you described?".
  * `SLASH_INSTRUCTIONS` told the model to answer only lists, figures, pages and rules here, and nothing in the record held
- * it to that. An ingest is a door to the outside, and one is opened on its own ask, where the question is about the door.
+ * it to that.
  *
  * A SCRIPT IS LET THROUGH, HELD TO WHAT `describedScript` ALLOWS (`loop/finish/contracts.md` X42). An owner asking for
  * something fetched is asking for exactly the call a script makes, its origins and keys are written in its header where
  * the kernel checks them, and the record says them in the question in its own words (`scriptSays`). What stays out is
  * what finding 14 used: rows handed to code that fetches.
+ *
+ * AND SO IS AN INGEST THAT ONLY READS, IN THE THIRD FINISH WORKFLOW (`loop/finish/shell.md` SLS-1, X42). "Fetch the rate
+ * hourly" is a poll: one address read on a clock and written into a list, which is a script's fetch with no code in it.
+ * Held to `describedIngest`, it sends no row and takes nothing anybody posts, and the record says where it fetches from,
+ * which key goes with it and which list it writes (`ingestSays`). A door others post to and a call that sends are still
+ * finding 14's shape and are asked for on their own, where the question is about the door.
  */
-const DESCRIBED_BUILDS: ReadonlySet<string> = new Set(['register', 'rule', 'metric', 'page', 'script']);
+const DESCRIBED_BUILDS: ReadonlySet<string> = new Set(['register', 'ingest', 'rule', 'metric', 'page', 'script']);
+
+/**
+ * The channels of a door a description may open: `poll` reads one address on a clock and `pull` reads a service a page at
+ * a time (`INGEST` in `grammar.ts`). Neither sends a row of the record, which a `call` does, and neither is an address the
+ * outside posts into, which a `webhook` is.
+ */
+const READS_IN: ReadonlySet<string> = new Set(['poll', 'pull']);
 
 /**
  * The verbs by which a rule reaches beyond the record, and what each would do, in a dropped line. `run` starts an ingest or
@@ -884,6 +898,7 @@ export const REACHES_OUT: Readonly<Record<string, string>> = {
   call: 'call out beyond the record',
   ask_slash: "send rows to Slash's model",
   script: 'start a script that may fetch beyond the record',
+  run_job: "start a job on the owner's machine",
 };
 
 /** The first verb in `REACHES_OUT` anywhere in a declaration's body, its steps and branches included. */
@@ -900,7 +915,7 @@ function reachesOut(value: unknown, depth = 0): string | null {
 }
 
 /** How the owner calls each kind a description builds, in the line the record writes about what exists. */
-const OWNERS_WORD: Readonly<Record<string, string>> = { register: 'list', metric: 'figure', page: 'page', rule: 'rule', script: 'script' };
+const OWNERS_WORD: Readonly<Record<string, string>> = { register: 'list', ingest: 'door', metric: 'figure', page: 'page', rule: 'rule', script: 'script' };
 
 /** The strings of a header's list, such as a script's `egress` or `writes`, and nothing else in it. */
 const strings = (value: unknown): string[] => (Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : []);
@@ -977,6 +992,50 @@ function scriptSays(d: { id?: unknown; body?: unknown }): string {
   return `Accepting it lets the script "${bare}" ${does.length > 0 ? joinNames(does) : 'run'} ${joinNames(when)} on its own${sent}.`;
 }
 
+/** An object's own keys, or none for anything else, so a header's nested part is read without a cast at every step. */
+const partOf = (value: unknown): Record<string, unknown> => (value !== null && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {});
+
+/**
+ * Why a door drafted from a description is dropped, or `null` when it may be filed: it reads on a clock (`READS_IN`) or
+ * it is not filed. WHAT A POLL MAY CARRY IS THE KERNEL'S TO SAY, and it refuses a `trigger` or a `sends` on one
+ * (`ingestBody` in `kernel/src/declare.ts`), so a reading door can never be the call finding 14 filed.
+ */
+function describedIngest(d: { id?: unknown; body?: unknown }, n: number): string | null {
+  const channel = partOf(d.body).channel;
+  if (typeof channel === 'string' && READS_IN.has(channel)) return null;
+  return `Proposal ${n} would open ${String(d.id ?? 'an ingest').slice(0, 80)}, a door that sends out or that others post to, and from a description Slash opens only one that fetches on a clock. Ask for it on its own.`;
+}
+
+/**
+ * What a reading door would do on its own once accepted, in the record's words, added to the question Decide draws, as
+ * `scriptSays` says a script's header. The model's question names only what it chooses to, so the host it fetches from,
+ * how often, the key sent with each request and the list it writes are read from the body itself. Only a `poll` or a
+ * `pull` is said here: every other door is either dropped from a description or said by the kernel's outside calls line.
+ */
+function ingestSays(d: { id?: unknown; body?: unknown }): string | null {
+  const body = partOf(d.body);
+  if (typeof body.channel !== 'string' || !READS_IN.has(body.channel)) return null;
+  const pulled = partOf(body.fetch);
+  const address = typeof body.url === 'string' ? body.url : typeof pulled.base === 'string' ? pulled.base : '';
+  let host = '';
+  try {
+    host = new URL(address).host.slice(0, 80);
+  } catch {
+    /* AN ADDRESS THAT IS NOT ONE is the kernel's to refuse, and the line then says only what else the body names. */
+  }
+  const every = typeof body.every === 'string' ? body.every : partOf(pulled.schedule).every;
+  const grant = typeof body.grant === 'string' ? body.grant : partOf(pulled.auth).grant;
+  const list = partOf(body.writes).register;
+  const id = String(d.id ?? '');
+  const bare = id.slice(id.indexOf('.') + 1).slice(0, 40);
+  const does = [
+    `fetch${host === '' ? '' : ` from ${host}`}${typeof every === 'string' ? ` every ${every.slice(0, 16)}` : ''}`,
+    ...(typeof list === 'string' ? [`write what it reads to your list "${list.slice(0, 40)}"`] : []),
+  ];
+  const sent = typeof grant === 'string' ? `, sending your key "${grant.slice(0, 40)}" with each request` : '';
+  return `Accepting it lets the door "${bare}" ${joinNames(does)} on its own${sent}.`;
+}
+
 /**
  * A model's `change` body as the kernel takes it, or why it is dropped. `to` is one declaration or `{ declarations }` of
  * them, and every one must be a kind in `BUILDS`. `declaration_id` is filled from `to` when the model left it out, as the
@@ -987,12 +1046,14 @@ function scriptSays(d: { id?: unknown; body?: unknown }): string {
  * to change nothing: with it removed the gold-rate test still found no trace of the model's host in the filed row, and
  * `stableKey` never reads either field, so a model that varies the egress it writes is still asked once.
  *
- * `described` IS A CHANGE DRAFTED FROM WHAT THE OWNER TYPED, held to `DESCRIBED_BUILDS` and to a rule that stays inside the
- * record, and `says` is what the record itself adds to the question about what already exists: the declarations it would
- * replace, and the existing list a rule would change rows of. The same finding filed `page.home` at version 1, swapped to
- * read Payroll, and Decide drew it as a new page; the question was the model's own words and named nothing it replaced.
- * A script adds its own line on every path, described or not (`scriptSays`), and no change body a model drafts is filed
- * with a key written out in it (`holdsKey`).
+ * `described` IS A CHANGE DRAFTED FROM WHAT THE OWNER TYPED, held to `DESCRIBED_BUILDS`, to a rule that stays inside the
+ * record and to a door that only reads, and `says` is what the record itself adds to the question about what already
+ * exists: the declarations it would replace, and the existing list a rule would change rows of. The same finding filed
+ * `page.home` at version 1, swapped to read Payroll, and Decide drew it as a new page; the question was the model's own
+ * words and named nothing it replaced. A script adds its own line on every path, described or not (`scriptSays`), a door
+ * drafted from a description adds its own (`ingestSays`), and no change body a model drafts is filed with a key written
+ * out in it (`holdsKey`). A door from a plain press keeps the question it always had, with the kernel's outside calls
+ * line beside it on Decide, since a press drafts from how the record is used and not from words anybody typed.
  */
 function changeBody(
   body: Record<string, unknown>,
@@ -1018,9 +1079,11 @@ function changeBody(
     };
   const says: string[] = [];
   if (described) {
-    const door = listed.find((d) => !DESCRIBED_BUILDS.has(String(d.kind)));
-    if (door !== undefined)
-      return { ok: false, why: `Proposal ${n} would open ${String(door.id ?? 'an ingest').slice(0, 80)}, a door to the outside, and Slash never opens one from a description. Ask for it on its own.` };
+    /* THE SET IS ASKED AND NOT ASSUMED, though today it is `BUILDS` whole, so a kind that joins `BUILDS` for a press
+       reaches a description only when somebody adds it here and says what holds it. */
+    const other = listed.find((d) => !DESCRIBED_BUILDS.has(String(d.kind)));
+    if (other !== undefined)
+      return { ok: false, why: `Proposal ${n} was a change to ${aKind(String(other.kind)).slice(0, 40)}, which Slash does not build from a description. Ask for it on its own.` };
     for (const d of listed) {
       const verb = d.kind === 'rule' ? reachesOut(d.body) : null;
       if (verb !== null)
@@ -1028,7 +1091,7 @@ function changeBody(
           ok: false,
           why: `Proposal ${n} has ${String(d.id ?? 'a rule').slice(0, 80)}, which would ${REACHES_OUT[verb]}, and Slash never opens a door to the outside from a description. Ask for it on its own.`,
         };
-      const held = d.kind === 'script' ? describedScript(d, n) : null;
+      const held = d.kind === 'script' ? describedScript(d, n) : d.kind === 'ingest' ? describedIngest(d, n) : null;
       if (held !== null) return { ok: false, why: held };
     }
     if (drawn !== undefined) {
@@ -1042,7 +1105,10 @@ function changeBody(
       }
     }
   }
-  for (const d of listed) if (d.kind === 'script') says.push(scriptSays(d));
+  for (const d of listed) {
+    const said = d.kind === 'script' ? scriptSays(d) : described && d.kind === 'ingest' ? ingestSays(d) : null;
+    if (said !== null) says.push(said);
+  }
   const named = typeof body.declaration_id === 'string' ? body.declaration_id : String(listed[0]?.id ?? '');
   /* THE VERSION EACH DECLARATION WAS DRAWN FROM IS THE READING'S, AND WHATEVER THE MODEL WROTE IS REPLACED. The reading a
      model is handed names no version, so a number it writes is a guess, and the likeliest guess is the version live when
@@ -1127,7 +1193,7 @@ function modelDraft(x: unknown, n: number, name: string, drawn: ((id: string) =>
     return { why: `Proposal ${n} was a ${String(d.body_kind)} proposal, and Slash files only pack, settings, arrange and change.` };
   if (d.body === null || typeof d.body !== 'object' || Array.isArray(d.body)) return { why: `Proposal ${n} had no body.` };
   if (described && d.body_kind !== 'change')
-    return { why: `Proposal ${n} was a ${d.body_kind} proposal, and from a description Slash files only a change that builds a list, a figure, a page, a rule or a script.` };
+    return { why: `Proposal ${n} was a ${d.body_kind} proposal, and from a description Slash files only a change that builds a list, a figure, a page, a rule, a script or a door that fetches on a clock.` };
   let body = d.body as Record<string, unknown>;
   let question = d.question.trim();
   if (d.body_kind === 'change') {
@@ -1165,9 +1231,14 @@ export type SlashRows = Record<string, Record<string, Json>[]>;
  * here only for its id and each block's refusals, so nothing else of its shape is written twice.
  */
 export type SlashPreviewedPage = { id: string; blocks: readonly { refusals?: readonly Refusal[] }[]; [key: string]: unknown };
-export type SlashPreview = { pages: SlashPreviewedPage[] };
 
-/** `previewChange` asked as the person pressing: one change and its sample rows drawn inside a rehearsal, nothing kept. */
+/** A rule of the draft taken over its sample by `tryAutomation`, as the try answered it, beside the rule's id. */
+export type SlashTried = Tried & { rule: string };
+
+/** What a draft drew, and, for a change of rules alone, what each rule did when tried (`previewerOf`). */
+export type SlashPreview = { pages: SlashPreviewedPage[]; tried?: SlashTried[] };
+
+/** `previewChange` asked as the person pressing, and its rules tried: one change and its sample rows drawn inside a rehearsal, nothing kept. */
 export type SlashPreviewer = (change: { to: unknown; rows?: SlashRows }) => Promise<Result<SlashPreview>>;
 
 /** One ask of the model, as `slashAsked` makes it: its raw answer, or the meter's refusal. A model that failed throws. */
@@ -1215,16 +1286,80 @@ export function pageFault(page: unknown): Refusal | null {
 }
 
 /**
- * `previewChange` on the record `api`, asked as `ctx`, or `null` on a record that has not got it.
+ * `previewChange` on the record `api`, asked as `ctx`, and then `tryAutomation` for each rule of a change of rules alone
+ * (`triedRules`), or `null` on a record that has not got `previewChange`.
  *
- * LOOKED UP WHEN IT IS CALLED, as the host looks up a row's method (`handlersFor`), because it is a sibling method under
+ * LOOKED UP WHEN IT IS CALLED, as the host looks up a row's method (`handlersFor`), because both are sibling methods under
  * `methods/` and neither `index.ts` nor a method file is handed the other's. `null` stops a description before the model
- * is asked: a draft nothing can try is a draft nothing can repair, and an ask spent on it is spent for nothing.
+ * is asked: a draft nothing can try is a draft nothing can repair, and an ask spent on it is spent for nothing. A record
+ * without `tryAutomation` draws its drafts as it did before the try, since the draw's lint still holds every rule.
  */
 export function previewerOf(api: unknown, ctx: unknown): SlashPreviewer | null {
   const method = (api as Record<string, unknown> | null)?.previewChange;
   if (typeof method !== 'function') return null;
-  return async (change) => (await (method as (args: unknown, ctx: unknown) => Promise<unknown>).call(api, change, ctx)) as Result<SlashPreview>;
+  const trial = (api as Record<string, unknown> | null)?.tryAutomation;
+  return async (change) => {
+    const seen = (await (method as (args: unknown, ctx: unknown) => Promise<unknown>).call(api, change, ctx)) as Result<SlashPreview>;
+    if (!seen.ok || typeof trial !== 'function') return seen;
+    const tried = await triedRules(change, async (args) => (await (trial as (args: unknown, ctx: unknown) => Promise<unknown>).call(api, args, ctx)) as Result<Tried>);
+    if ('refusal' in tried) return { ok: false, refusal: tried.refusal };
+    return tried.rules.length === 0 ? seen : { ...seen, value: { ...seen.value, tried: tried.rules } };
+  };
+}
+
+/** The most rules one change drafted from a description may carry, each tried before it is filed. */
+const RULES_TRIED_MOST = 5;
+
+/**
+ * Each rule of a change taken over its sample by `tryAutomation`, after `previewChange` drew it clean, or the refusal
+ * that stops it (`loop/finish/shell.md` SLS-1: a drafted automation is tried first).
+ *
+ * THE DRAW LINTS A RULE AND THE TRY RUNS IT. `previewChange` holds every declaration to the install's lint, the change laid
+ * over the record, and writes the sample rows through every rule a real row meets. A rule that starts on a clock meets no
+ * row, so "every morning tell me what is due" was filed with nothing having taken its steps. The try is the real runner
+ * in a rehearsal (`kernel/src/flow-try.ts`): a notice, a call or a question is said as what a live run would do and never
+ * leaves the record, and a step that fails is handed back to the model to mend as a draw's refusal is.
+ *
+ * ONLY A CHANGE OF RULES ALONE, because `tryAutomation` lints the body against the record as it stands: a rule over a list
+ * the same change builds would be refused for the list not being there yet, and the draft dropped for the order the record
+ * was asked in. A change that brings its own lists is held by the draw, whose rehearsal installs them first.
+ *
+ * A TRY THAT NEEDS A SAMPLE THE DRAFT HAS NOT GOT IS NOT A FAULT OF THE RULE. A rule on a list's rows is started from the
+ * draft's first sample row on that list; one on an arrival or a figure, with nothing to start it, is refused at `sample`,
+ * and that rule is left as the draw left it. A rule with no `on:` runs inside the write that fires it, which the draw's
+ * sample rows already took, and a try takes a run.
+ */
+async function triedRules(
+  change: { to: unknown; rows?: SlashRows },
+  tryAutomation: (args: { body: unknown; sample: Record<string, unknown> }) => Promise<Result<Tried>>,
+): Promise<{ rules: SlashTried[] } | { refusal: Refusal }> {
+  const to = partOf(change.to);
+  const listed = (Array.isArray(to.declarations) ? to.declarations : [to]).map(partOf);
+  if (listed.length === 0 || listed.some((d) => d.kind !== 'rule')) return { rules: [] };
+  const runs = listed.filter((d) => Object.keys(partOf(partOf(d.body).on)).length > 0);
+  if (runs.length > RULES_TRIED_MOST)
+    return { refusal: { code: 'OUT_OF_BOUNDS', fix: `A change from a description carries at most ${RULES_TRIED_MOST} rules that run, so each is tried before it is filed. Split it.`, at: 'to' } };
+  const rules: SlashTried[] = [];
+  for (const d of runs) {
+    const id = String(d.id ?? 'rule');
+    const body = partOf(d.body);
+    const list = subjectOf(body);
+    const row = list === null ? undefined : change.rows?.[list]?.[0];
+    let got: Result<Tried>;
+    try {
+      got = await tryAutomation({ body, sample: row === undefined ? {} : { row } });
+    } catch {
+      got = { ok: false, refusal: { code: 'RECORD_UNAVAILABLE', fix: 'The record could not try this rule.' } };
+    }
+    if (got.ok) {
+      rules.push({ ...got.value, rule: id });
+      continue;
+    }
+    const refusal: Refusal = 'refusal' in got ? got.refusal : { code: 'RECORD_UNAVAILABLE', fix: 'The record could not try this rule.' };
+    if (refusal.at?.startsWith('sample') === true) continue;
+    return { refusal: { ...refusal, at: refusal.at === undefined ? id : `${id}.${refusal.at}` } };
+  }
+  return { rules };
 }
 
 /**
@@ -1246,8 +1381,8 @@ function sampleRows(raw: unknown): SlashRows {
 }
 
 /**
- * Everything the record refused about one drawn draft: the lint's refusal, or each block that drew nothing, each with the
- * path the model reads it by. An empty list is a draft that previews clean.
+ * Everything the record refused about one drawn draft: the lint's or the try's refusal, or each block that drew nothing and
+ * each step a try failed, each with the path the model reads it by. An empty list is a draft that previews clean.
  */
 function faultsOf(seen: Result<SlashPreview>): { at: string; fix: string }[] {
   if (!seen.ok) return [{ at: ('refusal' in seen ? seen.refusal.at : undefined) ?? 'to', fix: 'refusal' in seen ? seen.refusal.fix : 'The change could not be drawn.' }];
@@ -1255,6 +1390,10 @@ function faultsOf(seen: Result<SlashPreview>): { at: string; fix: string }[] {
   for (const page of seen.value.pages)
     for (const [i, block] of page.blocks.entries())
       for (const r of block.refusals ?? []) faults.push({ at: `${page.id}.blocks[${i}]${r.at === undefined ? '' : `.${r.at}`}`, fix: r.fix });
+  /* A STEP THE TRY FAILED IS A FAULT AS A BLOCK THAT DREW NOTHING IS: the rule would install and then stop there on its
+     first live run. `would`, `waiting` and `skipped` are what a live run does past the try, and are not faults. */
+  for (const t of seen.value.tried ?? [])
+    for (const s of t.steps) if (s.state === 'failed') faults.push({ at: `${t.rule}.${s.path}`, fix: s.say });
   return faults;
 }
 
@@ -1274,7 +1413,8 @@ const answered = (d: SlashDraft & { rows: SlashRows }, said: string): unknown =>
 const opening = (text: string): string => `${text.charAt(0).toUpperCase()}${text.slice(1)}`;
 
 /**
- * A description drafted by the model, each draft tried with `previewChange`, and what it refused handed back to be mended.
+ * A description drafted by the model, each draft tried with `previewChange` (and its rules with `tryAutomation`, through
+ * `previewerOf`), and what it refused handed back to be mended.
  *
  * THE RECORD FILED WHATEVER PASSED `fromModel` FROM ONE ASK, WITH NO GRAMMAR IN IT (`loop/finish/pages.md` R5), so a
  * page naming a field its list lacks reached Decide and was found wrong when the owner accepted it. Now every draft is

@@ -25,6 +25,8 @@
 import type { Kernel, OutboxRow } from '@braindog/kernel';
 import { codeOf, fixOf, type Result, type Scheduler } from '@braindog/ports';
 
+import type { ModelJobEmbed } from './model-jobs.ts';
+
 /**
  * One question, as `flow.ts` `ask()` queues it and `@braindog/slash`'s `answer` takes it.
  *
@@ -238,4 +240,10 @@ export type DraftedPattern = {
 export type ModelJobInference = {
   draft(samples: readonly DraftSample[]): Promise<Result<DraftedPattern>>;
   prose(digest: unknown): Promise<Result<{ text: string }>>;
+  /**
+   * OPTIONAL, AND WIDENED HERE FOR TIDINESS ALONE: `serveModelJobs` already takes `ModelJobInference & ModelJobEmbed`
+   * (`model-jobs.ts`), so this was never refused; a builder's own return type just dropped `embed` unless it
+   * annotated one by hand.
+   */
+  embed?: ModelJobEmbed['embed'];
 };

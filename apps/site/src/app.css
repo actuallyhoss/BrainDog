@@ -27,6 +27,29 @@
   body {
     background: var(--bg);
     font-size: var(--t-site-body);
+    /**
+     * NOTHING ON THE SITE IS SET UNDER 14PX (`loop/finish/site.md` C10), and this is where that holds.
+     *
+     * The app's two smallest steps are 12 and 13, sized for a dense record read at a desk, and the
+     * site's pages borrowed them for every label, date, price note and footer link: some fifty rules
+     * across the routes, each of them a line under the floor on a phone. Raising the two tokens here
+     * lifts every one of them at once, and a rule written tomorrow with `--t-sm` lands on 14 too.
+     * It is set on `body` and not `:root` so `:root` still holds the app's values for the rule below.
+     */
+    --t-xs: var(--t-site-small);
+    --t-sm: var(--t-site-small);
+  }
+
+  /**
+   * THE DRAWINGS OF THE APP KEEP THE APP'S SCALE. A drawing is a picture of the record at its own
+   * size, with its labels at the sizes the app sets them, and a 13px label grown to 14 inside a
+   * drawn window pushes its rows out of the frame they were drawn to fit. Each root here is one
+   * drawing: the window, the phone, the decision, the Slash palette, the flow, and every figure
+   * that says it is a picture with `role="img"`.
+   */
+  :where(.app, .phone, .decide, .palette, .flow-figure, [role='img']) {
+    --t-xs: var(--t-app-xs);
+    --t-sm: var(--t-app-sm);
   }
 
   /* The one width every page's content and the bar share, so their edges line up. */
@@ -44,6 +67,9 @@
     --t-site-lead: clamp(18px, 17.26px + 0.19vw, 20px);
     --t-site-body: clamp(16px, 15.63px + 0.095vw, 17px);
     --t-site-small: 14px;
+    /* The app's two smallest steps, read here where they are still the app's, for the drawings. */
+    --t-app-xs: var(--t-xs);
+    --t-app-sm: var(--t-sm);
 
     /**
      * THE GROUNDS, AND THE PAGE HAD ONE.
@@ -210,26 +236,8 @@
     padding-inline: var(--sp-6);
   }
 
-  /**
-   * THE BAND OPENER: a word, and a rule that runs from it to the far edge of the column. The rule is
-   * what earns the opener its place: 1px of ink across the whole column. No number, no capitals.
-   */
-  .band-mark {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-3);
-    margin-block-end: var(--sp-5);
-    font-family: var(--font-id);
-    font-size: var(--t-xs);
-  }
-
-  .band-rule {
-    flex: 1;
-    block-size: 1px;
-    background: var(--line);
-  }
-
-  /* Sentence case in the text face, like every other label on the site (C10). */
+  /* Sentence case in the text face, like every other label on the site (C10). The opener's mono word
+     and its rule went with the redesign: no page drew them, and a mono label is not code. */
   .band-tag {
     color: var(--dim);
     font-family: var(--font-ui);

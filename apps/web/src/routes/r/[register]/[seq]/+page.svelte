@@ -41,7 +41,10 @@
   import Money from '$lib/ui/Money.svelte';
   import Chip from '$lib/ui/Chip.svelte';
   import IdentityMark from '$lib/ui/IdentityMark.svelte';
-  import AddField from '$lib/ui/AddField.svelte';
+  import Menu from '$lib/ui/Menu.svelte';
+  import ListEditor from '$lib/ui/ListEditor.svelte';
+  import { ofPeople } from '$lib/ui/RowCards.svelte';
+  import { fieldWords } from '$lib/record/field-words.ts';
   import AddValue from './AddValue.svelte';
   import { putBackOf, valueWords } from '$lib/record/field-write.ts';
   import { draftOf, editable, isFile, isJson, isQuantity, patchOf, unitOf, unitsOf, wrongValue } from '$lib/record/field-draft.ts';
@@ -65,6 +68,9 @@
   import Thread from '$lib/ui/Thread.svelte';
   import HandSheet from '$lib/ui/HandSheet.svelte';
   import UsedBy from '$lib/page/panels/UsedBy.svelte';
+  import { may } from '$lib/record/may.ts';
+  import type { Shell } from '$lib/record/boot-live.ts';
+  import { reachWords } from '../reach.ts';
 
   const id = $derived(page.params.register ?? '');
   const seq = $derived(Number(page.params.seq));
@@ -87,6 +93,16 @@
      of these read again: the field is on the row with no second read of the row. */
   const readable = $derived.by(() => (void got, readableFields(id)));
   const live = $derived(got?.from === 'live');
+  /**
+   * WHAT THE CALLER'S LEVEL ON THIS ROW'S LIST REACHES (COL-13), asked of `may()` and never worked out here.
+   *
+   * A CONTROL THE RECORD WOULD REFUSE IS NOT DRAWN: Edit, Archive, a field's pencil and the scope move are an `update`,
+   * which asks `write` of the list, and a note is a `log`, which asks `append`. A comment asks only that the row can be
+   * read, which is what drew this page, so the thread is not gated. `proposes` is the new-field box's rung, which files
+   * a proposal for anyone but the owner, and a `propose` names no list.
+   */
+  const changes = $derived(live && may(page.data as unknown as Shell, 'write', id));
+  const notes = $derived(live && may(page.data as unknown as Shell, 'append', id));
   /* WHAT THIS RECORD CALLS THE ROWS THIS ONE POINTS AT, and the only source, so a ref the record did
      not name is drawn as `<list>#<number>` and never as a sample row. Undefined for a row the record
      does not hold. */
@@ -229,7 +245,7 @@
   function startEdit(f: FieldDecl) {
     /* ONLY A ROW THE RECORD HOLDS OPENS A BOX. The sample's toast, "the row would open for editing", went with the
        sample (DIRECTION 26), and a row the record refused to show draws no edit control to press. */
-    if (!row || !live) return;
+    if (!row || !changes) return;
     problem = null;
     editing = f.id;
     draft = draftOf(f, row.fields[f.id], listCurrency(f));
@@ -403,6 +419,9 @@
   const me = $derived(String(page.data.me?.person ?? ''));
   /* WHETHER A FIELD ADDED HERE LANDS AT ONCE OR WAITS ON DECIDE: the settings screen's one predicate for owning. */
   const owner = $derived(page.data.me ? ownsRecord(page.data.me as Me) : false);
+  const proposes = $derived(owner || may(page.data as unknown as Shell, 'append'));
+  /* THE LIST'S FIELDS SHEET, opened from the head's "…" menu. */
+  let fieldsOpen = $state(false);
   let people = $state<ReadonlyMap<string, string>>(new Map());
   let namesAsked = false;
   $effect(() => {
@@ -596,15 +615,16 @@
            that puts `obligations#1` on the clipboard, ahead of anything that does something to the
            invoice. Details holds the number and its "Copy link", and `y` still copies the id. -->
       <!-- WHERE THE ROW APPLIES, FIRST: the project's chip, or the globe and "Everywhere", which opens the move. -->
-      <ScopeMove register={id} {row} {names} {live} title={String(row.fields[decl.title] ?? '')} onmoved={() => void rowMoved(id, seq)} />
-      <Button weight="quiet" onclick={editTitle}>{copy.editRow}</Button>
+      <ScopeMove register={id} {row} {names} live={changes} title={String(row.fields[decl.title] ?? '')} onmoved={() => void rowMoved(id, seq)} />
+      {#if changes}<Button weight="quiet" onclick={editTitle}>{copy.editRow}</Button>{/if}
       <!-- ARCHIVE IS THE LIST'S OWN VERB, on the row itself: a row that can be archived in one
            place and not the other is two products. `Put back` stands where `Archive` was for as
            long as this tab holds the row it just archived: see `archived` for why that moment is
            the only one it can be offered in. -->
-      {#if archived}
+      <!-- AND NEITHER FOR SOMEBODY WHO CANNOT CHANGE THE LIST (COL-13), where the note's place says why. -->
+      {#if changes && archived}
         <Button weight="quiet" disabled={saving} onclick={() => void setArchived(false)}>{copy.rowRestore}</Button>
-      {:else}
+      {:else if changes}
         <Button weight="quiet" disabled={saving} onclick={() => void setArchived(true)}>{copy.rowArchive}</Button>
       {/if}
       <!-- "HAND TO" (GAP-11): a teammate or an agent in one press, on a list that says who holds its rows, and while an
@@ -612,8 +632,20 @@
       {#if live && !archived}
         <HandSheet register={id} {row} {decl} trigger onhanded={() => void rowMoved(id, seq)} />
       {/if}
+      <!-- THE HEAD'S "…", LAST (design DSN-16): what is done to the list this row is in, and the row's link. "Add a field"
+           sat under the facts as a button of its own, a second way into what the list's Fields sheet does (FLD-1). -->
+      {#if live}
+        <Menu label={copy.moreOn(String(row.fields[decl.title] ?? '') || decl.one)} align="end">
+          {#snippet trigger()}
+            <span class="head-more"><Icon name="more" size="s" /><span class="head-vh">{copy.moreOn(String(row.fields[decl.title] ?? '') || decl.one)}</span></span>
+          {/snippet}
+          {#if proposes}<button type="button" class="mi" role="menuitem" onclick={() => (fieldsOpen = true)}>{fieldWords.add}</button>{/if}
+          <button type="button" class="mi" role="menuitem" onclick={() => clipboard.putLink(id, row.seq)}>{copy.copyLink}</button>
+        </Menu>
+      {/if}
     {/snippet}
   </PageHead>
+  {#if live && proposes}<ListEditor bind:open={fieldsOpen} register={id} {owner} onchanged={() => (got = got && { ...got })} />{/if}
 
   <div class="page">
     <!-- SAID ON THE ROW, because every list leaves an archived row out and nothing else on this
@@ -652,6 +684,9 @@
     <div class="split">
       <section class="fields">
         <section class="lead" aria-label={decl.one}>
+          <!-- A PERSON'S PAGE LEADS WITH THEIR FACE (design SYS-7), the one their row wears in the list, drawn from the
+               name in the title above; `Face` is `aria-hidden` because that name is already said. -->
+          {#if ofPeople(decl)}<span class="lead-face"><Face name={String(row.fields[decl.title] ?? '')} kind="person" size="l" /></span>{/if}
           {#if figure !== null && figureField}
             <p class="lead-figure num">
               <Money minor={figure} currency={currencyOf(row.fields[figureField.id]) ?? ''} weight="strong" />
@@ -792,7 +827,7 @@
               </dd>
               <!-- THE PENCIL IS ITS OWN CELL IN THE TRAILING COLUMN, so every pencil on the page shares one edge
                    whatever the value beside it holds. A `dd`, because a `dl`'s groups hold nothing else. -->
-              {#if live && editable(f) && editing !== f.id}
+              {#if changes && editable(f) && editing !== f.id}
                 <dd class="field-pencil">
                   <button type="button" class="edit-field tap" aria-label={copy.editValue(labelOf(f))} onclick={() => startEdit(f)}>
                     <Icon name="edit" size="s" />
@@ -812,7 +847,7 @@
           <ul class="unset" aria-label={copy.editNotSet}>
             {#each unset as f (f.id)}
               <li>
-                {#if live && editable(f)}
+                {#if changes && editable(f)}
                   <button type="button" class="unset-chip tap" aria-label="{rowWords.add} {labelOf(f).toLowerCase()}" onclick={() => startEdit(f)}>
                     <Icon name="plus" size="s" /><span>{labelOf(f)}</span>
                   </button>
@@ -823,8 +858,8 @@
             {/each}
           </ul>
         {/if}
-        <!-- A FIELD THIS LIST DOES NOT HAVE YET, added to every row of it. -->
-        <AddField register={id} {live} {owner} onadded={() => (got = got && { ...got })} />
+        <!-- A FIELD THIS LIST DOES NOT HAVE YET is added from the head's "…" menu (design DSN-16), in the list's own Fields
+             sheet, so the row page and the list offer one way to add a field and not two. -->
 
         <!-- A `document` field is the dialect, drawn by the same interpreter a declared page uses.
              The read view IS the renderer, so what you are looking at is the artefact (22 §8). -->
@@ -835,7 +870,7 @@
           <article class="document-slot">
             <div class="doc-head">
               <h2 class="doc-label">{labelOf(f)}</h2>
-              {#if live && editing !== f.id}
+              {#if changes && editing !== f.id}
                 <button type="button" class="edit-field tap" aria-label={copy.editValue(labelOf(f))} onclick={() => startEdit(f)}>
                   <Icon name="edit" size="s" />
                 </button>
@@ -924,13 +959,19 @@
           <dd>{#if addedWho}{copy.rowAddedBy(since(row.created, clock), addedWho.you ? copy.rowByYou : addedWho.person && addedWho.name === copy.feedSomeone ? copy.rowBySomeone : addedWho.name)}{:else}{since(row.created, clock)}{/if}</dd>
         </dl>
 
-        <form class="note-form" onsubmit={addNote}>
-          <label class="note-label" for="row-note">{copy.noteLabel}</label>
-          <div class="note-line">
-            <input id="row-note" class="note-input" type="text" maxlength="280" autocomplete="off" placeholder={copy.notePlaceholder} bind:value={noteText} />
-            {#if noteText.trim()}<Button type="submit">{copy.noteAdd}</Button>{/if}
-          </div>
-        </form>
+        <!-- THE NOTE BOX, for somebody whose level adds to the list (COL-13). For a Reads colleague the place says in one
+             sentence why this row has no Edit, Archive or note, and the thread under it is still theirs. -->
+        {#if notes}
+          <form class="note-form" onsubmit={addNote}>
+            <label class="note-label" for="row-note">{copy.noteLabel}</label>
+            <div class="note-line">
+              <input id="row-note" class="note-input" type="text" maxlength="280" autocomplete="off" placeholder={copy.notePlaceholder} bind:value={noteText} />
+              {#if noteText.trim()}<Button type="submit">{copy.noteAdd}</Button>{/if}
+            </div>
+          </form>
+        {:else if live}
+          <p class="reach">{reachWords.readOnly(listName(id))}</p>
+        {/if}
 
         <!-- THE ROW'S COMMENTS (COL-8), beside the note and above the history. A note is the row's own log line and
              asks to change the row; a comment is somebody saying something about it, which a Reads colleague may
@@ -1108,6 +1149,40 @@
     font-size: var(--t-base);
     font-weight: 600;
     letter-spacing: -0.006em;
+  }
+
+  /* COMMENTS ARE A SECTION OF THIS COLUMN, LIKE DETAILS AND HISTORY (design DSN-16). `Thread` titles itself as a
+     caption, small and in the second ink, which is right under a Decide card and read here as a fourth weight of
+     heading between two of these; beside them it takes theirs. Its gap under the title is already this column's. */
+  .side :global(.thread-title) {
+    color: var(--ink);
+    font-family: var(--font-ui);
+    font-size: var(--t-base);
+    font-weight: 600;
+    letter-spacing: -0.006em;
+  }
+
+  /* THE HEAD'S "…": a square the height of the head's other buttons, named for a screen reader by the hidden words. */
+  .head-more {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    inline-size: var(--ctl-h);
+    min-block-size: var(--ctl-h);
+  }
+
+  .head-vh {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* A PERSON'S FACE ABOVE THE FIGURE, at its own size and never stretched by the lead's grid. */
+  .lead-face {
+    display: flex;
   }
 
   /* The FIELD's label, quieter than the register's name: "Obligations party" reads as one heading
@@ -1349,6 +1424,14 @@
     flex-direction: column;
     gap: var(--sp-2);
     margin-block: var(--sp-5);
+  }
+
+  /* WHY THERE IS NO NOTE BOX (COL-13): one dim sentence in the box's place and its spacing, so nothing below it moves
+     further than the box's own height. */
+  .reach {
+    margin-block: var(--sp-5);
+    color: var(--ink2);
+    font-size: var(--t-sm);
   }
 
   .note-label {

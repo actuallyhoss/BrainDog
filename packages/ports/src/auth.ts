@@ -79,9 +79,30 @@ export type AuthCall =
    */
   | { flow: 'invite.prove'; email: string; invite: string; name?: string }
   /** The proof coming back from the mailbox, spent once: the host makes the person only after this answers. */
-  | { flow: 'invite.proved'; token: string };
+  | { flow: 'invite.proved'; token: string }
+  /**
+   * Operator only, like `claim.mint`: stop a person signing in (`suspended: true`), which ends every session they hold,
+   * or let them sign in again (`false`). `email` names them as the operator knows them.
+   */
+  | { flow: 'suspend'; email: string; suspended: boolean };
 
 export type AuthFlow = AuthCall['flow'];
+
+/**
+ * Closing an account (`POST /account/close`, OPS-21), a union beside `AuthCall` as `SignupCall` is, because it has no
+ * `/auth/*` row and `router-groups` holds every arm of `AuthCall` to exactly one.
+ *
+ * BY PERSON ID, BECAUSE THE DOOR HAS ALREADY ASKED EVERYTHING. `serveAccount` read the session, and the close door
+ * checked its proof is fifteen minutes old at most, the address typed against it, and every record the person owns for
+ * another owner, before this reaches the Directory. Nothing a browser sends is ever this call.
+ */
+export type AccountCall = { flow: 'account.close'; person: string };
+
+/** What closing answered: how many passkeys, sessions and memberships went with the person. */
+export type AccountClosed = { passkeys: number; sessions: number; records: number };
+
+/** What `suspend` answered: who, and since when they are stopped, `null` once they may sign in again. */
+export type Suspended = { person: string; suspended_at: string | null };
 
 /**
  * A stranger asking for a record of their own (`loop/finish/ops.md` §4.0 C, OPS-17). The Worker's alone: a self-host is
@@ -257,6 +278,8 @@ export type AuthBodies = {
   'signup.start': Record<string, never>;
   'signup.verify': SignupVerified;
   'signup.name': SignupName;
+  suspend: Suspended;
+  'account.close': AccountClosed;
 };
 
 /** `auth(call)`, typed so the body matches the flow that was asked. */

@@ -28,6 +28,11 @@
  *
  * NOTHING IS WRITTEN UNLESS EVERY PACK PASSES, so a refused pack leaves the catalogue as it was rather than half moved.
  *
+ * A YANK COMES FROM A PACK'S OWN `yanked.json`, NEVER FROM A HAND EDIT OF THE CATALOGUE (`apps/web/static/catalogue`
+ * is generated and rule 7 of `loop/finish/rules.md` §9 keeps it that way). `packs/<folder>/yanked.json` maps a
+ * catalogue id that folder publishes to why it is withdrawn; this run stamps each onto the matching index entry's
+ * matching versions, and a version already carrying a reason keeps it, so a second run writes nothing new.
+ *
  * EVERY ENTRY SAYS WHAT A MARKETPLACE SHOWS (`loop/finish/platform.md` §4.0 C): BrainDog as its publisher, its
  * categories worked out from its latest file by `categoriesOf`, and `unlisted` when that file says so (decisions.md
  * C41: a pack named for one person or one bank stays in the index, so it installs by id, and out of every listing). The
@@ -112,6 +117,28 @@ for (const folder of readdirSync(packsDir, { withFileTypes: true }).filter((d) =
   index = out.value.index;
   files.set(out.value.path, text);
   said.push(`${where} published as ${out.value.path}`);
+}
+
+/* YANKS, READ THE SAME WAY: a `yanked.json` beside a pack, never a hand edit of the index. Each maps a catalogue id
+   that pack publishes to why it is withdrawn, and every one of its versions is stamped, not only the latest, since
+   an old version stays installable by id until it too is marked. A reused reason and date (a version already
+   yanked) means a second run of this script writes nothing new here. */
+for (const folder of readdirSync(packsDir, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name).sort()) {
+  const yankFile = join(packsDir, folder, 'yanked.json');
+  if (!existsSync(yankFile)) continue;
+  const yanks = JSON.parse(readFileSync(yankFile, 'utf8'));
+  for (const [id, reason] of Object.entries(yanks)) {
+    if (!reason) fail(`packs/${folder}/yanked.json gives ${id} an empty reason.`);
+    if (!index.entries.some((e) => e.kind === 'pack' && e.id === id)) fail(`packs/${folder}/yanked.json names ${id}, which is not a pack entry in the index.`);
+    index = {
+      ...index,
+      entries: index.entries.map((e) =>
+        e.kind === 'pack' && e.id === id
+          ? { ...e, versions: e.versions.map((v) => (v.yanked ? v : { ...v, yanked: { reason, at: now.toISOString() } })) }
+          : e,
+      ),
+    };
+  }
 }
 
 /* EVERY ENTRY DESCRIBED FROM ITS LATEST FILE, the ones published before these fields existed included. A latest file

@@ -20,6 +20,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { bundled } from './bundled-worker.ts';
+import { asPage } from '../src/route.ts';
 
 const ORIGIN = 'https://brain.example.test';
 
@@ -67,6 +68,10 @@ async function world() {
   return { ask, asked };
 }
 
+/* `PAGE`'s policy is `frame-ancestors 'none'` alone because the shell here carries no meta policy of its own, and a
+   page is told only what a meta tag cannot say (`pagePolicy`). A file beside the pages is told this instead. */
+const FILE_POLICY = "default-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'";
+
 const pageHeaders = (out: Response) => Object.fromEntries(Object.keys(PAGE).map((name) => [name, out.headers.get(name)]));
 
 test('THE SHELL AND THE SIGN-IN PAGE CARRY ALL FOUR, and so does a page under a slug and a file beside the pages', async () => {
@@ -85,7 +90,8 @@ test('THE SHELL AND THE SIGN-IN PAGE CARRY ALL FOUR, and so does a page under a 
   assert.equal(font.status, 200);
   assert.equal(font.headers.get('content-type'), 'font/woff2');
   assert.deepEqual([...new Uint8Array(await font.arrayBuffer())], [119, 79, 70, 50]);
-  assert.deepEqual(pageHeaders(font), PAGE);
+  /* A FILE BESIDE THE PAGES GETS THE STRICT POLICY (OPS-22): nothing inline runs in a font, a script or an image. */
+  assert.deepEqual(pageHeaders(font), { ...PAGE, 'content-security-policy': FILE_POLICY });
   /* A HEAD IS ANSWERED WITH THE SAME HEADERS AND NO BODY. */
   const head = await ask('/app/signin', { method: 'HEAD' });
   assert.equal(head.status, 200);
@@ -128,4 +134,24 @@ test('AN API PATH UNDER A WORD THAT IS NOT A NAME IS THE ROUTER’S 404 JSON, an
     '/app/settings/api/boot 200 text/html',
   ]);
   assert.deepEqual(asked, [], 'the Directory was asked about a path that names no record');
+});
+
+/* OPS-22. THE HEADER IS THE PAGE'S OWN META POLICY, so the hashes in it are the build's own: a header `script-src`
+   that lacked them would refuse the shell's inline scripts and draw an empty screen (`apps/site/test/one-origin.test.mjs`
+   measured exactly that on the site). Turnstile stays on `/app/signup` alone. */
+test('A PAGE IS SENT THE POLICY IN ITS OWN META WITH FRAME-ANCESTORS, AND TURNSTILE ONLY ON /app/signup', async () => {
+  const meta = "default-src 'self'; script-src 'self' 'sha256-abc=' https://challenges.cloudflare.com; style-src-attr 'unsafe-inline'; frame-src https://www.loom.com https://challenges.cloudflare.com";
+  const shell = `<!doctype html><head><meta http-equiv="content-security-policy" content="${meta}"></head>`;
+  const answer = (body: string | null) => immutable(new Response(body, { headers: { 'content-type': 'text/html' } }));
+  const policy = async (path: string | undefined, body: string | null = shell) => (await asPage(answer(body), path)).headers.get('content-security-policy');
+
+  assert.equal(await policy('/app/signup'), `${meta}; frame-ancestors 'none'`);
+  assert.equal(await policy(undefined), `${meta}; frame-ancestors 'none'`, 'an answer with no address keeps the page policy whole');
+  const narrowed = "default-src 'self'; script-src 'self' 'sha256-abc='; style-src-attr 'unsafe-inline'; frame-src https://www.loom.com; frame-ancestors 'none'";
+  for (const path of ['/app/signin', '/app/', '/app/acme/r/tasks', '/app/signup/extra']) assert.equal(await policy(path), narrowed, path);
+
+  /* A HEAD OR A 304 HAS NO BODY TO READ, and a policy without the hashes would blank the page a browser kept. */
+  assert.equal(await policy('/app/signin', null), "frame-ancestors 'none'");
+  /* THE PAGE IS SENT UNCHANGED. */
+  assert.equal(await (await asPage(answer(shell), '/app/')).text(), shell);
 });

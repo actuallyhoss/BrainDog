@@ -1,51 +1,142 @@
 # `packs/`
 
-Features that are data on the record, not code in BrainDog. Each folder is one pack: the pack file a record installs,
-any script it runs, and the test that proves it installs and does what it says.
+Add-ons that are data on a record, not code in BrainDog. Each folder here is one add-on (a pack): the file a record
+installs, any script it runs, and the tests that prove it installs and does what it says. They are written to be
+read. If you are about to write your first add-on, start with `hello`, then open the one below nearest to what you
+want to make.
 
-It exists because of one rule (`loop/DIRECTION.md` sections 22 and 24): **BrainDog is the shell**. The core ships
-primitives, lists, fields, pages, blocks, scripts and automations, and a use case is built on top of them. A feature
-that knows about a kind of business, a bank or one person's projects does not go in `packages/` or `apps/`. It goes
-here, as a file anybody could have written, installed through the same `planPack` and `installPack` a person presses
-in the app. If a feature needs something the shell cannot yet say, the missing piece is built as a primitive, for
-everyone, and the feature stays a pack on top of it.
+**BrainDog is the shell.** The core ships lists, fields, pages, blocks, figures, digests, scripts and automations, and
+a use case is built on top of them. A feature that knows about a kind of business, a bank or one person's projects
+does not go in `packages/` or `apps/`. It goes here, as a file anybody could have written, installed through the same
+`planPack` and `installPack` a person presses in the app. If a feature needs something the shell cannot yet say, the
+missing piece is built as a primitive, for everyone, and the feature stays a pack on top of it.
+
+## The folder
 
 ```
 packs/<id>/
-  <id>.pack.json   the pack: its lists, what it lays on other packs' lists (`extends`), its pages
-  <id>.test.ts     a fresh record, the pack installed, and what a person or an agent then sees
-  *.js             a script the pack runs, when it has one
-  package.json     so `pnpm test` runs the test with every other workspace
+  <id>.pack.json   the add-on: its manifest, its lists, what it lays on other add-ons' lists (`extends`),
+                   and its pages, figures, rules, digests and scripts
+  <id>.test.json   rows to write into a scratch record, and what the record should then hold
+  <id>.test.ts     a fresh record, the add-on installed exactly as it ships, and what a person or an agent then sees
+  *.js             a script the add-on runs, when it has one
+  README.md        what it adds, in a few lines, when it has one
+  package.json     so `pnpm test` runs the test with every other workspace; it has no dependencies
+  tsconfig.json    so the test is typechecked with the rest
 ```
 
-## What a pack here is held to
+`braindog pack new <id>` writes the start of this folder: the pack file with one list, a page over it and two example
+rows, its `<id>.test.json` and a README. `packs/hello` is that folder with BrainDog's name on it, and its
+`hello.test.ts` runs `pack check` and `pack test` through the command line's own functions.
 
-**It installs through the record's own door.** A test builds a record with `createRecordApi`, installs the modules the
-pack needs, then plans and installs the pack file exactly as it ships. A test that built the declarations by hand
-would pass while the file refused.
+A script lives twice: as `<name>.js`, which is the file you edit and read, and as the `source` of its declaration in
+the pack file, which is what a record runs. The pack's test holds the two to be the same text, byte for byte. A script
+opens with a comment saying what it does, in words a person deciding whether to install it can follow.
 
-**It proves itself red first.** Each test opens by asserting the record does not already do what the pack adds, so a
-pack whose fields turn out to exist already, or whose page is drawn by something else, fails its own first test
-instead of passing for the wrong reason.
+## The manifest
 
-**It lays, it does not take.** A pack that adds to another pack's list does it with `extends`, which accepts only
-optional fields and new values on a closed list. Those leave every row readable and every other writer free to go on
-writing what it wrote, so the plan asks nobody to press anything. Uninstalling the pack takes its pages away and leaves
-what people wrote in its fields, as the record's own.
+The top of a pack file says what the add-on is and what it needs. Its keys are the ones `MANIFEST_KEYS` names in
+`packages/declare/src/catalogue.ts`; a record passes over any other key, and the Kennel refuses it.
 
-**It names nobody.** Fixtures are invented projects and invented wording. A pack is a file people share, and a test
-that quoted somebody's record would publish it.
+- `pack` and `version`: the id a record holds it under, and its version as three numbers.
+- `title` and `summary`: what a person sees on Browse and in the plan before installing it.
+- `changes`: what this version changed, in words a person will notice, at most 500 characters. The catalogue shows it
+  as the version's notes.
+- `author` and `license`.
+- `requires`: the format and primitives it is written for, and each add-on it needs installed first, with a version
+  range, as `"money-core": ">=3.0.0 <4.0.0"`.
+- `declarations`: the lists, pages, figures, rules, digests and scripts it adds. Beside them, `extends` lays optional
+  fields on another add-on's list, `config` declares the settings a person sets on the add-on's page, and `seeds` are
+  example rows.
+
+**A published version never changes.** A record that installed 1.0.0 is held to its checksum, so any change is a new
+version, and the version says how big the change is: a major when a list, a page or a module goes or a field changes
+type; a minor when a declaration, a module or a host is added; a patch for anything else, such as a changed page, rule,
+script, title or word.
+
+## The tests
+
+A pack can carry a test of each kind, and they do different jobs. Every pack here has a `.test.ts` (`<id>.test.ts`, or
+`bands.test.ts` in `portfolio-bands`); `hello` and `reading-list` carry a `<id>.test.json` beside it, as
+`braindog pack new` starts every new one.
+
+**`<id>.test.json` is the author's test**, the one `braindog pack test <folder>` runs. It installs the add-on in a
+scratch record on your machine, after the modules it needs and its example rows, then writes each of `rows` as a
+person would, with the record's rules running, and says each of `expect` as passed or failed:
+
+```json
+{
+  "rows":   [ { "list": "items", "fields": { "name": "Check the test runs" } } ],
+  "expect": [ { "list": "items", "count": 3 },
+              { "figure": "open-items", "value": 3 },
+              { "row": 1, "field": "state", "is": "open" } ]
+}
+```
+
+A count counts the example rows too, `row` counts the rows above it from one, and a figure is read the way a page
+reads it.
+
+**`<id>.test.ts` is the repository's test**, run by `pnpm test` with every other workspace; the catalogue tool below
+refuses a pack without one. It builds a record with `createRecordApi`, installs what the pack needs, then plans and
+installs the pack file exactly as it ships, because a test that built the declarations by hand would pass while the
+file was refused. Each one is held to these habits:
+
+- **It proves itself red first.** It opens by asserting the record does not already do what the pack adds, so a pack
+  whose fields turn out to exist already, or whose page is drawn by something else, fails its own first test instead
+  of passing for the wrong reason.
+- **It lays, it does not take.** A pack that adds to another pack's list does it with `extends`, which accepts only
+  optional fields and new values on a closed list. Those leave every row readable and every other writer free to go
+  on writing what it wrote. Uninstalling the pack takes its pages away and leaves what people wrote in its fields, as
+  the record's own.
+- **It runs on a fixed clock.** Anything that runs on a schedule is tested by moving the clock: the install arms it,
+  the clock moves to the hour it was armed for, and the record's own drain runs it. `week-in-money` and `standup` do
+  this with a digest.
+- **It names nobody.** Fixtures are invented projects and invented wording. A pack is a file people share, and a test
+  that quoted somebody's record would publish it.
+
+## Checking and publishing to the Kennel
+
+```
+braindog pack check <folder>     read it, warn on any manifest key the Kennel does not take, install it in a
+                                 scratch record and draw each page it adds, saying every refusal with its code
+braindog pack test <folder>      run its <id>.test.json, as above
+braindog pack preview <folder>   start a scratch BrainDog on this machine with the add-on in its catalogue
+braindog pack publish <id>.pack.json --kennel [--sign <key file>]
+```
+
+`check`, `test` and `preview` send nothing. `publish --kennel` submits the file to the Kennel, as the person signed in
+or signed with an author key made by `braindog pack key`, and says whether it is listed or waits for review. A later
+version of the same add-on is published the same way, with its `changes` line saying what moved.
+`braindog pack yank <id> <version> --reason <why>` withdraws a published version and says why.
 
 ## What is here
 
-| Pack | What it adds |
-| --- | --- |
-| `project-brief` | On each project, one line saying what it is, the plan, and what is in the way; and a Briefs page drawing all three over the projects in play. |
-| `portfolio-bands` | A daily script that splits the revenue across projects into now, next and later, one amount per currency, and a split bar that draws the three. |
-| `rates-poll` | Exchange rates fetched on a schedule into the record, for whichever currencies it names. |
-| `mercury` | Balances from a Mercury bank account, pulled on a schedule through a key held in the vault. |
+Roughly from the simplest to the most involved, each with what it shows you how to do.
 
-## How a pack here reaches a record
+| Folder | What it adds | What it shows |
+| --- | --- | --- |
+| `hello` | A list of things to do and a page of what is still open. | The smallest add-on, exactly as `braindog pack new` starts one, with its `.test.json`. |
+| `reading-list` | Books, articles and papers to read, what is being read now, and a line on each one finished. | A list with a state, and a page with one table for each state. |
+| `roadmap` | Your dated tasks on one time axis, each dragged to a new date. | A page over another add-on's list, named in `requires`. |
+| `project-brief` | On each project, one line on what it is, the plan, and what is in the way. | `extends`: optional fields laid on another add-on's list, and a block added to its page. |
+| `pad` | Notes beside the work, with a second opinion from Slash under each one. | An automation that asks Slash and writes the answer back, with no code. |
+| `standup` | One message every morning: what moved, what is blocked, and what agents finished. | A daily digest whose sections are left out when empty, so a quiet morning sends nothing. |
+| `week-in-money` | One message every Monday: cash now, what fell due each way, and what money arrived. | A weekly digest with a figure, and two sentences from Slash on top (`prose: slash`). |
+| `holdings` | What you hold rather than spend, with what each one cost and what they cost together. | Figures over a list, and a small script run by a rule and once a day. |
+| `count-cash` | A count of a cash box or an account, kept as a balance check with the difference in the ledger. | A script started by an automation on each new row, writing into another add-on's lists. |
+| `portfolio-bands` | What your projects take a month now, and the room left next and later, drawn as one bar. | A daily script, with settings a person fills in on the add-on's page. |
+| `card-alerts` | A card alert, forwarded by mail or posted as a text message, read into Money as a transaction. | Doors that read a message into a list, one pattern for each wording. |
+| `bank-hsbc-eg` | HSBC Egypt's alert mails and text messages read into Money, with the balance each one prints. | Many wordings behind one bank's doors, each tested with an invented message. |
+| `stripe` | The Stripe balance and the payouts on their way to the bank, every hour, into Money's accounts. | A script that calls out to one host with a key held in the vault. |
+| `mercury` | Mercury balances and the last thirty days of transactions, into Money. | A script that calls out, with how often it asks as a setting. |
+| `rates-poll` | What one currency is worth in each other currency the record holds, every day. | A poll of a public address on a schedule. |
+| `live-feed` | Figures polled from a stats address every hour. | The same, as the smallest example of a poll. |
+| `launch-desk` | A desk for launching a thing in parts, with each part's next step, a calendar and a price check. | A whole set of pages and example rows for one use case, built on other add-ons. |
+
+`legacy-import` is not an add-on: it is an import adapter, a map and a script that `braindog import` loads, and the
+catalogue tool passes over it.
+
+## How the packs here reach a record
 
 `node tools/catalogue/from-packs.mjs` publishes every `packs/<folder>/<folder>.pack.json` into
 `apps/web/static/catalogue/`, the catalogue the app ships and every host serves under `/app/catalogue/`. It goes
@@ -57,13 +148,13 @@ index line says what it reaches. From there:
   itself, `braindog pack install packs/project-brief/project-brief.pack.json`. `--dry-run` says what it would ask and
   sends nothing.
 
-The catalogue id is the one the file gives itself, not its folder's: `packs/mercury` is `mercury-company`.
+The catalogue id is the one the file gives itself, not its folder's name.
 
-**A published version never changes.** A record that installed 1.0.0 is held to its checksum, so a pack edited
-without a later `version` stops the tool, and a version that takes a list, page or field away must be a major. Run
-the tool after a pack's change is committed, never over one still being written: a version it publishes is fixed.
+**The tool holds each version to what it published.** A pack edited without a later `version` stops it, and so does a
+version that takes a list, page or field away without being a major. Run the tool after a pack's change is committed,
+never over one still being written: a version it publishes is fixed.
 
-**A pack with no test stops the tool.** Any `*.test.ts`, `*.test.mjs` or `*.test.js` beside the pack file counts. A folder with no
-`<folder>.pack.json`, such as an import adapter, is passed over.
+**A pack with no test stops the tool.** Any `*.test.ts`, `*.test.mjs` or `*.test.js` beside the pack file counts. A
+folder with no `<folder>.pack.json`, such as an import adapter, is passed over.
 
 The first-party modules are still read from `packages/seed`, and moving them here is its own piece of work.

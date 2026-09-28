@@ -33,7 +33,7 @@
 import { httpStatus } from '@braindog/host';
 import { clearCookie, readSid, sameKey, sameOrigin, sessionCookie } from '@braindog/host/auth';
 import { emptyCatalogue, readCatalogue, type CatalogueIndex } from '@braindog/declare/catalogue';
-import { listedEntries } from '@braindog/declare/catalogue';
+import { installedIdOf, listedEntries } from '@braindog/declare/catalogue';
 import {
   acceptSubmission,
   emptyPublishers,
@@ -49,6 +49,7 @@ import {
   readVerdict,
   readYank,
   reviewVerdict,
+  roundCount,
   SUBMIT_MOST_BYTES,
   trustIn,
   waitingFile,
@@ -295,7 +296,10 @@ async function waitingCopy(blobs: KennelBucket, index: CatalogueIndex | null, pa
   return copy === null ? null : copy.text();
 }
 
-/** `counts.json` as R2 holds it, raw, or nothing counted yet. A reader rounds (`roundCount`). */
+/**
+ * `counts.json` as R2 holds it, or nothing counted yet. The nightly walk writes it already rounded (`writeCounts`), and
+ * a reader rounds again (`roundCount`), which changes nothing on a rounded number and holds a file from before.
+ */
 async function countsOf(blobs: KennelBucket | undefined, now: Date): Promise<string> {
   const kept = blobs === undefined ? null : await blobs.get(PREFIX + COUNTS);
   if (kept !== null) {
@@ -310,6 +314,40 @@ async function countsOf(blobs: KennelBucket | undefined, now: Date): Promise<str
     }
   }
   return JSON.stringify({ at: now.toISOString(), counts: {} });
+}
+
+/** What the nightly walk hands the counts write: the bucket, and the bundled catalogue beside the Kennel's own index. */
+export type CountsDeps = { blobs: KennelBucket; assets?: Assets | undefined };
+
+/**
+ * `counts.json` from one night's tally: how many hosted records have each listing on, keyed `<kind>:<id>`, answering how
+ * many listings it names. `held` is the walk's tally by the id a record holds a pack under (`installedIdOf`).
+ *
+ * ONLY WHAT THE PUBLIC INDEX LISTS IS NAMED. A record's own add-on, one waiting for review and an `unlisted` one are all
+ * ids in `held`, and the file is public: a count beside an id nobody published would tell the world that somebody holds
+ * it. So each id is looked up in the index a reader is served (the bundled catalogue and the Kennel's, merged, listed
+ * entries only), and one that is not there is left out.
+ *
+ * ROUNDED DOWN HERE, AND NOTHING UNDER TEN, because the file is read by anybody. `roundCount` is what every reader says,
+ * and a raw number in a public file would let two nights be subtracted into which record turned what on. A reader that
+ * rounds again changes nothing.
+ *
+ * BOTH INDEXES ARE READ STRICTLY, as a submission reads them: one that is bound and does not read is a throw, and the
+ * last night's file stands. Read leniently, a night with a broken index would write every Kennel listing's count away.
+ *
+ * ONE UNCONDITIONAL PUT. The walk is the file's one writer and writes it whole once a night, so there is no other write
+ * to lose a race to, and a night that throws before this leaves the last night's file standing.
+ */
+export async function writeCounts(deps: CountsDeps, held: ReadonlyMap<string, number>, now: Date): Promise<number> {
+  const kennel = await stored(deps.blobs, INDEX, catalogueOf, () => emptyCatalogue('BrainDog Kennel'));
+  const index = mergeIndexes(await bundledIndex(deps.assets, true), kennel.value);
+  const counts: Record<string, number> = {};
+  for (const entry of listedEntries(index)) {
+    const said = roundCount(held.get(installedIdOf(entry)) ?? 0);
+    if (said !== null) counts[`${entry.kind}:${entry.id}`] = said;
+  }
+  await deps.blobs.put(PREFIX + COUNTS, JSON.stringify({ at: now.toISOString(), counts }), JSON_FILE);
+  return Object.keys(counts).length;
 }
 
 /* ── the three files ────────────────────────────────────────────────────── */

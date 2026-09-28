@@ -85,7 +85,7 @@ async function hmac(key: Uint8Array, body: string): Promise<string> {
 
 /* ── the paths ───────────────────────────────────────────────────────────── */
 
-test('the three shapes, and nothing else', () => {
+test('the four shapes, and nothing else', () => {
   assert.deepEqual(servesIngest('/in/webhook/ingest_sms'), { channel: 'webhook', ingest: 'ingest_sms' });
   assert.deepEqual(servesIngest('/in/webhook/rec_1/ingest_sms/tok'), {
     channel: 'webhook',
@@ -93,10 +93,12 @@ test('the three shapes, and nothing else', () => {
     ingest: 'ingest_sms',
     token: 'tok',
   });
+  /* A signed door on the Cloud (DOR-3): the record and the ingest, and no token, because the signature is the proof. */
+  assert.deepEqual(servesIngest('/in/webhook/rec_1/ingest_sms'), { channel: 'webhook', rec: 'rec_1', ingest: 'ingest_sms' });
   assert.deepEqual(servesIngest('/in/email/tok'), { channel: 'email', token: 'tok' });
   /* The repeated slashes `servesKeys` already forgives, forgiven the same way. */
   assert.deepEqual(servesIngest('//in//email//tok/'), { channel: 'email', token: 'tok' });
-  for (const path of ['/in', '/in/', '/in/webhook', '/in/webhook/', '/in/email', '/in/sms/x', '/in/webhook/a/b', '/in/webhook/a/b/c/d', '/api/list'])
+  for (const path of ['/in', '/in/', '/in/webhook', '/in/webhook/', '/in/email', '/in/sms/x', '/in/email/a/b', '/in/webhook/a/b/c/d', '/api/list'])
     assert.equal(servesIngest(path), null, path);
 });
 

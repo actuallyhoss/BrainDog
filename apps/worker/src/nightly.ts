@@ -37,6 +37,11 @@
  * itself, because a delete R2 took without complaint says nothing about what is left: a key still there is put back on
  * the record's outbox and counted open. Then the billing ladder (`ladder.ts`), once, over the Directory's lapsed rows.
  *
+ * AND WHAT EACH RECORD HAS ON, FOR THE KENNEL'S INSTALL COUNTS. The same visit asks the record which add-ons and use
+ * cases it has on, and once every record was asked the tally becomes `kennel/counts.json` (`writeCounts` in `kennel.ts`).
+ * Only the records this walk visits are counted, which are the hosted ones: a self-host has no row in this Directory,
+ * so it is never counted and never asked.
+ *
  * EVERY LINE IS ONE JSON OBJECT THROUGH `op()` (`oplog.ts`, `53 §2.3`), because the morning's alerts are saved queries
  * over fields: `op=walk backup=failed`, `op=walk.done stragglers>0`. A sentence could not be queried.
  */
@@ -67,6 +72,11 @@ export type Walked = {
   ms: number;
   replay?: { counted: number; lost: number; failed: number } | undefined;
   ladder?: Laddered | undefined;
+  /**
+   * The install counts, there only when the walk was handed both `installed` and `counts`: the records that answered,
+   * the ones that could not be asked, how many listings the file names, and whether it was written.
+   */
+  counts?: { records: number; failed: number; listings: number; written: boolean } | undefined;
 };
 
 /** How far back a done erasure is checked against the bucket: `53 §5.8` step 4's thirty nights. */
@@ -81,6 +91,13 @@ export const ERASE_LATE_MS = 86_400_000;
  * the next night, oldest first.
  */
 export const ERASE_ROWS_MOST = 1_000;
+
+/**
+ * The most pack ids one record adds to the night's install tally. A record's own add-ons are ids too, and the tally is
+ * held for the whole walk, so one record with thousands of its own cannot grow it without end; a record with more has
+ * the rest left out of the counts, which only ever makes a count too low.
+ */
+export const COUNTED_PACKS_MOST = 500;
 
 /**
  * One `erase.r2` row as the record answers it for the walk: its id, where it is on the ladder, when it was queued, and
@@ -125,6 +142,14 @@ export type Walk = {
    * for the reason `expire` is optional.
    */
   replay?: ((record: string) => Promise<Replayed | null>) | undefined;
+  /**
+   * The packs one record has on, by the id it holds each under (`Record$.packsOn`): its add-ons, and its use cases as
+   * `usecase-<id>`. `null` is a record with nothing to answer. ABSENT, OR `counts` ABSENT, NOTHING IS COUNTED AND THE
+   * CLOSING LINE SAYS NOTHING ABOUT COUNTS, for the reason `expire` is optional.
+   */
+  installed?: ((record: string) => Promise<readonly string[] | null>) | undefined;
+  /** The night's tally, records by pack id, written as the Kennel's `counts.json` (`writeCounts`); answers the listings named. */
+  counts?: ((held: ReadonlyMap<string, number>) => Promise<number>) | undefined;
   now: () => number;
 };
 
@@ -185,6 +210,13 @@ export async function reconcileErase(
 export async function nightlyWalk(o: Walk): Promise<Walked> {
   const began = o.now();
   const out: Walked = { records: 0, backups: 0, failed: 0, stragglers: 0, eraseOpen: 0, expired: 0, expiryFailed: 0, ms: 0 };
+  const installed = o.installed;
+  const writeCounts = o.counts;
+  const counted = installed && writeCounts ? { records: 0, failed: 0, listings: 0, written: false } : undefined;
+  if (counted) out.counts = counted;
+  /* HOW MANY RECORDS HAVE EACH PACK ON, by the id a record holds it under. Only a number per id is kept, never which
+     record, so nothing about one record outlives its visit. */
+  const held = new Map<string, number>();
 
   await each(o.records, async (record) => {
     out.records++;
@@ -241,9 +273,41 @@ export async function nightlyWalk(o: Walk): Promise<Walked> {
         line.erase_why = reason(e);
       }
     }
+    /* WHAT THE RECORD HAS ON, EACH ID ONCE. A record that could not be asked is out of tonight's tally and named here
+       with its reason; it costs no record its copy, and the counts are only ever too low, never too high. */
+    if (installed && counted) {
+      try {
+        const on = await installed(record);
+        if (on !== null) {
+          counted.records++;
+          for (const id of new Set(on.slice(0, COUNTED_PACKS_MOST))) held.set(id, (held.get(id) ?? 0) + 1);
+        }
+      } catch (e) {
+        counted.failed++;
+        bad = true;
+        line.counts = 'failed';
+        line.counts_why = reason(e);
+      }
+    }
     line.ms = o.now() - from;
     o.speak?.(line, bad ? 'error' : 'info');
   });
+
+  /* THE COUNTS WRITTEN ONCE, AFTER EVERY RECORD WAS ASKED, and before the ladder, whose deletions change no count that
+     was true tonight. A NIGHT WHERE NO RECORD ANSWERED AND SOME FAILED WRITES NOTHING: that is a binding or a build, not
+     a fleet where nobody holds anything, and the last night's file is truer than an empty one. A write that throws is a
+     line, and the last night's file stands. */
+  if (counted && writeCounts) {
+    if (counted.records === 0 && counted.failed > 0) o.speak?.({ op: 'walk', rec: null, counts: 'skipped', counts_failed: counted.failed }, 'error');
+    else {
+      try {
+        counted.listings = await writeCounts(held);
+        counted.written = true;
+      } catch (e) {
+        o.speak?.({ op: 'walk', rec: null, counts: 'failed', why: reason(e) }, 'error');
+      }
+    }
+  }
 
   /* THE LADDER AFTER THE COPIES, so a record deleted tonight had its night's copy first, and ONCE, over the Directory's
      lapsed rows rather than beside each record: the rows are few and the Directory answers them in one call. A ladder
@@ -324,6 +388,12 @@ export async function nightlyWalk(o: Walk): Promise<Walked> {
     done.replay_lost = out.replay.lost;
     done.replay_failed = out.replay.failed;
   }
+  if (out.counts) {
+    done.counted_records = out.counts.records;
+    done.counts_failed = out.counts.failed;
+    done.count_listings = out.counts.listings;
+    done.counts_written = out.counts.written;
+  }
   done.ms = out.ms;
   const problem =
     out.failed > 0 ||
@@ -331,7 +401,8 @@ export async function nightlyWalk(o: Walk): Promise<Walked> {
     out.eraseOpen > 0 ||
     out.expiryFailed > 0 ||
     (out.ladder !== undefined && out.ladder.failed > 0) ||
-    (out.replay !== undefined && (out.replay.failed > 0 || out.replay.lost > 0));
+    (out.replay !== undefined && (out.replay.failed > 0 || out.replay.lost > 0)) ||
+    (out.counts !== undefined && (out.counts.failed > 0 || !out.counts.written));
   /* WRITTEN ON EVERY NIGHT, INCLUDING AN EMPTY ONE. A Directory with no records and a Directory
      that answered nothing look identical in a log made only of per-record lines. */
   o.speak?.(done, problem ? 'error' : 'info');

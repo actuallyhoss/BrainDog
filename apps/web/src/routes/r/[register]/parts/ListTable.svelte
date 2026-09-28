@@ -33,6 +33,8 @@
   import JsonBox from '$lib/ui/JsonBox.svelte';
   import FileField from '$lib/ui/FileField.svelte';
   import ScopeChip from '$lib/ui/ScopeChip.svelte';
+  import Face from '$lib/ui/Face.svelte';
+  import { ofPeople } from '$lib/ui/RowCards.svelte';
   import { boxOf, deadlineOf, withoutGood, type Receipt } from './list.ts';
 
   let {
@@ -107,7 +109,8 @@
     cancelEdit: () => void;
     leftTheRow: (e: FocusEvent) => void;
     cellKeys: (e: KeyboardEvent, enterCommits: boolean) => void;
-    archive: (seq: number) => void;
+    /** Absent for a caller whose level cannot change the list, and the row's Archive is then not drawn (COL-13). */
+    archive?: ((seq: number) => void) | undefined;
     openCardMenu: (seq: number, el: HTMLElement) => void;
   } = $props();
 
@@ -126,6 +129,8 @@
   const dated = $derived(deadlineOf(decl));
   const toned = $derived(columns.map((c) => ({ ...c, tone: c.field === dated })));
   const calm = $derived(withoutGood(rows));
+  /* A LIST OF PEOPLE, whose titles each wear a face rather than a project's mark (`RowCards`' `ofPeople`). */
+  const faced = $derived(ofPeople(decl));
 </script>
 
 <div class="table-slot" data-picking={selected.size > 0 ? '' : undefined}>
@@ -153,7 +158,10 @@
          `showRow` finds the row by this attribute, so what is scrolled to and what is marked cannot
          disagree. -->
     {#if fresh.has(seq)}<span class="fresh" data-fresh={seq} aria-hidden="true"></span>{/if}
-    {#if own}<span
+    <!-- A PERSON IS LED BY THEIR FACE (design SYS-7), in the place a project's mark takes on any other list, drawn from
+         the name the title cell prints beside it; `Face` is `aria-hidden` for that reason. -->
+    {#if faced}<span class="row-face"><Face name={display(register, decl.title, rowAt(seq)?.fields[decl.title]) ?? ''} kind="person" size="s" /></span
+      >{:else if own}<span
         class="row-mark thing-glyph"
         data-shape={own.mark}
         style={own.retired ? undefined : `--hue:${own.hue}`}
@@ -376,7 +384,7 @@
           </span>
         {:else}
           <span class="verbs">
-            <button
+            {#if archive}<button
               type="button"
               class="verb icon tap"
               tabindex="-1"
@@ -384,8 +392,8 @@
               onmousedown={(e) => e.preventDefault()}
               onclick={(e) => {
                 e.stopPropagation();
-                archive(seq);
-              }}><Icon name="archive" size="s" /></button>
+                archive?.(seq);
+              }}><Icon name="archive" size="s" /></button>{/if}
             <button
               type="button"
               class="verb icon tap"
@@ -507,6 +515,13 @@
     color: var(--dim);
   }
 
+  /* THE FACE SITS ON THE TITLE'S LINE, in the middle of it, with the gap a mark keeps before the words. */
+  .row-face {
+    display: inline-flex;
+    margin-inline-end: var(--sp-2);
+    vertical-align: middle;
+  }
+
   /* THE ROW'S NUMBER, QUIET, IN THE BODY FACE with tabular figures, so a column of them lines up. It was
      the identifier face, and mono is for what a person wrote as code, never for a number (design-brief
      §11). */
@@ -603,9 +618,9 @@
   /**
    * THE ROW THAT JUST ARRIVED, MARKED FOR A MOMENT.
    *
-   * A BAR AT THE HEAD OF THE ROW AND NOT A WASH OVER IT. A tinted row competes with the row's own tone, which is
-   * the declared deadline state and means something; this is a rule in the accent, in the gutter where nothing
-   * else is drawn, so the two cannot be confused. It fades rather than blinks: the point is to be findable for
+   * A DOT AT THE HEAD OF THE TITLE AND NOT A WASH OVER THE ROW. A tinted row competes with the row's own tone, which
+   * is the declared deadline state and means something; this is a dot in the info ink, never the brand's red (design
+   * SYS-1), before the title where no tone is drawn, so the two cannot be confused. It fades rather than blinks: the point is to be findable for
    * the second somebody's eye takes to arrive, not to demand attention it has already got.
    *
    * IT ANIMATES ONCE BECAUSE IT IS MOUNTED ONCE. The page clears `fresh` in `$effect.pre`, before the list

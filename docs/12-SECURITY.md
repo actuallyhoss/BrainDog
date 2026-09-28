@@ -55,7 +55,7 @@ rather than by an incident, which is the only good way to find it.
 | **A machine the customer connected** — the tier-C runner | **the device grant of §6.1** with `reach = runner` (RFC 8628): six-digit code, owner approves in the browser, a 90-day bearer stored as `token_hash`, auto-deregistered after 14 silent days; the `runner` principal kind. It reaches the JOBS group's three runner methods — `claimJob` · `postJobEvent` · `readCancel` ([30-BLUEPRINT](30-BLUEPRINT.md) §5) — and, per job, a job bearer that `claimJob` mints as a `token` row: scope `propose` (which reads), labelled `job:<id>`, audience one job, expiring with the job ([46-SPEC-SLASH](46-SPEC-SLASH.md) §4.7). Never `write`. See [26-BYO-INTELLIGENCE](26-BYO-INTELLIGENCE.md) §2.3 |
 | Inbound webhook | the URL is `/in/webhook/<rec_id>/<ingest-id>/<token>` — a random path token per ingest — and a declared `verify: { kind: hmac_sha256, header: X-Signature, grant: <label> }` ([25-CONNECTORS](25-CONNECTORS.md) §3.2) is checked in the host through the record's `ingestVerify`, since the record never decrypts ([51-SPEC-WORKER](51-SPEC-WORKER.md) §5.4); an unverified payload is stored `untriaged` and never matched |
 | Inbound email | the per-record address is the capability; a DKIM/SPF pass is required to match, else the payload is quarantined `untriaged` |
-| Self-host, single user | `BRAINDOG_TOKEN` for a private instance — owner level, everything; self-host single-user only — exchanged at `POST /auth/token` for a session, behind which passkeys are registered (ES256 and RS256, no attestation); the magic link waits for a mail transport on this host ([49-SPEC-SELFHOST](49-SPEC-SELFHOST.md) §5.10) |
+| Self-host, single user | `BRAINDOG_TOKEN` for a private instance — owner level, everything; self-host single-user only — exchanged at `POST /auth/token` for a session, behind which passkeys are registered (ES256 and RS256, no attestation); the magic link and an invitation's mailbox proof work once `BRAINDOG_SMTP_URL` and `BRAINDOG_MAIL_FROM` name a submission server, over TLS or not at all, and are off without them ([49-SPEC-SELFHOST](49-SPEC-SELFHOST.md) §5.6, §5.20) |
 
 > **One row above deserves a note, because an earlier draft made it different in kind.** That draft
 > gave the connected machine a keypair it generated locally, with BrainDog holding only the public
@@ -83,6 +83,30 @@ fallback code field.
 
 Every token records `last_used_at` and the surface it was used from, and the app lists them with
 a revoke button. A credential you cannot see being used is a credential you cannot know is stolen.
+
+**What sign-in became before a stranger could sign up** (*amended September 28th 2026 against the tree: OPS-6,
+OPS-7, OPS-10, OPS-17, OPS-21; OPS-28 records it*):
+
+- **User verification is required** in both passkey ceremonies and the flag is checked, so a key that does not
+  verify its holder is refused; a security key with no PIN is one, and the mailed link is the way in for it.
+- **A session ends 90 days after its last proof** (`authed_at`), however often it was rotated. `/auth/sessions` lists
+  every live session by a short reference, never its id, and `/auth/logout/all` ends the others or all of them.
+- **Step-up**: registering or removing a passkey, `invite`, `createToken`, `restore`, `deleteRecord` and closing an
+  account need a proof within 15 minutes, and answer `401` with reason `stale` or `NEEDS_BROWSER_SESSION` otherwise.
+  Removing a passkey ends the person's other sessions, and adding or removing one mails them.
+- **An invitation proves the mailbox**: an address that cannot already sign in is mailed a link, and only that link
+  makes the person, accepts, and opens a session (`invite.prove`). A host with no mail says it cannot prove a new
+  address and asks for one that can already sign in.
+- **Sign-up** (`/auth/signup/start`, `verify`, `name`) is Cloud only, closed while `BILLING` is unset, locked out like
+  every other door, and checks Turnstile with `TURNSTILE_SECRET` when it is set. A known address gets a sign-in link
+  and the same `200 {}`, so the door tells nobody who has an account.
+- **The token cut-off** is `TOKENS_VALID_FROM` (`BRAINDOG_TOKENS_VALID_FROM` on a self-host): every token, device grant
+  and operation grant created before the instant is refused, and the owner's list shows them "ended by the operator".
+- **Closing an account** is the person's own act (`POST /account/close`, the address typed, a sign-in within 15
+  minutes), refused while they are the only owner of an open record; their passkeys, sessions, links and memberships
+  go and the Directory forgets them. **Suspending** one is the operator's (`POST /auth/suspend`, the operator key),
+  which stops sign-in and ends every session without touching a record ([53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md)
+  §5.16).
 
 ---
 
@@ -421,6 +445,19 @@ never opened the vault all ask the same way.
 | The grant is **revocable on its own**, without ending the session | it is a separate long-lived token, 90 days, stored as `token_hash`, because revocation is real. `expires` holds the code's ten minutes while pending and is rewritten when the poll exchanges an approved row (approved → active), once: a second poll is refused. A `login` exchange mints an ordinary `token` row through `createToken` (scope `write`, 90 days, the device's label, owned by the approver), so there is one bearer format and one verifier, and revoking the grant revokes that token. A device silent for 14 days, counted through its token for a login, is moved to `expired` by the hourly sweep and its token revoked |
 | **And it is the tier-C runner's enrolment flow too** — [26-BYO-INTELLIGENCE](26-BYO-INTELLIGENCE.md) §2.3 had a bespoke one; there is now one — **and the operation grant's** (§3), **and the vault grant's**. The row's `reach` says which: `login` · `runner` · `export` · `import` · `pack` · `token` · `vault` — seven values since kernel migration 4. A `runner` exchange returns the 90-day bearer; an operation reach returns a bearer that keeps the code's ten minutes and is spent on one call; a `vault` reach carries `scope`, a project row id or `*`, and returns a bearer that opens that scope's keys for 30 days, or 7 for `*`, checked by `vaultGrant` and never by `verifyToken` | one flow to secure, and it is a standard |
 
+**The `runner` reach, in use** *(added September 28th 2026, `loop/finish/agents.md` C13 and C14)*. `braindog runner
+enrol <host>` asks with `reach: 'runner'`, and the 90-day bearer it gets back is kept in the hosts file beside the
+login, never in its place ([48-SPEC-CLI](48-SPEC-CLI.md) §5.13). That bearer reaches three doors and nothing else:
+`claimJob`, `postJobEvent` and `readCancel` (`packages/record/src/jobs.ts`). The host builds the runner's principal from
+the record's own device grant (`runnerContext` in `packages/host/src/jobs.ts`), never from anything the caller sent,
+and every other guard in the record refuses a principal of that kind. Starting and cancelling a job are an owner's in
+a browser, as ADMIN is, so no agent token starts one. Each claim mints the job its own bearer: an ordinary token of
+scope `propose`, labelled `job:<id>`, for one day, the run's deadline, and revoked when the job ends. The runner hands
+it to Claude Code only inside a `0600` `mcp.json` that reaches the record's `/mcp` on the enrolled host's origin, and
+removes the file when the job ends. A runner silent for 14 days is moved to `expired` by the hourly sweep, as a login
+is. What a job may do on the machine is a `job.<id>` declaration the owner approved in Decide, and each machine pins
+a kind by its SHA-256 before its first run, so a host that forged one could not run it on a machine that never allowed it.
+
 Four more rows on the vault itself, each answering a specific way the earlier design would have
 failed:
 
@@ -524,12 +561,16 @@ implied.
 | Your credentials, vault passphrase **off** | **we could decrypt them** | no |
 | Your credentials, vault passphrase **on** | no | no |
 | Your prompts | payload retention off at the gateway — prompts and responses are not stored. Token counts and cost are, in Slash's `call` table ([46-SPEC-SLASH](46-SPEC-SLASH.md) §4.1), which holds no prompt text, because the budget needs them | no provider at all |
-| Telemetry | counts and durations only; record id hashed with a monthly-rotating salt | none |
+| Telemetry | off until the operator binds it; then one point per request: the door, the kind of client, the method, the refusal code or status class and the milliseconds, with the record id hashed under a key that changes every month, kept three months ([51-SPEC-WORKER](51-SPEC-WORKER.md) §5.18) | none |
+| Our logs | one JSON line per event, carrying a code, an id and a shape, never a value, an address or a prompt: which door refused, which job failed, which letter did not go ([53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md) §2.3) | the container's own output, on your machine |
+| Your account | your address, passkeys and sessions, in the Directory and in its nightly copies; closing the account removes them at once from the Directory and from the copies within 30 days | on your machine |
+| Your card | Stripe holds it; we hold Stripe's customer and subscription ids and whether the record is paid | nothing to bill |
 
-Operationally: access to a customer's record requires a named reason recorded in our own audit, follows
-the diagnosis order of [53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md) §5.15 — the tuple, the refusal state,
-`observation`, `event`, the `system` suggestions, and only then a row — and support never asks for a
-vault passphrase. **The strongest available answer to "can you read
+Operationally: access to a customer's record requires a named reason recorded in our own audit (a note
+in the operator's own record, written before the read), follows the diagnosis order of
+[53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md) §5.15 (the version tuple, the crash's reference, the refusal
+state, the record's log lines, which hold no values, and only then, with the owner, its events and the
+`system` suggestions), and support never asks for a vault passphrase. **The strongest available answer to "can you read
 my data" is "self-host, and here is the complete build"** — which is what publishing the source and
 D41 buy together, and why the self-host must never be a crippled tier. The licence is permissive, so
 it is the *complete build* half of that sentence doing the work, not an obligation the licence puts
@@ -577,11 +618,12 @@ removes our access going forward, and removes it from the backups thirty days la
 | Output encoding | one renderer, one escape function, escaping applied before any markup exists so nothing downstream can un-escape |
 | Link safety | `https:`, `mailto:`, anchors, same-origin paths only, `rel="noreferrer"` on the first two. Everything else renders as its literal text |
 | CSRF | `SameSite=Lax`, plus the `Origin` check (or, where a browser sends no `Origin`, `Sec-Fetch-Site: same-origin`) on every cookie-authenticated non-GET and every `/auth` POST, which must also be `application/json`. The app is served with `frame-ancestors 'none'`. A self-host with no server key answers only to its own names: any other `Host` is an empty 421, so a page that rebinds its name to 127.0.0.1 cannot reach it |
-| Rate limiting | per token and per IP at the Worker; per record at AI Gateway |
+| Rate limiting | per caller at the Worker, before the record is asked: the token, the person, or the address where nobody has said, 600 reads and 120 writes a minute on `/api` and `/mcp` (`RL_READ`, `RL_WRITE`), a `429 RATE_LIMITED` with `Retry-After` past them; `/auth` limited by address before the Directory is asked, on top of its lockouts; per record at AI Gateway. A limiter that throws opens the door and writes a `limit` line, because each record still checks its caller |
 | Dependency surface | **a stated goal of near-zero runtime dependencies**, and the few are enumerated in [ADR-046](16-DECISIONS.md): `valibot` in `declare`, and one YAML parser, `yaml`, on the CLI and self-host paths only ([ADR-063](16-DECISIONS.md)). The prior system's Worker had no `package.json` at all, which is why it ran unmodified on plain Node — a supply-chain posture and a portability win from one decision |
-| Secrets in CI | Cloudflare API tokens scoped to deploy only; no token in the repo, ever |
+| Secrets in CI | one Cloudflare API token, scoped to deploy Workers, held in the GitHub environment `production`, so only `deploy.yml`'s job reads it, and that job waits for a required reviewer's press; `ci` dry-runs both deploys with no token in its environment; no token in the repo, ever (`DEPLOYMENT.md`) |
+| Logs | one JSON line per event through `op()` (`apps/worker/src/oplog.ts`): a code, an id and a shape, never a value, a prompt or a payload; anything shaped like an address is replaced and a string field cut at 300 characters before the line is written, so a caller who slips cannot publish a person's words. A 500 carries only a reference to its line |
 | Migrations | forward-only, checksummed, `--dry-run` first, `transferred_classes` never `deleted_classes`. A deploy carrying a kernel migration is never rolled back and never percentage-rolled; the canary is the ops record and recovery is fix-forward ([53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md) §5.3) |
-| Backups | nightly `.brainl.age` to R2 under the record's own prefix, 30 days, ≤ 40 MiB per record, plus platform PITR at any point in 30 days. The age identity lives outside Cloudflare — two copies in the operator's password manager; the Worker holds only `AGE_RECIPIENT`. Drilled: restore monthly, KEK rotation quarterly for real, erasure quarterly on the ops record, self-host upgrade every release, parity every deploy ([53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md) §5.4, §9) |
+| Backups | nightly `.brainl.age` to R2 under the record's own prefix, the 30 newest kept, ≤ 40 MiB per record, and the Directory's own copy under `directory/snapshots/`, taken first; a kept copy is restored in place through the PITR bookmark it recorded, inside 30 days, with the record as it stood kept as a `before-restore` copy first. The age identity lives outside Cloudflare, in two copies in the operator's password manager; the Worker holds only `AGE_RECIPIENT`, so nothing on Cloudflare can open a copy. A self-host copy is signed, with a detached `.brain.sig` `braindog verify` checks. Drilled: restore monthly with `apps/cli/scripts/restore-drill.mjs`, its date read at the morning check; KEK rotation quarterly for real; erasure quarterly on the ops record; self-host upgrade every release; parity every deploy ([53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md) §5.1, §5.4, §9) |
 
 
 ### A person's script: the sandbox and its ceilings

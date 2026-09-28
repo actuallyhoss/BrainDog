@@ -138,7 +138,8 @@ test("A PERSON'S MONEY IS HELD TO A PERSON'S SUMS, not a studio's, and a founder
   assert.deepEqual(targetOf(null, 'out-30d'), { setting: 'most_out_30d' });
   /* EACH TARGET IS A SETTING A PERSON CHANGES LATER; a number of days starts at the use case's own. */
   const configOf = (u: ReturnType<typeof useCase> | null) => (moduleDocument(u ?? null, 'money-core', { today: TODAY, examples: true }) as { config: Record<string, { type: string; default?: unknown }> }).config;
-  assert.deepEqual(configOf(useCase('personal')).most_out_30d, { type: 'money', label: 'Most owed by you in 30 days', note: 'Held to this as soon as it is saved.' });
+  /* IN THE PLAIN WORDS, since MOD-23: a person is not "owed by" anybody, they have bills to pay. */
+  assert.deepEqual(configOf(useCase('personal')).most_out_30d, { type: 'money', label: 'Most to pay in 30 days', note: 'Held to this as soon as it is saved.' });
   assert.deepEqual(configOf(useCase('personal')).most_days_late?.default, 3);
   assert.equal(configOf(useCase('founder')).most_out_30d?.default, undefined);
   /* AND ITS WORDS: the late knob is called by this figure, so a person's pay, not a business's money in. */

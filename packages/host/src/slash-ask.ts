@@ -23,9 +23,10 @@
  * `not authorized: SQLITE_AUTH` from an unguarded `PRAGMA`, so `engine()` below rejected and every ask was
  * the 500 `INTERNAL` this door answers for a builder that threw, while `/api/version` said `slash: true`.
  * `packages/slash/src/index.ts` guards the pragma now, and `apps/worker/test/slash-in-do.test.ts` drives the
- * ask through workerd on real object storage: 500 before the guard, 200 after it. The same file carries a
- * `todo` for the fault behind that one, which is this package's: `post` in `slash.ts` sends
- * `redirect: 'error'`, workerd refuses the value, and so no model call leaves the Worker yet.
+ * ask through workerd on real object storage: 500 before the guard, 200 after it. The fault behind that one
+ * is mended too: `post` in `slash.ts` sent `redirect: 'error'`, which workerd refuses outright, and it sends
+ * `'manual'` now, so his own key's calls leave the Worker. The included model opens no socket of its own: it
+ * answers over the Worker's `AI` binding (`apps/worker/src/inference.ts`).
  *
  * IT IS A DOOR AND NOT A ROW IN `ROUTES`, AND THAT WAS MEASURED RATHER THAN PREFERRED. `ROUTES` is
  * the RECORD's surface and two gates hold it to that. `tools/gates/guards.mjs` reads every routed

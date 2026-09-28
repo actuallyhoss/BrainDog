@@ -150,6 +150,9 @@
     answered = got.value.status;
   }
 
+  /* THE SENTENCE FOR AN ADDRESS THAT NAMES NO RUN, kept here and not in `words.noSuch`, which puts the id in it. */
+  const gone = 'This run is not on this record';
+
   const title = $derived(row ? runName(row) : words.run1);
   const args = $derived(row ? Object.entries(row.args).filter(([, v]) => v !== '') : []);
 </script>
@@ -163,7 +166,11 @@
     <!-- A REFUSED SHELL IS NOT A RUN TO SHOW. The record's sentence is the page, as it is on Home. -->
     <Empty kind="error" heading title={route.data.refused.fix} />
   {:else if missing}
-    <Empty kind="no-results" title={words.noSuch(id)} body={words.noSuchWhy} />
+    <!-- NO ID IN THE TITLE, AND ONE WAY ON (design 2.15, 6.8.3): the address's id is the one part of it nobody reads,
+         so the sentence says what is missing in words and the list of runs is the place to go from here. -->
+    <Empty kind="no-results" title={gone} body={words.noSuchWhy}>
+      {#snippet actions()}<Button href="/jobs">{words.allJobs}</Button>{/snippet}
+    </Empty>
   {:else if refusal !== null}
     <ReadState state="refused" {refusal} />
   {:else if status === null || said === null}
@@ -265,7 +272,8 @@
     flex-direction: column;
     gap: var(--sp-4);
     padding: var(--sp-5) var(--gutter) var(--sp-9);
-    max-inline-size: 1000px;
+    /* THE PAGE'S CAP IS THE TOKEN EVERY SCREEN SHARES (design 6.7), and each line of prose keeps `--measure` below. */
+    max-inline-size: var(--page-max);
   }
 
   .state {
@@ -498,10 +506,13 @@
     max-inline-size: var(--measure);
   }
 
+  /* ABOVE THE TAB BAR, NOT UNDER IT: below 900 the shell's scroller runs to the bottom of the window and `TabBar` is
+     fixed over its last `--tabbar`, so a bar stuck to 0 was drawn behind it, as the automation screen's footer says. */
   @media (width < 900px) {
     .stop-bar {
       position: sticky;
-      inset-block-end: 0;
+      inset-block-end: var(--tabbar);
+      z-index: var(--z-raise);
       min-block-size: var(--sticky);
       max-block-size: var(--sticky);
       background: var(--bg);

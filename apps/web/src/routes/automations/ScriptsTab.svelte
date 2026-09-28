@@ -9,7 +9,6 @@
   import { apiBase, at } from '$lib/at.ts';
   import { untrack } from 'svelte';
   import Empty from '$lib/ui/Empty.svelte';
-  import Button from '$lib/ui/Button.svelte';
   import { closed, drew, opened } from '$lib/ui/screen.svelte.ts';
   import { readScripts, startsBy, stateOf, words, type Script } from '$lib/record/scripts.ts';
   import HubRows from './HubRows.svelte';
@@ -61,9 +60,8 @@
 {#if from === 'refused'}
   <Empty kind="error" heading title={fix} />
 {:else if from === 'absent' || (from === 'ready' && rows.length === 0)}
-  <Empty kind="no-data-yet" title={words.none} body={words.noneWhy} agentPrompt={w.scriptsPrompt}>
-    {#snippet actions()}<Button href="/scripts/new">{w.newScript}</Button>{/snippet}
-  </Empty>
+  <!-- NO BUTTON OF ITS OWN: the heading's "New script" is above it, and two read as two different things to press. -->
+  <Empty kind="no-data-yet" title={words.none} body={words.noneWhy} agentPrompt={w.scriptsPrompt} />
 {:else if from === 'ready'}
   <HubRows rows={shown} />
   <p class="more">{w.scriptsMore} <a href={at('/scripts')}>{w.scriptsOpen}</a></p>

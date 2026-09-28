@@ -324,7 +324,7 @@ Instrumented **before** the first public commit, not after.
 | **2** | 10 subscribers still paying at day 30 | **2027-02-28** | the price. A one-time sale is a purchase; a subscription is only real if it survives a month |
 | **3** | monthly churn under **5%** | ongoing | **the number that decides it.** Above it, MRR cannot compound |
 | **4** | ≥3 non-Sam records: >20 rows, >3 distinct days, present at day 14 | 3 months post-launch | whether it is a product at all. Not stars, not installs, not a Show HN score |
-| **5** | **5 packs by somebody who is not Sam** | 6 months post-platform | whether the PLATFORM is real. Zero means the eight kinds are one person's shape |
+| **5** | **5 packs by somebody who is not Sam** | 6 months post-platform | whether the PLATFORM is real. Zero means the declaration kinds are one person's shape |
 
 ### Gate 1 was broken, and it was the gate that gated spending
 
@@ -400,11 +400,11 @@ gate 2 measures paying customers.
 
 ## 6 · Phase C — the additive future scope
 
-Everything here is **additive**: it fits the eight kinds, the one grammar and the pack format
+Everything here is **additive**: it fits the declaration kinds, the one grammar and the pack format
 without changing them. That is the test for whether something belongs in this list at all.
 
 > **And the test rejected something, which is how you know it is a real test.**
-> [25-CONNECTORS](25-CONNECTORS.md) does not pass it. Pull connectors fit the eight kinds — `ingest`
+> [25-CONNECTORS](25-CONNECTORS.md) does not pass it. Pull connectors fit the declaration kinds — `ingest`
 > gains a `fetch:` block — and they fit the grammar. But they **change the pack format's security
 > enumeration**: [04-PACKS](04-PACKS.md) §7's *"a pack cannot make an outbound call of any kind"*
 > becomes false, and an enumeration with an exception is a weaker argument than one without.
@@ -412,16 +412,19 @@ without changing them. That is the test for whether something belongs in this li
 > So the test stands and connectors are marked as what they are: **the one item in this document
 > that is not purely additive, admitted deliberately, with the row it costs named in both places.**
 > The same goes for the two kernel tables in [24-SELF-IMPROVEMENT](24-SELF-IMPROVEMENT.md) — those
-> *are* additive to the pack format, which is why they were allowed to be kernel rather than a ninth
+> *are* additive to the pack format, which is why they were allowed to be kernel rather than a new
 > kind.
 
 > **And what connectors cost is metered, from the first run (2026-09-15, [ADR-069](16-DECISIONS.md)).**
 > Every scheduled fetch, call and poll is counted per record in the Directory, outside the record: runs,
-> requests, bytes, run time and failures, by day, project and action. A Hosted record's allowance is
-> 15,000 runs, 150,000 requests, 1 GB fetched and 50 hours of run time a month, the default until the
-> owner confirms it. At the limit an action waits for the next month and says so in one sentence. A
-> self-host is counted and never limited. The price does not change, and the month-24 case above assumes
-> no overage.
+> requests, bytes, run time and failures, by day, project and action. A record's allowance is its
+> plan's, in `ALLOWANCE` (`packages/record/src/directory.ts`): on Cloud 15,000 runs, 150,000 requests,
+> 1 GB fetched and 50 hours of run time a month, and on Cloud Plus 60,000 runs, 600,000 requests, 5 GB
+> and 200 hours, the owner's defaults until he says otherwise. At the limit an action waits for the next
+> month and says so in one sentence, and an automation's run that has not started waits with it. A
+> self-host is counted and never limited. Changing an allowance is `ALLOWANCE` and the pricing page's
+> figures (`apps/site/src/lib/plans.ts`), which `plans.test.ts` holds to it. The price does not change
+> with use, and the month-24 case above assumes no overage.
 
 | Scope | Shape | Why it is additive |
 |---|---|---|

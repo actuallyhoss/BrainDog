@@ -117,9 +117,10 @@ export const account = {
      contrast floors, so a colour that would be unreadable is refused rather than approximated." True,
      and a sentence about how the palette is computed, under a row of swatches somebody is choosing
      between. What it does for them is the same fact from their side, including the refusal, which
-     is the one thing a swatch press can do that they would not expect. */
-  accentHint:
-    'The colour this record is. The other colours on screen are worked out from it, and one that would leave text hard to read is refused.',
+     is the one thing a swatch press can do that they would not expect. AND THEN IT WAS STILL A PARAGRAPH ABOUT THE
+     SCREEN: how the other colours follow, and what a press may refuse, which the refusal says in place when it happens
+     (`accentRefused`). What is left is the choice itself (MOD-24). */
+  accentHint: 'The colour this record wears.',
   accentHouse: 'House',
   accentSet: (name: string) => `${name} is this record's colour.`,
   accentReset: 'Back to the house colour.',
@@ -465,7 +466,7 @@ export const account = {
   /* THE CHECK, RUN IN THIS BROWSER over a file somebody picks: the same `checkBrainl` an import runs before it writes
      a row. It proves the file is whole and signed by the key inside it, and not whose key that is, so it says no more. */
   fileChecked: (name: string) =>
-    `${name} is whole and signed. Every table matches its own manifest, and the signature holds for the key inside the file.`,
+    `${name} is whole and signed. Nothing in it has changed since it was written, and the signature holds for the key inside the file.`,
   fileFailed: (name: string, fix: string) => `${name} did not pass. ${fix}`,
   fileUnread: (name: string) => `${name} could not be read as text. Only a .brainl file can be checked here.`,
   theSignatureNotHere: 'Every export and every backup is signed. The public half of the key that signs them is not shown here yet, so there is nothing on this screen to hand to somebody checking a copy.',
@@ -491,7 +492,7 @@ export const account = {
      `deleteWhat` carries "It cannot be undone" one line above this, in the section whose own comment
      condemns *"three lines, two of them the same sentence"*, so this one does not say it twice. */
   deleteCosts:
-    'The name is given up for good, and no record here can use it again. Nothing is kept to go back to, so export a copy first if you want the rows.',
+    'The name is given up for good, and no record here can use it again. One final copy is kept for 30 days and then deleted, and it cannot be opened from here, so export a copy first if you want the rows.',
   typeSlug: (slug: string) => `Type ${slug} to confirm`,
 
   keptCloud: (n: number) => `A backup of the whole record every night. The ${n} newest are kept, plus the latest.`,
@@ -500,7 +501,7 @@ export const account = {
   /* A COPY OF NOTHING SAYS SO, rather than "0 B" (design SYS-14): render's `bytes(0)` is pinned, so the line is chosen here. */
   snapshotEmpty: 'Empty',
   download: 'Download',
-  rowsAndSize: (rows: number, size: string) => `${rows.toLocaleString('en')} rows · ${size}`,
+  rowsAndSize: (rows: number, size: string) => `${rows === 1 ? '1 row' : `${rows.toLocaleString('en')} rows`} · ${size}`,
   snapshotNow: 'Back up now',
   theKey: 'The key',
   /* `49 §8` asks for exactly this line. */
@@ -807,4 +808,30 @@ export const account = {
   inviteEverything: (does: string) => `everything (${does})`,
   inviteListGives: (list: string, does: string) => `${list} (${does})`,
   inviteDoes: { owner: 'owns it', decide: 'decides', write: 'edits rows', append: 'adds rows', read: 'reads' },
+  /* COL-12: one list's grant narrowed to the rows where one field holds one value, picked in the exception picker and
+     said back under the exception on the person's card. */
+  exceptionOnly: 'Only rows where',
+  exceptionEveryRow: 'Every row',
+  exceptionIs: 'Is',
+  exceptionYes: 'Yes',
+  exceptionNo: 'No',
+  exceptionOnlySaid: (field: string, value: string) => `Only rows where ${field} is ${value}.`,
+  exceptionOnlyWords: (words: string) => `Only rows where ${words}.`,
+  exceptionOnlyOther: 'Only the rows a rule set elsewhere picks.',
+  exceptionOnlyUnread: 'A rule BrainDog cannot read, so no rows of this list.',
+  exceptionAddedOnly: (name: string, list: string, level: string, field: string, value: string) =>
+    `${name} is set to ${level} on ${list}, only where ${field} is ${value}.`,
+  /* OPS-21: closing your account, from Settings > Identity. The records keep their own history, and the Directory's
+     nightly copies still hold the account until they age out, so both are said before anybody presses. */
+  closeTitle: 'Close your account',
+  closeSays:
+    'This removes your passkeys, your sessions and your sign-in email, and takes you off every record you belong to. Each record keeps its own history of what you did there, which its owner can erase. Our nightly backups still hold your account for up to 30 days, and then it is gone from them too.',
+  closeStart: 'Close your account',
+  closeLabel: 'Your sign-in email, to confirm',
+  closeHint: (email: string) => `Type ${email}. This works within 15 minutes of signing in.`,
+  closeGo: 'Close my account',
+  closeGoing: 'Closing',
+  closeDone: 'Your account is closed. We mailed you to say every session has ended.',
+  closeLeave: 'Done',
+  closeUnreached: 'Your account could not be closed just now. Try again in a minute.',
 } as const;

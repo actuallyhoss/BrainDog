@@ -3,11 +3,8 @@
  * (`loop/research-m3-dynamic.md` section 3, brief B7; `loop/DIRECTION.md` sections 22 and 24).
  *
  * THE DOCUMENT WAS A FUNCTION IN `packages/seed`. `mercuryPack` in `packages/seed/src/packs/mercury.ts` built it in
- * code, so the shell carried one bank as TypeScript. It is now `mercury.pack.json`, a legal pack as it stands, with the
- * four things a person supplies named under `fill`. Nothing in the tree offers a Mercury pull to a record, so the fill
- * is `fillMercury` below and nowhere else. While the builder was in the tree, the file filled was held equal to what
- * it built, byte for byte; it went on September 24th, and what each spec changes was printed from it that day, before
- * it was deleted, and is written out below as values.
+ * code, so the shell carried one bank as TypeScript. It became `mercury.pack.json`, with the four things a person
+ * supplied named under `fill` and filled by a function in this test that no stranger could run.
  *
  * WHY A BANK AND WHY THIS ONE. `loop/research-switch.md` names company cash (Mercury and Stripe pulls) as the one money
  * figure the record cannot answer without somebody retyping it. A bank answers the Money page's question, what is in
@@ -39,6 +36,11 @@
  * transaction it stands for instead of being written beside it, and a transaction whose row a person deleted is not
  * written again. The tests after "A TRANSACTION A PERSON VOIDED" hold both, and the whole path holds them against the
  * record's own `list`. They were written from reading the code, before any of them had run.
+ *
+ * `mercury` 1.0.0 IS THE SAME PACK UNDER ITS OWN ID, WITH SETTINGS WHERE THE FILL WAS (`loop/finish/platform.md` PLT-12).
+ * The key's label and how often it asks are `grant` and `every` beside `book`, filled by the record's own door when it
+ * is planned and installed, and read by the ledger from `ctx.config`. A setting holds no id, so a record holds one
+ * Mercury, and `mercury-company` is yanked from the catalogue with the reason "Replaced by Mercury".
  */
 
 import { test } from 'node:test';
@@ -48,7 +50,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { readPackFile } from '../../packages/declare/src/catalogue.ts';
-import { openRecord, type Declaration, type Kernel } from '../../packages/kernel/src/index.ts';
+import { configReads, fillConfig, openRecord, type Declaration, type Kernel } from '../../packages/kernel/src/index.ts';
 import { fixOf } from '../../packages/ports/src/index.ts';
 import { createRecordApi, type CallContext } from '../../packages/record/src/index.ts';
 import { fixedClock, openSqlite, type NodeSql } from '../../packages/kernel/test/sqlite.ts';
@@ -63,71 +65,38 @@ const ID = 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD';
 const PACK_FILE = new URL('./mercury.pack.json', import.meta.url);
 const template = (): Record<string, unknown> => JSON.parse(readFileSync(PACK_FILE, 'utf8')) as Record<string, unknown>;
 
-type MercurySpec = { id: string; grant: string; every?: string; base?: string };
-type Pull = Record<string, unknown> & { fetch: Record<string, unknown> & { auth: Record<string, unknown>; schedule: Record<string, unknown> } };
+/** Some of the pack's settings, as a person sets them on its page. What is not named keeps its default. */
+type Settings = { grant?: string; every?: string; book?: number };
+type Pull = Record<string, unknown> & { every: string; fetch: Record<string, unknown> & { base: string; auth: Record<string, unknown>; schedule: Record<string, unknown> } };
 type Script = Record<string, unknown> & { script: string; runs: { every: string }; egress: string[]; keys: string[]; reads: string[]; writes: string[]; limits?: Record<string, number>; source: string };
 
-/** The source's two lines a fill rewrites. Written as JSON so a label with a quote in it stays one string. */
-const API_LINE = (base: string): string => `const API = ${JSON.stringify(base)};`;
-const KEY_LINE = (grant: string): string => `const KEY = ${JSON.stringify(grant)};`;
 const scriptOf = (doc: Record<string, unknown>): Script => (doc.declarations as Record<string, unknown>[]).find((d) => typeof d.script === 'string') as Script;
 
-/** A spec's id as an identifier: lower case, digits, and underscores for everything else. */
-const ident = (text: string): string =>
-  text
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/gu, '_')
-    .replace(/^_+|_+$/gu, '')
-    .replace(/_+/gu, '_');
+/** Each setting's default, read from the file, so a test never holds a second copy of what the file says. */
+const defaults = (file: Record<string, unknown>): Record<string, Json> =>
+  Object.fromEntries(Object.entries(file.config as Record<string, { default: Json }>).map(([k, c]) => [k, c.default]));
 
 /**
- * The file filled for one Mercury profile. `base` and `every` default to what the file says, so a spec naming neither
- * asks Mercury itself once an hour.
+ * The file's declarations as a record stores them: every `{{config:<key>}}` filled with the settings' defaults and
+ * whatever `set` changes, through the kernel's own `fillConfig`, which is what a plan does before it installs.
  *
- * BOTH INTERVALS ARE WRITTEN, BECAUSE TWO SCHEDULERS READ THEM. The record arms the pull off the top-level `every` and
- * `@braindog/connect` computes the next slot off `fetch.schedule.every`; a file carrying two different numbers fires
- * on a cadence nothing else agrees with.
+ * FOR THE TESTS THAT HAND ONE DECLARATION STRAIGHT TO A KERNEL OR A SANDBOX, never for one that installs the file
+ * through the record's door: that door fills the settings itself, and those tests hand it the file as it ships.
  */
-function fillMercury(file: Record<string, unknown>, spec: MercurySpec): Record<string, unknown> {
-  const { fill: _marks, ...doc } = structuredClone(file);
-  const pull = (doc.declarations as Pull[])[0]!;
-  const base = spec.base ?? (pull.fetch.base as string);
-  const every = spec.every ?? (pull.every as string);
-  doc.pack = `mercury-${spec.id}`;
-  doc.summary = `Reads the balance of every Mercury account from ${new URL(base).host} every ${every}, into Money's accounts, and its last thirty days of transactions into the ledger.`;
-  pull.ingest = `mercury_${ident(spec.id)}`.slice(0, 32).replace(/_+$/u, '');
-  pull.every = every;
-  pull.fetch.base = base;
-  pull.fetch.auth.grant = spec.grant.trim();
-  pull.fetch.schedule.every = every;
-
-  /* THE LEDGER SCRIPT ASKS THE SAME HOST WITH THE SAME KEY ON THE SAME CLOCK, and its source cannot read its own
-     declaration, so the two constants it fetches with are rewritten in the source as well as in the header. A fill
-     that set `keys` and left the source naming the shipped label would install, and every run would be refused as a
-     key the script does not declare. The name is its own because two profiles on one record are two scripts. */
-  const script = scriptOf(doc);
-  if (script !== undefined) {
-    const shipped = scriptOf(file);
-    script.script = `mercury_ledger_${ident(spec.id)}`.slice(0, 32).replace(/_+$/u, '');
-    script.runs.every = every;
-    script.egress = [new URL(base).origin];
-    script.keys = [spec.grant.trim()];
-    script.source = script.source
-      .split(API_LINE(shipped.egress[0]!))
-      .join(API_LINE(new URL(base).origin))
-      .split(KEY_LINE(shipped.keys[0]!))
-      .join(KEY_LINE(spec.grant.trim()));
-  }
+function settled(file: Record<string, unknown>, set: Settings = {}): Record<string, unknown> {
+  const doc = structuredClone(file);
+  doc.declarations = fillConfig(doc.declarations as Json, { ...defaults(file), ...set });
   return doc;
 }
 
-const SPEC: MercurySpec = { id: 'kiln', grant: 'Mercury (read only)', base: 'https://api.mercury.example' };
+/** What `ctx.config` holds for a run of the ledger: the settings' defaults and whatever `set` changes. */
+const configOf = (set: Settings = {}): Json => ({ ...defaults(template()), ...set });
 
 type Ingest = Record<string, unknown> & { ingest: string };
 
 /** The pack's one declaration, with whatever a test wants taken off it. */
 const declOf = (over: Record<string, unknown> = {}, drop: string[] = []): Ingest => {
-  const doc = fillMercury(template(), SPEC) as { declarations: Ingest[] };
+  const doc = settled(template()) as { declarations: Ingest[] };
   const body = { ...doc.declarations[0]!, ...over };
   for (const key of drop) delete body[key];
   return body;
@@ -135,13 +104,25 @@ const declOf = (over: Record<string, unknown> = {}, drop: string[] = []): Ingest
 
 /* ── where the pack lives ─────────────────────────────────────────────────────────────────────── */
 
-test('the file reads clean as an add-on somebody opens from disk, and says what a person fills', async () => {
+test('the file reads clean as an add-on somebody opens from disk, one Mercury a record, with its key and its clock as settings', async () => {
   const file = await readPackFile(readFileSync(PACK_FILE, 'utf8'));
   assert.ok(file.ok, fixOf(file));
-  assert.equal(file.value.pack.manifest.pack, 'mercury-company');
+  /* ITS OWN ID, AND ONE OF IT A RECORD. mercury-company was filled into mercury-<id>, one pack a Mercury profile, by a
+     function no stranger could run; a setting holds no id, so a record holds one Mercury. */
+  assert.equal(file.value.pack.manifest.pack, 'mercury');
   /* A TITLE OF ITS OWN, where it had none and a person read its id, "mercury-company", as its name. */
   assert.equal(file.value.title, 'Mercury');
-  assert.deepEqual(Object.keys((file.value.doc.fill ?? {}) as object), ['id', 'grant', 'every', 'base']);
+  assert.equal('fill' in file.value.doc, false, 'the file still carries fill marks');
+  const config = template().config as Record<string, { type: string; values?: string[]; default: Json }>;
+  assert.deepEqual(
+    Object.entries(config).map(([k, c]) => [k, c.type, c.default]),
+    [
+      ['grant', 'text', 'Mercury (read only)'],
+      ['every', 'enum', '1h'],
+      ['book', 'number', 0],
+    ],
+  );
+  assert.deepEqual(config.every!.values, ['1h', '6h', '1d']);
 });
 
 test('THE SEED NO LONGER OFFERS THE BUILDER UNDER A SECOND NAME', () => {
@@ -158,59 +139,54 @@ test('THE SEED NO LONGER OFFERS THE BUILDER UNDER A SECOND NAME', () => {
   assert.deepEqual(offering, []);
 });
 
-/* ── nothing moved but the file ───────────────────────────────────────────────────────────────── */
+/* ── nothing moved but the settings ───────────────────────────────────────────────────────────── */
+
+test('THE KEY AND THE CLOCK ARE READ WHERE THE PULL AND THE LEDGER READ THEM, AND NOWHERE ELSE', () => {
+  /* BOTH INTERVALS, BECAUSE TWO SCHEDULERS READ THEM. The record arms the pull off the top-level `every` and
+     `@braindog/connect` computes the next slot off `fetch.schedule.every`; a file carrying two different numbers fires
+     on a cadence nothing else agrees with. The ledger runs on the same clock and declares the same key, which its
+     source reads from `ctx.config`, because a source cannot read its own declaration. */
+  const reads = (template().declarations as Record<string, unknown>[]).flatMap((d, i) => configReads(d).map((r) => `${i}.${r.at} ${r.key}${r.whole ? '' : ' in text'}`));
+  assert.deepEqual(reads, ['0.every every', '0.fetch.auth.grant grant', '0.fetch.schedule.every every', '1.runs.every every', '1.keys[0] grant']);
+  const source = readFileSync(new URL('./ledger.js', import.meta.url), 'utf8');
+  assert.ok(source.includes('keyOf(ctx.config)') && source.includes('bookOf(ctx.config)'), 'ledger.js no longer reads its key and its book from its settings');
+});
 
 /**
- * Each spec the byte comparison held, with what the builder answered for it on the day it was deleted: the pack's
- * name, the summary, the pull's name, both intervals, the host and the key label. The last four values are the ledger
- * script's, added on September 25th with it: its name, its clock, its one origin and its one key, which its source
- * fetches with too.
+ * Each set of settings, with what the file says once a record has filled it: the pull's two intervals and its key,
+ * and the ledger's clock and key. The name of each declaration and the host are the file's whatever is set.
  *
- * WRITTEN OUT AND NOT RECOMPUTED, because a table computed by a second copy of `fillMercury` agrees with it by
- * construction. Checked the other way on September 24th: with `.trim()` taken off the grant in `fillMercury`, the
- * spaced label's row went red here and nowhere else in this file.
+ * WRITTEN OUT AND NOT RECOMPUTED, because a table computed from the settings agrees with them by construction.
  */
-for (const [name, spec, want] of [
-  ['the file as it ships', { id: 'company', grant: 'Mercury (read only)' }, ['mercury-company', 'api.mercury.com', 'mercury_company', '1h', 'https://api.mercury.com', 'Mercury (read only)', 'mercury_ledger_company']],
-  ['a test host, a key label with spaces round it', { ...SPEC, grant: '  Mercury (read only)  ' }, ['mercury-kiln', 'api.mercury.example', 'mercury_kiln', '1h', 'https://api.mercury.example', 'Mercury (read only)', 'mercury_ledger_kiln']],
-  ['every six hours, an id past what an ingest name holds', { id: 'kiln-and-tallow-holding-company-operating', grant: 'Ops', every: '6h' }, ['mercury-kiln-and-tallow-holding-company-operating', 'api.mercury.com', 'mercury_kiln_and_tallow_holding', '6h', 'https://api.mercury.com', 'Ops', 'mercury_ledger_kiln_and_tallow_h']],
-] as const satisfies readonly (readonly [string, MercurySpec, readonly [string, string, string, string, string, string, string]])[])
-  test(`FILLED, THE FILE CHANGES WHERE THE SPEC SAYS AND NOWHERE ELSE: ${name}`, async () => {
-    const filled = fillMercury(template(), spec);
+for (const [name, set, want] of [
+  ['nothing set', {}, ['1h', 'Mercury (read only)']],
+  ['every six hours, a key of its own', { every: '6h', grant: 'Ops' }, ['6h', 'Ops']],
+] as const satisfies readonly (readonly [string, Settings, readonly [string, string]])[])
+  test(`SET, THE FILE CHANGES WHERE THE SETTINGS SAY AND NOWHERE ELSE: ${name}`, async () => {
+    const filled = settled(template(), set);
     const pull = (filled.declarations as Pull[])[0]!;
-    const [pack, host, ingest, every, base, grant, ledger] = want;
-    assert.deepEqual(
-      [filled.pack, filled.summary, pull.ingest, pull.every, pull.fetch.schedule.every, pull.fetch.base, pull.fetch.auth],
-      [pack, `Reads the balance of every Mercury account from ${host} every ${every}, into Money's accounts, and its last thirty days of transactions into the ledger.`, ingest, every, every, base, { kind: 'bearer', grant }],
-    );
     const script = scriptOf(filled);
-    assert.deepEqual([script.script, script.runs.every, script.egress, script.keys], [ledger, every, [base], [grant]]);
-    assert.ok(script.source.includes(API_LINE(base)) && script.source.includes(KEY_LINE(grant)), "the ledger fetches with a host or a key its header does not name");
+    const [every, grant] = want;
+    assert.deepEqual(
+      [pull.ingest, pull.every, pull.fetch.schedule.every, pull.fetch.base, pull.fetch.auth],
+      ['mercury', every, every, 'https://api.mercury.com', { kind: 'bearer', grant }],
+    );
+    assert.deepEqual([script.script, script.runs.every, script.egress, script.keys], ['mercury_ledger', every, ['https://api.mercury.com'], [grant]]);
 
-    /* AND EVERYTHING THE SPEC DOES NOT NAME IS THE FILE'S, key order included, which is what the byte comparison
-       held and the fields above do not: the version, the range on Money, the path, the map, the dedupe key. */
+    /* AND EVERYTHING THE SETTINGS DO NOT NAME IS THE FILE'S, key order included: the version, the range on Money, the
+       path, the map, the dedupe key, the source. */
     const blanked = (doc: Record<string, unknown>): string => {
       const d = structuredClone(doc);
       const p = (d.declarations as Pull[])[0]!;
-      d.pack = d.summary = p.ingest = p.every = p.fetch.base = p.fetch.auth.grant = p.fetch.schedule.every = '';
+      p.every = p.fetch.schedule.every = '';
+      p.fetch.auth.grant = '';
       const s = scriptOf(d);
-      s.source = s.source.replace(/^const API = .*;$/mu, '').replace(/^const KEY = .*;$/mu, '');
-      s.script = s.runs.every = '';
-      s.egress = s.keys = [];
+      s.runs.every = '';
+      s.keys = [];
       return JSON.stringify(d);
     };
-    const { fill: _marks, ...shipped } = template();
-    assert.equal(blanked(filled), blanked(shipped));
-
-    const read = await readPackFile(JSON.stringify(filled));
-    assert.ok(read.ok, fixOf(read));
-    assert.equal(JSON.stringify(read.value.doc), JSON.stringify(filled));
+    assert.equal(blanked(filled), blanked(template()));
   });
-
-test('the file as it ships, with its marks taken off, is its own example filled', () => {
-  const { fill: _marks, ...shipped } = template();
-  assert.equal(JSON.stringify(shipped), JSON.stringify(fillMercury(template(), { id: 'company', grant: 'Mercury (read only)' })));
-});
 
 /**
  * A vault entry as a row: a label and the host it opens, and no bytes, because a test's `openKey` is the key store.
@@ -249,13 +225,14 @@ async function withMoney(): Promise<{ sql: NodeSql; plan: (doc: unknown) => Prom
 /** What the owner reads for the ledger script, once the key is in the vault: the host, the key, and what it could carry out. */
 const LEDGER_LINES = [
   'CALLS OUT api.mercury.com · every 1h · key "Mercury (read only)" to api.mercury.com',
-  'mercury_ledger_kiln reads accounts, transactions and categories and may send what it reads to api.mercury.com.',
+  'mercury_ledger reads accounts, transactions and categories and may send what it reads to api.mercury.com.',
   'Keys are not kept per project yet, so any action in this record can send any key it names.',
 ];
 
 test('INSTALLED THROUGH THE RECORD’S OWN DOOR, once the key is in the vault and the owner approves the call out and the ledger script', async () => {
   const { sql, plan, put, close } = await withMoney();
-  const doc = fillMercury(template(), { id: 'kiln', grant: 'Mercury (read only)' });
+  /* THE FILE AS IT SHIPS, settings and all: the record's door fills them with their defaults. */
+  const doc = template();
   /* NOT BEFORE THE KEY IS IN THE VAULT. The pull alone installed without one and was refused on its first run; a
      script naming a key is refused at install, so since the ledger the key goes in first. */
   const early = await put(doc, true);
@@ -282,7 +259,7 @@ test(
        makes the pull's line read as a contradiction rather than a promise. */
     const { sql, plan, close } = await withMoney();
     grantFor(sql, 'Mercury (read only)');
-    const doc = fillMercury(template(), { id: 'kiln', grant: 'Mercury (read only)' });
+    const doc = template();
     assert.deepEqual((await plan(doc)).approve, ['CALLS OUT api.mercury.com · every 1h · grant "Mercury (read only)"', ...LEDGER_LINES]);
     close();
   },
@@ -474,12 +451,12 @@ test('TWO ACCOUNTS UNDER ONE NAME BECOME ONE ROW, which is the price of keying o
 /* ── what the pack says, before anything runs ────────────────────────────────────────────────── */
 
 test('THE PACK NAMES A KEY AND CARRIES NONE, and both intervals agree', () => {
-  const doc = fillMercury(template(), { id: 'kiln', grant: 'Mercury (read only)' }) as {
+  const doc = settled(template()) as {
     pack: string;
     requires: { packs: Record<string, string> };
     declarations: Record<string, unknown>[];
   };
-  assert.equal(doc.pack, 'mercury-kiln');
+  assert.equal(doc.pack, 'mercury');
   /* BELOW 4.0.0 AND NOT A CARET ON 1.x: money-core 2.0.0 took `holdings` away, which nothing here writes into, and a
      `^1.0.0` refused this pack beside it (`packages/seed/test/money-core-major.test.ts` plans it on both). 3.0.0 took
      pages and card wordings and kept the accounts and transactions this pack writes, so 1.1.1 widened to it. The floor
@@ -491,7 +468,7 @@ test('THE PACK NAMES A KEY AND CARRIES NONE, and both intervals agree', () => {
     fetch: { base: string; path: string; auth: Record<string, string>; schedule: { every: string } };
     writes: { register: string };
   };
-  assert.equal(decl.ingest, 'mercury_kiln');
+  assert.equal(decl.ingest, 'mercury');
   assert.equal(decl.fetch.base, 'https://api.mercury.com');
   assert.equal(decl.fetch.path, '/api/v1/accounts');
   assert.deepEqual(decl.fetch.auth, { kind: 'bearer', grant: 'Mercury (read only)' });
@@ -615,8 +592,8 @@ test('A TRANSACTIONS PULL WRITES NOTHING, because a map cannot turn a signed amo
 
 const LEDGER_SOURCE = readFileSync(new URL('./ledger.js', import.meta.url), 'utf8');
 
-/** The ledger script as the file ships it, or a failure that says the pack does not carry one. */
-const ledger = (doc: Record<string, unknown> = template()): Script => {
+/** The ledger script, as a record stores it unless a file is given, or a failure that says the pack does not carry one. */
+const ledger = (doc: Record<string, unknown> = settled(template())): Script => {
   const s = scriptOf(doc);
   assert.ok(s !== undefined, 'mercury.pack.json declares no script, so nothing in the pack can write a transaction');
   return s;
@@ -721,6 +698,7 @@ function mercuryHost(state: { accounts: Row[]; transactions: Row[]; categories: 
     now: () => new Date(NOW).toISOString(),
     tz: 'UTC',
     input: null,
+    config: configOf(),
   };
 }
 
@@ -897,6 +875,21 @@ test('A KEY MERCURY REFUSES STOPS THE RUN WITH A SENTENCE AND WRITES NOTHING', a
   assert.match(a.refused.why, /Mercury refused the key labelled "Mercury \(read only\)" \(401\)/);
 });
 
+test('THE LEDGER ASKS WITH THE KEY ITS SETTING NAMES, the one the pack declares, and asks nothing with none set', async () => {
+  /* A LABEL THE OWNER SET, filled into the declaration's `keys` at install and read by the source from `ctx.config`, so
+     the key the script asks for is the key it declares. */
+  const h = { ...mercuryHost({ accounts: [], transactions: [], categories: [] }), config: configOf({ grant: 'Ops' }) };
+  const a = await runInQuickJs(ledgerDecl(ledger(settled(template(), { grant: 'Ops' }))), h);
+  assert.ok('writes' in a, JSON.stringify(a));
+  assert.ok(h.asked.length > 0 && h.asked.every((r) => r.key === 'Ops'), JSON.stringify(h.asked));
+
+  const none = { ...mercuryHost({ accounts: [], transactions: [], categories: [] }), config: configOf({ grant: '  ' }) };
+  const refused = await runInQuickJs(ledgerDecl(), none);
+  assert.ok('refused' in refused, JSON.stringify(refused));
+  assert.match(refused.refused.why, /No key is set, so Mercury was not asked/);
+  assert.equal(none.asked.length, 0);
+});
+
 test('THE WHOLE PATH ON A SELF-HOST: installed from the file, run on the hour, and the ledger holds one row a transaction', async () => {
   const { start } = await import('../../apps/selfhost/src/server.ts');
   const dir = mkdtempSync(join(tmpdir(), 'braindog-mercury-'));
@@ -936,7 +929,7 @@ test('THE WHOLE PATH ON A SELF-HOST: installed from the file, run on the hour, a
     };
     for (const id of ['portfolio', 'people', 'money-core']) await put(firstPartyDocument(id, { seeds: [] }));
     grantFor(running.sql, 'Mercury (read only)');
-    const doc = fillMercury(template(), { id: 'kiln', grant: 'Mercury (read only)' });
+    const doc = template();
     await put(doc);
     const s = ledger(doc);
 

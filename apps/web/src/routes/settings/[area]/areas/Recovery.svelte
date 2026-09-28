@@ -3,6 +3,8 @@
 -->
 <script lang="ts">
   import { copy } from '$lib/copy.ts';
+  import { signinFor } from '$lib/at.ts';
+  import { page } from '$app/state';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { passkeyRegister, removePasskey, support } from '$lib/auth.ts';
   import { since } from 'braindog-render';
@@ -127,11 +129,23 @@
      there is no session to list keys for is that there is no passkey here, and how that
      person gets back in without one, which the host's own `magic` decides. There is no "Add
      a passkey": without a session there is nobody to add one for. -->
+<!-- AND THE WAY TO ONE, WHERE THE HOST OFFERS PASSKEYS AND NOBODY IS SIGNED IN (DSN-18). There is
+     still nobody to add a passkey for, so the action is signing in, which lands back here with
+     "Add a passkey" drawn by the arm above. A host that offers no passkeys is offered nothing. -->
 <Section title={copy.passkeys}>
   <p class="hint">{copy.passkeyHow}</p>
-  <Empty kind="no-data-yet" title={copy.noPasskeys} body={copy.noPasskeysWhy(hostAuth.magic)} />
+  <Empty
+    kind="no-data-yet"
+    title={copy.noPasskeys}
+    body={copy.noPasskeysWhy(hostAuth.magic)}
+    actions={hostAuth.passkey && !hostAuth.me ? signInToAdd : undefined}
+  />
 </Section>
 {/if}
+
+{#snippet signInToAdd()}
+  <Button href={signinFor(page.url)}>{copy.signIn}</Button>
+{/snippet}
 
 <!-- AND THE ONE THAT IS OFFERED ONLY WHERE IT EXISTS. `49 §5.6`: on a self-host with no SMTP
      `GET /auth/methods` answers `magic: false` "so the screen never offers it". A recovery

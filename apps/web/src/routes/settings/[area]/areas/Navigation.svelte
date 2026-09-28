@@ -10,6 +10,7 @@
   import { invalidateAll } from '$app/navigation';
   import { apiBase } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
+  import { said as voiceSaid } from '$lib/voice.svelte.ts';
   import { navShapeSignals, recommendNavShape, type NavShape } from '$lib/design/nav-shape.ts';
   import { glyphOf, iconOf, iconOffers, shapeOffer, waiting, type HeldList, type HeldPage, type Offer, type PenItem } from '$lib/design/pen.ts';
   import { penWords } from '$lib/design/words.ts';
@@ -325,7 +326,7 @@
       </ul>
     {/if}
     {#if offers.length === 0}
-      <Empty kind="cleared" title={penWords.nothing} body={penWords.nothingWhy} />
+      <Empty kind="cleared" title={voiceSaid('pen_nothing')} body={voiceSaid('pen_waits')} />
     {:else}
       <ul class="ledger ledger-glyph pen">
         {#each offers as o (idOf(o))}

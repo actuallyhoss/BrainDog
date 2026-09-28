@@ -269,10 +269,13 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   written about them; People's own page is placed under a People section and its cards leave out the agent's `met`
  *   lines; and a person that other rows still name is not deleted (`delete: refuse_while_referenced`). A page and a
  *   list key are added and nothing is taken away, so the step is a minor one.
+ * - people 2.3.0: `rule.meet-senders` meets whoever a mail arrives from, on by default, as an agent's own `meet`
+ *   already does for a commit; `page.someone` draws the person's `met` lines, which `page.people`'s cards still leave
+ *   out. A declaration is added and nothing is taken away, so the step is a minor one.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.5.0',
-  people: '2.2.0',
+  people: '2.3.0',
   'money-core': '3.1.0',
   estate: '2.0.0',
   work: '1.9.0',

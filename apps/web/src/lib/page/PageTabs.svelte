@@ -102,6 +102,50 @@
     scrollbar-width: none;
   }
 
+  /* AND THE EDGE WHERE IT IS CUT FADES, because its scrollbar is hidden and a tab sliced at the screen's edge said
+     nothing about the tabs past it (pages §2.5, PageTabs). The wide table's fade (`blocks.css`, `.table-region`): the
+     row's own inline scroll timeline moves the two fade widths, `--edge-start` and `--edge-end`, which that sheet
+     registers as lengths so they animate. A row that fits has no timeline and no fade, and a browser without scroll
+     timelines draws the row as it did. The mask reads only alpha, so `--ink` is the kept part. */
+  @keyframes tab-edges {
+    0% {
+      --edge-start: 0px;
+      --edge-end: var(--sp-7);
+    }
+
+    4% {
+      --edge-start: var(--sp-7);
+    }
+
+    96% {
+      --edge-end: var(--sp-7);
+    }
+
+    100% {
+      --edge-start: var(--sp-7);
+      --edge-end: 0px;
+    }
+  }
+
+  @supports (animation-timeline: scroll()) {
+    .tab-row {
+      --edge-dir: to right;
+      mask-image: linear-gradient(
+        var(--edge-dir),
+        transparent,
+        var(--ink) var(--edge-start),
+        var(--ink) calc(100% - var(--edge-end)),
+        transparent
+      );
+      animation: tab-edges linear both;
+      animation-timeline: scroll(self inline);
+    }
+
+    .tab-row:dir(rtl) {
+      --edge-dir: to left;
+    }
+  }
+
   /* `--ctl-h` TALL AND NO `.tap`. The hit box `.tap` adds is a pseudo-element reaching 6px past a 32px tab on each
      side, 2px past the row's 4px of padding, and a box that scrolls on one axis counts that as overflow on the other.
      Under a thumb `--ctl-h` is 44 already, which is the target `.tap` exists to reach. (Arithmetic from the tokens, not

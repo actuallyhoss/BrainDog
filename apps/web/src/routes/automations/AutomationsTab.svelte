@@ -5,13 +5,12 @@
   screen existed is an automation whose trigger is a change, and it opens on the same canvas.
 
   A RECORD WITHOUT THE READ STILL OFFERS NEW. Listing needs the `automations` method; drawing one and sending it needs
-  only `propose`, which every record has. So a record that cannot list says so and keeps the button.
+  only `propose`, which every record has. So a record that cannot list says so, and the heading keeps its button.
 -->
 <script lang="ts">
   import { apiBase } from '$lib/at.ts';
   import { untrack } from 'svelte';
   import Empty from '$lib/ui/Empty.svelte';
-  import Button from '$lib/ui/Button.svelte';
   import { closed, drew, opened } from '$lib/ui/screen.svelte.ts';
   import { words } from '$lib/flow/flow.ts';
   import { openAutomations, rowLine, rowTrigger, type AutomationRow } from '$lib/flow/source.ts';
@@ -73,9 +72,9 @@
 {:else if from === 'absent'}
   <Empty kind="no-data-yet" title={words.absent} body={words.absentHow} />
 {:else if from === 'ready' && rows.length === 0}
-  <Empty kind="no-data-yet" title={words.none} body={words.noneWhy} {agentPrompt}>
-    {#snippet actions()}<Button href="/automations/new">{words.newOne}</Button>{/snippet}
-  </Empty>
+  <!-- NO BUTTON OF ITS OWN. The heading's "New automation" is above it on every width, and a second one under it read as
+       two different things to press (`loop/finish/design.md` 2.7). -->
+  <Empty kind="no-data-yet" title={words.none} body={words.noneWhy} {agentPrompt} />
 {:else if from === 'ready'}
   <HubRows rows={shown} />
 {/if}

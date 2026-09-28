@@ -24,6 +24,11 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     },
   ],
   people: [
+    {
+      version: '2.3.0',
+      notes:
+        'Meeting someone by email now happens on its own, the way it already does from a commit. What you were met about moves off their card, which was getting crowded, and onto its own note on their page.',
+    },
     { version: '2.2.0', notes: 'One page per person: who they are, the projects you met them in and what is written about them. A person other rows still name cannot be deleted.' },
     { version: '2.1.0', notes: 'People is the list meetings write to, so a meeting finds the right person without the list having to be called People.' },
     { version: '2.0.0', notes: 'Role no longer offers registrar. A row that holds it keeps it as its own word.' },

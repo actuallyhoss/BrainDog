@@ -539,7 +539,7 @@ export default function graph(
   const name = (short) => byShort.get(short)?.npm ?? `@braindog/${short}`;
 
   /**
-   * THE ONE EDGE INTO A PACK THIS TREE HOLDS, NAMED, WITH WHY AND UNTIL WHEN. `from to`, by short name.
+   * AN EDGE INTO A PACK THIS TREE HOLDS, NAMED, WITH WHY AND UNTIL WHEN. `from to`, by short name.
    *
    * Measured the first time this gate read `packs/`, on 24 September: one finding in the whole tree,
    * `apps/web` declaring and importing `@braindog/pack-rates-poll`, and it was being written that
@@ -553,10 +553,8 @@ export default function graph(
    * nothing is the hole the next edge walks through. Only while both ends are in the tree, so a seeded
    * fixture without them has nothing to say about it.
    */
-  const PACK_EDGES_HELD = {
-    'web pack-rates-poll':
-      "the rates form fills `packs/rates-poll/rates-poll.pack.json` with the pack's `fillRates`, replacing the seed builder it called before (M3 B7).",
-  };
+  /* EMPTY SINCE USE-5, which made the rates form a preset of the new-action sheet, so `apps/web` names no pack. */
+  const PACK_EDGES_HELD = {};
   const held = new Set();
 
   for (const e of [...edges.values()].sort((a, b) => `${a.from}${a.to}`.localeCompare(`${b.from}${b.to}`))) {

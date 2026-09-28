@@ -13,6 +13,10 @@
   import { LIST_LEVELS } from '$lib/record/may.ts';
   /* THE WRITES THIS AREA MAKES, and the one reading of what the record answered to each. */
   import { addException, dropException, moveLevel, removeAccess, suspendPerson, type Wrote } from '$lib/record/settings-write.ts';
+  /* COL-12: the rows of one list a grant reaches, picked with the exception and said back under it. */
+  import { ruleRead, rulesHeld, ruleValue } from '$lib/record/settings-write.ts';
+  import { labelOf } from '$lib/record/api.ts';
+  import type { FieldDecl } from '$lib/record/schema.ts';
   /* Lane F: erasing a person. */
   import { erasePerson } from '$lib/record/settings-write.ts';
   /* Lane G: inviting somebody by address, with a link the owner sends and nobody mails. */
@@ -158,13 +162,63 @@
     picking = p.id;
     pickList = lists.find((l) => !p.scoped.some((sc) => sc.register === l.id))?.id ?? lists[0]?.id ?? '';
     pickLevel = 'read';
+    pickField = '';
+    pickValue = '';
+  }
+
+  /* ── one grant narrowed to some rows: "only rows where <field> is <value>" (COL-12) ── */
+
+  /**
+   * THE FIELDS A RULE CAN NAME, which are the ones a person can say one value of: words, a choice, a link to a row, a
+   * number, a yes or no, a day. A document, a secret, an amount, a moment, a length of time and a list of values are
+   * left out, because "is" one value is not a question anybody asks of them. A retired field is read by no row.
+   */
+  const RULE_TYPES: ReadonlySet<string> = new Set(['text', 'enum', 'ref', 'email', 'url', 'int', 'decimal', 'bool', 'day']);
+  let pickField = $state('');
+  let pickValue = $state('');
+  const ruleFields = $derived((REGISTERS[pickList]?.fields ?? []).filter((f) => !f.retired && RULE_TYPES.has(f.type)));
+  const ruleField = $derived(ruleFields.find((f) => f.id === pickField));
+  /* `null` while the value is not one the field holds, which keeps Add off rather than sending a rule no row meets. */
+  const ruleSent = $derived(ruleField === undefined ? null : ruleValue(ruleField.type, pickValue));
+
+  /** A value as the person reads it: a choice's own words, Yes or No, or what was typed. */
+  const valueSaid = (f: FieldDecl, value: string): string =>
+    f.type === 'bool' ? (value === 'true' ? copy.exceptionYes : copy.exceptionNo) : (f.labels?.[value] ?? value);
+
+  /** Where the value starts when a field is picked: a choice's first value and Yes are picked already, words are typed. */
+  function startValue(field: string) {
+    const f = ruleFields.find((x) => x.id === field);
+    pickValue = f?.type === 'bool' ? 'true' : f?.type === 'enum' ? (f.values?.[0] ?? '') : '';
+  }
+
+  /**
+   * The sentence under one exception on the card, or `null` when the grant is every row of the list. A rule this screen
+   * did not write is said as well as it can be and never rewritten: the next write sends it back as it came.
+   */
+  function onlySaid(p: Person, register: string): string | null {
+    const held = rulesHeld(p);
+    if (!Object.hasOwn(held, register)) return null;
+    const rule = ruleRead(held[register]);
+    if (rule.kind === 'unread') return copy.exceptionOnlyUnread;
+    if (rule.kind === 'words') return copy.exceptionOnlyWords(rule.words);
+    if (rule.kind === 'other') return copy.exceptionOnlyOther;
+    const f = REGISTERS[register]?.fields.find((x) => x.id === rule.field);
+    return copy.exceptionOnlySaid(f ? labelOf(f) : rule.field.replace(/_/g, ' '), f ? valueSaid(f, rule.value) : rule.value);
   }
 
   async function saveException(e: SubmitEvent, p: Person) {
     e.preventDefault();
     if (!pickList) return;
+    const field = ruleField;
+    const value = ruleSent;
+    if (field !== undefined && value === null) return;
     const name = lists.find((l) => l.id === pickList)?.name ?? pickList;
-    const ok = await settle(() => addException(apiBase(), p, pickList, pickLevel), copy.exceptionAdded(p.name, name, levelSaid(pickLevel)));
+    const only = field === undefined || value === null ? null : { field: field.id, value };
+    const said =
+      only === null || field === undefined
+        ? copy.exceptionAdded(p.name, name, levelSaid(pickLevel))
+        : copy.exceptionAddedOnly(p.name, name, levelSaid(pickLevel), labelOf(field), valueSaid(field, String(only.value)));
+    const ok = await settle(() => addException(apiBase(), p, pickList, pickLevel, only), said);
     if (ok) picking = null;
   }
 
@@ -551,6 +605,9 @@
                       disabled={peopleBusy}
                       onclick={() => backToLevel(p, ex.register)}
                     >{copy.removeException}</Button>
+                    <!-- WHICH ROWS OF THE LIST, when the grant is narrowed, said as a sentence on its own line under
+                         the exception it narrows, since it is part of what they hold there (COL-12). -->
+                    {#if onlySaid(p, ex.register) !== null}<span class="ex-only">{onlySaid(p, ex.register)}</span>{/if}
                   </li>
                 {/each}
               </ul>
@@ -568,7 +625,10 @@
               <form class="ex-pick" onsubmit={(e) => saveException(e, p)}>
                 <label class="ex-field">
                   <span class="ex-label">{copy.exceptionList}</span>
-                  <select class="ex-select" bind:value={pickList}>
+                  <select class="ex-select" bind:value={pickList} onchange={() => {
+                    pickField = '';
+                    pickValue = '';
+                  }}>
                     {#each lists as l (l.id)}<option value={l.id}>{l.name}</option>{/each}
                   </select>
                 </label>
@@ -580,7 +640,46 @@
                     {#each LIST_LEVELS as level}<option value={level}>{levelSaid(level)}</option>{/each}
                   </select>
                 </label>
-                <Button weight="primary" type="submit" disabled={peopleBusy || !pickList}>{copy.exceptionAdd}</Button>
+                <!-- AND WHICH ROWS OF IT (COL-12): every row, or only those where one of the list's own fields holds
+                     one value, the value picked from a choice or typed. Offered only when the list's fields are known
+                     here, because a field this screen cannot name is not one it can offer. -->
+                {#if ruleFields.length > 0}
+                  <div class="ex-where">
+                    <label class="ex-field">
+                      <span class="ex-label">{copy.exceptionOnly}</span>
+                      <select class="ex-select" bind:value={pickField} onchange={(e) => startValue(e.currentTarget.value)}>
+                        <option value="">{copy.exceptionEveryRow}</option>
+                        {#each ruleFields as f (f.id)}<option value={f.id}>{labelOf(f)}</option>{/each}
+                      </select>
+                    </label>
+                    {#if ruleField}
+                      <label class="ex-field">
+                        <span class="ex-label">{copy.exceptionIs}</span>
+                        {#if ruleField.type === 'enum' && (ruleField.values?.length ?? 0) > 0}
+                          <select class="ex-select" bind:value={pickValue}>
+                            {#each ruleField.values ?? [] as v (v)}<option value={v}>{ruleField.labels?.[v] ?? v}</option>{/each}
+                          </select>
+                        {:else if ruleField.type === 'bool'}
+                          <select class="ex-select" bind:value={pickValue}>
+                            <option value="true">{copy.exceptionYes}</option>
+                            <option value="false">{copy.exceptionNo}</option>
+                          </select>
+                        {:else}
+                          <span class="field ex-value">
+                            <input
+                              class="field-input"
+                              type={ruleField.type === 'day' ? 'date' : ruleField.type === 'email' ? 'email' : ruleField.type === 'url' ? 'url' : 'text'}
+                              inputmode={ruleField.type === 'int' ? 'numeric' : ruleField.type === 'decimal' ? 'decimal' : undefined}
+                              autocomplete="off"
+                              bind:value={pickValue}
+                            />
+                          </span>
+                        {/if}
+                      </label>
+                    {/if}
+                  </div>
+                {/if}
+                <Button weight="primary" type="submit" disabled={peopleBusy || !pickList || (ruleField !== undefined && ruleSent === null)}>{copy.exceptionAdd}</Button>
                 <Button weight="bare" onclick={() => (picking = null)}>{copy.exceptionCancel}</Button>
               </form>
             {:else}
@@ -969,6 +1068,42 @@
 
   .ex-label {
     color: var(--ink2);
+    font-size: var(--t-sm);
+  }
+
+  /* WHICH ROWS: the field and its value side by side beside the list and level on a wide screen, and on a phone a
+     row of their own with the two stacked at full width, since a field's name and a typed value do not both fit
+     beside each other in 390px with a 44px control each. */
+  .ex-where {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: var(--sp-2);
+    min-inline-size: 0;
+  }
+
+  .ex-value {
+    min-inline-size: 16ch;
+  }
+
+  @media (width < 640px) {
+    .ex-where {
+      flex-direction: column;
+      align-items: stretch;
+      flex-basis: 100%;
+    }
+
+    .ex-where .ex-select,
+    .ex-where .ex-value {
+      inline-size: 100%;
+      min-inline-size: 0;
+    }
+  }
+
+  /* The rows a narrowed grant reaches, said on a line of its own under the exception it narrows. */
+  .ex-only {
+    grid-column: 1 / -1;
+    color: var(--dim);
     font-size: var(--t-sm);
   }
 

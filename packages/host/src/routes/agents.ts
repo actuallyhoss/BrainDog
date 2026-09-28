@@ -15,7 +15,7 @@ import type { Route } from '../index.ts';
 export const ROUTES: readonly Route[] = [
   { name: 'usedBy', group: 'READ+', writes: false, what: 'Which runs used one key or one tool, the one that used it last first, each with its agent, its machine, when and how often.',
     takes: { spoken: 'text' } },
-  { name: 'triage', group: 'DATA', writes: true, what: 'File one arrival from the inbox as a row, or set it aside.' },
+  { name: 'triage', group: 'DATA', writes: true, what: 'File one arrival from the inbox as a row, set it aside, or put a filed or archived one back.' },
   { name: 'createJob', group: 'JOBS', writes: true, what: 'Start one job of a kind the owner approved. It waits in the queue until a runner claims it.' },
   { name: 'cancelJob', group: 'JOBS', writes: true, what: 'Stop one job. A runner working on it reads the stop and ends it.' },
   { name: 'listJobs', group: 'JOBS', writes: false, what: 'The jobs on this record, newest first, in one state or all of them, a page at a time.',

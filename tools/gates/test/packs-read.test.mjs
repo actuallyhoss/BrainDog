@@ -138,26 +138,6 @@ test('graph refuses the core importing a pack and a pack escaping by path, and r
   }
 });
 
-/**
- * THE ONE HELD EDGE, `apps/web` ON `packs/rates-poll`, MUST LEAVE THE GATE WHEN IT LEAVES THE TREE.
- * Both workspaces present and the edge gone is the day the exemption stops meaning anything.
- */
-test('graph names a held edge into a pack that the tree no longer has', () => {
-  const root = tree({
-    'docs/31-STACK.md': '| # | Package |\n| --- | --- |\n| 1 | `web` |\n',
-    'apps/web/package.json': JSON.stringify({ name: '@braindog/web' }),
-    'apps/web/src/index.ts': 'export const w = 1;\n',
-    'packs/rates-poll/package.json': manifest('@braindog/pack-rates-poll'),
-  });
-  try {
-    const { code, out } = run('graph', root);
-    assert.equal(code, 1, out);
-    assert.match(out, /apps\/web\/package\.json:1\s+held edge not seen: @braindog\/web → @braindog\/pack-rates-poll/);
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-  }
-});
-
 /*
  * THE WORD SITS AT THE PACK'S ROOT AND UNDER A `src` BESIDE IT, because this gate walks `<member>/src`.
  * With only the root file, adding `'packs'` to `WORKSPACES` walked `packs/demo/src`, found nothing

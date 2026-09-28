@@ -19,6 +19,7 @@ import { display, labelOf } from './api.ts';
 import { REGISTERS } from './held.ts';
 import { readBoot } from './boot-live.ts';
 import { moneyInText } from './money.ts';
+import { listName } from './names.ts';
 
 export type Fetch = NonNullable<ClientOptions['fetch']>;
 
@@ -59,6 +60,48 @@ export function noteOf(register: string, e: Event): string {
   const now = display(register, e.field, e.to);
   if (now === null) return `${name} cleared`;
   return was === null ? `${name} set to ${now}` : `${name} from ${was} to ${now}`;
+}
+
+/**
+ * THE FIELDS A `declare` LINE SAYS IT ADDED OR TOOK OFF, as the kernel writes them: "Added domain." and "Took off note.",
+ * each a sentence of field ids joined by ", " and " and " (`declared` in `packages/kernel/src/index.ts`). A note cut at
+ * its 280 characters loses its full stop and matches neither, which leaves the line in the words it had before.
+ */
+const IDS = '([a-z][a-z0-9_-]*(?:(?:, | and )[a-z][a-z0-9_-]*)*)';
+const ADDED = new RegExp(`(?:^|\\. )Added ${IDS}\\.(?= |$)`, 'u');
+const TOOK_OFF = new RegExp(`(?:^|\\. )Took off ${IDS}\\.(?= |$)`, 'u');
+
+/** A list's field by its label, lower case as `noteOf` says one, or its id in words when the list does not declare it here. */
+function fieldWords(register: string, id: string): string {
+  const f = REGISTERS[register]?.fields.find((x) => x.id === id);
+  return f ? labelOf(f).toLowerCase() : id.replace(/[_-]/gu, ' ');
+}
+
+/** "a", "a and b", "a, b and c". */
+const listed = (words: readonly string[]): string =>
+  words.length <= 1 ? words.join('') : `${words.slice(0, -1).join(', ')} and ${words.at(-1)}`;
+
+/**
+ * A list's fields added or taken off, in words, from a `declare` line's target and note: "Added domain to Projects",
+ * "Took off note from Tasks", or both in one sentence. `null` for any other `declare` line, which keeps its own words.
+ *
+ * HISTORY AND HOME BOTH SAID "Changed the page" OR THE BARE NOTE, "Added domain.", for a field put on a list: the verb
+ * named the wrong thing and the note did not say which list. The target names the list (`declaration:register.<id>`) and
+ * the note names the fields, so the line is made of the two. What else the note says ("Proposed by p_… in SG5.") is ids,
+ * which nobody reads (design.md §6.8.3), so it is left out rather than printed beside the sentence.
+ */
+export function declaredOf(target: string | null | undefined, note: string | null | undefined): string | null {
+  const register = /^declaration:register\.([a-z][a-z0-9_-]*)$/u.exec(target ?? '')?.[1];
+  if (register === undefined || !note) return null;
+  const words = (ids: string | undefined): string | null =>
+    ids === undefined ? null : listed(ids.split(/, | and /u).map((id) => fieldWords(register, id)));
+  const added = words(ADDED.exec(note)?.[1]);
+  const off = words(TOOK_OFF.exec(note)?.[1]);
+  const list = listName(register);
+  if (added !== null && off !== null) return `Added ${added} to ${list} and took off ${off}`;
+  if (added !== null) return `Added ${added} to ${list}`;
+  if (off !== null) return `Took off ${off} from ${list}`;
+  return null;
 }
 
 /* A RULE IS `rule:<id>` ON THE RECORD AND `rule.<id>` IN THE SAMPLE, and `actorOf` words the second. */

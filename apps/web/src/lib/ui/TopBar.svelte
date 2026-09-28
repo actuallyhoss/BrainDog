@@ -76,7 +76,7 @@
   </a>
   {#if spine.includes('decide')}
     <a class="bar-item spine tap" href={at('/decide')} aria-current={under('/decide') ? 'page' : undefined}>
-      <Icon name="decide" size="m" /><span class="bar-name">{copy.decide}</span>
+      <Icon name="decide" size="m" /><span class="bar-name">{said('decide')}</span>
       <!-- NAMED, NOT ONLY COLOURED (13 §5.1), the same fix as the rail's: `--tone` alone left this
            the one element in the bar whose meaning was carried by colour and nothing else. -->
       {#if open}<span class="tally num" data-intent="warn">{open}<Icon name="decide" size="s" title={copy.openQuestions} /></span>{/if}
@@ -84,7 +84,7 @@
   {/if}
   {#if spine.includes('inbox')}
     <a class="bar-item spine tap" href={at('/inbox')} aria-current={under('/inbox') ? 'page' : undefined}>
-      <Icon name="inbox" size="m" /><span class="bar-name">{copy.inbox}</span>
+      <Icon name="inbox" size="m" /><span class="bar-name">{said('inbox')}</span>
       {#if inbox}<span class="tally num">{inbox}</span>{/if}
     </a>
   {/if}

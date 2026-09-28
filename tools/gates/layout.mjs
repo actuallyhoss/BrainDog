@@ -126,8 +126,25 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
    *
    * THE EXTRAS ARE SECOND ADDRESSES OF ROUTES ALREADY IN THE LIST (a different page, a different
    * track), because one sample proves the route renders and a second proves the DECLARATION does.
+   *
+   * THE HUB'S TABS AND A NEW AUTOMATION ARE EXTRAS TOO. `/automations` draws each kind that runs by
+   * itself under one path, picked by `?tab=`, so the tree yields one address and every tab but the
+   * first went unmeasured at 390, where the tab bar scrolls inside itself and each tab's rows wrap
+   * their own way. `/automations/[id]`
+   * is sampled with an id no record has, so the canvas itself was measured only as "not found"; `new`
+   * opens it with a trigger card and the sticky bar, which is the page a phone draws wrong first.
    */
-  const { routes: ROUTES, unsampled } = await routesOf(join(root, 'apps', 'web'), ['/p/estate', '/p/work', '/p/kiln', '/t/3', '/nowhere']);
+  const { routes: ROUTES, unsampled } = await routesOf(join(root, 'apps', 'web'), [
+    '/p/estate',
+    '/p/work',
+    '/p/kiln',
+    '/t/3',
+    '/nowhere',
+    '/automations?tab=scheduled',
+    '/automations?tab=scripts',
+    '/automations?tab=doors',
+    '/automations/new',
+  ]);
   if (unsampled.length) {
     for (const u of unsampled) console.error(`  a route with no sample address: ${u}`);
     return 1;
@@ -493,6 +510,7 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
         reducedMotion: 'reduce',
         hasTouch: width < 640,
         isMobile: width < 640,
+        bypassCSP: true,
       });
       const page = await context.newPage();
       process.stdout.write(`    ${String(width).padStart(4)}px `);
@@ -585,6 +603,7 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
           reducedMotion: 'reduce',
           hasTouch: width < 640,
           isMobile: width < 640,
+          bypassCSP: true,
         });
         const page = await context.newPage();
         process.stdout.write(`    ${v.name} @${String(width).padStart(4)} `);

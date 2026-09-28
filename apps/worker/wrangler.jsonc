@@ -251,6 +251,14 @@
      `wrangler r2 bucket create braindog-blobs-alpha`, once each, on the account. */
   "triggers": { "crons": ["17 3 * * *"] },
 
+  /* INBOUND MAIL (DOR-7) NEEDS NO LINE IN THIS FILE, AND THIS NOTE IS WHERE THE STEP THAT DOES LIVES. `src/index.ts`
+     exports `email()`, which hands each message to the same door as `POST /in/email/<token>` (`src/email.ts`), and an
+     Email Routing rule is what sends a domain's mail to it. That rule is his DNS step, per environment, and nothing
+     reaches `email()` before it: turn on Email Routing for a receiving subdomain (the MX records Cloudflare adds), then
+     one catch-all rule, action "Send to a Worker", naming this Worker's script for that environment
+     (`braindog` or `braindog-alpha`). The address a record hands its senders is then `<token>@<that subdomain>`, the
+     token the Ingest screen mints today. Until the rule exists the HTTP door is the only one, as it has been. */
+
   /* ===========================================================================================
      THE TWO ENVIRONMENTS.
 
@@ -374,6 +382,10 @@
         /* EMPTY IS NO SIGN-IN LINKS. The sender, on a domain Email Service sends for, switches them on
            with the `EMAIL` binding below (51 §5.8). */
         "AUTH_MAIL_FROM": "hello@brain.dog",
+        /* EMPTY FALLS BACK TO AUTH_MAIL_FROM: mail.ts reads it for everything but a sign-in link (OPS-28). */
+        "MAIL_FROM": "",
+        /* EMPTY FALLS BACK TO THE GENERIC FOOTER: mail.ts reads it for the address a reader is told to write to (OPS-28). */
+        "SUPPORT_ADDRESS": "",
         /* AND THE ONE WORD THAT LETS A KEYLESS RECORD BE MADE ON PURPOSE. Empty is the default and
            the default is a refusal: with no `KEK` bound, `/auth/provision` answers
            `NOT_IN_THIS_BUILD` rather than making a record that can never seal a grant, because a
@@ -482,6 +494,11 @@
          beside each. Names carry the environment for the same reason the queue does — every one of
          these namespaces is account-global.
 
+         `analytics_engine_datasets` IS THE ONE THE CODE ALREADY READS, and it stays drafted on purpose until his H5
+         (`loop/finish/ops.md` OPS-23): one point per request is his money once Analytics Engine bills for it, so
+         binding it is his call and not a deploy's. `src/telemetry.ts` writes nothing while it is unbound, and with it
+         bound writes one point per request once `SESSION_SECRET` is set too, because the record's hash is keyed off
+         that secret. There is no account resource to create first: a dataset exists from its first write.
          "analytics_engine_datasets": [
            { "binding": "TELEMETRY", "dataset": "braindog_telemetry_alpha" }],
 
@@ -571,6 +588,10 @@
         /* EMPTY IS NO SIGN-IN LINKS. The sender, on a domain Email Service sends for, switches them on
            with the `EMAIL` binding below (51 §5.8). */
         "AUTH_MAIL_FROM": "hello@brain.dog",
+        /* EMPTY FALLS BACK TO AUTH_MAIL_FROM: mail.ts reads it for everything but a sign-in link (OPS-28). */
+        "MAIL_FROM": "",
+        /* EMPTY FALLS BACK TO THE GENERIC FOOTER: mail.ts reads it for the address a reader is told to write to (OPS-28). */
+        "SUPPORT_ADDRESS": "",
         /* AND THE ONE WORD THAT LETS A KEYLESS RECORD BE MADE ON PURPOSE. Empty is the default and
            the default is a refusal: with no `KEK` bound, `/auth/provision` answers
            `NOT_IN_THIS_BUILD` rather than making a record that can never seal a grant, because a
@@ -649,7 +670,8 @@
         { "name": "RL_WRITE", "namespace_id": "1002", "simple": { "limit": 120, "period": 60 } }
       ]
 
-      /* The same drafted blocks as alpha, without the suffix, less `ratelimits`, which is bound above:
+      /* The same drafted blocks as alpha, without the suffix, less `ratelimits`, which is bound above. `TELEMETRY` waits
+         for his H5 here as in alpha, and the argument is there:
          "analytics_engine_datasets": [
            { "binding": "TELEMETRY", "dataset": "braindog_telemetry" }],
          "secrets_store_secrets": [

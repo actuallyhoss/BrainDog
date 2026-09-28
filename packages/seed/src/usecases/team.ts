@@ -56,8 +56,13 @@ export const TEAM = {
   /* 2.6.0: Home leads with what agents suggest, draws who is on each ticket in flight and whether an agent is working
      on it now, the cycle's progress beside its burndown, and the two ways into Settings a new team needs. A planned
      ticket can be ticked done, and a new list, Cycle days, holds how many tickets were open each morning. Agent work
-     reads the runs the record knows are live rather than the `session` list. */
-  version: '2.6.0',
+     reads the runs the record knows are live rather than the `session` list.
+     2.7.0: a project's page takes Projects' new layout, its figures and what it runs on in a rail beside the main
+     column, and one sentence said from its figures first (PGS-22, through `projectTemplate` in `../modules/
+     portfolio.ts`, which this page's `page.project` already calls). And the voice says more of the record its own
+     way, Home's empty lines, the Inbox's and the pen's line among them (PGS-24). Each is a new setting a person can
+     change at /packs, so a minor step. */
+  version: '2.7.0',
   title: 'Team board',
   summary: 'Tickets with an owner and a status, the cycle each is in, and the work your agents took on.',
   author: 'BrainDog',
@@ -78,6 +83,17 @@ export const TEAM = {
     nothing_needs_you: 'No call is waiting on you',
     since_away: 'What the team and its agents did',
     lists: 'Team lists',
+    /* THE REST OF THE LINES, brisk and shared (PGS-24): a ticket, a call, the team and its agents. */
+    working_now: 'On it now',
+    coming_up: 'Due soon',
+    overdue: 'Slipping',
+    nothing_now: 'No call is waiting on you right now.',
+    nothing_waiting: 'No call is waiting on you.',
+    fills_with: 'Tickets in flight, calls waiting on you and what the team and its agents did show up here as work moves.',
+    no_questions: 'No call waiting',
+    inbox_clear: 'Triage is clear',
+    add_first: 'File the first one',
+    pen_waits: 'When there is a way to fit this to how the team works, it waits here until you keep it or say no.',
   },
   /* SETTINGS A TEAM CAN CHANGE (S8): call Tickets "Issues" (and one of them is then an issue), or a teammate a "Member", at
      /packs/usecase-team. Work's tasks are the team's tickets, and their statuses are said as a team says them. */
@@ -604,3 +620,16 @@ export async function backlogAgain(io: { rows: TicketIo['rows']; link: (register
   }
   return moved;
 }
+
+/**
+ * WHAT THE MODULES SAY TO A TEAM, by module and then by the module's own words (`MODULE_NAMES` in `install.ts`), laid
+ * over the plain words every use case but a business's gets. Work's tasks are the team's tickets (`labels.tasks`), so
+ * the page that holds them, its place on the rail and its sentences about a task say ticket too.
+ */
+export const TEAM_NAMES: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  work: {
+    Work: 'Tickets',
+    'Open work by project': 'Open tickets by project',
+    'No agent holds a task. An agent takes one by setting itself as its agent.': 'No agent holds a ticket. An agent takes one by setting itself as its agent.',
+  },
+};

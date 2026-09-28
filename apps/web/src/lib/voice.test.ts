@@ -11,6 +11,8 @@ import { labelSetting as labelSettingOfPack, speakingPack as speakingPackOf, use
 import { homePageOf as homeOfPack } from '@braindog/seed/usecases/install';
 
 import { copy } from './copy.ts';
+import { penWords } from './design/words.ts';
+import { words as homeWords } from './home/words.ts';
 import { VOICE_LINES, homePageOf, homeSlugOf, labelSetting, labelsOf, voiceWhenAdding, voiceWrites, lineOf, listNamed, relabel, relabelAll, speaking, voiceOf } from './voice.ts';
 
 test('THE DISPLAY READS EVERY KEY THE FORMAT ALLOWS, and no other', () => {
@@ -18,9 +20,9 @@ test('THE DISPLAY READS EVERY KEY THE FORMAT ALLOWS, and no other', () => {
 });
 
 test('A KEY LEFT OUT READS THE HOUSE VOICE, so the sample loses nothing', () => {
-  const house = new Set<unknown>(Object.values(copy));
+  const house = new Set<unknown>([...Object.values(copy), ...Object.values(homeWords), ...Object.values(penWords)]);
   for (const key of VOICE_KEYS) {
-    assert.ok(house.has(VOICE_LINES[key]), `${key} replaces a line copy.ts holds`);
+    assert.ok(house.has(VOICE_LINES[key]), `${key} replaces a line the house voice holds`);
     assert.equal(lineOf({}, key), VOICE_LINES[key]);
   }
   assert.equal(lineOf({ home: 'Today' }, 'home'), 'Today');

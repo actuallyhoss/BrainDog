@@ -24,6 +24,7 @@
   import { queueMore } from 'braindog-render';
   import { page as route } from '$app/state';
   import { copy } from '$lib/copy.ts';
+  import { said as voiceSaid } from '$lib/voice.svelte.ts';
   import { homeCurrency } from '$lib/record/api.ts';
   import { REGISTERS } from '$lib/record/held.ts';
   import { symbolText } from '$lib/record/money.ts';
@@ -182,7 +183,7 @@
                and look". `?new=1` opens the list's own create form. The block's own filter is deliberately NOT
                carried: the list is empty, and narrowing an empty list is the last thing anybody needs. NOT ON AN
                AGENT'S RUNS, which an agent starts and a person does not type in. */
-            ...(block.register === 'session' ? {} : { add: { href: `/r/${block.register}?new=1`, label: copy.addOne } }),
+            ...(block.register === 'session' ? {} : { add: { href: `/r/${block.register}?new=1`, label: voiceSaid('add_first') } }),
           }
         : undefined,
     ),
@@ -271,13 +272,15 @@
   {/each}
 {/if}
 
-<!-- THE PANEL THE HOST DRAWS UNDER A SECTION THAT NAMES ONE (`panel-of.ts`), for the row the page is about: what the
-     project runs on, and beside it the project's own key for its numbers; or the key alone. Not while arranging, since
-     a list that fetches is not a block to move, and not on an inert page, since the key's panel makes one. -->
+<!-- THE PANEL THE HOST DRAWS UNDER A SECTION THAT NAMES ONE (`panel-of.ts`), for the row the page is about, and only
+     the one it names: the project's scheduled actions under `panel: actions`, the key its numbers are sent with under
+     `panel: reporting`. The actions panel drew the key as well, so a founder's project page, which names both, drew
+     the key twice. Not while arranging, since a list that fetches is not a block to move, and not on an inert page,
+     since the key's panel makes one. -->
 {#if panel && param && writes && !arranging}
   <!-- BY THE ROW, `things#1`, and not by its title: the record resolves each action's project to its row (DOR-6). -->
-  {#if panel === 'actions'}<Actions project={{ spoken: `${param.register}#${param.seq}`, title: param.title }} />{/if}
-  <Reporting register={param.register} seq={param.seq} title={param.title} />
+  {#if panel === 'actions'}<Actions project={{ spoken: `${param.register}#${param.seq}`, title: param.title }} />
+  {:else}<Reporting register={param.register} seq={param.seq} title={param.title} />{/if}
 {/if}
 
 <!--
@@ -373,6 +376,21 @@
     padding-block-start: var(--sp-2);
     color: var(--dim);
     font-size: var(--t-sm);
+  }
+
+  /* THE DOOR TO THE REST IS A QUIET LINK, not the red underline the browser's link colour gave it: "Open Money for the
+     rest" under the forecast read as a warning on a healthy page (design §2.11, Money). The second ink with a hairline
+     under it says it can be pressed, and red stays for what is wrong. */
+  .block-slice > a {
+    color: var(--ink2);
+    text-decoration: underline;
+    text-decoration-color: var(--edge);
+    text-underline-offset: 3px;
+  }
+
+  .block-slice > a:hover {
+    color: var(--ink);
+    text-decoration-color: currentColor;
   }
 
   /* An input's refusal, under the inputs it is about, in the size the slice line under a block is said in. */

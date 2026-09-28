@@ -21,6 +21,7 @@
   import Sheet from '$lib/ui/Sheet.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import { bareOrigin, settingsState, type AreaProps } from '../settings-state.svelte.ts';
+  import { hostedHere } from '../../billing.ts';
 
   let { shell }: AreaProps = $props();
 
@@ -30,6 +31,12 @@
   const SLUG = $derived(shell.index.slug);
   const me = $derived(shell.me);
   const signedOut = $derived(s.signedOut);
+  /* THE TWO SIGN-IN STATES THAT ARE NOT A SESSION, said in the row where "Signed in as" stands when there is one (DSN-18). */
+  const identityWords = {
+    here: 'This browser',
+    openHost: 'Let in without signing in, as this host’s one person',
+    notSignedIn: 'Not signed in',
+  };
   const signedInEmail = $derived(s.hostAuth?.me?.email ?? null);
   const namesOf = s.namesOf;
 
@@ -231,6 +238,57 @@
   $effect(() => {
     untrack(() => void landed());
   });
+
+  /**
+   * CLOSING THE ACCOUNT (OPS-21) IS THE CLOUD'S ALONE: a self-host belongs to its operator, and its `/account/close` is a
+   * 404. The address is typed to confirm, in a sheet, and the host checks it, the fifteen minutes and every record's
+   * owners; this prints what the host answered and decides none of it.
+   */
+  const closable = $derived(hostedHere(shell) && !!signedInEmail && !signedOut);
+  let closeOpen = $state(false);
+  let typedClose = $state('');
+  let closing = $state(false);
+  let closeRefusal = $state('');
+  let closeStale = $state(false);
+  let closedNow = $state(false);
+
+  function startClose(): void {
+    typedClose = '';
+    closeRefusal = '';
+    closeStale = false;
+    closeOpen = true;
+  }
+
+  async function closeAccount(e?: SubmitEvent): Promise<void> {
+    e?.preventDefault();
+    if (closing) return;
+    closing = true;
+    closeRefusal = '';
+    closeStale = false;
+    const mark = opened();
+    let answer: { ok?: unknown; refusal?: { code?: unknown; fix?: unknown } } | undefined;
+    try {
+      const res = await fetch('/account/close', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', accept: 'application/json' },
+        credentials: 'same-origin',
+        cache: 'no-store',
+        body: JSON.stringify({ email: typedClose.trim() }),
+      });
+      answer = await res.json().catch(() => undefined);
+    } catch {
+      answer = undefined;
+    }
+    closed(true, mark);
+    closing = false;
+    if (answer?.ok === true) {
+      closedNow = true;
+      return;
+    }
+    const fix = answer?.refusal?.fix;
+    closeRefusal = typeof fix === 'string' && fix !== '' ? fix : copy.closeUnreached;
+    closeStale = answer?.refusal?.code === 'NEEDS_BROWSER_SESSION';
+  }
 </script>
 
 <!--
@@ -303,8 +361,17 @@
          "You are signed out." (`research-first-sign-in.md` friction 10). -->
     <!-- AND NEVER AN ID (design.md:270, SYS-3): with no address and no name the row says
          nothing rather than the person's id. -->
-    {#if !signedOut}
+    <!-- AND A REAL SIGN-IN STATE (DSN-18). "Signed in as" stood beside a "Sign in" button whenever the
+         host answered no session, because the row's only condition was that nobody had pressed Sign
+         out here. It is drawn only while a session names somebody, and otherwise the row says which
+         of the two other states this is: a host that lets its one person in without signing in, or
+         nobody signed in at all. -->
+    {#if !signedOut && s.hostAuth?.me}
       <li><span class="fact-key">{copy.signedInAs}</span><span class="fact-value">{myEmail ?? myName ?? copy.you}</span></li>
+    {:else}
+      <li><span class="fact-key">{identityWords.here}</span><span class="fact-value">{s.hostAuth?.open && !signedOut ? identityWords.openHost : identityWords.notSignedIn}</span></li>
+    {/if}
+    {#if !signedOut}
       {#if passkeysHere}
         <li><span class="fact-key">{copy.identityPasskeysWay}</span><span class="fact-value">{copy.identityPasskeys(s.liveKeys?.length ?? 0)}</span></li>
       {/if}
@@ -417,6 +484,53 @@
        two ways. -->
   {#if shell.recordsRefused}<p class="hint">{shell.recordsRefused}</p>{/if}
 </Section>
+
+<!-- CLOSE YOUR ACCOUNT, LAST (OPS-21): what goes and what stays said before anybody presses, the
+     red text button here and the one filled red button inside the sheet that does it. At 390px
+     `row-actions` stacks, so the button is full width. -->
+{#if closable || closedNow}
+  <Section title={copy.closeTitle}>
+    <p class="hint">{copy.closeSays}</p>
+    <div class="row-actions">
+      <Button tone="bad" onclick={startClose}>{copy.closeStart}</Button>
+    </div>
+  </Section>
+
+  <Sheet bind:open={closeOpen} title={copy.closeTitle}>
+    {#if closedNow}
+      <p class="sheet-said" role="status">{copy.closeDone}</p>
+    {:else}
+      <form id="identity-close-form" class="rename" onsubmit={closeAccount}>
+        <label class="identity-label" for="identity-close">{copy.closeLabel}</label>
+        <span class="field rename-field" class:rename-bad={!!closeRefusal}>
+          <input
+            class="field-input"
+            id="identity-close"
+            type="email"
+            inputmode="email"
+            autocomplete="off"
+            bind:value={typedClose}
+            aria-describedby="identity-close-help"
+            disabled={closing}
+          />
+        </span>
+        <p class="identity-help" class:identity-bad={!!closeRefusal} id="identity-close-help" role={closeRefusal ? 'alert' : undefined}>
+          {closeRefusal || copy.closeHint(signedInEmail ?? '')}
+        </p>
+        {#if closeStale}<div class="row-actions"><Button href={signinFor(page.url)}>{copy.signIn}</Button></div>{/if}
+      </form>
+    {/if}
+    {#snippet footer()}
+      {#if closedNow}
+        <Button href="/">{copy.closeLeave}</Button>
+      {:else}
+        <Button weight="primary" tone="bad" type="submit" form="identity-close-form" disabled={closing || typedClose.trim() === ''}>
+          {closing ? copy.closeGoing : copy.closeGo}
+        </Button>
+      {/if}
+    {/snippet}
+  </Sheet>
+{/if}
 
 <style>
   /* A short list of stated facts, for the areas that REPORT rather than offer. Two columns so

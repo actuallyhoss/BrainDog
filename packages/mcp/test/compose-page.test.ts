@@ -3,8 +3,8 @@
  * (`loop/research-dynamic-layouts.md` section 6 brief D9, section 7, `loop/DIRECTION.md` sections 11, 22 and 28).
  *
  * THE TOOL CALLS A MODEL WOULD MAKE, IN THE ORDER IT WOULD MAKE THEM, against a real record: read the page grammar,
- * try a page, mend what the record refused, file, let the owner accept, read a schema, try every page again with rows
- * under it, file the pages, and read them back installed. Nothing here calls the kernel to install anything; the only
+ * try the desk whole over sample rows with a part page drawn over one part, file its lists, let the owner accept, read
+ * a schema, file the pages, and read them back installed. Nothing here calls the kernel to install anything; the only
  * writes that are not `propose` are the owner's presses in Decide and the rows she types in.
  *
  * FROM THE DECLARATION BRIEF D8 SHIPS, `packs/launch-desk/launch-desk.pack.json`, read as it is on disk each run, with
@@ -25,16 +25,24 @@
  * called about."`. So the brief's red line, that the preview refused `layout`, `area`, `next`, `range` and `inputs`, was
  * right for four of the five and wrong for `layout`, which was admitted silently (the survey's finding 1).
  *
- * THREE THINGS THE BRIEF ASSUMED THAT THE RECORD DOES NOT DO, each measured here rather than worked around quietly:
- *   1. A page cannot be tried before its lists exist. `previewPage` holds a body to the install's lint, and the lint
- *      refuses a `requires` naming a list nobody installed, so the lists are filed and accepted first, and every page
- *      is tried and filed after. A `{ declarations: [...] }` bundle is tried with the record's `previewChange`, up to
- *      `PREVIEW_DECLARATIONS_MOST` declarations (`packages/record/src/preview-change.ts`).
- *   2. A bundle filed under a list's name may carry no other list (`govern.ts` `namesFault`), and the refusal says to
- *      propose each other list as a change of its own. The agent files it under a figure's name instead, which the
- *      record asks only whoever reads the whole record about; the sentence does not say that this is allowed.
- *   3. A template (`for:`) is tried as written, `{{name}}` and all, never over a row (`previewPage`'s header), so every
- *      block that filters by a ref is refused `REF_UNKNOWN`. The agent tries it over one row it read instead.
+ * THREE THINGS THE BRIEF ASSUMED THAT THE RECORD DID NOT DO, measured here on September 25th. Two are fixed, and the
+ * third is still worked around in the open:
+ *   1. FIXED: a page could not be tried before its lists existed. `previewPage` holds one page to the install's lint,
+ *      and the lint refuses a `requires` naming a list nobody installed, so the lists were filed and accepted before
+ *      any page was seen. `propose` with `try` on a bundle now answers `change_preview`
+ *      (`packages/record/src/preview-change.ts`), which installs the lists, figures and pages together inside the
+ *      kernel's rehearsal, writes the sample rows and throws all of it away. So the agent tries the Desk whole, its page and its page per part
+ *      with every list and figure they read, in one call before anything is filed. A preview takes at most
+ *      `PREVIEW_DECLARATIONS_MOST` declarations, and the whole pack with the pad's notes is more, so Numbers, which
+ *      reads a different set of figures, is its own try.
+ *   2. STILL WORKED AROUND: a bundle filed under a list's name may carry no other list (`govern.ts` `namesFault`), and
+ *      the refusal says to propose each other list as a change of its own. The agent files it under a figure's name
+ *      instead, which the record asks only whoever reads the whole record about; the sentence does not say that this
+ *      is allowed.
+ *   3. FIXED: a template (`for:`) was tried as written, `{{name}}` and all, so every block that filtered by a ref was
+ *      refused `REF_UNKNOWN`, and the agent filled it over a row it read by hand. `try` now takes `about`, the spoken
+ *      id of a row, a sample row among them, and the record draws the page per row over it the way the install fills
+ *      it.
  *
  * Every row here is invented, for a small product launch in parts. Nothing names a person, a label or a place.
  */
@@ -67,10 +75,13 @@ type Drawn = {
   nexts?: unknown[];
   rings?: unknown[];
   done_now?: boolean[];
+  short_now?: boolean[];
   next?: number;
   types?: Record<string, string>;
   queue?: Question[];
 };
+/** A page `change_preview` drew: the record's `PreviewedPage`, read here for what this file asserts. */
+type Previewed = { id: string; slug: string; title: string; about: string | null; blocks: Drawn[] };
 
 const said = <T>(r: unknown): T => {
   const x = r as Out;
@@ -101,14 +112,45 @@ const declarationOf = (d: Decl): { id: string; kind: string; body: Decl } => {
   return { id: `register.${name}`, kind, body: { id: name, ...rest } };
 };
 
+/** Declarations of the pack by kind and name, the pad's notes among them. */
+const named = (kind: string, ...names: string[]): Decl[] =>
+  names.map((n) => {
+    const found = [...DESK_PACK, NOTES].find((d) => d[kind] === n);
+    assert.ok(found, `the desk has no ${kind} called ${n}`);
+    return found;
+  });
+
+/** The Desk whole: its page and its page per part, with every list and figure they read. */
+const DESK_WHOLE = (): Decl[] => [
+  ...named('register', 'parts', 'steps', 'contacts', 'lessons', 'notes'),
+  ...named('metric', 'essentials', 'essentials-done', 'essentials-share'),
+  ...named('page', 'desk', 'part'),
+];
+
+/** Numbers, with its two lists, the parts a budget line points at, and every figure its verdict and tiles read. */
+const NUMBERS_WHOLE = (): Decl[] => [
+  ...named('register', 'parts', 'checks', 'lines'),
+  ...named('metric', 'price', 'costs', 'priced', 'cost-share', 'least-price', 'price-room', 'price-free', 'price-unjudged'),
+  ...named('page', 'numbers'),
+];
+
 /**
- * A template as it would be for one row: every `{{field}}` filled from the row and `for:` taken off, under the slug
- * the row would give it. What an agent tries in place of the template, which a preview draws only as written.
+ * Sample rows the agent writes into its try, invented for a small launch: two parts in their own colours, an essential
+ * and a lesser step under the box, one step done, most of them with a day they are due, and a thought on the pad. A
+ * ref names its row by spoken id, which is the seq the rehearsal gives it.
  */
-const overRow = (page: Decl, fields: Record<string, unknown>): Decl => {
-  const { for: _for, ...rest } = page;
-  const filled = JSON.parse(JSON.stringify(rest).replace(/\{\{(\w+)\}\}/g, (_, f: string) => String(fields[f] ?? ''))) as Decl;
-  return { ...filled, page: `${String(page.page)}-${String(fields.name).toLowerCase()}` };
+const SAMPLES = {
+  parts: [
+    { name: 'Product', what: 'The first piece', big: true, hue: 210 },
+    { name: 'Box', what: 'What it ships in', hue: 30 },
+  ],
+  steps: [
+    { what: 'Cut the pattern', part: 'parts#1', done: true, priority: 'essential', rank: 1, due: '2026-09-10' },
+    { what: 'Sample the fit', part: 'parts#1', done: false, priority: 'essential', rank: 2, due: '2026-10-05' },
+    { what: 'Box quote', part: 'parts#2', done: false, priority: 'should', rank: 3, due: '2026-10-12' },
+    { what: 'Box sample', part: 'parts#2', done: false, priority: 'essential', rank: 4, due: '2026-09-28' },
+  ],
+  notes: [{ text: 'Maybe fewer parts to start with.' }],
 };
 
 /** One page as a change an agent tries: `try` beside `to`. */
@@ -121,6 +163,15 @@ const tried = (page: Decl) => {
 const bundle = (question: string, decls: Decl[], named?: string) => {
   const members = decls.map(declarationOf);
   return { question, body_kind: 'change', body: { declaration_id: named ?? members[0]!.id, to: { declarations: members } } };
+};
+
+/**
+ * Several declarations as one change an agent tries, over the sample rows and the row `about` names when it says one,
+ * named as it would be filed, under a figure, so the try and the filing are the same change.
+ */
+const triedBundle = (question: string, decls: Decl[], named: string, how: { rows?: unknown; about?: string } | true) => {
+  const b = bundle(question, decls, named);
+  return { ...b, body: { ...b.body, try: how } };
 };
 
 /** The drawn block under a heading, which says which block it is whatever its place on the page. */
@@ -148,11 +199,11 @@ async function record() {
  */
 async function rows(api: Awaited<ReturnType<typeof createRecordApi>>) {
   const make = async (register: string, fields: Record<string, unknown>) => said<{ id: string }>(await api.create({ register, fields } as never, owner));
-  const product = await make('parts', { name: 'Product', what: 'The first piece', big: true });
-  const box = await make('parts', { name: 'Box', what: 'What it ships in' });
+  const product = await make('parts', { name: 'Product', what: 'The first piece', big: true, hue: 210 });
+  const box = await make('parts', { name: 'Box', what: 'What it ships in', hue: 30 });
   await make('steps', { what: 'Cut the pattern', part: product.id, done: true, priority: 'essential', rank: 1 });
-  await make('steps', { what: 'Sample the fit', part: product.id, done: false, priority: 'essential', rank: 2 });
-  await make('steps', { what: 'Box quote', part: box.id, done: false, priority: 'should', rank: 3 });
+  await make('steps', { what: 'Sample the fit', part: product.id, done: false, priority: 'essential', rank: 2, due: '2026-10-05' });
+  await make('steps', { what: 'Box quote', part: box.id, done: false, priority: 'should', rank: 3, due: '2026-10-12' });
   await make('lessons', { lesson: 'Ask for a sample first', body: 'The first run was the wrong weight.', part: product.id });
   await make('contacts', { name: 'A printer', part: box.id, status: 'asked' });
   await make('checks', { what: 'First price', price: 1000, making: 200, packing: 50, sending: 50, cost: 300 });
@@ -174,35 +225,99 @@ test('THE GRAMMAR AN AGENT READS FIRST NAMES inputs AMONG THE KINDS, so the one 
  * lists the kinds from the renderer, so `inputs` arrived with it, and its page, block and card-role lines were written
  * before wave one: measured on September 25th, split into words, it held `inputs` and none of `layout`, `sticky`,
  * `area`, `tabs`, `lead`, `first`, `next`, `reply`, `range`, `tiles` or `box`, nor an option's `shows` and
- * `about`. A model that reads the grammar and not the survey wrote none of them.
+ * `about`. A model that reads the grammar and not the survey wrote none of them. Desk 2.0 adds the words it wears:
+ * `short` on its path, `hue` and `picture` on a part's card, and its `calendar` with `back` and `ahead`.
  */
 test('THE GRAMMAR SAYS EVERY WORD THE DESK USES, so a model can write it before its first refusal', async () => {
   const { sql, mcp } = await record();
   const words = new Set(JSON.stringify(said(await mcp.read('braindog:grammar/page', agent))).split(/[^A-Za-z_]+/));
-  const missing = ['layout', 'sticky', 'area', 'tabs', 'lead', 'first', 'next', 'reply', 'range', 'tiles', 'box', 'shows', 'about', 'inputs'].filter((w) => !words.has(w));
+  const missing = [
+    ...['layout', 'sticky', 'area', 'tabs', 'lead', 'first', 'next', 'reply', 'range', 'tiles', 'box', 'shows', 'about', 'inputs'],
+    ...['short', 'hue', 'picture', 'calendar', 'back', 'ahead'],
+  ].filter((w) => !words.has(w));
   sql.close();
   assert.deepEqual(missing, []);
 });
 
-test('AN AGENT TRIES THE DESK, IS TOLD ITS LISTS ARE MISSING, FILES THEM, AND EVERY BLOCK OF EVERY PAGE ANSWERS BEFORE A PAGE IS FILED', async () => {
+test('AN AGENT TRIES THE DESK WHOLE IN ONE CALL, OVER SAMPLE ROWS AND ONE PART, AND EVERY BLOCK ANSWERS BEFORE ANYTHING IS FILED', async () => {
   const { sql, api, mcp, accept, pageIds } = await record();
   const DESK = pageNamed('desk');
-  const PART = pageNamed('part');
-  const NUMBERS = pageNamed('numbers');
+  const governance = async () => JSON.stringify(said(await api.governance({ status: 'open' } as never, owner)));
+  const nothingBefore = await governance();
 
-  /* FIRST TRY, BEFORE ANY LIST EXISTS. The lint names the first list the page requires and nobody installed. */
+  /* A PAGE ALONE, BEFORE ANY LIST EXISTS, is still held to the install's lint, which names the first list it requires
+     and nobody installed: a single page is tried as `page_preview` always was. The desk is tried as a bundle below. */
   const early = (await mcp.call('propose', tried(DESK), agent)) as Out;
   assert.equal(early.ok, false, 'a page over lists nobody installed was drawn');
   assert.equal(early.refusal?.code, 'DEPENDENCY_UNRESOLVED', JSON.stringify(early));
   assert.match(early.refusal?.fix ?? '', /register\.parts/);
 
-  /* AND THE WHOLE DESK AS ONE TRIED BUNDLE, which is the one change the brief would have sent, is more than one preview
-     takes (`loop/finish/contracts.md` §2.4), so it is refused on its size, at the declarations. */
-  const whole = bundle('Add the launch desk?', [...LISTS, ...PAGES], 'metric.essentials');
-  const triedWhole = (await mcp.call('propose', { ...whole, body: { ...whole.body, try: true } }, agent)) as Out;
-  assert.equal(triedWhole.refusal?.code, 'OUT_OF_BOUNDS', JSON.stringify(triedWhole));
-  assert.equal(triedWhole.refusal?.at, 'to.declarations');
-  assert.match(triedWhole.refusal?.fix ?? '', /at most 12 declarations at once, and this change has 23/);
+  /* THE WHOLE PACK AS ONE TRIED BUNDLE is more than one preview takes (`loop/finish/contracts.md` §2.4), so it is refused
+     on its size, at the declarations, in a sentence that says how to split it. */
+  const everything = [...LISTS, ...PAGES];
+  const triedAll = (await mcp.call('propose', triedBundle('Add the launch desk?', everything, 'metric.essentials', true), agent)) as Out;
+  assert.equal(triedAll.refusal?.code, 'OUT_OF_BOUNDS', JSON.stringify(triedAll));
+  assert.equal(triedAll.refusal?.at, 'to.declarations');
+  assert.match(triedAll.refusal?.fix ?? '', new RegExp(`and this change has ${everything.length}\\. Try its lists and figures first, then its pages\\.`));
+
+  /* THE DESK WHOLE, IN ONE TRY: its lists, its figures, the Desk and the page per part, over the sample rows, with the
+     page per part drawn over the box, a row that exists only inside the try. Nothing was installed before it. */
+  const desked = said<{ change_preview: { pages: Previewed[] }; proposed: boolean }>(
+    await mcp.call('propose', triedBundle('Add the launch desk?', DESK_WHOLE(), 'metric.essentials', { rows: SAMPLES, about: 'parts#2' }), agent),
+  );
+  assert.equal(desked.proposed, false);
+  assert.deepEqual(desked.change_preview.pages.map((p) => p.id), ['page.desk', 'page.part']);
+  for (const page of desked.change_preview.pages)
+    page.blocks.forEach((b, i) => assert.deepEqual(b.refusals, [], `${page.id}.blocks[${i}] (${b.kind}) was refused`));
+  const [deskDrawn, boxDrawn] = desked.change_preview.pages as [Previewed, Previewed];
+  assert.equal(deskDrawn.blocks.length, (DESK.blocks as unknown[]).length);
+
+  /* THE DESK'S WORDS ANSWERED, NOT ONLY ADMITTED: the next move across every part, each part carded in its own colour
+     with its ring and its next step, the lead part first, and the open steps on the days they are due, earliest first,
+     the done one left off. */
+  assert.deepEqual(headed(deskDrawn.blocks, 'Next move').rows.map((r) => r.fields.what), ['Sample the fit']);
+  const parts = deskDrawn.blocks.find((b) => b.kind === 'cards' && b.nexts !== undefined)!;
+  assert.deepEqual(parts.rows.map((r) => r.fields.name), ['Product', 'Box']);
+  assert.deepEqual(parts.rows.map((r) => r.fields.hue), [210, 30]);
+  assert.deepEqual(parts.rings, [50, 0]);
+  assert.deepEqual(parts.nexts, ['Sample the fit', 'Box quote']);
+  const calendar = deskDrawn.blocks.find((b) => b.kind === 'calendar')!;
+  assert.deepEqual(calendar.rows.map((r) => [r.fields.what, r.fields.due]), [
+    ['Box sample', '2026-09-28'],
+    ['Sample the fit', '2026-10-05'],
+    ['Box quote', '2026-10-12'],
+  ]);
+
+  /* THE PAGE PER PART DRAWN OVER THE BOX, as the install would fill it: its title is the part's name, and its path is
+     the box's open steps, with the essential one marked for the short view. */
+  assert.deepEqual([boxDrawn.title, boxDrawn.about], ['Box', 'parts#2']);
+  const path = headed(boxDrawn.blocks, 'The path');
+  assert.deepEqual(path.rows.map((r) => r.fields.what), ['Box quote', 'Box sample']);
+  assert.deepEqual(path.short_now, [false, true]);
+
+  /* NUMBERS, WITH EVERY FIGURE IT READS, IN A SECOND TRY, over a price check and a budget line. */
+  const counted = said<{ change_preview: { pages: Previewed[] } }>(
+    await mcp.call(
+      'propose',
+      triedBundle('Add the numbers of the launch desk?', NUMBERS_WHOLE(), 'metric.price', {
+        rows: {
+          parts: [{ name: 'Product', what: 'The first piece' }],
+          checks: [{ what: 'First price', price: 1000, making: 200, packing: 50, sending: 50, cost: 300 }],
+          lines: [{ item: 'Fabric', part: 'parts#1', low: 100, high: 300, spent: 120 }],
+        },
+      }),
+      agent,
+    ),
+  ).change_preview.pages;
+  assert.deepEqual(counted.map((p) => p.id), ['page.numbers']);
+  counted[0]!.blocks.forEach((b, i) => assert.deepEqual(b.refusals, [], `page.numbers.blocks[${i}] (${b.kind}) was refused`));
+  assert.deepEqual(counted[0]!.blocks.find((b) => b.kind === 'inputs')!.types, { price: 'decimal', making: 'decimal', packing: 'decimal', sending: 'decimal' });
+  assert.equal(counted[0]!.blocks.find((b) => b.kind === 'progress')!.matched, 1);
+
+  /* AND NOTHING OF EITHER TRY STAYED: no list, no page, no question in Decide. */
+  assert.equal(api.kernel.declarations().some((d) => d.id === 'register.parts'), false, 'a try installed a list');
+  assert.deepEqual(pageIds(), [], 'a try installed a page');
+  assert.equal(await governance(), nothingBefore, 'a try put a question in Decide');
 
   /* SO THE LISTS AND FIGURES GO FIRST, AS ONE CHANGE. Under the first list's name it is refused, since whoever reads
      Parts would read Steps in it; under a figure's name the record asks only whoever reads the whole record. Nothing
@@ -218,7 +333,7 @@ test('AN AGENT TRIES THE DESK, IS TOLD ITS LISTS ARE MISSING, FILES THEM, AND EV
 
   /* THE AGENT CAN NOW READ WHAT IT BUILT, as a model would before it writes a where. */
   const schema = said<{ fields: { id: string }[] }>(await mcp.call('schema', { register: 'steps' }, agent));
-  for (const field of ['part', 'done', 'priority', 'rank']) assert.ok(schema.fields.some((f) => f.id === field), field);
+  for (const field of ['part', 'done', 'priority', 'rank', 'due']) assert.ok(schema.fields.some((f) => f.id === field), field);
 
   await rows(api);
 
@@ -240,57 +355,8 @@ test('AN AGENT TRIES THE DESK, IS TOLD ITS LISTS ARE MISSING, FILES THEM, AND EV
       agent,
     ),
   );
-  const openBefore = JSON.stringify(said(await api.governance({ status: 'open' } as never, owner)));
 
-  /* THE TEMPLATE TRIED AS WRITTEN IS REFUSED ON EXACTLY THE BLOCKS THAT FILTER BY A REF, each in the same sentence. If a
-     preview ever learns to draw a template over a row, these lines are the ones to change. */
-  const literal = said<{ page_preview: { blocks: Drawn[] } }>(await mcp.call('propose', tried(PART), agent)).page_preview.blocks;
-  const refField = (list: unknown, field: string): boolean =>
-    ((LISTS.find((d) => d.register === list)?.fields ?? []) as Decl[]).some((f) => f.id === field && f.type === 'ref');
-  const byRef = (PART.blocks as Decl[]).flatMap((b, i) => {
-    const list = typeof b.source === 'string' ? b.source.replace(/^register\./, '') : b.register;
-    return typeof b.where === 'string' && b.where.includes('{{') && refField(list, b.where.split(' ')[0]!) ? [i] : [];
-  });
-  assert.ok(byRef.length >= 3, JSON.stringify(byRef));
-  assert.deepEqual(literal.flatMap((b, i) => (b.refusals.length > 0 ? [i] : [])), byRef);
-  for (const i of byRef) {
-    assert.deepEqual(literal[i]!.refusals.map((r) => r.code), ['REF_UNKNOWN'], `block ${i}`);
-    assert.ok(literal[i]!.refusals[0]!.fix.startsWith(`${String((PART.blocks as Decl[])[i]!.where)}: there is no `), literal[i]!.refusals[0]!.fix);
-  }
-
-  /* SO THE AGENT TRIES IT OVER ONE PART IT READ. `list` hands the agent a row's spoken id, which is what the pad's
-     `about is {{spoken}}` is filled with, by the agent here and by the install's `fill` alike. */
-  const parts = said<{ rows: { spoken: string; fields: Record<string, unknown> }[] }>(await mcp.call('list', { register: 'parts' }, agent)).rows;
-  const product = parts.find((r) => r.fields.name === 'Product')!;
-
-  /* EVERY PAGE TRIED, EVERY BLOCK ANSWERED, NOTHING FILED. */
-  const previews = new Map<string, Drawn[]>();
-  for (const page of [DESK, overRow(PART, { ...product.fields, spoken: product.spoken }), NUMBERS]) {
-    const out = said<{ page_preview: { blocks: Drawn[] }; proposed: boolean }>(await mcp.call('propose', tried(page), agent));
-    assert.equal(out.proposed, false);
-    assert.equal(out.page_preview.blocks.length, (page.blocks as unknown[]).length, String(page.page));
-    out.page_preview.blocks.forEach((b, i) => assert.deepEqual(b.refusals, [], `${String(page.page)}.blocks[${i}] (${b.kind}) was refused`));
-    previews.set(String(page.page), out.page_preview.blocks);
-  }
-  assert.equal(JSON.stringify(said(await api.governance({ status: 'open' } as never, owner))), openBefore, 'a preview put a question in Decide');
-  assert.deepEqual(pageIds(), [], 'a preview installed a page');
-
-  /* AND THE NEW WORDS ARE ANSWERED IN THE PREVIEW, not only admitted. */
-  const desk = previews.get('desk')!;
-  const move = headed(desk, 'Next move');
-  assert.deepEqual(move.rows.map((r) => r.fields.what), ['Sample the fit'], 'the next move is the first open step');
-  assert.deepEqual([move.matched, move.done_now, move.next], [3, [false], 0]);
-  const cards = desk.find((b) => b.kind === 'cards' && b.nexts !== undefined)!;
-  assert.deepEqual(cards.nexts, ['Sample the fit', 'Box quote'], 'the next step on each part, the lead part first');
-  assert.deepEqual(cards.rings, [50, 0], 'each part ringed by its own steps');
-  const tiles = headed(desk, 'Calls waiting on you').queue!;
-  assert.deepEqual(tiles.map((q) => q.question), ['Which lining for the box?']);
-  assert.deepEqual(tiles[0]!.options.map((o) => o.shows), [{ swatch: ['#d8c3a5'] }, { figure: '2 weeks longer' }]);
-  const inputs = previews.get('numbers')!.find((b) => b.kind === 'inputs')!;
-  assert.deepEqual(inputs.types, { price: 'decimal', making: 'decimal', packing: 'decimal', sending: 'decimal' });
-  assert.equal(previews.get('numbers')!.find((b) => b.kind === 'progress')!.matched, 1);
-
-  /* FILED AS ONE CHANGE, UNDER A PAGE'S NAME, ACCEPTED, INSTALLED. */
+  /* FILED AS ONE CHANGE, UNDER A PAGE'S NAME, ACCEPTED, INSTALLED: the pages the tries drew, now over the owner's rows. */
   const pages = said<{ id: string }>(await mcp.call('propose', bundle('Add the launch desk?', PAGES), agent));
   assert.deepEqual(pageIds(), [], 'filing a page installed it');
   await accept(pages.id);
@@ -307,9 +373,18 @@ test('AN AGENT TRIES THE DESK, IS TOLD ITS LISTS ARE MISSING, FILES THEM, AND EV
   assert.deepEqual(installed.layout, { rail: 4, sticky: true });
   assert.deepEqual(installed.nav, { section: 'Launch', order: 10, tabs: true });
   const tab = async (slug: string) => said<{ blocks: Drawn[] }>(await mcp.read(`braindog:page/${slug}`, agent)).blocks;
-  const path = headed(await tab('product'), 'The path');
-  assert.deepEqual(path.rows.map((r) => r.fields.what), ['Sample the fit'], "the product's path, the open step in its short view");
-  assert.deepEqual(path.done_now, [false]);
+  const desk = await tab('desk');
+  const move = headed(desk, 'Next move');
+  assert.deepEqual(move.rows.map((r) => r.fields.what), ['Sample the fit'], 'the next move is the first open step');
+  assert.deepEqual([move.matched, move.done_now, move.next], [3, [false], 0]);
+  /* THE CALL FOR THE OWNER AS TILES, each option shown as what it is. */
+  const tiles = headed(desk, 'Calls waiting on you').queue!;
+  assert.deepEqual(tiles.map((q) => q.question), ['Which lining for the box?']);
+  assert.deepEqual(tiles[0]!.options.map((o) => o.shows), [{ swatch: ['#d8c3a5'] }, { figure: '2 weeks longer' }]);
+  const productPath = headed(await tab('product'), 'The path');
+  assert.deepEqual(productPath.rows.map((r) => r.fields.what), ['Sample the fit'], "the product's path, its one open step");
+  assert.deepEqual(productPath.done_now, [false]);
+  assert.deepEqual(productPath.short_now, [true], 'the essential step is in the short view');
   /* THE CALL ABOUT THE BOX IS ON THE BOX'S TAB AND NOT THE PRODUCT'S, by the option body's `about`. */
   assert.deepEqual(headed(await tab('box'), 'Calls about this part').queue!.map((q) => q.question), ['Which lining for the box?']);
   assert.deepEqual(headed(await tab('product'), 'Calls about this part').queue, []);

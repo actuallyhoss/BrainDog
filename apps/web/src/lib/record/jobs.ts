@@ -306,7 +306,7 @@ export function transcriptOf(events: readonly JobEvent[]): Step[] {
     }
     if (e.kind === 'start') {
       const model = text(body.model);
-      steps.push({ seq: e.seq, kind: 'start', text: words.started(model, count(body.tools)), cut: null, tool: null, status: null });
+      steps.push({ seq: e.seq, kind: 'start', text: words.startedOn(model, count(body.tools)), cut: null, tool: null, status: null });
       continue;
     }
     if (e.kind === 'limit') {
@@ -420,7 +420,6 @@ export const words = {
   startedToast: (title: string) => `${title} is waiting for a machine.`,
   /* One run. */
   run1: 'Run',
-  noSuch: (id: string) => `There is no run called ${id} on this record`,
   noSuchWhy: 'It may have been from another record, or the link may be wrong.',
   cancel: 'Stop this run',
   cancelling: 'Stopping this run',
@@ -429,7 +428,7 @@ export const words = {
   result: 'Result',
   failed: 'Failed',
   cutAt: (len: number) => `Cut short: the whole was ${len.toLocaleString('en-GB')} characters.`,
-  started: (model: string, tools: number | null) =>
+  startedOn: (model: string, tools: number | null) =>
     model !== '' ? (tools !== null ? `Started on ${model}, with ${tools} tools.` : `Started on ${model}.`) : 'Started.',
   limitAt: (turns: number | null) => (turns !== null ? `Stopped at its limit of ${turns} turns.` : 'Stopped at its limit of turns.'),
   turns: (n: number) => (n === 1 ? '1 turn' : `${n} turns`),

@@ -14,6 +14,10 @@
   ARRIVALS THAT ARE ALIKE ARE DRAWN TOGETHER, by the kernel's own shape (`shapes.ts`), and at three or more
   alike the group offers to ask Slash for a pattern, which files a `pattern` proposal on Decide. The cursor
   walks the rows in the order they are drawn, so `j` never jumps between groups.
+
+  AND WHAT LEFT IT IS STILL HERE. Waiting, Filed and Archived are one series of the same arrivals, led by the record's
+  "Filed by rules this week" line, with the pattern proposals that wait on Decide above what waits. Every filing and
+  archiving, a person's or an agent's, names who did it and can be put back, through `triage`'s `back` (MOD-26).
 -->
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
@@ -23,6 +27,7 @@
   import { titleOf } from '$lib/title.ts';
   import { since } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
+  import { said } from '$lib/voice.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { DOM_CAP } from '$lib/record/api.ts';
   import { firstPartyModule as moduleOf } from '@braindog/seed/packs/modules';
@@ -38,6 +43,10 @@
   import { ALIKE, SAMPLES_MOST, groupsOf, type Group } from './shapes.ts';
   import { builderPath } from '$lib/pattern/draft.ts';
   import { words as patternWords } from '$lib/pattern/words.ts';
+  import Section from '$lib/ui/Section.svelte';
+  import Face from '$lib/ui/Face.svelte';
+  import { actor, listName } from '$lib/record/names.ts';
+  import type { Pattern, Series, SettledItem, Tally } from './series.ts';
 
   /**
    * THIS UNIT'S OWN WORDS, beside the one screen that says them. The press's cost is not named: the door meters it, and a
@@ -49,6 +58,24 @@
     asking: 'Slash is drafting a pattern',
     unfiled: 'Slash drafted nothing to decide from these.',
     unreached: 'BrainDog could not reach Slash. Nothing was drafted.',
+    tally: (ruled: number, waiting: number) => `Filed by rules this week: ${ruled} · waiting: ${waiting}`,
+    series: 'Show',
+    waiting: 'Waiting',
+    filed: 'Filed',
+    archived: 'Archived',
+    patterns: 'Patterns to decide',
+    putBack: 'Put back',
+    putBackDone: 'Put back in the inbox.',
+    filedIn: 'Filed in',
+    by: (who: string) => `by ${who}`,
+    filedBy: (who: string) => `Filed by ${who}`,
+    byRule: 'Filed by a rule',
+    archivedBy: (who: string) => `Archived by ${who}`,
+    archivedPlain: 'Archived',
+    noneFiled: 'Nothing has been filed yet',
+    noneFiledWhy: 'What you or an agent files from the inbox, and what a rule files as it arrives, is listed here.',
+    noneArchived: 'Nothing has been archived',
+    noneArchivedWhy: 'What you or an agent archives from the inbox is kept here, and can be put back.',
   };
 
   /**
@@ -95,7 +122,110 @@
         } else refused = out.fix;
       })
       .finally(() => closed(ok, at));
+    /* THE TALLY AND THE PATTERNS ARE READ BESIDE THE ARRIVALS AND OUTSIDE THEIR BRACKET: the arrivals are the screen, and
+       a record that answers neither of these still draws them. */
+    void retally();
+    void import('./series.ts')
+      .then((m) => m.readPatterns(apiBase()))
+      .then((read) => (patterns = read));
   });
+
+  /**
+   * THE SERIES AND THE TALLY. What waits is the screen's first series; filed and archived are the record's `matched` and
+   * `ignored`, read when chosen, so an Inbox opened to clear it pays for nothing more than what waits.
+   */
+  type View = 'waiting' | Series;
+  let view = $state<View>('waiting');
+  let tally = $state<Tally | null>(null);
+  let patterns = $state<Pattern[]>([]);
+  let series = $state<{ state: Series; items: SettledItem[]; cursor: number | null } | null>(null);
+  let seriesFix = $state<string | null>(null);
+  let seriesOlder = $state(false);
+  const me = $derived(String(route.data.me?.person ?? ''));
+  /* THE THREE SEGMENTS, each with the record's count for it once the tally is in. */
+  const segments = $derived<readonly { v: View; label: string; n: number | undefined }[]>([
+    { v: 'waiting', label: words.waiting, n: tally?.waiting },
+    { v: 'matched', label: words.filed, n: tally?.filed },
+    { v: 'ignored', label: words.archived, n: tally?.archived },
+  ]);
+
+  async function retally() {
+    const m = await import('./series.ts');
+    const read = await m.readTally(apiBase());
+    if (read) tally = read;
+  }
+
+  async function show(next: View) {
+    if (next === view) return;
+    view = next;
+    series = null;
+    seriesFix = null;
+    if (next === 'waiting') return;
+    try {
+      const m = await import('./series.ts');
+      const out = await m.readSeries(apiBase(), next);
+      /* A SERIES CHOSEN WHILE THIS ONE WAS READ is the one drawn, and this answer is dropped. */
+      if (view !== next) return;
+      if (out.from === 'live') {
+        series = { state: next, items: out.items, cursor: out.cursor };
+        if (out.tally) tally = out.tally;
+      } else if (out.from === 'refused') seriesFix = out.fix;
+      else series = { state: next, items: [], cursor: null };
+    } catch {
+      if (view === next) seriesFix = copy.recordNotReached;
+    }
+  }
+
+  async function loadOlderSeries() {
+    const had = series;
+    if (!had || had.cursor === null || seriesOlder) return;
+    seriesOlder = true;
+    try {
+      const m = await import('./series.ts');
+      const out = await m.readSeries(apiBase(), had.state, had.cursor);
+      if (out.from === 'live' && series?.state === had.state) series = { ...had, items: [...had.items, ...out.items], cursor: out.cursor };
+      else if (out.from === 'refused') olderFix = out.fix;
+    } finally {
+      seriesOlder = false;
+    }
+  }
+
+  /** A list as a person says it: the name the shell holds for it, or its id in words. */
+  const listOf = (id: string): string => lists.find((l) => l.id === id)?.name ?? listName(id);
+
+  /**
+   * PUT BACK, through `triage`'s `back` and the kernel's `returnArrival`. A filing names the version of the row it made,
+   * so a row somebody edited since is the record's conflict and nothing moves; an archiving has no row.
+   *
+   * ONE AT A TIME, as every write here is: a second press while the first is out would be a second return.
+   */
+  let backing = $state<string | null>(null);
+  async function putBack(id: string, version: number | null) {
+    if (backing !== null) return;
+    backing = id;
+    try {
+      const m = await import('$lib/record/inbox-write.ts');
+      const out = await m.putBack(apiBase(), id, version);
+      if (out.from !== 'written') return void toasts.push(out.fix, { intent: 'warn' });
+      toasts.push(words.putBackDone);
+      if (series) series = { ...series, items: series.items.filter((i) => i.id !== id) };
+      await rereadWaiting();
+      void retally();
+      void invalidateAll();
+    } finally {
+      backing = null;
+    }
+  }
+
+  /** What waits, read again from its first page, so an arrival put back is drawn where it arrived. */
+  async function rereadWaiting() {
+    const m = await import('./shapes.ts');
+    const { read: out, shapes: read } = await m.readShaped(apiBase());
+    if (out.from !== 'live') return;
+    shapes = read;
+    live = { items: out.items, cursor: out.cursor };
+    if (open !== null && !out.items.some((i) => i.id === open)) open = null;
+  }
 
   /**
    * THE PAGE BELOW, WHEN ASKED FOR. What arrives is added under what is drawn, and a refusal here is
@@ -158,7 +288,7 @@
   let busy = $state(false);
 
   /** One arrival through the record: `true` when it left the inbox. */
-  async function write(item: InboxItem, gesture: 'file' | 'archive'): Promise<{ ok: boolean; row?: string }> {
+  async function write(item: InboxItem, gesture: 'file' | 'archive'): Promise<{ ok: boolean; row?: string; version?: number }> {
     const m = await import('$lib/record/inbox-write.ts');
     const out =
       gesture === 'file' ? await m.fileArrival(apiBase(), item.id, target) : await m.archiveArrival(apiBase(), item.id);
@@ -166,7 +296,7 @@
       toasts.push(out.fix, { intent: 'warn' });
       return { ok: false };
     }
-    return { ok: true, ...(out.row ? { row: out.row } : {}) };
+    return { ok: true, ...(out.row ? { row: out.row } : {}), ...(out.version === undefined ? {} : { version: out.version }) };
   }
 
   /** Take arrivals off the list here, and keep the cursor and the open row on what comes next. */
@@ -190,8 +320,13 @@
       const out = await write(item, gesture);
       if (!out.ok) return;
       leave(new Set([item.id]));
-      toasts.push(gesture === 'archive' ? copy.inboxArchived : copy.inboxFiled(out.row ?? target));
+      /* EVERY FILING AND ARCHIVING CAN BE PUT BACK FROM ITS TOAST. A filing is put back at the version its row was made
+         at, so a host too old to send one offers no Undo rather than one the record would refuse. */
+      const version = gesture === 'archive' ? null : (out.version ?? undefined);
+      const text = gesture === 'archive' ? copy.inboxArchived : copy.inboxFiled(out.row ?? target);
+      toasts.push(text, version === undefined ? {} : { undo: () => void putBack(item.id, version) });
       /* AND THE RAIL FOLLOWS, as it does after a decision: its Inbox count, and the list a first row just put on it. */
+      void retally();
       void invalidateAll();
       await focusCursor();
     } finally {
@@ -240,6 +375,7 @@
     picked = new Set([...picked].filter((id) => !gone.has(id)));
     if (gone.size) {
       toasts.push(gesture === 'file' ? copy.inboxBatchFiled(gone.size) : copy.inboxBatchArchived(gone.size));
+      void retally();
       void invalidateAll();
     }
   }
@@ -272,6 +408,8 @@
   function onkeydown(e: KeyboardEvent) {
     /* A KEY THE SHELL ALREADY TOOK, `g` then a letter, is not this page's too. */
     if (e.defaultPrevented || covered() || typing()) return;
+    /* THE QUEUE'S KEYS ARE FOR WHAT WAITS. Filed and archived are read, and each is put back by its own button. */
+    if (view !== 'waiting') return;
     if (e.metaKey || e.ctrlKey || e.altKey || shown.length === 0) return;
     if (e.key === 'Escape' && picked.size > 0) {
       e.preventDefault();
@@ -310,11 +448,11 @@
   $effect(() => drew('ready'));
 </script>
 
-<svelte:head><title>{titleOf(copy.inbox)}</title></svelte:head>
+<svelte:head><title>{titleOf(said('inbox'))}</title></svelte:head>
 <svelte:window {onkeydown} />
 
 <PageHead icon="inbox"
-  title={copy.inbox}
+  title={said('inbox')}
   count={answered && !unrouted && !refused ? INBOX.length : undefined}
   atLeast={live !== null && live.cursor !== null}
 />
@@ -338,16 +476,121 @@
   {:else if !answered || unrouted}
     <!-- Bars before the first answer, and nothing from a host that has no inbox to read. -->
     {#if !answered}<Waiting />{/if}
-  {:else if INBOX.length === 0}
+  {:else}
+    <!-- THE ONE LINE OF CONTEXT, the record's own numbers: what the rules did this week without anybody, and what waits
+         on somebody. Absent until the record answers with them, never a guessed zero. -->
+    {#if tally && tally.ruled !== null}<p class="tally">{words.tally(tally.ruled, tally.waiting)}</p>{/if}
+
+    <!-- FILED AND UNFILED AS ONE SERIES, three states of the same arrivals, so what was filed stays where it can be
+         seen and put back rather than vanishing from the screen it left. -->
+    <div class="segmented series" role="group" aria-label={words.series}>
+      {#each segments as s (s.v)}
+        <button
+          type="button"
+          class="segment"
+          aria-pressed={view === s.v}
+          data-on={view === s.v ? '' : undefined}
+          onclick={() => show(s.v)}
+        >{s.label}{#if s.n}<span class="segment-n">{s.n}</span>{/if}</button>
+      {/each}
+    </div>
+
+    {#if view !== 'waiting'}
+      {@render settledSeries()}
+    {:else}
+      {#if patterns.length > 0}
+        <!-- PATTERNS FIRST: one accepted pattern files every arrival like its samples from then on, so it is worth
+             more than any one arrival below it. Each opens its question on Decide, where it is accepted or not. -->
+        <Section title={words.patterns} count={patterns.length}>
+          <ul class="ledger">
+            {#each patterns as p (p.id)}
+              <li>
+                <a class="line pattern" href={at(`/decide/${encodeURIComponent(p.id)}`)}>
+                  <span class="line-main"><span class="line-title">{p.title}</span></span>
+                  <Icon name="decide" size="s" />
+                </a>
+              </li>
+            {/each}
+          </ul>
+        </Section>
+      {/if}
+      {@render waitingSeries()}
+    {/if}
+  {/if}
+</div>
+
+{#snippet settledSeries()}
+  {#if seriesFix}
+    <Empty kind="error" compact title={seriesFix} />
+  {:else if series === null}
+    <Waiting />
+  {:else if series.items.length === 0}
+    {#if series.state === 'matched'}
+      <Empty kind="no-data-yet" compact title={words.noneFiled} body={words.noneFiledWhy} />
+    {:else}
+      <Empty kind="no-data-yet" compact title={words.noneArchived} body={words.noneArchivedWhy} />
+    {/if}
+  {:else}
+    <ul class="ledger arrivals">
+      {#each series.items as item (item.id)}
+        {@const s = item.settled}
+        {@const who = s ? actor(s.by, me || null) : null}
+        <!-- WHO SETTLED IT, IN PLACE: the face and the name of the person or the agent's run that filed or archived it,
+             and the list a filing went into, linked to its row. A rule's filing is said to be a rule's and offers no Put
+             back, since the record keeps a rule's filing to its list. -->
+        <li class="arrival">
+          <div class="line line-tall settled-line">
+            <span class="line-main">
+              <span class="line-title">{item.subject}</span>
+              <span class="line-detail settled-detail">
+                {#if who}<Face name={who.name} you={who.kind === 'you'} kind={who.kind} size="s" />{/if}
+                {#if series.state === 'matched'}
+                  {#if s?.row}
+                    <span>{words.filedIn}
+                      {#if s.row.seq !== null && !s.row.archived}<a class="settled-list" href={at(`/r/${encodeURIComponent(s.row.register)}/${s.row.seq}`)}>{listOf(s.row.register)}</a>{:else}{listOf(s.row.register)}{/if}
+                      {words.by(who?.name ?? '')}</span>
+                  {:else}
+                    <span>{who ? words.filedBy(who.name) : words.byRule}</span>
+                  {/if}
+                {:else}
+                  <span>{who ? words.archivedBy(who.name) : words.archivedPlain}</span>
+                {/if}
+                <span class="from">{item.from}</span>
+              </span>
+            </span>
+            <span class="line-when">{since(s?.at ?? item.arrived, clock)}</span>
+          </div>
+          {#if s}
+            <div class="settled-actions">
+              <Button disabled={backing !== null} onclick={() => putBack(item.id, s.row?.version ?? null)}>{words.putBack}</Button>
+            </div>
+          {/if}
+        </li>
+      {/each}
+    </ul>
+    {#if series.cursor !== null}
+      <div class="older">
+        <Button weight="quiet" onclick={loadOlderSeries} disabled={seriesOlder}>{copy.olderEntries}</Button>
+      </div>
+    {/if}
+    {#if olderFix}<p class="foot">{olderFix}</p>{/if}
+  {/if}
+{/snippet}
+
+{#snippet waitingSeries()}
+  {#if INBOX.length === 0}
     <!--
       AN EMPTY INBOX IS TWO DIFFERENT FACTS. A record with no connector has never had anything arrive,
       and a record that has one has cleared it. A record cannot tell these apart from the inbox alone,
       so it says what is true in both, with the door to a connector; and where something waits on
       Decide, the door there too. Only the sample knew its own sources and drew the two apart.
+
+      NEITHER DOOR IS INK. An empty inbox is good news, and the filled pill was the loudest shape on it (design.md 2.4),
+      so both are the quiet secondary.
     -->
-    <Empty kind="no-data-yet" glyph="inbox" title={copy.inboxClear} body={copy.inboxClearWhy}>
+    <Empty kind="no-data-yet" glyph="inbox" title={said('inbox_clear')} body={copy.inboxClearWhy}>
       {#snippet actions()}
-        {#if Number(route.data.open ?? 0) > 0}<Button weight="primary" href="/decide">{copy.inboxOpenDecide}</Button>{/if}
+        {#if Number(route.data.open ?? 0) > 0}<Button href="/decide">{copy.inboxOpenDecide}</Button>{/if}
         <Button href="/settings/ingest">{copy.inboxConnect}</Button>
       {/snippet}
     </Empty>
@@ -445,7 +688,7 @@
       </div>
     {/if}
   {/if}
-</div>
+{/snippet}
 
 <style>
   .page {
@@ -454,6 +697,65 @@
     gap: var(--sp-4);
     padding: var(--sp-5) var(--gutter) var(--sp-9);
     max-inline-size: var(--page-max); /* One cap for every list page (DESIGN-SYSTEM 3.1, appendix C12). */
+  }
+
+  /* THE ONE LINE OF CONTEXT under the head: quiet, and the numbers in it keep their width as they change. */
+  .tally {
+    color: var(--dim);
+    font-size: var(--t-sm);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* THE SERIES SITS AT ITS OWN WIDTH, a set of three pills and not a bar across the page. */
+  .series {
+    inline-size: fit-content;
+    max-inline-size: 100%;
+  }
+
+  .segment-n {
+    margin-inline-start: var(--sp-2);
+    color: var(--dim);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* A pattern is a row that opens its question: the title, and the glyph of where it goes. */
+  .pattern {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    color: var(--ink);
+    text-decoration: none;
+  }
+
+  .pattern .line-main {
+    flex: 1;
+    min-inline-size: 0;
+  }
+
+  /* A FILED OR ARCHIVED ARRIVAL IS READ, NOT OPENED: its row is text, and Put back is the one thing it does. */
+  .settled-line {
+    display: grid;
+    cursor: default;
+  }
+
+  .settled-detail {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: var(--sp-2);
+  }
+
+  .settled-list {
+    color: var(--ink);
+    text-decoration: underline;
+    text-decoration-color: var(--line);
+    text-underline-offset: 3px;
+  }
+
+  .settled-actions {
+    display: flex;
+    align-items: center;
+    padding: var(--sp-2) var(--sp-3) 0;
   }
 
   /* An arrival is its row, the box that selects it, and its body when open. */
@@ -700,6 +1002,32 @@
 
     .shape-actions :global(.btn) {
       inline-size: 100%;
+    }
+
+    /* AT 390 AN ARRIVAL IS ONE CARD, and File and Archive are full-width pills under what it said, with the list it
+       files into as a full-width field above them: a thumb reaches every one without aiming. */
+    .actions {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .actions :global(.btn),
+    .settled-actions :global(.btn) {
+      inline-size: 100%;
+    }
+
+    .file-into {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .file-select {
+      inline-size: 100%;
+    }
+
+    .settled-actions {
+      padding: var(--sp-2) var(--sp-3) var(--sp-3);
     }
 
     .arrival .line {

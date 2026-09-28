@@ -145,6 +145,18 @@
     mailReproving = false;
     if (back) await askMail(which);
   }
+
+  /**
+   * THE TITLES OF THE MAIL SECTION'S THREE STEPS, and the one sentence the third adds (DSN-18). The
+   * sentences the first two carry are `inbound-write.ts`'s and are read from there.
+   */
+  const words = {
+    stepMake: 'An address for this record',
+    stepForward: 'Point your mail at it',
+    stepTest: 'Send one to test it',
+    testLine: 'Forward one message to the address. It arrives in the Inbox as a row, so that is where to look.',
+    openInbox: 'Open the Inbox',
+  };
 </script>
 
 <!--
@@ -222,43 +234,76 @@
          or says nothing, and an owner has always been drawn nothing until the door answers. -->
     <p class="hint">{levelWords.ownersOnly}</p>
   {:else if mintsHere === true}
-    <!-- THE FACT THE SCREEN CANNOT HIDE: there is no route that reads an address back, so this says so
-         rather than leaving a blank where a value would go and letting it read as "you have none". -->
-    <p class="hint">{mailWords.unknown}</p>
-    {#if mailSaid?.kind === 'minted'}
-      <!-- SHOWN ONCE, from `mailSaid` alone, which leaving the area empties. -->
-      <div class="code-form" role="status">
-        <p class="code-label">{mailWords.once}</p>
-        <p class="mono wrap">{mailAddress}</p>
-        <div class="row-actions">
-          <!-- THE LABEL IS PASSED, because `clipboard.put(text)` quotes the text in its own toast, and
-               the text here is a live credential. -->
-          <Button weight="primary" onclick={() => void clipboard.put(mailAddress, mailWords.addressCopied)}>{mailWords.copyAddress}</Button>
+    <!--
+      THREE STEPS, IN THE ORDER A PERSON TAKES THEM (DSN-18): make the address, point the mail at it,
+      and send one to see it land. It was a wall of five paragraphs around two buttons, and the step
+      that tells somebody it worked was not on the screen at all. Each step is its number, its title,
+      its one sentence and its control, and nothing is boxed.
+    -->
+    <ol class="steps">
+      <li class="step">
+        <span class="step-n num" aria-hidden="true">1</span>
+        <div class="step-body">
+          <h3 class="step-title">{words.stepMake}</h3>
+          <p class="hint">{mailWords.freshWhy}</p>
+          <div class="row-actions">
+            <!-- ONE PRIMARY ON THE SCREEN: once an address is on it, copying that address is the one
+                 thing to do next, so making another steps down to a secondary. -->
+            <Button weight={mailSaid?.kind === 'minted' ? 'quiet' : 'primary'} disabled={mailBusy} onclick={() => void askMail('mint')}>
+              {mailBusy && mailPending === 'mint' ? mailWords.minting : mailWords.mint}
+            </Button>
+            <!-- THE QUIETER ACTION, AND THE MORE DAMAGING ONE. It writes `null` and answers no value; a bank
+                 posting to the old address is refused from that moment, with nothing to show for it. -->
+            <Button weight="bare" tone="bad" disabled={mailBusy} onclick={() => void askMail('revoke')}>
+              {mailBusy && mailPending === 'revoke' ? mailWords.revoking : mailWords.revoke}
+            </Button>
+          </div>
+          <!-- Always in the document, for the reason the agents field gives: a live region inserted with its
+               first sentence is not reliably announced. -->
+          <p class="code-said" role="status" data-intent={mailTone}>{mailLine}</p>
+          {#if mailSaid?.kind === 'signin'}
+            <!-- A STALE SIGN-IN IS A STATE WITH A WAY FORWARD, not an error. The same passkey re-proof the
+                 agents area offers, and then the same press again rather than a press the person has to find. -->
+            <div class="row-actions">
+              <Button weight="quiet" disabled={mailReproving} onclick={() => void mailSignInAgain()}>{copy.signInAgain}</Button>
+            </div>
+          {/if}
         </div>
-        <p class="hint">{mailWords.forwardHow}</p>
-      </div>
-    {/if}
-    <div class="row-actions">
-      <Button weight="primary" disabled={mailBusy} onclick={() => void askMail('mint')}>
-        {mailBusy && mailPending === 'mint' ? mailWords.minting : mailWords.mint}
-      </Button>
-      <!-- THE QUIETER ACTION, AND THE MORE DAMAGING ONE. It writes `null` and answers no value; a bank
-           posting to the old address is refused from that moment, with nothing to show for it. -->
-      <Button weight="bare" tone="bad" disabled={mailBusy} onclick={() => void askMail('revoke')}>
-        {mailBusy && mailPending === 'revoke' ? mailWords.revoking : mailWords.revoke}
-      </Button>
-    </div>
-    <!-- Always in the document, for the reason the agents field gives: a live region inserted with its
-         first sentence is not reliably announced. -->
-    <p class="code-said" role="status" data-intent={mailTone}>{mailLine}</p>
-    {#if mailSaid?.kind === 'signin'}
-      <!-- A STALE SIGN-IN IS A STATE WITH A WAY FORWARD, not an error. The same passkey re-proof the
-           agents area offers, and then the same press again rather than a press the person has to find. -->
-      <div class="row-actions">
-        <Button weight="quiet" disabled={mailReproving} onclick={() => void mailSignInAgain()}>{copy.signInAgain}</Button>
-      </div>
-    {/if}
-    <p class="hint">{mailWords.freshWhy}</p>
+      </li>
+      <li class="step">
+        <span class="step-n num" aria-hidden="true">2</span>
+        <div class="step-body">
+          <h3 class="step-title">{words.stepForward}</h3>
+          <p class="hint">{mailWords.forwardHow}</p>
+          {#if mailSaid?.kind === 'minted'}
+            <!-- SHOWN ONCE, from `mailSaid` alone, which leaving the area empties. -->
+            <div class="code-form" role="status">
+              <p class="code-label">{mailWords.once}</p>
+              <p class="address wrap">{mailAddress}</p>
+              <div class="row-actions">
+                <!-- THE LABEL IS PASSED, because `clipboard.put(text)` quotes the text in its own toast, and
+                     the text here is a live credential. -->
+                <Button weight="primary" onclick={() => void clipboard.put(mailAddress, mailWords.addressCopied)}>{mailWords.copyAddress}</Button>
+              </div>
+            </div>
+          {:else}
+            <!-- THE FACT THE SCREEN CANNOT HIDE: there is no route that reads an address back, so this says so
+                 rather than leaving a blank where a value would go and letting it read as "you have none". -->
+            <p class="hint">{mailWords.unknown}</p>
+          {/if}
+        </div>
+      </li>
+      <li class="step">
+        <span class="step-n num" aria-hidden="true">3</span>
+        <div class="step-body">
+          <h3 class="step-title">{words.stepTest}</h3>
+          <p class="hint">{words.testLine}</p>
+          <div class="row-actions">
+            <Button href="/inbox">{words.openInbox}</Button>
+          </div>
+        </div>
+      </li>
+    </ol>
   {/if}
 </Section>
 <!-- EVERY OTHER SENDER, AND RECORD METHODS RATHER THAN A HOST DOOR. `doors` lists what this record declares and
@@ -287,11 +332,59 @@
     overflow-wrap: anywhere;
   }
 
-  /* A monospace face, because an address is a string somebody compares character by character. */
-  .mono {
-    font-family: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, monospace;
+  /* THE IDENTIFIER FACE, because an address is a string somebody compares character by character, and
+     the house's token for it rather than a font stack written here (design brief §3, Type). It sits on
+     the sunk ground as code does, so the one credential on the screen reads as a thing to copy. */
+  .address {
+    margin: 0;
+    padding: var(--sp-2) var(--sp-3);
+    background: var(--sunk);
+    border-radius: var(--r-md);
+    font-family: var(--font-id);
     font-size: var(--t-sm);
-    letter-spacing: 0;
+  }
+
+  /* THE STEPS: a number in a fixed track, then the step. No box around a step or the list (design brief
+     §11.6); a hairline between steps, as between rows. */
+  .steps {
+    display: grid;
+    margin: var(--sp-4) 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .step {
+    display: grid;
+    grid-template-columns: var(--sp-6) minmax(0, 1fr);
+    column-gap: var(--sp-3);
+    padding-block: var(--sp-4);
+  }
+
+  .step + .step {
+    border-block-start: 1px solid var(--line-soft);
+  }
+
+  .step-n {
+    color: var(--dim);
+    font-size: var(--t-md);
+    font-weight: 600;
+    line-height: var(--lh-tight);
+  }
+
+  .step-body {
+    min-inline-size: 0;
+  }
+
+  .step-title {
+    margin: 0 0 var(--sp-2);
+    color: var(--ink);
+    font-size: var(--t-md);
+    font-weight: 600;
+    line-height: var(--lh-tight);
+  }
+
+  .step-body .hint:last-of-type {
+    margin-block-end: 0;
   }
 
   .code-said {

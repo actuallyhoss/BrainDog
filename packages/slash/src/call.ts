@@ -90,10 +90,16 @@ export type Core = {
   monthStart(): string;
   /** The first instant of the next month, which is the sentence `SLASH_BUDGET_SPENT` ends on. */
   resets(): string;
-  /** `SELECT COUNT(*)` on `slash_call_meter`: tier `a` reads and proposals this month that called a model. */
+  /** `SELECT COUNT(*)` on `slash_call_meter`: tier `a` reads and patterns this month that called a model, one row an ask. */
   asksUsed(): number;
-  /** Hold one ask on the meter before its model is called; see `reserve` below. Returns the row id to settle. */
-  reserve(kind: 'read' | 'propose', tier: Tier, model: string): string;
+  /**
+   * Hold one ask on the meter before its model is called; see `reserve` below. Returns the row id to settle.
+   *
+   * `id`, WHEN GIVEN, IS THE ROW'S OWN ID IN PLACE OF A FRESH ULID: `propose.ts` passes `<ask_id>:propose` for a pass 2
+   * on a stored `ask_id`, so the second such call for the same `ask_id` finds the first one's row already there and
+   * refuses before it holds anything (`propose.ts`'s own check, which reads this before calling `reserve`).
+   */
+  reserve(kind: 'read' | 'propose', tier: Tier, model: string, id?: string): string;
   /** Give a held ask back when no model was called. A row already settled by `account` is left alone. */
   release(id: string): void;
   /**
@@ -440,11 +446,9 @@ export const core = (sql: Sql, clock: Clock, fallback: Inference, priced: readon
        fitted a palette whose pass 1 was free; the only door built is `read`, which writes
        `kind = 'read'`, so an owner who set `ask_cap` to 2 was answered on five asks out of five,
        five model calls on their own key, with `status()` reading 0 of 2 throughout
-       (`test/read-meter.test.ts`). Both kinds count now, one per model call, so pass 1 and pass 2
-       of one question are two, and a repeated pass 2 on a stored `ask_id` cannot run unmetered
-       either. `model <> '-'` passes over the two read rows that are not asks. One called nothing:
-       a record with no lists answers `nothing` without a model, and billing it is the meter
-       `propose`'s zero-rows arm already refuses to be. The other tried and reached nothing: an
+       (`test/read-meter.test.ts`). `model <> '-'` passes over the two read rows that are not asks. One
+       called nothing: a record with no lists answers `nothing` without a model, and billing it is the
+       meter `propose`'s zero-rows arm already refuses to be. The other tried and reached nothing: an
        `answer` whose model was `UNREACHABLE`, which `answer.ts` settles under `-` because the host
        asks an `UNREACHABLE` again up to the ladder's eighth rung, and finding 6 of
        `loop/research-batch-forty-two-audit.md` put an outage at half the default cap spent on
@@ -452,10 +456,17 @@ export const core = (sql: Sql, clock: Clock, fallback: Inference, priced: readon
        name and still count. Under `-`, that `answer` row keeps the prompt estimate in `tokens_in`
        and gets 0 neurons on tier `a`, because `account` finds no rate for `-` in `MODELS`; under
        the model's name it was billed on that estimate. It also no longer says which model was
-       not reached. The index `slash_call_meter (tier, kind, ts)` still serves the count. */
+       not reached. The index `slash_call_meter (tier, kind, ts)` still serves the count.
+
+       ONE QUESTION IS ONE ASK, WHATEVER PASSES IT TOOK, since `46 §4.1` and `07 §5.5` both say so and a two-pass
+       question cost 2 here while `/usage` read it as one. `propose` is off this count now: every question writes
+       exactly one `read` row, pass 1 or the drafting read of a pass 2 with no stored `ask_id`, and `kind = 'propose'`
+       is the second model call of the same question rather than a second one. A repeated pass 2 on one stored
+       `ask_id` still cannot run free: `propose.ts` refuses it before it holds anything, off the row the first pass 2
+       left under `<ask_id>:propose` (`reserve`'s `id` parameter, just above). */
     asksUsed: () =>
       sql.one<{ n: number }>(
-        "SELECT COUNT(*) AS n FROM slash_call WHERE tier = 'a' AND kind IN ('read', 'propose', 'pattern') AND model <> '-' AND ts >= ?",
+        "SELECT COUNT(*) AS n FROM slash_call WHERE tier = 'a' AND kind IN ('read', 'pattern') AND model <> '-' AND ts >= ?",
         monthOf(clock.now(), 0),
       )?.n ?? 0,
     /* THE CHECK AND THE COUNT WERE TWO STEPS WITH A MODEL BETWEEN THEM. `spent()` read `asksUsed()`, and the row that
@@ -467,18 +478,18 @@ export const core = (sql: Sql, clock: Clock, fallback: Inference, priced: readon
        IT IS `error · SLASH_PENDING` AND NOT A NEW STATUS because the `46 §4.1` CHECK admits four, and a new one is a
        change to a column's `CHECK`, which is a step of its own under `STORE_VERSION`. A process that dies mid-call leaves
        the hold counted, which is the side of the line a cap should err on. */
-    reserve: (kind, tier, model) => {
-      const id = ulid(clock.now());
+    reserve: (kind, tier, model, id) => {
+      const held = id ?? ulid(clock.now());
       sql.exec(
         `INSERT INTO slash_call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status, code)
          VALUES (?, ?, ?, ?, ?, 0, 0, 0, 0, 'error', 'SLASH_PENDING')`,
-        id,
+        held,
         now(),
         kind,
         tier,
         model,
       );
-      return remember(id);
+      return remember(held);
     },
     /* AND THE ID IS FORGOTTEN WITH ITS HOLD: every caller releases in a `finally`, after its last `account`. */
     release: (id) => {

@@ -50,5 +50,5 @@ test('and nothing on it says the demo sentence', () => {
 
 test('the signing key is said to be out of reach on every shell, because the only key this screen ever drew was invented', () => {
   const arm = strip(readFileSync(new URL('areas/Export.svelte', DIR), 'utf8'));
-  assert.match(arm, /<Section title=\{copy\.theSignature\}>\s*<p class="hint">\{copy\.theSignatureNotHere\}<\/p>\s*<\/Section>/u);
+  assert.match(arm, /<Section title=\{copy\.theSignature\}>\s*<StateRow icon="key" title=\{words\.notHereYet\} line=\{copy\.theSignatureNotHere\} \/>\s*<\/Section>/u);
 });

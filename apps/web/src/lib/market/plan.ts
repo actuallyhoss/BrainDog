@@ -135,8 +135,13 @@ function namer(nameOf: (id: string) => string): (id: string) => string {
 const section = (key: SectionKey, title: string, rows: Row[]): Section[] => (rows.length === 0 ? [] : [{ key, title, rows }]);
 const row = (t: string, detail: string | null = null): Row => ({ text: t, detail });
 
-const isDiff = (v: unknown): v is Body => isMap(v) && isMap(v.pack) && typeof v.planHash === 'string';
-const isShared = (v: unknown): v is Body => isMap(v) && isMap(v.usecase) && Array.isArray(v.packs);
+/* THE PREDICATE NAMES ITS OWN SHAPE, AND NOT PLAIN `Body`: two guards that both narrow to the same wide type leave the
+   `if (isDiff(plan)) {} else {}` below with nothing to exclude in its `else`, which TypeScript then reads as `never`
+   rather than "the other shape". */
+const isDiff = (v: unknown): v is Body & { pack: Record<string, unknown>; planHash: string } =>
+  isMap(v) && isMap(v.pack) && typeof v.planHash === 'string';
+const isShared = (v: unknown): v is Body & { usecase: Record<string, unknown>; packs: unknown[] } =>
+  isMap(v) && isMap(v.usecase) && Array.isArray(v.packs);
 
 /** The record's `Diff` for one pack, as one part and the lines that stop it. */
 function diffPart(d: Body, name: (id: string) => string): { part: Part; stops: string[]; title: string; summary: string; direction: string; version: string; installed: string | null } {

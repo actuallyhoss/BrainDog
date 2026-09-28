@@ -9,7 +9,7 @@ engine is [11-ASSISTANT](11-ASSISTANT.md).
 
 | Question | Answer |
 |---|---|
-| Where does it live? | **Nowhere new.** A second mode of the command palette, plus rows in queues that already exist. No panel, no widget, no page, no chat |
+| Where does it live? | **In the palette, in the queues, and on one page of its own.** A second mode of the command palette, offered for a query that matched no place or ends in a question mark; rows in queues that already exist; and `/slash`, which opens with Ask where the host has a model, then what was asked lately, then what Slash noticed and suggests (`loop/finish/agents.md` §5 item 8). What it spent is the Slash section of `/usage`. No panel, no widget, no chat. *(Until September 28th this row said "no page", which `/slash` made false)* |
 | Does it ship in v1? | **No conversational surface** — [ADR-030](16-DECISIONS.md). The §1b base ships no in-app model call; Phase A ships tier A-minimal plus *one job*, the ingest-pattern proposal; conversation arrives with tier B |
 | What shape is it? | **A proposal row**, identical in kind to the suggestion rows the decision gate already consumes; it carries `model`, `filed` and `read` beside its five fields, and a fifth body, `query`, is the palette's unfiled answer (§4, §10) |
 | What does it emit? | `{{path}}`, block fences, and row addresses. **Never a typed number** |

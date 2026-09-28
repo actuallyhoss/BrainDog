@@ -199,7 +199,7 @@ export type McpSurface<C> = {
    * and it admits a token only when its owner gave it the `inbox` reach. Optional for the command line's reason above:
    * both HTTP hosts hand `serveMcp` the whole record, and `apps/cli/src/surface.ts` routes it once its client knows it.
    */
-  triage?(args: { arrival: string; register?: string; fields?: Args; ignore?: boolean; note?: string }, ctx: C): Answer;
+  triage?(args: { arrival: string; register?: string; fields?: Args; ignore?: boolean; note?: string; back?: boolean; version?: number }, ctx: C): Answer;
   /**
    * Every figure the record declares that this caller may read, whatever pack declared it, and whether it is read about
    * one thing (`param`, asked as `<id>:<value>`). READ+, the record's `figures`. Without it the record's methods name a
@@ -305,8 +305,10 @@ export const TOOLS: readonly Tool[] = [
   },
   {
     name: 'list',
+    /* "NARROWED BY A PREDICATE. THE PREDICATE IS A TREE" SAID "PREDICATE" TWICE; saying it once paid for most of
+       `fields` below. The list measured 2,720 before `fields` and 2,751 after, of the 2,760 `budget.test.ts` holds. */
     description:
-      'Rows of one register, newest first, narrowed by a predicate. The predicate is a tree: {"field":"state","is":"open"}, or {"all":[...]}.',
+      'Rows of one register, newest first, narrowed by a predicate tree: {"field":"state","is":"open"}, or {"all":[...]}.',
     input: obj(
       {
         register: str('A register id.'),
@@ -320,9 +322,13 @@ export const TOOLS: readonly Tool[] = [
            `limit` answered 50 rows, and `limit: 300` answered all 260, straight past the ceiling the
            description named. An agent that trusted "Default 25" reasoned about 50 rows believing it
            had asked for 25, and one that wanted 400 paged twice for what the record gives in one go.
-           Same length in tokens, so the ceiling `budget.test.ts` measures does not move. */
-        limit: int('1 to 500. Default 50.'),
+           The default is 20 now, and true, because the `list` below sends 20 when the call
+           names no limit; the ceiling is still the record's. */
+        limit: int('1 to 500. Default 20.'),
         cursor: str('From a previous answer.'),
+        /* THE ONE WAY PAST THE CUT, said where it is used. A row's long text stops at 280 characters and the row says
+           `clipped: true`, so an agent that needs the whole write-up names its field here or reads the row with `get`. */
+        fields: { type: 'array', items: { type: 'string' }, description: 'Text fields to answer whole, uncut.' },
       },
       ['register'],
     ),
@@ -479,14 +485,16 @@ export const TOOLS: readonly Tool[] = [
        reads `TOOLS` rather than a copy. Who may call it is not said here: the record refuses every token without the
        `inbox` reach in one sentence that names what it lacks, which teaches better than a clause every turn pays for.
        `ignore` says nothing beside its name, because "or set it aside" in the description already has. */
-    description: 'File one arrival from the inbox as a row in a list, or set it aside. braindog:inbox lists them.',
+    description: 'File one arrival from the inbox as a row, or set it aside. braindog:inbox lists them.',
     input: obj(
       {
         arrival: str('Its id in braindog:inbox.'),
         register: str('The list it goes in.'),
-        fields: { type: 'object', description: 'Field ids to values. Omit to title the row from the arrival.' },
+        fields: { type: 'object', description: 'Field ids to values. Omit to title from the arrival.' },
         ignore: { type: 'boolean' },
         note: str('One sentence a person reads in six weeks.'),
+        back: { type: 'boolean' },
+        version: { type: 'integer' },
       },
       ['arrival'],
     ),
@@ -541,6 +549,54 @@ export function compact(row: Entry, prefix = ''): Record<string, unknown> {
     fields: row.fields,
   };
 }
+
+/** The rows `list` answers when the call names no limit. */
+const LIST_PAGE = 20;
+/** The characters of one text a `list` row carries before it is cut, unless the call names its field in `fields`. */
+const CLIP = 280;
+
+/**
+ * A compact row as `list` answers it: what an agent reads to choose a row, and not the whole of each one.
+ *
+ * MEASURED ON THE SEED BEFORE THIS, by 44 §5.8's estimator over the JSON-RPC answer as a transport sends it: the 27
+ * tasks cost 3,018 tokens and 38 obligations 5,290, against the 2,000 that 10 §4 set for a page. Four things went, each
+ * for what it cost and what it said:
+ * - `updated_at`, about 25 tokens a row and the largest part. The page is already newest first, `get` still answers
+ *   it, and `activity` is where an agent asks what changed and when.
+ * - `state` beside the fields, when a field holds the same value. The record fills the one from the other, so it
+ *   was the same word twice on every row of every register that has a state.
+ * - an empty field, as `spoke` drops one from a log line. An absent field reads as empty.
+ * - a text past 280 characters, cut there, with `clipped: true` on the row so the agent knows it has less than the
+ *   whole. A project's write-up is thousands of characters and one row of it outweighed a page of tasks. A field the
+ *   call names in `fields` comes whole, and so does a text the schema does not call text or document, such as a URL.
+ *
+ * `version` STAYS, because the next `update` needs it, and so does `deleted_at` when a row has one.
+ *
+ * `texts` is the register's text and document fields, from its schema, or `undefined` where the schema could not be
+ * read; then any long string is cut, because the row still says so and `get` still answers it whole.
+ */
+const listed = (row: Record<string, unknown>, whole: ReadonlySet<string>, texts: ReadonlySet<string> | undefined): Record<string, unknown> => {
+  const fields: Record<string, unknown> = {};
+  let clipped = false;
+  for (const [id, value] of Object.entries(isObject(row.fields) ? row.fields : {})) {
+    if (value === null || value === '' || (Array.isArray(value) && value.length === 0)) continue;
+    /* COUNTED IN CODE POINTS, so a cut never splits a character in two and an emoji is one character of the 280. */
+    const points = typeof value === 'string' && value.length > CLIP && !whole.has(id) && (texts?.has(id) ?? true) ? Array.from(value) : [];
+    if (points.length > CLIP) {
+      fields[id] = points.slice(0, CLIP).join('');
+      clipped = true;
+    } else fields[id] = value;
+  }
+  const state = row.state;
+  return {
+    spoken: row.spoken,
+    version: row.version,
+    ...(typeof state === 'string' && !Object.values(fields).includes(state) ? { state } : {}),
+    ...(typeof row.deleted_at === 'string' ? { deleted_at: row.deleted_at } : {}),
+    fields,
+    ...(clipped ? { clipped: true } : {}),
+  };
+};
 
 /** A register's own prefix for its rows, such as `LN` or `S`, or `''` where it has none. */
 type PrefixOf = (register: string) => string;
@@ -798,6 +854,8 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
   /* AND ITS REF FIELDS, READ FROM THE SAME SCHEMA: whether each is a list of refs, and the register its `to` names.
      They move no more often than the prefix does, and they are what the naming pass below reads. */
   const refFields = new Map<string, Map<string, { many: boolean; to: string | null }>>();
+  /* AND ITS TEXT AND DOCUMENT FIELDS, the ones a `list` row cuts at 280 characters, from the same read. */
+  const textFields = new Map<string, Set<string>>();
   const learnPrefix = async (register: string, ctx: C): Promise<void> => {
     const schema = await surface.schema({ register }, ctx);
     if (!schema.ok) return;
@@ -809,6 +867,10 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       if (isObject(f) && typeof f.id === 'string' && (f.type === 'ref' || (f.type === 'list' && f.of === 'ref')))
         refs.set(f.id, { many: f.type === 'list', to: typeof f.to === 'string' && f.to !== '' ? f.to : null });
     refFields.set(register, refs);
+    textFields.set(
+      register,
+      new Set(declared.flatMap((f) => (isObject(f) && typeof f.id === 'string' && (f.type === 'text' || f.type === 'document') ? [f.id] : []))),
+    );
   };
   const spokenOf = (register: string, seq: number): string => {
     const prefix = prefixes.get(register) ?? '';
@@ -1284,12 +1346,16 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       return badSpoken(`${ROW_OR_ID} A figure is named by its id, and record_index lists them; ${said} is not one you can read.`);
     },
 
+    /* TWENTY WHEN THE CALL NAMES NO LIMIT, where the record's own default is fifty. 10 §4 set 2,000 tokens for a page
+       of 25, but counted as a transport sends it, every quote escaped inside the text block, 25 seeded tasks cost 2,094
+       even with `listed`'s cuts, and twenty cost well under. The record still answers up to 500 to a caller that asks,
+       and the description says 20, which `mcp.test.ts` holds the default to. */
     list: (args, ctx) =>
       surface.list(
         {
           register: String(args.register),
           ...(args.where === undefined ? {} : { where: args.where }),
-          ...(args.limit === undefined ? {} : { limit: Number(args.limit) }),
+          limit: args.limit === undefined ? LIST_PAGE : Number(args.limit),
           ...(args.cursor === undefined ? {} : { cursor: String(args.cursor) }),
         },
         ctx,
@@ -1652,6 +1718,15 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
           ok: true,
           value: { spoken, version, ...(updated_at === undefined ? {} : { updated_at }), ...(deleted_at === undefined ? {} : { deleted_at }) },
         };
+      }
+      /* A PAGE OF ROWS IS READ LEANER THAN ONE ROW: `listed` says what goes and why. Every row on a page is of the
+         register the call named, so that register's text fields are the ones cut. */
+      if (name === 'list') {
+        const said = shaped(await spokenRefs(answer, ctx), prefixOf);
+        if (!said.ok || !isObject(said.value) || !Array.isArray(said.value.rows)) return said;
+        const whole = new Set(Array.isArray(args.fields) ? args.fields.map(String) : []);
+        const texts = textFields.get(String(args.register));
+        return { ok: true, value: { ...said.value, rows: said.value.rows.map((r) => (isObject(r) ? listed(r, whole, texts) : r)) } };
       }
       return shaped(await spokenRefs(answer, ctx), prefixOf);
     },

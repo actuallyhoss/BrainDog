@@ -49,7 +49,7 @@ import { catalogueAnswer, catalogueFolder, catalogueOffersFrom } from './catalog
 import { serveKennelTo, servesKennel } from './kennel.ts';
 import { certificateNames, originFor } from './reach.ts';
 import { fileSnapshots, signCopies, type FileSnapshots } from './snapshots.ts';
-import { blobsFolder, eraseFile, serveFiles, servesFiles } from './files.ts';
+import { blobsFolder, eraseFile, keepAttachment, serveFiles, servesFiles } from './files.ts';
 import { seedCatalogue } from '@braindog/seed/usecases/catalogue';
 import { badSlug, createDirectory, switcherAsk, type Directory } from '@braindog/record/directory';
 import { fixOf, type Auth, type Param, type Refusal, type Row, type Scheduler, type Sql } from '@braindog/ports';
@@ -899,10 +899,13 @@ function inboundDigest(file: string, now: () => number): () => Promise<string | 
  * `cloudIngest` makes for a Worker (`apps/worker/src/route.ts`): there the digest is a key into the
  * Directory's index, here it is one comparison, and neither side is given the token.
  */
-function arrivalDoor(api: Api, spend: (key: string) => number | null, inbound: (() => Promise<string | null>) | null): IngestDoor {
+function arrivalDoor(api: Api, spend: (key: string) => number | null, inbound: (() => Promise<string | null>) | null, open: OpenKey, folder: string | null): IngestDoor {
   return {
+    /* A SIGNED DOOR'S KEY IS OPENED HERE, under this host's key store, and handed to the record for the one answer
+       (DOR-3): `keyOpener` is the opener every scheduled action uses, and its `grant.read` is the audit trail of each
+       check. The Cloud-shaped URL stays a path token's alone, so a signed door has the one URL `49 §231` writes. */
     verify: async (ask) => {
-      if (ask.rec === undefined) return api.ingestVerify({ ingest: ask.ingest });
+      if (ask.rec === undefined) return api.ingestVerify({ ingest: ask.ingest }, open);
       const here = api.kernel.identity()?.id;
       if (here === undefined || ask.rec !== here) return null;
       const v = await api.ingestVerify({ ingest: ask.ingest });
@@ -933,6 +936,11 @@ function arrivalDoor(api: Api, spend: (key: string) => number | null, inbound: (
             return held !== null && (await sameKey(hash, held)) ? (api.kernel.identity()?.id ?? null) : null;
           },
         }),
+    /* THE MAIL DOOR'S ATTACHMENTS, KEPT BY THE SAME RULE `/api/files` KEEPS A PERSON'S UPLOAD (DOR-7): the same
+       sniffed types and the same 2 MB ceiling, over `keepAttachment` in `./files.ts`. A database in memory has no
+       folder to keep a file in, so `keep` is absent there and every attachment is named and sized and nothing more,
+       the same as a host with no file store (`packages/host/src/ingest.ts` `IngestDoor.keep`). */
+    ...(folder === null ? {} : { keep: async ({ bytes }: { bytes: Uint8Array }) => keepAttachment(folder, bytes) }),
   };
 }
 
@@ -1905,7 +1913,7 @@ export async function start(options: {
     keys: keysDoor(api, options.keys, origins),
     slash: slashDoor(slashConfig, () => api, options.keys, { sql: slashSql, clock }, origins),
     /* ONE BUDGET PER PROCESS, built here so it outlives a request and is shared by every ingest. */
-    arrivals: arrivalDoor(api, ingestBudget(clock.now), inboundMail),
+    arrivals: arrivalDoor(api, ingestBudget(clock.now), inboundMail, keyOpener(api, options.keys), blobsFolder(options.file)),
     /* A LINK TO ONE PAGE, built here once so its read budget outlives a request, as the arrivals' does. */
     shared: sharedDoorOf(api, handlers, shareKey, clock.now),
     /* AND EVERY CALLER'S MINUTE, built here once for the same reason (`overLimit`), and what `limits` says of it. */

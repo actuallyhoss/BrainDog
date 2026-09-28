@@ -66,7 +66,7 @@ async function founder(): Promise<Kernel> {
 }
 
 type Series = { name: string; now: (number | null)[]; latest: { value: number } | null };
-type Drawn = { kind: string; heading?: string; rows?: { fields: Record<string, unknown> }[]; refusals?: { code: string; fix: string }[]; readings?: unknown[]; measures?: Series[]; matched?: number };
+type Drawn = { kind: string; heading?: string; drawn?: boolean; rows?: { fields: Record<string, unknown> }[]; refusals?: { code: string; fix: string }[]; readings?: unknown[]; measures?: Series[]; matched?: number };
 const OWNER = { actor: 'p_1' };
 
 test('THE DASHBOARD AND AN ORGANISATION PAGE read every block, and the numbers a project sent are their rows', async () => {
@@ -77,14 +77,18 @@ test('THE DASHBOARD AND AN ORGANISATION PAGE read every block, and the numbers a
     value(k.create('datapoints', { name: 'Sign-ups', value: 10 + d, organisation: org.id, source: 'reported', at: new Date(NOW - d * DAY).toISOString() }, OWNER));
 
   const dashboard = value<{ blocks: Drawn[] }>(k.page('dashboard')).blocks;
-  assert.deepEqual(dashboard.map((b) => b.kind), ['stat', 'bar', 'stat', 'lines', 'table', 'table']);
+  assert.deepEqual(dashboard.map((b) => b.kind), ['note', 'note', 'stat', 'bar', 'stat', 'lines', 'table', 'table']);
   for (const b of dashboard) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
-  assert.equal(dashboard[2]!.readings, undefined, 'the numbers are series, not figures');
-  assert.deepEqual(dashboard[2]!.measures?.map((m) => m.name), ['Sign-ups'], 'the example datapoint is in no tile');
-  assert.deepEqual(dashboard[3]!.measures?.map((m) => m.name), ['Sign-ups'], 'and in no chart');
-  assert.equal(dashboard[2]!.measures?.[0]?.now.at(-1), 10, 'today is the last day, and its reading the newest');
-  assert.ok((dashboard[4]!.rows ?? []).some((r) => r.fields.source === 'example'), 'the latest numbers still list it, marked');
-  assert.equal(dashboard[1]!.rows?.length, 2, 'the example organisation and Harbour Studio');
+  /* THE OPENING SENTENCE IS THE ONE THE NUMBERS ANSWER: forty were reported, so it counts them, and the one for a
+     month with none does not draw. */
+  assert.notEqual(dashboard[0]!.drawn, false, 'the sentence that counts the numbers is drawn');
+  assert.equal(dashboard[1]!.drawn, false, 'and the one for no numbers is not');
+  assert.equal(dashboard[4]!.readings, undefined, 'the numbers are series, not figures');
+  assert.deepEqual(dashboard[4]!.measures?.map((m) => m.name), ['Sign-ups'], 'the example datapoint is in no tile');
+  assert.deepEqual(dashboard[5]!.measures?.map((m) => m.name), ['Sign-ups'], 'and in no chart');
+  assert.equal(dashboard[4]!.measures?.[0]?.now.at(-1), 10, 'today is the last day, and its reading the newest');
+  assert.ok((dashboard[6]!.rows ?? []).some((r) => r.fields.source === 'example'), 'the latest numbers still list it, marked');
+  assert.equal(dashboard[3]!.rows?.length, 2, 'the example organisation and Harbour Studio');
 
   const pages = k.pages() as unknown as { slug: string; title: string }[];
   const harbour = pages.find((p) => p.title === 'Harbour Studio');
@@ -107,6 +111,9 @@ test('A FOUNDER’S PROJECT HAS A PAGE, with Estate since founder 1.4.0: what is
   const blocks = value<{ blocks: Drawn[] }>(k.page(page.slug)).blocks;
   assert.deepEqual(blocks.map((b) => b.heading), [
     'At a glance',
+    /* THE TWO OPENING SENTENCES, which carry no heading: nothing is handed back, and nothing is open, so the second draws. */
+    undefined,
+    undefined,
     'Waiting on you',
     'Where it stands',
     'Handed back or blocked',
@@ -118,13 +125,19 @@ test('A FOUNDER’S PROJECT HAS A PAGE, with Estate since founder 1.4.0: what is
     'Money',
     'Keeping it alive',
     'Notes',
+    'Runs on',
+    'Keys',
+    'Tools and servers',
+    'Skills',
     'The numbers',
     'Thirty days against the thirty before',
     'Send numbers here',
   ]);
   for (const b of blocks) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
   assert.deepEqual((blocks[0] as unknown as { cells: { label: string }[] }).cells.map((c) => c.label), ['Open', 'Owed to you', 'Costs a year'], 'with Estate present, what it costs a year takes the place the task figures held');
+  assert.equal(blocks[1]!.drawn, false, 'nothing is handed back, so that sentence is not drawn');
+  assert.notEqual(blocks[2]!.drawn, false, 'and nothing is open, so that one is');
   /* THE PROJECT'S NOTE, which is where an imported plan and its decisions are written, and which this example has none of. */
-  assert.equal((blocks[11] as unknown as { document?: boolean }).document, true);
-  assert.deepEqual(blocks[12]!.measures?.map((m) => [m.name, m.latest?.value]), [['Installs', 7]]);
+  assert.equal((blocks[13] as unknown as { document?: boolean }).document, true);
+  assert.deepEqual(blocks[18]!.measures?.map((m) => [m.name, m.latest?.value]), [['Installs', 7]]);
 });

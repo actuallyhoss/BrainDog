@@ -123,6 +123,7 @@ const ITEMS = {
     { id: 'name', type: 'text', required: true },
     { id: 'state', type: 'enum', values: ['open', 'done'], default: 'open' },
     { id: 'due', type: 'day' },
+    { id: 'tags', type: 'list', of: 'text' },
   ],
 };
 

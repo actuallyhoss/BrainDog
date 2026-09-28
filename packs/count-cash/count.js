@@ -3,21 +3,18 @@
  * to on that day written as a dated transaction.
  *
  * STARTED BY THE PACK'S AUTOMATION ON EACH NEW COUNT, which hands it the count's id. A count is a row a person writes,
- * because a question to a person offers a closed list of answers and an amount is not one (`count-cash.test.ts`, the
- * first test, measured).
+ * because a question to a person offers a closed list of answers and an amount is not one.
  *
- * A COUNT IS A BALANCE CHECK, SINCE 1.1.0. It says what the account held on a day, which is what a row of money-core's
- * `balances` is, so it is written there, and Cash now restarts the account from it and adds only what moved after it.
- * Before 1.1.0 it set the account's own balance and day, and the account then said the count and nothing else about
- * what it had held before, while a balance a person typed was written over by a script.
+ * A COUNT IS A BALANCE CHECK. It says what the account held on a day, which is what a row of money-core's `balances`
+ * is, so it is written there, and Cash now restarts the account from it and adds only what moved after it. The
+ * account's own balance is what a person typed, and this script never writes over it.
  *
  * THE DIFFERENCE IS AGAINST THE ROLLED FIGURE, NOT THE ACCOUNT'S TYPED BALANCE. The balance on the account is what
  * somebody said on its `as_of`, and every movement after that day has moved the money since. Subtracting the count from
- * the typed balance counted those movements a second time, once in the ledger and once in the difference
- * (`loop/finish/modules.md` MOD-20). So the figure a count is compared with is the one Cash now reads: the newest thing
- * anybody said the account held on or before the count's day (the account's own balance, a balance check, or a bank
- * message's balance after a movement, the account's own winning a tie), plus every cleared movement after it up to
- * that day.
+ * the typed balance would count those movements twice, once in the ledger and once in the difference. So the figure a
+ * count is compared with is the one Cash now reads: the newest thing anybody said the account held on or before the
+ * count's day (the account's own balance, a balance check, or a bank message's balance after a movement, the account's
+ * own winning a tie), plus every cleared movement after it up to that day.
  *
  * THE DIFFERENCE IS STILL A TRANSACTION. A gap nobody can account for is money that went somewhere, and every figure
  * over the ledger (spent this month, in and out) should see it. It is dated the day of the count, and a check on that

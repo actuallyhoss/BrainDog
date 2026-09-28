@@ -25,8 +25,11 @@ export type Decl = { id: string; kind: string; body: Record<string, unknown> };
  */
 export type PenItem = { id: string; kind: string; register: string; title: string; why: string; change: { to: Decl } };
 
+/** The navigation shape as one more offer, which carries its own `id` and never a `PenItem`. */
+export type ShapeOffer = { from: 'shape'; id: string; title: string; why: string; shape: NavShape };
+
 /** What one row of the pen is: an offer with a declaration behind it, or the navigation shape, which has none. */
-export type Offer = { from: 'change'; item: PenItem } | { from: 'shape'; id: string; title: string; why: string; shape: NavShape };
+export type Offer = { from: 'change'; item: PenItem } | ShapeOffer;
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const text = (v: unknown): v is string => typeof v === 'string' && v !== '';
@@ -59,7 +62,7 @@ export function penOf(said: unknown): PenItem[] {
  * device store kept, so the exact recommendation dismissed is the one that stays gone and a record that changes enough
  * to earn a different one may say so again.
  */
-export const shapeOffer = (rec: NavShapeRecommendation, title: string): Offer => ({
+export const shapeOffer = (rec: NavShapeRecommendation, title: string): ShapeOffer => ({
   from: 'shape',
   id: `shape:${rec.shape}:${rec.reason}`,
   title,
@@ -262,7 +265,7 @@ export function glyphOf(offer: Offer): IconName {
  * placed in, then the record's, strongest first as it sent them, then the icons. A dismissed offer is gone here as well
  * as on the record, so a dismissal holds before `boot` is read again.
  */
-export function waiting(shape: Offer | null, record: readonly PenItem[], icons: readonly PenItem[], gone: (id: string) => boolean): Offer[] {
+export function waiting(shape: ShapeOffer | null, record: readonly PenItem[], icons: readonly PenItem[], gone: (id: string) => boolean): Offer[] {
   const out: Offer[] = [];
   if (shape !== null && !gone(shape.id)) out.push(shape);
   const seen = new Set<string>();

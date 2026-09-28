@@ -559,5 +559,64 @@ Three rules, each from a real failure mode:
 
 ---
 
+## 9 · Proposing a whole change before it lands
+
+`installPack` and `setDeclaration` land one thing at a time. `change` (MCP) and the app's Slash draft a **change**,
+several declarations together, and both need to see every page it touches drawn before anybody accepts it.
+
+`previewChange` (record method, READ+, `writes: true` in `ROUTES` as `previewPage` is, though it writes nothing)
+takes `{ to: Decl | { declarations: Decl[] }, rows?: Record<string, Record<string, Json>[]>, about?: string }`, where
+`Decl = { id, kind, body }` is exactly what `change`'s own `to` takes. `rows` are sample rows per list (at most 20 a
+list, 100 in all), written inside the rehearsal so a page with nothing in its lists yet still draws something; `about`
+names the row a `for:` template is drawn over, as a spoken id `<list>#<seq>`, defaulting to the first row its `where`
+admits after `rows` land, and, with no row at all, the template draws unfilled with "No row of `<list>` yet, so this
+page is drawn with its placeholders." The answer is `{ pages: PreviewedPage[] }`, each `blocks` exactly what `page`
+answers for that page and `was` the page as installed now (`null` for a new one), so a reviewer sees before and after
+side by side. It runs inside `kernel.rehearse` (§0), so nothing it touches is written, observed or spent.
+
+Slash drafts through the same door. `slashDraft` (ADMIN, writes only the ask ledger's row) takes
+`{ asked: string, page?: string }`, `page` naming the slug the description is about so its stored declaration goes
+into the model's input, and answers `{ by, drafts: { question, change, rows, preview }[], dropped }`: each draft is
+linted and rehearsed with `previewChange` before it is shown, a refusal goes back to the model once as a repair round
+(at most two repair asks a press), and a draft still refused is dropped with its sentence in `dropped` rather than
+shown broken. `slashPropose` takes the same `page?` and files what `slashDraft` would answer, through the ordinary
+proposal door (§10). Neither writes a page; accepting one is the owner's `setDeclaration`, same as any other change.
+
+**`.dog` v2** (`packages/dog`) is the round-trip format §1's `<page>.dog` download is, now built: `dogText(body)`
+prints a page's stored declaration as text and `parseDog(text)` reads it back, `parseDog(dogText(b)).value` deep-
+equalling `b` for every body the kernel admits. Page keys print `page title for nav icon tone layout requires blocks`
+first, block keys `kind heading area span source register row where when columns cells order limit` first, each then
+the rest alphabetically; a scalar prints bare when it reads back as itself and would not be read as another type,
+otherwise as a JSON string; a column with only `field` prints bare (`columns: [client, amount]`); a string with a
+newline prints as a `|` block. A CLI pull, edit and check round-trips through this format (`braindog page pull`,
+`braindog page check`); pushing one back is `braindog page push`, and it is refused to a bearer token under ADR-060
+(§10) unamended: a `.dog` push needs a browser session, the same as any other write to a declaration a person did
+not type into a form.
+
+**The page reader, after the split** (`apps/web/src/lib/page/`). `PageView.svelte` takes
+`{ slug, got, mode?: 'page' | 'home' | 'preview', showSource?, reread?, was? }`. `page` is everything: head, source,
+Edit layout, writes. `home` has no head, no source and no Edit layout, and writes stay on: it is what Home mounts a
+declared page through. `preview` is inert: no writes, no arrange, no source, and, with `was`, a "Now · After" switch
+(one showing at a time below 390px) so a reviewer sees a `PreviewedPage` the way `previewChange` answered it. The
+reader is split by job: `PageView.svelte` (frame and head), `PageBody.svelte` (main, rail, box runs, span flow, the
+`j`/`k` keys), `BlockSlot.svelte` (one block: chrome, empty, refusal, the draw, `RenderOptions`, panels),
+`Arrange.svelte` (Edit layout), `page-writes.ts` (the `Writes` object behind tick, move, capture, inputs, reschedule
+and the queue's gate), `SourceView.svelte`, and `panels/{Actions,Reporting,PollForm,ActionRows}.svelte`. `oninput` is
+passed to a block only when the reader holds `write` or above on its list, so a read-only viewer never sees a control
+that would refuse the moment it was pressed.
+
+**The holding pen** (`boot`'s `pen: PenItem[]`, owner and whole-record readers only, empty when `pen.suggest` is
+off) is what §3's "it lands in a holding pen" names: what the record would add on its own if the owner asked, at most
+24, strongest first. `PenItem = { id, kind: 'page' | 'block' | 'column', register, title, why, change: { to: Decl } }`.
+`id` is the dismissal signature (`page:<list>`, `block:<page>:<kind>:<list>`, `column:<page>:<block>:<field>`), and an
+id in the person's `pen.dismissed` is never answered again, on any device. `why` is one sentence in the record's own
+words ("Parts has 7 rows and no page yet."), and `change.to` is a whole declaration: accepting it is the owner's
+`setDeclaration`, one click, and previewing it first is `previewChange({ to })` above. A page item's `change.to`
+carries its own `nav:`, so the system proposes nav placement but never writes it unasked (§3). `setPref`'s
+`PREF_KEYS` carry `pen.suggest: boolean` (the switch that turns the pen off) and `pen.dismissed: string[]` (at most
+500, oldest let go first) beside the nav order and shape keys.
+
+---
+
 *Next: [07-INGEST-AND-RULES](07-INGEST-AND-RULES.md) — five ways in, and patterns instead of
 parsers.*

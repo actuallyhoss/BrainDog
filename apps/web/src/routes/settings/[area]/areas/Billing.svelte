@@ -15,6 +15,7 @@
   import ReadState from '$lib/ui/ReadState.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { settingsState, type AreaProps } from '../settings-state.svelte.ts';
+  import StateRow from './StateRow.svelte';
 
   let { shell }: AreaProps = $props();
 
@@ -123,7 +124,8 @@
     <!-- THE HOST'S ANSWER AND NOT THE BUILD'S. The sample's `DEPLOYMENT.kind` read `self-host` in
          every shipped bundle, so a live Cloud record was told "This record runs on your own
          machine." (`research-first-sign-in.md` friction 5). `billing.ts` says what is asked instead. -->
-    <p class="hint">{billingLine({ host: shell.host, mintsMail: mintsHere })}</p>
+    <!-- AS A ROW, NOT A PARAGRAPH (DSN-18): the state in its title, the host's sentence as its line. -->
+    <StateRow icon="money" title={copy.billingNotBilled} line={billingLine({ host: shell.host, mintsMail: mintsHere })} />
   </Section>
 {/if}
 

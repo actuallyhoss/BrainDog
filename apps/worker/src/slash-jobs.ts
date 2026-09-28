@@ -20,13 +20,15 @@
  * calls that before a job is leased.
  */
 
+import type { ModelJobEmbed } from '@braindog/host/model-jobs';
 import type { ModelJobInference } from '@braindog/host/slash-answers';
 import type { RecordApi } from '@braindog/record';
 import type { Slash } from '@braindog/slash';
 
+import { aiInference } from './inference.ts';
 import { workerSlashEngine, workerSlashModel, type SlashEngineDeps, type SlashEnv } from './slash.ts';
 
-export function workerModelJobs(env: SlashEnv, api: () => RecordApi, deps: SlashEngineDeps): ModelJobInference | undefined {
+export function workerModelJobs(env: SlashEnv, api: () => RecordApi, deps: SlashEngineDeps): (ModelJobInference & ModelJobEmbed) | undefined {
   if (workerSlashModel(env, api, { ...deps, store: () => deps.sql }) === undefined) return undefined;
   let built: Promise<Slash | undefined> | null = null;
   const engine = async (): Promise<Slash> => {
@@ -41,5 +43,9 @@ export function workerModelJobs(env: SlashEnv, api: () => RecordApi, deps: Slash
   return {
     draft: async (samples) => (await engine()).draftPattern(samples),
     prose: async (digest) => (await engine()).digestProse(digest),
+    /* WORKERS AI, NOT THE SLASH ENGINE ABOVE (PLT-11, PLT-18): `embed` is `aiInference`'s own, over the `AI` binding
+       this Worker holds platform-wide, so it is offered whenever that binding exists and never gated on a record's
+       own Slash setup. Absent, `infer.embed` is never leased (`@braindog/host/model-jobs`'s `ModelJobEmbed`). */
+    embed: env.AI ? async (texts: readonly string[]) => aiInference(env).embed(texts) : undefined,
   };
 }

@@ -187,7 +187,7 @@ const usage = () =>
     'braindog hook start|end',
     '  What Claude Code runs when a session starts and ends, with its event on standard input.',
     'braindog install [--apply] [--replace <replace.json>] [--config-dir <folder>] [--settings <file>] [--mcp-json <file>]',
-    "  Show the two hooks it would add to Claude Code's settings (a profile folder, or one settings file such as a project's .claude/settings.local.json), and write them only with --apply. With --replace it also takes out the hooks, MCP servers and skills the replace file names as an old tool's, and says which, and from a .mcp.json only when it is named with --mcp-json and is outside any repository.",
+    "  Show the two hooks it would add to Claude Code's settings (a profile folder, or one settings file such as a project's .claude/settings.local.json), and write them only with --apply. It also places BrainDog's Agent Skill in each profile's skills/braindog/. With --replace it also takes out the hooks, MCP servers and skills the replace file names as an old tool's, and says which, and from a .mcp.json only when it is named with --mcp-json and is outside any repository.",
     'braindog verify <file> [--key <pubkey|url>]',
     "  Check a .brainl file on this machine: its format, every table against its manifest, and its signature, against the key you name when you name one. Nothing is sent, but for fetching a key from an address.",
     'braindog runner enrol <host>',

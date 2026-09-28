@@ -1,6 +1,6 @@
 /**
  * The words of add-ons and use cases: the catalogue, a pack's own page, sharing and installing a shared plan,
- * turning one off, and the exchange rates form on Money's settings.
+ * turning one off, and the way into exchange rates on Money's settings.
  *
  * AN AREA FILE OF THE COPY AGGREGATE (ARC-8). `lib/copy.ts` spreads this object into `copy`, and every screen reads a
  * key here as `copy.<key>`. The house voice is written once, at the top of `copy.ts`. A word a screen in another
@@ -12,33 +12,16 @@
 import { list } from './english.ts';
 
 export const packs = {
-  /* THE HOME CURRENCY PICKER AND THE EXCHANGE RATES FORM, on Money's settings (`routes/packs/[id]`). The form files a
-     proposal like the poll form on a page (`pages.ts`), because a poll calls out on a clock and the owner approves the address once. */
+  /* THE HOME CURRENCY PICKER AND THE WAY INTO EXCHANGE RATES, on Money's settings (`routes/packs/[id]`). Rates are a
+     preset of the new-action sheet (USE-5), so the words of the sheet itself are `actionWords` in `action-draft.ts`. */
   currencyNone: 'None chosen',
   currencyCommon: 'Common',
   currencyAll: 'All currencies',
   ratesHeading: 'Exchange rates, fetched every day',
   ratesWhy:
-    'BrainDog can fetch what your currencies are worth from a public address once a day, so money in more than one currency adds up in your home currency. You approve the address once, on Decide, and nothing is fetched before that.',
-  ratesSource: 'From',
-  ratesCustom: 'Another address',
-  ratesCoversOpenEr: 'About 160 currencies, most of the world’s, updated once a day. No key needed.',
-  ratesCoversFrankfurter: 'The European Central Bank’s rates for about 30 currencies, on working days. Many smaller currencies are not among them. No key needed.',
-  ratesCustomCovers: 'Any https address that answers JSON. Say which currency it quotes against and where each number is.',
-  ratesBase: 'Quoted against',
-  ratesBaseNote: (base: string) => `Each number in the answer says what one ${base} is worth in that currency.`,
-  ratesCurrencies: 'Currencies to fetch',
-  ratesCurrenciesNote: 'The currencies your money is in, and your home currency.',
-  ratesAdd: 'Add a currency',
-  ratesRemove: (code: string) => `Remove ${code}`,
-  ratesFile: 'Propose these rates',
-  ratesFaultBase: 'Choose the currency the address quotes against.',
-  ratesFaultNone: 'Choose at least one currency other than the one the address quotes against.',
-  ratesFaultCode: (code: string) => `${code || 'That'} is not a currency code.`,
-  ratesFaultUnquoted: (name: string, codes: string) => `${name} does not quote ${codes}. Choose another address.`,
-  ratesQuestion: (host: string, base: string, codes: string) => `Fetch ${host} every day for what one ${base} is worth in ${codes}?`,
+    'BrainDog can fetch what a currency is worth from a public address once a day, so money in more than one currency adds up in your home currency. Set up one for each currency your money is in.',
+  ratesSetUp: 'Set up exchange rates',
   noPacksYet: 'No add-ons installed',
-  noPacksBody: 'An add-on brings ready-made lists and pages. The ones below are ready to install.',
   /* The Vault's words are in `record/vault.ts`, which only its two routes load. */
 
   /* packs */
@@ -66,8 +49,10 @@ export const packs = {
   packNothingToSetWhy: 'It adds the lists and pages below, and nothing about it needs choosing.',
   /* THE SENTENCE UNDER THE TITLE. The screen was `Packs`, a word nobody brings with them; it is
      `Add-ons` now, the reader's word for an installable thing with an author. The API, the docs and
-     the `mcp` surface keep `pack`. The sentence stays for what an add-on here is: text, not code. */
-  packBlurb: 'An add-on brings ready-made lists and pages. It is readable text, and nothing in it runs.',
+     the `mcp` surface keep `pack`. It says what an add-on brings, which is also what fills the screen while none is
+     installed. "It is readable text, and nothing in it runs" was a sentence about how an add-on is built, and a person
+     choosing one is asking what they get (MOD-24). */
+  packBlurb: 'An add-on brings ready-made lists and pages.',
 
   /* USE CASES, SHARED AND INSTALLED (`loop/research-spark.md` S14). A use case is a file like an add-on, planned and
      approved the same way, so these sentences say what it arranges and never how the screen works. */

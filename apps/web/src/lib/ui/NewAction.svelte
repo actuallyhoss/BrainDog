@@ -18,7 +18,8 @@
   import { apiBase } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
   import * as clipboard from '$lib/clipboard.ts';
-  import { callerAt, mintDoor, type Said } from '$lib/ui/webhook-doors.ts';
+  import { callerAt, listDoors, mintDoor, type Said } from '$lib/ui/webhook-doors.ts';
+  import { openActions } from '$lib/record/actions.ts';
   import {
     AUTH_KINDS,
     CHANNELS,
@@ -58,6 +59,17 @@
   let reproving = $state(false);
   /* The vault's labels; `null` is a vault this sheet cannot read, and the key is then typed. */
   let keys = $state<string[] | null | undefined>(undefined);
+  /* EVERY INGEST ID THE RECORD ALREADY DECLARES, doors and scheduled actions together, so `declarationOf` can refuse a
+     name that would silently replace one; `undefined` while unread never blocks a press (USE-5). */
+  let taken = $state<Set<string> | undefined>(undefined);
+
+  async function loadTaken() {
+    const [doors, actions] = await Promise.all([listDoors(call()), openActions((url, init) => fetch(url, init), apiBase())]);
+    const ids = new Set<string>();
+    if (doors.kind === 'doors') for (const d of doors.doors) ids.add(d.id);
+    if (actions.first.ok) for (const a of actions.first.value) ids.add(a.ingest);
+    taken = ids;
+  }
 
   const call = () => callerAt(apiBase());
   const lists = $derived(open ? listsOffered() : []);
@@ -78,6 +90,7 @@
       door = null;
       busy = false;
       if (kind === 'action' && keys === undefined) void keyLabels(call()).then((k) => (keys = k));
+      void loadTaken();
     });
   });
 
@@ -100,7 +113,7 @@
   async function save(e: SubmitEvent) {
     e.preventDefault();
     if (busy || done) return;
-    const built = declarationOf(draft);
+    const built = declarationOf(draft, taken);
     if (!built.ok) {
       problem = { fix: built.fix, at: built.at };
       return;
@@ -244,10 +257,13 @@
               <select class="pick" aria-label={w.fromAnswer} bind:value={line.from}>
                 <option value="answer">{w.fromAnswer}</option>
                 <option value="fixed">{w.fromFixed}</option>
+                <option value="arrived">{w.fromArrived}</option>
               </select>
-              <span class="field">
-                <input class="field-input" type="text" autocomplete="off" spellcheck="false" aria-label={line.from === 'fixed' ? w.fromFixed : w.fromAnswer} bind:value={line.text} />
-              </span>
+              {#if line.from !== 'arrived'}
+                <span class="field">
+                  <input class="field-input" type="text" autocomplete="off" spellcheck="false" aria-label={line.from === 'fixed' ? w.fromFixed : w.fromAnswer} bind:value={line.text} />
+                </span>
+              {/if}
               <Button weight="bare" onclick={() => removeLine(i)}>{w.removeLine(fields.find((f) => f.id === line.field)?.name ?? line.field)}</Button>
             </div>
           {/each}

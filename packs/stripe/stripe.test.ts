@@ -184,7 +184,7 @@ test('THE PACK CARRIES stripe.js AS ITS SOURCE, byte for byte, and asks for one 
   /* money-core 3.1.0 AND NOT EARLIER: 3.0.0's walk brings a payout in on the day it lands (`accounts.arrives`), and
      3.1.0 has the `books` the `book` setting (1.2.0) files each row in. */
   const doc = JSON.parse(TEXT) as { version: string; requires: { packs: Record<string, string> }; config: Record<string, unknown> };
-  assert.equal(doc.version, '1.2.0');
+  assert.equal(doc.version, '1.3.0');
   assert.deepEqual(doc.requires.packs, { 'money-core': '>=3.1.0 <4.0.0' });
   assert.deepEqual(Object.keys(doc.config), ['book']);
   const file = await readPackFile(TEXT);

@@ -1,9 +1,29 @@
-import { existsSync, renameSync, rmSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, readFileSync, renameSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 
 import adapter from '@sveltejs/adapter-static';
 
 const OUT = process.env.BRAINDOG_ENV ? `build-${process.env.BRAINDOG_ENV}` : 'build';
+
+/* THE TEMPLATE'S OWN INLINE SCRIPT AND STYLE ARE HASHED HERE, because `kit.csp` hashes only what SvelteKit writes
+   itself: the boot script is added for us, and the preference reader and the first-paint style in `src/app.html` are
+   not. They are read from the file and not copied as literals, so an edit to either one moves its hash with it
+   instead of blanking the app. Comments go first, because a comment that spelled a tag would be hashed as one.
+   `apps/web/test/csp.test.ts` reads the built shell and fails on any inline script or style this list missed. */
+const TEMPLATE = readFileSync(new URL('./src/app.html', import.meta.url), 'utf8').replace(/<!--[\s\S]*?-->/g, '');
+/** @param {'script' | 'style'} tag */
+const inlineHashes = (tag) =>
+  [...TEMPLATE.matchAll(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`, 'g'))].map(
+    (m) => /** @type {`sha256-${string}`} */ (`sha256-${createHash('sha256').update(m[1] ?? '').digest('base64')}`),
+  );
+
+/* EVERY FRAME A PAGE MAY HOLD. The embeds are the origins of `EMBED_PROVIDERS` in `packages/render/src/embed.ts`,
+   which the kernel copies and refuses any other against, and `test/csp.test.ts` holds this list equal to that one.
+   Turnstile's origin is here for its script and its frame, and the hosts take it out of every page but `/app/signup`
+   (`asPage` in `apps/worker/src/route.ts`); the self-host has no sign-up, so it takes it out everywhere. */
+const TURNSTILE = 'https://challenges.cloudflare.com';
+const EMBEDS = ['https://www.youtube-nocookie.com', 'https://player.vimeo.com', 'https://www.loom.com', 'https://www.figma.com', 'https://www.google.com'];
 
 /* THE APP LIVES AT `brain.dog/app`, AND ITS FILES LIVE AT `build/app` (`loop/research-one-domain.md` §2.2). The Worker's
    asset directory stays `build/`, so `/app/_app/x.js` is `build/app/_app/x.js` and the marketing site's own `/_app/*`
@@ -61,10 +81,31 @@ export default {
     /* THE WORKER IS REGISTERED BY THE PRESS THAT NEEDS IT, NOT BY EVERY PAGE. At the default of `true`, the mere presence
        of `src/service-worker.ts` puts a `register` call in the shell's inline boot script, and the generated
        `internal.js` read `service_worker: true`: every visitor to every page installed a worker, whether or not they
-       ever turned notifications on. `PushToggle.svelte` registers it when he does. The file is still built to
-       `service-worker.js` either way, because building it follows the file and not this flag. */
+       ever turned notifications on. `PushToggle.svelte` registers it when he turns notifications on, and `keep` in
+       `lib/data/offline.ts` registers it for a record being followed, outside development, for the read copy
+       (MOD-27). The file is still built to `service-worker.js` either way, because building it follows the file and
+       not this flag. */
     serviceWorker: { register: false },
     version: { pollInterval: 0 },
+    /* A CONTENT SECURITY POLICY WITH NO INLINE SCRIPT BUT THE SHELL'S OWN (12 §8). A record draws strangers' text, so
+       `script-src` is the backstop behind escaping: nothing injected into a page can run. `mode: 'hash'` because the
+       shell is static and a nonce would be the same for every visitor. SvelteKit writes the policy into the shell's
+       `<meta>`, and both hosts copy it into the header with `frame-ancestors 'none'`, which a meta tag cannot carry.
+       The one named exception is `style-src-attr 'unsafe-inline'`: the renderer's `--cells` and `--magnitude` ride
+       a `style` attribute, which no content reaches unescaped (36 §13-10). Themes and the accent are constructed
+       sheets and never a `<style>`, so `style-src-elem` needs only the shell's own. */
+    csp: {
+      mode: 'hash',
+      directives: {
+        'default-src': ['self'],
+        'script-src': ['self', ...inlineHashes('script'), TURNSTILE],
+        'style-src-elem': ['self', ...inlineHashes('style')],
+        'style-src-attr': ['unsafe-inline'],
+        'frame-src': [...EMBEDS, TURNSTILE],
+        'object-src': ['none'],
+        'base-uri': ['none'],
+      },
+    },
   },
   compilerOptions: {
     // One stylesheet the linter can attribute every declaration to a file (22 §2).

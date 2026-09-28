@@ -42,7 +42,6 @@ export const words = {
   someProject: 'A project',
   days: (n: number) => `${n} days`,
   sealed: 'Sealed',
-  indexOnly: 'Value not kept here',
   opened: (n: number) => (n === 0 ? 'never opened' : n === 1 ? 'opened once' : `opened ${n} times`),
   lastOpened: (when: string) => `last ${when}`,
   /* WHO OPENED IT LAST, when that was a run: `usedBy`'s newest, as a key's row page and "Runs on" say it. */
@@ -89,6 +88,49 @@ export const words = {
   seeds: (n: number) => `${n} example ${n === 1 ? 'row' : 'rows'}, marked example, clearable in one action`,
   touches: 'nothing you have written: 0 rows read, 0 of your rows changed',
   conflict: (name: string, pack: string) => `${name} already exists, from ${pack}`,
+  /* THE VAULT PASSPHRASE (`12 §6`, "The optional second factor"): the switch, the honesty table and the two sheets. The
+     table is the document's own trade, said in a person's words, with the consequence in the same place as the switch. */
+  passphrase: 'Passphrase',
+  lockSwitch: 'Vault passphrase',
+  lockOn: 'On. Keys open only with your passphrase.',
+  lockOff: 'Off. BrainDog opens your keys with the key this host keeps.',
+  lockReading: 'Checking whether the vault has a passphrase.',
+  lockProtects:
+    'It guards every key you put here. Once it is on, BrainDog cannot open them without you, and neither can an agent: only you can, on this screen, with the passphrase. A connector’s keys stay on the host key, so scheduled pulls keep running.',
+  tableCaption: 'What the passphrase changes',
+  tableState: 'Passphrase',
+  tableReads: 'BrainDog can open your keys',
+  tableForget: 'If you forget it',
+  rowOff: 'Off',
+  rowOffNote: '(the default)',
+  rowOn: 'On',
+  offReads: 'Yes, with the key this host keeps',
+  offForget: 'Nothing is lost',
+  onReads: 'No, only you can',
+  onForget: 'BrainDog cannot open your keys, and nobody can reset it',
+  backups:
+    'Backups made before you turn it on still open with the host key until they age out, 30 days later. Backups made after it is on carry it.',
+  turnOnTitle: 'Put a passphrase on the vault',
+  turnOnHint: 'A short sentence you will remember is better than a short password.',
+  turnOffTitle: 'Take the passphrase off',
+  turnOffHint: 'Your keys go back under the key this host keeps, which BrainDog can open.',
+  passField: 'Passphrase',
+  passAgain: 'Type it again',
+  passAgainHint: 'The same passphrase, typed a second time, so a slip of the finger cannot lock you out.',
+  passDiffer: 'The two do not match yet.',
+  passForget: 'If you forget it, BrainDog cannot open your keys.',
+  showPass: 'Show passphrase',
+  hidePass: 'Hide passphrase',
+  turnOn: 'Put the passphrase on',
+  turningOn: 'Putting it on',
+  turnOff: 'Take the passphrase off',
+  turningOff: 'Taking it off',
+  lockedNow: 'The vault is behind your passphrase.',
+  unlockedNow: 'The passphrase is off. BrainDog opens your keys with the host key again.',
+  askTitle: (label: string) => `Open ${label}`,
+  askHint: 'The vault is behind a passphrase. Type it to open this key. It is sent with this one request and not kept.',
+  askGo: 'Open the key',
+  keyPassHint: 'The vault is behind a passphrase. Type it to seal this key. It is sent with this one request and not kept.',
 } as const;
 
 /* ── the approval ─────────────────────────────────────────────────────── */
@@ -402,3 +444,92 @@ export function reconnectOf(params: URLSearchParams, keys: readonly KeyRow[]): R
   const row = keys.find((k) => k.label.trim().toLowerCase() === label.toLowerCase());
   return row ? { mode: 'replace', row, then } : { mode: 'add', label, then };
 }
+
+/* ── the vault passphrase ─────────────────────────────────────────────── */
+
+/**
+ * An answer from the passphrase's two methods or the two key doors, with the part of a refusal read here: `at` says
+ * which field the record was talking about, so a missing passphrase is told apart from any other missing field.
+ */
+export type Told<T> =
+  | { ok: true; value: T }
+  | { ok: false; refusal: { code: string; fix: string; at?: string | undefined } }
+  | { ok: false; conflict: unknown };
+
+/** The two client methods the switch calls (`packages/client` `setVaultPassphrase`, `clearVaultPassphrase`). */
+export type Locker = {
+  setVaultPassphrase(passphrase: string): Promise<Told<unknown>>;
+  clearVaultPassphrase(passphrase: string): Promise<Told<unknown>>;
+};
+
+/**
+ * Whether the vault is behind a passphrase. `unknown` and `none` carry the record's sentence: `unknown` when the record
+ * would not say (a sign-in older than fifteen minutes, a colleague), `none` when there is nothing to put one on yet or
+ * this host cannot.
+ */
+export type Lock = { state: 'reading' | 'on' | 'off' } | { state: 'unknown' | 'none'; fix: string };
+
+/** The refusal every door gives a request that carried no passphrase while the vault is behind one. */
+export const wantsPassphrase = (out: Told<unknown>): boolean =>
+  !out.ok && 'refusal' in out && out.refusal.code === 'REQUIRED_MISSING' && out.refusal.at === 'passphrase';
+
+/** What a change answered the vault now is: the record's `{ on }`, read as a lock. */
+const lockFrom = (value: unknown): Lock => ({
+  state: typeof value === 'object' && value !== null && (value as { on?: unknown }).on === true ? 'on' : 'off',
+});
+
+/**
+ * Whether the vault is behind a passphrase, asked by taking it off with none.
+ *
+ * THE RECORD HAS NO READ THAT SAYS, and this is the one question whose answer says it and changes nothing either way
+ * (`kernel/src/api/vault-passphrase.ts`, `host/src/passphrase.ts`). A vault with no passphrase answers `ALREADY_KNOWN`
+ * before anything is compared. A vault behind one counts the try, then hears that no passphrase was carried, which is
+ * `REQUIRED_MISSING` and not a wrong one, so the try is handed back; `RATE_LIMITED` is only reached while one is on.
+ * `NOT_IN_THIS_BUILD` is a record with no key of its own yet, or a host that cannot, and it is said rather than hidden.
+ * Anything else, the vault gate above all, leaves the switch saying why it cannot tell.
+ */
+export async function lockOf(client: Pick<Locker, 'clearVaultPassphrase'>): Promise<Lock> {
+  const out = await client.clearVaultPassphrase('');
+  if (out.ok) return lockFrom(out.value);
+  if (!('refusal' in out)) return { state: 'unknown', fix: copy.writeRaced };
+  switch (out.refusal.code) {
+    case 'ALREADY_KNOWN':
+      return { state: 'off' };
+    case 'REQUIRED_MISSING':
+    case 'RATE_LIMITED':
+      return { state: 'on' };
+    case 'NOT_IN_THIS_BUILD':
+      return { state: 'none', fix: out.refusal.fix };
+    default:
+      return { state: 'unknown', fix: out.refusal.fix };
+  }
+}
+
+/**
+ * Put the passphrase on (`to: 'on'`) or take it off (`'off'`): the vault after, or the record's sentence and, where the
+ * refusal says what the vault is, that too.
+ *
+ * `ALREADY_KNOWN` IS THE VAULT ALREADY BEING WHERE IT WAS ASKED TO GO, changed from another tab since this one read it,
+ * so the switch moves to match and the sentence says why nothing was changed.
+ */
+export async function turnLock(
+  client: Locker,
+  to: 'on' | 'off',
+  passphrase: string,
+): Promise<{ ok: true; lock: Lock } | { ok: false; fix: string; lock: Lock | null }> {
+  const out = to === 'on' ? await client.setVaultPassphrase(passphrase) : await client.clearVaultPassphrase(passphrase);
+  if (out.ok) return { ok: true, lock: lockFrom(out.value) };
+  if (!('refusal' in out)) return { ok: false, fix: copy.writeRaced, lock: null };
+  const already: Lock | null = out.refusal.code === 'ALREADY_KNOWN' ? { state: to } : null;
+  return { ok: false, fix: out.refusal.fix, lock: already };
+}
+
+/** Both passphrases typed, and the same: the confirmation the Put it on button waits for. The record judges the rest. */
+export const confirmed = (first: string, again: string): boolean => first !== '' && first === again;
+
+/**
+ * The passphrase a key door's body carries, or nothing: sent only while the vault is behind one, so a vault without
+ * one is sent the body it always was.
+ */
+export const withPassphrase = (lock: Lock, passphrase: string): { passphrase?: string } =>
+  lock.state === 'on' && passphrase !== '' ? { passphrase } : {};

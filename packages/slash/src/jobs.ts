@@ -34,7 +34,7 @@ import type { CallStatus, Core } from './call.ts';
 import { anchorFault, checkSchema, isRecord, tokens } from './project.ts';
 import { fenced, fill, type PromptTemplate } from './prompts.ts';
 import { indexLines, nameIn, SLASH_CTX } from './propose.ts';
-import type { CallContext, Inference, InferenceReply, Proposal, RawPayload, ReadTrace, RecordApi } from './types.ts';
+import type { CallContext, Embedding, Inference, InferenceReply, Proposal, RawPayload, ReadTrace, RecordApi } from './types.ts';
 
 /** `12 §5`: the register that holds credentials is not one a derived pattern may write to. */
 const FORBIDDEN_REGISTERS = new Set(['grant']);
@@ -75,6 +75,7 @@ export const patterns = (
   proposePattern(samples: readonly RawPayload[], ctx: CallContext): Promise<Result<Proposal>>;
   draftPattern(samples: readonly RawPayload[]): Promise<Result<PatternDraft>>;
   digestProse(digest: unknown): Promise<Result<{ text: string }>>;
+  embedTexts(texts: readonly string[]): Promise<Result<Embedding>>;
 } => {
   /**
    * Everything up to the filing: the model's draft, checked, overwritten where it is not the model's to say, and wrapped
@@ -250,6 +251,7 @@ export const patterns = (
     },
 
     digestProse: (digest) => prose(core, fallback, digest),
+    embedTexts: (texts) => embedOf(core, fallback, texts),
   };
 };
 
@@ -502,4 +504,40 @@ async function prose(core: Core, fallback: Inference, digest: unknown): Promise<
   }
   account('ok', model, reply.usage);
   return ok({ text: said });
+}
+
+/**
+ * `infer.embed`'s one call: `fallback.embed`, over the same ledger `digestProse` writes to, as a `slash_call` row of
+ * kind `embed`. The model-jobs pass meters embeddings by counting these rows (`backgroundMeter` in
+ * `packages/host/src/model-jobs.ts`), so a call with no row here would spend a host's embedding allowance for free.
+ *
+ * MODEL `-` WHEN NEVER REACHED, as every other call this package makes settles a throw: `nameIn` reads a model off
+ * the throw where the host's adapter marked one, and `-` where nothing did, so `account` bills no neurons for a call
+ * that answered nobody (`call.ts`'s own reason for `model <> '-'`).
+ *
+ * `embed` ABSENT IS `NOT_IN_THIS_BUILD` AND NOT A THROW: a host built before this adapter method, or one with no
+ * embedding model behind it, refuses in words rather than crashing the pass that called it.
+ */
+async function embedOf(core: Core, fallback: Inference, texts: readonly string[]): Promise<Result<Embedding>> {
+  const s = core.settings();
+  const callId = core.mint();
+  const t0 = core.clock.now();
+  const account = (status: CallStatus, model: string, usage: { in: number; out: number }, code?: string): void =>
+    core.account({ id: callId, kind: 'embed', tier: s.tier, model, usage, ms: core.clock.now() - t0, status, code });
+
+  if (fallback.embed === undefined) {
+    account('error', '-', { in: 0, out: 0 }, 'NOT_IN_THIS_BUILD');
+    return no('NOT_IN_THIS_BUILD', 'This host has no embedding model wired in, so nothing was asked.');
+  }
+  try {
+    const embedded = await fallback.embed(texts);
+    account('ok', embedded.model, embedded.usage);
+    return ok(embedded);
+  } catch (e) {
+    const mark: Record<string, unknown> = isRecord(e) ? e : {};
+    const model = nameIn(e) ?? '-';
+    account('error', mark['reached'] === true ? model : '-', { in: 0, out: 0 }, 'UNREACHABLE');
+    const why = e instanceof Error ? e.message.replace(/[.\s]+$/u, '') : '';
+    return no('UNREACHABLE', `The model did not answer${why === '' ? '' : `: ${why}`}.`);
+  }
 }

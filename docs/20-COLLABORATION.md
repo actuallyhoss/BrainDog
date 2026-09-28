@@ -270,7 +270,7 @@ Six rules, each earned:
    "accept all".
 4. **The reason field is required and it is the *first* thing focused** after a choice, not a
    modal afterthought. Its placeholder is a question — *"Because…"* — because an empty box invites
-   "ok".
+   "ok". A light question a rule or Slash opened is the exception, and takes one press (below).
 5. **Three verbs, and the third is not "ignore".** Decide · **Defer with a date and a reason** ·
    Dismiss. A deferred question wakes on its date **with the reason shown first**.
 6. **A decision is immutable.** Superseding writes a new row pointing at the old one. There is no
@@ -302,6 +302,20 @@ The failure mode is a required field filled with "ok". Three cheap countermeasur
   a nudge, never a block. A validator that refuses short reasons produces "okokokokokok".
 - **The reason is what renders**, everywhere the decision is cited. When it is the visible artefact
   rather than an audit field, it gets written properly.
+
+### A light question takes one press
+
+The one place the reason is not asked. A question **a rule or Slash opened** whose band is **`call`**
+(a judgement with nothing attached, so answering it changes no row, declaration, access or money)
+is answered by pressing the option, and nothing more. Those two open many small questions on their
+own, and asking a sentence for each one is how a required field fills with "ok". Pressing the other
+button tomorrow undoes it, which is what makes it light.
+
+Both facts are the record's, never the proposer's: the band is computed from the body, and the
+opener is the row's own signer. A question a person or an agent opened still asks why, and so does
+every question in any other band. The decision still carries a sentence, because the reason is what
+renders: the chosen option's own *because*, marked as the option's and not the decider's, or a plain
+line saying it was answered in one press (`govern.ts` `oneAnswer`). A reason typed anyway is kept.
 
 ### Deferral beats quarantine, and this is why
 

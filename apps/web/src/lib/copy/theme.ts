@@ -144,5 +144,6 @@ export const theme = {
   lookSampleNote: 'A note on the page reads like this, in second text on the panel.',
   lookSampleQuiet: 'Added 3d ago by you',
   lookSampleFaint: 'Faint text is kept for large type',
-  lookSampleFigure: 'Owed to you',
+  /* THE WORDS MONEY GIVES A DIRECTION, `owed_to_me` said as "Money in", and not the "Owed to you" MOD-24 retires. */
+  lookSampleFigure: 'Money in',
 };

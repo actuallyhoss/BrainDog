@@ -224,6 +224,8 @@ const CASES = [
   /* ONE FALSE COUNT BESIDE TRUE ONES AND A QUALIFIED ONE (`Three CSS gates`), so a total of one proves the gate reads the
      code's tables rather than refusing every number, and leaves a count of some of a list alone. */
   { gate: 'docs-counts', expect: /and the code holds/, findings: 1, total: 1 },
+  /* A SECOND PLACE THAT WRITES A POINT, CARRYING A REGISTER'S NAME, beside a correct one. Check 1 names both calls and check 3 names the seed for `register`, so the seed is named twice and the total is three. The seed's tuple is well formed, which proves the gate reads what goes into a tuple and not only its labels. */
+  { gate: 'telemetry-allowlist', expect: /carries register/, findings: 2, total: 3 },
   /* THE SHELL CHECK, WHICH READS EVERY `apps/*\/src/app.html` IN THE WORKSPACE. It is in `bundle`
      because that gate already reads a built shell, and until now it read only the built one, only
      for `apps/web`, and only when there was a build. The source form needs neither, and it reaches

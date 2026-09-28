@@ -13,6 +13,8 @@
  *
  * A FIGURE'S TARGET IS THE USE CASE'S TOO, so a person's Money does not hold them to a studio's sums (`MODULE_TARGETS`).
  *
+ * AND SO ARE A MODULE'S WORDS, so a student's Work says Homework and nobody but a business is owed money (`MODULE_NAMES`).
+ *
  * HOME IS A PAGE THE USE CASE DECLARES, called `home-<use case>`, with no place on the rail. The display draws
  * it on Home in place of the house figures (`homePageOf`).
  */
@@ -20,12 +22,14 @@
 import { AGENTS_PACK, agentsPackDocument } from '../packs/agents.ts';
 import { FIRST_PARTY, firstPartyDocument, firstPartyManifest, type FirstPartyId } from '../packs/first-party.ts';
 import { dated, dayOf } from './dates.ts';
-import { BUSINESS_EXAMPLES } from './business.ts';
-import { FOUNDER_EXAMPLES } from './founder.ts';
+import { BUSINESS_EXAMPLES, BUSINESS_NAMES } from './business.ts';
+import { FOUNDER_EXAMPLES, FOUNDER_NAMES } from './founder.ts';
+import { GUIDE_NAMES } from './guide.ts';
 import { formGuide, GUIDE_KINDS, type FormedPlan } from './guide-kinds.ts';
 import type { ExampleLink } from './links.ts';
 import { PERSONAL_NAMES, PERSONAL_TARGETS } from './personal.ts';
-import { TEAM_EXAMPLES } from './team.ts';
+import { STUDENT_NAMES } from './student.ts';
+import { TEAM_EXAMPLES, TEAM_NAMES } from './team.ts';
 import { useCaseDocument, type UseCase } from './index.ts';
 
 type Body = Record<string, unknown>;
@@ -44,8 +48,103 @@ const MODULE_EXAMPLES: Readonly<Record<string, readonly Body[]>> = { business: B
  */
 const MODULE_TARGETS: Readonly<Record<string, Readonly<Record<string, unknown>>>> = { personal: PERSONAL_TARGETS };
 
-/** What each use case calls the modules' figures, by metric: the words a tile and the forecast's late knob say. */
-const MODULE_NAMES: Readonly<Record<string, Readonly<Record<string, string>>>> = { personal: PERSONAL_NAMES };
+/** One use case's words for the modules: by module id, then by the module's own words or a figure's metric id. */
+type ModuleWords = Readonly<Record<string, Readonly<Record<string, string>>>>;
+
+/**
+ * THE PLAIN WORDS, which every use case but a business's starts from (`loop/finish/modules.md` MOD-23). Money and a
+ * project's page speak a business's money as they ship: "Owed to you", "Late to you", "Most owed by you". Nobody but
+ * a founder or a small business is owed money by a client on an invoice, so a person, a student, a team or somebody
+ * starting a project reads what is due to them and what they have to pay.
+ */
+const PLAIN_NAMES: ModuleWords = {
+  'money-core': {
+    'Owed to you, 30 days': 'Due to you, 30 days',
+    'Owed by you, 30 days': 'To pay, 30 days',
+    'Owed to you': 'Due to you',
+    'Owed by you': 'Still to pay',
+    'Late to you': 'Late coming in',
+    'Money you are owed has gone past its date: {{late-in}} in all.': 'Money due to you has gone past its date: {{late-in}} in all.',
+    'Most owed by you in 30 days': 'Most to pay in 30 days',
+    'Most owed to you at once': 'Most due to you at once',
+    'Most owed by you at once': 'Most to pay at once',
+  },
+  portfolio: {
+    'Owed to you': 'Due to you',
+    'Nothing owed either way on {{name}}.': 'No money is due either way on {{name}}.',
+  },
+};
+
+/** A use case's own words laid over the plain words, module by module. */
+const over = (plain: ModuleWords, own: ModuleWords): ModuleWords =>
+  Object.fromEntries([...new Set([...Object.keys(plain), ...Object.keys(own)])].map((m) => [m, { ...plain[m], ...own[m] }]));
+
+/**
+ * WHAT EACH USE CASE CALLS WHAT THE MODULES SAY, by module. A key is a figure's metric id, which names the figure (the
+ * words a tile and the forecast's late knob say), or a sentence the module says, which is replaced whole wherever that
+ * module says it: a page's title and its place on the rail, a block's heading, empty line or note, a tile's or a
+ * series' label, a rule's question and a setting's label (`spoken`). A sentence is matched whole, so a module that
+ * rewords one is read in its own new words rather than half in each. A rule's answers are never relabelled, because
+ * what an answer starts is found by its words (`MONEY_AUTOMATIONS` in `modules/money.ts`).
+ *
+ * A USE CASE NOT LISTED SPEAKS THE PLAIN WORDS, and with no use case at all a module is its own document
+ * (`firstPartyDocument`), since that is what an install with none writes.
+ */
+const MODULE_NAMES: Readonly<Record<string, ModuleWords>> = {
+  personal: over(PLAIN_NAMES, PERSONAL_NAMES),
+  student: over(PLAIN_NAMES, STUDENT_NAMES),
+  team: over(PLAIN_NAMES, TEAM_NAMES),
+  guide: over(PLAIN_NAMES, GUIDE_NAMES),
+  founder: FOUNDER_NAMES,
+  business: BUSINESS_NAMES,
+};
+
+/** What a use case calls what one module says. */
+const wordsFor = (u: UseCase, id: string): Readonly<Record<string, string>> => (MODULE_NAMES[u.usecase] ?? PLAIN_NAMES)[id] ?? {};
+
+const isBody = (v: unknown): v is Body => typeof v === 'object' && v !== null && !Array.isArray(v);
+
+/** A value as the use case says it: a sentence it has a word for, else the value as the module wrote it. */
+const say = (words: Readonly<Record<string, string>>, v: unknown): unknown => (typeof v === 'string' && Object.hasOwn(words, v) ? words[v] : v);
+
+/** A block in the use case's words: its heading, empty line and note, and each tile's and series' label. */
+function spokenBlock(b: Body, words: Readonly<Record<string, string>>): Body {
+  const out: Body = { ...b };
+  for (const k of ['heading', 'empty', 'body'] as const) if (k in b) out[k] = say(words, b[k]);
+  for (const k of ['cells', 'series'] as const)
+    if (Array.isArray(b[k])) out[k] = (b[k] as unknown[]).map((c) => (isBody(c) && 'label' in c ? { ...c, label: say(words, c.label) } : c));
+  return out;
+}
+
+/**
+ * A module's document in the use case's words: each figure's name, each page's title, section and blocks, each rule's
+ * question, and each setting's label. Nothing else moves, so a figure, a page or a rule is the same declaration by id.
+ */
+function spoken(doc: Body, words: Readonly<Record<string, string>>): Body {
+  if (Object.keys(words).length === 0) return doc;
+  const out: Body = { ...doc };
+  if (Array.isArray(doc.declarations))
+    out.declarations = (doc.declarations as Body[]).map((d) => {
+      const s: Body = { ...d };
+      if (typeof d.metric === 'string') {
+        const name = Object.hasOwn(words, d.metric) ? words[d.metric] : say(words, d.name);
+        if (name !== undefined) s.name = name;
+      }
+      if (typeof d.page === 'string') {
+        if ('title' in d) s.title = say(words, d.title);
+        if (isBody(d.nav) && 'section' in d.nav) s.nav = { ...d.nav, section: say(words, d.nav.section) };
+        if (Array.isArray(d.blocks)) s.blocks = (d.blocks as unknown[]).map((b) => (isBody(b) ? spokenBlock(b, words) : b));
+      }
+      if (typeof d.rule === 'string' && Array.isArray(d.then))
+        s.then = (d.then as unknown[]).map((step) =>
+          isBody(step) && isBody(step.suggest) && 'question' in step.suggest ? { ...step, suggest: { ...step.suggest, question: say(words, step.suggest.question) } } : step,
+        );
+      return s;
+    });
+  if (isBody(doc.config))
+    out.config = Object.fromEntries(Object.entries(doc.config).map(([k, v]) => [k, isBody(v) && 'label' in v ? { ...v, label: say(words, v.label) } : v]));
+  return out;
+}
 
 /** The page a use case's Home is, by the id of the pack it carries or the use case's own id. */
 export const homePageOf = (id: string): string => `home-${id.replace(/^usecase-/u, '')}`;
@@ -85,7 +184,6 @@ export function moduleDocument(u: UseCase | null, id: string, options: ModuleOpt
   const doc = firstPartyDocument(id, { ...(options.holds === undefined ? {} : { holds: options.holds }), ...(seeds === undefined ? {} : { seeds }) });
   if (!doc) return null;
   const targets = u === null ? {} : (MODULE_TARGETS[u.usecase] ?? {});
-  const names = u === null ? {} : (MODULE_NAMES[u.usecase] ?? {});
   const config = (doc.config ?? {}) as Record<string, Body>;
   if (Array.isArray(doc.declarations))
     doc.declarations = (doc.declarations as Body[]).map((d) => {
@@ -108,10 +206,10 @@ export function moduleDocument(u: UseCase | null, id: string, options: ModuleOpt
       return {
         ...d,
         ...(target === undefined || empty ? {} : { target: { ...target, ...(held ? { setting } : {}) } }),
-        ...(names[d.metric] === undefined ? {} : { name: names[d.metric] }),
       };
     });
-  const out = dated(doc, options.today);
+  /* THE USE CASE'S WORDS LAST, over the targets, so a setting's label is said in them once its default is set. */
+  const out = dated(u === null ? doc : spoken(doc, wordsFor(u, id)), options.today);
   if (Array.isArray(out.seeds) && out.seeds.length === 0) delete out.seeds;
   return out;
 }
@@ -226,13 +324,15 @@ const formedSeeds = (seeds: readonly Body[]): Body[] =>
 export const moduleExamples = (u: UseCase): readonly Body[] => MODULE_EXAMPLES[u.usecase] ?? [];
 
 /**
- * Whether a use case gives a module words or targets of its own: a figure the module declares that the use case names or
- * holds to its own sum. A module installed before the use case keeps the words it went in with, and this is what says the
- * use case has something to offer it (`/packs`, the plan's "Update for").
+ * Whether a use case gives a module words or targets of its own: a figure the module declares that the use case holds to
+ * its own sum, or anything the module says that the use case says otherwise (`spoken`). A module installed before the use
+ * case keeps the words it went in with, and this is what says the use case has something to offer it (`/packs`, the
+ * plan's "Update for").
  */
 export function relabels(u: UseCase, id: string): boolean {
-  const own = new Set([...Object.keys(MODULE_NAMES[u.usecase] ?? {}), ...Object.keys(MODULE_TARGETS[u.usecase] ?? {})]);
-  if (own.size === 0) return false;
   const doc = firstPartyDocument(id);
-  return ((doc?.declarations ?? []) as Body[]).some((d) => typeof d.metric === 'string' && own.has(d.metric));
+  if (!doc) return false;
+  const targets = MODULE_TARGETS[u.usecase] ?? {};
+  if (((doc.declarations ?? []) as Body[]).some((d) => typeof d.metric === 'string' && Object.hasOwn(targets, d.metric))) return true;
+  return JSON.stringify(spoken(doc, wordsFor(u, id))) !== JSON.stringify(doc);
 }

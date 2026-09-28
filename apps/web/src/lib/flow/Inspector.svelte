@@ -53,6 +53,8 @@
     CONDITION_HINT,
     DAYS,
     LATE_SPANS,
+    SLASH_SHAPES,
+    SLASH_SHAPE_WORDS,
     TRIGGER_KINDS,
     VERB_LABELS,
     answerFields,
@@ -67,14 +69,20 @@
     pairsText,
     sayTrigger,
     setAt,
+    slashAbout,
+    slashSendable,
+    slashShape,
     spanWords,
+    toggleSlashAbout,
     triggerChips,
     triggerKind,
     varsBefore,
     verbOf,
+    withSlashShape,
     words,
     type Arg,
     type CondField,
+    type SlashShape,
     type Trigger,
     type TriggerKind,
   } from './flow.ts';
@@ -295,6 +303,30 @@
     const out: Record<string, string> = {};
     for (const [k = '', v = ''] of rows) out[k] = v;
     flow.setStep(found.node.key, setAt(found.node.step, a.path, out));
+  }
+
+  /* ── what Slash answers, and what goes with the question (AGT-25) ─────── */
+
+  /* THE ARGUMENTS THAT MEAN SOMETHING NOW. `choices` is drawn only while the answer is a choice (`Arg.when`), so a
+     person switching to "A number" is not left holding a list the lint would refuse. */
+  const args = $derived(found && verb ? ARGS[verb].filter((a) => !a.when || a.when(found.node.step)) : []);
+
+  const shape = $derived<SlashShape>(found ? slashShape(found.node.step) : 'text');
+  function setShape(s: SlashShape) {
+    if (found && s !== shape) flow.setStep(found.node.key, withSlashShape(found.node.step, s));
+  }
+
+  /* THE FIELDS OFFERED ARE THE LIST'S OWN, less what never leaves the record; the sample's come as ids alone, so all of
+     them are offered and the lint refuses a sealed one on Decide. A field already sent that the list no longer offers
+     stays, so it can be taken out rather than kept unseen. */
+  const about = $derived(found ? slashAbout(found.node.step) : []);
+  const aboutOptions = $derived.by(() => {
+    const offered = typedFields.length > 0 ? slashSendable(typedFields) : rowFields;
+    return [...offered, ...about.filter((f) => !offered.includes(f))];
+  });
+  const fieldWord = (id: string) => typedFields.find((f) => f.id === id)?.label ?? idWords(id);
+  function toggleAbout(field: string) {
+    if (found) flow.setStep(found.node.key, toggleSlashAbout(found.node.step, field));
   }
 
   /* ── a condition ──────────────────────────────────────────────────────── */
@@ -574,8 +606,30 @@
     </div>
   {:else if found && verb}
     <div class="form">
-      {#each ARGS[verb] as a (pathKey(a))}
-        {#if a.kind === 'condition'}
+      {#each args as a (pathKey(a))}
+        {#if a.kind === 'shape'}
+          <p class="label" id="{idOf(a)}-label">{a.label}</p>
+          <div class="segmented fill" id={idOf(a)} role="group" aria-labelledby="{idOf(a)}-label">
+            {#each SLASH_SHAPES as s (s)}
+              <button type="button" class="segment" aria-pressed={shape === s} data-on={shape === s ? '' : undefined} onclick={() => setShape(s)}>{SLASH_SHAPE_WORDS[s]}</button>
+            {/each}
+          </div>
+        {:else if a.kind === 'fields'}
+          <!-- PICKED, AS THE LIST'S FIELDS ARE PICKED EVERYWHERE ELSE ON THIS SHEET: `about:` holds field ids, which
+               nobody should have to type, and each is pressed in or out as a list's changes are. -->
+          <p class="label" id="{idOf(a)}-label">{a.label}</p>
+          {#if aboutOptions.length > 0}
+            <div class="segmented" id={idOf(a)} role="group" aria-labelledby="{idOf(a)}-label">
+              {#each aboutOptions as f (f)}
+                {@const on = about.includes(f)}
+                <button type="button" class="segment" aria-pressed={on} data-on={on ? '' : undefined} onclick={() => toggleAbout(f)}>{fieldWord(f)}</button>
+              {/each}
+            </div>
+            <p class="help">{words.inspect.aboutHelp}</p>
+          {:else}
+            <p class="help">{words.inspect.aboutNone}</p>
+          {/if}
+        {:else if a.kind === 'condition'}
           <p class="label" id="{idOf(a)}-label">{a.label}</p>
           <Condition
             id={idOf(a)}
@@ -782,6 +836,12 @@
   @media (width < 640px) {
     .pair {
       grid-template-columns: minmax(0, 1fr);
+    }
+
+    /* EACH CONTROL THE SHEET'S WIDTH ON A PHONE (AGT-25): the answer's shapes share the row equally, so a thumb has an
+       even part of it each rather than pills huddled at the start. */
+    .fill .segment {
+      flex: 1 1 0;
     }
   }
 </style>

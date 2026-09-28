@@ -28,7 +28,7 @@ export const words = {
   nothingFound: 'Nothing matches that search',
   nothingFoundBody: 'Try fewer words, or pick All.',
   results: (n: number): string => (n === 1 ? '1 result' : `${n} results`),
-  installs: (n: number): string => `${n}+ installs`,
+  installs: (n: number): string => `On ${n}+ BrainDogs`,
   by: (name: string): string => `By ${name}`,
   verified: 'Verified',
   reviewed: 'Reviewed by BrainDog',
@@ -66,7 +66,6 @@ export const words = {
   },
   calls: 'What it calls out to',
   versions: 'Versions',
-  requires: 'Needs',
   requiresNothing: 'Nothing else',
   licence: 'Licence',
   pages: 'Its pages',
@@ -83,4 +82,14 @@ export const words = {
   openDecide: 'Open it on Decide',
   missing: 'Nothing here by that name',
   missingBody: 'It may have been taken back, or the link is wrong.',
+  /* A CARD'S ONE CUE. The whole card opens the detail page, where the plan is read before anything installs, so the cue
+     names the press that page offers and never claims the install itself. */
+  installCue: 'Install',
+  /* THE DETAIL PAGE'S FACTS: what version this is, under what licence, and who signed it, said once below the fold. */
+  details: 'Details',
+  version: 'Version',
+  signature: 'Signature',
+  /* AN INSTALLED ADD-ON ON /packs AND ITS OWN PAGE (design.md §4, the add-ons row): one row, its switch, one "…". */
+  more: (name: string): string => `More for ${name}`,
+  versionOf: (version: string): string => `Version ${version}`,
 } as const;

@@ -419,7 +419,7 @@ export default async function keys(root = join(import.meta.dirname, '..', '..'))
         continue;
       }
 
-      const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+      const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce', bypassCSP: true });
       const page = await context.newPage();
       /* THE GATE'S OWN PROOF THAT IT LOOKS AT ANYTHING. `BRAINDOG_GATE_SEED=keys` swallows every `y` in
          the capture phase before any handler sees it, which is exactly what a binding that was never

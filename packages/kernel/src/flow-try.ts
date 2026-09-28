@@ -48,7 +48,7 @@ export type Tried = { trigger: Omit<RunTrigger, 'chain'>; steps: TriedStep[] };
  * `suggest` IS NOT ONE, though it too puts a question on the queue. It is a write of the record's own, with no run
  * waiting on it and nothing sent, and a try that called it `would` would say a create was different in kind.
  */
-const REACHES_OUT = new Set(['call', 'script', 'ask_person', 'ask_slash', 'notify', 'run']);
+const REACHES_OUT = new Set(['call', 'script', 'ask_person', 'ask_slash', 'notify', 'run', 'run_job']);
 
 /**
  * What an answer read from a variable set from a secret or file field says in its place.
@@ -288,6 +288,8 @@ function wouldSay(op: Op): string {
       return 'A live run would ask Slash here and wait up to a day for the answer. Nothing was asked, and the try stops here.';
     case 'notify':
       return 'A live run would send this notice here. Nothing was sent.';
+    case 'run_job':
+      return `A live run would start ${text('kind') ?? 'a job'} on the owner's machine here and wait up to a day for it to end. Nothing was started, and the try stops here.`;
     default:
       return `A live run would take this ${op.verb} step here. Nothing was started.`;
   }

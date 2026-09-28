@@ -142,6 +142,9 @@
   let composing = $state(false);
   let draft = $state('');
   let draftHealth = $state(String(healthField?.values?.[0] ?? ''));
+
+  /* THE WORD BESIDE A WORKING RUN'S DOT (DSN-18), so the dot's colour is never the only sign. */
+  const trackWords = { working: 'Working now' };
   let posting = $state(false);
   let writer: RowWriter | null = null;
 
@@ -231,7 +234,9 @@
     {#snippet actions()}
       <!-- The health, and it is a CLAIM SOMEBODY MADE rather than a computed status: the chip says
            what the newest update said, and the thread below it says who said so and when. -->
-      <Chip label={healthLabel(health, REGISTERS.updates)} tone={healthTone(health.health)} />
+      <!-- AND ONLY ONCE SOMEBODY HAS SAID ONE (DSN-18). With no update the chip read "Update missing" beside the primary,
+           a capsule standing for a value nobody gave; the thread below says there is none yet, once. -->
+      {#if health.health}<Chip label={healthLabel(health, REGISTERS.updates)} tone={healthTone(health.health)} />{/if}
       <Button weight="primary" onclick={startPost}>
         <Icon name="plus" size="s" />
         {copy.postUpdate}
@@ -249,11 +254,15 @@
         <form class="composer" onsubmit={post}>
           <label class="c-label" for="update-body">{bodyField ? labelOf(bodyField) : ''}</label>
           <textarea id="update-body" class="c-area" rows="4" dir="auto" bind:value={draft}></textarea>
+          <!-- THE HEALTH AS PILLS, NOT THE BROWSER'S MENU (DSN-18, design brief §11.10): the choices are few and
+               declared, so every one is on screen and the chosen one is `[data-on]`, as every segmented control is. -->
+          <p class="c-label" id="update-health">{healthField ? labelOf(healthField) : ''}</p>
+          <div class="segmented" role="group" aria-labelledby="update-health">
+            {#each healthChoices(REGISTERS.updates) as [v, said] (v)}
+              <button type="button" class="segment" aria-pressed={draftHealth === v} data-on={draftHealth === v ? '' : undefined} onclick={() => (draftHealth = v)}>{said}</button>
+            {/each}
+          </div>
           <div class="c-line">
-            <label class="c-label" for="update-health">{healthField ? labelOf(healthField) : ''}</label>
-            <select id="update-health" class="c-input" bind:value={draftHealth}>
-              {#each healthChoices(REGISTERS.updates) as [v, said]}<option value={v}>{said}</option>{/each}
-            </select>
             <Button type="submit" weight="primary" disabled={posting || draft.trim() === ''}>
               {posting ? copy.writeMarkSaving : copy.post}
             </Button>
@@ -310,7 +319,8 @@
                 <span class="dot" data-live={workingAt(s, clock)}></span>
                 <span class="row-main">
                   <span class="row-title" dir="auto">{s.fields.doing}</span>
-                  <span class="row-sub">{s.fields.agent} · {since(String(s.fields.last_seen), clock)}</span>
+                  <!-- THE DOT'S WORD BESIDE IT: a dot never stands alone (design brief §5, Status). -->
+                  <span class="row-sub">{workingAt(s, clock) ? `${trackWords.working} · ` : ''}{s.fields.agent} · {since(String(s.fields.last_seen), clock)}</span>
                 </span>
               </a>
             </li>
@@ -383,7 +393,7 @@
   }
 
   .update + .update {
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--line-soft);
   }
 
   .u-head {
@@ -435,21 +445,26 @@
   }
 
   .rows li + li {
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--line-soft);
   }
 
+  /* A ROW AT THE HEIGHT OF A TWO-LINE ROW, the whole of it the target, and a wash only under a mouse. */
   .row {
     display: flex;
     align-items: center;
     gap: var(--sp-3);
-    padding: var(--sp-3);
+    min-block-size: var(--row-h-2);
+    padding: var(--sp-2) var(--sp-3);
+    border-radius: var(--r-md);
     color: var(--ink);
     text-decoration: none;
     transition: background var(--d-state) var(--ease-out);
   }
 
-  .row:hover {
-    background: var(--hover-wash);
+  @media (hover: hover) and (pointer: fine) {
+    .row:hover {
+      background: var(--hover-wash);
+    }
   }
 
   .row-main {
@@ -460,7 +475,8 @@
   }
 
   .row-title {
-    font-size: var(--t-sm);
+    font-size: var(--t-base);
+    font-weight: 500;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -468,16 +484,16 @@
 
   .row-sub {
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
   }
 
   /* A run working now is the only one that gets the accent. An idle run is not news and a finished
      one is history; painting all of them would make the colour mean "a run" rather than "working now". */
   .dot {
-    inline-size: 7px;
-    block-size: 7px;
+    inline-size: var(--dot);
+    block-size: var(--dot);
     flex: none;
-    border-radius: 999px;
+    border-radius: var(--r-pill);
     background: var(--edge);
   }
 
@@ -488,7 +504,7 @@
   .quiet {
     margin-block-end: var(--sp-4);
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
   }
 
   /* Unboxed, like the updates under it: a hairline between the box and the thread rather than a
@@ -498,7 +514,7 @@
     flex-direction: column;
     gap: var(--sp-3);
     padding-block: var(--sp-4);
-    border-block-end: 1px solid var(--line);
+    border-block-end: 1px solid var(--line-soft);
   }
 
   .c-label {
@@ -507,6 +523,8 @@
     font-weight: 600;
   }
 
+  /* 16PX IN THE FIELD AT EVERY WIDTH, so a phone does not zoom into it, and it scrolls clear of the keyboard with the
+     health and Post under it still in view. */
   .c-area {
     inline-size: 100%;
     padding: var(--sp-3);
@@ -515,9 +533,10 @@
     border-radius: var(--r-md);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-ui);
+    font-size: var(--t-md);
     line-height: var(--lh-body);
     resize: vertical;
+    scroll-margin-block: calc(var(--sticky) + var(--sp-4)) var(--sp-9);
   }
 
   .c-line {
@@ -525,16 +544,5 @@
     flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-3);
-  }
-
-  .c-input {
-    min-block-size: var(--ctl-h);
-    padding: 0 var(--sp-3);
-    background: var(--s3);
-    border: 1px solid var(--line);
-    border-radius: var(--r-md);
-    color: var(--ink);
-    font: inherit;
-    font-size: var(--t-ui);
   }
 </style>

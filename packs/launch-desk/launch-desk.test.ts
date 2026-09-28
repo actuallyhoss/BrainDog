@@ -9,6 +9,10 @@
  * kernel half: the file installs through the record's own door, and every block of every page answers with no refusal.
  * The drawing is the app's (wave three), and is not asserted here.
  *
+ * 2.0 WEARS THE PAGE WORDS WAVE THREE ADDED: each part's card carries its own colour and picture (`hue`, `picture`), a
+ * part's path opens on its essential steps (`short`), and the Desk puts the open steps on a `calendar` by the day each
+ * is due. Each is asserted as the kernel answers it; how a phone draws it is the app's.
+ *
  * IT REQUIRES THE PAD (`packs/pad`) FOR ITS NOTES, rather than declaring a notes list of its own, so a record that
  * already keeps a pad keeps one pad. A pack cannot lay blocks on another pack's page, so the desk's rail copies the
  * pad's three blocks, which `packs/pad` holds to standing on their own for exactly this.
@@ -60,6 +64,8 @@ type Block = {
   rings?: (number | null)[];
   nexts?: (string | null)[];
   done_now?: boolean[];
+  short_now?: boolean[];
+  window?: { from: string; to: string; today: string };
   next?: number | null;
   types?: Record<string, string>;
   queue?: { question: string; about?: string; options: { label: string; shows?: unknown }[] }[];
@@ -130,19 +136,21 @@ async function settle(api: Api): Promise<void> {
 /**
  * Four parts of an invented launch, with steps of each priority under them, a question waiting on one part, a helper,
  * a lesson and two budget lines. The box is the part marked big, and is written second so the lead card is chosen by
- * the flag and not by the order the rows went in.
+ * the flag and not by the order the rows went in. Two parts wear a colour and two do not. Most open steps have a day
+ * they are due, one of them past the calendar's last month, and one done step has a day too, so the calendar is seen
+ * to leave both out.
  */
 async function launch(api: Api): Promise<{ candle: Row; box: Row; shop: Row }> {
-  const candle = make(api, 'parts', { name: 'The candle', what: 'The wax, the wick and the scent, settled before anything is printed.' });
-  const box = make(api, 'parts', { name: 'The box', what: 'What each candle ships in, and the card inside it.', big: true });
+  const candle = make(api, 'parts', { name: 'The candle', what: 'The wax, the wick and the scent, settled before anything is printed.', hue: 30 });
+  const box = make(api, 'parts', { name: 'The box', what: 'What each candle ships in, and the card inside it.', big: true, hue: 200 });
   const shop = make(api, 'parts', { name: 'The shop page', what: 'Where people read about it and buy it.' });
   make(api, 'parts', { name: 'Word of it', what: 'How people hear about it before the day.' });
-  make(api, 'steps', { what: 'Pick the wax', part: candle.id, priority: 'essential', done: true, rank: 1 });
-  make(api, 'steps', { what: 'Test the burn time', part: candle.id, priority: 'essential', done: false, rank: 2 });
-  make(api, 'steps', { what: 'Try a second scent', part: candle.id, priority: 'nice', done: false, rank: 3 });
+  make(api, 'steps', { what: 'Pick the wax', part: candle.id, priority: 'essential', done: true, rank: 1, due: '2026-09-10' });
+  make(api, 'steps', { what: 'Test the burn time', part: candle.id, priority: 'essential', done: false, rank: 2, due: '2026-10-02' });
+  make(api, 'steps', { what: 'Try a second scent', part: candle.id, priority: 'nice', done: false, rank: 3, due: '2027-01-15' });
   make(api, 'steps', { what: 'Ask for a box quote', part: box.id, priority: 'essential', done: true, rank: 1 });
-  make(api, 'steps', { what: 'Order a printed sample', part: box.id, priority: 'essential', done: false, rank: 2 });
-  make(api, 'steps', { what: 'Write the card', part: box.id, priority: 'should', done: false, rank: 3 });
+  make(api, 'steps', { what: 'Order a printed sample', part: box.id, priority: 'essential', done: false, rank: 2, due: '2026-09-30' });
+  make(api, 'steps', { what: 'Write the card', part: box.id, priority: 'should', done: false, rank: 3, due: '2026-10-20' });
   make(api, 'steps', { what: 'Take the photographs', part: shop.id, priority: 'should', done: true, rank: 1 });
   make(api, 'contacts', { name: 'The box printer', what: 'Quotes and samples', part: box.id, status: 'asked' });
   make(api, 'lessons', { lesson: 'Samples take a week', body: 'Order the printed sample before the card is final.', part: box.id });
@@ -275,6 +283,31 @@ test('THE PARTS AS CARDS: the big part first, each with its ring and its next op
      last part, whose card says so with no ring rather than an empty one. */
   assert.deepEqual(cards.rings, [33, 33, 100, null]);
   assert.deepEqual(cards.nexts, ['Order a printed sample', 'Test the burn time', null, null]);
+  /* EACH PART IN ITS OWN COLOUR, carried on the row as the number it was typed as, and a part with none carries none,
+     which the drawer leaves as the plain mark. The picture is read the same way, from the file the part holds. */
+  assert.deepEqual(cards.rows.map((r) => r.fields.hue ?? null), [200, 30, null, null]);
+  assert.deepEqual(cards.rows.map((r) => r.fields.picture ?? null), [null, null, null, null]);
+  sql.close();
+});
+
+test('THE CALENDAR PUTS EACH OPEN STEP ON THE DAY IT IS DUE, this month and the next two, earliest first', async () => {
+  const { api, sql } = await desked();
+  await launch(api);
+  const page = await pageOf(api, 'desk');
+  clean(page, 'desk');
+  const calendar = page.blocks.find((b) => b.kind === 'calendar')!;
+  assert.equal(calendar.area, undefined, 'the calendar is in the main column, not the rail that holds the pad');
+  assert.deepEqual(calendar.window, { from: '2026-09-01', to: '2026-11-30', today: '2026-09-25' });
+  /* THE DONE STEP WITH A DAY, THE STEP PAST NOVEMBER AND THE STEP WITH NO DAY ARE ALL LEFT OFF. */
+  assert.deepEqual(
+    calendar.rows.map((r) => [r.fields.what, r.fields.due]),
+    [
+      ['Order a printed sample', '2026-09-30'],
+      ['Test the burn time', '2026-10-02'],
+      ['Write the card', '2026-10-20'],
+    ],
+  );
+  assert.equal(calendar.matched, 3);
   sql.close();
 });
 
@@ -325,6 +358,10 @@ test('A PART\'S PAGE ANSWERS EVERY BLOCK: its path, its calls, its pad and its h
   assert.deepEqual(path.done_now, [false, false]);
   assert.equal(path.next, 0);
   assert.equal(path.matched, 3, 'the short view lost count of the done step it leaves out');
+  /* THE ESSENTIALS VIEW IS SAID ROW BY ROW beside every open step, so the switch between it and everything is the
+     drawer's alone and asks the record nothing: the sample is essential, and writing the card is only a should. */
+  assert.deepEqual((page.blocks.find((b) => b.kind === 'steps') as Decl).short, { where: 'priority is essential', label: 'Essentials' });
+  assert.deepEqual(path.short_now, [true, false]);
   const ring = page.blocks.find((b) => b.kind === 'cards')!;
   assert.deepEqual(ring.rings, [33]);
   const calls = page.blocks.find((b) => b.kind === 'queue')!;
@@ -516,6 +553,29 @@ test('A RECORD ON 1.0.1 TAKES THIS VERSION, and a check it already filled says s
   assert.deepEqual(verdict(await pageOf(api, 'numbers')), [UNJUDGED]);
   assert.deepEqual(verdict(await typeIn(api, { price: 25 })), [UNJUDGED]);
   assert.deepEqual(verdict(await typeIn(api, { making: 5 })), [PASSES]);
+  sql.close();
+});
+
+test('A RECORD ON 1.1.0 TAKES 2.0.0 WITH ITS PARTS AND STEPS KEPT, and a colour and a due day typed after it are drawn', async () => {
+  /* The published 1.1.0, as the catalogue serves it, holding a part and a step typed before a part had a colour or a
+     step a day. The new fields are added beside the rows, so nothing a person typed is asked about or lost. */
+  const { api, sql } = await record();
+  said(await put(api, PAD()));
+  said(await put(api, JSON.parse(readFileSync(new URL('../../apps/web/static/catalogue/packs/launch-desk/1.1.0.pack.json', import.meta.url), 'utf8'))));
+  const box = make(api, 'parts', { name: 'The box', what: 'What each candle ships in.', big: true });
+  const step = make(api, 'steps', { what: 'Order a printed sample', part: box.id, priority: 'essential', done: false, rank: 1 });
+  const diff = said<{ diff: Diff }>(await planOf(api, desk())).diff;
+  assert.deepEqual(diff.conflicts, []);
+  said(await put(api, desk()));
+  assert.equal(api.kernel.packs().find((p) => p.id === 'launch-desk')?.version, '2.0.0');
+  assert.equal(rowOf(api, box.id).fields.name, 'The box');
+
+  said(api.kernel.update('parts', box.id, { hue: 200 } as never, { actor: 'p_1', version: rowOf(api, box.id).version }));
+  said(api.kernel.update('steps', step.id, { due: '2026-10-01' } as never, { actor: 'p_1', version: rowOf(api, step.id).version }));
+  const page = await pageOf(api, 'desk');
+  clean(page, 'desk');
+  assert.deepEqual(page.blocks.find((b) => b.kind === 'cards' && b.area !== 'rail')!.rows.map((r) => r.fields.hue), [200]);
+  assert.deepEqual(page.blocks.find((b) => b.kind === 'calendar')!.rows.map((r) => r.fields.what), ['Order a printed sample']);
   sql.close();
 });
 

@@ -7,28 +7,33 @@
    * three hedged columns, a paragraph about mechanism. What stands there now is the product doing one
    * thing per band, drawn working, under a plain heading and a few sentences:
    *
-   *   hero     the promise, one action, and the drawn app lying across the bottom edge.
+   *   hero     the promise, one action, and the drawn app (`lib/app/Window.svelte`) across the bottom edge.
    *   slash    the assistant, as its palette, answering from the record the hero just showed.
    *   agents   an agent proposes, a person decides, and the row lands under the agent's name.
    *   inbox    three messages arrive, the shape is learned once, and every one is filed.
-   *   pages    a page of blocks over the same lists, and the packs that add more.
+   *   pages    a page of blocks drawn by the product's own renderer, and the packs that add more.
    *   yours    why the record stays the reader's, as prose on the turned-over ground.
    *   plans    the two prices, and what to do when a plan is not enough.
    *   close    one line and the button.
    *
    * THE SITE DESCRIBES THE FINISHED PRODUCT (§33) and is deployed with it, so nothing here says what
    * is not open yet.
+   *
+   * EVERY WORD IS IN `lib/copy/home.ts`, read here directly, except the page's title and description
+   * (`copy/shell.ts`) and the palette's demo, which `/slash` draws too (`copy/pricing.ts`).
    */
-  import Arrange from '$lib/Arrange.svelte';
   import Decide from '$lib/Decide.svelte';
   import Icon from '$lib/Icon.svelte';
   import InboxFlow from '$lib/InboxFlow.svelte';
-  import PageBlocks from '$lib/PageBlocks.svelte';
   import SlashPalette from '$lib/SlashPalette.svelte';
+  import Page from '$lib/app/Page.svelte';
+  import Window from '$lib/app/Window.svelte';
   import { MCP_URL, SIGNUP, SOURCE, site } from '$lib/copy.ts';
+  import { home } from '$lib/copy/home.ts';
+  import { DRAWN_ON } from '$lib/examples/index.ts';
   import { PLANS } from '$lib/plans.ts';
 
-  const h = site.home;
+  const h = home.home;
 </script>
 
 <svelte:head>
@@ -43,30 +48,28 @@
 <!-- ── The hero, unchanged in what it says: the promise, one action, and the drawn app. ── -->
 <section class="band hero" data-ground="page" aria-labelledby="hero-title">
   <div class="in">
-    <h1 class="display" id="hero-title">{site.hero.title} <span class="hl">{site.hero.titleAccent}</span></h1>
+    <h1 class="display" id="hero-title">{home.hero.title} <span class="hl">{home.hero.titleAccent}</span></h1>
 
     <div class="hero-row">
-      <p class="sub">{site.hero.sub}</p>
+      <p class="sub">{home.hero.sub}</p>
       <div class="hero-do">
         <div class="actions">
-          <a class="btn btn-primary btn-lg" href={SIGNUP} rel="external">{site.hero.primary}<Icon name="arrow" size="s" /></a>
-          <a class="quiet" href="/pricing">{site.hero.secondary}</a>
+          <a class="btn btn-primary btn-lg" href={SIGNUP} rel="external">{home.hero.primary}<Icon name="arrow" size="s" /></a>
+          <a class="quiet" href="/pricing">{home.hero.secondary}</a>
         </div>
-        <p class="note">{site.hero.note}</p>
+        <p class="note">{home.hero.note}</p>
       </div>
     </div>
   </div>
 
   <div class="in showcase">
-    <Arrange cases={site.arrange.cases} head={site.arrange.head} label={site.arrange.label} app={site.arrange.app} />
+    <Window />
   </div>
 </section>
 
 <!-- ── Slash. The band the window lands in, so its top padding is the overlap plus its own air. ── -->
 <section class="band sec slash-band" data-ground="page" aria-labelledby="slash-title">
   <div class="in">
-    <p class="hint">{site.arrange.hint}</p>
-
     <div class="split">
       <div class="sec-head reveal">
         <h2 class="h2" id="slash-title">{h.slash.title}</h2>
@@ -92,7 +95,7 @@
     </div>
 
     <div class="scene frame reveal">
-      <Decide scene={site.decide} />
+      <Decide scene={home.decide} />
     </div>
   </div>
 </section>
@@ -119,8 +122,8 @@
       <p class="lede">{h.pages.lead}</p>
     </div>
 
-    <div class="blocks-wrap reveal">
-      <PageBlocks blocks={h.pages} />
+    <div class="blocks-wrap frame reveal">
+      <Page src={h.pages.page.src} layout={h.pages.page.layout} now={DRAWN_ON} />
     </div>
 
     <p class="packs reveal">{h.pages.packsLine}</p>
@@ -169,12 +172,12 @@
 <!-- ── The close. ── -->
 <section class="band sec close" data-ground="page" aria-labelledby="close-title">
   <div class="in reveal">
-    <h2 class="h2" id="close-title">{site.closing.title}</h2>
+    <h2 class="h2" id="close-title">{home.closing.title}</h2>
     <div class="close-row">
-      <p class="close-body">{site.closing.body}</p>
+      <p class="close-body">{home.closing.body}</p>
       <div class="actions">
-        <a class="btn btn-primary btn-lg" href={SIGNUP} rel="external">{site.closing.primary}<Icon name="arrow" size="s" /></a>
-        <a class="quiet" href="/pricing">{site.closing.secondary}</a>
+        <a class="btn btn-primary btn-lg" href={SIGNUP} rel="external">{home.closing.primary}<Icon name="arrow" size="s" /></a>
+        <a class="quiet" href="/pricing">{home.closing.secondary}</a>
       </div>
     </div>
   </div>
@@ -269,15 +272,9 @@
 
   /* ── Slash ──────────────────────────────────────────────────────────── */
 
+  /* The window's own caption sits under it inside the overlap, so the air after it is this band's. */
   .slash-band {
-    padding-block-start: calc(var(--overlap) + var(--sp-5));
-  }
-
-  .hint {
-    margin: 0 0 clamp(var(--sp-8), 8vw, 112px);
-    color: var(--dim);
-    font-size: var(--t-sm);
-    text-align: center;
+    padding-block-start: calc(var(--overlap) + clamp(var(--sp-8), 8vw, 112px));
   }
 
   .split {
@@ -339,8 +336,11 @@
 
   /* ── Pages ──────────────────────────────────────────────────────────── */
 
+  /* The renderer's page, on the app's own ground inside a frame, as the decision scene is drawn. */
   .blocks-wrap {
     margin-block-start: var(--sp-7);
+    padding: clamp(var(--sp-4), 3vw, var(--sp-7));
+    background: var(--bg);
   }
 
   .packs {
@@ -435,7 +435,7 @@
   .mini-price .num {
     color: var(--ink);
     font-family: var(--font-display);
-    font-size: 40px;
+    font-size: var(--t-3xl);
     font-weight: 600;
     letter-spacing: -0.04em;
     line-height: 1;

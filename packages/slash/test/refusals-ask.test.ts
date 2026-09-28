@@ -117,12 +117,14 @@ for (const fixture of family) {
         const set = slash.configure({ tier: settings.tier, ask_cap: settings.ask_cap }, OWNER);
         assert.ok(set.ok, `${where}'s \`settings:\` were refused: ${JSON.stringify(set)}`);
         /* THE ROWS ARE DATED NOW, SO THEY COUNT THIS MONTH. The meter reads `ts >= monthStart`, and
-           a row stamped in some other month is a meter that reads zero and a fixture that files. */
+           a row stamped in some other month is a meter that reads zero and a fixture that files.
+           SEEDED AS `read`, NOT `propose`: `asksUsed` counts `kind IN ('read', 'pattern')` (`call.ts`), one row a
+           question however many passes it took, and `propose` is no longer one of them. */
         const ts = new Date(NOW).toISOString();
         for (let i = 0; i < settings.asks; i++)
           sql.exec(
             `INSERT INTO slash_call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status)
-             VALUES (?, ?, 'propose', ?, 'glm-5.3-flash', 1, 1, 1, 1, 'ok')`,
+             VALUES (?, ?, 'read', ?, 'glm-5.3-flash', 1, 1, 1, 1, 'ok')`,
             `seed${i}`,
             ts,
             settings.tier,

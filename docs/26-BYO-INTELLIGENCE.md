@@ -115,6 +115,30 @@ Two dated pricing notes that will need re-checking:
 
 ## 2 · Tier C, architected
 
+> **Where the built runner differs from this section and §4 and §5** *(added September 28th 2026;
+> [48-SPEC-CLI](48-SPEC-CLI.md) §5.13 is the runner as built, and `loop/finish/agents.md` §5 items 11 to 13 are the
+> owner's defaults it follows).*
+>
+> - **A kind is a declaration, not one of four templates.** A job kind is a `job.<id>` declaration: its title,
+>   prompt, arguments, repository name, tools, turns and permission mode, linted by the kernel's `jobBody`, approved
+>   once by the owner in Decide and installed by an ordinary `change`. The runner holds no templates and takes
+>   nothing from `@braindog/slash`; it runs the same lint again on what each claim carries.
+> - **Each machine pins a kind before its first run.** The first time a machine sees a kind, by the SHA-256 of what
+>   it would run, `braindog runner run` prints it whole and asks the person at the terminal; with no terminal it
+>   refuses the job and `braindog runner allow <kind>` asks later. A kind a machine never allowed never runs there,
+>   whatever the host sends.
+> - **A kind may work in a repository and read files.** `repo` is a name, and only the machine's own map
+>   (`braindog runner repos add <name> <folder>`) turns it into a folder; a kind that names none runs in an empty folder
+>   of its own. Its tools may be `Read`, `Grep`, `Glob`, named commands written `Bash(<pattern>)`, and the record's
+>   `mcp__braindog__` tools. Its mode is `dontAsk`, or `acceptEdits` for a kind that says `writes: true`, which Decide
+>   shows in red before anybody approves it. Such a kind turns on [C] in §4.4 by the owner's approval, and not by a flag.
+> - **Arguments are one line of at most 64 characters**, not only ids and enums.
+> - **The verb is `enrol`**, and the transport is long-poll only: `claimJob { wait: 20 }`. `/ws/runner`, the doorbell
+>   of §2.2, is not built.
+> - **The job's bearer is scope `propose`, for one day**, labelled `job:<id>` and revoked when the job ends.
+>   `--restricted` and `--disable-slash-commands` are passed only where the installed Claude Code's help lists them.
+>   The dedicated unix user and the hardened unit are the operator's, not the command's.
+
 ### 2.1 · The precedent, and it is Anthropic's own
 
 Five systems solve exactly this problem — give work to a machine behind NAT. GitHub Actions
@@ -196,7 +220,7 @@ third class" when there were two; a runner still adds no class of its own.*
 Enrolment **is** the vault's device-authorisation grant ([12-SECURITY](12-SECURITY.md) §6.1, RFC 8628).
 One flow to secure, and it is a standard.
 
-1. *Connect this machine* → `braindog runner enroll` calls `POST /auth/device` with
+1. *Connect this machine* → `braindog runner enrol` calls `POST /auth/device` with
    `reach: 'runner'`, prints the **six-digit code** and polls `POST /auth/device/token` with its long
    random id, never the code ([33-CONTRACTS](33-CONTRACTS.md) §4). The code lives **ten minutes**
    (`DEVICE_CODE_EXPIRED`) and survives **five** wrong tries (`DEVICE_CODE_TRIES`); a wrong code bumps
@@ -322,6 +346,10 @@ So the job is **not free-form text the server may set to anything.**
 > **A job is a typed kind plus bounded arguments.** Four kinds — `triage`, `explain`, `propose`,
 > `draft` — each with a server-side prompt template the runner holds a copy of and checks. The
 > wire carries the arguments, not the instructions.
+>
+> *As built, the kinds are the owner's own `job.<id>` declarations, approved in Decide and pinned on each machine by
+> their SHA-256, so the wire does carry the instructions, and what stops a compromised server inventing one is the pin
+> (§2's note at its head).*
 
 | Control | Effect |
 |---|---|

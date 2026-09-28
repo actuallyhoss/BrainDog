@@ -22,7 +22,7 @@
   /* `at` IS THE BLOCK INDEX WHERE THE PAGE BODY LAYS BLOCKS OUT, so the address helper goes by another name here too. */
   import { apiBase } from '../at.ts';
   import { titleOf } from '$lib/title.ts';
-  import '$lib/blocks-charts.css';
+  import '@braindog/skin/blocks-charts.css';
   /* EVERY REGISTERED KIND'S STYLESHEET, with the screen that draws its blocks (`kinds/styles.ts`). */
   import './kinds/styles.ts';
   import { untrack } from 'svelte';

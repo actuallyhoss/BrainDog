@@ -57,8 +57,10 @@
     >{/if}{/snippet}
 
 {#if seq !== null}
+  <!-- `.tap`: the disc is 24 or 32px, and a door a thumb presses is 44 either way (design 6.6), so the hit box grows
+       round it and the drawing stays the size the line needs. -->
   <a
-    class="face agent-face"
+    class="face agent-face tap"
     href={at(`/r/session/${seq}`)}
     data-agent={kind}
     data-live={live}

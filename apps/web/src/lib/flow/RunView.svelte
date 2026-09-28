@@ -36,7 +36,7 @@
   } = $props();
 
   /** A step's state in words: the runner's four, and not reached for a place with no step row. */
-  const STEP_WORD: Record<RunStep['state'], string> = { done: 'Done', waiting: 'Waiting', failed: 'Failed', skipped: 'Skipped' };
+  const STEP_WORD: Record<RunStep['state'], string> = { done: 'Done', waiting: 'Waiting', failed: 'Failed', skipped: 'Not reached' };
   /** Past this many characters an answer folds under a disclosure, so one long reply does not bury the steps after it. */
   const FOLD = 140;
 

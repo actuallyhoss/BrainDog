@@ -1,6 +1,11 @@
 <!--
   A use case drawn small: the rail its pages make and the headings of its Home, read from its declarations (`previewOf`),
-  and the lists it adds. The same drawing on a browse card and on the use case's own page.
+  and the lists it adds.
+
+  ON A CARD IT IS A THUMBNAIL OF THE HOME IT INSTALLS, and nothing else: a rail beside it left the Home a column too
+  narrow for its own headings at every card width (design.md §2.8). The large drawing, on the use case's own page and
+  on share, keeps the rail beside the Home. Either way it is one surface: the card's well, or this drawing's own when
+  large, with the Home's blocks as lines under hairlines and never a box inside it.
 -->
 <script lang="ts">
   import type { Preview } from '@braindog/seed/usecases/share';
@@ -12,6 +17,7 @@
 </script>
 
 <div class="preview" data-large={large ? '' : undefined} aria-hidden="true">
+  {#if large}
   <div class="mini-rail">
     <span class="mini-h">{copy.browseRail}</span>
     <span class="mini-item"><Icon name="home" size="s" />{preview.spine.home ?? copy.home}</span>
@@ -22,6 +28,7 @@
     {/each}
     {#if preview.rail.length === 0}<span class="mini-empty">{copy.browseNoRail}</span>{/if}
   </div>
+  {/if}
   <div class="mini-home">
     <span class="mini-h">{copy.browseHome}</span>
     <span class="mini-title">{preview.spine.home ?? copy.home}</span>
@@ -37,14 +44,10 @@
 </div>
 
 <style>
+  /* SMALL, IT HAS NO GROUND OF ITS OWN: the card's well is the surface it is drawn on. */
   .preview {
     display: grid;
-    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
-    gap: var(--sp-3);
-    margin-block: var(--sp-2);
-    padding: var(--sp-3);
-    border-radius: var(--r-lg);
-    background: var(--s1);
+    grid-template-columns: minmax(0, 1fr);
     font-size: var(--t-xs);
   }
 
@@ -68,7 +71,7 @@
   .mini-item {
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: var(--sp-1);
     color: var(--ink2);
   }
 
@@ -82,12 +85,14 @@
     font-weight: 600;
   }
 
+  /* A BLOCK OF THE HOME AS A LINE UNDER A HAIRLINE, the way a page reads, and never a bordered box inside the drawing. */
   .mini-block {
-    padding: var(--sp-1) var(--sp-2);
-    border: 1px solid var(--line-soft);
-    border-radius: var(--r-sm);
-    background: var(--bg);
+    overflow: hidden;
+    padding-block: var(--sp-1);
+    border-block-start: 1px solid var(--line-soft);
     color: var(--ink2);
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .mini-empty,
@@ -95,9 +100,19 @@
     color: var(--dim);
   }
 
+  /* LARGE, IT IS A SURFACE OF ITS OWN (nothing holds it), with the rail beside the Home from 640px and above it on a
+     phone, where two columns would halve each. */
   .preview[data-large] {
     gap: var(--sp-5);
     padding: var(--sp-4);
+    border-radius: var(--r-md);
+    background: var(--sunk);
     font-size: var(--t-sm);
+  }
+
+  @media (width >= 640px) {
+    .preview[data-large] {
+      grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+    }
   }
 </style>

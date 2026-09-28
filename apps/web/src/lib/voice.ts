@@ -1,9 +1,9 @@
 /**
  * The voice a record speaks in: which lines of the house voice a use case replaces (`loop/research-spark.md` §2.2).
  *
- * THE HOUSE VOICE IS `copy.ts`, AND IT STAYS THE ONLY PLACE A SENTENCE IS TYPED. A voice is data a record
- * holds, as the settings of its use-case pack (`voice_home`, `voice_needs_you`, ...), and each key replaces
- * exactly one `copy.ts` line below. A key a voice leaves out reads the house line, so the sample and
+ * THE HOUSE VOICE IS `copy.ts` AND THE `words` OBJECTS BESIDE THE SCREENS, AND THEY STAY THE ONLY PLACES A SENTENCE
+ * IS TYPED. A voice is data a record holds, as the settings of its use-case pack (`voice_home`, `voice_needs_you`,
+ * ...), and each key replaces exactly one house line below. A key a voice leaves out reads the house line, so the sample and
  * any record without a use case read exactly what they read before.
  *
  * NO PACKAGE IMPORT, because the shell reads this on every screen and `@braindog/declare` brings the
@@ -11,18 +11,51 @@
  */
 
 import { copy } from './copy.ts';
+import { penWords } from './design/words.ts';
+import { words as homeWords } from './home/words.ts';
 
-/** Each voice key, and the house line it replaces. The lines are read from `copy.ts`, never typed here. */
+/**
+ * Each voice key, and the house line it replaces. The lines are read from `copy.ts` and from the `words` objects of the
+ * modules that draw them (Home's, the pen's), never typed here.
+ *
+ * THIS IS ALSO THE LIST OF SENTENCES A SCREEN READS THROUGH `said(key)` IN PLACE OF THE LINE ITSELF, and the comment
+ * over each group names the screen that draws it. A line drawn straight from `copy` or a `words` object is the house
+ * voice on every record, so a key is only heard once its screen asks `said()` for it.
+ */
 export const VOICE_LINES = {
+  /* THE SPINE'S NAMES: the rail, the top bar, the phone's tab bar and its More sheet. */
   home: copy.home,
   decide: copy.decide,
   inbox: copy.inbox,
   lists: copy.lists,
+  /* HOME'S HEADINGS, over the bands of the house Home (`home/default-home.ts`) and a use case's own. */
   right_now: copy.rightNow,
   needs_you: copy.needsYou,
   nothing_needs_you: copy.nothingNeedsYou,
+  working_now: homeWords.workingNow,
+  coming_up: homeWords.comingUp,
+  overdue: homeWords.overdue,
   since_away: copy.sinceAway,
   nothing_new: copy.nothingNew,
+  /* HOME'S EMPTY LINES (`routes/+page.svelte`, `home/default-home.ts`): nothing needing you, what fills the page, a
+     block with nothing in it, and a record with nothing in it yet with its one button. */
+  nothing_now: homeWords.nothingNow,
+  fills_with: homeWords.fillsWith,
+  nothing_waiting: homeWords.nothingWaiting,
+  nothing_due: homeWords.nothingDue,
+  record_empty: copy.recordEmpty,
+  start_here: copy.startHere,
+  /* DECIDE'S AND THE INBOX'S EMPTY LINES (`routes/decide/+page.svelte`, `routes/inbox/+page.svelte`). */
+  no_questions: copy.noQuestions,
+  inbox_clear: copy.inboxClear,
+  /* THE ADD VERB: the word before a list's singular on its button and on the form's save (`routes/r/[register]`), and a
+     list's first-row button (`page/BlockSlot.svelte`, `routes/v/[view]`). */
+  new_row: copy.newRow,
+  add_row: copy.addRow,
+  add_first: copy.addOne,
+  /* THE PEN'S EMPTY STATE, its title and its line (`routes/settings/[area]/areas/Navigation.svelte`). */
+  pen_nothing: penWords.nothing,
+  pen_waits: penWords.nothingWhy,
 } as const;
 
 export type VoiceKey = keyof typeof VOICE_LINES;

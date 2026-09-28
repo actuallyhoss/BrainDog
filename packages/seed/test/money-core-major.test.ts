@@ -123,9 +123,10 @@ test('EACH RANGE MOVED WITH A VERSION OF ITS OWN, and neither admits a money-cor
      Mercury is 1.2.0 since DEF-3, a minor step for its ledger script counting money once, and the range did not
      move with it. bank-hsbc-eg's FLOOR MOVES TO money-core 3.0.0 AT 1.4.0, because `bank-balance` and its webhook
      twin read balances and `balance_after`, which exist only from 3.0.0. Mercury's floor moves to 3.1.0 at 1.3.0 for
-     the same reason, over the `book` setting money-core 3.1.0's books add. */
+     the same reason, over the `book` setting money-core 3.1.0's books add. The file is `mercury` 1.0.0 since PLT-12, a
+     new id with the settings where its fill was, and the range it carried as mercury-company 1.3.0 carried over. */
   assert.equal(bankHsbcEgFile().version, '1.4.0');
-  assert.equal(mercuryFile().version, '1.3.0');
+  assert.equal(mercuryFile().version, '1.0.0');
   for (const [name, doc] of [['bank-hsbc-eg', bankHsbcEgFile()], ['mercury', mercuryFile()]] as const) {
     const range = (doc.requires as { packs: Record<string, string> }).packs['money-core']!;
     assert.deepEqual(

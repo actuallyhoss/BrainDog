@@ -100,10 +100,6 @@ const HELD = {
     ids: ['credentials', 'things'],
     why: "the vault lists the Agents pack's credentials and the projects each is for.",
   },
-  'apps/web/src/routes/packs/[id]/RatesForm.svelte': {
-    ids: ['accounts', 'obligations'],
-    why: 'the rates form, which a preset of the scheduled-action sheet replaces (USE-5).',
-  },
 
   /* The hand-built Work screen, which a declared page replaces (`loop/finish/shell.md` §3, the M4 seam). */
   'apps/web/src/lib/record/track-live.ts': {

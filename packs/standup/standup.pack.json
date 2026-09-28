@@ -1,0 +1,86 @@
+{
+  "pack": "standup",
+  "version": "1.0.0",
+  "title": "Standup",
+  "summary": "One message every morning about the work: what moved since yesterday, what is blocked, and what agents finished. A morning with none of the three sends nothing.",
+  "changes": "The first version.",
+  "author": "BrainDog",
+  "license": "Apache-2.0",
+  "requires": {
+    "format": 1,
+    "primitives": 1,
+    "packs": {
+      "work": "^1.0.0"
+    }
+  },
+  "declarations": [
+    {
+      "digest": "standup",
+      "name": "Standup",
+      "schedule": {
+        "at": "09:00"
+      },
+      "channels": [
+        "email",
+        "in-app"
+      ],
+      "sections": [
+        {
+          "heading": "What moved",
+          "source": "register.tasks",
+          "where": "updated_at after -2d, state is doing or review or done, agent is empty",
+          "as": "table",
+          "columns": [
+            {
+              "field": "what",
+              "label": "Task"
+            },
+            {
+              "field": "by",
+              "label": "Due"
+            }
+          ],
+          "omit_when_empty": true
+        },
+        {
+          "heading": "What is blocked",
+          "source": "register.tasks",
+          "where": "state is blocked",
+          "as": "table",
+          "columns": [
+            {
+              "field": "what",
+              "label": "Task"
+            },
+            {
+              "field": "by",
+              "label": "Due"
+            }
+          ],
+          "omit_when_empty": true
+        },
+        {
+          "heading": "What agents finished",
+          "source": "register.tasks",
+          "where": "state is done, agent is set, done_on after -2d",
+          "as": "table",
+          "columns": [
+            {
+              "field": "what",
+              "label": "Task"
+            },
+            {
+              "field": "agent",
+              "label": "Agent"
+            },
+            {
+              "field": "done_on",
+              "label": "Done on"
+            }
+          ],
+          "omit_when_empty": true
+        }
+      ]
+    }
+  ]
+}

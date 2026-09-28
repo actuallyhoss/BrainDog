@@ -183,7 +183,7 @@
       grid-template-columns: minmax(0, 1fr);
       row-gap: var(--sp-3);
       padding-block-end: var(--sp-3);
-      padding-inline-start: var(--sp-5);
+      padding-inline-start: var(--sp-3);
     }
 
     /* ONE SPINE DOWN THE LEFT, 12px in from the card's edge, and the join from it back to the centre under the last
@@ -206,7 +206,7 @@
       content: '';
       position: absolute;
       inset-block-start: 0;
-      inset-inline: calc(var(--sp-3) - var(--sp-5)) calc(50% - 1px);
+      inset-inline: 0 calc(50% - 1px);
       border-block-start: 1px solid var(--line);
     }
 

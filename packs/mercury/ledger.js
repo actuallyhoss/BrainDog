@@ -21,7 +21,7 @@
  * same way, and otherwise it is left for the record's own rules to file.
  *
  * A ROW SOMEBODY DELETED STAYS DELETED. The ledger is read with its deleted rows as well (`includeDeleted`, which a
- * script's list takes since `loop/finish/defects.md` DEF-4), for the transactions it holds no live row for, and one
+ * script's list takes), for the transactions it holds no live row for, and one
  * whose row a person deleted is left out, where it used to be written anew the next hour because the list read live
  * rows only (M6). Voiding and deleting now both take a Mercury transaction out of the figures for good.
  *
@@ -35,16 +35,18 @@
  * day and amount, so a person can void the spare. The log says how many were taken. A void row is not the same money,
  * because voiding took it out of the figures, so it is never taken.
  *
- * EVERY ROW IN ONE BOOK, WHEN THE PACK IS TOLD WHICH. The `book` setting (1.3.0) files each transaction this script
+ * EVERY ROW IN ONE BOOK, WHEN THE PACK IS TOLD WHICH. The `book` setting files each transaction this script
  * writes, and each Mercury account the balances pull wrote, in that book of money-core's. The book is the one thing
  * past the bank's facts this script adds to a row it already holds, and only to a row in no book yet, because a person
  * may have moved a row on purpose. Left at 0 the setting files nothing.
  *
- * A KEY MERCURY REFUSES STOPS THE RUN WITH A SENTENCE, and the record pauses a script after three refused runs.
+ * THE KEY IS THE `grant` SETTING, the label of a key in the vault and never the key itself, read from `ctx.config` on
+ * every run. The pack declares the same setting as the key this script and the balances pull send, so both ask with
+ * one key. A key Mercury refuses stops the run with a sentence, and the record pauses a script after three refused
+ * runs.
  */
 
 const API = "https://api.mercury.com";
-const KEY = "Mercury (read only)";
 const DAYS = 30;
 /* THE MOST ROWS ONE LIST ANSWERS, since a script's list names no limit and the record's default is this (`list` in
    `packages/kernel/src/index.ts`). So a list asks about at most this many names or ids at once, and each comes back
@@ -64,20 +66,26 @@ const WRITES = 1000;
    the run whole, so an account past it is said and not asked about. */
 const FETCHES = 12;
 const STATES = { pending: 'pending', sent: 'cleared', cancelled: 'void', failed: 'void' };
-/* THE BOOK THIS PACK FILES ITS ROWS IN, SINCE 1.3.0: the `book` setting, the number of a row of money-core's `books`
-   (books#2), so the company's Mercury money sits on the company's book page and not in the household's. The setting is
-   written into this line when the pack is planned and installed, which is how a script is handed a setting in this
-   build. It is a number and never text because it lands inside the script itself, and a number cannot close the
-   quotes it sits in. Read before the fill, as a test reads this file, it is not a number, and nothing is filed. */
-const BOOK = Number('{{config:book}}');
-const IN_BOOK = Number.isInteger(BOOK) && BOOK > 0 ? { book: `books#${BOOK}` } : {};
-/** The book to add to a row the record already holds: the setting's, when the row is in no book yet, and else none. */
-const bookFor = (row) => (row.fields.book === undefined || row.fields.book === null ? IN_BOOK : {});
+/* THE BOOK THIS PACK FILES ITS ROWS IN: the `book` setting, the number of a row of money-core's `books` (books#2), so
+   the company's Mercury money sits on the company's book page and not in the household's. Anything but a whole number
+   above 0 files nothing. */
+const bookOf = (config) => {
+  const book = Number(config?.book);
+  return Number.isInteger(book) && book > 0 ? { book: `books#${book}` } : {};
+};
+
+/** The label of the key both halves of the pack send, from the `grant` setting, or a sentence when none is set. */
+const keyOf = (config) => {
+  const key = typeof config?.grant === 'string' ? config.grant.trim() : '';
+  if (key === '') throw new Error(`No key is set, so Mercury was not asked. Set the label of a read-only Mercury key on this pack's page.`);
+  return key;
+};
 
 async function ask(ctx, path) {
-  const r = await ctx.fetch(API + path, { key: KEY });
+  const key = keyOf(ctx.config);
+  const r = await ctx.fetch(API + path, { key });
   if (r.status === 401)
-    throw new Error(`Mercury refused the key labelled "${KEY}" (401) at ${path}, so nothing was written. Put a working read-only token in the vault under that label.`);
+    throw new Error(`Mercury refused the key labelled "${key}" (401) at ${path}, so nothing was written. Put a working read-only token in the vault under that label.`);
   if (!r.ok) throw new Error(`Mercury answered ${r.status} at ${path}, so nothing was written this hour.`);
   return r.json();
 }
@@ -145,6 +153,9 @@ export function ledgerOf(t, account) {
 }
 
 export default async function run(ctx) {
+  const inBook = bookOf(ctx.config);
+  /** The book to add to a row the record already holds: the setting's, when the row is in no book yet, and else none. */
+  const bookFor = (row) => (row.fields.book === undefined || row.fields.book === null ? inBook : {});
   const { accounts = [] } = await ask(ctx, '/api/v1/accounts');
   const names = [...new Set(accounts.map((a) => String(a.name)))];
   const rows = new Map();
@@ -243,7 +254,7 @@ export default async function run(ctx) {
         );
       const c = category === null ? undefined : categories.get(category);
       const fits = c !== undefined && (c.fields.direction === 'both' || c.fields.direction === fields.direction);
-      ctx.write('transactions', { ...fields, ...(fits ? { category: c.id } : {}), ...IN_BOOK });
+      ctx.write('transactions', { ...fields, ...(fits ? { category: c.id } : {}), ...inBook });
       writes += 1;
       continue;
     }

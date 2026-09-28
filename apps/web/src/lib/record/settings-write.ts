@@ -45,16 +45,76 @@ const clientOf = (base: string, io?: Fetch) => createClient({ base, ...(io ? { f
  * `since` IS `null` BECAUSE THE RECORD DOES NOT KNOW IT. `members` has no acceptance date, and the Directory that does
  * is outside the record; the screen reads `live` and says when they last looked instead.
  */
-export const personOf = (m: Member): Person => ({
-  id: m.person_id,
-  name: m.name ?? m.email ?? m.person_id,
-  level: m.level,
-  scoped: m.scoped,
-  email: m.email ?? '',
-  since: null,
-  suspended: m.suspended_at,
-  seen: m.seen_at,
-});
+export const personOf = (m: Member): Person => {
+  const p: Person = {
+    id: m.person_id,
+    name: m.name ?? m.email ?? m.person_id,
+    level: m.level,
+    scoped: m.scoped,
+    email: m.email ?? '',
+    since: null,
+    suspended: m.suspended_at,
+    seen: m.seen_at,
+  };
+  /* THE RULES RIDE ON THE PERSON, because every write below sends the whole of what they hold, and a list sent
+     without its rule is every row of it again (`members.ts`, `invite`). Neither the client's `Member` nor the web's
+     `Person` names the key yet, so it is read and carried as the record answered it, and `rulesHeld` reads it back. */
+  const wheres = (m as Member & { wheres?: unknown }).wheres;
+  return wheres !== null && typeof wheres === 'object' && !Array.isArray(wheres) ? Object.assign(p, { wheres }) : p;
+};
+
+/**
+ * One grant narrowed to the rows whose field holds one value: "only rows where Owner is Ben".
+ *
+ * THE SMALLEST RULE THE GRAMMAR TAKES, one leaf (`34-GRAMMARS` §1, `{ field, is }`), because that is the one sentence
+ * this screen can say back word for word. A richer rule sent by another caller is kept and sent back untouched.
+ */
+export type RowRule = { field: string; value: string | number | boolean };
+
+/** The rules somebody holds, keyed by list, exactly as the record answered them. `{}` when no grant is narrowed. */
+export const rulesHeld = (p: Person): Readonly<Record<string, unknown>> => {
+  const held = 'wheres' in p ? p.wheres : undefined;
+  return held !== null && typeof held === 'object' && !Array.isArray(held) ? (held as Record<string, unknown>) : {};
+};
+
+/**
+ * What one list's rule says, in the parts the card says it back with.
+ *
+ * `one` is the leaf this screen writes, `words` a sentence somebody typed, `other` a rule this screen cannot say (it is
+ * kept, never rewritten), and `unread` the record's own `null`: a rule it could not read, which reaches no row.
+ */
+export type RuleRead =
+  | { kind: 'one'; field: string; value: string }
+  | { kind: 'words'; words: string }
+  | { kind: 'other' }
+  | { kind: 'unread' };
+
+export function ruleRead(where: unknown): RuleRead {
+  if (where === null) return { kind: 'unread' };
+  if (typeof where === 'string') return { kind: 'words', words: where };
+  if (typeof where !== 'object' || Array.isArray(where)) return { kind: 'other' };
+  const leaf = where as Record<string, unknown>;
+  const field = leaf['field'];
+  const value = leaf['is'];
+  if (Object.keys(leaf).length === 2 && typeof field === 'string' && (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'))
+    return { kind: 'one', field, value: String(value) };
+  return { kind: 'other' };
+}
+
+/**
+ * What a typed or picked value is sent as, for a field of this type: a number for a number field and `true` or `false`
+ * for a yes-or-no one, so the record compares like with like. `null` when the words are not a value the field holds.
+ */
+export function ruleValue(type: string, typed: string): RowRule['value'] | null {
+  const said = typed.trim();
+  if (said === '') return null;
+  if (type === 'int' || type === 'decimal') {
+    const n = Number(said);
+    return Number.isFinite(n) && (type === 'decimal' || Number.isInteger(n)) ? n : null;
+  }
+  if (type === 'bool') return said === 'true' ? true : said === 'false' ? false : null;
+  return said;
+}
 
 /**
  * The second way of naming somebody, for the line under their name, or `''`, when there is no second way.
@@ -88,29 +148,52 @@ export async function readPeople(base: string, io?: Fetch): Promise<PeopleRead> 
  *
  * A register left out is taken away and a record level left off is taken away, so every change here carries the
  * exceptions that stay as well as the one that moved.
+ *
+ * AND THE RULES THAT STAY, for the same reason: a list sent without its rule is every row of it again. Only the rules of
+ * lists still sent go, because the record refuses a rule on a list the invitation does not give, and `wheres` is left
+ * off when there is none, so an unnarrowed person's invitation reads as it always did.
  */
-export function inviteOf(p: Person, level: Level | null, scoped: readonly { register: string; level: Level }[]) {
+export function inviteOf(
+  p: Person,
+  level: Level | null,
+  scoped: readonly { register: string; level: Level }[],
+  wheres: Readonly<Record<string, unknown>> = rulesHeld(p),
+) {
+  const kept = Object.fromEntries(scoped.filter((s) => Object.hasOwn(wheres, s.register)).map((s) => [s.register, wheres[s.register]]));
   return {
     person: p.id,
     ...(level === null ? {} : { level }),
     registers: Object.fromEntries(scoped.map((s) => [s.register, s.level])),
+    ...(Object.keys(kept).length === 0 ? {} : { wheres: kept }),
   };
 }
 
-/** Move somebody's level on the record, keeping their exceptions. */
+/** Move somebody's level on the record, keeping their exceptions and the rows each one reaches. */
 export async function moveLevel(base: string, p: Person, to: Level | null, io?: Fetch): Promise<Wrote<Member>> {
   return wrote(await clientOf(base, io).invite(inviteOf(p, to, p.scoped)));
 }
 
-/** Put one list back to their record level. */
+/** Put one list back to their record level, which takes its rule with it: their level is every row. */
 export async function dropException(base: string, p: Person, register: string, io?: Fetch): Promise<Wrote<Member>> {
   return wrote(await clientOf(base, io).invite(inviteOf(p, p.level, p.scoped.filter((s) => s.register !== register))));
 }
 
-/** Give somebody a different level on one list. A list they already have an exception on is moved, not doubled. */
-export async function addException(base: string, p: Person, register: string, level: Level, io?: Fetch): Promise<Wrote<Member>> {
+/**
+ * Give somebody a different level on one list, over every row of it or `only` the rows one field's value picks. A list
+ * they already have an exception on is moved, not doubled, and what is picked here replaces the rule it held.
+ */
+export async function addException(
+  base: string,
+  p: Person,
+  register: string,
+  level: Level,
+  only: RowRule | null,
+  io?: Fetch,
+): Promise<Wrote<Member>> {
   const scoped = [...p.scoped.filter((s) => s.register !== register), { register, level }];
-  return wrote(await clientOf(base, io).invite(inviteOf(p, p.level, scoped)));
+  const others = Object.fromEntries(Object.entries(rulesHeld(p)).filter(([list]) => list !== register));
+  const wheres = only === null ? others : { ...others, [register]: { field: only.field, is: only.value } };
+  return wrote(await clientOf(base, io).invite(inviteOf(p, p.level, scoped, wheres)));
 }
 
 /**

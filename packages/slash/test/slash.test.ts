@@ -81,7 +81,7 @@ test('ASK_CAP_DEFAULT AND BACKGROUND_ASKS_MONTH ARE THE NAMES THE CONTRACT GIVES
   assert.equal(BACKGROUND_ASKS_MONTH, 60);
 });
 
-test('the meter counts tier a asks in this month, reads and proposals alike, and nothing else', () => {
+test('the meter counts tier a asks in this month, reads and patterns alike, and never a propose', () => {
   const { sql, slash } = build();
   const put = (kind: string, tier: string, ts: string): void =>
     sql.exec(
@@ -92,13 +92,16 @@ test('the meter counts tier a asks in this month, reads and proposals alike, and
       kind,
       tier,
     );
-  put('propose', 'a', '2026-11-02T00:00:00.000Z');
-  put('propose', 'a', '2026-11-13T00:00:00.000Z');
   /* A READ IS AN ASK since the read door was metered: before, `ask_cap` could never be reached through the only door. */
-  put('read', 'a', '2026-11-05T00:00:00.000Z');
+  put('read', 'a', '2026-11-02T00:00:00.000Z');
+  put('read', 'a', '2026-11-13T00:00:00.000Z');
+  put('pattern', 'a', '2026-11-05T00:00:00.000Z');
+  /* A PROPOSE NO LONGER COUNTS on its own: one question is one ask, whatever passes it took
+     (`contracts.md` §7.5), and the `read` its pass 1 or its drafting read already wrote is that ask. */
+  put('propose', 'a', '2026-11-06T00:00:00.000Z');
   /* Not this month, not this tier: two rows that must not be counted. */
-  put('propose', 'a', '2026-10-30T00:00:00.000Z');
-  put('propose', 'b', '2026-11-05T00:00:00.000Z');
+  put('read', 'a', '2026-10-30T00:00:00.000Z');
+  put('read', 'b', '2026-11-05T00:00:00.000Z');
   assert.equal(slash.status().asks.used, 3);
 });
 

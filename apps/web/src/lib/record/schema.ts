@@ -410,6 +410,8 @@ export type PageBlock = {
   under?: number;
 };
 
+import type { Layout } from '../page/layout.ts';
+
 export type PageDecl = {
   /**
    * The row this page is ABOUT, when it is about one.
@@ -444,6 +446,8 @@ export type PageDecl = {
   icon?: IconRef;
   requires: readonly string[];
   blocks: readonly PageBlock[];
+  /** The main column and side rail's widths, as `page/layout.ts`'s `layoutOf` reads it; absent is the main column whole. */
+  layout?: Layout;
   pack?: string;
   /** A page that emerged from the data and has not been placed in nav yet (29 §3). */
   origin?: 'derived' | 'person' | 'pack';
@@ -743,6 +747,8 @@ export type Person = {
    * as one.
    */
   seen: string | null;
+  /** The lists whose grant is narrowed to some rows, keyed by list id, as the record answered them (COL-9). */
+  wheres?: Record<string, unknown>;
 };
 
 /**

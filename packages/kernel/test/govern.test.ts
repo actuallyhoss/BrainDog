@@ -207,6 +207,27 @@ test('A DECISION CARRIES ITS REASON, and a gate without one is a gate nobody can
   sql.close();
 });
 
+test('A LIGHT QUESTION A RULE OR SLASH ASKED IS ANSWERED IN ONE PRESS, for the option’s own reason', async () => {
+  const { k, sql } = await record();
+  for (const opener of ['rule:x', 'slash']) {
+    const made = value<{ id: string }>(k.propose(options, opener));
+    const out = value<{ decision: string }>(k.decide(made.id, { decide: { option: 'accept', reason: '' } }, 'p_2'));
+    assert.equal(
+      sql.one<{ reason: string }>('SELECT reason FROM decision WHERE id = ?', out.decision)?.reason,
+      "Answered in one press, for the option's own reason: it matches what we already do",
+      opener,
+    );
+  }
+  sql.close();
+});
+
+test('THE SAME LIGHT QUESTION, OPENED BY A PERSON, STILL OWES ITS REASON', async () => {
+  const { k, sql } = await record();
+  const made = value<{ id: string }>(k.propose(options, 'p_1'));
+  assert.equal(refusal(k.decide(made.id, { decide: { option: 'accept', reason: '' } }, 'p_2')).at, 'reason');
+  sql.close();
+});
+
 test('ALL THE ROWS OR NONE: a rowset with one bad row writes nothing at all', async () => {
   // Half a rowset accepted is a decision whose answer is not true of the record.
   const { k, sql } = await record();

@@ -28,20 +28,38 @@
   BOTH EXTRAS ARE OPTIONAL PROPS, so a saved view stays a list of links until somebody decides what
   a verb means there. A component that assumes its second caller wants everything the first one did
   is how the table ended up on a phone in the first place.
+
+  WHAT W2 ADDED IS DRAWN IN THE SAME TWO LINES (design DSN-16). Where the row applies, its scope chip, takes the
+  detail slot at the end of line two; the holder's face after a hand ends line two where a selected row's tick does;
+  a list of people leads each card with the person's face. None of them is a third line.
 -->
+<script module lang="ts">
+  import type { RegisterDecl } from '$lib/record/schema.ts';
+
+  /**
+   * Whether a list's rows are people, so each is led by a face rather than a project's mark (design SYS-7).
+   *
+   * BY THE GLYPH THE LIST DECLARES, which is the declaration's own word for what it holds, and not by its id: a list is
+   * never known here by the name a pack gave it. The list's grid and a row's page ask the same question of this.
+   */
+  export const ofPeople = (decl: Pick<RegisterDecl, 'icon'> | undefined): boolean => decl?.icon === 'people';
+</script>
+
 <script lang="ts">
   import { apiBase, at } from '../at.ts';
   import type { Snippet } from 'svelte';
   import { day, leadingCode, shortDay, symbolFigure, TONES } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import { valueSaid } from '$lib/voice.ts';
-  import { dirOf, display, identityFor, toneOf } from '$lib/record/api.ts';
+  import { dirOf, display, identityFor, labelOf, toneOf } from '$lib/record/api.ts';
   import { REGISTERS } from '$lib/record/held.ts';
   import { agentKey, agentName, handFor } from '$lib/record/hand.ts';
+  import { scopeFieldOf, scopeOf, type Scope } from '$lib/record/scope-move.ts';
   import { isMoney, type Entry } from '$lib/record/schema.ts';
   import type { Names } from '$lib/record/remote.ts';
   import Face from './Face.svelte';
   import Money from './Money.svelte';
+  import ScopeChip from './ScopeChip.svelte';
 
   let {
     register,
@@ -196,10 +214,31 @@
   const figure = $derived(decl?.mobile.slice(1).find((f) => FIGURES.has(decl.fields.find((d) => d.id === f)?.type ?? '')));
   /* THE DATE THE TONE IS ABOUT, which is the field `toneOf` reads: the one `day` declared `deadline:`. */
   const dated = $derived(decl?.fields.find((f) => f.type === 'day' && f.deadline)?.id);
+  /* THE FIELD THAT SAYS WHERE A ROW APPLIES (agents C8), whose chip is drawn in the detail slot rather than its name
+     as text. Read through `decl` so a list the record taught this file after mount is asked again. */
+  const scoped = $derived(decl ? scopeFieldOf(register)?.id : undefined);
   /* ONE DETAIL, the first declared card field that is none of the others and has something to say. */
   const detailFields = $derived(
-    decl ? decl.mobile.slice(1).filter((f) => f !== figure && f !== dated && f !== decl.state && f !== decl.finished) : [],
+    decl
+      ? decl.mobile.slice(1).filter((f) => f !== figure && f !== dated && f !== decl.state && f !== decl.finished && f !== scoped)
+      : [],
   );
+
+  /**
+   * A FIGURE THAT IS NOT A PAYMENT SAYS WHAT IT IS (design section 4, Lists: "a labelled rate").
+   *
+   * On a list with a state or a deadline the figure is the amount the row is about, and its line under it says what is
+   * happening to it. On a list with neither, People's rate or an account's balance, "£620.00" alone at the end of a
+   * name is a number nobody can place, so the field's own label stands before it, quieter than the figure.
+   */
+  const figureLabel = $derived.by(() => {
+    if (!decl || !figure || decl.state || dated) return null;
+    const f = decl.fields.find((d) => d.id === figure);
+    return f ? labelOf(f) : null;
+  });
+
+  /* A LIST OF PEOPLE IS LED BY FACES, one per card in the slot a project's mark takes elsewhere. */
+  const faced = $derived(ofPeople(decl));
 
   /* A field's words on this card: a declared value by its label (`worded`), anything else as `display` says it. */
   const saidOf = (e: Entry, f: string): string => worded(f, e.fields[f], display(register, f, e.fields[f], now, names) ?? '');
@@ -212,6 +251,11 @@
    * date is the deadline, or on a finished row the day it finished, which the record writes into the
    * list's `finished` field ("Paid · 2 Sep"): a due date beside "Paid" would read as the day it was
    * paid. A finished row on a list that declares no such field says its word alone.
+   *
+   * THE SCOPE CHIP TAKES THE DETAIL SLOT (design DSN-16). It was a line of its own under the card, a third line with a
+   * hairline over it, and on Tasks the project was said twice, as the detail's text and again as the chip. Where the
+   * list puts its scope field on the card, the chip is that detail; where it does not, the chip fills the slot only
+   * when no declared detail has anything to say, so a person's role is not traded for where they were met.
    */
   const lineOf = (e: Entry) => {
     const tone = lateness(e);
@@ -220,13 +264,15 @@
     const done = Boolean(state && decl?.done?.includes(String(e.fields[state] ?? '')));
     const word = tone && typeof due === 'string' ? dueSaid(due, tone) : state ? saidOf(e, state) || null : null;
     const date = done ? (decl?.finished ? daySaid(e.fields[decl.finished]) : null) : daySaid(due);
-    const detail = detailFields.find((f) => saidOf(e, f) !== '');
-    return { tone, word, date, detail };
+    const text = detailFields.find((f) => saidOf(e, f) !== '');
+    const place: Scope | null | undefined = scoped === undefined ? undefined : scopeOf(register, e.fields, names);
+    const chip = place !== undefined && (decl?.mobile.includes(scoped ?? '') === true || text === undefined);
+    return { tone, word, date, detail: chip ? undefined : text, place: chip ? (place ?? null) : undefined, chip };
   };
 
-  /* ONE LEADING SLOT, KEPT ON EVERY CARD when any card has a mark or a word: the mark in it on the first
-     line, the dot on the second, and the words of both lines start at one x. */
-  const slotted = $derived(Boolean(decl?.state || dated) || entries.some((e) => markFor(e) !== null));
+  /* ONE LEADING SLOT, KEPT ON EVERY CARD when any card has a mark, a face or a word: the mark or face in it on
+     the first line, the dot on the second, and the words of both lines start at one x. */
+  const slotted = $derived(faced || Boolean(decl?.state || dated) || entries.some((e) => markFor(e) !== null));
 </script>
 
 <!-- An amount is drawn with its currency's symbol, or with its code set quiet where it has none. -->
@@ -237,18 +283,22 @@
 {/snippet}
 
 {#if decl}
-  <ul class="cards">
+  <ul class="cards" data-faced={faced ? '' : undefined}>
     {#each entries as e (e.seq)}
       {@const title = display(register, decl.mobile[0], e.fields[decl.mobile[0]], now, names)}
       {@const line = lineOf(e)}
+      {@const holder = holderOf(e)}
       <li class="card-line" data-picked={picked?.has(e.seq) ? '' : undefined}>
         <a class="card" href={at(to(e))}>
           <!-- THE TITLE FIRST, in the document as well as on the screen, so a screen reader hears
-               what the row is before anything about it. ONE THING LEADS IT, the project's mark, in a
-               slot every card keeps when any card in the list has one, so the titles share an edge.
-               The tone and the mark both led it once, two dots before a word. -->
+               what the row is before anything about it. ONE THING LEADS IT, the project's mark or, on a
+               list of people, the person's face, in a slot every card keeps when any card in the list has
+               one, so the titles share an edge. The tone and the mark both led it once, two dots before a word. -->
           <span class="card-title" dir={dirOf(register, decl.mobile[0])} data-whole={figure ? undefined : ''} data-slot={slotted ? '' : undefined}>
-            {#if markFor(e)}
+            {#if faced}
+              <!-- `aria-hidden` inside `Face`, because the name it is drawn from is the title beside it. -->
+              <span class="card-face"><Face name={title ?? ''} kind="person" size="s" /></span>
+            {:else if markFor(e)}
               {@const it = markFor(e)!}
               <span
                 class="card-mark thing-glyph"
@@ -268,6 +318,7 @@
           {#if figure}
             {@const value = e.fields[figure]}
             <span class="card-figure" dir={dirOf(register, figure)}>
+              {#if figureLabel}<span class="card-figure-label">{figureLabel}</span>{/if}
               {#if isMoney(value)}<Money minor={value.amount} currency={value.currency} />{:else}{display(register, figure, value, now, names) ?? ''}{/if}
             </span>
           {/if}
@@ -283,21 +334,24 @@
             {/if}
             {#if line.word}<span class="card-word" data-late={line.tone ? '' : undefined}>{line.word}</span>{/if}
             {#if line.date}{#if line.word}<span aria-hidden="true">{' · '}</span>{/if}<span class="card-date">{line.date}</span>{/if}
-            {#if line.detail}
+            {#if line.chip}
+              <!-- WHERE THE ROW APPLIES, AS THE DETAIL (agents C8): a pill needs no separator before it, so it takes
+                   the gap the line's words keep instead. A card is a link, so the chip is words and never a control. -->
+              <ScopeChip scope={line.place ?? null} />
+            {:else if line.detail}
               {@const f = line.detail}
               {#if line.word || line.date}<span aria-hidden="true">{' · '}</span>{/if}<span dir={dirOf(register, f)} data-enum={isEnum(f) ? '' : undefined}>{@render amount(saidOf(e, f))}</span>
             {/if}
           </span>
-          <!-- THE HOLDER'S FACE, after a hand (GAP-11): drawn beside the card's own line rather than a
-               third grid column, so a row nobody has handed keeps the same two-column layout as before. -->
-          {#if holderOf(e)}
-            {@const holder = holderOf(e)!}
-            <span class="card-holder" role="img" aria-label={holder.name}><Face name={holder.name} kind={holder.kind} size="s" /></span>
-          {/if}
-          {#if picked?.has(e.seq)}
-            <!-- A GLYPH, NOT A TINT. `13 §5.1`: colour never carries meaning alone, and "this row is one
-                 of the four the bar above is about" is the meaning most worth not losing. -->
-            <span class="card-pick"><span class="picked-tick" role="img" aria-label={selectedLabel}>✓</span></span>
+          <!-- THE END OF LINE TWO: the holder's face after a hand (GAP-11), then a selected row's tick. The face had
+               a third grid row of its own, which made a handed row a card of three lines (design DSN-16). -->
+          {#if holder || picked?.has(e.seq)}
+            <span class="card-end">
+              {#if holder}<span class="card-holder" role="img" aria-label={holder.name}><Face name={holder.name} kind={holder.kind} size="s" /></span>{/if}
+              <!-- A GLYPH, NOT A TINT. `13 §5.1`: colour never carries meaning alone, and "this row is one
+                   of the four the bar above is about" is the meaning most worth not losing. -->
+              {#if picked?.has(e.seq)}<span class="picked-tick" role="img" aria-label={selectedLabel}>✓</span>{/if}
+            </span>
           {/if}
         </a>
         <!-- OUTSIDE THE ANCHOR, because a button inside a link is neither. The card stays the whole
@@ -500,26 +554,59 @@
       font-variant-numeric: tabular-nums;
     }
 
-    /* NOTHING ENDS THE SECOND LINE BUT THE TICK of a selected row. The row's number stood here, in the
-       id face, on every card (design SYS-6: no "#" on a phone). */
-    .card-pick {
+    /* NOTHING ENDS THE SECOND LINE BUT WHO HOLDS THE ROW AND THE TICK of a selected row. The row's number
+       stood here, in the id face, on every card (design SYS-6: no "#" on a phone), and the holder's face had
+       a third row of its own (design DSN-16: no third line). */
+    .card-end {
       grid-column: 2;
       grid-row: 2;
       align-self: center;
+      display: inline-flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: var(--sp-2);
       font-size: var(--t-sm);
-      text-align: end;
     }
 
-    .card:has(.card-pick) .card-b {
+    .card:has(.card-end) .card-b {
       grid-column: 1;
     }
 
-    /* THE HOLDER'S FACE, ITS OWN ROW so it never overlaps the title, the figure or the tick above it (GAP-11). */
     .card-holder {
-      grid-column: 1 / -1;
-      grid-row: 3;
-      justify-self: end;
       display: inline-flex;
+    }
+
+    /* A FACE IN THE LEADING SLOT, on a list of people: the slot widens to the face so both lines still start at
+       one x, and the face sits in the middle of the title's line as the mark does. */
+    .cards[data-faced] [data-slot] {
+      padding-inline-start: calc(20px + var(--sp-2));
+    }
+
+    .card-face {
+      position: absolute;
+      inset-inline-start: 0;
+      inset-block-start: calc((1lh - 20px) / 2);
+      display: flex;
+    }
+
+    /* THE FIGURE'S NAME, quieter and smaller than the figure it names, on the figure's own line. */
+    .card-figure-label {
+      margin-inline-end: var(--sp-1);
+      color: var(--dim);
+      font-size: var(--t-sm);
+      font-weight: 400;
+    }
+
+    /* THE SCOPE CHIP AS A WORD OF THE LINE: the line's height and not a control's, since on a card it is not one,
+       and the gap a separator would have taken before it. */
+    .card-b :global(.scope-chip) {
+      min-block-size: 0;
+      padding-block: 0;
+      vertical-align: baseline;
+    }
+
+    .card-b > :global(.scope-chip:not(:first-child)) {
+      margin-inline-start: var(--sp-2);
     }
 
     /* Sentence case in the stylesheet, so the text stays the record's own word for search and for a

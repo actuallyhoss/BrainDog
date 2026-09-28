@@ -116,6 +116,25 @@ export async function serveFiles(request: Request, ctx: CallContext, folder: str
   return one ? give(ctx, folder, one[1]!, method === 'HEAD') : keep(request, ctx, folder);
 }
 
+/**
+ * Sniffs and writes one file's bytes under `folder`, named by its hash: the write half of `PUT /api/files`, reused by
+ * `arrivalDoor`'s mail attachments (`DOR-7`) so a kept attachment is stored by the same rule a person's upload meets.
+ * `null` for a type this store does not take, oversized, or empty, since a caller keeping an attachment only needs to
+ * know whether it was kept.
+ */
+export function keepAttachment(folder: string, bytes: Uint8Array): { sha256: string; mime: string } | null {
+  if (bytes.byteLength > FILE_MOST || bytes.byteLength === 0) return null;
+  const mime = sniff(bytes);
+  if (mime === null) return null;
+  const sha256 = createHash('sha256').update(bytes).digest('hex');
+  mkdirSync(folder, { recursive: true });
+  const target = join(folder, sha256);
+  const passing = `${target}.${randomBytes(6).toString('hex')}.part`;
+  writeFileSync(passing, bytes, { mode: 0o600 });
+  renameSync(passing, target);
+  return { sha256, mime };
+}
+
 /** `PUT /api/files`: the body, checked, hashed and kept, and its name answered. */
 async function keep(request: Request, ctx: CallContext, folder: string | null): Promise<Response> {
   if (!writesFiles(ctx)) return refuse(403, CANNOT_WRITE);
@@ -129,13 +148,11 @@ async function keep(request: Request, ctx: CallContext, folder: string | null): 
   if (mime === null) return refuse(415, NOT_TAKEN);
   const said = (request.headers.get('content-type') ?? '').split(';')[0]!.trim().toLowerCase();
   if (said !== '' && said !== 'application/octet-stream' && said !== mime) return refuse(415, MISLABELLED(said, mime));
-  const sha256 = createHash('sha256').update(bytes).digest('hex');
-  mkdirSync(folder, { recursive: true });
-  const target = join(folder, sha256);
-  const passing = `${target}.${randomBytes(6).toString('hex')}.part`;
-  writeFileSync(passing, bytes, { mode: 0o600 });
-  renameSync(passing, target);
-  return answer(200, { sha256, mime, bytes: bytes.byteLength });
+  const kept = keepAttachment(folder, bytes);
+  /* UNREACHABLE HERE: the checks above already refused what `keepAttachment` would answer `null` for, each with its
+     own sentence, so this file is always taken once it reaches this line. */
+  if (kept === null) return refuse(415, NOT_TAKEN);
+  return answer(200, { sha256: kept.sha256, mime: kept.mime, bytes: bytes.byteLength });
 }
 
 /** `GET /api/files/<sha256>`: the bytes, inert, typed by their first bytes again. */

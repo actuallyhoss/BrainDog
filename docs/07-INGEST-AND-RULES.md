@@ -114,6 +114,17 @@ writes:
 on_conflict: skip          # skip | update | new
 ```
 
+A webhook ingest also declares `verify:`, checked at the door and never in code (DOR-3, `packages/kernel/src/declare.ts`):
+
+| `verify:` | Checks | Row |
+|---|---|---|
+| `{ kind: path }` | a random segment minted into the door's own URL, kept only as its SHA-256 | `ingestMint` |
+| `{ kind: hmac_sha256 \| stripe \| github, header?, key: <vault label>, tolerance?: 1s..60m, stripe only }` | the signature the sender put over the raw body, with the key named by its vault label and never written into the declaration | `packages/host/src/ingest.ts` |
+
+`header` defaults to what each sender actually sends when the declaration names none: `X-Signature` for `hmac_sha256`,
+`Stripe-Signature` for `stripe`, `X-Hub-Signature-256` for `github`. `tolerance`, how far the signed time may sit from
+now, is Stripe's alone, since Stripe is the one sender here that signs the time along with the body.
+
 ### The transform vocabulary, and it is closed
 
 | Transform | Does | JSON form |
@@ -303,6 +314,14 @@ That is the answer to every *"but my bank is different."*
 | Write outside `writes:` | that field is the whole of its permission |
 | Silently drop | an unmatched payload is kept raw, with its arrival time |
 | Write a row derived from unmatched content without approval | see [12-SECURITY](12-SECURITY.md) §5 |
+
+**A door can still hand its arrival to a script.** The ingest runs no code, but a `script` declaration whose
+`runs.door` names it is started by each verified arrival at it: the arrival is stored and matched as ever, and one
+`script.run` is queued for each such script with `input: { body, headers }`, in the arrival's own transaction
+(`startAtDoor` in `packages/kernel/src/script.ts`, called from `arrive` in `ingest.ts`). An unverified arrival, a
+redelivery of bytes already offered, a paused script, and an arrival too big to queue start nothing, and past
+`doorRunsPerDay()` a day the script is not started and says so once. The script runs in the host's sandbox, never in
+the record, and writes only what its `writes:` names ([25-CONNECTORS](25-CONNECTORS.md) §12).
 
 ---
 
@@ -561,24 +580,25 @@ predicate against the real rows and writes nothing.
 
 *(Added September 22nd 2026 for [DIRECTION §22](../loop/DIRECTION.md)'s automations layer. The design is
 `loop/research-shell-automations.md` §2 to §4; this section is what the lint holds and what the runner does. Of the
-steps that wait on somebody else, asking a person runs; asking Slash runs on a host with a model and is refused at
-install on one without; a script step starts the script and does not wait for it, since September 24th; a call is
-later work, and the section says where a run meets one.)*
+steps that wait on somebody else, asking a person runs, and can put the question to one member; asking Slash runs on
+a host with a model and is refused at install on one without; a script step starts the script and does not wait for
+it, since September 24th; a call step sends its declared call and waits for the answer. Checked against the code
+again on September 28th.)*
 
-**Not a kind of its own.** [04-PACKS](04-PACKS.md) closes the list of kinds, nine since `script` joined it on
-September 22nd (`KINDS` in `packages/kernel/src/declare.ts`), so an automation is a `rule` body that has
-grown two keys: `on:`, what starts it, and `steps:`, what it does. A rule with neither is an automation whose trigger
+**Not a kind of its own.** [04-PACKS](04-PACKS.md) closes the list of kinds (`KINDS` in
+`packages/kernel/src/declare.ts`, which `script` and `job` have joined since it was written), so an automation is a
+`rule` body that has grown two keys: `on:`, what starts it, and `steps:`, what it does. A rule with neither is an automation whose trigger
 is a write to its register, which is every rule installed before this section was written. The canvas can open all
 of them.
 
 ```yaml
-rule: gold_rate
-on: { every: 1h }                         # or written, arrival, manual
+rule: queue_watch
+on: { every: 1h }                         # or written, arrival, metric, decided, manual
 steps:
-  - call: { ingest: gold_price, as: price }
-  - if: { field: price, gt: 3000 }       # a condition over the run's answers
+  - call: { ingest: queue_depth, as: depth }   # a declared call; the run waits for its answer
+  - if: "depth > 100"                          # a condition over the row and the run's answers
     then:
-      - notify: { say: "Gold is at {{vars.price}}" }
+      - notify: { say: "The queue holds {{vars.depth}}" }
 ```
 
 **Two paths, and the body decides which.** `pathOf` in `packages/kernel/src/flow-lint.ts` answers `inline` or
@@ -594,8 +614,8 @@ steps:
 `packages/kernel/src/capabilities.ts`: whether it installs, whether a run takes it, on which hosts, and the words said
 where it does not. The lint, the runner, the record's dry run and the grammar an agent reads (`braindog:grammar/automations`,
 whose `not_in_this_build` is those rows) all read that table, so none of them says a capability the others do not. What
-the rows say today: every trigger installs and starts a run; a `call` step installs and fails the run that reaches it;
-`ask_slash` runs only on a host that answers Slash; `to:` on an `ask_person` does not install.
+the rows say today: every trigger installs and starts a run, and every step installs and runs, except that
+`ask_slash` runs only on a host that answers Slash.
 
 **What the lint refuses, and why each is refused rather than ignored.** Each of these installed before September
 22nd, and each would then have done nothing.
@@ -616,11 +636,11 @@ the rows say today: every trigger installs and starts a run; a `call` step insta
 | `then:` and `steps:` together | one list of things |
 | more than 50 steps, counting both arms of every branch; a branch nested past 3; more than 64 answer names | the kernel's ceilings, which `limits:` may lower and never raise (`runs_per_day` at most 1,000) |
 | a `call` step naming an address, or a call that is not declared with `trigger: rule` or `both` | a step names a declared call, whose host, key and fields were approved at install, exactly as `run:` does |
-| a `call` step or `run:` whose call `sends:` fields of a register, on a trigger that brings no row of that register: a clock, a button, or an arrival whose `ingest:` does not write it | the call would post a row nobody handed it. A call that sends nothing, such as the price in the example above, needs no row and runs on a clock |
+| a `call` step or `run:` whose call `sends:` fields of a register, on a trigger that brings no row of that register: a clock, a button, or an arrival whose `ingest:` does not write it | the call would post a row nobody handed it. A call that sends nothing, such as the one in the example above, needs no row and runs on a clock |
 | an answer name (`as:`) that is not an identifier, or is `trigger` or `vars` | it is read back as `{{vars.<name>}}`, and those two are the run context's own keys |
 | a step that notifies, creates, suggests, runs, calls or asks about a written row with no `once_per` | the same reason `notify` has always needed it |
 | an `ask_person` with fewer than two `options:`, or the same one twice | the question is opened through the gate's own `propose`, which refuses a choice of one, so it would install and fail at every run |
-| `to:` on an `ask_person`, while its row in the capability table does not install | a question goes to the record's queue, where anyone who decides answers it: `NOT_IN_THIS_BUILD` |
+| `to:` on an `ask_person` that is not text, or is blank | it is the id of the one member the question is put to, or a hole the run fills with one (`{{trigger.row.owner}}`). Whether that id is a member now is asked when the run reaches the step, since who is a member changes after install |
 | `about:` on an `ask_slash` that is not a list of field ids, on a trigger with no row, naming a field the row's list does not have (`FIELD_UNKNOWN`), or naming a `secret` or `file` field | `about:` is the fields of the run's row that go with the question, and a secret or a file never leaves the record |
 | an `ask_slash` whose `question:` names a `secret` or `file` field of the row (`{{pin}}`, `{{trigger.row.pin}}`), the whole row of a list that has one (`{{trigger.row}}`), or a variable a `set_var` before it filled from one, directly or by way of another variable | the question leaves the record as surely as `about:` does. The refusal names the `set_var` where the field went in |
 | `ask_slash`, once its `question:`, `as:`, `shape:`, `choices:` and `about:` are right, on a host that does not answer one | nothing would lease the `infer.ask` job it queues, so a run would wait its day and fail with nobody asked: `NOT_IN_THIS_BUILD`, *"… no host in this build answers an automation's question to Slash. Ask a person with ask_person instead."* Which hosts answer is under *Who answers a question to Slash*, below |
@@ -656,9 +676,11 @@ on: { every: 1y, day: 1, at: "09:00", month: apr }      # 1 April every year
 
 The canvas offers the same clocks (`apps/web/src/lib/flow/calendar.ts`): 15 minutes to a week, then every month,
 2, 3, 4 or 6 months, and every year, with the month, the day and the time as fields. A rule written with `12mo` opens
-with its own clock kept. Measured on 25 September, the canvas's own fault list (`faultsOf` in
-`apps/web/src/lib/flow/flow.ts`) still says *"1mo is not a clock"* of every one of them, so Send stays off on a monthly
-rule the record would take, and the card and the sheet's heading say the clock as written (*"1mo on 31 at 09:00"*).
+with its own clock kept. Every pick and edit of a clock is written from the clock it was (`clockTo`), keeping what the
+new clock reads and supplying what the lint requires, so a pick from `1mo` to `3mo` keeps its day and adds a month. The
+canvas's fault list (`faultsOf` in `apps/web/src/lib/flow/flow.ts`) raises nothing about a clock of months, so Send is
+on for a monthly rule the record takes. The card and the sheet's heading say the clock as the record says it on Decide
+(`calendarWords`, *"On the last day of each month at 09:00"*), and one the record would refuse as it was written.
 
 **One older shape is let through, and only one.** Some rules carry `on: create` as a word. Nothing ever read it:
 the pass fired those rules on every write. They lint as they did and answer `inline`. `create` is the only word any
@@ -723,10 +745,12 @@ for in writing.
 | `set_var` | fills `{{vars.…}}` and `{{trigger.…}}` into `to:` and keeps the answer; one answer holds 4 KB, all of them 64 KB |
 | `if` | reads the condition with the sentence builder over the run's row and its answers together; a field of the row wins over an answer of the same name |
 | `wait` | parks the run on its own schedule row and resumes it when the span has passed. A wait whose step row already says `done` is over and is not armed again |
-| `ask_person` | opens an `options` suggestion through the gate, by `rule:<id>`, whose body carries the run and the step, and parks the run until the end of its `wait:` (a week when it names none). A decision on it hands the chosen option's words to the run as `{{vars.<as>}}` and wakes it for the next drain; putting it off changes nothing; closing it unanswered, or the wait running out, fails the run with a sentence, and a question whose run has ended is closed with it |
+| `ask_person` | opens an `options` suggestion through the gate, by `rule:<id>`, whose body carries the run and the step, and parks the run until the end of its `wait:` (a week when it names none). A decision on it hands the chosen option's words to the run as `{{vars.<as>}}` and wakes it for the next drain; putting it off changes nothing; closing it unanswered, or the wait running out, fails the run with a sentence, and a question whose run has ended is closed with it. With `to:`, filled from the run, the question is put to that one member, and only they or an owner may answer it (`decide` in `govern.ts`); a `to:` that names nobody who is a member now, or one suspended, fails the run with nothing asked |
 | `ask_slash` | queues one `infer.ask` outbox job, `{ run, rule, step, question, shape, choices?, about? }`, and parks the run for a day. The question is filled from the run's row with every `secret` and `file` field read as the dash, and so is a variable set from one; `about` carries the fields the step names, never one of those two types. `rule` is who asks: the host's pass refuses a job without it and calls no model, because Slash's ledger row is written as `rule.<id> step <n>` and a key is opened as `rule:<id>`. The pass acks each job one of three ways. `done` with `result.text` is the answer, held to the step's `shape:` (a number, or one of its `choices:`) and kept as `{{vars.<as>}}`. `done` with `result.failed` is the sentence of a refusal no retry mends, which ends the run on that sentence: the month's asks spent, an answer the host could not read, an answer of the wrong shape or a blank one, a job queued without its rule, and on the Worker a vault with no key labelled `slash`. `failed` is a model not reached, which the outbox's retry ladder asks again, eight attempts over about four hours, and whose last rung fails the run with a sentence instead of opening a dead letter. A `done` with neither ends the run on *"Slash answered job … with no text"*. On a host that does not answer, a rule an earlier build let install fails the run there with `NOT_IN_THIS_BUILD` before anything is queued, and the steps before it stand |
 | `script` | queues one `script.run` outbox job, the one a script's clock queues, `{ script, version, input }`, pinned to the version active now, and the run goes on to its next step without waiting. `input` is the row's `id`, `register` and `seq` and what the step's `input:` says, filled from the run; the row's fields are not copied, and a script reads them through its own `reads:`. An `input:` that reaches a `secret` or `file` field fails the run and queues nothing. `as:` keeps the job's id. The run fails there, with a sentence and nothing queued, when the script is not installed or retired or its pack is off, when it does not say `runs: { rule: true }`, and when it is paused, until somebody resumes it. When a job for the same script with the same input is still unfinished, nothing more is queued and `as:` keeps that job's id. What the script writes lands through the ordinary write path as `script:<id>@v<n>`, when a host has run it |
-| `call` | while its row in the capability table does not run, fails the run there with that row's sentence; the steps before it stand |
+| `call` | queues the declared call as one `pull.fetch` outbox job naming the run and the step (`queueCall` in `actions.ts`), sending the run's row's fields only when the call `sends:` them, and parks the run for a day (`CALL_WAIT_MS` in `flow.ts`). The job's ack hands the provider's answer back, kept under `as:` as its JSON, so `{{vars.depth.total}}` reads into `{"total":120}`, or as its text when it is not JSON; an answer over 4 KB, the most one answer holds, stops the run with its size in the sentence, and a call that stopped hands back its sentence and fails the run. A call `queueCall` refuses fails the run there with nothing queued, and a wake that finds no answer after the day fails it with a sentence. The steps before it stand |
+| `meet` | `{ name?, email?, handle?, where }`, each filled from the run and the row as a note is, meets one person through `people.ts`'s `meet` as `rule:<id>`, linked to the run's project: matched by email, then handle, never by name; added to the list that plays `meets:` when nobody matches; `where` kept on them as a dated line (`mail: {{trigger.body.subject}}` keeps the day, then `mail:` and the subject); a name shared with somebody else opens one merge question. A key that fills with nothing is left out, and when name, email and handle all do, nobody is met, the step row says `skipped` and the run goes on; a `where` that fills with nothing says the rule. A key that reaches a `secret` or `file` field fails the run and meets nobody, and so does anything `meet` refuses, such as no list playing `meets:` |
+| `run_job` | `{ kind: 'job.<id>', args?, as? }` queues one job of that kind through `createJob` (`jobs.ts`), with the args filled from the run and the row and the run's row as its `about`, and parks the run. The run looks at the job's row every five minutes (`RUN_JOB_LOOK_MS` in `flow.ts`, since a job ends in `jobs.ts`, which knows nothing of runs) and, once the job ends, keeps `ok`, `needs_decision` or `error` under `as:` (every other end reads as `error`; the step row keeps which it was) and goes on. A job not ended a day after it was queued fails the run with a sentence and is left to run. A kind not approved, or retired, args the kind does not take, or one that reaches a `secret` or `file` field fail the run with nothing queued; `createJob`'s own ceilings on jobs waiting and jobs a day apply, and a write trigger needs `once_per` |
 
 **Who answers a question to Slash.** The record is opened with `answersSlash` where its host has a pass that asks
 Slash, and it is the same fact as `/api/version`'s `slash`, because both come out of one builder
@@ -800,9 +824,8 @@ that counts scheduled actions counts automations beside them: a failed or cancel
 A run can be cancelled while it waits, and its wake is dropped with it.
 
 **Not yet.** Runs are `local`: they do not travel in a `.brain` file, and carrying them means a format revision. A
-`call` step fails the run, and a script's answer does not come back into the run that started it: the step hands off
-and the run goes on. A question to Slash is answered on the two hosts above and
-nowhere else. A record opened without `answersSlash` refuses the step at install and fails it at the run, and both
+script's answer does not come back into the run that started it: the step hands off and the run goes on. A question
+to Slash is answered on the two hosts above and nowhere else. A record opened without `answersSlash` refuses the step at install and fails it at the run, and both
 read that one switch, so neither can come off without the other.
 
 ---

@@ -67,6 +67,7 @@
   import { latest } from './latest.ts';
   import { capLine, drawProposal, drawReading, offersSlash, pass2Refused, secondPass, slashWords, type Drawn, type DrawnProposal } from './slash.ts';
   import Cited from '../ui/Cited.svelte';
+  import SlashOut from '$lib/ui/SlashOut.svelte';
   import type { SlashStatus } from '@braindog/client';
 
   let { open = $bindable(false), nav }: { open?: boolean; nav: NavEntry[] } = $props();
@@ -146,7 +147,7 @@
    * cannot land over the next one. `Esc` in the mode goes back to the list and keeps the text; a second `Esc` closes.
    */
   /** Pass 2 under the rows: `null` while it is being written, then the proposal or the refusal, never both. */
-  type Second = { drawn: DrawnProposal | null; refused: { fix: string; without: string | null } | null };
+  type Second = { drawn: DrawnProposal | null; refused: { fix: string; without: string | null; spent?: boolean } | null };
   let slash = $state<{ q: string; question: string; drawn: Drawn | null; fix: string | null; second: Second | null } | null>(null);
   const slashShown = $derived(slash !== null && slash.q === q ? slash : null);
   const unreached = (e: unknown) => ({ ok: false as const, refusal: { code: 'UNREACHABLE', fix: e instanceof Error ? e.message : String(e) } });
@@ -1046,6 +1047,7 @@
             {#if slashShown.second.refused}
               <p class="p-slash-said">{slashShown.second.refused.fix}</p>
               {#if slashShown.second.refused.without}<p class="p-slash-said">{slashShown.second.refused.without}</p>{/if}
+              {#if slashShown.second.refused.spent}<SlashOut />{/if}
             {:else if slashShown.second.drawn}
               <!-- SLASH'S SENTENCE WITH ITS BRACES DRAWN, never printed (`Cited`): a row is a link to the row, a figure is
                    the figure. Following a link leaves the palette, as following any of its rows does; the listener is on
@@ -1493,7 +1495,10 @@
       padding-block: 0;
     }
 
+    /* ONE EDGE DOWN THE SCREEN (design DSN-16): the list's inset plus a row's own puts every glyph on the 16px gutter
+       the field's glyph sits on in the bar above, where the list's desktop inset left them four pixels inside it. */
     #palette-list {
+      padding-inline: var(--sp-2);
       padding-block-end: calc(var(--kb) + env(safe-area-inset-bottom, 0px) + var(--sp-2));
     }
   }

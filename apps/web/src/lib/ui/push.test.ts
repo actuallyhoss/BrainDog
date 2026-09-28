@@ -9,9 +9,9 @@
  *
  * THE SERVICE WORKER RUNS HERE, AGAINST A STAND-IN FOR ITS GLOBAL SCOPE. A service worker does not register under
  * `node --test`, but the file is two listeners on `self`, so the test puts an object with the same four members on
- * `globalThis.self`, imports the file, and fires the events at what it registered. That is how "reads nothing and caches
- * nothing" is held by behaviour rather than by a pattern over the source: a push whose payload throws when read still
- * shows the line, and nothing but `push` and `notificationclick` is ever listened for.
+ * `globalThis.self`, imports the file, and fires the events at what it registered. That is how "reads nothing of a push"
+ * is held by behaviour rather than by a pattern over the source: a push whose payload throws when read still shows the
+ * line. The read copy's listeners are registered too and never fired here.
  *
  * THE SUBSCRIPTION'S SHAPE IS `37 §2.3`'s `PushSubscription`, `{ endpoint, keys: { p256dh, auth } }`, and the two method
  * names are the ones W58-2 adds to the record. Neither was in the host table when this was written, so both are held by
@@ -439,9 +439,10 @@ test('A PUSH SHOWS ONE FIXED LINE AND READS NOTHING THAT CAME WITH IT', async ()
   assert.deepEqual(w.shown[0]?.[1], { tag: 'braindog' });
 });
 
-test('THE WORKER LISTENS FOR PUSH AND A CLICK AND NOTHING ELSE, so it caches nothing and answers no request', async () => {
+test('THE WORKER LISTENS FOR PUSH, A CLICK, AND THE READ COPY\'S THREE EVENTS, each once', async () => {
+  /* THE READ COPY (MOD-27) ADDED `install`, `activate` and `fetch`; `lib/data/offline.ts` holds which request is which. */
   const w = await worker();
-  assert.deepEqual([...w.on.keys()].sort(), ['notificationclick', 'push']);
+  assert.deepEqual([...w.on.keys()].sort(), ['activate', 'fetch', 'install', 'notificationclick', 'push']);
 });
 
 test('A CLICK CLOSES THE LINE AND OPENS THE RECORD\'S HOME, the root of the scope the worker was registered at', async () => {

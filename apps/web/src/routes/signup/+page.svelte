@@ -34,7 +34,7 @@
   import { titleOf } from '$lib/title.ts';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
-  import Mark from '$lib/ui/Mark.svelte';
+  import Entry from '../signin/Entry.svelte';
   import { drew } from '$lib/ui/screen.svelte.ts';
   import NoRecord from '../start/NoRecord.svelte';
   import NameField from './NameField.svelte';
@@ -238,13 +238,9 @@
 
 <svelte:head><title>{titleOf(copy.signupTitle)}</title></svelte:head>
 
-<div class="door">
+<!-- THE ENTRY LAYOUT EVERY WAY IN SHARES (`signin/Entry.svelte`): the brand at the top left, then this column. -->
+<Entry>
   <div class="col">
-    <header class="brand">
-      <Mark height={36} />
-      <span class="wordmark">{copy.product}</span>
-    </header>
-
     {#if step === 'loading' || step === 'verifying'}
       <h1 class="title">{copy.signupTitle}</h1>
       <p class="quiet" role="status">{step === 'verifying' ? copy.signupVerifying : copy.checkingWays}</p>
@@ -320,51 +316,33 @@
       {/if}
     {/if}
   </div>
-</div>
+</Entry>
 
 <style>
-  /* ONE COLUMN AT EVERY WIDTH, in the 16px gutter on a phone. `minmax(0, …)` so a long address cannot widen the track
-     past the screen and take the page sideways. */
-  .door {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    justify-items: center;
-    min-block-size: 100dvh;
-    padding-block: var(--sp-7);
-    padding-inline: var(--gutter);
-    background: var(--bg);
-  }
-
+  /* ONE COLUMN AT EVERY WIDTH. The frame, its gutter and the brand are `Entry.svelte`'s; `min-inline-size: 0` so a
+     long address cannot widen the column past the screen and take the page sideways. */
   .col {
     display: flex;
     flex-direction: column;
     gap: var(--sp-5);
-    inline-size: 100%;
-    max-inline-size: 26rem;
     min-inline-size: 0;
   }
 
-  .brand {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-  }
-
-  .wordmark {
-    color: var(--ink);
-    font-family: var(--font-display);
-    font-size: var(--t-lg);
-    font-weight: 600;
-  }
-
+  /* THE ENTRY SCREENS' ONE TITLE: `--t-3xl` in the display face, as sign in's slogan and /start's question are
+     (design §4), so moving from one of these screens to the next does not change the size of what it asks. */
   .title {
     color: var(--ink);
-    font-size: var(--t-xl);
+    font-family: var(--font-display);
+    font-size: var(--t-3xl);
     font-weight: 600;
-    line-height: var(--lh-tight);
+    letter-spacing: -0.03em;
+    line-height: var(--lh-3xl);
+    text-wrap: balance;
+    overflow-wrap: anywhere;
   }
 
   .title:focus {
+    /* focus-ok: `tabindex="-1"` moves focus here for a screen reader after mail sends; it is never in the tab order and has no interactive affordance a sighted keyboard user needs a ring to find. */
     outline: none;
   }
 
@@ -424,7 +402,6 @@
   }
 
   .aside {
-    text-align: center;
     font-size: var(--t-sm);
   }
 
@@ -435,9 +412,8 @@
     color: var(--link);
   }
 
-  @media (width < 900px) {
-    .door {
-      padding-block: var(--sp-5);
-    }
+  /* A FOCUSED FIELD SCROLLS CLEAR OF THE KEYBOARD, with room under it for the Send button riding `--kb` below. */
+  .row .field-input {
+    scroll-margin-block: var(--sp-6) calc(var(--tap) + var(--sp-7));
   }
 </style>

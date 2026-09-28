@@ -186,7 +186,7 @@ export function scriptTrial(options: ScriptTrialOptions): (draft: ScriptDraft) =
     const id = mint();
     const hold = options.ledger === null ? null : await options.ledger.mayRun(record.id, body.script, pending);
     if (hold) {
-      await count(id, record.id, body.script, 'held', { runs: 0, requests: 0, bytes: 0, ms: 0, failures: 0, held: 1 });
+      await count(id, record.id, body.script, 'held', { runs: 0, requests: 0, bytes: 0, ms: 0, failures: 0, held: 1, cpu_ms: 0 });
       return { held: hold };
     }
 
@@ -223,11 +223,11 @@ export function scriptTrial(options: ScriptTrialOptions): (draft: ScriptDraft) =
     try {
       answer = await options.sandbox(scripted, { grantOf, reads: draft.reads });
     } catch (e) {
-      await count(id, record.id, body.script, 'failed', { runs: 0, requests: 0, bytes: 0, ms: 0, failures: 1, held: 0 });
+      await count(id, record.id, body.script, 'failed', { runs: 0, requests: 0, bytes: 0, ms: 0, failures: 1, held: 0, cpu_ms: 0 });
       throw e;
     }
     if ('held' in answer) {
-      await count(id, record.id, body.script, 'held', { runs: 0, requests: 0, bytes: 0, ms: 0, failures: 0, held: 1 });
+      await count(id, record.id, body.script, 'held', { runs: 0, requests: 0, bytes: 0, ms: 0, failures: 0, held: 1, cpu_ms: 0 });
       return answer;
     }
     const refused = 'refused' in answer;
@@ -238,6 +238,7 @@ export function scriptTrial(options: ScriptTrialOptions): (draft: ScriptDraft) =
       ms: answer.usage.wall_ms,
       failures: refused ? 1 : 0,
       held: 0,
+      cpu_ms: answer.usage.cpu_ms,
     });
     return answer;
   }

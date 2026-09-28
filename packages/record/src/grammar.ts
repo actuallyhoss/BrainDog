@@ -257,6 +257,7 @@ const STEP_SAYS: Readonly<Record<string, string>> = {
   set_var: '{"set_var":{"name":"<answer>","to":"<text>"}}',
   wait: '{"wait":"2h"}: m, h, d or w',
   ask_person: '{"ask_person":{"question":"<text>","options":["yes","no"],"as":"<answer>","wait":"2d","to":"<member id>"}}: opens on Decide; to is optional',
+  meet: '{"meet":{"name":"<text>","email":"<text>","where":"<text>"}}: meets one person into People; one of name, email or handle, and where',
   tag: '{"tag":"x"}',
   untag: '{"untag":"x"}',
   set: '{"set":{"field":"f","to":"v"}}',
@@ -325,9 +326,8 @@ const PROPOSALS = {
  * A door and a scheduled action: an ingest declaration, which is how anything reaches the record from outside it.
  *
  * WHAT THE KERNEL'S LINT HOLDS, SAID ONCE (`kernel/src/declare.ts`, `ingestBody` and `actionFault`). It is a reference,
- * like the rest of this file, and the install still decides. It names no auth kind for a call or a poll beyond the key's
- * label, because that key is sent as a bearer until DOR-5 builds the others there, and a grammar that promised them
- * first would teach a declaration that installs and then sends the wrong header.
+ * like the rest of this file, and the install still decides. A call and a poll take four ways to send the key: header,
+ * query, basic or, absent, a bearer.
  */
 const INGEST = {
   declaration: { id: 'ingest.<name>', kind: 'ingest', body: 'the keys below' },
@@ -356,8 +356,11 @@ const INGEST = {
     trigger: 'call only: schedule (the default), rule or both',
     sends: 'call only, with trigger rule or both: the fields of the rule row it sends, each register.field, never a secret or a file',
     body: 'call only: one JSON object, at most 8 KB; {since}, {until} and, from a rule, {row.<field>} for a field it sends',
+    auth: 'call and poll: {kind: header, name: <header>}, {kind: query, name: <parameter>} or {kind: basic}; absent is a bearer. The key is still named by grant, never here',
+    at: 'HH:MM, the time of day each run belongs to, with every in whole days (1d, 2d, 1w)',
+    tz: 'the zone at is read in, such as Africa/Cairo; absent is the record zone',
     fetch:
-      'pull only: {base: an https:// host alone, path, auth: {kind: bearer, basic, header or query_param, grant, name?}, schedule: {every}, read: {rows: <path>}}; the map reads each row',
+      'pull only: {base: an https:// host alone, path, auth: {kind: bearer, basic, header or query_param, grant, name?}, schedule: {every} (the same interval as every, or left out), read: {rows: <path>}}; the map reads each row',
   },
   never: 'a token, a key or a password: a key is named by its vault label and nothing else',
   examples: [
@@ -404,9 +407,10 @@ export function grammarOf(name: string): Result<unknown> {
  * description only a `change` is filed. They are the same objects `arrangement({ grammar })` answers, so the model and an
  * agent read one text.
  */
-export const describedGrammar = (): { page: unknown; register: unknown; metric: unknown; rule: unknown } => ({
+export const describedGrammar = (): { page: unknown; register: unknown; metric: unknown; rule: unknown; ingest: unknown } => ({
   page: PAGE,
   register: REGISTER,
   metric: METRIC,
   rule: RULE,
+  ingest: INGEST,
 });

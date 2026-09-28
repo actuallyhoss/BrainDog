@@ -18,13 +18,19 @@
  * passes no `pin`: Cloudflare does not route a Worker's `fetch` to a private address. Each passes its own `send`
  * and its own key opener, or `null` for a host with no key store.
  *
- * THE KEY IS OPENED FOR ONE REQUEST, only once every check has passed, and sent as a bearer to the origin that named
- * it. Its value is scrubbed from everything this file returns, the provider's answer included, in every spelling
- * `spellingsOf` names, so a provider that echoes the header back does not put the key in the record.
+ * THE KEY IS OPENED FOR ONE REQUEST, only once every check has passed, and sent to the origin that named it the way
+ * its declaration says: a bearer, a header, a query parameter or a basic pair, built by `@braindog/connect`'s auth
+ * builder (`authoriseCall`). Its value, and every value the builder put on the request, is scrubbed from everything
+ * this file returns, the provider's answer included, in every spelling `spellingsOf` names, so a provider that echoes
+ * the header back does not put the key in the record.
+ *
+ * A PROVIDER'S `Retry-After` on a 429 or a 5xx goes back as the instant it names (`notBefore`), and the record arms the
+ * retry no sooner.
  *
  * NO RUNTIME HERE. No `node:` import and no bare `fetch`, so both hosts import it and the stack gate holds.
  */
 
+import { authoriseCall, PullError, retryAfterMs } from '@braindog/connect';
 import { reserveFor, type Budget, type PagedRun } from '@braindog/kernel';
 import type { RecordApi } from '@braindog/record';
 import { METER_MANY_MAX, type COUNTED_ONLY } from '@braindog/record/directory';
@@ -452,7 +458,7 @@ function countedRun(o: { prefix: CountedPrefix; id: string; name: string; at: nu
     channel: o.prefix.slice(0, -1),
     scope: 'global',
     outcome: 'ok',
-    usage: { runs: 1, requests: o.requests, bytes: o.bytes, ms: 0, failures: 0, held: 0 },
+    usage: { runs: 1, requests: o.requests, bytes: o.bytes, ms: 0, failures: 0, held: 0, cpu_ms: 0 },
   };
 }
 
@@ -507,7 +513,7 @@ const METERED_TARGETS = [
   { target: 'declaration:rule.', name: 'rule:' },
 ] as const;
 
-const USAGE_KEYS = ['runs', 'requests', 'bytes', 'ms', 'failures', 'held'] as const;
+const USAGE_KEYS = ['runs', 'requests', 'bytes', 'ms', 'failures', 'held', 'cpu_ms'] as const;
 
 /**
  * A metered run's `pull` event as the row the pass would have handed the ledger, or `null` for any other line.
@@ -524,7 +530,7 @@ function meteredOf(line: LogLine): Metered | null {
   if (spec === undefined || id === '') return null;
   const said = to.usage;
   if (typeof said !== 'object' || said === null || Array.isArray(said) || typeof to.outcome !== 'string') return null;
-  const usage = { runs: 0, requests: 0, bytes: 0, ms: 0, failures: 0, held: 0 };
+  const usage = { runs: 0, requests: 0, bytes: 0, ms: 0, failures: 0, held: 0, cpu_ms: 0 };
   for (const key of USAGE_KEYS) {
     const n = said[key];
     if (n === undefined) continue;
@@ -880,7 +886,34 @@ export function sendAction<P extends object | undefined = undefined>(options: Se
         const opened = await options.openKey(request.grant);
         if (opened === null) return refuse('WRONG_KEY', `The key "${request.grant.label}" could not be opened on this host, so nothing was sent.`);
         if (opened !== '') secret = spellingsOf(opened);
-        headers.set('authorization', `Bearer ${opened}`);
+        /* THROUGH CONNECT'S AUTH BUILDER, the one place in the tree a credential meets a request. It is handed no other
+           header, so what it answers is the key's own headers and nothing the record sent. */
+        let signed: Awaited<ReturnType<typeof authoriseCall>>;
+        try {
+          signed = await authoriseCall(request.auth ?? { kind: 'bearer' }, opened, { url, method: request.method, headers: {} }, Date.now());
+        } catch (e) {
+          if (!(e instanceof PullError)) throw e;
+          /* A KEY THAT DOES NOT HOLD WHAT ITS KIND SENDS is a key to add again, so the action pauses the way a key the
+             host cannot open does. A header the request may not carry is a declaration to change, and is not retried. */
+          return e.code === 'PULL_AUTH_REJECTED'
+            ? refuse('WRONG_KEY', `The key "${request.grant.label}" does not hold what ${request.auth?.kind ?? 'bearer'} sends, so nothing was sent.`)
+            : refuse('PULL_REQUEST_REFUSED', `The key "${request.grant.label}" was not sent: ${e.fix}`);
+        }
+        /* EVERY VALUE THE BUILDER PLACED IS SCRUBBED TOO, and the credential inside a scheme word as well as with it: a
+           basic pair is sent as base64, and a key opened as a grant's fields is sent as one field of it. Longest first,
+           so no shorter text is struck out of a longer one before the longer is found. */
+        const placed = new Set<string>();
+        for (const [name, value] of Object.entries(signed.headers)) {
+          headers.set(name, value);
+          placed.add(value);
+          placed.add(value.replace(/^(?:Bearer|Basic) /u, ''));
+        }
+        const before = url;
+        signed.url.searchParams.forEach((value, name) => {
+          if (!before.searchParams.getAll(name).includes(value)) placed.add(value);
+        });
+        for (const text of [...placed].filter((t) => t !== '' && t !== opened).sort((a, b) => b.length - a.length)) secret.push(...spellingsOf(text));
+        url = signed.url;
       }
 
       for (let hop = 0; ; hop++) {
@@ -927,7 +960,18 @@ export function sendAction<P extends object | undefined = undefined>(options: Se
           return refuse('PULL_REQUEST_REFUSED', `${url.host} answered with more than ${request.maxBytes} bytes, which is this action's cap.`);
         }
         bytes += read.length;
-        return { status: response.status, body: scrub(new TextDecoder().decode(read)), bytes, ms: Date.now() - started, requests };
+        /* A PROVIDER THAT SAYS WHEN TO COME BACK is read the way a connector reads it (`retryAfterMs`: seconds or a
+           date, a past date is now, at most six hours), and only on the answers the record retries. */
+        const now = Date.now();
+        const wait = response.status === 429 || response.status >= 500 ? retryAfterMs(response.headers.get('retry-after'), now) : null;
+        return {
+          status: response.status,
+          body: scrub(new TextDecoder().decode(read)),
+          bytes,
+          ms: now - started,
+          requests,
+          ...(wait === null ? {} : { notBefore: now + wait }),
+        };
       }
     } catch (e) {
       const late = signal.aborted || (e instanceof Error && (e.name === 'TimeoutError' || e.name === 'AbortError'));

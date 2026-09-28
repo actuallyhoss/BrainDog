@@ -28,7 +28,7 @@ import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 
 import { hostKey, hostsPath, readHosts, sameHost, saveHosts, target } from './http.ts';
-import { BRAINDOG_SERVER, installProfiles, profilesOf, serversFileOf } from './install.ts';
+import { BRAINDOG_SERVER, installProfiles, PLACES_SKILL, profilesOf, serversFileOf } from './install.ts';
 import { login } from './login.ts';
 import { connect, isObject, syncSkills, type AgentIo } from './skills.ts';
 import { runClaude, writeTools, type ClaudeRunner } from './tools.ts';
@@ -187,18 +187,18 @@ export async function setup(args: string[], io: SetupIo): Promise<number> {
      * closing line names `install --apply` as the way to write it, which is not this command's way, so it is left out.
      */
     const planned = installProfiles(profiles, [], { apply: false, scripts: io.scripts }).lines;
-    const pending = planned.some((line) => line.startsWith('  + hooks.'));
+    const pending = planned.some((line) => line.startsWith('  + hooks.') || line.startsWith(PLACES_SKILL));
     const rest = (lines: string[]) => lines.filter((line) => !line.startsWith('Nothing was changed.') && !line.includes('already runs both BrainDog hooks'));
     if (!pending) {
-      io.out("2. Hooks: Claude Code's settings already run both BrainDog hooks.");
+      io.out("2. Hooks: Claude Code's settings already run the BrainDog hooks and Agent Skill.");
       detail(rest(planned));
     } else if (dryRun) {
-      io.out("2. Hooks: the BrainDog hooks would be added to Claude Code's settings, with a copy of the file kept first.");
+      io.out("2. Hooks: the BrainDog hooks and Agent Skill would be added to Claude Code's settings, with a copy of the file kept first.");
       detail(rest(planned));
     } else {
       const applied = installProfiles(profiles, [], { apply: true, scripts: io.scripts }).lines;
       changed = true;
-      io.out("2. Hooks: the BrainDog hooks were added to Claude Code's settings.");
+      io.out("2. Hooks: the BrainDog hooks and Agent Skill were added to Claude Code's settings.");
       detail(rest(applied));
     }
   } catch (e) {

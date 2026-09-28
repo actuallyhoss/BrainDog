@@ -1,15 +1,25 @@
 {
   "name": "braindog-render",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "The BrainDog block dialect: a parser, thirty-eight kinds over eight primitives, and two renderers held to one accessibility tree.",
   "type": "module",
   "license": "MIT",
+  "repository": { "type": "git", "url": "git+https://github.com/actuallyhoss/braindog.git", "directory": "packages/render" },
   "exports": {
     ".": "./src/index.ts",
     "./svelte": "./svelte/index.ts",
     "./glyphs": "./src/glyphs/index.ts",
     "./glyphs/names": "./src/glyphs/names.ts"
   },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+      "./glyphs": { "types": "./dist/glyphs/index.d.ts", "default": "./dist/glyphs/index.js" },
+      "./glyphs/names": { "types": "./dist/glyphs/names.d.ts", "default": "./dist/glyphs/names.js" }
+    }
+  },
+  "files": ["dist", "src/glyphs/NOTICE"],
   "peerDependencies": {
     "svelte": "^5"
   },
@@ -17,6 +27,7 @@
     "svelte": { "optional": true }
   },
   "scripts": {
+    "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && tsc -p tsconfig.build.json",
     "test": "node --test src/*.test.ts src/glyphs/*.test.ts svelte/p/*.test.ts",
     "typecheck": "tsc -p tsconfig.json"
   }

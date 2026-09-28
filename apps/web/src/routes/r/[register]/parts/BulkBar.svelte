@@ -40,7 +40,8 @@
     saidInLine: (field: string, value: string) => string;
     copyIds: () => void;
     setPickedState: (state: string) => void;
-    archiveSelected: () => void;
+    /** Absent for a caller whose level cannot change the list, and Archive is then not on the bar (COL-13). */
+    archiveSelected?: (() => void) | undefined;
     onclear: () => void;
   } = $props();
 </script>
@@ -67,9 +68,11 @@
       {/each}
     </Menu>
   {/if}
-  <Button weight="quiet" onclick={() => archiveSelected()}>
-    <Icon name="archive" size="s" />{copy.archiveSelected}
-  </Button>
+  {#if archiveSelected}
+    <Button weight="quiet" onclick={() => archiveSelected?.()}>
+      <Icon name="archive" size="s" />{copy.archiveSelected}
+    </Button>
+  {/if}
   <button type="button" class="picked-clear" onclick={() => onclear()}>{copy.clear}</button>
 </div>
 

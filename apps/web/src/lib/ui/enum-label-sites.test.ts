@@ -225,7 +225,8 @@ test("A THREAD SAYS EACH UPDATE'S HEALTH, AND OFFERS EACH, BY THE RECORD'S LABEL
   relabelAll(REGISTERS, {});
   assert.deepEqual(healthChoices(REGISTERS.updates).map(([, said]) => said), ['On track', 'At risk', 'Off track']);
   /* The two source checks: the page draws both through the functions above, and keeps writing the stored value. */
-  assert.ok(TRACK_PAGE.includes('{#each healthChoices(REGISTERS.updates) as [v, said]}<option value={v}>{said}</option>{/each}'), "the composer no longer offers a health through `healthChoices`");
+  assert.ok(TRACK_PAGE.includes('{#each healthChoices(REGISTERS.updates) as [v, said] (v)}'), "the composer no longer offers a health through `healthChoices`");
+  assert.ok(TRACK_PAGE.includes('onclick={() => (draftHealth = v)}>{said}</button>'), 'the composer no longer draws the health it offers in the words `healthChoices` gives');
   assert.ok(TRACK_PAGE.includes('label={healthSaid(REGISTERS.updates, String(u.fields.health))}'), "an update's chip no longer says its health through `healthSaid`");
 });
 

@@ -91,7 +91,7 @@ the code too (`tools/gates/docs-counts.mjs`).
 | 50 | [Spec · web](50-SPEC-WEB.md) | HISTORICAL | |
 | 51 | [Spec · worker](51-SPEC-WORKER.md) | HISTORICAL | |
 | 52 | [Spec · testing and CI](52-SPEC-TESTING-AND-CI.md) | HISTORICAL | |
-| 53 | [Spec · operations](53-SPEC-OPERATIONS.md) | HISTORICAL | |
+| 53 | [Spec · operations](53-SPEC-OPERATIONS.md) | REFERENCE | |
 
 A builder reads the CONTRACT sections the brief names, and nothing else here. To learn how a part works, read its code.
 

@@ -31,9 +31,10 @@ operator's review between that door and the listing.
 | What it answers | `index.json` (the catalogue format, unchanged), each published file at `packs/<id>/<version>.pack.json` or `usecases/<id>/<version>.usecase.json`, the `.preview.json` beside it, and `counts.json`. Every read is public, to every origin, and a published file is served as immutable |
 | The index | BrainDog's own catalogue, bundled with the deployed build, then everything listed from outside. An id the bundled catalogue holds, or that BrainDog's built-in modules and use cases install under, is BrainDog's: no submission may take it |
 | Storage | the Cloud's existing R2 bucket, under `kennel/`: the Kennel's index, the review file, the trusted publishers, the counts, and the files. No table, no migration, no new binding |
-| Publishing | `POST submit` with the file. The publisher is the author's key when the file is signed (the Ed25519 signature a catalogue already verifies), or the person signed in to BrainDog on that host. An id belongs to whoever published it first: a later version comes from the same person, or is signed by the same key or one it rotated to |
+| Publishing | `POST submit` with the file. The publisher is the author's key when the file is signed (the Ed25519 signature a catalogue already verifies), or the person signed in to BrainDog on that host. An id belongs to whoever published it first: a later version comes from the same person, or is signed by the same key or one it rotated to. In the app, `/packs/share` publishes a use case and a page's "Share as a template" publishes a pack of that page alone, both as the signed-in person (`apps/web/src/lib/market/publish.ts`, `template.ts`). From a terminal, `braindog pack publish --kennel` and `braindog usecase publish --kennel`, signed with `--sign <key file>` or sent as the machine's sign-in (`apps/cli/src/kennel.ts`) |
 | Checks | the door a record installs through (size, credentials, shape, block kinds), a title, no manifest key outside `MANIFEST_KEYS`, versions that only move forward and are bumped as far as what they change, a daily limit per publisher, and a ceiling on how many wait at once. The record itself stays lenient about manifest keys; the Kennel is where a key nothing reads is refused by name |
-| Review | a submission from a publisher the operator has not trusted waits, and the operator lists it or refuses it with a reason. `GET review` lists what waits, and `GET review?kind=&id=&version=` answers one waiting file whole, so every script's source is read before it is listed. A listed version says when it was reviewed, and may carry a preview of its pages the operator made, never one its author drew. With no `PROVISION_KEY`, the review doors answer `NOT_IN_THIS_BUILD` |
+| Review | a submission from a publisher the operator has not trusted waits, and the operator lists it or refuses it with a reason. `GET review` lists what waits, and `GET review?kind=&id=&version=` answers one waiting file whole, so every script's source is read before it is listed. A listed version says when it was reviewed, and may carry a preview of its pages the operator made, never one its author drew. The operator reviews from a terminal with `braindog kennel review` and `PROVISION_KEY` in the environment, which installs the waiting file in a scratch record first, so every refusal a record would give is seen before it is listed (`apps/cli/src/kennel.ts`). With no `PROVISION_KEY`, the review doors answer `NOT_IN_THIS_BUILD` |
+| Counts | `counts.json` says how many hosted records have each listing on, keyed `<kind>:<id>`, for listed entries only, rounded down by `roundCount` with nothing under ten, written once a night by the walk (`writeCounts` in `apps/worker/src/kennel.ts`, the per-record step in `apps/worker/src/nightly.ts`). A self-host is never counted. As built, the Worker's nightly call does not yet hand the walk its per-record step or the counts write (`apps/worker/src/index.ts`), so the file answers an empty tally and nothing shows a count until it does |
 | Yanking | a version's key, its publisher or the operator takes a version back with a reason. It stays downloadable by its exact version, so a record that holds it keeps working, and a reader never offers it again |
 | A self-host | answers the same paths from its own catalogue folder first and the public Kennel second (`BRAINDOG_KENNEL`, `off` for none), keeping the public index for `KENNEL_KEEP_MS`. With the Kennel off or unreachable, its folder answers alone. It takes no submissions itself |
 | Install | still URL, git ref, file or paste. **The index is a convenience, never a gate**: every install is the record's own plan, approved by its owner, whatever it came from |
@@ -89,7 +90,8 @@ distribution channel. If that stops being true, this is a framework, and framewo
 monetise at zero (n8n at 203k★, priced at zero to an individual).
 
 The gate that measures it: **5 packs by somebody who is not Sam.** Zero at six months means the
-eight kinds are one person's shape, not a general one.
+declaration kinds (`KINDS` in `packages/kernel/src/declare.ts`, [04-PACKS](04-PACKS.md) §1) are one
+person's shape, not a general one.
 
 ---
 
@@ -116,7 +118,7 @@ Community is not a forum. It is the set of places a person can get unstuck and b
 |---|---|---|---|
 | **GitHub Issues** | the repo | bugs, and the only place that promises a response | free |
 | **GitHub Discussions** | the repo | "how do I model X", pack ideas, show-and-tell. Searchable by Google, unlike Discord | free |
-| **The Kennel repo** | separate | pack submissions and their review conversation | free |
+| **The Kennel** | `brain.dog/api/kennel/v1/` (§1) | pack submissions and the operator's review; the conversation about one belongs in Discussions | free |
 | **A changelog** | `brain.dog/changelog` | the single highest-leverage community artefact for a solo product: proof of life | a file |
 | Discord | later, if asked | real-time support is a commitment to be present. **Do not open one until there is somebody to talk to** | a real cost |
 
@@ -195,6 +197,11 @@ Three conclusions:
 
 That is a distribution experiment costing one file, testable before any of the platform exists,
 and it belongs in Phase A rather than in B9 ([15-ROADMAP](15-ROADMAP.md) §4).
+
+*(Amended September 28th 2026, as built: packs are indexed by the Kennel (§1) rather than a public
+repository, and a pack may carry a `script`, which runs in a host's sandbox and never in the record,
+with every host it calls out to approved at install ([04-PACKS](04-PACKS.md) §1). The artefact shape
+the comparison rests on is unchanged.)*
 
 ---
 

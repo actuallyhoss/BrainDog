@@ -197,10 +197,12 @@ test('THE 80 % LINE IS SHOWN ONCE A MONTH, ON TIER A, BELOW THE CAP, UNTIL DISMI
 
 test('A SPENT BUDGET ON PASS 2 IS ITS OWN FIX, VERBATIM, THEN THE SENTENCE THAT THE ROWS WERE DRAWN WITHOUT IT', () => {
   const fix = 'Slash is out of asks until 2026-10-01. Add your own key, or wait.';
-  assert.deepEqual(pass2Refused({ code: 'SLASH_BUDGET_SPENT', fix }), { fix, without: 'Everything above this line was drawn without it.' });
+  /* `spent` IS WHAT DRAWS THE TWO BUTTONS, "Use your own key" and "Settings" (AGT-29). */
+  assert.deepEqual(pass2Refused({ code: 'SLASH_BUDGET_SPENT', fix }), { fix, without: 'Everything above this line was drawn without it.', spent: true });
   /* ANY OTHER REFUSAL IS ITS FIX ALONE: the sentence is only true of a budget stop with rows above it. */
   assert.deepEqual(pass2Refused({ code: 'PROPOSAL_NO_ROWS', fix: 'A proposal names the rows behind it, or it is not filed.' }), {
     fix: 'A proposal names the rows behind it, or it is not filed.',
     without: null,
+    spent: false,
   });
 });

@@ -1,0 +1,50 @@
+{
+  "rows": [
+    {
+      "list": "readings",
+      "fields": {
+        "title": "A book about bridges",
+        "by": "A. Writer"
+      }
+    },
+    {
+      "list": "readings",
+      "fields": {
+        "title": "An article on tides",
+        "kind": "article",
+        "state": "reading"
+      }
+    },
+    {
+      "list": "readings",
+      "fields": {
+        "title": "A paper on soil",
+        "kind": "paper",
+        "state": "finished",
+        "finished": "2026-09-20",
+        "thoughts": "Shorter than it looked, and worth it."
+      }
+    }
+  ],
+  "expect": [
+    {
+      "list": "readings",
+      "count": 3
+    },
+    {
+      "row": 1,
+      "field": "kind",
+      "is": "book"
+    },
+    {
+      "row": 1,
+      "field": "state",
+      "is": "queued"
+    },
+    {
+      "row": 3,
+      "field": "finished",
+      "is": "2026-09-20"
+    }
+  ]
+}

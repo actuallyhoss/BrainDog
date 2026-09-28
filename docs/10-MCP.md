@@ -15,8 +15,8 @@ Built against the **2026-07-28 MCP specification**, which changed enough to matt
 | **`initialize`/`initialized` handshake removed; no `Mcp-Session-Id`** | Every request is self-contained, carrying protocol version, client identity and capabilities in `_meta`. The server is genuinely stateless, so it is just the Worker, with no session store and no sticky routing |
 | **`Mcp-Method` and `Mcp-Name` HTTP headers** | The headers must equal the body, so the edge's telemetry names the tool without parsing JSON. The rate limit itself keys on the token, never on a header (§8) |
 | **`ttlMs` and `cacheScope` on `tools/list`, `prompts/list`, `resources/list`, `resources/read`**, as top-level fields of the result | The tool list is cached by the client. This is the single biggest lever on context cost; see §4 |
-| **Multi Round-Trip Requests (MRTR)**: a server returns `resultType: "input_required"`, the client retries with `inputResponses` | **The decision gate becomes protocol-native.** See §5; this is the most important item in this document, and it is designed, not built |
-| **DCR deprecated in favour of Client ID Metadata Documents; `iss` per RFC 9207; issuer-bound credentials; `application_type`** | Standard OAuth 2.1 resource-server behaviour, and desktop/CLI clients on localhost redirects finally work |
+| **Multi Round-Trip Requests (MRTR)**: a server returns `resultType: "input_required"`, the client retries with `inputResponses` | **The decision gate could become protocol-native.** See §5: what is built is the `decide` link on every filed question, and the input-required answer waits behind a switch until a client's capability for it can be confirmed |
+| **DCR deprecated in favour of Client ID Metadata Documents; `iss` per RFC 9207; issuer-bound credentials; `application_type`** | Standard OAuth 2.1 resource-server behaviour, and desktop/CLI clients on localhost redirects finally work. BrainDog accepts a metadata document and still registers a client that brings none, because not every client ships one (§2) |
 | **Roots, Sampling and Logging deprecated** (12-month minimum support) | Do not build on them. Sampling in particular was the tempting way to have the client's model do our inference; it is going away |
 
 The legacy HTTP+SSE transport has a one-year offramp. BrainDog ships **streamable HTTP only** and
@@ -43,6 +43,14 @@ made in the app, or by `braindog login` through the device grant, which is the p
 session in a repo on a machine with no browser; or it is made by OAuth, below, for a client that
 connects by URL. Both land in the same list under Settings, Agents, and revoking one there stops it.
 
+A machine that runs Claude Code needs two lines, the install and then `setup`, which signs in by the device grant,
+adds the hooks and, with them, the Agent Skill, and registers `braindog mcp` ([48-SPEC-CLI](48-SPEC-CLI.md) §5.15):
+
+```sh
+curl -fsSL https://brain.dog/cli/install.sh | sh     # macOS and Linux; on Windows: irm https://brain.dog/cli/install.ps1 | iex
+braindog setup https://brain.dog/app/<slug>
+```
+
 **OAuth, as built** (`packages/host/src/oauth.ts`, the protocol; `packages/record/src/oauth.ts`, its
 store on the Directory's SQL; `apps/worker/src/oauth.ts`, the Cloud's wiring; `apps/selfhost/src/oauth.ts`, the
 self-host's). The Cloud serves all of it. A self-host serves it too, on the origin it serves the app from, wherever
@@ -61,8 +69,9 @@ it is the one a client reached.
   `127.0.0.1` or `localhost` at any port (RFC 8252).
 - `GET /oauth/authorize` checks the client and its redirect address, answering anything wrong with
   either on a BrainDog page and never at the client's address, then holds the request ten minutes and
-  sends the browser to the consent screen, which on the Cloud is a plain page of the Worker's own at
-  `/oauth/consent` until the app draws one. `GET /oauth/request?request=<id>` is that screen's read of
+  sends the browser to the consent screen. On the Cloud that is the app's own `/app/connect`
+  (`CONSENT_AT` in `apps/worker/src/oauth.ts`), and the Worker keeps a plain page at `/oauth/consent`
+  as its fallback; a self-host serves that plain page. `GET /oauth/request?request=<id>` is that screen's read of
   it: the client's name, its redirect host, and the scopes it may be given.
 - The person allows it (`POST /oauth/approve`) from a browser signed in within the last fifteen
   minutes, as a machine's six digits are approved. The token is minted by the record's own
@@ -228,8 +237,8 @@ field.
 |---|---|---|
 | `tools/list` total, `instructions` included | **≤ 2,760 tokens**, raised once from 2,600 for `triage` | it is in every turn of every session. 1,800 was set for eight tools; the agent path needs fourteen, `activity` joined inside 2,600, and `triage` is the one tool the ceiling was raised for ([44-SPEC-MCP](44-SPEC-MCP.md) §7) |
 | One tool description | < 200 tokens, measured at 12 to 60 | forces the description to say when to use it, not how it works |
-| `record_index` response | < 500 tokens, measured at 256 on the seed | the first call of every session |
-| A `list` response, default page | < 2,000 tokens, **not met**: 5,380 for a page of fifty rows | the target was set for 25 rows, projected, not whole documents. The record's default page is 50 rows, and a row carries every field |
+| `record_index` response | < 500 tokens, measured at 450 on the seed once it learned figures ([44-SPEC-MCP](44-SPEC-MCP.md) §7) | the first call of every session |
+| A `list` response, default page | < 2,000 tokens, **met on the Work list**: 1,728 for twenty seeded tasks; 2,287 for twenty `obligations`, which is over | the target was set for 25 rows, projected, not whole documents. The tool sends `limit: 20` when a call names none, and a `list` row leaves out `updated_at` and empty fields and cuts long text at 280 characters with `clipped: true` unless `fields` names it ([44-SPEC-MCP](44-SPEC-MCP.md) §7). A register of rows as dense as `obligations` wants a smaller `limit` from the agent |
 | A `get` on a document row | full | if you asked for the document, you want the document |
 
 The first two are asserted by `packages/mcp/test/budget.test.ts` with `tokenBudget`
@@ -271,10 +280,16 @@ device never moves it back and a read is never a write.
 
 This is the most consequential find in this research pass.
 
-**Not built.** `propose` answers like every other tool: the suggestion's id, and the person decides in the app's
-Decide queue. No result carries `resultType`, `inputResponses` is not read, and no write is turned into a question
-inside the call. What follows is the design, kept for the day a person can reach MCP ([44-SPEC-MCP](44-SPEC-MCP.md)
-§5.7).
+**As built: the link, and the shape behind a switch.** `propose` answers like every other tool, with the
+suggestion's id and a `decide` link, `<origin>/app/<slug>/decide/<id>`, the address where the person answers that
+one question, so an agent can hand it on in its own reply (`decideAt` in `packages/mcp/src/index.ts`). A transport
+that does not hand the core its origin answers without the link. The input-required answer is written in `rpc.ts`
+and held off by `const MRTR = false`, because the client capability the revision names for it could not be confirmed
+from the specification's own text; the day it is, the switch turns true for a client that declares it, and for no
+other. A `propose` that carries `inputResponses` is refused `LEVEL_REQUIRED` before anything is filed, because
+whatever a client collected in its own window is not the person's decision on this record: deciding stays a
+person's act in the app ([ADR-060](16-DECISIONS.md)). No write is turned into a question inside the call. What
+follows is the design, kept for the day a person can reach MCP ([44-SPEC-MCP](44-SPEC-MCP.md) §5.7, D8).
 
 The product's differentiator is that an agent lays out options and **never chooses**; a human
 does, and the choice becomes an immutable row with a mandatory reason. Until 2026-07-28, that
@@ -323,13 +338,14 @@ standards-track way to do it.
 
 ## 6 · Resources and prompts
 
-**Resources** are the read surface that does not belong in a tool. Nineteen kinds are built: thirteen fixed
-addresses and six templates.
+**Resources** are the read surface that does not belong in a tool. What is built is what `packages/mcp/src/index.ts`
+lists: the fixed addresses of `RESOURCES` and the templates of `TEMPLATES`, which a client fills in itself.
 
 | Resource | Contents |
 |---|---|
 | `schema/<register>` | the field list, types, validation. Fetched when an agent is about to write |
 | `decisions` | what has been proposed and not yet answered: the open suggestions |
+| **`inbox`**, **`inbox/<state>`** | what arrived and nothing filed yet, newest first, with how many arrivals are in each state; the template reads one state, and `skipped` is where a wrong skip rule shows. `triage` files one |
 | `digest/today` | what the scheduler would have said |
 | **`page/<slug>`** | a declared page, **resolved against live rows**: the same projection the web app renders, as data rather than HTML |
 | **`metric/<id>`** | one metric's value, target, window, delta and the row count behind it |
@@ -343,15 +359,16 @@ addresses and six templates.
 | **`automation/<id>`** | one automation as declared, with its last ten runs, each step with its outcome. A template, never listed one by one |
 | **`arrangement`** | how this BrainDog is arranged: its packs, what else is on offer, its voice and settings, its pages, and what waits |
 | **`declaration/<slug>`** | one page as declared, to change and propose back. A template, never listed one by one |
-| **`grammar/page`**, **`grammar/register`**, **`grammar/metric`**, **`grammar/proposals`** | what a page, a list and a figure declaration may contain, each with one that installs, and the `pack`, `settings` and `arrange` bodies of `propose`; `ttlMs` an hour. A rule is `grammar/automations` |
+| **`grammar/page`**, **`grammar/register`**, **`grammar/metric`**, **`grammar/proposals`**, **`grammar/ingest`** | what a page, a list and a figure declaration may contain, each with one that installs; the `pack`, `settings` and `arrange` bodies of `propose`; and what a door or a scheduled action may contain, with one of each; `ttlMs` an hour. A rule is `grammar/automations` |
 | **`grammar/script`**, **`grammar/automations`** | what a script and an automation may say, their limits, what does not run yet, and examples that install; `grammar/script` also says how to ask for a trial. `ttlMs` an hour |
 
-**Every resource is backed by a method but two**, so [ADR-018](16-DECISIONS.md)'s rule holds for seventeen by
+**Every resource is backed by a method but two**, so [ADR-018](16-DECISIONS.md)'s rule holds for the rest by
 construction: `schema` `digest/today` `page` `metric` `sessions/live` `context` `boot` `whoami` `actions` and
 `automations` are the methods `schema({ register })` `digestToday()` `page({ slug })` `metric({ metric })`
 `sessionsLive()` `context()` `boot()` `whoami()` `actions()` and `automations()` of [30-BLUEPRINT](30-BLUEPRINT.md)
-§5, and `automation/<id>` is `automations({ rule })`. `arrangement`, `declaration/<slug>`, `grammar/page` and
-`grammar/proposals` are one method, `arrangement()`, asked for the whole, a page or a grammar. `decisions` is
+§5, and `automation/<id>` is `automations({ rule })`. `inbox` and `inbox/<state>` are `inbox()`, asked for every
+state or one. `arrangement`, `declaration/<slug>` and the grammars of pages, lists, figures, proposals and doors are
+one method, `arrangement()`, asked for the whole, a page or a grammar. `decisions` is
 `governance({ register: 'suggestion' })`, the open suggestions, and `skill/<name>` is `list` over the skills register
 by name, so neither is a read path of its own. The two that are not a method are `grammar/script` and
 `grammar/automations`: each is text `packages/mcp` holds, because its numbers are copies of ceilings the record
@@ -469,7 +486,7 @@ Three things were meant to carry over as **tests**, not prose. One has:
 |---|---|---|
 | **Every route has a verdict** | each route in the router is either reachable through a tool, exposed as a resource, or named in the refusal list with a reason. A route with none of the three fails CI, which is how the predecessor found a briefing endpoint *"for the SessionStart hook"* that nothing called | no. `packages/mcp/test/index.test.ts` holds the other direction: every advertised tool and resource reaches a method ([44-SPEC-MCP](44-SPEC-MCP.md) §9) |
 | **The refusals are driven** | the test starts the sealed server and calls each refused path, asserting the refusal text arrives **before any fetch** | no, because there is no refusal list at the MCP layer to drive |
-| **The tool surface has a ceiling** | the predecessor caps the whole tool listing at ~4,900 tokens by test; **BrainDog's sum is §4's 2,760**, and `packages/mcp/test/budget.test.ts` asserts it. §4's budgets are the same idea per tool; this one is the sum | yes, measured at 2,597 |
+| **The tool surface has a ceiling** | the predecessor caps the whole tool listing at ~4,900 tokens by test; **BrainDog's sum is §4's 2,760**, and `packages/mcp/test/budget.test.ts` asserts it. §4's budgets are the same idea per tool; this one is the sum | yes; the latest measure is [44-SPEC-MCP](44-SPEC-MCP.md) §7's first row |
 
 And the server's `instructions` carry the contract every tool description would otherwise repeat. They go out in
 `initialize`, in `server/discover` and with every `tools/list` under the same `ttlMs`, because a 2026-07-28 client

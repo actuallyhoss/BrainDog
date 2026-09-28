@@ -46,7 +46,8 @@
   import Menu from '$lib/ui/Menu.svelte';
   import Sheet from '$lib/ui/Sheet.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { covered } from '$lib/a11y/keys.svelte.ts';
+  import { covered, typing } from '$lib/a11y/keys.svelte.ts';
+  import { copy } from '$lib/copy.ts';
   import { closed, drew, opened } from '$lib/ui/screen.svelte.ts';
   import FlowList from '$lib/flow/FlowList.svelte';
   import Inspector from '$lib/flow/Inspector.svelte';
@@ -226,6 +227,8 @@
   /* THE RECORD'S WORD ON THE BODY DRAWN NOW, from `checkAutomation`. One about a step is on that card (`FlowCard`); one
      about the body as a whole is said here with the builder's own. */
   const served = $derived(untouched ? null : flow.served);
+  /** The ids of the faults drawn under the trigger, which the trigger names as what describes it. */
+  const faultIds = $derived([...general.map((_, i) => `flow-fault-${i}`), ...(served && served.key === null ? ['flow-fault-served'] : [])]);
   const blocked = $derived(faults.length > 0 || served !== null);
   const triedNow = $derived(tried !== null && tried.body === drawn ? tried.answer : null);
   const ranNow = $derived(ran !== null && ran.body === drawn ? ran.answer : null);
@@ -499,6 +502,52 @@
       flow.cancelDrag();
     }
   }
+
+  /**
+   * Take back the last edit, from the button or the key. SAID IN THE LIVE LINE, because the card that moved back says
+   * nothing, and a keyboard user who pressed Mod+Z had no way to hear that it did anything.
+   */
+  function undo() {
+    flow.undo();
+    flow.said = copy.flowUndone;
+  }
+
+  /** Put the last undo back, from the button or the key (EDT-4). Same reason as `undo`: the card says nothing itself. */
+  function redo() {
+    flow.redo();
+    flow.said = copy.flowRedone;
+  }
+
+  /**
+   * MOD+Z UNDOES THE LAST EDIT ON THE CANVAS, as the Undo button in the footer does. The shell reads Mod+Z on every
+   * screen as "undo the newest toast" (`+layout.svelte`), which here was a record write from some other screen while
+   * the step just dragged stayed where it landed. So this listens first, in the capture phase, and takes the key only
+   * when the canvas has something to give back; with nothing to undo the shell's meaning stands.
+   *
+   * NEVER WHILE TYPING, because a field's own undo is the browser's and takes back letters, not steps. Only on the Steps
+   * tab, since Runs and Versions draw no canvas to change.
+   *
+   * MOD+SHIFT+Z AND MOD+Y BOTH REDO (EDT-4), the two spellings a keyboard offers for the move, taken the same way as
+   * Mod+Z: first, in the capture phase, and only when the canvas has something to give back.
+   */
+  $effect(() => {
+    function undoKey(e: KeyboardEvent) {
+      if (!(e.metaKey || e.ctrlKey) || e.altKey) return;
+      const key = e.key.toLowerCase();
+      const isUndo = key === 'z' && !e.shiftKey;
+      const isRedo = (key === 'z' && e.shiftKey) || key === 'y';
+      if (!isUndo && !isRedo) return;
+      if (tab !== 'steps' || typing()) return;
+      if (isUndo && !flow.canUndo) return;
+      if (isRedo && !flow.canRedo) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (isUndo) undo();
+      else redo();
+    }
+    window.addEventListener('keydown', undoKey, { capture: true });
+    return () => window.removeEventListener('keydown', undoKey, { capture: true });
+  });
 </script>
 
 <svelte:head><title>{titleOf(title)}</title></svelte:head>
@@ -548,13 +597,21 @@
 
     {#if tab === 'steps'}
       <div class="canvas">
-        <button type="button" class="trigger tap" data-selected={flow.selected === 'trigger' ? '' : undefined} onclick={() => flow.select('trigger')}>
+        <!-- A FAULT ABOUT THE WHOLE AUTOMATION IS READ WITH THE TRIGGER, the card it sits under, so a screen reader that
+             lands on the trigger hears what is wrong before it presses anything (`aria-describedby`). -->
+        <button
+          type="button"
+          class="trigger tap"
+          data-selected={flow.selected === 'trigger' ? '' : undefined}
+          aria-describedby={faultIds.length > 0 ? faultIds.join(' ') : undefined}
+          onclick={() => flow.select('trigger')}
+        >
           <span class="trigger-kicker">{words.trigger}</span>
           <span class="trigger-said">{sayStart(flow.draft)}</span>
           <span class="trigger-path">{flow.path === 'inline' ? words.inline : words.asRun}</span>
         </button>
-        {#each general as f (f.say)}<p class="fault">{f.say}</p>{/each}
-        {#if served && served.key === null}<p class="fault">{served.say}</p>{/if}
+        {#each general as f, i (f.say)}<p class="fault" id={`flow-fault-${i}`}>{f.say}</p>{/each}
+        {#if served && served.key === null}<p class="fault" id="flow-fault-served">{served.say}</p>{/if}
         <FlowList {flow} list={ROOT} nodes={flow.draft.steps} faults={shown} />
       </div>
 
@@ -580,14 +637,20 @@
         {:else if untouched}
           <p class="said">{editWords.start}</p>
         {:else if faults.length > 0}
-          <p class="said">{words.faults}: {faults.length === 1 ? faults[0]!.say : `${faults.length} things, each on its card.`}</p>
+          <p class="said" id="flow-held">{words.faults}: {faults.length === 1 ? faults[0]!.say : copy.flowFaultsOnCards(faults.length)}</p>
         {:else if served}
-          <p class="said">{words.faults}: {served.say}</p>
+          <p class="said" id="flow-held">{words.faults}: {served.say}</p>
         {:else if !flow.dirty && !filed}
           <p class="said">{words.nothingChanged}</p>
         {/if}
+        <!-- A NEW AUTOMATION THAT STARTS ON A PRESS SAYS WHERE THE PRESS WILL BE. Its trigger reads "When you press Run
+             now" and there was no Run now anywhere, because a run needs something saved to run. -->
+        {#if manual && !row}
+          <p class="said">{copy.flowRunAfterSave}</p>
+        {/if}
         <div class="foot-actions">
-          <Button disabled={!flow.canUndo} onclick={() => flow.undo()}>Undo</Button>
+          <Button disabled={!flow.canUndo} onclick={undo}>{copy.undo}</Button>
+          <Button disabled={!flow.canRedo} onclick={redo}>{copy.redo}</Button>
           {#if manual && row && row.enabled && !flow.dirty}
             <Button onclick={() => void runNow()}><Icon name="play" size="s" />{words.runNow}</Button>
           {/if}
@@ -598,7 +661,8 @@
            `--sticky`, sitting above the tab bar (`loop/finish/design-brief.md` §6 and §11.12). -->
       <div class="bar">
         <Button disabled={trying || flow.draft.steps.length === 0} onclick={() => void tryIt()}>{trying ? editWords.trying : editWords.tryIt}</Button>
-        <Button weight="primary" disabled={busy || blocked || !flow.dirty} onclick={() => void save()}>{saveWord}</Button>
+        <!-- A GREYED SAVE SAYS WHY, read from the footer's sentence, so its reason is not only somewhere above it. -->
+        <Button weight="primary" disabled={busy || blocked || !flow.dirty} aria-describedby={blocked && !untouched && !refusal ? 'flow-held' : undefined} onclick={() => void save()}>{saveWord}</Button>
       </div>
     {:else if tab === 'runs' && row}
       {#if runs.length === 0}
@@ -777,11 +841,15 @@
     font-size: var(--t-sm);
   }
 
+  /* THE FOOTER AND THE BAR ARE THE CARDS' WIDTH, 720PX, as the try panel and the calls are. At the page's own 960 their
+     rules ran 180px past the column they close, so at 1440 Save sat out on its own to the right of everything it saves
+     (`loop/finish/design.md` 2.7). */
   .foot {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-2) var(--sp-3);
+    max-inline-size: 720px;
     padding-block-start: var(--sp-3);
     border-block-start: 1px solid var(--line);
   }
@@ -821,6 +889,7 @@
     display: flex;
     justify-content: flex-end;
     gap: var(--sp-3);
+    max-inline-size: 720px;
     padding: var(--sp-1) 0;
     background: var(--bg);
     border-block-start: 1px solid var(--line-soft);
@@ -836,6 +905,12 @@
   @media (width < 640px) {
     .bar > :global(*) {
       flex: 1 1 0;
+    }
+
+    /* UNDO AND RUN NOW START AT THE LEFT EDGE ON A PHONE, under the sentence they follow, as every other screen's
+       controls do. Pushed to the right they sat alone across the screen from the words above them. */
+    .foot-actions {
+      margin-inline-start: 0;
     }
   }
 

@@ -20,6 +20,11 @@
  * a call and reads into its JSON answer by path, and `ask_person`'s `to:` holds the answer to that member or an owner
  * (`govern.ts`'s `decide`). `propose` says how a body is tried over a sample before anybody accepts it.
  *
+ * `meet` AND `run_job` ARE SAID AS THE RUNNER TAKES THEM TOO: `meet` goes through the kernel's own `meet`, so its match,
+ * its dated line and its merge question are an agent's, and `run_job` waits on the job for a day at most and keeps how it
+ * ended (`RUN_JOB_WAIT_MS` in `flow.ts`, copied as the other waits are). Each has an example below, installed with the
+ * rest by `test/automations.test.ts`.
+ *
  * THE `script` ENTRY SAYS WHAT THE RECORD'S DRY RUN SAYS (`said` in `packages/record/src/automations.ts`): the run does
  * not wait, `as:` is the queued run's id and not the script's answer, and the three things that stop it are each on the
  * script's own row.
@@ -92,6 +97,9 @@ export const AUTOMATION_GRAMMAR = {
       '{"script":{"id":"<script>","input":{"<name>":"<text>"},"as":"<answer>"}}: starts the script and goes on without waiting for it; what it writes lands when this host runs it. as keeps the id of its queued run, never what the script answers. The run stops here if the script is not installed, does not say runs: { rule: true }, or is paused',
     ask_slash: '{"ask_slash":{"question":"<text>","as":"<answer>","shape":"text"}}: shape is text, number or choice, and choice needs choices',
     ask_person: '{"ask_person":{"question":"<text>","options":["yes","no"],"as":"<answer>","wait":"2d","to":"<member>"}}: two options or more, each once. The question opens in Decide. to is optional: the id of one member, typed or filled from a field of the row, and only that member or an owner answers it; without to, anyone who decides answers it. The run waits 7d when wait is left out, and stops if nobody answers',
+    meet: '{"meet":{"name":"<text>","email":"<text>","handle":"<site>:<name>","where":"<text>"}}: meets one person into the list People keeps, as the rule. Matched by email, then handle, never by name; added when nobody matches; where is kept on them as a dated line, such as mail: {{trigger.body.subject}}; a name shared with somebody else opens one merge question in Decide. One of name, email or handle, and where. A key that fills with nothing is left out, and when all three do, nobody is met and the run goes on',
+    run_job:
+      '{"run_job":{"kind":"job.<id>","args":{"<arg>":"<text>"},"as":"<answer>"}}: queues one job of a kind the owner approved in Decide, to run on his own machine, with args filling the kind\'s own. The run waits up to 1d for it to end and keeps ok, needs_decision or error under as. A kind not approved, or args it does not take, stops the run with its sentence; a write trigger needs once_per',
     actions:
       'every action a rule has: {"tag":"x"} {"untag":"x"} {"set":{"field":"f","to":"v"}} {"move":"<state>"} {"link":{"field":"f","to":{"register":"r","by":"f","value":"v"}}} {"note":"text"} {"notify":{"say":"text"}} {"schedule":{"in":"14d","note":"text"}} {"create":{"register":"r","bound":10,"fields":{}}} {"suggest":{"question":"q","options":["a","b"]}} {"run":"<declared call>"} {"stop":true}. tag, untag, set, move, link, note, schedule and run act on a row, so a clock, a figure or a button cannot use them. A create with no row to stand on counts its bound over a day, not a run',
   },
@@ -126,6 +134,28 @@ export const AUTOMATION_GRAMMAR = {
         on: { written: { register: 'obligations', op: ['create'] } },
         once_per: ['entry'],
         steps: [{ wait: '3d' }, { if: 'state is open', then: [{ notify: { say: 'Still open after three days: {{trigger.row.what}}' } }] }],
+      },
+    },
+    /* AN ARRIVAL NAMES NO LIST, SO THE ROW DECIDES: an arrival filed into a list with no counterparty meets nobody and
+       the run goes on (`flow.ts`'s `meetOne`), so this meets the other side of each transaction an arrival files. */
+    {
+      id: 'rule.meet-counterparty',
+      kind: 'rule',
+      body: {
+        rule: 'meet-counterparty',
+        name: 'Meet the other side of each filed transaction',
+        on: { arrival: { state: ['matched'] } },
+        steps: [{ meet: { name: '{{trigger.row.counterparty}}', where: 'transaction: {{trigger.row.what}}' } }],
+      },
+    },
+    {
+      id: 'rule.weekly-notes',
+      kind: 'rule',
+      body: {
+        rule: 'weekly-notes',
+        name: 'Weekly notes on braindog, every Friday',
+        on: { every: '1w', at: '16:00', day: 'fri' },
+        steps: [{ run_job: { kind: 'job.weekly-notes', args: { project: 'braindog' }, as: 'notes' } }],
       },
     },
   ],

@@ -16,7 +16,8 @@
  * `apps/web/build/app/`, so a run printed "no record-app build" and exited 1.
  *
  * WHAT IS ON IT is lifted out of the built home page rather than typed again here: the bar's mark and
- * wordmark, and the hero's one `<h1>`, with the stylesheet the page loaded still applied. So the
+ * wordmark, the hero's one `<h1>` and the sentence under it, on the hero's own ground, with the
+ * stylesheet the page loaded still applied. So the
  * card's words are `copy.ts`'s, its faces are the ones in `static/fonts`, and its colours are the
  * palette's tokens; a change to any of them is a change to the card on the next run.
  *
@@ -99,35 +100,50 @@ if (BRAND && brand !== BRAND) {
   process.exit(1);
 }
 
-/* THE CARD: the hero's own ground, the mark and wordmark at the top, the slogan across the lower
-   half. The classes the build gave the lifted elements keep the page's rules for colour and face;
-   the rules below only size and place them, since a 1200-wide card is not the 1440-wide page. */
+/* THE CARD IS THE HERO, SHRUNK TO FIT: its own ground, the mark and wordmark at the top, and the
+   slogan with the sentence under it across the lower half. The ground is read off the hero section
+   rather than named here, so the card follows the hero whichever ground the page gives it: the
+   section says `data-ground="page"` and its own rule paints `--sunk`, and the computed colour is the
+   one a reader sees. The accent is on the slogan's last two words and nowhere else, as on
+   the page (`loop/finish/site.md` C10): the accent bar the old card carried along its foot is gone.
+   The classes the build gave the lifted elements keep the page's rules for colour and face; the rules
+   below only size and place them, since a 1200-wide card is not the 1440-wide page. */
 const drew = await page.evaluate(() => {
+  const hero = document.querySelector('section.hero');
   const mark = document.querySelector('header .brand');
   const title = document.querySelector('#hero-title');
-  if (!mark || !title) return false;
+  if (!hero || !mark || !title) return false;
+  const ground = getComputedStyle(hero).backgroundColor;
   const card = document.createElement('div');
   card.className = 'og-card';
-  card.append(mark.cloneNode(true), title.cloneNode(true));
+  const words = document.createElement('div');
+  words.className = 'og-words';
+  words.append(title.cloneNode(true));
+  /* The sentence under the slogan is the hero's too, and a card without it is only a slogan. */
+  const sub = hero.querySelector('.sub');
+  if (sub) words.append(sub.cloneNode(true));
+  card.append(mark.cloneNode(true), words);
   document.body.replaceChildren(card);
   const style = document.createElement('style');
   style.textContent = `
-    html, body { margin: 0; background: var(--sunk); }
+    html, body { margin: 0; background: ${ground}; }
     .og-card {
-      box-sizing: border-box; inline-size: 1200px; block-size: 630px; padding: 88px 96px;
+      box-sizing: border-box; inline-size: 1200px; block-size: 630px; padding: 80px 96px;
       display: flex; flex-direction: column; justify-content: space-between;
-      background: var(--sunk); border-block-end: 12px solid var(--accent);
+      background: ${ground};
     }
     .og-card .brand { gap: 22px; }
-    .og-card .brand .mark { inline-size: auto; block-size: 60px; }
-    .og-card .brand .wordmark { font-size: 52px; }
-    .og-card #hero-title { max-inline-size: 15ch; font-size: 96px; line-height: 1.04; }
+    .og-card .brand .mark { inline-size: auto; block-size: 56px; }
+    .og-card .brand .wordmark { font-size: 48px; }
+    .og-card .og-words { display: grid; gap: 28px; }
+    .og-card #hero-title { max-inline-size: 20ch; font-size: 88px; line-height: 1.04; }
+    .og-card .sub { max-inline-size: 44ch; margin: 0; font-size: 26px; line-height: 1.4; }
   `;
   document.head.append(style);
   return true;
 });
 if (!drew) {
-  console.error('  the built home page has no `header .brand` or `#hero-title` to draw the card from.');
+  console.error('  the built home page has no `section.hero`, `header .brand` or `#hero-title` to draw the card from.');
   process.exit(1);
 }
 await page.evaluate(() => document.fonts.ready);

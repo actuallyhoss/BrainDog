@@ -23,6 +23,7 @@ import type { Result, Sql } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 
 import { actionJitterMs, keyNamed } from './actions.ts';
+import { writeEmbeddings } from './embed.ts';
 import { finishPull, pullFinishOf, type PullFinished } from './pull.ts';
 
 /**
@@ -433,6 +434,15 @@ export function ack(sql: Sql, deps: AckDeps, args: Ack): Result<null> {
         'slash',
       );
       if (!filed.ok) return filed as Result<null>;
+    }
+
+    /* AN EMBEDDING'S VECTORS GO INTO `entry_vec`, in this transaction, so the job is `done` exactly when the index holds
+       them. A result that will not write is a fact about the answer, as a draft that will not file is: done, and the
+       refusal returned. The rows still have no vector as new as their words, so the next sweep queues them again. An ack with
+       no result, from a host that could not embed, writes nothing and leaves them to that sweep too. */
+    if (row.kind === 'infer.embed' && args.result !== undefined) {
+      const wrote = writeEmbeddings(sql, args.id, row.payload, args.result);
+      if (!wrote.ok) return wrote;
     }
 
     /* AND THE DIGEST THAT WAS WAITING FOR IT GOES OUT. `prose: slash` stops `runDigest` after one

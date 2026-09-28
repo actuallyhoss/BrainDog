@@ -21,7 +21,7 @@
   import { CapLine } from 'braindog-render/svelte';
   import { Block } from 'braindog-render/svelte';
   import type { Block as Drawn } from 'braindog-render';
-  import '$lib/blocks-charts.css';
+  import '@braindog/skin/blocks-charts.css';
   import Empty from '$lib/ui/Empty.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
   import Icon from '$lib/ui/Icon.svelte';
@@ -46,6 +46,9 @@
   /* WHAT THE LOG SAYS, IN WORDS: the lead, the twelve weeks, a row by its title and list, and a burst as one line.
      `lines.ts` holds each rule and why. */
   import { burstsOf, heatRows, historyWords, sinceGroups, sinceSaid, thingOf } from './lines.ts';
+  /* A FIELD PUT ON OR TAKEN OFF A LIST, IN WORDS, from the same helper Home's feed says it with. STATIC, and the lead's
+     `readUnseen` with it: one module both imported and imported lazily is neither split nor shared, only warned about. */
+  import { declaredOf, readUnseen } from '$lib/record/history-live.ts';
 
   /**
    * What an event kind is called, and what it looks like — all forty of them.
@@ -181,8 +184,7 @@
   $effect(() => {
     if (!route.data.live) return;
     const at = untrack(opened);
-    void import('$lib/record/history-live.ts')
-      .then((m) => m.readUnseen(apiBase()))
+    void readUnseen(apiBase())
       .then((out) => {
         if (out.from === 'live') unseen = { actors: out.actors, capped: out.capped };
       })
@@ -434,6 +436,7 @@
     {#each told as t}
       {@const e = t.e}
       {@const by = actorSaid(e.by, me, names)}
+      {@const declared = e.kind === 'declare' ? declaredOf(e.target, e.note) : null}
       <li>
         <div class="line line-short">
           <!-- ITS OWN COLUMN, NOT `.seq`. That one is 12ch of monospace for spoken ids, and
@@ -474,13 +477,17 @@
             <!-- AND A BURST IS ONE LINE, "Created 14 rows in Payments", linked to the list it
                  filled; the rows themselves are one press away there, and fourteen lines of one
                  rule's work here buried what anybody did by hand (`burstsOf`). -->
-            <span class="line-title"><span class="kind"><Icon name={kindOf(e.kind).icon} size="s" />{kindOf(e.kind).word}</span>
+            <!-- AND A FIELD PUT ON A LIST IS SAID AS ONE. A `declare` line read "Changed the page" with "Added domain."
+                 beside it, which named the wrong thing and not the list; `declaredOf` makes "Added domain to Projects"
+                 of the line's target and note, and that sentence is the whole line, so the note is not said twice. -->
+            {#if declared !== null}<span class="line-title"><span class="kind"><Icon name={kindOf(e.kind).icon} size="s" />{declared}</span></span>
+            {:else}<span class="line-title"><span class="kind"><Icon name={kindOf(e.kind).icon} size="s" />{kindOf(e.kind).word}</span>
               {#if t.many}<a class="target tap" href={at(t.many.href)}><bdi class="target-name">{t.many.text}</bdi></a
                 >{:else if e.target}{@const thing = thingFor(e.target)}{#if thing?.href}<a class="target tap" href={at(thing.href)}
                     ><bdi class="target-name">{thing.text}</bdi></a
-                  >{:else if thing}<bdi class="target-name">{thing.text}</bdi>{/if}{/if}</span>
+                  >{:else if thing}<bdi class="target-name">{thing.text}</bdi>{/if}{/if}</span>{/if}
           </span>
-          <span class="line-amount note">{t.note}</span>
+          <span class="line-amount note">{declared === null ? t.note : ''}</span>
           <!--
             HOW LONG AGO, WITH THE MOMENT BEHIND IT.
 

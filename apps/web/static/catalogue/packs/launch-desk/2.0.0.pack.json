@@ -1,0 +1,1044 @@
+{
+  "pack": "launch-desk",
+  "version": "2.0.0",
+  "title": "Launch desk",
+  "summary": "A desk for launching a thing in parts: where it stands in one sentence, each part in its own colour and picture with its next step, the steps on a calendar by the day they are due, the calls waiting on you, a pad beside it, and a price check.",
+  "author": "BrainDog",
+  "license": "Apache-2.0",
+  "requires": {
+    "format": 1,
+    "primitives": 1,
+    "packs": {
+      "pad": ">=1.0.0"
+    }
+  },
+  "declarations": [
+    {
+      "register": "parts",
+      "name": "Parts",
+      "one": "part",
+      "holds": "the parts a launch is made of, each with its own steps",
+      "title": "name",
+      "fields": [
+        {
+          "id": "name",
+          "label": "Part",
+          "type": "text",
+          "required": true,
+          "search": true
+        },
+        {
+          "id": "what",
+          "label": "What it is",
+          "type": "text",
+          "search": true
+        },
+        {
+          "id": "big",
+          "label": "Lead card",
+          "type": "bool"
+        },
+        {
+          "id": "progress",
+          "label": "How far along",
+          "type": "int",
+          "min": 0,
+          "max": 100
+        },
+        {
+          "id": "hue",
+          "label": "Colour",
+          "type": "int",
+          "min": 0,
+          "max": 359
+        },
+        {
+          "id": "picture",
+          "label": "Picture",
+          "type": "file"
+        }
+      ]
+    },
+    {
+      "register": "steps",
+      "name": "Steps",
+      "one": "step",
+      "holds": "what has to happen for each part, in order, and whether it is done",
+      "title": "what",
+      "fields": [
+        {
+          "id": "what",
+          "label": "Step",
+          "type": "text",
+          "required": true,
+          "search": true
+        },
+        {
+          "id": "part",
+          "label": "Part",
+          "type": "ref",
+          "to": "parts",
+          "index": true
+        },
+        {
+          "id": "done",
+          "label": "Done",
+          "type": "bool",
+          "default": false
+        },
+        {
+          "id": "priority",
+          "label": "How much it matters",
+          "type": "enum",
+          "values": [
+            "essential",
+            "should",
+            "nice"
+          ],
+          "index": true
+        },
+        {
+          "id": "rank",
+          "label": "Order",
+          "type": "int"
+        },
+        {
+          "id": "due",
+          "label": "Due",
+          "type": "day"
+        }
+      ],
+      "steps": {
+        "of": "part",
+        "done": "done",
+        "order": "rank"
+      }
+    },
+    {
+      "register": "contacts",
+      "name": "Helpers",
+      "one": "helper",
+      "holds": "the people and firms a launch leans on, and where each one stands",
+      "title": "name",
+      "fields": [
+        {
+          "id": "name",
+          "label": "Who",
+          "type": "text",
+          "required": true,
+          "search": true
+        },
+        {
+          "id": "what",
+          "label": "For what",
+          "type": "text",
+          "search": true
+        },
+        {
+          "id": "part",
+          "label": "Part",
+          "type": "ref",
+          "to": "parts",
+          "index": true
+        },
+        {
+          "id": "status",
+          "label": "Where it stands",
+          "type": "enum",
+          "values": [
+            "to ask",
+            "asked",
+            "agreed",
+            "declined"
+          ],
+          "index": true
+        },
+        {
+          "id": "phone",
+          "label": "Phone",
+          "type": "text"
+        },
+        {
+          "id": "email",
+          "label": "Email",
+          "type": "email"
+        }
+      ]
+    },
+    {
+      "register": "lines",
+      "name": "Budget lines",
+      "one": "line",
+      "holds": "what each piece of the launch should cost, low to high, and what was spent",
+      "title": "item",
+      "fields": [
+        {
+          "id": "item",
+          "label": "Item",
+          "type": "text",
+          "required": true,
+          "search": true
+        },
+        {
+          "id": "part",
+          "label": "Part",
+          "type": "ref",
+          "to": "parts",
+          "index": true
+        },
+        {
+          "id": "low",
+          "label": "At least",
+          "type": "decimal",
+          "min": 0
+        },
+        {
+          "id": "high",
+          "label": "At most",
+          "type": "decimal",
+          "min": 0
+        },
+        {
+          "id": "spent",
+          "label": "Spent",
+          "type": "decimal",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "register": "checks",
+      "name": "Price check",
+      "one": "check",
+      "holds": "one price and what making, packing and sending one costs, to see whether the costs are at most two fifths of the price",
+      "title": "what",
+      "fields": [
+        {
+          "id": "what",
+          "label": "Check",
+          "type": "text",
+          "required": true
+        },
+        {
+          "id": "price",
+          "label": "Price",
+          "type": "decimal",
+          "min": 0
+        },
+        {
+          "id": "making",
+          "label": "Making one",
+          "type": "decimal",
+          "min": 0
+        },
+        {
+          "id": "packing",
+          "label": "Packing one",
+          "type": "decimal",
+          "min": 0
+        },
+        {
+          "id": "sending",
+          "label": "Sending one",
+          "type": "decimal",
+          "min": 0
+        },
+        {
+          "id": "cost",
+          "label": "Costs together",
+          "type": "decimal"
+        },
+        {
+          "id": "least",
+          "label": "Least price that holds",
+          "type": "decimal"
+        },
+        {
+          "id": "tags",
+          "type": "list",
+          "of": "text"
+        }
+      ]
+    },
+    {
+      "register": "lessons",
+      "name": "Lessons",
+      "one": "lesson",
+      "holds": "what a part taught along the way, kept for the next launch",
+      "title": "lesson",
+      "fields": [
+        {
+          "id": "lesson",
+          "label": "Lesson",
+          "type": "text",
+          "required": true,
+          "search": true
+        },
+        {
+          "id": "body",
+          "label": "What happened",
+          "type": "text",
+          "search": true
+        },
+        {
+          "id": "part",
+          "label": "Part",
+          "type": "ref",
+          "to": "parts",
+          "index": true
+        }
+      ]
+    },
+    {
+      "rule": "launch_desk_cost",
+      "name": "Add the three costs of the price check together, and the least price they allow",
+      "on": {
+        "written": {
+          "register": "checks",
+          "op": [
+            "create",
+            "update"
+          ],
+          "fields": [
+            "making",
+            "packing",
+            "sending"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "script": {
+            "id": "launch_desk_cost",
+            "as": "costing"
+          }
+        }
+      ]
+    },
+    {
+      "script": "launch_desk_cost",
+      "title": "Add what making, packing and sending one costs, and the least price at which that is two fifths of it, whenever a cost is written",
+      "runs": {
+        "rule": true
+      },
+      "egress": [],
+      "keys": [],
+      "reads": [
+        "checks"
+      ],
+      "writes": [
+        "checks"
+      ],
+      "source": "/* A typed decimal as a whole number of units and how many places those units are, read off its shortest spelling. A\n   decimal field holds at most fifteen significant digits, so that spelling is the one that was typed: 4.004 is 4004 in\n   thousandths, never 4.00399999999999955946. */\nfunction exact(n) {\n  const [mantissa, power = '0'] = String(n).split('e');\n  const [whole, fraction = ''] = mantissa.split('.');\n  return { units: BigInt(whole + fraction), places: fraction.length - Number(power) };\n}\n\n/* Several decimals brought to the finest places any of them has, so they add as whole numbers. */\nfunction inCommon(list) {\n  const read = list.map(exact);\n  const places = Math.max(0, ...read.map((r) => r.places));\n  return { places, units: read.map((r) => r.units * 10n ** BigInt(places - r.places)) };\n}\n\n/* Whole units back to a number, through its decimal spelling, which Number reads to the nearest double; or null when the\n   spelling has more than the fifteen significant digits a decimal field holds, which the record would refuse. */\nfunction decimal(units, places) {\n  const digits = units.toString().padStart(places + 1, '0');\n  if (digits.replace(/^0+/, '').replace(/0+$/, '').length > 15) return null;\n  return Number(places === 0 ? digits : digits.slice(0, -places) + '.' + digits.slice(-places));\n}\n\n/* WHAT MAKING, PACKING AND SENDING ONE COST, ADDED EXACTLY, AND THE LEAST PRICE THEY ALLOW. The least price is five\n   halves of the costs, the price at which they are exactly two fifths of it, worked out in whole numbers here. The page\n   judges the price live against it, as the figure price less least price, so a price typed a moment ago is judged at\n   once and never against a verdict stored before it. */\nexport default async function run(ctx) {\n  const id = ctx.input && ctx.input.id;\n  const rows = id ? [await ctx.record.get(id)] : await ctx.record.list('checks', {});\n  for (const row of rows) {\n    if (!row) continue;\n    const costs = [row.fields.making, row.fields.packing, row.fields.sending];\n    let cost = null;\n    let least = null;\n    /* ALL THREE OR NOTHING: a sum of some of the costs was read as the cost, and passed. */\n    if (costs.every((n) => typeof n === 'number')) {\n      const common = inCommon(costs);\n      const sum = common.units.reduce((total, n) => total + n, 0n);\n      cost = decimal(sum, common.places);\n      least = cost === null ? null : decimal(sum * 25n, common.places + 1);\n      if (least === null) cost = null;\n    }\n    if ((row.fields.cost ?? null) === cost && (row.fields.least ?? null) === least) continue;\n    ctx.update('checks#' + row.seq, { cost, least }, row.version);\n  }\n}\n"
+    },
+    {
+      "metric": "essentials",
+      "name": "Essential steps",
+      "source": "register.steps",
+      "where": "priority is essential",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "essentials-done",
+      "name": "Essential steps done",
+      "source": "register.steps",
+      "where": "priority is essential, done is true",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "essentials-share",
+      "name": "Share of essential steps done",
+      "source": "register.steps",
+      "where": "priority is essential",
+      "value": {
+        "avg": "done"
+      },
+      "format": "pct",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "price",
+      "name": "Price",
+      "source": "register.checks",
+      "where": "seq is 1",
+      "value": {
+        "max": "price"
+      },
+      "format": "decimal",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "costs",
+      "name": "Costs",
+      "source": "register.checks",
+      "where": "seq is 1, making is set, packing is set, sending is set",
+      "value": {
+        "max": "cost"
+      },
+      "format": "decimal",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "priced",
+      "name": "Price check filled in",
+      "source": "register.checks",
+      "where": "seq is 1, price is set, making is set, packing is set, sending is set",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "cost-share",
+      "name": "Cost share",
+      "source": "register.checks",
+      "where": "seq is 1, price more than 0, making is set, packing is set, sending is set",
+      "value": {
+        "ratio": {
+          "of": {
+            "max": "cost"
+          },
+          "per": {
+            "max": "price"
+          }
+        }
+      },
+      "format": "pct",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "least-price",
+      "name": "Least price that holds",
+      "source": "register.checks",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none",
+      "where": "seq is 1, making is set, packing is set, sending is set",
+      "value": {
+        "max": "least"
+      },
+      "format": "decimal"
+    },
+    {
+      "metric": "price-room",
+      "name": "Price over the least that holds",
+      "source": "register.checks",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none",
+      "where": "seq is 1, price more than 0, making is set, packing is set, sending is set, least is set",
+      "value": {
+        "diff": {
+          "of": {
+            "max": "price"
+          },
+          "per": {
+            "max": "least"
+          }
+        }
+      },
+      "format": "decimal"
+    },
+    {
+      "metric": "price-free",
+      "name": "Price check at a price of 0",
+      "source": "register.checks",
+      "where": "seq is 1, price is 0, making is set, packing is set, sending is set",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "price-unjudged",
+      "name": "Price check costs not added yet",
+      "source": "register.checks",
+      "where": "seq is 1, price more than 0, making is set, packing is set, sending is set, least is not set",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "page": "desk",
+      "title": "Desk",
+      "icon": "thing",
+      "nav": {
+        "section": "Launch",
+        "order": 10,
+        "tabs": true
+      },
+      "layout": {
+        "rail": 4,
+        "sticky": true
+      },
+      "requires": [
+        "register.parts",
+        "register.steps",
+        "register.notes"
+      ],
+      "blocks": [
+        {
+          "kind": "section",
+          "heading": "Where it stands",
+          "box": true
+        },
+        {
+          "kind": "note",
+          "lead": true,
+          "when": {
+            "metric": "essentials",
+            "is": 0
+          },
+          "body": "Nothing essential is written down yet. Add the steps this launch cannot go without, and mark them essential."
+        },
+        {
+          "kind": "note",
+          "lead": true,
+          "when": {
+            "metric": "essentials-share",
+            "lt": 1
+          },
+          "body": "{{essentials-done}} of the {{essentials}} essential step(s) are done."
+        },
+        {
+          "kind": "note",
+          "lead": true,
+          "when": {
+            "metric": "essentials-share",
+            "is": 1
+          },
+          "body": "All {{essentials}} essential step(s) are done."
+        },
+        {
+          "kind": "steps",
+          "span": 4,
+          "heading": "Next move",
+          "source": "register.steps",
+          "first": 1,
+          "columns": [
+            {
+              "field": "what"
+            },
+            {
+              "field": "part"
+            }
+          ],
+          "order": [
+            {
+              "field": "rank",
+              "dir": "asc"
+            },
+            {
+              "field": "seq",
+              "dir": "asc"
+            }
+          ],
+          "empty": "No step is open."
+        },
+        {
+          "kind": "queue",
+          "span": 4,
+          "heading": "Your call",
+          "source": "governance.open",
+          "limit": 1,
+          "empty": "No call is waiting on you."
+        },
+        {
+          "kind": "table",
+          "span": 4,
+          "heading": "Already done",
+          "source": "register.steps",
+          "where": "done is true",
+          "columns": [
+            {
+              "field": "what"
+            },
+            {
+              "field": "part"
+            }
+          ],
+          "order": [
+            {
+              "field": "updated_at",
+              "dir": "desc"
+            }
+          ],
+          "limit": 3,
+          "empty": "Nothing is ticked yet."
+        },
+        {
+          "kind": "section",
+          "heading": "The parts",
+          "source": "register.parts",
+          "empty": "No parts yet."
+        },
+        {
+          "kind": "cards",
+          "span": 12,
+          "source": "register.parts",
+          "lead": true,
+          "columns": [
+            {
+              "field": "name",
+              "as": "title"
+            },
+            {
+              "field": "progress",
+              "as": "ring"
+            },
+            {
+              "field": "what",
+              "as": "next"
+            },
+            {
+              "field": "hue",
+              "as": "hue"
+            },
+            {
+              "field": "picture",
+              "as": "picture"
+            }
+          ],
+          "order": [
+            {
+              "field": "big",
+              "dir": "desc"
+            },
+            {
+              "field": "seq",
+              "dir": "asc"
+            }
+          ],
+          "empty": "No parts yet. A part is a piece of the launch with its own steps, such as the product, its box or its shop page."
+        },
+        {
+          "kind": "section",
+          "heading": "When it falls due"
+        },
+        {
+          "kind": "calendar",
+          "span": 12,
+          "heading": "Steps by the day they are due",
+          "source": "register.steps",
+          "where": "done is not true",
+          "columns": [
+            {
+              "field": "what"
+            },
+            {
+              "field": "due"
+            }
+          ],
+          "back": 0,
+          "ahead": 2,
+          "empty": "No open step is due this month or the next two. Give a step a day it is due, and it is put on the calendar."
+        },
+        {
+          "kind": "queue",
+          "span": 12,
+          "heading": "Calls waiting on you",
+          "source": "governance.open",
+          "tiles": true,
+          "empty": "No call is waiting on you."
+        },
+        {
+          "kind": "section",
+          "heading": "The pad",
+          "source": "register.notes",
+          "empty": "Nothing on the pad yet.",
+          "area": "rail"
+        },
+        {
+          "kind": "capture",
+          "heading": "A thought",
+          "register": "notes",
+          "span": 12,
+          "area": "rail"
+        },
+        {
+          "kind": "cards",
+          "span": 12,
+          "source": "register.notes",
+          "columns": [
+            {
+              "field": "text",
+              "as": "title"
+            },
+            {
+              "field": "reply",
+              "as": "reply"
+            }
+          ],
+          "order": [
+            {
+              "field": "seq",
+              "dir": "desc"
+            }
+          ],
+          "limit": 6,
+          "empty": "Nothing on the pad yet. Write a thought above, and a second opinion is written under it.",
+          "area": "rail"
+        }
+      ]
+    },
+    {
+      "page": "part",
+      "title": "{{name}}",
+      "for": {
+        "register": "parts"
+      },
+      "nav": {
+        "section": "Launch",
+        "order": 20,
+        "tabs": true
+      },
+      "layout": {
+        "rail": 4
+      },
+      "requires": [
+        "register.parts",
+        "register.steps",
+        "register.lessons",
+        "register.contacts",
+        "register.notes"
+      ],
+      "blocks": [
+        {
+          "kind": "note",
+          "body": "{{what}}"
+        },
+        {
+          "kind": "cards",
+          "span": 4,
+          "source": "register.parts",
+          "where": "name is {{name}}",
+          "columns": [
+            {
+              "field": "name",
+              "as": "title"
+            },
+            {
+              "field": "progress",
+              "as": "ring"
+            },
+            {
+              "field": "hue",
+              "as": "hue"
+            },
+            {
+              "field": "picture",
+              "as": "picture"
+            }
+          ],
+          "empty": "This part is not on the list."
+        },
+        {
+          "kind": "steps",
+          "span": 12,
+          "heading": "The path",
+          "source": "register.steps",
+          "where": "part is {{name}}",
+          "first": 5,
+          "short": {
+            "where": "priority is essential",
+            "label": "Essentials"
+          },
+          "columns": [
+            {
+              "field": "what"
+            },
+            {
+              "field": "priority"
+            }
+          ],
+          "order": [
+            {
+              "field": "rank",
+              "dir": "asc"
+            }
+          ],
+          "empty": "No steps for this part yet."
+        },
+        {
+          "kind": "section",
+          "heading": "Learned on the way",
+          "source": "register.lessons",
+          "where": "part is {{name}}",
+          "fold": true,
+          "empty": "Nothing learned here yet."
+        },
+        {
+          "kind": "table",
+          "span": 12,
+          "heading": "Learned on the way",
+          "source": "register.lessons",
+          "where": "part is {{name}}",
+          "columns": [
+            {
+              "field": "lesson"
+            },
+            {
+              "field": "body"
+            }
+          ],
+          "empty": "Nothing learned here yet."
+        },
+        {
+          "kind": "queue",
+          "area": "rail",
+          "heading": "Calls about this part",
+          "source": "governance.open",
+          "where": "about is {{name}}",
+          "empty": "No call about this part is waiting."
+        },
+        {
+          "kind": "capture",
+          "area": "rail",
+          "heading": "A thought",
+          "register": "notes",
+          "where": "about is {{spoken}}"
+        },
+        {
+          "kind": "cards",
+          "area": "rail",
+          "source": "register.notes",
+          "where": "about is {{spoken}}",
+          "columns": [
+            {
+              "field": "text",
+              "as": "title"
+            },
+            {
+              "field": "reply",
+              "as": "reply"
+            }
+          ],
+          "order": [
+            {
+              "field": "seq",
+              "dir": "desc"
+            }
+          ],
+          "limit": 6,
+          "empty": "Nothing on the pad about this part yet."
+        },
+        {
+          "kind": "table",
+          "area": "rail",
+          "heading": "Who helps",
+          "source": "register.contacts",
+          "where": "part is {{name}}",
+          "columns": [
+            {
+              "field": "name"
+            },
+            {
+              "field": "status"
+            },
+            {
+              "field": "phone"
+            },
+            {
+              "field": "email"
+            }
+          ],
+          "empty": "Nobody is helping with this part yet."
+        }
+      ]
+    },
+    {
+      "page": "numbers",
+      "title": "Numbers",
+      "icon": "money",
+      "nav": {
+        "section": "Launch",
+        "order": 90,
+        "tabs": true
+      },
+      "requires": [
+        "register.checks",
+        "register.lines"
+      ],
+      "blocks": [
+        {
+          "kind": "section",
+          "heading": "Does the price hold",
+          "box": true
+        },
+        {
+          "kind": "inputs",
+          "register": "checks",
+          "heading": "The price check",
+          "columns": [
+            {
+              "field": "price"
+            },
+            {
+              "field": "making"
+            },
+            {
+              "field": "packing"
+            },
+            {
+              "field": "sending"
+            }
+          ],
+          "row": "checks#1"
+        },
+        {
+          "kind": "note",
+          "when": {
+            "metric": "priced",
+            "is": 0
+          },
+          "body": "Type a price and the three costs above, and the verdict is said here."
+        },
+        {
+          "kind": "note",
+          "when": {
+            "metric": "price-free",
+            "is": 1
+          },
+          "body": "At a price of 0 there is nothing for the costs to be a share of, and every one sold loses what it cost to make, pack and send. Type the price it sells for."
+        },
+        {
+          "kind": "note",
+          "when": {
+            "metric": "price-unjudged",
+            "is": 1
+          },
+          "body": "The costs are not added up yet. They are added whenever a cost is typed, so type one of them again to see the verdict."
+        },
+        {
+          "kind": "note",
+          "when": {
+            "metric": "price-room",
+            "gte": 0
+          },
+          "body": "It passes: the costs are {{cost-share}} of the price."
+        },
+        {
+          "kind": "note",
+          "when": {
+            "metric": "price-room",
+            "lt": 0
+          },
+          "body": "Too thin: the costs are {{cost-share}} of the price. Raise the price or bring a cost down until they are at most two fifths of it."
+        },
+        {
+          "kind": "stat",
+          "span": 12,
+          "cells": [
+            {
+              "metric": "price",
+              "label": "Price"
+            },
+            {
+              "metric": "costs",
+              "label": "Costs together"
+            },
+            {
+              "metric": "cost-share",
+              "label": "Cost share"
+            },
+            {
+              "metric": "least-price",
+              "label": "Least price that holds"
+            }
+          ]
+        },
+        {
+          "kind": "section",
+          "heading": "Budget"
+        },
+        {
+          "kind": "progress",
+          "span": 12,
+          "source": "register.lines",
+          "range": true,
+          "columns": [
+            {
+              "field": "item"
+            },
+            {
+              "field": "spent"
+            },
+            {
+              "field": "low"
+            },
+            {
+              "field": "high"
+            }
+          ],
+          "order": [
+            {
+              "field": "seq",
+              "dir": "asc"
+            }
+          ],
+          "empty": "No budget lines yet. A line is one thing the launch pays for, with the least and the most it should cost."
+        }
+      ]
+    }
+  ],
+  "seeds": [
+    {
+      "register": "checks",
+      "fields": {
+        "what": "The price check"
+      }
+    }
+  ]
+}

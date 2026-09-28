@@ -33,6 +33,29 @@ export const PEOPLE: Fields[] = [
   { name: 'S. Marchetti', role: 'contractor', rate: gbp(62_000), email: 'sm@marchetti.example', note: 'Backend, two days a week', handles: ['git:smarchetti'], met: ['2026-08-27 · commit 8b1e4d0 in portage', '2026-09-02 · commit c47d19e in portage'] },
 ];
 
+/**
+ * PEOPLE'S ONE RULE, ON BY DEFAULT SINCE People 2.3.0: an agent's `meet` already writes a dated `met` line for a
+ * commit, and this is the same write for a mail sender, so a record with an inbox reads who wrote in the way it reads
+ * who committed. `{{trigger.body.from}}` and `{{trigger.body.subject}}` are the arrival's own words, as an ingest's
+ * `where:` reads them elsewhere in this seed; a channel with neither fills nothing, `meet` skips the step and the run
+ * goes on rather than meeting nobody under a blank name (`people.ts`'s `normalise`, `07 §4`).
+ *
+ * NOT AN INVOICE PARTY'S RULE, WHICH THIS UNIT ALSO ASKED FOR. No first-party ingest writes `register.obligations`
+ * or `register.transactions` from a matched arrival yet, so `on: { arrival: { state: ['matched'] } }` would fire on
+ * any matched arrival at all, of any pack's own ingests; and the one field named `party` on those two lists is
+ * `type: 'ref'`, an id `meet`'s `name` would write into a person's name rather than a word anybody typed. Left for
+ * whichever unit lands that ingest, to name the raw field it actually extracts.
+ */
+export const PEOPLE_AUTOMATIONS: Record<string, unknown>[] = [
+  {
+    rule: 'meet-senders',
+    name: 'Meet whoever writes in',
+    pack: 'people',
+    on: { arrival: { channel: 'email' } },
+    steps: [{ meet: { email: '{{trigger.body.from}}', where: 'mail: {{trigger.body.subject}}' } }],
+  },
+];
+
 export const PEOPLE_REGISTERS: Record<string, PeopleRegister> = {
   people: {
     id: 'people',
@@ -157,6 +180,19 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
         ],
         limit: 1,
         empty: 'Nothing is kept about {{name}} yet.',
+      },
+      {
+        /* THE MET LINES THE CARDS LEAVE OUT, since this is the one page about one person and not a list of everyone
+           (`someone` above the fold says why `page.people`'s cards do not draw them; a card also takes at most three
+           facts, and `role`, `projects` and `email` already fill that). Each dated line reads as `meet` wrote it,
+           "2026-08-27 · commit 8b1e4d0 in portage" or, since People 2.3.0, "2026-09-28 · mail: Renewal quote" for a
+           person `rule.meet-senders` met. NOT `document: true`: that reads one text field as a document body, and
+           `met` is a list, one line per meeting. */
+        kind: 'note',
+        heading: 'Met',
+        span: 12,
+        body: '{{met}}',
+        empty: 'Nothing is kept about how {{name}} was met yet.',
       },
       {
         /* A DOCUMENT, AS A PROJECT'S NOTES ARE, because a person `meet` recorded has no `note` at all, so the body stays

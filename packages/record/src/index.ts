@@ -93,6 +93,8 @@ import {
   runPlan,
   scriptBody,
   egressOf,
+  grantChosen,
+  intervalMs,
   /* RENAMED, because `ACROSS` in this file is the set of page sources that read across the record (`page`). */
   ACROSS as READS_ACROSS,
   ANY_LIST,
@@ -134,6 +136,7 @@ import { methods as jobMethods } from './jobs.ts';
 import { PEN_DISMISSED_MOST, penFor, type PenItem } from './emergent.ts';
 import { methods as previewChangeMethods } from './methods/preview-change.ts';
 import { landRetype } from './methods/retype.ts';
+import { rerank } from './rerank.ts';
 
 export type { CatalogueEntry, FigureTest, Grows, RowIo } from './arrange.ts';
 export { formedRows, fromModel, growsDrafts, noticeUsage, readUsage, FORM_SAID_MOST, SLASH_ASKED_MOST, SLASH_OPEN_CAP, type CatalogueOffer, type FormField, type FormList, type FormSpec, type NextSpec, type Noticed, type SlashDraft, type SlashFormInput, type SlashModel, type SlashModelInput, type Usage } from './slash.ts';
@@ -150,14 +153,38 @@ export { SKILL_DRAFTS_A_DAY, skillBearings, skillDraftOf, type SkillBearing, typ
 /**
  * What proves a caller is the sender an ingest expects, as the record can answer it today.
  *
- * TWO MEMBERS OF `@braindog/host`'s `IngestVerify`, AND `hmac_sha256` IS NOT ONE OF THEM, because
- * nothing binds a grant's key to an ingest yet and `declare.ts` refuses the spelling. `path` carries
- * the SHA-256 of the token `ingestMint` showed, in hex, and never the token: the door digests the URL's
- * segment and compares the two digests (`packages/host/src/ingest.ts`, `hook`). The record may not
- * import the host's type: the edge points the other way (`31 §2`), so this is structural and the
- * door's parameter is what checks the two agree.
+ * FOUR MEMBERS OF `@braindog/host`'s `IngestVerify`. `path` carries the SHA-256 of the token `ingestMint`
+ * showed, in hex, and never the token: the door digests the URL's segment and compares the two digests
+ * (`packages/host/src/ingest.ts`, `hook`). The record may not import the host's type: the edge points the
+ * other way (`31 §2`), so this is structural and the door's parameter is what checks the two agree.
+ *
+ * `hmac_sha256` AND `stripe` CARRY THE KEY OPENED, AND ONLY WHEN A HOST HANDED `ingestVerify` AN OPENER
+ * (DOR-3). The record cannot open a key; the host's opener can, and this is its answer passed straight on
+ * to the one comparison in `hook`. A GitHub door is `hmac_sha256` under `X-Hub-Signature-256`, which is
+ * exactly what GitHub sends, so the door has one HMAC check and not two. `tolerance` is in seconds, the unit
+ * `verifyStripe` takes.
  */
-export type IngestVerification = { kind: 'none' } | { kind: 'path'; sha256: string };
+export type IngestVerification =
+  | { kind: 'none' }
+  | { kind: 'path'; sha256: string }
+  | { kind: 'hmac_sha256'; header: string; key: Uint8Array }
+  | { kind: 'stripe'; header: string; secret: string; tolerance: number };
+
+/**
+ * Opens the vault key a door's `verify:` names, or answers `null`: the host's `OpenKey`, which the record may not
+ * import for `IngestVerification`'s reason, so it is spelled here and the host's opener is what checks the two agree.
+ */
+export type OpenDoorKey = (grant: { id: string; label: string }) => Promise<string | null>;
+
+/** The header each signed kind reads when its declaration names none: what the three senders actually send. */
+const SIGNATURE_HEADER: Readonly<Record<'hmac_sha256' | 'stripe' | 'github', string>> = {
+  hmac_sha256: 'x-signature',
+  stripe: 'stripe-signature',
+  github: 'x-hub-signature-256',
+};
+
+/** Stripe's own window, in seconds, for a Stripe door that declares none (`STRIPE_TOLERANCE_S` in `@braindog/host`). */
+const STRIPE_TOLERANCE_S = 300;
 
 /**
  * Where a webhook ingest's token digest is kept: a `dog_meta` row per ingest.
@@ -896,9 +923,13 @@ export type HistoryPage = { events: EventLine[]; cursor: Cursor | null };
 
 /**
  * `inbox`: one page of the arrivals in the state asked for, newest first, the cursor for the page below it, and how many
- * arrivals are in each state, whichever one was asked for.
+ * arrivals are in each state, whichever one was asked for. `ruledThisWeek` is how many a rule filed in the last
+ * `INBOX_WEEK_MS`, the Inbox's "Filed by rules this week".
  */
-export type InboxPage = { arrivals: InboxLine[]; cursor: number | null; counts: Record<InboxState, number> };
+export type InboxPage = { arrivals: InboxLine[]; cursor: number | null; counts: Record<InboxState, number>; ruledThisWeek: number };
+
+/** The week the Inbox counts a rule's filings over: seven days back from the record's clock. */
+const INBOX_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** One live run: the row, its spoken id, and what is worked out when it is read. */
 export type LiveRun = Entry & {
@@ -7204,14 +7235,30 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * declaration under the same id: one since retired, or one whose `verify:` was taken out on the way
      * (`heldDigest`, which deletes it). Both store every arrival `untriaged` and match none of them:
      * `12 §3` applied to a verifier nobody can check, which is better than treating the URL as proof.
+     *
+     * A SIGNED DOOR IS ANSWERED WITH ITS KEY OPENED, AND ONLY THROUGH `open` (DOR-3). The key is the live vault entry
+     * the declaration's `key:` names, chosen as every action chooses one (`grantChosen`, the newest), and `open` is the
+     * host's opener, which writes the `grant.read` that is the audit trail of every check. No opener, no key under that
+     * label, or a key that does not open are all `none`: the arrival is stored `untriaged` and matches nothing, which
+     * is how a wrong path token is answered, and never a 404 that would make a sender give up on the URL.
      */
-    async ingestVerify(args: { ingest: string }): Promise<IngestVerification | null> {
+    async ingestVerify(args: { ingest: string }, open?: OpenDoorKey): Promise<IngestVerification | null> {
       const held = typeof args?.ingest === 'string' ? heldDigest(args.ingest) : undefined;
       const row = kernel.declarations().find((d) => d.kind === 'ingest' && d.id === `ingest.${args.ingest}`);
       if (!row) return null;
-      const decl = JSON.parse(row.body) as { channel?: unknown; verify?: { kind?: unknown } };
+      const decl = JSON.parse(row.body) as { channel?: unknown; verify?: { kind?: unknown; header?: unknown; key?: unknown; tolerance?: unknown } };
       if (decl.channel !== 'webhook') return null;
-      if (decl.verify?.kind !== 'path') return { kind: 'none' };
+      const v = decl.verify;
+      if (v?.kind === 'hmac_sha256' || v?.kind === 'stripe' || v?.kind === 'github') {
+        const grant = open === undefined || typeof v.key !== 'string' ? undefined : grantChosen(kernel.grants(), v.key);
+        const secret = grant === undefined || open === undefined ? null : await open({ id: grant.id, label: grant.label });
+        if (secret === null || secret === '') return { kind: 'none' };
+        const header = (typeof v.header === 'string' && v.header !== '' ? v.header : SIGNATURE_HEADER[v.kind]).toLowerCase();
+        if (v.kind !== 'stripe') return { kind: 'hmac_sha256', header, key: new TextEncoder().encode(secret) };
+        const ms = typeof v.tolerance === 'string' ? intervalMs(v.tolerance) : null;
+        return { kind: 'stripe', header, secret, tolerance: ms === null ? STRIPE_TOLERANCE_S : Math.floor(ms / 1000) };
+      }
+      if (v?.kind !== 'path') return { kind: 'none' };
       return held === undefined ? { kind: 'none' } : { kind: 'path', sha256: held };
     },
 
@@ -7270,11 +7317,25 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       )?.version;
       if (since === undefined) return no('DECLARATION_UNKNOWN', `This record declares no ingest called ${ingest}.`, { at: 'ingest' });
       const token = webhookSecret();
-      sql.exec(
-        'INSERT INTO dog_meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value',
-        ingestTokenKey(ingest),
-        `${since}:${await sha256Hex(token)}`,
-      );
+      const digest = await sha256Hex(token);
+      const key = ingestTokenKey(ingest);
+      /* AND THE MINT IS AN EVENT, NAMING THE DOOR AND WHO MINTED IT (defects S5). A token that decides which rows
+         come in at `exact` was made and replaced with nothing in the log, so the owner could not say who opened a
+         door or when. `grant.add` for the first, `grant.rotate` for one that replaces a digest already held, both
+         existing kinds; the event carries the door's id and never the token or its digest, and it is written in
+         the same transaction as the digest, so a mint the log does not show never happened. */
+      kernel.transaction(() => {
+        const again = sql.one<{ value: string }>('SELECT value FROM dog_meta WHERE key = ?', key) !== undefined;
+        sql.exec('INSERT INTO dog_meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value', key, `${since}:${digest}`);
+        sql.exec(
+          "INSERT INTO event (id, ts, actor, kind, target, target_kind) VALUES (?, ?, ?, ?, ?, 'ingest')",
+          mintGrant(),
+          new Date(clock.now()).toISOString(),
+          actorOf(ctx),
+          again ? 'grant.rotate' : 'grant.add',
+          `door:${ingest}`,
+        );
+      });
       /* AND THE ADDRESS, BECAUSE NOTHING ELSE ANSWERED IT. `whoami` and `boot` carry no record id, so the screen that
          showed this token could not build the URL it goes in, and on a live record the owner's press never yielded
          one (`loop/research-shell-doors.md` §3c). `<rec>` is `kernel.identity().id` because that is what both hosts
@@ -7707,7 +7768,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const limit = Math.min(Math.max(1, asked ?? 50), 200);
       const lines = kernel.inboxBefore(cursor ?? null, limit + 1, states);
       const arrivals = lines.slice(0, limit);
-      return ok({ arrivals, cursor: lines.length > limit ? (arrivals.at(-1)?.rowid ?? null) : null, counts: kernel.inboxCounts() });
+      return ok({
+        arrivals,
+        cursor: lines.length > limit ? (arrivals.at(-1)?.rowid ?? null) : null,
+        counts: kernel.inboxCounts(),
+        ruledThisWeek: kernel.inboxRuledSince(new Date(clock.now() - INBOX_WEEK_MS).toISOString()),
+      });
     },
 
     /**
@@ -7803,7 +7869,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         ...(args.limit === undefined ? {} : { limit: args.limit }),
       });
       return ok({
-        hits: found.hits.flatMap((hit) => {
+        /* THE WORDS' ORDER, SHUFFLED BY MEANING WHERE THE ROWS HAVE VECTORS (`rerank.ts`), and left exactly as it was
+           where they have none. Before the reach below, which only drops hits and so keeps the order it is given. */
+        hits: rerank(sql, found.hits).flatMap((hit) => {
           const row = kernel.get(hit.id);
           if (!row || !rowAdmitted(ctx, row.register, row.seq)) return [];
           const title = kernel.register(row.register)?.title;

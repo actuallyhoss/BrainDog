@@ -4,6 +4,10 @@
  *
  *   pnpm --filter braindog-cli build
  *
+ * IT IS ALSO WHAT npm SHIPS. `braindog-cli` is this workspace's name for the package, and npm's is `braindog` (the root
+ * manifest holds that name here); `.github/workflows/tag.yml` builds with this file on a `cli-v*` tag and publishes
+ * `dist/` under the npm name. There is no second bundler.
+ *
  * WHY A BUNDLE AND NOT THE SOURCES. Node strips types from a `.ts` file it is asked to run, but refuses to under
  * `node_modules`, and the CLI imports workspace packages that are TypeScript all the way down. A person with Node and
  * no checkout can run one JavaScript file, so that is what this makes, and what `brain.dog/cli/` serves. The tests keep
@@ -45,6 +49,7 @@ const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const SRC = fileURLToPath(new URL('../src/', import.meta.url));
 const OUT = fileURLToPath(new URL('../dist/braindog.mjs', import.meta.url));
 const SUM = `${OUT}.sha256`;
+const SKILL = fileURLToPath(new URL('../../../skills/braindog/SKILL.md', import.meta.url));
 const HASHBANG = '#!/usr/bin/env node\n';
 
 /* The one spelling the sources use for their own entry, rewritten in the bundle for the reason THE COMMAND'S OWN PATH
@@ -93,6 +98,17 @@ function stamp() {
 
 const tuple = stamp();
 
+/* THE AGENT SKILL RIDES INSIDE THE BUNDLE. `install` places `skills/braindog/SKILL.md` in each profile, and a checkout
+   reads it from the repository's root, but the bundle is one file on a machine with no checkout, so the text is
+   defined into it as `__SKILL__`, exactly as the build is. A missing file stops the build rather than shipping an
+   install with nothing to place. */
+let skill = '';
+try {
+  skill = readFileSync(SKILL, 'utf8');
+} catch {
+  fail(`The Agent Skill is not at ${SKILL}, and the CLI carries it, so there is nothing to bundle.`);
+}
+
 /* THE OLD PAIR GOES FIRST, so a build that fails leaves no file beside a checksum that was written for another. */
 rmSync(OUT, { force: true });
 rmSync(SUM, { force: true });
@@ -106,7 +122,7 @@ try {
     platform: 'node',
     format: 'esm',
     target: 'node24',
-    define: { __BUILD__: JSON.stringify(tuple) },
+    define: { __BUILD__: JSON.stringify(tuple), __SKILL__: JSON.stringify(skill) },
     // A COMMONJS DEPENDENCY STILL CALLS require() INSIDE AN ESM FILE. `yaml` asks for `process` that way, and esbuild's
     // shim throws "Dynamic require is not supported" unless a real `require` is in scope, so the bundle makes one.
     banner: { js: "import { createRequire as __braindogRequire } from 'node:module';\nconst require = __braindogRequire(import.meta.url);" },

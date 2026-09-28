@@ -20,6 +20,7 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { copy } from '$lib/copy.ts';
+  import { said } from '$lib/voice.svelte.ts';
   import * as clipboard from '$lib/clipboard.ts';
   import * as pref from '$lib/pref.ts';
   import { covered, silenced, typing as isTyping } from '$lib/a11y/keys.svelte.ts';
@@ -63,6 +64,8 @@
   import { listWords, MAKE_ID, MAKE_PARAM, nameFromId, offered } from '$lib/record/list-write.ts';
   import { sheetWords } from '$lib/record/field-words.ts';
   import { ownsRecord, type Me } from '../../settings/levels.ts';
+  import { may } from '$lib/record/may.ts';
+  import { reachWords } from './reach.ts';
 
 
   const id = $derived(page.params.register ?? '');
@@ -117,7 +120,7 @@
    * the request. Closing clears it, or the effect would reopen the sheet the moment it shut.
    */
   $effect(() => {
-    if (page.url.searchParams.get('new') === '1') createOpen = true;
+    if (page.url.searchParams.get('new') === '1' && adds) createOpen = true;
   });
 
   const closeCreate = () => {
@@ -140,6 +143,20 @@
    */
   const hand = $derived(decl ? handFor(decl) : null);
   const shell = $derived(page.data as unknown as Shell);
+
+  /**
+   * WHAT THE CALLER'S LEVEL ON THIS LIST REACHES (COL-13), asked of `may()` and never worked out here.
+   *
+   * A CONTROL THE RECORD WOULD REFUSE IS NOT DRAWN. A colleague given Reads on Tasks met the capture line, the New
+   * button, a pencil in every cell and Archive on every row, and each press came back refused: `create` asks `append`
+   * of the list, and a change or an archive is an `update`, which asks `write`. `proposes` is the Fields sheet's rung,
+   * which files a proposal for anyone but the owner, and a `propose` names no list.
+   */
+  const adds = $derived(may(shell, 'append', id));
+  const changes = $derived(may(shell, 'write', id));
+  const proposes = $derived(owner || may(shell, 'append'));
+  /* A BOUND KEY DOES NOT ANSWER WITH SILENCE (`openEditor`), so `n`, `e` and `⌫` say to a Reads colleague why. */
+  const readOnlySaid = () => void toasts.push(reachWords.readOnly(decl?.name ?? nameFromId(id)), { intent: 'warn' });
   const peopleList = $derived.by(() => {
     const to = decl?.fields.find((f) => f.id === hand?.person)?.to ?? 'people';
     return { register: to, title: REGISTERS[to]?.title ?? 'name' };
@@ -1139,9 +1156,10 @@
    * back: `where.ts` `declaredValue` takes a value by its label.
    */
   const saidInLine = (field: string, value: string): string => fieldOf(field)?.labels?.[value] ?? value.replace(/_/g, ' ');
+  /* AND ONLY FOR SOMEBODY WHO MAY CHANGE THE LIST, so a Reads colleague is drawn no pencil (COL-13). */
   const editableHere = (field: string) => {
     const f = fieldOf(field);
-    return f !== undefined && editable(f);
+    return changes && f !== undefined && editable(f);
   };
   /* THE CURRENCY A MONEY CELL IS TYPED IN WHEN ITS ROW SAYS NONE, the fallback the row page passes too. */
   const listCurrency = (field: string): string | null => currencyFor(id, field);
@@ -1165,6 +1183,12 @@
   };
 
   function openEditor(seq: number, field: string) {
+    /* `e` STILL ANSWERS A READS COLLEAGUE, with why the list will not change for them rather than a reason about the
+       field's type, which would be true of the field and not the reason (COL-13). */
+    if (!changes) {
+      readOnlySaid();
+      return;
+    }
     if (!editableHere(field)) {
       /* A BOUND KEY DOES NOT ANSWER WITH SILENCE. `19 §4`'s sheet advertises `e` for the grid with
          no condition on it, and when this refused money and refs the press did nothing, drew nothing
@@ -1602,6 +1626,9 @@
         e.preventDefault();
         void copyId(row.seq);
       }
+    } else if ((e.key === 'Delete' || e.key === 'Backspace') && !changes) {
+      e.preventDefault();
+      readOnlySaid();
     } else if (e.key === 'Delete' || e.key === 'Backspace') {
       const row = result.entries[focus.row];
       if (row) {
@@ -1626,7 +1653,8 @@
       focus = { ...focus, col: columns.length - 1 };
     } else if (e.key === 'n') {
       e.preventDefault();
-      createOpen = true;
+      if (adds) createOpen = true;
+      else readOnlySaid();
     } else if (e.key === 'o') {
       /* The RELATED register: the one the focused cell points at. A `ref` cell knows its target, so
          `o` follows it; on any other cell there is nothing related and nothing happens. */
@@ -2023,7 +2051,7 @@
       body={id === MAKE_ID ? listWords.makeBody : have.length > 0 ? listWords.missing(nameFromId(id)) : listWords.missingNone(nameFromId(id))}
     >
       {#snippet actions()}
-        <Button weight="primary" onclick={() => (makeOpen = true)}>{listWords.make}</Button>
+        {#if proposes}<Button weight="primary" onclick={() => (makeOpen = true)}>{listWords.make}</Button>{/if}
         {#if id !== MAKE_ID}
           {#each have as r (r.id)}<Button href={`/r/${r.id}`}>{r.name}</Button>{/each}
         {/if}
@@ -2043,17 +2071,19 @@
            started a row, one under the other, and on a phone the button took a line of its own over
            the field that does the same thing in fewer presses. It stays while the field is hidden
            (`?first`), and on a laptop, where it opens the whole form and sits beside the title. -->
-      <span class="new-row" data-alone={arriving ? '' : undefined}>
-        <Button weight="primary" onclick={() => (createOpen = true)}><Icon name="plus" size="s" />{copy.newRow} {decl.one}</Button>
-      </span>
-      {#if !arriving}<CapturePlus one={decl.one} onclick={() => (captureOpen = true)} />{/if}
+      {#if adds}
+        <span class="new-row" data-alone={arriving ? '' : undefined}>
+          <Button weight="primary" onclick={() => (createOpen = true)}><Icon name="plus" size="s" />{said('new_row')} {decl.one}</Button>
+        </span>
+        {#if !arriving}<CapturePlus one={decl.one} onclick={() => (captureOpen = true)} />{/if}
+      {/if}
       <!-- THE VIEW OVER WHAT IS HANDED TO YOU, on a list that says who holds its rows (GAP-11). -->
       {#if handedToMeHref}<Button href={handedToMeHref}>{copy.handedToMe}</Button>{/if}
       <!-- THE LIST'S FIELDS, opened from its head: add any kind, rename one, or retire one (`ListEditor.svelte`). -->
-      <Button onclick={() => (fieldsOpen = true)} data-fields-open>{sheetWords.open}</Button>
+      {#if proposes}<Button onclick={() => (fieldsOpen = true)} data-fields-open>{sheetWords.open}</Button>{/if}
     {/snippet}
   </PageHead>
-  <ListEditor bind:open={fieldsOpen} register={id} {owner} onchanged={refresh} />
+  {#if proposes}<ListEditor bind:open={fieldsOpen} register={id} {owner} onchanged={refresh} />{/if}
 
   <div class="page" aria-busy={busy ? 'true' : undefined}>
     <!-- THE LIST HAS MOVED ON AND MORE THAN ONE PAGE OF IT IS IN HAND, so it says so rather than splicing a new head
@@ -2068,7 +2098,10 @@
     <!-- CAPTURE, FIRST ON THE PAGE, above the search and the filters because it is the one thing here
          that does not act on the rows below it. Not on the arrival itself, where the New button in
          the head is the way in. -->
-    {#if !arriving}
+    {#if !adds}
+      <!-- AND WHERE IT WOULD HAVE BEEN, WHY IT IS NOT (COL-13): a list with no way in reads as one nobody can add to. -->
+      <p class="reach">{reachWords.readOnly(decl.name)}</p>
+    {:else if !arriving}
       <CaptureLine one={decl.one} bind:value={capture} bind:open={captureOpen} {captureRow} allFields={() => (createOpen = true)} />
     {/if}
 
@@ -2102,12 +2135,12 @@
         <BulkBar
           count={picked.length}
           {decl}
-          {states}
+          states={changes ? states : []}
           {stateLabel}
           {saidInLine}
           {copyIds}
           {setPickedState}
-          {archiveSelected}
+          archiveSelected={changes ? archiveSelected : undefined}
           onclear={() => (selected = new Set())}
         />
       {/if}
@@ -2160,7 +2193,7 @@
           {cancelEdit}
           {leftTheRow}
           {cellKeys}
-          {archive}
+          archive={changes ? archive : undefined}
           {openCardMenu}
         />
       {/if}
@@ -2228,7 +2261,7 @@
     row={menuRow}
     register={id}
     {decl}
-    {states}
+    states={changes ? states : []}
     {selected}
     {rowAt}
     {saidInLine}
@@ -2238,21 +2271,23 @@
     {toggleSelect}
     {copyId}
     {copyLink}
-    {archive}
+    archive={changes ? archive : undefined}
     onhanded={landRow}
   />
 
   <!-- The new-row drawer, every declared field in front of the reader. `n`, and New in the head. -->
-  <FieldAdd
-    bind:open={createOpen}
-    register={id}
-    one={decl.one}
-    bind:problems
-    bind:taken
-    {writing}
-    {addTypedRow}
-    {closeCreate}
-  />
+  {#if adds}
+    <FieldAdd
+      bind:open={createOpen}
+      register={id}
+      one={decl.one}
+      bind:problems
+      bind:taken
+      {writing}
+      {addTypedRow}
+      {closeCreate}
+    />
+  {/if}
 
 {/if}
 
@@ -2277,6 +2312,14 @@
     margin: 0;
     color: var(--ink2);
     font-size: var(--t-xs);
+  }
+
+  /* WHY THERE IS NO CAPTURE LINE (COL-13), one dim sentence where the line would stand. It wraps like any sentence, so
+     at 390px it is the line's height or two and nothing else moves. */
+  .reach {
+    margin: 0;
+    color: var(--ink2);
+    font-size: var(--t-sm);
   }
 
   /* THE HEAD'S NEW BUTTON, which a phone does without: the "+" beside it opens the capture sheet, which starts a row in

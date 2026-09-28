@@ -57,6 +57,9 @@
  * checkout's own files, and the dry run over his profiles planned both from `C:\Repos\braindog`, the tree the loop's
  * agents edit every wave, so a session would start on whatever half-written file was there at the time. One line says
  * so and names the worktree fix. It never refuses, because the tree may be his, changed on purpose.
+ *
+ * AND IT OFFERS BRAINDOG'S OWN AGENT SKILL (OPS-26): each profile's `skills/braindog/SKILL.md`, planned beside the
+ * hooks, printed by the dry run and placed by `--apply` in the same all-or-none write (`planAgentSkill`).
  */
 
 import { execFileSync } from 'node:child_process';
@@ -139,6 +142,18 @@ export const BRAINDOG_SERVER = {
 } as const;
 
 const ADDS_SERVER = '  + mcpServers.braindog: ';
+
+/**
+ * BrainDog's own Agent Skill, the text of the repository's `skills/braindog/SKILL.md`. THE BUNDLE CARRIES IT AS
+ * `__SKILL__`, defined by `scripts/bundle.mjs` exactly as `__BUILD__` is, because the published CLI is one file on a
+ * machine with no checkout beside it; a checkout run of the sources reads the file from the repository's root.
+ */
+declare const __SKILL__: string;
+const agentSkill = (): string =>
+  typeof __SKILL__ === 'string' ? __SKILL__ : readFileSync(new URL('../../../skills/braindog/SKILL.md', import.meta.url), 'utf8');
+
+/** The line a plan prints for the skill, which `setup` also reads to know that install has something to place. */
+export const PLACES_SKILL = '  + skills/braindog/SKILL.md';
 
 /**
  * The shell a hand-run line is printed for, by the name the printed lines are headed with.
@@ -318,7 +333,9 @@ function commit(plans: Plan[]): string[] {
           copyFileSync(write.file, step.kept);
         } else step.made = mkdirSync(dirname(write.file), { recursive: true });
         /* The mode is carried over because `.claude.json` holds the account's sign-in, and a fresh file would be made readable by the umask. */
-        writeFileSync(step.tmp, `${JSON.stringify(write.value, null, 2)}\n`, write.had ? { mode: statSync(write.file).mode & 0o777 } : {});
+        /* A string is a text file's whole content (the Agent Skill); every other value is a JSON file's. */
+        const text = typeof write.value === 'string' ? write.value : `${JSON.stringify(write.value, null, 2)}\n`;
+        writeFileSync(step.tmp, text, write.had ? { mode: statSync(write.file).mode & 0o777 } : {});
       }
       for (const move of plan.moves ?? []) {
         failing = move.from;
@@ -476,6 +493,8 @@ export function installProfiles(profiles: string[], files: string[], options: Op
   };
   for (const dir of profiles) {
     add(join(dir, 'settings.json'), planSettings);
+    /* After the settings and before the servers, so a run's first line is still its first file's heading. */
+    add(join(dir, 'skills', 'braindog', 'SKILL.md'), planAgentSkill);
     if (options.replace) {
       const servers = serversFileOf(dir, options.home);
       add(servers, planServers);
@@ -847,7 +866,8 @@ function planSkills(skills: string, options: Options): Plan {
   const date = new Date().toISOString().slice(0, 10);
   const moves: Move[] = [];
   for (const name of readdirSync(skills).sort()) {
-    if (name.startsWith('.')) continue;
+    /* BrainDog's own skill is placed by this command, so it is never the old tool's, whatever its text names. */
+    if (name.startsWith('.') || name === 'braindog') continue;
     const from = join(skills, name);
     let text: string;
     try {
@@ -870,4 +890,22 @@ function planSkills(skills: string, options: Options): Plan {
     ...moves.map((move) => `  - skills/${basename(move.from)}, ${String(old?.name)}'s skill, set aside as skills/.replaced/${basename(move.to)}`),
   ];
   return { lines, write: null, moves };
+}
+
+/**
+ * BrainDog's Agent Skill in one profile, at `skills/braindog/SKILL.md`: what the record is to an agent, how it
+ * connects and the rules it keeps, so a session that has the server also knows how to use it (contracts X25, X55).
+ * OFFERED LIKE EVERYTHING ELSE HERE: the dry run says it would place the file and `--apply` places it, in the same
+ * all-or-none write as the profile's settings. A profile already holding this text is no line at all, and one holding
+ * an older text gets this one, its copy kept beside it as every file this command changes is.
+ */
+function planAgentSkill(file: string, options: Options): Plan {
+  const text = agentSkill();
+  const had = existsSync(file);
+  if (had && readFileSync(file, 'utf8') === text) return { lines: [], write: null };
+  const lines = [
+    `${options.apply ? 'Placed' : 'braindog install would place'} BrainDog's Agent Skill in ${dirname(dirname(dirname(file)))}:`,
+    `${PLACES_SKILL}${had ? ', in place of an older copy' : ''}: what BrainDog is to an agent, how it connects, and the rules it keeps.`,
+  ];
+  return { lines, write: { file, had, value: text } };
 }

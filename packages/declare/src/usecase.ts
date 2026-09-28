@@ -33,9 +33,32 @@
 import type { Result } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 
-/** The lines a voice may replace, in the order the display meets them. */
-export const VOICE_KEYS = ['home', 'decide', 'inbox', 'lists', 'right_now', 'needs_you', 'nothing_needs_you', 'since_away', 'nothing_new'] as const;
+/**
+ * The lines a voice may replace, in the order the display meets them: the spine's four names, Home's headings and its
+ * empty lines, Decide's and the Inbox's empty lines, the add verb, and the pen's empty line.
+ *
+ * WIDER THAN THE HEADINGS, BECAUSE A TONE IS MORE THAN ITS HEADINGS (`loop/DIRECTION.md` §11: a student's record should not
+ * talk like an accounts department). The first keys named only the rail and Home's bands, so every empty line, the verb on a
+ * list's add button and the pen's line still spoke the house voice on a record set up for a student. Each key here is a
+ * sentence the house voice already says, read through `said()` in the web with that sentence as the fallback.
+ */
+export const VOICE_KEYS = [
+  'home', 'decide', 'inbox', 'lists',
+  'right_now', 'needs_you', 'nothing_needs_you', 'working_now', 'coming_up', 'overdue', 'since_away', 'nothing_new',
+  'nothing_now', 'fills_with', 'nothing_waiting', 'nothing_due', 'record_empty', 'start_here',
+  'no_questions', 'inbox_clear',
+  'new_row', 'add_row', 'add_first',
+  'pen_nothing', 'pen_waits',
+] as const;
 export type VoiceKey = (typeof VOICE_KEYS)[number];
+
+/**
+ * THE KEYS THAT NAME A TAB, and the most characters such a line may have. The phone's tab bar draws Home, Decide and the
+ * Inbox side by side at 390, and the More sheet draws the lists' name as one row, so a line longer than the tab's label
+ * would be cut off mid-word. A use case's file is refused at the key that is too long.
+ */
+export const VOICE_TAB_KEYS: readonly VoiceKey[] = ['home', 'decide', 'inbox', 'lists'];
+export const VOICE_TAB_CHARS = 12;
 
 /**
  * The audiences a form suggests for who a use case is for. Said on the proposal and used to group a catalogue.
@@ -142,6 +165,12 @@ const SEMVER = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-[0-9A-Za-z.-]+)?$/;
 const SIGNAL = /^[a-z0-9][a-z0-9 '-]{0,39}$/;
 const SKILL = /^[a-z][a-z0-9-]{1,63}$/;
 const VOICE_BYTES = 80;
+/**
+ * A VOICE LINE MAY BE A SENTENCE, where a label is a word or a few. Home's line saying what fills it is longer than a
+ * label's limit in the house voice itself, so a use case could not say it its own way. Still one line, well under the
+ * kernel's own ceiling for a text setting.
+ */
+const VOICE_LINE_BYTES = 200;
 const NAV_ADDRESS = /^\/(p|r)\/[a-z0-9][a-z0-9_-]{0,63}$/;
 const NAV_CEILING = 64;
 const SIGNALS_CEILING = 64;
@@ -316,7 +345,10 @@ export function normaliseUseCase(doc: unknown): Result<UseCase> {
     for (const [key, line] of Object.entries(doc.voice)) {
       if (!(VOICE_KEYS as readonly string[]).includes(key))
         return no('FIELD_UNKNOWN', `A voice has no ${key}. It may replace ${VOICE_KEYS.join(', ')}.`, { at: `voice.${key}`, allowed: [...VOICE_KEYS] });
-      if (!text(line, VOICE_BYTES)) return no('VALUE_MALFORMED', `voice.${key} is a line of text of at most ${VOICE_BYTES} bytes.`, { at: `voice.${key}` });
+      if (!text(line, VOICE_LINE_BYTES) || /[\r\n]/u.test(line))
+        return no('VALUE_MALFORMED', `voice.${key} is one line of text of at most ${VOICE_LINE_BYTES} bytes.`, { at: `voice.${key}` });
+      if (VOICE_TAB_KEYS.includes(key as VoiceKey) && [...line].length > VOICE_TAB_CHARS)
+        return no('VALUE_MALFORMED', `voice.${key} names a tab on a phone, so it is at most ${VOICE_TAB_CHARS} characters.`, { at: `voice.${key}` });
       voice[key as VoiceKey] = line;
     }
   }
@@ -437,8 +469,24 @@ const VOICE_TITLES: Readonly<Record<VoiceKey, string>> = {
   right_now: 'The heading over what is happening now',
   needs_you: 'The heading over what needs you',
   nothing_needs_you: 'The line when nothing needs you',
+  working_now: 'The heading over who is working now',
+  coming_up: 'The heading over what falls due soon',
+  overdue: 'The heading over what is late',
   since_away: 'The heading over what changed while you were away',
   nothing_new: 'The line when nothing has changed',
+  nothing_now: 'The line on Home when nothing needs you',
+  fills_with: 'The line on Home saying what fills it',
+  nothing_waiting: 'The line when no question waits on you',
+  nothing_due: 'The line when nothing falls due soon',
+  record_empty: 'The line when the record holds nothing yet',
+  start_here: 'The button that starts an empty record',
+  no_questions: 'The line when Decide is empty',
+  inbox_clear: 'The line when the Inbox is empty',
+  new_row: 'The word on the button that adds one to a list',
+  add_row: 'The word on the button that saves a new one',
+  add_first: 'The button on a list with nothing in it',
+  pen_nothing: 'The heading when there is nothing to suggest',
+  pen_waits: 'The line saying where suggestions wait',
 };
 
 /** What a label's setting is called at `/packs/<id>`: "Label: people, role", "Label: one of tickets", "Label: what tickets holds". */

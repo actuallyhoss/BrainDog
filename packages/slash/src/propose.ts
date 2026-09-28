@@ -576,6 +576,15 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
     if (asked === '')
       return no('VALUE_MALFORMED', 'Ask Slash a question first. A blank ask has nothing to read.', { at: 'question' });
 
+    /* A SECOND PASS 2 ON ONE STORED `ask_id` IS REFUSED, NOT RUN AGAIN, since `asksUsed` stopped counting `propose`
+       (`call.ts`): the one row that meters this question is the `read` pass 1 left, so a repeat call quoting the same
+       `ask_id` would otherwise call a model for nothing the meter sees. The first pass 2 for an `ask_id` reserves its
+       proposal under `<ask_id>:propose` rather than a fresh ulid (`core.reserve`'s `id`), so that row is still there
+       to find here, whether the first pass 2 finished `ok` or failed after it held it; only a hold `release` deleted
+       (the vault-closed `FORBIDDEN` arm below, among others) leaves nothing, and that pass 2 never happened. */
+    if (askId !== undefined && earlier !== undefined && core.sql.one('SELECT 1 AS n FROM slash_call WHERE id = ?', `${askId}:propose`) !== undefined)
+      return no('ALREADY_KNOWN', 'This question already has an answer. Ask it again to draft a new one.', { at: 'ask_id' });
+
     const stored = earlier?.predicate == null ? undefined : storedDraft(earlier.predicate);
     /* EVERY MODEL CALL THIS PASS MAY MAKE IS HELD before the first `await`, as `read` holds its one. With a stored draft
        that is the proposal alone; with none it is the drafting `read` and then the proposal. Holding only the first left
@@ -584,7 +593,12 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
        check still runs once per call to this method, so one propose at the last ask still "starts one under the cap and
        ends one over" as `46 §5.5` records; two sent together no longer both do. */
     const s0 = core.settings();
-    const proposing = core.reserve('propose', s0.tier, s0.tier === 'a' ? PROMPTS.propose.model : (s0.model ?? PROMPTS.propose.model));
+    const proposing = core.reserve(
+      'propose',
+      s0.tier,
+      s0.tier === 'a' ? PROMPTS.propose.model : (s0.model ?? PROMPTS.propose.model),
+      askId === undefined ? undefined : `${askId}:propose`,
+    );
     const drafting = stored === undefined ? core.reserve('read', s0.tier, PROMPTS.predicate.model) : undefined;
     try {
       return await pass2(asked, ctx, byok, inference ?? fallback, stored, drafting, proposing);

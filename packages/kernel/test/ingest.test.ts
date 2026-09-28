@@ -1295,10 +1295,9 @@ test('NO FOURTH LIST: nothing outside two named places decides for itself what a
      its reason, which can only ever fail to offer a code and can never admit one the write refuses.
 
      AND A LONG LIST OF REAL CODES IS THE OTHER SHAPE, caught by counting rather than by name. The
-     threshold is deliberately well above the twelve `currencies.ts` legitimately holds, and the one
-     allowance below is a list of what a RATES SOURCE publishes, which is a question `Intl` cannot
-     answer and so cannot be derived. It carries no drift check and it will rot; it is named here so
-     that it rots in the open. */
+     threshold is deliberately well above the twelve `currencies.ts` legitimately holds. The rates
+     form's list of what one rates source publishes was allowed here until USE-5 made rates a preset
+     of the new-action sheet and the list went with the form. */
   const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
   const CLAIMS_THE_STANDARD = /(?:function|const|let|var|type|interface)\s+(ISO_?4217\w*|ALL_CURRENCIES|CURRENCY_CODES)\b/u;
 
@@ -1306,10 +1305,9 @@ test('NO FOURTH LIST: nothing outside two named places decides for itself what a
      than twelve, so an ordered head of the dozen a person actually picks is never mistaken for one.
      Tests are not exempt as a class: a test asserting on thirty codes is a test that will disagree
      with the runtime one day, and it is better for it to say so here than to go red in a year with
-     no explanation. The two that do it are named, with what each is for. */
+     no explanation. The one that does it is named, with what it is for. */
   const MANY = 20;
   const LIST_ALLOWED = new Map([
-    ['apps/web/src/lib/record/rates-form.ts', 'the currencies the ECB publishes, which Intl cannot answer'],
     ['apps/web/test/measures-currency.test.ts', 'the drawing test, which asserts on a spread of codes on purpose'],
   ]);
 

@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 
 import { copy } from '../copy.ts';
 import type { Fetch } from './boot-live.ts';
+import type { Member } from '@braindog/client';
 import type { Person } from './schema.ts';
 import {
   addException,
@@ -25,11 +26,14 @@ import {
   inviteLink,
   mintAgent,
   moveLevel,
+  personOf,
   readInvites,
   readPeople,
   readSnapshots,
   removeAccess,
   restoreSnapshot,
+  ruleRead,
+  ruleValue,
   withdrawInvite,
   wrote,
 } from './settings-write.ts';
@@ -114,8 +118,8 @@ test('a level change sends the whole of what they would hold, exceptions include
 
 test('an exception is added or taken back inside the same invitation', async () => {
   const { io, sent } = host(() => json(200, { ok: true, value: member }));
-  await addException(BASE, bo, 'payroll', 'read', io);
-  await addException(BASE, bo, 'obligations', 'owner', io);
+  await addException(BASE, bo, 'payroll', 'read', null, io);
+  await addException(BASE, bo, 'obligations', 'owner', null, io);
   await dropException(BASE, bo, 'obligations', io);
   assert.deepEqual(
     sent.map((s) => s.body),
@@ -125,6 +129,45 @@ test('an exception is added or taken back inside the same invitation', async () 
       { person: 'p_bo', level: 'read', registers: {} },
     ],
   );
+});
+
+/* A LIST SENT WITHOUT ITS RULE IS EVERY ROW OF IT AGAIN (`members.ts`, `invite`), so every write that sends somebody's
+   whole invitation carries the rules that stay, and only the lists still given keep theirs. */
+test('a narrowed grant is sent with its rule, and every other write keeps it', async () => {
+  const { io, sent } = host(() => json(200, { ok: true, value: member }));
+  await addException(BASE, bo, 'payroll', 'read', { field: 'owner', value: 'Ben' }, io);
+  /* THE RECORD'S ANSWER CARRIES `wheres` (`members.ts`), which the client's `Member` does not name yet. */
+  const answered: Member & { wheres: Record<string, unknown> } = {
+    person_id: 'p_bo',
+    email: 'bo@example.test',
+    name: 'Bo',
+    level: 'read',
+    scoped: [{ register: 'obligations', level: 'write' }, { register: 'payroll', level: 'read' }],
+    seen_at: null,
+    suspended_at: null,
+    wheres: { payroll: { field: 'owner', is: 'Ben' } },
+  };
+  const narrowed = personOf(answered);
+  await moveLevel(BASE, narrowed, 'write', io);
+  await addException(BASE, narrowed, 'payroll', 'write', null, io);
+  await dropException(BASE, narrowed, 'payroll', io);
+  assert.deepEqual(
+    sent.map((s) => s.body),
+    [
+      { person: 'p_bo', level: 'read', registers: { obligations: 'write', payroll: 'read' }, wheres: { payroll: { field: 'owner', is: 'Ben' } } },
+      { person: 'p_bo', level: 'write', registers: { obligations: 'write', payroll: 'read' }, wheres: { payroll: { field: 'owner', is: 'Ben' } } },
+      { person: 'p_bo', level: 'read', registers: { obligations: 'write', payroll: 'write' } },
+      { person: 'p_bo', level: 'read', registers: { obligations: 'write' } },
+    ],
+  );
+  assert.deepEqual(ruleRead({ field: 'owner', is: 'Ben' }), { kind: 'one', field: 'owner', value: 'Ben' });
+  assert.deepEqual(ruleRead('owner is Ben'), { kind: 'words', words: 'owner is Ben' });
+  assert.deepEqual(ruleRead({ any: [] }), { kind: 'other' });
+  assert.deepEqual(ruleRead(null), { kind: 'unread' });
+  assert.equal(ruleValue('int', '12'), 12);
+  assert.equal(ruleValue('int', '1.5'), null);
+  assert.equal(ruleValue('bool', 'false'), false);
+  assert.equal(ruleValue('text', '  '), null);
 });
 
 test("a refusal is the record's sentence, a race says so, and no record is a refusal too", async () => {

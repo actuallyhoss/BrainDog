@@ -8,17 +8,15 @@
  * section now says `panel: actions` or `panel: reporting`, and the kernel admits that key only on a page drawn for a
  * row (`for:`), which is the row the panel is about.
  *
- * THE TWO OLD HEADINGS ARE STILL READ, AND ONLY WHERE NO `panel` IS SAID, for declarations written before the key: his
- * record keeps its sections until it takes the seed's new versions. Nothing new relies on them, and they go once every
- * first-party declaration names its panel (PGS-22).
+ * NO HEADING IS READ ANY MORE. The two old headings were read where no `panel` was said, until every first-party
+ * declaration named its panel; since portfolio's project template and founder 1.8.0 do (PGS-22), a section that names
+ * none draws none. A record still on an older version draws its sections without the panel until it takes the update,
+ * which is offered and never forced.
  *
- * PURE, AND NODE LOADS IT: relative `.ts` imports only.
+ * PURE, AND NODE LOADS IT: no import at all.
  */
 
-import { copy } from '../../copy.ts';
-import { words as actionWords } from '../../record/actions.ts';
-
-/** The panels the host draws. `actions` carries the report key beside what the project runs on, as it always has. */
+/** The panels the host draws: a project's scheduled actions, and the key a row's numbers are sent with. */
 export type Panel = 'actions' | 'reporting';
 
 /* A `Set`, so a `panel:` of `constructor` names nothing. */
@@ -30,8 +28,5 @@ export function panelOf(block: { kind: string; heading?: string | undefined }): 
   /* THE PAGE READ CARRIES EVERY KEY IT DOES NOT NARROW (`page-live.ts` `blockOf`), so the key is on the block as the
      record stored it, and the app's block type does not name it. */
   const named = (block as { panel?: unknown }).panel;
-  if (named !== undefined) return typeof named === 'string' && PANELS.has(named) ? (named as Panel) : null;
-  if (block.heading === actionWords.runsOn) return 'actions';
-  if (block.heading === copy.reportHeading) return 'reporting';
-  return null;
+  return typeof named === 'string' && PANELS.has(named) ? (named as Panel) : null;
 }

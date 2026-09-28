@@ -221,6 +221,10 @@ jobs:
       - uses: ./.github/actions/setup
 
       - run: pnpm --filter @braindog/web build
+      # THE BUILT-SHELL HALF OF THE CSP TEST (OPS-22): it skips under plain `node --test` when
+      # `apps/web/build` is absent, which is every `test` leg, so only a job that builds first can
+      # run it on every push.
+      - run: node --test apps/web/test/csp.test.ts
       - run: pnpm --filter @braindog/site build
       # THE CLI BUNDLE TOO, so a change esbuild cannot bundle is red on the push and not first at the deploy, which
       # builds it before anything goes live (AGT-1).

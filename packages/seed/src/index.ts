@@ -54,7 +54,7 @@ export { MONEY_HOME_SETTING, MONEY_TARGET_SETTINGS, targetConfigOf } from './mod
 import { ESTATE_METRICS, ESTATE_PAGES, ESTATE_REGISTERS, SERVICES } from './modules/estate.ts';
 import { ESTATE_AUTOMATIONS, estateTargetConfig } from './modules/estate.ts';
 import { PORTFOLIO_PAGES, PORTFOLIO_REGISTERS, PORTFOLIO_RULES, PROJECTS_SAID, PROJECT_METRICS, THINGS } from './modules/portfolio.ts';
-import { PEOPLE, PEOPLE_PAGES, PEOPLE_REGISTERS } from './modules/people.ts';
+import { PEOPLE, PEOPLE_AUTOMATIONS, PEOPLE_PAGES, PEOPLE_REGISTERS } from './modules/people.ts';
 import { RUNS, TASKS, TRACKS, UPDATES, WORK_AUTOMATIONS, WORK_METRICS, WORK_PAGES, WORK_REGISTERS } from './modules/work.ts';
 
 /* ── registers ────────────────────────────────────────────────────────────── */
@@ -212,7 +212,7 @@ export const ruleDeclarations = (): Declaration[] =>
  * document held 93 declarations where the seed's own lists count 89, and the record the pack made held
  * `rule.close_follow_ups`, `rule.start_with_parent` and their two scripts where the one the seed made did not.
  */
-export const AUTOMATIONS: readonly Record<string, unknown>[] = [...WORK_AUTOMATIONS, ...MONEY_AUTOMATIONS, ...ESTATE_AUTOMATIONS];
+export const AUTOMATIONS: readonly Record<string, unknown>[] = [...WORK_AUTOMATIONS, ...MONEY_AUTOMATIONS, ...ESTATE_AUTOMATIONS, ...PEOPLE_AUTOMATIONS];
 
 export const automationDeclarations = (): Declaration[] =>
   AUTOMATIONS.map((body) =>

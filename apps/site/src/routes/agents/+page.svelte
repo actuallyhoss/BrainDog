@@ -14,28 +14,35 @@
   number they did not ask for. A reader who opens a page called For agents has asked. Every figure
   here is read off a declaration and the file it came from is in the comment beside its copy.
 
-  NO SCREENSHOTS, AND ONE DRAWING. The other pages carry the product's own screens because a screen
+  NO SCREENSHOTS, AND TWO DRAWINGS. The other pages carry the product's own screens because a screen
   is the argument there, and a screenshot of a terminal here would be a decoration standing where
   the reader wants a specification. What this page had instead was two lists of identifiers under
-  two uppercase headings, which is the counted-stat texture §19 named: sixteen names with nothing
-  saying how they relate. `loop/research-site-now.md` change 5 asked for the relation to be drawn,
-  so the first band is a diagram of a client reaching the record, the writes arriving as named events on
-  one side and the reads leaving on the other, built from the same strings and nothing new.
+  two uppercase headings, which is the counted-stat texture §19 named: names with nothing saying how
+  they relate. `loop/research-site-now.md` change 5 asked for the relation to be drawn, so the tools
+  band is a diagram of a client reaching the record, the writes arriving as named events on one side
+  and the reads leaving on the other, built from the same strings and nothing new. The value band
+  draws agents at work and the briefing the next one starts with, from its own lists' words.
 
-  FOUR BANDS ON `page, flip, page, page`, AND THEY WERE `page, sunk, page, sunk`. `--sunk` against
-  `--bg` is 1.07:1, which the eye adapts to rather than reads, so the alternation was four bands
-  that looked like one. One band turns over now, the one carrying the drawing. The last seam is the
-  hairline alone and that is a knowing cost: the two bands after the drawing are two different
-  subjects, a key and a refusal, and folding them into one to buy an inversion would put two layouts
-  in one band, which is the other half of the rule. No two bands open the same way, and
-  `bands.test.ts` beside this file holds both.
+  ONE BAND TURNS OVER, THE ONE CARRYING THE DRAWING OF THE TOOLS, and the others sit on `page`.
+  They were `page, sunk, page, sunk`, and `--sunk` against `--bg` is 1.07:1, which the eye adapts to
+  rather than reads, so the alternation was bands that looked like one. The seams between the rest
+  are the hairline alone, and each band opens differently: the value as two lists beside a drawing,
+  the ways in as cards, the tools as the drawing, the ways in from outside as one row per way, and
+  the refusals as a ruled list.
+
+  WHAT AN AGENT GIVES AND GETS COMES FIRST (SIT-10, from `loop/DIRECTION.md` §0), then how to
+  connect: the address, the terminal, a key as the fallback, and the Agent Skill. The ways in from
+  outside (doors, report keys and keys, each with its curl line) are SCR-5's section, folded in here
+  by contracts X30.
 -->
 <script lang="ts">
   import Icon from '$lib/Icon.svelte';
   import Mark from '$lib/Mark.svelte';
-  import { SIGNUP, SOURCE, site } from '$lib/copy.ts';
+  import { SIGNUP, SKILL, SOURCE, site } from '$lib/copy.ts';
+  import Code from './Code.svelte';
 
   const a = site.agents;
+  const v = a.value;
 </script>
 
 <svelte:head>
@@ -54,7 +61,74 @@
   </div>
 </section>
 
-<!-- ── Connect: the two ways in, each with the one line a reader copies. ── -->
+<!-- ── The value ───────────────────────────────────────────────────────────────
+     TWO PLAIN LISTS AND ONE DRAWING, never a grid of cards (`loop/DIRECTION.md` §33). The lists say
+     it and the drawing shows it: agents with faces leaving what they found, and the briefing the next
+     one starts with. The drawing repeats the lists' words in a picture, so it is one labelled image
+     and its parts are not read out twice. -->
+<section class="band" data-ground="page" aria-labelledby="value-title">
+  <div class="in">
+    <div class="sec-head">
+      <h2 class="h2 h2-s" id="value-title">{v.title}</h2>
+      <p class="lead">{v.lead}</p>
+    </div>
+
+    <div class="value">
+      <div class="trade">
+        <div>
+          <h3 class="list-head">{v.givesTitle}</h3>
+          <ul class="plain">
+            {#each v.gives as one (one.what)}
+              <li><strong>{one.what}</strong>, {one.said}</li>
+            {/each}
+          </ul>
+        </div>
+        <div>
+          <h3 class="list-head">{v.getsTitle}</h3>
+          <ul class="plain">
+            {#each v.gets as one (one.what)}
+              <li><strong>{one.what}</strong>, {one.said}</li>
+            {/each}
+          </ul>
+        </div>
+      </div>
+
+      <figure class="scene" role="img" aria-label={v.drawn.label}>
+        <ul class="crew">
+          {#each v.drawn.crew as one (one.name)}
+            <li class="worker">
+              <span class="face">{one.face}</span>
+              <span class="worker-text">
+                <span class="who">{one.name}</span>
+                <span class="did">{one.did}</span>
+              </span>
+            </li>
+          {/each}
+        </ul>
+        <span class="into" aria-hidden="true"></span>
+        <div class="brief">
+          <p class="brief-head">
+            <span class="brief-title">{v.drawn.briefing.title}</span>
+            <span class="brief-for">{v.drawn.briefing.for}</span>
+          </p>
+          <dl class="brief-rows">
+            {#each v.drawn.briefing.rows as row (row.what)}
+              <div class="brief-row">
+                <dt>{row.what}</dt>
+                <dd>{row.said}</dd>
+              </div>
+            {/each}
+          </dl>
+        </div>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- ── Connect ─────────────────────────────────────────────────────────────────
+     THE ORDER THE APP TEACHES: the address, which signs in through the app; then the terminal, the
+     install line and `braindog setup` after it (contracts X55); then a key, for a client that cannot
+     open a browser. The Agent Skill closes the band because both of the first two put it in place. -->
 <section class="band" data-ground="page" aria-labelledby="connect-title">
   <div class="in">
     <h2 class="h2" id="connect-title">{a.connect.title}</h2>
@@ -64,10 +138,34 @@
           <span class="way-icon" aria-hidden="true"><Icon name={i === 0 ? 'link' : 'terminal'} /></span>
           <h3>{w.head}</h3>
           <p>{w.said}</p>
-          <code>{w.code}</code>
+          {#each w.lines as line (line.code)}
+            <Code label={line.label} code={line.code} />
+          {/each}
         </li>
       {/each}
     </ul>
+
+    <div class="fallback">
+      <div class="fallback-text">
+        <h3>{a.connect.key.title}</h3>
+        <p>{a.connect.key.said}</p>
+      </div>
+      <div class="clients">
+        {#each a.connect.key.clients as client (client.name)}
+          <Code label={client.name} code={client.code} />
+        {/each}
+      </div>
+    </div>
+
+    <div class="skill">
+      <span class="way-icon" aria-hidden="true"><Icon name="layers" /></span>
+      <div class="skill-text">
+        <h3>{a.connect.skill.title}</h3>
+        <p>{a.connect.skill.said}</p>
+        <p>{a.connect.skill.where}</p>
+      </div>
+      <a class="btn" href={SKILL}>{a.connect.skill.open}<Icon name="arrow" size="s" /></a>
+    </div>
   </div>
 </section>
 
@@ -138,27 +236,34 @@
   </div>
 </section>
 
-<!-- ── Reported ────────────────────────────────────────────────────────────────
-     THE ARGUMENT ON THE LEFT AND THE SIX LIMITS AS A GRID ON THE RIGHT. They were a two-column
-     definition list under the lead, the same shape as the band after it, so the page had one layout
-     twice in a row. Six limits of one or two words each are what a hairline grid is for: each cell
-     leads with the limit and the sentence under it is the reason. -->
-<section class="band" data-ground="page" aria-labelledby="report-title">
+<!-- ── From outside ────────────────────────────────────────────────────────────
+     ONE ROW PER WAY IN: what it is and its curl line on the left, its limits as a hairline grid on
+     the right. Short limits of one or two words each are what a hairline grid is for: each cell
+     leads with the limit and the sentence under it is the reason. The report key's row is the band
+     this replaced, kept word for word. -->
+<section class="band" data-ground="page" aria-labelledby="outside-title">
   <div class="in">
-    <div class="split">
-      <div>
-        <h2 class="h2 h2-s" id="report-title">{a.report.title}</h2>
-        <p class="lead">{a.report.lead}</p>
-      </div>
-      <dl class="limits hair">
-        {#each a.report.limits as limit (limit.what)}
-          <div class="limit">
-            <dt>{limit.what}</dt>
-            <dd>{limit.said}</dd>
-          </div>
-        {/each}
-      </dl>
+    <div class="sec-head">
+      <h2 class="h2 h2-s" id="outside-title">{a.outside.title}</h2>
+      <p class="lead">{a.outside.lead}</p>
     </div>
+    {#each a.outside.ways as way (way.head)}
+      <div class="split push">
+        <div class="push-text">
+          <h3>{way.head}</h3>
+          <p>{way.said}</p>
+          <Code label={way.head} code={way.code} />
+        </div>
+        <dl class="limits hair">
+          {#each way.limits as limit (limit.what)}
+            <div class="limit">
+              <dt>{limit.what}</dt>
+              <dd>{limit.said}</dd>
+            </div>
+          {/each}
+        </dl>
+      </div>
+    {/each}
   </div>
 </section>
 
@@ -657,17 +762,237 @@
     line-height: 1.6;
   }
 
-  .way code {
-    display: block;
-    margin-block-start: var(--sp-2);
-    padding: 12px 14px;
-    overflow-x: auto;
-    background: var(--ink);
-    border-radius: 10px;
-    color: var(--bg);
-    font-family: var(--font-id);
+  /* A GRID ITEM'S MINIMUM IS ITS CONTENT, so without this a curl line would widen the card and then the
+     page; with it the line scrolls inside its own panel (`Code.svelte`). */
+  .way,
+  .clients,
+  .push-text {
+    min-inline-size: 0;
+  }
+
+  /* ── The value ───────────────────────────────────────────────────────── */
+
+  /* THE LISTS, THEN THE DRAWING. At 1440 the two lists sit side by side on the left and the drawing on
+     the right; below 900 everything stacks in reading order. */
+  .value {
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    gap: var(--sp-7);
+    align-items: center;
+    margin-block-start: var(--sp-7);
+  }
+
+  .trade {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--sp-6);
+    align-items: start;
+  }
+
+  .list-head {
+    margin: 0 0 var(--sp-3);
+    font-size: var(--t-md);
+    font-weight: 600;
+  }
+
+  .plain {
+    display: grid;
+    gap: var(--sp-3);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .plain li {
+    color: var(--ink2);
+    line-height: var(--lh-body);
+    text-wrap: pretty;
+  }
+
+  .plain strong {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  /* THE SCENE: the agents at work above, the record's briefing below, and one stroke between them
+     for what passes from the first to the second. The faces are `Decide.svelte`'s, with the agent's
+     hue, so an agent looks the same on every page that draws one. */
+  .scene {
+    display: grid;
+    justify-items: stretch;
+    margin: 0;
+    padding: var(--sp-6);
+    background: var(--s1);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+  }
+
+  .crew {
+    display: grid;
+    gap: var(--sp-3);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .worker {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    padding: var(--sp-3);
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+  }
+
+  .face {
+    display: grid;
+    flex: none;
+    place-items: center;
+    inline-size: 32px;
+    block-size: 32px;
+    background: var(--s1);
+    border: 2px solid var(--info);
+    border-radius: var(--r-pill);
+    color: var(--ink);
+    font-size: var(--t-xs);
+    font-weight: 600;
+  }
+
+  .worker-text {
+    display: grid;
+    min-inline-size: 0;
+  }
+
+  .who {
+    color: var(--ink);
     font-size: var(--t-sm);
-    white-space: nowrap;
+    font-weight: 600;
+  }
+
+  .did {
+    color: var(--ink2);
+    font-size: var(--t-sm);
+  }
+
+  .into {
+    justify-self: center;
+    inline-size: 1px;
+    block-size: var(--sp-6);
+    background: var(--edge);
+  }
+
+  .brief {
+    padding: var(--sp-4) var(--sp-5);
+    background: var(--bg);
+    border: 1px solid var(--edge);
+    border-radius: var(--r-lg);
+  }
+
+  .brief-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--sp-2);
+    margin: 0 0 var(--sp-3);
+  }
+
+  .brief-title {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  .brief-for {
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  .brief-rows {
+    display: grid;
+    gap: var(--sp-2);
+    margin: 0;
+  }
+
+  .brief-row {
+    display: grid;
+    grid-template-columns: minmax(0, 14ch) minmax(0, 1fr);
+    gap: var(--sp-3);
+    font-size: var(--t-sm);
+  }
+
+  .brief-row dt {
+    color: var(--dim);
+  }
+
+  .brief-row dd {
+    margin: 0;
+    color: var(--ink);
+  }
+
+  /* ── The key, and the skill ──────────────────────────────────────────── */
+
+  .fallback {
+    display: grid;
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+    gap: var(--sp-6);
+    align-items: start;
+    margin-block-start: var(--sp-7);
+  }
+
+  .fallback h3,
+  .skill h3,
+  .push-text h3 {
+    margin: 0;
+    font-size: var(--t-lg);
+    font-weight: 600;
+  }
+
+  .fallback p,
+  .skill p,
+  .push-text p {
+    margin: var(--sp-3) 0 0;
+    color: var(--ink2);
+    line-height: 1.6;
+    text-wrap: pretty;
+  }
+
+  .clients {
+    display: grid;
+    gap: var(--sp-4);
+  }
+
+  .skill {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: var(--sp-5);
+    align-items: start;
+    margin-block-start: var(--sp-7);
+    padding-block-start: var(--sp-6);
+    border-block-start: 1px solid var(--line);
+  }
+
+  .skill-text {
+    max-inline-size: 62ch;
+  }
+
+  /* ── From outside ────────────────────────────────────────────────────── */
+
+  .push {
+    margin-block-start: var(--sp-7);
+  }
+
+  .push + .push {
+    padding-block-start: var(--sp-7);
+    border-block-start: 1px solid var(--line);
+  }
+
+  .push-text {
+    display: grid;
+    gap: var(--sp-3);
+  }
+
+  .push-text p {
+    margin: 0;
   }
 
   .source {
@@ -688,6 +1013,44 @@
 
     .way {
       padding: var(--sp-5);
+    }
+  }
+
+  /* BELOW 900 THE VALUE, THE KEY AND THE SKILL STACK, in the order they are read: the lists before
+     the drawing, what a key is before the snippets, and the skill's button under its sentences. */
+  @media (width < 900px) {
+    .value,
+    .fallback {
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--sp-6);
+    }
+
+    .skill {
+      grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    .skill .btn {
+      grid-column: 2;
+      justify-self: start;
+    }
+  }
+
+  @media (width < 640px) {
+    .trade {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .scene {
+      padding: var(--sp-4);
+    }
+
+    .skill {
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--sp-4);
+    }
+
+    .skill .btn {
+      grid-column: auto;
     }
   }
 </style>

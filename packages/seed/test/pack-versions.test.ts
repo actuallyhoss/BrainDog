@@ -580,6 +580,14 @@ const DECLARED: Record<string, Version> = {
       'One page per person (`page.someone`), with who they are, the projects they were met in and what is written about them; People\'s own page is placed under a People section and its cards leave out the agent\'s met lines; and a person that other rows still name is not deleted -> dc4d1d8e39453316',
     ],
   },
+  'people@2.3.0': {
+    holds: ` page.people page.someone register.people rule.meet-senders `,
+    declares: 'fd9751362adfd6e0',
+    history: [
+      '`rule.meet-senders` meets whoever a mail arrives from, on by default; `page.someone` draws the person\'s `met` lines, which `page.people`\'s cards still leave out -> bf5edef4966a36eb',
+      'The `met` lines move off the cards block, which takes at most three facts and already has `role`, `projects` and `email`, onto their own `note` block on `page.someone` -> fd9751362adfd6e0',
+    ],
+  },
   'estate@1.1.0': {
     holds: `
       metric.estate-year metric.lapsing metric.points-nowhere metric.project-cost metric.renews-30d

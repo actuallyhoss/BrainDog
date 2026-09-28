@@ -591,7 +591,7 @@ queue(batch):
 |---|---|---|
 | `notify.email` | `cfDispatch.email(payload)` → `EMAIL.send(...)` | 60 s |
 | `notify.push` | `payload.sub` is `{ id }` and nothing else: one job per subscription, and the endpoint is asked of the record under the job's lease (`pushTarget`, checked as `sealedGrant` is), because the outbox travels in every `.brain` file and `push_sub` is `local`. A POST with no body, signed with VAPID over WebCrypto (`src/vapid.ts`); a 404/410 acks `done` with `{ gone: true }` so the record drops the subscription in the ack's transaction. Leased only where `VAPID_PUBLIC` and `VAPID_PRIVATE` are both set. *(Amended September 24th 2026, W58: this row read `cfDispatch.push(payload.sub, { title, url })` with `@pushforge/builder` signing, a payload that would have carried the phone's address and the notice's words into every export, and a package that is not in the lockfile.)* | 60 s |
-| `notify.webhook` | `cfDispatch.webhook(url, body, sig)` — `sig` = HMAC-SHA-256 under the grant the payload names, unsealed as §5.4 step 3; `redirect: 'manual'`; a 3xx or ≥ 400 is a failure | 60 s |
+| `notify.webhook` | `cfDispatch.webhook(url, body, sig)` — `sig` sits under the header `x-braindog-signature` (`SIGNATURE_HEADER`, `apps/worker/src/deliver.ts:96`), HMAC-SHA-256 under the grant the payload names, unsealed as §5.4 step 3; `redirect: 'manual'`; a 3xx or ≥ 400 is a failure | 60 s |
 | `pull.fetch` | `ingest(decl, { http: cfHttp(), secret })` from `@braindog/connect` — placeholders, `expect:`, cursors, ≤ 2 MB per body, ≤ 50 pages; every page → `arrive({ channel: 'pull', … })`; an `expect:` failure throws without advancing the cursor (25 §9) | 300 s |
 | `export.r2` | §5.12 | 300 s |
 | `erase.r2` | `for sha of payload.sha256s: BLOBS.delete(blobKey(rec, sha))`; a prefix with no keys is `done` | 300 s |
@@ -708,10 +708,22 @@ name ([46-SPEC-SLASH](46-SPEC-SLASH.md) §5.9). With no `KEK` bound no key can b
 
 ### 5.18 · Telemetry and logging
 
-1. One `TELEMETRY.writeDataPoint` per request in `ctx.waitUntil`, the shape of §4.3; the record id is
-   `sha256(rec ‖ salt)` with a salt that rotates monthly (08 §5). Never a field value, a query, a prompt or a payload.
-2. `console.log(JSON.stringify({ t, code, rec, method, status, ms }))` on refusals, conflicts, 5xx and every queue
-   dispatch: the code, the ids, the shape — never a value (35 §2, 12 §8). `observability.enabled` keeps them.
+*Amended September 28th 2026 against the tree (OPS-4, OPS-23; OPS-28 records it).*
+
+1. One Analytics Engine point per request in `ctx.waitUntil` (`src/telemetry.ts`), to the dataset
+   `braindog_telemetry`, and only when the `TELEMETRY` binding is uncommented in `wrangler.jsonc` and `SESSION_SECRET`
+   is set: which door, which kind of client, the record method, the refusal code or the status class, the
+   milliseconds, and the record id hashed under a key derived from `SESSION_SECRET` that changes every month (08 §5).
+   Never a field value, a query, a prompt or a payload; the `telemetry-allowlist` gate holds the list of what a point
+   may carry. Read with Analytics Engine's SQL API, kept three months.
+2. Every log line is one JSON object with `op` first, written by `op()` in `src/oplog.ts`: `boot`, `refuse`, `crash`,
+   `outbox`, `walk`, `walk.done`, `mail`, `auth`, `cut-off`, `limit`, `restore`, `billing` and the rest
+   (53 §2.3 lists their fields). A line carries the code, the ids and the shape, never a value (35 §2, 12 §8); `op()`
+   also replaces anything shaped like an address and cuts a string field at 300 characters, and it never throws.
+   `observability.enabled` keeps them in Workers Logs, where the alerts are saved queries over the fields
+   (`DEPLOYMENT.md`, "Alerts").
+3. A crash is one `crash` line with a new reference, the door and the error, and the caller gets a bare 500 whose
+   `fix` names only that reference (`crashed` in `@braindog/host`).
 
 ### 5.19 · A person's script, in a Dynamic Worker
 

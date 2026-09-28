@@ -528,8 +528,8 @@ export type { LinkRef } from './page.ts';
 
 /* And the credential: the one place in this package that sets `Authorization`, and the two
    functions that open a sealed grant (`47 §4.5`, `§4.6`). */
-export { applyAuth, b64, b64url, grantFields, openSealed, seal, tokenStep, unb64url } from './auth.ts';
-export type { Sealed, TokenStep, WrappedDek } from './auth.ts';
+export { applyAuth, authoriseCall, b64, b64url, grantFields, openSealed, seal, tokenStep, unb64url } from './auth.ts';
+export type { CallAuth, Sealed, TokenStep, WrappedDek } from './auth.ts';
 
 /* What a provider's answer means, before anything is read from it (`47 §5.1` steps 6.3, 6.4, 6.6). */
 export { classify, classifyBody, portFault, retryAfterMs } from './status.ts';
@@ -542,7 +542,7 @@ export { probe, proveScopes } from './probe.ts';
 export { writeSeries, type SeriesWrite } from './series.ts';
 
 /* When a run is due, and what range of time it asks for (`47 §4.8`, `§5.1` step 3). */
-export { jitterSeconds, nextDue, rfc3339, startOfGrainMs, wallAt, wallClock, watermarkAfter, windowFor, zonedToMs } from './when.ts';
+export { jitterMs, nextDue, rfc3339, startOfGrainMs, wallAt, wallClock, watermarkAfter, windowFor, zonedToMs } from './when.ts';
 export type { Wall } from './when.ts';
 
 /* One leased row, run: the loop that puts the two halves together (`47 §5.1`). */

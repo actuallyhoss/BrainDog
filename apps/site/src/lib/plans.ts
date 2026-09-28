@@ -17,6 +17,16 @@
  *
  * Runs, requests, bytes and hours are the Worker's metered units; each is priced at several times
  * Cloudflare's own rate so a busy record never costs more to run than it pays.
+ *
+ * HELD TO THE CODE THAT CHARGES AND METERS, by `plans.test.ts` (`loop/finish/contracts.md` C8): each
+ * plan's name and price to `HOSTED_PLANS` in `apps/worker/src/billing.ts`, what the checkout sells;
+ * its runs, requests, gigabytes and hours to the Directory's `ALLOWANCE` in
+ * `packages/record/src/directory.ts`, what the Worker holds a record to; Cloud's credits to
+ * `ASK_CAP_DEFAULT` in `packages/slash/src/types.ts`. A figure changed here and not there turns that
+ * test red, so the page never promises what the record does not do.
+ *
+ * FIGURES ONLY. The sentences the pricing page says about them are in `copy/pricing.ts`; `name`, `unit`
+ * and `for` stay here because the home page's teaser reads them beside the price.
  */
 
 import { SIGNUP } from './copy.ts';
@@ -42,16 +52,12 @@ export type Plan = {
   unit: string;
   /** One sentence: who it is for. */
   for: string;
-  cta: string;
   /** Where the button goes; `external` because `/app` is the app's, served on this site's name. */
   href: string;
   external: boolean;
   /** What the plan includes each month. */
   allowance: Allowance;
-  /** What sets the plan apart, beyond the numbers, in two or three lines. */
-  points: string[];
 };
-
 
 export const PLANS: readonly Plan[] = [
   {
@@ -60,11 +66,9 @@ export const PLANS: readonly Plan[] = [
     price: '$12',
     unit: 'a month, per record',
     for: 'For a person, a household or a small business.',
-    cta: 'Start your record',
     href: SIGNUP,
     external: true,
     allowance: { credits: 80, runs: 15_000, requests: 150_000, gb: 1, hours: 50 },
-    points: ['Unlimited colleagues', 'Nightly backups, last 30 kept', 'Email and webhook inbox'],
   },
   {
     id: 'plus',
@@ -72,32 +76,24 @@ export const PLANS: readonly Plan[] = [
     price: '$29',
     unit: 'a month, per record',
     for: 'For busy teams, or records with lots of agents and automations.',
-    cta: 'Start with Plus',
     href: `${SIGNUP}?plan=plus`,
     external: true,
     allowance: { credits: 400, runs: 60_000, requests: 600_000, gb: 5, hours: 200 },
-    points: ['Five times the Cloud allowance', 'Everything in Cloud', 'Switch plans any time'],
   },
-];
-
-/** A row of the allowance table: its name, what it means, and how each allowance is written. */
-export const USAGE: readonly { key: keyof Allowance; name: string; said: string; unit: (n: number) => string }[] = [
-  { key: 'credits', name: 'Slash credits', said: 'One for each question or draft. Background work never spends them.', unit: (n) => `${n.toLocaleString('en-US')} a month` },
-  { key: 'runs', name: 'Automation and script runs', said: 'Each time a rule, an automation or a script runs.', unit: (n) => `${n.toLocaleString('en-US')} a month` },
-  { key: 'requests', name: 'Requests to other services', said: 'Pulls, calls and webhooks your record sends out.', unit: (n) => `${n.toLocaleString('en-US')} a month` },
-  { key: 'gb', name: 'Data fetched', said: 'What those requests bring back.', unit: (n) => `${n} GB a month` },
-  { key: 'hours', name: 'Script time', said: 'Time your scripts spend running.', unit: (n) => `${n} hours a month` },
 ];
 
 /**
  * EXTRA USAGE, OFF UNTIL THE OWNER TURNS IT ON, under a monthly cap they set. Without it, work that
  * needs more than the plan waits for the next month, which is item 2's behaviour and stays the default.
+ *
+ * Each row is keyed by the allowance it extends, so its name is the allowance table's and cannot drift
+ * from it. Slash has none: more of it is bought as a pack, below.
  */
-export const EXTRA: readonly { name: string; price: string; per: string }[] = [
-  { name: 'Automation and script runs', price: '$1', per: 'per 5,000 runs' },
-  { name: 'Requests to other services', price: '$1', per: 'per 50,000 requests' },
-  { name: 'Data fetched', price: '$0.50', per: 'per GB' },
-  { name: 'Script time', price: '$1', per: 'per 10 hours' },
+export const EXTRA: readonly { key: Exclude<keyof Allowance, 'credits'>; price: string; per: string }[] = [
+  { key: 'runs', price: '$1', per: 'per 5,000 runs' },
+  { key: 'requests', price: '$1', per: 'per 50,000 requests' },
+  { key: 'gb', price: '$0.50', per: 'per GB' },
+  { key: 'hours', price: '$1', per: 'per 10 hours' },
 ];
 
 /**

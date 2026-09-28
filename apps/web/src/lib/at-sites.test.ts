@@ -50,6 +50,7 @@ const BARE_ORIGIN = new Map([
   ['lib/ui/WebhookDoors.svelte', 'a door is `/in/…` at the root, which a stranger posts to'],
   ['lib/page/panels/Reporting.svelte', 'the curl line is a bearer at `/api`, which names its record by the key'],
   ['routes/settings/[area]/settings-state.svelte.ts', 'the login line, the mail door, the invite link and the move to another record are built on the bare host'],
+  ['lib/ui/ShareMenu.svelte', 'a read-only page link is copied whole, so the host is written into it'],
 ]);
 
 test('NO ADDRESS IN THE APP IS RENDERED WITHOUT `at()`, and no record call goes to the bare origin', () => {

@@ -25,9 +25,9 @@ the self-host (§13 D5). It never runs `claude` with `--dangerously-skip-permiss
 **What it may import.** `render` for `PRIMITIVES_VERSION` (36); `ports` for the envelope types and the
 `node:sqlite` adapter (37; the one [40-SPEC-FIXTURES](40-SPEC-FIXTURES.md) §5.3 uses); `kernel` for
 `FORMAT_VERSION`, `KERNEL_MIGRATION` and `applyMigrations` (41); `declare` for the offline lint (42);
-`slash/prompts` for the runner's templates (46 §2, "data only, so the CLI's runner can bundle it alone");
-`where` only transitively. Row 12 of [31-STACK](31-STACK.md) §2 plus one edge, `slash` (§13 D9). Everything
-else is `node:*`.
+`where` only transitively. Row 12 of [31-STACK](31-STACK.md) §2. The runner's kinds, their lint (`jobBody`) and
+`fillPrompt` come from `kernel`, not from `slash/prompts`, so the edge to `slash` that §13 D9 planned was never
+taken (§5.13). Everything else is `node:*`.
 
 ---
 
@@ -78,8 +78,10 @@ of four codes (§4.4).
 | `token create` | `--scope read,propose` · `--name <n>` | `POST /api/createToken` (operation grant) | the token, **once**, then `shown once` | 0 · 1 · 3 |
 | `token list` | — | `POST /api/listTokens` (operation grant) | id · name · scope · created · last used · surface | 0 · 1 · 3 |
 | `token revoke <id>` | — | `POST /api/revokeToken` (operation grant) | `revoked <id>` | 0 · 1 · 3 |
-| `runner enroll` | — | `POST /auth/device` with `reach: 'runner'` | the six digits; `enrolled <host> as <label>` | 0 · 1 · 3 |
-| `runner run` | `--once` | `POST /api/claimJob { wait: 20 }` · `postJobEvent` · `readCancel`; spawns `claude` | one line per job to stderr; never exits unless `--once` | 0 · 1 · 3 |
+| `runner enrol <host>` | — | `claude --version` and `--help` first, then `POST /auth/device` with `reach: 'runner'` (§5.13) | the six digits; `enrolled on <host> as <label> · runner expires <date>`, never the bearer | 0 · 1 · 3 |
+| `runner repos add <name> <folder>` · `runner repos list` | — | nothing: this machine's own map in `~/.braindog/runner.json` | the map | 0 · 1 |
+| `runner allow <kind>` | — | nothing: the kind as the last refused job carried it, kept in `waiting` | the kind whole, and one question at the terminal | 0 · 1 |
+| `runner run` | `--once` · `--host <host>` | `claimJob { wait: 20 }` · `postJobEvent` · `readCancel` under the runner's own bearer; spawns `claude` in the kind's repository folder or an empty one | one line per job to stderr; never exits unless `--once` | 0 · 1 · 3 |
 | `--version` | — | nothing | `app <date>+<sha> · format 1 · kernel <n> · primitives 1` | 0 |
 
 Thirty commands plus `--version`, counted: the seventeen of the first design, then `mcp`, `serve`, `hook`
@@ -95,14 +97,23 @@ taken out of the arguments before dispatch so no command's own `parseArgs` has t
 `default`. A host is written `https://origin[/slug]`; a bare name means https, and plain http is refused
 except to this machine, because the bearer would cross the network in the clear.
 
-**Built today: `setup`, `mcp`, `hook`, `install`, `login`, `logout`, `keys put`, `keys exec`, `keys headers`, `run`, `skills sync`, `tools scan`, `tools write`, `session`, `context`, `automations`, `scripts`, `--version`, `init` and `serve`.** The command runs from a checkout as
-`node apps/cli/src/main.ts`. Until §3's bundle exists, the manifest's `bin` points at that file and the manifest
-stays `private`, so `tools/release.mjs` does not offer a file npm could not run. `init` and `serve` are the
-self-host's, which has no `bin` of its own and tells people to type them, so this command claims the name and
-spawns the self-host for both. The agent path's four (`loop/research-agent-path.md` §4.2) landed together and
-have their rows above, so nothing in this table is a command that names itself and does nothing. `token` and
-`runner` are the rows still waiting on the step that builds them, and they have never been offered by the
-command at all, which is the difference: a word it does not know is a typo, and it says so.
+**What is built is what `main.ts` dispatches**, and its usage text lists the same words: `setup`, `runner`, `mcp`,
+`hook`, `install`, `login`, `logout`, `keys`, `run`, `export`, `import`, `token`, `skills`, `tools`, `page`,
+`usecase`, `pack`, `kennel`, `context`, `session`, `automations`, `scripts`, `verify`, `init`, `serve` and
+`--version`. A word it does not know is a typo, and it says so. **The artefact is built**: §3's bundle is
+`dist/braindog.mjs`, the manifest's `bin` points at it, and the manifest is not `private`, so `tools/release.mjs`
+offers `braindog-cli`. A checkout still runs `node apps/cli/src/main.ts`, which is what `setup` writes into Claude
+Code's entry when it runs from one. `init` and `serve` are the self-host's, which has no `bin` of its own and tells
+people to type them, so this command claims the name and spawns the self-host for both.
+
+A new machine needs two lines, the install and then `setup` (`loop/finish/contracts.md` X55):
+
+```sh
+curl -fsSL https://brain.dog/cli/install.sh | sh     # macOS and Linux; on Windows: irm https://brain.dog/cli/install.ps1 | iex
+braindog setup https://brain.dog/app/<slug>
+```
+
+`login` and `install` stay commands of their own, and `setup` runs both (§5.15).
 
 **`automations` and `scripts` are the automations canvas from a terminal** (`loop/DIRECTION.md` §22,
 `apps/cli/src/automations.ts`), over five record methods: the four the canvas and the MCP tools already call,
@@ -231,7 +242,7 @@ apps/cli/
 │   ├── http.ts           ~220 lines  host resolution, hosts.json (0600, atomic), call() and stream(), the device flow, admin()
 │   ├── brain.ts          ~360 lines  the .brainl reader, the canonical projection, hashing, verify, materialise, toBrainl, mirror
 │   ├── pack.ts           ~180 lines  source resolution (path · url · git · Kennel), lint, plan, install (--with-deps), uninstall, the diff screen
-│   ├── runner.ts         ~240 lines  enrol, the claim loop, the claude spawn, distil(), PROMPTS from @braindog/slash/prompts
+│   ├── runner.ts         enrol, repos, allow, the claim loop, the pin, the claude spawn, distil(); kinds linted by jobBody from @braindog/kernel
 │   └── print.ts          ~120 lines  the refusal sentence, conflict and unreachable lines, tables, the verify block; the --json envelope is json.ts's (§4.5)
 └── test/
     ├── mock-host.ts      a node:http server answering canned Result envelopes and a .brainl body
@@ -710,8 +721,10 @@ runs them in order, stopping at the first that fails with that step's sentence:
    or none, `default` becomes this host, because the MCP entry and the hooks name no host of their own. Not held,
    `login <host>` runs as §5.3 says, with its six digits on stderr.
 2. **Hooks.** `install` is planned dry over the user profile (`CLAUDE_CONFIG_DIR`, else `~/.claude`). When it would
-   add a hook, `install --apply` writes both, keeping the copy `settings.json.bak` first. A settings file `install`
-   cannot read stops the run with its sentence, and nothing is written.
+   add a hook, `install --apply` writes both, keeping the copy `settings.json.bak` first, and places the Agent Skill,
+   `skills/braindog/SKILL.md`, as it always does (OPS-26). Today the step asks only whether a hook is missing, so a
+   profile that has both hooks and no skill is left without one until `braindog install --apply` is run by hand. A
+   settings file `install` cannot read stops the run with its sentence, and nothing is written.
 3. **MCP server.** The profile's servers file (`~/.claude.json` for the default profile, `<profile>/.claude.json` for
    a named one) is read for `mcpServers.braindog`. An entry with this command's `type`, `command` and `args` is left.
    Another entry by that name is removed first with `claude mcp remove braindog --scope user`. Then
@@ -830,7 +843,7 @@ Startup has nothing to load but one file: no dependency resolution, no `node_mod
 | `verify` | no network: the file, the key, WebCrypto. `--key <url>` is the one explicit fetch |
 | `export` · `import` | the `.brainl` is verified after it arrives and before it is sent; the `.brain` and `.brainl` are written `0600` — they carry the whole record with its sealed grants (03 §5) |
 | Attachments | bytes are hashed before they are written under their name; the content address is the check |
-| The runner | `--restricted`, `--permission-mode dontAsk`, `--strict-mcp-config`, an empty working directory it owns, the closed kind list and the 64-byte no-whitespace arg rule, the `mcp__braindog__` tool filter, the version gate, the job bearer only inside a `0600` `mcp.json` deleted after the job; never `--bare`, never `--dangerously-skip-permissions` (26 §4.4: one flag turns on [C]). The dedicated unix user and the hardened systemd unit of 26 §5 are the operator's ([53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md)) |
+| The runner | `--strict-mcp-config`, and `--allowedTools`, `--permission-mode` (`dontAsk` or `acceptEdits`) and `--max-turns` from the approved kind and nothing wider; `--restricted` and `--disable-slash-commands` only where the installed help lists them; the kind's repository folder from this machine's own map, or an empty folder it owns; the kernel's `jobBody` lint run again on the claim, one-line arguments of at most 64 characters, a kind pinned on each machine by its SHA-256 before its first run, the version gate, the job bearer only inside a `0600` `mcp.json` deleted after the job; never `--bare`, never `--dangerously-skip-permissions` (26 §4.4: one flag turns on [C]). The dedicated unix user and the hardened systemd unit of 26 §5 are the operator's ([53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md)) |
 | `keys` | the value is read from stdin, never an argument, and one command prints a key, `keys headers`, to a program and never to a terminal (§5.16): `exec` puts it into the environment of the one command it spawns, with no shell, and never on stdout, stderr or a file; it travels only in the one deposit request and the one read's answer, neither of which follows a redirect. The vault grant goes only to `/api/vault/*`, and no sentence quotes a value, a grant or a label (12 §6 rule 9). `exec` never puts a key in a variable that changes how a command runs, whether `--as` names it or a label makes it: `PATH`, `PATHEXT`, `HOME`, `USERPROFILE`, `SHELL`, `ENV`, `BASH_ENV`, `COMSPEC`, `SYSTEMROOT`, `WINDIR`, `NODE_OPTIONS`, `LD_PRELOAD`, `LD_LIBRARY_PATH`, `DYLD_INSERT_LIBRARIES`, `DYLD_LIBRARY_PATH`, `PYTHONPATH`, `PYTHONSTARTUP`, `PYTHONHOME`, `RUBYOPT`, `RUBYLIB`, `PERL5OPT`, `PERL5LIB`, `PERLLIB`, `JAVA_TOOL_OPTIONS`, `_JAVA_OPTIONS`, `JDK_JAVA_OPTIONS`, `PROMPT_COMMAND`, `PS4`, `IFS`, `SHELLOPTS`, `BASHOPTS`, `ZDOTDIR`, and any name starting `NODE_`, `LD_` or `DYLD_`. On Windows a `.cmd` or `.bat` runs through `cmd.exe` with AutoRun and delayed expansion off and every argument caret-escaped twice, once for `cmd.exe` and once for the batch file's `%*`, so `&`, `|`, `^`, `"` and `%` in an argument start nothing and expand nothing. An argument with a line break, or an environment variable whose name ends in `^`, is refused, because neither can be escaped. A batch file that reads its arguments a third time, through `call`, is outside that promise |
 | The session file | ids, a commit and the host's address, never a token; `0600` beside `hosts.json`; its ids are sent only to the host that wrote it |
 | Hook output | the briefing names a row by its spoken id and its own words, and a key by its label only; it reads only string fields, so a key's sealed-state projection never reaches the model. A failure line is fixed text or the host's refusal sentence, never an exception's message. A commit named by the record is checked to look like one before git sees it |
@@ -965,7 +978,7 @@ Position 12 of [31-STACK](31-STACK.md) §2, after `record` ([35-SPEC-OVERVIEW](3
 | 40 `fixtures` · 41 `kernel` | the materialiser of 40 §5.3 and `exportBrainl` produce the test `.brainl`; `applyMigrations` builds the `.brain`; 41 §5.10 owns the grammar |
 | 42 `declare` | `parsePack`, `lintPack`, `packChecksum` |
 | 45 `record` | the methods of §2; `export` and `import` as the routes carry them |
-| 46 `slash` | `PROMPTS`; the `Claim` · `Ack` · `EndBody` protocol the runner speaks |
+| 46 `slash` | the `Claim` · `Ack` · `EndBody` protocol the runner speaks; the kinds themselves are the kernel's `job` declarations (§5.13), not `PROMPTS` |
 
 | Unblocks | How |
 |---|---|
@@ -1043,7 +1056,10 @@ by construction; `mcp.tools` is filtered to `mcp__braindog__*` before it reaches
 `--no-session-persistence` is dropped from 26 §5's invocation because it defeats `--resume <claude_session>`,
 which the same section calls the most valuable column; sessions persist in the runner's own unix user's home.
 *Amend:* 33 §11 (the `Wait` row: `{ wait }` in the body; v1 pulls by long-poll), 26 §5 (the invocation), ADR-044
-(a note that the runner attaches to the socket when 51 exposes it).
+(a note that the runner attaches to the socket when 51 exposes it). *Overtaken on 27 September 2026 (§5.13):* a
+kind is a `job.<id>` declaration approved in Decide and pinned on each machine, not one of four fixed templates;
+the lint is the kernel's `jobBody`, and a kind may name a repository, `Read`, `Grep`, `Glob` and named commands
+besides the `mcp__braindog__` tools, and the permission mode `dontAsk` or `acceptEdits`. Long-poll only, `claimJob { wait }` in the body and the `Ack` and `EndBody` shapes still hold.
 
 **D9 · Methods and edges the corpus does not list.** `ruleTest({ id, against })` READ+ · `ruleApply({ id, dry })`
 DATA, `write` scope unless `dry` · `createToken({ scope, name })`, `listTokens()`, `revokeToken({ id })` ADMIN.

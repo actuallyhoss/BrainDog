@@ -46,8 +46,10 @@ export const GUIDE = {
      offered the words only when the version goes up. */
   /* 1.3.0: Home draws the milestones as a path, done, next and later, with the decision waiting and its suggestion
      beside it, the next three steps to tick and what helps. A milestone says whether it is passed, which the record
-     keeps in step with its status, and what it comes after. */
-  version: '1.3.0',
+     keeps in step with its status, and what it comes after.
+     1.4.0: the voice says more of the record its own way, Home's empty lines, the add verb and the pen's line among
+     them (PGS-24). Each is a new setting a person can change at /packs, so a minor step. */
+  version: '1.4.0',
   title: 'New project guide',
   summary: 'The milestones of your project, the next step to take, the choices to make and what helps along the way.',
   author: 'BrainDog',
@@ -69,6 +71,17 @@ export const GUIDE = {
     nothing_needs_you: 'Nothing is waiting on you',
     since_away: 'What you have done so far',
     lists: 'Your notes',
+    /* THE REST OF THE LINES, patient and one step at a time (PGS-24): a step, a milestone, the project taking shape. */
+    coming_up: 'Next steps',
+    overdue: 'Running late',
+    nothing_now: 'Nothing is waiting on you. Take the next step when you are ready.',
+    nothing_due: 'No step has a day in the next two weeks.',
+    fills_with: 'Your milestones, the next step and what you have done so far show up here as your project takes shape.',
+    record_empty: 'Your project starts here',
+    no_questions: 'Nothing to decide yet',
+    new_row: 'Add',
+    add_first: 'Write the first one',
+    pen_waits: 'When there is a way to help this project along, it waits here until you keep it or say no.',
   },
   /* SETTINGS A PERSON CAN CHANGE (S8): a writer may call Milestones "Drafts", a band may call Steps "Rehearsals". */
   labels: {
@@ -659,3 +672,14 @@ export const GUIDE_GROWS = {
   /* NO PACK IS NAMED HERE: one may be on already, and Decide lists what the answer installs. */
   question: 'Your idea stage is done. Add what it takes to run the project as well as guide it? Your milestones, steps and choices stay as they are.',
 } as const;
+
+/**
+ * WHAT THE MODULES SAY TO SOMEBODY STARTING A PROJECT, by module and then by the module's own words (`MODULE_NAMES` in
+ * `install.ts`), laid over the plain words every use case but a business's gets. Work is what `GUIDE_GROWS` adds once
+ * the idea stage is done, and to somebody who has never run a project it is their to-do list, not a workplace.
+ */
+export const GUIDE_NAMES: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  work: {
+    Work: 'To do',
+  },
+};

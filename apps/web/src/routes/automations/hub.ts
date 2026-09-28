@@ -10,10 +10,12 @@
  * The new-action sheet opens from the address too (`contracts.md` X57), so a declared page links to a sheet already
  * filled in and the hub is the only reader of `?new=`.
  *
- * PURE, so it loads in plain Node: the clock is an argument and every import is a type but `since`.
+ * PURE, so it loads in plain Node: the clock is an argument and every import is a type but `since` and `humanize`.
  */
 
 import { since } from 'braindog-render';
+
+import { humanize } from '../../lib/record/names.ts';
 
 import type { AutomationRow, RunRow } from '../../lib/flow/source.ts';
 import type { ActionRow } from '../../lib/record/actions.ts';
@@ -176,7 +178,7 @@ export function runLines(
   }
   for (const s of actions) {
     if (!s.last) continue;
-    out.push({ key: `s:${s.ingest}`, kind: 'scheduled', name: s.ingest, at: s.last.at, said: saidOf(s.last.outcome, s.last.at, s.last.note || null, now), bad: BAD.has(s.last.outcome), path: null });
+    out.push({ key: `s:${s.ingest}`, kind: 'scheduled', name: humanize(s.ingest), at: s.last.at, said: saidOf(s.last.outcome, s.last.at, s.last.note || null, now), bad: BAD.has(s.last.outcome), path: null });
   }
   for (const s of scripts) {
     const path = `/scripts/${encodeURIComponent(s.script)}`;

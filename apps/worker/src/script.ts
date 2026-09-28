@@ -76,6 +76,12 @@ export const URL_HEADER = 'x-braindog-url';
 const TIMEOUT_MS = 10_000;
 const MAX_BYTES = 2 * 1024 * 1024;
 
+/**
+ * How long a finished run waits for its tail to report CPU time. A quarter of a second, because it is spent by every
+ * run the tail never reports on, and a pass of many scripts pays it once each; a report later than this is dropped.
+ */
+const TAIL_MS = 250;
+
 const BARE =
   'A script fetches through ctx.fetch only. A bare fetch goes nowhere on this host, whatever address it names.';
 
@@ -96,7 +102,12 @@ export type ScriptCall =
     }
   /** `options` is `ctx.record.list`'s third argument as the script wrote it, or `null`: `scriptReads` reads it. */
   | { op: 'list'; register: string; where: Json; options: Json }
-  | { op: 'get'; spoken: string };
+  | { op: 'get'; spoken: string }
+  /**
+   * The CPU time the platform says a run spent, from `ScriptTail` and never from the sandbox: the two doors the script
+   * can reach build their calls with an `op` of their own, so nothing the script writes can send this one.
+   */
+  | { op: 'cpu'; ms: number };
 
 /** The record's answer to one call: the value, or the sentence the script's promise is rejected with. */
 export type ScriptReply = { ok: Json } | { error: string };
@@ -169,6 +180,28 @@ export class ScriptRecord extends WorkerEntrypoint<Wired, Linked> {
   }
 }
 
+/** What the tail is handed: the object, as the two doors are, and the one run its Worker was loaded for. */
+type Tailed = Linked & { run: string };
+
+/**
+ * The loaded Worker's tail: the platform's own account of what one run spent, carried back to the record's object.
+ *
+ * THE RUN IS IN THE PROPS HERE, AND THAT IS SAFE WHERE IT WAS NOT FOR THE DOORS. A tail is built for one `load`, and
+ * every run gets a `load` of its own (`runScript` says why), so the props are that run's and nobody else's. Nothing the
+ * script can reach calls it either: it is neither in the loaded Worker's `env` nor its `globalOutbound`, and it is the
+ * platform that hands it the trace once the run is over.
+ *
+ * CPU TIME IS THE ONE THING READ OFF THE TRACE, because it is the one number this host cannot measure for itself. Wall
+ * time, fetches and bytes are counted on this side of the isolate already, and a second count of them would be a
+ * second answer to a question that has one.
+ */
+export class ScriptTail extends WorkerEntrypoint<Wired, Tailed> {
+  override async tail(events: TraceItem[]): Promise<void> {
+    const ms = events.reduce((sum, e) => sum + (Number.isFinite(e.cpuTime) && e.cpuTime > 0 ? e.cpuTime : 0), 0);
+    await home(this.env, this.ctx.props).script(this.ctx.props.run, { op: 'cpu', ms });
+  }
+}
+
 /* ── the run, held by the record's object ───────────────────────────────────────────────────────── */
 
 /**
@@ -200,6 +233,14 @@ const utf8 = new TextEncoder();
  */
 export class ScriptRuns {
   readonly #turns = new Map<string, Turn>();
+  /**
+   * The CPU time each run's tail has reported so far, and who is waiting to hear it.
+   *
+   * APART FROM `#turns` BECAUSE THE TAIL SPEAKS AFTER THE RUN IS CLOSED, when every call the script makes is refused.
+   * A slot lives from `open` until `runScript` has read it or given up on it, and a report for a run with no slot (one
+   * that came too late) is dropped.
+   */
+  readonly #cpu = new Map<string, { ms: number | null; wake: (() => void) | null }>();
 
   /** How many runs are open. A test's witness that a run is closed behind it. */
   get size(): number {
@@ -209,6 +250,7 @@ export class ScriptRuns {
   open(turn: Omit<Turn, 'fetches' | 'bytes' | 'stop'>): string {
     const id = crypto.randomUUID();
     this.#turns.set(id, { ...turn, fetches: 0, bytes: 0, stop: null });
+    this.#cpu.set(id, { ms: null, wake: null });
     return id;
   }
 
@@ -218,7 +260,44 @@ export class ScriptRuns {
     return turn;
   }
 
+  /**
+   * The CPU time the platform reported for a closed run, waiting at most `ms` for it, or `null` when nothing said.
+   *
+   * THE WAIT IS BOUNDED BECAUSE THE REPORT IS NOT PROMISED. The platform hands a tail its trace after the invocation
+   * ends, on its own schedule, and a run that waited for it without limit would hold the record's pass on something
+   * that may never come. The slot is gone afterwards either way.
+   */
+  async cpu(run: string, ms: number): Promise<number | null> {
+    const slot = this.#cpu.get(run);
+    if (slot === undefined) return null;
+    if (slot.ms === null && ms > 0) {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      await new Promise<void>((resolve) => {
+        slot.wake = resolve;
+        timer = setTimeout(resolve, ms);
+      });
+      if (timer !== undefined) clearTimeout(timer);
+    }
+    this.#cpu.delete(run);
+    return slot.ms;
+  }
+
+  /** Give up on a run's CPU report. `runScript` calls it on every way out, so no slot outlives its run. */
+  forget(run: string): void {
+    this.#cpu.delete(run);
+  }
+
   async answer(run: string, call: ScriptCall): Promise<ScriptReply> {
+    /* THE TAIL'S REPORT BEFORE THE OPEN-RUN CHECK, because it arrives once the run is closed. Summed, since a trace may
+       come in more than one delivery, and the first one wakes whoever is waiting. */
+    if (call.op === 'cpu') {
+      const slot = this.#cpu.get(run);
+      if (slot !== undefined && Number.isFinite(call.ms) && call.ms >= 0) {
+        slot.ms = (slot.ms ?? 0) + call.ms;
+        slot.wake?.();
+      }
+      return { ok: null };
+    }
     const turn = this.#turns.get(run);
     if (turn === undefined) return { error: 'This run is over, so nothing was sent.' };
     /* A RULE BROKEN ONCE STAYS BROKEN. The script may have caught the first refusal; nothing after it is sent. */
@@ -374,10 +453,17 @@ type Handed = { writes?: unknown; log?: unknown; threw?: unknown; invalid?: unkn
 
 /* ── one run ────────────────────────────────────────────────────────────────────────────────────── */
 
-/** The loopback bindings `ctx.exports` makes of the two entrypoints above. */
+/**
+ * The loopback bindings `ctx.exports` makes of the entrypoints above.
+ *
+ * `ScriptTail` IS OPTIONAL BECAUSE A MAIN MODULE THAT DOES NOT EXPORT IT HAS NONE. The Worker's `index.ts` exports all
+ * three; a test's own main module may export the two doors alone, and then a run is loaded with no tail and reports no
+ * CPU, exactly as it did before there was one.
+ */
 export type ScriptExports = {
   ScriptOutbound(options: { props: Linked }): Fetcher;
   ScriptRecord(options: { props: Linked }): Fetcher;
+  ScriptTail?(options: { props: Tailed }): Fetcher;
 };
 
 /** What `runScript` needs from the record's object. */
@@ -435,9 +521,12 @@ function checkWrites(decl: ScriptDecl, limits: ScriptLimits, handed: unknown): S
 /**
  * One run of one script, in a Dynamic Worker, answered in `@braindog/script`'s shape.
  *
- * `cpu_ms` IS REPORTED AS 0 AND IS NOT FREE. The platform holds the loaded Worker to `limits.cpu_ms` (`cpuMs` on the
- * code) and ends it past that, but says nowhere this host can read at run time how much it spent. The ledger meters
- * wall time (`research-shell-scripts` section 6), and this is the number that stays honest until it meters CPU.
+ * `cpu_ms` IS THE PLATFORM'S OWN NUMBER WHEN ITS TAIL SAYS IT IN TIME, AND 0 WHEN IT DOES NOT, WHICH IS NOT FREE. The
+ * platform holds the loaded Worker to `limits.cpu_ms` (`cpuMs` on the code) and ends it past that, and the only place
+ * it says how much a run spent is the trace it hands a tail after the run (`ScriptTail`). So each run is loaded with a
+ * tail of its own, and its report is waited for, for `TAIL_MS` at most, after the wall time is taken, so the wait is
+ * never billed as the script's. Not measured on the platform yet: local workerd may call no tail or report 0, and a run
+ * that hears nothing reports 0 as it always did. The ledger meters wall time (`research-shell-scripts` section 6).
  *
  * NO `subRequests` ON THE CODE. The fetch count is `ScriptRuns`', exact and sticky; whether the platform would also
  * count the `env.RECORD` calls as subrequests is not something local workerd can say, and a platform limit that
@@ -478,6 +567,8 @@ export async function runScript(wiring: ScriptWiring, s: Scripted): Promise<Scri
       env: { RECORD: wiring.exports.ScriptRecord({ props: { object: wiring.object } }) },
       globalOutbound: wiring.exports.ScriptOutbound({ props: { object: wiring.object } }),
       limits: { cpuMs: limits.cpu_ms },
+      /* A TAIL FOR THIS RUN ALONE, where the main module exports one, so the platform's CPU time comes back to it. */
+      ...(wiring.exports.ScriptTail === undefined ? {} : { tails: [wiring.exports.ScriptTail({ props: { object: wiring.object, run } })] }),
     });
     const entry = worker.getEntrypoint(undefined, { props: { run } }) as unknown as { run(meta: Json): Promise<Handed> };
     /* `config` IS THE OWNING PACK'S SETTINGS, read by `prepareScript` at the lease, and the loaded module's
@@ -498,6 +589,10 @@ export async function runScript(wiring: ScriptWiring, s: Scripted): Promise<Scri
     ]);
     const turn = wiring.runs.close(run);
     const spent = usage(turn);
+    /* AND THEN THE TAIL'S CPU TIME, AFTER THE WALL TIME WAS TAKEN, so the wait is never counted against the script's
+       `wall_ms`. No tail, no wait: a run loaded without one has nothing to hear. */
+    const cpu = wiring.exports.ScriptTail === undefined ? null : await wiring.runs.cpu(run, TAIL_MS);
+    if (cpu !== null) spent.cpu_ms = Math.round(cpu);
 
     /* AN ANSWER THAT ARRIVED PAST THE DEADLINE IS LATE, WHOEVER WON THE RACE. The race cannot end code that never
        awaits: locally the loaded Worker runs on this object's thread, so the timer cannot fire until the script lets
@@ -520,5 +615,6 @@ export async function runScript(wiring: ScriptWiring, s: Scripted): Promise<Scri
   } finally {
     if (timer !== undefined) clearTimeout(timer);
     wiring.runs.close(run);
+    wiring.runs.forget(run);
   }
 }

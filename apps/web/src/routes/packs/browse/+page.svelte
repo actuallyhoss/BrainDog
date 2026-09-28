@@ -127,7 +127,7 @@
     flex-direction: column;
     gap: var(--sp-4);
     padding: var(--sp-5) var(--gutter) var(--sp-9);
-    max-inline-size: 1100px;
+    max-inline-size: var(--page-max);
     min-inline-size: 0;
   }
 
@@ -152,20 +152,24 @@
     gap: var(--sp-2);
     min-inline-size: 0;
     overflow-x: auto;
-    padding-block: 2px;
+    padding-block: var(--sp-1);
     scrollbar-width: none;
+    /* THE CLIPPED EDGE FADES, as `.table-region` does, so a row of chips that runs on says so. A mask reads only alpha,
+       so the opaque stop is any token. */
+    mask-image: linear-gradient(to right, var(--ink) calc(100% - var(--sp-6)), transparent);
   }
 
+  /* A CHOICE CHIP: a pill with an `--edge` border, and ink when chosen (design-brief §4); the ring is the shared one. */
   .chip {
     display: inline-flex;
     flex: none;
     align-items: center;
-    gap: 6px;
-    min-block-size: 32px;
+    gap: var(--sp-2);
+    min-block-size: var(--ctl-h);
     padding: 0 var(--sp-3);
-    border: 1px solid var(--line);
+    border: 1px solid var(--edge);
     border-radius: var(--r-pill);
-    background: var(--s1);
+    background: none;
     color: var(--ink2);
     font: inherit;
     font-size: var(--t-sm);
@@ -174,20 +178,15 @@
   }
 
   .chip[data-on] {
-    border-color: var(--ink);
-    background: var(--ink);
-    color: var(--bg);
-  }
-
-  .chip:focus-visible {
-    outline: 1px solid var(--ink2);
-    box-shadow: 0 0 0 3px var(--focus-halo);
+    border-color: var(--on);
+    background: var(--on);
+    color: var(--on-ink);
   }
 
   .n {
     color: inherit;
     font-size: var(--t-xs);
-    opacity: 0.7;
+    font-variant-numeric: tabular-nums;
   }
 
   .count {
@@ -196,10 +195,12 @@
     font-size: var(--t-xs);
   }
 
+  /* ONE COLUMN OF CARDS ON A PHONE, TWO FROM 640PX AND THREE FROM 900PX (design.md DSN-17), set by the breakpoints
+     rather than by a card's least width, so the count is the same at 390 and at 1440 whatever the rail takes. */
   .grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
-    gap: var(--sp-4);
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sp-6) var(--sp-5);
     margin: 0;
     padding: 0;
     list-style: none;
@@ -207,7 +208,7 @@
 
   @media (pointer: coarse) {
     .chip {
-      min-block-size: 44px;
+      min-block-size: var(--tap);
     }
   }
 
@@ -218,6 +219,18 @@
 
     .order {
       inline-size: 100%;
+    }
+  }
+
+  @media (width >= 640px) {
+    .grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (width >= 900px) {
+    .grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
     }
   }
 </style>

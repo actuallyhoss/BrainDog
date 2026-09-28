@@ -88,7 +88,7 @@ test('A PROFILE WHOSE .claude.json RUNS brain-mcp.mjs: the dry run lists + mcpSe
   /* `checkout: home`, a folder in no git tree, so the last line is the file's and not the moving-checkout warning. */
   assert.deepEqual(installInto(p.dir, { apply: true, replace: REPLACE, scripts, home, checkout: home }).slice(-1), [`${p.claudeJson} registers no the old tool MCP server. Nothing to change.`]);
   assert.equal(readFileSync(p.claudeJson, 'utf8'), after);
-  assert.deepEqual(readdirSync(p.dir).sort(), ['.claude.json', '.claude.json.bak', 'settings.json']);
+  assert.deepEqual(readdirSync(p.dir).sort(), ['.claude.json', '.claude.json.bak', 'settings.json', 'skills']);
 });
 
 test("A SERVER ONLY IN ONE PROJECT'S LOCAL SCOPE is replaced at user scope, since BrainDog's one server serves every folder", () => {

@@ -42,8 +42,8 @@
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Icon from '$lib/ui/Icon.svelte';
-  import Mark from '$lib/ui/Mark.svelte';
   import { closed, drew, opened } from '$lib/ui/screen.svelte.ts';
+  import Entry from './Entry.svelte';
 
   const here = support();
 
@@ -301,13 +301,9 @@
   {/if}
 {/snippet}
 
-<div class="door">
+<!-- THE ENTRY LAYOUT EVERY WAY IN SHARES (`Entry.svelte`): the brand at the top left, then this column. -->
+<Entry>
   <div class="col">
-    <header class="brand">
-      <Mark height={36} />
-      <span class="wordmark">{copy.product}</span>
-    </header>
-
     <div class="intro">
       <!-- The slogan, the same five words the README and the marketing site lead with. -->
       <h1 class="slogan">{copy.tagline}</h1>
@@ -485,29 +481,18 @@
       <!-- A STRANGER'S WAY TO A RECORD OF THEIR OWN (OPS-17). Not where the server key is offered: that is a self-host,
            made by its operator, and it has no sign-up to send anybody to. -->
       {#if doors && !doors.key}
-        <p class="new-here"><a class="new-link" href={at('/signup')}>{copy.signupNewHere}</a></p>
+        <p class="new-here"><a class="new-link" href={at('/signup')} data-sveltekit-reload>{copy.signupNewHere}</a></p>
       {/if}
 
       <!-- NO DEMO PILL. It opened the sample business at `/app/` for anybody not signed in, and there is no
            sample now (DIRECTION 26): `/app/` with no session is this screen, so the pill led back here. -->
     </div>
   </div>
-</div>
+</Entry>
 
 <style>
-  /* `minmax(0, …)` and `safe`, for the reasons `/start` records: a centred track sized to its content
-     outgrows a phone, and centred content taller than the screen loses its top above the scroll
-     origin. */
-  .door {
-    display: grid;
-    grid-template-columns: minmax(0, min(400px, 100%));
-    justify-content: center;
-    align-content: safe center;
-    min-block-size: 100dvh;
-    padding-block: var(--sp-7);
-    padding-inline: var(--sp-5);
-  }
-
+  /* THE FRAME AND THE BRAND ARE `Entry.svelte`'s; this is the column inside it, the slogan first and every way in
+     straight under it, all on the column's start edge, where the brand above it starts. */
   .col {
     display: flex;
     flex-direction: column;
@@ -515,26 +500,10 @@
     min-inline-size: 0;
   }
 
-  .brand {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--sp-3);
-  }
-
-  .wordmark {
-    color: var(--ink);
-    font-family: var(--font-display);
-    font-size: var(--t-xl);
-    font-weight: 600;
-    letter-spacing: -0.026em;
-  }
-
   .intro {
     display: flex;
     flex-direction: column;
     gap: var(--sp-3);
-    text-align: center;
   }
 
   .slogan {
@@ -575,7 +544,6 @@
   }
 
   .new-here {
-    text-align: center;
     font-size: var(--t-sm);
     line-height: var(--lh-body);
   }
@@ -592,23 +560,20 @@
     color: var(--ink2);
     font-size: var(--t-sm);
     line-height: var(--lh-body);
-    text-align: center;
   }
 
   .small {
     color: var(--dim);
     font-size: var(--t-sm);
     line-height: var(--lh-body);
-    text-align: center;
   }
 
-  /* A state that is not a problem: a glyph, a sentence and what it means, centred under the slogan. */
+  /* A state that is not a problem: a glyph, a sentence and what it means, on the slogan's start edge. */
   .calm {
     display: flex;
     flex-direction: column;
-    align-items: center;
+    align-items: start;
     gap: var(--sp-2);
-    text-align: center;
   }
 
   /* NOT `.glyph`, WHICH `blocks.css` DRAWS AS AN INTENT DOT. Under that name this set `display` and `color` and
@@ -647,20 +612,17 @@
     overflow-wrap: anywhere;
   }
 
-  /* `Empty` is the house's refusal and it is left-aligned everywhere else. Here everything above and
-     below it is centred, so it is too. */
+  /* `Empty` is the house's refusal, start-aligned as it is everywhere else and as everything around it is here; only
+     its own padding goes, because the column's gap already spaces it. */
   .said :global(.empty) {
-    align-items: center;
-    margin-inline: auto;
     padding-block: 0;
-    text-align: center;
   }
 
   .said :global(.empty-actions) {
     align-self: stretch;
   }
 
-  /* Short centred sentences, where a last word on its own line is the first thing the eye lands on. */
+  /* Short sentences, where a last word on its own line is the first thing the eye lands on. */
   .said :global(.empty-body),
   .calm-body,
   .small {
@@ -713,7 +675,6 @@
   .own-q {
     display: flex;
     align-items: center;
-    justify-content: center;
     gap: var(--sp-1);
     min-block-size: var(--ctl-h);
     color: var(--ink2);
@@ -743,17 +704,11 @@
     margin-block-start: var(--sp-3);
   }
 
-  /* ON A PHONE THE COLUMN FILLS THE SCREEN: the brand keeps the top, everything to press sits at the
-     foot where the thumb is, and the slogan floats in the space between rather than leaving a hole
-     under itself. `stretch` lets the one grid row take the full height. */
-  @media (width < 640px) {
-    .door {
-      align-content: stretch;
-      padding-block: var(--sp-6) var(--sp-5);
-    }
-
-    .intro {
-      margin-block: auto;
-    }
+  /* A FOCUSED FIELD SCROLLS CLEAR OF THE EDGES WITH THE PHONE'S KEYBOARD UP, with the button under it in view: the
+     column starts at the top now (`Entry.svelte`), so what the keyboard covers is below the field, and the margin
+     keeps the field's own submit button on screen with it. The phone rule that floated the slogan in the middle of
+     the screen, and left the hole under it, is gone with the centred frame. */
+  .form .field-input {
+    scroll-margin-block: var(--sp-6) var(--sp-8);
   }
 </style>

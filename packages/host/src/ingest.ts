@@ -35,13 +35,17 @@
  * bytes sent twice: with `verified: false` the payload was matched, extracted and written into a
  * register, and three unverified arrivals of one shape queued a model draft somebody pays for.
  *
- * A PATH TOKEN IS THE ONE `verify` A RECORD CAN ANSWER, SINCE 22 SEPTEMBER. `12 §3` names a random path
- * token and `25 §3.2` an HMAC; `declare.ts` now takes `verify: { kind: path }` on a webhook and refuses
- * `hmac_sha256` by name, because nothing binds a grant's key to an ingest yet. The record keeps the
- * minted token's digest and answers it; `hook` digests the URL's segment and compares. An ingest that
- * declares no verifier, or one nobody has minted a token for, is still answered `{ kind: 'none' }`, and
- * every arrival at it is stored `untriaged` and matched by nothing, which is `12 §3` the right way
- * round: the pipeline is reachable, and nothing is trusted that nobody vouched for.
+ * A PATH TOKEN OR A SIGNATURE, SINCE DOR-3. `12 §3` names a random path token and `25 §3.2` an HMAC;
+ * `declare.ts` takes `verify: { kind: path }` on a webhook, and `hmac_sha256`, `stripe` and `github`
+ * with `key:` naming a vault label. For a token the record keeps the minted token's digest and answers
+ * it, and `hook` digests the URL's segment and compares. For a signature the host hands `ingestVerify`
+ * its opener, the record answers the key opened, and `hook` checks the raw bytes against the header:
+ * `signed` for an HMAC (a GitHub door is one, under `X-Hub-Signature-256`) and `verifyStripe` for
+ * Stripe's `t=,v1=`, the one Stripe check in the repository. An ingest that declares no verifier, one
+ * nobody has minted a token for, or one whose key is missing or does not open is answered
+ * `{ kind: 'none' }`, and every arrival at it is stored `untriaged` and matched by nothing, which is
+ * `12 §3` the right way round: the pipeline is reachable, and nothing is trusted that nobody vouched
+ * for. A wrong or missing signature is answered exactly as a wrong token is: stored, and never matched.
  *
  * FORWARDED MAIL IS THE OTHER CHANNEL THAT CAN BE ELIGIBLE, and `forwarderPassed` below is
  * where that whole decision lives. It has been wrong twice, once by believing a verdict the sender
@@ -50,6 +54,8 @@
  */
 
 import type { Refusal, Result } from '@braindog/ports';
+
+import { verifyStripe } from './stripe-sign.ts';
 
 /** The two channels this route terminates. `30 §1`'s five, minus the three that do not arrive over HTTP. */
 export type IngestChannel = 'webhook' | 'email';
@@ -63,6 +69,11 @@ export type IngestChannel = 'webhook' | 'email';
  * `/in/webhook/<ingest-id>`, verified by the declaration's `verify:` alone. Serving one shape would have
  * meant a route that exists in one host and not the other, which is the fault this package exists to
  * prevent, so both are parsed here and each host declines what it does not resolve.
+ *
+ * AND THE CLOUD SHAPE WITHOUT ITS TOKEN, `/in/webhook/<rec_id>/<ingest-id>`, for a signed door (DOR-3).
+ * A Stripe or GitHub door is verified by the signature over its body, so a token segment there would be
+ * a second secret nothing reads. At a path-token door the same shape is a missing token, stored
+ * `untriaged` exactly as a wrong one is.
  */
 export type IngestPath =
   | { channel: 'webhook'; ingest: string; rec?: string; token?: string }
@@ -90,11 +101,16 @@ export type IngestPath =
  * `apps/worker/test/ingest.test.ts` build `{ kind: 'path', token }` doors of their own, and neither file
  * was this change's to edit; it is digested on arrival here, so both spellings meet the same comparison.
  * Nothing in either host answers it, and it goes when those two tests move to `sha256`.
+ *
+ * `stripe` CARRIES THE SIGNING SECRET AS TEXT AND ITS WINDOW IN SECONDS, because that is what
+ * `verifyStripe` takes: Stripe keys its HMAC with the `whsec_` string itself, and the window is how far
+ * the signed `t=` may be from this host's clock.
  */
 export type IngestVerify =
   | { kind: 'path'; sha256: string }
   | { kind: 'path'; token: string }
   | { kind: 'hmac_sha256'; header: string; key: Uint8Array }
+  | { kind: 'stripe'; header: string; secret: string; tolerance: number }
   | { kind: 'none' };
 
 /** One arrival, as the host hands it to the record. `kernel.arrive`'s `Arrival` plus who it is for and whether it is eligible. */
@@ -138,12 +154,37 @@ export type IngestDoor = {
    * ABSENT IS A HOST THAT TAKES NO FORWARDED MAIL, and the path then answers 404 like any other.
    */
   inbound?(tokenHash: string): Promise<string | null>;
+  /**
+   * Keep one attachment in the record's file store, and answer what it was kept as, or `null` for one it does not take.
+   *
+   * THE HOST'S OWN STORE AND ITS OWN RULES (`/api/files`, OPS-20): the same sniffed types and the same ceiling a person
+   * uploading the file would meet, so mail is no side door into the store for a type it refuses. A file answered `null`
+   * is still named on the arrival with its size, so "there was a PDF on that message" stays true when the PDF was not kept.
+   *
+   * ABSENT IS A HOST WITH NO FILE STORE, and every attachment is then named and sized and nothing more.
+   */
+  keep?(ask: { rec: string; name: string; type: string; bytes: Uint8Array<ArrayBuffer> }): Promise<{ sha256: string; mime: string } | null>;
 };
+
+/**
+ * One attachment as the arrival names it, in the shape a `file` field holds (`kernel/src/coerce.ts`), less `sha256` when
+ * the host did not keep the bytes. With `sha256` it is readable at `/api/files/<sha256>` by anybody who reads the record.
+ */
+export type IngestFile = { name: string; mime: string; bytes: number; sha256?: string };
+
+/**
+ * The header an arrival's attachments ride on, as JSON: an `IngestFile[]`.
+ *
+ * A HEADER BECAUSE THE ARRIVAL HAS NO OTHER PLACE FOR THEM, and the record already stores, shows and matches over the
+ * headers. A sender can type this name into its own message, so any copy of it in the message is dropped before this
+ * file writes its own: what the row says was attached is what this host found and kept, never what the sender claimed.
+ */
+export const FILES_HEADER = 'x-braindog-files';
 
 /** `51 §5.4` step 1, and the ceiling `/mcp` already uses. */
 const WEBHOOK_LIMIT = 1_048_576;
 /** `01 §5`'s five mebibytes for a message. A forwarded RFC 5322 body carries its attachments inline. */
-const EMAIL_LIMIT = 5_242_880;
+export const EMAIL_LIMIT = 5_242_880;
 
 /**
  * A segment longer than this is not an id and not a token, and refusing it here is what keeps a
@@ -178,6 +219,7 @@ export function servesIngest(pathname: string): IngestPath | null {
   const [, what, a, b, c] = segments;
   if (what === 'webhook') {
     if (segments.length === 3 && a !== undefined) return { channel: 'webhook', ingest: a };
+    if (segments.length === 4 && a !== undefined && b !== undefined) return { channel: 'webhook', rec: a, ingest: b };
     if (segments.length === 5 && a !== undefined && b !== undefined && c !== undefined)
       return { channel: 'webhook', rec: a, ingest: b, token: c };
     return null;
@@ -569,6 +611,19 @@ async function pathToken(segment: string, v: Extract<IngestVerify, { kind: 'path
 }
 
 /**
+ * Whether Stripe signed this body, within the declared window of this host's clock (DOR-3).
+ *
+ * `verifyStripe` AND NOTHING OF THIS FILE'S OWN (`loop/finish/contracts.md` X38): the billing webhook calls the same
+ * function, so the repository has one Stripe check and not two that could disagree. The text handed in is the body
+ * decoded once and never parsed, the string Stripe signed. An absent header is `false`, as `signed` answers one.
+ */
+async function stripeSigned(request: Request, body: string, v: Extract<IngestVerify, { kind: 'stripe' }>): Promise<boolean> {
+  const said = request.headers.get(v.header);
+  if (said === null) return false;
+  return verifyStripe(body, said, v.secret, Math.floor(Date.now() / 1000), v.tolerance);
+}
+
+/**
  * Answer one `/in/*` request.
  *
  * THE ORDER IS THE SECURITY, so it is worth reading as one list: the shape of the path, whether this
@@ -638,19 +693,22 @@ async function hook(request: Request, door: IngestDoor, path: Extract<IngestPath
   /* THE DECLARATION SAYS WHAT VERIFIES IT, AND THE URL DOES NOT. An ingest declaring an HMAC is not
      verified by a random segment somebody appended to the path, even a correct-looking one, or the
      weaker of the two checks would always be the one that ran. */
+  const body = new TextDecoder().decode(bytes);
   const verified =
     v.kind === 'path'
       ? path.token !== undefined && (await pathToken(path.token, v))
       : v.kind === 'hmac_sha256'
         ? await signed(request, bytes, v)
-        : false;
+        : v.kind === 'stripe'
+          ? await stripeSigned(request, body, v)
+          : false;
 
   return store(door, {
     ...(path.rec === undefined ? {} : { rec: path.rec }),
     ingest: path.ingest,
     channel: 'webhook',
     headers: headersOf(request),
-    body: new TextDecoder().decode(bytes),
+    body,
     sha256: await digest(bytes),
     verified,
   });
@@ -670,18 +728,459 @@ async function mail(request: Request, door: IngestDoor, hash: string): Promise<R
      rather than instead of it. `sha256` is over the bytes as they arrived, which is what makes a
      redelivery the same arrival (`kernel.arrive` is idempotent on the pair), and a head this function
      read wrongly is still a head somebody can read for themselves in the row. */
-  const body = new TextDecoder().decode(bytes);
+  const text = new TextDecoder().decode(bytes);
   /* THE HEAD IS SCANNED ONCE AND READ TWICE, in order for the eligibility test and joined for the row.
-     The join cannot answer "which hop said this", which is the whole of `forwarderPassed`'s question. */
-  const head = headLines(body);
+     The join cannot answer "which hop said this", which is the whole of `forwarderPassed`'s question.
+     ITS ENCODED WORDS ARE DECODED BEFORE EITHER READS IT, and the eligibility test is why. A `From:` written
+     `=?utf-8?q?alerts=40hsbc.example?= <bot@evil.example>` spells no bank domain until it is decoded, so alignment
+     read raw would pass it on `evil.example`'s signature while the record's `match:` read the decoded bank address. */
+  const head = headLines(text).map(([name, value]) => [name, words(value)] as const);
+  const read = readMime(bytes, text);
+  const files = read === null ? [] : await keepAll(door, rec, read.files);
+  const headers = joinHead(head.filter(([name]) => name !== FILES_HEADER));
+  if (files.length > 0) headers[FILES_HEADER] = JSON.stringify(files);
   return store(door, {
     rec,
     channel: 'email',
-    headers: joinHead(head),
-    body,
+    headers,
+    /* THE HEAD AS IT ARRIVED AND THE BODY AS A PERSON READS IT. A base64 or quoted-printable body, or a multipart one,
+       is text no `match:` and no extraction can read, so it is replaced by its decoded text; the head above it is left
+       whole, stale `Content-Transfer-Encoding` included, because it is the sender's and it is still true of the bytes
+       `sha256` names. A message that was plain text already is stored exactly as it arrived. */
+    body: read === null ? text : text.slice(0, bodyAt(text)) + read.text,
     sha256: await digest(bytes),
     verified: forwarderPassed(head),
   });
+}
+
+/* ── the message's own encodings (RFC 2045-2047, 2231) ───────────────────── */
+
+/** An attachment as the message carried it, before the host has said whether it keeps it. */
+type MailFile = { name: string; type: string; bytes: Uint8Array<ArrayBuffer> };
+
+/** Parts read in one message, nesting followed, and attachments named on one arrival. A message past either is read as far as that. */
+const PARTS_MOST = 64;
+const DEPTH_MOST = 8;
+const FILES_MOST = 16;
+/** A header value longer than this is not decoded, so one hostile line cannot make the word scanner quadratic. */
+const WORDS_MOST = 8_192;
+
+/** Where the body starts: after the first blank line, or the end for a message that has none. */
+function bodyAt(raw: string): number {
+  if (raw.startsWith('\r\n')) return 2;
+  if (raw.startsWith('\n')) return 1;
+  const crlf = raw.indexOf('\r\n\r\n');
+  const lf = raw.indexOf('\n\n');
+  if (crlf === -1 && lf === -1) return raw.length;
+  return crlf !== -1 && (lf === -1 || crlf < lf) ? crlf + 4 : lf + 2;
+}
+
+/**
+ * Bytes as a string of one character per byte.
+ *
+ * STRUCTURE IS FOUND IN BYTES AND TEXT IS MADE LAST, because a boundary or a base64 run is ASCII inside a body whose
+ * charset this file has not read yet. Decoding the whole message as UTF-8 first would turn every Latin-1 byte into
+ * U+FFFD before its own part could say it was Latin-1.
+ */
+function binary(bytes: Uint8Array): string {
+  let out = '';
+  for (let i = 0; i < bytes.length; i += 8_192) out += String.fromCharCode(...bytes.subarray(i, i + 8_192));
+  return out;
+}
+
+const octets = (bin: string): Uint8Array<ArrayBuffer> => {
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i) & 0xff;
+  return out;
+};
+
+/**
+ * The bytes as text in the charset their part named.
+ *
+ * NO CHARSET, AND `us-ascii`, READ AS UTF-8. WHATWG maps the label `us-ascii` to windows-1252, which turns the UTF-8 a
+ * careless sender put under it into mojibake; UTF-8 reads true ASCII identically, so it is the one guess that costs
+ * nothing when the label was right. A label this runtime does not know is read as UTF-8 too, rather than refused.
+ */
+function inCharset(bytes: Uint8Array<ArrayBuffer>, charset: string | undefined): string {
+  const label = (charset ?? '').trim().toLowerCase();
+  const ascii = label === '' || label === 'us-ascii' || label === 'ascii';
+  try {
+    return new TextDecoder(ascii ? 'utf-8' : label).decode(bytes);
+  } catch {
+    return new TextDecoder().decode(bytes);
+  }
+}
+
+/** Whether a character code is in base64's alphabet, `=` aside. Codes and not a pattern, since it runs once a byte. */
+const inBase64 = (code: number): boolean =>
+  (code >= 65 && code <= 90) || (code >= 97 && code <= 122) || (code >= 48 && code <= 57) || code === 43 || code === 47;
+
+/** A part's body with its transfer encoding undone, still as one character per byte. */
+function untransfer(bin: string, encoding: string): string {
+  const how = encoding.trim().toLowerCase();
+  if (how === 'base64') {
+    /* LINE BREAKS AND ANYTHING ELSE OUTSIDE THE ALPHABET ARE DROPPED, and the padding is put back to what the length
+       needs, because a mailer that wraps at 76 or trims its `=` has still sent readable base64. */
+    let clean = '';
+    for (let i = 0; i < bin.length; i++) if (inBase64(bin.charCodeAt(i))) clean += bin[i];
+    const rest = clean.length % 4;
+    if (rest === 1) clean = clean.slice(0, -1);
+    else if (rest > 1) clean += '='.repeat(4 - rest);
+    try {
+      return atob(clean);
+    } catch {
+      return bin;
+    }
+  }
+  if (how === 'quoted-printable') {
+    let out = '';
+    for (let i = 0; i < bin.length; i++) {
+      const c = bin[i]!;
+      if (c !== '=') {
+        out += c;
+        continue;
+      }
+      /* A SOFT LINE BREAK IS NOT TEXT: `=` at the end of a line joins it to the next. */
+      if (bin[i + 1] === '\r' && bin[i + 2] === '\n') {
+        i += 2;
+        continue;
+      }
+      if (bin[i + 1] === '\n') {
+        i += 1;
+        continue;
+      }
+      const pair = bin.slice(i + 1, i + 3);
+      if (/^[0-9A-Fa-f]{2}$/.test(pair)) {
+        out += String.fromCharCode(parseInt(pair, 16));
+        i += 2;
+        continue;
+      }
+      out += c;
+    }
+    return out;
+  }
+  return bin;
+}
+
+/**
+ * The encoded words in one header value, decoded (RFC 2047): `=?utf-8?B?...?=` and `=?iso-8859-1?Q?...?=`.
+ *
+ * WHITESPACE BETWEEN TWO ENCODED WORDS IS NOT TEXT (§6.2), which is how a long subject is split across words without
+ * spaces appearing in the middle of it. A token that only looks like a word is left exactly as it was written.
+ */
+function words(value: string): string {
+  if (!value.includes('=?') || value.length > WORDS_MOST) return value;
+  let out = '';
+  let i = 0;
+  let after = false;
+  while (i < value.length) {
+    const start = value.indexOf('=?', i);
+    if (start === -1) break;
+    const q1 = value.indexOf('?', start + 2);
+    const q2 = q1 === -1 ? -1 : value.indexOf('?', q1 + 1);
+    const end = q2 === -1 ? -1 : value.indexOf('?=', q2 + 1);
+    if (end === -1) break;
+    const between = value.slice(i, start);
+    const charset = value.slice(start + 2, q1).split('*')[0] ?? '';
+    const how = value.slice(q1 + 1, q2).toUpperCase();
+    if ((how !== 'B' && how !== 'Q') || /\s/.test(charset)) {
+      out += value.slice(i, start + 2);
+      i = start + 2;
+      after = false;
+      continue;
+    }
+    const payload = value.slice(q2 + 1, end);
+    const bin = how === 'B' ? untransfer(payload, 'base64') : untransfer(payload.replaceAll('_', ' '), 'quoted-printable');
+    if (!(after && between.trim() === '')) out += between;
+    out += inCharset(octets(bin), charset);
+    after = true;
+    i = end + 2;
+  }
+  return out + value.slice(i);
+}
+
+/** A structured header (`Content-Type`, `Content-Disposition`): its value lower-cased, and its parameters by name. */
+type Field = { value: string; params: Record<string, string> };
+
+/**
+ * One structured header read, quotes and RFC 2231's continued and charset-tagged parameters included.
+ *
+ * `filename*0*=utf-8''R%C3%A9sum%C3%A9; filename*1*=.pdf` IS ONE NAME, and an attachment from a phone's mail app is as
+ * likely to arrive that way as plain. A charset-tagged value wins over a plain one of the same name, as the RFC says.
+ */
+function fieldOf(raw: string | undefined): Field {
+  const s = raw ?? '';
+  /* A `;` INSIDE QUOTES IS PART OF A VALUE, so the split is a scan and not `split(';')`: `name="a;b.pdf"` is one name. */
+  const segments: string[] = [];
+  let text = '';
+  let inQuote = false;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i]!;
+    if (inQuote) {
+      if (c === '\\' && i + 1 < s.length) text += s[++i];
+      else if (c === '"') inQuote = false;
+      else text += c;
+    } else if (c === '"') inQuote = true;
+    else if (c === ';') {
+      segments.push(text);
+      text = '';
+    } else text += c;
+  }
+  segments.push(text);
+  const [first, ...rest] = segments;
+  const params: Record<string, string> = {};
+  const pieces: Record<string, { n: number; v: string; tagged: boolean }[]> = {};
+  for (const seg of rest) {
+    const eq = seg.indexOf('=');
+    if (eq <= 0) continue;
+    const key = seg.slice(0, eq).trim().toLowerCase();
+    const v = seg.slice(eq + 1).trim();
+    const star = /^([^*]+)\*(\d+)?(\*)?$/.exec(key);
+    if (star === null) params[key] = v;
+    else (pieces[star[1]!] ??= []).push({ n: Number(star[2] ?? '0'), v, tagged: star[3] !== undefined || star[2] === undefined });
+  }
+  for (const [key, list] of Object.entries(pieces)) {
+    list.sort((a, b) => a.n - b.n);
+    let charset = '';
+    let bin = '';
+    for (const [k, p] of list.entries()) {
+      let v = p.v;
+      if (k === 0 && p.tagged) {
+        const a = v.indexOf("'");
+        const b = a === -1 ? -1 : v.indexOf("'", a + 1);
+        if (b !== -1) {
+          charset = v.slice(0, a);
+          v = v.slice(b + 1);
+        }
+      }
+      bin += p.tagged ? unpercent(v) : v;
+    }
+    params[key] = inCharset(octets(bin), charset);
+  }
+  return { value: (first ?? '').trim().toLowerCase(), params };
+}
+
+/** `%XX` undone, one character per byte. */
+function unpercent(text: string): string {
+  let out = '';
+  for (let i = 0; i < text.length; i++) {
+    const pair = text.slice(i + 1, i + 3);
+    if (text[i] === '%' && /^[0-9A-Fa-f]{2}$/.test(pair)) {
+      out += String.fromCharCode(parseInt(pair, 16));
+      i += 2;
+    } else out += text[i];
+  }
+  return out;
+}
+
+/**
+ * A multipart body's parts, the preamble and the epilogue dropped.
+ *
+ * A DELIMITER COUNTS ONLY AT THE START OF A LINE, and the line break in front of it belongs to it, so a part's text is
+ * exactly what its sender wrote. Found with `indexOf`, like everything in this file that reads a stranger's bytes.
+ */
+function partsOf(body: string, boundary: string): string[] {
+  const delim = `--${boundary}`;
+  const next = (from: number): number => {
+    if (from === 0 && body.startsWith(delim)) return 0;
+    const k = body.indexOf(`\n${delim}`, Math.max(0, from - 1));
+    return k === -1 ? -1 : k + 1;
+  };
+  const out: string[] = [];
+  let at = next(0);
+  while (at !== -1 && out.length < PARTS_MOST) {
+    if (body.startsWith('--', at + delim.length)) break;
+    const lineEnd = body.indexOf('\n', at);
+    if (lineEnd === -1) break;
+    const following = next(lineEnd + 1);
+    let part = body.slice(lineEnd + 1, following === -1 ? body.length : following);
+    if (following !== -1) part = part.endsWith('\r\n') ? part.slice(0, -2) : part.endsWith('\n') ? part.slice(0, -1) : part;
+    out.push(part);
+    at = following;
+  }
+  return out;
+}
+
+const BLOCK_TAGS = new Set(['br', 'p', 'div', 'tr', 'li', 'table', 'blockquote', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr']);
+const DROPPED_TAGS = new Set(['style', 'script', 'head', 'title']);
+/**
+ * The named references a receipt or a bank alert actually uses, by code point: the markup's own, spacing, currency
+ * signs and quotes. Code points and not the characters, so this source holds no typographic dash or quote of its own.
+ */
+const ENTITIES: Readonly<Record<string, number>> = {
+  amp: 0x26, lt: 0x3c, gt: 0x3e, quot: 0x22, apos: 0x27, nbsp: 0x20,
+  pound: 0xa3, euro: 0x20ac, yen: 0xa5, cent: 0xa2, curren: 0xa4,
+  copy: 0xa9, reg: 0xae, trade: 0x2122, times: 0xd7, middot: 0xb7, bull: 0x2022, hellip: 0x2026,
+  ndash: 0x2013, mdash: 0x2014, lsquo: 0x2018, rsquo: 0x2019, ldquo: 0x201c, rdquo: 0x201d, laquo: 0xab, raquo: 0xbb,
+};
+
+/**
+ * An HTML part as text, for a message that sent no plain one.
+ *
+ * ONE PASS WITH `indexOf` AND NO TAG PATTERN. `/<[^>]*>/g` rescans to the end of the input from every `<` that has no
+ * `>` after it, so a stranger's five megabytes of `<` would be an outage; here each byte is looked at a bounded number of
+ * times. Block tags become line breaks, so an amount and its label in two cells stay on the lines a person saw them on.
+ */
+function textOfHtml(html: string): string {
+  const lower = html.toLowerCase();
+  let out = '';
+  let i = 0;
+  while (i < html.length) {
+    const lt = html.indexOf('<', i);
+    if (lt === -1) {
+      out += html.slice(i);
+      break;
+    }
+    out += html.slice(i, lt);
+    const gt = html.indexOf('>', lt + 1);
+    if (gt === -1) break;
+    const name = /^\/?([a-z0-9]+)/.exec(lower.slice(lt + 1, Math.min(gt, lt + 16)))?.[1] ?? '';
+    const closing = html[lt + 1] === '/';
+    if (!closing && DROPPED_TAGS.has(name)) {
+      const close = lower.indexOf(`</${name}`, gt);
+      const shut = close === -1 ? -1 : html.indexOf('>', close);
+      i = shut === -1 ? html.length : shut + 1;
+      continue;
+    }
+    if (BLOCK_TAGS.has(name)) out += '\n';
+    else if (name === 'td' || name === 'th') out += ' ';
+    i = gt + 1;
+  }
+  const decoded = out.replace(/&(#x[0-9a-f]{1,6}|#[0-9]{1,7}|[a-z]{2,6});/gi, (whole, what: string) => {
+    if (what[0] !== '#') {
+      const named = ENTITIES[what.toLowerCase()];
+      return named === undefined ? whole : String.fromCodePoint(named);
+    }
+    const code = what[1] === 'x' || what[1] === 'X' ? parseInt(what.slice(2), 16) : parseInt(what.slice(1), 10);
+    return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : whole;
+  });
+  const lines: string[] = [];
+  for (const line of decoded.split('\n')) {
+    /* `\s` AND NOT A LIST, because it takes the no-break space a mailer pads a table cell with, as well as tabs. */
+    const tidy = line.replace(/\s+/g, ' ').trim();
+    if (tidy === '' && (lines.length === 0 || lines[lines.length - 1] === '')) continue;
+    lines.push(tidy);
+  }
+  return lines.join('\n').trim();
+}
+
+/**
+ * A part's head, from its bytes, as UTF-8 text with names lower-cased.
+ *
+ * UTF-8 BECAUSE THAT IS WHAT EIGHT-BIT HEADERS ARE (RFC 6532), and read as text before any value is decoded, so a raw
+ * UTF-8 file name and an encoded-word one come out as the same kind of string.
+ */
+const headOf = (bin: string): Record<string, string> => joinHead(headLines(inCharset(octets(bin), 'utf-8')));
+
+/** What reading a message found: the text a person reads, the HTML to fall back on, and the attachments. */
+type Found = { texts: string[]; html: string[]; files: MailFile[]; parts: number };
+
+/** One part, read into `into`: text kept as text, HTML kept aside, anything else an attachment. */
+function walk(bin: string, into: Found, depth: number): void {
+  if (into.parts >= PARTS_MOST) return;
+  into.parts += 1;
+  const start = bodyAt(bin);
+  const head = headOf(bin.slice(0, start));
+  const body = bin.slice(start);
+  const type = fieldOf(head['content-type']);
+  const kind = type.value === '' ? 'text/plain' : type.value;
+  const disposition = fieldOf(head['content-disposition']);
+  const encoding = head['content-transfer-encoding'] ?? '';
+
+  if (kind.startsWith('multipart/')) {
+    const boundary = type.params.boundary;
+    if (boundary === undefined || boundary === '' || depth >= DEPTH_MOST) return;
+    /* ALTERNATIVE IS ONE MESSAGE WRITTEN TWICE, and reading both would put every amount in the body twice. The plain
+       version is read when there is one, because it is the one written to be read as text. */
+    const alternative = kind === 'multipart/alternative';
+    const sub: Found = alternative ? { texts: [], html: [], files: into.files, parts: into.parts } : into;
+    for (const part of partsOf(body, boundary)) walk(part, sub, depth + 1);
+    if (alternative) {
+      into.parts = sub.parts;
+      if (sub.texts.length > 0) into.texts.push(...sub.texts);
+      else into.html.push(...sub.html);
+    }
+    return;
+  }
+
+  /* A MESSAGE FORWARDED AS AN ATTACHMENT IS READ AS A MESSAGE, its sender and subject first, because "forward as
+     attachment" is how most mail apps send on the very bank alert a record is waiting for. */
+  if (kind === 'message/rfc822' && depth < DEPTH_MOST) {
+    const inner = untransfer(body, encoding);
+    const innerHead = headOf(inner.slice(0, bodyAt(inner)));
+    const said = ['from', 'date', 'subject']
+      .filter((name) => innerHead[name] !== undefined)
+      .map((name) => `${name[0]!.toUpperCase()}${name.slice(1)}: ${words(innerHead[name]!)}`);
+    if (said.length > 0) into.texts.push(said.join('\n'));
+    walk(inner, into, depth + 1);
+    return;
+  }
+
+  const data = untransfer(body, encoding);
+  const named = words(disposition.params.filename ?? type.params.name ?? '').trim();
+  const text = kind === 'text/plain' || kind === 'text/html';
+  if (disposition.value === 'attachment' || named !== '' || !text) {
+    if (into.files.length < FILES_MOST)
+      into.files.push({ name: (named === '' ? 'attachment' : named).slice(0, 200), type: kind.slice(0, 100), bytes: octets(data) });
+    return;
+  }
+  const decoded = inCharset(octets(data), type.params.charset);
+  if (kind === 'text/html') into.html.push(decoded);
+  else into.texts.push(decoded);
+}
+
+/**
+ * The message's body as text, and its attachments, or `null` for a message that was plain text already.
+ *
+ * `null` KEEPS THE COMMON CASE BYTE FOR BYTE. A bank alert sent as one plain UTF-8 or ASCII part needs nothing done
+ * to it, and anything done to it anyway (a line ending changed, a space trimmed) would move an anchor some declared
+ * extraction was written against.
+ */
+function readMime(bytes: Uint8Array, text: string): { text: string; files: MailFile[] } | null {
+  const start = bodyAt(text);
+  if (start === text.length) return null;
+  const head = joinHead(headLines(text.slice(0, start)));
+  const type = fieldOf(head['content-type']);
+  const encoding = (head['content-transfer-encoding'] ?? '').trim().toLowerCase();
+  const charset = (type.params.charset ?? '').trim().toLowerCase();
+  const asIs =
+    (type.value === '' || type.value === 'text/plain') &&
+    (encoding === '' || encoding === '7bit' || encoding === '8bit' || encoding === 'binary') &&
+    (charset === '' || charset === 'utf-8' || charset === 'us-ascii' || charset === 'ascii');
+  if (asIs && fieldOf(head['content-disposition']).value !== 'attachment') return null;
+  try {
+    const found: Found = { texts: [], html: [], files: [], parts: 0 };
+    walk(binary(bytes), found, 0);
+    const read = found.texts.length > 0 ? found.texts : found.html.map(textOfHtml);
+    return { text: read.join('\n\n'), files: found.files };
+  } catch {
+    /* A MESSAGE THIS FILE CANNOT READ IS STORED AS IT ARRIVED, which is the rule at the top of the file: an arrival
+       nobody understands is still an arrival somebody can look at. */
+    return null;
+  }
+}
+
+/** Each attachment offered to the host's store, and named on the arrival whether it was kept or not. */
+async function keepAll(door: IngestDoor, rec: string, files: MailFile[]): Promise<IngestFile[]> {
+  const out: IngestFile[] = [];
+  for (const file of files) {
+    let kept: { sha256: string; mime: string } | null = null;
+    if (door.keep !== undefined) {
+      try {
+        kept = await door.keep({ rec, name: file.name, type: file.type, bytes: file.bytes });
+      } catch {
+        /* A STORE THAT FAILED IS A FILE NOT KEPT, and never a message refused: the text is what the record matches on,
+           and a sender retrying for a bucket's hiccup would store the message a second time. */
+        kept = null;
+      }
+    }
+    out.push(
+      kept === null
+        ? { name: file.name, mime: file.type, bytes: file.bytes.byteLength }
+        : { name: file.name, mime: kept.mime, bytes: file.bytes.byteLength, sha256: kept.sha256 },
+    );
+  }
+  return out;
 }
 
 /**

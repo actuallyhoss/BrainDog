@@ -9,6 +9,7 @@
 <script lang="ts">
   import { inline, text, MISSING, type Block, type Row, type RenderOptions } from '../../src/index.ts';
   import { HEAT_DAY, HEAT_NONE, HEAT_VALUE, heatLines, heatOutside, heatPlan, heatSkipped, heatTitle } from '../../src/heat.ts';
+  import { LINES_NUMBERS } from '../../src/lines.ts';
   import { roadmapToday } from '../../src/roadmap.ts';
 
   let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
@@ -38,7 +39,8 @@
         ></span>
       {/each}
     </div>
-    <div class="heat-numbers">
+    <details class="lines-numbers">
+      <summary class="lines-toggle">{LINES_NUMBERS}</summary>
       <table class="heat-table">
         <thead>
           <tr><th scope="col">{HEAT_DAY}</th><th scope="col">{HEAT_VALUE}</th></tr>
@@ -49,7 +51,7 @@
           {/each}
         </tbody>
       </table>
-    </div>
+    </details>
     {#if skipped}<p class="heat-skipped">{skipped}</p>{/if}
     {#if plan.outside}<p class="heat-outside">{heatOutside(plan.outside)}</p>{/if}
   </div>

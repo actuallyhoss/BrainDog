@@ -20,7 +20,11 @@ name: tag
 #   v2026.09.08          the app: the browser client, the site, the hosts. A second one on the same
 #                        day is `v2026.09.08.2`.
 #   render-v0.1.0        `braindog-render` on npm. Semver, because a dependent's build depends on it
-#   cli-v0.1.0           `braindog-cli` on npm. The same
+#   cli-v0.1.0           `braindog` on npm, the command line (`apps/cli`, `braindog-cli` in this
+#                        workspace). The same
+#
+# NOTHING IS PUBLISHED UNTIL HE PUSHES ONE OF THOSE TWO TAGS, and only once npm's trusted publishing
+# names this repository and this file for both packages.
 #
 # WHAT IS LEFT HERE IS THE PART THAT WAS ALWAYS THE POINT. A tag can be cut from any commit,
 # including one `ci.yml` never saw, so the tagged tree is tested and gated before the tag is allowed
@@ -126,11 +130,14 @@ jobs:
         with:
           registry-url: https://registry.npmjs.org
 
-      # FIVE PRECONDITIONS, EACH REFUSING WITH THE FACT IT CHECKED. This job is inert today —
-      # `packages/render` has no build script and its `exports` point at TypeScript source, and
-      # `apps/cli` does not exist — and the useful behaviour for an inert job is to say precisely
-      # which precondition is missing rather than to publish something broken or to be commented out
-      # and forgotten.
+      # THE PRECONDITIONS, EACH REFUSING WITH THE FACT IT CHECKED, so a tag cut before its version
+      # commit, or a package that would ship something no consumer can run, stops here and says
+      # which, rather than after a build or on the registry.
+      #
+      # TWO NAMES PER PACKAGE, AND FOR THE CLI THEY DIFFER. `name` is the workspace's, which pnpm
+      # filters by; `npm` is the registry's. The CLI is `braindog` on npm, and the workspace cannot
+      # call it that because the root manifest already does, so the workspace says `braindog-cli`
+      # and the manifest npm reads is renamed below, in this job's checkout only.
       - name: preflight
         id: preflight
         env:
@@ -138,8 +145,8 @@ jobs:
         run: |
           set -euo pipefail
           case "$TAG" in
-            render-v*) dir=packages/render; semver="${TAG#render-v}" ;;
-            cli-v*)    dir=apps/cli;        semver="${TAG#cli-v}" ;;
+            render-v*) dir=packages/render; semver="${TAG#render-v}"; npm=braindog-render ;;
+            cli-v*)    dir=apps/cli;        semver="${TAG#cli-v}";    npm=braindog ;;
             *)         echo "  $TAG is neither a render nor a cli tag."; exit 1 ;;
           esac
 
@@ -160,23 +167,79 @@ jobs:
 
           # AND THE PACKAGE HAS TO SHIP SOMETHING A CONSUMER CAN RUN. `exports` pointing at `.ts` is
           # this workspace talking to itself through type-stripping; on a registry it is a package
-          # that fails to import for everyone who is not this repository.
+          # that fails to import for everyone who is not this repository. So what is read is what
+          # npm will get: `publishConfig.exports` when the manifest has one (the renderer keeps
+          # `exports` on its sources for the workspace), and `bin` beside it (the CLI's bundle). A
+          # `.d.ts` is a declaration file a consumer's compiler reads, and it is not source.
           node -e "
-            const e = JSON.stringify(require('./$manifest').exports ?? {});
-            if (e.includes('.ts')) {
-              console.error('  $name exports TypeScript source. A published package resolves to built ESM (31 §8).');
+            const m = require('./$manifest');
+            const e = JSON.stringify([m.publishConfig?.exports ?? m.exports ?? {}, m.bin ?? {}]);
+            if (/(?<!\.d)\.ts\"/.test(e)) {
+              console.error('  $name ships TypeScript source. A published package resolves to built ESM (31 §8).');
               process.exit(1);
             }"
 
           node -e "if (!(require('./$manifest').scripts ?? {}).build) { console.error('  $name has no build script, and a publish must build what it ships.'); process.exit(1) }"
 
+          # TRUSTED PUBLISHING IS npm 11.5.1's. An older npm has no OIDC exchange, finds no token,
+          # and fails at the registry with an answer that names neither.
+          node -e "
+            const [a, b, c] = process.argv[1].split('.').map(Number);
+            if (a < 11 || (a === 11 && (b < 5 || (b === 5 && c < 1)))) {
+              console.error('  npm is ' + process.argv[1] + ', and trusted publishing needs 11.5.1 or later.');
+              process.exit(1);
+            }" "$(npm --version)"
+
           {
             echo "dir=$dir"
             echo "name=$name"
+            echo "npm=$npm"
             echo "version=$version"
           } >> "$GITHUB_OUTPUT"
 
+      # AGT-1's `apps/cli/scripts/bundle.mjs` for the CLI and `tsc -p tsconfig.build.json` for the
+      # renderer, each as its own `build` script. There is no second bundler.
       - run: pnpm --filter ${{ steps.preflight.outputs.name }} run build
+
+      # WHAT THE MANIFEST PROMISES HAS TO BE THERE. Every file `publishConfig.exports` (or
+      # `exports`) and `bin` name is looked for after the build, because npm publishes a package
+      # whose entry is missing without a word, and its first consumer finds out.
+      - name: the files the manifest names
+        working-directory: ${{ steps.preflight.outputs.dir }}
+        run: |
+          node -e "
+            const fs = require('node:fs');
+            const m = require('./package.json');
+            const named = [];
+            const walk = (v) => (typeof v === 'string' ? named.push(v) : Object.values(v ?? {}).forEach(walk));
+            walk(m.publishConfig?.exports ?? m.exports);
+            walk(typeof m.bin === 'string' ? [m.bin] : m.bin);
+            const missing = named.filter((p) => !fs.existsSync(p));
+            if (missing.length > 0) {
+              console.error('  The build did not make ' + missing.join(', ') + ', which the manifest names.');
+              process.exit(1);
+            }"
+
+      # THE MANIFEST npm READS, WRITTEN IN THIS CHECKOUT AND NOWHERE ELSE. `npm publish` honours
+      # none of `publishConfig`'s field overrides (that is pnpm's), so `publishConfig.exports` is
+      # put where `exports` was; the registry name goes in; and the devDependencies go, because
+      # they are `workspace:*` lines that mean nothing off this tree, and the CLI's bundle already
+      # holds every one of them.
+      - name: the published manifest
+        working-directory: ${{ steps.preflight.outputs.dir }}
+        env:
+          NPM_NAME: ${{ steps.preflight.outputs.npm }}
+        run: |
+          node -e "
+            const fs = require('node:fs');
+            const m = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            m.name = process.env.NPM_NAME;
+            if (m.publishConfig?.exports) {
+              m.exports = m.publishConfig.exports;
+              delete m.publishConfig.exports;
+            }
+            delete m.devDependencies;
+            fs.writeFileSync('package.json', JSON.stringify(m, null, 2) + String.fromCharCode(10));"
 
       # `npm publish` AND NOT `pnpm publish`: the OIDC exchange that makes trusted publishing work
       # is npm's, and pnpm does not perform it. Run from the package directory, which is what npm
@@ -184,12 +247,12 @@ jobs:
       - run: npm publish
         working-directory: ${{ steps.preflight.outputs.dir }}
 
-      # THE REGISTRY IS ASKED, RATHER THAN THE EXIT CODE TRUSTED (52 §2, release step 8) — the same
+      # THE REGISTRY IS ASKED, RATHER THAN THE EXIT CODE TRUSTED (52 §2, release step 8), the same
       # principle every gate in this repository is built on: check the thing itself.
       - run: |
           set -euo pipefail
           found="$(npm view "${NAME}@${VERSION}" version)"
           [ "$found" = "$VERSION" ] || { echo "  the registry shows $found for $NAME, not $VERSION."; exit 1; }
         env:
-          NAME: ${{ steps.preflight.outputs.name }}
+          NAME: ${{ steps.preflight.outputs.npm }}
           VERSION: ${{ steps.preflight.outputs.version }}

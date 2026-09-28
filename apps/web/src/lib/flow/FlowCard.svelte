@@ -179,16 +179,18 @@
     class="handle tap"
     aria-label={words.drag(said)}
     title={words.drag(said)}
+    aria-describedby={shown.length > 0 ? `faults-${node.key}` : undefined}
     onpointerdown={down}
     onpointermove={track}
     onpointerup={up}
     onpointercancel={() => flow.cancelDrag()}
     onlostpointercapture={() => flow.dragging === node.key && flow.cancelDrag()}
+    onclick={() => (open = true)}
   >
     <Icon name="drag" size="s" />
   </button>
 
-  <button type="button" class="say tap" onclick={() => flow.select(node.key)}>
+  <button type="button" class="say tap" aria-describedby={shown.length > 0 ? `faults-${node.key}` : undefined} onclick={() => flow.select(node.key)}>
     {#if verb && GLYPH[verb]}<span class="glyph"><Icon name={GLYPH[verb]!} size="s" /></span>{/if}
     <span class="said">{#each parts as p, i (i)}{#if p.ref}<span class="ref">{p.text}</span>{:else}{p.text}{/if}{/each}</span>
   </button>
@@ -208,7 +210,7 @@
   </div>
 
   {#if shown.length > 0}
-    <ul class="faults">
+    <ul class="faults" id={`faults-${node.key}`}>
       {#each shown as f (f)}<li><span class="warn"><Icon name="alert" size="m" /></span>{f}</li>{/each}
     </ul>
   {/if}

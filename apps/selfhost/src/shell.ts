@@ -43,6 +43,30 @@ const TYPES: Readonly<Record<string, string>> = {
 /** The app's base, as `apps/web/svelte.config.js` sets `paths.base`. */
 const BASE = '/app';
 
+/** Cloudflare Turnstile's origin. The self-host has no sign-up (`on: 'worker'`), so no page of it keeps it. */
+const TURNSTILE = 'https://challenges.cloudflare.com';
+
+/** The policy on a file beside the pages, where nothing inline runs; an SVG opened on its own is a document that could. */
+const FILE_POLICY = "default-src 'self'; object-src 'none'; base-uri 'none'";
+
+/**
+ * The header for a page: the policy SvelteKit wrote into its `<meta>` (`kit.csp` in `apps/web/svelte.config.js`),
+ * less Turnstile, with `frame-ancestors 'none'`, which a meta tag cannot carry. It is the Worker's `pagePolicy`
+ * (`apps/worker/src/route.ts`) with sign-up taken away: the two hosts share no package this could live in.
+ *
+ * A PAGE WITH NO META GETS `frame-ancestors 'none'` ALONE, because a policy without the shell's hashes refuses its
+ * inline scripts and leaves an empty screen; `apps/web/test/csp.test.ts` fails a build whose shell lacks the meta.
+ */
+function pagePolicy(html: string): string {
+  const own = /<meta http-equiv="content-security-policy" content="([^"]*)"/i.exec(html)?.[1];
+  if (own === undefined) return "frame-ancestors 'none'";
+  const kept = own
+    .split(';')
+    .map((directive) => directive.trim().split(/\s+/).filter((source) => source !== TURNSTILE).join(' '))
+    .filter((directive) => directive !== '');
+  return [...kept, "frame-ancestors 'none'"].join('; ');
+}
+
 const inside = (root: string, path: string): boolean => path === root || path.startsWith(root + sep);
 
 /** The real file a URL path names under `root`, or `null`. `/x`, then `/x.html`, then `/x/index.html`. */
@@ -127,9 +151,13 @@ export function shellOf(dir: string): (request: Request) => Response {
       headers.set('cache-control', 'no-store');
       return new Response(null, { status: 404, headers });
     }
-    headers.set('content-type', TYPES[extname(file).toLowerCase()] ?? 'application/octet-stream');
+    const type = extname(file).toLowerCase();
+    headers.set('content-type', TYPES[type] ?? 'application/octet-stream');
     /* Vite names every immutable file by its content, so it can be kept for ever; the page that names them cannot. */
     headers.set('cache-control', within.startsWith('/_app/immutable/') ? 'public, max-age=31536000, immutable' : 'no-cache');
-    return new Response(request.method === 'HEAD' ? null : readFileSync(file), { status: 200, headers });
+    /* A HEAD IS READ TOO, so it is told the same policy as the GET it stands for. */
+    const bytes = readFileSync(file);
+    headers.set('content-security-policy', type === '.html' ? pagePolicy(bytes.toString('utf8')) : `${FILE_POLICY}; frame-ancestors 'none'`);
+    return new Response(request.method === 'HEAD' ? null : bytes, { status: 200, headers });
   };
 }

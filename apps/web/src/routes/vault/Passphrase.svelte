@@ -1,0 +1,320 @@
+<!--
+  The vault passphrase: its switch, the honest trade it makes, and the two sheets that turn it on and off
+  (`12 §6`, "The optional second factor"; `loop/finish/platform.md` COL-11).
+
+  THE CONSEQUENCE SITS WITH THE SWITCH, NOT BEHIND IT. `12 §6` asks for the trade "stated in the UI rather than in a
+  whitepaper" and offered "with the consequence in the same sentence as the switch", so the table is always drawn, the
+  switch's own line says what the vault is now, and the sheet that turns it on says the forgetting sentence again beside
+  the button that does it.
+
+  THE SWITCH NEVER FLIPS BY ITSELF. Pressing it opens the sheet; it moves only when the record answers, so a refusal
+  leaves it where the vault is. `aria-checked` is the record's answer and never the press.
+
+  A TYPED CONFIRMATION, because this is the one act on the screen a person cannot take back by themselves: a passphrase
+  typed wrong once and never again is a vault nobody opens. The two fields must match before the button does anything,
+  and how long a passphrase must be is the host's rule, said in the host's sentence, not a second copy of it here.
+
+  NOTHING IS KEPT. Both fields are emptied when the sheet shuts, whatever the answer was.
+-->
+<script lang="ts">
+  import Section from '$lib/ui/Section.svelte';
+  import Sheet from '$lib/ui/Sheet.svelte';
+  import Button from '$lib/ui/Button.svelte';
+  import { toasts } from '$lib/ui/toast.svelte.ts';
+  import { closed, opened } from '$lib/ui/screen.svelte.ts';
+  import { confirmed, turnLock, words, type Lock, type Locker } from '$lib/record/vault.ts';
+  import PassField from './PassField.svelte';
+
+  let {
+    lock,
+    client,
+    onturn,
+  }: {
+    lock: Lock;
+    client: Locker | null;
+    /** The vault after a change, or after a refusal that said where it is. */
+    onturn: (lock: Lock) => void;
+  } = $props();
+
+  const on = $derived(lock.state === 'on');
+  /* ONLY A KNOWN STATE CAN BE CHANGED: a switch pressed while the record would not say which way it is would be a guess. */
+  const can = $derived(client !== null && (lock.state === 'on' || lock.state === 'off'));
+  /* THE LAST BRANCH READS `fix` THROUGH `in`, because eliminating all three literals of the first variant's `state`
+     does not itself narrow TypeScript to the second variant across a ternary chain; `in` does. */
+  const line = $derived(
+    lock.state === 'on' ? words.lockOn : lock.state === 'off' ? words.lockOff : lock.state === 'reading' ? words.lockReading : 'fix' in lock ? lock.fix : '',
+  );
+
+  let sheet = $state<'on' | 'off' | null>(null);
+  let first = $state('');
+  let again = $state('');
+  let busy = $state(false);
+  let said = $state('');
+  const matches = $derived(confirmed(first, again));
+
+  function press() {
+    if (!can) return;
+    first = '';
+    again = '';
+    said = '';
+    sheet = on ? 'off' : 'on';
+  }
+
+  function shut() {
+    sheet = null;
+    first = '';
+    again = '';
+    said = '';
+  }
+
+  async function go(e?: SubmitEvent) {
+    e?.preventDefault();
+    if (sheet === null || busy || !client) return;
+    if (sheet === 'on' && !matches) {
+      said = words.passDiffer;
+      return;
+    }
+    const to = sheet;
+    busy = true;
+    said = '';
+    const at = opened();
+    const out = await turnLock(client, to, first);
+    closed(true, at);
+    busy = false;
+    if (out.lock) onturn(out.lock);
+    if (!out.ok) {
+      /* A REFUSAL THAT SAYS WHERE THE VAULT IS closes the sheet, because there is nothing left to do in it; any other
+         keeps the typing, and says the record's sentence under it. */
+      if (out.lock) {
+        toasts.push(out.fix, { intent: 'warn' });
+        shut();
+      } else said = out.fix;
+      return;
+    }
+    toasts.push(out.lock.state === 'on' ? words.lockedNow : words.unlockedNow, { intent: 'good' });
+    shut();
+  }
+</script>
+
+<Section title={words.passphrase}>
+  <div class="lock-head">
+    <div class="lock-said">
+      <span class="lock-name" id="lock-name">{words.lockSwitch}</span>
+      <p class="lock-line" id="lock-line" role="status">{line}</p>
+    </div>
+    <button
+      type="button"
+      class="switch"
+      role="switch"
+      aria-checked={on}
+      aria-labelledby="lock-name"
+      aria-describedby="lock-line"
+      disabled={!can || busy}
+      onclick={press}><span class="switch-track"></span></button
+    >
+  </div>
+
+  <p class="lock-text">{words.lockProtects}</p>
+
+  <!--
+    THE HONESTY TABLE, `12 §6`'s two rows. At 1440 it is a table; under 640px each row is a block with its two cells
+    labelled above their values, because three columns of sentences do not fit a phone and a label before every value
+    is what a row of facts is on a phone. Each label is drawn only under 640px, where the column headers are not, so a
+    screen reader hears one or the other and never both.
+  -->
+  <table class="lock-table">
+    <caption class="lock-hidden">{words.tableCaption}</caption>
+    <thead>
+      <tr>
+        <th scope="col">{words.tableState}</th>
+        <th scope="col">{words.tableReads}</th>
+        <th scope="col">{words.tableForget}</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <th scope="row">{words.rowOff} <span class="lock-note">{words.rowOffNote}</span></th>
+        <td><span class="lock-label">{words.tableReads}</span>{words.offReads}</td>
+        <td><span class="lock-label">{words.tableForget}</span>{words.offForget}</td>
+      </tr>
+      <tr>
+        <th scope="row">{words.rowOn}</th>
+        <td><span class="lock-label">{words.tableReads}</span>{words.onReads}</td>
+        <td><span class="lock-label">{words.tableForget}</span><strong class="lock-strong">{words.onForget}</strong></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p class="lock-text">{words.backups}</p>
+</Section>
+
+<Sheet
+  open={sheet !== null}
+  title={sheet === 'off' ? words.turnOffTitle : words.turnOnTitle}
+  subtitle={sheet === 'off' ? words.turnOffHint : words.turnOnHint}
+  onclose={shut}
+>
+  <form class="lock-form" id="lock-form" onsubmit={go} novalidate>
+    {#if sheet === 'on'}
+      <PassField id="lock-new" label={words.passField} autocomplete="new-password" bind:value={first} />
+      <PassField
+        id="lock-again"
+        label={words.passAgain}
+        hint={words.passAgainHint}
+        autocomplete="new-password"
+        invalid={again !== '' && !matches}
+        bind:value={again}
+      />
+      <p class="lock-strong">{words.passForget}</p>
+      <p class="lock-text">{words.backups}</p>
+    {:else}
+      <PassField id="lock-old" label={words.passField} autocomplete="current-password" bind:value={first} />
+    {/if}
+    {#if said}<p class="lock-bad" role="status">{said}</p>{/if}
+  </form>
+  {#snippet footer()}
+    <Button weight="quiet" onclick={shut}>{words.cancel}</Button>
+    <Button weight="primary" type="submit" form="lock-form" disabled={busy || (sheet === 'on' ? !matches : first === '')}>
+      {sheet === 'off' ? (busy ? words.turningOff : words.turnOff) : busy ? words.turningOn : words.turnOn}
+    </Button>
+  {/snippet}
+</Sheet>
+
+<style>
+  .lock-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-4);
+  }
+
+  .lock-said {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+    min-inline-size: 0;
+  }
+
+  .lock-name {
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  .lock-line,
+  .lock-text {
+    margin: 0;
+    color: var(--ink2);
+    font-size: var(--t-sm);
+  }
+
+  .lock-text {
+    margin-block-start: var(--sp-3);
+    max-inline-size: var(--measure);
+  }
+
+  .lock-strong {
+    margin: 0;
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  .lock-bad {
+    margin: 0;
+    color: var(--danger);
+    font-size: var(--t-sm);
+  }
+
+  .lock-hidden {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* A TABLE WITH NO BOX, as every list here is: hairlines between the rows and nothing around them. */
+  .lock-table {
+    inline-size: 100%;
+    margin-block-start: var(--sp-3);
+    border-collapse: collapse;
+    font-size: var(--t-sm);
+  }
+
+  .lock-table th,
+  .lock-table td {
+    padding-block: var(--sp-2);
+    padding-inline: 0 var(--sp-3);
+    color: var(--ink2);
+    text-align: start;
+    vertical-align: top;
+  }
+
+  .lock-table thead th {
+    color: var(--dim);
+    font-weight: 500;
+  }
+
+  .lock-table tbody th {
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  .lock-table tbody tr {
+    border-block-start: 1px solid var(--line);
+  }
+
+  .lock-note {
+    color: var(--dim);
+    font-weight: 400;
+  }
+
+  .lock-label {
+    display: none;
+  }
+
+  .lock-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+  }
+
+  /* UNDER 640PX, TWO LABELLED ROWS: each row a block, its state as the title, each cell its label above its value. */
+  @media (width < 640px) {
+    .lock-table,
+    .lock-table tbody,
+    .lock-table tr,
+    .lock-table th,
+    .lock-table td {
+      display: block;
+    }
+
+    .lock-table thead {
+      display: none;
+    }
+
+    .lock-table tbody tr {
+      padding-block: var(--sp-3);
+    }
+
+    .lock-table th,
+    .lock-table td {
+      padding: 0;
+    }
+
+    .lock-table tbody th {
+      font-size: var(--t-md);
+    }
+
+    .lock-table td {
+      margin-block-start: var(--sp-2);
+      color: var(--ink);
+    }
+
+    .lock-label {
+      display: block;
+      color: var(--dim);
+      font-size: var(--t-sm);
+    }
+  }
+</style>

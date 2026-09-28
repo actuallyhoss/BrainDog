@@ -45,7 +45,7 @@
   import { drew } from '$lib/ui/screen.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import Button from '$lib/ui/Button.svelte';
-  import Mark from '$lib/ui/Mark.svelte';
+  import Entry from '../signin/Entry.svelte';
   import { PEOPLE, withChip } from '$lib/who.ts';
   import { accept, type NotMade } from './accept.ts';
   import { caseOf, changesAsked, draftAsked, keepsCurrency, pagesOf, reminds, words as drawing } from './preview.ts';
@@ -281,13 +281,9 @@
 
 <svelte:head><title>{titleOf('Start')}</title></svelte:head>
 
-<div class="start">
+<!-- THE ENTRY LAYOUT EVERY WAY IN SHARES (`signin/Entry.svelte`), in its wide form for the previews below. -->
+<Entry wide>
   <div class="frame">
-    <header class="head">
-      <Mark height={34} />
-      <span class="wordmark">{copy.product}</span>
-    </header>
-
     {#if noRecord}
       <NoRecord title={copy.noRecordTitle} why={copy.noRecordWhy} />
     {:else if colleague}
@@ -459,19 +455,11 @@
       {/if}
     {/if}
   </div>
-</div>
+</Entry>
 
 <style>
-  /* ONE COLUMN AT EVERY WIDTH, with the 16px gutter on a phone. `minmax(0, …)` so a long word cannot widen the track
-     past the screen and take the page sideways. */
-  .start {
-    display: grid;
-    grid-template-columns: minmax(0, min(44rem, 100%));
-    justify-content: center;
-    min-block-size: 100dvh;
-    padding: var(--sp-6) var(--sp-4) 0;
-  }
-
+  /* ONE COLUMN AT EVERY WIDTH. The frame, its gutter and the brand are `signin/Entry.svelte`'s, the same as sign in's;
+     `min-inline-size: 0` so a long word cannot widen the column past the screen and take the page sideways. */
   .frame {
     display: grid;
     align-content: start;
@@ -479,25 +467,14 @@
     min-inline-size: 0;
   }
 
-  .head {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-3);
-  }
-
-  .wordmark {
-    color: var(--ink);
-    font-family: var(--font-display);
-    font-size: var(--t-xl);
-    font-weight: 600;
-  }
-
   .question {
     color: var(--ink);
     font-family: var(--font-display);
     font-size: var(--t-3xl);
     font-weight: 600;
-    line-height: var(--lh-tight);
+    letter-spacing: -0.03em;
+    line-height: var(--lh-3xl);
+    text-wrap: balance;
   }
 
   .prompt {
@@ -517,6 +494,8 @@
     font-size: var(--t-md);
     line-height: var(--lh-body);
     resize: vertical;
+    /* IT SCROLLS CLEAR OF THE PHONE'S KEYBOARD with the chips and Continue under it still in view. */
+    scroll-margin-block: var(--sp-6) var(--sp-9);
   }
 
   .chips {

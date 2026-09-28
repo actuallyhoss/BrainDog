@@ -15,10 +15,28 @@
  */
 
 import type { createClient } from '@braindog/client';
+import { dev } from '$app/environment';
+import { tick } from 'svelte';
 
 import { poller, type LiveState, type Visibility } from './live.ts';
+import { forget, hear, keep } from './offline.ts';
 
-export const live = $state<{ state: LiveState; version: number | null }>({ state: 'open', version: null });
+/**
+ * `state` is what the hairline draws.
+ *
+ * `version` IS THE MARK A SCREEN RE-ASKS ON: the record's version as the poll last heard it, or the mark of a pull
+ * (`reread`), and a screen compares it for equality only (`read.svelte.ts`, `listen.svelte.ts`), so any value it has
+ * not seen means "ask again".
+ *
+ * `from` IS WHEN THE OLDEST ANSWER ON SCREEN WAS KEPT, in milliseconds, when the service worker answered from the read
+ * copy (`offline.ts`), and `null` when everything drawn came from the record. `Pull.svelte` says it as "Offline · from
+ * 14:02".
+ */
+export const live = $state<{ state: LiveState; version: number | null; from: number | null }>({
+  state: 'open',
+  version: null,
+  from: null,
+});
 
 const timers = {
   every(fn: () => void, ms: number): () => void {
@@ -47,7 +65,12 @@ function asker(base: string): () => Promise<number> {
   return async () => {
     client ??= import('@braindog/client').then(({ createClient }) => createClient({ base }));
     const out = await (await client).version();
-    if (!out.ok) throw new Error('the record did not answer its version');
+    if (!out.ok) {
+      /* A SESSION THAT ENDED TAKES THE READ COPY WITH IT. The worker deletes it on any 401 it sees, and this covers a
+         page the worker does not control yet (the first visit, before it claims the tab). */
+      if ('refusal' in out && out.refusal.code === 'UNAUTHORIZED') void forget().catch(() => undefined);
+      throw new Error('the record did not answer its version');
+    }
     return out.value.version;
   };
 }
@@ -63,7 +86,15 @@ export function follow(base: string | null): void {
      told nothing until the new poll has heard twice. */
   live.state = 'open';
   live.version = null;
+  live.from = null;
   if (base === null) return;
+  /* THE READ COPY IS KEPT FOR A RECORD BEING FOLLOWED, and only then: never for the sample, which is in the browser
+     already, and never over a refusal, which the layout follows as `null`. A copy of another record goes here. */
+  void keep(base, dev).catch(() => undefined);
+  if (!hearing) {
+    hearing = true;
+    hear((at) => (live.from = live.from === null ? at : Math.min(live.from, at)));
+  }
   following = {
     base,
     stop: poller({
@@ -71,7 +102,38 @@ export function follow(base: string | null): void {
       timers,
       visible: tab,
       onChange: (version) => (live.version = version),
-      onState: (state) => (live.state = state),
+      onState: (state) => {
+        live.state = state;
+        /* BACK ONLINE WITH A COPY ON SCREEN, THE SCREEN READS AGAIN. The poll's first answer is its baseline and says no
+           change, so without this a list drawn from Tuesday's copy would stay Tuesday's until somebody wrote. */
+        if (state === 'open' && live.from !== null) {
+          live.from = null;
+          void reread();
+        }
+      },
     }),
   };
+}
+
+/** Whether the worker's "answered from the copy" is listened for. Once per tab: it names no record. */
+let hearing = false;
+
+/** How many pulls this tab has made, which is what makes each pull's mark one no screen has seen. */
+let pulls = 0;
+
+/**
+ * Read the screen again now: what a pull on a phone does (`Pull.svelte`).
+ *
+ * THROUGH THE SAME MARK THE POLL MOVES, so every screen that re-asks when the record changes re-asks on a pull, with
+ * no second path to keep in step. A pull's mark is a whole number and a half, and the record's version is a whole
+ * number, so the two can never be equal; the poll keeps its own last version and is not moved by this, so its next
+ * real change still reaches every screen.
+ *
+ * It resolves once the screens have started their reads, so `settled()` counts them from then on.
+ */
+export async function reread(): Promise<void> {
+  if (following === null) return;
+  pulls += 1;
+  live.version = pulls + 0.5;
+  await tick();
 }

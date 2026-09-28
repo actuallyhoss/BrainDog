@@ -699,6 +699,16 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
    *
    * Spans read left to right, 7 beside 5 and 8 beside 4, and every block is one column at a phone's width, in this
    * order.
+   *
+   * A RAIL FOR WHAT IS LOOKED UP AND NOT READ, SINCE PGS-22 (`loop/finish/pages.md`): the figures and what the project
+   * runs on sit in a rail four twelfths wide (`area: rail`), and the main column opens with one sentence said from the
+   * figures. A span in either column is a share of that column. At a phone's width the rail comes after the main
+   * column, so the sentence is still the first thing read.
+   *
+   * WHAT IS OPEN STAYS A CHECKLIST AND IS NOT A PATH. A `steps` block is drawn as a path only over a list that declares
+   * `steps:` with a done field that holds true or false (`ownSteps` in the kernel's `pages.ts`), and Work's tasks say
+   * where they are with a `state`. Over tasks a `steps` block would be a plain list with no tick, and the `todo` here
+   * already ticks a task done.
    */
   /**
    * ONE DECLARATION, FOUR PAGES. This was `kiln:`, with the name typed into six predicates, three
@@ -715,17 +725,37 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
     for: { register: 'things', where: 'lane is building or earning' },
     nav: { section: 'Projects', order: 10 },
     icon: 'thing',
+    layout: { rail: 4 },
     requires: ['register.things', 'register.tasks', 'register.session', 'register.obligations', 'register.services', 'register.transactions'],
     blocks: [
       {
         kind: 'stat',
         heading: 'At a glance',
         span: 12,
+        area: 'rail',
         cells: [
           { metric: 'project-open:{{name}}', label: 'Open' },
           { metric: 'project-owed:{{name}}', label: 'Owed to you' },
           { metric: 'project-cost:{{name}}', label: 'Costs a year' },
         ],
+      },
+      /* THE OPENING SENTENCE, SAID FROM THE PROJECT'S FIGURES. A sentence cannot print a figure named for one project
+         (`{{project-open:Kiln}}` is not a path the page reads), so each sentence is drawn on its figure's `when:`
+         instead, as the launch desk's are. Work handed back is inside what is open, so the two never draw together; a
+         project with open work and nothing handed back has no sentence, because the figures beside it already say it. */
+      {
+        kind: 'note',
+        lead: true,
+        span: 12,
+        when: { metric: 'project-in-review:{{name}}', gt: 0 },
+        body: 'Work on {{name}} has been handed back, and it waits for you to check it.',
+      },
+      {
+        kind: 'note',
+        lead: true,
+        span: 12,
+        when: { metric: 'project-open:{{name}}', is: 0 },
+        body: 'Nothing is open on {{name}} right now.',
       },
       {
         /* WHAT A RULE OR AN AGENT HAS ASKED ABOUT THIS PROJECT, answered where it is shown, three at a time, and the rest
@@ -892,23 +922,25 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         body: '{{note}}',
         empty: 'Nothing is written about {{name}} yet. Its note is on the project.',
       },
-      /* THE PAGE ENDS WITH WHAT RUNS ON IT (agents.md AGT-10): its own keys, tools and skills, then the ones that
-         apply everywhere, faint beneath. `panel: actions` names the host panel a section draws under it, so
-         `BlockSlot.svelte` attaches the scheduled actions list (Resume, Pause) here without matching English text
-         (`loop/finish/contracts.md` X5). A record without the agents pack, or with none of a kind, says so through
-         each block's own `empty:` rather than refusing: `runs_on` reads a list only where the record holds it. */
+      /* THE PAGE ENDS WITH WHAT RUNS ON IT (agents.md AGT-10), IN THE RAIL: its own keys, tools and skills, then the
+         ones that apply everywhere, faint beneath, one above the other at the rail's width. `panel: actions` names the
+         host panel a section draws under it, so `BlockSlot.svelte` attaches the scheduled actions list (Resume, Pause)
+         here without matching English text (`loop/finish/contracts.md` X5). A record without the agents pack, or with
+         none of a kind, says so through each block's own `empty:` rather than refusing: `runs_on` reads a list only
+         where the record holds it. */
       {
         kind: 'section',
         heading: 'Runs on',
         icon: 'plug',
         span: 12,
+        area: 'rail',
         panel: 'actions',
       },
       {
         /* `{{spoken}}` IS THIS PROJECT'S OWN ROW, `things#1`, which `runs_on` takes as `about:` and reads every kind
            from, so the same three blocks below narrow one read to a kind apiece by `where:` rather than asking the
-           kernel three times. `about:` is read by a `cards` block (`block-keys.ts` `KEY_KINDS`), as it is by `table`;
-           `cards` is `minSpan: 4` (`kinds.ts`), where `table`'s own floor is 6 and three at span 4 would not tile.
+           kernel three times. `about:` is read by a `cards` block (`block-keys.ts` `KEY_KINDS`), as it is by `table`.
+           Each takes the rail's whole width, since four twelfths of a page is too narrow to put two cards side by side.
 
            NO BLOCK HERE NAMES `kind is action`: the scheduled actions are the panel the section above draws, with
            Resume and Pause, so a card for each as well would say every action twice.
@@ -919,7 +951,8 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
            and `used_at` when anybody last did; a skill has no use the record counts, so it names neither. */
         kind: 'cards',
         heading: 'Keys',
-        span: 4,
+        span: 12,
+        area: 'rail',
         source: 'runs_on',
         about: '{{spoken}}',
         where: 'kind is key',
@@ -936,7 +969,8 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
       {
         kind: 'cards',
         heading: 'Tools and servers',
-        span: 4,
+        span: 12,
+        area: 'rail',
         source: 'runs_on',
         about: '{{spoken}}',
         where: 'kind is tool',
@@ -953,7 +987,8 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
       {
         kind: 'cards',
         heading: 'Skills',
-        span: 4,
+        span: 12,
+        area: 'rail',
         source: 'runs_on',
         about: '{{spoken}}',
         where: 'kind is skill',
@@ -988,7 +1023,8 @@ const PROJECT_CELLS = 4;
 
 /**
  * The project template for a record that holds these lists: every block and figure over a linked list it does not hold
- * left out, and the width a block took given to the block before it, so a row that paired two still fills the width.
+ * left out, and the width a block took given to the block before it in the same column, so a row that paired two still
+ * fills the width.
  */
 export function projectTemplate(holds: Iterable<string>): SeedPage {
   const held = new Set(holds);
@@ -1006,7 +1042,8 @@ export function projectTemplate(holds: Iterable<string>): SeedPage {
   for (const block of page.blocks as Record<string, unknown>[]) {
     if (gone(block.source) || linesGone(block.series)) {
       const before = blocks.at(-1);
-      if (before && typeof before.span === 'number' && typeof block.span === 'number')
+      /* ONLY WITHIN ONE COLUMN: a main block's width given to a rail block before it would widen the wrong column. */
+      if (before && before.area === block.area && typeof before.span === 'number' && typeof block.span === 'number')
         blocks[blocks.length - 1] = { ...before, span: Math.min(12, before.span + block.span) };
       continue;
     }

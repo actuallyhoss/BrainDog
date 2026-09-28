@@ -515,6 +515,13 @@ type ProjectionRow = { id: string; register: string; seq: number; spoken: Spoken
 
 ### 4.7 · The job protocol types
 
+*(Where the build differs, September 28th 2026: the runner and the record's JOBS methods are built, but not from
+this section's kinds. A kind is the owner's `job.<id>` declaration, linted by `jobBody` in
+`packages/kernel/src/jobs.ts`, whose `ClaimedJob` is the claim's shape; the runner takes nothing from
+`@braindog/slash/prompts`, and one-line arguments of at most 64 characters replace "ids and enums"
+([48-SPEC-CLI](48-SPEC-CLI.md) §5.13, [26-BYO-INTELLIGENCE](26-BYO-INTELLIGENCE.md) §2's note). The types below are
+the first design.)*
+
 ```ts
 type JobKind   = 'triage'|'explain'|'propose'|'draft';                       // 30 §1 CHECK, four
 type JobStatus = 'queued'|'claimed'|'ok'|'needs_decision'|'refused'|'limit'|'error'|'interrupted'|'cancelled';   // nine
@@ -549,6 +556,10 @@ type RunnerSocket = { send(text: string): void; close(code: number, reason: stri
 3. The client draws Slash's rows only after reading `slash: true`. Absent by default; presence is proven (23 §8).
 4. `createSlash` runs the §4.1 script through `sql.execScript`, inserts the `settings` singleton if missing, and returns. Under 5 ms; no network.
 5. The host reads the `SLASH_*` names only. Before September 25th 2026 the same settings carried the assistant's old name ([ADR-070](16-DECISIONS.md) lists the three), and no alias was kept, so a self-host still setting the old names boots as if no model were configured: it refuses nothing at boot and has no Slash. The rename is by hand, and the site's changelog says so.
+
+*(Steps 1 and 2 are the self-host's. The Worker reads no `SLASH_ENDPOINT` since his own key replaced it: there Slash is loaded when
+`SLASH_INCLUDED` is `yes` over the `AI` binding, or when `KEK` is bound so his own key can open (`apps/worker/src/slash.ts`,
+the header), and both deployed environments set `SLASH_INCLUDED`.)*
 
 Every deterministic feature is the same bytes either way — the e2e gate of §9 proves it.
 
@@ -592,8 +603,10 @@ palette's own-key adapter, nothing, or a refusal. The adapter is handed to both 
 `inference` and to `propose` as `byok`, so the predicate and the proposal of one question go to the model he chose. A
 refusal is the answer on a `read`, a `propose` and a `pattern` alike, before the model is called, so a caller the
 vault turns away costs no model call.
-The JOBS rows and `/ws/runner` wait on the record's six JOBS methods, which do not exist
-(`packages/slash/src/index.ts`, the header).
+The record's JOBS methods are built (`packages/record/src/jobs.ts`), and a machine runs them with `braindog runner`
+over long-poll ([48-SPEC-CLI](48-SPEC-CLI.md) §5.13); `/ws/runner` is not built, and this package's tier C
+dispatcher (`jobs`) is not the runner's, which reads a `job.<id>` declaration rather than a prompt of §4.7's. *(Until
+September 28th this said the JOBS methods did not exist; the package header still says so.)*
 
 **An automation's question to Slash is answered by a pass, not a door.** An `ask_slash` step queues one `infer.ask`
 outbox row, `{ run, rule, step, question, shape, choices?, about? }`, and parks its run for a day
@@ -608,14 +621,24 @@ installing it was the owner's consent to its question leaving for this host's en
 | Host | Answers where | Where the pass runs |
 |---|---|---|
 | self-host | `SLASH_ENDPOINT` is set | `poll`, after the scheduled actions |
-| Worker | `SLASH_ENDPOINT` is set and `KEK` is bound | `alarm()`, after the drain and the scheduled actions; a pass that leased its full five sets the alarm for now, because nothing else wakes the object for the sixth |
+| Worker | the included model is on (`SLASH_INCLUDED: "yes"` over the `AI` binding), or `KEK` is bound so his own key can open | `alarm()`, after the drain and the scheduled actions; a pass that leased its full five sets the alarm for now, because nothing else wakes the object for the sixth |
 
 The record's `answersSlash` is set where the host has that pass, and it is the same fact as `/api/version`'s `slash`,
 because both come out of `endpointOptionsOf`. Where it is off the kernel refuses the step at install, after its shape
 is checked, with `NOT_IN_THIS_BUILD`: *"… no host in this build answers an automation's question to Slash. Ask a person
 with ask_person instead."* (`unserved` in `packages/kernel/src/index.ts`), and a run that reaches one installed by an
-earlier build fails there with the same code before anything is queued. The deployed Worker's `SLASH_ENDPOINT` is
-empty (`apps/worker/wrangler.jsonc`), so the Cloud answers none until one is set.
+earlier build fails there with the same code before anything is queued. The Worker no longer reads `SLASH_ENDPOINT`
+(`apps/worker/src/slash.ts`, the header): both deployed environments set `SLASH_INCLUDED: "yes"`
+(`apps/worker/wrangler.jsonc`), so the Cloud answers an automation's question with the included model, or with his
+own key once he picks one (`workerSlashAnswers`). *(Until September 28th this said the Cloud answered none, which
+was true while the Worker read `SLASH_ENDPOINT`.)*
+
+*(Overtaken September 28th: no host chooses a key by its label any more (`SLASH_KEY_LABEL` in
+`packages/host/src/slash.ts`, `loop/finish/defects.md` S1). His own key is the one he picked by its id in Settings;
+with none picked, the Worker's included model answers or the run stops `NOT_IN_THIS_BUILD` saying to pick one, and a
+self-host's own endpoint is called with its operator's `SLASH_KEY` or with none. §5.9's "On his own key, what an
+automation's question does" is what holds. The two paragraphs below are the label rule as it stood, kept for the
+measurements in them.)*
 
 **A Worker record with no key labelled `slash` fails the run and sends nothing.** On a self-host a call with no
 `authorization` is a model on the owner's own machine working, and the host's key path sends one when the vault holds
@@ -739,6 +762,11 @@ citable(p):
 5. Return `{ text, citations }`. Complexity: one pass over the text; the sets are built once per projection.
 
 ### 5.8 · The tier-C dispatcher
+
+*(Not what runs. The record's JOBS methods (`packages/record/src/jobs.ts`) and the kernel's queue
+(`packages/kernel/src/jobs.ts`) are the dispatcher as built, the host holds a claim's wait (`holdClaim` in
+`packages/host/src/jobs.ts`), and there is no socket and no `jobs.wake()`. What follows is the first design, kept
+for §4.7's reason.)*
 
 **Create** — a browser session, owner level:
 1. `record.createJob({ kind, args, session, expires: expires ?? now + 24 h }, ctx)`. The record refuses a non-owner (`FORBIDDEN`), a bearer (`NEEDS_BROWSER_SESSION`), a fifth kind (the CHECK), prose in `args` (any value over 64 bytes or containing whitespace → `FORBIDDEN`, fix `Job arguments are ids and enums; the runner holds the prompt.`).
@@ -975,6 +1003,39 @@ interpolated into `SYSTEM`; it goes in the user message. The account row records
 separately when `usage` reports it, so the meter reflects what a turn actually cost.
 
 Token heuristic: `ceil(utf8Bytes / 3)` — over-counts English by about a quarter and holds for Arabic. `ponytail:` swap for the provider's counter when the `usage.in ≤ 1.3×` assertion fails on a fixture.
+
+### 7.1 · Measured on a real host *(AGT-30)*
+
+Every number above is modelled or measured over a canned model. What production answers with is measured by two tools,
+and this table records what they found. There is no alpha (`loop/DIRECTION.md` §27), so the production column is filled
+from the owner's first asks after W3 is deployed, and until then it says so.
+
+| What | Read from the code | On production |
+|---|---|---|
+| The included model | `@cf/zai-org/glm-5.3-flash`, routed and billed as `glm-5.3-flash` (`MODELS` in `apps/worker/src/inference.ts`, `INCLUDED_MODEL` in `apps/worker/src/slash.ts`), on the `chat` shape | not measured yet: the smoke's `status` line |
+| Strict `json_schema` | sent on every included call as `{ type: 'json_schema', json_schema: { name: 'answer', schema, strict: true } }` (`formatFor`) | not measured yet: the smoke's `json_schema` line |
+| A read, then a propose on the same ask | two model calls; the palette's budget is §7's first row | not measured yet: the smoke's `read` and `propose` lines, in milliseconds |
+| An automation's `ask_slash` step | answered on the Worker's alarm after the drain (§5.2) | not measured yet: the smoke's `ask_slash` line, from Run now to the step settled |
+| The daily look | at most once a UTC day, after a request or on the alarm (`slashTick`) | not measured yet: the smoke's `look` line |
+| Citing the right rows | thirty questions in `packages/slash/eval/questions.ts` | not measured yet: `cited right` in the evaluation's summary, run against the same model on a key |
+
+**The smoke**, `tools/slash-smoke.mjs`, signs in with a browser session's cookie (`BRAINDOG_SESSION`, never an
+argument), because every Slash door refuses a bearer. It asks status, one read and one propose on the same question,
+and prints for each the model, the milliseconds and whether the answer parsed. `--rule <id>` presses Run now on an
+automation with an `ask_slash` step and waits for the step; `--look` waits for today's daily look where it has not run.
+The propose files one suggestion on Decide when the answer is not a query, and prints its id. Accepted means at least one
+of the two answers parsed against the strict schema; a platform that refuses the format answers with its own refusal,
+which the smoke prints, and a model that ignores it answers `PROPOSAL_SCHEMA` or `ANSWER_UNREADABLE`. The verdict is
+printed only on the included model, because an own key's adapter is his provider's.
+
+```
+BRAINDOG_SESSION=<cookie> node tools/slash-smoke.mjs --base https://<host>/app/<slug> --rule <id> --look
+```
+
+**The evaluation**, `packages/slash/eval/run.ts`, asks the thirty questions of the shipped engine over a fixture record
+whose `project` applies the predicate with the grammar's own `evaluate`, on a model and key from the environment. Workers
+AI is reached on its chat completions address with an API token, so the included model can be scored before a deploy.
+It is not a `*.test.ts` file, so CI never runs it.
 
 ## 8 · Security
 

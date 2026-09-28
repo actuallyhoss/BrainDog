@@ -493,16 +493,16 @@ test('and the delete control is the confirmation rather than a sentence about on
   /* The slug is the record's own, not its display name: `deleteRecord({ slug })`. */
   assert.match(copy.typeSlug('the-studio'), /the-studio/u);
   /* AND IT SAYS WHAT IT COSTS BEFORE THE FIELD.
-     `deleteWhat` ALREADY SAYS "It cannot be undone", one line above this on screen — two lines, the
-     same sentence, in the section whose own comment condemns exactly that. This one carries what
-     the other does not: what is given up, and that nothing is kept to go back to. */
+     `deleteWhat` ALREADY SAYS "It cannot be undone", one line above this on screen, two lines that
+     would be the same sentence, in the section whose own comment condemns exactly that. This one
+     carries what the other does not: what is given up, and the one copy that outlives it. */
   assert.doesNotMatch(copy.deleteCosts, /cannot be undone|no undo/iu, 'it repeats the line above it again');
   assert.match(copy.deleteWhat('The Studio'), /cannot be undone/iu);
-  /* AND IT PROMISES NO WINDOW. It used to read "thirty days", off `53 §5.9`'s retention rule, and
-     that rule is about what the platform stops walking, not about a copy this screen can hand
-     back: there is no restore, so a number here reads as one. `settings/delete-costs.test.ts`
-     holds the other half, asserting the number is gone and staying gone. */
-  assert.doesNotMatch(copy.deleteCosts, /thirty days|30 days|rest of today|same day/iu, 'a window nothing can honour');
+  /* AND IT NAMES THE ONE WINDOW THAT IS REAL (OPS-28). `destroy.ts`'s `FINAL_KEPT_DAYS` is 30, and its own
+     comment asks this sentence to say the same number; `settings/delete-costs.test.ts` holds the fuller
+     case for why. There is still no restore, so the sentence says the copy cannot be opened from here. */
+  assert.match(copy.deleteCosts, /30 days/iu, 'the retention window must match `FINAL_KEPT_DAYS`');
+  assert.doesNotMatch(copy.deleteCosts, /rest of today|same day|within the hour/iu, 'a window nothing can honour');
   assert.match(copy.deleteCosts, /export/iu, 'the one thing that does answer a change of mind is the copy he takes first');
 });
 

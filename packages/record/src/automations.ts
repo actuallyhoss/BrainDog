@@ -363,6 +363,17 @@ function stepLines(step: unknown, depth: number, out: string[], slash: boolean):
     const to = ask.to === undefined ? '' : capability('ask_person.to')?.installs === true ? ' Only the one member it is put to, or an owner, answers it.' : NOT_INSTALLED;
     return line(`Ask in Decide ${JSON.stringify(words(ask.question))}, ${listed(ask.options)}, and keep the answer as ${words(ask.as)}. If nobody answers within ${wait}, the run stops here.${to}`);
   }
+  if ('meet' in s) {
+    /* WHO IT MEETS AND WHERE IT SAYS THEY WERE MET, which is what the owner accepting it is asked (AGT-16). */
+    const meet = spec('meet');
+    const who = ['name', 'email', 'handle'].filter((k) => meet[k] !== undefined).map((k) => `${k} ${JSON.stringify(words(meet[k]))}`).join(', ');
+    return line(`Meet the person with ${who} into People, as met at ${JSON.stringify(words(meet.where))}: matched by email or handle, added when nobody matches, and a merge asked in Decide when the name is somebody else's. Nobody is met when all of it is empty.`);
+  }
+  if ('run_job' in s) {
+    const job = spec('run_job');
+    const as = job.as === undefined ? '' : `, and keep how it ended (ok, needs_decision or error) as ${words(job.as)}`;
+    return line(`Start a ${words(job.kind)} job on the owner's machine${as}. The run waits up to a day for it to end, and stops here without an end.`);
+  }
   if ('tag' in s) return line(`Tag the row ${words(s.tag)}.`);
   if ('untag' in s) return line(`Take the tag ${words(s.untag)} off the row.`);
   if ('set' in s) return line(`Set ${words(spec('set').field)} to ${words(spec('set').to)}.`);

@@ -23,9 +23,10 @@
  * `loop/research-infer-ask.md` §4 does. `triage`, `embed` and `analyseDraft` have no
  * caller in this tree yet, and `AUDIT-interface-B` IB-60 is explicit that tier A `triage` has no
  * dispatcher at all: no outbox kind carries it and no record step calls it. The tier C dispatcher
- * (`jobs`) is the other half, and it waits on the record's six JOBS methods, which do not exist
- * either. `shapeOf` IS here, because it is the deterministic half of triage and needs no model:
- * `24 §4.3` groups unmatched arrivals on exactly that string, and `46 §13` D15 fixes it as code's
+ * (`jobs`) is the other half: it waits on `job.<id>` declarations, which `packages/kernel/src/flow.ts`'s
+ * runner reads, not on this package's own dispatch. The record's JOBS methods exist, in
+ * `packages/record/src/jobs.ts`. `shapeOf` IS here, because it is the deterministic half of triage and needs no
+ * model: `24 §4.3` groups unmatched arrivals on exactly that string, and `46 §13` D15 fixes it as code's
  * and never the model's.
  *
  * HOW A HOST LOADS IT. A host with no model to offer never imports this package, registers no
@@ -360,6 +361,7 @@ export function createSlash(deps: SlashDeps, options: SlashOptions = {}): Slash 
     proposePattern: (samples, ctx, inference) => (inference === undefined ? pattern : patterns(core, deps.record, inference)).proposePattern(samples, ctx),
     draftPattern: pattern.draftPattern,
     digestProse: pattern.digestProse,
+    embedTexts: pattern.embedTexts,
     answer: automation.answer,
     configure,
     status,

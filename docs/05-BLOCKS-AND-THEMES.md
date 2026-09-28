@@ -1,7 +1,8 @@
 # 05 · Blocks and themes
 
-What an agent reaches for when it has something to show, and the reason twenty kinds — and every
-kind a pack adds after them — can look like one product.
+What an agent reaches for when it has something to show, and the reason every kind in
+`packages/render/src/kinds.ts`'s `TABLE` — and every kind a pack adds after them — can look like one
+product.
 
 > A block set is a **system**, not a catalogue. Every kind draws from the same eight primitives
 > and the same tokens. **No kind introduces a colour, a font or a spacing value.**
@@ -14,23 +15,25 @@ Kinds are declarations over these. Primitives compose, so kinds do not have to.
 
 | Primitive | Is | Kinds built on it |
 |---|---|---|
-| `panel` | a bounded region with a tone, an optional glyph, and a nested document | `note`, `quote`, `section` (page only) |
-| `grid` | *n* cells of label and figure, row-aligned by subgrid | `stat`, `board`, `cards` (page only) |
-| `rows` | label · value · note, one per line | `spec`, `params` |
-| `proportional` | rows whose number drives a drawn magnitude | `bar`, `gauge` |
+| `panel` | a bounded region with a tone, an optional glyph, and a nested document | `note`, `quote`, `section`, `capture`, `embed` |
+| `grid` | *n* cells of label and figure, row-aligned by subgrid | `stat`, `board`, `cards`, `gallery`, `heat` |
+| `rows` | label · value · note, one per line | `spec`, `params`, `inputs` |
+| `proportional` | rows whose number drives a drawn magnitude | `bar`, `gauge`, `sparkline`, `split`, `bridge`, `series`, `forecast`, `lines`, `progress`, `ring` |
 | `inline` | a run of pills | `chips` |
-| `list` | title · detail · optional state marker | `steps`, `todo`, `timeline`, `feed` (page only) |
+| `list` | title · detail · optional state marker | `steps`, `todo`, `timeline`, `feed`, `agents`, `queue`, `roadmap`, `calendar`, `link` |
 | `table` | real columns, a header, per-column alignment | `comparison`, `table` |
 | `media` | a figure with a caption | `code`, `tree`, `diff` — and `diagram`, post-v1 |
+
+The column is read off `TABLE` in `packages/render/src/kinds.ts`, each kind's `primitive`, and which
+of them are page-only is §2's.
 
 > **Three kinds were listed here that are in no version of the closed list** — `callout`,
 > `sparkline` and `tags`. They are removed. `callout` is `note` with a tone, `tags` is `chips`, and
 > `sparkline` is the one that matters, because [08-METRICS](08-METRICS-AND-ANALYTICS.md) §3 binds it
-> as a chart. **`sparkline` is therefore a real gap, not a ghost:** it is a `proportional` over a
-> time bucket with no axes — **post-v1**, arriving as a pack alongside `diagram`, `series` and
-> `forecast`, which is what the primitive layer exists for. *An earlier draft of this note called it
-> "the sixteenth kind"; the sixteenth v1 kind is `table` (§2), and the four post-v1 kinds sit outside
-> the count.*
+> as a chart. *(Amended September 28th 2026, as built: `sparkline`, `series` and `forecast` are
+> first-party kinds on `proportional`, in `TABLE` beside the rest, not packs, and not post-v1: `TABLE`
+> is the one closed list, and a kind either sits in it or is a pack's own. `diagram` alone is still
+> post-v1.)*
 
 A board is a **grid of lists**. A roadmap is a **list with dates**. A risk matrix is a **grid of
 inlines**. This is why a pack can add a kind without asking a designer.

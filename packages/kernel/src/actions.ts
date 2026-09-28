@@ -14,7 +14,9 @@
  * FIVE RULES THE OWNER SET, AND WHERE EACH ONE HOLDS.
  *
  *   1 · Fifteen minutes, or a provider's own higher floor, refused at declaration: `declare.ts`.
- *   2 · Jitter is arithmetic over the record, the pack and the action, never random: `actionJitterMs`.
+ *   2 · Jitter is arithmetic over the record, the pack and the action, never random: `actionJitterMs`. A paged pull's
+ *       runner spreads its next run by the same arithmetic (`@braindog/connect`'s `jitterMs`), and every next run is
+ *       counted from its slot, not from when the alarm rang (`slot.ts`).
  *   3 · The install diff names every host and how often: `@braindog/declare`'s `calls_out`.
  *   4 · A 401 or a 403 is never retried, and neither is a key the host could not open (`WRONG_KEY`). The row
  *       pauses, an event says so, the owner is told through the one notification path, and only `resumeAction`
@@ -28,11 +30,12 @@
 import type { Result, Sql } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 
-import { parseSpoken, spoken as spokenId } from './coerce.ts';
+import { looksLikeCredential, parseSpoken, spoken as spokenId } from './coerce.ts';
 import { instant } from './migrate.ts';
 import type { Ack, OutboxRow } from './outbox.ts';
 import { FLOOR_MS, cursorOf, intervalMs, jitterMs, keyNameOf, type PullCursor } from './pull.ts';
 import type { Drained } from './schedule.ts';
+import { clockOf, nextSlotMs } from './slot.ts';
 import type { LeasedSeal } from './vault.ts';
 /* TYPES ONLY, so there is no cycle at run time: `script-run.ts` imports `meter` and `pause` from this file. */
 import type { ScriptAnswer, ScriptRunner, ScriptUnrun, Scripted } from './script-run.ts';
@@ -45,6 +48,46 @@ export type ActionKind = (typeof ACTION_KINDS)[number];
 export const ACTION_TIMEOUT_MS = 10_000;
 export const ACTION_MAX_BYTES = 2_000_000;
 
+/**
+ * The ways a `call` or a `poll` sends its key (`loop/finish/contracts.md`, "call and poll `auth.kind`"): as a bearer, in
+ * a header it names, in a query parameter it names, or as a basic user name and password.
+ *
+ * FOUR OF CONNECT'S EIGHT, the four that are built from the key alone. The other four fetch a token first or sign the
+ * whole request, which is a connector's run (`pull` with `fetch:`), not one request.
+ */
+export const ACTION_AUTH_KINDS = ['bearer', 'header', 'query', 'basic'] as const;
+/** How the executor is told to send a key that is not a bearer. A bearer is the absence of one. */
+export type ActionAuth = { kind: 'basic' } | { kind: 'header' | 'query'; name: string };
+
+/**
+ * Headers an action may not put its key in: `@braindog/connect`'s `RESERVED_HEADERS`, and any `x-forwarded-` one.
+ *
+ * A COPY, BECAUSE THE KERNEL SITS BELOW CONNECT (`31 §2`) and cannot import it. The copy is here so the install refuses
+ * the name with a sentence; connect's auth builder refuses it again at run time, so a copy that fell behind would stop
+ * the run with `PULL_REQUEST_REFUSED` and never send the key there.
+ */
+export const RESERVED_KEY_HEADERS: readonly string[] = ['authorization', 'cookie', 'host', 'content-length', 'referer', 'origin'];
+
+/** Whether a header is one the key may not go in. */
+export const reservedKeyHeader = (name: string): boolean => {
+  const lower = name.toLowerCase();
+  return RESERVED_KEY_HEADERS.includes(lower) || lower.startsWith('x-forwarded-');
+};
+
+/**
+ * How a `call` or a `poll` sends its key, as the executor is told it, or `undefined` for a bearer.
+ *
+ * READ, NOT TRUSTED. The install refused anything else (`declare.ts`), so what does not read here is a declaration from
+ * before the check, and a bearer is what it meant then.
+ */
+export function authOf(decl: Pick<ActionDecl, 'auth'>): ActionAuth | undefined {
+  const kind = decl.auth?.kind;
+  const name = typeof decl.auth?.name === 'string' && decl.auth.name !== '' ? decl.auth.name : undefined;
+  if (kind === 'basic') return { kind };
+  if ((kind === 'header' || kind === 'query') && name !== undefined) return { kind, name };
+  return undefined;
+}
+
 /** A declaration this runner reads: the keys of an ingest that a scheduled action uses. */
 export type ActionDecl = {
   ingest: string;
@@ -56,6 +99,12 @@ export type ActionDecl = {
   /** Absent only on a `call` whose `trigger` is `rule`, which runs when a rule says so and on no clock. */
   every?: string;
   floor?: string;
+  /** `HH:MM`: the time of day each run belongs to, with an `every` of whole days. Read in `tz` (`slot.ts`). */
+  at?: string;
+  /** The zone `at` is read in, and a pull's window. Absent is the record's own. */
+  tz?: string;
+  /** `call` and `poll`: how the key is sent (`ACTION_AUTH_KINDS`). Absent is a bearer, which is what a bare `grant` meant. */
+  auth?: { kind?: unknown; name?: unknown };
   /** `call` only: what starts it. `schedule`, the default, runs on `every`; `rule` runs when a rule says `run:`; `both` does both. */
   trigger?: 'schedule' | 'rule' | 'both';
   /** `call` only, with a rule trigger: the fields of the rule's row it sends, each `<register>.<field>`. Never a secret or a file. */
@@ -74,7 +123,7 @@ export type ActionDecl = {
    * here opaquely — the kernel never looks inside them — purely so that `prepareAction` can tell
    * which of the two runners a job belongs to, and hand the whole declaration on untouched.
    */
-  fetch?: { base?: string; path?: string; page?: unknown; read?: unknown; auth?: unknown };
+  fetch?: { base?: string; path?: string; page?: unknown; read?: unknown; auth?: unknown; schedule?: unknown };
   extract?: Record<string, unknown>;
   /** A JSON answer read by paths, in place of `extract` (`map.ts`). A poll's may be a list, one row a map, from one answer. */
   map?: Record<string, unknown> | Record<string, unknown>[];
@@ -94,6 +143,12 @@ export type ActionRequest = {
   body?: string;
   /** Which key to send, by reference. The executor opens it outside the record, or sends nothing. */
   grant: { id: string; label: string } | null;
+  /**
+   * How the executor sends the key, when it is not a bearer: in a header or a query parameter of this `name`, or as a
+   * basic pair. Absent is a bearer. The executor builds it with `@braindog/connect`'s auth builder, the one place a
+   * credential meets a request.
+   */
+  auth?: ActionAuth;
   timeoutMs: number;
   maxBytes: number;
 };
@@ -113,6 +168,11 @@ export type ActionAnswer =
        * carries.
        */
       held?: { until: number; say: string };
+      /**
+       * The instant the provider's `Retry-After` names, on a 429 or a 5xx that sent one. The retry is armed no sooner
+       * (`outbox.ts`'s ladder, which holds a provider's instant to its own six-hour bound).
+       */
+      notBefore?: number;
     }
   | {
       refused: { code: 'PULL_ORIGIN_REFUSED' | 'PULL_PROVIDER_UNAVAILABLE' | 'PULL_REQUEST_REFUSED' | 'WRONG_KEY'; fix: string };
@@ -135,7 +195,7 @@ export type Metered = {
   channel: string;
   scope: string;
   outcome: 'ok' | 'changed' | 'unchanged' | 'paused' | 'failed' | 'refused' | 'dropped' | 'held';
-  usage: { runs: number; requests: number; bytes: number; ms: number; failures: number; held: number };
+  usage: { runs: number; requests: number; bytes: number; ms: number; failures: number; held: number; cpu_ms: number };
 };
 
 /** What one pass did, counted. */
@@ -383,8 +443,11 @@ export function pause(
  * ONE REQUEST IN FLIGHT PER ACTION. A job still pending, leased or waiting on its retry is the run that
  * this fire would duplicate, so the fire queues nothing and only re-arms. That is what keeps a provider
  * that is down for a day from receiving a second request every interval on top of the ladder's.
+ *
+ * THE NEXT RUN IS COUNTED FROM THIS ONE'S SLOT, and not from now (`slot.ts`). It was `now + every`, so every alarm that
+ * rang late moved the action for good.
  */
-export function fireAction(deps: ActionDeps, row: { id: string; kind: string; key: string }): number | null | 'kept' {
+export function fireAction(deps: ActionDeps, row: { id: string; kind: string; key: string; due_at?: string; payload?: string }): number | null | 'kept' {
   const found = deps.lookup(row.key);
   if (!found || found.decl.channel !== row.kind) return null;
   const { decl, pack } = found;
@@ -414,7 +477,22 @@ export function fireAction(deps: ActionDeps, row: { id: string; kind: string; ke
   );
   if (!busy) deps.enqueue({ channel: row.kind, ingest: row.key, ...(key ? { grant: key.id } : {}) });
 
-  return deps.nowMs + every + actionJitterMs(deps.recordId, pack, row.key, every);
+  /* THE SLOT IS KEPT ON THE ROW, as a paged pull's is (`finishPull`), and only here. The first fire has none, and its
+     slot is the instant it was armed for, which carries no jitter; every fire after reads the one before wrote. A due
+     instant moved by a held month or a resume leaves the slot where the schedule put it. */
+  let kept: Record<string, unknown> = {};
+  try {
+    const said: unknown = JSON.parse(row.payload ?? '{}');
+    if (said !== null && typeof said === 'object' && !Array.isArray(said)) kept = said as Record<string, unknown>;
+  } catch {
+    kept = {};
+  }
+  const stored = typeof kept.slot === 'string' ? Date.parse(kept.slot) : Number.NaN;
+  const due = row.due_at === undefined ? Number.NaN : Date.parse(row.due_at);
+  const slot = Number.isFinite(stored) ? stored : Number.isFinite(due) ? due : deps.nowMs;
+  const next = nextSlotMs({ slotMs: slot, nowMs: deps.nowMs, everyMs: every, clock: clockOf(decl, deps.tz) });
+  deps.sql.exec('UPDATE schedule SET payload = ? WHERE id = ?', JSON.stringify({ ...kept, slot: instant(next) }), row.id);
+  return next + actionJitterMs(deps.recordId, pack, row.key, every);
 }
 
 /* ── building the request ───────────────────────────────────────────────── */
@@ -623,17 +701,26 @@ export function prepareAction(deps: ActionDeps, job: OutboxRow): Ready | Paged |
         `ingest.${ingest}`,
       )?.version ?? 1;
 
+    /* ONE INTERVAL, THE DECLARATION'S `every`, handed to the runner as its `fetch.schedule`. The runner counts the next
+       slot from `fetch.schedule.every` and this record fires from `every`, and while the two were written separately a
+       connector could say one thing to each. The install refuses a `fetch.schedule` that disagrees (`declare.ts`), and
+       this is what makes the one the record floor-checked the one the runner reads. `at` goes with it, and the zone
+       both are read in is the action's own `tz` where it names one. */
+    const clock = clockOf(decl, deps.tz);
+    const schedule = { every: decl.every ?? '', ...(typeof decl.at === 'string' && clock.at !== null ? { at: decl.at } : {}) };
+    const handed: ActionDecl = { ...decl, fetch: { ...decl.fetch, schedule } };
+
     return {
       job,
       decl,
       host,
       paged: {
         ingest,
-        decl,
+        decl: handed,
         declaration_version: version,
         grant: seal?.grant ?? null,
         dek: seal?.dek ?? null,
-        record: { id: deps.recordId, tz: deps.tz },
+        record: { id: deps.recordId, tz: clock.tz },
         /* THE CURSOR IS WHERE THE LAST RUN GOT TO, as the schedule row holds it. A resumed run reads
            back exactly what it left, a half-read window included, rather than recomputing one from the
            clock. A row with no cursor yet is a first run, or one the single-request path wrote. */
@@ -655,6 +742,10 @@ export function prepareAction(deps: ActionDeps, job: OutboxRow): Ready | Paged |
   /* THE FIELDS A RULE SENT, AND ONLY THOSE. The record copied them when the rule fired; nothing here reads the record. A
      call that declares no body sends them as they are. */
   const sent = payload.row !== null && typeof payload.row === 'object' && !Array.isArray(payload.row) ? (payload.row as Record<string, unknown>) : undefined;
+  /* HOW THE KEY GOES, for a call and a poll, which is what the four kinds are for (`contracts.md`). A single-request
+     pull keeps the bearer it always sent; a pull that needs another way pages through connect, which reads its
+     `fetch.auth` whole. */
+  const auth = key !== null && channel !== 'pull' ? authOf(decl) : undefined;
   const body =
     channel !== 'call'
       ? undefined
@@ -678,6 +769,7 @@ export function prepareAction(deps: ActionDeps, job: OutboxRow): Ready | Paged |
       headers: { accept: 'application/json', ...(body === undefined ? {} : { 'content-type': 'application/json' }) },
       ...(body === undefined ? {} : { body }),
       grant: key,
+      ...(auth === undefined ? {} : { auth }),
       timeoutMs: ACTION_TIMEOUT_MS,
       maxBytes: ACTION_MAX_BYTES,
     },
@@ -697,17 +789,56 @@ type Usage = {
   bytes: number;
   ms: number;
   failures: number;
+  /**
+   * Time the sandbox spent inside the interpreter (`ScriptUsage.cpu_ms`), for a script's run; absent for every other
+   * channel, which spends no CPU of its own to meter. Free wherever the run itself is (`free` below).
+   */
+  cpu_ms?: number;
   /** Who the event names. Absent is `ingest:<ingest>`; a script's run names the version that ran, `script:<id>@v<n>`. */
   actor?: string;
+  /** A `call`'s answer, as the provider sent it, for the run to keep (`keptAnswer`). Absent on every other run. */
+  answer?: { status: number; body: string } | undefined;
 };
+
+/**
+ * The most of a call's answer its run keeps, in bytes of UTF-8: `42 §4.7`'s ceiling on a fetch body, which is the
+ * ceiling a call's own body is held to at install (`BODY_BYTES` in `declare.ts`).
+ *
+ * NOT THE FETCH'S TWO MEGABYTES. The run is a row of the event log, which a Durable Object holds to two megabytes a row,
+ * so an answer at the fetch's cap could never be written; and every run of the month is read back to count it
+ * (`listActions`), so what one run keeps is paid for by every read of the action.
+ */
+export const ANSWER_KEPT_BYTES = 8_192;
+
+/** What a run keeps of a call's answer: the status, and the body to its ceiling, `null` when it is withheld. */
+export type KeptAnswer = { status: number; body: string | null; cut: boolean };
+
+/**
+ * A call's answer, as its run keeps it (`loop/DIRECTION.md` §0b: a call's "answer is recorded").
+ *
+ * THE KEY IS ALREADY OUT OF IT. The executor strikes every spelling of the key it sent from the body before the record
+ * sees it (`sendAction`). WHAT STILL LOOKS LIKE A KEY IS WITHHELD WHOLE, because the event log is exported, shown to
+ * agents and never rewritten: a provider that answers with a token of its own (a session, a signed link) would
+ * otherwise put that token in every copy of the record for good. The status is kept either way, so the run still says
+ * what the provider answered.
+ */
+export function keptAnswer(answer: { status: number; body: string }): KeptAnswer {
+  const bytes = new TextEncoder().encode(answer.body);
+  const cut = bytes.length > ANSWER_KEPT_BYTES;
+  /* CUT ON A CHARACTER, so the kept text is text: a cut through a character decodes as a replacement mark, which goes. */
+  const head = cut ? new TextDecoder().decode(bytes.subarray(0, ANSWER_KEPT_BYTES)) : answer.body;
+  const body = cut && head.endsWith(String.fromCharCode(0xfffd)) ? head.slice(0, -1) : head;
+  return { status: answer.status, body: looksLikeCredential(body) ? null : body, cut };
+}
 
 /**
  * The run, metered: one `pull` event, whatever happened.
  *
  * FROM THE FIRST RUN, because a meter that starts when billing starts has no history to bill against.
- * `to_v` carries `runs · requests · bytes · ms · failures` and the scope, which is the action's project or
- * `global`, so a per-account ledger in the Directory can sum these without reading anything else. No key,
- * no body and no header is in it: a host, a status and five numbers.
+ * `to_v` carries `runs · requests · bytes · ms · cpu_ms · failures` and the scope, which is the action's project or
+ * `global`, so a per-account ledger in the Directory can sum these without reading anything else. No key and
+ * no header is in it: a host, a status and five numbers, and a `call`'s answer (`keptAnswer`), which is what the
+ * action's runs show of what the provider said.
  */
 export function meter(deps: Pick<ActionDeps, 'sql' | 'mint' | 'nowMs'>, usage: Usage, say: string): Metered {
   const event = deps.mint();
@@ -732,6 +863,7 @@ export function meter(deps: Pick<ActionDeps, 'sql' | 'mint' | 'nowMs'>, usage: U
     ms: free ? 0 : usage.ms,
     failures: usage.failures,
     held: usage.outcome === 'held' ? 1 : 0,
+    cpu_ms: free ? 0 : (usage.cpu_ms ?? 0),
   };
   /* A SCRIPT'S RUN IS ON THE SCRIPT'S DECLARATION. The channel alone decides it, so the Directory's ledger, which keys
      on the name, needs nothing new, and the run history of `script.gold-rate` is not filed under an ingest that
@@ -742,7 +874,15 @@ export function meter(deps: Pick<ActionDeps, 'sql' | 'mint' | 'nowMs'>, usage: U
     at,
     usage.actor ?? `ingest:${usage.ingest}`,
     `declaration:${usage.channel === 'script' ? 'script' : 'ingest'}.${usage.ingest}`,
-    JSON.stringify({ channel: usage.channel, host: usage.host, status: usage.status, outcome: usage.outcome, scope, usage: counted }),
+    JSON.stringify({
+      channel: usage.channel,
+      host: usage.host,
+      status: usage.status,
+      outcome: usage.outcome,
+      scope,
+      usage: counted,
+      ...(usage.answer === undefined ? {} : { answer: keptAnswer(usage.answer) }),
+    }),
     say.slice(0, 280),
   );
   return { event, at, ingest: usage.ingest, channel: usage.channel, scope, outcome: usage.outcome, usage: counted };
@@ -799,7 +939,11 @@ export function finishAction(deps: ActionDeps, ready: Ready, answer: ActionAnswe
     return meter(deps, { ingest, channel, host, project: decl.project, status: null, outcome: 'held', requests: 0, bytes: 0, ms: 0, failures: 0 }, answer.held.say);
   }
 
-  const base = { ingest, channel, host, project: decl.project, requests: answer.requests, bytes: answer.bytes, ms: answer.ms };
+  /* A CALL'S ANSWER IS KEPT ON ITS RUN, whatever the status, so the action's runs say what the provider said and not only
+     that it answered (`keptAnswer`). A call about a row sent a post whose reply nothing else keeps; one a clock fired
+     may write its answer somewhere, and the run still shows what came back when it could not. */
+  const answered = channel === 'call' && 'body' in answer ? { answer: { status: answer.status, body: answer.body } } : {};
+  const base = { ingest, channel, host, project: decl.project, requests: answer.requests, bytes: answer.bytes, ms: answer.ms, ...answered };
   const status = 'status' in answer ? answer.status : null;
 
   if (status === 401 || status === 403) {
@@ -877,8 +1021,21 @@ export function finishAction(deps: ActionDeps, ready: Ready, answer: ActionAnswe
         : `PULL_REQUEST_REFUSED: ${host} answered ${String(status)}, which this action does not expect.`;
 
   if (transient) {
-    deps.ack({ id: job.id, state: 'failed', error: why, leasedUntil: job.leasedUntil });
-    return meter(deps, { ...base, status, outcome: 'failed', failures: 1 }, `${ingest} failed and will try again later. ${why}`);
+    /* NO SOONER THAN THE PROVIDER SAID. A 429 or a 503 that names a `Retry-After` has said when it will answer, and a
+       rung of the ladder that came round first is a request it has already said it will refuse. The instant goes on
+       the ack in the shape a paged pull's finish carries it (`pullFinishOf`), which is where `ack()` reads it when it
+       arms the retry; nothing else in that shape applies to one request, and `finishPull` writes nothing for a
+       `failed` run beyond the cursor this one does not carry. */
+    const notBefore = 'notBefore' in answer && typeof answer.notBefore === 'number' && Number.isFinite(answer.notBefore) ? answer.notBefore : null;
+    deps.ack({
+      id: job.id,
+      state: 'failed',
+      error: why,
+      leasedUntil: job.leasedUntil,
+      ...(notBefore === null ? {} : { result: { outcome: 'failed', error: { notBefore } } }),
+    });
+    const later = notBefore === null ? '' : ` ${host} asked for nothing before ${instant(notBefore)}.`;
+    return meter(deps, { ...base, status, outcome: 'failed', failures: 1 }, `${ingest} failed and will try again later.${later} ${why}`);
   }
 
   const said = `${ingest} was not retried. ${why}`;
@@ -1218,7 +1375,11 @@ export type ActionRow = {
   state: 'pending' | 'firing' | 'paused' | 'done';
   /** When it runs next, while it is pending or firing. A paused or finished action has none. */
   next: string | null;
-  last: { at: string; outcome: Metered['outcome']; status: number | null; note: string } | null;
+  /**
+   * The last run. `answer` is what a `call`'s provider answered, as the run kept it (`keptAnswer`); absent on a poll, a
+   * pull, and a call's run that got no answer.
+   */
+  last: { at: string; outcome: Metered['outcome']; status: number | null; note: string; answer?: KeptAnswer } | null;
   /** This calendar month so far, UTC. `held` is how many runs the plan's limit held, which count no run. */
   month: Totals & { held: number };
   /** This month by UTC day, from the first to today, oldest first. */
@@ -1258,7 +1419,15 @@ function projectRowOf(sql: Sql, ref: string): ProjectRow | null {
   };
 }
 
-type Run = { status: number | null; outcome: Metered['outcome']; usage: Metered['usage'] };
+type Run = { status: number | null; outcome: Metered['outcome']; usage: Metered['usage']; answer?: unknown };
+
+/** A kept answer as a run's `to_v` holds it, read back, or `undefined` when there is none or it is not one. */
+function answerOf(value: unknown): KeptAnswer | undefined {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const a = value as { status?: unknown; body?: unknown; cut?: unknown };
+  if (typeof a.status !== 'number' || (a.body !== null && typeof a.body !== 'string')) return undefined;
+  return { status: a.status, body: a.body, cut: a.cut === true };
+}
 
 /** A `pull` event's `to_v`, when `meter` wrote it. Anything else on the same target is not a run. */
 function runOf(to_v: string): Run | null {
@@ -1299,15 +1468,24 @@ export function listActions(sql: Sql, nowMs: number): ActionRow[] {
       )) {
         const run = runOf(e.to_v);
         if (run) {
-          last = { at: e.ts, outcome: run.outcome, status: run.status ?? null, note: e.note ?? '' };
+          const answer = answerOf(run.answer);
+          last = { at: e.ts, outcome: run.outcome, status: run.status ?? null, note: e.note ?? '', ...(answer === undefined ? {} : { answer }) };
           break;
         }
       }
 
       const totals = { runs: 0, requests: 0, bytes: 0, failures: 0, held: 0 };
       const days = Array.from({ length: upTo }, (_, i) => ({ day: `${month}-${String(i + 1).padStart(2, '0')}`, runs: 0, requests: 0, bytes: 0, failures: 0 }));
+      /* THE COUNTS ONLY, TAKEN OUT IN SQL. A call's run carries its answer (`ANSWER_KEPT_BYTES`), and a month of a call
+         every fifteen minutes is three thousand of them; the sum needs the outcome and the six numbers, so that is all
+         that leaves the database. A `to_v` that is not JSON was never a run (`runOf`), and `json_valid` skips it before
+         `json_extract` could throw on it. */
       for (const e of sql.all<{ ts: string; to_v: string }>(
-        "SELECT ts, to_v FROM event WHERE kind = 'pull' AND target = ? AND to_v IS NOT NULL AND ts >= ? ORDER BY rowid",
+        `SELECT ts, json_object(
+             'outcome', json_extract(to_v, '$.outcome'),
+             'usage', CASE WHEN json_type(to_v, '$.usage') = 'object' THEN json(json_extract(to_v, '$.usage')) END
+           ) AS to_v
+           FROM event WHERE kind = 'pull' AND target = ? AND to_v IS NOT NULL AND json_valid(to_v) AND ts >= ? ORDER BY rowid`,
         target,
         `${month}-01`,
       )) {

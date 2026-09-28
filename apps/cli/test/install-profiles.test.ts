@@ -181,7 +181,7 @@ test('--APPLY OVER HIS THREE PROFILES, through main.ts: every .claude.json ends 
   assert.equal(again.code, 0, again.stderr);
   for (const p of [quartz, acme, work]) {
     assert.ok(again.stdout.includes(`${p.claudeJson} registers no the old tool MCP server. Nothing to change.`), again.stdout);
-    assert.deepEqual(readdirSync(p.dir).sort(), ['.claude.json', '.claude.json.bak', 'settings.json', 'settings.json.bak']);
+    assert.deepEqual(readdirSync(p.dir).sort(), ['.claude.json', '.claude.json.bak', 'settings.json', 'settings.json.bak', 'skills']);
   }
 });
 

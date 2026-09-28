@@ -3,7 +3,7 @@
  *
  * WHAT WAS MEASURED, AND IT IS WHY THIS FILE EXISTS. `copy.deleteCosts` read *"A final copy is kept
  * for the rest of today, in case you change your mind within the hour. Within thirty days nothing
- * of this record is left anywhere."* Three claims, and the code says otherwise on all three.
+ * of this record is left anywhere."* Three claims, and the code said otherwise on all three then.
  *
  *   - THE NAME IS BURNED, AND NEITHER SENTENCE SAID SO. `Directory.prepare` in
  *     `apps/worker/src/index.ts` refuses a slug whose claim reads `released` with *"was the name of
@@ -11,19 +11,20 @@
  *     record had (`apps/worker/src/destroy.ts`). So changing your mind and making the record again
  *     at the same name, which is the one reversal the sentence invited, is the one the host has
  *     already decided it will refuse for ever.
- *   - NO FINAL COPY IS TAKEN. `deleteRecord` (`packages/record/src/index.ts`) calls `destroy()`
- *     and nothing else; the Worker's `destroy` deletes the alarm, deletes every byte the object
- *     holds and closes the names. The nightly R2 copy that landed this batch
- *     (`apps/worker/src/snapshots.ts`) is written by the cron and read by nobody in the app: the
- *     Worker hands the record no `snapshots` port, so `listSnapshots` and `restore` answer
- *     `NOT_IN_THIS_BUILD`. There is nothing on this deployment a person can restore from.
- *   - AND "NOTHING IS LEFT ANYWHERE" IS NOT SOMETHING THIS SCREEN CAN PROMISE. Pruning happens
+ *   - A FINAL COPY IS TAKEN, KEPT `FINAL_KEPT_DAYS` (30) AND THEN GONE (OPS-28). `destroyRecord`
+ *     (`apps/worker/src/destroy.ts`) writes it before the sweep, and `apps/worker/src/index.ts`'s
+ *     `destroy` hands it a swept copies port wherever `BLOBS` and the snapshots port are bound,
+ *     which production is: the sentence Settings shows before a delete has to say the same number
+ *     `destroy.ts`'s own comment asks for. The Worker still hands the record no `snapshots` port, so
+ *     `listSnapshots` and `restore` still answer `NOT_IN_THIS_BUILD`: the copy exists, and nothing on
+ *     this deployment can open it from here.
+ *   - AND "NOTHING IS LEFT ANYWHERE" IS STILL NOT SOMETHING THIS SCREEN CAN PROMISE. Pruning happens
  *     inside `take`, which only runs for records the Directory still lists, so a deleted record's
- *     nightly objects are no longer walked. Whatever the retention truth turns out to be, the
- *     screen should not be the place it is asserted.
+ *     nightly objects are no longer walked. What the retention truth is beyond the final copy is not
+ *     this screen's to assert.
  *
- * So what is left to say is the cost he can act on before he presses the button: the name goes, and
- * the export is the only copy there will be.
+ * So what is left to say is the cost he can act on before he presses the button: the name goes, one
+ * copy outlives it for 30 days with no way back to it from here, and the export is the copy he keeps.
  */
 
 import { test } from 'node:test';
@@ -48,10 +49,16 @@ test('and it does not invite a change of mind the host refuses for ever', () => 
   assert.doesNotMatch(copy.deleteCosts, /within the hour|rest of today|same day/iu, 'no window exists: `destroy()` is the whole of deletion');
 });
 
-test('and it promises no copy this deployment does not keep', () => {
-  assert.doesNotMatch(copy.deleteCosts, /final copy|copy is kept|last copy/iu, 'the app is handed no snapshots port, so nothing is kept for him');
+test('and it names the one copy this deployment does keep, and the day it goes (OPS-28)', () => {
+  /* `apps/worker/src/index.ts`'s `destroy` HANDS `destroyRecord` A SWEPT COPIES PORT wherever `BLOBS` and the
+     snapshots port are bound, which production is, so the final copy `destroy.ts` describes is written on every
+     delete this deployment does today, not only once W55-7 lands. `FINAL_KEPT_DAYS` (`destroy.ts:38`) is the day it
+     expires, and the sentence here must say the same number, as that constant's own comment requires. */
+  assert.match(copy.deleteCosts, /final copy|copy is kept|last copy/iu, 'a final copy really is kept, and Settings said otherwise');
+  assert.match(copy.deleteCosts, /30 days/iu, 'the retention window must match `FINAL_KEPT_DAYS`');
+  /* STILL NO RESTORE. The Worker hands the record no `snapshots` port, so `listSnapshots` and `restore` still answer
+     `NOT_IN_THIS_BUILD`: the copy exists in the bucket, and nothing on this deployment can open it from the app. */
   assert.doesNotMatch(copy.deleteCosts, /restore|bring .* back/iu, 'there is no restore on this deployment');
-  assert.doesNotMatch(copy.deleteCosts, /thirty days|30 days/iu, 'a deleted record is no longer walked, so retention is not this screen to promise');
 });
 
 test('and it names the one thing he can still do about it, which is the export', () => {

@@ -36,7 +36,7 @@
  * and leave, at most, as the one cookie or the one link they exist to become.
  */
 
-import type { AssertionJSON, Auth, AuthCall, AuthFlow, AuthResult, Mail, Methods, RegistrationJSON, Refusal, Result, Who } from '@braindog/ports';
+import type { AccountCall, AccountClosed, AssertionJSON, Auth, AuthCall, AuthFlow, AuthResult, Mail, Methods, RegistrationJSON, Refusal, Result, Who } from '@braindog/ports';
 import type { Wheres } from '@braindog/kernel';
 import { FRESH } from '@braindog/record';
 
@@ -253,6 +253,57 @@ async function emailConfirmed(door: EmailDoor, who: Who, body: Record<string, un
 /** A row this host does not serve: the same answer as a path that is no row at all. */
 const unserved = (): Response => refusal(404, { code: 'ROUTE_UNKNOWN', fix: 'There is no account route at that address.' });
 
+/* ── closing an account (OPS-21, `loop/finish/ops.md` §4.0 D) ─────────────────────────────────────────────── */
+
+/** The most owned records the close door asks for their other owners; past it the account is not closed. */
+export const CLOSE_RECORDS_MOST = 200;
+
+/** What the close door needs from its host: each record's owners, the Directory's half, and the letter. */
+export type CloseDeps = {
+  /**
+   * The names of the open records this person owns with nobody else as owner. Each record answers for itself, since
+   * who owns it is its own `member` table and not the Directory's. A host that could not ask every one names the
+   * rest, so the door refuses rather than closing past a record nobody would then own.
+   */
+  alone: (who: Who) => Promise<string[]>;
+  /** The Directory's `account.close`, asked only after every check below has passed. */
+  close: (call: AccountCall) => Promise<AuthResult<AccountClosed>>;
+  /** The `sessions.ended` letter. It must not throw, and the answer never waits for it. */
+  mail: (to: string) => void;
+  now: () => number;
+};
+
+/**
+ * `POST /account/close`: `{ email }` typed to confirm, from a session proved in the last fifteen minutes (`FRESH`).
+ *
+ * REFUSED WHILE THEY ARE A RECORD'S ONLY OWNER. Closing would leave that record with nobody who can pay for it, invite
+ * to it or delete it, so the person is told which one and the two ways out of that. Every other record
+ * keeps its own history of them, which its owner can erase (`erase` in the kernel).
+ *
+ * THE LETTER GOES TO THE ADDRESS THE SESSION READ, once the Directory has answered. That address is in hand before the
+ * Directory forgets it, and sending only after a close that happened means nobody is told they were signed out by a
+ * close that failed.
+ */
+export function closeDoor(deps: CloseDeps): AccountAsk {
+  return async (who, body) => {
+    if (deps.now() - who.provedAt > FRESH)
+      return {
+        ok: false,
+        refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to close your account. It has been more than fifteen minutes since you last did.' },
+      };
+    const typed = text(body.email).trim().toLowerCase();
+    if (typed === '' || typed !== who.email.trim().toLowerCase())
+      return { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: 'Type the address you sign in with, as it is, to close your account.', at: 'email' } };
+    const alone = await deps.alone(who);
+    if (alone.length > 0) return { ok: false, refusal: { code: 'LEVEL_REQUIRED', fix: `Delete ${alone[0]}, or make somebody else its owner, first.`, at: 'records' } };
+    const out = await deps.close({ flow: 'account.close', person: who.person });
+    if (out.status !== 200)
+      return { ok: false, refusal: 'refusal' in out ? out.refusal : { code: 'RECORD_UNAVAILABLE', fix: 'Your account could not be closed just now. Try again in a minute.' } };
+    deps.mail(who.email);
+    return { ok: true, value: out.body };
+  };
+}
+
 /** What one row does once the session is known, or `null` where this host was handed no door for it. */
 type Asked = (who: Who, body: Record<string, unknown>, url: URL) => Result<unknown> | Promise<Result<unknown>>;
 
@@ -332,6 +383,8 @@ export async function serveAccount(request: Request, door: AccountDoor): Promise
   /* A ROTATION REACHES THE COOKIE whatever the row below answers. */
   const kept: Header[] = seen.session === undefined ? [] : [['set-cookie', seen.session === 'clear' ? clearCookie(mode) : sessionCookie(seen.session.sid, mode)]];
   const out = await asked(seen.body as Who, body, url);
+  /* A CLOSED ACCOUNT HAS NO SESSION LEFT, so the cookie that named one is cleared on the same answer. */
+  if (path === '/account/close' && out.ok) return reply(200, out, [['set-cookie', clearCookie(mode)]]);
   return reply(out.ok ? 200 : httpStatus(out), out, kept);
 }
 
@@ -394,6 +447,7 @@ export const AUTH_ROUTES: readonly AuthRoute[] = [
   { path: '/auth/signup/name', method: 'GET', flow: 'signup.name', on: 'worker', needs: 'nothing', what: 'Whether a name for a new record is free, `?slug=`, and why not when it is not.' },
   { path: '/auth/claim/mint', method: 'POST', flow: 'claim.mint', on: 'worker', needs: 'operator', what: 'A new 24-hour claim link for somebody already provisioned.' },
   { path: '/auth/provision', method: 'POST', flow: 'provision', on: 'worker', needs: 'operator', what: 'A record, its Directory rows and a 24-hour claim link, handed to the operator.' },
+  { path: '/auth/suspend', method: 'POST', flow: 'suspend', on: 'worker', needs: 'operator', what: 'Stop somebody signing in, `{ email }`, ending every session they hold, or let them in again, `{ email, suspended: false }`.' },
   ...DEVICE_ROUTES,
   ...INVITE_ROUTES,
 ];
@@ -776,12 +830,13 @@ function callOf(flow: AuthFlow, body: Record<string, unknown>, sid: string | und
       return { flow, sid: sid ?? '', id: text(body.id) };
     case 'switch':
       return { flow, sid: sid ?? '', slug: text(body.slug) };
-    /* THE FOUR THAT ARE HANDLED ELSEWHERE AND NOT HERE. `methods` is answered above, `claim.mint`
-       goes through `operated`, which checks the operator key first, and the two halves of an
+    /* THE FIVE THAT ARE HANDLED ELSEWHERE AND NOT HERE. `methods` is answered above, `claim.mint`
+       and `suspend` go through `operated`, which checks the operator key first, and the two halves of an
        invitation's proof are called by `serveInvite` alone, after it has looked the invitation up.
        Naming them is what lets `default` be a type error rather than a 404. */
     case 'methods':
     case 'claim.mint':
+    case 'suspend':
     case 'invite.prove':
     case 'invite.proved':
       return null;
@@ -967,7 +1022,8 @@ function strike(ip: string, now: number): number | null {
 }
 
 /**
- * The operator's two routes: a record and a claim link, or a claim link on its own. Worker only.
+ * The operator's three routes: a record and a claim link, a claim link on its own, or a person stopped or let back in.
+ * Worker only.
  *
  * THE KEY IS COMPARED IN CONSTANT TIME, AND AN UNSET ONE IS NO ROUTE AT ALL. The link comes back to the
  * operator in the answer and is never mailed from here: a person should hear about their record from the
@@ -994,6 +1050,11 @@ async function operated(request: Request, route: AuthRoute, door: AuthDoor): Pro
   if (on.status !== 200 || !(on.body as Methods).configured) return off();
 
   const email = text(body.email).trim().toLowerCase();
+  /* AN ABUSIVE ACCOUNT STOPPED (OPS-21): the one writer of `dir_person.suspended_at`. Anything but `false` stops them,
+     so a body that forgot the field does the safer of the two. */
+  if (route.flow === 'suspend') {
+    return answered(await door.auth({ flow: 'suspend', email, suspended: body.suspended !== false }), cookieMode(door.origin) ?? 'secure');
+  }
   let made: Provisioned | null = null;
   if (route.flow === 'provision') {
     /* THE SAME RULE AS AN INVITATION'S, because it is the same column and the same passkey `displayName`. This

@@ -1,6 +1,8 @@
 node_modules/
 dist/
 build/
+# The site's own route named "build" (apps/site/src/routes/build/), not an output directory.
+!apps/site/src/routes/build/
 .svelte-kit/
 .wrangler/
 *.tsbuildinfo

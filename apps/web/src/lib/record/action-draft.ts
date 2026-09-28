@@ -41,7 +41,7 @@ export type Every = (typeof EVERY)[number];
 /**
  * One field of the row it writes, and where its value comes from: a place in the answer, or the same words every time.
  */
-export type MapLine = { field: string; from: 'answer' | 'fixed'; text: string };
+export type MapLine = { field: string; from: 'answer' | 'fixed' | 'arrived'; text: string };
 
 /** Everything the sheet asks. Every box is a string, so a half-filled sheet is still a draft. */
 export type ActionDraft = {
@@ -102,6 +102,7 @@ export const actionWords = {
   mapHelp: 'For each field, where its value is in the answer, such as total or data.amount, or the words it always holds.',
   fromAnswer: 'From the answer at',
   fromFixed: 'Always',
+  fromArrived: 'When it arrived',
   addLine: 'Add a field',
   removeLine: (field: string) => `Remove ${field}`,
   makeDoor: 'Make the door',
@@ -115,6 +116,7 @@ export const actionWords = {
   noKey: 'Pick the key it sends.',
   noRegister: 'Pick the list it writes to.',
   noRows: 'Say where the rows are in each answer.',
+  nameTaken: 'That name is already used by a door or a scheduled action. Pick another, or the one filed under it is replaced.',
   question: (name: string, door: boolean) => (door ? `Make a door called ${name}?` : `Add the scheduled action ${name}?`),
   reason: 'Made on the new-action sheet.',
   filed: 'It is waiting on Decide. Nothing changes until it is accepted there.',
@@ -142,7 +144,17 @@ export const blankDraft = (kind: ActionKind): ActionDraft => ({
  * The presets a page may open the sheet with, by id.
  *
  * `numbers` AND `watch` ARE THE FOUNDER HOME'S TWO BUTTONS (MOD-18), both writing to `datapoints`, which is the list its
- * numbers blocks read; `name` and `value` are that list's fields. USE-5 adds `rates` here.
+ * numbers blocks read; `name` and `value` are that list's fields.
+ *
+ * `rates` IS "SET UP EXCHANGE RATES" ON MONEY'S PAGE (USE-5), which was a form written for one pack. It reads one
+ * currency a day into `fx`, whose fields say that one `currency` is worth `rate` of `base`: here one US dollar in the
+ * currency the person names twice, once as the base and once at the end of `rates.`. ONE CURRENCY AN ACTION, so a
+ * record gains a currency by opening the preset again, which the old form could not do once its pack was installed.
+ * THE NAME IS LEFT FOR THE PERSON because an action is filed under the name it is given, and a second currency filed
+ * under the first one's name would replace it rather than join it.
+ * THE ADDRESS IS FRANKFURTER'S because its answer says its day as `2026-09-16`, which a day field reads as written;
+ * open.er-api quotes more currencies, but says its day in a form the sheet cannot yet map. It is an address the person
+ * can change, and needs no key.
  */
 export const PRESETS: Record<string, ActionDraft> = {
   numbers: {
@@ -162,6 +174,20 @@ export const PRESETS: Record<string, ActionDraft> = {
     map: [
       { field: 'name', from: 'fixed', text: '' },
       { field: 'value', from: 'answer', text: '' },
+    ],
+  },
+  rates: {
+    ...blankDraft('action'),
+    channel: 'poll',
+    url: 'https://api.frankfurter.app/latest?from=USD',
+    every: '1d',
+    register: 'fx',
+    map: [
+      { field: 'currency', from: 'fixed', text: 'USD' },
+      { field: 'base', from: 'fixed', text: '' },
+      { field: 'rate', from: 'answer', text: 'rates.' },
+      { field: 'as_of', from: 'answer', text: 'date' },
+      { field: 'source', from: 'fixed', text: 'api.frankfurter.app' },
     ],
   },
 };
@@ -224,8 +250,13 @@ export type Built = { ok: true; decl: Declared; name: string } | { ok: false; fi
 function mapOf(draft: ActionDraft): Record<string, unknown> | null {
   const map: Record<string, unknown> = {};
   for (const line of draft.map) {
+    if (line.field === '') continue;
+    if (line.from === 'arrived') {
+      map[line.field] = { arrived: true };
+      continue;
+    }
     const text = line.text.trim();
-    if (line.field === '' || text === '') continue;
+    if (text === '') continue;
     map[line.field] = line.from === 'fixed' ? { value: text } : { path: text, type: typeOf(draft.register, line.field) };
   }
   return Object.keys(map).length === 0 ? null : map;
@@ -236,11 +267,15 @@ function mapOf(draft: ActionDraft): Record<string, unknown> | null {
  *
  * A DOOR IS A WEBHOOK WITH A PATH TOKEN, which is the one kind `ingestMint` makes an address for. A POLL AND A CALL
  * carry their url whole; A PULL splits it into the host and the path, because a connector's `base` is a host alone.
+ *
+ * `taken` IS EVERY INGEST ID THE RECORD ALREADY DECLARES, bare (as `doors()` and `actions()` answer it, never
+ * prefixed `ingest.`), so a name that collides is refused here instead of silently replacing what it names (USE-5).
  */
-export function declarationOf(draft: ActionDraft): Built {
+export function declarationOf(draft: ActionDraft, taken?: ReadonlySet<string>): Built {
   const said = draft.name.trim();
   const name = nameOf(said);
   if (said === '' || name === null) return { ok: false, fix: actionWords.noName, at: 'name' };
+  if (taken?.has(name)) return { ok: false, fix: actionWords.nameTaken, at: 'name' };
   const body: Record<string, unknown> = { ingest: name, description: said };
   const map = mapOf(draft);
   const writes = draft.register === '' ? null : { register: draft.register };

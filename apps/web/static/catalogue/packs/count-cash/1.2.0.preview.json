@@ -1,0 +1,62 @@
+{
+  "format": 1,
+  "made_at": "2026-09-28T15:05:40.127Z",
+  "pages": [
+    {
+      "blocks": [
+        {
+          "columns": [
+            {
+              "field": "on",
+              "label": "Counted on",
+              "width": "13ch"
+            },
+            {
+              "field": "account",
+              "label": "Account",
+              "width": "minmax(14ch,1fr)"
+            },
+            {
+              "align": "end",
+              "field": "counted",
+              "label": "Counted",
+              "width": "15ch"
+            },
+            {
+              "align": "end",
+              "field": "difference",
+              "label": "Out by",
+              "width": "15ch"
+            }
+          ],
+          "empty": "Nothing has been counted yet. Add a count with what is actually in the box or the account, and the difference goes into the ledger.",
+          "heading": "Counts",
+          "kind": "table",
+          "order": [
+            {
+              "dir": "desc",
+              "field": "on"
+            }
+          ],
+          "source": "register.cash_counts",
+          "span": 12,
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        }
+      ],
+      "icon": "money",
+      "nav": {
+        "order": 40,
+        "section": "Money"
+      },
+      "page": "cash-counts",
+      "requires": [
+        "register.cash_counts"
+      ],
+      "title": "Cash counts",
+      "read_at": "2026-09-28T15:05:40.127Z",
+      "declared_version": 1
+    }
+  ]
+}

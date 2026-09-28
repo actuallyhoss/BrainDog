@@ -33,6 +33,7 @@ import type { Result, Sql } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 
 import { instant } from './migrate.ts';
+import { clockOf, nextSlotMs } from './slot.ts';
 
 
 export type PullDecl = {
@@ -48,6 +49,9 @@ export type PullDecl = {
    * with (`keyNameOf`). Everything else in it is `@braindog/connect`'s, and this file never looks.
    */
   fetch?: unknown;
+  /** The wall time a single-request pull is due at, and the zone it is read in (`slot.ts`'s `clockOf`). */
+  at?: string;
+  tz?: string;
 };
 
 /**
@@ -134,6 +138,8 @@ export type PullDeps = {
    * before it could be handed a label; a label then names no live key and the connector pauses.
    */
   keyOf?: ((name: string) => { id: string } | null) | undefined;
+  /** The record's zone, for a pull whose declaration names none (`slot.ts`'s `clockOf`). */
+  tz?: string | undefined;
 };
 
 /**
@@ -179,11 +185,13 @@ export function checkInterval(decl: PullDecl): Result<number> {
  * vault, under a `grant.read` event, so a fetch that reads a credential is a fetch that is on the
  * record — and one that never happened cannot pretend it did.
  */
-export function firePull(deps: PullDeps, row: { id: string; payload: string }, decl: PullDecl | null): Fired {
+export function firePull(deps: PullDeps, row: { id: string; payload: string; due_at?: string }, decl: PullDecl | null): Fired {
   const payload = row.payload;
   /* `cursor` IS WHATEVER THE ROW HOLDS: a page cursor as `keepCursor` and `finishPull` write it, or
-     the string an older `applyPull` wrote. The fire carries it as it is and never reads it. */
-  const { ingest, cursor } = JSON.parse(payload) as { ingest?: string; cursor?: unknown };
+     the string an older `applyPull` wrote. The fire carries it as it is and never reads it. `slot` is
+     the unjittered instant this row last counted from, kept here for a pull that does not page. */
+  const parsedPayload = JSON.parse(payload) as { ingest?: string; cursor?: unknown; slot?: unknown };
+  const { ingest, cursor } = parsedPayload;
   if (!ingest || !decl) return { ingest: ingest ?? '', outbox: null, nextMs: null, paused: false };
 
   /* A PAUSED CONNECTOR IS THIS ROW WITH `state = 'paused'`, and the claim never takes one — so a
@@ -223,6 +231,26 @@ export function firePull(deps: PullDeps, row: { id: string; payload: string }, d
 
   const every = intervalMs(decl.every) ?? FLOOR_MS;
 
+  /* A PULL THAT PAGES ARMS ITS NEXT RUN FROM ITS SLOT ONLY ONCE THE PAGED RUN ENDS (`finishPull`, whose
+     slot `prepareAction` then hands the runner): counting it here too would be a second, earlier answer
+     to "when is this due next," racing whichever alarm read it first. A pull that fires and finishes in
+     one request has no other writer, so it counts and keeps its own slot here, from the last slot this
+     row wrote, else its `due_at`, else now. */
+  const fetch = decl.fetch !== null && typeof decl.fetch === 'object' ? (decl.fetch as { page?: unknown; read?: unknown }) : undefined;
+  const paged = fetch !== undefined && (fetch.page !== undefined || fetch.read !== undefined);
+  let dueAfter = (): number => deps.nowMs + every + jitterMs(deps.recordId, ingest, every);
+  if (!paged) {
+    const slotMs =
+      typeof parsedPayload.slot === 'string' && !Number.isNaN(Date.parse(parsedPayload.slot))
+        ? Date.parse(parsedPayload.slot)
+        : typeof row.due_at === 'string' && !Number.isNaN(Date.parse(row.due_at))
+          ? Date.parse(row.due_at)
+          : deps.nowMs;
+    const next = nextSlotMs({ slotMs, nowMs: deps.nowMs, everyMs: every, clock: clockOf(decl, deps.tz ?? 'UTC') });
+    deps.sql.exec('UPDATE schedule SET payload = ? WHERE id = ?', JSON.stringify({ ...parsedPayload, slot: instant(next) }), row.id);
+    dueAfter = () => next + jitterMs(deps.recordId, ingest, every);
+  }
+
   /* A RUN THAT HAS NOT FINISHED IS NOT RUN AGAIN. `call` and `poll` have checked this since they
      were written (`actions.ts`, the `busy` query) and `pull` never did, so a connector whose hour
      came round while the last hour's run was still leased got a second row — two runs of the same
@@ -239,8 +267,7 @@ export function firePull(deps: PullDeps, row: { id: string; payload: string }, d
      AND json_extract(payload, '$.ingest') = ? LIMIT 1`,
     ingest,
   );
-  if (busy)
-    return { ingest, outbox: null, nextMs: deps.nowMs + every + jitterMs(deps.recordId, ingest, every), paused: false };
+  if (busy) return { ingest, outbox: null, nextMs: dueAfter(), paused: false };
 
   const id = deps.outbox({
     ingest,
@@ -250,7 +277,7 @@ export function firePull(deps: PullDeps, row: { id: string; payload: string }, d
 
   /* THE JITTER IS ON EVERY OCCURRENCE, not only the first. Twenty connectors that all started at
      midnight would re-converge within a day if the offset were applied once. */
-  return { ingest, outbox: id, nextMs: deps.nowMs + every + jitterMs(deps.recordId, ingest, every), paused: false };
+  return { ingest, outbox: id, nextMs: dueAfter(), paused: false };
 }
 
 /**

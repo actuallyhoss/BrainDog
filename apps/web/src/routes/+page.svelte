@@ -56,7 +56,16 @@
 
   /* THE HOUSE PAGE'S HEADINGS IN THE VOICE THAT SPEAKS, read before the page is asked for so a voice that lands after
      the first read asks it again in its own words. */
-  const voice = $derived<HomeVoice>({ rightNow: said('right_now'), needsYou: said('needs_you'), sinceAway: said('since_away') });
+  const voice = $derived<HomeVoice>({
+    rightNow: said('right_now'),
+    needsYou: said('needs_you'),
+    sinceAway: said('since_away'),
+    workingNow: said('working_now'),
+    comingUp: said('coming_up'),
+    overdue: said('overdue'),
+    nothingWaiting: said('nothing_waiting'),
+    nothingDue: said('nothing_due'),
+  });
 
   /**
    * ONLY A PAGE THE RECORD HOLDS IS ASKED FOR. A use case may declare no Home page (a reading club shared as a file), and
@@ -131,7 +140,7 @@
   listen(reread, () => reading || typing() || document.querySelector('main [aria-busy="true"]') !== null);
 
   const live = $derived(got?.from === 'live' ? got : null);
-  const blocks = $derived(live ? homeBlocks(live.page.blocks, live.now) : []);
+  const blocks = $derived(live ? homeBlocks(live.page.blocks, live.now, voice) : []);
   /* THE LEAD LINE IS BUILT FROM THE PAGE'S OWN COUNTS, so it can never disagree with the blocks under it. */
   const lead = $derived(live ? leadOf(countsOf(live.page.blocks)) : null);
   /* NOTHING PINNED, WAITING, DUE OR WORKING: one calm sentence, and only what changed under it. A host that cannot draw
@@ -214,8 +223,8 @@
       <Empty kind="no-permission" title={data.refused.fix} />
     {/if}
   {:else if empty}
-    <Empty kind="no-data-yet" title={copy.recordEmpty}>
-      {#snippet actions()}<Button weight="primary" href="/start">{copy.startHere}</Button>{/snippet}
+    <Empty kind="no-data-yet" title={said('record_empty')}>
+      {#snippet actions()}<Button weight="primary" href="/start">{said('start_here')}</Button>{/snippet}
     </Empty>
   {:else}
     <!-- THE EXAMPLES SETTING UP PLANTED, offered once they are all that is left to explain. -->
@@ -241,7 +250,7 @@
       </Empty>
     {:else if calm}
       <!-- ONE CALM SENTENCE AND ONE LINE ON WHAT FILLS THIS PAGE, never what a business is made of. -->
-      <Empty kind="cleared" title={nothing} body={words.fillsWith} />
+      <Empty kind="cleared" title={nothing} body={said('fills_with')} />
     {:else if lead}
       <p class="lead">{lead}</p>
     {/if}

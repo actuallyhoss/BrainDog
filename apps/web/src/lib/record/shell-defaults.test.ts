@@ -87,18 +87,6 @@ test('WITH NO HOME CURRENCY THE COMMON ONES ARE IN THE RUNTIME’S ORDER, with n
   assert.equal(currencyChoices('').other, OTHER_CURRENCIES);
 });
 
-test('THE RATES FORM DRAWS BOTH ITS PICKERS FROM THE RECORD’S HOME CURRENCY, not from the list as written', () => {
-  /* A SOURCE SCAN, BECAUSE NOTHING IN THIS APP RENDERS A ROUTE'S COMPONENT UNDER `node --test`. Before this file the
-     form imported `COMMON_CURRENCIES` and drew it directly in both pickers, so reordering `currencyChoices` alone left
-     the base currency and the add picker leading with `EGP` on a record at `JPY`. */
-  /* Comments blanked, as `at-sites.test.ts` blanks them: the form's own comment says what it used to draw. */
-  const source = readFileSync(fileURLToPath(new URL('../../routes/packs/[id]/RatesForm.svelte', import.meta.url)), 'utf8').replace(/<!--[\s\S]*?-->|\/\*[\s\S]*?\*\//gu, '');
-  assert.equal(/\bCOMMON_CURRENCIES\b|\bOTHER_CURRENCIES\b/u.test(source), false, 'the form reads a currency list other than the one ordered for its record');
-  assert.equal(/currencyChoices\(home\)/u.test(source), true, 'the form does not ask for the choices at its home currency');
-  const groups = [...source.matchAll(/<optgroup[^>]*>\{#each (\S+) as/gu)].map((m) => m[1]);
-  assert.deepEqual(groups, ['choices.common', 'choices.other', 'choices.common', 'choices.other']);
-});
-
 test('THE SETTINGS PICKER IS ORDERED BY THE SAVED CURRENCY, so a pick does not move the list under the next one', () => {
   /* WHAT WENT WRONG WHEN IT WAS ORDERED BY THE DRAFT. The select writes its draft on every `change`, and a closed select
      stepped with the down arrow fires one per step, so each step moved the code just picked to the front and the next
@@ -109,7 +97,8 @@ test('THE SETTINGS PICKER IS ORDERED BY THE SAVED CURRENCY, so a pick does not m
   const walked = Array.from({ length: 6 }, (_, i) => order[order.indexOf('GBP') + 1 + i]);
   assert.equal(new Set(walked).size, 6);
 
-  /* A SOURCE SCAN, as for the rates form above, with the comments blanked for the same reason. */
+  /* A SOURCE SCAN, BECAUSE NOTHING IN THIS APP RENDERS A ROUTE'S COMPONENT UNDER `node --test`. Comments blanked, as
+     `at-sites.test.ts` blanks them, because a comment may say what the page used to draw. */
   const source = readFileSync(fileURLToPath(new URL('../../routes/packs/[id]/+page.svelte', import.meta.url)), 'utf8').replace(/<!--[\s\S]*?-->|\/\*[\s\S]*?\*\//gu, '');
   const asked = [...source.matchAll(/currencyChoices\(([^)]*)\)/gu)].map((m) => m[1]);
   assert.equal(asked.length, 1, 'the settings screen asks for the choices in one place');

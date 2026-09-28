@@ -19,14 +19,16 @@
  *
  * `rows-write.ts` IS LOADED ON THE PRESS, NOT WITH THE PALETTE. The client carries the route table as a value, and the
  * palette is in the layout, so a static import would put it in the chunk every screen waits for. This file's own
- * imports are the fixture declarations the palette already loads, and types.
+ * imports are the fixture declarations the palette already loads, `may.ts` (a table and one function), and types.
  */
 
 import { REGISTERS } from '../record/held.ts';
+import { may } from '../record/may.ts';
+import type { Shell } from '../record/boot-live.ts';
 import type { List } from '../record/palette.ts';
 import type { Fetch } from '../record/row-live.ts';
 import type { Captured, Wrote } from '../record/rows-write.ts';
-import type { Entry, Fields } from '../record/schema.ts';
+import type { Entry, Fields, Level } from '../record/schema.ts';
 import type { Creation } from './admit.ts';
 
 /** Kept here rather than in `copy.ts`, which no builder in this wave owns. */
@@ -77,11 +79,11 @@ export function addable<T extends Pick<List, 'id'>>(lists: readonly T[]): T[] {
   return lists.filter((l) => Boolean(REGISTERS[l.id]?.title));
 }
 
-/** The rungs `create`'s `guard(ctx, 'append', ...)` lets through: `append` itself, and every rung above it. */
-const ADDS: ReadonlySet<string> = new Set(['append', 'write', 'decide', 'owner']);
-
 /** What the shell says about the lists and the caller, and only that. */
-export type Offer<T> = { lists?: readonly T[]; me?: { level: string; lists: readonly string[] | null } };
+export type Offer<T> = {
+  lists?: readonly T[];
+  me?: { level: string; lists: readonly string[] | null; levels?: Readonly<Record<string, Level>> | undefined };
+};
 
 /**
  * The lists the add row may name for this caller.
@@ -90,17 +92,25 @@ export type Offer<T> = { lists?: readonly T[]; me?: { level: string; lists: read
  * Tasks: buy milk" on an empty Tasks drew nothing (audit sixty-six, probe c1), which is the one moment the row helps
  * most. `shell.lists` is the one the shell keeps for putting something into a list.
  *
- * AND ONLY TO A CALLER WHO MAY ADD. The same probe drew the row for a `read` member, and `create` then refused the press:
- * a row that cannot run is absent (`admit.ts`), not drawn to fail. A colleague held to named lists arrives with the
- * shell's `read` as a fallback and the lists in `me.lists`, and is offered those: `boot` does not say the level they
- * hold on each one, and taking the row from a bookkeeper given `write` on the one list they were asked to fill would be
- * the fallback deciding again what the record never said. Nobody in the shell, a refused `boot`, is offered nothing.
+ * AND ONLY WHERE THE CALLER MAY ADD, LIST BY LIST, which is `may(shell, 'append', list)` (COL-13). The same probe drew
+ * the row for a `read` member, and `create` then refused the press: a row that cannot run is absent (`admit.ts`), not
+ * drawn to fail. `boot` now says the level held on each list (`me.levels`), so a colleague with Edits on Expenses and
+ * Reads on the rest is offered Expenses alone, and a record-wide appender is not offered the owner's lists `create`
+ * would refuse them.
+ *
+ * A HOST OLDER THAN `me.levels` SAYS ONLY `me.lists`, and a colleague held to named lists is then offered those, as
+ * before the field: the shell's `read` is a fallback for them, and taking the row from a bookkeeper given `write` on
+ * the one list they were asked to fill would be the fallback deciding what the record never said. Nobody in the shell,
+ * a refused `boot`, is offered nothing.
  */
 export function offered<T extends Pick<List, 'id'>>(shell: Offer<T>): T[] {
   const { me, lists = [] } = shell;
   if (!me) return [];
   const held = me.lists;
-  return addable(held !== null ? lists.filter((l) => held.includes(l.id)) : ADDS.has(me.level) ? lists : []);
+  if (me.levels === undefined && held !== null) return addable(lists.filter((l) => held.includes(l.id)));
+  /* `may` READS `level`, `lists` AND `levels` AND NOTHING ELSE of the shell's `me`, which is all an offer carries. */
+  const asked = { me } as unknown as Pick<Shell, 'me'>;
+  return addable(lists.filter((l) => may(asked, 'append', l.id)));
 }
 
 /**

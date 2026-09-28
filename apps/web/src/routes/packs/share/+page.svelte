@@ -5,18 +5,31 @@
   record writes the file (`exportUseCase`), reading it back through the door a stranger's file comes in by, so a row
   holding a credential is refused on this screen rather than on somebody else's record.
 
-  THE VERSION COUNTS ON FROM THE LAST SHARE. Once a file is downloaded its version is kept as the use case's
-  `shared_version` setting, and the form offers a patch or a minor after the later of that and the version installed.
-  The rail goes out in the order this person sees it (`drawnOrder`), and the words that suggest the use case and its
-  skills go in only when ticked.
+  THE VERSION COUNTS ON FROM THE LAST SHARE. Once a file is downloaded or published its version is kept as the use
+  case's `shared_version` setting, and the form offers a patch or a minor after the later of that and the version
+  installed. The rail goes out in the order this person sees it (`drawnOrder`), and the words that suggest the use case
+  and its skills go in only when ticked.
+
+  WHAT GOES OUT IS SHOWN AS A DIFF, AND AS AN INSTALLER SEES IT (PLT-14, P29). While the form is filled the record
+  writes the file again after each pause (`exportUseCase` writes nothing), and the screen says what it changes against
+  the version it counts on from: the one last published, else the use case as BrainDog ships it, else the one installed.
+  Under that, the file is drawn as browse draws a use case (`previewOf`), so the author sees the rail and Home a
+  stranger will be offered. "Publish to the Kennel" sits beside Download and sends the same file as the signed-in
+  person (`lib/market/publish.ts`); its answer is one sentence with a link.
+
+  ONE COLUMN AT `--measure`, at every width (design.md §4, the share row): a form read top to bottom, never two ragged
+  columns.
 -->
 <script lang="ts">
-  import { apiBase } from '$lib/at.ts';
+  import { apiBase, at } from '$lib/at.ts';
   import { onMount } from 'svelte';
   import { page } from '$app/state';
+  import type { Changes } from '@braindog/declare/catalogue';
   import { createClient } from '@braindog/client';
   import { useCase } from '@braindog/seed/usecases';
   import { useCaseName } from '@braindog/seed/usecases/names';
+  import { builtInFile, previewOf } from '@braindog/seed/usecases/share';
+  import { changeLines, changesSince, kennelFetch, publishedHref, publishedLink, publishedSaid, publishedText, publishWords, submitToKennel, type Submitted } from '$lib/market/publish.ts';
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
@@ -30,10 +43,14 @@
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import { drew } from '../../../lib/ui/screen.svelte.ts';
-  import { drawnOrder, exportShared, listWords, offeredVersion, rowTitle, speakingOf, speakingStates } from '../sharing.ts';
+  import Preview from '../browse/Preview.svelte';
+  import { drawnOrder, exportShared, listWords, moduleTitle, offeredVersion, rowTitle, speakingOf, speakingStates } from '../sharing.ts';
+  import { skillsOnce, words, type SkillOffer } from './share.ts';
 
   const AUDIENCES = ['individual', 'founder', 'team', 'starter', 'other'] as const;
   const EXAMPLES_MOST = 8;
+  /** How long the form rests before the file is written again for the diff: one read per pause, never one per key. */
+  const DRAFT_WAIT_MS = 600;
 
   let client = $state.raw<ReturnType<typeof createClient> | null>(null);
   /** True once the record answered. Download is only pressed then: the record writes the file. */
@@ -54,8 +71,17 @@
   let lastShared = $state<string | null>(null);
   /** Whether the file says the words that suggest this use case, and which skills it carries, by row number. */
   let withSignals = $state(false);
-  let skillRows = $state<{ seq: number; name: string }[]>([]);
+  let skillRows = $state<SkillOffer[]>([]);
   let skillsPicked = $state<number[]>([]);
+  /** The file as it would go out now, what it changes and what it counts on from; `null` until the first is written. */
+  let draft = $state.raw<
+    | { state: 'reading' }
+    | { state: 'ready'; doc: Record<string, unknown>; since: string | null; changes: Changes }
+    | { state: 'refused'; fix: string }
+    | null
+  >(null);
+  let publishing = $state(false);
+  let sent = $state.raw<(Submitted & { title: string }) | null>(null);
 
   const speaking = $derived(speakingOf(states));
   const own = $derived(states.find((s) => s.id === `usecase-${speaking}`) ?? null);
@@ -86,11 +112,7 @@
       if (id !== null) title = useCaseName(id);
       if (states.some((s) => s.registers.includes('skills') && s.disabled_at === null)) {
         const listed = await client.list({ register: 'skills', limit: 50 });
-        skillRows = listed.ok
-          ? (listed.value.rows as { seq: number | null; fields: Record<string, unknown> }[]).flatMap((r) =>
-              r.seq === null || typeof r.fields.name !== 'string' ? [] : [{ seq: r.seq, name: r.fields.name }],
-            )
-          : [];
+        skillRows = listed.ok ? skillsOnce(listed.value.rows as { seq: number | null; fields: Record<string, unknown> }[]) : [];
       }
       if (own) {
         const config = await client.packConfig({ id: own.id });
@@ -114,50 +136,142 @@
     picked = { ...picked, [register]: on ? [...now, seq].slice(0, EXAMPLES_MOST) : now.filter((n) => n !== seq) };
   }
 
+  /** What the form asks the record to write, read from every field; the draft and both buttons send the same. */
+  function argsOf() {
+    const examples = Object.fromEntries(Object.entries(picked).filter(([, seqs]) => seqs.length > 0));
+    /* THE RAIL AS IT IS DRAWN HERE: the pages in the reader's arrangement, then the lists in theirs. */
+    const arrangement = pref.read().nav ?? [];
+    const shell = page.data as { nav?: { section: string; href: string; order: number }[]; lists?: { id: string }[] };
+    const nav = drawnOrder(
+      arrange(shell.nav ?? [], arrangement).flatMap(([, entries]) => entries),
+      orderLists(shell.lists ?? [], arrangement),
+    );
+    return {
+      ...(title.trim() ? { title: title.trim() } : {}),
+      ...(version.trim() ? { version: version.trim() } : {}),
+      ...(summary.trim() ? { summary: summary.trim() } : {}),
+      ...(audience.trim() ? { audience: audience.trim() } : {}),
+      step,
+      ...(Object.keys(examples).length > 0 ? { examples } : {}),
+      ...(nav.length > 0 ? { nav } : {}),
+      ...(withSignals && signals.length > 0 ? { signals: [...signals] } : {}),
+      ...(skillsPicked.length > 0 ? { skills: [...skillsPicked] } : {}),
+    };
+  }
+
+  /* KEPT AS THE USE CASE'S SETTING, so the next share offers the version after this one. A pack installed before the
+     setting existed refuses it, and the form then counts from the installed version as it did. */
+  async function keepShared(shared: string | null) {
+    if (!client || !own || !shared) return;
+    const kept = await client.setPackConfig({ id: own.id, values: { shared_version: shared } });
+    if (kept.ok) {
+      lastShared = shared;
+      typed = false;
+    }
+  }
+
   async function download() {
     if (!client || busy || !live) return;
     busy = true;
     wrong = null;
     try {
-      const examples = Object.fromEntries(Object.entries(picked).filter(([, seqs]) => seqs.length > 0));
-      /* THE RAIL AS IT IS DRAWN HERE: the pages in the reader's arrangement, then the lists in theirs. */
-      const arrangement = pref.read().nav ?? [];
-      const shell = page.data as { nav?: { section: string; href: string; order: number }[]; lists?: { id: string }[] };
-      const nav = drawnOrder(
-        arrange(shell.nav ?? [], arrangement).flatMap(([, entries]) => entries),
-        orderLists(shell.lists ?? [], arrangement),
-      );
-      const out = await exportShared(client, {
-        ...(title.trim() ? { title: title.trim() } : {}),
-        ...(version.trim() ? { version: version.trim() } : {}),
-        ...(summary.trim() ? { summary: summary.trim() } : {}),
-        ...(audience.trim() ? { audience: audience.trim() } : {}),
-        step,
-        ...(Object.keys(examples).length > 0 ? { examples } : {}),
-        ...(nav.length > 0 ? { nav } : {}),
-        ...(withSignals && signals.length > 0 ? { signals: [...signals] } : {}),
-        ...(skillsPicked.length > 0 ? { skills: skillsPicked } : {}),
-      });
+      const out = await exportShared(client, argsOf());
       if (!out.ok) {
         wrong = out.fix;
         return;
       }
       saveDog(out.file, out.text);
-      /* KEPT AS THE USE CASE'S SETTING, so the next share offers the version after this one. A pack installed before
-         the setting existed refuses it, and the form then counts from the installed version as it did. */
-      const shared = /-(\d+\.\d+\.\d+)\.usecase\.json$/u.exec(out.file)?.[1] ?? null;
-      if (own && shared) {
-        const kept = await client.setPackConfig({ id: own.id, values: { shared_version: shared } });
-        if (kept.ok) {
-          lastShared = shared;
-          typed = false;
-        }
-      }
+      await keepShared(/-(\d+\.\d+\.\d+)\.usecase\.json$/u.exec(out.file)?.[1] ?? null);
       toasts.push(copy.shareDownloaded(out.file, count), { intent: 'good' });
     } finally {
       busy = false;
     }
   }
+
+  /** The same file as Download, sent to the Kennel as the signed-in person. One press sends one. */
+  async function publish() {
+    if (!client || busy || publishing || !live) return;
+    publishing = true;
+    wrong = null;
+    sent = null;
+    try {
+      const out = await exportShared(client, argsOf());
+      if (!out.ok) {
+        wrong = out.fix;
+        return;
+      }
+      const answer = await submitToKennel(kennelFetch, out.text);
+      if (!answer.ok) {
+        wrong = answer.fix;
+        return;
+      }
+      const doc = JSON.parse(out.text) as { title?: unknown };
+      sent = { ...answer.value, title: typeof doc.title === 'string' && doc.title !== '' ? doc.title : title.trim() };
+      await keepShared(answer.value.version);
+    } finally {
+      publishing = false;
+    }
+  }
+
+  /* ── the draft: what goes out, against what it counts on from ─────────── */
+
+  /** Each draft carries its number, so an answer that arrives after a later one began is dropped. */
+  let drafts = 0;
+
+  /** The version this share counts on from, as text, and how the screen names it; `null` for a first version. */
+  async function baselineOf(id: string | null): Promise<{ text: string; since: string } | null> {
+    if (id !== null && lastShared !== null) {
+      const text = await publishedText(kennelFetch, 'usecase', id, lastShared);
+      if (text !== null) return { text, since: words.sinceShared(lastShared) };
+    }
+    const shipped = speaking === null ? null : builtInFile(speaking);
+    if (speaking !== null && shipped !== null) return { text: JSON.stringify(shipped), since: words.sinceBuiltIn(useCaseName(speaking)) };
+    if (id !== null && installedVersion !== null) {
+      const text = await publishedText(kennelFetch, 'usecase', id, installedVersion);
+      if (text !== null) return { text, since: words.sinceInstalled(installedVersion) };
+    }
+    return null;
+  }
+
+  async function redraft(args: ReturnType<typeof argsOf>) {
+    if (!client) return;
+    const mine = ++drafts;
+    if (draft === null) draft = { state: 'reading' };
+    const out = await exportShared(client, args);
+    if (mine !== drafts) return;
+    if (!out.ok) {
+      draft = { state: 'refused', fix: out.fix };
+      return;
+    }
+    const doc = JSON.parse(out.text) as Record<string, unknown>;
+    const base = await baselineOf(typeof doc.usecase === 'string' ? doc.usecase : null);
+    const diff = await changesSince(base?.text ?? null, out.text);
+    if (mine !== drafts) return;
+    /* A FILE ITS OWN DOOR REFUSES IS SAID HERE, with the door's sentence, before anybody downloads or sends it. */
+    draft = diff.ok ? { state: 'ready', doc, since: base?.since ?? null, changes: diff.changes } : { state: 'refused', fix: diff.fix };
+  }
+
+  /* THE FILE IS WRITTEN AGAIN ONCE THE FORM RESTS. `argsOf` reads every field here, so a change to any one of them
+     restarts the wait, and leaving the screen clears it. */
+  $effect(() => {
+    if (!client || !live) return;
+    const args = argsOf();
+    const timer = setTimeout(() => void redraft(args), DRAFT_WAIT_MS);
+    return () => clearTimeout(timer);
+  });
+
+  const lines = $derived(draft?.state === 'ready' ? changeLines(draft.changes, moduleTitle) : []);
+  /* THE INSTALLER'S VIEW, drawn as browse draws a use case. A file this build cannot draw is simply not drawn: the
+     diff above it still says what goes out. */
+  const installerView = $derived.by(() => {
+    if (draft?.state !== 'ready') return null;
+    try {
+      const doc = { labels: {}, voice: {}, skills: [], modules: [], pack: null, ...draft.doc };
+      return previewOf(doc as unknown as Parameters<typeof previewOf>[0]);
+    } catch {
+      return null;
+    }
+  });
 </script>
 
 <svelte:head><title>{titleOf(copy.shareSetup)}</title></svelte:head>
@@ -182,17 +296,17 @@
         <label class="field-label" for="share-title">{copy.shareTitle}</label>
         <div class="field"><input class="field-input" id="share-title" type="text" autocomplete="off" bind:value={title} /></div>
       </div>
-      <div class="pair narrow">
+      <div class="pair">
         <label class="field-label" for="share-version">{copy.shareVersion}</label>
         <div class="field"><input class="field-input" id="share-version" type="text" inputmode="decimal" autocomplete="off" bind:value={version} oninput={() => (typed = true)} /></div>
         {#if lastShared}<p class="note">{copy.shareLastShared(lastShared)}</p>{/if}
       </div>
-      <fieldset class="pair wide steps">
+      <fieldset class="pair steps">
         <legend class="field-label">{copy.shareStep}</legend>
         <label class="row-pick"><input type="radio" name="share-step" value="patch" bind:group={step} onchange={() => (typed = false)} /><span>{copy.shareStepPatch}</span></label>
         <label class="row-pick"><input type="radio" name="share-step" value="minor" bind:group={step} onchange={() => (typed = false)} /><span>{copy.shareStepMinor}</span></label>
       </fieldset>
-      <div class="pair wide">
+      <div class="pair">
         <label class="field-label" for="share-summary">{copy.shareSummary}</label>
         <div class="field"><input class="field-input" id="share-summary" type="text" autocomplete="off" bind:value={summary} /></div>
       </div>
@@ -240,7 +354,10 @@
                 checked={skillsPicked.includes(skill.seq)}
                 onchange={(e) => (skillsPicked = e.currentTarget.checked ? [...skillsPicked, skill.seq] : skillsPicked.filter((n) => n !== skill.seq))}
               />
-              <span>{skill.name}</span>
+              <span class="pick-text">
+                <span>{skill.title}</span>
+                {#if skill.trigger}<span class="pick-detail">{skill.trigger}</span>{/if}
+              </span>
             </label>
           {:else}
             <p class="note">{copy.shareNoSkills}</p>
@@ -248,9 +365,39 @@
         </fieldset>
       </Section>
 
+      {#if draft}
+        <Section title={draft.state === 'ready' && draft.since !== null ? words.changesSince(draft.since) : words.changesFirst}>
+          {#if draft.state === 'reading'}
+            <p class="note" role="status">{words.drafting}</p>
+          {:else if draft.state === 'refused'}
+            <p class="note">{draft.fix}</p>
+          {:else}
+            {#if draft.since === null}<p class="note">{words.firstAll}</p>{/if}
+            {#if lines.length > 0}
+              <ul class="changes">
+                {#each lines as line, i (i)}<li>{line}</li>{/each}
+              </ul>
+            {:else if draft.since !== null}
+              <p class="note">{words.noChanges}</p>
+            {/if}
+          {/if}
+        </Section>
+        {#if installerView}
+          <Section title={words.installer}>
+            <Preview preview={installerView} large />
+          </Section>
+        {/if}
+      {/if}
+
       {#if wrong}<p class="wrong" role="alert">{wrong}</p>{/if}
+      {#if sent}
+        <p class="sent" role="status">{publishedSaid(sent)} <a href={at(publishedHref(sent))}>{publishedLink(sent)}</a></p>
+      {/if}
       <div class="actions">
         <Button weight="primary" type="submit" disabled={busy || !live}>{copy.shareDownload}</Button>
+        <Button disabled={publishing || !live} aria-busy={publishing ? 'true' : undefined} onclick={() => void publish()}>
+          {publishing ? publishWords.publishing : publishWords.publish}
+        </Button>
         <Button weight="bare" href="/packs">{copy.packs}</Button>
       </div>
     </form>
@@ -263,11 +410,10 @@
     flex-direction: column;
     gap: var(--sp-4);
     padding: var(--sp-5) var(--gutter) var(--sp-9);
-    max-inline-size: 820px;
+    max-inline-size: calc(var(--measure) + 2 * var(--gutter));
   }
 
   .blurb {
-    max-inline-size: 62ch;
     color: var(--ink2);
     font-size: var(--t-ui);
     line-height: 1.6;
@@ -279,17 +425,12 @@
     font-size: var(--t-sm);
   }
 
+  /* ONE COLUMN, EVERY FIELD THE SAME WIDTH: the measure the page is capped at. */
   .share-form {
-    display: grid;
-    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
-    gap: var(--sp-3) var(--sp-4);
-  }
-
-  .share-form > :global(section),
-  .share-form > .wrong,
-  .share-form > .actions,
-  .pair.wide {
-    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-4);
+    min-inline-size: 0;
   }
 
   .pair {
@@ -337,21 +478,48 @@
     font-size: var(--t-sm);
   }
 
+  .pick-text {
+    display: flex;
+    flex-direction: column;
+    min-inline-size: 0;
+  }
+
+  .pick-detail {
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  .changes {
+    display: grid;
+    gap: var(--sp-1);
+    margin: 0;
+    padding-inline-start: var(--sp-5);
+    color: var(--ink);
+    font-size: var(--t-sm);
+  }
+
   .wrong {
     margin: 0;
     color: var(--ink);
     font-size: var(--t-sm);
   }
 
+  /* The answer is one sentence, and its link is ink and underlined: red is never a link here. */
+  .sent {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--t-sm);
+    overflow-wrap: anywhere;
+  }
+
+  .sent a {
+    color: var(--ink);
+    text-decoration: underline;
+  }
+
   .actions {
     display: flex;
     flex-wrap: wrap;
     gap: var(--sp-2);
-  }
-
-  @media (width < 640px) {
-    .share-form {
-      grid-template-columns: minmax(0, 1fr);
-    }
   }
 </style>

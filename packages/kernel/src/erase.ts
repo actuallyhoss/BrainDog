@@ -3,7 +3,9 @@
  *
  * TOMBSTONE THE PAYLOAD, KEEP THE FACT. What goes is every value that names the subject: a row's fields, an event's
  * `from_v`/`to_v`/`note`, an arrival's body and headers, a decision's words, a suggestion's body, a prediction's claim,
- * a grant's label and hint, a device's label and user agent, a job's arguments and output. Each becomes the literal
+ * a grant's label and hint, a device's label and user agent, a job's arguments and output, an invitation's address, a
+ * saved view's name, search and filter, a rule run's variables, words and step answers, a token's label, an uninstalled
+ * pack's kept settings, and a grant's row rule. Each becomes the literal
  * `--erased--`, so a reader can tell *removed* from *there was nothing* (`NULL`) and from *withheld at write*
  * (`--redacted--`). What stays is every row's existence, position, time, actor, kind, target and field name.
  *
@@ -58,6 +60,27 @@ const names = (text: string | null | undefined, subjects: readonly string[]): bo
   const low = text.toLowerCase();
   return subjects.some((s) => low.includes(s));
 };
+
+/**
+ * A JSON column's text with every string or number inside it that names a subject turned into `--erased--`, its shape
+ * and its keys kept, so the reader that parses it still can. Keys are field, variable and setting names, which a person
+ * chose for the record and which name nobody. Text that is not JSON goes whole.
+ */
+function scrubbed(text: string, subjects: readonly string[]): string {
+  let value: unknown;
+  try {
+    value = JSON.parse(text);
+  } catch {
+    return ERASED;
+  }
+  const walk = (v: unknown): unknown => {
+    if (Array.isArray(v)) return v.map(walk);
+    if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, walk(x)]));
+    if ((typeof v === 'string' || typeof v === 'number') && names(String(v), subjects)) return ERASED;
+    return v;
+  };
+  return JSON.stringify(walk(value));
+}
 
 /** Every attachment key a field value holds: a `file` value, or a list of them. */
 function keysIn(value: unknown, into: Set<string>): void {
@@ -135,12 +158,20 @@ export function eraseSubjects(deps: EraseDeps, subjects: readonly string[], pers
   bump('inbox_raw', raws.length);
 
   /* ── the tombstoned columns, store by store ── */
-  const tomb = (table: string, key: string, cols: readonly string[], where = '1 = 1'): number => {
+  /* `json` names the columns a reader parses, which keep their shape: each value inside that names the subject goes,
+     and the column stays JSON, because a whole-column `--erased--` there would throw in the reader instead. */
+  const tomb = (table: string, key: string, cols: readonly string[], json: readonly string[] = []): number => {
     let n = 0;
-    for (const row of sql.all<Record<string, string | null>>(`SELECT ${key} AS k, ${cols.join(', ')} FROM ${table} WHERE ${where}`)) {
-      const hit = cols.filter((c) => names(row[c], subjects));
-      if (hit.length === 0) continue;
-      sql.exec(`UPDATE ${table} SET ${hit.map((c) => `${c} = ?`).join(', ')} WHERE ${key} = ?`, ...hit.map(() => ERASED), row.k as string);
+    for (const row of sql.all<Record<string, string | null>>(`SELECT ${key} AS k, ${cols.join(', ')} FROM ${table}`)) {
+      const sets: [string, string][] = [];
+      for (const c of cols) {
+        const was = row[c];
+        if (!names(was, subjects)) continue;
+        const now = json.includes(c) ? scrubbed(was as string, subjects) : ERASED;
+        if (now !== was) sets.push([c, now]);
+      }
+      if (sets.length === 0) continue;
+      sql.exec(`UPDATE ${table} SET ${sets.map(([c]) => `${c} = ?`).join(', ')} WHERE ${key} = ?`, ...sets.map(([, v]) => v), row.k as string);
       n++;
     }
     bump(table, n);
@@ -154,6 +185,16 @@ export function eraseSubjects(deps: EraseDeps, subjects: readonly string[], pers
   tomb('job', 'id', ['args', 'result', 'error']);
   /* `job_event` has no single key, so its rowid is the one. */
   tomb('job_event', 'rowid', ['body']);
+  /* THE LAST SIX (OPS-21). An invitation is an address; a saved view keeps a name, a search and a filter somebody typed;
+     a rule's run keeps its variables and what it said, and each step what it was answered; an agent token keeps the
+     label its maker gave it; an uninstalled pack keeps the settings chosen for it for thirty days. An invitation whose
+     address goes can no longer be accepted, since acceptance matches the address. */
+  tomb('invitation', 'id', ['email']);
+  tomb('view', 'rowid', ['name', 'search', 'filter'], ['filter']);
+  tomb('automation_run', 'id', ['vars', 'say'], ['vars']);
+  tomb('automation_step', 'rowid', ['answer']);
+  tomb('token', 'id', ['label']);
+  tomb('pack_removed', 'pack', ['settings'], ['settings']);
 
   /* ── pending work that names the subject: cancelled ── */
   const cancel = (table: string, states: string): number => {
@@ -201,6 +242,11 @@ export function eraseSubjects(deps: EraseDeps, subjects: readonly string[], pers
   bump('person', people);
   bump('member', members);
   bump('push_sub', phones);
+  /* AND ANOTHER MEMBER'S GRANT NARROWED BY A RULE THAT NAMES THEM (`member.row_where`, migration 19). Walked after the
+     person's own rows are deleted, so none is counted twice. The whole rule goes, not the value inside it: a rule that
+     is not JSON reaches no row (`members.ts`), which fails closed, where a rule matching `--erased--` would reach the
+     very rows this erasure just tombstoned. */
+  tomb('member', 'rowid', ['row_where']);
 
   /* ── metric_point: aggregates only; walked so the count is honest ── */
   bump('metric_point', 0);

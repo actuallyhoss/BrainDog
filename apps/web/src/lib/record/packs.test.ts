@@ -368,7 +368,9 @@ test('A MODULE A USE CASE BRINGS IS ITS, even on a record where none speaks yet:
 test("A MODULE ALREADY HERE IS OFFERED IN A USE CASE'S WORDS ONLY WHEN THE USE CASE GIVES IT SOME, and with no example rows", async () => {
   const { relabelDocument } = await import('./packs.ts');
   const held = [{ id: 'money-core', version: '1.0.0', disabled_at: null, registers: ['accounts', 'obligations'] }];
-  assert.equal(await relabelDocument('money-core', held, 'student'), null);
+  /* A STUDENT GIVES MONEY THE PLAIN WORDS SINCE MOD-23, so Money is offered again in them; Services it leaves alone. */
+  assert.equal(await relabelDocument('estate', held, 'student'), null);
+  assert.ok(JSON.stringify((await relabelDocument('money-core', held, 'student'))!.declarations).includes('Due to you'));
   assert.equal(await relabelDocument('people', held, 'personal'), null);
   const money = (await relabelDocument('money-core', held, 'personal'))!;
   assert.equal(money.seeds, undefined, 'an update would write example bills into a record already holding Money');

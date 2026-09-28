@@ -30,6 +30,9 @@
 
   const token = $derived(route.params.token ?? '');
 
+  /* THE ONE WORD THIS SCREEN ADDS (DSN-18): the action under a dead link. The rest are `share-write.ts`'s. */
+  const shareWords = { whatItIs: 'See what BrainDog is' };
+
   let got = $state<SharedRead | null>(null);
   let now = $state(Date.now());
 
@@ -119,9 +122,12 @@
   {#if got === null}
     <Waiting head />
   {:else if got.from === 'shut'}
-    <!-- NO ACTION and NO REASON. Every way a link fails is one answer at the record, so the page says it is not shared
-         and who can fix that, and nothing about which way it failed. -->
-    <Empty kind="no-permission" heading title={words.sharedDead} body={words.sharedDeadBody} />
+    <!-- NO REASON. Every way a link fails is one answer at the record, so the page says it is not shared and who can fix
+         that, and nothing about which way it failed. AND ONE ACTION (DSN-18): the person holding a dead link cannot mend
+         it from here, so the one thing offered is where it came from, the product, rather than an empty end. -->
+    <Empty kind="no-permission" heading glyph="link" title={words.sharedDead} body={words.sharedDeadBody}>
+      {#snippet actions()}<Button href="https://brain.dog">{shareWords.whatItIs}</Button>{/snippet}
+    </Empty>
   {:else if got.from === 'unreached'}
     <div class="unreached">
       <Empty kind="error" heading title={words.sharedUnreached}>

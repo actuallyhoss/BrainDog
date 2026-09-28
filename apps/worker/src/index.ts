@@ -24,7 +24,10 @@ import { handlersFor, hintsOf, httpStatus, serveApi, serveIngest, serveSlash, se
 import { deriveSessionKey, relyingParty, serveAccount, serveAuth, type DeviceDoor, type EmailDoor, type InviteDoor, type Provisioned } from '@braindog/host/auth';
 /* SIGN-UP (`loop/finish/ops.md` OPS-17): its three routes are answered in `signIn()` before `serveAuth`. */
 import { clearCookie, cookieMode, mirrorEverywhere, readSid, renameAsked, renamedName, sameOrigin, sessionCookie } from '@braindog/host/auth';
-import type { SignupCall } from '@braindog/ports';
+import type { AccountCall, SignupCall } from '@braindog/ports';
+/* CLOSING AN ACCOUNT (OPS-21): the door is the host package's, and `account()` hands it this Worker's halves. */
+import { CLOSE_RECORDS_MOST, closeDoor } from '@braindog/host/auth';
+import type { AccountClosed } from '@braindog/ports';
 import { gate, serveMcp as answerMcp, unauthorized as unknownAgent } from '@braindog/mcp/http';
 import { INVITE_GONE, ulids, type Arrival, type Arrived, type CreateRecordArgs, type DeviceCode, type Exchanged, type LeasedSeal, type OperationGrant, type OutboxRow, type VaultGrant, type Waiting } from '@braindog/kernel';
 import { createRecordApi, type CallContext, type Deposited, type IngestVerification, type Limited, type OpenedForGrant, type RecordApi, type SealTarget, type Sealed } from '@braindog/record';
@@ -33,7 +36,7 @@ import type { Auth, AuthCall, AuthResult, Param, Refusal, Result, Row, Scheduler
 
 import { createDirectory, switcherAsk, type AccountUsage, type Directory as Dir, type RunUsage, type SessionAsk, type SwitcherAsk, type SwitcherRow } from '@braindog/record/directory';
 import type { BillingAnswers, BillingCall } from '@braindog/record/directory';
-import type { MeterTally, Person, UsageNotice } from '@braindog/record/directory';
+import type { MeterTally, Person, SlashDay, SlashTally, UsageNotice } from '@braindog/record/directory';
 import type { Plan } from '@braindog/record/directory';
 import { answerOAuth, type OAuthAnswers, type OAuthCall } from '@braindog/record/oauth';
 import { seedCatalogue } from '@braindog/seed/usecases/catalogue';
@@ -51,10 +54,12 @@ import { backgroundMeter, serveModelJobs, type ModelJobMeter } from '@braindog/h
 import { alarmScheduler } from './alarm.ts';
 import { slashLook, workerSlashAnswers, workerSlashDoor, workerSlashModel } from './slash.ts';
 import { slashErasing } from './slash.ts';
-import { workerSlashMeter } from './slash-meter.ts';
+import { slashReplay, workerSlashMeter } from './slash-meter.ts';
 import { workerModelJobs } from './slash-jobs.ts';
 import { workerCatalogueOffers } from './catalogue.ts';
-import { serveKennel, servesKennel } from './kennel.ts';
+import { serveKennel, servesKennel, writeCounts } from './kennel.ts';
+/* MAIL ON THE CLOUD (DOR-7): Email Routing's messages into the same door as a forwarder's post. */
+import { fileKeeper, takeMail } from './email.ts';
 import { fileKey, serveFiles, servesFiles } from './files.ts';
 import { cloudSnapshots, type Pitr } from './copies.ts';
 import { DELETED, destroyRecord, expireFinal } from './destroy.ts';
@@ -104,6 +109,8 @@ import { doorPath, op, outboxFields, type AckedRow } from './oplog.ts';
 import { billingDoors, type BillingDeps } from './billing.ts';
 import { billingKey } from './billing.ts';
 import { stripeOf } from './stripe.ts';
+/* TELEMETRY (`loop/finish/ops.md` OPS-23): one Analytics Engine point per request, when `TELEMETRY` is bound. */
+import { telemetry } from './telemetry.ts';
 
 /** What a record answers between arming a restore and being reset: the gap between `51 D15`'s two calls. */
 const RESTORING: Refusal = { code: 'RECORD_UNAVAILABLE', fix: 'This record is going back to a copy and starts again in a moment. Ask again then.', at: 'record' };
@@ -294,6 +301,11 @@ type Env = {
    */
   TURNSTILE_SITE_KEY?: string;
   TURNSTILE_SECRET?: string;
+  /**
+   * The Analytics Engine dataset one point per request goes to (`telemetry.ts`, `51 §5.18`). Drafted and commented in
+   * `wrangler.jsonc` until his H5, and unbound is no point written; with it bound, a point also needs `SESSION_SECRET`.
+   */
+  TELEMETRY?: AnalyticsEngineDataset;
 };
 
 /** A `Result`'s refusal, for an RPC that hands back only the part a caller acts on. */
@@ -440,11 +452,11 @@ const serveMcp = (request: Request, api: RecordApi, ctx: CallContext, origin?: s
 const CATALOGUE = seedCatalogue();
 
 /**
- * THE SCRIPT SANDBOX'S TWO DOORS, EXPORTED FROM THE MAIN MODULE BECAUSE THAT IS WHAT `ctx.exports` IS MADE OF. A class
- * that is only imported here has no loopback binding, and `this.ctx.exports.ScriptOutbound` would be `undefined` at the
- * first run (`script.ts`).
+ * THE SCRIPT SANDBOX'S TWO DOORS AND ITS TAIL, EXPORTED FROM THE MAIN MODULE BECAUSE THAT IS WHAT `ctx.exports` IS MADE
+ * OF. A class that is only imported here has no loopback binding, and `this.ctx.exports.ScriptOutbound` would be
+ * `undefined` at the first run (`script.ts`). Without `ScriptTail` a run is loaded with no tail and reports no CPU time.
  */
-export { ScriptOutbound, ScriptRecord } from './script.ts';
+export { ScriptOutbound, ScriptRecord, ScriptTail } from './script.ts';
 
 /** One customer's record. The class name is `Record$` because `Record` is a TypeScript builtin. */
 export class Record$ extends DurableObject<Env> {
@@ -1037,12 +1049,26 @@ export class Record$ extends DurableObject<Env> {
     const record = api.kernel.identity()?.id;
     if (!record) return null;
     const ledger = this.env.DIRECTORY.get(this.env.DIRECTORY.idFromName('directory'));
+    /* AND SLASH'S ASKS BY DAY INTO THE ACCOUNT'S LEDGER (`slashReplay`, MTR-3), from this object's own `slash_call`. It logs what it could not hand across and never throws, so the runs below are replayed whatever it answered. */
+    await slashReplay(guardedSql(this.ctx.storage), record, (r, days) => ledger.meterSlash(r, days), Date.now());
     return replayUsage({
       record,
       read: (before, limit) => api.kernel.eventsBefore(before, limit),
       meter: (r, runs) => ledger.meterMany(r, runs),
       now: Date.now(),
     });
+  }
+
+  /**
+   * The packs this record has on, by the id it holds each under: the nightly walk's install counts (`nightly.ts`, PLT-15).
+   * AN RPC AND NEVER A ROUTE. `null` for a record deleted, refused by this build, or not yet made. A pack another pack
+   * handed declarations to was never installed, so it is not counted.
+   */
+  async packsOn(): Promise<string[] | null> {
+    if (this.#gone) return null;
+    const api = await this.#record();
+    if (api.kernel.refused()) return null;
+    return api.kernel.packStates().filter((p) => p.disabled_at === null && p.handed !== true).map((p) => p.id);
   }
 
   /* ── the nightly walk's calls (`nightly.ts`, `ladder.ts`) ─────────────────
@@ -1447,7 +1473,7 @@ export class Record$ extends DurableObject<Env> {
     const api = await this.#record();
     const broken = api.kernel.refused();
     if (broken) throw new Error(broken.fix);
-    return api.ingestVerify(args);
+    return api.ingestVerify(args, this.#openKey(api) ?? undefined);
   }
 
   /** A vault grant's bearer, checked for the key doors. AN RPC AND NEVER A ROUTE: `vaultGrant` is INTERNAL. */
@@ -1761,7 +1787,7 @@ export class Directory$ extends DurableObject<Env> {
    * Sign-in, whole: `/auth/*` arrives as an `AuthCall` and leaves as an `AuthResult`. And `session` with a `slug`, which
    * is how a request under `/app/<slug>` learns whether that name is this person's before any record is addressed.
    */
-  auth(call: AuthCall | SessionAsk | SignupCall): Promise<AuthResult> {
+  auth(call: AuthCall | SessionAsk | SignupCall | AccountCall): Promise<AuthResult> {
     return this.#directory().auth(call);
   }
 
@@ -1827,6 +1853,11 @@ export class Directory$ extends DurableObject<Env> {
   /** Count a batch of one record's runs, at most `METER_MANY_MAX`: the nightly replay's call (`Record$.meterReplay`). */
   meterMany(record: string, runs: readonly RunUsage[]): Result<MeterTally> {
     return this.#directory().meterMany(record, runs);
+  }
+
+  /** A record's Slash asks by UTC day, at most `SLASH_DAYS` of them: the nightly walk's call through `Record$.meterReplay` (MTR-3). */
+  meterSlash(record: string, days: readonly SlashDay[]): Result<SlashTally> {
+    return this.#directory().meterSlash(record, days);
   }
 
   /** `GET /account/usage`: what the records this person owns used between two days. */
@@ -2419,16 +2450,21 @@ export default {
    * branch for a refusal when one of its two hosts sometimes speaks a different language.
    */
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    const began = Date.now();
+    let answer: Response;
     try {
-      return await route(request, env, ctx);
+      answer = await route(request, env, ctx);
     } catch (e) {
       /* AN ARMED RECORD IS NOT A FAULT, AND 500 TOLD THE CLIENT IT WAS. Every door that checks a credential by RPC reaches
          `#record()` first, which rejects while a restore is armed, and this answered that 500 `INTERNAL` with the refusal's
          own sentence inside it (`test/restore-armed.test.ts`). The object's comments promise 503 `RECORD_UNAVAILABLE`,
          and 503 is what a client waits on and asks again. */
-      if (restoring(e)) return json({ ok: false, refusal: RESTORING }, 503);
-      return crashAnswer(request, e);
+      answer = restoring(e) ? json({ ok: false, refusal: RESTORING }, 503) : crashAnswer(request, e);
     }
+    /* ONE POINT PER REQUEST, CRASHES INCLUDED, AFTER THE ANSWER (`51 §5.18`, `telemetry.ts`). Inside `waitUntil` so the
+       caller never waits on a count, and it does nothing at all while `TELEMETRY` is unbound. */
+    ctx.waitUntil(telemetry(env, request, answer, Date.now() - began));
+    return answer;
   },
 
   /**
@@ -2457,6 +2493,18 @@ export default {
    */
   async scheduled(_controller: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
     await nightly(env);
+  },
+
+  /**
+   * Mail to a record's mailbox, from Email Routing (DOR-7, `email.ts`).
+   *
+   * THE SAME DOOR AS `POST /in/email/<token>`, WITH THE FILE STORE ADDED. `arrivals` is the Directory, the object and the
+   * brake the HTTP door uses, so a message is budgeted, looked up and stored exactly as a forwarder's post is, and
+   * `fileKeeper` puts its attachments in `BLOBS` under the record's prefix, as `PUT /api/files` does. Nothing reaches
+   * this until his Email Routing rule sends a domain's mail here; until then it is an export nothing calls.
+   */
+  async email(message: ForwardableEmailMessage, env: Env, _ctx: ExecutionContext): Promise<void> {
+    await takeMail(message, { ...cloudIngest(arrivals(env)), keep: fileKeeper(env.BLOBS) });
   },
 };
 
@@ -2543,6 +2591,9 @@ async function nightly(env: Env): Promise<void> {
     /* AND EACH RECORD'S LAST FORTY DAYS OF RUNS INTO THE LEDGER AGAIN, by its own object (`Record$.meterReplay`), so a
        count a pass lost and every automation run are in the account by morning. */
     replay: (record) => stub(record).meterReplay(),
+    /* AND WHAT EACH RECORD HAS ON, TALLIED INTO THE KENNEL'S PUBLIC INSTALL COUNTS (`writeCounts`, PLT-15). */
+    installed: (record) => stub(record).packsOn(),
+    counts: (held) => writeCounts({ blobs, assets: env.ASSETS }, held, new Date(tonight)),
     speak: op,
     now: () => Date.now(),
   });
@@ -2590,7 +2641,7 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
        returns for everything it does not recognise, and before the app shell, which would answer a bank's
        webhook with `index.html` and a 200 that its retry logic reads as delivered. `serveIngest` holds the
        whole order from here, including the 404 for the shape this host does not serve. */
-    if (servesIn(url.pathname)) return serveIngest(request, cloudIngest(arrivals(env)));
+    if (servesIn(url.pathname)) return serveIngest(request, { ...cloudIngest(arrivals(env)), keep: fileKeeper(env.BLOBS) });
     /* THE KEY DOORS, before any door is asked: their bearer is a vault grant, no cookie may reach them, and a login
        token reaches only the deposit door, to add a new key (`keyDoor`). */
     if (servesVault(url.pathname)) return keyDoor(request, env);
@@ -2976,7 +3027,7 @@ async function appPage(request: Request, env: Env, app: AppPath): Promise<Respon
   /* EVERY ANSWER THE ASSETS GIVE HERE IS A PAGE OF THE APP, OR A FILE BESIDE ONE, and leaves with `asPage`'s four
      headers: measured on production, the shell and the sign-in page carried none (`loop/research-push-a-live.md`
      finding 1). The 302 `appEntry` answers for bare `/app` is not wrapped, because a frame follows it to the shell. */
-  const shell = async () => asPage(await assets.fetch(new Request(new URL('/app/', request.url), { method: request.method })));
+  const shell = async () => asPage(await assets.fetch(new Request(new URL('/app/', request.url), { method: request.method })), new URL(request.url).pathname);
   if (app.slug === null && app.rest === '/') {
     const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
     return appEntry(request, {
@@ -2987,7 +3038,7 @@ async function appPage(request: Request, env: Env, app: AppPath): Promise<Respon
   }
   if (app.slug === null) {
     const file = await assets.fetch(request);
-    if (file.status !== 404 || /\.[A-Za-z0-9]+$/.test(app.rest)) return asPage(file);
+    if (file.status !== 404 || /\.[A-Za-z0-9]+$/.test(app.rest)) return asPage(file, new URL(request.url).pathname);
   }
   return shell();
 }
@@ -3234,6 +3285,32 @@ async function account(request: Request, env: Env, ctx: ExecutionContext): Promi
               env.RECORD.get(env.RECORD.idFromName(record)).mirrorPerson(person, change) as unknown as Promise<Result<unknown>>,
             mail: (kind: 'email.change' | 'email.changed', to: string, link?: string) => ctx.waitUntil(sendMail(env, kind, to, link ? { link } : {})),
           } satisfies EmailDoor,
+        }
+      : {}),
+    /* CLOSING AN ACCOUNT (OPS-21), only where somebody can sign in: unset, the row stays 404 as `ACCOUNT_ROUTES`
+       promises. Who owns a record is each record's own table, so every record this person holds at `owner` is asked
+       for its owners over RPC, at most `CLOSE_RECORDS_MOST`; the rest are named back, and the door refuses. The
+       Directory's half rides on `auth`, the one RPC it already answers for a person's way in, whose parameter does
+       not name `AccountCall` yet: `Directory$.auth` hands it to `signInMarked`, which does. */
+    ...((env.SESSION_SECRET ?? '').length >= 32
+      ? {
+          close: closeDoor({
+            alone: async (who) => {
+              const me = who.email.trim().toLowerCase();
+              const owned = (await directory.recordsFor(who.person)).filter((r) => r.level === 'owner').map((r) => r.slug);
+              const alone = owned.slice(CLOSE_RECORDS_MOST);
+              for (const slug of owned.slice(0, CLOSE_RECORDS_MOST)) {
+                const named = await directory.resolve(slug);
+                if (!named) continue;
+                const owners = await env.RECORD.get(env.RECORD.idFromName(named.record)).walkOwners();
+                if (!owners.some((email) => email.trim().toLowerCase() !== me)) alone.push(slug);
+              }
+              return alone;
+            },
+            close: (call) => directory.auth(call) as unknown as Promise<AuthResult<AccountClosed>>,
+            mail: (to) => ctx.waitUntil(sendMail(env, 'sessions.ended', to)),
+            now: () => Date.now(),
+          }),
         }
       : {}),
     ...billingDoors(env, billing),

@@ -73,46 +73,65 @@ test('TEN READS SENT TOGETHER AT A CAP OF 2 make two model calls, and the other 
   }
 });
 
-test('ten pass 2s on one ask_id, sent together with one ask left, make one model call', async () => {
+test('ten pass 2s on one ask_id, sent together, make one model call and the other nine are refused, not billed', async () => {
   const { sql, inference, slash } = build();
   try {
     assert.ok(slash.configure({ ask_cap: 2 }, OWNER).ok);
     inference.say(PREDICATE);
     const first = await slash.read('what is still open', OWNER);
     assert.ok(first.ok);
-    for (let i = 0; i < 10; i++) inference.say(PROPOSAL);
+    inference.say(PROPOSAL);
 
+    /* ONE REPLY, NOT TEN: only the first of the ten reserves `<ask_id>:propose` before the rest run their own
+       synchronous prefix (no `await` sits between `propose`'s entry and that reserve), so the other nine find it
+       there and are refused before any model is asked (`propose.ts`'s own check, off `call.ts`'s `reserve` id). */
     const out = await Promise.all(
       Array.from({ length: 10 }, () => slash.propose('what is still open', OWNER, undefined, first.value.ask_id)),
     );
 
     assert.equal(out.filter((o) => o.ok).length, 1, JSON.stringify(out.map(codeOf)));
-    assert.equal(out.filter((o) => codeOf(o) === 'SLASH_BUDGET_SPENT').length, 9);
+    assert.equal(out.filter((o) => codeOf(o) === 'ALREADY_KNOWN').length, 9);
     assert.equal(inference.seen.length, 2);
-    assert.equal(slash.status().asks.used, 2);
+    /* ONE QUESTION IS ONE ASK: the `read` above is the one this counts, and the admitted `propose` is its pass 2. */
+    assert.equal(slash.status().asks.used, 1);
   } finally {
     sql.close();
   }
 });
 
-test('TEN PROPOSES WITH NO ASK_ID SENT TOGETHER AT A CAP OF 2 make the two calls one of them makes alone', async () => {
-  const { sql, inference, slash, rows } = build();
+test('TEN PROPOSES WITH NO ASK_ID SENT TOGETHER AT A CAP OF 2 make the two calls each of two of them makes', async () => {
+  const sql = openSqlite();
   try {
+    /* A REPLY BY SHAPE, NOT BY QUEUE ORDER. Two admitted proposes now run concurrently (only the drafting `read`
+       counts against the cap, `asksUsed`), and their four model calls interleave across two `await`s each, so a
+       FIFO queue answered call 1's proposal with call 2's draft as often as its own. `maxTokens` tells the two
+       templates apart (`prompts.ts`'s `predicate: 200` and `propose: 1500`) without caring which call reaches
+       which first. */
+    const seen: { maxTokens: number }[] = [];
+    const inference: Inference = {
+      complete: async (call) => {
+        seen.push({ maxTokens: call.maxTokens });
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        return { text: call.maxTokens === 200 ? PREDICATE : PROPOSAL, usage: { in: 100, out: 20 } };
+      },
+    };
+    const slash = createSlash({ sql, clock: fixedClock(NOW), inference, record: fakeRecord() });
+    const rows = () =>
+      sql
+        .all<{ kind: string; status: string; code: string | null }>('SELECT kind, status, code FROM slash_call ORDER BY rowid')
+        .map((r) => ({ ...r }));
     assert.ok(slash.configure({ ask_cap: 2 }, OWNER).ok);
-    /* ONE PAIR OF REPLIES AND NOT TEN. The canned adapter answers in the order it is called, so a second admitted
-       propose would take a PREDICATE where it wanted a PROPOSAL; the count of calls is the assertion either way. */
-    inference.say(PREDICATE);
-    inference.say(PROPOSAL);
 
     const out = await Promise.all(Array.from({ length: 10 }, () => slash.propose('what is still open', OWNER)));
 
-    assert.equal(out.filter((o) => codeOf(o) === 'SLASH_BUDGET_SPENT').length, 9, JSON.stringify(out.map(codeOf)));
-    assert.equal(inference.seen.length, 2, 'a second propose was admitted on the count of the first one\'s draft alone');
+    assert.equal(out.filter((o) => o.ok).length, 2, JSON.stringify(out.map(codeOf)));
+    assert.equal(out.filter((o) => codeOf(o) === 'SLASH_BUDGET_SPENT').length, 8, JSON.stringify(out.map(codeOf)));
+    assert.equal(seen.length, 4, 'two admitted proposes each drafted once and proposed once');
     assert.equal(slash.status().asks.used, 2);
-    assert.deepEqual(rows(), [
-      { kind: 'read', status: 'ok', code: null },
-      { kind: 'propose', status: 'ok', code: null },
-    ]);
+    const settled = rows();
+    assert.equal(settled.filter((r) => r.kind === 'read' && r.status === 'ok').length, 2);
+    assert.equal(settled.filter((r) => r.kind === 'propose' && r.status === 'ok').length, 2);
+    assert.equal(settled.length, 4);
   } finally {
     sql.close();
   }
@@ -146,7 +165,9 @@ test('an ask that called no model gives its place back: the record refused the r
     inference.say(PROPOSAL);
     const again = await slash.propose('what is still open', OWNER, undefined, first.value.ask_id);
     assert.equal(again.ok, true, JSON.stringify(again));
-    assert.equal(slash.status().asks.used, 2);
+    /* STILL 1: the `read` above is the only row that ever counted, and a successful `propose` does not add a second
+       (`asksUsed` no longer reads `kind = 'propose'`). */
+    assert.equal(slash.status().asks.used, 1);
   } finally {
     sql.close();
   }

@@ -18,7 +18,9 @@ import { existsSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { site } from './copy.ts';
-import { PAGES } from './nav.ts';
+import { LAUNCH } from './launch.ts';
+import { SUPPORT_EMAIL } from './links.ts';
+import { PAGES, PLACES } from './nav.ts';
 
 const SITE = new URL('../../', import.meta.url);
 const REPO = new URL('../../', SITE);
@@ -61,6 +63,35 @@ test('nav.ts names every page the site prerenders, so the header, the 404 and th
 
   const named = PAGES.map((p) => p.path);
   for (const page of pages) assert.ok(named.includes(page), `nav.ts leaves out ${page}, so the 404 and the sitemap do too`);
+});
+
+test('every place nav.ts names is a route the site has', () => {
+  /* THE OTHER DIRECTION, AND UNDER PLAIN NODE IT IS THE ONLY GUARD. `exists` in `nav.ts` drops a place with no
+     `+page.svelte` from the header and the footer at build time, but here `import.meta.glob` does not exist, so
+     every place counts as live, and a path typed wrong (or a page for one kind of person under `for/` that was
+     never written) would be listed by the 404 and the sitemap from one build and missing from the next. */
+  const routes = new URL('src/routes/', SITE);
+  const missing = PLACES.map((p) => p.path).filter((path) => !existsSync(new URL(`.${path}/+page.svelte`, routes)));
+  assert.deepEqual(missing, [], `nav.ts names ${missing.join(', ')}, and src/routes holds no page there`);
+});
+
+/**
+ * THE SITE'S LAUNCH FLAGS MIRROR THE WORKER'S VARS (`loop/finish/contracts.md` §9, "The site's launch flags
+ * mirror the Worker's vars"). There is no sign-up var: production's `BILLING` is both switches, so
+ * `LAUNCH.signup` is on exactly when it is set, and `LAUNCH.billing` exactly when it is `live`. The support
+ * address is the Worker's `SUPPORT_ADDRESS`, and `/support` shows `SUPPORT_EMAIL`, so the two are one address
+ * or both empty. Each is read off the parsed config of production, because that is the environment the site
+ * deployed to brain.dog describes.
+ */
+test("the launch flags and the support address match production's Worker vars", () => {
+  const vars: { [key: string]: string } = wranglerConfig(fileURLToPath(REPO)).env?.['production']?.vars ?? {};
+  const billing = vars['BILLING'];
+  assert.ok(billing !== undefined, 'no BILLING in the production environment of apps/worker/wrangler.jsonc, so nothing says whether sign-up is open');
+  assert.equal(LAUNCH.signup, billing !== '', `production's BILLING is "${billing}", and LAUNCH.signup in src/lib/launch.ts is ${LAUNCH.signup}`);
+  assert.equal(LAUNCH.billing, billing === 'live', `production's BILLING is "${billing}", and LAUNCH.billing in src/lib/launch.ts is ${LAUNCH.billing}`);
+  /* Absent reads as empty: the var is added the day the address routes to a person (`contracts.md` §8.4). */
+  const support = vars['SUPPORT_ADDRESS'] ?? '';
+  assert.equal(SUPPORT_EMAIL, support, `production's SUPPORT_ADDRESS is "${support}", and SUPPORT_EMAIL in src/lib/links.ts is "${SUPPORT_EMAIL}"`);
 });
 
 test('the hosted backup cell does not promise copies while the sealing key is a placeholder', () => {

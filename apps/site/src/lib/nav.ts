@@ -7,6 +7,8 @@
  * a page that does not exist yet can never be drawn, which would also stop the strict prerender.
  */
 import { shell } from './copy/shell.ts';
+import { cases } from './copy/cases.ts';
+import { forPages } from './copy/for.ts';
 import { DOCS, PACKS, SECURITY, SUPPORT } from './links.ts';
 
 export type Group = 'product' | 'build' | 'trust';
@@ -26,12 +28,32 @@ const place = (path: string, key: keyof typeof shell.nav, group: Group, header: 
   group,
 });
 
-/** Every page a reader may be sent to, home aside. `/legal/*` stays out: those pages are unlinked until their texts arrive. */
+/* A PAGE WRITTEN FOR ONE KIND OF PERSON (`routes/for/`), at the address the drawn app's "More for" link
+   opens, in the footer's Product group and never in the header's row. */
+const person = (id: keyof typeof forPages.person.who): Place => ({
+  path: cases.drawn.moreFor[id].href,
+  label: forPages.person.who[id].nav,
+  header: false,
+  group: 'product',
+});
+
+/**
+ * Every page a reader may be sent to, home aside. `/legal/*` stays out: those pages are unlinked until their texts arrive.
+ *
+ * THE HEADER'S ROW IS FINAL: Slash, For agents, Packs, Pricing, Docs, Changelog, and then GitHub, which
+ * `+layout.svelte` adds from `SOURCE` in `links.ts` because it is not a page of this site. Slash leads
+ * because it has a page of its own since the redesign of 26 September (`loop/DIRECTION.md` §33).
+ */
 export const PLACES: readonly Place[] = [
   place('/slash', 'slash', 'product', true),
   place('/agents', 'agents', 'build', true),
   place(PACKS, 'packs', 'product', true),
   place('/pricing', 'pricing', 'product', true),
+  person('personal'),
+  person('student'),
+  person('founder'),
+  person('team'),
+  person('project'),
   place(DOCS, 'docs', 'build', true),
   place('/changelog', 'changelog', 'product', true),
   place(SUPPORT, 'support', 'trust', false),

@@ -50,7 +50,8 @@
     toggleSelect: (seq: number, extend: boolean) => void;
     copyId: (seq: number) => void;
     copyLink: (seq: number) => void;
-    archive: (seq: number) => void;
+    /** Absent for a caller whose level cannot change the list, and Archive is then not in the menu (COL-13). */
+    archive?: ((seq: number) => void) | undefined;
     /** How the row a hand leaves lands back on the grid (`landRow`), on a live record only (GAP-11). */
     onhanded?: ((entry: Entry) => void) | undefined;
   } = $props();
@@ -109,11 +110,13 @@
       <Icon name="link" size="s" />
       <span class="mi-name">{copy.copyLink}</span><Kbd keys="⇧Y" />
     </button>
-    <hr class="mi-rule" />
-    <button class="mi" role="menuitem" type="button" onclick={() => archive(seq)}>
-      <Icon name="archive" size="s" />
-      <span class="mi-name">{copy.archive}</span><Kbd keys="⌫" />
-    </button>
+    {#if archive}
+      <hr class="mi-rule" />
+      <button class="mi" role="menuitem" type="button" onclick={() => archive?.(seq)}>
+        <Icon name="archive" size="s" />
+        <span class="mi-name">{copy.archive}</span><Kbd keys="⌫" />
+      </button>
+    {/if}
   {/if}
 </RowMenu>
 

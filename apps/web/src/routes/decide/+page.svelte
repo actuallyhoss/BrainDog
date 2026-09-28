@@ -26,6 +26,7 @@
   import { goto, invalidateAll } from '$app/navigation';
   import { queueCost, since, symbolText } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
+  import { said } from '$lib/voice.svelte.ts';
   import { DOM_CAP } from '$lib/record/api.ts';
   import { targetLine } from '$lib/record/metrics.ts';
   import Changes from './[id]/Changes.svelte';
@@ -278,7 +279,7 @@
     fixes = next;
     answers = withdraw(answers, q.id);
     settledHere = new Map(settledHere).set(q.id, a.title);
-    toasts.push(copy.decisionRecorded(a.title, q.id), { intent: 'good' });
+    toasts.push(copy.decisionRecorded(a.title), { intent: 'good' });
     if (accepting && about && had) {
       /* WHAT IT APPLIED, said back, with the sidebar entries it added once the shell has read the record again. */
       appliedHere = new Map(appliedHere).set(q.id, appliedLines(out.applied ?? {}, about.body));
@@ -523,11 +524,11 @@
   });
 </script>
 
-<svelte:head><title>{titleOf(copy.decide)}</title></svelte:head>
+<svelte:head><title>{titleOf(said('decide'))}</title></svelte:head>
 <svelte:window {onkeydown} />
 
 <!-- NO COUNT IN THE HEAD: `Open questions` prints it one line lower, for the same list. -->
-<PageHead icon="decide" title={copy.decide}>
+<PageHead icon="decide" title={said('decide')}>
   {#snippet actions()}
     <!-- ONE QUIET PRESS, and only for somebody who may answer: a question a reader could ask and never settle is a
          question left in everybody else's queue. -->
@@ -688,7 +689,7 @@
     <!-- ALL CLEAR, with the last decision's age, and the other queue when something waits in it. -->
     <Empty
       kind="cleared"
-      title={copy.noQuestions}
+      title={said('no_questions')}
       body={DECIDED[0] ? `${copy.lastDecided} ${since(DECIDED[0].decided?.at ?? '', now)}.` : undefined}
     >
       {#snippet actions()}
@@ -750,7 +751,7 @@
       {/each}
 
       {#if waiting.length === 0}
-        <Empty kind="cleared" compact title={copy.noQuestions}>
+        <Empty kind="cleared" compact title={said('no_questions')}>
           {#snippet actions()}
             {#if Number(route.data.inbox ?? 0) > 0}<Button href="/inbox">{copy.decideOpenInbox}</Button>{/if}
           {/snippet}

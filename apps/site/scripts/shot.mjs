@@ -19,7 +19,7 @@
  */
 
 import { createReadStream } from 'node:fs';
-import { stat } from 'node:fs/promises';
+import { readdir, stat } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { extname, join, normalize } from 'node:path';
 
@@ -59,21 +59,40 @@ const server = createServer(async (req, res) => {
 await new Promise((r) => server.listen(PORT, r));
 
 /**
- * EVERY PRERENDERED ROUTE, AND IT WAS THREE OF FIVE.
+ * EVERY ROUTE THE BUILD HAS, READ FROM THE BUILD AND NOT TYPED HERE.
  *
- * `/legal` and `/404` were the two routes the redesign left on the old document layout, and they
- * were also the two routes this script had never photographed, which is not a coincidence: a page
- * nobody looks at is a page nobody notices has stopped matching the rest of the site. They are
- * here so the next person deciding what to do with them is deciding from a picture.
+ * The list was typed, and it was six routes on a site that now has twenty: `/slash`, `/packs`, the
+ * five `/for/` pages, `/docs`, `/support` and `/security` had never been photographed, and a page
+ * nobody looks at is a page nobody notices has stopped matching the rest of the site. Every `.html`
+ * the adapter wrote is a page a stranger can reach, so that is the list, and a page added tomorrow is
+ * in the next run without anyone remembering to add it.
+ *
+ * ONE PAGE PER ROUTE WITH A PARAMETER. `/packs/[id]`, `/docs/[section]/[slug]` and `/legal/[name]`
+ * each prerender a page per value from one template, and forty shots of one template teach nothing
+ * the first does not. The templates are read from `src/routes`, and the first built page of each (in
+ * sorted order, so the same one every run) stands for the rest.
  */
-const ROUTES = [
-  ['home', '/'],
-  ['pricing', '/pricing'],
-  ['agents', '/agents'],
-  ['changelog', '/changelog'],
-  ['legal', '/legal'],
-  ['404', '/404'],
-];
+const ROUTES = await (async () => {
+  const slash = (f) => f.replaceAll('\\', '/');
+  const templates = (await readdir(join(import.meta.dirname, '..', 'src', 'routes'), { recursive: true }))
+    .map(slash)
+    .filter((f) => f.endsWith('+page.svelte') && f.includes('['))
+    .map((f) => new RegExp(`^/${f.slice(0, -'/+page.svelte'.length).replace(/\[[^\]]+\]/g, '[^/]+')}$`));
+  const pages = (await readdir(ROOT, { recursive: true }))
+    .map(slash)
+    .filter((f) => f.endsWith('.html'))
+    .map((f) => `/${f.slice(0, -'.html'.length).replace(/(^|\/)index$/, '')}`)
+    .sort();
+  const seen = new Set();
+  const routes = [];
+  for (const path of pages) {
+    const template = templates.find((t) => t.test(path));
+    if (template && seen.has(template)) continue;
+    if (template) seen.add(template);
+    routes.push([path === '/' ? 'home' : path.slice(1).replaceAll('/', '-'), path]);
+  }
+  return routes;
+})();
 
 /**
  * TWO WIDTHS, BECAUSE HE READS THIS ON A PHONE AND THE PAGE WAS ONLY EVER PHOTOGRAPHED ON A DESKTOP.
@@ -160,6 +179,16 @@ for (const scheme of ['light', 'dark']) {
       broken += blank.length;
     }
 
+    /* AND A PAGE WIDER THAN THE SCREEN IS SAID OUT LOUD. A full-page capture is as wide as the
+       viewport, so a row that runs off the side at 390 is cut from the picture rather than shown in
+       it, and the one fault a phone reader meets first would be the one the shots hide. */
+    const wide = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    /* One pixel of slack, the layout gate's own, for a width that rounds up at a device scale of 1.5. */
+    if (wide > 1) {
+      console.error(`  ${path} scrolls sideways by ${wide}px at ${width}.`);
+      broken++;
+    }
+
     const file = join(OUT, `${name}-${scheme}${suffix}.png`);
     await page.screenshot({ path: file, fullPage: true });
     console.log(`  shots/${name}-${scheme}${suffix}.png`);
@@ -171,6 +200,6 @@ await browser.close();
 server.close();
 
 if (broken > 0) {
-  console.error(`\n  ${broken} request(s) failed. The build and the served directory disagree.`);
+  console.error(`\n  ${broken} fault(s) above: a failed request, an image that never loaded, or a page wider than the screen.`);
   process.exitCode = 1;
 }

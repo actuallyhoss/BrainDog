@@ -33,7 +33,16 @@ export type Where = Predicate;
 /** The port a host implements over Workers AI, an Ollama tag or a customer's own endpoint. */
 export interface Inference {
   complete(call: InferenceCall): Promise<InferenceReply>;
+  /**
+   * OPTIONAL, as `complete` is not: an adapter built before embeddings, or a host with no embedding model, answers
+   * `undefined` here and `embedTexts` (`jobs.ts`) refuses `NOT_IN_THIS_BUILD` rather than throwing on a method that
+   * was never there. Throws as `complete` does, on the same host marks `answer.ts` reads off a throw.
+   */
+  embed?(texts: readonly string[]): Promise<Embedding>;
 }
+
+/** One call's embeddings: the model that answered, the width of each vector, and the vectors themselves, in order. */
+export type Embedding = { model: string; dims: number; vectors: Int8Array[]; usage: { in: number; out: number } };
 
 /**
  * One model call.
@@ -329,6 +338,8 @@ export interface Slash {
   draftPattern(samples: readonly RawPayload[]): Promise<Result<PatternDraft>>;
   /** Two sentences above a digest about to be sent, or `{ text: '' }` for none: the record's `infer.prose` job (`jobs.ts`). */
   digestProse(digest: unknown): Promise<Result<{ text: string }>>;
+  /** The record's `infer.embed` job: one embedding call over `texts`, on the engine's own `Inference.embed` (`jobs.ts`). */
+  embedTexts(texts: readonly string[]): Promise<Result<Embedding>>;
   /**
    * An automation's question, answered in the shape its rule asked for. `inference` is the model for this job, keyed in the
    * rule's name, as `read`'s is keyed in the asker's; it takes no `CallContext` because nobody is asking.

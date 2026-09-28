@@ -10,7 +10,7 @@
     "deploy:production": "wrangler deploy --env production",
     "dev": "vite dev",
     "preview": "vite preview",
-    "test": "node --test test/*.test.ts test/*.test.mjs scripts/*.test.mjs src/lib/*.test.ts",
+    "test": "node --test test/*.test.ts test/*.test.mjs scripts/*.test.mjs \"src/**/*.test.ts\"",
     "typecheck": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json"
   },
   "dependencies": {
@@ -21,6 +21,7 @@
     "@sveltejs/adapter-static": "3.0.10",
     "@sveltejs/kit": "2.70.3",
     "@sveltejs/vite-plugin-svelte": "7.3.0",
+    "braindog-render": "workspace:*",
     "svelte-check": "4.7.6",
     "typescript": "6.0.3",
     "vite": "8.2.2",

@@ -765,9 +765,13 @@ export function blankStep(verb: Verb): Step {
  * `later` is a `schedule` span in the vault's grammar (where `m` is a month), `list` is one item a line, `pairs` is
  * `field: value` a line, and `condition` is a `where` sentence. `template` marks the ones that read `{{…}}`, which the
  * inspector offers as chips rather than asking anybody to type braces.
+ *
+ * `shape` is what Slash's answer has to be, picked from `SLASH_SHAPES`, and `fields` is some of the run's row's
+ * fields, picked from the list's own. `when` says the argument means something only while the step holds something
+ * else: `choices` is refused by the lint on an answer that is not a choice, so it is drawn only for one.
  */
-export type ArgKind = 'text' | 'long' | 'name' | 'number' | 'span' | 'later' | 'list' | 'pairs' | 'condition';
-type ArgBase = { path: readonly string[]; label: string; kind: ArgKind; template?: boolean; hint?: string };
+export type ArgKind = 'text' | 'long' | 'name' | 'number' | 'span' | 'later' | 'list' | 'pairs' | 'condition' | 'shape' | 'fields';
+type ArgBase = { path: readonly string[]; label: string; kind: ArgKind; template?: boolean; hint?: string; when?: (step: Step) => boolean };
 /**
  * A REQUIRED ARGUMENT CARRIES THE SENTENCE ITS ABSENCE SAYS, and the type will not take one without it. The fault was
  * assembled, `${verb} needs ${label}.`, and worked through `ARGS` it said "Tell you needs say.", "Add a note needs
@@ -830,8 +834,16 @@ export const ARGS: Record<Verb, readonly Arg[]> = {
     { path: ['ask_person', 'as'], label: 'Keep the answer as', kind: 'name', required: true, missing: NAME_IT },
     { path: ['ask_person', 'wait'], label: 'Wait at most', kind: 'span', hint: '7d' },
   ],
+  /* THE SHAPE, THE CHOICES AND `about` WERE WRITTEN ONLY THROUGH MCP OR A `.dog` FILE (AGT-25): the runner held an
+     answer to its shape and sent the named fields with the question, and the canvas drew the question and the name and
+     nothing else, so a choice could not be asked from here at all. The two optional ones are left out when unset, as
+     the runner reads no `shape` as text and no `about` as no fields. What a choice with nothing to choose from lacks is
+     the lint's to say (`flow-lint.ts`, the `ask_slash` case), on the card its `at` names. */
   ask_slash: [
     { path: ['ask_slash', 'question'], label: 'Question', kind: 'long', required: true, missing: 'Write the question for Slash.', template: true },
+    { path: ['ask_slash', 'shape'], label: 'The answer is', kind: 'shape' },
+    { path: ['ask_slash', 'choices'], label: 'Slash picks one of', kind: 'list', hint: 'One a line', when: (s) => slashShape(s) === 'choice' },
+    { path: ['ask_slash', 'about'], label: 'Send these fields with it', kind: 'fields' },
     { path: ['ask_slash', 'as'], label: 'Keep the answer as', kind: 'name', required: true, missing: NAME_IT },
   ],
   call: [
@@ -847,7 +859,7 @@ export const ARGS: Record<Verb, readonly Arg[]> = {
      `flow-script-as.test.ts` holds the two in step. */
   script: [
     { path: ['script', 'id'], label: 'The script', kind: 'text', required: true, missing: 'Say which script to run.' },
-    { path: ['script', 'as'], label: 'Keep the queued run id as', kind: 'name' },
+    { path: ['script', 'as'], label: 'Call its run', kind: 'name' },
   ],
   wait: [{ path: ['wait'], label: 'For', kind: 'span', required: true, missing: 'Say how long to wait.', hint: '2h' }],
   schedule: [
@@ -855,6 +867,65 @@ export const ARGS: Record<Verb, readonly Arg[]> = {
     { path: ['schedule', 'note'], label: 'Note', kind: 'text', required: true, missing: 'Write what to come back to.', template: true },
   ],
 };
+
+/* ── what Slash answers, and what goes with the question ──────────────────── */
+
+/** The shapes the lint takes for `ask_slash.shape` (`flow-lint.ts`, `SHAPES`), in the order the inspector draws them. */
+export const SLASH_SHAPES = ['text', 'number', 'choice'] as const;
+export type SlashShape = (typeof SLASH_SHAPES)[number];
+
+export const SLASH_SHAPE_WORDS: Record<SlashShape, string> = { text: 'Words', number: 'A number', choice: 'One of a list' };
+
+/** An `ask_slash` step's own object, or an empty one for a step written wrong, which the lint names. */
+const specOf = (step: Step): Record<string, unknown> => {
+  const spec = getAt(step, ['ask_slash']);
+  return spec !== null && typeof spec === 'object' && !Array.isArray(spec) ? (spec as Record<string, unknown>) : {};
+};
+
+/** The shape an `ask_slash` step asks for. None written is text, as the runner reads it (`packages/kernel/src/flow.ts`). */
+export function slashShape(step: Step): SlashShape {
+  const s = getAt(step, ['ask_slash', 'shape']);
+  return s === 'number' || s === 'choice' ? s : 'text';
+}
+
+/**
+ * The step asking for another shape.
+ *
+ * THE CHOICES GO WITH A CHOICE. The lint refuses `choices` on an answer that is not a choice, so a step switched from
+ * "One of a list" to "A number" would fault on a field the inspector no longer draws. Text is written by leaving
+ * `shape` out, the runner's own default, so a step that never asked for anything else reads as it always did.
+ */
+export function withSlashShape(step: Step, shape: SlashShape): Step {
+  const { shape: _was, choices, ...rest } = specOf(step);
+  const kept = shape === 'choice' && choices !== undefined ? { choices } : {};
+  return { ...step, ask_slash: { ...rest, ...(shape === 'text' ? {} : { shape }), ...kept } };
+}
+
+/** The fields an `ask_slash` step sends with its question, in the order written. */
+export function slashAbout(step: Step): string[] {
+  const about = getAt(step, ['ask_slash', 'about']);
+  return Array.isArray(about) ? about.filter((f): f is string => typeof f === 'string') : [];
+}
+
+/** The step with `field` sent, or no longer sent. An emptied list is left out, since the lint refuses `about: []`. */
+export function toggleSlashAbout(step: Step, field: string): Step {
+  const had = slashAbout(step);
+  const next = had.includes(field) ? had.filter((f) => f !== field) : [...had, field];
+  const { about: _was, ...rest } = specOf(step);
+  return { ...step, ask_slash: next.length === 0 ? rest : { ...rest, about: next } };
+}
+
+/**
+ * The fields of a list that may go with a question to Slash: all but a secret or a file, or a list of either, which
+ * never leave the record.
+ *
+ * WRITTEN HERE AND NOT IMPORTED, because `@braindog/kernel` does not export `UNSENDABLE` (`flow-lint.ts`). The lint
+ * refuses such a field in `about:` all the same, so this only keeps the picker from offering what Decide would refuse.
+ */
+export function slashSendable(fields: readonly { id: string; type: string; of?: string }[]): string[] {
+  const sealed = (t: string | undefined) => t === 'secret' || t === 'file';
+  return fields.filter((f) => !sealed(f.type) && !sealed(f.of)).map((f) => f.id);
+}
 
 /* ── what a card says ─────────────────────────────────────────────────────── */
 
@@ -977,6 +1048,8 @@ export const words = {
     fieldName: 'Field',
     fieldAdd: 'Add a field',
     fieldRemove: 'Take it out',
+    aboutHelp: 'Slash reads only the fields picked here. A secret or a file never goes with a question.',
+    aboutNone: 'Nothing to send. Only a run about a row, one a change to a list starts, has fields to go with the question.',
     asRows: 'Edit as conditions',
     asWords: 'Write it in words',
     relativeDay: 'It names a day relative to today, which rows would fix to one date. Keep it in words.',
@@ -1258,9 +1331,12 @@ export type CondField = { id: string; type: string; values?: readonly string[] }
  *
  * THE RUNNER TYPES AN ANSWER BY WHAT IT HOLDS AT RUN TIME, and the canvas has to guess before one exists. A person's
  * answer is one of the step's own options, so it is offered as a choice of them. A remembered value that is one
- * reference or one number is almost always a figure, so it is a number; any other value, Slash's answer, a call's
- * answer (an object) and a script's queued id are text. A guess that is wrong costs a test the builder does not offer,
- * and the words ("As text") still write any sentence the record reads.
+ * reference or one number is almost always a figure, so it is a number; any other value, a call's answer (an object)
+ * and a script's queued id are text. A guess that is wrong costs a test the builder does not offer, and the words
+ * ("As text") still write any sentence the record reads.
+ *
+ * SLASH'S ANSWER IS NO GUESS: the runner holds it to the shape its step asked for (`answerStep`), a number as a number
+ * and a choice as one of the step's choices, so it is typed by that shape and is text only when it asked for words.
  */
 export function answerFields(nodes: readonly Node[], key: string): CondField[] {
   return keepersBefore(nodes, key).flatMap((s): CondField[] => {
@@ -1270,6 +1346,13 @@ export function answerFields(nodes: readonly Node[], key: string): CondField[] {
     if (verb === 'ask_person') {
       const options = getAt(s, ['ask_person', 'options']);
       const values = Array.isArray(options) ? options.filter((o): o is string => typeof o === 'string' && o !== '') : [];
+      return [values.length > 0 ? { id: name, type: 'enum', values } : { id: name, type: 'text' }];
+    }
+    if (verb === 'ask_slash') {
+      const shape = slashShape(s);
+      if (shape === 'number') return [{ id: name, type: 'decimal' }];
+      const choices = getAt(s, ['ask_slash', 'choices']);
+      const values = shape === 'choice' && Array.isArray(choices) ? choices.filter((c): c is string => typeof c === 'string' && c !== '') : [];
       return [values.length > 0 ? { id: name, type: 'enum', values } : { id: name, type: 'text' }];
     }
     if (verb === 'set_var') {
@@ -1341,7 +1424,7 @@ export function faultsOf(d: Draft, { slash }: { slash: boolean } = { slash: fals
       const verb = verbOf(n.step);
       if (verb === null) continue;
       if (notYet(slash).includes(verb)) out.push({ key: n.key, say: 'This BrainDog has no model for Slash to answer with. Ask a person instead.' });
-      for (const arg of ARGS[verb]) if (arg.required && blank(getAt(n.step, arg.path))) out.push({ key: n.key, say: arg.missing });
+      for (const arg of ARGS[verb]) if (arg.required && (arg.when?.(n.step) ?? true) && blank(getAt(n.step, arg.path))) out.push({ key: n.key, say: arg.missing });
       if (verb === 'if') {
         if ((n.then ?? []).length === 0) out.push({ key: n.key, say: 'Add a step under If so, or this branch does nothing.' });
         walk(n.then ?? []);

@@ -9,9 +9,9 @@
   import { apiBase } from '$lib/at.ts';
   import { untrack } from 'svelte';
   import Empty from '$lib/ui/Empty.svelte';
-  import Button from '$lib/ui/Button.svelte';
   import { closed, drew, opened } from '$lib/ui/screen.svelte.ts';
   import { openActions, stateOf, whatOf, type ActionRow } from '$lib/record/actions.ts';
+  import { humanize } from '$lib/record/names.ts';
   import HubRows from './HubRows.svelte';
   import { hubWords as w, type HubRow } from './hub.ts';
 
@@ -47,7 +47,9 @@
       const said = stateOf(r, now);
       return {
         key: r.ingest,
-        name: r.ingest,
+        /* ITS ID IN WORDS, NEVER THE ID. An action declares no title, and a slug in a list of named automations one
+           tab over read as a different product (`loop/finish/design.md` 2.7 and SYS-3). */
+        name: humanize(r.ingest),
         what: whatOf(r),
         said: said.line,
         /* ONLY A PAUSE TAKES A DOT. A failed fetch retries on its own and its sentence says there is nothing to do, so
@@ -63,13 +65,10 @@
 {#if from === 'refused'}
   <Empty kind="error" heading title={fix} />
 {:else if from === 'absent'}
-  <Empty kind="no-data-yet" title={w.scheduledAbsent} body={w.scheduledAbsentHow}>
-    {#snippet actions()}<Button href="/automations?tab=scheduled&new=action">{w.newAction}</Button>{/snippet}
-  </Empty>
+  <!-- NO BUTTON OF ITS OWN, EITHER WAY: the heading's "New scheduled action" is above it, and two read as two things. -->
+  <Empty kind="no-data-yet" title={w.scheduledAbsent} body={w.scheduledAbsentHow} />
 {:else if from === 'ready' && rows.length === 0}
-  <Empty kind="no-data-yet" title={w.scheduledNone} body={w.scheduledWhy} agentPrompt={w.scheduledPrompt}>
-    {#snippet actions()}<Button href="/automations?tab=scheduled&new=action">{w.newAction}</Button>{/snippet}
-  </Empty>
+  <Empty kind="no-data-yet" title={w.scheduledNone} body={w.scheduledWhy} agentPrompt={w.scheduledPrompt} />
 {:else if from === 'ready'}
   <HubRows rows={shown} />
 {/if}

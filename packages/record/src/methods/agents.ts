@@ -60,11 +60,14 @@ const SEEN_WRITTEN =
 
 type Use = { actor: string; count: number; at: string };
 
-/** What `triage` takes. Exactly one of `register` or `ignore`, and `fields` and `note` only with `register`. */
-export type TriageArgs = { arrival: string; register?: string; fields?: Patch; ignore?: true; note?: string };
+/**
+ * What `triage` takes. Exactly one of `register`, `ignore` or `back`; `fields` and `note` only with `register`, and
+ * `version` only with `back`, where it is the filed row's (`loop/finish/contracts.md` §2.3).
+ */
+export type TriageArgs = { arrival: string; register?: string; fields?: Patch; ignore?: true; note?: string; back?: true; version?: number };
 
 /** The keys `triage` takes, named in the sentence that refuses any other. */
-const TRIAGE_TAKES = ['arrival', 'register', 'fields', 'ignore', 'note'] as const;
+const TRIAGE_TAKES = ['arrival', 'register', 'fields', 'ignore', 'note', 'back', 'version'] as const;
 
 /** The sentence every token without the `inbox` reach is given, whatever else it holds (agents C2). */
 const NO_REACH = 'Triage needs a token its owner gave the inbox reach.';
@@ -198,6 +201,11 @@ export function methods(deps: RecordDeps) {
      *
      * AGAIN IS THE SAME ANSWER, as the kernel's verbs give it: an arrival already filed answers with its row and writes
      * nothing, so an agent retrying a lost answer files one row.
+     *
+     * `back` TAKES A FILING OR AN ARCHIVING BACK, through the kernel's `returnArrival` and no verb of its own, so an agent
+     * that filed the wrong thing puts it back through the same door it filed by (contracts X34). A filed arrival's row is
+     * archived at the `version` the caller saw, so the caller needs the right to archive a row in that row's list; a rule's
+     * filing is refused in the kernel's sentence, since there is nothing a person did to take back.
      */
     async triage(args: TriageArgs, ctx: CallContext): Promise<Result<ArrivalSettled>> {
       const stop = scoped(ctx, 'read');
@@ -225,16 +233,48 @@ export function methods(deps: RecordDeps) {
       if (a.ignore !== undefined && typeof a.ignore !== 'boolean')
         return no('VALUE_MALFORMED', 'ignore is true, to set the arrival aside without filing it.', { at: 'ignore' });
       const ignore = a.ignore === true;
+      if (a.back !== undefined && typeof a.back !== 'boolean')
+        return no('VALUE_MALFORMED', 'back is true, to put a filed or archived arrival back in the inbox.', { at: 'back' });
+      const back = a.back === true;
       const register = typeof a.register === 'string' ? a.register.trim() : '';
       if (a.register !== undefined && !register) return no('VALUE_MALFORMED', 'register names a list by its id, such as transactions.', { at: 'register' });
-      if (ignore === (register !== ''))
-        return no('REQUIRED_MISSING', 'Say one of two things: register, the list to file the arrival in, or ignore: true, to set it aside.', {
-          at: 'register',
-          allowed: ['register', 'ignore'],
-        });
+      if ([ignore, register !== '', back].filter(Boolean).length !== 1)
+        return no(
+          'REQUIRED_MISSING',
+          'Say one of three things: register, the list to file the arrival in; ignore: true, to set it aside; or back: true, to put it back in the inbox.',
+          { at: 'register', allowed: ['register', 'ignore', 'back'] },
+        );
+      if (a.version !== undefined && !back) return no('VALUE_MALFORMED', 'A version goes with back: true, and names the filed row it archives.', { at: 'version' });
       if (a.note !== undefined && (typeof a.note !== 'string' || a.note.length > 280))
         return no('VALUE_MALFORMED', 'A note is one sentence a person reads, in 280 characters or fewer.', { at: 'note' });
       const note = typeof a.note === 'string' && a.note.trim() !== '' ? a.note.trim() : null;
+
+      if (back) {
+        /* THE KERNEL WRITES ITS OWN NOTE on the row it archives ("Put back in the inbox."), and a put back makes no row,
+           so neither fields nor a note has anywhere to go. */
+        if (a.fields !== undefined) return no('VALUE_MALFORMED', 'Putting an arrival back files no row, so it takes no fields.', { at: 'fields' });
+        if (note !== null) return no('VALUE_MALFORMED', 'Putting an arrival back writes its own note, so it takes none.', { at: 'note' });
+        const version: unknown = a.version;
+        if (version !== undefined && !(typeof version === 'number' && Number.isSafeInteger(version) && version >= 1))
+          return no('VALUE_MALFORMED', 'A version is a whole number from 1, the one the filed row had when you read it.', { at: 'version' });
+        /* THE RIGHT IS THE FILED ROW'S LIST'S. Archiving that row is a write on its list, so the caller is held to it
+           there; an archived arrival made no row, and putting it back moves the arrival alone. */
+        const was = kernel.arrivalSettlement(arrival);
+        const may = was?.row ? guard(ctx, 'write', was.row.register) : guard(ctx, 'append');
+        if (may) return { ok: false, refusal: may };
+        if (was?.row && version === undefined)
+          return no('REQUIRED_MISSING', 'This arrival was filed as a row, so name the version of that row you read; braindog:inbox gives it.', {
+            at: 'version',
+          });
+        const by = signerOf(ctx);
+        if (!by.ok) return tail(by as Result<never>);
+        return tail(
+          kernel.returnArrival(arrival, typeof version === 'number' ? version : 0, {
+            ...by.value,
+            ...(ctx.batch === undefined ? {} : { batch: ctx.batch }),
+          }),
+        );
+      }
 
       if (ignore) {
         /* NOTHING IS WRITTEN BUT THE ARRIVAL'S STATE, so there is nowhere for fields or a note to go, and taking them

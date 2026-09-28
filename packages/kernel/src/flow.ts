@@ -40,6 +40,11 @@
  * queues, for a script that says `runs: { rule: true }`, and the run goes on to its next step; what the script writes
  * lands through `finishScript` when a host has run it, and its answer does not come back into the run.
  *
+ * A `meet` STEP MEETS ONE PERSON AS THE RULE, through `people.ts`'s `meet`, the one an agent's `meet` goes through, so a
+ * person a rule met is matched, dated and offered for merging exactly as one an agent met (`FlowDeps.meet`). A `run_job`
+ * STEP QUEUES ONE JOB OF A KIND THE OWNER APPROVED (`jobs.ts`'s `createJob`, `FlowDeps.job`) and parks the run until the
+ * job ends, looking at the job's row every `RUN_JOB_LOOK_MS`, for a day at most; how it ended is the step's answer.
+ *
  * WHETHER A STEP RUNS AT ALL IS ITS ROW IN `capabilities.ts`, which the lint and the grammar read too. A step whose row
  * installs and does not run fails the run that reaches it with the row's sentence, after the steps before it, and one
  * whose row does not serve this host (`ask_slash` where nothing answers Slash) the same way.
@@ -69,6 +74,7 @@ import { instant } from './migrate.ts';
 import { evaluateMetric, predicateOf, type EvalContext, type MetricDecl } from './metrics.ts';
 import { FIGURE, WITHHELD } from './figure.ts';
 import { enqueue } from './outbox.ts';
+import type { MeetArgs, Met } from './people.ts';
 import { intervalMs } from './pull.ts';
 import {
   createAlone,
@@ -125,6 +131,32 @@ export const ASK_SLASH_WAIT_MS = DAY_MS;
  * host that leases no `pull.fetch` at all, which would otherwise park the run for the ninety days a run is kept.
  */
 export const CALL_WAIT_MS = DAY_MS;
+/**
+ * How long a run waits on a job it started before it stops: a day, the contract's bound for `run_job`
+ * (`loop/finish/contracts.md` §4.1). The job itself is not stopped with the run, since the owner approved its kind and
+ * started nothing that needs the run to finish it; its own page says how it ends.
+ */
+export const RUN_JOB_WAIT_MS = DAY_MS;
+/**
+ * How often a run waiting on a job looks at the job's row, so at most `RUN_JOB_WAIT_MS / RUN_JOB_LOOK_MS` looks a run:
+ * 288.
+ *
+ * A LOOK AND NOT AN ANSWER HANDED BACK, as a call's ack hands one back, because a job ends in many places (its runner's
+ * last event, a stop while it waits, the sweep that lets go of a job nobody ran), all in `jobs.ts`, which knows nothing
+ * of runs. One look at one row by its key, on the run's own schedule row, finds the end wherever it was written. Five
+ * minutes is short beside a job that runs Claude Code for several turns, and a run's next step waits no longer than that.
+ */
+export const RUN_JOB_LOOK_MS = 5 * 60_000;
+/**
+ * How a job's end reads to the steps after it (C13's statuses, `JOB_ENDS` in `jobs.ts`): the three words the contract
+ * names. Every other end (refused, limit, interrupted, cancelled) is `error` to a condition, and the step's own row
+ * keeps which it was.
+ */
+const JOB_ANSWERS: Readonly<Record<string, string>> = { ok: 'ok', needs_decision: 'needs_decision' };
+/** A job still going, whose run keeps waiting on it. */
+const JOB_GOING: readonly string[] = ['queued', 'claimed'];
+/** The keys of a `meet` step, which are `people.ts`'s `MeetArgs`. */
+const MEET_KEYS = ['name', 'email', 'handle', 'where'] as const;
 
 /** The keys of the two kinds of `rule` schedule row this file owns. A rule's own reminders are `<rule>:<row>`. */
 export const runKey = (run: string): string => `flow.run:${run}`;
@@ -158,6 +190,23 @@ export type FlowDeps = {
    * the step with a sentence rather than parking a run on a call nobody queued.
    */
   call?: ((ingest: string, a: { rule: string; entry: Entry | null; run: string; step: number }) => CallQueued) | undefined;
+  /**
+   * Meet one person as the rule: `people.ts`'s `meet` over the list that plays `meets:`, writing as `actor` (`rule:<id>`)
+   * and linking the person to the run's `project`, so the match, the dated line saying where they were met and the
+   * merge offer are the ones an agent's `meet` gives.
+   *
+   * OPTIONAL, as `call` is: the list, the write path and the gate are the kernel's to hand, and a runner built without
+   * them fails the step with a sentence rather than meeting nobody and saying it met someone.
+   */
+  meet?: ((args: MeetArgs, a: { actor: string; project: string | null }) => Result<Met>) | undefined;
+  /**
+   * Queue one job of an approved kind: `jobs.ts`'s `createJob`, which refuses a kind the owner has not approved, holds
+   * `args` to the kind's own, and keeps its ceilings (`JOBS_WAITING_MOST` waiting, `JOBS_A_DAY` a day). `about` is the
+   * run's row as a person says it, or `null`.
+   *
+   * OPTIONAL, for `call`'s reason: the queue's dependencies are the kernel's to hand.
+   */
+  job?: ((a: { kind: string; args: Record<string, string>; about: string | null }) => Result<{ id: string }>) | undefined;
   /**
    * A body being tried rather than a version installed (`flow-try.ts`): the run takes its steps from this, and is never
    * stopped for a rule that is not live, since a body being tried is one nobody has installed yet.
@@ -651,7 +700,7 @@ export function cancelRunsOf(deps: FlowDeps, rule: string, because?: string): nu
 /* ── the plan ───────────────────────────────────────────────────────── */
 
 const VERBS = [
-  'if', 'set_var', 'script', 'call', 'ask_slash', 'ask_person', 'wait',
+  'if', 'set_var', 'script', 'call', 'ask_slash', 'ask_person', 'wait', 'meet', 'run_job',
   'tag', 'untag', 'set', 'move', 'link', 'note', 'notify', 'schedule', 'create', 'suggest', 'run', 'stop',
 ] as const;
 
@@ -1409,6 +1458,61 @@ export function advance(deps: FlowDeps, id: string): number | null {
         return deps.nowMs + asked.waitMs;
       }
 
+      if (op.verb === 'meet') {
+        const met = meetOne(deps, run.rule, step, i, read(), scope(), paths(), sealedFields(), actor, run.project);
+        if (!met.ok) return fail(i, 'meet', met.say);
+        /* `skipped` AND NOT `done` WHEN NOBODY WAS NAMED, because nothing was met: a transaction with no counterparty
+           is not a person, and a row saying `done` would say the rule met one. */
+        record(deps, id, i, 'meet', met.person === null ? 'skipped' : 'done', met.said);
+        i = saved(i + 1);
+        continue;
+      }
+
+      if (op.verb === 'run_job') {
+        /* THE FIRST TIME THE STEP IS REACHED IT QUEUES THE JOB, AND EVERY WAKE AFTER IT LOOKS AT THE JOB'S ROW
+           (`RUN_JOB_LOOK_MS` says why a look). The step row's `at` is when the job was queued, since nothing writes the
+           row again until the job ends, so the day is counted from there however many looks there were. */
+        const was = deps.sql.one<{ state: string; answer: string | null; at: string }>('SELECT state, answer, at FROM automation_step WHERE run = ? AND n = ?', id, i);
+        if (was?.state === 'done') {
+          i = saved(i + 1);
+          continue;
+        }
+        const spec = step.run_job as { kind?: unknown; as?: unknown };
+        const kind = typeof spec?.kind === 'string' ? spec.kind : 'a job';
+        if (was?.state === 'waiting' && was.answer !== null) {
+          const status = deps.sql.one<{ status: string }>('SELECT status FROM job WHERE id = ?', was.answer)?.status ?? null;
+          if (status !== null && JOB_GOING.includes(status)) {
+            const until = Date.parse(was.at) + RUN_JOB_WAIT_MS;
+            if (!(deps.nowMs < until))
+              return fail(
+                i,
+                'run_job',
+                `rule.${run.rule} started ${kind} as ${was.answer} at step ${i + 1}, and it had not ended within a day, so the run stopped there. The job goes on, and its own page says how it ends.`,
+              );
+            deps.sql.exec("UPDATE automation_run SET state = 'waiting' WHERE id = ?", id);
+            return Math.min(deps.nowMs + RUN_JOB_LOOK_MS, until);
+          }
+          /* A JOB GONE FROM THE TABLE ENDED AS FAR AS THE RUN CAN TELL, and not well. */
+          const ended = status ?? 'gone';
+          const answer = JOB_ANSWERS[ended] ?? 'error';
+          /* THE ANSWER TAKES THE NAME OFF WHATEVER IT HELD, as a call's does (`answerCall`): the variable now holds how
+             the job ended, not the secret a `set_var` of the same name may once have held. */
+          if (typeof spec.as === 'string') {
+            vars[spec.as] = answer;
+            delete kept[spec.as];
+            sealedVars.delete(spec.as);
+          }
+          record(deps, id, i, 'run_job', 'done', answer === ended ? answer : `${answer} (${ended})`);
+          i = saved(i + 1);
+          continue;
+        }
+        const started = startJob(deps, run.rule, step, i, subject, read(), scope(), paths(), sealedFields());
+        if (!started.ok) return fail(i, 'run_job', started.say);
+        record(deps, id, i, 'run_job', 'waiting', started.job);
+        deps.sql.exec("UPDATE automation_run SET state = 'waiting', step = ?, vars = ? WHERE id = ?", i, pack(vars, kept, unsent, sealedVars), id);
+        return deps.nowMs + RUN_JOB_LOOK_MS;
+      }
+
       if (op.verb === 'script') {
         const started = startScript(deps, run.rule, step, i, read(), paths());
         if (!started.ok) return fail(i, op.verb, started.say);
@@ -1666,6 +1770,109 @@ function startScript(
       say: `rule.${rule} starts script.${name} at step ${n + 1}, and rules have started script.${name} ${RULE_CALLS_PER_DAY} times today, the most a day. Nothing was queued, and rules can start it again tomorrow; the steps before it were taken.`,
     };
   return { ok: true, job: enqueue(deps.sql, deps.mint, deps.nowMs, 'script.run', { script: name, version: found.version, input }) };
+}
+
+/**
+ * One text a `meet` or a `run_job` hands on, filled from the run and, where the run has one, the row, in one pass
+ * (`rules.ts`'s `filling`), with the first spelling in it that reached what a secret or file field holds, or `null`.
+ *
+ * THE ROW'S OWN `{{field}}` IS FILLED AS WELL AS THE RUN'S PATHS, as a note's is, because "meet its counterparty" is
+ * written `{{counterparty}}` as often as `{{trigger.row.counterparty}}`. With no row the row's braces are left as typed,
+ * as `handOn` leaves them.
+ */
+function handedText(text: string, row: Entry | null, by: RunFill, sealed: ReadonlySet<string>, nowMs: number): { text: string; secret: string | null } {
+  if (row !== null) return filling(text, row, nowMs, { sealed, run: by });
+  const handed = handOn({ text }, by, false);
+  return { text: String(handed.action.text), secret: handed.secret };
+}
+
+/**
+ * Meet the person a `meet` step names, as the rule, and say who they turned out to be; `person` is `null` when the step
+ * named nobody.
+ *
+ * A KEY THAT FILLS WITH NOTHING IS LEFT OUT (`nothingIn`), so an empty counterparty is not a person named with the dash a hole writes. When
+ * name, email and handle all fill with nothing, nobody is met and the run goes on: a row with no counterparty is not a
+ * fault of the rule's. A `where:` that fills with nothing says the rule, so the person's line still says how they
+ * were met.
+ *
+ * A SECRET IS NEVER COPIED INTO A PERSON, whose name and email every reader of People sees. The lint refuses the
+ * spelling at install (`flow-lint.ts`'s `copyFault`); this is the second line, for a rule stored before it did, and it
+ * names the spelling and never the value.
+ */
+function meetOne(
+  deps: FlowDeps,
+  rule: string,
+  step: Record<string, unknown>,
+  n: number,
+  row: Entry | null,
+  scope: Record<string, unknown>,
+  by: RunFill,
+  sealed: ReadonlySet<string>,
+  actor: string,
+  project: string | null,
+): { ok: true; person: string | null; said: string } | { ok: false; say: string } {
+  const spec: Record<string, unknown> = isObject(step.meet) ? step.meet : {};
+  const named: Partial<Record<(typeof MEET_KEYS)[number], string>> = {};
+  for (const key of MEET_KEYS) {
+    const text = spec[key];
+    if (typeof text !== 'string' || nothingIn(text, scope, row)) continue;
+    const filled = handedText(text, row, by, sealed, deps.nowMs);
+    if (filled.secret !== null)
+      return {
+        ok: false,
+        say: `rule.${rule}'s meet at step ${n + 1} reads ${filled.secret} into the person's ${key}, which holds what a secret or file field holds, and such a field is copied only into another secret or file field. Nobody was met; the steps before it were taken.`,
+      };
+    const clean = filled.text.trim();
+    if (clean !== '') named[key] = clean;
+  }
+  if (named.name === undefined && named.email === undefined && named.handle === undefined)
+    return { ok: true, person: null, said: 'Nobody: the name, email and handle it names were all empty.' };
+  if (!deps.meet) return { ok: false, say: `rule.${rule} reached a meet step, and this host wired no way to meet a person (NOT_IN_THIS_BUILD). The steps before it were taken.` };
+  const met = deps.meet({ ...named, where: named.where ?? `rule.${rule}` }, { actor, project });
+  if (!met.ok) return { ok: false, say: `rule.${rule}'s meet at step ${n + 1} met nobody: ${fixOf(met)}` };
+  const { person, created, merge } = met.value;
+  return { ok: true, person, said: `${person}${created ? ', added' : ''}${merge === null ? '' : `, and ${merge} asks whether to merge them`}` };
+}
+
+/**
+ * Queue the job a `run_job` step names, and answer its id.
+ *
+ * THE KIND IS NOT CHECKED HERE, `createJob` checks it: whether `job.<id>` is approved and not retired, and whether
+ * `args` are the kind's own and each filled, change after install, so the run asks when it gets here, and a refusal
+ * ends the run with `createJob`'s own sentence. A secret or file field is never handed to a job, whose arguments go to
+ * the owner's machine and to a model; the lint refuses the spelling at install and this refuses it again.
+ *
+ * `about` IS THE RUN'S LIVE ROW, never one a delete left, since `createJob` refuses a row that is not there.
+ */
+function startJob(
+  deps: FlowDeps,
+  rule: string,
+  step: Record<string, unknown>,
+  n: number,
+  subject: Entry | null,
+  row: Entry | null,
+  scope: Record<string, unknown>,
+  by: RunFill,
+  sealed: ReadonlySet<string>,
+): { ok: true; job: string } | { ok: false; say: string } {
+  const spec: Record<string, unknown> = isObject(step.run_job) ? step.run_job : {};
+  const kind = typeof spec.kind === 'string' ? spec.kind : '';
+  const args: Record<string, string> = {};
+  for (const [name, text] of Object.entries(isObject(spec.args) ? spec.args : {})) {
+    if (typeof text !== 'string' || nothingIn(text, scope, row)) continue;
+    const filled = handedText(text, row, by, sealed, deps.nowMs);
+    if (filled.secret !== null)
+      return {
+        ok: false,
+        say: `rule.${rule}'s run_job at step ${n + 1} hands ${name} ${filled.secret}, which holds what a secret or file field holds, and such a field is copied only into another secret or file field; a job's arguments go to a machine and a model. Nothing was queued; the steps before it were taken.`,
+      };
+    args[name] = filled.text;
+  }
+  if (!deps.job) return { ok: false, say: `rule.${rule} reached a run_job step, and this host wired no way to queue a job (NOT_IN_THIS_BUILD). The steps before it were taken.` };
+  const about = subject === null ? null : subject.seq === null ? subject.id : `${subject.register}#${subject.seq}`;
+  const queued = deps.job({ kind, args, about });
+  if (!queued.ok) return { ok: false, say: `rule.${rule} could not start ${kind || 'a job'} at step ${n + 1}: ${fixOf(queued)} Nothing was queued; the steps before it were taken.` };
+  return { ok: true, job: queued.value.id };
 }
 
 /**

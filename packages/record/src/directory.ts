@@ -23,11 +23,11 @@
  */
 
 import type { Clock, Result, Sql } from '@braindog/ports';
-import type { AuthCall, AuthResult, Who } from '@braindog/ports';
+import type { AccountCall, AccountClosed, AuthCall, AuthResult, Suspended, Who } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 import { ulids } from '@braindog/kernel';
 
-import { createAuth, type AuthConfig } from './identity.ts';
+import { createAuth, signInForgotten, type AuthConfig } from './identity.ts';
 import type { DirectoryAuth, SessionAsk } from './identity.ts';
 
 export type { AuthConfig, DirectoryAuth, Reason, SessionAsk } from './identity.ts';
@@ -257,6 +257,19 @@ CREATE TABLE IF NOT EXISTS dir_usage_run (
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS dir_usage_run_at ON dir_usage_run(record, at);
 
+-- SLASH'S ASKS, BY RECORD AND UTC DAY: how many it asked and the neurons they spent of the operator's included model.
+-- The record keeps every ask in its own slash_call, and that is where its ceiling is held; this is the account's copy,
+-- which the host hands across whole days at a time (meterSlash below), so a day's row is a total and not a sum of calls.
+-- A TABLE AND NOT A COLUMN ON dir_usage_day, for the reason dir_inbound gives below: a column is a TO_5, and a TO_5
+-- makes a Worker rollback an outage (loop/finish/contracts.md X4). Created on the next open, DIRECTORY_VERSION unmoved.
+CREATE TABLE IF NOT EXISTS dir_usage_slash (
+  record  TEXT NOT NULL,
+  day     TEXT NOT NULL,                    -- 'YYYY-MM-DD', UTC
+  asks    INTEGER NOT NULL DEFAULT 0,       -- every model call Slash made, on any tier, embeddings aside
+  neurons INTEGER NOT NULL DEFAULT 0,       -- what they spent of the included model; 0 on the owner's own key
+  PRIMARY KEY (record, day)
+) WITHOUT ROWID;
+
 -- FORWARDED MAIL: WHICH RECORD AN /in/email/<token> ADDRESS IS FOR.
 --
 -- THE DIGEST IS THE KEY AND THE TOKEN IS NOWHERE IN THIS FILE. That URL carries no record id, so the
@@ -425,7 +438,18 @@ export type RecordUsage = {
   days: ({ day: string } & UsageTotals)[];
   /** The deliveries and arrivals over the range, by action (`COUNTED_ONLY`): counted, and in none of the totals above. */
   counted: ({ action: string } & UsageTotals)[];
+  /**
+   * Slash's asks over the range and the neurons they spent, by day (`dir_usage_slash`): counted, and in none of the
+   * totals above, because the record's own `ask_cap` holds them and the allowance never does (`loop/finish/contracts.md` X41).
+   */
+  slash: { asks: number; neurons: number; days: SlashDay[] };
 };
+
+/** One UTC day of a record's Slash asks, as the record's own ledger totals it: what `meterSlash` takes and `usage` answers. */
+export type SlashDay = { day: string; asks: number; neurons: number };
+
+/** What one `meterSlash` did with the days it was handed: taken, older than the window, and not a day at all. */
+export type SlashTally = { taken: number; old: number; malformed: number };
 
 /** Everything a person owns, summed. What `GET /account/usage` answers. */
 export type AccountUsage = { from: string; to: string; totals: UsageTotals; records: RecordUsage[] };
@@ -442,6 +466,14 @@ const KEEP_RUNS_MS = 40 * DAY_MS;
  * every record shares.
  */
 export const METER_MANY_MAX = 500;
+
+/**
+ * How many UTC days back a record's Slash asks are handed to the ledger, and so the most days one `meterSlash` takes.
+ *
+ * THE WINDOW `dir_usage_run` KEEPS A RUN'S ID FOR, so the night that hands the runs again hands the asks over the same
+ * days, and a day the record stopped reporting keeps the last total it was told.
+ */
+export const SLASH_DAYS = 40;
 
 /**
  * The actions a record's ledger counts and its allowance never limits, by the prefix of their name: a delivery the
@@ -623,6 +655,7 @@ export const CARRIED = [
   'dir_passkey',
   'dir_usage_day',
   'dir_usage_run',
+  'dir_usage_slash',
   /* WHO PAYS FOR WHICH RECORD, AND THE EVENTS ALREADY APPLIED. A restore that lost `dir_billing` would leave every
      paying record unbilled and every lapsed one open, and one that lost `dir_stripe_event` would apply a redelivered
      event a second time. */
@@ -649,7 +682,7 @@ type Carried = (typeof CARRIED)[number];
  *
  * `rowid` WHERE THERE IS ONE, BECAUSE TWO READERS ORDER BY IT. `namesOf` lists a record's names by `rowid` and
  * `recordsOf` a person's records the same way, and a load inserts rows in the order they arrive, so dumping in `rowid`
- * order is what makes both answer the same after a restore. The three `WITHOUT ROWID` tables have no `rowid` to ask for
+ * order is what makes both answer the same after a restore. The `WITHOUT ROWID` tables have no `rowid` to ask for
  * and are ordered by their primary key, which makes two dumps of one Directory the same text.
  */
 const COPY_ORDER: Record<Carried, string> = {
@@ -661,6 +694,7 @@ const COPY_ORDER: Record<Carried, string> = {
   dir_passkey: 'rowid',
   dir_usage_day: 'record, day, scope, action',
   dir_usage_run: 'record, event',
+  dir_usage_slash: 'record, day',
   dir_billing: 'rowid',
   dir_stripe_event: 'rowid',
   dir_inbound: 'token_sha256',
@@ -938,7 +972,11 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig) {
   /* THE KEY A NEW SIGN-IN ADDRESS'S LINK IS MACED UNDER (GAP-7), imported now and not when a link is minted, because
      the host may zero its copy of the key once the Directory is built, as `createAuth` above allows. */
   const emailKey = auth ? crypto.subtle.importKey('raw', new Uint8Array(auth.mac), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']) : null;
-  const signInMarked = (async (call: AuthCall | SessionAsk): Promise<AuthResult> => {
+  const signInMarked = (async (call: AuthCall | SessionAsk | AccountCall): Promise<AuthResult> => {
+    /* CLOSING AND SUSPENDING ARE THE ACCOUNT'S AND NOT SIGN-IN'S, so the pair beside `billing` answers them. They ride
+       on `auth` because it is already the one RPC every host holds to the Directory for a person's way in. */
+    if (call.flow === 'account.close') return closeAccount(call.person);
+    if (call.flow === 'suspend') return suspendAccount(call.email, call.suspended);
     const out = await signIn(call);
     if (call.flow !== 'session' || out.status !== 200) return out;
     const who = out.body as Who;
@@ -1117,6 +1155,54 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig) {
       default:
         return null;
     }
+  };
+
+  /* ── closing and suspending an account (OPS-21) ── */
+
+  /**
+   * An account closed: the person's ways in, their memberships and their row, in one transaction.
+   *
+   * THE DOOR HAS ASKED EVERYTHING BEFORE THIS (`AccountCall` says what), because whether somebody is the last owner of
+   * a record is that record's own fact, which the Directory cannot read. What stays is each record's own history: the
+   * person's rows, events and mirror there are the record's, and its owner can erase them.
+   *
+   * A BILLING ROW NAMING THEM STAYS, because the payment it records is the record's and a co-owner's to change. Its
+   * person id then names nobody, which `due` already reads as a row with no address to write to.
+   */
+  const closeAccount = (person: string): AuthResult<AccountClosed> => {
+    const none: AuthResult<AccountClosed> = { status: 404, refusal: { code: 'OUT_OF_BOUNDS', fix: 'There is no account to close.', at: 'person' } };
+    if (typeof person !== 'string' || person === '') return none;
+    return sql.transactionSync((): AuthResult<AccountClosed> => {
+      const me = sql.one<{ email: string }>('SELECT email FROM dir_person WHERE id = ?', person);
+      if (!me) return none;
+      const forgotten = signInForgotten(sql, person, me.email);
+      const records = Number(sql.one<{ n: number }>('SELECT COUNT(*) AS n FROM dir_member WHERE person = ?', person)?.n ?? 0);
+      sql.exec('DELETE FROM dir_member WHERE person = ?', person);
+      sql.exec('DELETE FROM dir_person WHERE id = ?', person);
+      return { status: 200, body: { ...forgotten, records } };
+    });
+  };
+
+  /**
+   * The operator stopping a person, or letting them in again: the one writer of `dir_person.suspended_at`.
+   *
+   * STOPPED MEANS EVERY SESSION ENDS NOW, not at its next use: `LIVE` in `identity.ts` already refuses a suspended
+   * person's cookie, and the rows go here so Settings on another device shows nothing live. Passkeys stay, so letting
+   * them in again needs no new one. A second suspension keeps the time of the first.
+   */
+  const suspendAccount = (email: string, suspended: boolean): AuthResult<Suspended> => {
+    const typed = typeof email === 'string' ? email.trim() : '';
+    const found = typed === '' ? undefined : sql.one<{ id: string }>('SELECT id FROM dir_person WHERE lower(email) = lower(?)', typed);
+    if (!found) return { status: 422, refusal: { code: 'OUT_OF_BOUNDS', fix: 'There is nobody with that address.', at: 'email' } };
+    const stop = suspended !== false;
+    return sql.transactionSync((): AuthResult<Suspended> => {
+      if (stop) {
+        sql.exec('UPDATE dir_person SET suspended_at = COALESCE(suspended_at, ?) WHERE id = ?', at(), found.id);
+        sql.exec('DELETE FROM dir_session WHERE person = ?', found.id);
+      } else sql.exec('UPDATE dir_person SET suspended_at = NULL WHERE id = ?', found.id);
+      const row = sql.one<{ suspended_at: string | null }>('SELECT suspended_at FROM dir_person WHERE id = ?', found.id);
+      return { status: 200, body: { person: found.id, suspended_at: row?.suspended_at ?? null } };
+    });
   };
 
   return {
@@ -1870,6 +1956,51 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig) {
       }),
 
     /**
+     * A record's Slash asks, a UTC day at a time, as its own ledger totals them (`slash_call`, in the record): the
+     * host's nightly call, one per record, and nothing a person can reach.
+     *
+     * A DAY'S TOTAL AND NOT A CALL'S, SO HANDING IT TWICE CHANGES NOTHING. The record counts, and this keeps the larger
+     * of what it held and what it is told: a night handed again lands once, and a record gone back to an older copy,
+     * which has forgotten some of its asks, cannot take back what the account already counted. The record's ceiling is
+     * the record's (`ask_cap`, the operator's neurons) and is never read here.
+     *
+     * A day older than `SLASH_DAYS`, or one not yet begun, is passed over and tallied, and so is a row that is not a
+     * day's whole numbers, for the reason `meterMany` gives. Only the call itself is refused, before anything is written.
+     */
+    meterSlash: (record: string, days: readonly SlashDay[]): Result<SlashTally> =>
+      sql.transactionSync(() => {
+        if (!Array.isArray(days)) return no<SlashTally>('VALUE_MALFORMED', "Slash's asks to count are a list of days, each with its asks and neurons.", { at: 'days' });
+        if (days.length > SLASH_DAYS)
+          return no<SlashTally>('OUT_OF_BOUNDS', `One call counts at most ${thousands(SLASH_DAYS)} days of Slash's asks, and this one hands ${thousands(days.length)}.`, { at: 'days' });
+        if (!sql.one('SELECT 1 AS x FROM dir_record WHERE id = ?', record))
+          return no<SlashTally>('OUT_OF_BOUNDS', `There is no record ${record}.`, { at: 'record' });
+
+        const now = clock.now();
+        const oldest = dayOf(now - SLASH_DAYS * DAY_MS);
+        const today = dayOf(now);
+        const whole = (n: unknown): n is number => typeof n === 'number' && Number.isSafeInteger(n) && n >= 0;
+        const tally: SlashTally = { taken: 0, old: 0, malformed: 0 };
+        for (const d of days) {
+          const day: unknown = d?.day;
+          if (typeof day !== 'string' || !DAY.test(day) || !Number.isFinite(Date.parse(`${day}T00:00:00Z`)) || day > today || !whole(d.asks) || !whole(d.neurons))
+            tally.malformed++;
+          else if (day < oldest) tally.old++;
+          else {
+            sql.exec(
+              `INSERT INTO dir_usage_slash (record, day, asks, neurons) VALUES (?, ?, ?, ?)
+               ON CONFLICT (record, day) DO UPDATE SET asks = MAX(asks, excluded.asks), neurons = MAX(neurons, excluded.neurons)`,
+              record,
+              day,
+              d.asks,
+              d.neurons,
+            );
+            tally.taken++;
+          }
+        }
+        return ok(tally);
+      }),
+
+    /**
      * May this record's action run now? `null` is yes; otherwise, until when it waits, and the one sentence
      * its event says.
      *
@@ -1978,6 +2109,18 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig) {
          deliveries and arrivals are `counted`, apart. */
       const ranged = 'FROM dir_usage_day WHERE record = ? AND day >= ? AND day <= ?';
       const where = `${ranged} AND ${LIMITED}`;
+      /* SLASH'S ASKS FROM THEIR OWN TABLE, by day and summed, and in no total beside them. */
+      const slashOf = (id: string, span: { from: string; to: string }): RecordUsage['slash'] => {
+        const days = sql
+          .all<{ day: string; asks: number; neurons: number }>(
+            'SELECT day, asks, neurons FROM dir_usage_slash WHERE record = ? AND day >= ? AND day <= ? ORDER BY day',
+            id,
+            span.from,
+            span.to,
+          )
+          .map((d) => ({ day: d.day, asks: Number(d.asks), neurons: Number(d.neurons) }));
+        return { asks: days.reduce((n, d) => n + d.asks, 0), neurons: days.reduce((n, d) => n + d.neurons, 0), days };
+      };
       const records = owned.map((r): RecordUsage => {
         const plan = planOf(r.plan);
         return {
@@ -2004,6 +2147,7 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig) {
           counted: sql
             .all<{ action: string }>(`SELECT action, ${SUMS} ${ranged} AND (${COUNTED}) GROUP BY action ORDER BY action`, r.id, range.from, range.to)
             .map((g) => ({ action: g.action, ...totalsOf(g) })),
+          slash: slashOf(r.id, range),
         };
       });
       const totals = totalsOf({});

@@ -378,7 +378,7 @@ test('THE LEDGER IS ASKED FIRST: a held record makes no request and opens no key
   assert.equal(codeOf(free), 200);
 
   const metered: string[] = [];
-  const run = (event: string) => ({ event, at: '2026-09-15T12:00:00Z', ingest: 'balance', channel: 'poll', scope: 'global', outcome: 'ok' as const, usage: { runs: 1, requests: 1, bytes: 1, ms: 1, failures: 0, held: 0 } });
+  const run = (event: string) => ({ event, at: '2026-09-15T12:00:00Z', ingest: 'balance', channel: 'poll', scope: 'global', outcome: 'ok' as const, usage: { runs: 1, requests: 1, bytes: 1, ms: 1, failures: 0, held: 0, cpu_ms: 0 } });
   await meterPass(async (record, m) => void metered.push(`${record} ${m.event}`), 'rec_1', [run('e_1'), run('e_2')]);
   assert.deepEqual(metered, ['rec_1 e_1', 'rec_1 e_2']);
 });

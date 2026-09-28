@@ -11,6 +11,7 @@
 -->
 <script lang="ts">
   import { copy } from '$lib/copy.ts';
+  import { said } from '$lib/voice.svelte.ts';
   import type { Fields } from '$lib/record/schema.ts';
   import Button from '$lib/ui/Button.svelte';
   import Sheet from '$lib/ui/Sheet.svelte';
@@ -39,7 +40,7 @@
   } = $props();
 </script>
 
-<Sheet bind:open onclose={closeCreate} title="{copy.newRow} {one}">
+<Sheet bind:open onclose={closeCreate} title="{said('new_row')} {one}">
   <!-- No `autofocus` here: `Sheet` puts the caret in the first field after `showModal()`, which is
        the only moment it can, and it does it for every sheet that carries one. -->
   <!--
@@ -84,7 +85,7 @@
       disabled={problems.length > 0 || writing}
       aria-describedby={problems.length > 0 ? 'new-row-why' : undefined}
     >
-      {copy.addRow} {one}
+      {said('add_row')} {one}
     </Button>
     <Button weight="bare" onclick={() => (open = false)}>{copy.close}</Button>
   {/snippet}

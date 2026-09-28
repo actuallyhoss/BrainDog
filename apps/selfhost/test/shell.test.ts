@@ -166,3 +166,22 @@ test('a directory that is not a build is refused at start, with a sentence', () 
     b.clean();
   }
 });
+
+/* OPS-22. The page's own policy is the header's, so a hash in the shell's meta is a hash the header allows, and a
+   header `script-src` without it would refuse the shell's inline scripts and draw nothing. Turnstile is taken out,
+   because the self-host has no sign-up page to load it. */
+test('A PAGE CARRIES THE POLICY IN ITS OWN META, LESS TURNSTILE AND WITH FRAME-ANCESTORS; A FILE GETS THE STRICT ONE', async () => {
+  const b = build();
+  try {
+    const meta = "default-src 'self'; script-src 'self' 'sha256-abc=' https://challenges.cloudflare.com; frame-src https://www.loom.com https://challenges.cloudflare.com; object-src 'none'";
+    writeFileSync(join(b.app, 'index.html'), `<!doctype html><head><meta http-equiv="content-security-policy" content="${meta}"></head>`);
+    const serve = shellOf(b.root);
+    const want = "default-src 'self'; script-src 'self' 'sha256-abc='; frame-src https://www.loom.com; object-src 'none'; frame-ancestors 'none'";
+    for (const [path, method] of [['/app/', 'GET'], ['/app/signup', 'GET'], ['/app/r/tasks', 'HEAD']] as const)
+      assert.equal((await get(serve, path, method)).headers.get('content-security-policy'), want, `${method} ${path}`);
+    const script = await get(serve, '/app/_app/immutable/entry.js');
+    assert.equal(script.headers.get('content-security-policy'), "default-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'");
+  } finally {
+    b.clean();
+  }
+});

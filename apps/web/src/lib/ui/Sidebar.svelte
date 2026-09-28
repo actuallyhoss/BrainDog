@@ -379,7 +379,7 @@
 
   /* The registers are not a declared section, so they carry their own test: the same rule, over the
      one list this rail draws without asking `arrange` for it. */
-  const listsShut = $derived(!icons && shut.has(copy.lists) && !registers.some((r) => under(`/r/${r.id}`)));
+  const listsShut = $derived(!icons && shut.has(said('lists')) && !registers.some((r) => under(`/r/${r.id}`)));
 
   /* THE FOOT'S "MORE" FOLDS BY THE SAME RULE, and opens itself on any of its four places. */
   const moreShut = $derived(!icons && shut.has(copy.more) && ['/audit', '/packs', '/vault', '/settings'].every((area) => !under(area)));
@@ -671,7 +671,7 @@
       <hr class="sep" />
     {:else}
     <h2 class="section">
-      <button type="button" class="fold tap" aria-expanded={!listsShut} onclick={() => fold(copy.lists)}>
+      <button type="button" class="fold tap" aria-expanded={!listsShut} onclick={() => fold(said('lists'))}>
         <span class="fold-mark" aria-hidden="true" data-shut={listsShut ? '' : undefined}>
           <Icon name="chevronDown" size="s" />
         </span>

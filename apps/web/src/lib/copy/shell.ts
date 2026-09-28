@@ -105,6 +105,7 @@ export const shell = {
      successfully", which reports on the software rather than on the record. */
   toasts: 'Recent actions',
   undo: 'Undo',
+  redo: 'Redo',
   required: 'required',
   nothingToUndo: 'Nothing to undo.',
   copied: (what: string) => `Copied ${what}.`,
@@ -192,7 +193,6 @@ export const shell = {
      with no text in it, so none of them has ever been said out loud. */
   screenshotOn: 'Screenshot mode is on.',
   screenshotOff: 'Screenshot mode is off.',
-  suggestedPage: '1 suggested page.',
   review: 'Review',
 
   /* the palette */
