@@ -68,6 +68,31 @@ const favicon = (hex) =>
   `  </g>\n</svg>\n`;
 
 /**
+ * The BIMI logo: the mark on a plain square, in SVG Tiny Portable/Secure, which a mailbox shows beside a mail from
+ * brain.dog once the domain publishes a BIMI record pointing at it.
+ *
+ * THE SAME GLYPH AND THE SAME RED AS THE FAVICON, on the lightest surface rather than on red, because the mark is the
+ * red dog on a light ground and a reversed-out tile is an app icon (see `favicon` above). Tiny PS takes no role, no
+ * aria-label, no width and no height, so the root carries only what the profile names. The mailbox crops the square to
+ * a circle, so the glyph is 64% of the side and centred, which keeps every point of it inside the circle with room.
+ */
+const bimi = (hex, ground) => {
+  const side = 1000;
+  const [, , w, h] = MARK.viewBox.split(' ').map(Number);
+  const scale = (side * 0.64) / w;
+  const x = ((side - w * scale) / 2).toFixed(2);
+  const y = ((side - h * scale) / 2).toFixed(2);
+  return (
+    `<svg version="1.2" baseProfile="tiny-ps" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${side} ${side}">\n` +
+    `  <title>BrainDog</title>\n` +
+    `  <rect width="${side}" height="${side}" fill="${ground}"/>\n` +
+    `  <g transform="translate(${x} ${y}) scale(${scale.toFixed(5)})" fill="${hex}">\n` +
+    MARK.paths.map((d) => `    <path d="${d}"/>\n`).join('') +
+    `  </g>\n</svg>\n`
+  );
+};
+
+/**
  * The house colours a mail is painted in, as a module the Worker imports (`apps/worker/src/mail.ts`).
  *
  * A MAIL IS READ IN A CLIENT THAT REACHES NO CUSTOM PROPERTY, like the favicon, so its colours have to be literal, and
@@ -109,6 +134,7 @@ const ARTEFACTS = [
   { path: join(root, 'apps/web/static/mark.svg'), text: favicon(HOUSE.schemes.light.accent) },
   { path: join(root, 'apps/site/static/mark.svg'), text: favicon(HOUSE.schemes.light.accent) },
   { path: join(root, 'apps/web/static/mark-alpha.svg'), text: favicon(ALPHA.schemes.light.accent) },
+  { path: join(root, 'apps/site/static/bimi/braindog.svg'), text: bimi(HOUSE.schemes.light.accent, HOUSE.schemes.light.s3) },
   { path: join(root, 'apps/worker/src/mail-palette.ts'), text: mailPalette(HOUSE) },
 ];
 
