@@ -15,6 +15,7 @@ import { METRICS } from './declared.ts';
 import { hrefFor } from './metrics.ts';
 import { LOG_PAGE, markAll, readLog, tileOf } from './news-live.ts';
 import { liveWords, tileOf as pageTile } from './page-live.ts';
+import { readToday, sinceOf, tasksOf } from './today-live.ts';
 
 const BASE = 'http://record.test';
 
@@ -238,14 +239,105 @@ test('the page below is asked for with the cursor the page above answered, and t
    device. With no sample (DIRECTION 26) a shell is a record or a refusal, and Home draws the record's answers or the
    refusal's sentence. */
 test("Home reads the record's answers and nothing of the sample", () => {
-  const page = readFileSync(new URL('../../routes/+page.svelte', import.meta.url), 'utf8');
-  const script = page.slice(0, page.indexOf('</script>'));
-  for (const [said, why] of [
-    [/\bROWS\b/u, 'the sample rows'],
-    [/\bNOW\b/u, "the sample's frozen day"],
-    [/\bmetric\(/u, "the sample's figures"],
-    [/pref\.read\(\)\.seen/u, "a read mark kept for the sample's feed"],
-  ] as const)
-    assert.doesNotMatch(script, said, `Home reads ${why} again`);
-  assert.doesNotMatch(page, /\bROWS\b|\bNOW\b/u, 'the markup reads the sample again');
+  /* TODAY IS THE LANDING NOW AND THE OLD HOME IS `/?overview`, one component each, and neither reads the sample. */
+  for (const at of ['../../routes/+page.svelte', '../home/Today.svelte', '../home/Overview.svelte']) {
+    const page = readFileSync(new URL(at, import.meta.url), 'utf8');
+    const script = page.slice(0, page.indexOf('</script>'));
+    for (const [said, why] of [
+      [/\bROWS\b/u, 'the sample rows'],
+      [/\bNOW\b/u, "the sample's frozen day"],
+      [/\bmetric\(/u, "the sample's figures"],
+      [/pref\.read\(\)\.seen/u, "a read mark kept for the sample's feed"],
+    ] as const)
+      assert.doesNotMatch(script, said, `${at} reads ${why} again`);
+    assert.doesNotMatch(page, /\bROWS\b|\bNOW\b/u, `${at}'s markup reads the sample again`);
+  }
+});
+
+/* ── Today ─────────────────────────────────────────────────────────────── */
+
+test('SINCE YOU WERE LAST HERE COUNTS BY KIND: a row`s changes by its list, anything else by what it was, an agent`s heartbeat not at all', () => {
+  const lists = new Map([['tasks', 'Tasks']]);
+  const rows = sinceOf(
+    [
+      { kind: 'edit', register: 'tasks' },
+      { kind: 'create', register: 'tasks' },
+      { kind: 'state', register: 'tasks' },
+      { kind: 'decide', register: null },
+      { kind: 'suggest', register: null },
+      { kind: 'propose', register: null },
+      { kind: 'edit', register: 'session' },
+    ],
+    lists,
+  );
+  assert.deepEqual(
+    rows.map((r) => [r.label, r.count, r.href]),
+    [
+      ['Tasks', 3, '/audit?list=tasks'],
+      ['Questions asked', 2, '/audit?kind=suggest'],
+      ['Decisions made', 1, '/audit?kind=decide'],
+    ],
+  );
+});
+
+test('WHAT NEEDS YOU IS LATE, THEN DUE TODAY, THEN URGENT, each task once and named by its project', () => {
+  const row = (seq: number, fields: Record<string, unknown>) => ({ id: `t${seq}`, seq, fields });
+  const due = [row(1, { what: 'Pay the VAT', by: '2026-09-28', thing: 'p1' }), row(2, { what: 'Ship the fix', by: '2026-09-29' })];
+  const urgent = [row(2, { what: 'Ship the fix', by: '2026-09-29' }), row(3, { what: 'Call the bank', agent: 'claude' })];
+  const out = tasksOf(due, urgent, '2026-09-29', new Map([['p1', 'Northwind app']]));
+  assert.deepEqual(
+    out.map((t) => [t.seq, t.why, t.project, t.agent]),
+    [
+      [1, 'late', 'Northwind app', null],
+      [2, 'today', null, null],
+      [3, 'urgent', null, 'claude'],
+    ],
+  );
+});
+
+test('TODAY READS THE RECORD`S OWN ANSWERS, leaves out what it does not hold, and is refused only when boot is', async () => {
+  const { io, sent } = host((url) => {
+    const method = url.pathname.split('/').pop();
+    if (method === 'boot')
+      return json(200, {
+        ok: true,
+        value: {
+          registers: [{ id: 'tasks', name: 'Tasks', count: 2 }],
+          now: '2026-09-29T09:00:00.000Z',
+          counts: { decide: 5, inbox: null },
+          whatsNew: { events: [line({ kind: 'edit', register: 'tasks', seq: 1 })], upTo: 9, sinceCapped: false },
+        },
+      });
+    if (method === 'previewPage')
+      return json(200, {
+        ok: true,
+        value: {
+          blocks: [
+            {
+              kind: 'queue',
+              rows: [],
+              queue: [{ id: 'SG1', who: 'claude', at: '2026-09-29T08:00:00.000Z', kind: 'options', question: 'Ship on Friday?', why: '', cost: 'call', options: [{ key: 'yes', label: 'Yes', because: '', recommended: true }] }],
+            },
+            { kind: 'table', rows: [{ id: 's1', seq: 4, fields: { agent: 'claude', doing: 'Writing tests', last_seen: '2026-09-29T08:59:00.000Z' } }], scopes: ['Northwind app'] },
+          ],
+        },
+      });
+    if (method === 'list') return json(200, { ok: true, value: { rows: [{ id: 't1', seq: 1, fields: { what: 'Pay the VAT', by: '2026-09-28' } }], cursor: null, matched: 1 } });
+    return json(404, { ok: false, refusal: { code: 'NOT_FOUND', fix: 'No such thing.' } });
+  });
+  const out = await readToday(BASE, io, Date.parse('2026-09-29T12:00:00'));
+  assert.ok(out.ok);
+  if (!out.ok) return;
+  assert.deepEqual(out.value.tasks?.map((t) => [t.what, t.why]), [['Pay the VAT', 'late']]);
+  assert.deepEqual([out.value.questions.map((q) => q.id), out.value.open], [['SG1'], 5]);
+  assert.deepEqual(out.value.runs, [{ seq: 4, agent: 'claude', doing: 'Writing tests', project: 'Northwind app', seen: '2026-09-29T08:59:00.000Z' }]);
+  assert.deepEqual([out.value.since.total, out.value.upTo], [1, 9]);
+  /* NO MONEY LIST, NO MONEY SECTION, and nothing about money was asked. */
+  assert.equal(out.value.money, null);
+  assert.ok(!sent.some((s) => new URL(s.url).pathname.endsWith('/metric')));
+  /* AND NO MARK MOVED ON THE READ: the mark is the leaving's. */
+  assert.ok(!sent.some((s) => new URL(s.url).pathname.endsWith('/markRead')));
+
+  const refused = host(() => json(403, { ok: false, refusal: { code: 'LEVEL_REQUIRED', fix: 'Ask an owner to raise your access.' } }));
+  assert.deepEqual(await readToday(BASE, refused.io), { ok: false, refusal: { code: 'LEVEL_REQUIRED', fix: 'Ask an owner to raise your access.' } });
 });

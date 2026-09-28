@@ -45,7 +45,7 @@
   import { actorSaid, offeredActors, targetSaid } from './who.ts';
   /* WHAT THE LOG SAYS, IN WORDS: the lead, the twelve weeks, a row by its title and list, and a burst as one line.
      `lines.ts` holds each rule and why. */
-  import { burstsOf, heatRows, historyWords, sinceGroups, sinceSaid, thingOf } from './lines.ts';
+  import { burstsOf, heatRows, historyWords, listOf, sinceGroups, sinceSaid, thingOf } from './lines.ts';
   /* A FIELD PUT ON OR TAKEN OFF A LIST, IN WORDS, from the same helper Home's feed says it with. STATIC, and the lead's
      `readUnseen` with it: one module both imported and imported lazily is neither split nor shared, only warned about. */
   import { declaredOf, readUnseen } from '$lib/record/history-live.ts';
@@ -280,8 +280,19 @@
   const days = $derived([...new Set(LOG.map((e) => e.at.slice(0, 10)))].sort().reverse());
   const when = $derived(route.url.searchParams.get('on') ?? '');
 
+  /* ONE LIST, WHICH TODAY LINKS TO: "12 changes to Tasks since you were last here" opens here narrowed to Tasks. It has no
+     control of its own, since a list is chosen from Today or pasted, and the chip below says it and takes it off. */
+  const list = $derived(route.url.searchParams.get('list') ?? '');
+  const listName = $derived(route.data.lists?.find((l: { id: string; name: string }) => l.id === list)?.name ?? list);
+
   const matched = $derived(
-    LOG.filter((e) => (!who || e.by === who) && (!what || e.kind === what) && (!when || e.at.slice(0, 10) === when)),
+    LOG.filter(
+      (e) =>
+        (!who || e.by === who) &&
+        (!what || e.kind === what) &&
+        (!when || e.at.slice(0, 10) === when) &&
+        (!list || listOf(e.target) === list),
+    ),
   );
   /* THE LOG GROWS WITH WRITES, NOT WITH ROWS, so on a record of any size this is the longest list in
      the product — and it was the one rendering every entry it held. `13 §4.3`'s cap, and the line
@@ -338,8 +349,11 @@
 
   <!-- A CHOICE APPEARS WHEN THERE IS ONE TO MAKE. Two actors and two kinds is a filter; one of
        either is a fact about the record, and a segmented control over it changes nothing. -->
-  {#if actors.length > 1 || kinds.length > 1 || days.length > 1}
+  {#if actors.length > 1 || kinds.length > 1 || days.length > 1 || list}
     <div class="bar">
+      {#if list}
+        <span class="filter-label">{historyWords.onlyList(listName)}</span>
+      {/if}
       {#if actors.length > 1}
         <div class="filter" role="group" aria-labelledby="f-who">
           <span class="filter-label" id="f-who">{copy.auditWho}</span>
@@ -392,7 +406,7 @@
         </label>
       {/if}
 
-      {#if who || what || when}
+      {#if who || what || when || list}
         <Button weight="bare" href="/audit"><Icon name="close" size="s" />{copy.clearFilters}</Button>
       {/if}
     </div>

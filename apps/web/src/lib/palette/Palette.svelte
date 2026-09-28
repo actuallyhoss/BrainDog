@@ -65,6 +65,8 @@
   import type { Hits, Reader } from '../record/palette-live.ts';
   import type { Metric } from '../record/api.ts';
   import { latest } from './latest.ts';
+  import { palette as opener } from './open.svelte.ts';
+  import { untrack } from 'svelte';
   import { capLine, drawProposal, drawReading, offersSlash, pass2Refused, secondPass, slashWords, type Drawn, type DrawnProposal } from './slash.ts';
   import Cited from '../ui/Cited.svelte';
   import SlashOut from '$lib/ui/SlashOut.svelte';
@@ -820,7 +822,9 @@
     if (open && !el.open) {
       el.showModal();
       overlays.open();
-      q = '';
+      /* WHAT TODAY'S ASK BAR HANDED OVER, taken once and cleared, so the next open starts empty as it always has. */
+      q = untrack(() => opener.seed);
+      untrack(() => (opener.seed = ''));
       cursor = 0;
       slash = null;
       if (slashHere) warm();

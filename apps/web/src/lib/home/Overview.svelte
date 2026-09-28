@@ -1,6 +1,9 @@
 <!--
-  Home. Four questions, answered without a filter: WHAT NEEDS YOU, WHO IS WORKING, WHAT IS COMING, and WHAT HAPPENED
-  WHILE YOU WERE NOT LOOKING.
+  Overview, which was Home. Four questions, answered without a filter: WHAT NEEDS YOU, WHO IS WORKING, WHAT IS COMING,
+  and WHAT HAPPENED WHILE YOU WERE NOT LOOKING.
+
+  NOT THE LANDING ANY MORE. Every record opens on Today (`routes/+page.svelte`), and this page, the use case's own Home
+  with its figures and tables, is kept at `/?overview` and reached from More.
 
   ONE PAGE, THROUGH THE ONE READER (modules C8, contracts §11 X19). Home draws the speaking use case's `home-<id>` page,
   else the record's `home` page, else the house page `DEFAULT_HOME` (`lib/home/default-home.ts`), which the record draws
@@ -17,6 +20,7 @@
 -->
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
+  import type { Shell } from '$lib/record/boot-live.ts';
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
   import { homePage, said } from '$lib/voice.svelte.ts';
@@ -34,9 +38,9 @@
   import { untrack } from 'svelte';
   import { typing } from '$lib/a11y/keys.svelte.ts';
 
-  import { closed, drew, opened } from '../lib/ui/screen.svelte.ts';
+  import { closed, drew, opened } from '../ui/screen.svelte.ts';
 
-  let { data } = $props();
+  let { data }: { data: Shell } = $props();
 
   /**
    * THE DAY WHERE THE PERSON IS, on a live record: Home read Wednesday 16 September at two in the morning of the 17th,
@@ -89,7 +93,7 @@
     }
     /* THE HOUSE PAGE IS DRAWN BY THE RECORD, never installed: `previewPage` answers the body as `page` answers an
        installed one, each block held to the reader, and writes nothing. `drawnOf` is the one reader of that answer. */
-    const m = await import('./decide/[id]/proposed.ts');
+    const m = await import('../../routes/decide/[id]/proposed.ts');
     const drawn = await m.drawnOf(defaultHome(spoken), apiBase());
     if (drawn.from === 'live') return { from: 'live', page: { page: { page: 'home', title: '' }, blocks: drawn.blocks }, now: drawn.now };
     if (drawn.from === 'refused') return { from: 'refused', fix: drawn.fix };
