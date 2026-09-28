@@ -48,6 +48,12 @@ export type Toast = {
   /** Absent for a toast that only reports. Present, this is the whole point of the toast. */
   undo?: (() => void) | undefined;
   intent?: 'good' | 'warn' | 'bad' | undefined;
+  /**
+   * How long it stays, in milliseconds, when not the ten seconds every other toast gets. An optimistic write's receipt
+   * offers its Undo for six (`UNDO_MS` in `lib/data/optimistic.ts`): the change is already on screen where the reader
+   * is looking, so the line is a way back rather than news.
+   */
+  life?: number | undefined;
 };
 
 const LIFE = 10_000;
@@ -63,10 +69,10 @@ class Toasts {
   #next = 1;
   #timers = new Map<number, ReturnType<typeof setTimeout>>();
 
-  push(text: string, opts: { undo?: () => void; intent?: Toast['intent'] } = {}): number {
+  push(text: string, opts: { undo?: () => void; intent?: Toast['intent']; life?: number } = {}): number {
     return untrack(() => {
       const id = this.#next++;
-      const next = [...this.items, { id, text, undo: opts.undo, intent: opts.intent }];
+      const next = [...this.items, { id, text, undo: opts.undo, intent: opts.intent, life: opts.life }];
 
       /* THE OLDEST GOES THROUGH `dismiss` RATHER THAN JUST OFF THE END OF THE ARRAY, so that its
          countdown goes with it. A timer left armed on a toast nobody can see expires up to ten seconds
@@ -155,7 +161,7 @@ class Toasts {
     if (t) clearTimeout(t);
     this.#timers.set(
       id,
-      setTimeout(() => this.dismiss(id), LIFE),
+      setTimeout(() => this.dismiss(id), untrack(() => this.items.find((x) => x.id === id)?.life) ?? LIFE),
     );
   }
 }
