@@ -242,6 +242,16 @@ const FORM_WORDS: Readonly<Record<string, readonly string[]>> = { guide: GUIDE_K
 const escapeWord = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /**
+ * Whether the pack a use case carries owns a list of its own, not only a page. A student or a guide declares its own
+ * registers (courses, milestones) and claims its signals; small business's pack is one page and no list since MOD-18
+ * (its own Home), so a pack alone no longer says a use case carries something.
+ */
+const ownsList = (pack: Record<string, unknown> | null): boolean => {
+  const declarations = pack?.declarations;
+  return Array.isArray(declarations) && (declarations as Body[]).some((d) => typeof d.register === 'string');
+};
+
+/**
  * WHAT A USE CASE ALREADY HOLDS OF A SENTENCE: whether a phrase heard at `at` lies inside one of its own signals, or one of
  * the words it forms a plan from. "An Etsy shop" said to the guide is the project the guide is for, not a request for
  * Projects, so onboarding does not install a module for a phrase the use case claims (`apps/web/src/lib/shape.ts` `heardFor`).
@@ -249,7 +259,7 @@ const escapeWord = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&
 export function claimedBy(u: UseCase, said: string): (span: { at: number; text: string }) => boolean {
   /* A USE CASE THAT CARRIES NOTHING CLAIMS NOTHING. Small business is whichever modules the sentence names, so "I send
      invoices" said to it is Money, and claiming the word left a bakery with People alone. */
-  if (!u.pack && u.modules.length === 0) return () => false;
+  if (!ownsList(u.pack) && u.modules.length === 0) return () => false;
   const lower = said.toLowerCase();
   const taken: [number, number][] = [];
   for (const signal of [...u.signals, ...(FORM_WORDS[u.usecase] ?? [])])

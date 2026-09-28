@@ -193,10 +193,18 @@ for (const [name, set, want] of [
  *
  * NEEDED SINCE THE LEDGER: install refuses a script whose key is not in the vault ("Add the key called ... to the
  * vault, then install."), where the pull alone installed without one and was refused on its first run instead.
+ *
+ * SEALED UNDER 'connector' AND NOT THE DEFAULT: this key is opened by the mercury pull's own scheduled run, a
+ * `pull.fetch` job, never by a person at a screen. `sealed_under` defaults to `'record'`
+ * (`packages/kernel/src/migrations/0010_grant_sealed_under.ts`), which is right for a key a person deposits to use
+ * themselves, but `runnerCannotOpen` (`packages/kernel/src/actions.ts`) refuses to approve a call out with a
+ * record-sealed key and `sealedGrant` (`packages/kernel/src/vault.ts`) refuses to open one at run time, both with
+ * "was added for you to use, not for a connector". Leaving this row at the default made every test below fail that
+ * check instead of exercising the pull, so it is sealed the way a real connector key would be.
  */
 const grantFor = (sql: Pick<NodeSql, 'exec'>, label: string): void =>
   sql.exec(
-    "INSERT INTO grant (id, label, opens, kind, kdf, wrapped_by, kek_id, created_at) VALUES ('g_mercury', ?, 'api.mercury.com', 'api_token', 'none', 'kek', 'k_test', ?)",
+    "INSERT INTO grant (id, label, opens, kind, kdf, wrapped_by, kek_id, created_at, sealed_under) VALUES ('g_mercury', ?, 'api.mercury.com', 'api_token', 'none', 'kek', 'k_test', ?, 'connector')",
     label,
     new Date(NOW).toISOString(),
   );

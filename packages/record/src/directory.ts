@@ -416,7 +416,7 @@ export type Allowance = { runs: number; requests: number; bytes: number; ms: num
  */
 export const ALLOWANCE: Record<Plan, Allowance | null> = {
   hosted: { runs: 15_000, requests: 150_000, bytes: 1_000_000_000, ms: 50 * 3_600_000 },
-  plus: { runs: 60_000, requests: 600_000, bytes: 5_000_000_000, ms: 200 * 3_600_000 },
+  plus: { runs: 75_000, requests: 750_000, bytes: 5_000_000_000, ms: 250 * 3_600_000 },
   selfhost: null,
 };
 

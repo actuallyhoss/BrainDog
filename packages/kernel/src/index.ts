@@ -3735,12 +3735,33 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
          And any write on a list that pairs, because `pairs.ts`'s `pinnedBy` reads who set a mark from these lines, and
          a fold would turn his `edit` of it into a `create` that holds the default.
 
-         THE LINE MOVES TO THE END OF THE LOG. `MAX(event.rowid)` is the record's version and the live channel reads
-         `rowid > ?`, so a fold that rewrote the line where it stood would be a change no open screen could see. Its `id`,
-         `ts`, `batch` and `op_id` are kept, so everything that names the line still finds it. Every read here is bounded:
-         two lines of one row by the target index, and the lines written since the create, at most three minutes of the
-         record, by the time index. */
+         NOR A WRITE THAT TOUCHES A FIELD WHOSE HISTORY IS THE ONLY PLACE THE CHANGE LIVES. A `tags` field changes by
+         element (`tag`/`untag`, not `edit`), and folding it into the create's snapshot would answer "when was this
+         tagged late" with nothing, not with an earlier answer. A redacted field (`redacts`, secret or money) drops its
+         value from the ledger and keeps only who, when and which field; the create line already carries the row's first
+         value redacted, and a fold that rewrote it to the row's LATEST value would answer "when was the amount changed"
+         with "it wasn't", which is the one thing redaction promises never to hide. A `document` field is the one a
+         `diff` block reads version by version (`pages.ts`'s `diffBlock`, `versionsOf`); folding it away is the same
+         loss as a `tags` field's, read by a different page. A `file` field's every past name and hash is what holds a
+         copy of it back out of a call after the file is replaced (`actions.ts`'s `queueCall`, "a file field's history
+         is in the ledger, which keeps a file's value on the create row and on every edit of it"); a fold that rewrote
+         the create row on the replacing edit would make that promise false the moment it was tested.
+
+         NOR A WRITE THAT LEAVES A FIELD HOLDING ITS OWN DEFAULT. `pairs.ts`'s `pinnedBy` tells a row he pinned from one
+         that only filled a default in by reading the create line back and asking whether the mark's value differs from
+         what the field declares now, the only test it has, since a mark can be pinned before the list ever pairs and
+         `decl.pairs` is not there yet to except the write the way it excepts one made after. Ticked and then unticked
+         is his word twice, and folding the second write into the create would print the same value the row was born
+         with, indistinguishable from never having been touched at all. */
       const GRACE_MS = 3 * 60_000;
+      const foldable = (key: string): boolean => {
+        const of = known.get(key);
+        if (of?.type === 'list' && of.of === 'text') return false;
+        if (of?.type === 'document' || of?.type === 'file') return false;
+        if (redacts(register, key)) return false;
+        if (of?.default !== undefined && JSON.stringify(merged[key] ?? null) === JSON.stringify(of.default ?? null)) return false;
+        return true;
+      };
       const lines =
         !deleting &&
         !isMechanism(w.actor) &&
@@ -3748,6 +3769,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         w.opId === undefined &&
         !decl.pairs &&
         (!decl.state || nextState === current.state) &&
+        touched.every(foldable) &&
         Date.parse(now) - Date.parse(current.created_at) < GRACE_MS
           ? sql.all<{ id: string; actor: string; kind: string; ts: string; batch: string | null }>(
               'SELECT id, actor, kind, ts, batch FROM event WHERE target = ? ORDER BY rowid LIMIT 2',
@@ -3764,7 +3786,16 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       ) {
         /* The same check `appendEvent` makes of every line, since this write's line is the one it would have appended. */
         slashMayWrite(w.actor, 'edit');
-        const shape = Object.fromEntries(Object.entries(merged).map(([k, v]) => [k, shown(register, k, v) ?? null])) as Json;
+        /* ONLY A FIELD THE LIVE DECLARATION STILL KNOWS, never a retired or dropped one that merely rides along in
+           `merged` because the row's stored fields still hold it. A field never touched by this write, or any write
+           since the row was made, is not "the row as it now stands" by any write this actor made: it is data a
+           declaration once described and no longer does, kept on the row on purpose (`declare.ts`'s reasoning for
+           `sealedEver`) and never meant to be pulled back into view by a fold that is rewriting a DIFFERENT field. */
+        const shape = Object.fromEntries(
+          Object.entries(merged)
+            .filter(([k]) => known.has(k))
+            .map(([k, v]) => [k, shown(register, k, v) ?? null]),
+        ) as Json;
         sql.exec('UPDATE event SET rowid = (SELECT MAX(rowid) + 1 FROM event), to_v = ? WHERE id = ?', written(shape), made.id);
         const changed = touched.filter((key) => JSON.stringify(current.fields[key] ?? null) !== JSON.stringify(merged[key] ?? null));
         handedNotice(decl, entry, changed, w.actor);
@@ -4389,20 +4420,58 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
    * "recorded and withheld" is visible.
    */
   const REDACTED = '--redacted--';
-  const redacts = (register: string, field: string): boolean => {
-    const decl = registers.get(register)?.fields.find((f) => f.id === field);
-    if (!decl) return false;
-    /* A `list<T>` IS A T FOR THIS, AND THE ELEMENT TYPE IS WHAT IS ASKED. This read the field's own
-       type, which is `list` and not `money` for a `list<money>`, so an amount written as a list went
-       into the ledger in full while the same amount written as a scalar did not: the disclosure
-       above, reached by declaring the field the other way. `declare.ts`'s `kind` is the idiom, so a
-       seventeenth type does not have to remember this line exists.
-
-       `redact:` STAYS ON THE FIELD. It is a flag somebody put on this declaration, not a property of
-       what the field holds, so unwrapping `of` would be reading it off the wrong thing. */
-    const kind = decl.type === 'list' ? decl.of : decl.type;
-    return kind === 'secret' || kind === 'money' || decl.redact === true;
+  /**
+   * Every field of `register` that ANY VERSION of its declaration has ever marked redacted, retired or dropped
+   * ones included, cached by the register's newest declaration version and checksum so a write reads it once.
+   *
+   * THE DECLARATION'S WHOLE HISTORY AND NOT THE STANDING ONE, the same reasoning `declare.ts`'s `sealedEver` and
+   * `rules.ts`'s `sealedOf` give for a secret field's run-time guard: a field retired and dropped from the list
+   * leaves the rows written under it holding the value still, and reading only the current declaration answered
+   * `false` for it, so a row whose `pin` was secret before it was retired had `hunter2` folded straight into an
+   * event's `to_v` the moment the live declaration no longer named `pin` at all.
+   *
+   * ONCE REDACTED, ALWAYS REDACTED, whatever a later version types the field. The kernel refuses `secret` or
+   * `money` retyped to a plain type while a row holds a value, and passes the same change by way of a retire; the
+   * rows written under the old type keep what they held, so every version is asked and the first `secret`,
+   * `money` or `redact: true` any of them gives the field settles it for good.
+   */
+  const redactedKept = new Map<string, { key: string; ids: ReadonlySet<string> }>();
+  const redactedFields = (register: string): ReadonlySet<string> => {
+    const latest = sql.one<{ version: number; checksum: string }>(
+      "SELECT version, checksum FROM declaration WHERE id = ? AND kind = 'register' ORDER BY version DESC LIMIT 1",
+      `register.${register}`,
+    );
+    const key = latest === undefined ? '' : `${latest.version}:${latest.checksum}`;
+    const kept = redactedKept.get(register);
+    if (kept !== undefined && kept.key === key) return kept.ids;
+    const ids = new Set<string>();
+    for (const { body } of sql.all<{ body: string }>(
+      "SELECT body FROM declaration WHERE id = ? AND kind = 'register' ORDER BY version",
+      `register.${register}`,
+    )) {
+      let fields: unknown;
+      try {
+        fields = (JSON.parse(body) as { fields?: unknown } | null)?.fields;
+      } catch {
+        continue;
+      }
+      if (!Array.isArray(fields)) continue;
+      for (const f of fields as unknown[]) {
+        if (f === null || typeof f !== 'object') continue;
+        const { id, type, of, redact } = f as { id?: unknown; type?: unknown; of?: unknown; redact?: unknown };
+        if (typeof id !== 'string') continue;
+        /* A `list<T>` IS A T FOR THIS, AND THE ELEMENT TYPE IS WHAT IS ASKED. This read the field's own
+           type, which is `list` and not `money` for a `list<money>`, so an amount written as a list went
+           into the ledger in full while the same amount written as a scalar did not: the disclosure
+           above, reached by declaring the field the other way. */
+        const kind = type === 'list' ? of : type;
+        if (kind === 'secret' || kind === 'money' || redact === true) ids.add(id);
+      }
+    }
+    redactedKept.set(register, { key, ids });
+    return ids;
   };
+  const redacts = (register: string, field: string): boolean => redactedFields(register).has(field);
   const shown = (register: string, field: string, value: Json | undefined): Json | undefined =>
     value === undefined ? undefined : redacts(register, field) ? REDACTED : value;
 

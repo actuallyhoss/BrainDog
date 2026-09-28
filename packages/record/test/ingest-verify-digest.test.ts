@@ -127,14 +127,17 @@ const redeclare = async (api: Awaited<ReturnType<typeof record>>['api'], body: R
 };
 
 test('A TOKEN DOES NOT OUTLIVE ITS DECLARATION: retired and declared again, the id answers none and the digest is gone', async () => {
-  /* A WEBHOOK NO PATTERN NAMES AS ITS DOOR, and not `bank-from-out-sms`, for the same reason as the test below. Five of
-     the bank's patterns read that one, and since `loop/research-batch-forty-two-audit.md` finding 4 (c) retiring it is
-     refused while they do, so this case failed on 23 September at `DECLARATION_INVALID at ingest.bank-card-used-sms`
-     before it reached the digest. The refusal is asserted first; the digest is the same code on either id. */
+  /* A WEBHOOK NO PATTERN NAMES AS ITS DOOR, and not `bank-from-out-sms`, for the same reason as the test below. Six of
+     the bank's patterns read that one now that 1.4.0 added `bank-balance-sms` beside the other five, and since
+     `loop/research-batch-forty-two-audit.md` finding 4 (c) retiring it is refused while they do, so this case failed
+     on 23 September at `DECLARATION_INVALID at ingest.bank-card-used-sms` before it reached the digest. The guard
+     names the readers sorted (`declare.ts` `retireDeclarations`), and `bank-balance-sms` now sorts before
+     `bank-card-used-sms`, so the fix names `ingest.bank-balance-sms` since 1.4.0. The refusal is asserted first; the
+     digest is the same code on either id. */
   const { sql, api } = await record();
   const door = HSBC_EG_SMS_INGESTS['bank-from-out-sms']!;
   const kept = api.kernel.retire(['ingest.bank-from-out-sms']);
-  assert.equal(!kept.ok && 'refusal' in kept ? kept.refusal.at : JSON.stringify(kept), 'ingest.bank-card-used-sms', 'the bank door was retired while its patterns still name it');
+  assert.equal(!kept.ok && 'refusal' in kept ? kept.refusal.at : JSON.stringify(kept), 'ingest.bank-balance-sms', 'the bank door was retired while its patterns still name it');
   await redeclare(api, door, 'lone-sms');
   const minted = await api.ingestMint({ ingest: 'lone-sms' }, owner);
   assert.ok(minted.ok, JSON.stringify(minted));
@@ -152,7 +155,7 @@ test('A TOKEN DOES NOT OUTLIVE ITS DECLARATION: retired and declared again, the 
 });
 
 test('A DECLARATION THAT DROPS verify: TAKES THE DIGEST WITH IT, so putting verify: back does not bring the old token back', async () => {
-  /* A WEBHOOK NO PATTERN NAMES AS ITS DOOR, and not `bank-from-out-sms`. Five of the bank's patterns read that one, and
+  /* A WEBHOOK NO PATTERN NAMES AS ITS DOOR, and not `bank-from-out-sms`. Six of the bank's patterns read that one, and
      since `loop/research-batch-forty-two-audit.md` finding 4 (b) dropping its `verify:` is refused while they do, so
      this case failed on 23 September at `DECLARATION_INVALID at verify` before it reached the digest. The refusal is
      asserted first, so the reason for the second webhook stays in the file; the digest is the same code on either id. */

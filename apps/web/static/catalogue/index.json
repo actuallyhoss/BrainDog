@@ -722,8 +722,8 @@
             "calls_out": [
               {
                 "host": "api.mercury.com",
-                "line": "CALLS OUT api.mercury.com · every 1h · grant \"none\"",
-                "key": null
+                "line": "CALLS OUT api.mercury.com · every 1h · grant \"Mercury (read only)\"",
+                "key": "Mercury (read only)"
               },
               {
                 "host": "api.mercury.com",
@@ -755,8 +755,8 @@
             "calls_out": [
               {
                 "host": "api.mercury.com",
-                "line": "CALLS OUT api.mercury.com · every 1h · grant \"none\"",
-                "key": null
+                "line": "CALLS OUT api.mercury.com · every 1h · grant \"Mercury (read only)\"",
+                "key": "Mercury (read only)"
               },
               {
                 "host": "api.mercury.com",
@@ -788,8 +788,8 @@
             "calls_out": [
               {
                 "host": "api.mercury.com",
-                "line": "CALLS OUT api.mercury.com · every 1h · grant \"none\"",
-                "key": null
+                "line": "CALLS OUT api.mercury.com · every 1h · grant \"Mercury (read only)\"",
+                "key": "Mercury (read only)"
               },
               {
                 "host": "api.mercury.com",
@@ -821,8 +821,8 @@
             "calls_out": [
               {
                 "host": "api.mercury.com",
-                "line": "CALLS OUT api.mercury.com · every 1h · grant \"none\"",
-                "key": null
+                "line": "CALLS OUT api.mercury.com · every 1h · grant \"Mercury (read only)\"",
+                "key": "Mercury (read only)"
               }
             ]
           },

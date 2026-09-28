@@ -41,7 +41,7 @@ import type { Sql } from '@braindog/ports';
 import { ROUTES, handlersFor, serveApi, serveIngest, type IngestDoor } from '../src/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 import { NOW, day, installSeed } from '../../seed/src/index.ts';
-import { HSBC_EG_INGESTS, HSBC_EG_SMS_INGESTS, bankDeclarations } from '../../seed/test/pack-files.ts';
+import { HSBC_EG_INGESTS, HSBC_EG_SMS_INGESTS, bankDeclarations, bankHsbcEgFile } from '../../seed/test/pack-files.ts';
 
 const REC = 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD';
 
@@ -208,12 +208,16 @@ test('(7) THE SEED SHIPS NO TEXT DOOR: a record set up with money-core has none 
   assert.equal(await api.ingestVerify({ ingest: 'bank-card-out-sms' }), null, 'the seed alone carries the card alerts\' door');
   assert.equal(await api.ingestVerify({ ingest: 'bank-from-out-sms' }), null, 'the seed alone carries the bank pack\'s door');
   assert.deepEqual(k.declarations().filter((d) => d.kind === 'ingest' && d.id.endsWith('-sms')).map((d) => d.id), []);
-  /* AND WITH THE PACK, ITS SIX TWINS AND THE DOOR'S CATCH-ALL BESIDE THEM. */
+  /* AND WITH THE PACK, EVERY SMS DOOR IT SHIPS BESIDE THEM: the six twins, the door's catch-all, and, since 1.4.0,
+     `bank-balance-sms`, which `HSBC_EG_SMS_INGESTS` never counts because that constant is frozen to what money-core
+     1.8.0 to 2.4.0 handed (`seed/test/pack-files.ts`), a day before 1.4.0 added it. Counted from the shipped file
+     itself, not the frozen one, so a future door does not silently go untested here. */
   const withBank = await record();
   assert.deepEqual(await withBank.api.ingestVerify({ ingest: 'bank-from-out-sms' }), { kind: 'none' });
+  const shippedSms = bankHsbcEgFile().declarations.filter((d) => typeof d.ingest === 'string' && d.ingest.endsWith('-sms')).length;
   assert.equal(
     withBank.k.declarations().filter((d) => d.kind === 'ingest' && d.id.endsWith('-sms')).length,
-    Object.keys(HSBC_EG_SMS_INGESTS).length + 1,
+    shippedSms,
   );
   withBank.sql.close();
   sql.close();

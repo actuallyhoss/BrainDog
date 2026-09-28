@@ -994,7 +994,14 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
      when it is written, because four page fixtures across `packages/record` and `packages/mcp` — files
      this one does not own — declare a page with no `requires` at all. The shape is checked, and the
      coverage rule below is checked against whatever it says. Making it REQUIRED is the next pass, and
-     it is one line here and four in those two files. */
+     it is one line here and four in those two files.
+
+     ONLY THE SHAPE IS CHECKED HERE. Whether each want is actually installed is answered after the
+     blocks below, not in this pass: a block naming a kind nobody installed is `KIND_UNKNOWN` (PLT-8's
+     "a page naming a kind nobody installed is refused at install, not drawn blank"), and that refusal
+     is about the block, so it is owed to whoever is reading the refusal before a page-wide dependency
+     that has nothing to do with which kind was typo'd. Checking availability this early made every
+     page with both faults report the wrong one. */
   const requires = body.requires;
   if (requires !== undefined) {
     if (!Array.isArray(requires) || requires.length === 0 || requires.length > REQUIRES_CEILING)
@@ -1002,15 +1009,6 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
     for (const want of requires) {
       if (typeof want !== 'string' || !/^register\.[a-z][a-z0-9_-]{0,31}$/u.test(want))
         return bad('DECLARATION_INVALID', `${id} requires ${JSON.stringify(want)}, and a page requires register.<id>.`, 'requires');
-      /* AND THE REGISTER IS THERE, WHICH IS THE ONLY HALF A DOCUMENT CANNOT ANSWER ALONE. `04 §5`
-         gives this its own code and its own sentence — a page whose register never arrived is a nav
-         entry that opens an empty screen, and `06 §1` says that is worse than no nav entry at all. */
-      if (installed && !installed.has(want))
-        return bad(
-          'DEPENDENCY_UNRESOLVED',
-          `${id} requires ${want}: not installed. Install the pack that declares it first, or use --with-deps.`,
-          'requires',
-        );
     }
   }
   const declared = new Set(Array.isArray(requires) ? (requires as string[]) : []);
@@ -1437,6 +1435,23 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
       for (const term of order as { field?: unknown; dir?: unknown }[])
         if (typeof term?.field !== 'string' || (term.dir !== undefined && term.dir !== 'asc' && term.dir !== 'desc'))
           return bad('DECLARATION_INVALID', `${id}.${at} sorts by a field, ascending or descending.`, at, ['asc', 'desc']);
+    }
+  }
+
+  /* AND THE REGISTER IS THERE, WHICH IS THE ONLY HALF A DOCUMENT CANNOT ANSWER ALONE. `04 §5` gives
+     this its own code and its own sentence: a page whose register never arrived is a nav entry that
+     opens an empty screen, and `06 §1` says that is worse than no nav entry at all. Checked here,
+     after every block, so a block-level fault (a bad kind, a bad key, an unresolved source) is what a
+     reader hears first: the page-wide `requires` gap is real either way, but it is not the fault that
+     was typed. */
+  if (Array.isArray(requires) && installed) {
+    for (const want of requires as string[]) {
+      if (!installed.has(want))
+        return bad(
+          'DEPENDENCY_UNRESOLVED',
+          `${id} requires ${want}: not installed. Install the pack that declares it first, or use --with-deps.`,
+          'requires',
+        );
     }
   }
 

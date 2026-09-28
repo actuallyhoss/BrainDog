@@ -15,6 +15,10 @@
  * 25 September and the import now resolves `holdings` from the catalogue, which offers the file (`pack-files.ts`).
  * money-core stopped handing the list under 2.4.0 (`money-core-names-no-pack.test.ts`), so the update a record on 1.8.0
  * took is today's money-core with the `hands` it carried until then, and the last test drives the update it gets now.
+ *
+ * THE FILE IS 1.3.0 NOW: 1.2.0 gave `holdings-value` `sellable: true` (MOD-20), then the catalogue generator raised it
+ * again to 1.3.0 once the add-on carried its own `title` and its cost script opened with a comment saying what it
+ * does (`from-packs.mjs`'s own `changes` line on the file says so); nothing the pack writes moved with either step.
  */
 
 import { test } from 'node:test';
@@ -58,7 +62,7 @@ const snapshot = (k: Kernel, ids: readonly string[]): string[] => ids.map((id) =
 test('THE PACK DECLARES ONE LIST, UNDER ITS OWN NAME, AND NO GOLD: four kinds, commodity among them', async () => {
   const doc = holdingsFile() as unknown as Doc;
   assert.equal(doc.pack, 'holdings');
-  assert.equal(doc.version, '1.2.0');
+  assert.equal(doc.version, '1.3.0');
   const lists = doc.declarations.filter((d) => typeof d.register === 'string');
   assert.deepEqual(lists.map((d) => [d.register, d.pack]), [['holdings', 'holdings']]);
   const kind = (lists[0]!.fields as Field[]).find((f) => f.id === 'kind')!;
@@ -94,7 +98,7 @@ test('A RECORD ON 1.8.0 HOLDING ROWS UPDATES TO 2.0.0 AND TAKES THE PACK, every 
   assert.deepEqual(snapshot(k, ids), before, 'a row, its id or its history moved');
   assert.equal(k.count('holdings'), 14);
   const packs = k.packs().filter((p) => p.id === 'holdings' || p.id === 'money-core').map((p) => [p.id, p.version]);
-  assert.deepEqual(packs, [['holdings', '1.2.0'], ['money-core', FIRST_PARTY_VERSIONS['money-core']]]);
+  assert.deepEqual(packs, [['holdings', '1.3.0'], ['money-core', FIRST_PARTY_VERSIONS['money-core']]]);
 
   /* AND THE RECORD GOES ON TAKING BOTH WORDS: its own for the next lot, and the pack's for anything new. */
   assert.ok(k.create('holdings', { kind: 'gold', label: 'Gold 21c', qty: 1, unit_cost: { amount: 480_000, currency: 'EGP' } } as never, { actor: 'p_1' }).ok);
