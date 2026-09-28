@@ -146,6 +146,7 @@ const REGISTER = {
     rates: 'on the one list holding the rates a money figure converts by, the field that plays each part',
     meets: 'on the one list meet writes people into, the field that plays each part',
     pairs: 'transfer detection: the fields the record matches two legs of one move by',
+    hand: '{person?: <ref field>, agent?: <text field>, taken?: <state value>}: who holds a row, a person by a ref field and an agent by the text field it signs with, and the state a row moves to when an agent takes it. Either may be left out, but not both',
   },
   field: {
     id: 'lower-case letters, digits and single underscores; never id, seq, register, created_at, updated_at, deleted_at, version, spoken or title, and never starting with _ (required)',

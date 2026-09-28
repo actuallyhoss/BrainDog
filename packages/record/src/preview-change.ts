@@ -375,9 +375,29 @@ export function previewer(deps: PreviewDeps) {
         const planned = pages.find((q) => q.index === i);
         return planned === undefined ? d : laid(planned, rehearsing);
       });
-    const linted = layOut(false);
-    const fault = kernel.lint(linted);
-    if (fault) return { ok: false, refusal: blamed(namedBack(fault, backs), linted) };
+    /* A FAULT THE LINT BLAMES ON ONE BLOCK IS STRIPPED FROM WHAT IS LINTED, AND CARRIED AS THAT BLOCK'S OWN REFUSAL
+       INSTEAD, so a second block's fault is not hidden behind the first: `kernel.lint` halts the whole change at
+       its first bad `where`, and a model that named a field one block lacks and another field a different block
+       lacks made two faults with one lint call between them. `bare` (`laid`, below) is what already strips a
+       `where` `whereHeld` refused; the same shell serves a `where` the lint refused for what it names rather than
+       who may read it. A fault it cannot pin on one page's one block, or a block already stripped once for
+       nothing, still halts the whole change (`test/slash-compose-desk.test.ts`). */
+    let linted = layOut(false);
+    const quarantined = new Set<string>();
+    for (;;) {
+      const fault = kernel.lint(linted);
+      if (!fault) break;
+      const blamedFault = blamed(namedBack(fault, backs), linted);
+      const found = /^(.+)\.blocks\[(\d+)\](?:\.(.+))?$/u.exec(blamedFault.at ?? '');
+      const page = found ? pages.find((q) => q.decl.id === found[1]) : undefined;
+      const i = found ? Number(found[2]) : NaN;
+      const key = found ? `${found[1]}[${i}]` : '';
+      if (page === undefined || page.plans[i] === undefined || quarantined.has(key)) return { ok: false, refusal: blamedFault };
+      quarantined.add(key);
+      const { at: _at, ...rest } = blamedFault;
+      page.plans[i] = { refused: found![3] === undefined ? (rest as Refusal) : ({ ...rest, at: found![3] } as Refusal) };
+      linted = layOut(false);
+    }
     const installing = layOut(true);
     const staged = await kernel.stageInstall(installing);
     if (!staged.ok) return 'refusal' in staged ? { ok: false, refusal: blamed(namedBack(staged.refusal, backs), installing) } : (staged as Result<never>);

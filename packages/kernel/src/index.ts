@@ -1782,8 +1782,13 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
           if (JSON.stringify(where).includes('{{')) continue;
           const schema = shape(list);
           if (!schema) continue;
-          const bad = unreadWhere(`${decl.id}.blocks[${i}]`, where, schema, batch);
-          if (bad) return bad;
+          const at = `${decl.id}.blocks[${i}]`;
+          const bad = unreadWhere(at, where, schema, batch);
+          /* THE BLOCK'S OWN PLACE STAYS IN `at`, WHICH `unreadWhere` LEAVES BARE (a rule's or a metric's `when`
+             reads at the field alone). Left unprefixed here, a bundle's repair blamed the whole page for a fault
+             one block made, and lost which block to a description mending it (`preview-change.ts`'s `blamed`,
+             `test/slash-compose-desk.test.ts`). */
+          if (bad) return { ...bad, at: bad.at === undefined || bad.at === '' ? at : `${at}.${bad.at}` };
         }
 
       /* A COLUMN'S `sign:` IS READ HERE TOO, for the `where`'s reason: the page layer refused it on every open

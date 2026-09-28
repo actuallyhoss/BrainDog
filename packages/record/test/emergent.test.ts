@@ -113,9 +113,17 @@ test('A LIST WITH ROWS AND NO PAGE IS OFFERED ONE WHOLE PAGE, its figure first, 
   assert.deepEqual((pen[1]!.change.to.body.blocks as unknown as { order?: unknown }[])[0]!.order, [{ field: 'seq', dir: 'desc' }]);
   for (const item of pen) assert.equal(api.kernel.lint([asDecl(item)]), null, `${item.id} would be refused on accepting`);
 
-  /* ACCEPTED, IT IS A PAGE, and the pen stops offering it because a page now reads the list. */
+  /* ACCEPTED, IT IS A PAGE, and the pen stops offering it as a whole page because a page now reads the list. Parts
+     still puts a day on every row in `bought`, indexed, and the derived page drew no calendar of them, so PGS-17's
+     block item is offered beside `page:bins`: a second, later suggestion over the same list is not the whole page's
+     to refuse (`emergent-blocks.test.ts` holds that item's own shape). */
   value(await api.kernel.install([asDecl(parts)]));
-  assert.deepEqual((await bootOf(api, owner)).pen.map((i) => i.id), ['page:bins']);
+  const after = (await bootOf(api, owner)).pen;
+  assert.deepEqual(
+    after.map((i) => i.id),
+    ['page:bins', 'block:parts:calendar:parts'],
+  );
+  for (const item of after) assert.equal(api.kernel.lint([asDecl(item)]), null, `${item.id} would be refused on accepting`);
   sql.close();
 });
 
