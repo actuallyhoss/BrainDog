@@ -37,7 +37,14 @@ after(() => {
 /* ── a host ────────────────────────────────────────────────────────────── */
 
 type Seen = { method: string; query: URLSearchParams; headers: IncomingHttpHeaders };
-const ROWS = { rows: [{ seq: 1, fields: { what: 'Rent' } }], matched: 1, cursor: null };
+/* A RAW RECORD ROW, the shape `/api/list` answers: `id`, `register`, `seq` and `version` apart from its
+   fields. `@braindog/mcp`'s `list` tool always runs a page through `compact()` then `listed()` before an
+   agent sees it (`packages/mcp/src/index.ts` `SHAPED`, `listed`), which is what a row without them was
+   never a stand-in for: `compact` reads `isEntry`, and a row missing `id`, `register` or `version` fails
+   that check and is handed to `listed` unchanged, so `spoken` and `version` are read off fields that were
+   never there. `COMPACTED_ROWS` below is what the tool actually answers for this one. */
+const ROWS = { rows: [{ id: 'obligations#1', register: 'obligations', seq: 1, version: 1, fields: { what: 'Rent' } }], matched: 1, cursor: null };
+const COMPACTED_ROWS = { rows: [{ spoken: 'obligations#1', version: 1, fields: { what: 'Rent' } }], matched: 1, cursor: null };
 
 /**
  * `list` answers at once, after 300 ms for `late`, or never for `hangs`.
@@ -389,7 +396,7 @@ test('A LIST CALL goes to /api/list with the bearer and the session headers, and
 
   const reply = await s.ask('tools/call', { name: 'list', arguments: { register: 'obligations', where: { field: 'state', is: 'open' }, limit: 5 } });
   assert.notEqual(reply.result.isError, true, reply.result.content[0].text);
-  assert.deepEqual(said(reply), ROWS);
+  assert.deepEqual(said(reply), COMPACTED_ROWS);
 
   const hit = host.seen.find((x) => x.method === 'list');
   assert.ok(hit, 'the host was never asked');
@@ -488,7 +495,7 @@ test('WHEN STDIN ENDS, the calls in flight are answered before the process exits
   const ping = s.ask('ping');
   const { code, err } = await s.end();
   assert.equal(code, 0, err);
-  assert.deepEqual(said(await late), ROWS);
+  assert.deepEqual(said(await late), COMPACTED_ROWS);
   assert.ok((await ping).result);
 });
 
@@ -497,7 +504,7 @@ test('AND AFTER A SESSION OF CALLS, ONE AT A TIME, IT STILL EXITS 0 when stdin e
      last reply aborted Node 24 on Windows with a libuv assertion, every time, once there had been a few. */
   const host = await stubHost(t);
   const s = launch({ BRAINDOG_HOST: host.base, BRAINDOG_TOKEN: TOKEN });
-  for (let i = 0; i < 6; i++) assert.deepEqual(said(await s.ask('tools/call', { name: 'list', arguments: { register: 'tasks' } })), ROWS);
+  for (let i = 0; i < 6; i++) assert.deepEqual(said(await s.ask('tools/call', { name: 'list', arguments: { register: 'tasks' } })), COMPACTED_ROWS);
   const { code, err } = await s.end();
   assert.equal(code, 0, err);
   assert.doesNotMatch(err, /Assertion failed/);

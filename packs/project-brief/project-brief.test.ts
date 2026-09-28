@@ -27,7 +27,7 @@ import { readFileSync } from 'node:fs';
 import { readPackFile } from '../../packages/declare/src/catalogue.ts';
 import { createRecordApi, type CallContext } from '../../packages/record/src/index.ts';
 import { fixedClock, openSqlite } from '../../packages/kernel/test/sqlite.ts';
-import { firstPartyDocument } from '../../packages/seed/src/index.ts';
+import { FIRST_PARTY, PAGES, firstPartyDocument } from '../../packages/seed/src/index.ts';
 
 const owner: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'owner' } };
 
@@ -47,11 +47,19 @@ type Field = { id: string; type: string; of?: string; label?: string };
 const PACK_FILE = new URL('./project-brief.pack.json', import.meta.url);
 const brief = (): Record<string, unknown> => JSON.parse(readFileSync(PACK_FILE, 'utf8')) as Record<string, unknown>;
 
-/** A fresh record holding Portfolio and nothing else, which is all the brief asks of one. */
+/**
+ * A fresh record holding every module `page.project` itself requires (portfolio.ts's `project` declaration:
+ * register.things, register.tasks, register.obligations, register.services, register.transactions; register.session
+ * is the kernel's own), with the page laid on top the way the starter lays it. The project template reads tasks,
+ * money and services at once, so it sits in none of the five first-party packs and belongs to none of their pack
+ * rows (`packages/seed/src/packs/first-party.ts`, `crossPack`); a record that only ever installs Portfolio never
+ * holds it, which is why the brief's own block had nowhere to land until this record held the rest too.
+ */
 async function portfolio(): Promise<{ api: Api; close: () => void }> {
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(Date.UTC(2026, 8, 24, 12)) });
-  said(await put(api, firstPartyDocument('portfolio')));
+  for (const id of FIRST_PARTY) said(await put(api, firstPartyDocument(id, { seeds: [] })));
+  said(await api.kernel.install([{ id: 'page.project', kind: 'page', body: PAGES.project as never }]));
   return { api, close: () => sql.close() };
 }
 

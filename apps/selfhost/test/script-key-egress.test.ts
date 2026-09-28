@@ -72,8 +72,18 @@ function provider(): { send: Send; sent: { host: string; auth: string | null }[]
   };
 }
 
-/** One run of `source` through the self-host's runner, with `egress` and `keys` as the script declares them. */
-async function run(source: string, egress: string[], keys: string[], limits?: Record<string, number>) {
+/**
+ * One run of `source` through the self-host's runner, with `egress` and `keys` as the script declares them.
+ *
+ * `limits` DEFAULTS TO A CPU BUDGET WIDE OF CONTENTION, NOT THE PRODUCTION DEFAULT. Every test below is about
+ * key-egress refusal, not about the sandbox's own `cpu_ms` ceiling, and the production default (200 ms) is a CPU
+ * measurement: under the CHECK pass's `--workspace-concurrency=2`, many workspaces' tests run at once and QuickJS's
+ * own instantiation before the script's first line spent 246 ms of interpreter time against that 200 ms budget, so
+ * the run stopped OUT_OF_BOUNDS before it ever reached the `ctx.fetch` the test is about. Doubled off that failure.
+ * A test that means to exercise the budget itself (the overrun and the malformed-declaration cases below) passes
+ * its own `limits` and this default never applies to it.
+ */
+async function run(source: string, egress: string[], keys: string[], limits: Record<string, number> = { cpu_ms: 1_000 }) {
   const net = provider();
   const opened: string[] = [];
   const runner = scriptSandbox({ kernel: { grants: () => VAULT } } as never, {

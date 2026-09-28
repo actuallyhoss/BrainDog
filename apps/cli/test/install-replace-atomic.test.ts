@@ -53,8 +53,20 @@ function profile(dir: string, servers: Record<string, unknown> = { brain: { type
   return { dir, settings, claudeJson };
 }
 
-/** Every file in a folder with its bytes, so "as it was" is compared whole and a stray `.tmp` or `.bak` is seen. */
-const snapshot = (dir: string) => Object.fromEntries(readdirSync(dir).sort().map((name) => [name, readFileSync(join(dir, name), 'utf8')]));
+/**
+ * Every file under a folder with its bytes, so "as it was" is compared whole and a stray `.tmp` or `.bak` is seen.
+ * Keyed by its path from the folder, and walked, since OPS-26's skills/braindog/ nests a file a level down.
+ */
+function snapshot(dir: string, prefix = ''): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const name of readdirSync(dir).sort()) {
+    const path = join(dir, name);
+    const key = prefix ? `${prefix}/${name}` : name;
+    if (statSync(path).isDirectory()) Object.assign(out, snapshot(path, key));
+    else out[key] = readFileSync(path, 'utf8');
+  }
+  return out;
+}
 
 function cli(args: string[], home: string) {
   const env: NodeJS.ProcessEnv = { ...process.env, HOME: home, USERPROFILE: home, XDG_CONFIG_HOME: join(home, 'config') };

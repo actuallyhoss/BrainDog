@@ -191,7 +191,7 @@ test('ADDING A PASSKEY hands the browser bytes for the challenge, the person and
   assert.equal(o.user.name, 'ada@example.com');
   assert.deepEqual([...(o.excludeCredentials[0]?.id ?? [])], [255, 254]);
   assert.equal(o.rp.id, 'localhost');
-  assert.deepEqual(seen[1]?.body, { credential: { id: 'new', response: { clientDataJSON: 'AQ', attestationObject: 'AgM' } } });
+  assert.deepEqual(seen[1]?.body, { credential: { id: 'new', response: { clientDataJSON: 'AQ', attestationObject: 'AgM' } }, label: 'Passkey' });
 });
 
 test('a device that already holds one is `exists`, and a malformed challenge is a refusal rather than a throw', async () => {

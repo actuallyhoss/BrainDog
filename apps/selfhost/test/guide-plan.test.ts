@@ -163,6 +163,24 @@ test('A MILESTONE REACHED ASKS ONCE WHETHER TO START THE NEXT ONE, and the guide
   const api = await createRecordApi({ sql, clock: fixedClock(Date.UTC(2026, 8, 17, 12)), catalogue: seedCatalogue() });
   const asked = value<{ id: string }>(await api.propose({ question: 'Use the New project guide?', body_kind: 'pack', body: { install: 'usecase-guide' } }, owner));
   value(await api.decide({ id: asked.id, decide: { option: 'accept', reason: 'yes' } } as never, owner));
+  /* NO EXAMPLE ROWS COME WITH THE PACK ANY MORE (`loop/finish/modules.md` C11): a plain install off the catalogue
+     plants nothing, so the guide's own template rows, word for word as `guide.ts`'s retired `seeds:` once planted
+     them, are written by hand for this test to reach a milestone in. */
+  for (const fields of [
+    { what: 'Say what it is and who it is for', stage: 'idea', state: 'underway', order: 1 },
+    { what: 'Find the people who want it', stage: 'idea', state: 'not_started', order: 2 },
+    { what: 'Plan the smallest first version', stage: 'plan', state: 'not_started', order: 3 },
+    { what: 'Make the first version', stage: 'build', state: 'not_started', order: 4 },
+    { what: 'Share it with the first people', stage: 'launch', state: 'not_started', order: 5 },
+    { what: 'Keep it going and learn from it', stage: 'grow', state: 'not_started', order: 6 },
+  ])
+    value(await api.create({ register: 'milestones', fields }, owner));
+  for (const fields of [
+    { what: 'Write one sentence about what this is and who it is for', state: 'to_do', order: 1, by: '2026-09-19' },
+    { what: 'Name three people who would use it', state: 'to_do', order: 2, by: '2026-09-22' },
+    { what: 'Ask one of them what they would want first', state: 'to_do', order: 3, by: '2026-09-26' },
+  ])
+    value(await api.create({ register: 'steps', fields }, owner));
   const milestones = async () =>
     value<{ rows: Row[] }>(await api.list({ register: 'milestones', limit: 50 }, owner)).rows.sort((a, b) => Number(a.fields.order) - Number(b.fields.order));
   const next = () => sql.all<{ id: string; body: string; status: string }>("SELECT id, body, status FROM suggestion WHERE opened_by = 'slash' AND body_kind = 'rowset'");

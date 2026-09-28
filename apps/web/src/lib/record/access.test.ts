@@ -511,8 +511,10 @@ test('and the *Suggest new pages* switch that `19 §2` says the area exists for'
      what turns the PROPOSING off — `29 §2`: movement is forward-only and nothing already placed
      moves — and saying that is the difference between a switch somebody turns off and one they are
      afraid of. */
-  const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'routes', 'settings', '[area]', 'areas', 'Navigation.svelte'), 'utf8');
-  assert.match(src, /suggestPages = \$state\(held\.suggestPages \?\? true\)/u, 'the switch does not read the store, so it comes back on');
+  /* THE SWITCH ITSELF LIVES IN `nav-prefs.svelte.ts` NOW, not the area's own file: `NavPrefs` is the one state every
+     screen that reads or writes `pen.suggest` shares, and `Navigation.svelte` reads `navPrefs.suggest` off it. */
+  const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'nav-prefs.svelte.ts'), 'utf8');
+  assert.match(src, /this\.suggest = start\.suggest \?\? true/u, 'the switch does not read the store, so it comes back on');
   /* THE KEYS IT WRITES, NOT THE EXACT ARGUMENT LIST. This pinned `{ chars, suggestPages }`
      literally, so the first preference added to that same write broke a test whose own message is
      about whether the switch writes the store at all — `navShape` did exactly that. What matters

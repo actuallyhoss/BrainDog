@@ -177,9 +177,13 @@ test('THE MINT IS BUILT AND AN OWNER CAN NOW REACH IT', () => {
      agents area offers, and then the same press again. */
   assert.match(section, /mailSaid\?\.kind === 'signin'/u, 'a stale sign-in is not a state on this screen');
   assert.match(section, /mailSignInAgain\(\)/u, 'there is no way to prove a sign-in without leaving');
-  /* REVOKING IS THE QUIETER ONE. `weight="bare"` is this screen's quiet button, and minting is the primary. */
+  /* REVOKING IS THE QUIETER ONE. `weight="bare"` is this screen's quiet button. MINTING STARTS PRIMARY AND STEPS DOWN
+     ONCE AN ADDRESS IS ON SCREEN: with one to copy, copying it is the one thing to do next, so minting another is a
+     secondary act from then on (`mailSaid?.kind === 'minted' ? 'quiet' : 'primary'`), and copying the address is the
+     screen's one `weight="primary"` from that moment. */
   assert.match(section, /weight="bare"[^>]*onclick=\{\(\) => void askMail\('revoke'\)\}/u, 'revoking is not the quieter action');
-  assert.match(section, /weight="primary"[^>]*onclick=\{\(\) => void askMail\('mint'\)\}/u, 'minting is not the primary action');
+  assert.match(section, /weight=\{mailSaid\?\.kind === 'minted' \? 'quiet' : 'primary'\}[^>]*onclick=\{\(\) => void askMail\('mint'\)\}/u, "minting is not primary before an address exists, and does not step down once one does");
+  assert.match(section, /weight="primary" onclick=\{\(\) => void clipboard\.put\(mailAddress, mailWords\.addressCopied\)\}/u, 'copying the shown address is not the primary action once it exists');
   /* AND THE ADDRESS IS NEVER QUOTED IN A TOAST. `clipboard.put(text)` defaults its label to the text, so a
      copy with no label would print a live credential in the corner of the screen and in the toast history. */
   assert.match(section, /clipboard\.put\(mailAddress, mailWords\.addressCopied\)/u, 'the copy toast would quote the address');

@@ -156,8 +156,22 @@ test('a key row joins its grant for the counts, and a row with no grant is an in
   ];
   const keys = keysOf(rows, grants, names);
   assert.deepEqual(keys.map((k) => k.label), ['Admin panel', 'Briefed', 'Stripe'], 'retired rows are gone and the order is the label');
-  assert.deepEqual(keys.find((k) => k.id === 'c1'), { id: 'c1', spoken: null, label: 'Stripe', opens: 'Payments', project: 'Kiln', sealed: true, opened: 5, lastOpened: '2026-09-14T10:00:00Z', grant: 'g1' });
-  assert.deepEqual(keys.find((k) => k.id === 'c2'), { id: 'c2', spoken: null, label: 'Admin panel', opens: 'The panel', project: null, sealed: false, opened: 0, lastOpened: null, grant: null });
+  /* `scope` IS THE CHIP'S OWN SHAPE (AGT-11): the project's spoken id, name, mark and hue, built from the same
+     `project` row `names` already looked up, or `null` for a global key. `names` here carries no `.marks`, so a
+     scoped row's mark and hue read `null` and its spoken id falls back to the project's bare id. */
+  assert.deepEqual(keys.find((k) => k.id === 'c1'), {
+    id: 'c1',
+    spoken: null,
+    label: 'Stripe',
+    opens: 'Payments',
+    project: 'Kiln',
+    scope: { spoken: 'row_kiln', name: 'Kiln', mark: null, hue: null },
+    sealed: true,
+    opened: 5,
+    lastOpened: '2026-09-14T10:00:00Z',
+    grant: 'g1',
+  });
+  assert.deepEqual(keys.find((k) => k.id === 'c2'), { id: 'c2', spoken: null, label: 'Admin panel', opens: 'The panel', project: null, scope: null, sealed: false, opened: 0, lastOpened: null, grant: null });
   assert.equal(keys.find((k) => k.id === 'c4')?.opened, 2);
   /* THE GRANT IS WHAT `revokeGrant` NAMES, and a row that holds its counts instead names none. */
   assert.equal(keys.find((k) => k.id === 'c4')?.grant, null);

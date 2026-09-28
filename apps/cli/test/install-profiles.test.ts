@@ -110,7 +110,17 @@ const planFor = (stdout: string, file: string): string[] => {
   const end = lines.findIndex((l, i) => i > start && l.startsWith('Nothing was changed.'));
   return lines.slice(start, end < 0 ? undefined : end);
 };
-const snapshot = (dir: string) => Object.fromEntries(readdirSync(dir).sort().map((name) => [name, readFileSync(join(dir, name), 'utf8')]));
+/* Every file under a folder with its bytes, keyed by its path from the folder, since OPS-26's skills/braindog/ nests one. */
+function snapshot(dir: string, prefix = ''): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const name of readdirSync(dir).sort()) {
+    const path = join(dir, name);
+    const key = prefix ? `${prefix}/${name}` : name;
+    if (statSync(path).isDirectory()) Object.assign(out, snapshot(path, key));
+    else out[key] = readFileSync(path, 'utf8');
+  }
+  return out;
+}
 
 test('THE ACME SHAPE, no the old tool server in its .claude.json: the dry run plans + mcpServers.braindog there instead of "Nothing to change"', () => {
   const home = folder('home');

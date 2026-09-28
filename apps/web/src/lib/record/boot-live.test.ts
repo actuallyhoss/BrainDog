@@ -465,7 +465,12 @@ test('and a host that does not say which row a page is about draws the rail it d
 test('THE FIVE A TEMPLATE DRAWS ARE THE ROWS TOUCHED LAST, drawn and tabbed in the record\'s own order', () => {
   /* THE KERNEL NOW LISTS A TEMPLATE'S PAGES IN THE ORDER THE ROWS WERE WRITTEN, so a strip of tabs does not move when a
      row is edited, and the first five of that are the five oldest. Where the list came newest first they were the five
-     edited last, and that is what the rail keeps drawing: chosen by `about.updated_at`, placed where the record put them. */
+     edited last, and that is what the rail keeps drawing: chosen by `about.updated_at`, placed where the record put them.
+
+     A TABBED SECTION'S PAGES ARE NEVER CUT BY THE BUDGET (PGS-18, `boot-live.ts`): the strip of tabs draws every one of
+     them, in the record's own order, and only the rail narrows to the five kept, each entry past that carrying `cut`.
+     So `rail` below reads `nav` less anything `cut`, and `tabs`, which `tabsOf` draws from the same `nav` without ever
+     reading `cut`, is the same seven pages whichever five the budget kept. */
   const at = (minute: number) => `2026-09-25T10:${String(minute).padStart(2, '0')}:00.000Z`;
   const part = (n: number, minute: number) => ({
     slug: `part-${n}`,
@@ -482,19 +487,21 @@ test('THE FIVE A TEMPLATE DRAWS ARE THE ROWS TOUCHED LAST, drawn and tabbed in t
     const pages = [desk, ...[1, 2, 3, 4, 5, 6, 7].map((n) => part(n, edits[n] ?? touched[n]!))];
     const shell = layoutOf({ ...BOOT, pages } as never);
     return {
-      rail: shell.nav.filter((n) => n.section === 'Launch').map((n) => n.id),
+      rail: shell.nav.filter((n) => n.section === 'Launch' && !n.cut).map((n) => n.id),
       tabs: tabsOf(shell.nav, '/p/desk')?.shown.map((t) => t.href),
     };
   };
+  const ALL_TABS = ['/p/desk', '/p/part-1', '/p/part-2', '/p/part-3', '/p/part-4', '/p/part-5', '/p/part-6', '/p/part-7'];
   assert.deepEqual(drawn(), {
     rail: ['desk', 'part-2', 'part-4', 'part-5', 'part-6', 'part-7'],
-    tabs: ['/p/desk', '/p/part-2', '/p/part-4', '/p/part-5', '/p/part-6', '/p/part-7'],
+    tabs: ALL_TABS,
   });
   /* EDITING A PART THAT IS ALREADY DRAWN MOVES NOTHING. */
   assert.deepEqual(drawn({ 4: 40 }), drawn());
   /* EDITING ONE THAT IS NOT BRINGS IT IN WHERE IT WAS WRITTEN, and the one touched longest ago goes. */
   assert.deepEqual(drawn({ 1: 50 }).rail, ['desk', 'part-1', 'part-2', 'part-5', 'part-6', 'part-7']);
-  assert.deepEqual(drawn({ 1: 50 }).tabs, ['/p/desk', '/p/part-1', '/p/part-2', '/p/part-5', '/p/part-6', '/p/part-7']);
+  /* THE STRIP NEVER MOVES: every part stays a tab, in the order the rows were written, whichever five the rail keeps. */
+  assert.deepEqual(drawn({ 1: 50 }).tabs, ALL_TABS);
 });
 
 test('and a second template over one list draws its own five, rather than nothing at all', () => {

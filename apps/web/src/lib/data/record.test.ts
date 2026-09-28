@@ -141,6 +141,9 @@ function record(name: string, params: URLSearchParams): Response {
     if (register === 'people') return params.get('cursor') === null ? page([PEOPLE[0]], 'after-1', 2) : page([PEOPLE[1]], null, 2);
     if (register === 'things') return page(THINGS, null);
     if (register === 'obligations') return page(OBLIGATIONS, null, 38);
+    /* `obligations` also declares `book`, a ref to `books` (money-core `BOOK`), which the walk asks for
+       whether or not a sample row carries one: none here do, so the target list is empty. */
+    if (register === 'books') return page([], null);
   }
   return json(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: `Nothing here answers ${name}.` } });
 }

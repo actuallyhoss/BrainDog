@@ -114,7 +114,16 @@ async function tasks(): Promise<Kernel> {
   const k = await openRecord(openSqlite(), { now: () => NOW });
   const { scopes: _scopes, pack: _pack, ...body } = JSON.parse(JSON.stringify(REGISTERS.tasks)) as Record<string, unknown>;
   const fields = (body.fields as { id: string; type: string }[]).filter((f) => f.type !== 'ref');
-  const put = await k.install([{ id: 'register.tasks', kind: 'register', body: { ...body, fields } } as never]);
+  const kept = new Set(fields.map((f) => f.id));
+  /* `hand.person` NAMES `owner`, A LINK FIELD, which the line above strips along with every other ref this bare record
+     does not hold, so the same hand-off would point at a field that is no longer there. `hand.taken` names a value of
+     `state`, never a field, so it is never in question. */
+  const wholeHand = body.hand as Record<string, string> | undefined;
+  const hand =
+    wholeHand === undefined
+      ? undefined
+      : Object.fromEntries(Object.entries(wholeHand).filter(([k2, v]) => k2 === 'taken' || kept.has(v)));
+  const put = await k.install([{ id: 'register.tasks', kind: 'register', body: { ...body, fields, ...(hand && Object.keys(hand).length > 0 ? { hand } : { hand: undefined }) } } as never]);
   assert.ok(put.ok, JSON.stringify(put));
   return k;
 }

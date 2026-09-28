@@ -81,6 +81,9 @@ const DOOR_OF: { [asked: string]: string[] } = {
   servesMcp: ['/mcp', '/mcp/'],
   servesIn: ['/in/abc'],
   servesVault: ['/api/vault/deposit'],
+  /* OPS-20's file store, `PUT /api/files` and `GET /api/files/<sha256>` (ops §4.0 D), under `/api/*` like every other
+     door here, so the site's own entry already carries it. */
+  servesFiles: ['/api/files/abc123'],
   servesKennel: ['/api/kennel/v1/index.json'],
   servesOAuth: ['/oauth/token', '/oauth/authorize'],
   servesOAuthMeta: ['/.well-known/oauth-authorization-server', '/.well-known/oauth-protected-resource', '/.well-known/oauth-protected-resource/mcp'],

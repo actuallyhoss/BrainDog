@@ -440,9 +440,24 @@ test('the rows it DRAWS are still cut, because that half was never the bug', asy
   assert.ok(admitted.length > drawn.length, 'nothing was cut, so nothing is being tested');
 });
 
+/**
+ * NO SHIPPED PAGE DRAWS A GAUGE ANY MORE (estate's moved to `queue` and `split` on the way to W2), but the kind is
+ * still one `declare.ts` accepts and `blockOf` still draws, so the two tests below build the block by hand, over the
+ * same `services` register estate's gauge once read, rather than assert on a page nobody declares.
+ */
+const monthlySpend: { kind: 'gauge'; heading: string; span: number; columns: { field: string; label?: string }[]; source: string; where: string; target: number; empty: string } = {
+  kind: 'gauge',
+  heading: 'Monthly spend',
+  span: 5,
+  columns: [{ field: 'name', label: 'Every month' }, { field: 'cost' }],
+  source: 'register.services',
+  where: 'state is live, cycle is monthly',
+  target: 22_000,
+  empty: 'Nothing on a monthly plan.',
+};
+
 test('a gauge sums past the cut too', () => {
-  const block = page('estate')?.blocks.find((b) => b.kind === 'gauge');
-  assert.ok(block, 'the estate page has no gauge');
+  const block = readBlock(monthlySpend as never);
   const of = block.columns[1]?.field ?? '';
   const truth = block.matched.reduce((a, e) => a + (amountOf(e.fields[of]) ?? 0), 0);
   const drawn = toSegments(block).flatMap((seg) => ('rows' in seg ? (seg.rows as { cells: string[] }[]) : []));
@@ -478,10 +493,7 @@ test('a gauge keeps its currency when nothing matches', async () => {
     const wrote = k.update('services', `services#${s.seq}`, { cycle: 'yearly' }, { actor: 'p_owner' });
     assert.ok(wrote.ok, JSON.stringify(wrote));
   }
-  const opened = k.page('estate');
-  assert.ok(opened.ok, JSON.stringify(opened));
-  const answered = opened.value.blocks.find((b) => (b as { kind?: unknown }).kind === 'gauge');
-  assert.ok(answered, 'the estate page has no gauge');
+  const answered = k.block(monthlySpend as never);
   const block = liveBlockOf(answered as never, new Map(), NOW);
   assert.equal(block.total, 0, 'a service is still monthly, so this is not the case where nothing matches');
   const drawn = toSegments(block).flatMap((seg) => ('rows' in seg ? (seg.rows as { cells: string[] }[]) : []));

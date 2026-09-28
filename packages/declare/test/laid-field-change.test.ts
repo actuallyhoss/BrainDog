@@ -14,7 +14,7 @@ import { readFileSync } from 'node:fs';
 import type { Diff } from '../src/index.ts';
 import { createRecordApi, type CallContext } from '../../record/src/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
-import { firstPartyDocument } from '../../seed/src/index.ts';
+import { FIRST_PARTY, PAGES, firstPartyDocument } from '../../seed/src/index.ts';
 
 const owner: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'owner' } };
 
@@ -44,10 +44,16 @@ const brief = (version = '1.0.0', change: (fields: Field[]) => Field[] = (f) => 
 };
 const relabelled = (fields: Field[]): Field[] => fields.map((f) => (f.id === 'summary' ? { ...f, label: 'In one line' } : f));
 
+/**
+ * A fresh record holding every module `page.project` itself requires, the page laid on top as the starter lays it:
+ * the project template reads tasks, money and services at once, so it sits in none of the five first-party packs
+ * and none of their pack rows carry it (`packages/seed/src/packs/first-party.ts`, `crossPack`).
+ */
 async function portfolio(): Promise<{ api: Api; close: () => void }> {
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(Date.UTC(2026, 8, 27, 12)) });
-  said(await put(api, firstPartyDocument('portfolio')));
+  for (const id of FIRST_PARTY) said(await put(api, firstPartyDocument(id, { seeds: [] })));
+  said(await api.kernel.install([{ id: 'page.project', kind: 'page', body: PAGES.project as never }]));
   return { api, close: () => sql.close() };
 }
 const planOf = async (api: Api, doc: unknown): Promise<Diff> => said<{ diff: Diff }>(await api.planPack({ doc, source: { kind: 'local' } } as never, owner)).diff;

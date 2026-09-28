@@ -347,10 +347,10 @@ test('pack install <file> --dry-run says the plan and sends nothing; without it 
   const h = await setup(t);
   assert.equal(await pack(['install', PROJECT_BRIEF, '--dry-run'], h.io), 0, h.said.join('\n'));
   assert.equal(h.seen.length, 0, 'a dry run sent something');
-  assert.match(h.out[0] ?? '', /^Project brief 1\.0\.0 reads as an add-on/u);
+  assert.match(h.out[0] ?? '', /^Project brief 1\.2\.0 reads as an add-on/u);
   assert.ok(h.out.includes('  Installs first: portfolio'), h.out.join('\n'));
   assert.ok(h.out.includes('  Adds lists: none; pages: Briefs; rules: none'), h.out.join('\n'));
-  assert.match(h.out.at(-1) ?? '', /^Would ask the owner: Install Project brief 1\.0\.0\? Nothing was sent\.$/u);
+  assert.match(h.out.at(-1) ?? '', /^Would ask the owner: Install Project brief 1\.2\.0\? Nothing was sent\.$/u);
 
   h.out.length = 0;
   assert.equal(await pack(['install', PROJECT_BRIEF], h.io), 0, h.said.join('\n'));
@@ -359,7 +359,7 @@ test('pack install <file> --dry-run says the plan and sends nothing; without it 
   const body = asked[0]?.args.body as { install: string; doc: Record<string, unknown> };
   assert.equal(body.install, 'project-brief');
   assert.deepEqual(body.doc, JSON.parse(readFileSync(PROJECT_BRIEF, 'utf8')));
-  assert.match(h.out.at(-1) ?? '', /^Asked the owner: Install Project brief 1\.0\.0\? .*\/decide\/SG7$/u);
+  assert.match(h.out.at(-1) ?? '', /^Asked the owner: Install Project brief 1\.2\.0\? .*\/decide\/SG7$/u);
 
   /* A USE CASE IS NOT AN ADD-ON, and a file that is neither is refused before anything is sent. */
   assert.equal(await usecase(['new', 'club', '--author', 'Halden'], h.io), 0);
@@ -375,7 +375,7 @@ test('pack install <id> with no --from resolves the id in the catalogue the host
   assert.equal(await pack(['install', 'project-brief', '--dry-run'], h.io), 0, h.said.join('\n'));
   assert.equal(h.seen.filter((s) => s.method === 'propose').length, 0, 'a dry run asked');
   assert.match(h.out.join('\n'), /Unsigned: nothing says who published it/u);
-  assert.match(h.out.at(-1) ?? '', /^Would ask the owner: Install Project brief 1\.0\.0 from a catalogue\?.* Nothing was sent\.$/u);
+  assert.match(h.out.at(-1) ?? '', /^Would ask the owner: Install Project brief 1\.2\.0 from a catalogue\?.* Nothing was sent\.$/u);
 
   assert.equal(await pack(['install', 'project-brief'], h.io), 0, h.said.join('\n'));
   const asked = h.seen.filter((s) => s.method === 'propose');

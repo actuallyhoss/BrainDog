@@ -270,12 +270,23 @@ async function give(request: Request, blobs: FileBucket | undefined, record: str
   if (blobs === undefined) return refuse(501, NO_STORE);
   if (!SHA256.test(sha256)) return refuse(404, NO_FILE);
   const key = fileKey(record, sha256);
-  const object = request.method === 'HEAD' ? await blobs.head(key) : await blobs.get(key);
-  if (object === null) return refuse(404, NO_FILE);
-  const headers = {
+  const fileHeaders = (meta: { size: number; httpMetadata?: { contentType?: string } }): Record<string, string> => ({
     ...FILE_HEADERS,
-    'content-type': object.httpMetadata?.contentType ?? 'application/octet-stream',
-    'content-length': String(object.size),
-  };
-  return new Response('body' in object ? (object as R2ObjectBody).body : null, { status: 200, headers });
+    'content-type': meta.httpMetadata?.contentType ?? 'application/octet-stream',
+    'content-length': String(meta.size),
+  });
+  /*
+   * `blobs.head` and `blobs.get` are kept as two calls, never one behind a ternary, because TypeScript would
+   * otherwise infer their shared variable's type as `head`'s alone: `get`'s answer is a structural subtype of
+   * `head`'s (it has every field `head`'s has, and `body` besides), so a ternary of the two collapses to the
+   * wider, bodyless type, and `object.body` would read as `unknown` on the branch that does have it.
+   */
+  if (request.method === 'HEAD') {
+    const object = await blobs.head(key);
+    if (object === null) return refuse(404, NO_FILE);
+    return new Response(null, { status: 200, headers: fileHeaders(object) });
+  }
+  const object = await blobs.get(key);
+  if (object === null) return refuse(404, NO_FILE);
+  return new Response(object.body, { status: 200, headers: fileHeaders(object) });
 }

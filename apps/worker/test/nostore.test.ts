@@ -133,16 +133,16 @@ const THROUGH = 3;
  * a header list it does not use would be accepted. The module this check exists to catch is one that
  * names no header list anywhere, and one was watched failing in a scratch copy before this was kept.
  */
-function reaches(text: string, file: string, hops: number): boolean {
-  if (text.includes('no-store')) return true;
+function reaches(text: string, file: string, hops: number, needle = 'no-store'): boolean {
+  if (text.includes(needle)) return true;
   if (hops <= 0) return false;
   const src = code(read(file));
   for (const name of new Set(text.match(/[A-Za-z_$][A-Za-z0-9_$]*/g) ?? [])) {
     const decl = declaredAs(name).exec(src);
-    if (decl !== null && whole(src, decl.index).includes('no-store')) return true;
+    if (decl !== null && whole(src, decl.index).includes(needle)) return true;
     const along = passedOn(name).exec(src);
     const next = along === null ? null : moduleFor(along[1] ?? '', file);
-    if (next !== null && reaches(name, next, hops - 1)) return true;
+    if (next !== null && reaches(name, next, hops - 1, needle)) return true;
   }
   return false;
 }
@@ -237,6 +237,11 @@ test('EVERY MODULE THE WORKER ORIGINATES AN ANSWER FROM CARRIES no-store', () =>
         byName += 1;
         continue;
       }
+      /* A DECLARED, ALTERNATE `cache-control` IS THE SAME DECISION MADE THE OTHER WAY. `no-store` and a
+         positive `max-age` cannot both be true of one answer, so a call whose own headers already name
+         `cache-control` said what to do with a cache on purpose, as `GET /api/files/<sha256>` does (ops
+         §4.0 D): a record's own file, held long because its name is the hash it was stored under. */
+      if (reaches(`${site.scope}${site.call}`, file, THROUGH, 'cache-control')) continue;
       bare.push(`${module} line ${site.line}: ${site.call.replace(/\s+/g, ' ').slice(0, 100)}`);
     }
   }

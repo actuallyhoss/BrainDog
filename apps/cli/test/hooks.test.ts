@@ -531,7 +531,7 @@ test('INSTALL --REPLACE --APPLY copies each file beside itself, removes only the
     `${settings} already runs both BrainDog hooks and no the old tool hook. Nothing to change.`,
     `${claudeJson} registers no the old tool MCP server. Nothing to change.`,
   ]);
-  assert.deepEqual(readdirSync(dir).sort(), ['.claude.json', '.claude.json.bak', 'settings.json', 'settings.json.bak']);
+  assert.deepEqual(readdirSync(dir).sort(), ['.claude.json', '.claude.json.bak', 'settings.json', 'settings.json.bak', 'skills']);
 
   /* Without --replace, install leaves the old tool's entries where they are, as it always has. */
   const plain = folder('home');

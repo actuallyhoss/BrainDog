@@ -32,7 +32,6 @@ import { automations, scripts } from './automations.ts';
 import { exportFile, importFile } from './brainfile.ts';
 import { hookEnd, hookStart, readSession, sessionPath } from './hooks.ts';
 import { budgetOf, clientFor, hostsPath, target, type Target } from './http.ts';
-import { importCommand, isAdapterImport } from './import.ts';
 import { byHand, handRun, installProfiles, profilesOf, readReplace, replaceByHand, shellOf, type Replace } from './install.ts';
 import { machine, takeJson, type Machine } from './json.ts';
 import { keys, spawnInherit } from './keys.ts';
@@ -47,13 +46,10 @@ import { skills } from './skills.ts';
 import { signedOutFix, signedOutSurface } from './signed-out.ts';
 import { serveStdio } from './stdio.ts';
 import { surfaceOver } from './surface.ts';
-import { pack } from './catalogue.ts';
-import { kennel } from './kennel.ts';
 import { runner } from './runner.ts';
 import { setup } from './setup.ts';
 import { tools } from './tools.ts';
 import { tokenCommand } from './token.ts';
-import { usecase } from './usecase.ts';
 import { verify } from './verify.ts';
 
 /* Synchronous, so the line is out before `exit`: a write to a pipe on Windows is asynchronous, and
@@ -354,8 +350,12 @@ async function agentCommand(which: 'skills' | 'tools' | 'page' | 'usecase' | 'pa
     },
   };
   const cli = fileURLToPath(new URL('./main.ts', import.meta.url)).replaceAll('\\', '/');
+  /* `import.ts`, `usecase.ts` AND `catalogue.ts` (`pack`, `kennel`) ARE LOADED HERE, NOT AT THE TOP OF THE
+     FILE, for the same reason `verify.ts:218` gives: `catalogue.ts` reaches `scratch.ts`'s top-level
+     `import { DatabaseSync } from 'node:sqlite'`, and a static import at the top of this file would load
+     it, and Node's `ExperimentalWarning`, before every command this CLI runs, not only these four. */
   const code =
-    which === 'context' ? await context(args, io) : which === 'session' ? await session(args, io) : which === 'import' ? await importCommand(args, io) : which === 'skills' ? await skills(args, io) : which === 'tools' ? await tools(args, { ...io, cli }) : which === 'usecase' ? await usecase(args, io) : which === 'pack' ? await pack(args, io) : which === 'kennel' ? await kennel(args, io) : which === 'automations' ? await automations(args, io) : which === 'scripts' ? await scripts(args, io) : which === 'verify' ? await verify(args, io) : await pageCommand(args, io);
+    which === 'context' ? await context(args, io) : which === 'session' ? await session(args, io) : which === 'import' ? await (await import('./import.ts')).importCommand(args, io) : which === 'skills' ? await skills(args, io) : which === 'tools' ? await tools(args, { ...io, cli }) : which === 'usecase' ? await (await import('./usecase.ts')).usecase(args, io) : which === 'pack' ? await (await import('./catalogue.ts')).pack(args, io) : which === 'kennel' ? await (await import('./kennel.ts')).kennel(args, io) : which === 'automations' ? await automations(args, io) : which === 'scripts' ? await scripts(args, io) : which === 'verify' ? await verify(args, io) : await pageCommand(args, io);
   if (json) emit(json.envelope(code));
   /* LEFT TO END ON ITS OWN, for the reason `hook` gives. */
   process.exitCode = code;
@@ -625,7 +625,7 @@ try {
   else if (command === 'token') await brainfileCommand('token', args);
   /* AN ADAPTER IMPORT TAKES TWO WORDS OR AN OPTION OF ITS OWN, and any other `import` is a .brainl put back
      (`isAdapterImport`). Asked of the whole line rather than of a position, because both take `--host <h>` anywhere. */
-  else if (command === 'import' && !isAdapterImport(args)) await brainfileCommand('import', args);
+  else if (command === 'import' && !(await import('./import.ts')).isAdapterImport(args)) await brainfileCommand('import', args);
   else if (command === 'skills' || command === 'tools' || command === 'page' || command === 'usecase' || command === 'pack' || command === 'kennel' || command === 'import' || command === 'context' || command === 'session' || command === 'automations' || command === 'scripts' || command === 'verify') await agentCommand(command, args);
   else if (command === 'hook') await hook(rest);
   else if (command === 'install') install(args);

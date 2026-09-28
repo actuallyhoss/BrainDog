@@ -154,7 +154,7 @@ test('A FILE ALREADY HOLDING A braindog SERVER keeps it as it is: byte for byte 
   const lines = installInto(settled.dir, { apply: true, replace: REPLACE, scripts, home });
   assert.ok(!lines.some((l) => l.startsWith('  + mcpServers.braindog')), lines.join('\n'));
   assert.equal(readFileSync(settled.claudeJson, 'utf8'), settled.before);
-  assert.deepEqual(readdirSync(settled.dir).sort(), ['.claude.json', 'settings.json']);
+  assert.deepEqual(readdirSync(settled.dir).sort(), ['.claude.json', 'settings.json', 'skills']);
 
   /* the old tool's beside it: the old tool's goes, and the person's own braindog entry is neither replaced nor added twice. */
   const both = profile(home, '.claude-both', { mcpServers: { braindog: own, brain: SAM } });
@@ -182,7 +182,7 @@ test('A FAILURE IN A LATER FILE PUTS BACK THE ADDED ENTRY WITH THE REMOVED ONES'
   assert.throws(() => installEvery([a.dir, b.dir], [], { apply: true, replace: REPLACE, scripts, home }), /changed nothing/);
   assert.equal(readFileSync(a.claudeJson, 'utf8'), a.before, 'the first profile kept BrainDog in and the old tool out');
   assert.equal(readFileSync(b.claudeJson, 'utf8'), b.before);
-  assert.deepEqual(readdirSync(a.dir).sort(), ['.claude.json', 'settings.json']);
+  assert.deepEqual(readdirSync(a.dir).sort(), ['.claude.json', 'settings.json', 'skills']);
 });
 
 test('NO TOKEN IN THE ENTRY OR THE OUTPUT: the removed server’s env and headers are not carried into the new one', () => {

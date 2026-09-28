@@ -168,8 +168,19 @@ test('the seeded pages refuse nothing at all, so no page ships a broken declarat
  * never written to, so the change reached nothing. The record's `block`, which reads one declaration without a page
  * around it (`readBlock` in `fixtures/readers.ts`), is handed the changed declaration instead.
  */
+/* A REAL, ALWAYS-DRAWN REGISTER, NOT `deadlines`' OWN AND NOT ONE GATED BEHIND A `when:`. Money's "Coming up" table
+   reads the virtual `deadlines` source, which `blockOf` names a `.register` too (so a reader can say what it is bound
+   to), and "Being chased" is `register.obligations` but only when something is being chased, which the sample is
+   not, so it is never evaluated far enough to refuse anything. Money-core 3.1.0 put both ahead of "What moved", the
+   plain `register.transactions` table this file's `where:`, `seq` and misspelt-column cases mean. */
+const registerTable = (b: BlockResult): boolean =>
+  b.kind === 'table' &&
+  typeof (b as { source?: unknown }).source === 'string' &&
+  (b as { source: string }).source.startsWith('register.') &&
+  (b as { when?: unknown }).when === undefined;
+
 const declared = (over: Record<string, unknown>): BlockResult => {
-  const base = page('money')?.blocks.find((b) => b.kind === 'table' && b.register);
+  const base = page('money')?.blocks.find(registerTable);
   assert.ok(base);
   const decl = pages().money?.blocks.find((b) => b.heading === base.heading);
   assert.ok(decl);
@@ -185,7 +196,7 @@ test('A `where:` WRITTEN AS THE PREDICATE TREE THE DOCS SHOW DOES NOT BLANK THE 
   /* THE RECORD READS THE TREE, since ARC-2 (`where: Predicate | string`), where the browser refused it for not being a
      sentence. So a tree over values the list holds draws its rows, and one naming a value it does not hold is refused
      on its own block in the record's words, the page around it drawn. */
-  const base = page('money')?.blocks.find((b) => b.kind === 'table' && b.register);
+  const base = page('money')?.blocks.find(registerTable);
   assert.ok(base);
   const read = declared({ where: { all: [{ field: 'state', in: ['cleared'] }] } });
   assert.deepEqual(read.refusals, [], 'a tree the documentation shows was refused');

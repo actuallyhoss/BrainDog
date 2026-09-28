@@ -355,13 +355,15 @@ test('EIGHT PROCESSES MINTING AT ONCE ALL END UP WITH THE SAME KEY', async () =>
     writeFileSync(runner, OPENER);
     const mod = new URL('../src/keys.ts', import.meta.url).href;
 
-    const at = Date.now() + 5000;
-    /* 5000, NOT 1500: eight Node processes each loading TypeScript can take longer than 1500 ms to start on a machine
-       running the whole workspace, and this test failed under that load while passing alone. */
+    const at = Date.now() + 10_000;
+    /* 10000, NOT 5000: the CHECK pass runs many workspaces' tests at once under `--workspace-concurrency=2`, and
+       eight Node processes each loading TypeScript missed a 5000 ms deadline under that load (2 of 8 started late)
+       while passing alone. Doubled off that failure, the same wall-clock deadline this test needs to prove the race
+       happened at all, not a CPU budget it is measuring. */
     const ran = await Promise.all(Array.from({ length: RACERS }, () => race(runner, mod, file, at)));
 
     /* THE RACE HAPPENED. Every process reached the spin loop before the deadline, so all eight were
-       inside `openKeyStore` together. If this is what fails, the machine is slower than the 5000 ms
+       inside `openKeyStore` together. If this is what fails, the machine is slower than the 10000 ms
        allowed and the test proved nothing yet; raise the deadline rather than deleting the check. */
     const late = ran.filter((r) => r.said.ready === 0 || r.said.ready > at);
     assert.equal(late.length, 0, `${late.length} of ${RACERS} processes started after the deadline, so nothing raced`);
