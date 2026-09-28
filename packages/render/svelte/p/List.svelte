@@ -126,7 +126,7 @@
       <!-- `working: true`'s dot, on the cell `blocks.ts` marked, which for a todo is its own name. -->
       {@const title = takeWorking(row.cells[0] ?? '')}
       {@const meta = todoMeta(row.cells)}
-      <li class="item">
+      <li class="item" data-arrived={row.arrived ? '' : undefined}>
         {#if ontick}
           <!-- `role="checkbox"` and not a bare button: what it does is set a state, not run a verb,
                and `aria-checked` is the only way a screen reader is told which state it is in
@@ -192,7 +192,7 @@
       </li>
     {:else if block.kind === 'timeline'}
       {@const title = takeWorking(row.cells[1] ?? '')}
-      <li class="item" data-intent={row.tone}>
+      <li class="item" data-intent={row.tone} data-arrived={row.arrived ? '' : undefined}>
         <!-- The date cell goes through the inline renderer like every other cell. It did not, and a
              timeline written with `{{ago:…}}` — which is how you write one that stays true — printed
              its own source. -->
@@ -210,7 +210,7 @@
       </li>
     {:else}
       {@const title = takeWorking(row.cells[0] ?? '')}
-      <li class="item">
+      <li class="item" data-arrived={row.arrived ? '' : undefined}>
         <span class="item-title"
           >{#if title.working}<span role="img" aria-label={WORKING_LABEL} title={WORKING_LABEL}>{WORKING_GLYPH}</span>{' '}{/if}<Text nodes={inline(title.text ?? '', opts)} {opts} /></span
         >

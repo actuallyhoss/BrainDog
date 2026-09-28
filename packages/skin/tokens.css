@@ -323,6 +323,9 @@
        (design D-1, SYS-1). Focus is a place, not a verdict. */
     --focus-halo: color-mix(in srgb, var(--ink) 14%, transparent);
     --hold-wash: color-mix(in srgb, var(--ink) 12%, transparent);
+    /* A ROW THAT ARRIVED WHILE THE READER LOOKED (`[data-arrived]` in `blocks.css`): the info hue at the wash strength,
+       never the brand's red, and gone in a second and a half. */
+    --arrived-wash: color-mix(in srgb, var(--info) 12%, transparent);
 
     /**
      * THE STATE ROLES: WHAT IS ON, WHAT IS CURRENT, WHAT IS A LINK, AND THE ONE CHART SERIES.

@@ -3392,4 +3392,30 @@
       min-block-size: var(--tap);
     }
   }
+
+  /* A ROW THAT ARRIVED WHILE THE READER LOOKED: an agent's task, a colleague's row, a line captured on another tab.
+
+     A TINT UNDER THE ROW THAT FADES, AND NOTHING THAT MOVES. The rows already on screen stay exactly where they were
+     drawn, because a list that slides to make room is a list the reader loses their place in; the new row is simply
+     there, tinted for a second and a half so the eye finds it, and then it is a row like the others. The host sets the
+     attribute only on a row that was not in the last answer (`arrivals` in `apps/web/src/lib/data/optimistic.ts`) and
+     takes it away when the tint has run out, so a row drawn again later never flashes twice.
+
+     UNDER `prefers-reduced-motion` THE TINT HOLDS AND THEN GOES, with no fade: the fact that the row is new is kept, and
+     the change over time is one step rather than a movement. */
+  :is(.tr, .table-card, .item, .card)[data-arrived] {
+    animation: arrived 1.5s var(--ease-out);
+  }
+
+  @keyframes arrived {
+    from {
+      background-color: var(--arrived-wash);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :is(.tr, .table-card, .item, .card)[data-arrived] {
+      animation: arrived 1.5s step-end;
+    }
+  }
 }

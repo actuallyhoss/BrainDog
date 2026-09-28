@@ -78,6 +78,8 @@ export type TableRow = {
   /** From a column's `tone_when`, or from the row's own state. Reaches the DOM with its glyph. */
   tone?: Tone | undefined;
   href?: string | undefined;
+  /** New since the table was last drawn, and tinted for a moment (`Row`'s `arrived`). */
+  arrived?: boolean | undefined;
 };
 
 /**

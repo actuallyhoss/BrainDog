@@ -47,7 +47,12 @@ export type ParseOptions = { page?: boolean; kinds?: Readonly<Record<string, Kin
  */
 export type RowRef = { register: string; seq: number; version: number };
 
-export type Row = { cells: string[]; tone?: Tone; hole?: boolean; done?: boolean; depth?: number; ref?: RowRef };
+/**
+ * `arrived` IS THE HOST SAYING THIS ROW WAS NOT THERE THE LAST TIME THE LIST WAS DRAWN: an agent wrote it, or somebody
+ * else did, while the reader looked. The primitive marks it `data-arrived` and `blocks.css` tints it for a second and a
+ * half. Never parsed, like `ref`: a fence an author typed has no last time.
+ */
+export type Row = { cells: string[]; tone?: Tone; hole?: boolean; done?: boolean; depth?: number; ref?: RowRef; arrived?: boolean };
 
 export type Block = {
   type: 'block';
