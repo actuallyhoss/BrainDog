@@ -64,7 +64,7 @@ import { fileKey, serveFiles, servesFiles } from './files.ts';
 import { cloudSnapshots, type Pitr } from './copies.ts';
 import { DELETED, destroyRecord, expireFinal } from './destroy.ts';
 import { directoryCopies } from './directory-copy.ts';
-import { isMailKind, sendMail } from './mail.ts';
+import { isMailKind, opsAlert, sendMail, type OpsKind } from './mail.ts';
 import { delivers, leasedOpener, leasedTarget, makeDeliver, recordDelivers, type Mail } from './deliver.ts';
 import { fetchPush, pushKeyOf, servesPushKey, vapidKeys } from './vapid.ts';
 import { NO_SHARE_KEY, linkOpened, opensShare, serveShared, sharedNone, type SharedDoor } from '@braindog/host';
@@ -242,6 +242,8 @@ type Env = {
   MAIL_FROM?: string;
   /** Where a reader of any mail may write with a question, named in its footer. Empty, and the footer names none. */
   SUPPORT_ADDRESS?: string;
+  /** Where a `crash` or `refuse` line is mailed, at most once a kind in 15 minutes (`opsAlert`). Unset, and none is. */
+  OPS_ALERT_TO?: string;
   /** The app's host name: the cookie's origin, the passkeys' relying party, and what a cookie write must come from. */
   PUBLIC_HOST?: string;
   /**
@@ -1652,6 +1654,7 @@ export class Record$ extends DurableObject<Env> {
        counts: the code says which way the record and the build disagree, and the id says which record. */
     if (refused) {
       op({ op: 'refuse', rec: recOf(api), code: refused.code }, 'error');
+      this.ctx.waitUntil(opsAlert(this.env, { op: 'refuse', rec: recOf(api), code: refused.code }, alertClaim(this.env)));
       return json({ ok: false, refusal: refused }, 503);
     }
 
@@ -2114,7 +2117,28 @@ export class Directory$ extends DurableObject<Env> {
   async recordsFor(person: string): Promise<SwitcherRow[]> {
     return this.#directory().switcherRows(person, (record) => this.env.RECORD.get(this.env.RECORD.idFromName(record)).switcherRow(person));
   }
+
+  /**
+   * Whether an ops mail of this kind may go now, and if so the window starts over (`opsAlert`, `alertClaim`).
+   *
+   * HERE BECAUSE THE DIRECTORY IS THE ONE OBJECT EVERY ISOLATE REACHES, and this Worker binds no KV. One key a kind in
+   * the object's own storage, outside the tables the Directory's copy is made of.
+   */
+  async alertDue(kind: string, quietMs: number): Promise<boolean> {
+    const key = `ops-alert:${kind}`;
+    const now = Date.now();
+    const last = await this.ctx.storage.get<number>(key);
+    if (typeof last === 'number' && now - last < quietMs) return false;
+    await this.ctx.storage.put(key, now);
+    return true;
+  }
 }
+
+/** The Directory's window over every isolate's ops mail, for `opsAlert`. */
+const alertClaim =
+  (env: Env) =>
+  (kind: OpsKind, quietMs: number): Promise<boolean> =>
+    env.DIRECTORY.get(env.DIRECTORY.idFromName('directory')).alertDue(kind, quietMs);
 
 /**
  * One pass over one record’s outbox, with this deployment’s bindings behind it.
@@ -2394,8 +2418,10 @@ const unauthorized = (env: Env): Response =>
  * `/mcp` ANSWERS IN JSON-RPC, `-32603` with the reference in `data`, as `packages/mcp/src/rpc.ts` answers a throw one
  * layer down: an MCP client reads an `error` object, and the `/api` envelope is a body it cannot place. The reference is
  * read back off the line `crashed` wrote, so the answer and the log cannot name two different ones.
+ *
+ * `alert` MAILS THE OPERATOR the same line's ref and door (`opsAlert`), throttled, inside the caller's `waitUntil`.
  */
-function crashAnswer(request: Request, e: unknown): Response {
+function crashAnswer(request: Request, e: unknown, alert: (fields: { op: 'crash' } & Record<string, string>) => void): Response {
   let path = '/';
   try {
     path = new URL(request.url).pathname;
@@ -2407,6 +2433,7 @@ function crashAnswer(request: Request, e: unknown): Response {
     const said = JSON.parse(line) as Record<string, string>;
     ref = said['ref'] ?? null;
     op({ ...said, op: 'crash' }, 'error');
+    alert({ ...said, op: 'crash' });
   });
   return servesMcp(path) ? json({ jsonrpc: '2.0', id: null, error: { code: -32603, message: 'internal', data: { ref } } }, 500) : json(out, 500);
 }
@@ -2466,7 +2493,7 @@ export default {
          `#record()` first, which rejects while a restore is armed, and this answered that 500 `INTERNAL` with the refusal's
          own sentence inside it (`test/restore-armed.test.ts`). The object's comments promise 503 `RECORD_UNAVAILABLE`,
          and 503 is what a client waits on and asks again. */
-      answer = restoring(e) ? json({ ok: false, refusal: RESTORING }, 503) : crashAnswer(request, e);
+      answer = restoring(e) ? json({ ok: false, refusal: RESTORING }, 503) : crashAnswer(request, e, (fields) => ctx.waitUntil(opsAlert(env, fields, alertClaim(env))));
     }
     /* ONE POINT PER REQUEST, CRASHES INCLUDED, AFTER THE ANSWER (`51 §5.18`, `telemetry.ts`). Inside `waitUntil` so the
        caller never waits on a count, and it does nothing at all while `TELEMETRY` is unbound. */

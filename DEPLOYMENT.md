@@ -175,6 +175,7 @@ key fails the first deploy of an environment while the secret is unset.
 | `AUTH_MAIL_FROM` | variable | no sign-in links, no sign-up, no invitation proof | the sender for sign-in mail, on a domain Email Service sends for; production is `hello@brain.dog` |
 | `MAIL_FROM` | variable, not yet in `wrangler.jsonc` | notification and account mail goes from `AUTH_MAIL_FROM` | the sender for notification, lapse and account mail |
 | `SUPPORT_ADDRESS` | variable, not yet in `wrangler.jsonc` | every mail's footer says to contact whoever runs this BrainDog | the address support mail reaches, named in every mail's footer |
+| `OPS_ALERT_TO` | variable, production only | no mail on a `crash` or `refuse` line | where those lines are mailed, once a kind in 15 minutes ("Alerts" below) |
 | `AGE_RECIPIENT` | variable | the walk refuses every record's copy and says why | the age recipient every nightly copy is sealed to; its identity lives outside Cloudflare (53 §8) |
 | `PUBLIC_HOST`, `RP_ID`, `LEGACY_HOSTS` | variables | no cookie origin, no passkeys, no legacy host | `brain.dog`, `brain.dog`, `app.brain.dog` |
 | `PROVISION_WITHOUT_KEYS` | variable | a record is never made without keys | `yes` lets `/auth/provision` make a keyless record on purpose |
@@ -362,29 +363,29 @@ filters, pick the window, and save it under the alert's name. Seven, and each na
 dead one, and a deletion that sits pending for days is the same broken promise to a person who
 asked to be forgotten. The walk counts both in `erase_open` (`apps/worker/src/nightly.ts`).
 
-**The notification to wire.** Cloudflare's Notifications (Account > Notifications) showed no type
-that fires on a Workers Logs query when this was written (28 September 2026; look again), so the
-seven are read by a person: the morning check of 53 §5.1 step 5 opens each saved query, and a red
-row opens its runbook. The nightly ones also reach the ops record, where the walk writes its summary
-as a note once `OPS_RECORD` is set. The one alert that pushes is the uptime check below. When
-Cloudflare offers a notification on a query, `crash` and `refuse` move to it first, because they
-are the two that cannot wait until morning.
+**What mails you.** Cloudflare cannot mail on these lines for this account: Observability alerts
+are not offered, and the zone is on the free plan, so there are no Health Checks. The Worker and the
+site mail instead, both through the `EMAIL` (`send_email`) binding, to `OPS_ALERT_TO`
+(`admin@brain.dog` in production only; unset is off). The other five are read by a person: the
+morning check of 53 §5.1 step 5 opens each saved query, and a red row opens its runbook. The nightly
+ones also reach the ops record, where the walk writes its summary as a note once `OPS_RECORD` is set.
 
-*(29 September 2026: it does now. Notifications lists "Workers Observability > Alert Policy", which mails
-when an alert saved under Observability > Alerts fires (`status` FIRING_FAILED), so `crash` and `refuse`
-can move to it: save each as an Observability alert, then add that policy to your email. Set up so far:
-"BrainDog: Cloudflare incident", major and critical incidents, to admin@brain.dog. No Worker has a Workers
-Builds trigger any more; deploys go through the pipeline or by hand.)*
+- **Crash and migration refusal.** Every `op: crash` and `op: refuse` line also sends one plain
+  mail (`opsAlert` in `apps/worker/src/mail.ts`): the op, the line's `ref`, `where`, `rec` and
+  `code`, the build, and the runbook from the table above. Never the `error` sentence, which stays
+  in the log. At most one per kind in 15 minutes, held per isolate and across isolates by one
+  storage key per kind in the Directory (`alertDue`); if the Directory cannot be asked, the isolate's
+  own window is the cap.
+- **Uptime.** The site Worker's cron (`apps/site/wrangler.jsonc`, `env.production`) fetches the app's
+  `/healthz` through the `APP` binding every minute and wants 200 and `"ok":true`
+  (`apps/worker/src/health.ts`). The second failure in a row mails "BrainDog is down" once, and the
+  first success after it mails "BrainDog is up again" (`watch` in `apps/site/src/worker.ts`). The
+  count is per isolate, because the site binds no storage: a cron run on a fresh isolate starts from
+  zero, so a mail can come later than two minutes in, and a recovery a fresh isolate sees is not
+  mailed. It cannot see the site itself down, only the app behind it.
 
-**The uptime check, for you to create.** `https://brain.dog/healthz` answers 200 and
-`{"ok":true,...}` from the Worker alone, without waking a record or the Directory
-(`apps/worker/src/health.ts`), and the site hands the path to the app Worker
-(`apps/site/wrangler.jsonc`), so it is the one address that says the Worker is up. In the dashboard,
-zone `brain.dog` > Traffic > Health Checks > Create: HTTPS, host `brain.dog`, path `/healthz`,
-expected code 200, response body containing `"ok":true`, every 60 seconds from more than one
-region, two retries. Then Notifications > Add > Health Checks, to your email. Health Checks need a
-paid plan on the zone; on the free plan, any outside HTTP monitor with the same address, body and
-interval does the same job.
+Also set up in Notifications: "BrainDog: Cloudflare incident", major and critical incidents, to
+admin@brain.dog. No Worker has a Workers Builds trigger; deploys go through the pipeline or by hand.
 
 **Telemetry.** Off until you bind it (H5). `TELEMETRY` is drafted and commented in
 `apps/worker/wrangler.jsonc`; uncommented, and with `SESSION_SECRET` set, the Worker writes one

@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 
 import { existsSync } from 'node:fs';
 
-import { isMailKind, letterOf, POSTAL, recordLetter, sendMail, type MailKind } from '../src/mail.ts';
+import { isMailKind, letterOf, OPS_QUIET_MS, opsAlert, POSTAL, recordLetter, sendMail, type MailKind } from '../src/mail.ts';
 
 const KINDS: MailKind[] = [
   'signin',
@@ -259,4 +259,46 @@ test('NOTHING TO SEND WITH IS A FALSE WITH ITS REASON: no binding, no sender, or
       [false, 'no-link'],
     ],
   );
+});
+
+/* THE OPS MAIL KEEPS ITS WINDOW IN MODULE STATE, so each test below starts an hour after the last one's clock. */
+const HOUR = 60 * 60 * 1000;
+const OPS = { OPS_ALERT_TO: 'ops@example.test', AUTH_MAIL_FROM: 'hello@brain.dog', BRAINDOG_BUILD: '20260929+abc' };
+const CRASH = { op: 'crash', ref: 'r-1', where: '/api/boot', error: `TypeError: row ${ADDRESS}` } as const;
+
+test('AN OPS MAIL IS OFF WITHOUT OPS_ALERT_TO, and sends nothing', async () => {
+  const email = binding();
+  assert.equal(await opsAlert({ ...OPS, OPS_ALERT_TO: '', EMAIL: email }, CRASH, undefined, 1 * HOUR), false);
+  assert.equal(email.sent.length, 0);
+});
+
+test('A CRASH MAILS ITS REF, DOOR, BUILD AND RUNBOOK ONCE IN 15 MINUTES, and never the thrown sentence', async () => {
+  const email = binding();
+  const env = { ...OPS, EMAIL: email };
+  const t = 10 * HOUR;
+  await logged(async () => {
+    assert.equal(await opsAlert(env, CRASH, undefined, t), true);
+    assert.equal(await opsAlert(env, CRASH, undefined, t + OPS_QUIET_MS - 1), false);
+    assert.equal(await opsAlert(env, { op: 'refuse', rec: 'rec_1', code: 'FORMAT_AHEAD' }, undefined, t + 1), true);
+    assert.equal(await opsAlert(env, CRASH, undefined, t + OPS_QUIET_MS), true);
+  });
+  assert.equal(email.sent.length, 3);
+  const text = String(email.sent[0]?.text);
+  for (const said of ['op: crash', 'ref: r-1', 'where: /api/boot', 'build: 20260929+abc', 'Rolling back']) assert.ok(text.includes(said), said);
+  assert.ok(!text.includes('TypeError') && !text.includes(ADDRESS));
+  assert.equal(email.sent[0]?.to, 'ops@example.test');
+  assert.ok(String(email.sent[1]?.text).includes('53 §5.3'));
+});
+
+test("THE DIRECTORY'S WINDOW HOLDS ACROSS ISOLATES: a claim that says no sends nothing, and one that throws still sends", async () => {
+  const email = binding();
+  const env = { ...OPS, EMAIL: email };
+  assert.equal(await opsAlert(env, CRASH, async () => false, 20 * HOUR), false);
+  await logged(async () => {
+    assert.equal(
+      await opsAlert(env, CRASH, async () => Promise.reject(new Error('directory down')), 21 * HOUR),
+      true,
+    );
+  });
+  assert.equal(email.sent.length, 1);
 });

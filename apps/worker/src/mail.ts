@@ -21,7 +21,7 @@
  */
 
 import { MAIL_PALETTE } from './mail-palette.ts';
-import { op } from './oplog.ts';
+import { op, type OpValue } from './oplog.ts';
 
 /** Every mail this Worker sends, by what it is for. The lapse kinds name the day of the ladder they belong to. */
 export type MailKind =
@@ -644,7 +644,7 @@ export function recordLetter(subject: string, source: string, because = '', supp
 }
 
 /** One message as the `send_email` binding takes it, with the sender's display name. */
-type Outgoing = { from: { email: string; name: string }; to: string; subject: string; text: string; html: string };
+type Outgoing = { from: { email: string; name: string }; to: string; subject: string; text: string; html?: string };
 
 /**
  * The part of the Worker's `Env` this module reads.
@@ -720,6 +720,92 @@ export async function sendMail(env: MailEnv, kind: MailKind, to: string, vars: M
   } catch {
     /* A FAULT IN THIS MODULE, OR IN THE LOG ITSELF, IS STILL A `false` AND NEVER A THROW: the caller's answer has gone,
        or its walk has other records to reach. */
+    return false;
+  }
+}
+
+/** The two lines that mail the operator, and nothing else: every other alert is read the next morning. */
+export type OpsKind = 'crash' | 'refuse';
+
+/** Where each one sends whoever reads it, as DEPLOYMENT.md's "## Alerts" table says it. */
+const RUNBOOK: Record<OpsKind, string> = {
+  crash:
+    'find the ref the person was shown, read where and error in Workers Logs; if it started with a deploy, DEPLOYMENT.md "Rolling back"; more than one door, 53 §5.11',
+  refuse: '53 §5.3 (docs/53-SPEC-OPERATIONS.md)',
+};
+
+/** The fields a mail repeats from its line: ids and codes. `error` stays in the log, where it is scrubbed and cut. */
+const OPS_FIELDS = ['ref', 'where', 'rec', 'code'] as const;
+
+/** One mail per kind in this long, however many lines a burst writes. */
+export const OPS_QUIET_MS = 15 * 60 * 1000;
+
+/* PER ISOLATE FIRST, so a burst in one isolate asks the shared gate once and not once a line. */
+const opsSent = new Map<OpsKind, number>();
+
+/** The part of the Worker's `Env` an ops mail reads. */
+export type OpsEnv = MailEnv & { OPS_ALERT_TO?: string | undefined; BRAINDOG_BUILD?: string | undefined };
+
+/**
+ * Mail the operator that a `crash` or `refuse` line was written. `true` when one went out.
+ *
+ * CLOUDFLARE CANNOT MAIL ON A LOG LINE FOR THIS ACCOUNT, so the Worker does: Observability alerts are not offered and the
+ * zone's plan has no Health Checks. `OPS_ALERT_TO` unset is off.
+ *
+ * AT MOST ONE PER KIND PER `OPS_QUIET_MS`: this isolate's clock first, then `claim`, the Directory's, which holds the
+ * window across isolates. A `claim` that throws is a send anyway, because the Directory failing is a likely cause of
+ * the crash being reported, and the isolate's own window still caps the burst.
+ *
+ * NEVER THROWS, like `sendMail`: it runs inside `waitUntil` beside an answer that has already gone.
+ */
+export async function opsAlert(
+  env: OpsEnv,
+  fields: { op: OpsKind } & Record<string, OpValue>,
+  claim?: (kind: OpsKind, quietMs: number) => Promise<boolean>,
+  now = Date.now(),
+): Promise<boolean> {
+  try {
+    const to = env.OPS_ALERT_TO?.trim() ?? '';
+    if (to === '') return false;
+    const kind = fields.op;
+    const last = opsSent.get(kind);
+    if (last !== undefined && now - last < OPS_QUIET_MS) return false;
+    opsSent.set(kind, now);
+    if (claim) {
+      let due = true;
+      try {
+        due = await claim(kind, OPS_QUIET_MS);
+      } catch {
+        /* See the header: the isolate's window is the one left. */
+      }
+      if (!due) return false;
+    }
+    const binding = bindingOf(env.EMAIL);
+    const from = (env.MAIL_FROM || env.AUTH_MAIL_FROM)?.trim() ?? '';
+    if (binding === null || from === '') {
+      op({ op: 'mail', kind: `ops.${kind}`, ok: false, why: binding === null ? 'no-binding' : 'no-sender' }, 'error');
+      return false;
+    }
+    const said = OPS_FIELDS.flatMap((key) => (fields[key] == null ? [] : [`${key}: ${String(fields[key]).slice(0, 200)}`]));
+    const text = [
+      `The app Worker wrote an op: ${kind} line.`,
+      '',
+      ...said,
+      `build: ${env.BRAINDOG_BUILD || 'unknown'}`,
+      '',
+      `Runbook: ${RUNBOOK[kind]}`,
+      '',
+      `More ${kind} lines in the next 15 minutes are not mailed. Workers Logs has every one.`,
+    ].join('\n');
+    try {
+      await binding.send({ from: { email: from, name: SENDER_NAME }, to, subject: `BrainDog ${kind}`, text });
+    } catch (e) {
+      op({ op: 'mail', kind: `ops.${kind}`, ok: false, why: 'refused', code: codeOf(e) }, 'error');
+      return false;
+    }
+    op({ op: 'mail', kind: `ops.${kind}`, ok: true });
+    return true;
+  } catch {
     return false;
   }
 }
