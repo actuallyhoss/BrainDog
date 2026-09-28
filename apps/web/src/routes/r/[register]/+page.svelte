@@ -65,7 +65,9 @@
   import { sheetWords } from '$lib/record/field-words.ts';
   import { ownsRecord, type Me } from '../../settings/levels.ts';
   import { may } from '$lib/record/may.ts';
-  import { reachWords } from './reach.ts';
+  import { reachWords, writeWords } from './reach.ts';
+  import { liveOverlay, run, UNDO_MS, type Sent } from '$lib/data/optimistic.svelte.ts';
+  import { ARRIVED_MS } from '$lib/data/optimistic.ts';
 
 
   const id = $derived(page.params.register ?? '');
@@ -281,6 +283,14 @@
     held = new Map(held).set(seq, { at, entry });
   };
 
+  /**
+   * LINES TYPED AND NOT YET WRITTEN, drawn at the head of the list the moment Enter is pressed (`lib/data/optimistic.ts`).
+   * Each is a row under a number below zero, which no row the record holds has, wearing `Saving`; it goes when the
+   * record's row takes its place, or when the record refuses it and the typing goes back into the box.
+   */
+  const typedRows = liveOverlay<Entry>((e) => String(e.seq));
+  let typedSeq = 0;
+
   const receipt = (seq: number, r: Receipt) => {
     receipts = new Map(receipts).set(seq, r);
   };
@@ -381,6 +391,9 @@
        just filtered to, is a mark about a different screen. */
     held = new Map();
     fresh = new Map();
+    untrack(() => typedRows.clear());
+    arrived = new Set();
+    owed = false;
     capture = '';
     editing = null;
   });
@@ -507,12 +520,48 @@
     untrack(() => void recheck());
   });
 
+  /**
+   * A CHANGE HEARD WHILE A CELL IS OPEN IS READ WHEN IT CLOSES. The poll asks every 1.5 s while somebody is looking, and
+   * a row an agent added at the head of the list moves every row under it down one: the cell being typed in would be
+   * rebuilt a row lower, and the caret would go with the old one. So the list waits for the editor, once, however many
+   * changes land meanwhile, and reads as soon as it closes.
+   */
+  let owed = $state(false);
+  $effect(() => {
+    if (editing === null && owed) untrack(() => void recheck());
+  });
+
+  /* THE LATEST RE-ASK STARTED IS THE ONE DRAWN, so an answer that took longer than the next poll never lands over it. */
+  let rechecks = 0;
+
+  /**
+   * THE ROWS THAT ARRIVED WHILE THE READER LOOKED, by the key the table speaks in, tinted for a moment
+   * (`[data-arrived]` in `blocks.css`). Only a re-ask marks them: a page the reader scrolled to is rows they asked for,
+   * and a row they typed wears its own mark (`fresh`).
+   */
+  let arrived = $state(new Set<string>());
+  function arrive(keys: readonly string[]) {
+    if (keys.length === 0) return;
+    arrived = new Set([...arrived, ...keys]);
+    setTimeout(() => {
+      const next = new Set(arrived);
+      for (const k of keys) next.delete(k);
+      arrived = next;
+    }, ARRIVED_MS + 20);
+  }
+
   async function recheck() {
     if (declared?.register !== id) return;
+    if (editing !== null) {
+      owed = true;
+      return;
+    }
+    owed = false;
     if (pages.length > 1) {
       stale = true;
       return;
     }
+    const mine = ++rechecks;
     const said = asked;
     const register = id;
     const chips = filters;
@@ -524,7 +573,7 @@
       src.page(register, { filters: chips, q: text, sort: order }, null),
       counted.size > 0 ? countAll(register, decl, chips, text) : Promise.resolve(counted),
     ]);
-    if (asked !== said || !answer.ok) return;
+    if (asked !== said || !answer.ok || mine !== rechecks) return;
     /* THE READER SCROLLED WHILE THIS WAS OUT, and page 2 is now under page 1: the same seam as above. */
     if (pages.length > 1) {
       stale = true;
@@ -537,6 +586,8 @@
       const by = answer.value.matched - matched;
       if (by !== 0) booted = { ...booted, registers: booted.registers.map((r) => (r.id === register ? { ...r, count: r.count + by } : r)) };
     }
+    const had = new Set(pages.flat().map((e) => e.seq));
+    arrive(answer.value.entries.filter((e) => !had.has(e.seq) && !fresh.has(e.seq)).map((e) => `${register}#${e.seq}`));
     pages = [answer.value.entries];
     named = answer.value.names;
     cursor = answer.value.cursor;
@@ -620,7 +671,8 @@
     /* AND A ROW SOMEBODY HAS JUST ACTED ON IS WHERE THEY LEFT IT. `holdInPlace` pins each held row to the index it
        was read at and brings back one the answer has since dropped — the reopened row that no longer matches the
        chip it was found under. The hold is released when the question changes, with the receipt it belongs to. */
-    entries: holdInPlace(pages.flat(), held).map((e) => {
+    /* AND A LINE TYPED INTO THE CAPTURE IS AT THE HEAD BEFORE THE RECORD HAS IT (`typedRows`), until it lands. */
+    entries: typedRows.draw(holdInPlace(pages.flat(), held)).map((e) => {
       const patch = edits.get(e.seq);
       return patch ? { ...e, fields: { ...e.fields, ...patch } } : e;
     }),
@@ -924,6 +976,20 @@
   /** The sheet's add is out, so a second press does not send a second row. */
   let writing = $state(false);
 
+  /* A ROW WRITE'S ANSWER AS THE OPTIMISTIC LAYER READS IT. A conflict draws the row as it now stands first, so the
+     retry is against the latest version, as `missed` does; the layer says the sentence. */
+  const sent = (was: string, out: Wrote): Sent<Entry> => {
+    if (out.ok) return { ok: true, value: out.entry };
+    if (asked === was && out.why === 'conflict' && out.entry) landRow(out.entry);
+    return { ok: false, fix: out.fix };
+  };
+
+  /** A row's name in a receipt: its title where it has one, and its number where it does not. */
+  const nameOf = (seq: number): string => {
+    const title = decl?.title ? rowAt(seq)?.fields[decl.title] : undefined;
+    return typeof title === 'string' && title.trim() !== '' ? title : `${id}#${seq}`;
+  };
+
   function landRow(entry: Entry) {
     pages = pages.map((p) => p.map((e) => (e.seq === entry.seq ? entry : e)));
   }
@@ -1051,7 +1117,16 @@
   async function createRow(said: string, onBack: (back: string) => void, mark?: string): Promise<Entry | null> {
     const was = asked;
     const { fields, filled } = capturedFields(id, said, filters, now, result.entries);
+    /* THE ROW IS ON THE LIST BEFORE IT IS SENT, at the head, wearing `Saving`, and the record's row takes its place. */
+    const seq = -++typedSeq;
+    const line = typedRows.add({ seq, fields, version: 0, created: new Date(now).toISOString(), by: '' });
+    receipt(seq, { mark: copy.writeMarkSaving, intent: 'warn' });
+    const unline = () => {
+      typedRows.drop(line);
+      if (asked === was) clearReceipt(seq);
+    };
     const out = await writes().create(id, fields);
+    unline();
     if (!out.ok) {
       missed(was, out);
       onBack(said);
@@ -1082,19 +1157,34 @@
     const field = decl?.state;
     if (!field) return;
     const was = asked;
+    const list = id;
     const before = rowAt(seq);
     const patch = { [field]: state };
-    hold(seq);
-    receipt(seq, { mark: copy.writeMarkSaving, intent: 'warn' });
-    void writes()
-      .update(id, seq, patch, before?.version)
-      .then((out) => {
-        if (asked === was) clearReceipt(seq);
-        if (!out.ok) return missed(was, out);
+    const name = nameOf(seq);
+    /* THE ROW SHOWS ITS NEW STATE THE MOMENT IT IS CHOSEN (`lib/data/optimistic.ts`), wearing `Saving` until the record
+       answers; a refusal puts the state it had back and says why. The receipt on the row keeps its Put back, and the
+       toast offers the same way back for six seconds for the reader whose eye has left the row. */
+    void run<Entry>({
+      apply: () => {
+        hold(seq);
+        setPatch(seq, field, state);
+        receipt(seq, { mark: copy.writeMarkSaving, intent: 'warn' });
+      },
+      revert: () => {
         if (asked !== was) return;
-        landRow(out.entry);
-        receipt(seq, { mark: said, intent: 'good', undo: putBackOf(before, patch, out.entry) });
-      });
+        dropPatch(seq, field);
+        clearReceipt(seq);
+      },
+      send: () => writes().update(list, seq, patch, before?.version).then((out) => sent(was, out)),
+      settle: (entry) => {
+        if (asked !== was) return;
+        dropPatch(seq, field);
+        landRow(entry);
+        receipt(seq, { mark: said, intent: 'good', undo: putBackOf(before, patch, entry) });
+      },
+      said: writeWords.state(name, said),
+      undo: (entry) => (before ? () => void putBack([{ before, patch, answered: entry }], list) : null),
+    });
   }
 
   /* ── editing a value where it is drawn ───────────────────────────────────── */
@@ -1290,33 +1380,40 @@
        retry is against the latest version. The branch that held the value unsaved and toasted what it
        would have written was the sample's, and went with it. */
     const was = asked;
+    const list = id;
     /* THE ROW AS THE RECORD HELD IT, read before the patch goes over it, since the patch is what `Put back` undoes. */
     const before = rowAt(at.seq);
     const patch = { [at.field]: value };
-    hold(at.seq);
-    setPatch(at.seq, at.field, value);
-    receipt(at.seq, { mark: copy.writeMarkSaving, intent: 'warn' });
-    void writes()
-      .update(id, at.seq, patch, before?.version)
-      .then((out) => {
-        if (asked !== was) {
-          if (!out.ok) toasts.push(out.fix, { intent: 'warn' });
-          return;
-        }
+    const name = nameOf(at.seq);
+    /* THROUGH THE OPTIMISTIC LAYER (`lib/data/optimistic.ts`): drawn now, and on a refusal the cell opens again on what
+       was typed, so it is corrected rather than typed again. A landed edit offers its way back in a toast for six
+       seconds as well as on the row. */
+    void run<Entry>({
+      apply: () => {
+        hold(at.seq);
+        setPatch(at.seq, at.field, value);
+        receipt(at.seq, { mark: copy.writeMarkSaving, intent: 'warn' });
+      },
+      revert: () => {
+        if (asked !== was) return;
         dropPatch(at.seq, at.field);
         clearReceipt(at.seq);
-        if (out.ok) {
-          landRow(out.entry);
-          receipt(at.seq, { mark: copy.writeMarkSaved, intent: 'good', undo: putBackOf(before, patch, out.entry) });
-          return;
-        }
-        missed(was, out);
         if (editing === null) {
           editing = at;
           editValue = String(typed);
           editTicked = typed === true;
         }
-      });
+      },
+      send: () => writes().update(list, at.seq, patch, before?.version).then((out) => sent(was, out)),
+      settle: (entry) => {
+        if (asked !== was) return;
+        dropPatch(at.seq, at.field);
+        landRow(entry);
+        receipt(at.seq, { mark: copy.writeMarkSaved, intent: 'good', undo: putBackOf(before, patch, entry) });
+      },
+      said: writeWords.edited(labelOf(f), name),
+      undo: (entry) => (before ? () => void putBack([{ before, patch, answered: entry }], list) : null),
+    });
   }
 
   const copyId = (seq: number) => clipboard.putSpoken(id, seq);
@@ -1828,12 +1925,16 @@
    */
   async function archiveOnRecord(seqs: readonly number[], named: string) {
     const was = asked;
+    const list = id;
     const landed: Entry[] = [];
     let first: string | null = null;
+    /* ARCHIVED THE MOMENT IT IS PRESSED (`lib/data/optimistic.ts`): the row wears `Archived` before the record has
+       answered, and the chip's Put back arrives with the answer, since a way back needs the version the archive made. A
+       row the record refused goes back to its verbs, and the toast says why. */
     for (const seq of seqs) hold(seq);
-    for (const seq of seqs) receipt(seq, { mark: copy.writeMarkSaving, intent: 'warn' });
+    for (const seq of seqs) receipt(seq, { mark: copy.markArchived });
     for (const seq of seqs) {
-      const out = await writes().archive(id, seq, rowAt(seq)?.version);
+      const out = await writes().archive(list, seq, rowAt(seq)?.version);
       if (out.ok) landed.push(out.entry);
       else first ??= out.fix;
       if (asked !== was) continue;
@@ -1841,7 +1942,7 @@
       if (out.ok) {
         const row = out.entry;
         landRow(row);
-        receipt(seq, { mark: copy.markArchived, undo: () => void restoreOnRecord([row]) });
+        receipt(seq, { mark: copy.markArchived, undo: () => void restoreOnRecord([row], list) });
       } else if (out.why === 'conflict' && out.entry) landRow(out.entry);
     }
     if (landed.length === 0) {
@@ -1849,7 +1950,10 @@
       return;
     }
     const line = landed.length === seqs.length ? copy.writeArchived(named) : copy.writeArchivedSome(landed.length, seqs.length);
-    toasts.push(first ? `${line} ${first}` : line, { undo: () => void restoreOnRecord(landed), ...(first ? { intent: 'warn' as const } : {}) });
+    toasts.push(first ? `${line} ${first}` : line, {
+      undo: () => void restoreOnRecord(landed, list),
+      ...(first ? { intent: 'warn' as const } : { life: UNDO_MS }),
+    });
   }
 
   /**
@@ -1945,34 +2049,47 @@
    * and a row whose own chip had been pressed first was sent again at the spent version, answered conflict, and lost
    * its `Restored` to a sentence about somebody else's change that was in fact the reader's own press.
    */
-  async function putBack(changes: readonly Change[]) {
+  async function putBack(changes: readonly Change[], list = id) {
     const owed = spent.take(changes);
     if (owed.length === 0) return;
     const was = asked;
+    /* A TOAST OUTLIVES ITS SCREEN, so its Put back names the list it was raised on and draws nothing on another one. */
+    const here = list === id;
+    const shape = decl;
     let first: string | null = null;
     const wore = new Map(owed.map((c) => [c.before.seq, receipts.get(c.before.seq)] as const));
-    for (const { before } of owed) receipt(before.seq, { mark: copy.writeMarkSaving, intent: 'warn' });
-    for (const change of owed) {
-      const { before, patch, answered } = change;
-      const out = await writes().update(id, before.seq, inverseOf(before, patch, decl), answered.version);
+    /* THE ROW SHOWS WHAT IT HELD AT ONCE, over the answer, until the record has it back (`lib/data/optimistic.ts`). */
+    const back = owed.map((c) => inverseOf(c.before, c.patch, shape));
+    if (here)
+      owed.forEach(({ before }, i) => {
+        receipt(before.seq, { mark: copy.writeMarkSaving, intent: 'warn' });
+        for (const [field, value] of Object.entries(back[i]!)) setPatch(before.seq, field, value as Fields[string]);
+      });
+    for (const [i, change] of owed.entries()) {
+      const { before, answered } = change;
+      const out = await writes().update(list, before.seq, back[i]!, answered.version);
       spent.answered(change, out);
       if (!out.ok) first ??= out.fix;
-      if (asked !== was) continue;
+      if (!here || asked !== was) continue;
+      for (const field of Object.keys(back[i]!)) dropPatch(before.seq, field);
       backAnswered(before.seq, out, wore.get(before.seq));
     }
     if (first) toasts.push(first, { intent: 'warn' });
   }
 
   /** Put archived rows back. A row this screen has read since is sent at the version it now holds. */
-  async function restoreOnRecord(rows: readonly Entry[]) {
+  async function restoreOnRecord(rows: readonly Entry[], list = id) {
     const was = asked;
+    const here = list === id;
     let first: string | null = null;
     const wore = new Map(rows.map((e) => [e.seq, receipts.get(e.seq)] as const));
-    for (const e of rows) receipt(e.seq, { mark: copy.writeMarkSaving, intent: 'warn' });
+    /* `Saving` AT ONCE, which carries no Put back, so a second press has nothing to press; the archive chip comes back if
+       the record refuses. */
+    if (here) for (const e of rows) receipt(e.seq, { mark: copy.writeMarkSaving, intent: 'warn' });
     for (const e of rows) {
-      const out = await writes().restore(id, e.seq, rowAt(e.seq)?.version ?? e.version);
+      const out = await writes().restore(list, e.seq, (here ? rowAt(e.seq)?.version : undefined) ?? e.version);
       if (!out.ok) first ??= out.fix;
-      if (asked !== was) continue;
+      if (!here || asked !== was) continue;
       backAnswered(e.seq, out, wore.get(e.seq));
     }
     if (first) toasts.push(first, { intent: 'warn' });
@@ -2166,7 +2283,7 @@
           register={id}
           {decl}
           {columns}
-          {rows}
+          rows={arrived.size === 0 ? rows : rows.map((r) => (arrived.has(r.key) ? { ...r, arrived: true } : r))}
           total={rowCount}
           {sort}
           {selected}
