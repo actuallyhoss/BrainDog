@@ -18,6 +18,6 @@ export const words = {
   fromTemplate: 'Every page like this one is drawn from this same text, so a change to it changes all of them.',
   /* A NEW BLOCK SHOWS A LIST. On a page that shows none yet the reader is asked which, rather than handed one. */
   bindTitle: 'Which list to show',
-  bindWhy: 'This page shows no list yet. Choose the one the new block draws from.',
-  bindNone: 'This record has no list yet, so a new block would have nothing to show.',
+  bindWhy: 'This page shows no list yet. Choose the list it should show.',
+  bindNone: 'This record has no list yet, so anything added here would have nothing to show.',
 } as const;

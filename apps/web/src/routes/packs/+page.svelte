@@ -578,13 +578,13 @@
         <li class="addon update">
           <span class="addon-main">
             <span class="addon-name">{u.title}</span>
-            <span class="addon-line num">{words.fromTo(u.from, u.to)}</span>
+            <span class="addon-line" title={words.fromTo(u.from, u.to)}>{words.updateAvailable}</span>
           </span>
           <Button disabled={busy !== null || !client} onclick={() => void showPlan(u)}>{busy === u.key ? words.planning : words.seePlan}</Button>
           {#if s && 'filed' in s}
             <p class="addon-said" role="status">{words.asked}{#if s.filed}{' '}<a class="tap" href={at(`/decide/${s.filed}`)}>{words.openDecide}</a>{/if}</p>
           {:else if s}
-            <p class="addon-said" role="status">{s.fix}{#if s.code}<span class="code">{copy.refusalCode(s.code)}</span>{/if}</p>
+            <p class="addon-said" role="status" title={s.code ? copy.refusalCode(s.code) : undefined}>{s.fix}</p>
           {/if}
         </li>
       {/each}
@@ -751,12 +751,6 @@
     padding-block-end: var(--sp-3);
     color: var(--ink2);
     font-size: var(--t-sm);
-  }
-
-  .code {
-    color: var(--dim);
-    font-family: var(--font-id);
-    font-size: var(--t-xs);
   }
 
   /* WHAT ONE ADD-ON BRINGS, as rows in the sheet: a glyph and a name, each opening what it names. */

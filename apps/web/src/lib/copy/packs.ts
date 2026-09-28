@@ -103,7 +103,9 @@ export const packs = {
   shareSkills: 'Skills, each as its name and when to use it. Their text stays here.',
   shareNoSkills: 'No skills to share yet.',
   shareRailOrder: 'The order of your pages and lists in the rail goes in too, and is used on the BrainDog that installs it.',
-  refusalCode: (code: string) => `Refusal code ${code}`,
+  /* THE CODE IS A TOOLTIP ON THE SENTENCE, never words on the screen: the sentence is what a person reads, and the code
+     is what they quote to somebody who can look it up. */
+  refusalCode: (code: string) => `Reference: ${code}`,
   useCaseFor: 'What it is for',
   /* THE KENNEL'S TRUST LINES (`routes/packs/browse/catalogue.ts`), said the same on browse and on /packs. */
   catalogueSigned: (keyId: string) => `Signed by key ${keyId}`,

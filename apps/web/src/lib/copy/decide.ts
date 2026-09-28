@@ -162,7 +162,7 @@ export const decide = {
     const word = { m: 'minute', h: 'hour', d: 'day', w: 'week' }[unit];
     return n === 1 ? `every ${word}` : `every ${n.toLocaleString('en')} ${word}s`;
   },
-  arrangePacks: 'Packs',
+  arrangePacks: 'Add-ons',
   arrangeInstalls: (names: readonly string[]) => `Installs ${names.join(', then ')}`,
   /** The same line inside the Packs section, which is why `arranged.ts` guards against printing both. */
   arrangeUpdates: updatesTo,
@@ -220,7 +220,7 @@ export const decide = {
   arrangeExtendsValues: (pack: string, values: readonly string[], field: string, name: string) =>
     `${pack} adds ${values.length} ${values.length === 1 ? 'choice' : 'choices'} to ${field} in ${name}: ${list([...values])}`,
   arrangeMany: (kind: string): string =>
-    ({ page: 'Pages', register: 'Lists', ingest: 'Rules for what comes in', theme: 'Looks', metric: 'Measures', digest: 'Summaries', rule: 'Rules', block: 'Blocks' })[kind] ??
+    ({ page: 'Pages', register: 'Lists', ingest: 'Rules for what comes in', theme: 'Looks', metric: 'Measures', digest: 'Summaries', rule: 'Rules', block: 'Page parts' })[kind] ??
     kind.charAt(0).toUpperCase() + kind.slice(1),
   arrangeShowsNow: 'Shows now',
   arrangeWillShow: 'Will show',

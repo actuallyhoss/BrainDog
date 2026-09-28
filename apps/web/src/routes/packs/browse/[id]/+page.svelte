@@ -308,7 +308,7 @@
         {#if listing.count !== null}<span class="num">{words.installs(listing.count)}</span>{/if}
       </p>
       {#if refused}
-        <p class="said" role="status">{refused.fix}{#if refused.code}<span class="code">{copy.refusalCode(refused.code)}</span>{/if}</p>
+        <p class="said" role="status" title={refused.code ? copy.refusalCode(refused.code) : undefined}>{refused.fix}</p>
         <!-- A THEME PACK REFUSED AT INSTALL OFFERS "Fix and install" (GAP-3): the editor side, staging and the failing
              roles selected, is built; this is the one press that reaches it from here. -->
         {#if refused.code && FIXABLE.has(refused.code) && hasTheme(file?.doc)}
@@ -510,12 +510,6 @@
   .trust[data-loud] {
     color: var(--ink);
     font-weight: 600;
-  }
-
-  .code {
-    color: var(--dim);
-    font-family: var(--font-id);
-    font-size: var(--t-xs);
   }
 
   .act {
