@@ -228,6 +228,14 @@ export function sharedPlanOf(value: unknown, nav: readonly string[] = [], links:
 /**
  * Ask the record to plan a shared use case. The modules it needs that this record does not hold are sent as the app
  * builds them for this record (`packDocument`), because a host with no catalogue cannot offer them by name.
+ *
+ * EVERY MODULE THIS BATCH BRINGS IN COUNTS AS HELD WHILE THE OTHERS ARE BUILT, or a link field pointing at a sibling's
+ * list is stripped for good. `packDocument` reads `holds` off `installed`, and every module's document here is built
+ * off the SAME `installed` snapshot, before any of them has actually gone in: with People built beside Portfolio, both
+ * new, `installed` said neither's lists existed yet, so People's "Met in" (`to: things`) and Work's "Project" and
+ * "Owner" were left out of what was proposed and never came back — reinstalling Portfolio later does not reach back
+ * into a document already filed. `firstPartyModule` says each module's own lists without installing anything, so a
+ * sibling in this same batch is held for that alone.
  */
 export async function planShared(
   client: SharingClient,
@@ -240,10 +248,16 @@ export async function planShared(
   const { readShared } = await import('@braindog/declare');
   const read = await readShared(file.text, { kind: file.source });
   if (!read.ok) return { ok: false, fix: 'refusal' in read ? read.refusal.fix : copy.writeRaced, code: 'refusal' in read ? read.refusal.code : null };
+  const withBatch: readonly PackState[] = [
+    ...installed,
+    ...read.value.usecase.modules
+      .filter((m) => !installed.some((p) => p.id === m))
+      .map((m) => ({ id: m, version: null, disabled_at: null, registers: [...(moduleOf(m)?.registers ?? [])] })),
+  ];
   const modules: Record<string, unknown> = {};
   for (const m of read.value.usecase.modules) {
     const held = installed.find((p) => p.id === m);
-    const doc = held ? (held.disabled_at === null ? await relabelDoc(m, installed, read.value.usecase.usecase) : null) : await moduleDoc(m, installed, read.value.usecase.usecase);
+    const doc = held ? (held.disabled_at === null ? await relabelDoc(m, installed, read.value.usecase.usecase) : null) : await moduleDoc(m, withBatch, read.value.usecase.usecase);
     if (doc) modules[m] = doc;
   }
   const out = await client.planUseCase({

@@ -140,12 +140,22 @@ test('A FILE IS READ HERE FIRST: a credential in it is refused before the record
   assert.equal(calls.length, 0);
 });
 
-test('A MODULE THE RECORD LACKS IS SENT AS THE APP BUILDS IT', async () => {
+test('A MODULE THE RECORD LACKS IS SENT AS THE APP BUILDS IT, EVERY SIBLING IN THE SAME BATCH ALREADY HELD FOR IT', async () => {
   const { client, calls } = stub();
-  const text = JSON.stringify({ usecase: 'study', version: '1.0.1', title: 'Study', summary: 's', author: 'a', license: 'MIT', audience: 'other', tone: 't', modules: ['people', 'work'] });
-  const out = await planShared(client, { text, source: 'local' }, [state('work')], async (id) => ({ pack: id }));
+  const text = JSON.stringify({
+    usecase: 'study', version: '1.0.1', title: 'Study', summary: 's', author: 'a', license: 'MIT', audience: 'other', tone: 't', modules: ['portfolio', 'people', 'work'],
+  });
+  const seen: Record<string, readonly string[]> = {};
+  const out = await planShared(client, { text, source: 'local' }, [state('work')], async (id, installed) => {
+    seen[id] = installed.map((p) => p.id);
+    return { pack: id };
+  });
   assert.equal(out.ok, true);
-  assert.deepEqual(calls[0]?.[1].modules, { people: { pack: 'people' } });
+  assert.deepEqual(calls[0]?.[1].modules, { portfolio: { pack: 'portfolio' }, people: { pack: 'people' } });
+  /* PEOPLE'S DOCUMENT IS BUILT AS THOUGH PORTFOLIO WERE ALREADY HERE, neither installed yet, so "Met in" is not stripped
+     for going in beside it in the same batch (`sharing.ts` `withBatch`): a founder's People and Portfolio install
+     together, and People's link to Portfolio's list must not be judged as though Portfolio were still absent. */
+  assert.ok(seen.people?.includes('portfolio'), 'a sibling new in this same batch is held while the others are built');
 });
 
 test('THE SHARE FORM OFFERS A PATCH OR A MINOR ON FROM THE LATER OF INSTALLED AND LAST SHARED, AND NAMES A ROW BY ITS TITLE', () => {
