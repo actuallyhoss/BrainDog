@@ -234,7 +234,8 @@
     {#if part.table}<Table columns={part.table.columns} rows={part.table.rows} total={part.table.total} label={headingText} href={inApp} />{/if}
   {/each}
 {:else if block.kind === 'table' && !block.answer}
-  <Table columns={block.columns} rows={block.rows} total={block.total} label={headingText} href={inApp} scope={block.scopeCells} />
+  <!-- THE ROWS THAT ARRIVED SINCE IT WAS LAST DRAWN ARE MARKED, as a list's are, where the page can write. -->
+  <Table columns={block.columns} rows={writes ? writes.arrivedTable(i, block.rows, block) : block.rows} total={block.total} label={headingText} href={inApp} scope={block.scopeCells} />
 {:else if block.kind === 'queue' && block.queue && block.queue.length > 0 && writes}
   <!-- A QUESTION IS ANSWERED WHERE IT IS SHOWN (MOD-9, `QueueAnswer.svelte`): one card a question, and the count of what is left is still the door to Decide. -->
   <div class="queue">
@@ -249,7 +250,7 @@
            HANDED, so a board, a checklist, a roadmap and a queue are each read-only exactly where `writes` is null. -->
       <!-- `w` IS A CONSTANT so each callback below keeps the narrowing it was built under. -->
       {@const w = writes}
-      {@const shown = w ? w.keptSegment(i, segment) : segment}
+      {@const shown = w ? w.keptSegment(i, segment, block) : segment}
       <Block
         block={shown}
         {opts}
