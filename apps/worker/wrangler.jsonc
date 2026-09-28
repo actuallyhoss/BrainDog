@@ -506,7 +506,8 @@
          Alpha leaves it drafted on purpose, kept for a rehearsal, and an unbound one limits nothing:
          "ratelimits": [
            { "name": "RL_READ",  "namespace_id": "1001", "simple": { "limit": 600, "period": 60 } },
-           { "name": "RL_WRITE", "namespace_id": "1002", "simple": { "limit": 120, "period": 60 } }],
+           { "name": "RL_WRITE", "namespace_id": "1002", "simple": { "limit": 120, "period": 60 } },
+           { "name": "RL_POLL",  "namespace_id": "1003", "simple": { "limit": 240, "period": 60 } }],
          "secrets_store_secrets": [
            { "binding": "KEK", "store_id": "<store-id>", "secret_name": "braindog-kek-alpha" }]
 
@@ -670,7 +671,11 @@
          a 429 `RATE_LIMITED` with `Retry-After: 60` is what a caller over it is answered. */
       "ratelimits": [
         { "name": "RL_READ", "namespace_id": "1001", "simple": { "limit": 600, "period": 60 } },
-        { "name": "RL_WRITE", "namespace_id": "1002", "simple": { "limit": 120, "period": 60 } }
+        { "name": "RL_WRITE", "namespace_id": "1002", "simple": { "limit": 120, "period": 60 } },
+        /* THE VERSION POLL'S OWN MINUTE (`POLL_PER_MINUTE`): an open tab asks `/api/version` every 1.5 s while it has
+           focus, and that must never be refused because the same person's screens spent the read budget. Unbound, the
+           poll spends `RL_READ` as it did before (`bindingLimiter`). */
+        { "name": "RL_POLL", "namespace_id": "1003", "simple": { "limit": 240, "period": 60 } }
       ]
 
       /* The same drafted blocks as alpha, without the suffix, less `ratelimits`, which is bound above. `TELEMETRY` waits

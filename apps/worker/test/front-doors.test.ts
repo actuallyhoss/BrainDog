@@ -118,6 +118,28 @@ test('A REFUSING RL_READ IS 429 BEFORE THE RECORD IS ASKED, AND NO BINDING LIMIT
   }
 });
 
+test('THE VERSION POLL SPENDS RL_POLL, SO A PERSON WHOSE READ MINUTE IS SPENT STILL HEARS THE RECORD MOVE', async () => {
+  const refusing = { limit: async () => ({ success: false }) };
+  const passing = { limit: async () => ({ success: true }) };
+  const c = await cloud({ RL_READ: refusing, RL_POLL: passing });
+  await c.provision(REC, 'studio', OWNER);
+  const cookie = await c.signIn(OWNER);
+  assert.equal((await c.ask('/api/boot', { cookie })).status, 429, 'the read minute is spent');
+  const out = await c.ask('/api/version', { cookie });
+  const text = await out.text();
+  assert.equal(out.status, 200, text);
+  assert.equal(typeof (JSON.parse(text) as { value?: { version?: unknown } }).value?.version, 'number', text);
+});
+
+test('ONLY GET /api/version IS THE POLL, which is the one ask that never wakes Slash’s daily look', async () => {
+  const { pollAsked } = await import('../src/route.ts');
+  assert.equal(pollAsked('GET', '/api/version'), true);
+  assert.equal(pollAsked('GET', '/api/version/'), true);
+  assert.equal(pollAsked('POST', '/api/version'), false);
+  assert.equal(pollAsked('GET', '/api/boot'), false);
+  assert.equal(pollAsked('GET', '/api/versions'), false);
+});
+
 test('A LINE IS ONE JSON OBJECT, op FIRST, AND AN ADDRESS NEVER LEAVES IN IT', async () => {
   const { lines } = await logged(async () => {
     op({ op: 'mail', kind: 'signin', ok: false, why: 'sent to ada@example.test and refused' }, 'error');
