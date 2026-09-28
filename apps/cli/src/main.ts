@@ -20,7 +20,8 @@
  */
 
 import { spawn } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -55,6 +56,46 @@ import { verify } from './verify.ts';
 /* Synchronous, so the line is out before `exit`: a write to a pipe on Windows is asynchronous, and
    `process.exit` does not wait for it. */
 const say = (line: string) => writeFileSync(2, `${line}\n`);
+
+/**
+ * The folder the two hook shims are in, which is what `install` and `setup` write into Claude Code's settings.
+ *
+ * IN A CHECKOUT IT IS `hooks/` BESIDE `src/`. THE PUBLISHED CLI IS ONE FILE, and `install.ps1` and `install.sh` put
+ * nothing beside it, so `../hooks/` named a folder no machine had: `braindog setup` on 28 September wrote both hooks
+ * into three profiles pointing at `~/.braindog/hooks/braindog-hook.ps1`, which did not exist, and every session would
+ * have started without its context. So the bundle writes its own shims beside itself, each running this file.
+ */
+function hookScripts(): string {
+  const checkout = fileURLToPath(new URL('../hooks/', import.meta.url));
+  if (existsSync(join(checkout, 'braindog-hook.ps1'))) return checkout;
+  const dir = join(dirname(fileURLToPath(import.meta.url)), 'hooks');
+  mkdirSync(dir, { recursive: true });
+  const ps1 = [
+    "param([string]$Which = 'start')",
+    '$OutputEncoding = New-Object System.Text.UTF8Encoding($false)',
+    '[Console]::OutputEncoding = $OutputEncoding',
+    "$cli = Join-Path $PSScriptRoot '..\\braindog.mjs'",
+    'try {',
+    '  $raw = [Console]::In.ReadToEnd()',
+    '  $raw | & node $cli hook $Which',
+    '} catch {',
+    "  if ($Which -eq 'start') { 'BrainDog could not start; this session works without shared context.' }",
+    '}',
+    'exit 0',
+  ];
+  const sh = [
+    '#!/bin/sh',
+    'which="${1:-start}"',
+    'dir=$(dirname "$0")',
+    'if ! node "$dir/../braindog.mjs" hook "$which"; then',
+    "  [ \"$which\" = start ] && printf 'BrainDog could not start; this session works without shared context.\\n'",
+    'fi',
+    'exit 0',
+  ];
+  writeFileSync(join(dir, 'braindog-hook.ps1'), ps1.join('\r\n') + '\r\n');
+  writeFileSync(join(dir, 'braindog-hook.sh'), sh.join('\n') + '\n', { mode: 0o755 });
+  return dir;
+}
 
 /**
  * The `--json` sinks for this run, or `null` in human mode. Set once by the dispatch at the bottom,
@@ -408,7 +449,7 @@ async function setupCommand(args: string[]): Promise<void> {
     say,
     signal: stopping.signal,
     cli: fileURLToPath(new URL('./main.ts', import.meta.url)).replaceAll('\\', '/'),
-    scripts: fileURLToPath(new URL('../hooks/', import.meta.url)),
+    scripts: hookScripts(),
     /* The run the session file names, sent only to the host that wrote it, as `mcp` does. */
     headers: async (host: string) => {
       const held = readSession(sessionPath(process.env, cwd));
@@ -509,7 +550,7 @@ function install(args: string[]): void {
   } catch {
     return stop('braindog install takes --apply, --replace <replace.json>, --config-dir <folder>, --settings <file> and --mcp-json <file>, and nothing else.');
   }
-  const scripts = fileURLToPath(new URL('../hooks/', import.meta.url));
+  const scripts = hookScripts();
   /* THE FILE IS READ BEFORE ANYTHING ELSE IS, so a replace file that does not read changes nothing anywhere. */
   let replace: Replace | undefined;
   if (values.replace !== undefined) {
