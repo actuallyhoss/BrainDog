@@ -652,6 +652,11 @@ The order is fixed so two people reach the same answer (§13 #7).
 
 Verify: the ticket names the tuple and the step that found the cause. Rollback: none.
 
+### 5.16 · Account recovery
+
+A lost mailbox: sign in by passkey or the operator's claim link (`POST /auth/claim/mint`), then Settings > Identity >
+Change email (GAP-7).
+
 ## 6 · Refusals and errors
 
 Codes an operator meets, every one from 30 §6 or the adapter's list in 30 §13. None is new.

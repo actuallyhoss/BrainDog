@@ -1,172 +1,408 @@
 <!--
-  One use case, before it is installed: `/packs/browse/<id>` (`loop/research-marketplace.md` §1, the detail page).
+  One listing on its own page, for every kind: `/packs/browse/<id>?kind=module|usecase|pack`, `usecase` when no kind is
+  said so the links written before add-ons had pages still open (`loop/finish/platform.md` PLT-3, §4.0 L).
 
-  EVERYTHING HERE IS READ FROM THE USE CASE ITSELF, never written for the page: what it is for and who for, the rail and
-  Home it draws (`previewOf`), the lists and pages and example rows it adds (`installsOf`), the lines of the house voice
-  it replaces, the skills it suggests, and its version. So the page cannot promise what installing does not do.
+  EVERYTHING HERE IS READ FROM THE THING ITSELF, never written for the page: the summary and who published it, a large
+  drawing of each page it adds, what it adds (`$lib/market/adds.ts`, from the document the plan is read from), every line
+  it would call out with, its versions with their notes, what it needs first, and its licence. So the page cannot
+  promise what installing does not do.
 
-  INSTALL IS THE CARD'S (`Offer.svelte`): the file planned by the record, the plan read here, and each pack installed
-  through `installPack`.
+  A KENNEL VERSION IS VERIFIED WHEN THE PAGE OPENS: its checksum, and its author's signature when it has one. One that
+  does not verify is refused with its sentence and code and nothing can be pressed. A signed one says whether this
+  browser has seen that key for its author before, loudly when it is a different key; a key its author revoked, or a
+  version that lost the signature earlier ones had, is never offered. The key is kept on first use when the install goes
+  through (`catalogue.ts` `keepFirstKey`), and never written over.
+
+  ONE PRIMARY BUTTON: Install, Update, Turn on, or Installed. Install and Update read the record's plan and open the plan
+  sheet (`$lib/market/PlanSheet.svelte`, PLT-4's); what installs is what the sheet showed (`./offer.ts`). Somebody the
+  record will not let install is refused there, and a Kennel entry is then asked for on Decide instead.
 -->
 <script lang="ts">
-  import { apiBase } from '$lib/at.ts';
-  import { onMount } from 'svelte';
+  import { apiBase, at } from '$lib/at.ts';
+  import { onMount, untrack } from 'svelte';
   import { page } from '$app/state';
   import { createClient } from '@braindog/client';
+  import type { CatalogueIndex, Reach, Trust } from '@braindog/declare/catalogue';
   import { useCase } from '@braindog/seed/usecases';
-  import { installsOf, previewOf } from '@braindog/seed/usecases/share';
+  import { builtInFile, previewOf } from '@braindog/seed/usecases/share';
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
-  import { VOICE_LINES, type VoiceKey } from '$lib/voice.ts';
+  import * as pref from '$lib/pref.ts';
   import { read } from '$lib/data/record.ts';
-  import { choose, type PackState, type Source } from '$lib/record/packs.ts';
+  import { toasts } from '$lib/ui/toast.svelte.ts';
+  import { choose, packDocument, type PackState } from '$lib/record/packs.ts';
+  import type { Shell } from '$lib/record/boot-live.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import Empty from '$lib/ui/Empty.svelte';
+  import PlanSheet from '$lib/market/PlanSheet.svelte';
+  import PreviewPage from '$lib/market/PreviewPage.svelte';
+  import { addsOf, namesOf } from '$lib/market/adds.ts';
+  import { readCounts } from '$lib/market/counts.ts';
+  import { actionOf, entryOf, latestOf, listingKey, listingsOf, type ListingKind } from '$lib/market/listing.ts';
+  import { readVersionPreview, type PreviewRead } from '$lib/market/preview.ts';
+  import { words } from '$lib/market/words.ts';
   import { drew } from '../../../../lib/ui/screen.svelte.ts';
-  import Offer from '../Offer.svelte';
+  import { hostedHere } from '../../../settings/billing.ts';
   import { moduleTitle } from '../../sharing.ts';
   import Preview from '../Preview.svelte';
-  import CatalogueDetail from './CatalogueDetail.svelte';
-  import { readHostCatalogue } from '../catalogue.ts';
-  import type { CatalogueEntry, KeyStatements } from '@braindog/declare/catalogue';
+  import { browserStore, catalogueText, keepFirstKey, readHostCatalogue, signedWords, trustForEntry, trustWords } from '../catalogue.ts';
+  import { askOnDecide, diffOf, install, notOwner, planFor, turnOn, type OfferClient, type Planned } from './offer.ts';
 
-  /* A CATALOGUE'S USE CASE IS ASKED FOR BY NAME (`?from=catalogue`), so one published under a built-in's id is still reachable. An add-on
-     says its kind (`&kind=pack`), so one sharing an id with a use case is found as itself. */
-  const fromCatalogue = $derived(page.url.searchParams.get('from') === 'catalogue');
-  const kindAsked = $derived(page.url.searchParams.get('kind') === 'pack' ? 'pack' : 'usecase');
-  const u = $derived(fromCatalogue ? null : (useCase(page.params.id ?? '') ?? null));
-  let entry = $state.raw<CatalogueEntry | null>(null);
-  /* THE CATALOGUE'S KEY STATEMENTS, verified on the page before any counts. */
-  let keys = $state.raw<KeyStatements | undefined>(undefined);
+  const KINDS: readonly ListingKind[] = ['module', 'usecase', 'pack'];
+  const kind = $derived<ListingKind>(KINDS.find((k) => k === page.url.searchParams.get('kind')) ?? 'usecase');
+  const id = $derived(page.params.id ?? '');
+
+  let kennel = $state.raw<CatalogueIndex | null>(null);
   let looked = $state(false);
-  const preview = $derived(u ? previewOf(u) : null);
-  const installs = $derived(u ? installsOf(u) : null);
-  const voice = $derived(u ? (Object.entries(u.voice) as [VoiceKey, string][]) : []);
+  let counts = $state.raw<Record<string, number> | null>(null);
+  let client = $state.raw<OfferClient | null>(null);
+  /** This record's packs, `null` until it answers or when it does not. */
+  let states = $state.raw<PackState[] | null>(null);
+  let recordRefused = $state<string | null>(null);
 
-  let client = $state.raw<ReturnType<typeof createClient> | null>(null);
-  let source: Source | null = null;
-  let live = $state(false);
-  let states = $state<PackState[]>([]);
-  let refused = $state<string | null>(null);
+  const listing = $derived(listingsOf({ kennel, counts }).find((l) => l.key === listingKey(kind, id)) ?? null);
+  const entry = $derived(listing ? entryOf(kennel, listing) : null);
+  const u = $derived(listing?.kind === 'usecase' && listing.source === 'bundled' ? useCase(listing.id) : undefined);
+  const latest = $derived(listing ? latestOf(listing) : null);
+  const action = $derived(listing && states ? actionOf(listing, states) : null);
 
-  async function reread() {
-    const again = await source?.packs();
-    if (again?.ok) states = again.value;
+  /* ── the file, verified ─────────────────────────────────────────────────── */
+
+  /** The document the plan is read from and the page describes, with a use case's file text; `null` until read. */
+  let file = $state.raw<{ doc: Record<string, unknown> | null; text: string | null } | null>(null);
+  /** What it can reach, computed from the file for a built-in and by the catalogue for a Kennel entry. */
+  let reach = $state.raw<Reach | null>(null);
+  /** A Kennel version that did not verify, or a plan or install the record refused. */
+  let refused = $state<{ fix: string; code: string | null } | null>(null);
+  let trust = $state.raw<Trust | null>(null);
+  const said = $derived(trust && listing ? trustWords(trust, listing.author) : null);
+  const untrusted = $derived(trust?.kind === 'revoked' || trust?.kind === 'stripped');
+  let preview = $state.raw<PreviewRead>({ state: 'none' });
+
+  const adds = $derived(file ? addsOf(file.doc ?? (file.text ? safeParse(file.text) : null)) : null);
+  const names = $derived(file ? namesOf(file.doc ?? (file.text ? safeParse(file.text) : null)) : new Map<string, string>());
+
+  function safeParse(text: string): unknown {
+    try {
+      return JSON.parse(text);
+    } catch {
+      return null;
+    }
+  }
+
+  /* READ ONCE PER LISTING AND VERSION. `listingsOf` hands back new objects when the counts arrive, and re-verifying the
+     file then would blank the trust sentence and the button under the person reading them. */
+  const fileKey = $derived(listing && latest ? `${listing.source}:${listing.key}@${latest.version}` : null);
+
+  $effect(() => {
+    const k = fileKey;
+    untrack(() => load(k));
+  });
+
+  function load(k: string | null) {
+    const l = listing;
+    const e = entry;
+    const v = latest;
+    file = null;
+    reach = null;
+    trust = null;
+    refused = null;
+    preview = { state: 'none' };
+    if (!l || !v) return;
+    const still = () => fileKey === k;
+    void (async () => {
+      const cat = await import('@braindog/declare/catalogue');
+      if (l.source === 'kennel' && e) {
+        const got = await catalogueText(fetch, e, v);
+        if (!still()) return;
+        if (!got.ok) {
+          refused = { fix: got.fix, code: got.code };
+          return;
+        }
+        const parsed = safeParse(got.text);
+        file = { doc: l.kind === 'pack' && parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null, text: got.text };
+        reach = v.reach;
+        const t = await trustForEntry(browserStore(), e, v.version, got.signature, kennel?.keys);
+        if (!still()) return;
+        trust = t;
+        if (!v.preview) return;
+        const drawn = await readVersionPreview(fetch, l.kind === 'module' ? 'pack' : l.kind, l.id, v.version);
+        if (still()) preview = drawn;
+        return;
+      }
+      /* A BUILT-IN IS ITS OWN FILE, built here as it would be installed, and its reach is computed as the Kennel's is. */
+      if (l.kind === 'usecase') {
+        const built = builtInFile(l.id);
+        if (!built || !still()) return;
+        const text = JSON.stringify(built);
+        file = { doc: null, text };
+        const held = await cat.readCatalogueFile(text, { kind: 'local' });
+        if (held.ok && still()) reach = cat.reachOf(held.value);
+        return;
+      }
+      const doc = await packDocument(l.id);
+      if (!doc || !still()) return;
+      file = { doc, text: null };
+      const held = await cat.readPackFile(doc, { kind: 'local' });
+      if (held.ok && still()) reach = cat.reachOf(held.value);
+    })();
   }
 
   onMount(() => {
     void readHostCatalogue(fetch).then((got) => {
-      entry = got.ok ? (got.index?.entries.find((e) => e.id === page.params.id && e.kind === kindAsked) ?? null) : null;
-      keys = got.ok ? got.index?.keys : undefined;
+      kennel = got.ok ? got.index : null;
       looked = true;
     });
+    void readCounts(fetch).then((got) => (counts = got));
     void read(async () => {
-      client = createClient({ base: apiBase() });
-      const chosen = await choose(client, !page.data.live);
-      source = chosen.source;
-      live = true;
+      const c = createClient({ base: apiBase() });
+      client = c;
+      const chosen = await choose(c);
       if (!chosen.first.ok) {
-        refused = chosen.first.refusal.fix;
+        recordRefused = chosen.first.refusal.fix;
         return false;
       }
       states = chosen.first.value;
       return true;
     });
   });
-  /* ONLY A USE CASE THAT EXISTS SAYS READY. The missing one is `Empty`'s to report, and it does. This effect called
-     `drew('empty')` itself, whose `s.empties++` reads what it writes, so the effect depended on itself and threw
-     `effect_update_depth_exceeded`: an unknown id drew its sentence and never settled. */
+
+  /* ONLY A LISTING THAT EXISTS SAYS READY. The missing one is `Empty`'s to report. Calling `drew('empty')` from this
+     effect would read what it writes and loop (`effect_update_depth_exceeded`), as it once did on this page. */
   $effect(() => {
-    if (u || entry) drew('ready');
+    if (listing) drew('ready');
   });
+
+  async function reread() {
+    if (!client) return;
+    const again = await choose(client);
+    if (again.first.ok) states = again.first.value;
+  }
+
+  /* ── the one button ─────────────────────────────────────────────────────── */
+
+  let busy = $state(false);
+  let planned = $state.raw<Planned | null>(null);
+  /** A Kennel entry asked for on Decide: the proposal id, empty when the record named none. */
+  let filed = $state<string | null>(null);
+
+  /** Whether the button can be pressed: the record has answered, and a Kennel version verified and is trusted. */
+  const pressable = $derived(!busy && client !== null && states !== null && file !== null && (listing?.source !== 'kennel' || (trust !== null && !untrusted)));
+
+  async function press() {
+    if (!listing || !client || !states || !file || !pressable || !action) return;
+    refused = null;
+    busy = true;
+    try {
+      if (action.kind === 'turn-on') {
+        const out = await turnOn(client, listing, states, u ? u.pack !== null : true, copy.writeRaced);
+        if (out.ok) toasts.push(listing.kind === 'usecase' ? copy.switchedTo(listing.title) : words.turnedOn(listing.title), { intent: 'good' });
+        else refused = out;
+        await reread();
+        return;
+      }
+      if (action.kind !== 'install' && action.kind !== 'update') return;
+      const out = await planFor(client, listing, file, states, copy.writeRaced);
+      if (out.ok) planned = out.planned;
+      else refused = out;
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function approve() {
+    if (!listing || !client || !states || !planned) return;
+    const p = planned;
+    busy = true;
+    try {
+      const out = await install(client, p, states, pref.read().nav ?? [], copy.writeRaced);
+      if (out.ok) {
+        if (out.nav) pref.write({ nav: out.nav });
+        if (entry && trust) await keepFirstKey(browserStore(), `${entry.kind}:${entry.id}`, trust);
+        toasts.push(copy.shareInstalled(listing.title), { intent: 'good' });
+        planned = null;
+      } else if (entry && notOwner(out.code)) {
+        planned = null;
+        const asked = await askOnDecide(client, entry, action?.kind === 'update' ? action.from : null);
+        if (asked.ok) filed = asked.id;
+        else refused = asked;
+      } else {
+        planned = null;
+        refused = out;
+      }
+      await reread();
+    } finally {
+      busy = false;
+    }
+  }
+
+  const label = $derived(
+    busy && planned === null
+      ? words.planning
+      : action?.kind === 'update'
+        ? words.update(action.to)
+        : action?.kind === 'turn-on'
+          ? words.turnOn(listing?.title ?? '')
+          : action?.kind === 'installed'
+            ? words.installed
+            : words.install(listing?.title ?? ''),
+  );
+  const publisherWords = $derived(
+    !listing
+      ? ''
+      : latest?.reviewed
+        ? words.reviewed
+        : listing.publisher?.kind === 'key'
+          ? words.signedBy(listing.publisher.id)
+          : words.by(listing.publisher?.name ?? listing.author),
+  );
 </script>
 
-<svelte:head><title>{titleOf(u?.title ?? entry?.title ?? copy.browseTitle)}</title></svelte:head>
+<svelte:head><title>{titleOf(listing?.title ?? copy.browseTitle)}</title></svelte:head>
 
-<PageHead icon="packs" title={u?.title ?? entry?.title ?? copy.browseTitle} />
+<PageHead icon="packs" title={listing?.title ?? copy.browseTitle} />
+
+{#snippet act()}
+  {#if filed !== null}
+    <p class="said" role="status">{words.asked}{#if filed}{' '}<a class="tap" href={at(`/decide/${filed}`)}>{words.openDecide}</a>{/if}</p>
+  {:else if action?.kind === 'installed'}
+    <Button weight="primary" disabled>{label}</Button>
+  {:else if !untrusted}
+    <Button weight="primary" disabled={!pressable || planned !== null} onclick={() => void press()}>{label}</Button>
+  {/if}
+{/snippet}
 
 <div class="page">
   <Button weight="bare" href="/packs/browse"><Icon name="back" size="s" />{copy.browseAll}</Button>
 
-  {#if !u && entry}
-    {#if refused}<Empty kind="error" title={refused} />{/if}
-    <CatalogueDetail {entry} {client} {live} {states} {keys} />
-  {:else if !u || !preview || !installs}
-    {#if looked || u}<Empty kind="no-results" title={copy.useCaseMissing} />{/if}
+  {#if !listing}
+    {#if looked}<Empty kind="no-results" title={words.missing} body={words.missingBody} />{/if}
   {:else}
-    {#if refused}<Empty kind="error" title={refused} />{/if}
+    {#if recordRefused}<Empty kind="error" title={recordRefused} />{/if}
 
     <section class="lead" aria-label={copy.useCaseFor}>
-      <p class="for">{copy.shareAudiences[u.audience]}</p>
-      <p class="summary">{u.summary}</p>
-      <p class="meta">{copy.useCaseTone(u.tone)} {copy.useCaseVersion(u.version, u.author, u.license)}</p>
-      <div class="offer"><Offer {u} {client} {live} {states} onchanged={reread} /></div>
+      <p class="for">{words.kinds[listing.kind]}{#if listing.count !== null}{' · '}{words.installs(listing.count)}{/if}</p>
+      <p class="summary">{listing.summary}</p>
+      <p class="meta"><Icon name={listing.source === 'bundled' || latest?.signature || latest?.reviewed ? 'check' : 'info'} size="s" />{publisherWords}</p>
+      {#if listing.source === 'kennel'}<p class="meta key"><Icon name={latest?.signature ? 'key' : 'info'} size="s" />{signedWords(latest?.signature)}</p>{/if}
+      {#if said}<p class="trust" data-loud={said.loud ? '' : undefined} role={said.loud ? 'alert' : undefined}>{#if said.loud}<Icon name="alert" size="s" />{/if}{said.text}</p>{/if}
+      <div class="act wide-only">{@render act()}</div>
+      {#if refused}<p class="said" role="status">{refused.fix}{#if refused.code}<span class="code">{copy.refusalCode(refused.code)}</span>{/if}</p>{/if}
+    </section>
+
+    {#if planned}
+      <PlanSheet
+        diff={diffOf(planned)}
+        nameOf={(a: string, b?: string) => names.get(b ?? a) ?? moduleTitle(b ?? a)}
+        hosted={hostedHere(page.data as unknown as Shell)}
+        {busy}
+        onapprove={() => void approve()}
+        oncancel={() => (planned = null)}
+      />
+    {/if}
+
+    <section class="panel drawing" aria-labelledby="d-pages">
+      <h2 class="panel-h" id="d-pages">{words.pages}</h2>
+      {#if u}
+        <Preview preview={previewOf(u)} large />
+      {:else if preview.state === 'ready' && preview.preview.pages.length > 0}
+        <PreviewPage preview={preview.preview} large />
+      {:else}
+        <p class="quiet">{preview.state === 'refused' ? preview.fix : words.noPreview}</p>
+      {/if}
     </section>
 
     <div class="grid">
-      <section class="panel wide" aria-labelledby="uc-preview">
-        <h2 class="panel-h" id="uc-preview">{copy.browseRail} · {copy.browseHome}</h2>
-        <Preview {preview} large />
-      </section>
-
-      <section class="panel" aria-labelledby="uc-installs">
-        <h2 class="panel-h" id="uc-installs">{copy.useCaseInstalls}</h2>
-        <dl class="facts">
-          {#if installs.modules.length > 0}
-            <dt>{copy.useCaseModulesFirst}</dt>
-            <dd>{installs.modules.map(moduleTitle).join(', ')}</dd>
-          {/if}
-          {#if installs.lists.length > 0}
-            <dt>{copy.browseLists}</dt>
-            <dd>
-              <ul class="names">
-                {#each installs.lists as name (name)}<li><Icon name="rows" size="s" />{name}</li>{/each}
-              </ul>
-            </dd>
-          {/if}
-          {#if installs.pages.length > 0}
-            <dt>{copy.useCasePages}</dt>
-            <dd>
-              <ul class="names">
-                {#each installs.pages as p (p.title)}<li><Icon name="doc" size="s" />{p.title}{#if p.section && p.section.toLowerCase() !== p.title.toLowerCase()}<span class="section">{p.section}</span>{/if}</li>{/each}
-              </ul>
-            </dd>
-          {/if}
-          {#if installs.lists.length === 0 && installs.pages.length === 0}
-            <dd class="span">{copy.useCaseNothingOwn}</dd>
-          {:else}
-            <dt>{copy.diffSeeds}</dt>
-            <dd>{copy.useCaseExamples(installs.examples)}</dd>
-          {/if}
-        </dl>
-      </section>
-
-      <section class="panel" aria-labelledby="uc-voice">
-        <h2 class="panel-h" id="uc-voice">{copy.useCaseVoice}</h2>
-        {#if voice.length === 0}
-          <p class="quiet">{copy.useCaseVoiceHouse}</p>
+      <section class="panel" aria-labelledby="d-adds">
+        <h2 class="panel-h" id="d-adds">{words.adds}</h2>
+        {#if adds && adds.lists.length + adds.pages.length + adds.figures.length + adds.rules.length > 0}
+          <dl class="facts">
+            {#if adds.lists.length > 0}
+              <dt>{words.addsLists}</dt>
+              <dd>
+                <ul class="names">
+                  {#each adds.lists as l (l.id)}<li><Icon name="rows" size="s" /><span class="name">{l.name}</span>{#if l.fields.length > 0}<span class="small">{l.fields.join(', ')}</span>{/if}</li>{/each}
+                </ul>
+              </dd>
+            {/if}
+            {#if adds.pages.length > 0}
+              <dt>{words.addsPages}</dt>
+              <dd>
+                <ul class="names">
+                  {#each adds.pages as p (p.id)}<li><Icon name="doc" size="s" />{p.title}</li>{/each}
+                </ul>
+              </dd>
+            {/if}
+            {#if adds.figures.length > 0}
+              <dt>{words.addsFigures}</dt>
+              <dd>
+                <ul class="names">
+                  {#each adds.figures as f (f.id)}<li><span class="name">{f.name}</span>{#if f.target || f.window}<span class="small">{[f.target, f.window].filter(Boolean).join(', ')}</span>{/if}</li>{/each}
+                </ul>
+              </dd>
+            {/if}
+            {#if adds.rules.length > 0}
+              <dt>{words.addsRules}</dt>
+              <dd>
+                <ul class="names">
+                  {#each adds.rules as r, i (i)}<li>{r}</li>{/each}
+                </ul>
+              </dd>
+            {/if}
+            <dt>{words.addsExamples}</dt>
+            <dd>{words.examples(adds.examples)}</dd>
+          </dl>
+        {:else if reach && reach.lists.length + reach.pages.length > 0}
+          <dl class="facts">
+            {#if reach.lists.length > 0}<dt>{words.addsLists}</dt><dd>{reach.lists.join(', ')}</dd>{/if}
+            {#if reach.pages.length > 0}<dt>{words.addsPages}</dt><dd>{reach.pages.join(', ')}</dd>{/if}
+            <dt>{words.addsExamples}</dt><dd>{words.examples(reach.examples)}</dd>
+          </dl>
         {:else}
-          <ul class="voice">
-            {#each voice as [key, line] (key)}
-              <li><span class="house">{VOICE_LINES[key]}</span><Icon name="arrow" size="s" /><span class="theirs">{line}</span></li>
-            {/each}
-          </ul>
+          <p class="quiet">{words.addsNothing}</p>
         {/if}
       </section>
 
-      {#if installs.skills.length > 0}
-        <section class="panel wide" aria-labelledby="uc-skills">
-          <h2 class="panel-h" id="uc-skills">{copy.useCaseSkills}</h2>
-          <ul class="skills">
-            {#each installs.skills as skill (skill.name)}
-              <li><span class="skill-name">{skill.name}</span><span class="quiet">{skill.trigger}</span></li>
-            {/each}
+      <section class="panel" aria-labelledby="d-calls">
+        <h2 class="panel-h" id="d-calls">{words.calls}</h2>
+        {#if reach && reach.calls_out.length > 0}
+          <ul class="names">
+            {#each reach.calls_out as call, i (i)}<li class="loud"><Icon name="globe" size="s" />{call.line}</li>{/each}
           </ul>
-        </section>
-      {/if}
+        {:else if reach}
+          <p class="quiet with-icon"><Icon name="check" size="s" />{words.callsNothing}</p>
+        {/if}
+      </section>
+
+      <section class="panel" aria-labelledby="d-versions">
+        <h2 class="panel-h" id="d-versions">{words.versions}</h2>
+        <ol class="versions">
+          {#each listing.versions as v (v.version)}
+            <li data-yanked={v.yanked ? '' : undefined}>
+              <span class="v">{v.version}</span>
+              <span class="quiet">{v.bump ? words.bump[v.bump] : words.first}{#if v.published_at}{' · '}{words.published(v.published_at)}{/if}</span>
+              {#if v.notes}<span class="notes">{v.notes}</span>{/if}
+              {#if v.yanked}<span class="quiet">{words.yanked(v.yanked.reason)}</span>{/if}
+              {#if listing.source === 'kennel'}<span class="quiet small">{signedWords(v.signature)}</span>{/if}
+            </li>
+          {/each}
+        </ol>
+      </section>
+
+      <section class="panel" aria-labelledby="d-needs">
+        <h2 class="panel-h" id="d-needs">{words.requires}</h2>
+        <dl class="facts">
+          <dt>{words.addsModules}</dt>
+          <dd>{(reach ?? latest?.reach)?.modules.map(moduleTitle).join(', ') || words.requiresNothing}</dd>
+          <dt>{words.licence}</dt>
+          <dd>{listing.license}</dd>
+        </dl>
+      </section>
     </div>
+
+    <div class="act narrow-only">{@render act()}</div>
   {/if}
 </div>
 
@@ -178,6 +414,7 @@
     gap: var(--sp-4);
     padding: var(--sp-5) var(--gutter) var(--sp-9);
     max-inline-size: 1100px;
+    min-inline-size: 0;
   }
 
   .page > :global(*) {
@@ -194,7 +431,12 @@
 
   .for,
   .meta,
-  .quiet {
+  .quiet,
+  .said {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
     margin: 0;
     color: var(--dim);
     font-size: var(--t-sm);
@@ -207,8 +449,32 @@
     line-height: 1.6;
   }
 
-  .offer {
+  .trust {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+    color: var(--ink2);
+    font-size: var(--t-sm);
+  }
+
+  .trust[data-loud] {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  .code {
+    color: var(--dim);
+    font-family: var(--font-id);
+    font-size: var(--t-xs);
+  }
+
+  .act {
     margin-block-start: var(--sp-2);
+  }
+
+  .drawing {
+    inline-size: 100%;
   }
 
   .grid {
@@ -225,12 +491,8 @@
     min-inline-size: 0;
     padding: var(--sp-4);
     border: 1px solid var(--line-soft);
-    border-radius: var(--r-lg);
+    border-radius: var(--r-md);
     background: var(--bg);
-  }
-
-  .wide {
-    grid-column: 1 / -1;
   }
 
   .panel-h {
@@ -260,23 +522,17 @@
     min-inline-size: 0;
   }
 
-  .facts .span {
-    grid-column: 1 / -1;
-  }
-
   .names,
-  .voice,
-  .skills {
+  .versions {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-1);
+    gap: var(--sp-2);
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
-  .names li,
-  .voice li {
+  .names li {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -285,35 +541,80 @@
     font-size: var(--t-sm);
   }
 
-  .section {
+  .name {
+    color: var(--ink);
+  }
+
+  .small {
+    inline-size: 100%;
     color: var(--dim);
     font-size: var(--t-xs);
   }
 
-  .house {
-    color: var(--dim);
-  }
-
-  .theirs {
+  .loud {
     color: var(--ink);
     font-weight: 600;
   }
 
-  .skills li {
+  .versions li {
     display: flex;
     flex-direction: column;
     gap: 2px;
   }
 
-  .skill-name {
+  .versions li[data-yanked] .v {
+    text-decoration: line-through;
+    color: var(--dim);
+  }
+
+  .v {
     color: var(--ink);
     font-family: var(--font-id);
     font-size: var(--t-sm);
   }
 
-  @media (width < 720px) {
+  .notes {
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    line-height: 1.5;
+  }
+
+  .narrow-only {
+    display: none;
+  }
+
+  @media (width < 640px) {
     .grid {
       grid-template-columns: minmax(0, 1fr);
+    }
+
+    .facts {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 2px;
+    }
+
+    .facts dd {
+      margin-block-end: var(--sp-2);
+    }
+
+    .wide-only {
+      display: none;
+    }
+
+    /* THE BUTTON STICKS TO THE BOTTOM OF THE SCREEN, above the tab bar and the home indicator (`--tabbar`), for as long
+       as the page scrolls: it is last in the page so a sticky bottom holds it there, and settles under the last panel. */
+    .narrow-only {
+      position: sticky;
+      inset-block-end: var(--tabbar, env(safe-area-inset-bottom));
+      display: flex;
+      inline-size: 100%;
+      padding-block: var(--sp-3);
+      background: var(--bg);
+      border-block-start: 1px solid var(--line-soft);
+    }
+
+    .narrow-only > :global(*) {
+      flex: 1;
     }
   }
 </style>

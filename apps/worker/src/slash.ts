@@ -337,6 +337,13 @@ export function workerSlashModel(env: SlashEnv, api: () => Pick<RecordApi, 'kern
       if (model.form === undefined) throw new NotSent('The model Slash answers with here drafts no first plan.');
       return model.form(input);
     },
+    /* THE DAILY LOOK'S SKILL STEP (GAP-12), through the same model choice as `form`: the included model or the
+       record's own key, whichever `chosen()` says is asking today. */
+    skill: async (input) => {
+      const model = chosen();
+      if (model.skill === undefined) throw new NotSent('The model Slash answers with here drafts no skill.');
+      return model.skill(input);
+    },
   };
 }
 

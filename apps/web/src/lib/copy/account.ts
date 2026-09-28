@@ -258,6 +258,35 @@ export const account = {
   yourRecords: 'Records you can open',
   thisOne: 'you are here',
 
+  /* identity, GAP-7: a person changes their own name and sign-in email. The name is the record's `renamePerson`; the
+     address is a link mailed to the new one (`/account/email`), and nothing moves until it is opened. */
+  identityNoName: 'No name yet',
+  identityChangeName: 'Change name',
+  identityNameLabel: 'Your name',
+  identityNameHint: 'How every record you belong to shows you, from 1 to 80 characters.',
+  identitySaveName: 'Save name',
+  identitySaving: 'Saving',
+  identityCancel: 'Cancel',
+  identityClose: 'Close',
+  identityNameSaved: (name: string) => `You are ${name} in every record you belong to.`,
+  identityPeopleRow: 'Rename your People row too',
+  identityPeopleRowDone: 'Your People row has the new name too.',
+  identitySignInWays: 'How you sign in',
+  identityPasskeysWay: 'Passkeys',
+  identityPasskeys: (n: number) => (n === 0 ? 'None yet' : n === 1 ? 'One passkey' : `${n} passkeys`),
+  identityChangeEmail: 'Change email',
+  identityEmailLabel: 'New email address',
+  identityEmailHint: 'We mail a link to it. Nothing changes until you open that link.',
+  identitySendLink: 'Send the link',
+  identitySending: 'Sending',
+  identityLinkSent: (to: string) => `We sent a link to ${to}. It works for 24 hours.`,
+  identityEmailMoving: 'Changing your sign-in email',
+  identityEmailMoved: (to: string) => `You now sign in with ${to}.`,
+  identityEmailBehind: (n: number) =>
+    n === 1
+      ? 'One of your records could not be reached just now and still shows your old address. It catches up the next time you change your name or email.'
+      : `${n} of your records could not be reached just now and still show your old address. They catch up the next time you change your name or email.`,
+
   /* `backup` AND IT WAS `sealed copy` AND `snapshot`, WHICH ARE TWO WORDS FOR ONE IDEA. A friction
      pass found them competing on the same screen: `/decide` said "The newest sealed copy is from
      2026-09-02" and a card beside it was titled `Snapshot`. Neither is the word a person uses, and
@@ -335,11 +364,20 @@ export const account = {
   /* `25 §9`'s own blockquote, and it outranks the screen it is on. */
   staleShows: 'A figure fed by one of these shows a gap and says it is stale rather than holding yesterday’s number.',
 
-  /* notifications — `09` specifies the mechanism and no settings, so this reports */
+  /* notifications: `09` specifies the mechanism and one setting, the quiet hours, so the rest of this reports */
   whenWeInterrupt: 'When this record interrupts you',
   batchByDefault: 'Most things wait for your summary. Only urgent ones interrupt.',
+  /* QUIET HOURS ARE THE RECORD'S AND AN OWNER SETS THEM (`09 §5` rule 3, GAP-10). One sentence with the two times in it
+     and a switch beside it; a member reads the same sentence with no control. A summary due inside them waits for
+     their end, and an urgent notice never does. */
   quietHours: 'Quiet hours',
-  quietHoursAre: '22:00 to 08:00 in this record’s timezone. Anything not urgent waits until they end.',
+  quietHold: 'Hold notices from',
+  quietUntil: 'to',
+  quietWhy: 'Anything not urgent waits until they end, in this record’s time zone. Urgent notices still reach you.',
+  quietHeld: (from: string, to: string) => `Notices are held from ${from} to ${to}.`,
+  quietOff: 'Off. Your summary goes when it is due, day or night.',
+  quietOwner: 'Only an owner can change these.',
+  quietDefault: 'Put back 22:00 to 08:00',
   urgentKinds: 'Urgent',
   /* WHAT THE RECORD ITSELF RAISES, AND THEN WHAT A RULE DOES. This said "a payment failing, a domain expiring inside 7
      days" as if they were the product's own, and the kernel raises neither: `notify` in `digest.ts` interrupts for what
@@ -660,4 +698,114 @@ export const account = {
   inviteFromMail: 'You opened the link from your mail. Accept to join the record.',
   /* A key taken out of service from the vault screen: the bytes go, the row stays. */
   keyRevoked: (label: string) => label + ' is out of service. Its row stays, because what it opened is a fact.',
+
+  /* ── OPS-18: Billing, Sessions, Recovery and the lapse banner ─────────────────────────────────────────────────────
+     BILLING SAYS ONE SENTENCE A RECORD, and the sentence says what happens next: nothing for a paid one, Stripe's retry
+     and a new card for a failed payment, and for a lapsed one the date it went read-only, the date it is deleted and
+     that export never stops. The plan's price is the Worker's own string (`GET /account/billing`), never written here. */
+  billingYours: 'Records you own',
+  billingPlan: (plan: string, price: string) => (price ? `${plan}, ${price}` : plan),
+  billingPlanHosted: 'Hosted',
+  billingPlanPlus: 'Cloud Plus',
+  billingPaidThrough: (day: string) => `Paid through ${day}.`,
+  billingPaid: 'Paid and up to date.',
+  billingPastDue: 'The last payment did not go through. Stripe will try again; update the card.',
+  billingLapsedSince: (since: string, deleted: string) =>
+    `Read-only since ${since}, and deleted on ${deleted} unless it is paid. Export is always available.`,
+  billingLapsed: 'Read-only until it is paid. Export is always available.',
+  billingNotBilled: 'Not billed',
+  billingManage: 'Manage payment',
+  billingPayAgain: 'Pay again',
+  billingOpening: 'Opening the payment page',
+  billingNotOpen: 'This host is not taking payments at the moment, so nothing here can be paid or changed.',
+  billingNoneOwned: 'Billing belongs to a record’s owner, and you own no record on this host.',
+  billingUnread: 'What this record costs could not be read just now. Try again in a minute.',
+  /* The Worker's `LAPSED_FIX` (`apps/worker/src/lapse.ts`), word for word, because the banner and a refused write must
+     say the same thing about the same record. */
+  lapsedFix: 'Read-only until billing resumes. Export is available.',
+  lapseDeletes: (day: string) => `It is deleted on ${day} unless it is paid.`,
+
+  /* SESSIONS: every browser this person is signed in on, this one first. A session has no device name, so a row
+     says when it was proved and when it was last used, which is what tells a stranger's session from your own. */
+  sessions: 'Where you are signed in',
+  sessionsHow: 'Each browser you are signed in on. Signing the others out ends them there at once; this one stays.',
+  sessionThis: 'This browser',
+  sessionOther: 'Another browser',
+  sessionWhen: (proved: string, used: string) => `Signed in ${proved} · last used ${used}`,
+  sessionsEndOthers: 'Sign out everywhere else',
+  sessionsEnding: 'Signing out',
+  sessionsEnded: (n: number) => (n === 1 ? 'One other session was signed out.' : `${n} other sessions were signed out.`),
+  sessionsNoneElse: 'You are not signed in anywhere else.',
+  sessionsFailed: 'Nothing was signed out. Try again.',
+  sessionsUnread: 'Where you are signed in could not be read just now. Try again in a minute.',
+  sessionsSignedOut: 'Sign in to see where else you are signed in.',
+
+  /* RECOVERY: what a lost passkey costs, which is nothing while another way in is left. */
+  passkeyLost: 'If you lose a passkey',
+  passkeyLostHow: (magic: boolean) =>
+    magic
+      ? 'Sign in with a link from your mail, then remove the lost passkey here. With no passkey and no mail, the person who runs this host can let you back in.'
+      : 'Sign in with another passkey, then remove the lost one here. With none left, the person who runs this host can let you back in.',
+
+  /* OPS-17: sign-up for a stranger, a record of your own for somebody signed in with none, and a passkey first */
+  signupTitle: 'Make a record',
+  signupLede: 'Your email, and a name for your record.',
+  signupClosedTitle: 'Sign-up is not open yet',
+  signupClosedWhy: 'This BrainDog is not taking new records yet. If you already have one, sign in.',
+  signupNameLabel: 'A name for your record',
+  signupNameHint: 'Lower-case letters, digits and hyphens. It is part of your record\'s address.',
+  signupNameChecking: 'Checking the name',
+  signupNameFree: 'That name is free.',
+  signupNameUnreachable: 'BrainDog could not check that name. It is checked again when you send the form.',
+  signupYourName: 'Your name (optional)',
+  signupHuman: 'A check that you are a person',
+  signupSend: 'Send the link',
+  signupSending: 'Sending',
+  signupFailed: 'That did not go through. Check the address and the name, then send it again.',
+  signupLocked: (minutes: number) => `Too many tries from here. Try again in ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}.`,
+  signupCheckMail: 'Check your mail',
+  signupMailSent: (email: string) => `A link to finish is on its way to ${email}. Open it on this device. It works once, within a day.`,
+  signupOtherAddress: 'Use another address',
+  signupVerifying: 'Checking the link',
+  signupLinkFailed: 'That link did not work',
+  signupLinkFailedWhy: 'A link works once, within a day. Start again and a new one is sent.',
+  signupStartAgain: 'Start again',
+  signupPayFor: (name: string) => `Pay for ${name}`,
+  signupPayRecord: 'Pay for your record',
+  signupPayWhy: (price: string) => `BrainDog keeps your record for ${price}. You pay on Stripe's page, then come straight back here.`,
+  signupPaying: 'Opening the payment page',
+  signupCancelled: 'The payment was not made, and nothing was charged.',
+  signupWaiting: 'Making your record',
+  signupWaitingWhy: 'Your payment is in. This takes a few seconds.',
+  signupWaitingSlow: 'This is taking longer than it should. Your record is made as soon as the payment arrives, so check again in a minute.',
+  signupCheckAgain: 'Check again',
+  signupHaveRecord: 'Already have a record? Sign in',
+  signupNewHere: 'New here? Make a record',
+  noRecordTitle: 'Make a record of your own',
+  noRecordWhy: 'You are signed in and on no record yet. Name one and pay for it here, or open the invitation somebody sent you.',
+  passkeyFirstTitle: 'First, keep a way back in',
+  passkeyFirstWhy: 'Add a passkey on this device, so you can sign in again without waiting for an email.',
+  passkeyFirstLater: 'Not now',
+  passkeyFirstFailed: 'That did not add a passkey. You can add one later in Settings, under Recovery.',
+
+  /* COL-6: People and invitations. Stop and let back in, an invitation to chosen lists, a new link for one that ran
+     out, and what a link opens, said on `/invite` before Accept. */
+  stopAccess: 'Stop',
+  letBackIn: 'Let back in',
+  accessStopped: (name: string) => `${name} is stopped. Everything they hold is kept for when you let them back in.`,
+  accessLetBack: (name: string) => `${name} is back in, with what they held.`,
+  inviteReachLabel: 'What the invitation opens',
+  inviteWholeRecord: 'The whole record',
+  inviteChosenLists: 'Chosen lists',
+  inviteListNothing: 'Nothing',
+  inviteListsHint: 'Give each list they need a level. A list left at Nothing stays closed to them.',
+  inviteAddsOnlyLeavesOut:
+    'Adds only on the whole record leaves out Keys, People and any list kept for owners. Choose lists instead to give one of those.',
+  inviteNewLink: 'New link',
+  inviteRanOut: (gives: string, on: string) => `${gives} · ran out on ${on}`,
+  inviteOpens: (record: string, what: string) => `${record}: ${what}`,
+  inviteThisRecord: 'This record',
+  inviteEverything: (does: string) => `everything (${does})`,
+  inviteListGives: (list: string, does: string) => `${list} (${does})`,
+  inviteDoes: { owner: 'owns it', decide: 'decides', write: 'edits rows', append: 'adds rows', read: 'reads' },
 } as const;

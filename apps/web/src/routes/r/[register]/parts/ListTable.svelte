@@ -21,7 +21,7 @@
   import { Table, type Column, type TableRow } from 'braindog-render/svelte';
   import { display, DOM_CAP, identityFor, identityOf, labelOf } from '$lib/record/api.ts';
   import { currencyTypedIn } from '$lib/ui/money-typed.ts';
-  import { isJson, isQuantity, unitOf, unitsOf } from '$lib/record/field-draft.ts';
+  import { isFile, isJson, isQuantity, unitOf, unitsOf } from '$lib/record/field-draft.ts';
   import { scopeFieldOf, scopeOf } from '$lib/record/scope-move.ts';
   import type { Names } from '$lib/record/remote.ts';
   import type { Entry, FieldDecl, RegisterDecl } from '$lib/record/schema.ts';
@@ -31,6 +31,7 @@
   import DayBox from '$lib/ui/DayBox.svelte';
   import QuantityBox from '$lib/ui/QuantityBox.svelte';
   import JsonBox from '$lib/ui/JsonBox.svelte';
+  import FileField from '$lib/ui/FileField.svelte';
   import ScopeChip from '$lib/ui/ScopeChip.svelte';
   import { boxOf, deadlineOf, withoutGood, type Receipt } from './list.ts';
 
@@ -292,6 +293,12 @@
             onfocusout={leftTheRow}
             onkeydown={(e) => cellKeys(e, true)}
           />
+        {:else if f && isFile(f)}
+          <!-- A FILE IS CHOSEN, NEVER TYPED (OPS-20): the picker sends the bytes and the draft holds what came back,
+               saved through the same commit as any other cell once the row is left. -->
+          <span class="cell-box" onclick={(e) => e.stopPropagation()} onfocusout={leftTheRow}>
+            <FileField bind:value={editValue} label={labelOf(f)} />
+          </span>
         {:else if f && isJson(f)}
           <!-- STRUCTURED DATA KEEPS ITS LINE BREAKS, so Enter is a new line and the grid's Cmd+Enter commits, as a
                document's cell does (MOD-22). -->

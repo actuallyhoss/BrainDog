@@ -62,6 +62,27 @@ The argument for BrainDog is stronger than convenience:
 The fields this needs — `entity`, `assignee`, `actor` — already exist, and the predicate is the
 same `where:` grammar every consumer in [02-DATA-MODEL](02-DATA-MODEL.md) §6 uses.
 
+**As built (kernel migration 19).** A list grant carries at most one rule: `member.row_where`, one `where`
+([34-GRAMMARS](34-GRAMMARS.md) §1) held as JSON text beside the level it narrows. NULL is every row, which is what
+every grant meant before; the `'*'` row never holds one, since a rule is about one list's fields. The owner sets it
+with `invite({ …, registers, wheres })`, where `wheres` maps a list the same invitation gives to its rule; a list sent
+without one is every row again, because an invitation is the whole of what somebody holds. `invite` reads each rule
+against its list before storing it and refuses one it cannot read. Each change is its own event on the member row:
+`access.grant` when a list is narrowed or its rule changes, `access.revoke` when the rule comes off, with
+`field: '<list>#where'` and the rule's JSON text in `from_v` and `to_v`, so "who could see what, when" is still read
+from the log. `members()` answers the rules as `wheres`, in the shape `invite` takes them.
+
+The record's `access(person)` answers `wheres` beside `levels`, and both hosts copy it into the call's context wherever
+they copy `levels` (`CallContext.wheres`). Every row read narrows by it: `list`, `get`, `search`, `history`, blocks,
+question rowsets, MCP and Slash. The kernel's `list(q, grant)` and `count(register, grant)` take the caller's rule on
+that list and AND it with the caller's own `where`, so a page, its cursor and its `matched` come from one clause and a
+narrowed member is never told how many rows they cannot see. A figure over a narrowed list is withheld for that member,
+since a sum over rows they cannot see says what those rows hold. A rule the record cannot read reaches no row: it fails
+closed, and the member sees an empty list rather than the rows the owner kept from them.
+
+This is Notion's shape with one rule per grant rather than several with a highest-wins merge. A person who needs two
+slices of one list is one rule with an `any:`, which keeps "what can she see" a single predicate a person can read.
+
 ### The five levels
 
 | Level | Can |
@@ -174,7 +195,7 @@ or changing a property's type"* and *"creating or changing views."*
 
 | Tier | What | Cost |
 |---|---|---|
-| **0 · A collaborator's own agent** | they write through a scoped agent token. Async, no UI, works today | ~0d |
+| **0 · A collaborator's own agent** | they write through an agent token of their own. Any member mints one from Settings > Agents in a sign-in proved in the last fifteen minutes (`createOwnToken`, then `ownTokens` and `revokeOwnToken`, all DATA, a person in a browser and never a token); it writes as them and is capped by their own levels at every call, so an "Adds only" colleague, who cannot open the app, adds rows through MCP. The owner's `listTokens` names whose each token is, and `revokeToken` ends any of them | ~0d |
 | **1 · Shared read-only links** | a signed token per page. **Every shared page is also a landing page** | ~1d |
 | **2 · A second person with a login** | largely absorbed by Phase A's auth-for-strangers work — the invitation flow is [12-SECURITY](12-SECURITY.md) §3, and it is two methods: `invite({ email, levels })`, ADMIN, the owner mints the link; `acceptInvite`, INTERNAL, the host calls at acceptance with the Directory's verified person, and that writes the `member` rows and their `access.grant` events ([45-SPEC-RECORD](45-SPEC-RECORD.md) §5.6, §5.11). *An earlier draft had one method doing both* | ~4d |
 | **3 · Collaborate on decisions** | comments, and the gate itself | ~3d |

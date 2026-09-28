@@ -15,15 +15,30 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import Section from '$lib/ui/Section.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import { redraw } from '$lib/theme/draw.ts';
+  import LookEditor from '$lib/theme/LookEditor.svelte';
+  import { takeFix } from '$lib/theme/staged.ts';
   import type { AreaProps } from '../settings-state.svelte.ts';
+  import { ownsRecord } from '../../levels.ts';
 
-  /* EVERY AREA TAKES THE SAME PROPS. This one draws the device's own choices and reads none of them. */
+  /* EVERY AREA TAKES THE SAME PROPS. The device's own choices read none of them; the record's look asks whether the
+     person is the owner, whose save installs it, or a member, whose save goes to Decide. */
   let props: AreaProps = $props();
+  const owner = $derived(ownsRecord(props.shell.me));
+
+  /* A THEME REFUSED AT INSTALL, handed over by the add-on screen's Fix and install. Taken once, so a reload of this
+     screen opens as it always does. */
+  const staged = takeFix();
 
   /* SET IT AND REMEMBER IT, in one call. These were two things and the second was never written:
      every preference in this product was lost on refresh, and a setting that does not survive a
-     reload is a setting somebody changes once and then stops trusting. */
-  const set = (key: 'scheme' | 'text' | 'density', value: string) => pref.apply(key, value);
+     reload is a setting somebody changes once and then stops trusting.
+
+     A DENSITY PICKED HERE BEATS THE RECORD'S LOOK on this device, so the look is drawn again without its row height. */
+  const set = (key: 'scheme' | 'text' | 'density', value: string) => {
+    pref.apply(key, value);
+    if (key === 'density') redraw();
+  };
 
   /* SEEDED FROM WHAT IS REMEMBERED, so the controls show the state the page is already in rather
      than the default the state happens to start at. */
@@ -115,6 +130,15 @@
     </button>
   </div>
   {#if accentWrong}<p class="wrong">{accentWrong}</p>{/if}
+</Section>
+
+<!--
+  THE RECORD'S LOOK, which is everybody's, under the device's colour, which is this screen's alone (GAP-3, `21 §6`).
+  The editor is its own component with its own styles, because this file's style block is the device choices'.
+-->
+<Section title={copy.lookTitle}>
+  <p class="hint">{copy.lookHint}</p>
+  <LookEditor {owner} {staged} />
 </Section>
 
 <Section title={copy.scheme}>

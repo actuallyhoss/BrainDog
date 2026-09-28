@@ -3,54 +3,91 @@
   rule or look by its name, with the facts that say where it lands and what it shows. The accent of a
   look is drawn as a swatch beside its code, because a colour is judged by eye and not by its number.
 
-  A PAGE IS ALSO DRAWN, under its lines, by the record (`drawnOf`, the record's `previewPage`). The lines
-  named its blocks and nothing filled them, so what an agent's page would hold was learnt by accepting it.
-  The blocks go through the page's own drawing, `draw` and the renderer's primitives (A3: the preview is
-  the real renderer), with no callback handed to any of them, so nothing on a page nobody has accepted
-  can be ticked or moved. A block the record held back draws its sentence. A host older than the method
-  draws nothing more than the lines, which is what this screen drew before.
+  A PAGE IS ALSO DRAWN, under its lines, as it will be, beside the page as it is when the change replaces
+  one. The record rehearses the whole change (`previewOf`, the record's `previewChange`), so a page over a
+  list the same bundle brings is drawn over that list, and each page goes through the one page reader,
+  `PageView mode="preview"`, with its rail, its spans and its boxes, and a "Now · After" switch for a page
+  that is already there. A preview is handed no writes, so nothing on a page nobody has accepted can be
+  ticked or moved.
+
+  A HOST WITHOUT `previewChange` asks for each page alone (`drawnOf`, the record's `previewPage`), and a host
+  without that either draws the lines and nothing more, which is what this screen drew before either.
 -->
 <script lang="ts">
-  import { Block, Degraded, Markdown, Table } from 'braindog-render/svelte';
-
-  import { apiBase, at as inApp } from '$lib/at.ts';
+  import { apiBase } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
-  import { draw } from '$lib/record/blocks.ts';
-  import { resolverOf, type LiveBlock } from '$lib/record/page-live.ts';
-  import Empty from '$lib/ui/Empty.svelte';
-  import { drawnOf, words, type Drawn, type Proposed } from './proposed.ts';
+  import PageView from '$lib/page/PageView.svelte';
+  import { drawnOf, openedOf, previewOf, words, type Proposed, type Rehearsed, type Tried } from './proposed.ts';
 
   let { proposed }: { proposed: Proposed } = $props();
 
-  /* ONE ANSWER PER PAGE, BY ITS PLACE IN THE LIST, and a proposal changed under the screen drops the answers it was
-     waiting on rather than drawing the last proposal's page under the next one's title. */
-  let drawn = $state<(Drawn | null)[]>([]);
+  /** What is drawn under one line of the preview: a page, or the record's sentence for why it is not drawn. */
+  type Shown = { tried: Tried } | { fix: string };
+
+  /* ONE ANSWER PER PROPOSAL, and a proposal changed under the screen drops the answers it was waiting on rather than
+     drawing the last proposal's pages under the next one's title. */
+  let rehearsed = $state<Rehearsed | null>(null);
+  /* THE FALLBACK'S ANSWERS, ONE PER PAGE BY ITS PLACE IN THE LIST, filled only when the host has no `previewChange`. */
+  let alone = $state<(Shown | null)[]>([]);
+
   $effect(() => {
-    const bodies = proposed.appears.map((a) => a.page ?? null);
+    const change = proposed.change;
+    const appears = proposed.appears;
     let current = true;
-    drawn = bodies.map(() => null);
+    rehearsed = null;
+    alone = appears.map(() => null);
     const base = apiBase();
-    bodies.forEach((body, i) => {
-      if (body)
+    const each = () =>
+      appears.forEach((a, i) => {
+        if (!a.page) return;
+        const body = a.page;
+        const slug = typeof body.page === 'string' && body.page !== '' ? body.page : (a.id ?? '').replace(/^page\./u, '');
         void drawnOf(body, base)
           .then((d) => {
-            if (current) drawn[i] = d;
+            if (!current) return;
+            if (d.from === 'refused') alone[i] = { fix: d.fix };
+            else if (d.from === 'live') alone[i] = { tried: { id: a.id ?? '', slug, got: openedOf(body, slug, a.title, d.blocks, d.now), was: null } };
           })
-          .catch(() => {
-            if (current) drawn[i] = { from: 'none' };
-          });
-    });
+          .catch(() => undefined);
+      });
+    if (!change) {
+      each();
+    } else {
+      void previewOf(change, base)
+        .then((r) => {
+          if (!current) return;
+          rehearsed = r;
+          if (r.from === 'none') each();
+        })
+        .catch(() => {
+          if (current) each();
+        });
+    }
     return () => {
       current = false;
     };
   });
 
-  const optsFor = (block: LiveBlock, now: number) => ({
-    resolve: (path: string) => resolverOf(block.values)(path) ?? '',
-    now,
-    href: inApp,
-  });
+  /* EACH DRAWN PAGE UNDER THE LINES THAT NAME IT, by its declaration's id; a page the change draws that no line names
+     (a page per row the record filled from one declaration twice, say) is drawn after the list, so none is lost. */
+  const live = $derived(rehearsed?.from === 'live' ? rehearsed.pages : []);
+  const ids = $derived(new Set(proposed.appears.flatMap((a) => (a.id ? [a.id] : []))));
+  const loose = $derived(live.filter((p) => !ids.has(p.id)));
+  const shownFor = (i: number): Shown[] => {
+    const a = proposed.appears[i];
+    if (!a?.page) return [];
+    if (rehearsed?.from === 'live') return live.filter((p) => a.id !== undefined && p.id === a.id).map((tried) => ({ tried }));
+    const one = alone[i];
+    return one ? [one] : [];
+  };
 </script>
+
+{#snippet drawing(tried: Tried)}
+  <div class="appear-drawn" role="group" aria-label={words.drawn(tried.got.page.page.title)}>
+    <p class="appear-kind">{words.drawnHead}</p>
+    <PageView slug={tried.slug} got={tried.got} mode="preview" was={tried.was} />
+  </div>
+{/snippet}
 
 <ul class="appears">
   {#each proposed.appears as a, i (i)}
@@ -63,41 +100,28 @@
         <dl class="appear-lines">
           {#each a.lines as line (line.label)}
             <dt>{line.label}</dt>
-            <dd>
+            <dd data-intent={line.tone}>
               {#if a.accent && line.value === a.accent}<span class="swatch" style:background={a.accent} aria-hidden="true"></span>{/if}
               {line.value}
             </dd>
           {/each}
         </dl>
       {/if}
-      {#if drawn[i]?.from === 'refused'}
-        <p class="appear-note">{(drawn[i] as { fix: string }).fix}</p>
-      {:else if drawn[i]?.from === 'live'}
-        {@const live = drawn[i] as Extract<Drawn, { from: 'live' }>}
-        <div class="appear-drawn" role="group" aria-label={words.drawn(a.title)}>
-          <p class="appear-kind">{words.drawnHead}</p>
-          {#each live.blocks as block, j (j)}
-            {@const shown = draw(block)}
-            <div class="appear-block">
-              {#if block.heading}<p class="appear-block-head">{block.heading}</p>{/if}
-              {#if block.cannot}
-                <p class="appear-note">{block.cannot}</p>
-              {:else if shown.refusal}
-                <Empty compact kind={shown.refusal.kind} title={shown.refusal.title} body={shown.refusal.body} lines={shown.refusal.lines} />
-              {:else if block.kind === 'table'}
-                <Table columns={block.columns} rows={block.rows} total={block.total} label={block.heading} href={inApp} />
-              {:else}
-                {#each shown.segments as segment, k (k)}
-                  {#if segment.type === 'block'}<Block block={segment} opts={optsFor(block, live.now)} />{:else if segment.type === 'degraded'}<Degraded {segment} />{:else if segment.type === 'markdown'}<div class="document"><Markdown {segment} opts={{ href: inApp }} /></div>{/if}
-                {/each}
-              {/if}
-            </div>
-          {/each}
-        </div>
-      {/if}
+      {#each shownFor(i) as shown, j (j)}
+        {#if 'fix' in shown}
+          <p class="appear-note">{shown.fix}</p>
+        {:else}
+          {@render drawing(shown.tried)}
+        {/if}
+      {/each}
     </li>
   {/each}
+  {#each loose as tried, k (k)}
+    <li class="appear">{@render drawing(tried)}</li>
+  {/each}
 </ul>
+<!-- A CHANGE THE RECORD WOULD NOT INSTALL IS SAID ONCE, in its sentence, under the lines that still say what it holds. -->
+{#if rehearsed?.from === 'refused'}<p class="appear-note">{rehearsed.fix}</p>{/if}
 {#if proposed.samples !== null}<p class="appear-note">{copy.proposalSamples(proposed.samples)}</p>{/if}
 
 <style>
@@ -160,6 +184,11 @@
     overflow-wrap: anywhere;
   }
 
+  /* A KIND THAT WRITES, IN RED: agents AGT-23's job line reads as a warning rather than an ordinary fact. */
+  .appear-lines dd[data-intent='bad'] {
+    color: var(--danger);
+  }
+
   .swatch {
     flex: none;
     inline-size: 12px;
@@ -168,7 +197,9 @@
     box-shadow: inset 0 0 0 1px var(--line);
   }
 
-  /* THE DRAWING SITS UNDER THE LINES, RULED OFF FROM THEM, because it is the page and not a fact about it. */
+  /* THE DRAWING SITS UNDER THE LINES, RULED OFF FROM THEM, because it is the page and not a fact about it. It is the
+     width of the column it is in and never wider, so at 390 it is one column under the question and above Accept, the
+     reader stacking the rail under the main column as a phone always does. */
   .appear-drawn {
     display: flex;
     flex-direction: column;
@@ -181,21 +212,6 @@
 
   .appear-drawn .appear-kind {
     margin: 0;
-  }
-
-  .appear-block {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-1);
-    min-inline-size: 0;
-    overflow-x: auto;
-  }
-
-  .appear-block-head {
-    margin: 0;
-    color: var(--ink);
-    font-size: var(--t-ui);
-    font-weight: 500;
   }
 
   .appear-note {

@@ -4,8 +4,8 @@
  * NOT IMPORTED BY A KIND'S OWN MODULE, though that is where a stylesheet would be looked for first: a kind module is
  * loaded by `blocks.ts`, which the app's tests load in plain Node, and Node cannot import a stylesheet. So the
  * stylesheets are gathered here, by a pattern rather than a list, and a new kind's `.css` arrives without a line in
- * any file. `PageView.svelte` imports this (and `DeclaredHome.svelte` draws through it), so the rules
- * cost only the screens that draw a block.
+ * any file. `PageView.svelte` imports this, and Home mounts `PageView` directly, so the rules cost only the screens
+ * that draw a block.
  *
  * ONLY A `.svelte` FILE IMPORTS THIS. `import.meta.glob` is the bundler's and is not there in Node, so a test or a
  * plain module that imported it would throw at load.

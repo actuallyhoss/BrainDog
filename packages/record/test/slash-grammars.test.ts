@@ -43,7 +43,7 @@ async function record() {
 test('EVERY GRAMMAR IS SERVED BY ITS NAME, a name that is not one is refused with all of them, and a description is handed four', async () => {
   const { api, sql } = await record();
   for (const name of GRAMMARS) value(await api.arrangement({ grammar: name }, OWNER));
-  assert.deepEqual(refusal(await api.arrangement({ grammar: 'ingest' }, OWNER)).allowed, [...GRAMMARS]);
+  assert.deepEqual(refusal(await api.arrangement({ grammar: 'yaml' }, OWNER)).allowed, [...GRAMMARS]);
   const described = describedGrammar();
   assert.deepEqual(Object.keys(described).sort(), ['metric', 'page', 'register', 'rule']);
   for (const [name, grammar] of Object.entries(described)) assert.equal(grammar, value(grammarOf(name)), `${name} is handed to Slash as something other than what is served`);

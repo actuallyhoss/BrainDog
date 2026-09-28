@@ -37,6 +37,8 @@
  */
 
 import type { AssertionJSON, Auth, AuthCall, AuthFlow, AuthResult, Mail, Methods, RegistrationJSON, Refusal, Result, Who } from '@braindog/ports';
+import type { Wheres } from '@braindog/kernel';
+import { FRESH } from '@braindog/record';
 
 import { DEVICE_ROUTES, serveDevice, type DeviceDoor, type DeviceFlow } from './device.ts';
 import { INVITE_ROUTES, personName, serveInvite, type InviteDoor, type InviteFlow } from './invite.ts';
@@ -81,6 +83,11 @@ export const ACCOUNT_ROUTES: readonly AccountRoute[] = [
   { path: '/account/billing/portal', method: 'POST', on: 'worker', needs: 'session', what: 'The page the payment provider keeps for a record you own, `{ record }`, or `{ record, plan }` to switch its plan.' },
   { path: '/account/billing/webhook', method: 'POST', on: 'worker', needs: 'stripe', what: 'The payment provider saying a payment happened, signed over the body as it was sent.' },
   { path: '/account/close', method: 'POST', on: 'worker', needs: 'session', what: 'Close your account, `{ email }` typed to confirm, from a sign-in in the last fifteen minutes.' },
+  /* THE WAY BACK FROM A LOST MAILBOX, with the operator's claim link: sign in by passkey or claim link, then change the
+     address. Both hosts, because a self-host's person loses a mailbox as easily; a host with no way to send mail is
+     handed no door and answers 404, as for every row (GAP-7, `loop/finish/contracts.md` §12.1). */
+  { path: '/account/email', method: 'POST', on: 'both', needs: 'session', what: 'Change the address you sign in with, `{ email }`: a link good for a day is mailed to the new address, and nothing moves until it is pressed.' },
+  { path: '/account/email/confirm', method: 'POST', on: 'both', needs: 'session', what: 'Press the mailed link, `{ token }`, from a sign-in in the last fifteen minutes: the address moves in every record you belong to.' },
 ];
 
 /** A door a signed-in person's POST reaches: who they are, and the JSON object they sent. */
@@ -118,7 +125,130 @@ export type AccountDoor = {
    * it must be able to answer 400 to a bad signature before anything here has an opinion about the body.
    */
   webhook?: ((request: Request) => Promise<Response>) | undefined;
+  /** `POST /account/email` and `/account/email/confirm`: the Directory's halves, each record's mirror, and the mail. */
+  email?: EmailDoor | undefined;
 };
+
+/* ── a person's own name and sign-in address (GAP-7, `loop/finish/contracts.md` §12.1) ─────────────────────────── */
+
+/**
+ * What moves in a person's mirror in each record: a new name, a new sign-in address, or both.
+ *
+ * A RENAME CARRIES THE ADDRESS TOO, the Directory's as it stands, so a record that could not be reached when the address
+ * last moved catches up the next time the person changes either (`mirrorEverywhere`). The kernel writes only what
+ * differs, so a record already in line writes nothing for the value it already held.
+ */
+export type PersonChange = { name?: string | undefined; email?: string | undefined };
+
+/**
+ * What a host hands the two email routes.
+ *
+ * `ask` AND `move` ARE THE DIRECTORY'S (`emailAsk` and `emailMove` in `packages/record/src/directory.ts`): the link is
+ * minted and spent there, and the address moves there first. `mirror` is one record's `mirrorPerson`, reached however
+ * the host reaches a record (over RPC on the Worker, in the same process on a self-host). `mail` sends one of the two
+ * letters (`email.change` with the link, `email.changed` to the old address) and must not throw; it is not awaited, so
+ * the answer never waits for a mail server.
+ */
+export type EmailDoor = {
+  ask: (person: string, email: string) => Promise<Result<{ to: string; token: string }>>;
+  move: (person: string, token: string) => Promise<Result<{ from: string; to: string; records: string[] }>>;
+  mirror: (record: string, person: string, change: PersonChange) => Promise<Result<unknown>>;
+  mail: (kind: 'email.change' | 'email.changed', to: string, link?: string) => void;
+  /** The clock `FRESH` is read against. Absent, it is the platform's own. */
+  now?: (() => number) | undefined;
+};
+
+/**
+ * The most records one change is carried into, in order of joining. A person on more than this is told how many were
+ * not reached, and the rest keep the old value in their mirror until the next change, rather than one request walking
+ * an unbounded list of objects.
+ */
+export const MIRROR_RECORDS_MOST = 200;
+
+/** What carrying one change into a person's records came to: how many took it, and how many could not be reached. */
+export type Mirrored = { reached: number; unreached: number };
+
+/**
+ * One change, carried into every record in `records`, one at a time.
+ *
+ * NEVER SKIPPED SILENTLY. A record that refused, threw or was past `MIRROR_RECORDS_MOST` is counted in `unreached`, and
+ * the screen says how many still show the old value. The Directory has already moved, so the person signs in with the
+ * new address everywhere; what an unreached record keeps is its own copy of who they are, which the next change of
+ * name or address carries in again, since a rename carries the Directory's address with it (`PersonChange`).
+ */
+export async function mirrorEverywhere(records: readonly string[], mirror: (record: string) => Promise<Result<unknown>>): Promise<Mirrored> {
+  let reached = 0;
+  let unreached = Math.max(0, records.length - MIRROR_RECORDS_MOST);
+  for (const record of records.slice(0, MIRROR_RECORDS_MOST)) {
+    try {
+      if ((await mirror(record)).ok) reached++;
+      else unreached++;
+    } catch {
+      unreached++;
+    }
+  }
+  return { reached, unreached };
+}
+
+/** Whether a request is the record's `renamePerson`, under either base: `/api/...` or `/app/<slug>/api/...`. */
+export const renameAsked = (method: string, pathname: string): boolean => method === 'POST' && /\/api\/+renamePerson\/*$/.test(pathname);
+
+/**
+ * The name a record kept, read from a copy of its answer to `renamePerson`, or `null` when it kept none.
+ *
+ * THE HOST FOLLOWS A RENAME THE RECORD ACCEPTED with the Directory's `renamePerson` and `mirrorEverywhere` over the
+ * person's other records, as it follows a removal with the Directory's `leave`: the record's answer is what says the
+ * name was good, so nothing is written anywhere else unless it was.
+ */
+export async function renamedName(answer: Response): Promise<string | null> {
+  if (answer.status !== 200) return null;
+  try {
+    const body = (await answer.json()) as { ok?: unknown; value?: { name?: unknown } } | null;
+    return body?.ok === true && typeof body.value?.name === 'string' ? body.value.name : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * `POST /account/email`: a link to the new address, and `{}` whatever it was, so the answer never carries the link.
+ * An address somebody else signs in with is refused by the Directory in a sentence that names nobody.
+ */
+async function emailAsked(door: EmailDoor, origin: string, who: Who, body: Record<string, unknown>): Promise<Result<unknown>> {
+  const typed = text(body.email).trim();
+  if (typed === '') return { ok: false, refusal: { code: 'REQUIRED_MISSING', fix: 'Type the new address you want to sign in with.', at: 'email' } };
+  const out = await door.ask(who.person, typed);
+  if (!out.ok) return out;
+  /* THE LANDING IS IDENTITY, IN WHICHEVER RECORD THE SESSION IS ON (`/app/settings/...` names none), and the token is
+     in the fragment, which no server, proxy or `Referer` ever reads, as a sign-in link's is. */
+  door.mail('email.change', out.value.to, `${origin}/app/settings/identity#email=${out.value.token}`);
+  return { ok: true, value: {} };
+}
+
+/**
+ * `POST /account/email/confirm`: the link spent, the address moved in the Directory and then in every record the person
+ * belongs to, and one line to the old address saying so.
+ *
+ * FRESH FIRST, BEFORE THE LINK IS SPENT. Moving the address is taking over the account's way in, so a session left
+ * signed in for a month is asked to sign in again (`FRESH`, OPS-7), and the link still works when they come back to it.
+ */
+async function emailConfirmed(door: EmailDoor, who: Who, body: Record<string, unknown>): Promise<Result<unknown>> {
+  const now = door.now ?? Date.now;
+  if (now() - who.provedAt > FRESH)
+    return {
+      ok: false,
+      refusal: {
+        code: 'NEEDS_BROWSER_SESSION',
+        fix: 'Sign in again to finish changing your sign-in email, then open the link once more. It has been more than fifteen minutes since you last did.',
+      },
+    };
+  const moved = await door.move(who.person, text(body.token).trim());
+  if (!moved.ok) return moved;
+  const { to, from, records } = moved.value;
+  const { unreached } = await mirrorEverywhere(records, (record) => door.mirror(record, who.person, { email: to }));
+  door.mail('email.changed', from);
+  return { ok: true, value: { email: to, unreached } };
+}
 
 /** A row this host does not serve: the same answer as a path that is no row at all. */
 const unserved = (): Response => refusal(404, { code: 'ROUTE_UNKNOWN', fix: 'There is no account route at that address.' });
@@ -127,7 +257,7 @@ const unserved = (): Response => refusal(404, { code: 'ROUTE_UNKNOWN', fix: 'The
 type Asked = (who: Who, body: Record<string, unknown>, url: URL) => Result<unknown> | Promise<Result<unknown>>;
 
 function askedOf(path: string, door: AccountDoor): Asked | null {
-  const { billing, checkout, portal, close } = door;
+  const { billing, checkout, portal, close, email } = door;
   switch (path) {
     case '/account/usage':
       return (who, _body, url) => door.usage(who.person, { from: url.searchParams.get('from') ?? '', to: url.searchParams.get('to') ?? '' });
@@ -141,6 +271,10 @@ function askedOf(path: string, door: AccountDoor): Asked | null {
       return portal ? (who, body) => portal(who, body) : null;
     case '/account/close':
       return close ? (who, body) => close(who, body) : null;
+    case '/account/email':
+      return email ? (who, body) => emailAsked(email, door.origin, who, body) : null;
+    case '/account/email/confirm':
+      return email ? (who, body) => emailConfirmed(email, who, body) : null;
     default:
       return null;
   }
@@ -151,6 +285,7 @@ function signInFor(path: string): string {
   if (path === '/account/records') return 'Sign in to see which records you can reach.';
   if (path === '/account/usage') return 'Sign in to see what your records used.';
   if (path === '/account/close') return 'Sign in to close your account.';
+  if (path.startsWith('/account/email')) return 'Sign in to change the address you sign in with, then open the link again.';
   return 'Sign in to see billing for the records you own.';
 }
 
@@ -456,14 +591,19 @@ export async function deriveSessionKey(material: Uint8Array): Promise<Uint8Array
  *
  * `provedAt` COMES FROM THE SESSION ROW AND FROM NOWHERE ELSE, which is what lets the vault ask for a proof
  * in the last fifteen minutes. `credentialed`, because a cookie is a credential of the person's own.
+ *
+ * `wheres` GOES WHEREVER `levels` GOES, the rows of each list a narrowed grant reaches, so both hosts hand every reader
+ * the same rules (`loop/finish/platform.md` §4.0 W). Absent from `held`, which is a record older than migration 19,
+ * no grant is narrowed.
  */
 export function sessionContext<L extends string>(
   who: Who,
-  held: { level: L | null; registers: readonly string[] | null; levels: Readonly<Record<string, L>> },
+  held: { level: L | null; registers: readonly string[] | null; levels: Readonly<Record<string, L>>; wheres?: Readonly<Wheres> },
 ): {
   principal: { kind: 'person'; id: string; level: L | null };
   registers?: readonly string[];
   levels?: Readonly<Record<string, L>>;
+  wheres?: Readonly<Wheres>;
   credentialed: true;
   provedAt: number;
 } {
@@ -471,6 +611,7 @@ export function sessionContext<L extends string>(
     principal: { kind: 'person', id: who.person, level: held.level },
     ...(held.registers === null ? {} : { registers: held.registers }),
     ...(Object.keys(held.levels).length === 0 ? {} : { levels: held.levels }),
+    ...(held.wheres === undefined || Object.keys(held.wheres).length === 0 ? {} : { wheres: held.wheres }),
     credentialed: true,
     provedAt: who.provedAt,
   };

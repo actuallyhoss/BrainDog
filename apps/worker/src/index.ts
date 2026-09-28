@@ -21,7 +21,10 @@
 import { DurableObject } from 'cloudflare:workers';
 
 import { handlersFor, hintsOf, httpStatus, serveApi, serveIngest, serveSlash, servesSlash, withSession, type SessionHints, type SlashAskDoor, type VaultGrantSeen } from '@braindog/host';
-import { deriveSessionKey, relyingParty, serveAccount, serveAuth, type DeviceDoor, type InviteDoor, type Provisioned } from '@braindog/host/auth';
+import { deriveSessionKey, relyingParty, serveAccount, serveAuth, type DeviceDoor, type EmailDoor, type InviteDoor, type Provisioned } from '@braindog/host/auth';
+/* SIGN-UP (`loop/finish/ops.md` OPS-17): its three routes are answered in `signIn()` before `serveAuth`. */
+import { clearCookie, cookieMode, mirrorEverywhere, readSid, renameAsked, renamedName, sameOrigin, sessionCookie } from '@braindog/host/auth';
+import type { SignupCall } from '@braindog/ports';
 import { gate, serveMcp as answerMcp, unauthorized as unknownAgent } from '@braindog/mcp/http';
 import { INVITE_GONE, ulids, type Arrival, type Arrived, type CreateRecordArgs, type DeviceCode, type Exchanged, type LeasedSeal, type OperationGrant, type OutboxRow, type VaultGrant, type Waiting } from '@braindog/kernel';
 import { createRecordApi, type CallContext, type Deposited, type IngestVerification, type Limited, type OpenedForGrant, type RecordApi, type SealTarget, type Sealed } from '@braindog/record';
@@ -30,31 +33,34 @@ import type { Auth, AuthCall, AuthResult, Param, Refusal, Result, Row, Scheduler
 
 import { createDirectory, switcherAsk, type AccountUsage, type Directory as Dir, type RunUsage, type SessionAsk, type SwitcherAsk, type SwitcherRow } from '@braindog/record/directory';
 import type { BillingAnswers, BillingCall } from '@braindog/record/directory';
-import type { MeterTally } from '@braindog/record/directory';
+import type { MeterTally, Person, UsageNotice } from '@braindog/record/directory';
 import type { Plan } from '@braindog/record/directory';
 import { answerOAuth, type OAuthAnswers, type OAuthCall } from '@braindog/record/oauth';
 import { seedCatalogue } from '@braindog/seed/usecases/catalogue';
 
 import { ALARM_RUNS, IN_FLIGHT, actionExecutor, holding, holdingPaged, invocation, keyOpener, meterPass, pass, sharedReader, type Admissions, type Ledger, type OpenKey } from './actions.ts';
-import { deliveryRun, holdAutomations, replayUsage, runsHold, type Replayed } from '@braindog/host/actions';
+import { deliveryRun, holdAutomations, noticePass, replayUsage, runsHold, type Replayed } from '@braindog/host/actions';
 import { arrivalRun } from '@braindog/host/actions';
 import { runScript, ScriptRuns, type ScriptCall, type ScriptExports, type ScriptReply } from './script.ts';
 import { grantNamed, holdingScript, scriptReads } from '@braindog/host/script';
 import { askerOf, scriptTrial } from '@braindog/host/script-try';
 import { pagedRunner } from '@braindog/host/connector';
-import { serveAsks, type SlashAnswer } from '@braindog/host/slash-answers';
+import { serveAsks, type ModelJobInference, type SlashAnswer } from '@braindog/host/slash-answers';
+import { backgroundMeter, serveModelJobs, type ModelJobMeter } from '@braindog/host/model-jobs';
 
 import { alarmScheduler } from './alarm.ts';
 import { slashLook, workerSlashAnswers, workerSlashDoor, workerSlashModel } from './slash.ts';
 import { slashErasing } from './slash.ts';
 import { workerSlashMeter } from './slash-meter.ts';
+import { workerModelJobs } from './slash-jobs.ts';
 import { workerCatalogueOffers } from './catalogue.ts';
 import { serveKennel, servesKennel } from './kennel.ts';
+import { fileKey, serveFiles, servesFiles } from './files.ts';
 import { cloudSnapshots, type Pitr } from './copies.ts';
 import { DELETED, destroyRecord, expireFinal } from './destroy.ts';
 import { directoryCopies } from './directory-copy.ts';
 import { isMailKind, sendMail } from './mail.ts';
-import { delivers, leasedOpener, leasedTarget, makeDeliver, type Mail } from './deliver.ts';
+import { delivers, leasedOpener, leasedTarget, makeDeliver, recordDelivers, type Mail } from './deliver.ts';
 import { fetchPush, pushKeyOf, servesPushKey, vapidKeys } from './vapid.ts';
 import { NO_SHARE_KEY, linkOpened, opensShare, serveShared, sharedNone, type SharedDoor } from '@braindog/host';
 /* NAMED APART FOR THE LINK'S DOOR, so the front doors' own limiter can import the same two functions under their own
@@ -66,10 +72,14 @@ import { afterRestore, appPath, recoverRestore, restoredOf, asPage, atRoot, clou
 import { HEALTHZ, healthz } from './health.ts';
 import { NO_MINT_SESSION, serveInbound, servesInbound } from './inbound.ts';
 import { appEntry, bearerOf, doorOf, withCookie, type BearerDeps } from './session.ts';
+import { LAPSED_FIX, lapseDrops } from './lapse.ts';
+import type { OutboxKind } from '@braindog/kernel';
 import { httpFor } from './http.ts';
 import { isBound, keyStoreOf, recordKeys, type KekBinding } from './keys.ts';
 import { keylessRefusal } from './keyless.ts';
-import { fleetFailure, nightlyWalk } from './nightly.ts';
+import { ERASE_CHECK_MS, ERASE_ROWS_MOST, fleetFailure, nightlyWalk, reconcileErase, type EraseRow } from './nightly.ts';
+import { ladder } from './ladder.ts';
+import { rewrapRecord } from './rewrap.ts';
 import { workerSigner } from './sign.ts';
 import { dumpOf, prefixOf, r2Snapshots, type Dump } from './snapshots.ts';
 import { serveWorkerKeys, serveWorkerVault, servesKeys, servesVault, type KeyDeps } from './vault.ts';
@@ -92,6 +102,7 @@ import { KERNEL_MIGRATION, type Ack } from '@braindog/kernel';
 import { doorPath, op, outboxFields, type AckedRow } from './oplog.ts';
 /* BILLING (`loop/finish/ops.md` OPS-13): the account's four billing doors, and the Stripe client they call through. */
 import { billingDoors, type BillingDeps } from './billing.ts';
+import { billingKey } from './billing.ts';
 import { stripeOf } from './stripe.ts';
 
 /** What a record answers between arming a restore and being reset: the gap between `51 D15`'s two calls. */
@@ -209,6 +220,8 @@ type Env = {
    * reader.
    */
   KEK?: KekBinding;
+  /** The operator's own record id, where the nightly walk writes its summary as one note (`53 §5.1`). Unset or empty, no note. */
+  OPS_RECORD?: string;
   /** The sender for sign-in links, on a domain Email Service sends for. Empty, or no `EMAIL`, and there are no links. */
   AUTH_MAIL_FROM?: string;
   /**
@@ -275,6 +288,12 @@ type Env = {
    */
   RL_READ?: RateLimitBinding;
   RL_WRITE?: RateLimitBinding;
+  /**
+   * Cloudflare Turnstile on the sign-up page (`loop/finish/ops.md` OPS-17): the site key a var the page is handed, the
+   * secret a secret `signIn()` checks each answer with. Either unset, and sign-up runs on the Directory's lockouts alone.
+   */
+  TURNSTILE_SITE_KEY?: string;
+  TURNSTILE_SECRET?: string;
 };
 
 /** A `Result`'s refusal, for an RPC that hands back only the part a caller acts on. */
@@ -355,6 +374,22 @@ function guardedSql(storage: DurableObjectStorage): Sql {
 
 /** Where an object keeps the build it last opened as, in its own storage and outside the record (`Record$` `#booted`). */
 const BOOTED = 'braindog.booted';
+
+/** Where an object keeps whether its record's billing has lapsed, beside `BOOTED` and outside the record (`setLapsed`). */
+const LAPSED = 'braindog.lapsed';
+
+/**
+ * The jobs a lapsed record's alarm acks as done and unsent, and the most it acks in one pass (`lapse.ts`'s `lapseDrops`
+ * holds the notifications, which the queue's pump leases and not the alarm).
+ */
+const UNSENT_KINDS: readonly OutboxKind[] = ['pull.fetch', 'infer.embed', 'infer.prose', 'infer.draft', 'infer.ask'];
+const UNSENT_MOST = 50;
+
+/**
+ * How long a lapsed record holds an automation run that has not started before asking again. The run's own schedule
+ * row wakes it then, so a lapse ended a minute ago holds a run for at most this long.
+ */
+const LAPSE_HOLD_MS = 15 * 60_000;
 
 /** This record's id for a log line, or `null` for a record not yet made, or one whose identity cannot be read. */
 const recOf = (api: RecordApi): string | null => {
@@ -476,6 +511,9 @@ export class Record$ extends DurableObject<Env> {
   /** The copies port, or `undefined` on a deployment with no `BLOBS`, where the record says it keeps none. */
   #copies: (Snapshots & { readonly reopens: true }) | undefined;
 
+  /** The record's own deletion, as `#open` hands it to the record, or `null` before the record is opened. */
+  #destroy: (() => Promise<void>) | null = null;
+
   /**
    * The `Scheduler` port over this object's own alarm. One per customer, and this is the one.
    *
@@ -506,18 +544,47 @@ export class Record$ extends DurableObject<Env> {
    */
   #answers: SlashAnswer | undefined;
 
+  /**
+   * What answers the record's model jobs from this object's alarm, a pattern's draft and a digest's prose, or `undefined`
+   * where there is no model, and the background allowance they are spent from. Set in `#open` beside `#answers`, because
+   * the record's `delivers` names `infer.prose` only where this answers it.
+   */
+  #jobs: ModelJobInference | undefined;
+  #jobsMeter: ModelJobMeter | undefined;
+
   /** The scripts running from this object's alarm, and the rules each is held to (`script.ts`). */
   #scripts = new ScriptRuns();
 
   /**
    * The record's own switch, set by the account door over RPC (`loop/finish/ops.md` §4.0 F): while it is on, the
-   * record answers reads and refuses writes, and its alarm runs the drain and nothing else.
+   * record's alarm runs the drain and nothing else, and the queue's pump sends no digest. The doors cap callers from
+   * the Directory's row (`session.ts`), so this is the object's half and not a second answer to who may write.
+   *
+   * IN THE OBJECT'S OWN STORAGE AND NOT IN MEMORY, because an evicted object forgot a flag held in a field and the next
+   * alarm ran every connector of a record nobody was paying for. `undefined` is not read yet.
    */
-  #lapsed = false;
+  #lapsed: boolean | undefined;
 
   /** Set or clear this record's lapse: billing's webhook, when a payment moves it into or out of one. */
-  setLapsed(on: boolean): void {
+  async setLapsed(on: boolean): Promise<void> {
+    await this.ctx.storage.put(LAPSED, on);
     this.#lapsed = on;
+    /* A LAPSE ENDED RESUMES ON THE NEXT ALARM, and this sets one for now, so a record that queued work while it was
+       held does not wait for its next write to ring. A lapse begun needs none: the next alarm reads the flag. */
+    if (!on && !this.#gone) await this.#alarm.set(Date.now());
+  }
+
+  /** Whether this record's billing has lapsed, for the queue's pump (`drainOutbox`). */
+  async lapsed(): Promise<boolean> {
+    if (this.#lapsed === undefined) {
+      try {
+        this.#lapsed = (await this.ctx.storage.get(LAPSED)) === true;
+      } catch {
+        /* A READ THAT FAILED IS NOT A LAPSE, and is asked again next time: a record is never held on a storage fault. */
+        return false;
+      }
+    }
+    return this.#lapsed;
   }
 
   /**
@@ -557,6 +624,10 @@ export class Record$ extends DurableObject<Env> {
        engine is handed, so the two engines count one `ask_cap`. Before this line a Worker with a model said `slash: true`
        and refused `ask_slash` at propose as if it had none (`test/slash-answers.test.ts`). */
     this.#answers = workerSlashAnswers(this.env, () => api, { sql, clock: { now: () => Date.now() } });
+    /* AND WHAT ANSWERS ITS MODEL JOBS, over the same storage, so a job's ledger row sits beside every ask's and the
+       background allowance is counted out of the one `slash_call` table (`@braindog/host/model-jobs`). */
+    this.#jobs = workerModelJobs(this.env, () => api, { sql, clock: { now: () => Date.now() } });
+    this.#jobsMeter = backgroundMeter(sql);
     /* THE RECORD'S COPIES, IN THE BUCKET THE NIGHT WRITES TO (`copies.ts`). Taken, listed and gone back to from inside
        this object, because `onNextSessionRestoreBookmark` is this storage's and nothing outside the object can call it.
        No `BLOBS` and there is no port, so the record answers `NOT_IN_THIS_BUILD` as it always did. */
@@ -610,7 +681,10 @@ export class Record$ extends DurableObject<Env> {
            do. A kind with no deliverer sits `pending` for ever — which is honest — and without
            this every write afterwards rang the queue about it. `notify.push` is among them only where both VAPID halves
            are set, so a record on an unkeyed deployment rings for a push no more than it did before push existed. */
-        delivers: delivers(this.env),
+        /* AND `infer.prose` WHERE THE ALARM'S MODEL PASS ANSWERS IT (`recordDelivers`), so a digest declaring
+           `prose: slash` queues its two sentences here and goes as figures where no model could write them. The pump
+           still leases `delivers(this.env)`, which never names it. */
+        delivers: recordDelivers(this.env, this.#jobs !== undefined),
         /* THE SWITCH THAT FILES `ask_slash`, ON WHERE `alarm()` HAS A PASS TO ASK IT. `infer.ask` is not among what
            `delivers` answers: `makeDeliver` has no branch that asks Slash, so a question the pump leased would come back
            "nothing in this deployment delivers a infer.ask" and every run would end on that. */
@@ -657,8 +731,9 @@ export class Record$ extends DurableObject<Env> {
         /* DELETION, `51 §5.13`, in `loop/research-restore.md` §5's order: a final copy, every other object under the
            record's prefix, the alarm, the bytes, the names. The record has checked the owner, the sign-in and the typed
            name, and no request is answered in between. Measured before the bucket was passed: 2 objects under the prefix
-           before and 2 after, for good, because the walk lists open records only. */
-        destroy: async () => {
+           before and 2 after, for good, because the walk lists open records only. KEPT ON THE OBJECT TOO, so the nightly
+           ladder's day-90 deletion (`lapseDelete`) is this same deletion and not a second one. */
+        destroy: (this.#destroy = async () => {
           const id = api.kernel.identity()?.id ?? null;
           const directory = this.env.DIRECTORY.get(this.env.DIRECTORY.idFromName('directory'));
           const storage = this.ctx.storage;
@@ -674,7 +749,7 @@ export class Record$ extends DurableObject<Env> {
           await this.ctx.blockConcurrencyWhile(async () => {
             await destroyRecord(wipe, (record) => directory.close(record), id, swept);
           });
-        },
+        }),
       });
 
       /* ARM FROM WHAT THE RECORD ALREADY HOLDS, INSIDE THE BLOCK. An object is evicted between
@@ -742,16 +817,82 @@ export class Record$ extends DurableObject<Env> {
   override async alarm(): Promise<void> {
     if (this.#gone || this.#armed) return;
     const api = await this.#record();
+    /* A LAPSED RECORD RUNS THE DRAIN AND NOTHING ELSE (`loop/finish/ops.md` OPS-14): its reminders still land, and no
+       connector, call, poll, script, automation or Slash ask starts. An automation run that has not started waits under
+       the lapse's sentence, which is the record's one message about it; no run writes a held event of its own. The
+       hold is handed in before the drain, which is where a run starts, and on the first alarm after the lapse ends
+       `#act` hands the ledger's own hold in its place. */
+    if (await this.lapsed()) {
+      holdAutomations(api.kernel, { until: Date.now() + LAPSE_HOLD_MS, say: LAPSED_FIX });
+      await api.kernel.drain(this.#alarm);
+      /* THE TAIL AFTER THE ACKS, because a digest's prose answered with nothing queues the digest itself, and the tail is
+         what rings the queue for it. Work left for another pass sets the alarm for now, last, for the reason below. */
+      const more = this.#unsent(api);
+      await api.kernel.tail(this.#alarm);
+      if (more) await this.#alarm.set(Date.now());
+      return;
+    }
     await api.kernel.drain(this.#alarm);
     const more = await this.#act(api);
     const asked = await this.#ask(api);
+    const modelled = await this.#model(api);
     await slashLook(api);
     /* WORK LEFT FOR THE NEXT INVOCATION SETS THE ALARM FOR NOW, AND IT IS SET LAST. `kernel.tail` sets the alarm from the
        `schedule` table alone, and both the ask pass and the daily look tail it, so a `set(now)` made inside `#act`
        before either of them could be moved out to the next schedule row, or cleared, by a pass that answered one
        question. Neither jobs `#act` released nor questions left in the outbox are schedule rows, so nothing else here
        would set it back. */
-    if (more || asked) await this.#alarm.set(Date.now());
+    if (more || asked || modelled) await this.#alarm.set(Date.now());
+  }
+
+  /**
+   * A lapsed record's calls, polls and model jobs, acked as done and unsent: `true` when the pass took its full
+   * `UNSENT_MOST` and more may be waiting.
+   *
+   * DONE AND NOT LEFT `pending`, because the work was for a month nobody paid for, and a lapse ended in May must not
+   * post April's calls. A call or question a run waits on is answered with the lapse's sentence, so the run stops on it
+   * rather than waiting out its day; a digest's prose is answered with nothing, so the digest goes as figures and the
+   * pump drops it as a digest (`lapseDrops`). A draft is answered with nothing too, so nothing is proposed.
+   *
+   * AN ACK THE KERNEL REFUSES IS LEFT, with its `outbox` line saying why (`loggingAcks`), and its lease expires into the
+   * next pass, as a delivery's would.
+   */
+  #unsent(api: RecordApi): boolean {
+    if (api.kernel.refused()) return false;
+    const jobs = api.kernel.leaseOutbox(UNSENT_KINDS, UNSENT_MOST);
+    for (const job of jobs) {
+      const answered = job.kind === 'infer.ask' || job.kind === 'pull.fetch' ? { result: { failed: LAPSED_FIX } } : {};
+      api.kernel.ackOutbox({ id: job.id, state: 'done', leasedUntil: job.leasedUntil, ...answered });
+    }
+    return jobs.length === UNSENT_MOST;
+  }
+
+  /**
+   * The record's model jobs, a pattern's draft and a digest's two sentences, served after the questions (`contracts.md` X8).
+   *
+   * AFTER `#ask`, because an automation's question is a run waiting and a draft is a proposal nobody is waiting on. The
+   * pass is `@braindog/host`'s `serveModelJobs`, the one the self-host's `poll` calls too, spent from the background
+   * allowance and never from his asks; a spent month leases nothing, so the jobs stay `pending` and the line says why.
+   * A PASS THAT LEASED ITS FULL FIVE ANSWERS `true`, `#ask`'s rule and for its reason: five model calls fit in what this
+   * invocation has left, a queue's worth may not, so `alarm()` sets the next alarm for now.
+   *
+   * A PASS THAT THROWS IS LOGGED AND NOT RETHROWN, `#act`'s rule. The message only, because a draft carries a stranger's text.
+   */
+  async #model(api: RecordApi): Promise<boolean> {
+    if (this.#jobs === undefined || this.#jobsMeter === undefined || api.kernel.refused()) return false;
+    const rec = recOf(api);
+    try {
+      return await serveModelJobs(api, {
+        inference: this.#jobs,
+        meter: this.#jobsMeter,
+        now: () => Date.now(),
+        scheduler: this.#alarm,
+        log: (line) => op({ op: 'slash.jobs', rec, ok: false, error: line }),
+      });
+    } catch (e) {
+      op({ op: 'slash.jobs', rec, ok: false, error: e instanceof Error ? e.message : String(e) }, 'error');
+      return false;
+    }
   }
 
   /**
@@ -851,6 +992,14 @@ export class Record$ extends DurableObject<Env> {
            counted by the nightly walk from the record's own events (`meterPass`, `meterReplay`). */
         const lost = await meterPass((r, run) => ledger.meter(r, run), record, out.usage);
         if (lost > 0) console.error(`actions: ${String(lost)} of ${String(out.usage.length)} runs were not counted; the nightly walk counts them from this record's events.`);
+        /* THE OWNER'S ONE NOTE AT 80% AND ONE WHEN FIRST HELD (MTR-2): asked after this pass is metered, so the note is
+           about what the month now holds. The Directory decides and deduplicates; only the Worker can reach the owner. */
+        const told = await noticePass(
+          (r) => ledger.notice(r),
+          record,
+          (note) => (note.email ? sendMail(this.env, 'usage.notice', note.email, { record: note.slug ?? '', say: note.say }) : undefined),
+        );
+        if (told === 'untold') console.error(`usage: a note for ${record} was owed and the owner was not told.`);
       } finally {
         /* A PASS THAT NEVER SETTLES HOLDS ITS RECORD'S RUNS FOR THE LIFE OF THE RUNTIME, so this is in a finally. */
         admissions.settle();
@@ -896,6 +1045,101 @@ export class Record$ extends DurableObject<Env> {
     });
   }
 
+  /* ── the nightly walk's calls (`nightly.ts`, `ladder.ts`) ─────────────────
+     EACH AN RPC AND NEVER A ROUTE: the cron is their one caller, and every one of them answers for the record as the
+     system and not as any person. */
+
+  /**
+   * The addresses of this record's owners, for a lapse letter: the payer is not always the person who would lose it.
+   * Empty for a record that is deleted, refused by this build, or not yet made.
+   */
+  async walkOwners(): Promise<string[]> {
+    if (this.#gone) return [];
+    const api = await this.#record();
+    if (api.kernel.refused()) return [];
+    return api.kernel
+      .members()
+      .filter((m) => m.level === 'owner' && m.suspended_at === null && m.email !== null && m.email !== '')
+      .map((m) => m.email ?? '');
+  }
+
+  /**
+   * This record's `erase.r2` rows the walk checks (`53 §5.1` step 3d): every one not yet `done`, whatever its age, and
+   * every `done` one queued since `since`. At most `ERASE_ROWS_MOST`, oldest first.
+   *
+   * READ FROM THE OUTBOX ITSELF, because the kernel keeps no second list of erasures: the outbox row is the promise
+   * that an object goes, and its state is how far that promise has got.
+   */
+  async eraseRows(since: string): Promise<EraseRow[]> {
+    if (this.#gone) return [];
+    const api = await this.#record();
+    if (api.kernel.refused()) return [];
+    const rows = guardedSql(this.ctx.storage).all<{ id: string; state: string; created: string; payload: string }>(
+      "SELECT id, state, created, payload FROM outbox WHERE kind = 'erase.r2' AND (state <> 'done' OR created >= ?) ORDER BY created LIMIT ?",
+      since,
+      ERASE_ROWS_MOST,
+    );
+    const out: EraseRow[] = [];
+    for (const row of rows) {
+      let payload: unknown;
+      try {
+        payload = JSON.parse(row.payload);
+      } catch {
+        payload = null;
+      }
+      const p = payload !== null && typeof payload === 'object' ? (payload as { erase?: unknown; key?: unknown }) : {};
+      if (typeof p.key !== 'string') continue;
+      out.push({ id: row.id, state: row.state, created: row.created, erase: typeof p.erase === 'string' ? p.erase : '', key: p.key });
+    }
+    return out;
+  }
+
+  /**
+   * The erasures whose object the bucket still held, put back on the outbox (`53 §5.1` step 3d: "a hit re-enqueues the
+   * deletion"). Through the kernel's one insertion path, and the doorbell rung after, as every write here rings it.
+   */
+  async eraseAgain(rows: { erase: string; key: string }[]): Promise<number> {
+    if (this.#gone) return 0;
+    const api = await this.#record();
+    if (api.kernel.refused()) return 0;
+    for (const row of rows.slice(0, ERASE_ROWS_MOST)) api.kernel.outbox('erase.r2', { erase: row.erase, key: row.key });
+    await api.kernel.tail(this.#alarm);
+    return Math.min(rows.length, ERASE_ROWS_MOST);
+  }
+
+  /**
+   * The billing ladder's day-90 deletion (`ladder.ts`): the same deletion an owner's `deleteRecord` runs, final copy
+   * first. `record` must be this object's own id, so a walk that addressed the wrong object deletes nothing.
+   *
+   * IT THROWS RATHER THAN ANSWERS `false`, so the walk's line carries the reason.
+   */
+  async lapseDelete(record: string): Promise<void> {
+    if (this.#gone) throw new Error(DELETED.fix);
+    const api = await this.#record();
+    if (api.kernel.refused()) throw new Error('This build cannot open the record, so it did not delete it.');
+    if (api.kernel.identity()?.id !== record) throw new Error(`This object is not ${record}, so nothing was deleted.`);
+    if (!this.#destroy) throw new Error('The record has no deletion wired, so nothing was deleted.');
+    await this.#destroy();
+  }
+
+  /**
+   * One `note` event in the operator's own record, written as the system: the nightly summary (`53 §5.1` step 4). The
+   * event's own shape (`noteEvent` in the kernel), at most 280 characters as a `note` row requires. `false` for a
+   * record that is deleted, refused by this build, or not yet made.
+   */
+  async opsNote(text: string): Promise<boolean> {
+    if (this.#gone) return false;
+    const api = await this.#record();
+    if (api.kernel.refused() || !api.kernel.identity()) return false;
+    guardedSql(this.ctx.storage).exec(
+      "INSERT INTO event (id, ts, actor, kind, target, target_kind, note) VALUES (?, ?, 'system', 'note', NULL, NULL, ?)",
+      ulids(() => Date.now())(),
+      new Date().toISOString(),
+      text.slice(0, 280),
+    );
+    return true;
+  }
+
   /**
    * One outbox job this Worker sent, counted in the Directory's ledger and never limited (`deliveryRun`). AN RPC AND
    * NEVER A ROUTE: `drainOutbox` calls it through `deliver.ts`'s `counted`, and only after the send succeeded.
@@ -911,6 +1155,18 @@ export class Record$ extends DurableObject<Env> {
     const ledger = this.env.DIRECTORY.get(this.env.DIRECTORY.idFromName('directory'));
     const lost = await meterPass((r, run) => ledger.meter(r, run), record, [deliveryRun(job, Date.now())]);
     if (lost > 0) console.error(`deliveries: ${job.kind} ${job.id} was sent and not counted.`);
+  }
+
+  /**
+   * This record's own id (`rec_<ulid>`), for a transport that is handed only the Durable Object's hex id.
+   *
+   * AN RPC AND NEVER A ROUTE: `drainOutbox`'s `erase` transport keys `BLOBS` by the record id (`fileKey`, OPS-20), and
+   * the queue's doorbell and the object's own storage address both carry the hex id, never this one.
+   */
+  async recId(): Promise<string | null> {
+    if (this.#gone) return null;
+    const api = await this.#record();
+    return api.kernel.refused() ? null : (api.kernel.identity()?.id ?? null);
   }
 
   /**
@@ -1116,6 +1372,17 @@ export class Record$ extends DurableObject<Env> {
     if (this.#gone) return { level: null, name: null };
     const api = await this.#record();
     return switcherAsk(api.kernel, person);
+  }
+
+  /**
+   * A name or address the Directory has already moved, carried into this record's own mirror of the person (GAP-7).
+   * `renamedEverywhere` and the account's email doors reach every record a person belongs to over this RPC, because on
+   * the Worker the record method has no Directory to ask for the other records itself (`deps.directory` is `null`).
+   */
+  async mirrorPerson(person: string, change: { name?: string | undefined; email?: string | undefined }): Promise<Result<unknown>> {
+    if (this.#gone) return { ok: false, refusal: { code: 'RECORD_UNAVAILABLE', fix: 'This record is closed.' } };
+    const api = await this.#record();
+    return api.kernel.mirrorPerson(person, change);
   }
 
   /**
@@ -1408,8 +1675,10 @@ export class Record$ extends DurableObject<Env> {
       return serveSlash(request, this.#slash, ctx);
     }
 
-    /* SLASH'S DAILY LOOK, beside the answer and not in its way: the record says whether it is due, at most once a UTC day. */
-    this.ctx.waitUntil(slashLook(api));
+    /* SLASH'S DAILY LOOK, beside the answer and not in its way: the record says whether it is due, at most once a UTC day.
+       NEVER WHILE LAPSED (`loop/finish/ops.md` OPS-14): no Slash ask starts on a lapsed record, and the alarm already
+       skips this call for the same reason, so a read must skip it too. */
+    if (!(await this.lapsed())) this.ctx.waitUntil(slashLook(api));
     /* THE METHOD ROUTER'S HANDLERS, WITH THE VAULT PASSPHRASE'S TWO ROUTES ANSWERED THROUGH THE ROOT KEY INSIDE THIS OBJECT
        (`withVaultPassphrase`), which takes the passphrase off before the record is called. Built once, so both calls
        below serve the same table. */
@@ -1492,7 +1761,7 @@ export class Directory$ extends DurableObject<Env> {
    * Sign-in, whole: `/auth/*` arrives as an `AuthCall` and leaves as an `AuthResult`. And `session` with a `slug`, which
    * is how a request under `/app/<slug>` learns whether that name is this person's before any record is addressed.
    */
-  auth(call: AuthCall | SessionAsk): Promise<AuthResult> {
+  auth(call: AuthCall | SessionAsk | SignupCall): Promise<AuthResult> {
     return this.#directory().auth(call);
   }
 
@@ -1539,6 +1808,14 @@ export class Directory$ extends DurableObject<Env> {
   /** Whether a record's scheduled action may run now: `null`, or until when it waits and why. A record's alarm asks before each run. */
   mayRun(record: string, action: string, pending = 0): { until: number; say: string } | null {
     return this.#directory().mayRun(record, action, pending);
+  }
+
+  /**
+   * The note this record's owner is owed about its month, once, or `null` when nothing is owed (MTR-2). A record's
+   * alarm asks after each pass it meters (`noticePass` in `@braindog/host/actions`), which decides who is told.
+   */
+  notice(record: string): UsageNotice | null {
+    return this.#directory().notice(record);
   }
 
   /** Count one run a record's alarm metered. `null` is counted, already counted or too old to count; a refusal is a row that is not a run. */
@@ -1746,6 +2023,31 @@ export class Directory$ extends DurableObject<Env> {
   }
 
   /**
+   * A person's own name, moved here after one of their records has accepted a rename (GAP-7). `forward()`'s
+   * `renamedEverywhere` calls it once the record has said the new name was good, then carries it into every other
+   * record this person reaches (`mirrorPerson`, `mirrorEverywhere`).
+   */
+  renamePerson(id: string, name: string): Result<Person> {
+    return this.#directory().renamePerson(id, name);
+  }
+
+  /**
+   * `POST /account/email`: a link good for a day, minted for a person's new sign-in address and not yet moved.
+   * `packages/host/src/auth.ts`'s `EmailDoor.ask`, reached over RPC because only the Directory holds the address book.
+   */
+  emailAsk(person: string, email: string): Promise<Result<{ to: string; token: string }>> {
+    return this.#directory().emailAsk(person, email);
+  }
+
+  /**
+   * `POST /account/email/confirm`: the link spent, and the address moved in the Directory for every record this
+   * person belongs to. `EmailDoor.move` (`packages/host/src/auth.ts`), which then mirrors the change into each record.
+   */
+  emailMove(person: string, token: string): Promise<Result<{ from: string; to: string; records: string[] }>> {
+    return this.#directory().emailMove(person, token);
+  }
+
+  /**
    * Which records this person can reach at all. The switcher's index, and not an authorisation.
    *
    * WHAT THEY MAY DO INSIDE ONE IS THE RECORD'S OWN TABLE. Reading the level from here made `invite`
@@ -1811,6 +2113,19 @@ async function drainOutbox(env: Env, id: string): Promise<void> {
     /* EVERY JOB THAT WAS SENT, COUNTED IN THE ACCOUNT'S LEDGER AND NEVER LIMITED, by the record's own object, which knows
        the record id the ledger is keyed by. The kind and the id cross the RPC and nothing of the payload does. */
     counted: (job) => record.countDelivery({ id: job.id, kind: job.kind }),
+    /* A FILE DELETED FROM `BLOBS`, FOR AN `erase.r2` JOB (OPS-20). `id` here is the Durable Object's own hex id, and the
+       bytes live at `rec_<id>/a/<sha256>`, so the record's own id is asked of the object once, over the same RPC as
+       `counted` and `pushTargetFor` above. Absent when this deployment has no bucket, or the object could not say its
+       id, and then an erasure dead-letters saying so rather than doing nothing silently. */
+    ...(env.BLOBS === undefined
+      ? {}
+      : {
+          erase: async (sha256: string) => {
+            const recId = await record.recId();
+            if (recId === null) throw new Error('This record could not say its own id, so nothing was deleted.');
+            await env.BLOBS!.delete(fileKey(recId, sha256));
+          },
+        }),
     /* THE KEY A POST NAMES, OPENED UNDER ITS LEASE BY THE RECORD AND UNWRAPPED HERE. `KEK` is read only when a post
        names a key, so a deployment with a malformed one still sends its email. */
     open: leasedOpener(
@@ -1849,7 +2164,11 @@ async function drainOutbox(env: Env, id: string): Promise<void> {
 
      ONE RING, NOT A LOOP. The lease is still held when this fires; the redelivery arrives after
      Cloudflare's own delay, by which time it has expired and `leaseOutbox` reclaims it. */
-  const pass = await pump(record, deliver);
+  /* A LAPSED RECORD'S DIGESTS ARE ACKED DONE AND UNSENT, and its other notifications go (`lapseDrops`): a reminder is
+     a date the lapse is no reason to miss. Asked once a pass, of the object's own flag. Nothing is counted for a job
+     that was not sent, because `counted` is `deliver`'s and runs only after a send. */
+  const lapsed = await record.lapsed();
+  const pass = await pump(record, lapsed ? async (job) => (lapseDrops(job) ? undefined : deliver(job)) : deliver);
   if (pass.unacked > 0) await env.INGRESS.send({ record: id });
 }
 
@@ -1864,6 +2183,9 @@ function bearerDeps(env: Env): BearerDeps {
   const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
   return {
     knows: (id) => directory.knows(id),
+    /* THE DIRECTORY'S ROW AND NOT THE OBJECT'S FLAG, as the session's `lapsed` is, so both doors cap on one fact. A record
+       with no billing row answers `false` and is never capped. */
+    lapsed: async (id) => ((await directory.billing({ op: 'lapsed', record: id })) as unknown) === true,
     verify: (id, bearer, surface) => held(env, id, (record) => record.verify(bearer, surface)),
     access: (id, person) => held(env, id, (record) => record.access(person)),
     /* ASKED ONLY UNDER `/app/<slug>`, to hold the path to the record the bearer names. */
@@ -2129,11 +2451,9 @@ export default {
    * cron shows green every night, and the absence of copies is found by the person who needed one.
    * Throwing marks the invocation failed, which is a red row in the dashboard and a line in the tail.
    *
-   * WHAT IS NOT HERE YET IS 53 §5.1's OTHER FOUR STEPS: the KEK re-wrap, the erasure reconcile, the
-   * billing ladder and the ops record's `log` note. They belong in `ops.ts` beside this call and
-   * need `opsReport`; the re-wrap is `rewrapRecord` in `src/rewrap.ts`, which the walk is to call for each record
-   * (`loop/finish/ops.md` OPS-15). The backup is the step the
-   * record cannot survive without, so it is the step that landed first.
+   * AND THE REST OF 53 §5.1 RIDES THE SAME WALK: each record's keys re-wrapped and its erasures checked against the
+   * bucket beside its copy, the billing ladder once after them (`ladder.ts`), and the night's summary as one note in
+   * the operator's record when `OPS_RECORD` is set.
    */
   async scheduled(_controller: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
     await nightly(env);
@@ -2157,31 +2477,73 @@ async function nightly(env: Env): Promise<void> {
      A failure is said at once and makes the invocation red below, after the records have had their turn. */
   let directoryFailed: string | null = null;
   try {
+    const began = Date.now();
     const kept = await directoryCopies(blobs, { recipient: env.AGE_RECIPIENT ?? '' }).take(await directory.dump(), at);
-    console.log(`walk directory backup=${String(kept.rows)} rows ${String(kept.bytes)} bytes`);
+    op({ op: 'walk', rec: 'directory', backup: 'ok', rows: kept.rows, bytes: kept.bytes, backup_ms: Date.now() - began });
   } catch (e) {
     const why = e instanceof Error ? e.message : String(e);
     directoryFailed = `The Directory's nightly copy was not written: ${why}`;
-    console.error(`walk directory backup=failed: ${why}`);
+    op({ op: 'walk', rec: 'directory', backup: 'failed', why }, 'error');
   }
+  const stub = (record: string) => env.RECORD.get(env.RECORD.idFromName(record));
+  /* THE DIRECTORY'S BILLING GROUP, TYPED BY ITS `op` as the billing doors type it (`BillingDeps`), because the RPC stub
+     answers the union of every op's answer. */
+  const billing = ((call: BillingCall) => directory.billing(call)) as unknown as BillingDeps['billing'];
+  const origin = (env.PUBLIC_HOST ?? '').trim();
+  const opsRecord = (env.OPS_RECORD ?? '').trim();
+  /* THE WALK'S ONE CLOCK FOR THE LADDER, read once. Day 90 is a deletion, and a deletion decided against one instant
+     and checked against another is the mistake `ladder.ts` exists to rule out. */
+  const tonight = Date.now();
   /* THE TALLY IS SAID AND NOT RETURNED. `53 §5.1` step 5 is a person reading the closing line the
-     morning after; the ops record's `log` note needs a record to write it to, which is `ops.ts`'s
-     half of this and not built. Nothing else reads the numbers yet. */
+     morning after, and the ops record's note when `OPS_RECORD` names one. */
   const walked = await nightlyWalk({
     records: async (cursor) => directory.listRecords(cursor),
-    snapshot: async (record) => copies.take(record, await env.RECORD.get(env.RECORD.idFromName(record)).dump(at)),
+    snapshot: async (record) => copies.take(record, await stub(record).dump(at)),
+    /* THE KEYS BEFORE THE COPY, so tonight's copy holds them under tonight's root key (`rewrap.ts`). */
+    rewrap: (record) => rewrapRecord(env, record),
+    /* THE ERASURES AGAINST THE BUCKET ITSELF: every `done` one from the last thirty days whose object is still there is
+       put back on the record's outbox (`53 §5.1` step 3d). `head` and not `get`, because only whether it is there
+       matters and the bytes are somebody's erased file. */
+    erase: async (record) => {
+      const object = stub(record);
+      const rows = (await object.eraseRows(new Date(tonight - ERASE_CHECK_MS).toISOString())) as EraseRow[];
+      return reconcileErase(
+        rows,
+        /* `key` IS THE BARE SHA-256 (`erase.r2`'s payload), and the object lives at `rec_<id>/a/<sha256>` (`fileKey`,
+           OPS-20), so the head must ask for that address and not the hash alone. */
+        async (key) => (await blobs.head(fileKey(record, key))) !== null,
+        async (again) => {
+          await object.eraseAgain(again);
+        },
+        tonight,
+      );
+    },
+    ladder: () =>
+      ladder({
+        due: (now) => billing({ op: 'due', now }),
+        owners: async (record) => stub(record).walkOwners(),
+        mail: (kind, to, vars) => sendMail(env, kind, to, vars),
+        told: async (record, day) => (await billing({ op: 'told', record, day })).ok,
+        lapsed: (record) => billing({ op: 'lapsed', record }),
+        destroy: (record) => stub(record).lapseDelete(record),
+        link: (slug) => (origin === '' ? undefined : `https://${origin}/app/${slug}`),
+        speak: op,
+        now: tonight,
+      }),
+    ...(opsRecord === ''
+      ? {}
+      : {
+          note: async (text: string) => {
+            if (!(await stub(opsRecord).opsNote(text))) throw new Error(`The ops record ${opsRecord} did not take the night's note: it is deleted, not made, or refused by this build.`);
+          },
+        }),
     /* WHAT DELETED RECORDS LEFT: every record closed longer ago than a final copy is kept, and its prefix emptied. */
     closed: async (cutoff, cursor) => directory.closedBefore(cutoff, cursor),
     expire: (record) => expireFinal(blobs, record),
     /* AND EACH RECORD'S LAST FORTY DAYS OF RUNS INTO THE LEDGER AGAIN, by its own object (`Record$.meterReplay`), so a
        count a pass lost and every automation run are in the account by morning. */
-    replay: (record) => env.RECORD.get(env.RECORD.idFromName(record)).meterReplay(),
-    say: (line) => {
-      console.log(line);
-    },
-    moan: (line) => {
-      console.error(line);
-    },
+    replay: (record) => stub(record).meterReplay(),
+    speak: op,
     now: () => Date.now(),
   });
   /* AND A NIGHT THAT COPIED NOTHING MAKES THE INVOCATION ITSELF RED. Every per-record failure is
@@ -2209,7 +2571,7 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
        DIRECTORY IS ASKED, on top of its own lockouts, because nobody at this door has proved who they are yet: the
        address is the one thing a caller cannot choose here (`cf-connecting-ip`). */
     if (servesAuth(url.pathname)) return (await overLimit(env, null, request, SAFE_METHODS.has(request.method) ? 'read' : 'write')) ?? signIn(request, env, ctx);
-    if (servesAccount(url.pathname)) return account(request, env);
+    if (servesAccount(url.pathname)) return account(request, env, ctx);
     /* OAUTH 2.1, WITH BRAINDOG AS ITS OWN AUTHORIZATION SERVER (`loop/finish/agents.md` C4): the metadata an MCP client
        discovers from `/mcp`'s 401, and the endpoints it signs in by. Before `/mcp` and every record door, because none
        of it reaches a record until a person approves in the app. Only the names it owns are handed over (`servesOAuth`,
@@ -2243,6 +2605,20 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
         session: (sid) => env.DIRECTORY.get(env.DIRECTORY.idFromName('directory')).auth({ flow: 'session', sid }) as unknown as Promise<AuthResult<Who>>,
         bearer: bearerDeps(env),
         spend: (asked) => overLimit(env, null, asked, 'write'),
+      });
+    /* A RECORD'S FILES, AT EITHER ADDRESS (`files.ts`, OPS-20): the bytes go to `BLOBS` and never through the record's
+       object, and who may is asked of the same session and bearer doors `recordApi` asks, in its order. */
+    if (servesFiles(url.pathname))
+      return serveFiles(request, {
+        blobs: env.BLOBS,
+        session: {
+          origin: `https://${env.PUBLIC_HOST ?? ''}`,
+          session: (sid, slug) => env.DIRECTORY.get(env.DIRECTORY.idFromName('directory')).auth({ flow: 'session', sid, ...(slug === undefined ? {} : { slug }) }) as unknown as Promise<AuthResult<Who>>,
+          access: (record, person) => held(env, record, (object) => object.access(person)),
+          stopped: (record, person) => held(env, record, (object) => object.memberStopped(person)),
+        },
+        bearer: bearerDeps(env),
+        limit: (who, cls) => overLimit(env, who, request, cls),
       });
     /* `/app` IS THE APP, AND `/app/<slug>/api/*` IS THAT RECORD'S API (§2.4). The slug is stripped here, because no
        route pattern can pick it out, and handed to the door, which has the Directory check it before anything is
@@ -2498,8 +2874,10 @@ async function forward(inner: Request, env: Env, record: string, ctx: CallContex
   /* A REMOVAL'S BODY IS READ AFTER THE RECORD HAS ANSWERED IT, and the record consumes the request, so the copy is
      taken first. Only this one method is copied: every other request goes through untouched. */
   const removal = removalAsked(inner.method, new URL(inner.url).pathname) ? inner.clone() : null;
+  const renaming = renameAsked(inner.method, new URL(inner.url).pathname);
   const out = await stub().fetch(inner);
   if (removal !== null && out.status === 200) await leftDirectory(removal, env, record);
+  if (renaming && out.status === 200) await renamedEverywhere(out.clone(), env, ctx);
   if (!restoreAsked(inner.method, new URL(inner.url).pathname)) return out;
   return afterRestore(out, actorOf(ctx), {
     reset: () => stub().reopen(),
@@ -2527,6 +2905,29 @@ async function leftDirectory(asked: Request, env: Env, record: string): Promise<
     await env.DIRECTORY.get(env.DIRECTORY.idFromName('directory')).leaveRecord(record, person);
   } catch {
     /* A Directory that did not answer leaves the list as it was, and the record has already said who is on it. */
+  }
+}
+
+/**
+ * The Directory's `renamePerson` and `mirrorEverywhere`, for a rename the record has already accepted (GAP-7).
+ *
+ * THE RECORD'S ANSWER STANDS WHATEVER THIS DOES, as `leftDirectory`'s removal does: the name is already the new one
+ * where it was asked, and this only moves it in the Directory and carries it, with the address as the Directory holds
+ * it (`PersonChange`), into every other record the person reaches. A record `mirrorEverywhere` could not reach keeps
+ * its old mirror until the next rename or address change carries the Directory's value in again.
+ */
+async function renamedEverywhere(answer: Response, env: Env, ctx: CallContext): Promise<void> {
+  try {
+    const name = await renamedName(answer);
+    if (name === null) return;
+    const person = ctx.principal.id;
+    const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
+    const kept = await directory.renamePerson(person, name);
+    if (!kept.ok) return;
+    const records = (await directory.reaches(person)).map((r) => r.record);
+    await mirrorEverywhere(records, (r) => env.RECORD.get(env.RECORD.idFromName(r)).mirrorPerson(person, { name, email: kept.value.email }));
+  } catch {
+    /* A Directory that did not answer leaves the mirror as it was, and the record has already accepted the new name. */
   }
 }
 
@@ -2795,7 +3196,7 @@ async function agent(request: Request, env: Env): Promise<Response> {
  * door answers `NOT_IN_THIS_BUILD` with the sentence naming the setting (`billingKey`), so the rows are never a 404
  * that reads as a missing route.
  */
-async function account(request: Request, env: Env): Promise<Response> {
+async function account(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
   if (request.method === 'POST') {
     const over = await overLimit(env, null, request, 'write');
     if (over !== null) return over;
@@ -2821,6 +3222,20 @@ async function account(request: Request, env: Env): Promise<Response> {
     auth: (env.SESSION_SECRET ?? '').length >= 32 ? (((call: AuthCall) => directory.auth(call)) as unknown as Auth) : null,
     usage: (person, range) => directory.usage(person, range) as unknown as Promise<Result<AccountUsage>>,
     records: async (person) => ({ ok: true as const, value: await directory.recordsFor(person) }),
+    /* THE WAY BACK FROM A LOST MAILBOX (GAP-7), and only while this deployment can prove an address and sign somebody
+       in: unset, both `/account/email` rows stay 404 `ROUTE_UNKNOWN`, as `ACCOUNT_ROUTES` promises a host that hands in
+       no door. `mirror` reaches a record's own object over RPC, because the host holds no record here to call into. */
+    ...(env.AUTH_MAIL_FROM && env.EMAIL && (env.SESSION_SECRET ?? '').length >= 32
+      ? {
+          email: {
+            ask: (p: string, e: string) => directory.emailAsk(p, e) as unknown as Promise<Result<{ to: string; token: string }>>,
+            move: (p: string, t: string) => directory.emailMove(p, t) as unknown as Promise<Result<{ from: string; to: string; records: string[] }>>,
+            mirror: (record: string, person: string, change: { name?: string | undefined; email?: string | undefined }) =>
+              env.RECORD.get(env.RECORD.idFromName(record)).mirrorPerson(person, change) as unknown as Promise<Result<unknown>>,
+            mail: (kind: 'email.change' | 'email.changed', to: string, link?: string) => ctx.waitUntil(sendMail(env, kind, to, link ? { link } : {})),
+          } satisfies EmailDoor,
+        }
+      : {}),
     ...billingDoors(env, billing),
   });
 }
@@ -2835,6 +3250,11 @@ async function account(request: Request, env: Env): Promise<Response> {
 async function signIn(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
   const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
   const url = new URL(request.url);
+  /* SIGN-UP IS ANSWERED HERE AND NOT BY `serveAuth`, which declares its three rows and answers each as a way in this
+     host does not offer until a host serves them (`packages/host/src/auth.ts`). Only the Worker ever will: a self-host
+     is made by its operator. */
+  const signupPath = url.pathname.replace(/\/+$/, '');
+  if (Object.hasOwn(SIGNUP_ROUTES, signupPath)) return signUp(request, env, ctx, signupPath as keyof typeof SIGNUP_ROUTES);
   /* THE ZONE IS READ FROM A COPY OF THE BODY, because `operated()` in `packages/host/src/auth.ts` hands `provision`
      the slug, the email and the name and drops every other field, so a `tz` in the body never arrived here and every
      record was made in `UTC` (`loop/research-first-sign-in.md` friction 12). The copy is read only inside the
@@ -2865,6 +3285,152 @@ async function signIn(request: Request, env: Env, ctx: ExecutionContext): Promis
     reached: url.host,
     ...((env.SESSION_SECRET ?? '').length >= 32 ? { device: devices(env), invite: invites(env) } : {}),
   });
+}
+
+/** The three sign-up routes and the one method each answers, as `AUTH_ROUTES` declares them. */
+const SIGNUP_ROUTES = { '/auth/signup/start': 'POST', '/auth/signup/verify': 'POST', '/auth/signup/name': 'GET' } as const;
+
+/** The most a sign-up body may be: an address, a name, a person's name, a zone and a Turnstile answer fit many times over. */
+const SIGNUP_BODY_MAX = 8_192;
+
+/** Where Turnstile's answer is checked (developers.cloudflare.com/turnstile/get-started/server-side-validation). */
+const SITEVERIFY = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
+
+/* A sign-up answer is one browser's and never a cache's, as every `/auth` answer is. */
+const signupReply = (status: number, payload: object, extra: readonly (readonly [string, string])[] = []): Response =>
+  new Response(JSON.stringify(payload), {
+    status,
+    headers: [['content-type', 'application/json; charset=utf-8'], ['cache-control', 'no-store'], ['x-content-type-options', 'nosniff'], ...extra.map(([k, v]): [string, string] => [k, v])],
+  });
+
+const signupRefused = (status: number, refusal: Refusal, extra: readonly (readonly [string, string])[] = []): Response =>
+  signupReply(status, { ok: false, refusal }, extra);
+
+/**
+ * `/auth/signup/*`: a stranger asking for a record of their own (`loop/finish/ops.md` OPS-17).
+ *
+ * THE SAME ORDER `serveAuth` KEEPS. The method first; then whether sign-in is on at all (a `SESSION_SECRET` and an
+ * origin a cookie can be set on); then, on a POST, the origin and the content type before the body is read, so a page
+ * elsewhere gets a 403 and the Directory never hears of it; and only then the Directory. The answers are the `/auth`
+ * envelope, so the page reads them as it reads every sign-in answer.
+ *
+ * `/auth/signup/name` ALSO SAYS WHETHER SIGN-UP IS OPEN, and the Turnstile site key when it is, because the page is a
+ * stranger's and has no other door that answers without a session. While `BILLING` is off (`billingKey`) sign-up is
+ * shut: the name answer says `open: false`, the page asks nothing, and `start` refuses with the sentence. A proof
+ * already in a mailbox is still spent by `verify`, which makes a person and no record.
+ *
+ * TURNSTILE IS CHECKED ON `start` WHEN `TURNSTILE_SECRET` IS SET, against the address Cloudflare wrote
+ * (`cf-connecting-ip`, as `remoteip`), and a failed or missing answer is a 403 with a sentence. Unset, the Directory's
+ * lockouts (`signup:<ip>`, `signup-email:<address>`, `email:<address>`) are the whole of the brake.
+ *
+ * THE MAIL GOES OUT WITHOUT BEING WAITED FOR, through `sendMail` inside `waitUntil`, as every `/auth` letter does, so an
+ * address that already has an account answers in the time a new one does. A known address is sent a sign-in link
+ * (`/app/signin#magic=`), which the sign-in page already spends; a new one the proof (`/app/signup#verify=`).
+ */
+async function signUp(request: Request, env: Env, ctx: ExecutionContext, path: keyof typeof SIGNUP_ROUTES): Promise<Response> {
+  const method = SIGNUP_ROUTES[path];
+  if (request.method !== method) return signupRefused(405, { code: 'FORBIDDEN', fix: `${path} is a ${method}.` }, [['allow', method]]);
+
+  const origin = `https://${env.PUBLIC_HOST ?? ''}`;
+  const mode = cookieMode(origin);
+  if ((env.SESSION_SECRET ?? '').length < 32 || mode === null)
+    return signupRefused(404, { code: 'ROUTE_UNKNOWN', fix: 'This BrainDog does not offer that way to sign in.' });
+
+  const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
+  /* THE RPC STUB'S TYPE IS A CAST, as `serveAuth`'s door is: the Directory answers `AuthResult` over the wire. */
+  const ask = ((call: SignupCall) => directory.auth(call)) as unknown as (call: SignupCall) => Promise<AuthResult>;
+  const ip = request.headers.get('cf-connecting-ip') ?? '';
+  const open = billingKey(env).ok;
+
+  if (method === 'GET') {
+    const slug = new URL(request.url).searchParams.get('slug') ?? '';
+    const out = await ask({ flow: 'signup.name', slug: slug.slice(0, 256) });
+    if (out.status !== 200) return signupAnswer(out, mode);
+    const siteKey = (env.TURNSTILE_SITE_KEY ?? '').trim();
+    return signupReply(200, { ok: true, value: { ...(out.body as object), open, ...(open && siteKey !== '' ? { turnstile: siteKey } : {}) } });
+  }
+
+  if (!sameOrigin(request, origin))
+    return signupRefused(403, { code: 'FORBIDDEN', fix: `Sign-up is answered only for pages on ${origin}.`, at: 'origin' });
+  if (!(request.headers.get('content-type') ?? '').toLowerCase().startsWith('application/json'))
+    return signupRefused(400, { code: 'BODY_MALFORMED', fix: `${path} takes a JSON object, sent as application/json.` });
+  const declared = Number(request.headers.get('content-length') ?? '0');
+  if (Number.isFinite(declared) && declared > SIGNUP_BODY_MAX)
+    return signupRefused(413, { code: 'BODY_MALFORMED', fix: `${path} takes at most ${SIGNUP_BODY_MAX} bytes.` });
+  const raw = await request.text().catch(() => '');
+  if (raw.length > SIGNUP_BODY_MAX) return signupRefused(413, { code: 'BODY_MALFORMED', fix: `${path} takes at most ${SIGNUP_BODY_MAX} bytes.` });
+  let parsed: unknown = null;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    parsed = null;
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed))
+    return signupRefused(400, { code: 'BODY_MALFORMED', fix: `${path} takes a JSON object, sent as application/json.` });
+  const body = parsed as Record<string, unknown>;
+  const said = (k: string): string => (typeof body[k] === 'string' ? (body[k] as string) : '');
+
+  let call: SignupCall;
+  if (path === '/auth/signup/start') {
+    if (!open) return signupRefused(403, { code: 'NOT_IN_THIS_BUILD', fix: 'Sign-up is not open on this BrainDog yet.' });
+    if (!(await turnstilePassed(env, body['turnstile'], ip)))
+      return signupRefused(403, { code: 'FORBIDDEN', fix: 'The check that you are a person did not pass. Try it again, then send the form.', at: 'turnstile' });
+    const name = said('name').trim();
+    const tz = said('tz').trim();
+    call = { flow: 'signup.start', email: said('email'), slug: said('slug'), ip, ...(name !== '' ? { name } : {}), ...(tz !== '' ? { tz } : {}) };
+  } else {
+    const presented = readSid(request, mode);
+    call = { flow: 'signup.verify', token: said('token'), ip, ...(presented === undefined ? {} : { sid: presented }) };
+  }
+
+  const out = await ask(call);
+  const mail = out.status === 200 ? out.mail : undefined;
+  if (mail && 'kind' in mail && (mail.kind === 'signup.verify' || mail.kind === 'signup.known') && env.AUTH_MAIL_FROM && env.EMAIL) {
+    const link = mail.kind === 'signup.known' ? `${origin}/app/signin#magic=${mail.link}` : `${origin}/app/signup#verify=${mail.link}`;
+    ctx.waitUntil(sendMail(env, mail.kind, mail.to, { link }));
+  }
+  return signupAnswer(out, mode);
+}
+
+/** The Directory's answer as the `/auth` envelope: the status, the cookie, and `Retry-After` on a 429. Never the mail. */
+function signupAnswer(out: AuthResult, mode: NonNullable<ReturnType<typeof cookieMode>>): Response {
+  const extra: (readonly [string, string])[] = [];
+  if (out.session === 'clear') extra.push(['set-cookie', clearCookie(mode)]);
+  else if (out.session !== undefined) extra.push(['set-cookie', sessionCookie(out.session.sid, mode)]);
+  switch (out.status) {
+    case 200:
+      return signupReply(200, { ok: true, value: out.body }, extra);
+    case 429:
+      extra.push(['retry-after', String(out.retryAfter)]);
+      return signupReply(429, { ok: false, retryAfter: out.retryAfter }, extra);
+    case 503:
+      return signupReply(503, { ok: false }, extra);
+    default:
+      return signupRefused(out.status, out.refusal, extra);
+  }
+}
+
+/**
+ * Whether the Turnstile answer a sign-up carried passes, or `true` when no secret is set and nothing is checked.
+ *
+ * FAILS CLOSED WHEN IT IS SET: no answer, a malformed one, Cloudflare unreachable or a reply that is not `success: true`
+ * are all a failed check, because a check that passed whenever siteverify could not be reached is one a flood switches off.
+ */
+async function turnstilePassed(env: Env, answer: unknown, ip: string): Promise<boolean> {
+  const secret = (env.TURNSTILE_SECRET ?? '').trim();
+  if (secret === '') return true;
+  if (typeof answer !== 'string' || answer === '' || answer.length > 2048) return false;
+  const form = new FormData();
+  form.append('secret', secret);
+  form.append('response', answer);
+  if (ip !== '') form.append('remoteip', ip);
+  try {
+    const res = await fetch(SITEVERIFY, { method: 'POST', body: form });
+    const verdict = (await res.json().catch(() => null)) as { success?: unknown } | null;
+    return verdict?.success === true;
+  } catch {
+    return false;
+  }
 }
 
 /**

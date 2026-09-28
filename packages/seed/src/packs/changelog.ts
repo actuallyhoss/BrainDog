@@ -1,0 +1,57 @@
+/**
+ * What each version of a module this build ships changed, in the words a person reads on its detail page
+ * (`apps/web/src/lib/market/listing.ts`, platform §4.0 L).
+ *
+ * A MODULE HAS NO CATALOGUE FILE, so nothing publishes its `changes` line the way the Kennel publishes an add-on's. The
+ * notes live here instead, newest first, one entry for each version a record could have been given. The long record of
+ * why each step was taken, and why it was the size it was, stays beside `FIRST_PARTY_VERSIONS` in `first-party.ts`;
+ * these are the same steps said plainly, at most 500 characters each, as an add-on's `changes` is.
+ *
+ * THE NEWEST ENTRY IS THE VERSION THIS BUILD SHIPS. `test/pack-versions.test.ts` fingerprints the versions; a version
+ * bumped there and not named here draws on the page with no notes, which says less than it should and nothing false.
+ */
+
+import type { FirstPartyId } from './first-party.ts';
+
+export type ModuleChange = { version: string; notes: string };
+
+export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly ModuleChange[]>> = {
+  portfolio: [
+    {
+      version: '1.5.0',
+      notes:
+        'A project page leads with the questions waiting on it, shows what changed, draws its plan on a time axis when its tasks have days and its money month by month. Every money figure is in your own currency, and its target is a setting.',
+    },
+  ],
+  people: [
+    { version: '2.2.0', notes: 'One page per person: who they are, the projects you met them in and what is written about them. A person other rows still name cannot be deleted.' },
+    { version: '2.1.0', notes: 'People is the list meetings write to, so a meeting finds the right person without the list having to be called People.' },
+    { version: '2.0.0', notes: 'Role no longer offers registrar. A row that holds it keeps it as its own word.' },
+  ],
+  'money-core': [
+    {
+      version: '3.1.0',
+      notes:
+        'Books keep money that is not one person\'s apart, each with its own page and its own cash walk. A late invoice you chase is marked chased, a repeating line that stopped is ended, and an account or book that rows point at cannot be deleted.',
+    },
+    {
+      version: '3.0.0',
+      notes:
+        'One page called Money in place of Overview and Ledger. Cash now rolls forward from each account\'s newest balance, a new Balances list holds the checks it restarts from, and Obligations is called Bills and invoices. Card alert wordings moved to their own add-on.',
+    },
+  ],
+  estate: [
+    {
+      version: '2.0.0',
+      notes:
+        'Services keeps subscriptions, memberships, insurance and utilities, opens with what it costs a month, asks before a renewal and marks a passed one lapsing. Every target is a setting with no default.',
+    },
+    { version: '1.3.0', notes: 'Services says who a row is with, where it said a registrar.' },
+  ],
+  work: [
+    { version: '1.8.0', notes: 'Finishing a task closes the steps still open under it, and a step added under a task starts in its project.' },
+    { version: '1.7.0', notes: 'An update can be written by anybody, not only one of four agent vendors.' },
+    { version: '1.6.0', notes: 'Work\'s own page lists tasks as checklists cut so that each task sits under exactly one: Today, This week, Waiting on you, With an agent, After this week, Later and No due day.' },
+  ],
+  agents: [{ version: '1.3.0', notes: 'The version this build ships.' }],
+};

@@ -26,6 +26,7 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { ROOT, sayParts, sayStep, verbOf, words, type ListId, type Node, type Nudge, type Verb } from './flow.ts';
   import type { FlowDraft } from './flow.svelte.ts';
+  import { editWords } from './source.ts';
 
   let {
     flow,
@@ -44,7 +45,12 @@
   const verb = $derived(verbOf(node.step));
   /* A CARD JUST ADDED KEEPS ITS FAULTS UNTIL THE SHEET HAS CLOSED ON IT ONCE (`FlowDraft.holds`): every required box
      starts empty, and the card was told off while the inspector was still opening on it to be filled. */
-  const shown = $derived(flow.holds(node.key) ? [] : faults);
+  /* THE RECORD'S OWN WORD JOINS THEM, from `checkAutomation`, on the card its `at` names (`FlowDraft.serve`). It is held
+     with the rest for a card just added, which the record would fault for the same empty boxes. */
+  const served = $derived(flow.served?.key === node.key ? flow.served.say : null);
+  const shown = $derived(flow.holds(node.key) ? [] : served !== null && !faults.includes(served) ? [...faults, served] : faults);
+  /* HOW THIS STEP WENT IN THE LAST TRY, painted under the sentence until the next edit (`FlowDraft.paintOf`). */
+  const paint = $derived(flow.paintOf(node.key));
 
   /** One glyph per group of verbs, from the set the app already draws. No new artwork. */
   const GLYPH: Partial<Record<Verb, IconName>> = {
@@ -206,6 +212,16 @@
       {#each shown as f (f)}<li><span class="warn"><Icon name="alert" size="m" /></span>{f}</li>{/each}
     </ul>
   {/if}
+
+  {#if paint}
+    <!-- THE WORD CARRIES THE OUTCOME AND THE DOT ONLY REPEATS IT (`loop/finish/design-brief.md` §5, a dot never stands
+         alone). A step that did something says its answer; one that did not says the runner's sentence for why. -->
+    <p class="paint">
+      <span class="paint-dot" data-state={paint.state} aria-hidden="true"></span>
+      <span class="paint-word">{editWords.tryState[paint.state]}</span>
+      {#if paint.answer}<span class="paint-said">{paint.answer}</span>{:else if paint.state !== 'done' && paint.say}<span class="paint-said">{paint.say}</span>{/if}
+    </p>
+  {/if}
 </div>
 
 <style>
@@ -357,6 +373,57 @@
     display: inline-flex;
     padding-block-start: 1px;
     color: var(--warn);
+  }
+
+  /* UNDER THE SENTENCE, LINED UP WITH IT, as the faults are: the handle's column is left clear. */
+  .paint {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 var(--sp-2);
+    margin: 0;
+    padding: 0 var(--sp-2) var(--sp-1) calc(var(--ctl-h) + var(--sp-2));
+    color: var(--ink2);
+    font-size: var(--t-sm);
+  }
+
+  /* A STATE'S DOT IN ITS INTENT (`loop/finish/design-brief.md` §10): running and reaching outside is `--info`, parked on
+     something is `--warn`, a failure `--danger`, done `--dim`, and a step never reached a hollow mark. */
+  .paint-dot {
+    display: inline-block;
+    flex: none;
+    inline-size: var(--dot);
+    block-size: var(--dot);
+    border-radius: var(--r-pill);
+    background: var(--dim);
+  }
+
+  .paint-dot[data-state='would'] {
+    background: var(--info);
+  }
+
+  .paint-dot[data-state='waiting'] {
+    background: var(--warn-fill);
+  }
+
+  .paint-dot[data-state='failed'] {
+    background: var(--danger-fill);
+  }
+
+  .paint-dot[data-state='skipped'] {
+    background: transparent;
+    border: 1px solid var(--edge);
+  }
+
+  .paint-word {
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  .paint-said {
+    min-inline-size: 0;
+    overflow-wrap: anywhere;
   }
 
   .vh {

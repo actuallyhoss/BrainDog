@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 import '../../lib/record/fixtures/fill.ts';
 import { copy } from '../../lib/copy.ts';
 import type { PackState } from '../../lib/record/packs.ts';
+import { words } from './words.ts';
 import { afterInstall, drawnOrder, installShared, moduleTitle, movesOf, nothingElse, oneOf, relabelled, keepVoice, offerFor, olderThan, offeredVersion, planShared, readOnHost, rowTitle, sharedPlanOf, speakingStates, switchTo, voiceQuestion, type SharingClient } from './sharing.ts';
 import { speaking } from '../../lib/voice.ts';
 
@@ -60,7 +61,7 @@ function stub(over: Partial<SharingClient> = {}): { client: SharingClient; calls
     installPack: log('installPack'),
     enablePack: log('enablePack'),
     disablePack: log('disablePack'),
-    fetchUseCase: log('fetchUseCase'),
+    fetchShared: log('fetchShared'),
     packConfig: log('packConfig'),
     setPackConfig: log('setPackConfig'),
     ...over,
@@ -159,7 +160,7 @@ test('THE SHARE FORM OFFERS A PATCH OR A MINOR ON FROM THE LATER OF INSTALLED AN
 
 test('ON A LIVE RECORD AN ADDRESS IS READ BY THE HOST, AND ITS REFUSAL COMES BACK WITH ITS CODE', async () => {
   const { client, calls } = stub({
-    fetchUseCase: async ({ url }) =>
+    fetchShared: async ({ url }) =>
       url.includes('10.0.0.1')
         ? { ok: false as const, refusal: { code: 'PULL_ORIGIN_REFUSED', fix: '10.0.0.1 is a private or local address, so nothing was read from it.' } }
         : ok({ url, text: '{"usecase":"x"}', bytes: 15 }),
@@ -167,6 +168,9 @@ test('ON A LIVE RECORD AN ADDRESS IS READ BY THE HOST, AND ITS REFUSAL COMES BAC
   assert.deepEqual(await readOnHost(client, 'https://files.example.org/study.usecase.json'), { ok: true, text: '{"usecase":"x"}' });
   assert.deepEqual(await readOnHost(client, 'https://10.0.0.1/a.json'), { ok: false, fix: '10.0.0.1 is a private or local address, so nothing was read from it.', code: 'PULL_ORIGIN_REFUSED' });
   assert.deepEqual(await readOnHost(client, 'http://files.example.org/a.json'), { ok: false, fix: copy.shareAddressHttps, code: null });
+  /* A `git:` ADDRESS GOES TO THE HOST AS IT WAS TYPED, which turns it into the raw file; one that is not the shape is said here. */
+  assert.deepEqual(await readOnHost(client, 'git:someone/kit@main:kit.usecase.json'), { ok: true, text: '{"usecase":"x"}' });
+  assert.deepEqual(await readOnHost(client, 'git:someone'), { ok: false, fix: words.gitNotOne, code: null });
   assert.equal(calls.length, 0, 'the stub logged a call it was not given');
 });
 
@@ -184,20 +188,21 @@ test('A FILE WITH A BLOCK THIS BUILD DOES NOT DRAW IS SAID PLAINLY, WITH ITS COD
 });
 
 test('AFTER AN INSTALL THE EXAMPLES ARE LINKED AND THE FILE ORDER LEADS THE READER ARRANGEMENT', async () => {
+  /* THE GUIDE'S, since Student 1.3.0 carries no example to link (`loop/finish/modules.md` C11). */
   const rows: Record<string, { seq: number; fields: Record<string, unknown> }[]> = {
-    assignments: [{ seq: 1, fields: { what: 'Problem set 1: probability', tags: ['example'] } }],
-    courses: [{ seq: 4, fields: { name: 'Introduction to statistics', tags: ['example'] } }],
+    steps: [{ seq: 1, fields: { what: 'Write one sentence about what this is and who it is for', tags: ['example'] } }],
+    milestones: [{ seq: 4, fields: { what: 'Say what it is and who it is for', tags: ['example'] } }],
   };
   const updates: unknown[] = [];
   const client = {
     list: async ({ register }: { register: string }) => ok({ rows: rows[register] ?? [] }),
     update: async (args: { register: string; seq: number; patch: Record<string, unknown> }) => (updates.push(args), ok({})),
   };
-  const plan = { ...sharedPlanOf(ANSWER)!, usecase: { ...sharedPlanOf(ANSWER)!.usecase, id: 'student' }, nav: ['/r/courses', '/r/assignments'] };
-  const out = await afterInstall(client, plan, ['/p/money', '/r/assignments']);
-  assert.deepEqual(out.nav, ['/r/courses', '/r/assignments', '/p/money']);
+  const plan = { ...sharedPlanOf(ANSWER)!, usecase: { ...sharedPlanOf(ANSWER)!.usecase, id: 'guide' }, nav: ['/r/milestones', '/r/steps'] };
+  const out = await afterInstall(client, plan, ['/p/money', '/r/steps']);
+  assert.deepEqual(out.nav, ['/r/milestones', '/r/steps', '/p/money']);
   assert.ok(out.links >= 1, 'no example was linked');
-  assert.deepEqual(updates[0], { register: 'assignments', seq: 1, patch: { course: 'courses#4' } });
+  assert.deepEqual(updates[0], { register: 'steps', seq: 1, patch: { milestone: 'milestones#4' } });
   assert.equal((await afterInstall(client, { ...plan, nav: [] }, [])).nav, null);
 });
 
@@ -277,7 +282,6 @@ test('AN UPDATE THAT BRINGS ONLY ITS VERSION SAYS NOTHING ELSE CHANGES, and one 
   assert.equal(nothingElse(sharedPlanOf({ ...bare, packs: [{ ...bare.packs[0]!, installed_version: null, direction: 'install' }] })!), false);
   assert.equal(nothingElse(sharedPlanOf({ ...bare, packs: [{ ...bare.packs[0]!, direction: 'reinstall' }] })!), false, 'the same version says so in its own words');
   assert.equal(nothingElse(sharedPlanOf({ ...bare, packs: [{ ...bare.packs[0]!, changes: ['register.courses'] }] })!), false);
-  assert.equal(copy.shareNothingElse, 'Nothing else changes');
 });
 
 /* THE RECORD TAKES A HANDED LIST OUT OF `retires` AND FILES IT UNDER `hands` (`@braindog/record` `usecase.ts`), and this

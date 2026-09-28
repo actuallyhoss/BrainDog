@@ -31,6 +31,7 @@
   import Appearance from './areas/Appearance.svelte';
   import Identity from './areas/Identity.svelte';
   import Recovery from './areas/Recovery.svelte';
+  import Sessions from './areas/Sessions.svelte';
   import People from './areas/People.svelte';
   import Agents from './areas/Agents.svelte';
   import Ingest from './areas/Ingest.svelte';
@@ -75,6 +76,7 @@
     { id: 'appearance', label: 'Appearance', icon: 'sun', group: 'you', line: 'Colour, text size and density' },
     { id: 'identity', label: 'Identity', icon: 'people', group: 'signin', line: 'Who you are, and your records' },
     { id: 'recovery', label: 'Recovery', icon: 'key', group: 'signin', line: 'Passkeys, and getting back in' },
+    { id: 'sessions', label: 'Sessions', icon: 'lock', group: 'signin', line: 'Where you are signed in' },
     { id: 'people', label: 'People & sharing', icon: 'people', group: 'sharing', line: 'Who can see this record, and invites' },
     { id: 'agents', label: 'Agents', icon: 'session', group: 'sharing', line: 'Machines and agents that work here' },
     { id: 'ingest', label: 'Ingest', icon: 'inbox', group: 'sharing', line: 'Mail and sources that feed this record' },
@@ -197,6 +199,8 @@
       <People {shell} {area} />
     {:else if area === 'recovery'}
       <Recovery {shell} {area} />
+    {:else if area === 'sessions'}
+      <Sessions {shell} {area} />
     {:else if area === 'identity'}
       <Identity {shell} {area} />
     {:else if area === 'agents'}

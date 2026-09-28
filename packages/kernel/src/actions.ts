@@ -28,6 +28,7 @@
 import type { Result, Sql } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 
+import { parseSpoken, spoken as spokenId } from './coerce.ts';
 import { instant } from './migrate.ts';
 import type { Ack, OutboxRow } from './outbox.ts';
 import { FLOOR_MS, cursorOf, intervalMs, jitterMs, keyNameOf, type PullCursor } from './pull.ts';
@@ -1203,8 +1204,14 @@ type Totals = { runs: number; requests: number; bytes: number; failures: number 
 export type ActionRow = {
   ingest: string;
   channel: ActionKind;
-  /** The project it runs for, or `null` for every project. */
+  /** The project it runs for, as its declaration holds it, or `null` for every project. */
   project: string | null;
+  /**
+   * The row `project` names, found in the record: its id, its spoken id and its title, or `null` when the action is for
+   * every project or names no row. OPTIONAL IN THE TYPE ONLY, so a row built by hand for a test or an older host still
+   * reads; `listActions` always answers it.
+   */
+  project_row?: ProjectRow | null;
   host: string | null;
   every: string;
   key: string | null;
@@ -1219,6 +1226,37 @@ export type ActionRow = {
 };
 
 const ROW_STATES: readonly string[] = ['pending', 'firing', 'paused', 'done'];
+
+/** A project an action runs for, as the record holds it: the row's id, the id a person says, and its title. */
+export type ProjectRow = { id: string; spoken: string; title: string | null };
+
+/**
+ * The project row an action's declaration names, by its row id or its spoken id (`things#1`), or `null` when there is
+ * no such live row.
+ *
+ * WHY THE HOST IS HANDED THE ROW AND NOT THE WORDS: a declaration holds the project as a row id, which no page and no
+ * person reads, and "Runs on" matched it against the project's NAME, so an action declared with `project: things#1` or
+ * with the row's id showed on no project page at all (`loop/finish/shell.md` DOR-6). Resolved here, once, the page
+ * matches the row it is drawn for and says the project's title where it names one.
+ */
+function projectRowOf(sql: Sql, ref: string): ProjectRow | null {
+  const said = parseSpoken(ref);
+  const cols = 'SELECT id, register, seq, fields FROM entry WHERE deleted_at IS NULL AND ';
+  type Found = { id: string; register: string; seq: number | null; fields: string };
+  const row = said ? sql.one<Found>(`${cols}register = ? AND seq = ?`, said.register, said.seq) : sql.one<Found>(`${cols}id = ?`, ref);
+  if (!row) return null;
+  const declared = sql.one<{ body: string }>(
+    "SELECT body FROM declaration WHERE id = ? AND kind = 'register' AND superseded_at IS NULL AND retired = 0",
+    `register.${row.register}`,
+  )?.body;
+  const field = declared === undefined ? undefined : (JSON.parse(declared) as { title?: unknown }).title;
+  const title = typeof field === 'string' ? (JSON.parse(row.fields) as Record<string, unknown>)[field] : undefined;
+  return {
+    id: row.id,
+    spoken: row.seq === null ? row.id : spokenId(row.register, row.seq),
+    title: typeof title === 'string' && title.trim() !== '' ? title.trim() : null,
+  };
+}
 
 type Run = { status: number | null; outcome: Metered['outcome']; usage: Metered['usage'] };
 
@@ -1290,10 +1328,12 @@ export function listActions(sql: Sql, nowMs: number): ActionRow[] {
         }
       }
 
+      const project = typeof decl.project === 'string' && decl.project !== '' && decl.project !== 'global' ? decl.project : null;
       return {
         ingest: decl.ingest,
         channel,
         project: typeof decl.project === 'string' && decl.project !== '' ? decl.project : null,
+        project_row: project === null ? null : projectRowOf(sql, project),
         host: address && originOf(address) ? new URL(address).host : null,
         every: decl.every ?? '',
         key: decl.grant === undefined || decl.grant === '' ? null : (keyNamed(sql, decl.grant)?.label ?? decl.grant),
@@ -1385,7 +1425,11 @@ export function egressOf(body: unknown, nameOf?: (project: string) => string | n
   if (every === null && trigger === 'schedule') return null;
 
   const host = hostOf(addressOf(d as ActionDecl));
-  const key = typeof d.grant === 'string' && d.grant !== '' ? d.grant : null;
+  /* DOR-2: A PULL'S KEY IS THE ONE `fetch.auth` NAMES, when it names one, because that is the key the requests are
+     actually signed with (`keyNameOf`, `pull.ts`) — not always `grant`, which a paged pull's own approval line and
+     `install`'s `PLAN_STALE` check both read through this one function, so the fix lands for both at once. Every
+     other channel keeps reading its top-level `grant`, as it always did. */
+  const key = (channel === 'pull' ? keyNameOf(d) : typeof d.grant === 'string' && d.grant !== '' ? d.grant : undefined) ?? null;
   const sends = trigger === 'schedule' || !Array.isArray(d.sends) ? [] : d.sends.filter((s): s is string => typeof s === 'string');
   const project = typeof d.project === 'string' && d.project !== '' ? d.project : null;
   const ingest = typeof d.ingest === 'string' ? d.ingest : '';

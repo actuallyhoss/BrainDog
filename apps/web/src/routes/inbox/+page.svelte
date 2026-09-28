@@ -10,18 +10,22 @@
   Enter opens the one under it, `e` files it in the chosen list, Delete archives it, `x` selects it so
   several are filed or archived at once, and Esc clears the selection. A row leads with its subject,
   then who sent it and the first words of what they said, then when (rule 7).
+
+  ARRIVALS THAT ARE ALIKE ARE DRAWN TOGETHER, by the kernel's own shape (`shapes.ts`), and at three or more
+  alike the group offers to ask Slash for a pattern, which files a `pattern` proposal on Decide. The cursor
+  walks the rows in the order they are drawn, so `j` never jumps between groups.
 -->
 <script lang="ts">
-  import { apiBase } from '$lib/at.ts';
+  import { apiBase, at } from '$lib/at.ts';
   import { tick, untrack } from 'svelte';
   import { page as route } from '$app/state';
-  import { invalidateAll } from '$app/navigation';
+  import { goto, invalidateAll } from '$app/navigation';
   import { titleOf } from '$lib/title.ts';
   import { since } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { DOM_CAP } from '$lib/record/api.ts';
-  import { moduleOf } from '$lib/record/modules.ts';
+  import { firstPartyModule as moduleOf } from '@braindog/seed/packs/modules';
   import type { InboxItem } from '$lib/record/schema.ts';
   import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
   import { CapLine } from 'braindog-render/svelte';
@@ -31,6 +35,21 @@
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import { closed, drew, opened } from '../../lib/ui/screen.svelte.ts';
+  import { ALIKE, SAMPLES_MOST, groupsOf, type Group } from './shapes.ts';
+  import { builderPath } from '$lib/pattern/draft.ts';
+  import { words as patternWords } from '$lib/pattern/words.ts';
+
+  /**
+   * THIS UNIT'S OWN WORDS, beside the one screen that says them. The press's cost is not named: the door meters it, and a
+   * sentence here that named the allowance would be wrong the day the door moves it.
+   */
+  const words = {
+    alike: (n: number) => `${n} alike`,
+    askPattern: 'Ask Slash for a pattern',
+    asking: 'Slash is drafting a pattern',
+    unfiled: 'Slash drafted nothing to decide from these.',
+    unreached: 'BrainDog could not reach Slash. Nothing was drafted.',
+  };
 
   /**
    * THE INBOX IS THE RECORD'S, its newest page, and nothing of the sample is mixed into it. Until the
@@ -44,7 +63,12 @@
   let refused = $state<string | null>(null);
   let unrouted = $state(false);
   const INBOX = $derived(live?.items ?? []);
-  const shown = $derived(INBOX.slice(0, DOM_CAP));
+  /* THE SHAPE OF EVERY ARRIVAL READ, by id, replaced whole so that the groups follow it. `shown` is the rows in the order
+     the groups draw them, which is the order the cursor walks and the next row opens in. */
+  let shapes = $state.raw<ReadonlyMap<string, string>>(new Map());
+  const groups = $derived(groupsOf(INBOX.slice(0, DOM_CAP), shapes));
+  const shown = $derived(groups.flatMap((g) => g.items));
+  const place = $derived(new Map(shown.map((item, i) => [item.id, i])));
   const clock = $derived(Date.now());
   const answered = $derived(live !== null);
 
@@ -57,10 +81,11 @@
        how any shell's Inbox ends in the record's answer or its sentence rather than in bars that never stop. */
     const at = untrack(opened);
     let ok = false;
-    void import('$lib/record/inbox-live.ts')
-      .then((m) => m.readInbox(apiBase()))
-      .then((out) => {
+    void import('./shapes.ts')
+      .then((m) => m.readShaped(apiBase()))
+      .then(({ read: out, shapes: read }) => {
         if (out.from === 'live') {
+          shapes = read;
           live = { items: out.items, cursor: out.cursor };
           open = out.items[0]?.id ?? null;
           ok = true;
@@ -84,10 +109,12 @@
     older = true;
     olderFix = null;
     try {
-      const m = await import('$lib/record/inbox-live.ts');
-      const out = await m.readInbox(apiBase(), undefined, had.cursor);
-      if (out.from === 'live') live = { items: [...had.items, ...out.items], cursor: out.cursor };
-      else if (out.from === 'refused') olderFix = out.fix;
+      const m = await import('./shapes.ts');
+      const { read: out, shapes: read } = await m.readShaped(apiBase(), had.cursor);
+      if (out.from === 'live') {
+        shapes = new Map([...shapes, ...read]);
+        live = { items: [...had.items, ...out.items], cursor: out.cursor };
+      } else if (out.from === 'refused') olderFix = out.fix;
     } finally {
       older = false;
     }
@@ -147,9 +174,11 @@
     const had = live;
     if (!had) return;
     const at = shown.findIndex((i) => ids.has(i.id));
+    /* THE NEXT ONE IS THE NEXT DRAWN, which inside a group is the next alike and not the next to arrive. */
+    const rest = shown.filter((i) => !ids.has(i.id));
     const items = had.items.filter((i) => !ids.has(i.id));
     live = { items, cursor: had.cursor };
-    if (open !== null && ids.has(open)) open = items[Math.max(0, at)]?.id ?? items[at - 1]?.id ?? null;
+    if (open !== null && ids.has(open)) open = rest[Math.max(0, at)]?.id ?? rest[at - 1]?.id ?? null;
     if (cursor >= items.length) cursor = items.length - 1;
   }
 
@@ -212,6 +241,31 @@
     if (gone.size) {
       toasts.push(gesture === 'file' ? copy.inboxBatchFiled(gone.size) : copy.inboxBatchArchived(gone.size));
       void invalidateAll();
+    }
+  }
+
+  /**
+   * ASK SLASH FOR A PATTERN FROM ONE GROUP. The newest alike go as the samples, as many as the door takes, and the record
+   * reads them itself: nothing a stranger wrote is sent from here. What comes back is a `pattern` proposal filed on
+   * Decide, which is where this goes next; nothing is installed until it is accepted there.
+   *
+   * ONE PRESS AT A TIME, across every group: a second press while a draft is out would be a second model call for the
+   * same question. The door meters the press and refuses it in its own sentence when the month is spent.
+   */
+  let asking = $state<string | null>(null);
+  async function askPattern(group: Group) {
+    if (asking !== null) return;
+    asking = group.shape;
+    try {
+      const { createClient } = await import('@braindog/client');
+      const out = await createClient({ base: apiBase() }).slashPattern(group.items.slice(0, SAMPLES_MOST).map((i) => i.id));
+      if (!out.ok) return void toasts.push('refusal' in out ? out.refusal.fix : words.unreached, { intent: 'warn' });
+      if (out.value.filed === null) return void toasts.push(words.unfiled, { intent: 'warn' });
+      await goto(at(`/decide/${encodeURIComponent(out.value.filed)}`));
+    } catch {
+      toasts.push(words.unreached, { intent: 'warn' });
+    } finally {
+      asking = null;
     }
   }
 
@@ -299,7 +353,17 @@
     </Empty>
   {:else}
     <ul class="ledger arrivals" data-picking={picked.size > 0 ? '' : undefined}>
-      {#each shown as item, i (item.id)}
+      {#each groups as group (group.shape)}
+        <!-- A GROUP OF ONE IS DRAWN AS A ROW AND NOTHING MORE. Two or more alike are led by who they are from and how
+             many there are, and the rows follow. -->
+        {#if group.items.length > 1}
+          <li class="shape">
+            <span class="shape-from">{group.items[0]?.from}</span>
+            <span class="shape-n">{words.alike(group.items.length)}</span>
+          </li>
+        {/if}
+        {#each group.items as item (item.id)}
+        {@const i = place.get(item.id) ?? -1}
         <li class="arrival" data-cursor={i === cursor ? '' : undefined} data-open={open === item.id ? '' : undefined}>
           <!-- THE SUBJECT LEADS, then who sent it and the first of what they said, then when. The
                sender's domain led the row in a column of its own and was said again under the
@@ -341,13 +405,25 @@
                 <Button weight="primary" disabled={busy} onclick={() => settle(item, 'file')}>{copy.fileIt}</Button>
                 <Button weight="bare" disabled={busy} onclick={() => settle(item, 'archive')}>{copy.archiveArrival}</Button>
               </div>
-              <!-- NO RULE OFFER. Only the sample's arrivals carried a `suggestion`, and its two buttons
-                   could only say nothing was saved: making a rule needs a pattern the record does not
-                   derive yet and a declaration write through the same lint a pack gets. It is not
-                   drawn until it can write (`loop/research-no-sample.md` 1e). -->
+              <!-- NO RULE OFFER ON ONE ARRIVAL. A rule is made from alike messages, so it is offered on the
+                   group's row below, which opens the pattern builder with the group as its samples. -->
             </div>
           {/if}
         </li>
+        {/each}
+        <!-- THE GROUP'S OWN ROW OF ACTIONS, under its last arrival. Asking Slash waits for the record's threshold for a
+             pattern, since it spends a model call; making the rule by hand (PLT-10, contracts X43) is offered for any
+             group, because pointing at two alike messages costs nothing and already shows what the rule would read. -->
+        {#if group.items.length > 1}
+          <li class="shape-actions">
+            {#if group.items.length >= ALIKE}
+              <Button disabled={asking !== null} onclick={() => askPattern(group)}>
+                {asking === group.shape ? words.asking : words.askPattern}
+              </Button>
+            {/if}
+            <Button weight="quiet" href={builderPath(group.items.slice(0, SAMPLES_MOST).map((i) => i.id))}>{patternWords.fromInbox}</Button>
+          </li>
+        {/if}
       {/each}
     </ul>
     <CapLine shown={Math.min(INBOX.length, DOM_CAP)} total={INBOX.length} />
@@ -391,6 +467,44 @@
 
   .arrivals > li + li {
     border-block-start: 1px solid var(--line);
+  }
+
+  /* A GROUP'S HEAD IS A QUIET LABEL, not a row: it opens nothing, so it is not drawn as one. */
+  .shape {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-2);
+    padding: var(--sp-4) var(--sp-3) var(--sp-2);
+    font-size: var(--t-xs);
+  }
+
+  .shape-from {
+    min-inline-size: 0;
+    overflow: hidden;
+    color: var(--ink2);
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .shape-n {
+    flex: none;
+    color: var(--dim);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* A group reads as one block: no rule between its head and its first row, or between its last row and its actions. */
+  .arrivals > .shape + li,
+  .arrivals > li + .shape-actions {
+    border-block-start: 0;
+  }
+
+  /* THE GROUP'S ACTIONS WRAP as the open row's do, and on a phone each is a full-width button under its group. */
+  .shape-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+    padding: var(--sp-2) var(--sp-3) var(--sp-4);
   }
 
   .arrivals[data-picking] > li {
@@ -580,6 +694,14 @@
 
   /* ON A CARD THE TIME SITS BESIDE THE SUBJECT, where the row's first line has room for it. */
   @media (width < 640px) {
+    .shape-actions {
+      flex-direction: column;
+    }
+
+    .shape-actions :global(.btn) {
+      inline-size: 100%;
+    }
+
     .arrival .line {
       grid-template-columns: minmax(0, 1fr) auto;
     }

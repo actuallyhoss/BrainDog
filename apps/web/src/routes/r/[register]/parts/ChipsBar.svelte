@@ -17,6 +17,13 @@
   and the page reads it and writes it (`isOn`, `toggleFilter`, `dropFilter`, `setQuery`); the counts
   are the page's `facets`; `saveView` is the page's write. The sheet's open state is kept here
   because nothing but this bar opens it or reads it.
+
+  THE SHEET HOLDS THE QUERY BUILDER (GAP-2), the one editor of a filter in this app, at every width:
+  from 640 it opens from the bar's Filter control beside the pills, and below it from the one Filter
+  button, under the pills' own values. The builder edits the address's chips as rows and writes them
+  back when the sheet closes, so typing a value is not a navigation per key. The address is a flat
+  "and" of chips (`chipsOf`), so the builder is offered depth 1 and the operators a chip spells
+  (`ADDRESS_OPS`), and a chip it cannot draw is kept in the address exactly as it was.
 -->
 <script lang="ts">
   import { copy } from '$lib/copy.ts';
@@ -30,6 +37,17 @@
   import Icon from '$lib/ui/Icon.svelte';
   import ViewsMenu from './ViewsMenu.svelte';
   import type { Listed } from './list.ts';
+  import { untrack } from 'svelte';
+  import { goto } from '$app/navigation';
+  import { page } from '$app/state';
+  import type { Predicate } from '@braindog/where';
+  import { apiBase } from '$lib/at.ts';
+  import { open } from '$lib/data/record.ts';
+  import { chipsOf, type Filter } from '$lib/record/api.ts';
+  import { REGISTERS } from '$lib/record/held.ts';
+  import QueryBuilder from '$lib/query/QueryBuilder.svelte';
+  import { ADDRESS_OPS, fromChips, fromWhere, offered, toChips, toWhere, type Counted } from '$lib/query/tree.ts';
+  import { describeWith, slashAnswers } from '$lib/query/slash.ts';
 
   let {
     shown,
@@ -72,6 +90,69 @@
 
   /* This part's own words: the phone's Filter button, named with what is chosen in it. */
   const words = { filterOn: (chosen: string): string => `${copy.filter}: ${chosen}` } as const;
+
+  /* ── the query builder in the sheet (GAP-2) ─────────────────────────────── */
+
+  /**
+   * THE FIELDS A CONDITION MAY NAME, as the record last declared this list. `REGISTERS` is filled by the page's own
+   * `schema` read before the bar is drawn, and it is not a rune, so it is read again whenever the sheet opens.
+   */
+  const fields = $derived.by(() => (void filterOpen, offered(REGISTERS[register]?.fields ?? [])));
+  /** The address's chips, as rows, and the chips the rows cannot draw, which go back into the address untouched. */
+  const drawn = $derived(fromChips(chipsOf(page.url.searchParams), fields));
+  const value = $derived(toWhere(drawn.root, register, fields));
+  /** Whether the phone's one Filter button and its sheet stand in for the bar's controls. */
+  const sheeted = $derived(rowsAsCards() && (enums.length > 0 || fields.length > 0));
+
+  /**
+   * THE BUILDER'S TREE, HELD UNTIL THE SHEET CLOSES, beside the address it was written over. A pill pressed in the
+   * meantime moves the address, and a draft written over an address that has since moved is not applied over it.
+   */
+  let draft = $state<{ at: string; where: Predicate | undefined } | null>(null);
+
+  /** A tree as the address's chips, with the undrawn ones kept, or `null` where the address cannot say it. */
+  function chipsFor(where: Predicate | undefined): Filter[] | null {
+    const rows = fromWhere(where, fields);
+    const chips = rows ? toChips(rows, fields) : null;
+    return chips ? [...chips, ...drawn.kept] : null;
+  }
+
+  /** The draft into the address, as one history entry, so Back undoes the whole of what the sheet changed. */
+  async function apply(): Promise<void> {
+    const held = draft;
+    draft = null;
+    if (!held || held.at !== page.url.search) return;
+    const chips = chipsFor(held.where);
+    if (!chips) return;
+    const next = new URLSearchParams(page.url.searchParams);
+    next.delete('f');
+    for (const c of chips) next.append('f', `${c.field}:${c.op}:${c.values.join(',')}`);
+    await goto(`?${next}`, { noScroll: true, keepFocus: true });
+  }
+
+  let wasOpen = false;
+  $effect(() => {
+    const now = filterOpen;
+    if (wasOpen && !now) untrack(() => void apply());
+    if (!wasOpen && now) total = null;
+    wasOpen = now;
+  });
+
+  /** The list's own size, asked once each time the sheet opens: the "of N" under the builder. */
+  let total: Promise<number | null> | null = null;
+
+  /** "Matches n of N": the record's own count for this list, the search box and the builder's filter. */
+  async function counted(where: Predicate | undefined): Promise<Counted | null> {
+    const chips = chipsFor(where);
+    if (!chips) return null;
+    const src = await open();
+    total ??= src.count(register, { filters: [], q: '' }).then((out) => (out.ok ? out.value : null));
+    const [n, of] = await Promise.all([src.count(register, { filters: chips, q }), total]);
+    return n.ok && of !== null ? { n: n.value, of } : null;
+  }
+
+  /* SLASH DRAFTS ONLY WHERE A MODEL IS BEHIND IT ON THIS HOST, and the control is absent everywhere else. */
+  const describe = $derived(slashAnswers(page.data) ? describeWith(apiBase(), name) : undefined);
 </script>
 
 {#if shown}
@@ -111,7 +192,7 @@
     the search box. How many values are on is the figure beside the glyph, and what they are is in
     its name for a screen reader and in the sheet it opens.
   -->
-  {#if rowsAsCards() && enums.length}
+  {#if sheeted}
     {@const chosen = enums.flatMap((f) => (f.values ?? []).filter((value) => isOn(f.id, value)).map((value) => valueSaid(f, value)))}
     <button
       type="button"
@@ -188,7 +269,16 @@
     </button>
   {/each}
 
-  {#if filtered && !(rowsAsCards() && enums.length)}
+  <!-- THE FILTER ITSELF, FROM 640: the query builder in the sheet, for every field and every question the pills do
+       not ask. It is not a `Menu`, so the gates that open a field's menu by `.menu-trigger:has(.sift)` still open
+       the first field's. Below 640 the one Filter button above opens the same sheet. -->
+  {#if !rowsAsCards() && fields.length}
+    <button type="button" class="sift sift-build" aria-haspopup="dialog" onclick={() => (filterOpen = true)}>
+      <Icon name="filter" size="s" /><span class="sift-name">{copy.filter}</span>
+    </button>
+  {/if}
+
+  {#if filtered && !sheeted}
     <span class="bar-clear"><Button weight="bare" href="/r/{register}"><Icon name="close" size="s" />{copy.clearFilters}</Button></span>
   {/if}
 
@@ -209,7 +299,7 @@
        before Display because both are about the list as a whole, and Display stays last as the
        one that changes how it looks. On a phone with filters it lives in the filter sheet
        instead, beside Clear, for the reason Clear does. -->
-  {#if filtered && !(rowsAsCards() && enums.length)}
+  {#if filtered && !sheeted}
     <span class="bar-save"><ViewsMenu {saveView} /></span>
   {/if}
   <!-- ITS NAME IS "Display" AT EVERY WIDTH. On a phone the word is hidden and the glyph is the
@@ -223,11 +313,12 @@
 </div>
 {/if}
 
-<!-- The phone's filter sheet. The same fields and values as the bar's menus, as the Display sheet's
-     rows, each with its count, and Clear beside Done so undoing every filter is in the same place
-     as setting one. -->
-{#if rowsAsCards() && enums.length}
+<!-- The filter sheet. On a phone it opens with the same fields and values as the bar's menus, as the
+     Display sheet's rows, each with its count, and Clear beside Done so undoing every filter is in the
+     same place as setting one. At every width the query builder follows, over the same address. -->
+{#if sheeted || fields.length}
   <Sheet bind:open={filterOpen} title={copy.filter}>
+    {#if rowsAsCards() && enums.length}
     <div class="filter-groups">
       {#each enums as f}
         <fieldset class="filter-group">
@@ -251,16 +342,33 @@
         </fieldset>
       {/each}
     </div>
+    {/if}
+
+    {#if fields.length}
+      <div class="filter-build">
+        <QueryBuilder
+          {value}
+          {fields}
+          {register}
+          depth={1}
+          ops={ADDRESS_OPS}
+          count={counted}
+          {describe}
+          onchange={(where) => (draft = { at: page.url.search, where })}
+        />
+      </div>
+    {/if}
 
     {#snippet footer()}
       <Button weight="primary" onclick={() => (filterOpen = false)}><Icon name="check" size="s" />{copy.done}</Button>
       {#if filtered}
         <Button weight="bare" href="/r/{register}"><Icon name="close" size="s" />{copy.clearFilters}</Button>
-        <!-- The sheet closes first so the toast and the page it opens are not behind it. -->
+        <!-- The sheet closes first so the toast and the page it opens are not behind it, and the builder's rows reach
+             the address before the view is saved from it. -->
         <ViewsMenu
           saveView={() => {
             filterOpen = false;
-            saveView();
+            void apply().then(saveView);
           }}
         />
       {/if}
@@ -381,6 +489,25 @@
   .sift-count {
     color: var(--ink);
     font-size: var(--t-sm);
+  }
+
+  /* THE BUILDER'S CONTROL IS ONE MORE PILL IN THE TRACK, and a real button, so it sheds the button's own box. */
+  .sift-build {
+    border: 0;
+    font: inherit;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .sift-build:hover {
+      background: var(--hover-wash);
+    }
+  }
+
+  /* On a phone the builder follows the pills' own values, a section's gap below them. */
+  .filter-groups + .filter-build {
+    margin-block-start: var(--sp-5);
   }
 
   /* A LIST CLAUSE IS A PILL THAT IS ALREADY ON, drawn in the same track as the rest of the bar so it

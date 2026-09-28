@@ -6,12 +6,30 @@
       "kind": "pack",
       "id": "bank-hsbc-eg",
       "title": "bank-hsbc-eg",
-      "summary": "Reads HSBC Egypt alert mails and text messages into Money as transactions.",
+      "summary": "Reads HSBC Egypt alert mails and text messages into Money as transactions, each with the balance it prints, and a message that only prints a balance as a balance check.",
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.3.1",
+      "latest": "1.4.0",
       "versions": [
+        {
+          "version": "1.4.0",
+          "checksum": "d5f75176d1e28a10afe4e2b6d9f3d978c186882181498877a5dbd11a96617601",
+          "bytes": 55298,
+          "published_at": "2026-09-28T00:35:03.785Z",
+          "bump": "minor",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          }
+        },
         {
           "version": "1.3.1",
           "checksum": "953a4b1f1dcb400b0f2124b55185f64be4e3a9bc08549f348dd3e99ce3a52fab",
@@ -102,12 +120,37 @@
       "kind": "pack",
       "id": "count-cash",
       "title": "Count the cash",
-      "summary": "Write down what is actually in a cash box or an account, and the record writes the difference into the ledger and sets the balance to what was counted.",
+      "summary": "Write down what is actually in a cash box or an account, and the record keeps it as a balance check and writes the difference from what it thought was there into the ledger.",
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.0.1",
+      "latest": "1.1.0",
       "versions": [
+        {
+          "version": "1.1.0",
+          "checksum": "027554c11c0da97a0b18dc4068d5c64dea7b6675a9d32c3067e31a21d8749576",
+          "bytes": 12296,
+          "published_at": "2026-09-28T00:35:03.785Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Cash counts"
+            ],
+            "pages": [
+              "Cash counts"
+            ],
+            "rules": [
+              "Write the difference of each count"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "preview": true
+        },
         {
           "version": "1.0.1",
           "checksum": "e17bc6641fb6278b9f3b21c8d1aa3f18b1d4b4a255ffbfa5601cc91af7185a4e",
@@ -220,8 +263,33 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.1.0",
+      "latest": "1.2.0",
       "versions": [
+        {
+          "version": "1.2.0",
+          "checksum": "384884804f7d7bb2baa0033f8a1fab2e26a9e526dc8ec98a516426842c0f6831",
+          "bytes": 6247,
+          "published_at": "2026-09-28T00:35:03.785Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Holdings"
+            ],
+            "pages": [
+              "Holdings"
+            ],
+            "rules": [
+              "holdings_cost"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "preview": true
+        },
         {
           "version": "1.1.0",
           "checksum": "75d5f011a508a43c50355a830bafbac5fdab81820b6ea73eed4a12b277c57195",
@@ -382,8 +450,37 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.2.0",
+      "latest": "1.3.0",
       "versions": [
+        {
+          "version": "1.3.0",
+          "checksum": "7f49073d8fe319bfa29d8a2b72f0540ad189ffca023f2c2338444f6af7d765c3",
+          "bytes": 19384,
+          "published_at": "2026-09-28T00:35:03.785Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "api.mercury.com",
+                "line": "CALLS OUT api.mercury.com · every 1h · grant \"Mercury (read only)\"",
+                "key": "Mercury (read only)"
+              },
+              {
+                "host": "api.mercury.com",
+                "line": "CALLS OUT api.mercury.com · every 1h · key \"Mercury (read only)\" to the host its vault entry opens",
+                "key": "Mercury (read only)"
+              }
+            ]
+          }
+        },
         {
           "version": "1.2.0",
           "checksum": "e1279d5004954603b672fa3d9f3db8dbc810c852cf3940567670620571987afd",
@@ -601,8 +698,28 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.0.0",
+      "latest": "1.1.0",
       "versions": [
+        {
+          "version": "1.1.0",
+          "checksum": "2ee5290fdf121f0e094609d883cc2aa886003bf20d1528eab178b1d2b83ca671",
+          "bytes": 4209,
+          "published_at": "2026-09-28T00:35:03.785Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "portfolio"
+            ],
+            "lists": [],
+            "pages": [
+              "Briefs"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          }
+        },
         {
           "version": "1.0.0",
           "checksum": "e9703347c9ca2b523bcf1d59111fcd44825635d5b9f57b397aa46dc556551bcc",
@@ -639,12 +756,34 @@
       "kind": "pack",
       "id": "rates-open-er-api-com",
       "title": "rates-open-er-api-com",
-      "summary": "Polls open.er-api.com every 1d for what one USD is worth in EGP, GBP.",
+      "summary": "Polls open.er-api.com every 1d for what one USD is worth in each other currency the record holds, named when it is installed.",
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.0.0",
+      "latest": "1.1.0",
       "versions": [
+        {
+          "version": "1.1.0",
+          "checksum": "d559af88e27e3f3da57b9f4abbc1983f9b98ae5e5c69cafd31ee43937b8fffe3",
+          "bytes": 1331,
+          "published_at": "2026-09-28T00:35:03.785Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "open.er-api.com",
+                "line": "CALLS OUT open.er-api.com · every 1d · grant \"none\"",
+                "key": null
+              }
+            ]
+          }
+        },
         {
           "version": "1.0.0",
           "checksum": "7895187e0a02f96f21112edc772696cd10ff48000df5e115c0a4cc2050db1642",
@@ -769,8 +908,32 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.1.0",
+      "latest": "1.2.0",
       "versions": [
+        {
+          "version": "1.2.0",
+          "checksum": "00c02cb1ff0f550a575a6e8730955eabe06b3b1f1cd99c72ca9fecfd7ba5c51d",
+          "bytes": 12331,
+          "published_at": "2026-09-28T00:35:03.785Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "api.stripe.com",
+                "line": "CALLS OUT api.stripe.com · every 1h · key \"stripe\" to the host its vault entry opens",
+                "key": "stripe"
+              }
+            ]
+          }
+        },
         {
           "version": "1.1.0",
           "checksum": "9594d6abf7422bca1ec7d592482dcb1937e367ffbde476bf40e82e05d5ae14f5",

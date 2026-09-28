@@ -1,0 +1,741 @@
+<!--
+  The ingest pattern builder (`loop/finish/platform.md` PLT-10): a rule made from a few messages that arrived alike, by
+  pointing at the words in them, never by writing a pattern.
+
+  FOUR SCREENS IN ONE PLACE. Samples (a counter, a paste box, the list the rows go to); what it reads (a column per
+  sample, a row per field, the typed value in each cell and a `3/3` chip per field, and the match as a sentence of
+  conditions); point at it (select the words in a sample and pick a way to find them again, scored against every
+  sample by `anchorsFor`, or add another way, a fallback, or a condition); try and save (`tryPattern`, then the save).
+
+  AN OWNER'S SAVE INSTALLS THE RULE AT `proposed`, so what it reads waits on Decide as rowsets, the holding tray the
+  kernel already has, until she presses "Trust it now". Anybody else's save files a `pattern` proposal.
+
+  OPENED FROM TWO PLACES, both by address: an Inbox group ("Make a rule from these", its arrivals as `samples`) and a
+  `pattern` proposal on Decide ("Open in the builder", its samples and the ingest it proposes).
+-->
+<script lang="ts">
+  import { apiBase, at } from '$lib/at.ts';
+  import { untrack } from 'svelte';
+  import { page as route } from '$app/state';
+  import { goto } from '$app/navigation';
+  import { titleOf } from '$lib/title.ts';
+  import { humanize } from '$lib/record/names.ts';
+  import { may } from '$lib/record/may.ts';
+  import type { Shell } from '$lib/record/boot-live.ts';
+  import { schemaOf } from '$lib/record/page-write.ts';
+  import PageHead from '$lib/ui/PageHead.svelte';
+  import Empty from '$lib/ui/Empty.svelte';
+  import Waiting from '$lib/ui/Waiting.svelte';
+  import Button from '$lib/ui/Button.svelte';
+  import Chip from '$lib/ui/Chip.svelte';
+  import { toasts } from '$lib/ui/toast.svelte.ts';
+  import { closed, opened } from '$lib/ui/screen.svelte.ts';
+  import SampleText from '$lib/pattern/SampleText.svelte';
+  import FieldTable from '$lib/pattern/FieldTable.svelte';
+  import { anchorsFor, install, readSamples, suggest, tryPattern, type Anchor, type Sample, type Tried } from '$lib/pattern/api.ts';
+  import {
+    ASKS,
+    TESTS,
+    draftOf,
+    fallbackValue,
+    freshDraft,
+    openedFrom,
+    takesFallback,
+    withAnotherWay,
+    withCondition,
+    withFallback,
+    withReading,
+    withoutReading,
+    type Ask,
+    type Condition,
+    type Draft,
+    type Test,
+  } from '$lib/pattern/draft.ts';
+  import { readingSaid, valueSaid, words } from '$lib/pattern/words.ts';
+
+  /** The most samples a rule is made from, as `tryPattern` and `POST /api/slash/pattern` take them. */
+  const SAMPLES_MOST = 10;
+  /** The most characters of a pasted message, as `tryPattern` takes it. */
+  const PASTED_CHARS_MOST = 20_000;
+
+  const shell = $derived(route.data as unknown as Shell);
+  const owner = $derived(may(shell, 'owner'));
+  const lists = $derived<readonly { id: string; name: string }[]>(shell.lists ?? []);
+  const asked = untrack(() => openedFrom(route.url.searchParams, SAMPLES_MOST));
+
+  let samples = $state.raw<Sample[]>([]);
+  let missing = $state(0);
+  let loadFix = $state<string | null>(null);
+  let loaded = $state(false);
+  let cantOpen = $state(false);
+  let draft = $state.raw<Draft | null>(null);
+  let step = $state<1 | 2 | 3 | 4>(1);
+  let index = $state(0);
+  let pasted = 0;
+  let pasteText = $state('');
+
+  /* THE SAMPLES, READ ONCE, and a proposal's ingest opened as a draft. `load` is also Retry. */
+  function load() {
+    const mark = opened();
+    let ok = false;
+    loadFix = null;
+    void readSamples(apiBase(), asked.samples)
+      .then((out) => {
+        if (!out.ok) return void (loadFix = out.fix);
+        samples = out.value.samples;
+        missing = out.value.missing;
+        if (asked.ingest !== undefined) {
+          const made = draftOf(asked.ingest, Date.now());
+          if (made === null) cantOpen = true;
+          else {
+            draft = made;
+            step = 2;
+          }
+        }
+        loaded = true;
+        ok = true;
+      })
+      .finally(() => closed(ok, mark));
+  }
+  $effect(() => untrack(load));
+
+  /* THE FIELDS OF THE LIST THE RULE WRITES INTO, with their names and types, read when the list is picked. */
+  type FieldSpec = { id: string; label: string; type: string | undefined };
+  let fields = $state.raw<FieldSpec[]>([]);
+  const register = $derived(draft?.register ?? '');
+  $effect(() => {
+    const into = register;
+    if (!into) return;
+    void schemaOf(apiBase(), into).then((d) => {
+      if (into !== register || !d) return;
+      fields = d.fields.map((f) => {
+        const said = f as { id: string; label?: unknown; type?: unknown };
+        return { id: said.id, label: typeof said.label === 'string' && said.label ? said.label : humanize(said.id), type: typeof said.type === 'string' ? said.type : undefined };
+      });
+    });
+  });
+  const labelOf = (field: string): string => fields.find((f) => f.id === field)?.label ?? humanize(field);
+  const typeOf = (field: string): string | undefined => fields.find((f) => f.id === field)?.type;
+  const unread = $derived(fields.filter((f) => !(draft?.readings ?? []).some((r) => r.field === f.id)));
+
+  function pickList(id: string) {
+    if (!id) return;
+    draft = draft === null ? freshDraft(samples, id, Date.now()) : { ...draft, register: id, readings: draft.register === id ? draft.readings : [] };
+  }
+
+  /* THE DRY RUN, again on every change while its answer is on screen. A later answer replaces an earlier one only if it
+     is the answer to the latest change, so a slow try never draws over a newer one. */
+  let tried = $state.raw<Tried | null>(null);
+  let tryFix = $state<string | null>(null);
+  let tries = 0;
+  $effect(() => {
+    const d = draft;
+    const s = samples;
+    if (d === null || s.length === 0 || (step !== 2 && step !== 4)) return;
+    const mine = ++tries;
+    void tryPattern(apiBase(), d, s).then((out) => {
+      if (mine !== tries) return;
+      tried = out.ok ? out.value : null;
+      tryFix = out.ok ? null : out.fix;
+    });
+  });
+  const claimed = $derived(tried ? tried.claims.filter(Boolean).length : 0);
+
+  /* SCREEN 1: the pager and the paste box. */
+  const current = $derived(samples[Math.min(index, Math.max(0, samples.length - 1))]);
+  function addPasted() {
+    const body = pasteText.trim();
+    if (!body || samples.length >= SAMPLES_MOST) return;
+    samples = [...samples, { key: `paste:${pasted++}`, channel: null, from: '', subject: '', body: body.slice(0, PASTED_CHARS_MOST) }];
+    pasteText = '';
+    index = samples.length - 1;
+  }
+  function removeSample(key: string) {
+    samples = samples.filter((s) => s.key !== key);
+    index = Math.max(0, Math.min(index, samples.length - 1));
+  }
+  const nameOf = (s: Sample, i: number): string => (s.key.startsWith('paste:') ? words.pastedFrom : s.from || words.sampleOf(i + 1, samples.length));
+
+  /* SCREEN 3: one field, a selection in one sample, and the ways to find it again. */
+  let pointing = $state<string | null>(null);
+  let picked = $state<{ sample: string; start: number; end: number; text: string } | null>(null);
+  let anchors = $state.raw<Anchor[] | null>(null);
+  let anchorFix = $state<string | null>(null);
+  let finding = $state(false);
+  let fallback = $state('');
+  const hasReading = $derived(pointing !== null && (draft?.readings ?? []).some((r) => r.field === pointing));
+
+  function point(field: string) {
+    pointing = field;
+    picked = null;
+    anchors = null;
+    anchorFix = null;
+    fallback = '';
+    step = 3;
+  }
+  async function find() {
+    const sel = picked;
+    const field = pointing;
+    if (!sel || !field || finding) return;
+    finding = true;
+    anchorFix = null;
+    try {
+      const out = await anchorsFor(apiBase(), samples, { sample: sel.sample, field, start: sel.start, end: sel.end, type: typeOf(field) });
+      anchors = out.ok ? out.value : [];
+      anchorFix = out.ok ? null : out.fix;
+    } finally {
+      finding = false;
+    }
+  }
+  function use(a: Anchor, another: boolean) {
+    if (!draft || !pointing) return;
+    draft = another ? withAnotherWay(draft, pointing, a.how) : withReading(draft, pointing, a.how);
+    step = 2;
+  }
+  function addFallback() {
+    if (!draft || !pointing) return;
+    const value = fallbackValue(fallback, typeOf(pointing));
+    if (value === null) return;
+    draft = withFallback(draft, pointing, value);
+    step = 2;
+  }
+  function narrow() {
+    if (!draft || !picked) return;
+    draft = withCondition(draft, { ask: 'body', test: 'contains', value: picked.text.trim() });
+    step = 2;
+  }
+
+  /* THE MATCH, as a sentence of conditions the person edits in place. */
+  function setCondition(i: number, patch: Partial<Condition>) {
+    if (!draft || draft.conditions === null) return;
+    draft = { ...draft, conditions: draft.conditions.map((c, j) => (j === i ? { ...c, ...patch } : c)) };
+  }
+  function addCondition() {
+    if (!draft) return;
+    draft = { ...draft, conditions: [...(draft.conditions ?? []), { ask: 'body', test: 'contains', value: '' }], match: null };
+  }
+  function dropCondition(i: number) {
+    if (!draft || draft.conditions === null) return;
+    draft = { ...draft, conditions: draft.conditions.filter((_, j) => j !== i) };
+  }
+
+  /* SCREEN 4: the save. One press at a time, and the owner's "Trust it now" after it. */
+  let saving = $state(false);
+  let saved = $state<'installed' | 'trusted' | 'suggested' | null>(null);
+  let saveFix = $state<string | null>(null);
+  const froms = $derived([...new Set(samples.map((s) => s.from).filter(Boolean))]);
+  async function save() {
+    if (!draft || saving) return;
+    if (!owner && samples.every((s) => s.key.startsWith('paste:'))) return void (saveFix = words.needsSample);
+    saving = true;
+    saveFix = null;
+    try {
+      if (owner) {
+        const out = await install(apiBase(), draft, 'proposed');
+        if (!out.ok) saveFix = out.fix;
+        else {
+          draft = { ...draft, confidence: 'proposed' };
+          saved = 'installed';
+        }
+      } else {
+        const out = await suggest(apiBase(), draft, samples, words.question(froms.length === 1 ? froms[0]! : ''));
+        if (!out.ok) saveFix = out.fix;
+        else if (out.value !== null) await goto(at(`/decide/${encodeURIComponent(out.value)}`));
+        else saved = 'suggested';
+      }
+    } finally {
+      saving = false;
+    }
+  }
+  async function trust() {
+    if (!draft || saving) return;
+    saving = true;
+    try {
+      const out = await install(apiBase(), draft, 'exact');
+      if (!out.ok) toasts.push(out.fix, { intent: 'warn' });
+      else {
+        draft = { ...draft, confidence: 'exact' };
+        saved = 'trusted';
+      }
+    } finally {
+      saving = false;
+    }
+  }
+
+  const reachable = (n: 1 | 2 | 3 | 4): boolean => n === 1 || (draft !== null && (n !== 3 || pointing !== null));
+</script>
+
+<svelte:head><title>{titleOf(words.title)}</title></svelte:head>
+
+<PageHead icon="inbox" title={words.title} kicker={words.kicker} back="/inbox" />
+
+{#if loadFix !== null}
+  <Empty kind="error" title={words.unreached} detail={loadFix}>
+    {#snippet actions()}<Button onclick={load}>{words.retry}</Button>{/snippet}
+  </Empty>
+{:else if !loaded}
+  <Waiting rows={4} />
+{:else if cantOpen}
+  <Empty kind="no-data-yet" title={words.cantOpen}>
+    {#snippet actions()}<Button href="/inbox">{words.toInbox}</Button>{/snippet}
+  </Empty>
+{:else if samples.length === 0 && asked.samples.length === 0 && step === 1 && pasted === 0}
+  <Empty kind="no-data-yet" title={words.noSamples} body={words.noSamplesBody}>
+    {#snippet actions()}<Button href="/inbox">{words.toInbox}</Button>{/snippet}
+  </Empty>
+{:else}
+  <nav class="steps" aria-label={words.title}>
+    <ol>
+      {#each words.steps as name, i (name)}
+        {@const n = (i + 1) as 1 | 2 | 3 | 4}
+        <li>
+          <button type="button" class="step" aria-current={step === n ? 'step' : undefined} disabled={!reachable(n)} onclick={() => (step = n)}>
+            <span class="step-n num">{n}</span>{name}
+          </button>
+        </li>
+      {/each}
+    </ol>
+  </nav>
+
+  {#if missing > 0}<p class="note">{words.missing(missing)}</p>{/if}
+
+  {#if step === 1}
+    <section class="screen" aria-labelledby="pattern-samples">
+      <h2 id="pattern-samples" class="screen-title">{words.steps[0]}</h2>
+      {#if current}
+        <div class="pager">
+          <Button weight="quiet" disabled={index === 0} onclick={() => (index -= 1)}>{words.previous}</Button>
+          <span class="counter num" aria-live="polite">{words.sampleOf(index + 1, samples.length)}</span>
+          <Button weight="quiet" disabled={index >= samples.length - 1} onclick={() => (index += 1)}>{words.next}</Button>
+        </div>
+        <article class="sample">
+          <p class="sample-from">{nameOf(current, index)}</p>
+          {#if !current.key.startsWith('paste:')}<p class="sample-subject">{current.subject || words.noSubject}</p>{/if}
+          <p class="sample-body">{current.body}</p>
+          <Button weight="bare" onclick={() => removeSample(current.key)}>{words.removeSample}</Button>
+        </article>
+      {/if}
+
+      <div class="field">
+        <label class="label" for="pattern-paste">{words.pasteLabel}</label>
+        <textarea id="pattern-paste" class="paste" rows="4" maxlength={PASTED_CHARS_MOST} bind:value={pasteText} disabled={samples.length >= SAMPLES_MOST}></textarea>
+        <p class="help">{samples.length >= SAMPLES_MOST ? words.samplesMost(SAMPLES_MOST) : words.pasteHelp}</p>
+        <div><Button disabled={pasteText.trim() === '' || samples.length >= SAMPLES_MOST} onclick={addPasted}>{words.pasteAdd}</Button></div>
+      </div>
+
+      <div class="field">
+        <label class="label" for="pattern-into">{words.intoLabel}</label>
+        <select id="pattern-into" class="select" value={register} onchange={(e) => pickList(e.currentTarget.value)}>
+          <option value="" disabled>{words.intoPick}</option>
+          {#each lists as l (l.id)}<option value={l.id}>{l.name}</option>{/each}
+        </select>
+      </div>
+    </section>
+  {:else if step === 2 && draft}
+    <section class="screen" aria-labelledby="pattern-reads">
+      <h2 id="pattern-reads" class="screen-title">{words.steps[1]}</h2>
+
+      <div class="match">
+        {#if draft.conditions === null}
+          <p class="match-lead">{words.matchKept}</p>
+          <div><Button weight="quiet" onclick={() => draft && (draft = { ...draft, conditions: [], match: null })}>{words.matchReplace}</Button></div>
+        {:else}
+          <p class="match-lead">{draft.conditions.length === 0 ? words.matchAny : words.matchLead}</p>
+          <ul class="conditions">
+            {#each draft.conditions as c, i (i)}
+              <li class="condition">
+                {#if i > 0}<span class="and">{words.matchAnd}</span>{/if}
+                <select class="select" aria-label={words.conditionAsk} value={c.ask} onchange={(e) => setCondition(i, { ask: e.currentTarget.value as Ask })}>
+                  {#each ASKS as a (a)}<option value={a}>{words.asks[a]}</option>{/each}
+                </select>
+                <select class="select" aria-label={words.conditionTest} value={c.test} onchange={(e) => setCondition(i, { test: e.currentTarget.value as Test })}>
+                  {#each TESTS as t (t)}<option value={t}>{words.tests[t]}</option>{/each}
+                </select>
+                <input class="input" aria-label={words.conditionValue} value={c.value} oninput={(e) => setCondition(i, { value: e.currentTarget.value })} />
+                <Button weight="bare" onclick={() => dropCondition(i)}>{words.removeCondition}</Button>
+              </li>
+            {/each}
+          </ul>
+          <div><Button weight="quiet" onclick={addCondition}>{words.addCondition}</Button></div>
+        {/if}
+        {#if tried}<Chip label={words.takes(claimed, samples.length)} tone={claimed === samples.length ? 'good' : claimed === 0 ? 'bad' : 'warn'} />{/if}
+      </div>
+
+      {#if tryFix}<p class="fix" role="alert">{tryFix}</p>{/if}
+      {#if draft.readings.length === 0}
+        <p class="note">{words.noReadings}</p>
+      {:else}
+        <FieldTable {samples} readings={draft.readings} {tried} {labelOf} onchange={point} onremove={(f) => draft && (draft = withoutReading(draft, f))} />
+      {/if}
+
+      {#if unread.length > 0}
+        <div class="field">
+          <label class="label" for="pattern-add">{words.addField}</label>
+          <select id="pattern-add" class="select" value="" onchange={(e) => e.currentTarget.value && point(e.currentTarget.value)}>
+            <option value="" disabled>{words.addFieldPick}</option>
+            {#each unread as f (f.id)}<option value={f.id}>{f.label}</option>{/each}
+          </select>
+        </div>
+      {/if}
+    </section>
+  {:else if step === 3 && draft && pointing}
+    {@const field = pointing}
+    <section class="screen" aria-labelledby="pattern-point">
+      <h2 id="pattern-point" class="screen-title">{labelOf(field)}</h2>
+      <p class="note">{words.selectLead(labelOf(field).toLowerCase())} {words.selectHelp}</p>
+      {#if current}
+        <div class="pager">
+          <Button weight="quiet" disabled={index === 0} onclick={() => ((index -= 1), (picked = null))}>{words.previous}</Button>
+          <span class="counter num" aria-live="polite">{words.sampleOf(index + 1, samples.length)}</span>
+          <Button weight="quiet" disabled={index >= samples.length - 1} onclick={() => ((index += 1), (picked = null))}>{words.next}</Button>
+        </div>
+        {#key current.key}
+          <SampleText body={current.body} label={nameOf(current, index)} onselect={(p) => (picked = { sample: current.key, ...p })} />
+        {/key}
+      {/if}
+
+      {#if anchorFix}<p class="fix" role="alert">{anchorFix}</p>{/if}
+      {#if anchors !== null}
+        <h3 class="sub">{words.candidates}</h3>
+        {#if anchors.length === 0}
+          <p class="note">{words.noCandidates}</p>
+        {:else}
+          <ul class="anchors">
+            {#each anchors as a, i (i)}
+              <li class="anchor">
+                <div class="anchor-main">
+                  <span class="anchor-said">{readingSaid(a.how)}</span>
+                  <span class="anchor-value">{valueSaid(a.value)}</span>
+                </div>
+                <Chip label={words.readsOf(a.hits, a.of)} tone={a.hits === a.of ? 'good' : 'warn'} />
+                <div class="anchor-acts">
+                  <Button onclick={() => use(a, false)}>{words.use}</Button>
+                  {#if hasReading}<Button weight="quiet" onclick={() => use(a, true)}>{words.anotherWay}</Button>{/if}
+                </div>
+              </li>
+            {/each}
+          </ul>
+        {/if}
+      {/if}
+
+      {#if picked}
+        <div><Button weight="quiet" onclick={narrow}>{words.narrow(picked.text.trim().slice(0, 40))}</Button></div>
+      {/if}
+
+      {#if hasReading && takesFallback(typeOf(field))}
+        <div class="field">
+          <label class="label" for="pattern-fallback">{words.fallbackLabel(labelOf(field).toLowerCase())}</label>
+          <input id="pattern-fallback" class="input" bind:value={fallback} />
+          <div><Button weight="quiet" disabled={fallbackValue(fallback, typeOf(field)) === null} onclick={addFallback}>{words.fallbackAdd}</Button></div>
+        </div>
+      {/if}
+    </section>
+  {:else if step === 4 && draft}
+    <section class="screen" aria-labelledby="pattern-try">
+      <h2 id="pattern-try" class="screen-title">{words.tryLead}</h2>
+      {#if tryFix}<p class="fix" role="alert">{tryFix}</p>{/if}
+      {#if tried}
+        <p class="summary">{words.claimed(claimed, samples.length)}</p>
+        <ul class="read-list">
+          {#each tried.fields as f (f.field)}
+            <li>{words.fieldRead(labelOf(f.field), f.cells.filter((c) => c.ok).length, samples.length)}</li>
+          {/each}
+        </ul>
+      {:else if !tryFix}
+        <Waiting rows={2} />
+      {/if}
+      {#if saved === 'installed' || saved === 'trusted'}
+        <p class="summary" role="status">{saved === 'trusted' ? words.trustedNote : words.saved}</p>
+        <p class="note">{tried?.waited ? words.accepted(tried.waited.accepted, tried.waited.of) : words.noneYet}</p>
+      {:else if saved === 'suggested'}
+        <p class="summary" role="status">{words.suggested}</p>
+      {/if}
+      {#if saveFix}<p class="fix" role="alert">{saveFix}</p>{/if}
+    </section>
+  {/if}
+
+  <!-- THE STEP'S ACTIONS, in one bar: at the foot of the screen at a desk, and held at the bottom above the tab bar on a
+       phone, where every one is a 44px button. -->
+  <div class="bar">
+    {#if step === 1}
+      <Button weight="primary" disabled={!draft || samples.length === 0} onclick={() => (step = 2)}>{words.toTable}</Button>
+      {#if !draft}<span class="bar-note">{words.needsList}</span>{/if}
+    {:else if step === 2}
+      <Button weight="quiet" onclick={() => (step = 1)}>{words.back}</Button>
+      <Button weight="primary" disabled={!draft || draft.readings.length === 0} onclick={() => (step = 4)}>{words.toTry}</Button>
+    {:else if step === 3}
+      <Button weight="quiet" onclick={() => (step = 2)}>{words.back}</Button>
+      <Button weight="primary" disabled={!picked || finding} onclick={find}>
+        {finding ? words.finding : picked ? words.find(picked.text.trim().slice(0, 24)) : words.pointAt}
+      </Button>
+    {:else if step === 4}
+      <Button weight="quiet" onclick={() => (step = 2)}>{words.back}</Button>
+      {#if saved === 'installed'}
+        <Button weight="primary" disabled={saving} onclick={trust}>{words.trust}</Button>
+      {:else if saved === null}
+        <Button weight="primary" disabled={saving || !draft || draft.readings.length === 0} onclick={save}>
+          {saving ? words.saving : owner ? words.save : words.suggest}
+        </Button>
+      {/if}
+    {/if}
+  </div>
+{/if}
+
+<style>
+  .steps ol {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+    margin: 0 0 var(--sp-5);
+    padding: 0;
+    list-style: none;
+  }
+
+  .step {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-block-size: var(--ctl-h);
+    padding: 0 var(--sp-3);
+    border: 1px solid var(--line);
+    border-radius: var(--r-pill);
+    background: none;
+    color: var(--ink2);
+    font: inherit;
+    font-size: var(--t-sm);
+    cursor: pointer;
+  }
+
+  .step[aria-current='step'] {
+    background: var(--selected);
+    color: var(--ink);
+    border-color: var(--edge);
+  }
+
+  .step:disabled {
+    cursor: default;
+    color: var(--dim);
+  }
+
+  .step-n {
+    color: var(--dim);
+  }
+
+  .screen {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-4);
+    max-inline-size: var(--page-max);
+  }
+
+  .screen-title {
+    margin: 0;
+    font-size: var(--t-md);
+    font-weight: 600;
+  }
+
+  .sub {
+    margin: 0;
+    font-size: var(--t-base);
+    font-weight: 600;
+  }
+
+  .note,
+  .help,
+  .bar-note {
+    margin: 0;
+    color: var(--dim);
+    font-size: var(--t-sm);
+    max-inline-size: var(--measure);
+  }
+
+  .fix {
+    margin: 0;
+    color: var(--danger);
+    font-size: var(--t-sm);
+  }
+
+  .summary {
+    margin: 0;
+    color: var(--ink);
+  }
+
+  .pager {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    flex-wrap: wrap;
+  }
+
+  .counter {
+    color: var(--ink2);
+    font-size: var(--t-sm);
+  }
+
+  .sample {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+    padding: var(--sp-3);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+  }
+
+  .sample-from {
+    margin: 0;
+    font-weight: 500;
+    overflow-wrap: anywhere;
+  }
+
+  .sample-subject {
+    margin: 0;
+    color: var(--dim);
+    font-size: var(--t-sm);
+    overflow-wrap: anywhere;
+  }
+
+  .sample-body {
+    margin: var(--sp-2) 0;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    max-block-size: 40dvh;
+    overflow-y: auto;
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    max-inline-size: var(--measure);
+  }
+
+  .label {
+    font-size: var(--t-sm);
+    color: var(--ink2);
+  }
+
+  .paste,
+  .input,
+  .select {
+    min-block-size: var(--ctl-h);
+    padding: var(--sp-2) var(--sp-3);
+    border: 1px solid var(--edge);
+    border-radius: var(--r-md);
+    background: var(--bg);
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--t-md);
+  }
+
+  .paste {
+    resize: vertical;
+  }
+
+  .match {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--sp-2);
+  }
+
+  .match-lead {
+    margin: 0;
+  }
+
+  .conditions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .condition {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2);
+  }
+
+  .and {
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  .anchors,
+  .read-list {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .anchor {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2) var(--sp-3);
+    padding: var(--sp-3) 0;
+    border-block-end: 1px solid var(--line-soft);
+  }
+
+  .anchor-main {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+    flex: 1 1 16ch;
+    min-inline-size: 0;
+  }
+
+  .anchor-said {
+    overflow-wrap: anywhere;
+  }
+
+  .anchor-value {
+    color: var(--dim);
+    font-size: var(--t-sm);
+    overflow-wrap: anywhere;
+  }
+
+  .anchor-acts {
+    display: flex;
+    gap: var(--sp-2);
+  }
+
+  .read-list li {
+    padding: var(--sp-1) 0;
+  }
+
+  .bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--sp-2);
+    margin-block-start: var(--sp-5);
+    padding-block: var(--sp-3);
+    border-block-start: 1px solid var(--line-soft);
+  }
+
+  /* ON A PHONE THE BAR STAYS UNDER THE THUMB, above the tab bar, and every action in it is 44px and shares the width. */
+  @media (width < 640px) {
+    .bar {
+      position: sticky;
+      inset-block-end: 0;
+      background: var(--bg);
+    }
+
+    .bar :global(button),
+    .bar :global(a) {
+      flex: 1 1 0;
+      min-block-size: var(--tap);
+    }
+
+    .anchor-acts :global(button),
+    .pager :global(button) {
+      min-block-size: var(--tap);
+    }
+  }
+</style>

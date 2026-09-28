@@ -29,6 +29,11 @@ import { methods as slashDraft } from './slash-draft.ts';
 import { methods as comments } from './comments.ts';
 import { methods as vaultPassphrase } from './vault-passphrase.ts';
 import { methods as shares } from './shares.ts';
+import { methods as ownTokens } from './own-tokens.ts';
+import { methods as quiet } from './quiet.ts';
+import { methods as retype } from './retype.ts';
+import { methods as pattern } from './pattern.ts';
+import { methods as personName } from './person-name.ts';
 /* END METHODS */
 
 /**
@@ -80,6 +85,11 @@ export function methods(deps: RecordDeps) {
     ...comments(deps),
     ...vaultPassphrase(deps),
     ...shares(deps),
+    ...ownTokens(deps),
+    ...quiet(deps),
+    ...retype(deps),
+    ...pattern(deps),
+    ...personName(deps),
     /* END METHODS */
   };
 }

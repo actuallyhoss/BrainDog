@@ -1,6 +1,6 @@
 {
   "pack": "project-brief",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "title": "Project brief",
   "summary": "A line on what each project is, the plan for it, and what is in the way.",
   "author": "BrainDog",
@@ -36,6 +36,39 @@
       ]
     }
   },
+  "adds": [
+    {
+      "page": "page.project",
+      "after": "Where it stands",
+      "note": "The one line, the plan and what is in the way, on the project page itself, where the old tool shows them.",
+      "block": {
+        "kind": "cards",
+        "heading": "The brief",
+        "span": 12,
+        "source": "register.things",
+        "where": "name is {{name}}",
+        "columns": [
+          {
+            "field": "summary",
+            "label": "One line",
+            "as": "title"
+          },
+          {
+            "field": "plan",
+            "label": "The plan",
+            "as": "fact"
+          },
+          {
+            "field": "blockers",
+            "label": "In the way",
+            "as": "fact"
+          }
+        ],
+        "limit": 1,
+        "empty": "Nobody has written a line, a plan or what is in the way for {{name}} yet."
+      }
+    }
+  ],
   "declarations": [
     {
       "page": "briefs",

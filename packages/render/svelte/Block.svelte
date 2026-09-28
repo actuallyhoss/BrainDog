@@ -1,6 +1,6 @@
 <!--
-  One drawn block. Dispatches on `KINDS[kind].primitive` to one of the eight primitive components, which is why a
-  kind a pack invented after this bundle shipped renders anyway. The few kinds with a drawer and a callback of their
+  One drawn block. Dispatches on its spec's primitive (`kindSpec`, with the kinds the host installed in `opts.kinds`) to
+  one of the eight primitive components, which is why a kind a pack invented after this bundle shipped renders anyway. The few kinds with a drawer and a callback of their
   own (`inputs`, `calendar`, `link`, `gallery`, `embed` and `steps path`) are asked for by name first, below.
 
   The `<figure>` skeleton, its classes and its data attributes are the same as `toHTML`'s, so the
@@ -8,7 +8,8 @@
   police afterwards (50 §2.7).
 -->
 <script lang="ts">
-  import { KINDS, TONES, captioned, inline, type Block, type RenderOptions, type Row } from '../src/index.ts';
+  import { TONES, captioned, inline, type Block, type RenderOptions, type Row } from '../src/index.ts';
+  import { kindSpec } from '../src/kind-spec.ts';
   import Text from './Text.svelte';
   import Panel from './p/Panel.svelte';
   import Grid from './p/Grid.svelte';
@@ -87,8 +88,10 @@
 
   const PRIMITIVE = { panel: Panel, grid: Grid, rows: Rows, proportional: Proportional, inline: InlineRun, list: List, media: Media };
 
-  const spec = $derived(KINDS[block.kind]);
-  const Draw = $derived(PRIMITIVE[spec.primitive as keyof typeof PRIMITIVE]);
+  /* THROUGH `kindSpec`, so a kind a pack declared is looked up in the installed ones the host passed (`opts.kinds`) and
+     drawn by its primitive below like any first-party kind on it. `undefined` is a kind nobody installed. */
+  const spec = $derived(kindSpec(block.kind, opts.kinds));
+  const Draw = $derived(spec ? PRIMITIVE[spec.primitive as keyof typeof PRIMITIVE] : undefined);
 
   /* `comparison` builds its columns from its first row, which fixes the column count. The
      derivation is `comparisonPlan` in `../src/table.ts` rather than here, because `toHTML` has to
@@ -97,6 +100,10 @@
   const comparison = $derived(comparisonPlan(block.rows));
 </script>
 
+{#if !spec}
+  <!-- A kind nobody installed, `toHTML`'s same one line: a label and what to do, never an empty figure. -->
+  <figure class="block" data-kind={block.kind}><p class="needs-client">Block “{block.kind}” needs a newer client.</p></figure>
+{:else}
 <figure
   class="block block-{spec.primitive}"
   data-kind={block.kind}
@@ -160,3 +167,4 @@
     <p class="needs-client">Block “{block.kind}” needs a newer client.</p>
   {/if}
 </figure>
+{/if}

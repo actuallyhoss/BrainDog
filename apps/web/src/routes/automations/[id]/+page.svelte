@@ -4,28 +4,37 @@
   THE TRIGGER CARD ON TOP, THEN THE STEPS IN A COLUMN, and a branch's two arms as two columns under it. That is the
   whole geometry: nothing has an x or a y, so every drag, key and menu entry is a move between lists (`lib/flow`).
 
-  ONE DRAFT, SENT ONCE, AS AN AGENT WOULD SEND IT. "Send to Decide" files a `change` to `rule.<id>` through `propose`
-  with the whole body and the version it was opened at (`flow.ts` `proposalOf`), the proposal `packages/mcp` documents
-  for an agent. Nothing here writes a declaration: the owner's press on Decide installs it, with the calls it makes
-  shown there once, and a canvas edit and an agent's edit are the same thing to review.
+  ONE DRAFT, SENT ONCE, AS AN AGENT WOULD SEND IT. A save files a `change` to `rule.<id>` through `propose` with the
+  whole body and the version it was opened at (`flow.ts` `proposalOf`), the proposal `packages/mcp` documents for an
+  agent, and a canvas edit and an agent's edit are the same thing to review. FOR THE OWNER IT IS ONE PRESS: "Save and
+  turn on" files the change and accepts it at once (`decide`), as `record/field-write.ts` does for a new field, so the
+  owner never walks to Decide to approve what they drew a second ago. Anybody else's save waits there for the owner.
 
-  WHAT IS WRONG IS SAID BEFORE THE BUTTON, on the card it is about, in the lint's terms (`faultsOf`); the record checks
-  again when it is filed and its word is final.
+  WHAT IS WRONG IS SAID BEFORE THE BUTTON, on the card it is about: the builder's own reading first (`faultsOf`), and
+  once that is clear, the record's (`checkAutomation`), which is the install's own lint and names the step by its place
+  in the body. The page puts it on the card at that place (`FlowDraft.serve`).
 
-  TRY IT BEFORE SENDING IT. "Try it" hands the drawn body to the record's own `dryRun`, which writes nothing, and draws
-  the answer under the column (`Tried.svelte`): how many rows an inline rule matches now, or a run's steps as the record
-  says them. Before it, the only way to see whether a condition caught anything was to send it and wait.
+  TRY IT BEFORE SAVING IT. A run is tried by the real runner over a sample picked in the panel (`tryAutomation`), and
+  every card is painted with how its step went; an inline rule is walked over its list by the dry run (`Tried.svelte`).
+  Neither writes anything.
 
-  RUNS, AND "AS WRITTEN". Runs lists the record's own runs with each step's outcome and a failed run's sentence, and a
-  run that has not finished can be stopped. As written is the declaration itself, one click away and never the only
-  way to see it (21 §3.1's text lens).
+  THE LIFECYCLE IS IN THE HEAD'S MENU: turn it off and on (`setAutomation`, a new version landed at once), duplicate it
+  into a new draft, and delete it (`retireDeclaration`). Rename is offered only once it is saved, since a new draft's
+  name is the first field of its trigger's sheet.
+
+  RUNS, VERSIONS AND "AS WRITTEN". Runs pages back through the record's runs, and a run opens in a sheet drawn on the
+  canvas of the version it ran under, with Run it again. Versions lists what was installed, what changed from the one
+  before in the steps' own words, and puts an older one back on the canvas to be saved. As written is the declaration
+  itself, one click away and never the only way to see it (21 §3.1's text lens).
 -->
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
   import { untrack } from 'svelte';
+  import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { since } from 'braindog-render';
   import { titleOf } from '$lib/title.ts';
+  import { actor } from '$lib/record/names.ts';
   import { openActions, type ActionRow, type CallOut } from '$lib/record/actions.ts';
   import CallsOut from '$lib/ui/CallsOut.svelte';
   import type { Shell } from '$lib/record/boot-live.ts';
@@ -34,46 +43,102 @@
   import Empty from '$lib/ui/Empty.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import Menu from '$lib/ui/Menu.svelte';
+  import Sheet from '$lib/ui/Sheet.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { covered } from '$lib/a11y/keys.svelte.ts';
   import { closed, drew, opened } from '$lib/ui/screen.svelte.ts';
   import FlowList from '$lib/flow/FlowList.svelte';
   import Inspector from '$lib/flow/Inspector.svelte';
+  import RunView from '$lib/flow/RunView.svelte';
   import Tried from '$lib/flow/Tried.svelte';
   import { FlowDraft } from '$lib/flow/flow.svelte.ts';
-  import { ROOT, VERB_LABELS, callsIn, freshId, sayStart, words, type Verb } from '$lib/flow/flow.ts';
-  import { answerWords, openAutomations, type Answer, type AutomationRow, type Source, type Tried as TriedAnswer } from '$lib/flow/source.ts';
+  import { ROOT, callsIn, freshId, sayStart, triggerKind, words } from '$lib/flow/flow.ts';
+  import {
+    diffLines,
+    durationOf,
+    editWords,
+    openAutomations,
+    sampleOf,
+    sayLines,
+    stepAnswer,
+    type Answer,
+    type AutomationRow,
+    type Pick,
+    type Pickable,
+    type RunRow,
+    type Source,
+    type Tried as TriedAnswer,
+    type TryRun,
+    type Version,
+  } from '$lib/flow/source.ts';
 
   const flow = new FlowDraft({ slash: () => page.data.slash === true });
 
-  /* THE WORDS THIS PAGE ADDS, kept here while `flow.ts` is another brief's file; they can move into `words` there. */
-  const say = {
-    rename: 'Rename',
-    tryIt: 'Try it',
-    trying: 'Trying',
-    start: 'Pick what starts it and add a step, then send it to Decide.',
-  };
   const cap = (s: string): string => (s === '' ? s : s[0]!.toUpperCase() + s.slice(1));
-  /* A RUN'S STEP IS KEPT BY ITS VERB, `ask_person`, and printed raw it was the runner's word on the owner's screen. */
-  const verbWord = (kind: string): string => (Object.hasOwn(VERB_LABELS, kind) ? VERB_LABELS[kind as Verb] : kind);
+
+  /**
+   * THE RECORD'S REFUSALS THAT ARE ABOUT THE CALLER OR THE WIRE, NOT THE BODY. A check refused for one of these says
+   * nothing about the steps, so it paints no card and holds no save back; the save meets the same answer and says it.
+   */
+  const QUIET: ReadonlySet<string> = new Set(['UNREACHABLE', 'UNAUTHORIZED', 'ROUTE_UNKNOWN', 'LEVEL_REQUIRED', 'FORBIDDEN']);
+  /** How long the canvas rests before the record is asked about it, so a name typed letter by letter is asked once. */
+  const CHECK_AFTER = 500;
 
   let from = $state<'reading' | 'ready' | 'missing' | 'refused'>('reading');
   let source = $state<Source | null>(null);
   let row = $state<AutomationRow | null>(null);
   let taken = $state<string[]>([]);
   let fix = $state('');
-  let tab = $state<'steps' | 'runs' | 'written'>('steps');
+  let tab = $state<'steps' | 'runs' | 'versions' | 'written'>('steps');
   let busy = $state(false);
   let filed = $state<{ id: string | null } | null>(null);
   let refusal = $state('');
-  /** The last Try it, and the body it was asked about, so an edit after it hides an answer about a flow that is gone. */
+  /** The last dry run of an inline body, and the body it was asked about, so an edit after it hides a stale answer. */
   let tried = $state<{ body: string; answer: Answer<TriedAnswer> } | null>(null);
+  /** The last try of a run body, kept the same way. Its steps are painted on the cards as well. */
+  let ran = $state<{ body: string; answer: Answer<TryRun> } | null>(null);
   let trying = $state(false);
+  /** What a try starts from, bound into the panel so the sticky bar's Try reads the same pick. */
+  let pick = $state<Pick>({ from: 'latest', row: '', json: '' });
+  let pickRows = $state<Pickable[]>([]);
+  let arrivals = $state<Pickable[]>([]);
   /** What a new draft looked like when it opened, so the page can tell a draft nobody has touched from one being drawn. */
   let startedAs = $state('');
 
+  /* THE RUNS, PAGED. The first page comes with the automation; `older` is the run the next page starts before. */
+  let runs = $state<RunRow[]>([]);
+  let older = $state<string | null>(null);
+  let paging = $state(false);
+  let runOpen = $state<RunRow | null>(null);
+  let runSheet = $state(false);
+  let retrying = $state(false);
+
+  /* THE VERSIONS, read when the tab or a run of an older version first needs them. */
+  let versions = $state<Version[] | null>(null);
+  let versionsFix = $state('');
+  let diffOf = $state<number | null>(null);
+
+  let menuOpen = $state(false);
+  let removeSheet = $state(false);
+  let removing = $state(false);
+  let switching = $state(false);
+
   const id = $derived(String(page.params.id ?? ''));
   const fresh = $derived(id === 'new');
+  const owner = $derived(page.data.me?.owner === true);
+  const me = $derived(String(page.data.me?.person ?? ''));
+  const names = $derived(new Map(Object.entries((page.data.names ?? {}) as Record<string, string>)));
+
+  /** Take a freshly read automation: its row, its first page of runs, and its body on the canvas. */
+  function take(one: AutomationRow) {
+    row = one;
+    runs = one.runs;
+    older = one.older;
+    versions = null;
+    diffOf = null;
+    if (one.body) flow.open(one.id, one.body, one.version);
+  }
 
   async function load(want: string) {
     const at = opened();
@@ -90,23 +155,38 @@
     filed = null;
     refusal = '';
     tried = null;
+    ran = null;
     startedAs = '';
+    runs = [];
+    older = null;
+    runOpen = null;
+    versions = null;
+    tab = 'steps';
     if (want === 'new') {
       row = null;
-      flow.open('automation', null, null);
-      startedAs = JSON.stringify(flow.body);
+      /* A DUPLICATE OPENS AS A NEW DRAFT WITH THE STEPS OF THE ONE IT CAME FROM, named as a copy, on, and unsaved. The
+         id is made from the name at the first save (`freshId`), as for any new one. */
+      const copyOf = page.url.searchParams.get('from');
+      const origin = copyOf && !out.absent ? await out.source.automation(copyOf) : null;
+      if (origin?.ok && origin.value.body) {
+        const { enabled: _was, ...body } = origin.value.body;
+        flow.open('automation', { ...body, rule: 'automation', name: editWords.copyOf(origin.value.name) }, null);
+      } else {
+        flow.open('automation', null, null);
+        startedAs = JSON.stringify(flow.body);
+      }
       from = 'ready';
       return;
     }
     /* THE LIST CARRIES NO BODY, so the one is asked for by its id. A record without the read cannot open one it has, and
        says so the same way as an id it does not have. */
     const one = out.absent ? null : await out.source.automation(want);
-    row = one?.ok ? one.value : null;
-    if (!row || !row.body) {
+    if (!one?.ok || !one.value.body) {
+      row = null;
       from = 'missing';
       return;
     }
-    flow.open(row.id, row.body, row.version);
+    take(one.value);
     from = 'ready';
   }
 
@@ -143,9 +223,58 @@
   const untouched = $derived(fresh && startedAs !== '' && drawn === startedAs);
   const shown = $derived(untouched ? [] : faults);
   const general = $derived(shown.filter((f) => f.key === null));
+  /* THE RECORD'S WORD ON THE BODY DRAWN NOW, from `checkAutomation`. One about a step is on that card (`FlowCard`); one
+     about the body as a whole is said here with the builder's own. */
+  const served = $derived(untouched ? null : flow.served);
+  const blocked = $derived(faults.length > 0 || served !== null);
   const triedNow = $derived(tried !== null && tried.body === drawn ? tried.answer : null);
-  const title = $derived(flow.draft.name.trim() || (fresh ? words.newOne : flow.draft.id));
+  const ranNow = $derived(ran !== null && ran.body === drawn ? ran.answer : null);
+  /* THE DECLARED TITLE, NEVER THE ID (`loop/finish/design-brief.md` §9): the name typed, else the one the record's row
+     carries, which `rowOf` has already worked out from the product's names when the body declares none. */
+  const title = $derived(flow.draft.name.trim() || (row ? row.name : fresh ? words.newOne : words.untitled));
   const manual = $derived('manual' in flow.draft.trigger);
+  const kind = $derived(triggerKind(flow.draft.trigger));
+  const register = $derived('written' in flow.draft.trigger ? flow.draft.trigger.written.register : null);
+  const saveWord = $derived(busy ? words.saving : !owner ? words.save : row ? editWords.saveChanges : editWords.saveOn);
+
+  /* THE RECORD IS ASKED ABOUT THE BODY ONCE THE BUILDER HAS NOTHING TO SAY ABOUT IT, after the canvas rests. Asked
+     sooner, it would say the same fault twice in two sets of words. */
+  $effect(() => {
+    const body = drawn;
+    const s = source;
+    if (from !== 'ready' || s === null || untouched || faults.length > 0) return;
+    const wait = setTimeout(() => {
+      void s.check(JSON.parse(body) as Record<string, unknown>).then((out) => {
+        if (out.ok) flow.serve(body, null);
+        else if (!QUIET.has(out.refusal.code)) flow.serve(body, { say: out.refusal.fix, at: out.refusal.at });
+      });
+    }, CHECK_AFTER);
+    return () => clearTimeout(wait);
+  });
+
+  /* WHAT A TRY CAN START FROM: the newest rows of the list a change starts it on, and for an owner the newest arrivals. */
+  $effect(() => {
+    const list = register;
+    const s = source;
+    if (s === null || list === null || list === '') {
+      pickRows = [];
+      return;
+    }
+    untrack(() => {
+      void s.rows(list, now).then((out) => {
+        if (register === list) pickRows = out.ok ? out.value : [];
+      });
+    });
+  });
+  $effect(() => {
+    const s = source;
+    if (s === null || kind !== 'arrival' || !owner) return;
+    untrack(() => {
+      void s.arrivals(now).then((out) => {
+        arrivals = out.ok ? out.value : [];
+      });
+    });
+  });
 
   /**
    * THE CALLS IT MAKES, AS DECIDE WILL LIST THEM, drawn from the record's own `actions` read: the host and the key are on
@@ -162,36 +291,83 @@
   );
 
 
-  async function send() {
-    if (!source || busy || faults.length > 0) return;
-    if (fresh) flow.draft = { ...flow.draft, id: freshId(flow.draft.name, taken) };
+  /**
+   * Save what is drawn. Anybody's save files the change; the owner's is accepted in the same press, so it lands and runs
+   * without a trip to Decide. A new one lands on its own page, where Run now and Rename are offered from then on.
+   */
+  async function save() {
+    if (!source || busy || blocked || !flow.dirty) return;
+    const isNew = row === null;
+    if (isNew) flow.draft = { ...flow.draft, id: freshId(flow.draft.name, taken) };
     busy = true;
     refusal = '';
     const out = await source.propose(flow.proposal());
-    busy = false;
     if (!out.ok) {
+      busy = false;
       refusal = out.refusal.fix;
       return;
     }
     filed = out.value;
     flow.sent();
-    toasts.push(words.filed);
+    if (!owner || out.value.id === null) {
+      busy = false;
+      toasts.push(words.filed);
+      return;
+    }
+    const accepted = await source.accept(out.value.id);
+    busy = false;
+    if (!accepted.ok) {
+      /* FILED AND NOT ACCEPTED: the change waits on Decide, and the footer says so with the link and the record's reason. */
+      refusal = accepted.refusal.fix;
+      toasts.push(editWords.filedOnly, { intent: 'warn' });
+      return;
+    }
+    filed = null;
+    toasts.push(isNew ? editWords.savedOn : editWords.saved);
+    if (isNew) {
+      await goto(at(`/automations/${flow.draft.id}`));
+      return;
+    }
+    await reopen();
   }
 
-  /** The record's own dry run of what is drawn now. It writes nothing, so it needs no fault-free body and no Decide. */
+  /**
+   * Try what is drawn now. A run is taken by the real runner over the picked sample and its steps painted on the cards;
+   * an inline rule is walked by the dry run. Neither writes anything, so neither needs a fault-free body.
+   */
   async function tryIt() {
     if (!source || trying) return;
     const body = flow.body;
     const asked = JSON.stringify(body);
     trying = true;
-    const answer = await source.dryRun(body);
+    if (flow.path === 'inline') {
+      const answer = await source.dryRun(body);
+      tried = { body: asked, answer };
+      ran = null;
+      flow.unpaint();
+    } else {
+      const sample = sampleOf(kind, pick, pickRows, arrivals);
+      const answer: Answer<TryRun> = sample.ok ? await source.attempt(body, sample.value) : sample;
+      ran = { body: asked, answer };
+      tried = null;
+      if (answer.ok) flow.paint(asked, answer.value.steps, (s) => stepAnswer(s.verb, s.answer));
+      else {
+        flow.unpaint();
+        /* A REFUSAL THAT NAMES A STEP GOES ON ITS CARD, as the check's does. */
+        if (answer.refusal.at !== undefined && !QUIET.has(answer.refusal.code) && answer.refusal.at.includes('['))
+          flow.serve(asked, { say: answer.refusal.fix, at: answer.refusal.at });
+      }
+    }
     trying = false;
-    tried = { body: asked, answer };
   }
 
+  /** Held while Run now is on the wire, so a double press starts one run and not two. */
+  let starting = false;
+
   async function runNow() {
-    if (!source || !row) return;
-    const out = await source.run(row.id);
+    if (!source || !row || starting) return;
+    starting = true;
+    const out = await source.run(row.id).finally(() => (starting = false));
     if (!out.ok) return void toasts.push(out.refusal.fix, { intent: 'warn' });
     toasts.push(words.ran);
     await reread();
@@ -209,7 +385,109 @@
   async function reread() {
     if (!source || !row) return;
     const out = await source.automation(row.id);
-    if (out.ok) row = out.value;
+    if (!out.ok) return;
+    row = out.value;
+    runs = out.value.runs;
+    older = out.value.older;
+  }
+
+  /** The automation again, with what was just saved on the canvas as the version now live. */
+  async function reopen() {
+    if (!source || !row) return;
+    const out = await source.automation(row.id);
+    if (out.ok) take(out.value);
+  }
+
+  /** The page of runs before the last one shown. */
+  async function moreRuns() {
+    if (!source || !row || older === null || paging) return;
+    paging = true;
+    const out = await source.automation(row.id, { before: older });
+    paging = false;
+    if (!out.ok) return void toasts.push(out.refusal.fix, { intent: 'warn' });
+    const seen = new Set(runs.map((r) => r.id));
+    runs = [...runs, ...out.value.runs.filter((r) => !seen.has(r.id))];
+    older = out.value.older;
+  }
+
+  async function loadVersions() {
+    if (!source || !row || versions !== null) return;
+    const out = await source.versions(row.id);
+    versions = out.ok ? out.value : [];
+    versionsFix = out.ok ? '' : out.refusal.fix;
+  }
+
+  /** Open one run's detail, reading the versions when it ran under one that is not live now. */
+  function openRun(r: RunRow) {
+    runOpen = r;
+    runSheet = true;
+    if (row && r.version !== null && r.version !== row.version) void loadVersions();
+  }
+
+  /** The body a run ran under: the live one, or an older version's once the versions are read, else none. */
+  function bodyOfRun(r: RunRow) {
+    if (!row) return null;
+    if (r.version === null || r.version === row.version) return row.body;
+    return versions?.find((v) => v.version === r.version)?.body ?? null;
+  }
+
+  async function retry(r: RunRow) {
+    if (!source || retrying) return;
+    retrying = true;
+    const out = await source.retry(r.id);
+    retrying = false;
+    if (!out.ok) return void toasts.push(out.refusal.fix, { intent: 'warn' });
+    toasts.push(editWords.retried);
+    runSheet = false;
+    runOpen = null;
+    await reread();
+  }
+
+  async function switchTo(enabled: boolean) {
+    menuOpen = false;
+    if (!source || !row || switching) return;
+    switching = true;
+    const out = await source.setEnabled(row.id, enabled);
+    switching = false;
+    if (!out.ok) return void toasts.push(out.refusal.fix, { intent: 'warn' });
+    flow.switched(out.value.enabled, out.value.version);
+    row = { ...row, enabled: out.value.enabled, version: out.value.version };
+    versions = null;
+    toasts.push(out.value.enabled ? editWords.turnedOn : editWords.turnedOff);
+  }
+
+  function duplicate() {
+    menuOpen = false;
+    if (!row) return;
+    void goto(at(`/automations/new?${new URLSearchParams({ from: row.id }).toString()}`));
+  }
+
+  async function remove() {
+    if (!source || !row || removing) return;
+    removing = true;
+    const out = await source.retire(row.id);
+    removing = false;
+    if (!out.ok) return void toasts.push(out.refusal.fix, { intent: 'warn' });
+    removeSheet = false;
+    toasts.push(editWords.removed);
+    await goto(at('/automations'));
+  }
+
+  /** Put an older version on the canvas, to be saved over the live one. */
+  function putBack(v: Version) {
+    flow.restore(v.body);
+    tab = 'steps';
+    toasts.push(editWords.putBackSaid(v.version));
+  }
+
+  /** What one version changed from the one before it, in the steps' own words. */
+  function changesOf(i: number) {
+    const list = versions ?? [];
+    const v = list[i];
+    const before = list[i + 1];
+    if (!v || !row) return null;
+    if (!before) return [];
+    return diffLines(sayLines(row.id, before.body), sayLines(row.id, v.body)).filter((d) => d.op !== 'same');
   }
 
   /* ESCAPE DROPS A DRAG WHERE IT STARTED, and only when nothing is over the page: with the inspector open, Escape is
@@ -230,16 +508,30 @@
   <div class="page"><Empty kind="error" heading title={fix} /></div>
 {:else if from === 'missing'}
   <div class="page">
-    <Empty kind="no-results" heading title={`There is no automation called ${id}.`}>
+    <Empty kind="no-results" heading title={editWords.missing}>
       {#snippet actions()}<Button href="/automations">{words.heading}</Button>{/snippet}
     </Empty>
   </div>
 {:else if from === 'ready'}
   <!-- RENAME OPENS THE TRIGGER'S SHEET, WHOSE FIRST FIELD IS THE NAME, and `Sheet.svelte` puts the caret in the first
-       field it holds. A stranger clicked the title and nothing happened; the name was only reachable by opening the
-       trigger card, which nothing on it says (`loop/research-canvas-ux.md` 1.13). -->
+       field it holds. Offered once it is saved: a new draft's sheet opens on its trigger anyway, and "Rename" over a
+       draft with no name yet named nothing. The lifecycle sits in one "…" menu beside it, destructive last. -->
   <PageHead icon="refresh" kicker={words.heading} back="/automations" {title}>
-    {#snippet actions()}<Button onclick={() => flow.select('trigger')}>{say.rename}</Button>{/snippet}
+    {#snippet actions()}
+      {#if row}
+        <Button onclick={() => flow.select('trigger')}>{editWords.rename}</Button>
+        <Menu label={editWords.more(title)} align="end" bind:open={menuOpen}>
+          {#snippet trigger()}<span class="more-trigger tap"><Icon name="more" size="s" /><span class="vh">{editWords.more(title)}</span></span>{/snippet}
+          {#if owner}
+            <button type="button" class="mi" role="menuitem" disabled={switching} onclick={() => void switchTo(!row?.enabled)}>{row.enabled ? editWords.turnOff : editWords.turnOn}</button>
+          {/if}
+          <button type="button" class="mi" role="menuitem" onclick={duplicate}>{editWords.duplicate}</button>
+          {#if owner}
+            <button type="button" class="mi" role="menuitem" data-tone="bad" onclick={() => ((menuOpen = false), (removeSheet = true))}>{editWords.remove}</button>
+          {/if}
+        </Menu>
+      {/if}
+    {/snippet}
   </PageHead>
   <div class="page">
 
@@ -247,9 +539,12 @@
       <button type="button" class="segment" aria-pressed={tab === 'steps'} data-on={tab === 'steps' ? '' : undefined} onclick={() => (tab = 'steps')}>{words.steps}</button>
       {#if row}
         <button type="button" class="segment" aria-pressed={tab === 'runs'} data-on={tab === 'runs' ? '' : undefined} onclick={() => (tab = 'runs')}>{words.runs}</button>
+        <button type="button" class="segment" aria-pressed={tab === 'versions'} data-on={tab === 'versions' ? '' : undefined} onclick={() => ((tab = 'versions'), void loadVersions())}>{editWords.versions}</button>
       {/if}
       <button type="button" class="segment" aria-pressed={tab === 'written'} data-on={tab === 'written' ? '' : undefined} onclick={() => (tab = 'written')}>{words.written}</button>
     </div>
+
+    {#if row && !row.enabled}<p class="said">{words.off}</p>{/if}
 
     {#if tab === 'steps'}
       <div class="canvas">
@@ -259,16 +554,19 @@
           <span class="trigger-path">{flow.path === 'inline' ? words.inline : words.asRun}</span>
         </button>
         {#each general as f (f.say)}<p class="fault">{f.say}</p>{/each}
+        {#if served && served.key === null}<p class="fault">{served.say}</p>{/if}
         <FlowList {flow} list={ROOT} nodes={flow.draft.steps} faults={shown} />
       </div>
 
-      {#if triedNow}<Tried tried={triedNow} />{/if}
+      {#if flow.draft.steps.length > 0}
+        <Tried {kind} path={flow.path} {owner} rows={pickRows} {arrivals} bind:pick inline={triedNow} run={ranNow} />
+      {/if}
 
       {#if calls.length > 0}
         <dl class="calls"><CallsOut {calls} hosted={hostedHere(page.data as unknown as Shell)} /></dl>
       {/if}
 
-      <div class="bar">
+      <div class="foot">
         <!-- SENT SAYS SO ONLY UNTIL THE NEXT EDIT. Kept after one, the footer read "Sent to Decide" over a draft that was
              not, and hid the fault line that said why the button had gone grey. -->
         {#if filed && !flow.dirty}
@@ -276,56 +574,100 @@
             {words.filed}
             {#if filed.id}<a class="tap" href={at(`/decide/${filed.id}`)}>{words.openDecide}</a>{/if}
           </p>
-        {:else if refusal}
+        {/if}
+        {#if refusal}
           <p class="said" data-intent="warn" role="status">{refusal}</p>
         {:else if untouched}
-          <p class="said">{say.start}</p>
+          <p class="said">{editWords.start}</p>
         {:else if faults.length > 0}
           <p class="said">{words.faults}: {faults.length === 1 ? faults[0]!.say : `${faults.length} things, each on its card.`}</p>
-        {:else if !flow.dirty}
+        {:else if served}
+          <p class="said">{words.faults}: {served.say}</p>
+        {:else if !flow.dirty && !filed}
           <p class="said">{words.nothingChanged}</p>
         {/if}
-        <div class="bar-actions">
+        <div class="foot-actions">
           <Button disabled={!flow.canUndo} onclick={() => flow.undo()}>Undo</Button>
-          <Button disabled={trying} onclick={() => void tryIt()}>{trying ? say.trying : say.tryIt}</Button>
-          {#if manual && row && !flow.dirty}
+          {#if manual && row && row.enabled && !flow.dirty}
             <Button onclick={() => void runNow()}><Icon name="play" size="s" />{words.runNow}</Button>
           {/if}
-          <Button weight="primary" disabled={busy || faults.length > 0 || !flow.dirty} onclick={() => void send()}>{busy ? words.saving : words.save}</Button>
         </div>
       </div>
+
+      <!-- TRY AND SAVE, AND NOTHING ELSE, IN THE STICKY BAR, so on a phone it is one row of two 44px buttons, no taller than
+           `--sticky`, sitting above the tab bar (`loop/finish/design-brief.md` §6 and §11.12). -->
+      <div class="bar">
+        <Button disabled={trying || flow.draft.steps.length === 0} onclick={() => void tryIt()}>{trying ? editWords.trying : editWords.tryIt}</Button>
+        <Button weight="primary" disabled={busy || blocked || !flow.dirty} onclick={() => void save()}>{saveWord}</Button>
+      </div>
     {:else if tab === 'runs' && row}
-      {#if row.runs.length === 0}
+      {#if runs.length === 0}
         <Empty kind="no-data-yet" compact title={words.noRuns} />
       {:else}
         <ol class="runs">
-          {#each row.runs as r (r.id)}
-            <!-- STATE FIRST, WITH ITS DOT, AND THE ID LAST (DESIGN-SYSTEM 4.4). The id led in the identifier face and a failed
-                 run differed from a finished one by one lower-case word, with `data-state` on the row and nothing styling
-                 it (`loop/research-canvas-ux.md` 1.12). -->
+          {#each runs as r (r.id)}
+            {@const took = durationOf(r)}
+            <!-- STATE FIRST, WITH ITS DOT, THEN WHEN, HOW LONG AND WHAT STARTED IT, and no id: a run is opened by the whole
+                 row, and its detail is the canvas it ran on (`RunView.svelte`). -->
             <li class="run">
-              <p class="run-head">
-                <span class="dot" data-state={r.state} aria-hidden="true"></span>
-                <span>{cap(words.runState[r.state] ?? r.state)}, {since(r.started, now)}</span>
-                <span class="run-id">{r.id}</span>
-                {#if r.state === 'pending' || r.state === 'running' || r.state === 'waiting'}
-                  <Button weight="bare" onclick={() => void stop(r.id)}>{words.cancel}</Button>
-                {/if}
+              <button type="button" class="run-open" aria-label={`${editWords.openRun}: ${cap(words.runState[r.state] ?? r.state)}, ${since(r.started, now)}`} onclick={() => openRun(r)}>
+                <span class="run-head">
+                  <span class="dot" data-state={r.state} aria-hidden="true"></span>
+                  <span>{cap(words.runState[r.state] ?? r.state)}, {since(r.started, now)}</span>
+                </span>
+                <span class="run-meta">
+                  {#if took !== null}<span>{editWords.took(took)}</span>{/if}
+                  {#if r.trigger !== null && editWords.startedBy[r.trigger]}<span>{editWords.startedBy[r.trigger]}</span>{/if}
+                </span>
+                {#if r.say}<span class="run-say">{r.say}</span>{/if}
+              </button>
+              {#if r.state === 'pending' || r.state === 'running' || r.state === 'waiting'}
+                <Button weight="bare" onclick={() => void stop(r.id)}>{words.cancel}</Button>
+              {/if}
+            </li>
+          {/each}
+        </ol>
+        {#if older !== null}
+          <div><Button disabled={paging} onclick={() => void moreRuns()}>{editWords.olderRuns}</Button></div>
+        {/if}
+      {/if}
+    {:else if tab === 'versions' && row}
+      {#if versions === null}
+        <p class="said" role="status">{editWords.versions}</p>
+      {:else if versionsFix !== ''}
+        <p class="said" data-intent="warn" role="status">{versionsFix}</p>
+      {:else if versions.length === 0}
+        <Empty kind="no-data-yet" compact title={editWords.noVersions} />
+      {:else}
+        <ol class="versions">
+          {#each versions as v, i (v.version)}
+            {@const changes = diffOf === v.version ? changesOf(i) : null}
+            <li class="version">
+              <p class="version-head">
+                <span class="version-name">{editWords.versionOf(v.version)}</span>
+                {#if v.live}<span class="version-tag">{editWords.live}</span>{/if}
+                {#if !v.enabled}<span class="version-tag">{editWords.off}</span>{/if}
+                <span class="version-meta">{since(v.at, now)}{v.by ? `, ${editWords.by(actor(v.by, me, names).name)}` : ''}</span>
               </p>
-              {#if r.say}<p class="run-say">{r.say}</p>{/if}
-              {#if r.steps.length > 0}
-                <ol class="run-steps">
-                  {#each r.steps as s (s.n)}
-                    <li>
-                      <span class="run-n num">{s.n + 1}</span>
-                      <span class="run-line">
-                        <span class="run-kind">{verbWord(s.kind)}</span>
-                        <span class="run-state"><span class="dot" data-state={s.state} aria-hidden="true"></span>{words.runState[s.state] ?? s.state}</span>
-                        {#if s.answer}<span class="run-answer">{answerWords(s.answer)}</span>{/if}
-                      </span>
-                    </li>
-                  {/each}
-                </ol>
+              <div class="version-actions">
+                <Button weight="quiet" onclick={() => (diffOf = diffOf === v.version ? null : v.version)}>{diffOf === v.version ? editWords.hideChanges : editWords.showChanges}</Button>
+                {#if !v.live}<Button weight="quiet" onclick={() => putBack(v)}>{editWords.putBack}</Button>{/if}
+              </div>
+              {#if changes !== null}
+                {#if changes.length === 0}
+                  <p class="said">{i === versions.length - 1 ? editWords.firstVersion : editWords.noChanges}</p>
+                {:else}
+                  <ul class="diff">
+                    {#each changes as d, j (j)}
+                      <!-- A WORD AND A MARK, NOT A COLOUR ALONE (`loop/finish/design-brief.md` §10): the mark is read out as
+                           added or removed, and the line keeps its indent under a branch. -->
+                      <li class="diff-line" data-op={d.op}>
+                        <span class="diff-mark" role="img" aria-label={d.op === 'added' ? 'Added' : 'Removed'}>{d.op === 'added' ? '+' : '−'}</span>
+                        <span class="diff-said">{d.line}</span>
+                      </li>
+                    {/each}
+                  </ul>
+                {/if}
               {/if}
             </li>
           {/each}
@@ -342,6 +684,23 @@
   </div>
 
   <Inspector {flow} />
+
+  {#if runOpen && row}
+    {@const shownRun = runOpen}
+    <Sheet bind:open={runSheet} title={editWords.runSheet} subtitle={since(shownRun.started, now)} onclose={() => (runOpen = null)}>
+      <RunView run={shownRun} rule={row.id} body={bodyOfRun(shownRun)} {now} {retrying} onretry={owner ? () => void retry(shownRun) : undefined} />
+    </Sheet>
+  {/if}
+
+  {#if row}
+    <Sheet bind:open={removeSheet} title={editWords.removeAsk}>
+      <p class="said">{editWords.removeWhy}</p>
+      {#snippet footer()}
+        <Button onclick={() => (removeSheet = false)}>{editWords.keep}</Button>
+        <Button tone="bad" weight="primary" disabled={removing} onclick={() => void remove()}>{editWords.removeIt}</Button>
+      {/snippet}
+    </Sheet>
+  {/if}
 {/if}
 
 <style>
@@ -353,8 +712,11 @@
     max-inline-size: 960px;
   }
 
+  /* FOUR TABS WRAP RATHER THAN PUSH THE PAGE SIDEWAYS on a 320px screen, where their words do not fit one row. */
   .tabs {
     align-self: flex-start;
+    flex-wrap: wrap;
+    max-inline-size: 100%;
   }
 
   .canvas {
@@ -415,32 +777,12 @@
     font-size: var(--t-sm);
   }
 
-  /* THE FOOTER STAYS IN REACH ON A LAPTOP. A flow of twenty cards puts the button two screens down, and "Send to
-     Decide" is the one thing on the page that does anything outside it.
-
-     AND ON A PHONE IT IS THE END OF THE COLUMN, NOT A LID ON IT. Below 900px the scroller is the shell's `.body`, whose
-     scrollport runs to the bottom of the window, and the tab bar is fixed over the last `--tabbar` of it. Sticky at 0,
-     this stuck to that edge, under the tab bar: at 390 it is the sentence on one line and the buttons wrapped under it
-     (the sentence's 16rem basis and the buttons do not fit 358px together), 12 + 18 + 8 + 44 + 12 = 94px, so an iPhone's
-     90px tab bar hid its buttons, and what showed above the tab bar was opaque `--bg` over the arm drawn beneath it,
-     "Otherwise" on the sample's "Gold rate". Sticking it above the tab bar instead would still take 94 of the 754px above
-     an iPhone's tab bar at 844, over the column, for as long as the column scrolls. In the flow it
-     covers nothing, and the column scrolls clear of it by being above it. `canvas-page.test.ts` holds the sticky to
-     this query. */
-  @media (width >= 900px) {
-    .bar {
-      position: sticky;
-      inset-block-end: 0;
-    }
-  }
-
-  .bar {
+  .foot {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-2) var(--sp-3);
-    padding: var(--sp-3) 0;
-    background: var(--bg);
+    padding-block-start: var(--sp-3);
     border-block-start: 1px solid var(--line);
   }
 
@@ -449,21 +791,92 @@
     margin: 0;
     color: var(--ink2);
     font-size: var(--t-sm);
+    overflow-wrap: anywhere;
   }
 
   .said[data-intent='warn'] {
     color: var(--ink);
   }
 
-  .bar-actions {
+  .foot-actions {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--sp-2);
+    gap: var(--sp-3);
     margin-inline-start: auto;
   }
 
-  .runs,
-  .run-steps {
+  /* TRY AND SAVE STAY IN REACH AT EVERY WIDTH. A flow of twenty cards puts them two screens down, and they are the two
+     things the page is for.
+
+     ON A PHONE IT STICKS ABOVE THE TAB BAR, NOT UNDER IT. Below 900px the scroller is the shell's `.body`, whose
+     scrollport runs to the bottom of the window, and `TabBar` is fixed over the last `--tabbar` of it, so this sticks
+     `--tabbar` up. It was once the sentence and every button, 94px tall, and on an iPhone the tab bar hid it; it is now
+     the two buttons on one row, 44 + 8 = 52px, which is `--sticky`, the most anything sticky may be on a phone
+     (`loop/finish/design-brief.md` §6). The sentence, Undo and Run now sit in the flow above it. At 900 and up there is
+     no tab bar and it sticks to the bottom edge. */
+  .bar {
+    position: sticky;
+    inset-block-end: var(--tabbar);
+    z-index: var(--z-raise);
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--sp-3);
+    padding: var(--sp-1) 0;
+    background: var(--bg);
+    border-block-start: 1px solid var(--line-soft);
+  }
+
+  @media (width >= 900px) {
+    .bar {
+      inset-block-end: 0;
+    }
+  }
+
+  /* ON A PHONE THE TWO BUTTONS SHARE THE ROW, so each is a wide target for a thumb and neither label is cut. */
+  @media (width < 640px) {
+    .bar > :global(*) {
+      flex: 1 1 0;
+    }
+  }
+
+  .more-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    inline-size: var(--ctl-h);
+    min-block-size: var(--ctl-h);
+    color: var(--ink2);
+  }
+
+  .mi {
+    display: flex;
+    align-items: center;
+    inline-size: 100%;
+    min-block-size: var(--ctl-h);
+    padding: 0 var(--sp-3);
+    background: none;
+    border: 0;
+    border-radius: var(--r-sm);
+    color: var(--ink2);
+    font: inherit;
+    font-size: var(--t-ui);
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .mi:hover,
+  .mi:focus-visible {
+    background: var(--hover-wash);
+    color: var(--ink);
+  }
+
+  /* RED ONLY UNDER THE POINTER OR THE FOCUS, as `FlowCard`'s Remove: at rest it is one more item, last in the menu. */
+  .mi[data-tone='bad']:hover,
+  .mi[data-tone='bad']:focus-visible {
+    color: var(--danger);
+  }
+
+  .versions {
     display: flex;
     flex-direction: column;
     margin: 0;
@@ -471,18 +884,141 @@
     list-style: none;
   }
 
-  /* A HAIRLINE BETWEEN RUNS AND NONE ROUND THE LIST (DESIGN-SYSTEM 4.4). */
-  .run {
+  .version {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
     padding: var(--sp-3) 0;
+  }
+
+  .version + .version {
+    border-block-start: 1px solid var(--line-soft);
+  }
+
+  .version-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: var(--sp-3);
+    margin: 0;
+  }
+
+  .version-name {
+    color: var(--ink);
+    font-size: var(--t-base);
+    font-weight: 500;
+  }
+
+  .version-tag {
+    color: var(--ink2);
+    font-size: var(--t-sm);
+  }
+
+  .version-meta {
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  .version-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-3);
+  }
+
+  .diff {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 0;
+    padding: var(--sp-2) var(--sp-3);
+    list-style: none;
+    background: var(--sunk);
+    border-radius: var(--r-md);
+    font-size: var(--t-sm);
+  }
+
+  .diff-line {
+    display: grid;
+    grid-template-columns: 2ch minmax(0, 1fr);
+    gap: var(--sp-1);
+    color: var(--ink2);
+  }
+
+  .diff-line[data-op='removed'] .diff-said {
+    color: var(--dim);
+    text-decoration: line-through;
+  }
+
+  .diff-line[data-op='added'] .diff-said {
+    color: var(--ink);
+  }
+
+  .diff-mark {
+    color: var(--dim);
+    text-align: center;
+  }
+
+  .diff-said {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .runs {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  /* A HAIRLINE BETWEEN RUNS AND NONE ROUND THE LIST (DESIGN-SYSTEM 4.4). The row is the button that opens the run, and
+     Stop sits beside it, outside it, so the two presses never nest. */
+  .run {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    padding: var(--sp-1) 0;
+  }
+
+  .run-open {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+    min-inline-size: 0;
+    min-block-size: var(--tap);
+    padding: var(--sp-2);
+    background: none;
+    border: 0;
+    border-radius: var(--r-sm);
+    color: inherit;
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .run-open:hover {
+      background: var(--hover-wash);
+    }
+  }
+
+  .run-meta {
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: var(--sp-3);
+    color: var(--dim);
+    font-size: var(--t-sm);
   }
 
   .run + .run {
     border-block-start: 1px solid var(--line-soft);
   }
 
-  /* THE ONE COLOURED THING ON A RUN'S LINE, BESIDE THE WORD IT COLOURS (DESIGN-SYSTEM 1.2). Working now takes the accent,
-     as progress does (1.3); a finished run is `earn`, a failed one `danger`, one parked on a person `warn`, and one that was
-     stopped or skipped is a mark with no intent at all. */
+  /* THE ONE COLOURED THING ON A RUN'S LINE, BESIDE THE WORD IT COLOURS (DESIGN-SYSTEM 1.2). Working now is `--info`, a
+     failed run `danger`, one parked on a person `warn`; done is `--dim`, as `loop/finish/design-brief.md` §10 gives a
+     normal state no colour, and one that was stopped is a mark with no intent at all. */
   .dot {
     display: inline-block;
     flex: none;
@@ -498,7 +1034,7 @@
   }
 
   .dot[data-state='done'] {
-    background: var(--earn-fill);
+    background: var(--dim);
   }
 
   .dot[data-state='waiting'] {
@@ -519,56 +1055,9 @@
     font-size: var(--t-ui);
   }
 
-  .run-id {
-    color: var(--dim);
-    font-family: var(--font-id);
-    font-size: var(--t-xs);
-  }
-
   .run-say {
-    margin: var(--sp-1) 0 0;
     color: var(--ink2);
     font-size: var(--t-sm);
-  }
-
-  .run-steps {
-    gap: 2px;
-    margin-block-start: var(--sp-2);
-    padding-inline-start: var(--sp-3);
-    border-inline-start: 1px solid var(--line);
-    color: var(--ink2);
-    font-size: var(--t-sm);
-  }
-
-  /* A NUMBERED SEQUENCE (DESIGN-SYSTEM 4.4): the number in a 3ch column, the step's name first, its answer last. */
-  .run-steps li {
-    display: grid;
-    grid-template-columns: 3ch minmax(0, 1fr);
-    gap: var(--sp-2);
-  }
-
-  .run-n {
-    color: var(--dim);
-    text-align: end;
-  }
-
-  .run-line {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: 0 var(--sp-2);
-    min-inline-size: 0;
-  }
-
-  .run-state {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--sp-1);
-    color: var(--dim);
-  }
-
-  .run-answer {
-    color: var(--ink2);
     overflow-wrap: anywhere;
   }
 

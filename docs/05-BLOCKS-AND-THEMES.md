@@ -35,11 +35,26 @@ Kinds are declarations over these. Primitives compose, so kinds do not have to.
 A board is a **grid of lists**. A roadmap is a **list with dates**. A risk matrix is a **grid of
 inlines**. This is why a pack can add a kind without asking a designer.
 
-A kind is data, not code. A `block` declaration is a primitive, an `accepts:` list and a body of
-primitive nodes, each node one of `parts children rows columns empty value`; `$<name>` substitutes a
-whole node named in `accepts:` and is never spliced into a string. The twenty ship as one TypeScript
-table — `src/kinds.ts`, `as const`, with a derived `Kind` union — whose shape is the shape a pack's
-`block` declaration takes, so a first-party kind and a pack's kind take one code path
+A kind is data, not code. A pack's `block` declaration is the spec a first-party kind has:
+
+```yaml
+id: block.risk-grid
+kind: block
+body: { block: risk-grid, title: Risk grid, primitive: grid, cells: 3, tone: true, minSpan: 4, purpose: figure }
+```
+
+The keys are closed: `block`, `title` (1 to 60 characters), `primitive` (one of `panel grid rows
+proportional inline list`; not `table` or `media`, whose kinds are bound to a register or to code),
+`cells` (1 to 8), `optional` (below `cells`), `tone`, `header` and `ordered` (true or false), `rows` (at
+most 200), `minSpan` (1 to 12), `purpose` (one of the picker's groups, `say figure list plan media`)
+and `note`. The record refuses a malformed one at install with the key named. A page names it as
+`kind: 'block.risk-grid'`, a fence as ```` ```block.risk-grid | Risks ````, and a page naming a
+`block.<id>` no installed pack declares is refused at install. The record's `schema` answer carries
+the installed ones as `blocks`, keyed `block.<id>`; the web reads them with `installedKinds` and
+hands them to the renderer as `RenderOptions.kinds` and `ParseOptions.kinds`, and `kindSpec(kind,
+kinds)` is the one lookup both renderers and the parser read, so a pack's kind is drawn by its
+primitive exactly as a first-party kind on that primitive is. The first-party kinds ship as one
+TypeScript table, `src/kinds.ts`, `as const` with a derived `Kind` union, in the same shape
 ([36-SPEC-RENDER](36-SPEC-RENDER.md) §13 D4; an earlier draft said sixteen JSON files).
 `PRIMITIVES_VERSION = 1` at stage 0. The package's root exports `parse`, `toHTML`, `render`, `KINDS`,
 `PRIMITIVES` and `PRIMITIVES_VERSION` — no `expand`; kinds expansion is `declare`'s. `toHTML` serves

@@ -37,6 +37,9 @@
  * currency is the one its name gives, or else the one its balance was typed in. A row this pack already keeps under
  * that name wins, and the hand row is left as it is, with a line in the log.
  *
+ * EVERY ROW IN ONE BOOK, WHEN THE PACK IS TOLD WHICH. The `book` setting (1.2.0) files each row this script writes in
+ * that book of money-core's, so a company's balance is on the company's page; left at 0 it files none.
+ *
  * A KEY STRIPE REFUSES STOPS THE RUN WITH A SENTENCE. The record pauses a script after three refused runs in a row,
  * so a revoked key pauses this one within three hours instead of failing every hour for ever.
  */
@@ -54,6 +57,14 @@ const ON_ITS_WAY = ['in_transit', 'pending'];
 const OURS = /^Stripe (available|pending|payout in transit) [A-Z]{3}$/;
 /* A STRIPE BALANCE TYPED IN BY HAND, "Stripe" or "Stripe USD", and the currency its name gives when it gives one. */
 const TYPED = /^Stripe(?: ([A-Z]{3}))?$/;
+
+/* THE BOOK THIS PACK FILES ITS ROWS IN, SINCE 1.2.0: the `book` setting, the number of a row of money-core's `books`
+   (books#2), so a company's Stripe money sits on the company's book page and not in the household's. The setting is
+   written into this line when the pack is planned and installed, which is how a script is handed a setting in this
+   build. It is a number and never text because it lands inside the script itself, and a number cannot close the
+   quotes it sits in. Read before the fill, as a test reads this file, it is not a number, and nothing is filed. */
+const BOOK = Number('{{config:book}}');
+const IN_BOOK = Number.isInteger(BOOK) && BOOK > 0 ? { book: `books#${BOOK}` } : {};
 
 async function ask(ctx, path) {
   const r = await ctx.fetch(API + path, { key: KEY });
@@ -129,7 +140,8 @@ export default async function run(ctx) {
       ctx.log(`"${name}" was typed in by hand and "${target}" is already kept from Stripe, so both count: delete "${name}" if they are the same money.`);
       continue;
     }
-    ctx.update(`accounts#${row.seq}`, { name: target, kind: 'bank', balance: { amount: want.amount, currency: want.currency }, as_of: today, liquid: want.liquid }, row.version);
+    const file = row.fields.book === undefined || row.fields.book === null ? IN_BOOK : {};
+    ctx.update(`accounts#${row.seq}`, { name: target, kind: 'bank', balance: { amount: want.amount, currency: want.currency }, as_of: today, liquid: want.liquid, ...file }, row.version);
     taken.add(target);
     ctx.log(`"${name}" was typed in before this pack, so it is now "${target}" and kept from Stripe every hour, rather than counted a second time beside it.`);
   }
@@ -147,6 +159,7 @@ export default async function run(ctx) {
         as_of: today,
         liquid: want.liquid,
         ...(want.arrives === null ? {} : { arrives: want.arrives }),
+        ...IN_BOOK,
       });
       continue;
     }
@@ -156,8 +169,11 @@ export default async function run(ctx) {
        does, and Cash now would go on counting it today while the walk, which reads only rows that are not cash, never
        brought it in on the day it lands. A row gone from Stripe's answer keeps what it says: it is going to zero. */
     const relabel = want !== undefined && row.fields.liquid !== want.liquid;
-    const same = row.fields.balance.amount === balanceNow.amount && row.fields.as_of === today && (!transit || (row.fields.arrives ?? null) === arrives) && !relabel;
+    /* A ROW WITH NO BOOK IS FILED WHEN THE SETTING NAMES ONE, once. A row already in a book is left in it, because the
+       record holds the book's id and not its number, and a person may have moved it on purpose. */
+    const file = row.fields.book === undefined || row.fields.book === null ? IN_BOOK : {};
+    const same = row.fields.balance.amount === balanceNow.amount && row.fields.as_of === today && (!transit || (row.fields.arrives ?? null) === arrives) && !relabel && Object.keys(file).length === 0;
     if (same) continue;
-    ctx.update(`accounts#${row.seq}`, { balance: balanceNow, as_of: today, ...(transit ? { arrives } : {}), ...(relabel ? { liquid: want.liquid } : {}) }, row.version);
+    ctx.update(`accounts#${row.seq}`, { balance: balanceNow, as_of: today, ...(transit ? { arrives } : {}), ...(relabel ? { liquid: want.liquid } : {}), ...file }, row.version);
   }
 }

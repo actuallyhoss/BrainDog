@@ -15,7 +15,8 @@
   worked and which run last used it, with Revoke.
 
   ALL OF IT IS THE OWNER'S. Approving, minting, revoking and listing what can act on the record are ADMIN methods, so a
-  colleague is told who can do it rather than shown controls the record refuses them.
+  colleague is not shown controls the record refuses them. A colleague sees `MyTokens.svelte` instead: keys for their
+  own agent, which the record caps by their own levels (COL-10), and each of which the owner's list names by whose it is.
 -->
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
@@ -33,7 +34,6 @@
   import { callsOutOf, type CallOut } from '$lib/record/actions.ts';
   import { mintAgent, wrote } from '$lib/record/settings-write.ts';
   import { hostedHere } from '../../billing.ts';
-  import { words as levelWords } from '../../levels.ts';
   import CallsOut from '$lib/ui/CallsOut.svelte';
   import { AGENTS_PACK, agentsPackDocument } from '@braindog/seed/packs';
   /* Imported here and nowhere in the layout, so the client stays out of the entry chunk. */
@@ -51,6 +51,8 @@
   import Empty from '$lib/ui/Empty.svelte';
   import ReadState from '$lib/ui/ReadState.svelte';
   import { bareOrigin, settingsState, type AreaProps } from '../settings-state.svelte.ts';
+  import MyTokens from './MyTokens.svelte';
+  import { words as ownWords } from './my-tokens.ts';
 
   let { shell }: AreaProps = $props();
 
@@ -137,6 +139,11 @@
     const status = c.machine?.status;
     if (status === 'pending' || status === 'expired' || status === 'denied' || status === 'revoked') return [copy.deviceState[status] ?? status];
     const facts: string[] = status === 'approved' ? [copy.deviceState.approved ?? status] : [];
+    /* WHOSE KEY IT IS, since a colleague may mint their own (COL-10): Revoke means something different on a key the
+       owner made and on one a colleague's agent runs on. `person_name` is on `listTokens`'s rows and not on the type
+       `device.ts` declares, so it is read here as the optional it is. */
+    const whose = (c.token as { person_name?: string | null } | null | undefined)?.person_name;
+    if (whose) facts.push(ownWords.madeBy(whose));
     facts.push(c.used ? copy.usedWhen(since(c.used, nowMs)) : copy.neverUsed);
     if (c.token?.expires_at) facts.push(copy.endsWhen(relative(c.token.expires_at.slice(0, 10), nowMs)));
     return facts;
@@ -290,7 +297,7 @@
 <!--
   APPROVING, MINTING AND LISTING ARE THE OWNER'S, which this screen once never asked: `deviceApprove`, `createToken`,
   `listDevices` and `listTokens` all need `owner`, and a `read` colleague was offered the six-digit field and its
-  Approve button. So everything but Slash's sections is drawn inside this arm, and a colleague is told who can do it.
+  Approve button. So everything but Slash's sections is drawn inside this arm, and a colleague is given their own keys.
 -->
 {#if anOwner}
   <!--
@@ -493,10 +500,9 @@
     {/if}
   </Section>
 {:else}
-  <!-- A COLLEAGUE IS TOLD WHO CAN, rather than shown three ways in that the record would refuse them at the end. -->
-  <Section title={copy.connectTitle}>
-    <Empty kind="no-permission" title={levelWords.ownersOnlyTitle} body={levelWords.ownersOnlyHow} />
-  </Section>
+  <!-- A COLLEAGUE CONNECTS THEIR OWN AGENT, with a key of their own capped by their own levels, rather than being shown
+       three ways in that the record would refuse them at the end (COL-10, `loop/finish/contracts.md` X54). -->
+  <MyTokens />
 {/if}
 <SlashAsks owner={anOwner} />
 <SlashModel owner={anOwner} />

@@ -23,8 +23,9 @@
  * tell him before he presses the button, so it throws rather than answering a document.
  *
  * THE OUTPUT WAS THE OLD BUILDER'S, BYTE FOR BYTE, for as long as the builder was in the tree to compare against: the
- * file's key order is the document's, the `fill` marks come off, and the map is the file's first entry repeated once a
- * currency. The builder went on September 24th, and `rates-poll.test.ts` holds what it answered that day as values.
+ * file's key order is the document's, the `fill` marks come off, and the map is one entry a currency in the shape the
+ * file's own entries had (`entryOf`). The builder went on September 24th, and `rates-poll.test.ts` holds what it
+ * answered that day as values.
  *
  * `apps/web` READS THIS FILE AND THE PACK FILE, AND NOTHING ELSE HERE, which is why nothing here may reach for Node:
  * the rates form runs in the browser and imports `fillRates` beside `rates-poll.pack.json` as JSON.
@@ -94,18 +95,31 @@ export function fillRates(template: Record<string, unknown>, spec: RatesSpec): R
   const rates = quoted(base, spec.rates);
   const { fill: _marks, ...doc } = structuredClone(template);
   const poll = (doc.declarations as Poll[])[0]!;
-  const shape = poll.map[0]!;
   doc.pack = `rates-${spec.id}`;
   doc.summary = `Polls ${host} every ${spec.every} for what one ${base} is worth in ${rates.map((r) => r.currency).join(', ')}.`;
   poll.ingest = `rates_${spec.id.replace(/[^a-z0-9]+/gu, '_')}`.slice(0, 32).replace(/_+$/u, '');
   poll.url = spec.url;
   poll.every = spec.every;
-  poll.map = rates.map((r) => ({
-    ...shape,
+  poll.map = rates.map((r) => entryOf(base, r, host));
+  return doc;
+}
+
+/**
+ * One row of `fx` as the poll's map writes it: one of `base` is worth the number at `path` of the other currency, as of
+ * the day the answer arrived, said by the host.
+ *
+ * THE SHAPE LIVES HERE AND NOT IN THE FILE, SINCE 1.1.0. The file shipped two maps, dollars in Egyptian pounds and in
+ * sterling, and the fill copied the first for every currency, so the shape came with a pair of currencies that were one
+ * record's own. A record installing the file as it stood was sent those two whatever it held (`loop/finish/modules.md`
+ * MOD-20). The file now ships no map, the form fills one a currency from what the record already holds
+ * (`ratesProposalFor`), and the key order is the one the file's maps always had.
+ */
+function entryOf(base: string, r: { currency: string; path: string }, host: string): Entry {
+  return {
     currency: { value: base },
     base: { value: r.currency },
-    rate: { ...shape.rate, path: r.path },
+    rate: { path: r.path, type: 'decimal' },
+    as_of: { arrived: true },
     source: { value: host },
-  }));
-  return doc;
+  };
 }

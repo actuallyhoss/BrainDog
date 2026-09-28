@@ -16,7 +16,7 @@
  */
 
 import type { Clock, Refusal, Result, Scheduler, Snapshot, Snapshots, Sql } from '@braindog/ports';
-import { PRIMITIVES_VERSION } from 'braindog-render';
+import { PRIMITIVES_VERSION, type KindSpec } from 'braindog-render';
 import {
   install,
   plan,
@@ -29,7 +29,7 @@ import {
 import { isDuplicate, matchLiterals, normalise as normaliseText, parseDate, scanDates, scanDecimals, scanInts, scanMoney, type CurrencyTable } from '@braindog/extract';
 import { fixOf, no, ok } from '@braindog/ports';
 import { backfillSpeaks } from './speaks.ts';
-import { normaliseChecked } from './theme-check.ts';
+import { normaliseChecked, themeBuilt } from './theme-check.ts';
 import type { EraseReport, EraseRequest } from '@braindog/kernel';
 import type { InvitationRow } from '@braindog/kernel';
 import type { Backlinks } from '@braindog/kernel';
@@ -97,6 +97,8 @@ import {
   ACROSS as READS_ACROSS,
   ANY_LIST,
   touches,
+  whereFor,
+  type Wheres,
 } from '@braindog/kernel';
 import { parseWhere, type Predicate } from '@braindog/where';
 import type { Json as JsonValue } from '@braindog/kernel';
@@ -107,6 +109,7 @@ import { catalogueDrafts, describedPresses, drawnVersions, FORM_SAID_MOST, forme
 import { grammarOf } from './grammar.ts';
 import { askedFault, describe, DESCRIBED_NO_MODEL, DESCRIBED_NO_PREVIEW, draftedOf, pageFault, previewerOf, type SlashDescribed, type SlashDrafted, type SlashPreviewer } from './slash.ts';
 import { describedGrammar } from './grammar.ts';
+import { skillBearings, skillDraftInput, skillDraftOf } from './slash.ts';
 import {
   BODY_DEPTH,
   SAID_DEPTH,
@@ -130,6 +133,7 @@ import { methods } from './methods/index.ts';
 import { methods as jobMethods } from './jobs.ts';
 import { PEN_DISMISSED_MOST, penFor, type PenItem } from './emergent.ts';
 import { methods as previewChangeMethods } from './methods/preview-change.ts';
+import { landRetype } from './methods/retype.ts';
 
 export type { CatalogueEntry, FigureTest, Grows, RowIo } from './arrange.ts';
 export { formedRows, fromModel, growsDrafts, noticeUsage, readUsage, FORM_SAID_MOST, SLASH_ASKED_MOST, SLASH_OPEN_CAP, type CatalogueOffer, type FormField, type FormList, type FormSpec, type NextSpec, type Noticed, type SlashDraft, type SlashFormInput, type SlashModel, type SlashModelInput, type Usage } from './slash.ts';
@@ -141,6 +145,7 @@ export type { AutomationVersion, Checked as AutomationChecked, Switched as Autom
 export type { PenItem } from './emergent.ts';
 export { PREVIEW_DECLARATIONS_MOST, PREVIEW_SAMPLE_ROWS_A_LIST, PREVIEW_SAMPLE_ROWS_MOST, type ChangePreviewed, type PreviewChangeArgs, type PreviewedPage } from './preview-change.ts';
 export { SAMPLE_ROWS_MOST, SLASH_REPAIRS_MOST, type DescribedDraft, type SlashDecl, type SlashDrafted, type SlashPreview, type SlashPreviewedPage, type SlashPreviewer, type SlashRows } from './slash.ts';
+export { SKILL_DRAFTS_A_DAY, skillBearings, skillDraftOf, type SkillBearing, type SkillDraftInput } from './slash.ts';
 
 /**
  * What proves a caller is the sender an ingest expects, as the record can answer it today.
@@ -293,6 +298,17 @@ export type CallContext = {
    */
   levels?: Readonly<Record<string, Level>> | undefined;
 
+  /**
+   * One `where` per list this caller's grant narrows, filled by a host wherever `levels` is (COL-9).
+   *
+   * A ROW PREDICATE, NOT A CEILING. `registers` and `levels` say which lists exist for this caller and what they may
+   * do with one; this says which ROWS of a list they may do it to, when their grant is narrowed rather than whole.
+   * Every reader honours it through `whereFor(ctx.wheres, register)` (`@braindog/kernel`), never a second copy of the
+   * rule: `list` and register counts hand it straight to the kernel; `get`, `history`, a block or question rowset,
+   * search and Slash confirm a row they already read is still one this `where` admits before answering it.
+   */
+  wheres?: Readonly<Wheres> | undefined;
+
   /** Which registers this caller may touch at all. `'*'` is every one the record declares. */
   registers?: readonly string[] | '*';
   /** Groups the events of everything one call causes. */
@@ -402,6 +418,12 @@ export type SealTarget = {
   version: number;
   aad: string;
   key: { wrapped: Uint8Array; nonce: Uint8Array; wrapped_by: string; kek_id: string | null };
+  /**
+   * Which of the record's two data keys the bytes are sealed under (DOR-2): `'record'`, the key `depositGrant` has
+   * always used, or `'connector'`, for a key deposited for a scheduled connector, never from a caller's own body.
+   * Absent reads as `'record'`, so a host built before this field still seals where it always did.
+   */
+  purpose?: 'record' | 'connector';
 };
 
 /** What the host hands back: sealed bytes, and what they are unopened. Never the value. */
@@ -817,6 +839,20 @@ export type Boot = {
    * reader then falls back to whatever it inferred before, rather than being handed a value nobody gave.
    */
   host?: 'cloud' | 'self-host';
+  /**
+   * The record's installed look, drawn: each scheme's custom properties by name without the `--`, or `null` when no
+   * `theme` declaration is installed and the house theme is what everybody sees (GAP-3, `28 §5`).
+   *
+   * THE SAME BUILD THE INSTALL CHECKED. `themeBuilt` in `theme-check.ts` solves the declaration's seed under the house
+   * profile and lays its `roles` over it, which is exactly the palette `themeFault` refused or admitted, so what is drawn
+   * is what passed. Only the house profile's roles travel: a reader who turned on more contrast keeps the house's
+   * high-contrast palette, because a record's look must never take away the palette that reader needs.
+   *
+   * AND THE CORNERS AND THE ROW HEIGHT TRAVEL BESIDE THE ROLES, as `r-sm`, `r-md`, `r-lg` and `row-h`, when the
+   * declaration's `scale` names them: a look is its colours, its corners and its density, and the app draws all three
+   * from one place.
+   */
+  theme: { light: Record<string, string>; dark: Record<string, string> } | null;
 };
 
 /** One line of the log as a caller sees it: the event, and what it is about when they may read that. */
@@ -997,6 +1033,12 @@ export type Build = {
 export type SlashMeter = {
   /** `draft` for a press or the daily look, `form` for a first plan. A refusal's `fix` is the sentence the owner is shown. */
   hold(kind: 'draft' | 'form'): Promise<{ ok: true; value: SlashHeld } | { ok: false; refusal: Refusal }>;
+  /**
+   * One ask of the background allowance (`BACKGROUND_ASKS_MONTH`, 60 a month), never one of his: the daily look's skill
+   * drafts (GAP-12). OPTIONAL, AND A METER WITHOUT IT DRAFTS NO SKILL, because `hold` counts against his asks and a
+   * background draft must never spend one of those.
+   */
+  background?(): Promise<{ ok: true; value: SlashHeld } | { ok: false; refusal: Refusal }>;
 };
 
 /** A held ask. Exactly one of the two is called: `settle` for a call that left this host, `release` for one that never did. */
@@ -1104,8 +1146,10 @@ export type RecordDeps = {
    * A draft script run now in the host's sandbox, writing nothing (`@braindog/host/script-try`). Absent, `scriptTry` refuses `NOT_IN_THIS_BUILD`.
    * `owner` is whether the vault's own gate would open for this caller, and the host opens a key only on it; `stale` is
    * `true` when the one thing keeping it shut is a proof older than the vault allows, which changes what the run is told.
+   * `config` is the draft's own pack's settings values, the record's alone to read (`kernel.packConfig`), which the
+   * host passes the run through as `ctx.config` (platform PLT-7).
    */
-  tryScript?: ((draft: { record: { id: string; tz: string }; body: Record<string, unknown>; input: unknown; reads: { list(register: string, where: unknown, options?: unknown): Promise<unknown[]>; get(spoken: string): Promise<unknown> }; owner: boolean; stale: boolean; asker: string }) => Promise<unknown>) | undefined;
+  tryScript?: ((draft: { record: { id: string; tz: string }; body: Record<string, unknown>; config: Record<string, JsonValue>; input: unknown; reads: { list(register: string, where: unknown, options?: unknown): Promise<unknown[]>; get(spoken: string): Promise<unknown> }; owner: boolean; stale: boolean; asker: string }) => Promise<unknown>) | undefined;
   /**
    * The Directory, where this host keeps it in the same process as the record, for the methods under `methods/`.
    *
@@ -1493,6 +1537,22 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * SO THIS ASKS EXACTLY WHAT `list` ASKS, and the two answer the same way about the same register.
    */
   const readable = (ctx: CallContext, register: string): Refusal | null => guard(ctx, 'read', register);
+
+  /**
+   * Whether a row this caller can already read on the register is one their own narrowed grant still admits
+   * (COL-9). `list` and register counts hand `whereFor(ctx.wheres, register)` straight to the kernel, which narrows
+   * there; a reader that answers one row read some other way (`get`, `history`, a block or question rowset, a search
+   * hit, an MCP tool, a Slash read) has no `where` of its own to hand the kernel, so it asks this instead: the row is
+   * read again, filtered on its own `seq` and the same rule, and it is admitted only if that still finds it. `seq:
+   * null` is a row no register's `where` can be written against, so it is never withheld by one.
+   */
+  const rowAdmitted = (ctx: CallContext, register: string, seq: number | null): boolean => {
+    if (seq === null) return true;
+    const rule = whereFor(ctx.wheres, register);
+    if (rule === undefined) return true;
+    const found = kernel.list({ register, where: { field: 'seq', is: seq }, includeDeleted: true, limit: 1 }, rule);
+    return found.ok && found.value.rows.length > 0;
+  };
 
   /**
    * The vault gate: a person at `owner`, and never a bearer of any kind.
@@ -2026,6 +2086,85 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       ];
     const { filed, skipped } = await slashFiling(drafts, r);
     return { by, filed, skipped, dropped, large };
+  };
+
+  /**
+   * THE DAILY LOOK'S SKILL STEP (GAP-12): each skill that active learnings bear on and its `because` does not carry yet
+   * (`skillBearings`, the briefing's rule over the whole record) gets its next version drafted by the model and filed as
+   * one `rowset` on `skills`, which Decide draws as a diff, one press takes, and Put back undoes.
+   *
+   * THE BACKGROUND ALLOWANCE AND NEVER HIS ASKS (`loop/finish/contracts.md` §7.5). Each draft holds one of the meter's
+   * `background` asks; a meter without that way to count draws nothing, since `hold` spends his. With no meter at all, as
+   * in a build that keeps no ledger, the model is asked unmetered, as the press is there.
+   *
+   * NOTHING IS ASKED THAT COULD NOT BE FILED: a skill with a draft already waiting (one open draft a skill), a version
+   * with these same lessons Slash drafted before in any state (so a dismissal holds), and anything past the slots
+   * `SLASH_OPEN_CAP` leaves on Decide are passed over before the model is asked, and each is a line in the look's log,
+   * as is a draft that changed nothing and one that could not be shaped into the rowset, which is never filed half formed.
+   */
+  const slashSkills = async (): Promise<{ filed: { id: string; question: string; by: string }[]; dropped: string[] }> => {
+    const bearings = skillBearings(sql, kernel);
+    if (bearings.length === 0) return { filed: [], dropped: [] };
+    const model = deps.slashModel;
+    const named = bearings.map((b) => b.name).join(', ');
+    if (!model?.skill) return { filed: [], dropped: [`Lessons bear on ${named}, and no model here drafts a skill, so no next version was drafted.`] };
+    const skill = model.skill.bind(model);
+    const meter = deps.slashMeter;
+    if (meter && !meter.background)
+      return { filed: [], dropped: [`Lessons bear on ${named}, and this host cannot count a draft against the background allowance, so none was drafted.`] };
+    const r = slashReading();
+    const dropped: string[] = [];
+    const drafts: SlashDraft[] = [];
+    let room = SLASH_OPEN_CAP - r.waiting.length;
+    for (const b of bearings) {
+      const waiting = [...r.asked].some(([key, a]) => a.status === 'open' && key.startsWith(`version:skills:${b.at}@`));
+      if (waiting) {
+        dropped.push(`A next version of ${b.name} is already waiting on Decide, so another was not drafted.`);
+        continue;
+      }
+      /* The key the draft will file under, known before the model is asked: the row, the version it makes, its lessons. */
+      const key = stableKey({ register: 'skills', rows: [{ at: b.at, patch: { rev: b.rev + 1, because: [...b.carried, ...b.learnings.map((l) => l.id)] } }] });
+      if (r.asked.has(key)) {
+        dropped.push(`Slash drafted version ${b.rev + 1} of ${b.name} from these lessons before, so it was not drafted again.`);
+        continue;
+      }
+      if (room <= 0) {
+        dropped.push(`${SLASH_OPEN_CAP} of Slash's questions are already waiting on Decide, so the next version of ${b.name} waits for a slot.`);
+        continue;
+      }
+      let held: SlashHeld | undefined;
+      if (meter?.background) {
+        const hold = await meter.background().catch(() => ({ ok: false as const, refusal: { code: 'INTERNAL', fix: "Slash's ledger could not be read, so its model was not asked." } }));
+        if (!hold.ok) {
+          dropped.push(`${hold.refusal.fix} No next version of ${b.name} was drafted.`);
+          break;
+        }
+        held = hold.value;
+      }
+      const input = skillDraftInput(b);
+      let raw: unknown;
+      try {
+        raw = await skill(input);
+      } catch (e) {
+        /* SETTLED AS THE PRESS SETTLES A THROW (`slashAsked`): a call never sent is released, anything else is counted. */
+        const mark = (typeof e === 'object' && e !== null ? e : {}) as { sent?: unknown; answered?: unknown };
+        if (mark.sent === false) held?.release();
+        else held?.settle({ usage: { in: slashTokens(input), out: 0 }, code: mark.answered === true ? 'PROPOSAL_SCHEMA' : 'UNREACHABLE' });
+        dropped.push(`The model did not answer for ${b.name}, so no next version was drafted.`);
+        continue;
+      }
+      held?.settle({ usage: { in: slashTokens(input), out: slashTokens(raw) } });
+      const got = skillDraftOf(raw, b, model.name);
+      if ('why' in got) dropped.push(got.why);
+      else if ('unchanged' in got) dropped.push(`${got.unchanged} Nothing was filed for it.`);
+      else {
+        drafts.push(got.draft);
+        room--;
+      }
+    }
+    const { filed, skipped } = await slashFiling(drafts, r);
+    for (const s of skipped) dropped.push(`${s.question} was not filed: ${s.why}`);
+    return { filed, dropped };
   };
 
   /**
@@ -2797,6 +2936,22 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const names = changeTouches(body, typeof row.opened_at === 'string' ? row.opened_at : null);
       if (names.size === 0 && (typeof named !== 'string' || named === '')) return !wholeRecord(ctx);
       return !sees(ctx, names);
+    }
+    /* A `rowset`'S OWN ROWS ARE HELD BACK TOO, when the caller's grant on the register is narrowed by a `where`
+       (COL-9): the register may be readable while a row a `rowset` names by `at` is not one the grant admits, and
+       a rowset carries every field value of the rows it names. The whole question is held back, as a plan's rows
+       are above, rather than the rowset drawn with the one row missing. A row the rowset adds names no `at` and is
+       not an existing row this caller could already be denied. */
+    if (row.body_kind === 'rowset' && typeof named === 'string' && named !== '' && readable(ctx, named) === null) {
+      const rule = whereFor(ctx.wheres, named);
+      if (rule !== undefined) {
+        const rows = Array.isArray(body?.rows) ? (body.rows as { at?: unknown }[]) : [];
+        for (const r of rows) {
+          if (typeof r.at !== 'string') continue;
+          const seq = Number(r.at.slice(r.at.lastIndexOf('#') + 1));
+          if (!Number.isInteger(seq) || !rowAdmitted(ctx, named, seq)) return true;
+        }
+      }
     }
     if (typeof named !== 'string' || named === '') return !wholeRecord(ctx);
     return readable(ctx, named) !== null;
@@ -3749,6 +3904,69 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     return p.kind === 'token' && p.level === 'owner' && Array.isArray(p.reach) && p.reach.includes('inbox');
   };
 
+  /**
+   * The `theme` declaration the record is drawn in, or `null` (GAP-3).
+   *
+   * ONE LOOK AT A TIME, AND THE ONE SET FROM THE APP FIRST. A theme saved in Settings > Appearance is written by
+   * `setDeclaration` with no pack behind it, and it is the owner's own answer to how the record looks, so it wins over a
+   * theme a pack brought. With none of those, the first installed theme by id is drawn, which is deterministic rather
+   * than whichever row the database happened to return first. Retiring the owner's own look, or uninstalling the pack,
+   * drops the row, and the next `boot` answers `null`: the house theme is back.
+   */
+  const themeInstalled = (): { id: string; body: string; checksum: string } | null => {
+    const themes = kernel.declarations().filter((d) => d.kind === 'theme');
+    return themes.find((d) => d.pack_id === null) ?? themes[0] ?? null;
+  };
+
+  /**
+   * The drawn look, kept by the declaration's checksum.
+   *
+   * A SOLVE IS THE GENERATOR'S WHOLE SEARCH, twice, and `boot` is the call every client makes on every load. The row's
+   * checksum changes with every edit, so a kept answer is never stale, and only the latest one is kept: a record is drawn
+   * in one look, and a map that grew with every save would be a leak shaped like a cache.
+   */
+  let themeKept: { key: string; drawn: Promise<Boot['theme']> } | null = null;
+  const themeDrawn = (row: { id: string; body: string; checksum: string }): Promise<Boot['theme']> => {
+    const key = `${row.id}\n${row.checksum}`;
+    if (themeKept?.key === key) return themeKept.drawn;
+    const drawn = (async (): Promise<Boot['theme']> => {
+      let body: unknown;
+      try {
+        body = JSON.parse(row.body);
+      } catch {
+        return null;
+      }
+      const built = await themeBuilt(row.id, body);
+      if (built === null) return null;
+      const scale = themeScale(body);
+      return { light: { ...built.house.schemes.light, ...scale }, dark: { ...built.house.schemes.dark, ...scale } };
+    })();
+    themeKept = { key, drawn };
+    return drawn;
+  };
+
+  /**
+   * The corners and the row height a declaration's `scale` names, as the custom properties the app reads.
+   *
+   * THE HEIGHTS ARE `packages/skin/tokens.css`'s own three, one per density, so a theme that says roomy draws the rows a
+   * person who picked Roomy gets. The kernel's `themeBody` already held each radius to a whole number from 0 to 24 and
+   * the density to its three words, so anything else here is a row written before that check, and it is left out.
+   */
+  const themeScale = (body: unknown): Record<string, string> => {
+    const out: Record<string, string> = {};
+    const scale = body !== null && typeof body === 'object' ? (body as { scale?: unknown }).scale : undefined;
+    if (scale === null || typeof scale !== 'object') return out;
+    const { radius, density } = scale as { radius?: unknown; density?: unknown };
+    if (radius !== null && typeof radius === 'object')
+      for (const step of ['sm', 'md', 'lg'] as const) {
+        const r = (radius as Record<string, unknown>)[step];
+        if (typeof r === 'number' && Number.isInteger(r) && r >= 0 && r <= 24) out[`r-${step}`] = `${r}px`;
+      }
+    const rows: Record<string, string> = { compact: '32px', comfortable: '36px', roomy: '44px' };
+    if (typeof density === 'string' && Object.hasOwn(rows, density)) out['row-h'] = rows[density]!;
+    return out;
+  };
+
   const shellFor = (ctx: CallContext): Pick<Boot, 'record' | 'me' | 'pages' | 'counts' | 'pen' | 'whatsNew' | 'names'> => {
     const p = ctx.principal;
     const person = p.kind === 'person' ? p.id : p.kind === 'token' ? p.person : null;
@@ -4059,6 +4277,35 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   const listOf = (x: unknown): string[] => (Array.isArray(x) ? x.filter((v): v is string => typeof v === 'string') : []);
   const projectOf = (run: Entry): string | null => (typeof run.fields.project === 'string' ? run.fields.project : null);
 
+  /**
+   * The text at an address a person pasted, read by the host with no credentials: `fetchShared`, and `fetchUseCase`
+   * while it stays for one release. The caller has passed the ADMIN guard already.
+   *
+   * `git:<owner>/<repo>@<ref>:<path>` IS READ AS THE RAW FILE ON GITHUB, so an author can share a file from a repository
+   * without hosting it. It is turned into the one https address before the fetch, so it passes the same checks a pasted
+   * address does: https, no private or local host, a size cap and a timeout (`RecordDeps.readAddress`).
+   */
+  const readSharedAt = async (args: unknown) => {
+    const said = (args ?? {}) as Record<string, unknown>;
+    const extra = stray(said, ['url']);
+    if (extra) return { ok: false as const, refusal: extra };
+    if (typeof said.url !== 'string' || said.url.trim() === '' || said.url.length > 2048)
+      return no('REQUIRED_MISSING', 'url is the https address of a shared file, or git:owner/repo@ref:path.', { at: 'url' });
+    const asked = said.url.trim();
+    let url = asked;
+    if (asked.startsWith('git:')) {
+      const git = /^git:([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)@([A-Za-z0-9_./-]+):([^\s?#]+)$/u.exec(asked);
+      if (!git) return no('VALUE_MALFORMED', 'A git address reads git:owner/repo@ref:path, such as git:someone/kit@main:kit.usecase.json.', { at: 'url' });
+      const [, owner, repo, ref, path] = git;
+      url = `https://raw.githubusercontent.com/${owner}/${repo}/${ref}/${String(path).replace(/^\/+/u, '')}`;
+    }
+    if (!deps.readAddress)
+      return no('PULL_ORIGIN_REFUSED', 'This host does not read addresses. Download the file, then choose it as a file.', { at: 'url' });
+    const read = await deps.readAddress(url);
+    if (!read.ok) return no('PULL_ORIGIN_REFUSED', read.fix, { at: 'url' });
+    return ok({ url: asked, text: read.text, bytes: read.bytes });
+  };
+
   return {
     /**
      * What this record is: its registers, and how many rows each holds.
@@ -4072,16 +4319,19 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* ONE TRANSACTION, SO ONE MOMENT. A second connection to the same file, a CLI beside a running
          self-host, could commit between the counts and the feed, and the rail said one row beside a
          feed announcing two. SQLite holds a read transaction to the snapshot of its first read. */
-      return kernel.transaction(() => {
+      /* THE LOOK IS READ IN THE SAME MOMENT AND DRAWN AFTER IT (GAP-3). The row is read inside the transaction with
+         everything else, and solved outside it, because the solve loads `@braindog/theme` on demand and a read
+         transaction held open across an `await` is a snapshot another connection's writes wait behind. */
+      const [answer, look] = kernel.transaction(() => {
         const out: { id: string; name: string; count: number }[] = [];
         for (const [id, decl] of kernel.registers()) {
           /* THE FILTER WAS THE CEILING'S, WHICH IS THE WRONG ONE. A register somebody holds `append`
              on is inside their ceiling by construction, so its name and its row count went out to the
              one level whose whole point is that it does not read. */
           if (readable(ctx, id)) continue;
-          out.push({ id, name: decl.name, count: kernel.count(id) });
+          out.push({ id, name: decl.name, count: kernel.count(id, whereFor(ctx.wheres, id)) });
         }
-        return ok({
+        const answered: Omit<Boot, 'theme'> = {
           registers: out,
           now: new Date(clock.now()).toISOString(),
           /* THE FIRST SCREEN IN ONE ROUND TRIP (`32 §3`): who is working, and what waits on a person, each
@@ -4093,20 +4343,34 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           /* ONLY WHEN THE BUILD NAMES ONE: a key set to `undefined` still reads as `'host' in boot`, which is a host
              that said something. */
           ...(build?.host === undefined ? {} : { host: build.host }),
-        });
+        };
+        return [answered, themeInstalled()] as const;
       });
+      return ok({ ...answer, theme: look === null ? null : await themeDrawn(look) });
     },
 
-    /** What a register holds, so a caller can write a correct row on the first try. */
-    async schema(args: { register: string }, ctx: CallContext): Promise<Result<RegisterDecl>> {
+    /**
+     * What a register holds, so a caller can write a correct row on the first try.
+     *
+     * `blocks` CARRIES EVERY INSTALLED PACK KIND (PLT-8), keyed by its declaration id (`block.<id>`), for
+     * `RenderOptions.kinds` and `ParseOptions.kinds`; `installedKinds(schema)` in the web reads exactly this.
+     * Not narrowed to the register asked for: a page may draw any installed kind, whichever register it names.
+     */
+    async schema(args: { register: string }, ctx: CallContext): Promise<Result<RegisterDecl & { blocks: Record<string, KindSpec & { title: string; purpose: string }> }>> {
       const stop = guard(ctx, 'read', args.register);
       if (stop) return { ok: false, refusal: stop };
       const decl = kernel.register(args.register);
-      return decl
-        ? ok(decl)
-        : no('REGISTER_UNKNOWN', `There is no register called ${args.register}.`, {
-            allowed: [...kernel.registers().keys()],
-          });
+      if (!decl)
+        return no('REGISTER_UNKNOWN', `There is no register called ${args.register}.`, {
+          allowed: [...kernel.registers().keys()],
+        });
+      const blocks: Record<string, KindSpec & { title: string; purpose: string }> = {};
+      for (const d of kernel.declarations()) {
+        if (!d.id.startsWith('block.')) continue;
+        const { block, note, ...rest } = JSON.parse(d.body) as Record<string, unknown>;
+        blocks[d.id] = rest as KindSpec & { title: string; purpose: string };
+      }
+      return ok({ ...decl, blocks });
     },
 
     /**
@@ -4138,16 +4402,18 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
               `No register you can read numbers its rows ${/^[A-Z]+/.exec(said)?.[0] ?? said}. A suggestion (SG) or a decision (D) is read with governance.`,
               { at: 'spoken' },
             );
-          return ok(kernel.get(said));
+          const owned = kernel.get(said);
+          return ok(owned && rowAdmitted(ctx, owner.id, owned.seq) ? owned : null);
         }
         const row = kernel.get(said);
-        return ok(row && !readable(ctx, row.register) ? row : null);
+        return ok(row && !readable(ctx, row.register) && rowAdmitted(ctx, row.register, row.seq) ? row : null);
       }
       const missing = named(args, true);
       if (missing) return { ok: false, refusal: missing };
       const stop = guard(ctx, 'read', args.register);
       if (stop) return { ok: false, refusal: stop };
-      return ok(kernel.get({ register: args.register as string, seq: args.seq as number }));
+      const row = kernel.get({ register: args.register as string, seq: args.seq as number });
+      return ok(row && rowAdmitted(ctx, args.register as string, row.seq) ? row : null);
     },
 
     async list(
@@ -4232,7 +4498,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          resolves refs and only this layer knows who is asking, so without `reads` a member invited to
          Jobs alone read `ok 0` for a hidden client that exists and `REF_UNKNOWN` for one that does not
          (audit twenty-two, finding 1). */
-      return kernel.list({ ...args, reads: (register) => readable(ctx, register) === null });
+      return kernel.list({ ...args, reads: (register) => readable(ctx, register) === null }, whereFor(ctx.wheres, args.register));
     },
 
     /**
@@ -4559,6 +4825,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (state.last === today) return { ran: false, why: 'today' };
       kernel.setPref(SLASH, SLASH_LAST, today);
       const out = await slashFile();
+      /* THE SKILL STEP COMES AFTER, so a skill's next version takes a slot on Decide the look's own drafts left, and what
+         it passed over or found unchanged is said in the same log (`dropped`). */
+      const skills = await slashSkills();
+      out.filed.push(...skills.filed);
+      out.dropped.push(...skills.dropped);
       if (out.filed.length > 0 && scheduler) await kernel.tail(scheduler);
       return { ran: true, ...out };
     },
@@ -4605,25 +4876,24 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     },
 
     /**
-     * The text of a shared use-case file at an https address, read by the host (`RecordDeps.readAddress`). It writes
-     * nothing and plans nothing: the caller reads the text through `readShared` and `planUseCase`, as it would a file.
+     * The text of a shared file, a use case or an add-on, at an https address or `git:owner/repo@ref:path`, read by the
+     * host (`RecordDeps.readAddress`). It writes nothing and plans nothing: the caller reads the text through
+     * `readCatalogueFile` and plans it, as it would a file chosen from the computer.
      *
      * ADMIN, AS `planUseCase` IS, because it makes this host fetch an address somebody typed, and only the owner who is
      * about to install should be able to ask for that. A private or local address is refused as a scheduled action's is.
      */
+    async fetchShared(args: { url: string } | undefined, ctx: CallContext) {
+      const stop = admin(ctx, 'read a shared file from the web');
+      if (stop) return { ok: false as const, refusal: stop };
+      return readSharedAt(args);
+    },
+
+    /** `fetchShared` under the name it had when only a use case could be read this way. It stays for one release. */
     async fetchUseCase(args: { url: string } | undefined, ctx: CallContext) {
       const stop = admin(ctx, 'read a use case from the web');
       if (stop) return { ok: false as const, refusal: stop };
-      const said = (args ?? {}) as Record<string, unknown>;
-      const extra = stray(said, ['url']);
-      if (extra) return { ok: false as const, refusal: extra };
-      if (typeof said.url !== 'string' || said.url.trim() === '' || said.url.length > 2048)
-        return no('REQUIRED_MISSING', 'url is the https address of a .usecase.json file.', { at: 'url' });
-      if (!deps.readAddress)
-        return no('PULL_ORIGIN_REFUSED', 'This host does not read addresses. Download the file, then choose it as a file.', { at: 'url' });
-      const read = await deps.readAddress(said.url);
-      if (!read.ok) return no('PULL_ORIGIN_REFUSED', read.fix, { at: 'url' });
-      return ok({ url: said.url.trim(), text: read.text, bytes: read.bytes });
+      return readSharedAt(args);
     },
 
     /**
@@ -4826,7 +5096,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           const l = leg as { register?: unknown; where?: unknown; amount?: unknown } | null;
           if (l === null || typeof l !== 'object' || typeof l.register !== 'string') continue;
           const reads = (list: string): boolean => readable(ctx, list) === null;
-          let page = kernel.list({ register: l.register, where: l.where as never, limit: 500, reads });
+          const rule = whereFor(ctx.wheres, l.register);
+          let page = kernel.list({ register: l.register, where: l.where as never, limit: 500, reads }, rule);
           /* A LEG `list` REFUSES IS REFUSED BY THE WALK IN ITS OWN ANSWER, and reads nothing. */
           if (!page.ok) continue;
           legRows += page.value.matched;
@@ -4842,7 +5113,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
               if (money !== null && typeof money === 'object' && typeof money.currency === 'string') currencies.add(money.currency);
             }
             if (page.value.cursor === null) break;
-            const next = kernel.list({ register: l.register, where: l.where as never, limit: 500, cursor: page.value.cursor, reads });
+            const next = kernel.list({ register: l.register, where: l.where as never, limit: 500, cursor: page.value.cursor, reads }, rule);
             if (!next.ok) break;
             page = next;
           }
@@ -5126,10 +5397,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const shut = vault(ctx);
       const p = ctx.principal;
       const who = kernel.identity();
+      /* THE DRAFT'S OWN PACK'S SETTINGS, since the record is the only side that can read them (platform PLT-7); a
+         script that names no pack, or one this record does not hold, tries with none. */
+      const config: Record<string, JsonValue> = typeof b.pack === 'string' ? ((r) => (r.ok ? r.value.values : {}))(kernel.packConfig(b.pack)) : {};
       return ok(
         await deps.tryScript({
           record: { id: who?.id ?? 'self', tz: who?.tz ?? 'UTC' },
           body: b,
+          config,
           input: said.input ?? null,
           reads,
           owner: p.kind === 'person' && shut === null,
@@ -5747,6 +6022,16 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         }
       }
       const out = kernel.decide(args.id, verdict, actorOf(ctx));
+      /* AN ACCEPTED RETYPE OR NARROWING LANDS HERE, when the owner accepts it rather than the caller who filed it
+         (GAP-8): `govern.decide` hands back `retype` in place of `install`, since it stages the list's next version
+         through the pack path rather than an ordinary declaration write, and `landRetype` is the one place both
+         `decide` and `retypeField`'s own accept call it from. Reopens the question with its own sentence when it will
+         not land, as every other kind that lands late does. */
+      if (out.ok && out.value.retype) {
+        const landed = await landRetype(kernel, out.value.retype, actorOf(ctx), out.value.suggestion);
+        if (!landed.ok) return tail(landed);
+        return tail(settledAs(ctx, args.id, out));
+      }
       if (out.ok && out.value.apply) {
         /* AND IT LANDS BEFORE THE ANSWER IS TRUE. What will not apply reopens the question, with what was kept in its sentence. */
         const applied = await arrangement.apply(out.value.apply.kind, out.value.apply.body, actorOf(ctx));
@@ -7116,7 +7401,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * login token that leaks can add a key and can never swap one.
      */
     async depositGrant(
-      args: { label?: unknown; opens?: unknown; kind?: unknown; project?: unknown; credential?: unknown },
+      args: { label?: unknown; opens?: unknown; kind?: unknown; project?: unknown; credential?: unknown; sealed_under?: unknown },
       by: VaultGrant | CallContext,
       hints: SessionHints,
       seal: (target: SealTarget) => Promise<Result<Sealed>>,
@@ -7149,6 +7434,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
             at: args?.project !== undefined ? 'project' : 'credential',
           });
       }
+      /* WHICH DATA KEY THE VALUE IS SEALED UNDER (DOR-2). This picks it, never the caller's body read as anything but
+         the one other word: an agent's login token deposits its own run's key, sealed under the record's, and never
+         one for a scheduled connector, whatever it sends. */
+      const under = args.sealed_under === 'connector' ? 'connector' : 'record';
+      if (agent !== null && under === 'connector')
+        return no('FORBIDDEN', "An agent's key deposit seals under the record's own key, never a connector's.", { at: 'sealed_under' });
       const label = typeof args?.label === 'string' ? args.label.trim() : '';
       if (!label || label.length > 120)
         return no('REQUIRED_MISSING', 'A key has a label a person would say, in 120 characters or fewer.', { at: 'label' });
@@ -7206,12 +7497,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const version = live ? live.version + 1 : 1;
 
       const key = sql.one<{ wrapped: Uint8Array; nonce: Uint8Array; wrapped_by: string; kek_id: string | null }>(
-        "SELECT wrapped, nonce, wrapped_by, kek_id FROM vault_key WHERE purpose = 'record'",
+        'SELECT wrapped, nonce, wrapped_by, kek_id FROM vault_key WHERE purpose = ?',
+        under,
       );
       if (!key) return no('NOT_IN_THIS_BUILD', 'This record has no wrapped key, so it cannot hold a sealed value.', { at: 'credential' });
 
       /* The same additional data `openGrant` hands back, so what is sealed here is what opens there. */
-      const sealed = await seal({ grant: id, version, aad: `${kernel.identity()?.id ?? 'self'}\u001f${id}\u001f${version}`, key });
+      const sealed = await seal({ grant: id, version, aad: `${kernel.identity()?.id ?? 'self'}\u001f${id}\u001f${version}`, key, purpose: under });
       if (!sealed.ok) return sealed;
 
       const declares = (field: string) => kernel.register(KEYS)?.fields.some((f) => f.id === field && !f.retired) === true;
@@ -7237,7 +7529,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           ref: row?.id ?? null,
           field: KEY_FIELD,
           fields,
-          grant: { label, opens, kind, ciphertext: s.ciphertext, nonce: s.nonce, kdf: s.kdf, wrapped_by: 'kek', kek_id: s.kek_id, bytes: s.bytes, hint: s.hint, sealed_for: { id, version } },
+          grant: { label, opens, kind, ciphertext: s.ciphertext, nonce: s.nonce, kdf: s.kdf, wrapped_by: 'kek', kek_id: s.kek_id, bytes: s.bytes, hint: s.hint, sealed_for: { id, version }, sealed_under: under },
         },
         /* An agent's deposit is signed by its run, and a person's by the person: a person's name on an agent's
            act is the attribution a run replaces, and an agent's name on a person's act is the same mistake back. */
@@ -7279,7 +7571,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const stop = guard(ctx, 'read', args.register);
       if (stop) return { ok: false, refusal: stop } as Result<never>;
       const row = kernel.get({ register: args.register, seq: args.seq });
-      return ok(row ? kernel.history(row.id) : []);
+      return ok(row && rowAdmitted(ctx, args.register, row.seq) ? kernel.history(row.id) : []);
     },
 
     /**
@@ -7513,10 +7805,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       return ok({
         hits: found.hits.flatMap((hit) => {
           const row = kernel.get(hit.id);
-          if (!row) return [];
+          if (!row || !rowAdmitted(ctx, row.register, row.seq)) return [];
           const title = kernel.register(row.register)?.title;
           return [{ register: row.register, seq: row.seq, title: title ? String(row.fields[title] ?? '') : '', rank: hit.rank }];
         }),
+        /* THE TOTAL IS NOT NARROWED THE SAME WAY (COL-9): `fts.searchMatched` counts every live row of a register
+           this caller may read, and a caller whose grant is further narrowed by a `where` sees a figure over the
+           whole register beside a page that is already narrowed. The hits above never name a row outside the
+           `where`; the count naming how many there might be is the known gap left here. */
         matched: found.matched,
         comments,
       });

@@ -483,8 +483,8 @@ test('THE PACK NAMES A KEY AND CARRIES NONE, and both intervals agree', () => {
   /* BELOW 4.0.0 AND NOT A CARET ON 1.x: money-core 2.0.0 took `holdings` away, which nothing here writes into, and a
      `^1.0.0` refused this pack beside it (`packages/seed/test/money-core-major.test.ts` plans it on both). 3.0.0 took
      pages and card wordings and kept the accounts and transactions this pack writes, so 1.1.1 widened to it. The floor
-     is unmoved. */
-  assert.deepEqual(doc.requires.packs, { 'money-core': '>=1.0.0 <4.0.0' });
+     moved in 1.3.0, to 3.1.0, whose `books` the `book` setting files each row in. */
+  assert.deepEqual(doc.requires.packs, { 'money-core': '>=3.1.0 <4.0.0' });
 
   const decl = doc.declarations[0] as {
     ingest: string; every: string; dedupe: string[]; on_conflict: string;
@@ -631,7 +631,8 @@ test('THE PACK CARRIES ledger.js AS ITS SOURCE, byte for byte, beside the pull, 
   assert.deepEqual(s.egress, [pull.fetch.base]);
   assert.deepEqual(s.keys, [pull.fetch.auth.grant]);
   assert.deepEqual([...s.reads].sort(), ['accounts', 'categories', 'transactions']);
-  assert.deepEqual(s.writes, ['transactions']);
+  /* AND THE ACCOUNTS SINCE 1.3.0, which it files in the `book` setting's book because the pull that writes them cannot. */
+  assert.deepEqual(s.writes, ['transactions', 'accounts']);
   /* THE SCRIPT STOPS QUEUING AT ITS OWN LIMIT, so the two numbers are one. A limit lower than the script's constant
      would refuse the whole run past it, and every row with it. */
   assert.ok(s.source.includes(`const WRITES = ${s.limits?.writes};`), `limits.writes is ${s.limits?.writes} and ledger.js stops at another number`);

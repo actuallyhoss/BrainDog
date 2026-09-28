@@ -14,10 +14,61 @@
  * credential the live record has ended since the copy stays ended (`CARRIED`).
  */
 
-import { chmodSync, existsSync, mkdirSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { chmodSync, createReadStream, existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
+import type { Signer } from '@braindog/kernel';
 import type { Param, Snapshot, Snapshots, Sql } from '@braindog/ports';
+
+/**
+ * The detached signature beside a copy, `<id>.brain.sig`: what `braindog verify` reads to check a self-host copy.
+ *
+ * DETACHED, BECAUSE A COPY IS THE WHOLE FILE. A signature written into the copy would change the bytes it signs, and
+ * a copy is a backup of the instance that `sqlite3` opens as it is. So the file is hashed as written, and the hash,
+ * the record it belongs to and the format's name are what the record's own key signs (`COPY_SIGNED`).
+ */
+export type CopySignature = {
+  format: typeof COPY_SIGNATURE;
+  record: string;
+  sha256: string;
+  bytes: number;
+  key_id: string;
+  public_key: string;
+  sig: string;
+  signed_at: string;
+};
+
+/** The format a `.brain.sig` names, and the first line of the bytes it signs, so a signature over one thing is never read as one over another. */
+export const COPY_SIGNATURE = 'braindog-copy-signature/1';
+
+/** The bytes a copy's signature is over. `apps/cli/src/verify.ts` builds the same three lines to check it. */
+export const copySigned = (record: string, sha256: string): Uint8Array =>
+  new TextEncoder().encode(`${COPY_SIGNATURE}\n${record}\n${sha256}\n`);
+
+/**
+ * The signer each open record signs its copies with, by the connection the copies are taken through.
+ *
+ * BY CONNECTION, BECAUSE TWO PLACES BUILD A COPIER: the server's "Snapshot now" and the nightly clock in `backup.ts`,
+ * which is handed `running.sql` and builds its own. Both reach the one signer the server holds, which opens the record's
+ * key only when a copy is actually taken, without either caller passing a key along.
+ */
+const signers = new WeakMap<Sql, Signer>();
+
+/** Sign every copy taken through `sql` with `sign` from now on. A signer that answers `null` leaves copies unsigned. */
+export function signCopies(sql: Sql, sign: Signer): void {
+  signers.set(sql, sign);
+}
+
+/** The SHA-256 of a file, read in pieces, as lower-case hex. */
+const hashOf = (file: string): Promise<string> =>
+  new Promise((done, failed) => {
+    const hash = createHash('sha256');
+    createReadStream(file)
+      .on('data', (piece) => hash.update(piece))
+      .on('error', failed)
+      .on('end', () => done(hash.digest('hex')));
+  });
 
 /**
  * How many copies are kept (`53 §5.4`: thirty), of each kind: thirty nightly copies, and apart from them thirty a person
@@ -106,7 +157,35 @@ export function fileSnapshots(sql: Sql, file: string, now: () => number): FileSn
   };
 
   const prune = async (keep: number, which: (id: string) => boolean = () => true): Promise<void> => {
-    for (const old of (await list()).filter((c) => which(c.id)).slice(keep)) rmSync(join(dir, `${old.id}.brain`), { force: true });
+    for (const old of (await list()).filter((c) => which(c.id)).slice(keep)) {
+      rmSync(join(dir, `${old.id}.brain`), { force: true });
+      rmSync(join(dir, `${old.id}.brain.sig`), { force: true });
+    }
+  };
+
+  /**
+   * Signs one copy, or leaves it unsigned and says nothing: a record with no signing key (restored from a redacted
+   * export, or with its key under a passphrase) takes copies all the same, and `braindog verify` says such a copy
+   * carries no signature. A copy is never lost because it could not be signed.
+   */
+  const signed = async (id: string, target: string): Promise<void> => {
+    const sign = signers.get(sql);
+    const record = sql.one<{ id: string }>('SELECT id FROM record WHERE singleton = 1')?.id;
+    if (!sign || !record) return;
+    const sha256 = await hashOf(target);
+    const got = await sign(copySigned(record, sha256));
+    if (!got) return;
+    const body: CopySignature = {
+      format: COPY_SIGNATURE,
+      record,
+      sha256,
+      bytes: statSync(target).size,
+      key_id: got.keyId,
+      public_key: got.publicKey,
+      sig: got.sig,
+      signed_at: got.signedAt,
+    };
+    writeFileSync(join(dir, `${id}.brain.sig`), `${JSON.stringify(body, null, 2)}\n`, { mode: 0o600 });
   };
 
   return {
@@ -126,6 +205,12 @@ export function fileSnapshots(sql: Sql, file: string, now: () => number): FileSn
         chmodSync(target, 0o600);
       } catch {
         /* Advisory on Windows. */
+      }
+      /* SIGNED BEFORE ANYTHING IS PRUNED, and a signature that fails costs the signature and never the copy. */
+      try {
+        await signed(id, target);
+      } catch {
+        rmSync(join(dir, `${id}.brain.sig`), { force: true });
       }
       /* A COPY TAKEN JUST BEFORE A RESTORE PRUNES NOTHING, so the copy being restored cannot be the one that goes. */
       if (label !== 'before-restore') await prune(KEEP, isNightly(id) ? isNightly : (other) => !isNightly(other));

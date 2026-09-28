@@ -47,7 +47,7 @@ const said = <T>(r: unknown): T => {
 const PACK_FILE = new URL('./rates-poll.pack.json', import.meta.url);
 const template = (): Record<string, unknown> => JSON.parse(readFileSync(PACK_FILE, 'utf8')) as Record<string, unknown>;
 
-/** What the file itself says, filled: the address and the two currencies it ships with. */
+/** The file's own address filled with the two currencies it shipped with before 1.1.0, as a record holding them would fill it. */
 const EXAMPLE: RatesSpec = {
   id: 'open-er-api-com',
   url: 'https://open.er-api.com/v6/latest/USD',
@@ -195,26 +195,31 @@ for (const [name, spec, want] of FILLED)
     );
 
     /* AND EVERYTHING THE SPEC DOES NOT NAME IS THE FILE'S, key order included, which is what the byte comparison
-       held and the fields above do not: the version, the licence, what it requires, the register it writes, and
-       each map entry's shape past the four values a spec fills. */
+       held and the fields above do not: the version, the licence, what it requires and the register it writes. The
+       file ships no map since 1.1.0, so each entry's shape past the four values a spec fills is held on its own. */
     const { fill: _marks, ...shipped } = template() as typeof filled & { fill?: unknown };
     const shape = (doc: typeof filled): string =>
-      JSON.stringify({
-        ...doc,
-        pack: '',
-        summary: '',
-        declarations: doc.declarations.map((d) => ({ ...d, ingest: '', url: '', every: '', map: d.map.map((m) => ({ ...m, currency: '', base: '', rate: { ...m.rate, path: '' }, source: '' })).slice(0, 1) })),
-      });
+      JSON.stringify({ ...doc, pack: '', summary: '', declarations: doc.declarations.map((d) => ({ ...d, ingest: '', url: '', every: '', map: [] })) });
     assert.equal(shape(filled), shape(shipped));
+    for (const m of poll.map)
+      assert.equal(
+        JSON.stringify({ ...m, currency: '', base: '', rate: { ...(m.rate as Record<string, unknown>), path: '' }, source: '' }),
+        '{"currency":"","base":"","rate":{"path":"","type":"decimal"},"as_of":{"arrived":true},"source":""}',
+      );
 
     /* AND READ AS SOMEBODY PASTING IT WOULD READ IT, which is the door a filled file goes through. `readPackFile`
        answers the document it read, so a key it dropped or reordered would show here. */
     if (spec.url.startsWith('https://')) assert.equal(JSON.stringify(said<{ doc: unknown }>(await readPackFile(JSON.stringify(filled))).doc), JSON.stringify(filled));
   });
 
-test('the file as it ships, with its marks taken off, is its own example filled', () => {
-  const { fill: _marks, ...shipped } = template();
-  assert.equal(JSON.stringify(shipped), JSON.stringify(fillRates(template(), EXAMPLE)));
+/* THE FILE AS IT SHIPS NAMES NO PAIR, SINCE 1.1.0: it shipped dollars in Egyptian pounds and in sterling, one record's own
+   currencies, and every record that installed it was sent those. The pairs are the fill's, from what a record holds. */
+test('the file as it ships quotes no currency, and filled with its example it is the example and nothing else', () => {
+  const shipped = template();
+  assert.equal(shipped.version, '1.1.0');
+  assert.deepEqual(mapOf(shipped), []);
+  const { fill: _marks, ...rest } = shipped;
+  assert.equal(JSON.stringify({ ...rest, summary: '', declarations: [] }), JSON.stringify({ ...fillRates(template(), EXAMPLE), summary: '', declarations: [] }));
 });
 
 /* ── what the fill refuses, moved from `packages/seed/test/rates.test.ts` ─────────────────────── */

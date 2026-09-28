@@ -20,7 +20,8 @@
 -->
 <script lang="ts">
   import type { ActorKind } from '../record/names.ts';
-  import { faceKindOf, hueFor, initialOf } from './face.ts';
+  import { faceKindOf, hueFor, initialOf, type RunLive } from './face.ts';
+  import AgentFace from './AgentFace.svelte';
   import Icon from './Icon.svelte';
   import Mark from './Mark.svelte';
 
@@ -30,6 +31,8 @@
     size = 'm',
     kind,
     hue,
+    run = null,
+    live = 'stopped',
   }: {
     name: string;
     you?: boolean | undefined;
@@ -38,6 +41,10 @@
     kind?: ActorKind | undefined;
     /** A person's hue where the caller holds one; absent, one kept from their name, so it is the same on every screen. */
     hue?: number | null | undefined;
+    /** The run an agent wrote as (`runOf(by)` in `face.ts`), which its face is coloured by and links to. */
+    run?: string | null | undefined;
+    /** Where that run is, which its ring says; a line in a log does not know, so it is drawn as stopped. */
+    live?: RunLive | undefined;
   } = $props();
 
   const drawn = $derived<ActorKind>(you ? 'you' : (kind ?? faceKindOf(name)));
@@ -48,14 +55,16 @@
 <!-- AN AUTOMATION AND A RULE ARE NOT PEOPLE, SO THEY DO NOT WEAR AN INITIAL: they take the glyph the
      rail gives Automations, which is where a person goes to find them. Slash wears its own mark, a
      slash, and BrainDog the product's mark in ink, never in the brand's red, which a face repeated
-     down a log would spend. AN AGENT keeps its initial on the neutral disc until the agents area's
-     `AgentFace` draws it; that is the branch it takes over. -->
-<span class="face" data-kind={drawn} data-size={size} style="--hue:{hue ?? hueFor(name)}" aria-hidden="true"
+     down a log would spend. AN AGENT IS `AgentFace` (AGT-13): its kind's glyph, in its run's hue where the caller
+     names the run, at the size a line of text takes and the list size for a page's own. -->
+{#if drawn === 'agent'}
+  <AgentFace agent={name} run={run ?? ''} {live} size={size === 'l' ? 'm' : 's'} />
+{:else}<span class="face" data-kind={drawn} data-size={size} style="--hue:{hue ?? hueFor(name)}" aria-hidden="true"
   >{#if drawn === 'automation' || drawn === 'rule'}<Icon name="refresh" size={size === 's' ? 's' : 'm'} />{:else if drawn === 'slash'}<svg
       class="face-slash"
       viewBox="0 0 24 24"><path d="M15.5 4.5 8.5 19.5" /></svg
     >{:else if drawn === 'system' || drawn === 'sample'}<Mark height={markHeight} tone="inherit" />{:else}{initialOf(name)}{/if}</span
->
+  >{/if}
 
 <style>
   .face {

@@ -25,12 +25,15 @@ export type MailKind =
   | 'passkey.added'
   | 'passkey.removed'
   | 'sessions.ended'
+  | 'email.change'
+  | 'email.changed'
   | 'lapse.0'
   | 'lapse.60'
   | 'lapse.83'
   | 'lapse.90'
   | 'lapse.back'
-  | 'welcome';
+  | 'welcome'
+  | 'usage.notice';
 
 const KINDS: ReadonlySet<string> = new Set<MailKind>([
   'signin',
@@ -40,12 +43,15 @@ const KINDS: ReadonlySet<string> = new Set<MailKind>([
   'passkey.added',
   'passkey.removed',
   'sessions.ended',
+  'email.change',
+  'email.changed',
   'lapse.0',
   'lapse.60',
   'lapse.83',
   'lapse.90',
   'lapse.back',
   'welcome',
+  'usage.notice',
 ]);
 
 /** Whether a word a door handed on names one of this module's letters. */
@@ -63,10 +69,12 @@ const SIGN_IN_KINDS: ReadonlySet<MailKind> = new Set<MailKind>([
   'passkey.added',
   'passkey.removed',
   'sessions.ended',
+  'email.change',
+  'email.changed',
 ]);
 
 /** The kinds whose whole point is a link. Without one there is nothing to send, and `sendMail` says so and sends nothing. */
-const NEEDS_LINK: ReadonlySet<MailKind> = new Set<MailKind>(['signin', 'signup.verify', 'signup.known', 'invite.prove']);
+const NEEDS_LINK: ReadonlySet<MailKind> = new Set<MailKind>(['signin', 'signup.verify', 'signup.known', 'invite.prove', 'email.change']);
 
 /**
  * What a letter may say beyond its own words. Each is optional, and a letter leaves out the sentence a value is missing
@@ -88,6 +96,8 @@ export type MailVars = {
   label?: string | undefined;
   /** Where to write with a question. Empty, and the footer names no address. */
   support?: string | undefined;
+  /** The one sentence the Directory already wrote, printed whole as the letter's body (`usage.notice`, MTR-2). */
+  say?: string | undefined;
 };
 
 /** One letter: its subject, its text, and the same words as simple HTML. */
@@ -117,12 +127,15 @@ const WHY: Record<MailKind, string> = {
   'passkey.added': 'because the passkeys that sign in with this address changed',
   'passkey.removed': 'because the passkeys that sign in with this address changed',
   'sessions.ended': 'because every session for this address ended',
+  'email.change': 'because somebody asked to sign in to BrainDog with this address instead of their old one',
+  'email.changed': 'because the address that signs in to this BrainDog account changed',
   'lapse.0': 'about billing for a record this address pays for or owns',
   'lapse.60': 'about billing for a record this address pays for or owns',
   'lapse.83': 'about billing for a record this address pays for or owns',
   'lapse.90': 'about billing for a record this address pays for or owns',
   'lapse.back': 'about billing for a record this address pays for or owns',
   welcome: 'because a BrainDog record was made for this address',
+  'usage.notice': "about this record's usage this month",
 };
 
 /**
@@ -192,6 +205,26 @@ function partsOf(kind: MailKind, v: { [K in keyof MailVars]-?: string }): { subj
         subject: 'You are signed out of BrainDog',
         parts: [{ say: 'Every BrainDog session for this address has ended, on every device. Signing in again needs a passkey or a new sign-in link.' }],
       };
+    /* THE TWO HALVES OF CHANGING A SIGN-IN ADDRESS (GAP-7). The link goes to the new address, so only somebody who reads
+       it can finish; the notice goes to the old one, so a change nobody there made is seen by the person it was done to.
+       The notice names no address, old or new: the mail may be read by whoever now holds the old mailbox. */
+    case 'email.change':
+      return {
+        subject: 'Confirm your new BrainDog sign-in address',
+        parts: [
+          { say: 'Open this link to sign in to BrainDog with this address from now on. It works once, for the next 24 hours, while you are signed in.' },
+          ...link,
+          { say: 'If you did not ask, you can ignore this message and nothing changes.' },
+        ],
+      };
+    case 'email.changed':
+      return {
+        subject: 'Your BrainDog sign-in address changed',
+        parts: [
+          { say: 'This address no longer signs in to BrainDog. The account now signs in with a new one.' },
+          { say: v.support ? `If this was not you, write to ${v.support} straight away.` : 'If this was not you, contact whoever runs this BrainDog straight away.' },
+        ],
+      };
     case 'lapse.0':
       return {
         subject: `${record} is read-only until billing resumes`,
@@ -233,6 +266,13 @@ function partsOf(kind: MailKind, v: { [K in keyof MailVars]-?: string }): { subj
           ...(v.asked ? [{ say: `The name ${v.asked} was taken before the payment went through, so the record was made as ${v.record || 'the next free name'}.` }] : []),
         ],
       };
+    /* THE ONE SENTENCE THE DIRECTORY ALREADY WROTE (MTR-2), printed whole: `notice()` decided the words against the
+       record's own allowance and plan, and this letter adds nothing to them beyond the subject and the footer. */
+    case 'usage.notice':
+      return {
+        subject: v.record ? `${v.record}: usage this month` : 'Your BrainDog usage this month',
+        parts: [{ say: v.say || "There is news about this record's usage this month." }],
+      };
   }
 }
 
@@ -250,6 +290,7 @@ export function letterOf(kind: MailKind, vars: MailVars = {}): Letter {
     asked: flat(vars.asked),
     label: flat(vars.label),
     support: flat(vars.support),
+    say: flat(vars.say),
   };
   const { subject, parts } = partsOf(kind, v);
   const footer: Part[] = [

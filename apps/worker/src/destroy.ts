@@ -24,6 +24,7 @@
  * name that opens an empty record, and saying "deleted" over that would be the record agreeing with itself.
  */
 
+import { filesPrefix } from './files.ts';
 import { prefixOf, type Blobs } from './snapshots.ts';
 
 /**
@@ -125,7 +126,9 @@ async function sweep(blobs: Pick<Blobs, 'list' | 'delete'>, prefix: string, keep
  * owed, and its prefix is the one place those leftovers are ever going to be found. The same listing proves it empty.
  */
 export async function expireFinal(blobs: Pick<Blobs, 'list' | 'delete'>, record: string): Promise<number> {
-  return sweep(blobs, prefixOf(record), null);
+  /* AND ITS FILES, for the same measured reason: a record deleted before the file store's prefix was swept at delete
+     left its files at `<record>/a/`, and a closed record's prefix is the one place anybody will find them. */
+  return (await sweep(blobs, prefixOf(record), null)) + (await sweep(blobs, filesPrefix(record), null));
 }
 
 /**
@@ -144,6 +147,11 @@ export async function destroyRecord(storage: Wipe, close: Close, record: string 
     if (!kept.startsWith(`${prefix}${FINAL}`))
       throw new Error(`The final copy was written to ${kept}, outside ${prefix}${FINAL}, where no night would ever expire it. Nothing was deleted.`);
     await sweep(copies.blobs, prefix, kept);
+    /* THE RECORD'S FILES GO WITH ITS COPIES, before the bytes and for the same reason (OPS-20): a file whose row is gone
+       is a photo of somebody's receipt that nothing names and nobody can delete, and a failed sweep throws while the
+       record is still whole. None is kept: the final copy holds each file's name and not its bytes, so a record put
+       back from it within the thirty days comes back with its facts and without its files. */
+    await sweep(copies.blobs, filesPrefix(record), null);
   }
   await storage.deleteAlarm();
   await storage.deleteAll();

@@ -47,6 +47,7 @@ import {
   isRefusal,
   LOG_BYTES,
   PRELUDE,
+  WITH_CONFIG,
   type HostResponse,
   type Json,
   type ScriptDecl,
@@ -327,6 +328,7 @@ const MAIN = `import { WorkerEntrypoint } from 'cloudflare:workers';
 import * as source from './script.js';
 
 const prelude = ${PRELUDE};
+const withConfig = ${WITH_CONFIG};
 
 export default class extends WorkerEntrypoint {
   async run(meta) {
@@ -356,7 +358,7 @@ export default class extends WorkerEntrypoint {
       get: (spoken) => record.get(run, spoken),
     };
     if (typeof source.default !== 'function') return { invalid: true, log: '' };
-    const ctx = prelude(host)(meta);
+    const ctx = withConfig(prelude(host)(meta), meta.config);
     try {
       await source.default(ctx);
     } catch (e) {
@@ -447,7 +449,7 @@ function checkWrites(decl: ScriptDecl, limits: ScriptLimits, handed: unknown): S
  */
 export async function runScript(wiring: ScriptWiring, s: Scripted): Promise<ScriptAnswer> {
   const started = wiring.now();
-  const { script, version, decl, record, input } = s.scripted;
+  const { script, version, decl, record, input, config } = s.scripted;
   const full: ScriptDecl = { id: script, version, ...decl };
   const usage = (turn?: Turn) => ({ fetches: turn?.fetches ?? 0, bytes: turn?.bytes ?? 0, wall_ms: Math.max(0, wiring.now() - started), cpu_ms: 0 });
 
@@ -478,7 +480,9 @@ export async function runScript(wiring: ScriptWiring, s: Scripted): Promise<Scri
       limits: { cpuMs: limits.cpu_ms },
     });
     const entry = worker.getEntrypoint(undefined, { props: { run } }) as unknown as { run(meta: Json): Promise<Handed> };
-    const meta: Json = { input: (input ?? null) as Json, now: new Date(started).toISOString(), tz: record.tz };
+    /* `config` IS THE OWNING PACK'S SETTINGS, read by `prepareScript` at the lease, and the loaded module's
+       `withConfig` freezes it onto `ctx` with the self-host's own text. */
+    const meta: Json = { input: (input ?? null) as Json, now: new Date(started).toISOString(), tz: record.tz, config: config ?? {} };
 
     /* THE DEADLINE IS RACED, NOT ASKED OF THE SANDBOX. A script awaiting a slow provider is not spending CPU, so
        `cpuMs` never ends it; this does, and the run is closed below so whatever it asks for afterwards is refused. */

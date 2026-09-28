@@ -136,7 +136,35 @@ export interface CtxHost {
   tz: string;
   /** A door's body and headers, a rule's copied fields, or `null` on a schedule. */
   input: Json;
+  /**
+   * `ctx.config`: the owning pack's settings, defaults filled (`Scripted`'s `config` in the kernel). Absent, or anything
+   * but a plain object, the script reads `{}`, so a host that knows no pack cannot hand it something else by mistake.
+   */
+  config?: Json;
 }
+
+/**
+ * The function that puts `config` on the `ctx` the prelude built, frozen all the way down, run inside the sandbox.
+ *
+ * A SECOND FUNCTION AND NOT A LINE IN THE PRELUDE, because both hosts already hand `PRELUDE`'s `build` the same `meta`
+ * and freeze what it returns: this takes that frozen `ctx` and answers a frozen copy with `config` beside the rest, so
+ * the self-host (`runInQuickJs`) and the Cloud's loaded module wrap it the same way and one text speaks for both.
+ *
+ * FROZEN BECAUSE IT IS THE OWNER'S, NOT THE SCRIPT'S. A setting is changed on the settings screen, and a script that
+ * could write `ctx.config.limit = 0` would read its own edit for the rest of the run as if the owner had made it. Like
+ * the prelude it is a courtesy and not a check: what a script does to its own copy changes nothing the host reads.
+ */
+export const WITH_CONFIG = `(function (ctx, config) {
+  const deep = (v) => {
+    if (v !== null && typeof v === 'object' && !Object.isFrozen(v)) {
+      Object.freeze(v);
+      for (const k of Object.keys(v)) deep(v[k]);
+    }
+    return v;
+  };
+  const settings = config !== null && typeof config === 'object' && !Array.isArray(config) ? config : {};
+  return Object.freeze({ ...ctx, config: deep(settings) });
+})`;
 
 /** A write the run asked for. Nothing is applied here; Brief 3 applies them after the run, together. */
 export type ScriptWrite =

@@ -368,13 +368,11 @@ test('A STEP READS THE ANSWERS OF THE STEPS BEFORE IT, and not of the ones after
   assert.deepEqual(varsBefore(asked, d.steps[3]!.key), ['vars.rate', 'vars.shown'], 'an answer inside one arm is not certain after it');
 });
 
-test('what the record would refuse is said before saving, in its own terms', () => {
+/* R2: ONLY WHAT IS PLAINLY MISSING IS SAID HERE. A tag on a clock and a clock under fifteen minutes were this list's
+   copy of the lint, and are the record's to say now, through `checkAutomation` on the card its `at` names. */
+test('what is plainly missing is said before saving, and nothing the record alone decides', () => {
   const empty = draftOf('x', { rule: 'x', on: { every: '1h' }, steps: [] });
   assert.ok(faultsOf(empty).some((f) => /at least one step/.test(f.say)));
-  const tagOnClock = draftOf('y', { rule: 'y', on: { every: '1h' }, steps: [{ tag: 'late' }] });
-  assert.ok(faultsOf(tagOnClock).some((f) => /no row/.test(f.say)));
-  const fast = draftOf('z', { rule: 'z', on: { every: '5m' }, steps: [{ note: 'x' }] });
-  assert.ok(faultsOf(fast).some((f) => /15 minutes/.test(f.say)));
   const blank = draftOf('w', { rule: 'w', on: { manual: true }, steps: [{ ask_slash: { question: '', as: '' } }] });
   assert.ok(faultsOf(blank).length >= 1);
   const slash = draftOf('s', { rule: 's', on: { manual: true }, steps: [{ ask_slash: { question: 'Why?', as: 'why' } }] });
@@ -398,27 +396,6 @@ test('WHERE THERE IS NO MODEL, AN ASK_SLASH STEP SAYS SO, and not that the build
   const none = 'This BrainDog has no model for Slash to answer with. Ask a person instead.';
   assert.deepEqual(faultsOf(slash, { slash: false }), [{ key, say: none }], 'an ask_slash an agent wrote is named before Send');
   assert.deepEqual(faultsOf(slash), faultsOf(slash, { slash: false }), 'the default is the host with no model');
-});
-
-/*
- * TWO REFUSALS ABOUT `when` THE CANVAS CAN SEE AND DID NOT SAY. Measured on 22 September by running the kernel's
- * `flowFault` over `bodyOf` from a scratch script: the sample's own "Chase late payments" with one branch added, and
- * the same rule switched to an arrival, both came back NOT_IN_THIS_BUILD at `when`, while `faultsOf` said nothing and
- * the button was live. The person would have learned it on Decide.
- */
-test('A CONDITION THE RECORD WOULD REFUSE IS SAID HERE: a day relative to today on a run, and any condition on an arrival', () => {
-  const late = draftOf('late', {
-    rule: 'late',
-    register: 'obligations',
-    when: 'due before today, state is open',
-    then: [{ tag: 'late' }, { notify: { say: 'Late' } }],
-    once_per: ['entry', 'due'],
-  });
-  assert.deepEqual(faultsOf(late), [], 'inline, it is read again as the days pass, and the record takes it');
-  const branchedLate = { ...late, steps: insertAt(late.steps, 'root', 2, { key: 'b', step: { if: 'amount is 5' }, then: [{ key: 'c', step: { tag: 'big' } }], else: [] }) };
-  assert.ok(faultsOf(branchedLate).some((f) => f.key === null && /today/.test(f.say)));
-  const onArrival = { ...late, trigger: blankTrigger('arrival') };
-  assert.ok(faultsOf(onArrival).some((f) => f.key === null && /arrival/.test(f.say)));
 });
 
 /* ── the inspector's text boxes ───────────────────────────────────────────── */
@@ -532,17 +509,6 @@ test('C2: A TREE CONDITION IS HELD IN THE DRAFT WHERE THE CARD CAN SEE IT, and a
   assert.equal(sayStart(deep), 'When a row in bills is added or changed, only when the condition holds', 'a tree the builder cannot read is still named');
 });
 
-test('C3: A CONDITION IN EITHER FORM ON A TRIGGER WITH NO ROW IS SAID BEFORE SEND', () => {
-  const d = draftOf('paid-tag', bigBills);
-  const onClock = { ...d, trigger: { every: '1h' }, steps: nodesOf([{ notify: { say: 'x' } }]) };
-  assert.ok(
-    faultsOf(onClock).some((f) => f.key === null && /no row/u.test(f.say)),
-    'the record refuses a when: on a clock, and the canvas said nothing',
-  );
-  const onArrival = { ...d, trigger: blankTrigger('arrival'), steps: nodesOf([{ notify: { say: 'x' } }]) };
-  assert.ok(faultsOf(onArrival).some((f) => f.key === null && /arrival/u.test(f.say)));
-});
-
 test('A SWITCH AWAY FROM A CHANGE TAKES THE CONDITION WITH IT, both forms, and an edit of the change keeps it', () => {
   const d = { ...draftOf('paid-tag', bigBills), when: 'what is Rent' };
   const clock = withTrigger(d, blankTrigger('every'));
@@ -625,4 +591,22 @@ test('F: "ADD THE AUTOMATION" ON A TAKEN ID IS A CONFLICT ON ACCEPT, and the aut
   const live = k.declarations().find((d) => d.id === 'rule.gold-rate')!;
   assert.deepEqual((JSON.parse(live.body) as { steps: unknown }).steps, clock.steps, 'the owner’s clock was replaced by a question that said "add"');
   assert.equal(landed.ok, false);
+});
+
+/* EDT-2: A DECISION TRIGGER AND AN EMPTY `else` ARE READ AND WRITTEN BACK AS THEY WERE FILED. */
+test('A RULE STARTED BY A DECISION ROUND-TRIPS, `about` and `option` and all, and is said in words', () => {
+  const chased = { rule: 'chased', on: { decided: { about: 'rule.chase', option: 'Chase it' } }, steps: [{ notify: { say: 'Chasing' } }] };
+  const d = draftOf('chased', chased);
+  assert.deepEqual(d.trigger, { decided: { about: 'rule.chase', option: 'Chase it' } });
+  assert.deepEqual(bodyOf(d), chased);
+  assert.equal(sayTrigger(d.trigger), 'When a question from chase is decided on Decide, when the answer is "Chase it"');
+  const any = { rule: 'any', on: { decided: {} }, steps: [{ notify: { say: 'x' } }] };
+  assert.deepEqual(bodyOf(draftOf('any', any)), any, 'a decision with nothing narrowing it is still a decision, not a button');
+});
+
+test('AN EMPTY `else` A BODY WROTE IS KEPT, and a branch drawn on the canvas files none', () => {
+  const kept = { rule: 'k', on: { manual: true }, steps: [{ if: 'amount is 5', then: [{ notify: { say: 'x' } }], else: [] }] };
+  assert.deepEqual(bodyOf(draftOf('k', kept)), kept);
+  const none = { rule: 'n', on: { manual: true }, steps: [{ if: 'amount is 5', then: [{ notify: { say: 'x' } }] }] };
+  assert.deepEqual(bodyOf(draftOf('n', none)), none);
 });

@@ -18,7 +18,8 @@
   import { TONES } from 'braindog-render';
   import { apiBase } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
-  import { afterResume, forProject, openActions, stateOf, whatOf, words, type ActionRow, type Source } from '$lib/record/actions.ts';
+  import { afterResume, forProject, openActions, stateOf, whatOf, words, type ActionRow, type ForProject, type Source } from '$lib/record/actions.ts';
+  import { words as jobWords } from '$lib/record/jobs.ts';
   import { signInFor } from '$lib/record/packs.ts';
   import { reprove } from '$lib/record/vault.ts';
   import { methods, passkeySignIn, support } from '$lib/auth.ts';
@@ -28,8 +29,10 @@
   import Empty from '$lib/ui/Empty.svelte';
   import { closed, opened } from '../../ui/screen.svelte.ts';
 
-  /* `null` lists every action, for Settings, ingest, and says so when there are none. */
-  let { project }: { project: string | null } = $props();
+  /* THE ROW THE PAGE IS DRAWN FOR, by its spoken id and title, which the record's own resolution of each action's
+     project is matched against (`forProject`). `null` lists every action, for Settings, ingest, and says so when
+     there are none. */
+  let { project }: { project: ForProject | null } = $props();
 
   let from = $state<'reading' | 'ready' | 'absent' | 'refused'>('reading');
   let rows = $state<ActionRow[]>([]);
@@ -59,8 +62,10 @@
     }
   }
 
+  /* READ AGAIN FOR ANOTHER ROW, and not for a new object naming the same one, which each draw of the page hands over. */
+  const which = $derived(project === null ? null : project.spoken);
   $effect(() => {
-    void project;
+    void which;
     untrack(() => void load());
   });
 
@@ -138,6 +143,10 @@
       {#each split.own as row (row.ingest)}{@render item(row, false)}{/each}
       {#each split.everywhere as row (row.ingest)}{@render item(row, true)}{/each}
     </ul>
+    <!-- "RUNS ON" LINKS TO THE PROJECT'S OWN SLICE OF /JOBS (AGT-23): /jobs already filters on `?repo=`. -->
+    {#if project}
+      <Button weight="quiet" href={`/jobs?repo=${encodeURIComponent(project.title)}`}>{jobWords.headingFor(project.title)}</Button>
+    {/if}
   </section>
 {/if}
 

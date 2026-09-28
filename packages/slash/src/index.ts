@@ -100,6 +100,7 @@ export type {
 } from './types.ts';
 export { ASK_CAP_DEFAULT, BACKGROUND_ASKS_MONTH, PROVIDERS, VERBS } from './types.ts';
 export type { IngestDeclaration, PatternDraft } from './jobs.ts';
+export { SKILL_BODY_MOST, SKILL_DRAFT_INSTRUCTIONS, SKILL_LEARNINGS_MOST, skillDraftShaped, type SkillDraftInput, type SkillDrafted } from './skill-draft.ts';
 
 /**
  * The two `slash_meta` keys the own key's provider and address are kept under (`Setup`).

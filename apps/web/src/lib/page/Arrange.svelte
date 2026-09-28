@@ -43,17 +43,26 @@
 </script>
 
 <script lang="ts">
+  import { tick } from 'svelte';
   import { apiBase } from '../at.ts';
   import { page as route } from '$app/state';
   import { copy } from '$lib/copy.ts';
+  import type { Area } from '$lib/record/arrange.ts';
   import type { Arrangement } from '$lib/record/arrange.svelte.ts';
+  import { blockWords, readList } from '$lib/record/block-edit.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
+  import type { InstalledKind } from '$lib/record/kinds.ts';
+  import { may } from '$lib/record/may.ts';
+  import { listName } from '$lib/record/names.ts';
   import type { LivePageDecl } from '$lib/record/page-live.ts';
+  import type { Patch } from '$lib/record/page-write.ts';
+  import type { BlockBody } from '$lib/record/pages-live.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import AddBlock from '$lib/ui/AddBlock.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import Sheet from '$lib/ui/Sheet.svelte';
+  import BlockEditor from './BlockEditor.svelte';
   import { layoutOf, slotOf } from './layout.ts';
   import { words } from './words.ts';
 
@@ -86,6 +95,19 @@
   const layout = $derived(layoutOf(page));
   const arranging = $derived(arrangement.editing);
 
+  /**
+   * WHETHER THIS PERSON MAY CHANGE PAGES AT ALL. The arrangement is written with `setDeclaration`, which the record
+   * guards as ADMIN, so a member without the owner's level would be offered Edit layout and Add a block and refused on
+   * Done. The controls are absent for them instead, as every control that cannot act is (19 §6).
+   */
+  const mayChange = $derived(may(route.data as unknown as Shell, 'owner'));
+
+  /**
+   * THE LIST WHOSE EVERY PAGE THIS ARRANGES, on a page made for each row of one. Arranging it arranges the template
+   * (`page-write.ts` `saveArrangement`), so the mode says so before anything is moved.
+   */
+  const every = $derived(page.for?.register ? listNamed(page.for.register) : null);
+
   function beginArrange() {
     arrangement.begin(all.map((b, i) => slotOf(b, i, layout)));
   }
@@ -105,6 +127,26 @@
      list with no row yet, so a record whose lists were all still empty would have been told it had no list at all,
      and a block over an empty list is a block that draws its "Add one" (`boot-live.ts` `lists`). */
   const lists = $derived((route.data as unknown as Partial<Shell>).lists ?? []);
+
+  /** A list's name as the record calls it, and `names.ts`'s spelling of its id where the shell does not list it. */
+  function listNamed(id: string): string {
+    const bare = id.startsWith('register.') ? id.slice('register.'.length) : id;
+    return lists.find((l) => l.id === bare)?.name ?? listName(bare);
+  }
+
+  /* THE KINDS THE RECORD'S PACKS DECLARE, read with the bound list's schema, so the picker lists them beside its own. */
+  let installed = $state<Record<string, InstalledKind>>({});
+  $effect(() => {
+    const list = bindTo;
+    if (!list || !arranging) return;
+    let live = true;
+    void readList(apiBase(), list).then((got) => {
+      if (live && got) installed = got.kinds;
+    });
+    return () => {
+      live = false;
+    };
+  });
 
   let adding = $state(false);
   let asking = $state(false);
@@ -148,37 +190,107 @@
       toasts.push(copy.arrangeNothing);
       return;
     }
-    if (saving) return;
+    await write(null);
+  }
+
+  /**
+   * The arrangement write, with one block's edit in it when the editor saved.
+   *
+   * AN EDIT GOES THROUGH THE SAME WRITE AS A MOVE, so the draft in force (the order, widths and columns arranged so far,
+   * and any block added) lands with it and Put back sets the whole body that was there before. After an edit the mode
+   * stays open over the page as re-read, because the reader was in the middle of arranging it; after Done it closes.
+   */
+  async function write(edit: { i: number; patch: Patch; name: string } | null): Promise<boolean> {
+    if (saving) return false;
     saving = true;
     const title = page.title;
     const m = await import('$lib/record/page-write.ts');
-    const placed = arrangement.body.map((b) => ({ i: b.block, span: b.span, ...(b.area ? { area: b.area } : {}) }));
+    const placed = arrangement.body.map((b) => ({
+      i: b.block,
+      span: b.span,
+      ...(b.area ? { area: b.area } : {}),
+      ...(edit && edit.i === b.block ? { edit: edit.patch } : {}),
+    }));
     const out = await m.saveArrangement(apiBase(), slug, declared.length, placed, extra, undefined, page.declared_version);
     saving = false;
-    if (out.from !== 'written') return void toasts.push(out.fix, { intent: 'warn' });
+    if (out.from !== 'written') {
+      toasts.push(out.fix, { intent: 'warn' });
+      return false;
+    }
     arrangement.commit();
     await reread();
     extra = [];
     arrangement.slots = null;
     const before = out.before;
-    toasts.push(copy.arranged(title), {
+    const said = edit ? blockWords.saved(edit.name) : out.template && every ? blockWords.arrangedEvery(every) : copy.arranged(title);
+    toasts.push(said, {
       undo: () =>
         void m.setBody(apiBase(), before, undefined, out.version).then(async (back) => {
           if (back.from !== 'written') toasts.push(back.fix, { intent: 'warn' });
           await reread();
         }),
     });
+    if (edit) {
+      await tick();
+      beginArrange();
+    }
+    return true;
+  }
+
+  /* ── the block editor ─────────────────────────────────────────────────── */
+
+  /** The place being edited, and the block there, while the editor is open. */
+  const editing = $derived.by(() => {
+    const at = arrangement.editAt;
+    const slot = at === null ? undefined : arrangement.slots?.[at];
+    const block = slot ? all[slot.i] : undefined;
+    return at !== null && slot && block ? { at, slot, block } : null;
+  });
+
+  /** The sheet is open while a place is being edited, and closing it clears the place, so the next Edit opens afresh. */
+  const editorOpen = () => editing !== null;
+  const setEditorOpen = (open: boolean) => {
+    if (!open) arrangement.editAt = null;
+  };
+
+  /**
+   * A block added in this session, as the record would be sent it: the picker's drawing hints (a column's width and
+   * alignment) left off, as `declaredBlock` leaves them off in the write.
+   */
+  function addedBody(i: number): BlockBody | null {
+    const b = i >= declared.length ? extra[i - declared.length] : undefined;
+    if (!b) return null;
+    const columns = b.columns?.map((c) => ({ field: c.field, ...(c.label ? { label: c.label } : {}), ...(c.as ? { as: c.as } : {}) }));
+    return { ...(b as unknown as BlockBody), ...(columns ? { columns } : {}) };
+  }
+
+  /** The lists a block may show: the ones the page requires, or every list where the page names none. */
+  const offered = $derived.by(() => {
+    const required = (page.requires ?? []).filter((r) => r.startsWith('register.') || !r.includes('.'));
+    return required.length ? required.map((r) => ({ id: r.replace(/^register\./, ''), name: listNamed(r) })) : lists.map((l) => ({ id: l.id, name: l.name }));
+  });
+
+  async function saveEdit(patch: Patch, span: number, area: Area | null): Promise<boolean> {
+    const now = editing;
+    if (!now) return false;
+    arrangement.setSpan(now.at, span);
+    if (area) arrangement.setArea(now.at, area);
+    const name = now.block.heading || (copy.kindNames[now.block.kind] ?? blockWords.kindNames[now.block.kind] ?? now.block.kind);
+    if (Object.keys(patch).length === 0 && !arrangement.dirty) return true;
+    return write({ i: now.slot.i, patch, name });
   }
 </script>
 
-{#if arranging}
+<!-- NOTHING HERE FOR A MEMBER WHO CANNOT CHANGE PAGES (`mayChange`): no Edit layout, no Add a block, no editor. -->
+{#if arranging && mayChange}
+  {#if every}<span class="arrange-every" role="status">{blockWords.everyPage(every)}</span>{/if}
   <Button weight="quiet" onclick={addBlock}>
     <Icon name="plus" size="s" />
     {copy.addBlock}
   </Button>
   <Button weight="bare" onclick={() => arrangement.cancel()}><Icon name="close" size="s" />{copy.arrangeCancel}</Button>
   <Button weight="primary" onclick={commitArrange}><Icon name="check" size="s" />{copy.arrangeDone}</Button>
-{:else if !showSource}
+{:else if !showSource && mayChange}
   <span class="arrange-slot">
     <Button weight="quiet" onclick={beginArrange}>
       <Icon name="grid" size="s" />
@@ -187,8 +299,23 @@
   </span>
 {/if}
 
-{#if bindTo}
-  <AddBlock bind:open={adding} blocks={declared} register={bindTo} onadd={add} />
+{#if bindTo && mayChange}
+  <AddBlock bind:open={adding} blocks={declared} register={bindTo} onadd={add} {installed} />
+{/if}
+
+{#if editing && mayChange}
+  <BlockEditor
+    bind:open={editorOpen, setEditorOpen}
+    {slug}
+    index={editing.slot.i}
+    added={addedBody(editing.slot.i)}
+    block={editing.block}
+    span={editing.slot.span}
+    area={layout ? (editing.slot.area ?? 'main') : null}
+    lists={offered}
+    {every}
+    onsave={saveEdit}
+  />
 {/if}
 
 <!-- ASKED ONLY ON A PAGE THAT SHOWS NO LIST: which list the new block draws from, before the picker opens over it. -->
@@ -211,6 +338,13 @@
     .arrange-slot {
       display: none;
     }
+  }
+
+  /* THE ONE LINE OF CONTEXT the mode carries on a template: quiet, beside the controls it is about. */
+  .arrange-every {
+    align-self: center;
+    color: var(--dim);
+    font-size: var(--t-sm);
   }
 
   .bind-why {

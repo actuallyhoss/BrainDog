@@ -23,21 +23,25 @@
 import { clearCookie, readSid, sameOrigin, sessionContext, sessionCookie } from '@braindog/host/auth';
 import { shareOf } from '@braindog/host';
 import { OPERATION_METHOD } from '@braindog/kernel';
-import type { TokenReach } from '@braindog/kernel';
+import type { TokenReach, Wheres } from '@braindog/kernel';
 import { MEMBER_STOPPED } from '@braindog/kernel';
 import type { AuthResult, Refusal, Who } from '@braindog/ports';
 import { TOKEN_REACHES, type CallContext } from '@braindog/record';
 
 import { recordOf } from './route.ts';
+import { capped, LAPSED_FIX, mayWrite, mcpWrites } from './lapse.ts';
 
-/** What the record says a person holds in it. The same shape `Record$.access` answers. */
-export type Held = { level: string | null; registers: string[] | null; levels: Record<string, string> };
+/**
+ * What the record says a person holds in it. The same shape `Record$.access` answers. `wheres` is optional because a
+ * record whose kernel is older than migration 19 answers without it, and that is a record with no narrowed grant.
+ */
+export type Held = { level: string | null; registers: string[] | null; levels: Record<string, string>; wheres?: Wheres };
 
 export type Deps = {
   /** `https://<PUBLIC_HOST>`, the one origin a cookie write may come from. */
   origin: string;
-  /** The Directory's `session` flow, with the path's slug when the request named one. */
-  session: (sid: string, slug?: string) => Promise<AuthResult<Who>>;
+  /** The Directory's `session` flow, with the path's slug when the request named one. `lapsed` is there only when the record has lapsed. */
+  session: (sid: string, slug?: string) => Promise<AuthResult<Who & { lapsed?: true }>>;
   access: (record: string, person: string) => Promise<Held | null>;
   /** Whether a person the record holds nothing for is on it and stopped, so the refusal says so. Absent, the door says its own words. */
   stopped?: (record: string, person: string) => Promise<boolean>;
@@ -95,7 +99,13 @@ export async function doorOf(request: Request, deps: Deps, slug: string | null =
     }
     /* `12 §8` CSRF: a cookie write comes from a page on this origin or not at all. */
     if (!SAFE.has(request.method) && !sameOrigin(request, deps.origin)) return { door: 'refused', status: 403, refusal: CROSS, ...carried };
-    return { door: 'session', record, ctx: sessionContext(out.body, held) as CallContext, ...carried };
+    const ctx = sessionContext(out.body, held) as CallContext;
+    /* A LAPSED RECORD ANSWERS A PERSON AT `read`, and a write in the lapse's own sentence (`lapse.ts`). The Directory said
+       so in the same answer that named the record, so nothing more is asked; a record nobody pays for has no row there
+       and never carries the flag. */
+    if (out.body.lapsed !== true) return { door: 'session', record, ctx, ...carried };
+    const lapse = underLapse(methodAsked(request), ctx);
+    return 'refusal' in lapse ? { door: 'refused', status: 403, refusal: lapse.refusal, ...carried } : { door: 'session', record, ctx: lapse.ctx, ...carried };
   }
 
   /* NOTHING PRESENTED IS A 401, AT THE ROOT AND UNDER A SLUG ALIKE. The Directory is not asked: a stranger has no name to
@@ -129,6 +139,11 @@ export type BearerDeps = {
    * `null` when the bearer is not one. Absent, and no operation bearer is taken, which is the Worker before W55-7.
    */
   operation?: (record: string, bearer: string) => Promise<{ method: string; person: string } | null>;
+  /**
+   * Whether the record's billing has lapsed, the Directory's `billing({ op: 'lapsed' })`. Asked only once the secret is
+   * checked, so a stranger learns nothing from it. Absent, and no bearer is capped, which is the Worker before OPS-14.
+   */
+  lapsed?: (record: string) => Promise<boolean>;
 };
 
 export type Bearer = { record: string; ctx: CallContext } | { status: 401 } | { status: 403; refusal: Refusal };
@@ -150,6 +165,23 @@ export const operationAsked = (request: Request): string | null => {
   const name = /^\/+api\/+([^/]+)\/*$/.exec(new URL(request.url).pathname)?.[1] ?? '';
   return OPERATIONS.has(name) ? name : null;
 };
+
+/** The record method a `/api/<method>` path names, or `''` for any other path, which no route row names. */
+const methodAsked = (request: Request): string => /^\/+api\/+([^/]+)\/*$/.exec(new URL(request.url).pathname)?.[1] ?? '';
+
+const LAPSED: Refusal = { code: 'FORBIDDEN', fix: LAPSED_FIX, at: 'billing' };
+
+/**
+ * A call on a lapsed record: refused in the lapse's sentence when it writes, and otherwise the context to answer it
+ * under.
+ *
+ * AN EXPORT THAT PASSES KEEPS ITS CONTEXT WHOLE, because `export` is an owner's method and a context held to `read` would
+ * be refused it by the record: `mayWrite` has already said this caller may take it. Every other call goes on `capped`.
+ */
+function underLapse(method: string, ctx: CallContext): { ctx: CallContext } | { refusal: Refusal } {
+  if (!mayWrite(method, ctx)) return { refusal: LAPSED };
+  return { ctx: method === OPERATION_METHOD.export ? ctx : capped(ctx) };
+}
 
 /**
  * An agent's bearer, for `/api` and `/mcp` alike, so a token reaches the same person at the same level
@@ -192,15 +224,12 @@ export async function bearerOf(request: Request, surface: 'api' | 'mcp', deps: B
       return { status: 403, refusal: { code: 'FORBIDDEN', fix: `This bearer was approved for one ${grant.method} and reaches nothing else. Start the device again for this.`, at: 'operation' } };
     const admitted = await heldBy(deps, record, grant.person, slug);
     if ('status' in admitted) return admitted;
-    return {
-      record,
-      ctx: {
-        principal: { kind: 'person', id: grant.person, level: admitted.held.level as PersonPrincipal['level'] },
-        operation: grant.method,
-        credentialed: true,
-        ...scoped(admitted.held),
-      },
-    };
+    return lapseOf(deps, record, grant.method, {
+      principal: { kind: 'person', id: grant.person, level: admitted.held.level as PersonPrincipal['level'] },
+      operation: grant.method,
+      credentialed: true,
+      ...scoped(admitted.held),
+    });
   }
   const admitted = await heldBy(deps, record, seen.person_id, slug);
   if ('status' in admitted) return admitted;
@@ -214,28 +243,52 @@ export async function bearerOf(request: Request, surface: 'api' | 'mcp', deps: B
   const reach = Array.isArray(seen.reach) ? TOKEN_REACHES.filter((r) => seen.reach?.includes(r)) : [];
   /* BOTH HALVES GO OVER, the token's scope and the person's level, and the record computes where they meet: a
      token says what its holder may do with their access and never what access they have. */
-  return {
-    record,
-    ctx: {
-      principal: {
-        kind: 'token',
-        id: seen.id,
-        scope: seen.scope as TokenPrincipal['scope'],
-        person: seen.person_id,
-        level: held.level as TokenPrincipal['level'],
-        ...(reach.length === 0 ? {} : { reach }),
-      },
-      ...scoped(held),
+  const ctx: CallContext = {
+    principal: {
+      kind: 'token',
+      id: seen.id,
+      scope: seen.scope as TokenPrincipal['scope'],
+      person: seen.person_id,
+      level: held.level as TokenPrincipal['level'],
+      ...(reach.length === 0 ? {} : { reach }),
     },
+    ...scoped(held),
   };
+  /* OVER `/mcp` THE METHOD IS INSIDE THE BODY, so a copy of it is read for the tool's name; the record reads the body
+     itself after this, from the request as it came. A write refuses in the lapse's sentence, as on `/api`, and a call
+     this cannot read goes on at `read`, where the record's own ladder refuses anything that writes. */
+  if (surface === 'mcp') {
+    if (deps.lapsed === undefined || !(await deps.lapsed(record))) return { record, ctx };
+    const message: unknown = await request.clone().json().catch(() => null);
+    return mcpWrites(message) ? { status: 403, refusal: LAPSED } : { record, ctx: capped(ctx) };
+  }
+  return lapseOf(deps, record, methodAsked(request), ctx);
+}
+
+/**
+ * A bearer's context as its record's billing leaves it: whole, capped at `read`, or refused in the lapse's sentence.
+ *
+ * AFTER THE SECRET AND THE PERSON ARE CHECKED, so a lapsed record answers a forged bearer the same 401 as a paid one.
+ */
+async function lapseOf(deps: BearerDeps, record: string, method: string, ctx: CallContext): Promise<Bearer> {
+  if (deps.lapsed === undefined || !(await deps.lapsed(record))) return { record, ctx };
+  const lapse = underLapse(method, ctx);
+  return 'refusal' in lapse ? { status: 403, refusal: lapse.refusal } : { record, ctx: lapse.ctx };
 }
 
 type PersonPrincipal = Extract<CallContext['principal'], { kind: 'person' }>;
 
-/** The lists a person is held to on the record, when they are held to any. */
-const scoped = (held: Held): Pick<CallContext, 'registers' | 'levels'> => ({
+/**
+ * The lists a person is held to on the record, when they are held to any, and the rows of each they reach.
+ *
+ * `wheres` TRAVELS WHEREVER `levels` DOES, so a narrowed grant reaches every reader the same way through a bearer as
+ * through a session (`loop/finish/platform.md` §4.0 W). Left off, every reader would show a narrowed colleague the
+ * whole list.
+ */
+const scoped = (held: Held): Pick<CallContext, 'registers' | 'levels'> & { wheres?: Wheres } => ({
   ...(held.registers === null ? {} : { registers: held.registers }),
   ...(Object.keys(held.levels).length === 0 ? {} : { levels: held.levels as CallContext['levels'] }),
+  ...(held.wheres === undefined || Object.keys(held.wheres).length === 0 ? {} : { wheres: held.wheres }),
 });
 
 /**

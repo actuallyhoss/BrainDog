@@ -25,15 +25,19 @@
   import { said } from '../voice.svelte.ts';
   import type { NavEntry } from '../record/api.ts';
   import Icon from './Icon.svelte';
+  import type { SpineKey } from '../spine.ts';
 
   let {
     entries,
+    spine = ['home', 'decide', 'inbox'],
     open = 0,
     inbox = 0,
     onmore,
   }: {
     /** The declared nav, flat, in the reader's own arranged order. */
     entries: NavEntry[];
+    /** The spine as `spineOf` reads it, so this bar and the rail never disagree about Decide and Inbox (PGS-18). */
+    spine?: readonly SpineKey[] | undefined;
     open?: number | undefined;
     inbox?: number | undefined;
     onmore?: (() => void) | undefined;
@@ -65,20 +69,25 @@
 
 <nav class="topbar" aria-label="Record">
   <!-- The spine. Home, Decide and Inbox are the three surfaces whose absence would make this a
-       different product, so they are first and no pack may add to them, reorder them or badge them. -->
+       different product, so they are first and no pack may add to them, reorder them or badge them.
+       Decide and Inbox are drawn once they have been used, by the rail's own rule (`spine.ts`, PGS-18). -->
   <a class="bar-item spine tap" href={at('/')} aria-current={here('/') ? 'page' : undefined}>
     <Icon name="home" size="m" /><span class="bar-name">{said('home')}</span>
   </a>
-  <a class="bar-item spine tap" href={at('/decide')} aria-current={under('/decide') ? 'page' : undefined}>
-    <Icon name="decide" size="m" /><span class="bar-name">{copy.decide}</span>
-    <!-- NAMED, NOT ONLY COLOURED (13 §5.1), the same fix as the rail's: `--tone` alone left this
-         the one element in the bar whose meaning was carried by colour and nothing else. -->
-    {#if open}<span class="tally num" data-intent="warn">{open}<Icon name="decide" size="s" title={copy.openQuestions} /></span>{/if}
-  </a>
-  <a class="bar-item spine tap" href={at('/inbox')} aria-current={under('/inbox') ? 'page' : undefined}>
-    <Icon name="inbox" size="m" /><span class="bar-name">{copy.inbox}</span>
-    {#if inbox}<span class="tally num">{inbox}</span>{/if}
-  </a>
+  {#if spine.includes('decide')}
+    <a class="bar-item spine tap" href={at('/decide')} aria-current={under('/decide') ? 'page' : undefined}>
+      <Icon name="decide" size="m" /><span class="bar-name">{copy.decide}</span>
+      <!-- NAMED, NOT ONLY COLOURED (13 §5.1), the same fix as the rail's: `--tone` alone left this
+           the one element in the bar whose meaning was carried by colour and nothing else. -->
+      {#if open}<span class="tally num" data-intent="warn">{open}<Icon name="decide" size="s" title={copy.openQuestions} /></span>{/if}
+    </a>
+  {/if}
+  {#if spine.includes('inbox')}
+    <a class="bar-item spine tap" href={at('/inbox')} aria-current={under('/inbox') ? 'page' : undefined}>
+      <Icon name="inbox" size="m" /><span class="bar-name">{copy.inbox}</span>
+      {#if inbox}<span class="tally num">{inbox}</span>{/if}
+    </a>
+  {/if}
 
   <span class="bar-rule" aria-hidden="true"></span>
 

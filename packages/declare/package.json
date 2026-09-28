@@ -7,11 +7,13 @@
     ".": "./src/index.ts",
     "./catalogue": "./src/catalogue.ts",
     "./job": "./src/job.ts",
-    "./kennel": "./src/kennel.ts"
+    "./kennel": "./src/kennel.ts",
+    "./yaml": "./src/yaml.ts"
   },
   "dependencies": {
     "@braindog/kernel": "workspace:*",
-    "@braindog/ports": "workspace:*"
+    "@braindog/ports": "workspace:*",
+    "yaml": "2.9.0"
   },
   "scripts": {
     "test": "node --test test/*.test.ts",

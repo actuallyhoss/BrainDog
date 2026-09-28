@@ -1,0 +1,83 @@
+/*
+ * A `gallery` block (`kinds/gallery.ts`, drawn by `braindog-render`'s `Gallery.svelte` and its `toHTML` twin): a tile a
+ * row, the picture where the record serves the file, the file's name where it is not a picture, and the caption under
+ * either.
+ *
+ * THE HOST LAYS THE TILES OUT, and the renderer counts no columns: as many 10rem tracks as the block holds, and two
+ * below C4's 640px, so a phone shows pictures big enough to tell apart rather than a column of one. The block is its
+ * own container, so a gallery in a narrow column at 1440 is laid out as it is on a phone, and no `@media` width is added.
+ *
+ * EVERY TILE KEEPS ONE SHAPE, 4:3, whatever it holds: a picture is cut to it, a file that is no picture is its name on
+ * a well of the same size, and a tile whose file the record could not find is the same empty well over its caption. So
+ * a missing file never collapses its tile and pulls the row out of line, and the caption still says what was there.
+ */
+
+@layer components {
+  .block[data-kind='gallery'] {
+    container-type: inline-size;
+  }
+
+  .gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(10rem, 100%), 1fr));
+    gap: var(--sp-4) var(--sp-3);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  @container (inline-size < 40rem) {
+    .gallery {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  .gallery-item {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    min-inline-size: 0;
+  }
+
+  .gallery-picture,
+  .gallery-file,
+  .gallery-item:not(:has(> .gallery-picture, > .gallery-file))::before {
+    display: block;
+    inline-size: 100%;
+    aspect-ratio: 4 / 3;
+    border-radius: var(--r-md);
+    background: var(--sunk);
+  }
+
+  .gallery-picture {
+    object-fit: cover;
+  }
+
+  /* A FILE THAT IS NO PICTURE is its name, centred on the well, and wraps: a name is often one long word. */
+  .gallery-file {
+    display: grid;
+    place-items: center;
+    padding: var(--sp-3);
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    overflow-wrap: anywhere;
+    text-align: center;
+  }
+
+  .gallery-item:not(:has(> .gallery-picture, > .gallery-file))::before {
+    content: '';
+  }
+
+  .gallery-caption {
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    line-height: var(--lh-tight);
+    overflow-wrap: anywhere;
+  }
+
+  .gallery-empty {
+    margin: 0;
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+}

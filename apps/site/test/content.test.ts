@@ -606,57 +606,49 @@ test('the home page is at most eight bands, opens on the drawn product, and hold
 });
 
 /**
- * NO LICENCE NAME AND NO EM DASH IN THE COPY FILE EITHER. The served-bytes checks above only see
+ * NO LICENCE NAME AND NO EM DASH IN THE COPY FILES EITHER. The served-bytes checks above only see
  * what a page renders today, and a key added for a section not drawn yet slips past them.
  *
- * IT USED TO READ A PREFIX AND NOW IT READS THE WHOLE OBJECT. The line was
- * `source.slice(indexOf('export const site'), indexOf('\n  legal: {'))`, which measured everything
- * declared ABOVE `legal:` and nothing below it. That is not a rule about what is marketing copy, it
- * is an accident of key order: `changelog` and `footer` sit after `legal` and were unscanned, and
- * moving any section past `legal:` would have dropped it out of the check without a word. So the
- * sections are read out of the file by their indentation and every one of them is scanned.
- *
- * THE LICENCE NAMES ARE EXCUSED IN `legal:` AND NOWHERE ELSE, which is the owner's split of
- * 2026-09-16 that the served-bytes test above measures from the other side. The em dash rule has no
- * exception: `copy.ts` states it as the fifth of its five voice rules, and a reader on /legal is
- * still a reader.
+ * IT READS EVERY FILE UNDER `src/lib/copy/`, so an area file added tomorrow is scanned the day it
+ * lands. The licence names are excused in `trust.ts`'s `legal:` section and nowhere else, which is the
+ * owner's split of 2026-09-16 that the served-bytes test above measures from the other side. The em
+ * dash rule has no exception: `copy.ts` states it as the fifth of its five voice rules.
  */
-test('copy.ts holds no em dash, and names a licence only in its legal section', () => {
-  const source = readFileSync(new URL('../src/lib/copy.ts', import.meta.url), 'utf8');
-  const opens = source.indexOf('export const site');
-  const closes = source.indexOf('\n} as const;', opens);
-  assert.equal(opens !== -1 && closes !== -1, true, 'copy.ts no longer holds one `export const site` object, so this check reads nothing');
-  const site = source.slice(opens, closes);
-
-  /* The sections, at the two-space indent a top-level key of `site` is declared at. Reading them
-     out of the file rather than naming them here is the whole point: a section added tomorrow is
-     scanned the day it lands, and no ordering of them can put one out of reach. */
-  const sections = [...site.matchAll(/^ {2}([A-Za-z]+): \{$/gm)];
-  const named = sections.map((m) => m[1] ?? '');
-  assert.equal(named.length > 8, true, `only ${named.length} sections parsed out of copy.ts; its shape has changed`);
-  assert.equal(named.includes('legal'), true, `copy.ts declares no "legal" section, so this check cannot tell where the licence names are allowed. It declares: ${named.join(', ')}`);
-
-  const at = named.indexOf('legal');
-  const from = sections[at]?.index ?? 0;
-  const to = sections[at + 1]?.index ?? site.length;
+test('the copy files hold no em dash, and name a licence only in the legal section', () => {
+  const folder = new URL('../src/lib/copy/', import.meta.url);
+  const files = readdirSync(folder).filter((name) => name.endsWith('.ts'));
+  assert.equal(files.includes('trust.ts'), true, `src/lib/copy/ holds no trust.ts, so this check cannot tell where the licence names are allowed. It holds: ${files.join(', ')}`);
 
   const quoted = (region: string): string =>
     [...region.matchAll(/'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"|`((?:[^`\\]|\\.)*)`/g)].map((m) => m[1] ?? m[2] ?? m[3] ?? '').join('\n');
 
-  const legal = quoted(site.slice(from, to));
-  const rest = quoted(site.slice(0, from) + site.slice(to));
+  let legal = '';
+  let rest = '';
+  for (const name of files) {
+    const source = readFileSync(new URL(name, folder), 'utf8');
+    if (name !== 'trust.ts') {
+      rest += `\n${quoted(source)}`;
+      continue;
+    }
+    /* The `legal:` section runs from its key to the next key at the same two-space indent. */
+    const from = source.search(/^ {2}legal: \{$/m);
+    assert.equal(from !== -1, true, 'trust.ts declares no "legal" section at two spaces of indent');
+    const next = source.slice(from + 1).search(/^ {2}[A-Za-z]+: \{$|^\} as const;$/m);
+    const to = next === -1 ? source.length : from + 1 + next;
+    legal = quoted(source.slice(from, to));
+    rest += `\n${quoted(source.slice(0, from) + source.slice(to))}`;
+  }
 
-  /* THE LEGAL SECTION STILL NAMES BOTH LICENCES, which is what proves the two regions above landed
-     where this test thinks they did. If the split misfired, either this goes red or the licence
-     assertion below does, and a silent pass over an empty string is not one of the outcomes. */
-  assert.match(legal, /\bApache\b/, 'the legal section of copy.ts no longer names the Apache licence');
-  assert.match(legal, /\bMIT\b/, 'the legal section of copy.ts no longer names the MIT licence');
+  /* THE LEGAL SECTION STILL NAMES BOTH LICENCES, which is what proves the split landed where this
+     test thinks it did. A silent pass over an empty string is not one of the outcomes. */
+  assert.match(legal, /\bApache\b/, 'the legal section no longer names the Apache licence');
+  assert.match(legal, /\bMIT\b/, 'the legal section no longer names the MIT licence');
 
   const licence = /\bApache\b|\bMIT\b/.exec(rest);
-  assert.equal(licence, null, `copy.ts names a licence outside its legal section: ${licence ? around(rest, licence[0]).join(' | ') : ''}`);
+  assert.equal(licence, null, `a copy file names a licence outside the legal section: ${licence ? around(rest, licence[0]).join(' | ') : ''}`);
 
   const dashes = around(`${rest}\n${legal}`, '—');
-  assert.equal(dashes.length, 0, `copy.ts has ${dashes.length} em dash(es) in its strings: ${dashes.join(' | ')}`);
+  assert.equal(dashes.length, 0, `the copy files have ${dashes.length} em dash(es) in their strings: ${dashes.join(' | ')}`);
 });
 
 /**

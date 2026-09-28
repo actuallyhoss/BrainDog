@@ -1,6 +1,6 @@
 {
   "pack": "holdings",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "summary": "What you hold rather than spend: certificates, policies and commodities, with what each one cost, and what they cost together.",
   "author": "BrainDog",
   "license": "MIT",
@@ -144,7 +144,8 @@
         "gte": 0
       },
       "window": "30d",
-      "compare": "none"
+      "compare": "none",
+      "sellable": true
     },
     {
       "metric": "holdings-count",

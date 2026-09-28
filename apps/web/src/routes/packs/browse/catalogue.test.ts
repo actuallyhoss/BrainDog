@@ -50,11 +50,11 @@ async function served(): Promise<{ index: CatalogueIndex; fetcher: (input: strin
     index = out.value.index;
     files.set(out.value.path, text);
   }
-  /* UNDER THE APP'S BASE, since the app moved to `brain.dog/app`: `/catalogue/` on that hostname is the marketing
-     site's, which has none, so a read there is a 404 page and the catalogue would quietly read as absent. */
+  /* AT THE KENNEL, which every host answers at the origin (`/api/kennel/v1/`): anything else is the app shell's 404
+     page, and the catalogue would quietly read as absent. */
   const fetcher = async (input: string) => {
-    if (!input.startsWith('/app/catalogue/')) return new Response('<!doctype html>', { status: 404, headers: { 'content-type': 'text/html' } });
-    const path = input.slice('/app/catalogue/'.length);
+    if (!input.startsWith('/api/kennel/v1/')) return new Response('<!doctype html>', { status: 404, headers: { 'content-type': 'text/html' } });
+    const path = input.slice('/api/kennel/v1/'.length);
     if (path === 'index.json') return new Response(JSON.stringify(index), { headers: { 'content-type': 'application/json' } });
     const text = files.get(path);
     return text === undefined ? new Response('{}', { status: 404, headers: { 'content-type': 'application/json' } }) : new Response(text, { headers: { 'content-type': 'application/json' } });
@@ -111,7 +111,7 @@ async function servedAddon(key: AuthorKey) {
     files.set(out.value.path, text);
   }
   const fetcher = async (input: string) => {
-    const text = input.startsWith('/app/catalogue/') ? files.get(input.slice('/app/catalogue/'.length)) : undefined;
+    const text = input.startsWith('/api/kennel/v1/') ? files.get(input.slice('/api/kennel/v1/'.length)) : undefined;
     return text === undefined ? new Response('', { status: 404 }) : new Response(text, { headers: { 'content-type': 'application/json' } });
   };
   return { index, fetcher, entry: index.entries[0]! };
@@ -249,12 +249,14 @@ test('browse is named for both kinds it lists, and /packs names a catalogue entr
   assert.match(at('../+page.svelte'), /catalogueNames\.get\(id\)/u);
 });
 
-test('a use case on its catalogue page is asked for on Decide, as an add-on is, and never installed from the page', async () => {
+test('a listing page installs through the plan sheet, and a Kennel entry is asked for on Decide by somebody who may not install', async () => {
   const { readFileSync } = await import('node:fs');
-  const detail = readFileSync(new URL('./[id]/CatalogueDetail.svelte', import.meta.url), 'utf8');
+  const detail = readFileSync(new URL('./[id]/+page.svelte', import.meta.url), 'utf8');
+  const offer = readFileSync(new URL('./[id]/offer.ts', import.meta.url), 'utf8');
   assert.doesNotMatch(detail, /InstallShared/u);
-  assert.doesNotMatch(detail, /entry\.kind === 'pack'\}/u);
-  assert.match(detail, /askForVersion\(/u);
+  assert.match(detail, /<PlanSheet/u);
+  assert.match(detail, /notOwner\(out\.code\)/u);
+  assert.match(offer, /askForVersion\(/u);
 });
 
 test('a browser that kept an old key trusts and keeps the key it rotated to, and a revoked key is said plainly and never offered', async () => {
@@ -305,8 +307,8 @@ test('a browser that kept an old key trusts and keeps the key it rotated to, and
   assert.match(offered.refused[0] ?? '', /which its author revoked, so it is not trusted/u);
 
   const { readFileSync } = await import('node:fs');
-  const detail = readFileSync(new URL('./[id]/CatalogueDetail.svelte', import.meta.url), 'utf8');
-  assert.match(detail, /trust\?\.kind !== 'revoked'/u);
+  const detail = readFileSync(new URL('./[id]/+page.svelte', import.meta.url), 'utf8');
+  assert.match(detail, /trust\?\.kind === 'revoked'/u);
 });
 
 test('a version arriving unsigned after signed ones is said loudly, cannot be asked for, and is not offered on /packs', async () => {
@@ -333,11 +335,9 @@ test('a version arriving unsigned after signed ones is said loudly, cannot be as
   assert.match(offered.refused[0] ?? '', /is unsigned, and earlier versions were signed/u);
 
   const { readFileSync } = await import('node:fs');
-  const detail = readFileSync(new URL('./[id]/CatalogueDetail.svelte', import.meta.url), 'utf8');
+  const detail = readFileSync(new URL('./[id]/+page.svelte', import.meta.url), 'utf8');
   assert.match(detail, /trust\?\.kind !== 'stripped'|trust\?\.kind === 'stripped'/u);
   assert.doesNotMatch(detail, /trustFor\(browserStore\(\), entry\.author/u);
-  const updates = readFileSync(new URL('../CatalogueUpdates.svelte', import.meta.url), 'utf8');
-  assert.doesNotMatch(updates, /entry\.author, /u);
 });
 
 test('a file whose own id is not the entry it is listed under is not asked for', async () => {

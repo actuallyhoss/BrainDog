@@ -16,25 +16,18 @@
          anywhere in the served HTML, which is a thing `grep` can check rather than a thing somebody
          has to remember. -->
     <!--
-      A SHARED LINK HAD NO PREVIEW AT ALL. No Open Graph, no Twitter card, no canonical: an audit of
-      the live pages found every one of them missing, so this site pasted into a message, a post or
-      a chat showed a bare URL. For a page whose entire job is to be the first thing somebody sees,
-      that is the first thing somebody sees.
+      THE SHARED CARD. Pasted into a message, a post or a chat, a page shows this preview rather than
+      a bare URL.
 
-      IN THE SHELL AND NOT PER PAGE, for the parts that do not vary: the site name, the type, the
-      card format and the image. The three pages set their own `og:title` and `og:description` from
-      their own `<title>` and description in each route's own `+page.svelte`, so there is one
-      sentence per page and not two that can disagree. This comment said `+layout.svelte`, which has
-      no `svelte:head` in it at all.
+      IN THE SHELL, the parts that do not vary: the site name, the type, the card format and the
+      image. Each page sets its own `og:title` and `og:description` from its own `<title>` and
+      description in its `+page.svelte`, so there is one sentence per page and not two that can
+      disagree.
 
-      `og:image` IS A DRAWN CARD AND NOT A SCREENSHOT. It was a 288 KB capture of the record app's
-      Work board until 23 September, the last screenshot of the app left anywhere on the site after
-      the owner said of them *i hate those screenshots. they look terrible*. It is now the mark,
-      the wordmark and the slogan on the hero's own ground, 1200 by 630, which `scripts/product.mjs`
-      draws out of the built home page, so its words, faces and colours are the site's and cannot
-      drift from them. The file name did not change, so `_headers` still caches it for a day. An
-      absolute URL, because a preview is fetched by somebody else's server and a relative one
-      resolves against nothing.
+      `og:image` IS A DRAWN CARD AND NOT A SCREENSHOT: the mark, the wordmark and the slogan on the
+      hero's own ground, 1200 by 630, which `scripts/product.mjs` draws out of the built home page, so
+      its words, faces and colours are the site's. An absolute URL, because a preview is fetched by
+      somebody else's server and a relative one resolves against nothing.
     -->
     <meta property="og:site_name" content="BrainDog" />
     <meta property="og:type" content="website" />

@@ -32,10 +32,11 @@ test('A MODULE CARRIES NO ROWS UNLESS IT IS ASKED FOR EXAMPLES, with a use case 
     assert.deepEqual(seedsOf(moduleDocument(null, id, { today: TODAY })), [], `${id} carries the sample's rows`);
     for (const u of USE_CASES) assert.deepEqual(seedsOf(moduleDocument(u, id, { today: TODAY })), [], `${id} carries ${u.usecase}'s examples`);
   }
-  /* AND ASKED, THEY ARE STILL THERE, for a preview or a test to draw. */
-  const personal = useCase('personal');
-  assert.ok(moduleExamples(personal).length > 0, 'Personal gives its modules no examples to draw');
-  assert.ok(seedsOf(moduleDocument(personal, 'money-core', { today: TODAY, examples: true })).length > 0, 'examples: true carries nothing');
+  /* AND ASKED, THEY ARE STILL THERE, for a preview or a test to draw. The founder's, since Personal 2.0.0 gives its
+     modules none (`loop/finish/modules.md` MOD-17). */
+  const founder = useCase('founder');
+  assert.ok(moduleExamples(founder).length > 0, 'the founder gives its modules no examples to draw');
+  assert.ok(seedsOf(moduleDocument(founder, 'money-core', { today: TODAY, examples: true })).length > 0, 'examples: true carries nothing');
 });
 
 test('A USE CASE CARRIES ONLY THE PLAN FORMED FROM WHAT THE PERSON SAID', () => {

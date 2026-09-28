@@ -533,7 +533,7 @@ export const INBOX: InboxItem[] = [
    A row with `at` updates that row at the version it was read at; a row without one creates. */
 
 import type { RowsetBody } from '../governance.ts';
-import { MODULES } from '../modules.ts';
+import { firstPartyModules } from '@braindog/seed/packs/modules';
 
 const KILN = THINGS.find((t) => t.fields.name === 'Kiln');
 const PORTAGE = THINGS.find((t) => t.fields.name === 'Portage');
@@ -712,10 +712,10 @@ export const VAULT_GRANTS = ALL_VAULT_GRANTS;
 
 /* ── packs ───────────────────────────────────────────────────────────────── */
 
-/* THE SIX THIS BUILD SHIPS ARE `modules.ts`'S, which live screens read, and the sample holds every one of them. The
+/* THE SIX THIS BUILD SHIPS ARE THEIR MANIFESTS' (`@braindog/seed/packs/modules`), which live screens read, and the sample holds every one of them. The
    two after them are the sample's picture of a catalogue: nobody wrote them and nothing ships a document for either. */
 export const PACKS: PackInfo[] = [
-  ...MODULES.map((m) => ({ ...m, installed: true })),
+  ...firstPartyModules().map((m) => ({ ...m, installed: true })),
   /* IT WANTS TO SIT ABOVE YOUR MONEY PAGE, AND IT DOES NOT GET TO. `04 §4`'s worked example is this
      pack, and the record had no way to hold the fact — so the diff's `CHANGES` section was behind a
      condition that could never be true and the three sentences about it rendered nowhere. A trust

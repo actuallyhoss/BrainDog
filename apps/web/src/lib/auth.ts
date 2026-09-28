@@ -243,14 +243,33 @@ async function afresh<T>(io: Io, run: () => Promise<Said<T>>): Promise<Said<T>> 
   return proved.ok ? run() : first;
 }
 
-/** Add a passkey for the person signed in, on this device. */
-export async function passkeyRegister(io: Io = live()): Promise<Said<PasskeyInfo>> {
+/**
+ * The name a new passkey is given, from the platform that made it.
+ *
+ * A LIST OF KEYS THAT ALL SAY "Unnamed" CANNOT BE PRUNED. Recovery asks a person to keep more than one passkey, and
+ * then to remove the one on the phone they lost, which they can only do if the rows say which is which. The host has
+ * always taken a `label` (`packages/record/src/identity.ts`, `passkey.register`) and nothing sent one. What the
+ * browser says about its platform is all there is to go on, so the name is the platform's own word for its
+ * authenticator where there is one and "Passkey" everywhere else, never a guess at a model.
+ */
+export function platformLabel(g: unknown = globalThis): string {
+  const nav = (g as { navigator?: { userAgent?: unknown; userAgentData?: { platform?: unknown } } }).navigator;
+  const hint = typeof nav?.userAgentData?.platform === 'string' ? nav.userAgentData.platform : '';
+  const ua = `${hint} ${typeof nav?.userAgent === 'string' ? nav.userAgent : ''}`;
+  if (/iPhone/u.test(ua)) return 'iPhone';
+  if (/Android/u.test(ua)) return 'Android';
+  if (/Windows/u.test(ua)) return 'Windows Hello';
+  return 'Passkey';
+}
+
+/** Add a passkey for the person signed in, on this device, named for its platform (`platformLabel`). */
+export async function passkeyRegister(io: Io = live(), label: string = platformLabel()): Promise<Said<PasskeyInfo>> {
   return afresh(io, async (): Promise<Said<PasskeyInfo>> => {
     const asked = await call(io, '/auth/passkey/register/options', {});
     if (!asked.ok) return asked;
     const credential = await creation(io, asked.value as RegistrationOptions);
     if (!credential.ok) return credential;
-    const out = await call(io, '/auth/passkey/register', { credential: credential.value });
+    const out = await call(io, '/auth/passkey/register', { credential: credential.value, label });
     if (!out.ok) return out;
     const info = passkeyOf(out.value);
     return info ? { ok: true, value: info } : { ok: false, kind: 'refused', fix: null };
@@ -366,8 +385,39 @@ export function takeInvite(hash: string, clear: () => void): InviteLink | null {
   return token ? { token, proof: proof || null } : null;
 }
 
-/** What an invitation says before anybody accepts it: the address it is for, when it runs out, and who is signed in. */
-export type InviteSeen = { email: string; expiresAt: string; signedInAs: string | null };
+/** The record's ladder, restated for the reason the types at the top of this file are: an invitation names one of these. */
+export type InviteLevel = 'owner' | 'decide' | 'write' | 'append' | 'read';
+
+const INVITE_LEVELS: ReadonlySet<string> = new Set(['owner', 'decide', 'write', 'append', 'read']);
+
+const levelOf = (said: unknown): InviteLevel | null => (typeof said === 'string' && INVITE_LEVELS.has(said) ? (said as InviteLevel) : null);
+
+/**
+ * What an invitation says before anybody accepts it: the address it is for, when it runs out, who is signed in, and
+ * what it opens.
+ *
+ * WHAT IT OPENS IS SAID BEFORE ACCEPT (`loop/finish/platform.md` §4.0 M): the record's name, the level it gives on the
+ * whole record, and each list by name at its own level. `lists` is empty and the other two `null` when a host older
+ * than those fields sent none, and the page then says only the address, as it did.
+ */
+export type InviteSeen = {
+  email: string;
+  expiresAt: string;
+  signedInAs: string | null;
+  record: string | null;
+  level: InviteLevel | null;
+  lists: { id: string; name: string; level: InviteLevel }[];
+};
+
+/** The lists an invitation names, keeping only a row with an id, a name and a level this build knows. */
+const inviteListsOf = (said: unknown): InviteSeen['lists'] =>
+  Array.isArray(said)
+    ? said.flatMap((l: unknown) => {
+        if (!isObj(l) || typeof l.id !== 'string' || typeof l.name !== 'string') return [];
+        const level = levelOf(l.level);
+        return level ? [{ id: l.id, name: l.name, level }] : [];
+      })
+    : [];
 
 /** Look at an invitation. Nothing is spent. */
 export async function lookInvite(token: string, io: Io = live()): Promise<Said<InviteSeen>> {
@@ -377,7 +427,14 @@ export async function lookInvite(token: string, io: Io = live()): Promise<Said<I
   if (!isObj(v) || typeof v.email !== 'string') return { ok: false, kind: 'refused', fix: null };
   return {
     ok: true,
-    value: { email: v.email, expiresAt: typeof v.expires_at === 'string' ? v.expires_at : '', signedInAs: typeof v.signedInAs === 'string' ? v.signedInAs : null },
+    value: {
+      email: v.email,
+      expiresAt: typeof v.expires_at === 'string' ? v.expires_at : '',
+      signedInAs: typeof v.signedInAs === 'string' ? v.signedInAs : null,
+      record: typeof v.record === 'string' && v.record ? v.record : null,
+      level: levelOf(v.level),
+      lists: inviteListsOf(v.lists),
+    },
   };
 }
 

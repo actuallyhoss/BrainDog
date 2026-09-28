@@ -79,6 +79,7 @@ import type { Refusal, Result, Sql } from '@braindog/ports';
 import type { SlashMeter } from '@braindog/record';
 
 import { httpStatus } from './index.ts';
+import { backgroundMeter, BACKGROUND_JOBS_MONTH } from './model-jobs.ts';
 import { slashBaseUrlOf, slashKeySave } from './slash.ts';
 import { VAULT_HEADERS } from './vault.ts';
 
@@ -577,6 +578,18 @@ export type SlashLedgerDeps = {
  * where the provider's count is 12. The COUNT against `ask_cap` is exact; the price waits on a `SlashModel` that hands
  * back the provider's usage, which is `packages/record/src/slash.ts` and each host's builder and not this file.
  */
+/** The first instant of the month `ms` falls in, UTC, so a background spend and its cap agree on where the month starts. */
+const monthStart = (ms: number): string => {
+  const at = new Date(ms);
+  return new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), 1)).toISOString();
+};
+
+/** The day the month `ms` falls in resets, for the sentence a spent background allowance is shown with. */
+const monthResets = (ms: number): string => {
+  const at = new Date(ms);
+  return new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth() + 1, 1)).toISOString().slice(0, 10);
+};
+
 export function slashRecordMeter(deps: SlashLedgerDeps): SlashMeter {
   const mint = ulids(() => deps.clock.now());
   return {
@@ -637,6 +650,64 @@ export function slashRecordMeter(deps: SlashLedgerDeps): SlashMeter {
             );
           },
           /* NOTHING LEFT THIS HOST, SO NOTHING IS WRITTEN, as `answer` releases its hold for a call never sent. */
+          release: () => {
+            if (done) return;
+            done = true;
+            deps.sql.exec("DELETE FROM slash_call WHERE id = ? AND code = 'SLASH_PENDING'", id);
+          },
+        },
+      };
+    },
+    /**
+     * ONE ASK OF THE BACKGROUND ALLOWANCE, never his: the daily look's skill draft (GAP-12). Counted the way
+     * `backgroundMeter` counts it, over a `pattern` row with no `filed`, which `asksUsed` (the engine's own count of kind
+     * `read`) never sees, so a skill draft never spends one of his asks.
+     */
+    async background() {
+      const engine = await deps.engine();
+      if (engine === undefined) return { ok: false, refusal: { code: 'NOT_IN_THIS_BUILD', fix: 'Slash has no ledger on this host to count the draft in.' } };
+      const status = engine.status() as { tier?: unknown; model?: unknown } | undefined;
+      const spent = backgroundMeter(deps.sql).spent(monthStart(deps.clock.now()));
+      if (spent >= BACKGROUND_JOBS_MONTH)
+        return {
+          ok: false,
+          refusal: { code: 'SLASH_BUDGET_SPENT', fix: `This month's background Slash asks are spent until ${monthResets(deps.clock.now())}.` },
+        };
+      const tier = typeof status?.tier === 'string' ? status.tier : 'a';
+      const model = typeof status?.model === 'string' && status.model !== '' ? status.model : deps.model;
+      const id = mint();
+      const at = () => new Date(deps.clock.now()).toISOString();
+      const t0 = deps.clock.now();
+      deps.sql.exec(
+        `INSERT INTO slash_call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status, code, question)
+         VALUES (?, ?, 'pattern', ?, ?, 0, 0, 0, 0, 'error', 'SLASH_PENDING', ?)`,
+        id,
+        at(),
+        tier,
+        model,
+        "Slash's skill draft",
+      );
+      let done = false;
+      return {
+        ok: true,
+        value: {
+          settle: ({ usage, code }) => {
+            if (done) return;
+            done = true;
+            const rate = deps.rate;
+            const neurons = rate === undefined ? 0 : Math.round((usage.in * rate.in) / 1e6 + (usage.out * rate.out) / 1e6);
+            deps.sql.exec(
+              'UPDATE slash_call SET ts = ?, tokens_in = ?, tokens_out = ?, neurons = ?, ms = ?, status = ?, code = ? WHERE id = ?',
+              at(),
+              usage.in,
+              usage.out,
+              neurons,
+              deps.clock.now() - t0,
+              code === undefined ? 'ok' : 'error',
+              code ?? null,
+              id,
+            );
+          },
           release: () => {
             if (done) return;
             done = true;

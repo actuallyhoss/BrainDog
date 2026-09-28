@@ -484,7 +484,7 @@ checked-in fixtures LF so the same hash comes out on Windows and Linux CI ([31-S
 | Outbox states | 5 | `pending leased done failed dead` | 30 §1 |
 | `inbox_raw.channel` | 5 | `email webhook pull paste api` | 30 §1 |
 | `inbox_raw.state` | 7 | `untriaged matched skipped review proposed ignored erased` | 30 §1 |
-| Member levels | 5 | `read append write decide owner` | 20 §1 |
+| Member levels | 5 | `read append write decide owner`; kernel migration 19 adds `member.row_where` beside the CHECK and leaves the list as it is | 20 §1 |
 | Token scopes | 3 | `read propose write` | 10 §2 |
 | Principal kinds | 6 | `person token runner share system slash` | 33 §2 |
 | Device-grant statuses | 6 | `pending approved active expired denied revoked` | 12 §6.1 |

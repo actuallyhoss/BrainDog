@@ -133,11 +133,11 @@ test('key rotate lets a reader who trusted the old key trust the new one, and ke
   const newId = (JSON.parse(readFileSync(join(keys, 'new.json'), 'utf8')) as { key_id: string }).key_id;
 
   assert.equal(await pack(['new', 'bookshelf', '--author', 'Halden'], h.io), 0, h.said.join('\n'));
-  assert.equal(await pack(['publish', 'bookshelf-1.0.0.pack.json', '--to', 'catalogue', '--sign', join(keys, 'old.json')], h.io), 0, h.said.join('\n'));
+  assert.equal(await pack(['publish', 'bookshelf', '--to', 'catalogue', '--sign', join(keys, 'old.json')], h.io), 0, h.said.join('\n'));
   assert.equal(await pack(['install', 'bookshelf', '--from', 'catalogue'], h.io), 0, h.said.join('\n'));
   assert.match(h.out.join('\n'), /has not seen a key for Halden before/u);
 
-  const later = JSON.parse(readFileSync(join(h.dir, 'bookshelf-1.0.0.pack.json'), 'utf8')) as Record<string, unknown>;
+  const later = JSON.parse(readFileSync(join(h.dir, 'bookshelf', 'bookshelf.pack.json'), 'utf8')) as Record<string, unknown>;
   writeFileSync(join(h.dir, 'bookshelf-1.0.1.pack.json'), JSON.stringify({ ...later, version: '1.0.1', summary: `${String(later.summary)} Kept tidy.` }));
   assert.equal(await pack(['publish', 'bookshelf-1.0.1.pack.json', '--to', 'catalogue', '--sign', join(keys, 'new.json')], h.io), 1);
   assert.match(h.said.at(-1) ?? '', /rotation/u);
@@ -168,8 +168,8 @@ test('install refuses a version that arrives unsigned after signed ones, and sea
   assert.equal(await pack(['key', join(keys, 'k.json'), '--author', 'Halden'], h.io), 0, h.said.join(' '));
   const keyId = (JSON.parse(readFileSync(join(keys, 'k.json'), 'utf8')) as { key_id: string }).key_id;
   assert.equal(await pack(['new', 'bookshelf', '--author', 'Halden'], h.io), 0, h.said.join(' '));
-  assert.equal(await pack(['publish', 'bookshelf-1.0.0.pack.json', '--to', 'catalogue', '--sign', join(keys, 'k.json')], h.io), 0, h.said.join(' '));
-  const later = JSON.parse(readFileSync(join(h.dir, 'bookshelf-1.0.0.pack.json'), 'utf8')) as Record<string, unknown>;
+  assert.equal(await pack(['publish', 'bookshelf', '--to', 'catalogue', '--sign', join(keys, 'k.json')], h.io), 0, h.said.join(' '));
+  const later = JSON.parse(readFileSync(join(h.dir, 'bookshelf', 'bookshelf.pack.json'), 'utf8')) as Record<string, unknown>;
   writeFileSync(join(h.dir, 'bookshelf-1.0.1.pack.json'), JSON.stringify({ ...later, version: '1.0.1', summary: `${String(later.summary)} Kept tidy.` }));
   assert.equal(await pack(['publish', 'bookshelf-1.0.1.pack.json', '--to', 'catalogue', '--sign', join(keys, 'k.json')], h.io), 0, h.said.join(' '));
 
@@ -192,8 +192,8 @@ test('install refuses a file whose own id is not the entry it is listed under', 
   const { fileChecksum } = await import('@braindog/declare/catalogue');
   const h = await setup(t);
   assert.equal(await pack(['new', 'bookshelf', '--author', 'Halden'], h.io), 0, h.said.join(' '));
-  assert.equal(await pack(['publish', 'bookshelf-1.0.0.pack.json', '--to', 'catalogue'], h.io), 0, h.said.join(' '));
-  const doc = JSON.parse(readFileSync(join(h.dir, 'bookshelf-1.0.0.pack.json'), 'utf8')) as Record<string, unknown>;
+  assert.equal(await pack(['publish', 'bookshelf', '--to', 'catalogue'], h.io), 0, h.said.join(' '));
+  const doc = JSON.parse(readFileSync(join(h.dir, 'bookshelf', 'bookshelf.pack.json'), 'utf8')) as Record<string, unknown>;
   const swapped = JSON.stringify({ ...doc, pack: 'other' });
   writeFileSync(join(h.dir, 'catalogue', 'packs', 'bookshelf', '1.0.0.pack.json'), swapped);
   const path = join(h.dir, 'catalogue', 'index.json');
@@ -271,9 +271,9 @@ test("check, publish, diff and install --from print a shared file's title, autho
   assert.equal(await usecase(['install', 'club', '--from', 'catalogue', '--version', '9.9.9'], h.io), 1);
 
   assert.equal(await pack(['new', 'shelf', '--author', 'Halden'], h.io), 0);
-  const shelf = JSON.parse(readFileSync(join(h.dir, 'shelf-1.0.0.pack.json'), 'utf8')) as Record<string, unknown>;
-  writeFileSync(join(h.dir, 'shelf-1.0.0.pack.json'), JSON.stringify({ ...shelf, title: OSC_TITLE, author: SGR_AUTHOR, license: 'MIT\u0007' }));
-  assert.equal(await pack(['check', 'shelf-1.0.0.pack.json'], h.io), 0, h.said.join('\n'));
+  const shelf = JSON.parse(readFileSync(join(h.dir, 'shelf', 'shelf.pack.json'), 'utf8')) as Record<string, unknown>;
+  writeFileSync(join(h.dir, 'shelf', 'shelf.pack.json'), JSON.stringify({ ...shelf, title: OSC_TITLE, author: SGR_AUTHOR, license: 'MIT\u0007' }));
+  assert.equal(await pack(['check', 'shelf'], h.io), 0, h.said.join('\n'));
 
   assert.deepEqual(dirty([...h.out, ...h.said]), []);
   assert.ok(h.out.includes('  By A [31mRed, MIT ]52;c;Y3VybA==.'), h.out.join('\n'));

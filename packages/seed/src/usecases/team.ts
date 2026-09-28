@@ -21,7 +21,15 @@ import { projectTemplate } from '../modules/portfolio.ts';
 type Body = Record<string, unknown>;
 
 /** The lists a team's record holds, so the project page leaves out what reads money and services. */
-const HOLDS = ['things', 'people', 'tasks', 'tracks', 'updates', 'cycles', 'cycle_plan'];
+const HOLDS = ['things', 'people', 'tasks', 'tracks', 'updates', 'cycles', 'cycle_plan', 'cycle_days'];
+
+/*
+ * THE TWO DOORS A NEW TEAM NEEDS, both into Settings: People sends the invitation, and Agents shows the line to paste
+ * into Claude Code for this record, the real one worked out there for this record and this machine, so Home never
+ * prints a line that goes stale.
+ */
+const INVITE = '/settings/people';
+const CONNECT = '/settings/agents';
 
 /* NO LABEL: the column over a ticket's title is headed by what one ticket is called, so a team that calls them Issues reads Issue. */
 const TICKET = { field: 'what', width: 'minmax(20ch,1fr)' } as const;
@@ -45,7 +53,11 @@ export const TEAM = {
   /* 2.4.1: Home's empty title loses its full stop, as every other title already has. */
   /* 2.5.0: the project page takes Portfolio 1.5.0's project template: the questions waiting on a project, what
      changed on it, its plan and its money by month. */
-  version: '2.5.0',
+  /* 2.6.0: Home leads with what agents suggest, draws who is on each ticket in flight and whether an agent is working
+     on it now, the cycle's progress beside its burndown, and the two ways into Settings a new team needs. A planned
+     ticket can be ticked done, and a new list, Cycle days, holds how many tickets were open each morning. Agent work
+     reads the runs the record knows are live rather than the `session` list. */
+  version: '2.6.0',
   title: 'Team board',
   summary: 'Tickets with an owner and a status, the cycle each is in, and the work your agents took on.',
   author: 'BrainDog',
@@ -82,10 +94,15 @@ export const TEAM = {
     people: 'Teammates',
     'people:holds': 'everyone on the team, the part each one plays and how to reach them',
     'people.role.collaborator': 'Teammate',
+    cycle_days: 'Cycle days',
   },
   skills: [
     { name: 'task-triage', trigger: 'when a ticket is opened, to set its priority, suggest an owner and say whether an agent can take it' },
-    { name: 'standup-digest', trigger: 'each morning, to say what moved yesterday, what is blocked and what agents finished' },
+    {
+      name: 'standup-digest',
+      trigger:
+        'each morning, to say what moved yesterday, what is blocked and what agents finished, tick the planned tickets that are done, and add a cycle day with how many tickets are still open',
+    },
   ],
   pack: {
     pack: 'usecase-team',
@@ -128,38 +145,77 @@ export const TEAM = {
         icon: 'rows',
         holds: 'which tickets each cycle takes on, and how many points each one is worth',
         title: 'what',
-        mobile: ['what', 'cycle', 'points'],
+        /* A PLANNED TICKET IS A STEP OF ITS CYCLE (2.6.0), so a cycle knows how much of what it took on is done: Home's
+           progress counts the lines ticked against the lines planned, and a cycle's card fills the same way. A line
+           keeps its own tick rather than reading its ticket's status, because a page reads one list at a time. */
+        steps: { of: 'cycle', done: 'done' },
+        mobile: ['what', 'cycle', 'done'],
         fields: [
           { id: 'what', label: 'Planned', type: 'text', required: true, search: true },
           { id: 'task', label: 'Ticket', type: 'ref', to: 'tasks', index: true },
           { id: 'cycle', label: 'Cycle', type: 'ref', to: 'cycles', index: true },
           { id: 'points', label: 'Points', type: 'int', min: 0 },
+          { id: 'done', label: 'Done', type: 'bool', default: false, index: true },
           { id: 'tags', type: 'list', of: 'text' },
         ],
       },
       {
-        /* HOME, AS A TEAM ANSWERS IT (S13): what is moving, what is stuck and what is due, with no place on the rail. */
+        /* HOW MANY TICKETS WERE STILL OPEN, ONE ROW A MORNING (2.6.0), which is what the burndown on Home draws. The
+           record keeps no history of a count, so the count is written down: by the standup agent each morning, or by
+           a person, the same way a founder's numbers are. */
+        register: 'cycle_days',
+        name: 'Cycle days',
+        one: 'cycle day',
+        icon: 'rows',
+        holds: 'how many tickets were still open on each day of a cycle, one row a morning',
+        title: 'day',
+        mobile: ['day', 'open', 'cycle'],
+        fields: [
+          { id: 'day', label: 'Day', type: 'day', required: true, index: true },
+          { id: 'open', label: 'Open tickets', type: 'int', min: 0, required: true },
+          { id: 'cycle', label: 'Cycle', type: 'ref', to: 'cycles', index: true },
+          { id: 'tags', type: 'list', of: 'text' },
+        ],
+      },
+      {
+        /* HOME, AS A TEAM ANSWERS IT (S13): what agents suggest, what is moving and who is on it, what is stuck, what is
+           due, and how far the cycle has come, with no place on the rail. */
         page: 'home-team',
         title: 'Team',
         icon: 'home',
-        requires: ['register.tasks'],
+        requires: ['register.tasks', 'register.cycle_plan', 'register.cycle_days'],
         blocks: [
+          {
+            /* FIRST, BECAUSE AN AGENTIC TASK LIST IS ONE WHERE THE AGENTS PROPOSE: a ticket to open, a priority to
+               change, an owner to set, each answered here with Keep or No thanks and never by opening Decide. */
+            kind: 'queue',
+            heading: 'Agents suggest',
+            span: 12,
+            source: 'governance.open',
+            where: 'list is tasks',
+            limit: 3,
+            empty: 'No agent is suggesting anything right now.',
+          },
           {
             /* AND WHEN EACH ONE IS DUE, because Due this week below no longer draws these rows a second time and nothing
                else on this page carries their date. Without this column a ticket in progress and due tomorrow said
-               neither, which is what the third test in `test/team-home-twice.test.ts` watched happen. */
-            kind: 'table',
+               neither, which is what the third test in `test/team-home-twice.test.ts` watched happen.
+               CARDS, SO WHO IS ON IT IS A FACE: only a card reads a column's role, and a table would draw the owner as
+               a name among the other cells. The agent is a fact beside the status, and the working dot marks a ticket
+               whose agent has a run going now, so a lead sees at a glance which tickets are moving this minute. */
+            kind: 'cards',
             heading: '{{config:voice_right_now}}',
             span: 12,
             source: 'register.tasks',
             where: IN_FLIGHT,
             columns: [
-              TICKET,
-              { field: 'owner', label: 'Owner', width: 'minmax(10ch,16ch)' },
-              { field: 'agent', label: 'Agent', width: '10ch' },
-              { field: 'state', label: 'Status', width: '12ch' },
-              { field: 'by', label: 'Due', width: '13ch', align: 'end' },
+              { field: 'what', as: 'title' },
+              { field: 'owner', label: 'Owner', as: 'who' },
+              { field: 'agent', label: 'Agent', as: 'fact' },
+              { field: 'state', label: 'Status', as: 'fact' },
+              { field: 'by', label: 'Due', as: 'when' },
             ],
+            working: true,
             limit: 8,
             empty: 'Nothing is in flight.',
           },
@@ -197,6 +253,39 @@ export const TEAM = {
                where it drew two, and on a board where everything due is in flight or blocked it draws none at all
                directly under two headings full of dates. */
             empty: 'Nothing else is due this week.',
+          },
+          {
+            /* HOW FAR THE CYCLE HAS COME: the planned tickets ticked done against every ticket planned, one track a
+               cycle. The newest cycle first, since the one a team is in is the one it asks about. */
+            kind: 'progress',
+            heading: 'This cycle',
+            span: 6,
+            source: 'register.cycle_plan',
+            columns: [{ field: 'cycle' }, { field: 'done' }],
+            order: [{ field: 'cycle', dir: 'desc' }],
+            limit: 3,
+            empty: 'Plan tickets into a cycle and how far it has come shows here.',
+          },
+          {
+            /* BESIDE IT, THE BURNDOWN: how many tickets were open each morning of the last two weeks, against the two
+               weeks before, from the Cycle days the standup agent or a teammate writes. */
+            kind: 'lines',
+            heading: 'Open tickets, each morning',
+            span: 6,
+            source: 'register.cycle_days',
+            columns: [{ field: 'day' }, { field: 'open' }],
+            back: 14,
+            bucket: 'day',
+            empty: 'No cycle day is written yet. The standup agent adds one each morning, or add today by hand.',
+          },
+          {
+            kind: 'link',
+            heading: 'Bring the team in',
+            span: 12,
+            authored: [
+              { cells: ['Invite your team', INVITE, 'Send each teammate a link to this board'] },
+              { cells: ['Connect an agent', CONNECT, 'The line to paste into Claude Code so an agent can take tickets'] },
+            ],
           },
         ],
       },
@@ -265,8 +354,20 @@ export const TEAM = {
         title: 'Agent work',
         nav: { section: 'Team', order: 20 },
         icon: 'session',
-        requires: ['register.tasks', 'register.session'],
+        requires: ['register.tasks'],
         blocks: [
+          {
+            /* THE RUNS THE RECORD KNOWS ARE GOING (2.6.0), each with the agent's face and what it says it is doing, read
+               from `sessions.live` as Home's own runs are. This page listed the `session` list by hand, and drew an
+               empty list on a record whose agents were working. */
+            kind: 'cards',
+            heading: 'Working now',
+            span: 12,
+            source: 'sessions.live',
+            columns: [{ field: 'doing', as: 'title' }, { field: 'agent', as: 'who' }, { field: 'last_seen', as: 'when' }],
+            limit: 12,
+            empty: 'No agent is working here right now. Connect one in Settings, under Agents.',
+          },
           {
             kind: 'table',
             heading: 'Taken by agents',
@@ -292,16 +393,6 @@ export const TEAM = {
             empty: 'No agent has changed anything here yet.',
           },
           {
-            kind: 'cards',
-            heading: 'Runs',
-            span: 12,
-            source: 'register.session',
-            columns: [{ field: 'doing', as: 'title' }, { field: 'agent', as: 'who' }, { field: 'last_seen', as: 'when' }],
-            order: [{ field: 'last_seen', dir: 'desc' }],
-            limit: 12,
-            empty: 'No agent has started a run here yet.',
-          },
-          {
             kind: 'table',
             heading: 'Finished by agents',
             span: 12,
@@ -317,10 +408,17 @@ export const TEAM = {
     ],
     seeds: [
       { register: 'cycles', fields: { name: 'Cycle 1', state: 'active', goal: 'Ship the first version of the board' } },
-      { register: 'cycle_plan', fields: { what: 'Write the release notes', points: 2 } },
-      { register: 'cycle_plan', fields: { what: 'Agree what goes in the next cycle', points: 1 } },
-      { register: 'cycle_plan', fields: { what: 'Fix the sign-in link that expires too soon', points: 3 } },
-      { register: 'cycle_plan', fields: { what: 'Wait on the design for the settings screen', points: 5 } },
+      { register: 'cycle_plan', fields: { what: 'Write the release notes', points: 2, done: false } },
+      { register: 'cycle_plan', fields: { what: 'Agree what goes in the next cycle', points: 1, done: false } },
+      { register: 'cycle_plan', fields: { what: 'Fix the sign-in link that expires too soon', points: 3, done: false } },
+      { register: 'cycle_plan', fields: { what: 'Wait on the design for the settings screen', points: 5, done: false } },
+      { register: 'cycle_plan', fields: { what: 'Tidy the backlog labels', points: 1, done: true } },
+      /* FIVE MORNINGS OF THE EXAMPLE CYCLE, so the burndown has a line to draw on the first day. */
+      { register: 'cycle_days', fields: { day: '-4d', open: 6 } },
+      { register: 'cycle_days', fields: { day: '-3d', open: 6 } },
+      { register: 'cycle_days', fields: { day: '-2d', open: 5 } },
+      { register: 'cycle_days', fields: { day: '-1d', open: 5 } },
+      { register: 'cycle_days', fields: { day: '0d', open: 4 } },
     ],
   },
 };

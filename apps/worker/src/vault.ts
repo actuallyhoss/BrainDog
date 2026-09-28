@@ -32,9 +32,9 @@
  */
 
 import {
-  grantKey as deriveGrantKey, NONCE_BYTES, openSealed as openBytes, seal as sealBytes,
+  grantKey as deriveGrantKey, NONCE_BYTES, openSealed as openBytes, purposeOf, seal as sealBytes, sealedUnderOf,
   serveKeys, serveVault, servesKeys, servesVault, unlockedKey, VAULT_HEADERS, vaultReply,
-  type KeysDoor, type PassphraseUnlock, type RootKeys, type SessionHints, type VaultGrantSeen, type VaultPassphrase,
+  type KeysDoor, type PassphraseUnlock, type RootKeys, type SealedUnder, type SessionHints, type VaultGrantSeen, type VaultPassphrase,
 } from '@braindog/host';
 import type { CallContext, Deposited, OpenedForGrant, SealTarget, Sealed } from '@braindog/record';
 import { no, ok, type Result } from '@braindog/ports';
@@ -58,7 +58,8 @@ export type KeyDeps = {
   wrappingKey(record: string): Promise<string | null>;
   depositGrant(
     record: string,
-    args: { label?: unknown; opens?: unknown; kind?: unknown; project?: unknown; credential?: unknown },
+    /* `sealed_under` IS THE HOST'S READING OF THE BODY (`sealedUnderOf`), so the record binds what this host sealed. */
+    args: { label?: unknown; opens?: unknown; kind?: unknown; project?: unknown; credential?: unknown; sealed_under?: SealedUnder },
     by: By,
     hints: SessionHints,
     seal: (target: SealTarget) => Promise<Result<Sealed>>,
@@ -105,6 +106,7 @@ const VALUE_LIMIT = 65_536;
 const NO_STORE = 'This host holds no key store yet, so it keeps no keys for agents.';
 export const OLD_RECORD = 'Keys need a record created after this host key store was bound, and this record is older than that.';
 const WRONG_KEY = 'This host key store does not open this record, so no key was sealed or opened.';
+const CONNECTOR_SEAL = 'This record cannot seal a key for a scheduled connector yet, so nothing was added. Add it for you to use, or try again after the next update.';
 
 const utf8 = (text: string): Uint8Array => new TextEncoder().encode(text);
 const text = (x: unknown): string => (typeof x === 'string' ? x : '');
@@ -115,10 +117,20 @@ const text = (x: unknown): string => (typeof x === 'string' ? x : '');
  * `unlocked` IS THE RECORD KEY A PASSPHRASE OPENED FOR THIS REQUEST (`unlockedKey`), and behind a passphrase it is the
  * only way in: the root key opens nothing there. The caller zero-fills it when its request is answered.
  */
-async function grantKey(store: KeyStore, record: string, key: SealTarget['key'], grant: string, unlocked: Uint8Array | null = null) {
-  if (key.wrapped_by === 'passphrase') return unlocked === null ? null : await deriveGrantKey(unlocked, grant);
+async function grantKey(
+  store: KeyStore,
+  record: string,
+  key: SealTarget['key'],
+  grant: string,
+  unlocked: Uint8Array | null = null,
+  purpose: SealedUnder = 'record',
+) {
+  /* A CONNECTOR KEY IS NEVER BEHIND THE PASSPHRASE (ADR-052): a scheduled run has no person to type it, so only the
+     record key can be, and the key a passphrase opened is that one and no other. */
+  if (key.wrapped_by === 'passphrase') return unlocked === null || purpose !== 'record' ? null : await deriveGrantKey(unlocked, grant);
   if (key.kek_id === null) return null;
-  const dek = await unwrap(store, record, 'record', { wrapped: key.wrapped, nonce: key.nonce, kek_id: key.kek_id, wrapped_by: 'kek' });
+  /* THE PURPOSE IS HALF THE WRAPPING'S ADDITIONAL DATA, so the connector key unwraps only when asked for as itself. */
+  const dek = await unwrap(store, record, purpose, { wrapped: key.wrapped, nonce: key.nonce, kek_id: key.kek_id, wrapped_by: 'kek' });
   if (!dek) return null;
   try {
     /* AWAITED INSIDE THE `try`, so the derivation is done before the `finally` zeroes the DEK. Dropping the
@@ -141,7 +153,7 @@ export async function openSealed(
   record: string,
   sealed: { id: string; key: SealTarget['key']; nonce: Uint8Array; aad: string; ciphertext: Uint8Array },
 ): Promise<string | null> {
-  const key = await grantKey(store, record, sealed.key, sealed.id);
+  const key = await grantKey(store, record, sealed.key, sealed.id, null, purposeOf(sealed));
   if (!key) return null;
   const opened = await openBytes(key, sealed.nonce, sealed.aad, sealed.ciphertext);
   if (opened === null) return null;
@@ -188,6 +200,10 @@ function doors(keys: KeyDeps, record: () => string | null) {
     const value = utf8(said) as Plaintext;
     try {
       if (value.length > VALUE_LIMIT) return no('OUT_OF_BOUNDS', 'A key is at most 64 KiB.', { at: 'value' });
+      /* WHICH KEY SEALS IT, asked before any key is unwrapped, so a deposit that could not be sealed as asked touches none. */
+      const under = sealedUnderOf(body, opts?.agentDeposit === true);
+      if (!under.ok) return under;
+      const sealedUnder = under.value;
       const opened = await ready(keys, id, by, body);
       if (!opened.ok) return opened;
       const { store, recordKey } = opened.value;
@@ -195,7 +211,10 @@ function doors(keys: KeyDeps, record: () => string | null) {
         /* What it is, unopened: a length, never a character of it. */
         const hint = `a ${String(said.length)}-character value`;
         const seal = async (target: SealTarget): Promise<Result<Sealed>> => {
-          const key = await grantKey(store, id, target.key, target.grant, recordKey);
+          /* SEALED UNDER THE KEY THAT WAS ASKED FOR OR NOT AT ALL. A record that handed back its own key for a connector's
+             deposit would bind a key a scheduled run is refused, under a sentence saying it was added for the connector. */
+          if (purposeOf(target) !== sealedUnder) return no('NOT_IN_THIS_BUILD', CONNECTOR_SEAL, { at: 'sealed_under' });
+          const key = await grantKey(store, id, target.key, target.grant, recordKey, sealedUnder);
           /* BEHIND A PASSPHRASE THE RECORD KEY NAMES NO ROOT KEY, and a grant row names one all the same: the one the
              record's other keys are under, which is the one a later rotation renames with them (`rewrapKeys`). */
           const kekId = target.key.kek_id ?? (recordKey === null ? null : await offeredId(store, await keys.wrappingKey(id)));
@@ -208,8 +227,8 @@ function doors(keys: KeyDeps, record: () => string | null) {
            project, and reading a second one out of its body would be a way to put a key out of its reach. */
         const args =
           'principal' in by
-            ? { label: body.label, opens: body.opens, kind: body.kind, project: body.project, credential: body.credential }
-            : { label: body.label, opens: body.opens, kind: body.kind };
+            ? { label: body.label, opens: body.opens, kind: body.kind, project: body.project, credential: body.credential, sealed_under: sealedUnder }
+            : { label: body.label, opens: body.opens, kind: body.kind, sealed_under: sealedUnder };
         return await keys.depositGrant(id, args, by, hints, seal, opts);
       } finally {
         recordKey?.fill(0);
@@ -232,7 +251,7 @@ function doors(keys: KeyDeps, record: () => string | null) {
       const out = await keys.openForGrant(id, { label: text(body.label), credential: text(body.credential) }, by, hints, kekId);
       if (!out.ok) return vaultReply(out);
       const sealed = out.value;
-      const key = await grantKey(store, id, sealed.key, sealed.id, recordKey);
+      const key = await grantKey(store, id, sealed.key, sealed.id, recordKey, purposeOf(sealed));
       if (!key) return vaultReply(no('WRONG_KEY', WRONG_KEY, { at: 'kek_id' }));
       const decrypted = await openBytes(key, sealed.nonce, sealed.aad, sealed.ciphertext);
       /* A failed decrypt says only that these bytes do not open under this key. */

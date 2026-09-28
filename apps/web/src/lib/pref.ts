@@ -72,14 +72,10 @@ export type Pref = {
    * different answers, so it stays per device where it has always been. The shape is a fact about
    * how somebody reads, and it should follow them.
    *
-   * PER DEVICE, AND `19 §3` SAYS IT SHOULD NOT BE. *"The shape follows the person, so it is the
-   * record's, not the cookie's."* It is in this file for the same reason `suggestPages` is, said in
-   * that field's own comment eight lines down: there is no table among `30 §1`'s thirty-one that
-   * could hold a preference and no `setPref` in `45 §5`, so the record cannot keep one yet. The
-   * screen says which it is rather than letting somebody assume the durable one.
-   *
-   * `ponytail:` move to a `member('*')` column and a `setPref` method with `suggestPages`, in one
-   * migration, because they are the same deviation and they are on the same screen.
+   * THE RECORD KEEPS IT NOW, AND THIS IS ITS FIRST-PAINT COPY. `19 §3`: *"The shape follows the person, so it is the
+   * record's, not the cookie's."* The record holds it as `nav.shape` (`setPref`, answered on `boot`'s `me.prefs`), and
+   * `nav-prefs.svelte.ts` writes this copy from the record's word so the shell draws the right shape before `boot`
+   * answers. It is never read as the truth once the record has spoken.
    */
   navShape?: 'rail' | 'bar' | 'menu' | undefined;
   /** Whether bare letters act inside a focused grid. */
@@ -97,13 +93,10 @@ export type Pref = {
    * firing, so on is the only reading consistent with the rest of that section — and it is a reading
    * rather than a citation, which is why it is said here rather than assumed.
    *
-   * PER DEVICE, AND `19 §3` SAYS IT SHOULD NOT BE. *"nav order, hidden pages, pins, dismissals and
-   * the *Suggest new pages* switch must survive a change of device, so none of them is a cookie."*
-   * There is no table among `30 §1`'s thirty-one that could hold it and no `setPref` in `45 §5`;
-   * `50 §10` owns the deviation and names the migration. This is the honest state, and the screen
-   * does not claim otherwise.
-   *
-   * `ponytail:` move to a `member('*')` column and a `setPref` method when the record grows one.
+   * THE RECORD KEEPS IT NOW, AND THIS IS ITS FIRST-PAINT COPY. `19 §3`: *"nav order, hidden pages, pins, dismissals
+   * and the *Suggest new pages* switch must survive a change of device, so none of them is a cookie."* The record holds
+   * it as `pen.suggest`, and `nav-prefs.svelte.ts` writes this copy from the record's word, so a record's settings
+   * screen draws the switch as it stands before `boot` answers, and the sample, which has no record, keeps it here.
    */
   suggestPages?: boolean | undefined;
   /**
@@ -246,21 +239,8 @@ export function write(change: Pref): Pref {
        which is where a self-host is first opened. */
     document.cookie = `${NAME}=${encodeURIComponent(JSON.stringify(next))}; path=/; max-age=${YEAR}; samesite=lax`;
 
-  /**
-   * AND THE SHELL IS TOLD, because one preference is set from INSIDE the thing it changes.
-   *
-   * Every other setting here is read once by whoever needs it: `app.html` stamps three onto the
-   * document before first paint, and the rest are read by the screen that draws them. `navShape` is
-   * the first that a screen sets and the SHELL AROUND THAT SCREEN draws, and the shell is mounted
-   * once for the life of the tab. So choosing Top bar on `/settings/navigation` wrote the cookie,
-   * changed nothing anybody could see, and came back on the next reload: a control that works and
-   * looks broken, which is the one state worse than a control that does nothing.
-   *
-   * ONE EVENT FOR EVERY WRITE rather than one for this key, because a second reader of a second
-   * preference would otherwise add a second mechanism. It carries nothing: a listener re-reads, the
-   * way it would have on the reload it is replacing.
-   */
-  if (typeof window !== 'undefined') window.dispatchEvent(new Event('bdpref'));
+  /* NO EVENT ANY MORE. The shell once listened for every write to redraw its shape; it reads the shape from
+     `nav-prefs.svelte.ts` now, whose field changes when the shape is set, so there is nobody left to tell. */
 
   return next;
 }

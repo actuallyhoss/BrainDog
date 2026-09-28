@@ -12,10 +12,10 @@
  */
 
 import { useCaseName } from '@braindog/seed/usecases/names';
+import { firstPartyModule as moduleOf } from '@braindog/seed/packs/modules';
 
 import { copy } from '../../lib/copy.ts';
 import { PAGES } from '../../lib/record/held.ts';
-import { moduleOf } from '../../lib/record/modules.ts';
 import { moneyInText } from '../../lib/record/money.ts';
 import { actor, humanize, listName, nameWords, type Actor } from '../../lib/record/names.ts';
 import type { AuditEvent } from '../../lib/record/schema.ts';

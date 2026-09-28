@@ -1,0 +1,123 @@
+/*
+ * An `embed` block (`kinds/embed.ts`, drawn by `braindog-render`'s `Embed.svelte` and its `toHTML` twin): a video, a
+ * design or a map, first as a facade (its title, whose it is, a Load button) and, once pressed, as the provider's frame.
+ *
+ * THE FACADE AND THE FRAME ARE ONE SIZE, the aspect the author named (`data-aspect`), so pressing Load swaps what is in
+ * the box and moves nothing under it. The box is the block's full width at every width, as C4 says; a tall `9:16`
+ * alone is held to a phone's width, since at 1440 a full-width portrait frame would be taller than the screen.
+ *
+ * Nothing here loads anything: the renderer puts the frame on the page only on the press.
+ */
+
+@layer components {
+  .embed {
+    display: grid;
+    justify-items: start;
+    gap: var(--sp-2);
+    min-inline-size: 0;
+  }
+
+  .embed-frame,
+  .embed-facade {
+    inline-size: 100%;
+    aspect-ratio: 16 / 9;
+    border: 0;
+    border-radius: var(--r-md);
+  }
+
+  .embed[data-aspect='4:3'] :is(.embed-frame, .embed-facade) {
+    aspect-ratio: 4 / 3;
+  }
+
+  .embed[data-aspect='1:1'] :is(.embed-frame, .embed-facade) {
+    aspect-ratio: 1;
+  }
+
+  .embed[data-aspect='9:16'] :is(.embed-frame, .embed-facade) {
+    max-inline-size: 24rem;
+    aspect-ratio: 9 / 16;
+  }
+
+  .embed-frame {
+    display: block;
+    background: var(--sunk);
+  }
+
+  /* THE FACADE IS A WELL CUT INTO THE BLOCK, the words at its foot and the one button under them, so it reads as a
+     thing waiting to be opened rather than a broken frame. */
+  .embed-facade {
+    display: flex;
+    flex-direction: column;
+    justify-content: end;
+    align-items: start;
+    gap: var(--sp-1);
+    padding: var(--sp-4);
+    background: var(--sunk);
+  }
+
+  .embed-title {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--t-md);
+    font-weight: 600;
+    line-height: var(--lh-tight);
+    overflow-wrap: anywhere;
+  }
+
+  .embed-from {
+    margin: 0;
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  /* A BUTTON IN THE HOUSE'S SHAPE: `--ctl-h`, which is 44px under a coarse pointer, so the press a phone makes is a
+     whole target. */
+  .embed-load {
+    min-block-size: var(--ctl-h);
+    margin-block-start: var(--sp-2);
+    padding-inline: var(--sp-4);
+    border: 1px solid var(--edge);
+    border-radius: var(--r-md);
+    background: var(--s1);
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--t-base);
+    font-weight: 500;
+    cursor: pointer;
+    transition: border-color var(--d-state);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .embed-load:hover {
+      border-color: var(--ink2);
+    }
+  }
+
+  .embed-open {
+    color: var(--dim);
+    font-size: var(--t-sm);
+    text-decoration: underline;
+    text-decoration-color: var(--line);
+    text-underline-offset: 3px;
+    overflow-wrap: anywhere;
+  }
+
+  .embed-open:hover,
+  .embed-open:focus-visible {
+    color: var(--ink);
+  }
+
+  @media (pointer: coarse) {
+    .embed-open {
+      display: inline-flex;
+      align-items: center;
+      min-block-size: var(--tap);
+    }
+  }
+
+  .embed-empty {
+    margin: 0;
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+}

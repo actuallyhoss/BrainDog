@@ -18,15 +18,28 @@
   DSN-6): below 640px or with a coarse pointer, the list rises from the bottom of the screen over a
   scrim, as a popover in the top layer, in 48px rows at 16px with a Cancel row. A panel pinned to a
   row's rect is a panel under the finger that long-pressed the row.
+
+  "HAND TO" IS THIS MENU'S OWN ITEM (GAP-11), last before Cancel, on a row of a list that says who holds its rows and
+  for somebody who may change it, at every width. The sheet it opens lives outside the menu, since the menu closes on
+  the press, and its code is fetched on the first press, so the rail that also uses this menu carries none of it.
 -->
 <script lang="ts">
   import type { Snippet } from 'svelte';
+  import { page } from '$app/state';
+  import { copy } from '../copy.ts';
+  import type { Shell } from '../record/boot-live.ts';
+  import { may } from '../record/may.ts';
+  import type { Entry, RegisterDecl } from '../record/schema.ts';
+  import Icon from './Icon.svelte';
+
+  type Handed = { register: string; row: Entry; decl: RegisterDecl; onhanded?: ((entry: Entry) => void) | undefined };
 
   let {
     open = $bindable(false),
     at,
     label,
     onclose,
+    hand = null,
     children,
   }: {
     open?: boolean;
@@ -35,10 +48,21 @@
     at: { x: number; y: number; height: number } | null;
     label: string;
     onclose?: () => void;
+    /** The row the menu is about, its list, and what to do with the row a hand leaves; absent, there is no "Hand to". */
+    hand?: Handed | null | undefined;
     children: Snippet;
   } = $props();
 
   let list = $state<HTMLElement>();
+
+  /* ONLY ON A LIST THAT DECLARES `hand:` AND FOR SOMEBODY WHO MAY CHANGE ITS ROWS: a control that cannot act is absent
+     rather than greyed (`19 §6`). The sheet asks both again before it draws anything. */
+  const handable = $derived(
+    hand != null && (hand.decl as unknown as { hand?: unknown }).hand != null && may(page.data as unknown as Shell, 'write', hand.register),
+  );
+  /* THE ROW AS IT WAS WHEN "HAND TO" WAS PRESSED, since the menu closing lets its caller forget which row it was on. */
+  let handing = $state<Handed | null>(null);
+  let handOpen = $state(false);
 
   const words = { cancel: 'Cancel' };
 
@@ -145,9 +169,29 @@
     onclick={() => close()}
   >
     {@render children()}
+    {#if handable && hand}
+      <button
+        type="button"
+        class="row-menu-hand"
+        role="menuitem"
+        onclick={() => {
+          handing = hand ?? null;
+          handOpen = true;
+        }}
+      >
+        <Icon name="people" size="s" />
+        <span>{copy.handTo}</span>
+      </button>
+    {/if}
     <!-- A menu item, so the arrows reach it; the list's click closes the menu on it. -->
     {#if sheet}<button type="button" class="row-menu-cancel" role="menuitem">{words.cancel}</button>{/if}
   </div>
+{/if}
+
+{#if handing}
+  {#await import('./HandSheet.svelte') then loaded}
+    <loaded.default bind:open={handOpen} register={handing.register} row={handing.row} decl={handing.decl} onhanded={handing.onhanded} />
+  {/await}
 {/if}
 
 <style>
@@ -160,6 +204,36 @@
     border: 1px solid var(--edge);
     border-radius: var(--r-md);
     box-shadow: var(--e2);
+  }
+
+  /* "Hand to" drawn as the caller's items are: the same 34px row, glyph first, the same wash on hover. */
+  .row-menu-hand {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    inline-size: 100%;
+    min-block-size: 34px;
+    padding: 0 var(--sp-3);
+    background: none;
+    border: 0;
+    border-radius: var(--r-sm);
+    color: var(--ink2);
+    font: inherit;
+    font-size: var(--t-ui);
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .row-menu-hand:hover,
+  .row-menu-hand:focus-visible {
+    background: var(--hover-wash);
+    color: var(--ink);
+  }
+
+  @media (pointer: coarse) {
+    .row-menu-hand {
+      min-block-size: var(--tap);
+    }
   }
 
   /* Rendered only for a sheet; the sheet's rule below draws it. */

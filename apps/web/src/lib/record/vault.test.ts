@@ -156,8 +156,8 @@ test('a key row joins its grant for the counts, and a row with no grant is an in
   ];
   const keys = keysOf(rows, grants, names);
   assert.deepEqual(keys.map((k) => k.label), ['Admin panel', 'Briefed', 'Stripe'], 'retired rows are gone and the order is the label');
-  assert.deepEqual(keys.find((k) => k.id === 'c1'), { id: 'c1', label: 'Stripe', opens: 'Payments', project: 'Kiln', sealed: true, opened: 5, lastOpened: '2026-09-14T10:00:00Z', grant: 'g1' });
-  assert.deepEqual(keys.find((k) => k.id === 'c2'), { id: 'c2', label: 'Admin panel', opens: 'The panel', project: null, sealed: false, opened: 0, lastOpened: null, grant: null });
+  assert.deepEqual(keys.find((k) => k.id === 'c1'), { id: 'c1', spoken: null, label: 'Stripe', opens: 'Payments', project: 'Kiln', sealed: true, opened: 5, lastOpened: '2026-09-14T10:00:00Z', grant: 'g1' });
+  assert.deepEqual(keys.find((k) => k.id === 'c2'), { id: 'c2', spoken: null, label: 'Admin panel', opens: 'The panel', project: null, sealed: false, opened: 0, lastOpened: null, grant: null });
   assert.equal(keys.find((k) => k.id === 'c4')?.opened, 2);
   /* THE GRANT IS WHAT `revokeGrant` NAMES, and a row that holds its counts instead names none. */
   assert.equal(keys.find((k) => k.id === 'c4')?.grant, null);
@@ -220,7 +220,7 @@ test('an answer with no plan hash is no plan, so nothing can be installed from i
 });
 
 test('RECONNECT OPENS THE KEY A PAUSED ACTION NAMED: its row to replace, or Add under that name, and the action to resume', () => {
-  const row = { id: 'cred_1', label: 'Stripe read', opens: 'api.stripe.com', project: null, scope: null, sealed: true, opened: 3, lastOpened: null, grant: 'g_1' };
+  const row = { id: 'cred_1', spoken: 'credentials#1', label: 'Stripe read', opens: 'api.stripe.com', project: null, scope: null, sealed: true, opened: 3, lastOpened: null, grant: 'g_1' };
   const asked = (href: string) => new URL(href, 'https://x.example').searchParams;
   assert.deepEqual(reconnectOf(asked('/vault?reconnect=stripe%20READ&then=stripe-balance'), [row]), { mode: 'replace', row, then: 'stripe-balance' });
   assert.deepEqual(reconnectOf(asked('/vault?reconnect=GitHub%20deploy'), [row]), { mode: 'add', label: 'GitHub deploy', then: null });

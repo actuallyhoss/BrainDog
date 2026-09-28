@@ -25,14 +25,15 @@ registerHooks({
 });
 
 const { NavPrefs } = await import('./nav-prefs.svelte.ts');
+type Prefs = import('./nav-prefs.svelte.ts').Prefs;
 
-type Sent = { key: string; value: string[] };
+type Sent = { key: string; value: string[] | string | boolean };
 
 const recorder = (answer: (s: Sent) => { from: 'kept' } | { from: 'refused'; fix: string } = () => ({ from: 'kept' })) => {
   const sent: Sent[] = [];
   return {
     sent,
-    send: async (key: 'nav.order' | 'nav.hidden', value: string[]) => {
+    send: async (key: keyof Prefs, value: string[] | string | boolean) => {
       const s = { key, value };
       sent.push(s);
       return answer(s);
@@ -89,7 +90,7 @@ test('TWO QUICK MOVES ARRIVE IN THE ORDER THEY WERE MADE', async () => {
       slow = false;
       await new Promise((r) => setTimeout(r, 20));
     }
-    sent.push(value);
+    sent.push(value as string[]);
     return { from: 'kept' };
   });
   await Promise.all([prefs.setOrder(['/p/a', '/p/b']), prefs.setOrder(['/p/b', '/p/a'])]);

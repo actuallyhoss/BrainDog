@@ -10,9 +10,6 @@
  */
 
 export const home = {
-  /* What the record would do, appended to a decision's second line on Home, so "what needs you"
-     shows its thinking rather than four questions and none. */
-  suggestedAnswer: 'Suggested:',
   toDecide: 'to decide',
 
   /* home */
@@ -25,12 +22,6 @@ export const home = {
   rightNow: 'Right now',
   sinceAway: 'Since you were away',
   nothingNeedsYou: 'Nothing needs you today',
-  andMore: 'and more',
-  /* THE OVERFLOW OF A FEED, as a count and a place to go. Home is not the log — `19 §2` gives that
-     job to `/audit` — so what this screen owes a reader is how much it is not showing and the door
-     to the rest, which is the same shape the needs-you list already uses. */
-  moreInTheLog: (n: number) => `${n.toLocaleString('en')} more in the log`,
-  markAllRead: 'Mark all read',
   /* THE `cleared` STATE FOR THE FEED, which is a feed you have worked through rather than a record
      with nothing in it. `19 §6` gives this state no action, because there is nothing to do. */
   nothingNew: 'Nothing new since you last looked',
@@ -45,7 +36,6 @@ export const home = {
   /* THE RECORD ITSELF IS EMPTY, which is a different sentence from every list being empty and from
      nothing needing you. It is the state of the first hour and nothing could say it. */
   recordEmpty: 'Nothing in the record yet',
-  recordEmptyBody: 'A record holds what you keep track of: what you owe and are owed, what you pay for, who is involved, and the decisions behind them.',
   startHere: 'Start here',
   /**
    * HOME FOR A COLLEAGUE WHO HOLDS LISTS AND NOT THE RECORD, in place of the two nothings above.

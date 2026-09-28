@@ -19,6 +19,7 @@
 import { agentDoing, day as fmtDay, diffRows, money, relative, shortDay, since, integer, MISSING } from 'braindog-render';
 import type { Column, TableRow } from 'braindog-render/svelte';
 import { useCaseName } from '@braindog/seed/usecases/names';
+import { firstPartyModule as moduleOf } from '@braindog/seed/packs/modules';
 import { STALE_MS, type Bars, type MeasureSeries, type Part, type QueueQuestion, type Rate } from '@braindog/kernel';
 import type { BlockResult as Answer } from '@braindog/kernel';
 
@@ -26,13 +27,11 @@ import { amountOf, currencyOf } from './money.ts';
 import { isGlyph, type IconName } from '../ui/icons.ts';
 import { copy } from '../copy.ts';
 import { PAGES, REGISTERS, ROWS, TITLES } from './held.ts';
-import { MODULES, moduleOf } from './modules.ts';
 /* Type only, and there is no cycle: `remote.ts` reads the declaration and the sample, never this file. */
 import type { Names } from './remote.ts';
 import { compile, declaredValue } from './where.ts';
 import type { MetricDecl } from './metrics.ts';
-import type { Entry, Fields, Filter, FieldDecl, PackInfo, PageBlock, RegisterDecl } from './schema.ts';
-import type { CallOut } from './actions.ts';
+import type { Entry, Fields, Filter, FieldDecl, PageBlock, RegisterDecl } from './schema.ts';
 import { listLine } from './tags.ts';
 /* No cycle: `names.ts` reads `held.ts` and the copy, never this file. */
 import { actor, nameWords } from './names.ts';
@@ -1123,120 +1122,6 @@ export const hueOf = (id: { register: string; seq: number } | undefined): number
   const hue = row ? Number(row.fields[accent]) : NaN;
   return Number.isFinite(hue) ? hue : undefined;
 };
-
-/**
- * What installing a pack would add, derived from the record rather than typed.
- *
- * `04 §3` IS THE TRUST MODEL AND IT IS THE REASON A PACK MAY NOT CONTAIN CODE: "A pack is readable
- * text, so a truthful diff is possible — this is the entire trust model. You cannot diff a binary's
- * intentions." So the one screen that carries that promise had better be true.
- *
- * IT WAS A TEMPLATE STRING WITH THREE THINGS WRONG WITH IT. `+ register.things  1 field(s) added`:
- * the internal id for a list the rail calls Projects; `${pack.registers.length}` — a count of
- * REGISTERS — printed as a count of FIELDS, so all five installed packs said "1 field(s)" while
- * Obligations declares eight; and `+ page.— placed in nav`, the em-dash fallback for a pack with no
- * page, rendered as though `—` were a page about to be put in somebody's sidebar. Under it, a
- * paragraph explaining how nav ordering works — `23 §7`: never write a sentence explaining the
- * interface.
- *
- * SEVEN SECTIONS, AND ONLY THE ONES THAT SAY SOMETHING. `04 §3`'s diff is
- * `adds · changes · conflicts · seeds · spawns · calls_out · touches`, and three of them are
- * guarantees rather than findings: a pack physically cannot read a row at install time, so
- * "0 rows read" is a fact about the mechanism and not about this pack. Those are stated. `changes`
- * is stated only when there IS one, because `06 §1` is that a warning which does not apply teaches
- * people to ignore warnings.
- *
- * WHAT IS NOT KNOWN IS SAID AS NOT KNOWN. A pack this record has not installed declares registers
- * and pages this record does not have, so there is no field count to give and inventing one would
- * be the same lie in a new place. It gets the names it declares and a line saying the shape arrives
- * with the file.
- */
-export type PackDiff = {
-  adds: { kind: 'list' | 'page'; name: string; detail: string | null }[];
-  /** A nav move this pack would make to a page it does not own. Shown, never applied (04 §4). */
-  changes: string[];
-  conflicts: string[];
-  seeds: string;
-  touches: string;
-  /** True when the pack is not installed, so the counts are unknown rather than zero. */
-  unread: boolean;
-  /** Every scheduled action it would add: `04 §3`'s `calls_out`. */
-  calls: readonly CallOut[];
-};
-
-export function packDiff(pack: PackInfo, installed: boolean = pack.installed === true): PackDiff {
-  const adds: PackDiff['adds'] = [];
-
-  for (const id of pack.registers) {
-    /* A NAME THAT COLLIDES IS NOT AN ADD. It is the reason the install does not happen, and it has
-       its own section; listing it under ADDS as well — with the EXISTING list's field count, since
-       that name resolves — would say the pack brings you a Services you already have. */
-    if (pack.conflicts?.includes(id)) continue;
-    const decl = REGISTERS[id];
-    adds.push(
-      decl
-        ? { kind: 'list', name: decl.name, detail: `${decl.fields.length} ${decl.fields.length === 1 ? 'field' : 'fields'}` }
-        /* THE KIND IN WORDS WHEN THERE IS NO COUNT, because the glyph beside it is decorative and a
-           screen reader would otherwise hear three bare nouns with nothing saying which is which. */
-        : { kind: 'list', name: pack.titles?.[id] ?? id, detail: 'a list' },
-    );
-  }
-
-  for (const id of pack.pages) {
-    const decl = PAGES[id];
-    adds.push(
-      decl
-        ? {
-            kind: 'page',
-            name: decl.title,
-            detail: [
-              /* AND IT COUNTED `blocks`. `block` is defined once, on the AddBlock sheet, once per
-                 device, behind a cookie — and this line is on the trust screen, which is where a
-                 stranger decides whether to let a file into their business and the one screen in
-                 the product with no way to define anything. What the count is FOR is how much
-                 page arrives with the pack, and a table and a figure are what a page is made of.
-                 The word is untouched everywhere it is taught. */
-              `${decl.blocks.length} ${decl.blocks.length === 1 ? 'table or figure' : 'tables and figures'}`,
-              /* WHERE IT LANDS IN THE RAIL, which is the half somebody actually checks. A pack may
-                 place a page it owns; `04 §4` is that it may never move yours. */
-              decl.nav ? `${decl.nav.section} section` : 'not in your sidebar',
-            ].join(' · '),
-          }
-        : { kind: 'page', name: pack.titles?.[id] ?? id, detail: 'a page' },
-    );
-  }
-
-  /* `04 §4`: a pack may place a page it OWNS and may never move yours, and an update that would is
-     shown and then ignored. Named by title, because the reader is being asked about their own
-     sidebar rather than about a declaration. */
-  const changes = (pack.moves ?? []).map((m) => {
-    const decl = PAGES[m.page];
-    return `${decl?.title ?? m.page} would move from ${m.from} to ${m.to} in the ${decl?.nav?.section ?? 'sidebar'} section`;
-  });
-
-  /* A NAME THIS RECORD ALREADY HAS. `02 §1`: a register the kernel or another pack ships is a name
-     no pack can own, and the install is refused rather than merged — so this is the one section on
-     the screen that means "you cannot have this", not "here is what would happen". */
-  const conflicts = (pack.conflicts ?? []).map((id) => {
-    const decl = REGISTERS[id];
-    const owner = MODULES.find((p) => p.registers.includes(id));
-    return `${decl?.name ?? id} already exists${owner ? `, from ${owner.name}` : ''}`;
-  });
-
-  return {
-    adds,
-    changes,
-    conflicts,
-    /* `04 §3.2`: seeds get their own line, are marked `example`, and are clearable in one undoable
-       action. It is a WRITE, and the trust screen was untrue for as long as it claimed otherwise. */
-    seeds: '1 example row, marked example, clearable in one action',
-    /* AND THIS ONE IS A GUARANTEE, not a measurement. `04 §3.2`: "A pack physically cannot read a
-       row at install time, so \"0 rows read\" is a guarantee." */
-    touches: 'nothing you have written: 0 rows read, 0 of your rows changed',
-    unread: !installed,
-    calls: pack.calls ?? [],
-  };
-}
 
 export type BlockResult = PageBlock & {
   /** A `bar` or `split` over a grouped figure: the whole, and each part by its key, largest first. */

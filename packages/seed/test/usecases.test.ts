@@ -68,7 +68,9 @@ test('EACH CARRIED PACK INSTALLS ON AN EMPTY RECORD after its modules, with its 
     const { k, sql } = await record();
     for (const id of modulesFor(u)) if (id !== 'agents') value(await put(k, firstPartyDocument(id)));
     value(await put(k, doc));
-    for (const list of listsOf(u)) assert.ok(k.count(list.id) >= 1, `${u.usecase}: ${list.id} has its example row`);
+    /* PERSONAL AND STUDENT CARRY NO EXAMPLE ROW (`loop/finish/modules.md` C11), so only a pack that seeds is counted. */
+    const seeded = new Set(((doc.seeds ?? []) as { register: string }[]).map((s) => s.register));
+    for (const list of listsOf(u)) if (seeded.has(list.id)) assert.ok(k.count(list.id) >= 1, `${u.usecase}: ${list.id} has its example row`);
     const settings = value<{ values: Record<string, unknown>; config: Record<string, { label?: string }> }>(k.packConfig(`usecase-${u.usecase}`));
     assert.deepEqual(voiceOf(settings.values), u.voice, `${u.usecase}: the record holds the voice`);
     assert.deepEqual(labelsOf(settings.values, settings.config), u.labels, `${u.usecase}: the record holds the labels`);
@@ -94,10 +96,7 @@ test('THE PROPOSAL SAYS WHICH PAGES AND SECTIONS IT MAKES', () => {
     { page: 'agent-work', title: 'Agent work', section: 'Team' },
   ]);
   assert.deepEqual(pagesOf(useCase('guide')!), [{ page: 'guide', title: 'Guide', section: 'Guide' }]);
-  assert.deepEqual(pagesOf(useCase('personal')!), [
-    { page: 'spending', title: 'Spending', section: 'Money' },
-    { page: 'goals', title: 'Goals', section: 'Goals' },
-  ]);
+  assert.deepEqual(pagesOf(useCase('personal')!), [{ page: 'goals', title: 'Goals', section: 'Goals' }]);
   assert.deepEqual(pagesOf(useCase('business')!), []);
   assert.deepEqual(modulesFor(useCase('student')!, ['people']), ['people']);
   assert.deepEqual(modulesFor(useCase('founder')!, ['estate']), ['portfolio', 'people', 'money-core', 'estate', 'work']);

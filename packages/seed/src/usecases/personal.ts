@@ -16,66 +16,19 @@
  * form reads the label since 1.6.0 (`RowForm.svelte`, `valueSaid`); before, it drew every value raw, and a household
  * was offered Client and Registrar (`personal-words.test.ts`).
  *
- * WHAT MONEY DOES NOT HOLD IS THIS PACK'S. Day-to-day spending carries a person's own categories (groceries, getting
- * around), which Money's closed business categories cannot say and a use case cannot add to another pack's list. So
- * spending, the monthly budget per category, savings goals, goals and habits, and the steps of a project are this
- * pack's own lists, and a budget reads what was spent this month through a figure grouped by the same categories.
+ * WHAT A PERSON SPENDS IS MONEY'S LEDGER, SINCE 2.0.0. Personal kept its own `spending` and `budgets` lists beside
+ * Money's, so a purchase an import or a bank message wrote into the ledger never reached the budget, and a person's
+ * month was two lists that disagreed. Money's `transactions` hold what moved and its `categories` hold the most a month
+ * on each (`budget`), so Budget left reads `spent-by-category-month` against those rows (`loop/finish/modules.md`
+ * MOD-17). What Money does not hold stays this pack's: savings goals, goals and habits, and the steps of a project.
+ *
+ * NOTHING IS WRITTEN AS AN EXAMPLE, AND NO SUM IS IN A CURRENCY (`loop/finish/modules.md` C11, §6.7). A Personal record
+ * used to arrive holding a stranger's month, every row in pounds. It now holds only what the person said: a pay day is a `recurring` row formed
+ * from a sentence that names pay, in the currency the sentence names (`payDayRow`).
  */
 
-/** This calendar month, from its first day, as a structured predicate: the sentence grammar has no "on or after". */
-const THIS_MONTH = { field: 'on', gte: 'bom' };
-
-const RAINY_DAY = 'Rainy day fund';
-const LISBON = 'Trip to Lisbon';
-const LAPTOP = 'New laptop';
-const RUN_WEEKLY = 'Run three times a week';
-const RUN_KM = 'Run 100 km before the half marathon';
-const COOK = 'Cook at home five nights a week';
-const BOOKS = 'Read 12 books this year';
-
-/**
- * THE EXAMPLE LOG: what each row is, what it counts toward, how much, and when. Days are counted from the day the record is
- * made, so a habit has something this week on any day: a row on `0d` is always in the week.
- */
-const LOGGED: readonly (readonly [string, string, number, string])[] = [
-  ['Morning run', RUN_WEEKLY, 1, '0d'],
-  ['Run after work', RUN_WEEKLY, 1, '-2d'],
-  ['Morning run, 5 km', RUN_KM, 5, '0d'],
-  ['Long run, 14 km', RUN_KM, 14, '-3d'],
-  ['Easy run, 8 km', RUN_KM, 8, '-9d'],
-  ['Cooked a curry', COOK, 1, '0d'],
-  ['Pasta night', COOK, 1, '-1d'],
-  ['Finished Piranesi', BOOKS, 1, '-12d'],
-];
-
-/** THE EXAMPLE SAVINGS PUT BY: what, toward which goal, pence, when. */
-const PUT_BY: readonly (readonly [string, string, number, string])[] = [
-  ['Moved from the current account', RAINY_DAY, 150_000, '-60d'],
-  ['Monthly transfer', RAINY_DAY, 17_500, '-30d'],
-  ['Monthly transfer, this month', RAINY_DAY, 17_500, '-2d'],
-  ['Birthday money', LISBON, 20_000, '-45d'],
-  ['Put aside from pay day', LISBON, 22_000, '-10d'],
-  ['Sold the old phone', LAPTOP, 15_000, '-5d'],
-];
-
-/** The categories a person spends in, shared by spending and budgets so a budget line and a purchase can be matched. */
-const CATEGORIES = {
-  values: ['groceries', 'eating_out', 'transport', 'home', 'shopping', 'fun', 'health', 'travel', 'gifts', 'other'],
-  labels: {
-    groceries: 'Groceries',
-    eating_out: 'Eating out',
-    transport: 'Getting around',
-    home: 'Home',
-    shopping: 'Shopping',
-    fun: 'Fun',
-    health: 'Health',
-    travel: 'Travel',
-    gifts: 'Gifts',
-    other: 'Other',
-  },
-};
-
-const BILLS_THIS_WEEK = 'state is open or part, direction is owed by me, due before +8d';
+/** Money's lists that hold a day something falls due, as the `deadlines` source names them (`list is ...`). */
+const MONEY_DUE = 'list is obligations or recurring or installments';
 
 /**
  * THE BLOCKS HOME AND THE GOALS PAGE SHARE: how far each savings goal, habit and goal has come.
@@ -123,16 +76,22 @@ const goalsProgress = (span: number) => ({
   empty: 'No goals yet. Add one, like running a hundred kilometres, and log each step toward it.',
 });
 
+/**
+ * WHAT IS LEFT OF EACH MONTH'S BUDGET: Money's categories that money goes out on and that hold a most a month, each set
+ * against what the ledger spent on it since the first of the month. The figure is grouped by the category a
+ * transaction points at, so a row and its reading are matched by the row itself and never by a word.
+ */
 const budgetProgress = (heading: string) => ({
   kind: 'progress',
   heading,
   span: 12,
-  source: 'register.budgets',
-  columns: [{ field: 'category' }, { field: 'limit' }],
-  spent: 'spent-this-month-by-category',
+  source: 'register.categories',
+  where: 'state is live, direction is out, budget is set',
+  columns: [{ field: 'name' }, { field: 'budget' }],
+  spent: 'spent-by-category-month',
   order: [{ field: 'seq', dir: 'asc' }],
   limit: 10,
-  empty: 'No budget yet. Give a category a monthly amount and what you have spent against it shows here.',
+  empty: 'No budget yet. Give a category the most you mean to spend on it in a month, and what is left shows here.',
 });
 
 export const PERSONAL = {
@@ -142,8 +101,11 @@ export const PERSONAL = {
      1.6.0: the studio's roles are relabelled in a household's words that are not its own five.
      1.7.0: the `registrar` label went, because People 2.0.0 no longer offers the value it read.
      1.7.1: Home's empty title loses its full stop, as every other title already has; a record is offered the words
-     only when the version goes up. */
-  version: '1.7.1',
+     only when the version goes up.
+     2.0.0: the `spending` and `budgets` lists and the Spending page went, since Money's ledger and categories carry
+     them; every money figure is in the record's own currency; Home is rebuilt over Money (`loop/finish/modules.md`
+     MOD-17). Major, because two lists and a page go. No record holds Personal to lose their rows (modules.md O6). */
+  version: '2.0.0',
   title: 'Personal',
   summary: 'Your money and bills, what you are saving for, and the projects and goals you care about.',
   author: 'BrainDog',
@@ -218,18 +180,15 @@ export const PERSONAL = {
     'people.role.contractor': 'Hired help',
     'people.role.accountant': 'Tax and accounts',
     'people.role.collaborator': 'Project partner',
-    spending: 'Spending',
-    'spending:one': 'purchase',
-    budgets: 'Budget',
-    'budgets:one': 'budget line',
     savings_goals: 'Savings goals',
     goals: 'Goals',
     goal_log: 'Log',
     put_by: 'Put by',
     project_steps: 'Project steps',
   },
+  /* NO SPENDING SORTER SINCE 2.0.0: a purchase is a row of Money's ledger, and Money files it by its categories' own
+     `match` (`txn-categorise`), so a second sorter would only argue with it. */
   skills: [
-    { name: 'spending-sorter', trigger: 'when a purchase is added without a category, to suggest the one it belongs in' },
     { name: 'bill-reminder', trigger: 'the day before a bill is due, to say what is going out and from which account' },
   ],
   pack: {
@@ -241,39 +200,6 @@ export const PERSONAL = {
        is ever taken out, because rows hold them. */
     extends: { 'register.people': { values: { role: ['family', 'friend', 'landlord', 'tradesperson', 'adviser'] } } },
     declarations: [
-      {
-        register: 'spending',
-        name: 'Spending',
-        one: 'purchase',
-        icon: 'money',
-        holds: 'what you spent day to day, on what and when',
-        title: 'what',
-        mobile: ['what', 'amount', 'on'],
-        fields: [
-          { id: 'what', label: 'What', type: 'text', required: true, search: true },
-          { id: 'amount', label: 'Amount', type: 'money', required: true },
-          { id: 'category', label: 'Category', type: 'enum', ...CATEGORIES, index: true, required: true },
-          { id: 'on', label: 'Day', type: 'day', required: true, index: true },
-          { id: 'account', label: 'Paid from', type: 'ref', to: 'accounts', index: true },
-          { id: 'note', label: 'Notes', type: 'text' },
-          { id: 'tags', type: 'list', of: 'text' },
-        ],
-      },
-      {
-        register: 'budgets',
-        name: 'Budget',
-        one: 'budget line',
-        icon: 'tag',
-        holds: 'how much you mean to spend on each category in a month',
-        title: 'category',
-        mobile: ['category', 'limit'],
-        fields: [
-          { id: 'category', label: 'Category', type: 'enum', ...CATEGORIES, required: true, unique: true, index: true },
-          { id: 'limit', label: 'Each month', type: 'money', required: true },
-          { id: 'note', label: 'Notes', type: 'text' },
-          { id: 'tags', type: 'list', of: 'text' },
-        ],
-      },
       {
         register: 'savings_goals',
         name: 'Savings goals',
@@ -401,40 +327,6 @@ export const PERSONAL = {
         ],
       },
       {
-        metric: 'spent-this-month',
-        name: 'Spent this month',
-        source: 'register.spending',
-        where: THIS_MONTH,
-        value: { sum: 'amount' },
-        format: 'money.GBP',
-        target: { gte: 0 },
-        window: '30d',
-        compare: 'none',
-      },
-      {
-        /* WHAT A BUDGET LINE IS SET AGAINST: this month's spending, one part a category. */
-        metric: 'spent-this-month-by-category',
-        name: 'Spent this month, by category',
-        source: 'register.spending',
-        where: THIS_MONTH,
-        value: { sum: 'amount' },
-        group_by: 'category',
-        format: 'money.GBP',
-        target: { gte: 0 },
-        window: '30d',
-        compare: 'none',
-      },
-      {
-        metric: 'budget-each-month',
-        name: 'Monthly budget',
-        source: 'register.budgets',
-        value: { sum: 'limit' },
-        format: 'money.GBP',
-        target: { gte: 0 },
-        window: '30d',
-        compare: 'none',
-      },
-      {
         /* WHAT WAS LOGGED TOWARD EACH HABIT THIS WEEK, from Monday, so a habit starts again every week. */
         metric: 'logged-this-week-by-goal',
         name: 'Logged this week, by goal',
@@ -464,18 +356,8 @@ export const PERSONAL = {
         source: 'register.put_by',
         value: { sum: 'amount' },
         group_by: 'saving',
-        format: 'money.GBP',
-        target: { gte: 0 },
-        window: '30d',
-        compare: 'none',
-      },
-      {
-        metric: 'bills-this-week',
-        name: 'Bills this week',
-        source: 'register.obligations',
-        where: BILLS_THIS_WEEK,
-        value: { sum: 'amount' },
-        format: 'money.GBP',
+        /* IN THE RECORD'S OWN CURRENCY, never a literal one (`loop/finish/modules.md` C1). */
+        format: 'money',
         target: { gte: 0 },
         window: '30d',
         compare: 'none',
@@ -485,122 +367,95 @@ export const PERSONAL = {
         name: 'Saved toward goals',
         source: 'register.put_by',
         value: { sum: 'amount' },
-        format: 'money.GBP',
+        format: 'money',
         target: { gte: 0 },
         window: '30d',
         compare: 'none',
       },
       {
-        /* HOME, AS THIS USE CASE ANSWERS IT (`loop/research-spark.md` S13): this month's spending against the budget,
-           the bills due this week, how close each goal is and which projects are moving. No `nav`, because Home is on
-           the rail already; the first heading reads the voice. */
+        /* HOME, AS THIS USE CASE ANSWERS IT (`loop/finish/modules.md` MOD-17): what I have, the bills falling due this
+           week, what is left of the budget, my projects with the next step on each, and my goals, then the house Home's
+           own three (what needs you, what is coming up, and what changed), so a person's Home loses nothing the house
+           one says. No `nav`, because Home is on the rail already. Every block is a whole row, so at 390 the page stacks
+           in this order and nothing is placed beside anything. */
         page: 'home-personal',
         title: 'Day to day',
         icon: 'home',
-        requires: ['register.spending', 'register.budgets', 'register.savings_goals', 'register.goals', 'register.goal_log', 'register.put_by', 'register.project_steps', 'register.obligations', 'register.accounts'],
+        requires: ['register.accounts', 'register.categories', 'register.things', 'register.project_steps', 'register.goals', 'register.goal_log'],
         blocks: [
           {
+            /* MONEY'S OWN FIGURES, READ IN A PERSON'S WORDS. Cash now is every liquid account rolled forward to today
+               (money-core `cash-now`), so it says what is there and not what was typed on the day an account was added. */
             kind: 'stat',
-            heading: '{{config:voice_right_now}}',
+            heading: 'What I have',
             span: 12,
             cells: [
-              { metric: 'spent-this-month', label: 'Spent this month' },
-              { metric: 'budget-each-month', label: 'Monthly budget' },
-              { metric: 'bills-this-week', label: 'Bills this week' },
-              { metric: 'cash-now', label: 'In your accounts', note: 'in {{cash-accounts}} account(s), as of {{cash-as-of}}' },
+              { metric: 'cash-now', label: 'In my accounts', note: 'in {{cash-accounts}} account(s), as of {{cash-as-of}}' },
+              { metric: 'arriving-30d', label: 'Coming in, 30 days' },
+              { metric: 'leaving-30d', label: 'Going out, 30 days' },
             ],
           },
-          budgetProgress('Spending against your budget'),
           {
-            kind: 'table',
-            heading: 'Bills due this week',
+            /* EVERY MONEY LIST'S DUE DAYS AT ONCE: a bill, a pay day or a subscription that comes round, and a part of
+               something paid in parts. The record reads the days each list declares `deadline: true`, overdue first. */
+            kind: 'timeline',
+            heading: 'Bills this week',
             span: 12,
-            source: 'register.obligations',
-            where: BILLS_THIS_WEEK,
+            source: 'deadlines',
+            horizon: 7,
+            where: MONEY_DUE,
+            columns: [{ field: 'day' }, { field: 'title' }, { field: 'amount', sign: { field: 'direction', minus: 'out' } }],
+            limit: 8,
+            empty: 'Nothing is due this week.',
+          },
+          budgetProgress('Budget left'),
+          {
+            /* ONE CARD A PROJECT THAT IS MOVING, WITH ITS NEXT STEP: the first step under it that is not done, which the
+               record reads from Project steps (`steps:` on that list, `nextsOf` in the kernel). */
+            kind: 'cards',
+            heading: 'My projects',
+            span: 12,
+            source: 'register.things',
+            where: 'lane is building or earning',
             columns: [
-              { field: 'what', label: 'Bill', width: 'minmax(16ch,1fr)' },
-              { field: 'amount', label: 'Amount', width: '14ch', align: 'end' },
-              { field: 'due', label: 'Due', width: '13ch', align: 'end' },
+              { field: 'name', as: 'title' },
+              { field: 'lane', label: 'Status', as: 'fact' },
+              { field: 'what', label: 'Next', as: 'next' },
             ],
-            order: [{ field: 'due', dir: 'asc' }],
+            order: [{ field: 'seq', dir: 'asc' }],
             limit: 6,
-            empty: 'No bills due this week.',
+            empty: 'No projects on the go. Add one you make or do for the love of it, and its next step shows here.',
           },
-          savingsProgress(6),
+          goalsProgress(12),
+          habitsProgress(12),
           {
-            kind: 'progress',
-            heading: 'Projects in motion',
-            span: 6,
-            source: 'register.project_steps',
-            columns: [{ field: 'thing' }, { field: 'done' }],
-            limit: 6,
-            empty: 'No project steps yet. Give a project its steps and its progress shows here.',
-          },
-          habitsProgress(6),
-          goalsProgress(6),
-          {
-            /* THE NEXT STEP ON EACH PROJECT, across all of them. It was a Projects page of this use case's own, which sat on
-               the rail beside Projects' Overview under the same heading; the Overview lists the projects, each moving project
-               has its own page of steps, and what is next across them is here. */
-            kind: 'table',
-            heading: 'Next steps',
+            /* THE HOUSE HOME'S THREE, as `defaultHome` in the web draws them, so a person's own Home still answers what
+               needs them, what falls due in a fortnight and what changed since they last looked. */
+            kind: 'queue',
+            heading: '{{config:voice_needs_you}}',
             span: 12,
-            source: 'register.project_steps',
-            where: 'done is false',
-            columns: [
-              { field: 'what', label: 'Step', width: 'minmax(18ch,1fr)' },
-              { field: 'thing', label: 'Project', width: 'minmax(12ch,22ch)' },
-              { field: 'by', label: 'By', width: '13ch', align: 'end' },
-            ],
-            order: [{ field: 'by', dir: 'asc' }],
-            limit: 6,
-            empty: 'Nothing left to do on your projects. Add the next step when you have one.',
-          },
-        ],
-      },
-      {
-        /* A PERSON'S OWN MONEY PAGE, beside Money's overview on the rail: the month against the budget, where it went
-           and what was bought. */
-        page: 'spending',
-        title: 'Spending',
-        nav: { section: 'Money', order: 20 },
-        icon: 'tag',
-        requires: ['register.spending', 'register.budgets'],
-        blocks: [
-          {
-            kind: 'stat',
-            heading: 'This month',
-            span: 12,
-            cells: [
-              { metric: 'spent-this-month', label: 'Spent this month' },
-              { metric: 'budget-each-month', label: 'Monthly budget' },
-            ],
-          },
-          budgetProgress('Against your budget'),
-          {
-            kind: 'split',
-            heading: 'Where it went, last 30 days',
-            span: 12,
-            source: 'register.spending',
-            where: 'on after -31d',
-            columns: [{ field: 'category' }, { field: 'amount' }],
-            limit: 6,
-            empty: 'Nothing spent in the last 30 days.',
+            source: 'governance.open',
+            limit: 5,
+            empty: '{{config:voice_nothing_needs_you}}',
           },
           {
-            kind: 'table',
-            heading: 'Recent spending',
+            kind: 'timeline',
+            heading: 'Coming up',
             span: 12,
-            source: 'register.spending',
-            columns: [
-              { field: 'what', label: 'What', width: 'minmax(16ch,1fr)' },
-              { field: 'category', label: 'Category', width: '14ch' },
-              { field: 'amount', label: 'Amount', width: '12ch', align: 'end' },
-              { field: 'on', label: 'Day', width: '12ch', align: 'end' },
-            ],
-            order: [{ field: 'on', dir: 'desc' }],
+            source: 'deadlines',
+            horizon: 14,
+            columns: [{ field: 'day' }, { field: 'title' }, { field: 'amount', sign: { field: 'direction', minus: 'out' } }],
             limit: 12,
-            empty: 'Nothing spent yet. Add a purchase and it shows here.',
+            empty: 'Nothing falls due in the next two weeks.',
+          },
+          {
+            kind: 'feed',
+            heading: '{{config:voice_since_away}}',
+            span: 12,
+            source: 'activity',
+            since: 'seen',
+            first: 8,
+            empty: 'Nothing new since you last looked.',
           },
         ],
       },
@@ -703,45 +558,10 @@ export const PERSONAL = {
         ],
       },
     ],
-    /* A DAY WRITTEN `-3d` IS COUNTED FROM THE DAY THE RECORD IS MADE (`dates.ts`), so the month has spending in it on
-       any day but the first few, and the week has bills. Amounts are pence. */
-    seeds: [
-      { register: 'spending', fields: { what: 'Weekly shop', amount: { amount: 6_420, currency: 'GBP' }, category: 'groceries', on: '-2d' } },
-      { register: 'spending', fields: { what: 'Lunch with Priya', amount: { amount: 1_860, currency: 'GBP' }, category: 'eating_out', on: '-1d' } },
-      { register: 'spending', fields: { what: 'Bus pass top-up', amount: { amount: 2_500, currency: 'GBP' }, category: 'transport', on: '-6d' } },
-      { register: 'spending', fields: { what: 'Running shoes', amount: { amount: 8_999, currency: 'GBP' }, category: 'health', on: '-4d' } },
-      { register: 'spending', fields: { what: 'Cinema', amount: { amount: 1_250, currency: 'GBP' }, category: 'fun', on: '-3d' } },
-      { register: 'spending', fields: { what: 'Birthday present for Sam', amount: { amount: 3_000, currency: 'GBP' }, category: 'gifts', on: '-7d' } },
-      { register: 'spending', fields: { what: 'Takeaway', amount: { amount: 2_280, currency: 'GBP' }, category: 'eating_out', on: '-5d' } },
-      { register: 'spending', fields: { what: 'Top-up shop', amount: { amount: 2_135, currency: 'GBP' }, category: 'groceries', on: '0d' } },
-      { register: 'budgets', fields: { category: 'groceries', limit: { amount: 30_000, currency: 'GBP' } } },
-      { register: 'budgets', fields: { category: 'eating_out', limit: { amount: 8_000, currency: 'GBP' } } },
-      { register: 'budgets', fields: { category: 'transport', limit: { amount: 6_000, currency: 'GBP' } } },
-      { register: 'budgets', fields: { category: 'fun', limit: { amount: 5_000, currency: 'GBP' } } },
-      { register: 'budgets', fields: { category: 'health', limit: { amount: 4_000, currency: 'GBP' } } },
-      { register: 'budgets', fields: { category: 'gifts', limit: { amount: 5_000, currency: 'GBP' } } },
-      { register: 'savings_goals', fields: { name: RAINY_DAY, target: { amount: 300_000, currency: 'GBP' }, state: 'saving' } },
-      { register: 'savings_goals', fields: { name: LISBON, target: { amount: 90_000, currency: 'GBP' }, by: '+140d', state: 'saving' } },
-      { register: 'savings_goals', fields: { name: LAPTOP, target: { amount: 120_000, currency: 'GBP' }, by: '+300d', state: 'saving' } },
-      ...PUT_BY.map(([what, , pence, on]) => ({ register: 'put_by', fields: { what, amount: { amount: pence, currency: 'GBP' }, on } })),
-      { register: 'goals', fields: { what: RUN_WEEKLY, kind: 'habit', target: 3, unit: 'runs', state: 'active' } },
-      { register: 'goals', fields: { what: RUN_KM, kind: 'goal', target: 100, unit: 'km', by: '+60d', state: 'active' } },
-      { register: 'goals', fields: { what: COOK, kind: 'habit', target: 5, unit: 'nights', state: 'active' } },
-      { register: 'goals', fields: { what: BOOKS, kind: 'goal', target: 12, unit: 'books', state: 'active' } },
-      ...LOGGED.map(([what, , amount, on]) => ({ register: 'goal_log', fields: { what, amount, on } })),
-      { register: 'project_steps', fields: { what: 'Strip and clean the frame', done: true } },
-      { register: 'project_steps', fields: { what: 'Order new brake pads', done: true } },
-      { register: 'project_steps', fields: { what: 'Fit the new tyres', done: false, by: '+3d' } },
-      { register: 'project_steps', fields: { what: 'Adjust the gears', done: false, by: '+10d' } },
-      { register: 'project_steps', fields: { what: 'Draft the first story', done: true } },
-      { register: 'project_steps', fields: { what: 'Draft the second story', done: false, by: '+14d' } },
-      { register: 'project_steps', fields: { what: 'Ask Sam to read the first story', done: false, by: '+5d' } },
-    ],
+    /* NO `seeds` SINCE 2.0.0 (`loop/finish/modules.md` C11): every one was an example, in pounds, that a person then had
+       to find and clear. */
   },
 };
-
-const OLD_BIKE = 'Restore the old road bike';
-const STORIES = 'A collection of short stories';
 
 /**
  * WHAT A RECORD MADE BEFORE THE LOG HAD TYPED, CARRIED INTO IT. Personal 1.0.0 kept a goal's "so far" and a savings goal's
@@ -757,40 +577,13 @@ export const PERSONAL_CARRIED = {
   ],
 } as const;
 
-/** Which goal each example log row and each saving counts toward, for the linker (`links.ts`). */
-export const PERSONAL_LOG_LINKS: readonly { register: string; title: string; field: string; to: string; target: string }[] = [
-  ...LOGGED.map(([title, goal]) => ({ register: 'goal_log', title, field: 'goal', to: 'goals', target: goal })),
-  ...PUT_BY.map(([title, goal]) => ({ register: 'put_by', title, field: 'saving', to: 'savings_goals', target: goal })),
-];
-
-/** Which project each example step belongs to, for the linker (`links.ts`). */
-export const PERSONAL_STEP_PROJECTS: readonly (readonly [string, string])[] = [
-  ['Strip and clean the frame', OLD_BIKE],
-  ['Order new brake pads', OLD_BIKE],
-  ['Fit the new tyres', OLD_BIKE],
-  ['Adjust the gears', OLD_BIKE],
-  ['Draft the first story', STORIES],
-  ['Draft the second story', STORIES],
-  ['Ask Sam to read the first story', STORIES],
-];
-
-const gbp = (pence: number) => ({ amount: pence, currency: 'GBP' });
-
 /**
- * WHAT GOOD LOOKS LIKE ON MONEY'S FIGURES FOR ONE PERSON, in place of a studio's. Money's own targets are a business's
- * ("no more than £50,000.00" going out in 30 days), which on a person's Overview read as though the record were somebody
- * else's. The use case installs Money with these, by metric, in pence; a figure left out keeps Money's.
- *
- * SINCE money-core 3.0.0 ONLY `days-late-in` TAKES: a money setting holds `{ amount, currency }`, these sums are in no
- * currency, and so a sum of money starts empty (`moduleDocument` in `install.ts`). The sums stay here as the sizes a
- * person's record is drawn at, for whoever gives a use case a currency.
+ * WHAT GOOD LOOKS LIKE ON MONEY'S FIGURES FOR ONE PERSON, in place of a studio's, and only where the bound is in no
+ * currency: a number of days. The sums of money that were here (`out-30d` at 2,500.00 and the rest) were one person's
+ * sizes in pounds, and a use case knows neither the size nor the currency of the record it lands on, so Money's own
+ * ceilings start empty until the person types one (`MONEY_TARGET_SETTINGS` in `modules/money.ts`).
  */
 export const PERSONAL_TARGETS: Readonly<Record<string, { lte: number } | { gte: number }>> = {
-  'out-30d': { lte: 250_000 },
-  'every-month-out': { lte: 150_000 },
-  'every-month-by-category': { lte: 150_000 },
-  'due-30d': { lte: 250_000 },
-  'owed-to-you': { lte: 500_000 },
   'days-late-in': { lte: 3 },
 };
 
@@ -803,23 +596,112 @@ export const PERSONAL_NAMES: Readonly<Record<string, string>> = {
 };
 
 /**
- * THE EXAMPLE ROWS MONEY AND PROJECTS GET IN A PERSON'S RECORD, in place of the sample studio's: a current account, a
- * savings account and a card; rent, a phone, a streaming subscription and the rest of a month's bills, and a pay day;
- * two projects on the go and one on hold. People gets none: onboarding writes the person's own row there.
+ * A PAY DAY, FORMED FROM A SENTENCE THAT NAMES PAY, as a row of Money's `recurring` list: "I get paid 2,400.00 USD on
+ * the 25th" is money in every month, next due on the coming 25th. `missing` names each field the sentence did not
+ * give, and a row with anything missing is not written, so a sum is never guessed and never put in a currency the person
+ * did not name. `null` when the sentence says nothing of pay.
+ *
+ * NOT A SEED OF THIS PACK. A pack seeds only the lists it declares (`@braindog/declare`), and `recurring` is Money's, so
+ * the first run writes this row beside the others it proposes, once Money is in (`apps/web/src/lib/start/propose.ts`).
  */
-export const PERSONAL_EXAMPLES = [
-  { register: 'accounts', fields: { name: 'Current account', kind: 'bank', balance: gbp(124_056), as_of: '0d', liquid: true } },
-  { register: 'accounts', fields: { name: 'Savings account', kind: 'bank', balance: gbp(242_000), as_of: '-2d', liquid: true } },
-  { register: 'accounts', fields: { name: 'Credit card', kind: 'card', balance: gbp(-18_640), as_of: '-1d', liquid: false } },
-  { register: 'obligations', fields: { what: 'Rent', direction: 'owed_by_me', amount: gbp(85_000), due: '+6d', state: 'open', category: 'premises', repeats: 'monthly' } },
-  { register: 'obligations', fields: { what: 'Phone contract', direction: 'owed_by_me', amount: gbp(1_800), due: '+3d', state: 'open', category: 'software', repeats: 'monthly' } },
-  { register: 'obligations', fields: { what: 'Streaming subscription', direction: 'owed_by_me', amount: gbp(1_099), due: '+2d', state: 'open', category: 'software', repeats: 'monthly' } },
-  { register: 'obligations', fields: { what: 'Gym membership', direction: 'owed_by_me', amount: gbp(3_200), due: '+12d', state: 'open', category: 'professional', repeats: 'monthly' } },
-  { register: 'obligations', fields: { what: 'Energy bill', direction: 'owed_by_me', amount: gbp(9_600), due: '+18d', state: 'open', category: 'premises', repeats: 'monthly' } },
-  { register: 'obligations', fields: { what: 'Contents insurance', direction: 'owed_by_me', amount: gbp(850), due: '+21d', state: 'open', category: 'insurance', repeats: 'monthly' } },
-  { register: 'obligations', fields: { what: 'Council tax', direction: 'owed_by_me', amount: gbp(14_200), due: '+25d', state: 'open', category: 'premises', repeats: 'monthly' } },
-  { register: 'obligations', fields: { what: 'Pay day', direction: 'owed_to_me', amount: gbp(245_000), due: '+10d', state: 'open', category: 'client_work', repeats: 'monthly' } },
-  { register: 'things', fields: { name: OLD_BIKE, lane: 'building', since: '-40d' } },
-  { register: 'things', fields: { name: STORIES, lane: 'building', since: '-90d' } },
-  { register: 'things', fields: { name: 'Balcony vegetable garden', lane: 'parked', since: '-200d' } },
+export type PayDay = { register: 'recurring'; fields: Record<string, unknown>; missing: string[] };
+
+/* WHAT NAMES PAY, and not paying: "I pay rent" is a bill, "I get paid" and "my salary" are pay. */
+const PAY_WORDS = /(?<![\p{L}\p{N}])(?:pay ?days?|pay ?cheques?|paychecks?|pay packets?|salary|wages?|my pay|(?:get|gets|getting|am|i'm) paid)(?![\p{L}\p{N}])/iu;
+
+/* HOW OFTEN, most specific first, so "every two weeks" is not read as "every week". Monthly when the sentence says none.
+   NOT "a week" OR "a month": "forty hours a week, paid monthly" names the pay's cadence once and a working week once. */
+const CADENCES: readonly (readonly [string, RegExp])[] = [
+  ['fortnightly', /(?<![\p{L}])(?:fortnightly|bi-?weekly|every (?:two|2|other) weeks)(?![\p{L}])/iu],
+  ['twice_monthly', /(?<![\p{L}])(?:twice (?:a|per|each) month|twice monthly|semi-?monthly)(?![\p{L}])/iu],
+  ['weekly', /(?<![\p{L}])(?:weekly|every week|each week|every (?:mon|tues|wednes|thurs|fri|satur|sun)day)(?![\p{L}])/iu],
+  ['monthly', /(?<![\p{L}])(?:monthly|every month|each month)(?![\p{L}])/iu],
 ];
+
+const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
+
+const NUM = String.raw`(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{1,3}))?(k)?`;
+
+/**
+ * EVERY CURRENCY BY THE SYMBOL IT IS WRITTEN WITH, read from the runtime's own `Intl` and not from a table in source
+ * (`loop/finish/modules.md` C10): "€" is EUR, "$" is USD, "CA$" is CAD. The first currency to claim a symbol keeps it.
+ */
+let symbols: Map<string, string> | null = null;
+function symbolTable(): Map<string, string> {
+  if (symbols) return symbols;
+  symbols = new Map();
+  for (const code of Intl.supportedValuesOf('currency')) {
+    const sign = new Intl.NumberFormat('en', { style: 'currency', currency: code }).formatToParts(1).find((p) => p.type === 'currency')?.value;
+    if (sign && sign !== code && !symbols.has(sign)) symbols.set(sign, code);
+  }
+  return symbols;
+}
+
+const escapeText = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** A sum in minor units of `currency`, shifted by that currency's own decimals, or `null` for one it cannot hold. */
+function minorOf(whole: string, part: string | undefined, thousand: boolean, currency: string): number | null {
+  const places = new Intl.NumberFormat('en', { style: 'currency', currency }).resolvedOptions().maximumFractionDigits ?? 2;
+  if (!thousand && part !== undefined && part.length > places) return null;
+  const n = Number(`${whole.replace(/,/g, '')}${part === undefined ? '' : `.${part}`}`) * (thousand ? 1000 : 1);
+  const out = Math.round(n * 10 ** places);
+  return Number.isSafeInteger(out) && out > 0 ? out : null;
+}
+
+/** The first sum in the sentence written with its currency, a symbol before it or a code either side. */
+function sumOf(said: string): { amount: number; currency: string } | null {
+  const codes = new Set(Intl.supportedValuesOf('currency'));
+  const signs = [...symbolTable().keys()].sort((a, b) => b.length - a.length).map(escapeText).join('|');
+  const found: { at: number; amount: number | null; currency: string }[] = [];
+  for (const m of said.matchAll(new RegExp(`(${signs})\\s?${NUM}`, 'gu'))) {
+    const currency = symbolTable().get(m[1] ?? '');
+    if (currency) found.push({ at: m.index ?? 0, amount: minorOf(m[2] ?? '0', m[3], m[4] !== undefined, currency), currency });
+  }
+  /* UPPER CASE ONLY, as `apps/web/src/lib/shape.ts` reads a code: `ALL` and `TOP` are currencies and "all 20" is no sum. */
+  for (const m of said.matchAll(new RegExp(`\\b([A-Z]{3})\\s?${NUM}`, 'gu')))
+    if (codes.has(m[1] ?? '')) found.push({ at: m.index ?? 0, amount: minorOf(m[2] ?? '0', m[3], m[4] !== undefined, m[1]!), currency: m[1]! });
+  for (const m of said.matchAll(new RegExp(`${NUM}\\s?([A-Z]{3})\\b`, 'gu')))
+    if (codes.has(m[4] ?? '')) found.push({ at: m.index ?? 0, amount: minorOf(m[1] ?? '0', m[2], m[3] !== undefined, m[4]!), currency: m[4]! });
+  const first = found.sort((a, b) => a.at - b.at).find((f) => f.amount !== null);
+  return first && first.amount !== null ? { amount: first.amount, currency: first.currency } : null;
+}
+
+const DAY_MS = 86_400_000;
+const dayText = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
+
+/**
+ * THE NEXT DAY PAY LANDS, from `today`, or `null` when the sentence gives no day. A day of the month ("the 25th", "the
+ * last day of the month") for a monthly cadence, a weekday ("Fridays") for a weekly one. A 31st in a shorter month is
+ * that month's last day, as a bank pays it.
+ */
+function nextDue(said: string, every: string, today: string): string | null {
+  const now = Date.parse(`${today}T00:00:00Z`);
+  if (!Number.isFinite(now)) return null;
+  const lower = said.toLowerCase();
+  const weekday = WEEKDAYS.findIndex((d) => new RegExp(`(?<![\\p{L}])${d}s?(?![\\p{L}])`, 'u').test(lower));
+  if (weekday >= 0 && (every === 'weekly' || every === 'fortnightly')) return dayText(now + ((weekday - new Date(now).getUTCDay() + 7) % 7) * DAY_MS);
+  const date = new Date(now);
+  const lastOf = (y: number, m: number): number => new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+  const on = (n: number | 'last'): string => {
+    const y = date.getUTCFullYear();
+    const m = date.getUTCMonth();
+    const here = n === 'last' ? lastOf(y, m) : Math.min(n, lastOf(y, m));
+    if (here >= date.getUTCDate()) return dayText(Date.UTC(y, m, here));
+    const next = n === 'last' ? lastOf(y, m + 1) : Math.min(n, lastOf(y, m + 1));
+    return dayText(Date.UTC(y, m + 1, next));
+  };
+  if (/(?<![\p{L}])(?:last (?:working )?day of (?:the|each|every) month|end of (?:the|each|every) month|month end)(?![\p{L}])/iu.test(lower)) return on('last');
+  const m = /(?<![\p{L}\p{N}])(?:the )?([1-9]|[12]\d|3[01])(?:st|nd|rd|th)(?![\p{L}\p{N}])/iu.exec(lower);
+  return m ? on(Number(m[1])) : null;
+}
+
+export function payDayRow(said: string, today: string | null): PayDay | null {
+  if (!PAY_WORDS.test(said)) return null;
+  const every = CADENCES.find(([, at]) => at.test(said))?.[0] ?? 'monthly';
+  const sum = sumOf(said);
+  const due = today === null ? null : nextDue(said, every, today);
+  const fields: Record<string, unknown> = { what: 'Pay day', direction: 'in', every, state: 'live' };
+  if (sum) fields.amount = sum;
+  if (due) fields.next_due = due;
+  return { register: 'recurring', fields, missing: [...(sum ? [] : ['amount']), ...(due ? [] : ['next_due'])] };
+}

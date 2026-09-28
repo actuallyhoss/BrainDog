@@ -33,7 +33,7 @@
     type Said,
     type Who,
   } from '$lib/auth.ts';
-  import { BASE } from '$lib/at.ts';
+  import { at, BASE } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
   import { forget } from '$lib/record/boot-live.ts';
   import { onwardOf, stateOf, type How, type Shelf, type Step, type Ways } from '$lib/signin.ts';
@@ -482,6 +482,12 @@
         </div>
       {/if}
 
+      <!-- A STRANGER'S WAY TO A RECORD OF THEIR OWN (OPS-17). Not where the server key is offered: that is a self-host,
+           made by its operator, and it has no sign-up to send anybody to. -->
+      {#if doors && !doors.key}
+        <p class="new-here"><a class="new-link" href={at('/signup')}>{copy.signupNewHere}</a></p>
+      {/if}
+
       <!-- NO DEMO PILL. It opened the sample business at `/app/` for anybody not signed in, and there is no
            sample now (DIRECTION 26): `/app/` with no session is this screen, so the pill led back here. -->
     </div>
@@ -566,6 +572,20 @@
     min-block-size: var(--sp-7);
     white-space: normal;
     text-align: center;
+  }
+
+  .new-here {
+    text-align: center;
+    font-size: var(--t-sm);
+    line-height: var(--lh-body);
+  }
+
+  /* A 44PX TARGET ON A PHONE, as every way on from this screen is, without making a line of text look like a button. */
+  .new-link {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: var(--tap);
+    color: var(--link);
   }
 
   .status {

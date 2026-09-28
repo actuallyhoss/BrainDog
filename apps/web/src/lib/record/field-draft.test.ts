@@ -128,12 +128,26 @@ test('a yes or no is ticked, not typed', () => {
   assert.equal(draft.unchanged(AMOUNT, '12.51', { amount: 1250, currency: 'EGP' }, null), false);
 });
 
-test('every type the record has is editable but a secret and a file', () => {
+test('every type the record has is editable but a secret', () => {
   assert.equal(typeof draft.editable, 'function', 'field-draft.ts exports no editable');
   /* THE RECORD'S TYPES, NOT THE APP'S, because a declaration the record serves can carry any of them. A quantity and
-     structured data came back when a box could take each apart (MOD-22); a file waits for the file store. */
+     structured data came back when a box could take each apart (MOD-22); a file when the file store could hold it
+     (OPS-20). */
   const not = RECORD_TYPES.filter((type) => !draft.editable({ type: type as FieldDecl['type'] }));
-  assert.deepEqual(not, ['file', 'secret']);
+  assert.deepEqual(not, ['secret']);
+});
+
+test('a file opens as its value written out, and goes back as the object the record stores', () => {
+  const f = { id: 'receipt', type: 'file' } as unknown as FieldDecl;
+  const held = { sha256: 'a'.repeat(64), mime: 'image/png', bytes: 1200, name: 'receipt.png' };
+  const opened = draft.draftOf(f, held, null);
+  assert.deepEqual(draft.fileOf(opened), held);
+  assert.equal(draft.unchanged(f, opened, held, null), true);
+  assert.deepEqual(draft.patchOf(f, opened, held, null), { receipt: held });
+  assert.deepEqual(draft.patchOf(f, '', held, null), { receipt: null });
+  /* A DRAFT THAT NAMES NO FILE IS SAID UNDER THE FIELD, and the hash is held to the record's own test. */
+  assert.ok(draft.wrongValue(f, 'receipt.png', held, null) !== null);
+  assert.equal(draft.fileOf(JSON.stringify({ ...held, sha256: 'A'.repeat(64) })), null);
 });
 
 test('no editable type opens on the words [object Object]', () => {
@@ -145,7 +159,7 @@ test('no editable type opens on the words [object Object]', () => {
     money: { amount: 1250, currency: 'EGP' },
     quantity: { value: 2, unit: 'kg' },
     json: { a: 1 },
-    file: { id: 'f1', name: 'receipt.pdf' },
+    file: { sha256: 'b'.repeat(64), mime: 'application/pdf', bytes: 5120, name: 'receipt.pdf' },
     list: ['rent'],
   };
   for (const type of RECORD_TYPES) {
@@ -166,7 +180,7 @@ test('the grid says why a cell is not the editor only for the types it cannot ed
   const refused = RECORD_TYPES.filter((type) => !draft.editable({ type: type as FieldDecl['type'] }));
   const unexplained = refused.filter((type) => copy.cellWhy[type] === undefined);
   assert.deepEqual(unexplained, [], `a refused type falls back to a sentence about no type: ${unexplained.join(', ')}`);
-  const said = String((copy as Record<string, unknown>).cellNotEdited instanceof Function ? copy.cellNotEdited('Receipt', copy.cellWhy.file ?? '') : '');
+  const said = String((copy as Record<string, unknown>).cellNotEdited instanceof Function ? copy.cellNotEdited('Password', copy.cellWhy.secret ?? '') : '');
   assert.ok(said !== '', 'copy.ts has no cellNotEdited');
   assert.ok(!/open the row/iu.test(said), `the grid sends a reader to a row that cannot change it either: ${said}`);
   assert.ok(!('cellOpensRow' in copy), 'copy.ts still keeps the sentence that sends a reader to the row');

@@ -16,7 +16,6 @@
 import type { Refusal, Result } from '@braindog/ports';
 import { ok } from '@braindog/ports';
 import {
-  MODULES,
   SEEDS_PER_REGISTER,
   exampleFields,
   exportUseCase,
@@ -48,6 +47,7 @@ import { normaliseChecked, themeFault } from './theme-check.ts';
 type Body = Record<string, unknown>;
 
 const USE_CASE = packIdOf('');
+const AUDIENCE_BYTES = 40;
 const ID = /^[a-z][a-z0-9-]{1,40}$/u;
 const SEMVER = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/u;
 const isMap = (x: unknown): x is Body => x !== null && typeof x === 'object' && !Array.isArray(x);
@@ -145,8 +145,10 @@ export function useCases(d: UseCaseDeps) {
     const lastShared = typeof values[SHARED_VERSION] === 'string' ? (values[SHARED_VERSION] as string) : null;
     const version = args.version ?? nextVersion(laterVersion(speaking?.version, lastShared), args.step ?? 'patch');
     if (!SEMVER.test(version)) return refuse('VALUE_MALFORMED', `${version} is not a version. Write 1.0.1.`, 'version');
-    if (args.audience !== undefined && !(AUDIENCES as readonly string[]).includes(args.audience))
-      return refuse('ENUM_VALUE_UNKNOWN', `${args.audience} is not an audience. It is one of ${AUDIENCES.join(', ')}.`, 'audience');
+    /* FREE TEXT ON ONE LINE (shell.md USE-3): `declare`'s AUDIENCES are suggestions, never a closed list, so an
+       audience outside them is accepted here too, up to the same 40 bytes `declare` checks it against on the way in. */
+    if (args.audience !== undefined && (/[\r\n]/u.test(args.audience) || args.audience.trim() === '' || new TextEncoder().encode(args.audience).length > AUDIENCE_BYTES))
+      return refuse('VALUE_MALFORMED', `Say who this is for in a few words on one line, such as ${AUDIENCES.join(', ')}.`, 'audience');
 
     const config = settings?.ok ? (settings.value.config as Record<string, { default?: unknown; label?: unknown }>) : {};
     /* A HEADING THE VOICE FILLED goes out as its placeholder, from the value now or the default it was installed with. */
@@ -237,7 +239,9 @@ export function useCases(d: UseCaseDeps) {
       }
     }
 
-    const modules = (MODULES as readonly string[]).filter((m) => on.some((s) => s.id === m));
+    /* A SHARED USE CASE MAY STAND ON ANY INSTALLED PACK, not only the six first-party modules (shell.md USE-3):
+       every other enabled pack goes out by id, and a use case never names its own family. */
+    const modules = on.map((s) => s.id).filter((id) => !id.startsWith(USE_CASE));
     const title = args.title ?? id.charAt(0).toUpperCase() + id.slice(1).replaceAll('-', ' ');
     const built = exportUseCase({
       usecase: id,

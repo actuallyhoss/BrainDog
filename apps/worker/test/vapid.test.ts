@@ -109,7 +109,7 @@ test('THE k= KEY IS SENT AS BASE64URL WITHOUT PADDING, whatever padding the past
 /* ── which kinds are leased ──────────────────────────────────────────────── */
 
 test('WITHOUT BOTH KEYS THE LEASED LIST IS TODAY’S, and with both it adds notify.push', () => {
-  const today = ['notify.email', 'notify.webhook'];
+  const today = ['notify.email', 'notify.webhook', 'erase.r2'];
   assert.deepEqual(DELIVERS, today);
   assert.deepEqual(delivers({}), today);
   assert.deepEqual(delivers({ VAPID_PUBLIC: '', VAPID_PRIVATE: '' }), today, 'the var is declared empty in wrangler.jsonc');

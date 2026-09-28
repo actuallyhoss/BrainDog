@@ -350,7 +350,10 @@ ${sent.text}` : sent.text;
         went.pop();
         continue;
       }
-      deps.outbox('notify.email', { to, subject: sent.name, text });
+      /* `because: 'digest.<id>'` IS OPS-14'S OWN MARK (`apps/worker/src/lapse.ts` `lapseDrops`), which drops a
+         lapsed record's digests by it before anything ships. Without it a digest email read the same as an
+         urgent notice and still went out while the record was read-only. */
+      deps.outbox('notify.email', { to, subject: sent.name, text, because: `digest.${sent.digest}` });
       continue;
     }
     if (channel === 'push') {
@@ -362,8 +365,9 @@ ${sent.text}` : sent.text;
         continue;
       }
       /* NO CONTENT IN A PUSH. It says how many things and where, and the record is where they are:
-         a lock screen is not a place a person chose to read their business on. */
-      deps.outbox('notify.push', { title: `${sent.name}: ${sent.sections.length} items`, url: `/digest/${sent.digest}` });
+         a lock screen is not a place a person chose to read their business on. `because` is the same
+         `digest.<id>` mark the email arm carries; `lapseDrops` also reads this one by its `/digest/` url. */
+      deps.outbox('notify.push', { title: `${sent.name}: ${sent.sections.length} items`, url: `/digest/${sent.digest}`, because: `digest.${sent.digest}` });
       continue;
     }
     if (channel === 'webhook') {
@@ -383,6 +387,9 @@ ${sent.text}` : sent.text;
           url: sent.webhook,
           body: JSON.stringify({ digest: sent.digest, sections: sent.sections }),
           ...(sent.webhook_grant ? { grant: sent.webhook_grant } : {}),
+          /* `because` MATCHES THE OTHER TWO CHANNELS, so `lapseDrops` need not fall back to reading
+             `body.digest`: it already does, for an older row, but a fresh one carries this first. */
+          because: `digest.${sent.digest}`,
         });
       else went.pop();
       continue;
@@ -571,11 +578,73 @@ export function localParts(
   };
 }
 
-/** `22:00`–`08:00` in the record's timezone. A non-urgent notification inside them waits. */
-export const inQuietHours = (ms: number, tz: string): boolean => {
-  const h = localParts(ms, tz).hour;
-  return h >= 22 || h < 8;
+/**
+ * The record's quiet hours: a window in its own time zone, or `'off'` (`09 §5` rule 3, `loop/finish/contracts.md`
+ * §12.1). `from` and `to` are `HH:MM`, and a window whose `from` is later than its `to` runs across midnight.
+ */
+export type QuietWindow = { from: string; to: string } | 'off';
+
+/** The window a record holds until its owner says otherwise, which is the constant this file used to hard-code. */
+export const QUIET_DEFAULT: { from: string; to: string } = { from: '22:00', to: '08:00' };
+
+/**
+ * What `record.quiet` holds, read as a window (migration 0020).
+ *
+ * ANYTHING UNREADABLE READS AS THE DEFAULT, never as off. The column is written only by `setQuietHours`, so a value this
+ * cannot read is a value somebody wrote by hand, and holding a digest to the hours every record started with is the
+ * failure a person notices least; waking them at three in the morning is the one they notice most.
+ */
+export function quietOf(stored: string | null | undefined): QuietWindow {
+  if (stored === null || stored === undefined) return QUIET_DEFAULT;
+  if (stored === 'off') return 'off';
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(stored);
+  } catch {
+    return QUIET_DEFAULT;
+  }
+  const w = parsed as { from?: unknown; to?: unknown } | null;
+  const from = timeOf(w?.from);
+  const to = timeOf(w?.to);
+  if (from === null || to === null) return QUIET_DEFAULT;
+  return { from: hhmm(from), to: hhmm(to) };
+}
+
+/** A time as `HH:MM`, padded, so `8:00` typed and `08:00` stored are one window. */
+export const hhmm = (t: { hh: number; mm: number }): string => `${String(t.hh).padStart(2, '0')}:${String(t.mm).padStart(2, '0')}`;
+
+/**
+ * Whether an instant falls inside the record's quiet hours. A non-urgent notification inside them waits.
+ *
+ * THE WINDOW IS THE RECORD'S, AND ABSENT READS AS THE DEFAULT, so a caller that has not read `record.quiet` keeps the
+ * behaviour every record had while this was a constant. A window whose ends are equal holds nothing: `setQuietHours`
+ * refuses one, and reading it as "all day" would stop every digest for good.
+ */
+export const inQuietHours = (ms: number, tz: string, window: QuietWindow = QUIET_DEFAULT): boolean => {
+  if (window === 'off') return false;
+  const from = timeOf(window.from);
+  const to = timeOf(window.to);
+  if (from === null || to === null) return false;
+  const local = localParts(ms, tz);
+  const at = local.hour * 60 + local.minute;
+  const start = from.hh * 60 + from.mm;
+  const end = to.hh * 60 + to.mm;
+  if (start === end) return false;
+  return start < end ? at >= start && at < end : at >= start || at < end;
 };
+
+/**
+ * The instant the quiet hours around `ms` end, which is when a digest held by them goes (`09 §5` rule 3, "moves to the
+ * next opening").
+ *
+ * THE NEXT WALL-CLOCK `to` AFTER `ms`, through `nextOccurrence`, so the opening is found the way a digest's own `at:` is
+ * and a short day at a clock change cannot move it by an hour. A window that is off, or an opening that the zone skips
+ * entirely, answers an hour on, so the handler asks again rather than holding the digest for a day.
+ */
+export function quietEnds(ms: number, tz: string, window: QuietWindow): number {
+  if (window === 'off') return ms;
+  return nextOccurrence({ at: window.to }, ms, tz) ?? ms + 3_600_000;
+}
 
 /** An in-app note, as the event that IS the notification. */
 export function noteEvent(sql: Sql, mint: () => string, nowMs: number, actor: string, text: string): void {

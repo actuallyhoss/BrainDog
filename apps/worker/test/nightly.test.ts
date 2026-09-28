@@ -15,10 +15,17 @@ import { createDirectory } from '@braindog/record/directory';
 
 import { fixedClock, openSqlite } from '../../../packages/kernel/test/sqlite.ts';
 import { FINAL_KEPT_DAYS, FINAL_KEPT_MS, expireFinal } from '../src/destroy.ts';
-import { fleetFailure, nightlyWalk } from '../src/nightly.ts';
+import { ERASE_CHECK_MS, fleetFailure, nightlyWalk, reconcileErase, type EraseRow } from '../src/nightly.ts';
+import type { OpFields } from '../src/oplog.ts';
 import { prefixOf } from '../src/snapshots.ts';
 
 const ids = (n: number, from = 0): string[] => Array.from({ length: n }, (_, i) => `rec_${String(from + i).padStart(4, '0')}`);
+
+/** The walk's lines, collected in order with their level, as `op()` would write them. */
+function heard() {
+  const lines: { fields: OpFields; level: 'info' | 'error' }[] = [];
+  return { lines, speak: (fields: OpFields, level: 'info' | 'error') => void lines.push({ fields, level }) };
+}
 
 test('EVERY PAGE IS WALKED, AND THE TALLY IS WHAT THE DIRECTORY LISTED', async () => {
   // `53 §5.1` verify step: `walk.done.records` equals the count `listRecords` returned. A walk that
@@ -43,44 +50,46 @@ test('A RECORD WHOSE COPY FAILED IS LOUD, AND THE WALK CARRIES ON', async () => 
   // is counted, named in an error line with the reason, and repeated in the closing `walk.done`
   // line that `53 §2.3`'s alert query reads. And it is not fatal: stopping would mean one record
   // with a full bucket decides that nobody else gets a copy tonight either.
-  const moaned: string[] = [];
-  const said: string[] = [];
+  const { lines, speak } = heard();
   const out = await nightlyWalk({
     records: () => Promise.resolve({ ids: ids(3) }),
     snapshot: (record) =>
       record === 'rec_0001'
         ? Promise.reject(new Error('the bucket said no'))
         : Promise.resolve({ key: `${record}/snapshots/x`, bytes: 10, rows: 2 }),
-    say: (line) => said.push(line),
-    moan: (line) => moaned.push(line),
+    speak,
     now: () => 0,
   });
 
   assert.equal(out.records, 3);
   assert.equal(out.backups, 2, 'the two that worked were still taken');
   assert.equal(out.failed, 1);
-  assert.equal(moaned.length, 2, 'the record that failed, and the closing line repeated as a problem');
-  assert.match(moaned[0] ?? '', /rec_0001/u);
-  assert.match(moaned[0] ?? '', /the bucket said no/u);
-  assert.match(moaned.at(-1) ?? '', /backups_failed=1/u, 'a night with a failure is in the error stream, not only the log');
-  assert.match(said.at(-1) ?? '', /backups_failed=1/u, 'the closing line is where the alert query looks');
+  const errors = lines.filter((l) => l.level === 'error');
+  assert.equal(errors.length, 2, 'the record that failed, and the closing line as a problem');
+  assert.equal(errors[0]?.fields.rec, 'rec_0001');
+  assert.equal(errors[0]?.fields.backup, 'failed', 'the alert query `op=walk backup=failed` would not find it');
+  assert.match(String(errors[0]?.fields.why), /the bucket said no/u);
+  assert.equal(lines.at(-1)?.fields.op, 'walk.done');
+  assert.equal(lines.at(-1)?.fields.backups_failed, 1, 'the closing line is where the alert query looks');
+  assert.equal(lines.at(-1)?.level, 'error', 'a night with a failure is in the error stream, not only the log');
 });
 
 test('A WALK WITH NO RECORDS SAYS SO RATHER THAN SAYING NOTHING', async () => {
   // An empty Directory and a Directory that failed to answer look identical in a log that only
   // prints per-record lines. The closing line is written on every night, so a night with zero
   // records is a fact somebody can read the morning after.
-  const said: string[] = [];
+  const { lines, speak } = heard();
   const out = await nightlyWalk({
     records: () => Promise.resolve({ ids: [] }),
     snapshot: () => assert.fail('nothing to snapshot'),
-    say: (line) => said.push(line),
+    speak,
     now: () => 0,
   });
 
   assert.equal(out.records, 0);
-  assert.equal(said.length, 1);
-  assert.match(said[0] ?? '', /records=0/u);
+  assert.equal(lines.length, 1);
+  assert.equal(lines[0]?.fields.op, 'walk.done');
+  assert.equal(lines[0]?.fields.records, 0);
 });
 
 test('A NIGHT THAT COPIED NOTHING IS THE DEPLOYMENT, AND IT IS SAID DIFFERENTLY', async () => {
@@ -103,7 +112,7 @@ test('A NIGHT THAT COPIED NOTHING IS THE DEPLOYMENT, AND IT IS SAID DIFFERENTLY'
   });
   assert.equal(fleetFailure(one), null, 'one record over the ceiling made the whole night red');
 
-  assert.equal(fleetFailure({ records: 0, backups: 0, failed: 0, expired: 0, expiryFailed: 0, ms: 1 }), null, 'a deployment with no records is not a failure');
+  assert.equal(fleetFailure({ records: 0, backups: 0, failed: 0, stragglers: 0, eraseOpen: 0, expired: 0, expiryFailed: 0, ms: 1 }), null, 'a deployment with no records is not a failure');
 });
 
 test('A CURSOR THAT DOES NOT MOVE IS STOPPED, rather than paging for ever', async () => {
@@ -175,7 +184,7 @@ test('A RECORD CLOSED MORE THAN THIRTY DAYS AGO LOSES WHAT IS LEFT OF IT, AND ON
   // second keeps its copy for the nine days it is still owed, and the open record is never asked about.
   const { d, early, late, open, final, keys } = deleted();
   const blobs = bucket(keys);
-  const said: string[] = [];
+  const { lines, speak } = heard();
   const tonight = T0 + (FINAL_KEPT_DAYS + 1) * DAY;
   const asked: number[] = [];
 
@@ -184,7 +193,7 @@ test('A RECORD CLOSED MORE THAN THIRTY DAYS AGO LOSES WHAT IS LEFT OF IT, AND ON
     snapshot: () => assert.fail('no open record was listed'),
     closed: (cutoff, cursor) => (asked.push(cutoff), Promise.resolve(d.closedBefore(cutoff, cursor, 1))),
     expire: (record) => expireFinal(blobs, record),
-    say: (line) => said.push(line),
+    speak,
     now: () => tonight,
   });
 
@@ -194,7 +203,8 @@ test('A RECORD CLOSED MORE THAN THIRTY DAYS AGO LOSES WHAT IS LEFT OF IT, AND ON
   assert.ok(blobs.held.has(`${prefixOf(open)}latest.brainl.age`), 'an open record lost a copy');
   assert.equal(out.expired, 3);
   assert.equal(out.expiryFailed, 0);
-  assert.match(said.at(-1) ?? '', /expired_objects=3 expiry_failed=0/u);
+  assert.equal(lines.at(-1)?.fields.expired_objects, 3);
+  assert.equal(lines.at(-1)?.fields.expiry_failed, 0);
 });
 
 test('AN EXPIRY THAT FAILS IS LOUD, THE REST STILL EXPIRE, AND IT DOES NOT MAKE THE NIGHT RED', async () => {
@@ -203,29 +213,102 @@ test('AN EXPIRY THAT FAILS IS LOUD, THE REST STILL EXPIRE, AND IT DOES NOT MAKE 
   // deployment failing, and the records that did get their copy must not be reported as a night that copied nothing.
   const { d, early, late, keys } = deleted();
   const blobs = bucket(keys, early);
-  const moaned: string[] = [];
+  const { lines, speak } = heard();
   const out = await nightlyWalk({
     records: () => Promise.resolve({ ids: ids(1) }),
     snapshot: (record) => Promise.resolve({ key: record, bytes: 1, rows: 1 }),
     closed: (cutoff, cursor) => Promise.resolve(d.closedBefore(cutoff, cursor)),
     expire: (record) => expireFinal(blobs, record),
-    moan: (line) => moaned.push(line),
+    speak,
     now: () => T0 + 60 * DAY,
   });
 
   assert.equal(out.expiryFailed, 1);
   assert.equal(out.expired, 1, 'the late record was not expired because the early one failed');
   assert.ok(![...blobs.held].some((k) => k.startsWith(prefixOf(late))));
-  assert.match(moaned[0] ?? '', new RegExp(`${early}.*the bucket said no`, 'u'));
-  assert.match(moaned.at(-1) ?? '', /expiry_failed=1/u);
+  const errors = lines.filter((l) => l.level === 'error');
+  assert.equal(errors[0]?.fields.rec, early);
+  assert.match(String(errors[0]?.fields.why), /the bucket said no/u);
+  assert.equal(errors.at(-1)?.fields.expiry_failed, 1);
   assert.equal(fleetFailure(out), null);
 });
 
 test('A WALK WITH NO EXPIRY WIRED SAYS NOTHING ABOUT EXPIRY, rather than a zero that reads as one that ran', async () => {
-  // The Worker's cron does not pass `closed` until W55-7 wires it. `expired_objects=0` in that line would be read the
-  // morning after as "nothing was due", when the truth is that nothing was asked.
-  const said: string[] = [];
-  const out = await nightlyWalk({ records: () => Promise.resolve({ ids: [] }), snapshot: () => assert.fail('none'), say: (l) => said.push(l), now: () => 0 });
-  assert.doesNotMatch(said.at(-1) ?? '', /expir/u);
+  // `expired_objects: 0` in the closing line would be read the morning after as "nothing was due", when the truth is
+  // that nothing was asked. The same holds for stragglers, open erasures and the ladder.
+  const { lines, speak } = heard();
+  const out = await nightlyWalk({ records: () => Promise.resolve({ ids: [] }), snapshot: () => assert.fail('none'), speak, now: () => 0 });
+  const done = lines.at(-1)?.fields ?? {};
+  for (const field of ['expired_objects', 'stragglers', 'erase_open', 'lapsed']) assert.ok(!(field in done), `${field} was said by a walk that never ran it`);
   assert.equal(out.expired, 0);
+});
+
+/* ── the re-wrap, the erasures and the ops record's note ─────────────── */
+
+test('A STRAGGLER IS COUNTED, A RE-WRAP THAT THROWS IS ONE TOO, AND NEITHER COSTS THE RECORD ITS COPY', async () => {
+  // `53 §2.3`'s KEK alert reads `stragglers` from the closing line. A deployment whose root key is not keys throws for
+  // every record, and that must read as every record a straggler with a reason, not as a rotation that finished.
+  const { lines, speak } = heard();
+  const out = await nightlyWalk({
+    records: () => Promise.resolve({ ids: ids(3) }),
+    snapshot: (record) => Promise.resolve({ key: record, bytes: 1, rows: 1 }),
+    rewrap: (record) => (record === 'rec_0001' ? Promise.resolve('straggler') : record === 'rec_0002' ? Promise.reject(new Error('not keys')) : Promise.resolve('ok')),
+    speak,
+    now: () => 0,
+  });
+  assert.equal(out.stragglers, 2);
+  assert.equal(out.backups, 3, 'a straggler lost its copy');
+  const walk = lines.filter((l) => l.fields.op === 'walk');
+  assert.deepEqual(walk.map((l) => l.fields.kek), ['ok', 'straggler', 'failed']);
+  assert.equal(lines.at(-1)?.fields.stragglers, 2);
+});
+
+test('AN ERASED OBJECT STILL IN THE BUCKET IS PUT BACK ONCE AND COUNTED OPEN, AND ONE THAT IS GONE IS NOT', () => {
+  // `53 §5.1` step 3d. The done row stays inside the thirty days whatever happens next, so a key already waiting again
+  // must not be queued a second time, or each night adds a row until a delete finally takes.
+  const now = T0 + 2 * DAY;
+  const at = (ms: number) => new Date(ms).toISOString();
+  const rows: EraseRow[] = [
+    { id: 'o1', state: 'done', created: at(now - DAY), erase: 'e1', key: 'rec_x/still-there' },
+    { id: 'o2', state: 'done', created: at(now - DAY), erase: 'e1', key: 'rec_x/gone' },
+    { id: 'o3', state: 'done', created: at(now - DAY), erase: 'e1', key: 'rec_x/waiting' },
+    { id: 'o4', state: 'pending', created: at(now - 60_000), erase: 'e1', key: 'rec_x/waiting' },
+    { id: 'o5', state: 'dead', created: at(now - DAY), erase: 'e1', key: 'rec_x/dead' },
+    { id: 'o6', state: 'failed', created: at(now - 2 * DAY), erase: 'e1', key: 'rec_x/late' },
+    { id: 'o7', state: 'done', created: at(now - ERASE_CHECK_MS - DAY), erase: 'e0', key: 'rec_x/old' },
+  ];
+  const held = new Set(['rec_x/still-there', 'rec_x/waiting', 'rec_x/old']);
+  const queued: string[] = [];
+  return reconcileErase(
+    rows,
+    (key) => Promise.resolve(held.has(key)),
+    (again) => (queued.push(...again.map((r) => r.key)), Promise.resolve()),
+    now,
+  ).then((open) => {
+    assert.deepEqual(queued, ['rec_x/still-there'], 'only the done erasure whose object is still there goes back');
+    assert.equal(open, 3, 'the one put back, the dead one and the late one are open; the fresh pending one is not');
+  });
+});
+
+test('THE NIGHT IS ONE NOTE IN THE OPS RECORD, AND A NOTE THAT FAILS IS A LINE AND NOT THE END', async () => {
+  const notes: string[] = [];
+  await nightlyWalk({
+    records: () => Promise.resolve({ ids: ids(2) }),
+    snapshot: (record) => Promise.resolve({ key: record, bytes: 1, rows: 1 }),
+    note: (text) => (notes.push(text), Promise.resolve()),
+    now: () => T0,
+  });
+  assert.deepEqual(notes, ['walk 2026-09-01 · 2 records · 0 stragglers · 0 failed · 0 open']);
+
+  const { lines, speak } = heard();
+  const out = await nightlyWalk({
+    records: () => Promise.resolve({ ids: ids(1) }),
+    snapshot: (record) => Promise.resolve({ key: record, bytes: 1, rows: 1 }),
+    note: () => Promise.reject(new Error('no such record')),
+    speak,
+    now: () => T0,
+  });
+  assert.equal(out.backups, 1);
+  assert.equal(lines.at(-1)?.fields.note, 'failed');
+  assert.equal(lines.at(-1)?.level, 'error');
 });

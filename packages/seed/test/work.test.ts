@@ -91,7 +91,8 @@ test('WORK’S OVERVIEW LEADS WITH WHAT IS DUE, AS LISTS THAT TICK, and no task 
   const k = await seeded();
   const page = opened(k, 'work');
   const headings = page.blocks.map((b) => b.heading);
-  assert.deepEqual(headings.slice(0, 3), ['Right now', 'Today', 'This week'], headings.join(', '));
+  /* THE CAPTURE LINE COMES FIRST (MOD-12), so a task is written down before anything is read. */
+  assert.deepEqual(headings.slice(0, 4), ['What needs doing?', 'Right now', 'Today', 'This week'], headings.join(', '));
 
   /* PAST ITS DATE IS TODAY'S, because it is still the next thing to do. The sample's is four days late. */
   const today = block(page, 'Today');

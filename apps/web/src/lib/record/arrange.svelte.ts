@@ -31,7 +31,7 @@
  * asks for — a single-pointer alternative that is not a re-implementation.
  */
 
-import { differs, moveAt, removeAt, setSpanAt, type Slot } from './arrange.ts';
+import { differs, moveAt, removeAt, setAreaAt, setSpanAt, type Area, type Slot } from './arrange.ts';
 
 export { COLUMNS, STEPS, spanLabel, spanOf, stepsFor, type Slot } from './arrange.ts';
 
@@ -51,6 +51,14 @@ export class Arrangement {
       while nobody is arranging. */
   editing = $state(false);
 
+  /**
+   * The place (an index into `slots`) of the block whose editor is open, or `null` when none is.
+   *
+   * HELD HERE AND NOT IN THE BAR, because the bar is drawn once per block by the page's body while the editor is one
+   * sheet drawn by the arranging controls: this class is the one thing both are handed.
+   */
+  editAt = $state<number | null>(null);
+
   #declared: Slot[] = [];
   #before: Slot[] | null = null;
 
@@ -66,12 +74,14 @@ export class Arrangement {
   cancel() {
     this.slots = this.#before;
     this.editing = false;
+    this.editAt = null;
   }
 
   /** Leave keeping it. Returns the undo, so the caller can put it in the toast. */
   commit(): () => void {
     const before = this.#before;
     this.editing = false;
+    this.editAt = null;
     return () => {
       this.slots = before;
     };
@@ -92,6 +102,15 @@ export class Arrangement {
 
   setSpan(at: number, span: number) {
     if (this.slots) this.slots = setSpanAt(this.slots, at, span);
+  }
+
+  setArea(at: number, area: Area) {
+    if (this.slots) this.slots = setAreaAt(this.slots, at, area);
+  }
+
+  /** Open the block editor on the block at place `at`. Only while arranging: the editor is part of the mode. */
+  edit(at: number) {
+    if (this.editing && this.slots && at >= 0 && at < this.slots.length) this.editAt = at;
   }
 
   /**

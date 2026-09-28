@@ -208,6 +208,51 @@ export const markOf = (value: string): string | null => {
 };
 
 /**
+ * What a host says about the run a card is for, when the block's rows are runs (`sessions.live`): the run as it signs
+ * (`S42`), the kind of agent, and where it is. Handed beside the block, one a row, as `opts.runs`.
+ */
+export type RunCell = { run: string; agent: string | null; live: 'working' | 'quiet' | 'stopped' };
+
+/** A run's face as a card draws it: the run, its number, its hue, the glyph its kind wears, and where it is. */
+export type RunFace = RunCell & { seq: number; hue: number; glyph: string };
+
+/** A run as a `who` cell names one: `S` and its number. */
+const RUN_CELL = /^S([1-9][0-9]*)$/u;
+
+/**
+ * The glyph each kind of agent wears, by the names the host's `icon` draws. `apps/web`'s `face.ts` keeps the same
+ * table for `AgentFace`; it is written out here because this package imports nothing. `slash` is its own mark.
+ */
+const RUN_GLYPHS: Readonly<Record<string, string>> = { claude: 'bot', codex: 'code', cursor: 'keyboard', runner: 'play', slash: 'slash', other: 'session' };
+
+/** The glyph for a kind of agent, said as its id, its signature or its name; anything else is `other`'s. */
+export function runGlyphOf(agent: string | null): string {
+  const said = (agent ?? '').trim().toLowerCase().replace(/^agent:/u, '');
+  const kind = said.startsWith('runner:') ? 'runner' : said;
+  return Object.hasOwn(RUN_GLYPHS, kind) ? (RUN_GLYPHS[kind] ?? 'session') : 'session';
+}
+
+/**
+ * A run's face, or null where the card is not for a run (agents C11).
+ *
+ * A RUN IS NAMED TWO WAYS. The host hands one a row for a block of runs (`sessions.live`), whose `who` cell says the
+ * agent by name; and a `who` cell that is itself a run (`S42`) is one wherever it stands, though nothing then says
+ * what kind of agent or whether it is still working, so it wears the plain glyph and a dashed ring only when the card
+ * is dimmed as gone quiet.
+ *
+ * THE HUE IS THE RUN'S NUMBER in twelve steps of thirty degrees, not the agent's, so two Claude runs at once are two
+ * colours (`runHue` in `apps/web`'s `face.ts`, the same sum).
+ */
+export function runFaceOf(cell: string, host: RunCell | null | undefined, quiet: boolean): RunFace | null {
+  const said = cell.trim();
+  const given = host ?? (RUN_CELL.test(said) ? { run: said, agent: null, live: quiet ? ('quiet' as const) : ('stopped' as const) } : null);
+  const seq = given ? RUN_CELL.exec(given.run.trim())?.[1] : undefined;
+  if (!given || seq === undefined) return null;
+  const n = Number(seq);
+  return { ...given, seq: n, hue: (n % 12) * 30, glyph: runGlyphOf(given.agent) };
+}
+
+/**
  * The renderer's own words. It cannot import `apps/web`'s `copy.ts`, because it imports nothing
  * (the `graph` gate), so the few sentences it draws live here, as `Grid.svelte`'s `NOT_SAVED` does.
  */
@@ -217,6 +262,8 @@ export const FOLD_HIDE = 'Hide';
 export const TREND = 'Trend';
 /** The word before a card's next step. */
 export const CARDS_NEXT = 'Next';
+/** A run's face is a door to the run, named by what it does since its ring is not read out. */
+export const RUN_OPEN = 'Open this run';
 
 /** A section's count is shown only when it counts something: a zero says nothing a sentence below it does not. */
 export const counted = (value: string): boolean => {

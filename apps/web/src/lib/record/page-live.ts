@@ -20,7 +20,7 @@
 
 import { createClient, type ClientOptions } from '@braindog/client';
 import { COSTS, isBucket, isStale, type Bars, type FxRead, type MeasureSeries, type Part, type QueueQuestion, type TargetIn } from '@braindog/kernel';
-import { MISSING, integer, money, quantity } from 'braindog-render';
+import { MISSING, integer, money, quantity, day as fmtDay } from 'braindog-render';
 
 import { copy } from '../copy.ts';
 import type { ActionRow, Outcome } from './actions.ts';
@@ -825,6 +825,66 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
     return bars ? { ...shell, bars, shown: bars.keys.length, total: bars.keys.length } : cannot;
   }
   if (!b.source) return shell;
+  /* WHAT A PROJECT RUNS ON NAMES NO REGISTER (`packages/kernel/src/pages.ts` `runsOnBlock`), so `registerOf` cannot
+     resolve it and the common path below, which checks `REGISTERS[register]`, drew every such block as one this
+     build cannot draw. Its rows are the kernel's own fields (agents C6), scoped and ordered already: the project's
+     own first, then the ones that apply everywhere. */
+  if (b.source === 'runs_on') {
+    const register = 'runs_on';
+    const entries = got.map((r) => entryOf(register, r, refs));
+    const rows = toRows(register, entries, shell.columns, now, namesOf(refs));
+    /* EACH ROW'S PROJECT IS A CHIP (agents C8), as any block with a `scope` column draws one: the kernel's own
+       `scopes`, the project's name for its own rows and none, drawn as Everywhere, for the ones beside it. */
+    (b.columns ?? []).forEach((c, i) => {
+      if (c.as !== 'scope') return;
+      rows.forEach((row, n) => {
+        row.cells[i] = scopes?.[n] ?? EVERYWHERE;
+      });
+    });
+    const scopeCells = scopeCellsOf(b.columns ?? [], rows, scopeMarked);
+    return {
+      ...shell,
+      register,
+      entries,
+      matched: entries,
+      rows,
+      shown: entries.length,
+      total: matched,
+      names: namesOf(refs),
+      /* A ROW THAT APPLIES EVERYWHERE DRAWS FAINT, exactly as a run gone quiet does (`lib/record/blocks.ts`
+         `cardsRows` already reads this array for any cards block): the kernel's own `quiet` cell on each row
+         (agents C6), which a declaration cannot name (`braindog-render`'s `CARD_ROLES` admits it, `declare.ts`
+         does not), so it is filled here rather than through a column an author wrote. */
+      quiet: entries.map((e) => Boolean(e.fields.quiet)),
+      ...(scopeCells ? { scopeCells } : {}),
+    };
+  }
+  /* A `deadlines` BLOCK READS ACROSS EVERY LIST (`packages/kernel/src/pages.ts` `deadlinesBlock`), so its rows are
+     the kernel's own fields, `list`, `row`, `title`, `day`, `amount`, `direction`, and not a register's: `deadlines`
+     names no real list, so `registerOf` answers null for it and the common path below sent every such block back
+     as one this build cannot draw. Entries carry the raw fields (`homeBlocks` reads `entries[n].fields.day` to
+     split Overdue), and rows are said by hand: `toRows`'s `display()` only knows a field's type through a declared
+     register, which this one can never be. */
+  if (b.source === 'deadlines') {
+    const spoken = /^([a-z][a-z0-9_]*)#([1-9][0-9]*)$/u;
+    const entries = got.map((r) => entryOf('deadlines', r, refs));
+    const rows: LiveBlock['rows'] = got.map((r) => {
+      const at = typeof r.fields.row === 'string' ? spoken.exec(r.fields.row) : null;
+      const cells = (b.columns ?? []).map((c) => {
+        const v = r.fields[c.field];
+        if (c.field === 'day') return typeof v === 'string' ? fmtDay(v) : null;
+        if (c.field === 'amount') {
+          if (!isObject(v) || typeof v.amount !== 'number' || typeof v.currency !== 'string') return null;
+          const said = money(v.amount, v.currency);
+          const out = c.sign ? r.fields[c.sign.field] === c.sign.minus : false;
+          return `${out ? '−' : '+'}${said}`;
+        }
+        return typeof v === 'string' ? v : v === null || v === undefined ? null : String(v);
+      });
+      return { key: typeof r.fields.row === 'string' ? r.fields.row : String(r.id), cells, ...(at ? { href: `/r/${at[1]}/${at[2]}` } : {}) };
+    });
+    return { ...shell, register: 'deadlines', entries, matched: entries, rows, shown: entries.length, total: matched };
+  }
   if (b.source === 'actions') {
     const actions = got.map((r) => actionOf(r.fields));
     return { ...shell, actions, shown: actions.length, total: matched };
@@ -1005,6 +1065,62 @@ export function resolverOf(values: Record<string, unknown> | undefined): (path: 
       if (typeof amount === 'number' && typeof currency === 'string') return money(amount, currency);
     }
     return null;
+  };
+}
+
+/* A FILE'S NAME IS ITS HASH, and only a hash in the one shape the record writes is ever put in an address: a value an
+   agent wrote into a row is not a path segment until it is proven to be 64 hex digits (`kernel/src/coerce.ts` `file`). */
+const SHA256 = /^[0-9a-f]{64}$/u;
+
+/** The hash a stored file is kept under, or null for a value that is no file. */
+function sha256Of(v: unknown): string | null {
+  if (!isObject(v)) return null;
+  const { sha256 } = v;
+  return typeof sha256 === 'string' && SHA256.test(sha256) ? sha256 : null;
+}
+
+/**
+ * Where each file a block draws is served, by the row and the field that hold it: the page's `RenderOptions.file`.
+ *
+ * THE RENDERER NAMES A FILE BY WHERE THE RECORD KEEPS IT, `file:<list>#<seq>/<field>`, and never by its address, because
+ * only the host knows the address (`packages/render/src/gallery.ts`). The record's page answer already carries each
+ * file's stored value, `{ sha256, mime, bytes, name }`, so the address is made from what the block holds and nothing is
+ * fetched to find it (pages C10). Three places hold one:
+ * - the rows a block drew over a list, a card's `picture` among them (`entries`, beside `register`);
+ * - the rows the record answered a registered kind with (`answer.rows`, over `answer.source`), a `gallery` over a list;
+ * - a `gallery`'s written-out rows, whose files the record answers in `answer.files`, one a row in the rows' order, so
+ *   the reference its author typed finds the file the record looked up for it.
+ *
+ * The answer is RECORD-RELATIVE, `/api/files/<sha256>`: the page places it under the record it is on, as it places every
+ * other address the renderer draws (`RenderOptions.href`, `at`). A file the block does not hold, or one the record could
+ * not find, answers `null`, and the tile or card draws its caption and no picture, never a reference as words.
+ */
+export function fileAt(block: LiveBlock): (row: string, field: string) => string | null {
+  const held = new Map<string, string>();
+  const keep = (list: string, seq: unknown, fields: unknown): void => {
+    if (!isObject(fields) || typeof seq !== 'number' || !Number.isInteger(seq) || seq < 1) return;
+    for (const [field, v] of Object.entries(fields)) {
+      const sha256 = sha256Of(v);
+      if (sha256) held.set(`${list}#${seq}/${field}`, sha256);
+    }
+  };
+  if (block.register) for (const e of block.entries) keep(block.register, e.seq, e.fields);
+  const answer: unknown = block.answer;
+  if (isObject(answer)) {
+    const { source, rows, authored, files } = answer;
+    const list = typeof source === 'string' && source.startsWith('register.') ? source.slice('register.'.length) : '';
+    if (list && Array.isArray(rows)) for (const r of rows) if (isObject(r)) keep(list, r.seq, r.fields);
+    if (Array.isArray(authored) && Array.isArray(files) && files.length === authored.length)
+      authored.forEach((r, n) => {
+        const cells = isObject(r) && Array.isArray(r.cells) ? r.cells : [];
+        const said = cells.find((c): c is string => typeof c === 'string' && c.trim().startsWith('file:'));
+        const sha256 = sha256Of(files[n]);
+        if (said && sha256) held.set(said.trim().slice('file:'.length).trim(), sha256);
+      });
+  }
+  return (row, field) => {
+    const sha256 = held.get(`${row}/${field}`);
+    return sha256 ? `/api/files/${sha256}` : null;
   };
 }
 

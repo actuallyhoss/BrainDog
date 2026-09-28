@@ -13,16 +13,23 @@
  * file, the key and WebCrypto are the whole of the rest, so a copy can be checked on a machine that
  * has never signed in anywhere.
  *
- * TWO KINDS OF FILE ARE REFUSED BY WHAT THEY ARE, BEFORE ANY CHECK, because the check would answer
- * them with a sentence about damage that is not true. A sealed Cloud copy (`.brainl.age`) is text
- * nobody can read until `age -d` opens it, and `checkBrainl` would call it `FILE_MALFORMED`. A
- * self-host copy is a SQLite `.brain` whose `dog_sig` holds no row (§2.2 measured 0 rows), so there is
- * no signature to check and "the signature does not verify" would send somebody looking for a
- * tampering that never happened. Signing those copies is later work; this says so in plain words.
+ * A SEALED CLOUD COPY IS REFUSED BY WHAT IT IS, BEFORE ANY CHECK, because the check would answer it
+ * with a sentence about damage that is not true: a `.brainl.age` is text nobody can read until
+ * `age -d` opens it, and `checkBrainl` would call it `FILE_MALFORMED`.
+ *
+ * A SELF-HOST COPY IS CHECKED AGAINST THE SIGNATURE BESIDE IT. It is a SQLite `.brain`, the whole
+ * file, and its `dog_sig` holds no row (§2.2 measured 0 rows), so the host signs it from outside:
+ * `<copy>.brain.sig` holds the record's key and its signature over the file's SHA-256
+ * (`apps/selfhost/src/snapshots.ts`). A copy with no `.sig` beside it is said to be unsigned, never
+ * to be damaged, because "the signature does not verify" would send somebody looking for a
+ * tampering that never happened.
  */
 
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
+import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 
 import { checkBrainl, keyIdOf } from '@braindog/kernel';
@@ -106,12 +113,7 @@ export async function verify(args: string[], io: VerifyIo): Promise<number> {
     );
     return 1;
   }
-  if (kind === 'selfhost') {
-    io.say(
-      `${file} is a self-host copy, a SQLite .brain file, and self-host copies are not signed yet, so there is no signature in it to check. Export a .brainl from the record and verify that instead.`,
-    );
-    return 1;
-  }
+  if (kind === 'selfhost') return verifyCopy(file, resolve(io.cwd, file), bytes, key, io);
   if (kind === 'sqlite') {
     io.say(`${file} is not a .brain file: it is a SQLite database, and not one BrainDog wrote.`);
     return 1;
@@ -125,6 +127,111 @@ export async function verify(args: string[], io: VerifyIo): Promise<number> {
   for (const line of block(verified)) io.out(line);
   io.answer?.({ value: verified });
   return 0;
+}
+
+/**
+ * The format a self-host copy's `.sig` names. `apps/selfhost/src/snapshots.ts` writes it as `COPY_SIGNATURE`, and the
+ * CLI cannot import the self-host, so the name and the bytes it signs are written again here and nowhere else.
+ */
+const COPY_SIGNATURE = 'braindog-copy-signature/1';
+
+/** The bytes a copy's signature is over: the format, the record, and the copy's SHA-256, a line each. */
+const copySigned = (record: string, sha256: string) => new TextEncoder().encode(`${COPY_SIGNATURE}\n${record}\n${sha256}\n`);
+
+/**
+ * A self-host copy checked against the `.sig` beside it, and against `--key` when one was named.
+ *
+ * THE SAME FOUR CHECKS A `.brainl` GETS, IN THE SAME ORDER: the bytes against the hash the signature is over, the key id
+ * against the key, the signature under that key, and the key against the one named. Each refusal is
+ * `SIGNATURE_INVALID` with its own sentence, because each is a different repair.
+ */
+async function verifyCopy(file: string, path: string, bytes: Buffer, key: string | undefined, io: VerifyIo): Promise<number> {
+  let raw: string;
+  try {
+    raw = readFileSync(`${path}.sig`, 'utf8');
+  } catch {
+    io.say(
+      `${file} is a self-host copy with no signature beside it (${file}.sig), so there is nothing to check it against. Copies taken before signing began, or by a record with no signing key, are unsigned. Take a new copy, or export a .brainl from the record and verify that instead.`,
+    );
+    return 1;
+  }
+  const no = (fix: string, at = `${file}.sig`): number => refuse(io, { ok: false, refusal: { code: 'SIGNATURE_INVALID', at, fix } });
+
+  let s: Record<string, unknown>;
+  try {
+    s = JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    return no(`${file}.sig is not readable. Take a new copy to get a new signature.`);
+  }
+  const { format, record, sha256, key_id, public_key, sig, signed_at } = s;
+  if (
+    format !== COPY_SIGNATURE ||
+    typeof record !== 'string' ||
+    typeof sha256 !== 'string' ||
+    typeof key_id !== 'string' ||
+    typeof public_key !== 'string' ||
+    !RAW_KEY.test(public_key) ||
+    typeof sig !== 'string' ||
+    typeof signed_at !== 'string'
+  )
+    return no(`${file}.sig is not a copy signature this build reads. Take a new copy, or update braindog.`);
+
+  if (createHash('sha256').update(bytes).digest('hex') !== sha256)
+    return no(`${file} has changed since it was signed: its bytes are not the ones its signature is over.`, file);
+
+  const publicKey = new Uint8Array(Buffer.from(public_key, 'base64url'));
+  if ((await keyIdOf(publicKey)) !== key_id) return no(`The key id in ${file}.sig is not the id of the key beside it. The signature has been edited.`);
+
+  let valid = false;
+  try {
+    const verifier = await crypto.subtle.importKey('raw', publicKey, { name: 'Ed25519' }, false, ['verify']);
+    valid = await crypto.subtle.verify('Ed25519', verifier, new Uint8Array(Buffer.from(sig, 'base64url')), copySigned(record, sha256));
+  } catch {
+    valid = false;
+  }
+  if (!valid) return no(`The signature beside ${file} does not verify: the copy or its signature was changed after it was signed.`);
+
+  /* A PINNED KEY IS COMPARED WHOLE. A copy re-signed by a key made for the purpose passes every check above, and this is
+     the one that says it is not the record's. */
+  const pinned = key !== undefined;
+  if (pinned && key !== public_key)
+    return no(`${file} is signed by key ${key_id}, which is not the key you named, so it is not a copy of the record you meant.`);
+
+  const verified: Verified = {
+    container: 'dog',
+    /* `PRAGMA user_version`, the `.brain` format revision, is the big-endian integer at offset 60 of the header. */
+    format: bytes.length >= 64 ? bytes.readUInt32BE(60) : 0,
+    ...countsOf(path),
+    manifest: 'ok',
+    signature: { valid: true, key_id, pinned },
+    produced: { at: signed_at, by: record },
+  };
+  for (const line of block(verified)) io.out(line);
+  io.answer?.({ value: verified });
+  return 0;
+}
+
+/**
+ * How many tables and rows a copy holds, read with the file opened read-only and immutable so checking it writes
+ * nothing beside it. A copy SQLite will not open is counted as empty: its signature has already been checked.
+ */
+function countsOf(path: string): { tables: number; rows: number } {
+  let db: DatabaseSync | undefined;
+  try {
+    const at = pathToFileURL(path);
+    at.searchParams.set('immutable', '1');
+    db = new DatabaseSync(at, { readOnly: true });
+    const names = (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND sql NOT LIKE 'CREATE VIRTUAL%'").all() as { name: string }[]).map(
+      (t) => t.name,
+    );
+    let rows = 0;
+    for (const name of names) rows += Number((db.prepare(`SELECT count(*) AS n FROM "${name.replace(/"/g, '""')}"`).get() as { n: number }).n);
+    return { tables: names.length, rows };
+  } catch {
+    return { tables: 0, rows: 0 };
+  } finally {
+    db?.close();
+  }
 }
 
 /**

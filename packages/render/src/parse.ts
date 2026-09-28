@@ -16,7 +16,8 @@
  * escape (05 §7.4).
  */
 
-import { BAR_HOLE, KINDS, TONE_ALIAS, TONES, isKind, type DegradeCode, type Kind, type Tone } from './kinds.ts';
+import { BAR_HOLE, TONE_ALIAS, TONES, type DegradeCode, type KindSpec, type Tone } from './kinds.ts';
+import { isPackKind, kindSpec, type BlockKind } from './kind-spec.ts';
 import { cardFault } from './cards.ts';
 import { feedFault } from './feed.ts';
 import { queueFault } from './queue.ts';
@@ -31,8 +32,11 @@ import { embedFault } from './embed.ts';
  * `page` is set by a page's own evaluator and never by a write-up. It admits the page-only kinds
  * that have a row grammar (`cards`, `section`), because their rows come from a declaration rather
  * than from an author. `table` has none and still degrades: the host draws it from the register.
+ *
+ * `kinds` is the kinds the record's packs declare, keyed `block.<id>` (`kindSpec`). Without it a `block.<id>` fence
+ * degrades as an unknown kind, because there is no spec to read its rows against.
  */
-export type ParseOptions = { page?: boolean };
+export type ParseOptions = { page?: boolean; kinds?: Readonly<Record<string, KindSpec>> };
 
 /**
  * Which record row a drawn row is, when a host drew it from one: its register, its number and the version it was read at.
@@ -47,7 +51,8 @@ export type Row = { cells: string[]; tone?: Tone; hole?: boolean; done?: boolean
 
 export type Block = {
   type: 'block';
-  kind: Kind;
+  /** One of the thirty-eight, or `block.<id>` for a kind a pack declared; `kindSpec` reads either. */
+  kind: BlockKind;
   /** The word after the kind in the fence, one of `KINDS[kind].forms`: ` ```stat lead ` is `lead`. */
   form?: string;
   heading?: string;
@@ -86,7 +91,9 @@ const FENCE = /^(`{3,}|~{3,})(.*)$/;
  * looking for the thing they had already done. When the author is an agent the visible fence is
  * the only feedback channel there is, which makes the sentence the whole value of a degradation.
  */
-const INFO = /^(?<kind>[A-Za-z]+)(?:\s+(?<form>[A-Za-z]+))?(?:\s*\|\s*(?<heading>.*))?$/;
+/* A PACK'S KIND IS `block.` AND ITS ID, so the kind half takes a dot and the id's digits, hyphens and underscores after
+   one word. The pattern admits more than a pack may declare; `kindSpec` is what decides whether the name is a kind. */
+const INFO = /^(?<kind>[A-Za-z]+(?:\.[A-Za-z0-9_-]+)?)(?:\s+(?<form>[A-Za-z]+))?(?:\s*\|\s*(?<heading>.*))?$/;
 
 /** Split on `|` AFTER unescaping, so `\|` is a literal pipe and `\\` a literal backslash. */
 export function splitRow(line: string): string[] {
@@ -129,8 +136,7 @@ function takeTone(cells: string[], spec: { cells: number; tone: boolean; hole?: 
 
 const TODO = /^\[([ xX])\]\s*(.*)$/;
 
-function readRows(kind: Kind, body: string[]): { rows: Row[]; over?: string } {
-  const spec = KINDS[kind];
+function readRows(kind: string, spec: KindSpec, body: string[]): { rows: Row[]; over?: string } {
   // Prose keeps its blank lines, because a blank line is where one paragraph ends.
   if (spec.prose) return { rows: body.map((line) => ({ cells: [line] })) };
   if (spec.verbatim) {
@@ -277,11 +283,16 @@ export function parse(src: string, opts: ParseOptions = {}): Segment[] {
     const written = parsed?.groups?.kind ?? '';
     const kind = written.toLowerCase();
 
-    if (!isKind(kind)) {
+    const spec = kindSpec(kind, opts.kinds);
+    if (!spec) {
       out.push({
         type: 'degraded',
         code: 'DIALECT_KIND_UNKNOWN',
-        fix: written
+        /* A PACK'S KIND THAT IS NOT INSTALLED IS A DIFFERENT REPAIR from a misspelt one: the author wrote a kind that
+           exists somewhere, and the step is to install the pack, not to pick another word. */
+        fix: isPackKind(kind)
+          ? `"${written}" is a block kind no installed pack declares. Install the pack that declares it. The block is shown as you wrote it.`
+          : written
           ? `"${written}" is not one of the thirty-eight kinds. The block is shown as you wrote it.`
           : 'A fence with no kind is shown as you wrote it.',
         raw,
@@ -325,8 +336,8 @@ export function parse(src: string, opts: ParseOptions = {}): Segment[] {
      * is an agent the visible fence is the only feedback channel there is, so the sentence on it
      * has to name the real reason. `36 §13`'s codes are a closed pair and this is the unknown one.
      */
-    const drawable = opts.page === true && (KINDS[kind].cells > 0 || KINDS[kind].header === true);
-    if (KINDS[kind].pageOnly && !drawable) {
+    const drawable = opts.page === true && (spec.cells > 0 || spec.header === true);
+    if (spec.pageOnly && !drawable) {
       out.push({
         type: 'degraded',
         code: 'DIALECT_KIND_UNKNOWN',
@@ -359,7 +370,7 @@ export function parse(src: string, opts: ParseOptions = {}): Segment[] {
        forms existed a second word matched nothing and was told the fence had no kind; `code ts`
        still degrades, now saying where the heading goes. */
     const form = parsed?.groups?.form;
-    const forms = KINDS[kind].forms ?? [];
+    const forms = spec.forms ?? [];
     if (form !== undefined && !forms.includes(form)) {
       out.push({
         type: 'degraded',
@@ -381,7 +392,7 @@ export function parse(src: string, opts: ParseOptions = {}): Segment[] {
     const headTone = takeTone(headingCells, { cells: 1, tone: true });
     const heading = headTone.cells.filter((c) => c !== '').join(' | ') || undefined;
 
-    const { rows, over } = readRows(kind, body);
+    const { rows, over } = readRows(kind, spec, body);
     if (over) {
       out.push({
         type: 'degraded',
@@ -458,11 +469,12 @@ export function parse(src: string, opts: ParseOptions = {}): Segment[] {
 
     // A hole never participates in a scale and never sorts among the knowns: it sits last, and it
     // is the only row that is a button, because an unknown is a task somebody has to close (05 §7.5).
-    const ordered = KINDS[kind].hole ? [...rows.filter((r) => !r.hole), ...rows.filter((r) => r.hole)] : rows;
+    const ordered = spec.hole ? [...rows.filter((r) => !r.hole), ...rows.filter((r) => r.hole)] : rows;
 
     out.push({
       type: 'block',
-      kind,
+      /* `kindSpec` answered, so the name is one of the thirty-eight or an installed `block.<id>`. */
+      kind: kind as BlockKind,
       ...(form ? { form } : {}),
       ...(heading ? { heading } : {}),
       ...(headTone.tone ? { tone: headTone.tone } : {}),

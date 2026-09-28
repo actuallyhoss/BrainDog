@@ -111,6 +111,7 @@ key that is not here is refused by name.
 | `requires` | `{ format: <int>, primitives: <int>, packs: { <pack id>: <semver range> } }` — the `.brain` format revision and the `PRIMITIVES_VERSION` the declarations need, and the packs they depend on. **Never an app version: the app has no semver** ([31-STACK](31-STACK.md) §6) | optional |
 | `seeds` | `[{ register, fields, note? }]` — the example rows: at most eight per register, own registers only, no `ref`/`secret`/`file` values; marked by the value `example` in the register's declared `tags` field, applied through the write path with `cascade = false`, and counted on their own line in the diff (§3) — [42-SPEC-DECLARE](42-SPEC-DECLARE.md) §5.5 | optional |
 | `provides` | **derived** — the `kind.id` of every declaration. It may be written out for a reader, and if it is, it must equal the derived list — `PROVIDES_MISMATCH` otherwise | derived |
+| `adds` | `[{ page, block, after?, note? }]`, at most 16: blocks this pack adds to another pack's page. `page` is the page's id (`page.project`), `block` is one block as the page's own would say it, and `after` is the heading of the page's block it goes after, else it goes last. Kept in the manifest and never written into the page's declaration, so either pack updates without losing the other's addition, and uninstalling or turning off this pack takes it away ([06-PAGES](06-PAGES.md) §4). The plan says "adds a block to <page> from <pack>"; a page the record lacks plans as unresolved and is refused `PAGE_UNKNOWN` | optional |
 
 *(Amended September 15th 2026 for modularity: the manifest gains one more optional key, `config:`, a
 closed subset of field types (no `ref`, `secret` or `file`) that a pack declares and an owner fills
@@ -118,7 +119,7 @@ at `/packs/<id>`, read back through `{{config:<key>}}`. `loop/research-modular.m
 and why the subset stays narrow.)*
 
 *(Built September 15th 2026. A setting is `config: { <key>: { type, values?, default?, label?, note? } }`, at most 64
-of them, each key lower-case letters, digits and underscores. The type is text, enum, bool, money, day, duration or number,
+of them, each key lower-case letters, digits and underscores. The type is text, enum, bool, money, day, duration, number or list,
 and any other type is refused `CONFIG_TYPE_UNSUPPORTED`, with its own sentence for a ref, a secret and a file. A
 default is coerced as a field of that type would be, so a money default is minor units and a currency. A declaration
 reads a setting as `{{config:<key>}}`: a string that is only the placeholder becomes the typed value, and a
@@ -134,6 +135,17 @@ effect the next time the pack document is planned and installed, and that plan l
 `enablePack` brings back the bodies a pack went off with, so it does not read a setting either. `packConfig({ id })`
 reads a pack's settings and the value each holds now. A chosen value the next version no longer accepts falls back to
 that version's default, and the plan says which values were kept and which are defaults.)*
+
+*(Amended September 28th 2026: a list setting, and a script reads its pack's settings. The type list gains `list`,
+declared `{ type: 'list', max?, default?, label?, note? }`: lines of text, at most 20 of them whatever `max` says, each
+at most 200 bytes, trimmed, none blank, and each refused as a text setting would refuse it. `max` is a whole number from
+1 to 20 and no other type takes one. A string that is only `{{config:<key>}}` of a list becomes the array; inside longer
+text, and in an example row's note, it becomes the lines joined by a comma and a space. `/packs/<id>` draws a list as
+one text box per line, with a line added or removed beside them. A script is the one declaration that reads a setting
+at run time and not at install: `ctx.config` holds its pack's settings as they stand when the run starts, each the
+chosen value or else the default (`null` with neither), frozen, and `{}` for a script no pack owns. It is the same on
+the self-host, on the Cloud and in `script_try`, so a change on the settings screen holds from the next run with no
+reinstall.)*
 
 `requires` on the manifest is a map. `requires` on a `page` declaration is a list of `register.<id>`
 ([06-PAGES](06-PAGES.md) §1.1). The two never appear on the same object. *An earlier draft's manifest
@@ -337,6 +349,13 @@ leaves out. 30 §6 now counts a hundred and twenty-two.)* *An earlier draft of t
 row compared a `braindog` version the app does not have.* A dialect fault is never one of these — a
 document is not parsed at write; it degrades at render ([05-BLOCKS-AND-THEMES](05-BLOCKS-AND-THEMES.md) §3).
 
+*(Amended September 28th 2026: a register may say who holds its rows with `hand: { person?, agent?, taken? }`,
+[42-SPEC-DECLARE](42-SPEC-DECLARE.md) §4.4. It is checked at install with the code every other register key uses,
+`DECLARATION_INVALID`, so the count above does not move: `person` must be a link field of the register, `agent` a text
+field, and `taken` one of its states, and the refusal names the part that was wrong, as
+`register.tasks hands a row to a person by "who", and that is a link field of register.tasks to the person, such as owner.`
+Work declares it on `tasks`, and the app's "Hand to" and the start hook's briefing read it.)*
+
 ### Versioning
 
 Semver, with ranges resolved at install and **pinned in `pack`**. A range is the `Range` grammar of
@@ -356,9 +375,9 @@ ecosystem that can silently change what a page says about your money.
 | Change | What happens |
 |---|---|
 | Remove a field | `retired: true` on the field. It stops rendering and stops being writable; the data stays in `fields`. A retired field may not be `required`, `index`, `unique`, or named in `search:` or `mobile:` |
-| Change a field's type | **refused in v1** — `FIELD_TYPE_CHANGED`: retire the field and add a new one. The conversion preview in [21-AUTHORING](21-AUTHORING.md) §5 is authoring-tier scope, and it is what this refusal is waiting for |
+| Change a field's type | **refused as an ordinary pack update** — `FIELD_TYPE_CHANGED`: retire the field and add a new one. The governed conversion in [21-AUTHORING](21-AUTHORING.md) §5 (`previewRetype`, `retypeField`, GAP-8) is the only path that converts rows over an existing field, one owner's decision at a time; this refusal still stands for every other install |
 | Drop `index: true` | the index is dropped in the same transaction |
-| Add `required` to a populated register | refused — `REQUIRED_ON_POPULATED`, above |
+| Add `required` to a populated register | refused — `REQUIRED_ON_POPULATED`, above; the same governed conversion (a `narrow`) is the only path that fills every row first and lands the requirement with them |
 | Rename an id | refused — `ID_RENAMED`, above. Ids are stable forever, and there is no alias key |
 
 ---

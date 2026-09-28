@@ -1,0 +1,62 @@
+/*
+ * A `link` block (`kinds/link.ts`, drawn by `braindog-render`'s `Links.svelte` and its `toHTML` twin): a list of
+ * addresses, each its title, the host it goes to under the title, and a note.
+ *
+ * IT IS A LIST AND KEEPS THE LIST'S RULES (`.list > .item` in `blocks.css`): the title on the first line, the host in
+ * the detail line and the note under it. What this sheet adds is what a list of doors needs: the title looks like the
+ * link it is, and the whole row is the target, 44px tall under a coarse pointer (C4), since a thumb aims at a row and
+ * not at the words in it.
+ */
+
+@layer components {
+  .list[data-kind='link'] > .item {
+    position: relative;
+  }
+
+  .list[data-kind='link'] a.item-title {
+    color: var(--link);
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, var(--ink) 40%, transparent);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+    overflow-wrap: anywhere;
+  }
+
+  /* THE ROW IS THE LINK'S HIT BOX, with the link still the one element in the tab order and the focus ring on it. */
+  .list[data-kind='link'] a.item-title::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .list[data-kind='link'] > .item:has(> a.item-title):hover {
+      background: var(--hover-wash);
+    }
+  }
+
+  .link-host {
+    color: var(--dim);
+    font-size: var(--t-xs);
+    overflow-wrap: anywhere;
+  }
+
+  .link-note {
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    overflow-wrap: anywhere;
+  }
+
+  @media (pointer: coarse) {
+    .list[data-kind='link'] > .item {
+      min-block-size: var(--tap);
+      align-content: center;
+    }
+  }
+
+  .links-empty {
+    margin: 0;
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+}

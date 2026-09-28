@@ -4,7 +4,7 @@
  *
  * ONE INSTALL PATH FOR A BUILT-IN AND A SHARED FILE. The browse screen installs Student the way it installs a file from
  * somebody else: the file goes to the record's `planUseCase`, the owner reads the plan, and each pack goes in through
- * `installPack`. So a built-in is handed out as a file here, with its example days counted from today.
+ * `installPack`. So a built-in is handed out as a file here, with no example rows in it (`builtInFile`).
  *
  * A PREVIEW IS READ FROM THE DECLARATIONS, never drawn by hand: the rail is the pages' own `nav`, the lists are the
  * pack's registers under their labels, and Home is the headings of the use case's Home page, a heading that reads the
@@ -15,35 +15,42 @@ import type { UseCase, VoiceKey } from '@braindog/declare';
 
 import { dated, dayOf } from './dates.ts';
 import { listsOf, pagesOf, useCase } from './index.ts';
-import { homePageOf } from './install.ts';
-import { exampleLinks } from './links.ts';
+import { homePageOf, withoutRows } from './install.ts';
 
 type Body = Record<string, unknown>;
 
 /**
- * THE HOUSE SETUP'S MODULES, for a use case that carries no pack and names none (Small business): what onboarding installs
- * for a business when the sentence names nothing in particular, less the agents pack, which is added when agents are
- * mentioned. Browse installs these, so the house setup is installed like the others rather than only switched to.
+ * The modules browse installs for a use case: the ones it names, and nothing it does not.
+ *
+ * NO HOUSE SETUP FOR A USE CASE THAT NAMES NONE (`loop/finish/modules.md` MOD-17). Small business carries no pack and
+ * names no module, and this used to hand it five (Projects, People, Money, Services and Work), so a bakery picked from
+ * Browse arrived with a studio's rail. It is whichever modules the person's sentence names, as onboarding reads it
+ * (`claimedBy` in `install.ts`), and from Browse that is none until they add one.
  */
-export const HOUSE_MODULES: readonly string[] = ['portfolio', 'people', 'money-core', 'estate', 'work'];
+export const modulesToInstall = (u: UseCase): readonly string[] => u.modules;
 
-/** The modules browse installs for a use case: its own, or the house setup's for one that carries nothing. */
-export const modulesToInstall = (u: UseCase): readonly string[] => (u.pack === null && u.modules.length === 0 ? HOUSE_MODULES : u.modules);
-
-/** A built-in use case as a shared file's document, its examples dated from `today`. `null` for an id that is not one. */
+/**
+ * A built-in use case as a shared file's document, with no example rows. `null` for an id that is not one.
+ *
+ * NOTHING IN IT IS WRITTEN AS AN EXAMPLE (`loop/finish/modules.md` C11). Browse installs this file as it is, so the
+ * pack's own rows used to land in the record, a type foundry's projects in a student's among them. The file carries no
+ * `seeds` and so no `links` between them; the first run puts in only the rows formed from what the person said, and
+ * their links (`fileFor` in `apps/web/src/routes/start/accept.ts`). `today` still dates anything left relative.
+ */
 export function builtInFile(id: string, today: string = dayOf(Date.now())): Body | null {
   const u = useCase(id);
   if (!u) return null;
-  /* ITS LINKS GO IN THE FILE, so a built-in use case is linked by the same declared path as one somebody shared. */
-  const links = exampleLinks(id);
-  return { ...u, modules: [...modulesToInstall(u)], pack: u.pack === null ? null : dated(u.pack, today), ...(links.length > 0 ? { links: [...links] } : {}) } as unknown as Body;
+  const pack = u.pack === null ? null : withoutRows(dated(u.pack, today));
+  return { ...u, modules: [...modulesToInstall(u)], pack } as unknown as Body;
 }
 
 /** What a use case's detail page says it installs, read from the file: modules, lists, pages, example rows and skills. */
 export type Installs = { modules: string[]; lists: string[]; pages: { title: string; section: string | null }[]; examples: number; skills: { name: string; trigger: string }[] };
 
 export function installsOf(u: UseCase): Installs {
-  const seeds = Array.isArray(u.pack?.seeds) ? (u.pack.seeds as unknown[]).length : 0;
+  /* A BUILT-IN IS HANDED OUT WITH NO EXAMPLES (`builtInFile`), so it says none; a file somebody shared says what it
+     carries. */
+  const seeds = useCase(u.usecase) !== undefined ? 0 : Array.isArray(u.pack?.seeds) ? (u.pack.seeds as unknown[]).length : 0;
   return {
     modules: [...modulesToInstall(u)],
     lists: listsOf(u).map((l) => u.labels[l.id] ?? l.name),

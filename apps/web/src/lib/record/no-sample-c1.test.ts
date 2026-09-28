@@ -64,9 +64,10 @@ test('a seeded block is proposed from the rows it is handed, and a list with non
 });
 
 test('the modules a screen names are the six this build ships, and not the sample catalogue', async () => {
-  const { MODULES, moduleOf } = await import('./modules.ts');
+  const { firstPartyModules, firstPartyModule: moduleOf } = await import('@braindog/seed/packs/modules');
+  const MODULES = firstPartyModules();
   assert.deepEqual(MODULES.map((m) => m.id).sort(), ['agents', 'estate', 'money-core', 'people', 'portfolio', 'work']);
-  assert.ok(MODULES.every((m) => m.installed === undefined), 'a shipped module says whether a record holds it');
-  assert.deepEqual(moduleOf('agents')?.registers, ['learnings', 'skills', 'credentials', 'tools']);
+  assert.ok(MODULES.every((m) => !('installed' in m)), 'a shipped module says whether a record holds it');
+  assert.deepEqual([...(moduleOf('agents')?.registers ?? [])].sort(), ['credentials', 'learnings', 'skills', 'tools']);
   assert.equal(moduleOf('freelancer-uk'), undefined, "the sample's made-up add-on is named on a real record");
 });

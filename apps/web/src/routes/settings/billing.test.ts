@@ -107,5 +107,6 @@ test('and on the Cloud an hourly pull is counted against the allowance, not told
   const said = estimateOf(hourly, hostedHere({ live: true, host: 'cloud' }));
   assert.ok(said, 'an hourly call has an estimate');
   assert.doesNotMatch(said, /no monthly limit/u);
-  assert.match(said, /15,000/u);
+  /* THE FIGURE IS THE DIRECTORY'S NOW, read from its answer; with none read, the runs are said to be counted. */
+  assert.match(said, /monthly allowance/u);
 });

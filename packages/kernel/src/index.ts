@@ -70,6 +70,7 @@ import { ack, enqueue, lease, unlease, type Ack, type AckDeps, type OutboxKind }
 import { ERASED, eraseSubjects, subjectsOf, type EraseReport, type EraseRequest } from './erase.ts';
 import { leasedPushTarget, ownersPushSubs, pushSubOf, settlePush, type PushSettled, type PushTarget } from './push.ts';
 import { access, invite, members, remove, type Level as MemberLevel, type Member, type MemberDeps, suspend } from './members.ts';
+import { narrowed, ruleOf, type Wheres } from './members.ts';
 import { stopped as stoppedOf, type Suspended } from './members.ts';
 import {
   GONE as INVITE_GONE,
@@ -121,6 +122,7 @@ import { isMechanism, loadLeg, markPinned, neighboursOf, pairsReads, passOf, set
 import { costOf, costRank } from './weigh.ts';
 import { evaluateMetric, predicateOf, scorePrediction, snapshot, unaggregatableIn, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
 import { readBlock, readPage, registersOf, registersOfBlock, resolvePages, type ActivityEvent, type BlockResult, type ListsBeside, type PageBlock, type PageDecl, type PageDeps, type PageResult } from './pages.ts';
+import { additionsOf } from './page-adds.ts';
 import { SETUP_KIND, setupCollapser, type FeedLine } from './feed.ts';
 import {
   carryingOf,
@@ -137,6 +139,7 @@ import {
   type DigestDecl,
   type DigestDeps,
 } from './digest.ts';
+import { inQuietHours, quietEnds, quietOf } from './digest.ts';
 import { CREATE_CEILING, applyRule, dryRun, marker, runRules, type Applied as RuleApplied, type DryRun, type FlowDecl, type RuleDecl, type RulesDeps } from './rules.ts';
 import {
   advance as advanceRun,
@@ -337,6 +340,7 @@ export { cutOffReadable, endedByCutOff } from './token.ts';
 export { LEVELS as MEMBER_LEVELS, RECORD as WHOLE_RECORD } from './members.ts';
 export { STOPPED as MEMBER_STOPPED, type Suspended } from './members.ts';
 export type { Member } from './members.ts';
+export { whereFor, WHERE_MAX_CHARS, type Wheres } from './members.ts';
 export { GONE as INVITE_GONE, INVITE_HOURS, tokenParts as inviteTokenParts } from './invitations.ts';
 export type { InvitationRow, InviteArgs, Invited } from './invitations.ts';
 export type { CreateTokenArgs, Minted, Scope, TokenReach, TokenRow, Verified } from './token.ts';
@@ -583,6 +587,9 @@ export type RegisterDecl = {
   pairs?: PairsDecl;
   /** A list a record-wide "Adds only" does not reach, as Keys and People are by their roles (`20 §1`). */
   owner_only?: true;
+  /** Who holds a row: a link to the person it is handed to, a text field naming the agent, and a state it moves
+   * to when an agent takes it (GAP-11, checked at install by `declare.ts`'s `handFault`). */
+  hand?: { person?: string; agent?: string; taken?: string };
 };
 
 export type Entry = {
@@ -1386,10 +1393,14 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
   /** The oldest removal a reinstall still puts back (`REMOVED_WINDOW_DAYS`). */
   const removedSince = (): string => instant(clock.now() - REMOVED_WINDOW_DAYS * 86_400_000);
 
-  const count = (register: string): number =>
-    Number(
-      sql.one<{ n: number }>('SELECT count(*) AS n FROM entry WHERE register = ? AND deleted_at IS NULL', register)?.n ?? 0,
+  /* `grant` IS THE CALLER'S RULE ON THIS LIST (`whereFor(ctx.wheres, register)`), so a narrowed member counts only the
+     rows they reach; one that cannot be read counts none (`narrowed` in `members.ts`). Absent, every live row. */
+  const count = (register: string, grant?: Json): number => {
+    const c = narrowed({ sql: '(1)', params: [], bad: [] }, grant === undefined ? null : ruleOf(grant, schemaOf(register), evalContext()));
+    return Number(
+      sql.one<{ n: number }>(`SELECT count(*) AS n FROM entry WHERE register = ? AND deleted_at IS NULL AND (${c.sql})`, register, ...c.params)?.n ?? 0,
     );
+  };
 
   /**
    * A page of rows, newest first.
@@ -1556,6 +1567,15 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       if (decl.kind === 'script') {
         const every = (body.runs as { every?: unknown } | undefined)?.every;
         arm('script', bare, { script: bare }, firstDueMs(recordIdentity(sql)?.id ?? 'self', bare, typeof every === 'string' ? every : null, clock.now()));
+        /* SCR-2: A REINSTALL UNPAUSES A SCRIPT, and `arm` only moves a row that is `done` or `failed` (the comment
+           above), so a script paused for refusing too many times in a row stayed paused after the fix that was
+           supposed to end that streak was installed. `pauseAfterRefusals` counts only the installed version's
+           refusals, so a new version starts that streak again and the row is due at once. */
+        sql.exec(
+          "UPDATE schedule SET state = 'pending', due_at = ?, attempts = 0 WHERE kind = 'script' AND key = ? AND state = 'paused'",
+          instant(clock.now()),
+          bare,
+        );
       }
 
       /* AN AUTOMATION ON A CLOCK IS ARMED AS A CONNECTOR IS, and one interval out rather than now: a connector's first
@@ -2736,7 +2756,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
 
   /* THE QUESTION'S SHAPE IS `ListQuery` IN `parts.ts`, with the reasons for each of its keys, so an extension handed
      `list` and this function read one type. */
-  function list(q: ListQuery): Result<Listed> {
+  function list(q: ListQuery, grant?: Json): Result<Listed> {
     const barred = schemaRefusal(state);
     if (barred) return barred;
     if (!registers.has(q.register))
@@ -2749,7 +2769,10 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     /* A PREDICATE THAT COULD NOT BE READ RUNS NOTHING. Returning the register would be a list that
        looks filtered and is not, which is the one failure a declarative surface must not have —
        especially when the thing writing most predicates is an agent that cannot see the screen. */
-    const c = compile(said.predicate, schema);
+    /* AND THE CALLER'S GRANT, when theirs is narrowed to the rows matching one `where` (`CallContext.wheres`): the page,
+       its cursor and `matched` all come from the one clause, so a narrowed member is never told how many rows they
+       cannot see. */
+    const c = narrowed(compile(said.predicate, schema), grant === undefined ? null : ruleOf(grant, schema, evalContext()));
     if (c.bad.length) return { ok: false, refusal: c.bad[0]! };
 
     /* COERCED AT THE EDGE. These arrive from a query string a stranger wrote: `cursor=5` is a number
@@ -3785,7 +3808,51 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       const changed = touched.filter((key) => JSON.stringify(current.fields[key] ?? null) !== JSON.stringify(merged[key] ?? null));
       if (paired && decl.pairs && !changed.includes(decl.pairs.mark) && paired.fields[decl.pairs.mark] !== current.fields[decl.pairs.mark])
         changed.push(decl.pairs.mark);
+      if (!deleting) handedNotice(decl, paired ?? entry, changed, w.actor);
       return ok(rules(paired ?? entry, register, w, batch, { op: first === 'delete' ? 'delete' : 'update', changed }));
+    });
+  }
+
+  /**
+   * GAP-11: `hand.person` CHANGED TO A ROW THAT STANDS FOR A MEMBER TELLS THAT MEMBER, through the same path an
+   * automation's `ask_person to:` uses (`flow.ts`'s `ask`, `govern.ts`'s `propose`), as a notice rather than a
+   * question: no run is waiting on the answer, so nothing reads which option was pressed.
+   *
+   * MATCHED BY EMAIL, because `hand.person` points at a People row and a member is a `person` row, and the
+   * address is the one fact this record has that says they are the same person; a People row with no email, or
+   * one nobody signed in with, is handed the row and told nothing, which is no worse than today.
+   *
+   * `checkBody` REFUSES A CHOICE OF ONE ("A choice is between at least two options."), so a second option rides
+   * beside "Seen" rather than the done-means' single button: "Put back" is the done-means' own name for undoing a
+   * hand, so it is a real second option and not a formality invented to pass the gate.
+   */
+  function handedNotice(decl: RegisterDecl, entry: Entry, changed: readonly string[], actor: string): void {
+    const field = decl.hand?.person;
+    if (!field || !changed.includes(field)) return;
+    const to = entry.fields[field];
+    if (typeof to !== 'string' || to === '') return;
+    const row = byId(to, true);
+    if (!row) return;
+    const emailField = registers.get(row.register)?.fields.find((f) => f.type === 'email')?.id;
+    const email = emailField === undefined ? undefined : row.fields[emailField];
+    if (typeof email !== 'string' || email === '') return;
+    const member = sql.one<{ id: string }>(
+      "SELECT m.person_id AS id FROM member m JOIN person p ON p.id = m.person_id WHERE p.email = ? AND p.suspended_at IS NULL LIMIT 1",
+      email,
+    );
+    if (!member || member.id === actor) return;
+    const name = sql.one<{ name: string | null }>('SELECT name FROM person WHERE id = ?', actor)?.name?.trim();
+    const title = entry.fields[decl.title];
+    openSuggestion(governDeps(), actor, {
+      question: `${name && name !== '' ? name : 'Someone'} handed you ${typeof title === 'string' && title !== '' ? title : 'a row'}`,
+      body_kind: 'options',
+      body: {
+        options: [
+          { id: 'o1', label: 'Seen', because: 'handed to you' },
+          { id: 'o2', label: 'Put back', because: 'not for you' },
+        ],
+        to: member.id,
+      },
     });
   }
 
@@ -4398,6 +4465,10 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     },
     schemaOf: (register) => (registers.has(register) ? schemaOf(register) : null),
     titleOf: (register) => registers.get(register)?.title ?? null,
+    /* GAP-9: WITHOUT THIS LINE `readPage` NEVER LAYS ANOTHER PACK'S BLOCKS ON A PAGE, because `deps.adds` is
+       optional and this is the one host that hands it: `additionsOf` reads every installed pack's manifest for
+       what it adds to this page's declaration id. */
+    adds: (page) => additionsOf(sql.all<{ id: string; manifest: string }>('SELECT id, manifest FROM pack WHERE disabled_at IS NULL ORDER BY id'), page),
     runway: (opening, legs, horizon, only) => {
       const out = runway(
         { sql, schemaOf: (r) => (registers.has(r) ? schemaOf(r) : null), titleOf: (r) => registers.get(r)?.title ?? null, hydrate: (id) => byId(id), ctx: evalContext() },
@@ -5100,7 +5171,13 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       ),
   });
 
-  const memberDeps = (): MemberDeps => ({ sql, nowMs: clock.now(), mint, hasRegister: (r) => registers.has(r) });
+  const memberDeps = (): MemberDeps => ({
+    sql,
+    nowMs: clock.now(),
+    mint,
+    hasRegister: (r) => registers.has(r),
+    readsRule: (r, where) => ruleOf(where, schemaOf(r), evalContext()).bad[0] ?? null,
+  });
 
   /**
    * What a token needs beyond SQL.
@@ -5419,10 +5496,19 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       if (!found) return null;
 
       const decl = JSON.parse(found.body) as DigestDecl;
+      const tz = recordIdentity(sql)?.tz ?? 'UTC';
+      /* INSIDE THE RECORD'S QUIET HOURS THE DIGEST WAITS FOR THE OPENING (`09 §5` rule 3, "moves to the next
+         opening"), and is not run and dropped: the row comes due again at the window's end, runs then, and only then
+         arms its declared next occurrence. This is the one place the window applies, because a digest is the one
+         non-urgent thing that leaves the record; a reminder writes an in-app note, and an urgent notice never waits
+         (rule 2). The window is the record's own column, NULL reading as 22:00 to 08:00 (migration 0020). */
+      const quiet = quietOf(sql.one<{ quiet: string | null }>('SELECT quiet FROM record WHERE singleton = 1')?.quiet);
+      const now = clock.now();
+      if (inQuietHours(now, tz, quiet)) return quietEnds(now, tz, quiet);
       runDigest(digestDeps(), decl);
       /* A SCHEDULE THAT IS NOT A SCHEDULE ENDS THE ROW rather than arming it for an hour nobody
          asked for. `null` is one-shot here, and the declaration is what needs fixing. */
-      return nextOccurrence(decl.schedule, clock.now(), recordIdentity(sql)?.tz ?? 'UTC');
+      return nextOccurrence(decl.schedule, clock.now(), tz);
     },
 
     /**
@@ -6595,7 +6681,15 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
        entries are decisions about other people. */
     invite: (
       by: string,
-      args: { person: string; email?: string; name?: string; level?: MemberLevel; registers?: Record<string, MemberLevel>; why?: string },
+      args: {
+        person: string;
+        email?: string;
+        name?: string;
+        level?: MemberLevel;
+        registers?: Record<string, MemberLevel>;
+        wheres?: Wheres;
+        why?: string;
+      },
     ): Result<Member> => transaction(() => invite(memberDeps(), by, args)),
 
     /** Take somebody off. Never the last owner, and their person row stays. */

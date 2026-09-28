@@ -43,7 +43,7 @@ const refusal = (r: unknown) => {
 /* ── the declaration ────────────────────────────────────────────────────── */
 
 test('THE SIX TYPES ARE ACCEPTED, AND EACH DEFAULT IS COERCED AS A FIELD OF THAT TYPE WOULD BE', () => {
-  assert.deepEqual([...CONFIG_TYPES], ['text', 'enum', 'bool', 'money', 'day', 'duration', 'number']);
+  assert.deepEqual([...CONFIG_TYPES], ['text', 'enum', 'bool', 'money', 'day', 'duration', 'number', 'list']);
   const read = value<Record<string, { type: string; default?: unknown; values?: string[] }>>(
     readConfig({
       heading: { type: 'text', default: 'Sample invoices', label: 'Heading' },

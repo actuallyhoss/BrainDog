@@ -13,7 +13,7 @@
 
 import { FIRST_PARTY, firstPartyDocument } from '../packs/first-party.ts';
 import { useCase } from './index.ts';
-import { PERSONAL_CARRIED, PERSONAL_LOG_LINKS, PERSONAL_STEP_PROJECTS } from './personal.ts';
+import { PERSONAL_CARRIED } from './personal.ts';
 import { BACKLOG_KEPT_IN, TEAM_PLAN_LINKS, TICKETS_MOVED_IN, backlogAgain, moveTickets } from './team.ts';
 
 /**
@@ -39,20 +39,9 @@ export type LinkIo = {
   link: (register: string, seq: number, field: string, spoken: string | readonly string[]) => Promise<boolean>;
 };
 
-const COURSE = 'Introduction to statistics';
-
+/* NO PERSONAL OR STUDENT ENTRY SINCE PERSONAL 2.0.0 AND STUDENT 1.3.0: neither carries an example row any more
+   (`loop/finish/modules.md` C11), so there is nothing of theirs to link. */
 const LINKS: Readonly<Record<string, readonly ExampleLink[]>> = {
-  /* A PERSON'S STEPS POINT AT PROJECTS AND A GOAL AT AN ACCOUNT, lists Money and Projects hold, so their examples are the
-     ones `install.ts` gives those modules for this use case. */
-  personal: [
-    ...PERSONAL_STEP_PROJECTS.map(([title, project]) => ({ register: 'project_steps', title, field: 'thing', to: 'things', target: project })),
-    { register: 'savings_goals', title: 'Rainy day fund', field: 'account', to: 'accounts', target: 'Savings account' },
-    ...PERSONAL_LOG_LINKS,
-  ],
-  student: [
-    { register: 'assignments', title: 'Problem set 1: probability', field: 'course', to: 'courses', target: COURSE },
-    { register: 'study_sessions', title: 'Go over the lecture on conditional probability', field: 'course', to: 'courses', target: COURSE },
-  ],
   guide: [
     { register: 'steps', title: 'Write one sentence about what this is and who it is for', field: 'milestone', to: 'milestones', target: 'Say what it is and who it is for' },
     { register: 'steps', title: 'Name three people who would use it', field: 'milestone', to: 'milestones', target: 'Find the people who want it' },
@@ -72,7 +61,7 @@ const LINKS: Readonly<Record<string, readonly ExampleLink[]>> = {
   ],
 };
 
-/** The links a use case makes between its examples, by its id (`student`, or `usecase-student`). None for most. */
+/** The links a use case makes between its examples, by its id (`guide`, or `usecase-guide`). None for most. */
 export const exampleLinks = (usecase: string): readonly ExampleLink[] => LINKS[usecase.replace(/^usecase-/u, '')] ?? [];
 
 /** The field a list's rows are titled by, read off the pack the use case carries or a first-party module it builds on. */

@@ -36,6 +36,8 @@ import {
   type AccountDoor,
   type AuthDoor,
   type CookieMode,
+  type EmailDoor,
+  type MailNotice,
 } from '@braindog/host/auth';
 import { gate, serveMcp, unauthorized } from '@braindog/mcp/http';
 import { OPERATION_METHOD, type Execute, type OutboxKind, type OutboxRow, type PagedRun, type ScriptRunner, type Signer } from '@braindog/kernel';
@@ -46,7 +48,8 @@ import { basename as baseOf, dirname as dirOf, join as joinPath } from 'node:pat
 import { catalogueAnswer, catalogueFolder, catalogueOffersFrom } from './catalogue.ts';
 import { serveKennelTo, servesKennel } from './kennel.ts';
 import { certificateNames, originFor } from './reach.ts';
-import { fileSnapshots, type FileSnapshots } from './snapshots.ts';
+import { fileSnapshots, signCopies, type FileSnapshots } from './snapshots.ts';
+import { blobsFolder, eraseFile, serveFiles, servesFiles } from './files.ts';
 import { seedCatalogue } from '@braindog/seed/usecases/catalogue';
 import { badSlug, createDirectory, switcherAsk, type Directory } from '@braindog/record/directory';
 import { fixOf, type Auth, type Param, type Refusal, type Row, type Scheduler, type Sql } from '@braindog/ports';
@@ -73,12 +76,13 @@ import {
 import { pagedRunner } from '@braindog/host/connector';
 import { replayUsage } from '@braindog/host/actions';
 import { serveAsks } from '@braindog/host/slash-answers';
+import { backgroundMeter, serveModelJobs } from '@braindog/host/model-jobs';
 import { grantNamed, holdingScript } from '@braindog/host/script';
 import { askerOf, scriptTrial, trialSandbox } from '@braindog/host/script-try';
 import { runInQuickJs } from '@braindog/script/quickjs';
 import { scriptSandbox } from './script.ts';
 import { httpFor } from './http.ts';
-import { slashAnswersFor, slashDoor, slashEngineFor, slashFromEnv, slashModelFor, type SlashConfig } from './slash.ts';
+import { slashAnswersFor, slashDoor, slashEngineFor, slashFromEnv, slashModelFor, slashModelJobs, type SlashConfig } from './slash.ts';
 import { unwrap, type KeyStore } from './keys.ts';
 import { shellOf } from './shell.ts';
 import { signerFor } from './sign.ts';
@@ -301,6 +305,10 @@ type Site = {
   /** `/account/*`: the Directory's usage ledger, and the switcher's rows, for a signed-in person. */
   /** The copies kept beside the record file, `<slug>/snapshots/` (`53 §5.4`); absent for a database in memory. */
   snapshots: FileSnapshots | undefined;
+  /** A record's files, `<slug>/blobs/` beside the record file (`./files.ts`); `null` for a database in memory. */
+  blobs: string | null;
+  /** `/account/email` and `/account/email/confirm` (GAP-7), where this host can mail the notices; absent where it cannot. */
+  email: EmailDoor | undefined;
   /** Whether the Directory gives this record `slug` as a name it holds now, beside the one the record carries. */
   names: (slug: string) => boolean;
   /**
@@ -455,6 +463,9 @@ async function bearerFor(sent: string, site: Site, surface: 'api' | 'mcp', door?
       },
       ...(held.registers === null ? {} : { registers: held.registers }),
       ...(Object.keys(held.levels).length === 0 ? {} : { levels: held.levels }),
+      /* `wheres` GOES WHEREVER `levels` GOES (COL-9, contracts §12), the rows of each list a narrowed grant reaches, as
+         `sessionContext` copies it for the session path. */
+      ...(held.wheres === undefined || Object.keys(held.wheres).length === 0 ? {} : { wheres: held.wheres }),
     },
   };
 }
@@ -528,6 +539,8 @@ async function operationFor(sent: string, api: Api): Promise<Known> {
       credentialed: true,
       ...(held.registers === null ? {} : { registers: held.registers }),
       ...(Object.keys(held.levels).length === 0 ? {} : { levels: held.levels }),
+      /* `wheres` GOES WHEREVER `levels` GOES (COL-9, contracts §12), as the bearer path above copies it too. */
+      ...(held.wheres === undefined || Object.keys(held.wheres).length === 0 ? {} : { wheres: held.wheres }),
     },
   };
 }
@@ -1123,6 +1136,18 @@ export async function start(options: {
    * fifteen seconds. `main.ts` says it on stderr.
    */
   unsentMail?: ((waiting: number) => void) | undefined;
+  /**
+   * How this host mails a person a sign-in link, an invitation's proof or a passkey notice: called and not awaited, and
+   * it never throws (`AuthDoor['mail']`). `main.ts` builds it from `BRAINDOG_SMTP_URL` (`./smtp.ts`).
+   *
+   * GIVEN, SIGN-IN LINKS TURN ON AND AN INVITATION TO A NEW ADDRESS CAN BE PROVED; absent, the Directory offers no link
+   * and an invitation says this host sends no mail, as it always has.
+   *
+   * WIDENED PAST `AuthDoor['mail']` FOR THE TWO EMAIL-CHANGE LETTERS (GAP-7): `email.change` and `email.changed` are not
+   * `MailNotice`, because `packages/ports` is not this lane's to widen, so this field takes the two kinds beside it and
+   * hands them to `serveAccount`'s `email.mail`; a narrower caller (`door.mail`, `AuthDoor['mail']`) still fits it.
+   */
+  mail?: ((to: string, link: string, kind?: MailNotice | 'email.change' | 'email.changed') => void) | undefined;
 } & (
     | {
         /**
@@ -1219,7 +1244,7 @@ export async function start(options: {
       !present(joinPath(at, 'kek'));
     if (own) removeTree(at, { recursive: true, force: true });
     else
-      for (const p of [options.file, `${options.file}-wal`, `${options.file}-shm`, joinPath(at, 'snapshots'), ...(slashFile ? [slashFile, joinPath(at, LEDGER_BEFORE)].flatMap((f) => [f, `${f}-wal`, `${f}-shm`]) : [])])
+      for (const p of [options.file, `${options.file}-wal`, `${options.file}-shm`, joinPath(at, 'snapshots'), joinPath(at, 'blobs'), ...(slashFile ? [slashFile, joinPath(at, LEDGER_BEFORE)].flatMap((f) => [f, `${f}-wal`, `${f}-shm`]) : [])])
         removeTree(p, { recursive: true, force: true });
   };
 
@@ -1252,6 +1277,11 @@ export async function start(options: {
      record's `answersSlash` below and `/api/version`'s `slash` are one fact. Before this, a self-host with a model
      refused `ask_slash` at install as if it had none (`test/slash-answers.test.ts`). */
   const answers = slashAnswersFor(slashConfig, () => api, options.keys, { sql: slashSql, clock });
+  /* AND WHAT ANSWERS THE RECORD'S MODEL JOBS, a pattern's draft and a digest's prose, from the same config and the same
+     Slash SQLite, whose `slash_call` table the background allowance is counted out of (`@braindog/host/model-jobs`).
+     `undefined` with no model, and then the jobs wait `pending`, as they always have here. */
+  const modelJobs = slashModelJobs(slashConfig, () => api, options.keys, { sql: slashSql, clock });
+  const jobsMeter = backgroundMeter(slashSql);
   /* AND THE LEDGER THE RECORD'S OWN TWO ASKS ARE SPENT FROM, the press and the first plan, in the same Slash SQLite and
      under the same `ask_cap` a read and an automation's question are (`@braindog/host` `slashRecordMeter`). Without it
      the record asks `slashModel` unmetered, which it did on both hosts until `loop/research-batch-sixty-audit.md` finding 2
@@ -1294,7 +1324,11 @@ export async function start(options: {
      job `done` with no `result`, and the run it answers ends on "Slash answered job ... with no text": measured in
      `test/slash-answers.test.ts`, a deliverer handed every kind was handed the question. Only `serveAsks` in `poll` leases
      it, and only where there is a model to ask. */
-  const delivers: readonly OutboxKind[] = (options.delivers ?? []).filter((k) => k !== 'infer.ask' && (!options.actions || k !== 'pull.fetch'));
+  /* AND A MODEL JOB IS NOT A DELIVERER'S WHERE `serveModelJobs` SERVES IT, for the same reason: acked `done` with no
+     result, a draft files nothing and a digest goes without its prose. With no model the list is left as it was given. */
+  const delivers: readonly OutboxKind[] = (options.delivers ?? []).filter(
+    (k) => k !== 'infer.ask' && (!options.actions || k !== 'pull.fetch') && (!modelJobs || (k !== 'infer.draft' && k !== 'infer.prose')),
+  );
 
   /**
    * One pass of the scheduled actions, never two at once.
@@ -1429,6 +1463,22 @@ export async function start(options: {
         console.error('slash answers:', e instanceof Error ? e.message : String(e));
       }
     }
+    /* AND THE RECORD'S MODEL JOBS AFTER THE QUESTIONS, the Worker's alarm order (`contracts.md` X8), through the one pass
+       both hosts share, spent from the background allowance. A pass that leased its full five leaves the rest to the
+       next poll, which the fifteen-second belt runs whether or not a bell rang. */
+    if (modelJobs && !gone) {
+      try {
+        await serveModelJobs(api, {
+          inference: modelJobs,
+          meter: jobsMeter,
+          now: () => clock.now(),
+          scheduler,
+          log: (line) => console.error('slash jobs:', line),
+        });
+      } catch (e) {
+        console.error('slash jobs:', e instanceof Error ? e.message : String(e));
+      }
+    }
     tellUnsentMail();
     if (!options.deliver) return;
     let jobs: OutboxRow[];
@@ -1444,7 +1494,13 @@ export async function start(options: {
       let sent = false;
       let why = '';
       try {
-        await options.deliver(job, postKeys(api, options.keys, job));
+        /* AN ERASURE'S FILE, DELETED BY ITS HASH, ON THIS HOST'S OWN DISK (OPS-20), never handed to `options.deliver`:
+           the file is this process's own, not a transport's, so the self-host deletes it itself, as the Worker's
+           `deliver.ts` does for its bucket. */
+        if (job.kind === 'erase.r2') {
+          const payload = JSON.parse(job.payload) as { key?: unknown };
+          eraseFile(blobsFolder(options.file), typeof payload.key === 'string' ? payload.key : '');
+        } else await options.deliver(job, postKeys(api, options.keys, job));
         sent = true;
       } catch (e) {
         why = e instanceof Error ? e.message : String(e);
@@ -1494,6 +1550,9 @@ export async function start(options: {
     }
     return resolved ? resolved(bytes) : null;
   };
+  /* EVERY COPY TAKEN THROUGH THIS CONNECTION IS SIGNED BY THE SAME KEY, the app's "Snapshot now" and the nightly copy
+     `backup.ts` takes through `running.sql` alike, so `braindog verify` can check either against the record's key. */
+  signCopies(sql, sign);
 
   /* WHETHER AN INVITATION CAN BE SPENT HERE, known once sign-in is decided below. Until then, and wherever sign-in
      is off, it cannot. */
@@ -1507,8 +1566,14 @@ export async function start(options: {
     scheduler,
     /* `infer.ask` RINGS THE DOORBELL WHERE A MODEL ANSWERS IT, because the doorbell is `poll` and `poll` is where the
        pass runs; without it a queued question waited for the fifteen-second belt, which a test passing `pollMs: 0` has not
-       got. The pump's own list leaves it out, above. */
-    delivers: [...delivers, ...(options.actions ? (['pull.fetch'] as const) : []), ...(answers ? (['infer.ask'] as const) : [])],
+       got. The pump's own list leaves it out, above. `infer.prose` for the same reason where the model pass answers it,
+       and so that a digest declaring `prose: slash` queues its two sentences here rather than going as figures. */
+    delivers: [
+      ...delivers,
+      ...(options.actions ? (['pull.fetch'] as const) : []),
+      ...(answers ? (['infer.ask'] as const) : []),
+      ...(modelJobs ? (['infer.prose'] as const) : []),
+    ],
     /* THE RECORD'S SWITCH FOR `ask_slash`, ON EXACTLY WHERE THE PASS ABOVE HAS SOMETHING TO ASK WITH. Off, install refuses
        the step with `NOT_IN_THIS_BUILD` (Brief A's `unserved`), which is the honest answer on a host with no model. */
     answersSlash: answers !== undefined,
@@ -1781,8 +1846,9 @@ export async function start(options: {
       ? {
           mac: key,
           ...(rp ? { rp } : {}),
-          /* NO LINK UNTIL THERE IS SMTP. A link printed to a terminal is a link anybody reading the log can spend. */
-          magic: false,
+          /* A LINK ONLY WHERE THERE IS A WAY TO MAIL IT. A link printed to a terminal is a link anybody reading the log
+             can spend, so without SMTP there is none, and the sign-in screen offers passkeys and the server key. */
+          magic: options.mail !== undefined,
           key: { serverKey: token },
           /* The reason a sign-in failed, for the operator. A flow and a word, never who or with what. */
           log: (line) => console.error(`auth: ${line.flow} refused (${line.reason})`),
@@ -1867,6 +1933,21 @@ export async function start(options: {
       resolve: options.shared?.resolve,
     }),
     snapshots: kept,
+    blobs: blobsFolder(options.file),
+    /* GAP-7: THE TWO EMAIL ROUTES, GIVEN ONLY WHERE THIS HOST CAN MAIL THE LETTERS, as the magic-link door beside it is
+       (`magic: options.mail !== undefined`, above). `ask` and `move` are the Directory's; `mirror` carries the change
+       into the one record this process serves, and no other, because a self-host never opens a second one. */
+    email: options.mail
+      ? {
+          ask: (person, email) => directory.emailAsk(person, email),
+          move: (person, token) => directory.emailMove(person, token),
+          mirror: async (record, person, change) =>
+            record === api.kernel.identity()?.id
+              ? api.kernel.mirrorPerson(person, change)
+              : { ok: false, refusal: { code: 'OUT_OF_BOUNDS', fix: 'This self-host serves only the one record it has open.' } },
+          mail: (kind, to, link) => options.mail?.(to, link ?? '', kind),
+        }
+      : undefined,
     names: (slug) => {
       const here = api.kernel.identity()?.id;
       return here !== undefined && directory.namesOf(here).some((n) => n.slug === slug && n.released_at === null);
@@ -1881,6 +1962,8 @@ export async function start(options: {
       origin,
       auth: directory.auth,
       open: token === undefined,
+      /* THE MAIL DOOR, beside the `magic` switch above: the two are on together or off together. */
+      ...(options.mail ? { mail: options.mail } : {}),
       /* AN INVITATION LINK IS SPENT BY SIGNING IN, so it is taken only where somebody can: the record says who may join,
          and the Directory makes the person and holds the session. */
       ...(off === null
@@ -2185,7 +2268,7 @@ async function answer(
     return write(res, over ?? (await serveAuth(request, { ...site.door, ip, reached: req.headers.host ?? '' })));
   }
   /* `/account/*` IS THE DIRECTORY'S TOO, and reads only the session cookie. */
-  if (/^\/+account(?:\/|$)/.test(path)) return write(res, await serveAccount(request, { origin: site.origin, auth: site.auth, usage: site.usage, records: site.records }));
+  if (/^\/+account(?:\/|$)/.test(path)) return write(res, await serveAccount(request, { origin: site.origin, auth: site.auth, usage: site.usage, records: site.records, email: site.email }));
   /* `/in/*`: SOMETHING ARRIVES FROM OUTSIDE, AND NOBODY IS ASKED WHO IT IS (`49 §5.16`, `12 §3`).
      It is taken before the `/api` fallback below and not after, because that fallback hands every
      path it does not recognise to the app shell: without this line `POST /in/webhook/x` answered
@@ -2241,6 +2324,10 @@ async function answer(
   /* A KEPT COPY AS THE FILE IT IS (`49 §5.13`): `GET /api/snapshots/<id>`, for whoever `snapshots` answers. */
   const copyAsked = /^\/+api\/+snapshots\/+([^/]+)\/*$/.exec(path);
   if (copyAsked && method === 'GET' && 'ctx' in seen) return write(res, await copyOf(decodeURIComponent(copyAsked[1]!), seen.ctx, site), seen.cookie);
+  /* `PUT /api/files` AND `GET /api/files/<sha256>` (OPS-19, OPS-20, PGS-14): the self-host half of the file store,
+     `./files.ts`'s door, so a gallery or a card picture served on the self-host draws the picture and not only its
+     caption. */
+  if (servesFiles(path) && 'ctx' in seen) return write(res, await serveFiles(request, withSession(seen.ctx, sessionOf(request.headers)), site.blobs), seen.cookie);
   /* AND THE APP'S OWN KEY DOORS, AFTER THE SESSION AND NOT BEFORE IT, which is the whole difference between them
      and `/api/vault/*` above: those take a bearer `contextFor` would not know, and these take the session it just
      worked out. `serveKeys` refuses a bearer and any origin this host does not answer for; who the session is

@@ -17,7 +17,6 @@ import {
   installWords,
   live,
   everyMs,
-  HOSTED_RUNS,
   runsAMonth,
   type CallOut,
   forProject,
@@ -36,8 +35,6 @@ import {
   type ActionRow,
   type Fetch,
 } from './actions.ts';
-import { PACKS } from './fixtures/sample.ts';
-import { packDiff } from './api.ts';
 import { signInFor } from './packs.ts';
 import { copy } from '../copy.ts';
 
@@ -133,9 +130,22 @@ test('a row names what it does, where, how often and its key by label', () => {
 
 test('a project gets its own actions, matched by name without case, and the global ones separately', () => {
   const rows = [row({ ingest: 'b', project: 'kiln' }), row({ ingest: 'a', project: 'Kiln' }), row({ ingest: 'g', project: null }), row({ ingest: 'p', project: 'Portage' })];
-  const split = forProject(rows, 'Kiln');
+  const split = forProject(rows, { spoken: 'things#1', title: 'Kiln' });
   assert.deepEqual(split.own.map((r) => r.ingest), ['a', 'b']);
   assert.deepEqual(split.everywhere.map((r) => r.ingest), ['g']);
+});
+
+/* DOR-6: A DECLARATION HOLDS THE PROJECT AS A ROW ID, which is no name, and the record resolves it to the row. */
+test('an action the record resolved to the project row shows on that project, whatever its declaration held', () => {
+  const kiln = { id: '01KILN', spoken: 'things#1', title: 'Kiln' };
+  const rows = [
+    row({ ingest: 'byId', project: '01KILN', project_row: kiln }),
+    row({ ingest: 'bySpoken', project: 'things#1', project_row: kiln }),
+    row({ ingest: 'other', project: '01PORT', project_row: { id: '01PORT', spoken: 'things#2', title: 'Kiln' } }),
+    row({ ingest: 'unresolved', project: 'things#1' }),
+  ];
+  const split = forProject(rows, { spoken: 'things#1', title: 'Kiln' });
+  assert.deepEqual(split.own.map((r) => r.ingest), ['byId', 'bySpoken', 'unresolved']);
 });
 
 test('no project lists every action as its own, by name, with nothing faint', () => {
@@ -223,8 +233,13 @@ test('THE LEDGER FIRST: this month against the allowance, and waiting said when 
   assert.ok(read.ok === true);
   assert.equal(read.view.from, 'ledger');
   assert.ok(sent.some((x) => x.url === '/account/usage?from=2026-09-01&to=2026-09-15'));
-  assert.deepEqual(read.view.records, [{ name: 'studio', used: 150, allowance: 15_000, resets: '1 October', waiting: false }]);
-  assert.deepEqual(read.view.projects.map((p) => [p.name, p.faint]), [['Kiln', false], [words.everywhere, true]]);
+  const [studio] = read.view.records;
+  assert.deepEqual(
+    studio && { name: studio.name, used: studio.used, allowance: studio.allowance, resets: studio.resets, waiting: studio.waiting },
+    { name: 'studio', used: 150, allowance: 15_000, resets: '1 October', waiting: false },
+  );
+  assert.equal(studio?.meters[0]?.line, 'Runs 150 of 15,000');
+  assert.deepEqual(read.view.projects.map((p) => [p.name, p.faint]), [['Kiln', false], [words.everywhereUsage, true]]);
 
   assert.equal(usageFromLedger(ledger(3), '2026-09').records[0]?.waiting, true);
 });
@@ -319,29 +334,21 @@ test('the install says each call on one line, and the runs a month they add agai
   assert.equal(calls.length, 2);
   assert.equal(callLine(calls[0]!), 'Watches status.kiln.example, every hour, with the key "Kiln read"');
   assert.equal(callLine(calls[1]!), 'Calls hooks.kiln.example, every hour, with no key, sends seq and amount due');
-  assert.equal(estimateOf(calls, true), "About 1,460 runs a month, 10% of this record's 15,000.");
+  assert.equal(estimateOf(calls, 15_000), "About 1,460 runs a month, 10% of this record's 15,000.");
   assert.equal(estimateOf(calls, false), 'About 1,460 runs a month, with no monthly limit on this record.');
   assert.equal(callLine({ ...calls[0]!, host: null, sends: [] }), 'Watches a host it does not name, every hour, with the key "Kiln read", sends no fields');
 });
 
 test('an estimate says less than 1%, says when runs would wait, and is absent when nothing has an interval', () => {
   const one = (every: string): CallOut => ({ ingest: 'a', channel: 'pull', host: 'api.example', every, key: null, sends: null });
-  assert.equal(estimateOf([one('1d')], true), "About 30 runs a month, less than 1% of this record's 15,000.");
+  assert.equal(estimateOf([one('1d')], 15_000), "About 30 runs a month, less than 1% of this record's 15,000.");
   assert.equal(
-    estimateOf(Array.from({ length: 6 }, () => one('15m')), true),
+    estimateOf(Array.from({ length: 6 }, () => one('15m')), 15_000),
     "About 17,520 runs a month, more than this record's 15,000, so some runs would wait until the next month.",
   );
   assert.equal(estimateOf([one('when paid')], true), null);
   assert.equal(estimateOf([], true), null);
-  assert.equal(HOSTED_RUNS, 15_000);
-});
-
-test('a catalogue entry that calls out draws its calls in the diff', () => {
-  const pack = PACKS.find((p) => p.id === 'freelancer-uk');
-  assert.ok(pack);
-  const d = packDiff(pack);
-  assert.equal(d.calls.length, 3);
-  assert.equal(estimateOf(d.calls, true), "About 1,490 runs a month, 10% of this record's 15,000.");
+  assert.equal(estimateOf([one('1d')], true), "About 30 runs a month, counted against this record's monthly allowance.");
 });
 
 test('a call only a rule runs keeps its line, its daily ceiling and the key note it is approved with', () => {

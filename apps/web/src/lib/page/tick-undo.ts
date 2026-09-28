@@ -45,3 +45,48 @@ export function tickBackOf(ref: RowRef, done: boolean, decl: Declared | null, he
     ...(typeof finished === 'string' ? { finished } : {}),
   });
 }
+
+/* ── a stone on a path ───────────────────────────────────────────────────── */
+
+/** What a list of steps declares: the `ref` field naming the row each step belongs to, the `bool` that marks it done, and the field they sort by. */
+export type Steps = { of: string; done: string; order?: string };
+
+/**
+ * A list's `steps: { of, done, order }` as the record declares it, or `null` for a list that declares no steps.
+ *
+ * READ OFF THE RECORD'S WHOLE ANSWER, as the finished day is above: `Declared` types only the state, and `schemaOf` hands
+ * back the list's full declaration, `steps` with it. There is no built-in stand-in, because no list this build declares
+ * is a list of steps; a path is only ever over a list somebody declared one.
+ */
+export function stepsOf(decl: Declared | null): Steps | null {
+  const steps = decl ? (decl as { steps?: unknown }).steps : undefined;
+  if (steps === null || typeof steps !== 'object') return null;
+  const { of, done, order } = steps as { of?: unknown; done?: unknown; order?: unknown };
+  if (typeof of !== 'string' || typeof done !== 'string') return null;
+  return { of, done, ...(typeof order === 'string' ? { order } : {}) };
+}
+
+/**
+ * The patch that marks a path's stone done or not done, or `null` when its list declares no steps to mark.
+ *
+ * THE LIST'S `done` FIELD AND NOTHING ELSE, because that one `bool` is what the record reads a path's marks from
+ * (`done_now` in the kernel's `pages.ts`). A stone is not a task: its list may have no state at all, and `tickPatch`
+ * would answer null for it, or move a state the path never reads.
+ */
+export function stonePatch(done: boolean, decl: Declared | null): Record<string, unknown> | null {
+  const steps = stepsOf(decl);
+  return steps ? { [steps.done]: done } : null;
+}
+
+/**
+ * The patch that undoes pressing a stone to `done`, given `held`, the step as the page drew it when it was pressed.
+ *
+ * WHAT THE STEP HELD, as a tick's undo sends: a step nobody had ticked holds no value at all, and putting it back writes
+ * that nothing rather than `false`, so the undo leaves the row as it found it. With no `held`, which is a step the
+ * re-read no longer carries, the opposite mark is the only fact left to send, as `tickBackOf` falls back to.
+ */
+export function stoneBackOf(done: boolean, decl: Declared | null, held: Entry | undefined): Record<string, unknown> | null {
+  const patch = stonePatch(done, decl);
+  if (!patch) return null;
+  return held ? inverseOf(held, patch as Entry['fields'], undefined) : stonePatch(!done, decl);
+}

@@ -30,10 +30,13 @@ import {
   grantKey as deriveGrantKey,
   NONCE_BYTES,
   openSealed as openBytes,
+  purposeOf,
   seal as sealBytes,
+  sealedUnderOf,
   VAULT_HEADERS,
   vaultReply,
   type KeysDoor,
+  type SealedUnder,
   type SessionHints,
   type VaultDoor,
   type VaultGrantSeen,
@@ -68,10 +71,14 @@ async function grantKey(
   key: SealTarget['key'],
   grant: string,
   unlocked: Uint8Array | null = null,
+  purpose: SealedUnder = 'record',
 ): Promise<webcrypto.CryptoKey | null> {
-  if (key.wrapped_by === 'passphrase') return unlocked === null ? null : await deriveGrantKey(unlocked, grant);
+  /* A CONNECTOR KEY IS NEVER BEHIND THE PASSPHRASE (ADR-052): a scheduled run has no person to type it, so only the
+     record key can be, and the key a passphrase opened is that one and no other. */
+  if (key.wrapped_by === 'passphrase') return unlocked === null || purpose !== 'record' ? null : await deriveGrantKey(unlocked, grant);
   if (key.kek_id === null) return null;
-  const dek = await unwrap(store, record, 'record', { wrapped: key.wrapped, nonce: key.nonce, kek_id: key.kek_id, wrapped_by: 'kek' });
+  /* THE PURPOSE IS HALF THE WRAPPING'S ADDITIONAL DATA, so the connector key unwraps only when asked for as itself. */
+  const dek = await unwrap(store, record, purpose, { wrapped: key.wrapped, nonce: key.nonce, kek_id: key.kek_id, wrapped_by: 'kek' });
   if (!dek) return null;
   try {
     /* AWAITED INSIDE THE `try`, so the derivation is done before the `finally` zeroes the DEK. Node's
@@ -84,6 +91,7 @@ async function grantKey(
 }
 
 const WRONG_KEY = 'This host key store does not open this record, so no key was sealed or opened.';
+const CONNECTOR_SEAL = 'This record cannot seal a key for a scheduled connector yet, so nothing was added. Add it for you to use, or try again after the next update.';
 const NO_IDENTITY = 'This record has no identity yet, so it keeps no keys.';
 
 /** The one answer a value leaves in. */
@@ -125,6 +133,13 @@ function steps(api: RecordApi, store: KeyStore) {
       value.fill(0);
       return no('OUT_OF_BOUNDS', 'A key is at most 64 KiB.', { at: 'value' });
     }
+    /* WHICH KEY SEALS IT, asked before any key is unwrapped, so a deposit that could not be sealed as asked touches none. */
+    const under = sealedUnderOf(body, opts?.agentDeposit === true);
+    if (!under.ok) {
+      value.fill(0);
+      return under;
+    }
+    const sealedUnder = under.value;
     const door = await unlocked(record, by, body);
     if (!door.ok) {
       value.fill(0);
@@ -134,7 +149,10 @@ function steps(api: RecordApi, store: KeyStore) {
     /* What it is, unopened: a length, never a character of it. */
     const hint = `a ${String(said.length)}-character value`;
     const seal = async (target: SealTarget): Promise<Result<Sealed>> => {
-      const key = await grantKey(store, record, target.key, target.grant, recordKey);
+      /* SEALED UNDER THE KEY THAT WAS ASKED FOR OR NOT AT ALL. A record that handed back its own key for a connector's
+         deposit would bind a key a scheduled run is refused, under a sentence saying it was added for the connector. */
+      if (purposeOf(target) !== sealedUnder) return no('NOT_IN_THIS_BUILD', CONNECTOR_SEAL, { at: 'sealed_under' });
+      const key = await grantKey(store, record, target.key, target.grant, recordKey, sealedUnder);
       /* BEHIND A PASSPHRASE THE RECORD KEY NAMES NO ROOT KEY, and a grant row names one all the same: the one the
          record's other keys are under, which a later rotation renames with them. */
       const kekId = target.key.kek_id ?? (recordKey === null ? null : await offeredId(store, api.kernel.wrappingKey()));
@@ -148,8 +166,8 @@ function steps(api: RecordApi, store: KeyStore) {
        way to put a key somewhere the grant does not reach. */
     const args =
       'principal' in by
-        ? { label: body.label, opens: body.opens, kind: body.kind, project: body.project, credential: body.credential }
-        : { label: body.label, opens: body.opens, kind: body.kind };
+        ? { label: body.label, opens: body.opens, kind: body.kind, project: body.project, credential: body.credential, sealed_under: sealedUnder }
+        : { label: body.label, opens: body.opens, kind: body.kind, sealed_under: sealedUnder };
     try {
       return await api.depositGrant(args, by, hints, seal, opts);
     } finally {
@@ -171,7 +189,7 @@ function steps(api: RecordApi, store: KeyStore) {
       const out = await api.openForGrant({ label: text(body.label), credential: text(body.credential) }, by, hints, kekId);
       if (!out.ok) return vaultReply(out);
       const sealed = out.value;
-      const key = await grantKey(store, record, sealed.key, sealed.id, recordKey);
+      const key = await grantKey(store, record, sealed.key, sealed.id, recordKey, purposeOf(sealed));
       if (!key) return vaultReply(no('WRONG_KEY', WRONG_KEY, { at: 'kek_id' }));
       const opened = await openBytes(key, sealed.nonce, sealed.aad, sealed.ciphertext);
       /* A failed decrypt says only that these bytes do not open under this key. */

@@ -42,8 +42,11 @@ import { lists } from './copy/lists.ts';
 import { packs } from './copy/packs.ts';
 import { pages } from './copy/pages.ts';
 import { palette } from './copy/palette.ts';
+import { query } from './copy/query.ts';
 import { read } from './copy/read.ts';
 import { shell } from './copy/shell.ts';
+import { theme } from './copy/theme.ts';
+import { hand } from './copy/hand.ts';
 
 export type { Held } from './copy/shell.ts';
 export { INPUTS_SAID } from './copy/pages.ts';
@@ -62,6 +65,9 @@ export const copy = {
   ...home,
   ...palette,
   ...read,
+  ...query,
+  ...theme,
+  ...hand,
 } as const;
 
 export type Copy = typeof copy;

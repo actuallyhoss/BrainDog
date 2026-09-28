@@ -289,7 +289,7 @@ test('A SEALED COPY IS REFUSED NAMING age -d, told by its first bytes and not by
   assert.match(out.stderr, /age -d/);
 });
 
-test('A SELF-HOST COPY (application_id 1146046241) IS REFUSED AS NOT SIGNED YET, and any other SQLite file as not a .brain', async (t) => {
+test('A SELF-HOST COPY (application_id 1146046241) WITH NO .sig BESIDE IT IS REFUSED AS UNSIGNED, and any other SQLite file as not a .brain', async (t) => {
   const dir = scratch(t);
 
   /* THE KERNEL'S OWN MIGRATIONS WRITE THE HEADER, as they do for every self-host record and every
@@ -300,7 +300,7 @@ test('A SELF-HOST COPY (application_id 1146046241) IS REFUSED AS NOT SIGNED YET,
   sql.close();
   const copy = await ran(['verify', '2026-09-23T03-20-00Z-drill.brain'], dir);
   assert.equal(copy.code, 1);
-  assert.match(copy.stderr, /self-host copies are not signed yet/);
+  assert.match(copy.stderr, /self-host copy with no signature beside it/);
 
   const plain = new DatabaseSync(join(dir, 'plain.brain'));
   plain.exec('CREATE TABLE t (x)');

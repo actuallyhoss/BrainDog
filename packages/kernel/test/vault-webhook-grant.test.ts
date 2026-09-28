@@ -207,7 +207,7 @@ test('AND ONLY THE TWO KINDS THAT SEND A KEY: an email job opens nothing, and a 
   leasedPost(sql, made.id, 'pull.fetch');
   const why = refusal(k.sealedGrant({ outbox: 'ob_1', leasedUntil: LEASE, grant: made.id }, 'ingest:x'));
   assert.equal(why.code, 'OUT_OF_BOUNDS');
-  assert.match(why.fix, /sealed for use by a person/);
+  assert.match(why.fix, /added for a person to use, not for a connector/);
   sql.close();
 });
 

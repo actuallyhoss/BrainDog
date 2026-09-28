@@ -13,7 +13,7 @@ import { figureTile } from './fixtures/readers.ts';
 import { forget, readBoot, type Fetch } from './boot-live.ts';
 import { METRICS } from './declared.ts';
 import { hrefFor } from './metrics.ts';
-import { LOG_PAGE, markAll, readHome, readLog, tileOf } from './news-live.ts';
+import { LOG_PAGE, markAll, readLog, tileOf } from './news-live.ts';
 import { liveWords, tileOf as pageTile } from './page-live.ts';
 
 const BASE = 'http://record.test';
@@ -137,33 +137,6 @@ test('a zero the predicate does say something about keeps its verdict and its do
   assert.notEqual(nothing.note, liveWords.unsaid, 'a list holding nothing is not a field nobody filled in');
 });
 
-/* HOME ASKS NO FIGURE OF ITS OWN (shell.md USE-2). It asked Money's three of every record holding `obligations`, which
-   is the web knowing one pack by its list; what leads Home now is the page the record declares. */
-test('Home asks for what is new and for no figure, whatever lists the record holds', async () => {
-  const { io, sent } = host((url) =>
-    url.pathname === '/api/whatsNew'
-      ? json(200, { ok: true, value: { events: [line({ rowid: 5, register: 'obligations', seq: 2, title: 'Rent' })], upTo: 5, sinceCapped: false } })
-      : json(200, { ok: true, value: { value: 100, unit: 'GBP', rows: 1, met: true, refusals: [] } }),
-  );
-  const out = await readHome(BASE, 'p_1', io);
-  assert.equal(out.from, 'live');
-  if (out.from !== 'live') return;
-  assert.deepEqual(out.news.items.map((i) => [i.by, i.text]), [['you', 'Added Rent']]);
-  assert.equal(out.news.upTo, 5);
-  assert.deepEqual(sent.map((s) => new URL(s.url).pathname), ['/api/whatsNew'], 'only what is new was asked for');
-});
-
-/* NO RECORD IS A REFUSAL NOW, NOT THE SAMPLE (DIRECTION 26): Home drew the studio's figures and its "since you were
-   away" under a host that did not answer or asked for sign-in. */
-test('Home with no record is a refusal, and so is any other refusal, in the record sentence', async () => {
-  const away = await readHome(BASE, null, host(null).io);
-  assert.equal(away.from, 'refused');
-  assert.ok(away.from === 'refused' && away.fix.trim() !== '', 'a refusal with no sentence says nothing to the reader');
-  assert.deepEqual(await readHome(BASE, null, host(() => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in.' } })).io), { from: 'refused', fix: 'Sign in.' });
-  const said = await readHome(BASE, null, host(() => json(403, { ok: false, refusal: { code: 'FORBIDDEN', fix: 'Ask the owner.' } })).io);
-  assert.deepEqual(said, { from: 'refused', fix: 'Ask the owner.' });
-});
-
 test("marking all read sends the newest line's number, and the shell asks boot again", async () => {
   forget();
   const { io, sent } = host((url) =>
@@ -186,19 +159,12 @@ test('A MEMBER HELD TO ONE LIST MARKS WITH THE CURSOR SHE WAS HANDED, and it goe
      `markAll` typed `upTo` as a number, so the one thing it could send her back was a number, which is now a refusal. */
   forget();
   const upTo = 'e.01M1RQ3130J6MBME97EKYKKWZ2';
-  const { rowid: _rowid, ...hers } = line({ id: '01M1RQ3130J6MBME97EKYKKWZ2', register: 'obligations', seq: 2, title: 'Rent', target: 'entry:x', target_kind: 'entry' });
   const { io, sent } = host((url) =>
-    url.pathname === '/api/whatsNew'
-      ? json(200, { ok: true, value: { events: [hers], upTo, sinceCapped: false } })
-      : url.pathname === '/api/markRead'
-        ? json(200, { ok: true, value: { upTo, seen_at: '2026-09-15T09:00:00.000Z' } })
-        : json(200, { ok: true, value: { registers: [], now: '2026-09-15T12:00:00.000Z' } }),
+    url.pathname === '/api/markRead'
+      ? json(200, { ok: true, value: { upTo, seen_at: '2026-09-15T09:00:00.000Z' } })
+      : json(200, { ok: true, value: { registers: [], now: '2026-09-15T12:00:00.000Z' } }),
   );
-  const home = await readHome(BASE, 'p_9', io);
-  assert.equal(home.from, 'live');
-  if (home.from !== 'live') return;
-  assert.equal(home.news.upTo, upTo);
-  assert.equal(await markAll(BASE, home.news.upTo, io), true);
+  assert.equal(await markAll(BASE, upTo, io), true);
   const mark = sent.find((s) => new URL(s.url).pathname === '/api/markRead')!;
   assert.deepEqual(JSON.parse(mark.body ?? '{}'), { upTo });
   forget();

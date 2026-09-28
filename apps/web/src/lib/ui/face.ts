@@ -7,6 +7,7 @@
 import { RULE_NAMES } from '@braindog/seed/usecases/names';
 
 import { AGENT_NAMES, nameWords, saidKind, type ActorKind } from '../record/names.ts';
+import type { IconName } from './icons.ts';
 
 /**
  * The letter in a writer's disc.
@@ -68,4 +69,97 @@ export const hueFor = (key: string): number => {
     hash = Math.imul(hash, 0x01000193) >>> 0;
   }
   return (hash % HUES) * (360 / HUES);
+};
+
+/* ── an agent's run ─────────────────────────────────────────────────────────── */
+
+/** The kinds of agent a run face tells apart, each by its own glyph (agents C11). */
+export type AgentKind = 'claude' | 'codex' | 'cursor' | 'slash' | 'runner' | 'other';
+
+/** Where a run is: working, gone quiet while still open, or stopped. The ring says which. */
+export type RunLive = 'working' | 'quiet' | 'stopped';
+
+/**
+ * The glyph each kind of agent wears, from the app's own set and the render core, so every one draws at once.
+ *
+ * A GLYPH AND NEVER A VENDOR LOGO (agents C11): a mark that is somebody else's brand, repeated down a log, is an
+ * advert, and a glyph says what kind of worker it is in the app's own hand. Slash is not here, because it wears its
+ * own mark, the slash `Face` draws.
+ */
+export const AGENT_GLYPHS = {
+  claude: 'bot',
+  codex: 'code',
+  cursor: 'keyboard',
+  runner: 'play',
+  other: 'session',
+} as const satisfies Record<Exclude<AgentKind, 'slash'>, IconName>;
+
+/** An agent's kind from its display name, back through `AGENT_NAMES`, so a face handed "Claude" knows it is claude. */
+const AGENT_BY_NAME = new Map<string, string>(Object.entries(AGENT_NAMES).map(([id, said]) => [said.toLowerCase(), id]));
+
+/**
+ * The kind of agent a word names: its id (`claude`), its signature (`agent:claude`, `runner:<id>`), or the name
+ * `names.ts` says for it (`Claude`). Anything else, a run's number included, is `other`.
+ */
+export const agentKindOf = (agent: string | null | undefined): AgentKind => {
+  const said = (agent ?? '').trim().toLowerCase();
+  if (said === '') return 'other';
+  if (said === 'slash' || said === nameWords.slash.toLowerCase()) return 'slash';
+  if (said === 'runner' || said.startsWith('runner:')) return 'runner';
+  const bare = said.replace(/^agent:/u, '');
+  const id = AGENT_BY_NAME.get(bare) ?? bare;
+  return id === 'claude' || id === 'codex' || id === 'cursor' ? id : 'other';
+};
+
+/** A run as a writer signs with it: `S` and its number (`30 §3`). */
+const RUN = /^S([1-9][0-9]*)$/u;
+
+/**
+ * The run a signature names, as `S42`, or null when it names none.
+ *
+ * AN AGENT SIGNS A WRITE WITH ITS RUN when the write came through a session (`packages/record/src/slash.ts` `isAgent`
+ * reads the same shape), so this is how a log line knows which run to draw and to link. `agent:claude` names the kind
+ * and no run, so it is null here and the face is drawn without a ring or a door.
+ */
+export const runOf = (by: string | null | undefined): string | null => {
+  const said = (by ?? '').trim();
+  return RUN.test(said) ? said : null;
+};
+
+/** A run's number, from `S42` or a bare `42`, or null for anything that is not one. */
+export const runSeq = (run: string): number | null => {
+  const m = /^S?([1-9][0-9]*)$/u.exec(run.trim());
+  return m?.[1] ? Number(m[1]) : null;
+};
+
+/**
+ * A run's hue: its number in twelve steps of thirty degrees round the wheel, drawn at the theme's mark lightness and
+ * chroma as every identity hue is.
+ *
+ * FROM THE RUN, NOT THE AGENT, so two Claude runs at once wear two colours: the glyph says what kind of worker it is,
+ * and the ring says which one. Consecutive runs land thirty degrees apart, which is as far apart as two hues on this
+ * wheel get, and the twelfth run after this one wears the same colour, by when the first has long stopped.
+ */
+export const runHue = (seq: number): number => (((seq % HUES) + HUES) % HUES) * (360 / HUES);
+
+/**
+ * Where a run is, from its `state` and whether it has gone quiet (`isStale` in `@braindog/kernel`, which the caller
+ * asks against the record's clock).
+ *
+ * ONLY AN ACTIVE RUN HAS A RING. An idle run, a handoff waiting for a pickup and a finished one have all stopped
+ * working, and a ring on any of them would say somebody is at it.
+ */
+export const liveOf = (state: unknown, quiet: boolean): RunLive => (state === 'active' ? (quiet ? 'quiet' : 'working') : 'stopped');
+
+/** The words a run face and a run's handoff say. The face's own name is for a screen reader, which the ring is not. */
+export const faceWords = {
+  openRun: 'Open this run',
+  live: { working: 'Working now', quiet: 'Gone quiet', stopped: 'Stopped' } satisfies Record<RunLive, string>,
+  handoff: 'Handoff',
+  doing: 'Doing',
+  project: 'Project',
+  next: 'Next step',
+  tried: 'Already tried',
+  notes: 'Notes',
+  nothingYet: 'This run has not said what it is doing yet.',
 };

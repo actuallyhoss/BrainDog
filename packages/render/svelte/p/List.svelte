@@ -20,6 +20,7 @@
 -->
 <script lang="ts">
   import { inline, takeWorking, text, TONES, WORKING_GLYPH, WORKING_LABEL, type Block, type RenderOptions, type Row } from '../../src/index.ts';
+  import { kindSpec } from '../../src/kind-spec.ts';
   import { moveTick, nextTicks, tickState } from '../../src/ticks.ts';
   import { TODO_META_JOIN, todoMeta } from '../../src/todo.ts';
   import Agents from '../Agents.svelte';
@@ -118,7 +119,7 @@
      plain `steps` block below still prints that cell as the state it was written as. -->
 <Path {block} {opts} />
 {:else}
-<svelte:element this={block.kind === 'steps' ? 'ol' : 'ul'} class="list" data-kind={block.kind}>
+<svelte:element this={kindSpec(block.kind, opts.kinds)?.ordered ? 'ol' : 'ul'} class="list" data-kind={block.kind}>
   {#each block.rows as row, i}
     {#if block.kind === 'todo'}
       {@const state = tickState(row.done, ticks.get(i))}

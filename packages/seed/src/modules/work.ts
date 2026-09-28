@@ -18,7 +18,7 @@ export const TASKS: Fields[] = [
      breaks links in files that have already been delivered. Three places named the fault and the
      one task tracking it proposed doing the fault again. This record is the product's only worked
      example, and a stranger reads it as what a real record looks like. */
-  { what: 'Turn auto-renew back on for kilnfonts.example', state: 'open', thing: 1, by: day(-4), effort: days(0.2), note: '' },
+  { what: 'Turn auto-renew back on for kilnfonts.example', state: 'open', thing: 1, priority: 'urgent', why: 'The domain lapses when the card fails again.', by: day(-4), effort: days(0.2), note: '' },
   { what: 'Draft the September issue', state: 'doing', thing: 3, by: day(4), effort: days(2), note: '' },
   /* SEVEN OF THE FOURTEEN NAME A TRACK, and none of them did. `tasks` declares a `track:` ref and
      every row left it null, so the Track column on `/r/tasks` was fourteen dashes and every track
@@ -128,7 +128,10 @@ export const UPDATES: Fields[] = [
   { body: 'Parked behind SG29. Nothing moves until the sending question is decided.', health: 'on_track', track: 4, by: 'you', at: stamp(-45 * 24) },
 ];
 
-export const WORK_REGISTERS: Record<string, SeedRegister> = {
+/** A Work list, which may say who holds its rows (`hand:`, `42 §4.4`), as `people.ts`'s own type adds its keys. */
+type WorkRegister = SeedRegister & { hand?: { person: string; agent: string; taken: string } };
+
+export const WORK_REGISTERS: Record<string, WorkRegister> = {
   /* NO `sessions` HERE. Agent runs are the kernel's own `session` register (migration 0002), which
      every agent write lands on. A second copy declared here drew a second "Agent runs" list. */
   /**
@@ -231,6 +234,9 @@ export const WORK_REGISTERS: Record<string, SeedRegister> = {
     /* THE RECORD DATES THE FINISH: Done on is filled when a task moves to done and emptied when it is reopened, so the
        weeks on the Overview count every finished task and not only the ones somebody dated. */
     finished: 'done_on',
+    /* WHO HOLDS A TASK, SO "HAND TO" CAN GIVE IT TO SOMEBODY IN ONE PRESS: a person by Owner, an agent by Agent, and a
+       task an agent takes is Doing (GAP-11). */
+    hand: { person: 'owner', agent: 'agent', taken: 'doing' },
     pack: 'work',
     fields: [
       { id: 'what', label: 'Description', type: 'text', required: true, search: true },
@@ -256,6 +262,9 @@ export const WORK_REGISTERS: Record<string, SeedRegister> = {
         values: ['urgent', 'high', 'normal', 'low'],
         labels: { urgent: 'Urgent', high: 'High', normal: 'Normal', low: 'Low' },
       },
+      /* WHY IT SITS AT ITS TIER, in a line, so a list ordered by tier can be argued with by the person reading it and
+         an agent that sets a tier says what it weighed. Optional, and not indexed, for the same reason as the tier. */
+      { id: 'why', label: 'Why this tier', type: 'text' },
       /* WHO HOLDS IT, a person. Empty is you. A link, so Work installs on a record with no People and leaves it out. */
       { id: 'owner', label: 'Owner', type: 'ref', to: 'people', index: true },
       /* THE AGENT THAT TOOK IT, by the name it signs its runs with (claude, codex, cursor). An agent is a delegate, never
@@ -546,20 +555,45 @@ export const WORK_AUTOMATIONS: Record<string, unknown>[] = [
    Tickets reads Ticket, and one that relabels them later reads that. */
 const DESCRIPTION = { field: 'what', width: 'minmax(20ch,1fr)' } as const;
 
+/**
+ * BY TIER, THEN BY THE DAY IT FALLS DUE (decisions C30, the old tool's board rule). The record sorts an enum by the order
+ * its values were declared in, so `urgent` comes before `low`, and a task with no tier sorts after every tier, as an
+ * empty value always does. BOTH KEYS SAY `asc` because an order that says no direction is read descending, which would
+ * put Low first and the latest day at the top.
+ */
+const TIER_THEN_DUE = [
+  { field: 'priority', dir: 'asc' },
+  { field: 'by', dir: 'asc' },
+] as const;
+
 export const WORK_PAGES: Record<string, SeedPage> = {
   /**
    * WORK LEADS WITH WHAT IS IN PLAY AND WHAT WAITS ON YOU (`loop/DIRECTION.md` §3, `research-modules.md` §2.2). "What I
    * have to do next, what my agents are doing, and what's stuck": the figures, the queue a person works from, what is
    * due, how the work moved week by week, where it sits, and what agents took. The board is its own page beside it.
+   *
+   * SINCE work 1.9.0 IT IS A TO-DO FIRST: the capture line leads, the lists of yours are ordered by tier and then by due
+   * day, and beside what agents hold are what they ask (`governance.open`), what falls due in two weeks (`deadlines`) and
+   * what was finished day by day (`heat`).
    */
   work: {
     page: 'work',
-    title: 'Overview',
+    /* CALLED WORK, as the section it heads is, because the page is the to-do and not a report about one. */
+    title: 'Work',
     nav: { section: 'Work', order: 10 },
     icon: 'task',
     requires: ['register.tasks'],
     pack: 'work',
     blocks: [
+      {
+        /* CAPTURE FIRST, before any figure, because a task that is not written down the moment it comes to mind is the
+           one carried in your head. The heading is the field's prompt (`render/src/capture.ts`), and a task added here
+           is To do with no day, so it lands under No due day until somebody gives it one. */
+        kind: 'capture',
+        heading: 'What needs doing?',
+        span: 12,
+        register: 'tasks',
+      },
       {
         kind: 'stat',
         lead: true,
@@ -583,7 +617,7 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         source: 'register.tasks',
         where: `${YOURS}, by before +1d`,
         columns: [{ field: 'what' }, { field: 'by' }],
-        order: [{ field: 'by', dir: 'asc' }],
+        order: TIER_THEN_DUE,
         limit: 8,
         empty: 'Nothing of yours is due today.',
       },
@@ -594,7 +628,7 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         source: 'register.tasks',
         where: `${YOURS}, by after today, by before +8d`,
         columns: [{ field: 'what' }, { field: 'by' }],
-        order: [{ field: 'by', dir: 'asc' }],
+        order: TIER_THEN_DUE,
         limit: 8,
         empty: 'Nothing else of yours is due this week.',
       },
@@ -631,6 +665,29 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         empty: 'No agent holds a task. An agent takes one by setting itself as its agent.',
       },
       {
+        /* WHAT AN AGENT OR A RULE HAS ASKED ABOUT A TASK, answered where it is shown, three at a time, and the rest are in
+           Decide. No `empty:` of its own: with nothing waiting the queue says its own line (`QUEUE_CLEARED`). */
+        kind: 'queue',
+        heading: 'Agents suggest',
+        span: 6,
+        source: 'governance.open',
+        where: 'list is tasks',
+        limit: 3,
+      },
+      {
+        /* WHAT FALLS DUE IN THE NEXT FOURTEEN DAYS, on a time axis, overdue first and then by day, in the order the
+           record gives (`deadlines` takes no `order:`). Not finished is the list's own `done` states. */
+        kind: 'timeline',
+        heading: 'Next two weeks',
+        span: 6,
+        source: 'deadlines',
+        where: 'list is tasks',
+        horizon: 14,
+        columns: [{ field: 'day' }, { field: 'title' }],
+        limit: 12,
+        empty: 'Nothing falls due in the next two weeks.',
+      },
+      {
         kind: 'todo',
         heading: 'After this week',
         span: 7,
@@ -655,9 +712,22 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         empty: 'Everything of yours has a due day.',
       },
       {
+        /* WHAT WAS FINISHED, DAY BY DAY, for the last twelve weeks: a task counts once on the day it was done, and a day
+           nothing was finished is left pale rather than counted as idle. On a phone the host draws the last eight
+           weeks of the same grid. The grid starts on a Monday 77 to 83 days back, so the window reaches 83 days and
+           no drawn day is missing; early in a week a few rows fall before the grid, and the drawer counts and says them. */
+        kind: 'heat',
+        heading: 'Done, 12 weeks',
+        span: 5,
+        source: 'register.tasks',
+        where: 'state is done, done_on after -84d',
+        columns: [{ field: 'done_on' }],
+        empty: 'Nothing was finished in the last twelve weeks.',
+      },
+      {
         kind: 'series',
         heading: 'Done, and due ahead',
-        span: 12,
+        span: 7,
         series: [{ metric: 'tasks-done-by-week', then: 'tasks-due-by-week', label: 'Done, then due' }],
         back: 8,
         ahead: 4,
@@ -721,6 +791,9 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         columns: [{ field: 'state' }, { field: 'what' }, { field: 'thing' }],
         source: 'register.tasks',
         where: 'state is not dropped',
+        /* EACH COLUMN BY TIER, THEN BY DUE DAY. A board keeps its rows in the order they are read within each column
+           (`render/src/board.ts`), so the order the record reads them in is the order a column draws. */
+        order: TIER_THEN_DUE,
         /* AND WHICH CARDS AN AGENT IS ON RIGHT NOW. This is the page that answers "what are my agents
            doing", and until now it answered it only in a strip beside the board: a card being worked
            on looked exactly like one nobody had opened in a week. */

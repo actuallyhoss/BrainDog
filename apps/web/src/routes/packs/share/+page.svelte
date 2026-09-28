@@ -47,7 +47,7 @@
   let title = $state('');
   let version = $state('');
   let summary = $state('');
-  let audience = $state<(typeof AUDIENCES)[number]>('other');
+  let audience = $state('');
   let busy = $state(false);
   let wrong = $state<string | null>(null);
   let step = $state<'patch' | 'minor'>('patch');
@@ -131,7 +131,7 @@
         ...(title.trim() ? { title: title.trim() } : {}),
         ...(version.trim() ? { version: version.trim() } : {}),
         ...(summary.trim() ? { summary: summary.trim() } : {}),
-        audience,
+        ...(audience.trim() ? { audience: audience.trim() } : {}),
         step,
         ...(Object.keys(examples).length > 0 ? { examples } : {}),
         ...(nav.length > 0 ? { nav } : {}),
@@ -198,9 +198,12 @@
       </div>
       <div class="pair">
         <label class="field-label" for="share-audience">{copy.shareAudience}</label>
-        <select class="share-select" id="share-audience" bind:value={audience}>
-          {#each AUDIENCES as a (a)}<option value={a}>{copy.shareAudiences[a]}</option>{/each}
-        </select>
+        <div class="field">
+          <input class="field-input" id="share-audience" type="text" autocomplete="off" list="share-audience-suggestions" bind:value={audience} />
+        </div>
+        <datalist id="share-audience-suggestions">
+          {#each AUDIENCES as a (a)}<option value={copy.shareAudiences[a]}></option>{/each}
+        </datalist>
       </div>
 
       {#if live && own && own.registers.length > 0}
@@ -294,18 +297,6 @@
     flex-direction: column;
     gap: var(--sp-1);
     min-inline-size: 0;
-  }
-
-  .share-select {
-    min-block-size: var(--ctl-h);
-    max-inline-size: 100%;
-    padding: 0 var(--sp-3);
-    background: var(--s3);
-    border: 1px solid var(--line);
-    border-radius: var(--r-md);
-    color: var(--ink);
-    font: inherit;
-    font-size: var(--t-ui);
   }
 
   .steps {

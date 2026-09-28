@@ -40,6 +40,7 @@
   import Icon from '$lib/ui/Icon.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import Arrange, { added } from './Arrange.svelte';
+  import ChangePage from './ChangePage.svelte';
   import PageBody from './PageBody.svelte';
   import SourceView from './SourceView.svelte';
   import { heldNone, pageWrites, type Held } from './page-writes.ts';
@@ -175,6 +176,8 @@
             {showSource ? copy.pageBack : copy.pageSource}
           </Button>
         </span>
+        <!-- "Change this page", and below 900px the page menu that holds it and the link above (PGS-12). -->
+        <ChangePage {slug} title={live.page.page.title} {showSource} {reread} />
       {/if}
       <Arrange {arrangement} {slug} page={live.page.page} declared={live.page.blocks} {all} bind:extra {showSource} {reread} />
     {/snippet}

@@ -57,7 +57,7 @@ export const personOf = (m: Member): Person => ({
 });
 
 /**
- * The second way of naming somebody, for the line under their name — or `''`, when there is no second way.
+ * The second way of naming somebody, for the line under their name, or `''`, when there is no second way.
  *
  * `personOf` FALLS BACK TO THE EMAIL FOR THE NAME, because a row has to be called something, and the
  * detail line then printed the email again: a colleague the record holds no name for was drawn as
@@ -113,6 +113,14 @@ export async function addException(base: string, p: Person, register: string, le
   return wrote(await clientOf(base, io).invite(inviteOf(p, p.level, scoped)));
 }
 
+/**
+ * Stop somebody, or let them back in. EVERYTHING THEY HOLD IS KEPT, which is the difference from removing them: the
+ * record answers where they now stand, and letting them back in gives them exactly what they had.
+ */
+export async function suspendPerson(base: string, p: Person, suspended: boolean, io?: Fetch): Promise<Wrote<unknown>> {
+  return wrote(await clientOf(base, io).suspendMember({ person: p.id, suspended }));
+}
+
 /** Take somebody off the record. The record refuses the last owner. */
 export async function removeAccess(base: string, p: Person, io?: Fetch): Promise<Wrote<unknown>> {
   return wrote(await clientOf(base, io).removeMember({ person: p.id }));
@@ -128,22 +136,56 @@ export async function removeAccess(base: string, p: Person, io?: Fetch): Promise
  */
 export const inviteLink = (origin: string, token: string): string => `${origin.replace(/\/+$/, '')}${BASE}/invite#${token}`;
 
+/**
+ * What an invitation gives: the whole record at one level, or chosen lists each at its own.
+ *
+ * ONE OR THE OTHER, NEVER AN EMPTY MAP. The record refuses an invitation that gives nothing, and a screen that could
+ * send `{ registers: {} }` would only be asking for that refusal. Lists are sent as the map the record keeps
+ * (`registers`, contracts X12), never as an array.
+ */
+export type InviteReach = { level: Level } | { registers: Record<string, Level> };
+
 /** Mint one for an address. The answer holds the only copy of the link, to show once and keep nowhere. */
-export async function inviteEmail(base: string, email: string, level: Level, io?: Fetch): Promise<Wrote<Invited>> {
-  return wrote(await clientOf(base, io).inviteByEmail({ email: email.trim(), level }));
+export async function inviteEmail(base: string, email: string, reach: InviteReach, io?: Fetch): Promise<Wrote<Invited>> {
+  return wrote(await clientOf(base, io).inviteByEmail({ email: email.trim(), ...reach }));
 }
 
-export type InvitesRead = { from: 'live'; invites: Invitation[] } | { from: 'unrouted' } | { from: 'refused'; fix: string };
+/**
+ * A new link for an invitation already listed, waiting or run out, giving what it gave.
+ *
+ * THE SAME CALL AS THE FIRST ONE, because the record withdraws the old link whenever a second is made for one address,
+ * so there is never a stale link and a fresh one both alive. The owner does not retype the address or choose the lists
+ * again: both come off the row.
+ */
+export async function renewInvite(base: string, inv: Invitation, io?: Fetch): Promise<Wrote<Invited>> {
+  const reach: InviteReach = inv.level !== null ? { level: inv.level } : { registers: { ...inv.registers } };
+  return inviteEmail(base, inv.email, reach, io);
+}
+
+/** One invitation as the People area lists it, with whether its link has run out. */
+export type Waiting = Invitation & { expired: boolean };
 
 /**
- * Every invitation still waiting, newest first. A host older than invitations is `unrouted`, as it is for `readPeople`.
+ * Whether one ran out: the record's own word where it sent one, and the date it named where an older record did not.
+ * An older record lists only live rows, so the date is a fallback that is almost never the one that decides.
+ */
+const waitingOf = (inv: Invitation, now: number): Waiting => {
+  const said = (inv as Invitation & { expired?: unknown }).expired;
+  return { ...inv, expired: typeof said === 'boolean' ? said : Date.parse(inv.expires_at) <= now };
+};
+
+export type InvitesRead = { from: 'live'; invites: Waiting[] } | { from: 'unrouted' } | { from: 'refused'; fix: string };
+
+/**
+ * Every invitation nobody has used or withdrawn, newest first, the ones that ran out marked. A host older than
+ * invitations is `unrouted`, as it is for `readPeople`.
  *
  * IT AND A HOST WITH NO RECORD BOTH READ `sample`, so a signed-out reader and a record too old for the method were told
  * the same thing. The screen draws neither as a list, and the second one now says why.
  */
-export async function readInvites(base: string, io?: Fetch): Promise<InvitesRead> {
+export async function readInvites(base: string, io?: Fetch, now: number = Date.now()): Promise<InvitesRead> {
   const out = wrote(await clientOf(base, io).invitations());
-  if (out.ok) return { from: 'live', invites: out.value };
+  if (out.ok) return { from: 'live', invites: out.value.map((inv) => waitingOf(inv, now)) };
   if (out.code === 'ROUTE_UNKNOWN') return { from: 'unrouted' };
   return { from: 'refused', fix: out.fix };
 }

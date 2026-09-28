@@ -15,6 +15,7 @@
   import { copy } from '../copy.ts';
   import Icon from './Icon.svelte';
   import { spanLabel, stepsFor } from '../record/arrange.ts';
+  import { blockWords } from '../record/block-edit.ts';
 
   let {
     kind,
@@ -25,8 +26,14 @@
     onmove,
     onspan,
     onremove,
+    onedit,
     widths = true,
   }: {
+    /**
+     * Opens the block editor on this block. ABSENT, THE BUTTON IS ABSENT, as the moves are at the ends: a body that
+     * cannot edit a block (a preview) draws a bar with no Edit rather than one whose Edit does nothing.
+     */
+    onedit?: (() => void) | undefined;
     kind: string;
     span: number;
     /**
@@ -50,7 +57,7 @@
 <div class="bar">
   <span class="handle" aria-hidden="true"><Icon name="drag" size="s" /></span>
 
-  <span class="kind">{copy.kindNames[kind] ?? kind}</span>
+  <span class="kind">{copy.kindNames[kind] ?? blockWords.kindNames[kind] ?? kind}</span>
 
   {#if widths}
     <div class="widths" role="group" aria-label={copy.width}>
@@ -88,6 +95,14 @@
   -->
   <!-- WITH NO WIDTHS THE MOVES TAKE THEIR PLACE AT THE END, where the widths' own margin used to push them. -->
   <div class="moves" data-alone={widths ? undefined : ''}>
+    <!-- EDIT IS A WORD, NOT A PENCIL ALONE: it opens a whole sheet about the block, which is a bigger thing than the
+         three icon buttons beside it, and a reader looking for "change what this shows" reads for the word. -->
+    {#if onedit}
+      <button type="button" class="edit-btn" onclick={onedit} aria-label={blockWords.editLabel(copy.kindNames[kind] ?? blockWords.kindNames[kind] ?? kind)}>
+        <Icon name="edit" size="s" />
+        <span>{blockWords.edit}</span>
+      </button>
+    {/if}
     {#if at > 0}
       <button type="button" class="icon-btn" onclick={() => onmove(at - 1)} aria-label={copy.moveUp}>
         <Icon name="arrowUp" size="s" />
@@ -169,6 +184,34 @@
 
   .moves[data-alone] {
     margin-inline-start: auto;
+  }
+
+  .edit-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-block-size: 26px;
+    padding: 0 var(--sp-2);
+    background: none;
+    border: 0;
+    border-radius: var(--r-pill);
+    color: var(--ink2);
+    font: inherit;
+    font-size: var(--t-xs);
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .edit-btn:hover {
+    background: var(--hover-wash);
+    color: var(--ink);
+  }
+
+  /* A THUMB'S TARGET under a coarse pointer, at any width a tablet arranges at. */
+  @media (pointer: coarse) {
+    .edit-btn {
+      min-block-size: var(--tap);
+    }
   }
 
   .icon-btn {

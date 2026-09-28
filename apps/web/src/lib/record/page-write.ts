@@ -225,10 +225,31 @@ function footOf(rows: readonly Row[], lanes: readonly string[], lane: string): n
 /* ── arranging a page ────────────────────────────────────────────────────── */
 
 /**
- * One place in the arrangement: which block (declared first, then added), the width it takes, and on a page with a rail
- * the column it sits in. No `area` is the block left where the record has it.
+ * What the block editor changed on one block: each key it set, and `null` for each key it took off.
+ *
+ * `null` AND NOT `undefined` FOR A KEY TAKEN OFF, because a patch travels as JSON-shaped data between the sheet and this
+ * write, and an `undefined` value is a key that silently vanishes on the way rather than one that says "remove".
  */
-export type Placed = { i: number; span: number; area?: 'main' | 'rail' };
+export type Patch = Readonly<Record<string, unknown>>;
+
+/** A block with one edit laid over it. `kind` is never patched away: a block without one is not a block. */
+export function withPatch(block: BlockBody, patch: Patch | undefined): BlockBody {
+  if (!patch) return block;
+  const out: Record<string, unknown> = { ...block };
+  for (const [key, value] of Object.entries(patch)) {
+    if (key === 'kind') continue;
+    if (value === null) delete out[key];
+    else out[key] = value;
+  }
+  return { ...out, kind: block.kind };
+}
+
+/**
+ * One place in the arrangement: which block (declared first, then added), the width it takes, and on a page with a rail
+ * the column it sits in. No `area` is the block left where the record has it. `edit` is what the block editor changed
+ * on that block, which travels in the same write so an edit and a move are one thing to put back.
+ */
+export type Placed = { i: number; span: number; area?: 'main' | 'rail'; edit?: Patch };
 
 /** A block added in arrange mode, in the app's spelling. Only the keys a declaration may carry go to the record. */
 export type Added = { kind: string; [key: string]: unknown };
@@ -272,7 +293,7 @@ export function arrangedBody(body: PageBody, placed: readonly Placed[], added: r
   for (const p of placed) {
     const from = p.i < declared ? body.blocks[p.i] : added[p.i - declared] ? declaredBlock(added[p.i - declared]!) : undefined;
     if (!from) return null;
-    blocks.push(inArea({ ...from, span: p.span }, p.area));
+    blocks.push(inArea({ ...withPatch(from, p.edit), span: p.span }, p.area));
   }
   return { ...body, blocks };
 }
@@ -286,10 +307,52 @@ function inArea(block: BlockBody, to: Placed['area']): BlockBody {
   return { ...rest, kind: block.kind };
 }
 
+/** `template` is the template's own page id when what was set is the one declaration every row's page is drawn from. */
 export type Arranged =
-  | { from: 'written'; before: PageBody; version: number | null }
+  | { from: 'written'; before: PageBody; version: number | null; template: string | null }
   | { from: 'refused'; fix: string }
   | { from: 'unreachable'; fix: string };
+
+/**
+ * The body the arrangement is laid over: the page's own, or, on a page drawn for one row of a list, its template's.
+ *
+ * A TEMPLATE'S ANSWER IS ONE ROW'S EXPANSION, so it is never the body written back: setting it would turn one declaration
+ * for every row into a page about one row, with that row's name filled into every filter. The stored template is read
+ * instead, through `arrangement({ page })` (`sourceOf`), the same read "How this is built" makes, and arranged by BLOCK
+ * INDEX: an expansion has the template's blocks in the template's order, so place `n` on screen is block `n` of the
+ * template, and nothing is matched by the text a row filled in.
+ */
+async function storedBody(
+  base: string,
+  slug: string,
+  io?: ClientFetch,
+): Promise<{ body: PageBody; version: number | null; template: string | null } | { from: 'refused' | 'unreachable'; fix: string }> {
+  const read = await pagesReader(base, io).readOne(slug);
+  if (read.from === 'absent') return { from: 'refused', fix: copy.recordNotReached };
+  if (read.from === 'refused') return read;
+  if (read.from === 'live') return { body: read.page.body, version: read.page.version, template: null };
+  const { sourceOf } = await import('../dog/read.ts');
+  const stored = await sourceOf(base, slug, io);
+  if ('fix' in stored) return { from: stored.code === 'UNREACHABLE' ? 'unreachable' : 'refused', fix: stored.fix };
+  /* AN EXPANSION WHOSE SOURCE NAMES NO TEMPLATE is a page this build cannot place, and it is refused in the sentence that
+     says why rather than written over as if it were its own. */
+  if (stored.template === null) return { from: 'refused', fix: copy.arrangeTemplate };
+  return { body: asPageBody(stored.body, stored.template), version: stored.version, template: stored.template };
+}
+
+/**
+ * A stored body as the open shape this file writes. `page` stays the FIRST key, because the record reads a declaration's
+ * kind from its first key (`bodyOf` in `pages-live.ts` says the same), and a block with no `kind` is carried as the empty
+ * string so the body keeps its length and the drawn count still compares.
+ */
+function asPageBody(raw: Readonly<Record<string, unknown>>, page: string): PageBody {
+  const listed = Array.isArray(raw.blocks) ? (raw.blocks as unknown[]) : [];
+  const blocks = listed
+    .filter((b): b is Record<string, unknown> => typeof b === 'object' && b !== null && !Array.isArray(b))
+    .map((b) => ({ ...b, kind: typeof b.kind === 'string' ? b.kind : '' }));
+  const named = { page, title: typeof raw.title === 'string' ? raw.title : '' };
+  return { ...named, ...raw, ...named, blocks };
+}
 
 /**
  * Done, on a live page: read the body the record stores, lay it out as arranged, and set it whole.
@@ -297,8 +360,8 @@ export type Arranged =
  * `drawn` IS HOW MANY BLOCKS THE SCREEN WAS ARRANGING, and a body with another number is a page that changed since it was
  * read. `before` comes back so the toast's undo can set it again.
  *
- * A TEMPLATE IS REFUSED. Its answer is one row's expansion, and setting that would turn one declaration for every row into
- * a page about one row.
+ * A TEMPLATE ARRANGES THE TEMPLATE (`storedBody`), so every row's page moves together, and the answer names it so the
+ * screen can say so.
  *
  * `seen` IS THE VERSION THE SCREEN DREW, and the write carries it: a page somebody else arranged after it was drawn is
  * refused here or by the record, never written over. `version` in the answer is what the undo carries.
@@ -312,16 +375,14 @@ export async function saveArrangement(
   io?: ClientFetch,
   seen?: number | null,
 ): Promise<Arranged> {
-  const read = await pagesReader(base, io).readOne(slug);
-  if (read.from === 'absent') return { from: 'refused', fix: copy.recordNotReached };
-  if (read.from === 'refused') return read;
-  if (read.from === 'expanded') return { from: 'refused', fix: copy.arrangeTemplate };
-  if (read.page.body.blocks.length !== drawn) return { from: 'refused', fix: copy.arrangeMoved };
-  if (typeof seen === 'number' && read.page.version !== null && read.page.version !== seen) return { from: 'refused', fix: copy.arrangeMoved };
-  const body = arrangedBody(read.page.body, placed, added);
+  const read = await storedBody(base, slug, io);
+  if ('from' in read) return read;
+  if (read.body.blocks.length !== drawn) return { from: 'refused', fix: copy.arrangeMoved };
+  if (typeof seen === 'number' && read.version !== null && read.version !== seen) return { from: 'refused', fix: copy.arrangeMoved };
+  const body = arrangedBody(read.body, placed, added);
   if (!body) return { from: 'refused', fix: copy.arrangeMoved };
-  const out = await setBody(base, body, io, read.page.version);
-  return out.from === 'written' ? { from: 'written', before: read.page.body, version: out.version } : out;
+  const out = await setBody(base, body, io, read.version);
+  return out.from === 'written' ? { from: 'written', before: read.body, version: out.version, template: read.template } : out;
 }
 
 /**

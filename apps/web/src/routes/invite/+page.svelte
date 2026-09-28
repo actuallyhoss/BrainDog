@@ -14,7 +14,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
 
-  import { acceptInvite, acceptProved, lookInvite, passkeyRegister, support, takeInvite, type InviteLink, type InviteSeen, type Said } from '$lib/auth.ts';
+  import { acceptInvite, acceptProved, lookInvite, passkeyRegister, support, takeInvite, type InviteLevel, type InviteLink, type InviteSeen, type Said } from '$lib/auth.ts';
   import { copy } from '$lib/copy.ts';
   import { forget } from '$lib/record/boot-live.ts';
   import { titleOf } from '$lib/title.ts';
@@ -41,6 +41,22 @@
    */
   let name = $state('');
   const asksName = $derived(seen !== null && seen.ok && !seen.value.signedInAs && !link?.proof);
+
+  /**
+   * WHAT THE LINK OPENS, IN ONE LINE, BEFORE ACCEPT: "Ashgrove: Money (adds rows), Tasks (reads)". Somebody asked to
+   * join a record should know what they are agreeing to see before they agree, and the bookkeeper invited to one list
+   * should not have to accept to find out it is one list. The whole record comes first when the invitation gives it,
+   * then each list by its own name. `null` when a host older than these fields said nothing about either, and the
+   * page then says only the address, as it did.
+   */
+  const does = (level: InviteLevel): string => (Object.hasOwn(copy.inviteDoes, level) ? copy.inviteDoes[level] : level);
+  const opens = (v: InviteSeen): string | null => {
+    const what = [
+      ...(v.level !== null ? [copy.inviteEverything(does(v.level))] : []),
+      ...v.lists.map((l) => copy.inviteListGives(l.name, does(l.level))),
+    ];
+    return what.length > 0 ? copy.inviteOpens(v.record ?? copy.inviteThisRecord, what.join(', ')) : null;
+  };
 
   /** The host's own sentence where it gave one, and a calm general one where it did not. */
   const sentence = (out: Said<unknown>): string => (!out.ok && 'fix' in out && typeof out.fix === 'string' && out.fix ? out.fix : copy.inviteFailed);
@@ -142,6 +158,7 @@
                it; the moment it settled `empty` the gate looked and found no `h1` at four widths. The
                branches are exclusive, so exactly one of these is ever on the page. -->
           <h1 class="calm-title">{copy.inviteLanding}</h1>
+          {#if opens(seen.value)}<p class="calm-body opens">{opens(seen.value)}</p>{/if}
           <p class="calm-body">{copy.inviteFor(seen.value.email)}</p>
           {#if seen.value.signedInAs}<p class="calm-body">{copy.inviteSignedInAs(seen.value.signedInAs)}</p>{/if}
           {#if link?.proof && !seen.value.signedInAs}<p class="calm-body">{copy.inviteFromMail}</p>{/if}
@@ -270,5 +287,11 @@
     margin: 0;
     color: var(--ink2);
     overflow-wrap: anywhere;
+  }
+
+  /* WHAT THE LINK OPENS is the line a person decides by, so it reads in ink rather than the grey around it. */
+  .opens {
+    color: var(--ink);
+    font-weight: 500;
   }
 </style>

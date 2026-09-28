@@ -1,9 +1,18 @@
 /**
- * The use-case and add-on SDK on this machine: `braindog usecase|pack new|check|diff|publish|search|key`, `usecase preview`,
+ * The use-case and add-on SDK on this machine: `braindog usecase|pack new|check|diff|publish|yank|search|key|preview`, `pack test`,
  * and `install <id> --from` (`loop/research-marketplace.md` §3, over `@braindog/declare/catalogue`).
  *
  * NEW writes a starting file that already reads through its door (`readShared` for a use case, `readPackFile` for an
- * add-on), so the first `check` passes and every edit after it is checked the way a record will check it.
+ * add-on), so the first `check` passes and every edit after it is checked the way a record will check it. An add-on
+ * starts as a folder shaped like `packs/<id>/`: its file (JSON, or YAML with `--yaml`), `<id>.test.json` and a README.
+ *
+ * CHECK AND TEST RUN THE RECORD ON THIS MACHINE. `pack check` plans and installs the file in a scratch record in memory
+ * (`scratch.ts`), so every refusal a record would give is said with its code, and warns on every manifest key outside
+ * `MANIFEST_KEYS`; `pack test` writes the rows of `<id>.test.json` into that record and says each expectation
+ * (`pack-test.ts`). A file may be YAML anywhere a file is read, through `@braindog/declare/yaml`.
+ *
+ * A KENNEL IS ONE MORE PLACE TO PUBLISH. `publish --kennel [host]` submits to it, `yank` takes a version back there, and
+ * `search` with no `--from` reads it (`kennel.ts`).
  *
  * PUBLISH WRITES INTO A CATALOGUE FOLDER, never to a service. The file is read through its door, its version must be later
  * than the latest there and never one already published, and a version that takes a list, page, module or field away must
@@ -36,7 +45,7 @@
  */
 
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -81,11 +90,16 @@ import {
   type Signature,
   type Trust,
 } from '@braindog/declare/catalogue';
+import { DEFAULT_KENNEL } from '@braindog/declare/kennel';
+import { parseYaml } from '@braindog/declare/yaml';
 import { refused, type Result } from '@braindog/ports';
 
 import { oneLine, printable } from './clip.ts';
 import { hostsPath, target } from './http.ts';
 import { refuse } from './json.ts';
+import { kennelBase, submitToKennel, takeKennel, yankFromKennel } from './kennel.ts';
+import { readPackTest, runPackTest, testFileName } from './pack-test.ts';
+import { checkInScratch } from './scratch.ts';
 import type { AgentIo } from './skills.ts';
 import { proposeFile, readSource } from './usecase.ts';
 
@@ -155,7 +169,7 @@ export function starter(id: string, title: string, author: string): Result<Recor
   });
 }
 
-/** A starting add-on: the same list and page, as a pack file that reads through `readPackFile`. */
+/** A starting add-on: the same list and page with two example rows, as a pack file that reads through `readPackFile`. */
 export function packStarter(id: string, title: string, author: string): Record<string, unknown> {
   return {
     pack: id,
@@ -166,36 +180,138 @@ export function packStarter(id: string, title: string, author: string): Record<s
     license: 'MIT',
     requires: { format: 1, primitives: 1, packs: {} },
     declarations: [ITEMS, itemsPage(id, title)],
+    seeds: [
+      { register: 'items', fields: { name: 'Write the first real item', due: '2026-10-01' } },
+      { register: 'items', fields: { name: 'Delete these two examples', state: 'done' } },
+    ],
   };
 }
 
-async function create(args: string[], io: AgentIo, kind: EntryKind): Promise<number> {
-  const cmd = `braindog ${kind} new`;
-  let values: { title?: string | undefined; author?: string | undefined; out?: string | undefined };
+/** The starting add-on's test: one more row written, then what the list and that row should hold (`pack-test.ts`). */
+export const packStarterTest = (): Record<string, unknown> => ({
+  rows: [{ list: 'items', fields: { name: 'Check the test runs' } }],
+  expect: [
+    { list: 'items', count: 3 },
+    { row: 1, field: 'state', is: 'open' },
+  ],
+});
+
+/** The five lines of README a new add-on's folder starts with. */
+const packReadme = (id: string, title: string, file: string): string =>
+  [
+    `# ${title}`,
+    `What ${title} adds to a BrainDog, in one sentence.`,
+    `Edit ${file}, then run braindog pack check ${id} to see what a record would say about it.`,
+    `Run braindog pack test ${id} to write the rows in ${testFileName(id)} into a scratch record and check what it expects.`,
+    `Publish it with braindog pack publish ${file} --kennel, signed with --sign <key file> or as the person signed in.`,
+    '',
+  ].join('\n');
+
+/** YAML for a JSON document the starter built: plain enough that `parseYaml` reads it back as the same document. */
+function yamlOf(value: unknown, indent = ''): string {
+  const scalar = (v: unknown): string => (typeof v === 'string' ? JSON.stringify(v) : String(v));
+  if (Array.isArray(value)) {
+    if (value.length === 0) return '[]';
+    return value
+      .map((v) => {
+        if (typeof v !== 'object' || v === null) return `${indent}- ${scalar(v)}`;
+        const inner = yamlOf(v, `${indent}  `);
+        return `${indent}- ${inner.slice(indent.length + 2)}`;
+      })
+      .join('\n');
+  }
+  if (typeof value === 'object' && value !== null) {
+    const entries = Object.entries(value);
+    if (entries.length === 0) return '{}';
+    return entries
+      .map(([k, v]) => {
+        if (typeof v !== 'object' || v === null) return `${indent}${k}: ${scalar(v)}`;
+        const empty = Array.isArray(v) ? v.length === 0 : Object.keys(v).length === 0;
+        return empty ? `${indent}${k}: ${Array.isArray(v) ? '[]' : '{}'}` : `${indent}${k}:\n${yamlOf(v, `${indent}  `)}`;
+      })
+      .join('\n');
+  }
+  return `${indent}${scalar(value)}`;
+}
+
+/**
+ * `pack new <id> [--yaml] [--out <folder>]`: a folder shaped like `packs/<id>/`, holding `<id>.pack.json` (or
+ * `.pack.yaml`), `<id>.test.json` and a README, where a first `check` and a first `test` both pass.
+ *
+ * NEVER OVER A FOLDER ALREADY THERE, as `new` never writes over a file.
+ */
+async function createPack(args: string[], io: AgentIo): Promise<number> {
+  let values: { title?: string | undefined; author?: string | undefined; out?: string | undefined; yaml?: boolean | undefined };
   let positionals: string[];
   try {
-    ({ values, positionals } = parseArgs({ args, allowPositionals: true, strict: true, options: { title: { type: 'string' }, author: { type: 'string' }, out: { type: 'string' } } }));
+    ({ values, positionals } = parseArgs({
+      args,
+      allowPositionals: true,
+      strict: true,
+      options: { title: { type: 'string' }, author: { type: 'string' }, out: { type: 'string' }, yaml: { type: 'boolean' } },
+    }));
   } catch {
-    io.say(`${cmd} takes an id, and --title, --author and --out.`);
+    io.say('braindog pack new takes an id, and --title, --author, --out <folder> and --yaml.');
     return 1;
   }
   const [id, ...more] = positionals;
-  if (!id || more.length > 0 || !ID.test(id) || (kind === 'pack' && id.length < 2)) {
+  if (!id || more.length > 0 || !ID.test(id) || id.length < 2) {
+    io.say('braindog pack new takes one id of lower-case letters, digits and dashes, as in braindog pack new reading-club.');
+    return 1;
+  }
+  const words = id.replace(/-/gu, ' ');
+  const title = values.title ?? words.charAt(0).toUpperCase() + words.slice(1);
+  const doc = packStarter(id, title, values.author ?? 'Your name');
+  const read = await readCatalogueFile(`${JSON.stringify(doc)}\n`);
+  if (!read.ok) {
+    refuse(io, read, saidWithCode(read));
+    return 1;
+  }
+  const dir = resolve(io.cwd, values.out ?? id);
+  if (existsSync(dir)) {
+    io.say(`${dir} is already there, and new never writes over it.`);
+    return 1;
+  }
+  const file = `${id}${values.yaml ? '.pack.yaml' : NOUN.pack.suffix}`;
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, file), values.yaml ? `${yamlOf(doc)}\n` : `${JSON.stringify(doc, null, 2)}\n`);
+  writeFileSync(join(dir, testFileName(id)), `${JSON.stringify(packStarterTest(), null, 2)}\n`);
+  writeFileSync(join(dir, 'README.md'), packReadme(id, title, file));
+  io.out(`${title} 1.0.0 written to ${dir}: ${file} with one list, a page over it and two example rows, ${testFileName(id)} and a README. Check it with braindog pack check ${values.out ?? id}, and test it with braindog pack test ${values.out ?? id}.`);
+  return 0;
+}
+
+/** `usecase new <id> [--yaml]`: one `.usecase.json` (or `.usecase.yaml`) file that already reads through `readShared`. */
+async function createUseCase(args: string[], io: AgentIo): Promise<number> {
+  const cmd = 'braindog usecase new';
+  let values: { title?: string | undefined; author?: string | undefined; out?: string | undefined; yaml?: boolean | undefined };
+  let positionals: string[];
+  try {
+    ({ values, positionals } = parseArgs({
+      args,
+      allowPositionals: true,
+      strict: true,
+      options: { title: { type: 'string' }, author: { type: 'string' }, out: { type: 'string' }, yaml: { type: 'boolean' } },
+    }));
+  } catch {
+    io.say(`${cmd} takes an id, and --title, --author, --out and --yaml.`);
+    return 1;
+  }
+  const [id, ...more] = positionals;
+  if (!id || more.length > 0 || !ID.test(id)) {
     io.say(`${cmd} takes one id of lower-case letters, digits and dashes, as in ${cmd} reading-club.`);
     return 1;
   }
   const words = id.replace(/-/gu, ' ');
   const title = values.title ?? words.charAt(0).toUpperCase() + words.slice(1);
-  let doc: Record<string, unknown>;
-  if (kind === 'usecase') {
-    const built = starter(id, title, values.author ?? 'Your name');
-    if (!built.ok) {
-      refuse(io, built, saidWithCode(built));
-      return 1;
-    }
-    doc = built.value;
-  } else doc = packStarter(id, title, values.author ?? 'Your name');
-  const file = resolve(io.cwd, values.out ?? (kind === 'usecase' ? sharedFileName(id, '1.0.0') : `${id}-1.0.0${NOUN.pack.suffix}`));
+  const built = starter(id, title, values.author ?? 'Your name');
+  if (!built.ok) {
+    refuse(io, built, saidWithCode(built));
+    return 1;
+  }
+  const doc = built.value;
+  const named = values.yaml ? sharedFileName(id, '1.0.0').replace(/\.json$/u, '.yaml') : sharedFileName(id, '1.0.0');
+  const file = resolve(io.cwd, values.out ?? named);
   if (existsSync(file)) {
     io.say(`${file} is already there, and new never writes over a file.`);
     return 1;
@@ -206,19 +322,22 @@ async function create(args: string[], io: AgentIo, kind: EntryKind): Promise<num
     refuse(io, read, saidWithCode(read));
     return 1;
   }
-  writeFileSync(file, text);
-  io.out(
-    `${title} 1.0.0 written to ${file}: one list and a page over it. Check it with braindog ${kind} check${kind === 'usecase' ? ', and see it with braindog usecase preview' : ''}.`,
-  );
+  writeFileSync(file, values.yaml ? `${yamlOf(doc)}\n` : text);
+  io.out(`${title} 1.0.0 written to ${file}: one list and a page over it. Check it with braindog usecase check, and see it with braindog usecase preview.`);
   return 0;
 }
 
-/* ── check, for an add-on ───────────────────────────────────────────────── */
+/* ── check and test, for an add-on ──────────────────────────────────────── */
 
+/**
+ * `pack check <file|dir>`: the file read through the add-on door (YAML or JSON), a warning for every key outside
+ * `MANIFEST_KEYS`, then planned and installed in a scratch record holding the modules it needs, so every refusal the
+ * record would give is said here with its code (`scratch.ts`).
+ */
 async function checkPack(args: string[], io: AgentIo): Promise<number> {
   const [file, ...more] = args;
   if (!file || more.length > 0 || file.startsWith('-')) {
-    io.say('braindog pack check takes one file, as in braindog pack check bookshelf-1.0.0.pack.json.');
+    io.say('braindog pack check takes one file or folder, as in braindog pack check bookshelf or braindog pack check bookshelf/bookshelf.pack.json.');
     return 1;
   }
   const read = await readFileAs(file, io, 'pack');
@@ -229,7 +348,56 @@ async function checkPack(args: string[], io: AgentIo): Promise<number> {
   io.out(`${title} ${pack.manifest.version} reads as an add-on: ${count('register')} lists, ${count('page')} pages and ${pack.seeds.length} example rows. Nothing was sent.`);
   io.out(`  By ${pack.manifest.author}, ${pack.manifest.license}.`);
   for (const line of reachLines(reachOf(read.file))) io.out(line);
-  return 0;
+  const checked = await checkInScratch(read.file);
+  for (const line of checked.lines) io.out(line);
+  if (!checked.ok) io.say(`${title} ${pack.manifest.version} would be refused by a record, as said above.`);
+  return checked.ok ? 0 : 1;
+}
+
+/**
+ * `pack test <dir>`: `<id>.test.json` beside the pack, run in a scratch record after the pack and its example rows are
+ * installed, each expectation said as passed or failed (`pack-test.ts`).
+ */
+async function testPack(args: string[], io: AgentIo): Promise<number> {
+  const [given, ...more] = args;
+  if (!given || more.length > 0 || given.startsWith('-')) {
+    io.say('braindog pack test takes the folder a pack is in, as in braindog pack test bookshelf.');
+    return 1;
+  }
+  const read = await readFileAs(given, io, 'pack');
+  if (typeof read === 'number') return read;
+  if (read.file.kind !== 'pack') return 1;
+  const id = read.file.file.pack.manifest.pack;
+  const path = join(read.dir ?? resolve(io.cwd, given), testFileName(id));
+  let doc: unknown;
+  try {
+    doc = JSON.parse(readFileSync(path, 'utf8'));
+  } catch {
+    io.say(`There is no test to run: ${path} is missing or is not JSON. braindog pack new writes one to start from.`);
+    return 1;
+  }
+  const test = readPackTest(doc);
+  if (!test.ok) {
+    refuse(io, test, `${testFileName(id)}: ${saidWithCode(test)}`);
+    return 1;
+  }
+  const checked = await checkInScratch(read.file, true);
+  if (!checked.ok || checked.held === null) {
+    checked.held?.scratch.close();
+    for (const line of checked.lines) io.out(line);
+    io.say(`${oneLine(read.file.file.title)} does not install in a scratch record, so its test did not run.`);
+    return 1;
+  }
+  const { scratch } = checked.held;
+  try {
+    const run = runPackTest(scratch, test.value);
+    io.out(`${oneLine(read.file.file.title)} ${oneLine(read.file.file.pack.manifest.version)}, tested in a scratch record after installing it:`);
+    for (const line of run.lines) io.out(line);
+    if (!run.passed) io.say('Some of what the test expects did not hold, as said above.');
+    return run.passed ? 0 : 1;
+  } finally {
+    scratch.close();
+  }
 }
 
 /* ── what a file reaches, said ──────────────────────────────────────────── */
@@ -470,22 +638,28 @@ function parsed(text: string, read: Catalogue['read'], where: string): Catalogue
 
 /* ── publish, search, diff ──────────────────────────────────────────────── */
 
+/**
+ * `publish <file> --to <folder>` into a catalogue folder, or `publish <file> --kennel [host]` to a Kennel (`kennel.ts`),
+ * signed with `--sign <key file>` either way when one is named.
+ */
 async function publish(args: string[], io: AgentIo, kind: EntryKind): Promise<number> {
   const cmd = `braindog ${kind} publish`;
+  const { rest, kennel: toKennel } = takeKennel(args);
   let values: { to?: string | undefined; sign?: string | undefined };
   let positionals: string[];
   try {
-    ({ values, positionals } = parseArgs({ args, allowPositionals: true, strict: true, options: { to: { type: 'string' }, sign: { type: 'string' } } }));
+    ({ values, positionals } = parseArgs({ args: rest, allowPositionals: true, strict: true, options: { to: { type: 'string' }, sign: { type: 'string' } } }));
   } catch {
-    io.say(`${cmd} takes one file, --to <folder> and --sign <key file>.`);
+    io.say(`${cmd} takes one file, --to <folder> or --kennel [host], and --sign <key file>.`);
     return 1;
   }
   const [file, ...more] = positionals;
-  if (!file || more.length > 0 || values.to === undefined) {
-    io.say(`${cmd} takes one file and --to <folder>, as in ${cmd} ${kind === 'usecase' ? 'study-1.0.0.usecase.json' : 'bookshelf-1.0.0.pack.json'} --to ./catalogue.`);
+  const example = kind === 'usecase' ? 'study-1.0.0.usecase.json' : 'bookshelf/bookshelf.pack.json';
+  if (!file || more.length > 0 || (values.to === undefined) === (toKennel === undefined)) {
+    io.say(`${cmd} takes one file and either --to <folder> or --kennel [host], as in ${cmd} ${example} --to ./catalogue or ${cmd} ${example} --kennel.`);
     return 1;
   }
-  const source = await readSource(file, io);
+  const source = await loadSource(file, io);
   if (!source.ok) {
     io.say(source.fix);
     return 1;
@@ -504,6 +678,12 @@ async function publish(args: string[], io: AgentIo, kind: EntryKind): Promise<nu
     }
     signer = got;
   }
+  if (toKennel !== undefined) {
+    /* THE FILE IS READ HERE FIRST, so a file the Kennel would refuse for its shape is said without sending it. */
+    if (!shape.ok) return refuse(io, shape, `${file}: ${saidWithCode(shape)} Nothing was sent.`);
+    return submitToKennel(source.text, shape.value, toKennel, signer, io);
+  }
+  if (values.to === undefined) return 1;
   const at = await catalogueAt(values.to, io, true);
   if (typeof at === 'string') {
     io.say(at);
@@ -527,19 +707,30 @@ async function publish(args: string[], io: AgentIo, kind: EntryKind): Promise<nu
 
 async function search(args: string[], io: AgentIo, kind: EntryKind): Promise<number> {
   const cmd = `braindog ${kind} search`;
+  const { rest, kennel: inKennel } = takeKennel(args);
   let values: { from?: string | undefined };
   let positionals: string[];
   try {
-    ({ values, positionals } = parseArgs({ args, allowPositionals: true, strict: true, options: { from: { type: 'string' } } }));
+    ({ values, positionals } = parseArgs({ args: rest, allowPositionals: true, strict: true, options: { from: { type: 'string' } } }));
   } catch {
-    io.say(`${cmd} takes words and --from <folder or address>.`);
+    io.say(`${cmd} takes words, and --from <folder or address> or --kennel [host].`);
     return 1;
   }
-  if (values.from === undefined) {
-    io.say(`${cmd} needs --from <folder or address>, the catalogue to read.`);
+  if (values.from !== undefined && inKennel !== undefined) {
+    io.say(`${cmd} reads one catalogue: --from <folder or address>, or --kennel [host].`);
     return 1;
   }
-  const at = await catalogueAt(values.from, io);
+  /* NO --from IS THE KENNEL, the public one unless --kennel names another: a Kennel is a catalogue at an address. */
+  let from = values.from;
+  if (from === undefined) {
+    try {
+      from = inKennel === undefined || inKennel === null ? DEFAULT_KENNEL : kennelBase(inKennel);
+    } catch (e) {
+      io.say(e instanceof Error ? e.message : 'That is not a Kennel address.');
+      return 1;
+    }
+  }
+  const at = await catalogueAt(from, io);
   if (typeof at === 'string') {
     io.say(at);
     return 1;
@@ -559,12 +750,51 @@ async function search(args: string[], io: AgentIo, kind: EntryKind): Promise<num
     if (v) for (const line of reachLines(v.reach)) io.out(line);
     io.out(`  ${trustLine(trustOf(known, trustSubject(e), v?.signature, statements, v ? await keysSignedBefore(e, v.version) : []), e.author)}`);
   }
-  io.out(`Not from the add-on index. A signature is checked when it is installed, with braindog ${kind} install <id> --from ${values.from}.`);
+  io.out(`Not from the add-on index. A signature is checked when it is installed, with braindog ${kind} install <id> --from ${from}.`);
   return 0;
 }
 
-async function readFileAs(given: string, io: AgentIo, kind: EntryKind): Promise<{ text: string; file: CatalogueFile } | number> {
-  const source = await readSource(given, io);
+const YAML_FILE = /\.ya?ml$/iu;
+const SDK_FILE = /\.(pack|usecase)\.(json|ya?ml)$/iu;
+
+/**
+ * A file named on the command line, as JSON text, and the folder it sits in when it is on this machine.
+ *
+ * A FOLDER IS THE FILE INSIDE IT that `pack new` wrote: `<folder name>.pack.json` or `.pack.yaml`, or else the one add-on
+ * or use-case file it holds. A YAML file is read through `@braindog/declare/yaml`, the one parser (ADR-063), and handed
+ * on as the JSON it means, so every door after this one, a checksum and a signature included, reads JSON only.
+ */
+export async function loadSource(given: string, io: AgentIo): Promise<{ ok: true; text: string; dir: string | null } | { ok: false; fix: string }> {
+  let name = given;
+  let dir: string | null = null;
+  if (!/^[a-z][a-z0-9+.-]*:\/\//iu.test(given)) {
+    const path = resolve(io.cwd, given);
+    let folder = false;
+    try {
+      folder = statSync(path).isDirectory();
+    } catch {
+      folder = false;
+    }
+    if (folder) {
+      const inside = readdirSync(path).filter((f) => SDK_FILE.test(f));
+      const own = ['.pack.json', '.pack.yaml', '.pack.yml', '.usecase.json', '.usecase.yaml'].map((s) => `${basename(path)}${s}`).find((f) => inside.includes(f));
+      const found = own ?? (inside.length === 1 ? inside[0] : undefined);
+      if (found === undefined)
+        return { ok: false, fix: inside.length === 0 ? `${given} holds no .pack.json, .pack.yaml or .usecase.json file.` : `${given} holds ${inside.join(', ')}; name the one you mean.` };
+      name = join(path, found);
+      dir = path;
+    } else dir = dirname(path);
+  }
+  const source = await readSource(name, io);
+  if (!source.ok) return source;
+  if (!YAML_FILE.test(name)) return { ok: true, text: source.text, dir };
+  const parsed = parseYaml(source.text);
+  if (!parsed.ok) return { ok: false, fix: `${given}: ${saidWithCode(parsed)}` };
+  return { ok: true, text: `${JSON.stringify(parsed.value, null, 2)}\n`, dir };
+}
+
+async function readFileAs(given: string, io: AgentIo, kind: EntryKind): Promise<{ text: string; file: CatalogueFile; dir: string | null } | number> {
+  const source = await loadSource(given, io);
   if (!source.ok) {
     io.say(source.fix);
     return 1;
@@ -578,7 +808,7 @@ async function readFileAs(given: string, io: AgentIo, kind: EntryKind): Promise<
     io.say(`${given} is ${NOUN[read.value.kind].a}, not ${NOUN[kind].a}. Use braindog ${read.value.kind} for it.`);
     return 1;
   }
-  return { text: source.text, file: read.value };
+  return { text: source.text, file: read.value, dir: source.dir };
 }
 
 const idOf = (f: CatalogueFile): string => (f.kind === 'usecase' ? f.shared.usecase.usecase : f.file.pack.manifest.pack);
@@ -755,25 +985,32 @@ async function proposePack(id: string, doc: Record<string, unknown>, question: s
 
 /* ── preview ────────────────────────────────────────────────────────────── */
 
-async function preview(args: string[], io: AgentIo): Promise<number> {
+/**
+ * `usecase preview <file>` and `pack preview <file|dir>`: the file published to a scratch catalogue and a scratch
+ * self-host started over it, with the page to install it from printed. An add-on is shown the way a use case is.
+ */
+async function preview(args: string[], io: AgentIo, kind: EntryKind = 'usecase'): Promise<number> {
+  const cmd = `braindog ${kind} preview`;
   let values: { port?: string | undefined };
   let positionals: string[];
   try {
     ({ values, positionals } = parseArgs({ args, allowPositionals: true, strict: true, options: { port: { type: 'string' } } }));
   } catch {
-    io.say('braindog usecase preview takes one file and --port <n>.');
+    io.say(`${cmd} takes one file and --port <n>.`);
     return 1;
   }
   const [file, ...more] = positionals;
   const port = Number(values.port ?? '5870');
   if (!file || more.length > 0 || !Number.isInteger(port) || port < 1024 || port > 65535) {
-    io.say('braindog usecase preview takes one file and --port <n> above 1023, as in braindog usecase preview study-1.0.0.usecase.json --port 5870.');
+    io.say(`${cmd} takes one file and --port <n> above 1023, as in ${cmd} ${kind === 'usecase' ? 'study-1.0.0.usecase.json' : 'bookshelf'} --port 5870.`);
     return 1;
   }
-  const got = await readFileAs(file, io, 'usecase');
+  const got = await readFileAs(file, io, kind);
   if (typeof got === 'number') return got;
-  if (got.file.kind !== 'usecase') return 1;
-  const read = { text: got.text, shared: got.file.shared };
+  const read =
+    got.file.kind === 'usecase'
+      ? { text: got.text, id: got.file.shared.usecase.usecase, title: got.file.shared.usecase.title, version: got.file.shared.usecase.version }
+      : { text: got.text, id: got.file.file.pack.manifest.pack, title: got.file.file.title, version: got.file.file.pack.manifest.version };
 
   const scratch = mkdtempSync(join(tmpdir(), 'braindog-preview-'));
   const catalogue = join(scratch, 'catalogue');
@@ -791,7 +1028,7 @@ async function preview(args: string[], io: AgentIo): Promise<number> {
   const entry = io.env.BRAINDOG_SELFHOST || fileURLToPath(new URL('../../selfhost/src/main.ts', import.meta.url));
   if (!existsSync(entry)) {
     rmSync(scratch, { recursive: true, force: true });
-    io.say('braindog usecase preview needs the self-host. Set BRAINDOG_SELFHOST to its entry file.');
+    io.say(`${cmd} needs the self-host. Set BRAINDOG_SELFHOST to its entry file.`);
     return 1;
   }
   /* LOOPBACK AND NOBODY SIGNS IN: no token, a scratch data folder and a scratch key file, so nothing of a real record is
@@ -818,26 +1055,58 @@ async function preview(args: string[], io: AgentIo): Promise<number> {
     return 1;
   }
   /* THE FILE'S TITLE IS ITS AUTHOR'S, and `preview` reads a file from an address as readily as `check` does. */
-  io.out(`Previewing ${oneLine(read.shared.usecase.title)} ${oneLine(read.shared.usecase.version)} on a scratch BrainDog. Open http://localhost:${port}/packs/browse/${read.shared.usecase.usecase}?from=catalogue and press Review the plan. Stop with Ctrl+C; the scratch record is removed.`);
+  io.out(`Previewing ${oneLine(read.title)} ${oneLine(read.version)} on a scratch BrainDog. Open http://localhost:${port}/packs/browse/${read.id}?from=catalogue and press Review the plan. Stop with Ctrl+C; the scratch record is removed.`);
   const code = await run(['serve'], true);
   rmSync(scratch, { recursive: true, force: true });
   return code;
 }
 
+/* ── yank ───────────────────────────────────────────────────────────────── */
+
+/** `yank <id> <version> --reason <why> [--kennel host] [--sign <key file>]`: a version taken back on a Kennel (`kennel.ts`). */
+async function yank(args: string[], io: AgentIo, kind: EntryKind): Promise<number> {
+  const cmd = `braindog ${kind} yank`;
+  const { rest, kennel: onKennel } = takeKennel(args);
+  let values: { reason?: string | undefined; sign?: string | undefined };
+  let positionals: string[];
+  try {
+    ({ values, positionals } = parseArgs({ args: rest, allowPositionals: true, strict: true, options: { reason: { type: 'string' }, sign: { type: 'string' } } }));
+  } catch {
+    io.say(`${cmd} takes an id, a version, --reason <why>, and --kennel [host] and --sign <key file>.`);
+    return 1;
+  }
+  const [id, version, ...more] = positionals;
+  const reason = values.reason?.trim() ?? '';
+  if (!id || !version || more.length > 0 || !ID.test(id) || !VERSION.test(version) || reason === '') {
+    io.say(`${cmd} takes an id, a version and --reason <why>, as in ${cmd} bookshelf 1.0.1 --reason "It drops every row's due date." Readers see the reason as written.`);
+    return 1;
+  }
+  let signer: AuthorKey | undefined;
+  if (values.sign !== undefined) {
+    const got = await readKeyFile(values.sign, io);
+    if (typeof got === 'string') {
+      io.say(got);
+      return 1;
+    }
+    signer = got;
+  }
+  return yankFromKennel(kind, id, version, reason, onKennel, signer, io);
+}
 
 /** The SDK verbs `usecase` and `pack` hand here, or `null` for a verb that is not one of them. */
 export function sdkVerb(verb: string | undefined, kind: EntryKind = 'usecase'): ((args: string[], io: AgentIo) => Promise<number>) | null {
-  if (verb === 'new') return (a, io) => create(a, io, kind);
+  if (verb === 'new') return kind === 'pack' ? createPack : createUseCase;
   if (verb === 'publish') return (a, io) => publish(a, io, kind);
+  if (verb === 'yank') return (a, io) => yank(a, io, kind);
   if (verb === 'search') return (a, io) => search(a, io, kind);
   if (verb === 'diff') return (a, io) => diff(a, io, kind);
   if (verb === 'key') return (a, io) => key(a, io, kind);
-  if (verb === 'preview' && kind === 'usecase') return preview;
+  if (verb === 'preview') return (a, io) => preview(a, io, kind);
   return null;
 }
 
 const PACK_USAGE =
-  'braindog pack takes new <id>, check <file>, diff <a> <b>, key <file> --author <name>, key rotate <old key file> <new key file> --to <folder>, key revoke <key file> --to <folder> --reason <why> [--successor <key id>], publish <file> --to <folder> [--sign <key file>], search [words] --from <catalogue>, or install <id|file> [--from <catalogue>] [--version <x.y.z>] [--host <host>] [--dry-run].';
+  'braindog pack takes new <id> [--yaml], check <file|dir>, test <dir>, preview <file|dir>, diff <a> <b>, key <file> --author <name>, key rotate <old key file> <new key file> --to <folder>, key revoke <key file> --to <folder> --reason <why> [--successor <key id>], publish <file> --to <folder> or --kennel [host] [--sign <key file>], yank <id> <version> --reason <why> [--kennel host], search [words] [--from <catalogue>], or install <id|file> [--from <catalogue>] [--version <x.y.z>] [--host <host>] [--dry-run].';
 
 /**
  * `pack install <file>`: a `.pack.json` from a path or an address, read through the add-on door here first, then asked for
@@ -863,6 +1132,7 @@ async function installPackFile(given: string, host: string | undefined, io: Agen
 export async function pack(args: string[], io: AgentIo): Promise<number> {
   const [verb, ...rest] = args;
   if (verb === 'check') return checkPack(rest, io);
+  if (verb === 'test') return testPack(rest, io);
   if (verb === 'install') {
     let values: { host?: string | undefined; from?: string | undefined; version?: string | undefined; 'dry-run'?: boolean | undefined };
     let positionals: string[];
@@ -902,7 +1172,7 @@ export async function pack(args: string[], io: AgentIo): Promise<number> {
     }
     return installFromCatalogue(given, from, values.version, values.host, io, 'pack', dryRun);
   }
-  const sdk = verb === 'preview' ? null : sdkVerb(verb, 'pack');
+  const sdk = sdkVerb(verb, 'pack');
   if (sdk) return sdk(rest, io);
   io.say(PACK_USAGE);
   return 1;

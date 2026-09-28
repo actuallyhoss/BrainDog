@@ -3,12 +3,13 @@
  * came of the press.
  *
  * A FILE OF ITS OWN AND NOT `copy.ts`, because every line here is about one affordance (`AddField.svelte`) and the
- * module that writes for it (`field-write.ts`), and the three move together. The rules are the house ones: no dashes
+ * module that writes for it (`field-write.ts`), and the three move together. The Fields sheet (`ListEditor.svelte`) is
+ * the same affordance grown to every kind, so its words are here too. The rules are the house ones: no dashes
  * between clauses, and nothing that names a use case. A list somebody extends is theirs, so no sentence here knows
  * what the list holds; the one example is the placeholder, which a person types over.
  */
 
-import type { Addable } from './field-write.ts';
+import type { Addable, DurationUnit, SheetKind } from './field-write.ts';
 
 /** What each kind of field is called where somebody picks one, in the order they are offered. */
 export const KIND_WORDS: Readonly<Record<Addable, string>> = {
@@ -43,4 +44,81 @@ export const fieldWords = {
   reason: 'Added by the owner from a row.',
   added: (label: string) => `${label} is on every row now.`,
   filed: (label: string) => `${label} is waiting on Decide for the owner.`,
+  reserved: (label: string) => `${label} is a name the record keeps for itself. Pick another.`,
+} as const;
+
+/**
+ * What each kind is called in the Fields sheet, where every kind a list can hold is offered, in the order it is offered.
+ *
+ * A WIDER SET THAN `KIND_WORDS`, because the sheet asks the one more thing some kinds need (the values of a choice list,
+ * the list a link points at, the unit a duration is said in), and the one-line form on a row page asks nothing more.
+ */
+export const SHEET_KIND_WORDS: Readonly<Record<SheetKind, string>> = {
+  text: 'Text',
+  document: 'Long text',
+  enum: 'Choice list',
+  ref: 'Link to another list',
+  money: 'Money',
+  tags: 'List of text',
+  int: 'Whole number',
+  decimal: 'Number',
+  quantity: 'Quantity',
+  duration: 'Duration',
+  day: 'Date',
+  instant: 'Day and time',
+  bool: 'Yes or no',
+  url: 'Web address',
+  email: 'Email address',
+};
+
+/** How a duration may be said, and the word for each: the record keeps seconds and says them in this unit. */
+export const DURATION_WORDS: Readonly<Record<DurationUnit, string>> = { m: 'Minutes', h: 'Hours', d: 'Days' };
+
+/**
+ * The kind of a field the list already has, as the sheet says it beside its name.
+ *
+ * `listName` turns the id a link points at into the name a person reads, because a link to `vendors` is said as a link to
+ * Suppliers when that is what the list is called.
+ */
+export function kindSaid(f: { type: string; of?: string | undefined; to?: string | undefined }, listName: (id: string) => string): string {
+  if (f.type === 'ref' && f.to) return `Link to ${listName(f.to)}`;
+  if (f.type === 'list' && f.of === 'ref' && f.to) return `Links to ${listName(f.to)}`;
+  if (f.type === 'list' && f.of === 'text') return SHEET_KIND_WORDS.tags;
+  if (f.type === 'list') return 'List';
+  return Object.hasOwn(SHEET_KIND_WORDS, f.type) ? SHEET_KIND_WORDS[f.type as SheetKind] : 'Other';
+}
+
+/** The words of the Fields sheet: the fields a list has, adding one of any kind, renaming, and retiring. */
+export const sheetWords = {
+  open: 'Fields',
+  title: (list: string) => `Fields of ${list}`,
+  subtitle: 'Every row of the list has these.',
+  none: 'This list has no fields yet beyond its name.',
+  titleField: 'The name each row is called by',
+  rename: 'Rename',
+  renameTo: (label: string) => `New name for ${label}`,
+  saveName: 'Save the name',
+  cancel: 'Cancel',
+  done: 'Done',
+  addHead: 'Add a field',
+  values: 'Choices',
+  valuesHelp: 'One per line, or separated by commas.',
+  noValues: 'A choice list needs at least one choice.',
+  valueTwice: (value: string) => `${value} is in the choices twice.`,
+  linkTo: 'Links to',
+  noLists: 'This record has no other list to link to yet.',
+  pickList: 'Pick the list it links to.',
+  unit: 'Said in',
+  quantityUnit: 'Unit',
+  quantityHelp: 'Optional, like kg or hours. Each row can say its own.',
+  moneyHelp: 'Each amount keeps its own currency.',
+  retireNote: 'Retiring waits on Decide, and every row keeps its value.',
+  renamed: (was: string, now: string) => `${was} is called ${now} now.`,
+  renameFiled: (now: string) => `The new name ${now} is waiting on Decide for the owner.`,
+  sameName: 'That is already its name.',
+  nameTaken: (label: string) => `Another field is already called ${label}.`,
+  renameQuestion: (was: string, now: string, list: string) => `Rename ${was} to ${now} on ${list}?`,
+  renameReason: 'Renamed by the owner from the Fields sheet.',
+  addReason: 'Added by the owner from the Fields sheet.',
+  noSchema: 'BrainDog could not read the list just now. Try again.',
 } as const;

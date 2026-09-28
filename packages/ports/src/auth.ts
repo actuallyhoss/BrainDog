@@ -84,6 +84,35 @@ export type AuthCall =
 export type AuthFlow = AuthCall['flow'];
 
 /**
+ * A stranger asking for a record of their own (`loop/finish/ops.md` §4.0 C, OPS-17). The Worker's alone: a self-host is
+ * made by its operator and has nobody to sign up.
+ *
+ * A UNION BESIDE `AuthCall` AND NOT THREE MORE ARMS IN IT, because `serveAuth` (`packages/host/src/auth.ts`) switches
+ * over `AuthCall` with a `never` default, and a flow it has no case for is meant to fail to compile there. These three
+ * never reach that switch: the Worker's `signIn()` answers their routes before `serveAuth` is asked, so the Directory's
+ * `auth` takes both unions and every host that holds an `Auth` is unchanged.
+ *
+ * `signup.start` ALWAYS ANSWERS `200 {}` for an address, known or not, and only the mail differs: a new address is sent
+ * the proof, and one that can already sign in is sent a sign-in link. `turnstile` never reaches the Directory: the
+ * Worker checks it and drops it.
+ */
+export type SignupCall =
+  | { flow: 'signup.start'; email: string; slug: string; name?: string; tz?: string; ip: string }
+  /**
+   * The proof back from the mailbox, spent once: the person is made, and signed in. A presented `sid` is deleted before
+   * the new session is written, as on every sign-in.
+   */
+  | { flow: 'signup.verify'; token: string; ip: string; sid?: string }
+  /** Whether a name for a new record is free, and why not when it is not. Reads, and writes nothing. */
+  | { flow: 'signup.name'; slug: string };
+
+/** What `signup.name` answers: the name as it would be stored, whether it can be had, and the sentence when not. */
+export type SignupName = { slug: string; free: boolean; why?: string };
+
+/** What `signup.verify` answers: who was made, and the record name, person's name and zone typed at the start. */
+export type SignupVerified = { person: string; email: string; slug: string; name: string | null; tz: string | null };
+
+/**
  * Who a live session belongs to.
  *
  * `record` IS THE ONE COOKIE'S SECOND HALF. The session row carries the record it was opened for, so the browser
@@ -163,6 +192,9 @@ export type Mail =
   | { to: string; linkToken: string }
   | { to: string; claimToken: string }
   | { kind: 'invite.prove'; to: string; link: string }
+  /* A SIGN-UP'S TWO LETTERS BOTH CARRY A LINK: the proof for a new address, and a sign-in link for a known one, so the
+     person who already has an account is let in rather than told so on the page. */
+  | { kind: 'signup.verify' | 'signup.known'; to: string; link: string }
   | { kind: 'passkey.added' | 'passkey.removed'; to: string };
 
 /**
@@ -222,6 +254,9 @@ export type AuthBodies = {
   'logout.all': { ended: number };
   'invite.prove': Record<string, never>;
   'invite.proved': InviteProved;
+  'signup.start': Record<string, never>;
+  'signup.verify': SignupVerified;
+  'signup.name': SignupName;
 };
 
 /** `auth(call)`, typed so the body matches the flow that was asked. */

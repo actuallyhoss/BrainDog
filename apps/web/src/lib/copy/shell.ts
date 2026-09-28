@@ -70,6 +70,8 @@ export const shell = {
   settings: 'Settings',
   audit: 'History',
   automations: 'Automations',
+  /* AGT-23's screen, named in the rail and in the phone's More sheet. */
+  jobs: 'Jobs',
   more: 'More',
   close: 'Close',
   arrangeCancel: 'Cancel',

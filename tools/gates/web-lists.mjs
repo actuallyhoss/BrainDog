@@ -64,15 +64,11 @@ const CURRENCY_TABLES = new Set(['apps/web/src/lib/record/currencies.ts', 'apps/
  * like anywhere else.
  */
 const HELD = {
-  /* The first run: its keyword map to the modules, and a hand copy of the modules. The first run moves to the
-     catalogue in W2 (USE-3, then PGS-20), which is where these go. */
+  /* The first run hears packs by the catalogue's signals since USE-3; what is left is the rows a sentence fills, which
+     are Projects', People's and Money's, and the Projects every other list points at. PGS-20 owns it next. */
   'apps/web/src/lib/shape.ts': {
-    ids: ['agents', 'estate', 'money-core', 'obligations', 'people', 'portfolio', 'things', 'work'],
-    why: "the first run's map from what a person says to a first-party module, which catalogue signals replace.",
-  },
-  'apps/web/src/lib/record/modules.ts': {
-    ids: ['agents', 'credentials', 'estate', 'learnings', 'money-core', 'obligations', 'people', 'portfolio', 'services', 'skills', 'tasks', 'things', 'tools', 'work'],
-    why: 'a hand copy of the first-party modules, which the manifests and the catalogue replace.',
+    ids: ['money-core', 'obligations', 'people', 'portfolio', 'things'],
+    why: "the first rows a sentence fills (a project, a person, an invoice) and the Projects module every other list leans on.",
   },
   'apps/web/src/lib/who.ts': {
     ids: ['people'],
@@ -80,7 +76,7 @@ const HELD = {
   },
   'apps/web/src/routes/inbox/+page.svelte': {
     ids: ['agents'],
-    why: "the inbox reads the Agents module's lists through `moduleOf`, which goes with `modules.ts`.",
+    why: "the inbox reads the Agents module's lists off its manifest (`@braindog/seed/packs/modules`) by the pack id.",
   },
 
   /* A list the web reads by its id, where the record could say which list plays the part. */

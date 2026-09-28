@@ -31,12 +31,19 @@ test('A CARD SHOWS THE RAIL, THE LISTS AND HOME FROM THE DECLARATIONS, AND THE V
   assert.ok(team.home.some((h) => 'voice' in h && h.voice === 'right_now'));
   assert.ok(team.lists.includes('Tickets') || team.lists.length > 0);
   const business = previewOf(useCase('business')!);
-  assert.deepEqual(business, { rail: [], lists: [], home: [], spine: {} });
+  /* SMALL BUSINESS HAS ITS OWN HOME SINCE 1.2.0 AND STILL NO RAIL, LIST OR VOICE: the card shows the Home it opens on. */
+  assert.deepEqual(business, {
+    rail: [],
+    lists: [],
+    home: [{ text: 'What you have' }, { text: 'Due this week' }, { text: 'Needs your call' }, { text: 'Working now' }, { text: 'What changed' }],
+    spine: {},
+  });
 });
 
-test('SMALL BUSINESS INSTALLS THE HOUSE MODULES FROM BROWSE, AND A USE CASE THAT NAMES ITS OWN KEEPS THEM', async () => {
+test('SMALL BUSINESS INSTALLS NO MODULE IT DOES NOT NAME FROM BROWSE, AND A USE CASE THAT NAMES ITS OWN KEEPS THEM', async () => {
+  /* NO HOUSE SETUP SINCE MOD-17 (`loop/finish/modules.md`): a use case that names none is handed none. */
   const file = builtInFile('business', '2026-09-17') as { modules: string[] };
-  assert.deepEqual(file.modules, ['portfolio', 'people', 'money-core', 'estate', 'work']);
+  assert.deepEqual(file.modules, []);
   const read = await readShared(JSON.stringify(file));
   assert.ok(read.ok);
   assert.deepEqual((builtInFile('student', '2026-09-17') as { modules: string[] }).modules, useCase('student')!.modules);
@@ -46,7 +53,8 @@ test('A DETAIL PAGE SAYS WHAT A USE CASE INSTALLS, FROM THE FILE', () => {
   const student = installsOf(useCase('student')!);
   assert.ok(student.lists.includes('Courses'));
   assert.ok(student.pages.length > 0);
-  assert.ok(student.examples > 0);
+  /* A BUILT-IN IS HANDED OUT WITH NO EXAMPLE ROW (C11), so its detail page promises none. */
+  assert.equal(student.examples, 0);
   assert.deepEqual(student.skills.map((s) => s.name), ['study-planner']);
-  assert.deepEqual(installsOf(useCase('business')!), { modules: ['portfolio', 'people', 'money-core', 'estate', 'work'], lists: [], pages: [], examples: 0, skills: [] });
+  assert.deepEqual(installsOf(useCase('business')!), { modules: [], lists: [], pages: [], examples: 0, skills: [] });
 });

@@ -25,6 +25,8 @@ import type { Result } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 
 import { meter, pause, type ActionDeps, type Metered } from './actions.ts';
+import type { Json } from './coerce.ts';
+import { readPackConfig } from './declare.ts';
 import { SCRIPT_CHAIN_CEILING, chainOfJob, underChain } from './flow.ts';
 import { instant } from './migrate.ts';
 import type { OutboxRow } from './outbox.ts';
@@ -69,6 +71,16 @@ export type Scripted = {
     /** `script:<id>@v<n>`: what every row it writes says wrote it. */
     actor: string;
     input: unknown;
+    /**
+     * `ctx.config`: the owning pack's settings as they stand when the run is leased, each a chosen value or else its
+     * default (or `null` when it has neither), and `{}` for a script no pack owns.
+     *
+     * READ AT THE RUN, NOT AT INSTALL, unlike a `{{config:}}` in a declaration. A script's source is the owner's approved
+     * code and a setting only changes what it is handed, the way `input` does, so a change on the settings screen holds
+     * from the next run with no reinstall. OPTIONAL IN THE TYPE ONLY: `prepareScript` always sets it, and a host that
+     * builds a `Scripted` of its own (a trial, a test's double) and leaves it out hands the sandbox `{}`.
+     */
+    config?: Record<string, Json>;
     decl: Pick<ScriptBody, 'egress' | 'keys' | 'reads' | 'writes' | 'limits' | 'source'>;
     record: { id: string; tz: string };
   };
@@ -163,6 +175,18 @@ const hostOf = (origin: string | undefined): string | null => {
 const isObject = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
 
 /**
+ * The settings a run's `ctx.config` holds: its pack's values now, defaults filled, or `{}`.
+ *
+ * `{}` AND NOT A REFUSAL when the pack is gone or declares nothing. A script with no active version never gets here,
+ * so a pack that cannot be read is one whose manifest holds no settings, and a run of it reads none.
+ */
+function settingsFor(deps: Pick<ScriptRunDeps, 'sql'>, pack: string | null): Record<string, Json> {
+  if (pack === null) return {};
+  const read = readPackConfig(deps.sql, pack);
+  return read.ok ? { ...read.value.values } : {};
+}
+
+/**
  * A leased `script.run` becomes a job a host can run, or is finished here because it cannot.
  *
  * THE VERSION IS THE ONE IN THE PAYLOAD. `script.ts` pins it at fire time, and this reads that exact declaration row,
@@ -178,9 +202,15 @@ export function prepareScript(deps: ScriptRunDeps, job: OutboxRow): Scripted | M
   }
   const script = typeof payload.script === 'string' ? payload.script : '';
   const version = typeof payload.version === 'number' && Number.isInteger(payload.version) ? payload.version : null;
+  /* THE OWNER AS `declare.ts` READS ONE: the pack path writes `pack_id`, and the seed's first-party packs name
+     themselves only in the body's `pack:`. */
   const found =
     script !== '' && version !== null && activeScript(deps.sql, script) !== null
-      ? deps.sql.one<{ body: string }>("SELECT body FROM declaration WHERE id = ? AND kind = 'script' AND version = ?", `script.${script}`, version)
+      ? deps.sql.one<{ body: string; pack: string | null }>(
+          "SELECT body, coalesce(pack_id, json_extract(body, '$.pack')) AS pack FROM declaration WHERE id = ? AND kind = 'script' AND version = ?",
+          `script.${script}`,
+          version,
+        )
       : null;
 
   if (!found) {
@@ -201,6 +231,7 @@ export function prepareScript(deps: ScriptRunDeps, job: OutboxRow): Scripted | M
       version: version!,
       actor: `script:${script}@v${version}`,
       input: payload.input ?? null,
+      config: settingsFor(deps, typeof found.pack === 'string' ? found.pack : null),
       decl: {
         egress: body.egress,
         keys: body.keys,

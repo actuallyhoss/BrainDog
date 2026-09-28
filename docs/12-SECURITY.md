@@ -672,15 +672,24 @@ The rules for `file` and the `/a/<sha256>` route, all from the predecessor and a
 
 - **The writer cannot choose the key** — it is the content's SHA-256, so dedupe is per record and
   a stranger cannot overwrite.
-- **Type from bytes, never from the header.** PNG, JPEG, WebP, GIF, AVIF. **SVG is refused with
-  `415`** — an SVG is a script.
-- Served with `nosniff`, `default-src 'none'; sandbox`, `noindex`, immutable. **The URL is the
-  capability**: an `<img>` cannot send a bearer header, so the route is unauthenticated and the
-  64-hex path regex is what stops traversal.
-- 2 MB, checked against `Content-Length` before buffering and against the bytes after.
-- **Uploads exist, and the client names the hash**: `PUT /a/<sha256>` with a session cookie or a `write`
-  bearer; the server hashes what arrived and a mismatch is `CHECKSUM_MISMATCH`
-  ([51-SPEC-WORKER](51-SPEC-WORKER.md) §5.5). *(An earlier draft had a store and no way in.)*
+- **Type from bytes, never from the header.** PNG, JPEG, WebP, GIF, AVIF, PDF. **SVG is refused with
+  `415`**: an SVG is a script. A header that names a type other than the bytes' is refused too.
+- Served with `nosniff`, `default-src 'none'; sandbox`, `private`, immutable, so a file opened as a page
+  runs nothing and no shared cache keeps it.
+- 2 MB, checked against `Content-Length` before reading and against the bytes as they arrive.
+- **The route is `/api/files`, and it asks who you are** (OPS-20). The earlier `/a/<sha256>` was
+  never forwarded by the site, and "the URL is the capability" made a hash seen once a key for
+  ever. Now `PUT /api/files` takes a session cookie from the page's own origin, or a `write` bearer,
+  and the server hashes what arrived and answers `{ sha256, mime, bytes }`; `GET
+  /api/files/<sha256>` takes the same doors and anybody the record lets read. The app's `<img>`
+  sends its cookie, so it needs no bearer. The 64-hex test stops traversal before a key or a path
+  is built, and the key is always under the caller's own record (`rec_<id>/a/` on the Cloud,
+  `<data>/<slug>/blobs/` on a self-host), so no hash reaches another record's file
+  ([51-SPEC-WORKER](51-SPEC-WORKER.md) §5.5).
+- **An erasure deletes the file, and so does deleting the record.** The kernel queues one
+  `erase.r2` per file the subject's rows held; the host deletes that object, and the nightly walk
+  puts back any that is still in the bucket. Deleting a record sweeps its `a/` prefix before its
+  bytes go.
 
 ### The export, and what it leaves out
 

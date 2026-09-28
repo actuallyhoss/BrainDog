@@ -11,25 +11,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { dismiss, dismissedFor, signatureOf } from './dismissed.ts';
 import { navShapeSignals, recommendNavShape, type NavShapeSignals } from './nav-shape.ts';
 
 const base: NavShapeSignals = { entries: 0, sections: 0, handArranged: false, current: undefined };
-
-/** A `localStorage` with a jar behind it, since that is the whole of what `dismissed.ts` touches. */
-function jar() {
-  const data = new Map<string, string>();
-  (globalThis as { localStorage?: Storage }).localStorage = {
-    getItem: (k: string) => data.get(k) ?? null,
-    setItem: (k: string, v: string) => void data.set(k, v),
-    removeItem: (k: string) => void data.delete(k),
-    clear: () => data.clear(),
-    key: (i: number) => [...data.keys()][i] ?? null,
-    get length() {
-      return data.size;
-    },
-  } as Storage;
-}
 
 test('nothing placed yet recommends the menu, and says why', () => {
   const rec = recommendNavShape({ ...base, entries: 0 });
@@ -88,28 +72,4 @@ test('navShapeSignals reads entries and sections off the nav list and the regist
 test('navShapeSignals reads a hand-arranged nav from a non-empty Pref.nav', () => {
   const signals = navShapeSignals([{ section: 'Money' }], 0, { nav: ['/p/money'], navShape: undefined });
   assert.equal(signals.handArranged, true);
-});
-
-test('a dismissal is terminal for the exact recommendation, and not for a different one', () => {
-  jar();
-  const rec = { shape: 'bar' as const, reason: 'You have 4 nav entries.' };
-  const sig = signatureOf(rec);
-  assert.equal(dismissedFor('a-record-nobody-else-uses'), null);
-  dismiss('a-record-nobody-else-uses', sig);
-  assert.equal(dismissedFor('a-record-nobody-else-uses'), sig);
-  assert.notEqual(dismissedFor('a-record-nobody-else-uses'), signatureOf({ shape: 'rail', reason: 'grew' }));
-});
-
-test('a second record dismissing its own recommendation does not touch the first', () => {
-  jar();
-  dismiss('record-a', signatureOf({ shape: 'bar', reason: 'small' }));
-  dismiss('record-b', signatureOf({ shape: 'menu', reason: 'empty' }));
-  assert.equal(dismissedFor('record-a'), 'bar:small');
-  assert.equal(dismissedFor('record-b'), 'menu:empty');
-});
-
-test('dismissedFor reads null rather than throwing when localStorage is absent', () => {
-  delete (globalThis as { localStorage?: Storage }).localStorage;
-  assert.equal(dismissedFor('never-touched-record'), null);
-  dismiss('never-touched-record', 'bar:x');
 });

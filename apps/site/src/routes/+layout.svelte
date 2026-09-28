@@ -1,5 +1,5 @@
 <!--
-  The site shell: a bar, the page, a footer.
+  The site shell: a bar, the page, a footer. Which pages the bar and the footer name is `nav.ts`'s.
 
   NOTHING HERE IS NEEDED TO READ THE SITE. The nav is links, the theme follows the operating system,
   and every page is finished HTML. The one thing scripting adds is closing the phone menu after a
@@ -20,26 +20,37 @@
   import { page } from '$app/state';
   import Icon from '$lib/Icon.svelte';
   import Mark from '$lib/Mark.svelte';
-  import { APP, DOCS, SIGNUP, SOURCE, site } from '$lib/copy.ts';
+  import { site } from '$lib/copy.ts';
+  import { SIGNIN, SIGNUP, SOURCE } from '$lib/links.ts';
+  import { LIVE, type Group } from '$lib/nav.ts';
 
   let { children } = $props();
 
   let menuOpen = $state(false);
   let menu: HTMLDetailsElement | undefined = $state();
 
-  /* `Design` IS ABSENT UNTIL `DOCS` HAS AN ADDRESS. `GitHub` is drawn from `SOURCE`, which is
-     published ahead of the repository going public, on the owner's word (see `copy.ts`). */
-  const links: { href: string; label: string }[] = [
-    { href: '/slash', label: site.nav.slash },
-    { href: '/pricing', label: site.nav.pricing },
-    /* THE PAGE THE HOME PAGE'S SPECIFICATIONS MOVED TO, in the bar because §19 asks for a page a
-       curious reader reaches ON PURPOSE, and a link only in the footer is one they reach by
-       scrolling past everything else first. */
-    { href: '/agents', label: site.nav.agents },
-    { href: '/changelog', label: site.nav.changelog },
-    ...(DOCS ? [{ href: DOCS, label: site.nav.docs }] : []),
-    ...(SOURCE ? [{ href: SOURCE, label: site.nav.source }] : []),
-  ];
+  type Link = { href: string; label: string; rel?: 'external' };
+
+  /* THE HEADER'S LINKS ARE `nav.ts`'s, so each page appears the day its route does and never
+     before. `GitHub` is drawn from `SOURCE`, which is published ahead of the repository going
+     public, on the owner's word. */
+  const github: Link[] = SOURCE ? [{ href: SOURCE, label: site.nav.source }] : [];
+  const links: Link[] = [...LIVE.filter((p) => p.header).map((p) => ({ href: p.path, label: p.label })), ...github];
+
+  /* `rel="external"` ON EVERY LINK UNDER `/app`, because `/app` is on this site's name and is not a
+     page of this site. Without it the prerender crawler follows the link and the build stops at
+     "404 /app". SvelteKit's crawler skips a link marked `external` and its router leaves the click
+     to the browser, so it is an ordinary page load. */
+  const signin: Link = { href: SIGNIN, label: site.nav.signin, rel: 'external' };
+
+  /* THE FOOTER: three groups of the same pages beside the brand. GitHub sits with Build and Sign in
+     with Product, and the licence is named only on /legal. */
+  const group = (g: Group): Link[] => LIVE.filter((p) => p.group === g).map((p) => ({ href: p.path, label: p.label }));
+  const columns: { title: string; links: Link[] }[] = [
+    { title: site.footer.groups.product, links: [...group('product'), signin] },
+    { title: site.footer.groups.build, links: [...group('build'), ...github] },
+    { title: site.footer.groups.trust, links: group('trust') },
+  ].filter((c) => c.links.length > 0);
 
   const here = (href: string) => page.url.pathname === href;
 
@@ -75,23 +86,13 @@
       {/each}
     </nav>
 
-    <!-- A QUIET PILL AND NOT A FILLED ONE. Every page has its own filled primary (the hero, the
-         hosted plan, the changelog's status), and a filled button up here made two answers to
-         "what do I do" in the first screen of each.
-
-         `rel="external"` ON EVERY LINK TO `APP`, because `/app` is on this site's name and is not a
-         page of this site: the site's script hands it to the app. Without it the prerender crawler
-         followed the link and the build stopped at "404 /app (linked from /)" (measured when `APP`
-         became `/app`). SvelteKit's crawler skips a link marked `external` (`crawl.js` tests `rel`
-         for it) and its router leaves the click to the browser, so it is an ordinary page load. -->
     <!-- SIGN IN QUIET AND START FILLED: the site describes the finished product (`loop/DIRECTION.md`
          §33), where a stranger's one action is to start a record and a customer's is to sign in. -->
-    <a class="signin" href="{APP}/signin" rel="external">{site.nav.signin}</a>
+    <a class="signin" href={signin.href} rel="external">{signin.label}</a>
     <a class="btn btn-sm btn-primary cta" href={SIGNUP} rel="external">{site.nav.start}</a>
 
-    <!-- THE PHONE'S BAR IS ONE ROW. It was two: the brand and the action, then the links on a line
-         of their own, over a hundred pixels before the first word of the page. The links live in
-         this disclosure under a thumb-sized button instead, and the action stays in the bar. -->
+    <!-- THE PHONE'S BAR IS ONE ROW: the brand, the action and this button. The links and Sign in
+         live in this disclosure in 44px rows, so the page's first word sits near the top. -->
     <details class="menu" bind:open={menuOpen} bind:this={menu}>
       <summary class="menu-btn" aria-label={site.nav.menu}>
         <Icon name={menuOpen ? 'close' : 'rows'} />
@@ -105,7 +106,7 @@
             onclick={() => (menuOpen = false)}>{link.label}<Icon name="arrow" size="s" /></a
           >
         {/each}
-        <a class="menu-link" href="{APP}/signin" rel="external">{site.nav.signin}<Icon name="arrow" size="s" /></a>
+        <a class="menu-link" href={signin.href} rel="external">{signin.label}<Icon name="arrow" size="s" /></a>
         <a class="btn btn-primary menu-app" href={SIGNUP} rel="external">{site.nav.start}</a>
       </nav>
     </details>
@@ -124,10 +125,10 @@
       <p class="foot-tagline">{site.footer.tagline}</p>
     </div>
 
-    {#each site.footer.columns as column}
+    {#each columns as column}
       <nav class="foot-col" aria-label={column.title}>
         <h2 class="foot-title">{column.title}</h2>
-        {#each column.links as link}<a href={link.href} rel={'rel' in link ? link.rel : undefined}>{link.label}</a>{/each}
+        {#each column.links as link}<a href={link.href} rel={link.rel}>{link.label}</a>{/each}
       </nav>
     {/each}
   </div>
@@ -193,6 +194,7 @@
     text-decoration: none;
   }
 
+  /* Poppins here and nowhere else on the site: the wordmark is the one place the display face is the brand. */
   .wordmark {
     color: var(--ink);
     font-family: var(--font-display);
@@ -331,16 +333,16 @@
     border-block-start: 1px solid var(--line);
   }
 
+  /* The brand and its slogan take the widest column, and the three groups share the rest. */
   .foot-in {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-start;
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr));
+    align-items: start;
     gap: var(--sp-7);
     padding-block: var(--sp-7) var(--sp-8);
   }
 
   .foot-brand {
-    flex: 1;
     display: flex;
     flex-direction: column;
     gap: var(--sp-2);
@@ -349,13 +351,14 @@
 
   .foot-tagline {
     color: var(--dim);
-    font-size: var(--t-sm);
+    font-size: var(--t-site-small);
   }
 
   .foot-col {
     display: flex;
     flex-direction: column;
-    min-inline-size: 12ch;
+    align-items: flex-start;
+    min-inline-size: 0;
   }
 
   .foot-title {
@@ -415,18 +418,28 @@
       display: block;
     }
 
+    /* Two columns of groups under the brand, each row a thumb's height. */
     .foot-in {
-      gap: var(--sp-6) var(--sp-7);
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: var(--sp-6) var(--sp-5);
     }
 
     .foot-brand {
-      flex-basis: 100%;
+      grid-column: 1 / -1;
+    }
+
+    .foot-col a {
+      min-block-size: var(--tap);
     }
   }
 
   @media (width < 370px) {
     .cta {
       display: none;
+    }
+
+    .foot-in {
+      grid-template-columns: minmax(0, 1fr);
     }
 
     .menu {

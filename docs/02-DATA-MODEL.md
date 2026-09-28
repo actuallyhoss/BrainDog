@@ -14,7 +14,8 @@ resolve offline, the vault's wrapped keys, and the two job tables of tier C.)*
 
 ```sql
 -- IDENTITY AND SHAPE ------------------------------------------------------------
-record        -- one row (singleton = 1). id 'rec_' + ULID, slug, name, locale, tz, format_ver (mirrors PRAGMA user_version), created_at
+record        -- one row (singleton = 1). id 'rec_' + ULID, slug, name, locale, tz, format_ver (mirrors PRAGMA user_version), created_at,
+              --   quiet (the record's quiet hours, 09 §5 rule 3: NULL reads as 22:00 to 08:00, 'off', or {"from":"HH:MM","to":"HH:MM"} in tz; migration 0020)
 pack          -- installed packs: id, version, source, installed_at, manifest json, checksum
 declaration   -- every declared thing: kind, id, version, pack_id, body json, checksum, superseded_at, retired. PRIMARY KEY (id, version)
 migration     -- applied kernel migrations: version, applied_at, checksum
@@ -447,10 +448,11 @@ forever.
 Byte-exact, and the authority is [34-GRAMMARS](34-GRAMMARS.md) §3; step 3 of the write path (COERCE)
 parses to these shapes and nothing else, and the `where:` compiler compares against them.
 
-*(Amended September 15th 2026: a pack's settings, its manifest's `config:` ([04-PACKS](04-PACKS.md) §2), take six of
-these types, `text`, `enum`, `bool`, `money`, `day`, `duration` and `number` (a decimal), and are coerced to the same shapes by the same
+*(Amended September 15th 2026: a pack's settings, its manifest's `config:` ([04-PACKS](04-PACKS.md) §2), take these
+types, `text`, `enum`, `bool`, `money`, `day`, `duration` and `number` (a decimal), and are coerced to the same shapes by the same
 step. A `ref`, a `secret`, a `file` and every other type are refused `CONFIG_TYPE_UNSUPPORTED`. The chosen values are
-stored on the `pack` row's manifest, not in `entry`.)*
+stored on the `pack` row's manifest, not in `entry`. Amended September 27th 2026 (PLT-7): one more, `list`, lines of
+text, at most 20 (a `max` narrows this), each coerced as a text setting's own line is.)*
 
 **A text never holds a key.** A `text` or `document` value, or a `list<text>` element, that looks like
 a credential is refused at step 3 as `VALUE_MALFORMED`, from every caller, with no `found` and a

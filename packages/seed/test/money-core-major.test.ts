@@ -25,7 +25,7 @@ import { satisfies } from '@braindog/declare';
 
 import { FIRST_PARTY, FIRST_PARTY_VERSIONS, firstPartyDocument } from '../src/index.ts';
 import { asMoneyCore180, asMoneyCore200, attempt, planOf, put, record, type Doc } from './money-core-earlier.ts';
-import { bankHsbcEgFile } from './pack-files.ts';
+import { bankHsbcEgFile, bankHsbcEgFile13 } from './pack-files.ts';
 
 /**
  * The Mercury pack as it ships, with the marks that say what a person fills taken off.
@@ -80,18 +80,31 @@ test('NOTHING A FIRST-PARTY PACK SHIPS SAYS GOLD, in a kind or in the sentence o
    held to what the tests here ask of it (`holdings` back, the bank's twelve handed, the dependents planned), not to its
    bytes. */
 
-test('bank-hsbc-eg AND MERCURY PLAN CLEAN AND INSTALL on money-core 1.8.0, on 2.0.0 and on the one the seed ships', async () => {
+/**
+ * BANK-HSBC-EG MOVED ITS FLOOR TO MONEY-CORE 3.0.0 AT 1.4.0 (balance reading), and MERCURY TO 3.1.0 AT 1.3.0, so
+ * neither shipped file plans clean on 1.8.0 or 2.0.0 any more. The frozen `bank-hsbc-eg-1.3.1.json` (its floor was
+ * still 1.8.0) stands in for the bank pack on those two; Mercury has no such frozen file and is planned only on the
+ * money-core the seed ships.
+ */
+test('bank-hsbc-eg PLANS CLEAN AND INSTALLS on money-core 1.8.0 and on 2.0.0 (frozen at 1.3.1); BOTH PACKS DO on the one the seed ships', async () => {
   const shipped = (doc: unknown): Doc => doc as Doc;
-  for (const [at, build] of [['1.8.0', asMoneyCore180], ['2.0.0', asMoneyCore200], [FIRST_PARTY_VERSIONS['money-core'], shipped]] as const) {
-    for (const [name, doc] of [['bank-hsbc-eg', bankHsbcEgFile()], ['mercury', mercuryFile()]] as const) {
-      const { k, sql } = await onMoney(build);
-      const { diff } = await planOf(k, doc);
-      assert.deepEqual(diff.requires.packs.filter((p) => !p.ok), [], `${name} on money-core ${at}`);
-      assert.deepEqual(diff.conflicts, [], `${name} on money-core ${at}`);
-      const { out } = await attempt(k, doc);
-      assert.equal(out.ok, true, `${name} on money-core ${at}: ${out.refusal?.code} ${out.refusal?.fix}`);
-      sql.close();
-    }
+  for (const [at, build] of [['1.8.0', asMoneyCore180], ['2.0.0', asMoneyCore200]] as const) {
+    const { k, sql } = await onMoney(build);
+    const { diff } = await planOf(k, bankHsbcEgFile13());
+    assert.deepEqual(diff.requires.packs.filter((p) => !p.ok), [], `bank-hsbc-eg on money-core ${at}`);
+    assert.deepEqual(diff.conflicts, [], `bank-hsbc-eg on money-core ${at}`);
+    const { out } = await attempt(k, bankHsbcEgFile13());
+    assert.equal(out.ok, true, `bank-hsbc-eg on money-core ${at}: ${out.refusal?.code} ${out.refusal?.fix}`);
+    sql.close();
+  }
+  for (const [name, doc] of [['bank-hsbc-eg', bankHsbcEgFile()], ['mercury', mercuryFile()]] as const) {
+    const { k, sql } = await onMoney(shipped);
+    const { diff } = await planOf(k, doc);
+    assert.deepEqual(diff.requires.packs.filter((p) => !p.ok), [], `${name} on money-core ${FIRST_PARTY_VERSIONS['money-core']}`);
+    assert.deepEqual(diff.conflicts, [], `${name} on money-core ${FIRST_PARTY_VERSIONS['money-core']}`);
+    const { out } = await attempt(k, doc);
+    assert.equal(out.ok, true, `${name} on money-core ${FIRST_PARTY_VERSIONS['money-core']}: ${out.refusal?.code} ${out.refusal?.fix}`);
+    sql.close();
   }
 });
 
@@ -108,14 +121,16 @@ test('EACH RANGE MOVED WITH A VERSION OF ITS OWN, and neither admits a money-cor
      same reason as Mercury's 1.0.1: no declaration moved.
 
      Mercury is 1.2.0 since DEF-3, a minor step for its ledger script counting money once, and the range did not
-     move with it. */
-  assert.equal(bankHsbcEgFile().version, '1.3.1');
-  assert.equal(mercuryFile().version, '1.2.0');
+     move with it. bank-hsbc-eg's FLOOR MOVES TO money-core 3.0.0 AT 1.4.0, because `bank-balance` and its webhook
+     twin read balances and `balance_after`, which exist only from 3.0.0. Mercury's floor moves to 3.1.0 at 1.3.0 for
+     the same reason, over the `book` setting money-core 3.1.0's books add. */
+  assert.equal(bankHsbcEgFile().version, '1.4.0');
+  assert.equal(mercuryFile().version, '1.3.0');
   for (const [name, doc] of [['bank-hsbc-eg', bankHsbcEgFile()], ['mercury', mercuryFile()]] as const) {
     const range = (doc.requires as { packs: Record<string, string> }).packs['money-core']!;
     assert.deepEqual(
       ['1.7.0', '1.8.0', '2.0.0', '2.9.0', '3.0.0', '3.9.0', '4.0.0'].filter((v) => satisfies(v, range)),
-      name === 'mercury' ? ['1.7.0', '1.8.0', '2.0.0', '2.9.0', '3.0.0', '3.9.0'] : ['1.8.0', '2.0.0', '2.9.0', '3.0.0', '3.9.0'],
+      name === 'mercury' ? ['3.9.0'] : ['3.0.0', '3.9.0'],
       name,
     );
   }
@@ -144,11 +159,12 @@ test('THE HOLE R5 READ IS CLOSED: a record holding a pack on ^1.8.0 is refused m
   assert.equal(k.packs().find((p) => p.id === 'bank-hsbc-eg')?.version, '1.0.0');
   assert.equal(k.packs().find((p) => p.id === 'money-core')?.version, '1.8.0', 'the refused update moved money-core');
 
-  /* AND THE SHIPPED PACK, INSTALLED BEFORE THE SAME UPDATE, STILL HAS WHAT IT ASKS FOR AFTER IT. */
+  /* AND THE SHIPPED PACK, INSTALLED BEFORE THE SAME UPDATE, STILL HAS WHAT IT ASKS FOR AFTER IT. Frozen at 1.3.1,
+     since the shipped 1.4.0 no longer plans clean on a 1.8.0 record (its floor moved to money-core 3.0.0). */
   const { k: k2, sql: sql2 } = await onMoney(asMoneyCore180);
-  await put(k2, bankHsbcEgFile());
+  await put(k2, bankHsbcEgFile13());
   await put(k2, asMoneyCore200(firstPartyDocument('money-core')));
-  const wants = (bankHsbcEgFile() as unknown as Doc).requires.packs['money-core']!;
+  const wants = (bankHsbcEgFile13() as unknown as Doc).requires.packs['money-core']!;
   assert.equal(satisfies(k2.packs().find((p) => p.id === 'money-core')?.version ?? null, wants), true);
   sql.close();
   sql2.close();

@@ -16,13 +16,14 @@
 
 import { createClient, type Boot, type ClientOptions, type Cursor, type EventLine } from '@braindog/client';
 import { railRoom } from '@braindog/kernel';
+/* THE BUILT-IN ADD-ONS' NAMES AND LISTS: a line about an add-on names it from here. It read the sample's `PACKS`, which
+   carried the same six and the sample's two made-up add-ons, until wave C1, then a hand copy in `modules.ts` until each module's
+   own manifest said it (USE-3). */
+import { firstPartyModule as moduleOf } from '@braindog/seed/packs/modules';
 import { useCaseName } from '@braindog/seed/usecases/names';
 
 import { iconFor, setupSaid, whoDid, type NavEntry } from './api.ts';
 import { learnHome } from './api.ts';
-/* THE BUILT-IN ADD-ONS' NAMES AND LISTS: a line about an add-on names it from here. It read the sample's `PACKS`, which
-   carried the same six and the sample's two made-up add-ons, until wave C1 (`modules.ts`). */
-import { moduleOf } from './modules.ts';
 import { learnPages, REGISTERS } from './held.ts';
 import { copy } from '../copy.ts';
 import type { SwitcherRow } from './switcher.ts';
@@ -31,6 +32,9 @@ import type { NewsItem, PageDecl, Person, Question } from './schema.ts';
 import type { Level } from './schema.ts';
 import { levelsFrom } from './may.ts';
 import type { IconName } from '../ui/icons.ts';
+/* THE HOLDING PEN, AS THE RECORD SENDS IT (`boot`'s `pen`), held to the shape the settings screen draws (PGS-16). */
+import { penOf, type PenItem } from '../design/pen.ts';
+import type { Prefs } from '../nav-prefs.svelte.ts';
 
 export type Fetch = NonNullable<ClientOptions['fetch']>;
 
@@ -56,10 +60,16 @@ type ShellBase = {
     currency: string | null;
     registers: { id: string; name: string; count: number; icon: IconName; views: { key: string; name: string; href: string }[] }[];
   };
-  /** The rail's pages; `tabs` when the page's declaration asked for its nav section to be drawn as tabs. */
-  nav: (NavEntry & { tabs?: true })[];
-  /** Pages that emerged and were never placed. A holding pen, not a decision (19 §3). */
-  pen: PageDecl[];
+  /**
+   * The rail's pages; `tabs` when the page's declaration asked for its nav section to be drawn as tabs, and `cut` on a
+   * tabbed section's page the rail's budget left out: the strip of tabs draws it and the rail does not (PGS-18).
+   */
+  nav: (NavEntry & { tabs?: true; cut?: true })[];
+  /**
+   * The holding pen: what the record would add if somebody asked, each offer with the whole declaration keeping it
+   * writes. A holding pen, not a decision (19 §3). Empty for a caller who is offered nothing.
+   */
+  pen: PenItem[];
   people: Person[];
   questions: Question[];
   whatsNew: NewsItem[];
@@ -101,8 +111,8 @@ export type Shell = ShellBase & {
      * from a host older than the field, rather than guessed.
      */
     levels?: Readonly<Record<string, Level>>;
-    /** A person's own rail on this record (`nav-prefs.svelte.ts`). Absent for a token. */
-    prefs?: { 'nav.order'?: string[]; 'nav.hidden'?: string[] };
+    /** A person's own navigation on this record, key by key (`nav-prefs.svelte.ts`). Absent for a token. */
+    prefs?: Prefs;
   };
   /**
    * Why the records this person can reach could not be listed, when they could not.
@@ -157,6 +167,11 @@ export type Shell = ShellBase & {
   inbox: number;
   /* HOW MANY QUESTIONS ARE OPEN, which `questions` cannot say: `boot` caps that list at twenty, and the count is the record's. */
   open: number;
+  /**
+   * `boot`'s counts as the record sent them, which `spineOf` reads to say whether Decide and Inbox are drawn yet (PGS-18).
+   * Absent on a shell no record answered; the root layout then reads `open` and `inbox`.
+   */
+  counts?: NonNullable<Boot['counts']>;
   now: number;
   live: boolean;
   /* A ROWID FOR THE OWNER AND `e.<id>` FOR A MEMBER HELD TO NAMED LISTS: handed back to `markRead` as it came. */
@@ -511,8 +526,8 @@ export function newsOf(events: readonly EventLine[], me: string | null, names: R
 /**
  * The record's `boot` in the shape the shell draws.
  *
- * WHAT THE RECORD DOES NOT SEND IS EMPTY, NOT SAMPLED. Saved views, the pen of unplaced pages and the people with access
- * are not in `boot`, so a live shell has none of them rather than the sample's.
+ * WHAT THE RECORD DOES NOT SEND IS EMPTY, NOT SAMPLED. Saved views and the people with access are not in `boot`, so a
+ * live shell has none of them rather than the sample's. The holding pen is, and is drawn as the record sent it.
  *
  * THE SWITCHER STARTS AT THE RECORD YOU ARE IN, and the root layout replaces that row with the account's own list. `boot`
  * names this record and no other, so one row is the most this function can honestly claim.
@@ -554,14 +569,26 @@ export function layoutOf(b: Boot): Shell {
      are the five oldest, where before they were the five edited last. So the cap is spent in order of `about.updated_at`,
      newest first, and the pages it keeps are then drawn where the record put them. A host that sends no time spends
      it in the record's order, which is the rail it drew before. */
+  /* A PAGE OVER A LIST WITH NOTHING IN IT STAYS OFF THE RAIL UNTIL THE LIST'S FIRST ROW (PGS-18). A module installs its
+     pages with its lists, so a record that took a few modules had a rail of pages that each said "nothing here yet".
+     `list` is the one list a page draws, sent only when the caller reads it, and its count is `registers`' own. A saved
+     view is somebody's own page and stays, as its list does above, and so does a colleague's own list, for the same
+     reason `registers` keeps it at zero rows below. */
+  const rows = new Map(b.registers.map((r) => [r.id, r.count]));
+  const waiting = (p: NonNullable<Boot['pages']>[number]) =>
+    typeof p.list === 'string' && p.nav?.section !== copy.viewsSection && !theirs.has(p.list) && rows.get(p.list) === 0;
+  /* A TABBED SECTION'S PAGES ARE NEVER CUT BY THE BUDGET (PGS-18). A launch desk with more parts than `RAIL_PAGES` lost the
+     rest from its strip, because the cap ran before `nav` existed. They are kept apart instead: the rail still spends
+     its budget, and a page past it is carried with `cut`, which the strip draws and the rail leaves out. */
+  const tabbed = new Set((b.pages ?? []).flatMap((p) => (p.nav && (p.nav as { tabs?: unknown }).tabs === true ? [p.nav.section] : [])));
   const room = railRoom();
   const newest = [...(b.pages ?? [])].sort((x, y) => (y.about?.updated_at ?? '').localeCompare(x.about?.updated_at ?? ''));
-  const kept = new Set(newest.filter((p) => p.nav && room(p.about ? { register: p.about.register, section: p.nav.section } : null)));
+  const kept = new Set(newest.filter((p) => p.nav && !waiting(p) && room(p.about ? { register: p.about.register, section: p.nav.section } : null)));
   /* AND WHETHER ITS SECTION IS DRAWN AS TABS (`$lib/page/tabs.ts`). This entry named its five keys and so dropped every
      other one `boot` sent: with `tabs: true` on the page, `tabsOf` over this list answered no strip on every page of the
      section (`tabs.test.ts`, five of its cases). Only `true` is carried, and a page that did not say it carries no key. */
   const nav: ShellBase['nav'] = (b.pages ?? []).flatMap((p) =>
-    p.nav && kept.has(p)
+    p.nav && !waiting(p) && (kept.has(p) || tabbed.has(p.nav.section))
       ? [
           {
             id: p.slug,
@@ -571,6 +598,7 @@ export function layoutOf(b: Boot): Shell {
             order: p.nav.order,
             icon: iconFor(p.icon ?? undefined, 'doc'),
             ...((p.nav as { tabs?: unknown }).tabs === true ? { tabs: true as const } : {}),
+            ...(kept.has(p) ? {} : { cut: true as const }),
           },
         ]
       : [],
@@ -597,7 +625,9 @@ export function layoutOf(b: Boot): Shell {
     pages: (b.pages ?? []).map((p) => p.slug),
     names: { ...b.names },
     nav,
-    pen: [],
+    /* THE RECORD'S OWN OFFERS, strongest first as it sent them. The browser's own two kinds, the navigation shape and
+       the icons, are made on the settings screen that draws them, from what only that screen reads. */
+    pen: penOf(b.pen),
     me: {
       person: person ?? '',
       level,
@@ -618,6 +648,7 @@ export function layoutOf(b: Boot): Shell {
     assistant: false,
     inbox: b.counts?.inbox ?? 0,
     open: b.counts?.decide ?? (b.waiting ?? []).length,
+    ...(b.counts ? { counts: b.counts } : {}),
     now: Number.isFinite(Date.parse(b.now)) ? Date.parse(b.now) : Date.now(),
     live: true,
     upTo: b.whatsNew?.upTo ?? null,
@@ -634,6 +665,18 @@ export function layoutOf(b: Boot): Shell {
  * sentence nobody had run the code to check. `said` is the refusal, and the last one this module
  * read when the caller has none to hand.
  */
+/**
+ * Whether a refused `boot` is the one a person signed in and on no record gets (`loop/finish/ops.md` OPS-17).
+ *
+ * THE WORKER'S DOOR ANSWERS IT 403 `FORBIDDEN` IN ONE SENTENCE (`doorOf`, `apps/worker/src/session.ts`), and the same
+ * code is every other refusal a record gives a person, so the sentence is what tells them apart. `/start` draws "Make a
+ * record of your own" on it instead of an empty shell that says nothing is here.
+ */
+export const NO_RECORD_FIX = 'You are signed in and on no record yet.';
+
+export const onNoRecord = (said: { code: string; fix: string } | null | undefined): boolean =>
+  said !== null && said !== undefined && said.code === 'FORBIDDEN' && said.fix === NO_RECORD_FIX;
+
 export const refusedShell = (said: { code: string; fix: string } | null = refusal): Shell => ({
   ...layoutOf({ registers: [], now: new Date().toISOString() }),
   ...(said ? { refused: said } : {}),

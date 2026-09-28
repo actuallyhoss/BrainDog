@@ -32,7 +32,7 @@ const open = async () => {
 test('an empty database becomes a record', async () => {
   const { sql, result } = await open();
   assert.ok(result.ok, fixOf(result));
-  assert.deepEqual(result.value, { kernel: 18, format: 1, applied: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18] });
+  assert.deepEqual(result.value, { kernel: 20, format: 1, applied: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20] });
 
   const tables = sql
     .all<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
@@ -40,7 +40,7 @@ test('an empty database becomes a record', async () => {
     .filter((n) => !n.startsWith('sqlite_') && !n.startsWith('entry_fts_'));
   // Thirty-one in `30-BLUEPRINT` §1, `invitation` from migration 6, `view` from migration 7, `pref` and `pack_removed` from 9.
   // Migration 10 adds a column and no table. Migration 14 adds `push_sub`, and 17 `automation_watch`. Migration 18
-  // rebuilds two tables and adds none.
+  // rebuilds two tables and adds none. Migrations 19 and 20 each add a column and no table.
   assert.equal(tables.length, 39, `tables: ${tables.join(', ')}`);
   for (const wanted of ['record', 'declaration', 'migration', 'counter', 'entry', 'event', 'schedule', 'outbox'])
     assert.ok(tables.includes(wanted), `${wanted} is missing`);
@@ -53,9 +53,9 @@ test('applying twice applies nothing twice', async () => {
   const first = await applyMigrations(sql, clock);
   const second = await applyMigrations(sql, clock);
   assert.ok(first.result.ok && second.result.ok);
-  assert.deepEqual(first.result.value.applied, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]);
+  assert.deepEqual(first.result.value.applied, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]);
   assert.deepEqual(second.result.value.applied, [], 'a second run re-applied a migration');
-  assert.equal(sql.all('SELECT version FROM migration').length, 18);
+  assert.equal(sql.all('SELECT version FROM migration').length, 20);
   sql.close();
 });
 
@@ -113,6 +113,9 @@ async function beforeMigration2() {
   sql.exec('ALTER TABLE grant DROP COLUMN sealed_under');
   /* And migration 15's column, for migration 10's reason. */
   sql.exec('ALTER TABLE token DROP COLUMN reach');
+  /* And migration 19's and 20's columns, for the same reason. */
+  sql.exec('ALTER TABLE member DROP COLUMN row_where');
+  sql.exec('ALTER TABLE record DROP COLUMN quiet');
   sql.exec('DELETE FROM migration WHERE version >= 2');
   return sql;
 }
@@ -123,7 +126,7 @@ test('A RECORD CREATED BEFORE MIGRATION 2 TAKES IT ON OPEN, and everything it he
 
   const { result } = await applyMigrations(sql, fixedClock(NOW));
   assert.ok(result.ok, fixOf(result));
-  assert.deepEqual(result.value.applied, [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]);
+  assert.deepEqual(result.value.applied, [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]);
 
   const after = snapshot(sql);
   assert.deepEqual(after.entry, before.entry, 'a row changed');
@@ -282,6 +285,8 @@ test('AN APPLIED MIGRATION IS NEVER EDITED, so each checksum is pinned here', as
     'ae2c2c8fbd2120ab152315c4290a22f763a4bf81f8d748e5ddb779523d50e2ee',
     'db601baac1f2aacb645e06bf6b4c7e38115f9989a68ed4667060900fee33cb9a',
     '2d37be52999866741056861e33ac6c4b3431837b5384e53824f236bc770213a4',
+    '4d783603c20778c92773e360b2bd43de74a08e93b7eebc799da9cdb1089cadc8',
+    '71399f1445217c57c48bb0aefa833b650e72cd45965a98249ce841bfd999237d',
   ]);
 });
 
@@ -295,6 +300,9 @@ test('MIGRATION 4 REBUILDS device_grant: every row copied, a seventh reach, and 
   sql.exec(shipped);
   sql.exec('ALTER TABLE grant DROP COLUMN sealed_under');
   sql.exec('ALTER TABLE token DROP COLUMN reach');
+  /* And migration 19's and 20's columns, for the same reason. */
+  sql.exec('ALTER TABLE member DROP COLUMN row_where');
+  sql.exec('ALTER TABLE record DROP COLUMN quiet');
   sql.exec('DELETE FROM migration WHERE version >= 4');
   const row = ['fake-poll-id', 'fake-hash', 'denied', 'runner', 'old-box', null, null, 5, '2026-09-01T00:00:00.000Z', null, null, null];
   sql.exec(
@@ -304,7 +312,7 @@ test('MIGRATION 4 REBUILDS device_grant: every row copied, a seventh reach, and 
 
   const { result } = await applyMigrations(sql, clock);
   assert.ok(result.ok, fixOf(result));
-  assert.deepEqual(result.value.applied, [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]);
+  assert.deepEqual(result.value.applied, [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]);
   assert.deepEqual(
     { ...sql.one<Record<string, unknown>>('SELECT id, code_hash, status, reach, label, tries, scope FROM device_grant') },
     { id: 'fake-poll-id', code_hash: 'fake-hash', status: 'denied', reach: 'runner', label: 'old-box', tries: 5, scope: null },
@@ -327,13 +335,16 @@ test('MIGRATION 13 REBUILDS outbox: every row copied, and infer.ask admitted', a
   sql.exec('CREATE INDEX outbox_ready ON outbox(state, created)');
   /* And migration 15's column, which `ADD COLUMN` cannot re-apply over itself. */
   sql.exec('ALTER TABLE token DROP COLUMN reach');
+  /* And migration 19's and 20's columns, for the same reason. */
+  sql.exec('ALTER TABLE member DROP COLUMN row_where');
+  sql.exec('ALTER TABLE record DROP COLUMN quiet');
   sql.exec('DELETE FROM migration WHERE version >= 13');
   sql.exec("INSERT INTO outbox (id, created, kind, payload, state, attempts) VALUES ('j1', '2026-09-01T00:00:00.000Z', 'script.run', '{}', 'failed', 3)");
   assert.throws(() => sql.exec("INSERT INTO outbox (id, created, kind, payload) VALUES ('j2', 'x', 'infer.ask', '{}')"), /CHECK/);
 
   const { result } = await applyMigrations(sql, clock);
   assert.ok(result.ok, fixOf(result));
-  assert.deepEqual(result.value.applied, [13, 14, 15, 16, 17, 18]);
+  assert.deepEqual(result.value.applied, [13, 14, 15, 16, 17, 18, 19, 20]);
   assert.deepEqual(
     { ...sql.one<Record<string, unknown>>('SELECT id, kind, state, attempts FROM outbox') },
     { id: 'j1', kind: 'script.run', state: 'failed', attempts: 3 },

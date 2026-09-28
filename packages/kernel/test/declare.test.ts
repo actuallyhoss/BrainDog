@@ -910,9 +910,9 @@ test('A BLOCK KIND IS ONE OF THE TWENTY, and the closure is what the security ar
   assert.ok((said?.allowed?.length ?? 0) > 20, 'the refusal offers every kind, not a handful');
   assert.match(validateDeclaration(block({ kind: 'prose' }))?.fix ?? '', /not a kind this build draws/);
 
-  /* A PACK'S OWN KIND DRAWS NOTHING IN THIS BUILD, so a page naming one is refused NOT_IN_THIS_BUILD at install rather
+  /* A PACK'S OWN KIND IS ADMITTED WHEN ITS DECLARATION IS INSTALLED and refused KIND_UNKNOWN when it is not, rather
      than installed to draw a hole. The prefix is still what tells it from a misspelt kind. */
-  assert.equal(refusedWith(block({ kind: 'block.invoice_card' })), 'NOT_IN_THIS_BUILD');
+  assert.equal(validateDeclaration(block({ kind: 'block.invoice_card' }), new Map())?.code, 'KIND_UNKNOWN');
   assert.equal(refusedWith(block({ kind: 'block.Invoice Card' })), 'KIND_UNKNOWN');
 });
 
@@ -973,33 +973,30 @@ test('A SECTION AND A CARDS BLOCK INSTALL, and a column is one role on a card', 
   assert.equal(refusedWith(cards([{ field: 'what' }], { icon: 'A Receipt' })), 'DECLARATION_INVALID');
 });
 
-test('AND THE DECLARATION THAT SEVENTEENTH ARRIVES AS WAS CHECKED BY NOTHING WHATEVER', () => {
-  /**
-   * `validate` branched on `digest`, `metric`, `page`, `theme`, `ingest` and `rule` and then read
-   * `if (decl.kind !== 'register') return null;` — and `block` is one of `KINDS` with no branch
-   * above that line. So a standalone `block.<id>` declaration fell straight out, whatever it said:
-   *
-   *     block.invoice_card, no primitive, no accepts, no body -> ACCEPTED (null)
-   *
-   * all three of which `42 §4.6` marks required. The test above accepts `kind: 'block.invoice_card'`
-   * on a page *on the strength of* the declaration being checked as a document of its own, and the
-   * document of its own was checked by nothing.
-   *
-   * AND CHECKING `42 §4.6`'s SHAPE WOULD BE A CHECK ABOUT NOTHING, which is why the answer is this
-   * code and not a body validator: nothing in this repository reads a declaration whose kind is
-   * `block`. `packages/render` owns the sixteen drawn kinds as a compiled table and there is no
-   * path from an installed declaration into it, so the page draws its fallback and says nothing.
-   * The declaration is well formed and the build is behind — the repair is a deploy, not an edit.
-   */
-  const said = validateDeclaration({
-    id: 'block.invoice_card',
+test('A PACK BLOCK KIND IS ITS SPEC, and a malformed one is refused with the key named', () => {
+  /* The renderer draws a pack's kind from the spec it declares (`kindSpec`), so every number in it is checked at install
+     and not first seen by a reader. */
+  const kind = (over: Record<string, unknown>): Declaration => ({
+    id: 'block.risk-grid',
     kind: 'block',
-    body: { block: 'invoice_card', primitive: 'panel', accepts: { row: 'register' }, body: [{ primitive: 'rows' }] } as never,
+    body: { block: 'risk-grid', title: 'Risk grid', primitive: 'grid', cells: 3, tone: true, minSpan: 4, purpose: 'figure', ...over } as never,
   });
-  assert.equal(said?.code, 'NOT_IN_THIS_BUILD');
-  assert.equal(said?.at, 'kind');
-  assert.match(said?.fix ?? '', /draws nowhere/);
-  assert.match(said?.fix ?? '', /The repair is a deploy, not an edit\./);
+  assert.equal(refusedWith(kind({})), null);
+  for (const [key, value] of [
+    ['primitive', 'table'],
+    ['cells', 0],
+    ['cells', 9],
+    ['rows', 201],
+    ['minSpan', 13],
+    ['purpose', 'chart'],
+    ['title', ''],
+    ['tone', 'yes'],
+    ['accepts', { row: 'register' }],
+  ] as const) {
+    const said = validateDeclaration(kind({ [key]: value }));
+    assert.equal(said?.code, 'DECLARATION_INVALID', `${key}: ${JSON.stringify(value)} installed`);
+    assert.equal(said?.at, key);
+  }
 
   /* AND THE ID CHECK STILL RUNS FIRST, because a declaration whose id does not match its body is
      wrong about itself before it is wrong about the build. */

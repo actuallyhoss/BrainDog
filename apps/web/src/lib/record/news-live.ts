@@ -1,6 +1,5 @@
 /**
- * Home's and History's reads against the record: what is new, and the log; and one figure as a tile, which the palette
- * draws.
+ * Home's read mark and History's log against the record; and one figure as a tile, which the palette draws.
  *
  * A ROUTE-ONLY MODULE, loaded by the two screens that read it, like `page-live.ts`: the client carries the route table
  * as a value.
@@ -10,7 +9,7 @@
  *
  * EVERY SENTENCE THE RECORD STORED IS HANDED ON THROUGH `moneyInText`. The kernel writes an amount into a sentence the
  * way a program reads it, "GBP 2,400.00", and a screen prints it the way a person does, "£2,400.00" in the home
- * currency and "$4,800.00 USD" in any other (design.md §5, DSN-4). So the feed and the log leave here already spoken.
+ * currency and "$4,800.00 USD" in any other (design.md §5, DSN-4). So the log leaves here already spoken.
  */
 
 import { createClient, type Cursor, type EventLine } from '@braindog/client';
@@ -19,12 +18,12 @@ import { MISSING, money } from 'braindog-render';
 
 import { copy } from '../copy.ts';
 import { NO_ROW_SAID, unsaidFigure, type Metric } from './api.ts';
-import { actorFor, forget, newsOf, readBoot, type Fetch } from './boot-live.ts';
+import { actorFor, forget, type Fetch } from './boot-live.ts';
 import { METRICS } from './declared.ts';
 import { noteOf } from './history-live.ts';
 import { format, fxNote, hrefFor, offTarget, partsText, targetLine } from './metrics.ts';
 import { moneyInText } from './money.ts';
-import type { AuditEvent, NewsItem } from './schema.ts';
+import type { AuditEvent } from './schema.ts';
 
 /**
  * A reading as the kernel's `metrics.ts` sends one, and only the keys read here.
@@ -104,36 +103,15 @@ export function tileOf(id: string, r: Reading | null): Metric {
   };
 }
 
-/** `upTo` is the record's cursor for the newest line: a rowid for the owner, `e.<id>` for a member held to named lists. */
-export type News = { items: NewsItem[]; upTo: Cursor | null; sinceCapped: boolean };
-
-export type HomeRead = { from: 'live'; news: News } | { from: 'refused'; fix: string };
+/*
+ * HOME READS WHAT IS NEW AS A `feed` BLOCK NOW (`lib/home/default-home.ts`), which the page reader draws with the
+ * reader's mark, so the feed's own read went (MOD-8). What stays is the mark: Home stamps it when the reader leaves.
+ */
 
 /**
- * What is new on Home, and nothing else.
- *
- * NO FIGURE IS ASKED HERE. What leads Home is a page the record declares (`home-<use case>`, else `home`), drawn by
- * the page reader with its own figures; a record that declares none has no figure this file could name without
- * knowing a pack (shell.md USE-2).
+ * Mark everything up to `upTo` read, and drop the shell's kept answer, whose feed it was. `upTo` is the record's cursor
+ * for the newest line: a rowid for the owner, `e.<id>` for a member held to named lists, handed back as it came.
  */
-export async function readHome(base: string, me: string | null, io?: Fetch): Promise<HomeRead> {
-  const client = createClient({ base, ...(io ? { fetch: io } : {}) });
-  const news = await client.whatsNew();
-  if (!news.ok) return { from: 'refused', fix: refusalOf(news).fix };
-  const names = news.value.events.some((e) => e.actor.startsWith('p_') && e.actor !== me) ? await namesFor(base, io) : new Map<string, string>();
-  return {
-    from: 'live',
-    news: { items: newsOf(news.value.events, me, names).map((item) => ({ ...item, text: moneyInText(item.text) })), upTo: news.value.upTo, sinceCapped: news.value.sinceCapped },
-  };
-}
-
-/** The names `boot` told this reader, from the shell's kept answer, so it costs no call once the shell has drawn. Asked only when somebody else is in the feed. */
-async function namesFor(base: string, io?: Fetch): Promise<ReadonlyMap<string, string>> {
-  const booted = await readBoot(base, io).catch(() => null);
-  return new Map(Object.entries(booted?.from === 'live' ? (booted.boot.names ?? {}) : {}));
-}
-
-/** Mark everything up to `upTo` read, and drop the shell's kept answer, whose feed it was. */
 export async function markAll(base: string, upTo: Cursor | null, io?: Fetch): Promise<boolean> {
   const client = createClient({ base, ...(io ? { fetch: io } : {}) });
   const out = await client.markRead(upTo ?? undefined);

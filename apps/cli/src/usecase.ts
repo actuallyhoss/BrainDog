@@ -33,7 +33,7 @@ import { readShared, SHARED_SUFFIX } from '@braindog/declare';
 import { reachOf } from '@braindog/declare/catalogue';
 import { refused, type Result } from '@braindog/ports';
 
-import { installFromCatalogue, reachLines, sdkVerb } from './catalogue.ts';
+import { installFromCatalogue, loadSource, reachLines, sdkVerb } from './catalogue.ts';
 import { oneLine, printable } from './clip.ts';
 import { refuse } from './json.ts';
 import { connect, fixOf, type AgentIo, type Connected } from './skills.ts';
@@ -156,14 +156,14 @@ async function check(args: string[], io: AgentIo): Promise<number> {
     io.say('braindog usecase check takes one file, as in braindog usecase check student-1.0.1.usecase.json.');
     return 1;
   }
-  let text: string;
-  try {
-    text = readFileSync(resolve(io.cwd, file), 'utf8');
-  } catch {
-    io.say(`${file} could not be read.`);
+  /* READ AS PUBLISH, PREVIEW, DIFF, SEARCH AND YANK ALREADY DO (PLT-5), through `catalogue.ts`'s `loadSource`, so a
+     `.usecase.yaml` file checks the same as the JSON it means. */
+  const loaded = await loadSource(file, io);
+  if (!loaded.ok) {
+    io.say(loaded.fix);
     return 1;
   }
-  const shared = await readShared(text);
+  const shared = await readShared(loaded.text);
   if (!shared.ok) {
     refuse(io, shared, saidWithCode(shared));
     return 1;
@@ -266,7 +266,8 @@ async function installFile(args: string[], io: AgentIo): Promise<number> {
     return 1;
   }
   if (ID.test(given)) return installOffered(given, values.host, io);
-  const read = await readSource(given, io);
+  /* AS `check` READS ITS FILE (PLT-5): YAML turns to JSON text here too, so `install <file>.usecase.yaml` reads. */
+  const read = await loadSource(given, io);
   if (!read.ok) {
     io.say(read.fix);
     return 1;

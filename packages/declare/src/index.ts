@@ -27,7 +27,7 @@ import type { Conflict, Refusal, Result } from '@braindog/ports';
 import { no, ok, refused } from '@braindog/ports';
 import { credentialKey as credential, credentialValue, NESTED_MOST, nestedPast } from './credentials.ts';
 import { FIRST_PARTY_LISTS } from './usecase.ts';
-import { KINDS, approvalLines, configReads, configValue, digest, egressChanged, egressOf as egressOfBody, fillConfig, jcs, misread, readConfig, rowRegisterOf, sentencesOver, widens, type ConfigDecl, type DeclKind, type Egress, type Json } from '@braindog/kernel';
+import { KINDS, approvalLines, configReads, configValue, digest, egressChanged, egressOf as egressOfBody, fillConfig, jcs, misread, readConfig, rowRegisterOf, sentencesOver, validateDeclaration, widens, type ConfigDecl, type DeclKind, type Egress, type Json } from '@braindog/kernel';
 
 /**
  * What one declaration sends out of the record, or `null` when it sends nothing: every host, how often, the key by label
@@ -126,10 +126,52 @@ export type Manifest = {
    * to go on writing what it wrote.
    */
   extends?: Record<string, Extension>;
+  /**
+   * Blocks this pack adds to pages other packs declare: `[{ page: 'page.project', block: { kind: 'cards', ... }, after:
+   * 'Where it stands' }]`. Absent when it adds none.
+   *
+   * WITHOUT IT A PACK COULD ONLY DRAW ON A PAGE OF ITS OWN (`loop/finish/gaps.md` GAP-9). project-brief laid a one-line
+   * summary, a plan and blockers on every project and drew them on a Briefs page, because the project page is
+   * Portfolio's and a second template over projects fought it for each project's address.
+   *
+   * KEPT IN THE MANIFEST AND NEVER WRITTEN INTO THE PAGE, so the page stays its own pack's to update and the addition
+   * goes when this pack does. The kernel lays it among the page's blocks each time the page is read (`page-adds.ts`).
+   */
+  adds?: PageAddition[];
 };
 
 /** What one pack lays on one list another pack owns: optional fields after the list's own, values after a closed list's own. */
 export type Extension = { fields?: Record<string, Json>[]; values?: Record<string, string[]> };
+
+/**
+ * One block a pack adds to another pack's page: the page's declaration id, the block as a page's own would say it, and
+ * the heading of the page's block it goes after, or last when there is none or the page no longer has it.
+ */
+export type PageAddition = { page: string; block: Record<string, Json>; after?: string; note?: string };
+
+/**
+ * Who holds a list's rows, as its `hand:` says (GAP-11): the link field a person is handed a row by, the text field
+ * holding the name an agent signs with, and the state a row an agent takes moves to. Either holder may be absent.
+ */
+export type Hand = { person: string | null; agent: string | null; taken: string | null };
+
+/**
+ * A register body's `hand:`, or `null` for a list that does not say who holds its rows.
+ *
+ * READ, NOT CHECKED: the record refused a `hand:` whose parts are not fields of the list at install (`handFault` in
+ * `packages/kernel/src/declare.ts`), so a reader only has to tell a part that is there from one that is not. A part that
+ * is not a string is read as absent rather than trusted, since a body can reach a screen from an older host.
+ */
+export function handOf(body: Readonly<Record<string, unknown>> | null | undefined): Hand | null {
+  const hand = body?.hand;
+  if (hand === null || typeof hand !== 'object' || Array.isArray(hand)) return null;
+  const part = (k: string): string | null => {
+    const v = (hand as Record<string, unknown>)[k];
+    return typeof v === 'string' && v !== '' ? v : null;
+  };
+  const out = { person: part('person'), agent: part('agent'), taken: part('taken') };
+  return out.person === null && out.agent === null ? null : out;
+}
 
 export type Pack = {
   manifest: Manifest;
@@ -374,6 +416,16 @@ export type Diff = {
    * person who wants one gone takes it off the list, which asks the question a pack cannot, whether anything uses it.
    */
   extends: { id: string; adds: string[]; body?: string; refusal?: Refusal }[];
+  /**
+   * Each block this pack adds to another pack's page (`Manifest.adds`), in the order it wrote them: the page, the block's
+   * kind and heading, where it goes, and `line`, the sentence the plan and the install sheet say for it, "adds a block to
+   * <page> from <pack>". `unresolved` is an addition whose page the record lacks, and `refusal` why `install` will not
+   * take the pack: that page missing, or a block the page could not draw.
+   *
+   * ABSENT WHEN THE PACK ADDS NOTHING, so every plan of a pack without `adds` reads exactly as it did before the key.
+   * Nothing is staged for it: the manifest the install stores is where the kernel reads it from.
+   */
+  page_adds?: { page: string; kind: string; heading?: string; after?: string; line: string; unresolved?: true; refusal?: Refusal }[];
   seeds: { count: number; registers: { register: string; rows: number }[] };
   /** Every rule that would generate rows, with the ceiling it declares. */
   spawns: { rule: string; register: string; bound: number; when: string }[];
@@ -613,10 +665,11 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
     ...(Object.keys(settings.value).length > 0 ? { config: settings.value } : {}),
   };
 
-  /* A PACK WHOSE ONLY CONTENT IS `extends` CHANGES SOMETHING, so it has no declarations to list and is not refused for
-     it here. Whether it lays anything is asked once `extends` is read, below. */
-  const raw = doc.declarations ?? (doc.extends === undefined ? undefined : []);
-  if (!Array.isArray(raw) || (raw.length === 0 && doc.extends === undefined))
+  /* A PACK WHOSE ONLY CONTENT IS `extends` OR `adds` CHANGES SOMETHING, so it has no declarations to list and is not
+     refused for it here. Whether it lays or adds anything is asked once those are read, below. */
+  const reaches = doc.extends !== undefined || doc.adds !== undefined;
+  const raw = doc.declarations ?? (reaches ? [] : undefined);
+  if (!Array.isArray(raw) || (raw.length === 0 && !reaches))
     return malformed(`${id} declares nothing, so installing it would change nothing.`, 'declarations');
 
   const declarations: PackDeclaration[] = [];
@@ -744,7 +797,14 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
     if (!read.ok) return read as Result<Pack>;
     if (Object.keys(read.value).length > 0) manifest.extends = read.value;
   }
-  if (declarations.length === 0 && manifest.extends === undefined)
+  /* WHAT IT ADDS TO OTHER PACKS' PAGES, read for the same reason and kept in the checksum for the same reason: a page
+     this pack declares takes its blocks in its own declaration. */
+  if (doc.adds !== undefined) {
+    const read = readAdds(id, doc.adds, seen);
+    if (!read.ok) return read as Result<Pack>;
+    if (read.value.length > 0) manifest.adds = read.value;
+  }
+  if (declarations.length === 0 && manifest.extends === undefined && manifest.adds === undefined)
     return malformed(`${id} declares nothing, so installing it would change nothing.`, 'declarations');
 
   /**
@@ -984,6 +1044,96 @@ function readExtends(pack: string, raw: unknown, declared: ReadonlySet<string>):
     out[list] = one;
   }
   return ok(out);
+}
+
+/** The most blocks one pack adds to other packs' pages, a page's worth: past it, the pack wants a page of its own. */
+export const ADDS_MOST = 16;
+
+/** The keys one addition may carry. `note` is legal on everything a pack says (`04 §2`). */
+const ADDITION_KEYS = ['page', 'block', 'after', 'note'];
+
+/**
+ * A pack's `adds`, read: each block it adds to another pack's page, or the refusal naming the part that is wrong.
+ *
+ * ONLY THE SHAPE IS ASKED HERE, for `readExtends`' reason: whether the page is there, and whether it can draw the block,
+ * only the record knows, so `plan` asks it (`addedTo`) and `install` refuses it. A block may read a setting no more than
+ * an extension may, since it is drawn as written and a placeholder would reach the page with its braces in it.
+ */
+function readAdds(pack: string, raw: unknown, declared: ReadonlySet<string>): Result<PageAddition[]> {
+  if (!Array.isArray(raw))
+    return malformed('`adds` is a list of blocks for other packs\' pages, each { page: page.project, block: { kind: note, ... } }.', 'adds');
+  if (raw.length > ADDS_MOST) return malformed(`${pack} adds ${raw.length} blocks to other pages, and a pack adds at most ${ADDS_MOST}.`, 'adds');
+  const out: PageAddition[] = [];
+  for (const [n, one] of (raw as unknown[]).entries()) {
+    const at = `adds.${n}`;
+    if (!isObject(one)) return malformed(`${at} is { page: <page id>, block: { kind: ... }, after?: <heading> }.`, at);
+    const stray = Object.keys(one).find((k) => !ADDITION_KEYS.includes(k));
+    if (stray !== undefined) return malformed(`An addition names a page, a block and where the block goes, so ${stray} is not one of its keys.`, `${at}.${stray}`);
+    const page = one.page;
+    if (typeof page !== 'string' || !page.startsWith('page.') || !NAME.test(page.slice('page.'.length)))
+      return malformed(`${String(page)} is not a page id: page, a full stop and the page's name, like page.project.`, `${at}.page`);
+    if (declared.has(page)) return malformed(`${pack} declares ${page} and adds to it. A pack's own page takes its blocks in its own declaration.`, `${at}.page`);
+    const block = one.block;
+    if (!isObject(block) || typeof block.kind !== 'string')
+      return malformed(`${at}.block is one block with its kind, like { kind: note, heading: The brief }.`, `${at}.block`);
+    if (one.after !== undefined && (typeof one.after !== 'string' || one.after.trim() === ''))
+      return malformed(`${at}.after is the heading of the block on ${page} this one goes after.`, `${at}.after`);
+    if (one.note !== undefined && typeof one.note !== 'string') return malformed(`${at}.note is text.`, `${at}.note`);
+    const wrong = credential(block) ?? credentialValue(block);
+    if (wrong) return no('SECRET_IN_PACK', `${at} carries what looks like a credential at ${wrong}, and a pack is a file people share.`, { at: `${at}.block.${wrong}` });
+    const painted = colour(block);
+    if (painted) return no('COLOUR_OUTSIDE_THEME', `${at} sets ${painted.at} to ${painted.value}. A block names an intent, and the theme names the colour.`, { at: `${at}.block.${painted.at}` });
+    if (configReads(block).length > 0) return malformed(`${at} reads a setting, and a block added to another page is drawn as it is written.`, `${at}.block`);
+    out.push({
+      page,
+      block,
+      ...(typeof one.after === 'string' ? { after: one.after } : {}),
+      ...(typeof one.note === 'string' ? { note: one.note } : {}),
+    });
+  }
+  return ok(out);
+}
+
+/**
+ * One addition as `Diff.page_adds` says it, against `host`, the page as the record holds it, or `undefined` when it holds
+ * none. The page is named by its title where the title is words, and by its id's name where it is a template's
+ * placeholder (`{{name}}`), since the plan is about every page the template makes.
+ *
+ * THE BLOCK IS CHECKED AS THE PAGE'S OWN WOULD BE: the kernel's `validate` over a page holding it alone, with the page's
+ * `for:`, so a block over a template's row reads that row's fields as the page's own blocks do. A block the page could
+ * not draw is refused here, before it reaches a page its pack does not own.
+ */
+function addedTo(pack: string, add: PageAddition, host: { kind: DeclKind; body: string } | undefined): NonNullable<Diff['page_adds']>[number] {
+  const name = add.page.slice('page.'.length);
+  const heading = typeof add.block.heading === 'string' ? add.block.heading : undefined;
+  const said = { page: add.page, kind: add.block.kind as string, ...(heading === undefined ? {} : { heading }), ...(add.after === undefined ? {} : { after: add.after }) };
+  let body: Record<string, Json> | null = null;
+  if (host !== undefined && host.kind === 'page') {
+    try {
+      const parsed = JSON.parse(host.body) as unknown;
+      body = isObject(parsed) ? parsed : null;
+    } catch {
+      body = null;
+    }
+  }
+  if (body === null)
+    return {
+      ...said,
+      line: `adds a block to ${name} from ${pack}`,
+      unresolved: true,
+      refusal: {
+        code: 'PAGE_UNKNOWN',
+        fix: `${pack} adds a block to the ${name} page, which this record does not hold. Install the pack that declares ${add.page} first.`,
+        at: `adds.${add.page}`,
+      },
+    };
+  const title = typeof body.title === 'string' && body.title.trim() !== '' && !body.title.includes('{{') ? body.title : name;
+  const fault = validateDeclaration({
+    id: add.page,
+    kind: 'page',
+    body: { page: name, title: typeof body.title === 'string' ? body.title : name, ...(body.for === undefined ? {} : { for: body.for }), blocks: [add.block] },
+  });
+  return { ...said, line: `adds a block to ${title} from ${pack}`, ...(fault ? { refusal: { ...fault, at: `adds.${add.page}.${fault.at ?? 'block'}` } } : {}) };
 }
 
 /**
@@ -1538,6 +1688,8 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
     const held = live.get(id);
     return held === undefined || held.kind !== 'register' ? [] : [extended(mine, id, held.body, ext, laidBy(installed, mine, id, held))];
   });
+  /* AND A PAGE THE RECORD LACKS HAS NOWHERE TO DRAW WHAT IS ADDED TO IT, which `addedTo` marks unresolved. */
+  const pageAdds = pack.manifest.adds?.map((a) => addedTo(mine, a, live.get(a.page)));
 
   const format = { wanted: pack.manifest.requires.format, has: installed.format, ok: installed.format >= pack.manifest.requires.format };
   const primitives = {
@@ -1585,6 +1737,7 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
     kept,
     stays,
     extends: extensions,
+    ...(pageAdds === undefined ? {} : { page_adds: pageAdds }),
     seeds: { count: seedsFor(pack, adds).length, registers: seedRows(seedsFor(pack, adds)) },
     spawns: spawnsOf(pack),
     calls_out: calls,
@@ -1642,6 +1795,12 @@ function settingsFor(pack: Pack, installed: Installed): Diff['config'] {
 }
 
 /**
+ * A filled note as the line of text a note is. A note that is one `{{config:}}` of a list setting fills whole, as its
+ * array, and `String` would have read that `rent,rates`; it reads as the placeholder inside text does, joined by a comma.
+ */
+const noteOf = (filled: Json): string => (Array.isArray(filled) ? filled.map((v) => (typeof v === 'string' ? v : JSON.stringify(v))).join(', ') : String(filled));
+
+/**
  * The pack with every `{{config:<key>}}` in its declarations and its example rows filled from
  * `config`. The same pack when there is nothing to fill.
  *
@@ -1667,7 +1826,7 @@ function filledWith(pack: Pack, config: Diff['config']): Pack {
     return {
       ...seed,
       fields: fillConfig(seed.fields, values) as Record<string, Json>,
-      ...(seed.note === undefined ? {} : { note: String(fillConfig(seed.note, values)) }),
+      ...(seed.note === undefined ? {} : { note: noteOf(fillConfig(seed.note, values)) }),
     };
   });
   return { ...pack, declarations, seeds };
@@ -2686,6 +2845,11 @@ function faultOf(pack: Pack, diff: Diff): Result<never> | null {
   /* AND A LIST THAT CANNOT TAKE WHAT THIS PACK LAYS ON IT, in the sentence `plan` wrote for it (`extended`). */
   const unlaid = diff.extends.find((e) => e.refusal !== undefined);
   if (unlaid?.refusal) return { ok: false, refusal: unlaid.refusal };
+
+  /* AND A BLOCK FOR ANOTHER PACK'S PAGE THAT HAS NO PAGE TO GO ON, or that the page could not draw, in `addedTo`'s
+     sentence. Nothing is staged for an addition, so this is the only place it can be stopped. */
+  const unplaced = diff.page_adds?.find((a) => a.refusal !== undefined);
+  if (unplaced?.refusal) return { ok: false, refusal: unplaced.refusal };
 
   /**
    * A RENAME IS REFUSED BEFORE THE ORPHAN IT ALSO IS, because it is the truer sentence.

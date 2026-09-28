@@ -1,6 +1,8 @@
 /**
  * Automations on the wire: the record's `automations` read, `automationRun`, `cancelRun`, and `propose` for a save
- * (`loop/research-shell-automations.md` §5 and §6, Brief E against Brief D's methods).
+ * (`loop/research-shell-automations.md` §5 and §6, Brief E against Brief D's methods), and since EDT-1 the editor's
+ * methods from `loop/finish/contracts.md` §2.2: `checkAutomation`, `tryAutomation`, `setAutomation`, `retryRun` and
+ * `automationVersions`, with `decide` for the owner's one-press save and `retireDeclaration` for Delete.
  *
  * THE RECORD OR ITS REFUSAL, as `record/actions.ts` does it for scheduled actions. A screen reads a `Source`, which is
  * the record over HTTP. With no record it drew the sample's four automations, and a flow drawn and "sent" there was
@@ -28,7 +30,8 @@
 import { since } from 'braindog-render';
 
 import { copy } from '../copy.ts';
-import { pathOf, sayTrigger, triggerKind, triggerOfBody, words, type Body } from './flow.ts';
+import { titleOf } from '../record/names.ts';
+import { draftOf, pathOf, sayStart, sayStep, sayTrigger, triggerKind, triggerOfBody, words, type Body, type Node } from './flow.ts';
 
 /* ── the shapes ─────────────────────────────────────────────────────────── */
 
@@ -40,8 +43,21 @@ export type RunState = 'pending' | 'running' | 'waiting' | 'done' | 'failed' | '
 /** One step a run took, as `automation_step` keeps it. `answer` is at most 64 KB and never a secret. */
 export type RunStep = { n: number; kind: string; state: 'done' | 'waiting' | 'failed' | 'skipped'; answer: string | null; at: string };
 
-/** One run, as `automation_run` keeps it: pinned to the version it started under, with its sentence if it failed. */
-export type RunRow = { id: string; state: RunState; started: string; finished: string | null; say: string | null; steps: RunStep[] };
+/**
+ * One run, as `automation_run` keeps it: pinned to the version it started under, with its sentence if it failed.
+ * `version` is `null` and `trigger` is `null` from a record that did not say them, which the run's detail survives.
+ */
+export type RunRow = {
+  id: string;
+  state: RunState;
+  started: string;
+  finished: string | null;
+  say: string | null;
+  steps: RunStep[];
+  version: number | null;
+  /** What kind of thing started it: written, arrival, every, metric, decided or manual. */
+  trigger: string | null;
+};
 
 /**
  * One automation, as the record's `automations` read answers it (`packages/record/src/automations.ts`).
@@ -67,6 +83,8 @@ export type AutomationRow = {
   month: { runs: number; failures: number } | null;
   body: Body | null;
   runs: RunRow[];
+  /** The run to pass as `before` for the page of runs after these, or `null` when these reach the first one kept. */
+  older: string | null;
 };
 
 /** `propose`'s answer: the suggestion's id, or `null` when the record filed it without saying which. */
@@ -84,6 +102,30 @@ export type TriedRow = { spoken: string; would: string[]; reason: string | null 
  * are `null` for it and `sample` is empty, and the screen says the sentences alone.
  */
 export type Tried = { path: 'inline' | 'run'; trigger: string; steps: string[]; matches: number | null; rows: number | null; sample: TriedRow[] };
+
+/** How one step went in a try: taken, would reach outside the record, would park, failed, or never reached. */
+export type TryState = 'done' | 'would' | 'waiting' | 'failed' | 'skipped';
+
+/** One step of a try, as `tryAutomation` answers it: where it sits in the body, its verb, how it went and its sentence. */
+export type TriedStep = { path: string; verb: string; state: TryState; answer: string | null; say: string };
+
+/**
+ * What `tryAutomation` answers (`packages/kernel/src/flow-try.ts`): the trigger it built from the sample, by its kind,
+ * and every step of the body, each with how it went.
+ */
+export type TryRun = { trigger: string; steps: TriedStep[] };
+
+/** What a try starts from, as `tryAutomation` takes it. Every key is optional; the trigger's kind says which it reads. */
+export type Sample = { row?: string | Record<string, unknown>; arrival?: string; payload?: unknown };
+
+/** One row or one arrival a try can start from, named as a person reads it. */
+export type Pickable = { id: string; label: string; at: string | null };
+
+/** One version of an automation, newest first, as `automationVersions` answers it. */
+export type Version = { version: number; at: string; live: boolean; enabled: boolean; by: string | null; body: Body };
+
+/** What `setAutomation` answers: the version now live and whether it runs. */
+export type Switched = { version: number; enabled: boolean };
 
 /* ── reading an answer that is being written in the same wave ────────────── */
 
@@ -107,7 +149,16 @@ function runOf(raw: unknown): RunRow | null {
           : [],
       )
     : [];
-  return { id, state: state as RunState, started, finished: text(raw.finished_at) ?? text(raw.finished), say: text(raw.say), steps };
+  return {
+    id,
+    state: state as RunState,
+    started,
+    finished: text(raw.finished_at) ?? text(raw.finished),
+    say: text(raw.say),
+    steps,
+    version: typeof raw.version === 'number' ? raw.version : null,
+    trigger: text(raw.trigger),
+  };
 }
 
 /**
@@ -131,11 +182,16 @@ export function rowOf(r: unknown): AutomationRow | null {
     isObject(r.month) && typeof r.month.runs === 'number'
       ? { runs: r.month.runs, failures: typeof r.month.failed === 'number' ? r.month.failed : typeof r.month.failures === 'number' ? r.month.failures : 0 }
       : null;
-  const named = text(r.name) ?? (body && typeof body.name === 'string' && body.name.trim() !== '' ? body.name : null);
+  /* THE DECLARED TITLE, NEVER THE ID. The record answers `name` as the body's name "or the id when it has none", so a
+     name equal to the id is the record filling a gap, and the title is worked out as History and the rest of the app
+     work one out for a rule (`names.ts` `titleOf`): the product's own name for a rule it ships, else the id in words. */
+  const said = text(r.name);
+  const fromRecord = said !== null && said !== id && said !== `rule.${id}` ? said : null;
+  const named = (body && typeof body.name === 'string' && body.name.trim() !== '' ? body.name.trim() : null) ?? fromRecord;
   const path = r.path === 'inline' || r.path === 'run' ? r.path : body ? pathOf(body) : 'inline';
   return {
     id,
-    name: named ?? id,
+    name: named ?? titleOf({ id, kind: 'rule' }),
     version: typeof r.version === 'number' ? r.version : 0,
     trigger: text(r.trigger) ?? (body ? triggerKind(triggerOfBody(body)) : 'written'),
     path,
@@ -146,6 +202,7 @@ export function rowOf(r: unknown): AutomationRow | null {
     month,
     body,
     runs,
+    older: text(r.older),
   };
 }
 
@@ -195,6 +252,340 @@ export function answerWords(answer: string): string {
   if (Array.isArray(v)) return v.map(one).join(', ');
   if (isObject(v)) return Object.entries(v).map(([k, x]) => `${k} ${one(x)}`).join(', ');
   return one(v);
+}
+
+/* ── the editor's words and the pure half of its reads (EDT-1) ──────────────── */
+
+/**
+ * THE WORDS EDT-1 ADDS, kept beside the reads they describe as `fieldWords` is in `record/field-write.ts`, because
+ * `flow.ts` and its `words` are EDT-2's file in this wave. The page, `Tried.svelte` and `RunView.svelte` read them here.
+ */
+export const editWords = {
+  rename: 'Rename',
+  missing: 'There is no automation here',
+  tryIt: 'Try it',
+  trying: 'Trying',
+  start: 'Pick what starts it and add a step, then save it.',
+  saveOn: 'Save and turn on',
+  saveChanges: 'Save changes',
+  savedOn: 'Saved. It is on.',
+  saved: 'Saved.',
+  filedOnly: 'Saved to Decide, and not accepted yet.',
+  more: (title: string) => `More for ${title}`,
+  turnOff: 'Turn off',
+  turnOn: 'Turn on',
+  turnedOff: 'It is off. Nothing starts it until it is turned on.',
+  turnedOn: 'It is on.',
+  duplicate: 'Duplicate',
+  copyOf: (title: string) => `Copy of ${title}`,
+  remove: 'Delete',
+  removeAsk: 'Delete this automation?',
+  removeWhy: 'It stops running. Its runs and every row it wrote stay.',
+  removeIt: 'Delete the automation',
+  keep: 'Keep it',
+  removed: 'The automation is deleted.',
+  versions: 'Versions',
+  noVersions: 'No versions yet',
+  versionOf: (n: number) => `Version ${n}`,
+  live: 'Live',
+  off: 'Off',
+  by: (who: string) => `by ${who}`,
+  showChanges: 'Show changes',
+  hideChanges: 'Hide changes',
+  noChanges: 'The same steps as the version before it.',
+  firstVersion: 'The first version.',
+  putBack: 'Put this version back',
+  putBackSaid: (n: number) => `Version ${n} is on the canvas. Save it to put it back.`,
+  olderRuns: 'Show older runs',
+  openRun: 'Open this run',
+  retry: 'Run it again',
+  retried: 'It runs again. The new run shows here once it has started.',
+  runSheet: 'Run',
+  handedBack: 'What it handed back',
+  notReached: 'Not reached',
+  took: (ms: number) => `took ${lasted(ms)}`,
+  startedBy: {
+    written: 'Started by a change',
+    arrival: 'Started by an arrival',
+    every: 'Started by the clock',
+    metric: 'Started by a figure',
+    decided: 'Started by a decision',
+    manual: 'Started by a press',
+  } as Record<string, string>,
+  held: 'It held, so it took If so.',
+  notHeld: 'It did not hold, so it took If not.',
+  /* THE TRY PANEL. */
+  tryFrom: 'Try it on',
+  fromLatest: 'The latest row',
+  fromRow: 'A row I pick',
+  fromArrival: 'The last arrival',
+  fromJson: 'Something I paste',
+  fromNow: 'Now',
+  fromAsIs: 'As it would be decided',
+  pickRow: 'Row',
+  pasteLabel: 'What to try it on',
+  pasteHint: 'The fields of a row, what arrived, or a figure, written as JSON.',
+  noRows: 'This list has no rows yet, so paste the fields of one.',
+  noArrivals: 'Nothing has arrived yet, so paste what would.',
+  notJson: 'That is not JSON. Write it as {"field": "value"}.',
+  pickOne: 'Pick a row to try it on.',
+  tryState: {
+    done: 'Done',
+    would: 'Would do this',
+    waiting: 'Would wait here',
+    failed: 'Failed',
+    skipped: 'Not reached',
+  } as Record<TryState, string>,
+  triedHeading: 'If it ran now',
+  triedWrote: 'Trying it changes nothing and sends nothing.',
+  row: (at: string) => `A row from ${at}`,
+  arrival: (at: string) => `Something that arrived ${at}`,
+} as const;
+
+/** How long something took, in the fewest words that say it: "under a second", "12s", "3m 4s", "2h 5m". */
+export function lasted(ms: number): string {
+  if (!Number.isFinite(ms) || ms < 1000) return 'under a second';
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ${s % 60}s`;
+  const h = Math.floor(m / 60);
+  return h < 48 ? `${h}h ${m % 60}m` : `${Math.floor(h / 24)}d ${h % 24}h`;
+}
+
+/** How long a finished run took, or `null` for one still going or a stamp that does not parse. */
+export function durationOf(run: { started: string; finished: string | null }): number | null {
+  if (run.finished === null) return null;
+  const ms = Date.parse(run.finished) - Date.parse(run.started);
+  return Number.isFinite(ms) && ms >= 0 ? ms : null;
+}
+
+/**
+ * A step's answer as a person reads it, by its verb. A branch keeps `then` or `else` as its answer, which printed raw
+ * was the runner's word for the arm it took; said here as whether the condition held.
+ */
+export function stepAnswer(verb: string, answer: string | null): string | null {
+  if (answer === null) return null;
+  if (verb === 'if' && answer === 'then') return editWords.held;
+  if (verb === 'if' && answer === 'else') return editWords.notHeld;
+  return answerWords(answer);
+}
+
+const TRY_STATES: ReadonlySet<string> = new Set(['done', 'would', 'waiting', 'failed', 'skipped']);
+
+/** A try's answer, read by name for `rowOf`'s reason. `null` for one with no steps list, which is nothing to draw. */
+export function tryRunOf(raw: unknown): TryRun | null {
+  if (!isObject(raw) || !Array.isArray(raw.steps)) return null;
+  const trigger = isObject(raw.trigger) ? (text(raw.trigger.kind) ?? '') : (text(raw.trigger) ?? '');
+  const steps = raw.steps.flatMap((s): TriedStep[] =>
+    isObject(s) && typeof s.path === 'string' && typeof s.verb === 'string' && typeof s.state === 'string' && TRY_STATES.has(s.state)
+      ? [{ path: s.path, verb: s.verb, state: s.state as TryState, answer: text(s.answer), say: typeof s.say === 'string' ? s.say : '' }]
+      : [],
+  );
+  return { trigger, steps };
+}
+
+/** `automationVersions`' answer, newest first. A version with no number or no body is left out: it cannot be shown. */
+export function versionsOf(raw: unknown): Version[] {
+  const list = isObject(raw) && Array.isArray(raw.versions) ? raw.versions : Array.isArray(raw) ? raw : [];
+  return list.flatMap((v): Version[] =>
+    isObject(v) && typeof v.version === 'number' && isObject(v.body)
+      ? [{ version: v.version, at: text(v.at) ?? '', live: v.live === true, enabled: v.enabled !== false, by: text(v.by), body: v.body }]
+      : [],
+  );
+}
+
+/**
+ * A row as a try's picker names it: the first text field it has, cut to a line, else when it was added. Never its id
+ * or its number, which a person does not say (`loop/finish/design-brief.md` §9).
+ */
+export function pickableRow(raw: unknown, now: number): Pickable | null {
+  if (!isObject(raw)) return null;
+  const id = text(raw.id);
+  if (!id) return null;
+  const fields = isObject(raw.fields) ? raw.fields : {};
+  const first = Object.values(fields).find((v): v is string => typeof v === 'string' && v.trim() !== '');
+  const at = text(raw.updated_at) ?? text(raw.created_at);
+  const label = first !== undefined ? (first.trim().length > 60 ? `${first.trim().slice(0, 59)}…` : first.trim()) : editWords.row(at ? since(at, now) : '');
+  return { id, label, at };
+}
+
+/** An arrival as a try's picker names it: its subject, else who sent it, else when it came. */
+export function pickableArrival(raw: unknown, now: number): Pickable | null {
+  if (!isObject(raw)) return null;
+  const id = text(raw.id);
+  if (!id) return null;
+  const at = text(raw.ts);
+  const label = text(raw.subject) ?? text(raw.from) ?? editWords.arrival(at ? since(at, now) : '');
+  return { id, label, at };
+}
+
+/** Where a try starts from: the newest row or arrival, one picked, or pasted JSON. */
+export type Pick = { from: 'latest' | 'row' | 'json'; row: string; json: string };
+
+/** Which ways of starting a try a trigger offers, first the one it opens on. A clock or a press needs nothing. */
+export function picksFor(kind: string, owner: boolean): Pick['from'][] {
+  if (kind === 'written') return ['latest', 'row', 'json'];
+  /* THE INBOX IS AN OWNER'S READ, and `tryAutomation` refuses anybody else an arrival by id, so they paste one. */
+  if (kind === 'arrival') return owner ? ['latest', 'json'] : ['json'];
+  if (kind === 'metric') return ['json'];
+  if (kind === 'decided') return ['latest', 'json'];
+  return [];
+}
+
+/**
+ * The sample a try sends, or the sentence for why it cannot be built. A trigger that reads nothing (a clock, a press)
+ * starts from an empty sample; everything else is read off the picker, and pasted text is parsed as JSON, never as a
+ * number by `Number()`.
+ */
+export function sampleOf(kind: string, pick: Pick, rows: readonly Pickable[], arrivals: readonly Pickable[]): Answer<Sample> {
+  const fail = (fix: string): Answer<Sample> => ({ ok: false, refusal: { code: 'VALUE_MALFORMED', fix } });
+  const choices = picksFor(kind, true);
+  if (choices.length === 0) return { ok: true, value: {} };
+  if (pick.from === 'json' || !choices.includes(pick.from)) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(pick.json);
+    } catch {
+      return fail(editWords.notJson);
+    }
+    if (kind === 'written') return isObject(parsed) ? { ok: true, value: { row: parsed } } : fail(editWords.notJson);
+    return { ok: true, value: { payload: parsed } };
+  }
+  if (kind === 'written') {
+    const id = pick.from === 'row' ? pick.row : (rows[0]?.id ?? '');
+    if (id === '') return fail(pick.from === 'row' ? editWords.pickOne : editWords.noRows);
+    return { ok: true, value: { row: id } };
+  }
+  if (kind === 'arrival') {
+    const id = arrivals[0]?.id;
+    return id === undefined ? fail(editWords.noArrivals) : { ok: true, value: { arrival: id } };
+  }
+  return { ok: true, value: {} };
+}
+
+/* ── where a step sits in a body ──────────────────────────────────────── */
+
+/**
+ * Each card's place in the body a save would send, as the record names a step (`steps[1].then[0]`), by the card's key.
+ * `root` is what the body calls its list, `steps` or `then`. The walk is `bodyOf`'s order, so a place here is the place
+ * of the step in what is sent.
+ */
+export function pathsOf(nodes: readonly Node[], root: string): Map<string, string> {
+  const out = new Map<string, string>();
+  const walk = (list: readonly Node[], at: string) => {
+    for (const [i, node] of list.entries()) {
+      const here = `${at}[${i}]`;
+      out.set(node.key, here);
+      if (node.then) walk(node.then, `${here}.then`);
+      if (node.else) walk(node.else, `${here}.else`);
+    }
+  };
+  walk(nodes, root);
+  return out;
+}
+
+/**
+ * The card a record's `at` is about: the step whose place is the longest start of it. A lint refusal names a place
+ * inside a step (`steps[1].set.field`) and sometimes the body around it (`body.steps[1]`); `steps[1]` must not claim
+ * `steps[10]`, so a place counts only where the next character ends it. `null` for an `at` about no step.
+ */
+export function keyAt(paths: ReadonlyMap<string, string>, at: string | undefined): string | null {
+  if (at === undefined) return null;
+  const said = at.startsWith('body.') ? at.slice('body.'.length) : at;
+  let best: { key: string; length: number } | null = null;
+  for (const [key, place] of paths) {
+    const next = said.charAt(place.length);
+    if (said.startsWith(place) && (next === '' || next === '.' || next === '[') && (best === null || place.length > best.length)) best = { key, length: place.length };
+  }
+  return best?.key ?? null;
+}
+
+/**
+ * Each place in the flat plan the runner numbers a run's steps by, as `packages/kernel/src/flow.ts` `plan` builds it:
+ * an `if` is followed by its `then`, a `jump` (an empty place here) where it has an `else`, then the `else`. A run's
+ * step `n` is an index into this, so the run's detail finds each step's card by it.
+ */
+export function planPlaces(body: Body): string[] {
+  const out: string[] = [];
+  const root = Array.isArray(body.steps) ? 'steps' : 'then';
+  const walk = (list: unknown, at: string) => {
+    if (!Array.isArray(list)) return;
+    for (const [i, step] of list.entries()) {
+      if (!isObject(step)) continue;
+      const here = `${at}[${i}]`;
+      out.push(here);
+      if ('if' in step) {
+        walk(step.then, `${here}.then`);
+        if (step.else !== undefined) {
+          out.push('');
+          walk(step.else, `${here}.else`);
+        }
+      }
+    }
+  };
+  walk(root === 'steps' ? body.steps : body.then, root);
+  return out;
+}
+
+/* ── what changed between two versions ──────────────────────────────── */
+
+/**
+ * A body as lines a person reads: what starts it, then each step's sentence, a branch's arms indented under it. The
+ * diff between two versions is taken over these, so it says "Tell you: …" changed and never a brace.
+ */
+export function sayLines(id: string, body: Body): string[] {
+  const d = draftOf(id, body);
+  const out = [sayStart(d)];
+  const walk = (list: readonly Node[], depth: number) => {
+    for (const node of list) {
+      out.push(`${'  '.repeat(depth)}${sayStep(node.step)}`);
+      if (node.then && node.then.length > 0) {
+        out.push(`${'  '.repeat(depth + 1)}${words.then}`);
+        walk(node.then, depth + 2);
+      }
+      if (node.else && node.else.length > 0) {
+        out.push(`${'  '.repeat(depth + 1)}${words.otherwise}`);
+        walk(node.else, depth + 2);
+      }
+    }
+  };
+  walk(d.steps, 0);
+  return out;
+}
+
+export type DiffLine = { op: 'same' | 'added' | 'removed'; line: string };
+
+/**
+ * The lines `after` adds to and takes from `before`, in order, by the longest run they share. A body is tens of lines,
+ * so the square table is small and exact, where a cleverer diff would only be faster.
+ */
+export function diffLines(before: readonly string[], after: readonly string[]): DiffLine[] {
+  const n = before.length;
+  const m = after.length;
+  const common: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));
+  for (let i = n - 1; i >= 0; i -= 1)
+    for (let j = m - 1; j >= 0; j -= 1)
+      common[i]![j] = before[i] === after[j] ? common[i + 1]![j + 1]! + 1 : Math.max(common[i + 1]![j]!, common[i]![j + 1]!);
+  const out: DiffLine[] = [];
+  let i = 0;
+  let j = 0;
+  while (i < n && j < m) {
+    if (before[i] === after[j]) {
+      out.push({ op: 'same', line: before[i]! });
+      i += 1;
+      j += 1;
+    } else if (common[i + 1]![j]! >= common[i]![j + 1]!) {
+      out.push({ op: 'removed', line: before[i]! });
+      i += 1;
+    } else {
+      out.push({ op: 'added', line: after[j]! });
+      j += 1;
+    }
+  }
+  for (; i < n; i += 1) out.push({ op: 'removed', line: before[i]! });
+  for (; j < m; j += 1) out.push({ op: 'added', line: after[j]! });
+  return out;
 }
 
 /** The register a body's rows come from, as `flow-lint.ts`'s `subjectOf` reads it. */
@@ -267,14 +658,38 @@ export type Proposal = { question: string; body_kind: 'change'; body: Record<str
 export type Source = {
   /** Every automation, summarised, with no bodies. */
   automations(): Promise<Answer<AutomationRow[]>>;
-  /** One, with its body and its last ten runs. What the editor opens. */
-  automation(rule: string): Promise<Answer<AutomationRow>>;
+  /** One, with its body and its last ten runs, or the page of runs before the run `before`. What the editor opens. */
+  automation(rule: string, page?: { before?: string; limit?: number }): Promise<Answer<AutomationRow>>;
   run(rule: string): Promise<Answer<{ run: string }>>;
   cancel(run: string): Promise<Answer<{ run: string }>>;
   propose(p: Proposal): Promise<Answer<Filed>>;
-  /** What a body would do, before it is sent anywhere. It writes nothing, on the record or here. */
+  /** What an inline body would do, before it is sent anywhere. It writes nothing, on the record or here. */
   dryRun(body: Body): Promise<Answer<Tried>>;
+  /** Whether a body would install, or the install's own refusal with where in the body it is. Installs nothing. */
+  check(body: Body): Promise<Answer<{ path: 'inline' | 'run' }>>;
+  /** A run body's steps taken over a sample by the real runner, with everything rolled back and nothing sent. */
+  attempt(body: Body, sample: Sample): Promise<Answer<TryRun>>;
+  /** Turn one on or off: a new version, landed at once. ADMIN. */
+  setEnabled(rule: string, enabled: boolean): Promise<Answer<Switched>>;
+  /** Start a finished run again, as the rule is installed now. ADMIN. */
+  retry(run: string): Promise<Answer<{ run: string }>>;
+  /** One automation's versions, newest first, each with its body. */
+  versions(rule: string): Promise<Answer<Version[]>>;
+  /** Take one out of the record. Its runs and the rows it wrote stay. ADMIN. */
+  retire(rule: string): Promise<Answer<unknown>>;
+  /** Accept a suggestion this browser just filed, for the owner's one-press save. */
+  accept(suggestion: string): Promise<Answer<unknown>>;
+  /** The newest rows of one list, for a try's picker. */
+  rows(register: string, now: number): Promise<Answer<Pickable[]>>;
+  /** The newest arrivals, for a try's picker. An owner's read. */
+  arrivals(now: number): Promise<Answer<Pickable[]>>;
 };
+
+/** How many rows or arrivals a try's picker offers. */
+const PICKABLE = 10;
+
+/** The reason the owner's one-press save gives Decide, which History keeps beside the accept. */
+const SAVED_HERE = 'Saved from the automation editor.';
 
 export function live(io: Fetch, base = ''): Source {
   return {
@@ -284,8 +699,11 @@ export function live(io: Fetch, base = ''): Source {
     },
     /* A READ TAKES ITS ARGUMENTS IN THE QUERY (`packages/host/src/index.ts`, `takes`), and `rule` is `text`, so the
        bare id goes as it is and comes back as the one automation or the record's DECLARATION_UNKNOWN. */
-    automation: async (rule) => {
-      const out = await send<unknown>(io, `${base}/api/automations?${new URLSearchParams({ rule: bare(rule) }).toString()}`);
+    automation: async (rule, page = {}) => {
+      const query = new URLSearchParams({ rule: bare(rule) });
+      if (page.before !== undefined) query.set('before', page.before);
+      if (page.limit !== undefined) query.set('limit', String(page.limit));
+      const out = await send<unknown>(io, `${base}/api/automations?${query.toString()}`);
       if (!out.ok) return out;
       const row = rowOf(out.value);
       return row ? { ok: true, value: row } : unreachable();
@@ -305,6 +723,42 @@ export function live(io: Fetch, base = ''): Source {
       if (!out.ok) return out;
       const tried = triedOf(out.value);
       return tried ? { ok: true, value: tried } : unreachable();
+    },
+    /* `checkAutomation` AND `tryAutomation` ARE ROUTED AS WRITES for `previewPage`'s reason (a body is no query
+       string), so both are a POST with the body whole, though neither keeps anything. */
+    check: async (body) => {
+      const out = await send<{ path?: unknown }>(io, `${base}/api/checkAutomation`, { body });
+      return out.ok ? { ok: true, value: { path: out.value?.path === 'inline' ? 'inline' : 'run' } } : out;
+    },
+    attempt: async (body, sample) => {
+      const out = await send<unknown>(io, `${base}/api/tryAutomation`, { body, sample });
+      if (!out.ok) return out;
+      const tried = tryRunOf(out.value);
+      return tried ? { ok: true, value: tried } : unreachable();
+    },
+    setEnabled: async (rule, enabled) => {
+      const out = await send<{ version?: unknown; enabled?: unknown }>(io, `${base}/api/setAutomation`, { rule: bare(rule), enabled });
+      if (!out.ok) return out;
+      return { ok: true, value: { version: typeof out.value?.version === 'number' ? out.value.version : 0, enabled: out.value?.enabled === true } };
+    },
+    retry: (run) => send<{ run: string }>(io, `${base}/api/retryRun`, { run }),
+    versions: async (rule) => {
+      const out = await send<unknown>(io, `${base}/api/automationVersions?${new URLSearchParams({ rule: bare(rule) }).toString()}`);
+      return out.ok ? { ok: true, value: versionsOf(out.value) } : out;
+    },
+    retire: (rule) => send<unknown>(io, `${base}/api/retireDeclaration`, { id: `rule.${bare(rule)}` }),
+    accept: (suggestion) => send<unknown>(io, `${base}/api/decide`, { id: suggestion, decide: { option: 'accept', reason: SAVED_HERE } }),
+    rows: async (register, now) => {
+      const out = await send<{ rows?: unknown }>(io, `${base}/api/list?${new URLSearchParams({ register, limit: String(PICKABLE) }).toString()}`);
+      if (!out.ok) return out;
+      const rows = Array.isArray(out.value?.rows) ? out.value.rows : [];
+      return { ok: true, value: rows.map((r) => pickableRow(r, now)).filter((x): x is Pickable => x !== null) };
+    },
+    arrivals: async (now) => {
+      const out = await send<{ arrivals?: unknown }>(io, `${base}/api/inbox?${new URLSearchParams({ limit: String(PICKABLE) }).toString()}`);
+      if (!out.ok) return out;
+      const lines = Array.isArray(out.value?.arrivals) ? out.value.arrivals : [];
+      return { ok: true, value: lines.map((a) => pickableArrival(a, now)).filter((x): x is Pickable => x !== null) };
     },
   };
 }

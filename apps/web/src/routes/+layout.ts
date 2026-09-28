@@ -61,7 +61,7 @@ export async function load({ url, fetch }): Promise<Shell & { slash: boolean }> 
   const inner = here(url.pathname);
   /* `/connect` too: an app's sign-in lands there, and a redirect to `/start` would strand it halfway (AGT-8). */
   const spared =
-    inner === '/start' || inner === '/signin' || inner === '/invite' || inner === '/connect' || inner.startsWith('/s/');
+    inner === '/start' || inner === '/signin' || inner === '/signup' || inner === '/invite' || inner === '/connect' || inner.startsWith('/s/');
   const booted = await live.readBoot(api);
 
   /* AN ADDRESS THAT WILL NOT OPEN FOR A STRANGER ASKS FOR SIGN-IN (`signInFirst`), the bare `/app/` as much as
@@ -73,6 +73,7 @@ export async function load({ url, fetch }): Promise<Shell & { slash: boolean }> 
   /* THE VOICE THE RECORD SPEAKS IN, from its use-case pack's settings (`loop/research-spark.md` §2.2). Asked once per
      `boot` answer and never awaited past a refusal: a record that cannot say speaks in the house voice. */
   await voice.listen(booted.from === 'live' ? booted.boot : null, api).catch(() => undefined);
+  if (typeof document !== 'undefined') void import('$lib/theme/draw.ts').then((look) => look.draw(booted.from === 'live' ? booted.boot : null));
 
   /* ANY OTHER REFUSAL IS THE RECORD'S ANSWER, a host nobody reached among them (a static host's fallback page, a
      preview with no record behind it): the shell draws nothing and the screen says what it said. */

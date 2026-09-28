@@ -41,6 +41,7 @@ const SAMPLES = {
     'appearance',
     'identity',
     'recovery',
+    'sessions',
     'people',
     'agents',
     'ingest',
@@ -68,10 +69,14 @@ const SAMPLES = {
  *  under. `people` is a pack the seeded record holds: the seed writes no `pack` row, so a pack is
  *  known by the `pack:` its declarations carry, and `braindog-starter` is only the document's name.
  *
- *  `/jobs/[id]` DRAWS "no such run" FOR EVERY ID, since no record answers with a run's steps yet and the sample's
- *  `j_7Q2F` went with the sample (DIRECTION 26). The refusal is what the route draws, so it is what is measured, under
- *  an id that says so rather than one that looks like a run somebody could open. */
-const BY_ROUTE = { '/jobs/[id]': 'j_none', '/packs/[id]': 'people' };
+ *  `/jobs/[id]` NOW READS THE RECORD, and `j_none` settles `empty` ("There is no run called j_none on
+ *  this record") rather than drawing a refusal: the sample's `j_7Q2F` went with the sample (DIRECTION
+ *  26), and an id naming no run is the calm not-found empty, not a failure. */
+const BY_ROUTE = {
+  '/jobs/[id]': 'j_none',
+  '/packs/[id]': 'people',
+  '/scripts/[id]': 'no-script',
+};
 
 async function walk(dir, out = []) {
   for (const e of await readdir(dir, { withFileTypes: true })) {

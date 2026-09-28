@@ -26,6 +26,7 @@
   import Waiting from '$lib/ui/Waiting.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import Face from '$lib/ui/Face.svelte';
+  import { runOf } from '$lib/ui/face.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import type { IconName } from '$lib/ui/icons.ts';
   /* THE URL IS NOT TYPED. `?kind=` carries whatever somebody pasted, and the words this screen
@@ -448,7 +449,8 @@
                reader's own writes with their id, and it is `news-live.ts` and `actor` between them
                that know the id is theirs. -->
           <span class="who">
-            <Face name={by.name} you={by.you} kind={by.kind} size="s" />
+            <!-- AN AGENT'S LINE WEARS ITS RUN (AGT-13): the run's hue, and a door to the run's handoff. -->
+            <Face name={by.name} you={by.you} kind={by.kind} run={runOf(e.by)} size="s" />
             <span class="who-name">{by.name}</span>
           </span>
           <span class="line-main">

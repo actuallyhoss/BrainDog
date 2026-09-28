@@ -543,9 +543,13 @@ better organisation.
 
 ### Type change is a conversion preview, not a warning
 
-> **In v1 a type change is refused at install** — `FIELD_TYPE_CHANGED`: retire the field and add a new
-> one ([04-PACKS](04-PACKS.md) §5). The preview below is the authoring tier's answer, and it replaces
-> the refusal when that tier is funded.
+> **This preview is built** (GAP-8): `previewRetype` draws it over the list's live rows and writes nothing;
+> `retypeField` files the answered conversion as one `change` body — `{ retype: { register, field, as, answers } }`
+> for a field whose type moves, `{ narrow: ... }` for one that only tightens — and lands only once every failing
+> row has an answer of `clear`, `keep` (a sibling text field beside it) or `{ to: <value> }` (typed by hand). An
+> owner's lands at once; anybody else's waits on Decide. `FIELD_TYPE_CHANGED` and `REQUIRED_ON_POPULATED` still
+> refuse an ordinary pack update ([04-PACKS](04-PACKS.md) §5): this governed path is the only one that converts
+> rows.
 
 Airtable's failure here is severe and documented in its community rather than its docs: text→number
 **silently truncates integers above 2⁵³−1**, with video evidence and no staff reply. Airtable
@@ -574,6 +578,9 @@ and blast-radius line; a declaration id is never renamed (`ID_RENAMED`, [04-PACK
 ---
 
 ## 6 · The theme editor
+
+*Built by GAP-3 (W2), as Settings > Appearance "Edit the look": every role, its three tabs, the scales chosen
+never typed, and the specimen beside it, as this section specifies.*
 
 **Roles, and only roles.** Every role is a **light/dark pair in one row, two swatches** — there is no
 "make a dark theme" step. And **there is no other colour surface in the product**: an author who

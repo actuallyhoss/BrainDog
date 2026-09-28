@@ -1,66 +1,69 @@
 <!--
-  The use cases, as cards: `/packs/browse`, the seed of the marketplace (`loop/research-spark.md` S14,
-  `loop/research-marketplace.md` §1).
+  Everything a record can add, in one grid: `/packs/browse` (`loop/finish/platform.md` PLT-3, §4.0 L).
 
-  A CARD IS READ FROM THE USE CASE'S OWN DECLARATIONS (`share.ts` `previewOf`): what it is for, the rail its pages make,
-  the headings of its Home and the lists it adds. Nothing on a card is drawn by hand, so a card cannot promise what the
-  install does not do.
+  ONE LISTING MODEL. The modules this build ships, its built-in use cases and every entry the Kennel answers are read into
+  `Listing`s by `listingsOf` (`$lib/market/listing.ts`), so they are searched, counted, filtered and sorted the same
+  way. A search reads the title, the summary, the id, the lists and pages it adds, who made it and its categories; a chip
+  keeps one category; the order is For you, Most installed or Newest. With nothing searched, BrainDog's own and the ways
+  of working lead.
 
-  INSTALL IS THE SAME PLAN A SHARED FILE GETS. A built-in use case is handed to the record as the file it would be
-  (`builtInFile`), planned by `planUseCase` and installed pack by pack through `installPack`. A use case this record
-  already holds is switched to, by turning its pack on and the one speaking now off.
+  NOTHING HERE INSTALLS. A card opens the listing's own page, where the file is verified and the record's plan is read
+  before anything can be pressed. The record's packs are read only to say on a card what is already in.
+
+  A HOST WITH NO KENNEL, OR A RECORD THAT DOES NOT ANSWER, still draws every built-in listing: neither is what browse is
+  about, and a signed-out visitor from the site's Install link is shown what there is before being asked to sign in.
 -->
 <script lang="ts">
-  import { apiBase, at } from '$lib/at.ts';
+  import { apiBase } from '$lib/at.ts';
   import { onMount } from 'svelte';
   import { page } from '$app/state';
   import { createClient } from '@braindog/client';
-  import { USE_CASES } from '@braindog/seed/usecases';
-  import { modulesToInstall, previewOf } from '@braindog/seed/usecases/share';
+  import type { CatalogueIndex, Category } from '@braindog/declare/catalogue';
+  import { useCase } from '@braindog/seed/usecases';
+  import { previewOf } from '@braindog/seed/usecases/share';
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
   import { read } from '$lib/data/record.ts';
-  import { choose, type PackState, type Source } from '$lib/record/packs.ts';
+  import { choose, type PackState } from '$lib/record/packs.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
-  import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
+  import ListingCard from '$lib/market/ListingCard.svelte';
+  import { chipsOf, categoryName, inCategory } from '$lib/market/categories.ts';
+  import { readCounts } from '$lib/market/counts.ts';
+  import { actionOf, listingsOf, ordered, searchListings, type Order } from '$lib/market/listing.ts';
+  import { words } from '$lib/market/words.ts';
   import { drew } from '../../../lib/ui/screen.svelte.ts';
-  import Offer from './Offer.svelte';
   import Preview from './Preview.svelte';
-  import CatalogueCard from './CatalogueCard.svelte';
   import { readHostCatalogue } from './catalogue.ts';
-  import type { CatalogueIndex } from '@braindog/declare/catalogue';
 
-  const cards = USE_CASES.map((u) => ({ u, preview: previewOf(u) }));
+  let kennel = $state.raw<CatalogueIndex | null>(null);
+  let kennelRefused = $state<string | null>(null);
+  let counts = $state.raw<Record<string, number> | null>(null);
+  /** This record's packs, `null` until it answers or when it does not. */
+  let states = $state.raw<PackState[] | null>(null);
 
-  let client = $state.raw<ReturnType<typeof createClient> | null>(null);
-  let source: Source | null = null;
-  let live = $state(false);
-  let states = $state<PackState[]>([]);
-  let refused = $state<string | null>(null);
-  /* THIS HOST'S CATALOGUE, when it serves one (`BRAINDOG_CATALOGUE`); none is not an error. */
-  let catalogue = $state.raw<CatalogueIndex | null>(null);
-  let catalogueRefused = $state<string | null>(null);
+  let query = $state(page.url.searchParams.get('q') ?? '');
+  let category = $state<Category | null>(null);
+  let order = $state<Order>('for-you');
 
-  async function reread() {
-    const again = await source?.packs();
-    if (again?.ok) states = again.value;
-  }
+  const listings = $derived(listingsOf({ kennel, counts }));
+  const searched = $derived(searchListings(listings, query, categoryName));
+  const chips = $derived(chipsOf(searched));
+  /* A CHIP THAT A NEW SEARCH EMPTIED lets go, so the grid never says nothing matches because of a chip no longer drawn. */
+  const picked = $derived(category !== null && chips.some((c) => c.category === category) ? category : null);
+  /* WITH A SEARCH, THE BEST MATCH LEADS under For you; the other orders are what a person asked for, search or not. */
+  const shown = $derived(order === 'for-you' && query.trim() !== '' ? inCategory(searched, picked) : ordered(inCategory(searched, picked), order));
+  const ORDERS: readonly Order[] = ['for-you', 'installed', 'newest'];
 
   onMount(() => {
     void readHostCatalogue(fetch).then((got) => {
-      if (got.ok) catalogue = got.index;
-      else catalogueRefused = got.fix;
+      if (got.ok) kennel = got.index;
+      else kennelRefused = got.fix;
     });
+    void readCounts(fetch).then((got) => (counts = got));
     void read(async () => {
-      client = createClient({ base: apiBase() });
-      const chosen = await choose(client, !page.data.live);
-      source = chosen.source;
-      live = true;
-      if (!chosen.first.ok) {
-        refused = chosen.first.refusal.fix;
-        return false;
-      }
+      const chosen = await choose(createClient({ base: apiBase() }));
+      if (!chosen.first.ok) return false;
       states = chosen.first.value;
       return true;
     });
@@ -73,43 +76,48 @@
 <PageHead icon="packs" title={copy.browseTitle} />
 
 <div class="page">
-  <p class="blurb">{copy.useCasesBlurb}</p>
-  {#if refused}
-    <Empty kind="error" title={refused} />
-  {/if}
-  <ul class="cards">
-    {#each cards as { u, preview } (u.usecase)}
-      <li class="card">
-        <header class="card-head">
-          <h2 class="card-title"><a class="card-link tap" href={at(`/packs/browse/${u.usecase}`)}>{u.title}</a></h2>
-          <span class="card-for">{copy.shareAudiences[u.audience]}</span>
-        </header>
-        <p class="card-summary">{u.summary}</p>
-        {#if modulesToInstall(u).length > 0}<p class="card-note">{copy.browseBuildsOn([...modulesToInstall(u)])}</p>{/if}
+  <div class="field field-lg search">
+    <input class="field-input" type="search" bind:value={query} aria-label={words.searchLabel} placeholder={words.searchHint} autocomplete="off" enterkeyhint="search" />
+  </div>
 
-        <Preview {preview} />
+  <div class="controls">
+    <div class="chips" role="group" aria-label={words.categoriesLabel}>
+      <button type="button" class="chip" aria-pressed={picked === null} data-on={picked === null ? '' : undefined} onclick={() => (category = null)}>
+        {words.all}<span class="n">{searched.length}</span>
+      </button>
+      {#each chips as c (c.category)}
+        <button type="button" class="chip" aria-pressed={picked === c.category} data-on={picked === c.category ? '' : undefined} onclick={() => (category = picked === c.category ? null : c.category)}>
+          {c.name}<span class="n">{c.count}</span>
+        </button>
+      {/each}
+    </div>
+    <div class="segmented order" role="group" aria-label={words.orderLabel}>
+      {#each ORDERS as o (o)}
+        <button type="button" class="segment" aria-pressed={order === o} data-on={order === o ? '' : undefined} onclick={() => (order = o)}>{words.orders[o]}</button>
+      {/each}
+    </div>
+  </div>
 
-        <footer class="card-foot">
-          <div class="card-offer"><Offer {u} {client} {live} {states} onchanged={reread} /></div>
-          <Button weight="bare" href="/packs/browse/{u.usecase}">{copy.browseDetails}</Button>
-        </footer>
-      </li>
-    {/each}
-  </ul>
+  {#if kennelRefused}<Empty kind="error" title={kennelRefused} />{/if}
 
-  {#if catalogueRefused}
-    <Empty kind="error" title={catalogueRefused} />
-  {:else if catalogue && catalogue.entries.some((e) => e.unlisted !== true)}
-    <!-- AN UNLISTED PACK INSTALLS BY ID AND IS LEFT OUT OF EVERY LISTING (decisions C41), this public grid among them.
-         Filtered inline rather than through `listedEntries`, whose static import would carry the declare package and
-         the kernel into this route's bundle. -->
-    <section class="catalogue" aria-labelledby="catalogue-h">
-      <h2 class="catalogue-h" id="catalogue-h">{copy.catalogueHeading}</h2>
-      <p class="blurb">{copy.catalogueBlurb}</p>
-      <ul class="cards fill">
-        {#each catalogue.entries.filter((e) => e.unlisted !== true) as entry (`${entry.kind}:${entry.id}`)}<CatalogueCard {entry} />{/each}
-      </ul>
-    </section>
+  <p class="count" role="status">{words.results(shown.length)}</p>
+
+  {#if shown.length === 0}
+    <Empty kind="no-results" title={words.nothingFound} body={words.nothingFoundBody} />
+  {:else}
+    <ul class="grid">
+      {#each shown as l (l.key)}
+        {@const u = l.kind === 'usecase' && l.source === 'bundled' ? useCase(l.id) : undefined}
+        {@const action = states ? actionOf(l, states) : null}
+        {#if u}
+          <ListingCard listing={l} {action}>
+            {#snippet drawing()}<Preview preview={previewOf(u)} />{/snippet}
+          </ListingCard>
+        {:else}
+          <ListingCard listing={l} {action} />
+        {/if}
+      {/each}
+    </ul>
   {/if}
 </div>
 
@@ -120,104 +128,96 @@
     gap: var(--sp-4);
     padding: var(--sp-5) var(--gutter) var(--sp-9);
     max-inline-size: 1100px;
+    min-inline-size: 0;
   }
 
-  .blurb {
-    max-inline-size: 62ch;
+  .search {
+    inline-size: 100%;
+    max-inline-size: 40rem;
+  }
+
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-3);
+    min-inline-size: 0;
+  }
+
+  /* THE CHIPS SCROLL SIDEWAYS IN THEIR OWN ROW, so the page never does at 390px. */
+  .chips {
+    display: flex;
+    flex: 1 1 20rem;
+    gap: var(--sp-2);
+    min-inline-size: 0;
+    overflow-x: auto;
+    padding-block: 2px;
+    scrollbar-width: none;
+  }
+
+  .chip {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 6px;
+    min-block-size: 32px;
+    padding: 0 var(--sp-3);
+    border: 1px solid var(--line);
+    border-radius: var(--r-pill);
+    background: var(--s1);
     color: var(--ink2);
-    font-size: var(--t-ui);
-    line-height: 1.6;
+    font: inherit;
+    font-size: var(--t-sm);
+    white-space: nowrap;
+    cursor: pointer;
   }
 
-  .cards {
+  .chip[data-on] {
+    border-color: var(--ink);
+    background: var(--ink);
+    color: var(--bg);
+  }
+
+  .chip:focus-visible {
+    outline: 1px solid var(--ink2);
+    box-shadow: 0 0 0 3px var(--focus-halo);
+  }
+
+  .n {
+    color: inherit;
+    font-size: var(--t-xs);
+    opacity: 0.7;
+  }
+
+  .count {
+    margin: 0;
+    color: var(--dim);
+    font-size: var(--t-xs);
+  }
+
+  .grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
     gap: var(--sp-4);
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
-  /* A CATALOGUE OF ONE keeps a card's width rather than stretching across the page. */
-  .cards.fill {
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  @media (pointer: coarse) {
+    .chip {
+      min-block-size: 44px;
+    }
   }
 
-  .catalogue {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-3);
-    margin-block-start: var(--sp-4);
-  }
+  @media (width < 640px) {
+    .search {
+      max-inline-size: none;
+    }
 
-  .catalogue-h {
-    font-family: var(--font-ui);
-    font-size: var(--t-base);
-    font-weight: 600;
-  }
-
-  .card {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-2);
-    min-inline-size: 0;
-    padding: var(--sp-4);
-    border: 1px solid var(--line-soft);
-    border-radius: var(--r-lg);
-    background: var(--bg);
-  }
-
-  .card-head {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: var(--sp-2);
-  }
-
-  .card-title {
-    font-family: var(--font-ui);
-    font-size: var(--t-base);
-    font-weight: 600;
-  }
-
-  .card-for,
-  .card-note {
-    color: var(--dim);
-    font-size: var(--t-xs);
-  }
-
-  .card-summary {
-    margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
-    line-height: 1.5;
-  }
-
-  .card-note {
-    margin: 0;
-  }
-
-  .card-foot {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: var(--sp-2);
-    margin-block-start: auto;
-  }
-
-  .card-offer {
-    flex: 1 1 12rem;
-    min-inline-size: 0;
-  }
-
-  .card-link {
-    color: inherit;
-    text-decoration: none;
-  }
-
-  .card-link:hover {
-    text-decoration: underline;
+    .order {
+      inline-size: 100%;
+    }
   }
 </style>

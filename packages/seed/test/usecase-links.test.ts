@@ -47,18 +47,19 @@ test('EVERY LINK NAMES A REF FIELD AND TWO EXAMPLE ROWS THE USE CASE REALLY SEED
       assert.ok(seeded(l.to, l.target), `${u.usecase}: no example ${l.to} titled ${l.target}`);
     }
   }
-  assert.ok(counted >= 12);
-  assert.deepEqual(exampleLinks('usecase-student'), exampleLinks('student'));
+  assert.ok(counted > 0);
+  assert.deepEqual(exampleLinks('usecase-guide'), exampleLinks('guide'));
   assert.deepEqual(exampleLinks('business'), []);
+  /* PERSONAL AND STUDENT CARRY NO EXAMPLE ROW SINCE PERSONAL 2.0.0 AND STUDENT 1.3.0 (C11), so nothing of theirs links. */
+  assert.deepEqual(exampleLinks('personal'), []);
+  assert.deepEqual(exampleLinks('student'), []);
 });
 
 test('ONLY AN EXAMPLE WITH THE FIELD EMPTY IS LINKED, AND A REFUSED WRITE IS SKIPPED', async () => {
+  const STEP = 'Write one sentence about what this is and who it is for';
   const rows: Record<string, LinkRow[]> = {
-    courses: [{ seq: 4, fields: { name: 'Introduction to statistics', tags: ['example'] } }],
-    assignments: [
-      { seq: 1, fields: { what: 'Problem set 1: probability', tags: ['example'] } },
-    ],
-    study_sessions: [{ seq: 2, fields: { what: 'Go over the lecture on conditional probability', course: 'c_mine', tags: ['example'] } }],
+    milestones: [{ seq: 4, fields: { what: 'Say what it is and who it is for', tags: ['example'] } }],
+    steps: [{ seq: 1, fields: { what: STEP, tags: ['example'] } }],
   };
   const writes: string[] = [];
   const io: LinkIo = {
@@ -68,21 +69,21 @@ test('ONLY AN EXAMPLE WITH THE FIELD EMPTY IS LINKED, AND A REFUSED WRITE IS SKI
       return true;
     },
   };
-  assert.equal(await linkExamples(io, 'student'), 1);
-  assert.deepEqual(writes, ['assignments#1.course=courses#4']);
+  assert.equal(await linkExamples(io, 'guide'), 1);
+  assert.deepEqual(writes, ['steps#1.milestone=milestones#4']);
 
   /* A ROW SOMEBODY WROTE, WITH THE SAME TITLE, IS NOT AN EXAMPLE AND IS LEFT ALONE; a refusal counts nothing. */
   writes.length = 0;
-  rows.assignments = [{ seq: 1, fields: { what: 'Problem set 1: probability', tags: [] } }];
-  assert.equal(await linkExamples(io, 'student'), 0);
+  rows.steps = [{ seq: 1, fields: { what: STEP, tags: [] } }];
+  assert.equal(await linkExamples(io, 'guide'), 0);
   assert.deepEqual(writes, []);
-  rows.assignments = [{ seq: 1, fields: { what: 'Problem set 1: probability', tags: ['example'] } }];
-  assert.equal(await linkExamples({ ...io, link: async () => false }, 'student'), 0);
-  assert.equal(await linkExamples({ rows: async () => { throw new Error('down'); }, link: io.link }, 'student'), 0);
+  rows.steps = [{ seq: 1, fields: { what: STEP, tags: ['example'] } }];
+  assert.equal(await linkExamples({ ...io, link: async () => false }, 'guide'), 0);
+  assert.equal(await linkExamples({ rows: async () => { throw new Error('down'); }, link: io.link }, 'guide'), 0);
 });
 
-test('ON A REAL RECORD, A STUDENT, A GUIDE AND A TEAM OPEN WITH THEIR EXAMPLES LINKED', async () => {
-  for (const id of ['student', 'guide', 'team']) {
+test('ON A REAL RECORD, A GUIDE AND A TEAM OPEN WITH THEIR EXAMPLES LINKED', async () => {
+  for (const id of ['guide', 'team']) {
     const u = useCase(id)!;
     const sql = openSqlite();
     const k: Kernel = await openRecord(sql, fixedClock(NOW));

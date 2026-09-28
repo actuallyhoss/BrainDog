@@ -381,6 +381,10 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
         versions: 5,
         empty: 'One version so far.',
       },
+      /* THE LEARNINGS THIS VERSION TOOK IN, each a card that opens its row (GAP-12). `id is {{because}}` and not a note:
+         `because` holds row ids, which `fill` writes into a sentence as `id is A or B`, so the cards are the lessons
+         themselves and never the ids. A version drafted by Slash lists them in `because` when it is taken on Decide. */
+      { kind: 'cards', heading: 'Learnings behind this version', span: 12, source: 'register.learnings', where: 'id is {{because}}', columns: [{ field: 'lesson', as: 'title' }, { field: 'confirmed_on', as: 'when' }], limit: 8, empty: 'No learning is written into this version yet.' },
       {
         kind: 'cards',
         heading: 'Learnings that bear on it',

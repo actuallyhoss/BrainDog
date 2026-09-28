@@ -27,7 +27,7 @@ import { createRecordApi, type CallContext } from '../../record/src/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 import { FIRST_PARTY, NOW, firstPartyDocument } from '../../seed/src/index.ts';
 import { asMoneyCore180 } from '../../seed/test/money-core-earlier.ts';
-import { HSBC_EG_INGESTS, HSBC_EG_SMS_INGESTS, MONEY_CORE_HANDS, bankHsbcEgFile } from '../../seed/test/pack-files.ts';
+import { HSBC_EG_INGESTS, HSBC_EG_SMS_INGESTS, MONEY_CORE_HANDS, bankHsbcEgFile, bankHsbcEgFile13 } from '../../seed/test/pack-files.ts';
 
 const owner: CallContext = { principal: { kind: 'person', id: 'p_owner', level: 'owner' } };
 
@@ -108,7 +108,9 @@ test('A TOKEN MINTED ON 1.7.0 OPENS THE DOOR AFTER THE UPDATE AND AFTER THE PACK
   for (const r of update.retires)
     assert.equal(r.to, r.id === 'ingest.bank-from-out-sms' ? 'bank-hsbc-eg' : undefined, `${r.id} retires to the wrong place`);
 
-  const bank = await put(api, bankHsbcEgFile());
+  /* THE FROZEN 1.3.1, NOT THE SHIPPED FILE: bank-hsbc-eg's floor moved to money-core 3.0.0 at 1.4.0, and this record
+     is on 1.8.0 (`seed/test/money-core-major.test.ts`). */
+  const bank = await put(api, bankHsbcEgFile13());
   assert.deepEqual(bank.conflicts, []);
   assert.deepEqual(bank.adds.map((a) => a.id).sort(), [...HSBC, 'ingest.bank-not-mine-sms'].sort());
   assert.deepEqual(await api.ingestVerify({ ingest: 'bank-from-out-sms' }), door, 'the owner has to mint again');
@@ -118,7 +120,7 @@ test('A TOKEN MINTED ON 1.7.0 OPENS THE DOOR AFTER THE UPDATE AND AFTER THE PACK
   assert.equal(owners.length, 12);
   /* THE VERSION ITS FILE SHIPS. Read off the file because this line holds that the pack arrived, and the range step is
      `seed/test/bank-pack.test.ts`'s. */
-  assert.ok(api.kernel.packs().some((p) => p.id === 'bank-hsbc-eg' && p.version === bankHsbcEgFile().version));
+  assert.ok(api.kernel.packs().some((p) => p.id === 'bank-hsbc-eg' && p.version === bankHsbcEgFile13().version));
   assert.equal(api.kernel.packs().find((p) => p.id === 'money-core')?.version, '1.8.0');
   sql.close();
 });

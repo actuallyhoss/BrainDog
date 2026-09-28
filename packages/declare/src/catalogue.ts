@@ -177,7 +177,7 @@ export type CatalogueEntry = {
  * The closed list of keys an add-on's manifest may say, which the SDK and the Kennel hold a file to. The record itself
  * stays lenient and reads what it knows. `unlisted` is decisions.md C41's flag: a pack named for one person or one bank.
  */
-export const MANIFEST_KEYS = ['pack', 'version', 'title', 'summary', 'changes', 'author', 'license', 'requires', 'provides', 'declarations', 'seeds', 'config', 'extends', 'note', 'unlisted'] as const;
+export const MANIFEST_KEYS = ['pack', 'version', 'title', 'summary', 'changes', 'author', 'license', 'requires', 'provides', 'declarations', 'seeds', 'config', 'extends', 'adds', 'note', 'unlisted'] as const;
 
 export const PREVIEW_FORMAT = 1;
 

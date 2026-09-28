@@ -110,6 +110,13 @@ export function slashModelFor(
       if (model.form === undefined) throw Object.assign(new Error('The model Slash answers with here drafts no first plan.'), { sent: false });
       return model.form(input);
     },
+    /* HANDS `SlashModel.skill` THROUGH THE SAME CHOICE `form` IS (GAP-12), so the daily look's skill step reads his own
+       key's model, and not only the record's endpoint, when he has one chosen. */
+    skill: async (input) => {
+      const model = chosen();
+      if (model.skill === undefined) throw Object.assign(new Error('The model Slash answers with here drafts no skill.'), { sent: false });
+      return model.skill(input);
+    },
   };
 }
 

@@ -91,8 +91,8 @@ function drawn(k: Kernel, slug: string): Drawn[] {
 test("HOME, THE DASHBOARD, AN ORGANISATION AND ESTATE'S OWN PAGE ALL READ with Estate in, and Home still speaks as a founder", async () => {
   const k = await founder();
   const home = drawn(k, 'home-founder');
-  assert.equal(home[0]!.heading, 'The numbers', "Home's first heading is the founder's voice, not Estate's");
-  assert.deepEqual(home[0]!.cells?.map((c) => c.label), ['Cash now', 'Owed to you, 30 days', 'Owed by you, 30 days', 'Reported, 30 days']);
+  assert.equal(home[0]!.heading, 'What you have', "Home leads with the founder's money, not Estate's page");
+  assert.deepEqual(home[0]!.cells?.map((c) => c.label), ['Cash now', 'Lasts until', 'Coming in, 30 days', 'Going out, 30 days']);
   drawn(k, 'dashboard');
   drawn(k, 'estate');
   const pages = k.pages() as unknown as { slug: string; title: string }[];

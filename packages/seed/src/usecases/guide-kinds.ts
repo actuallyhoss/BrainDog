@@ -6,8 +6,10 @@
  * choices and what helps, instead of the six milestones any project passes. The same sentence always forms the same
  * plan, so a fresh self-host with nothing configured does it. Nothing heard, and the guide opens on the general plan.
  *
- * THEY ARE EXAMPLE ROWS, installed with the pack and marked as examples, so a person can edit, finish or clear them like
- * any other use case's examples. A model, where one is configured, never writes a plan: it may only propose one on Decide.
+ * THEY ARE YOUR PLAN, NOT EXAMPLE ROWS. They are planted the way examples are, so a person can edit, finish or delete them
+ * like any row, but each carries the `formed` tag (`install.ts` `FORMED_TAG`), so a screen reading the tag (`web/lib/record/tags.ts`)
+ * calls them the plan the person asked for, and "Clear the examples" never takes them away. A model, where one is configured, never writes a plan:
+ * it may only propose one on Decide.
  */
 
 import type { ExampleLink } from './links.ts';
@@ -380,10 +382,10 @@ export function guideKindOf(said: string): { kind: GuideKind; heard: string[] } 
   return best;
 }
 
-/** A plan formed for a kind: the pack's example rows, and how they point at each other, which a seed cannot say. */
+/** A plan formed for a kind: the rows of the person's plan, and how they point at each other, which a seed cannot say. */
 export type FormedPlan = { kind: string; name: string; heard: readonly string[]; seeds: Body[]; links: ExampleLink[] };
 
-/** The example rows and their links for one kind of project. */
+/** The rows of the plan and their links for one kind of project. */
 export function planFor(kind: GuideKind, heard: readonly string[] = []): FormedPlan {
   const titles = kind.milestones.map(([, what]) => what);
   const at = (i: number): string => titles[Math.min(Math.max(0, i), titles.length - 1)]!;

@@ -1,0 +1,104 @@
+{
+  "format": 1,
+  "made_at": "2026-09-28T00:35:03.785Z",
+  "pages": [
+    {
+      "blocks": [
+        {
+          "cells": [
+            {
+              "label": "Holdings value",
+              "metric": "holdings-value",
+              "note": "what was paid for {{holdings-costed}} of {{holdings-count}} holding(s), one amount per currency"
+            }
+          ],
+          "heading": "What you hold",
+          "kind": "stat",
+          "lead": true,
+          "span": 12,
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "values": {
+            "holdings-costed": 0,
+            "holdings-count": 0
+          },
+          "readings": [
+            {
+              "label": "Holdings value",
+              "metric": "holdings-value",
+              "note": "what was paid for {{holdings-costed}} of {{holdings-count}} holding(s), one amount per currency",
+              "target": {
+                "gte": 0
+              },
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 0,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            }
+          ]
+        },
+        {
+          "columns": [
+            {
+              "field": "label",
+              "width": "minmax(18ch,2fr)"
+            },
+            {
+              "field": "kind"
+            },
+            {
+              "field": "qty"
+            },
+            {
+              "field": "unit_cost"
+            },
+            {
+              "field": "cost"
+            },
+            {
+              "field": "acquired_on"
+            },
+            {
+              "field": "matures_on"
+            }
+          ],
+          "empty": "Nothing held yet. A certificate, a policy or a lot of a commodity goes here with what it cost.",
+          "heading": "Everything you hold",
+          "kind": "table",
+          "limit": 100,
+          "order": [
+            {
+              "dir": "desc",
+              "field": "acquired_on"
+            }
+          ],
+          "source": "register.holdings",
+          "span": 12,
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        }
+      ],
+      "icon": "money",
+      "nav": {
+        "order": 30,
+        "section": "Money"
+      },
+      "pack": "holdings",
+      "page": "holdings",
+      "requires": [
+        "register.holdings"
+      ],
+      "title": "Holdings",
+      "read_at": "2026-09-28T00:35:03.785Z",
+      "declared_version": 1
+    }
+  ]
+}

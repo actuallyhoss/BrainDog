@@ -11,8 +11,8 @@
  *
  * SO THE COUNT IS A ROW, AND THE AUTOMATION STARTS ON IT. Typing an amount into a form is what a list already takes
  * from a person, so the pack declares `cash_counts`; an automation on each new count starts a script, and the script
- * does the subtraction nothing declared can: the counted amount less the account's balance, written as a dated
- * transaction, the account set to what was counted, and the difference kept on the count. Nothing in `packages/`
+ * does the subtraction nothing declared can: the counted amount less what Cash now rolls the account to, written as a dated
+ * transaction, the count kept as a balance check (1.1.0), and the difference kept on the count. Nothing in `packages/`
  * changed for it. The day `ask_person` takes an amount, the form becomes a question and the rest stays.
  *
  * RED FIRST, MEASURED ON SEPTEMBER 25TH: with no `count.js` and no `count-cash.pack.json` this file failed at its first
@@ -83,8 +83,9 @@ test('THE PACK CARRIES count.js AS ITS SOURCE, byte for byte; it fetches nothing
   assert.equal(SCRIPT.source, SOURCE, 'count-cash.pack.json and count.js disagree; copy count.js into the source');
   assert.deepEqual(SCRIPT.runs, { rule: true });
   assert.deepEqual([SCRIPT.egress, SCRIPT.keys], [[], []], 'counting cash calls nobody');
-  assert.deepEqual([...SCRIPT.reads].sort(), ['accounts', 'cash_counts']);
-  assert.deepEqual([...SCRIPT.writes].sort(), ['accounts', 'cash_counts', 'transactions']);
+  /* 1.1.0 READS WHAT CASH NOW ROLLS FROM AND WRITES A CHECK, and no longer writes over the account's own balance. */
+  assert.deepEqual([...SCRIPT.reads].sort(), ['accounts', 'balances', 'cash_counts', 'transactions']);
+  assert.deepEqual([...SCRIPT.writes].sort(), ['balances', 'cash_counts', 'transactions']);
   /* A NEW COUNT, NOT AN EDITED ONE. An edited count run again would subtract against the balance the count itself
      already set, so a correction is a new count, which is also what leaves a trail. */
   assert.deepEqual(RULE.on, { written: { register: 'cash_counts', op: ['create'] } });
@@ -136,7 +137,7 @@ test('A COUNT DATED BEFORE THE BALANCE IT WOULD CORRECT IS KEPT AND CHANGES NOTH
 
 /* ── The whole path ────────────────────────────────────────────────────────────────────────────── */
 
-test('THE WHOLE PATH ON A SELF-HOST: a person writes a count, and the record writes the difference, the balance and the day', async () => {
+test('THE WHOLE PATH ON A SELF-HOST: a person writes a count, and the record writes the difference and the check', async () => {
   const { start } = await import('../../apps/selfhost/src/server.ts');
   const dir = mkdtempSync(join(tmpdir(), 'braindog-count-cash-'));
   const running = await start({
@@ -186,8 +187,15 @@ test('THE WHOLE PATH ON A SELF-HOST: a person writes a count, and the record wri
       ledger().map((t) => [t.what, t.on, t.direction, t.amount.amount, t.amount.currency, t.account, t.state]),
       [['Cash count difference', '2026-09-25', 'out', 8_750, 'GBP', box.id, 'cleared']],
     );
+    /* THE COUNT IS A BALANCE CHECK AND THE ACCOUNT KEEPS WHAT A PERSON TYPED, since 1.1.0. */
+    const checks = () =>
+      running.sql
+        .all<{ fields: string }>("SELECT fields FROM entry WHERE register = 'balances' AND deleted_at IS NULL ORDER BY seq")
+        .map((r) => JSON.parse(r.fields) as { account: string; balance: { amount: number; currency: string }; as_of: string; source: string })
+        .map((c) => [c.account, c.balance.amount, c.balance.currency, c.as_of, c.source]);
     const boxNow = () => api.kernel.get(box.id)?.fields as { balance: { amount: number }; as_of: string };
-    assert.deepEqual([boxNow().balance.amount, boxNow().as_of], [41_250, '2026-09-25']);
+    assert.deepEqual(checks(), [[box.id, 41_250, 'GBP', '2026-09-25', 'Cash count of 2026-09-25']]);
+    assert.deepEqual([boxNow().balance.amount, boxNow().as_of], [50_000, '2026-09-20']);
     assert.deepEqual(api.kernel.get(short.id)?.fields.difference, { amount: -8_750, currency: 'GBP' });
 
     /* THE NEXT COUNT FINDS MORE THAN THE BOX SAYS, and the difference goes in. The edit the script made to the first
@@ -201,22 +209,34 @@ test('THE WHOLE PATH ON A SELF-HOST: a person writes a count, and the record wri
         ['in', 1_750, '2026-09-26'],
       ],
     );
-    assert.deepEqual([boxNow().balance.amount, boxNow().as_of], [43_000, '2026-09-26']);
+    assert.deepEqual(checks().map((c) => [c[1], c[3]]), [
+      [41_250, '2026-09-25'],
+      [43_000, '2026-09-26'],
+    ]);
 
-    /* A COUNT THAT AGREES WRITES NO TRANSACTION, and still moves the box's day, because the balance was checked. */
+    /* A COUNT THAT AGREES WRITES NO TRANSACTION, and still writes its check, because the balance was checked. */
     said(await api.create({ register: 'cash_counts', fields: { account: box.id, counted: { amount: 43_000, currency: 'GBP' }, on: '2026-09-27' } }, owner));
     await settle();
     assert.equal(ledger().length, 2);
-    assert.deepEqual([boxNow().balance.amount, boxNow().as_of], [43_000, '2026-09-27']);
+    assert.deepEqual(checks().at(-1)?.slice(1, 4), [43_000, 'GBP', '2026-09-27']);
 
-    /* A PERSON EDITS AN OLD COUNT'S NOTE, AND NOTHING RUNS. Three counts, three runs. Checked the other way on
-       September 25th: with the rule widened to `op: [create, update]`, this edit was a fourth run. The script's own
+    /* A MOVEMENT BETWEEN TWO COUNTS IS NOT COUNTED TWICE. 1.0.x subtracted the count from the balance the account was
+       typed with, so 20.00 spent after the last count was in the ledger and in the difference as well. The next count
+       finds exactly what the ledger says is left, and writes no difference. */
+    said(await api.create({ register: 'transactions', fields: { what: 'Stamps', on: '2026-09-28', direction: 'out', amount: { amount: 2_000, currency: 'GBP' }, account: box.id, state: 'cleared' } }, owner));
+    said(await api.create({ register: 'cash_counts', fields: { account: box.id, counted: { amount: 41_000, currency: 'GBP' }, on: '2026-09-29' } }, owner));
+    await settle();
+    assert.deepEqual(ledger().map((t) => t.what), ['Cash count difference', 'Cash count difference', 'Stamps']);
+    assert.deepEqual(checks().at(-1)?.slice(1, 4), [41_000, 'GBP', '2026-09-29']);
+
+    /* A PERSON EDITS AN OLD COUNT'S NOTE, AND NOTHING RUNS. Four counts, four runs. Checked the other way on
+       September 25th: with the rule widened to `op: [create, update]`, this edit was one run more. The script's own
        write of the difference was never one, rule or no rule, because the kernel does not start a rule twice on one row
        in one chain; the edit is what `op: [create]` is for. */
     said(await api.update({ register: 'cash_counts', seq: api.kernel.get(short.id)!.seq!, patch: { note: 'Recounted with the till roll.' } }, owner));
     await settle();
     const runs = running.sql.one<{ n: number }>('SELECT count(*) AS n FROM automation_run WHERE rule = ?', RULE.rule)?.n;
-    assert.equal(runs, 3);
+    assert.equal(runs, 4);
   } finally {
     await running.close();
     rmSync(dir, { recursive: true, force: true });

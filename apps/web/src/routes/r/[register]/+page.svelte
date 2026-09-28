@@ -56,6 +56,10 @@
   import RowPeek from './parts/RowPeek.svelte';
   import DisplayMenu from './parts/DisplayMenu.svelte';
   import FieldAdd from './parts/FieldAdd.svelte';
+  import ListEditor from '$lib/ui/ListEditor.svelte';
+  import { listWords, MAKE_ID, MAKE_PARAM, nameFromId, offered } from '$lib/record/list-write.ts';
+  import { sheetWords } from '$lib/record/field-words.ts';
+  import { ownsRecord, type Me } from '../../settings/levels.ts';
 
 
   const id = $derived(page.params.register ?? '');
@@ -117,6 +121,31 @@
     createOpen = false;
     if (page.url.searchParams.has('new')) setParam((p) => p.delete('new'));
   };
+
+  /* THE FIELDS SHEET (`ListEditor.svelte`), opened from the list's head, and the new-list sheet, which is the same sheet
+     for a list the record does not have yet. Whether the person owns the record decides whether what they do lands at
+     once or waits on Decide, and the sheet says which before the press. */
+  const owner = $derived(page.data.me ? ownsRecord(page.data.me as Me) : false);
+  let fieldsOpen = $state(false);
+  let makeOpen = $state(false);
+
+  /**
+   * A LINK CAN ASK FOR THE NEW-LIST SHEET: `/r/_new?make` from the "New list" entry, or `?make` on the address of a list
+   * that is not there. It opens once as the parameter arrives and not again while it stays, so closing the sheet needs
+   * no write to the address.
+   */
+  let makeAsked = false;
+  $effect(() => {
+    const asked = page.url.searchParams.has(MAKE_PARAM);
+    if (asked && !makeAsked) makeOpen = true;
+    makeAsked = asked;
+  });
+
+  /* A LIST MADE UNDER THIS ADDRESS IS ASKED FOR AGAIN, and one made under another name is opened. */
+  function made(list: string) {
+    if (list === id) refresh();
+    else void goto(at(`/r/${list}`));
+  }
   /* WHAT THE FORM WOULD REFUSE, held here so the BUTTON can be disabled by it. Asking the form on
      click could only ever answer after the press. */
   let problems = $state<string[]>([]);
@@ -1948,21 +1977,30 @@
        the region is on its way, and `data-screen` stays off until it has arrived. -->
   <div aria-busy="true"><Waiting head rows={8} /></div>
 {:else if !decl}
+  {@const have = offered(booted?.registers ?? [])}
   <div class="page">
     <!-- A URL NAMING SOMETHING THIS RECORD DOES NOT HAVE IS A REFUSAL, and the record already has
          the sentence for it. Nothing failed, so there is no request id to quote (`50 §13 D11`), and
          no filter ran, so "nothing matched" is about something that did not happen. It names the
          thing, says it is not here, and lists what is — `10 §7`'s fourth rule: the refusal is the
-         teacher. -->
+         teacher. WHAT IS HERE IS OFFERED AS LISTS TO OPEN, and the list asked for as one to make: a sentence of ids
+         ("Lists on this record: session") was the record's machinery read aloud, and nothing in it could be pressed.
+         The "New list" entry lands here under `_new`, which no list can be called, and reads as a place to start. -->
     <Empty
-      kind="error"
+      kind={id === MAKE_ID ? 'no-data-yet' : 'error'}
       heading
-      title={copy.noSuch('list', id)}
-      body={copy.theseExist('Lists', (booted?.registers ?? []).map((r) => ({ address: r.id, title: r.name })))}
+      title={id === MAKE_ID ? listWords.title : listWords.missingTitle}
+      body={id === MAKE_ID ? listWords.makeBody : have.length > 0 ? listWords.missing(nameFromId(id)) : listWords.missingNone(nameFromId(id))}
     >
-      {#snippet actions()}<Button href="/">{copy.home}</Button>{/snippet}
+      {#snippet actions()}
+        <Button weight="primary" onclick={() => (makeOpen = true)}>{listWords.make}</Button>
+        {#if id !== MAKE_ID}
+          {#each have as r (r.id)}<Button href={`/r/${r.id}`}>{r.name}</Button>{/each}
+        {/if}
+      {/snippet}
     </Empty>
   </div>
+  <ListEditor bind:open={makeOpen} register={null} {owner} name={nameFromId(id)} onmade={made} />
 {:else}
   <PageHead icon={iconFor(decl.icon, 'rows')}
     title={decl.name}
@@ -1979,8 +2017,11 @@
         <Button weight="primary" onclick={() => (createOpen = true)}><Icon name="plus" size="s" />{copy.newRow} {decl.one}</Button>
       </span>
       {#if !arriving}<CapturePlus one={decl.one} onclick={() => (captureOpen = true)} />{/if}
+      <!-- THE LIST'S FIELDS, opened from its head: add any kind, rename one, or retire one (`ListEditor.svelte`). -->
+      <Button onclick={() => (fieldsOpen = true)} data-fields-open>{sheetWords.open}</Button>
     {/snippet}
   </PageHead>
+  <ListEditor bind:open={fieldsOpen} register={id} {owner} onchanged={refresh} />
 
   <div class="page" aria-busy={busy ? 'true' : undefined}>
     <!-- THE LIST HAS MOVED ON AND MORE THAN ONE PAGE OF IT IS IN HAND, so it says so rather than splicing a new head

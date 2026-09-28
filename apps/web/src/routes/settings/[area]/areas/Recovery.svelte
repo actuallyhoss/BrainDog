@@ -143,6 +143,16 @@
   </Section>
 {/if}
 
+<!-- WHAT A LOST PASSKEY COSTS, said before it happens. The last passkey cannot be removed from this screen (above),
+     and the host allows it on purpose (`passkey.remove`, "the last one included"), so a person who signs in by the
+     mailed link can still clear a key they lost. The sentence names that way when this host sends mail, and the
+     person who runs the host as the last resort either way, because there is no recovery code to offer. -->
+{#if livePasskeys}
+  <Section title={copy.passkeyLost}>
+    <p class="hint">{copy.passkeyLostHow(livePasskeys.magic)}</p>
+  </Section>
+{/if}
+
 <Section title={copy.lockout}>
   <p class="hint">{copy.lockoutHow}</p>
 </Section>
@@ -163,5 +173,18 @@
     display: flex;
     gap: var(--sp-2);
     margin-block-start: var(--sp-3);
+  }
+
+  /* ON A PHONE "Add a passkey" IS A FULL-WIDTH ROW AT THE TOUCH HEIGHT, as every area's buttons are. */
+  @media (width < 640px) {
+    .row-actions {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .row-actions :global(.btn) {
+      justify-content: center;
+      min-block-size: 44px;
+    }
   }
 </style>

@@ -259,6 +259,32 @@ const DECLARED: Record<string, Version> = {
     declares: '1e9eb57c702e9659',
     history: ["Home's empty title, `setting.voice_nothing_needs_you`, loses its closing full stop, as every other title already has -> 1e9eb57c702e9659"],
   },
+  /**
+   * SPENDING AND BUDGETS GONE, AND HOME REBUILT: money-core's own Money now keeps what Personal's own `spending` and
+   * `budgets` kept, so this use case drops its copies and `page.home-personal` is rebuilt to lead with what a person
+   * has, bills due this week, budget left, projects and goals.
+   */
+  'personal@2.0.0': {
+    holds: `
+      extends.register.people.role.adviser extends.register.people.role.family extends.register.people.role.friend
+      extends.register.people.role.landlord extends.register.people.role.tradesperson
+      metric.logged-by-goal metric.logged-this-week-by-goal metric.put-by-by-goal metric.saved-toward-goals
+      page.goals page.home-personal page.my-project
+      register.goal_log register.goals register.project_steps register.put_by register.savings_goals
+      setting.holds_obligations setting.holds_people setting.holds_things setting.label_goal_log setting.label_goals
+      setting.label_obligations setting.label_people__role__accountant setting.label_people__role__client
+      setting.label_people__role__collaborator setting.label_people__role__contractor setting.label_project_steps setting.label_put_by
+      setting.label_savings_goals setting.label_things setting.label_things__lane__building setting.label_things__lane__earning
+      setting.label_things__lane__parked setting.label_things__lane__retired setting.label_things__revenue setting.lk_10103af7
+      setting.lk_1d01726f setting.lk_303a3cce setting.lk_4f9bf906 setting.lk_666e92eb setting.lk_91a285a5 setting.lk_d66e361a
+      setting.lk_f625eca1 setting.one_obligations setting.one_things setting.shared_version setting.speaks setting.voice_home
+      setting.voice_lists setting.voice_needs_you setting.voice_nothing_needs_you setting.voice_right_now setting.voice_since_away
+    `,
+    declares: 'b9d9129104f32581',
+    history: [
+      "Spending and budgets move into Money, so `register.spending`, `register.budgets` and `page.spending` are gone, and `page.home-personal` is rebuilt to show what you have, bills this week, budget left, projects and goals -> b9d9129104f32581",
+    ],
+  },
   'student@1.2.0': {
     holds: `
       page.home-student page.studies register.assignments register.courses register.study_sessions
@@ -282,6 +308,20 @@ const DECLARED: Record<string, Version> = {
     `,
     declares: 'e13772efff3d1072',
     history: ["Home's empty title, `setting.voice_nothing_needs_you`, loses its closing full stop, as every other title already has -> e13772efff3d1072"],
+  },
+  /** `page.home-student` IS REBUILT, and its list word changes: `setting.voice_lists` now reads My lists instead of the old word. */
+  'student@1.3.0': {
+    holds: `
+      page.home-student page.studies
+      register.assignments register.courses register.study_sessions
+      setting.label_assignments setting.label_courses setting.label_study_sessions setting.one_assignments setting.one_courses
+      setting.one_study_sessions setting.shared_version setting.speaks setting.voice_home setting.voice_lists setting.voice_needs_you
+      setting.voice_nothing_needs_you setting.voice_right_now setting.voice_since_away
+    `,
+    declares: 'cef74e3cf79aaa37',
+    history: [
+      "`page.home-student` is rebuilt, and `setting.voice_lists` now reads My lists in place of the word Student used before -> cef74e3cf79aaa37",
+    ],
   },
   'founder@1.3.2': {
     holds: `
@@ -353,6 +393,20 @@ const DECLARED: Record<string, Version> = {
       "`page.project` takes portfolio 1.5.0's project template: the questions waiting on a project, what changed on it, its plan and its money by month -> fb63016ae24fe5a5",
     ],
   },
+  /** THE SAME IDS AS 1.6.0: what moved is the words inside them, not the list. */
+  'founder@1.7.0': {
+    holds: `
+      metric.datapoints-30d
+      page.dashboard page.home-founder page.organisation page.project
+      register.datapoints register.organisations
+      setting.shared_version setting.speaks setting.voice_home setting.voice_lists setting.voice_needs_you
+      setting.voice_nothing_needs_you setting.voice_right_now setting.voice_since_away
+    `,
+    declares: '62cf765a92427d27',
+    history: [
+      "`page.home-founder` leads with What you have, by book or organisation, and the week's numbers; `page.dashboard` renames Datapoints to Numbers and lists to Lists; `page.organisation` lists its projects -> 62cf765a92427d27",
+    ],
+  },
   'team@2.3.0': {
     holds: `
       page.agent-work page.cycles page.home-team page.project register.cycle_plan register.cycles
@@ -418,6 +472,22 @@ const DECLARED: Record<string, Version> = {
       "`page.project` takes portfolio 1.5.0's project template: the questions waiting on a project, what changed on it, its plan and its money by month -> 35c567fe0cc7cd90",
     ],
   },
+  /** A CYCLE'S LENGTH IS A RECORD'S OWN CHOICE: `register.cycle_days` and `setting.label_cycle_days` are new. */
+  'team@2.6.0': {
+    holds: `
+      page.agent-work page.cycles page.home-team page.project
+      register.cycle_days register.cycle_plan register.cycles
+      setting.holds_people setting.holds_tasks setting.label_cycle_days setting.label_cycle_plan setting.label_cycles
+      setting.label_people setting.label_people__role__collaborator setting.label_tasks setting.label_tasks__state__backlog
+      setting.label_tasks__state__doing setting.label_tasks__state__open setting.label_tasks__state__review setting.one_tasks
+      setting.shared_version setting.speaks setting.voice_home setting.voice_lists setting.voice_needs_you
+      setting.voice_nothing_needs_you setting.voice_right_now setting.voice_since_away
+    `,
+    declares: 'a67b18591483c33e',
+    history: [
+      "`register.cycle_days` and `setting.label_cycle_days` land so a cycle's length is a record's own choice and not always fourteen days -> a67b18591483c33e",
+    ],
+  },
   'guide@1.2.0': {
     holds: `
       metric.guide-choices-made metric.guide-choices-open metric.guide-idea-left metric.guide-idea-reached
@@ -447,6 +517,35 @@ const DECLARED: Record<string, Version> = {
     `,
     declares: 'c78b79e54f66d0bd',
     history: ["Home's empty title, `setting.voice_nothing_needs_you`, loses its closing full stop, as every other title already has -> c78b79e54f66d0bd"],
+  },
+  /** A MILESTONE WHOSE DAY HAS COME OR GONE IS ASKED ABOUT: `rule.guide_milestone_passed` and `rule.guide_milestone_open` are new. */
+  'guide@1.3.0': {
+    holds: `
+      metric.guide-choices-made metric.guide-choices-open metric.guide-idea-left metric.guide-idea-reached metric.guide-milestones
+      metric.guide-milestones-reached metric.guide-steps-agents metric.guide-steps-blocked metric.guide-steps-done
+      metric.guide-steps-done-7d metric.guide-steps-done-by-week metric.guide-steps-open
+      page.guide page.home-guide page.milestone
+      register.choices register.milestones register.resources register.steps
+      rule.guide_milestone_open rule.guide_milestone_passed
+      setting.label_choices setting.label_milestones setting.label_resources setting.label_steps setting.shared_version setting.speaks
+      setting.start_next_milestone setting.voice_home setting.voice_lists setting.voice_needs_you setting.voice_nothing_needs_you
+      setting.voice_right_now setting.voice_since_away
+    `,
+    declares: '03af08efcd82cbc4',
+    history: [
+      "`rule.guide_milestone_passed` and `rule.guide_milestone_open` land so a milestone whose day has come or gone is asked about rather than sitting silent -> 03af08efcd82cbc4",
+    ],
+  },
+  /** SMALL BUSINESS NOW CARRIES A PACK: it had none before, so this is its first entry and not a reset. */
+  'business@1.2.0': {
+    holds: `
+      page.home-business
+      setting.shared_version setting.speaks
+    `,
+    declares: 'f897dcb6d0161fe1',
+    history: [
+      "Small business now carries a pack: `page.home-business` shows what you have, what is due this week and what needs your call -> f897dcb6d0161fe1",
+    ],
   },
 };
 
@@ -538,7 +637,7 @@ test('EACH STARTER USE CASE DECLARES WHAT ITS VERSION SAYS, and one that changed
     said.push(...wrong(`${u.usecase}@${u.version}`, DECLARED[`${u.usecase}@${u.version}`], { holds: inventory(doc), declares: fingerprint(doc), current: true }));
   }
   /* THE ONE THAT CARRIES NO PACK IS NAMED, so that a use case losing its pack by accident is not read as deliberate. */
-  assert.deepEqual(USE_CASES.map((u) => u.usecase).filter((id) => !carried.includes(id)), ['business']);
+  assert.deepEqual(USE_CASES.map((u) => u.usecase).filter((id) => !carried.includes(id)), []);
 
   /* AND EVERY RETIRED ENTRY IS HELD TO THE SAME SHAPE, because its history is the only record left of what that label
      meant on the day a record installed it, and a history with a line nobody wrote is not a record. */
@@ -628,7 +727,7 @@ test("A RENAMED LABEL WITH THE VERSION LEFT ALONE IS WHAT THIS REFUSES, over the
   const entry = DECLARED[key]!;
   assert.deepEqual(wrong(key, entry, { holds: inventory(doc), declares: fingerprint(doc), current: true }), [], 'the entry is right before any word is moved');
 
-  const renamed = JSON.parse(JSON.stringify(doc).replace('"Reported, 30 days"', '"Reported in the last 30 days"')) as Doc;
+  const renamed = JSON.parse(JSON.stringify(doc).replace('"Numbers reported, 30 days"', '"Numbers reported in the last 30 days"')) as Doc;
   assert.notEqual(fingerprint(renamed), fingerprint(doc), 'the label the audit moved is inside the fingerprint');
   assert.deepEqual(inventory(renamed), inventory(doc), 'only a word moved: nothing appeared and nothing vanished');
 

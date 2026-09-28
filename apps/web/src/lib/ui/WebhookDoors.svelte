@@ -27,6 +27,8 @@
   import Section from '$lib/ui/Section.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
+  import NewAction from '$lib/ui/NewAction.svelte';
+  import { actionWords } from '$lib/record/action-draft.ts';
 
   let { owner = false }: { owner?: boolean } = $props();
 
@@ -39,6 +41,13 @@
      still asks is two confirms open, and the one somebody presses is the one they were not reading. */
   let asking = $state<string | null>(null);
   let reproving = $state(false);
+  /* THE NEW-DOOR SHEET. A door made there is minted there, so closing it reads the list again for the new row. */
+  let making = $state(false);
+
+  function made() {
+    making = false;
+    listed = null;
+  }
   /* THE PRESS A SIGN-IN INTERRUPTED, so signing in again finishes it rather than leaving a press to find. */
   let resume = $state<string | null>(null);
 
@@ -108,6 +117,9 @@
 </script>
 
 <Section title={copy.doorsTitle}>
+  {#snippet aside()}
+    {#if owner}<Button weight="quiet" onclick={() => (making = true)}>{actionWords.newDoor}</Button>{/if}
+  {/snippet}
   <p class="hint">{copy.doorsHow}</p>
   {#if !owner}
     <p class="hint">{levelWords.ownersOnly}</p>
@@ -138,14 +150,15 @@
             <p class="hint">{door.held ? copy.doorsHeld : copy.doorsNotHeld}</p>
             {#if mine?.kind === 'minted'}
               {@const minted = mine}
-              <!-- SHOWN ONCE, from `said` alone. THE LABEL IS PASSED to `clipboard.put`, because it quotes the text in
-                   its own toast and the text here is a live credential. -->
+              <!-- SHOWN ONCE, from `said` alone. THE SENTENCE IS PASSED to `clipboard.put` as `said`, so the toast is
+                   that one line: passed only as the label it read "Copied Address copied." (defects A12), and with
+                   neither it would quote the text, which is a live credential. -->
               <div class="code-form">
                 <p class="code-label">{copy.doorsOnce}</p>
                 {#if minted.url}
                   <p class="mono wrap">{minted.url}</p>
                   <div class="row-actions">
-                    <Button weight="primary" onclick={() => void clipboard.put(minted.url ?? '', copy.doorsUrlCopied)}>{copy.doorsCopyUrl}</Button>
+                    <Button weight="primary" onclick={() => void clipboard.put(minted.url ?? '', copy.doorsUrlCopied, copy.doorsUrlCopied)}>{copy.doorsCopyUrl}</Button>
                   </div>
                   <p class="hint">{copy.doorsPost}</p>
                 {:else}
@@ -153,7 +166,7 @@
                        shown rather than thrown away, with the sentence that says why the address is missing. -->
                   <p class="mono wrap">{minted.token}</p>
                   <div class="row-actions">
-                    <Button weight="primary" onclick={() => void clipboard.put(minted.token, copy.doorsTokenCopied)}>{copy.doorsCopyToken}</Button>
+                    <Button weight="primary" onclick={() => void clipboard.put(minted.token, copy.doorsTokenCopied, copy.doorsTokenCopied)}>{copy.doorsCopyToken}</Button>
                   </div>
                   <p class="hint">{copy.doorsNoAddress}</p>
                 {/if}
@@ -188,6 +201,10 @@
     <p class="hint">{copy.doorsFreshWhy}</p>
   {/if}
 </Section>
+
+{#if owner}
+  <NewAction open={making} kind="door" onclose={made} />
+{/if}
 
 <style>
   /* THE SETTINGS PAGE'S OWN RULES, REPEATED, because its styles are scoped to it and do not reach inside a component:

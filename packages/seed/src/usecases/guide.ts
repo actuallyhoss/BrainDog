@@ -7,7 +7,7 @@
  * a project passes, the steps that reach each one, the choices still to make, and what helps along the way.
  * The example rows are the six milestones a project passes, from an idea to keeping it going, the first three steps,
  * a first choice and a first resource, so the guide opens already guiding. When onboarding heard what the project is,
- * the examples are that kind of project's plan instead (`guide-kinds.ts`).
+ * the rows are that kind of project's plan instead, and they are the person's plan rather than examples (`guide-kinds.ts`).
  *
  * WHERE YOU ARE, WHAT IS NEXT, WHAT IS STUCK AND WHAT WAITS ON YOU (1.1.0). A step can be blocked and say what it waits
  * on, and taken by an agent; a step, a milestone and a choice each keep the day they were finished, which the record
@@ -44,7 +44,10 @@ export const GUIDE = {
   usecase: 'guide',
   /* 1.2.1 BECAUSE HOME'S EMPTY TITLE LOSES ITS FULL STOP. A title ends without one everywhere else, and a record is
      offered the words only when the version goes up. */
-  version: '1.2.1',
+  /* 1.3.0: Home draws the milestones as a path, done, next and later, with the decision waiting and its suggestion
+     beside it, the next three steps to tick and what helps. A milestone says whether it is passed, which the record
+     keeps in step with its status, and what it comes after. */
+  version: '1.3.0',
   title: 'New project guide',
   summary: 'The milestones of your project, the next step to take, the choices to make and what helps along the way.',
   author: 'BrainDog',
@@ -90,6 +93,10 @@ export const GUIDE = {
         icon: 'star',
         holds: 'the points your project passes on the way, from an idea to something people use',
         title: 'what',
+        /* THE MILESTONES ARE A PATH (1.3.0), and a path is a list that says which of its rows are done, in a yes or no,
+           and what each belongs to. `passed` is the yes or no, kept in step with the status by the two rules below, and
+           `after` is the milestone this one follows, usually left empty: a path is drawn in `order` whatever it says. */
+        steps: { of: 'after', done: 'passed', order: 'order' },
         mobile: ['what', 'stage', 'state'],
         state: 'state',
         done: ['reached'],
@@ -117,6 +124,8 @@ export const GUIDE = {
           { id: 'order', label: 'Order', type: 'int', index: true },
           { id: 'target', label: 'Aim for', type: 'day', index: true },
           { id: 'reached_on', label: 'Reached on', type: 'day', index: true },
+          { id: 'passed', label: 'Passed', type: 'bool', default: false, index: true },
+          { id: 'after', label: 'Comes after', type: 'ref', to: 'milestones', index: true },
           { id: 'why', label: 'Why it matters', type: 'document' },
           { id: 'tags', type: 'list', of: 'text' },
         ],
@@ -231,35 +240,62 @@ export const GUIDE = {
         group_by: 'done_on',
         bucket: 'week',
       },
+      /* A MILESTONE IS PASSED WHEN IT IS REACHED, and no longer when it is moved back, so the path's marks and the status
+         never disagree. The status is what a person moves; the yes or no is only what the path reads. */
       {
-        /* HOME, AS THE GUIDE ANSWERS IT (S13): the milestone you are on, the next steps, what is stuck and the choices waiting on you. */
+        rule: 'guide_milestone_passed',
+        name: 'Mark a milestone passed on the path once it is reached',
+        on: { written: { register: 'milestones', op: ['create', 'update'], fields: ['state'] } },
+        when: 'state is reached',
+        steps: [{ set: { field: 'passed', to: 'true' } }],
+      },
+      {
+        rule: 'guide_milestone_open',
+        name: 'Take a milestone off the path as passed when it is moved back',
+        on: { written: { register: 'milestones', op: ['update'], fields: ['state'] } },
+        when: 'state is not reached',
+        steps: [{ set: { field: 'passed', to: 'false' } }],
+      },
+      {
+        /* HOME, AS THE GUIDE ANSWERS IT (S13): the way from the idea to keeping it going with where you are on it, the
+           decision waiting on you and what is suggested, the next three steps, what is stuck and what helps. */
         page: 'home-guide',
         title: 'Your project',
         icon: 'home',
-        requires: ['register.milestones', 'register.steps', 'register.choices'],
+        requires: ['register.milestones', 'register.steps', 'register.choices', 'register.resources'],
         blocks: [
           {
-            kind: 'table',
+            /* THE MILESTONES AS A PATH, top to bottom in their order: the ones passed are done, the first not passed is
+               next, and the rest are later. The record marks them from `passed`, so the path and the status agree. */
+            kind: 'steps',
             heading: '{{config:voice_right_now}}',
-            span: 12,
+            span: 7,
             source: 'register.milestones',
-            where: 'state is underway',
-            columns: [
-              { field: 'what', label: 'Milestone', width: 'minmax(20ch,1fr)' },
-              { field: 'stage', label: 'Stage', width: '10ch' },
-              { field: 'target', label: 'Aim for', width: '13ch', align: 'end' },
-            ],
+            columns: [{ field: 'what' }, { field: 'stage' }],
             order: [{ field: 'order', dir: 'asc' }],
-            limit: 3,
-            empty: 'No milestone is underway. Pick the next one on the Guide.',
+            limit: 8,
+            empty: 'No milestones yet. Add the first point your project should reach.',
           },
           {
-            kind: 'steps',
-            heading: 'Your next steps',
-            span: 12,
+            /* ONE DECISION AT A TIME, with the option suggested drawn as the answer to take: whether to start the next
+               milestone, or a choice an agent has weighed up. Answered here, never by opening Decide. */
+            kind: 'queue',
+            heading: 'A decision waiting',
+            span: 5,
+            source: 'governance.open',
+            where: 'list is choices or milestones',
+            tiles: true,
+            limit: 1,
+            empty: 'No decision is waiting on you.',
+          },
+          {
+            /* THREE, AND EACH ONE TICKED WHERE IT IS: a step ticked here is done, and the next one moves up. */
+            kind: 'todo',
+            heading: 'Next three steps',
+            span: 7,
             source: 'register.steps',
             where: 'state is to_do or doing',
-            columns: [{ field: 'what' }, { field: 'by' }, { field: 'milestone' }],
+            columns: [{ field: 'what' }, { field: 'by' }],
             order: [{ field: 'order', dir: 'asc' }],
             limit: 3,
             empty: 'No step is waiting. Add the next small thing to do.',
@@ -267,7 +303,7 @@ export const GUIDE = {
           {
             kind: 'table',
             heading: 'Blocked',
-            span: 12,
+            span: 5,
             when: { metric: 'guide-steps-blocked', gt: 0 },
             source: 'register.steps',
             where: 'state is blocked',
@@ -287,6 +323,20 @@ export const GUIDE = {
             ],
             limit: 5,
             empty: '{{config:voice_nothing_needs_you}}',
+          },
+          {
+            /* WHAT HELPS, last, because it is what a person reaches for once they know the step they are taking. */
+            kind: 'table',
+            heading: 'Resources',
+            span: 12,
+            source: 'register.resources',
+            columns: [
+              { field: 'name', label: 'Resource', width: 'minmax(18ch,1fr)' },
+              { field: 'kind', label: 'Kind', width: '10ch' },
+              { field: 'link', label: 'Link', width: 'minmax(12ch,24ch)' },
+            ],
+            limit: 5,
+            empty: 'Nothing saved yet. Keep the guides and tools that help here.',
           },
         ],
       },

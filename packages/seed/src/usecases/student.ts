@@ -9,8 +9,10 @@
 export const STUDENT = {
   usecase: 'student',
   /* 1.2.1 BECAUSE HOME'S EMPTY TITLE LOSES ITS FULL STOP. A title ends without one everywhere else, and a record is
-     offered the words only when the version goes up. */
-  version: '1.2.1',
+     offered the words only when the version goes up.
+     1.3.0: Home leads with Add homework, then what is due this week, the week's study as a strip and the study streak;
+     the lists are "My lists", not "Notebooks"; and the pack plants no example course (`loop/finish/modules.md` MOD-17). */
+  version: '1.3.0',
   title: 'Student',
   summary: 'Your courses, what is due and when, and how each piece of work went.',
   author: 'BrainDog',
@@ -30,7 +32,9 @@ export const STUDENT = {
     needs_you: 'Coming up',
     nothing_needs_you: 'Nothing is due',
     since_away: 'Since you last looked',
-    lists: 'Notebooks',
+    /* "My lists", AND IT WAS "Notebooks": a notebook is a thing a student writes in, and the rail's word is for the
+       lists the record keeps, so it read as though the record held their notes (`loop/finish/modules.md` MOD-17). */
+    lists: 'My lists',
   },
   /* THE LISTS' OWN WORDS, SO A STUDENT CAN CALL THEM WHAT THEIR SCHOOL DOES: Modules, Coursework, Revision. Kept as the
      pack's settings (S8), so they are renamed at /packs/usecase-student and travel with a shared copy. */
@@ -113,45 +117,59 @@ export const STUDENT = {
         ],
       },
       {
-        /* HOME, AS THIS USE CASE ANSWERS IT (`loop/research-spark.md` S13). No `nav`, because Home is already on the
-           rail: the display draws the page called `home-<use case>` there in place of the house figures. Its
-           headings read the voice, so a line changed at `/packs` changes the heading with it. */
+        /* HOME, AS THIS USE CASE ANSWERS IT (`loop/finish/modules.md` MOD-17): Add homework first, because a piece of
+           work not written down the moment it is set is the one forgotten; then what is due this week, the week's
+           study as a strip, the study streak, and what is due after. No `nav`, because Home is already on the rail: the
+           display draws the page called `home-<use case>` there in place of the house figures. Every block is a whole
+           row, so at 390 the page stacks in this order, the capture first. */
         page: 'home-student',
         title: 'Today',
         icon: 'home',
         requires: ['register.assignments', 'register.study_sessions'],
         blocks: [
           {
-            kind: 'table',
-            heading: '{{config:voice_right_now}}',
+            /* THE HEADING IS THE PROMPT (`render/src/capture.ts`), and a piece of work added here is To do with no day
+               until the student gives it one. */
+            kind: 'capture',
+            heading: 'Add homework',
             span: 12,
-            source: 'register.assignments',
-            where: 'state is not handed_in or marked, due before +8d',
-            columns: [
-              { field: 'what', label: 'Assignment', width: 'minmax(18ch,1fr)' },
-              { field: 'course', label: 'Course', width: 'minmax(10ch,18ch)' },
-              { field: 'state', label: 'Status', width: '12ch' },
-              { field: 'due', label: 'Due', width: '14ch', align: 'end' },
-            ],
-            order: [{ field: 'due', dir: 'asc' }],
+            register: 'assignments',
+          },
+          {
+            /* WHAT FALLS DUE IN SEVEN DAYS, overdue first, as the record reads every day declared `deadline: true`; an
+               assignment's `due` is one, so this is the same row its reminders ring for. */
+            kind: 'timeline',
+            heading: 'Due this week',
+            span: 12,
+            source: 'deadlines',
+            horizon: 7,
+            where: 'list is assignments',
+            columns: [{ field: 'day' }, { field: 'title' }],
             limit: 8,
             empty: '{{config:voice_nothing_needs_you}}',
           },
           {
-            kind: 'table',
-            heading: 'Study sessions',
+            /* THE WEEK'S STUDY ON ITS DAYS. Below 640px a calendar is a strip of days with a dot, then the days that hold
+               anything (`kernel/src/kinds/calendar.ts`), which is the week strip; on a desk it is this month. */
+            kind: 'calendar',
+            heading: '{{config:voice_right_now}}',
             span: 12,
             source: 'register.study_sessions',
-            where: 'on after yesterday, on before +8d',
-            columns: [
-              { field: 'what', label: 'Session', width: 'minmax(18ch,1fr)' },
-              { field: 'course', label: 'Course', width: 'minmax(10ch,18ch)' },
-              { field: 'minutes', label: 'Minutes', width: '10ch', align: 'end' },
-              { field: 'on', label: 'Day', width: '14ch', align: 'end' },
-            ],
-            order: [{ field: 'on', dir: 'asc' }],
-            limit: 8,
+            columns: [{ field: 'what' }, { field: 'on' }],
+            back: 0,
+            ahead: 0,
             empty: 'No study time planned this week.',
+          },
+          {
+            /* THE STUDY STREAK: every session done in the last twelve weeks on its day, each day washed by the minutes
+               studied, so a run of days reads as a run and a day off is left pale rather than counted against anybody. */
+            kind: 'heat',
+            heading: 'Study streak',
+            span: 12,
+            source: 'register.study_sessions',
+            where: 'done is true, on after -84d',
+            columns: [{ field: 'on' }, { field: 'minutes' }],
+            empty: 'No study done yet. Tick a session done and your streak starts here.',
           },
           {
             kind: 'table',
@@ -230,12 +248,7 @@ export const STUDENT = {
         ],
       },
     ],
-    /* A DAY WRITTEN `+3d` IS COUNTED FROM THE DAY THE RECORD IS MADE (`install.ts` `dated`), so the example is due
-       this week on whichever day somebody starts, and Home has something to show. */
-    seeds: [
-      { register: 'courses', fields: { name: 'Introduction to statistics', term: 'Autumn', teacher: 'Dr Adeyemi' } },
-      { register: 'assignments', fields: { what: 'Problem set 1: probability', state: 'doing', due: '+3d' } },
-      { register: 'study_sessions', fields: { what: 'Go over the lecture on conditional probability', on: '+1d', minutes: 90, done: false } },
-    ],
+    /* NO `seeds` SINCE 1.3.0 (`loop/finish/modules.md` C11): a student's record holds only what the student wrote, and
+       an example course was one more thing to find and clear. */
   },
 };

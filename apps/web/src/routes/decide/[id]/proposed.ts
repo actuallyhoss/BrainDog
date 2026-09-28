@@ -18,8 +18,10 @@ import { ruleName } from '@braindog/seed/usecases/names';
 
 import { copy } from '../../../lib/copy.ts';
 import { pathOf, sayCondition, sayStep, sayTrigger, triggerOfBody, verbOf, words as canvas } from '../../../lib/flow/flow.ts';
-import { blockOf, type Fetch, type LiveBlock } from '../../../lib/record/page-live.ts';
-import { learn, refMapOf, targetsOf, type RecordRow, type RefMap } from '../../../lib/record/remote.ts';
+import { kindLines, kindWords } from '../../../lib/record/jobs.ts';
+import { blockOf, type Fetch, type LiveBlock, type LivePageDecl, type Opened } from '../../../lib/record/page-live.ts';
+import { learn, refMapOf, targetsOf, type RecordRow, type RefMap, type SchemaCall } from '../../../lib/record/remote.ts';
+import { builderPath } from '../../../lib/pattern/draft.ts';
 
 type Row = Record<string, unknown>;
 
@@ -27,16 +29,29 @@ type Row = Record<string, unknown>;
 export type Appears = {
   kind: string;
   title: string;
-  lines: { label: string; value: string }[];
+  /** `tone: 'bad'` on a line that must be read in red, as a job kind that changes files is (agents AGT-23). */
+  lines: { label: string; value: string; tone?: 'bad' }[];
   /** A look's accent, so the preview can show the colour and not only its code. */
   accent?: string;
   /** A script's source, whole, to be read before it is accepted: code keeps its lines, so it is not one of `lines`. */
   source?: string;
   /** A page's body, as proposed, for the record to draw (`drawnOf`): the lines name its blocks, the drawing fills them. */
   page?: Row;
+  /** A page's declaration id, as `page.<name>`, which is how the record's `previewChange` names the page it drew. */
+  id?: string;
 };
 
-export type Proposed = { appears: Appears[]; samples: number | null };
+/**
+ * `change` is what `previewChange` is asked with: the proposal's `to`, and the sample rows and the row a page per row is
+ * drawn over when the proposal carries them. Only a `change` has one; a `pattern` is a rule and draws no page.
+ */
+export type Proposed = {
+  appears: Appears[];
+  samples: number | null;
+  change?: Row;
+  /** A `pattern`'s address in the builder, with its samples and its rule, for "Open in the builder" (PLT-10). */
+  builder?: string;
+};
 
 const isRow = (v: unknown): v is Row => typeof v === 'object' && v !== null && !Array.isArray(v);
 const text = (v: unknown): string => (typeof v === 'string' ? v : typeof v === 'number' ? String(v) : '');
@@ -193,6 +208,17 @@ function digest(id: string, body: Row, filed: readonly unknown[]): Appears {
   };
 }
 
+/**
+ * A job kind, as the owner approves it: what it asks Claude, the tools it may use in plain words, the repository it
+ * works in, its permission mode and, in red, that it changes files (agents AGT-23, C13).
+ *
+ * THE PROMPT IS DRAWN WHOLE, because it is what runs on his machine each time the kind is started; its `%arg%` slots
+ * stay as written, since they are filled once per run and never here.
+ */
+function job(id: string, body: Row): Appears {
+  return { kind: copy.proposalKind('job'), title: text(body.title) || kindWords(text(body.job) || id), lines: kindLines(body) };
+}
+
 function hostOf(url: string): string {
   try {
     return new URL(url.replace(/\{[^}]*\}/gu, 'x')).host;
@@ -214,6 +240,7 @@ export function appearsOf(decl: unknown, filed: readonly unknown[] = []): Appear
   if (kind === 'rule') return rule(id, body);
   if (kind === 'script') return script(id, body, filed);
   if (kind === 'digest') return digest(id, body, filed);
+  if (kind === 'job') return job(id, body);
   if (kind === '') return null;
   return { kind: copy.proposalKind(kind), title: text(body.title) || named(id), lines: [] };
 }
@@ -231,7 +258,13 @@ export function proposedOf(kind: string, body: Row): Proposed | null {
     const filed = Array.isArray(body.egress) ? body.egress : [];
     const held = body.ingest;
     const rule = !isRow(held) ? null : 'id' in held || 'kind' in held ? appearsOf(held, filed) : ingest('', held, filed);
-    return rule ? { appears: [rule], samples: Array.isArray(body.samples) ? body.samples.length : null } : null;
+    /* AND THE BUILDER, OPENED ON THE SAME SAMPLES WITH THE SAME RULE (PLT-10), so a pattern that reads nearly right is
+       fixed by pointing at what it missed rather than answered no. Only an ingest opens there. */
+    const samples = Array.isArray(body.samples) ? body.samples.filter((s): s is string => typeof s === 'string') : [];
+    const opens = isRow(held) && (held.kind === undefined || held.kind === 'ingest');
+    return rule
+      ? { appears: [rule], samples: Array.isArray(body.samples) ? body.samples.length : null, ...(opens ? { builder: builderPath(samples, held) } : {}) }
+      : null;
   }
   if (kind !== 'change') return null;
   const to = body.to;
@@ -242,9 +275,15 @@ export function proposedOf(kind: string, body: Row): Proposed | null {
   const appears = decls.flatMap((d) => {
     const a = appearsOf(d, filed);
     if (!a) return [];
-    return [isRow(d) && d.kind === 'page' && isRow(d.body) ? { ...a, page: d.body } : a];
+    return [isRow(d) && d.kind === 'page' && isRow(d.body) ? { ...a, page: d.body, id: text(d.id) } : a];
   });
-  return appears.length ? { appears, samples: null } : null;
+  if (!appears.length) return null;
+  /* THE WHOLE CHANGE GOES TO THE RECORD, NOT A PAGE AT A TIME, because a page over a list the same change brings could
+     not be drawn against the record as it is: the list is not there until the change lands. */
+  const change: Row = { to };
+  if (isRow(body.rows)) change.rows = body.rows;
+  if (typeof body.about === 'string') change.about = body.about;
+  return { appears, samples: null, change };
 }
 
 /**
@@ -258,44 +297,80 @@ export const words = {
   drawn: (title: string) => `${title}, as it would look now`,
 } as const;
 
+/** A page the reader draws, with nothing missing: what `PageView` takes as `got`. */
+export type LiveOpened = Extract<Opened, { from: 'live' }>;
+
 /**
  * A proposed page as the record draws it: `live` with its blocks, `refused` with the record's sentence for a body it
  * would not install, or `none` from a host older than the method, which leaves the lines above as the whole preview.
  */
 export type Drawn = { from: 'live'; now: number; blocks: LiveBlock[] } | { from: 'refused'; fix: string } | { from: 'none' };
 
+/**
+ * One page the whole change draws, as `PageView mode="preview"` takes it: `got` is the page as the change would make it,
+ * and `was` the page as it stands now, `null` for a page the change makes new. `id` is its declaration's, which is how
+ * the screen puts the drawing under the lines that name it.
+ */
+export type Tried = { id: string; slug: string; got: LiveOpened; was: LiveBlock[] | null };
+
+/**
+ * The whole change as the record rehearsed it: `live` with every page it draws, `refused` with the record's sentence
+ * for a change it would not install, or `none` from a host without `previewChange`, which falls back to `drawnOf`.
+ */
+export type Rehearsed = { from: 'live'; pages: Tried[] } | { from: 'refused'; fix: string } | { from: 'none' };
+
 /** A refusal that says the host has no such method, or no record here, rather than anything about this page. */
 const UNSERVED = new Set(['ROUTE_UNKNOWN', 'NOT_IN_THIS_BUILD', 'UNREACHABLE', 'UNAUTHORIZED']);
 
+type Answered = Parameters<typeof blockOf>[0];
+type Client = ReturnType<typeof createClient>;
+
 /**
- * WHAT ACCEPTING THE PAGE WOULD DRAW, drawn by the record before anybody accepts it (M4 wave two brief 5).
+ * A page's head and blocks as the reader takes them. The record answers the head's facts beside the blocks (its place
+ * in the sidebar, its rail), and they are kept, because a page with a rail judged without its rail is judged wrong.
+ */
+export function openedOf(head: Row, slug: string, title: string, blocks: LiveBlock[], now: number): LiveOpened {
+  const extra: Row = {};
+  for (const key of ['nav', 'layout', 'icon'] as const) if (head[key] !== null && head[key] !== undefined) extra[key] = head[key];
+  return { from: 'live', now, page: { page: { ...extra, page: slug, title } as LivePageDecl, blocks } };
+}
+
+/**
+ * The lists a change declares, by name, so a page over a list the same change brings can be drawn.
  *
- * THE LINES NAMED THE BLOCKS AND NOTHING FILLED THEM. "Shows: Open, Notes" was the whole preview of a page, so what an
- * agent's page would hold was found out by accepting it. `previewPage` draws the body as `page` draws an installed one,
- * each block held to the reader, and writes nothing; this turns its answer into the blocks `PageView` already draws.
+ * THE RECORD HAS NO SUCH LIST UNTIL THE CHANGE LANDS, so its `schema` answers nothing for it and every block over it
+ * said it could not be drawn. The declaration in the change is the list as it would be; it is only asked for when the
+ * record has none of that name.
+ */
+function declaredLists(to: unknown): Map<string, Row> {
+  const decls = isRow(to) && Array.isArray(to.declarations) ? to.declarations : [to];
+  const out = new Map<string, Row>();
+  for (const d of decls) {
+    if (!isRow(d) || d.kind !== 'register' || !isRow(d.body)) continue;
+    const id = text(d.id);
+    out.set(id.startsWith('register.') ? id.slice('register.'.length) : id, d.body);
+  }
+  return out;
+}
+
+/**
+ * Answered blocks as the page draws them, several runs of them at once.
  *
  * THE SAME CONVERSION AS A LIVE PAGE'S, `blockOf`, and the same two reads before it, for `pageReader`'s reasons: a list
  * this build does not ship is learnt through `schema` before its block is drawn, or every block over it says it cannot be
  * drawn, and a list a ref points at is walked once, so a ref draws as the row's title and not its id. A block the record
- * held back carries its refusal and is drawn as that, never filled from the sample.
+ * held back carries its refusal and is drawn as that, never filled from the sample. Every run is read together, so a
+ * list both sides of a change read is asked for once.
  */
-export async function drawnOf(body: Row, base: string, io?: Fetch): Promise<Drawn> {
-  const client = createClient({ base, ...(io ? { fetch: io } : {}) });
-  const out = await client.call<{ read_at?: unknown; blocks?: unknown }>('previewPage', { body });
-  if (!out.ok) {
-    if (!('refusal' in out)) return { from: 'none' };
-    return UNSERVED.has(out.refusal.code) ? { from: 'none' } : { from: 'refused', fix: out.refusal.fix };
-  }
-  type Answered = Parameters<typeof blockOf>[0];
-  const blocks = (Array.isArray(out.value.blocks) ? out.value.blocks : []) as Answered[];
-  const said = typeof out.value.read_at === 'string' ? Date.parse(out.value.read_at) : Number.NaN;
-  const now = Number.isFinite(said) ? said : Date.now();
-  const lists = [...new Set(blocks.flatMap((b) => (!b.refusals?.length && b.source?.startsWith('register.') ? [b.source.slice('register.'.length)] : [])))];
+async function liveOf(client: Client, runs: readonly Answered[][], now: number, declared: ReadonlyMap<string, Row> = new Map()): Promise<LiveBlock[][]> {
+  const schema: SchemaCall = (register) =>
+    client.schema(register).then((out) => (out.ok || !declared.has(register) ? out : { ok: true, value: { ...declared.get(register), id: register } }));
+  const lists = [...new Set(runs.flat().flatMap((b) => (!b.refusals?.length && b.source?.startsWith('register.') ? [b.source.slice('register.'.length)] : [])))];
   const asked = new Map<string, Promise<void>>();
-  for (const list of lists) await learn(client.schema, list, asked);
+  for (const list of lists) await learn(schema, list, asked);
   const refs = new Map<string, RefMap>();
   for (const target of new Set(lists.flatMap(targetsOf))) {
-    await learn(client.schema, target, asked);
+    await learn(schema, target, asked);
     const rows: RecordRow[] = [];
     let cursor: string | null = null;
     do {
@@ -306,5 +381,63 @@ export async function drawnOf(body: Row, base: string, io?: Fetch): Promise<Draw
     } while (cursor !== null);
     refs.set(target, refMapOf(target, rows));
   }
-  return { from: 'live', now, blocks: blocks.map((b) => blockOf(b, refs, now)) };
+  return runs.map((run) => run.map((b) => blockOf(b, refs, now)));
+}
+
+/**
+ * WHAT ACCEPTING THE PAGE WOULD DRAW, drawn by the record before anybody accepts it (M4 wave two brief 5).
+ *
+ * THE LINES NAMED THE BLOCKS AND NOTHING FILLED THEM. "Shows: Open, Notes" was the whole preview of a page, so what an
+ * agent's page would hold was found out by accepting it. `previewPage` draws the body as `page` draws an installed one,
+ * each block held to the reader, and writes nothing; this turns its answer into the blocks `PageView` already draws.
+ *
+ * SINCE `previewChange` THIS IS THE FALLBACK: a host older than that method may still have this one, and a page over
+ * lists that are installed is drawn by it as it was before.
+ */
+export async function drawnOf(body: Row, base: string, io?: Fetch): Promise<Drawn> {
+  const client = createClient({ base, ...(io ? { fetch: io } : {}) });
+  const out = await client.call<{ read_at?: unknown; blocks?: unknown }>('previewPage', { body });
+  if (!out.ok) {
+    if (!('refusal' in out)) return { from: 'none' };
+    return UNSERVED.has(out.refusal.code) ? { from: 'none' } : { from: 'refused', fix: out.refusal.fix };
+  }
+  const blocks = (Array.isArray(out.value.blocks) ? out.value.blocks : []) as Answered[];
+  const said = typeof out.value.read_at === 'string' ? Date.parse(out.value.read_at) : Number.NaN;
+  const now = Number.isFinite(said) ? said : Date.now();
+  const [live = []] = await liveOf(client, [blocks], now);
+  return { from: 'live', now, blocks: live };
+}
+
+/**
+ * THE WHOLE CHANGE, DRAWN AS IT WOULD STAND, beside each page as it stands now (pages R4, contracts `previewChange`).
+ *
+ * `drawnOf` TRIED ONE PAGE AGAINST THE RECORD AS IT IS, so a bundle whose page reads a list the same bundle brings drew
+ * that page as blocks that could not be drawn, and a change to an installed page showed only the page after, with
+ * nothing to hold it against. The record now installs the whole change in a rehearsal it throws away and answers every
+ * page it draws, with `was` for a page it replaces; this turns each into what `PageView` takes.
+ */
+export async function previewOf(change: Row, base: string, io?: Fetch): Promise<Rehearsed> {
+  const client = createClient({ base, ...(io ? { fetch: io } : {}) });
+  const out = await client.call<{ pages?: unknown }>('previewChange', change);
+  if (!out.ok) {
+    if (!('refusal' in out)) return { from: 'none' };
+    return UNSERVED.has(out.refusal.code) ? { from: 'none' } : { from: 'refused', fix: out.refusal.fix };
+  }
+  const pages = (Array.isArray(out.value.pages) ? out.value.pages : []).filter(isRow);
+  const now = Date.now();
+  const runs = pages.flatMap((p) => [(Array.isArray(p.blocks) ? p.blocks : []) as Answered[], (Array.isArray(p.was) ? p.was : []) as Answered[]]);
+  const live = await liveOf(client, runs, now, declaredLists(change.to));
+  return {
+    from: 'live',
+    pages: pages.map((p, i) => {
+      const slug = text(p.slug);
+      return {
+        id: text(p.id),
+        slug,
+        got: openedOf(p, slug, text(p.title) || named(slug), live[i * 2] ?? [], now),
+        /* NO `was` IS NOT AN EMPTY ONE: a new page has nothing to be held against, and draws no switch. */
+        was: Array.isArray(p.was) ? (live[i * 2 + 1] ?? []) : null,
+      };
+    }),
+  };
 }

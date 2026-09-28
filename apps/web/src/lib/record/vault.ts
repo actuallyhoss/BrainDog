@@ -45,6 +45,8 @@ export const words = {
   indexOnly: 'Value not kept here',
   opened: (n: number) => (n === 0 ? 'never opened' : n === 1 ? 'opened once' : `opened ${n} times`),
   lastOpened: (when: string) => `last ${when}`,
+  /* WHO OPENED IT LAST, when that was a run: `usedBy`'s newest, as a key's row page and "Runs on" say it. */
+  openedBy: (run: string, agent: string | null, when: string) => `Last opened by ${run}${agent ? ` (${agent})` : ''} ${when}`,
   noKeys: 'No keys yet',
   noKeysHow: 'Add one here, or let an agent add one with braindog keys put and run a command with it through braindog keys exec <label> -- <command>.',
   noMachines: 'No machine may open keys',
@@ -225,6 +227,8 @@ export function namesOf(
 /** One row of the Keys index. `project` is a name, or null for a global key. */
 export type KeyRow = {
   id: string;
+  /** The row as a person says it, `credentials#3`, which `usedBy` is asked with; `null` for a row read without its seq. */
+  spoken: string | null;
   label: string;
   opens: string;
   project: string | null;
@@ -255,7 +259,7 @@ const isKnown = (v: unknown): v is KnownState =>
  * index row: the key is kept somewhere the row names, not here.
  */
 export function keysOf(
-  rows: readonly { id: string; fields: Record<string, unknown>; state?: string | null }[],
+  rows: readonly { id: string; seq?: number | null; fields: Record<string, unknown>; state?: string | null }[],
   grants: readonly GrantState[],
   names: ReadonlyMap<string, string> & { marks?: ReadonlyMap<string, ProjectMark> },
   field = 'value',
@@ -275,6 +279,7 @@ export function keysOf(
         : null;
       return {
         id: r.id,
+        spoken: typeof r.seq === 'number' ? `${KEYS_REGISTER}#${r.seq}` : null,
         grant: grant ? grant.id : null,
         label: String(r.fields.label ?? ''),
         opens: String(r.fields.opens ?? ''),
@@ -287,6 +292,38 @@ export function keysOf(
     })
     .sort((a, b) => a.label.localeCompare(b.label));
 }
+
+/** The list the Keys index reads, which `usedBy` names a key's row in. */
+export const KEYS_REGISTER = 'credentials';
+
+/** One run among a key's or a tool's newest uses, as `usedBy` answers it (`@braindog/record` `UsedByRun`). */
+export type UsedByRun = { run: string; agent: string | null; machine: string | null; at: string; count: number };
+
+/** The client's one method this reads, so a test hands a stub and nothing else. */
+export type UsedByReader = { usedBy(args: { spoken: string }): Promise<Wire<{ runs: UsedByRun[] }>> };
+
+/**
+ * The run that opened each key last, by the key's row id, for the keys that were opened at all: at most `most` asks,
+ * in the order the index draws them.
+ *
+ * WHY A KEY'S ROW SAYS IT: the vault counts every open and signs each with the run that asked, so "opened 12 times"
+ * was a count with nobody behind it, and the question a person has about a key is which agent is using it
+ * (`loop/finish/agents.md` AGT-10). A key nobody opened is not asked about, and a refusal leaves the row saying what
+ * it said before rather than guessing: `usedBy` answers a key the caller cannot read as one that is not there.
+ */
+export async function lastUsers(client: UsedByReader, keys: readonly KeyRow[], most = 24): Promise<Map<string, UsedByRun>> {
+  const asked = keys.filter((k) => k.spoken !== null && k.opened > 0).slice(0, most);
+  const answers = await Promise.all(asked.map((k) => client.usedBy({ spoken: k.spoken! })));
+  const out = new Map<string, UsedByRun>();
+  answers.forEach((a, i) => {
+    const first = a.ok ? a.value.runs[0] : undefined;
+    if (first) out.set(asked[i]!.id, first);
+  });
+  return out;
+}
+
+/** A run's page, `S47` to the `session` list's row 47, or `null` for an actor that is not a run's name. */
+export const runPath = (run: string): string | null => (/^S[1-9][0-9]*$/u.test(run) ? `/r/session/${run.slice(1)}` : null);
 
 /* ── the pack offered on connect ──────────────────────────────────────── */
 

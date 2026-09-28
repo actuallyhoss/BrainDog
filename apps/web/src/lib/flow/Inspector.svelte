@@ -3,10 +3,10 @@
 
   A FORM, NEVER CODE (§6). Every argument is a field with a label, drawn from `ARGS` in `flow.ts`, so there is one list
   of what each verb takes and the menu, the card's sentence, the fault list and this form all read it. A template is
-  filled from chips, the answers the steps before can certainly read and what the trigger hands a run, so nobody types
-  braces; a condition is the `where` sentence every list and block already speaks, "amount is more than 500" among it
-  since `3187be5a`, or, for a number, a field picked from what the step can read, a test and a value, which files the
-  tree those same words read as (`flow.ts` `COMPARE`, held to the record by `flow-words.test.ts`).
+  filled from chips, the answers the steps before can certainly read and what the trigger hands a run, and each one sits
+  in the text as a pill (`Tokens.svelte`), so nobody types or reads braces; a condition is the query builder over the
+  record's `where` tree, rows joined by all, any or none, or the sentence every list and block already speaks
+  (`Condition.svelte`).
 
   EVERY KEYSTROKE GOES INTO THE DRAFT, AND NOTHING LEAVES IT. The sheet has no Save of its own: the draft is sent whole
   from the editor's footer, once, so closing this is never a question of whether something was lost.
@@ -21,55 +21,69 @@
   Each is now a choice read from the record, and this sheet does the reading itself so the page's file stays the
   page's: the lists from the shell's `lists` (every list, empty ones too, which is the list `boot-live.ts` keeps for
   anything that puts something INTO a list; the rail's `index.registers` leaves out a list with no rows yet, and a
-  new list is the likeliest one to automate), a list's fields through `schemaOf`, the declared calls through
+  new list is the likeliest one to automate), a list's fields through the tab's record source, the declared calls through
   `openActions` as the page does for its call lines, and the doors through `listDoors` as Settings does. A read that
   does not answer leaves the box as it was, so a record that cannot say is no worse off than before.
 
   THE FIELDS WERE THE SAMPLE'S ONLY. The page hands in `fieldsOf`, which answers for the sample and `[]` on a real
   record, so on anybody's own record the chips offered nothing from the row and "the invoice's amount" could only be
   typed as braces. The record's own declaration is asked first now, and `fieldsOf` is the sample's path.
+
+  EVERY TRIGGER AND STEP THE RECORD RUNS HAS ITS FIELDS HERE (EDT-2). A figure crossing a line and a decision taken on
+  Decide are offered beside the four that were (`flow.ts` `TRIGGER_KINDS`, read from the kernel's capability table); a
+  clock says how late a turn may still be taken; a script is picked from the installed ones, a person asked from the
+  record's members, and a call from the declared ones with the way to declare another. A template's references are
+  pills (`Tokens.svelte`) and a condition is the query builder over the record's `where` tree (`Condition.svelte`).
 -->
 <script lang="ts">
-  import { apiBase } from '../at.ts';
-  import { tick } from 'svelte';
+  import { apiBase, at } from '../at.ts';
   import { page } from '$app/state';
+  import { createClient } from '@braindog/client';
+  import type { Predicate } from '@braindog/where';
   import Sheet from '$lib/ui/Sheet.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
-  import { schemaOf } from '$lib/record/page-write.ts';
+  import { open as openRecord } from '$lib/data/record.ts';
+  import type { FieldDecl } from '$lib/record/schema.ts';
+  import { readNames } from '$lib/record/history-live.ts';
   import { callerAt, listDoors, type Door } from '$lib/ui/webhook-doors.ts';
   import {
     ARGS,
     CHANNELS,
-    COMPARE,
     CONDITION_HINT,
     DAYS,
+    LATE_SPANS,
     TRIGGER_KINDS,
     VERB_LABELS,
+    answerFields,
     blankTrigger,
+    unbrace,
+    conditionOf,
     find,
     getAt,
-    leafOf,
-    leafTo,
     listFrom,
     listText,
     pairsFrom,
     pairsText,
     sayTrigger,
     setAt,
+    spanWords,
     triggerChips,
     triggerKind,
     varsBefore,
     verbOf,
-    withChip,
+    withCondition,
     words,
     type Arg,
-    type CompareOp,
+    type CondField,
     type Trigger,
+    type TriggerKind,
   } from './flow.ts';
   import { openActions, whatOf, type ActionRow } from '$lib/record/actions.ts';
   import { CLOCKS, MONTHS, MONTH_DAYS, MONTH_WORDS, andWords, clockTo, clockWords, dayWords, fallsIn, monthsOf, type ClockWas } from './calendar.ts';
-  import { CHANNEL_WORDS, DAY_WORDS, doorsPickable, groupChips, idWords, pickerOf, withCurrent } from './chips.ts';
+  import { CHANNEL_WORDS, DAY_WORDS, doorsPickable, groupChips, idWords, pickerOf, withCurrent, type Picker } from './chips.ts';
+  import Condition from './Condition.svelte';
+  import Tokens from './Tokens.svelte';
   import type { FlowDraft } from './flow.svelte.ts';
 
   let {
@@ -100,17 +114,83 @@
   const live = $derived(Boolean(page.data.live));
   const lists = $derived<readonly { id: string; name: string }[]>(page.data.lists ?? page.data.index?.registers ?? []);
 
-  /* A LIST'S FIELDS, BY LIST, ASKED ONCE A LIST IS PICKED. `schemaOf` keeps its own answer for the tab and forgets a
-     refusal, so a list opened twice is read once, and a record that would not say is asked again next time. */
-  let declaredFields = $state<Record<string, string[]>>({});
+  /* A LIST'S FIELDS, BY LIST, ASKED ONCE A LIST IS PICKED, WITH THEIR TYPES. The query builder offers each field the
+     tests its type can hold, so the ids alone (`schemaOf`, which this read before) are not enough; the tab's one source
+     (`lib/data/record.ts`) keeps its answer for the tab and forgets a refusal, so a list that would not say is asked
+     again next time. */
+  let declaredFields = $state<Record<string, readonly FieldDecl[]>>({});
   $effect(() => {
     const r = register;
-    if (!open || !live || r === '' || r in declaredFields) return;
-    void schemaOf(apiBase(), r).then((d) => {
-      if (d) declaredFields = { ...declaredFields, [r]: d.fields.map((f) => f.id) };
-    });
+    if (!open || !live || r === '' || Object.hasOwn(declaredFields, r)) return;
+    void openRecord()
+      .then((s) => s.schema(r))
+      .then((d) => {
+        if (d.ok) declaredFields = { ...declaredFields, [r]: d.value.fields };
+      })
+      .catch(() => undefined);
   });
-  const rowFields = $derived(register === '' ? [] : (declaredFields[register] ?? fieldsOf(register)));
+  const typedFields = $derived<readonly FieldDecl[]>(register === '' ? [] : (declaredFields[register] ?? []));
+  const rowFields = $derived(register === '' ? [] : typedFields.length > 0 ? typedFields.map((f) => f.id) : fieldsOf(register));
+  /* THE SAMPLE'S FIELDS COME AS IDS ALONE, and a field of unknown type is offered as text, which every test reads. */
+  const condFields = $derived<readonly CondField[]>(typedFields.length > 0 ? typedFields : rowFields.map((id) => ({ id, type: 'text' })));
+
+  /* ── the pickers each trigger and step reads, each asked once per sheet, each keeping its box when refused ── */
+
+  const client = () => createClient({ base: apiBase() });
+
+  /* THE INSTALLED SCRIPTS A RUN MAY START: `startScript` in `packages/kernel/src/flow.ts` fails a run on a script that
+     does not say `runs: { rule: true }`, so only those are offered. */
+  let scripts = $state<{ id: string; name: string }[] | null>(null);
+  $effect(() => {
+    if (!open || !live || scripts !== null || verb !== 'script') return;
+    scripts = [];
+    void client()
+      .scripts()
+      .then((out) => {
+        scripts = out.ok ? out.value.filter((s) => s.runs.rule).map((s) => ({ id: s.script, name: s.title || idWords(s.script) })) : [];
+      })
+      .catch(() => undefined);
+  });
+
+  /* THE MEMBERS, BY THE ID THE RECORD HOLDS FOR EACH, which is what `to:` takes; their names from the shell's answer
+     (`readNames`), so a member who may not read People gets an empty list and keeps the box. */
+  let members = $state<{ id: string; name: string }[] | null>(null);
+  $effect(() => {
+    if (!open || !live || members !== null || verb !== 'ask_person') return;
+    members = [];
+    void readNames(apiBase())
+      .then((names) => {
+        members = [...names].map(([id, name]) => ({ id, name }));
+      })
+      .catch(() => undefined);
+  });
+
+  /* THE FIGURES A RULE MAY WATCH: every one the caller reads, whichever pack declared it. A figure read about one thing
+     (`param`) is asked as `<id>:<value>` and the sweep reads a bare id, so those are not offered. */
+  let figures = $state<{ id: string; name: string }[] | null>(null);
+  $effect(() => {
+    if (!open || !live || figures !== null || !('metric' in t)) return;
+    figures = [];
+    void client()
+      .figures()
+      .then((out) => {
+        figures = out.ok ? out.value.filter((f) => !f.param).map((f) => ({ id: f.id, name: f.name })) : [];
+      })
+      .catch(() => undefined);
+  });
+
+  /* THE AUTOMATIONS THAT CAN PUT A QUESTION ON DECIDE, for a decision trigger's `about:`, named as the list names them. */
+  let rules = $state<{ id: string; name: string }[] | null>(null);
+  $effect(() => {
+    if (!open || !live || rules !== null || !('decided' in t)) return;
+    rules = [];
+    void client()
+      .automations()
+      .then((out) => {
+        rules = out.ok ? out.value.filter((r) => r.rule !== flow.draft.id).map((r) => ({ id: `rule.${r.rule}`, name: r.name || idWords(r.rule) })) : [];
+      })
+      .catch(() => undefined);
+  });
 
   /* THE DECLARED CALLS A RULE MAY START: `callFault` in `packages/kernel/src/flow-lint.ts` refuses anything that is not
      channel `call`, so a fetch or a watch is not offered only to be refused on Decide. Read once per sheet. */
@@ -135,25 +215,39 @@
     });
   });
 
-  const PICK = { list: 'Pick a list', call: 'Pick a call', field: 'Pick a field' } as const;
-  function optionsFor(p: 'list' | 'call' | 'field'): readonly { id: string; name: string }[] {
+  const PICK: Record<Picker, string> = {
+    list: 'Pick a list',
+    call: 'Pick a call',
+    field: 'Pick a field',
+    script: words.inspect.pickScript,
+    member: words.inspect.pickMember,
+  };
+  function optionsFor(p: Picker): readonly { id: string; name: string }[] {
     if (p === 'list') return lists;
     if (p === 'call') return callOptions;
+    if (p === 'script') return scripts ?? [];
+    if (p === 'member') return members ?? [];
     return rowFields.map((f) => ({ id: f, name: f }));
   }
 
   /** Template chips: what the trigger hands a run, then the answers kept before this card, under where each comes from. */
   const earlier = $derived(found ? varsBefore(flow.draft.steps, found.node.key) : []);
   const chips = $derived(found ? groupChips([...triggerChips(t, rowFields), ...earlier]) : []);
-  /** A condition reads an answer by its bare name, `rate is more than 70`, and a row's field the same way. */
-  const reads = $derived(found ? groupChips([...rowFields.map((f) => `trigger.row.${f}`), ...earlier]) : []);
-  const names = $derived(reads.flatMap((g) => g.chips.map((c) => c.word)));
+
+  /* A BRANCH'S CONDITION READS THE ROW'S FIELDS AND THE ANSWERS KEPT BEFORE IT BY THEIR BARE NAMES, `rate is more than
+     70`, over one schema in which a field of the row wins over an answer of the same name (`test` in
+     `packages/kernel/src/flow.ts`), so the builder is handed them in that order, the row's first and each name once. */
+  const branchFields = $derived.by((): readonly CondField[] => {
+    if (!found) return [];
+    const own = 'written' in t ? condFields : [];
+    const taken = new Set(own.map((f) => f.id));
+    return [...own, ...answerFields(flow.draft.steps, found.node.key).filter((f) => !taken.has(f.id))];
+  });
 
   const whenFaults = $derived(check && register && flow.draft.when ? check(register, flow.draft.when) : []);
 
   /* ── one argument ─────────────────────────────────────────────────────── */
 
-  const inputs: Record<string, HTMLInputElement | HTMLTextAreaElement> = {};
   const pathKey = (a: Arg) => a.path.join('.');
   const idOf = (a: Arg) => `flow-arg-${pathKey(a)}`;
 
@@ -188,36 +282,83 @@
     return head.length === 0 ? rest : setAt(step, head, rest);
   }
 
-  async function chip(a: Arg, name: string) {
-    const el = inputs[pathKey(a)];
-    const text = textOf(a);
-    const out = withChip(text, el?.selectionStart ?? text.length, el?.selectionEnd ?? text.length, name);
-    write(a, out.value);
-    await tick();
-    el?.focus();
-    el?.setSelectionRange(out.caret, out.caret);
+  /** `create`'s fields as rows, in the order written. A value that is not text is shown as the JSON it is. */
+  function pairsOf(a: Arg): [string, string][] {
+    const v = valueOf(a);
+    if (v === null || typeof v !== 'object' || Array.isArray(v)) return [];
+    return Object.entries(v).map(([k, x]) => [k, typeof x === 'string' ? x : JSON.stringify(x)]);
+  }
+
+  /* THE ROWS WRITTEN BACK WHOLE, in their order. A second row with a name already used takes its place, as
+     `pairsFrom` read one; a row with no name yet is kept as '' so its box stays on the screen while it is typed. */
+  function setPairs(a: Arg, rows: readonly (readonly string[])[]) {
+    if (!found) return;
+    const out: Record<string, string> = {};
+    for (const [k = '', v = ''] of rows) out[k] = v;
+    flow.setStep(found.node.key, setAt(found.node.step, a.path, out));
   }
 
   /* ── a condition ──────────────────────────────────────────────────────── */
 
-  const leaf = $derived(found && verb === 'if' ? leafOf(found.node.step.if) : null);
-  let mode = $state<'words' | 'number'>('words');
-  $effect(() => {
-    mode = leaf ? 'number' : 'words';
-  });
+  /** A branch's condition, in whichever form `Condition.svelte` hands back. An emptied one is `''`, which the card faults. */
+  function setIf(next: string | Predicate | null) {
+    if (found) flow.setStep(found.node.key, { if: next ?? '' });
+  }
 
-  function setLeaf(field: string, op: CompareOp, value: number) {
-    if (found) flow.setStep(found.node.key, { if: leafTo(field, op, value) });
+  /*
+   * THE TRIGGER'S CONDITION, EITHER FORM. `FlowDraft` has `setWhen` for a sentence and nothing for a tree, and the page's
+   * file is EDT-1's; so the sentence goes through `setWhen`, which also marks the undo, and a tree is put in place by
+   * `withCondition` straight after it. A `setCondition` of its own on the draft is the tidier home (asked for in this
+   * unit's report).
+   */
+  function setWhenOf(next: string | Predicate | null) {
+    if (typeof next === 'string' || next === null) {
+      flow.setWhen(next ?? '');
+      if (flow.draft.whenTree !== null) flow.draft = withCondition(flow.draft, next ?? '');
+      return;
+    }
+    flow.setWhen('');
+    flow.draft = withCondition(flow.draft, next);
   }
 
   /* ── the trigger ──────────────────────────────────────────────────────── */
 
-  /* THE CONDITION GOES WITH THE CHANGE. Only a change draws the "Only when" field, so a condition kept across a switch
-     to a clock, a button or an arrival was a fault the person could read and had no field left to clear. */
-  function pick(k: (typeof TRIGGER_KINDS)[number]) {
+  /* THE CONDITION GOES WITH A CHANGE OF KIND, both forms of it, through `setTrigger` and `withTrigger` in `flow.ts`. */
+  function pick(k: TriggerKind) {
     if (k === kind) return;
     flow.setTrigger(blankTrigger(k, t));
-    if (k !== 'written' && flow.draft.when !== null) flow.setWhen('');
+  }
+
+  function setMetric(patch: { id?: string; crosses?: 'target' | { lte: number } | { gte: number } }) {
+    if (!('metric' in t)) return;
+    flow.setTrigger({ metric: { ...t.metric, ...patch } });
+  }
+
+  const CROSSINGS = [
+    ['target', words.inspect.crossTarget],
+    ['gte', words.inspect.crossUp],
+    ['lte', words.inspect.crossDown],
+  ] as const;
+
+  /** Which way the figure crosses, and the line: its target, or a number it reaches or falls to. */
+  const crossing = $derived<'target' | 'gte' | 'lte'>(!('metric' in t) || t.metric.crosses === 'target' ? 'target' : 'gte' in t.metric.crosses ? 'gte' : 'lte');
+  const lineOf = $derived(!('metric' in t) || t.metric.crosses === 'target' ? 0 : 'gte' in t.metric.crosses ? t.metric.crosses.gte : t.metric.crosses.lte);
+  function setCrossing(way: 'target' | 'gte' | 'lte', line: number) {
+    setMetric({ crosses: way === 'target' ? 'target' : way === 'gte' ? { gte: line } : { lte: line } });
+  }
+  /** A typed line, read as decimal digits only (`rules.md` §4): "0x10" is not 16, and a half-typed "-" keeps the old line. */
+  function lineFrom(text: string): number | null {
+    return /^-?\d+(?:\.\d+)?$/u.test(text.trim()) ? Number(text.trim()) : null;
+  }
+
+  function setDecided(patch: Record<string, string>) {
+    if (!('decided' in t)) return;
+    const next: Record<string, string> = { ...t.decided };
+    for (const [k, v] of Object.entries(patch)) {
+      if (v.trim() === '') delete next[k];
+      else next[k] = v;
+    }
+    flow.setTrigger({ decided: next });
   }
 
   function setWritten(patch: Partial<{ register: string; op: ('create' | 'update' | 'delete')[] | undefined }>) {
@@ -269,7 +410,7 @@
       </div>
 
       <p class="label" id="flow-kind">{words.trigger}</p>
-      <div class="segmented" role="group" aria-labelledby="flow-kind">
+      <div class="segmented kinds" role="group" aria-labelledby="flow-kind">
         {#each TRIGGER_KINDS as k (k)}
           <button type="button" class="segment" aria-pressed={kind === k} data-on={kind === k ? '' : undefined} onclick={() => pick(k)}>{words.kinds[k]}</button>
         {/each}
@@ -296,10 +437,16 @@
           {/each}
         </div>
         <p class="help">{(t.written.op ?? []).length === 0 ? 'None picked is added or changed.' : ''}</p>
-        <label class="label" for="flow-when">{words.condition}</label>
-        <div class="field">
-          <input id="flow-when" class="field-input" value={flow.draft.when ?? ''} placeholder={CONDITION_HINT} spellcheck="false" oninput={(e) => flow.setWhen(e.currentTarget.value)} />
-        </div>
+        <p class="label" id="flow-when-label">{words.condition}</p>
+        <Condition
+          id="flow-when"
+          labelledby="flow-when-label"
+          value={conditionOf(flow.draft)}
+          fields={condFields}
+          register={t.written.register}
+          hint={CONDITION_HINT}
+          onchange={setWhenOf}
+        />
         {#each whenFaults as f (f)}<p class="fault"><span class="fault-glyph"><Icon name="alert" /></span>{f}</p>{/each}
       {:else if 'arrival' in t}
         <label class="label" for="flow-ingest">At the door</label>
@@ -318,6 +465,69 @@
           <option value="">Any way</option>
           {#each CHANNELS as c (c)}<option value={c}>{CHANNEL_WORDS[c] ?? c}</option>{/each}
         </select>
+        <!-- AN ARRIVAL'S CONDITION IS READ OVER THE FIRST ROW IT WROTE, or the top-level keys of its body where it wrote
+             none (contracts, arrival `when:`). Neither has fields the sheet can list before anything arrives, so it is
+             written in words and the record checks it. -->
+        <p class="label" id="flow-when-label">{words.condition}</p>
+        <Condition id="flow-when" labelledby="flow-when-label" value={conditionOf(flow.draft)} fields={[]} register="" hint={CONDITION_HINT} onchange={setWhenOf} />
+      {:else if 'metric' in t}
+        <label class="label" for="flow-figure">{words.inspect.figure}</label>
+        {#if figures && figures.length > 0}
+          <select id="flow-figure" class="select" value={t.metric.id} onchange={(e) => setMetric({ id: e.currentTarget.value })}>
+            {#if t.metric.id === ''}<option value="" disabled>{words.inspect.pickFigure}</option>{/if}
+            {#each withCurrent(figures, t.metric.id) as f (f.id)}<option value={f.id}>{f.name}</option>{/each}
+          </select>
+        {:else}
+          <div class="field">
+            <input id="flow-figure" class="field-input" value={t.metric.id} spellcheck="false" oninput={(e) => setMetric({ id: e.currentTarget.value.trim() })} />
+          </div>
+        {/if}
+        <p class="label" id="flow-crosses">{words.inspect.crosses}</p>
+        <div class="segmented" role="group" aria-labelledby="flow-crosses">
+          {#each CROSSINGS as [way, label] (way)}
+            <button type="button" class="segment" aria-pressed={crossing === way} data-on={crossing === way ? '' : undefined} onclick={() => setCrossing(way, lineOf)}>{label}</button>
+          {/each}
+        </div>
+        {#if crossing !== 'target'}
+          <label class="label" for="flow-line">{words.inspect.line}</label>
+          <div class="field">
+            <input
+              id="flow-line"
+              class="field-input"
+              inputmode="decimal"
+              value={String(lineOf)}
+              oninput={(e) => {
+                const n = lineFrom(e.currentTarget.value);
+                if (n !== null) setCrossing(crossing, n);
+              }}
+            />
+          </div>
+          <p class="help">{words.inspect.lineHelp}</p>
+        {/if}
+      {:else if 'decided' in t}
+        <label class="label" for="flow-about">{words.inspect.about}</label>
+        {#if rules && rules.length > 0}
+          <select id="flow-about" class="select" value={t.decided.about ?? ''} onchange={(e) => setDecided({ about: e.currentTarget.value })}>
+            <option value="">{words.inspect.anyQuestion}</option>
+            {#each withCurrent(rules, t.decided.about ?? '') as r (r.id)}<option value={r.id}>{r.name}</option>{/each}
+          </select>
+        {:else}
+          <div class="field">
+            <input
+              id="flow-about"
+              class="field-input"
+              value={t.decided.about ?? ''}
+              placeholder={words.inspect.anyQuestion}
+              spellcheck="false"
+              oninput={(e) => setDecided({ about: e.currentTarget.value.trim() })}
+            />
+          </div>
+        {/if}
+        <label class="label" for="flow-option">{words.inspect.option}</label>
+        <div class="field">
+          <input id="flow-option" class="field-input" value={t.decided.option ?? ''} placeholder={words.inspect.anyAnswer} oninput={(e) => setDecided({ option: e.currentTarget.value })} />
+        </div>
+        <p class="help">{words.inspect.optionHelp}</p>
       {:else if 'every' in t}
         <label class="label" for="flow-every">How often</label>
         <select id="flow-every" class="select" value={t.every} onchange={(e) => setClock({ every: e.currentTarget.value })}>
@@ -357,6 +567,16 @@
             </select>
           {/if}
         {/if}
+        <!-- HOW LATE A TURN MAY STILL BE TAKEN, kept across every pick of how often (`calendar.ts` `clockTo`). A host that
+             was asleep past it records the turn as skipped with its sentence, rather than running a morning report at
+             night. -->
+        <label class="label" for="flow-late">{words.inspect.late}</label>
+        <select id="flow-late" class="select" value={t.late ?? ''} onchange={(e) => setClock({ late: e.currentTarget.value })}>
+          <option value="">{words.inspect.neverLate}</option>
+          {#each LATE_SPANS as s (s)}<option value={s}>{words.inspect.lateBy(spanWords(s))}</option>{/each}
+          {#if t.late && !(LATE_SPANS as readonly string[]).includes(t.late)}<option value={t.late}>{words.inspect.lateBy(spanWords(t.late))}</option>{/if}
+        </select>
+        {#if t.late}<p class="help">{words.inspect.lateHelp}</p>{/if}
       {/if}
 
       <p class="path">{flow.path === 'inline' ? words.inline : words.asRun}</p>
@@ -365,61 +585,33 @@
     <div class="form">
       {#each ARGS[verb] as a (pathKey(a))}
         {#if a.kind === 'condition'}
-          <p class="label" id="flow-cond">{a.label}</p>
-          <div class="segmented" role="group" aria-labelledby="flow-cond">
-            <button type="button" class="segment" aria-pressed={mode === 'words'} data-on={mode === 'words' ? '' : undefined} onclick={() => (mode = 'words')}>In words</button>
-            <button type="button" class="segment" aria-pressed={mode === 'number'} data-on={mode === 'number' ? '' : undefined} onclick={() => (mode = 'number')}>A number</button>
-          </div>
-          {#if mode === 'words'}
-            <div class="field">
-              <input
-                id={idOf(a)}
-                class="field-input"
-                aria-labelledby="flow-cond"
-                value={typeof valueOf(a) === 'string' ? String(valueOf(a)) : ''}
-                placeholder={a.hint}
-                spellcheck="false"
-                oninput={(e) => write(a, e.currentTarget.value)}
-              />
-            </div>
-          {:else}
-            {@const l = leaf ?? { field: names[0] ?? '', op: 'gt' as CompareOp, value: 0 }}
-            <div class="leaf">
-              {#if reads.length > 0}
-                <select class="select" aria-label="Field or answer" value={l.field} onchange={(e) => setLeaf(e.currentTarget.value, l.op, l.value)}>
-                  {#if l.field !== '' && !names.includes(l.field)}<option value={l.field}>{l.field}</option>{/if}
-                  {#each reads as g (g.label)}
-                    <optgroup label={g.label}>
-                      {#each g.chips as c (c.path)}<option value={c.word}>{c.word}</option>{/each}
-                    </optgroup>
-                  {/each}
-                </select>
-              {:else}
-                <div class="field">
-                  <input class="field-input" aria-label="Field or answer" value={l.field} spellcheck="false" oninput={(e) => setLeaf(e.currentTarget.value.trim(), l.op, l.value)} />
-                </div>
-              {/if}
-              <select class="select" aria-label="Test" value={l.op} onchange={(e) => setLeaf(l.field, e.currentTarget.value as CompareOp, l.value)}>
-                {#each COMPARE as c (c.op)}<option value={c.op}>{c.said}</option>{/each}
-              </select>
-              <div class="field">
-                <input class="field-input" type="number" inputmode="decimal" aria-label="Value" value={l.value} oninput={(e) => setLeaf(l.field, l.op, Number(e.currentTarget.value) || 0)} />
-              </div>
-            </div>
-          {/if}
-          {#if mode === 'words' && reads.length > 0}
-            <div class="groups">
-              {#each reads as g (g.label)}
-                <p class="chips-head">{g.label}</p>
-                <div class="chips">{#each g.chips as c (c.path)}<span class="chip-word">{c.word}</span>{/each}</div>
-              {/each}
-            </div>
-          {/if}
+          <p class="label" id="{idOf(a)}-label">{a.label}</p>
+          <Condition
+            id={idOf(a)}
+            labelledby="{idOf(a)}-label"
+            value={valueOf(a)}
+            fields={branchFields}
+            register={register === '' ? 'vars' : register}
+            hint={a.hint}
+            onchange={setIf}
+          />
         {:else}
           {@const picks = pickerOf(verb, a.path)}
           {@const options = picks ? optionsFor(picks) : []}
-          <label class="label" for={idOf(a)}>{a.label}</label>
-          {#if picks && options.length > 0}
+          {#if a.template && (a.kind === 'text' || a.kind === 'long' || a.kind === 'pairs')}
+            <p class="label" id="{idOf(a)}-label">{a.label}</p>
+          {:else}
+            <label class="label" for={idOf(a)}>{a.label}</label>
+          {/if}
+          {#if picks === 'member'}
+            <!-- THE OWNER IS THE EMPTY CHOICE, which leaves `to:` out: the question is then the owner's, as it was before
+                 a question could be put to one person. A reference a run fills (the row's owner, say) is kept as it was
+                 written, and named by its word. -->
+            <select id={idOf(a)} class="select" value={textOf(a)} onchange={(e) => write(a, e.currentTarget.value)}>
+              <option value="">{words.inspect.owner}</option>
+              {#each withCurrent(options, textOf(a)) as o (o.id)}<option value={o.id}>{unbrace(o.name)}</option>{/each}
+            </select>
+          {:else if picks && options.length > 0}
             <select id={idOf(a)} class="select" value={textOf(a)} onchange={(e) => write(a, e.currentTarget.value)}>
               {#if textOf(a) === ''}<option value="" disabled={a.required}>{PICK[picks]}</option>{/if}
               {#each withCurrent(options, textOf(a)) as o (o.id)}<option value={o.id}>{o.name}</option>{/each}
@@ -428,16 +620,52 @@
               {@const chosen = (calls ?? []).find((c) => c.ingest === textOf(a))}
               {#if chosen}<p class="help">{whatOf(chosen)}</p>{/if}
             {/if}
-          {:else if a.kind === 'long' || a.kind === 'list' || a.kind === 'pairs'}
-            <textarea
+          {:else if a.template && (a.kind === 'text' || a.kind === 'long')}
+            <Tokens
               id={idOf(a)}
-              class="area"
-              rows={a.kind === 'long' ? 3 : 4}
+              labelledby="{idOf(a)}-label"
               value={textOf(a)}
+              multiline={a.kind === 'long'}
               placeholder={a.hint}
-              bind:this={inputs[pathKey(a)]}
-              oninput={(e) => write(a, e.currentTarget.value)}
-            ></textarea>
+              groups={chips}
+              onchange={(text) => write(a, text)}
+            />
+          {:else if a.kind === 'pairs'}
+            {@const rows = pairsOf(a)}
+            <!-- ONE ROW A FIELD, the field's name and then its value, so each value is a template field of its own with
+                 its references as pills. `field: value` a line in one text box was the only way to write these, and it
+                 could only hold a reference as its braces. -->
+            <div class="pairs" id={idOf(a)} role="group" aria-labelledby="{idOf(a)}-label">
+              {#each rows as [field, text], i (i)}
+                <div class="pair">
+                  <div class="field">
+                    <input
+                      class="field-input"
+                      aria-label={words.inspect.fieldName}
+                      value={field}
+                      placeholder={words.inspect.fieldName}
+                      spellcheck="false"
+                      oninput={(e) => setPairs(a, rows.map((r, j) => (j === i ? [e.currentTarget.value.trim(), r[1]] : r)))}
+                    />
+                  </div>
+                  <div>
+                    <Tokens
+                      id="{idOf(a)}-{i}"
+                      labelledby="{idOf(a)}-label"
+                      value={text}
+                      groups={chips}
+                      onchange={(next) => setPairs(a, rows.map((r, j) => (j === i ? [r[0], next] : r)))}
+                    />
+                  </div>
+                  <Button weight="bare" onclick={() => setPairs(a, rows.filter((_, j) => j !== i))}>{words.inspect.fieldRemove}</Button>
+                </div>
+              {/each}
+              {#if !rows.some(([f]) => f === '')}
+                <div><Button weight="quiet" onclick={() => setPairs(a, [...rows, ['', '']])}>{words.inspect.fieldAdd}</Button></div>
+              {/if}
+            </div>
+          {:else if a.kind === 'long' || a.kind === 'list'}
+            <textarea id={idOf(a)} class="area" rows={a.kind === 'long' ? 3 : 4} value={textOf(a)} placeholder={a.hint} oninput={(e) => write(a, e.currentTarget.value)}></textarea>
           {:else}
             <div class="field">
               <input
@@ -448,24 +676,14 @@
                 value={textOf(a)}
                 placeholder={a.hint}
                 spellcheck="false"
-                bind:this={inputs[pathKey(a)]}
                 oninput={(e) => write(a, e.currentTarget.value)}
               />
             </div>
           {/if}
-          {#if a.template && chips.length > 0}
-            <!-- EACH HEADING NAMES ITS GROUP, because two chips can share a word ("amount" from the row and from a call),
-                 and a screen reader hearing "Put amount in" twice needs the heading to tell them apart. -->
-            <div class="groups">
-              {#each chips as g, i (g.label)}
-                <p class="chips-head" id="{idOf(a)}-from-{i}">{g.label}</p>
-                <div class="chips" role="group" aria-labelledby="{idOf(a)}-from-{i}">
-                  {#each g.chips as c (c.path)}
-                    <button type="button" class="chip" aria-label={words.chipInsert(c.word)} onclick={() => void chip(a, c.path)}>{c.word}</button>
-                  {/each}
-                </div>
-              {/each}
-            </div>
+          {#if picks === 'call' && live}
+            <!-- A CALL NOT DECLARED YET IS DECLARED IN DOR-4's SHEET, which the automations hub opens from its address
+                 (`?new=action`), so a person who needs one is sent to where it is made rather than told it is missing. -->
+            <p class="help">{words.inspect.newCallHelp} <a class="link" href={at('/automations?new=action')}>{words.inspect.newCall}</a></p>
           {/if}
         {/if}
       {/each}
@@ -544,63 +762,34 @@
     line-height: var(--lh-body);
   }
 
-  .leaf {
+  /* SIX TRIGGERS DO NOT FIT ONE ROW AT 390, so the choice wraps onto a second line rather than scrolling sideways. */
+  .kinds {
+    flex-wrap: wrap;
+  }
+
+  /* ONE ROW A FIELD: the name, then its value, then the way to take it out; stacked under 640px, where three across
+     would leave the value too narrow to read. */
+  .pairs {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+  }
+
+  .pair {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto minmax(0, 7rem);
+    grid-template-columns: minmax(0, 10rem) minmax(0, 1fr) auto;
+    align-items: start;
     gap: var(--sp-2);
   }
 
-  .groups {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-1);
-  }
-
-  .chips-head {
-    margin: var(--sp-1) 0 0;
-    color: var(--dim);
-    font-size: var(--t-xs);
-    font-weight: 500;
-  }
-
-  .chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--sp-1);
-  }
-
-  .chip,
-  .chip-word {
-    display: inline-flex;
-    align-items: center;
-    min-block-size: var(--ctl-h-sm);
-    padding: 0 var(--sp-2);
-    background: var(--s2);
-    border: 1px solid var(--line);
-    border-radius: var(--r-pill);
-    color: var(--ink2);
-    /* THE UI FACE: `rate` and `due` are names a person gave, not identifiers to copy (DESIGN-SYSTEM 2.1). */
-    font-family: var(--font-ui);
-    font-size: var(--t-xs);
-  }
-
-  .chip {
-    cursor: pointer;
-  }
-
-  .chip:hover {
-    border-color: var(--edge);
+  .link {
     color: var(--ink);
-  }
-
-  @media (pointer: coarse) {
-    .chip {
-      min-block-size: var(--tap);
-    }
+    text-decoration: underline;
+    text-underline-offset: 2px;
   }
 
   @media (width < 640px) {
-    .leaf {
+    .pair {
       grid-template-columns: minmax(0, 1fr);
     }
   }

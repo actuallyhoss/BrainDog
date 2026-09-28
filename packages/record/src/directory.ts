@@ -80,8 +80,8 @@ const RESERVED = new Set([
      record called `settings` would make `/app/settings/agents` two pages at once, for ever. `fonts` and `catalogue`
      are the static folders served under `/app` beside the pages. `test/directory.test.ts` reads the app's route and
      static folders and fails for any this set does not hold, so a route added later cannot fall behind it. */
-  'audit', 'automations', 'catalogue', 'connect', 'decide', 'fonts', 'inbox', 'invite', 'jobs', 'packs', 'search', 'settings',
-  'signin', 'slash', 'start', 't', 'usage', 'v', 'vault',
+  'audit', 'automations', 'catalogue', 'connect', 'decide', 'fonts', 'inbox', 'invite', 'jobs', 'packs', 'scripts', 'search',
+  'settings', 'signin', 'signup', 'slash', 'start', 't', 'usage', 'v', 'vault',
 ]);
 
 /**
@@ -316,7 +316,7 @@ CREATE TABLE IF NOT EXISTS dir_billing (
   state        TEXT NOT NULL,               -- 'active', 'past_due' or 'lapsed', checked in code
   period_end   INTEGER,                     -- epoch ms
   lapsed_at    INTEGER,                     -- set on entering 'lapsed', cleared on 'active'
-  told         TEXT NOT NULL DEFAULT '',    -- the ladder's notices sent in this lapse: '', '0', '0,60' or '0,60,83'
+  told         TEXT NOT NULL DEFAULT '',    -- the ladder's notices sent in this lapse: '', '0', '0,60', '0,60,83' or '0,60,83,90'
   updated_at   INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS dir_billing_customer ON dir_billing(customer);
@@ -454,8 +454,31 @@ export const METER_MANY_MAX = 500;
  */
 export const COUNTED_ONLY = ['deliver:', 'in:'] as const;
 
-/** The rows the allowance is read against, as a condition: every action but the `COUNTED_ONLY` ones. */
-const LIMITED = COUNTED_ONLY.map((prefix) => `action NOT LIKE '${prefix}%'`).join(' AND ');
+/**
+ * The prefix of the rows that remember the owner was told: `notice:near` and `notice:held`, one each a month at most,
+ * on the first of the month, with every count at zero (`notice` below).
+ *
+ * IN THE LEDGER'S OWN TABLE, NOT A NEW ONE, because a table would be a migration and the ledger is already carried,
+ * copied and kept for as long as the month it remembers. Every read below leaves these rows out.
+ */
+const NOTICE = 'notice:';
+
+/** The `COUNTED_ONLY` rows, as a condition. */
+const COUNTED = COUNTED_ONLY.map((prefix) => `action LIKE '${prefix}%'`).join(' OR ');
+
+/** The rows the allowance is read against, as a condition: every action but the `COUNTED_ONLY` ones and the notices. */
+const LIMITED = `NOT (${COUNTED}) AND action NOT LIKE '${NOTICE}%'`;
+
+/**
+ * How far into an allowance the owner is told it is running out: the share of any one of the four meters.
+ *
+ * ONE NOTE AT THIS SHARE AND ONE WHEN FIRST HELD, a month (`loop/finish/shell.md` MTR-2), so an owner hears before the
+ * record stops and hears again when it has, and never once a run.
+ */
+export const NOTICE_AT = 0.8;
+
+/** A note the owner of a record is owed about its month, once: nearly at the allowance, or held at it. */
+export type UsageNotice = { kind: 'near' | 'held'; record: string; slug: string | null; person: string; email: string | null; say: string };
 
 /** A run to count, checked: its time in epoch milliseconds, or `null` for a row that is not a run. */
 const runAt = (run: RunUsage): number | null => {
@@ -682,8 +705,8 @@ const attempt = <T>(fn: () => T): T | null => {
 const BILLING_STATES = ['active', 'past_due', 'lapsed'] as const;
 export type BillingState = (typeof BILLING_STATES)[number];
 
-/** The days of a lapse a notice goes out on, which is what `told` records. */
-const LADDER_DAYS = [0, 60, 83] as const;
+/** The days of a lapse a notice goes out on, which is what `told` records: the last is the deletion's own letter. */
+const LADDER_DAYS = [0, 60, 83, 90] as const;
 export type LadderDay = (typeof LADDER_DAYS)[number];
 
 /** How long an applied Stripe event's id is kept, the same forty days a counted run's id is (`KEEP_RUNS_MS`). */
@@ -768,6 +791,38 @@ const numberOrNull = (v: unknown): number | null => (v === null || v === undefin
 /** The ladder's days as `told` writes them: once each, in the order they come. */
 const toldWith = (told: string, day: LadderDay): string =>
   [...new Set([...told.split(',').filter((d) => d !== '').map(Number), day])].sort((a, b) => a - b).join(',');
+
+/* ── a person's own name and sign-in address (GAP-7) ─────────────────────────── */
+
+/** The longest name a person may give themselves, in code points: the kernel's `PERSON_NAME_MOST`, bounded here too. */
+const PERSON_NAME_MOST = 80;
+
+/** How long a link to a new sign-in address works: a day, as a claim link and a sign-up proof do. */
+export const EMAIL_LINK_LIFE = 86_400_000;
+
+/** An address as sign-in reads one (`identity.ts`'s `ADDRESS`): something, an at sign, a domain with a dot. */
+const EMAIL_ADDRESS = /^(?=.{3,254}$)[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** A token this file minted: 32 random bytes as unpadded base64url, 43 characters. Anything else is not looked up. */
+const EMAIL_TOKEN = /^[A-Za-z0-9_-]{43}$/;
+
+/** A fresh link token, from the platform's random source. */
+function mintedToken(): string {
+  let out = '';
+  for (const b of crypto.getRandomValues(new Uint8Array(32))) out += String.fromCharCode(b);
+  return btoa(out).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+/**
+ * The token as it is stored: an HMAC under the Directory's key, with its own prefix, so a pending row never holds the
+ * link itself and a sign-in link's MAC can never be read as this one's (`identity.ts` prefixes each kind the same way).
+ */
+async function emailLinkHash(key: ReturnType<typeof crypto.subtle.importKey>, token: string): Promise<string> {
+  const tag = new Uint8Array(await crypto.subtle.sign('HMAC', await key, new TextEncoder().encode(`e:${token}`)));
+  let out = '';
+  for (const b of tag) out += b.toString(16).padStart(2, '0');
+  return out;
+}
 
 /**
  * The Directory over one `Sql`.
@@ -880,6 +935,9 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig) {
    * cap a lapsed record read the flag from there. Absent means not lapsed, which is what every other record answers.
    */
   const signIn = createAuth(sql, clock, auth);
+  /* THE KEY A NEW SIGN-IN ADDRESS'S LINK IS MACED UNDER (GAP-7), imported now and not when a link is minted, because
+     the host may zero its copy of the key once the Directory is built, as `createAuth` above allows. */
+  const emailKey = auth ? crypto.subtle.importKey('raw', new Uint8Array(auth.mac), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']) : null;
   const signInMarked = (async (call: AuthCall | SessionAsk): Promise<AuthResult> => {
     const out = await signIn(call);
     if (call.flow !== 'session' || out.status !== 200) return out;
@@ -1034,8 +1092,10 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig) {
           .map((r) => ({ record: r.record, person: r.person, email: r.email ?? null, slug: slugOf(r.record), lapsed_at: Number(r.lapsed_at), told: r.told }));
       }
 
-      /* A NOTICE SENT, WRITTEN ONLY WHILE THE RECORD IS STILL LAPSED. A record paid for between `due` and here has
-         left the ladder and `active` has emptied `told`, so there is nothing to record and the answer is still done.
+      /* A NOTICE SENT, WRITTEN WHILE THE ROW SAYS `lapsed`. A record paid for between `due` and here has left the
+         ladder and `active` has emptied `told`, so there is nothing to record and the answer is still done. Closing
+         the record touches `dir_record`, never this row's `state`, so day 90, the deletion's own letter, is still
+         written here after the record is gone, and a failed one is retried on the same closed row the next night.
          The same day twice is written once. */
       case 'told': {
         const { record, day } = call;
@@ -1210,6 +1270,118 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig) {
         );
         return ok(sql.one<Person>('SELECT id, email, name, created_at FROM dir_person WHERE id = ?', id)!);
       }),
+
+    /* ── a person changes their own name and sign-in address (GAP-7, `loop/finish/contracts.md` §12.1) ── */
+
+    /**
+     * A person's own name, moved here after their record has accepted it (`renamePerson`), so the next record they
+     * open, and the passkey chooser, read the new one.
+     *
+     * THE RECORD HAS ALREADY JUDGED THE NAME (`packages/kernel/src/api/person-name.ts`), and this bounds only what a
+     * row may hold, so a host that called this directly still cannot store an empty or an endless name.
+     */
+    renamePerson: (id: string, name: string): Result<Person> =>
+      sql.transactionSync(() => {
+        const trimmed = name.trim();
+        if (trimmed === '' || [...trimmed].length > PERSON_NAME_MOST)
+          return no<Person>('VALUE_MALFORMED', `A name is 1 to ${PERSON_NAME_MOST} characters.`, { at: 'name' });
+        if (!sql.one('SELECT 1 AS x FROM dir_person WHERE id = ?', id)) return no<Person>('OUT_OF_BOUNDS', 'There is no person with that id here.', { at: 'person' });
+        sql.exec('UPDATE dir_person SET name = ? WHERE id = ?', trimmed, id);
+        return ok(sql.one<Person>('SELECT id, email, name, created_at FROM dir_person WHERE id = ?', id)!);
+      }),
+
+    /**
+     * A new sign-in address asked for: a single-use link, good for `EMAIL_LINK_LIFE`, for the host to mail to it.
+     * NOTHING MOVES UNTIL IT IS PRESSED (`emailMove`), because an address nobody has proved they read is a way to
+     * hand somebody's account to a mailbox they do not own.
+     *
+     * AN ADDRESS ANOTHER PERSON HOLDS IS REFUSED IN ONE SENTENCE THAT NAMES NOBODY. `dir_person`'s address is unique
+     * (`dir_person_email`), so the move could never land, and saying so now saves the person a link that cannot work.
+     *
+     * ONE LIVE LINK A PERSON: asking again takes the last one back, so the newest mail is the only one that works and a
+     * person who mistyped an address can put it right without the first link still standing.
+     *
+     * THE ROW IS `dir_pending`'s, purpose `email`, which is left out of every Directory copy with the sign-in links, so
+     * a restore can never revive a link the person has since replaced. Its token is kept only as an HMAC under the
+     * Directory's key, as every link's is.
+     */
+    emailAsk: async (person: string, email: string): Promise<Result<{ to: string; token: string }>> => {
+      if (!emailKey) return no('NOT_IN_THIS_BUILD', 'This BrainDog has no sign-in switched on, so there is no sign-in address to change.', { at: 'email' });
+      const to = email.trim();
+      if (!EMAIL_ADDRESS.test(to)) return no('VALUE_MALFORMED', 'That is not an email address.', { at: 'email' });
+      const token = mintedToken();
+      const hash = await emailLinkHash(emailKey, token);
+      return sql.transactionSync(() => {
+        const me = sql.one<{ email: string; suspended_at: string | null }>('SELECT email, suspended_at FROM dir_person WHERE id = ?', person);
+        if (!me || me.suspended_at) return no<{ to: string; token: string }>('UNAUTHORIZED', 'Sign in again to change your sign-in email.', { at: 'person' });
+        if (me.email.toLowerCase() === to.toLowerCase())
+          return no<{ to: string; token: string }>('VALUE_MALFORMED', 'That is already the address you sign in with.', { at: 'email' });
+        const holder = personByEmail(to);
+        if (holder && holder.id !== person)
+          return no<{ to: string; token: string }>('ALREADY_KNOWN', 'Another account already signs in with that address. Choose a different one.', { at: 'email' });
+        const now = clock.now();
+        sql.exec('DELETE FROM dir_pending WHERE expires <= ?', now);
+        sql.exec("DELETE FROM dir_pending WHERE purpose = 'email' AND json_extract(payload, '$.person') = ?", person);
+        sql.exec(
+          'INSERT INTO dir_pending (hash, purpose, email, payload, expires, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+          hash,
+          'email',
+          to.toLowerCase(),
+          JSON.stringify({ person, email: to }),
+          now + EMAIL_LINK_LIFE,
+          now,
+        );
+        return ok({ to, token });
+      });
+    },
+
+    /**
+     * The link pressed: the person's sign-in address moves, and the answer names every open record they belong to, for
+     * the host to carry the new address into each one's mirror.
+     *
+     * SPENT ONLY BY THE PERSON IT WAS MINTED FOR. The row names who asked, and a link opened in somebody else's session
+     * is refused and left standing, so a link forwarded by mistake is not burnt by the wrong reader. A dead, spent or
+     * unknown link is the one sentence, whichever it was.
+     *
+     * THE ADDRESS IS CHECKED AGAIN, because a day passes between asking and pressing, and somebody else may have taken
+     * it in between; the unique index would otherwise throw out of a function whose contract is a `Result`.
+     */
+    emailMove: async (person: string, token: string): Promise<Result<{ from: string; to: string; records: string[] }>> => {
+      type Moved = { from: string; to: string; records: string[] };
+      const dead = no<Moved>('UNAUTHORIZED', 'That link has been used, has run out, or was sent for another account. Ask for a new one in Settings.', { at: 'token' });
+      if (!emailKey || !EMAIL_TOKEN.test(token)) return dead;
+      const hash = await emailLinkHash(emailKey, token);
+      return sql.transactionSync(() => {
+        const row = sql.one<{ payload: string }>(
+          "DELETE FROM dir_pending WHERE hash = ? AND purpose = 'email' AND expires > ? AND json_extract(payload, '$.person') = ? RETURNING payload",
+          hash,
+          clock.now(),
+          person,
+        );
+        if (!row) return dead;
+        let to = '';
+        try {
+          const held = JSON.parse(row.payload) as { email?: unknown };
+          to = typeof held.email === 'string' ? held.email : '';
+        } catch {
+          to = '';
+        }
+        const me = sql.one<{ email: string }>('SELECT email FROM dir_person WHERE id = ? AND suspended_at IS NULL', person);
+        if (!me || !EMAIL_ADDRESS.test(to)) return dead;
+        const holder = personByEmail(to);
+        if (holder && holder.id !== person)
+          return no<Moved>('ALREADY_KNOWN', 'Another account started signing in with that address after the link was sent. Choose a different one.', { at: 'email' });
+        sql.exec('UPDATE dir_person SET email = ? WHERE id = ?', to, person);
+        const records = sql
+          .all<{ record: string }>(
+            `SELECT m.record AS record FROM dir_member m JOIN dir_record r ON r.id = m.record AND r.closed_at IS NULL
+              WHERE m.person = ? ORDER BY m.rowid`,
+            person,
+          )
+          .map((r) => r.record);
+        return ok({ from: me.email, to, records });
+      });
+    },
 
     /**
      * A record comes into being: an address, a name for it, and somebody who owns it.
@@ -1728,6 +1900,59 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig) {
     },
 
     /**
+     * The note this record's owner is owed about its month, once, or `null`: `near` when any meter has reached
+     * `NOTICE_AT` of the allowance, `held` when a run was first held or a meter is used up.
+     *
+     * ASKED AFTER A PASS IS METERED, by the host (`noticePass` in `@braindog/host/actions`), which hands the note to
+     * whoever tells the owner. THE ROW IS WRITTEN IN THE SAME TRANSACTION AS THE ANSWER, so two passes asking at once
+     * get one note between them, and a pass asking again the same month gets none. A held month writes the `near`
+     * row too: a record that jumped past both at once is told once, that it is held, and not the smaller news after it.
+     * A plan with no allowance, or a record this Directory does not hold, is owed nothing.
+     */
+    notice: (record: string): UsageNotice | null =>
+      sql.transactionSync(() => {
+        const row = sql.one<{ plan: string; owner: string }>('SELECT plan, owner FROM dir_record WHERE id = ? AND closed_at IS NULL', record);
+        const allowance = row ? ALLOWANCE[planOf(row.plan)] : null;
+        if (!row || !allowance) return null;
+        const now = clock.now();
+        const first = dayOf(monthStart(now));
+        const until = nextMonth(now);
+        const used = totalsOf(sql.one(`SELECT ${SUMS} FROM dir_usage_day WHERE record = ? AND day >= ? AND day < ? AND ${LIMITED}`, record, first, dayOf(until)));
+        const meters = ['runs', 'requests', 'bytes', 'ms'] as const;
+        /* THE METER NEAREST ITS LIMIT is the one the sentence names, because it is the one that will stop the record. */
+        const binding = [...meters].sort((a, b) => used[b] / allowance[b] - used[a] / allowance[a])[0] ?? 'runs';
+        const share = used[binding] / allowance[binding];
+        const kind = used.held > 0 || share >= 1 ? 'held' : share >= NOTICE_AT ? 'near' : null;
+        if (kind === null) return null;
+        const told = (k: 'near' | 'held'): boolean => sql.one('SELECT 1 AS x FROM dir_usage_day WHERE record = ? AND day = ? AND scope = ? AND action = ?', record, first, '', `${NOTICE}${k}`) !== undefined;
+        if (told(kind)) return null;
+        for (const k of kind === 'held' ? (['near', 'held'] as const) : (['near'] as const))
+          if (!told(k))
+            sql.exec(
+              'INSERT INTO dir_usage_day (record, day, scope, action, runs, requests, bytes, ms, failures, held) VALUES (?, ?, ?, ?, 0, 0, 0, 0, 0, 0)',
+              record,
+              first,
+              '',
+              `${NOTICE}${k}`,
+            );
+        const turns = new Date(until);
+        const month = MONTHS[new Date(now).getUTCMonth()] ?? '';
+        const again = `${turns.getUTCDate()} ${MONTHS[turns.getUTCMonth()] ?? ''}`;
+        const person = sql.one<{ email: string | null }>('SELECT email FROM dir_person WHERE id = ?', row.owner);
+        return {
+          kind,
+          record,
+          slug: slugOf(record),
+          person: row.owner,
+          email: person?.email ?? null,
+          say:
+            kind === 'held'
+              ? `This record has used ${SPENT[binding](allowance[binding])} for ${month}, so its scheduled actions and automations wait until ${again}.`
+              : `This record has used ${Math.floor(share * 100)}% of ${SPENT[binding](allowance[binding])} for ${month}. At the limit its scheduled actions and automations wait until ${again}.`,
+        };
+      }),
+
+    /**
      * What the records this person owns used, from one UTC day to another inclusive: by project, by action
      * and by day, with each record's month so far against its allowance.
      *
@@ -1777,7 +2002,7 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig) {
             .all<{ day: string }>(`SELECT day, ${SUMS} ${where} GROUP BY day ORDER BY day`, r.id, range.from, range.to)
             .map((g) => ({ day: g.day, ...totalsOf(g) })),
           counted: sql
-            .all<{ action: string }>(`SELECT action, ${SUMS} ${ranged} AND NOT (${LIMITED}) GROUP BY action ORDER BY action`, r.id, range.from, range.to)
+            .all<{ action: string }>(`SELECT action, ${SUMS} ${ranged} AND (${COUNTED}) GROUP BY action ORDER BY action`, r.id, range.from, range.to)
             .map((g) => ({ action: g.action, ...totalsOf(g) })),
         };
       });

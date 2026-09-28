@@ -43,6 +43,7 @@ import {
   HEAP_BYTES,
   isRefusal,
   LOG_BYTES,
+  WITH_CONFIG,
   type CtxHost,
   type HostRequest,
   type Json,
@@ -422,8 +423,12 @@ export async function runInQuickJs(decl: ScriptDecl, host: CtxHost): Promise<Scr
       }
       const build = vm.unwrapResult(vm.callFunction(prelude, vm.undefined, hostObj));
       const meta = intoVm(parse, { input: host.input, now: host.now(), tz: host.tz });
-      const ctx = vm.unwrapResult(vm.callFunction(build, vm.undefined, meta));
-      for (const h of [parse, prelude, hostObj, build, meta]) h.dispose();
+      const built = vm.unwrapResult(vm.callFunction(build, vm.undefined, meta));
+      /* `ctx.config`, PUT ON BY THE SAME TEXT THE CLOUD'S LOADED MODULE USES (`WITH_CONFIG`), frozen inside the VM. */
+      const withConfig = vm.unwrapResult(vm.evalCode(WITH_CONFIG, 'config.js'));
+      const config = intoVm(parse, host.config ?? {});
+      const ctx = vm.unwrapResult(vm.callFunction(withConfig, vm.undefined, built, config));
+      for (const h of [parse, prelude, hostObj, build, meta, built, withConfig, config]) h.dispose();
 
       const evaluated = vm.evalCode(decl.source, 'script.js', { type: 'module' });
       if ('error' in evaluated && evaluated.error !== undefined) return { error: errorText(vm, evaluated.error) };

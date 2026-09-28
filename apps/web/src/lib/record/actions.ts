@@ -37,8 +37,11 @@ export type Channel = 'pull' | 'call' | 'poll';
 /** What a run came to, as the kernel's `meter` writes it on the run's `pull` event. */
 export type Outcome = 'ok' | 'changed' | 'unchanged' | 'paused' | 'failed' | 'refused' | 'dropped' | 'held';
 
-/** The four counts a person reads. Run time is the ledger's, and failures are never limited. */
-export type Totals = { runs: number; requests: number; bytes: number; failures: number };
+/** The four counts a person reads, and run time when the ledger counted it. Failures are never limited. */
+export type Totals = { runs: number; requests: number; bytes: number; failures: number; ms?: number };
+
+/** The four meters an allowance holds, in the ledger's words. */
+export type MeterKey = 'runs' | 'requests' | 'bytes' | 'ms';
 
 /**
  * One scheduled action, as the record's `actions` read answers it.
@@ -49,8 +52,10 @@ export type Totals = { runs: number; requests: number; bytes: number; failures: 
 export type ActionRow = {
   ingest: string;
   channel: Channel;
-  /** The project it runs for, by name, or `null` for the whole record. */
+  /** The project it runs for, as its declaration holds it, or `null` for the whole record. */
   project: string | null;
+  /** The row `project` names, found by the record: its id, its spoken id and its title. Absent from an older host. */
+  project_row?: { id: string; spoken: string; title: string | null } | null;
   host: string | null;
   every: string;
   key: string | null;
@@ -82,6 +87,13 @@ export type AccountUsage = {
     projects: ({ scope: string } & LedgerTotals)[];
     actions: ({ scope: string; action: string } & LedgerTotals)[];
     days: ({ day: string } & LedgerTotals)[];
+    /**
+     * Slash's credits this month: how many the plan includes, how many are used, and how many packs hold on top
+     * (`loop/DIRECTION.md` §33). Absent from a host that does not count them yet, and then nothing is said.
+     */
+    slash?: { included: number; used: number; packs: number };
+    /** Extra usage past the allowance, when the owner turned it on: units this month, and the cost and cap in minor units. */
+    extra?: { on: boolean; units: number; cost: number; cap: number; currency: string };
   }[];
 };
 
@@ -161,7 +173,7 @@ export async function openActions(io: Fetch, base = ''): Promise<Opened> {
 /* ── one row, said ──────────────────────────────────────────────────────── */
 
 export const words = {
-  /* THE SEED'S HEADING, which the agents pack declares and this list is drawn under. */
+  /* THE OLD HEADING this list was found under before a section named its panel (`panel-of.ts` reads it for those). */
   runsOn: 'Runs on',
   heading: 'Scheduled actions',
   everywhere: 'For every project',
@@ -193,12 +205,41 @@ export const words = {
   requests: 'requests',
   failures: (n: number) => (n === 1 ? '1 failure' : `${n.toLocaleString('en-GB')} failures`),
   noUsage: 'Nothing has run this month',
+  noUsageIn: (month: string) => `Nothing ran in ${month}`,
   noLedger: 'This record does not report usage yet',
-  ofAllowance: (used: number, allowance: number, resets: string) =>
-    `${used.toLocaleString('en-GB')} of ${allowance.toLocaleString('en-GB')} runs. It starts again on ${resets}.`,
-  waitingUntil: (resets: string) => `Actions on this record are waiting until ${resets}, because it has used this month's runs.`,
+  /* THE LIMIT THAT HELD IT, NAMED. This said "this month's runs" whichever of the four meters had run out, so a record
+     held on its fetched data was told to look at a count that was nowhere near its limit. */
+  waitingUntil: (resets: string, noun: string) => `Actions on this record are waiting until ${resets}, because it has used this month's ${noun}.`,
   noLimit: 'Counted, with no monthly limit.',
   week: (from: string, to: string) => (from === to ? from : `${from} to ${to}`),
+  /* The four meters, each "Runs 1,204 of 15,000" and one sentence under its bar. */
+  meterName: { runs: 'Runs', requests: 'Requests', bytes: 'Data fetched', ms: 'Run time' } as Record<MeterKey, string>,
+  meterNoun: { runs: 'runs', requests: 'requests', bytes: 'fetched data', ms: 'run time' } as Record<MeterKey, string>,
+  meterLine: (name: string, used: string, allowance: string) => `${name} ${used} of ${allowance}`,
+  meterFree: (share: string, resets: string) => `${share} used. It starts again on ${resets}.`,
+  meterNear: (share: string, resets: string) => `${share} used. At the limit, actions wait until ${resets}.`,
+  meterFull: (resets: string) => `Used up. Actions wait until ${resets}.`,
+  meterPast: (share: string) => `${share} of the month's allowance.`,
+  binding: (noun: string) => `The limit this record is nearest is its ${noun}.`,
+  hours: (n: number) => (n === 1 ? '1 hour' : `${n.toLocaleString('en-GB', { maximumFractionDigits: n < 10 ? 1 : 0 })} hours`),
+  /* The plan, what it allows, and what else the month holds. */
+  planName: { hosted: 'Cloud', plus: 'Cloud Plus' } as Record<string, string>,
+  planLine: (plan: string, runs: string, requests: string, bytes: string, hours: string) =>
+    `On ${plan}: ${runs} runs, ${requests} requests, ${bytes} fetched and ${hours} of run time a month.`,
+  slashLine: (left: number, included: number, packs: number) =>
+    `Slash has ${left.toLocaleString('en-GB')} of ${included.toLocaleString('en-GB')} credits left this month` +
+    (packs > 0 ? `, and ${packs.toLocaleString('en-GB')} more in packs.` : '.'),
+  extraLine: (units: number, cost: string, cap: string) =>
+    `Extra usage is on: ${units.toLocaleString('en-GB')} ${units === 1 ? 'unit' : 'units'} this month, ${cost} of the ${cap} cap.`,
+  /* A member's page. The ledger is the owner's, and an empty one read as nothing having run. */
+  notOwner: "Limits and plans are the owner's to see. These are this record's own runs.",
+  notOwnerNone: "Usage is counted on the owner's account, so only the owner of this record sees it here.",
+  /* The month switcher and a project's slice. */
+  months: 'Months',
+  monthIn: (month: string) => `Usage in ${month}`,
+  everywhereUsage: 'Everywhere',
+  only: (name: string) => `Only ${name}`,
+  allProjects: 'Show every project',
 } as const;
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -263,21 +304,32 @@ export function stateOf(row: ActionRow, now: number): Said {
 export const whatOf = (row: ActionRow): string =>
   [`${words.verb[row.channel]} ${row.host ?? row.ingest}`, often(row.every), row.key ? words.key(row.key) : ''].filter(Boolean).join(', ');
 
+/** The project a page is drawn for, as `forProject` matches an action to it: its row as a person says it, and its title. */
+export type ForProject = { spoken: string; title: string };
+
 /**
  * A project's actions, its own first and then the ones for every project.
  *
- * MATCHED BY NAME, as the "Runs on" blocks above it match `project is {{name}}`, and case-blind, because
- * a declaration typed `kiln` and a project called Kiln are the same project to a person.
+ * MATCHED BY THE ROW, as the record resolves the project an action's declaration names (`listActions`,
+ * `project_row`): a declaration holds a row id, which is no name, so matching it against the project's title found
+ * nothing and an action declared for a project showed on no page (DOR-6). An action the record could not resolve,
+ * or one from a host that does not resolve, is matched by what it holds: the spoken id, or the name case-blind,
+ * because a declaration typed `kiln` and a project called Kiln are the same project to a person.
  *
  * `null` is no project: Settings, ingest lists every action as its own, none of them faint.
  */
-export function forProject(rows: readonly ActionRow[], project: string | null): { own: ActionRow[]; everywhere: ActionRow[] } {
+export function forProject(rows: readonly ActionRow[], project: ForProject | null): { own: ActionRow[]; everywhere: ActionRow[] } {
   const name = (r: ActionRow) => r.ingest;
   const by = (a: ActionRow, b: ActionRow) => name(a).localeCompare(name(b));
   if (project === null) return { own: [...rows].sort(by), everywhere: [] };
-  const want = project.trim().toLowerCase();
+  const want = project;
+  const fold = (s: string) => s.trim().toLowerCase();
+  const mine = (r: ActionRow): boolean => {
+    if (r.project_row) return r.project_row.spoken === want.spoken;
+    return r.project !== null && (r.project === want.spoken || fold(r.project) === fold(want.title));
+  };
   return {
-    own: rows.filter((r) => r.project !== null && r.project.trim().toLowerCase() === want).sort(by),
+    own: rows.filter(mine).sort(by),
     everywhere: rows.filter((r) => r.project === null || r.project === 'global').sort(by),
   };
 }
@@ -294,22 +346,70 @@ const add = (into: Totals, from: Totals): void => {
   into.requests += from.requests;
   into.bytes += from.bytes;
   into.failures += from.failures;
+  /* RUN TIME ONLY WHERE IT WAS COUNTED: the record's own events carry none, and a zero would say it took no time. */
+  if (from.ms !== undefined) into.ms = (into.ms ?? 0) + from.ms;
 };
 
 export type Named = { name: string; faint: boolean } & Totals;
 
-/** One record's month against its allowance. Only a ledger draws one, and only for a plan with a limit. */
-export type Allowed = { name: string; used: number; allowance: number | null; resets: string; waiting: boolean };
+/** One meter of an allowance, as the page draws it: "Runs 1,204 of 15,000", the bar's share, and one sentence. */
+export type Meter = { key: MeterKey; line: string; said: string; share: number; binding: boolean };
+
+/**
+ * One record's month against its allowance. Only a ledger draws one; a plan with no limit has no meters.
+ *
+ * `used` AND `allowance` ARE THE RUNS, kept beside the four meters for the one-line summary. `slash` and `extra` are
+ * sentences, `null` when the host does not count them or extra usage is off.
+ */
+export type Allowed = {
+  name: string;
+  plan: string | null;
+  planLine: string | null;
+  used: number;
+  allowance: number | null;
+  resets: string;
+  waiting: boolean;
+  meters: Meter[];
+  binding: string | null;
+  slash: string | null;
+  extra: string | null;
+};
+
+/**
+ * One project's slice: its own actions under its name, the global ones under Everywhere. `key` tells groups apart
+ * (`''` is Everywhere); `scope` is the project as its actions declare it, which is what `usageHref` links by.
+ */
+export type Group = { key: string; scope: string; name: string; faint: boolean; totals: Totals; actions: Named[] };
+
+/** An action on its way into a group: the group's key, its scope and name, and the action's counts. */
+type Scoped = { key: string; scope: string; name: string; named: Named };
 
 export type UsageView = {
   from: 'ledger' | 'events';
   month: string;
+  /** Whether `month` is the one running now. A past month is drawn against the allowance, and nothing waits in it. */
+  current: boolean;
+  /** `false` for a person who owns no record here: the ledger is the owner's, and a member is told so. */
+  owner: boolean;
   totals: Totals;
   projects: Named[];
   actions: Named[];
+  groups: Group[];
   weeks: { label: string; runs: number }[];
   records: Allowed[];
 };
+
+/**
+ * What a ledger's names are to a person: an automation's `rule:<id>` its name, a script's id its title, and a
+ * project's scope its title. Built from the record's own reads; a name it cannot find is said as the ledger holds it.
+ */
+export type Names = ReadonlyMap<string, string>;
+
+const NO_NAMES: Names = new Map();
+
+const nameOf = (names: Names, raw: string): string => names.get(raw) ?? raw;
+
+const isGlobal = (scope: string | null): boolean => scope === null || scope === '' || scope === 'global';
 
 /**
  * Days, in weeks from the first of the month: 1 to 7, 8 to 14, and on. A month is five bars at most.
@@ -335,79 +435,232 @@ export function weeksOf(days: readonly ({ day: string } & Pick<Totals, 'runs'>)[
 
 const sortNamed = (rows: Named[]): Named[] => rows.sort((a, b) => Number(a.faint) - Number(b.faint) || b.runs - a.runs || a.name.localeCompare(b.name));
 
+/**
+ * Actions grouped by project: each project's own under its name, the global ones last under Everywhere, faint.
+ *
+ * GROUPED BECAUSE A PROJECT'S "RUNS ON" LINKS TO ITS SLICE (`usageHref`), and a slice is a group: the question a
+ * person brings from a project's page is what that project costs, not which action in the whole account is busiest.
+ */
+function groupsOf(rows: readonly Scoped[]): Group[] {
+  const out = new Map<string, Group>();
+  for (const { key, scope, name, named } of rows) {
+    const global = key === '';
+    const g = out.get(key) ?? { key, scope, name, faint: global, totals: zero(), actions: [] };
+    add(g.totals, named);
+    g.actions.push(named);
+    out.set(key, g);
+  }
+  for (const g of out.values()) sortNamed(g.actions);
+  return [...out.values()].sort((a, b) => Number(a.faint) - Number(b.faint) || b.totals.runs - a.totals.runs || a.name.localeCompare(b.name));
+}
+
 /** The record's own events, summed: what `/usage` draws when there is no ledger. Nothing about limits. */
-export function usageFromActions(rows: readonly ActionRow[], month: string, from: 'events', through?: string): UsageView {
+export function usageFromActions(rows: readonly ActionRow[], month: string, from: 'events', through?: string, current = true): UsageView {
   const totals = zero();
   const projects = new Map<string, Named>();
   const days = new Map<string, number>();
   const actions: Named[] = [];
+  const scoped: Scoped[] = [];
   for (const r of rows) {
     add(totals, r.month);
-    const global = r.project === null || r.project === 'global';
+    const global = isGlobal(r.project);
     const key = global ? '' : r.project!;
-    const p = projects.get(key) ?? { name: global ? words.everywhere : r.project!, faint: global, ...zero() };
+    const title = global ? words.everywhereUsage : (r.project_row?.title ?? key);
+    const p = projects.get(key) ?? { name: title, faint: global, ...zero() };
     add(p, r.month);
     projects.set(key, p);
-    actions.push({ name: r.ingest, faint: global, runs: r.month.runs, requests: r.month.requests, bytes: r.month.bytes, failures: r.month.failures });
+    const named: Named = { name: r.ingest, faint: global, runs: r.month.runs, requests: r.month.requests, bytes: r.month.bytes, failures: r.month.failures };
+    actions.push(named);
+    scoped.push({ key, scope: key, name: title, named });
     for (const d of r.days) days.set(d.day, (days.get(d.day) ?? 0) + d.runs);
   }
   return {
     from,
     month,
+    current,
+    owner: true,
     totals,
     projects: sortNamed([...projects.values()]),
     actions: sortNamed(actions),
+    groups: groupsOf(scoped),
     weeks: weeksOf([...days].map(([day, runs]) => ({ day, runs })), month, through),
     records: [],
   };
 }
 
+/** A project's scope, as an action's declaration holds it, to the project's title the record found for it. */
+function projectNames(rows: readonly ActionRow[]): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const r of rows) if (r.project !== null && r.project_row?.title) out.set(r.project, r.project_row.title);
+  return out;
+}
+
+/**
+ * The names the ledger's rows are said by, from the record's own reads: its automations, its scripts and its actions.
+ * Each is optional, so a record that answers none of them leaves every name as the ledger holds it.
+ */
+export function namesOf(o: {
+  automations?: readonly { id: string; rule?: string; name: string }[] | undefined;
+  scripts?: readonly { id: string; script?: string; title: string }[] | undefined;
+  actions?: readonly ActionRow[] | undefined;
+}): Names {
+  const out = new Map<string, string>(o.actions ? projectNames(o.actions) : []);
+  for (const a of o.automations ?? []) {
+    /* THE LEDGER NAMES A RULE'S RUN `rule:<id>` (`@braindog/host` `meteredOf`); both ids are kept, as either can be it. */
+    out.set(`rule:${a.id}`, a.name);
+    if (a.rule) out.set(`rule:${a.rule}`, a.name);
+  }
+  for (const s of o.scripts ?? []) {
+    out.set(s.id, s.title);
+    if (s.script) out.set(s.script, s.title);
+  }
+  return out;
+}
+
+/** An amount of one meter, as a person reads it. */
+function amountOf(key: MeterKey, n: number): string {
+  if (key === 'bytes') return fmtBytes(n);
+  if (key === 'ms') return words.hours(n / 3_600_000);
+  return n.toLocaleString('en-GB');
+}
+
+/** A share as a person says it: "Less than 1%" for a little, never "0%" for something. */
+const shareWords = (share: number): string => (share > 0 && share < 0.01 ? 'Less than 1%' : `${Math.floor(share * 100)}%`);
+
+/** How far into its allowance a meter is before the page says the limit is near: the Directory's `NOTICE_AT`. */
+const NEAR = 0.8;
+
+/** A sum of money in minor units, as a person reads it in its own currency. */
+const money = (minor: number, currency: string): string => {
+  try {
+    return (minor / 100).toLocaleString('en-GB', { style: 'currency', currency });
+  } catch {
+    return `${(minor / 100).toFixed(2)} ${currency}`;
+  }
+};
+
+/** One record of the ledger, against its allowance: its four meters, the one nearest its limit, and its plan. */
+function allowedOf(r: AccountUsage['records'][number], current: boolean): Allowed {
+  const allowance = r.month.allowance;
+  const used = current ? r.month.used : r.totals;
+  const resets = dayWords(r.month.resets);
+  const keys: MeterKey[] = ['runs', 'requests', 'bytes', 'ms'];
+  const shares = allowance ? keys.map((k) => ({ k, share: allowance[k] > 0 ? used[k] / allowance[k] : 0 })) : [];
+  const top = [...shares].sort((a, b) => b.share - a.share)[0];
+  const waiting = current && allowance !== null && (used.held > 0 || shares.some((s) => s.share >= 1));
+  const meters: Meter[] = allowance
+    ? shares.map(({ k, share }) => ({
+        key: k,
+        line: words.meterLine(words.meterName[k], amountOf(k, used[k]), amountOf(k, allowance[k])),
+        said: !current ? words.meterPast(shareWords(share)) : share >= 1 ? words.meterFull(resets) : share >= NEAR ? words.meterNear(shareWords(share), resets) : words.meterFree(shareWords(share), resets),
+        share: Math.min(1, share),
+        binding: top !== undefined && top.k === k && top.share > 0,
+      }))
+    : [];
+  const planName = Object.hasOwn(words.planName, r.plan) ? (words.planName[r.plan] ?? null) : null;
+  const slash = r.slash ? words.slashLine(Math.max(0, r.slash.included - r.slash.used), r.slash.included, r.slash.packs) : null;
+  const extra = r.extra?.on ? words.extraLine(r.extra.units, money(r.extra.cost, r.extra.currency), money(r.extra.cap, r.extra.currency)) : null;
+  return {
+    name: r.slug ?? r.record,
+    plan: planName,
+    planLine:
+      planName && allowance
+        ? words.planLine(planName, amountOf('runs', allowance.runs), amountOf('requests', allowance.requests), amountOf('bytes', allowance.bytes), amountOf('ms', allowance.ms))
+        : null,
+    used: used.runs,
+    allowance: allowance?.runs ?? null,
+    resets,
+    waiting,
+    meters,
+    binding: top !== undefined && top.share > 0 ? words.meterNoun[top.k] : null,
+    slash,
+    extra,
+  };
+}
+
 /** The ledger, as one view over every record the person owns. */
-export function usageFromLedger(said: AccountUsage, month: string, through?: string): UsageView {
+export function usageFromLedger(said: AccountUsage, month: string, through?: string, names: Names = NO_NAMES, current = true): UsageView {
   const totals = zero();
+  totals.ms = 0;
   const projects = new Map<string, Named>();
   const actions: Named[] = [];
+  const scoped: Scoped[] = [];
   const days = new Map<string, number>();
   const many = said.records.length > 1;
   for (const r of said.records) {
     add(totals, r.totals);
     const prefix = many ? `${r.slug ?? r.record} · ` : '';
     for (const p of r.projects) {
-      const global = p.scope === 'global' || p.scope === '';
-      const key = `${r.record}:${p.scope}`;
-      const into = projects.get(key) ?? { name: prefix + (global ? words.everywhere : p.scope), faint: global, ...zero() };
+      const global = isGlobal(p.scope);
+      const key = `${r.record}:${global ? '' : p.scope}`;
+      const into = projects.get(key) ?? { name: prefix + (global ? words.everywhereUsage : nameOf(names, p.scope)), faint: global, ...zero(), ms: 0 };
       add(into, p);
       projects.set(key, into);
     }
     for (const a of r.actions) {
-      const global = a.scope === 'global' || a.scope === '';
-      actions.push({ name: prefix + a.action, faint: global, runs: a.runs, requests: a.requests, bytes: a.bytes, failures: a.failures });
+      const global = isGlobal(a.scope);
+      const named: Named = { name: prefix + nameOf(names, a.action), faint: global, runs: a.runs, requests: a.requests, bytes: a.bytes, failures: a.failures, ms: a.ms };
+      actions.push(named);
+      /* ONE RECORD'S PROJECT IS NOT ANOTHER'S, so a group is keyed by record and scope and named with the record's prefix;
+         every record's global actions share Everywhere. */
+      scoped.push(global ? { key: '', scope: '', name: words.everywhereUsage, named } : { key: `${r.record}:${a.scope}`, scope: a.scope, name: prefix + nameOf(names, a.scope), named });
     }
     for (const d of r.days) days.set(d.day, (days.get(d.day) ?? 0) + d.runs);
   }
-  const records: Allowed[] = said.records
-    .filter((r) => !r.closed)
-    .map((r) => {
-      const allowance = r.month.allowance;
-      const waiting = allowance !== null && (r.month.used.held > 0 || (['runs', 'requests', 'bytes', 'ms'] as const).some((k) => r.month.used[k] >= allowance[k]));
-      return { name: r.slug ?? r.record, used: r.month.used.runs, allowance: allowance?.runs ?? null, resets: dayWords(r.month.resets), waiting };
-    });
+  const records: Allowed[] = said.records.filter((r) => !r.closed).map((r) => allowedOf(r, current));
   return {
     from: 'ledger',
     month,
+    current,
+    owner: said.records.length > 0,
     totals,
     projects: sortNamed([...projects.values()]),
     actions: sortNamed(actions),
+    groups: groupsOf(scoped),
     weeks: weeksOf([...days].map(([day, runs]) => ({ day, runs })), month, through),
     records,
   };
 }
 
-/** This month so far, UTC: the range the page asks the ledger for. */
-export function monthRange(now: number): { month: string; from: string; to: string } {
-  const today = new Date(now).toISOString().slice(0, 10);
-  return { month: today.slice(0, 7), from: `${today.slice(0, 7)}-01`, to: today };
+/** A month the switcher may show: `YYYY-MM`. */
+const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/u;
+
+/** The month `by` months from `month`, as `YYYY-MM`. */
+export function shiftMonth(month: string, by: number): string {
+  const y = Number(month.slice(0, 4));
+  const m = Number(month.slice(5, 7)) - 1 + by;
+  return new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 7);
 }
+
+/** How far back the switcher goes: the ledger answers a year at most (`directory.ts` `usage`). */
+export const MONTHS_BACK = 12;
+
+/**
+ * The range the page asks the ledger for: this month so far, UTC, or a whole past month when `month` names one.
+ *
+ * A MONTH AHEAD OF THIS ONE, OR FURTHER BACK THAN `MONTHS_BACK`, OR NOT A MONTH, IS THIS ONE: the address is typed by
+ * whoever typed it, and a month nobody could have used is not a question to send.
+ */
+export function monthRange(now: number, month?: string): { month: string; from: string; to: string } {
+  const today = new Date(now).toISOString().slice(0, 10);
+  const current = today.slice(0, 7);
+  if (month !== undefined && MONTH.test(month) && month < current && month >= shiftMonth(current, -MONTHS_BACK)) {
+    const last = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0)).toISOString().slice(0, 10);
+    return { month, from: `${month}-01`, to: last };
+  }
+  return { month: current, from: `${current}-01`, to: today };
+}
+
+/** The months either side of `month` the switcher offers, `null` past either end. */
+export function monthsBeside(now: number, month: string): { earlier: string | null; later: string | null } {
+  const current = new Date(now).toISOString().slice(0, 7);
+  const earlier = shiftMonth(month, -1);
+  const later = shiftMonth(month, 1);
+  return { earlier: earlier >= shiftMonth(current, -MONTHS_BACK) ? earlier : null, later: later <= current ? later : null };
+}
+
+/** Where a project's "Runs on" links: `/usage` showing that project's slice. `project` is its scope, as the action declares it. */
+export const usageHref = (project: string): string => `/usage?project=${encodeURIComponent(project)}`;
 
 /** A month as a person says it: `2026-09` is September. */
 export const monthWords = (month: string): string => MONTHS[Number(month.slice(5, 7)) - 1] ?? month;
@@ -425,18 +678,43 @@ export type UsageRead = { ok: true; view: UsageView } | { ok: false; refusal: Re
  * TWO BASES SINCE THE RECORD IS IN THE ADDRESS. `base` is the bare host, where `/account/usage` and `/auth/methods` are the
  * person's; `api` is where the record answers, `/app/<slug>` under a slug, so the events counted are the record on screen.
  */
-export async function readUsage(io: Fetch, now: number, base = '', api: string = base): Promise<UsageRead> {
-  const range = monthRange(now);
+export async function readUsage(io: Fetch, now: number, base = '', api: string = base, month?: string): Promise<UsageRead> {
+  const range = monthRange(now, month);
+  const current = range.to === new Date(now).toISOString().slice(0, 10);
   /* NOBODY SIGNED IN IS NO LEDGER TO ASK. An open self-host, or a browser with no session, would only be told 401, and
      the browser logs that as an error; `/auth/methods` says so without one. A host that cannot say is asked as before. */
+  let member = false;
   if (!(await nobodySignedIn(io, base))) {
     const ledger = await send<AccountUsage>(io, `${base}/account/usage?from=${range.from}&to=${range.to}`);
-    if (ledger.ok) return { ok: true, view: usageFromLedger(ledger.value, range.month, range.to) };
-    if (!ledger.notFound && !ASK_THE_RECORD.has(ledger.refusal.code)) return { ok: false, refusal: ledger.refusal };
+    if (ledger.ok && ledger.value.records.length > 0) {
+      /* THE NAMES, FROM THE RECORD ON SCREEN, asked beside each other and never waited on for an answer that failed:
+         a name not found is said as the ledger holds it, which is what this page said before it asked. */
+      const [automations, scripts, actions] = await Promise.all([
+        send<{ id: string; rule?: string; name: string }[]>(io, `${api}/api/automations`),
+        send<{ id: string; script?: string; title: string }[]>(io, `${api}/api/scripts`),
+        live(io, api).actions(),
+      ]);
+      const names = namesOf({
+        automations: automations.ok && Array.isArray(automations.value) ? automations.value : undefined,
+        scripts: scripts.ok && Array.isArray(scripts.value) ? scripts.value : undefined,
+        actions: actions.ok && Array.isArray(actions.value) ? actions.value : undefined,
+      });
+      return { ok: true, view: usageFromLedger(ledger.value, range.month, current ? range.to : undefined, names, current) };
+    }
+    /* A LEDGER WITH NO RECORD IN IT IS A MEMBER'S, since usage is the owner's (`directory.ts` `usage`). It read "Nothing
+       has run this month" over a record that ran all month; now the record's own runs are drawn under the sentence. */
+    if (ledger.ok) member = true;
+    else if (!ledger.notFound && !ASK_THE_RECORD.has(ledger.refusal.code)) return { ok: false, refusal: ledger.refusal };
   }
 
   const events = await live(io, api).actions();
-  if (events.ok) return { ok: true, view: usageFromActions(events.value, range.month, 'events', range.to) };
+  if (events.ok) {
+    /* THE RECORD'S EVENTS ARE THIS MONTH'S ONLY (`ActionRow.month`), so a past month read from them is a month with
+       nothing to say, never this month's runs under last month's name. */
+    const view = usageFromActions(current ? events.value : [], range.month, 'events', current ? range.to : undefined, current);
+    return { ok: true, view: member ? { ...view, owner: false } : view };
+  }
+  if (member) return { ok: true, view: usageFromLedger({ from: range.from, to: range.to, totals: { ...zero(), ms: 0, held: 0 }, records: [] }, range.month, undefined, NO_NAMES, current) };
   if (events.refusal.code === 'ROUTE_UNKNOWN') return { ok: 'none' };
   return { ok: false, refusal: events.refusal };
 }
@@ -453,15 +731,14 @@ export const countsOf = (t: Totals): string =>
     t.runs === 1 ? '1 run' : `${t.runs.toLocaleString('en-GB')} runs`,
     t.requests === 1 ? '1 request' : `${t.requests.toLocaleString('en-GB')} ${words.requests}`,
     fmtBytes(t.bytes),
+    /* RUN TIME WHERE THE LEDGER COUNTED ANY: it was never shown, and it is one of the four things a plan limits. */
+    t.ms !== undefined && t.ms > 0 ? words.hours(t.ms / 3_600_000) : '',
     t.failures > 0 ? words.failures(t.failures) : '',
   ]
     .filter(Boolean)
     .join(' · ');
 
 /* ── what an install calls ─────────────────────────────────────────────── */
-
-/** The hosted plan's runs a month, per record (`research-scheduled-actions.md` §4.4). A self-host has none. */
-export const HOSTED_RUNS = 15_000;
 
 /** A month as a twelfth of a year, so an hourly action is 730 runs and twenty of them are 14,600. */
 const MONTH_MS = (365 / 12) * 86_400_000;
@@ -558,6 +835,7 @@ export const installWords = {
       : `${about}, ${share} of this record's ${allowance.toLocaleString('en-GB')}.`;
   },
   noLimit: (runs: number) => `About ${runs.toLocaleString('en-GB')} ${runs === 1 ? 'run' : 'runs'} a month, with no monthly limit on this record.`,
+  counted: (runs: number) => `About ${runs.toLocaleString('en-GB')} ${runs === 1 ? 'run' : 'runs'} a month, counted against this record's monthly allowance.`,
   byRule: (perDay: number) => `when a rule runs it, at most ${perDay.toLocaleString('en-GB')} a day`,
   /* THE ONE APPROVAL (`research-scheduled-actions.md` §5): said under the lines, before the press. */
   asksOnce: 'Installing asks you to approve these once, and none of them runs until you do.',
@@ -586,12 +864,18 @@ export const callLine = (c: CallOut): string =>
     .join(', ');
 
 /**
- * The sentence under the lines: runs a month these actions add, against the hosted allowance. `null`
+ * The sentence under the lines: runs a month these actions add, against the record's allowance. `null`
  * when no action has an interval to count, because a guess is not an estimate.
+ *
+ * `allowance` IS THE RUNS THE DIRECTORY ANSWERED (`GET /account/usage`, a record's `month.allowance.runs`), `true` a
+ * hosted record whose allowance this screen has not read, and `false` a host with no limit. The figure was typed here as
+ * `HOSTED_RUNS` beside the Directory's `ALLOWANCE`, two copies of one number that a plan change would have split; now
+ * the only figure said is one the Directory said, and without one the sentence says the runs are counted, not how many.
  */
-export function estimateOf(calls: readonly CallOut[], hosted: boolean): string | null {
+export function estimateOf(calls: readonly CallOut[], allowance: number | boolean): string | null {
   const counted = calls.map((c) => runsAMonth(c.every)).filter((n): n is number => n !== null);
   if (counted.length === 0) return null;
   const runs = counted.reduce((a, b) => a + b, 0);
-  return hosted ? installWords.estimate(runs, HOSTED_RUNS) : installWords.noLimit(runs);
+  if (allowance === false) return installWords.noLimit(runs);
+  return allowance === true || allowance <= 0 ? installWords.counted(runs) : installWords.estimate(runs, allowance);
 }

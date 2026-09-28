@@ -19,13 +19,15 @@
 
 import type { createClient } from '@braindog/client';
 import { modulesFor, useCase, type UseCase } from '@braindog/seed/usecases';
+import { moduleName } from '@braindog/seed/usecases/names';
 
 import { firstRun } from '../../lib/first-run.ts';
-import { MODULES } from '../../lib/record/modules.ts';
 import { packDocument, relabelDocument, type PackState } from '../../lib/record/packs.ts';
+import { fileDrafted, type Drafted, type SlashClient } from '../../lib/record/slash.ts';
 import { hear, introduce, personRow, PEOPLE } from '../../lib/who.ts';
 import type { Proposal } from '../../lib/start/propose.ts';
 import { afterInstall, installShared, keepVoice, planShared, speakingStates } from '../packs/sharing.ts';
+import { words } from './preview.ts';
 
 type Body = Record<string, unknown>;
 type Client = ReturnType<typeof createClient>;
@@ -50,6 +52,11 @@ export type Accepting = {
   email: string | null;
   /** The reader's own rail order, which a use case's order is laid over. */
   nav: readonly string[];
+  /**
+   * What Slash drafted for a business no use case fits, when the person kept it (`loop/finish/pages.md` PGS-20): its
+   * lists, figures and pages, filed and accepted in this same press. Its sample rows are never written.
+   */
+  drafted?: Drafted | null;
 };
 
 /** One thing that was not made: the person's sentence and the record's. */
@@ -60,7 +67,13 @@ export type NotMade = { said: string; why: string };
  * `null` for no change. An entry left whose client was written names that client in its own fields, so a second press
  * links it without writing the client again.
  */
-export type Accepted = { failed: NotMade[]; left: Proposal['rows']; nav: string[] | null };
+export type Accepted = {
+  failed: NotMade[];
+  left: Proposal['rows'];
+  nav: string[] | null;
+  /** Whether the draft went onto Decide, kept or waiting there, so a second press does not file it again. */
+  filed: boolean;
+};
 
 /** The record's own sentence for a refusal, or the calm one when nothing answered. */
 const fixOf = (r: Wire<unknown>, otherwise: string): string => (!r.ok && 'refusal' in r ? r.refusal.fix : otherwise);
@@ -102,7 +115,7 @@ async function packsOf(client: Client): Promise<{ ok: true; value: PackState[] }
 }
 
 /** A module by the name a person knows it by. */
-const nameOf = (id: string): string => MODULES.find((m) => m.id === id)?.name ?? id;
+const nameOf = (id: string): string => moduleName(id);
 
 /** Install one module alone, for a proposal with no use case: planned, then installed with exactly that plan's hash. */
 async function addModule(client: Client, id: string, held: readonly PackState[]): Promise<string | null> {
@@ -150,7 +163,7 @@ export async function accept(client: Client, asked: Accepting): Promise<Accepted
   const failed: NotMade[] = [];
   let nav: string[] | null = null;
   const held = await packsOf(client);
-  if (!held.ok) return { failed: [{ said: firstRun.notAllMade, why: held.why }], left: asked.proposal.rows, nav };
+  if (!held.ok) return { failed: [{ said: firstRun.notAllMade, why: held.why }], left: asked.proposal.rows, nav, filed: false };
   let states = held.value;
   const who = hear(asked.sentence);
   const u = asked.usecase === null ? null : (useCase(asked.usecase) ?? null);
@@ -193,6 +206,21 @@ export async function accept(client: Client, asked: Accepting): Promise<Accepted
   /* THE USE CASE CHOSEN SPEAKS, AND ANY BESIDE IT IS SET NOT TO, so no use case added later moves the voice by how its
      id sorts (`sharing.ts` `keepVoice`). With one use case there is nothing to write. */
   if (u && installed.length > 1) await keepVoice(client, await speakingStates(client, states), u.usecase, 'speaks');
+
+  /* WHAT SLASH DRAFTED GOES IN AS A CHANGE, proposed and then decided in this press, which is the one way a change comes
+     into a record (`slash.ts` `fileDrafted`). It is filed as it was drawn, its declarations and nothing else: the sample
+     rows the preview drew were only examples. After the modules, since a page it makes may read one of their lists. */
+  let filed = false;
+  if (asked.drafted) {
+    const kept = await fileDrafted(client as unknown as SlashClient, asked.drafted, true);
+    filed = kept.kind !== 'refused';
+    if (kept.kind === 'refused') failed.push({ said: words.notDrafted, why: kept.fix });
+    else if (kept.kind === 'filed') failed.push({ said: words.draftWaits, why: kept.fix ?? '' });
+    if (filed) {
+      const now = await packsOf(client);
+      if (now.ok) states = now.value;
+    }
+  }
 
   /* ── the person, first ─────────────────────────────────────────────────── */
   /* ONLY WITH PEOPLE ON, and People is on only where the person left it on: `introduce` reads the record, and a name heard
@@ -252,5 +280,5 @@ export async function accept(client: Client, asked: Accepting): Promise<Accepted
     left.push({ register: row.register, fields, ...(still === undefined ? {} : { party: still }) });
   }
 
-  return { failed, left, nav };
+  return { failed, left, nav, filed };
 }

@@ -31,8 +31,9 @@
   import { joinsWithOr, registerHref } from '$lib/record/where.ts';
   import { may } from '$lib/record/may.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
-  import { resolverOf, type LiveBlock } from '$lib/record/page-live.ts';
+  import { fileAt, resolverOf, type LiveBlock } from '$lib/record/page-live.ts';
   import { glyphSetNow, isGlyph, pathOf } from '$lib/ui/icons.ts';
+  import { liveOf } from '../ui/face.ts';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Icon from '$lib/ui/Icon.svelte';
@@ -41,6 +42,7 @@
   import Reporting from './panels/Reporting.svelte';
   import { panelOf } from './panels/panel-of.ts';
   import type { Writes } from './page-writes.ts';
+  import AddStep from './AddStep.svelte';
 
   let {
     block,
@@ -83,6 +85,9 @@
   /* THE HEADING AS A TABLE'S ACCESSIBLE NAME: its words without a glyph's braces (`text` drops an icon to nothing). */
   const headingText = $derived(block.heading ? text(inline(block.heading)).trim() : undefined);
 
+  /* Where each file the block holds is served, record-relative (`page-live.ts` `fileAt`), read by `opts.file` below. */
+  const filed = $derived(fileAt(block));
+
   const opts = $derived({
     resolve: (path: string) => said(resolverOf(block.values)(path)),
     now,
@@ -96,6 +101,18 @@
     cellHref: (n: number) => block.metrics?.[n]?.href ?? null,
     /* WHERE A ROW APPLIES, AS A CHIP, in a card grid's scope facts (agents C8, `page-live.ts` `scopeCells`). */
     ...(block.scopeCells ? { scope: block.scopeCells } : {}),
+    /* A RUN'S FACE, ON A CARD OF RUNS (AGT-13): the run and whether it is working, gone quiet or stopped, so
+       `Cards.svelte` draws the run's glyph in the `who` cell instead of a plain initial. */
+    ...(block.source === 'sessions.live' && block.entries
+      ? { runs: block.entries.map((e, n) => ({ run: `S${e.seq}`, agent: typeof e.fields.agent === 'string' ? e.fields.agent : null, live: liveOf(e.fields.state, block.quiet?.[n] === true) })) }
+      : {}),
+    /* A PICTURE IS SERVED BY THE RECORD THE PAGE IS ON (pages C10): a gallery tile's or a card's file, found in what the
+       block already holds (`fileAt`) and placed under this record's address. A file the block does not hold answers
+       nothing, and the tile draws its caption. */
+    file: (row: string, field: string) => {
+      const path = filed(row, field);
+      return path === null ? null : inApp(path);
+    },
   });
 
   /**
@@ -240,7 +257,9 @@
         onreschedule={w ? (row, drop) => void w.rescheduleBar(block, row, drop, i, shown.rows) : undefined}
         oncapture={w && w.capturable(block) ? w.captureLine : undefined}
         oninput={w && typable ? w.typeInto : undefined}
+        onpath={w ? (row, done) => w.onpath(block, row, done, i, shown.rows) : undefined}
       />
+      {#if w && segment.kind === 'steps' && w.stepable(block)}<AddStep {block} writes={w} />{/if}
       <!-- WHAT THE RECORD REFUSED ABOUT A FIELD IS SAID UNDER ITS BLOCK, named by the field's label, until that field is
            written. -->
       {#if segment.kind === 'inputs' && w}
@@ -256,7 +275,8 @@
      project runs on, and beside it the project's own key for its numbers; or the key alone. Not while arranging, since
      a list that fetches is not a block to move, and not on an inert page, since the key's panel makes one. -->
 {#if panel && param && writes && !arranging}
-  {#if panel === 'actions'}<Actions project={param.title} />{/if}
+  <!-- BY THE ROW, `things#1`, and not by its title: the record resolves each action's project to its row (DOR-6). -->
+  {#if panel === 'actions'}<Actions project={{ spoken: `${param.register}#${param.seq}`, title: param.title }} />{/if}
   <Reporting register={param.register} seq={param.seq} title={param.title} />
 {/if}
 

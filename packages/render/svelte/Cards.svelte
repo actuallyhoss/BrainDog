@@ -28,7 +28,7 @@
     type Row,
   } from '../src/index.ts';
   /* From the module and not the root, which does not export it: the word is this drawer's and `html.ts`'s alone. */
-  import { CARDS_NEXT } from '../src/cards.ts';
+  import { CARDS_NEXT, RUN_OPEN, runFaceOf, type RunCell, type RunFace } from '../src/cards.ts';
   import { hueOf } from '../src/cards.ts';
   import { pictureSrc } from '../src/gallery.ts';
   import { hrefFor } from '../src/html.ts';
@@ -41,7 +41,8 @@
    */
   type ScopeCells = { columns: readonly number[]; everywhere: string; glyph: string | null; marks: ReadonlyMap<string, { mark: string | null; hue: number | null }> };
 
-  let { block, opts = {} }: { block: Block; opts?: RenderOptions & { scope?: ScopeCells | undefined } } = $props();
+  /* A BLOCK OF RUNS COMES WITH ITS RUNS (agents C11): the host hands one a row, which the `who` face is drawn from. */
+  let { block, opts = {} }: { block: Block; opts?: RenderOptions & { scope?: ScopeCells | undefined; runs?: readonly (RunCell | null)[] | undefined } } = $props();
 
   const L = $derived(cardLayout(block.rows[0]?.cells ?? []));
   const rows = $derived(block.rows.slice(1));
@@ -60,12 +61,45 @@
      beside its name. The mark is hidden from a screen reader, which reads the name. -->
 {#snippet scopeChip(cells: ScopeCells, said: string)}{@const everywhere = said === cells.everywhere}{@const m = everywhere ? undefined : cells.marks.get(said)}<span class="scope-chip" data-everywhere={everywhere ? '' : undefined}>{#if everywhere && cells.glyph}<svg class="scope-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={cells.glyph} /></svg>{:else if m?.mark}<span class="scope-mark" style={m.hue === null ? undefined : `--hue:${m.hue}`} aria-hidden="true">{m.mark}</span>{/if}<span class="scope-name">{said}</span></span>{/snippet}
 
+<!-- A RUN'S FACE (agents C11), as `apps/web`'s `AgentFace` draws one: the kind's glyph on a disc washed in the run's
+     hue, ringed in that hue while the run is open, solid while it works and dashed once it has gone quiet, and a door to
+     the run's page. The hue is written on the drawing alone, so the card's own `--hue` is left as it was. -->
+{#snippet runFace(f: RunFace)}{@const d = f.glyph === 'slash' ? 'M15.5 4.5 8.5 19.5' : (opts.icon?.(f.glyph) ?? null)}<a
+    class="cards-face cards-run"
+    style="background:none"
+    href={hrefFor(opts, `/r/session/${f.seq}`)}
+    data-live={f.live}
+    aria-label={RUN_OPEN}
+    ><svg class="cards-run-mark" viewBox="0 0 36 36" width="100%" height="100%" aria-hidden="true" style="--run-hue:{f.hue}"
+      ><circle class="cards-run-disc" cx="18" cy="18" r="14" style="fill:color-mix(in srgb, oklch(var(--mark-l) var(--mark-c) var(--run-hue)) 30%, var(--bg))"
+      ></circle>{#if f.live !== 'stopped'}<circle
+          class="cards-run-ring"
+          cx="18"
+          cy="18"
+          r="16.5"
+          fill="none"
+          stroke-width="2.5"
+          stroke-dasharray={f.live === 'quiet' ? '4 3' : undefined}
+          style="stroke:oklch(var(--mark-l) var(--mark-c) var(--run-hue))"
+        ></circle>{/if}{#if d}<path
+          d={d}
+          transform="translate(9 9) scale(0.75)"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        ></path>{/if}</svg
+    ></a
+  >{/snippet}
+
 {#if rows.length === 0}
   <p class="cards-empty">{CARDS_NONE}</p>
 {:else}
   <ul class="cards-grid">
     {#each rows as r, n}
       {@const mark = L.mark >= 0 ? markOf(said(r, L.mark)) : null}
+      {@const run = L.name >= 0 || L.who >= 0 ? runFaceOf(said(r, L.nameIsWho ? L.name : L.who), opts.runs?.[n], isQuiet(L, r.cells)) : null}
       {@const face = L.nameIsWho ? initialOf(said(r, L.name)) : null}
       {@const symbol = L.figure >= 0 ? symbolFigure(r.cells[L.figure] ?? '') : null}
       {@const coded = L.figure >= 0 ? leadingCode(r.cells[L.figure] ?? '') : null}
@@ -87,6 +121,7 @@
         {#if picture}<img class="cards-picture" src={hrefFor(opts, picture)} alt="" loading="lazy" />{/if}
         <div class="cards-head">
           {#if mark}<span class="cards-mark" aria-hidden="true">{mark}</span>
+          {:else if L.nameIsWho && run}{@render runFace(run)}
           {:else if face}<span class="cards-face" aria-hidden="true">{face}</span>{/if}
           {#if L.name >= 0}<h3 class="cards-title">{#if r.cells[L.name]}<Text nodes={nodes(r, L.name)} {opts} />{:else}{MISSING}{/if}</h3>{/if}
           {#if r.tone}<span class="glyph" role="img" aria-label={TONES[r.tone].label}>{TONES[r.tone].glyph}</span>{/if}
@@ -150,7 +185,7 @@
         {#if L.next >= 0 && r.cells[L.next]}<p class="cards-next">{CARDS_NEXT}: <Text nodes={nodes(r, L.next)} {opts} /></p>{/if}
         {#if L.who >= 0 && r.cells[L.who]}
           <div class="cards-who">
-            {#if whoFace}<span class="cards-face" aria-hidden="true">{whoFace}</span>{/if}
+            {#if run}{@render runFace(run)}{:else if whoFace}<span class="cards-face" aria-hidden="true">{whoFace}</span>{/if}
             <span class="cards-name"><Text nodes={nodes(r, L.who)} {opts} /></span>
           </div>
         {/if}

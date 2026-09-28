@@ -35,6 +35,8 @@ import tokenReach0015 from './migrations/0015_token_reach.ts';
 import slash0016 from './migrations/0016_slash.ts';
 import automationWatch0017 from './migrations/0017_automation_watch.ts';
 import jobs0018 from './migrations/0018_jobs.ts';
+import memberWhere0019 from './migrations/0019_member_where.ts';
+import quiet0020 from './migrations/0020_quiet.ts';
 
 export type Migration = { version: number; slug: string; sql: string };
 
@@ -58,6 +60,8 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 16, slug: 'slash', sql: slash0016 },
   { version: 17, slug: 'automation_watch', sql: automationWatch0017 },
   { version: 18, slug: 'jobs', sql: jobs0018 },
+  { version: 19, slug: 'member_where', sql: memberWhere0019 },
+  { version: 20, slug: 'quiet', sql: quiet0020 },
 ];
 
 /**
@@ -81,6 +85,10 @@ export const MIGRATIONS: readonly Migration[] = [
  * Migration 18 rebuilds `declaration` with one more kind, keeping every column, and `job` with no CHECK on its kind and
  * two new nullable columns; an older file carries only the kinds it still takes, and `job` is `local`, so no file carries
  * it.
+ * Migration 19 adds one nullable column to `member`, which an older file imports without and reads as NULL, every row
+ * of the list, which is what that file's grants meant, so the format is still 1.
+ * Migration 20 adds one nullable column to `record`, which an older file imports without and reads as NULL, the quiet
+ * hours every record kept before it, so the format is still 1.
  */
 export const FORMAT_VERSION = 1 as const;
 

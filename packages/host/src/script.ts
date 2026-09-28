@@ -306,6 +306,8 @@ export function scriptRunner<P extends object | undefined = undefined>(options: 
         now: () => new Date(now()).toISOString(),
         tz: scripted.record.tz,
         input: (scripted.input ?? null) as Json,
+        /* The owning pack's settings, which `prepareScript` read when the run was leased; `{}` for a script no pack owns. */
+        config: (scripted.config ?? {}) as Json,
       },
     );
     return kept.stop === null ? answer : { refused: kept.stop, log: answer.log, usage: answer.usage };

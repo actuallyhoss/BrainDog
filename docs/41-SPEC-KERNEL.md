@@ -690,10 +690,12 @@ checksum (K21: `retired` never goes back to 0); then `UPDATE pack SET disabled_a
 `to_v` the same list, all in one transaction; then the cache is rebuilt and derived schedule rows re-armed. The pack's
 version and every `entry` row are unchanged. It reads no pack setting: each body comes back exactly as it went off.
 
-**Pack settings** (`declare.ts`, the 2026-09-15 build). `readConfig(config)` checks a manifest's `config:` map: at most
-32 keys matching `^[a-z][a-z0-9_]{0,31}$` (`OUT_OF_BOUNDS`, `PACK_MALFORMED`), the sub-keys `type`, `values`, `default`,
-`label` and `note` (`FIELD_UNKNOWN`), a type from text, enum, bool, money, day, duration and number (`CONFIG_TYPE_UNSUPPORTED`
-otherwise), an enum's one to 64 distinct values (`VALUE_MALFORMED`), and a default `configValue` accepts. `configValue`
+**Pack settings** (`declare.ts`, the 2026-09-15 build, widened for `list` by PLT-7). `readConfig(config)` checks a
+manifest's `config:` map: at most 32 keys matching `^[a-z][a-z0-9_]{0,31}$` (`OUT_OF_BOUNDS`, `PACK_MALFORMED`), the
+sub-keys `type`, `values`, `max`, `default`, `label` and `note` (`FIELD_UNKNOWN`), a type from text, enum, bool, money,
+day, duration, number and list (`CONFIG_TYPE_UNSUPPORTED` otherwise), an enum's one to 64 distinct values
+(`VALUE_MALFORMED`), a list's own `max` on its lines, a whole number 1 to 20 and a list's alone (`FIELD_UNKNOWN` on any
+other type, `OUT_OF_BOUNDS` outside the range), and a default `configValue` accepts. `configValue`
 is `coerce` for a field of that type, then enum membership (`ENUM_VALUE_UNKNOWN`) and at most 1024 bytes of text
 (`OUT_OF_BOUNDS`). `fillConfig` replaces each `{{config:<key>}}` in a body, and `validate` refuses `FIELD_UNKNOWN` at
 the placeholder for a body that still carries one, so only the pack path, which fills them, installs such a body.

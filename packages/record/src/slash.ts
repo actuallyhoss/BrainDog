@@ -719,6 +719,11 @@ export interface SlashModel {
    * without it forms nothing, and the use case's own plan stands.
    */
   form?(input: SlashFormInput): Promise<unknown>;
+  /**
+   * A skill's next version from the learnings that bear on it (`skillDraftOf` checks the answer). OPTIONAL: a model without
+   * it drafts no skill, and the daily look's log says so. The host passes `@braindog/slash`'s `SKILL_DRAFT_INSTRUCTIONS`.
+   */
+  skill?(input: SkillDraftInput): Promise<unknown>;
 }
 
 export type SlashModelInput = {
@@ -1390,6 +1395,14 @@ export function stableKey(body: Record<string, unknown>): string {
   /* A PLAN'S ROWS are what it is about by the lists it fills, so a first plan is asked once. */
   if (body.register === undefined && Array.isArray(body.rows))
     return `plan:${[...new Set(body.rows.map((r) => String((r as { register?: unknown })?.register)))].sort().join(',')}`;
+  /* A SKILL'S NEXT VERSION IS THE ROW, THE VERSION IT MAKES AND THE LEARNINGS IT CARRIES (`skillDraftOf`). Keyed by the row
+     alone, as a row Slash offers is below, every version after a skill's first draft would read as asked before, and the
+     skill would grow once and never again. This way a dismissed version is not drafted again, and a new lesson is a new
+     question. */
+  const update = typeof body.register === 'string' && Array.isArray(body.rows) && body.rows.length === 1 ? (body.rows[0] as { at?: unknown; patch?: unknown }) : undefined;
+  const patch = update?.patch !== null && typeof update?.patch === 'object' ? (update.patch as { rev?: unknown; because?: unknown }) : undefined;
+  if (typeof update?.at === 'string' && typeof patch?.rev === 'number' && Array.isArray(patch.because))
+    return `version:${String(body.register)}:${update.at}@${patch.rev}:${patch.because.map(String).sort().join(',')}`;
   /* A ROW SLASH OFFERS is recognised by its list and its title, so a skill declined is not offered again. */
   if (typeof body.register === 'string' && Array.isArray(body.rows))
     return `rows:${body.register}:${body.rows.map((r) => String((r as { name?: unknown; what?: unknown; at?: unknown })?.name ?? (r as { what?: unknown })?.what ?? (r as { at?: unknown })?.at ?? '')).sort().join(',')}`;
@@ -1634,4 +1647,153 @@ export function catalogueDrafts(offers: readonly CatalogueOffer[]): SlashDraft[]
       by: 'rules',
     };
   });
+}
+
+/* ── a skill's next version, from what its learnings taught (GAP-12) ─────── */
+
+/** The most skills one daily look drafts: the briefing's own three (`apps/cli/src/brief.ts` `MAX_BEARING`). */
+export const SKILL_DRAFTS_A_DAY = 3;
+
+/** The most learnings one draft is handed, as `@braindog/slash`'s `SKILL_LEARNINGS_MOST` says. */
+const SKILL_LEARNINGS_MOST = 8;
+
+/** The longest skill text a draft may carry, as `@braindog/slash`'s `SKILL_BODY_MOST` says. */
+const SKILL_BODY_MOST = 20_000;
+
+/** How many skill rows the daily look weighs at most, so a record of a thousand skills is not read whole every day. */
+const SKILLS_WEIGHED_MOST = 200;
+
+/** How many learnings the daily look reads at most, newest first, for the same reason. */
+const LEARNINGS_READ_MOST = 2_000;
+
+/**
+ * What the model is handed for one skill: the skill as it stands and the lessons it does not carry yet, and nothing else
+ * of the record. `@braindog/slash` restates it in `skill-draft.ts`, since neither package may import the other.
+ */
+export type SkillDraftInput = {
+  skill: { name: string; trigger: string; rev: number; body: string };
+  learnings: readonly { id: string; lesson: string; because: string }[];
+};
+
+/** A skill with active learnings bearing on it that its `because` does not carry yet, as the daily look reads it. */
+export type SkillBearing = {
+  /** The skill's row id, the `at` its rowset names. */
+  at: string;
+  /** The version its row was read at, which the rowset carries so a row changed since is not overwritten. */
+  version: number;
+  name: string;
+  trigger: string;
+  rev: number;
+  body: string;
+  /** The learnings its `because` already names, kept in the next version's. */
+  carried: string[];
+  /** The learnings that bear on it and are not carried: row id, spoken id, the lesson and the failure behind it. */
+  learnings: { id: string; spoken: string; lesson: string; because: string }[];
+};
+
+const textOf = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
+
+/**
+ * The skills whose next version is waiting to be written, oldest skill first, `SKILL_DRAFTS_A_DAY` at most.
+ *
+ * THE BRIEFING'S RULE, READ OVER THE WHOLE RECORD (`bearing` in `apps/cli/src/brief.ts`, which reads one project's
+ * context): a learning bears on a skill when its `topic` is the skill's name, whatever the case and the space around it,
+ * only an active lesson bears on anything, and a lesson the skill's `because` already names is in the skill. A skill of
+ * the same name as one weighed before it is left for the next look, so two rows are never drafted from one lesson at once.
+ */
+export function skillBearings(sql: Sql, kernel: Kernel): SkillBearing[] {
+  if (!kernel.register('skills') || !kernel.register('learnings')) return [];
+  const prefix = kernel.register('learnings')?.seq_prefix;
+  const spoken = (seq: number) => (prefix && prefix !== '#' ? `${prefix}${seq}` : `learnings#${seq}`);
+  const byTopic = new Map<string, SkillBearing['learnings']>();
+  for (const row of sql.all<{ id: string; seq: number; fields: string }>(
+    "SELECT id, seq, fields FROM entry WHERE register = 'learnings' AND deleted_at IS NULL ORDER BY seq DESC LIMIT ?",
+    LEARNINGS_READ_MOST,
+  )) {
+    let f: Record<string, unknown>;
+    try {
+      f = JSON.parse(row.fields) as Record<string, unknown>;
+    } catch {
+      continue;
+    }
+    if (f.state !== undefined && f.state !== null && f.state !== 'active') continue;
+    const topic = textOf(f.topic).toLowerCase();
+    const lesson = textOf(f.lesson);
+    if (!topic || !lesson) continue;
+    byTopic.set(topic, [...(byTopic.get(topic) ?? []), { id: row.id, spoken: spoken(row.seq), lesson, because: textOf(f.because) }]);
+  }
+  if (byTopic.size === 0) return [];
+
+  const out: SkillBearing[] = [];
+  const seen = new Set<string>();
+  for (const row of sql.all<{ id: string; version: number; fields: string }>(
+    "SELECT id, version, fields FROM entry WHERE register = 'skills' AND deleted_at IS NULL ORDER BY seq LIMIT ?",
+    SKILLS_WEIGHED_MOST,
+  )) {
+    if (out.length >= SKILL_DRAFTS_A_DAY) break;
+    let f: Record<string, unknown>;
+    try {
+      f = JSON.parse(row.fields) as Record<string, unknown>;
+    } catch {
+      continue;
+    }
+    const name = textOf(f.name);
+    if (!name || seen.has(name.toLowerCase())) continue;
+    seen.add(name.toLowerCase());
+    if (f.state !== undefined && f.state !== null && f.state !== 'active') continue;
+    const carried = Array.isArray(f.because) ? f.because.filter((id): id is string => typeof id === 'string') : [];
+    const held = new Set(carried);
+    /* Oldest lesson first, so the text takes them in the order they were learned. */
+    const fresh = (byTopic.get(name.toLowerCase()) ?? []).filter((l) => !held.has(l.id)).reverse().slice(0, SKILL_LEARNINGS_MOST);
+    if (fresh.length === 0) continue;
+    out.push({
+      at: row.id,
+      version: row.version,
+      name,
+      trigger: textOf(f.trigger),
+      rev: typeof f.rev === 'number' && Number.isInteger(f.rev) && f.rev > 0 ? f.rev : 1,
+      body: typeof f.body === 'string' ? f.body : '',
+      carried,
+      learnings: fresh,
+    });
+  }
+  return out;
+}
+
+/** What one skill's model is handed: the lessons by spoken id, which is how a person and the diff name them. */
+export const skillDraftInput = (b: SkillBearing): SkillDraftInput => ({
+  skill: { name: b.name, trigger: b.trigger, rev: b.rev, body: b.body },
+  learnings: b.learnings.map((l) => ({ id: l.spoken, lesson: l.lesson, because: l.because })),
+});
+
+/** Words said as a person lists them: "LN12", "LN12 and LN15", "LN12, LN15 and LN18". */
+const listed = (words: readonly string[]): string => (words.length < 2 ? (words[0] ?? '') : `${words.slice(0, -1).join(', ')} and ${words[words.length - 1]!}`);
+
+/**
+ * What the model answered for one skill, as the draft the daily look files: one `rowset` on `skills` in the shape an
+ * agent's `propose` sends (`packages/mcp/src/index.ts` `rowset`), its one row `{ at, version, patch }` with the whole new
+ * `body`, `rev + 1` and `because` carrying the lessons it took in after the ones it held. `unchanged` when the lessons
+ * change nothing; `why` when the answer could not be shaped into that rowset, which is dropped whole and never filed.
+ *
+ * THE HOST'S CHECK IS `@braindog/slash`'s `skillDraftShaped`; this is the record's own, because a port's answer is not
+ * trusted for being checked on the far side of it.
+ */
+export function skillDraftOf(raw: unknown, b: SkillBearing, by: string): { draft: SlashDraft } | { unchanged: string } | { why: string } {
+  const said = raw !== null && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : null;
+  if (said === null) return { why: `Slash could not shape a next version of ${b.name} from the model's answer, so nothing was filed for it.` };
+  if (typeof said.unchanged === 'string' && said.body === undefined)
+    return { unchanged: `${b.name}: ${said.unchanged.trim().slice(0, 280) || 'the lessons change nothing.'}` };
+  const body = typeof said.body === 'string' ? said.body.replace(/\r\n?/gu, '\n') : '';
+  if (body.trim() === '' || [...body].length > SKILL_BODY_MOST)
+    return { why: `Slash could not shape a next version of ${b.name} from the model's answer, so nothing was filed for it.` };
+  if (body.trim() === b.body.replace(/\r\n?/gu, '\n').trim()) return { unchanged: `${b.name}: the model wrote the same text back.` };
+  const rev = b.rev + 1;
+  const ids = b.learnings.map((l) => l.spoken);
+  const rowset = {
+    register: 'skills',
+    rows: [{ at: b.at, version: b.version, patch: { body, rev, because: [...b.carried, ...b.learnings.map((l) => l.id)] } }],
+  };
+  const one = ids.length === 1;
+  const question = `Take version ${rev} of the skill ${b.name}? It takes in what ${listed(ids)} ${one ? 'teaches' : 'teach'}.`;
+  return { draft: { key: stableKey(rowset), question: question.length > 280 ? `${question.slice(0, 277)}...` : question, body_kind: 'rowset', body: rowset, by } };
 }

@@ -134,7 +134,9 @@ test('THE FILE DECLARES THE LIST 1.0.0 DID, with `cost` added, and a version abo
   const doc = file();
   const built = v100();
   assert.equal(doc.pack, 'holdings');
-  assert.equal(doc.version, '1.1.0');
+  /* 1.2.0 IS MOD-20's, and adds one key: `holdings-value` is `sellable`, so a forecast's sell control offers it. */
+  assert.equal(doc.version, '1.2.0');
+  assert.equal(doc.declarations.find((d) => d.metric === 'holdings-value')?.sellable, true);
   assert.equal(built.version, '1.0.0', 'the frozen 1.0.0 moved, so this file has to say what it now is beside it');
   assert.deepEqual(doc.requires, built.requires);
   const list = doc.declarations.find((d) => d.register === 'holdings')!;
@@ -168,7 +170,7 @@ test('INSTALLED FROM THE FILE: one list, one rule, one script, three figures and
     ['metric.holdings-costed', 'metric.holdings-count', 'metric.holdings-value', 'page.holdings', 'register.holdings', 'rule.holdings_cost', 'script.holdings_cost'],
   );
   said(await put(api, file()));
-  assert.equal(api.kernel.packs().find((p) => p.id === 'holdings')?.version, '1.1.0');
+  assert.equal(api.kernel.packs().find((p) => p.id === 'holdings')?.version, '1.2.0');
   close();
 });
 
@@ -252,7 +254,7 @@ async function upgraded(rows: readonly Body[] = HELD): Promise<{ api: Api; clock
   said(await put(api, v100()));
   const ids = rows.map((row) => hold(api, row));
   said(await put(api, file()));
-  assert.equal(api.kernel.packs().find((p) => p.id === 'holdings')?.version, '1.1.0');
+  assert.equal(api.kernel.packs().find((p) => p.id === 'holdings')?.version, '1.2.0');
   return { api, clock, ids, close };
 }
 
@@ -260,7 +262,7 @@ async function upgraded(rows: readonly Body[] = HELD): Promise<{ api: Api; clock
    for any interval of two and a half hours or more, so a daily script is first due inside a quarter of an hour. */
 const SPREAD_MS = 15 * 60_000;
 
-test('A RECORD ON 1.0.0 UPDATES TO 1.1.0 AND EVERY HOLDING IT HELD IS COSTED, with nobody writing a row again', async () => {
+test('A RECORD ON 1.0.0 UPDATES TO THIS FILE AND EVERY HOLDING IT HELD IS COSTED, with nobody writing a row again', async () => {
   const { api, clock, ids, close } = await upgraded();
   const cost = (id: string): Money | undefined => api.kernel.get(id)!.fields.cost as Money | undefined;
   /* THE RULE IS NO HELP HERE. It listens for a write to `qty` or `unit_cost`, and the update writes neither, so every
@@ -366,5 +368,5 @@ test('HALF A UNIT IS A HOLDING AND A NEGATIVE COUNT IS NOT, and the card keeps t
 
 test('THE SAME FILE PASSES AS AN ADD-ON SOMEBODY OPENS FROM DISK', async () => {
   const opened = said<{ pack: { manifest: { pack: string; version: string } } }>(await readPackFile(readFileSync(PACK_FILE, 'utf8')));
-  assert.deepEqual([opened.pack.manifest.pack, opened.pack.manifest.version], ['holdings', '1.1.0']);
+  assert.deepEqual([opened.pack.manifest.pack, opened.pack.manifest.version], ['holdings', '1.2.0']);
 });

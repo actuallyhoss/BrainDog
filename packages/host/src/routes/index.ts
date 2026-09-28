@@ -20,6 +20,11 @@ import { ROUTES as members } from './members.ts';
 import { ROUTES as previewChange } from './preview-change.ts';
 import { ROUTES as slashDraft } from './slash-draft.ts';
 import { ROUTES as vaultPassphrase } from './vault-passphrase.ts';
+import { ROUTES as ownTokens } from './own-tokens.ts';
+import { ROUTES as quiet } from './quiet.ts';
+import { ROUTES as pattern } from './pattern.ts';
+import { ROUTES as personName } from './person-name.ts';
+import { ROUTES as retype } from './retype.ts';
 /* END ROUTES */
 
 export const EXTRA_ROUTES: readonly Route[] = [
@@ -31,5 +36,10 @@ export const EXTRA_ROUTES: readonly Route[] = [
   ...previewChange,
   ...slashDraft,
   ...vaultPassphrase,
+  ...ownTokens,
+  ...quiet,
+  ...pattern,
+  ...personName,
+  ...retype,
   /* END ROUTES */
 ];

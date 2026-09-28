@@ -14,10 +14,11 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { site } from './copy.ts';
+import { PAGES } from './nav.ts';
 
 const SITE = new URL('../../', import.meta.url);
 const REPO = new URL('../../', SITE);
@@ -46,9 +47,10 @@ const productionRecipient = (): string | undefined => wranglerConfig(fileURLToPa
 const strings = (v: unknown): string[] =>
   typeof v === 'string' ? [v] : v && typeof v === 'object' ? Object.values(v).flatMap(strings) : [];
 
-test('the 404 page and the sitemap name every page the site prerenders', () => {
+test('nav.ts names every page the site prerenders, so the header, the 404 and the sitemap do', () => {
   /* THE ROUTE DIRECTORIES ARE THE LIST, because `svelte.config.js` prerenders `*` and every one of
-     these has no parameter. `/agents` was added on 6ef2193e and neither list heard about it. */
+     these has no parameter. The 404's list and `/sitemap.xml` are both built from `nav.ts`'s
+     `PAGES`, so a page missing there is missing from both. */
   const routes = new URL('src/routes/', SITE);
   const pages = [
     '/',
@@ -57,14 +59,8 @@ test('the 404 page and the sitemap name every page the site prerenders', () => {
       .map((d) => `/${d.name}`),
   ];
 
-  const linked: string[] = site.notFound.links.map((l) => l.href);
-  const map = readFileSync(new URL('static/sitemap.xml', SITE), 'utf8');
-  const located = [...map.matchAll(/<loc>https:\/\/brain\.dog([^<]*)<\/loc>/g)].map((m) => m[1]);
-
-  for (const page of pages) {
-    assert.ok(linked.includes(page), `the 404 page says it lists every page and leaves out ${page}`);
-    assert.ok(located.includes(page), `sitemap.xml leaves out ${page}`);
-  }
+  const named = PAGES.map((p) => p.path);
+  for (const page of pages) assert.ok(named.includes(page), `nav.ts leaves out ${page}, so the 404 and the sitemap do too`);
 });
 
 test('the hosted backup cell does not promise copies while the sealing key is a placeholder', () => {

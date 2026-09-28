@@ -140,17 +140,18 @@ test('MONEY-CORE DECLARES NO BANK WORDING, and the twelve it handed until 2.4.0 
   assert.equal(firstPartyDocument('money-core')!.hands, undefined);
 });
 
-test('THE PACK DECLARES EXACTLY THE TWELVE, needs money-core 1.8.0 or later before 4.0.0, and is not a first-party module', async () => {
+test('THE PACK DECLARES THE TWELVE AND THE BALANCE READING, needs money-core 3.0.0 or later before 4.0.0, and is not a first-party module', async () => {
   const doc = bankHsbcEgFile() as unknown as Doc;
   assert.equal(doc.pack, 'bank-hsbc-eg');
-  assert.equal(doc.version, '1.3.1');
-  assert.deepEqual(ingestsOf(doc), [...HSBC, 'ingest.bank-not-mine-sms'].sort());
-  /* `<3.0.0` SINCE 1.0.1, because the caret it had at 1.0.0 admits no 2.0.0, and `<4.0.0` SINCE 1.3.1, because money-core
-     3.0.0 kept every list and field these wordings write (`test/money-core-major.test.ts`). The floor is unmoved. */
-  assert.deepEqual(doc.requires.packs, { 'money-core': '>=1.8.0 <4.0.0' });
+  assert.equal(doc.version, '1.4.0');
+  assert.deepEqual(ingestsOf(doc), [...HSBC, 'ingest.bank-balance', 'ingest.bank-balance-sms', 'ingest.bank-not-mine-sms'].sort());
+  /* `<3.0.0` SINCE 1.0.1, because the caret it had at 1.0.0 admits no 2.0.0. THE FLOOR MOVES TO 3.0.0 AT 1.4.0, because
+     `bank-balance` and its webhook twin read `register.accounts`' `balance_after` and money-core's own balances,
+     which exist only from 3.0.0 (`test/money-core-major.test.ts`). */
+  assert.deepEqual(doc.requires.packs, { 'money-core': '>=3.0.0 <4.0.0' });
   for (const d of doc.declarations) assert.equal(d.pack, 'bank-hsbc-eg', `${String(d.ingest)} still says it is money-core's`);
   const pack = value<Pack>(await normalise(doc, { kind: 'local' }));
-  assert.deepEqual([...pack.manifest.provides].sort(), [...HSBC, 'ingest.bank-not-mine-sms'].sort());
+  assert.deepEqual([...pack.manifest.provides].sort(), [...HSBC, 'ingest.bank-balance', 'ingest.bank-balance-sms', 'ingest.bank-not-mine-sms'].sort());
   assert.ok(!(FIRST_PARTY as readonly string[]).includes('bank-hsbc-eg'));
 });
 
@@ -172,7 +173,7 @@ test('A RECORD ON 1.7.0 UPDATES WITHOUT A REFUSAL, then takes the pack, and ends
      so the plan also has to carry the missing step, which is what the floor of 1.8.0 is for. */
   const early = (await planOf(k, bankHsbcEgFile())).diff;
   assert.deepEqual(early.conflicts.map((c) => c.id).sort(), HSBC);
-  assert.deepEqual(early.requires.packs, [{ id: 'money-core', range: '>=1.8.0 <4.0.0', installed: '1.7.0', ok: false }]);
+  assert.deepEqual(early.requires.packs, [{ id: 'money-core', range: '>=3.0.0 <4.0.0', installed: '1.7.0', ok: false }]);
 
   /* THE UPDATE HANDS THE TWELVE TO THE BANK PACK AND IS NOT REFUSED. An ingest has no rows, so nothing is orphaned. The
      update is today's 2.0.0, straight from 1.7.0, so it also hands `holdings` on: this plan names no `used`, and a plan
@@ -185,12 +186,14 @@ test('A RECORD ON 1.7.0 UPDATES WITHOUT A REFUSAL, then takes the pack, and ends
 
   const bank = await put(k, bankHsbcEgFile());
   assert.deepEqual(bank.conflicts, []);
-  assert.deepEqual(bank.adds.map((a) => a.id).sort(), [...HSBC, 'ingest.bank-not-mine-sms'].sort());
+  assert.deepEqual(bank.adds.map((a) => a.id).sort(), [...HSBC, 'ingest.bank-balance', 'ingest.bank-balance-sms', 'ingest.bank-not-mine-sms'].sort());
 
   const after = k.declarations().filter((d) => d.kind === 'ingest');
-  /* PLUS THE PACK'S CATCH-ALL SINCE 1.3.0 (K2): a text no other door took is skipped as not the bank's, not queued. */
-  assert.deepEqual(after.map((d) => d.id).sort(), [...before, 'ingest.bank-not-mine-sms'].sort());
-  for (const d of after) assert.equal(d.pack_id, HSBC.includes(d.id) || d.id === 'ingest.bank-not-mine-sms' ? 'bank-hsbc-eg' : 'money-core', d.id);
+  /* PLUS THE PACK'S CATCH-ALL SINCE 1.3.0 (K2) AND THE BALANCE READING SINCE 1.4.0: a text no other door took is
+     skipped as not the bank's, not queued. */
+  assert.deepEqual(after.map((d) => d.id).sort(), [...before, 'ingest.bank-balance', 'ingest.bank-balance-sms', 'ingest.bank-not-mine-sms'].sort());
+  const NEW_BANK = ['ingest.bank-balance', 'ingest.bank-balance-sms', 'ingest.bank-not-mine-sms'];
+  for (const d of after) assert.equal(d.pack_id, HSBC.includes(d.id) || NEW_BANK.includes(d.id) ? 'bank-hsbc-eg' : 'money-core', d.id);
 
   /* AND A LINE FROM THE BANK IS STILL CLAIMED BY ITS PATTERN, which is what the owner notices if this goes wrong. */
   const out = value<{ ingest: string | null }>(
@@ -229,7 +232,10 @@ test('A RECORD THAT NEVER USED THE TWELVE RETIRES THEM ON THE UPDATE, and holds 
   /* AND THE PACK STILL INSTALLS LATER, as twelve new doors rather than twelve taken over. */
   const bank = await put(k, bankHsbcEgFile(), usedOf(sql));
   assert.deepEqual(bank.conflicts, []);
-  assert.deepEqual(bank.adds.map((a) => [a.id, a.handed ?? false]).sort(), [...HSBC.map((id) => [id, false]), ['ingest.bank-not-mine-sms', false]].sort());
+  assert.deepEqual(
+    bank.adds.map((a) => [a.id, a.handed ?? false]).sort(),
+    [...HSBC.map((id) => [id, false]), ['ingest.bank-balance', false], ['ingest.bank-balance-sms', false], ['ingest.bank-not-mine-sms', false]].sort(),
+  );
   sql.close();
 });
 
@@ -315,6 +321,9 @@ test('money-core AS IT SHIPS NOW RETIRES THE TWELVE ON A 1.7.0 RECORD, USED OR N
 
   const bank = await put(k, bankHsbcEgFile(), used);
   assert.deepEqual(bank.conflicts, []);
-  assert.deepEqual(bank.adds.map((a) => [a.id, a.handed ?? false]).sort(), [...HSBC, 'ingest.bank-not-mine-sms'].sort().map((id) => [id, false]));
+  assert.deepEqual(
+    bank.adds.map((a) => [a.id, a.handed ?? false]).sort(),
+    [...HSBC, 'ingest.bank-balance', 'ingest.bank-balance-sms', 'ingest.bank-not-mine-sms'].sort().map((id) => [id, false]),
+  );
   sql.close();
 });

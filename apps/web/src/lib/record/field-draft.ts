@@ -30,8 +30,12 @@ import { listFromDraft, listLine } from './tags.ts';
  *
  * EVERY TYPE BUT THOSE `UNBOXED` NAMES, ON BOTH SCREENS, and one predicate so the two cannot drift again. A secret is
  * never drawn and never edited: a credential does not go in a row, the vault is a different surface with different
- * rules, and `readableFields` has already left it out. A `file` is bytes the record keeps outside the row, and a box
- * that takes typing cannot hold one; it waits for the file store (M5 `/a`).
+ * rules, and `readableFields` has already left it out.
+ *
+ * A `file` WAS UNBOXED BESIDE IT until the file store existed (OPS-20): its bytes live outside the row, at
+ * `/api/files/<sha256>`, and the row holds `{ sha256, mime, bytes, name }`. Its draft is that value written out
+ * (`draftOf`), which `FileField.svelte` reads and writes, so the file goes through the same `patchOf` and `unchanged` as
+ * every other field.
  *
  * `quantity` AND `json` WERE REFUSED BESIDE THEM, because `draftOf` handed the box `String` of the value: a `json`
  * cell holding `{ a: 1 }` opened as `[object Object]`, and one character typed after it went back as that string,
@@ -39,7 +43,7 @@ import { listFromDraft, listLine } from './tags.ts';
  * the whole value, a number and its unit or the structure written out, and goes back through `patchOf` as the object
  * the record stores, in the box drawn for it (`QuantityBox.svelte`, `JsonBox.svelte`).
  */
-const UNBOXED: ReadonlySet<string> = new Set(['secret', 'file']);
+const UNBOXED: ReadonlySet<string> = new Set(['secret']);
 export const editable = (f: Pick<FieldDecl, 'type'>): boolean => !UNBOXED.has(f.type);
 
 /**
@@ -51,6 +55,30 @@ export const editable = (f: Pick<FieldDecl, 'type'>): boolean => !UNBOXED.has(f.
  */
 export const isQuantity = (f: Pick<FieldDecl, 'type'>): boolean => (f.type as string) === 'quantity';
 export const isJson = (f: Pick<FieldDecl, 'type'>): boolean => (f.type as string) === 'json';
+/** A `file` field, compared as text for the same reason: the app's `FieldType` does not list it. */
+export const isFile = (f: Pick<FieldDecl, 'type'>): boolean => (f.type as string) === 'file';
+
+/** A file as a row holds it (`kernel/src/coerce.ts` `file`): its bytes are at `/api/files/<sha256>`. */
+export type FileValue = { sha256: string; mime: string; bytes: number; name: string };
+
+/**
+ * The file a draft names, or `null` for an empty draft or one that is not a file.
+ *
+ * THE SAME FOUR TESTS THE RECORD'S COERCION MAKES, so a draft this accepts is a value the record accepts: a hash of
+ * sixty-four lower-case hex characters, a type, a whole number of bytes and a name.
+ */
+export function fileOf(draft: string): FileValue | null {
+  const read = jsonOf(draft.trim());
+  if (!read.ok || read.value === null || typeof read.value !== 'object' || Array.isArray(read.value)) return null;
+  const v = read.value as Record<string, unknown>;
+  if (typeof v.sha256 !== 'string' || !/^[0-9a-f]{64}$/u.test(v.sha256)) return null;
+  if (typeof v.mime !== 'string' || v.mime === '' || typeof v.name !== 'string' || v.name === '') return null;
+  if (typeof v.bytes !== 'number' || !Number.isInteger(v.bytes) || v.bytes < 0) return null;
+  return { sha256: v.sha256, mime: v.mime, bytes: v.bytes, name: v.name };
+}
+
+/** A file as its draft: the value written out, which `fileOf` reads back. Empty for no file. */
+export const fileDraft = (file: FileValue | null): string => (file === null ? '' : JSON.stringify(file));
 
 /** A typed number, read as decimal digits and nothing else, so `0x10` is refused rather than written as 16. */
 const DECIMAL = /^-?\d+(\.\d+)?$/u;
@@ -171,6 +199,8 @@ const words = {
   unitUnknown: (units: string) => `This field counts in ${units}: write the number alone and choose its unit beside it.`,
   jsonShape: 'This does not read as structured data yet: check its brackets, quotes and commas.',
   dayShape: 'Write the day as the record does, like 3 Sep 2026.',
+  /* A FILE IS CHOSEN AND NEVER TYPED (OPS-20), so a draft that names none came from somewhere other than the picker. */
+  fileShape: 'This is not a file yet: choose one with Add a file.',
 } as const;
 
 /**
@@ -218,6 +248,8 @@ function durationDraft(f: FieldDecl, held: unknown): string {
 export function draftOf(f: FieldDecl, held: unknown, currency: string | null | undefined): string {
   if (held === null || held === undefined) return '';
   if (isJson(f)) return JSON.stringify(held, null, 2) ?? '';
+  /* A FILE IS ITS VALUE WRITTEN OUT, in one key order, so a draft `FileField` wrote and the held value compare as text. */
+  if (isFile(f)) return fileDraft(fileOf(JSON.stringify(held) ?? ''));
   /* A LIST IS TYPED AS ITS TAGS WITH COMMAS, and the tags the record keeps for itself are not in the box (`tags.ts`). */
   if (Array.isArray(held)) return listLine(held) ?? '';
   if (isQuantity(f)) {
@@ -274,6 +306,7 @@ export function wrongValue(f: FieldDecl, typed: string, held: unknown, currency:
     return known.length > 0 && !known.includes(unit) ? words.unitUnknown(known.join(' or ')) : null;
   }
   if (isJson(f)) return jsonOf(raw).ok ? null : words.jsonShape;
+  if (isFile(f)) return fileOf(raw) === null ? words.fileShape : null;
   return null;
 }
 
@@ -314,6 +347,11 @@ export function patchOf(f: FieldDecl, typed: string | boolean, held: unknown, cu
     if (raw === '') return { [f.id]: null };
     const read = jsonOf(raw);
     return { [f.id]: read.ok ? stored(read.value) : raw };
+  }
+  if (isFile(f)) {
+    if (raw === '') return { [f.id]: null };
+    const file = fileOf(raw);
+    return { [f.id]: file === null ? raw : stored(file) };
   }
   if (isQuantity(f)) {
     if (raw === '') return { [f.id]: null };

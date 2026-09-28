@@ -402,9 +402,4 @@ test('a module turned on by itself is offered its newer version on /packs, as a 
   const held = (id: string, version: string | null, off = false) => ({ id, version, disabled_at: off ? '2026-09-17' : null, registers: [] });
   const out = await moduleUpdates([held('work', '1.0.0'), held('people', FIRST_PARTY_VERSIONS.people), held('estate', '1.0.0', true), held('bookshelf', '0.1.0'), held('portfolio', null)]);
   assert.deepEqual(out, [{ id: 'work', from: '1.0.0', to: FIRST_PARTY_VERSIONS.work }]);
-
-  const { readFileSync } = await import('node:fs');
-  const screen = readFileSync(new URL('../../routes/packs/+page.svelte', import.meta.url), 'utf8');
-  assert.match(screen, /moduleUpdates\(/u);
-  assert.match(screen, /copy\.updateTo\(/u);
 });

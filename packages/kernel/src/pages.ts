@@ -35,6 +35,7 @@ import type { Entry } from './index.ts';
 import { predicateOf, windowMs, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
 import { runway, type Leg, type Only, type Runway } from './forecast.ts';
 import { figureLists } from './money-figures.ts';
+import { withAdds, type PageAddition } from './page-adds.ts';
 import { barsOf, type Bars, type SeriesLine } from './series.ts';
 import { isStale, SESSION_PREFIX, STALE_MS } from './session.ts';
 import { nextSteps, stepsPercent, tallySteps, type StepsDecl } from './steps.ts';
@@ -318,6 +319,12 @@ export type BlockResult = PageBlock & {
    * holds a value for, by the path as written. A path it holds nothing for is absent, and draws `—`.
    */
   values?: Record<string, Json>;
+  /**
+   * The pack that added this block to a page another pack declares (`page-adds.ts`), absent on the page's own blocks. A
+   * host says where the block came from with it, and leaves it out of an arrangement it saves, because the page's own
+   * declaration never holds it.
+   */
+  added?: string;
   /** What this block could not do. Non-empty means the block drew nothing. */
   refusals: Refusal[];
 };
@@ -457,6 +464,11 @@ export type PageDeps = {
   lists?: () => readonly ListShape[];
   /** Every live metric declaration, which `figures.home` and a forecast's sell knob choose from by what each declares. */
   metrics?: () => readonly MetricDecl[];
+  /**
+   * The blocks installed packs add to the page whose declaration id is `page` (`additionsOf` in `page-adds.ts`), which
+   * `readPage` lays among the page's own. Absent, a page draws its own blocks and nothing else.
+   */
+  adds?: (page: string) => readonly PageAddition[];
   /**
    * What `readBlock` hands a registered kind beside the record's reads (`KindKit`). Filled by `readBlock` when it asks a
    * kind module, and by nothing else: a host leaves it out, and whatever a host put here is replaced.
@@ -842,10 +854,16 @@ export function readPage(deps: PageDeps, slug: string): Result<PageResult> {
       : {}),
     /* A HOST PANEL IS ABOUT THE PAGE'S ROW, so on a page about no row it draws nothing and says why. It is said here
        because the page is in hand here; the word itself was checked with the block (`kinds/words.ts` `panelFault`). */
-    blocks: found.decl.blocks.map((b) => {
+    /* AND WHAT OTHER PACKS ADD TO IT, laid among its own blocks as it is read and never written into its declaration
+       (`page-adds.ts`). A page made from a template fills each addition from its row, as `resolvePages` filled its own. */
+    blocks: withAdds(
+      found.decl.blocks,
+      (deps.adds?.(`page.${found.decl.page}`) ?? []).map((a) => (found.row ? { ...a, block: fill(a.block, found.row) as PageBlock } : a)),
+    ).map(({ block: b, added }) => {
       const read = readBlock(deps, b);
       const astray = found.decl.for || panelFault(b.panel, null) ? null : panelFault(b.panel, false);
-      return astray ? { ...read, rows: [], matched: 0, refusals: [...read.refusals, astray] } : read;
+      const drawn = astray ? { ...read, rows: [], matched: 0, refusals: [...read.refusals, astray] } : read;
+      return added === undefined ? drawn : { ...drawn, added };
     }),
   });
 }
@@ -970,18 +988,10 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
     if (value === undefined || key === 'of' || !kinds || kinds.includes(block.kind)) continue;
     unread.push({ code: 'DECLARATION_INVALID', fix: wrongKindKey(key, block.kind), at: key });
   }
-  /* A PACK'S OWN KIND DRAWS NOTHING IN THIS BUILD, so it reads nothing: it answered its rows with no refusal, and a host
-     handed rows under a kind it has no drawer for draws a hole where the block should be. */
-  if (/^block\./u.test(block.kind))
-    return {
-      ...block,
-      rows: [],
-      matched: 0,
-      refusals: [
-        ...unread,
-        { code: 'NOT_IN_THIS_BUILD', fix: `${block.kind} is a block kind the documents publish and this build draws nowhere. The repair is a deploy, not an edit; until then use a kind this build draws.`, at: 'kind' },
-      ],
-    };
+  /* PLT-8: A PACK'S OWN KIND (`block.<id>`) IS INSTALLED LIKE ANY OTHER (`declare.ts` `pageBody`), so it is read like
+     any other: it falls through the arms below exactly as an unregistered built-in kind would, and a `source:` naming
+     a register draws through the same grid primitive a `table` does. The early refusal this file answered before
+     PLT-8 landed left an installed block drawing a hole on the page; nothing here still says a deploy is owed. */
   /* `of:` IS READ BY ONE KIND OVER ONE KIND OF SOURCE, and anywhere else it would be a sentence the block drew
      without, which is the misspelt key above by another route. */
   if (block.of !== undefined && !(block.kind === 'ring' && typeof block.source === 'string' && block.source.startsWith('register.')))

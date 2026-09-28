@@ -60,6 +60,12 @@
   import { keptColumns, viewReader, type ViewReader, type Viewed } from '$lib/record/views-live.ts';
   import { closed, drew, opened } from '../../../lib/ui/screen.svelte.ts';
   import { deadlineOf, withoutGood } from '../../r/[register]/parts/list.ts';
+  import type { Predicate } from '@braindog/where';
+  import { chipsOf } from '$lib/record/api.ts';
+  import Sheet from '$lib/ui/Sheet.svelte';
+  import QueryBuilder from '$lib/query/QueryBuilder.svelte';
+  import { ADDRESS_OPS, fromChips, fromWhere, offered, toChips, toWhere, type Counted } from '$lib/query/tree.ts';
+  import { describeWith, slashAnswers } from '$lib/query/slash.ts';
 
   /**
    * A register's named predicate, never a free-form slug.
@@ -93,12 +99,10 @@
    * The way back is the view's own address, which the state and the note both offer.
    */
   const q = $derived(page.url.searchParams.get('q') ?? '');
-  const extra = $derived.by((): Filter[] =>
-    page.url.searchParams.getAll('f').map((raw) => {
-      const [field = '', op = 'is', values = ''] = raw.split(':');
-      return { field, op, values: values.split(',') };
-    }),
-  );
+  /* THE LIST'S OWN CHIP READER (`chipsOf`), which cuts at the first two colons and keeps the rest as the value. This
+     route split on every colon, so `handles:has:git:jokonkwo` narrowed the view by `git`, and the builder below writes
+     the chips back the way `chipsOf` reads them. */
+  const extra = $derived.by((): Filter[] => chipsOf(page.url.searchParams));
   const narrowed = $derived(Boolean(q) || extra.length > 0);
 
   /**
@@ -203,6 +207,57 @@
 
   let focus = $state({ row: 0, col: 1 });
   let binding = $state(false);
+
+  /* ── narrowing the view with the query builder (GAP-2) ─────────────────── */
+
+  /**
+   * THE BUILDER EDITS THE NARROWING, NEVER THE VIEW'S OWN PREDICATE. `19 §1` makes the saved view the predicate and the
+   * address a narrower question about it, ANDed on (`extra` above); saving a different predicate is the list's Save as
+   * a view. So the builder is handed the address's chips, at depth 1 and with the operators a chip spells, and writes
+   * them back to the address when its sheet closes, as the list's does.
+   */
+  let narrowing = $state(false);
+  const fields = $derived(offered(decl?.fields ?? []));
+  const drawn = $derived(fromChips(extra, fields));
+  const narrowingValue = $derived(register ? toWhere(drawn.root, register, fields) : undefined);
+  let draft = $state<{ at: string; where: Predicate | undefined } | null>(null);
+
+  /** A tree as the address's chips, with the chips the rows cannot draw kept as they were. */
+  function chipsFor(where: Predicate | undefined): Filter[] | null {
+    const rows = fromWhere(where, fields);
+    const chips = rows ? toChips(rows, fields) : null;
+    return chips ? [...chips, ...drawn.kept] : null;
+  }
+
+  function applyNarrowing() {
+    const held = draft;
+    draft = null;
+    if (!held || held.at !== page.url.search) return;
+    const chips = chipsFor(held.where);
+    if (!chips) return;
+    const next = new URLSearchParams(page.url.searchParams);
+    next.delete('f');
+    for (const c of chips) next.append('f', `${c.field}:${c.op}:${c.values.join(',')}`);
+    void goto(`?${next}`, { noScroll: true, keepFocus: true });
+  }
+
+  let wasNarrowing = false;
+  $effect(() => {
+    const now = narrowing;
+    if (wasNarrowing && !now) untrack(applyNarrowing);
+    wasNarrowing = now;
+  });
+
+  /** "Matches n of N": the record's own answer for this view with the builder's narrowing ANDed on. */
+  async function countNarrowed(where: Predicate | undefined): Promise<Counted | null> {
+    const chips = chipsFor(where);
+    if (!chips) return null;
+    reader ??= viewReader(apiBase());
+    const out = await reader.read(key, chips, q);
+    return out.from === 'live' ? { n: out.matched, of: out.total } : null;
+  }
+
+  const describeNarrowing = $derived(slashAnswers(page.data) && name ? describeWith(apiBase(), name) : undefined);
 
   /* `⌥B`, which 50 §5.2 step 9 has specified all along and nothing bound. */
   function onkeydown(e: KeyboardEvent) {
@@ -324,7 +379,15 @@
          an empty `.predicate-said` after it in a flex row, so the whole line was the label. The
          sample could not reach it because every view in `VIEWS` ships at least one clause. The
          length is what is asked, not the array, and `extra` counts too so a `?f=` clause over an
-         unfiltered view is still written out. -->
+         unfiltered view is still written out.
+
+         THE LINE ALSO CARRIES "Narrow this view" (GAP-2) wherever the list has fields to narrow by,
+         and over an unfiltered view it is that control alone: a control, never an empty label. -->
+    {#snippet narrow()}
+      {#if fields.length}
+        <Button weight="bare" aria-haspopup="dialog" onclick={() => (narrowing = true)}><Icon name="filter" size="s" />{copy.queryNarrowView}</Button>
+      {/if}
+    {/snippet}
     {#if filters?.length || narrowed || live?.search}
       <!-- THE SENTENCE STANDS ON ITS OWN, with no "Filter" in front of it: under the view's name it
            can only be what the view shows. -->
@@ -334,10 +397,31 @@
              nothing reading it back. It is quoted as typed, like `q`, because it is text somebody typed. -->
         {#if live?.search}<span class="predicate-q">{copy.matching} <code>{live.search}</code></span>{/if}
         {#if q}<span class="predicate-q">{copy.matching} <code>{q}</code></span>{/if}
+        {@render narrow()}
         {#if narrowed}
           <Button weight="bare" href="/v/{key}"><Icon name="close" size="s" />{copy.backToView}</Button>
         {/if}
       </p>
+    {:else if fields.length}
+      <p class="predicate">{@render narrow()}</p>
+    {/if}
+
+    <!-- THE BUILDER OVER THE VIEW'S NARROWING, in the same sheet the list's filter opens in, with the count and Done
+         pinned at its foot. The rows reach the address when the sheet closes. -->
+    {#if fields.length && register}
+      <Sheet bind:open={narrowing} title={copy.queryNarrowView}>
+        <QueryBuilder
+          value={narrowingValue}
+          {fields}
+          {register}
+          depth={1}
+          ops={ADDRESS_OPS}
+          count={countNarrowed}
+          describe={describeNarrowing}
+          onchange={(where) => (draft = { at: page.url.search, where })}
+          ondone={() => (narrowing = false)}
+        />
+      </Sheet>
     {/if}
 
     <!--

@@ -129,6 +129,8 @@ export type Boot = {
   pen?: Answer<'boot'>['pen'];
   /** What changed since the caller last read, as `whatsNew` answers. */
   whatsNew?: WhatsNew;
+  /** The record's installed look, as the record's Boot.theme: each scheme's custom properties without the `--`; null for the house look; absent from an older host. */
+  theme?: { light: Record<string, string>; dark: Record<string, string> } | null;
 };
 
 /** One line of the log, as `whatsNew` and `recentHistory` send it. See `EventLine` in `@braindog/record`. */
@@ -317,6 +319,8 @@ export type ActionRow = {
   channel: 'pull' | 'call' | 'poll';
   /** The project it runs for, or `null` for every project. */
   project: string | null;
+  /** The row `project` names, found in the record: its id, its spoken id and its title, or `null` for every project. */
+  project_row?: { id: string; spoken: string; title: string | null } | null;
   host: string | null;
   every: string;
   key: string | null;
@@ -490,6 +494,8 @@ export type TokenRow = {
   revoked_at: string | null;
   /** Present when the operator's cut-off (TOKENS_VALID_FROM) ended it, so the list can say why it stopped. */
   ended_by?: 'operator';
+  /** Whose it is, by name or address, on `listTokens`'s rows only: a colleague may hold keys of their own. */
+  person_name?: string | null;
 };
 
 /** `invitations`: one invitation still waiting to be used. Never its link. */
@@ -501,6 +507,8 @@ export type Invitation = {
   invited_by: string;
   created_at: string;
   expires_at: string;
+  /** Whether its link has run out. */
+  expired: boolean;
 };
 
 /** `invite` by address: the invitation, and the only copy of its link's token. Show the link once, and keep it nowhere. */
@@ -814,6 +822,20 @@ export function createClient(options: ClientOptions) {
    * a browser sends no `Origin` on a same-origin GET, and the door's origin rule for both is written for exactly
    * that request. A POST here would be answered 405.
    */
+  /**
+   * An account door (`/account/email`, `/account/email/confirm`; GAP-7): the person's and not a record's, so at the
+   * origin's root whatever record `base` names, with the browser's cookie and never a bearer, as `hostDoor`'s rule.
+   */
+  async function accountDoor<T>(path: 'email' | 'email/confirm', args: Record<string, unknown>): Promise<Result<T>> {
+    return hostAnswer<T>(() =>
+      doFetch(new URL(`/account/${path}`, base).toString(), {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(args),
+      }),
+    );
+  }
+
   async function hostGet<T>(path: 'slash/status' | `slash/asks?limit=${number}`): Promise<Result<T>> {
     return hostAnswer<T>(() => doFetch(`${base}/api/${path}`, { method: 'GET' }));
   }
@@ -841,7 +863,7 @@ export function createClient(options: ClientOptions) {
        passphrase each carries `passphrase` too, and without it the answer is `REQUIRED_MISSING` at `passphrase`; a
        wrong one is `WRONG_KEY`, and past the kernel's `PASSPHRASE_TRIES` the answer is `RATE_LIMITED` with `retry_after`. */
     /** Put a key in, or replace the value of one named by `credential`. The host seals it; the record never sees it. */
-    putKey: (args: { label: string; value: string; opens?: string; kind?: string; project?: string; credential?: string; passphrase?: string }) =>
+    putKey: (args: { label: string; value: string; opens?: string; kind?: string; project?: string; credential?: string; passphrase?: string; sealed_under?: 'record' | 'connector' }) =>
       hostDoor<KeyPut>('keys/put', args as unknown as Record<string, unknown>),
     /** Read one key back, once, by its label or by its spoken id. */
     openKey: (args: { label?: string; credential?: string; passphrase?: string }) =>
@@ -976,7 +998,12 @@ export function createClient(options: ClientOptions) {
     /** What installing a shared use case would do, pack by pack, with the documents to install. A POST, as a file is long. */
     planUseCase: (args: { doc?: unknown; text?: string; source?: { kind: string; ref?: string }; modules?: Record<string, unknown> }) =>
       call<unknown>('planUseCase', args as Record<string, unknown>),
-    /** The text of a shared use-case file at an https address, read by the host, for `planUseCase` to read like a file. */
+    /**
+     * The text of a shared use case or add-on at an https address or `git:owner/repo@ref:path`, read by the host, for the
+     * plan to read like a chosen file. Answers `{ url, text, bytes }`.
+     */
+    fetchShared: (args: { url: string }) => call<unknown>('fetchShared', args as Record<string, unknown>),
+    /** `fetchShared` under its old name, kept for one release. */
     fetchUseCase: (args: { url: string }) => call<unknown>('fetchUseCase', args as Record<string, unknown>),
     /** This BrainDog's arrangement as a use-case file, with only the example rows named by list and number. */
     exportUseCase: (
@@ -1032,6 +1059,16 @@ export function createClient(options: ClientOptions) {
     createToken: (args: { scope: TokenRow['scope']; label?: string; days?: number; reach?: TokenReach[] }) =>
       call<MintedToken>('createToken', args as Record<string, unknown>),
     revokeToken: (args: { id: string }) => call<TokenRow>('revokeToken', args as Record<string, unknown>),
+    /* A MEMBER'S OWN AGENT (`docs/20-COLLABORATION.md` §2, tier 0). DATA, so any person on the record, signed in as
+       themselves; minting needs a sign-in in the last fifteen minutes. A token writes as its person and never does more
+       than they can, so `scope` is a ceiling (`write` unless said). */
+    /** Make a key for your own agent. The bearer is in the answer once: show it, and keep it nowhere. */
+    createOwnToken: (args: { name?: string; scope?: TokenRow['scope']; days?: number } = {}) =>
+      call<MintedToken>('createOwnToken', args as Record<string, unknown>),
+    /** Your own keys, newest first, revoked ones included. Never a bearer. */
+    ownTokens: () => call<TokenRow[]>('ownTokens'),
+    /** Revoke one of your own keys. The second call says the same as the first. */
+    revokeOwnToken: (args: { id: string }) => call<TokenRow>('revokeOwnToken', args as Record<string, unknown>),
     /** A token that sends rows to one list and reaches nothing else. Revoked with `revokeToken`. */
     createReportKey: (args: { register: string; fixed?: Record<string, unknown>; stamp?: string; name?: string; days?: number }) =>
       call<MintedReportKey>('createReportKey', args as Record<string, unknown>),
@@ -1168,6 +1205,17 @@ export function createClient(options: ClientOptions) {
     /** Resolve a comment with the reason. Its author may, and so may somebody who may change what it is on. */
     resolveComment: (args: { id: string; as: 'addressed' | 'wont-fix' | 'incorrect'; why: string }) =>
       call<Answer<'resolveComment'>>('resolveComment', args as Record<string, unknown>),
+
+    /* THE RECORD'S QUIET HOURS (`docs/09` §5 rule 3): READ+ to read, ADMIN to change, since the window holds the summary
+       back for everybody. `quiet: null` puts 22:00 to 08:00 back. */
+    quietHours: () => call<Answer<'quietHours'>>('quietHours'),
+    setQuietHours: (quiet: { from: string; to: string } | 'off' | null) => call<Answer<'setQuietHours'>>('setQuietHours', { quiet }),
+
+    /* A PERSON'S OWN NAME AND SIGN-IN ADDRESS (GAP-7). The name is a record method, DATA, a person only; the address is
+       the account's: a link mailed to the new one, then pressed from a sign-in in the last fifteen minutes. */
+    renamePerson: (name: string) => call<Answer<'renamePerson'>>('renamePerson', { name }),
+    changeEmail: (email: string) => accountDoor<Record<string, never>>('email', { email }),
+    confirmEmail: (token: string) => accountDoor<{ email: string; unreached: number }>('email/confirm', { token }),
 
     /* SHARED LINKS TO ONE PAGE. The first three are ADMIN, so a browser session at owner; their answers are
        `@braindog/host`'s, because the host signs the link into `openShare`'s and the record never holds the key. */

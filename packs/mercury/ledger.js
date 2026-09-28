@@ -35,6 +35,11 @@
  * day and amount, so a person can void the spare. The log says how many were taken. A void row is not the same money,
  * because voiding took it out of the figures, so it is never taken.
  *
+ * EVERY ROW IN ONE BOOK, WHEN THE PACK IS TOLD WHICH. The `book` setting (1.3.0) files each transaction this script
+ * writes, and each Mercury account the balances pull wrote, in that book of money-core's. The book is the one thing
+ * past the bank's facts this script adds to a row it already holds, and only to a row in no book yet, because a person
+ * may have moved a row on purpose. Left at 0 the setting files nothing.
+ *
  * A KEY MERCURY REFUSES STOPS THE RUN WITH A SENTENCE, and the record pauses a script after three refused runs.
  */
 
@@ -59,6 +64,15 @@ const WRITES = 1000;
    the run whole, so an account past it is said and not asked about. */
 const FETCHES = 12;
 const STATES = { pending: 'pending', sent: 'cleared', cancelled: 'void', failed: 'void' };
+/* THE BOOK THIS PACK FILES ITS ROWS IN, SINCE 1.3.0: the `book` setting, the number of a row of money-core's `books`
+   (books#2), so the company's Mercury money sits on the company's book page and not in the household's. The setting is
+   written into this line when the pack is planned and installed, which is how a script is handed a setting in this
+   build. It is a number and never text because it lands inside the script itself, and a number cannot close the
+   quotes it sits in. Read before the fill, as a test reads this file, it is not a number, and nothing is filed. */
+const BOOK = Number('{{config:book}}');
+const IN_BOOK = Number.isInteger(BOOK) && BOOK > 0 ? { book: `books#${BOOK}` } : {};
+/** The book to add to a row the record already holds: the setting's, when the row is in no book yet, and else none. */
+const bookFor = (row) => (row.fields.book === undefined || row.fields.book === null ? IN_BOOK : {});
 
 async function ask(ctx, path) {
   const r = await ctx.fetch(API + path, { key: KEY });
@@ -134,8 +148,18 @@ export default async function run(ctx) {
   const { accounts = [] } = await ask(ctx, '/api/v1/accounts');
   const names = [...new Set(accounts.map((a) => String(a.name)))];
   const rows = new Map();
+  let writes = 0;
   for (const chunk of chunks(names))
-    for (const r of await ctx.record.list('accounts', { field: 'name', in: chunk })) rows.set(String(r.fields.name), r.id);
+    for (const r of await ctx.record.list('accounts', { field: 'name', in: chunk })) {
+      rows.set(String(r.fields.name), r.id);
+      /* THE BALANCES PULL WRITES THE ACCOUNT AND CANNOT FILE IT, because a pull's map has no way to leave a field out
+         when the setting names no book. So the account is filed here, once, the first hour it is in no book. */
+      const file = bookFor(r);
+      if (Object.keys(file).length > 0) {
+        ctx.update(`accounts#${r.seq}`, file, r.version);
+        writes += 1;
+      }
+    }
 
   const start = new Date(Date.parse(ctx.now()) - DAYS * DAY_MS).toISOString().slice(0, 10);
   const seen = [];
@@ -184,7 +208,6 @@ export default async function run(ctx) {
   for (const chunk of chunks(wanted))
     for (const c of await ctx.record.list('categories', { all: [{ field: 'name', in: chunk }, { field: 'state', is: 'live' }] })) categories.set(String(c.fields.name), c);
 
-  let writes = 0;
   let deleted = 0;
   let taken = 0;
   /* A ROW TAKEN THIS RUN IS NOT TAKEN AGAIN: the update is queued, so the ledger still answers it as a row with no
@@ -209,7 +232,7 @@ export default async function run(ctx) {
       if (twins.length === 1) {
         const twin = twins[0];
         claimed.add(twin.id);
-        ctx.update(`transactions#${twin.seq}`, { ...patchOf(twin, fields), mercury_id: fields.mercury_id }, twin.version);
+        ctx.update(`transactions#${twin.seq}`, { ...patchOf(twin, fields), mercury_id: fields.mercury_id, ...bookFor(twin) }, twin.version);
         writes += 1;
         taken += 1;
         continue;
@@ -220,11 +243,11 @@ export default async function run(ctx) {
         );
       const c = category === null ? undefined : categories.get(category);
       const fits = c !== undefined && (c.fields.direction === 'both' || c.fields.direction === fields.direction);
-      ctx.write('transactions', fits ? { ...fields, category: c.id } : fields);
+      ctx.write('transactions', { ...fields, ...(fits ? { category: c.id } : {}), ...IN_BOOK });
       writes += 1;
       continue;
     }
-    const patch = patchOf(row, fields);
+    const patch = { ...patchOf(row, fields), ...bookFor(row) };
     if (Object.keys(patch).length === 0) continue;
     ctx.update(`transactions#${row.seq}`, patch, row.version);
     writes += 1;

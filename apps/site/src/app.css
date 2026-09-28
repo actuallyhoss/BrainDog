@@ -26,11 +26,24 @@
 
   body {
     background: var(--bg);
+    font-size: var(--t-site-body);
   }
 
   /* The one width every page's content and the bar share, so their edges line up. */
   :root {
     --site-max: 1200px;
+
+    /**
+     * THE TYPE SCALE, one size per role, from 390 to 1440 (`loop/finish/site.md` C10). Each grows in a
+     * straight line between the two widths, so the gap between a sub-heading and a section heading is
+     * filled at every width in between. The slope is (large - small) / 1050px, anchored at 390px.
+     */
+    --t-site-display: clamp(40px, 28.11px + 3.048vw, 72px);
+    --t-site-h2: clamp(30px, 24.8px + 1.333vw, 44px);
+    --t-site-h3: clamp(20px, 18.51px + 0.381vw, 24px);
+    --t-site-lead: clamp(18px, 17.26px + 0.19vw, 20px);
+    --t-site-body: clamp(16px, 15.63px + 0.095vw, 17px);
+    --t-site-small: 14px;
 
     /**
      * THE GROUNDS, AND THE PAGE HAD ONE.
@@ -98,14 +111,32 @@
   }
 
   /**
+   * THE DARK SCHEME'S FLIP IS `--s1` AND THE PAGE'S OWN INKS, never the reversed pair. Reversed, a
+   * flipped band in the dark scheme is a near-white field, the brightest thing on the screen by far.
+   * Here it is one step up from the ground, which still marks where one idea stops. The inks keep
+   * their certified pairs on `--s1`, and the focus ring keeps the ink, as it does on the light flip.
+   */
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --flip-bg: var(--s1);
+      --flip-ink: var(--ink);
+      --flip-ink2: var(--ink2);
+      --flip-dim: var(--dim);
+      --flip-line: var(--line);
+      --flip-s1: var(--s2);
+      --flip-sunk: var(--bg);
+      --flip-edge: var(--edge);
+    }
+  }
+
+  /**
    * A BAND'S GROUND, in three values, and one of them is "the page".
    *
    * `page` is written rather than assumed so a section that changes its mind is one attribute
    * value, and so the list of grounds this site has is readable in one place.
    *
-   * THERE WAS A FOURTH, `brand`, the accent as a whole field under the home page's closing band. The
-   * owner asked on 22 September for that band to be much less red, it went back to the page ground
-   * with the accent in its heading, and a ground nothing uses was deleted with it.
+   * `flip` is the ink field in the light scheme only. In the dark scheme it is `--s1`, a raised panel,
+   * because the ink reversed there is a near-white slab across the screen (see the dark block below).
    */
   [data-ground] {
     background: var(--bg);
@@ -180,11 +211,8 @@
   }
 
   /**
-   * THE BAND OPENER: a word, and a rule that runs from it to the far edge of the column.
-   *
-   * It carried a sequence number in the accent, `0001` upwards, until 22 September, when the owner
-   * asked for the numbering to go. The rule is what earns the opener its place: 1px of ink across
-   * the whole column, on a page where the median row of ink once stopped at x=389 of 1440.
+   * THE BAND OPENER: a word, and a rule that runs from it to the far edge of the column. The rule is
+   * what earns the opener its place: 1px of ink across the whole column. No number, no capitals.
    */
   .band-mark {
     display: flex;
@@ -201,10 +229,11 @@
     background: var(--line);
   }
 
+  /* Sentence case in the text face, like every other label on the site (C10). */
   .band-tag {
     color: var(--dim);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
+    font-family: var(--font-ui);
+    font-size: var(--t-site-small);
   }
 
   /**
@@ -352,7 +381,7 @@
   }
 }
 
-/* ── The sections every page is made of (26 September, `loop/DIRECTION.md` §33) ──────────────────
+/* ── The sections every page is made of (`loop/DIRECTION.md` §33) ──────────────────
    One heading shape, one lead, one frame for a drawing, so the home page, /slash, /pricing and
    /agents read as one site. A section heading is one plain sentence in one colour, smaller than the
    hero's, so the drawings under it do the talking. The accent stays in the hero and on the Slash key. */
@@ -380,11 +409,23 @@
   .h2 {
     margin: 0;
     color: var(--ink);
-    font-family: var(--font-display);
-    font-size: clamp(1.75rem, 1rem + 2.2vw, 2.75rem);
+    font-family: var(--font-ui);
+    font-size: var(--t-site-h2);
     font-weight: 600;
     line-height: 1.1;
     letter-spacing: -0.03em;
+    text-wrap: balance;
+  }
+
+  /* The hero's heading, the largest role of the scale. A page may still size its own. */
+  .display {
+    margin: 0;
+    color: var(--ink);
+    font-family: var(--font-ui);
+    font-size: var(--t-site-display);
+    font-weight: 600;
+    line-height: 1.04;
+    letter-spacing: -0.035em;
     text-wrap: balance;
   }
 
@@ -396,8 +437,8 @@
     margin: 0;
     max-inline-size: 58ch;
     color: var(--ink2);
-    font-size: clamp(1rem, 0.95rem + 0.25vw, 1.125rem);
-    line-height: 1.6;
+    font-size: var(--t-site-lead);
+    line-height: 1.55;
     text-wrap: pretty;
   }
 

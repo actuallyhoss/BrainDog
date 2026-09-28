@@ -105,8 +105,11 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
     /* `prerendered` IS A FACT ABOUT THIS ROOT AND NOT A WAIVER. The site makes no call, so it has
        nothing to settle and no `data-screen` to carry, and holding it to the readiness contract would
        be six ten-second timeouts on three pages that were finished when the document loaded. Every
-       other root here is the record app with a different record inside it. */
-    { name: 'site', root: join(root, 'apps', 'site', 'build'), routes: ['/', '/pricing', '/changelog'], prerendered: true },
+       other root here is the record app with a different record inside it.
+
+       ITS ROUTES COME FROM ITS TREE, as `a11y` reads them, because the three typed here left every page
+       added since unswept: a new page is measured the day its folder lands. */
+    { name: 'site', root: join(root, 'apps', 'site', 'build'), routes: (await routesOf(join(root, 'apps', 'site'))).routes, prerendered: true },
     /* `record` NAMES WHICH OF `record.mjs`'s VARIANTS THE PORT FORWARDS TO for the length of the pass, over the one
        build. Why each exists, and why `connected` took `quiet`'s place, is written beside `VARIANTS` there. */
     ...RECORDS.map((v) => ({ name: v.name, root: ROOT, routes: v.routes, record: v.name })),

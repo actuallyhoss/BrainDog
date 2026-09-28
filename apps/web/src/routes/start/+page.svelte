@@ -5,9 +5,14 @@
   the product is for (§11). The sentence is read without a model (`lib/start/propose.ts`), in any language: one these
   rules cannot read is kept as the person's note, never refused.
 
-  THEN A PREVIEW, AND NOTHING WRITTEN. What was heard and what each phrase became; the BrainDog it makes, its pages and its
-  Home drawn with examples that are marked and never saved; a switch for each thing it keeps; the currency, asked only
-  when Money is kept and none was typed; and "Remind me on this phone" where there are due dates to ring about.
+  THEN A PREVIEW, AND NOTHING WRITTEN. What was heard and what each phrase became; the BrainDog it makes, every page of it
+  drawn by the record with examples that are marked and never saved (`PagesPreview.svelte`); a switch for each thing it
+  keeps; the currency, asked only when Money is kept and none was typed; and "Remind me on this phone" where there are
+  due dates to ring about.
+
+  A BUSINESS NO USE CASE FITS IS DRAFTED FOR, where a model answers (`loop/finish/pages.md` PGS-20). Slash drafts lists,
+  figures and pages made for what was said (`slashDraft`), which files nothing; they are drawn over its sample rows, and
+  the same one press files and accepts them. The sample rows are never written.
 
   THEN ONE PRESS. "Make it mine" writes it all through the install path Browse uses (`accept.ts`) and lands on Home.
   There is no second screen and no one-row form: a list with nothing in it draws its own empty state, and a record with
@@ -21,6 +26,7 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { createClient } from '@braindog/client';
+  import { firstPartyModule, moduleOfList } from '@braindog/seed/packs/modules';
   import { USE_CASES } from '@braindog/seed/usecases';
   import { dayOf } from '@braindog/seed/usecases/install';
   import { moduleName } from '@braindog/seed/usecases/names';
@@ -30,10 +36,11 @@
   import { firstRun } from '$lib/first-run.ts';
   import * as pref from '$lib/pref.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
+  import { onNoRecord } from '$lib/record/boot-live.ts';
   import { landing } from '$lib/record/landing.ts';
-  import { MODULES } from '$lib/record/modules.ts';
-  import { INSTALL_ORDER, LEANS_ON, type PackId } from '$lib/shape.ts';
-  import { propose, type Proposal } from '$lib/start/propose.ts';
+  import { INSTALL_ORDER, LEANS_ON } from '$lib/shape.ts';
+  import { byRules, draftChange, type Drafted, type SlashClient } from '$lib/record/slash.ts';
+  import { outsideCatalogue, propose, type Proposal } from '$lib/start/propose.ts';
   import { titleOf } from '$lib/title.ts';
   import { drew } from '$lib/ui/screen.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
@@ -41,10 +48,12 @@
   import Mark from '$lib/ui/Mark.svelte';
   import { PEOPLE, withChip } from '$lib/who.ts';
   import { accept, type NotMade } from './accept.ts';
-  import { caseOf, keepsCurrency, pagesOf, reminds } from './preview.ts';
+  import { caseOf, changesAsked, draftAsked, keepsCurrency, pagesOf, reminds, words as drawing } from './preview.ts';
   import Currency from './Currency.svelte';
-  import HomePreview from './HomePreview.svelte';
+  import PagesPreview from './PagesPreview.svelte';
   import Remind from './Remind.svelte';
+  import NoRecord from './NoRecord.svelte';
+  import PasskeyFirst from './PasskeyFirst.svelte';
 
   /**
    * A COLLEAGUE WHO HOLDS LISTS AND NOT THE RECORD IS NEVER ASKED TO SET ONE UP. A record's shape is its owner's, and
@@ -52,6 +61,13 @@
    * came for (`landing.ts`).
    */
   const colleague = $derived(Boolean(page.data.live) && (page.data as unknown as Shell).me.lists != null);
+
+  /**
+   * SIGNED IN AND ON NO RECORD (OPS-17): a proved mailbox that has not paid yet, or a person whose only record closed.
+   * `/app` sends that session here, and the `boot` under it answered 403, so the screen asks for a name and a payment
+   * instead of drawing an empty record that says nothing is here.
+   */
+  const noRecord = $derived(!page.data.live && onNoRecord((page.data as unknown as Shell).refused));
   const notTheirs = $derived(colleague ? landing(page.data as unknown as Shell) : null);
 
   /**
@@ -111,13 +127,49 @@
     kept = [...p.modules];
     currency = p.currency;
     failed = null;
+    draft = null;
+    drafting = false;
+    drafts += 1;
+    if (model && outsideCatalogue(p)) void draftFor(sentence);
     void tick().then(() => heardHeading?.focus());
+  }
+
+  /* ── what Slash drafts for a business outside the catalogue ─────────────── */
+
+  /** Whether this host has a model behind Slash, the same fact the page sheet stands on (`ChangePage.svelte`). */
+  const model = $derived(page.data.slash === true);
+  /** What Slash drafted for the sentence, `null` when it drafted nothing or was not asked. */
+  let draft = $state.raw<Drafted | null>(null);
+  let drafting = $state(false);
+  /* EACH DRAFT IS NUMBERED, so an answer that arrives after the sentence changed is not drawn under the new words. */
+  let drafts = 0;
+
+  /**
+   * ASK SLASH FOR LISTS AND PAGES MADE FOR THIS BUSINESS (`slashDraft`), which drafts, repairs and draws them and files
+   * nothing. An answer from its own rules, which cannot read a sentence, or one with no draft that drew clean, leaves the
+   * proposal as the lexicon made it: its modules, or the use cases to choose from.
+   */
+  async function draftFor(said: string) {
+    const mine = drafts;
+    drafting = true;
+    try {
+      const out = await draftChange(createClient({ base: apiBase() }) as unknown as SlashClient, said);
+      if (mine !== drafts) return;
+      draft = out.ok && !byRules(out.drafted) ? (out.drafted.drafts[0] ?? null) : null;
+    } catch {
+      if (mine === drafts) draft = null;
+    } finally {
+      if (mine === drafts) drafting = false;
+    }
   }
 
   /* THE SENTENCE AGAIN, AS A FIELD. The preview goes with it, so nothing on screen describes words that changed. */
   function edit() {
     proposal = null;
     failed = null;
+    draft = null;
+    drafting = false;
+    drafts += 1;
     void tick().then(() => {
       field?.focus();
       field?.setSelectionRange(sentence.length, sentence.length);
@@ -135,12 +187,20 @@
    */
   function heldBy(id: string): string | null {
     for (const c of cases) if (c.modules.includes(id)) return c.title;
-    for (const m of kept) if (m !== id && (LEANS_ON[m as PackId] ?? []).includes(id as PackId)) return moduleName(m);
+    for (const m of kept) if (m !== id && (LEANS_ON[m] ?? []).includes(id)) return moduleName(m);
     return null;
   }
 
-  /** What is installed: every module kept, and every one something kept or chosen needs, in install order. */
-  const modules = $derived<string[]>(INSTALL_ORDER.filter((id) => kept.includes(id) || heldBy(id) !== null));
+  /**
+   * EVERY PACK THE PERSON CAN TURN ON HERE: the modules this build ships, in install order, then any other catalogue pack
+   * the sentence was heard asking for or a use case chosen stands on (shell.md USE-3), in the order they came.
+   */
+  const offered = $derived<string[]>([
+    ...new Set([...INSTALL_ORDER, ...(proposal?.modules ?? []), ...kept, ...cases.flatMap((c) => c.modules)]),
+  ]);
+
+  /** What is installed: every pack kept, and every one something kept or chosen needs, in install order. */
+  const modules = $derived<string[]>(offered.filter((id) => kept.includes(id) || heldBy(id) !== null));
 
   function flip(id: string) {
     if (heldBy(id) !== null) return;
@@ -152,9 +212,18 @@
   const asksCurrency = $derived(money !== null && proposal !== null && proposal.currency === null);
   const ring = $derived(proposal !== null && reminds(cases, modules));
   const pages = $derived(pagesOf(cases, modules));
+
+  /* THE DRAFT STANDS ONLY WHILE NO USE CASE IS CHOSEN: choosing one from the chips is choosing its pages instead. */
+  const using = $derived(chosen === null ? draft : null);
+  const today = dayOf(Date.now());
+  /**
+   * WHAT THE RECORD IS ASKED TO DRAW: the draft as Slash drew it, over its sample rows, beside the modules kept; or every
+   * page of the use cases and modules, over their examples. Every one is a rehearsal that keeps nothing.
+   */
+  const asks = $derived(using ? [draftAsked(using), ...changesAsked([], modules, today)] : changesAsked(cases, modules, today));
   const entries = $derived(
     (proposal?.rows ?? []).flatMap((r) => {
-      const m = MODULES.find((x) => x.registers.includes(r.register));
+      const m = moduleOfList(r.register);
       return m && modules.includes(m.id) ? [firstRun.mineIn(String(r.fields.what ?? r.fields.name ?? ''), m.name)] : [];
     }),
   );
@@ -164,7 +233,7 @@
   let busy = $state(false);
   /** What could not be made, `null` until a press has come back with something refused. */
   let failed = $state<NotMade[] | null>(null);
-  const nothing = $derived(u === null && modules.length === 0);
+  const nothing = $derived(u === null && modules.length === 0 && using === null);
   const ready = $derived(proposal !== null && !busy && !nothing && !(asksCurrency && currency === null));
 
   async function make() {
@@ -179,6 +248,7 @@
       currency: money === null ? null : currency,
       today: dayOf(Date.now()),
       nav: pref.read().nav ?? [],
+      drafted: using,
     };
     busy = true;
     failed = null;
@@ -197,6 +267,8 @@
       /* WHAT WENT IN STAYS IN, AND IS NOT ASKED FOR AGAIN: the proposal keeps only the entries not written, so pressing
          "Make it mine" after a refusal writes only the ones that were not made. */
       if (out.left.length < asked.proposal.rows.length && proposal === asked.proposal) proposal = { ...asked.proposal, rows: out.left };
+      /* A DRAFT ON DECIDE IS NOT FILED TWICE: kept, or waiting there, the next press leaves it where it is. */
+      if (out.filed && draft === asked.drafted) draft = null;
       failed = out.failed;
     } finally {
       busy = false;
@@ -216,7 +288,9 @@
       <span class="wordmark">{copy.product}</span>
     </header>
 
-    {#if colleague}
+    {#if noRecord}
+      <NoRecord title={copy.noRecordTitle} why={copy.noRecordWhy} />
+    {:else if colleague}
       <section class="again" aria-labelledby="again-h">
         <p class="again-h" id="again-h">{copy.startNotYours}</p>
         <p class="again-why">{copy.startNotYoursWhy}</p>
@@ -238,6 +312,9 @@
           </div>
         </section>
       {/if}
+
+      <!-- A NEW PERSON'S FIRST ASK IS A PASSKEY (OPS-17), and it draws nothing for anybody who has one. -->
+      <PasskeyFirst />
 
       <h1 class="question" id="who-h">{firstRun.whoQuestion}</h1>
 
@@ -294,6 +371,11 @@
           {#if u}
             <p class="mine-title">{u.title}</p>
             <p class="quiet">{u.summary}</p>
+          {:else if using}
+            <p class="mine-title">{drawing.drafted}</p>
+            <p class="quiet">{using.question}</p>
+          {:else if drafting}
+            <p class="quiet" role="status">{drawing.drafting}</p>
           {/if}
           <div class="chips" role="group" aria-label={firstRun.mineFor}>
             {#each USE_CASES as one (one.usecase)}
@@ -310,7 +392,8 @@
             </ul>
           {/if}
 
-          {#if u}<HomePreview {u} today={dayOf(Date.now())} />{/if}
+          <!-- EVERY PAGE IT MAKES, one card a page under the sentence, each opening as the record would draw it. -->
+          <PagesPreview asked={asks} />
 
           {#if entries.length > 0}
             <h3 class="sub-h">{firstRun.mineEntries}</h3>
@@ -321,9 +404,9 @@
 
           <h3 class="sub-h">{firstRun.mineKeeps}</h3>
           <ul class="keeps">
-            {#each INSTALL_ORDER as id (id)}
+            {#each offered as id (id)}
               {@const by = heldBy(id)}
-              {@const blurb = MODULES.find((m) => m.id === id)?.blurb ?? ''}
+              {@const blurb = firstPartyModule(id)?.blurb ?? ''}
               <li class="keep">
                 <span class="keep-main">
                   <span class="keep-name" id="keep-{id}">{moduleName(id)}</span>

@@ -7,6 +7,9 @@
   a command surface in a tab slot looks like another place to go (19 §3). A new place is a row in
   More and in the rail, never a fifth tab (design 6.6).
 
+  DECIDE AND INBOX ARE HERE ONCE THEY HAVE BEEN USED (`spine.ts`, PGS-18), as they are in the rail, and the tabs present
+  share the bar evenly.
+
   Safe-area insets are paid exactly once, on the fixed elements only. Paying twice is a real, easy bug.
 -->
 <script lang="ts">
@@ -15,13 +18,17 @@
   import { copy } from '../copy.ts';
   import { said } from '../voice.svelte.ts';
   import Icon from './Icon.svelte';
+  import { BAR_SPINE, type SpineKey } from '../spine.ts';
 
   let {
+    spine = ['home', 'decide', 'inbox'],
     open = 0,
     inbox = 0,
     more = false,
     onmore,
   }: {
+    /** The spine as `spineOf` reads it, so this bar and the rail never disagree about Decide and Inbox (PGS-18). */
+    spine?: readonly SpineKey[];
     open?: number;
     inbox?: number;
     /** Whether the More sheet is open, said on the tab that opens it. */
@@ -38,26 +45,33 @@
     const where = inside(page.url.pathname);
     return where === href || where.startsWith(`${href}/`);
   };
+  /* THE TABS PRESENT, MORE INCLUDED, which is how many columns the bar splits evenly: a young record's Home and More
+     are two halves, not two quarters with a gap where Decide and Inbox will be. */
+  const shown = $derived(spine.filter((k) => BAR_SPINE.has(k)));
 </script>
 
-<nav class="tabs" aria-label="Record">
+<nav class="tabs" aria-label="Record" style={`--tabs:${shown.length + 1}`}>
   <a class="tab tap" href={at('/')} aria-current={here('/') ? 'page' : undefined}>
     <Icon name="home" size="l" /><span>{said('home')}</span>
   </a>
-  <a class="tab tap" href={at('/decide')} aria-current={under('/decide') ? 'page' : undefined}>
-    <span class="badge-slot">
-      <Icon name="decide" size="l" />
-      {#if open}<span class="badge" data-intent="warn">{open}</span>{/if}
-    </span>
-    <span>{said('decide')}</span>
-  </a>
-  <a class="tab tap" href={at('/inbox')} aria-current={under('/inbox') ? 'page' : undefined}>
-    <span class="badge-slot">
-      <Icon name="inbox" size="l" />
-      {#if inbox}<span class="badge">{inbox}</span>{/if}
-    </span>
-    <span>{said('inbox')}</span>
-  </a>
+  {#if shown.includes('decide')}
+    <a class="tab tap" href={at('/decide')} aria-current={under('/decide') ? 'page' : undefined}>
+      <span class="badge-slot">
+        <Icon name="decide" size="l" />
+        {#if open}<span class="badge" data-intent="warn">{open}</span>{/if}
+      </span>
+      <span>{said('decide')}</span>
+    </a>
+  {/if}
+  {#if shown.includes('inbox')}
+    <a class="tab tap" href={at('/inbox')} aria-current={under('/inbox') ? 'page' : undefined}>
+      <span class="badge-slot">
+        <Icon name="inbox" size="l" />
+        {#if inbox}<span class="badge">{inbox}</span>{/if}
+      </span>
+      <span>{said('inbox')}</span>
+    </a>
+  {/if}
   <button type="button" class="tab tap" aria-haspopup="dialog" aria-expanded={more} onclick={onmore}>
     <Icon name="more" size="l" /><span>{copy.more}</span>
   </button>
@@ -70,7 +84,7 @@
     inset-inline: 0;
     z-index: var(--z-sheet);
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(var(--tabs, 4), 1fr);
     background: var(--sunk);
     border-block-start: 1px solid var(--line);
     padding-block-end: env(safe-area-inset-bottom);

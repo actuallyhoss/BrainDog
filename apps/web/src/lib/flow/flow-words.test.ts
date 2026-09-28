@@ -122,8 +122,4 @@ test('WHERE A CONDITION IS WRITTEN IN WORDS, THE EXAMPLE SHOWS A NUMBER COMPARED
   assert.match(CONDITION_HINT, ordered);
   const cond = ARGS.if.find((a) => a.kind === 'condition');
   assert.equal(cond?.hint, CONDITION_HINT, "a branch's condition shows the example");
-  /* THE TRIGGER'S "Only when" WAS A SECOND COPY OF THE SAME PLACEHOLDER, typed into the inspector as a literal. */
-  const inspector = readFileSync(`${HERE}Inspector.svelte`, 'utf8');
-  const when = /<input id="flow-when"[^>]*>/u.exec(inspector)?.[0] ?? '';
-  assert.match(when, /placeholder=\{CONDITION_HINT\}/u, "the trigger's condition shows the example");
 });

@@ -37,11 +37,24 @@ import { no, ok } from '@braindog/ports';
 export const VOICE_KEYS = ['home', 'decide', 'inbox', 'lists', 'right_now', 'needs_you', 'nothing_needs_you', 'since_away', 'nothing_new'] as const;
 export type VoiceKey = (typeof VOICE_KEYS)[number];
 
-/** Who a use case is for. Said on the proposal and used to group a catalogue. */
+/**
+ * The audiences a form suggests for who a use case is for. Said on the proposal and used to group a catalogue.
+ *
+ * SUGGESTIONS AND NOT A CLOSED LIST (shell.md USE-3). A shared use case is written by somebody we have not met, for
+ * people we did not think of: "a choir", "an allotment society". The starters use these five words, and `alongside` in the
+ * seed reads `individual` to know which use cases may sit beside each other, so an audience outside them is only ever
+ * said and grouped by, never refused.
+ */
 export const AUDIENCES = ['individual', 'founder', 'team', 'starter', 'other'] as const;
-export type Audience = (typeof AUDIENCES)[number];
+export type Audience = string;
 
-/** The first-party packs a use case may name as modules. The seed's test holds this to its own list. */
+/**
+ * The first-party packs this build ships, which own the lists in `MODULE_LISTS`. The seed's test holds this to its own list.
+ *
+ * NOT THE PACKS A USE CASE MAY NAME (shell.md USE-3). A use case may stand on any pack in the catalogue, a shared add-on
+ * as much as Money, so `modules` is checked for the shape of a pack id and nothing else, and a pack the host cannot find
+ * is refused at install by name, where the person can do something about it.
+ */
 export const MODULES = ['portfolio', 'people', 'money-core', 'estate', 'work', 'agents'] as const;
 export type ModuleId = (typeof MODULES)[number];
 
@@ -132,6 +145,10 @@ const VOICE_BYTES = 80;
 const NAV_ADDRESS = /^\/(p|r)\/[a-z0-9][a-z0-9_-]{0,63}$/;
 const NAV_CEILING = 64;
 const SIGNALS_CEILING = 64;
+/** A pack id, as `index.ts` reads one in a pack file, for a module a use case stands on. */
+const PACK_ID = /^[a-z][a-z0-9-]{1,63}$/;
+const AUDIENCE_BYTES = 40;
+const MODULES_CEILING = 32;
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const bytes = (s: string): number => new TextEncoder().encode(s).length;
@@ -278,8 +295,9 @@ export function normaliseUseCase(doc: unknown): Result<UseCase> {
   for (const key of ['title', 'summary', 'author', 'license', 'tone'] as const)
     if (!text(doc[key], key === 'summary' ? 280 : 80)) return malformed(`A use case says its ${key}, in a line of text.`, key);
 
-  if (typeof doc.audience !== 'string' || !(AUDIENCES as readonly string[]).includes(doc.audience))
-    return no('VALUE_MALFORMED', `${String(doc.audience)} is not an audience. A use case is for one of ${AUDIENCES.join(', ')}.`, { at: 'audience', allowed: [...AUDIENCES] });
+  /* FREE TEXT ON ONE LINE, with the five suggestions offered in the refusal so a writer sees what the starters say. */
+  if (!text(doc.audience, AUDIENCE_BYTES) || /[\r\n]/u.test(doc.audience))
+    return no('VALUE_MALFORMED', `Say who this is for in a few words on one line, such as ${AUDIENCES.join(', ')}.`, { at: 'audience', allowed: [...AUDIENCES] });
 
   const signals = doc.signals ?? [];
   if (!Array.isArray(signals) || signals.length > SIGNALS_CEILING || signals.some((s) => typeof s !== 'string' || !SIGNAL.test(s)))
@@ -287,8 +305,10 @@ export function normaliseUseCase(doc: unknown): Result<UseCase> {
   if (new Set(signals).size !== signals.length) return no('VALUE_MALFORMED', 'A signal is listed twice.', { at: 'signals' });
 
   const modules = doc.modules ?? [];
-  if (!Array.isArray(modules) || modules.some((m) => typeof m !== 'string' || !(MODULES as readonly string[]).includes(m)))
-    return no('VALUE_MALFORMED', `Modules are first-party packs: ${MODULES.join(', ')}.`, { at: 'modules', allowed: [...MODULES] });
+  if (!Array.isArray(modules) || modules.length > MODULES_CEILING || modules.some((m) => typeof m !== 'string' || !PACK_ID.test(m)))
+    return no('VALUE_MALFORMED', `Modules are the ids of up to ${MODULES_CEILING} packs in the catalogue, such as ${MODULES.join(', ')}.`, { at: 'modules', allowed: [...MODULES] });
+  if (new Set(modules).size !== modules.length) return no('VALUE_MALFORMED', 'A module is listed twice.', { at: 'modules' });
+  if (modules.includes(packIdOf(id))) return no('VALUE_MALFORMED', 'A use case does not stand on its own pack.', { at: 'modules' });
 
   const voice: Partial<Record<VoiceKey, string>> = {};
   if (doc.voice !== undefined) {

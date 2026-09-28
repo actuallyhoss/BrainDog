@@ -31,27 +31,62 @@
  * two or be refused. So each record hands the Directory its last forty days of runs again
  * (`replayUsage`), and a run already counted adds nothing, which makes a night that replays twice the
  * same as one that replays once.
+ *
+ * EACH RECORD, IN ORDER: ITS KEYS RE-WRAPPED, ITS COPY, ITS ERASURES CHECKED (`53 §5.1` step 3). The re-wrap comes
+ * before the copy so tonight's copy holds the keys under tonight's root key. The erasures are checked against the bucket
+ * itself, because a delete R2 took without complaint says nothing about what is left: a key still there is put back on
+ * the record's outbox and counted open. Then the billing ladder (`ladder.ts`), once, over the Directory's lapsed rows.
+ *
+ * EVERY LINE IS ONE JSON OBJECT THROUGH `op()` (`oplog.ts`, `53 §2.3`), because the morning's alerts are saved queries
+ * over fields: `op=walk backup=failed`, `op=walk.done stragglers>0`. A sentence could not be queried.
  */
 
 import type { Replayed } from '@braindog/host/actions';
 
 import { FINAL_KEPT_MS } from './destroy.ts';
+import type { Laddered } from './ladder.ts';
+import type { OpFields } from './oplog.ts';
+import type { RewrapOutcome } from './rewrap.ts';
 
 /**
- * What one night came to. `53 §5.1` step 4's `walk.done`, in the fields this build can fill.
+ * What one night came to. `53 §5.1` step 4's `walk.done`.
  *
- * `replay` IS THERE ONLY WHEN THE WALK WAS HANDED ONE: the runs the ledger counted new, the runs it would not take, and
- * the records whose replay failed outright.
+ * `replay` AND `ladder` ARE THERE ONLY WHEN THE WALK WAS HANDED ONE: the runs the ledger counted new, the runs it would
+ * not take, and the records whose replay failed outright; the lapsed rows, the letters, the deletions and the failures.
  */
 export type Walked = {
   records: number;
   backups: number;
   failed: number;
+  /** Records whose keys are still under an old root key, or whose re-wrap threw. */
+  stragglers: number;
+  /** `erase.r2` work still open: pending longer than a day, dead, or done with its object still in the bucket. */
+  eraseOpen: number;
   expired: number;
   expiryFailed: number;
   ms: number;
   replay?: { counted: number; lost: number; failed: number } | undefined;
+  ladder?: Laddered | undefined;
 };
+
+/** How far back a done erasure is checked against the bucket: `53 §5.8` step 4's thirty nights. */
+export const ERASE_CHECK_MS = 30 * 86_400_000;
+
+/** How long an erasure may wait before it counts as open. The queue drains in minutes; a day is a stuck row. */
+export const ERASE_LATE_MS = 86_400_000;
+
+/**
+ * The most `erase.r2` rows one record answers the walk in a night, and the most it puts back. An erasure queues one row
+ * per attachment of the subject, so a thousand is a record with a thousand erased files in a month; the rest are read
+ * the next night, oldest first.
+ */
+export const ERASE_ROWS_MOST = 1_000;
+
+/**
+ * One `erase.r2` row as the record answers it for the walk: its id, where it is on the ladder, when it was queued, and
+ * the erasure and object key its payload names.
+ */
+export type EraseRow = { id: string; state: string; created: string; erase: string; key: string };
 
 /** A page of record ids and the cursor to the next, absent at the end. The Directory's keyset shape, for both lists. */
 type Page = { ids: readonly string[]; cursor?: string | undefined };
@@ -61,10 +96,22 @@ export type Walk = {
   records: (cursor?: string) => Promise<Page>;
   /** One record's copy. Throwing is how it reports a failure, and the reason is the sentence. */
   snapshot: (record: string) => Promise<{ key: string; bytes: number; rows: number }>;
-  /** The walk's own lines. `console.log` in the Worker, collected in a test. */
-  say?: ((line: string) => void) | undefined;
-  /** The same, for the lines that are a problem. `console.error` in the Worker, so the tail shows them apart. */
-  moan?: ((line: string) => void) | undefined;
+  /**
+   * The walk's own lines, one object each: `op()` in the Worker, collected in a test. `error` is a line that is a
+   * problem, which Workers Logs files apart from the rest.
+   */
+  speak?: ((fields: OpFields, level: 'info' | 'error') => void) | undefined;
+  /**
+   * One record's keys moved under the current root key: `rewrapRecord` (`rewrap.ts`). ABSENT, NOTHING IS RE-WRAPPED AND
+   * THE CLOSING LINE SAYS NOTHING ABOUT STRAGGLERS, for the reason `expire` is optional.
+   */
+  rewrap?: ((record: string) => Promise<RewrapOutcome>) | undefined;
+  /** One record's erasures checked against the bucket, answering how many are open (`reconcileErase`). */
+  erase?: ((record: string) => Promise<number>) | undefined;
+  /** The billing ladder, once, after every copy (`ladder.ts`). */
+  ladder?: (() => Promise<Laddered>) | undefined;
+  /** The night's summary as one `log` note in the operator's own record (`OPS_RECORD`). Absent, no note is written. */
+  note?: ((text: string) => Promise<void>) | undefined;
   /**
    * The records closed before `cutoff` (epoch milliseconds), paged like `records`: the Directory's `closedBefore`.
    * ABSENT, NOTHING IS EXPIRED AND THE CLOSING LINE SAYS NOTHING ABOUT EXPIRY, which is the Worker until W55-7 wires it.
@@ -99,24 +146,116 @@ async function each(list: (cursor?: string) => Promise<Page>, visit: (id: string
   } while (cursor !== undefined);
 }
 
+const reason = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+
+/**
+ * How many of one record's erasures are open, putting back on its outbox every one whose object is still there.
+ *
+ * OPEN IS THREE THINGS (`53 §5.1` step 3d): a row still waiting a day after it was queued, a row the retry ladder gave
+ * up on (`dead`, which is a compliance alert and not only the owner's item), and a row marked `done` in the last thirty
+ * days whose object the bucket still holds. Only the third is put back: the first two are already on the outbox.
+ *
+ * A KEY ALREADY WAITING AGAIN IS NOT QUEUED A SECOND TIME. The done row stays in the thirty days whatever happens next,
+ * so without this every night would add one more row for the same object until a delete finally took.
+ */
+export async function reconcileErase(
+  rows: readonly EraseRow[],
+  held: (key: string) => Promise<boolean>,
+  again: (rows: { erase: string; key: string }[]) => Promise<void>,
+  now: number,
+): Promise<number> {
+  let open = 0;
+  const waiting = new Set(rows.filter((r) => r.state !== 'done').map((r) => r.key));
+  const back: { erase: string; key: string }[] = [];
+  for (const row of rows) {
+    const created = Date.parse(row.created);
+    if (row.state === 'dead') open++;
+    else if (row.state !== 'done') {
+      if (!(now - created < ERASE_LATE_MS)) open++;
+    } else if (now - created <= ERASE_CHECK_MS && !waiting.has(row.key) && (await held(row.key))) {
+      open++;
+      waiting.add(row.key);
+      back.push({ erase: row.erase, key: row.key });
+    }
+  }
+  if (back.length > 0) await again(back);
+  return open;
+}
+
 export async function nightlyWalk(o: Walk): Promise<Walked> {
   const began = o.now();
-  const out: Walked = { records: 0, backups: 0, failed: 0, expired: 0, expiryFailed: 0, ms: 0 };
+  const out: Walked = { records: 0, backups: 0, failed: 0, stragglers: 0, eraseOpen: 0, expired: 0, expiryFailed: 0, ms: 0 };
 
   await each(o.records, async (record) => {
     out.records++;
+    const from = o.now();
+    const line: OpFields = { op: 'walk', rec: record };
+    let bad = false;
+    /* A RE-WRAP THAT THROWS IS A STRAGGLER WITH A REASON, and the walk carries on to the copy. `53 §5.6` would stop the
+       walk here; this file's rule is that one record never costs another its copy, and the closing line's
+       `stragglers` is the alert either way. */
+    if (o.rewrap) {
+      try {
+        const moved = await o.rewrap(record);
+        line.kek = moved;
+        if (moved === 'straggler') {
+          out.stragglers++;
+          bad = true;
+        }
+      } catch (e) {
+        out.stragglers++;
+        bad = true;
+        line.kek = 'failed';
+        line.rewrap_why = reason(e);
+      }
+    }
+    const copying = o.now();
     try {
       const kept = await o.snapshot(record);
       out.backups++;
-      o.say?.(`walk ${record} backup=${String(kept.rows)} rows ${String(kept.bytes)} bytes`);
+      line.backup = 'ok';
+      line.rows = kept.rows;
+      line.bytes = kept.bytes;
+      line.backup_ms = o.now() - copying;
     } catch (e) {
       out.failed++;
+      bad = true;
       /* THE RECORD AND THE REASON, AND NOTHING FROM THE FILE. The dump is somebody's whole
          business; an error line that quoted a byte of it would have published it to wherever
          logs go. `deliver.ts` makes the same decision for the same reason. */
-      o.moan?.(`walk ${record} backup=failed: ${e instanceof Error ? e.message : String(e)}`);
+      line.backup = 'failed';
+      line.why = reason(e);
     }
+    /* AN ERASURE CHECK THAT COULD NOT RUN COUNTS AS ONE OPEN. `erase_open = 0` is the morning's proof that every
+       erased object is gone, and a record that could not be asked has not proved it. */
+    if (o.erase) {
+      try {
+        const open = await o.erase(record);
+        out.eraseOpen += open;
+        line.erase_open = open;
+        if (open > 0) bad = true;
+      } catch (e) {
+        out.eraseOpen++;
+        bad = true;
+        line.erase_open = 1;
+        line.erase_why = reason(e);
+      }
+    }
+    line.ms = o.now() - from;
+    o.speak?.(line, bad ? 'error' : 'info');
   });
+
+  /* THE LADDER AFTER THE COPIES, so a record deleted tonight had its night's copy first, and ONCE, over the Directory's
+     lapsed rows rather than beside each record: the rows are few and the Directory answers them in one call. A ladder
+     that throws is a line and a failure, never the end of the walk. */
+  if (o.ladder) {
+    try {
+      out.ladder = await o.ladder();
+    } catch (e) {
+      out.ladder = { lapsed: 0, sent: 0, deleted: 0, failed: 1 };
+      o.speak?.({ op: 'walk', rec: null, billing: 'failed', why: reason(e) }, 'error');
+    }
+  }
 
   /* AFTER THE COPIES, SO A SLOW BUCKET SPENDS THE EXPIRY'S TIME AND NOT A RECORD'S COPY. A final
      copy kept a night longer than promised is a line to read in the morning; a record that got no
@@ -132,10 +271,10 @@ export async function nightlyWalk(o: Walk): Promise<Walked> {
         try {
           const gone = await expire(record);
           out.expired += gone;
-          o.say?.(`walk ${record} closed, expired=${String(gone)} objects`);
+          o.speak?.({ op: 'walk', rec: record, closed: true, expired: gone }, 'info');
         } catch (e) {
           out.expiryFailed++;
-          o.moan?.(`walk ${record} closed, expiry=failed: ${e instanceof Error ? e.message : String(e)}`);
+          o.speak?.({ op: 'walk', rec: record, closed: true, expiry: 'failed', why: reason(e) }, 'error');
         }
       },
     );
@@ -154,27 +293,68 @@ export async function nightlyWalk(o: Walk): Promise<Walked> {
         if (again === null) return;
         tally.counted += again.counted;
         tally.lost += again.lost;
-        if (again.lost > 0) o.moan?.(`walk ${record} replay lost=${String(again.lost)} of ${String(again.runs)} runs`);
-        if (again.reached === 'ceiling') o.moan?.(`walk ${record} replay stopped after ${String(again.walked)} events, before the forty days ended`);
+        if (again.lost > 0) o.speak?.({ op: 'walk', rec: record, replay_lost: again.lost, runs: again.runs }, 'error');
+        if (again.reached === 'ceiling') o.speak?.({ op: 'walk', rec: record, replay: 'ceiling', walked: again.walked }, 'error');
       } catch (e) {
         tally.failed++;
-        o.moan?.(`walk ${record} replay=failed: ${e instanceof Error ? e.message : String(e)}`);
+        o.speak?.({ op: 'walk', rec: record, replay: 'failed', why: reason(e) }, 'error');
       }
     });
   }
 
   out.ms = o.now() - began;
-  /* THE EXPIRY'S TWO FIELDS ONLY WHEN IT RAN. `expired_objects=0` from a walk that was never handed
-     the Directory's `closedBefore` would read, the morning after, as a night when nothing was due. The replay's fields
-     likewise. */
-  const expiry = expire ? ` expired_objects=${String(out.expired)} expiry_failed=${String(out.expiryFailed)}` : '';
-  const replayed = out.replay ? ` replayed_runs=${String(out.replay.counted)} replay_lost=${String(out.replay.lost)} replay_failed=${String(out.replay.failed)}` : '';
-  const done = `walk.done records=${String(out.records)} backups=${String(out.backups)} backups_failed=${String(out.failed)}${expiry}${replayed} ms=${String(out.ms)}`;
+  /* EACH STEP'S FIELDS ONLY WHEN IT RAN. `expired_objects: 0` from a walk that was never handed the Directory's
+     `closedBefore` would read, the morning after, as a night when nothing was due, and `stragglers: 0` from a walk that
+     re-wrapped nothing as a rotation that finished. */
+  const done: OpFields = { op: 'walk.done', records: out.records, backups: out.backups, backups_failed: out.failed };
+  if (o.rewrap) done.stragglers = out.stragglers;
+  if (o.erase) done.erase_open = out.eraseOpen;
+  if (out.ladder) {
+    done.lapsed = out.ladder.lapsed;
+    done.lapse_letters = out.ladder.sent;
+    done.lapse_deleted = out.ladder.deleted;
+    done.lapse_failed = out.ladder.failed;
+  }
+  if (expire) {
+    done.expired_objects = out.expired;
+    done.expiry_failed = out.expiryFailed;
+  }
+  if (out.replay) {
+    done.replayed_runs = out.replay.counted;
+    done.replay_lost = out.replay.lost;
+    done.replay_failed = out.replay.failed;
+  }
+  done.ms = out.ms;
+  const problem =
+    out.failed > 0 ||
+    out.stragglers > 0 ||
+    out.eraseOpen > 0 ||
+    out.expiryFailed > 0 ||
+    (out.ladder !== undefined && out.ladder.failed > 0) ||
+    (out.replay !== undefined && (out.replay.failed > 0 || out.replay.lost > 0));
   /* WRITTEN ON EVERY NIGHT, INCLUDING AN EMPTY ONE. A Directory with no records and a Directory
      that answered nothing look identical in a log made only of per-record lines. */
-  o.say?.(done);
-  if (out.failed > 0 || out.expiryFailed > 0 || (out.replay !== undefined && (out.replay.failed > 0 || out.replay.lost > 0))) o.moan?.(done);
+  o.speak?.(done, problem ? 'error' : 'info');
+
+  /* AND THE SAME NIGHT AS ONE NOTE IN THE OPERATOR'S OWN RECORD (`53 §5.1` step 4), which is where the morning check
+     starts. A note that could not be written is a line, and the night it describes still happened. */
+  if (o.note) {
+    try {
+      await o.note(summaryOf(out, began));
+    } catch (e) {
+      o.speak?.({ op: 'walk', rec: null, note: 'failed', why: reason(e) }, 'error');
+    }
+  }
   return out;
+}
+
+/**
+ * The night in one line for the operator's record: `walk 2026-09-28 · 12 records · 0 stragglers · 0 failed · 0 open`.
+ * `53 §5.1` step 4's words, dated by the walk's own clock.
+ */
+export function summaryOf(walked: Walked, began: number): string {
+  const date = new Date(began).toISOString().slice(0, 10);
+  return `walk ${date} · ${String(walked.records)} records · ${String(walked.stragglers)} stragglers · ${String(walked.failed)} failed · ${String(walked.eraseOpen)} open`;
 }
 
 /**

@@ -15,9 +15,10 @@
  * would live. `flow.svelte.ts` is the reactive half and holds nothing these functions do not.
  */
 
+import { notInThisBuild } from '@braindog/kernel';
 import { dropIndex, moveAt } from '../record/arrange.ts';
-import { everyMs, often } from '../record/actions.ts';
-import { DAYS, EVERY, calendarFault, calendarWords, clockWords, inMonths } from './calendar.ts';
+import { often } from '../record/actions.ts';
+import { DAYS, EVERY, calendarWords, clockWords, inMonths } from './calendar.ts';
 
 /* ── the definition, as §3 sketches it and `rules.ts` declares it ──────────── */
 
@@ -31,8 +32,13 @@ export type Trigger =
   | { arrival: { ingest?: string; channel?: 'webhook' | 'email' | 'paste' | 'api' | 'pull'; state?: string[]; unverified?: boolean } }
   /* `day` IS A WEEKDAY ON A WEEK AND 1 TO 31 OR `last` ON A CLOCK OF MONTHS, and `month` counts a clock of months from
      one (`calendar.ts`). */
-  | { every: string; at?: string; day?: string | number; month?: string }
+  /* `late` IS HOW LONG AFTER ITS TIME A TURN MAY STILL BE TAKEN (`2h`); a turn reached later is recorded as skipped with
+     its sentence and not taken (contracts, clock `late:`). Absent, every turn is taken however late. */
+  | { every: string; at?: string; day?: string | number; month?: string; late?: string }
   | { metric: { id: string; crosses: 'target' | { lte: number } | { gte: number } } }
+  /* `about` IS THE DECLARATION THAT PUT THE QUESTION (`rule.chase`), and `option` one answer's words exactly as the
+     question offers it, since a rule's `suggest` options are words whose ids are only their places (contracts X36). */
+  | { decided: { about?: string; option?: string } }
   | { manual: true };
 
 /** A clock trigger alone, which is what a pick of a clock builds. */
@@ -51,23 +57,14 @@ export const FLOW_VERBS = ['if', 'set_var', 'script', 'call', 'ask_slash', 'ask_
 export const VERBS = [...FLOW_VERBS, ...ACTIONS] as const;
 export type Verb = (typeof VERBS)[number];
 
-/** The kernel's ceilings (`flow-lint.ts`): fifty steps over both arms of every branch, and three levels of branch. */
-export const STEP_CEILING = 50;
+/**
+ * The kernel's depth ceiling (`flow-lint.ts`): three levels of branch. A move that would pass it is refused here, as the
+ * record would refuse the body; every other limit the record holds is said by `checkAutomation` (R2).
+ */
 export const DEPTH_CEILING = 3;
-/** Fifteen minutes, the shortest clock the record keeps (`pull.ts` `FLOOR_MS`). */
-export const FLOOR_MS = 15 * 60_000;
 
-/** Verbs that act on a row, refused on a trigger that brings none. `flow-lint.ts` `ROW_VERBS`. */
-const ROW_VERBS: readonly string[] = ['tag', 'untag', 'set', 'move', 'link', 'note', 'schedule', 'run'];
-/** Triggers with no row. `flow-lint.ts` `ROWLESS`. */
-const ROWLESS: readonly string[] = ['every', 'metric', 'manual'];
 /** Verbs that need `once_per` on a trigger about a row. `flow-lint.ts` `ONCE`. */
 const ONCE: readonly string[] = ['notify', 'create', 'suggest', 'run', 'call', 'ask_slash', 'ask_person'];
-/** An answer's name. `flow-lint.ts` `NAME`, and `trigger` and `vars` are the run's own. */
-const NAME = /^[a-z][a-z0-9_]{0,31}$/u;
-const RESERVED: readonly string[] = ['trigger', 'vars'];
-/** A day relative to today in a condition. `flow-lint.ts` `RELATIVE_DAY`, which the kernel does not export. */
-const RELATIVE_DAY = /\b(?:today|yesterday|tomorrow)\b|[+-]\d+[dwmy]\b/u;
 
 const isObject = (x: unknown): x is Record<string, unknown> => x !== null && typeof x === 'object' && !Array.isArray(x);
 
@@ -86,7 +83,7 @@ export function verbOf(step: Step): Verb | null {
  * A BRANCH HOLDS ITS ARMS BESIDE ITS STEP, not inside it, so that every list in the tree is a `Node[]` and every move is
  * the same move. `step` for a branch is `{ if: condition }` and nothing else.
  */
-export type Node = { key: string; step: Step; then?: Node[]; else?: Node[] };
+export type Node = { key: string; step: Step; then?: Node[]; else?: Node[]; elseKept?: true };
 
 /**
  * A list's address: `root`, or a branch's key and an arm, `k7/then`. A string, because a drop target carries it in a
@@ -102,22 +99,30 @@ export const mintKey = (): string => `k${(minted += 1)}`;
 
 const isBranch = (n: Node): boolean => 'if' in n.step;
 
-/** A body's list of steps as cards. A branch's arms become lists of their own, and a missing `else` is an empty one. */
+/**
+ * A body's list of steps as cards. A branch's arms become lists of their own, and a missing `else` is an empty one.
+ *
+ * `elseKept` MARKS A BRANCH WHOSE BODY SPELLED `else:` OUT, empty or not, so `stepsOf` writes it back. An agent that
+ * wrote `else: []` read its own body back on Decide without it, as a change nobody made.
+ */
 export function nodesOf(list: unknown): Node[] {
   if (!Array.isArray(list)) return [];
   return list.filter(isObject).map((step): Node => {
     if (!('if' in step)) return { key: mintKey(), step: { ...step } };
     const { then, else: otherwise, ...rest } = step;
-    return { key: mintKey(), step: rest, then: nodesOf(then), else: nodesOf(otherwise) };
+    return { key: mintKey(), step: rest, then: nodesOf(then), else: nodesOf(otherwise), ...(Array.isArray(otherwise) ? { elseKept: true as const } : {}) };
   });
 }
 
-/** Cards back into a body's list. An empty `else` is left out, which is how the record reads a branch with none. */
+/**
+ * Cards back into a body's list. An empty `else` is left out, which is how the record reads a branch with none, unless
+ * the body it was read from wrote one (`elseKept`), and then it is kept as written.
+ */
 export function stepsOf(nodes: readonly Node[]): Step[] {
   return nodes.map((n) => {
     if (!isBranch(n)) return n.step;
     const otherwise = stepsOf(n.else ?? []);
-    return { ...n.step, then: stepsOf(n.then ?? []), ...(otherwise.length > 0 ? { else: otherwise } : {}) };
+    return { ...n.step, then: stepsOf(n.then ?? []), ...(otherwise.length > 0 || n.elseKept ? { else: otherwise } : {}) };
   });
 }
 
@@ -330,6 +335,9 @@ export function triggerOfBody(body: Body): Trigger {
     if (isObject(on.arrival)) return { arrival: on.arrival };
     if (typeof on.every === 'string') return on as { every: string };
     if (isObject(on.metric)) return on as Trigger;
+    /* A DECISION TRIGGER KEEPS ITS OWN OBJECT, `{}` included, so a rule an agent wrote to start on any decision reads
+       back as the same `decided: {}` it filed and not as a button. */
+    if (isObject(on.decided)) return { decided: on.decided as { about?: string; option?: string } };
     if (on.manual === true) return { manual: true };
   }
   if (typeof body.register === 'string') return { written: { register: body.register } };
@@ -394,14 +402,24 @@ export function conditionOf(d: Draft): unknown {
 }
 
 /**
- * The draft with another trigger. THE CONDITION GOES WITH THE CHANGE, BOTH FORMS OF IT: only a change has a row for a
- * condition to be about, and only a change draws the "Only when" field, so a condition carried to a clock, a button or
- * an arrival is one the record refuses and the person has no field left to clear. `Inspector.svelte`'s `pick` cleared
- * the sentence and left the tree, which is how C3 in the thirty-sixth audit filed a `when:` on a clock.
+ * The draft with another trigger. THE CONDITION GOES WITH A CHANGE OF KIND, BOTH FORMS OF IT: a condition is about the
+ * row a change brings or the row (or body) an arrival wrote, and a clock, a button, a figure or a decision has none, so
+ * a condition carried across is one the record refuses or one that names fields the new trigger does not have.
+ * `Inspector.svelte`'s `pick` once cleared the sentence and left the tree, which is how C3 in the thirty-sixth audit
+ * filed a `when:` on a clock. An edit within one kind (another list, added or changed) keeps it.
  */
 export function withTrigger(d: Draft, trigger: Trigger): Draft {
-  const leaves = triggerKind(d.trigger) !== triggerKind(trigger) && !('written' in trigger);
+  const leaves = triggerKind(d.trigger) !== triggerKind(trigger);
   return leaves ? { ...d, trigger, when: null, whenTree: null } : { ...d, trigger };
+}
+
+/**
+ * The draft with its condition replaced, in whichever form the editor has it: a sentence, a tree from the query
+ * builder, or nothing. One form at a time, so the one on the screen is the one filed (`conditionOf`).
+ */
+export function withCondition(d: Draft, cond: unknown): Draft {
+  if (typeof cond === 'string') return { ...d, when: cond.trim() === '' ? null : cond, whenTree: null };
+  return { ...d, when: null, whenTree: cond === undefined ? null : cond };
 }
 
 const onlyActions = (nodes: readonly Node[]): boolean => nodes.every((n) => !isBranch(n) && (ACTIONS as readonly string[]).includes(verbOf(n.step) ?? ''));
@@ -559,23 +577,35 @@ export function withChip(value: string, start: number, end: number, chip: string
 
 /* ── triggers, as the inspector offers them ───────────────────────────────── */
 
+/** Every trigger the grammar has, in the order the inspector offers them. */
+const ALL_TRIGGERS = ['written', 'arrival', 'every', 'metric', 'decided', 'manual'] as const;
+export type TriggerKind = (typeof ALL_TRIGGERS)[number];
+
 /**
- * The four triggers a person can pick. NOT `metric`, which the lint refuses as not in this build (nothing starts it
- * yet), and not `decided`, which is reserved: a choice that installs and is then refused on Decide teaches somebody
- * the canvas cannot be trusted. A body that already names one is still drawn and said, and `faultsOf` says why.
+ * The triggers a person can pick: every one the record installs and runs, read from the kernel's one table
+ * (`capabilities.ts`, through `notInThisBuild`) rather than listed here. `metric` and `decided` were held back while the
+ * lint refused them, since a choice that installs and is then refused on Decide teaches somebody the canvas cannot be
+ * trusted; AUT-1 made both run, the table's rows say so, and this list follows the table without an edit.
  */
-export const TRIGGER_KINDS = ['written', 'arrival', 'every', 'manual'] as const;
-export type TriggerKind = (typeof TRIGGER_KINDS)[number];
+export const TRIGGER_KINDS: readonly TriggerKind[] = ALL_TRIGGERS.filter((k) => !notInThisBuild(false).triggers.includes(k));
 
-export const triggerKind = (t: Trigger): string => Object.keys(t).find((k) => k !== 'at' && k !== 'day' && k !== 'month') ?? 'manual';
+export const triggerKind = (t: Trigger): string => Object.keys(t).find((k) => k !== 'at' && k !== 'day' && k !== 'month' && k !== 'late') ?? 'manual';
 
-/** A trigger of another kind, keeping the list it watched when it goes from a change to an arrival and back is moot. */
+/**
+ * A trigger of another kind, keeping the list it watched when it goes from a change to an arrival and back is moot.
+ * A figure starts on crossing its own target, the one line every figure with a target already has.
+ */
 export function blankTrigger(kind: TriggerKind, was?: Trigger): Trigger {
   if (kind === 'written') return { written: { register: was && 'written' in was ? was.written.register : '' } };
   if (kind === 'arrival') return { arrival: {} };
   if (kind === 'every') return { every: '1h' };
+  if (kind === 'metric') return { metric: { id: '', crosses: 'target' } };
+  if (kind === 'decided') return { decided: {} };
   return { manual: true };
 }
+
+/** The spans a clock may run late by before a turn is skipped, offered as a choice. Absent is never skipped. */
+export const LATE_SPANS = ['1h', '6h', '1d'] as const;
 
 /** The clocks under a month, and the weekdays. Defined in `calendar.ts`, which says why. */
 export { DAYS, EVERY };
@@ -633,8 +663,13 @@ export const VERB_LABELS: Record<Verb, string> = {
  * answers `infer.ask` (`slashAskAt` in `packages/kernel/src/flow-lint.ts`). So the canvas asks the flag the record
  * asks, `/api/version`'s `slash`, which the layout reads once for the tab. A body an agent wrote with one on a host
  * with no model still says so before Send.
+ *
+ * READ FROM THE KERNEL'S TABLE (`capabilities.ts`), which the lint, the runner and the agents' grammar read too, so a
+ * row flipped there is offered here in the same change. Only whole verbs are menu entries; a row for one key of a step
+ * (`ask_person.to`) is not.
  */
-export const notYet = (slash: boolean): readonly Verb[] => (slash ? [] : ['ask_slash']);
+export const notYet = (slash: boolean): readonly Verb[] =>
+  notInThisBuild(slash).steps.filter((s): s is Verb => (VERBS as readonly string[]).includes(s));
 
 /**
  * §6's five groups, in the order the menu draws them. Every verb the menu offers is in exactly one.
@@ -643,14 +678,43 @@ export const notYet = (slash: boolean): readonly Verb[] => (slash ? [] : ['ask_s
  * fault on a host with none sends somebody there.
  */
 export function stepGroups(slash: boolean): readonly { label: string; verbs: readonly Verb[] }[] {
+  const held = notYet(slash);
+  const offer = (verbs: readonly Verb[]): Verb[] => verbs.filter((v) => !held.includes(v));
   return [
-    { label: 'Check', verbs: ['if', 'set_var', 'stop'] },
-    { label: 'Change', verbs: ['tag', 'untag', 'set', 'move', 'link', 'note', 'create'] },
-    { label: 'Ask', verbs: slash ? ['notify', 'suggest', 'ask_person', 'ask_slash'] : ['notify', 'suggest', 'ask_person'] },
-    { label: 'Call out', verbs: ['call', 'run', 'script'] },
-    { label: 'Wait', verbs: ['wait', 'schedule'] },
+    { label: 'Check', verbs: offer(['if', 'set_var', 'stop']) },
+    { label: 'Change', verbs: offer(['tag', 'untag', 'set', 'move', 'link', 'note', 'create']) },
+    { label: 'Ask', verbs: offer(['notify', 'suggest', 'ask_person', 'ask_slash']) },
+    { label: 'Call out', verbs: offer(['call', 'run', 'script']) },
+    { label: 'Wait', verbs: offer(['wait', 'schedule']) },
   ];
 }
+
+/**
+ * What each step does, in one line, for the step menu's sheet on a phone, where a label alone ("Come back later",
+ * "Run a call on this row") leaves a stranger guessing. Said as the runner does it (`packages/kernel/src/flow.ts`), and
+ * the search in the sheet reads these words as well as the label.
+ */
+export const STEP_HELP: Record<Verb, string> = {
+  if: 'Take one of two ways, depending on a condition.',
+  set_var: 'Keep a value under a name, for later steps to use.',
+  stop: 'End the run here, and do nothing after.',
+  tag: 'Put a tag on the row.',
+  untag: 'Take a tag off the row.',
+  set: 'Write a value into one field of the row.',
+  move: 'Move the row to another state.',
+  link: 'Point a field of the row at a row in another list.',
+  note: 'Write a note on the row.',
+  create: 'Add new rows to a list.',
+  notify: 'Send you a message.',
+  suggest: 'Put a question on Decide for you to answer.',
+  ask_person: 'Ask someone on this record and wait for the answer.',
+  ask_slash: 'Ask Slash a question and keep its answer.',
+  call: 'Fetch from a service you declared, and keep what it answers.',
+  run: 'Send this row to a service you declared.',
+  script: 'Start one of your scripts.',
+  wait: 'Pause, then carry on with the next step.',
+  schedule: 'Put a reminder on the row for a later day.',
+};
 
 /** A new step of one kind, with the arguments it needs present and empty, so the inspector has something to fill. */
 export function blankStep(verb: Verb): Step {
@@ -760,6 +824,9 @@ export const ARGS: Record<Verb, readonly Arg[]> = {
   ask_person: [
     { path: ['ask_person', 'question'], label: 'Question', kind: 'long', required: true, missing: 'Write the question to ask.', template: true },
     { path: ['ask_person', 'options'], label: 'Answers', kind: 'list', required: true, missing: 'Give at least one answer to choose from.' },
+    /* OPTIONAL: left out, the question is the owner's to answer, as it always was. Picked from the record's members
+       (`chips.ts` `pickerOf`), since `to:` holds a member's id, which nobody should have to type. */
+    { path: ['ask_person', 'to'], label: 'Put it to', kind: 'text' },
     { path: ['ask_person', 'as'], label: 'Keep the answer as', kind: 'name', required: true, missing: NAME_IT },
     { path: ['ask_person', 'wait'], label: 'Wait at most', kind: 'span', hint: '7d' },
   ],
@@ -805,6 +872,8 @@ export const words = {
   written: 'As written',
   addStep: 'Add a step',
   addHere: 'Add a step here',
+  findStep: 'Find a step',
+  noStep: 'No step matches those words.',
   then: 'If so',
   otherwise: 'If not',
   /* WHERE THE COLUMN RESUMES UNDER A BRANCH, because a step there runs whichever arm was taken, and nothing on the
@@ -868,14 +937,51 @@ export const words = {
     written: 'A change',
     arrival: 'An arrival',
     every: 'A clock',
+    metric: 'A figure',
+    decided: 'A decision',
     manual: 'A button',
   } as Record<string, string>,
   triggerHelp: {
     written: 'A row in one list is added, changed or deleted.',
     arrival: 'Something arrives at a door: a webhook, an email, a paste.',
     every: 'On a clock, every fifteen minutes or longer.',
+    metric: 'A figure crosses a line. It is read every hour.',
+    decided: 'A question on Decide is answered.',
     manual: 'Only when somebody presses Run now.',
   } as Record<string, string>,
+  /* THE INSPECTOR'S OWN WORDS for the triggers and pickers EDT-2 added, beside the ones above so the sheet reads one
+     object. Sentence case, no full stop on a label or a button. */
+  inspect: {
+    figure: 'The figure',
+    pickFigure: 'Pick a figure',
+    crosses: 'Starts when it',
+    crossTarget: 'Crosses its target',
+    crossUp: 'Reaches',
+    crossDown: 'Falls to',
+    line: 'The line',
+    lineHelp: 'In the figure’s own units. An amount of money is in its smallest unit, cents or pence.',
+    about: 'A question from',
+    anyQuestion: 'Any question',
+    option: 'Only when the answer is',
+    anyAnswer: 'Any answer',
+    optionHelp: 'The answer’s words, exactly as the question offers them.',
+    late: 'If it runs late',
+    neverLate: 'Run it however late',
+    lateBy: (span: string) => `Skip it when more than ${span} late`,
+    lateHelp: 'A skipped turn is kept in the runs with the reason.',
+    owner: 'The owner',
+    pickScript: 'Pick a script',
+    pickMember: 'Pick a person',
+    newCall: 'Declare a new call',
+    newCallHelp: 'A call you declare shows here once it is accepted.',
+    fieldName: 'Field',
+    fieldAdd: 'Add a field',
+    fieldRemove: 'Take it out',
+    asRows: 'Edit as conditions',
+    asWords: 'Write it in words',
+    relativeDay: 'It names a day relative to today, which rows would fix to one date. Keep it in words.',
+    notRows: 'These words cannot be drawn as rows. Keep them in words.',
+  },
 } as const;
 
 const UNITS: Record<string, [string, string]> = { m: ['minute', 'minutes'], h: ['hour', 'hours'], d: ['day', 'days'], w: ['week', 'weeks'] };
@@ -1000,14 +1106,25 @@ export function sayTrigger(t: Trigger): string {
   }
   /* A CLOCK OF MONTHS IS SAID AS THE RECORD SAYS IT, "On the last day of each month at 09:00", and not as "1mo on last
      at 09:00". One the record would refuse is said as it was written, in the words of its count. */
-  if ('every' in t) return calendarWords(t) ?? `${cap(inMonths(t.every) === null ? often(t.every) : clockWords(t.every))}${t.day ? ` on ${t.day}` : ''}${t.at ? ` at ${t.at}` : ''}`;
+  if ('every' in t) {
+    const said = calendarWords(t) ?? `${cap(inMonths(t.every) === null ? often(t.every) : clockWords(t.every))}${t.day ? ` on ${t.day}` : ''}${t.at ? ` at ${t.at}` : ''}`;
+    return t.late ? `${said}, skipped when more than ${spanWords(t.late)} late` : said;
+  }
   if ('metric' in t) {
     const c = t.metric.crosses;
+    const figure = t.metric.id === '' ? 'a figure' : t.metric.id.replace(/[-_]/gu, ' ');
     return c === 'target'
-      ? `When ${t.metric.id} crosses its target`
+      ? `When ${figure} crosses its target`
       : 'lte' in c
-        ? `When ${t.metric.id} falls to ${c.lte} or below`
-        : `When ${t.metric.id} reaches ${c.gte} or above`;
+        ? `When ${figure} falls to ${c.lte} or below`
+        : `When ${figure} reaches ${c.gte} or above`;
+  }
+  /* THE QUESTION IS NAMED BY THE AUTOMATION THAT PUT IT, without the `rule.` an id carries, and the answer in quotes,
+     because it is matched as written. */
+  if ('decided' in t) {
+    const about = t.decided.about ? ` from ${t.decided.about.replace(/^[a-z]+\./u, '').replace(/[-_]/gu, ' ')}` : '';
+    const option = t.decided.option ? `, when the answer is "${t.decided.option}"` : '';
+    return `When a question${about} is decided on Decide${option}`;
   }
   return 'When you press Run now';
 }
@@ -1112,8 +1229,11 @@ function keeps(step: Step): string | null {
  * an answer kept inside one arm may not exist when it runs, and offering it as a chip would be offering a hole.
  * Earlier steps of the list it is in, and of every list it is inside, are the ones it can count on.
  */
-export function varsBefore(nodes: readonly Node[], key: string): string[] {
-  const walk = (list: readonly Node[], inherited: readonly string[]): string[] | null => {
+export const varsBefore = (nodes: readonly Node[], key: string): string[] => keepersBefore(nodes, key).map((s) => `vars.${keeps(s)}`);
+
+/** The steps that certainly kept an answer before `key`, one per name, the first to keep it, in the order they ran. */
+function keepersBefore(nodes: readonly Node[], key: string): Step[] {
+  const walk = (list: readonly Node[], inherited: readonly Step[]): Step[] | null => {
     const seen = [...inherited];
     for (const n of list) {
       if (n.key === key) return seen;
@@ -1122,11 +1242,43 @@ export function varsBefore(nodes: readonly Node[], key: string): string[] {
         if (inner) return inner;
       }
       const kept = keeps(n.step);
-      if (kept && !seen.includes(`vars.${kept}`)) seen.push(`vars.${kept}`);
+      if (kept && !seen.some((s) => keeps(s) === kept)) seen.push(n.step);
     }
     return null;
   };
   return walk(nodes, []) ?? [];
+}
+
+/** A field a condition may name, as the query builder takes one (`lib/query/tree.ts` `QueryField`). */
+export type CondField = { id: string; type: string; values?: readonly string[] };
+
+/**
+ * The answers a branch's condition may test, typed as the runner's `test` will type them (`packages/kernel/src/flow.ts`),
+ * so the query builder offers each the tests that can hold.
+ *
+ * THE RUNNER TYPES AN ANSWER BY WHAT IT HOLDS AT RUN TIME, and the canvas has to guess before one exists. A person's
+ * answer is one of the step's own options, so it is offered as a choice of them. A remembered value that is one
+ * reference or one number is almost always a figure, so it is a number; any other value, Slash's answer, a call's
+ * answer (an object) and a script's queued id are text. A guess that is wrong costs a test the builder does not offer,
+ * and the words ("As text") still write any sentence the record reads.
+ */
+export function answerFields(nodes: readonly Node[], key: string): CondField[] {
+  return keepersBefore(nodes, key).flatMap((s): CondField[] => {
+    const name = keeps(s);
+    if (name === null) return [];
+    const verb = verbOf(s);
+    if (verb === 'ask_person') {
+      const options = getAt(s, ['ask_person', 'options']);
+      const values = Array.isArray(options) ? options.filter((o): o is string => typeof o === 'string' && o !== '') : [];
+      return [values.length > 0 ? { id: name, type: 'enum', values } : { id: name, type: 'text' }];
+    }
+    if (verb === 'set_var') {
+      const to = getAt(s, ['set_var', 'to']);
+      const figure = typeof to === 'string' && /^\s*(?:\{\{[^}]+\}\}|-?\d+(?:\.\d+)?)\s*$/u.test(to);
+      return [{ id: name, type: figure ? 'decimal' : 'text' }];
+    }
+    return [{ id: name, type: 'text' }];
+  });
 }
 
 /**
@@ -1157,7 +1309,7 @@ export function triggerChips(t: Trigger, fields: readonly string[] = []): string
   return [];
 }
 
-/* ── what the record would refuse, said before sending ────────────────────── */
+/* ── what is missing, said at once ─────────────────────────────────────────── */
 
 export type Fault = { key: string | null; say: string };
 
@@ -1165,152 +1317,38 @@ const blank = (v: unknown): boolean =>
   v === undefined || v === null || (typeof v === 'string' && v.trim() === '') || (Array.isArray(v) && v.length === 0) || (typeof v === 'number' && !(v > 0));
 
 /**
- * What would stop this draft being accepted, one sentence each, with the card each is about.
+ * What is plainly missing from this draft, one sentence each, with the card each is about: a list not picked, a figure
+ * not picked, no step at all, a required field left empty, a branch with nothing under If so.
  *
- * THE RECORD CHECKS AGAIN, AND ITS WORD IS FINAL. These are the refusals a person would want told before pressing the
- * button, in the lint's terms, so that the first time they hear "a clock is fifteen minutes or longer" is not on Decide.
- * Anything the canvas cannot know (whether a call is declared, whether a register exists) is left to the record.
+ * ONLY WHAT NEEDS NO SECOND READING (R2, `loop/finish/shell.md` §3). This was a second copy of the record's lint, a
+ * hundred and forty lines of it, and it drifted: it refused a condition on an arrival after the runner learned to read
+ * one, and said a figure trigger would never start after the sweep started it. Every other fault now comes from the
+ * record's own lint through `checkAutomation`, placed on the card its `at` names (`FlowDraft.served`), so there is one
+ * reading of a body and it is the one that installs it.
  *
- * `slash` IS WHETHER THIS HOST ANSWERS SLASH, and it defaults to no. The default is the answer this list gave before it
- * knew, and it is the one that keeps `source.test.ts`'s starter samples, none of which asks Slash, saying nothing.
+ * `slash` STAYS, because it is a fact this tab already holds and the menu already acts on: a step the menu would not
+ * offer here, written by an agent, is said on its card before anybody asks the record.
  */
 export function faultsOf(d: Draft, { slash }: { slash: boolean } = { slash: false }): Fault[] {
   const out: Fault[] = [];
   const t = d.trigger;
-  const rowless = ROWLESS.includes(triggerKind(t));
   if ('written' in t && t.written.register.trim() === '') out.push({ key: null, say: 'Say which list it watches.' });
-  /* A CLOCK OF MONTHS IS `calendar.ts`'s, which asks what the lint asks of one. `everyMs` knows m, h, d and w, and read
-     every monthly clock as no clock at all, so picking one turned Send off. */
-  if ('every' in t && inMonths(t.every) !== null) {
-    const said = calendarFault(t);
-    if (said !== null) out.push({ key: null, say: said });
-  } else if ('every' in t) {
-    const ms = everyMs(t.every);
-    if (ms === null) out.push({ key: null, say: `${t.every} is not a clock. Write 15m, 1h, 1d, 1w or 1mo.` });
-    else if (ms < FLOOR_MS) out.push({ key: null, say: 'The shortest clock is every 15 minutes.' });
-  }
-  if ('metric' in t) out.push({ key: null, say: 'Nothing in this build watches a metric yet, so it would never start.' });
-  /* EITHER FORM OF THE CONDITION, because the record refuses either. Read off the typed sentence alone, a tree `when`
-     carried to a clock said nothing here and was refused on Send: "rule.paid-tag is started by every, which has no row
-     for when: to be about" (`loop/research-batch-thirty-six-audit.md` finding 3, C3). */
-  const conditioned = conditionOf(d) !== null;
-  if (rowless && conditioned)
-    out.push({ key: null, say: 'A clock or a button has no row for a condition to be about. Put the condition in an If step.' });
-  /* THE TWO BELOW WERE MEASURED, NOT READ. Both bodies went through the kernel's `flowFault` and came back refused at
-     `when` while this list was empty (`flow.test.ts` has the pair), so a person pressed Send and heard about it on
-     Decide. The run-path one is reached from the sample's own "Chase late payments" by adding a single branch. */
-  if ('arrival' in t && conditioned)
-    out.push({ key: null, say: 'The runner does not read a condition on an arrival yet. Narrow it by its door, or test the row in an If step.' });
-  if ('written' in t) {
-    const body = bodyOf(d);
-    if (pathOf(body) === 'run' && Array.isArray(body.once_per) && body.once_per.length > 0 && RELATIVE_DAY.test(JSON.stringify(body.when ?? '')))
-      out.push({
-        key: null,
-        say: 'The condition names a day relative to today, and only an automation that runs inside the change is read again as the days pass. Take out what makes it a run, such as a branch, a wait or a pick of added or changed, or drop the day.',
-      });
-  }
+  if ('metric' in t && t.metric.id.trim() === '') out.push({ key: null, say: 'Say which figure it watches.' });
   if (d.steps.length === 0) out.push({ key: null, say: 'An automation does at least one step.' });
-  const count = countOf(d.steps);
-  if (count > STEP_CEILING) out.push({ key: null, say: `It has ${count} steps, and ${STEP_CEILING} is the most one automation holds.` });
 
-  const walk = (list: readonly Node[], depth: number) => {
+  const walk = (list: readonly Node[]) => {
     for (const n of list) {
       const verb = verbOf(n.step);
-      if (verb === null) {
-        out.push({ key: n.key, say: 'This step names no verb this build reads.' });
-        continue;
-      }
+      if (verb === null) continue;
       if (notYet(slash).includes(verb)) out.push({ key: n.key, say: 'This BrainDog has no model for Slash to answer with. Ask a person instead.' });
-      if (rowless && ROW_VERBS.includes(verb)) out.push({ key: n.key, say: `${sayTrigger(t)} brings no row, and "${sayStep(n.step)}" acts on one.` });
-      for (const arg of ARGS[verb]) {
-        const v = getAt(n.step, arg.path);
-        if (arg.required && blank(v)) out.push({ key: n.key, say: arg.missing });
-        else if (arg.kind === 'name' && !blank(v) && (typeof v !== 'string' || !NAME.test(v) || RESERVED.includes(v)))
-          /* A SCRIPT'S `as:` HOLDS THE ID OF ITS QUEUED RUN (`startScript`), so its bad-name line says that, as its label
-             and its missing-value line do; it still said "an answer" after both were corrected. */
-          out.push({
-            key: n.key,
-            say: `${String(v)} is not a name ${verb === 'script' ? 'the id of a queued run' : 'an answer'} can have. Use lower-case letters, digits and underscores.`,
-          });
-        else if (arg.kind === 'span' && !blank(v) && (typeof v !== 'string' || everyMs(v) === null))
-          out.push({ key: n.key, say: `${String(v)} is not a span. Write 30m, 2h, 3d or 1w.` });
-        else if (arg.kind === 'later' && !blank(v) && (typeof v !== 'string' || !/^\d+[dwmy]$/u.test(v.trim())))
-          out.push({ key: n.key, say: `${String(v)} is not a span. Write 14d, 2w, 3m or 1y.` });
-      }
+      for (const arg of ARGS[verb]) if (arg.required && blank(getAt(n.step, arg.path))) out.push({ key: n.key, say: arg.missing });
       if (verb === 'if') {
         if ((n.then ?? []).length === 0) out.push({ key: n.key, say: 'Add a step under If so, or this branch does nothing.' });
-        if (depth + 1 > DEPTH_CEILING) out.push({ key: n.key, say: `Branches go ${DEPTH_CEILING} deep at most.` });
-        walk(n.then ?? [], depth + 1);
-        walk(n.else ?? [], depth + 1);
+        walk(n.then ?? []);
+        walk(n.else ?? []);
       }
     }
   };
-  walk(d.steps, 0);
-  if (pathOf(bodyOf(d)) === 'run') out.push(...unkept(d.steps));
-  return out;
-}
-
-/** A `{{vars.x}}` as `fill` reads it, spaces allowed inside the braces. `flow-lint.ts`'s `RUN_PATH`, less `trigger`. */
-const VARS_READ = /\{\{\s*vars\.([A-Za-z0-9_.]+)\s*\}\}/gu;
-
-/**
- * Every card that reads `{{vars.x}}` where no card before it certainly kept `x`, one line each, as the record refuses it
- * (`unkeptIn` in `packages/kernel/src/flow-lint.ts`).
- *
- * `varsBefore` ONLY DECIDED WHICH CHIPS TO OFFER, and so a chip already in a card outlived the name it read. Audit
- * sixty-six, finding 7: a script step's `as:` deleted in the inspector took `job` off the chips, left `{{vars.job}}` in
- * the `set` after it, and this list said nothing; the record installed it and the run wrote "queued as —". Now the
- * record refuses it, and this says so first, on the card that reads the name.
- *
- * NOT `varsBefore`, WHICH IS STRICTER THAN THE RECORD. It drops what either arm kept, and the record keeps a name kept in
- * both, since whichever arm ran kept it; offering fewer chips costs nothing, but a fault the record would not raise
- * stops a person sending a body it would take. `flow-as-read.test.ts` holds this list to the lint over the same bodies.
- *
- * ONLY ON THE RUN PATH, as the lint asks it: the inline pass has no answers and reads no `{{vars.x}}` at all.
- */
-function unkept(nodes: readonly Node[]): Fault[] {
-  const out: Fault[] = [];
-  const anywhere = new Set<string>();
-  const every = (list: readonly Node[]): void => {
-    for (const n of list) {
-      const name = keeps(n.step);
-      if (name) anywhere.add(name);
-      if (isBranch(n)) {
-        every(n.then ?? []);
-        every(n.else ?? []);
-      }
-    }
-  };
-  every(nodes);
-  const walk = (list: readonly Node[], kept: Set<string>): void => {
-    for (const n of list) {
-      const verb = verbOf(n.step);
-      const texts: string[] = [];
-      const collect = (v: unknown): void => {
-        if (typeof v === 'string') texts.push(v);
-        else if (Array.isArray(v)) v.forEach(collect);
-        else if (isObject(v)) Object.values(v).forEach(collect);
-      };
-      if (verb !== null) collect(n.step[verb]);
-      const name = texts.flatMap((t) => [...t.matchAll(VARS_READ)].map((m) => m[1]!.split('.')[0]!)).find((x) => !kept.has(x));
-      if (name !== undefined)
-        out.push({
-          key: n.key,
-          say: anywhere.has(name)
-            ? `"${sayStep(n.step)}" reads ${name}, and ${name} is kept only by a step that may not run before it: a later step, or one arm of an If. Keep ${name} before this step on every way to it, or take ${name} out.`
-            : `"${sayStep(n.step)}" reads ${name}, and no step keeps a value called ${name}, so the run would write a dash in its place. Name it ${name} on the step that makes it, or take ${name} out.`,
-        });
-      const own = keeps(n.step);
-      if (own) kept.add(own);
-      if (isBranch(n)) {
-        const yes = new Set(kept);
-        const no = new Set(kept);
-        walk(n.then ?? [], yes);
-        walk(n.else ?? [], no);
-        for (const x of yes) if (no.has(x)) kept.add(x);
-      }
-    }
-  };
-  walk(nodes, new Set());
+  walk(d.steps);
   return out;
 }

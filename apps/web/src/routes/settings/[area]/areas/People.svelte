@@ -12,11 +12,11 @@
   import { LEVELS, type Level, type Person } from '$lib/record/schema.ts';
   import { LIST_LEVELS } from '$lib/record/may.ts';
   /* THE WRITES THIS AREA MAKES, and the one reading of what the record answered to each. */
-  import { addException, dropException, moveLevel, removeAccess, type Wrote } from '$lib/record/settings-write.ts';
+  import { addException, dropException, moveLevel, removeAccess, suspendPerson, type Wrote } from '$lib/record/settings-write.ts';
   /* Lane F: erasing a person. */
   import { erasePerson } from '$lib/record/settings-write.ts';
   /* Lane G: inviting somebody by address, with a link the owner sends and nobody mails. */
-  import { inviteEmail, inviteLink, readInvites, withdrawInvite } from '$lib/record/settings-write.ts';
+  import { inviteEmail, inviteLink, readInvites, renewInvite, withdrawInvite, type InviteReach, type Waiting } from '$lib/record/settings-write.ts';
   import type { Invitation } from '@braindog/client';
   import { relative, since } from 'braindog-render';
   import { untrack } from 'svelte';
@@ -28,6 +28,7 @@
   import Empty from '$lib/ui/Empty.svelte';
   import { namesHeld, personSaid, secondSaid } from '../people-said.ts';
   import { bareOrigin, settingsState, type AreaProps } from '../settings-state.svelte.ts';
+  import Links from '../Links.svelte';
 
   let { shell }: AreaProps = $props();
 
@@ -167,6 +168,17 @@
     if (ok) picking = null;
   }
 
+  /**
+   * STOP, AND LET BACK IN, WHICH REMOVE CANNOT UNDO. Removing somebody deletes what they held, so the owner who only
+   * wanted them out for a week had to remember every list to invite them back to. Stopping keeps all of it, and the
+   * same press on a stopped person lets them back in with exactly that.
+   */
+  function stopOrLetBack(p: Person) {
+    if (peopleFrom !== 'live') cannotWrite();
+    else if (p.suspended) void settle(() => suspendPerson(apiBase(), p, false), copy.accessLetBack(p.name));
+    else void settle(() => suspendPerson(apiBase(), p, true), copy.accessStopped(p.name));
+  }
+
   function takeAway(p: Person) {
     if (peopleFrom !== 'live') cannotWrite();
     else void settle(() => removeAccess(apiBase(), p), copy.accessRemoved(p.name));
@@ -187,9 +199,33 @@
    */
   let inviteTo = $state('');
   let inviteLevel = $state<Level>('read');
+  /**
+   * THE WHOLE RECORD, OR CHOSEN LISTS, and a list is chosen by giving it a level. The one-line form could only say
+   * "the whole record at this level", so a bookkeeper meant for Money alone was invited to everything and demoted
+   * after they accepted, and until then the link opened more than the owner meant it to.
+   */
+  let inviteReach = $state<'record' | 'lists'>('record');
+  let inviteLists = $state<Record<string, Level | ''>>({});
+  const REACHES: readonly { reach: 'record' | 'lists'; said: string }[] = [
+    { reach: 'record', said: copy.inviteWholeRecord },
+    { reach: 'lists', said: copy.inviteChosenLists },
+  ];
   let inviting = $state(false);
   let madeLink = $state<{ email: string; link: string } | null>(null);
-  let waitingInvites = $state<Invitation[]>([]);
+  let waitingInvites = $state<Waiting[]>([]);
+
+  /** What the form would send, or `null` while it gives nothing: no address, or chosen lists with none given a level. */
+  const reachChosen = $derived.by((): InviteReach | null => {
+    if (inviteReach === 'record') return { level: inviteLevel };
+    const registers: Record<string, Level> = {};
+    for (const [list, level] of Object.entries(inviteLists)) if (level) registers[list] = level;
+    return Object.keys(registers).length > 0 ? { registers } : null;
+  });
+
+  function pickListLevel(list: string, said: string) {
+    const level = (LIST_LEVELS as readonly string[]).includes(said) ? (said as Level) : '';
+    inviteLists = { ...inviteLists, [list]: level };
+  }
 
   $effect(() => {
     untrack(() => void readInvitesNow());
@@ -205,24 +241,49 @@
   async function makeInvite(e: SubmitEvent) {
     e.preventDefault();
     const email = inviteTo.trim();
-    if (!email || inviting) return;
+    const reach = reachChosen;
+    if (!email || !reach || inviting) return;
     if (peopleFrom !== 'live') {
       cannotWrite();
       return;
     }
+    if (await mint(() => inviteEmail(apiBase(), email, reach))) {
+      inviteTo = '';
+      inviteLists = {};
+    }
+  }
+
+  /**
+   * One link made, from the form or from a listed row, then shown once and the list read again.
+   * `inviting` is the in-flight guard for both, so a double press makes one link and not two that withdraw each other.
+   */
+  async function mint(make: () => ReturnType<typeof inviteEmail>): Promise<boolean> {
     inviting = true;
     const at = opened();
-    const out = await inviteEmail(apiBase(), email, inviteLevel);
+    const out = await make();
     closed(true, at);
     inviting = false;
     if (!out.ok) {
       toasts.push(out.fix, { intent: 'warn' });
-      return;
+      return false;
     }
     /* THE LINK IS BUILT ON THE BARE HOST, because `/invite` is the person's before it is a record's. */
     madeLink = { email: out.value.invitation.email, link: inviteLink(bareOrigin(), out.value.token) };
-    inviteTo = '';
     await readInvitesNow();
+    return true;
+  }
+
+  /**
+   * A NEW LINK FOR A ROW ALREADY LISTED, waiting or run out, giving what it gave. The record withdraws the old link as
+   * it makes this one, so the row is replaced rather than joined by a second.
+   */
+  async function renew(inv: Waiting) {
+    if (inviting) return;
+    if (peopleFrom !== 'live') {
+      cannotWrite();
+      return;
+    }
+    await mint(() => renewInvite(apiBase(), inv));
   }
 
   /** The one copy, to the clipboard, with the toast that says whether it got there. */
@@ -374,6 +435,15 @@
               {#if secondSaid(p, said(p))}{secondSaid(p, said(p))}{' · '}{/if}{p.seen ? copy.lastLooked(since(p.seen, Date.now())) : copy.neverLooked}{#if p.suspended}{' · '}{copy.suspendedSince(relative(p.suspended, Date.now()))}{/if}
             </span>
             <span class="who-do">
+            <!-- STOP IS NOT FOR YOURSELF, for the reason your own level is not: it is the press that removes your own
+                 way back to this screen. Nor for the last owner, who would leave the record with nobody to let anybody
+                 back in. -->
+            <Button
+              weight="bare"
+              disabled={lastOwner(p) || self(p) || peopleBusy}
+              aria-describedby={lastOwner(p) ? 'last-owner' : self(p) ? 'own-level' : undefined}
+              onclick={() => stopOrLetBack(p)}
+            >{p.suspended ? copy.letBackIn : copy.stopAccess}</Button>
             <Button
               weight="bare"
               tone="bad"
@@ -424,6 +494,25 @@
                 >{levelSaid(level)}</button>
               {/each}
             </div>
+            <!-- BELOW 520PX THE LADDER IS A SELECT. Six segments wrap to three lines on a phone and the chosen one lands
+                 wherever the wrap put it; one select is one line, 44px tall, with the same six answers and the same
+                 ones disabled. Both are drawn and CSS shows one, so each keeps its own accessible name. -->
+            <select
+              class="ex-select level-select"
+              aria-label={copy.levelFor(said(p))}
+              value={p.level ?? ''}
+              disabled={lastOwner(p) || self(p) || peopleBusy}
+              aria-describedby={lastOwner(p) ? 'last-owner' : self(p) ? 'own-level' : undefined}
+              onchange={(e) => {
+                const to = e.currentTarget.value;
+                levelChange(p, (LEVELS as readonly string[]).includes(to) ? (to as Level) : null);
+                /* THE SELECT SHOWS WHAT THE RECORD HOLDS, not what was picked: the list read after the write moves it,
+                   and a refusal leaves it where it was rather than on a level nobody has. */
+                e.currentTarget.value = p.level ?? '';
+              }}
+            >
+              {#each [null, ...LEVELS] as level}<option value={level ?? ''}>{levelSaid(level)}</option>{/each}
+            </select>
             <!-- WHAT THE SELECTED ONE MEANS, said once, in a sentence, under the control that
                  sets it. Five ladder words with nothing explaining them is the schema's
                  vocabulary on the screen that decides who can change somebody's business. -->
@@ -533,27 +622,66 @@
   <!-- NO MAIL LEAVES THIS HOST, and the sentence says so beside the control rather than after the press:
        the owner sends the link themselves, and somebody expecting an email would wait for one that never comes. -->
   <p class="hint">{copy.inviteNoMail}</p>
-  <form class="code-form field-row" onsubmit={makeInvite}>
-    <label class="field-row-label" for="invite-email">{copy.inviteEmailLabel}</label>
-    <div class="field-row-controls">
-      <div class="field field-lg">
-        <input
-          class="field-input"
-          id="invite-email"
-          type="email"
-          autocomplete="off"
-          autocapitalize="off"
-          spellcheck="false"
-          bind:value={inviteTo}
-        />
-      </div>
+  <!-- ONE COLUMN AT EVERY WIDTH: the address, what it opens, then the level or the lists, then the button. It was one
+       row, and a row has no room for "these lists, at these levels", which is the sentence inviting a bookkeeper is. -->
+  <form class="code-form invite-form" onsubmit={makeInvite}>
+    <label class="ex-label" for="invite-email">{copy.inviteEmailLabel}</label>
+    <div class="field field-lg invite-email">
+      <input
+        class="field-input"
+        id="invite-email"
+        type="email"
+        autocomplete="off"
+        autocapitalize="off"
+        spellcheck="false"
+        bind:value={inviteTo}
+      />
+    </div>
+    <div class="segmented reach" role="group" aria-label={copy.inviteReachLabel}>
+      {#each REACHES as r (r.reach)}
+        <button
+          type="button"
+          class="segment"
+          data-on={inviteReach === r.reach ? '' : undefined}
+          aria-pressed={inviteReach === r.reach ? 'true' : 'false'}
+          onclick={() => (inviteReach = r.reach)}
+        >{r.said}</button>
+      {/each}
+    </div>
+    {#if inviteReach === 'record'}
       <label class="ex-field">
         <span class="ex-label">{copy.inviteLevelLabel}</span>
         <select class="ex-select" bind:value={inviteLevel}>
           {#each LEVELS as level}<option value={level}>{levelSaid(level)}</option>{/each}
         </select>
       </label>
-      <Button weight="primary" type="submit" disabled={inviting || !inviteTo.trim()} aria-busy={inviting}>
+      <!-- WHAT A WHOLE-RECORD "ADDS ONLY" LEAVES OUT, said before the link is made (`20 §1`, D4): the record keeps an
+           appender off Keys, People and any list declared for owners, and an owner who meant them to add keys would
+           otherwise learn it from the colleague. -->
+      {#if inviteLevel === 'append'}<p class="hint">{copy.inviteAddsOnlyLeavesOut}</p>{/if}
+    {:else}
+      <p class="hint">{copy.inviteListsHint}</p>
+      <!-- A ROW PER LIST, EACH WITH ITS SELECT, and a list is chosen by giving it a level. The three levels one list
+           honours (`LIST_LEVELS`), and Nothing first, because nothing is what every list gives until the owner says. -->
+      <ul class="invite-lists">
+        {#each lists as l (l.id)}
+          <li>
+            <label class="invite-list-name" for="invite-list-{l.id}">{l.name}</label>
+            <select
+              class="ex-select"
+              id="invite-list-{l.id}"
+              value={inviteLists[l.id] ?? ''}
+              onchange={(e) => pickListLevel(l.id, e.currentTarget.value)}
+            >
+              <option value="">{copy.inviteListNothing}</option>
+              {#each LIST_LEVELS as level}<option value={level}>{levelSaid(level)}</option>{/each}
+            </select>
+          </li>
+        {/each}
+      </ul>
+    {/if}
+    <div class="invite-send">
+      <Button weight="primary" type="submit" disabled={inviting || !inviteTo.trim() || !reachChosen} aria-busy={inviting}>
         <Icon name="plus" size="s" />{inviting ? copy.inviteMaking : copy.invitePerson}
       </Button>
     </div>
@@ -578,16 +706,27 @@
     <p class="invites-head">{copy.invitesWaiting}</p>
     <ul class="invites">
       {#each waitingInvites as inv (inv.id)}
-        <li class="invite">
+        <!-- A ROW THAT RAN OUT STAYS, SAYING SO, with New link beside Withdraw: the owner who hears nothing sees why,
+             and one press makes a fresh link giving what this one gave. A waiting row has New link too, for the
+             link that was copied somewhere and lost. -->
+        <li class="invite" data-expired={inv.expired ? '' : undefined}>
           <span class="invite-who">{inv.email}</span>
-          <span class="invite-when">{copy.inviteWaitingRow(inviteGives(inv), inv.expires_at.slice(0, 10))}</span>
-          <Button weight="bare" tone="bad" disabled={peopleBusy} onclick={() => void withdraw(inv)}>{copy.inviteWithdraw}</Button>
+          <span class="invite-when">{inv.expired
+            ? copy.inviteRanOut(inviteGives(inv), inv.expires_at.slice(0, 10))
+            : copy.inviteWaitingRow(inviteGives(inv), inv.expires_at.slice(0, 10))}</span>
+          <span class="invite-do">
+            <Button weight="bare" disabled={inviting || peopleBusy} onclick={() => void renew(inv)}>{copy.inviteNewLink}</Button>
+            <Button weight="bare" tone="bad" disabled={peopleBusy} onclick={() => void withdraw(inv)}>{copy.inviteWithdraw}</Button>
+          </span>
         </li>
       {/each}
     </ul>
   {/if}
 </Section>
 {/if}
+
+<!-- The read-only links to single pages, beside who can see the record (COL-7). -->
+{#if anOwner}<Links />{/if}
 
 <!-- AND ERASE ARRIVES WITH THE SECOND PERSON. On a record whose only person is you, the one
      candidate for a red, irreversible "Erase a person" is the person reading it. -->
@@ -694,6 +833,21 @@
   .who-detail {
     color: var(--dim);
     font-size: var(--t-sm);
+    overflow-wrap: anywhere;
+  }
+
+  .who-name {
+    overflow-wrap: anywhere;
+  }
+
+  /* STOP AND REMOVE GO UNDER THE NAME ON A PHONE. Two buttons in the third column left a 390px row
+     about a hundred pixels for the name and the address, which then wrapped a word to a line. */
+  @media (width < 520px) {
+    .who-head > .who-do {
+      grid-column: 1 / -1;
+      grid-row: auto;
+      margin-inline-start: 0;
+    }
   }
 
   /* The controls sit at the end of the head line and never shrink: a button that wraps its own
@@ -890,13 +1044,72 @@
     font-size: var(--t-sm);
   }
 
-  /* THE INVITATION'S ROW ALIGNS ITS CONTROLS BY THEIR BOTTOM EDGE, not by the baseline a field row
-     uses. The level is a select with its own label over it, so its first baseline is that label's,
-     and a baseline row would set the email field and the button level with the words and leave the
-     select hanging below them. By their bottoms the field, the select and the button stand on one
-     line. */
-  .code-form .field-row-controls {
-    align-items: end;
+  /* THE INVITATION'S FORM IS ONE COLUMN, capped at a reading width so the address field is not a
+     thousand pixels long on a wide screen, and full width on a phone. */
+  .invite-form {
+    max-inline-size: 36rem;
+  }
+
+  .invite-email {
+    inline-size: 100%;
+  }
+
+  .invite-form .segmented {
+    margin-block-end: 0;
+  }
+
+  /* A ROW PER LIST: its name, and its select at the end of the line. The name takes the slack and
+     wraps, so a long list name never pushes the select off a 390px screen. */
+  .invite-lists {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .invite-lists li {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--sp-2);
+    padding-block: var(--sp-1);
+  }
+
+  .invite-lists li + li {
+    border-block-start: 1px solid var(--line);
+  }
+
+  .invite-list-name {
+    color: var(--ink);
+    overflow-wrap: anywhere;
+  }
+
+  .invite-send {
+    margin-block-start: var(--sp-1);
+  }
+
+  /* New link and Withdraw stay together at the end of the row, and wrap under it on a phone. */
+  .invite-do {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+  }
+
+  /* THE LADDER'S SELECT IS FOR A PHONE ONLY, and the segments for everywhere else (see the markup). */
+  .level-select {
+    display: none;
+  }
+
+  @media (width < 520px) {
+    .levels {
+      display: none;
+    }
+
+    .level-select {
+      display: block;
+      inline-size: 100%;
+    }
   }
 
   .hint {

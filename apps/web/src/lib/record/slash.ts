@@ -115,6 +115,99 @@ export async function askSlash(client: SlashClient, asked?: string): Promise<{ o
   return { ok: true, asked: out.value, said: out.value.filed.length === 0 ? words.filedNone : words.filed(out.value.filed.length) };
 }
 
+/* ── a change described, drawn, then kept ─────────────────────────────────────
+   `loop/finish/pages.md` PGS-12: the owner says what a page should do differently, Slash drafts the change, the page
+   draws it as it would stand, and one press keeps it. The Slash screen's own description goes the same way, with no
+   page named. */
+
+export const changeWords = {
+  change: 'Change this page',
+  /** The page menu below 900px, for a screen reader: the trigger itself is only an icon. */
+  more: (title: string) => `More for ${title}`,
+  describeTitle: 'Describe what you want',
+  hintPage: 'Say what you want this page to show or do differently. Slash drafts the change and draws it here, and nothing changes until you keep it.',
+  hintRecord: 'Say in your own words what you want this BrainDog to hold and show. Slash drafts the lists, figures and pages for it and draws them here, and nothing is made until you keep one.',
+  placeholderPage: 'Put the late ones first, and add a figure for how many are left this week',
+  placeholderRecord: 'A desk for my launch, in five parts, with the next step on each and a sentence saying how far along I am',
+  field: 'What to change',
+  send: 'Draft it',
+  sending: 'Drafting',
+  drawing: 'Drawing the draft',
+  keep: 'Keep it',
+  keeping: 'Keeping',
+  file: 'Ask on Decide',
+  drop: 'Not this',
+  /** Which of several drafts is drawn, for a screen reader. */
+  which: 'Which draft to show',
+  kept: 'Kept. This is how it stands now.',
+  filed: 'This is waiting on Decide.',
+  open: 'Open on Decide',
+  none: 'Slash drafted nothing from that.',
+  noPage: 'This draft changes no page, so there is nothing to draw. What it changes is in its question.',
+  unDrawn: 'This draft could not be drawn here. You can still ask about it on Decide, where it is drawn again.',
+  unreached: 'BrainDog could not reach this record.',
+  noModel: 'Slash changes a page from a description only when this BrainDog has a model set up. You can still change how the page is built yourself.',
+  source: 'Change how this is built',
+  /** The reason an owner's own keep is decided with, which Decide's history shows beside it. */
+  reason: 'Kept from what Slash drafted on the page.',
+} as const;
+
+/** A declaration as a change carries it (`SlashDecl` in the record). */
+export type ChangeDecl = { id: string; kind: string; body: Record<string, unknown> };
+
+/**
+ * One draft from a description, as `slashDraft` answers it (`SlashDrafted` in the record, `loop/finish/contracts.md`
+ * `slashDraft`). `rows` are sample rows the preview is drawn over and nothing files; `preview` is what the record drew
+ * when it checked the draft, carried here as it came.
+ */
+export type Drafted = {
+  question: string;
+  change: { to: ChangeDecl | { declarations: ChangeDecl[] } };
+  rows: Record<string, Record<string, unknown>[]>;
+  preview: { pages: unknown[] };
+};
+
+/** `slashDraft`'s whole answer: who drafted, the drafts that drew clean, and a sentence for each that did not. */
+export type DraftedAll = { by: string; drafts: Drafted[]; dropped: string[] };
+
+/**
+ * What the owner described, drafted and checked, filing nothing. `page` is the page it is about, by its address, and is
+ * left out on the Slash screen, where the description is about the whole BrainDog.
+ */
+export async function draftChange(client: SlashClient, asked: string, page?: string): Promise<{ ok: true; drafted: DraftedAll } | { ok: false; fix: string }> {
+  const out = await client.call<DraftedAll>('slashDraft', page === undefined ? { asked } : { asked, page });
+  if (!out.ok) return { ok: false, fix: fixOf(out) };
+  return { ok: true, drafted: out.value };
+}
+
+/**
+ * Whether the answer came from Slash's own rules, which cannot read a sentence: no model is set up, or the record cannot
+ * draw a change before it lands. Either way the sheet offers the source instead, the one other way to change a page.
+ */
+export const byRules = (drafted: DraftedAll): boolean => drafted.by === 'rules';
+
+/** What a keep or an ask on Decide came to. `fix` on a filed one is why it was not kept at once. */
+export type Kept = { kind: 'kept' } | { kind: 'filed'; id: string; href: string; fix?: string } | { kind: 'refused'; fix: string };
+
+/**
+ * One draft filed on Decide, and with `keep` accepted in the same press.
+ *
+ * THE CHANGE IS FILED AS IT WAS DRAWN, its declarations and nothing else: the sample rows were only there to draw it
+ * over, and a kept change must not bring made-up rows into the record. The accept is always asked when keeping, and the
+ * record answers it, so a person who may not decide is refused there with the record's own sentence and the change
+ * waits on Decide, as a member's field does (`action-draft.ts` `fileDraft`).
+ */
+export async function fileDrafted(client: SlashClient, draft: Drafted, keep: boolean): Promise<Kept> {
+  const filed = await client.call<{ id?: unknown }>('propose', { question: draft.question, body_kind: 'change', body: { to: draft.change.to } });
+  if (!filed.ok) return { kind: 'refused', fix: fixOf(filed) };
+  const id = String(filed.value?.id ?? '');
+  const href = decideHref(id);
+  if (!keep) return { kind: 'filed', id, href };
+  const accepted = await client.call<unknown>('decide', { id, decide: { option: 'accept', reason: changeWords.reason } });
+  if (!accepted.ok) return { kind: 'filed', id, href, fix: fixOf(accepted) };
+  return { kind: 'kept' };
+}
+
 /** The line under the switch: what on or off means, and when Slash last looked. */
 export const dailySaid = (daily: Daily): string => (daily.on ? words.dailyOn : words.dailyOff) + (daily.last ? ` ${words.dailyLast(daily.last)}` : '');
 

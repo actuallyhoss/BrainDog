@@ -760,6 +760,7 @@ const FIXED: readonly Resource[] = [
   resource('grammar/register', "What a list declaration may contain: its keys, each field's keys, and one that installs."),
   resource('grammar/metric', 'What a figure declaration may contain, with one that installs.'),
   resource('grammar/proposals', 'The bodies that change what this BrainDog is: pack, settings and arrange.'),
+  resource('grammar/ingest', 'What a door or a scheduled action may contain, with one of each.'),
   resource('grammar/script', 'What a script declaration may contain, what its ctx can reach, its limits, and two that install.'),
   resource('grammar/automations', 'What an automation may say: its triggers, its steps, its limits, what does not run yet, and two that install.'),
 ];
@@ -1536,7 +1537,8 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       if (head === 'arrangement' && !rest) return arranged({}, ctx);
       /* THE RECORD'S OWN GRAMMARS (`packages/record/src/grammar.ts`), all but its `rule`: a rule is said in full by
          `grammar/automations` above, this package's text, and a second rule grammar here would be two to keep in step. */
-      if (head === 'grammar' && (rest === 'page' || rest === 'register' || rest === 'metric' || rest === 'proposals')) return arranged({ grammar: rest }, ctx);
+      if (head === 'grammar' && (rest === 'page' || rest === 'register' || rest === 'metric' || rest === 'proposals' || rest === 'ingest'))
+        return arranged({ grammar: rest }, ctx);
       if (head === 'declaration' && NAMED.test(rest)) return arranged({ page: rest }, ctx);
     }
     const named = NAMED.test(rest);

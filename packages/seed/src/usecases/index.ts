@@ -78,10 +78,17 @@ export type Arrangement = { pick: UseCase | null; ranked: Ranked[] };
 const escape = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /** Every place a use case's signals appear, longest signal first, never two over one stretch. */
-function heard(said: string, u: UseCase): Span[] {
+const heard = (said: string, u: UseCase): Span[] => signalsIn(said, u.signals);
+
+/**
+ * Every place any of `signals` appears in what was said, as whole words, longest signal first, never two over one
+ * stretch, in sentence order. The one reading of a signal, so the first run hears a pack's words exactly as the arranger
+ * hears a use case's (`apps/web/src/lib/shape.ts`).
+ */
+export function signalsIn(said: string, signals: readonly string[]): Span[] {
   const lower = said.toLowerCase();
   const out: Span[] = [];
-  for (const signal of [...u.signals].sort((a, b) => b.length - a.length || a.localeCompare(b))) {
+  for (const signal of [...signals].sort((a, b) => b.length - a.length || a.localeCompare(b))) {
     const words = new RegExp(`(?<![\\p{L}\\p{N}])${escape(signal)}(?![\\p{L}\\p{N}])`, 'gu');
     for (const m of lower.matchAll(words)) {
       const at = m.index ?? 0;
@@ -148,10 +155,17 @@ export function alongside(arranged: Arrangement, proposed: UseCase | null): UseC
 /** First-party packs in install order: every list a later one points at comes earlier. */
 export const MODULE_ORDER = ['portfolio', 'people', 'money-core', 'estate', 'work', 'agents'] as const;
 
-/** The first-party packs to install for a use case: its own modules and any the sentence named, in order. */
+/**
+ * The packs to install for a use case: its own modules and any the sentence named, the first-party ones in install order
+ * and then any other catalogue pack in the order it was named.
+ *
+ * A CATALOGUE PACK IS KEPT, since a use case may stand on any pack (`@braindog/declare` `MODULES`, shell.md USE-3). It
+ * goes after the first-party ones because it may point at their lists and they never point at its.
+ */
 export function modulesFor(u: UseCase, named: readonly string[] = []): string[] {
   const wanted = new Set([...u.modules, ...named]);
-  return MODULE_ORDER.filter((id) => wanted.has(id));
+  const first = new Set<string>(MODULE_ORDER);
+  return [...MODULE_ORDER.filter((id) => wanted.has(id)), ...[...wanted].filter((id) => !first.has(id))];
 }
 
 /** The pages and rail sections a use case's own pack declares, for the proposal to say. Its Home is not one: it is Home. */

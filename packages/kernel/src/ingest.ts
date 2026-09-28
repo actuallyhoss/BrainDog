@@ -178,6 +178,19 @@ export type IngestDecl = {
      * until a person has looked at what it would have written.
      */
     confidence?: Confidence;
+    /**
+     * A FIXED VALUE ON EVERY ROW THIS PATTERN WRITES, never derived from the payload. An extract has
+     * no constant form of its own — `43 §4`'s nine transforms all read the message — so a field a bank
+     * pack needs on every row (money-core's `book`) had no honest way in: `default:` is an extractor
+     * that runs over a form and files its outcome at `proposed`, and an empty `ref` value is refused
+     * outright, so an unset setting could not be left out either.
+     *
+     * `{{config:<key>}}` IS FILLED AT INSTALL (`declare.ts` `fillConfig`) AND NEVER LIVE, same as
+     * everywhere else a placeholder appears. A setting that is empty leaves the field out of the row
+     * rather than writing an empty string in; a setting with a value writes it, always at `exact`,
+     * because nothing here was read off the payload for a person to check.
+     */
+    set?: Record<string, string>;
   };
   /**
    * What makes two arrivals the same thing.
@@ -924,6 +937,14 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
           else if (got.outcome !== 'exact') soft.push(field);
         }
       }
+    }
+
+    /* `writes.set` FILLS IN AFTER THE PAYLOAD, NEVER BEFORE IT, so a field the message itself sent is
+       never overwritten by a fixed one. A setting `fillConfig` filled empty is left out rather than
+       written as `''`, which a `ref` field would refuse, and neither branch touches `missed` or
+       `soft`: a fixed value is not a thing this arrival read, so it cannot lower `confidence`. */
+    for (const [field, value] of Object.entries(matched.writes.set ?? {})) {
+      if (value !== '' && !Object.hasOwn(extracted, field)) extracted[field] = value;
     }
 
     /* THE CEILING IS PART OF THE DECLARATION AND THE OUTCOME IS PART OF THE PAYLOAD, and the lower of

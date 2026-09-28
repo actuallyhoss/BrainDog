@@ -76,7 +76,23 @@ export function briefing(attached: Attached, at: Where, moved: Moved): string {
       { text: head, keep: true },
       { text: 'This host sends no briefing. Call context for one, and call handoff with the one next step before you stop.', keep: true },
     ]);
-  return briefingOf(head, c, moved);
+  const agent = attached.session.fields.agent;
+  return briefingOf(head, c, moved, typeof agent === 'string' ? agent : null);
+}
+
+/**
+ * The open rows somebody handed to this agent, by the name it signs with (GAP-11): the rows whose `agent` field holds it.
+ *
+ * THE FIELD'S OWN NAME, because Work's `hand:` names `agent` and `context` sends a row's string fields and not its
+ * list's declaration. The kernel's own run register is left out, since every run there carries the agent that ran it.
+ */
+export function handedTo(c: Context, agent: string | null): Brief[] {
+  const me = agent?.trim().toLowerCase().replace(/^agent:/u, '') ?? '';
+  if (!me) return [];
+  return c.registers
+    .filter((r) => r.id !== 'session' && !OWN.has(r.id))
+    .flatMap((r) => [...r.rows, ...r.inherited])
+    .filter((row) => typeof row.agent === 'string' && row.agent.trim().toLowerCase() === me);
 }
 
 /**
@@ -85,13 +101,18 @@ export function briefing(attached: Attached, at: Where, moved: Moved): string {
  * THE FIRST LINE IS PART OF IT, so the caps of `fit` count it, and a caller that has not attached can say what
  * `attach` cannot say for it. `braindog context` starts nothing and resumes nothing, so it writes its own.
  */
-export function briefingOf(head: string, c: Context, moved: Moved): string {
+export function briefingOf(head: string, c: Context, moved: Moved, agent: string | null = null): string {
   const lines: Line[] = [{ text: head, keep: true }];
   const keep = (text: string) => lines.push({ text, keep: true });
   const add = (text: string) => lines.push({ text, keep: false });
 
+  /* WHAT WAS HANDED TO THIS AGENT COMES BEFORE ANYTHING ELSE (GAP-11), and is kept: a person pressed "Hand to" and the
+     row says it waits for this session, so a briefing that dropped the line would leave it waiting. */
+  const handed = handedTo(c, agent);
+  if (handed.length > 0) keep(`Handed to you (${String(handed.length)}): ${handed.slice(0, PER_LINE).map((row) => item(row, 60)).join('; ')}. Take these first.`);
+
   if (c.handoff) {
-    keep(`Last handoff (${c.handoff.from}, ${ago(c.handoff.age_s)}): ${clip(c.handoff.next, 200)}`);
+    keep(`Last handoff (${clip(c.handoff.from, 40)}, ${ago(c.handoff.age_s)}): ${clip(c.handoff.next, 200)}`);
     for (const tried of c.handoff.tried.slice(-3)) keep(`  Already tried: ${clip(tried, 160)}`);
     if (moved !== undefined)
       keep(
@@ -106,7 +127,7 @@ export function briefingOf(head: string, c: Context, moved: Moved): string {
      crash nobody reported, and is not working either. */
   const working = c.live.same_repo.filter((r) => r.state === 'active' && !r.stale);
   if (working.length > 0) {
-    const runs = working.slice(0, PER_LINE).map((r) => `${r.spoken}${r.doing ? ` "${clip(r.doing, 60)}"` : ''}, seen ${ago(r.age_s)}`);
+    const runs = working.slice(0, PER_LINE).map((r) => `${clip(r.spoken, 40)}${r.doing ? ` "${clip(r.doing, 60)}"` : ''}, seen ${ago(r.age_s)}`);
     keep(`Also live in this repo: ${runs.join('; ')}.`);
     keep(`  ${TWO_SESSIONS}`);
   }
@@ -146,8 +167,69 @@ export function briefingOf(head: string, c: Context, moved: Moved): string {
     add(`Skills: ${named.join('; ')}.`);
   }
 
-  keep(clip(c.next, 240));
+  /* KEPT, because these are the lines that make the brain grow: a lesson a run learned the hard way reaches the
+     skill it bears on only when a later run proposes the skill's next version, and a line the cap dropped is a
+     proposal nobody makes. Three at most, so the cap still has room for everything else. */
+  const growing = bearing(c);
+  for (const g of growing) {
+    const ids = and(g.learnings.map((id) => clip(id, 40)));
+    const one = g.learnings.length === 1;
+    keep(`Skill ${g.skill}${g.rev === null ? '' : ` (v${String(g.rev)})`}: ${ids} ${one ? 'bears' : 'bear'} on it. If ${one ? 'it changes' : 'they change'} how it should read, propose its next version.`);
+  }
+
+  const first = growing[0];
+  keep(first ? `${clip(c.next, 240)} Then propose skill ${first.skill}'s next version from what bears on it.` : clip(c.next, 240));
   return fit(lines);
+}
+
+/** Words said as a person lists them: "LN12", "LN12 and LN15", "LN12, LN15 and LN18". */
+const and = (words: string[]): string => (words.length < 2 ? (words[0] ?? '') : `${words.slice(0, -1).join(', ')} and ${words[words.length - 1]!}`);
+
+/** A skill with active learnings bearing on it that its `because` does not carry yet. */
+export type Bearing = { skill: string; rev: number | null; learnings: string[] };
+
+const MAX_BEARING = 3;
+
+/**
+ * The skills whose next version is waiting to be written, nearest first, three at most.
+ *
+ * A LEARNING BEARS ON A SKILL WHEN ITS `topic` IS THE SKILL'S NAME, the rule the learnings' `topic` field states
+ * (`packages/seed/src/packs/agents.ts`); case and surrounding space are not a different skill. A learning the skill's
+ * `because` already names is in the skill, so it is no reason for another version.
+ *
+ * A PROJECT'S SKILL COMES BEFORE THE GLOBAL ONE OF THE SAME NAME, and only the first is weighed, because the skills
+ * sync writes the project's over the global one (`apps/cli/src/skills.ts`), so the global one is not what runs here.
+ */
+export function bearing(c: Context): Bearing[] {
+  const reg = (id: string) => c.registers.find((r) => r.id === id);
+  const learnings = reg('learnings');
+  const skills = reg('skills');
+  if (!learnings || !skills) return [];
+
+  /* Only a lesson still standing bears on anything; a superseded or reverted one was taken back. */
+  const byTopic = new Map<string, string[]>();
+  for (const row of [...learnings.rows, ...learnings.inherited]) {
+    if (row.state !== null && row.state !== 'active') continue;
+    const topic = typeof row.topic === 'string' ? row.topic.trim().toLowerCase() : '';
+    if (!topic) continue;
+    byTopic.set(topic, [...(byTopic.get(topic) ?? []), row.spoken]);
+  }
+  if (byTopic.size === 0) return [];
+
+  const out: Bearing[] = [];
+  const seen = new Set<string>();
+  for (const row of [...skills.rows, ...skills.inherited]) {
+    if (out.length >= MAX_BEARING) break;
+    const name = typeof row.name === 'string' ? row.name.trim() : '';
+    if (!name || seen.has(name.toLowerCase())) continue;
+    seen.add(name.toLowerCase());
+    if (row.state !== null && row.state !== 'active') continue;
+    const carried = new Set(Array.isArray(row.because) ? row.because.filter((id): id is string => typeof id === 'string') : []);
+    const fresh = (byTopic.get(name.toLowerCase()) ?? []).filter((id) => !carried.has(id));
+    if (fresh.length === 0) continue;
+    out.push({ skill: clip(name, 60), rev: typeof row.rev === 'number' ? row.rev : null, learnings: fresh.slice(0, PER_LINE) });
+  }
+  return out;
 }
 
 /**

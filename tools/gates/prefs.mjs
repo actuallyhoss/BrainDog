@@ -72,7 +72,7 @@ import { extname, join } from 'node:path';
 import { chromium } from '@playwright/test';
 
 import { APP_BASE, appShell, budget, readiness } from './lib.mjs';
-import { answers, forward, forwards, startRecord } from './record.mjs';
+import { answers, forward, forwards, serverKeyFor, startRecord } from './record.mjs';
 
 /* AND WHY THIS GATE DECLARES NO `needs`, although it drives a browser like the four that do.
    `52 §5.1` step 2 lets the runner refuse a gate whose prerequisite is unmet, and a refusal means
@@ -296,6 +296,62 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
           .map((b) => (b.textContent ?? '').replace(/\s+/g, ' ').trim())
           .join(' '),
     },
+
+    /*
+     * THE RECORD'S OWN KEYS (`PREF_KEYS`, contracts §7.3). A person's shape, switch and dismissals are kept by the record
+     * and answered on `boot`'s `me.prefs`, and the cookie is only their first-paint copy. The gate's record is reached with
+     * a key, and a key is not a person, so `setPref` refuses it; instead this gate's server writes the case's `@record`
+     * into the `boot` it hands the page (`bootWith` below), which is exactly the answer a person's `boot` carries. A value
+     * may be a function of the value before it, for a case whose second load names what the first one drew.
+     */
+    {
+      /**
+       * `nav.shape`: the record's word draws the shell, AND IT STANDS OVER THE COOKIE. The third value carries a top bar in
+       * the cookie and a menu in the record, so a build that still read the cookie as the truth comes back with the top
+       * bar twice and goes red.
+       */
+      name: 'nav.shape',
+      record: true,
+      what: "which navigation the shell draws when the record keeps the shape, over the cookie's copy (contracts §7.3)",
+      route: '/',
+      values: [{ '@record': {} }, { '@record': { 'nav.shape': 'bar' } }, { navShape: 'bar', '@record': { 'nav.shape': 'menu' } }],
+      probe: () =>
+        [
+          document.querySelectorAll('nav.rail').length,
+          document.querySelectorAll('nav.topbar').length,
+          document.querySelectorAll('button.menu-open').length,
+        ].join(' '),
+    },
+    {
+      /** `pen.suggest`: the switch as the record keeps it, and the pen or the empty state it draws, over the cookie's copy. */
+      name: 'pen.suggest',
+      record: true,
+      what: 'the Suggest new pages switch as the record keeps it, and the holding pen or the empty state it draws (29 §4)',
+      route: '/settings/navigation',
+      values: [{ '@record': {} }, { suggestPages: true, '@record': { 'pen.suggest': false } }],
+      probe: () =>
+        [
+          document.querySelector('#main button[role="switch"][aria-label="Suggest new pages"]')?.getAttribute('aria-checked') ?? 'none',
+          document.querySelectorAll('#main [data-pen]').length,
+          [...document.querySelectorAll('#main h3, #main [class*="empty"] strong, #main [class*="empty"] h3')].map((e) => e.textContent?.trim()).filter(Boolean).join('|'),
+        ].join(' '),
+    },
+    {
+      /**
+       * `pen.dismissed`: an offer dismissed on the record is gone from the pen, which is what makes Dismiss terminal on
+       * every device (`19 §3`). The first load keeps a menu so the navigation shape is offered at this width; the second
+       * dismisses every offer the first one drew, by the ids it drew them under, and the pen has to come back without them.
+       */
+      name: 'pen.dismissed',
+      record: true,
+      what: 'the offers the holding pen draws, and that a dismissal the record keeps takes one out on every device (19 §3)',
+      route: '/settings/navigation',
+      values: [
+        { '@record': { 'nav.shape': 'menu' } },
+        (drew) => ({ '@record': { 'nav.shape': 'menu', 'pen.dismissed': drew.split('\n').filter(Boolean) } }),
+      ],
+      probe: () => [...document.querySelectorAll('#main [data-pen]')].map((row) => row.getAttribute('data-pen')).join('\n'),
+    },
   ];
 
   /**
@@ -332,7 +388,7 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
         '        The parse wants `export type Pref = {`, one field per line at two spaces, and `};` on its own.',
     );
   else {
-    const measured = new Set(CASES.map((c) => c.name));
+    const measured = new Set(CASES.filter((c) => !c.record).map((c) => c.name));
     for (const field of FIELDS)
       if (!measured.has(field) && !EXCUSED.has(field))
         drift.push(
@@ -344,6 +400,36 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
         drift.push(
           `${name} is named here and Pref no longer has it, which is how previewDismissed outlived the type.\n` +
             '        Take it out of CASES or out of EXCUSED, whichever is holding it.',
+        );
+  }
+
+  /**
+   * AND THE RECORD'S KEYS THE SAME WAY, both directions, read off `PREF_KEYS` as text as `Pref` is read above.
+   *
+   * `nav.order` AND `nav.hidden` ARE EXCUSED because the rail keeps them through the same `nav-prefs.svelte.ts` path the
+   * three cases above measure, and their cookie and `localStorage` copies are what the `nav` case already loads.
+   */
+  const RECORD_EXCUSED = new Set(['nav.order', 'nav.hidden']);
+  const recordSrc = await readFile(join(root, 'packages', 'record', 'src', 'index.ts'), 'utf8').catch(() => '');
+  const keysSaid = /export const PREF_KEYS = \[([^\]]*)\]/u.exec(recordSrc)?.[1];
+  const RECORD_KEYS = keysSaid === undefined ? [] : [...keysSaid.matchAll(/'([^']+)'/gu)].map((m) => m[1]);
+  if (!RECORD_KEYS.length)
+    drift.push(
+      'PREF_KEYS could not be read out of packages/record/src/index.ts, so no key the record keeps was checked here.\n' +
+        "        The parse wants `export const PREF_KEYS = ['a', 'b'] as const;` on one line.",
+    );
+  else {
+    const measured = new Set(CASES.filter((c) => c.record).map((c) => c.name));
+    for (const key of RECORD_KEYS)
+      if (!measured.has(key) && !RECORD_EXCUSED.has(key))
+        drift.push(
+          `${key} is a key the record keeps with no case and no excuse, so nothing asks whether it changes anything.\n` +
+            '        Add a case with `record: true` above, or name it in RECORD_EXCUSED with why.',
+        );
+    for (const name of [...measured, ...RECORD_EXCUSED])
+      if (!RECORD_KEYS.includes(name))
+        drift.push(
+          `${name} is named here and PREF_KEYS no longer has it.\n` + '        Take it out of CASES or out of RECORD_EXCUSED, whichever is holding it.',
         );
   }
 
@@ -424,6 +510,8 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
     record = await startRecord();
 
     server = createServer(async (req, res) => {
+      const held = recordPrefsOf(req.headers.cookie);
+      if (held !== null && /^\/+api\/boot$/u.test(new URL(req.url ?? '/', 'http://x').pathname)) return bootWith(req, res, record.base, held);
       if (forwards(new URL(req.url ?? '/', 'http://x').pathname)) return forward(req, res, record.base);
       const rel = decodeURIComponent(new URL(req.url ?? '/', 'http://x').pathname).slice(1);
       if (rel.includes('..')) return res.writeHead(400).end();
@@ -463,14 +551,20 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
       /* A CASE IS COMPARED ONLY IF EVERY LOAD IN IT WAS REAL. Two probes of two screens, one of which
          was never there, is not a comparison of a preference. */
       let comparable = true;
-      for (const value of test.values) {
+      /* WHAT THE LOAD BEFORE DREW, for a value that is a function of it (`pen.dismissed`). */
+      let drew = '';
+      for (const said of test.values) {
+        const value = typeof said === 'function' ? said(drew) : said;
+        /* `@record` IS WHAT THE RECORD KEEPS FOR THE PERSON, and never goes in the cookie. */
+        const { '@record': kept, ...cookie } = value;
         const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
         /* THE COOKIE, NOT A CLICK. `50 §4.7` has the shell read `bd_pref` in a one-statement inline
            script before first paint, so setting it is exactly what the product does. It keeps this
            gate about whether the preference REACHES the DOM rather than about the control that sets it,
            which the a11y and layout gates already drive. */
         await context.addCookies([
-          { name: 'bd_pref', value: encodeURIComponent(JSON.stringify(value)), url: `http://localhost:${PORT}` },
+          { name: 'bd_pref', value: encodeURIComponent(JSON.stringify(cookie)), url: `http://localhost:${PORT}` },
+          ...(kept === undefined ? [] : [{ name: RECORD_PREFS, value: encodeURIComponent(JSON.stringify(kept)), url: `http://localhost:${PORT}` }]),
         ]);
         const page = await context.newPage();
         await page.goto(`http://localhost:${PORT}${APP_BASE}${test.route}`, { waitUntil: 'networkidle' });
@@ -488,7 +582,8 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
         if (process.env.BRAINDOG_GATE_SEED === 'prefs')
           await page.addStyleTag({ content: ':root{--row-h:34px !important}html{--t-ui:15px !important;--text:15px !important}' });
         await page.waitForTimeout(120);
-        seen.set(JSON.stringify(value), await page.evaluate(test.probe));
+        drew = await page.evaluate(test.probe);
+        seen.set(JSON.stringify(value), drew);
         await context.close();
         checked++;
         process.stdout.write('.');
@@ -512,7 +607,8 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
     process.stdout.write('\n');
 
     console.log(
-      `  prefs: ${checked} page-runs over ${CASES.length} of Pref's ${FIELDS.length} preferences, ` +
+      `  prefs: ${checked} page-runs over ${CASES.filter((c) => !c.record).length} of Pref's ${FIELDS.length} preferences ` +
+        `and ${CASES.filter((c) => c.record).length} of the record's ${RECORD_KEYS.length} keys, ` +
         `${findings.length + drift.length} finding(s)` +
         (unsettled.length ? `, ${unsettled.length} load(s) on a page that never drew` : ''),
     );
@@ -563,6 +659,38 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
     if (server !== null) await new Promise((r) => server.close(() => r()));
     await record?.close().catch(() => {});
   }
+}
+
+/** The cookie a case's `@record` rides in from the browser to this gate's server. Only this gate's server reads it. */
+const RECORD_PREFS = 'bd_gate_record';
+
+/** What a case says the record keeps for the person, from the request's cookie, or `null` when the case says nothing. */
+function recordPrefsOf(cookie) {
+  const raw = new RegExp(`(?:^|;\\s*)${RECORD_PREFS}=([^;]*)`).exec(cookie ?? '')?.[1];
+  if (raw === undefined) return null;
+  try {
+    const out = JSON.parse(decodeURIComponent(raw));
+    return out && typeof out === 'object' && !Array.isArray(out) ? out : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The record's own `boot`, with `me.prefs` set to what the case says the record keeps.
+ *
+ * THE REST IS THE RECORD'S ANSWER, UNTOUCHED, read with the gate's key as `forward` reads it, so the page draws exactly
+ * the screen it draws for a person whose record holds these preferences.
+ */
+async function bootWith(req, res, base, held) {
+  const key = serverKeyFor(base);
+  const said = await fetch(new URL(req.url ?? '/', base), { headers: key === undefined ? {} : { authorization: `Bearer ${key}` } })
+    .then((r) => r.json())
+    .catch(() => null);
+  if (said?.ok === true && said.value && typeof said.value === 'object') said.value.me = { ...(said.value.me ?? {}), prefs: held };
+  const answer = said ?? { ok: false, refusal: { code: 'RECORD_UNAVAILABLE', fix: "The gate's record did not answer its boot." } };
+  res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+  res.end(JSON.stringify(answer));
 }
 
 /* AND IT IS STILL A SCRIPT, because `self-test` spawns this file with `BRAINDOG_GATE_SEED=prefs` and

@@ -86,6 +86,12 @@ export type SealedGrant = {
   aad: string;
   /** The record's own wrapped key, so the host can unwrap without a second round trip. */
   key: { wrapped: Uint8Array; nonce: Uint8Array; wrapped_by: string; kek_id: string | null; salt: Uint8Array | null };
+  /**
+   * Which of the record's two data keys `key` is, the grant's own `sealed_under`: the host unwraps it under that name
+   * (`purposeOf` in `@braindog/host`), since the name is half of what the wrapping binds. OPTIONAL IN THE TYPE ONLY,
+   * so a host's test double that hands a record key reads as one; `openGrant` always says it.
+   */
+  purpose?: 'record' | 'connector';
 };
 
 export type BindGrantArgs = {
@@ -172,6 +178,13 @@ export function bindGrant(
       at: 'kind',
       allowed: GRANT_KINDS,
     });
+  /* REFUSED WITH A SENTENCE BEFORE THE TABLE'S CHECK THROWS ONE. The value arrives over a host's RPC from a body, and a
+     constraint failure several layers down names a column and not what to send. */
+  if (args.sealed_under !== undefined && args.sealed_under !== 'record' && args.sealed_under !== 'connector')
+    return no<GrantRow>('ENUM_VALUE_UNKNOWN', 'A key is sealed for a person to use (record) or for a scheduled connector (connector).', {
+      at: 'sealed_under',
+      allowed: ['record', 'connector'],
+    });
   if (!args.label.trim()) return no<GrantRow>('REQUIRED_MISSING', 'A grant has a label a person would say.', { at: 'label' });
   if (!args.opens.trim())
     return no<GrantRow>('REQUIRED_MISSING', 'A grant says what it opens: a host, an account, a machine.', { at: 'opens' });
@@ -233,12 +246,18 @@ export function bindGrant(
 
       /* ONE PRIOR VERSION, and the schema is what says so: two columns rather than a table. Enough
          to finish the requests already in flight when the key changed, and not a history of every
-         credential the customer has ever held. */
+         credential the customer has ever held.
+
+         `sealed_under` MOVES WITH THE BYTES. A rotation seals a new value, and whoever sealed it says under which key,
+         as a first bind does. Left as it was, a key a person replaced from the Keys screen and turned into a connector's
+         kept saying `record` over bytes the connector key sealed, and the run that opened it was refused for the old
+         answer; turned back, the row said `connector` over bytes only the record key opens. Unsaid is `record`, the
+         insert's own default, because a caller that says nothing sealed with the record key. */
       const moved = sql.all<{ id: string }>(
         `UPDATE grant SET prev_ciphertext = ciphertext, prev_nonce = nonce,
            ciphertext = ?, nonce = ?, version = version + 1, kdf = ?, wrapped_by = ?, kek_id = ?,
            bytes = ?, hint = ?, label = ?, opens = ?,
-           scopes = COALESCE(?, scopes), rotated_at = ?, stale_at = NULL
+           scopes = COALESCE(?, scopes), rotated_at = ?, stale_at = NULL, sealed_under = ?
          WHERE id = ? AND revoked_at IS NULL
          RETURNING id`,
         args.ciphertext,
@@ -252,6 +271,7 @@ export function bindGrant(
         args.opens,
         args.scopes ?? null,
         at,
+        args.sealed_under ?? 'record',
         id,
       );
       /* A REVOKED GRANT IS NOT ROTATABLE, and the refusal says which of the two it is: an id that
@@ -340,7 +360,8 @@ export function openGrant(
     wrapped_by: string;
     kek_id: string;
     revoked_at: string | null;
-  }>('SELECT id, kind, version, ciphertext, nonce, kdf, wrapped_by, kek_id, revoked_at FROM grant WHERE id = ?', args.id);
+    sealed_under: 'record' | 'connector';
+  }>('SELECT id, kind, version, ciphertext, nonce, kdf, wrapped_by, kek_id, revoked_at, sealed_under FROM grant WHERE id = ?', args.id);
 
   if (!row) return no<SealedGrant>('OUT_OF_BOUNDS', `There is no grant ${args.id}.`, { at: 'id' });
   if (row.revoked_at)
@@ -350,13 +371,16 @@ export function openGrant(
   if (!row.ciphertext || !row.nonce)
     return no<SealedGrant>('GRANT_REVOKED', `${args.id} carries no sealed bytes.`, { at: 'id' });
 
+  /* THE KEY THE BYTES WERE SEALED UNDER. A key added for a connector is sealed under the connector key, so its owner
+     reading it back, or a scheduled `call` sending it, is handed that key and told so in `purpose`; handed the record
+     key, the host's decrypt failed and read as the host's key store being wrong. */
   const key = sql.one<{
     wrapped: Uint8Array;
     nonce: Uint8Array;
     wrapped_by: string;
     kek_id: string | null;
     salt: Uint8Array | null;
-  }>("SELECT wrapped, nonce, wrapped_by, kek_id, salt FROM vault_key WHERE purpose = 'record'");
+  }>('SELECT wrapped, nonce, wrapped_by, kek_id, salt FROM vault_key WHERE purpose = ?', row.sealed_under);
   if (!key)
     return no<SealedGrant>('OUT_OF_BOUNDS', 'This record has no wrapped key, so nothing in it can be opened.', {
       at: 'id',
@@ -409,6 +433,7 @@ export function openGrant(
          the first restore that crossed a host. */
       aad: `${deps.recordId ?? 'self'}\u001f${row.id}\u001f${row.version}`,
       key,
+      purpose: row.sealed_under,
     });
   });
 }
@@ -533,9 +558,13 @@ export function sealedGrant(
      U+FFFF the post signed with one key and a call naming the same label sent the other (`vault-webhook-grant.test.ts`).
      No id the vault mints reaches that, since `bindGrant` holds every id to `g_` and a ULID. The filter stays in SQL,
      as `liveNamed`'s does, and the revoked fallback asks the same chooser over the same rows read as if live, so the
-     date the refusal names is that of the grant the order would have chosen. */
+     date the refusal names is that of the grant the order would have chosen.
+
+     A CONNECTOR'S JOB IS READ THE SAME WAY, because a label reaches here too. The fire writes the id it resolved, but a
+     job queued before the fire resolved names, or one a runner re-sent as the connector declared it, carries the label
+     its `fetch.auth.grant` says, and read by id alone it was refused as a key that does not exist. An id still finds
+     exactly its own row, since the chooser matches on the id as well as the label. */
   const row = ((): Held | undefined => {
-    if (job.kind !== 'notify.webhook') return sql.one<Held>(`SELECT ${COLUMNS} FROM grant WHERE id = ?`, args.grant) ?? undefined;
     const named = sql.all<Held & GrantChoosable>(`SELECT ${COLUMNS}, label, created_at FROM grant WHERE label = ? OR id = ?`, args.grant, args.grant);
     const chosen = grantChosen(named, args.grant) ?? grantChosen(named.map((g) => ({ ...g, revoked_at: null })), args.grant);
     return chosen === undefined ? undefined : named.find((g) => g.id === chosen.id);
@@ -562,7 +591,7 @@ export function sealedGrant(
   if (job.kind === 'pull.fetch' && row.sealed_under !== 'connector')
     return no<LeasedSeal>(
       'OUT_OF_BOUNDS',
-      `${args.grant} was sealed for use by a person, not by a connector. Re-add it to the connector before it runs.`,
+      `${args.grant} was added for a person to use, not for a connector. Replace its value on the Keys screen with "For a scheduled connector" on, and the next run opens it.`,
       { at: 'grant' },
     );
 

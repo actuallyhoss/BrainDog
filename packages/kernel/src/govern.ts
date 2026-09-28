@@ -29,6 +29,7 @@ import { pairsReads, type PairsDecl } from './pairs.ts';
 import { ACROSS, ANY_LIST, touches, type Resolve } from './reach.ts';
 import { egressChanged } from './script.ts';
 import { slashMayWrite } from './slash.ts';
+import { askOf, retypedBody, retypeShapeFault } from './api/retype.ts';
 
 /** The three tables that are read like registers and are not registers. */
 export const GOVERNANCE = ['suggestion', 'decision', 'prediction'] as const;
@@ -364,7 +365,10 @@ export function propose(deps: GovernDeps, actor: string | (() => string), p: Pro
     }
     const to = resolveTo(deps.sql, body);
     if (to.ok) {
-      const read: Result<{ egress: Egress[]; approve: string[] } | null> = deps.review ? deps.review(to.value.to) : ok(null);
+      /* A RETYPE IS NOT REVIEWED HERE, because `review` counts the rows as the install does and would answer the very
+         `FIELD_TYPE_CHANGED` a retype answers row by row. A list sends nothing out, and the record lints the list it would
+         install before it files one (`packages/record/src/methods/retype.ts`). */
+      const read: Result<{ egress: Egress[]; approve: string[] } | null> = deps.review && !isRetype(body.to) ? deps.review(to.value.to) : ok(null);
       if (!read.ok) return read as Result<{ id: string }>;
       /* AND A DIGEST'S WEBHOOK, which `review` does not ask `egressOf` about: it reads an ingest or a script and passes
          every other kind by, so audit fifty-one's digest posting Notes to `collector.example.com` was filed with
@@ -661,7 +665,39 @@ const isRetire = (to: unknown): to is { retire: unknown } => isMap(to) && 'retir
  * stamp a version on at filing, and whether the id installed is the resolved one. A retire asked `isAdd` there would be
  * stamped as a whole body drawn at filing, which is the race resolving at the press exists to end.
  */
-const fieldLevel = (to: unknown): boolean => isAdd(to) || isRetire(to);
+const fieldLevel = (to: unknown): boolean => isAdd(to) || isRetire(to) || isRetype(to);
+
+/* ── retype: one field retyped or narrowed over its rows (GAP-8, `api/retype.ts`) ── */
+
+/**
+ * Whether a change's `to` retypes or narrows one field of a live list, `{ retype: {...} }` or `{ narrow: {...} }`.
+ *
+ * FIELD-LEVEL, SO IT IS MERGED AT THE PRESS like an addition and a retire, and never stamped with a version at filing: the
+ * rows it answers move between filing and the press, and `api/retype.ts` reads them again when it lands.
+ */
+const isRetype = (to: unknown): to is Record<string, unknown> => isMap(to) && ('retype' in to || 'narrow' in to) && !('add' in to) && !('retire' in to);
+
+/**
+ * The list a retype would install, merged onto the list as it is live, and the version it was merged onto.
+ *
+ * `retypedBody` IS THE LANDING'S OWN, so the body the owner is asked about and the body that lands are one answer. Only the
+ * declaration is resolved here; the rows are `api/retype.ts`'s, which the record runs when the change is accepted.
+ */
+function retypeIn(sql: Sql, to: Record<string, unknown>, named: unknown): Result<{ to: Record<string, unknown>; version: number }> {
+  const shape = retypeShapeFault(to);
+  if (shape) return no('VALUE_MALFORMED', shape.fix, { at: shape.at });
+  const ask = askOf(to);
+  const list = listNamed(ask.register, named);
+  if (list === null || named !== `register.${list}`)
+    return no('VALUE_MALFORMED', `A retype of ${ask.register} is filed under "declaration_id":"register.${ask.register}".`, { at: 'body.declaration_id' });
+  const live = liveList(sql, list);
+  if (!live) return no('REGISTER_UNKNOWN', `There is no list called ${list} to change a field on.`, { at: 'body.to.register' });
+  const body = retypedBody(live.body, ask);
+  if (!body.ok) return body as Result<never>;
+  return ok({ to: { id: `register.${list}`, kind: 'register', body: body.value.body }, version: live.version });
+}
+
+/* ── end retype ── */
 
 /** The ids a bundle installs, in its order, or `null` when `to` is one declaration. */
 const membersOf = (to: unknown): string[] | null => {
@@ -707,6 +743,7 @@ function resolveTo(sql: Sql, body: Record<string, unknown>): Result<{ to: Record
      "needs to" would be a wrong answer to a proposer who sent one. */
   if (isAdd(body.to)) return addTo(sql, body.to, body.declaration_id);
   if (isRetire(body.to)) return retireIn(sql, body.to, body.declaration_id);
+  if (isRetype(body.to)) return retypeIn(sql, body.to, body.declaration_id);
   return ok({ to: body.to as Record<string, unknown> });
 }
 
@@ -1525,6 +1562,12 @@ export type Decided = {
    * like a `change`, so the gate hands the body back, and the caller reopens the question if it will not land.
    */
   apply?: { kind: Arranging; body: Record<string, unknown> };
+  /**
+   * An accepted retype or narrowing (GAP-8), for the caller to land through `retypeLanding` and `retypeLand`: its `to`
+   * as filed, and the version of the list it was merged onto. Landing asks for that version again, and the caller
+   * reopens the question if it will not land.
+   */
+  retype?: { to: Record<string, unknown>; expect?: { id: string; version: number } };
 };
 
 export type Verdict =
@@ -1718,6 +1761,7 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
   let expect: Decided['expect'];
   let expects: Decided['expects'];
   let apply: Decided['apply'];
+  let retype: Decided['retype'];
 
   if (option === 'accept') {
     if (row.body_kind === 'rowset') {
@@ -1770,7 +1814,7 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
         if (!resolved.ok) return resolved as Result<Decided>;
         install = resolved.value.to;
         const wrong =
-          shapeFault(install) ?? namesFault(deps.sql, { ...body, to: install }) ?? (fieldLevel(body.to) ? null : retiresRead(deps.sql, install)) ?? deps.fits?.(install) ?? null;
+          shapeFault(install) ?? namesFault(deps.sql, { ...body, to: install }) ?? (fieldLevel(body.to) ? null : retiresRead(deps.sql, install)) ?? (isRetype(body.to) ? null : deps.fits?.(install)) ?? null;
         if (wrong) return { ok: false, refusal: wrong };
         /* A WHOLE BODY IS HELD TO THE VERSION IT WAS FILED AGAINST. A change filed before the stamp existed carries none,
            and is installed as it always was rather than refused for a number nobody wrote. */
@@ -1818,6 +1862,15 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
         }
     }
 
+    /* A RETYPE IS HANDED BACK TO BE LANDED, NEVER INSTALLED (GAP-8). The install counts the rows and would refuse the
+       type change it exists to make, so the record lands it through `api/retype.ts` instead: the list and every answered
+       row in one transaction, or nothing and the question reopened, as a change that will not install is. */
+    if (row.body_kind === 'change' && isRetype(body.to) && install !== undefined) {
+      retype = { to: body.to, ...(expect === undefined ? {} : { expect }) };
+      install = undefined;
+      expect = undefined;
+    }
+
     /* THE PREDICTION, WRITTEN WITH THE DECISION AND IN THE SAME TRANSACTION.
 
        NOTHING WROTE ONE. `scorePrediction`, the `score` schedule handler and the brake that reads
@@ -1860,6 +1913,7 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
     ...(expect === undefined ? {} : { expect }),
     ...(expects === undefined ? {} : { expects }),
     ...(apply === undefined ? {} : { apply }),
+    ...(retype === undefined ? {} : { retype }),
   });
 }
 

@@ -74,7 +74,7 @@ export function monthsOf(every: string): number | null {
 }
 
 /** The clock and what goes beside it, loosely, because an agent may have written `day: 31` or `day: fri`. */
-export type ClockWas = { every?: string; at?: string; day?: unknown; month?: unknown };
+export type ClockWas = { every?: string; at?: string; day?: unknown; month?: unknown; late?: unknown };
 
 const isMonthDay = (d: unknown): d is number | 'last' => d === 'last' || (Number.isInteger(d) && (d as number) >= 1 && (d as number) <= 31);
 const isMonth = (m: unknown): m is string => typeof m === 'string' && (MONTHS as readonly string[]).includes(m);
@@ -92,6 +92,13 @@ const isTime = (at: unknown): at is string => {
  * starts from its default: Monday for a week (`clockOf`), the 1st for a month.
  */
 export function clockTo(every: string, was: ClockWas): Clock {
+  /* `late:` IS KEPT ACROSS EVERY PICK, since how late a turn may be taken is a question about the turn and not about how
+     often it comes. A patch of `late: ''` is the person choosing "however late", and drops it. */
+  const late = typeof was.late === 'string' && was.late !== '' ? { late: was.late } : {};
+  return { ...clockWithout(every, was), ...late };
+}
+
+function clockWithout(every: string, was: ClockWas): Clock {
   const months = monthsOf(every);
   if (months === null) {
     const weekday = typeof was.day === 'string' && (DAYS as readonly string[]).includes(was.day) ? was.day : undefined;

@@ -19,9 +19,10 @@
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  /* THE MODULES THIS BUILD SHIPS, for their names, blurbs and lists. It was the sample's `PACKS`, which carried the same
-     six and two add-ons nobody wrote (wave C1, `modules.ts`). */
-  import { MODULES } from '$lib/record/modules.ts';
+  /* THE MODULES THIS BUILD SHIPS, for their names, blurbs and lists, read off each one's own manifest and document. It
+     was the sample's `PACKS`, which carried the same six and two add-ons nobody wrote (wave C1), then a hand copy with
+     stale versions (USE-3). */
+  import { firstPartyModules } from '@braindog/seed/packs/modules';
   import { PAGES, REGISTERS } from '$lib/record/held.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import { HOME_CURRENCY_SETTING } from '@braindog/kernel';
@@ -57,7 +58,7 @@
   import { SPEAKS } from '$lib/voice.ts';
 
   const id = $derived(String(page.params.id));
-  const pack = $derived(MODULES.find((p) => p.id === id));
+  const pack = $derived(firstPartyModules().find((p) => p.id === id));
   /* A use case's pack by its use case, never `usecase-founder`. */
   const name = $derived(pack?.name ?? moduleName(id));
 
@@ -69,7 +70,29 @@
   /** Whether this use case is the only one on, so its voice is the record's whatever `speaks` says. */
   let alone = $state(false);
   let drafts = $state<Record<string, Draft>>({});
+  /** A list setting's lines as typed, one box each; `Draft` holds one text, so a list keeps its lines here. */
+  let lines = $state<Record<string, string[]>>({});
   let source: Source | null = null;
+
+  /**
+   * A LIST SETTING IS LINES OF TEXT, one box per line. Read by its type's word and not through `ConfigType`, so the
+   * form draws what the record declares whether or not the shared type has learnt the word yet.
+   */
+  const isList = (decl: ConfigDecl): boolean => (decl.type as string) === 'list';
+  /** The most lines the add-on declares, when it says; the record refuses past its own ceiling in its own words. */
+  const mostOf = (decl: ConfigDecl): number | null => {
+    const max = (decl as { max?: unknown }).max;
+    return typeof max === 'number' ? max : null;
+  };
+  const linesOf = (value: unknown): string[] => (Array.isArray(value) ? value.map((v) => (typeof v === 'string' ? v : JSON.stringify(v))) : []);
+  /** What Save would send for a list: the lines with something in them, trimmed, blank boxes left out. */
+  const listOf = (typedLines: readonly string[]): string[] => typedLines.map((l) => l.trim()).filter((l) => l !== '');
+  const listWords = {
+    add: 'Add a line',
+    remove: 'Remove',
+    line: (label: string, n: number) => `${label}, line ${n}`,
+    removeLine: (label: string, n: number) => `Remove line ${n} of ${label}`,
+  } as const;
 
   /** Sent and waiting; the record's refusal, the setting it names, and whether signing in again answers it. */
   let busy = $state(false);
@@ -86,8 +109,30 @@
     const next = { ...drafts };
     /* A NEW HOME CURRENCY CHANGES WHAT EVERY SUM IS TYPED IN, so every box is drawn again. */
     const redraw = keys.includes('home_currency') ? Object.keys(s.config) : keys;
-    for (const k of redraw) if (s.config[k]) next[k] = draftOf(s.config[k], s.values[k], currencyOf(s, k));
+    const nextLines = { ...lines };
+    for (const k of redraw) {
+      const decl = s.config[k];
+      if (!decl) continue;
+      /* A LIST'S DRAFT IS A BLANK ONE, kept only so the row draws; its lines are what it sends. */
+      next[k] = draftOf(decl, isList(decl) ? null : s.values[k], currencyOf(s, k));
+      if (isList(decl)) nextLines[k] = linesOf(s.values[k]);
+    }
     drafts = next;
+    lines = nextLines;
+  }
+
+  function setLine(key: string, i: number, text: string) {
+    const rows = [...(lines[key] ?? [])];
+    rows[i] = text;
+    lines[key] = rows;
+  }
+
+  function addLine(key: string) {
+    lines[key] = [...(lines[key] ?? []), ''];
+  }
+
+  function dropLine(key: string, i: number) {
+    lines[key] = (lines[key] ?? []).filter((_, n) => n !== i);
   }
 
   async function load(want: string) {
@@ -96,6 +141,7 @@
     fixAt = null;
     signin = false;
     drafts = {};
+    lines = {};
     const at = opened();
     const chosen = await openSettings(createClient({ base: apiBase() }), want);
     /* An answer for an add-on somebody has already navigated away from draws nothing. */
@@ -122,7 +168,19 @@
   });
 
   const entries = $derived(Object.entries(settings?.config ?? {}));
-  const pending = $derived(settings ? changesOf(settings, drafts) : { values: {}, wrong: {} as Record<string, string> });
+  /* A LIST'S LINES ARE COMPARED HERE, and its blank draft is kept out of `changesOf`, which would read the empty box as
+     the setting cleared. A list that held nothing and still holds nothing has not moved. */
+  const pending = $derived.by(() => {
+    const s = settings;
+    if (!s) return { values: {} as Record<string, unknown>, wrong: {} as Record<string, string> };
+    const listed = new Set(Object.entries(s.config).filter(([, d]) => isList(d)).map(([k]) => k));
+    const out = changesOf(s, Object.fromEntries(Object.entries(drafts).filter(([k]) => !listed.has(k))));
+    for (const k of listed) {
+      const now = listOf(lines[k] ?? []);
+      if (JSON.stringify(now) !== JSON.stringify(linesOf(s.values[k]))) out.values[k] = now;
+    }
+    return out;
+  });
   const dirty = $derived(Object.keys(pending.values).length > 0);
   const held = $derived(Object.keys(pending.wrong).length > 0);
   /* A refusal that names a setting this form draws is drawn beside it; any other under Save. */
@@ -223,7 +281,7 @@
             {@const only = key === SPEAKS && alone}
             {#if d}
               <div class="setting">
-                {#if decl.type === 'bool' || segmented}
+                {#if decl.type === 'bool' || segmented || isList(decl)}
                   <span class="setting-label" id="set-{key}-label">{label}</span>
                 {:else}
                   <label class="setting-label" for="set-{key}">{label}</label>
@@ -258,6 +316,32 @@
                           onkeydown={(e) => step(e, values, i, d)}
                         >{said}</button>
                       {/each}
+                    </div>
+                  {:else if isList(decl)}
+                    <!-- A LIST IS ITS LINES, one box each, so a person reads the whole value and changes one line
+                         without retyping the rest. A blank box is left out of what is saved. -->
+                    {@const rows = lines[key] ?? []}
+                    {@const most = mostOf(decl)}
+                    <div class="setting-lines" id="set-{key}" role="group" aria-labelledby="set-{key}-label">
+                      {#each rows as row, i (i)}
+                        <div class="setting-line">
+                          <div class="field setting-field">
+                            <input
+                              class="field-input"
+                              type="text"
+                              value={row}
+                              aria-label={listWords.line(label, i + 1)}
+                              oninput={(e) => setLine(key, i, typed(e))}
+                              aria-invalid={why ? 'true' : undefined}
+                              aria-describedby={why ? `set-${key}-why` : undefined}
+                            />
+                          </div>
+                          <Button weight="bare" disabled={busy} aria-label={listWords.removeLine(label, i + 1)} onclick={() => dropLine(key, i)}>{listWords.remove}</Button>
+                        </div>
+                      {/each}
+                      <div>
+                        <Button weight="bare" disabled={busy || (most !== null && rows.length >= most)} onclick={() => addLine(key)}>{listWords.add}</Button>
+                      </div>
                     </div>
                   {:else if decl.type === 'enum'}
                     <select class="setting-select" id="set-{key}" value={d.text} onchange={(e) => (d.text = typed(e))}>
@@ -462,6 +546,25 @@
 
   .setting-number {
     flex: 0 1 12ch;
+  }
+
+  /* A LIST'S LINES STACK, each box beside its Remove, and the label sits level with the first line. */
+  .setting:has(.setting-lines) {
+    align-items: start;
+  }
+
+  .setting-lines {
+    display: grid;
+    flex: 1 1 16ch;
+    gap: var(--sp-2);
+    min-inline-size: 0;
+    max-inline-size: 48ch;
+  }
+
+  .setting-line {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
   }
 
   .setting-unit {

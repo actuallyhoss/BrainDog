@@ -23,7 +23,7 @@ export const BASE = '/app';
  */
 export const APP_WORDS: ReadonlySet<string> = new Set(
   (
-    'audit automations catalogue connect decide fonts inbox invite jobs p packs r s search settings signin slash start t usage v vault ' +
+    'audit automations catalogue connect decide fonts inbox invite jobs p packs r s scripts search settings signin signup slash start t usage v vault ' +
     'api auth mcp a in ws admin app assets static www new _app'
   ).split(' '),
 );
@@ -33,9 +33,9 @@ export const APP_WORDS: ReadonlySet<string> = new Set(
 const SLUG = /^[a-z][a-z0-9-]{0,30}[a-z0-9]$/;
 const SPOKEN = /^[a-z]{1,3}\d+$/i;
 
-/* THE THREE ADDRESSES THAT NAME NO RECORD. Sign-in and an invitation are before any record is open, and `/s/<token>` is
+/* THE ADDRESSES THAT NAME NO RECORD. Sign-in, sign-up and an invitation are before any record is open, and `/s/<token>` is
    a capability that must not imply a record behind it; a slug added to any of them would ask for a record nobody meant. */
-const RECORDLESS = new Set(['signin', 'invite', 's']);
+const RECORDLESS = new Set(['signin', 'signup', 'invite', 's']);
 
 const now = (): string => globalThis.location?.pathname ?? '';
 

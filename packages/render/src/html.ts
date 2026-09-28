@@ -21,11 +21,12 @@
  * written only inside that option's `queue-visual`, and nothing on the page is drawn in it.
  */
 
-import { KINDS, SPARKLINE_POINT, TONES, type Kind } from './kinds.ts';
+import { SPARKLINE_POINT, TONES, type KindSpec } from './kinds.ts';
+import { kindSpec } from './kind-spec.ts';
 import { inline, magnitudeOfCell, text as plain, type Inline, type InlineOptions } from './inline.ts';
 import { glyphPath } from './inline.ts';
 import { MISSING, barFigure, day, figureChars, leadingCode, symbolFigure, symbolText, valueWord } from './format.ts';
-import { CARDS_NEXT, CARDS_NONE, FOLD_HIDE, FOLD_SHOW, TREND, cardLayout, counted, initialOf, isQuiet, markOf, ringDash, ringOf, trendOf } from './cards.ts';
+import { CARDS_NEXT, CARDS_NONE, FOLD_HIDE, FOLD_SHOW, RUN_OPEN, TREND, cardLayout, counted, initialOf, isQuiet, markOf, ringDash, ringOf, runFaceOf, trendOf, type RunCell, type RunFace } from './cards.ts';
 import { FEED_EARLIER, feedNew, feedPlan } from './feed.ts';
 import { QUEUE_RECOMMENDED, fileSrc, queueMore, queuePlan, queueSuggested, queueWays, type QueueShows } from './queue.ts';
 import { PATH_DONE, PATH_NEXT, pathMore, pathPlan } from './path.ts';
@@ -116,6 +117,13 @@ export type RenderOptions = InlineOptions & {
    * host's, the picture is left out and the option keeps its words (`queue.ts` `fileSrc`).
    */
   file?: (row: string, field: string) => string | null;
+  /**
+   * The kinds the record's packs declare, keyed `block.<id>`, as the record's `schema` answers them. A READ, like the
+   * rest: both renderers look a block's spec up through `kindSpec` with this, so a pack's kind is drawn by its
+   * primitive exactly as a first-party kind on that primitive is, and a kind nobody installed draws the one line that
+   * says so rather than nothing.
+   */
+  kinds?: Readonly<Record<string, KindSpec>>;
 };
 
 /** An address as the host serves it (`RenderOptions.href`). */
@@ -450,8 +458,7 @@ function list(b: Block, o: RenderOptions): string {
   if (b.kind === 'steps' && b.form === 'path') return path(b, o);
   if (b.kind === 'calendar') return calendar(b, o);
   if (b.kind === 'link') return links(b, o);
-  const spec = KINDS[b.kind];
-  const tag = spec.ordered ? 'ol' : 'ul';
+  const tag = kindSpec(b.kind, o.kinds)?.ordered ? 'ol' : 'ul';
   const body = b.rows
     .map((r) => {
       if (b.kind === 'todo')
@@ -611,7 +618,8 @@ export function verbatimText(b: Block): string {
      hand: `String.repeat` answers a negative or a non-finite count with a `RangeError`. */
   const level = (d: number | undefined): string =>
     '  '.repeat(Number.isFinite(d) ? Math.max(0, Math.floor(d as number)) : 0);
-  const indented = KINDS[b.kind].indented;
+  /* No options here, and none needed: a pack's kind cannot draw on `media`, so only a built-in kind is ever indented. */
+  const indented = kindSpec(b.kind)?.indented;
   return b.rows.map((r) => (indented ? level(r.depth) : '') + (r.cells[0] ?? '')).join('\n');
 }
 
@@ -732,13 +740,28 @@ function amount(value: string, o: RenderOptions): string {
 }
 
 /**
+ * A run's face (agents C11), mirroring `Cards.svelte`'s `runFace` snippet: the kind's glyph on a disc washed in the
+ * run's hue, ringed in that hue while the run is open, solid while it works and dashed once it has gone quiet, and a
+ * door to the run's page.
+ */
+function runFaceHtml(f: RunFace, o: RenderOptions): string {
+  const d = f.glyph === 'slash' ? 'M15.5 4.5 8.5 19.5' : (o.icon?.(f.glyph) ?? null);
+  const ring =
+    f.live !== 'stopped'
+      ? `<circle class="cards-run-ring" cx="18" cy="18" r="16.5" fill="none" stroke-width="2.5"${f.live === 'quiet' ? ' stroke-dasharray="4 3"' : ''} style="stroke:oklch(var(--mark-l) var(--mark-c) var(--run-hue))"></circle>`
+      : '';
+  const path = d ? `<path d="${escape(d)}" transform="translate(9 9) scale(0.75)" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>` : '';
+  return `<a class="cards-face cards-run" style="background:none" href="${escape(hrefFor(o, `/r/session/${f.seq}`))}" data-live="${f.live}" aria-label="${escape(RUN_OPEN)}"><svg class="cards-run-mark" viewBox="0 0 36 36" width="100%" height="100%" aria-hidden="true" style="--run-hue:${f.hue}"><circle class="cards-run-disc" cx="18" cy="18" r="14" style="fill:color-mix(in srgb, oklch(var(--mark-l) var(--mark-c) var(--run-hue)) 30%, var(--bg))"></circle>${ring}${path}</svg></a>`;
+}
+
+/**
  * `cards`: one card per row after the first, which names what each column is (`src/cards.ts`).
  *
  * The grid's column count is the host's `auto-fill` over a minimum width, so a narrow container is
  * one column with no breakpoint. `--cells` is not written: 05 §4 forbids inferring a count from the
  * space, and a card grid infers nothing, it only lets empty tracks stay empty.
  */
-function cards(b: Block, o: RenderOptions): string {
+function cards(b: Block, o: RenderOptions & { runs?: readonly (RunCell | null)[] | undefined }): string {
   const [head, ...rows] = b.rows;
   if (rows.length === 0) return `<p class="cards-empty">${escape(CARDS_NONE)}</p>`;
   const L = cardLayout(head?.cells ?? []);
@@ -750,12 +773,15 @@ function cards(b: Block, o: RenderOptions): string {
   const body = rows
     .map((r, n) => {
       const mark = L.mark >= 0 ? markOf(said(r, L.mark)) : null;
+      const run = L.name >= 0 || L.who >= 0 ? runFaceOf(said(r, L.nameIsWho ? L.name : L.who), o.runs?.[n], isQuiet(L, r.cells)) : null;
       const face = L.nameIsWho ? initialOf(said(r, L.name)) : null;
       const lead = mark
         ? `<span class="cards-mark" aria-hidden="true">${escape(mark)}</span>`
-        : face
-          ? `<span class="cards-face" aria-hidden="true">${escape(face)}</span>`
-          : '';
+        : L.nameIsWho && run
+          ? runFaceHtml(run, o)
+          : face
+            ? `<span class="cards-face" aria-hidden="true">${escape(face)}</span>`
+            : '';
       const name = L.name >= 0 ? `<h3 class="cards-title">${r.cells[L.name] ? drawn(r, L.name) : MISSING}</h3>` : '';
       const when = L.when >= 0 && r.cells[L.when] ? `<span class="cards-when">${drawn(r, L.when)}</span>` : '';
 
@@ -787,7 +813,7 @@ function cards(b: Block, o: RenderOptions): string {
       const whoFace = L.who >= 0 ? initialOf(said(r, L.who)) : null;
       const who =
         L.who >= 0 && r.cells[L.who]
-          ? `<div class="cards-who">${whoFace ? `<span class="cards-face" aria-hidden="true">${escape(whoFace)}</span>` : ''}<span class="cards-name">${drawn(r, L.who)}</span></div>`
+          ? `<div class="cards-who">${run ? runFaceHtml(run, o) : whoFace ? `<span class="cards-face" aria-hidden="true">${escape(whoFace)}</span>` : ''}<span class="cards-name">${drawn(r, L.who)}</span></div>`
           : '';
       /* DIMMED BY AN ATTRIBUTE, so the host's CSS decides how, and the card keeps every word it had. */
       const quiet = isQuiet(L, r.cells) ? ' data-quiet=""' : '';
@@ -1443,7 +1469,11 @@ const PRIMITIVE_RENDERERS ={ panel, grid, rows, proportional, inline: inlinePrim
 export const captioned = (b: Block): boolean => Boolean(b.heading) && b.kind !== 'code' && b.kind !== 'section' && b.kind !== 'capture';
 
 function block(b: Block, o: RenderOptions): string {
-  const spec = KINDS[b.kind];
+  const spec = kindSpec(b.kind, o.kinds);
+  /* A KIND NOBODY INSTALLED IS ONE LINE, the Svelte drawer's own: a host can build a `Block` by hand, or keep one it
+     parsed while a pack was installed, and a renderer that throws takes the whole page with it. */
+  if (!spec)
+    return `<figure class="block" data-kind="${escape(b.kind)}"><p class="needs-client">Block “${escape(b.kind)}” needs a newer client.</p></figure>`;
   const draw = PRIMITIVE_RENDERERS[spec.primitive];
   const cap = captioned(b)
     ? `<figcaption class="block-head"${toneAttrs(b.tone)}>${toneGlyph(b.tone)}${renderInline(inline(b.heading ?? '', o), o)}</figcaption>`

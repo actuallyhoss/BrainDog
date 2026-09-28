@@ -9,7 +9,7 @@
  *
  * IT NEVER REFUSES. A sentence in a language these rules do not read, or one that names nothing they know, is a proposal
  * with nothing heard: the screen offers every module to turn on by hand and keeps the words as the person's note. The
- * signature is fixed for the unit that replaces the inside with the catalogue's signals (shell.md USE-3).
+ * signature is fixed, and the inside reads the catalogue's signals (shell.md USE-3).
  *
  * A plain `.ts` with relative imports, so `node --test` can hold it; the screen only calls it.
  */
@@ -20,7 +20,7 @@ import { moduleName } from '@braindog/seed/usecases/names';
 
 import { arrangeTurns } from '../arrange.ts';
 import { firstRun } from '../first-run.ts';
-import { heardFor, INSTALL_ORDER, LEANS_ON, shape, toTurnOn, writable, type PackId } from '../shape.ts';
+import { BUNDLED, closeOver, heardFor, shape, toTurnOn, writable, type Offer, type PackId } from '../shape.ts';
 import { hear } from '../who.ts';
 
 export type Proposal = {
@@ -30,7 +30,10 @@ export type Proposal = {
   usecase: string | null;
   /** The other use cases for one person the sentence also described, by id, installed beside the one proposed. */
   also: string[];
-  /** The first-party modules to install, in install order, every one each leans on included. */
+  /**
+   * The packs to install, every one each leans on included: the first-party modules in install order, then any other
+   * catalogue pack the sentence was heard asking for.
+   */
   modules: string[];
   /** The currency typed in the sentence, or `null`: never guessed from a place or a word like "pounds". */
   currency: string | null;
@@ -43,8 +46,12 @@ export type Proposal = {
   heard: { phrase: string; became: string }[];
 };
 
-/** Where and how the sentence was typed: the person's time zone, for a day such as "on the 1st", and their language. */
-export type ProposeContext = { zone: string | null; locale: string };
+/**
+ * Where and how the sentence was typed: the person's time zone, for a day such as "on the 1st", and their language.
+ * `catalogue` is any pack beyond the bundled modules the first run may offer, each with the words it is heard in (a
+ * Kennel listing's manifest); absent, only the modules this build ships are listened for.
+ */
+export type ProposeContext = { zone: string | null; locale: string; catalogue?: readonly Offer[] };
 
 /**
  * TODAY WHERE THE PERSON IS, for a date the sentence gives as a day of the month. `null` when the zone is not one the
@@ -71,23 +78,22 @@ const overlaps = (a: { at: number; text: string }, b: { at: number; text: string
  * nothing loses a module it cannot install without. A phrase the use case claims ("an Etsy shop" said to the guide is
  * its project) asks for no module of its own (`claimedBy`).
  */
-function modulesOf(read: ReturnType<typeof shape>, said: string, named: boolean, u: UseCase | null, beside: readonly UseCase[]): PackId[] {
+function modulesOf(read: ReturnType<typeof shape>, said: string, named: boolean, u: UseCase | null, beside: readonly UseCase[], offers: readonly Offer[]): PackId[] {
   const kept = u ? heardFor(read, claimedBy(u, said)) : read;
   const pointed = new Set(kept.packs.filter((p) => p.why.length > 0).map((p) => p.id));
   /* `toTurnOn` ADDS PEOPLE FOR A NAME, and a declined reading has no packs, so a name alone still keeps People. */
-  const heard = toTurnOn(kept, named).filter((id) => pointed.has(id) || (named && !kept.packs.some((p) => p.id === id)));
-  const wanted = new Set<string>(u ? [...modulesFor(u, heard), ...beside.flatMap((b) => b.modules)] : heard);
-  for (let grew = true; grew; ) {
-    grew = false;
-    for (const id of [...wanted])
-      for (const needs of LEANS_ON[id as PackId] ?? [])
-        if (!wanted.has(needs)) {
-          wanted.add(needs);
-          grew = true;
-        }
-  }
-  return INSTALL_ORDER.filter((id) => wanted.has(id));
+  const heard = toTurnOn(kept, named, offers).filter((id) => pointed.has(id) || (named && !kept.packs.some((p) => p.id === id)));
+  /* A CATALOGUE PACK THE SENTENCE ASKED FOR IS KEPT beside the use case's modules, since `modulesFor` keeps any pack. */
+  return closeOver(u ? [...modulesFor(u, heard), ...beside.flatMap((b) => b.modules)] : heard, offers);
 }
+
+/**
+ * WHETHER THE SENTENCE DESCRIBES A BUSINESS NO USE CASE FITS: the lexicon heard no use case's words in it
+ * (`arrangeTurns` picks none with no score), so whatever it heard can only turn on a module or two. That is when a host with a model is asked
+ * to draft lists and pages made for it (`loop/finish/pages.md` PGS-20); a sentence these rules could not read at all is
+ * one of those too, since a model reads it in any language.
+ */
+export const outsideCatalogue = (p: Proposal): boolean => p.usecase === null && p.also.length === 0;
 
 /** What one sentence proposes. `ctx.locale` is carried for the catalogue's reading; these rules read English. */
 export function propose(sentence: string, ctx: ProposeContext): Proposal {
@@ -95,11 +101,13 @@ export function propose(sentence: string, ctx: ProposeContext): Proposal {
   /* THE REST OF THE SENTENCE IS READ WITHOUT THE NAME, so "Kiln, I run a studio" is not a project called Kiln. */
   const said = who.bio;
   const today = todayIn(ctx.zone);
-  const read = today === null ? shape(said) : shape(said, today);
+  /* THE CATALOGUE'S SIGNALS: the bundled modules' own, and those of any other pack the caller can offer. */
+  const offers = [...BUNDLED, ...(ctx.catalogue ?? []).filter((o) => !BUNDLED.some((b) => b.id === o.id))];
+  const read = shape(said, today ?? undefined, offers);
   const arranged = arrangeTurns(null, said);
   const u = read.declined === 'language' ? null : arranged.pick;
   const beside = u ? alongside(arranged, u) : [];
-  const modules = modulesOf(read, said, who.name !== null, u, beside);
+  const modules = modulesOf(read, said, who.name !== null, u, beside, offers);
 
   const heard: { at: number; phrase: string; became: string }[] = [];
   const phrases = read.declined === null ? read.heard : [];

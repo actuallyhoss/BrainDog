@@ -22,14 +22,14 @@ import { DatabaseSync } from 'node:sqlite';
 import { openRecord, type Kernel } from '@braindog/kernel';
 import { installSeed } from '@braindog/seed';
 
-import { columnsFor, currencyFor, dirOf, display, identityFor, isProse, labelOf, learnHome, seqWidth, packDiff, readableFields, spokenRow, toRows, unnamed } from './api.ts';
+import { columnsFor, currencyFor, dirOf, display, identityFor, isProse, labelOf, learnHome, seqWidth, readableFields, spokenRow, toRows, unnamed } from './api.ts';
 import { applyFilters, backlinks, boot, metric, page, pages, readBlock, search } from './fixtures/readers.ts';
 import { amountOf } from './money.ts';
 import { toSegments } from './blocks.ts';
 import { declaredValue } from './where.ts';
 import { seedBlock } from './seed.ts';
 import { hrefFor } from './metrics.ts';
-import { AUDIT, JOB, NEWS, NOW, PACKS, VAULT } from './fixtures/sample.ts';
+import { AUDIT, JOB, NEWS, NOW, VAULT } from './fixtures/sample.ts';
 import { PAGES, REGISTERS, ROWS } from './held.ts';
 import { blockOf as liveBlockOf } from './page-live.ts';
 import { layoutOf } from './boot-live.ts';
@@ -845,114 +845,6 @@ test('A ROW AND THE LEDGER AGREE ABOUT WHO PUT IT THERE', () => {
   const line = NEWS.find((n) => n.text.includes('services from the Fenwick invoice'));
   assert.ok(line, 'the away list no longer mentions the Fenwick services, so this test proves nothing');
   assert.match(line.text, new RegExp(`Added ${made} services`), 'the away list and the audit disagree about how many');
-});
-
-/* ── the one screen that carries the trust model ─────────────────────────── */
-
-test('A PACK DIFF COUNTS WHAT IT SAYS IT COUNTS', () => {
-  /* `04 §3`: "A pack is readable text, so a truthful diff is possible — this is the entire trust
-     model. You cannot diff a binary's intentions." The screen that carries it printed
-     `${pack.registers.length} field(s) added` — a count of REGISTERS labelled as FIELDS — so all
-     five installed packs said "1 field(s)" while Obligations declares eight. */
-  const money = PACKS.find((p) => p.id === 'money-core')!;
-  const d = packDiff(money);
-
-  const list = d.adds.find((a) => a.kind === 'list')!;
-  assert.equal(list.name, REGISTERS.obligations!.name, 'the diff named the id, not the list');
-  assert.equal(list.detail, `${REGISTERS.obligations!.fields.length} fields`);
-  assert.notEqual(list.detail, `${money.registers.length} fields`, 'the register count is back in the field slot');
-
-  const page_ = d.adds.find((a) => a.kind === 'page')!;
-  assert.equal(page_.name, PAGES.money!.title);
-  /* THE COUNT IS THE DECLARATION'S, AND THE WORD IS NO LONGER `blocks`. It asserted the whole
-     phrase, so it was holding two facts in one regex: that the number comes from the page rather
-     than from anywhere else, which is what this test is about and has not moved, and that the
-     noun beside it is `block`, which was never this test's subject. `block` is defined once, on a
-     sheet a person reaches from a different screen, once per device, behind a cookie — and this
-     is the screen where a stranger decides whether to let a file into their business and the one
-     screen in the product that can define nothing. So the number is asserted, and the word this
-     surface may not use is asserted absent. */
-  assert.match(page_.detail ?? '', new RegExp(`^${PAGES.money!.blocks.length} `));
-  assert.doesNotMatch(page_.detail ?? '', /\bblocks?\b/u, 'the trust screen is printing a word it has no room to define');
-});
-
-test('and it never names a page that does not exist', () => {
-  /* `+ page.— placed in nav` — the em-dash fallback for a pack with no page, rendered as though `—`
-     were a page about to be put in somebody's sidebar. Two of the eight packs declare none. */
-  for (const pack of PACKS) {
-    const d = packDiff(pack);
-    assert.equal(d.adds.filter((a) => a.kind === 'page').length, pack.pages.length, `${pack.id}: page rows and declared pages disagree`);
-    /* A COLLIDING NAME IS NOT AN ADD. It is the reason the install does not happen and it has its
-       own section; under ADDS it would say the pack brings you a Services you already have — with
-       the EXISTING list's field count, because that name resolves. */
-    const clashes = pack.conflicts?.length ?? 0;
-    assert.equal(
-      d.adds.filter((a) => a.kind === 'list').length,
-      pack.registers.length - clashes,
-      `${pack.id}: list rows and declared registers disagree`,
-    );
-    for (const clash of pack.conflicts ?? [])
-      assert.ok(
-        !d.adds.some((a) => a.name === REGISTERS[clash]?.name),
-        `${pack.id}: ${clash} is listed as an add and as a conflict`,
-      );
-    for (const add of d.adds) {
-      assert.ok(add.name, `${pack.id}: an unnamed thing in the diff`);
-      assert.ok(!add.name.includes('—'), `${pack.id}: the em-dash fallback reached the screen as a name`);
-      /* EVERY LINE SAYS WHICH KIND IT IS, in words. The glyph beside it is decorative, so without
-         this an unread pack is three bare nouns to anybody listening. */
-      assert.ok(add.detail, `${pack.id}: "${add.name}" says nothing about what it is`);
-    }
-  }
-});
-
-test('an unread pack says the shape is unknown rather than inventing one', () => {
-  const available = PACKS.find((p) => !p.installed)!;
-  const d = packDiff(available);
-  assert.equal(d.unread, true);
-  /* A pack this record has not installed declares lists it does not have, so there is no field
-     count — and the previous version printed one anyway. */
-  for (const add of d.adds) assert.match(add.detail ?? '', /^a (list|page)$/);
-});
-
-test('the two guarantees are stated, and the two findings only when there are any', () => {
-  for (const pack of PACKS) {
-    const d = packDiff(pack);
-    /* `04 §3.2`: seeds are a WRITE and get their own line — the trust screen was untrue for as long
-       as it claimed "0 rows written" while three documents required seeding. */
-    assert.match(d.seeds, /example/);
-    /* And this one is a fact about the mechanism: a pack physically cannot read a row at install. */
-    assert.match(d.touches, /0 rows read/);
-    /* `06 §1`: a warning that does not apply teaches people to ignore warnings, so a pack with
-       nothing to declare in these two sections declares nothing. */
-    assert.equal(d.changes.length, pack.moves?.length ?? 0, `${pack.id}: the CHANGES section and the declaration disagree`);
-    assert.equal(d.conflicts.length, pack.conflicts?.length ?? 0, `${pack.id}: the CONFLICTS section and the declaration disagree`);
-  }
-});
-
-test('AND THE TWO SECTIONS THAT WERE BEHIND A CONDITION THAT COULD NOT BE TRUE', () => {
-  /* `packDiff` returned `changes: []` and `conflicts: []` as literals and never wrote to either, so
-     `copy.diffChanges`, `copy.diffConflicts` and `copy.diffNavKept` were shipped to the browser
-     behind `{#if}`s that were permanently false — three sentences rendered nowhere, on a screen
-     whose `04 §4` section is the most important refusal it makes. The `dead-copy` gate could not
-     see it: it proves a MENTION, not a render.
-
-     The record can hold both facts now, and two of the three packs you can install carry one. */
-  const moves = PACKS.find((p) => p.moves?.length);
-  assert.ok(moves, 'no pack declares a nav move, so the CHANGES section is unreachable again');
-  const changed = packDiff(moves).changes;
-  assert.equal(changed.length, 1);
-  /* NAMED BY TITLE, because the reader is being asked about their own sidebar rather than about a
-     declaration — and `04 §4` is that a pack may place a page it owns and may never move yours. */
-  assert.match(changed[0]!, new RegExp(`^${PAGES[moves.moves![0]!.page]!.title} would move from`));
-
-  const clash = PACKS.find((p) => p.conflicts?.length);
-  assert.ok(clash, 'no pack declares a collision, so the CONFLICTS section is unreachable again');
-  const found = packDiff(clash).conflicts;
-  assert.equal(found.length, 1);
-  /* AND IT NAMES WHO ALREADY OWNS IT. `02 §1`: a register another pack ships is a name this one
-     cannot own, and "Services already exists" without the owner leaves the reader nowhere. */
-  assert.match(found[0]!, /already exists, from /);
 });
 
 test('A ROW SAYS WHICH THING IT BELONGS TO, and every list was grey because nothing could ask', () => {

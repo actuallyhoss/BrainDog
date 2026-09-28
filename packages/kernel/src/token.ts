@@ -60,6 +60,13 @@ export type TokenRow = {
    * say why it stopped. Absent on every other row, and on every row when the listing was not handed the cut-off.
    */
   ended_by?: 'operator';
+  /**
+   * Whose token it is, as the owner knows them: the person's name, or their address when they gave none, and `null`
+   * for a person this record's mirror does not hold. On `listTokens`'s rows only, because a colleague may mint their
+   * own (`createOwnToken` in `packages/record`) and the owner's list has to say whose each one is before Revoke means
+   * anything.
+   */
+  person_name?: string | null;
 };
 
 const VISIBLE = 'id, person_id, scope, reach, label, created_at, last_used_at, last_surface, expires_at, revoked_at';
@@ -132,6 +139,18 @@ const reachOf = (column: string | null): TokenReach[] => {
 };
 
 type Stored = Omit<TokenRow, 'reach' | 'ended_by'> & { reach: string | null };
+
+/**
+ * The listing's columns, each named from the token table, with whose it is from the person mirror beside them.
+ *
+ * QUALIFIED, BECAUSE `person` HAS AN `id` TOO, and an unqualified `id` in a join is either ambiguous or the wrong one.
+ * A LEFT JOIN, so a token whose person the mirror has lost is still listed and still revocable.
+ */
+const LISTED =
+  'SELECT t.id AS id, t.person_id AS person_id, t.scope AS scope, t.reach AS reach, t.label AS label, ' +
+  't.created_at AS created_at, t.last_used_at AS last_used_at, t.last_surface AS last_surface, ' +
+  't.expires_at AS expires_at, t.revoked_at AS revoked_at, COALESCE(p.name, p.email) AS person_name ' +
+  'FROM token t LEFT JOIN person p ON p.id = t.person_id';
 
 /**
  * A stored row as a listing shows it, marked when the cut-off has ended it. A revoked row is not marked: somebody ended
@@ -260,10 +279,11 @@ export async function createToken(
  * Every token, with a revoke button's worth of information and nothing a hash needs.
  *
  * `validFrom` IS THE HOST'S CUT-OFF, as `TokenDeps.validFrom`, and marks each token it has ended, so a token that stopped
- * working in an incident says so on the owner's list rather than looking live.
+ * working in an incident says so on the owner's list rather than looking live. Each row says whose it is
+ * (`person_name`), since a colleague may hold tokens of their own.
  */
 export const listTokens = (sql: Sql, validFrom?: string): TokenRow[] =>
-  sql.all<Stored>(`SELECT ${VISIBLE} FROM token ORDER BY created_at DESC, id`).map((raw) => rowOf(raw, validFrom));
+  sql.all<Stored>(`${LISTED} ORDER BY t.created_at DESC, t.id`).map((raw) => rowOf(raw, validFrom));
 
 /**
  * Revoke one.

@@ -37,7 +37,7 @@
   import * as pref from '../pref.ts';
   import { navPrefs, type Saved } from '../nav-prefs.svelte.ts';
   import type { NavEntry } from '../record/api.ts';
-  import type { PageDecl, RegisterDecl } from '../record/schema.ts';
+  import type { RegisterDecl } from '../record/schema.ts';
   import Icon, { type IconName } from './Icon.svelte';
   import { palette } from '../palette/open.svelte.ts';
   import Menu from './Menu.svelte';
@@ -46,6 +46,7 @@
   import { levelWord, openRecord, type SwitcherRow } from '../record/switcher.ts';
   import { nameWords } from '../record/names.ts';
   import type { Shell } from '../record/boot-live.ts';
+  import type { SpineKey } from '../spine.ts';
 
   let {
     nav,
@@ -54,18 +55,22 @@
     records = [],
     refused,
     registers,
+    spine = ['home', 'decide', 'inbox', 'slash', 'automations'],
     open = 0,
     inbox = 0,
     icons = false,
     ontoggle,
   }: {
     nav: NavEntry[];
-    pen: PageDecl[];
+    /** The holding pen's offers (`boot`'s `pen`); the rail says only how many (PGS-18). */
+    pen: readonly unknown[];
     record: string;
     records?: SwitcherRow[];
     /** Why the rest of the records could not be listed, when they could not: the host's own sentence. */
     refused?: string | undefined;
     registers: { id: string; name: string; count: number; icon: IconName; views?: { key: string; name: string; href: string }[] }[];
+    /** The spine as `spineOf` reads it, which the tab bar and the top bar read too (PGS-18). */
+    spine?: readonly SpineKey[] | undefined;
     open?: number | undefined;
     inbox?: number | undefined;
     /** The narrow rail: glyphs, with the names on hover and on focus. Per device, `pref.sidebar`. */
@@ -81,6 +86,10 @@
     unnamed: 'My BrainDog',
     moreLists: (n: number) => `Show ${n} more`,
     fewerLists: 'Show fewer',
+    /* FLD-1's row under the lists, said only here. */
+    newList: 'New list',
+    /* THE HOLDING PEN'S ROW (PGS-18): how many offers wait, and Settings, Navigation says what they are. */
+    suggested: (n: number) => `${n} suggested`,
   } as const;
 
   /**
@@ -497,13 +506,16 @@
   <!-- The spine. Home, Decide and Inbox are the three surfaces whose absence would make this a
        different product, so no pack may add to it, reorder it or badge it. Slash and Automations
        follow them: they were two glyphs in a strip at the foot that nobody could tell apart, and
-       they are what fits the record to how a person works (design SYS-12). -->
+       they are what fits the record to how a person works (design SYS-12). Decide and Inbox are
+       drawn once they have been used, by the rule the tab bar and the top bar read too (`spine.ts`,
+       PGS-18); both still answer by address and by `g then d` / `g then i`. -->
   <ul class="group spine">
     <li>
       <a class="item tap" href={at('/')} data-label={said('home')} aria-current={here('/') ? 'page' : undefined}>
         <Icon name="home" size="m" /><span class="item-name">{said('home')}</span>
       </a>
     </li>
+    {#if spine.includes('decide')}
     <li>
       <a class="item tap" href={at('/decide')} data-label={said('decide')} aria-current={under('/decide') ? 'page' : undefined}>
         <Icon name="decide" size="m" /><span class="item-name">{said('decide')}</span>
@@ -520,12 +532,15 @@
         {#if open}<span class="tally num" data-waiting aria-label={`${open} ${copy.openQuestions}`}>{open}</span>{/if}
       </a>
     </li>
+    {/if}
+    {#if spine.includes('inbox')}
     <li>
       <a class="item tap" href={at('/inbox')} data-label={said('inbox')} aria-current={under('/inbox') ? 'page' : undefined}>
         <Icon name="inbox" size="m" /><span class="item-name">{said('inbox')}</span>
         {#if inbox}<span class="tally num">{inbox}</span>{/if}
       </a>
     </li>
+    {/if}
     <li>
       <!-- ITS LABEL IS ITS NAME, and its tooltip says what it is, since Slash is not a word a person uses about their
            own work. The tooltip is `title` and not the accessible name, so the name read aloud is the name on screen. -->
@@ -536,6 +551,13 @@
     <li>
       <a class="item tap" href={at('/automations')} data-label={copy.automations} aria-current={under('/automations') ? 'page' : undefined}>
         <Icon name="refresh" size="m" /><span class="item-name">{copy.automations}</span>
+      </a>
+    </li>
+    <li>
+      <!-- JOBS BESIDE AUTOMATIONS (AGT-23): an agent's job runs on its own once started, and while one is running it is
+           the screen somebody keeps going back to, so it sits with the other things that run rather than under More. -->
+      <a class="item tap" href={at('/jobs')} data-label={copy.jobs} aria-current={under('/jobs') ? 'page' : undefined}>
+        <Icon name="play" size="m" /><span class="item-name">{copy.jobs}</span>
       </a>
     </li>
   </ul>
@@ -636,6 +658,14 @@
 
     <!-- The registers themselves. Native, never pack-positioned: a page can be uninstalled with the
          pack that declared it, and the collections underneath it still have to be reachable. -->
+    <!-- "NEW LIST" SITS UNDER THE LISTS IT JOINS (FLD-1), the last row of the group. It opens the list screen on the
+         new-list sheet at `NEW_LIST_PATH` in `record/list-write.ts`, written out here because importing that file would
+         pull the record's write path into the shell's entry chunk (see `nav.ts`). -->
+    {#snippet newListItem()}
+      <a class="item tap" href={at('/r/_new?make')} data-label={words.newList} aria-current={here('/r/_new') ? 'page' : undefined}>
+        <Icon name="plus" size="m" /><span class="item-name">{words.newList}</span>
+      </a>
+    {/snippet}
     {#if anyList}
     {#if icons}
       <hr class="sep" />
@@ -684,7 +714,13 @@
           </button>
         </li>
       {/if}
+      <li>{@render newListItem()}</li>
     </ul>
+    {:else}
+      <!-- A RECORD WITH NO LIST YET STILL HAS THE WAY TO MAKE ONE, which is when it is wanted most. -->
+      <ul class="group">
+        <li>{@render newListItem()}</li>
+      </ul>
     {/if}
 
     {#if hiddenHere > 0}
@@ -701,9 +737,9 @@
            returns it to its stored order, never to the end of the list (19 §3). -->
       <!-- The one row in this rail that had no glyph, sitting between groups that all have one.
            This file's own header argues against exactly that. -->
-      <a class="pen tap" href={at('/settings/navigation')} data-label={copy.suggested}>
+      <a class="pen tap" href={at('/settings/navigation')} data-label={words.suggested(pen.length)}>
         <Icon name="alert" size="m" />
-        <span class="pen-text">{pen.length === 1 ? copy.suggestedPage : `${pen.length} suggested pages.`}</span>
+        <span class="pen-text">{words.suggested(pen.length)}</span>
         <span class="pen-action">{copy.review}</span>
       </a>
     {/if}

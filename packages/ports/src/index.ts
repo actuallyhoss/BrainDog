@@ -449,3 +449,4 @@ export type {
   AssertionJSON, AssertionOptions, Auth, AuthBodies, AuthCall, AuthFlow, AuthResult, InviteProved, Mail, Methods,
   PasskeyInfo, RegistrationJSON, RegistrationOptions, SessionInfo, Who,
 } from './auth.ts';
+export type { SignupCall, SignupName, SignupVerified } from './auth.ts';

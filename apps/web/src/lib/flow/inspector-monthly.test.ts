@@ -96,8 +96,9 @@ test('A MONTHLY CLOCK PICKED ON THE CANVAS LEAVES SEND ON, and the trigger says 
   for (const every of CLOCKS) assert.deepEqual(faultsOf(draft(clockTo(every, { every: '1h' }))), [], every);
 });
 
+/* R2 MOVED WHO SAYS IT: the canvas's fault list no longer copies the lint, and the record's own refusal comes back
+   through `checkAutomation`. `calendarFault` is still the sheet's reading of a clock of months, held here to the lint. */
 test('A MONTHLY CLOCK THE RECORD WOULD REFUSE IS SAID IN CALENDAR WORDS, and never as no clock at all', () => {
-  const faults = (on: Record<string, unknown>) => faultsOf(draftOf('rule.m', { rule: 'm', on, steps: [{ notify: { say: 'x' } }] })).map((f) => f.say);
   const cases: Record<string, unknown>[] = [
     { every: '5mo', day: 1, at: '09:00', month: 'jan' },
     { every: '1mo', at: '09:00' },
@@ -112,7 +113,6 @@ test('A MONTHLY CLOCK THE RECORD WOULD REFUSE IS SAID IN CALENDAR WORDS, and nev
   for (const on of cases) {
     const said = calendarFault(on);
     assert.notEqual(said, null, JSON.stringify(on));
-    assert.deepEqual(faults(on), [said], JSON.stringify(on));
     assert.doesNotMatch(said!, /not a clock|—/u);
     /* AND THE RECORD REFUSES EVERY ONE OF THEM, so the canvas is not stricter than the lint, nor looser. */
     assert.notEqual(record(on), 'ok', JSON.stringify(on));

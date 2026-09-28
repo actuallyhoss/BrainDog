@@ -46,6 +46,54 @@ export type KeysDoor<C> = {
   keys?: { put(ask: KeysAsk<C>): Promise<Result<unknown>>; open(ask: KeysAsk<C>): Promise<Response> } | undefined;
 };
 
+/** Which of the record's two data keys sealed a key's bytes (`12 §6`). */
+export type SealedUnder = 'record' | 'connector';
+
+/**
+ * Which key a deposit asks to be sealed under: `record` for one a person uses, `connector` for one a scheduled
+ * connector opens on its own. Unsaid is `record`, as it always was.
+ *
+ * READ HERE, BY BOTH HOSTS' DEPOSIT STEPS, AND NOT BY THE RECORD ALONE, because the choice changes which key the host
+ * unwraps to seal, and a value the host cannot read is refused before any key is touched.
+ *
+ * NOT FROM AN AGENT'S LOGIN TOKEN. That door adds a key for the run to use and nothing else (`loop/finish/agents.md`
+ * C1), and a key a scheduled run can open without a person present is the owner's to add, from the app, or an agent's
+ * holding a vault grant. So the connector path stays behind a vault grant or a browser session.
+ */
+export function sealedUnderOf(body: Record<string, unknown>, agentDeposit = false): Result<SealedUnder> {
+  const said = body.sealed_under;
+  if (said === undefined || said === 'record') return { ok: true, value: 'record' };
+  if (said !== 'connector')
+    return {
+      ok: false,
+      refusal: {
+        code: 'ENUM_VALUE_UNKNOWN',
+        fix: 'A key is sealed for you to use (record) or for a scheduled connector (connector).',
+        at: 'sealed_under',
+        allowed: ['record', 'connector'],
+      },
+    };
+  if (agentDeposit)
+    return {
+      ok: false,
+      refusal: {
+        code: 'FORBIDDEN',
+        fix: 'A login token adds a key for its run to use. A key for a scheduled connector needs a vault grant (braindog login <host> --vault <project>) or the owner on the Keys screen.',
+        at: 'sealed_under',
+      },
+    };
+  return { ok: true, value: 'connector' };
+}
+
+/**
+ * Which data key a seal target or a sealed read names: `connector` only when the record says so outright.
+ *
+ * READ OFF THE OBJECT RATHER THAN ITS TYPE, because the record's `SealTarget` and `OpenedForGrant` name the key they
+ * hand out and, until the record says which of its two keys that is, every one of them is the record key. A target
+ * that says nothing is unwrapped as it always was.
+ */
+export const purposeOf = (x: object): SealedUnder => ((x as { purpose?: unknown }).purpose === 'connector' ? 'connector' : 'record');
+
 /** Which of the two doors a path is, or `null`. */
 export function servesKeys(pathname: string): 'put' | 'open' | null {
   const hit = /^\/+api\/+keys\/+(put|open)\/*$/.exec(pathname)?.[1];

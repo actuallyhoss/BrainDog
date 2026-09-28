@@ -39,6 +39,85 @@ const numbers = (where: string | null, empty: string, line: string) => {
   ];
 };
 
+/**
+ * WHERE A BUTTON ON A DECLARED PAGE OPENS THE NEW-ACTION SHEET (`loop/finish/contracts.md` X57). A path of this
+ * BrainDog, which the app puts under the record's own address (`at` in `apps/web/src/lib/at.ts`), and the preset ids
+ * are `PRESETS` in `apps/web/src/lib/record/action-draft.ts`: `numbers` is a door writing to this list, `watch` a
+ * scheduled read of one number.
+ */
+const SEND_NUMBERS = '/automations?new=door&preset=numbers';
+const WATCH_NUMBER = '/automations?new=action&preset=watch';
+
+/**
+ * BROWSE, SEARCHED FOR THE PACKS A BUTTON NAMES. Browse reads `q` off the address and keeps a listing only when every
+ * word is in it, so one word each: every pack that brings money in says "Money" in its summary, and every pack that
+ * reads a live number says "Polls".
+ */
+const BROWSE_MONEY = '/packs/browse?q=money';
+const BROWSE_LIVE = '/packs/browse?q=polls';
+
+/**
+ * WHAT YOU HAVE, AS MONEY'S OWN PAGE SAYS IT (`MONEY_PAGES.money` in `../modules/money.ts`): Cash now, how long it
+ * lasts and what moves in the next thirty days while the record keeps one set of money, and Cash now a book once it
+ * keeps two, because one figure over two books adds a company's money to a person's own.
+ */
+const WHAT_YOU_HAVE: Record<string, unknown>[] = [
+  {
+    kind: 'stat',
+    lead: true,
+    heading: 'What you have',
+    span: 12,
+    cells: [
+      { metric: 'cash-now', label: 'Cash now', trend: '12w' },
+      { metric: 'runway-days', label: 'Lasts until' },
+      { metric: 'arriving-30d', label: 'Coming in, 30 days' },
+      { metric: 'leaving-30d', label: 'Going out, 30 days' },
+    ],
+    when: { metric: 'books-held', lt: 2 },
+  },
+  {
+    kind: 'bar',
+    heading: 'What you have, by book',
+    span: 12,
+    source: 'metric.cash-by-book',
+    unset: 'In no book',
+    when: { metric: 'books-held', gte: 2 },
+    empty: 'No account counts as cash yet.',
+  },
+];
+
+/**
+ * THE NUMBERS OF THE WEEK, one line a measure over thirty days against the thirty before, once a project has sent one.
+ *
+ * UNTIL THEN, THE WAYS TO START, in place of an empty chart: a door a project posts its numbers to, a number the record
+ * asks for on a schedule, and the packs that already read one. Both halves are held to the same figure
+ * (`datapoints-30d`, which leaves the example out), so exactly one of them draws.
+ */
+const NUMBERS_THIS_WEEK: Record<string, unknown>[] = [
+  {
+    kind: 'lines',
+    heading: 'Numbers this week',
+    span: 12,
+    source: 'register.datapoints',
+    columns: [{ field: 'at' }, { field: 'value' }, { field: 'name' }, { field: 'unit' }],
+    where: 'source is not example',
+    back: 30,
+    when: { metric: 'datapoints-30d', gte: 1 },
+    empty: 'Each measure draws a line once a project reports it.',
+  },
+  {
+    kind: 'link',
+    heading: 'Numbers this week',
+    span: 12,
+    when: { metric: 'datapoints-30d', lt: 1 },
+    authored: [
+      { cells: ['Send numbers from a project', SEND_NUMBERS, 'A project posts each number to its own address here'] },
+      { cells: ['Watch a number', WATCH_NUMBER, 'BrainDog asks an address for one number on a schedule'] },
+      { cells: ['Watch a live number', BROWSE_LIVE, 'Add-ons that read a live number for you'] },
+    ],
+  },
+];
+
 export const FOUNDER = {
   usecase: 'founder',
   /* 1.3.2 BECAUSE THE TWO THIRTY-DAY TILES ON BOTH DASHBOARDS ARE RENAMED, and a record is offered a
@@ -59,8 +138,13 @@ export const FOUNDER = {
 
      1.6.0 BECAUSE THE PROJECT PAGE TAKES PORTFOLIO 1.5.0'S TEMPLATE: the questions waiting on a project, what
      changed on it, its plan on a time axis and its money by month, over the same registers this use case already
-     lists (`transactions` joins `HOLDS` so the money series draws). */
-  version: '1.6.0',
+     lists (`transactions` joins `HOLDS` so the money series draws).
+
+     1.7.0 BECAUSE HOME LEADS WITH THE MONEY THERE IS AND NOT WITH WHO OWES WHOM (MOD-18): What you have, by book
+     once there are two, Lasts until, the numbers of the week as lines, then what is due, lapsing and working now.
+     `page.home-founder` now requires `register.books`, which money-core 3.1.0 holds, so it is a minor step as
+     1.5.0 was. Datapoints are called Numbers, the lists are Lists, and an organisation's page lists its projects. */
+  version: '1.7.0',
   title: 'Solo founder',
   summary: 'The organisations you run, the money across them, and the numbers your projects report.',
   author: 'BrainDog',
@@ -80,7 +164,7 @@ export const FOUNDER = {
     needs_you: 'Needs your call',
     nothing_needs_you: 'Nothing needs your call',
     since_away: 'While you were building',
-    lists: 'Records',
+    lists: 'Lists',
   },
   skills: [
     { name: 'datapoint-reporter', trigger: 'when a project ships a number worth watching, to post it as a datapoint' },
@@ -121,8 +205,10 @@ export const FOUNDER = {
       },
       {
         register: 'datapoints',
-        name: 'Datapoints',
-        one: 'datapoint',
+        /* "NUMBERS" AND NOT "DATAPOINTS", which is a word from a database and not from a founder. The list's id stays
+           `datapoints`, because every door, poll and figure already writes to it by that id. */
+        name: 'Numbers',
+        one: 'number',
         icon: 'observe',
         holds: 'one number from one project at one moment, reported by the project or polled by the record',
         title: 'name',
@@ -161,41 +247,37 @@ export const FOUNDER = {
       {
         /* HOME, AS THIS USE CASE ANSWERS IT (`loop/research-spark.md` S13): the money across every organisation and
            the numbers the projects sent, in place of the house figures. No `nav`, because Home is on the rail
-           already. The first heading reads the voice, so a line changed at `/packs` changes it too.
+           already.
 
-           WHAT IS DUE AND WHAT IS LAPSING COME STRAIGHT UNDER THE FIGURES SINCE 1.5.0, above the numbers, because
-           they are the two lists on this page somebody has to act on this week. Before it, the three headings
-           were the figures, Latest numbers and Organisations, and a bill due in three days or a domain about to
-           lapse was on no page a founder opens first. */
+           WHAT YOU HAVE LEADS SINCE 1.7.0, THEN THE NUMBERS, THEN WHAT TO ACT ON. The figures were Cash now beside
+           "Owed to you" and "Owed by you", which framed a founder's money as who owes whom; now it is the money there
+           is, by book or by organisation, and how long it lasts. Due this week and Lapsing stay, the two lists
+           somebody has to act on this week, and the latest-numbers and organisations tables went to the Dashboard,
+           which already drew both. */
         page: 'home-founder',
         title: 'Overview',
         icon: 'home',
-        requires: ['register.datapoints', 'register.organisations', 'register.accounts', 'register.obligations', 'register.services'],
+        requires: ['register.datapoints', 'register.organisations', 'register.accounts', 'register.obligations', 'register.services', 'register.books'],
         blocks: [
+          ...WHAT_YOU_HAVE,
           {
-            /**
-             * THE TWO THIRTY-DAY TILES CARRY THE FIGURES' OWN NAMES, which is `491e7e05` arriving here.
-             *
-             * BOTH READ ONE REGISTER AND ONE DIRECTION (`direction is owed by me`, and its opposite), so
-             * "Going out, 30 days" claimed a whole they cannot count. Measured where it could be seen: on
-             * `/p/money` those words over `out-30d` read GBP 38,880.00 above a walk over three lists
-             * reading GBP 42,741.00 of the same thirty days, GBP 3,861.00 apart on one screen.
-             *
-             * THIS PAGE DRAWS NO WALK, SO NOTHING ON IT CONTRADICTED, which is how the old words survived
-             * that rename and is not a reason to keep them. A founder's record installs money-core too,
-             * so the same figure is read here and on `/p/money`, and two names for one figure is a
-             * question about which of them is the real number.
-             */
-            kind: 'stat',
-            heading: '{{config:voice_right_now}}',
-            span: 12,
-            cells: [
-              { metric: 'cash-now', label: 'Cash now' },
-              { metric: 'in-30d', label: 'Owed to you, 30 days' },
-              { metric: 'out-30d', label: 'Owed by you, 30 days' },
-              { metric: 'datapoints-30d', label: 'Reported, 30 days' },
-            ],
+            /* EACH ORGANISATION'S MONEY, the accounts it lists added up, beside the one way in for a bank or a payments
+               feed. Browse is searched for "money" because every pack that brings money in says so in its summary, and
+               this file names no provider (`tools/gates/shell-words.mjs`). */
+            kind: 'bar',
+            heading: 'What you have, by organisation',
+            span: 8,
+            source: 'register.organisations',
+            columns: [{ field: 'name' }, { field: 'accounts' }],
+            empty: 'No organisation lists an account yet. Open one and add the accounts it holds.',
           },
+          {
+            kind: 'link',
+            heading: 'Bring your money in',
+            span: 4,
+            authored: [{ cells: ['Connect a bank or a payments feed', BROWSE_MONEY, 'Balances and payments arrive on their own'] }],
+          },
+          ...NUMBERS_THIS_WEEK,
           DUE_THIS_WEEK,
           {
             /* THE SET ESTATE'S OWN `lapsing` TILE COUNTS, `state is lapsing` and nothing else, so the number on
@@ -216,34 +298,18 @@ export const FOUNDER = {
             empty: 'Nothing is lapsing.',
           },
           {
+            /* THE RUNS STILL WORKING, as the house Home draws them, which hides this block when none is. */
             kind: 'table',
-            heading: 'Latest numbers',
+            heading: 'Working now',
             span: 12,
-            source: 'register.datapoints',
+            source: 'sessions.live',
+            where: 'state is active',
             columns: [
-              { field: 'name', label: 'Measure', width: 'minmax(16ch,1fr)' },
-              { field: 'value', label: 'Value', width: '12ch', align: 'end' },
-              { field: 'unit', label: 'Unit', width: '8ch' },
-              { field: 'source', label: 'Source', width: '11ch' },
-              { field: 'at', label: 'When', width: '14ch', align: 'end' },
-            ],
-            order: [{ field: 'at', dir: 'desc' }],
-            limit: 6,
-            empty: 'No project has reported a number yet.',
-          },
-          {
-            kind: 'table',
-            heading: 'Organisations',
-            span: 12,
-            source: 'register.organisations',
-            columns: [
-              { field: 'name', label: 'Organisation', width: 'minmax(18ch,1fr)' },
-              { field: 'kind', label: 'Kind', width: '12ch' },
-              { field: 'country', label: 'Registered in', width: '16ch' },
-              { field: 'currency', label: 'Currency', width: '9ch' },
+              { field: 'agent', as: 'who' },
+              { field: 'doing', as: 'title' },
+              { field: 'last_seen', as: 'when' },
             ],
             limit: 6,
-            empty: 'No organisations yet.',
           },
         ],
       },
@@ -265,13 +331,14 @@ export const FOUNDER = {
             heading: 'Across your organisations',
             lead: true,
             span: 12,
-            /* THE THIRTY-DAY TILES, IN THE FIGURES' OWN WORDS, and the argument is on Overview's stat
-               block above: they read one register and one direction, so the bridge's words over them
-               were a claim about money they cannot reach. */
+            /* THE MONEY THERE IS AND HOW LONG IT LASTS, AND NOT WHO OWES WHOM, since 1.7.0: the same tiles as Money's
+               own page, whose thirty-day figures walk every list that moves money, so no tile here reads one list
+               under words that promise all of them. */
             cells: [
               { metric: 'cash-now', label: 'Cash now', trend: '30d' },
-              { metric: 'in-30d', label: 'Owed to you, 30 days' },
-              { metric: 'out-30d', label: 'Owed by you, 30 days' },
+              { metric: 'runway-days', label: 'Lasts until' },
+              { metric: 'arriving-30d', label: 'Coming in, 30 days' },
+              { metric: 'leaving-30d', label: 'Going out, 30 days' },
             ],
           },
           {
@@ -337,6 +404,17 @@ export const FOUNDER = {
             empty: '{{name}} lists no account yet. Add the accounts it holds and its balance shows here.',
           },
           ...numbers('organisation is {{name}}', 'When a number is reported for {{name}}, it shows here. Examples are left out.', 'Each measure draws a line once it is reported for {{name}}.'),
+          {
+            /* THE PROJECTS IT RUNS, as the organisation lists them: a project cannot name its organisation (a use case
+               adds no field to another pack's list), so the organisation's own list is the one answer. */
+            kind: 'table',
+            heading: 'Projects',
+            span: 12,
+            source: 'register.organisations',
+            where: 'name is {{name}}',
+            columns: [{ field: 'projects', label: 'Projects', width: 'minmax(20ch,1fr)' }],
+            empty: '{{name}} lists no project yet.',
+          },
           {
             kind: 'table',
             heading: 'Latest numbers',

@@ -62,6 +62,12 @@ export type Transports = {
    * the Worker. Asked only once a send has succeeded; absent, nothing is counted.
    */
   counted?: ((job: OutboxRow) => Promise<unknown>) | undefined;
+  /**
+   * Deletes one of this record's files by its SHA-256, for an `erase.r2` job: `BLOBS.delete(fileKey(record, sha256))`
+   * on the Worker (`files.ts`). Absent when the deployment has no bucket, and then an erasure dead-letters saying so,
+   * because a file an erasure named and nobody deleted is exactly what must not pass as done.
+   */
+  erase?: ((sha256: string) => Promise<void>) | undefined;
 };
 
 /**
@@ -102,8 +108,14 @@ export type Delivered = { gone: true };
 /** A deliverer as `pump` takes it: what the ack should carry, or nothing. */
 export type Deliver = (job: OutboxRow) => Promise<Delivered | undefined>;
 
-/** The kinds this host can actually deliver. A kind absent from it dead-letters with a sentence. */
-export const DELIVERS: OutboxKind[] = ['notify.email', 'notify.webhook'];
+/**
+ * The kinds this host can actually deliver. A kind absent from it dead-letters with a sentence.
+ *
+ * `erase.r2` IS ONE SINCE THE FILE STORE (OPS-20): an erasure queues one row per file its subject's rows held
+ * (`kernel/src/erase.ts`), and before this the rows sat `pending` for ever while the nightly walk put them back, so the
+ * bytes of an erased person's receipt stayed in the bucket.
+ */
+export const DELIVERS: OutboxKind[] = ['notify.email', 'notify.webhook', 'erase.r2'];
 
 /**
  * `DELIVERS`, plus `notify.push` when this deployment holds both VAPID halves.
@@ -391,6 +403,19 @@ export function makeDeliver(transports: Transports): Deliver {
          phone and fails as any other post does. */
       if (status === 404 || status === 410) return { gone: true };
       throw new Error(`the push service answered ${status}`);
+    }
+
+    /* AN ERASURE'S FILE, DELETED BY ITS HASH (`kernel/src/erase.ts` queues `{ erase, key }`, the key being the file's
+       SHA-256). The key is checked before it reaches the bucket, because it becomes part of an object's name and a key
+       that is not a hash could name something that is not a file. R2 takes a delete of a key it does not hold without
+       complaint, which is right here: a file already gone is a file erased, and the nightly walk checks the bucket
+       itself (`nightly.ts` `reconcileErase`). Not counted: an erasure is not a delivery anybody is billed for. */
+    if (job.kind === 'erase.r2') {
+      if (!transports.erase) throw new Error('this deployment has no bucket to delete the file from: bind BLOBS');
+      const key = text(payload.key);
+      if (!/^[0-9a-f]{64}$/.test(key)) throw new Error('an erase.r2 names the file it deletes by its SHA-256, and this one does not');
+      await transports.erase(key);
+      return;
     }
 
     /* NOTHING HERE DELIVERS THIS KIND, said out loud. Silently acking it would make the outbox

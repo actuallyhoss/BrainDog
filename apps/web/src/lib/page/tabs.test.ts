@@ -104,20 +104,34 @@ test(`PAST ${TABS_SHOWN} THE REST ARE BEHIND MORE, and the page you are on is sa
 });
 
 /*
- * THE BRIEF SAYS A TEMPLATE'S PAGES ARE NOT CAPPED BY `RAIL_PAGES` BELOW TWELVE, and the strip cannot honour it alone.
- * `layoutOf` drops a template's sixth page under one heading before `nav` exists (`railRoom`), so seven areas reach the
- * strip as five. Lifting it for a tabbed section is a change to what the rail draws, or a second list on the shell, and
- * both are outside the nav entry this brief was given.
+ * A TABBED SECTION'S PAGES ARE NEVER CUT BY THE RAIL'S BUDGET (PGS-18). `layoutOf` spends the rail's five on a template's
+ * pages under one heading, and the rest arrive with `cut`: the strip draws every one of them, and the rail leaves them
+ * out, so a desk with seven parts and a page of figures has nine tabs.
  */
-test(
-  'SEVEN PAGES OUT OF ONE TEMPLATE IN A TABBED SECTION ARE SEVEN TABS',
-  { todo: 'the rail cap in `layoutOf` drops the sixth and seventh before the strip reads `nav`' },
-  () => {
-    const areas = Array.from({ length: 7 }, (_, i) => page(`a${i + 1}`, `Area ${i + 1}`, { section: 'Launch', order: 20, tabs: true }, { register: 'areas', seq: i + 1 }));
-    const strip = tabsOf(shell([page('desk', 'Desk', { section: 'Launch', order: 10, tabs: true }), ...areas]).nav, '/p/desk');
-    assert.equal(strip?.shown.length, 8);
-  },
-);
+test('SEVEN PAGES OUT OF ONE TEMPLATE IN A TABBED SECTION ARE SEVEN TABS, and the two past the rail`s budget are cut from the rail', () => {
+  const areas = Array.from({ length: 7 }, (_, i) => page(`a${i + 1}`, `Area ${i + 1}`, { section: 'Launch', order: 20, tabs: true }, { register: 'areas', seq: i + 1 }));
+  const nav = shell([page('desk', 'Desk', { section: 'Launch', order: 10, tabs: true }), ...areas, page('numbers', 'Numbers', { section: 'Launch', order: 30, tabs: true })]).nav;
+  assert.equal(tabsOf(nav, '/p/desk')?.shown.length, 9);
+  assert.equal(nav.filter((e) => e.cut).length, 2);
+});
+
+test('A SECTION NOBODY TABBED IS STILL CUT BY THE BUDGET, as the rail always was', () => {
+  const areas = Array.from({ length: 7 }, (_, i) => page(`a${i + 1}`, `Area ${i + 1}`, { section: 'Areas', order: 20 }, { register: 'areas', seq: i + 1 }));
+  const nav = shell(areas).nav;
+  assert.equal(nav.length, 5);
+  assert.ok(!nav.some((e) => e.cut));
+});
+
+test('A PAGE OVER A LIST WITH NO ROW YET STAYS OFF THE RAIL UNTIL THE FIRST ONE', () => {
+  const over = (count: number) =>
+    layoutOf({
+      registers: [{ id: 'clients', name: 'Clients', count }],
+      now: '2026-09-25T12:00:00.000Z',
+      pages: [{ ...page('clients', 'Clients', { section: 'Work', order: 10 }), list: 'clients' }],
+    } as unknown as Boot).nav.map((e) => e.href);
+  assert.deepEqual(over(0), []);
+  assert.deepEqual(over(1), ['/p/clients']);
+});
 
 /* The kernel's own page list, shaped into what `boot` sends, from a record holding the declaration. */
 function openSqlite(): Parameters<typeof openRecord>[0] {

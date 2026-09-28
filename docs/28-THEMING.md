@@ -477,6 +477,10 @@ Four intents need at least 10. Move one hue, or lower the chroma of the other.
 
 ## 5 · Applying a theme without a rebuild
 
+*Built by GAP-3 (W2): `Boot.theme` carries the record's installed theme, built into both schemes' role
+values by `@braindog/theme`, and the web's `lib/theme/` adopts it as one constructed stylesheet in
+`@layer theme`, exactly the mechanism this section specifies.*
+
 `adoptedStyleSheets` + `replaceSync()`, which [22-FRONTEND](22-FRONTEND.md) §7 already picked and
 which is **Baseline Widely available (2025-09-27)** — an earlier draft of that document said "95%",
 and it now carries the date. Full

@@ -34,7 +34,7 @@ const AGGREGATES = new Set(['bar', 'gauge', 'stat']);
 import type { Entry, FieldDecl, PageBlock, RegisterDecl } from './schema.ts';
 
 /** What each cell of a kind wants, in order. `any` takes the first field left. */
-type Want = 'title' | 'number' | 'date' | 'enum' | 'ref' | 'text' | 'any';
+type Want = 'title' | 'number' | 'date' | 'enum' | 'ref' | 'text' | 'url' | 'file' | 'any';
 
 /**
  * Cell wants per kind. Only the kinds a register can fill are here — `note`, `quote`, `code`, `tree`
@@ -61,6 +61,12 @@ const WANTS: Record<string, Slot[]> = {
   timeline: [{ want: 'date', hard: true }, { want: 'title' }, { want: 'ref' }],
   board: [{ want: 'enum', hard: true }, { want: 'title' }, { want: 'ref' }],
   table: [{ want: 'title' }, { want: 'number' }, { want: 'date' }],
+  /* THE NEW KINDS EACH READ ONE COLUMN BY WHAT IT IS (`packages/kernel/src/kinds/`), so that slot is hard: a calendar
+     places its rows by their day, a gallery draws its file and a link goes to its address. Without such a field the
+     kind is not offered over that list, or, for links, is offered written out (`UNBOUND`). */
+  calendar: [{ want: 'title' }, { want: 'date', hard: true }],
+  gallery: [{ want: 'title' }, { want: 'file', hard: true }],
+  link: [{ want: 'title' }, { want: 'url', hard: true }],
 };
 
 /**
@@ -95,6 +101,22 @@ const AUTHORED: Record<string, { cells: string[] }[]> = {
   ],
   code: [{ cells: ['npx braindog pull --register obligations'] }],
   tree: [{ cells: ['the-studio'] }, { cells: ['  obligations'] }, { cells: ['  services'] }],
+  /* AN EMBED IS WRITTEN OUT AND NEVER READ (`kinds/embed.ts`): one row of an address from a player the record names, and
+     a title. The seed is a real player's address, because one from anywhere else is refused at install. */
+  embed: [{ cells: ['https://vimeo.com/76979871', 'The video this page is about'] }],
+};
+
+/**
+ * The written-out seed a BOUND kind falls back to over a list with no field it can read.
+ *
+ * A LIST OF LINKS IS OFTEN WRITTEN BY HAND: a team's handbook, its bank, its shared drive. So a list with no address
+ * field is still offered links, as rows to correct, rather than having the kind vanish from the picker.
+ */
+const UNBOUND: Record<string, { cells: string[] }[]> = {
+  link: [
+    { cells: ['Handbook', 'https://example.com/handbook', 'How the work is done here'] },
+    { cells: ['This page', '#', 'Back to the top'] },
+  ],
 };
 
 const NUMERIC = new Set(['money', 'int', 'decimal', 'duration']);
@@ -114,6 +136,10 @@ function matches(field: FieldDecl, want: Want, decl: RegisterDecl): boolean {
       return field.type === 'ref';
     case 'text':
       return field.type === 'text' || field.type === 'document';
+    case 'url':
+      return field.type === 'url';
+    case 'file':
+      return field.type === 'file';
     default:
       return true;
   }
@@ -146,6 +172,31 @@ function fill(decl: RegisterDecl, slots: Slot[]): { field: string }[] | null {
     out.push({ field: hit.id });
   }
   return out;
+}
+
+/**
+ * A block of a kind one of the record's packs declares (`block.<id>`, PLT-8), bound to the list and drawing.
+ *
+ * THE SPEC SAYS HOW MANY CELLS A ROW HAS AND NOTHING ABOUT WHAT EACH ONE WANTS, so the first is the list's title and the
+ * rest are the next fields in the order the list declares them: a seed to narrow, as every other is. A list this build
+ * does not describe, or one with too few fields to fill the cells, is not offered the kind.
+ */
+export function seedPackBlock(kind: string, spec: { cells: number; minSpan: number; title: string }, register: string): PageBlock | null {
+  const decl = REGISTERS[register];
+  if (!decl || spec.cells < 1) return null;
+  if (decl.fields.filter((f) => f.type !== 'secret').length < spec.cells) return null;
+  const wants: Slot[] = [{ want: 'title' }, ...Array.from({ length: spec.cells - 1 }, (): Slot => ({ want: 'any' }))];
+  const filled = fill(decl, wants);
+  if (!filled) return null;
+  return {
+    kind,
+    heading: decl.name,
+    span: spec.minSpan,
+    source: `register.${register}`,
+    columns: filled,
+    limit: 6,
+    empty: `Nothing in ${decl.name.toLowerCase()} yet.`,
+  };
 }
 
 /** Every kind the picker can seed: bound to a register, or authored with example rows. */
@@ -193,7 +244,10 @@ export function seedBlock(kind: string, register: string, rows: readonly Entry[]
   if (!decl || !wants) return null;
 
   const filled = fill(decl, wants);
-  if (!filled) return null;
+  if (!filled) {
+    const unbound = UNBOUND[kind];
+    return unbound ? { kind, heading: decl.name, span: spec.minSpan, authored: unbound } : null;
+  }
   const columns = filled.slice(0, Math.max(spec.cells, wants.length));
 
   /**

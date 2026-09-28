@@ -43,7 +43,15 @@ import {
   type Verb,
 } from './flow.ts';
 
+import { keyAt, pathsOf, type TriedStep, type TryState } from './source.ts';
+
 export type Over = { list: ListId; at: number; edge: 'before' | 'after' };
+
+/** How one card went in the last try: its outcome, its answer as a person reads it, and the runner's sentence. */
+export type Paint = { state: TryState; answer: string | null; say: string };
+
+/** The record's own word on a body (`checkAutomation`): the card its `at` is about, or `null` for the whole body. */
+export type Served = { key: string | null; say: string };
 
 /** How many drafts back Undo reaches. A person undoing thirty drags has lost the thread; the cap keeps memory flat. */
 const UNDO_DEPTH = 30;
@@ -93,22 +101,96 @@ export class FlowDraft {
    * wrong is said at once.
    */
   #held = $state.raw<ReadonlySet<string>>(new Set());
+  /**
+   * THE RECORD'S LAST WORD ON A BODY AND THE LAST TRY OF ONE, each kept with the body it was about, so an edit after
+   * either hides it rather than painting a card with an answer about a flow that is gone. Both are keyed by card, since
+   * the record names a step by its place and a card keeps its key through every move.
+   */
+  #served = $state.raw<{ body: string; fault: Served | null } | null>(null);
+  #painted = $state.raw<{ body: string; by: ReadonlyMap<string, Paint> } | null>(null);
+  /** The body drawn now as JSON, worked out once per edit rather than once per card that asks. */
+  #drawn = $derived(JSON.stringify(bodyOf(this.draft)));
 
   constructor({ slash }: { slash: boolean | (() => boolean) }) {
     this.#slash = typeof slash === 'function' ? slash : () => slash;
   }
 
-  /** Open a body. `null` is a new automation, which has no version and nothing to compare against. */
+  /**
+   * Open a body. `null` is a new automation, which has no version and nothing to compare against. A body with no
+   * version is new as well, a duplicate drawn from another: it has steps and is still unsaved, so it opens dirty.
+   */
   open(id: string, body: Body | null, version: number | null) {
     this.draft = body ? draftOf(id, body) : blankDraft(id);
     this.version = body ? version : null;
-    this.#opened = body ? JSON.stringify(bodyOf(this.draft)) : '';
+    this.#opened = body && version !== null ? JSON.stringify(bodyOf(this.draft)) : '';
     this.#undo = [];
     this.#held = new Set();
     this.selected = null;
     this.dragging = null;
     this.over = null;
     this.said = '';
+    this.#served = null;
+    this.#painted = null;
+  }
+
+  /**
+   * Put an older version's body on the canvas, to be saved over the live one. The version it is drawn from stays the
+   * live one, so the save is a change to what is installed now and a version that landed since is a conflict.
+   */
+  restore(body: Body) {
+    this.#keep();
+    this.draft = draftOf(this.draft.id, body);
+    this.selected = null;
+  }
+
+  /**
+   * The rule was turned on or off, which installed a new version. The draft takes the switch and the version, so the
+   * next save is drawn from the version now live and does not put the old switch back; a draft nobody had changed
+   * stays unchanged.
+   */
+  switched(enabled: boolean, version: number) {
+    const clean = !this.dirty;
+    const { enabled: _was, ...rest } = this.draft.rest;
+    this.draft = { ...this.draft, rest: enabled ? rest : { ...rest, enabled: false } };
+    this.version = version;
+    if (clean) this.#opened = JSON.stringify(this.body);
+  }
+
+  /** Each card's place in the body a save would send, by key. */
+  get paths(): Map<string, string> {
+    return pathsOf(this.draft.steps, Array.isArray(this.body.steps) ? 'steps' : 'then');
+  }
+
+  /** Keep the record's word on `body` (the JSON of the body that was checked), `null` when it would install. */
+  serve(body: string, fault: { say: string; at?: string | undefined } | null) {
+    this.#served = { body, fault: fault === null ? null : { key: keyAt(this.paths, fault.at), say: fault.say } };
+  }
+
+  /** The record's fault on the body drawn now, or `null`: none, not asked yet, or asked about a body since changed. */
+  get served(): Served | null {
+    const s = this.#served;
+    return s !== null && s.body === this.#drawn ? s.fault : null;
+  }
+
+  /** Paint each card with how it went in a try of `body` (the JSON of the body tried). */
+  paint(body: string, steps: readonly TriedStep[], words: (step: TriedStep) => string | null) {
+    const byPlace = new Map(steps.map((s) => [s.path, s]));
+    const by = new Map<string, Paint>();
+    for (const [key, place] of this.paths) {
+      const s = byPlace.get(place);
+      if (s) by.set(key, { state: s.state, answer: words(s), say: s.say });
+    }
+    this.#painted = { body, by };
+  }
+
+  unpaint() {
+    this.#painted = null;
+  }
+
+  /** How one card went in the last try of the body drawn now, or `null`. */
+  paintOf(key: string): Paint | null {
+    const p = this.#painted;
+    return p !== null && p.body === this.#drawn ? (p.by.get(key) ?? null) : null;
   }
 
   get body(): Body {

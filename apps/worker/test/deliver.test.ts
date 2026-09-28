@@ -101,7 +101,18 @@ test('A KIND NOTHING HERE DELIVERS IS SAID OUT LOUD, and never acked as done', a
   assert.match(await threw(() => deliver(job('pull.fetch', { ingest: 'x' }))), /delivers a pull.fetch/);
 
   // And the list this host leases is the list it can actually deliver.
-  assert.deepEqual(DELIVERS, ['notify.email', 'notify.webhook']);
+  assert.deepEqual(DELIVERS, ['notify.email', 'notify.webhook', 'erase.r2']);
+});
+
+test('AN ERASURE DELETES THE FILE IT NAMES BY ITS HASH, and a key that is not one never reaches the bucket (OPS-20)', async () => {
+  const deleted: string[] = [];
+  const deliver = makeDeliver({ erase: async (sha) => void deleted.push(sha) });
+  const sha = 'c'.repeat(64);
+  assert.equal(await deliver(job('erase.r2', { erase: 'e1', key: sha })), undefined);
+  assert.deepEqual(deleted, [sha]);
+  assert.match(await threw(() => deliver(job('erase.r2', { erase: 'e1', key: '../snapshots/latest' }))), /SHA-256/);
+  assert.match(await threw(() => makeDeliver({})(job('erase.r2', { erase: 'e1', key: sha }))), /no bucket/);
+  assert.deepEqual(deleted, [sha]);
 });
 
 test('and a payload nobody can read, or a transport nobody configured, fails rather than throws past', async () => {

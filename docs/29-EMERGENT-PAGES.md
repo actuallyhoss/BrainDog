@@ -113,6 +113,33 @@ safe:
 Every weak threshold carries an instrument and a kill criterion: **log promotions, and at 90 days,
 if fewer than 40% of a trigger's proposals are accepted, the trigger or its number is wrong.**
 
+### Which are built
+
+The record answers the holding pen on `boot` (`packages/record/src/emergent.ts`), and nothing it holds is placed or
+written until a person keeps it. Each item is a whole page declaration, which passes the lint accepting it would meet.
+
+| Trigger | Built | What the record offers |
+|---|---|---|
+| T1 with T6 | yes | a page for a list with a row that no page reads: a `stat` of up to three figures whose `source` is the list, then a `table` of its first six fields a table may draw |
+| T5 | yes | the field filled on at least 80% of at least 20 rows that the page's first `table` over the list does not show, added as that table's last column. A table naming no columns draws the default projection and is left alone. The filter chip is not built |
+| T2, T3 | no | both count what a person does (opens, re-typed filters), which needs an instrument per person that the record does not keep |
+| T4 | no | a grouping inside a page is no key a block declares today (`packages/kernel/src/block-keys.ts`) |
+
+Beside the triggers, a page that draws a list without the block that list's shape asks for is offered that block,
+appended at the end of the page's main column:
+
+| The list has | The block offered |
+|---|---|
+| a `day` field on its rows | a `calendar` of the title on that day, a deadline first |
+| a `file` field holding a picture | a `gallery` of the title and the file |
+| `steps:` | a `steps` block, which the read draws as a path |
+| a state `enum` of three to seven values | a `board` of the state and the title |
+| a `day` and an `int` or `decimal` together on 8 rows or more | `lines` of the number over that day, never over a deadline |
+
+A page is offered one block or column at a time, its strongest, because each item is the whole page and keeping two
+built from the same page would take the first away again. A page whose address takes a parameter is offered nothing,
+since a block added to it would draw every row on each row's page.
+
 ### Explicitly not triggers
 
 | Rejected | Why |

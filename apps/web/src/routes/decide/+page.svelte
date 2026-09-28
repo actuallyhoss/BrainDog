@@ -37,7 +37,7 @@
   import { appliedLines, arrangedOf, isArranging, partialOf, type Partial } from './[id]/arranged.ts';
   import { answerFor, optionsOf, reasonState, record, setReason, withdraw, type Answer } from '$lib/record/answer.ts';
   import { mayAnswer, whyNotAnswering } from './answering.ts';
-  import { spoken } from './spoken.ts';
+  import { dayWord, readViews, WORDS, type Views } from './views.ts';
   import { groupedAddress, groupingOf, type Grouping } from './grouping.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
   import { keepDecided, olderDecisions, plainOf, readQueue, type Queue } from '$lib/record/governance.ts';
@@ -55,6 +55,7 @@
   import Button from '$lib/ui/Button.svelte';
   import Chip from '$lib/ui/Chip.svelte';
   import Kbd from '$lib/ui/Kbd.svelte';
+  import AskSheet from '$lib/ui/AskSheet.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { closed, drew, opened } from '../../lib/ui/screen.svelte.ts';
 
@@ -74,12 +75,25 @@
   async function readLive() {
     const at = opened();
     client ??= createClient({ base: apiBase() });
-    const out = await readQueue(client);
+    const [out, more] = await Promise.all([readQueue(client), readViews(client, Date.now())]);
     /* A RE-READ AFTER A CONFLICT KEEPS THE OLDER DECISIONS ALREADY ASKED FOR, which a fresh read answers without. */
     if (out.from === 'live') live = keepDecided(live, out.value);
     if (out.from === 'refused') refusal = out.fix;
+    /* THE TWO LISTS UNDER THE QUEUE ARE ITS COMPANY, NOT ITS CONDITION. A host that answers the queue and refuses these
+       still has a queue to clear, so a refusal here keeps whatever was drawn before and never settles the screen. */
+    if (more.from === 'live') views = more.value;
     from = out.from;
     closed(out.from !== 'refused', at);
+  }
+
+  /* WHAT WAS PUT OFF AND WHEN IT COMES BACK, and the calls a prediction was made about (`views.ts`). */
+  let views = $state<Views>({ later: [], calls: [] });
+
+  /* ASKING YOURSELF A QUESTION, filed through PGS-19's sheet; the new question is read back into the queue it joins. */
+  let asking = $state(false);
+  function filed() {
+    asking = false;
+    void readLive();
   }
 
   $effect(() => {
@@ -513,7 +527,15 @@
 <svelte:window {onkeydown} />
 
 <!-- NO COUNT IN THE HEAD: `Open questions` prints it one line lower, for the same list. -->
-<PageHead icon="decide" title={copy.decide} />
+<PageHead icon="decide" title={copy.decide}>
+  {#snippet actions()}
+    <!-- ONE QUIET PRESS, and only for somebody who may answer: a question a reader could ask and never settle is a
+         question left in everybody else's queue. -->
+    {#if answerable}<Button weight="quiet" onclick={() => (asking = true)}>{WORDS.ask}</Button>{/if}
+  {/snippet}
+</PageHead>
+
+<AskSheet open={asking} onclose={() => (asking = false)} onfiled={filed} />
 
 {#snippet card(q: Question)}
   {@const said = answers.get(q.id)}
@@ -558,7 +580,8 @@
               <!-- What it would cost to get this one wrong, which is why it sits where it sits. The
                    word is `braindog-render`'s, the same one the `queue` block draws. -->
               {#if queueCost(q.band ?? '')}<span class="q-band" data-cost={q.band}>{queueCost(q.band ?? '')}</span>{/if}
-              {#if spoken(q.id)}<span class="q-id">{q.id}</span>{/if}
+              <!-- NO ID ENDS THE LINE, NOT EVEN ONE A READER COULD SAY: the question is named by its words, and a number
+                   here counted the questions a one-list member was not shown (rules §2, SYS-3). -->
             </span>
           </span>
         </a>
@@ -780,6 +803,51 @@
     </Section>
   {/if}
 
+  <!-- WHAT WAS PUT OFF, the soonest back first. The queue above leaves a deferred question out until its day comes, so
+       without this list a question put off was a question nobody could find until it reappeared. -->
+  {#if from === 'live' && views.later.length}
+    <Section title={WORDS.later} count={views.later.length}>
+      <ul class="ledger">
+        {#each views.later.slice(0, DOM_CAP) as q (q.id)}
+          <li>
+            <a class="line" href={at(`/decide/${q.id}`)}>
+              <span class="line-main">
+                <span class="line-title">{q.title}</span>
+                {#if q.why}<span class="line-detail">{q.why}</span>{/if}
+              </span>
+              <span class="line-when">{WORDS.back(dayWord(q.until, now))}</span>
+            </a>
+          </li>
+        {/each}
+      </ul>
+      <CapLine shown={Math.min(views.later.length, DOM_CAP)} total={views.later.length} />
+    </Section>
+  {/if}
+
+  <!-- THE CALLS A PREDICTION WAS MADE ABOUT, and whether it came true, so a decision is judged by what followed and
+       not by how sure it sounded. The word carries the outcome; the glyph beside it is never the only sign. -->
+  {#if from === 'live' && views.calls.length}
+    <Section title={WORDS.calls} count={views.calls.length}>
+      <ul class="ledger">
+        {#each views.calls as c (c.id)}
+          {@const when = dayWord(c.at, now)}
+          <li>
+            {#snippet body()}
+              <span class="line-main">
+                <span class="line-title">{c.claim}</span>
+                <span class="line-detail call-went" data-went={c.went}>
+                  {#if c.went === 'met'}<Icon name="check" size="s" />{WORDS.met}{:else if c.went === 'missed'}<Icon name="close" size="s" />{WORDS.missed}{:else if c.went === 'unread'}{WORDS.unread}{:else}<Icon name="clock" size="s" />{WORDS.due(when)}{/if}
+                </span>
+              </span>
+              {#if c.went !== 'due' && when}<span class="line-when">{WORDS.checked(when)}</span>{/if}
+            {/snippet}
+            {#if c.about}<a class="line" href={at(`/decide/${c.about}`)}>{@render body()}</a>{:else}<div class="line">{@render body()}</div>{/if}
+          </li>
+        {/each}
+      </ul>
+    </Section>
+  {/if}
+
   {#if DECIDED.length}
     <Section title={copy.searchDecided} count={decidedTotal}>
       <ul class="ledger">
@@ -787,14 +855,14 @@
           <!-- THE OPTION BY ITS LABEL. A live decision keeps the option's id, and its options come from the suggestion it settled. -->
           {@const choseTitle = q.options.find((o) => o.key === q.decided?.option)?.title}
           <li>
-            <!-- A TICK LEADS AND THE ID ENDS THE LINE, the order the queue above keeps. -->
+            <!-- ON THE LIST'S EDGE, WITH NO TICK AND NO ID: every row here is decided, which the heading says once, and a
+                 tick on each pushed every title 32px in from the rows above it. -->
             <a class="line" href={at(`/decide/${q.id}`)}>
-              <span class="seq"><Icon name="check" size="s" /></span>
               <span class="line-main">
                 <span class="line-title">{q.title}</span>
                 <span class="line-detail">{#if choseTitle}<span class="decided-choice">{choseTitle}</span> {/if}{q.decided?.reason}</span>
               </span>
-              <span class="line-when">{since(q.decided?.at ?? '', now)}{#if spoken(q.id)}<span class="decided-id">{q.id}</span>{/if}</span>
+              <span class="line-when">{since(q.decided?.at ?? '', now)}</span>
             </a>
           </li>
         {/each}
@@ -998,12 +1066,6 @@
     font-weight: 500;
   }
 
-  /* The identifier ends the line, in the id face and quiet. */
-  .q-id {
-    color: var(--dim);
-    font-family: var(--font-id);
-  }
-
   /* Between items, so a question about nothing does not open its line with a dot. */
   .q-head > span + span::before {
     content: '·';
@@ -1129,6 +1191,21 @@
     }
   }
 
+  /* ON A PHONE EACH OPTION IS A FULL-WIDTH ROW, so a thumb meets one answer at a time and a long label wraps inside its
+     own button rather than pushing the next one onto half a line. */
+  @media (width < 640px) {
+    .q-options {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .q-options :global(.btn) {
+      inline-size: 100%;
+      justify-content: flex-start;
+      text-align: start;
+    }
+  }
+
   /* THE SUGGESTION IS A WORD, IN THE QUIET INK, read with the option's name. */
   .rec {
     color: var(--dim);
@@ -1172,8 +1249,12 @@
     font-size: var(--t-ui);
   }
 
+  /* THE REASON STAYS ABOVE THE KEYBOARD, with room under it for Send: a focused field scrolls clear of the sticky bar
+     above and of `--kb` below, which is the keyboard's height once it is up and nothing before. */
   .why-field {
     resize: vertical;
+    scroll-margin-block-start: calc(var(--sticky) + var(--sp-4));
+    scroll-margin-block-end: calc(var(--kb) + var(--ctl-h) + var(--sp-6));
   }
 
   .why-note {
@@ -1276,47 +1357,42 @@
      it won at every size and left a zero-width track holding a nowrap note. */
   @media (width >= 640px) {
     .ledger :global(.line) {
-      grid-template-columns: 2ch minmax(0, 1fr) auto;
+      grid-template-columns: minmax(0, 1fr) auto;
       min-block-size: 44px;
     }
   }
 
-  /* ON A PHONE THE TICK IS A COLUMN, as on Home. */
+  /* ON A PHONE THE DAY GOES UNDER THE WORDS, and the words start on the list's edge like every row above them. */
   @media (width < 640px) {
     .ledger :global(.line) {
-      grid-template-columns: 20px minmax(0, 1fr);
-      gap: var(--sp-1) var(--sp-3);
-    }
-
-    .ledger :global(.seq) {
-      grid-column: 1;
-      grid-row: 1;
-      align-self: start;
-      min-inline-size: 0;
-      padding-block-start: 2px;
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--sp-1);
     }
 
     .ledger :global(.line-main) {
-      grid-column: 2;
+      grid-column: 1;
       grid-row: 1;
     }
 
     .ledger :global(.line-when) {
-      grid-column: 2;
+      grid-column: 1;
       grid-row: 2;
       justify-content: flex-start;
     }
+  }
+
+  /* HOW A CALL WENT, AS A WORD WITH ITS GLYPH, in the quiet ink: the outcome is read, never told apart by colour. */
+  .call-went {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+    color: var(--ink2);
   }
 
   .decided-choice {
     margin-inline-end: var(--sp-1);
     color: var(--ink2);
     font-weight: 500;
-  }
-
-  .decided-id::before {
-    content: '·';
-    margin-inline-end: 5px;
   }
 
   @media (width < 900px) {

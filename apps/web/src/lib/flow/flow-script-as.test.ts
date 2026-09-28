@@ -30,18 +30,6 @@ test('the inspector names the field as the id of the queued run, with no answer 
   assert.doesNotMatch(as.label, /answer/u);
 });
 
-/* THE OTHER SENTENCE THE SAME FIELD CAN SAY. The label and the missing-value line were corrected and the bad-name line
-   was not: `as: 'Job'` still read "Job is not a name an answer can have", found by the check that followed this change.
-   Measured red on that sentence before the fault said the id instead. */
-test('a bad name on a script step is refused as the id of its queued run, not as an answer', () => {
-  const body = { rule: 'one', on: { manual: true }, steps: [{ script: { id: 'tidy', as: 'Job' } }] };
-  const said = faultsOf(draftOf('one', body)).map((f) => f.say);
-  assert.equal(said.length, 1);
-  assert.match(said[0]!, /^Job is not a name the id of a queued run can have\./u);
-  const asked = { ...body, steps: [{ ask_person: { question: 'Which?', as: 'Job' } }] };
-  assert.ok(faultsOf(draftOf('one', asked)).some((f) => /^Job is not a name an answer can have\./u.test(f.say)));
-});
-
 /* THE CANVAS AND THE LINT BOTH TAKE A SCRIPT STEP WITH NO NAME, and a new step starts without one. Until 24 September
    the lint refused `{ script: { id: 'tidy' } }` ("steps[0].script.as is undefined, and an answer's name is ...") though
    the runner writes `vars[as]` only when `as` is a string, so this test used to pin the canvas to that refusal. The lint

@@ -217,9 +217,22 @@ test('DONE READS THE STORED BODY, SETS IT WHOLE, and hands back the one before f
   const moved = await saveArrangement(BASE, 'money', 2, [{ i: 0, span: 12 }], [], io);
   assert.deepEqual(moved, { from: 'refused', fix: copy.arrangeMoved });
 
-  /* A template's answer is one row's expansion, and is never set. */
-  const template: ClientFetch = async () => json(200, { ok: true, value: { ...BODY, for: { register: 'projects' }, param: { register: 'projects', seq: 1, title: 'Kiln' } } });
-  assert.deepEqual(await saveArrangement(BASE, 'kiln', 3, [], [], template), { from: 'refused', fix: copy.arrangeTemplate });
+  /* A template's answer is one row's expansion, and is never set: the stored template is, by block index. */
+  const stored = { ...BODY, page: 'projects', for: { register: 'projects' }, blocks: BODY.blocks.map((b, n) => (n === 1 ? { ...b, where: 'client is {{client}}' } : b)) };
+  const setTemplate: unknown[] = [];
+  const template: ClientFetch = async (input, init) => {
+    const url = String(input);
+    if (url.includes('/api/page')) return json(200, { ok: true, value: { ...BODY, for: { register: 'projects' }, param: { register: 'projects', seq: 1, title: 'Kiln' } } });
+    if (url.includes('/api/arrangement')) return json(200, { ok: true, value: { id: 'page.projects', version: 7, body: stored } });
+    setTemplate.push(init?.body ? JSON.parse(String(init.body)) : null);
+    return json(200, { ok: true, value: [{ id: 'page.projects', version: 8 }] });
+  };
+  const arranged = await saveArrangement(BASE, 'kiln', 3, [{ i: 1, span: 12 }, { i: 0, span: 12 }, { i: 2, span: 6 }], [], template);
+  assert.deepEqual(arranged.from === 'written' && [arranged.template, arranged.version], ['projects', 8]);
+  const written = (setTemplate[0] as { body: { page: string; blocks: { where?: string }[] }; version?: number } | undefined);
+  assert.equal(written?.body.page, 'projects');
+  assert.equal(written?.version, 7);
+  assert.equal(written?.body.blocks[0]?.where, 'client is {{client}}', 'the template was written with one row filled into it');
 
   const refused: ClientFetch = async (url) =>
     String(url).includes('/api/page') ? json(200, { ok: true, value: BODY }) : json(403, { ok: false, refusal: { code: 'FORBIDDEN', fix: 'Only an owner or an admin sets a declaration.' } });

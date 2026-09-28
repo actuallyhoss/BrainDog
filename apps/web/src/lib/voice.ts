@@ -50,7 +50,8 @@ export const homePageOf = (pack: string): string => `home-${pack.replace(/^useca
 /**
  * The page Home draws on a live record: the use case's own Home page when the record holds it, else the house one, `home`,
  * when that is held, else `null`. Only a page the record names is ever asked for, so a use case with no Home page is not
- * refused on every load.
+ * refused on every load. `null` is not an empty Home: Home then draws the house page, `DEFAULT_HOME`
+ * (`lib/home/default-home.ts`), through the same reader (modules C8).
  */
 export const homeSlugOf = (useCasePage: string | null, pages: readonly string[]): string | null =>
   [useCasePage, 'home'].find((slug): slug is string => slug !== null && pages.includes(slug)) ?? null;

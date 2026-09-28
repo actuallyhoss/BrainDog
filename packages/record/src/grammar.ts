@@ -30,8 +30,11 @@ import { REACHES_OUT } from './slash.ts';
  * `rule` IS HERE BESIDE THE TWO `loop/finish/contracts.md` §6.4 NAMES, by `loop/finish/gaps.md`'s ruling on defects G1: Slash is never
  * told to read a grammar nothing serves, and SLS-1 drafts rules against this one. MCP serves `register` and `metric` as
  * resources and not `rule`, because its own `grammar/automations` already says a rule in full.
+ *
+ * `ingest` IS LAST, after `proposals`, by `contracts.md` §6.4 (DOR-4): a door and a scheduled action were learned from
+ * the lint alone, one refusal at a time, and the web's new-action sheet builds the same declaration this says.
  */
-export const GRAMMARS = ['page', 'register', 'metric', 'rule', 'proposals'] as const;
+export const GRAMMARS = ['page', 'register', 'metric', 'rule', 'proposals', 'ingest'] as const;
 
 const PAGE = {
   declaration: { id: 'page.<slug>', kind: 'page', body: 'the page body below' },
@@ -318,7 +321,73 @@ const PROPOSALS = {
   answered_by: 'the owner, in Decide. Nothing changes until they accept, and a pack is planned again then.',
 };
 
-const SERVED: Readonly<Record<(typeof GRAMMARS)[number], unknown>> = { page: PAGE, register: REGISTER, metric: METRIC, rule: RULE, proposals: PROPOSALS };
+/**
+ * A door and a scheduled action: an ingest declaration, which is how anything reaches the record from outside it.
+ *
+ * WHAT THE KERNEL'S LINT HOLDS, SAID ONCE (`kernel/src/declare.ts`, `ingestBody` and `actionFault`). It is a reference,
+ * like the rest of this file, and the install still decides. It names no auth kind for a call or a poll beyond the key's
+ * label, because that key is sent as a bearer until DOR-5 builds the others there, and a grammar that promised them
+ * first would teach a declaration that installs and then sends the wrong header.
+ */
+const INGEST = {
+  declaration: { id: 'ingest.<name>', kind: 'ingest', body: 'the keys below' },
+  body: {
+    ingest: 'the name, as in the id: a lower-case letter, then lower-case letters, digits and _ (required)',
+    description: 'what a person calls it; the doors list shows it',
+    channel:
+      'webhook (a door: an address others post to), call (sends to an address on a clock), poll (reads one address on a clock), pull (reads a service a page at a time); email, paste and api arrive with no address of their own (required)',
+    writes: '{register: <id>}: the list a row lands in; with none, what arrives waits in the inbox. Required on a poll',
+    map: '{<field>: {path, type}, {value} or {arrived: true}}: one entry per field. path reads the JSON that arrived, such as data.total or items[0].id; type is the field type it is read as. A poll may give a list of maps, one row each',
+    match: 'on a pattern, which arrivals it takes, as a list filter says it over what arrived',
+    dedupe: '1 to 4 field ids that make an arrival the same as a row already written',
+    on_conflict: 'skip, update, new or review; never review on a pull',
+    skip: '[{when, reason}]: arrivals left out, each with the reason somebody will come looking for',
+    project: 'the project it runs for, by its id; absent for the whole record',
+  },
+  door: {
+    channel: 'webhook',
+    verify: "{kind: path}: the address carries a secret the owner makes on the Ingest settings screen and is shown once. It is never written in a declaration",
+    door: 'on a second webhook pattern: the name of the door whose address it also reads. That door has verify and a match',
+  },
+  action: {
+    url: 'call and poll: the whole https:// address, its host written out with nothing computed; {since} and {until} may stand in the path or query',
+    grant: 'the label of the vault key it sends. Required on a call; a poll of a public address names none',
+    every: '15m or longer, or the provider floor; not on a call only a rule runs',
+    trigger: 'call only: schedule (the default), rule or both',
+    sends: 'call only, with trigger rule or both: the fields of the rule row it sends, each register.field, never a secret or a file',
+    body: 'call only: one JSON object, at most 8 KB; {since}, {until} and, from a rule, {row.<field>} for a field it sends',
+    fetch:
+      'pull only: {base: an https:// host alone, path, auth: {kind: bearer, basic, header or query_param, grant, name?}, schedule: {every}, read: {rows: <path>}}; the map reads each row',
+  },
+  never: 'a token, a key or a password: a key is named by its vault label and nothing else',
+  examples: [
+    {
+      id: 'ingest.orders_in',
+      kind: 'ingest',
+      body: {
+        ingest: 'orders_in',
+        description: 'Orders from the shop',
+        channel: 'webhook',
+        verify: { kind: 'path' },
+      },
+    },
+    {
+      id: 'ingest.watch_visitors',
+      kind: 'ingest',
+      body: {
+        ingest: 'watch_visitors',
+        description: 'Visitors today',
+        channel: 'poll',
+        url: 'https://example.com/stats.json',
+        every: '1h',
+        map: { name: { value: 'Visitors today' }, value: { path: 'visitors', type: 'decimal' }, at: { arrived: true } },
+        writes: { register: 'datapoints' },
+      },
+    },
+  ],
+};
+
+const SERVED: Readonly<Record<(typeof GRAMMARS)[number], unknown>> = { page: PAGE, register: REGISTER, metric: METRIC, rule: RULE, proposals: PROPOSALS, ingest: INGEST };
 
 export function grammarOf(name: string): Result<unknown> {
   if ((GRAMMARS as readonly string[]).includes(name)) return ok(SERVED[name as (typeof GRAMMARS)[number]]);

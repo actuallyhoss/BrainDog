@@ -205,6 +205,10 @@ test('A RECORD OPENED UNDER THE RENAMED BUILD HOLDS THE OLD NAME NOWHERE, and ev
   /* THE LEDGER IS REWOUND AND THE TABLES LEFT, which is how a test stands in for an older record (0011's note): the
      next open applies every migration above the older build's last one, over the rows that build wrote. */
   sql.exec('DELETE FROM migration WHERE version > 15');
+  /* AND THE TWO COLUMNS MIGRATIONS 19 AND 20 ADD, which `ADD COLUMN` cannot re-apply over themselves: a rewind that
+     left them would be a record no older build ever wrote. */
+  sql.exec('ALTER TABLE member DROP COLUMN row_where');
+  sql.exec('ALTER TABLE record DROP COLUMN quiet');
   const k = await openRecord(sql, fixedClock(NOW), { sign: SIGNER, answersSlash: true });
 
   assert.deepEqual(holdingOld(sql), [], 'the old name survived the open');

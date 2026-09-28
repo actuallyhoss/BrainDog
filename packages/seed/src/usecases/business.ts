@@ -1,9 +1,15 @@
 /**
  * Small business: the first-party setup onboarding made before use cases existed (`loop/research-spark.md` §4).
  *
- * IT CARRIES NO PACK AND NO VOICE. Its modules are whichever first-party packs the sentence names, which
+ * IT CARRIES NO VOICE AND NO LIST. Its modules are whichever first-party packs the sentence names, which
  * is what onboarding already did, and it speaks in the house voice. It is in the catalogue so the
  * arranger can say "this reads like a business" as plainly as it says "student".
+ *
+ * ITS PACK IS ONE PAGE, ITS HOME, SINCE 1.2.0 (MOD-18). Money's own Home retired with money-core 3.0.0, and a record
+ * whose use case declares no `home-<id>` falls back to the house Home, which leads with nothing a business asks
+ * first. Because its modules are whatever the sentence named, the page reads only what the record answers across
+ * every list it holds (`figures.home`, `deadlines`, `governance.open`, `sessions.live`, `activity`), and so installs
+ * on a record with Money and on one without.
  */
 
 /** Money in minor units, as every example writes it. */
@@ -33,7 +39,8 @@ export const BUSINESS_EXAMPLES = [
  */
 export const BUSINESS = {
   usecase: 'business',
-  version: '1.1.0',
+  /* 1.2.0 BECAUSE IT GAINS A PACK AND A PAGE, its own Home, where it had none: a declaration added is a minor step. */
+  version: '1.2.0',
   title: 'Small business',
   summary: 'What your clients owe you and what you owe, the hosting and subscriptions you run on, the people involved and the work.',
   author: 'BrainDog',
@@ -47,4 +54,55 @@ export const BUSINESS = {
   ],
   modules: [],
   skills: [],
+  pack: {
+    pack: 'usecase-business',
+    requires: { format: 1, primitives: 1, packs: {} },
+    declarations: [
+      {
+        /* WHAT YOU HAVE, WHAT FALLS DUE THIS WEEK, WHAT NEEDS YOUR CALL, WHO IS WORKING, WHAT CHANGED. The figures are the
+           ones the installed packs pinned to Home (`home: 1..9`, Cash now and how long it lasts when Money is in), and
+           Home hides a block with nothing in it, so a business with no Money yet opens on its week and not on empty
+           tiles. `register.session` is the kernel's own list and is on every record, so requiring it asks nothing of
+           the sentence. */
+        page: 'home-business',
+        title: 'Overview',
+        icon: 'home',
+        requires: ['register.session'],
+        blocks: [
+          { kind: 'stat', lead: true, heading: 'What you have', span: 12, source: 'figures.home' },
+          {
+            /* EVERY LIST THAT HOLDS A DUE DAY, overdue first and then by day: an invoice, a bill, a renewal and a task
+               are one week, and the amount carries its own sign. */
+            kind: 'table',
+            heading: 'Due this week',
+            span: 12,
+            source: 'deadlines',
+            horizon: 7,
+            columns: [
+              { field: 'title', label: 'Description', width: 'minmax(14ch,1fr)' },
+              { field: 'amount', label: 'Amount', width: '15ch', align: 'end', sign: { field: 'direction', minus: 'out' } },
+              { field: 'day', label: 'Due', width: '13ch', align: 'end' },
+            ],
+            limit: 8,
+            empty: 'Nothing is due this week.',
+          },
+          { kind: 'queue', heading: 'Needs your call', span: 12, source: 'governance.open', limit: 5 },
+          {
+            kind: 'table',
+            heading: 'Working now',
+            span: 12,
+            source: 'sessions.live',
+            where: 'state is active',
+            columns: [
+              { field: 'agent', as: 'who' },
+              { field: 'doing', as: 'title' },
+              { field: 'last_seen', as: 'when' },
+            ],
+            limit: 6,
+          },
+          { kind: 'feed', heading: 'What changed', span: 12, source: 'activity', first: 8, empty: 'Nothing has changed yet.' },
+        ],
+      },
+    ],
+  },
 };

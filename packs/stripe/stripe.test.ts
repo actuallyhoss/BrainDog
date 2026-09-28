@@ -181,9 +181,12 @@ test('THE PACK CARRIES stripe.js AS ITS SOURCE, byte for byte, and asks for one 
   /* THE BALANCE, THE PAYOUTS IN TRANSIT AND THE PAYOUTS PENDING, and not one request more, which the first run below
      counts. */
   assert.deepEqual(SCRIPT.limits, { fetches: 3 });
-  /* money-core 3.0.0 AND NOT EARLIER, because only its walk brings a payout in on the day it lands (`accounts.arrives`),
-     and this pack no longer counts one as cash today. */
-  assert.deepEqual((JSON.parse(TEXT) as { requires: { packs: Record<string, string> } }).requires.packs, { 'money-core': '>=3.0.0 <4.0.0' });
+  /* money-core 3.1.0 AND NOT EARLIER: 3.0.0's walk brings a payout in on the day it lands (`accounts.arrives`), and
+     3.1.0 has the `books` the `book` setting (1.2.0) files each row in. */
+  const doc = JSON.parse(TEXT) as { version: string; requires: { packs: Record<string, string> }; config: Record<string, unknown> };
+  assert.equal(doc.version, '1.2.0');
+  assert.deepEqual(doc.requires.packs, { 'money-core': '>=3.1.0 <4.0.0' });
+  assert.deepEqual(Object.keys(doc.config), ['book']);
   const file = await readPackFile(TEXT);
   assert.ok(file.ok, fixOf(file));
   assert.equal(file.value.pack.manifest.pack, 'stripe');

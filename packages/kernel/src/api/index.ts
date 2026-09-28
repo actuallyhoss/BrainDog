@@ -20,6 +20,9 @@ import { extension as keys } from './keys.ts';
 import { extension as comments } from './comments.ts';
 import { extension as vaultPassphrase } from './vault-passphrase.ts';
 import { extension as jobs } from './jobs.ts';
+import { extension as quiet } from './quiet.ts';
+import { extension as retype } from './retype.ts';
+import { extension as personName } from './person-name.ts';
 /* END EXTENSIONS */
 
 export function extensions(parts: KernelParts) {
@@ -31,6 +34,9 @@ export function extensions(parts: KernelParts) {
     ...comments(parts),
     ...vaultPassphrase(parts),
     ...jobs(parts),
+    ...quiet(parts),
+    ...retype(parts),
+    ...personName(parts),
     /* END EXTENSIONS */
   };
 }

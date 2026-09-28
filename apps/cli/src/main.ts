@@ -48,6 +48,7 @@ import { signedOutFix, signedOutSurface } from './signed-out.ts';
 import { serveStdio } from './stdio.ts';
 import { surfaceOver } from './surface.ts';
 import { pack } from './catalogue.ts';
+import { kennel } from './kennel.ts';
 import { runner } from './runner.ts';
 import { setup } from './setup.ts';
 import { tools } from './tools.ts';
@@ -133,20 +134,32 @@ const usage = () =>
     '  Read a use-case file the way a record will, locally: its size, any credential, its shape and its block kinds. Nothing is sent.',
     'braindog usecase install <id|file|url> [--from <catalogue>] [--version <x.y.z>] [--host <host>]',
     '  Ask the owner to install a use case on offer, a shared one, or one from a catalogue held to its checksum: files a proposal and prints its link on Decide. Nothing is installed until they accept it.',
-    'braindog usecase new <id> [--title <title>] [--author <name>] [--out <file>]',
+    'braindog usecase new <id> [--title <title>] [--author <name>] [--out <file>] [--yaml]',
     '  Write a starting use-case file, one list and a page over it, that already reads the way a record will read it.',
     'braindog usecase diff <earlier file> <later file>',
     '  Say what moved between two versions of a use case, and the least version bump that needs. Nothing is sent.',
-    'braindog usecase publish <file> --to <folder> [--sign <key file>]',
-    '  Add a version to a catalogue folder: never one already there, never an earlier one, and a major when it takes something away.',
-    'braindog usecase search [words] --from <folder|address>',
-    '  List what a catalogue holds, with what each can reach and call out to. Nothing is sent to a record.',
+    'braindog usecase publish <file> --to <folder> | --kennel [host] [--sign <key file>]',
+    '  Add a version to a catalogue folder, or submit it to the Kennel: never one already there, never an earlier one, and a major when it takes something away.',
+    'braindog usecase yank <id> <version> --reason <why> [--kennel host] [--sign <key file>]',
+    '  Take a version back on the Kennel. It is never offered again, and a record holding it is told why.',
+    'braindog usecase search [words] [--from <folder|address> | --kennel [host]]',
+    '  List what a catalogue holds, the Kennel when no --from is named, with what each can reach and call out to. Nothing is sent to a record.',
     'braindog usecase preview <file> [--port <n>]',
     '  Start a scratch BrainDog on this machine with the file in its catalogue, to install and look at. Removed when it stops.',
-    'braindog pack new|check|diff|search|install <...>',
-    '  The same for an add-on (a .pack.json file): new <id>, check <file>, diff <a> <b>, search [words] --from <catalogue>, install <id> --from <catalogue>.',
-    'braindog pack publish <file> --to <folder> [--sign <key file>]',
-    '  Add an add-on version to a catalogue folder, by the same rules, signed with an author key when one is named.',
+    'braindog pack new <id> [--title <title>] [--author <name>] [--out <folder>] [--yaml]',
+    '  Write a starting add-on folder: its .pack.json (or .pack.yaml), a first page over a first list with two example rows, its test and a README.',
+    'braindog pack check <file|dir>',
+    '  Read an add-on, JSON or YAML, warn on any key its manifest does not take, and install it in a scratch record here, saying every refusal a record would give. Nothing is sent.',
+    'braindog pack test <dir>',
+    '  Install the add-on in a scratch record, write the rows in its <id>.test.json and say each expectation as passed or failed. Nothing is sent.',
+    'braindog pack preview <file|dir> [--port <n>]',
+    '  Start a scratch BrainDog on this machine with the add-on in its catalogue, and print its page. Removed when it stops.',
+    'braindog pack diff|search|install|yank <...>',
+    '  The same as for a use case: diff <a> <b>, search [words] [--from <catalogue> | --kennel [host]], install <id|file> [--from <catalogue>], yank <id> <version> --reason <why>.',
+    'braindog pack publish <file> --to <folder> | --kennel [host] [--sign <key file>]',
+    '  Add an add-on version to a catalogue folder, or submit it to the Kennel and say whether it is listed or waits for review, signed with an author key or as the person signed in.',
+    'braindog kennel review [show|list|refuse <kind> <id> <version>] [--reason <why>] [--kennel <host>] | trust <publisher>',
+    "  The Kennel operator's review, with PROVISION_KEY set: what waits; show installs one in a scratch record and prints what it reaches and calls out to; list sends it with a preview of its pages; refuse says why; trust lists a publisher's files at once.",
     'braindog pack key <file> --author <name>',
     '  Make an author key in a file you choose, outside any repository. Keep it private: it signs what you publish.',
     'braindog pack key rotate <old key file> <new key file> --to <folder>',
@@ -318,14 +331,14 @@ async function keysCommand(args: string[]): Promise<void> {
 }
 
 /**
- * `braindog skills|tools|page|usecase|pack|import|context|session|automations|scripts|verify`, over the real terminal, and the exit
- * code the command decides.
+ * `braindog skills|tools|page|usecase|pack|kennel|import|context|session|automations|scripts|verify`, over the real terminal, and
+ * the exit code the command decides.
  *
- * `--json` IS DECIDED HERE AND NOWHERE ELSE (`48 §4.5`, `json.ts`). The eleven commands below all take
+ * `--json` IS DECIDED HERE AND NOWHERE ELSE (`48 §4.5`, `json.ts`). The twelve commands below all take
  * the same `AgentIo`, so swapping where `out` goes is the whole of the flag: not one line in a command
  * body asks whether it was given.
  */
-async function agentCommand(which: 'skills' | 'tools' | 'page' | 'usecase' | 'pack' | 'import' | 'context' | 'session' | 'automations' | 'scripts' | 'verify', args: string[]): Promise<void> {
+async function agentCommand(which: 'skills' | 'tools' | 'page' | 'usecase' | 'pack' | 'kennel' | 'import' | 'context' | 'session' | 'automations' | 'scripts' | 'verify', args: string[]): Promise<void> {
   const cwd = process.cwd();
   const io = {
     env: process.env,
@@ -342,7 +355,7 @@ async function agentCommand(which: 'skills' | 'tools' | 'page' | 'usecase' | 'pa
   };
   const cli = fileURLToPath(new URL('./main.ts', import.meta.url)).replaceAll('\\', '/');
   const code =
-    which === 'context' ? await context(args, io) : which === 'session' ? await session(args, io) : which === 'import' ? await importCommand(args, io) : which === 'skills' ? await skills(args, io) : which === 'tools' ? await tools(args, { ...io, cli }) : which === 'usecase' ? await usecase(args, io) : which === 'pack' ? await pack(args, io) : which === 'automations' ? await automations(args, io) : which === 'scripts' ? await scripts(args, io) : which === 'verify' ? await verify(args, io) : await pageCommand(args, io);
+    which === 'context' ? await context(args, io) : which === 'session' ? await session(args, io) : which === 'import' ? await importCommand(args, io) : which === 'skills' ? await skills(args, io) : which === 'tools' ? await tools(args, { ...io, cli }) : which === 'usecase' ? await usecase(args, io) : which === 'pack' ? await pack(args, io) : which === 'kennel' ? await kennel(args, io) : which === 'automations' ? await automations(args, io) : which === 'scripts' ? await scripts(args, io) : which === 'verify' ? await verify(args, io) : await pageCommand(args, io);
   if (json) emit(json.envelope(code));
   /* LEFT TO END ON ITS OWN, for the reason `hook` gives. */
   process.exitCode = code;
@@ -566,7 +579,7 @@ function install(args: string[]): void {
  * program reads from stdout, and the first prints for a person while its first step may wait for six digits
  * (`setupCommand`, `48 §5.15`, `§5.16`). Both refuse the flag through their own strict `parseArgs`.
  */
-const JSON_COMMANDS = new Set(['--version', '-v', 'help', '--help', '-h', 'login', 'logout', 'skills', 'tools', 'page', 'usecase', 'pack', 'import', 'export', 'token', 'context', 'session', 'automations', 'scripts', 'install', 'verify', 'runner']);
+const JSON_COMMANDS = new Set(['--version', '-v', 'help', '--help', '-h', 'login', 'logout', 'skills', 'tools', 'page', 'usecase', 'pack', 'kennel', 'import', 'export', 'token', 'context', 'session', 'automations', 'scripts', 'install', 'verify', 'runner']);
 
 const [command, ...rest] = process.argv.slice(2);
 /* ONE DECISION, TAKEN BEFORE DISPATCH (`48 §4.5`, `json.ts`): the flag is answered here and removed,
@@ -576,13 +589,13 @@ const cut = takeJson(rest);
    credential row it became. `keys exec` hands stdout to a child process and takes no envelope (§4.5),
    and `keys headers` prints the one header document a program reads there, so the flag is offered on
    the verb rather than on the command. */
-/* `usecase preview` IS A SEVENTH COMMAND WITH NOTHING TO PUT IN AN ENVELOPE, for the reason §4.5 gives
+/* `usecase preview`, AND `pack preview` BESIDE IT, IS A SEVENTH COMMAND WITH NOTHING TO PUT IN AN ENVELOPE, for the reason §4.5 gives
    about `init` and `serve`: it spawns the self-host with `stdio: 'inherit'`, so the child owns this
    process's stdout until Ctrl+C. Measured before this line existed, `usecase preview <file> --json`
    left `BrainDog self-host listening on http://localhost:5870` on stdout and then the document beneath
    it, and `JSON.parse` over that buffer throws. Left out of the flag, the verb's own strict
    `parseArgs` refuses `--json` in its own words, exactly as `keys exec` does. */
-const noEnvelope = command === 'usecase' && rest[0] === 'preview';
+const noEnvelope = (command === 'usecase' || command === 'pack') && rest[0] === 'preview';
 const takesJson = !noEnvelope && (JSON_COMMANDS.has(command ?? '') || (command === 'keys' && rest[0] === 'put'));
 const args = takesJson ? cut.rest : rest;
 if (takesJson && cut.json) json = machine(say);
@@ -613,7 +626,7 @@ try {
   /* AN ADAPTER IMPORT TAKES TWO WORDS OR AN OPTION OF ITS OWN, and any other `import` is a .brainl put back
      (`isAdapterImport`). Asked of the whole line rather than of a position, because both take `--host <h>` anywhere. */
   else if (command === 'import' && !isAdapterImport(args)) await brainfileCommand('import', args);
-  else if (command === 'skills' || command === 'tools' || command === 'page' || command === 'usecase' || command === 'pack' || command === 'import' || command === 'context' || command === 'session' || command === 'automations' || command === 'scripts' || command === 'verify') await agentCommand(command, args);
+  else if (command === 'skills' || command === 'tools' || command === 'page' || command === 'usecase' || command === 'pack' || command === 'kennel' || command === 'import' || command === 'context' || command === 'session' || command === 'automations' || command === 'scripts' || command === 'verify') await agentCommand(command, args);
   else if (command === 'hook') await hook(rest);
   else if (command === 'install') install(args);
   else if (command === 'init' || command === 'serve') selfhost(command, rest);

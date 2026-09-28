@@ -88,12 +88,13 @@ test('IT RUNS OUT after 24 hours', async () => {
   const { k, clock } = await record();
   const { token } = value<{ token: string }>(await k.createInvitation('p_ada', { email: 'bea@example.com', level: 'read' }));
   clock.advance(24 * 3_600_000 - 1);
-  assert.equal(k.listInvitations().length, 1);
+  assert.deepEqual(k.listInvitations().map((i) => i.expired), [false]);
   clock.advance(1);
   assert.equal(refusal(await k.lookInvitation(token)).code, 'UNAUTHORIZED');
   assert.equal(refusal(await k.acceptInvitation(token, bea)).code, 'UNAUTHORIZED');
   assert.equal(k.access('p_bea'), null);
-  assert.deepEqual(k.listInvitations(), []);
+  /* THE ROW STAYS, MARKED, so the owner can see the link ran out and make a new one from it. */
+  assert.deepEqual(k.listInvitations().map((i) => i.expired), [true]);
 });
 
 test('A WITHDRAWN LINK IS DEAD, and withdrawing twice answers the same', async () => {

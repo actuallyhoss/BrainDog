@@ -65,6 +65,8 @@ export type ScriptDraft = {
   body: Pick<ScriptDecl, 'egress' | 'keys' | 'reads' | 'writes' | 'limits' | 'source'> & { script: string };
   /** What a door would have handed it. `null`, as on a schedule, when the caller says nothing. */
   input?: Json | undefined;
+  /** `ctx.config`: the draft's own pack settings, each a chosen value or its default. `{}` for a script no pack owns. */
+  config?: Record<string, Json> | undefined;
   /** The caller's own reads, built by the record under the caller's context. Absent is a caller who reads nothing. */
   reads?: ScriptReads | undefined;
   /** The vault by label, for a caller the record lets open a key; `null` for every other caller. */
@@ -199,6 +201,7 @@ export function scriptTrial(options: ScriptTrialOptions): (draft: ScriptDraft) =
         version: 0,
         actor: `script:${body.script}@try`,
         input: draft.input ?? null,
+        config: draft.config ?? {},
         decl: {
           egress: [...body.egress],
           keys: [...body.keys],

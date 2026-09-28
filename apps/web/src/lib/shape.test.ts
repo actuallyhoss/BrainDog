@@ -50,7 +50,7 @@ test('WORDS IT DOES NOT KNOW decline as unread', () => {
 
 test('"I freelance" turns on Money and People, and invents no invoice', () => {
   const s = read('I freelance');
-  assert.deepEqual(ids(s), ['money-core', 'people', 'portfolio']);
+  assert.deepEqual(ids(s), ['people', 'money-core', 'portfolio']);
   assert.deepEqual(s.packs.at(-1), { id: 'portfolio', why: [] }, 'Projects is added because the others point at it');
   assert.deepEqual(s.rows, []);
   assert.equal(s.declined, null);
@@ -211,10 +211,10 @@ test('WHAT EACH LIST LEANS ON is what the seed says its pack requires, and comes
   for (const id of FIRST_PARTY) for (const p of firstPartyManifest(id).provides) ownerOf.set(p, id);
   const leans = (requires: readonly string[]) => [...new Set(requires.map((r) => ownerOf.get(r) ?? r))].sort();
 
-  for (const id of FIRST_PARTY) assert.deepEqual([...LEANS_ON[id]].sort(), leans(firstPartyManifest(id).requires), id);
-  assert.deepEqual([...LEANS_ON.agents].sort(), leans(AGENTS_PACK.manifest.requires));
+  for (const id of FIRST_PARTY) assert.deepEqual([...(LEANS_ON[id] ?? [])].sort(), leans(firstPartyManifest(id).requires), id);
+  assert.deepEqual([...(LEANS_ON.agents ?? [])].sort(), leans(AGENTS_PACK.manifest.requires));
   for (const id of INSTALL_ORDER)
-    for (const needs of LEANS_ON[id]) assert.ok(INSTALL_ORDER.indexOf(needs) < INSTALL_ORDER.indexOf(id), `${id} is before ${needs}`);
+    for (const needs of LEANS_ON[id] ?? []) assert.ok(INSTALL_ORDER.indexOf(needs) < INSTALL_ORDER.indexOf(id), `${id} is before ${needs}`);
 });
 
 test('A PROJECT THE GUIDE IS FOR ASKS FOR NO MODULE: "an Etsy shop" said to the New project guide installs no Projects', async () => {

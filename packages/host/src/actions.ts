@@ -217,6 +217,8 @@ export type Ledger = {
   /** `pending` is how many runs this pass has already let through, which the ledger has not been told of yet. */
   mayRun: (record: string, action: string, pending?: number) => Hold | Promise<Hold>;
   meter: (record: string, run: Metered) => unknown;
+  /** The note the owner is owed about the month, once (`noticePass`). Absent from a host that tells nobody. */
+  notice?: (record: string) => UsageNotice | null | Promise<UsageNotice | null>;
 };
 
 /**
@@ -388,6 +390,48 @@ export async function meterPass(meter: Ledger['meter'], record: string, usage: r
   let lost = 0;
   for (const run of usage) if ((await tried(() => meter(record, run))) === undefined) lost++;
   return lost;
+}
+
+/* ── telling the owner ──────────────────────────────────────────────────── */
+
+/**
+ * The note a record's owner is owed about its month, as the Directory's `notice` answers it: `near` at `NOTICE_AT` of
+ * the allowance, `held` when a run first waited. Said here again, as `Hold` is, because a host reaches the Directory
+ * over RPC and imports none of it.
+ */
+export type UsageNotice = { kind: 'near' | 'held'; record: string; slug: string | null; person: string; email: string | null; say: string };
+
+/**
+ * After a pass is metered, asks the ledger whether the owner is owed a note, and hands it to `tell` once.
+ *
+ * AFTER THE METER AND NEVER BEFORE, because the note is about what the month now holds, and a pass that held its first
+ * run has only said so once that run is counted. THE DIRECTORY REMEMBERS IT WAS ASKED (`notice` writes its row in the
+ * answer's transaction), so a host that asks after every pass tells the owner at most twice a month.
+ *
+ * NOTHING HERE STOPS A PASS. A ledger that cannot be asked, or a `tell` that throws, is logged by the caller from the
+ * answer and the pass has already run: `'unasked'` when there was nothing to ask or the question failed, `'none'` when
+ * nothing is owed, `'told'` and `'untold'` when a note was owed and `tell` did or did not take it. An untold note is not
+ * asked for again this month, which is the price of never telling it twice; the page at `/usage` says the same thing.
+ */
+export async function noticePass(
+  notice: ((record: string) => UsageNotice | null | Promise<UsageNotice | null>) | undefined,
+  record: string,
+  tell: (note: UsageNotice) => unknown,
+): Promise<'unasked' | 'none' | 'told' | 'untold'> {
+  if (notice === undefined) return 'unasked';
+  let note: UsageNotice | null;
+  try {
+    note = await notice(record);
+  } catch {
+    return 'unasked';
+  }
+  if (note === null) return 'none';
+  try {
+    await tell(note);
+    return 'told';
+  } catch {
+    return 'untold';
+  }
 }
 
 /* ── counting what the record did not choose to run ─────────────────────── */

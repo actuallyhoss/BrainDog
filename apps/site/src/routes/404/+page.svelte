@@ -5,15 +5,13 @@
   a path the build has no file for answers a 404 status with this page in the site's own shell,
   rather than a blank white page. It is not in the sitemap and asks not to be indexed.
 
-  IT OPENS THE WAY EVERY OTHER BAND ON THIS SITE OPENS, and the number in the mark is the status
-  code. The redesign left this page on the old document layout on purpose, and the reason given
-  was that it is a signpost rather than a pitch. That is still true of the WORDS, and they have
-  not changed: one sentence and the four addresses the site has. What was wrong was that the one
-  page a stranger meets by accident was the one page that did not look like the site, at the
-  moment they most need telling which site they are on.
+  IT OPENS THE WAY EVERY OTHER BAND ON THIS SITE OPENS, because the one page a stranger meets by
+  accident has to tell them which site they are on. Its list is every page `nav.ts` knows exists, so
+  it names a page the day its folder lands.
 -->
 <script lang="ts">
   import { site } from '$lib/copy.ts';
+  import { PAGES } from '$lib/nav.ts';
 
   const n = site.notFound;
 </script>
@@ -29,16 +27,16 @@
     <h1 class="title">{n.title}</h1>
     <p class="lede">{n.lede}</p>
     <ul class="part-links">
-      {#each n.links as link}
-        <li><a href={link.href}>{link.label}</a></li>
+      {#each PAGES as link}
+        <li><a href={link.path}>{link.label}</a></li>
       {/each}
     </ul>
   </div>
 </section>
 
 <style>
-  /* The site's band, at the legal page's air: this is one screen with four links on it and the
-     footer under it, so it takes the same 128px each side rather than the home page's 192. */
+  /* The site's band, at the legal page's air: this is one screen with a row of links on it and the
+     footer under it, so it takes less air than the home page's bands. */
   .band {
     padding-block: var(--sp-7) var(--sp-8);
   }
@@ -50,18 +48,18 @@
   }
 
   .title {
-    font-family: var(--font-display);
-    font-size: clamp(2.375rem, 4.7vw, 4.25rem);
+    font-family: var(--font-ui);
+    font-size: var(--t-site-display);
     font-weight: 600;
     line-height: 1.04;
-    letter-spacing: -0.04em;
+    letter-spacing: -0.035em;
     text-wrap: balance;
   }
 
   .lede {
     max-inline-size: 48ch;
     color: var(--ink2);
-    font-size: clamp(17px, 0.4vw + 15px, 20px);
+    font-size: var(--t-site-lead);
     line-height: 1.5;
     text-wrap: pretty;
   }
@@ -81,6 +79,7 @@
     display: inline-flex;
     align-items: center;
     min-block-size: var(--ctl-h);
+    min-inline-size: var(--tap);
     color: var(--ink);
     font-size: var(--t-base);
     font-weight: 500;

@@ -54,12 +54,15 @@ type Body = Record<string, unknown>;
 const PACK_FILE = new URL('./bank-hsbc-eg.pack.json', import.meta.url);
 const file = (): Body & { declarations: Body[] } => JSON.parse(readFileSync(PACK_FILE, 'utf8')) as never;
 
-/** The door the Shortcut posts every text to, read off the file: the one twin the other five name as their `door:`. */
+/** The door the Shortcut posts every text to, read off the file: the one twin the other six name as their `door:`. */
 const door = (): string => String(file().declarations.find((d) => typeof d.door === 'string')!.door);
 
-/** The six wordings and their twins, and the door's catch-all: thirteen, spelled out so a pattern lost from the file fails here. */
-const THIRTEEN = [
-  'ingest.bank-card-used', 'ingest.bank-card-used-sms', 'ingest.bank-from-in', 'ingest.bank-from-in-sms',
+/**
+ * The six wordings and their twins, the balance message and its twin (1.4.0), and the door's catch-all: fifteen, spelled
+ * out so a pattern lost from the file fails here.
+ */
+const FIFTEEN = [
+  'ingest.bank-balance', 'ingest.bank-balance-sms', 'ingest.bank-card-used', 'ingest.bank-card-used-sms', 'ingest.bank-from-in', 'ingest.bank-from-in-sms',
   'ingest.bank-from-out', 'ingest.bank-from-out-sms', 'ingest.bank-from-unsure', 'ingest.bank-from-unsure-sms',
   'ingest.bank-ipn-in', 'ingest.bank-ipn-in-sms', 'ingest.bank-ipn-out', 'ingest.bank-ipn-out-sms', 'ingest.bank-not-mine-sms',
 ];
@@ -86,6 +89,8 @@ const FROM_IN = `From HSBC: 01AUG26 Deposit Interest to ${ACCOUNT_LINE} EGP 418.
 const FROM_PLUS = `From HSBC: 01AUG26 Deposit Interest ${ACCOUNT_LINE} EGP 418.62+ Your available balance is EGP 33,540.25`;
 const FROM_SPACED = `From HSBC: 01AUG26 Transfer from NADIA FARID to ${ACCOUNT_LINE} EGP 418.62 - Your available balance is EGP 33,540.25`;
 const NO_SIGN = `From HSBC: 18AUG26 Card Payment ${ACCOUNT_LINE} EGP 1,200.00 Your available balance is EGP 30,000.00`;
+/** Shape four (1.4.0): a message that prints a balance and moves nothing, in the account line's own day and account. */
+const BALANCE = `HSBC: 21AUG26 Your account ${ACCOUNT_LINE} available balance is EGP 30,512.40`;
 
 /**
  * The two generic card sentences, `packs/card-alerts`' since money-core 3.0.0, so no bank pattern is seen claiming a line
@@ -153,34 +158,38 @@ const text = (k: Kernel, body: string, sha256: string): Arrived => said<Arrived>
 
 /* ── the file ────────────────────────────────────────────────────────────────────────────────────────────────────── */
 
-/* 1.3.1 BESIDE money-core 3.0.0, A PATCH STEP: the range widened to `<4.0.0` and not one wording moved. money-core 3.0.0
-   took pages and the card wordings away and kept every list, field and id these thirteen write (`first-party.ts`), and
-   the tests below install the file on the 3.0.0 the seed ships. 1.4.0 is MOD-20's, in W2 (contracts §7.6). */
-test('THE FILE IS bank-hsbc-eg 1.3.1, on money-core 1.8.0 or later before 4.0.0, with the thirteen', () => {
+/* 1.4.0 IS MOD-20's (contracts §7.6), A MINOR STEP: two patterns added for a message that only prints a balance, which
+   write money-core 3.0.0's `balances`; the balance a `From HSBC:` line prints lands in 3.0.0's `balance_after`; and each
+   merchant name loses its acquirer's prefix (`strip`). So the floor moves to 3.0.0, the first Money with both lists.
+   1.3.1 IS KEPT BESIDE THIS FILE as `bank-hsbc-eg-1.3.1.json`, byte for byte as it shipped, because the tests that drive a
+   record on money-core 1.8.0 taking the bank's wordings need the last version that installs there. */
+test('THE FILE IS bank-hsbc-eg 1.4.0, on money-core 3.0.0 or later before 4.0.0, with the fifteen', () => {
   const doc = file();
-  assert.deepEqual([doc.pack, doc.version], ['bank-hsbc-eg', '1.3.1']);
-  assert.deepEqual((doc.requires as { packs: unknown }).packs, { 'money-core': '>=1.8.0 <4.0.0' });
-  assert.deepEqual(doc.declarations.map((d) => `ingest.${String(d.ingest)}`).sort(), THIRTEEN);
+  assert.deepEqual([doc.pack, doc.version], ['bank-hsbc-eg', '1.4.0']);
+  const frozen = JSON.parse(readFileSync(new URL('./bank-hsbc-eg-1.3.1.json', import.meta.url), 'utf8')) as { version: string; requires: { packs: unknown } };
+  assert.deepEqual([frozen.version, frozen.requires.packs], ['1.3.1', { 'money-core': '>=1.8.0 <4.0.0' }]);
+  assert.deepEqual((doc.requires as { packs: unknown }).packs, { 'money-core': '>=3.0.0 <4.0.0' });
+  assert.deepEqual(doc.declarations.map((d) => `ingest.${String(d.ingest)}`).sort(), FIFTEEN);
 });
 
 test('BEFORE THE PACK: a record with every first-party pack leaves the bank\'s card alert untriaged', async () => {
   const { api, sql } = await withReaders(false);
   const ids = api.kernel.declarations().map((d) => d.id);
-  assert.deepEqual(THIRTEEN.filter((id) => ids.includes(id)), [], 'money-core still declares one of this bank\'s wordings');
+  assert.deepEqual(FIFTEEN.filter((id) => ids.includes(id)), [], 'money-core still declares one of this bank\'s wordings');
   const out = mail(api.kernel, CARD, 'before-the-pack');
   assert.deepEqual([out.state, out.ingest], ['untriaged', null]);
   sql.close();
 });
 
-test('INSTALLED FROM THE FILE: thirteen patterns, nothing refused, and the same file opens as an add-on from disk', async () => {
+test('INSTALLED FROM THE FILE: fifteen patterns, nothing refused, and the same file opens as an add-on from disk', async () => {
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
   for (const id of FIRST_PARTY) await put(api, firstPartyDocument(id));
   const diff = await planOf(api, file());
   assert.deepEqual(diff.conflicts, []);
-  assert.deepEqual(diff.adds.map((a) => a.id).sort(), THIRTEEN);
+  assert.deepEqual(diff.adds.map((a) => a.id).sort(), FIFTEEN);
   await put(api, file());
-  assert.equal(api.kernel.packs().find((p) => p.id === 'bank-hsbc-eg')?.version, '1.3.1');
+  assert.equal(api.kernel.packs().find((p) => p.id === 'bank-hsbc-eg')?.version, '1.4.0');
   const opened = said<{ pack: { manifest: { pack: string } } }>(await readPackFile(readFileSync(PACK_FILE, 'utf8')));
   assert.equal(opened.pack.manifest.pack, 'bank-hsbc-eg');
   sql.close();
@@ -246,6 +255,30 @@ test('THE TRANSFERS AND THE ACCOUNT LINE WRITE THEIR ROWS, each in its own direc
   sql.close();
 });
 
+/* THE BALANCE A `From HSBC:` LINE PRINTS IS THE ACCOUNT'S BALANCE AFTER THE MOVEMENT, which Cash now restarts the account
+   from; a card's available limit stays `available`, since a limit is not what an account holds. */
+test('A MESSAGE THAT ONLY PRINTS A BALANCE IS A BALANCE CHECK (1.4.0), and a movement line keeps its balance on the row', async () => {
+  const { api, sql, current } = await withReaders();
+  const moved = mail(api.kernel, FROM_OUT, 'from-out-balance');
+  assert.deepEqual(api.kernel.get(moved.wrote[0]!)!.fields.balance_after, { amount: 3_104_025, currency: 'EGP' });
+  const out = mail(api.kernel, BALANCE, 'balance-only');
+  assert.deepEqual([out.state, out.ingest, out.confidence], ['matched', 'bank-balance', 'exact'], out.reason);
+  const check = api.kernel.get(out.wrote[0]!)!;
+  assert.equal(check.register, 'balances');
+  assert.deepEqual([check.fields.account, check.fields.balance, check.fields.as_of], [current, { amount: 3_051_240, currency: 'EGP' }, '2026-08-21']);
+  /* THE SAME MESSAGE AGAIN IS THE SAME CHECK. */
+  assert.equal(mail(api.kernel, BALANCE, 'balance-only-again').state, 'skipped');
+  sql.close();
+});
+
+test('AN ACQUIRER\'S PREFIX COMES OFF THE MERCHANT (1.4.0): a card charge at FAWRY*Vodafone files as Vodafone', async () => {
+  const { api, sql } = await withReaders();
+  const out = mail(api.kernel, CARD.replace('CEDAR LANE BAKERY', 'FAWRY*Vodafone'), 'card-fawry');
+  assert.deepEqual([out.state, out.ingest], ['matched', 'bank-card-used'], out.reason);
+  assert.equal(api.kernel.get(out.wrote[0]!)!.fields.what, 'Vodafone');
+  sql.close();
+});
+
 /* ── what each wording claims, on a bare kernel ──────────────────────────────────────────────────────────────────── */
 
 test('AN INSTAPAY TRANSFER IS CLAIMED BY ITS OWN PATTERN IN EACH DIRECTION, and a bare kernel stops at the date it cannot read', async () => {
@@ -306,9 +339,9 @@ test('THE `From HSBC:` LINE IS CLAIMED BY ITS SIGN: a glued `-` is the debit, a 
  * its own, the rest retired, because `arrive` takes the first pattern that matches and so can only ever report one.
  */
 test('NO WORDING IS CLAIMED BY TWO PATTERNS, and a line with both glued signs is claimed by none', async () => {
-  const mails = THIRTEEN.filter((id) => !id.endsWith('-sms'));
+  const mails = FIFTEEN.filter((id) => !id.endsWith('-sms'));
   const bodies = {
-    CARD, IPN_OUT, IPN_IN, IPN_BUY, FROM_OUT, FROM_IN, FROM_PLUS, FROM_SPACED, CHARGE, CREDIT,
+    CARD, IPN_OUT, IPN_IN, IPN_BUY, FROM_OUT, FROM_IN, FROM_PLUS, FROM_SPACED, CHARGE, CREDIT, BALANCE,
     BOTH: `From HSBC: 01AUG26 Deposit Interest ${ACCOUNT_LINE} EGP 418.62+ Your available balance is EGP 2500.00- Your available balance is EGP 1.00`,
     PLUS_AND_SPACED: `From HSBC: 01AUG26 Deposit Interest ${ACCOUNT_LINE} EGP 418.62+ Your available balance is EGP 2500.00 - Your available balance is EGP 1.00`,
   };
@@ -373,7 +406,7 @@ test('THE CATCH-ALL CANNOT TAKE A TEXT A TWIN READS, whatever order the record o
   assert.equal(catchAll.length, 1, 'the pack declares no catch-all at its door');
   assert.equal(catchAll[0]!.door, door());
   const refused = ((catchAll[0]!.match as { none?: { field: string; contains: string }[] }).none ?? []).map((p) => `${p.field}:${p.contains}`);
-  assert.equal(twins.length, 6);
+  assert.equal(twins.length, 7);
   for (const twin of twins) {
     const required = ((twin.match as { all?: { field?: string; contains?: string }[] }).all ?? []).filter((p) => p.contains !== undefined).map((p) => `${p.field}:${p.contains}`);
     assert.ok(required.some((phrase) => refused.includes(phrase)), `${String(twin.ingest)} requires no phrase the catch-all refuses`);

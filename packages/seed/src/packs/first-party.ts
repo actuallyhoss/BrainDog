@@ -40,6 +40,38 @@ const SUMMARIES: Record<FirstPartyId, string> = {
 };
 
 /**
+ * THE WORDS A PERSON USES FOR WHAT EACH PACK KEEPS, which the first run listens for in the sentence it is told
+ * (`apps/web/src/lib/shape.ts`, shell.md USE-3). They are the manifest's, the way a use case's `signals` are its own, so
+ * the first run reads a first-party pack exactly as it reads anything else in the catalogue, and a pack from the Kennel
+ * that says what it is for can be offered on the same terms.
+ *
+ * Lower-case words and short phrases, each inflection written out, because the reader matches whole words and never
+ * stems: "invoicing" is a signal of its own. A word may belong to two packs: "freelance" says there is money and there
+ * are clients. "track" is in none, since "I track a few side projects" is a verb about projects and not a Work list.
+ */
+const SIGNALS: Record<FirstPartyId, readonly string[]> = {
+  portfolio: [
+    'project', 'projects', 'side project', 'side projects', 'side-project', 'side-projects', 'product', 'products', 'app', 'apps',
+    'studio', 'shop', 'store', 'brand', 'brands', 'game', 'games', 'agency', 'foundry', 'website', 'websites',
+  ],
+  people: [
+    'freelance', 'freelances', 'freelanced', 'freelancing', 'freelancer', 'freelancers', 'team', 'staff', 'employee', 'employees',
+    'contractor', 'contractors', 'client', 'clients', 'customer', 'customers', 'collaborator', 'collaborators', 'partner', 'partners',
+    'accountant', 'accountants', 'people', 'colleague', 'colleagues', 'cofounder', 'cofounders', 'co-founder', 'co-founders',
+  ],
+  'money-core': [
+    'freelance', 'freelances', 'freelanced', 'freelancing', 'freelancer', 'invoice', 'invoices', 'invoiced', 'invoicing', 'bill',
+    'bills', 'billed', 'billing', 'retainer', 'retainers', 'owe', 'owes', 'owed', 'owing', 'payment', 'payments', 'paid', 'vat',
+    'tax', 'taxes', 'money', 'cash', 'fee', 'fees', 'charge', 'charges', 'charged', 'charging',
+  ],
+  estate: [
+    'domain', 'domains', 'hosting', 'server', 'servers', 'subscription', 'subscriptions', 'saas', 'licence', 'licences', 'license',
+    'licenses', 'certificate', 'certificates', 'renewal', 'renewals',
+  ],
+  work: ['task', 'tasks', 'todo', 'todos', 'to-do', 'to-dos', 'deadline', 'deadlines', 'sprint', 'sprints', 'backlog', 'roadmap', 'milestone', 'milestones'],
+};
+
+/**
  * EACH PACK'S OWN VERSION. A record is offered an update when the version here is later than the one it installed, so a
  * pack whose declarations or settings change goes up, and one that did not stays where it is: nobody is asked to update
  * Estate because Work gained a field. A new field, page, figure or setting is a minor step; a list or field taken away is
@@ -181,6 +213,12 @@ const SUMMARIES: Record<FirstPartyId, string> = {
  *   doing or blocked, and a step created with a parent and no project takes the parent's project and thread. Four ids
  *   are added and nothing is taken away, so the step is a minor one. A version and not a reset because 1.7.0 is on
  *   `origin/master` (`814ca32c`), and an id gained is a declaration a record on 1.7.0 could never be told about.
+ * - work 1.9.0: the Overview is called Work and leads with a capture line; the lists of yours and the Board are
+ *   ordered by tier then due; it adds a queue of what agents ask about tasks, a timeline of the next two weeks and a
+ *   heat of what was done in twelve weeks; tasks gain an optional `why`, and `register.tasks` declares `hand`
+ *   (`person: owner, agent: agent, taken: doing`), so `ROLE_KEYS` drops only the `person` part on a record with no
+ *   People and a task still hands to an agent. Blocks and a field are added and nothing is taken away, so the step is
+ *   a minor one.
  * - money-core 2.4.0, NO STEP: `hands` is gone, so the core pack names no other pack (`loop/research-legacy-parity.md`
  *   brief B1, `test/money-core-names-no-pack.test.ts`). It gave the bank's twelve patterns and `holdings` to the two
  *   packs that are now files under `packs/`, which is the core knowing one person's bank and one person's list by id.
@@ -220,7 +258,9 @@ const SUMMARIES: Record<FirstPartyId, string> = {
  *   away, so the step is a minor one.
  * - portfolio 1.5.0: a project page leads with the questions waiting on it, draws what changed on it, its plan on a time
  *   axis when its tasks have days and its money month by month, signs the amount on its Money table, drops the agent
- *   code block, and every money figure is in the record's own currency (`format: money`) with its target a setting.
+ *   code block, and every money figure is in the record's own currency (`format: money`) with its target a setting,
+ *   and ends with what it runs on (`runs_on`): its keys, tools and servers and skills with where each applies and who
+ *   used it last, and its scheduled actions under a section that names its panel.
  * - estate 2.0.0: Services keeps subscriptions, memberships, insurance and utilities, opens with what it costs a month,
  *   asks before a renewal (`rule.renew-soon`) and marks a passed renewal lapsing (`rule.renewal-passed`), pins Renews in
  *   30 days to Home, and every target is a setting with no default. A major step because the gauge and its fixed
@@ -235,7 +275,7 @@ export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   people: '2.2.0',
   'money-core': '3.1.0',
   estate: '2.0.0',
-  work: '1.8.0',
+  work: '1.9.0',
 };
 
 type Body = Record<string, unknown>;
@@ -326,9 +366,10 @@ function split(): Split {
 
 /**
  * One first-party pack's manifest: its id, its version, the registers it needs already there, and the ones it
- * only links to (`LINKS`), which it points at when the record holds them and leaves out when it does not.
+ * only links to (`LINKS`), which it points at when the record holds them and leaves out when it does not, and the
+ * words the first run hears it in (`SIGNALS`).
  */
-export function firstPartyManifest(id: FirstPartyId): PackManifest & { provides: readonly string[]; links: readonly string[] } {
+export function firstPartyManifest(id: FirstPartyId): PackManifest & { provides: readonly string[]; links: readonly string[]; signals: readonly string[] } {
   const { packs } = split();
   const mine = packs.get(id)!.declarations;
   const own = new Set(mine.filter((d) => typeof d.register === 'string').map((d) => d.register as string));
@@ -339,7 +380,7 @@ export function firstPartyManifest(id: FirstPartyId): PackManifest & { provides:
     for (const r of leansOn(d)) if (!own.has(r)) any.add(`register.${r}`);
   }
   const links = [...any].filter((r) => !needs.has(r)).sort();
-  return { id, version: FIRST_PARTY_VERSIONS[id], requires: [...needs].sort(), provides: mine.map(idOf).sort(), links };
+  return { id, version: FIRST_PARTY_VERSIONS[id], requires: [...needs].sort(), provides: mine.map(idOf).sort(), links, signals: SIGNALS[id] };
 }
 
 /** The block kinds whose first column is what they group by, so they say nothing once it is gone. */
@@ -351,7 +392,7 @@ const GROUPED = new Set(['bar', 'split']);
  * part must go with it: the kernel refuses a role naming a field the list does not have (`FIELD_UNKNOWN`), and
  * `projects` is a part `meet` does without, recording the person and linking nobody.
  */
-const ROLE_KEYS = ['meets', 'rates'] as const;
+const ROLE_KEYS = ['meets', 'rates', 'hand'] as const;
 
 /**
  * A declaration with the fields in `gone` taken out, and every column and phone field drawn over them. A bar grouped by

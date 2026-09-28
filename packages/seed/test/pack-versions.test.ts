@@ -544,6 +544,21 @@ const DECLARED: Record<string, Version> = {
       'A task\'s follow-ups close with it and start in its project (W59-1): `rule.close_follow_ups` starts `script.close_follow_ups` when a task moves to done, which closes every step `Part of` it still open, doing or blocked, and `rule.start_with_parent` starts `script.start_with_parent` when a task is created with a parent, which gives it the parent\'s project and thread -> e4126747e977dddd',
     ],
   },
+  'work@1.9.0': {
+    holds: `
+      metric.open-tasks metric.project-dated metric.project-done-7d metric.project-due-soon metric.project-in-review
+      metric.project-open metric.tasks-done-7d metric.tasks-done-7d-agents metric.tasks-done-by-week metric.tasks-due-7d
+      metric.tasks-due-by-week metric.tasks-later metric.tasks-overdue metric.tasks-waiting metric.tasks-with-agents
+      page.work page.work-board
+      register.tasks register.tracks register.updates
+      rule.close_follow_ups rule.start_with_parent
+      script.close_follow_ups script.start_with_parent
+    `,
+    declares: '03c89c8b18be3c6d',
+    history: [
+      'Work is called Work and its Overview leads with a capture line; the lists of yours and the Board are ordered by tier then due; it adds `project-dated` for a timeline of the next two weeks and a heat of what was done in twelve weeks, and a queue of what agents ask about tasks; tasks gain an optional `why` and `register.tasks` declares `hand` (`person: owner, agent: agent, taken: doing`), so a task can be handed to an agent even on a record with no People -> 03c89c8b18be3c6d',
+    ],
+  },
   'people@2.0.0': {
     holds: ` page.people register.people `,
     declares: 'a197d208773e19c1',

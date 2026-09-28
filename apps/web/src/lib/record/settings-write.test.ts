@@ -214,7 +214,7 @@ test('a kept copy downloads as the file the host named, and a refusal is read th
 test('an invitation is minted for one address, handed back once as a link, listed and withdrawn', async () => {
   const invitation = {
     id: 'inv_1', email: 'bo@example.com', level: 'write' as const, registers: {}, invited_by: 'p_ada',
-    created_at: '2026-09-16T12:00:00.000Z', expires_at: '2026-09-17T12:00:00.000Z',
+    created_at: '2026-09-16T12:00:00.000Z', expires_at: '2026-09-17T12:00:00.000Z', expired: false,
   };
   const made = { invitation, token: 'rec_1.thesecret' };
   const { io, sent } = host((path) =>
@@ -223,7 +223,7 @@ test('an invitation is minted for one address, handed back once as a link, liste
       value: path === '/api/invitations' ? [invitation] : path === '/api/revokeInvite' ? { id: 'inv_1', revoked_at: '2026-09-16T13:00:00.000Z' } : made,
     }),
   );
-  assert.deepEqual(await inviteEmail(BASE, '  bo@example.com ', 'write', io), { ok: true, value: made });
+  assert.deepEqual(await inviteEmail(BASE, '  bo@example.com ', { level: 'write' }, io), { ok: true, value: made });
   assert.deepEqual(await readInvites(BASE, io), { from: 'live', invites: [invitation] });
   assert.ok((await withdrawInvite(BASE, 'inv_1', io)).ok);
   assert.deepEqual(sent.map((s) => [s.path, s.method, s.body]), [

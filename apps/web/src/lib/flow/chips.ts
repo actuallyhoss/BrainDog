@@ -70,13 +70,44 @@ export function groupChips(paths: readonly string[]): ChipGroup[] {
  * and faulted on Send when it was guessed wrong. A name for a new answer (`as`) is written, because nothing exists yet
  * to pick it from.
  */
-export function pickerOf(verb: Verb | string, path: readonly string[]): 'list' | 'call' | 'field' | null {
+export type Picker = 'list' | 'call' | 'field' | 'script' | 'member';
+
+/*
+ * A SCRIPT IS ONE THE RECORD HAS INSTALLED, and a person asked is one of its members by the id the record holds for
+ * them: both were boxes wanting an internal name (`script.id`, `ask_person.to`) that nobody at the canvas could know.
+ */
+export function pickerOf(verb: Verb | string, path: readonly string[]): Picker | null {
   const last = path[path.length - 1];
   if (last === 'register') return 'list';
   if ((verb === 'call' && last === 'ingest') || (verb === 'run' && path.length === 1)) return 'call';
   if ((verb === 'set' || verb === 'link') && path.length === 2 && last === 'field') return 'field';
+  if (verb === 'script' && path.length === 2 && last === 'id') return 'script';
+  if (verb === 'ask_person' && path.length === 2 && last === 'to') return 'member';
   return null;
 }
+
+/**
+ * A template's text as pieces: words, and the references a run fills (`{{vars.rate}}`), each with the whole path it
+ * reads and the word a pill shows. `Tokens.svelte` draws the references as pills, so a person never meets the braces.
+ * Joined back (`tokensText`) the pieces are the text, character for character.
+ */
+export type Piece = { text: string } | { ref: string; word: string };
+
+const REF = /\{\{\s*([^{}]+?)\s*\}\}/gu;
+
+export function piecesOf(text: string): Piece[] {
+  const out: Piece[] = [];
+  let at = 0;
+  for (const m of text.matchAll(REF)) {
+    if (m.index > at) out.push({ text: text.slice(at, m.index) });
+    out.push({ ref: m[1]!, word: chipWord(m[1]!) });
+    at = m.index + m[0].length;
+  }
+  if (at < text.length) out.push({ text: text.slice(at) });
+  return out;
+}
+
+export const tokensText = (pieces: readonly Piece[]): string => pieces.map((p) => ('ref' in p ? `{{${p.ref}}}` : p.text)).join('');
 
 /**
  * The choices, with the value already written kept at the head when the record does not list it.

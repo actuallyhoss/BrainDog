@@ -15,9 +15,11 @@
  * anybody into, or close, and the only way out of it is somebody with a database.
  */
 
-import type { Result, Sql } from '@braindog/ports';
+import type { Refusal, Result, Sql } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
+import { compile, type Compiled, type Json, type Schema } from '@braindog/where';
 
+import { predicateOf, type EvalContext } from './metrics.ts';
 import { instant } from './migrate.ts';
 
 /** The five, and only a person ever reaches the top two. */
@@ -35,15 +37,41 @@ export type Member = {
   level: Level | null;
   /** Register ids where they hold something OTHER than their record level. */
   scoped: { register: string; level: Level }[];
+  /**
+   * The lists whose grant is narrowed to the rows matching one `where`, keyed by list id, in the shape `invite` takes
+   * them, so the People screen can send back what it was given. Absent when no grant is narrowed. A rule that cannot be
+   * read is `null` here, and it reaches no row.
+   */
+  wheres?: Record<string, Json>;
   seen_at: string | null;
   suspended_at: string | null;
 };
+
+/**
+ * One `where` per list grant: the rows of that list a member reaches, keyed by list id (`20-COLLABORATION` §1).
+ *
+ * A LIST WITH NO KEY HERE IS EVERY ROW OF IT, which is what every grant meant before migration 19, and `null` is a rule
+ * the record could not read, which reaches no row: a narrowed grant that failed open would show a colleague the rows
+ * the owner chose to keep from them, and one that fails closed shows them an empty list they can ask about.
+ */
+export type Wheres = Record<string, Json>;
+
+/**
+ * THE LONGEST RULE A GRANT HOLDS, in characters of its JSON text. A rule is a few conditions an owner picked on the
+ * People screen; one this long is not a rule anybody reads, and every row read by that member compiles it.
+ */
+export const WHERE_MAX_CHARS = 4_000;
 
 export type MemberDeps = {
   sql: Sql;
   nowMs: number;
   mint: () => string;
   hasRegister: (register: string) => boolean;
+  /**
+   * Why a rule cannot be read against one list, or `null` when it can, so `invite` refuses a rule the readers would
+   * answer nothing for rather than storing it. Absent, only the rule's shape is checked.
+   */
+  readsRule?: (register: string, where: Json) => Refusal | null;
 };
 
 /**
@@ -62,7 +90,7 @@ export type MemberDeps = {
 export function access(
   sql: Sql,
   person: string,
-): { level: Level | null; registers: string[] | null; levels: Record<string, Level> } | null {
+): { level: Level | null; registers: string[] | null; levels: Record<string, Level>; wheres?: Wheres } | null {
   /* A SUSPENDED PERSON HOLDS NOTHING, and until now the column was a thing the interface could show
      and the ladder could not enforce: `access` read only `member`, `verifyToken` joined nothing, and
      a suspension was a label. Suspending somebody is what you do when you cannot yet decide whether
@@ -86,8 +114,8 @@ export function access(
 
      An `INNER JOIN` is the fix and it is the shape the sentence above always described: a level
      belongs to a person, so no person is no level. */
-  const rows = sql.all<{ register: string; level: Level }>(
-    `SELECT m.register AS register, m.level AS level
+  const rows = sql.all<{ register: string; level: Level; row_where: string | null }>(
+    `SELECT m.register AS register, m.level AS level, m.row_where AS row_where
        FROM member m JOIN person p ON p.id = m.person_id
       WHERE m.person_id = ? AND p.suspended_at IS NULL`,
     person,
@@ -120,12 +148,73 @@ export function access(
   /* AND THE PER-REGISTER LEVELS TRAVEL, or the whole feature is decorative: a bookkeeper with
      `read` on the record and `write` on one register is the point, and so is an owner held to
      `read` on the one register that carries the payroll. */
+  /* AND THE RULES TRAVEL BESIDE THE LEVELS THEY NARROW, one per list grant, so both hosts copy them into the call's
+     context wherever they copy `levels` and every reader narrows by the same map (`CallContext.wheres`). A `'*'` row
+     never holds one, and one written there by hand is not read: a rule is about one list's fields. Absent when no grant
+     is narrowed, which is every grant on a record that has never set a rule. */
+  const wheres = wheresOf(scoped);
   return {
     level,
     registers: whole ? null : scoped.map((r) => r.register),
     levels: Object.fromEntries(scoped.map((r) => [r.register, r.level])),
+    ...(Object.keys(wheres).length === 0 ? {} : { wheres }),
   };
 }
+
+/**
+ * The rules on a person's list grants, by list id, from the stored text of each.
+ *
+ * A TEXT THAT IS NOT JSON READS AS `null`, which reaches no row. It can only be there by a hand edit or a file from
+ * somewhere else, and the grant it narrows is still a grant the owner narrowed.
+ */
+function wheresOf(rows: readonly { register: string; row_where: string | null }[]): Wheres {
+  const out: Wheres = {};
+  for (const row of rows) {
+    if (row.register === RECORD || row.row_where === null) continue;
+    out[row.register] = parsed(row.row_where);
+  }
+  return out;
+}
+
+const parsed = (text: string): Json => {
+  try {
+    return JSON.parse(text) as Json;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * A grant's rule compiled against its list, or a refusal in `bad` when it cannot be read.
+ *
+ * THE SAME TWO STEPS A CALLER'S OWN `where` TAKES in `list` (`predicateOf`, then `compile`), so a rule and a filter are
+ * one grammar (`34-GRAMMARS` §1) and a rule the owner could type as a filter is a rule a grant can hold. Only a
+ * sentence or a tree is a rule; `null`, a number or a list is one the record could not read.
+ */
+export function ruleOf(where: Json, schema: Schema, ctx: EvalContext): Compiled {
+  if (typeof where !== 'string' && (where === null || typeof where !== 'object' || Array.isArray(where)))
+    return { sql: '', params: [], bad: [{ code: 'VALUE_MALFORMED', fix: 'A rule is a where: a sentence, or the conditions a filter holds.' }] };
+  const said = predicateOf(where as Parameters<typeof predicateOf>[0], schema, ctx);
+  if (said.bad.length) return { sql: '', params: [], bad: said.bad };
+  return compile(said.predicate, schema);
+}
+
+/**
+ * What a caller asked for, held to the rows their grant reaches.
+ *
+ * THE CALLER'S OWN REFUSAL COMES FIRST, so a filter they got wrong is still named to them. `null` is a grant with no
+ * rule, every row. A rule that cannot be read runs as a clause no row meets and refuses nothing: the member sees an
+ * empty list, not a sentence about a rule they cannot see or change.
+ */
+export function narrowed(asked: Compiled, rule: Compiled | null): Compiled {
+  if (asked.bad.length || rule === null) return asked;
+  if (rule.bad.length) return { sql: `(${asked.sql}) AND 0`, params: asked.params, bad: [] };
+  return { sql: `(${asked.sql}) AND (${rule.sql})`, params: [...asked.params, ...rule.params], bad: [] };
+}
+
+/** The rule a caller's grant holds on one list, or `undefined` when that list is every row to them. */
+export const whereFor = (wheres: Readonly<Wheres> | undefined, register: string): Json | undefined =>
+  wheres !== undefined && Object.hasOwn(wheres, register) ? wheres[register] : undefined;
 
 /**
  * Everybody on the record, with what they hold and where.
@@ -136,8 +225,8 @@ export function access(
  * everything. That is the pair the fix was about, relocated one function over.
  */
 export function members(sql: Sql): Member[] {
-  const rows = sql.all<{ person_id: string; register: string; level: Level; seen_at: string | null }>(
-    `SELECT m.person_id AS person_id, m.register AS register, m.level AS level, m.seen_at AS seen_at
+  const rows = sql.all<{ person_id: string; register: string; level: Level; seen_at: string | null; row_where: string | null }>(
+    `SELECT m.person_id AS person_id, m.register AS register, m.level AS level, m.seen_at AS seen_at, m.row_where AS row_where
        FROM member m JOIN person p ON p.id = m.person_id
       ORDER BY m.person_id, m.register`,
   );
@@ -152,7 +241,7 @@ export function members(sql: Sql): Member[] {
   const out = new Map<string, Member>();
   for (const row of rows) {
     const person = people.get(row.person_id);
-    const held =
+    const held: Member =
       out.get(row.person_id) ??
       ({
         person_id: row.person_id,
@@ -168,7 +257,12 @@ export function members(sql: Sql): Member[] {
       } satisfies Member);
 
     if (row.register === RECORD) held.level = row.level;
-    else held.scoped.push({ register: row.register, level: row.level });
+    else {
+      held.scoped.push({ register: row.register, level: row.level });
+      /* THE RULE ON THIS LIST, WHEN THE OWNER NARROWED IT, read the way `access` reads it, so the People screen draws
+         the grant the ladder enforces. */
+      if (row.row_where !== null) held.wheres = { ...held.wheres, [row.register]: parsed(row.row_where) };
+    }
     /* THE FURTHEST MARK ON ANY OF THEIR ROWS, and not the `'*'` row's alone. A level is about a
        register, so it belongs to the row it is on; a read mark is about the person, and `markRead`
        moves it on every row they hold. Reading it off `'*'` meant a colleague invited to one list
@@ -190,7 +284,15 @@ export function members(sql: Sql): Member[] {
 export function invite(
   deps: MemberDeps,
   by: string,
-  args: { person: string; email?: string; name?: string; level?: Level; registers?: Record<string, Level>; why?: string },
+  args: {
+    person: string;
+    email?: string;
+    name?: string;
+    level?: Level;
+    registers?: Record<string, Level>;
+    wheres?: Wheres;
+    why?: string;
+  },
 ): Result<Member> {
   if (!args?.person) return no<Member>('REQUIRED_MISSING', 'Who?', { at: 'person' });
   /* A LEVEL ON THE RECORD IS OPTIONAL, and leaving it out is how somebody is invited to ONE
@@ -213,6 +315,8 @@ export function invite(
     if (!(LEVELS as readonly string[]).includes(level))
       return no<Member>('ENUM_VALUE_UNKNOWN', `${String(level)} is not a level.`, { at, allowed: LEVELS });
   }
+  const rules = rulesOf(deps, args);
+  if (!rules.ok) return rules;
 
   /**
    * A SUSPENDED PERSON IS NOT INVITED THROUGH.
@@ -326,7 +430,58 @@ export function invite(
       }
   }
 
+  /**
+   * THE RULES ARE PART OF THE WHOLE, SO A LIST SENT WITHOUT ONE IS EVERY ROW AGAIN, and each change is said out loud:
+   * `access.grant` when a list is narrowed or its rule changes, `access.revoke` when a rule is taken off, with
+   * `field: '<list>#where'` and the rule's JSON text either side (`loop/finish/platform.md` §4.0 W). A rule is a grant
+   * of rows, so its history is read where every other grant's is.
+   *
+   * A LIST TAKEN AWAY ABOVE TOOK ITS RULE WITH ITS ROW, and that list's own `access.revoke` already says so.
+   */
+  for (const register of wanted.keys()) {
+    if (register === RECORD) continue;
+    const had =
+      deps.sql.one<{ row_where: string | null }>(
+        'SELECT row_where FROM member WHERE person_id = ? AND register = ?',
+        args.person,
+        register,
+      )?.row_where ?? null;
+    const rule = rules.value.get(register) ?? null;
+    if (had === rule) continue;
+    deps.sql.exec('UPDATE member SET row_where = ? WHERE person_id = ? AND register = ?', rule, args.person, register);
+    event(deps, at, by, rule === null ? 'access.revoke' : 'access.grant', args.person, `${register}#where`, rule, had, args.why ?? null);
+  }
+
   return ok(members(deps.sql).find((m) => m.person_id === args.person)!);
+}
+
+/**
+ * The rules an invitation sends, as the JSON text each list's grant will hold, or the refusal for the first that
+ * cannot be held.
+ *
+ * A RULE NARROWS A LIST THE SAME INVITATION GIVES, and nothing else: a rule on the whole record, or on a list the person
+ * is not being given, would be a rule on a grant that does not exist. `at` is the path into what the caller sent, as
+ * the register checks above write it.
+ */
+function rulesOf(deps: MemberDeps, args: { registers?: Record<string, Level>; wheres?: Wheres }): Result<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (args.wheres === undefined) return ok(out);
+  if (args.wheres === null || typeof args.wheres !== 'object' || Array.isArray(args.wheres))
+    return no('VALUE_MALFORMED', 'The rules are a map from a list to the rows of it somebody reaches.', { at: 'wheres' });
+  for (const [register, where] of Object.entries(args.wheres)) {
+    const at = `wheres.${register}`;
+    if (!Object.hasOwn(args.registers ?? {}, register))
+      return no('VALUE_MALFORMED', `A rule narrows a list somebody is given. Give them ${register} first.`, { at });
+    if (typeof where !== 'string' && (where === null || typeof where !== 'object' || Array.isArray(where)))
+      return no('VALUE_MALFORMED', 'A rule is a where: a sentence, or the conditions a filter holds.', { at });
+    const text = JSON.stringify(where);
+    if (text.length > WHERE_MAX_CHARS)
+      return no('OUT_OF_BOUNDS', `A rule is at most ${WHERE_MAX_CHARS} characters, and this one is ${text.length}.`, { at });
+    const bad = deps.readsRule?.(register, where) ?? null;
+    if (bad) return { ok: false, refusal: { ...bad, at } };
+    out.set(register, text);
+  }
+  return ok(out);
 }
 
 /**
@@ -519,8 +674,8 @@ function event(
   kind: 'access.grant' | 'access.revoke',
   person: string,
   register: string,
-  level: Level | null,
-  was: Level | null = null,
+  level: string | null,
+  was: string | null = null,
   why: string | null = null,
 ): void {
   deps.sql.exec(

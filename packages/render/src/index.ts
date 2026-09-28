@@ -197,6 +197,7 @@ export {
   type Primitive,
   type Tone,
 } from './kinds.ts';
+export { PACK_KIND, isPackKind, kindSpec, type BlockKind, type PackKind } from './kind-spec.ts';
 export {
   MISSING,
   TYPED,

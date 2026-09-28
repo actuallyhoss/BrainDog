@@ -1,7 +1,13 @@
 /**
  * Turn 2 of the first run, "What's your business?", read without a model (`loop/research-modules.md`
- * §5, option (a)). A sentence becomes a `Shape`: which first-party packs to turn on, and the first
- * rows the sentence itself can fill.
+ * §5, option (a)). A sentence becomes a `Shape`: which packs to turn on, and the first rows the
+ * sentence itself can fill.
+ *
+ * THE WORDS ARE THE CATALOGUE'S, NOT THIS FILE'S (shell.md USE-3, R4). Each pack says what a person
+ * calls what it keeps in its manifest's `signals`, as a use case does, and this reads them: the six
+ * modules from their own manifests (`@braindog/seed/packs/modules`), and any other pack the caller
+ * hands in from the catalogue. A pack from the Kennel that says it is for "choir" is offered to a
+ * person who says they run a choir, on the same terms as Money is to a person who invoices.
  *
  * DETERMINISTIC, because 19 §6 says the first run works on a fresh self-host with nothing
  * configured. Keyword and pattern rules only; the same sentence always gives the same shape.
@@ -18,14 +24,26 @@
  * A plain `.ts` so `node --test` can hold it; the screen only calls it.
  */
 
+import { firstPartyModules } from '@braindog/seed/packs/modules';
+import { MODULE_ORDER, signalsIn } from '@braindog/seed/usecases';
 import { exponentOf } from 'braindog-render';
 
 import { firstRun } from './first-run.ts';
 
-export type PackId = 'portfolio' | 'people' | 'money-core' | 'estate' | 'work' | 'agents';
+/** A pack's id: one of the six modules, or any other pack in the catalogue. */
+export type PackId = string;
 
-/** Portfolio first, because every other first-party list points at a project (`packs.ts` `LEANS_ON`). */
-export const INSTALL_ORDER: readonly PackId[] = ['portfolio', 'people', 'money-core', 'estate', 'work', 'agents'];
+/** Portfolio first, because every other first-party list points at a project (`LEANS_ON`). */
+export const INSTALL_ORDER: readonly PackId[] = MODULE_ORDER;
+
+/**
+ * One pack the first run may offer: its id, the words it is heard in, and the packs it cannot install without. A
+ * catalogue entry that says its `signals` (`@braindog/seed/usecases/catalogue`) is one as it stands.
+ */
+export type Offer = { id: string; signals: readonly string[]; modules: readonly string[] };
+
+/** The modules this build ships, from their manifests. */
+export const BUNDLED: readonly Offer[] = firstPartyModules().map((m) => ({ id: m.id, signals: m.signals, modules: m.leans }));
 
 export type Span = { at: number; text: string };
 export type Money = { amount: number; currency: string };
@@ -61,16 +79,20 @@ const oneLine = (s: string): string => s.replace(/\s+/g, ' ').trim();
 
 /* ── the lexicon ──────────────────────────────────────────────────────── */
 
-/* "track" is not here: "I track a few side projects" is a verb about projects, not a Work list. */
-const LEXICON: readonly { packs: PackId[]; words: RegExp }[] = [
-  { packs: ['money-core', 'people'], words: /\bfreelanc(?:e|es|ed|ing|er)\b/giu },
-  { packs: ['money-core'], words: /\b(?:invoic(?:e|es|ed|ing)|bill(?:s|ed|ing)?|retainers?|owe[sd]?|owing|payments?|paid|vat|tax(?:es)?|money|cash|fees?|charg(?:e|es|ed|ing))\b/giu },
-  { packs: ['estate'], words: /\b(?:domains?|hosting|servers?|subscriptions?|saas|licen[cs]es?|certificates?|renewals?)\b/giu },
-  { packs: ['people'], words: /\b(?:team|staff|employees?|contractors?|freelancers|clients?|customers?|collaborators?|partners?|accountants?|people|colleagues?|co-?founders?)\b/giu },
-  { packs: ['work'], words: /\b(?:tasks?|to-?dos?|deadlines?|sprints?|backlog|roadmap|milestones?)\b/giu },
-  { packs: ['portfolio'], words: /\b(?:(?:side[- ])?projects?|products?|apps?|studio|shop|store|brands?|games?|agency|foundry|websites?)\b/giu },
-  { packs: ['agents'], words: /\b(?:claude|codex|cursor|agents?|ai|mcp|llms?|copilot|chatgpt)\b/giu },
-];
+/**
+ * Every signal the offers carry, with the packs that listen for it. One word may be two packs': "freelance" is Money
+ * and People both, so it is heard once and becomes both.
+ */
+function lexiconOf(offers: readonly Offer[]): Map<string, PackId[]> {
+  const out = new Map<string, PackId[]>();
+  for (const o of offers)
+    for (const signal of o.signals) {
+      const had = out.get(signal);
+      if (had === undefined) out.set(signal, [o.id]);
+      else if (!had.includes(o.id)) had.push(o.id);
+    }
+  return out;
+}
 
 const NUMBER_WORDS: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
 const COUNT = `(\\d{1,3}|${Object.keys(NUMBER_WORDS).join('|')})`;
@@ -115,10 +137,9 @@ const NAME_RULES: readonly NameRule[] = [
 
 const NOT_A_NAME = new Set(['i', 'we', 'my', 'our', 'the', 'a', 'an', 'and', 'but', 'so']);
 const CODES = new Set(Intl.supportedValuesOf('currency'));
-const WHOLE_WORDS = LEXICON.map(({ words }) => new RegExp(`^(?:${words.source})$`, 'iu'));
 /* "building MCP servers" names no project: a word the lexicon already reads is never a name. */
-const aName = (name: string): boolean =>
-  !NOT_A_NAME.has((name.split(' ')[0] ?? '').toLowerCase()) && !CODES.has(name) && !WHOLE_WORDS.some((w) => w.test(name));
+const aName = (name: string, lexicon: ReadonlyMap<string, unknown>): boolean =>
+  !NOT_A_NAME.has((name.split(' ')[0] ?? '').toLowerCase()) && !CODES.has(name) && !lexicon.has(name.toLowerCase());
 
 /* ── money ────────────────────────────────────────────────────────────── */
 
@@ -189,11 +210,15 @@ const nothing = (declined: Shape['declined']): Shape => ({ currency: null, packs
 
 const overlaps = (a: Span, b: Span): boolean => a.at < b.at + b.text.length && b.at < a.at + a.text.length;
 
-/** What a sentence says about a business. `today` is an ISO day, for a date given as "on the 1st". */
-export function shape(sentence: string, today: string = new Date().toISOString().slice(0, 10)): Shape {
+/**
+ * What a sentence says about a business. `today` is an ISO day, for a date given as "on the 1st". `offers` are the packs
+ * whose signals are listened for: the bundled modules unless the caller hands in more of the catalogue.
+ */
+export function shape(sentence: string, today: string = new Date().toISOString().slice(0, 10), offers: readonly Offer[] = BUNDLED): Shape {
   const said = oneLine(sentence);
   if (!said) return nothing('empty');
   if (foreign(said)) return nothing('language');
+  const lexicon = lexiconOf(offers);
 
   const heard: Heard[] = [];
   const rows: Row[] = [];
@@ -215,7 +240,7 @@ export function shape(sentence: string, today: string = new Date().toISOString()
         from += part.length;
         if (SEPARATOR.test(part)) continue;
         const name = part.replace(/[.'’-]+$/u, '');
-        if (!name || !aName(name)) continue;
+        if (!name || !aName(name, lexicon)) continue;
         if (!hear(at, name, [rule.register === 'things' ? 'portfolio' : 'people'])) continue;
         if (rows.some((r) => r.register === rule.register && r.fields.name === name)) continue;
         rows.push(
@@ -245,7 +270,7 @@ export function shape(sentence: string, today: string = new Date().toISOString()
     const n = (m[1] ?? m[2] ?? '').toLowerCase();
     if (hear(m.index ?? 0, m[0], ['people'])) team = NUMBER_WORDS[n] ?? Number(n);
   }
-  for (const { packs, words } of LEXICON) for (const m of said.matchAll(words)) hear(m.index ?? 0, m[0], packs);
+  for (const span of signalsIn(said, [...lexicon.keys()])) hear(span.at, span.text, lexicon.get(span.text.toLowerCase()) ?? []);
 
   /* THE INVOICE, only when the sentence says money is billed. Money requires an amount and a due
      date, so without both typed it is shown as needing them and not written. */
@@ -290,21 +315,33 @@ export function shape(sentence: string, today: string = new Date().toISOString()
 }
 
 /**
- * Which lists each one points at, so turning one on turns those on too. Every list points at a
- * project, and Money points at the person an invoice is to. `shape.test.ts` holds this to the
- * seed's pack manifests.
+ * Which packs each module points at, so turning one on turns those on too, read off each manifest's `requires`
+ * (`@braindog/seed/packs/modules` `leans`). People and Work only link to Projects and People, and Money links to People
+ * for a payment's party, so each goes in without them (`first-party.ts` `LINKS`, MOD-4). `shape.test.ts` holds this to
+ * the seed's pack manifests.
  */
-export const LEANS_ON: Readonly<Record<PackId, readonly PackId[]>> = {
-  portfolio: [],
-  /* People only links to Projects, to say where somebody was met, and goes in without them (`first-party.ts` `LINKS`). */
-  people: [],
-  /* Money links to People for a payment's party and goes in without them (`first-party.ts` `LINKS`, MOD-4). */
-  'money-core': ['portfolio'],
-  estate: ['portfolio'],
-  /* Work only links to Projects and People too: a task's project and owner are left out of a record without them. */
-  work: [],
-  agents: ['portfolio'],
-};
+export const LEANS_ON: Readonly<Record<PackId, readonly PackId[]>> = Object.fromEntries(BUNDLED.map((o) => [o.id, o.modules]));
+
+/**
+ * `ids` with every pack each leans on added, the modules in install order and then any other catalogue pack in the order
+ * it came. A catalogue pack says what it leans on in its own `modules`; one the offers do not know leans on nothing here,
+ * and the install names whatever it is missing.
+ */
+export function closeOver(ids: Iterable<PackId>, offers: readonly Offer[] = BUNDLED): PackId[] {
+  const leans = (id: PackId): readonly PackId[] => offers.find((o) => o.id === id)?.modules ?? LEANS_ON[id] ?? [];
+  const wanted = new Set<PackId>(ids);
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const id of [...wanted])
+      for (const needs of leans(id))
+        if (!wanted.has(needs)) {
+          wanted.add(needs);
+          grew = true;
+        }
+  }
+  const first = new Set<PackId>(INSTALL_ORDER);
+  return [...INSTALL_ORDER.filter((id) => wanted.has(id)), ...[...wanted].filter((id) => !first.has(id))];
+}
 
 /**
  * The shape with the packs a use case already holds taken out: a pack every phrase of which the use case claims
@@ -320,19 +357,10 @@ export function heardFor(s: Shape, claimed: (span: Span) => boolean): Shape {
 }
 
 /** The packs to turn on, dependencies first, with People added when turn 1 heard a name. */
-export function toTurnOn(s: Shape, person: boolean): PackId[] {
+export function toTurnOn(s: Shape, person: boolean, offers: readonly Offer[] = BUNDLED): PackId[] {
   const wanted = new Set<PackId>(s.packs.map((p) => p.id));
   if (person) wanted.add('people');
-  for (let grew = true; grew; ) {
-    grew = false;
-    for (const id of [...wanted])
-      for (const needs of LEANS_ON[id])
-        if (!wanted.has(needs)) {
-          wanted.add(needs);
-          grew = true;
-        }
-  }
-  return INSTALL_ORDER.filter((id) => wanted.has(id));
+  return closeOver(wanted, offers);
 }
 
 /** The rows that can be written: every required field given. */

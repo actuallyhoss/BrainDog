@@ -1,5 +1,6 @@
 /**
- * Decide's writes against the record: answering a question or a proposal, and parking one until a day.
+ * Decide's writes against the record: answering a question or a proposal, parking one until a day, and asking one of
+ * yourself (`askYourself`, filed through `propose` like any other question).
  *
  * A ROUTE-ONLY MODULE, loaded by the two Decide screens, like `inbox-live.ts`: the client carries the route table as
  * a value. The fetch is handed in, so a test drives every branch without a socket.
@@ -92,3 +93,91 @@ export const answerQuestion = (base: string, id: string, option: string, reason?
 /** Park one until a day, with why it can wait. */
 export const parkQuestion = (base: string, id: string, until: string, why: string, io?: Fetch): Promise<Written> =>
   writeDecision(base, id, { defer: { until, why } }, io);
+
+/**
+ * What an option IS, as the sheet collects it: its colours, a figure, or a file the record already holds. The kernel
+ * checks every one again on filing (`govern.ts` `showsOf`), so this is the shape it reads and nothing looser.
+ */
+export type AskShows = { swatch: string[] } | { figure: string } | { file: { row: string; field: string } };
+
+export type AskOption = { label: string; because: string; shows?: AskShows };
+
+/**
+ * A question the owner puts to themselves. `recommended` is the place of the one they suggest, or `null` for none;
+ * `about` is the thing it is about when the sheet was opened from a page, so that page's queue can find it.
+ */
+export type Ask = { question: string; why: string; options: AskOption[]; recommended: number | null; about?: string };
+
+/** `at` names what to fix where the sheet can point at it: `question`, or `option-<n>` counted from one. */
+export type Asked = { from: 'filed'; id: string } | { from: 'refused'; fix: string; at?: string };
+
+/** The sheet's own words: what it says when something it holds cannot be filed yet. */
+export const askWords = {
+  noQuestion: 'Write the question you want to answer.',
+  noLabel: (n: number) => `Give option ${n} a name.`,
+  tooFew: 'A choice is between at least two options.',
+  tooMany: 'Six options is the most a question offers.',
+  noFigure: (n: number) => `Write what option ${n} shows, or pick another way to show it.`,
+  noFile: (n: number) => `Option ${n}'s file is not one this record holds. Name the row that holds it, a slash, then its field.`,
+} as const;
+
+/** The most options a person offers here; the kernel takes more from an agent, and a sheet on a phone does not. */
+export const ASK_MOST = 6;
+
+/** A file named the way a person types it, `parts#2/photo`, read as the row and field the kernel keeps. */
+export function fileOf(said: string): { row: string; field: string } | null {
+  const m = /^([a-z][a-z0-9_]*#[1-9][0-9]*)\/([a-z][a-z0-9_]*)$/u.exec(said.trim());
+  return m && m[1] && m[2] ? { row: m[1], field: m[2] } : null;
+}
+
+/** The first thing the sheet holds that cannot be filed, or `null`. The record is not asked about what is plainly missing. */
+function askFault(ask: Ask): { fix: string; at: string } | null {
+  if (ask.question.trim() === '') return { fix: askWords.noQuestion, at: 'question' };
+  if (ask.options.length < 2) return { fix: askWords.tooFew, at: 'option-1' };
+  if (ask.options.length > ASK_MOST) return { fix: askWords.tooMany, at: `option-${ASK_MOST + 1}` };
+  for (const [i, o] of ask.options.entries()) {
+    if (o.label.trim() === '') return { fix: askWords.noLabel(i + 1), at: `option-${i + 1}` };
+    if (o.shows && 'figure' in o.shows && o.shows.figure.trim() === '') return { fix: askWords.noFigure(i + 1), at: `option-${i + 1}` };
+  }
+  return null;
+}
+
+/**
+ * The `options` body the kernel reads (`govern.ts` `checkBody`): each option an id, a label and its because, the
+ * suggested one marked, and why the question is asked in `context`, which is where the gate reads it from.
+ *
+ * THE IDS ARE PLACES, `o1` and on, because a person never reads them and two options named alike must still be two.
+ */
+function askBody(ask: Ask): Record<string, unknown> {
+  const about = ask.about?.trim();
+  return {
+    ...(ask.why.trim() !== '' ? { context: ask.why.trim() } : {}),
+    ...(about ? { about } : {}),
+    options: ask.options.map((o, i) => ({
+      id: `o${i + 1}`,
+      label: o.label.trim(),
+      because: o.because.trim(),
+      ...(ask.recommended === i ? { recommended: true } : {}),
+      ...(o.shows ? { shows: 'figure' in o.shows ? { figure: o.shows.figure.trim() } : o.shows } : {}),
+    })),
+  };
+}
+
+/**
+ * File the owner's own `options` question through `propose`, where it waits on Decide like any other.
+ *
+ * IT IS FILED, NOT ANSWERED. Asking yourself is writing the question down so it is decided with a reason later, on the
+ * gate, and not in the same breath it was asked. The rail's count follows because the kept boot is dropped here.
+ */
+export async function askYourself(base: string, ask: Ask, io?: Fetch): Promise<Asked> {
+  const said = askFault(ask);
+  if (said !== null) return { from: 'refused', ...said };
+  const client = createClient({ base, ...(io ? { fetch: io } : {}) });
+  const out = await client.call<{ id?: unknown }>('propose', { question: ask.question.trim(), body_kind: 'options', body: askBody(ask) });
+  if (out.ok) {
+    forget();
+    return { from: 'filed', id: out.value && typeof out.value.id === 'string' ? out.value.id : '' };
+  }
+  if ('conflict' in out) return { from: 'refused', fix: copy.decideConflict };
+  return { from: 'refused', fix: out.refusal.fix, ...(typeof out.refusal.at === 'string' ? { at: out.refusal.at } : {}) };
+}

@@ -40,7 +40,7 @@ export const RAIL: Readonly<Record<string, IconName>> = {
   Overview: 'home',
   Dashboard: 'observe',
   Organisations: 'grid',
-  Datapoints: 'observe',
+  Numbers: 'observe',
   Money: 'money',
   People: 'people',
   Tasks: 'task',

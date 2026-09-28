@@ -65,6 +65,8 @@ export function apply(accent: string | null): { ok: true } | { ok: false; refusa
 
   sheet ??= new CSSStyleSheet();
   sheet.replaceSync(built.value.css);
+  /* AT THE END, AND THAT IS WHAT MAKES THIS DEVICE'S PICK WIN. The record's installed look (`theme/draw.ts`) is adopted
+     at the front of the same list, so whichever arrives first, this sheet is the later one in `@layer theme`. */
   if (!document.adoptedStyleSheets.includes(sheet)) document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
 
   pref.write({ theme: accent });

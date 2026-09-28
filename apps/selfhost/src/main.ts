@@ -51,6 +51,7 @@ import { initFrom } from './restore.ts';
 import { openSqlite, signedWebhooks, start } from './server.ts';
 import { rewrapAtStart } from './rewrap.ts';
 import { webhookPost } from './actions.ts';
+import { authMail, mailedNotices, smtpLine, smtpOf, smtpSender } from './smtp.ts';
 
 /**
  * One sentence on stderr, and nothing on stdout — ever.
@@ -573,6 +574,15 @@ async function serve(): Promise<void> {
   const dirFile = join(data, 'directory.sqlite');
   const shell = env.BRAINDOG_SHELL ?? (existsSync(join(BUILT, 'index.html')) ? BUILT : undefined);
 
+  /* MAIL, WHEN BOTH HALVES ARE SET: `BRAINDOG_SMTP_URL` says where it goes and `BRAINDOG_MAIL_FROM` who it is from. Half
+     set or malformed stops the server with the sentence that names the fix, rather than a host that quietly sends
+     nothing; neither set is a host with no mail, as before. The sentence never quotes the URL, which holds the password. */
+  const smtp = smtpOf(env.BRAINDOG_SMTP_URL, env.BRAINDOG_MAIL_FROM);
+  if (smtp && 'wrong' in smtp) return refuse(smtp.wrong);
+  const send = smtp ? smtpSender(smtp) : undefined;
+  const notices = send ? mailedNotices(send) : undefined;
+  const webhooks = signedWebhooks(webhookPost());
+
   const running = await start({
     file,
     port,
@@ -591,16 +601,25 @@ async function serve(): Promise<void> {
     actions: {},
     /* SLASH LOOKS ONCE A DAY on its own unless the owner turned that off; asking hourly is how a day is noticed. */
     slashTickMs: 3_600_000,
-    /* A SIGNED WEBHOOK LEAVES THROUGH THE PINNED POST, and it is the one kind this process delivers. Nothing was passed
-       here before, so a `notify.webhook` an automation queued sat `pending` for the life of the process (measured,
-       `test/webhook-wired.test.ts`). `pull.fetch` is the scheduled actions' own, above. */
-    delivers: ['notify.webhook'],
-    deliver: signedWebhooks(webhookPost()),
-    /* AND MAIL, WHICH HAS NO WAY OUT OF THIS HOST YET, IS SAID ONCE rather than left to wait unseen. The jobs stay queued:
-       a transport added later (W61) sends them, where dropping them would lose the digest somebody was promised. */
+    /* A SIGNED WEBHOOK LEAVES THROUGH THE PINNED POST. Nothing was passed here once, so a `notify.webhook` an automation
+       queued sat `pending` for the life of the process (measured, `test/webhook-wired.test.ts`). `pull.fetch` is the
+       scheduled actions' own, above.
+
+       AND A `notify.email` LEAVES THROUGH SMTP, ONLY WHERE THERE IS SMTP. It is on the list only then, so without it the
+       row is never leased and waits `pending` for the day mail is set up, rather than walking the ladder to a dead
+       letter (`49 §5.12` note 1).
+
+       AND `erase.r2` IS ALWAYS ON IT (OPS-20): `start` deletes that file itself, off this record's own disk, whatever
+       `deliver` below is passed, so an erasure is never left `pending` for want of a transport it does not need. */
+    delivers: notices ? ['notify.webhook', 'notify.email', 'erase.r2'] : ['notify.webhook', 'erase.r2'],
+    deliver: (job, keys) => (job.kind === 'notify.email' && notices ? notices(job) : webhooks(job, keys)),
+    /* SIGN-IN LINKS, AN INVITATION'S PROOF AND THE PASSKEY NOTICES go out the same way, and `start` turns links on with it. */
+    ...(send ? { mail: authMail(send, say) } : {}),
+    /* AND MAIL THIS HOST CANNOT SEND IS SAID ONCE rather than left to wait unseen. The jobs stay queued, where dropping
+       them would lose the digest somebody was promised; `start` says nothing when `notify.email` is delivered. */
     unsentMail: (waiting) =>
       say(
-        `braindog · ${String(waiting)} notification ${waiting === 1 ? 'email is' : 'emails are'} waiting to be sent, and this host has no way to send mail yet. ${waiting === 1 ? 'It stays' : 'They stay'} queued, and nothing is lost; this is said once each time the host starts.`,
+        `braindog · ${String(waiting)} notification ${waiting === 1 ? 'email is' : 'emails are'} waiting to be sent, and this host has no way to send mail yet. Set BRAINDOG_SMTP_URL and BRAINDOG_MAIL_FROM and start it again to send ${waiting === 1 ? 'it' : 'them'}. ${waiting === 1 ? 'It stays' : 'They stay'} queued, and nothing is lost; this is said once each time the host starts.`,
       ),
   });
   /* `importKey` copied it, so these are the last copies this process holds as bytes. */
@@ -620,6 +639,8 @@ async function serve(): Promise<void> {
      somebody who expected the server on their LAN needs to know why it is not, and somebody who set a
      token needs to know where to sign in. It names ways, never a key. */
   say(bootLine(running.signIn));
+  /* AND WHERE MAIL GOES, by host and port and never with what password. */
+  if (smtp) say(`  ${smtpLine(smtp)}`);
 
   /* AND WHAT IS WRONG WITH THE ORIGIN, WHENEVER SOMETHING IS, rather than only when sign-in is off.
      MEASURED: at `BRAINDOG_ORIGIN=https://192.168.1.50:8443` a second boot reports

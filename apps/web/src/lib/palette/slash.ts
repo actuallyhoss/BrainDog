@@ -4,7 +4,8 @@
  * OUT OF THE COMPONENT SO `node --test` CAN HOLD THEM. `admit.ts` is here for the same reason: a `.svelte` file cannot be
  * imported by a test, and a regex over source proves where a string sits rather than what the panel does with it.
  *
- * WHEN THE ROW EXISTS is `50 §5.5` step 5: a model behind Slash on this host, and a query that matched no place. Without a
+ * WHEN THE ROW EXISTS is `50 §5.5` step 5: a model behind Slash on this host, and a query that matched no place or that ends
+ * in a question mark. Without a
  * model the row is ABSENT, NOT DISABLED (`23 §8`), and because the row is the only way into the mode, nothing that says
  * "Slash" can reach the screen on a host without one (`loop/research-spark.md` §0 decision 6).
  *
@@ -37,11 +38,16 @@ export const FIGURES_TRACE = '@figures';
  * the frame before the hits arrive, and a row offered in that frame is a row that vanishes under the pointer.
  */
 export function offersSlash(a: { slash: boolean; prefix: string | null; text: string; pending: boolean; places: number }): string | null {
-  if (!a.slash || a.prefix !== null || a.pending || a.places > 0) return null;
+  if (!a.slash || a.prefix !== null) return null;
   /* TWO CHARACTERS OR MORE, the palette's own threshold for asking the record's search. Below it the search never ran, so
      `places` would be zero for every single letter and each one would be offered to Slash as a question. */
   const question = a.text.trim();
-  return question.length < 2 ? null : question;
+  if (question.length < 2) return null;
+  /* A QUESTION MARK IS THE PERSON SAYING IT IS A QUESTION (`loop/finish/agents.md` AGT-24), so the row is offered beside the
+     places that matched and not only when none did. It does not wait on the search either: it depends on nothing the
+     search answers, so it cannot vanish under the pointer when the hits arrive. */
+  if (question.endsWith('?')) return question;
+  return a.pending || a.places > 0 ? null : question;
 }
 
 /**

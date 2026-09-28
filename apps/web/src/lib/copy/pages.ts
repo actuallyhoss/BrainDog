@@ -229,6 +229,11 @@ export const pages = {
   pageRowConflict: (title: string) => `${title} was changed somewhere else first. The page has been read again, so try once more.`,
   pageRowUnknown: 'This could not be saved from here, because the page did not say which row it is.',
   pageRowNoState: 'This could not be saved from here, because its list has no state to mark it done with.',
+  /* A path's own add line (`page/AddStep.svelte`), and what it says when the record did not say where a step goes. */
+  pathStepAdd: 'Add a step',
+  pathStepNew: 'A new step',
+  pathStepAdded: (title: string) => `Added ${title}.`,
+  pathStepNowhere: 'A step could not be added from here, because nothing says which row these steps belong to.',
   /* Lane O: the page's source as a file. The name is on the button because the name is the point —
      one page, one file, called what the declaration's first line calls it. */
   pageSourceSave: (file: string) => `Download ${file}`,

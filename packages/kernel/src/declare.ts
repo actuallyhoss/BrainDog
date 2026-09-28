@@ -707,6 +707,73 @@ const BLOCK_KINDS: readonly string[] = [
 /** A register id as a block names one on its own, with no `register.` in front: the half `SOURCE` checks after the dot. */
 const REGISTER_ID = /^[a-z][a-z0-9_-]{0,31}$/u;
 
+/** A kind a pack declares, as a page names it: `block.` and the declaration's own id (`blockBody` below). */
+const PACK_KIND = /^block\.[a-z][a-z0-9_-]{0,31}$/u;
+
+/**
+ * The primitives a pack's kind may draw on, `packages/render/src/kinds.ts`'s `PRIMITIVES` less two, copied for the reason
+ * `BLOCK_KINDS` is. `table` is bound to a register and `media` to code the renderer holds, so a kind a pack invents on
+ * either would be a declaration whose rows nothing can draw.
+ */
+const PACK_PRIMITIVES: readonly string[] = ['panel', 'grid', 'rows', 'proportional', 'inline', 'list'];
+
+/** The add-block picker's groups, render's `KindSpec.purpose`, which a pack's kind is listed under. */
+const PACK_PURPOSES: readonly string[] = ['say', 'figure', 'list', 'plan', 'media'];
+
+/** A block declaration's own keys, closed as a page's are, so a misspelt key is named rather than read by nothing. */
+const PACK_BLOCK_KEYS: readonly string[] = ['block', 'title', 'primitive', 'cells', 'optional', 'tone', 'rows', 'header', 'ordered', 'minSpan', 'purpose', 'note'];
+
+/** The widest row a pack's kind takes, the most rows it may draw, and the longest title the picker shows. */
+const PACK_CELLS_MAX = 8;
+const PACK_ROWS_MAX = 200;
+const PACK_TITLE_MAX = 60;
+
+/**
+ * A `block.<id>` declaration: a kind a pack invents, drawn by one of the renderer's primitives from the spec it declares.
+ *
+ * THE SPEC IS THE KIND, so every number in it is checked here and not at render. A `cells: 0` grid draws every row as
+ * an arity fault, a `minSpan: 13` is a width no page has, and a purpose the picker does not group under hides the kind
+ * from the one place a person would look for it. Each is refused with the key named, as a page's keys are, so the pack
+ * author hears at install what a reader would otherwise be the first to hear.
+ */
+function blockBody(decl: Declaration): Refusal | null {
+  const body = decl.body as Record<string, unknown>;
+  const id = decl.id;
+  for (const key of Object.keys(body))
+    if (!PACK_BLOCK_KEYS.includes(key))
+      return bad('DECLARATION_INVALID', `${id} declares ${key}:, which a block kind does not take.`, key, PACK_BLOCK_KEYS);
+
+  const whole = (v: unknown, lo: number, hi: number): boolean => typeof v === 'number' && Number.isInteger(v) && v >= lo && v <= hi;
+
+  if (typeof body.title !== 'string' || body.title.trim() === '' || body.title.length > PACK_TITLE_MAX)
+    return bad('DECLARATION_INVALID', `${id} needs a title of 1 to ${PACK_TITLE_MAX} characters, the name the add-block picker lists it by.`, 'title');
+  if (typeof body.primitive !== 'string' || !PACK_PRIMITIVES.includes(body.primitive))
+    return bad(
+      'DECLARATION_INVALID',
+      body.primitive === 'table' || body.primitive === 'media'
+        ? `${id} draws on ${body.primitive}, whose kinds are bound to a register or to code this build holds. Use one of the six the others draw on.`
+        : `${id}: primitive ${JSON.stringify(body.primitive ?? null)} is not one a pack's kind can draw on.`,
+      'primitive',
+      PACK_PRIMITIVES,
+    );
+  if (!whole(body.cells, 1, PACK_CELLS_MAX))
+    return bad('DECLARATION_INVALID', `${id}: cells is how many cells a row takes, a whole number from 1 to ${PACK_CELLS_MAX}.`, 'cells');
+  if (body.optional !== undefined && !whole(body.optional, 0, (body.cells as number) - 1))
+    return bad('DECLARATION_INVALID', `${id}: optional is how many cells a row may leave off, a whole number below cells.`, 'optional');
+  for (const flag of ['tone', 'header', 'ordered'] as const)
+    if (body[flag] !== undefined && typeof body[flag] !== 'boolean')
+      return bad('DECLARATION_INVALID', `${id}: ${flag} is true or false.`, flag);
+  if (body.rows !== undefined && !whole(body.rows, 1, PACK_ROWS_MAX))
+    return bad('DECLARATION_INVALID', `${id}: rows is the most rows the kind draws, a whole number from 1 to ${PACK_ROWS_MAX}.`, 'rows');
+  if (!whole(body.minSpan, 1, 12))
+    return bad('DECLARATION_INVALID', `${id}: minSpan is the narrowest the kind stays legible at, a whole number of twelfths from 1 to 12.`, 'minSpan');
+  if (typeof body.purpose !== 'string' || !PACK_PURPOSES.includes(body.purpose))
+    return bad('DECLARATION_INVALID', `${id}: purpose is the add-block picker's group the kind is listed under.`, 'purpose', PACK_PURPOSES);
+  if (body.note !== undefined && typeof body.note !== 'string')
+    return bad('DECLARATION_INVALID', `${id}: note is a sentence saying what the kind is for.`, 'note');
+  return null;
+}
+
 /**
  * What a column is on a card, `packages/render/src/cards.ts`'s `CARD_ROLES`, copied for the reason
  * `BLOCK_KINDS` is. A card takes one of each role and up to three facts, as `cardFault` there says.
@@ -997,17 +1064,19 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
         at,
         BLOCK_KINDS as unknown as string[],
       );
-    /* A PACK'S OWN KIND IS REFUSED IN THE SENTENCE ITS DECLARATION GETS, below, because nothing draws either. Admitted
-       here by prefix, a page naming `block.pad` installed and read its rows clean while `block.pad` itself could not be
-       installed: the "no rows, no refusal, no mark on the page" hole by another door. */
-    if (typeof kind === 'string' && /^block\.[a-z][a-z0-9_-]{0,31}$/u.test(kind))
+    /* A PACK'S OWN KIND IS ADMITTED WHEN ITS DECLARATION IS INSTALLED, in this batch or before it, and refused by name
+       when it is not. Admitted by prefix alone, a page naming `block.pad` installed and read its rows clean with nothing
+       anywhere able to draw them: the "no rows, no refusal, no mark on the page" hole by another door. A caller that
+       cannot say what is installed skips the check, as every other cross-declaration check here does. */
+    const packKind = typeof kind === 'string' && PACK_KIND.test(kind);
+    if (packKind && installed && !installed.has(kind as string))
       return bad(
-        'NOT_IN_THIS_BUILD',
-        `${id}.${at} draws ${kind}, a block kind the documents publish and this build draws nowhere. The repair is a deploy, not an edit; until then use a kind this build draws.`,
+        'KIND_UNKNOWN',
+        `${id}.${at} draws ${kind as string}, and no installed pack declares it, so the page would open with a hole where the block should be. Install the pack that declares ${kind as string} first, or use a kind this build draws.`,
         at,
-        BLOCK_KINDS as unknown as string[],
+        [...BLOCK_KINDS, ...[...installed.keys()].filter((known) => PACK_KIND.test(known))],
       );
-    if (!(BLOCK_KINDS as readonly unknown[]).includes(kind))
+    if (!packKind && !(BLOCK_KINDS as readonly unknown[]).includes(kind))
       return bad(
         'KIND_UNKNOWN',
         `${id}.${at}: kind ${JSON.stringify(kind ?? null)} is not a kind this build draws, and no block declares it.`,
@@ -1690,6 +1759,26 @@ const ROUTE_BY_MOST = 4;
 const ROUTE_TO_MOST = 64;
 const ROUTE_VALUE_MOST = 200;
 
+/**
+ * MOD-20's `writes.set`: field ids mapped to a fixed value, checked the same as `dedupe:` and a route's
+ * `by` (`IDENT`, the same identifier a field id anywhere else must be), because this key becomes a row's
+ * field the same way an extracted one does. The value itself is left as the pack wrote it: a
+ * `{{config:<key>}}` inside it is filled at install by `fillConfig`, well before this ever runs, and a
+ * literal string needs no further shape here.
+ */
+function setFault(set: unknown, id: string): Refusal | null {
+  if (set === undefined) return null;
+  if (set === null || typeof set !== 'object' || Array.isArray(set))
+    return bad('DECLARATION_INVALID', `${id}'s writes.set is a map of field ids to a fixed value.`, 'writes.set');
+  for (const [field, value] of Object.entries(set)) {
+    if (!IDENT.test(field))
+      return bad('DECLARATION_INVALID', `${id}'s writes.set names ${JSON.stringify(field)} as a field, and it is not one.`, 'writes.set');
+    if (typeof value !== 'string' || value.length > ROUTE_VALUE_MOST)
+      return bad('DECLARATION_INVALID', `${id}'s writes.set.${field} is text of at most ${ROUTE_VALUE_MOST} characters.`, `writes.set.${field}`);
+  }
+  return null;
+}
+
 /** `42 §4.7`'s two caps on a skip list: how many rules, and how long a reason a person has to read. */
 const SKIP_MOST = 16;
 const SKIP_REASON_MOST = 120;
@@ -1959,10 +2048,19 @@ function ingestBody(decl: Declaration, installed?: Known): Refusal | null {
 
   /* `writes.register`, WHICH IS A NAME OR `07 §2`'s TABLE. A series ingest writes no register and
      is left to the block below, which is where `series:` is read. */
-  const writes = body.writes as { register?: unknown; series?: unknown } | undefined;
+  const writes = body.writes as { register?: unknown; series?: unknown; set?: unknown } | undefined;
   if (writes !== undefined && writes !== null && typeof writes === 'object' && writes.series === undefined) {
     const wrongTarget = routeFault(writes.register, id);
     if (wrongTarget) return wrongTarget;
+  }
+
+  /* MOD-20: `writes.set` FILLS A FIXED VALUE ON EVERY ROW, keyed by field id the same way `dedupe:`
+     is, and checked the same way for the same reason — an unchecked field id becomes SQL two files
+     away (`existingRow`'s comment above `dedupeFault`), and a value that is not text could not be
+     left out when a setting is empty without a second rule to read. */
+  if (writes !== undefined && writes !== null && typeof writes === 'object') {
+    const wrongSet = setFault(writes.set, id);
+    if (wrongSet) return wrongSet;
   }
 
   /**
@@ -3162,6 +3260,9 @@ function createFault(
  *   `owner_only`  `true`, or left out: a colleague who adds across the whole record does not add here, and a grant
  *             naming the list still does (`guard` in `packages/record/src/index.ts`, `20 §1`). Keys and People are
  *             owner-only by their role, so neither declares it.
+ *   `hand`    `{ person?, agent?, taken? }`: who holds a row, a person by a `ref` field and an agent by the `text` field
+ *             it signs with, and the state a row moves to when an agent takes it (`HAND_PARTS`, `handFault` below).
+ *             The app's "Hand to" reads it (GAP-11), and nothing in the kernel names the list that declares it.
  *
  * `rates` AND `meets` ARE NOT IN `42 §4.4` YET, and `declare.test.ts` lists what the code admits
  * that the document does not publish. They landed with the roles brief (`loop/research-shell-next.md`
@@ -3178,6 +3279,7 @@ const REGISTER_KEYS = [
   'id', 'state', 'done', 'finished', 'icon', 'holds', 'seq_prefix', 'scopes', 'steps', 'rates', 'meets', 'pairs',
   'delete',
   'owner_only',
+  'hand',
 ] as const;
 
 /**
@@ -3199,6 +3301,53 @@ const REGISTER_UNBUILT = ['key', 'predicates', 'immutable_when'] as const;
  * `bymonthday`, which nothing reads yet, and they are refused by name rather than installed and ignored.
  */
 const REPEAT_READ = ['freq', 'interval', 'count', 'until', 'workday'] as const;
+
+/**
+ * The parts of a list's `hand:` (GAP-11): the `ref` field a person is handed a row by, the `text` field holding the name
+ * an agent signs with, and the state a row moves to when an agent takes it.
+ *
+ * EITHER HOLDER MAY BE LEFT OUT, BUT NOT BOTH. Work's `owner` is a link that goes when the record has no People
+ * (`LINKS` in `packages/seed/src/packs/first-party.ts`), and a list that hands only to agents is still handed.
+ */
+const HAND_PARTS = ['person', 'agent', 'taken'] as const;
+
+/** Why a list's `hand:` would write what its fields cannot hold, or `null` when every part it names is there. */
+function handFault(id: string, fields: readonly FieldLike[], state: unknown, hand: unknown): Refusal | null {
+  const said = hand !== null && typeof hand === 'object' && !Array.isArray(hand) ? (hand as Record<string, unknown>) : null;
+  const shape = `as { person: owner, agent: agent, taken: doing }, a link to a person, a text field and one of its states`;
+  if (said === null || Object.keys(said).some((k) => !(HAND_PARTS as readonly string[]).includes(k)) || (said.person === undefined && said.agent === undefined))
+    return bad('DECLARATION_INVALID', `${id} says who holds its rows. Say it ${shape}.`, 'hand', HAND_PARTS);
+  const field = (part: string) => fields.find((f) => f.id === said[part]);
+  if (said.person !== undefined && field('person')?.type !== 'ref')
+    return bad(
+      'DECLARATION_INVALID',
+      `${id} hands a row to a person by ${JSON.stringify(said.person)}, and that is a link field of ${id} to the person, such as owner.`,
+      'hand.person',
+      fields.filter((f) => f.type === 'ref').map((f) => f.id),
+    );
+  if (said.agent !== undefined && field('agent')?.type !== 'text')
+    return bad(
+      'DECLARATION_INVALID',
+      `${id} hands a row to an agent by ${JSON.stringify(said.agent)}, and that is a text field of ${id} holding the name the agent signs with.`,
+      'hand.agent',
+      fields.filter((f) => f.type === 'text').map((f) => f.id),
+    );
+  if (said.taken !== undefined) {
+    /* A STATE THE LIST HAS, named by its value, so the row an agent takes shows as taken the way any other row does. */
+    const declared = fields.find((f) => f.id === state)?.values;
+    const values = Array.isArray(declared)
+      ? (declared as unknown[]).map((v) => (typeof v === 'string' ? v : v !== null && typeof v === 'object' ? String((v as { id?: unknown }).id) : ''))
+      : [];
+    if (typeof said.taken !== 'string' || !values.includes(said.taken))
+      return bad(
+        'DECLARATION_INVALID',
+        `${id} moves a row an agent takes to ${JSON.stringify(said.taken)}, and that is one of the states ${id} declares.`,
+        'hand.taken',
+        values,
+      );
+  }
+  return null;
+}
 
 /**
  * The prefixes the kernel speaks. Governance numbers its decisions `D41` and its suggestions `SG23`,
@@ -3899,34 +4048,8 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners, 
   /* A JOB KIND, whose every key is a promise the runner keeps or the record refuses (`jobs.ts`). */
   if (decl.kind === 'job') return jobBody(decl);
 
-  /**
-   * A STANDALONE `block.<id>` DECLARATION WAS CHECKED BY NOTHING, AND IT IS DRAWN BY NOTHING.
-   *
-   * `block` is one of `KINDS` and had no branch above the register line below, so it fell straight
-   * to `return null`: `validate({ id: 'block.invoice_card', kind: 'block', body: { block:
-   * 'invoice_card' } })` was accepted with no `primitive`, no `accepts` and no `body`, all three of
-   * which `42 §4.6` marks required.
-   *
-   * AND CHECKING THOSE THREE WOULD BE A CHECK ABOUT NOTHING. `05 §2` says a new block kind arrives
-   * as a declaration of this kind, and `pageBody` already admits `kind: 'block.<id>'` on a page by
-   * prefix on the strength of it — but nothing in this repository reads a declaration whose kind is
-   * `block`: `grep` finds the eight kinds in `KINDS` and in the migration's CHECK constraint, and
-   * no consumer anywhere. `packages/render` owns the twenty drawn kinds as a compiled table, and
-   * there is no path from an installed declaration into it. So the page draws the fallback and the
-   * author is told nothing, which is `BLOCK_KINDS`'s own sentence one file over: *"no rows, no
-   * refusal, no mark on the page."*
-   *
-   * SO THE HONEST ANSWER IS THE ONE `keyFault` GIVES A PUBLISHED KEY NOTHING KEEPS. The declaration
-   * is well formed and the build is behind, which is what `NOT_IN_THIS_BUILD` says and why `30 §6`
-   * files it beside `SCHEMA_NEWER`: the repair is a deploy, not an edit. Validating `42 §4.6`'s
-   * shape belongs in the change that makes something draw it.
-   */
-  if (decl.kind === 'block')
-    return bad(
-      'NOT_IN_THIS_BUILD',
-      `${decl.id} declares a block kind, which the documents publish and this build draws nowhere, so it would install and be read by nothing. The repair is a deploy, not an edit.`,
-      'kind',
-    );
+  /* A PACK'S OWN BLOCK KIND, drawn by one of the renderer's primitives from the spec it declares (`blockBody`). */
+  if (decl.kind === 'block') return blockBody(decl);
 
   /* A `once_per` THAT IS NOT A LIST THROWS AT FIRE TIME, INSIDE A WRITE. `onceKey` calls `.map` on
      it, and nothing checked the shape — so `once_per: 'row'` installed cleanly and then made every
@@ -4400,6 +4523,13 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners, 
   const ownerOnly = decl.body.owner_only;
   if (ownerOnly !== undefined && ownerOnly !== true)
     return bad('DECLARATION_INVALID', `${id}'s owner_only is true, or left out. ${JSON.stringify(ownerOnly)} is not.`, 'owner_only', ['true']);
+
+  /* `hand:` NAMES FIELDS OF THIS LIST OF THE TYPES A HAND WRITES, or pressing "Hand to" would set a person into a text
+     field or leave a row in a state its list does not have. Checked here, at install, and not when somebody presses. */
+  if (decl.body.hand !== undefined) {
+    const fault = handFault(id, fields as unknown as FieldLike[], state, decl.body.hand);
+    if (fault) return fault;
+  }
 
   /* `state` IS ALWAYS AN ENUM (`02 §1`, `04 §5`). A `state:` naming a `text` field gives the
      register a lifecycle with no transitions the record can check, so every `move` in every rule
@@ -5263,21 +5393,31 @@ export async function enablePack(
  * into reading a list it did not declare, and a `secret` or a `file` would put a credential or a
  * document in a manifest people share. What is left is a value a person can read on a settings
  * screen, so `04 §7`'s enumeration of what a pack can do does not grow.
+ *
+ * A `list` IS A FEW LINES OF TEXT, NOT ONE OF THE RECORD'S LISTS: the words a script matches a bank
+ * line against, the labels a rule reads. Each line is checked as a text setting is, and there are at
+ * most `LIST_ITEMS_CEILING` of them, so a person still reads the whole value on the settings screen.
  */
-export const CONFIG_TYPES = ['text', 'enum', 'bool', 'money', 'day', 'duration', 'number'] as const;
+export const CONFIG_TYPES = ['text', 'enum', 'bool', 'money', 'day', 'duration', 'number', 'list'] as const;
 export type ConfigType = (typeof CONFIG_TYPES)[number];
 
-/** One setting as a manifest declares it, after `readConfig` has checked it. */
-export type ConfigDecl = { type: ConfigType; values?: string[]; default?: Json; label?: string; note?: string };
+/**
+ * One setting as a manifest declares it, after `readConfig` has checked it. `max` is a `list`'s own
+ * ceiling on its lines, at most `LIST_ITEMS_CEILING`, and no other type takes one.
+ */
+export type ConfigDecl = { type: ConfigType; values?: string[]; max?: number; default?: Json; label?: string; note?: string };
 
 /** A pack's settings as the record holds them: what the manifest declares, and the value each holds now. */
 export type PackConfig = { id: string; version: string | null; config: Record<string, ConfigDecl>; values: Record<string, Json> };
 
 const CONFIG_NAME = /^[a-z][a-z0-9_]{0,31}$/;
-const CONFIG_KEYS = ['type', 'values', 'default', 'label', 'note'];
+const CONFIG_KEYS = ['type', 'values', 'max', 'default', 'label', 'note'];
 const CONFIG_CEILING = 64;
 const CONFIG_TEXT_BYTES = 1024;
 const CONFIG_VALUES_CEILING = 64;
+/** The most lines a `list` setting holds whatever its `max` says, and the most bytes in one line. */
+const LIST_ITEMS_CEILING = 20;
+const LIST_ITEM_BYTES = 200;
 
 /** `{{config:<key>}}`, anywhere in a string. The key is checked against the manifest, not here. */
 const PLACEHOLDER = /\{\{config:([^{}]*)\}\}/g;
@@ -5290,6 +5430,7 @@ const PLACEHOLDER = /\{\{config:([^{}]*)\}\}/g;
  * exactly as a row's field is.
  */
 export function configValue(key: string, decl: ConfigDecl, value: unknown, at = `config.${key}`): Result<Json> {
+  if (decl.type === 'list') return listValue(key, decl, value, at);
   /* A NUMBER IS A DECIMAL FIELD'S VALUE, the one type a setting names in its own word, because a setting is not a column. */
   const field = { id: key, type: decl.type === 'number' ? 'decimal' : decl.type, ...(decl.values === undefined ? {} : { values: decl.values }) } as FieldDecl;
   const out = coerce(field, value, {}, at);
@@ -5303,6 +5444,31 @@ export function configValue(key: string, decl: ConfigDecl, value: unknown, at = 
   if (decl.type === 'text' && byteLength(out.value as string) > CONFIG_TEXT_BYTES)
     return no<Json>('OUT_OF_BOUNDS', `The setting ${key} holds at most ${CONFIG_TEXT_BYTES} bytes of text.`, { at });
   return ok(out.value);
+}
+
+/**
+ * A `list` setting's value: lines of text, each trimmed and coerced as a text setting is, none blank.
+ *
+ * EACH LINE GOES THROUGH THE TEXT FIELD'S OWN COERCION, so a line that looks like a key is refused
+ * here exactly as a text setting holding it would be, and a list carries nothing a text cannot.
+ */
+function listValue(key: string, decl: ConfigDecl, value: unknown, at: string): Result<Json> {
+  const most = Math.min(decl.max ?? LIST_ITEMS_CEILING, LIST_ITEMS_CEILING);
+  if (!Array.isArray(value))
+    return no<Json>('VALUE_MALFORMED', `The setting ${key} is a list, so it holds lines of text, such as ["rent", "rates"].`, { at });
+  if (value.length > most) return no<Json>('OUT_OF_BOUNDS', `The setting ${key} holds at most ${most} lines, and this has ${value.length}.`, { at });
+  const lines: string[] = [];
+  for (const [i, item] of value.entries()) {
+    const where = `${at}[${i}]`;
+    if (typeof item !== 'string' || item.trim() === '')
+      return no<Json>('VALUE_MALFORMED', `Line ${i + 1} of the setting ${key} is empty or is not text, and every line holds some text.`, { at: where });
+    const out = coerce({ id: key, type: 'text' } as FieldDecl, item.trim(), {}, where);
+    if (!out.ok) return { ok: false, refusal: out.refusal };
+    if (byteLength(out.value as string) > LIST_ITEM_BYTES)
+      return no<Json>('OUT_OF_BOUNDS', `Line ${i + 1} of the setting ${key} holds at most ${LIST_ITEM_BYTES} bytes of text.`, { at: where });
+    lines.push(out.value as string);
+  }
+  return ok(lines);
 }
 
 /** Why a type is not a setting's, said for the three that are left out on purpose and for everything else. */
@@ -5364,7 +5530,18 @@ export function readConfig(config: unknown): Result<Record<string, ConfigDecl>> 
         });
       decl.values = [...(values as string[])];
     } else if (said.values !== undefined)
-      return no('FIELD_UNKNOWN', `The setting ${key} is a ${decl.type}, and only an enum lists values.`, { at: `${at}.values`, allowed: ['type', 'default', 'label', 'note'] });
+      return no('FIELD_UNKNOWN', `The setting ${key} is a ${decl.type}, and only an enum lists values.`, {
+        at: `${at}.values`,
+        allowed: decl.type === 'list' ? ['type', 'max', 'default', 'label', 'note'] : ['type', 'default', 'label', 'note'],
+      });
+
+    if (said.max !== undefined) {
+      if (decl.type !== 'list')
+        return no('FIELD_UNKNOWN', `The setting ${key} is a ${decl.type}, and only a list has a max.`, { at: `${at}.max`, allowed: ['type', 'default', 'label', 'note'] });
+      if (typeof said.max !== 'number' || !Number.isInteger(said.max) || said.max < 1 || said.max > LIST_ITEMS_CEILING)
+        return no('OUT_OF_BOUNDS', `The setting ${key}'s max is a whole number from 1 to ${LIST_ITEMS_CEILING}.`, { at: `${at}.max` });
+      decl.max = said.max;
+    }
 
     for (const [name, ceiling] of [['label', 80], ['note', 280]] as const) {
       const text = said[name];
@@ -5388,8 +5565,9 @@ export function readConfig(config: unknown): Result<Record<string, ConfigDecl>> 
  * Every `{{config:<key>}}` in a declaration body: the key, where it is, and whether it is the whole string.
  *
  * WHOLE OR PART MATTERS. A string that is exactly one placeholder is replaced by the setting's value as
- * it is, so a money setting lands as `{ amount, currency }` and a bool as `true`. A placeholder inside a
- * longer string is replaced by its text, which a money value does not have.
+ * it is, so a money setting lands as `{ amount, currency }`, a bool as `true` and a list as its array.
+ * A placeholder inside a longer string is replaced by its text, which a money value does not have and
+ * a list's is its lines joined by a comma and a space.
  */
 export function configReads(body: unknown): { key: string; at: string; whole: boolean }[] {
   const out: { key: string; at: string; whole: boolean }[] = [];
@@ -5423,6 +5601,8 @@ export function fillConfig(body: Json, values: Readonly<Record<string, Json>>): 
     return body.replace(PLACEHOLDER, (m, key: string) => {
       if (!Object.hasOwn(values, key)) return m;
       const value = values[key];
+      /* A LIST INSIDE TEXT READS AS A SENTENCE WOULD SAY IT, "rent, rates, water", and never as its JSON. */
+      if (Array.isArray(value)) return value.map((v) => (typeof v === 'string' ? v : JSON.stringify(v))).join(', ');
       return typeof value === 'string' ? value : JSON.stringify(value);
     });
   }

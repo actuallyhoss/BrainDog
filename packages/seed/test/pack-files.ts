@@ -31,6 +31,13 @@ const read = (path: string): PackDoc => JSON.parse(readFileSync(new URL(`../../.
 /** `packs/bank-hsbc-eg/bank-hsbc-eg.pack.json` as it ships: six mail wordings, their six webhook twins and the door's catch-all. */
 export const bankHsbcEgFile = (): PackDoc => read('bank-hsbc-eg/bank-hsbc-eg.pack.json');
 
+/**
+ * `bank-hsbc-eg` 1.3.1, frozen the day 1.4.0 moved the floor to money-core 3.0.0. A record on money-core 1.8.0 or
+ * 2.0.0 is offered this file, never the one that ships, since 1.4.0 is refused there for wanting balances the record
+ * does not hold yet.
+ */
+export const bankHsbcEgFile13 = (): PackDoc => read('bank-hsbc-eg/bank-hsbc-eg-1.3.1.json');
+
 /** `packs/holdings/holdings.pack.json` as it ships, which is 1.1.0: the list, `cost`, the rule and script, three figures and a page. */
 export const holdingsFile = (): PackDoc => read('holdings/holdings.pack.json');
 
@@ -53,9 +60,15 @@ export const holdingsList = (doc: PackDoc = holdingsFile()): Declaration[] =>
 /** The catch-all the pack added at 1.3.0. money-core never declared it, so it was never handed. */
 const NOT_MINE = 'bank-not-mine-sms';
 
+/*
+ * THE FROZEN FILE, NOT THE SHIPPED ONE: `HSBC_EG_INGESTS` and `HSBC_EG_SMS_INGESTS` model the twelve as money-core
+ * 1.8.0 to 2.4.0 handed them, a closed historical set `bank-pack.test.ts` rebuilds a 1.7.0 or 1.8.0 money-core
+ * document from. The pack gained `bank-balance` and `bank-balance-sms` at 1.4.0, and a record reconstructed on 1.7.0
+ * never declared those two, so this reads the file frozen the day the floor moved to money-core 3.0.0.
+ */
 const byIngest = (sms: boolean): Record<string, Body> =>
   Object.fromEntries(
-    bankHsbcEgFile()
+    bankHsbcEgFile13()
       .declarations.filter((d) => d.ingest !== NOT_MINE && d.channel === (sms ? 'webhook' : 'email'))
       .map((d) => [String(d.ingest), d]),
   );

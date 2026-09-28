@@ -338,26 +338,42 @@ Email:
 3. `verified = Authentication-Results carries dkim=pass and spf=pass` (§13 A14).
 4. `arrive({ channel: 'email', headers, body, sha256, verified })` as above. Nothing else; nothing parsed.
 
-### 5.5 · `GET /a/<sha256>` and `PUT /a`
+### 5.5 · `PUT /api/files` and `GET /api/files/<sha256>`
 
-Read:
-1. Path must match `^/a/([0-9a-f]{64})$` → else **404**. The record is the session's, else `?r=<rec_id>`
-   (a shared page's images); neither → **404**. No session check: the URL is the capability (12 §8).
-2. `obj = await BLOBS.get(blobKey(rec, sha))`; `null` → **404**.
-3. Headers: `Content-Type` from `obj.httpMetadata.contentType` (set from bytes at upload), `X-Content-Type-Options:
-   nosniff`, `Content-Security-Policy: default-src 'none'; sandbox`, `X-Robots-Tag: noindex`,
-   `Cache-Control: private, max-age=31536000, immutable`. Stream `obj.body`.
+*Amended by OPS-20. This section named `/a/<sha256>` and `PUT /a`; the site does not forward `/a/*` to the Worker
+(`apps/site/wrangler.jsonc`) and does forward `/api/*`, so the store is reached under `/api/files`, at the root and
+under `/app/<slug>/api/files` alike. `src/files.ts` holds the door and `route()` hands it every such path.*
 
-Write:
-1. `preContext`; a bearer needs scope `write` — the Worker cannot know that, so the upload is confirmed by a
-   `call('whoami', {}, pre)` whose principal must be a person or a `write` token → else **403**.
-2. `Content-Length` absent or over 2,097,152 → **413** before reading; read; length mismatch → **400**.
-3. Sniff the first 16 bytes: PNG `89 50 4E 47 0D 0A 1A 0A` · JPEG `FF D8 FF` · GIF `47 49 46 38` · WebP
-   `52 49 46 46 ?? ?? ?? ?? 57 45 42 50` · AVIF `?? ?? ?? ?? 66 74 79 70 61 76 69 66`. Anything else → **415**; an
-   SVG is anything else (12 §8).
-4. `sha = hex(sha256(bytes))`; `BLOBS.put(blobKey(rec, sha), bytes, { httpMetadata: { contentType }, customMetadata:
-   { bytes } })` — the writer cannot choose the key. Return `{ sha256, mime, bytes }`; the `file` value is then
-   written through `create`/`update` by the caller.
+Who is asking, both ways: the same doors as every record method (`src/session.ts`), in the same order. A share link
+is one 404 with no body; a session cookie names its record, and a write needs the page's own origin (12 §8); a
+bearer names its record and, under a slug, must name the same one. The caller's minute is spent before the bucket is
+touched. `BLOBS` unbound → **501** `NOT_IN_THIS_BUILD`.
+
+Write, `PUT /api/files` with the raw bytes as the body:
+1. A person holding anything above `read` (on the record or on one list), or a `write` token → else **403**
+   `LEVEL_REQUIRED`.
+2. `Content-Length` over 2,097,152 → **413** before reading; the body is counted as it arrives and refused at the
+   same figure whatever the header said; an empty body → **400**.
+3. The type is read from the first bytes: PNG `89 50 4E 47 0D 0A 1A 0A` · JPEG `FF D8 FF` · GIF `GIF87a` or `GIF89a`
+   · WebP `RIFF`, four bytes, `WEBP` · AVIF `ftyp` at byte 4 and `avif` or `avis` at byte 8 · PDF `%PDF-`. Anything
+   else → **415**, and an SVG is anything else (12 §8). A `Content-Type` that names a different type → **415**; none,
+   or `application/octet-stream`, says nothing.
+4. `sha = hex(sha256(bytes))`; the bytes are put at `rec_<id>/a/<sha>` with `httpMetadata.contentType` set to the
+   sniffed type: the writer cannot choose the key. Answers **200** `{ sha256, mime, bytes }`; the caller then writes the field's value,
+   `{ sha256, mime, bytes, name }`, through `create` or `update`.
+
+Read, `GET` or `HEAD /api/files/<sha256>`:
+1. Anybody the record lets read: a person at any level but `append` alone, or any token → else **403**.
+2. A name that is not sixty-four lower-case hex characters, and a hash this record does not hold, are the same
+   **404**.
+3. Headers: `Content-Type` from the upload's sniff, `Content-Length`, `X-Content-Type-Options: nosniff`,
+   `Content-Security-Policy: default-src 'none'; sandbox`, `Cache-Control: private, max-age=31536000, immutable`.
+   Streams the object's body.
+
+Erasure and deletion: an `erase.r2` job's `key` is a file's hash, and the pump deletes `rec_<id>/a/<key>`
+(`src/deliver.ts`). Deleting a record sweeps `rec_<id>/a/` with its copies (`src/destroy.ts`), and the night that
+expires a closed record's final copy sweeps it again. The self-host keeps the same files at `<data>/<slug>/blobs/`
+(`apps/selfhost/src/files.ts`), under the same rules.
 
 ### 5.6 · A shared link: `/app/s/<token>` and `Authorization: Share <token>`
 

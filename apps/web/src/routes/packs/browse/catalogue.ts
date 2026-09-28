@@ -1,32 +1,31 @@
 /**
- * A catalogue on browse: the use cases and add-ons this BrainDog's host serves from a folder (`/catalogue/index.json`,
- * `@braindog/declare/catalogue`, `loop/research-marketplace.md` §1 and §2).
+ * The Kennel on browse: the use cases and add-ons every host answers under `/api/kennel/v1/` (`@braindog/declare/kennel`,
+ * `loop/finish/platform.md` §4.0 K), the bundled catalogue from `packs/` first and the Kennel's entries after it.
  *
  * NOTHING HERE INSTALLS. It reads the index, fetches a version's file and holds it to the checksum and signature the index
- * gives, says whether this record holds that entry at that version, and what changed from the version installed. Installing
- * either kind is a proposal on Decide: the record plans it and the owner approves it.
+ * gives, says whether this record holds that entry at that version, and what changed from the version installed. The
+ * detail page hands what it verified to the record's plan, and the plan sheet installs it.
  *
  * TRUST ON FIRST USE IS KEPT PER BROWSER: the key ids seen for each author, in `localStorage` under `KNOWN_KEYS`. A page
  * that cannot reach storage still draws; it only cannot say a key was seen before. The catalogue's own rotation and
  * revocation statements are verified here too: a new key named by a key already seen is trusted and kept, and a revoked
  * key is said as untrusted and nothing it signed is asked for.
  *
- * A HOST WITH NO CATALOGUE is not an error: browse draws the built-in use cases alone, as before.
+ * A HOST WITH NO KENNEL is not an error: browse draws the modules and built-in use cases alone, as before.
  *
  * PURE, AND THEREFORE TESTABLE: the fetcher is handed in.
  */
 
 import type { CatalogueEntry, CatalogueFile, CatalogueIndex, CatalogueUpdate, CatalogueVersion, Changes, KeyStatements, KnownKeys, Signature, Trust } from '@braindog/declare/catalogue';
 
-import { BASE } from '../../../lib/at.ts';
 import { copy } from '../../../lib/copy.ts';
+import { KENNEL_AT } from '../../../lib/market/counts.ts';
 import type { PackState } from '../../../lib/record/packs.ts';
 
 type Fetcher = (input: string, init?: RequestInit) => Promise<Response>;
 
-/* UNDER THE APP'S BASE. `/catalogue/` on `brain.dog` is the marketing site's, which serves a 404 page there, and a 404
-   reads as a host with no catalogue, so the move would have emptied Browse without a sentence. */
-export const CATALOGUE_BASE = `${BASE}/catalogue/`;
+/** Where the Kennel answers, from `lib/market/counts.ts`, which says why it is written out. */
+export const CATALOGUE_BASE = KENNEL_AT;
 
 /** The index this host serves, `null` when it serves none, or the sentence to say when one is there and does not read. */
 export async function readHostCatalogue(fetcher: Fetcher): Promise<{ ok: true; index: CatalogueIndex | null } | { ok: false; fix: string }> {

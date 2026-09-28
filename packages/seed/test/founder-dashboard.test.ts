@@ -90,7 +90,7 @@ test('THE DASHBOARD AND AN ORGANISATION PAGE read every block, and the numbers a
   const harbour = pages.find((p) => p.title === 'Harbour Studio');
   assert.ok(harbour, 'an organisation has its own page');
   const own = value<{ blocks: Drawn[] }>(k.page(harbour.slug)).blocks;
-  assert.deepEqual(own.map((b) => b.heading), ['Balance', 'The numbers', 'Thirty days against the thirty before', 'Latest numbers', 'Send numbers here']);
+  assert.deepEqual(own.map((b) => b.heading), ['Balance', 'The numbers', 'Thirty days against the thirty before', 'Projects', 'Latest numbers', 'Send numbers here']);
   for (const b of own) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
   assert.equal(own[0]!.rows?.length, 1, 'its balance reads its own row');
   assert.equal(own[1]!.matched, 40, 'only its own numbers, the example one left out');

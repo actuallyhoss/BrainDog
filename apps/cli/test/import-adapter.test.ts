@@ -220,7 +220,7 @@ test('AN OFFER SIGNED BY A REVOKED KEY IS NOT FILED, as pack install refuses it'
   assert.equal(await pack(['key', join(keys, 'k.json'), '--author', 'Halden'], io), 0, said.join(' '));
   const keyId = (JSON.parse(readFileSync(join(keys, 'k.json'), 'utf8')) as { key_id: string }).key_id;
   assert.equal(await pack(['new', 'bookshelf', '--author', 'Halden'], io), 0, said.join(' '));
-  assert.equal(await pack(['publish', 'bookshelf-1.0.0.pack.json', '--to', 'catalogue', '--sign', join(keys, 'k.json')], io), 0, said.join(' '));
+  assert.equal(await pack(['publish', 'bookshelf', '--to', 'catalogue', '--sign', join(keys, 'k.json')], io), 0, said.join(' '));
   assert.equal(await pack(['key', 'revoke', join(keys, 'k.json'), '--to', 'catalogue', '--reason', 'Copied off a shared machine.'], io), 0, said.join(' '));
   const adapter = await offering(io, 'bookshelf');
   out.length = 0;
@@ -241,8 +241,8 @@ test('AN OFFER WHOSE SIGNATURE WAS STRIPPED AFTER SIGNED VERSIONS IS NOT FILED, 
   assert.equal(await pack(['key', join(keys, 'k.json'), '--author', 'Halden'], io), 0, said.join(' '));
   const keyId = (JSON.parse(readFileSync(join(keys, 'k.json'), 'utf8')) as { key_id: string }).key_id;
   assert.equal(await pack(['new', 'bookshelf', '--author', 'Halden'], io), 0, said.join(' '));
-  assert.equal(await pack(['publish', 'bookshelf-1.0.0.pack.json', '--to', 'catalogue', '--sign', join(keys, 'k.json')], io), 0, said.join(' '));
-  const later = JSON.parse(readFileSync(join(io.cwd, 'bookshelf-1.0.0.pack.json'), 'utf8')) as Record<string, unknown>;
+  assert.equal(await pack(['publish', 'bookshelf', '--to', 'catalogue', '--sign', join(keys, 'k.json')], io), 0, said.join(' '));
+  const later = JSON.parse(readFileSync(join(io.cwd, 'bookshelf', 'bookshelf.pack.json'), 'utf8')) as Record<string, unknown>;
   writeFileSync(join(io.cwd, 'bookshelf-1.0.1.pack.json'), JSON.stringify({ ...later, version: '1.0.1', summary: `${String(later.summary)} Kept tidy.` }));
   assert.equal(await pack(['publish', 'bookshelf-1.0.1.pack.json', '--to', 'catalogue', '--sign', join(keys, 'k.json')], io), 0, said.join(' '));
   const path = join(io.cwd, 'catalogue', 'index.json');

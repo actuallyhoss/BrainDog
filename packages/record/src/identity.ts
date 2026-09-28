@@ -23,13 +23,18 @@
  * "fifteen minutes since the first strike".
  */
 
-import type { AssertionOptions, AuthBodies, AuthCall, AuthResult, Clock, Methods, PasskeyInfo, RegistrationOptions, Sql, Who } from '@braindog/ports';
+import type {
+  AssertionOptions, AuthBodies, AuthCall, AuthResult, Clock, Methods, PasskeyInfo, RegistrationOptions, SignupCall, SignupName, SignupVerified, Sql, Who,
+} from '@braindog/ports';
+import { ulids } from '@braindog/kernel';
+
+import { badSlug } from './directory.ts';
 
 import { FRESH } from './index.ts';
 import { assertion, b64url, clientData, registration, same, unb64url, type Alg, type PublicJwk, type Why } from './webauthn.ts';
 
 type Key = Awaited<ReturnType<typeof crypto.subtle.importKey>>;
-type Flow = AuthCall['flow'];
+type Flow = AuthCall['flow'] | SignupCall['flow'];
 /* Read through `AuthBodies`, which `@braindog/ports` already exports from its root, whose index names neither of these two. */
 type SessionInfo = AuthBodies['sessions']['sessions'][number];
 type InviteProved = AuthBodies['invite.proved'];
@@ -200,7 +205,7 @@ const slugTyped = (x: unknown): string | null => {
 export type SessionAsk = { flow: 'session'; sid: string; slug?: string };
 
 /** `Auth`, and the named `session` beside it. Assignable to `Auth`, so every host that holds one is unchanged. */
-export type DirectoryAuth = <C extends AuthCall | SessionAsk>(call: C) => Promise<AuthResult<AuthBodies[C['flow']]>>;
+export type DirectoryAuth = <C extends AuthCall | SessionAsk | SignupCall>(call: C) => Promise<AuthResult<AuthBodies[C['flow']]>>;
 
 type Row = { id_hash: string; person: string; record: string | null; rotated_at: number; authed_at: number; email: string; is_current: number };
 type Found = { row: Row; rotated: { sid: string } | null };
@@ -231,12 +236,41 @@ const pendingInvite = (payload: string): { invite: string; name: string | null }
   return { invite: x.invite, name: typeof x.name === 'string' && x.name !== '' ? x.name : null };
 };
 
+/** The record name, person's name and zone a sign-up proof was minted with, or `null` for a payload this code did not write. */
+const pendingSignup = (payload: string): { slug: string; name: string | null; tz: string | null } | null => {
+  let x: unknown = null;
+  try {
+    x = JSON.parse(payload);
+  } catch {
+    return null;
+  }
+  if (!isObject(x) || typeof x.slug !== 'string' || x.slug === '') return null;
+  return {
+    slug: x.slug,
+    name: typeof x.name === 'string' && x.name !== '' ? x.name : null,
+    tz: typeof x.tz === 'string' && x.tz !== '' ? x.tz : null,
+  };
+};
+
+/**
+ * A typed record name as it would be stored: trimmed, and lower-cased only when it is ASCII.
+ *
+ * ASCII BEFORE IT IS LOWERED, for the reason `slugTyped` gives: `toLowerCase` folds the Kelvin sign to `k`, and a name
+ * that folded into a legal one would be checked as a name the person never typed.
+ */
+const signupSlug = (x: unknown): string => {
+  const typed = text(x).trim();
+  return /^[\x20-\x7e]*$/.test(typed) ? typed.toLowerCase() : typed;
+};
+
 /**
  * `auth(call)`, or with no config, a Directory that answers `methods` with "not configured" and every other flow
  * with 404. That is the Worker without `SESSION_SECRET`: it says why sign-in is off rather than failing.
  */
 export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): DirectoryAuth {
   const encoder = new TextEncoder();
+  /* A PERSON MADE BY A SIGN-UP GETS THE SAME `p_` AND ULID the Directory's own `person$` writes, off the same clock. */
+  const personId = ulids(() => clock.now());
 
   if (config && config.mac.length < 32) throw new Error('The sign-in MAC key must be at least 32 bytes.');
   const macKey: Promise<Key> | null = config
@@ -446,7 +480,7 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
     return { id, clientDataJSON, authenticatorData, signature, userHandle };
   };
 
-  const auth = async (call: AuthCall | SessionAsk): Promise<AuthResult> => {
+  const auth = async (call: AuthCall | SessionAsk | SignupCall): Promise<AuthResult> => {
     const flow = call.flow;
     if (!config) {
       if (flow !== 'methods') return off();
@@ -976,6 +1010,157 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
         if (!held) return rejected(flow, 'shape');
         const body: InviteProved = { email: spent.email, invite: held.invite, name: held.name };
         return { status: 200, body };
+      }
+
+      /**
+       * Whether a name for a new record can be had: the Directory's grammar and words (`badSlug`), then whether any
+       * record holds it or ever held it. A read, so the screen can ask it at every pause in typing.
+       *
+       * A RELEASED NAME IS NEVER FREE, as `claimed` says in `directory.ts`: every stale link still names it, and handing
+       * it out again is how one of them would read somebody else's record.
+       */
+      case 'signup.name': {
+        const slug = signupSlug(call.slug);
+        /* THE TYPED NAME IS NOT SAID BACK AT ANY LENGTH: `badSlug` puts it in its sentence, and a page could be handed a
+           kilobyte of it. */
+        if (slug.length > 64) {
+          const body: SignupName = { slug: '', free: false, why: 'A name is at most thirty-two characters.' };
+          return { status: 200, body };
+        }
+        const wrong = badSlug(slug);
+        if (wrong !== null) {
+          const body: SignupName = { slug, free: false, why: wrong };
+          return { status: 200, body };
+        }
+        const held = sql.one<{ released_at: string | null }>('SELECT released_at FROM dir_slug WHERE slug = ?', slug);
+        const body: SignupName = held
+          ? { slug, free: false, why: held.released_at ? 'That name was used before, and a name is never given out twice. Try another.' : 'That name is taken. Try another.' }
+          : { slug, free: true };
+        return { status: 200, body };
+      }
+
+      /**
+       * A stranger asks for a record: an address, a name for the record, and optionally their own name and zone.
+       *
+       * THE SAME `200 {}` FOR EVERY ADDRESS, so this door tells nobody who has an account. A new address is sent a proof
+       * (`dir_pending`, purpose `signup`, a day); an address that can already sign in is sent a sign-in link instead,
+       * `signup.known`, so the person who forgot they had one is let in from their mailbox and nobody watching the page
+       * learns anything. Both mint one MAC and write one row, so neither answers faster.
+       *
+       * A LOCKOUT ON EACH OF ITS KEYS (`loop/finish/ops.md` §4.0 C): `signup:<ip>` for the asking address, then
+       * `signup-email:<address>` for the address typed, which is struck for known and unknown alike so a lock says
+       * nothing about which it is; and `email:<address>`, the count of mails sent, is reserved only when a mail is about
+       * to go. A full mail count sends nothing and answers exactly as a sent one does.
+       *
+       * THE NAME IS CHECKED HERE AS WELL AS LIVE, because nothing about a name is secret: `signup.name` answers the same
+       * question to anybody. It is checked again at checkout and once more when the record is made, where it is claimed.
+       */
+      case 'signup.start': {
+        if (!config.magic) return off();
+        const stop = reserve(flow, `signup:${text(call.ip)}`, now);
+        if (stop) return stop;
+        const email = text(call.email).trim().toLowerCase();
+        if (!ADDRESS.test(email)) return { status: 422, refusal: { code: 'VALUE_MALFORMED', fix: 'That is not an email address.', at: 'email' } };
+        const slug = signupSlug(call.slug);
+        if (slug.length > 64) return { status: 422, refusal: { code: 'VALUE_MALFORMED', fix: 'A name is at most thirty-two characters.', at: 'slug' } };
+        const wrong = badSlug(slug);
+        if (wrong !== null) return { status: 422, refusal: { code: 'VALUE_MALFORMED', fix: wrong, at: 'slug' } };
+        if (sql.one('SELECT 1 AS n FROM dir_slug WHERE slug = ?', slug))
+          return { status: 422, refusal: { code: 'ALREADY_KNOWN', fix: 'That name is taken. Try another.', at: 'slug' } };
+        const name = text(call.name).trim() || null;
+        if (name !== null && name.length > 200) return { status: 422, refusal: { code: 'VALUE_MALFORMED', fix: 'A name is at most 200 characters.', at: 'name' } };
+        /* THE ZONE IS KEPT AS TYPED AND ONLY BOUNDED HERE: checkout and the record's making check it against the zones
+           the runtime knows (`zoneOf` in the Worker), and a zone refused there is asked again on the page. */
+        const tz = text(call.tz).trim() || null;
+        if (tz !== null && (tz.length > 64 || !/^[A-Za-z0-9_+\-/]+$/.test(tz)))
+          return { status: 422, refusal: { code: 'VALUE_MALFORMED', fix: 'That is not a time zone, such as Europe/London.', at: 'tz' } };
+
+        const token = fresh();
+        const [linkHash, proofHash] = await Promise.all([hmac('l:', token), hmac('p:', token)]);
+        const asked = reserve(flow, `signup-email:${email}`, now);
+        if (asked) return asked;
+        const person = sql.one<Person & { suspended: number }>(
+          'SELECT id, email, suspended_at IS NOT NULL AS suspended FROM dir_person WHERE lower(email) = lower(?)',
+          email,
+        );
+        /* A SUSPENDED PERSON IS SENT NOTHING AND IS NEVER MADE AGAIN: the address is theirs, and `dir_person` holds one
+           row per address. The answer is the one every address gets. */
+        if (person && Number(person.suspended) !== 0) {
+          say(flow, 'suspended');
+          return { status: 200, body: {} };
+        }
+        /* `reserve` has told the log why; either way nothing is sent, and the answer is the one a sent mail gets. */
+        if (reserve(flow, mailKey(email), now)) return { status: 200, body: {} };
+        if (person) {
+          sql.transactionSync(() => {
+            sql.exec('DELETE FROM dir_link WHERE expires <= ?', now);
+            sql.exec('INSERT INTO dir_link (hash, person, purpose, expires) VALUES (?, ?, ?, ?)', linkHash, person.id, 'magic', now + MAGIC_LIFE);
+          });
+          return { status: 200, body: {}, mail: { kind: 'signup.known', to: person.email, link: token } };
+        }
+        sql.transactionSync(() => {
+          sql.exec('DELETE FROM dir_pending WHERE expires <= ?', now);
+          sql.exec(
+            'INSERT INTO dir_pending (hash, purpose, email, payload, expires, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+            proofHash,
+            'signup',
+            email,
+            JSON.stringify({ slug, name, tz }),
+            now + PENDING_LIFE,
+            now,
+          );
+        });
+        return { status: 200, body: {}, mail: { kind: 'signup.verify', to: email, link: token } };
+      }
+
+      /**
+       * The proof back from the mailbox, spent once: the person is made (the mailbox is now proved) and signed in.
+       *
+       * STRUCK AGAINST THE ASKING ADDRESS, as a sign-in link is, and never against the mailbox: a proof already sent is
+       * always worth spending, and spending it clears the mailbox's count of mails sent.
+       *
+       * AN ADDRESS THAT BECAME A PERSON IN THE MEANTIME, by an invitation or a second sign-up, is that person: the
+       * proof shows the same mailbox either way, and `dir_person` holds one row per address. No record is made here.
+       * The session opens on none, and the record is made when its payment is in (`/account/billing/checkout`).
+       */
+      case 'signup.verify': {
+        const token = call.token;
+        const [presented, next, hash] = await Promise.all([
+          hashOf(call.sid),
+          minted(),
+          typeof token === 'string' && MINTED.test(token) ? hmac('p:', token) : null,
+        ]);
+        const strike = `ip:${text(call.ip)}`;
+        const stop = reserve(flow, strike, now);
+        if (stop) return stop;
+        if (hash === null) return rejected(flow, 'shape');
+        const made = new Date(now).toISOString();
+        const outcome = sql.transactionSync((): { who: Who; held: { slug: string; name: string | null; tz: string | null } } | Reason => {
+          const row = sql.one<{ email: string; payload: string }>(
+            "DELETE FROM dir_pending WHERE hash = ? AND purpose = 'signup' AND expires > ? RETURNING email, payload",
+            hash,
+            now,
+          );
+          if (!row) return 'link';
+          const held = pendingSignup(row.payload);
+          if (!held) return 'shape';
+          sql.exec('DELETE FROM dir_fail WHERE key = ?', mailKey(row.email));
+          const known = sql.one<Person & { suspended: number }>(
+            'SELECT id, email, suspended_at IS NOT NULL AS suspended FROM dir_person WHERE lower(email) = lower(?)',
+            row.email,
+          );
+          if (known && Number(known.suspended) !== 0) return 'suspended';
+          let person: Person;
+          if (known) person = { id: known.id, email: known.email };
+          else {
+            person = { id: `p_${personId()}`, email: row.email };
+            sql.exec('INSERT INTO dir_person (id, email, name, created_at) VALUES (?, ?, ?, ?)', person.id, person.email, held.name, made);
+          }
+          return { who: open(person, presented, next, now, strike), held };
+        });
+        if (typeof outcome === 'string') return rejected(flow, outcome);
+        const body: SignupVerified = { person: outcome.who.person, email: outcome.who.email, ...outcome.held };
+        return { status: 200, body, session: { sid: next.sid } };
       }
 
       default:

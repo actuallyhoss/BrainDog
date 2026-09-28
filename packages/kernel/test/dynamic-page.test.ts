@@ -5,8 +5,8 @@
  * THE SURVEY MEASURED THREE SILENT DOORS through a pack installed on a fresh record, and each is held shut here: a
  * block key nobody reads (`size: 2`) installed and was refused only when the page was opened; a page key nobody reads
  * (`layout`, `tabs`) installed and was handed to the host unread; `lead: true` on cards and `first: 3` on steps
- * installed and read clean while nothing looked at them; and a page naming `block.pad` installed and read its rows
- * while the only thing that could declare that kind is refused `NOT_IN_THIS_BUILD`.
+ * installed and read clean while nothing looked at them; and a page naming `block.pad` reads its rows through the
+ * same fall-through an unregistered kind always has, now that PLT-8 lets a pack's own kind read like any other.
  *
  * AND THE NEW WORDS ARE ANSWERED, not only admitted: a card's next step, a path's done and next marks and its short
  * view, a question's option shown as what it is, the questions about one thing, and one row's fields to type into.
@@ -90,11 +90,13 @@ async function record() {
 
 /* ── the survey's lint lines, each a refusal naming the key or an acceptance with a shape check ── */
 
-test('A PAGE NAMING A PACK KIND IS REFUSED NOT_IN_THIS_BUILD, in the sentence a block declaration already gets', () => {
-  const out = lint(blocks({ kind: 'block.pad', heading: 'Pad' }));
-  assert.equal(out?.code, 'NOT_IN_THIS_BUILD');
+test('A PAGE NAMING A PACK KIND NOBODY INSTALLED IS REFUSED AT INSTALL, and one a pack declares is admitted', () => {
+  const pad = { block: 'pad', title: 'Pad', primitive: 'grid', cells: 3, tone: true, minSpan: 4, purpose: 'figure' };
+  const out = validateDeclaration(blocks({ kind: 'block.pad', heading: 'Pad' }), new Map());
+  assert.equal(out?.code, 'KIND_UNKNOWN');
   assert.match(out?.fix ?? '', /block\.pad/);
-  assert.match(out?.fix ?? '', /draws nowhere/);
+  assert.match(out?.fix ?? '', /no installed pack declares it/);
+  assert.equal(validateDeclaration(blocks({ kind: 'block.pad', heading: 'Pad' }), new Map([['block.pad', pad]])), null);
 });
 
 test('A BLOCK KEY NOBODY READS IS REFUSED AT INSTALL, by name, with what to write instead', () => {
@@ -267,9 +269,11 @@ test('THE READ REFUSES A KEY ON A KIND THAT DOES NOT READ IT, as the install doe
     const odd = k.block({ kind: 'note', body: 'x', [key]: 1 } as never);
     assert.equal(odd.refusals[0]?.at, key);
   }
+  /* PLT-8: A PACK'S OWN KIND READS LIKE ANY OTHER once its declaration is installed (`declare.ts` `pageBody`), so a
+     `block.pad` naming a register draws its rows through the same fall-through a `table` does, with no refusal. */
   const pack = k.block({ kind: 'block.pad', source: 'register.areas' } as never);
-  assert.equal(pack.refusals[0]?.code, 'NOT_IN_THIS_BUILD');
-  assert.deepEqual(pack.rows, []);
+  assert.deepEqual(pack.refusals, []);
+  assert.ok(pack.rows.length > 0);
 });
 
 test('AN OPTION IS SHOWN AS WHAT IT IS, and a question may say what it is about, which a queue filters on', async () => {

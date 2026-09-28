@@ -38,7 +38,9 @@
   import { page as route } from '$app/state';
   import { REGISTERS } from '../record/held.ts';
   import { toSegments } from '../record/blocks.ts';
-  import { bindableFor, seedBlock } from '../record/seed.ts';
+  import { bindableFor, seedBlock, seedPackBlock } from '../record/seed.ts';
+  import { blockWords } from '../record/block-edit.ts';
+  import type { InstalledKind } from '../record/kinds.ts';
   import type { PageBlock } from '../record/schema.ts';
   import Define from './Define.svelte';
   import Sheet from './Sheet.svelte';
@@ -48,8 +50,15 @@
     blocks,
     register,
     onadd,
+    installed = {},
   }: {
     open?: boolean;
+    /**
+     * THE KINDS THE RECORD'S PACKS DECLARE (`installedKinds`, PLT-8), listed under their own group beside this build's.
+     * Each is seeded over the list like any other; its tile draws its title, because this build has no drawing of a kind
+     * it did not ship and a tile never draws a wireframe.
+     */
+    installed?: Readonly<Record<string, InstalledKind>>;
     /**
      * THE PAGE'S OWN BLOCKS, AS THE RECORD ANSWERED THEM, which a preview binds to. It took the page's slug and read the
      * sample's page of that name, so every tile on a record previewed the sample's rows under the words "never to a
@@ -166,6 +175,20 @@
       return { kind, seed, segments, spec: isKind(kind) ? KINDS[kind] : undefined };
     });
   });
+
+  /** A kind's name and its one line, from the shared table first, then this unit's words for the kinds it adds. */
+  const nameOf = (kind: string): string => copy.kindNames[kind] ?? blockWords.kindNames[kind] ?? installed[kind]?.title ?? kind;
+  const whatOf = (kind: string): string => copy.kinds[kind] ?? blockWords.kinds[kind] ?? '';
+
+  /* THE RECORD'S OWN KINDS, each seeded over the list, left out where the list cannot fill it. No segments: the tile
+     draws the kind's title in the description's slot, the documented degrade. */
+  const packTiles = $derived(
+    Object.entries(installed).flatMap(([kind, spec]) => {
+      const seed = seedPackBlock(kind, spec, register);
+      return seed ? [{ kind, seed: seed as PageBlock | null, segments: [] as ReturnType<typeof toSegments>, spec: spec as { purpose: string } | undefined }] : [];
+    }),
+  );
+  const allTiles = $derived([...tiles, ...packTiles]);
 </script>
 
 <Sheet bind:open title={copy.addBlock} >
@@ -181,7 +204,7 @@
   {/if}
 
   {#each PURPOSES as purpose}
-    {@const group = tiles.filter((t) => t.spec?.purpose === purpose)}
+    {@const group = allTiles.filter((t) => t.spec?.purpose === purpose)}
     {#if group.length}
       <section class="group">
         <h3 class="group-name">{copy.purposes[purpose]}</h3>
@@ -197,8 +220,8 @@
                 }}
               >
                 <span class="tile-head">
-                  <span class="tile-kind">{copy.kindNames[tile.kind] ?? tile.kind}</span>
-                  <span class="tile-what">{copy.kinds[tile.kind] ?? ''}</span>
+                  <span class="tile-kind">{nameOf(tile.kind)}</span>
+                  <span class="tile-what">{whatOf(tile.kind)}</span>
                 </span>
                 <!-- `inert` AND NOT `aria-hidden`. It takes the subtree out of the tab order, out
                      of the accessibility tree and out of hit-testing in one attribute, which is
@@ -217,7 +240,7 @@
                          IT PRINTED THE NAME, which the tile's own head prints two lines above — so a
                          tile that could not draw itself read `Bar chart / amounts side by side,
                          biggest first / Bar chart`. -->
-                    <span class="tile-fallback">{copy.kinds[tile.kind] ?? ''}</span>
+                    <span class="tile-fallback">{whatOf(tile.kind) || nameOf(tile.kind)}</span>
                   {/if}
                 </span>
               </button>

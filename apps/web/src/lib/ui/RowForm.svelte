@@ -27,7 +27,9 @@
   import { valueSaid } from '../voice.ts';
   import { firstAsks } from '../first-run.ts';
   import DayBox from './DayBox.svelte';
+  import FileField from './FileField.svelte';
   import Icon from './Icon.svelte';
+  import { fileOf, isFile } from '../record/field-draft.ts';
 
   /**
    * `problems` IS BOUND OUT rather than pulled in.
@@ -233,6 +235,13 @@
       }
       const raw = (typed[f.id] ?? '').trim();
       if (raw === '') continue;
+      /* A FILE IS HELD AS ITS VALUE WRITTEN OUT (`FileField`), and goes as the object the record stores; a draft that
+         names no file writes nothing (OPS-20). `Fields` does not list the file's shape, so it is cast as `patchOf`'s is. */
+      if (isFile(f)) {
+        const file = fileOf(raw);
+        if (file !== null) out[f.id] = file as unknown as Fields[string];
+        continue;
+      }
       if (f.type === 'money') {
         /* NOTHING IS WRITTEN FOR AN AMOUNT THE RECORD WOULD REFUSE, a missing currency among them: the
            sentence under the box says why, and the button is disabled while it is there. */
@@ -423,6 +432,9 @@
         <label class="row-check"><input id={id(f)} type="checkbox" bind:checked={ticked[f.id]} /> {copy.yes}</label>
       {:else if f.type === 'document'}
         <textarea class="row-input row-area" id={id(f)} rows="4" required={f.required} bind:value={typed[f.id]}></textarea>
+      {:else if isFile(f)}
+        <!-- A FILE IS CHOSEN, NEVER TYPED (OPS-20): the picker sends the bytes and the draft holds what came back. -->
+        <FileField id={id(f)} label={labelOf(f)} bind:value={typed[f.id]} />
       {:else}
         <div class="field"><input class="field-input" id={id(f)} type="text" required={f.required} bind:value={typed[f.id]} /></div>
       {/if}

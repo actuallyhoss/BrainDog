@@ -64,8 +64,10 @@
   import { nameWords } from '$lib/record/names.ts';
   import { arrange, orderLists } from '$lib/nav.ts';
   import { navPrefs } from '$lib/nav-prefs.svelte.ts';
+  import { spineOf } from '$lib/spine.ts';
   import Sheet from '$lib/ui/Sheet.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import LapseBanner from '$lib/ui/LapseBanner.svelte';
   import { untrack } from 'svelte';
   import { beforeNavigate, goto } from '$app/navigation';
   import { page } from '$app/state';
@@ -90,7 +92,7 @@
   const bare = $derived.by(() => {
     /* Read inside the record: the address is `/app/acme/start` and the rule is about `/start`. */
     const at = here(page.url.pathname);
-    return at === '/start' || at === '/signin' || at === '/invite' || at === '/connect' || at.startsWith('/s/');
+    return at === '/start' || at === '/signin' || at === '/signup' || at === '/invite' || at === '/connect' || at.startsWith('/s/');
   });
 
   /* THE SHELL'S, AND A PAGE'S. It was local, so a page could not open the palette — which is why
@@ -144,6 +146,7 @@
   const PLACES = [
     ['/packs', copy.packs, 'packs', '/packs'],
     ['/automations', copy.automations, 'refresh', '/automations'],
+    ['/jobs', copy.jobs, 'play', '/jobs'],
     ['/slash', nameWords.slash, 'star', '/slash'],
     ['/vault', copy.vault, 'vault', '/vault'],
     ['/settings', copy.settings, 'settings', '/settings'],
@@ -153,10 +156,15 @@
   /** The same sectioned grouping AND THE SAME ORDER the rail draws — one nav, not two shapes. It
       was `group(data.nav)`, so the phone's More sheet ignored an arrangement the rail honoured. */
   /* A SAVED VIEW DRAWN UNDER ITS LIST is not drawn again under Views. The palette still reads every page in `data.nav`. */
+  /* AND A TABBED SECTION'S PAGE PAST THE RAIL'S BUDGET IS THE STRIP'S, NOT THE RAIL'S (`cut`, PGS-18): the page's own
+     tabs read `data.nav` whole, and every bar here reads this. */
   const railNav = $derived.by(() => {
     const placed = new Set(data.index.registers.flatMap((r) => (r.views ?? []).map((v) => v.href)));
-    return placed.size ? data.nav.filter((n) => !placed.has(n.href)) : data.nav;
+    return data.nav.filter((n) => !n.cut && !placed.has(n.href));
   });
+  /* THE SPINE, ONE RULE FOR THE THREE BARS (`spine.ts`). A shell no record answered has no `counts`, and is read from the
+     two numbers it does carry. */
+  const spine = $derived(spineOf(data.counts ?? { decide: data.open, inbox: data.inbox }));
   /* THE PERSON'S OWN RAIL, as `boot` answered it, before anything draws it (`nav-prefs.svelte.ts`). */
   $effect.pre(() => navPrefs.adopt(data.me.prefs, apiBase()));
   /* A PAGE HIDDEN FROM THE RAIL IS HIDDEN FROM THE TOP BAR AND THE MORE SHEET TOO: one nav, not two. */
@@ -266,23 +274,15 @@
    * enforced in CSS a few rules down rather than here: a shape that let somebody put an
    * eighteen-entry strip across a phone would be a shape that breaks their phone.
    */
-  let shape = $state<'rail' | 'bar' | 'menu'>(pref.read().navShape ?? 'rail');
-
-  /**
-   * AND IT IS RE-READ WHEN IT IS WRITTEN, because the control that sets it is INSIDE the thing it
-   * changes.
+  /*
+   * THE RECORD'S WORD, `nav.shape`, held for the tab by `navPrefs` and adopted from `boot` above. Before `boot` answers
+   * it is the cookie's first-paint copy, and after it the cookie is only ever written from the record (contracts §7.3).
    *
-   * `/settings/navigation` is a screen in this shell, and this shell mounts once for the life of the
-   * tab. So choosing Top bar wrote the cookie, left the rail exactly where it was, and came back
-   * correct on the next reload: a control that works and looks broken. `pref.write` announces every
-   * write for exactly this, and the listener re-reads rather than being told, so nothing here has to
-   * know which key moved.
+   * AND IT REDRAWS WHEN IT IS SET, because the control that sets it is INSIDE the thing it changes: `/settings/navigation`
+   * is a screen in this shell, and this shell mounts once for the life of the tab. Reading the field rather than the
+   * cookie is what makes choosing Top bar move the navigation at once instead of on the next reload.
    */
-  $effect(() => {
-    const reread = () => (shape = pref.read().navShape ?? 'rail');
-    window.addEventListener('bdpref', reread);
-    return () => window.removeEventListener('bdpref', reread);
-  });
+  const shape = $derived(navPrefs.shape);
 
   /* CLEARED ON EVERY NAVIGATION, or `data-screen` is the PREVIOUS screen's answer for exactly as
      long as this one takes to arrive, which is the window every browser gate measures in.
@@ -443,6 +443,7 @@
           records={data.me.records}
           refused={data.recordsRefused}
           registers={data.index.registers}
+          {spine}
           open={data.open}
           inbox={data.inbox}
         />
@@ -450,7 +451,7 @@
     {:else}
       <div class="bar-slot">
         {#if shape === 'bar'}
-          <TopBar entries={numbered} open={data.open} inbox={data.inbox} onmore={() => (moreOpen = true)} />
+          <TopBar entries={numbered} {spine} open={data.open} inbox={data.inbox} onmore={() => (moreOpen = true)} />
         {:else}
           <!--
             THE MENU SHAPE IS ONE BUTTON AND NOTHING ELSE, which is the whole of what it promises:
@@ -486,13 +487,14 @@
     -->
     {#key page.url.pathname}
     <main id="main" class="body" data-screen={settled()}>
+      <LapseBanner shell={data} />
       {@render children()}
     </main>
     {/key}
   </div>
 
   <div class="tab-slot">
-    <TabBar open={data.open} inbox={data.inbox} more={moreOpen} onmore={() => (moreOpen = true)} />
+    <TabBar {spine} open={data.open} inbox={data.inbox} more={moreOpen} onmore={() => (moreOpen = true)} />
   </div>
 
   <!--

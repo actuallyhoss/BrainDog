@@ -341,6 +341,7 @@
           {count}
           onmove={(to) => stepInArea(at, pos, to)}
           onspan={(span) => a.setSpan(at, span)}
+          onedit={() => a.edit(at)}
           onremove={() => a.remove(at)}
           widths={!rail}
         />

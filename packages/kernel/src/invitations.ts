@@ -31,6 +31,12 @@ export type InvitationRow = {
   invited_by: string;
   created_at: string;
   expires_at: string;
+  /**
+   * Whether its link has run out. ONLY THE LISTING HOLDS ONE THAT HAS: an owner who sent a link a week ago and hears
+   * nothing needs to see that it ran out and make a new one from the same row, and a row that vanished at hour
+   * twenty-four left them retyping the address and every list they chose, not knowing whether the first link was spent.
+   */
+  expired: boolean;
 };
 
 /** A minted invitation, and the only copy of its link's token there will ever be. */
@@ -52,11 +58,12 @@ export const secretOf = (bytes: Uint8Array): string => {
 
 const ADDRESS = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-type Raw = Omit<InvitationRow, 'registers'> & { registers: string };
+type Raw = Omit<InvitationRow, 'registers' | 'expired'> & { registers: string };
 
 const COLUMNS = 'id, email, level, registers, invited_by, created_at, expires_at';
 
-const shaped = (raw: Raw): InvitationRow => {
+/* `nowMs` DECIDES `expired`, and the two answers that only ever hold a live row pass the moment they were asked at. */
+const shaped = (raw: Raw, nowMs: number): InvitationRow => {
   let registers: Record<string, Level> = {};
   try {
     const parsed: unknown = JSON.parse(raw.registers);
@@ -64,7 +71,7 @@ const shaped = (raw: Raw): InvitationRow => {
   } catch {
     registers = {};
   }
-  return { ...raw, registers };
+  return { ...raw, registers, expired: raw.expires_at <= instant(nowMs) };
 };
 
 /**
@@ -136,18 +143,22 @@ export function mintInvitation(deps: InviteDeps, by: string, args: InviteArgs, s
     at,
     expires,
   );
-  const invitation = shaped({ id, email, level: args.level ?? null, registers, invited_by: by, created_at: at, expires_at: expires });
+  const invitation = shaped({ id, email, level: args.level ?? null, registers, invited_by: by, created_at: at, expires_at: expires }, deps.nowMs);
   return ok({ invitation, token: `${record}.${secret}` });
 }
 
-/** Every invitation still waiting: not spent, not withdrawn, not run out. Never the hash. */
+/**
+ * Every invitation nobody has used or withdrawn, newest first, the ones that ran out included and marked `expired`.
+ * Never the hash.
+ *
+ * A LINK THAT RAN OUT STAYS LISTED until the owner withdraws it or makes a new one, which withdraws it as a second
+ * link for one address always does. Its link is as dead as a withdrawn one (`lookInvitation` still asks for a live
+ * row); the row is kept only so the owner can see it and press "New link" on the grants it already carries.
+ */
 export const listInvitations = (sql: Sql, nowMs: number): InvitationRow[] =>
   sql
-    .all<Raw>(
-      `SELECT ${COLUMNS} FROM invitation WHERE accepted_at IS NULL AND revoked_at IS NULL AND expires_at > ? ORDER BY created_at DESC, id`,
-      instant(nowMs),
-    )
-    .map(shaped);
+    .all<Raw>(`SELECT ${COLUMNS} FROM invitation WHERE accepted_at IS NULL AND revoked_at IS NULL ORDER BY created_at DESC, id`)
+    .map((raw) => shaped(raw, nowMs));
 
 /** The live invitation behind a hash, or the one refusal every dead link gets. */
 export function lookInvitation(sql: Sql, nowMs: number, hash: string): Result<InvitationRow> {
@@ -156,7 +167,7 @@ export function lookInvitation(sql: Sql, nowMs: number, hash: string): Result<In
     hash,
     instant(nowMs),
   );
-  return raw ? ok(shaped(raw)) : no<InvitationRow>('UNAUTHORIZED', GONE, { at: 'token' });
+  return raw ? ok(shaped(raw, nowMs)) : no<InvitationRow>('UNAUTHORIZED', GONE, { at: 'token' });
 }
 
 /**

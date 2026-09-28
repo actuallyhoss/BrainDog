@@ -286,7 +286,9 @@ export function applyPull(
       JSON.stringify(payload),
       row.id,
     );
-    const grant = typeof payload.grant === 'string' ? payload.grant : null;
+    /* BY LABEL OR ID, as the fire resolves it, so a row that names its key by label marks that key stale and not nothing. */
+    const said = typeof payload.grant === 'string' && payload.grant !== '' ? payload.grant : null;
+    const grant = said === null ? null : (deps.keyOf?.(said)?.id ?? said);
     if (grant) deps.sql.exec('UPDATE grant SET stale_at = ? WHERE id = ?', instant(deps.nowMs), grant);
     deps.sql.exec(
       "INSERT INTO event (id, ts, actor, kind, target, target_kind, note) VALUES (?, ?, ?, 'pull', ?, 'grant', ?)",

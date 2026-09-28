@@ -22,7 +22,7 @@
   browser history and in URL-bar autocomplete (19 §5).
 -->
 <script lang="ts">
-  import { apiBase, signInFirst } from '$lib/at.ts';
+  import { apiBase, at, signInFirst } from '$lib/at.ts';
   import { onDestroy, onMount } from 'svelte';
   import { createClient } from '@braindog/client';
   import { since, relative } from 'braindog-render';
@@ -30,8 +30,8 @@
   import { copy } from '$lib/copy.ts';
   import { CODE_DIGITS, type Answer, type DeviceRow } from '$lib/record/device.ts';
   import {
-    answerLine, approve, asks, daysFor, holders, keysOf, namesOf, reconnectOf, reprove, revoke, scopeName, words, type GrantState,
-    type KeyRow, type ProjectMark,
+    answerLine, approve, asks, daysFor, holders, keysOf, lastUsers, namesOf, reconnectOf, reprove, revoke, runPath, scopeName, words,
+    type GrantState, type KeyRow, type ProjectMark, type UsedByRun,
   } from '$lib/record/vault.ts';
   import { words as actionWords } from '$lib/record/actions.ts';
   import { read } from '$lib/data/record.ts';
@@ -56,6 +56,8 @@
   let from = $state<'reading' | 'live'>('reading');
   let machines = $state<DeviceRow[]>([]);
   let keys = $state<KeyRow[]>([]);
+  /** The run that opened each key last, by the key's row id, from `usedBy`. A key missing here says only its counts. */
+  let lastBy = $state<ReadonlyMap<string, UsedByRun>>(new Map());
   let names: ReadonlyMap<string, string> & { marks?: ReadonlyMap<string, ProjectMark> } = $state(new Map());
   let client: ReturnType<typeof createClient> | null = null;
 
@@ -132,6 +134,8 @@
          points at one this screen cannot name, which is this screen saying where the record said nothing. */
       names = projects.ok ? namesOf(projects.value.rows as Row[]) : new Map();
       keys = credentials.ok ? keysOf(credentials.value.rows as Row[], grants.ok ? (grants.value as GrantState[]) : [], names) : [];
+      forConnectors = connectorGrants(grants.ok ? grants.value : []);
+      void whoOpened();
       from = 'live';
       reconnect();
       /* The screen has an answer if either half answered; a screen refused both halves is a refused screen. */
@@ -213,8 +217,17 @@
   async function reread() {
     if (!client) return;
     const [credentials, grants] = await Promise.all([client.list({ register: 'credentials', limit: 200 }), client.listGrants()]);
-    type Row = { id: string; fields: Record<string, unknown>; state: string | null };
+    type Row = { id: string; seq: number | null; fields: Record<string, unknown>; state: string | null };
     if (credentials.ok) keys = keysOf(credentials.value.rows as Row[], grants.ok ? (grants.value as GrantState[]) : [], names);
+    if (grants.ok) forConnectors = connectorGrants(grants.value);
+    void whoOpened();
+  }
+
+  /* WHO OPENED EACH KEY LAST, asked after the index is drawn, so a slow answer never holds the keys back; the line
+     appears under a key when its answer does. */
+  async function whoOpened() {
+    if (!client) return;
+    lastBy = await lastUsers(client, keys);
   }
 
   /* ── putting a key in, and reading one back ── */
@@ -226,7 +239,28 @@
    * bearer, and want an owner whose last sign-in is under fifteen minutes old, which is the record's own rule.
    */
   let sheet = $state<{ mode: 'add' } | { mode: 'replace'; row: KeyRow } | null>(null);
-  const blank = () => ({ label: '', opens: '', kind: 'api_token', project: '', value: '' });
+  const blank = () => ({ label: '', opens: '', kind: 'api_token', project: '', value: '', connector: false });
+
+  /**
+   * WHICH KEYS A SCHEDULED CONNECTOR CAN OPEN, by grant id, from `listGrants`' `sealed_under`.
+   *
+   * READ SO A REPLACED VALUE STAYS WHERE IT WAS. A replacement is sealed again under the key the sheet asks for, so a
+   * connector's key replaced with the toggle unset would come back as one only a person can open, and the connector
+   * would stop on its next run. The toggle starts where the key already is.
+   */
+  let forConnectors = $state<ReadonlySet<string>>(new Set());
+  const connectorGrants = (grants: unknown): ReadonlySet<string> =>
+    new Set(
+      (Array.isArray(grants) ? (grants as { id?: unknown; sealed_under?: unknown }[]) : [])
+        .filter((g) => g.sealed_under === 'connector' && typeof g.id === 'string')
+        .map((g) => g.id as string),
+    );
+
+  /* THE SHEET'S OWN WORDS for the one control this unit adds, kept beside it rather than in the vault's shared list. */
+  const connectorWords = {
+    field: 'For a scheduled connector',
+    hint: 'A connector that runs on a schedule, with nobody signed in, opens only a key added for it. Leave this off for a key you use yourself.',
+  };
   let form = $state(blank());
   let saving = $state(false);
   let sheetSaid = $state('');
@@ -301,7 +335,7 @@
       return;
     }
     sheetSaid = '';
-    form = blank();
+    form = { ...blank(), connector: row.grant !== null && forConnectors.has(row.grant) };
     sheet = { mode: 'replace', row };
   }
 
@@ -322,11 +356,13 @@
     saving = true;
     sheetSaid = '';
     const at = opened();
-    const out = await client.putKey(
+    /* `sealed_under` ONLY WHEN THE TOGGLE IS ON, so a key for a person sends the body it always sent. */
+    const under = form.connector ? { sealed_under: 'connector' } : {};
+    const args =
       sheet.mode === 'add'
-        ? { label: form.label, opens: form.opens, kind: form.kind, value: form.value, ...(form.project === '' ? {} : { project: form.project }) }
-        : { label: sheet.row.label, opens: sheet.row.opens, credential: sheet.row.id, value: form.value },
-    );
+        ? { label: form.label, opens: form.opens, kind: form.kind, value: form.value, ...(form.project === '' ? {} : { project: form.project }), ...under }
+        : { label: sheet.row.label, opens: sheet.row.opens, credential: sheet.row.id, value: form.value, ...under };
+    const out = await client.putKey(args);
     closed(true, at);
     saving = false;
     if (!out.ok) {
@@ -474,6 +510,13 @@
             </span>
           </div>
           {#if k.opens}<p class="who-why">{k.opens}</p>{/if}
+          {#if lastBy.get(k.id)}
+            {@const u = lastBy.get(k.id)!}
+            {@const href = runPath(u.run)}
+            <p class="who-why who-used">
+              {#if href}<a href={at(href)}>{words.openedBy(u.run, u.agent, since(u.at, Date.now()))}</a>{:else}{words.openedBy(u.run, u.agent, since(u.at, Date.now()))}{/if}
+            </p>
+          {/if}
           {#if shown && shown.id === k.id}
             <!--
               THE ONE PLACE A VALUE IS DRAWN. It goes by itself, the countdown says when, and nothing puts it in
@@ -572,6 +615,13 @@
       <div class="field">
         <input class="field-input" id="key-value" type="password" autocomplete="off" spellcheck="false" bind:value={form.value} />
       </div>
+
+      <!-- THE WHOLE LINE IS THE TARGET, the box and its words, so a thumb on a phone finds it at the tap height. -->
+      <label class="field-toggle" for="key-connector">
+        <input id="key-connector" type="checkbox" bind:checked={form.connector} />
+        <span>{connectorWords.field}</span>
+      </label>
+      <p class="field-hint">{connectorWords.hint}</p>
       {#if sheetSaid}<p class="code-said" data-intent="bad" role="status">{sheetSaid}</p>{/if}
     </form>
     {#snippet footer()}
@@ -674,6 +724,16 @@
     font-size: var(--t-sm);
   }
 
+  /* THE RUN THAT OPENED THE KEY LAST, a link to it: quieter than what the key opens, and wrapping on a phone. */
+  .who-used {
+    color: var(--dim);
+    overflow-wrap: anywhere;
+  }
+
+  .who-used a {
+    color: inherit;
+  }
+
   .code-form {
     display: flex;
     flex-direction: column;
@@ -753,6 +813,31 @@
     margin: 0 0 var(--sp-2);
     color: var(--dim);
     font-size: var(--t-sm);
+  }
+
+  /* ONE COLUMN AT ANY WIDTH, the box then its words, which wrap rather than push the sheet sideways. The control is
+     ink and not the accent (D-1). */
+  .field-toggle {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-block-size: var(--tap);
+    color: var(--ink);
+    font-size: var(--t-sm);
+    cursor: pointer;
+  }
+
+  .field-toggle input {
+    flex: none;
+    inline-size: 20px;
+    block-size: 20px;
+    margin: 0;
+    accent-color: var(--ink);
+  }
+
+  .field-toggle span {
+    min-inline-size: 0;
+    overflow-wrap: anywhere;
   }
 
   @media (width < 900px) {

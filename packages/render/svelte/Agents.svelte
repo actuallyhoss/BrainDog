@@ -5,6 +5,8 @@
 -->
 <script lang="ts">
   import { AGENTS_EARLIER, TONES, agentsPlan, counted, initialOf, inline, text, type Block, type RenderOptions } from '../src/index.ts';
+  import { RUN_OPEN, runFaceOf, type RunFace } from '../src/cards.ts';
+  import { hrefFor } from '../src/html.ts';
   import Text from './Text.svelte';
 
   let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
@@ -14,11 +16,43 @@
   const nodes = (v: string | undefined) => inline(v ?? '', opts);
 </script>
 
+<!-- A RUN'S FACE (agents C11), as `Cards.svelte`'s own `runFace` snippet draws one: every place a run is named draws
+     the agent face, and this block groups its lines by who did them, which is a run wherever `sessions.live` names one. -->
+{#snippet runFace(f: RunFace)}{@const d = f.glyph === 'slash' ? 'M15.5 4.5 8.5 19.5' : (opts.icon?.(f.glyph) ?? null)}<a
+    class="cards-face cards-run"
+    style="background:none"
+    href={hrefFor(opts, `/r/session/${f.seq}`)}
+    data-live={f.live}
+    aria-label={RUN_OPEN}
+    ><svg class="cards-run-mark" viewBox="0 0 36 36" width="100%" height="100%" aria-hidden="true" style="--run-hue:{f.hue}"
+      ><circle class="cards-run-disc" cx="18" cy="18" r="14" style="fill:color-mix(in srgb, oklch(var(--mark-l) var(--mark-c) var(--run-hue)) 30%, var(--bg))"
+      ></circle>{#if f.live !== 'stopped'}<circle
+          class="cards-run-ring"
+          cx="18"
+          cy="18"
+          r="16.5"
+          fill="none"
+          stroke-width="2.5"
+          stroke-dasharray={f.live === 'quiet' ? '4 3' : undefined}
+          style="stroke:oklch(var(--mark-l) var(--mark-c) var(--run-hue))"
+        ></circle>{/if}{#if d}<path
+          d={d}
+          transform="translate(9 9) scale(0.75)"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        ></path>{/if}</svg
+    ></a
+  >{/snippet}
+
 {#if plan.groups.length === 0}
   <p class="feed-empty">{plan.empty}</p>
 {:else}
   <div class="feed">
     {#each plan.groups as g}
+      {@const run = runFaceOf(g.who, null, false)}
       {@const face = initialOf(said(g.who))}
       <div class="feed-group" data-by="agent">
         <h3 class="feed-head"><Text nodes={nodes(g.who)} {opts} /><span class="feed-tally num">{g.total}</span></h3>
@@ -26,7 +60,7 @@
           {#each g.rows as row}
             <li class="feed-row" data-intent={row.tone}>
               <span class="feed-count num">{#if counted(said(row.cells[1]))}<Text nodes={nodes(row.cells[1])} {opts} />{/if}</span>
-              <span class="feed-face" aria-hidden="true">{face ?? ''}</span>
+              {#if run}{@render runFace(run)}{:else}<span class="feed-face" aria-hidden="true">{face ?? ''}</span>{/if}
               <span class="feed-what"
                 >{#if (row.cells[2] ?? '').trim() === ''}{AGENTS_EARLIER}{:else}<Text nodes={nodes(row.cells[2])} {opts} />{/if}{#if row.tone}<span
                     class="glyph"

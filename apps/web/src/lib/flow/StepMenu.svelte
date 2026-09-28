@@ -17,12 +17,20 @@
 
   ASK SLASH IS OFFERED WHERE A MODEL IS, read from the layout's `slash` here rather than passed down through `FlowList`,
   because every menu on the canvas asks the same question of the same tab and none of the lists between has a use for it.
+
+  ON A PHONE IT IS A SEARCHABLE SHEET, WITH A LINE SAYING WHAT EACH STEP DOES (EDT-2). Nineteen verbs in an action sheet
+  are a long scroll of labels ("Come back later", "Run a call on this row") that a stranger has to guess at; the sheet
+  puts a search box at the top, which reads the label and the line (`flow.ts` `STEP_HELP`), and a line under each. The
+  width is the app's one answer to "cards or a table" (`body.svelte.ts` `rowsAsCards`), so a menu never asks
+  `matchMedia` for itself, one listener per gap on the canvas.
 -->
 <script lang="ts">
   import Menu from '$lib/ui/Menu.svelte';
+  import Sheet from '$lib/ui/Sheet.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import { page } from '$app/state';
-  import { stepGroups, VERB_LABELS, words, type Verb } from './flow.ts';
+  import { rowsAsCards } from '$lib/ui/body.svelte.ts';
+  import { STEP_HELP, stepGroups, VERB_LABELS, words, type Verb } from './flow.ts';
 
   let {
     label = words.addStep,
@@ -32,25 +40,84 @@
   }: { label?: string; compact?: boolean; landing?: boolean; onpick: (verb: Verb) => void } = $props();
 
   let open = $state(false);
+  let sheet = $state(false);
+  let query = $state('');
   const groups = $derived(stepGroups(page.data.slash === true));
+  const phone = $derived(rowsAsCards());
+
+  /* EVERY WORD TYPED HAS TO BE IN THE LABEL OR THE LINE, in any order and any case, so "row tag" finds "Add a tag". */
+  const shown = $derived.by(() => {
+    const said = query.trim().toLowerCase().split(/\s+/u).filter(Boolean);
+    if (said.length === 0) return groups;
+    return groups
+      .map((g) => ({ ...g, verbs: g.verbs.filter((v) => said.every((w) => `${VERB_LABELS[v]} ${STEP_HELP[v]}`.toLowerCase().includes(w))) }))
+      .filter((g) => g.verbs.length > 0);
+  });
+
+  function choose(verb: Verb) {
+    sheet = false;
+    query = '';
+    onpick(verb);
+  }
 </script>
 
 <div class="step-menu" data-compact={compact ? '' : undefined} data-landing={landing ? '' : undefined}>
-  <Menu {label} bind:open>
-    {#snippet trigger()}
+  {#if phone}
+    <button type="button" class="open" aria-haspopup="dialog" aria-expanded={sheet} onclick={() => (sheet = true)}>
       <span class="add">
         <Icon name="plus" size="s" />
         <span class={compact ? 'vh' : undefined}>{label}</span>
       </span>
-    {/snippet}
-    {#each groups as group (group.label)}
-      <p class="group" role="none">{group.label}</p>
-      {#each group.verbs as verb (verb)}
-        <button type="button" class="mi" role="menuitem" onclick={() => onpick(verb)}>{VERB_LABELS[verb]}</button>
+    </button>
+  {:else}
+    <Menu {label} bind:open>
+      {#snippet trigger()}
+        <span class="add">
+          <Icon name="plus" size="s" />
+          <span class={compact ? 'vh' : undefined}>{label}</span>
+        </span>
+      {/snippet}
+      {#each groups as group (group.label)}
+        <p class="group" role="none">{group.label}</p>
+        {#each group.verbs as verb (verb)}
+          <button type="button" class="mi" role="menuitem" title={STEP_HELP[verb]} onclick={() => onpick(verb)}>{VERB_LABELS[verb]}</button>
+        {/each}
       {/each}
-    {/each}
-  </Menu>
+    </Menu>
+  {/if}
 </div>
+
+{#if phone}
+  <Sheet
+    open={sheet}
+    title={words.addStep}
+    onclose={() => {
+      sheet = false;
+      query = '';
+    }}
+  >
+    <div class="find">
+      <div class="field">
+        <Icon name="search" size="s" />
+        <input class="field-input" type="search" aria-label={words.findStep} placeholder={words.findStep} autocomplete="off" spellcheck="false" bind:value={query} />
+      </div>
+    </div>
+    {#each shown as group (group.label)}
+      <p class="group">{group.label}</p>
+      <ul class="picks">
+        {#each group.verbs as verb (verb)}
+          <li>
+            <button type="button" class="pick" onclick={() => choose(verb)}>
+              <span class="pick-label">{VERB_LABELS[verb]}</span>
+              <span class="pick-help">{STEP_HELP[verb]}</span>
+            </button>
+          </li>
+        {/each}
+      </ul>
+    {/each}
+    {#if shown.length === 0}<p class="none">{words.noStep}</p>{/if}
+  </Sheet>
+{/if}
 
 <style>
   .step-menu {
@@ -149,5 +216,62 @@
   .mi:focus-visible {
     background: var(--hover-wash);
     color: var(--ink);
+  }
+
+  /* THE PHONE'S TRIGGER IS A BARE BUTTON AROUND THE SAME PILL, so the column looks the same at every width. */
+  .open {
+    padding: 0;
+    background: none;
+    border: 0;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .find {
+    padding-block-end: var(--sp-2);
+  }
+
+  .picks {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  /* A ROW OF THE SHEET: the step's name, and under it what the step does, the whole row the target at 44 or more. */
+  .pick {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    inline-size: 100%;
+    min-block-size: var(--tap);
+    padding: var(--sp-2) var(--sp-3);
+    background: none;
+    border: 0;
+    border-radius: var(--r-sm);
+    color: var(--ink);
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .pick:focus-visible {
+    background: var(--hover-wash);
+  }
+
+  .pick-label {
+    font-size: var(--t-md);
+    font-weight: 500;
+  }
+
+  .pick-help {
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  .none {
+    margin: var(--sp-3);
+    color: var(--dim);
+    font-size: var(--t-sm);
   }
 </style>

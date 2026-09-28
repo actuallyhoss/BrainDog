@@ -6,18 +6,21 @@
  * and to plan what a `pack` or `arrange` proposal would install; it never installs from it until the owner accepts.
  * The self-host and the Worker hand in this one list, so an update carries progress forward on both.
  *
- * NO EXAMPLE ROWS FROM A BARE MODULE. A first-party pack asked for by itself carries none, because its own
- * examples are the sample studio's and would land in somebody else's record. A use case carries its own, and a module
- * installed for a use case carries that use case's examples, exactly as onboarding installs it (`install.ts`).
+ * NO EXAMPLE ROWS, FROM ANYTHING ON OFFER (`loop/finish/modules.md` C11). A first-party pack carries none, because its
+ * own examples are the sample studio's and would land in somebody else's record; a module installed for a use case
+ * carries none, exactly as onboarding installs it (`moduleDocument` in `install.ts`); and a use case's pack is offered
+ * without its own, so a record an agent arranges holds only what somebody wrote. What a use case forms around what the
+ * owner said is its `forms`, which the record fills from the model and puts on Decide, not a seed.
  */
 
 import { FIRST_PARTY_LISTS, packIdOf } from '@braindog/declare';
 
 import { AGENTS_PACK, agentsPackDocument } from '../packs/agents.ts';
 import { FIRST_PARTY, firstPartyDocument, firstPartyManifest, type FirstPartyId } from '../packs/first-party.ts';
+import { AGENTS_SIGNALS } from '../packs/modules.ts';
 import { GUIDE_FORMS, GUIDE_GROWS, GUIDE_NEXT } from './guide.ts';
 import { MODULE_ORDER, USE_CASES, modulesFor, useCase, useCaseDocument } from './index.ts';
-import { moduleDocument } from './install.ts';
+import { moduleDocument, withoutRows } from './install.ts';
 import { carryForward, linkExamples, type CarryIo, type LinkIo } from './links.ts';
 
 /**
@@ -30,6 +33,11 @@ export type SeedCatalogueEntry = {
   title: string;
   summary: string;
   modules: readonly string[];
+  /**
+   * The words a person uses for what it keeps, which the first run listens for (shell.md USE-3): a pack's from its
+   * manifest, a use case's its own `signals`.
+   */
+  signals?: readonly string[];
   /** The version `doc` builds, so a pack on at an older one is offered as an update without building a document. */
   version?: string;
   doc: (options: { holds: readonly string[]; usecase?: string | null }) => Record<string, unknown> | null;
@@ -99,6 +107,7 @@ export function seedCatalogue(): SeedCatalogueEntry[] {
       summary: typeof bare?.summary === 'string' ? bare.summary : '',
       modules: before(firstPartyManifest(id).requires).filter((m) => m !== id),
       version: firstPartyManifest(id).version,
+      signals: firstPartyManifest(id).signals,
       doc: ({ holds, usecase }) => {
         const u = usecase ? useCase(usecase) : undefined;
         const doc = u ? moduleDocument(u, id, { today: today(), holds }) : firstPartyDocument(id, { holds, seeds: [] });
@@ -117,9 +126,14 @@ export function seedCatalogue(): SeedCatalogueEntry[] {
     title: u.title,
     summary: u.summary,
     modules: modulesFor(u),
+    signals: u.signals,
     version,
-    /* THE LISTS THE RECORD HOLDS, so an update keeps a list the older version declared (`useCaseDocument`). */
-    doc: ({ holds }) => useCaseDocument(u.usecase, today(), holds),
+    /* THE LISTS THE RECORD HOLDS, so an update keeps a list the older version declared (`useCaseDocument`), and none of
+       the use case's example rows (C11). */
+    doc: ({ holds }) => {
+      const doc = useCaseDocument(u.usecase, today(), holds);
+      return doc ? withoutRows(doc) : null;
+    },
     /* A SEED CARRIES NO LINK (42 §5.2), so the use case's examples are pointed at each other once they are in (`links.ts`). */
     afterInstall: (io) => linkExamples(io, u.usecase),
     /* AN UPDATE FROM BEFORE A VERSION THAT READS WHAT IS LOGGED moves what was typed into the log (`links.ts`). */
@@ -131,7 +145,7 @@ export function seedCatalogue(): SeedCatalogueEntry[] {
   }));
   return [
     ...modules,
-    { id: 'agents', kind: 'pack', title: 'agents', summary: String(agents.summary ?? ''), modules: before(AGENTS_PACK.manifest.requires), version: AGENTS_PACK.manifest.version, doc: () => agentsPackDocument() },
+    { id: 'agents', kind: 'pack', title: 'agents', summary: String(agents.summary ?? ''), modules: before(AGENTS_PACK.manifest.requires), version: AGENTS_PACK.manifest.version, signals: AGENTS_SIGNALS, doc: () => agentsPackDocument() },
     ...useCases,
   ];
 }

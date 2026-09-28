@@ -52,6 +52,7 @@
   import { answerFor, type Answer } from '$lib/record/answer.ts';
   import { everyGovernance, plainOf, readOne, words as governed, type One } from '$lib/record/governance.ts';
   import { answerQuestion, parkQuestion, type Written } from '$lib/record/decide-write.ts';
+  import { visualOf, type Visual } from '$lib/page/queue-answer.ts';
   import { mayAnswer, whyNotAnswering } from '../answering.ts';
   import { nextOpen, stillWaiting, words as onwardWords } from './onward.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
@@ -66,6 +67,7 @@
   import Empty from '$lib/ui/Empty.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import Thread from '$lib/ui/Thread.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { closed, drew, opened } from '../../../lib/ui/screen.svelte.ts';
 
@@ -151,6 +153,22 @@
 
   /* A PACK, A SETTINGS CHANGE OR A WHOLE ARRANGEMENT, drawn whole: why, the calls out, the packs, what appears, the words. */
   const about = $derived(from === 'live' ? live?.about : undefined);
+
+  /* WHAT EACH OPTION IS, drawn inside its own card as the queue's tile draws it. It is read from the body the question
+     was filed with, because the question's words carry none, and through `visualOf`, which holds a swatch to the
+     renderer's own spelling before it reaches a style. A file is left out here for the reason the tile leaves it out:
+     only a page's renderer is handed the address a file is served at. */
+  const visuals = $derived.by(() => {
+    const offered = about?.kind === 'options' && Array.isArray(about.body.options) ? (about.body.options as unknown[]) : [];
+    const out = new Map<string, Visual>();
+    for (const o of offered) {
+      if (o === null || typeof o !== 'object') continue;
+      const { id, shows } = o as { id?: unknown; shows?: unknown };
+      const seen = typeof id === 'string' ? visualOf(shows) : null;
+      if (seen !== null && typeof id === 'string') out.set(id, seen);
+    }
+    return out;
+  });
   const lists = $derived(
     new Map<string, string>(((page.data.lists ?? page.data.index?.registers ?? []) as { id: string; name: string }[]).map((l) => [l.id, l.name])),
   );
@@ -629,7 +647,17 @@
                  keeps no titles or values for a reader who may not read them; where the body holds no reason, the words
                  `questionOf` made of it. -->
             {@const because = reasonIn(about?.body, option.key) ?? option.body}
+            {@const shows = visuals.get(option.key)}
             <article class="card" data-on={highlighted === option.key ? '' : undefined}>
+              <!-- WHAT THE OPTION IS LEADS IT, inside its own box and nowhere else: a swatch writes its colour into
+                   `--swatch` on its chip alone, hidden from a screen reader because the option's name says what it is. -->
+              {#if shows && 'swatch' in shows}
+                <span class="card-visual" data-shows="swatch" aria-hidden="true">
+                  {#each shows.swatch as colour, s (s)}<span class="card-swatch" style:--swatch={colour}></span>{/each}
+                </span>
+              {:else if shows}
+                <span class="card-visual" data-shows="figure"><span class="card-figure num">{shows.figure}</span></span>
+              {/if}
               <header class="card-head">
                 <span class="card-n num">{i + 1}</span>
                 <h3 class="card-title">{option.title}</h3>
@@ -671,12 +699,15 @@
             {copy.deferTitle}
             <span class="commit-required">{copy.required}</span>
           </h2>
+          <!-- A FIELD WITH ITS LABEL ABOVE IT. "What has to happen first" was grey words beside the Defer button and
+               a placeholder inside this box, so it read as loose text on the queue and vanished once anybody typed. -->
+          <label class="commit-label" for="defer-why">{copy.deferHint}</label>
           <textarea
+            id="defer-why"
             bind:this={field}
             bind:value={reason}
             class="commit-field"
             rows="2"
-            placeholder={copy.deferHint}
             spellcheck="true"
           ></textarea>
           <label class="commit-wake">
@@ -744,9 +775,19 @@
                It had no handler, so the one control that stops a gate being cleared by dismissing
                things did nothing — while `d` on the keyboard opened the same flow correctly. -->
           <Button disabled={!answerable} aria-describedby={answerable ? undefined : 'cannot-decide'} onclick={defer}>{copy.defer}</Button>
-          <span class="third-note">{copy.deferHint}</span>
         </div>
       {/if}
+    {/if}
+
+    <!-- THE QUESTION'S COMMENTS (COL-8), open or settled, since what was said about it is worth as much after the
+         decision as before. On the question and not on each option: the record keeps a thread on a question or a
+         decision, and an option is part of the question. A Reads colleague may comment here too. -->
+    {#if from === 'live'}
+      <Thread
+        on="suggestion:{question.id}"
+        me={String(page.data.me?.person ?? '') || null}
+        people={new Map(Object.entries((page.data.names ?? {}) as Record<string, string>))}
+      />
     {/if}
   </div>
 {/if}
@@ -892,10 +933,13 @@
      tracks, four of them empty — a 550px slab of border colour, with every selector correct (05 §4). */
   /* The options sit on the page's own ground, side by side, with space between them. The chosen one
      takes the raised surface; its button is the page's one primary. The negative inset keeps the text
-     of the first option on the heading's edge while the chosen one still has room for its surface. */
+     of the first option on the heading's edge while the chosen one still has room for its surface.
+     EACH TRACK IS CAPPED, AND THE ROW SITS ON THE HEADING'S EDGE. Stretched to the page's width, two options at 1440
+     stood 580px apart with nothing between them, so the second read as unrelated to the first. */
   .cards {
     display: grid;
-    grid-template-columns: repeat(var(--cells, 3), minmax(0, 1fr));
+    grid-template-columns: repeat(var(--cells, 3), minmax(0, 22rem));
+    justify-content: start;
     gap: var(--sp-2);
     margin-inline: calc(-1 * var(--sp-4));
   }
@@ -919,6 +963,35 @@
 
   .card > :global(.btn) {
     align-self: start;
+  }
+
+  /* THE OPTION'S VISUAL, THE TILE'S SHAPE AT THE CARD'S SIZE: swatches share the card's width in one band, a figure
+     is the card's largest type. `--swatch` is set on a chip and read by this one rule, so the colour stays inside its
+     option's box, and forced colours leave it alone because the lining is the thing being chosen. */
+  .card-visual {
+    display: flex;
+    gap: 2px;
+    min-inline-size: 0;
+    overflow: hidden;
+    border-radius: var(--r-sm);
+  }
+
+  .card-swatch {
+    flex: 1;
+    block-size: 3rem;
+    background: var(--swatch);
+    border: 1px solid var(--line);
+    forced-color-adjust: none;
+  }
+
+  .card-figure {
+    padding: var(--sp-3);
+    flex: 1;
+    background: var(--s2);
+    color: var(--ink);
+    font-size: var(--t-xl);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
   }
 
   .card-head {
@@ -961,25 +1034,28 @@
     line-height: 1.55;
   }
 
-  /* An inline callout: the raised surface and nothing round it in the dark, a hairline in the light. */
+  /* A FORM ON THE PAGE'S OWN GROUND, NOT A FILLED BOX AROUND A GROUP. The field is the only edge it needs, and the
+     box made the reason read as a second card beside the options rather than the next thing to write. */
   .commit {
     max-inline-size: var(--measure);
-    padding: var(--sp-3) var(--sp-4);
-    background: var(--s1);
-    border: 1px solid transparent;
-    border-radius: var(--r-md);
   }
 
-  :global(:root[data-scheme='light']) .commit,
   :global(:root[data-scheme='light']) .settled {
     border-color: var(--line);
   }
 
   @media (prefers-color-scheme: light) {
-    :global(:root:not([data-scheme='dark'])) .commit,
     :global(:root:not([data-scheme='dark'])) .settled {
       border-color: var(--line);
     }
+  }
+
+  .commit-label {
+    display: block;
+    margin-block-end: var(--sp-2);
+    color: var(--ink);
+    font-size: var(--t-sm);
+    font-weight: 500;
   }
 
   .commit-wake {
@@ -1068,8 +1144,7 @@
     margin-block-start: var(--sp-3);
   }
 
-  .commit-note,
-  .third-note {
+  .commit-note {
     color: var(--dim);
     font-size: var(--t-xs);
   }

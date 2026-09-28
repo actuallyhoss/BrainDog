@@ -14,7 +14,7 @@ import '../../../lib/record/fixtures/fill.ts';
 import { sayStep, sayTrigger, words } from '../../../lib/flow/flow.ts';
 import { REGISTERS } from '../../../lib/record/api.ts';
 import type { Fetch } from '../../../lib/record/page-live.ts';
-import { drawnOf, proposedOf } from './proposed.ts';
+import { drawnOf, previewOf, proposedOf } from './proposed.ts';
 
 test('a page says where it lands in the sidebar and what it shows', () => {
   const out = proposedOf('change', {
@@ -336,4 +336,43 @@ test('A BLOCK THE RECORD HELD BACK IS DRAWN AS ITS REFUSAL, never filled from th
   assert.deepEqual(drawn.blocks[0]?.rows, []);
   /* THE RECORD'S SENTENCE, which is what the page's drawing reads off a refused block (`blockOf` keeps each `fix`). */
   assert.deepEqual(drawn.blocks[0]?.refusals, ['You cannot read Things.']);
+});
+
+test('A CHANGE CARRIES WHAT previewChange IS ASKED WITH, and a pattern carries none', () => {
+  const to = { id: 'page.building', kind: 'page', body: PAGE };
+  const out = proposedOf('change', { declaration_id: 'page.building', to, about: 'things#1' });
+  assert.deepEqual(out?.change, { to, about: 'things#1' });
+  assert.equal(out?.appears[0]?.id, 'page.building');
+  const pattern = proposedOf('pattern', { ingest: { ingest: 'card_receipts', channel: 'email' }, samples: [] });
+  assert.equal(pattern?.change, undefined);
+});
+
+test('THE WHOLE CHANGE IS DRAWN AS IT WOULD STAND, beside the page as it is, and a host without the method says none', async () => {
+  const table = (rows: number) => ({ kind: 'table', heading: 'Being built', rows: [], matched: rows, refusals: [] });
+  const asked: unknown[] = [];
+  const io = (async (_url: string | URL | Request, init?: RequestInit) => {
+    asked.push(JSON.parse(String(init?.body ?? '{}')));
+    return reply(200, {
+      ok: true,
+      value: {
+        pages: [
+          { id: 'page.building', slug: 'building', title: 'Building', nav: null, layout: { rail: 4 }, icon: null, about: null, blocks: [table(3)], was: [table(1)] },
+          { id: 'page.fresh', slug: 'fresh', title: 'Fresh', nav: null, layout: null, icon: null, about: null, blocks: [], was: null },
+        ],
+      },
+    });
+  }) as unknown as Fetch;
+  const change = { to: { declarations: [{ id: 'page.building', kind: 'page', body: PAGE }] } };
+  const out = await previewOf(change, BASE, io);
+  assert.equal(out.from, 'live');
+  if (out.from !== 'live') return;
+  assert.deepEqual(asked[0], change);
+  const [built, fresh] = out.pages;
+  assert.equal(built?.got.page.page.title, 'Building');
+  /* THE RAIL COMES WITH IT, because a page judged without its rail is judged wrong. */
+  assert.deepEqual(built?.got.page.page.layout, { rail: 4 });
+  assert.equal(built?.was?.length, 1);
+  assert.equal(fresh?.was, null);
+  const older = (async () => reply(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'There is no method called previewChange.' } })) as unknown as Fetch;
+  assert.deepEqual(await previewOf(change, BASE, older), { from: 'none' });
 });

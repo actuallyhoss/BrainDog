@@ -31,6 +31,9 @@
   import { REGISTERS } from '$lib/record/held.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import Face from '$lib/ui/Face.svelte';
+  import AgentFace from '$lib/ui/AgentFace.svelte';
+  import { faceWords, liveOf, runOf } from '$lib/ui/face.ts';
+  import { isStale } from '@braindog/kernel';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
@@ -41,7 +44,8 @@
   import AddField from '$lib/ui/AddField.svelte';
   import AddValue from './AddValue.svelte';
   import { putBackOf, valueWords } from '$lib/record/field-write.ts';
-  import { draftOf, editable, isJson, isQuantity, patchOf, unitOf, unitsOf, wrongValue } from '$lib/record/field-draft.ts';
+  import { draftOf, editable, isFile, isJson, isQuantity, patchOf, unitOf, unitsOf, wrongValue } from '$lib/record/field-draft.ts';
+  import FileField from '$lib/ui/FileField.svelte';
   import DayBox from '$lib/ui/DayBox.svelte';
   import QuantityBox from '$lib/ui/QuantityBox.svelte';
   import JsonBox from '$lib/ui/JsonBox.svelte';
@@ -58,6 +62,9 @@
   import { actor, listName, nameWords } from '$lib/record/names.ts';
   import { movable, scopeFieldOf } from '$lib/record/scope-move.ts';
   import ScopeMove from './ScopeMove.svelte';
+  import Thread from '$lib/ui/Thread.svelte';
+  import HandSheet from '$lib/ui/HandSheet.svelte';
+  import UsedBy from '$lib/page/panels/UsedBy.svelte';
 
   const id = $derived(page.params.register ?? '');
   const seq = $derived(Number(page.params.seq));
@@ -470,6 +477,33 @@
      field, wraps whole, and on a row you can write to it opens that field. */
   const unsetFields = $derived(row ? listed.filter((f) => unsetValue(row.fields[f.id]) && editing !== f.id) : []);
   const shownFields = $derived(listed.filter((f) => !unsetFields.includes(f)));
+
+  /**
+   * A RUN'S PAGE LEADS WITH ITS HANDOFF (AGT-13): what it is doing, where, the next step, what it already tried and its
+   * notes, said as the next session would want them, above the same fields listed as facts.
+   *
+   * THE PROJECT BY ITS NAME OR NOT AT ALL. A run holds it as a spoken id, which is not for a person to read, so it is
+   * said only where the record named it beside the row. What was tried is appended as it happens, so it is turned
+   * round to lead with the newest, which is the one the next session is most likely to repeat.
+   */
+  const handoff = $derived.by(() => {
+    if (id !== 'session' || !row) return null;
+    const f = row.fields;
+    const said = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
+    const lines = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && x.trim() !== '') : []);
+    const project = said(f.project);
+    const mark = project ? names?.marks?.get(project) : undefined;
+    return {
+      agent: said(f.agent) || null,
+      live: liveOf(f.state, isStale({ fields: f as never, updated_at: row.created }, clock)),
+      doing: said(f.doing),
+      project: project ? (names?.get(project) ?? null) : null,
+      mark: mark ? { mark: mark.mark, hue: mark.hue } : null,
+      next: said(f.next),
+      tried: lines(f.tried).reverse(),
+      notes: lines(f.notes),
+    };
+  });
   /* A DOCUMENT WITH NO PROSE IS ONE OF THOSE CHIPS TOO, after the short fields, and its slot is drawn only while it
      holds prose or its box is open. */
   const writtenDocuments = $derived(row ? documents.filter((f) => !unsetValue(row.fields[f.id]) || editing === f.id) : []);
@@ -573,6 +607,11 @@
       {:else}
         <Button weight="quiet" disabled={saving} onclick={() => void setArchived(true)}>{copy.rowArchive}</Button>
       {/if}
+      <!-- "HAND TO" (GAP-11): a teammate or an agent in one press, on a list that says who holds its rows, and while an
+           agent holds this one, the run working on it or whose next session it waits for. -->
+      {#if live && !archived}
+        <HandSheet register={id} {row} {decl} trigger onhanded={() => void rowMoved(id, seq)} />
+      {/if}
     {/snippet}
   </PageHead>
 
@@ -581,6 +620,31 @@
          screen would say why it has gone from them. -->
     {#if archived}
       <p class="archived-note">{copy.rowArchivedNote}</p>
+    {/if}
+    <!-- A RUN READS AS ITS HANDOFF (AGT-13), led by its face, what it is doing and where it is, then what the next
+         session needs: the next step, what was already tried, newest first, and the notes it left. -->
+    {#if handoff}
+      <section class="handoff" aria-label={faceWords.handoff}>
+        <div class="handoff-head">
+          <AgentFace agent={handoff.agent} run="S{seq}" live={handoff.live} project={handoff.mark} />
+          <p class="handoff-doing">{handoff.doing || faceWords.nothingYet}</p>
+          <span class="handoff-live">{faceWords.live[handoff.live]}</span>
+        </div>
+        {#if handoff.project || handoff.next}
+          <dl class="handoff-facts">
+            {#if handoff.project}<div><dt>{faceWords.project}</dt><dd>{handoff.project}</dd></div>{/if}
+            {#if handoff.next}<div><dt>{faceWords.next}</dt><dd>{handoff.next}</dd></div>{/if}
+          </dl>
+        {/if}
+        {#if handoff.tried.length}
+          <h2 class="handoff-title">{faceWords.tried}</h2>
+          <ol class="handoff-lines">{#each handoff.tried as t}<li>{t}</li>{/each}</ol>
+        {/if}
+        {#if handoff.notes.length}
+          <h2 class="handoff-title">{faceWords.notes}</h2>
+          <ul class="handoff-lines">{#each handoff.notes as n}<li>{n}</li>{/each}</ul>
+        {/if}
+      </section>
     {/if}
     <!-- THE FIGURE HEADS THE LEFT COLUMN, AND DETAILS STARTS BESIDE IT. The lead sat above both
          columns, so the side column began 190px below the title it describes, beside the second
@@ -657,6 +721,9 @@
                     {:else if isJson(f)}
                       <!-- STRUCTURED DATA WRITTEN OUT, refused on the save when it does not read (MOD-22). -->
                       <JsonBox bind:value={draft} label={labelOf(f)} />
+                    {:else if isFile(f)}
+                      <!-- A FILE IS CHOSEN, NEVER TYPED: the picker sends the bytes and the draft holds what came back (OPS-20). -->
+                      <FileField bind:value={draft} label={labelOf(f)} />
                     {:else if f.type === 'money'}
                       <!-- THE CURRENCY THE BOX WRITES IN, by the chain `field-draft.ts` types in: the row's, the field
                            default's, the list's, then the record's, so an empty box names what it will write. -->
@@ -735,6 +802,10 @@
             </div>
           {/each}
         </dl>
+        <!-- WHO USED IT (AGT-10): a key's or a tool's row lists the last ten runs that opened or reached it. -->
+        {#if live && (id === 'credentials' || id === 'tools')}
+          <UsedBy spoken="{id}#{row.seq}" />
+        {/if}
         <!-- WHAT THE ROW HAS NOT ANSWERED, one pill each in one wrapping row, and on a row you can write to each opens its
              field. The list is named for a screen reader, since the pills alone do not say they are empty. -->
         {#if unset.length > 0}
@@ -861,6 +932,11 @@
           </div>
         </form>
 
+        <!-- THE ROW'S COMMENTS (COL-8), beside the note and above the history. A note is the row's own log line and
+             asks to change the row; a comment is somebody saying something about it, which a Reads colleague may
+             too, with replies one level deep and a resolved comment folded. Named as the row is spoken. -->
+        {#if live}<Thread on="{id}#{row.seq}" me={me || null} {people} />{/if}
+
         {#if told?.from === 'refused'}
           <h2 class="side-title">History</h2>
           <Empty kind="error" compact title={told.fix} />
@@ -872,7 +948,8 @@
                    mark, never a monogram. The name is printed as `actor` says it, since "de Vries" is not a typo. -->
               {@const who = actor(e.by, me || null, people)}
               <li>
-                <Face name={who.name} kind={who.kind} size="s" />
+                <!-- AN AGENT'S LINE WEARS ITS RUN (AGT-13), in the run's hue and linking to its handoff. -->
+                <Face name={who.name} kind={who.kind} run={runOf(e.by)} size="s" />
                 <span class="history-by">{who.name}</span>
                 <span class="history-note">{e.note}</span>
                 <span class="history-when">{since(e.at, clock)}</span>
@@ -1303,6 +1380,79 @@
     border-color: var(--edge);
   }
 
+  /* THE HANDOFF IS A BLOCK OF READING, not a form: sentences at the measure, the facts in a short column beside their
+     names, and the lists as lists. */
+  .handoff {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+    max-inline-size: var(--measure);
+    margin-block-end: var(--sp-5);
+    padding-block-end: var(--sp-5);
+    border-block-end: 1px solid var(--line);
+  }
+
+  .handoff-head {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    min-inline-size: 0;
+  }
+
+  .handoff-doing {
+    flex: 1;
+    min-inline-size: 0;
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--t-md);
+    overflow-wrap: anywhere;
+  }
+
+  .handoff-live {
+    flex: none;
+    color: var(--ink2);
+    font-size: var(--t-sm);
+  }
+
+  .handoff-facts {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: var(--sp-1) var(--sp-3);
+    margin: 0;
+  }
+
+  .handoff-facts > div {
+    display: contents;
+  }
+
+  .handoff-facts dt {
+    color: var(--ink2);
+    font-size: var(--t-sm);
+  }
+
+  .handoff-facts dd {
+    margin: 0;
+    color: var(--ink);
+    overflow-wrap: anywhere;
+  }
+
+  .handoff-title {
+    margin: 0;
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    font-weight: 500;
+  }
+
+  .handoff-lines {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+    margin: 0;
+    padding-inline-start: var(--sp-5);
+    color: var(--ink);
+    overflow-wrap: anywhere;
+  }
+
   .history {
     display: flex;
     flex-direction: column;
@@ -1316,7 +1466,8 @@
      and the note, so a row's history reads as people passing through rather than as a log. */
   .history li {
     display: grid;
-    grid-template-columns: 22px minmax(0, 1fr) auto;
+    /* 24px, THE WIDTH OF AN AGENT'S RUN FACE AT ITS LINE SIZE, so a run's ring is not clipped by the column. */
+    grid-template-columns: 24px minmax(0, 1fr) auto;
     gap: 2px var(--sp-2);
     padding-block-end: var(--sp-2);
     border-block-end: 1px solid var(--line);

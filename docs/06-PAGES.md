@@ -466,6 +466,29 @@ and optional. The others are the record proposing its own shape from the first r
 says. The pack format is still built first, because it is the mechanism every one of those writes
 through; what is no longer true is that a new record needs a shipped pack to be useful.)*
 
+### 4.1 · A pack adds a block to another pack's page
+
+A pack's manifest may say `adds: [{ page: page.<name>, block: {...}, after?: <heading> }]`
+([04-PACKS](04-PACKS.md) §2). The plan and the install sheet say "adds a block to <page> from
+<pack>" for each; a page the record lacks plans as unresolved and the pack does not install
+(`PAGE_UNKNOWN`). The block is checked as the page's own would be, against the page's `for:`.
+
+The record draws the page with its own blocks in their stored order and lays each addition after
+the first of its own blocks whose `heading` is `after`, or after all of them when there is no
+`after` or the page no longer has that heading. Additions come in pack id order and then in the
+order each pack wrote them. On a page made from a template the addition is filled from the row as
+the page's own blocks are, so `{{name}}` is the project's name. Each added block's answer carries
+`added: <pack id>`.
+
+The addition is never written into the page's declaration. It is read off the adding pack's stored
+manifest each time the page is read (`packages/kernel/src/page-adds.ts`), so updating either pack
+keeps the other's addition, and uninstalling or turning off the adding pack takes it away. A page the
+person arranged keeps their order: a block of the same kind and heading already on the page is taken
+as the addition placed by them and is not drawn twice, and an addition they have not placed goes
+after its `after` block or last. At 390 an addition follows the page's order in one column, as every
+block does. `packs/project-brief` uses it to put the one line, the plan and what is in the way on
+Portfolio's project page, after "Where it stands".
+
 ---
 
 ## 5 · Native and authored, identical in nav

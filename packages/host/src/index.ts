@@ -23,7 +23,7 @@ import { EXTRA_ROUTES } from './routes/index.ts';
 
 export { HINTS, hintsOf, sessionOf, withSession, type SessionHints } from './session.ts';
 export { serveVault, servesVault, VAULT_HEADERS, vaultReply, type VaultAsk, type VaultDoor, type VaultGrantSeen, type VaultTokenAsk } from './vault.ts';
-export { keysReply, serveKeys, servesKeys, type KeysAsk, type KeysDoor } from './keys.ts';
+export { keysReply, purposeOf, sealedUnderOf, serveKeys, servesKeys, type KeysAsk, type KeysDoor, type SealedUnder } from './keys.ts';
 /* `POST /api/slash/read` IS A DOOR AND NOT A ROW IN `ROUTES`, and `slash-ask.ts` carries the measurement: `ROUTES` is the
    record's surface, `tools/gates/guards.mjs` looks for every routed name as a method of `packages/record/src/index.ts`, and
    this answer comes out of the engine the HOST built. It is exported from here for the reason the vault, key, session and
@@ -281,6 +281,8 @@ const CORE_ROUTES: readonly Route[] = [
     takes: { usecase: 'text', said: 'text' } },
   { name: 'planUseCase', group: 'ADMIN', writes: false, what: 'What installing a shared use-case file would do, pack by pack. It writes nothing.',
     takes: { doc: 'json', text: 'text', source: 'json', modules: 'json' } },
+  { name: 'fetchShared', group: 'ADMIN', writes: false, what: 'The text of a shared use-case or add-on file at an https address or git:owner/repo@ref:path, read by the host with no credentials. It writes nothing.',
+    takes: { url: 'text' } },
   { name: 'fetchUseCase', group: 'ADMIN', writes: false, what: 'The text of a shared use-case file at an https address, read by the host with no credentials. It writes nothing.',
     takes: { url: 'text' } },
   { name: 'installPack', group: 'ADMIN', writes: true, what: 'Apply the plan somebody approved, with the calls-out lines it asks for. A browser session only.' },
@@ -303,7 +305,7 @@ const CORE_ROUTES: readonly Route[] = [
   { name: 'clearExamples', group: 'ADMIN', writes: true, what: 'Delete every example row nobody has touched. A row somebody edited, or one a row of theirs points at, stays.' },
   { name: 'members', group: 'ADMIN', writes: false, what: 'Who is on this record, at what level, and where.' },
   { name: 'invite', group: 'ADMIN', writes: true, what: 'Put somebody on, or move them. A level per register. An address alone mints a single-use link, sent by nobody.' },
-  { name: 'invitations', group: 'ADMIN', writes: false, what: 'Every invitation still waiting to be used. Never a link.' },
+  { name: 'invitations', group: 'ADMIN', writes: false, what: 'Every invitation nobody has used or withdrawn, the ones that ran out marked expired. Never a link.' },
   { name: 'revokeInvite', group: 'ADMIN', writes: true, what: 'Withdraw an invitation. Its link stops working at once.' },
   { name: 'removeMember', group: 'ADMIN', writes: true, what: 'Take somebody off. Never the last owner.' },
   { name: 'listTokens', group: 'ADMIN', writes: false, what: 'Every agent token, with when it was last used. Never the token.' },
@@ -550,6 +552,7 @@ export type RecordSurface = {
   packs(ctx: never): Promise<Result<unknown>>;
   planPack(args: never, ctx: never): Promise<Result<unknown>>;
   planUseCase(args: never, ctx: never): Promise<Result<unknown>>;
+  fetchShared(args: never, ctx: never): Promise<Result<unknown>>;
   fetchUseCase(args: never, ctx: never): Promise<Result<unknown>>;
   exportUseCase(args: never, ctx: never): Promise<Result<unknown>>;
   installPack(args: never, ctx: never): Promise<Result<unknown>>;
@@ -651,6 +654,7 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     packs: (_a, ctx) => api.packs(ctx as never),
     planPack: (a, ctx) => api.planPack(a as never, ctx as never),
     planUseCase: (a, ctx) => api.planUseCase(a as never, ctx as never),
+    fetchShared: (a, ctx) => api.fetchShared(a as never, ctx as never),
     fetchUseCase: (a, ctx) => api.fetchUseCase(a as never, ctx as never),
     exportUseCase: (a, ctx) => api.exportUseCase(a as never, ctx as never),
     installPack: (a, ctx) => api.installPack(a as never, ctx as never),

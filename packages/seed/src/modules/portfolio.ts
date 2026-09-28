@@ -908,27 +908,47 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         /* `{{spoken}}` IS THIS PROJECT'S OWN ROW, `things#1`, which `runs_on` takes as `about:` and reads every kind
            from, so the same three blocks below narrow one read to a kind apiece by `where:` rather than asking the
            kernel three times. `about:` is read by a `cards` block (`block-keys.ts` `KEY_KINDS`), as it is by `table`;
-           `cards` is `minSpan: 4` (`kinds.ts`), where `table`'s own floor is 6 and three at span 4 would not tile. */
+           `cards` is `minSpan: 4` (`kinds.ts`), where `table`'s own floor is 6 and three at span 4 would not tile.
+
+           NO BLOCK HERE NAMES `kind is action`: the scheduled actions are the panel the section above draws, with
+           Resume and Pause, so a card for each as well would say every action twice.
+
+           EACH CARD SAYS WHERE IT APPLIES AND WHO USED IT LAST. `scope` is the chip, the project's mark or the globe
+           for everywhere (agents C8), and the kernel answers the project's own first and the global ones after them.
+           `used_by` is the run that last opened a key or called a tool, `S47`, which the card draws as that run's face,
+           and `used_at` when anybody last did; a skill has no use the record counts, so it names neither. */
         kind: 'cards',
         heading: 'Keys',
         span: 4,
         source: 'runs_on',
         about: '{{spoken}}',
         where: 'kind is key',
-        columns: [{ field: 'name', as: 'title' }, { field: 'detail', label: 'Opens', as: 'fact' }],
+        columns: [
+          { field: 'name', as: 'title' },
+          { field: 'scope', label: 'Applies to', as: 'scope' },
+          { field: 'detail', label: 'Opens', as: 'fact' },
+          { field: 'used_by', label: 'Last used by', as: 'who' },
+          { field: 'used_at', label: 'Last used', as: 'when' },
+        ],
         limit: 8,
-        empty: 'No keys apply to {{name}}.',
+        empty: 'No key is kept for {{name}} yet. An agent working in its folder adds what it uses.',
       },
       {
         kind: 'cards',
-        heading: 'Tools',
+        heading: 'Tools and servers',
         span: 4,
         source: 'runs_on',
         about: '{{spoken}}',
         where: 'kind is tool',
-        columns: [{ field: 'name', as: 'title' }, { field: 'detail', label: 'Transport', as: 'fact' }],
+        columns: [
+          { field: 'name', as: 'title' },
+          { field: 'scope', label: 'Applies to', as: 'scope' },
+          { field: 'detail', label: 'Reached by', as: 'fact' },
+          { field: 'used_by', label: 'Last used by', as: 'who' },
+          { field: 'used_at', label: 'Last used', as: 'when' },
+        ],
         limit: 8,
-        empty: 'No tools apply to {{name}}.',
+        empty: 'No tool or server is set up for {{name}} yet. An agent working in its folder adds what it uses.',
       },
       {
         kind: 'cards',
@@ -937,9 +957,13 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         source: 'runs_on',
         about: '{{spoken}}',
         where: 'kind is skill',
-        columns: [{ field: 'name', as: 'title' }, { field: 'detail', label: 'Rev', as: 'fact' }],
+        columns: [
+          { field: 'name', as: 'title' },
+          { field: 'scope', label: 'Applies to', as: 'scope' },
+          { field: 'detail', label: 'Version', as: 'fact' },
+        ],
         limit: 8,
-        empty: 'No skills apply to {{name}}.',
+        empty: 'No skill is written for {{name}} yet. An agent working in its folder adds what it uses.',
       },
     ],
   },

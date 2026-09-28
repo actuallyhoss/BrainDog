@@ -304,7 +304,102 @@ export function pageWrites(deps: WritesDeps) {
     });
   }
 
-  return { forPage, keptSegment, moveCard, capturable, captureLine, typeInto, saidOf, tickTask, rescheduleBar };
+  /**
+   * A stone pressed on a path, with a receipt whose undo puts the step back as it was.
+   *
+   * THE LIST'S `done` FIELD, FROM ITS `steps:` DECLARATION, and not the state a todo's tick moves: a path draws its marks
+   * from that one `bool` (`done_now`), so a stone that moved a state would say "done" in the toast and stay open on the
+   * path. The write is `writeRow`'s, so the step is held where it was, the receipt names it, and a refusal is the
+   * record's own sentence.
+   *
+   * THE STEP IS FOUND AMONG THE BLOCK'S ENTRIES as a todo's row is, by the record row the stone names (`withRefs` in
+   * `blocks.ts` skips the short view's name row and the count, so a stone's `ref` is its own step's). The rules for a
+   * stone and its undo are loaded on the press, as a tick's undo is.
+   */
+  function onpath(block: LiveBlock, row: Row, done: boolean, at: number, before: readonly Row[]) {
+    const title = row.cells[0] ?? copy.cardFallback;
+    if (deps.now() === null) return;
+    const held = block.entries.find((e) => e.seq === row.ref?.seq && e.version === row.ref.version);
+    void import('./tick-undo.ts').then((stone) =>
+      writeRow(row.ref, (_m, _ref, decl) => stone.stonePatch(done, decl), title, {
+        at,
+        before,
+        what: { done },
+        back: (_m, _ref, decl) => stone.stoneBackOf(done, decl, held),
+        undone: { done: !done },
+        said: (w) => w.ticked(title, done),
+      }),
+    );
+  }
+
+  /**
+   * Whether a block is a path a step can be added under: a `steps` block the record answered marks for, over a list.
+   *
+   * `done_now` IS THE RECORD SAYING THE LIST DECLARES `steps:`, which it answers only then (`marksOf` in `blocks.ts`), so
+   * this is asked without loading the declaration; the press reads the declaration itself and says so when it is short.
+   */
+  const stepable = (block: LiveBlock): boolean => block.kind === 'steps' && Boolean(block.register) && Array.isArray((block as unknown as Record<string, unknown>).done_now);
+
+  /**
+   * A step typed under a path: one row in the path's list, titled with the line, belonging to the row the path's steps
+   * belong to, and after the last of them. Answers whether it was written, so the field empties only then.
+   *
+   * THE ROW WRITER'S CREATE, as a capture's line is, over the list's own declaration read from the record, because a
+   * path's list is one a pack declared and this build has no copy of it: the title field and the `steps:` `of` come
+   * from the record, and `REGISTERS` would know neither.
+   *
+   * THE ROW IT BELONGS TO IS THE ONE EVERY STEP DRAWN HERE ALREADY NAMES, read off the block's entries; a path with no
+   * step yet reads it from the block's `where:`, the `<of> is <row>` clause that put these steps on this path. With
+   * neither, a step would be written to no path, and it is not written at all.
+   *
+   * AFTER THE LAST, where the list sorts by a number: one more than the highest step drawn, so a step added under a
+   * path is its last stone and not wherever an empty rank sorts. A list sorted any other way draws it where its order
+   * puts it.
+   */
+  async function addStep(block: LiveBlock, text: string): Promise<boolean> {
+    const line = text.trim();
+    const register = block.register;
+    if (deps.now() === null || !register || line === '') return false;
+    const [m, { stepsOf }, { rowWriter }] = await Promise.all([import('../record/page-write.ts'), import('./tick-undo.ts'), import('../record/rows-write.ts')]);
+    const decl = await m.schemaOf(deps.base(), register);
+    const steps = stepsOf(decl);
+    const title = decl ? (decl as { title?: unknown }).title : undefined;
+    const parent = steps ? parentOf(block, steps.of) : null;
+    if (!steps || typeof title !== 'string' || parent === null) {
+      toasts.push(copy.pathStepNowhere, { intent: 'warn' });
+      return false;
+    }
+    const order = steps.order;
+    const ranks = order ? block.entries.map((e) => e.fields[order]) : [];
+    const last = ranks.length > 0 && ranks.every((r) => typeof r === 'number') ? Math.max(...(ranks as number[])) : null;
+    const fields = { [title]: line, [steps.of]: parent, ...(order && last !== null ? { [order]: last + 1 } : {}) };
+    const out = await rowWriter(deps.base()).create(register, fields);
+    if (!out.ok) {
+      toasts.push(out.fix, { intent: 'warn' });
+      return false;
+    }
+    toasts.push(copy.pathStepAdded(line), { intent: 'good' });
+    await deps.reread();
+    return true;
+  }
+
+  return { forPage, keptSegment, moveCard, capturable, captureLine, typeInto, saidOf, tickTask, rescheduleBar, onpath, stepable, addStep };
+}
+
+/**
+ * The row a path's steps belong to: the value of `of` every drawn step holds, or the one the block's `where:` pins, or
+ * `null` when neither says.
+ *
+ * ONE ROW OR NONE. Steps that name two rows are a block over more than one path, and a new step given either would be
+ * a guess, so they answer null as no row does. A `where:` clause still holding a `{{` placeholder is a sentence the
+ * record did not fill, and is no row either.
+ */
+function parentOf(block: LiveBlock, of: string): string | number | null {
+  const named = [...new Set(block.entries.map((e) => e.fields[of]).filter((v): v is string | number => typeof v === 'string' || typeof v === 'number'))];
+  if (named.length > 0) return named.length === 1 ? named[0]! : null;
+  const clause = (block.where ?? '').split(/\s+and\s+/u).map((c) => c.trim().match(/^(\S+)\s+is\s+(.+)$/u)).find((c) => c?.[1] === of);
+  const value = clause?.[2]?.trim();
+  return value && !value.includes('{{') ? value : null;
 }
 
 /** The writes a page hands every block it draws; `null` where the page is inert. */

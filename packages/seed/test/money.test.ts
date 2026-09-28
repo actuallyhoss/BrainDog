@@ -484,9 +484,10 @@ test('NO PAGE LABELS THE THIRTY-DAY FIGURES MORE WIDELY THAN THEY READ, wherever
   for (const u of USE_CASES) walk(u.usecase, ((u.pack?.declarations ?? []) as Page[]).filter((d) => d.page !== undefined));
 
   /* THE COUNTS ARE ASSERTED BECAUSE A SWEEP THAT FINDS NOTHING PASSES EVERY LOOP BELOW IT: the walk's two tiles on
-     `/p/money`, and two narrow tiles on each of the founder's Overview and Dashboard. */
+     `/p/money`, and the same two on each of the founder's Overview and Dashboard, which since founder 1.7.0 lead with
+     the money there is and no longer with who owes whom. */
   assert.equal(cells.filter((c) => c.where === 'money-core /money').length, 2, 'the Money page no longer leads with the walk');
-  const founder = cells.filter((c) => c.where.startsWith('founder ') && (c.metric === 'in-30d' || c.metric === 'out-30d'));
+  const founder = cells.filter((c) => c.where.startsWith('founder ') && (c.metric === 'arriving-30d' || c.metric === 'leaving-30d'));
   assert.equal(founder.length, 4, 'the two founder dashboards are not both in the sweep');
   for (const c of cells) assert.equal(c.label, nameOf(c.metric), `${c.where} labels ${c.metric} "${c.label}" where the figure is called "${nameOf(c.metric)}"`);
 

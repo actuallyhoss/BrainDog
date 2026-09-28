@@ -1,0 +1,286 @@
+/**
+ * The one plan sheet's reading of a plan (`loop/finish/platform.md` §4.0 P): the record's `Diff` for an add-on or a
+ * module, a use case's pack-by-pack plan (`routes/packs/sharing.ts` `SharedPlan`), or several of either for "Update
+ * all", turned into the rows `PlanSheet.svelte` draws.
+ *
+ * THE WHOLE DIFF, NOT A SUMMARY OF IT. The Packs screen drew four of its keys (`vault.ts` `planOf`), so an update that
+ * retired a list, reset a setting or carried the owner's own edits over said none of it before the press. Every key a
+ * person could want to know before approving is a section here, and a section with nothing in it is left out, because a
+ * heading over nothing teaches people to skip headings.
+ *
+ * WHAT STOPS THE INSTALL COMES FIRST AND BLOCKS IT: a conflict, a requirement this record does not meet, a pack that
+ * would stop meeting its own, and rows a retired list would strand. The record refuses each of these at install; the
+ * sheet says them before anyone presses.
+ *
+ * PURE AND NODE-LOADABLE, so a test can read a plan without a browser: relative `.ts` imports only.
+ */
+
+import { callLine, callsOutOf, type CallOut } from '../record/actions.ts';
+
+type Body = Record<string, unknown>;
+
+const isMap = (v: unknown): v is Body => typeof v === 'object' && v !== null && !Array.isArray(v);
+const list = (v: unknown): Body[] => (Array.isArray(v) ? v.filter(isMap) : []);
+const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
+const text = (v: unknown): string => (typeof v === 'string' ? v : '');
+const count = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+
+/** The sheet's own words. The buttons' verbs follow `design.md` §6.4: the verb and its object. */
+export const words = {
+  install: (name: string) => `Install ${name}`,
+  update: (name: string, to: string) => `Update ${name} to ${to}`,
+  reinstall: (name: string) => `Install ${name} again`,
+  downgrade: (name: string, to: string) => `Go back to ${name} ${to}`,
+  updateAll: (n: number) => (n === 1 ? 'Update 1 add-on' : `Update all ${n}`),
+  updateAllTitle: (n: number) => (n === 1 ? 'One update' : `${n} updates`),
+  fromTo: (from: string, to: string) => `${from} to ${to}`,
+  version: (v: string) => `Version ${v}`,
+  notNow: 'Not now',
+  stops: "What stops this install",
+  adds: 'Adds',
+  handed: 'already here, under another add-on',
+  changes: 'Changes',
+  retires: 'Takes away',
+  keepsRows: (n: number) => (n === 0 ? 'holds no rows' : n === 1 ? 'its 1 row stays in the record' : `its ${n.toLocaleString('en-GB')} rows stay in the record`),
+  moves: 'Hands on',
+  movesTo: (to: string) => `stays, now under ${to}`,
+  kept: 'Your edits it carries over',
+  keptAdds: (fields: readonly string[]) => `keeps the ${fields.length === 1 ? 'field' : 'fields'} you added: ${fields.join(', ')}`,
+  keptRebased: 'keeps your changes on top of the new version',
+  keptOwn: 'keeps your version',
+  stays: 'Values it keeps because rows hold them',
+  staysLine: (values: readonly string[], rows: number) => `${values.join(', ')}, held by ${rows.toLocaleString('en-GB')} ${rows === 1 ? 'row' : 'rows'}`,
+  extends: 'Adds to your lists',
+  extendsLine: (fields: readonly string[]) => `adds ${fields.join(', ')}`,
+  pageAdds: 'Adds to your pages',
+  settings: 'Settings',
+  settingKept: (value: string) => `kept at ${value}`,
+  settingDefault: (value: string) => `set to ${value}`,
+  settingNone: 'left empty',
+  examples: 'Example rows',
+  examplesLine: (n: number) => (n === 1 ? '1 example row, marked as one and cleared in one step' : `${n.toLocaleString('en-GB')} example rows, marked as examples and cleared in one step`),
+  examplesIn: (n: number) => (n === 1 ? '1 row' : `${n.toLocaleString('en-GB')} rows`),
+  spawns: 'Rules that make rows',
+  spawnLine: (register: string, bound: number, when: string) => `makes rows in ${register}, at most ${bound.toLocaleString('en-GB')} ${when}`.trim(),
+  interrupts: 'Rules that interrupt you',
+  worth: 'Worth knowing',
+  retype: (field: string, from: string, to: string, rows: number) => `${field} changes from ${from} to ${to} on ${rows.toLocaleString('en-GB')} ${rows === 1 ? 'row' : 'rows'}`,
+  required: (field: string, rows: number) => `${field} becomes required, and ${rows.toLocaleString('en-GB')} ${rows === 1 ? 'row leaves' : 'rows leave'} it empty`,
+  renamed: (from: string, to: string) => `${from} is renamed ${to}`,
+  misread: (reader: string, where: string) => `${reader} reads "${where}" differently after this`,
+  turnsOn: 'Turns on',
+  calls: 'Calls other services',
+  callNew: 'new',
+  callChanged: 'changed',
+  callsNote: 'Approving this approves these once, and none of them runs until you do.',
+  touches: 'Nothing you have written is read or changed: 0 rows read, 0 of your rows changed.',
+  needs: (name: string, range: string, has: string | null) => (has ? `Needs ${name} ${range}, and this record has ${has}` : `Needs ${name} ${range}, which this record does not have`),
+  breaks: (name: string, version: string, range: string) => `${name} ${version} needs ${range} of this, which this version is not`,
+  format: 'This file is written for a newer BrainDog than this record runs',
+  orphans: (n: number) => `${n.toLocaleString('en-GB')} ${n === 1 ? 'row' : 'rows'} would be left under a list it takes away`,
+  conflict: (name: string, pack: string) => `${name} is already here, from ${pack}`,
+  conflictOwn: (name: string) => `${name} is one you changed, and this version changes it too`,
+  conflictReads: (name: string, reads: string) => `${name}, which you changed, reads ${reads}, which this version takes away`,
+  conflictField: (name: string, field: string) => `${name} reads ${field}, which this version takes away or changes`,
+} as const;
+
+/** One line of a section: what it names, and what it says about it. */
+export type Row = { text: string; detail: string | null };
+
+export type SectionKey =
+  | 'turns-on'
+  | 'adds'
+  | 'changes'
+  | 'retires'
+  | 'moves'
+  | 'kept'
+  | 'stays'
+  | 'extends'
+  | 'page-adds'
+  | 'settings'
+  | 'examples'
+  | 'spawns'
+  | 'interrupts'
+  | 'worth';
+
+export type Section = { key: SectionKey; title: string; rows: Row[] };
+
+/** One calls-out line, the record's own sentence where it wrote one, and whether it is new to this record. */
+export type Call = { line: string; note: string | null; change: 'new' | 'changed' | 'same' };
+
+/** One pack's part of the plan. A single add-on is one part; a use case is one part per pack, in the order they go in. */
+export type Part = { key: string; title: string; move: string; sections: Section[]; calls: Call[] };
+
+export type Sheet = {
+  title: string;
+  summary: string | null;
+  /** What stops the install, from every part, drawn first and in the danger colour. Any at all disables approve. */
+  stops: string[];
+  parts: Part[];
+  /** Every call from every part, for the runs-a-month estimate. */
+  callOuts: CallOut[];
+  approve: string;
+};
+
+/** A declaration id or a pack id as a person reads it, with the id in words when `nameOf` knows nothing better. */
+function namer(nameOf: (id: string) => string): (id: string) => string {
+  return (id) => {
+    const said = nameOf(id);
+    if (said !== '' && said !== id) return said;
+    const bare = id.includes('.') ? id.slice(id.indexOf('.') + 1) : id;
+    return (bare.charAt(0).toUpperCase() + bare.slice(1)).replace(/[_-]/gu, ' ');
+  };
+}
+
+const section = (key: SectionKey, title: string, rows: Row[]): Section[] => (rows.length === 0 ? [] : [{ key, title, rows }]);
+const row = (t: string, detail: string | null = null): Row => ({ text: t, detail });
+
+const isDiff = (v: unknown): v is Body => isMap(v) && isMap(v.pack) && typeof v.planHash === 'string';
+const isShared = (v: unknown): v is Body => isMap(v) && isMap(v.usecase) && Array.isArray(v.packs);
+
+/** The record's `Diff` for one pack, as one part and the lines that stop it. */
+function diffPart(d: Body, name: (id: string) => string): { part: Part; stops: string[]; title: string; summary: string; direction: string; version: string; installed: string | null } {
+  const pack = isMap(d.pack) ? d.pack : {};
+  const id = text(pack.id);
+  const version = text(pack.version);
+  const installed = typeof d.installed_version === 'string' ? d.installed_version : null;
+  const direction = text(d.direction) || 'install';
+  const title = name(id);
+
+  const stops: string[] = [];
+  const requires = isMap(d.requires) ? d.requires : {};
+  if ((isMap(requires.format) && requires.format.ok === false) || (isMap(requires.primitives) && requires.primitives.ok === false)) stops.push(words.format);
+  for (const p of list(requires.packs)) if (p.ok === false) stops.push(words.needs(name(text(p.id)), text(p.range), typeof p.installed === 'string' ? p.installed : null));
+  for (const p of list(d.dependents)) if (p.ok === false && p.was !== false) stops.push(words.breaks(name(text(p.id)), text(p.version), text(p.range)));
+  for (const c of list(d.conflicts)) {
+    const what = name(text(c.id));
+    if (typeof c.reads === 'string') stops.push(words.conflictReads(what, name(c.reads)));
+    else if (typeof c.field === 'string') stops.push(words.conflictField(what, c.field));
+    else if (c.changed === true || text(c.pack) === '(this record)') stops.push(words.conflictOwn(what));
+    else stops.push(words.conflict(what, name(text(c.pack))));
+  }
+  if (count(d.orphans) > 0) stops.push(words.orphans(count(d.orphans)));
+
+  const retires = list(d.retires);
+  const seeds = isMap(d.seeds) ? d.seeds : {};
+  const seedRows = list(seeds.registers).filter((r) => count(r.rows) > 0);
+  const worth = [
+    ...list(d.retypes).map((r) => row(name(text(r.id)), words.retype(text(r.field), text(r.from), text(r.to), count(r.rows)))),
+    ...list(d.newly_required).map((r) => row(name(text(r.id)), words.required(text(r.field), count(r.rows)))),
+    ...list(d.renames).map((r) => row(words.renamed(name(text(r.from)), name(text(r.to))))),
+    ...list(d.misreads).map((r) => row(name(text(r.id)), words.misread(name(text(r.reader)), text(r.where)))),
+    ...list(d.warnings).map((w) => row(text(w.say))),
+  ];
+
+  const part: Part = {
+    key: id,
+    title,
+    move: installed && installed !== version ? words.fromTo(installed, version) : words.version(version),
+    sections: [
+      ...section('adds', words.adds, list(d.adds).map((a) => row(name(text(a.id)), a.handed === true ? words.handed : text(a.summary) || null))),
+      ...section('changes', words.changes, list(d.changes).map((c) => row(name(text(c.id)), text(c.summary) || null))),
+      ...section('retires', words.retires, retires.filter((r) => typeof r.to !== 'string').map((r) => row(name(text(r.id)), words.keepsRows(count(r.rows))))),
+      ...section('moves', words.moves, retires.filter((r) => typeof r.to === 'string').map((r) => row(name(text(r.id)), words.movesTo(name(text(r.to)))))),
+      ...section('kept', words.kept, list(d.kept).map((k) => {
+        const adds = strings(k.adds);
+        return row(name(text(k.id)), adds.length > 0 ? words.keptAdds(adds) : typeof k.rebased === 'string' ? words.keptRebased : words.keptOwn);
+      })),
+      ...section('stays', words.stays, list(d.stays).map((s) => row(name(text(s.id)), words.staysLine(strings(s.values), count(s.rows))))),
+      ...section('extends', words.extends, list(d.extends).filter((e) => !isMap(e.refusal)).map((e) => row(name(text(e.id)), words.extendsLine(strings(e.adds))))),
+      ...section('page-adds', words.pageAdds, list(d.page_adds).filter((p) => !isMap(p.refusal)).map((p) => row(name(`page.${text(p.page)}`), text(p.line) || null))),
+      ...section('settings', words.settings, list(d.config).map((c) => {
+        const value = typeof c.value === 'string' || typeof c.value === 'number' || typeof c.value === 'boolean' ? String(c.value) : JSON.stringify(c.value ?? null);
+        return row(text(c.key).replace(/_/gu, ' '), c.from === 'kept' ? words.settingKept(value) : c.from === 'default' ? words.settingDefault(value) : words.settingNone);
+      })),
+      ...section('examples', words.examples, count(seeds.count) === 0 ? [] : [row(words.examplesLine(count(seeds.count)), seedRows.map((r) => `${name(`register.${text(r.register)}`)} ${words.examplesIn(count(r.rows))}`).join(', ') || null)]),
+      ...section('spawns', words.spawns, list(d.spawns).map((s) => row(name(`rule.${text(s.rule)}`), words.spawnLine(name(`register.${text(s.register)}`), count(s.bound), text(s.when))))),
+      ...section('interrupts', words.interrupts, strings(d.interrupts).map((r) => row(name(`rule.${r}`)))),
+      ...section('worth', words.worth, worth),
+    ],
+    calls: list(d.calls_out).map((c) => ({
+      line: text(c.line) || callsOutOf([c]).map(callLine)[0] || text(c.ingest),
+      note: typeof c.key_line === 'string' && c.key_line !== '' ? c.key_line : null,
+      change: c.change === 'changed' ? 'changed' : c.change === 'same' ? 'same' : 'new',
+    })),
+  };
+  return { part, stops, title, summary: text(pack.summary), direction, version, installed };
+}
+
+/** A use case's pack-by-pack plan (`SharedPlan`), a part per pack, the modules first as the record plans them. */
+function sharedParts(plan: Body, name: (id: string) => string): { parts: Part[]; stops: string[] } {
+  const enable = strings(plan.enable);
+  const turnsOn: Part[] =
+    enable.length === 0 ? [] : [{ key: 'turns-on', title: words.turnsOn, move: '', sections: section('turns-on', words.turnsOn, enable.map((id) => row(name(id)))), calls: [] }];
+  const stops: string[] = [];
+  const parts = list(plan.packs).map((p): Part => {
+    stops.push(...strings(p.conflicts));
+    const version = text(p.version);
+    const installed = typeof p.installedVersion === 'string' ? p.installedVersion : null;
+    const named = (items: unknown): Row[] => list(items).map((a) => row(text(a.name)));
+    const examples = count(p.examples);
+    return {
+      key: text(p.id),
+      title: text(p.title) || name(text(p.id)),
+      move: installed && installed !== version ? words.fromTo(installed, version) : words.version(version),
+      sections: [
+        ...section('adds', words.adds, named(p.adds)),
+        ...section('changes', words.changes, strings(p.changes).map((c) => row(c))),
+        ...section('retires', words.retires, strings(p.retires).map((c) => row(c))),
+        ...section('moves', words.moves, list(p.hands).map((h) => row(text(h.name), words.movesTo(text(h.to))))),
+        ...section('examples', words.examples, examples === 0 ? [] : [row(words.examplesLine(examples))]),
+      ],
+      calls: (Array.isArray(p.calls) ? (p.calls as CallOut[]) : []).map((c) => ({ line: callLine(c), note: c.note ?? null, change: 'new' as const })),
+    };
+  });
+  return { parts: [...turnsOn, ...parts], stops };
+}
+
+/** The calls a plan carries, as `CallOut`s, for the estimate under the lines. */
+function callOutsOf(one: Body): CallOut[] {
+  if (isDiff(one)) return callsOutOf(one.calls_out);
+  return list(one.packs).flatMap((p) => (Array.isArray(p.calls) ? (p.calls as CallOut[]) : []));
+}
+
+/**
+ * The sheet for a plan, several plans, or `null` for an answer this build does not recognise. `nameOf` names a
+ * declaration id (`register.money`, `page.home`) or a pack id as the reader knows it.
+ */
+export function sheetOf(diff: unknown, nameOf: (id: string) => string): Sheet | null {
+  const name = namer(nameOf);
+  const plans = (Array.isArray(diff) ? diff : [diff]).filter((d): d is Body => isDiff(d) || isShared(d));
+  if (plans.length === 0 || (Array.isArray(diff) && plans.length !== diff.length)) return null;
+
+  const stops: string[] = [];
+  const parts: Part[] = [];
+  const heads: { title: string; summary: string; direction: string; version: string }[] = [];
+  for (const plan of plans) {
+    if (isDiff(plan)) {
+      const one = diffPart(plan, name);
+      stops.push(...one.stops);
+      parts.push(one.part);
+      heads.push({ title: one.title, summary: one.summary, direction: one.direction, version: one.version });
+    } else {
+      const shared = sharedParts(plan, name);
+      stops.push(...shared.stops);
+      parts.push(...shared.parts);
+      const u = isMap(plan.usecase) ? plan.usecase : {};
+      const own = list(plan.packs).find((p) => p.role === 'usecase');
+      const updating = own !== undefined && typeof own.installedVersion === 'string';
+      heads.push({ title: text(u.title), summary: text(u.summary), direction: updating ? 'upgrade' : 'install', version: text(u.version) });
+    }
+  }
+
+  const head = heads[0];
+  if (plans.length > 1 || !head) {
+    return { title: words.updateAllTitle(plans.length), summary: null, stops, parts, callOuts: plans.flatMap(callOutsOf), approve: words.updateAll(plans.length) };
+  }
+  const approve =
+    head.direction === 'upgrade'
+      ? words.update(head.title, head.version)
+      : head.direction === 'downgrade'
+        ? words.downgrade(head.title, head.version)
+        : head.direction === 'reinstall'
+          ? words.reinstall(head.title)
+          : words.install(head.title);
+  return { title: head.title || approve, summary: head.summary || null, stops, parts, callOuts: plans.flatMap(callOutsOf), approve };
+}

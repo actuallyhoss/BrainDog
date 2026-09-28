@@ -24,16 +24,24 @@ import { BUSINESS_EXAMPLES } from './business.ts';
 import { FOUNDER_EXAMPLES } from './founder.ts';
 import { formGuide, GUIDE_KINDS, type FormedPlan } from './guide-kinds.ts';
 import type { ExampleLink } from './links.ts';
-import { PERSONAL_EXAMPLES, PERSONAL_NAMES, PERSONAL_TARGETS } from './personal.ts';
+import { PERSONAL_NAMES, PERSONAL_TARGETS } from './personal.ts';
 import { TEAM_EXAMPLES } from './team.ts';
 import { useCaseDocument, type UseCase } from './index.ts';
 
 type Body = Record<string, unknown>;
 
-/** The example rows each use case gives the first-party modules it names. A use case not listed gives none. */
-const MODULE_EXAMPLES: Readonly<Record<string, readonly Body[]>> = { business: BUSINESS_EXAMPLES, founder: FOUNDER_EXAMPLES, personal: PERSONAL_EXAMPLES, team: TEAM_EXAMPLES };
+/**
+ * The example rows each use case gives the first-party modules it names, drawn only by a preview or a test (C11). A use
+ * case not listed gives none. PERSONAL IS NOT LISTED SINCE ITS 2.0.0: a person's month in pounds was the wrong picture
+ * of anybody's record, and a person's Home is drawn from what they write.
+ */
+const MODULE_EXAMPLES: Readonly<Record<string, readonly Body[]>> = { business: BUSINESS_EXAMPLES, founder: FOUNDER_EXAMPLES, team: TEAM_EXAMPLES };
 
-/** The targets each use case gives the modules' figures, by metric. A figure not listed keeps the module's own. */
+/**
+ * The targets each use case gives the modules' figures, by metric. A figure not listed keeps the module's own. IN NO
+ * CURRENCY: a bound here is a count or a number of days, because a use case cannot know the currency of the record it
+ * lands on (`loop/finish/modules.md` C1), and a sum of money a person means is a setting they type.
+ */
 const MODULE_TARGETS: Readonly<Record<string, Readonly<Record<string, unknown>>>> = { personal: PERSONAL_TARGETS };
 
 /** What each use case calls the modules' figures, by metric: the words a tile and the forecast's late knob say. */

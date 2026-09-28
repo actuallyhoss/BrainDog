@@ -1041,6 +1041,27 @@
     font-size: var(--t-lg);
   }
 
+  /* A CARD'S `hue` IS ITS MARK'S COLOUR AND NOTHING ELSE (pages C4, 05 §5's one identity accent): the renderer writes
+     `--hue` on the card only for a whole number from 0 to 359, and the mark is drawn in the identity formula every
+     other mark in the app uses (`IdentityMark.svelte`). Never the card's edge, its ground or its ring, so a hue never
+     reads as a tone. Asked of the card's own attribute and not of the inherited property, because `--hue` inherits: a
+     page drawn for a project may carry that project's hue above the block, and every card without one of its own would
+     wear it. */
+  .cards-item[style*='--hue'] > .cards-head > .cards-mark {
+    color: oklch(var(--mark-l) var(--mark-c) var(--hue));
+  }
+
+  /* A CARD'S `picture` LEADS IT at 16:9, cut to fit, on the well a missing picture would leave, so a card whose file
+     has not loaded yet is the same height as it will be. The title under it names the card. */
+  .cards-picture {
+    display: block;
+    inline-size: 100%;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    border-radius: var(--r-md);
+    background: var(--sunk);
+  }
+
   /* ── section: a heading for the blocks after it ──────────────────────────
      A group on a page is a heading and air, never a box: `--t-md` semibold in sentence case, which is
      every section title in the product (design §6.2) and a step above a block's name, the count on its
@@ -3253,5 +3274,23 @@
   .progress[data-form='range'] > .progress-row[data-total] > .progress-label {
     color: var(--ink);
     font-weight: 500;
+  }
+
+  /* A PATH'S VIEW SWITCH (PGS-13): "<label> · Everything" as a segmented control, `packages/render/svelte/Path.svelte`'s
+     own markup. The stones under it already reach 44px through `.tap`; this is the switch above them. */
+  .path-switch {
+    display: flex;
+    gap: var(--sp-1);
+    margin-block-end: var(--sp-2);
+  }
+
+  .path-view {
+    min-block-size: var(--ctl-h-sm);
+  }
+
+  @media (pointer: coarse) {
+    .path-view {
+      min-block-size: var(--tap);
+    }
   }
 }

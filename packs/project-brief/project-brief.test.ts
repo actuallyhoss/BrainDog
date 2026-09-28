@@ -12,15 +12,12 @@
  * record's primitives, never code in the shell that knows about him. Everything here is the pack file and the record's
  * own install path, `planPack` then `installPack`, the road a person takes from the app.
  *
- * ONE PAGE OVER EVERY PROJECT, NOT A SECTION ON EACH PROJECT'S PAGE, and that was measured rather than chosen. The brief
- * asked for a section on a project. A pack cannot lay a block on Portfolio's `project` page (`extends` lays fields and
- * values, nothing else), so the only way to draw it per project was a second template `for: things`, and two templates
- * over one list share one slug per row, first come first served. Measured with every first-party pack and the founder
- * use case, whose `project` page is the one he opens every day: a brief template installed after it got `/p/marrow-2`,
- * an address nobody would guess, and one installed BEFORE it took `/p/marrow` outright, moving the project page to
- * `marrow-2`. The slugs are claimed in the order the declaration rows were written, so which page owns a project's
- * address would turn on which was installed or updated last. So the brief is one page, `/p/briefs`, which is also the
- * shape the old tool's agent index has: one line per project, with what is in the way.
+ * ON EACH PROJECT'S OWN PAGE, AND ON ONE PAGE OVER EVERY PROJECT. The brief asked for a section on a project, and a
+ * second template `for: things` could not give it one: two templates over one list share one slug per row, so a brief
+ * template took `/p/marrow` or `/p/marrow-2` by which was installed last. So the pack adds one block to Portfolio's
+ * `project` page through `adds` (`loop/finish/gaps.md` GAP-9), which the kernel lays after "Where it stands" each time
+ * the page is read and never writes into Portfolio's declaration. `/p/briefs` stays beside it, which is the shape Sam
+ * Brain's agent index has: one line per project, with what is in the way.
  */
 
 import { test } from 'node:test';
@@ -139,6 +136,50 @@ test('the Briefs page draws what is in the way, the one line and the plan, each 
   assert.ok(!names('In the way').includes('Ember'), 'a parked project was listed as blocked');
   assert.ok(names('What each one is').includes('Tallow'));
   assert.deepEqual(names('The plan').filter((n) => n === 'Marrow' || n === 'Tallow'), ['Marrow']);
+  close();
+});
+
+test('the project page draws the brief after where it stands, and Portfolio\'s own page declaration is left as it was', async () => {
+  const { api, close } = await portfolio();
+  const before = api.kernel.declarations().find((d) => d.id === 'page.project')!.body;
+  const diff = await planOf(api, brief());
+  assert.deepEqual(
+    (diff as { page_adds?: { page: string; line: string; unresolved?: true }[] }).page_adds?.map((a) => [a.page, a.line, a.unresolved ?? null]),
+    [['page.project', 'adds a block to project from project-brief', null]],
+  );
+  said(await put(api, brief()));
+  said(api.kernel.create('things', { name: 'Marrow', lane: 'earning', summary: 'A recipe book', blockers: ['The printer quote'] }, { actor: 'p_1' }));
+  const page = said<{ blocks: { heading?: string; added?: string; rows: { fields: Record<string, unknown> }[]; refusals: unknown[] }[] }>(
+    await api.page({ slug: 'marrow' }, owner),
+  );
+  const headings = page.blocks.map((b) => b.heading);
+  const at = headings.indexOf('The brief');
+  assert.equal(headings[at - 1], 'Where it stands');
+  const added = page.blocks[at]!;
+  assert.equal(added.added, 'project-brief');
+  assert.deepEqual(added.refusals, []);
+  assert.equal(added.rows[0]?.fields.summary, 'A recipe book');
+  assert.equal(api.kernel.declarations().find((d) => d.id === 'page.project')!.body, before, 'the addition was written into Portfolio\'s page');
+  /* TAKING THE PACK OUT TAKES ITS BLOCK OFF THE PAGE, because the block lived in its manifest and nowhere else. */
+  said(await api.uninstallPack({ id: 'project-brief' } as never, owner));
+  const after = said<{ blocks: { heading?: string }[] }>(await api.page({ slug: 'marrow' }, owner));
+  assert.ok(!after.blocks.some((b) => b.heading === 'The brief'));
+  close();
+});
+
+test('a pack adding to a page the record lacks plans it as unresolved and does not install', async () => {
+  const { api, close } = await portfolio();
+  const doc = { ...brief(), adds: [{ page: 'page.nowhere', block: { kind: 'note', heading: 'Lost', body: 'Nothing' } }] };
+  const planned = (await api.planPack({ doc, source: { kind: 'local' } } as never, owner)) as Out;
+  /* A PLAN THAT ANSWERS SAYS THE PAGE IS MISSING, and one the record refuses at the plan refuses it for that page. */
+  if (planned.ok) {
+    const diff = (planned.value as { diff: Diff & { page_adds?: { unresolved?: true }[] } }).diff;
+    assert.equal(diff.page_adds?.[0]?.unresolved, true);
+    const r = (await api.installPack({ doc, source: { kind: 'local' }, planHash: diff.planHash, approve: diff.approve } as never, owner)) as Out;
+    assert.equal(r.ok, false);
+    assert.equal(r.refusal?.code, 'PAGE_UNKNOWN');
+  } else assert.equal(planned.refusal?.code, 'PAGE_UNKNOWN');
+  assert.ok(!api.kernel.declarations().some((d) => d.id === 'page.briefs'), 'the pack installed');
   close();
 });
 

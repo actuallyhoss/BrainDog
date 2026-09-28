@@ -14,13 +14,14 @@
 
 import { linkExamples, type ExampleLink } from '@braindog/seed/usecases/links';
 import { moduleName, ruleName } from '@braindog/seed/usecases/names';
+import { firstPartyModule as moduleOf } from '@braindog/seed/packs/modules';
 
 import { copy } from '../../lib/copy.ts';
+import { words } from './words.ts';
 import { withOrder } from '../../lib/nav.ts';
 import { SPEAKS, speaking, voiceBatch, voiceWrites, withSpeaks, type SpeakingState } from '../../lib/voice.ts';
 import { callsOutOf, type CallOut } from '../../lib/record/actions.ts';
 import type { PackState, Refusal } from '../../lib/record/packs.ts';
-import { moduleOf } from '../../lib/record/modules.ts';
 import { REGISTERS } from '../../lib/record/held.ts';
 
 type Body = Record<string, unknown>;
@@ -41,7 +42,7 @@ export type SharingClient = {
     signals?: string[];
     skills?: number[];
   }): Promise<Wire<unknown>>;
-  fetchUseCase(args: { url: string }): Promise<Wire<unknown>>;
+  fetchShared(args: { url: string }): Promise<Wire<unknown>>;
   planPack(args: { doc: unknown; source?: { kind: string } }): Promise<Wire<unknown>>;
   installPack(args: { doc: unknown; source?: { kind: string }; planHash: string; approve?: string[] }): Promise<Wire<unknown>>;
   enablePack(args: { id: string }): Promise<Wire<unknown>>;
@@ -59,21 +60,31 @@ const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is
 /* ── reading a file in ─────────────────────────────────────────────────── */
 
 /**
- * The text at an https address, read by the record's host (`fetchUseCase`), or the sentence to say instead.
+ * The text at an https address or `git:owner/repo@ref:path`, read by the record's host (`fetchShared`), or the sentence
+ * to say instead.
  *
  * THE HOST READS IT, because most sites send no CORS header and a tab may not read them. The host sends nothing of the
  * record's and refuses a private or local address, so what an owner pastes cannot point this server at its own network.
- * The tab read an address itself only for the sample, which had no host, and went with it (DIRECTION 26).
+ * A `git:` address is turned into the raw file on GitHub by the host, so it is checked there as an https one is; here
+ * it is only held to its shape, so a typing slip is said before anything is asked.
  */
-export async function readOnHost(client: Pick<SharingClient, 'fetchUseCase'>, address: string): Promise<{ ok: true; text: string } | { ok: false; fix: string; code: string | null }> {
-  let url: URL;
-  try {
-    url = new URL(address.trim());
-  } catch {
-    return { ok: false, fix: copy.shareAddressNotOne, code: null };
+export async function readOnHost(client: Pick<SharingClient, 'fetchShared'>, address: string): Promise<{ ok: true; text: string } | { ok: false; fix: string; code: string | null }> {
+  const asked = address.trim();
+  let url: string;
+  if (asked.startsWith('git:')) {
+    if (!GIT.test(asked)) return { ok: false, fix: words.gitNotOne, code: null };
+    url = asked;
+  } else {
+    let parsed: URL;
+    try {
+      parsed = new URL(asked);
+    } catch {
+      return { ok: false, fix: copy.shareAddressNotOne, code: null };
+    }
+    if (parsed.protocol !== 'https:') return { ok: false, fix: copy.shareAddressHttps, code: null };
+    url = parsed.href;
   }
-  if (url.protocol !== 'https:') return { ok: false, fix: copy.shareAddressHttps, code: null };
-  const out = await client.fetchUseCase({ url: url.href });
+  const out = await client.fetchShared({ url });
   if (!out.ok) {
     const refusal = refusalOf(out);
     return { ok: false, fix: refusal.fix, code: refusal.code };
@@ -81,6 +92,9 @@ export async function readOnHost(client: Pick<SharingClient, 'fetchUseCase'>, ad
   const v = out.value;
   return isMap(v) && typeof v.text === 'string' ? { ok: true, text: v.text } : { ok: false, fix: copy.writeRaced, code: null };
 }
+
+/** `git:owner/repo@ref:path`, as the host reads it (`fetchShared` in `@braindog/record`). */
+export const GIT = /^git:[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+@[A-Za-z0-9_./-]+:[^\s?#]+$/u;
 
 /* ── the plan ──────────────────────────────────────────────────────────── */
 

@@ -291,7 +291,7 @@ test('the page route reads the record, waits for it, and draws what it cannot sa
   assert.match(view, /\{#if got === null\}/);
   assert.match(view, /block\.cannot/);
   assert.match(view, /<ActionRows /);
-  assert.match(view, /<Actions project=\{param\.title\} \/>/, 'Runs on went missing from the project pages');
+  assert.match(view, /<Actions project=\{\{ spoken: `\$\{param\.register\}#\$\{param\.seq\}`, title: param\.title \}\} \/>/, 'Runs on went missing from the project pages');
   assert.doesNotMatch(route, /\$effect\(\(\) => drew\('ready'\)\)/, 'the page says it drew before the record answered');
 });
 

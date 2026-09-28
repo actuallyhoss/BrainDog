@@ -198,7 +198,7 @@ test('KILN AND PORTAGE DRAW "RUNS ON" on the seeded record, with no block refuse
     const at = drawn.blocks.findIndex((b) => b.heading === 'Runs on');
     assert.ok(at >= 0, `/p/${slug} has no Runs on`);
     const after = drawn.blocks.slice(at + 1);
-    assert.deepEqual(after.map((b) => b.heading), ['Keys', 'Tools', 'Skills'], slug);
+    assert.deepEqual(after.map((b) => b.heading), ['Keys', 'Tools and servers', 'Skills'], slug);
     for (const b of after) {
       assert.deepEqual(b.refusals, [], `${String(b.heading)} on ${slug}`);
       assert.ok(b.rows.length > 0, `${String(b.heading)} on ${slug} draws nothing`);
