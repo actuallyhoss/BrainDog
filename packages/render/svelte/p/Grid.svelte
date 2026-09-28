@@ -354,6 +354,7 @@
         {#each lane.cards as card (card.at)}
           <div
             class="card"
+            data-arrived={card.row.arrived ? '' : undefined}
             data-at={live ? card.at : undefined}
             data-moved={card.moved ? '' : undefined}
             data-carrying={carrying === card.at ? '' : undefined}

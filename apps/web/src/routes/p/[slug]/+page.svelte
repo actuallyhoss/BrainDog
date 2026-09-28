@@ -49,14 +49,18 @@
   /* A RE-READ OF THE PAGE'S OWN, after one of its writes landed, counted so the record moving under it does not read
      the page a second time while the first is still out. */
   let own = 0;
+  /* THE LATEST READ STARTED IS THE ONE DRAWN. A re-read the record moving started just before a tick landed can answer
+     after the one the tick started, and drawing it last put the row back as it was before the tick. */
+  let started = 0;
 
   async function reread() {
     const asked = slug;
     if (!reader) return;
     own += 1;
+    const mine = ++started;
     try {
       const out = await reader.read(asked);
-      if ((route.params.slug ?? '') === asked && out.from === 'live') got = out;
+      if (mine === started && (route.params.slug ?? '') === asked && out.from === 'live') got = out;
     } finally {
       own -= 1;
     }

@@ -86,7 +86,7 @@ export type Reader<T> = {
   /** What the screen draws now. */
   now(): Snapshot<T>;
   /** Ask for a key, or for nothing (`null`). The ticket is what the answer is handed back with; `null` asks nothing. */
-  ask(key: string | null): Ticket | null;
+  ask(key: string | null, quiet?: boolean): Ticket | null;
   /** An answer came back. `false` when it was dropped, because a newer question was asked since. */
   answer(ticket: Ticket, got: Result<T>): boolean;
   /** The call threw instead of answering. `false` when it was dropped. */
@@ -107,13 +107,24 @@ export function reader<T>(empty?: (value: T) => boolean, version: number | null 
   let key: string | null = null;
   let n = 0;
   let seen = version;
+  /* THE TICKET OF A QUIET ASK: the record moved and the screen is asking again on its own, with an answer on screen. */
+  let quietly: number | null = null;
+
+  /**
+   * A QUIET ASK THAT FAILS KEEPS THE ANSWER ON SCREEN. The poll asks every 1.5 s while somebody is looking, and each
+   * change it hears asks every read on screen again; one of those failing for a moment (a dropped request, a restart)
+   * turned a drawn list into the offline screen under the reader, over rows that were all still right. The hairline
+   * says a failed poll, and the next change asks again. Retry and a screen's own `reread` are not quiet, so a failure
+   * the person asked about is still shown.
+   */
+  const kept = (ticket: Ticket): boolean => quietly === ticket.n && (snap.state === 'ready' || snap.state === 'empty');
 
   /** Whether this ticket is still the question on screen. Anything older is an answer for a key the screen left. */
   const current = (ticket: Ticket): boolean => asked !== null && asked.n === ticket.n;
 
   return {
     now: () => snap,
-    ask(next) {
+    ask(next, quiet = false) {
       /* A DIFFERENT QUESTION WIPES THE OLD ANSWER. A row of one record under the address of another is worse than a
          moment of waiting, so a new key starts from nothing. The same key asked again (Retry, or the record moving)
          keeps drawing what it has until the new answer lands, so a list does not blink every fifteen seconds; only a
@@ -126,15 +137,18 @@ export function reader<T>(empty?: (value: T) => boolean, version: number | null 
       }
       n += 1;
       asked = { key: next, n };
+      quietly = quiet ? n : null;
       return asked;
     },
     answer(ticket, got) {
       if (!current(ticket)) return false;
+      if (!got.ok && kept(ticket)) return true;
       snap = settle(got, empty);
       return true;
     },
     failed(ticket, why) {
       if (!current(ticket)) return false;
+      if (kept(ticket)) return true;
       /* A THROW IS DRAWN AS OFFLINE, AND THE REASON IS KEPT. The client never throws (a dead socket is its
          `UNREACHABLE`), so a throw here is a screen's own `fetch` failing, which is the network. The sentence the
          person reads is DSN-12's; what actually threw sits under Details, so nobody is misled about which it was. */

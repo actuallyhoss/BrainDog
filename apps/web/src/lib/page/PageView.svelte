@@ -45,6 +45,7 @@
   import PageBody from './PageBody.svelte';
   import SourceView from './SourceView.svelte';
   import { heldNone, pageWrites, type Held } from './page-writes.ts';
+  import { liveArrivals } from '$lib/data/optimistic.svelte.ts';
   import { words } from './words.ts';
 
   let {
@@ -85,6 +86,12 @@
     reread: () => reread(),
     toasts,
     state: { get: () => held, set: (next) => (held = next) },
+    arrivals: liveArrivals(),
+  });
+
+  /* THE WRITE MODULE IS FETCHED ONCE A WRITABLE PAGE HAS DRAWN, so its first tick is drawn the moment it is pressed. */
+  $effect(() => {
+    if (mode !== 'preview' && live) untrack(() => writes.warm());
   });
 
   /* THE HOLDS GO WHEN THE PAGE DOES: `/p/[slug]` keeps this component across slugs (`page-writes.ts` `forPage`). */

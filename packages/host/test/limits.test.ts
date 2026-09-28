@@ -145,3 +145,24 @@ test('THE BINDING SPEAKS THE SAME TYPE, AND AN ABSENT ONE LIMITS NOTHING', async
   const none = limits.bindingLimiter({});
   assert.deepEqual(await none.limit('token:t_a', 'write'), { ok: true });
 });
+
+test('THE VERSION POLL SPENDS ITS OWN BUDGET, SO A TAB POLLING EVERY 1.5 s IS NEVER REFUSED FOR THE READS BESIDE IT', async () => {
+  assert.equal(limits.classOf('version'), 'poll');
+  assert.equal(limits.POLL_PER_MINUTE, 240);
+
+  const l = limits.windowLimiter(clock().now);
+  const a = limits.limitKey(tokenA, '203.0.113.7');
+  /* Every read of the minute spent, and the poll still answers: forty a minute is one focused tab at 1.5 s. */
+  await spend(l, a, 'read', 600);
+  assert.equal((await l.limit(a, 'read')).ok, false);
+  await spend(l, a, 'poll', 240);
+  assert.equal((await l.limit(a, 'poll')).ok, false, 'the 241st poll is refused');
+});
+
+test('A POLL WITH NO RL_POLL BOUND SPENDS RL_READ, AND WITH ONE BOUND SPENDS THAT', async () => {
+  const asked: string[] = [];
+  const binding = (name: string) => ({ limit: async () => (asked.push(name), { success: true }) });
+  await limits.bindingLimiter({ read: binding('RL_READ') }).limit('person:p_1', 'poll');
+  await limits.bindingLimiter({ read: binding('RL_READ'), poll: binding('RL_POLL') }).limit('person:p_1', 'poll');
+  assert.deepEqual(asked, ['RL_READ', 'RL_POLL']);
+});

@@ -2,7 +2,7 @@
  * A PAGE THAT LISTENS: it reads itself again when the record moves, so a reply an agent wrote while the reader looked
  * at the page appears under its note without a reload.
  *
- * The record's version is `live.version`, which the shell's poll (`lib/data/live.ts`, every 15 s) moves only when it
+ * The record's version is `live.version`, which the shell's poll (`lib/data/live.ts`, about every 1.5 s while the tab has focus) moves only when it
  * hears a different one. This follows it from a component: call `listen` while the component initialises, and the
  * effects it makes go with the component, so it stops on unmount with no teardown of the caller's.
  */
@@ -10,8 +10,8 @@ import { untrack } from 'svelte';
 import { live } from '$lib/data/live.svelte.ts';
 
 /* HOW OFTEN A RE-READ HELD BACK BY `busy()` LOOKS AGAIN. `busy` is a plain function, often a question about the DOM (a
-   finger down, a field focused), which no rune tracks, so the wait is a short timer rather than an effect. A second is
-   well inside the poll's 15 s, so a change owed is still drawn before the next one is heard. */
+   finger down, a field focused), which no rune tracks, so the wait is a short timer rather than an effect. A change
+   heard meanwhile only sets the same flag, so however fast the poll runs, the reader's typing is waited out once. */
 const RETRY_MS = 1_000;
 
 /**

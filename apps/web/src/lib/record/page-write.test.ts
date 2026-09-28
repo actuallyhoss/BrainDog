@@ -299,6 +299,23 @@ const drawnAs = (rows: readonly Row[]) => rows.map((r) => r.cells.join(' '));
  * the columns read Open, Done, Doing, with the card at the head of Done. Measured against the first version of
  * `keepInPlace`: columns `[open, done, doing]` from a board that had read `[open, doing, done]` before and after.
  */
+/**
+ * A TICK IS DRAWN BEFORE IT IS SENT, and the page may read itself again while the write is out: the poll heard some other
+ * change, or the write's own re-read has not come back. That answer was read before the tick, so it still says the row is
+ * not done, and a hold that drew the answer's row drew the tick away under the reader's finger. A pending hold wears what
+ * it holds over the answer's row; once the write is read back, the answer is the truth again.
+ */
+test('A PENDING HOLD WEARS ITS TICK AND ITS COLUMN over an answer read before the write, and a settled one does not', () => {
+  const [a, b] = [ROW(1, 'a'), ROW(2, 'b')];
+  const pending = keepInPlace([a, b], [a, b], new Map([[rowKey(b.ref!), { done: true, pending: true }]]));
+  assert.equal(pending[1]!.done, true, 'the answer read before the tick drew the tick away');
+  const settled = keepInPlace([a, b], [a, b], new Map([[rowKey(b.ref!), { done: true }]]));
+  assert.equal(settled[1]!.done, undefined, 'a settled hold draws the row the record answered');
+  const before = [card(1, 'Open'), card(2, 'Open'), card(3, 'Done')];
+  const moved = keepInPlace(before, before, new Map([[rowKey(before[0]!.ref!), { to: 'Done', pending: true }]]));
+  assert.deepEqual(drawnAs(moved), ['Open card 2', 'Done card 3', 'Done card 1'], 'the card is in its new column before the record has it');
+});
+
 test('A MOVED CARD WEARS ITS NEW COLUMN at the foot of it, and the board keeps its columns in their order', () => {
   const before = [card(1, 'Open'), card(2, 'Open'), card(3, 'Doing'), card(4, 'Done')];
   /* The record answers newest write first, so the moved card comes back at the head of its new column. */

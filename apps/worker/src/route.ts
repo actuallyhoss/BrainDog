@@ -172,6 +172,9 @@ export async function copyRefusal(id: string, list: () => Promise<Result<Snapsho
   return { ok: false, refusal: { code: 'OUT_OF_BOUNDS', fix: `${id} is not one of the copies this record keeps.`, at: 'id' } };
 }
 
+/** Whether a request is the version poll: `GET /api/version`, the one call a tab makes on a clock. */
+export const pollAsked = (method: string, pathname: string): boolean => (method === 'GET' || method === 'HEAD') && /^\/+api\/+version\/*$/.test(pathname);
+
 /** `POST /api/restore`, the one method whose answer the Worker acts on after the record has given it. */
 export const restoreAsked = (method: string, pathname: string): boolean => method === 'POST' && /^\/+api\/+restore\/*$/.test(pathname);
 

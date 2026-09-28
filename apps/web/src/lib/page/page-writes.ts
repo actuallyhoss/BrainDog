@@ -17,7 +17,7 @@
  * each of them is a browser thing and the rules of a write are not.
  */
 
-import type { Row, RowRef } from 'braindog-render';
+import type { Row, RowRef, TableRow } from 'braindog-render';
 
 import { copy } from '../copy.ts';
 import { REGISTERS } from '../record/held.ts';
@@ -26,6 +26,7 @@ import type { Declared, Kept } from '../record/page-write.ts';
 import type { InputsWriter } from '../record/inputs-write.ts';
 import type { Drop } from '../record/roadmap-write.ts';
 import type { toasts } from '../ui/toast.svelte.ts';
+import { UNDO_MS } from '../data/optimistic.ts';
 
 /** The page write module, loaded on the first gesture. */
 type PageWrite = typeof import('../record/page-write.ts');
@@ -53,10 +54,25 @@ export type Held = {
   inputsKey: ((ref: RowRef, field: string) => string) | null;
   /** What the record refused about a typed field, by `inputsKey`. */
   inputSaid: ReadonlyMap<string, string>;
+  /**
+   * LINES CAPTURED AND NOT YET WRITTEN, by the list they go to, drawn at the head of every `todo` or `list` block over
+   * that list until the record has the row and the page has read it back (`captureLine`). The slug they were typed on
+   * goes with them, as `kept`'s does.
+   */
+  added: { slug: string; rows: ReadonlyMap<string, readonly Row[]> };
 };
 
 /** Nothing held: the state a page opens with. A function, so no two pages ever share one map. */
-export const heldNone = (): Held => ({ module: null, kept: { slug: '', blocks: new Map() }, inputsKey: null, inputSaid: new Map() });
+export const heldNone = (): Held => ({
+  module: null,
+  kept: { slug: '', blocks: new Map() },
+  inputsKey: null,
+  inputSaid: new Map(),
+  added: { slug: '', rows: new Map() },
+});
+
+/** Which rows of each list arrived since it was last drawn (`arrivals` in `lib/data/optimistic.ts`). */
+export type Seen = { see(list: string, keys: readonly string[]): ReadonlySet<string>; forget(): void };
 
 export type WritesDeps = {
   /** The page's address now, which a hold is taken on and a late write is checked against. */
@@ -73,6 +89,8 @@ export type WritesDeps = {
   toasts: Pick<typeof toasts, 'push'>;
   /** Where the writes keep what they hold, read fresh on every gesture. */
   state: { get(): Held; set(next: Held): void };
+  /** Marks the rows that arrived since a block was last drawn, so they are tinted for a moment. Absent, none are. */
+  arrivals?: Seen;
 };
 
 /** The writes one page makes, over what the page hands in. */
@@ -87,24 +105,108 @@ export function pageWrites(deps: WritesDeps) {
   /* AND THEY GO WHEN THE PAGE DOES. `/p/[slug]` keeps the reader across slugs, so without this a reader who left Work
      for Money and came back found Work's holds still standing, over rows the record has since moved on from. */
   function forPage(on: string) {
-    if (stored().kept.slug !== on) put({ kept: { slug: on, blocks: new Map() } });
+    if (stored().kept.slug !== on) {
+      put({ kept: { slug: on, blocks: new Map() }, added: { slug: on, rows: new Map() } });
+      deps.arrivals?.forget();
+    }
   }
 
-  /** A block's segment with its held rows where they were. Untouched until something on this page is held. */
-  function keptSegment<S extends { rows: Row[] }>(at: number, segment: S): S {
-    const { module, kept } = stored();
-    const hold = kept.slug === deps.slug() ? kept.blocks.get(at) : undefined;
-    return module && hold ? { ...segment, rows: module.keepInPlace(hold.before, segment.rows, hold.held) } : segment;
+  /**
+   * THE WRITE MODULE, FETCHED BEFORE THE FIRST GESTURE NEEDS IT. A tick is drawn the moment it is pressed only when the
+   * module that holds the row is already here; on a page's first tick it was a chunk away. `PageView` calls this once the
+   * page has drawn, so the fetch is after the page and never in its way.
+   */
+  function warm() {
+    if (!stored().module) void import('../record/page-write.ts').then((m) => put({ module: m }));
   }
 
-  /** Holds `ref` in block `at`, wearing `what`. `before` is the block as drawn now, which is the frame every place is read off. */
-  function holdRow(m: PageWrite, at: number, before: readonly Row[], ref: RowRef, what: Kept) {
+  /**
+   * A block's segment with its held rows where they were, its captured lines at its head, and the rows that arrived
+   * since it was last drawn marked. Untouched until something on this page is held, typed or new.
+   *
+   * A HELD ROW CHANGES THE BLOCK'S `raw`, which is what the primitive drops its own marks on (`ticks` in `List.svelte`,
+   * `moved` in `Grid.svelte`). The box is ticked by the primitive the instant it is pressed, and then by the hold here
+   * the instant after; without the change the primitive kept its own tick beside the hold's and, when the record refused
+   * and the hold was taken back, went on drawing the tick it no longer had, as "Not saved". Only a hold that wears
+   * something counts: a moved bar wears nothing, and its roadmap keeps its drag until the page is read again.
+   */
+  function keptSegment<S extends { rows: Row[] }>(at: number, segment: S, block?: LiveBlock): S {
+    const { module, kept, added } = stored();
+    const on = deps.slug();
+    const hold = kept.slug === on ? kept.blocks.get(at) : undefined;
+    let out: S = module && hold ? { ...segment, rows: module.keepInPlace(hold.before, segment.rows, hold.held) } : segment;
+    /* A CHECKLIST AND A BOARD ONLY: a path draws its stones from its own cell and a roadmap its bars from their days, so
+       for those the primitive's own marks are still the only drawing of the gesture until the page is read again. */
+    const kind = (segment as { kind?: unknown }).kind;
+    const worn = hold && (kind === 'todo' || kind === 'board') ? wornOf(hold.held) : '';
+    const raw = (segment as { raw?: unknown }).raw;
+    if (worn && typeof raw === 'string') out = { ...out, raw: `${raw}\u0000${worn}` };
+    const typed = added.slug === on && block?.register && (block.kind === 'todo' || block.kind === 'list') ? added.rows.get(block.register) : undefined;
+    /* AND A LINE AT THE HEAD MOVES EVERY ROW BELOW IT ONE PLACE, so it changes `raw` too: the primitive's marks are by
+       place, and a mark left where it was would sit on the row above the one it was made on. */
+    if (typed && typed.length > 0) {
+      out = { ...out, rows: [...typed, ...out.rows] };
+      const now = (out as { raw?: unknown }).raw;
+      if (typeof now === 'string') out = { ...out, raw: `${now}\u0000+${typed.length}` };
+    }
+    return marked(at, out, block);
+  }
+
+  /** The rows of `segment` that arrived since block `at` was last drawn, marked. Rows the page drew from no record row are never marked. */
+  function marked<S extends { rows: Row[] }>(at: number, segment: S, block?: LiveBlock): S {
+    const seen = deps.arrivals;
+    if (!seen) return segment;
+    const key = (row: Row): string | null => (row.ref ? `${row.ref.register}#${row.ref.seq}` : null);
+    const on = seen.see(listOf(at, block), segment.rows.flatMap((r) => key(r) ?? []));
+    if (on.size === 0) return segment;
+    return { ...segment, rows: segment.rows.map((r) => (on.has(key(r) ?? '') ? { ...r, arrived: true } : r)) };
+  }
+
+  /** A `table` block's rows with the ones that arrived since it was last drawn marked, as `keptSegment` marks a list's. */
+  function arrivedTable(at: number, rows: readonly TableRow[], block?: LiveBlock): TableRow[] {
+    const seen = deps.arrivals;
+    if (!seen) return [...rows];
+    const on = seen.see(listOf(at, block), rows.map((r) => r.key));
+    return on.size === 0 ? [...rows] : rows.map((r) => (on.has(r.key) ? { ...r, arrived: true } : r));
+  }
+
+  /* WHICH LIST A BLOCK IS, for what arrived in it: the page, the place and what the block reads, so a block added in
+     arrange mode at a place another block held is a new list with a baseline of its own, not a list of new rows. */
+  const listOf = (at: number, block?: LiveBlock): string => `${deps.slug()}#${at}#${block?.kind ?? ''}#${block?.register ?? ''}`;
+
+  /** Holds `ref` in block `at`, wearing `what`. `before` is the block as drawn now, which is the frame every place is read off. Answers what was held there before. */
+  function holdRow(m: PageWrite, at: number, before: readonly Row[], ref: RowRef, what: Kept): Kept | undefined {
     const slug = deps.slug();
     const { kept } = stored();
     const blocks = new Map(kept.slug === slug ? kept.blocks : []);
     const prior = blocks.get(at);
+    const was = prior?.held.get(m.rowKey(ref));
     blocks.set(at, { before: [...before], held: new Map(prior?.held).set(m.rowKey(ref), what) });
     put({ kept: { slug, blocks } });
+    return was;
+  }
+
+  /** Puts block `at`'s hold on `ref` back to `was`: what it held before a gesture the record refused, or nothing. */
+  function unholdRow(m: PageWrite, at: number, ref: RowRef, was: Kept | undefined) {
+    const slug = deps.slug();
+    const { kept } = stored();
+    if (kept.slug !== slug) return;
+    const prior = kept.blocks.get(at);
+    if (!prior) return;
+    const held = new Map(prior.held);
+    if (was) held.set(m.rowKey(ref), was);
+    else held.delete(m.rowKey(ref));
+    const blocks = new Map(kept.blocks);
+    if (held.size === 0) blocks.delete(at);
+    else blocks.set(at, { ...prior, held });
+    put({ kept: { slug, blocks } });
+  }
+
+  /** Block `at`'s hold on `ref`, no longer waiting on the record: it has the write and the page has read it back. */
+  function settleRow(m: PageWrite, at: number, ref: RowRef) {
+    const { kept } = stored();
+    const now = kept.slug === deps.slug() ? kept.blocks.get(at)?.held.get(m.rowKey(ref)) : undefined;
+    if (now?.pending) holdRow(m, at, kept.blocks.get(at)!.before, ref, { ...now, pending: false });
   }
 
   /**
@@ -122,40 +224,62 @@ export function pageWrites(deps: WritesDeps) {
     ref: RowRef | undefined,
     change: Change,
     title: string,
-    hold: { at: number; before: readonly Row[]; what: Kept; back: Back; undone: Kept; said: (w: PageWrite['words']) => string },
+    hold: { at: number; before: readonly Row[]; what: Kept; back: Back; undone: Kept; said: (w: PageWrite['words']) => string; early?: boolean },
   ) {
     if (!ref) return void toasts.push(copy.pageRowUnknown, { intent: 'warn' });
     /* THE PAGE THE GESTURE WAS MADE ON. A write that lands after the reader has opened another page holds nothing,
        because its place was read off a block that page does not have. */
     const on = deps.slug();
-    const m = await import('../record/page-write.ts');
-    put({ module: m });
+    const m = stored().module ?? (await import('../record/page-write.ts'));
+    if (!stored().module) put({ module: m });
+    /* DRAWN BEFORE IT IS SENT (`lib/data/optimistic.ts`), where the hold can say what the row now is: a tick's box and a
+       card's column. The row wears it over whatever the page reads meanwhile, until the record has answered and the
+       page has read the answer back; a refusal puts back what the row was held as before. */
+    const was = hold.early && on === deps.slug() ? { prior: holdRow(m, hold.at, hold.before, ref, { ...hold.what, pending: true }) } : null;
+    const undraw = () => void (was && on === deps.slug() && unholdRow(m, hold.at, ref, was.prior));
     /* THE REGISTER AS THE RECORD DECLARES IT, so a list a pack brought is ticked and moved by its own states. */
     const decl = await m.schemaOf(deps.base(), ref.register);
     const patch = change(m, ref, decl);
-    if (!patch) return void toasts.push(copy.pageRowNoState, { intent: 'warn' });
+    if (!patch) {
+      undraw();
+      return void toasts.push(copy.pageRowNoState, { intent: 'warn' });
+    }
     const out = await m.updateRow(deps.base(), ref, patch, title);
-    if (out.from !== 'written') toasts.push(out.fix, { intent: 'warn' });
+    if (out.from !== 'written') {
+      undraw();
+      toasts.push(out.fix, { intent: 'warn' });
+    }
     if (out.from === 'written') {
-      if (on === deps.slug()) holdRow(m, hold.at, hold.before, ref, { ...hold.what, version: out.version });
+      if (on === deps.slug()) holdRow(m, hold.at, hold.before, ref, { ...hold.what, version: out.version, pending: Boolean(hold.early) });
       const made: RowRef = { ...ref, version: out.version ?? ref.version };
-      toasts.push(hold.said(m.words), { intent: 'good', undo: () => void putBack(m, made, decl, title, hold) });
+      toasts.push(hold.said(m.words), { intent: 'good', undo: () => void putBack(m, made, decl, title, hold), life: UNDO_MS });
     }
     if (out.from === 'written' || out.from === 'conflict') await deps.reread();
+    if (out.from === 'written' && hold.early && on === deps.slug()) settleRow(m, hold.at, ref);
   }
 
-  /** The receipt's undo: the opposite write at the version the first one made, with the row held where it still is. */
-  async function putBack(m: PageWrite, ref: RowRef, decl: Declared | null, title: string, hold: { at: number; back: Back; undone: Kept }) {
+  /**
+   * The receipt's undo: the opposite write at the version the first one made, with the row held where it still is.
+   *
+   * DRAWN AT ONCE TOO, for a tick and a card, which wear the way back before it is sent and the change again if the
+   * record refuses it.
+   */
+  async function putBack(m: PageWrite, ref: RowRef, decl: Declared | null, title: string, hold: { at: number; back: Back; what: Kept; undone: Kept; early?: boolean }) {
+    const { kept } = stored();
+    const prior = kept.slug === deps.slug() ? kept.blocks.get(hold.at) : undefined;
+    if (hold.early && prior) holdRow(m, hold.at, prior.before, ref, { ...hold.undone, pending: true });
     const patch = await hold.back(m, ref, decl);
-    if (!patch) return;
-    const out = await m.updateRow(deps.base(), ref, patch, title);
-    if (out.from !== 'written') toasts.push(out.fix, { intent: 'warn' });
-    else {
-      const { kept } = stored();
-      const prior = kept.slug === deps.slug() ? kept.blocks.get(hold.at) : undefined;
-      if (prior) holdRow(m, hold.at, prior.before, ref, { ...hold.undone, version: out.version });
+    if (!patch) {
+      if (hold.early && prior) holdRow(m, hold.at, prior.before, ref, { ...hold.what, version: ref.version });
+      return;
     }
+    const out = await m.updateRow(deps.base(), ref, patch, title);
+    if (out.from !== 'written') {
+      toasts.push(out.fix, { intent: 'warn' });
+      if (hold.early && prior) holdRow(m, hold.at, prior.before, ref, { ...hold.what, version: ref.version });
+    } else if (prior) holdRow(m, hold.at, prior.before, ref, { ...hold.undone, version: out.version, pending: Boolean(hold.early) });
     if (out.from === 'written' || out.from === 'conflict') await deps.reread();
+    if (out.from === 'written' && hold.early) settleRow(m, hold.at, ref);
   }
 
   function moveCard(block: LiveBlock, row: Row, to: string, at: number, before: readonly Row[]) {
@@ -177,6 +301,7 @@ export function pageWrites(deps: WritesDeps) {
       back: async (_m, ref, decl) => (field ? (await import('./move-undo.ts')).moveBackOf(ref, field, to, from, decl, held) : null),
       undone: { to: from },
       said: (w) => w.moved(title, to),
+      early: true,
     });
   }
 
@@ -201,18 +326,39 @@ export function pageWrites(deps: WritesDeps) {
   async function captureLine(register: string, text: string, inherited: Record<string, string>) {
     const now = deps.now();
     if (now === null) return;
+    /* THE LINE IS ON THE LIST BEFORE IT IS WRITTEN, at the head of every checklist over the list it goes to, and it goes
+       once the page has read the row back, or at once if the record refuses it (`lib/data/optimistic.ts`). */
+    const line: Row = { cells: [text.trim()], done: false };
+    typedLine(register, line, true);
     const [{ captureRow }, { rowWriter }] = await Promise.all([import('./capture.ts'), import('../record/rows-write.ts')]);
     const row = captureRow(register, text, inherited, now);
     /* NO ROW IS A LIST WHOSE TITLE LEFT BETWEEN THE READ AND THE PRESS, because the page hands a capture a write only
        when the list declares one. It is the race it is, read again. */
     if (!row) {
+      typedLine(register, line, false);
       toasts.push(copy.writeRaced, { intent: 'warn' });
       return void (await deps.reread());
     }
     const out = await rowWriter(deps.base()).create(register, row.fields);
-    if (!out.ok) return void toasts.push(out.fix, { intent: 'warn' });
+    if (!out.ok) {
+      typedLine(register, line, false);
+      return void toasts.push(out.fix, { intent: 'warn' });
+    }
     toasts.push(row.filled.length > 0 ? copy.markAddedFilled(row.filled) : copy.writeMarkAdded, { intent: 'good' });
     await deps.reread();
+    typedLine(register, line, false);
+  }
+
+  /** A captured line drawn on the lists over `register`, or taken off them. */
+  function typedLine(register: string, line: Row, on: boolean) {
+    const slug = deps.slug();
+    const { added } = stored();
+    const rows = new Map(added.slug === slug ? added.rows : []);
+    const now = (rows.get(register) ?? []).filter((r) => r !== line);
+    if (on) now.unshift(line);
+    if (now.length > 0) rows.set(register, now);
+    else rows.delete(register);
+    put({ added: { slug, rows } });
   }
 
   /**
@@ -274,6 +420,7 @@ export function pageWrites(deps: WritesDeps) {
       back: async (_m, ref, decl) => (await import('./tick-undo.ts')).tickBackOf(ref, done, decl, held),
       undone: { done: !done },
       said: (w) => w.ticked(title, done),
+      early: true,
     });
   }
 
@@ -383,7 +530,20 @@ export function pageWrites(deps: WritesDeps) {
     return true;
   }
 
-  return { forPage, keptSegment, moveCard, capturable, captureLine, typeInto, saidOf, tickTask, rescheduleBar, onpath, stepable, addStep };
+  return { forPage, warm, keptSegment, arrivedTable, moveCard, capturable, captureLine, typeInto, saidOf, tickTask, rescheduleBar, onpath, stepable, addStep };
+}
+
+/**
+ * What a block's holds wear, as one string: the key, tick and column of every held row that wears one. It changes
+ * exactly when what the primitive should draw from the host changes, which is when its own marks must go.
+ */
+function wornOf(held: ReadonlyMap<string, Kept>): string {
+  const out: string[] = [];
+  for (const [key, kept] of held) {
+    if (kept.done === undefined && kept.to === undefined) continue;
+    out.push(`${key}:${kept.done === undefined ? '' : kept.done ? 1 : 0}:${kept.to ?? ''}:${kept.pending ? 'p' : ''}`);
+  }
+  return out.join('|');
 }
 
 /**

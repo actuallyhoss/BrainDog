@@ -29,8 +29,20 @@ import { ROUTES } from './index.ts';
 export const READ_PER_MINUTE = 600;
 export const WRITE_PER_MINUTE = 120;
 
+/**
+ * The version poll's own budget (`RL_POLL` in `wrangler.jsonc`), 240 a minute: four a second.
+ *
+ * AN OPEN TAB ASKS `/api/version` ABOUT EVERY 1.5 s WHILE IT HAS FOCUS (`apps/web/src/lib/data/live.ts`), which is 40 a
+ * minute, and on the read budget that was 40 of the 600 a person's screens, agents and re-reads share. Worse, the
+ * poll is the one call that must keep answering while the rest is busy: a screen that spent the minute on re-reads
+ * would have had its next poll refused, and the tab would sit stale for up to a minute. So the poll counts apart, at
+ * six focused tabs' worth, and spends nothing of the read budget. The answer is one `MAX(rowid)`, so a caller looping
+ * on it past this costs the record little; the ceiling is here so it costs something.
+ */
+export const POLL_PER_MINUTE = 240;
+
 /** Which budget a request spends. Separate budgets, so a burst of writes never starves reads, and not the reverse. */
-export type LimitClass = 'read' | 'write';
+export type LimitClass = 'read' | 'write' | 'poll';
 
 /** A limiter's answer: go on, or wait this many whole seconds. */
 export type Verdict = { ok: true } | { ok: false; retryAfter: number };
@@ -76,6 +88,9 @@ export function limitKey(door: LimitDoor | null, ip: string): string {
 
 const WRITES = new Set(ROUTES.filter((r) => r.writes).map((r) => r.name));
 
+/** The routes a screen polls on a clock, which spend `POLL_PER_MINUTE` and not the read budget. */
+const POLLS: ReadonlySet<string> = new Set(['version']);
+
 /**
  * Which budget a request spends, from the route table's `writes`.
  *
@@ -87,11 +102,12 @@ const WRITES = new Set(ROUTES.filter((r) => r.writes).map((r) => r.name));
  * A NAME NO ROUTE HAS IS A READ, because the router answers it `ROUTE_UNKNOWN` without touching the record.
  */
 export function classOf(route: string | undefined): LimitClass {
+  if (route !== undefined && POLLS.has(route)) return 'poll';
   return route !== undefined && WRITES.has(route) ? 'write' : 'read';
 }
 
 const WINDOW_MS = 60_000;
-const PER_MINUTE: Readonly<Record<LimitClass, number>> = { read: READ_PER_MINUTE, write: WRITE_PER_MINUTE };
+const PER_MINUTE: Readonly<Record<LimitClass, number>> = { read: READ_PER_MINUTE, write: WRITE_PER_MINUTE, poll: POLL_PER_MINUTE };
 
 /**
  * A fixed sixty-second window per key, for a host with no binding to ask.
@@ -148,11 +164,14 @@ export type RateLimitBinding = { limit(options: { key: string }): Promise<{ succ
  *
  * A BINDING THAT THROWS IS THROWN. Whether a broken limiter should open the door or close it is the door's to decide,
  * next to the rest of what it does with a failure.
+ *
+ * A POLL WITH NO `RL_POLL` SPENDS THE READ BUDGET, as it did before it had one, so a deployment that has not bound the
+ * new binding yet limits the poll exactly as it always has rather than not at all.
  */
-export function bindingLimiter(bindings: { read?: RateLimitBinding | undefined; write?: RateLimitBinding | undefined }): Limiter {
+export function bindingLimiter(bindings: { read?: RateLimitBinding | undefined; write?: RateLimitBinding | undefined; poll?: RateLimitBinding | undefined }): Limiter {
   return {
     async limit(key, cls) {
-      const binding = bindings[cls];
+      const binding = cls === 'poll' ? (bindings.poll ?? bindings.read) : bindings[cls];
       if (binding === undefined) return { ok: true };
       const { success } = await binding.limit({ key });
       return success ? { ok: true } : { ok: false, retryAfter: WINDOW_MS / 1000 };

@@ -320,15 +320,15 @@
            `div[role=row]` with `cursor: auto` and makes no promise at all, which is what this
            branch now matches. A row that cannot be activated is not a control. -->
       {#if row.href}
-        <a class="table-card" href={hrefFor({ href }, row.href)} data-intent={row.tone}>
+        <a class="table-card" href={hrefFor({ href }, row.href)} data-intent={row.tone} data-arrived={row.arrived ? '' : undefined}>
           {@render card(row)}
         </a>
       {:else if onactivate}
-        <button type="button" class="table-card" data-intent={row.tone} onclick={() => onactivate(row)}>
+        <button type="button" class="table-card" data-intent={row.tone} data-arrived={row.arrived ? '' : undefined} onclick={() => onactivate(row)}>
           {@render card(row)}
         </button>
       {:else}
-        <div class="table-card" data-intent={row.tone}>
+        <div class="table-card" data-intent={row.tone} data-arrived={row.arrived ? '' : undefined}>
           {@render card(row)}
         </div>
       {/if}
@@ -402,6 +402,7 @@
             aria-selected={selected ? selected.has(row.key) : undefined}
             data-intent={row.tone}
             data-focused={focus?.row === index ? '' : undefined}
+            data-arrived={row.arrived ? '' : undefined}
           >
             {#each columns as column, c}
               {@const value = row.cells[c] ?? null}

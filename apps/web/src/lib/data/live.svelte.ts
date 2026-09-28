@@ -18,7 +18,7 @@ import type { createClient } from '@braindog/client';
 import { dev } from '$app/environment';
 import { tick } from 'svelte';
 
-import { poller, type LiveState, type Visibility } from './live.ts';
+import { poller, Wait, type LiveState, type Visibility } from './live.ts';
 import { forget, hear, keep } from './offline.ts';
 
 /**
@@ -39,17 +39,26 @@ export const live = $state<{ state: LiveState; version: number | null; from: num
 });
 
 const timers = {
-  every(fn: () => void, ms: number): () => void {
-    const h = setInterval(fn, ms);
-    return () => clearInterval(h);
+  after(fn: () => void, ms: number): () => void {
+    const h = setTimeout(fn, ms);
+    return () => clearTimeout(h);
   },
 };
 
+/* FOCUS IS THE WINDOW'S, heard on `focus` and `blur` and read from `document.hasFocus()`, so a tab on the other monitor
+   asks at the slow interval and the one somebody is working in asks at the fast one (`live.ts`). */
 const tab: Visibility = {
   hidden: () => document.visibilityState === 'hidden',
+  focused: () => document.hasFocus(),
   watch(fn) {
     document.addEventListener('visibilitychange', fn);
-    return () => document.removeEventListener('visibilitychange', fn);
+    window.addEventListener('focus', fn);
+    window.addEventListener('blur', fn);
+    return () => {
+      document.removeEventListener('visibilitychange', fn);
+      window.removeEventListener('focus', fn);
+      window.removeEventListener('blur', fn);
+    };
   },
 };
 
@@ -69,6 +78,8 @@ function asker(base: string): () => Promise<number> {
       /* A SESSION THAT ENDED TAKES THE READ COPY WITH IT. The worker deletes it on any 401 it sees, and this covers a
          page the worker does not control yet (the first visit, before it claims the tab). */
       if ('refusal' in out && out.refusal.code === 'UNAUTHORIZED') void forget().catch(() => undefined);
+      /* A RATE LIMIT SAYS HOW LONG TO WAIT, and the poll waits that long without calling the tab offline. */
+      if ('refusal' in out && out.refusal.code === 'RATE_LIMITED') throw new Wait(Number(out.refusal.retry_after) || 60);
       throw new Error('the record did not answer its version');
     }
     return out.value.version;

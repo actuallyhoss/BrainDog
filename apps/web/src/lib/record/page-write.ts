@@ -150,7 +150,16 @@ export const rowKey = (ref: RowRef): string => `${ref.register}#${ref.seq}`;
  * What happened to a held row: the tick it now wears, or the column it now sits in as the screen spells it, and the
  * version the write answered with when the record said one.
  */
-export type Kept = { done?: boolean | undefined; to?: string | undefined; version?: number | undefined };
+export type Kept = {
+  done?: boolean | undefined;
+  to?: string | undefined;
+  version?: number | undefined;
+  /**
+   * The write is still out, or its answer not read back: the row wears this even where the page's answer still has it,
+   * because that answer was read before the write and says what the row was, not what it is (`lib/data/optimistic.ts`).
+   */
+  pending?: boolean | undefined;
+};
 
 /** The remembered copy of a row, wearing what happened to it. A board's column is its first cell, as `columnOf` reads it. */
 function wear(row: Row, kept: Kept): Row {
@@ -204,7 +213,8 @@ export function keepInPlace(before: readonly Row[], after: readonly Row[], held:
   const out = after.filter((row) => !pinned.has(keyOf(row)));
   const lanes = [...new Set(before.map((row) => row.cells[0] ?? ''))];
   for (const p of places) {
-    const now = after.find((row) => keyOf(row) === keyOf(p.row)) ?? wear(p.row, p.kept);
+    const found = after.find((row) => keyOf(row) === keyOf(p.row));
+    const now = found ? (p.kept.pending ? wear(found, p.kept) : found) : wear(p.row, p.kept);
     out.splice(p.kept.to === undefined ? Math.min(p.at, out.length) : footOf(out, lanes, now.cells[0] ?? ''), 0, now);
   }
   return out;

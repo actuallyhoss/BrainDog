@@ -73,7 +73,7 @@ import { NO_SHARE_KEY, linkOpened, opensShare, serveShared, sharedNone, type Sha
 import { bindingLimiter as linkLimiter, refusedFor as linkRefused } from '@braindog/host/limits';
 import { shareKeyOf } from './share.ts';
 import { consume, pump } from './pump.ts';
-import { afterRestore, appPath, recoverRestore, restoredOf, asPage, atRoot, cloudIngest, copyAsked, copyRefusal, drained, ingestBudget, inward, isRecordId, legacyRedirect, restoreAsked, servesAccount, servesApi, servesAuth, servesBuild, servesIn, servesKey, servesMcp, type AppPath, type CloudIngestDeps, type Restored, type Stranded } from './route.ts';
+import { afterRestore, appPath, pollAsked, recoverRestore, restoredOf, asPage, atRoot, cloudIngest, copyAsked, copyRefusal, drained, ingestBudget, inward, isRecordId, legacyRedirect, restoreAsked, servesAccount, servesApi, servesAuth, servesBuild, servesIn, servesKey, servesMcp, type AppPath, type CloudIngestDeps, type Restored, type Stranded } from './route.ts';
 import { HEALTHZ, healthz } from './health.ts';
 import { NO_MINT_SESSION, serveInbound, servesInbound } from './inbound.ts';
 import { appEntry, bearerOf, doorOf, withCookie, type BearerDeps } from './session.ts';
@@ -299,6 +299,8 @@ type Env = {
    */
   RL_READ?: RateLimitBinding;
   RL_WRITE?: RateLimitBinding;
+  /** The version poll's own budget, 240 a minute (`POLL_PER_MINUTE`). Unbound, the poll spends `RL_READ`. */
+  RL_POLL?: RateLimitBinding;
   /**
    * Cloudflare Turnstile on the sign-up page (`loop/finish/ops.md` OPS-17): the site key a var the page is handed, the
    * secret a secret `signIn()` checks each answer with. Either unset, and sign-up runs on the Directory's lockouts alone.
@@ -1709,7 +1711,11 @@ export class Record$ extends DurableObject<Env> {
     /* SLASH'S DAILY LOOK, beside the answer and not in its way: the record says whether it is due, at most once a UTC day.
        NEVER WHILE LAPSED (`loop/finish/ops.md` OPS-14): no Slash ask starts on a lapsed record, and the alarm already
        skips this call for the same reason, so a read must skip it too. */
-    if (!(await this.lapsed())) this.ctx.waitUntil(slashLook(api));
+    /* BUT NEVER FOR THE VERSION POLL. An open tab asks `/api/version` every 1.5 s while it has focus
+       (`apps/web/src/lib/data/live.ts`), and the poll is the one call that must stay one `MAX(rowid)`: a daily look
+       woken by it would put Slash's model calls behind a question that only asks whether anything changed. The alarm
+       and every other read still start it. */
+    if (!pollAsked(request.method, new URL(request.url).pathname) && !(await this.lapsed())) this.ctx.waitUntil(slashLook(api));
     /* THE METHOD ROUTER'S HANDLERS, WITH THE VAULT PASSPHRASE'S TWO ROUTES ANSWERED THROUGH THE ROOT KEY INSIDE THIS OBJECT
        (`withVaultPassphrase`), which takes the passphrase off before the record is called. Built once, so both calls
        below serve the same table. */
@@ -2459,7 +2465,7 @@ const classAt = (pathname: string): LimitClass => classOf(/^\/+api\/+([^/]+)\/*$
 async function overLimit(env: Env, door: LimitDoor | null, request: Request, cls: LimitClass): Promise<Response | null> {
   const key = limitKey(door, request.headers.get('cf-connecting-ip') ?? '');
   try {
-    const said = await bindingLimiter({ read: env.RL_READ, write: env.RL_WRITE }).limit(key, cls);
+    const said = await bindingLimiter({ read: env.RL_READ, write: env.RL_WRITE, poll: env.RL_POLL }).limit(key, cls);
     return said.ok ? null : refusedFor(said.retryAfter);
   } catch (e) {
     op({ op: 'limit', ok: false, class: cls, error: e instanceof Error ? e.message : String(e) }, 'error');

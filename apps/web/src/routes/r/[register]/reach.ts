@@ -11,3 +11,14 @@
 export const reachWords = {
   readOnly: (list: string) => `You can read ${list} but not add to it or change it.`,
 } as const;
+
+/**
+ * The receipts a list's optimistic writes raise in a toast, with their six-second Undo (`lib/data/optimistic.ts`).
+ *
+ * Past tense and the row named, as every receipt in the product is. Kept here for `reachWords`' reason: `copy.ts` is
+ * another builder's this wave.
+ */
+export const writeWords = {
+  state: (row: string, state: string) => `Set ${row} to ${state}.`,
+  edited: (field: string, row: string) => `Changed ${field} on ${row}.`,
+} as const;
