@@ -121,3 +121,29 @@ test('the record moving asks again once, and the version the screen opened on is
   opened.ask('a');
   assert.equal(opened.heard(7), false);
 });
+
+test('a quiet ask the record moving made keeps a good answer on screen when it fails, and a loud one does not', () => {
+  const m = reader<string>();
+  const first = m.ask('a');
+  assert.ok(first);
+  m.answer(first, yes('kept'));
+
+  const quiet = m.ask('a', true);
+  assert.ok(quiet);
+  assert.equal(m.answer(quiet, no('UNREACHABLE', 'The record could not be reached: offline')), true);
+  assert.deepEqual(m.now(), { state: 'ready', value: 'kept', refusal: null }, 'a failed background re-read keeps the rows');
+  const thrown = m.ask('a', true);
+  assert.ok(thrown);
+  m.failed(thrown, 'Failed to fetch');
+  assert.equal(m.now().state, 'ready', 'and so does one that threw');
+
+  const answered = m.ask('a', true);
+  assert.ok(answered);
+  m.answer(answered, yes('newer'));
+  assert.equal(m.now().value, 'newer', 'an answer still lands');
+
+  const loud = m.ask('a');
+  assert.ok(loud);
+  m.answer(loud, no('FORBIDDEN', 'Ask the owner for access.'));
+  assert.equal(m.now().state, 'refused', 'a re-read somebody asked for still shows its refusal');
+});

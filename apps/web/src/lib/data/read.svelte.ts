@@ -44,8 +44,8 @@ export function read<T>(
   const out = new Map<number, number>();
   let gone = false;
 
-  async function ask(k: string | null): Promise<void> {
-    const ticket = m.ask(k);
+  async function ask(k: string | null, quiet = false): Promise<void> {
+    const ticket = m.ask(k, quiet);
     now = m.now();
     if (ticket === null || gone) return;
     const at = opened();
@@ -76,7 +76,7 @@ export function read<T>(
   $effect(() => {
     const v = live.version;
     untrack(() => {
-      if (m.heard(v)) void ask(asking);
+      if (m.heard(v)) void ask(asking, true);
     });
   });
 

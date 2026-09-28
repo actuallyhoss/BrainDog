@@ -16,25 +16,31 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { poller, type LiveState, type Timers, type Visibility } from './live.ts';
+import { delayOf, poller, Wait, type LiveState, type Timers, type Visibility } from './live.ts';
 
-/** A clock that only moves when told to, and fires each interval as often as the time it moved covers. */
-function clock(): Timers & { advance(ms: number): void } {
+/**
+ * A clock that only moves when told to, and fires each timer that falls due inside the time it moved.
+ *
+ * ONE-SHOT, AS THE POLL'S ARE: the poll sets its next timer when an answer lands, so a timer fired here asks, and the
+ * next one exists only after `settle` lets the answer through. `advance` then moves the rest of the way.
+ */
+function clock(): Timers & { advance(ms: number): void; now(): number } {
   let now = 0;
-  const running = new Set<{ fn: () => void; ms: number; next: number }>();
+  const running = new Set<{ fn: () => void; at: number }>();
   return {
-    every(fn, ms) {
-      const t = { fn, ms, next: now + ms };
+    now: () => now,
+    after(fn, ms) {
+      const t = { fn, at: now + ms };
       running.add(t);
       return () => running.delete(t);
     },
     advance(ms) {
       const until = now + ms;
       for (;;) {
-        const due = [...running].filter((t) => t.next <= until).sort((a, b) => a.next - b.next)[0];
+        const due = [...running].filter((t) => t.at <= until).sort((a, b) => a.at - b.at)[0];
         if (!due) break;
-        now = due.next;
-        due.next += due.ms;
+        running.delete(due);
+        now = due.at;
         due.fn();
       }
       now = until;
@@ -42,11 +48,12 @@ function clock(): Timers & { advance(ms: number): void } {
   };
 }
 
-/** A tab that is hidden or not, and says so to whoever is listening. */
-function tab(hidden: boolean): Visibility & { set(hidden: boolean): void } {
+/** A tab that is hidden or not and focused or not, and says so to whoever is listening. */
+function tab(hidden: boolean, focused?: boolean): Visibility & { set(hidden: boolean): void; focus(on: boolean): void } {
   const heard = new Set<() => void>();
   return {
     hidden: () => hidden,
+    ...(focused === undefined ? {} : { focused: () => focused === true }),
     watch(fn) {
       heard.add(fn);
       return () => heard.delete(fn);
@@ -55,7 +62,19 @@ function tab(hidden: boolean): Visibility & { set(hidden: boolean): void } {
       hidden = next;
       for (const fn of heard) fn();
     },
+    focus(on) {
+      focused = on;
+      for (const fn of heard) fn();
+    },
   };
+}
+
+/** Move the clock `ms` in steps of `step`, letting every answer land after each, which is how time passes for a poll. */
+async function run(timers: ReturnType<typeof clock>, ms: number, step = 100) {
+  for (let t = 0; t < ms; t += step) {
+    timers.advance(Math.min(step, ms - t));
+    await settle();
+  }
 }
 
 /** An `ask` that answers from a script, one entry per call, and counts the calls. A string is a failure. */
@@ -143,13 +162,79 @@ test('a failed ask is offline, an answer is open, and each is said once', async 
   timers.advance(15_000);
   await settle();
   assert.deepEqual(states, ['offline']);
-  timers.advance(15_000);
+  /* THE SECOND ASK WAITS TWICE AS LONG, because the first failed. */
+  timers.advance(30_000);
   await settle();
   assert.deepEqual(states, ['offline'], 'a second failure changes nothing on screen');
-  timers.advance(15_000);
+  timers.advance(60_000);
   await settle();
   assert.deepEqual(states, ['offline', 'open']);
   assert.deepEqual(heard, [5], 'and what was written while it was down is a change like any other');
+  stop();
+});
+
+test('a focused tab asks about every 1.5 s, a blurred one every 15 s, and taking focus asks at once', async () => {
+  const timers = clock();
+  const t = tab(false, true);
+  const a = asker([1]);
+  const stop = poller({ ask: a.ask, timers, visible: t, onChange: () => {} });
+  await settle();
+  assert.equal(a.calls, 1);
+  await run(timers, 15_000);
+  assert.equal(a.calls, 11, 'fifteen seconds focused is ten more asks');
+  t.focus(false);
+  await run(timers, 14_000);
+  assert.equal(a.calls, 11, 'without focus the next ask is fifteen seconds off');
+  await run(timers, 1_000);
+  assert.equal(a.calls, 12);
+  t.focus(true);
+  await settle();
+  assert.equal(a.calls, 13, 'focus back is one ask at once');
+  await run(timers, 1_500);
+  assert.equal(a.calls, 14, 'and the fast interval from there');
+  stop();
+});
+
+test('failures back off by doubling to a minute, and one answer brings the interval back', async () => {
+  assert.equal(delayOf(1_500, 0, 60_000, null), 1_500);
+  assert.equal(delayOf(1_500, 1, 60_000, null), 3_000);
+  assert.equal(delayOf(1_500, 3, 60_000, null), 12_000);
+  assert.equal(delayOf(1_500, 9, 60_000, null), 60_000, 'never longer than a minute');
+  assert.equal(delayOf(1_500, 1, 60_000, 20), 20_000, 'and never shorter than a 429 asked for');
+
+  const timers = clock();
+  const a = asker([1, 'down', 'down', 'down', 2]);
+  const stop = poller({ ask: a.ask, timers, visible: tab(false, true), onChange: () => {} });
+  await settle();
+  const at: number[] = [];
+  let seen = a.calls;
+  for (let ms = 0; ms < 40_000; ms += 100) {
+    timers.advance(100);
+    await settle();
+    if (a.calls !== seen) (seen = a.calls), at.push(timers.now());
+  }
+  assert.deepEqual(at.slice(0, 5), [1_500, 4_500, 10_500, 22_500, 24_000], 'failing at 1.5, then 3, 6 and 12 s apart, and 1.5 s again once it answers');
+  stop();
+});
+
+test('a 429 is not offline, and the next ask waits as long as it said', async () => {
+  const timers = clock();
+  const states: LiveState[] = [];
+  let calls = 0;
+  const ask = async () => {
+    calls++;
+    if (calls === 2) throw new Wait(20);
+    return 1;
+  };
+  const stop = poller({ ask, timers, visible: tab(false, true), onChange: () => {}, onState: (s) => states.push(s) });
+  await settle();
+  await run(timers, 1_500);
+  assert.equal(calls, 2);
+  await run(timers, 19_900);
+  assert.equal(calls, 2, 'nothing asked inside the twenty seconds');
+  await run(timers, 200);
+  assert.equal(calls, 3);
+  assert.deepEqual(states, [], 'and the hairline never said offline');
   stop();
 });
 
