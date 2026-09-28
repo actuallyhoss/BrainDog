@@ -42,19 +42,19 @@ Where | beside the record | in its snapshots folder
 
 A table with real columns. The first row is the header and fixes how many columns every row has. Use it for choices side by side.
 
-```comparison | Two ways to run BrainDog
- | Hosted | Your own server
-Where it runs | brain.dog | a machine you run
-Backups | taken for you | nightly, beside the record
-Updates | arrive on their own | when you pull and restart
+```comparison | Cloud and Cloud Plus
+ | Cloud | Cloud Plus
+Runs a month | 15,000 | 60,000
+Requests a month | 150,000 | 600,000
+Data fetched a month | 1 GB | 5 GB
 ```
 
 ~~~code | As written
-```comparison | Two ways to run BrainDog
- | Hosted | Your own server
-Where it runs | brain.dog | a machine you run
-Backups | taken for you | nightly, beside the record
-Updates | arrive on their own | when you pull and restart
+```comparison | Cloud and Cloud Plus
+ | Cloud | Cloud Plus
+Runs a month | 15,000 | 60,000
+Requests a month | 150,000 | 600,000
+Data fetched a month | 1 GB | 5 GB
 ```
 ~~~
 

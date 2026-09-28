@@ -14,8 +14,6 @@ A token in the address | The app mints a random token for the door and shows the
 A signature | The sender signs the body with a shared key kept in your vault: an HMAC-SHA256 under a header the door names, GitHub's X-Hub-Signature-256, or Stripe's own signature | /in/webhook/<record id>/<door>
 ```
 
-On your own server, which serves one record, the address is `/in/webhook/<door>` and the declaration's check is the only one.
-
 ```code | sh
 curl -s -X POST "https://brain.dog/in/webhook/<record id>/<door>/<token>" -H "content-type: application/json" -d '{"amount": 1200, "currency": "USD", "from": "Northwind"}'
 ```

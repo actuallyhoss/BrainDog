@@ -26,9 +26,9 @@ Export stays available when a record is read-only because its payment lapsed. Yo
 
 ## Backups
 
-Your record is backed up every night. On the Cloud, the 30 newest are kept, plus the latest. On a self-hosted record the backups are kept on your own machine. The owner can also press **Back up now**, and download any backup from the list.
+Your record is backed up every night. The 30 newest are kept, plus the latest. The owner can also press **Back up now**, and download any backup from the list.
 
-Backups are sealed with a key that is not inside them, kept outside the product on purpose. On a self-host that key is the key file you made when you set the record up: copy it somewhere else, or the backups cannot be opened.
+Backups are sealed with a key that is not inside them, kept outside the product on purpose.
 
 Going back to a backup is asked for, not pressed. Nothing in the app can put a record back to how it was, so a restore is something you ask the host for.
 

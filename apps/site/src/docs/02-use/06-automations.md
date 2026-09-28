@@ -78,7 +78,7 @@ Press **Resume** on a paused action to run it again.
 
 ## Automations and your plan
 
-Runs of automations, scheduled actions and scripts count against the month's runs on a hosted record, and requests and data fetched from other services count too. [Usage and limits](/docs/use/usage) shows each against your plan. A self-hosted record counts them and sets no limit.
+Runs of automations, scheduled actions and scripts count against the month's runs, and requests and data fetched from other services count too. [Usage and limits](/docs/use/usage) shows each against your plan.
 
 ## Agents can draw them too
 

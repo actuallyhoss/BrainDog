@@ -58,7 +58,7 @@ For somebody who should see one page and nothing else, press **Share** on the pa
 
 ## Agents have levels too
 
-An agent you connect works at a level too: read only, read and propose changes that wait for you, or read and change rows directly. Its name stays on every change it makes. Connecting one is covered in [Agents](/docs/agents).
+An agent you connect works at a level too: read only, read and propose changes that wait for you, or read and change rows directly. Its name stays on every change it makes. Connecting one is covered in [Agents](/docs/agents/connect).
 
 ## Share how you work, without the rows
 

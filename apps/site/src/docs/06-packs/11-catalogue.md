@@ -47,7 +47,3 @@ braindog pack publish reading-list/reading-list.pack.json --to ./catalogue
 ```
 
 `--to <folder>` adds a version to a catalogue folder: an `index.json` and each version's file under `packs/<id>/`. It is held to the same rules as the Kennel: never a version already there, never an earlier one, and a major for anything taken away. Serve the folder from any address, and a record installs from it with `--from`. The Kennel is laid out the same way, which is why one reader serves both.
-
-## On a server of your own
-
-A self-hosted BrainDog offers the catalogue bundled with its app unless `BRAINDOG_CATALOGUE` names a folder of your own, and then the public Kennel at `https://brain.dog/api/kennel/v1/`. `BRAINDOG_KENNEL` names another Kennel, or `off` for none, for a server with no way out to the internet. The folder is read first, so an id in it wins over the same id on the Kennel. [Self-hosting](/docs/selfhost/overview) has the rest of the settings.

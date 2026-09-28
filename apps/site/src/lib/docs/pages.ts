@@ -10,7 +10,7 @@
 import { parse, type Segment } from 'braindog-render';
 
 /** The sections, in the order the docs are read (site.md C7). A folder is `NN-<section>`, numbered from 01. */
-export const SECTIONS = ['start', 'use', 'agents', 'api', 'dialect', 'packs', 'selfhost'] as const;
+export const SECTIONS = ['start', 'use', 'agents', 'api', 'dialect', 'packs'] as const;
 export type Section = (typeof SECTIONS)[number];
 
 /** Where the pages live in the repository, for the link that edits one. */

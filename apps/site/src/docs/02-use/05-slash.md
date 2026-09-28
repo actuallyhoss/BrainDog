@@ -41,8 +41,6 @@ When the month's asks are spent, Slash says so, and says when they reset. Two wa
 
 In Settings, under Agents, the owner can give Slash a key from a model provider of their own. Asks on your own key are billed by that provider, so Slash lists them and sets no limit.
 
-On a self-hosted record, Slash answers only where a model is set up. A host with no model has no Slash, and says so.
-
 ## What Slash can and cannot do
 
 ```comparison | Slash, and your agents
@@ -53,7 +51,7 @@ What it writes | Nothing directly. Every change is a proposal on Decide | Propos
 Who pays for it | Your plan's asks, or your own key | Your agent's own provider
 ```
 
-Agents are covered in [Agents](/docs/agents).
+Agents are covered in [Agents](/docs/agents/connect).
 
 ## The palette, without Slash
 

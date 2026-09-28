@@ -67,4 +67,4 @@ Installing one shows each service it will call, with which key and how often, be
 
 ## Agents and the Inbox
 
-An agent you connect reads the Inbox only if you allowed it to when you connected it. It can then read the arrivals no rule has filed yet, and it cannot file or archive them. See [Agents](/docs/agents).
+An agent you connect reads the Inbox only if you allowed it to when you connected it. It can then read the arrivals no rule has filed yet, and it cannot file or archive them. See [Agents](/docs/agents/connect).

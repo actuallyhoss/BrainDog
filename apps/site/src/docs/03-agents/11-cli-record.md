@@ -1,6 +1,6 @@
 # The command line: automations and files
 
-The last of `braindog`: automations and scripts, the record as one file you can keep, check and put back, another tool's export brought in, and a record on your own machine. [The first page](/docs/agents/cli) covers signing in, keys and sessions.
+The last of `braindog`: automations and scripts, the record as one file you can keep, check and put back, and another tool's export brought in. [The first page](/docs/agents/cli) covers signing in, keys and sessions.
 
 ## Automations and scripts
 
@@ -34,16 +34,6 @@ braindog import <adapter> export.json
 ```
 
 `import` with an adapter moves another tool's export into your record: the adapter is a pack that knows that tool's shape. Running it again updates what it added rather than adding it twice, and no key's value is ever read from the export. `--dry-run` says what it would do and writes nothing.
-
-## Your own server
-
-```comparison | Self-hosting
-Command | What it does
-braindog init <slug> --owner <email> | Create a record on this machine
-braindog serve [<record file>] | Serve it, through the self-host
-```
-
-A record you serve yourself takes the same commands, with `--host` pointing at your server.
 
 ## Set up a machine
 

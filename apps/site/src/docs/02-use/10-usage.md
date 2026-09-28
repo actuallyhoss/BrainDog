@@ -1,6 +1,6 @@
 # Usage and limits
 
-A hosted record includes a month of work: automation and script runs, requests to other services, data fetched, script time, and Slash asks. **Usage** shows where this month stands against each, and what happens when one runs out. A self-hosted record counts the same things and sets no limit.
+Your record includes a month of work: automation and script runs, requests to other services, data fetched, script time, and Slash asks. **Usage** shows where this month stands against each, and what happens when one runs out.
 
 ## What a plan includes
 
@@ -40,7 +40,7 @@ When Slash's asks run out, Slash says when they reset and offers two ways on: us
 
 ## Limits that hold everywhere
 
-These are true on every record, hosted or self-hosted:
+These are true on every record:
 
 ```comparison | Other limits
 What | Limit
@@ -58,5 +58,3 @@ Forwarding addresses for mail | One per record at a time
 ## When a payment does not go through
 
 Billing belongs to the record's owner, in Settings under Billing. If a payment fails, Stripe tries again, and Billing asks you to update the card. A record that stays unpaid becomes read-only, and Billing says the day it will be deleted unless it is paid. Export is always available, whatever the record's state, so your rows are never held back from you. See [Export and deleting](/docs/use/export-and-delete).
-
-A self-hosted record has nothing to bill and no subscription to lapse.
