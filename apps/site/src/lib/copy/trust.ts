@@ -70,7 +70,7 @@ export const trust = {
         'What you did, step by step, and what you expected to happen.',
         'What happened instead, with the exact words of any message BrainDog showed.',
         'Where it happened: the address in the browser, or the command you ran.',
-        'Which browser, or which version of the command line, and whether you use brain.dog or your own copy.',
+        'Which browser, or which version of the command line, and the name of the record it happened in.',
         'Leave out passwords, keys and tokens. A report never needs one.',
       ],
     },
