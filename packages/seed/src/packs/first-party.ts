@@ -272,13 +272,17 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  * - people 2.3.0: `rule.meet-senders` meets whoever a mail arrives from, on by default, as an agent's own `meet`
  *   already does for a commit; `page.someone` draws the person's `met` lines, which `page.people`'s cards still leave
  *   out. A declaration is added and nothing is taken away, so the step is a minor one.
+ * - people 2.3.1 and work 1.9.1: NOTHING NEW IS DECLARED, as at money-core 1.4.0. A record set up for a use case before
+ *   `planShared` held the whole batch built People and Work beside Portfolio as though Projects were not coming, and
+ *   left out Met in, Project and Owner for good. A record holding a pack at its offered version is offered no change,
+ *   so this step is what lets such a record take the update and have the links put back, and nothing else moves.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.5.0',
-  people: '2.3.0',
+  people: '2.3.1',
   'money-core': '3.1.0',
   estate: '2.0.0',
-  work: '1.9.0',
+  work: '1.9.1',
 };
 
 type Body = Record<string, unknown>;

@@ -27,6 +27,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     },
   ],
   people: [
+    { version: '2.3.1', notes: 'People now links each person to the projects you met them in on a BrainDog set up before this fix.' },
     {
       version: '2.3.0',
       notes:
@@ -57,6 +58,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '1.3.0', notes: 'Services says who a row is with, where it said a registrar.' },
   ],
   work: [
+    { version: '1.9.1', notes: 'Tasks and threads now say which project they are for and who holds them on a BrainDog set up before this fix.' },
     {
       version: '1.9.0',
       notes:

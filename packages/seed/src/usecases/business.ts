@@ -43,7 +43,7 @@ export const BUSINESS = {
   /* 1.2.0 BECAUSE IT GAINS A PACK AND A PAGE, its own Home, where it had none: a declaration added is a minor step.
      1.3.0 BECAUSE IT GAINS A VOICE, three of Home's lines said as a business says them (PGS-24), each a new setting a
      person can change at /packs. */
-  version: '1.3.0',
+  version: '1.3.1',
   title: 'Small business',
   summary: 'What your clients owe you and what you owe, the hosting and subscriptions you run on, the people involved and the work.',
   author: 'BrainDog',

@@ -2104,7 +2104,17 @@ export async function importCommand(args: string[], io: AgentIo, given?: string,
   const send: typeof fetch = async (input, init) => {
     const sent = new Headers(init?.headers);
     for (const [name, value] of Object.entries(headers)) sent.set(name, value);
-    return fetch(input, { ...init, headers: sent, signal: AbortSignal.timeout(ms), redirect: 'error' });
+    /* A 429 IS WAITED OUT, not written down as a refusal. A record answers a caller as many requests as a minute allows,
+       and an import of a few thousand rows is past that in its first minute: the the old tool import of 28 September had
+       400 rows refused RATE_LIMITED and exited 1 with a third of its lists half-carried. The record says when to come
+       back in `retry-after`, and the request is sent again then, the same body, up to the tenth time. */
+    for (let tries = 1; ; tries++) {
+      const res = await fetch(input, { ...init, headers: sent, signal: AbortSignal.timeout(ms), redirect: 'error' });
+      if (res.status !== 429 || tries >= 10) return res;
+      const after = Number(res.headers.get('retry-after'));
+      await res.body?.cancel();
+      await new Promise((done) => setTimeout(done, Math.min(Number.isFinite(after) && after > 0 ? after : 5, 65) * 1000));
+    }
   };
   const client = createClient({ base: to.base, ...(to.token ? { token: to.token } : {}), fetch: send });
   const door: Door = {

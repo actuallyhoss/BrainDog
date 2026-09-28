@@ -642,6 +642,15 @@ const DECLARED: Record<string, Version> = {
       "Small business now carries a pack: `page.home-business` shows what you have, what is due this week and what needs your call -> f897dcb6d0161fe1",
     ],
   },
+  'business@1.3.1': {
+    holds: `
+      page.home-business
+      setting.shared_version setting.speaks
+      setting.voice_coming_up setting.voice_fills_with setting.voice_nothing_due
+    `,
+    declares: '2eedf30c3ef15c77',
+    history: ["`page.home-business`'s Working now table labels its columns where it gave them card roles, which only a cards block reads and the record refused -> 2eedf30c3ef15c77"],
+  },
   'business@1.3.0': {
     holds: `
       page.home-business

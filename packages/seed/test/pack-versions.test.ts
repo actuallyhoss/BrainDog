@@ -559,6 +559,19 @@ const DECLARED: Record<string, Version> = {
       'Work is called Work and its Overview leads with a capture line; the lists of yours and the Board are ordered by tier then due; it adds `project-dated` for a timeline of the next two weeks and a heat of what was done in twelve weeks, and a queue of what agents ask about tasks; tasks gain an optional `why` and `register.tasks` declares `hand` (`person: owner, agent: agent, taken: doing`), so a task can be handed to an agent even on a record with no People -> 03c89c8b18be3c6d',
     ],
   },
+  'work@1.9.1': {
+    holds: `
+      metric.open-tasks metric.project-dated metric.project-done-7d metric.project-due-soon metric.project-in-review
+      metric.project-open metric.tasks-done-7d metric.tasks-done-7d-agents metric.tasks-done-by-week metric.tasks-due-7d
+      metric.tasks-due-by-week metric.tasks-later metric.tasks-overdue metric.tasks-waiting metric.tasks-with-agents
+      page.work page.work-board
+      register.tasks register.tracks register.updates
+      rule.close_follow_ups rule.start_with_parent
+      script.close_follow_ups script.start_with_parent
+    `,
+    declares: '03c89c8b18be3c6d',
+    history: ['Nothing new is declared: the step lets a record whose links were left out when a use case installed it take the update, which puts the `thing` and `owner` of `register.tasks` back -> 03c89c8b18be3c6d'],
+  },
   'people@2.0.0': {
     holds: ` page.people register.people `,
     declares: 'a197d208773e19c1',
@@ -587,6 +600,11 @@ const DECLARED: Record<string, Version> = {
       '`rule.meet-senders` meets whoever a mail arrives from, on by default; `page.someone` draws the person\'s `met` lines, which `page.people`\'s cards still leave out -> bf5edef4966a36eb',
       'The `met` lines move off the cards block, which takes at most three facts and already has `role`, `projects` and `email`, onto their own `note` block on `page.someone` -> fd9751362adfd6e0',
     ],
+  },
+  'people@2.3.1': {
+    holds: ` page.people page.someone register.people rule.meet-senders `,
+    declares: 'fd9751362adfd6e0',
+    history: ['Nothing new is declared: the step lets a record whose links were left out when a use case installed it take the update, which puts the `projects` of `register.people` back -> fd9751362adfd6e0'],
   },
   'estate@1.1.0': {
     holds: `
