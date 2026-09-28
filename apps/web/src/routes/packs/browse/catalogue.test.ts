@@ -95,8 +95,8 @@ test('standing against the latest, and what changed from the version installed',
   assert.equal(await changesSince(fetcher, entry, '0.9.0'), null);
 });
 
-const BOOKS = { register: 'books', name: 'Books', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] };
-const SHELF = { page: 'shelf', title: 'Shelf', requires: ['register.books'], blocks: [{ kind: 'table', source: 'register.books', span: 12 }] };
+const BOOKS = { register: 'library', name: 'Books', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] };
+const SHELF = { page: 'shelf', title: 'Shelf', requires: ['register.library'], blocks: [{ kind: 'table', source: 'register.library', span: 12 }] };
 const addon = (version: string, declarations: Record<string, unknown>[]) =>
   JSON.stringify({ pack: 'bookshelf', version, title: 'Bookshelf', summary: 'Books you own.', author: 'Halden', license: 'MIT', declarations });
 

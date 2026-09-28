@@ -21,7 +21,7 @@ const value = <T>(r: unknown): T => {
   return x.value as T;
 };
 
-const BOOKS = { register: 'books', name: 'Books', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] };
+const BOOKS = { register: 'library', name: 'Books', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] };
 const MEETINGS = { register: 'meetings', name: 'Meetings', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] };
 const file = (version: string, declarations: Record<string, unknown>[]) => {
   const built = exportUseCase({ usecase: 'club', version, title: 'Reading club', summary: 'Books.', author: 'Halden', license: 'MIT', audience: 'other', tone: 'plain', modules: [], voice: {}, labels: {}, declarations, examples: [] });

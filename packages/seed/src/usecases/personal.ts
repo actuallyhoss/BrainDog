@@ -27,6 +27,8 @@
  * from a sentence that names pay, in the currency the sentence names (`payDayRow`).
  */
 
+import { exponentOf } from '@braindog/kernel';
+
 /** Money's lists that hold a day something falls due, as the `deadlines` source names them (`list is ...`). */
 const MONEY_DUE = 'list is obligations or recurring or installments';
 
@@ -674,7 +676,7 @@ const escapeText = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&
 
 /** A sum in minor units of `currency`, shifted by that currency's own decimals, or `null` for one it cannot hold. */
 function minorOf(whole: string, part: string | undefined, thousand: boolean, currency: string): number | null {
-  const places = new Intl.NumberFormat('en', { style: 'currency', currency }).resolvedOptions().maximumFractionDigits ?? 2;
+  const places = exponentOf(currency);
   if (!thousand && part !== undefined && part.length > places) return null;
   const n = Number(`${whole.replace(/,/g, '')}${part === undefined ? '' : `.${part}`}`) * (thousand ? 1000 : 1);
   const out = Math.round(n * 10 ** places);

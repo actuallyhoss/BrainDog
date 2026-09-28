@@ -1,8 +1,9 @@
 {
   "pack": "reading-list",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "title": "Reading list",
   "summary": "Books and articles to read, what you are reading now, and a line on each one you finish.",
+  "changes": "readings no longer declares a field named title: the kernel keeps that name for the record's own. It is now name, still what each row is titled by.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": { "format": 1, "primitives": 1, "packs": {} },
@@ -10,9 +11,9 @@
     {
       "register": "readings",
       "name": "Readings",
-      "title": "title",
+      "title": "name",
       "fields": [
-        { "id": "title", "type": "text", "required": true },
+        { "id": "name", "type": "text", "required": true },
         { "id": "by", "type": "text" },
         { "id": "kind", "type": "enum", "values": ["book", "article", "paper"], "default": "book" },
         { "id": "state", "type": "enum", "values": ["queued", "reading", "finished"], "default": "queued" },
@@ -34,7 +35,7 @@
           "source": "register.readings",
           "where": "state is reading",
           "columns": [
-            { "field": "title", "label": "Title", "width": "minmax(20ch,1fr)" },
+            { "field": "name", "label": "Title", "width": "minmax(20ch,1fr)" },
             { "field": "by", "label": "By", "width": "20ch" }
           ],
           "limit": 20,
@@ -47,7 +48,7 @@
           "source": "register.readings",
           "where": "state is queued",
           "columns": [
-            { "field": "title", "label": "Title", "width": "minmax(20ch,1fr)" },
+            { "field": "name", "label": "Title", "width": "minmax(20ch,1fr)" },
             { "field": "kind", "label": "Kind", "width": "12ch" }
           ],
           "limit": 50,
@@ -60,7 +61,7 @@
           "source": "register.readings",
           "where": "state is finished",
           "columns": [
-            { "field": "title", "label": "Title", "width": "minmax(20ch,1fr)" },
+            { "field": "name", "label": "Title", "width": "minmax(20ch,1fr)" },
             { "field": "finished", "label": "Finished", "width": "14ch", "align": "end" }
           ],
           "order": [{ "field": "finished", "dir": "desc" }],

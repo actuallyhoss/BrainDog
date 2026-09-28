@@ -65,7 +65,7 @@
   let recordRefused = $state<string | null>(null);
 
   /* AN ADDRESS WITH NO `?kind=` IS READ AS A USE CASE FIRST, for the links written before add-ons had pages, and then as
-     whatever else goes by that id: `/packs/browse/launch-desk` said "nothing here by that name" for an add-on the
+     whatever else goes by that id: `/packs/browse/reading-list` said "nothing here by that name" for an add-on the
      catalogue lists (design.md §2.8). A kind that is said is kept to. */
   const listing = $derived.by(() => {
     const all = listingsOf({ kennel, counts });

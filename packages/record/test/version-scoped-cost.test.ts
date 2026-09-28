@@ -56,7 +56,8 @@ async function studio() {
       return rows;
     },
   };
-  const api = await createRecordApi({ sql: counted, clock: fixedClock(Date.UTC(2026, 8, 22, 12)) });
+  const clock = fixedClock(Date.UTC(2026, 8, 22, 12));
+  const api = await createRecordApi({ sql: counted, clock });
   assert.ok((await api.kernel.install([OBLIGATIONS, DIARY])).ok);
   assert.ok(
     api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_1' } }).ok,
@@ -77,7 +78,7 @@ async function studio() {
   const diary = async (n: number): Promise<void> => {
     for (let i = 0; i < n; i++) value(await api.create({ register: 'diary', fields: { body: `Dinner ${i}` } }, owner));
   };
-  return { sql, api, mo, invoice: invoice.seq, at, cold, cost, diary };
+  return { sql, api, mo, invoice: invoice.seq, at, cold, cost, diary, clock };
 }
 
 test('(1) A MEMBER WHO ASKS AGAIN IS NOT WALKED DOWN EVERY DIARY ROW TO HER OWN LINE', async () => {
@@ -97,7 +98,7 @@ test('(1) A MEMBER WHO ASKS AGAIN IS NOT WALKED DOWN EVERY DIARY ROW TO HER OWN 
 });
 
 test('(2) THE REMEMBERED ANSWER IS THE ONE A COLD WALK GIVES, after every kind of write', async () => {
-  const { sql, api, mo, invoice, at, cold, diary } = await studio();
+  const { sql, api, mo, invoice, at, cold, diary, clock } = await studio();
   await diary(20);
   const start = await at(mo);
   assert.equal(start, await cold(mo));
@@ -106,6 +107,10 @@ test('(2) THE REMEMBERED ANSWER IS THE ONE A COLD WALK GIVES, after every kind o
   assert.equal(await at(mo), start, 'Diary rows she may not read moved her version');
   assert.equal(await at(mo), await cold(mo));
 
+  /* PAST THE CREATOR'S OWN GRACE WINDOW (docs/02 §8, three minutes), so this edit writes its own line
+     rather than folding into the create: what this case measures is the cache on an edit's own line,
+     not the fold's separate one-line-only rewrite (session.test.ts covers that). */
+  clock.advance(3 * 60_000 + 1);
   value(await api.update({ register: 'obligations', seq: invoice, patch: { what: 'Invoice 41, paid' } }, owner));
   const edited = await at(mo);
   assert.notEqual(edited, start, 'an edit to a line she reads did not move her version');

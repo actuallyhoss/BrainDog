@@ -3,14 +3,14 @@
     {
       "list": "readings",
       "fields": {
-        "title": "A book about bridges",
+        "name": "A book about bridges",
         "by": "A. Writer"
       }
     },
     {
       "list": "readings",
       "fields": {
-        "title": "An article on tides",
+        "name": "An article on tides",
         "kind": "article",
         "state": "reading"
       }
@@ -18,7 +18,7 @@
     {
       "list": "readings",
       "fields": {
-        "title": "A paper on soil",
+        "name": "A paper on soil",
         "kind": "paper",
         "state": "finished",
         "finished": "2026-09-20",

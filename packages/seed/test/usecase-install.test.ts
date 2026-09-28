@@ -162,14 +162,22 @@ test("A USE CASE'S HOME OPENS, every block readable, with its headings in the re
 
   const founder = await made('founder');
   const blocks = value<{ blocks: Drawn[] }>(founder.k.page(homePageOf('founder'))).blocks;
-  /* WHAT IS DUE AND WHAT IS LAPSING SIT UNDER THE FIGURES SINCE FOUNDER 1.5.0 (`founder-home.test.ts`). Both are empty on a
-     new record: the example bill falls due in nine days, one past the week, and no example service is lapsing. So the
-     row count below is found by heading, because by position it had come to read "Due this week" and counted nothing. */
-  assert.deepEqual(blocks.map((b) => b.heading), ['The numbers', 'Due this week', 'Lapsing', 'Latest numbers', 'Organisations']);
+  /* WHAT IS DUE AND WHAT IS LAPSING SIT UNDER THE FIGURES SINCE FOUNDER 1.5.0 (`founder-home.test.ts`), AND HOME LEADS
+     WITH WHAT YOU HAVE SINCE 1.7.0 (`loop/finish/modules.md` MOD-18): the money there is, by book once there are two
+     or by organisation, then the week's numbers, then what is due, lapsing and working now. `page.home-founder` holds
+     one pair of blocks each for "what you have" and "Numbers this week", gated by `when` on how many books there are
+     and whether a project has reported, so a record with one book and no report draws the first of each pair; the
+     other member of each pair is read here with `drawn`, not left out, the same way the guide's Home is above. Both
+     are empty on a new record: the example bill falls due in nine days, one past the week, and no example service is
+     lapsing. So the row count below is found by heading, because by position it had come to read "Due this week" and
+     counted nothing. */
+  const drawnBlocks = blocks.filter((b) => (b as { drawn?: boolean }).drawn !== false);
+  assert.deepEqual(drawnBlocks.map((b) => b.heading), ['What you have', 'What you have, by organisation', 'Bring your money in', 'Numbers this week', 'Due this week', 'Lapsing', 'Working now']);
   for (const b of blocks) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
-  for (const cell of blocks[0]!.readings ?? []) assert.ok(cell.reading && cell.reading.value !== null && !cell.refusal, `${cell.metric} cannot be worked out`);
-  const rowsUnder = (heading: string): number | undefined => blocks.find((b) => b.heading === heading)?.rows?.length;
-  assert.equal(rowsUnder('Latest numbers'), 1);
+  /* `runway-days` HAS NO VERDICT ON A RECORD THIS YOUNG: it walks 365 days of balance and a record made today has
+     none, so its own reading answers `null` with no refusal, not a failure to work out (`money.ts`'s `cashSeries`). */
+  for (const cell of drawnBlocks[0]!.readings ?? []) assert.ok(cell.reading && !cell.refusal, `${cell.metric} cannot be worked out`);
+  const rowsUnder = (heading: string): number | undefined => drawnBlocks.find((b) => b.heading === heading)?.rows?.length;
   assert.equal(rowsUnder('Due this week'), 0);
   assert.equal(rowsUnder('Lapsing'), 0);
   founder.sql.close();

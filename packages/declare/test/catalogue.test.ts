@@ -152,8 +152,8 @@ test('an index with an unsafe id or no checksum is refused, and search ranks the
 
 /* ── add-ons, signatures and updates ────────────────────────────────────── */
 
-const BOOKS = { register: 'books', name: 'Books', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] };
-const SHELF = { page: 'shelf', title: 'Shelf', requires: ['register.books'], blocks: [{ kind: 'table', source: 'register.books', span: 12 }] };
+const BOOKS = { register: 'library', name: 'Books', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] };
+const SHELF = { page: 'shelf', title: 'Shelf', requires: ['register.library'], blocks: [{ kind: 'table', source: 'register.library', span: 12 }] };
 
 function addon(version: string, declarations: Record<string, unknown>[], extra: Record<string, unknown> = {}): string {
   return JSON.stringify({ pack: 'bookshelf', version, title: 'Bookshelf', summary: 'Books you own.', author: 'Halden', license: 'MIT', declarations, ...extra }, null, 2);
@@ -188,7 +188,7 @@ test('an add-on publishes beside a use case under its own path, with its bump co
   assert.deepEqual(updates[0]!.changes?.hosts.added, ['books.example.org']);
 });
 
-const POLL_BOOKS = { ingest: 'poll_books', channel: 'poll', url: 'https://books.example.org/new', every: '1d', map: [{ name: { path: '$.title' } }], writes: { register: 'books' } };
+const POLL_BOOKS = { ingest: 'poll_books', channel: 'poll', url: 'https://books.example.org/new', every: '1d', map: [{ name: { path: '$.title' } }], writes: { register: 'library' } };
 
 test('an add-on file is refused at the same door a use case is: a credential, a module id, a module list, a use case, the size', async () => {
   const { readPackFile } = await import('../src/catalogue.ts');

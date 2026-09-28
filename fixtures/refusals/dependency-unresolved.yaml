@@ -9,7 +9,7 @@ pack: {
     "author": "BrainDog fixtures", "license": "MIT",
     "declarations": [
       { "page": "clients", "title": "Clients", "requires": [ "register.clients" ],
-        "blocks": [ { "table": { "source": "register.clients" } } ] }
+        "blocks": [ { "kind": "table", "source": "register.clients" } ] }
     ]
   }
 
@@ -18,3 +18,9 @@ pack: {
 # `page.clients.requires`, because a page's `requires` is a list the pack points at. The kernel's
 # arm at `requires` is what a declaration set from the app meets, where nothing plans before
 # `kernel.install`. See `packages/record/test/refusals-install.test.ts`, `IN_APP`.
+#
+# THE ONE BLOCK NAMES ITS KIND, on purpose. `declare.ts`'s `pageBody` checks every block before it
+# checks `requires` against what is installed (CHECK round 3, "a block-level fault reports first"),
+# so a block with no `kind:` would answer `KIND_UNKNOWN` here and this fixture would no longer claim
+# `DEPENDENCY_UNRESOLVED` at all. `kind: table` keeps the block itself clean so the one fault left is
+# the register `page.clients` requires and nothing installs.

@@ -16,7 +16,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { jcs, openRecord, validateDeclaration, type Declaration } from '../src/index.ts';
+import { jcs, openRecord, validateDeclaration, type Declaration, type Json } from '../src/index.ts';
 import { fixedClock, openSqlite } from './sqlite.ts';
 
 const NOW = Date.UTC(2026, 8, 25, 12);
@@ -96,7 +96,17 @@ test('A PAGE NAMING A PACK KIND NOBODY INSTALLED IS REFUSED AT INSTALL, and one 
   assert.equal(out?.code, 'KIND_UNKNOWN');
   assert.match(out?.fix ?? '', /block\.pad/);
   assert.match(out?.fix ?? '', /no installed pack declares it/);
-  assert.equal(validateDeclaration(blocks({ kind: 'block.pad', heading: 'Pad' }), new Map([['block.pad', pad]])), null);
+  /* THE PAGE'S OWN `requires` NEEDS ITS THREE REGISTERS TOO, or this proves nothing about the kind: `pageBody` checks
+     every block before it checks `requires` against what is installed (CHECK round 3, "a block-level fault reports
+     first"), so leaving them out of `installed` would answer DEPENDENCY_UNRESOLVED here, not the clean admission this
+     assertion is about. */
+  const withPad = new Map<string, Record<string, Json>>([
+    ['block.pad', pad],
+    ['register.areas', {}],
+    ['register.steps', {}],
+    ['register.lines', {}],
+  ]);
+  assert.equal(validateDeclaration(blocks({ kind: 'block.pad', heading: 'Pad' }), withPad), null);
 });
 
 test('A BLOCK KEY NOBODY READS IS REFUSED AT INSTALL, by name, with what to write instead', () => {

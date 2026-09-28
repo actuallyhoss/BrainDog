@@ -12,7 +12,7 @@ import { join } from 'node:path';
 
 import { createClient } from '@braindog/client';
 import { builtInFile } from '@braindog/seed/usecases/share';
-import { linkExamples } from '@braindog/seed/usecases/links';
+import { linkExamples, type ExampleLink } from '@braindog/seed/usecases/links';
 
 import { start } from '../src/server.ts';
 import type { Pinned } from '../src/actions.ts';
@@ -60,11 +60,24 @@ test('A USE CASE SHARED ON ONE HOST INSTALLS ON ANOTHER FROM AN ADDRESS, IN THE 
   t.after(() => a.close());
   const student = value<Planned>(await a.client.planUseCase({ doc: builtInFile('student') }));
   await installPlan(a.client, student);
-  assert.ok((await linkExamples(io(a.client), 'student')) > 0);
+  /* A BUILT-IN CARRIES NO EXAMPLE ROW SINCE STUDENT 1.3.0 (`loop/finish/modules.md` MOD-17, C11): a student's record
+     holds only what the student wrote, so installing the file links nothing yet. */
+  assert.equal(await linkExamples(io(a.client), 'student'), 0);
+
+  /* SO WHAT GOES OUT IS A REAL STUDENT'S OWN ROWS, drawn the ordinary way, one pointing at the other. */
+  const course = value<{ seq: number }>(await a.client.create({ register: 'courses', fields: { name: 'Introduction to statistics' } }));
+  const assignment = value<{ seq: number }>(
+    await a.client.create({ register: 'assignments', fields: { what: 'Problem set 1: probability', course: `courses#${course.seq}` } }),
+  );
 
   const order = ['/r/study_sessions', '/r/courses', '/r/assignments', '/p/studies'];
-  const exported = value<{ file: string; doc: Record<string, unknown> }>(await a.client.exportUseCase({ nav: order, step: 'minor', examples: { courses: [1], assignments: [1] } }));
+  const exported = value<{ file: string; doc: Record<string, unknown> }>(
+    await a.client.exportUseCase({ nav: order, step: 'minor', examples: { courses: [course.seq], assignments: [assignment.seq] } }),
+  );
   assert.deepEqual(exported.doc.nav, order);
+  /* THE PICKED ROWS POINTED AT EACH OTHER ON A, so the file carries that as a link by title, not as the ref itself
+     (a seed carries no ref: 42 §5.2). */
+  assert.ok(Array.isArray(exported.doc.links) && (exported.doc.links as unknown[]).length > 0, 'the exported file has no link between its examples');
   const text = JSON.stringify(exported.doc, null, 2);
 
   /* THE WEB B READS FROM: one public-looking host with the file on it, and every address resolved to a public one. */
@@ -81,13 +94,16 @@ test('A USE CASE SHARED ON ONE HOST INSTALLS ON ANOTHER FROM AN ADDRESS, IN THE 
   assert.equal(read.text, text);
   const plan = value<Planned>(await b.client.planUseCase({ text: read.text, source: { kind: 'url', ref: 'https://files.example.org/student.usecase.json' } }));
   await installPlan(b.client, plan);
-  assert.ok((await linkExamples(io(b.client), 'student')) > 0, 'no example was linked on B');
+  /* 'student' NAMES NO LINK OF ITS OWN (C11 stripped it with the example course), so B links by the file's OWN
+     declared links, the way a use case shared under an id this build has never heard of still would. */
+  const declaredLinks = (exported.doc.links ?? []) as readonly ExampleLink[];
+  assert.ok((await linkExamples(io(b.client), 'student', { links: declaredLinks })) > 0, 'no example was linked on B');
 
   /* THE DECLARATIONS WENT IN IN THE ORDER A DREW THEM, so the lists come back that way. */
   const lists = value<{ registers: { id: string }[] }>(await b.client.boot()).registers.map((r) => r.id).filter((id) => ['courses', 'assignments', 'study_sessions'].includes(id));
   assert.deepEqual(lists, ['study_sessions', 'courses', 'assignments']);
-  const assignment = value<{ rows: { fields: Record<string, unknown> }[] }>(await b.client.list({ register: 'assignments' })).rows[0];
-  assert.match(String(assignment?.fields.course ?? ''), /./u, 'the example assignment has no course');
+  const bAssignment = value<{ rows: { fields: Record<string, unknown> }[] }>(await b.client.list({ register: 'assignments' })).rows[0];
+  assert.match(String(bAssignment?.fields.course ?? ''), /./u, 'the example assignment has no course');
 
   /* A PRIVATE ADDRESS, AND A NAME THAT RESOLVES TO ONE, ARE REFUSED BY THE HOST, and nothing is sent to either. */
   const before = asked.length;

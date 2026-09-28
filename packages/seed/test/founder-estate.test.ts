@@ -9,16 +9,15 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
 
 import { install, normalise, plan, type Host, type Installed, type Pack } from '@braindog/declare';
 import { openRecord, type Kernel } from '@braindog/kernel';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
 import { NOW, firstPartyManifest } from '../src/index.ts';
-import { projectTemplate } from '../src/modules/portfolio.ts';
 import { modulesFor, useCase, useCaseDocument } from '../src/usecases/index.ts';
 import { carriedDocument, dayOf, moduleDocument } from '../src/usecases/install.ts';
+import { FOUNDER_SHIPPED_1_3_2, FOUNDER_SHIPPED_1_4_0, FOUNDER_SHIPPED_1_5_0, shippedFingerprint } from './founder-shipped.ts';
 
 const TODAY = dayOf(NOW);
 
@@ -116,64 +115,25 @@ test("A FOUNDER'S PROJECT DRAWS WHAT IT RUNS ON: a domain pointed at it is on it
   assert.ok(blocks.some((b) => b.heading === 'Send numbers here'), 'the founder half of the page is still under it');
 });
 
-/** The fingerprint `usecase-versions.test.ts` takes of a document, so a rebuilt version is held to the one it recorded. */
-const printOf = (d: { declarations: unknown; config?: unknown }): string =>
-  createHash('sha256').update(JSON.stringify({ declarations: d.declarations, config: d.config ?? null })).digest('hex').slice(0, 16);
-
 /**
- * A RECORD MADE ON 1.3.2, REBUILT: the four modules it named, and its pack as it shipped. It is rebuilt backwards one
- * version at a time, and each step is checked against the fingerprint `usecase-versions.test.ts` recorded for that
- * version, so the rebuild is held to what shipped rather than to what this file believes shipped.
+ * A RECORD MADE ON 1.3.2, REBUILT: the four modules it named, and its pack as it shipped. `founder-shipped.ts` holds
+ * what each old version's pack actually was, read off the commit that raised it rather than rebuilt by hand over
+ * `founder.ts`'s current diff.
  *
- * TWO STEPS AND NOT ONE, BECAUSE 1.5.0 MOVED A SECOND PAGE. Until it, the project page was the only thing between the
- * current document and 1.3.2, and undoing it alone printed 3e4927061f959b6d. Once Home gained "Due this week" and
- * "Lapsing", the same undo printed 4d2724eb47aa50e0, which is no version anybody shipped. Undoing 1.5.0 first and
- * checking the 1.4.0 it gives means a later version that moves a third page fails at the step it broke. 1.5.1 moved
- * only Home's words, so it is undone first, and checked the same way.
+ * A MUTATION OVER TODAY'S DOCUMENT COULD NOT STAY THE REBUILD FOR LONG. `projectTemplate` (`modules/portfolio.ts`)
+ * and `DUE_THIS_WEEK` (`modules/money.ts`) both moved under Founder's pages more than once without founder.ts's own
+ * version changing (the same drift `usecase-versions.test.ts` calls out for `projectTemplate`), so undoing only
+ * founder.ts's own diff from today's document stopped landing on what 1.5.0 or 1.3.2 actually shipped the moment
+ * either dependency moved again. Each constant in `founder-shipped.ts` is checked there against the fingerprint
+ * `usecase-versions.test.ts`'s DECLARED table pins for that version, so this file trusts them rather than
+ * re-deriving them, and a constant that drifts from what shipped is caught at its own assertion, not here.
  */
 async function onEarlier(): Promise<{ k: Kernel; before: Record<string, unknown> }> {
   const u = useCase('founder')!;
-  const now = useCaseDocument('founder', TODAY) as { declarations: Record<string, unknown>[]; version: string; config?: unknown };
-
-  /* 1.5.1 TO 1.5.0: Home's empty title with its closing full stop back. Due this week is the same block it was, now taken
-     from Money by name, so the words are the only step. */
-  const v150 = {
-    ...now,
-    version: '1.5.0',
-    config: JSON.parse(JSON.stringify(now.config ?? null).replace('"Nothing needs your call"', '"Nothing needs your call."')) as unknown,
-  };
-  assert.equal(printOf(v150), 'b3550baded7ee204', 'the rebuilt 1.5.0 is not the 1.5.0 that shipped');
-
-  /* 1.5.0 TO 1.4.0: Home without the two tables it gained, and without the services list they read. */
-  const added = new Set(['Due this week', 'Lapsing']);
-  const v140 = {
-    ...v150,
-    version: '1.4.0',
-    declarations: v150.declarations.map((d) =>
-      d.page !== 'home-founder'
-        ? d
-        : {
-            ...d,
-            requires: (d.requires as string[]).filter((r) => r !== 'register.services'),
-            blocks: (d.blocks as { heading?: string }[]).filter((b) => !added.has(b.heading ?? '')),
-          },
-    ),
-  };
-  assert.equal(printOf(v140), '15c1f37be2561258', 'the rebuilt 1.4.0 is not the 1.4.0 that shipped');
-
-  /* 1.4.0 TO 1.3.2: the project page taken from Portfolio's template without services. */
-  const withServices = projectTemplate(['things', 'tasks', 'obligations', 'services']).blocks as unknown[];
-  const without = projectTemplate(['things', 'tasks', 'obligations']);
-  const before = {
-    ...v140,
-    version: '1.3.2',
-    declarations: v140.declarations.map((d) =>
-      d.page !== 'project'
-        ? d
-        : { ...d, requires: (d.requires as string[]).filter((r) => r !== 'register.services'), blocks: [...(without.blocks as unknown[]), ...(d.blocks as unknown[]).slice(withServices.length)] },
-    ),
-  };
-  assert.equal(printOf(before), '3e4927061f959b6d', 'the rebuilt 1.3.2 is not the 1.3.2 that shipped');
+  assert.equal(shippedFingerprint(FOUNDER_SHIPPED_1_5_0), 'b3550baded7ee204', 'founder-shipped.ts’s 1.5.0 is not the 1.5.0 that shipped');
+  assert.equal(shippedFingerprint(FOUNDER_SHIPPED_1_4_0), '15c1f37be2561258', 'founder-shipped.ts’s 1.4.0 is not the 1.4.0 that shipped');
+  assert.equal(shippedFingerprint(FOUNDER_SHIPPED_1_3_2), '3e4927061f959b6d', 'founder-shipped.ts’s 1.3.2 is not the 1.3.2 that shipped');
+  const before = FOUNDER_SHIPPED_1_3_2 as Record<string, unknown>;
 
   const k = await openRecord(openSqlite(), fixedClock(NOW));
   for (const m of ['portfolio', 'people', 'money-core', 'work']) {

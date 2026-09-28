@@ -19,8 +19,8 @@ import { serveKennel, type KennelBucket, type KennelDeps } from '../src/kennel.t
 const NOW = new Date('2026-09-25T10:00:00Z');
 const HOST = 'https://brain.example.test';
 const OPERATOR = 'the-operator-key-of-this-test';
-const BOOKS = { register: 'books', name: 'Books', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] };
-const SHELF = { page: 'shelf', title: 'Shelf', requires: ['register.books'], blocks: [{ kind: 'table', source: 'register.books', span: 12 }] };
+const BOOKS = { register: 'library', name: 'Books', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] };
+const SHELF = { page: 'shelf', title: 'Shelf', requires: ['register.library'], blocks: [{ kind: 'table', source: 'register.library', span: 12 }] };
 
 const addon = (version: string, id = 'bookshelf'): string =>
   JSON.stringify({ pack: id, version, title: 'Bookshelf', summary: `Books you own, as of ${version}.`, author: 'Halden', license: 'MIT', declarations: [BOOKS, SHELF] }, null, 2);

@@ -8,20 +8,24 @@
  * named was at 3.1.0 and brought nine. Everything here is computed from what the pack declares, so a list a module gains
  * is on its card the day it is declared.
  *
- * AGENTS' WORDS ARE KEPT HERE, because its manifest is written in `agents.ts` as a plain `PackManifest` and the other
- * five carry theirs in `first-party.ts` `SIGNALS`. Both reach the first run through `firstPartyModules()` alone.
+ * AGENTS' WORDS ARE KEPT HERE, because its manifest is written in `packs/agents.ts` as a plain `PackManifest` and the
+ * other five carry theirs in `packs/first-party.ts` `SIGNALS`. Both reach the first run through `firstPartyModules()`
+ * alone.
  *
- * COMPUTED ONCE AND ON FIRST ASK, because `first-party.ts` re-exports through `index.ts` and reads it back: a value
- * computed when this file loads would run before the declarations it reads exist, and splitting the starter into its
- * packs is not work to repeat on every screen that wants a module's name.
+ * COMPUTED ONCE AND ON FIRST ASK, because `packs/first-party.ts` re-exports through `index.ts` and reads it back: a
+ * value computed when this file loads would run before the declarations it reads exist, and splitting the starter
+ * into its packs is not work to repeat on every screen that wants a module's name.
+ *
+ * NOT UNDER `packs/`, because that folder holds only what a record is built from (`agents.ts`, `first-party.ts`), and
+ * this is a module's own card for a screen (`packs/rates-poll/rates-poll.test.ts`, "B7's DIRECTORY").
  */
 
 import { FIRST_PARTY_LISTS } from '@braindog/declare';
 
-import { MODULE_ORDER } from '../usecases/index.ts';
-import { MODULE_NAMES } from '../usecases/names.ts';
-import { AGENTS_PACK, agentsPackDocument } from './agents.ts';
-import { FIRST_PARTY, firstPartyDocument, firstPartyManifest } from './first-party.ts';
+import { MODULE_ORDER } from './usecases/index.ts';
+import { MODULE_NAMES } from './usecases/names.ts';
+import { AGENTS_PACK, agentsPackDocument } from './packs/agents.ts';
+import { FIRST_PARTY, firstPartyDocument, firstPartyManifest } from './packs/first-party.ts';
 
 export type ModuleInfo = {
   id: string;

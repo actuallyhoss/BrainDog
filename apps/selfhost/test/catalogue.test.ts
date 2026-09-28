@@ -75,8 +75,8 @@ test('the folder offers Slash a newer version of an installed add-on, verified, 
   const { emptyCatalogue, publishTo, newAuthorKey } = await import('@braindog/declare/catalogue');
   const dir = mkdtempSync(join(tmpdir(), 'bd-offers-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
-  const books = { register: 'books', name: 'Books', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] };
-  const poll = { ingest: 'poll_books', channel: 'poll', url: 'https://books.example.org/new', every: '1d', map: [{ name: { path: '$.title' } }], writes: { register: 'books' } };
+  const books = { register: 'library', name: 'Books', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] };
+  const poll = { ingest: 'poll_books', channel: 'poll', url: 'https://books.example.org/new', every: '1d', map: [{ name: { path: '$.title' } }], writes: { register: 'library' } };
   const text = (version: string, declarations: unknown[]) => JSON.stringify({ pack: 'bookshelf', version, title: 'Bookshelf', summary: 'Books.', author: 'Halden', license: 'MIT', declarations });
   const key = await newAuthorKey('Halden');
   let index = emptyCatalogue('Test');

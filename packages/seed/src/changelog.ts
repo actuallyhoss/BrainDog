@@ -4,14 +4,17 @@
  *
  * A MODULE HAS NO CATALOGUE FILE, so nothing publishes its `changes` line the way the Kennel publishes an add-on's. The
  * notes live here instead, newest first, one entry for each version a record could have been given. The long record of
- * why each step was taken, and why it was the size it was, stays beside `FIRST_PARTY_VERSIONS` in `first-party.ts`;
+ * why each step was taken, and why it was the size it was, stays beside `FIRST_PARTY_VERSIONS` in `packs/first-party.ts`;
  * these are the same steps said plainly, at most 500 characters each, as an add-on's `changes` is.
  *
  * THE NEWEST ENTRY IS THE VERSION THIS BUILD SHIPS. `test/pack-versions.test.ts` fingerprints the versions; a version
  * bumped there and not named here draws on the page with no notes, which says less than it should and nothing false.
+ *
+ * NOT UNDER `packs/`, because that folder holds only what a record is built from (`agents.ts`, `first-party.ts`), and
+ * this is words for a screen (`packs/rates-poll/rates-poll.test.ts`, "B7's DIRECTORY").
  */
 
-import type { FirstPartyId } from './first-party.ts';
+import type { FirstPartyId } from './packs/first-party.ts';
 
 export type ModuleChange = { version: string; notes: string };
 

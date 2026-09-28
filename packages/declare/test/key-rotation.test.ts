@@ -23,8 +23,8 @@ import {
   type CatalogueIndex,
 } from '../src/catalogue.ts';
 
-const BOOKS = { register: 'books', name: 'Books', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] };
-const SHELF = { page: 'shelf', title: 'Shelf', requires: ['register.books'], blocks: [{ kind: 'table', source: 'register.books', span: 12 }] };
+const BOOKS = { register: 'library', name: 'Books', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] };
+const SHELF = { page: 'shelf', title: 'Shelf', requires: ['register.library'], blocks: [{ kind: 'table', source: 'register.library', span: 12 }] };
 const addon = (version: string, summary = 'Books you own.') => JSON.stringify({ pack: 'bookshelf', version, title: 'Bookshelf', summary, author: 'Halden', license: 'MIT', declarations: version === '1.0.0' ? [BOOKS] : [BOOKS, SHELF] });
 
 test('a rotation is signed by the old key, and only the old key; a revocation only by the key it revokes', async () => {

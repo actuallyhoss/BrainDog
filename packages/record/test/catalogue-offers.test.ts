@@ -12,9 +12,9 @@ import { addKeyStatement, emptyCatalogue, newAuthorKey, publishTo, rotateKey, ty
 import { offersFromCatalogue } from '../src/catalogue-offers.ts';
 import { catalogueDrafts } from '../src/slash.ts';
 
-const BOOKS = { register: 'books', name: 'Books', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] };
+const BOOKS = { register: 'library', name: 'Books', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] };
 const LOANS = { register: 'loans', name: 'Loans', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] };
-const POLL = { ingest: 'poll_books', channel: 'poll', url: 'https://books.example.org/api/latest', every: '1d', map: [{ name: { path: '$.title' } }], writes: { register: 'books' } };
+const POLL = { ingest: 'poll_books', channel: 'poll', url: 'https://books.example.org/api/latest', every: '1d', map: [{ name: { path: '$.title' } }], writes: { register: 'library' } };
 const addon = (version: string, declarations: unknown[], title = 'Bookshelf') =>
   JSON.stringify({ pack: 'bookshelf', version, title, summary: 'Books.', author: 'Halden', license: 'MIT', declarations });
 

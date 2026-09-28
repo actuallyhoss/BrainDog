@@ -34,8 +34,8 @@ import {
 import { signVersion, type AuthorKey } from '../src/signing.ts';
 
 const NOW = new Date('2026-09-25T10:00:00Z');
-const BOOKS = { register: 'books', name: 'Books', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] };
-const SHELF = { page: 'shelf', title: 'Shelf', requires: ['register.books'], blocks: [{ kind: 'table', source: 'register.books', span: 12 }] };
+const BOOKS = { register: 'library', name: 'Books', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] };
+const SHELF = { page: 'shelf', title: 'Shelf', requires: ['register.library'], blocks: [{ kind: 'table', source: 'register.library', span: 12 }] };
 
 /** An add-on whose summary names its version, so each later version is a patch that changes words. */
 const addon = (version: string, extra: Record<string, unknown> = {}, id = 'bookshelf'): string =>

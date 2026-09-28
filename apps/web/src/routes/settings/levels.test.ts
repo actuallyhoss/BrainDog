@@ -90,6 +90,14 @@ test('an owner is an owner by either half of what the record said', () => {
  * pushes a frame and a close pops one, so a `{:else}` belongs to the block it is really in. A frame
  * an `anOwner` condition opened is `yes` on the arm that needs one and `no` on the other, and the
  * two swap at `{:else}`. A control is gated when some frame around it is `yes` and none is `no`.
+ *
+ * A `{#snippet}`'S OWN BODY SITS IN NO ARM, because a snippet is a template, not a render: nothing inside
+ * it draws until something `{@render}`s it, or hands it to a component as a prop, and `/settings/export`
+ * and `/settings/backups` do the gating right there: `action={anOwner ? exportPack : undefined}` hands a
+ * colleague `undefined` and `StateRow` draws no control at all (DSN-18). So a snippet whose only mention
+ * anywhere else in the file is on the `anOwner` arm of exactly that shape is gated by proxy: read as though
+ * its body sat inside `{#if anOwner}`. One that is ever rendered some other way is left as the walk found it,
+ * which is `other`, same as before this existed, so nothing here can turn an ungated control gated by accident.
  */
 function ownedAt(markup: string): (at: number) => boolean {
   type Arm = 'yes' | 'no' | 'other';
@@ -97,6 +105,8 @@ function ownedAt(markup: string): (at: number) => boolean {
   type Frame = { owner: Arm; known: Arm };
   const marks: { at: number; frames: Frame[] }[] = [];
   const stack: Frame[] = [];
+  const snippetStack: { name: string; start: number }[] = [];
+  const snippets: { name: string; start: number; end: number }[] = [];
   /* THE NEGATION IS NOT ALWAYS AT THE FRONT: `{:else if mintsHere === true && !anOwner}` is the arm
      for somebody who is not an owner, and reading only the first token called it the owner's. */
   const armOf = (cond: string): Arm => (/!\s*anOwner\b/u.test(cond) ? 'no' : /\banOwner\b/u.test(cond) ? 'yes' : 'other');
@@ -106,8 +116,17 @@ function ownedAt(markup: string): (at: number) => boolean {
     if (m[1] !== undefined) {
       const arm = m[1] === 'if' ? armOf(m[2] ?? '') : 'other';
       stack.push({ owner: arm, known: other(arm) });
-    } else if (m[5] !== undefined) stack.pop();
-    else {
+      if (m[1] === 'snippet') {
+        const name = /^\s*([A-Za-z_$][\w$]*)/u.exec(m[2] ?? '')?.[1];
+        snippetStack.push({ name: name ?? '', start: block.lastIndex });
+      }
+    } else if (m[5] !== undefined) {
+      stack.pop();
+      if (m[5] === 'snippet') {
+        const open = snippetStack.pop();
+        if (open && open.name !== '') snippets.push({ name: open.name, start: open.start, end: m.index });
+      }
+    } else {
       const top = stack[stack.length - 1];
       /**
        * A LATER ARM OF A CHAIN INHERITS WHAT THE ARMS BEFORE IT RULED OUT, which is the whole reason
@@ -123,13 +142,30 @@ function ownedAt(markup: string): (at: number) => boolean {
     }
     marks.push({ at: m.index, frames: stack.map((f) => ({ ...f })) });
   }
+  /* A SNIPPET NAMED `name` IS GATED BY PROXY WHEN EVERY MENTION OF IT OUTSIDE ITS OWN `{#snippet}` LINE READS
+     `anOwner ? name`: one ungated mention (another `{@render}`, a bare prop, the `!anOwner` arm) and the walk's
+     own answer for its body is kept instead, so nothing here can hide a control the walk would otherwise catch.
+     `(?<!\.)` SO `copy.exportPack` NEVER COUNTS AS A MENTION OF THE SNIPPET NAMED `exportPack`: a property read
+     off another object that happens to share the word is not a reference to the snippet at all. */
+  const gatedByProxy = new Set<string>();
+  for (const { name } of snippets) {
+    if (gatedByProxy.has(name)) continue;
+    const mentions = [...markup.matchAll(new RegExp(`(?<!\\.)\\b${name}\\b`, 'gu'))];
+    const ownGated = mentions.every((mm) => {
+      const before = markup.slice(0, mm.index);
+      return /\{#snippet\s*$/u.test(before) || /\banOwner\s*\?\s*$/u.test(before);
+    });
+    if (ownGated && mentions.some((mm) => /\banOwner\s*\?\s*$/u.test(markup.slice(0, mm.index)))) gatedByProxy.add(name);
+  }
+  const proxied = snippets.filter((s) => gatedByProxy.has(s.name));
   return (at: number) => {
     let frames: Frame[] = [];
     for (const mark of marks) {
       if (mark.at > at) break;
       frames = mark.frames;
     }
-    return frames.some((f) => f.owner === 'yes') && !frames.some((f) => f.owner === 'no');
+    if (frames.some((f) => f.owner === 'yes') && !frames.some((f) => f.owner === 'no')) return true;
+    return proxied.some((s) => at >= s.start && at < s.end);
   };
 }
 

@@ -3170,12 +3170,20 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
       'What you approved is not what this install would call out. Read the plan again.',
       { at: 'approve' },
     );
+  /* THE SETTINGS ARE FILLED IN HERE, before either use below reads a declaration's body: the bodies staged are the
+     bodies the plan compared, and a script's own `keys` are read filled too. Read unfilled, a script whose key is
+     `{{config:grant}}` (mercury's `mercury_ledger`) asked the vault for a key literally called `{{config:grant}}`
+     and refused every install, key in the vault or not (measured: `packs/mercury/mercury.test.ts`, "INSTALLED
+     THROUGH THE RECORD'S OWN DOOR" and the self-host path). The colour rule for what a setting filled is asked in
+     `installFault`. */
+  const filled = filledWith(pack, diff.config);
+
   /* A SCRIPT'S LINE CARRIES ITS LABELS JOINED WITH ", " (`scriptEgress`), SO IT IS ASKED LABEL BY LABEL. Asked as the
      joined string, a script that sends two keys asked the vault for a key called "a, b" and could never install; the
      labels are the script declaration's own `keys`, as `labelsSent` in the kernel's `govern.ts` reads them for Decide. */
   const labelsOf = (c: Diff['calls_out'][number], grant: string): string[] => {
     if (c.channel !== 'script') return [grant];
-    const script = pack.declarations.find((d) => d.kind === 'script' && isObject(d.body) && d.body.script === c.ingest);
+    const script = filled.declarations.find((d) => d.kind === 'script' && isObject(d.body) && d.body.script === c.ingest);
     const keys = script !== undefined && isObject(script.body) ? script.body.keys : undefined;
     return Array.isArray(keys) && keys.length > 0 && keys.every((k) => typeof k === 'string') ? (keys as string[]) : [grant];
   };
@@ -3192,9 +3200,6 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
       }
     }
 
-  /* THE SETTINGS ARE WRITTEN IN HERE, from the plan that was approved, so the bodies staged are the
-     bodies the plan compared. The colour rule for what a setting filled is asked in `installFault`. */
-  const filled = filledWith(pack, diff.config);
   const keep = new Set(diff.kept.filter((k) => k.rebased === undefined).map((k) => k.id));
   const handing = diff.retires.filter((r) => r.to !== undefined && r.body !== undefined).length;
   const staged = await host.stage(stagedBatch(pack, diff));

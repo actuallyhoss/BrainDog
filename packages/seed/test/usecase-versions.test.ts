@@ -457,10 +457,11 @@ const DECLARED: Record<string, Version> = {
       setting.voice_nothing_now setting.voice_nothing_waiting setting.voice_overdue setting.voice_pen_waits
       setting.voice_working_now
     `,
-    declares: 'b78dfb33a2490526',
+    declares: '51db7a7065cc95c7',
     history: [
       "`page.dashboard` and `page.project` open with one sentence said from their figures first and keep a rail; `Send numbers here` on `page.organisation` and `page.project` says `panel: reporting` -> 3755a69ec8c3ff98",
       "Home, Decide, the Inbox and the add buttons now speak in your use case's own words: `setting.voice_working_now`, `setting.voice_coming_up`, `setting.voice_overdue`, `setting.voice_nothing_now`, `setting.voice_nothing_waiting`, `setting.voice_fills_with`, `setting.voice_no_questions`, `setting.voice_inbox_clear` and `setting.voice_pen_waits` -> b78dfb33a2490526",
+      "CHECK pass repair round 1 renamed `page.home-founder`'s Working now columns from `as` to `label`, the shape every other table on the page already used (`agent`, `doing`, `last_seen`) -> 51db7a7065cc95c7",
     ],
   },
   'team@2.3.0': {

@@ -87,7 +87,10 @@ test('ONLY UNTOUCHED EXAMPLES ARE CLEARED: one linked to another example goes, o
   /* A real row naming the example project keeps it; an edited example is kept. */
   const mine = value<{ id: string }>(k.create('tasks', { what: 'My own task', state: 'open', [link.id]: project.id }, w));
   const track = exampleIn(k, 'tracks')!;
-  value(k.update('tracks', track.id, { name: 'Launch the yearly plan' }, w));
+  /* A note on the write keeps it off the grace-window fold (`packages/kernel/src/index.ts` write, decision C26): a
+     bare correction in a row's first three minutes folds into its `create` line and reads as never touched, so an
+     edit meant to be seen here carries the note a real edit would. */
+  value(k.update('tracks', track.id, { name: 'Launch the yearly plan' }, { ...w, note: 'Renamed the track.' }));
   /* A real row somebody tagged example later is not an example. */
   const real = value<{ id: string }>(k.create('tracks', { name: 'Hire a designer', state: 'open' }, w));
   value(k.update('tracks', real.id, { tags: ['example'] }, w));

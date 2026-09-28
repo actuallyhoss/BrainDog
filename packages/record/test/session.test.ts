@@ -73,7 +73,10 @@ test('A TOKEN WRITE IS SIGNED BY ITS RUN, and the next write from the same clien
   const two = value<Entry>(await api.update({ register: 'tasks', seq: one.seq!, patch: { what: 'One, done' } }, agent(said)));
 
   assert.deepEqual(runs(sql), [1]);
-  assert.deepEqual(events(sql, two.id).map((e) => e.actor), ['S1', 'S1']);
+  /* THE GRACE WINDOW (docs/02 §8) FOLDS THIS: the run's own edit lands inside the create's first three
+     minutes, so it writes no second line, only the version this second write still carries. */
+  assert.equal(two.version, 2);
+  assert.deepEqual(events(sql, two.id).map((e) => e.actor), ['S1']);
   const s1 = await run(api, 'S1');
   assert.deepEqual(
     { client_id: s1.fields.client_id, token_id: s1.fields.token_id, host: s1.fields.host, repo: s1.fields.repo, agent: s1.fields.agent },
@@ -249,7 +252,10 @@ test('A HANDOFF FROM AN AGENT WITH NO RUN YET OPENS ONE, and lands on it', async
   const out = value<Entry>(await api.handoff({ next: 'Start with the hooks' }, agent({})));
   assert.deepEqual(runs(sql), [1]);
   assert.equal(out.fields.next, 'Start with the hooks');
-  assert.deepEqual(events(sql, out.id).map((e) => e.actor), ['S1', 'S1']);
+  /* THE GRACE WINDOW (docs/02 §8) FOLDS THIS TOO: the auto-open and the handoff that names its first next
+     step land in the same write, so the run's history opens already holding it, one line signed 'S1'. */
+  assert.equal(out.version, 2);
+  assert.deepEqual(events(sql, out.id).map((e) => e.actor), ['S1']);
   sql.close();
 });
 

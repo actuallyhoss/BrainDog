@@ -507,7 +507,7 @@ test('A SHARED USE-CASE FILE IS PROPOSED AS A QUESTION: read through readShared,
     modules: ['work'],
     voice: { home: 'Club night' },
     labels: {},
-    declarations: [{ register: 'books', name: 'Books', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] }],
+    declarations: [{ register: 'library', name: 'Books', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] }],
     examples: [],
   });
   assert.ok(built.ok);
@@ -517,7 +517,7 @@ test('A SHARED USE-CASE FILE IS PROPOSED AS A QUESTION: read through readShared,
   assert.equal(row.body.install, 'usecase-club');
   assert.equal(row.body.title, 'Reading club');
   assert.deepEqual(row.body.packs.install, ['work', 'usecase-club'], 'the module it names goes in first');
-  assert.equal(row.body.names['register.books'], 'Books');
+  assert.equal(row.body.names['register.library'], 'Books');
   assert.equal(row.body.file, undefined, 'the file was filed as sent, beside what the record read from it');
   assert.equal(api.kernel.packStates().length, 0, 'a proposal installed something');
   assert.ok(refusal(await api.decide(accept(filed.id), agent)));

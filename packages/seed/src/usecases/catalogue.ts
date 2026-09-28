@@ -17,7 +17,7 @@ import { FIRST_PARTY_LISTS, packIdOf } from '@braindog/declare';
 
 import { AGENTS_PACK, agentsPackDocument } from '../packs/agents.ts';
 import { FIRST_PARTY, firstPartyDocument, firstPartyManifest, type FirstPartyId } from '../packs/first-party.ts';
-import { AGENTS_SIGNALS } from '../packs/modules.ts';
+import { AGENTS_SIGNALS } from '../module-info.ts';
 import { GUIDE_FORMS, GUIDE_GROWS, GUIDE_NEXT } from './guide.ts';
 import { MODULE_ORDER, USE_CASES, modulesFor, useCase, useCaseDocument } from './index.ts';
 import { moduleDocument, withoutRows } from './install.ts';

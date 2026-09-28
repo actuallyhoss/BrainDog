@@ -54,11 +54,11 @@ test('the bundled catalogue offers a newer version of what a hosted record holds
 
 test('a signed update is offered with its key, and one whose file the assets do not hold is not offered', async () => {
   const key = await newAuthorKey('Halden');
-  const books = { register: 'books', name: 'Books', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] };
+  const books = { register: 'library', name: 'Books', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] };
   const text = (version: string, extra: unknown[] = []) => JSON.stringify({ pack: 'bookshelf', version, title: 'Bookshelf', summary: 'Books.', author: 'Halden', license: 'MIT', declarations: [books, ...extra] });
   const files = new Map<string, string>();
   let index = emptyCatalogue('Test');
-  for (const t of [text('1.0.0'), text('1.1.0', [{ page: 'shelf', title: 'Shelf', requires: ['register.books'], blocks: [{ kind: 'table', source: 'register.books', span: 12 }] }])]) {
+  for (const t of [text('1.0.0'), text('1.1.0', [{ page: 'shelf', title: 'Shelf', requires: ['register.library'], blocks: [{ kind: 'table', source: 'register.library', span: 12 }] }])]) {
     const out = await publishTo(index, t, (p) => files.get(p) ?? null, new Date(), key);
     assert.ok(out.ok, JSON.stringify(out));
     index = out.value.index;
