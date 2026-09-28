@@ -32,6 +32,9 @@
   import { searchable } from '$lib/record/find.ts';
   import type { Entry, Fields, RegisterDecl } from '$lib/record/schema.ts';
   import { saidPlainly } from '$lib/record/blocks.ts';
+  import type { Shell } from '$lib/record/boot-live.ts';
+  import { REGISTERS } from '$lib/record/held.ts';
+  import { handFor, readHolders } from '$lib/record/hand.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
@@ -128,6 +131,33 @@
   const owner = $derived(page.data.me ? ownsRecord(page.data.me as Me) : false);
   let fieldsOpen = $state(false);
   let makeOpen = $state(false);
+
+  /**
+   * "HANDED TO ME" (GAP-11): a list that says who holds its rows (`hand:`) offers a view onto the ones handed to you,
+   * found the same way `HandSheet.svelte` finds every holder, `readHolders`, filtered to the one with `you: true`. The
+   * seq is asked again each time the list itself does, since who you are handed does not change inside one visit and a
+   * second read would only cost the record another round trip for nothing that could have changed.
+   */
+  const hand = $derived(decl ? handFor(decl) : null);
+  const shell = $derived(page.data as unknown as Shell);
+  const peopleList = $derived.by(() => {
+    const to = decl?.fields.find((f) => f.id === hand?.person)?.to ?? 'people';
+    return { register: to, title: REGISTERS[to]?.title ?? 'name' };
+  });
+  let handedSeq = $state<number | null>(null);
+  $effect(() => {
+    const h = hand;
+    if (!h?.person) {
+      handedSeq = null;
+      return;
+    }
+    const me = String(shell.me?.person ?? '');
+    void readHolders(apiBase(), h, me, shell.names ?? {}, peopleList).then((got) => {
+      const you = got.from === 'live' ? got.holders.find((o) => o.kind === 'person' && o.you) : undefined;
+      handedSeq = you && you.kind === 'person' ? you.seq : null;
+    });
+  });
+  const handedToMeHref = $derived(hand?.person && handedSeq !== null ? at(`/r/${id}?f=${hand.person}:is:${handedSeq}`) : null);
 
   /**
    * A LINK CAN ASK FOR THE NEW-LIST SHEET: `/r/_new?make` from the "New list" entry, or `?make` on the address of a list
@@ -2017,6 +2047,8 @@
         <Button weight="primary" onclick={() => (createOpen = true)}><Icon name="plus" size="s" />{copy.newRow} {decl.one}</Button>
       </span>
       {#if !arriving}<CapturePlus one={decl.one} onclick={() => (captureOpen = true)} />{/if}
+      <!-- THE VIEW OVER WHAT IS HANDED TO YOU, on a list that says who holds its rows (GAP-11). -->
+      {#if handedToMeHref}<Button href={handedToMeHref}>{copy.handedToMe}</Button>{/if}
       <!-- THE LIST'S FIELDS, opened from its head: add any kind, rename one, or retire one (`ListEditor.svelte`). -->
       <Button onclick={() => (fieldsOpen = true)} data-fields-open>{sheetWords.open}</Button>
     {/snippet}
@@ -2207,6 +2239,7 @@
     {copyId}
     {copyLink}
     {archive}
+    onhanded={landRow}
   />
 
   <!-- The new-row drawer, every declared field in front of the reader. `n`, and New in the head. -->

@@ -160,6 +160,10 @@ function diffPart(d: Body, name: (id: string) => string): { part: Part; stops: s
     else stops.push(words.conflict(what, name(text(c.pack))));
   }
   if (count(d.orphans) > 0) stops.push(words.orphans(count(d.orphans)));
+  /* AN UNRESOLVED PAGE ADD IS THE PAGE THAT IS MISSING (GAP-9): `page_adds` carries `unresolved` only beside a
+     `refusal`, whose sentence already names the page and the pack, so it is shown as a stop rather than dropped
+     silently the way the resolved ones below are drawn. */
+  for (const p of list(d.page_adds)) if (p.unresolved === true && isMap(p.refusal)) stops.push(text(p.refusal.fix));
 
   const retires = list(d.retires);
   const seeds = isMap(d.seeds) ? d.seeds : {};

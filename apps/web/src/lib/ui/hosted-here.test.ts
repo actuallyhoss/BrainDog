@@ -44,8 +44,8 @@ const SITES = svelteFiles(SRC)
     return [...text.matchAll(/<CallsOut\b[\s\S]*?\/>/gu)].map((m) => ({ file: relative(SRC, f).replaceAll('\\', '/'), tag: m[0] }));
   });
 
-test('THE SIX SITES ARE STILL THERE, so a sweep that finds none has not passed by finding none', () => {
-  assert.equal(SITES.length, 6, SITES.map((s) => s.file).join('\n'));
+test('THE THREE SITES ARE STILL THERE, so a sweep that finds none has not passed by finding none', () => {
+  assert.equal(SITES.length, 3, SITES.map((s) => s.file).join('\n'));
   for (const { file, tag } of SITES) assert.ok(!tag.slice(1).includes('<'), `${file} has a CallsOut tag that is not self-closing`);
 });
 

@@ -32,6 +32,7 @@
     copyId,
     copyLink,
     archive,
+    onhanded,
   }: {
     open: boolean;
     /** The row's viewport rect, taken when the menu opened. */
@@ -50,10 +51,12 @@
     copyId: (seq: number) => void;
     copyLink: (seq: number) => void;
     archive: (seq: number) => void;
+    /** How the row a hand leaves lands back on the grid (`landRow`), on a live record only (GAP-11). */
+    onhanded?: ((entry: Entry) => void) | undefined;
   } = $props();
 </script>
 
-<RowMenu {open} at={rect} label={copy.rowMenu} {onclose}>
+<RowMenu {open} at={rect} label={copy.rowMenu} {onclose} hand={row && onhanded ? { register, row, decl, onhanded } : null}>
   {#if row}
     {@const seq = row.seq}
     <!-- A glyph per verb. The rail's menu has always had them and this one never did, so four

@@ -13,6 +13,8 @@ import { article, list } from './english.ts';
 
 export const lists = {
   rowActions: 'What you can do here',
+  /* A LIST THAT SAYS WHO HOLDS ITS ROWS (`hand:`) offers this view over its own, filtered to what is handed to you (GAP-11). */
+  handedToMe: 'Handed to me',
   editValue: (field: string) => `Change ${field.toLowerCase()}`,
   /* WHY THIS CELL IS NOT THE EDITOR, said when somebody asks for it rather than only drawn.
      The pencil appears on an editable cell and on no other, which answers the question for anybody

@@ -38,6 +38,7 @@
   import Empty from '$lib/ui/Empty.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import ShareMenu from '$lib/ui/ShareMenu.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import Arrange, { added } from './Arrange.svelte';
   import ChangePage from './ChangePage.svelte';
@@ -176,6 +177,7 @@
             {showSource ? copy.pageBack : copy.pageSource}
           </Button>
         </span>
+        <ShareMenu {slug} />
         <!-- "Change this page", and below 900px the page menu that holds it and the link above (PGS-12). -->
         <ChangePage {slug} title={live.page.page.title} {showSource} {reread} />
       {/if}

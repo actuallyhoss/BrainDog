@@ -16,9 +16,9 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { TONES } from 'braindog-render';
-  import { apiBase } from '$lib/at.ts';
+  import { apiBase, at } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
-  import { afterResume, forProject, openActions, stateOf, whatOf, words, type ActionRow, type ForProject, type Source } from '$lib/record/actions.ts';
+  import { afterResume, forProject, openActions, stateOf, usageHref, whatOf, words, type ActionRow, type ForProject, type Source } from '$lib/record/actions.ts';
   import { words as jobWords } from '$lib/record/jobs.ts';
   import { signInFor } from '$lib/record/packs.ts';
   import { reprove } from '$lib/record/vault.ts';
@@ -48,9 +48,9 @@
   const now = (): number => Date.now();
 
   async function load() {
-    const at = opened();
+    const started = opened();
     const out = await openActions((url, init) => fetch(url, init), apiBase());
-    closed(out.first.ok || out.absent, at);
+    closed(out.first.ok || out.absent, started);
     source = out.source;
     if (out.absent) from = 'absent';
     else if (out.first.ok) {
@@ -75,9 +75,9 @@
     if (!source || busy) return;
     busy = true;
     failed = null;
-    const at = opened();
+    const started = opened();
     const out = await source.resume(row.ingest);
-    closed(true, at);
+    closed(true, started);
     busy = false;
     if (!out.ok) {
       failed = { ingest: row.ingest, fix: out.refusal.fix, signin: signInFor(out.refusal) };
@@ -119,7 +119,7 @@
         {#if said.resume}
           <Button weight="quiet" disabled={busy} aria-label="{words.resume} {row.ingest}" onclick={() => void resume(row)}>{words.resume}</Button>
         {/if}
-        {#if said.usage}<Button weight="bare" href="/usage">{words.seeUsage}</Button>{/if}
+        {#if said.usage}<Button weight="bare" href={at(usageHref(row.project ?? ''))}>{words.seeUsage}</Button>{/if}
         {#if failed?.ingest === row.ingest && failed.signin}
           <Button weight="quiet" disabled={reproving} onclick={() => void signInAgain()}>{copy.signInAgain}</Button>
         {/if}

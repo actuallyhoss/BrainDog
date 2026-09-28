@@ -454,7 +454,6 @@ export const account = {
      these are the verbs around it, never applied on their own and Dismiss is terminal. */
   navShapeRecommend: 'A shape that might suit this record better',
   navShapeRecommendAccept: (label: string) => `Switch to ${label}`,
-  navShapeRecommendDismiss: 'Dismiss',
 
   /* the signing key — `53 §4` puts the public half on the export screen, and `03 §4` says why */
   theSignature: 'How anybody checks a copy is yours',

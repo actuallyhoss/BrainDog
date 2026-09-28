@@ -32,6 +32,7 @@ import {
   replaceStep,
   sayStep,
   blankStep,
+  withCondition,
   withTrigger,
   type Body,
   type Draft,
@@ -335,6 +336,13 @@ export class FlowDraft {
   setWhen(when: string) {
     this.#keepOnce();
     this.draft = { ...this.draft, when: when === '' ? null : when };
+  }
+
+  /** A query-builder tree has no setter of its own (EDT-2): `Inspector.svelte` marks the undo through this, then
+      assigns `flow.draft = withCondition(...)` directly. */
+  setCondition(cond: unknown) {
+    this.#keepOnce();
+    this.draft = withCondition(this.draft, cond);
   }
 
   select(key: string | null) {

@@ -164,7 +164,7 @@ export async function readBilling(io: Fetch = (u, i) => globalThis.fetch(u, i)):
   const out = await door(io, '/account/billing');
   if (!out.ok) return out;
   const answer = billingOf(out.value);
-  return answer ? { ok: true, value: answer } : { ok: false, refusal: { code: 'HTTP_200', fix: copy.billingUnread } };
+  return answer ? { ok: true, value: answer } : { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: copy.billingUnread } };
 }
 
 /**
@@ -181,7 +181,7 @@ export async function paymentPage(
   const out = await door(io, `/account/billing/${kind}`, { record });
   if (!out.ok) return out;
   const url = isObj(out.value) && typeof out.value.url === 'string' ? out.value.url : null;
-  return url && /^https:\/\//u.test(url) ? { ok: true, value: url } : { ok: false, refusal: { code: 'HTTP_200', fix: copy.billingUnread } };
+  return url && /^https:\/\//u.test(url) ? { ok: true, value: url } : { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: copy.billingUnread } };
 }
 
 /**

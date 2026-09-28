@@ -29,7 +29,7 @@
   so the tile is one target rather than a live block you can accidentally operate.
 -->
 <script lang="ts">
-  import { KINDS, isKind } from 'braindog-render';
+  import { KINDS, isKind, kindSpec } from 'braindog-render';
   import { Block, Degraded } from 'braindog-render/svelte';
 
   import { at } from '../at.ts';
@@ -123,7 +123,7 @@
         } catch {
           segments = [];
         }
-        return { kind, seed, segments, spec: isKind(kind) ? KINDS[kind] : undefined };
+        return { kind, seed, segments, spec: kindSpec(kind, installed) };
       }
       if (seed && bound) {
         try {
@@ -172,7 +172,7 @@
        * answer, and naming the one that does it today is how this comes back.
        */
       if (segments.length > 0 && segments.every((s2) => s2.type === 'degraded')) segments = [];
-      return { kind, seed, segments, spec: isKind(kind) ? KINDS[kind] : undefined };
+      return { kind, seed, segments, spec: kindSpec(kind, installed) };
     });
   });
 

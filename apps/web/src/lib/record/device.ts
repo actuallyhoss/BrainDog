@@ -46,6 +46,8 @@ export type TokenRow = {
   revoked_at: string | null;
   /** Present when the operator's cut-off ended it (OPS-10): it can do nothing, and the list says why. */
   ended_by?: 'operator';
+  /** Whose token this is, for the owner's `listTokens` (COL-10). Absent on a host older than the field. */
+  person_name?: string | null;
 };
 
 /**

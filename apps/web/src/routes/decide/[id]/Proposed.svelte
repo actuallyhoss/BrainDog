@@ -14,8 +14,9 @@
   without that either draws the lines and nothing more, which is what this screen drew before either.
 -->
 <script lang="ts">
-  import { apiBase } from '$lib/at.ts';
+  import { apiBase, at } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
+  import { words as patternWords } from '$lib/pattern/words.ts';
   import PageView from '$lib/page/PageView.svelte';
   import { drawnOf, openedOf, previewOf, words, type Proposed, type Rehearsed, type Tried } from './proposed.ts';
 
@@ -123,6 +124,7 @@
 <!-- A CHANGE THE RECORD WOULD NOT INSTALL IS SAID ONCE, in its sentence, under the lines that still say what it holds. -->
 {#if rehearsed?.from === 'refused'}<p class="appear-note">{rehearsed.fix}</p>{/if}
 {#if proposed.samples !== null}<p class="appear-note">{copy.proposalSamples(proposed.samples)}</p>{/if}
+{#if proposed.builder}<p class="appear-note"><a href={at(proposed.builder)}>{patternWords.openInBuilder}</a></p>{/if}
 
 <style>
   .appears {

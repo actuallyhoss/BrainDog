@@ -162,14 +162,34 @@ const OUT = {
   /* A WORD A STRANGER TYPES, read to tell which kind of record they want, and not a use case the core
      runs: the guide hears `payday` and offers Personal. */
   'packages/seed/src/usecases/personal.ts': {
-    why: 'the guide signals for Personal (1 hit).',
-    words: { payday: 'a word a person says about their own money, in the list the guide matches what they type against.' },
+    why: 'the guide signals for Personal, and its own pay-day parser matches what a person typed (2 hits).',
+    words: {
+      payday: 'a word a person says about their own money, in the list the guide matches what they type against.',
+      salary: '`PAY_WORDS` at line 610 matches a sentence like "my salary" as pay, for `payDayRow`: a phrase read out of the record\'s own words, never a branch on which use case is installed.',
+    },
+  },
+  'packages/seed/src/usecases/index.ts': {
+    why: 're-exports Personal\'s own row builder by its own name, the way `founder-poll.ts`\'s `pollPack` sits beside it (2 hits).',
+    words: { payday: '`export { payDayRow, type PayDay } from \'./personal.ts\';`, requested for `propose.ts` by MOD-17: a name carried through, not a branch taken on it.' },
+  },
+  'apps/web/src/lib/start/propose.ts': {
+    why: 'the one call site MOD-17 named for `personal.ts`\'s own row builder (2 hits).',
+    words: {
+      payday: 'the import and the one call of `payDayRow`, only reached inside `u?.usecase === \'personal\'`: Personal\'s pack, not this shell, decided pay day is a row, and this file only carries its name to the one place `personal.ts` cannot seed it from.',
+    },
   },
   'apps/site': {
-    why: 'the public site is prose about the product, not code that runs a record (3 hits).',
+    why: 'the public site is prose about the product, not code that runs a record (5 hits).',
     words: {
       egypt: 'the changelog entry at `routes/changelog/entries.ts:317` says `Egyptian pounds` about a currency fix that shipped.',
       sam: 'two changelog titles, at `routes/changelog/entries.ts:200` and `:354`, name the the old tool import as history.',
+      mercury: 'the home page names the Mercury pack twice, in `lib/copy/home.ts`: the inbox example ("connect Stripe and Mercury") and the packs line, exactly as it names Stripe, Money and Work.',
+    },
+  },
+  'packages/seed/src/packs/changelog.ts': {
+    why: 'a module\'s own changelog, read on its detail page: prose about what shipped, not a branch on a use case (2 hits).',
+    words: {
+      registrar: 'people 2.0.0\'s and money-core 1.3.0\'s notes name the role value People stopped offering, the same way the site\'s changelog names history.',
     },
   },
 };

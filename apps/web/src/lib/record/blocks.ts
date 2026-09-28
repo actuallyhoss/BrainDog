@@ -39,7 +39,7 @@
 
 import { across, convertMinor, dayFieldOf, rateFor, type Part, type Rate } from '@braindog/kernel';
 import { day as longDay, money, parse, since, workingCell, WORKING_MARK, type Block } from 'braindog-render';
-import { KINDS, isKind, showsOf, type CardRole } from 'braindog-render';
+import { KINDS, kindSpec, showsOf, type CardRole, type KindSpec } from 'braindog-render';
 /* WHICH FILES A CARD LEADS WITH, the renderer's list, read by `pictureCell`. */
 import { isPictureMime } from 'braindog-render';
 import type { Column } from 'braindog-render/svelte';
@@ -992,23 +992,23 @@ function linkedCharted(block: BlockResult, of: string): { charts: Charted; conve
   };
 }
 
-export function toSegments(block: BlockResult): ReturnType<typeof parse> {
+export function toSegments(block: BlockResult, kinds?: Readonly<Record<string, KindSpec>>): ReturnType<typeof parse> {
   const split = charted(block);
   if (split) {
     const one = split.charts.length === 1 && split.charts[0]!.currency === null;
     return [
       ...split.charts.flatMap(({ currency, block: part }) => [
         ...(one || currency === null ? [] : parse(`**${copy.inCurrency(currency)}**`, { page: true })),
-        ...drawSegments(part),
+        ...drawSegments(part, kinds),
         ...(split.converted ? parse(copy.figureConverted(longDay(split.converted)), { page: true }) : []),
       ]),
       ...(split.note ? parse(split.note, { page: true }) : []),
     ];
   }
-  return drawSegments(block);
+  return drawSegments(block, kinds);
 }
 
-function drawSegments(block: BlockResult): ReturnType<typeof parse> {
+function drawSegments(block: BlockResult, kinds?: Readonly<Record<string, KindSpec>>): ReturnType<typeof parse> {
   /* A NOTE THAT IS A WHOLE DOCUMENT, such as the plan and the decisions written on a project, is drawn as that document,
      blocks and all. One the row has not written yet is still its placeholder, and draws nothing, so `empty:` says so. */
   if (block.kind === 'note' && block.document) {
@@ -1025,7 +1025,7 @@ function drawSegments(block: BlockResult): ReturnType<typeof parse> {
   /* THE HERO FIGURE IS A FORM OF `stat`, written after the kind: ```stat lead. */
   const form = formOf(block);
   const head = `${block.kind}${form}${heading || (block.tone ? ` |  | ${block.tone}` : '')}`;
-  const spec = isKind(block.kind) ? KINDS[block.kind] : undefined;
+  const spec = kindSpec(block.kind, kinds);
 
   /* AUTHORED ROWS COME FIRST, and a block that declares both a source and authored rows is refused
      rather than resolved. Picking one would be a silent decision about where a block's content
@@ -1093,7 +1093,7 @@ function drawSegments(block: BlockResult): ReturnType<typeof parse> {
           : [];
   /* `page`, because this is a page's evaluator: it is the one caller that may draw the page-only
      kinds whose rows it wrote itself. `table` has no rows to write and still degrades. */
-  const segments = parse(['```' + head, ...rows, '```'].join('\n'), { page: true });
+  const segments = parse(['```' + head, ...rows, '```'].join('\n'), { page: true, ...(kinds ? { kinds } : {}) });
   /* EVERY FIELD OF AN `inputs` BLOCK IS THE ONE ROW IT EDITS, so each drawn row names that row: the write a change makes
      is an update of it at the version it was read at (`inputs-write.ts`). */
   if (block.kind === 'inputs' && block.register) return withRefs(segments, block.register, rows.map(() => block.entries[0]!).filter(Boolean));
@@ -1350,6 +1350,8 @@ export function draw(
    * declared `holds:` sentence come from the record and this file draws blocks.
    */
   held?: { rows: number; name: string; holds?: string; add?: { href: string; label: string } } | undefined,
+  /** The record's installed pack kinds (PLT-8, `kinds.ts` `installedKinds`), threaded to `toSegments` below. */
+  kinds?: Readonly<Record<string, KindSpec>>,
 ): { segments: ReturnType<typeof parse>; refusal: Refusal | null } {
   /**
    * Nothing matched — and which kind of nothing.
@@ -1497,7 +1499,7 @@ export function draw(
      one currency, so what came back could not say which it was in.
      A TILE'S FIGURE IS A HEADLINE, the second cell of each `stat` row, and says a round amount without its ".00". */
   const home = homeCurrency();
-  const segments = toSegments(block).map((s) =>
+  const segments = toSegments(block, kinds).map((s) =>
     s.type === 'block' && s.kind !== 'code' && s.kind !== 'capture' && s.kind !== 'inputs'
       ? { ...s, rows: s.rows.map((r) => ({ ...r, cells: r.cells.map((c, j) => symbolText(c, home, s.kind === 'stat' && j === 1)) })) }
       : s,

@@ -37,8 +37,10 @@
   import { valueSaid } from '$lib/voice.ts';
   import { dirOf, display, identityFor, toneOf } from '$lib/record/api.ts';
   import { REGISTERS } from '$lib/record/held.ts';
+  import { agentKey, agentName, handFor } from '$lib/record/hand.ts';
   import { isMoney, type Entry } from '$lib/record/schema.ts';
   import type { Names } from '$lib/record/remote.ts';
+  import Face from './Face.svelte';
   import Money from './Money.svelte';
 
   let {
@@ -91,6 +93,24 @@
       .catch(() => undefined);
   });
   const to = $derived(href ?? ((e: Entry) => `/r/${register}/${e.seq}`));
+
+  /**
+   * THE ROW'S HOLDER, AFTER A HAND (GAP-11): a person by their People row's own name, read as any other ref field is
+   * (`display`, so the record's `names` resolve it exactly as `card-figure` above does), or an agent by the name it
+   * signs with. `null` on a list with no `hand:` and on a row nobody has been handed.
+   */
+  const hand = $derived(decl ? handFor(decl) : null);
+  function holderOf(e: Entry): { name: string; kind: 'person' | 'agent' } | null {
+    if (!hand) return null;
+    if (hand.person && e.fields[hand.person] != null) {
+      const name = display(register, hand.person, e.fields[hand.person], now, names);
+      return name ? { name, kind: 'person' } : null;
+    }
+    if (hand.agent && typeof e.fields[hand.agent] === 'string' && e.fields[hand.agent] !== '') {
+      return { name: agentName(agentKey(e.fields[hand.agent])), kind: 'agent' };
+    }
+    return null;
+  }
 
   /**
    * THE ROW'S TONE, LATE OR CLOSE AND NOTHING ELSE.
@@ -268,6 +288,12 @@
               {#if line.word || line.date}<span aria-hidden="true">{' · '}</span>{/if}<span dir={dirOf(register, f)} data-enum={isEnum(f) ? '' : undefined}>{@render amount(saidOf(e, f))}</span>
             {/if}
           </span>
+          <!-- THE HOLDER'S FACE, after a hand (GAP-11): drawn beside the card's own line rather than a
+               third grid column, so a row nobody has handed keeps the same two-column layout as before. -->
+          {#if holderOf(e)}
+            {@const holder = holderOf(e)!}
+            <span class="card-holder" role="img" aria-label={holder.name}><Face name={holder.name} kind={holder.kind} size="s" /></span>
+          {/if}
           {#if picked?.has(e.seq)}
             <!-- A GLYPH, NOT A TINT. `13 §5.1`: colour never carries meaning alone, and "this row is one
                  of the four the bar above is about" is the meaning most worth not losing. -->
@@ -486,6 +512,14 @@
 
     .card:has(.card-pick) .card-b {
       grid-column: 1;
+    }
+
+    /* THE HOLDER'S FACE, ITS OWN ROW so it never overlaps the title, the figure or the tick above it (GAP-11). */
+    .card-holder {
+      grid-column: 1 / -1;
+      grid-row: 3;
+      justify-self: end;
+      display: inline-flex;
     }
 
     /* Sentence case in the stylesheet, so the text stays the record's own word for search and for a

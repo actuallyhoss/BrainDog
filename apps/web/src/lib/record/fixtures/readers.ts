@@ -794,8 +794,10 @@ export function boot() {
         })),
     },
     nav,
-    /** Pages that emerged and were never placed. A holding pen, not a decision (19 §3). */
-    pen: resolved.filter((p) => p.placed === false),
+    /** Pages that emerged and were never placed. A holding pen, not a decision (19 §3).
+        PGS-16: `Shell.pen` is now `PenItem[]` (`lib/design/pen.ts`), and this sample fixture never emits a change
+        offer, so it holds none rather than the old `PageDecl[]` shape. */
+    pen: [],
     me: {
       person: 'you',
       level: 'owner' as const,

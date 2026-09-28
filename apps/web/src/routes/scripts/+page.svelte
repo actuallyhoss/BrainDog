@@ -16,7 +16,7 @@
 <script lang="ts">
   import { page } from '$app/state';
   import { TONES, since } from 'braindog-render';
-  import { apiBase } from '$lib/at.ts';
+  import { apiBase, at } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
   import { titleOf } from '$lib/title.ts';
   import { read } from '$lib/data/read.svelte.ts';
@@ -59,12 +59,12 @@
     if (busy) return;
     busy = true;
     failed = null;
-    const at = opened();
+    const started = opened();
     const out = await resumeScript(apiBase(page.url), row.script);
-    closed(true, at);
+    closed(true, started);
     busy = false;
     if (!out.ok) {
-      const refusal = 'refusal' in out ? out.refusal : { code: 'CONFLICT', fix: copy.readRefused };
+      const refusal = 'refusal' in out ? out.refusal : { code: 'VERSION_STALE', fix: copy.writeRaced };
       failed = { script: row.script, fix: refusal.fix, signin: signInFor(refusal) };
       return;
     }
@@ -88,7 +88,11 @@
 <svelte:head><title>{titleOf(words.heading)}</title></svelte:head>
 
 <!-- THE HEAD IN EVERY STATE, so the screen always has its one `h1` and a refusal reads as this page's. -->
-<PageHead icon="code" title={words.heading} count={scripts.state === 'ready' ? rows.length : undefined} />
+<PageHead icon="code" title={words.heading} count={scripts.state === 'ready' ? rows.length : undefined}>
+  {#snippet actions()}
+    <Button weight="primary" href="/scripts/new">{words.newScript}</Button>
+  {/snippet}
+</PageHead>
 <div class="page">
   {#if scripts.state === 'waiting' || scripts.state === 'refused' || scripts.state === 'offline'}
     <ReadState state={scripts.state} refusal={scripts.refusal} onretry={scripts.reread} />
@@ -99,7 +103,7 @@
       {#each rows as s (s.id)}
         {@const said = stateOf(s, now())}
         <li class="card">
-          <h2 class="card-title">{s.title}</h2>
+          <h2 class="card-title"><a href={at(`/scripts/${s.script}`)}>{s.title}</a></h2>
           <p class="card-state" data-intent={said.tone}>
             {#if said.tone}<span class="glyph" role="img" aria-label={TONES[said.tone].label}>{TONES[said.tone].glyph}</span>{/if}
             {said.line}

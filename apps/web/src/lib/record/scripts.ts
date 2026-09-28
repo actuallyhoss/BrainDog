@@ -179,6 +179,8 @@ export function afterResume(rows: readonly Script[], script: string, nowIso: str
 
 export const words = {
   heading: 'Scripts',
+  /* THE ONE WAY IN, since nothing on this list otherwise starts a script (SCR-3). */
+  newScript: 'New script',
   none: 'No scripts yet',
   noneWhy: 'A script is a short program an agent writes and you accept. It runs on a clock, when something arrives, or when an automation starts it, and it may only read, write and fetch what it declares.',
   resume: 'Resume',

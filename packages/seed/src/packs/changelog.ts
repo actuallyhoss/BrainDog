@@ -49,6 +49,11 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '1.3.0', notes: 'Services says who a row is with, where it said a registrar.' },
   ],
   work: [
+    {
+      version: '1.9.0',
+      notes:
+        'Work leads with a line to capture what is on your mind, and your tasks and the Board sort by tier then due day. It adds a queue of what agents ask about tasks, a two-week timeline and a twelve-week heat of what got done, and a task can carry why it matters.',
+    },
     { version: '1.8.0', notes: 'Finishing a task closes the steps still open under it, and a step added under a task starts in its project.' },
     { version: '1.7.0', notes: 'An update can be written by anybody, not only one of four agent vendors.' },
     { version: '1.6.0', notes: 'Work\'s own page lists tasks as checklists cut so that each task sits under exactly one: Today, This week, Waiting on you, With an agent, After this week, Later and No due day.' },

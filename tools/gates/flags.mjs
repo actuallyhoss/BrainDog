@@ -164,7 +164,14 @@ export default async function flagsGate(root = process.env.BRAINDOG_GATE_ROOT ??
     if (file === DECL) continue;
     const text = readable((await readFile(file, 'utf8')).replace(CRLF, '\n'));
     const where = relative(ROOT, file).replace(/\\/g, '/');
-    for (const m of text.matchAll(/\bflags\.([A-Za-z]\w*)\b/g)) {
+    /* NOT AFTER A DOT. `form.flags`, `draft.flags` and `blockWords.flags` are a block's own boolean
+       keys (`lib/record/block-edit.ts` `Flag`), a domain word that collides with this module's import
+       name; the real import is always bare (`import { flags } from '$lib/flags.ts'` then `flags.x`),
+       so a `flags.x` with a member access in front of it is somebody else's object, not a read of this
+       one. Measured over `apps/web/src` on 28 September: `BlockEditor.svelte`'s `form.flags.length`,
+       `form.flags as flag`, `draft.flags[flag]` and `blockWords.flags[flag]` were the only four hits,
+       and none of them is this file's `flags`. */
+    for (const m of text.matchAll(/(?<!\.)\bflags\.([A-Za-z]\w*)\b/g)) {
       const at = text.slice(0, m.index).split('\n').length;
       if (!uses.has(m[1])) uses.set(m[1], []);
       uses.get(m[1]).push(`${where}:${at}`);

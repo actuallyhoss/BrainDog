@@ -28,10 +28,10 @@ export type PackState = { id: string; version: string | null; disabled_at: strin
 export type PackToggle = { id: string; state: 'enabled' | 'disabled'; changed: boolean; packs: string[]; declarations: string[]; said: string };
 
 /** The seven types a setting may take (`loop/research-modular.md` §1.3). */
-export type ConfigType = 'text' | 'enum' | 'bool' | 'money' | 'day' | 'duration' | 'number';
+export type ConfigType = 'text' | 'enum' | 'bool' | 'money' | 'day' | 'duration' | 'number' | 'list';
 
-/** One setting as `packConfig` answers it. */
-export type ConfigDecl = { type: ConfigType; values?: readonly string[]; default?: unknown; label?: string; note?: string };
+/** One setting as `packConfig` answers it. `max` bounds a `list`'s item count (contracts.md platform S, PLT-7). */
+export type ConfigDecl = { type: ConfigType; values?: readonly string[]; default?: unknown; label?: string; note?: string; max?: number };
 
 /** What `packConfig` answers: what the manifest declares, and the value each setting holds now. */
 export type PackConfig = { id: string; version: string | null; config: Record<string, ConfigDecl>; values: Record<string, unknown> };

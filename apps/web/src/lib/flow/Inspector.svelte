@@ -72,7 +72,6 @@
     triggerKind,
     varsBefore,
     verbOf,
-    withCondition,
     words,
     type Arg,
     type CondField,
@@ -306,19 +305,11 @@
   }
 
   /*
-   * THE TRIGGER'S CONDITION, EITHER FORM. `FlowDraft` has `setWhen` for a sentence and nothing for a tree, and the page's
-   * file is EDT-1's; so the sentence goes through `setWhen`, which also marks the undo, and a tree is put in place by
-   * `withCondition` straight after it. A `setCondition` of its own on the draft is the tidier home (asked for in this
-   * unit's report).
+   * THE TRIGGER'S CONDITION, EITHER FORM (EDT-2): `flow.setCondition` marks the undo and files whichever one the
+   * editor is holding, sentence, tree or nothing, through `withCondition`, which keeps one form at a time.
    */
   function setWhenOf(next: string | Predicate | null) {
-    if (typeof next === 'string' || next === null) {
-      flow.setWhen(next ?? '');
-      if (flow.draft.whenTree !== null) flow.draft = withCondition(flow.draft, next ?? '');
-      return;
-    }
-    flow.setWhen('');
-    flow.draft = withCondition(flow.draft, next);
+    flow.setCondition(next);
   }
 
   /* ── the trigger ──────────────────────────────────────────────────────── */

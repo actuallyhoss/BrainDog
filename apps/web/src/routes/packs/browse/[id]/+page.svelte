@@ -20,6 +20,7 @@
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
   import { onMount, untrack } from 'svelte';
+  import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { createClient } from '@braindog/client';
   import type { CatalogueIndex, Reach, Trust } from '@braindog/declare/catalogue';
@@ -48,6 +49,7 @@
   import { moduleTitle } from '../../sharing.ts';
   import Preview from '../Preview.svelte';
   import { browserStore, catalogueText, keepFirstKey, readHostCatalogue, signedWords, trustForEntry, trustWords } from '../catalogue.ts';
+  import { FIXABLE, hasTheme, stageFix } from '$lib/theme/staged.ts';
   import { askOnDecide, diffOf, install, notOwner, planFor, turnOn, type OfferClient, type Planned } from './offer.ts';
 
   const KINDS: readonly ListingKind[] = ['module', 'usecase', 'pack'];
@@ -289,7 +291,14 @@
       {#if listing.source === 'kennel'}<p class="meta key"><Icon name={latest?.signature ? 'key' : 'info'} size="s" />{signedWords(latest?.signature)}</p>{/if}
       {#if said}<p class="trust" data-loud={said.loud ? '' : undefined} role={said.loud ? 'alert' : undefined}>{#if said.loud}<Icon name="alert" size="s" />{/if}{said.text}</p>{/if}
       <div class="act wide-only">{@render act()}</div>
-      {#if refused}<p class="said" role="status">{refused.fix}{#if refused.code}<span class="code">{copy.refusalCode(refused.code)}</span>{/if}</p>{/if}
+      {#if refused}
+        <p class="said" role="status">{refused.fix}{#if refused.code}<span class="code">{copy.refusalCode(refused.code)}</span>{/if}</p>
+        <!-- A THEME PACK REFUSED AT INSTALL OFFERS "Fix and install" (GAP-3): the editor side, staging and the failing
+             roles selected, is built; this is the one press that reaches it from here. -->
+        {#if refused.code && FIXABLE.has(refused.code) && hasTheme(file?.doc)}
+          <Button onclick={() => { stageFix(file?.doc); void goto(at('/settings/appearance')); }}>{copy.lookFixAndInstall}</Button>
+        {/if}
+      {/if}
     </section>
 
     {#if planned}
