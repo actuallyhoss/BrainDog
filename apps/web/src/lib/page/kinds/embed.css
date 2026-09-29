@@ -40,7 +40,7 @@
 
   .embed-frame {
     display: block;
-    background: var(--sunk);
+    background: var(--s1);
   }
 
   /* THE FACADE IS A WELL CUT INTO THE BLOCK, the words at its foot and the one button under them, so it reads as a
@@ -52,7 +52,7 @@
     align-items: start;
     gap: var(--sp-1);
     padding: var(--sp-4);
-    background: var(--sunk);
+    background: var(--s1);
   }
 
   .embed-title {
@@ -76,9 +76,9 @@
     min-block-size: var(--ctl-h);
     margin-block-start: var(--sp-2);
     padding-inline: var(--sp-4);
-    border: 1px solid var(--edge);
-    border-radius: var(--r-md);
-    background: var(--s1);
+    border: 1px solid transparent;
+    border-radius: var(--r-pill);
+    background: var(--bg);
     color: var(--ink);
     font: inherit;
     font-size: var(--t-base);
@@ -89,7 +89,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     .embed-load:hover {
-      border-color: var(--ink2);
+      border-color: var(--line);
     }
   }
 

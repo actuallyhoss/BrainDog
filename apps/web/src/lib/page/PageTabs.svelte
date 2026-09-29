@@ -9,9 +9,9 @@
   That is also why this is a `nav` of links with `aria-current` and not an ARIA `tablist`: a tablist promises arrow keys
   that move between panels on one page, and these go to another page.
 
-  IT IS THE APP'S OWN CONTROL, NOT THE DECLARING PACK'S. "Here" is the rail's here (`s2` and full ink, no accent), the
-  row has the rail's height and the rail's type, and nothing in it takes a colour from the record (DIRECTION 28: what a
-  person builds is structure, and BrainDog's look stays its own).
+  IT IS THE APP'S OWN CONTROL, NOT THE DECLARING PACK'S: the toolbar's glass segmented control (SYSTEM §5), "here" the
+  white pill in it, and nothing in it takes a colour from the record (DIRECTION 28: what a person builds is structure,
+  and BrainDog's look stays its own).
 -->
 <script lang="ts">
   import { at } from '../at.ts';
@@ -75,38 +75,43 @@
 </nav>
 
 <style>
-  /* THE STRIP SPANS THE COLUMN AND THE ROW IN IT CARRIES THE GUTTER, so the first tab starts on the title's left edge
-     and a row too long for the screen scrolls out to the screen's own edge rather than being cut a gutter short of it.
-     The page head under it pads by the same `--gutter`, and `--page-max` is the page grid's own width. */
+  /* THE STRIP IS A GLASS SEGMENTED CONTROL ON THE GROUND (SYSTEM §5, `controls.css`'s `.segmented`): a glass track with
+     its hairline pair, each tab a pill in it, and the page you are on the tile's own white pill lifted by a tiny
+     shadow, a shape and not a shade. It sits in the page's gutter, on the title's left edge, and `--page-max` is the
+     page grid's own width. */
   .page-tabs {
     display: flex;
     align-items: center;
+    gap: var(--sp-2);
     min-inline-size: 0;
     max-inline-size: var(--page-max);
-    padding-block-start: var(--sp-3);
-    border-block-end: 1px solid var(--line);
+    padding: var(--sp-3) var(--gutter) 0;
   }
 
-  /* NEVER WRAPS, SCROLLS SIDEWAYS. A second line of tabs reads as a second set of places, and it pushes the page down
-     by a row each time a section grows. The block padding is the focus ring's room: the ring sits 4px outside a tab,
-     and a box that scrolls on one axis clips on both. */
+  /* NEVER WRAPS, SCROLLS SIDEWAYS INSIDE ITS TRACK. A second line of tabs reads as a second set of places, and it
+     pushes the page down by a row each time a section grows. */
   .tab-row {
     display: flex;
-    flex: 1 1 auto;
-    gap: var(--sp-1);
+    flex: 0 1 auto;
+    gap: 2px;
     min-inline-size: 0;
-    padding: var(--sp-1) var(--gutter);
+    padding: 3px;
     overflow-x: auto;
     overflow-y: hidden;
     overscroll-behavior-inline: contain;
     scrollbar-width: none;
+    background: var(--glass);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    border-radius: var(--r-pill);
+    box-shadow: var(--glass-edge);
   }
 
-  /* AND THE EDGE WHERE IT IS CUT FADES, because its scrollbar is hidden and a tab sliced at the screen's edge said
+  /* AND THE EDGE WHERE IT IS CUT FADES, because its scrollbar is hidden and a tab sliced at the track's edge said
      nothing about the tabs past it (pages §2.5, PageTabs). The wide table's fade (`blocks.css`, `.table-region`): the
      row's own inline scroll timeline moves the two fade widths, `--edge-start` and `--edge-end`, which that sheet
-     registers as lengths so they animate. A row that fits has no timeline and no fade, and a browser without scroll
-     timelines draws the row as it did. The mask reads only alpha, so `--ink` is the kept part. */
+     registers as lengths so they animate. A row that fits has no timeline and no fade. The mask reads only alpha, so
+     `--ink` is the kept part. */
   @keyframes tab-edges {
     0% {
       --edge-start: 0px;
@@ -146,24 +151,26 @@
     }
   }
 
-  /* `--ctl-h` TALL AND NO `.tap`. The hit box `.tap` adds is a pseudo-element reaching 6px past a 32px tab on each
-     side, 2px past the row's 4px of padding, and a box that scrolls on one axis counts that as overflow on the other.
-     Under a thumb `--ctl-h` is 44 already, which is the target `.tap` exists to reach. (Arithmetic from the tokens, not
-     a browser measurement: the browser gates were not run for this brief.) */
+  /* A SEGMENT: the track's 3px comes off it, so the whole control is `--ctl-h`, and under a thumb `--ctl-h` is 44
+     already, the target `.tap` exists to reach. No `.tap`: its pseudo-element reaching past the tab counts as overflow
+     in a box that scrolls on one axis. */
   .tab {
     display: inline-flex;
     flex: 0 0 auto;
     align-items: center;
     gap: var(--sp-2);
-    min-block-size: var(--ctl-h);
+    min-block-size: calc(var(--ctl-h) - 6px);
     padding-inline: var(--sp-3);
-    border-radius: var(--r-sm);
+    border-radius: var(--r-pill);
     color: var(--ink2);
     font-size: var(--t-sm);
     font-weight: 500;
     white-space: nowrap;
     text-decoration: none;
-    transition: background var(--d-state) var(--ease-out);
+    transition:
+      background var(--d-state) var(--ease-out),
+      box-shadow var(--d-state) var(--ease-out),
+      color var(--d-state) var(--ease-out);
   }
 
   /* A NAME IS SOMEBODY'S OWN WORDS, and a row title can be a sentence. Past 16rem it ends in an ellipsis, so one
@@ -174,37 +181,50 @@
     text-overflow: ellipsis;
   }
 
-  .tab:hover {
-    background: var(--hover-wash);
-    color: var(--ink);
+  /* HOVER ONLY WHERE THERE IS ONE. A phone reports `:hover` on the last thing tapped and keeps it. */
+  @media (hover: hover) and (pointer: fine) {
+    .tab:hover {
+      background: var(--hover-wash);
+      color: var(--ink);
+    }
   }
 
-  /* Where you are, said the way the rail and the top bar say it: `s2` and full ink, no accent. */
+  /* Where you are: the tile's white pill with a tiny shadow and a hairline, so it is a shape on the glass in light and
+     in dark, where a shadow alone does not show. Ink, and no weight change. */
   .tab[aria-current='page'],
   .tab-more[data-here] .tab {
-    background: var(--s2);
+    background: var(--bg);
+    box-shadow:
+      0 1px 2px color-mix(in srgb, var(--ink) 12%, transparent),
+      0 0 0 0.5px var(--line);
     color: var(--ink);
   }
 
+  /* MORE IS ITS OWN GLASS PILL BESIDE THE TRACK, as a toolbar's pill buttons are. */
   .tab-more {
     flex: 0 0 auto;
-    padding-inline-end: var(--gutter);
+    padding: 3px;
+    background: var(--glass);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    border-radius: var(--r-pill);
+    box-shadow: var(--glass-edge);
   }
 
   .tally {
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
   }
 
   /* The Menu's rows, as the rail's switcher draws them: a list of places, one of which you may be in. */
   .mi {
     display: flex;
     align-items: center;
-    min-block-size: 34px;
+    min-block-size: calc(var(--ctl-h-sm) + var(--sp-1));
     padding: 0 var(--sp-3);
-    border-radius: var(--r-sm);
+    border-radius: var(--r-md);
     color: var(--ink2);
-    font-size: var(--t-ui);
+    font-size: var(--t-base);
     text-decoration: none;
   }
 
@@ -223,5 +243,17 @@
   .mi[aria-current] {
     color: var(--ink);
     font-weight: 600;
+  }
+
+  /* FORCED COLOURS DROP THE GLASS AND THE LIFT, so the track keeps an edge and the current tab an outline. */
+  @media (forced-colors: active) {
+    .tab-row,
+    .tab-more {
+      border: 1px solid CanvasText;
+    }
+
+    .tab[aria-current='page'] {
+      outline: 1px solid CanvasText;
+    }
   }
 </style>

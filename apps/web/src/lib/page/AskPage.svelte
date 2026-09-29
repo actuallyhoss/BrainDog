@@ -255,9 +255,9 @@
   .ask-field {
     inline-size: 100%;
     padding: var(--sp-3);
-    background: var(--bg);
-    border: 1px solid var(--edge);
-    border-radius: var(--r-sm);
+    background: var(--s1);
+    border: 1px solid transparent;
+    border-radius: var(--r-md);
     color: var(--ink);
     font-family: var(--font-ui);
     font-size: var(--t-ui);
@@ -278,9 +278,9 @@
     inline-size: 100%;
     min-block-size: var(--ctl-h);
     padding: var(--sp-2) var(--sp-3);
-    background: none;
-    border: 1px solid var(--edge);
-    border-radius: var(--r-sm);
+    background: var(--s1);
+    border: 1px solid transparent;
+    border-radius: var(--r-md);
     color: var(--ink);
     font: inherit;
     font-size: var(--t-ui);

@@ -38,6 +38,7 @@
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import IconWell from '$lib/ui/IconWell.svelte';
   import Actions from './panels/Actions.svelte';
   import ActionRows from './panels/ActionRows.svelte';
   import Reporting from './panels/Reporting.svelte';
@@ -191,9 +192,11 @@
 </script>
 
 <header class="block-bar">
-  <!-- A BLOCK WITH NO AUTHORED `heading:` PRINTS ITS KIND'S NAME, never its dialect id: an id is what an agent writes
-       into a declaration, a name is what a person reads. AN AUTHORED ONE IS READ AS TEXT, so `{{icon:rocket}} shipped`
-       draws the rocket (PGS-4) rather than its braces. -->
+  <!-- THE TILE'S HEADING ROW (SYSTEM §6): the block's own glyph in its well when it declares one, the name, and where
+       its rows live at the right. A BLOCK WITH NO AUTHORED `heading:` PRINTS ITS KIND'S NAME, never its dialect id: an
+       id is what an agent writes into a declaration, a name is what a person reads. AN AUTHORED ONE IS READ AS TEXT, so
+       `{{icon:rocket}} shipped` draws the rocket (PGS-4) rather than its braces. -->
+  {#if block.icon && isGlyph(block.icon)}<IconWell name={block.icon} />{/if}
   <svelte:element this={level === 3 ? 'h3' : 'h2'} class="block-name" id="{ids}h-{i + 1}"
     >{#if block.heading}<Text nodes={inline(block.heading, { icon })} opts={{ icon }} />{:else}{copy.kindNames[block.kind] ?? block.kind}{/if}</svelte:element
   >
@@ -308,25 +311,25 @@
 {/if}
 
 <style>
-  /* NO RULE UNDER THE HEADER. The name at the section size is what says a block starts here, and a hairline under it
-     was a second device doing the same job. The source link shares the name's baseline, which is what keeps the two
-     halves of the header together. */
+  /* THE TILE'S HEADING ROW (SYSTEM §6, `ui/Tile.svelte`'s): the well, the name at `--t-row` 600, and the source as the
+     meta at the right, one well high, with the tile's 16 under it. No rule under it: the name is what says a block
+     starts here. */
   .block-bar {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     gap: var(--sp-3);
-    margin-block-end: var(--sp-3);
+    min-block-size: var(--well);
+    margin-block-end: var(--sp-4);
   }
 
-  /* A BLOCK NAME IS A HEADING AND LOOKS LIKE ONE: the second level of the page's hierarchy, under the page title and
-     over everything in the block, at the size `Section` gives every other heading at that level. Section size, not
-     page size: 20px belongs to the page title alone. */
   .block-name {
+    min-inline-size: 0;
+    margin: 0;
     color: var(--ink);
     font-family: var(--font-ui);
-    font-size: var(--t-base);
+    font-size: var(--t-row);
     font-weight: 600;
-    letter-spacing: -0.005em;
+    line-height: 20px;
   }
 
   /* Every block header names its source, and `o` opens that list PRE-FILTERED to the block's own `where:`. That is the
@@ -338,8 +341,9 @@
     gap: var(--sp-1);
     margin-inline-start: auto;
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
     text-decoration: none;
+    transition: color var(--d-state) var(--ease-out);
   }
 
   .block-source:hover {

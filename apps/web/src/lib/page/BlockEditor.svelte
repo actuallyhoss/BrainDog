@@ -430,12 +430,13 @@
     margin-block-start: var(--sp-5);
   }
 
+  /* A FIELD'S LABEL SITS ABOVE IT in the meta step and the second ink (SYSTEM §6, fields). */
   .label {
     margin: 0;
-    color: var(--ink);
+    color: var(--ink2);
     font-family: var(--font-ui);
     font-size: var(--t-sm);
-    font-weight: 600;
+    font-weight: 500;
   }
 
   .help {
@@ -456,7 +457,7 @@
   .kept {
     margin: 0;
     padding: var(--sp-2) var(--sp-3);
-    background: var(--sunk);
+    background: var(--s1);
     border-radius: var(--r-md);
     color: var(--ink2);
     font-size: var(--t-sm);
@@ -510,9 +511,12 @@
     block-size: var(--ctl-h);
     background: none;
     border: 0;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-pill);
     color: var(--dim);
     cursor: pointer;
+    transition:
+      background var(--d-state) var(--ease-out),
+      color var(--d-state) var(--ease-out);
   }
 
   .icon-btn:hover {

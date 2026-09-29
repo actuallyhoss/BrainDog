@@ -424,17 +424,18 @@
      column to the rightmost, and people lost their spatial memory of where a control lived. A flow cannot do that: the
      order you declared is the order you get, at every width.
 
-     `align-items: start` so a half-width block beside a tall one keeps its own height instead of stretching to match.
+     THE PAGE SITS ON THE GROUND AND EVERY BLOCK IS A TILE ON IT (SYSTEM §4, §6): 12 between tiles on both axes, and the
+     tiles of one row stretch to one height, so a row reads as a row of tiles rather than a skyline. The page has no
+     surface of its own; the ground and its light are the shell's.
 
      THE CAP IS FOR THE PROSE, NOT FOR THE PAGE. The page gets the width a dashboard can use, `--page-max`, and running
-     text keeps its own 72ch measure inside the block that has it, rather than every block paying for the one that reads
-     like a paragraph. */
+     text keeps its own 72ch measure inside the block that has it. */
   .page {
+    --tile-pad: 20px;
     display: grid;
     grid-template-columns: repeat(12, minmax(0, 1fr));
-    align-items: start;
-    gap: var(--sp-7) var(--sp-6);
-    padding: var(--sp-5) var(--gutter) var(--sp-9);
+    gap: var(--sp-3);
+    padding: var(--sp-3) var(--gutter) var(--sp-9);
     max-inline-size: var(--page-max);
   }
 
@@ -448,15 +449,14 @@
 
   /* ── the main column and the rail (brief D4) ──────────────────────────────
      THE TWO COLUMNS ARE SPANS OF THE PAGE'S OWN TWELVE, so the rail's `4` is four of the same twelfths a block's span is
-     counted in, and the gutter between the columns is the gutter between blocks. THE MAIN COLUMN IS A TWELVE-COLUMN FLOW
-     OF ITS OWN, so `span: 6` there is half the main column, not half the page. THE RAIL IS ONE STACK, and a block's span
-     means nothing in it: every block is the rail's width, one under another, each as tall as itself. `align-items:
-     start` on `.page` keeps the rail its own height rather than the main column's, and a sticky rail depends on it. */
+     counted in. THE MAIN COLUMN IS A TWELVE-COLUMN FLOW OF ITS OWN, so `span: 6` there is half the main column, not half
+     the page. THE RAIL IS ONE STACK, and a block's span means nothing in it. Each area is its own height, which a sticky
+     rail depends on. */
   .area {
     display: grid;
     grid-column: span var(--area-span, 12);
-    align-items: start;
-    gap: var(--sp-7) var(--sp-6);
+    align-self: start;
+    gap: var(--sp-3);
     min-inline-size: 0;
   }
 
@@ -473,8 +473,8 @@
 
   .area[data-area='rail'] {
     grid-template-columns: minmax(0, 1fr);
-    /* Where it sticks, set whether or not it does: the same offset the settings page's sticky list uses, under the page
-       head, and the offset this component subtracts when it measures whether the rail fits. */
+    /* Where it sticks, set whether or not it does: under the page head, and the offset this component subtracts when it
+       measures whether the rail fits. */
     inset-block-start: calc(var(--sticky) + var(--sp-4));
   }
 
@@ -490,25 +490,76 @@
     }
   }
 
-  /* A BOXED SECTION'S SURFACE: the section and the blocks after it, up to the next section, on one panel. The page is
-     `--bg`, this is one step up at `--s1` with the hairline a lifted panel has, and the cards inside it sit a step above
-     that. `--r-lg` because it holds `--r-md` cards with padding between. Inside it the blocks keep their spans, as
-     twelfths of the box. */
+  /* ── the tile ─────────────────────────────────────────────────────────────
+     A BLOCK IS A TILE (SYSTEM §6): the tile surface at the large radius, 20 in, at the first level of depth, and no
+     border. Its heading row is `BlockSlot`'s. */
+  .block-slot {
+    grid-column: span var(--span, 12);
+    /* Required, not decorative: the tracks are `minmax(0, 1fr)` and a grid item without it refuses to shrink below its
+       content, so one wide table pushes the whole row past the page. */
+    min-inline-size: 0;
+    /* The landing line is positioned against this. */
+    position: relative;
+    padding: var(--tile-pad);
+    background: var(--bg);
+    border-radius: var(--r-lg);
+    box-shadow: var(--e1);
+    /* `#b-4` must not scroll underneath the sticky header. Paid once, per anchor. */
+    scroll-margin-block-start: calc(var(--sticky) + var(--sp-4));
+  }
+
+  /* A BOXED SECTION IS ONE TILE: the section and the blocks after it, up to the next section, and no tile inside it
+     (SYSTEM §4). Its blocks are sections of the one surface, still laid out by their spans as twelfths of it. */
   .box {
     grid-column: 1 / -1;
     display: grid;
     grid-template-columns: repeat(12, minmax(0, 1fr));
-    align-items: start;
-    gap: var(--sp-5) var(--sp-6);
+    gap: var(--sp-5);
     min-inline-size: 0;
-    padding: var(--sp-5);
-    background: var(--s1);
-    border: 1px solid var(--line);
+    padding: var(--tile-pad);
+    background: var(--bg);
     border-radius: var(--r-lg);
+    box-shadow: var(--e1);
   }
 
   .area[data-area='rail'] .box {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* FORCED COLOURS DELETE THE SHADOW, and a tile with no edge would be words on nothing. */
+  @media (forced-colors: active) {
+    .block-slot,
+    .box {
+      border: 1px solid CanvasText;
+    }
+  }
+
+  /* NOT A TILE: a block inside a boxed tile, a section, which is a group heading on the ground (SYSTEM §6), and the
+     page's sentence (`note lead`), which is the title row's line under the title (SYSTEM §5). */
+  .box > .block-slot,
+  .block-slot:has(> :global(.block[data-kind='section'])),
+  .block-slot:has(> :global(.block[data-kind='note'][data-form='lead'])) {
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  /* The sentence is its own line and carries no name over it. The region keeps its name: a reference to a hidden
+     heading still reads its text. */
+  .block-slot:has(> :global(.block[data-kind='note'][data-form='lead'])) > :global(.block-bar) {
+    display: none;
+  }
+
+  /* A group heading keeps air above it and none below, so it reads as the head of the tiles after it. */
+  .block-slot:not(.box > *):has(> :global(.block[data-kind='section'])) {
+    padding-block-start: var(--sp-5);
+  }
+
+  /* The figure's own bottom margin is the LIST's spacing, and the grid already provides it. */
+  .block-slot :global(.block) {
+    margin-block-end: 0;
   }
 
   /* While arranging, the block's way to the other column, under its bar and at its leading edge. */
@@ -517,69 +568,39 @@
     margin-block-end: var(--sp-2);
   }
 
-  /* UNDER 900px THE RAIL FOLLOWS THE MAIN COLUMN, the app's one narrow breakpoint, for the reason the page's own single
-     column gives below: the declared order is the one thing a narrow screen keeps. At 390 the page is 358px between the
-     16px gutters, both columns take all of it, and the rail's blocks come after the main column's in the order they
-     were declared. A box drops its inner columns and a step of padding. */
-  @media (width < 900px) {
-    .area,
-    .area[data-area='main'],
-    .area[data-area='rail'] {
-      grid-column: 1 / -1;
-      grid-template-columns: minmax(0, 1fr);
-    }
-
-    .box {
-      grid-template-columns: minmax(0, 1fr);
-      padding: var(--sp-4);
-    }
-  }
-
-  .block-slot {
-    grid-column: span var(--span, 12);
-    /* Required, not decorative: the tracks are `minmax(0, 1fr)` and a grid item without it refuses to shrink below its
-       content, so one wide table pushes the whole row past the page. */
-    min-inline-size: 0;
-    /* The landing line is positioned against this. */
-    position: relative;
-  }
-
-  /* `#b-4` must not scroll underneath the sticky header. Paid once, per anchor. */
-  .block-slot {
-    scroll-margin-block-start: calc(var(--sticky) + var(--sp-4));
-  }
-
-  /* The figure's own bottom margin is the LIST's spacing, and the grid already provides it. Both were applying, so every
-     gap on a declared page was 48px where the token says 24. */
-  .block-slot :global(.block) {
-    margin-block-end: 0;
-  }
-
-  /* The cursor is a BAND on the leading edge, not a box around the block. A block is already a bordered card; a second
-     border around it reads as two nested boxes rather than as "this one". IN THE FOCUS INK, NOT THE BRAND RED: the
-     accent lives only on the mark, the record tile, /start, /signin and `::selection` (design D-1), and a red band
-     beside a block reads as that block being late. */
+  /* THE CURSOR IS THE FOCUS RING, round the tile it is on, in the focus ink and never the brand's red (design D-1). */
   .block-slot[data-cursor] {
     outline: 2px solid var(--focus-in);
-    outline-offset: var(--sp-2);
-    border-radius: var(--r-sm);
+    outline-offset: 2px;
   }
 
   /* ── arranging ────────────────────────────────────────────────────────────
-     The block is outlined rather than lifted. A card that grows a shadow the moment a mode opens tells you the mode
-     changed the page; an outline tells you the mode changed what you can do TO the page, which is the true thing. */
+     The tile is marked rather than lifted. A card that grows a shadow the moment a mode opens tells you the mode
+     changed the page; a dashed edge a step outside it tells you the mode changed what you can do TO the page. The
+     content keeps its contrast, so the words stay readable, which they have to be to know which block you are holding. */
   .block-slot[data-arranging] {
     outline: 1px dashed var(--edge);
-    outline-offset: var(--sp-2);
-    border-radius: var(--r-sm);
+    outline-offset: 3px;
     cursor: grab;
   }
 
-  /* THE LANDING LINE. A 3px bar on the edge the held block will arrive at, drawn with a pseudo-element so it sits over
-     the block's own border rather than moving it: a border that appears on hover reflows the grid under the pointer,
-     which makes a drag feel like it is fighting you. `--z-raise` because it clears its own sibling inside one local
-     stacking context, above it and below every overlay. */
+  .block-slot[data-arranging] :global(.block) {
+    pointer-events: none;
+  }
+
+  /* The one moving. Half-visible rather than hidden, so the row you are dragging out of does not collapse under the
+     pointer. */
+  .block-slot[data-dragging] {
+    opacity: 0.45;
+    outline-style: solid;
+    outline-color: var(--ink);
+  }
+
+  /* THE LANDING LINE, a 3px ink bar in the middle of the gap on the edge the held block will arrive at, drawn on a
+     pseudo-element so nothing reflows under the pointer. `--z-raise` clears its own sibling and stays under every
+     overlay. */
   .block-slot[data-drop]::after {
+    --mid: calc(var(--sp-3) / -2 - 1.5px);
     content: '';
     position: absolute;
     z-index: var(--z-raise);
@@ -591,64 +612,49 @@
   /* Side by side: a vertical line on the leading or trailing edge. */
   .block-slot[data-drop='before']::after,
   .block-slot[data-drop='after']::after {
-    inset-block: calc(var(--sp-2) * -1);
+    inset-block: 0;
     inline-size: 3px;
   }
 
   .block-slot[data-drop='before']::after {
-    inset-inline-start: calc(var(--sp-3) * -1);
+    inset-inline-start: var(--mid);
   }
 
   .block-slot[data-drop='after']::after {
-    inset-inline-end: calc(var(--sp-3) * -1);
+    inset-inline-end: var(--mid);
   }
 
   /* Full width: it stacks, so the line goes across the top or the bottom instead. */
-  .block-slot[data-stacked][data-drop='before']::after,
-  .block-slot[data-stacked][data-drop='after']::after {
-    inset-inline: calc(var(--sp-2) * -1);
+  .block-slot[data-stacked][data-drop]::after {
+    inset-inline: 0;
     inset-block: auto;
     inline-size: auto;
     block-size: 3px;
   }
 
   .block-slot[data-stacked][data-drop='before']::after {
-    inset-block-start: calc(var(--sp-3) * -1);
+    inset-block-start: var(--mid);
   }
 
   .block-slot[data-stacked][data-drop='after']::after {
-    inset-block-end: calc(var(--sp-3) * -1);
+    inset-block-end: var(--mid);
   }
 
-  /* The one moving. Half-visible rather than hidden, so the row you are dragging out of does not collapse and re-lay-out
-     under the pointer. */
-  .block-slot[data-dragging] {
-    opacity: 0.45;
-    outline-style: solid;
-    outline-color: var(--ink);
-  }
-
-  /* A PAGE BEING ARRANGED IS A PAGE WHOSE CONTENT IS NOT THE POINT, and the hierarchy is built by RAISING the controls
-     rather than sinking the content through the contrast floor: the block recedes onto the sunk surface, its own borders
-     soften, and the bar above it keeps full contrast, so the text stays readable, which it has to be to know which block
-     you are holding. */
-  .block-slot[data-arranging] :global(.block) {
-    pointer-events: none;
-  }
-
-  .block-slot[data-arranging] :global(.block) > :global(*) {
-    background: var(--sunk);
-    border-color: color-mix(in srgb, var(--line) 55%, transparent);
-  }
-
-  /* ONE COLUMN below 900px, in declaration order. 13 §10 has two breakpoints and 05 §6 allows width to change LAYOUT but
-     never size. Collapsing to one column keeps the only thing a span was ever encoding, which block comes after which,
-     and that is precisely the property masonry lost. There is no second stored layout for narrow, because a second
-     layout is a second thing to keep in sync and nobody ever does. */
+  /* ONE COLUMN below 900px, in declaration order, the tiles full width in the 16 gutters (SYSTEM §9). 13 §10 has two
+     breakpoints and 05 §6 allows width to change LAYOUT but never size. There is no second stored layout for narrow,
+     because a second layout is a second thing to keep in sync and nobody ever does. */
   @media (width < 900px) {
     .page {
       grid-template-columns: minmax(0, 1fr);
-      padding: var(--sp-4) var(--gutter) var(--sp-8);
+      padding: var(--sp-3) var(--gutter) var(--sp-8);
+    }
+
+    .area,
+    .area[data-area='main'],
+    .area[data-area='rail'],
+    .box {
+      grid-column: 1 / -1;
+      grid-template-columns: minmax(0, 1fr);
     }
 
     .block-slot {
@@ -658,33 +664,11 @@
 
   /**
    * A STAT IN A NARROW SLOT STACKS ITS FIGURES, because a slot on this page is narrower than a phone long before the
-   * window is, and every rule below this one is keyed to the VIEWPORT.
-   *
-   * `/p/portfolio` puts a two-figure stat in a four-column slot. Measured in Chromium on the shipped record, that block
-   * is 267px wide in a 1180px window, 215px at 1024 and 174px at 900, which leaves each cell 117.7px, 91.7px and 71px.
-   * `£22,600.00` draws 123px at `--t-xl`, so 5px, 31px and 52px of it were cut off: a money figure drawn short a digit,
-   * on a laptop, on a screen whose whole job is to say how much.
-   *
-   * THE LAYOUT GATE CANNOT SEE THIS and never could. It reports an element only when it reaches past the window with
-   * nothing scrolling above it, and a figure overflowing a 117px cell in the middle of the page does neither.
-   *
-   * STACKED RATHER THAN SHRUNK, AND NOTHING DROPPED. A figure longer than its tile already steps down inside it
-   * (`blocks.css` reads `--chars`), and that mark is put on a figure only above ten characters, which `£22,600.00` is
-   * exactly not. What this page has instead is room down the column: one figure a row draws the whole amount at the size
-   * every other figure on the page reads at.
-   *
-   * 288px IS THE ROW'S OWN ARITHMETIC RATHER THAN A DEVICE, and it was 280 until the same figure was drawn on Linux. Two
-   * cells of 123px with the 32px gap between them need 278px, and 280 left `£22,600.00` 0.8px in a 124px cell on
-   * Windows. The same woff2 on a hosted ubuntu image draws about 1.6 per cent wider, 125.2px, which is past that cell.
-   * `record/figure-fit.test.ts` asks for two per cent of room in the face the runner draws, so on Linux two cells need
-   * 2 x 127.7 + 32 = 287.4px. 288 leaves each 128px: 3.9 per cent on Windows and about 2.2 on Linux. It stops at 288
-   * because the phone is untouched at both ends of its range and has to stay so: the slot there is the page itself,
-   * 358px at 390 and exactly 288px at 320, and the query is strictly less than, so neither stacks.
-   *
-   * AND THE THRESHOLD IS px WHERE EVERY OTHER QUERY IN THIS SYSTEM IS rem, because the width it guards is a px width:
-   * `--t-xl` is 24px whatever the root font size is, so the figure stays 123px and a rem threshold would be the only
-   * thing that moved. Written as `17.5rem` it was measured firing on a phone with the browser's own font size set to
-   * Large, which undid the two-up strip a phone drew then for figures that were never in any danger.
+   * window is, and every rule above this one is keyed to the VIEWPORT. Two figures side by side need their two cells and
+   * the gap between them; under 288px of block they take a row each, at the size every other figure on the page reads
+   * at, rather than a cut one. `record/figure-fit.test.ts` measures every stat a declared page draws against this and
+   * `blocks.css`'s own steps. px AND NOT rem: the figure it guards is px wide at any root size, so a rem threshold would
+   * be the only thing that moved when a reader sets her text smaller.
    */
   @container (inline-size < 288px) {
     .block-slot :global(.grid:has(> .cell:nth-child(2))) {

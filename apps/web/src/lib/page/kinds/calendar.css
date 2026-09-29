@@ -63,7 +63,7 @@
   .calendar-cell {
     block-size: 6.5rem;
     padding: var(--sp-1) var(--sp-2);
-    border-block-start: 1px solid var(--line-soft);
+    border-block-start: 1px solid var(--line);
     vertical-align: top;
     overflow: hidden;
   }
@@ -81,12 +81,13 @@
     font-size: var(--t-xs);
   }
 
-  /* TODAY IS THE ONE DAY ON THE "ON" SURFACE, told by weight as well as ground so it holds in every theme. */
+  /* TODAY IS AN INK DISC WITH THE DATE IN THE GROUND'S COLOUR (SYSTEM §6, the week strip), told by weight as well as
+     ground so it holds in every theme. */
   .calendar-cell[data-today] .calendar-num,
   .calendar-day[data-today] .calendar-date {
-    background: var(--selected);
+    background: var(--ink);
     border-radius: var(--r-pill);
-    color: var(--ink);
+    color: var(--on-ink);
     font-weight: 600;
   }
 
@@ -143,7 +144,7 @@
     align-items: baseline;
     gap: var(--sp-3);
     padding: var(--sp-2) 0;
-    border-block-end: 1px solid var(--line-soft);
+    border-block-end: 1px solid var(--line);
   }
 
   .calendar-day:last-child {

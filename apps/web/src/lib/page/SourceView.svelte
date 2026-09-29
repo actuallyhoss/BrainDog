@@ -332,8 +332,8 @@
      not move the page's edges. */
   .source-view {
     display: grid;
-    gap: var(--sp-7) var(--sp-6);
-    padding: var(--sp-5) var(--gutter) var(--sp-9);
+    gap: var(--sp-3);
+    padding: var(--sp-3) var(--gutter) var(--sp-9);
     max-inline-size: var(--page-max);
   }
 
@@ -355,14 +355,19 @@
   .source-work {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: var(--sp-7) var(--sp-6);
+    gap: var(--sp-3);
     align-items: start;
   }
 
+  /* THE TEXT IS A TILE ON THE GROUND, as the page's blocks are (SYSTEM §6), and its box the tile's second surface. */
   .source-edit {
     display: grid;
     gap: var(--sp-3);
     min-inline-size: 0;
+    padding: 20px;
+    background: var(--bg);
+    border-radius: var(--r-lg);
+    box-shadow: var(--e1);
   }
 
   .source-label {
@@ -380,7 +385,7 @@
     margin: 0;
     padding: var(--sp-4);
     background-color: var(--s1);
-    border: 1px solid var(--edge);
+    border: 1px solid transparent;
     border-radius: var(--r-md);
     color: var(--ink);
     font-family: var(--font-id);
@@ -460,7 +465,7 @@
 
   @media (width < 900px) {
     .source-view {
-      padding: var(--sp-4) var(--gutter) var(--sp-8);
+      padding: var(--sp-3) var(--gutter) var(--sp-8);
     }
 
     .source-work {
