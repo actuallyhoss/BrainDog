@@ -82,6 +82,8 @@
     <Empty kind="no-permission" title={levelWords.ownersOnlyTitle} body={levelWords.ownersOnlyHow} />
   </Section>
 {:else}
+<!-- ON THE GROUND AND UNBOXED (SYSTEM §6, §11): the sentence, what it costs, the typed name and the verb. The box this
+     sat in was a red-edged panel, and red is what needs him, not what is dangerous; the words carry the weight here. -->
 <Section title={copy.deleteRecord(RECORD)}>
   <div class="danger">
     <p class="danger-title">{copy.deleteWhat(RECORD)}</p>
@@ -133,14 +135,27 @@
   }
 
   .danger {
-    padding: var(--sp-4);
-    background: var(--s1);
-    border: 1px solid color-mix(in srgb, var(--danger) 40%, var(--line));
-    border-radius: var(--r-md);
+    display: grid;
+    gap: var(--sp-3);
+    max-inline-size: var(--measure);
   }
 
+  .danger > p {
+    margin: 0;
+  }
+
+  /* WHAT HAPPENS, AT THE ROW'S WEIGHT IN INK. It was red, and red means "needs you" and nothing else (SYSTEM §2): the
+     act is irreversible because the sentence says so, not because of its colour. */
   .danger-title {
-    color: var(--danger);
+    color: var(--ink);
+    font-size: var(--t-row);
     font-weight: 500;
+    line-height: 20px;
+  }
+
+  .danger-why {
+    color: var(--ink2);
+    font-size: var(--t-base);
+    line-height: 20px;
   }
 </style>

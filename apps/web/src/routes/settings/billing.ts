@@ -32,6 +32,7 @@
  */
 
 import { copy } from '../../lib/copy.ts';
+import { words as usageWords, type Meter, type MeterKey } from '../../lib/record/actions.ts';
 
 export const words = {
   /* TRUE ON BOTH HOSTS, which is why it is the default: a self-host is not charged either. */
@@ -233,4 +234,240 @@ export function lapseLines(r: BilledRecord | null, now: number): { fix: string; 
 export function thisRecord(answer: BillingAnswer | null, slug: string | null | undefined): BilledRecord | null {
   if (!answer || !slug) return null;
   return answer.records.find((r) => r.slug === slug) ?? null;
+}
+
+/* ── what the Settings tiles draw (SYSTEM §6, §7): the meters, the nightly strip and the title's sentence ─────────── */
+
+/*
+ * PURE, AND HERE, so `node --test` holds every sentence a tile says. The areas draw the tiles; what each tile means is
+ * worked out below from the record's own answers, and a tile with nothing true to say is not drawn (SCREENS rule 4).
+ */
+
+/** The words the Settings tiles add. A sentence another screen already says is read from there, never typed twice. */
+export const tileWords = {
+  planTitle: 'Plan and usage',
+  /** The tile's meta: where the month is, and the day it starts again. */
+  monthMeta: (day: number, of: number, resets: string) => `day ${day} of ${of} · resets ${resets}`,
+  /** What the bars are, read out before the bars themselves. */
+  metersSubject: "This month's allowance, used",
+  copiesTitle: 'Nightly copies',
+  copiesMeta: (kept: number) => `every night · last ${kept} kept`,
+  /** The strip's right-hand end, under it. */
+  stripTo: 'last night',
+  everyNight: (n: number) => `Every one of the last ${n} nights was copied.`,
+  sinceFirst: (n: number, first: string) =>
+    n === 1 ? `The first copy was taken on ${first}.` : `A copy on each of the last ${n} nights, since the first on ${first}.`,
+  missed: (m: number, n: number, last: string) =>
+    m === 1 ? `1 of the last ${n} nights has no copy: ${last}.` : `${m} of the last ${n} nights have no copy, the last on ${last}.`,
+  /** The strip read aloud, which the reading line under it then explains. */
+  stripSaid: (copied: number, n: number, missed: number) =>
+    `A copy on ${copied} of the last ${n} nights` + (missed > 0 ? `, and ${missed} with none` : '') + '.',
+  /* THE TITLE ROW'S SENTENCE, in its parts. */
+  healthy: 'All healthy',
+  copyIn: "last night's copy is in",
+  noCopy: 'no copy last night',
+  nothingRunsOut: (resets: string) => `nothing runs out before ${resets}`,
+  meterFull: (noun: string, plural: boolean, resets: string) => `${noun} ${plural ? 'are' : 'is'} used up until ${resets}`,
+  meterNear: (noun: string, plural: boolean, share: string, left: number) =>
+    `${noun} ${plural ? 'are' : 'is'} at ${share}, ${left === 1 ? '1 day' : `${left} days`} to go`,
+  meterPace: (noun: string, resets: string) => `at this pace ${noun} will be used up before ${resets}`,
+};
+
+/** Where this month is, in UTC as the Worker counts it: the 29th of a 30-day month is `{ day: 29, of: 30 }`. */
+export function monthDay(now: number): { day: number; of: number } {
+  const d = new Date(now);
+  return { day: d.getUTCDate(), of: new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate() };
+}
+
+/** A share as the chart writes it: `53%`, and `<1%` for a little, never `0%` for something. */
+export const shareOf = (share: number): string =>
+  !Number.isFinite(share) || share <= 0 ? '0%' : share < 0.01 ? '<1%' : `${Math.floor(Math.min(share, 1) * 100)}%`;
+
+/**
+ * One bar per meter: the meter's short name, what it has used as a note ("18,400 of 75,000"), and its share.
+ *
+ * THE NEAREST ONE IS INK AND THE REST ARE GREY (SYSTEM §2): the binding meter is the one the month turns on. The note
+ * is `Meter.line` without the name it starts with, so the figures are the ledger's own and never counted twice.
+ */
+export function meterBars(meters: readonly Meter[]): { label: string; value: number; note?: string; tone?: 'ink' }[] {
+  return meters.map((m) => {
+    const name = usageWords.meterName[m.key] ?? m.key;
+    const note = m.line.startsWith(`${name} `) ? m.line.slice(name.length + 1) : undefined;
+    return {
+      label: name,
+      value: Math.min(1, Math.max(0, m.share)),
+      ...(note ? { note } : {}),
+      ...(m.binding ? { tone: 'ink' as const } : {}),
+    };
+  });
+}
+
+/* ── the nightly copies, one square a night ── */
+
+/** What one night of the strip is: copied, missed after the first copy, before the first copy kept, or not due yet. */
+export type NightState = 'copied' | 'missed' | 'before' | 'due';
+export type Night = { day: string; state: NightState };
+
+/**
+ * THE HOUR (UTC) BY WHICH A NIGHT'S COPY HAS RUN. The Cloud copies at 03:17 UTC and a self-host between 02:00 and 03:00
+ * (`Backups.svelte` says where each is written), so before six this morning's copy is due rather than missed.
+ */
+export const NIGHT_DUE_HOUR = 6;
+
+const DAY_MS = 86_400_000;
+const dayKey = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
+
+/**
+ * The last `n` nights, oldest first, each marked by whether a copy was kept that night.
+ *
+ * A GAP IS ONLY A MISS AFTER THE FIRST COPY KEPT. A record made a week ago has no copies from the three weeks before
+ * it existed, and a host that prunes the oldest copy first keeps no copy of a night older than the ones it holds;
+ * neither is a failure, so every night before the first copy kept is `before` and drawn quiet. A night after it with no
+ * copy really had none, since pruning never takes a newer copy than one it keeps.
+ */
+export function nightsOf(copies: readonly { at: string }[], now: number, n = 30): Night[] {
+  const kept = new Set<string>();
+  for (const c of copies) {
+    const ms = Date.parse(c.at);
+    if (Number.isFinite(ms)) kept.add(dayKey(ms));
+  }
+  const first = [...kept].sort()[0];
+  const today = dayKey(now);
+  const early = new Date(now).getUTCHours() < NIGHT_DUE_HOUR;
+  const nights: Night[] = [];
+  for (let i = n - 1; i >= 0; i--) {
+    const day = dayKey(now - i * DAY_MS);
+    const state: NightState = kept.has(day)
+      ? 'copied'
+      : first === undefined || day < first
+        ? 'before'
+        : day === today && early
+          ? 'due'
+          : 'missed';
+    nights.push({ day, state });
+  }
+  return nights;
+}
+
+const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** A night as the tile says it: `24 Sep`, the way a copy's own day is written in the list under it. */
+export const nightWords = (day: string): string => {
+  const m = /^\d{4}-(\d{2})-(\d{2})$/u.exec(day);
+  return m ? `${Number(m[2])} ${SHORT_MONTHS[Number(m[1]) - 1] ?? m[1]}` : day;
+};
+
+export type NightTone = 'ink' | 'g2' | 'g4' | 'danger';
+
+/**
+ * The strip as the waffle takes it: one part per run of nights in one state, in order, so thirty squares in one row
+ * read left to right as the thirty nights. A copied night is grey and the newest copy ink (one highlight, SYSTEM §2); a
+ * miss is the red of what needs him; a night before the first copy, or not due yet, is the quietest grey.
+ */
+export function nightParts(nights: readonly Night[]): { label: string; value: number; tone: NightTone }[] {
+  const newest = nights.map((x) => x.state).lastIndexOf('copied');
+  const parts: { label: string; value: number; tone: NightTone }[] = [];
+  nights.forEach((night, i) => {
+    const tone: NightTone = i === newest ? 'ink' : night.state === 'copied' ? 'g2' : night.state === 'missed' ? 'danger' : 'g4';
+    const last = parts[parts.length - 1];
+    if (last && last.tone === tone && tone !== 'ink') last.value++;
+    else parts.push({ label: night.state, value: 1, tone });
+  });
+  return parts;
+}
+
+/** The strip read aloud: how many nights have a copy and how many have none. */
+export function nightsSaid(nights: readonly Night[]): string {
+  const copied = nights.filter((x) => x.state === 'copied').length;
+  const missed = nights.filter((x) => x.state === 'missed').length;
+  return tileWords.stripSaid(copied, nights.length, missed);
+}
+
+/** The one line under the strip, saying what it means. */
+export function nightsLine(nights: readonly Night[]): string {
+  const copied = nights.filter((x) => x.state === 'copied');
+  const missed = nights.filter((x) => x.state === 'missed');
+  const lastMissed = missed[missed.length - 1];
+  if (lastMissed) return tileWords.missed(missed.length, copied.length + missed.length, nightWords(lastMissed.day));
+  if (nights.some((x) => x.state === 'before') && copied[0]) return tileWords.sinceFirst(copied.length, nightWords(copied[0].day));
+  return tileWords.everyNight(copied.length);
+}
+
+/** The newest night that has had its chance, and whether its copy is in. `null` when no copy was ever kept. */
+export function lastNight(nights: readonly Night[]): 'copied' | 'missed' | null {
+  for (let i = nights.length - 1; i >= 0; i--) {
+    const s = nights[i]?.state;
+    if (s === 'copied' || s === 'missed') return s;
+    if (s === 'before') return null;
+  }
+  return null;
+}
+
+/* ── the doors a record takes things in at ── */
+
+/** The words the Doors tile adds: its title, and one short state a door is in. */
+export const doorWords = {
+  title: 'Doors',
+  on: 'On',
+  off: 'Off',
+  otherCheck: 'Checked another way',
+  allOn: (n: number) => (n === 1 ? 'The door has an address in use, so it takes things in.' : `All ${n} doors have an address in use, so each takes things in.`),
+  someOff: (off: number, of: number) =>
+    off === 1 && of === 1
+      ? 'The door has no address yet, so nothing arrives through it.'
+      : `${off} of ${of} doors ${off === 1 ? 'has' : 'have'} no address yet, so nothing arrives through ${off === 1 ? 'it' : 'them'}.`,
+  noneMade: 'Every door here checks its senders another way, so there is no address to make.',
+};
+
+/** A door as the tile says it: on while an address is in use, off with none, or checked some other way. */
+export const doorState = (d: { mintable: boolean; held: boolean }): 'on' | 'off' | 'other' => (!d.mintable ? 'other' : d.held ? 'on' : 'off');
+
+/** The one line under the doors, saying how many take things in and what an unused one means. */
+export function doorsLine(doors: readonly { mintable: boolean; held: boolean }[]): string {
+  const minted = doors.filter((d) => d.mintable);
+  const off = minted.filter((d) => !d.held).length;
+  if (minted.length === 0) return doorWords.noneMade;
+  return off === 0 ? doorWords.allOn(minted.length) : doorWords.someOff(off, minted.length);
+}
+
+/* ── the title row's sentence ── */
+
+const PLURAL: Record<MeterKey, boolean> = { runs: true, requests: true, bytes: false, ms: false };
+
+const upper = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
+
+/** The usage half: the meter the month turns on, against where the month is. */
+function usageSaid(meters: readonly Meter[], resets: string, now: number): { needs: string | null; fine: string | null } {
+  const top = meters.find((m) => m.binding) ?? [...meters].sort((a, b) => b.share - a.share)[0];
+  if (!top) return { needs: null, fine: null };
+  const noun = usageWords.meterNoun[top.key] ?? top.key;
+  const plural = PLURAL[top.key] ?? false;
+  const { day, of } = monthDay(now);
+  if (top.share >= 1) return { needs: tileWords.meterFull(noun, plural, resets), fine: null };
+  if (top.share >= 0.8) return { needs: tileWords.meterNear(noun, plural, shareOf(top.share), of - day + 1), fine: null };
+  /* AT THIS PACE: the share so far, spread over the whole month. "Nothing runs out" is a claim about the rest of the
+     month, so it is made only where the month's pace keeps the nearest meter under its allowance. */
+  if ((top.share * of) / day >= 1) return { needs: tileWords.meterPace(noun, resets), fine: null };
+  return { needs: null, fine: tileWords.nothingRunsOut(resets) };
+}
+
+/**
+ * The sentence under "Settings" (SYSTEM §5), from the nightly copies and this month's meters, and the phrase inside it
+ * that needs him. `null` when neither was read: a self-host with no ledger and no copies says nothing rather than
+ * "all healthy" about what nobody looked at.
+ */
+export function settingsSentence(o: {
+  nights: readonly Night[] | null;
+  meters: readonly Meter[] | null;
+  resets: string | null;
+  now: number;
+}): { sentence: string; needs?: string } | null {
+  const night = o.nights ? lastNight(o.nights) : null;
+  const usage = o.meters && o.resets ? usageSaid(o.meters, o.resets, o.now) : { needs: null, fine: null };
+  const needs = [night === 'missed' ? tileWords.noCopy : null, usage.needs].filter((x): x is string => x !== null);
+  const fine = [night === 'copied' ? tileWords.copyIn : null, usage.fine].filter((x): x is string => x !== null);
+  if (needs.length === 0 && fine.length === 0) return null;
+  if (needs.length === 0) return { sentence: `${tileWords.healthy}: ${fine.join(', and ')}.` };
+  const phrase = upper(needs.join(', and '));
+  return { sentence: fine.length > 0 ? `${phrase}, and ${fine.join(', and ')}.` : `${phrase}.`, needs: phrase };
 }

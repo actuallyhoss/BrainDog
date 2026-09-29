@@ -17,6 +17,11 @@
   import Section from '$lib/ui/Section.svelte';
   import Button from '$lib/ui/Button.svelte';
   import WebhookDoors from '$lib/ui/WebhookDoors.svelte';
+  import { callerAt, listDoors, type Door } from '$lib/ui/webhook-doors.ts';
+  import { read, type Result } from '$lib/data/read.svelte.ts';
+  import Tile from '$lib/ui/Tile.svelte';
+  import IconWell from '$lib/ui/IconWell.svelte';
+  import { doorState, doorsLine, doorWords } from '../../billing.ts';
   import Actions from '$lib/page/panels/Actions.svelte';
   import { bareOrigin, settingsState, type AreaProps } from '../settings-state.svelte.ts';
 
@@ -147,6 +152,22 @@
   }
 
   /**
+   * THE DOORS TILE (Light-Settings): each web address the record takes things in at, on while an address is in use and
+   * off with none, and one line saying what an unused door means.
+   *
+   * THE SAME READ AS THE SECTION BELOW, asked once more, and only of an owner: `doors` is ADMIN, and a colleague asking
+   * would be told no for a tile they are not shown. The mint below writes an event, so the record's version moves and
+   * `read()` asks again, and the tile follows the section rather than contradicting it. A refusal is no tile: the
+   * section under it says what the record said.
+   */
+  async function doorsNow(): Promise<Result<Door[]>> {
+    const out = await listDoors(callerAt(apiBase()));
+    return out.kind === 'doors' ? { ok: true, value: out.doors } : { ok: false, refusal: { code: 'REFUSED', fix: out.fix } };
+  }
+  const doors = read(() => (anOwner ? `doors ${apiBase()}` : null), doorsNow);
+  const doorList = $derived(doors.value ?? []);
+
+  /**
    * THE TITLES OF THE MAIL SECTION'S THREE STEPS, and the one sentence the third adds (DSN-18). The
    * sentences the first two carry are `inbound-write.ts`'s and are read from there.
    */
@@ -166,6 +187,27 @@
   only. `47 §12` gives the composition: one row per connector, from `PullResult` via the
   receipts and the schedule row.
 -->
+<!-- A LIST TILE, WITH NO CHART (SYSTEM §6: a pure list is the one tile that holds no figure). Drawn only where the record
+     declares a door and an owner is reading; the section below says the rest. -->
+{#if anOwner && doorList.length > 0}
+  <Tile icon="plug" title={doorWords.title} count={doorList.length}>
+    <ul class="doors">
+      {#each doorList as door (door.id)}
+        {@const lit = doorState(door)}
+        <li class="door">
+          <IconWell name="plug" size="l" />
+          <span class="door-words">
+            <span class="door-name" dir="auto">{door.name}</span>
+            {#if door.register}<span class="door-detail">{copy.doorsWrites(door.register)}</span>{/if}
+          </span>
+          <span class="door-state" data-state={lit}>{lit === 'on' ? doorWords.on : lit === 'off' ? doorWords.off : doorWords.otherCheck}</span>
+        </li>
+      {/each}
+    </ul>
+    <p class="reading">{doorsLine(doorList)}</p>
+  </Tile>
+{/if}
+
 <Section title={copy.sources}>
   <p class="hint">{copy.sourcesHow}</p>
   <!-- A RECORD LISTS ITS OWN SCHEDULED ACTIONS, with Resume and Reconnect that write.
@@ -338,7 +380,7 @@
   .address {
     margin: 0;
     padding: var(--sp-2) var(--sp-3);
-    background: var(--sunk);
+    background: var(--bg);
     border-radius: var(--r-md);
     font-family: var(--font-id);
     font-size: var(--t-sm);
@@ -399,6 +441,106 @@
     color: var(--dim);
     font-size: var(--t-sm);
     line-height: var(--lh-body);
+  }
+
+  /* THE DOORS TILE'S ROWS: a 32px well, the door and the list it writes to, and its state as a 6px dot and a word
+     (SYSTEM §6, Badges), with a hairline between each. */
+  .doors {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .door {
+    display: grid;
+    grid-template-columns: var(--well-l) minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: var(--sp-3);
+    min-block-size: var(--row-h-2);
+    padding-block: var(--sp-2);
+  }
+
+  .door + .door {
+    border-block-start: 1px solid var(--line);
+  }
+
+  .door-words {
+    display: grid;
+    gap: 2px;
+    min-inline-size: 0;
+  }
+
+  .door-name {
+    overflow-wrap: anywhere;
+    color: var(--ink);
+    font-size: var(--t-row);
+    font-weight: 500;
+    line-height: 20px;
+  }
+
+  .door-detail {
+    color: var(--dim);
+    font-size: var(--t-sm);
+    line-height: 18px;
+  }
+
+  .door-state {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .door-state::before {
+    content: '';
+    inline-size: 6px;
+    block-size: 6px;
+    border-radius: var(--r-pill);
+    background: var(--dim);
+  }
+
+  .door-state[data-state='on'] {
+    color: var(--ink);
+  }
+
+  .door-state[data-state='on']::before {
+    background: var(--earn);
+  }
+
+  /* OFF IS AN EMPTY RING, so the two states differ by shape as well as colour. */
+  .door-state[data-state='off']::before {
+    background: none;
+    box-shadow: inset 0 0 0 1.5px var(--dim);
+  }
+
+  .reading {
+    margin: 0;
+    max-inline-size: var(--measure);
+    color: var(--ink);
+    font-size: var(--t-base);
+    line-height: 20px;
+  }
+
+  @media (width < 900px) {
+    .door {
+      min-block-size: 60px;
+    }
+  }
+
+  @media (forced-colors: active) {
+    .door-state::before {
+      background: CanvasText;
+    }
+
+    .door-state[data-state='off']::before {
+      background: none;
+      box-shadow: inset 0 0 0 1.5px CanvasText;
+    }
   }
 
   /* WRAPPING, for the reason `/audit`'s segmented bar already wraps: two buttons that do not fit

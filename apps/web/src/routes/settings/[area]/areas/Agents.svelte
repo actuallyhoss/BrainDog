@@ -26,8 +26,8 @@
   import { INSTALL_LINES, OSES, osOf, type Os } from '$lib/device.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import {
-    CODE_DIGITS, LABEL_MAX, RUNS_READ, TOKEN_DAYS, connectLines, connected, headerLine, nameOf, reachOf, runName, runsOf,
-    standing, waiting, type Answer, type Connection, type DeviceRow, type Run, type TokenRow,
+    CODE_DIGITS, LABEL_MAX, RUNS_READ, TOKEN_DAYS, connectLines, connected, headerLine, nameOf, reachKey, reachOf, reportKeyOf,
+    runName, runsOf, standing, waiting, type Answer, type Connection, type DeviceRow, type Run, type TokenRow,
   } from '$lib/record/device.ts';
   /* THE APPROVAL `/vault` SENDS TOO, from one module, so the two screens cannot drift apart. */
   import { answerLine as lineOf, approve, planOf, reprove, revoke, words as vaultWords, type Plan } from '$lib/record/vault.ts';
@@ -39,6 +39,8 @@
   /* Imported here and nowhere in the layout, so the client stays out of the entry chunk. */
   import { createClient } from '@braindog/client';
   import { TONES, relative, since } from 'braindog-render';
+  import { STALE_MS } from '@braindog/kernel';
+  import { liveOf, type RunLive } from '$lib/ui/face.ts';
   import { untrack } from 'svelte';
   import { methods, passkeySignIn, support } from '$lib/auth.ts';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
@@ -48,6 +50,9 @@
   import SlashDaily from '$lib/ui/SlashDaily.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import IconWell from '$lib/ui/IconWell.svelte';
+  import AgentFace from '$lib/ui/AgentFace.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import ReadState from '$lib/ui/ReadState.svelte';
   import { bareOrigin, settingsState, type AreaProps } from '../settings-state.svelte.ts';
@@ -64,8 +69,31 @@
   let client: ReturnType<typeof createClient> | null = null;
   const clientOf = (): ReturnType<typeof createClient> => (client ??= createClient({ base: apiBase() }));
 
-  /** What the record answered: its machines, its standing keys, and the newest runs, which name who used each. */
-  type Held = { machines: DeviceRow[]; tokens: TokenRow[]; runs: Run[] };
+  /**
+   * What the record answered: its machines, its standing keys, the newest runs, which name who used each, and whether
+   * each of those runs is at work now, gone quiet or stopped (`RunLive`), which the faces draw as their ring.
+   */
+  type Held = { machines: DeviceRow[]; tokens: TokenRow[]; runs: Run[]; live: Map<number, RunLive> };
+
+  /**
+   * Each run's state as its face draws it, from the run's own `state` and when it was last heard from.
+   *
+   * THE KERNEL'S OWN QUIET, `STALE_MS`: a run not heard from in 45 minutes is quiet, worked out when read, as the run's
+   * own page works it out (`r/[register]/[seq]`), so a face here and the face there never disagree about one run.
+   */
+  function livenessOf(rows: readonly unknown[], nowMs: number): Map<number, RunLive> {
+    const out = new Map<number, RunLive>();
+    for (const row of rows) {
+      if (typeof row !== 'object' || row === null) continue;
+      const r = row as { seq?: unknown; fields?: unknown; updated_at?: unknown; created?: unknown };
+      if (typeof r.seq !== 'number' || typeof r.fields !== 'object' || r.fields === null) continue;
+      const f = r.fields as Record<string, unknown>;
+      const seen =
+        typeof f.last_seen === 'string' ? f.last_seen : typeof r.updated_at === 'string' ? r.updated_at : typeof r.created === 'string' ? r.created : null;
+      out.set(r.seq, liveOf(f.state, seen === null || Date.parse(seen) < nowMs - STALE_MS));
+    }
+    return out;
+  }
 
   /**
    * THE MACHINES DECIDE WHETHER THE LIST WAS READ; the keys and the runs only add to it. A record that answers the
@@ -85,6 +113,7 @@
         machines: devices.value,
         tokens: keys.ok ? standing(keys.value as TokenRow[]) : [],
         runs: runs.ok ? runsOf(runs.value.rows) : [],
+        live: runs.ok ? livenessOf(runs.value.rows, Date.now()) : new Map(),
       },
     };
   }
@@ -116,18 +145,73 @@
   /* THE INSTALLER FOR THE COMPUTER THIS BROWSER IS ON, and one press away from the other one. */
   let os = $state<Os>(osOf(globalThis.navigator));
 
-  /** A mark for the states that need one; `13 §5.1`, so the glyph and the tone come from one map. */
-  const DEVICE_TONE: Record<string, 'good' | 'warn' | 'bad' | undefined> = {
-    pending: 'warn',
-    approved: 'good',
-    expired: 'warn',
-    denied: 'bad',
+  /**
+   * THE WORDS THE CONNECTED TILE ADDS (Light-Settings): what each key can do in two words, at the end of its row, and
+   * the line under the list that says what a propose-only key means for the person reading it.
+   */
+  const words = {
+    scope: { read: 'can read', propose: 'can propose', write: 'can write' } as Record<string, string>,
+    /* A GRANT THAT IS NOT A KEY'S SCOPE says what it may do in its own two words, and the sentence under its name says
+       for how long; a one-time grant is "once", which is the whole of what makes it one. */
+    grant: { login: 'can sign in', runner: 'can run work', vault: 'can open keys', vaultAll: 'can open keys' } as Record<string, string>,
+    once: 'once',
+    report: 'sends numbers',
+    allAtWork: 'all at work now',
+    atWork: (n: number) => `${n} at work now`,
+    proposeOnly: (names: string, one: boolean) =>
+      `${names} can only propose, so anything ${one ? 'it' : 'they'} would change waits for you in Decide.`,
+    readOnly: (names: string, one: boolean) => `${names} can only read, so ${one ? 'it changes' : 'they change'} nothing.`,
   };
 
-  /* A grant that has not finished working carries its state's mark; a key or a machine nobody has used carries one too,
-     because the one nobody has used is the one to look at. */
-  const toneOf = (c: Connection): 'good' | 'warn' | 'bad' | undefined =>
-    c.machine && c.machine.status !== 'active' ? DEVICE_TONE[c.machine.status] : c.used === null ? 'warn' : undefined;
+  /**
+   * A MACHINE WAITING FOR SIX DIGITS IS THE ONE ROW THAT WAITS ON THE READER, so its well is amber (SYSTEM §2, "waiting
+   * on someone"); every other state is said in words on the row, and a colour would only repeat them.
+   */
+  const waitsOnYou = (c: Connection): boolean => c.machine?.status === 'pending';
+
+  /**
+   * What a connection may do, in the two words the row ends with, and whether that says all of it.
+   *
+   * A PLAIN KEY'S SCOPE IS THE WHOLE ANSWER, so its row says it once, at the end. A key that also reads the inbox, a
+   * report key and a machine's grant each carry more than two words can say (what it reaches, for how long), so their
+   * row keeps `reachOf`'s sentence under the name as well.
+   */
+  function scopeOf(c: Connection): { word: string | null; whole: boolean } {
+    const t = c.token;
+    if (t) {
+      if (reportKeyOf(t.label)) return { word: words.report, whole: false };
+      return { word: words.scope[t.scope] ?? null, whole: !t.reach?.includes('inbox') };
+    }
+    const m = c.machine;
+    if (!m) return { word: null, whole: false };
+    return { word: words.grant[reachKey(m.reach, m.scope)] ?? words.once, whole: false };
+  }
+
+  /** The run's ring: at work, gone quiet or stopped, from the record's own row for it. */
+  const liveOfRun = (run: Run): RunLive => held.value?.live.get(run.seq) ?? 'stopped';
+
+  /* HOW MANY ARE AT WORK NOW, which is the tile's meta only when some are: "all at work now" when every connection that
+     can act has a run working, and the count when only some do. */
+  const atWork = $derived.by(() => {
+    const working = rows.filter((c) => c.live && c.run !== null && liveOfRun(c.run) === 'working').length;
+    if (working === 0) return undefined;
+    return working === rows.filter((c) => c.live).length ? words.allAtWork : words.atWork(working);
+  });
+
+  /**
+   * THE LINE UNDER THE LIST: what the narrowest keys here mean for the reader. A key that can only propose sends every
+   * change it would make to Decide, and saying so by name is what makes "can propose" a thing a person understands.
+   */
+  const LIST = new Intl.ListFormat('en-GB', { type: 'conjunction' });
+  const reading = $derived.by(() => {
+    const plain = (scope: string): string[] =>
+      rows.filter((c) => c.live && c.token?.scope === scope && !reportKeyOf(c.token.label)).map((c) => nameOf(c));
+    const proposers = plain('propose');
+    if (proposers.length > 0) return words.proposeOnly(LIST.format(proposers), proposers.length === 1);
+    const readers = plain('read');
+    if (readers.length > 0) return words.readOnly(LIST.format(readers), readers.length === 1);
+    return null;
+  });
 
   /**
    * The facts under a row's name, each its own item, so a line that wraps breaks between facts and never leaves a
@@ -344,7 +428,7 @@
   <!-- A LINE TO COPY: the text in the code face, breaking anywhere so a long line never pushes the page sideways, and
        its button beside it, or under it where the two do not fit. -->
   {#snippet copyable(line: string, button: string, said: string)}
-    <div class="line">
+    <div class="copy-line">
       <code class="mono">{line}</code>
       <Button onclick={() => put(line, said)}>{button}</Button>
     </div>
@@ -354,17 +438,106 @@
     <Section title={copy.approveTitle}>{@render codeForm()}</Section>
   {/if}
 
+  <!--
+    EVERYTHING THAT CAN ACT ON THE RECORD, AS ONE LIST TILE (Light-Settings): each machine or key with its face, what it
+    can do in two words at the end of its row, and the line under the list that says what the narrowest of them means.
+    Every row the record keeps, denied ones included: "I said no to a request I did not make" (`12 §6.1`). Never a
+    secret, a handle or an id: a row is named by what runs on it or the name it was given (`12 §3`). A pure list, so the
+    one tile that holds no chart (SYSTEM §6).
+  -->
+  <Tile icon="session" title={copy.connectedTitle} count={held.state === 'ready' ? rows.length : undefined} meta={atWork}>
+    {#if held.state === 'waiting' || held.state === 'refused' || held.state === 'offline'}
+      <ReadState state={held.state} refusal={held.refusal} onretry={held.reread} />
+    {:else if rows.length === 0}
+      <Empty kind="no-data-yet" compact title={copy.connectedNone} body={copy.connectedNoneWhy} />
+    {:else}
+      {@const nowMs = Date.now()}
+      <ul class="whos">
+        {#each rows as c (c.key)}
+          {@const scope = scopeOf(c)}
+          <li class="who" data-done={c.live ? undefined : ''}>
+            <!-- A RUN'S FACE WHERE A RUN USED IT, its ring the run's state (at work, quiet, stopped); a well otherwise,
+                 amber only on the machine waiting for the reader's six digits. -->
+            {#if c.run}
+              <AgentFace agent={c.run.agent} run={runName(c.run)} live={liveOfRun(c.run)} />
+            {:else}
+              <IconWell name={c.machine ? 'session' : 'key'} size="l" tone={waitsOnYou(c) ? 'warn' : undefined} />
+            {/if}
+            <span class="who-words">
+              <!-- `dir="auto"`: an app names itself, in whatever script it chose. -->
+              <span class="who-name" dir="auto">{nameOf(c)}</span>
+              {#if !scope.whole}<span class="who-detail who-reach">{reachOf(c)}</span>{/if}
+              <span class="who-detail who-facts">
+                {#each factsOf(c, nowMs) as fact}<span>{fact}</span>{/each}
+                <!-- THE RUN THAT LAST USED IT, BY THE NAME ITS WRITES ARE SIGNED WITH, and a link to what it did. `.tap`
+                     because `S47` in small text is a target far under a thumb's 44px. -->
+                {#if c.run}<span>{copy.lastRun} <a class="run tap" href={at(`/r/session/${c.run.seq}`)}>{runName(c.run)}</a></span>{/if}
+              </span>
+            </span>
+            {#if c.live && scope.word}<span class="who-scope">{scope.word}</span>{/if}
+            <span class="who-do">
+              {#if c.live}
+                <Button weight="bare" size="sm" tone="bad" disabled={revoking !== null} onclick={() => void revokeRow(c)}>{copy.revokeKey}</Button>
+              {/if}
+            </span>
+          </li>
+        {/each}
+      </ul>
+      {#if reading}<p class="reading">{reading}</p>{/if}
+    {/if}
+  </Tile>
+
+  <!-- THE AGENTS ADD-ON, OFFERED ONCE SOMETHING IS CONNECTED, on the ground under the list it follows from. -->
+  {#if offer}
+    <div class="code-form offer">
+      <p class="code-label">{copy.installDiff}</p>
+      {#if offer.summary}<p class="who-why">{offer.summary}</p>{/if}
+      <dl class="plan">
+        <dt>{copy.diffAdds}</dt>
+        <dd>
+          <ul class="plan-adds">
+            {#each offer.adds as add (add.kind + add.name)}
+              <li>
+                <Icon name={add.kind === 'list' ? 'rows' : add.kind === 'figure' ? 'observe' : 'doc'} size="s" />
+                <span class="plan-name">{add.name}</span>
+                <span class="plan-detail">{add.detail}</span>
+              </li>
+            {/each}
+          </ul>
+        </dd>
+        {#if offer.conflicts.length}
+          <dt>{copy.diffConflicts}</dt>
+          <dd>{#each offer.conflicts as c (c)}<p>{c}</p>{/each}</dd>
+        {/if}
+        <CallsOut calls={offerCalls} hosted={hostedHere(shell)} />
+        {#if offer.seeds}
+          <dt>{copy.diffSeeds}</dt>
+          <dd>{offer.seeds}</dd>
+        {/if}
+        <dt>{copy.diffTouches}</dt>
+        <dd>{offer.touches}</dd>
+      </dl>
+      <div class="row-actions">
+        <Button disabled={installing || offer.conflicts.length > 0} onclick={() => void installOffer()}>{copy.install}</Button>
+        <Button weight="bare" onclick={() => (offer = null)}>{vaultWords.notNow}</Button>
+      </div>
+      <p class="code-said" role="status" data-intent={offerSaid ? 'bad' : undefined}>
+        {#if offerSaid}<span role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span> {offerSaid}{/if}
+      </p>
+    </div>
+  {/if}
+
   <Section title={copy.connectTitle}>
     <ul class="doors">
       <li class="door">
-        <h3 class="door-title"><Icon name="globe" size="s" />{copy.doorAny}</h3>
+        <h3 class="door-title"><IconWell name="globe" />{copy.doorAny}</h3>
         <p class="hint">{copy.doorAnyHint}</p>
         {@render copyable(lines.mcp, copy.copyAddress, copy.lineCopied)}
         <p class="step">{copy.doorAnyClaude}</p>
         {@render copyable(lines.claude, copy.copyCommand, copy.lineCopied)}
       </li>
       <li class="door">
-        <h3 class="door-title"><Icon name="session" size="s" />{copy.doorSetup}</h3>
+        <h3 class="door-title"><IconWell name="session" />{copy.doorSetup}</h3>
         <p class="hint">{copy.doorSetupHint}</p>
         <p class="step">{copy.doorInstall}</p>
         <div class="segmented" role="group" aria-label={copy.doorOs}>
@@ -378,7 +551,7 @@
         {#if !first}{@render codeForm()}{/if}
       </li>
       <li class="door">
-        <h3 class="door-title"><Icon name="key" size="s" />{copy.doorKey}</h3>
+        <h3 class="door-title"><IconWell name="key" />{copy.doorKey}</h3>
         <!-- THE KEY IS DRAWN ONCE, from `minted`, which Done and leaving the area both empty; nothing else on this
              screen holds it. -->
         {#if minted}
@@ -423,82 +596,6 @@
     </ul>
   </Section>
 
-  <!-- Every row the record keeps, denied ones included: "I said no to a request I did not make" (`12 §6.1`). Never a
-       secret, a handle or an id: a row is named by what runs on it or the name it was given (`12 §3`). -->
-  <Section title={copy.connectedTitle} count={rows.length}>
-    {#if held.state === 'waiting' || held.state === 'refused' || held.state === 'offline'}
-      <ReadState state={held.state} refusal={held.refusal} onretry={held.reread} />
-    {:else if rows.length === 0}
-      <Empty kind="no-data-yet" title={copy.connectedNone} body={copy.connectedNoneWhy} />
-    {:else}
-      {@const nowMs = Date.now()}
-      <ul class="whos">
-        {#each rows as c (c.key)}
-          {@const tone = toneOf(c)}
-          <li class="who" data-intent={tone}>
-            <div class="who-head">
-              {#if tone}
-                <span class="glyph" role="img" aria-label={TONES[tone].label}>{TONES[tone].glyph}</span>
-              {:else}<Icon name={c.machine ? 'session' : 'key'} size="s" />{/if}
-              <!-- `dir="auto"`: an app names itself, in whatever script it chose. -->
-              <span class="who-name" dir="auto">{nameOf(c)}</span>
-              <span class="who-detail who-reach">{reachOf(c)}</span>
-              <span class="who-detail who-facts">
-                {#each factsOf(c, nowMs) as fact}<span>{fact}</span>{/each}
-                <!-- THE RUN THAT LAST USED IT, BY THE NAME ITS WRITES ARE SIGNED WITH, and a link to what it did. `.tap`
-                     because `S47` in small text is a target far under a thumb's 44px. -->
-                {#if c.run}<span>{copy.lastRun} <a class="run tap" href={at(`/r/session/${c.run.seq}`)}>{runName(c.run)}</a></span>{/if}
-              </span>
-              <span class="who-do">
-                {#if c.live}
-                  <Button weight="bare" tone="bad" disabled={revoking !== null} onclick={() => void revokeRow(c)}>{copy.revokeKey}</Button>
-                {/if}
-              </span>
-            </div>
-          </li>
-        {/each}
-      </ul>
-    {/if}
-
-    {#if offer}
-      <div class="code-form">
-        <p class="code-label">{copy.installDiff}</p>
-        {#if offer.summary}<p class="who-why">{offer.summary}</p>{/if}
-        <dl class="plan">
-          <dt>{copy.diffAdds}</dt>
-          <dd>
-            <ul class="plan-adds">
-              {#each offer.adds as add (add.kind + add.name)}
-                <li>
-                  <Icon name={add.kind === 'list' ? 'rows' : add.kind === 'figure' ? 'observe' : 'doc'} size="s" />
-                  <span class="plan-name">{add.name}</span>
-                  <span class="plan-detail">{add.detail}</span>
-                </li>
-              {/each}
-            </ul>
-          </dd>
-          {#if offer.conflicts.length}
-            <dt>{copy.diffConflicts}</dt>
-            <dd>{#each offer.conflicts as c (c)}<p>{c}</p>{/each}</dd>
-          {/if}
-          <CallsOut calls={offerCalls} hosted={hostedHere(shell)} />
-          {#if offer.seeds}
-            <dt>{copy.diffSeeds}</dt>
-            <dd>{offer.seeds}</dd>
-          {/if}
-          <dt>{copy.diffTouches}</dt>
-          <dd>{offer.touches}</dd>
-        </dl>
-        <div class="row-actions">
-          <Button disabled={installing || offer.conflicts.length > 0} onclick={() => void installOffer()}>{copy.install}</Button>
-          <Button weight="bare" onclick={() => (offer = null)}>{vaultWords.notNow}</Button>
-        </div>
-        <p class="code-said" role="status" data-intent={offerSaid ? 'bad' : undefined}>
-          {#if offerSaid}<span role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span> {offerSaid}{/if}
-        </p>
-      </div>
-    {/if}
-  </Section>
 {:else}
   <!-- A COLLEAGUE CONNECTS THEIR OWN AGENT, with a key of their own capped by their own levels, rather than being shown
        three ways in that the record would refuse them at the end (COL-10, `loop/finish/contracts.md` X54). -->
@@ -510,8 +607,8 @@
 <SlashDaily link />
 
 <style>
-  /* UNBOXED, AND EVERY ONE OF THESE WAS A CARD. A machine and a key are rows on the page with a
-     hairline between them, the way every other list in the product is drawn. */
+  /* THE CONNECTED TILE'S ROWS (SYSTEM §6): the face or the 32px well, the name over what is known about it, what it can
+     do in two words, and Revoke at the end, at a two-line row's height with a hairline between each. */
   .whos {
     display: flex;
     flex-direction: column;
@@ -521,94 +618,101 @@
   }
 
   .who {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-2);
-    padding-block: var(--sp-3);
-  }
-
-  /* THE SOFT HAIRLINE A LIST'S ROWS ARE PARTED BY everywhere (design 6.5), and not `--line`, which is a field's edge. */
-  .who + .who {
-    border-block-start: 1px solid var(--line-soft);
-  }
-
-  /* THE NAME, WHAT IS KNOWN ABOUT IT UNDER THE NAME, AND THE CONTROL AT THE END OF BOTH. The head was
-     a wrapping line, so the facts and the button landed wherever the name's length left room, and a
-     row with a reach sentence pushed its Revoke onto a line of its own. */
-  .who-head {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-columns: var(--well-l) minmax(0, 1fr) auto auto;
     align-items: center;
-    gap: 2px var(--sp-2);
+    column-gap: var(--sp-3);
+    min-block-size: var(--row-h-2);
+    padding-block: var(--sp-2);
   }
 
-  .who-head > :first-child {
-    grid-column: 1;
-    grid-row: 1;
+  .who + .who {
+    border-block-start: 1px solid var(--line);
   }
 
-  .who-head > .who-name {
-    grid-column: 2;
-    grid-row: 1;
+  /* A FINISHED GRANT KEEPS SAYING WHAT IT SAID, quieter: it can do nothing, and the rows that can come first. */
+  .who[data-done] .who-name {
+    color: var(--ink2);
   }
 
-  .who-head > .who-detail {
-    grid-column: 2;
+  /* THE FACE SITS IN THE WELL'S COLUMN, centred, so faces and wells start every name on one edge. */
+  .who > :global(.agent-face) {
+    justify-self: center;
   }
 
-  .who-head > .who-do {
-    grid-column: 3;
-    grid-row: 1 / span 2;
-    margin-inline-start: var(--sp-2);
+  .who-words {
+    display: grid;
+    gap: 2px;
+    min-inline-size: 0;
   }
 
   /* A NAME AN APP OR A MACHINE CHOSE MAY BE ONE LONG WORD, a host name most of all, and it breaks rather than
      pushing the row past the edge at 320. */
   .who-name {
     color: var(--ink);
+    font-size: var(--t-row);
     font-weight: 500;
+    line-height: 20px;
     overflow-wrap: anywhere;
   }
 
   .who-detail {
     color: var(--dim);
     font-size: var(--t-sm);
+    line-height: 18px;
   }
 
-  /* WHAT IT WOULD BE ALLOWED TO DO GETS ITS OWN LINE, at full width.
-
-     It is the sentence the decision is made from, and as a third clause it would have landed
-     wherever the name's length happened to leave room: sometimes beside the state, sometimes
-     under it, never twice the same across five rows. Its own line puts it under the name, which is
-     where the eye goes after reading who is asking.
-
-     `--ink2` rather than `--dim`: the row's other clauses are context and this one is the question. */
+  /* WHAT IT WOULD BE ALLOWED TO DO, where two words do not say all of it: the sentence the decision is made from, so
+     the second ink rather than the quiet one. */
   .who-reach {
     color: var(--ink2);
   }
 
-  /* The controls sit at the end of the head line and never shrink: a button that wraps its own
-     label is a button somebody reads twice. */
+  /* WHAT IT CAN DO, IN TWO WORDS, at the end of the row where the eye runs down the list (Light-Settings). */
+  .who-scope {
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  /* The control sits at the end of the row and never shrinks: a button that wraps its own label is a button somebody
+     reads twice. */
   .who-do {
     display: flex;
     flex: none;
-    flex-wrap: wrap;
     gap: var(--sp-2);
   }
 
-  /* ONE COLUMN ON A PHONE, AND REVOKE ON A LINE OF ITS OWN. Beside the name it took a third of a 390px row from
-     the words that say what is being revoked, and a destructive button pressed by mistake next to a name is the
-     worst tap on this screen. */
+  /* THE ONE WRITTEN LINE under the list, in ink. */
+  .reading {
+    margin: 0;
+    max-inline-size: var(--measure);
+    color: var(--ink);
+    font-size: var(--t-base);
+    line-height: 20px;
+  }
+
+  /* ON A PHONE THE TWO WORDS AND REVOKE GO UNDER THE NAME, starting where the name starts. Beside the name, Revoke took
+     a third of a 390px row from the words that say what is being revoked, and a destructive button pressed by mistake
+     next to a name is the worst tap on this screen. */
   @media (width < 640px) {
-    .who-head {
-      grid-template-columns: auto minmax(0, 1fr);
+    .who {
+      grid-template-columns: var(--well-l) minmax(0, 1fr);
+      align-items: start;
+      row-gap: var(--sp-1);
+      min-block-size: 60px;
     }
 
-    .who-head > .who-do {
-      grid-column: 1 / -1;
-      grid-row: auto;
-      margin-inline-start: 0;
+    .who-scope,
+    .who-do {
+      grid-column: 2;
     }
+  }
+
+  /* THE ADD-ON OFFER, on the ground under the tile it follows from. */
+  .offer {
+    margin-block-start: 0;
   }
 
   /* A whole sentence, wrapping, under the row it is about. */
@@ -722,7 +826,7 @@
     margin: 0;
     padding-block: var(--sp-2);
     padding-inline: var(--sp-3);
-    background: var(--sunk);
+    background: var(--bg);
     border-radius: var(--r-md);
     color: var(--ink);
     font-family: var(--font-id);
@@ -733,7 +837,7 @@
   }
 
   /* A LINE AND ITS COPY BUTTON on one row where both fit, the button under the line where they do not. */
-  .line {
+  .copy-line {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -767,14 +871,16 @@
     border-block-start: 1px solid var(--line-soft);
   }
 
+  /* EACH WAY IN HEADS WITH ITS WELL, as a tile's heading does: the 28px well, then the title at the row's size. */
   .door-title {
     display: flex;
     align-items: center;
-    gap: var(--sp-2);
+    gap: var(--sp-3);
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--t-row);
     font-weight: 600;
+    line-height: 20px;
   }
 
   /* WHAT THE NEXT LINE IS FOR, as a label is drawn above its field. */

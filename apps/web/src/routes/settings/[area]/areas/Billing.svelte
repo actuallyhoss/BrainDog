@@ -1,17 +1,25 @@
 <!--
-  Settings > Billing: what each record you own costs on the Cloud and where its bill stands, or on a self-host the
-  one line that says there is nothing to bill; then where usage and the export are.
+  Settings > Billing: this month's plan and usage as a tile of meters, then what each record you own costs on the Cloud
+  and where its bill stands, or on a self-host the one line that says there is nothing to bill; then where usage and
+  the export are.
 -->
 <script lang="ts">
+  import { page } from '$app/state';
   import { copy } from '$lib/copy.ts';
-  import { at } from '$lib/at.ts';
-  import { words as actionWords } from '$lib/record/actions.ts';
-  import { read } from '$lib/data/read.svelte.ts';
-  import { billingLine, hostedHere, paymentPage, planLine, readBilling, stateLine, type BilledRecord } from '../../billing.ts';
+  import { apiBase, at } from '$lib/at.ts';
+  import { readUsage, words as actionWords, type Meter, type UsageView } from '$lib/record/actions.ts';
+  import { read, type Result } from '$lib/data/read.svelte.ts';
+  import {
+    billingLine, hostedHere, meterBars, monthDay, paymentPage, planLine, readBilling, shareOf, stateLine, thisRecord, tileWords,
+    type BilledRecord,
+  } from '../../billing.ts';
   import { untrack } from 'svelte';
   import Section from '$lib/ui/Section.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import IconWell from '$lib/ui/IconWell.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
+  import Bars from '$lib/viz/Bars.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import ReadState from '$lib/ui/ReadState.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
@@ -31,6 +39,40 @@
      `boot` said the host is the Cloud, and everywhere else the key is `null` and nothing is asked. */
   const hosted = $derived(hostedHere(shell));
   const bill = read(() => (hosted ? 'account-billing' : null), readBilling, { empty: (v) => v.records.length === 0 });
+
+  /**
+   * THIS MONTH AGAINST THE ALLOWANCE, which only `/usage` asked for until the tile (SCREENS, Settings: NEW PLUMBING 3).
+   *
+   * THE SAME READ AS `/usage`, and asked only on the Cloud for the reason the bill is: a self-host keeps no ledger, and
+   * its record's events carry no allowance to draw a meter against. A host without the route answers `none`, which is
+   * no tile rather than a refusal; a refusal is no tile too, because the bill below already says what the host said.
+   */
+  async function usageOf(): Promise<Result<UsageView | null>> {
+    const out = await readUsage((url, init) => fetch(url, init), Date.now(), '', apiBase(page.url));
+    if (out.ok === true) return { ok: true, value: out.view };
+    if (out.ok === 'none') return { ok: true, value: null };
+    return { ok: false, refusal: out.refusal };
+  }
+  const usage = read(() => (hosted ? `usage ${apiBase(page.url)}` : null), usageOf);
+
+  /**
+   * THIS RECORD'S MONTH, AND NO OTHER'S. The ledger holds every record the person owns, each named by its address, so
+   * the tile draws the one whose address is this record's. A colleague's ledger holds none of this record's, and a
+   * member is shown no meters: the allowance is the owner's to see (`actions.ts`, `notOwner`).
+   */
+  const allowed = $derived(usage.value?.from === 'ledger' ? (usage.value.records.find((r) => r.name === shell.index.slug) ?? null) : null);
+  const meters = $derived<Meter[]>(allowed?.meters ?? []);
+  const billed = $derived(bill.value ? thisRecord(bill.value, shell.index.slug) : null);
+  const month = $derived(monthDay(shell.now));
+  /* THE ONE THE MONTH TURNS ON, whose own sentence joins the reading line once it is near its limit. */
+  const nearest = $derived(meters.find((m) => m.binding) ?? null);
+  const figure = $derived(billed && billed.state !== 'unbilled' ? planLine(billed) : (allowed?.plan ?? null));
+  const needs = $derived(nearest && nearest.share >= 0.8 ? nearest.said : null);
+  const reading = $derived(
+    [allowed?.binding ? actionWords.binding(allowed.binding) : `${actionWords.noUsage}.`, allowed?.slash ?? null, allowed?.extra ?? null]
+      .filter((x): x is string => x !== null)
+      .join(' '),
+  );
 
   /**
    * AND BILLING ASKS THE MAIL DOOR, because it is the one answer only a self-host gives.
@@ -74,6 +116,19 @@
 </script>
 
 <!--
+  PLAN AND USAGE, THE AREA'S LEAD TILE (Light-Settings): the plan as the figure, one bar per meter with the nearest in
+  ink, and one line saying which limit the month turns on. Drawn only where the ledger answered with this record's
+  allowance: a plan with no limit has no meters, and a number tile without a chart is the one thing a tile may not be.
+-->
+{#if meters.length > 0 && allowed}
+  <Tile icon="money" title={tileWords.planTitle} meta={tileWords.monthMeta(month.day, month.of, allowed.resets)} lead>
+    {#if figure}<p class="figure num">{figure}</p>{/if}
+    <Bars items={meterBars(meters)} max={1} format={shareOf} subject={tileWords.metersSubject} />
+    <p class="reading">{reading}{#if needs}{' '}<span data-needs>{needs}</span>{/if}</p>
+  </Tile>
+{/if}
+
+<!--
   THERE IS NOTHING TO BILL ON A SELF-HOST, and `23 §8`'s precedent for exactly this shape is
   "one line in Settings". `53 §5.10` puts the whole ladder "in the Worker and nothing in the
   record, so the record package stays billing-agnostic"; `33 §10` holds the state in the Cloud
@@ -87,16 +142,22 @@
   <Section title={copy.billingYours}>
     {#if bill.state === 'ready' && bill.value}
       {#if !bill.value.open}<p class="hint">{copy.billingNotOpen}</p>{/if}
+      <!-- ROWS ON THE GROUND (SYSTEM §6): a well, the record and its plan, the state under them, and the verbs at the
+           end. A bill that needs him wears the red well, and says so in its sentence, so red is never the only sign. -->
       <ul class="bills">
         {#each bill.value.records as r (r.record)}
+          {@const late = r.state === 'past_due' || r.state === 'lapsed'}
           <li class="bill">
-            <div class="bill-head">
-              <span class="bill-name" dir="auto">{nameOf(r)}</span>
-              <span class="bill-plan">{r.state === 'unbilled' ? copy.billingNotBilled : planLine(r)}</span>
+            <IconWell name="money" size="l" tone={late ? 'danger' : undefined} />
+            <div class="bill-main">
+              <div class="bill-head">
+                <span class="bill-name" dir="auto">{nameOf(r)}</span>
+                <span class="bill-plan">{r.state === 'unbilled' ? copy.billingNotBilled : planLine(r)}</span>
+              </div>
+              {#if r.state !== 'unbilled'}
+                <p class="bill-state" data-state={r.state}>{stateLine(r, shell.now)}</p>
+              {/if}
             </div>
-            {#if r.state !== 'unbilled'}
-              <p class="bill-state" data-state={r.state}>{stateLine(r, shell.now)}</p>
-            {/if}
             <!-- THE ACTIONS STRIPE CAN TAKE, and only while this host is taking payments: with billing off every
                  billing door refuses, so a button here would be a press that can only fail. A record with no row
                  has no customer at Stripe, so it has nothing to manage either. -->
@@ -148,6 +209,32 @@
 </div>
 
 <style>
+  /* THE FIGURE IN A TILE (SYSTEM §3, `t-figure`): the plan, which is what the meters under it are measured against. */
+  .figure {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--t-figure);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 34px;
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+  }
+
+  /* THE ONE WRITTEN LINE under the chart (SYSTEM §6), in ink, with the phrase that needs him in red. */
+  .reading {
+    margin: 0;
+    max-inline-size: var(--measure);
+    color: var(--ink);
+    font-size: var(--t-base);
+    line-height: 20px;
+  }
+
+  .reading [data-needs] {
+    color: var(--danger);
+    font-weight: 500;
+  }
+
   .hint {
     margin: 0 0 var(--sp-3);
     max-inline-size: var(--measure);
@@ -163,11 +250,24 @@
     list-style: none;
   }
 
+  /* A ROW: the 32px well, then the words, then the verbs, at the height of a two-line row. */
   .bill {
     display: grid;
-    gap: var(--sp-1);
-    padding-block: var(--sp-3);
-    border-block-end: 1px solid var(--line-soft);
+    grid-template-columns: var(--well-l) minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: var(--sp-3);
+    min-block-size: var(--row-h-2);
+    padding-block: var(--sp-2);
+  }
+
+  .bill + .bill {
+    border-block-start: 1px solid var(--line);
+  }
+
+  .bill-main {
+    display: grid;
+    gap: 2px;
+    min-inline-size: 0;
   }
 
   /* THE NAME AND THE PLAN SHARE A LINE WHILE THEY FIT, and the plan wraps under the name when they do not, so a long
@@ -177,20 +277,22 @@
     flex-wrap: wrap;
     align-items: baseline;
     column-gap: var(--sp-3);
-    row-gap: var(--sp-1);
+    row-gap: 2px;
   }
 
   .bill-name {
     min-inline-size: 0;
     overflow-wrap: anywhere;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--t-row);
     font-weight: 500;
+    line-height: 20px;
   }
 
   .bill-plan {
     color: var(--dim);
     font-size: var(--t-sm);
+    font-variant-numeric: tabular-nums;
   }
 
   .bill-state {
@@ -198,11 +300,11 @@
     max-inline-size: var(--measure);
     color: var(--ink2);
     font-size: var(--t-sm);
-    line-height: var(--lh-body);
+    line-height: 18px;
   }
 
-  /* PAST DUE AND LAPSED ARE THE TWO STATES THAT NEED THE PERSON, and red is the house's word for past due (design
-     brief §10). The sentence says it too, so the colour is never the only sign. */
+  /* PAST DUE AND LAPSED ARE THE TWO STATES THAT NEED THE PERSON, and red is the house's word for what needs him
+     (SYSTEM §2). The sentence says it too, so the colour is never the only sign. */
   .bill-state[data-state='past_due'],
   .bill-state[data-state='lapsed'] {
     color: var(--danger);
@@ -211,8 +313,8 @@
   .bill-actions {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--sp-2);
-    margin-block-start: var(--sp-2);
+    justify-content: flex-end;
+    gap: 6px;
   }
 
   /* WRAPPING, for the reason `/audit`'s segmented bar already wraps: two buttons that do not fit
@@ -221,13 +323,24 @@
     flex-wrap: wrap;
     display: flex;
     gap: var(--sp-2);
-    margin-block-start: var(--sp-3);
   }
 
-  /* ON A PHONE EVERY BUTTON IS A FULL-WIDTH ROW AT THE TOUCH HEIGHT, stacked, so a thumb never has to aim between two
+  /* ON A PHONE THE VERBS GO UNDER THE WORDS, at the touch height, full width, so a thumb never has to aim between two
      pills that wrapped to odd widths. */
   @media (width < 640px) {
-    .bill-actions,
+    .bill {
+      grid-template-columns: var(--well-l) minmax(0, 1fr);
+      align-items: start;
+      row-gap: var(--sp-2);
+      min-block-size: 60px;
+    }
+
+    .bill-actions {
+      grid-column: 2;
+      flex-direction: column;
+      align-items: stretch;
+    }
+
     .row-actions {
       flex-direction: column;
       align-items: stretch;

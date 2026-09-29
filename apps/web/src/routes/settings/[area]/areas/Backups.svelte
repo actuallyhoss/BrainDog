@@ -19,6 +19,9 @@
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import Empty from '$lib/ui/Empty.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
+  import Waffle from '$lib/viz/Waffle.svelte';
+  import { nightParts, nightsLine, nightsOf, nightsSaid, nightWords, tileWords } from '../../billing.ts';
   import { settingsState, type AreaProps } from '../settings-state.svelte.ts';
   import StateRow from './StateRow.svelte';
 
@@ -54,8 +57,14 @@
   let restoreBusy = $state(false);
 
   type CopyLine = { id: string; at: string; bytes: number; rows: number | null; failed: string | null };
-  /* A RECORD IS DRAWN ITS OWN COPIES OR NONE: a host that keeps none shows its sentence over an empty list. */
-  const copyLines = $derived<CopyLine[]>(copiesFrom === 'live' ? liveCopies.map((c) => ({ ...c, rows: null, failed: null })) : []);
+  /* A RECORD IS DRAWN ITS OWN COPIES OR NONE: a host that keeps none shows its sentence over an empty list. NEWEST
+     FIRST, whatever order the host answered in, so the months below read down from this one. Instants the host wrote
+     compare as text. */
+  const copyLines = $derived<CopyLine[]>(
+    copiesFrom === 'live'
+      ? liveCopies.map((c) => ({ ...c, rows: null, failed: null })).sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0))
+      : [],
+  );
   /**
    * HOW MANY NIGHTS A HOST KEEPS, which the answer to `snapshots` does not say.
    *
@@ -65,6 +74,30 @@
    * sentence that says it, and it is the line to change the day either host keeps a different number.
    */
   const KEPT_NIGHTS = 30;
+
+  /**
+   * THE LAST THIRTY NIGHTS, ONE SQUARE EACH (Light-Settings), from the copies the record answered with and nothing
+   * else. `null` until it answered with at least one: a strip of thirty quiet squares over a record that has never
+   * been copied would be a chart of nothing, and the list below already says there is no backup yet.
+   *
+   * A NIGHT IS MISSED ONLY AFTER THE FIRST COPY KEPT (`nightsOf` says why), so a record made last week is shown the
+   * nights it has had, not three weeks of failures from before it existed.
+   */
+  const nights = $derived(copyLines.length > 0 ? nightsOf(copyLines, Date.now(), KEPT_NIGHTS) : null);
+
+  /** The copies by the month they were taken in, newest first: one group on the ground each (SYSTEM §6). */
+  const MONTH_NAME = new Intl.DateTimeFormat('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+  const months = $derived.by(() => {
+    const out: { key: string; label: string; lines: CopyLine[] }[] = [];
+    for (const line of copyLines) {
+      const ms = Date.parse(line.at);
+      const key = Number.isFinite(ms) ? new Date(ms).toISOString().slice(0, 7) : '';
+      const last = out[out.length - 1];
+      if (last && last.key === key) last.lines.push(line);
+      else out.push({ key, label: Number.isFinite(ms) ? MONTH_NAME.format(ms) : copy.kept, lines: [line] });
+    }
+    return out;
+  });
 
   /* A COPY IS NAMED BY ITS DAY, AND A DAY READS AS THE REST OF THE PRODUCT WRITES ONE: `3 Sep 2026`,
      not `2026-09-03` (DESIGN-SYSTEM APPENDIX C14). An id that is not a day is shown as it is. */
@@ -142,84 +175,122 @@
 {/snippet}
 
 <!--
+  AND TAKING ONE IS THE OWNER'S. `snapshot` needs `owner`, and a `read` colleague was offered this button over a list
+  already drawing the record's refusal: pressing it answered with three toasts at once, one of them about restoring,
+  which was not pressed. The refusal is the record's own sentence, so nothing is said twice.
+
+  AND ONLY WHERE THE RECORD ANSWERED WITH ITS COPIES. On the Worker `snapshots` answers `NOT_IN_THIS_BUILD`, and the
+  button sat under that sentence and answered its press with the same refusal as a toast (`research-first-sign-in.md`
+  friction 11). `reading` is not an answer either, or the button flashes before the refusal lands.
+
+  AT THE RIGHT OF THE FIRST GROUP'S HEADING, where a group's own verb goes (SYSTEM §6), so it stays one press away
+  whether the record has kept thirty copies or none.
+-->
+{#snippet backUpButton()}
+  {#if anOwner && copiesFrom === 'live'}
+    <Button weight="primary" disabled={backingUp} aria-busy={backingUp} onclick={backUp}>{copy.snapshotNow}</Button>
+  {/if}
+{/snippet}
+
+<!--
   `53 §5.4`: "Three mechanisms, one contract: nightly, sealed, thirty kept, restorable." And
   `03 §6` on why this is not the Export area: "A snapshot is not an export: it is a full copy
   ... disaster recovery, not portability."
 -->
+<!--
+  THE NIGHTLY COPIES AS A STRIP OF THIRTY (Light-Settings): one square a night, oldest at the left, the newest copy in
+  ink and a night with none in red where it fell, then one line saying what the strip means. The policy under it is the
+  host's own: `53 §4` has the Cloud keep "the 30 newest dated keys plus `latest`" and run at `17 3 * * *` UTC, and
+  `49 §5.13` a self-host keep 30 files and run at 02:00 UTC plus `hash(slug) mod 60` minutes, so no one time is printed.
+-->
+{#if nights && nights.length > 0}
+  <Tile icon="archive" title={tileWords.copiesTitle} meta={tileWords.copiesMeta(KEPT_NIGHTS)}>
+    <div class="strip">
+      <Waffle parts={nightParts(nights)} columns={KEPT_NIGHTS} summary={nightsSaid(nights)} />
+      <!-- THE STRIP'S TWO ENDS, so the squares read as dates. Secondary labels, dropped on a phone (SYSTEM §9). -->
+      <div class="strip-ends" aria-hidden="true">
+        <span>{nightWords(nights[0]?.day ?? '')}</span>
+        <span class="strip-now">{tileWords.stripTo}</span>
+      </div>
+    </div>
+    <p class="reading">{nightsLine(nights)}</p>
+    <p class="policy">{shell.host === 'cloud' ? copy.keptCloud(KEPT_NIGHTS) : copy.keptSelfHost(KEPT_NIGHTS)}</p>
+  </Tile>
+{/if}
+
 <!-- THE COUNT IS WHAT IS KEPT, and a night that kept nothing is not one. It read "What is kept
      · 4" over three copies and a row saying *nothing kept*, counting the failure as a backup,
      which is the same class of error as hiding it. -->
-<Section title={copy.kept} count={copyLines.filter((s) => s.failed === null).length}>
-  <!-- "The 30 newest are kept" IS A SENTENCE ABOUT A LIST THAT HAS SOME. On a record whose
-       first backup has not run it describes a policy over nothing, above nothing. -->
-  {#if copiesFrom === 'refused'}
+{#if copiesFrom === 'refused'}
+  <Section title={copy.kept}>
     <!-- NOT ON THIS HOST YET, AS A ROW, with the record's own sentence as its line and the one way
          out that does exist on every host, the export, as its action (DSN-18). -->
     <div role="status">
       <StateRow icon="archive" title={words.notHereYet} line={copiesSaid} action={anOwner ? exportInstead : undefined} />
     </div>
-  {:else if copyLines.length === 0}
+  </Section>
+{:else if copiesFrom === 'reading'}
+  <!-- NOTHING UNTIL THE RECORD ANSWERS: "No backup yet" drawn while the list is read is a sentence the answer may take
+       straight back. -->
+  <Section title={copy.kept}>{''}</Section>
+{:else if copyLines.length === 0}
+  <!-- "The 30 newest are kept" IS A SENTENCE ABOUT A LIST THAT HAS SOME. On a record whose
+       first backup has not run it describes a policy over nothing, above nothing. -->
+  <Section title={copy.kept} aside={backUpButton}>
     <Empty kind="no-data-yet" title={copy.noSnapshots} body={copy.noSnapshotsWhy} />
-  {:else}
-  <!-- THE POLICY IS THE HOST'S, and this sentence was Cloud's schedule and the self-host's
-       retention at the same time. `53 §4`: Cloud keeps *"the 30 newest dated keys plus
-       `latest`"* and runs at `17 3 * * *` UTC; `49 §5.13`: a self-host keeps 30 files and runs
-       at 02:00 UTC plus `hash(slug) mod 60` minutes. It said "nightly, at 03:00. The 30 newest
-       are kept" on both, which is right on neither. -->
-  <p class="hint">{shell.host === 'cloud' ? copy.keptCloud(KEPT_NIGHTS) : copy.keptSelfHost(KEPT_NIGHTS)}</p>
-  {/if}
-  <ul class="ledger ledger-glyph">
-    {#each copyLines as snap (snap.id)}
-      <li data-intent={snap.failed ? 'bad' : undefined}>
-        <div class="line">
-          <span class="seq">
-            {#if snap.failed}
-              <span class="glyph" role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span>
-            {:else}<Icon name="archive" size="s" />{/if}
-          </span>
-          <span class="line-main">
-            <span class="line-title">{copyDay(snap.id)}</span>
-            <!-- THE REASON BESIDE ITS DATE. It sat at the far end of the row, 900px from the night it
-                 explains, where it read as a note about some other line. -->
-            <span class="line-detail">{relative(snap.at, Date.now())}{#if snap.failed}{' · '}<span class="why-failed">{snap.failed}</span>{/if}</span>
-          </span>
-          <!-- A NIGHT THAT PRODUCED NOTHING SAYS SO, AND SAYS WHY. `12 §8`: "A backup that
-               silently gave up is worse than none", which is the argument for these two
-               routes existing, and the list drew four identical successes. `13 §6`: the
-               record's own `note` is rendered, not a sentence written here. -->
-          <span class="line-amount">
-            <span class="means">{snap.failed ? copy.snapshotFailed : snap.bytes === 0 ? copy.snapshotEmpty : snap.rows === null ? copy.sizeOnDisk(bytes(snap.bytes)) : copy.rowsAndSize(snap.rows, bytes(snap.bytes))}</span>
-          </span>
-          <span class="line-when">
-            {#if !snap.failed}
-              <!-- `49 §5.13`: `GET /api/snapshots/:id` streams the file with
-                   `Content-Disposition: attachment`. A self-host's only way back is putting a
-                   copy back by hand, so the copy has to be reachable. Cloud's prefix is not
-                   served to a browser, so there is nothing to offer. -->
-              {#if copiesFrom === 'live'}
-                <Button weight="bare" onclick={() => downloadCopy(snap.id)}>{copy.download}</Button>
-                <Button weight="bare" onclick={() => (restoring = snap.id)}>{copy.restoreThis}</Button>
+  </Section>
+{:else}
+  <!-- ONE GROUP ON THE GROUND PER MONTH, each counting what it kept, with the rows sitting straight on the ground. The
+       newest month's heading carries Back up now, and only that one. -->
+  {#snippet monthRows(lines: CopyLine[])}
+    <ul class="ledger ledger-glyph">
+      {#each lines as snap (snap.id)}
+        <li data-intent={snap.failed ? 'bad' : undefined}>
+          <div class="line">
+            <span class="seq">
+              {#if snap.failed}
+                <span class="glyph" role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span>
+              {:else}<Icon name="archive" size="s" />{/if}
+            </span>
+            <span class="line-main">
+              <span class="line-title">{copyDay(snap.id)}</span>
+              <!-- THE REASON BESIDE ITS DATE. It sat at the far end of the row, 900px from the night it
+                   explains, where it read as a note about some other line. -->
+              <span class="line-detail">{relative(snap.at, Date.now())}{#if snap.failed}{' · '}<span class="why-failed">{snap.failed}</span>{/if}</span>
+            </span>
+            <!-- A NIGHT THAT PRODUCED NOTHING SAYS SO, AND SAYS WHY. `12 §8`: "A backup that
+                 silently gave up is worse than none", which is the argument for these two
+                 routes existing, and the list drew four identical successes. `13 §6`: the
+                 record's own `note` is rendered, not a sentence written here. -->
+            <span class="line-amount">
+              <span class="means">{snap.failed ? copy.snapshotFailed : snap.bytes === 0 ? copy.snapshotEmpty : snap.rows === null ? copy.sizeOnDisk(bytes(snap.bytes)) : copy.rowsAndSize(snap.rows, bytes(snap.bytes))}</span>
+            </span>
+            <span class="line-when">
+              {#if !snap.failed}
+                <!-- `49 §5.13`: `GET /api/snapshots/:id` streams the file with
+                     `Content-Disposition: attachment`. A self-host's only way back is putting a
+                     copy back by hand, so the copy has to be reachable. Cloud's prefix is not
+                     served to a browser, so there is nothing to offer. -->
+                {#if copiesFrom === 'live'}
+                  <Button weight="bare" size="sm" onclick={() => downloadCopy(snap.id)}>{copy.download}</Button>
+                  <Button weight="bare" size="sm" onclick={() => (restoring = snap.id)}>{copy.restoreThis}</Button>
+                {/if}
               {/if}
-            {/if}
-          </span>
-        </div>
-      </li>
-    {/each}
-  </ul>
-  <!-- AND TAKING ONE IS THE OWNER'S. `snapshot` needs `owner`, and a `read` colleague was
-       offered this button over a list already drawing the record's refusal: pressing it
-       answered with three toasts at once, one of them about restoring, which was not pressed.
-       The refusal above this is the record's own sentence, so nothing is said twice. -->
-  <!-- AND ONLY WHERE THE RECORD ANSWERED WITH ITS COPIES. On the Worker `snapshots` answers
-       `NOT_IN_THIS_BUILD`, and the button sat under that sentence and answered its press with
-       the same refusal as a toast (`research-first-sign-in.md` friction 11). `reading` is not
-       an answer either, or the button flashes before the refusal lands. -->
-  {#if anOwner && copiesFrom === 'live'}
-  <div class="row-actions">
-    <Button weight="primary" disabled={backingUp} aria-busy={backingUp} onclick={backUp}>{copy.snapshotNow}</Button>
-  </div>
-  {/if}
-</Section>
+            </span>
+          </div>
+        </li>
+      {/each}
+    </ul>
+  {/snippet}
+  {#each months as month, i (`${month.key}:${i}`)}
+    {@const kept = month.lines.filter((line) => line.failed === null).length}
+    {#if i === 0}
+      <Section title={month.label} count={kept} aside={backUpButton}>{@render monthRows(month.lines)}</Section>
+    {:else}
+      <Section title={month.label} count={kept}>{@render monthRows(month.lines)}</Section>
+    {/if}
+  {/each}
+{/if}
 
 <!-- `49 §8`, and it asks for exactly this: the key "is what a self-hoster must back up
      SEPARATELY; Settings > backups says so in one line." A snapshot sealed with a key that
@@ -264,8 +335,10 @@
     <p class="hint">{copy.restoreLive}</p>
   {/if}
   {#if restoring}
-    <div class="danger">
-      <p class="danger-title">{copy.restoreConfirm(restoring)}</p>
+    <!-- THE CONFIRM IS WORDS AND TWO VERBS ON THE GROUND (SYSTEM §6): a destructive verb is its words in ink asking to
+         be pressed again, never a red box. What it replaces is said in the sentence, which is the part to read. -->
+    <div class="confirm" role="group" aria-label={copy.restoreThis}>
+      <p class="confirm-said">{copy.restoreConfirm(restoring)}</p>
       <div class="row-actions">
         <Button tone="bad" disabled={restoreBusy} aria-busy={restoreBusy} onclick={restoreCopy}>{copy.restoreThis}</Button>
         <Button weight="bare" disabled={restoreBusy} onclick={() => (restoring = null)}>{copy.keepAsIs}</Button>
@@ -319,19 +392,65 @@
     margin-block-start: var(--sp-3);
   }
 
-  .danger {
-    padding: var(--sp-4);
-    background: var(--s1);
-    border: 1px solid color-mix(in srgb, var(--danger) 40%, var(--line));
-    border-radius: var(--r-md);
+  /* THE CONFIRM, UNBOXED: a sentence at the row's weight and its two verbs under it, with a hairline above so it reads
+     as the next step of the group rather than a note. */
+  .confirm {
+    padding-block-start: var(--sp-3);
+    border-block-start: 1px solid var(--line);
   }
 
-  .danger-title {
-    color: var(--danger);
+  .confirm-said {
+    margin: 0;
+    max-inline-size: var(--measure);
+    color: var(--ink);
+    font-size: var(--t-row);
+    font-weight: 500;
+    line-height: 20px;
+  }
+
+  /* THE STRIP HOLDS ITS SQUARES AT UP TO 16PX (`waffle.ts`), so it is no wider than thirty of them and the two dates
+     under it sit at its two ends. */
+  .strip {
+    display: grid;
+    gap: var(--sp-2);
+    max-inline-size: calc(30 * 16px + 29 * 3px);
+  }
+
+  .strip-ends {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--sp-3);
+    color: var(--dim);
+    font-size: var(--t-xs);
+    line-height: 16px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .strip-now {
+    color: var(--ink);
     font-weight: 500;
   }
 
-  .danger :global(.btn) {
-    margin-block-start: var(--sp-3);
+  /* THE ONE WRITTEN LINE under the chart (SYSTEM §6), and the host's policy under it in the quiet ink. */
+  .reading {
+    margin: 0;
+    max-inline-size: var(--measure);
+    color: var(--ink);
+    font-size: var(--t-base);
+    line-height: 20px;
+  }
+
+  .policy {
+    margin: 0;
+    max-inline-size: var(--measure);
+    color: var(--dim);
+    font-size: var(--t-sm);
+    line-height: 18px;
+  }
+
+  @media (width < 640px) {
+    .strip-ends {
+      display: none;
+    }
   }
 </style>

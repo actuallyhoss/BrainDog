@@ -30,6 +30,7 @@
   import Icon from '$lib/ui/Icon.svelte';
   import Face from '$lib/ui/Face.svelte';
   import Empty from '$lib/ui/Empty.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
   import { namesHeld, personSaid, secondSaid } from '../people-said.ts';
   import { bareOrigin, settingsState, type AreaProps } from '../settings-state.svelte.ts';
   import Links from '../Links.svelte';
@@ -419,6 +420,20 @@
    */
   const peopleNames = $derived(namesHeld(people));
   const said = (who: Person) => personSaid(who, me.person, peopleNames);
+
+  /**
+   * THE COLLEAGUES TILE (Light-Settings): everybody on the record but the reader, each with their face, what they may
+   * do and when they last looked. The tile is who is here at a glance; what each may do is changed on the ground under
+   * it, where the controls are.
+   */
+  const colleagues = $derived(people.filter((p) => !self(p)));
+  const tileWords = {
+    title: 'Colleagues',
+    none: 'none yet',
+    /* THE BOARD'S SENTENCE, SAID TO AN OWNER, who is the one who can act on it: every change a colleague makes is
+       signed with their name, which is what makes asking somebody in safe. */
+    invite: 'Invite someone, and every change they make carries their name.',
+  };
 </script>
 
 <!--
@@ -453,10 +468,25 @@
     <Empty kind="error" title={peopleRefusal} />
   </Section>
 {:else if alone}
-  <Section title={copy.whoCanSee}>
-    <p class="hint">{copy.onlyPerson}</p>
-  </Section>
+  <!-- ONE PERSON IS THE TILE'S SENTENCE AND NOTHING ELSE: there is nobody to list and nobody to compare. -->
+  <Tile icon="users" title={tileWords.title} count={tileWords.none}>
+    <p class="reading">{copy.onlyPerson}{#if anOwner}{' '}{tileWords.invite}{/if}</p>
+  </Tile>
 {:else}
+  <Tile icon="users" title={tileWords.title} count={colleagues.length}>
+    <ul class="mates">
+      {#each colleagues as p (p.id)}
+        <li class="mate">
+          <Face name={said(p)} kind="person" size="l" />
+          <span class="mate-words">
+            <span class="mate-name" dir="auto">{said(p)}</span>
+            <span class="mate-detail">{p.seen ? copy.lastLooked(since(p.seen, Date.now())) : copy.neverLooked}{#if p.suspended}{' · '}{copy.suspendedSince(relative(p.suspended, Date.now()))}{/if}</span>
+          </span>
+          <span class="mate-level">{levelSaid(p.level)}</span>
+        </li>
+      {/each}
+    </ul>
+  </Tile>
   <Section title={copy.whoCanSee} count={people.length}>
     <p class="hint">{copy.accessScope}</p>
     <!-- TWO LINES PER PERSON, and not the five-column `.line` every other ledger uses.
@@ -1280,19 +1310,91 @@
     margin-block-start: var(--sp-3);
   }
 
+  /* ERASING IS WORDS AND FIELDS ON THE GROUND, unboxed: the red-edged panel it sat in drew red for a danger, and red
+     is what needs him and nothing else (SYSTEM §2). */
   .danger {
-    padding: var(--sp-4);
-    background: var(--s1);
-    border: 1px solid color-mix(in srgb, var(--danger) 40%, var(--line));
-    border-radius: var(--r-md);
+    display: grid;
+    gap: var(--sp-2);
+    max-inline-size: var(--measure);
   }
 
   .danger-title {
-    color: var(--danger);
+    margin: 0 0 var(--sp-1);
+    color: var(--ink);
+    font-size: var(--t-row);
     font-weight: 500;
+    line-height: 20px;
   }
 
   .danger :global(.btn) {
-    margin-block-start: var(--sp-3);
+    justify-self: start;
+    margin-block-start: var(--sp-2);
+  }
+
+  /* THE COLLEAGUES TILE'S ROWS: a 32px face, the name over when they last looked, and what they may do at the end, one
+     hairline between each. */
+  .mates {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .mate {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: var(--sp-3);
+    min-block-size: var(--row-h-2);
+    padding-block: var(--sp-2);
+  }
+
+  .mate + .mate {
+    border-block-start: 1px solid var(--line);
+  }
+
+  .mate-words {
+    display: grid;
+    gap: 2px;
+    min-inline-size: 0;
+  }
+
+  .mate-name {
+    overflow: hidden;
+    color: var(--ink);
+    font-size: var(--t-row);
+    font-weight: 500;
+    line-height: 20px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mate-detail {
+    color: var(--dim);
+    font-size: var(--t-sm);
+    line-height: 18px;
+  }
+
+  .mate-level {
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  /* THE ONE WRITTEN LINE a tile with no figure still carries. */
+  .reading {
+    margin: 0;
+    max-inline-size: var(--measure);
+    color: var(--ink2);
+    font-size: var(--t-base);
+    line-height: 20px;
+  }
+
+  @media (width < 900px) {
+    .mate {
+      min-block-size: 60px;
+    }
   }
 </style>
