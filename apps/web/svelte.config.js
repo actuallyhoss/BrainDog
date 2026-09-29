@@ -113,5 +113,9 @@ export default {
     /* NO `window.__svelte.v` MARKER. It is a chunk of its own in the entry graph, read by nothing this
        app ships, and the entry bundle has a budget. */
     discloseVersion: false,
+    /* EVERY COMPONENT IN RUNES MODE. Two components with no rune in them compiled in legacy mode, and legacy mode's
+       `init` and its before- and after-update queues rode into the Svelte runtime the entry imports: about 200
+       brotli bytes on the budget in `bundle.mjs` for two components that use none of it. */
+    runes: true,
   },
 };

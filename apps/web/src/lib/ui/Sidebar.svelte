@@ -355,7 +355,7 @@
       </section>
     {/if}
 
-    <div class="more">
+    <div class="foot">
       {#if icons}
         <hr class="sep" />
       {:else}
@@ -774,7 +774,8 @@
     display: none;
   }
 
-  .more {
+  /* NOT `.more`, which `controls.css` dims on press: a press on any row under it dimmed the whole group. */
+  .foot {
     margin-block-start: auto;
     padding-block-start: var(--sp-4);
   }

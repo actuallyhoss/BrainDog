@@ -199,17 +199,6 @@
     white-space: nowrap;
   }
 
-  /* WHAT THE RECORD WOULD DO, under the reason it matters: a conclusion rather than more detail, so it is the second
-     ink rather than the dim one. It never wraps. */
-  .line-pick {
-    color: var(--ink2);
-    font-size: var(--t-sm);
-    font-weight: 600;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
   /* THE FIGURE, TABULAR, at the row's own size so a column of amounts reads as figures and not as captions. */
   .line-amount {
     color: var(--ink);

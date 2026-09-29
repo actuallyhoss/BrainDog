@@ -62,10 +62,7 @@
     transition-duration: var(--d-press);
   }
 
-  .to-decide:active,
-  .more:active,
-  .who-chip:active,
-  .second .one:active {
+  .more:active {
     opacity: var(--press-dim);
     transition-duration: var(--d-press);
     transition-timing-function: var(--ease-push);
