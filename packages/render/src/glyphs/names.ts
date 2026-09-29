@@ -34,6 +34,8 @@ const APP = [
   'tag', 'bell', 'session', 'drag', 'arrowUp', 'arrowDown', 'grid', 'edit', 'trash', 'archive', 'eye', 'download',
   'refresh', 'star', 'ban', 'info', 'ask', 'more', 'keyboard', 'code', 'observe', 'history', 'lock', 'key',
   'learning', 'skill', 'plug', 'globe',
+  /* The rail's places by their own names (SYSTEM §12.2 "Glyphs", from `loop/design/bento/ICONS.md`). */
+  'today', 'work', 'projects', 'activity', 'slash',
 ] as const;
 
 /** A name the app draws with a path of its own. */

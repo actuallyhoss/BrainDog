@@ -140,7 +140,7 @@ test('a glyph adds no words and no number to what a cell says', () => {
   assert.equal(magnitudeOfCell('{{icon:trash-2}} 5'), 5, 'the glyph moved the figure beside it');
 });
 
-const SVG_ATTRS = 'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"';
+const SVG_ATTRS = 'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"';
 const DRAWN = `<svg class="glyph-inline" role="img" aria-label="rocket" ${SVG_ATTRS}><path d="${DRAWING}"></path></svg>${NBSP}shipped`;
 const UNDRAWN = `<span class="glyph-inline" data-glyph="rocket" role="img" aria-label="rocket"></span>${NBSP}shipped`;
 

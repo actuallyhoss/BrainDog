@@ -7,10 +7,21 @@
  * every unit test of the record layer died on `ERR_UNKNOWN_FILE_EXTENSION` before running a line.
  * Path data is not a component concern anyway; `Icon.svelte` is the thing that draws it.
  *
- * About forty glyphs, one 24-box, one 1.6 stroke, `currentColor` only. There is no `color` prop
- * anywhere near them, because that would be a colour-writing component and CI must reject it
- * (22 §9). Deliberately quiet: the identity here is carried by the type, the one red and the id
- * chips, and an icon set that also wants attention is one accessory too many.
+ * THE SHAPES ARE `loop/design/bento/ICONS.md`'s, copied as its inner markup, exactly (SYSTEM §12.2
+ * "Glyphs"). A name here that ICONS.md also draws takes its shape; a name it has no shape for is drawn
+ * in the same hand (24 grid, 2px padding, round caps, rounded rects rx 2 to 4.5), so the set reads as
+ * one family. `Icon.svelte` strokes them at 1.75 in `currentColor`; there is no `color` prop anywhere
+ * near them, because that would be a colour-writing component and CI must reject it (22 §9).
+ *
+ * EACH ENTRY IS INNER SVG MARKUP, NOT ONE `d`, because a glyph is circles and rects as well as paths
+ * (settings' three knobs, search's lens). The markup is never inserted as HTML: `shapesOf` reads it
+ * into elements and attributes from a closed list, and `Icon` draws those. The renderer and a page's
+ * glyph slot still ask for ONE `d` in a 24 box, and `pathOf` answers them by rewriting the shapes as
+ * path commands, the way `braindog-render/glyphs` stores Lucide's.
+ *
+ * ONE ENTRY PER LINE, `name: '<markup>'`, and never a reference to another entry: `glyphs.test.ts`
+ * in `braindog-render` reads the names off this file as text, and a name spelled any other way is one
+ * it does not see. That is why `sun` repeats `today`'s markup instead of pointing at it.
  *
  * A DECLARATION MAY NAME MORE THAN THESE. `braindog-render/glyphs` holds 251, Lucide's, and a page an
  * agent declares with `icon: rocket` draws one of them; see `IconName` at the foot of this file.
@@ -23,97 +34,101 @@ import { CORE, loadSet, type CoreGlyph, type SetGlyph } from 'braindog-render/gl
 import { GLYPH_NAMES, type AppGlyph } from 'braindog-render/glyphs/names';
 
 export const PATHS = {
-  home: 'M4 11 12 4l8 7v8a1 1 0 0 1-1 1h-4v-5h-6v5H5a1 1 0 0 1-1-1z',
-  decide: 'M12 21v-8m0 0L6 7V3m6 10 6-6V3',
-  inbox: 'M5 4h14l2 8v7a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-7zM3 12h5l1.5 2.5h5L16 12h5',
-  search: 'M11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14zm5-2 5 5',
-  packs: 'M4 4h6.5v6.5H4zM13.5 4H20v6.5h-6.5zM4 13.5h6.5V20H4zM13.5 13.5H20V20h-6.5z',
-  vault: 'M12 3 5 6v6c0 4 3 7.5 7 9 4-1.5 7-5 7-9V6zM12 13v3',
-  settings: 'M4 7h9m4 0h3M4 12h11m4 0h2M4 17h5m4 0h8',
-  plus: 'M12 5v14M5 12h14',
-  chevron: 'm9 5 7 7-7 7',
-  chevronDown: 'm5 9 7 7 7-7',
-  close: 'M6 6l12 12M18 6 6 18',
-  check: 'm5 12 5 5L19 6',
-  filter: 'M3 5h18l-7 8.2V20l-4-2.2v-4.6z',
-  copy: 'M9 9h10v10H9zM15 9V5H5v10h4',
-  /** A chain, for a URL. `copy` is two sheets of paper and is the id — the two are different verbs. */
-  link: 'M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 1 0-5.7-5.7L11.5 7M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 1 0 5.7 5.7L12.5 17',
-  clock: 'M12 21a9 9 0 1 1 0-18 9 9 0 0 1 0 18zm0-14v5l3 2',
-  alert: 'M12 4 2.5 20h19zM12 10v4',
-  sun: 'M12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zM12 2v2m0 16v2M4.2 4.2l1.4 1.4m12.8 12.8 1.4 1.4M2 12h2m16 0h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4',
-  moon: 'M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z',
-  monitor: 'M3 5h18v11H3zM9 20h6M12 16v4',
-  arrow: 'M5 12h14m-6-6 6 6-6 6',
-  back: 'M19 12H5m6-6-6 6 6 6',
-  external: 'M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5',
-  stop: 'M7 7h10v10H7z',
-  play: 'M8 5l11 7-11 7z',
+  /* The places, in the rail's order. `today` is the sun of the day's start; `work` a checked task. */
+  today: '<circle cx="12" cy="12" r="4"/><path d="M12 2.75v1.5M12 19.75v1.5M2.75 12h1.5M19.75 12h1.5M5.46 5.46l1.06 1.06M17.48 17.48l1.06 1.06M5.46 18.54l1.06-1.06M17.48 6.52l1.06-1.06"/>',
+  work: '<rect x="3.75" y="3.75" width="16.5" height="16.5" rx="4.5"/><path d="M8.25 12.25l2.5 2.5 5-5.5"/>',
+  projects: '<rect x="3.75" y="3.75" width="9.5" height="7" rx="2"/><rect x="15.25" y="3.75" width="5" height="7" rx="2"/><rect x="3.75" y="12.75" width="5" height="7.5" rx="2"/><rect x="10.75" y="12.75" width="9.5" height="7.5" rx="2"/>',
+  money: '<path d="M18.5 7.25V5.9a1.4 1.4 0 0 0-1.75-1.36L6 7.25"/><rect x="3.75" y="7.25" width="16.5" height="12.5" rx="3"/><path d="M20.25 11.5h-3.5a2 2 0 0 0 0 4h3.5"/>',
+  activity: '<path d="M3 12.5h3.75l2.5-6 4.5 11 2.5-5h4.75"/>',
+  decide: '<path d="M12 20.5v-6.25L6.25 8.5"/><path d="M12 14.25l5.75-5.75"/><path d="M6.25 13V8.5h4.5"/><path d="M17.75 13V8.5h-4.5"/>',
+  settings: '<path d="M4 6.5h9M17 6.5h3M4 12h3M11 12h9M4 17.5h11M19 17.5h1"/><circle cx="15" cy="6.5" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="17.5" r="2"/>',
+  search: '<circle cx="10.75" cy="10.75" r="6.5"/><path d="M20 20l-4.6-4.6"/>',
+  /* Ask, the Slash field. `star` draws the same, because every caller that named `star` meant Slash, and
+     ICONS.md allows no star in the product. */
+  slash: '<rect x="3.75" y="3.75" width="16.5" height="16.5" rx="4.5"/><path d="M14.25 7.75l-4.5 8.5"/>',
+  star: '<rect x="3.75" y="3.75" width="16.5" height="16.5" rx="4.5"/><path d="M14.25 7.75l-4.5 8.5"/>',
+  inbox: '<path d="M3.75 13.25 6.4 5.9a2 2 0 0 1 1.88-1.15h7.44a2 2 0 0 1 1.88 1.15l2.65 7.35"/><path d="M3.75 13.25v4.5a2.5 2.5 0 0 0 2.5 2.5h11.5a2.5 2.5 0 0 0 2.5-2.5v-4.5h-5l-1.5 2.5h-3.5l-1.5-2.5z"/>',
+  /* A house: a property, and the palette's way home. Today is `today`. */
+  home: '<path d="M4 10.5 12 4l8 6.5"/><path d="M6 9v10.25h12V9"/><path d="M10 19.25v-5h4v5"/>',
 
-  /* Nav glyphs. A DECLARATION NAMES ONE OF THESE — a register and a page carry an icon the same
-     way they carry a title, because a rail where half the rows have a glyph and half do not reads
-     as a rendering bug rather than as a hierarchy (19 §3). Same 24-box, same 1.6 stroke, same
-     deliberate quietness: these have to sit under the type, not compete with it. */
-  money: 'M3 6h18v12H3zM6.5 9.5v.01M17.5 14.5v.01',
-  calendar: 'M4 6h16v14H4zM4 10h16M8 3v4m8-4v4',
-  board: 'M4 4h4.5v16H4zM9.75 4h4.5v10h-4.5zM15.5 4H20v13h-4.5z',
-  rows: 'M4 6h16M4 12h16M4 18h16',
-  obligation: 'M6 3h12v18l-3-2-3 2-3-2-3 2zM9.5 8h5M9.5 12h5',
-  service: 'M6 3v6m12-6v6M4 9h16v3a8 8 0 0 1-8 8 8 8 0 0 1-8-8z',
-  thing: 'M12 3 3 7.5v9L12 21l9-4.5v-9zM12 12l9-4.5M12 12v9M12 12 3 7.5',
-  people: 'M9.5 11.5a3.75 3.75 0 1 1 0-7.5 3.75 3.75 0 0 1 0 7.5zM2.5 20.5c0-3.6 3.1-6 7-6s7 2.4 7 6M16 4.6a3.6 3.6 0 0 1 0 6.9m1.4 3.3c2.4.6 4.1 2.4 4.1 5.7',
-  task: 'M4.5 5h15v14h-15zM8.5 12l2.5 2.5 4.5-4.5',
-  doc: 'M6 3h8l4 4v14H6zM14 3v4h4M9 13h6M9 17h4',
-  tag: 'M3 11V4h7l11 11-7 7zM7.2 7.2h.01',
-  bell: 'M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6M10 19a2 2 0 0 0 4 0',
-  session: 'M3 5h18v13H3zM7.5 9.5l2.5 2.5-2.5 2.5M12.5 14.5h4',
-  /* Arranging. `drag` is the six-dot grip every list in every product uses; borrowing the
-     convention is the point — a novel handle is a handle nobody grabs. */
-  drag: 'M9 5h.01M15 5h.01M9 12h.01M15 12h.01M9 19h.01M15 19h.01',
-  arrowUp: 'M12 19V5m-6 6 6-6 6 6',
-  arrowDown: 'M12 5v14m6-6-6 6-6-6',
-  grid: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
+  /* Verbs and the controls that carry them. */
+  plus: '<path d="M12 5.25v13.5M5.25 12h13.5"/>',
+  check: '<path d="M5 12.5l4.25 4.25L19 7"/>',
+  close: '<path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/>',
+  chevron: '<path d="M9.5 6.5 15 12l-5.5 5.5"/>',
+  chevronDown: '<path d="M6.5 9.5 12 15l5.5-5.5"/>',
+  arrow: '<path d="M4.75 12h14.5M13.5 6.25 19.25 12l-5.75 5.75"/>',
+  back: '<path d="M19.25 12H4.75M10.5 6.25 4.75 12l5.75 5.75"/>',
+  external: '<path d="M7 17 17 7M8.5 7H17v8.5"/>',
+  arrowUp: '<path d="M12 19.25V4.75M6.25 10.5 12 4.75l5.75 5.75"/>',
+  arrowDown: '<path d="M12 4.75v14.5M6.25 13.5 12 19.25l5.75-5.75"/>',
+  more: '<path stroke-width="2.75" d="M5.5 12h.01M12 12h.01M18.5 12h.01"/>',
+  /* The six-dot grip every list in every product uses; borrowing the convention is the point. */
+  drag: '<path stroke-width="2.75" d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01"/>',
+  filter: '<path d="M3.75 5.25h16.5l-6.25 7.5v6.5l-4 1.5v-8z"/>',
+  keyboard: '<rect x="2.75" y="6" width="18.5" height="12" rx="2.5"/><path d="M6.5 9.75h.01M10 9.75h.01M13.5 9.75h.01M17 9.75h.01M8 14h8"/>',
+  trash: '<path d="M4.75 6.75h14.5M9.75 6.75V4.75h4.5v2M6.75 6.75l.8 12.1a1.5 1.5 0 0 0 1.5 1.4h5.9a1.5 1.5 0 0 0 1.5-1.4l.8-12.1"/>',
+  download: '<path d="M12 4.25V15.5M7.5 11 12 15.5 16.5 11"/><path d="M4.75 14.75v2.5a3 3 0 0 0 3 3h8.5a3 3 0 0 0 3-3v-2.5"/>',
+  refresh: '<path d="M19.5 12a7.5 7.5 0 0 1-12.9 5.2M4.5 12a7.5 7.5 0 0 1 12.9-5.2"/><path d="M17.75 3.5v3.5h-3.5M6.25 20.5V17h3.5"/>',
+  eye: '<path d="M2.75 12S6 5.75 12 5.75 21.25 12 21.25 12 18 18.25 12 18.25 2.75 12 2.75 12z"/><circle cx="12" cy="12" r="3"/>',
+  play: '<path d="M7.25 5.5v13l11-6.5z"/>',
+  /* Drawn in ICONS.md's hand, which has no shape for these. */
+  stop: '<rect x="6.25" y="6.25" width="11.5" height="11.5" rx="2.5"/>',
+  copy: '<rect x="8.75" y="8.75" width="11.5" height="11.5" rx="2.5"/><path d="M15.25 8.75v-2.5a2.5 2.5 0 0 0-2.5-2.5h-6.5a2.5 2.5 0 0 0-2.5 2.5v6.5a2.5 2.5 0 0 0 2.5 2.5h2.5"/>',
+  edit: '<path d="M4.75 19.25h3.5L18.5 9a2.47 2.47 0 0 0-3.5-3.5L4.75 15.75z"/><path d="M13.5 7l3.5 3.5"/>',
+  archive: '<rect x="3.25" y="4.25" width="17.5" height="4.5" rx="2"/><path d="M5 8.75v8.5a2.5 2.5 0 0 0 2.5 2.5h9a2.5 2.5 0 0 0 2.5-2.5v-8.5"/><path d="M10 12.75h4"/>',
 
-  /* Verbs. Every one of these was being drawn by a glyph that already meant something else, by a
-     literal character typed into the markup, or by nothing at all. A set where `close` has to mean
-     both "dismiss this" and "remove this block" is a set that has run out. */
-  edit: 'M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17zM15 6l3 3',
-  trash: 'M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7v12a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7M10 11v5M14 11v5',
-  archive: 'M3 6h18v4H3zM5 10v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9M10 14h4',
-  eye: 'M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6zM12 15a3 3 0 1 1 0-6 3 3 0 0 1 0 6z',
-  download: 'M12 4v11m-4-4 4 4 4-4M4 19h16',
-  refresh: 'M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5',
-  star: 'm12 4 2.4 5 5.6.8-4 3.9.9 5.5-4.9-2.6-4.9 2.6.9-5.5-4-3.9 5.6-.8z',
+  /* The theme. `sun` is `today`'s shape, as ICONS.md says. */
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2.75v1.5M12 19.75v1.5M2.75 12h1.5M19.75 12h1.5M5.46 5.46l1.06 1.06M17.48 17.48l1.06 1.06M5.46 18.54l1.06-1.06M17.48 6.52l1.06-1.06"/>',
+  moon: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"/>',
+  monitor: '<rect x="2.75" y="4.25" width="18.5" height="12.5" rx="2.5"/><path d="M8.5 20.25h7M12 16.75v3.5"/>',
 
-  /* The other two intents. `good` had `check` and `warn` had `alert`; `bad` and `info` had nothing,
-     which is why the toast stack fell back to a bare coloured dot and broke the rule that colour
-     never carries meaning on its own (13 §2.3). */
-  ban: 'M12 21a9 9 0 1 1 0-18 9 9 0 0 1 0 18zM5.6 5.6l12.8 12.8',
-  info: 'M12 21a9 9 0 1 1 0-18 9 9 0 0 1 0 18zM12 11v5M12 7.5v.01',
-  /* A question waiting for an answer, which is not the Decide screen's fork: that is a place, this is
-     a row asking something of the reader. */
-  ask: 'M12 21a9 9 0 1 1 0-18 9 9 0 0 1 0 18zM9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.8M12 17v.01',
+  /* Intents and states. `alert` is late; `ban`, `info` and `ask` complete the toast's four, so colour
+     never carries meaning on its own (13 §2.3). `ask` is a row asking something of the reader, not
+     the Decide screen's fork. */
+  alert: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.75v5"/><path d="M12 16.25h.01"/>',
+  ban: '<circle cx="12" cy="12" r="8.5"/><path d="M6 6l12 12"/>',
+  info: '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.25"/><path d="M12 7.75h.01"/>',
+  ask: '<circle cx="12" cy="12" r="8.5"/><path d="M9.75 9.5a2.4 2.4 0 0 1 4.6.9c0 1.6-2.35 2.1-2.35 3.6"/><path d="M12 17h.01"/>',
+  clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+  /* The log: a clock turned back. Drawn in ICONS.md's hand, from `clock` and `refresh`. */
+  history: '<path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3L4.5 8.75"/><path d="M4.5 5.25v3.5h3.5"/><path d="M12 8v4l2.75 1.75"/>',
+  /* A pulse, what the observe loop looks at: ICONS.md's `activity`, and deliberately not `alert`. */
+  observe: '<path d="M3 12.5h3.75l2.5-6 4.5 11 2.5-5h4.75"/>',
 
-  /* Nouns that were being said with a borrowed word. `settings` was carrying Settings, More and
-     Keymap at once; `clock` was carrying both "a time" and "the log"; `copy` was carrying both "to
-     the clipboard" and "show me the source". */
-  more: 'M5 12h.01M12 12h.01M19 12h.01',
-  keyboard: 'M2 6h20v12H2zM6 9.5v.01M9.5 9.5v.01M13 9.5v.01M16.5 9.5v.01M7 14h10',
-  code: 'm9 8-5 4 5 4M15 8l5 4-5 4',
-  /* A pulse: the shape of something that keeps happening. It is what the observe loop looks at, and
-     it is deliberately not `alert` — a pattern the record noticed is a note, not a fault. */
-  observe: 'M3 15h3.2l2.3-7.5L11.8 19l2.4-6.4 1.4 2.4H21',
-  history: 'M4 12a8 8 0 1 0 2.3-5.6M4 4v5h5M12 8v4l3 2',
-  lock: 'M6 11h12v9H6zM9 11V8a3 3 0 0 1 6 0v3',
-  key: 'M14.5 9.5a4 4 0 1 1-1.6 3.2L7 19H4v-3l6.3-6.3a4 4 0 0 1 4.2-.2zM16.5 7.5v.01',
+  /* Things in the record. */
+  calendar: '<rect x="3.75" y="5.25" width="16.5" height="15" rx="3.5"/><path d="M3.75 10h16.5M8 3.25v3.5M16 3.25v3.5"/>',
+  task: '<rect x="3.75" y="3.75" width="16.5" height="16.5" rx="4.5"/><path d="M8.25 12.25l2.5 2.5 5-5.5"/>',
+  people: '<circle cx="9" cy="8.75" r="3.25"/><path d="M3.25 19.5a5.75 5.75 0 0 1 11.5 0"/><path d="M15.5 5.75a3.25 3.25 0 0 1 0 6"/><path d="M17.25 14.25a5.75 5.75 0 0 1 3.5 5.25"/>',
+  obligation: '<path d="M6 3.75h12v16.5l-2-1.25-2 1.25-2-1.25-2 1.25-2-1.25-2 1.25z"/><path d="M9 8.5h6M9 12h6M9 15.5h3.5"/>',
+  /* A subscription someone pays for and is served by: ICONS.md's hosted service. */
+  service: '<path d="M7 18.5h10a4 4 0 0 0 .6-7.96A5.5 5.5 0 0 0 6.9 9.9 4.3 4.3 0 0 0 7 18.5z"/>',
+  thing: '<path d="M12 3.25 20.25 7.5v9L12 20.75 3.75 16.5v-9z"/><path d="M3.75 7.5 12 11.75l8.25-4.25M12 11.75v9"/>',
+  /* An add-on: ICONS.md draws it as a box. */
+  packs: '<path d="M12 3.25 20.25 7.5v9L12 20.75 3.75 16.5v-9z"/><path d="M3.75 7.5 12 11.75l8.25-4.25M12 11.75v9"/>',
+  doc: '<path d="M6.25 3.75h7.5l4.5 4.5v12H6.25z"/><path d="M13.75 3.75v4.5h4.5"/><path d="M9 13h6M9 16.5h4"/>',
+  tag: '<path d="M3.75 12.5V5.25a1.5 1.5 0 0 1 1.5-1.5h7.25l8.25 8.25-8.75 8.75z"/><path d="M8 8h.01"/>',
+  bell: '<path d="M6.25 16.75V11a5.75 5.75 0 0 1 11.5 0v5.75l1.5 1.75H4.75z"/><path d="M10 20.5a2.1 2.1 0 0 0 4 0"/>',
+  /* An agent's session: ICONS.md's `agent`, a terminal with a prompt. */
+  session: '<rect x="3.25" y="4.75" width="17.5" height="14.5" rx="3.5"/><path d="M7.5 10l2.75 2.25L7.5 14.5M12.75 14.5h3.75"/>',
+  link: '<path d="M10 14a4 4 0 0 0 5.66 0l2.83-2.83a4 4 0 0 0-5.66-5.66L11.5 6.84"/><path d="M14 10a4 4 0 0 0-5.66 0l-2.83 2.83a4 4 0 0 0 5.66 5.66l1.33-1.33"/>',
+  code: '<path d="M8.5 7.5 4 12l4.5 4.5M15.5 7.5 20 12l-4.5 4.5M13.5 5l-3 14"/>',
+  /* The vault: ICONS.md's `shield`, security. */
+  vault: '<path d="M12 3.25 19.25 6v5.5c0 4.4-3 7.9-7.25 9.25C7.75 19.4 4.75 15.9 4.75 11.5V6z"/><path d="M9 12l2.25 2.25L15.25 10"/>',
+  lock: '<rect x="4.75" y="10.25" width="14.5" height="10" rx="3"/><path d="M8 10.25V7.5a4 4 0 0 1 8 0v2.75"/>',
+  key: '<circle cx="8" cy="15.5" r="4.25"/><path d="M11.1 12.6 19.5 4.25M16.25 7.5l2.5 2.5M14 9.75l1.75 1.75"/>',
+  /* Views of a list, drawn in ICONS.md's hand: columns, lines and tiles. */
+  board: '<rect x="3.75" y="3.75" width="4.5" height="16.5" rx="2"/><rect x="9.75" y="3.75" width="4.5" height="10.5" rx="2"/><rect x="15.75" y="3.75" width="4.5" height="13" rx="2"/>',
+  rows: '<path d="M4.75 6.5h14.5M4.75 12h14.5M4.75 17.5h14.5"/>',
+  grid: '<rect x="3.75" y="3.75" width="7" height="7" rx="2"/><rect x="13.25" y="3.75" width="7" height="7" rx="2"/><rect x="3.75" y="13.25" width="7" height="7" rx="2"/><rect x="13.25" y="13.25" width="7" height="7" rx="2"/>',
 
-  /* The agents pack's registers. A learning is a bulb, a thing found out; a skill is a bolt, a thing
-     done on cue; a tool is a plug, because it is connected rather than written; and `globe` is where
-     a row applies when it applies to every project. */
-  learning: 'M9.5 18h5M10.5 21h3M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.4 1.1 2.3v.4h5v-.4c0-.9.4-1.7 1.1-2.3A6 6 0 0 0 12 3z',
-  skill: 'M13 3 5 13.5h6L10 21l8-10.5h-6z',
-  plug: 'M9 3v4M15 3v4M7 7h10v4a5 5 0 0 1-10 0zM12 16v5',
-  globe: 'M12 21a9 9 0 1 1 0-18 9 9 0 0 1 0 18zM3 12h18M12 3c2.4 2.5 3.6 5.5 3.6 9s-1.2 6.5-3.6 9M12 3c-2.4 2.5-3.6 5.5-3.6 9s1.2 6.5 3.6 9',
+  /* The agents pack's registers. A learning is a bulb, a thing found out (ICONS.md has none, so it is
+     drawn in its hand); a skill is ICONS.md's `zap`, a thing done on cue; a tool is a plug, because it
+     is connected rather than written; and `globe` is where a row applies when it applies everywhere. */
+  learning: '<path d="M9.75 17.75h4.5M10.5 20.75h3"/><path d="M12 3.25a5.75 5.75 0 0 0-3.45 10.35c.6.45.95 1.15.95 1.9v.75h5v-.75c0-.75.35-1.45.95-1.9A5.75 5.75 0 0 0 12 3.25z"/>',
+  skill: '<path d="M13 3.25 5.25 13.5H12l-1 7.25 7.75-10.25H12z"/>',
+  plug: '<path d="M9 3.75v4M15 3.75v4"/><path d="M6.5 7.75h11v3.5a5.5 5.5 0 0 1-11 0z"/><path d="M12 16.75v3.5"/>',
+  globe: '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17"/><path d="M12 3.5c2.4 2.3 3.6 5.1 3.6 8.5s-1.2 6.2-3.6 8.5c-2.4-2.3-3.6-5.1-3.6-8.5S9.6 5.8 12 3.5z"/>',
 } as const satisfies Record<AppGlyph, string>;
 
 /**
@@ -154,16 +169,104 @@ export const glyphSet = (): Promise<Readonly<Record<string, string>>> =>
 /** The set if it is already here, for a component to start from. */
 export const glyphSetNow = (): Readonly<Record<string, string>> | undefined => arrived;
 
+/* ── shapes ───────────────────────────────────────────────────────────────── */
+
+/** The four elements a glyph is drawn with. Nothing else is read out of the markup. */
+export type Shape =
+  | { tag: 'path'; attrs: { d: string; 'stroke-width'?: string } }
+  | { tag: 'circle'; attrs: { cx: string; cy: string; r: string } }
+  | { tag: 'ellipse'; attrs: { cx: string; cy: string; rx: string; ry: string } }
+  | { tag: 'rect'; attrs: { x: string; y: string; width: string; height: string; rx?: string } };
+
+/** The attributes each element may carry: a closed list, so no markup string can hand `Icon` an `onload`. */
+const ALLOWED: Record<Shape['tag'], readonly string[]> = {
+  path: ['d', 'stroke-width'],
+  circle: ['cx', 'cy', 'r'],
+  ellipse: ['cx', 'cy', 'rx', 'ry'],
+  rect: ['x', 'y', 'width', 'height', 'rx'],
+};
+
+const ELEMENT = /\s*<(path|circle|ellipse|rect)((?:\s+[a-z-]+="[^"<>]*")*)\s*\/>/y;
+const ATTR = /([a-z-]+)="([^"<>]*)"/g;
+
 /**
- * The path for `name`, in the order the app has always drawn: its own map first, so `home`, `search`
- * and `inbox` keep the shape the rail has had, then the core, then the set if it has arrived.
- * Undefined means "not yet", and only ever for a name only the set holds: `isGlyph` has refused everything else.
+ * A glyph's markup read into shapes, or a thrown error naming where it stops being one. STRICT ON
+ * PURPOSE: a typo in `PATHS` should fail `icons-set.test.ts`, not draw half a glyph.
+ */
+export function parseShapes(markup: string): Shape[] {
+  const out: Shape[] = [];
+  ELEMENT.lastIndex = 0;
+  while (ELEMENT.lastIndex < markup.length) {
+    const at = ELEMENT.lastIndex;
+    const m = ELEMENT.exec(markup);
+    if (!m) {
+      if (markup.slice(at).trim() === '') break;
+      throw new Error(`not a glyph shape at ${at}: ${markup.slice(at, at + 24)}`);
+    }
+    const tag = m[1] as Shape['tag'];
+    const attrs: Record<string, string> = {};
+    for (const [, key, value] of m[2]!.matchAll(ATTR)) {
+      if (!ALLOWED[tag].includes(key!)) throw new Error(`<${tag}> may not carry ${key}`);
+      attrs[key!] = value!;
+    }
+    out.push({ tag, attrs } as Shape);
+  }
+  return out;
+}
+
+/** The app's own glyphs, read once each, on first draw. */
+const read = new Map<string, readonly Shape[]>();
+
+/** A Lucide glyph from the core or the set, `undefined` until the set has arrived when only the set holds it. */
+const lucide = (name: string, set: Readonly<Record<string, string>> | undefined): string | undefined =>
+  Object.hasOwn(CORE, name)
+    ? CORE[name as CoreGlyph]
+    : set && Object.hasOwn(set, name)
+      ? set[name]
+      : undefined;
+
+/**
+ * The shapes for `name`, in the order the app has always drawn: its own map first, so `home`, `search`
+ * and `inbox` keep the shape the rail draws, then the core, then the set if it has arrived. A Lucide
+ * glyph is one path. Undefined means "not yet", and only ever for a name only the set holds: `isGlyph`
+ * has refused everything else.
+ */
+export const shapesOf = (name: IconName, set: Readonly<Record<string, string>> | undefined): readonly Shape[] | undefined => {
+  if (Object.hasOwn(PATHS, name)) {
+    let shapes = read.get(name);
+    if (!shapes) read.set(name, (shapes = parseShapes(PATHS[name as keyof typeof PATHS])));
+    return shapes;
+  }
+  const d = lucide(name, set);
+  return d === undefined ? undefined : [{ tag: 'path', attrs: { d } }];
+};
+
+const num = (v: number): string => String(Math.round(v * 1000) / 1000);
+
+/** One shape as path commands, opening with an absolute move so it can follow another. */
+function commands(s: Shape): string {
+  if (s.tag === 'path') return s.attrs.d.replace(/^\s*m/, 'M');
+  if (s.tag === 'rect') {
+    const [x, y, w, h] = [s.attrs.x, s.attrs.y, s.attrs.width, s.attrs.height].map(Number) as [number, number, number, number];
+    const r = Math.min(Number(s.attrs.rx ?? 0), w / 2, h / 2);
+    if (r === 0) return `M${num(x)} ${num(y)}h${num(w)}v${num(h)}h${num(-w)}z`;
+    const arc = (dx: number, dy: number) => `a${num(r)} ${num(r)} 0 0 1 ${num(dx)} ${num(dy)}`;
+    return (
+      `M${num(x + r)} ${num(y)}h${num(w - 2 * r)}${arc(r, r)}v${num(h - 2 * r)}${arc(-r, r)}` +
+      `h${num(2 * r - w)}${arc(-r, -r)}v${num(2 * r - h)}${arc(r, -r)}z`
+    );
+  }
+  const cx = Number(s.attrs.cx);
+  const cy = Number(s.attrs.cy);
+  const [rx, ry] = s.tag === 'circle' ? [Number(s.attrs.r), Number(s.attrs.r)] : [Number(s.attrs.rx), Number(s.attrs.ry)];
+  const half = (dx: number) => `a${num(rx)} ${num(ry)} 0 1 0 ${num(dx)} 0`;
+  return `M${num(cx - rx)} ${num(cy)}${half(2 * rx)}${half(-2 * rx)}`;
+}
+
+/**
+ * The glyph for `name` as ONE path `d` in the 24 box, for the renderer's glyph slots, which draw a single
+ * `<path>`. Same order and same "undefined means not yet" as `shapesOf`. A dot's heavier stroke
+ * (`more`, `drag`) does not survive into one `d`; the dots are still drawn, at the drawer's stroke.
  */
 export const pathOf = (name: IconName, set: Readonly<Record<string, string>> | undefined): string | undefined =>
-  Object.hasOwn(PATHS, name)
-    ? PATHS[name as keyof typeof PATHS]
-    : Object.hasOwn(CORE, name)
-      ? CORE[name as CoreGlyph]
-      : set && Object.hasOwn(set, name)
-        ? set[name]
-        : undefined;
+  Object.hasOwn(PATHS, name) ? shapesOf(name, set)!.map(commands).join('') : lucide(name, set);

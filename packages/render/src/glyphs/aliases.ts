@@ -62,6 +62,12 @@ export const SHELL = {
   observe: 'activity',
   learning: 'lightbulb',
   skill: 'zap',
+  /* The rail's places, named as `loop/design/bento/ICONS.md` names them. `activity` is Lucide's own name
+     and needs no entry. `slash` is the ask field's rounded square with a stroke through it. */
+  today: 'sun',
+  work: 'square-check',
+  projects: 'layout-grid',
+  slash: 'square',
 } as const satisfies Record<string, CoreGlyph>;
 
 /** The plan's short names (research-modules §1.3) where Lucide's name is longer or different. */

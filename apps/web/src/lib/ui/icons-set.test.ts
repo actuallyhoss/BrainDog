@@ -1,5 +1,6 @@
 /**
- * A declared icon draws from all 251 glyphs, not only the 63 the app drew for itself.
+ * A declared icon draws from all 251 glyphs, not only the 68 the app draws for itself, and the app's
+ * own are ICONS.md's shapes, drawn as the elements they are.
  *
  * BEFORE THIS FILE, `icon: rocket` ON A PAGE DREW A DOCUMENT. `iconFor` checked the name against
  * `icons.ts` alone, so every name in `braindog-render/glyphs` that the app had not also drawn by hand
@@ -9,8 +10,7 @@
  *
  * THE ORDER IS THE APP'S, THEN THE CORE, THEN THE SET, and the first test below is why the order
  * matters: `home`, `search` and `inbox` are drawn by both the app and the core, differently, and the
- * rail has been drawing the app's for months. A lookup that asked the core first would redraw the
- * shell under everybody the day this landed.
+ * rail draws the app's. A lookup that asked the core first would redraw the shell under everybody.
  *
  * WHAT A GREEN RUN HERE DOES NOT PROVE: that the set stays out of the entry chunk. `node --test` has
  * no bundler, so a static import of `set.ts` would pass every line of this file. That is the
@@ -28,10 +28,10 @@ import type { Component } from 'svelte';
 
 import { CORE, loadSet } from 'braindog-render/glyphs';
 import { iconFor } from '../record/api.ts';
-import { PATHS } from './icons.ts';
+import { PATHS, parseShapes, pathOf, type Shape } from './icons.ts';
 
 /* THE COMPONENT IS COMPILED HERE, FOR THE SERVER, because `node --test` cannot load a `.svelte` file
-   and the last claim below is about what `Icon` draws rather than about what a lookup answers. Same
+   and the claims below are about what `Icon` draws rather than about what a lookup answers. Same
    hook as `braindog-render`'s `table-cards.test.ts`. The server build runs no effect, so what it
    draws is what the component has on hand at mount, which is exactly the question for the core. */
 registerHooks({
@@ -50,26 +50,101 @@ registerHooks({
 const { default: Icon } = (await import(new URL('./Icon.svelte', import.meta.url).href)) as {
   default: Component<{ name: string; size?: 's' | 'm' | 'l' | 'xl'; title?: string }>;
 };
+const { default: IconWell } = (await import(new URL('./IconWell.svelte', import.meta.url).href)) as {
+  default: Component<{ name: string; size?: 'm' | 'l'; tone?: string }>;
+};
+
+const body = (name: string): string => render(Icon, { props: { name } }).body;
+
+/** The shapes the component drew, read back off its markup, attributes and all. */
+const drawnShapes = (name: string): Shape[] =>
+  [...body(name).matchAll(/<(path|circle|ellipse|rect)\b([^>]*?)\/?>/g)].map(([, tag, attrs]) => ({
+    tag,
+    attrs: Object.fromEntries([...attrs!.matchAll(/([a-z-]+)="([^"]*)"/g)].map(([, k, v]) => [k, v])),
+  })) as Shape[];
 
 /** The one `d` the component drew, or undefined when it drew a path with none. */
-const drawn = (name: string): string | undefined => {
-  const body = render(Icon, { props: { name } }).body;
-  return /<path d="([^"]*)"/.exec(body)?.[1];
-};
+const drawn = (name: string): string | undefined => /<path d="([^"]*)"/.exec(body(name))?.[1];
 
 test('the app draws its own glyph first, where the core draws the same name differently', () => {
   for (const name of ['home', 'search', 'inbox'] as const) {
     assert.equal(iconFor(name, 'doc'), name);
-    assert.equal(drawn(name), PATHS[name]);
+    assert.deepEqual(drawnShapes(name), parseShapes(PATHS[name]));
+    assert.notEqual(drawn(name), CORE[name === 'home' ? 'house' : name]);
   }
-  /* The premise, checked rather than assumed: if the two ever agreed this test would prove nothing. */
-  assert.notEqual(PATHS.search, CORE.search);
+});
+
+test('a glyph of several shapes is drawn as those shapes, with no name special-cased', () => {
+  /* Settings is three sliders and three knobs: one path and three circles, read from the data. */
+  assert.deepEqual(
+    drawnShapes('settings').map((s) => s.tag),
+    ['path', 'circle', 'circle', 'circle'],
+  );
+  assert.deepEqual(
+    drawnShapes('projects').map((s) => s.tag),
+    ['rect', 'rect', 'rect', 'rect'],
+  );
+  /* The dots carry ICONS.md's heavier stroke, on the element, over the glyph's 1.75. */
+  assert.equal((drawnShapes('more')[0] as Extract<Shape, { tag: 'path' }>).attrs['stroke-width'], '2.75');
+});
+
+test('every glyph is drawn at stroke 1.75 with round caps and joins, a Lucide one included', () => {
+  for (const name of ['today', 'house', 'check']) {
+    const svg = /<svg[^>]*>/.exec(body(name))![0];
+    assert.match(svg, /stroke-width="1\.75"/, name);
+    assert.match(svg, /stroke-linecap="round"/, name);
+    assert.match(svg, /stroke-linejoin="round"/, name);
+    assert.match(svg, /stroke="currentColor"/, name);
+  }
+});
+
+test('every app glyph parses into shapes that sit in the 24 box', () => {
+  for (const [name, markup] of Object.entries(PATHS)) {
+    const shapes = parseShapes(markup);
+    assert.ok(shapes.length > 0, name);
+    for (const s of shapes) {
+      const a = s.attrs as Record<string, string>;
+      const n = (k: string) => Number(a[k]);
+      const box =
+        s.tag === 'circle'
+          ? [n('cx') - n('r'), n('cy') - n('r'), n('cx') + n('r'), n('cy') + n('r')]
+          : s.tag === 'ellipse'
+            ? [n('cx') - n('rx'), n('cy') - n('ry'), n('cx') + n('rx'), n('cy') + n('ry')]
+            : s.tag === 'rect'
+              ? [n('x'), n('y'), n('x') + n('width'), n('y') + n('height')]
+              : null;
+      if (box) for (const v of box) assert.ok(v >= 1 && v <= 23, `${name} ${s.tag} reaches ${v}`);
+    }
+  }
+});
+
+test('a markup that is not a glyph is refused, not half drawn', () => {
+  assert.throws(() => parseShapes('<circle cx="1" cy="1" r="1"/><g/>'));
+  assert.throws(() => parseShapes('<path d="M0 0" onload="x"/>'));
+});
+
+test('pathOf still answers ONE d for the renderer, shapes rewritten as path commands', () => {
+  for (const name of Object.keys(PATHS) as (keyof typeof PATHS)[]) {
+    const d = pathOf(name, undefined)!;
+    assert.equal(d[0], 'M', name);
+    assert.doesNotMatch(d, /NaN|undefined|</, name);
+  }
+  /* A circle becomes two half arcs; a rounded rect four quarter arcs; a leading relative `m` an absolute one. */
+  assert.match(pathOf('search', undefined)!, /^M4\.25 10\.75a6\.5 6\.5 0 1 0 13 0a6\.5 6\.5 0 1 0 -13 0M20 20/);
+  assert.match(pathOf('work', undefined)!, /^M8\.25 3\.75h7\.5a4\.5 4\.5 0 0 1 4\.5 4\.5v7\.5/);
+  assert.equal(pathOf('house', undefined), CORE.house);
 });
 
 test('a core glyph the app never drew resolves, and draws at mount without waiting on the set', () => {
   assert.equal(Object.hasOwn(PATHS, 'house'), false);
   assert.equal(iconFor('house', 'doc'), 'house');
   assert.equal(drawn('house'), CORE.house);
+});
+
+test('the rail places resolve by their own names', () => {
+  for (const name of ['today', 'work', 'projects', 'money', 'activity', 'decide', 'settings', 'search', 'slash', 'plus'])
+    assert.equal(iconFor(name, 'doc'), name);
+  assert.equal(Object.keys(PATHS).length, 68);
 });
 
 test('a glyph only the set holds is a name the check accepts before the set has arrived', () => {
@@ -92,6 +167,15 @@ test('every glyph in the set is a name the check accepts, so the list the app ca
   const refused = Object.keys(set).filter((name) => iconFor(name, 'doc') !== name);
   assert.deepEqual(refused, []);
   assert.equal(Object.keys(set).length, 188);
+});
+
+test('IconWell is a span.well holding the icon, its tone on the well', () => {
+  const plain = render(IconWell, { props: { name: 'money' } }).body;
+  assert.match(plain, /<span class="well[^"]*" data-size="m"/);
+  assert.doesNotMatch(plain, /data-tone/);
+  const chosen = render(IconWell, { props: { name: 'today', size: 'l', tone: 'ink' } }).body;
+  assert.match(chosen, /data-size="l" data-tone="ink"/);
+  assert.match(chosen, /<svg class="icon/);
 });
 
 test('Icon given rocket draws the set path once the set has arrived', async () => {

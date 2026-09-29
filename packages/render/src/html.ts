@@ -153,7 +153,7 @@ const magnitude = (v: number): string => Math.max(0, Math.min(1, v)).toFixed(2);
  * `Text.svelte`, `Section.svelte` and `p/Inline.svelte` draw the same element with the same attributes.
  */
 const glyphSvg = (d: string, attrs = ''): string =>
-  `<svg${attrs} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="${escape(d)}"></path></svg>`;
+  `<svg${attrs} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="${escape(d)}"></path></svg>`;
 
 /**
  * A glyph slot's drawing, or nothing: the host's art for a name the set holds, else the slot stays
