@@ -242,16 +242,18 @@
   .share-label {
     color: var(--ink2);
     font-size: var(--t-sm);
+    font-weight: 500;
   }
 
   /* The link wraps anywhere: a token has no spaces to break at, and a sideways scroll inside a sheet on a phone hides
      the half that matters. */
+  /* A FIELD: the `--s1` fill with no border, radius `--r-md`, as `controls.css` draws `.field` (SYSTEM §6). */
   .share-link {
     inline-size: 100%;
-    min-block-size: var(--ctl-h);
+    min-block-size: 40px;
     padding: var(--sp-2) var(--sp-3);
-    background: var(--s3);
-    border: 1px solid var(--line);
+    background: var(--s1);
+    border: 0;
     border-radius: var(--r-md);
     color: var(--ink);
     font-family: var(--font-id);
@@ -288,9 +290,9 @@
   /* THE TEMPLATE'S FACTS: a small heading over each, and the lines under it in the sheet's one column. */
   .share-h {
     margin: var(--sp-2) 0 0;
-    color: var(--ink);
+    color: var(--dim);
     font-size: var(--t-sm);
-    font-weight: 600;
+    font-weight: 500;
   }
 
   .share-list {
@@ -321,7 +323,7 @@
     text-decoration: underline;
   }
 
-  @media (max-width: 640px) {
+  @media (width < 640px) {
     .share-actions :global(.btn) {
       flex: 1 1 100%;
     }

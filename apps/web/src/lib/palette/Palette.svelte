@@ -1,7 +1,7 @@
 <!--
   The palette: a centred dialog that reaches OBJECTS, not only the screens they live on.
 
-  A 640px DIALOG 12vh FROM THE TOP, AND THE WHOLE SCREEN ON A PHONE (design SYS-13). It was a panel
+  A 640px DIALOG 12vh FROM THE TOP, AND THE WHOLE SCREEN BELOW 640PX (design SYS-13). It was a panel
   two thirds of the width, pinned to the inline end, and at 1440 it cut the page title in half and
   read as a second app beside the first. Centred and narrow, it sits over the page as one question
   being asked of it; on a phone the field is in the top bar and the results fill what is left. Each
@@ -24,10 +24,14 @@
   out. The rule is enforced there, in `commands()`, so nothing in this file can add a row that
   fails it. This file applies the same standing rule to the objects it draws.
 
-  NO KEY IS PRINTED ON THE SURFACE, and no legend of them under it (design SYS-13). A key on every
-  row and a grammar in a mono footer read as a tool for the people who wrote it. A row with a
-  binding shows it in a tooltip when a mouse rests on it at desktop width, read from the keymap
-  registry so it cannot drift from what is bound, and the `?` sheet is where the whole map lives.
+  NO LEGEND OF KEYS, AND A KEY ONLY ON THE CURSOR ROW (SYSTEM §6). A key on every row and a grammar
+  in a mono footer read as a tool for the people who wrote it. The cursor row carries a key cap hint
+  at desktop width: its binding, read from the keymap registry so it cannot drift from what is bound,
+  and `↵`. The `?` sheet is where the whole map lives.
+
+  GLASS, THE STRONG ONE (SYSTEM §6): 640 wide, level 2, radius `--r-lg`, a 52px field, and the
+  results grouped under meta headings. Slash's answers are drawn in the same surface, under the same
+  headings, rather than in a second panel.
 
   Prefixes work in EVERY mode: `>` commands, `#` rows, `@` people, `/` pages and registers, none is
   everything ranked. GitHub's palette has one grammar per mode and a second opener that fast-paths
@@ -1121,10 +1125,11 @@
     onclick={() => run(row)}
   >
     <Result icon={row.icon} title={row.title} line={row.detail} value={row.value} tone={row.tone} />
-    <!-- THE BINDING, IN A TOOLTIP AND NEVER ON THE SURFACE (design SYS-13). It is drawn only while a mouse rests on the
-         row at desktop width (the style block says when), and it is `aria-hidden` so the key is not read out as part of
+    <!-- THE KEY CAP HINT, ON THE CURSOR ROW ONLY (SYSTEM §6: "the cursor row is wash plus a key cap hint"): the row's own
+         binding when it has one, so the slow path teaches the fast one, and `↵`, which is what runs it now. Drawn only at
+         desktop width with a fine pointer (the style block says when), and `aria-hidden` so no key is read out as part of
          the option's name: the `?` sheet is where a screen reader hears the keymap. -->
-    {#if bound}<span class="p-tip" aria-hidden="true"><Kbd keys={bound} /></span>{/if}
+    <span class="p-keys" aria-hidden="true">{#if bound}<Kbd keys={bound} />{/if}<Kbd keys="↵" /></span>
   </button>
 {/snippet}
 
@@ -1135,17 +1140,13 @@
     display: none;
   }
 
-  /* THE COUNT IS THE SAME COUNT ON EVERY SCREEN, and this rule was written INSIDE the phone's media
-     block. In the built CSS it came out as
-     `@media (pointer:coarse),not (min-width:640px){.p-count{…}}`, so on a desktop the number
-     rendered at `--t-ui` (15px) instead of `--t-xs` (12px), wrapped, and lost its tabular figures,
-     which is the one property a count that changes on every keystroke actually needs, because
-     proportional digits make it twitch. `css-rules` did not see it; a brace in the wrong place is
-     valid CSS. */
+  /* THE COUNT IS THE SAME COUNT ON EVERY SCREEN, and this rule was once written INSIDE the phone's
+     media block, so on a desktop the number lost its size and its tabular figures, which is the one
+     property a count that changes on every keystroke needs: proportional digits make it twitch. */
   .p-count {
     margin: 0;
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
@@ -1160,20 +1161,19 @@
       block-size: var(--ctl-h);
       padding: 0;
       border: 0;
-      background: none;
-      color: var(--dim);
+      border-radius: var(--r-pill);
+      background: var(--hover-wash);
+      color: var(--ink2);
       cursor: pointer;
     }
   }
 
   /**
-   * A 640px DIALOG, CENTRED, 12vh FROM THE TOP (design SYS-13), and the whole screen below 640px.
+   * A 640px DIALOG, CENTRED, 12vh FROM THE TOP, and the whole screen below 640px.
    *
-   * It was a panel two thirds of the width, full height, hard against the inline end, and at 1440 it
-   * cut the page title in half. A result is now a glyph, a title and one line, which needs the width
-   * of a title and not of a row of columns, so the dialog is the width of a reading column and the
-   * page stays whole around it. Its height is its content's, up to what leaves the same 12vh free
-   * below it, and past that the list scrolls inside it.
+   * GLASS, THE STRONG ONE, AT LEVEL 2 (SYSTEM §6): the palette opens over whatever the page holds, and legibility over
+   * busy content is what the strong glass is for. Radius `--r-lg`, the hairline pair and the floating shadow; no border.
+   * Its height is its content's, up to what leaves the same 12vh free below it, and past that the list scrolls inside.
    *
    * THE EXPLICIT SIZES ARE NOT REDUNDANT: see `Sheet.svelte`. The UA stylesheet gives `<dialog>` a
    * `max-height: calc(100% - 6px - 2em)`, a matching `max-width` and an automatic margin on both
@@ -1194,17 +1194,17 @@
     margin-block: 0;
     margin-inline: auto;
     padding: 0;
-    background: var(--s1);
-    border: 1px solid var(--line);
+    background: var(--glass-strong);
+    backdrop-filter: var(--glass-blur);
+    border: 0;
     border-radius: var(--r-lg);
     color: var(--ink);
-    box-shadow: var(--e3);
+    box-shadow: var(--glass-edge), var(--e2);
     overflow: hidden;
   }
 
-  /* NO ENTRANCE. It used to slide in from the edge; it is opened from the keyboard far more often
-     than from anything else, and nothing moves when something is opened from the keyboard (design
-     brief §3, Motion). It is there on the frame the key is pressed. */
+  /* NO ENTRANCE. It is opened from the keyboard far more often than from anything else, and nothing
+     moves on a keyboard action (SYSTEM §8). It is there on the frame the key is pressed. */
   .palette:not([open]) {
     display: none;
   }
@@ -1213,18 +1213,19 @@
     display: flex;
   }
 
-  /* `--scrim`, not a colour. This and `Sheet.svelte` each wrote their own `color-mix` over
-     `black`, six per cent apart: two strengths of the same *behind*, and neither of them chosen.
-     `colour-grep` was blind to both, because a colour with a name is not hex. */
+  /* `--scrim`, THE ONE *BEHIND*, and no blur on it: the blur is the palette's own glass, over the dimmed page. */
   .palette::backdrop {
     background: var(--scrim);
   }
 
+  /* THE 52PX FIELD (SYSTEM §6): the glyph, the query, the count. The hairline under it is the one rule in the panel. */
   .p-head {
     display: flex;
     align-items: center;
     gap: var(--sp-3);
-    padding: var(--sp-3) var(--sp-4);
+    min-block-size: calc(var(--sp-7) + var(--sp-1));
+    padding-block: 0;
+    padding-inline: calc(var(--sp-4) + var(--sp-1)) var(--sp-4);
     border-block-end: 1px solid var(--line);
     color: var(--dim);
     transition: border-color var(--d-state) var(--ease-out);
@@ -1232,17 +1233,15 @@
 
   /* The state change the input gave up. It is the row that looks like a field, so it is the row
      that says it is live, and it says it the way every focused field in the product does: its edge
-     darkens to `--ink2` (`a11y.css`). It was the accent, and a red rule under the query read as a
-     validation error before anything had been typed (design SYS-1). */
+     darkens toward the ink. Never the accent, which under the query read as a validation error
+     before anything had been typed (design SYS-1). */
   .p-head:focus-within {
     border-block-end-color: var(--ink2);
     color: var(--ink2);
   }
 
-  /* 262x28 ON A PHONE: the palette's only text field, sixteen pixels under the rule, on the surface
-     `19 §4` makes the primary way to reach a row. `controls.css` carries a paragraph about 28px
-     being exactly this mistake. Two gates missed it: it is outside `#main`, and while the `<dialog>`
-     is closed it measures 0x0 and is filtered as not-on-screen. */
+  /* A FULL-HEIGHT TARGET, and it was 262x28 on a phone: the palette's only text field, on the surface `19 §4` makes the
+     primary way to reach a row. */
   .p-input {
     flex: 1;
     min-block-size: var(--ctl-h);
@@ -1255,7 +1254,7 @@
   }
 
   /* A 2px ring plus a 4px halo drawn around a transparent, borderless input inside an already-modal
-     dialog is a white box floating in the middle of the panel around nothing: it frames the text,
+     dialog is a box floating in the middle of the panel around nothing: it frames the text,
      not a control, because there is no control there to frame. The blinking caret is the platform's
      own focus indicator for a text field and is what every command palette relies on; this panel
      opens with focus here and traps it, so there is nowhere else for focus to have gone.
@@ -1296,26 +1295,30 @@
 
   #palette-list {
     flex: 1;
-    padding: var(--sp-2) var(--sp-3);
+    padding: var(--sp-1) var(--sp-2) var(--sp-2);
     overflow-y: auto;
+    overscroll-behavior: contain;
   }
 
+  /* A META HEADING OVER EACH GROUP (SYSTEM §6): the meta step, at 500, in the lowest text ink. */
   .p-group {
+    margin: 0;
     padding: var(--sp-3) var(--sp-2) var(--sp-1);
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
     font-weight: 500;
   }
 
-  /* A MENU ROW WITH A FINE POINTER, 44px WITH A COARSE ONE, AND 56px ON A PHONE, where a result is
-     two lines (`Result.svelte`) and is the phone's route to several places (design brief §6). What
-     the row draws is `Result`'s; this is the box the arrow keys and the pointer walk. */
+  /* A ROW'S HEIGHT, 44, WITH A FINE POINTER OR A COARSE ONE, AND 56px ON A PHONE, where a result is two lines
+     (`Result.svelte`) and is the phone's route to several places. What the row draws is `Result`'s; this is the box the
+     arrow keys and the pointer walk. The wash is rounded `--r-md`, a row's wash (SYSTEM §4). */
   .p-row {
     position: relative;
     display: flex;
     align-items: center;
+    gap: var(--sp-3);
     inline-size: 100%;
-    min-block-size: var(--row-h);
+    min-block-size: max(var(--row-h), var(--tap));
     padding: var(--sp-1) var(--sp-2);
     border: 0;
     border-radius: var(--r-md);
@@ -1324,12 +1327,7 @@
     font: inherit;
     text-align: start;
     cursor: pointer;
-  }
-
-  @media (pointer: coarse) {
-    .p-row {
-      min-block-size: var(--tap);
-    }
+    transition: background var(--d-state) var(--ease-out);
   }
 
   @media (width < 640px) {
@@ -1338,54 +1336,47 @@
     }
   }
 
-  /* The cursor row is the current thing, and the current thing is `--selected` everywhere in the
-     product (design brief §3): opaque and mixed into the ground, so it shows in both schemes. */
+  /* THE CURSOR ROW IS THE WASH (SYSTEM §6), and the pointer moves the cursor, so hover and the cursor are one state. */
   .p-row[data-cursor] {
-    background: var(--selected);
+    background: var(--hover-wash);
   }
 
-  .p-row[data-cursor] :global(.result-glyph) {
-    color: var(--ink2);
-  }
-
-  /* THE HOVER TOOLTIP, and the only place a key reaches this surface: a small raised mark at the
-     row's trailing edge, drawn only where a mouse can rest on the row at desktop width. */
-  .p-tip {
+  /* THE KEY CAP HINT, on the cursor row at desktop width with a fine pointer, where the keyboard is. */
+  .p-keys {
     display: none;
-    position: absolute;
-    inset-inline-end: var(--sp-2);
-    inset-block-start: 50%;
-    padding: var(--sp-1) var(--sp-2);
-    background: var(--s2);
-    border-radius: var(--r-sm);
-    box-shadow: var(--e1);
+    flex: none;
+    align-items: center;
+    gap: var(--sp-1);
     color: var(--dim);
-    font-size: var(--t-xs);
-    transform: translateY(-50%);
   }
 
   @media (hover: hover) and (pointer: fine) and (width >= 900px) {
-    .p-row:hover .p-tip {
-      display: block;
+    .p-row[data-cursor] .p-keys {
+      display: inline-flex;
     }
   }
 
   .p-none {
+    margin: 0;
     padding: var(--sp-5) var(--sp-3);
     color: var(--dim);
   }
 
-  /* EVERY LINE SLASH'S ANSWER DRAWS BREAKS WHERE IT MUST (`overflow-wrap: anywhere`): a predicate over a long value, a
-     row's title or a model's name can be one unbroken word, and at 390px one of those would push the panel sideways. */
+  /* SLASH ANSWERS IN THE SAME SURFACE (SYSTEM §6). What it looked for sits where a group heading sits, in the meta step,
+     and the rows it found are grouped under their own heading like any others. EVERY LINE SLASH'S ANSWER DRAWS BREAKS
+     WHERE IT MUST (`overflow-wrap: anywhere`): a predicate over a long value, a row's title or a model's name can be one
+     unbroken word, and at 390px one of those would push the panel sideways. */
   .p-slash-where {
     margin: 0;
     padding: var(--sp-3) var(--sp-4) 0;
     color: var(--ink2);
+    font-size: var(--t-sm);
     overflow-wrap: anywhere;
   }
 
   .p-slash-label {
     color: var(--dim);
+    font-weight: 500;
   }
 
   /* THE FOLD IS FOLDED, AND IT IS THERE ON EVERY ASK. `23 §6`: its last line is the vault, refused, drawn every time. */
@@ -1405,10 +1396,11 @@
     margin: var(--sp-2) 0 0;
     padding: 0;
     list-style: none;
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
     overflow-wrap: anywhere;
   }
 
+  /* PASS 2, under the rows, set off by the one hairline, in the body step. */
   .p-slash-second {
     display: flex;
     flex-direction: column;
@@ -1422,11 +1414,12 @@
     margin: 0;
     max-inline-size: var(--measure);
     color: var(--ink2);
+    font-size: var(--t-base);
     line-height: var(--lh-body);
     overflow-wrap: anywhere;
   }
 
-  /* A LINK IS INK WITH ITS UNDERLINE (design brief §10), never the brand's red, and a 44px target through `.tap`. */
+  /* A LINK IS INK WITH ITS UNDERLINE, never the brand's red, and a 44px target through `.tap`. */
   .p-slash-decide {
     align-self: flex-start;
     color: var(--link);
@@ -1440,7 +1433,7 @@
   .p-slash-model {
     margin: 0;
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
     overflow-wrap: anywhere;
   }
 
@@ -1459,9 +1452,7 @@
     cursor: pointer;
   }
 
-  /* THE FOOTER WRAPS (defects U4). The line and the button that hides it sat on one row that could
-     not break, so a long sentence had nowhere to go but past the edge; now the button drops under
-     the sentence when the two do not fit side by side. */
+  /* THE FOOTER WRAPS (defects U4): the button drops under the sentence when the two do not fit side by side. */
   .p-foot {
     display: flex;
     flex-wrap: wrap;
@@ -1470,12 +1461,13 @@
     padding: var(--sp-2) var(--sp-4);
     border-block-start: 1px solid var(--line);
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
   }
 
   /**
-   * ON A PHONE THE PALETTE IS THE SCREEN, with the field in a top bar `--sticky` tall (design brief
-   * §6), because a dialog floating over 390px would be a narrower screen inside the screen.
+   * ON A PHONE THE PALETTE IS THE SCREEN, with the field in a top bar `--sticky` tall, because a
+   * dialog floating over 390px would be a narrower screen inside the screen. It is a sheet there and
+   * not glass: the whole screen, on the tile's surface.
    *
    * EACH INSET IS PAID HERE, ONCE. The top one is under the bar, because the palette sits in the top
    * layer and nothing of the shell's padding reaches it; the bottom one and the keyboard (`--kb`,
@@ -1490,20 +1482,29 @@
       block-size: 100dvh;
       max-block-size: 100dvh;
       padding-block-start: env(safe-area-inset-top, 0px);
-      border: 0;
+      background: var(--bg);
+      backdrop-filter: none;
       border-radius: 0;
+      box-shadow: none;
     }
 
     .p-head {
-      block-size: var(--sticky);
-      padding-block: 0;
+      min-block-size: var(--sticky);
+      padding-inline: var(--sp-4) var(--sp-3);
     }
 
     /* ONE EDGE DOWN THE SCREEN (design DSN-16): the list's inset plus a row's own puts every glyph on the 16px gutter
-       the field's glyph sits on in the bar above, where the list's desktop inset left them four pixels inside it. */
+       the field's glyph sits on in the bar above. */
     #palette-list {
       padding-inline: var(--sp-2);
       padding-block-end: calc(var(--kb) + env(safe-area-inset-bottom, 0px) + var(--sp-2));
+    }
+  }
+
+  /* UNDER FORCED COLOURS the glass and the shadow are gone, so the palette's edge is a border. */
+  @media (forced-colors: active) {
+    .palette {
+      border: 1px solid CanvasText;
     }
   }
 </style>

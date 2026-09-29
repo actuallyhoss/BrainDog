@@ -227,11 +227,16 @@
     font-size: var(--t-ui);
   }
 
+  /* A META HEADING over each group, as the palette's are (SYSTEM §6). */
   .hand-head {
-    margin-block: var(--sp-3) var(--sp-1);
-    color: var(--ink2);
-    font-size: var(--t-ui);
+    margin-block: var(--sp-4) var(--sp-1);
+    color: var(--dim);
+    font-size: var(--t-sm);
     font-weight: 500;
+  }
+
+  .hand-head:first-child {
+    margin-block-start: 0;
   }
 
   .hand-list {
@@ -250,17 +255,26 @@
     padding: 0 var(--sp-2);
     background: none;
     border: 0;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-md);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-md);
+    font-size: var(--t-row);
+    font-weight: 500;
     text-align: start;
     cursor: pointer;
+    transition: background var(--d-state) var(--ease-out);
   }
 
   .hand-one:hover,
   .hand-one:focus-visible {
     background: var(--hover-wash);
+  }
+
+  /* SIXTEEN ON A PHONE, its row step (SYSTEM §3). */
+  @media (width < 900px) {
+    .hand-one {
+      font-size: var(--t-md);
+    }
   }
 
   .hand-one:disabled {
@@ -272,7 +286,7 @@
   }
 
   .hand-holds {
-    color: var(--ink2);
-    font-size: var(--t-ui);
+    color: var(--dim);
+    font-size: var(--t-sm);
   }
 </style>

@@ -1,6 +1,7 @@
 <!--
-  A `<dialog>`: a 480px drawer from 640px up, and below it a bottom sheet that is as tall as what it
-  holds, up to 88dvh, with a grab handle and a head on one line (design SYS-4, DSN-6).
+  A `<dialog>`: from 900px up a drawer that floats `--inset` in from the window's end edge, a tile's surface at radius
+  `--r-lg` and the third level of depth, over a scrim with no blur (SYSTEM §4, §6). Below 900px, the phone (SYSTEM §9),
+  it is a bottom sheet that is as tall as what it holds, up to 88dvh, with a grab handle and a head on one line.
 
   THE PHONE SHEET FITS ITS CONTENT. It was always 88% of the screen, so a Display sheet of six
   options was two thirds empty panel. Its height now comes from what is in it, capped at
@@ -13,8 +14,8 @@
   title, which is where a peeked row showed "#12". A person reads a name there; the id lives in the
   row's Details and in "Copy link" (design SYS-3).
 
-  Open is longer than close, always: a panel opens in 280ms and closes in 160ms. Opening is
-  something you watch; closing is something you have already decided about (13 §9).
+  It slides in over 220ms on the arriving curve and closes at once. Opening is something you watch;
+  closing is something you have already decided about (SYSTEM §8).
 -->
 <script lang="ts">
   import { copy } from '../copy.ts';
@@ -155,7 +156,7 @@
    *
    * ONLY THE HANDLE'S STRIP TAKES THE PULL, not the head. Pointer capture sends the release to the
    * element that captured it, so a head that captured would swallow the click of its own Close
-   * button. The strip holds nothing a person presses, and it is hidden from 640px up, where the
+   * button. The strip holds nothing a person presses, and it is hidden from 900px up, where the
    * sheet is a drawer with no handle to pull.
    */
   const LET_GO = 80;
@@ -196,7 +197,7 @@
        an ellipsis rather than pushing Close down to a second row. -->
   <header class="sheet-head">
     <h2 class="sheet-title">{title}</h2>
-    <button type="button" class="sheet-close tap" onclick={close} aria-label={copy.close}>
+    <button type="button" class="sheet-close tap" onclick={close} aria-label={copy.close} title={copy.close}>
       <Icon name="close" size="m" />
     </button>
   </header>
@@ -215,36 +216,38 @@
 </dialog>
 
 <style>
+  /* THE DRAWER, from 900px up. It floats `--inset` in from the window's end edge on three sides, as the docked panel
+     does (SYSTEM §5), rather than hanging off the edge with a rule down its side: a sheet is a tile's surface at radius
+     `--r-lg` and the third level of depth, and a tile has no border (SYSTEM §6). */
   .sheet {
     position: fixed;
-    inset-block: 0;
-    inset-inline-end: 0;
+    inset-block: var(--inset);
+    inset-inline-end: var(--inset);
     inset-inline-start: auto;
     z-index: var(--z-sheet);
     display: flex;
     flex-direction: column;
-    inline-size: min(480px, 100vw);
-    /* EXPLICIT, because `inset-block: 0` is not enough. The UA stylesheet gives `<dialog>` a
-       `height: fit-content`, which beats the stretch the two insets ask for — so the drawer was
-       hanging from the top-right corner at the height of whatever was in it, ending mid-page with
-       the table still visible underneath. A drawer that covers a corner is a popover in the wrong
-       place.
+    inline-size: min(480px, calc(100vw - 2 * var(--inset)));
+    /* EXPLICIT, because `inset-block` is not enough. The UA stylesheet gives `<dialog>` a
+       `height: fit-content`, which beats the stretch the two insets ask for, so the drawer hung
+       from the corner at the height of whatever was in it, ending mid-page with the table still
+       visible underneath. A drawer that covers a corner is a popover in the wrong place.
 
        BOTH properties, and the second one is not redundant. The UA also sets
-       `max-height: calc(100% - 6px - 2em)`, which clamps a 900px viewport to 864 and leaves a
-       36-pixel strip of the page showing under the drawer — measured, not guessed. */
-    /* AND `--kb` IS SUBTRACTED HERE TOO, NOT ONLY ON THE PHONE SHEET BELOW. The drawer is what an
-       iPad in portrait gets (744px is above the 640 breakpoint), and its footer carries the submit
-       button on every create and every edit. `inset-block: 0` and a definite `block-size`
-       over-constrain the box, so the browser drops `inset-block-end`: the top stays pinned at zero
-       and the bottom edge lifts by exactly the keyboard, which is the behaviour wanted. */
-    block-size: calc(100dvh - var(--kb));
+       `max-height: calc(100% - 6px - 2em)`, which clamps a 900px viewport to 864, measured. */
+    /* AND `--kb` IS SUBTRACTED HERE TOO, NOT ONLY ON THE PHONE SHEET BELOW. The drawer is what a
+       tablet in landscape gets, and its footer carries the submit button on every create and every
+       edit. `inset-block` and a definite `block-size` over-constrain the box, so the browser drops
+       `inset-block-end`: the top stays pinned and the bottom edge lifts by exactly the keyboard,
+       which is the behaviour wanted. */
+    block-size: calc(100dvh - 2 * var(--inset) - var(--kb));
     max-block-size: 100dvh;
     margin: 0;
     padding: 0;
-    background: var(--s1);
+    overflow: hidden;
+    background: var(--bg);
     border: 0;
-    border-inline-start: 1px solid var(--edge);
+    border-radius: var(--r-lg);
     color: var(--ink);
     box-shadow: var(--e3);
   }
@@ -253,52 +256,65 @@
     display: none;
   }
 
-  /* THE SAME `--scrim` THE PALETTE USES. It was 46% here and 52% there. */
+  /* THE SAME `--scrim` THE PALETTE AND THE MENUS USE, with no blur: a blur behind a sheet is glass, and a sheet is not
+     chrome (SYSTEM §6). */
   .sheet::backdrop {
     background: var(--scrim);
   }
 
-  /* EASE-OUT, NOT THE SPRING. Squeezed into 200ms the spring's 3% overshoot is a flick at the end of
-     every open, which is motion performing rather than answering. */
+  /* THE ARRIVING CURVE, OVER 220MS (SYSTEM §8), with no overshoot: a spring squeezed into a fifth of a second is a
+     flick at the end of every open, which is motion performing rather than answering. */
   .sheet[open] {
     animation: slide-in var(--d-enter) var(--ease-out);
   }
 
   /* NO `opacity: 0` IN THE START STATE, and this is a failure-mode decision rather than a taste one.
-     
+
      Measured: `getAnimations()` on this dialog reported `playState: running` with an unresolved
-     start time for up to 900ms after `showModal()` — a CSS animation stays pending until its first
+     start time for up to 900ms after `showModal()`. A CSS animation stays pending until its first
      rendered frame, and a dialog entering the top layer with forty rows of content inside it can
      wait a while for one. With `opacity: 0` in the `from`, that pause is a second of nothing where
      the reader asked for a panel.
-     
-     A stalled slide is a panel 24px to the right of where it belongs. A stalled fade is no panel.
-     Whatever the start state is, it has to be a state somebody could read. */
+
+     A stalled slide is a panel 24px from where it belongs. A stalled fade is no panel. Whatever the
+     start state is, it has to be a state somebody could read. */
   @keyframes slide-in {
     from {
-      transform: translateX(24px);
+      transform: translateX(var(--sheet-from));
     }
   }
 
-  /* THE HANDLE IS A PHONE'S, so the drawer from 640px up has none; the rule below 640px shows it. */
+  /* THE SLIDE COMES FROM THE END EDGE, which is the left one in a right-to-left page. */
+  .sheet {
+    --sheet-from: 24px;
+  }
+
+  :global([dir='rtl']) .sheet {
+    --sheet-from: -24px;
+  }
+
+  /* THE HANDLE IS A PHONE'S, so the drawer from 900px up has none; the rule below 900px shows it. */
   .sheet-grab {
     display: none;
   }
 
+  /* ONE LINE: the title and its close circle, centred on each other. */
   .sheet-head {
+    flex: none;
     display: flex;
     align-items: center;
     gap: var(--sp-3);
-    padding: var(--sp-3) var(--sp-3) var(--sp-2) var(--sp-4);
+    padding: var(--sp-3) var(--sp-3) var(--sp-2) calc(var(--sp-4) + var(--sp-1));
   }
 
-  /* The element holding the words carries the ellipsis, and it is a block, not the flex row. */
+  /* The element holding the words carries the ellipsis, and it is a block, not the flex row. A sheet's title is at a
+     group heading's step, as the docked panel's is (SYSTEM §3). */
   .sheet-title {
     flex: 1;
     min-inline-size: 0;
     margin: 0;
     overflow: hidden;
-    font-size: var(--t-lg);
+    font-size: var(--t-group);
     font-weight: 600;
     line-height: var(--lh-tight);
     text-overflow: ellipsis;
@@ -307,72 +323,73 @@
 
   .sheet-sub {
     margin: 0;
-    padding: 0 var(--sp-4) var(--sp-3);
+    padding: 0 calc(var(--sp-4) + var(--sp-1)) var(--sp-3);
     color: var(--dim);
     font-size: var(--t-sm);
   }
 
-  /* A round glyph button, and a pill because it is pressed (design D-2). `--ctl-h` is 44 under a
-     coarse pointer, and `.tap` grows the box to 44 where it is 32. */
+  /* A 36px CIRCLE, the toolbar's icon circle (SYSTEM §5), with a quiet fill at rest so it reads as a thing to press.
+     `.tap` grows its hit box to 44 where the pointer is a thumb. */
   .sheet-close {
     flex: none;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    display: grid;
+    place-items: center;
     inline-size: var(--ctl-h);
     block-size: var(--ctl-h);
-    background: none;
+    padding: 0;
+    background: var(--s1);
     border: 0;
     border-radius: var(--r-pill);
-    color: var(--dim);
+    color: var(--ink2);
     cursor: pointer;
-    transition: background var(--d-state) var(--ease-out);
+    transition:
+      background var(--d-state) var(--ease-out),
+      color var(--d-state) var(--ease-out);
   }
 
   @media (hover: hover) and (pointer: fine) {
     .sheet-close:hover {
-      background: var(--hover-wash);
+      background: var(--hold-wash);
       color: var(--ink);
     }
   }
 
   /* `min-block-size: 0` so a sheet capped at 88dvh scrolls its body instead of growing past the cap:
-     a flex item will not shrink below its content without it. */
+     a flex item will not shrink below its content without it. Twenty in from each edge, a tile's padding. */
   .sheet-body {
     flex: 1 1 auto;
     min-block-size: 0;
-    padding: var(--sp-4);
+    padding: var(--sp-2) calc(var(--sp-4) + var(--sp-1)) calc(var(--sp-4) + var(--sp-1));
     overflow-y: auto;
+    overscroll-behavior: contain;
   }
 
-  /* WRAPPING, because a footer can carry a sentence as well as buttons — the reason a control is
+  /* WRAPPING, because a footer can carry a sentence as well as buttons: the reason a control is
      disabled belongs beside it, and squeezed into a flex row it became three lines in a 12ch
      column. A footer with only buttons in it wraps to exactly the row it was. */
   .sheet-foot {
+    flex: none;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-2);
-    padding: var(--sp-3) var(--sp-4);
+    padding: var(--sp-3) calc(var(--sp-4) + var(--sp-1));
     border-block-start: 1px solid var(--line);
   }
 
   /**
    * AND THE UA'S `max-width`, WHICH IS THE OTHER HALF OF THE SAME BUG.
    *
-   * This file already overrides `max-block-size` for the UA's `max-height: calc(100% - 6px - 2em)`,
-   * with a comment saying "measured, not guessed" — and the horizontal twin was never taken. At the
-   * sheet's 15px font that computes to `calc(100% - 36px)`, so a sheet declaring `100vw` rendered
-   * 284px at 320, 354 at 390 and 394 at 430: a dead strip of dimmed page down the right edge, with
-   * the sheet's rounded corner floating mid-screen, in every sheet in the product.
+   * The UA gives a modal `<dialog>` `max-width: calc(100% - 6px - 2em)` as well as the height, and
+   * at the sheet's font that computes to `calc(100% - 36px)`, so a sheet declaring `100vw`
+   * rendered 354 wide at 390: a dead strip of dimmed page down one edge, in every sheet in the
+   * product.
    */
-  /* IT WAS WRITTEN TWICE, rule and paragraph both, one immediately after the other. A duplicate
-     that says the same thing is harmless until the day somebody edits one of them. */
   .sheet {
     max-inline-size: 100%;
   }
 
-  @media (width < 640px) {
+  @media (width < 900px) {
     .sheet {
       inset-block-start: auto;
       inset-inline: 0;
@@ -397,21 +414,16 @@
       /* THE PULL. `--pulled` is how far the handle has been drawn down, written on the element as
          it moves, and `translate` composes with the `rise` animation's `transform`. */
       translate: 0 var(--pulled);
-      border-inline-start: 0;
-      border-block-start: 1px solid var(--edge);
-      border-start-start-radius: var(--r-lg);
-      border-start-end-radius: var(--r-lg);
+      border-end-start-radius: 0;
+      border-end-end-radius: 0;
       /* THE HOME INDICATOR IS NOT UNDER THE KEYBOARD, so the inset is not paid twice. With the
          sheet already lifted by `--kb` the strip at the bottom of the screen is the keyboard's,
          and paying `env(safe-area-inset-bottom)` on top of it left 34px of dead panel between the
          footer and the keys, which reads as the sheet having failed to move. */
       padding-block-end: max(0px, calc(env(safe-area-inset-bottom) - var(--kb)));
       /**
-       * AND THE INLINE EDGES, WHICH NOTHING IN EITHER APP HAS EVER PAID.
-       *
-       * `app.html` sets `viewport-fit=cover`, so a phone in landscape puts 44 to 59px of notch
-       * over one side of a box that declares `inset-inline: 0`. This sheet is the widest such box
-       * in the product, and its close button sits at the trailing edge.
+       * AND THE INLINE EDGES. `app.html` sets `viewport-fit=cover`, so a phone in landscape puts 44
+       * to 59px of notch over one side of a box that declares `inset-inline: 0`.
        *
        * `max()` OF THE TWO RATHER THAN ONE EACH SIDE, because `env()` has no logical spelling: the
        * insets are named `left` and `right`, and a `padding-inline` that maps `left` to the start
@@ -435,7 +447,7 @@
     .sheet-grab-bar {
       inline-size: var(--sp-6);
       block-size: var(--sp-1);
-      background: var(--edge);
+      background: var(--line);
       border-radius: var(--r-pill);
     }
 
@@ -459,6 +471,26 @@
       from {
         transform: translateY(24px);
       }
+    }
+  }
+
+  /* A FADE IN PLACE OF EVERY MOVE (SYSTEM §8). The a11y layer shortens the duration; this takes the move away. */
+  @media (prefers-reduced-motion: reduce) {
+    .sheet[open] {
+      animation-name: sheet-fade;
+    }
+  }
+
+  @keyframes sheet-fade {
+    from {
+      opacity: 0.6;
+    }
+  }
+
+  /* UNDER FORCED COLOURS the shadow is gone, so the sheet's edge is a border. */
+  @media (forced-colors: active) {
+    .sheet {
+      border: 1px solid CanvasText;
     }
   }
 </style>

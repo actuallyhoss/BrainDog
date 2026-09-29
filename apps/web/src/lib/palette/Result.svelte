@@ -15,7 +15,7 @@
 -->
 <script lang="ts">
   import { TONES } from 'braindog-render';
-  import Icon from '../ui/Icon.svelte';
+  import IconWell from '../ui/IconWell.svelte';
   import type { IconName } from '../ui/Icon.svelte';
 
   let {
@@ -40,7 +40,7 @@
 </script>
 
 <span class="result">
-  {#if icon}<span class="result-glyph"><Icon name={icon} size="m" /></span>{/if}
+  {#if icon}<span class="result-glyph"><IconWell name={icon} /></span>{/if}
   <span class="result-title">{title}</span>
   {#if line}<span class="result-line">{line}</span>{/if}
   <!-- THE GLYPH TRAVELS WITH THE TONE, always (`13 §5.1`): colour never carries a verdict alone, and under simulated
@@ -61,10 +61,10 @@
     min-inline-size: 0;
   }
 
+  /* THE GLYPH IN ITS WELL (SYSTEM §6: "a 32px icon well for anything else"), at the 28 a result's row has room for. */
   .result-glyph {
     display: flex;
     flex: none;
-    color: var(--dim);
   }
 
   /* A CAP, NOT A `flex: none`. A question's title is a whole sentence; what it must not do is push its own line and the
@@ -74,7 +74,7 @@
     min-inline-size: 0;
     overflow: hidden;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--t-row);
     font-weight: 500;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -96,6 +96,7 @@
     flex: none;
     margin-inline-start: auto;
     color: var(--tone, var(--ink));
+    font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
 

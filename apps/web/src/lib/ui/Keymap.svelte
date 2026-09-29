@@ -93,12 +93,13 @@
   }
 
   /* The space between scopes is the header row's own, above its name, so the first scope starts at the table's top. */
+  /* A META HEADING over each scope, as the palette's are (SYSTEM §6). */
   .scope-title {
     padding-block: var(--sp-5) var(--sp-2);
     color: var(--dim);
     font-family: var(--font-ui);
     font-size: var(--t-sm);
-    font-weight: 600;
+    font-weight: 500;
     text-align: start;
   }
 
@@ -124,8 +125,8 @@
 
   .does {
     padding-block: var(--sp-1);
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink);
+    font-size: var(--t-base);
     vertical-align: baseline;
   }
 

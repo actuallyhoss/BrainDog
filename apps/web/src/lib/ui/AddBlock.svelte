@@ -266,12 +266,13 @@
     margin-block-start: var(--sp-5);
   }
 
+  /* A META HEADING over each group, as the palette's are (SYSTEM §6), and at 500: the weights are 400 to 600. */
   .group-name {
-    margin-block-end: var(--sp-2);
+    margin-block: 0 var(--sp-2);
     color: var(--dim);
     font-family: var(--font-ui);
     font-size: var(--t-sm);
-    font-weight: 700;
+    font-weight: 500;
   }
 
   .tiles {
@@ -290,16 +291,28 @@
     inline-size: 100%;
     padding: var(--sp-3);
     background: var(--s1);
-    border: 1px solid var(--line);
+    border: 0;
     border-radius: var(--r-md);
+    color: var(--ink);
     font: inherit;
     text-align: start;
     cursor: pointer;
-    transition: border-color var(--d-state) var(--ease-out);
+    transition: background var(--d-state) var(--ease-out);
   }
 
-  .tile:hover {
-    border-color: var(--ink2);
+  /* A CHOICE ON THE SHEET, NOT A TILE IN IT (SYSTEM §4: a tile never holds a tile, and a tile has no border): the `--s1`
+     fill, and one step deeper under the pointer. */
+  @media (hover: hover) and (pointer: fine) {
+    .tile:hover {
+      background: var(--s2);
+    }
+  }
+
+  /* UNDER FORCED COLOURS the fill is gone, so each choice keeps an edge. */
+  @media (forced-colors: active) {
+    .tile {
+      border: 1px solid CanvasText;
+    }
   }
 
   .tile-head {
@@ -313,7 +326,7 @@
      you must copy exactly rather than as a thing you can pick. */
   .tile-kind {
     color: var(--ink);
-    font-size: var(--t-ui);
+    font-size: var(--t-row);
     font-weight: 600;
   }
 
@@ -338,8 +351,7 @@
   .tile-fallback {
     display: block;
     padding: var(--sp-3);
-    background: var(--sunk);
-    border: 1px dashed var(--line);
+    background: var(--bg);
     border-radius: var(--r-sm);
     color: var(--dim);
     font-size: var(--t-sm);

@@ -171,13 +171,13 @@ export function commands(live: Live): Command[] {
 }
 
 export const COMMANDS: readonly Command[] = [
-  { id: 'c-home', title: copy.home, href: '/', group: copy.destinations, icon: 'home' },
+  { id: 'c-home', title: copy.home, href: '/', group: copy.destinations, icon: 'today' },
   { id: 'c-decide', title: copy.decide, href: '/decide', group: copy.destinations, icon: 'decide' },
   { id: 'c-inbox', title: copy.inbox, href: '/inbox', group: copy.destinations, icon: 'inbox' },
   { id: 'c-vault', title: copy.vault, href: '/vault', group: copy.destinations, icon: 'vault' },
   { id: 'c-packs', title: copy.packs, href: '/packs', group: copy.destinations, icon: 'packs' },
   /* SLASH'S PAGE, what it noticed and suggests; its title is its name, which is why it is not a copy key. */
-  { id: 'c-slash', title: 'Slash', href: '/slash', group: copy.destinations, icon: 'star' },
+  { id: 'c-slash', title: 'Slash', href: '/slash', group: copy.destinations, icon: 'slash' },
   /* AUTOMATIONS, the canvas an owner and an agent both edit (`loop/DIRECTION.md` section 22). Reachable only by its address
      until it was here and in the rail. */
   { id: 'c-automations', title: copy.automations, href: '/automations', group: copy.destinations, icon: 'refresh' },
@@ -190,7 +190,7 @@ export const COMMANDS: readonly Command[] = [
      nothing, and on a phone the route was reachable only from the palette's overflow row, which is
      to say only from inside the cap it exists to relieve. */
   { id: 'c-search', title: copy.search, href: '/search', group: copy.destinations, icon: 'search' },
-  { id: 'c-audit', title: copy.audit, href: '/audit', group: copy.destinations, icon: 'clock' },
+  { id: 'c-audit', title: copy.audit, href: '/audit', group: copy.destinations, icon: 'activity' },
   { id: 'c-keys', title: copy.keymap, href: '/settings/keyboard', group: copy.commands, icon: 'keyboard' },
   /**
    * THE FIRST ROW IN THIS PRODUCT'S PALETTE THAT DOES SOMETHING RATHER THAN GO SOMEWHERE.

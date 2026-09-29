@@ -338,12 +338,13 @@
     border: 0;
   }
 
+  /* THE LABEL SITS ABOVE ITS FIELD in the meta step and the second ink (SYSTEM §6, Fields). */
   .label {
     margin: 0 0 var(--sp-1);
     padding: 0;
     color: var(--ink2);
     font-size: var(--t-sm);
-    font-weight: 600;
+    font-weight: 500;
   }
 
   .help {
@@ -357,8 +358,10 @@
     color: var(--danger);
   }
 
+  /* A FIELD HAS NO BORDER NOW (`controls.css`), so the one that is wrong is ringed inside its own edge, beside the line
+     under it that says why. */
   .field[data-bad] {
-    border-color: var(--danger);
+    box-shadow: inset 0 0 0 1px var(--danger);
   }
 
   /* 16px TEXT IN EVERY INPUT, so a phone does not zoom the page when one is focused. */
@@ -367,15 +370,23 @@
     font-size: max(16px, var(--t-ui));
   }
 
+  /* A SELECT IS A FIELD: 40 tall and 44 under a thumb, the `--s1` fill with no border, radius `--r-md`, as
+     `controls.css` draws `.field` (SYSTEM §6). */
   .pick {
     min-inline-size: 0;
-    min-block-size: max(var(--ctl-h), var(--tap));
+    min-block-size: 40px;
     padding-inline: var(--sp-3);
     background: var(--s1);
-    border: 1px solid var(--edge);
-    border-radius: var(--r-sm);
+    border: 0;
+    border-radius: var(--r-md);
     color: var(--ink);
     font: inherit;
+  }
+
+  @media (pointer: coarse) {
+    .pick {
+      min-block-size: var(--tap);
+    }
   }
 
   .lines {
@@ -415,7 +426,7 @@
   }
 
   .mono {
-    font-family: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, monospace;
+    font-family: var(--font-id);
     font-size: var(--t-sm);
     letter-spacing: 0;
   }

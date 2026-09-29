@@ -299,9 +299,10 @@
     gap: var(--sp-2);
   }
 
+  /* THE LABEL SITS ABOVE ITS FIELD in the meta step and the second ink (SYSTEM §6, Fields). */
   .ask-label {
     padding: 0;
-    color: var(--ink);
+    color: var(--ink2);
     font-size: var(--t-sm);
     font-weight: 500;
   }
@@ -312,12 +313,14 @@
     font-size: var(--t-sm);
   }
 
+  /* A FIELD: the `--s1` fill with no border, radius `--r-md`, as `controls.css` draws `.field` (SYSTEM §6). */
   .ask-text {
     inline-size: 100%;
-    padding: var(--sp-3);
-    background: var(--bg);
-    border: 1px solid var(--edge);
-    border-radius: var(--r-sm);
+    min-block-size: 40px;
+    padding: var(--sp-2) var(--sp-3);
+    background: var(--s1);
+    border: 0;
+    border-radius: var(--r-md);
     color: var(--ink);
     font-family: var(--font-ui);
     font-size: var(--t-ui);
@@ -335,18 +338,19 @@
     min-inline-size: 0;
   }
 
-  /* An option is a card on the sheet's ground: the raised surface, nothing round it, one below the next. */
+  /* AN OPTION IS A GROUP ON THE SHEET, NOT A CARD IN IT (SYSTEM §4: a tile never holds a tile), and its fields take the
+     `--s1` fill a card would have hidden them in. A hairline over each, one below the next. The one that is wrong says so
+     in its rule, its fields' `aria-invalid` and the alert under the form. */
   .ask-option {
     display: flex;
     flex-direction: column;
     gap: var(--sp-2);
-    padding: var(--sp-4);
-    background: var(--s1);
-    border-radius: var(--r-md);
+    padding-block-start: var(--sp-4);
+    border-block-start: 1px solid var(--line);
   }
 
   .ask-option[data-wrong] {
-    box-shadow: inset 0 0 0 1px var(--danger);
+    border-block-start: 2px solid var(--danger);
   }
 
   .ask-option-head {
@@ -359,8 +363,8 @@
   .ask-option-title {
     margin: 0;
     font-family: var(--font-ui);
-    font-size: var(--t-base);
-    font-weight: 500;
+    font-size: var(--t-row);
+    font-weight: 600;
   }
 
   .ask-swatches {
@@ -383,7 +387,7 @@
     padding: 0;
     background: none;
     border: 1px solid var(--line);
-    border-radius: var(--r-sm);
+    border-radius: var(--r-md);
     cursor: pointer;
   }
 
@@ -408,7 +412,7 @@
 
   /* FULL SCREEN ON A PHONE. The bottom sheet is as tall as what it holds, so the form asks for the whole screen and
      the sheet stops at its own cap, with the form scrolling inside it and the footer's press above the keyboard. */
-  @media (width < 640px) {
+  @media (width < 900px) {
     .ask {
       min-block-size: 100dvh;
     }

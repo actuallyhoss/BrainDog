@@ -29,6 +29,10 @@
   bottom of the screen over a scrim, in 48px rows at 16px, with a Cancel row at its foot. The items,
   the keys and the roles are the same in both forms; only the placing differs.
 
+  WITH A MOUSE IT IS GLASS (SYSTEM §6): the strong glass at level 2, radius `--r-md`, arriving in 140ms, and every row
+  in it 32 tall with an icon, the word and a key cap, whatever class the caller drew its items with. Under a thumb it is
+  a sheet and not glass: a tile's surface over the scrim.
+
   THE SHEET IS A POPOVER IN THE TOP LAYER, which is the one place a fixed panel is placed against
   the screen whatever it sits inside. A menu lives in toolbars and bars that have their own stacking
   order, and a panel fixed to the bottom of the screen inside one of them would be drawn in that
@@ -288,8 +292,9 @@
     cursor: pointer;
   }
 
-  /* Over the page, so it is one of the few things allowed a shadow, and it uses the generated
-     ladder rather than a number invented here. */
+  /* GLASS, AND THE STRONG ONE (SYSTEM §6): a menu opens over busy content, and legibility is the whole of its job. Level
+     2, the chrome's, is the glass hairline pair and the floating shadow; radius `--r-md`; and it arrives in 140ms on the
+     arriving curve (SYSTEM §8). */
   .menu {
     /* The three the clamp writes, declared here so the panel is correct before `place()` has run
        and so the names exist in a stylesheet rather than only in TypeScript. */
@@ -313,16 +318,17 @@
     /* `translate` and not `transform`, because `menu-in` below already owns `transform` and the
        two properties compose instead of overwriting each other. */
     translate: var(--menu-shift) var(--menu-lift);
-    /* EIGHT AND NOT FOUR, because the box scrolls now. The focus ring is a 2px outline at 1px
-       offset plus a 4px shadow, so it reaches 7px past an item, and at 4px of padding
-       `overflow-y: auto` clipped three of them off the first and last rows. The ring is the one
-       thing in this component that may not be trimmed to make room. */
+    /* EIGHT AND NOT FOUR, because the box scrolls. The focus ring is a 2px outline at an offset, so
+       it reaches past an item, and at 4px of padding `overflow-y: auto` clipped it off the first and
+       last rows. The ring is the one thing in this component that may not be trimmed to make room. */
     padding: var(--sp-2);
-    background: var(--s3);
-    border: 1px solid var(--edge);
+    background: var(--glass-strong);
+    backdrop-filter: var(--glass-blur);
+    border: 0;
     border-radius: var(--r-md);
-    box-shadow: var(--e2);
-    animation: menu-in var(--d-enter) var(--ease-out);
+    color: var(--ink);
+    box-shadow: var(--glass-edge), var(--e2);
+    animation: menu-in var(--d-menu) var(--ease-out);
   }
 
   .menu[data-align='start'] {
@@ -331,6 +337,28 @@
 
   .menu[data-align='end'] {
     inset-inline-end: 0;
+  }
+
+  /**
+   * THE ROW, WHATEVER CLASS THE CALLER GAVE IT (SYSTEM §6): 32 tall, an icon, the word, and a key cap at the trailing
+   * edge. Callers draw their own items and style them, and this is the one place the menu's rhythm is said, so every
+   * menu in the product reads as one menu. The colours stay the caller's: a destructive verb is its own business.
+   */
+  .menu :global([role^='menuitem']) {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    inline-size: 100%;
+    min-block-size: var(--sp-6);
+    padding-block: 0;
+    padding-inline: var(--sp-2);
+    border-radius: var(--r-sm);
+    font-size: var(--t-base);
+    transition: background var(--d-state) var(--ease-out);
+  }
+
+  .menu :global([role^='menuitem'] > .kbd-run) {
+    margin-inline-start: auto;
   }
 
   /* No `opacity: 0` in a start state, see Sheet.svelte. A stalled animation must leave something
@@ -347,13 +375,15 @@
   }
 
   /**
-   * THE ACTION SHEET: the same panel, against the bottom of the screen.
+   * THE ACTION SHEET: the same list, against the bottom of the screen.
    *
    * `[popover]` rather than the `@media` query, because the attribute is what the script set when
    * it read that query at open, so the form and the markup cannot disagree. Every UA default for a
    * popover (centred with `margin: auto`, `fit-content` on both axes, a border and `Canvas`) is
    * taken back here. From 640px up, which only a coarse pointer reaches, it is a 560px sheet in the
    * middle of the bottom edge rather than one as wide as a tablet.
+   *
+   * A SHEET, NOT GLASS (SYSTEM §6): a tile's surface at radius `--r-lg`, the third level, over the scrim.
    */
   .menu[popover] {
     position: fixed;
@@ -367,9 +397,9 @@
     margin-inline: auto;
     translate: none;
     padding: var(--sp-2) var(--sp-2) calc(var(--sp-2) + env(safe-area-inset-bottom));
-    background: var(--s1);
+    background: var(--bg);
+    backdrop-filter: none;
     border: 0;
-    border-block-start: 1px solid var(--edge);
     border-start-start-radius: var(--r-lg);
     border-start-end-radius: var(--r-lg);
     border-end-start-radius: 0;
@@ -419,10 +449,25 @@
     }
   }
 
+  /* A FADE IN PLACE OF EVERY MOVE (SYSTEM §8). The a11y layer shortens the duration; this takes the move away. */
   @media (prefers-reduced-motion: reduce) {
     .menu,
     .menu[popover] {
-      animation: none;
+      animation-name: menu-fade;
+    }
+  }
+
+  @keyframes menu-fade {
+    from {
+      opacity: 0.6;
+    }
+  }
+
+  /* UNDER FORCED COLOURS the glass and the shadow are gone, so the menu's edge is a border. */
+  @media (forced-colors: active) {
+    .menu,
+    .menu[popover] {
+      border: 1px solid CanvasText;
     }
   }
 </style>

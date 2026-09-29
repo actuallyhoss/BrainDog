@@ -195,31 +195,51 @@
 {/if}
 
 <style>
+  /* `Menu.svelte`'s surface (SYSTEM §6): the strong glass at level 2, radius `--r-md`, in 140ms on the arriving curve. */
   .row-menu {
     position: fixed;
     z-index: var(--z-palette);
     min-inline-size: 252px;
-    padding: var(--sp-1);
-    background: var(--s3);
-    border: 1px solid var(--edge);
+    padding: calc(var(--sp-1) + 2px);
+    background: var(--glass-strong);
+    backdrop-filter: var(--glass-blur);
+    border: 0;
     border-radius: var(--r-md);
-    box-shadow: var(--e2);
+    color: var(--ink);
+    box-shadow: var(--glass-edge), var(--e2);
+    animation: row-menu-in var(--d-menu) var(--ease-out);
   }
 
-  /* "Hand to" drawn as the caller's items are: the same 34px row, glyph first, the same wash on hover. */
-  .row-menu-hand {
+  /* THE ROW, WHATEVER CLASS THE CALLER GAVE IT, as `Menu.svelte` draws it: 32 tall, an icon, the word, a key cap. */
+  .row-menu :global([role='menuitem']) {
     display: flex;
     align-items: center;
-    gap: var(--sp-3);
+    gap: var(--sp-2);
     inline-size: 100%;
-    min-block-size: 34px;
-    padding: 0 var(--sp-3);
+    min-block-size: var(--sp-6);
+    padding-block: 0;
+    padding-inline: var(--sp-2);
+    border-radius: var(--r-sm);
+    font-size: var(--t-base);
+    transition: background var(--d-state) var(--ease-out);
+  }
+
+  .row-menu :global([role='menuitem'] > .kbd-run) {
+    margin-inline-start: auto;
+  }
+
+  @keyframes row-menu-in {
+    from {
+      transform: translateY(-4px);
+    }
+  }
+
+  /* "Hand to" drawn as the caller's items are: the same row, glyph first, the same wash on hover. */
+  .row-menu-hand {
     background: none;
     border: 0;
-    border-radius: var(--r-sm);
     color: var(--ink2);
     font: inherit;
-    font-size: var(--t-ui);
     text-align: start;
     cursor: pointer;
   }
@@ -230,19 +250,14 @@
     color: var(--ink);
   }
 
-  @media (pointer: coarse) {
-    .row-menu-hand {
-      min-block-size: var(--tap);
-    }
-  }
-
   /* Rendered only for a sheet; the sheet's rule below draws it. */
   .row-menu-cancel {
     display: none;
   }
 
   /* THE ACTION SHEET, `Menu.svelte`'s form: every UA default for a popover is taken back, and from
-     640px up, which only a coarse pointer reaches, it is 560px wide in the middle of the bottom edge. */
+     640px up, which only a coarse pointer reaches, it is 560px wide in the middle of the bottom edge.
+     A sheet, not glass: a tile's surface at radius `--r-lg`, the third level, over the scrim. */
   .row-menu[popover] {
     inset-block: auto var(--kb);
     inset-inline: 0;
@@ -255,9 +270,9 @@
     overflow-y: auto;
     overscroll-behavior: contain;
     padding: var(--sp-2) var(--sp-2) calc(var(--sp-2) + env(safe-area-inset-bottom));
-    background: var(--s1);
+    background: var(--bg);
+    backdrop-filter: none;
     border: 0;
-    border-block-start: 1px solid var(--edge);
     border-start-start-radius: var(--r-lg);
     border-start-end-radius: var(--r-lg);
     border-end-start-radius: 0;
@@ -305,9 +320,25 @@
     }
   }
 
+  /* A FADE IN PLACE OF EVERY MOVE (SYSTEM §8). */
   @media (prefers-reduced-motion: reduce) {
+    .row-menu,
     .row-menu[popover] {
-      animation: none;
+      animation-name: row-menu-fade;
+    }
+  }
+
+  @keyframes row-menu-fade {
+    from {
+      opacity: 0.6;
+    }
+  }
+
+  /* UNDER FORCED COLOURS the glass and the shadow are gone, so the menu's edge is a border. */
+  @media (forced-colors: active) {
+    .row-menu,
+    .row-menu[popover] {
+      border: 1px solid CanvasText;
     }
   }
 </style>
