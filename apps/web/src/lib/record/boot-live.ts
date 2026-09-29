@@ -32,7 +32,7 @@ import type { NewsItem, PageDecl, Person, Question } from './schema.ts';
 import type { Level } from './schema.ts';
 import { levelsFrom } from './may.ts';
 import type { IconName } from '../ui/icons.ts';
-import { AGENT_GLYPHS, agentKindOf } from '../ui/face.ts';
+import { agentKindOf, type AgentKind } from '../ui/face.ts';
 /* THE HOLDING PEN, AS THE RECORD SENDS IT (`boot`'s `pen`), held to the shape the settings screen draws (PGS-16). */
 import { penOf, type PenItem } from '../design/pen.ts';
 import type { Prefs } from '../nav-prefs.svelte.ts';
@@ -231,7 +231,7 @@ export const signsIn = (b: Boot): boolean => (b as Boot & { signIn?: unknown }).
  * One agent at work, as the rail's Working now draws it (SYSTEM §5): the run, the kind of agent, the project it was
  * placed in, what it says it is doing, when the run began, and whether it has gone quiet.
  */
-export type Working = { seq: number | null; agent: string; glyph: IconName; project: string | null; doing: string; since: string | null; quiet: boolean };
+export type Working = { seq: number | null; agent: string; kind: AgentKind; project: string | null; doing: string; since: string | null; quiet: boolean };
 
 /** The most runs the rail lists; Today and the run pages hold the rest. */
 const WORKING_SHOWN = 5;
@@ -276,8 +276,9 @@ export async function readWorking(base: string, io?: Fetch, now = Date.now()): P
       {
         seq: typeof row.seq === 'number' ? row.seq : null,
         agent: said(fields.agent) || 'other',
-        /* The agent's own glyph (`face.ts`), chosen here so the rail's chunk does not carry the names behind it. */
-        glyph: kind === 'slash' ? 'slash' : AGENT_GLYPHS[kind],
+        /* The kind of agent (`face.ts`), worked out here so the rail's chunk does not carry the names behind it; the rail
+           draws its maker's mark from it (`AgentMark`). */
+        kind,
         project: (typeof scope === 'string' && scope !== '' ? scope : null) ?? (said(fields.project) || null),
         doing: said(fields.doing),
         since: said(row.created_at) || null,

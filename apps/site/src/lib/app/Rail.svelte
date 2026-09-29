@@ -16,6 +16,8 @@
   not pressed: an example record has nothing behind them, and a control that opens nothing is a broken one.
 -->
 <script lang="ts">
+  import AgentMark from '../AgentMark.svelte';
+  import { markedOf } from '../agent-marks.ts';
   import type { Snippet } from 'svelte';
   import Icon from '../Icon.svelte';
   import Mark from '../Mark.svelte';
@@ -90,8 +92,9 @@
     <p class="section">{w.working}</p>
     <ul class="agents">
       {#each working as a, i (a.who)}
+        {@const marked = markedOf(a.who)}
         <li class="agent">
-          <span class="face" aria-hidden="true"><svg viewBox="0 0 24 24">
+          <span class="face" data-marked={marked ? '' : undefined} aria-hidden="true"><svg viewBox="0 0 24 24">
             <circle class="ring-track" cx="12" cy="12" r="10" />
             <circle
               class="ring"
@@ -103,7 +106,7 @@
               transform="rotate(-90 12 12)"
             />
             <circle class="disc" cx="12" cy="12" r="8" />
-</svg><span class="initial">{a.who.slice(0, 1)}</span></span>
+</svg>{#if marked}<span class="mark"><AgentMark agent={marked} /></span>{:else}<span class="initial">{a.who.slice(0, 1)}</span>{/if}</span>
           <span class="agent-name">{a.who}</span>
           <span class="agent-when">{a.when}</span>
         </li>
@@ -325,6 +328,22 @@
 
   .disc {
     fill: var(--ink2);
+  }
+
+  /* A MAKER'S MARK ON A PLAIN DISC (the owner's "use real ones"): an ink disc would swallow Codex's black knot. */
+  .face[data-marked] .disc {
+    fill: var(--bg);
+    stroke: var(--line);
+    stroke-width: 1;
+  }
+
+  .mark {
+    position: relative;
+    display: grid;
+    place-items: center;
+    inline-size: 70%;
+    block-size: 70%;
+    color: var(--ink);
   }
 
   .initial {

@@ -105,3 +105,14 @@ export const forcedColors = (classes: readonly string[]): string => `@media (for
  */
 export const brand = (colour: string): string =>
   ['', '@layer theme {', '  html {', `    --brand: ${colour.toLowerCase()};`, '  }', '}', ''].join('\n');
+
+/**
+ * THE AGENTS' OWN COLOURS, for the two marks their makers draw in colour (`apps/web/src/lib/ui/agent-marks.ts`): Claude's
+ * clay and Gemini's blue. The owner asked for the agents' real marks (30 September 2026), and a real mark wears its
+ * maker's colour. Emitted beside `--brand` and outside `toCSS` for the same reason the mark is: they are nobody's to
+ * theme, and a record's palette must not be able to repaint somebody else's logo. Both read on either scheme's ground.
+ */
+export const AGENT_COLOURS = { claude: '#d97757', gemini: '#3186ff' } as const;
+
+export const agentColours = (): string =>
+  ['', '@layer theme {', '  html {', ...Object.entries(AGENT_COLOURS).map(([k, v]) => `    --agent-${k}: ${v};`), '  }', '}', ''].join('\n');

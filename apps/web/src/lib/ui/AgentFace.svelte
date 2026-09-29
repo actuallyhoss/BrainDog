@@ -1,11 +1,13 @@
 <!--
-  An agent's run, as a face: the glyph for the kind of agent inside a disc washed in the run's own hue, and a ring in
-  that hue while the run is open (agents C11).
+  An agent's run, as a face: the agent's own mark (`AgentMark`) inside a disc, and a ring while the run is open.
 
-  THE GLYPH SAYS WHAT, THE HUE SAYS WHICH. Two Claude runs at once share a glyph, so the colour comes from the run's
-  number and not from the agent (`runHue` in `face.ts`): side by side they are two faces, and a log line from either
-  can be told apart from the other at a glance. The disc keeps the hue after the run stops, so an old line in the
-  history still says which run wrote it; only the ring goes.
+  A NAMED AGENT WEARS ITS MAKER'S MARK on a plain disc (the owner, 30 September 2026: "use real ones"): Claude's clay
+  spark, Codex's knot, Cursor's cube. A maker's logo on a washed disc is two colours arguing, so the run's hue is kept for
+  the faces that wear the app's own glyph (a runner, an agent nobody names), where it is still what tells two apart.
+
+  ON A GLYPH'S FACE, THE GLYPH SAYS WHAT AND THE HUE SAYS WHICH. Two runners at once share a glyph, so the colour comes
+  from the run's number (`runHue` in `face.ts`), and the disc keeps it after the run stops; only the ring goes. Two
+  Claude runs side by side are told apart by what each line says beside them: the project, the run's own words.
 
   THE RING IS WHERE THE RUN IS, in `--live`: solid while it works, dashed once it has gone quiet but is still open, and
   absent when it has stopped. A shape and not a colour, so the three read the same in both schemes and to a reader who does not
@@ -20,8 +22,9 @@
 -->
 <script lang="ts">
   import { at } from '../at.ts';
-  import { AGENT_GLYPHS, agentKindOf, faceWords, runHue, runSeq, type RunLive } from './face.ts';
-  import Icon from './Icon.svelte';
+  import { agentKindOf, faceWords, runHue, runSeq, type RunLive } from './face.ts';
+  import { isMarked } from './agent-marks.ts';
+  import AgentMark from './AgentMark.svelte';
 
   let {
     agent,
@@ -42,14 +45,16 @@
 
   const kind = $derived(agentKindOf(agent));
   const seq = $derived(runSeq(run));
-  const hue = $derived(seq === null ? null : runHue(seq));
+  const marked = $derived(isMarked(kind));
+  /* The run's hue washes only a face with no maker's mark in it (see above). */
+  const hue = $derived(seq === null || marked ? null : runHue(seq));
   /* THE BADGE ONLY ON THE LIST SIZE: at 24px a second mark in the corner is a smudge, and the line beside it names the
      project in words anyway. */
   const badge = $derived(size === 'm' && project?.mark ? project : null);
 </script>
 
 {#snippet inside()}{#if kind === 'slash'}<svg class="agent-face-slash" viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 4.5 8.5 19.5" /></svg
-  >{:else}<Icon name={AGENT_GLYPHS[kind]} size="s" />{/if}{#if badge}<span
+  >{:else}<AgentMark {kind} size="s" />{/if}{#if badge}<span
       class="agent-face-project"
       data-hued={badge.hue === null ? undefined : ''}
       style={badge.hue === null ? undefined : `--project-hue:${badge.hue}`}
@@ -65,12 +70,13 @@
     data-agent={kind}
     data-live={live}
     data-size={size}
-    data-hued=""
-    style="--run-hue:{hue}"
+    data-hued={hue === null ? undefined : ''}
+    data-marked={marked ? '' : undefined}
+    style={hue === null ? undefined : `--run-hue:${hue}`}
     aria-label="{faceWords.openRun}, {faceWords.live[live]}">{@render inside()}</a
   >
 {:else}
-  <span class="face agent-face" data-agent={kind} data-live={live} data-size={size} aria-hidden="true">{@render inside()}</span>
+  <span class="face agent-face" data-agent={kind} data-live={live} data-size={size} data-marked={marked ? '' : undefined} aria-hidden="true">{@render inside()}</span>
 {/if}
 
 <style>
@@ -102,15 +108,25 @@
 
   /* THE RING IS `--live`, the one hue that means "alive" (SYSTEM §2): an agent working right now wears it, solid, and
      one gone quiet wears it dashed. A hair of the tile inside it, so it reads as a ring round the disc and not as a
-     darker disc. The disc keeps the run's own hue, which is what tells two runs apart. */
-  .agent-face[data-hued][data-live='working'],
-  .agent-face[data-hued][data-live='quiet'] {
+     darker disc. A glyph's disc keeps the run's own hue, which is what tells two runs apart. */
+  .agent-face[data-live='working'],
+  .agent-face[data-live='quiet'] {
     border-color: var(--live);
     box-shadow: inset 0 0 0 1px var(--bg);
   }
 
   .agent-face[data-live='quiet'] {
     border-style: dashed;
+  }
+
+  /* A MAKER'S MARK SITS ON A PLAIN DISC: the tile's white with a hairline, so the mark keeps its own colours and the disc
+     still reads as a face on a white tile. */
+  .agent-face[data-marked] {
+    background: var(--bg);
+  }
+
+  .agent-face[data-marked]:not([data-live='working'], [data-live='quiet']) {
+    box-shadow: inset 0 0 0 1px var(--line);
   }
 
   .agent-face:focus-visible {

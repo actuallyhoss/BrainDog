@@ -49,6 +49,8 @@
   server-render test compiles this file alone.
 -->
 <script lang="ts">
+  import AgentMark from './AgentMark.svelte';
+  import { markedOf } from './agent-marks.ts';
   /** `rule` marks a row a rule wrote, drawn with no face: faces are for agents and people. */
   type Row = { who: string; what: string; when: string; rule?: boolean };
 
@@ -153,6 +155,11 @@
   });
 </script>
 
+<!-- A FACE: an agent its maker's mark on a plain disc (the owner's "use real ones"), anybody else an initial. -->
+{#snippet face(name: string)}{@const m = markedOf(name)}<span class="face" data-marked={m ? '' : undefined} data-initial={m ? undefined : initial(name)} aria-hidden="true"
+    >{#if m}<AgentMark agent={m} />{/if}</span
+  >{/snippet}
+
 
 <figure class="decide" data-phase={phase} bind:this={root} aria-labelledby="{uid}-label">
   <figcaption class="label" id="{uid}-label">{scene.label}</figcaption>
@@ -170,7 +177,7 @@
 
       <div class="flow">
         <p class="actor agent">
-          <span class="face" data-initial={initial(scene.agent)} aria-hidden="true"></span>
+          {@render face(scene.agent)}
           <span class="name">{scene.agent}</span>
           <!-- THE TYPING DOTS ARE THE ONLY THING THAT SAYS "DRAFTING", and they need no word: the
                proposal arriving under them is what the dots were promising. -->
@@ -187,7 +194,7 @@
           </p>
           <div class="foot">
             <p class="actor person">
-              <span class="face" data-initial={initial(scene.person)} aria-hidden="true"></span>
+              {@render face(scene.person)}
               <span class="name">{scene.person}</span>
             </p>
             <!-- THE VERB AND THE STAMP SHARE ONE CELL, so the tile is one size before and after the press
@@ -223,7 +230,7 @@
       <ol class="history">
         {#if landing}
           <li class="row landing">
-            <span class="face" data-initial={initial(landing.who)} aria-hidden="true"></span>
+            {@render face(landing.who)}
             <span class="said">
               <span class="what">{landing.what}</span>
               <span class="meta"><span class="who">{landing.who}</span><span class="dot" aria-hidden="true"></span><span class="when">{landing.when}</span></span>
@@ -237,7 +244,7 @@
                 <svg viewBox="0 0 24 24"><path d="M13 3.25 5.25 13.5H12l-1 7.25 7.75-10.25H12z" /></svg>
               </span>
             {:else}
-              <span class="face" data-initial={initial(row.who)} aria-hidden="true"></span>
+              {@render face(row.who)}
             {/if}
             <span class="said">
               <span class="what">{row.what}</span>
@@ -369,6 +376,12 @@
 
   .person .face {
     background: var(--ink);
+  }
+
+  .face[data-marked] {
+    background: var(--bg);
+    box-shadow: inset 0 0 0 1px var(--line);
+    color: var(--ink);
   }
 
   .name {

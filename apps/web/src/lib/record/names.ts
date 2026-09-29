@@ -50,6 +50,9 @@ export const AGENT_NAMES: Readonly<Record<string, string>> = {
   claude: 'Claude',
   codex: 'Codex',
   cursor: 'Cursor',
+  gemini: 'Gemini',
+  copilot: 'Copilot',
+  windsurf: 'Windsurf',
 };
 
 /** The person the seed signs its own rows with (`packages/seed/src/index.ts`, `installSeed`): the sample, not somebody. */

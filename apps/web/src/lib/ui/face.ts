@@ -91,26 +91,46 @@ export const hueFor = (key: string): number => {
 
 /* ── an agent's run ─────────────────────────────────────────────────────────── */
 
-/** The kinds of agent a run face tells apart, each by its own glyph (agents C11). */
-export type AgentKind = 'claude' | 'codex' | 'cursor' | 'slash' | 'runner' | 'other';
+/** The kinds of agent a run face tells apart: each named one by its maker's mark (`agent-marks.ts`), the rest by a glyph. */
+export type AgentKind = 'claude' | 'codex' | 'cursor' | 'gemini' | 'copilot' | 'windsurf' | 'slash' | 'runner' | 'other';
 
 /** Where a run is: working, gone quiet while still open, or stopped. The ring says which. */
 export type RunLive = 'working' | 'quiet' | 'stopped';
 
 /**
- * The glyph each kind of agent wears, from the app's own set and the render core, so every one draws at once.
+ * The glyph each kind of agent falls back to, from the app's own set, where there is no mark to draw.
  *
- * A GLYPH AND NEVER A VENDOR LOGO (agents C11): a mark that is somebody else's brand, repeated down a log, is an
- * advert, and a glyph says what kind of worker it is in the app's own hand. Slash is not here, because it wears its
- * own mark, the slash `Face` draws.
+ * A NAMED AGENT WEARS ITS MAKER'S MARK NOW, not this. Agents C11 once ruled "a glyph and never a vendor logo"; the owner
+ * overruled it on 30 September 2026 ("for stuff like claude codex logos etc please use real ones"), so `AgentMark`
+ * draws Claude, Codex, Cursor, Gemini, Copilot and Windsurf as their makers do, and these glyphs are what a runner and
+ * an agent nobody names wear, and what a surface too small for a mark falls back to. Slash is not here, because it
+ * wears its own mark, the slash `Face` draws.
  */
 export const AGENT_GLYPHS = {
   claude: 'bot',
   codex: 'code',
   cursor: 'keyboard',
+  gemini: 'bot',
+  copilot: 'code',
+  windsurf: 'code',
   runner: 'play',
   other: 'session',
 } as const satisfies Record<Exclude<AgentKind, 'slash'>, IconName>;
+
+/** The kinds a word can name outright, as an id or a name. */
+const KNOWN = ['claude', 'codex', 'cursor', 'gemini', 'copilot', 'windsurf'] as const satisfies readonly AgentKind[];
+
+/** The other words the same agents sign with: a tool's name, its command, its maker. */
+const ALIASES: Readonly<Record<string, AgentKind>> = {
+  'claude-code': 'claude',
+  'claude code': 'claude',
+  anthropic: 'claude',
+  'codex-cli': 'codex',
+  openai: 'codex',
+  'gemini-cli': 'gemini',
+  'github-copilot': 'copilot',
+  'github copilot': 'copilot',
+};
 
 /** An agent's kind from its display name, back through `AGENT_NAMES`, so a face handed "Claude" knows it is claude. */
 const AGENT_BY_NAME = new Map<string, string>(Object.entries(AGENT_NAMES).map(([id, said]) => [said.toLowerCase(), id]));
@@ -125,8 +145,8 @@ export const agentKindOf = (agent: string | null | undefined): AgentKind => {
   if (said === 'slash' || said === nameWords.slash.toLowerCase()) return 'slash';
   if (said === 'runner' || said.startsWith('runner:')) return 'runner';
   const bare = said.replace(/^agent:/u, '');
-  const id = AGENT_BY_NAME.get(bare) ?? bare;
-  return id === 'claude' || id === 'codex' || id === 'cursor' ? id : 'other';
+  const id = AGENT_BY_NAME.get(bare) ?? ALIASES[bare] ?? bare;
+  return (KNOWN as readonly string[]).includes(id) ? (id as AgentKind) : 'other';
 };
 
 /** A run as a writer signs with it: `S` and its number (`30 §3`). */

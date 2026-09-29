@@ -63,7 +63,7 @@
 <!-- AN AUTOMATION AND A RULE ARE NOT PEOPLE, SO THEY DO NOT WEAR AN INITIAL: they take the glyph the
      rail gives Automations, which is where a person goes to find them. Slash wears its own mark, a
      slash, and BrainDog the product's mark in ink, never in the brand's red, which a face repeated
-     down a log would spend. AN AGENT IS `AgentFace` (AGT-13): its kind's glyph, in its run's hue where the caller
+     down a log would spend. AN AGENT IS `AgentFace` (AGT-13): its maker's mark, or its kind's glyph in its run's hue, where the caller
      names the run, at the size a line of text takes and the list size for a page's own. -->
 {#if drawn === 'agent'}
   <AgentFace agent={name} run={run ?? ''} {live} size={size === 'l' ? 'm' : 's'} />

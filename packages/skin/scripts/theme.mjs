@@ -31,6 +31,7 @@ import {
   ALPHA,
   ALPHA_HIGH_CONTRAST,
   brand,
+  agentColours,
   toCSS,
   validate,
   refusals,
@@ -126,10 +127,10 @@ const mailPalette = (theme) => {
  * write it, so `recordTheme`'s adopted block cannot carry it, and only this script can.
  */
 const ARTEFACTS = [
-  { path: join(skin, 'house.css'), text: toCSS(HOUSE, HIGH_CONTRAST) + brand(HOUSE.schemes.light.accent) },
+  { path: join(skin, 'house.css'), text: toCSS(HOUSE, HIGH_CONTRAST) + brand(HOUSE.schemes.light.accent) + agentColours() },
   {
     path: join(skin, 'alpha.css'),
-    text: toCSS(ALPHA, ALPHA_HIGH_CONTRAST) + brand(ALPHA.schemes.light.accent),
+    text: toCSS(ALPHA, ALPHA_HIGH_CONTRAST) + brand(ALPHA.schemes.light.accent) + agentColours(),
   },
   { path: join(root, 'apps/web/static/mark.svg'), text: favicon(HOUSE.schemes.light.accent) },
   { path: join(root, 'apps/site/static/mark.svg'), text: favicon(HOUSE.schemes.light.accent) },

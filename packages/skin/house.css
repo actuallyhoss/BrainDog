@@ -558,3 +558,10 @@
     --brand: #db2527;
   }
 }
+
+@layer theme {
+  html {
+    --agent-claude: #d97757;
+    --agent-gemini: #3186ff;
+  }
+}

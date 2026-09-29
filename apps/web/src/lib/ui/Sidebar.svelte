@@ -40,6 +40,8 @@
   import type { NavEntry } from '../record/api.ts';
   import Icon, { type IconName } from './Icon.svelte';
   import IconWell from './IconWell.svelte';
+  import AgentMark from './AgentMark.svelte';
+  import { isMarked } from './agent-marks.ts';
   import Kbd from './Kbd.svelte';
   import Mark from './Mark.svelte';
   import { palette } from '../palette/open.svelte.ts';
@@ -327,7 +329,7 @@
               >
                 <span class="face" data-quiet={w.quiet ? '' : undefined} aria-hidden="true">
                   <svg class="ring" viewBox="0 0 28 28" focusable="false"><circle cx="14" cy="14" r="13" /></svg>
-                  <span class="face-disc"><Icon name={w.glyph} size="s" /></span>
+                  <span class="face-disc" data-marked={isMarked(w.kind) ? '' : undefined}><AgentMark kind={w.kind} size="s" /></span>
                 </span>
                 <span class="item-name" aria-hidden="true">{name}</span>
                 {#if took}<span class="tally num" aria-hidden="true">{took}</span>{/if}
@@ -931,6 +933,13 @@
     background: var(--ink2);
     border-radius: var(--r-pill);
     color: var(--on-ink);
+  }
+
+  /* A MAKER'S MARK ON A PLAIN DISC, in its own colours (`AgentMark`): an ink disc would turn Codex's black knot to nothing. */
+  .face-disc[data-marked] {
+    background: var(--bg);
+    box-shadow: inset 0 0 0 1px var(--line);
+    color: var(--ink);
   }
 
   /* ── The foot ─────────────────────────────────────────────────────────── */

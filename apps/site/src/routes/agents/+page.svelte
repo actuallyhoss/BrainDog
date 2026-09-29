@@ -19,6 +19,8 @@
   `test/content.test.ts` holds to `packages/mcp`, and the reach chart is the order the ways are listed in.
 -->
 <script lang="ts">
+  import AgentMark from '$lib/AgentMark.svelte';
+  import { markedOf } from '$lib/agent-marks.ts';
   import Icon from '$lib/Icon.svelte';
   import Mark from '$lib/Mark.svelte';
   import type { IconName } from '$lib/icons.ts';
@@ -69,8 +71,9 @@
         <figure class="scene" role="img" aria-label={v.drawn.label}>
           <ul class="crew">
             {#each v.drawn.crew as one (one.name)}
+              {@const m = markedOf(one.name)}
               <li class="worker">
-                <span class="face">{one.face}</span>
+                <span class="face" data-marked={m ? '' : undefined}>{#if m}<AgentMark agent={m} />{:else}{one.face}{/if}</span>
                 <span class="worker-text">
                   <span class="who">{one.name}</span>
                   <span class="did">{one.did}</span>
@@ -361,7 +364,7 @@
     border-radius: var(--r-md);
   }
 
-  /* An agent's face is a circle (SYSTEM §2), in the second ink with its initials. */
+  /* An agent's face is a circle (SYSTEM §2): its maker's mark on a plain disc, or its initials in the second ink. */
   .face {
     display: grid;
     flex: none;
@@ -373,6 +376,12 @@
     color: var(--on-ink);
     font-size: var(--t-xs);
     font-weight: 600;
+  }
+
+  .face[data-marked] {
+    background: var(--bg);
+    box-shadow: inset 0 0 0 1px var(--line);
+    color: var(--ink);
   }
 
   .worker-text {
