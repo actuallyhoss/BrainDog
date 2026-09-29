@@ -192,10 +192,10 @@ const OUT = {
       quartz: '`POSTAL`, "Quartz Apps LLC, c/o Cloud Peak Law, ...": the company that runs BrainDog, printed under every letter as the sender a mail law asks for, never a branch on a use case.',
     },
   },
-  'packages/seed/src/packs/changelog.ts': {
+  'packages/seed/src/changelog.ts': {
     why: 'a module\'s own changelog, read on its detail page: prose about what shipped, not a branch on a use case (2 hits).',
     words: {
-      registrar: 'people 2.0.0\'s and money-core 1.3.0\'s notes name the role value People stopped offering, the same way the site\'s changelog names history.',
+      registrar: 'people 2.0.0\'s and estate 1.3.0\'s notes name the role value People stopped offering, the same way the site\'s changelog names history.',
     },
   },
 };

@@ -9,3 +9,7 @@ export const title = 'The the old tool import says what it could not carry, inst
 /* THE LEAK. Before the entry was narrowed it exempted all ten words for the whole site, and this line
    read green: a bank's slug is not the changelog, and nothing about the site's reason covers it. */
 export const BANK = 'bank-hsbc-eg';
+
+/* AND THE THIRD: the home page names the Mercury pack as it names Stripe, so the site's entry holds `mercury` too, and
+   a tree with the site in it and no such line would read that word as idle. */
+export const packsLine = 'Or start from a pack: Money, Work, Stripe, Mercury and more.';

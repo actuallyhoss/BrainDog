@@ -308,6 +308,12 @@ export default async function cssRules(root = process.cwd()) {
 
     // Inline `style="--x: …"` in a template declares a custom property too.
     for (const m of text.matchAll(/style=["'][^"']*?--([a-z-]+)\s*:/gi)) declared.add(`--${m[1]}`);
+    /* AND SO DO SVELTE'S OTHER TWO SPELLINGS of the same thing: the `style:--x={…}` directive, and a string handed to
+       `style={…}` that a script built (`` `--pair-fg: ${…}` ``). Each is a declaration the browser sees; reading only the
+       quoted attribute called five real properties unknown. Only a property whose value is interpolated (`--x: ${`),
+       which is a template building a style and nothing else. */
+    for (const m of text.matchAll(/style:--([a-z0-9-]+)\s*=/gi)) declared.add(`--${m[1]}`);
+    for (const m of text.matchAll(/--([a-z0-9-]+)\s*:\s*\$\{/gi)) declared.add(`--${m[1]}`);
 
     /* `52 §5.2` ROW 7, FIRST HALF. A literal `size="…"` on the markup, not the value of a template
        expression. `size={x}` is computed at runtime and this gate reads source, not output, so it is
@@ -429,8 +435,9 @@ export default async function cssRules(root = process.cwd()) {
           findings.push({ where, rule: 'ellipsis-on-flex', text: `${d.prop}: ${d.value}` });
 
         // 13 §2.4 check C's usage half: `faint` clears only the LARGE-text floor, so it may not carry
-        // text below 24px. The palette half is the theme validator's.
-        if (d.prop === 'color' && /--faint/.test(d.value))
+        // text below 24px. The palette half is the theme validator's. A rule that sets one of the steps at or above
+        // 24 (`--t-title` 28, `--t-figure` 30, `--t-lead` 34) is the large text the floor is for, so it may.
+        if (d.prop === 'color' && /--faint/.test(d.value) && !/font-size:\s*var\(--t-(?:title|figure|lead)\)/.test(blockOf(text, d.at)))
           findings.push({ where, rule: 'faint-on-text', text: `${d.prop}: ${d.value}` });
       }
 

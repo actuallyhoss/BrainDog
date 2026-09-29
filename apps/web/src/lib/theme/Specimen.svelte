@@ -163,7 +163,7 @@
   .spec-faint {
     margin: 0;
     color: var(--faint);
-    font-size: var(--t-xl);
+    font-size: var(--t-title);
   }
 
   .spec-intents {
