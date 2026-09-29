@@ -1,6 +1,6 @@
 /**
- * `braindog skills sync` against a stub record on node:http: every row of the conflict table in
- * `loop/research-agent-path.md` §5.4, the name rule, the lock file, the dry run, and the start hook's sync.
+ * `braindog skills sync` against a stub record on node:http: every row of the sync conflict
+ * table, the name rule, the lock file, the dry run, and the start hook's sync.
  *
  * EVERY FOLDER IS A TEMPORARY ONE. The home folder, the Claude config folder and the repository are made per test and
  * removed after it, so nothing here reads or writes this machine's own skills.

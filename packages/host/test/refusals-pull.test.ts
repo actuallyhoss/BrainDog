@@ -6,7 +6,7 @@
  * `40 §6` gives the whole family to `connect/test`, and that would have called these two wrong.
  * `runPull` raises `PULL_ORIGIN_REFUSED` and `PULL_REQUEST_REFUSED` with an address; this loop
  * answers `{ code, fix }` and nothing else, because an action's outcome is written on a run and not
- * handed back to a caller with a path into their input. Measured on September 22nd 2026:
+ * handed back to a caller with a path into their input. Measured:
  * `pull-origin-refused.yaml`, shaped as a connector and driven through `runPull` by
  * `packages/connect/test/refusals-pull.test.ts`, answered `at: fetch.page[1]` where the fixture
  * claims none. The fixture was right about the site it names, so it was reshaped to reach that site

@@ -19,14 +19,13 @@ import { readHosts } from '../src/http.ts';
 import { ANY_HOST, login, sameMachine } from '../src/login.ts';
 
 /**
- * Production's `PUBLIC_HOST`, read off `apps/worker/wrangler.jsonc` with the deploy checker's own parser.
+ * Production's `PUBLIC_HOST`, read off `apps/worker/wrangler.jsonc` with the deploy check script's own parser.
  *
  * THE LOGIN EXAMPLE IS THE ONE ADDRESS A PERSON COPIES, AND ONLY ONE HOST STARTS A DEVICE THERE. `POST /auth/device`
- * checks that the name a request came by is `PUBLIC_HOST` (`packages/host/src/device.ts`), and with push B2's vars
- * `app.brain.dog` answered 403 "This BrainDog signs devices in at https://brain.dog, so start there"
- * (`loop/research-one-domain-binding.md` section 2.4). The example said `app.brain.dog` and promised it "signs in on
- * both sides", and nothing here read the file that made that false, so the tests stayed green through the flip. A
- * runtime specifier, because the script has no declaration and a static import of it does not typecheck.
+ * checks that the name a request came by is `PUBLIC_HOST` (`packages/host/src/device.ts`), and with the production vars
+ * `app.brain.dog` answered 403 "This BrainDog signs devices in at https://brain.dog, so start there". The example
+ * said `app.brain.dog` and promised it "signs in on both sides", and nothing here read the file that made that
+ * false, so the tests stayed green through the flip. A runtime specifier, because the script has no declaration and a static import of it does not typecheck.
  */
 const checker = new URL('../../worker/scripts/provision-check.mjs', import.meta.url).href;
 const { wranglerConfig } = (await import(checker)) as { wranglerConfig: () => { env?: { [name: string]: { vars?: { [key: string]: string } } } } };
@@ -120,7 +119,7 @@ test('APPROVED: pending twice, then the token kept in the hosts file, the defaul
 });
 
 test('THE APP\'S ADDRESS FOR A RECORD, <host>/app/<slug>, POSTS THE SLUG AND KEEPS THE LOGIN UNDER <host>/<slug>', async (t) => {
-  /* `loop/research-one-domain.md` Brief D. The whole pathname used to be the slug, so the address the app now prints
+  /* The whole pathname used to be the slug, so the address the app now prints
      sent `app/acme`, which no Directory holds, and the sign-in failed with "Name a record this BrainDog holds". */
   const host = await stub(t, () => granted);
   const out = await run(t, `${host.base}/app/acme`);

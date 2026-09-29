@@ -1,7 +1,7 @@
 /**
  * Slash's own SQLite outlives the process (`src/server.ts`, `slashSql`).
  *
- * `loop/research-spark-seam.md` found it opened as `:memory:` on every self-host, so the `settings` row and the
+ * It was opened as `:memory:` on every self-host, so the `settings` row and the
  * `call` ledger of `46 §4.1` began again at every restart. The ledger is what the month's meter counts: a
  * process restarted twice a day forgot every ask it had been made, and on tier `a` the cap of 80 was a cap per
  * uptime and not per month. The comment above the line called the tables a cache, which they are not: a cache
@@ -13,7 +13,7 @@
  * ledger is still the thing that was being thrown away and the thing the meter is counted from, so it is what
  * this test holds. The day a `propose` door is mounted here, its rows land in the same table and the same file.
  *
- * RED BEFORE THE FIX, MEASURED ON 22 SEPTEMBER: both asks answered 200 and `slash.sqlite` did not exist, so
+ * RED BEFORE THE FIX, MEASURED: both asks answered 200 and `slash.sqlite` did not exist, so
  * the second process had no way to know the first had been asked anything.
  *
  * THE MODEL IS THE ONLY DOUBLE: a real `start`, a real socket, a real record on disk, restarted on the same file.
@@ -86,7 +86,7 @@ test('AN ASK SURVIVES A RESTART: the call ledger the month is metered from is on
   }
 });
 
-/* DELETING THE RECORD TAKES SLASH'S FILE WITH IT, on both of `destroy`'s paths. Measured on 22 September with the
+/* DELETING THE RECORD TAKES SLASH'S FILE WITH IT, on both of `destroy`'s paths. Measured with the
    `slashSql.close()` in `destroy` removed: on Windows both cases below failed, because an open handle held
    `slash.sqlite` and `rmSync` with `force` left it, and its directory, behind without a word. `record.sqlite` is
    the path that removes named files; `record.brain` is the path that removes the directory whole. */

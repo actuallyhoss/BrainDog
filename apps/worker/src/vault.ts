@@ -1,6 +1,6 @@
 /**
- * The Worker's vault step: `/api/vault/deposit` and `/api/vault/open`. `loop/research-agent-path.md` §5.7,
- * `12 §6` rule 9, ADR-062.
+ * The Worker's vault step: `/api/vault/deposit` and `/api/vault/open`. `12 §6` rule 9,
+ * ADR-062.
  *
  * WITHOUT `env.KEK` BOTH DOORS CHECK THE VAULT GRANT AND THEN ANSWER `NOT_IN_THIS_BUILD`. The grant is checked first,
  * with the record's `vaultGrant` and never `verifyToken`, so a login token is refused here exactly as on the
@@ -63,7 +63,7 @@ export type KeyDeps = {
     by: By,
     hints: SessionHints,
     seal: (target: SealTarget) => Promise<Result<Sealed>>,
-    /* SET BY THE DEPOSIT DOOR ALONE, for a login token it checked itself (`loop/finish/agents.md` C1). */
+    /* SET BY THE DEPOSIT DOOR ALONE, for a login token it checked itself. */
     opts?: { agentDeposit?: true | undefined },
   ): Promise<Result<Deposited>>;
   openForGrant(
@@ -88,7 +88,7 @@ export type KeyDeps = {
 export type GrantDeps = {
   knows(record: string): Promise<boolean>;
   vaultGrant(record: string, bearer: string): Promise<Result<VaultGrantSeen>>;
-  /** An agent's login token at the deposit door: the record it names and the context /api builds for it (`loop/finish/agents.md` C1). */
+  /** An agent's login token at the deposit door: the record it names and the context /api builds for it. */
   token?: ((request: Request) => Promise<Result<{ record: string; ctx: CallContext }>>) | undefined;
   keys?: KeyDeps | undefined;
 };
@@ -286,7 +286,7 @@ export function serveWorkerVault(request: Request, deps: GrantDeps): Promise<Res
       return out;
     },
     /* A LOGIN TOKEN'S RECORD IS THE ONE ITS OWN CHECK NAMED, held as a grant's is, so the key is sealed for that record
-       and no other (`loop/finish/agents.md` C1). */
+       and no other. */
     ...(token === undefined
       ? {}
       : {

@@ -22,10 +22,10 @@ import { DurableObject } from 'cloudflare:workers';
 
 import { handlersFor, hintsOf, httpStatus, serveApi, serveIngest, serveSlash, servesSlash, withSession, type SessionHints, type SlashAskDoor, type VaultGrantSeen } from '@braindog/host';
 import { deriveSessionKey, relyingParty, serveAccount, serveAuth, type DeviceDoor, type EmailDoor, type InviteDoor, type Provisioned } from '@braindog/host/auth';
-/* SIGN-UP (`loop/finish/ops.md` OPS-17): its three routes are answered in `signIn()` before `serveAuth`. */
+/* SIGN-UP: its three routes are answered in `signIn()` before `serveAuth`. */
 import { clearCookie, cookieMode, mirrorEverywhere, readSid, renameAsked, renamedName, sameOrigin, sessionCookie } from '@braindog/host/auth';
 import type { AccountCall, SignupCall } from '@braindog/ports';
-/* CLOSING AN ACCOUNT (OPS-21): the door is the host package's, and `account()` hands it this Worker's halves. */
+/* CLOSING AN ACCOUNT: the door is the host package's, and `account()` hands it this Worker's halves. */
 import { CLOSE_RECORDS_MOST, closeDoor } from '@braindog/host/auth';
 import type { AccountClosed } from '@braindog/ports';
 import { gate, serveMcp as answerMcp, unauthorized as unknownAgent } from '@braindog/mcp/http';
@@ -58,7 +58,7 @@ import { slashReplay, workerSlashMeter } from './slash-meter.ts';
 import { workerModelJobs } from './slash-jobs.ts';
 import { workerCatalogueOffers } from './catalogue.ts';
 import { serveKennel, servesKennel, writeCounts } from './kennel.ts';
-/* MAIL ON THE CLOUD (DOR-7): Email Routing's messages into the same door as a forwarder's post. */
+/* MAIL ON THE CLOUD: Email Routing's messages into the same door as a forwarder's post. */
 import { fileKeeper, takeMail } from './email.ts';
 import { fileKey, serveFiles, servesFiles } from './files.ts';
 import { cloudSnapshots, type Pitr } from './copies.ts';
@@ -98,18 +98,18 @@ import { claimIdle, holdClaim, runnerContext } from '@braindog/host';
 import { recordOf } from './route.ts';
 import { validFromOf } from './cut-off.ts';
 import type { Verified } from '@braindog/kernel';
-/* THE FRONT DOORS (`loop/finish/ops.md` OPS-4): a crash answered by reference, the limiter, the guard in front of every
+/* THE FRONT DOORS: a crash answered by reference, the limiter, the guard in front of every
    statement, and the JSON lines. */
 import { crashed } from '@braindog/host';
 import { bindingLimiter, classOf, limitKey, refusedFor, type LimitClass, type LimitDoor, type RateLimitBinding } from '@braindog/host/limits';
 import { codeOf, guarded } from '@braindog/ports';
 import { KERNEL_MIGRATION, type Ack } from '@braindog/kernel';
 import { doorPath, op, outboxFields, type AckedRow } from './oplog.ts';
-/* BILLING (`loop/finish/ops.md` OPS-13): the account's four billing doors, and the Stripe client they call through. */
+/* BILLING: the account's four billing doors, and the Stripe client they call through. */
 import { billingDoors, type BillingDeps } from './billing.ts';
 import { billingKey } from './billing.ts';
 import { stripeOf } from './stripe.ts';
-/* TELEMETRY (`loop/finish/ops.md` OPS-23): one Analytics Engine point per request, when `TELEMETRY` is bound. */
+/* TELEMETRY: one Analytics Engine point per request, when `TELEMETRY` is bound. */
 import { telemetry } from './telemetry.ts';
 
 /** What a record answers between arming a restore and being reset: the gap between `51 D15`'s two calls. */
@@ -302,14 +302,14 @@ type Env = {
   /** The version poll's own budget, 240 a minute (`POLL_PER_MINUTE`). Unbound, the poll spends `RL_READ`. */
   RL_POLL?: RateLimitBinding;
   /**
-   * Cloudflare Turnstile on the sign-up page (`loop/finish/ops.md` OPS-17): the site key a var the page is handed, the
+   * Cloudflare Turnstile on the sign-up page: the site key a var the page is handed, the
    * secret a secret `signIn()` checks each answer with. Either unset, and sign-up runs on the Directory's lockouts alone.
    */
   TURNSTILE_SITE_KEY?: string;
   TURNSTILE_SECRET?: string;
   /**
    * The Analytics Engine dataset one point per request goes to (`telemetry.ts`, `51 §5.18`). Drafted and commented in
-   * `wrangler.jsonc` until his H5, and unbound is no point written; with it bound, a point also needs `SESSION_SECRET`.
+   * `wrangler.jsonc` until the owner decides, and unbound is no point written; with it bound, a point also needs `SESSION_SECRET`.
    */
   TELEMETRY?: AnalyticsEngineDataset;
 };
@@ -328,8 +328,8 @@ function storageSql(storage: DurableObjectStorage): Sql {
    * `node:sqlite` returns to the self-host. Without it `encode` in `packages/kernel/src/brainl.ts` wrote each
    * `ArrayBuffer` as `{}`, so every export and every nightly copy this Worker made held the rows and none of the vault:
    * signed, its manifest hashing the `{}`, and restored into another object as the text `[object Object]` with `ok`.
-   * `base64` in `vault.ts` read `length` off the same buffer and handed a leased connector `""`
-   * (`loop/research-batch-forty-five-audit.md` §1). THE R2 COPIES MADE BEFORE THIS LINE CARRY NO VAULT, and `decode`
+   * `base64` in `vault.ts` read `length` off the same buffer and handed a leased connector `""`.
+   * THE R2 COPIES MADE BEFORE THIS LINE CARRY NO VAULT, and `decode`
    * now refuses them at import with `FILE_MALFORMED` at the column, rather than restoring them in silence.
    */
   const bytesIn = (row: Record<string, unknown>): Row => {
@@ -449,8 +449,7 @@ function loggingAcks(api: RecordApi, sql: Sql): void {
  * The record's `/mcp`, with `_meta.session` checked as the session headers were and put on the context
  * over them, key by key. The headers' hints are already on `ctx`: `inward` put them there.
  */
-/* `origin` IS WHERE THIS HOST SERVES THE APP, the start of a filed question's `decide` link (`loop/finish/contracts.md`
-   §6.3): the configured `PUBLIC_HOST` and never the request's own URL. Unset, it is left out, and so is the link. */
+/* `origin` IS WHERE THIS HOST SERVES THE APP, the start of a filed question's `decide` link: the configured `PUBLIC_HOST` and never the request's own URL. Unset, it is left out, and so is the link. */
 const serveMcp = (request: Request, api: RecordApi, ctx: CallContext, origin?: string): Promise<Response> =>
   answerMcp(request, api, ctx, { session: (c, said) => withSession(c, hintsOf(said)), ...(origin ? { origin } : {}) });
 
@@ -487,7 +486,7 @@ export class Record$ extends DurableObject<Env> {
    *
    * SET AT THE ARM, BY `#arming`, AND NOT WHEN `restore` ANSWERS. It was set on the answer, and `copies.ts` puts its
    * receipt to R2 after arming: an input gate stays shut for this object's storage and not for a bucket, so a request
-   * can arrive inside that put. Measured by the checker: a `setPref` sent from inside it was answered 200
+   * can arrive inside that put. Measured: a `setPref` sent from inside it was answered 200
    * (`test/restore-in-do.test.ts`, the receipt being put).
    */
   #armed = false;
@@ -574,7 +573,7 @@ export class Record$ extends DurableObject<Env> {
   #scripts = new ScriptRuns();
 
   /**
-   * The record's own switch, set by the account door over RPC (`loop/finish/ops.md` §4.0 F): while it is on, the
+   * The record's own switch, set by the account door over RPC: while it is on, the
    * record's alarm runs the drain and nothing else, and the queue's pump sends no digest. The doors cap callers from
    * the Directory's row (`session.ts`), so this is the object's half and not a second answer to who may write.
    *
@@ -686,7 +685,7 @@ export class Record$ extends DurableObject<Env> {
           app: this.env.BRAINDOG_BUILD ?? '',
           slash: slashModel !== undefined,
           /* `boot` SAYS WHICH HOST THIS IS, because billing told the Cloud from a self-host by whether
-             `/api/inbound/mint` answered 404 (`loop/research-held-landing.md` friction 5). This Worker is
+             `/api/inbound/mint` answered 404. This Worker is
              the Cloud and nothing else, so it is a constant and not a binding. */
           host: 'cloud',
         },
@@ -746,7 +745,7 @@ export class Record$ extends DurableObject<Env> {
         /* AN INVITATION IS SPENT BY SIGNING IN, and nobody signs in here without the Directory's key. */
         invitations: () => ((this.env.SESSION_SECRET ?? '').length >= 32 ? null : INVITES_OFF),
         ...(copies === undefined ? {} : { snapshots: copies }),
-        /* DELETION, `51 §5.13`, in `loop/research-restore.md` §5's order: a final copy, every other object under the
+        /* DELETION, `51 §5.13`, in this order: a final copy, every other object under the
            record's prefix, the alarm, the bytes, the names. The record has checked the owner, the sign-in and the typed
            name, and no request is answered in between. Measured before the bucket was passed: 2 objects under the prefix
            before and 2 after, for good, because the walk lists open records only. KEPT ON THE OBJECT TOO, so the nightly
@@ -786,7 +785,7 @@ export class Record$ extends DurableObject<Env> {
         }
       /* EVERY ACK FROM HERE ON WRITES ITS `outbox` LINE, and the first open of this build says so once (`#booted`). */
       loggingAcks(api, sql);
-      /* AN ERASURE REACHES SLASH'S LEDGER TOO, in this same storage (`slashErasing`, `loop/finish/contracts.md` §7.2). */
+      /* AN ERASURE REACHES SLASH'S LEDGER TOO, in this same storage (`slashErasing`). */
       slashErasing(api, sql);
       await this.#booted(api);
     });
@@ -835,7 +834,7 @@ export class Record$ extends DurableObject<Env> {
   override async alarm(): Promise<void> {
     if (this.#gone || this.#armed) return;
     const api = await this.#record();
-    /* A LAPSED RECORD RUNS THE DRAIN AND NOTHING ELSE (`loop/finish/ops.md` OPS-14): its reminders still land, and no
+    /* A LAPSED RECORD RUNS THE DRAIN AND NOTHING ELSE: its reminders still land, and no
        connector, call, poll, script, automation or Slash ask starts. An automation run that has not started waits under
        the lapse's sentence, which is the record's one message about it; no run writes a held event of its own. The
        hold is handed in before the drain, which is where a run starts, and on the first alarm after the lapse ends
@@ -886,7 +885,7 @@ export class Record$ extends DurableObject<Env> {
   }
 
   /**
-   * The record's model jobs, a pattern's draft and a digest's two sentences, served after the questions (`contracts.md` X8).
+   * The record's model jobs, a pattern's draft and a digest's two sentences, served after the questions.
    *
    * AFTER `#ask`, because an automation's question is a run waiting and a draft is a proposal nobody is waiting on. The
    * pass is `@braindog/host`'s `serveModelJobs`, the one the self-host's `poll` calls too, spent from the background
@@ -944,7 +943,7 @@ export class Record$ extends DurableObject<Env> {
    * The scheduled actions due on this record: `pull`, `call` and `poll`, sent from this alarm (`09 §1`).
    *
    * AFTER THE DRAIN, so a row the drain just fired is a job this pass leases, and a retry the drain just released is
-   * one too. `ALARM_RUNS` keeps one alarm inside `research-scheduled-actions` §2.3's ceilings, and `runActions` tails
+   * one too. `ALARM_RUNS` keeps one alarm inside the platform's ceilings, and `runActions` tails
    * the alarm when it is done, so work left over sets the next one.
    *
    * THE KEY STORE ONLY WHEN `KEK` IS BOUND. Unbound, an action that names a key sends nothing and its run event says
@@ -964,7 +963,7 @@ export class Record$ extends DurableObject<Env> {
       /* THE DIRECTORY'S LEDGER, OVER RPC: asked before each run, and told every run the pass metered. A record on the
          hosted plan at its monthly allowance answers `held`, sends nothing, and waits for the first of next month. */
       const ledger = this.env.DIRECTORY.get(this.env.DIRECTORY.idFromName('directory'));
-      /* AND THE RECORD'S AUTOMATIONS WAIT AT THE SAME ALLOWANCE (`loop/finish/decisions.md` C34), asked of the same ledger
+      /* AND THE RECORD'S AUTOMATIONS WAIT AT THE SAME ALLOWANCE, asked of the same ledger
          at most every `RUNS_HOLD_EVERY_MS` and handed to the kernel, which leaves a run it would start `pending` with the
          sentence on it. For the drain of the next alarm, because this one's has already run. A question that cannot be
          asked holds nothing, and a hold the kernel will not take is logged, so the actions below run either way. */
@@ -1010,7 +1009,7 @@ export class Record$ extends DurableObject<Env> {
            counted by the nightly walk from the record's own events (`meterPass`, `meterReplay`). */
         const lost = await meterPass((r, run) => ledger.meter(r, run), record, out.usage);
         if (lost > 0) console.error(`actions: ${String(lost)} of ${String(out.usage.length)} runs were not counted; the nightly walk counts them from this record's events.`);
-        /* THE OWNER'S ONE NOTE AT 80% AND ONE WHEN FIRST HELD (MTR-2): asked after this pass is metered, so the note is
+        /* THE OWNER'S ONE NOTE AT 80% AND ONE WHEN FIRST HELD: asked after this pass is metered, so the note is
            about what the month now holds. The Directory decides and deduplicates; only the Worker can reach the owner. */
         const told = await noticePass(
           (r) => ledger.notice(r),
@@ -1055,7 +1054,7 @@ export class Record$ extends DurableObject<Env> {
     const record = api.kernel.identity()?.id;
     if (!record) return null;
     const ledger = this.env.DIRECTORY.get(this.env.DIRECTORY.idFromName('directory'));
-    /* AND SLASH'S ASKS BY DAY INTO THE ACCOUNT'S LEDGER (`slashReplay`, MTR-3), from this object's own `slash_call`. It logs what it could not hand across and never throws, so the runs below are replayed whatever it answered. */
+    /* AND SLASH'S ASKS BY DAY INTO THE ACCOUNT'S LEDGER (`slashReplay`), from this object's own `slash_call`. It logs what it could not hand across and never throws, so the runs below are replayed whatever it answered. */
     await slashReplay(guardedSql(this.ctx.storage), record, (r, days) => ledger.meterSlash(r, days), Date.now());
     return replayUsage({
       record,
@@ -1066,7 +1065,7 @@ export class Record$ extends DurableObject<Env> {
   }
 
   /**
-   * The packs this record has on, by the id it holds each under: the nightly walk's install counts (`nightly.ts`, PLT-15).
+   * The packs this record has on, by the id it holds each under: the nightly walk's install counts (`nightly.ts`).
    * AN RPC AND NEVER A ROUTE. `null` for a record deleted, refused by this build, or not yet made. A pack another pack
    * handed declarations to was never installed, so it is not counted.
    */
@@ -1192,7 +1191,7 @@ export class Record$ extends DurableObject<Env> {
   /**
    * This record's own id (`rec_<ulid>`), for a transport that is handed only the Durable Object's hex id.
    *
-   * AN RPC AND NEVER A ROUTE: `drainOutbox`'s `erase` transport keys `BLOBS` by the record id (`fileKey`, OPS-20), and
+   * AN RPC AND NEVER A ROUTE: `drainOutbox`'s `erase` transport keys `BLOBS` by the record id (`fileKey`), and
    * the queue's doorbell and the object's own storage address both carry the hex id, never this one.
    */
   async recId(): Promise<string | null> {
@@ -1397,7 +1396,7 @@ export class Record$ extends DurableObject<Env> {
    *
    * AND THE LISTS, WHEN THERE IS NO LEVEL. This answered `access(person)?.level ?? null`, which is
    * `null` for a colleague invited to one list, so `switcherRows` dropped the record that had just
-   * admitted them (`research-invite-landing.md` finding 2). `switcherAsk` is shared with the self-host
+   * admitted them. `switcherAsk` is shared with the self-host
    * so the two cannot drift back apart.
    */
   async switcherRow(person: string): Promise<SwitcherAsk> {
@@ -1407,7 +1406,7 @@ export class Record$ extends DurableObject<Env> {
   }
 
   /**
-   * A name or address the Directory has already moved, carried into this record's own mirror of the person (GAP-7).
+   * A name or address the Directory has already moved, carried into this record's own mirror of the person.
    * `renamedEverywhere` and the account's email doors reach every record a person belongs to over this RPC, because on
    * the Worker the record method has no Directory to ask for the other records itself (`deps.directory` is `null`).
    */
@@ -1527,7 +1526,7 @@ export class Record$ extends DurableObject<Env> {
    * only the sealed bytes `seal` returns, which is ADR-062 across the RPC boundary.
    *
    * `opts.agentDeposit` IS SET BY THE WORKER'S DEPOSIT DOOR ALONE, for a login token it checked itself, and never read
-   * from a request (`loop/finish/agents.md` C1). The record then adds a new key in the token's run's project and
+   * from a request. The record then adds a new key in the token's run's project and
    * refuses to replace one.
    */
   async depositGrant(
@@ -1544,7 +1543,7 @@ export class Record$ extends DurableObject<Env> {
 
   /**
    * A runner's bearer, checked against this record's own device grants: the context of the machine it names, or
-   * `null` when it is not a runner's (`loop/finish/agents.md` C13). AN RPC AND NEVER A ROUTE, like `verify`, and for
+   * `null` when it is not a runner's. AN RPC AND NEVER A ROUTE, like `verify`, and for
    * its reason: only the object holding the grant table can say whether the bearer is in it. THE CUT-OFF TOO, as
    * `operationGrant` and `verify` take it: a machine enrolled before `TOKENS_VALID_FROM` is one nobody enrolled.
    */
@@ -1678,9 +1677,8 @@ export class Record$ extends DurableObject<Env> {
     }
 
     /**
-     * SLASH'S ASK, AND THIS BRANCH IS THE WHOLE OF WHAT WAS MISSING. Three passes added the dependency, then
-     * the builder, then the door, and each reported that the thirteenth package was reached; an audit drove it
-     * each time and found the only callers were the tests naming them. `slash.ts` says where the mount belongs
+     * SLASH'S ASK, AND THIS BRANCH IS THE WHOLE OF WHAT WAS MISSING. The dependency, the builder and the door
+     * were each added without it, and driving the door found the only callers were the tests naming them. `slash.ts` says where the mount belongs
      * in its own words, and this is that place: beside `servesMcp`'s branch and before `serveApi`, because
      * `servesApi` is a prefix test and `/api/slash/read` reaches this object already, where `serveApi` would
      * answer it `ROUTE_UNKNOWN: There is no method called slash/read.`
@@ -1695,8 +1693,7 @@ export class Record$ extends DurableObject<Env> {
       if (ctx.principal.kind !== 'person') return json({ ok: false, refusal: NO_SLASH_TOKEN }, 403);
       /* AND A SIGNED-IN PERSON, NOT MERELY A PERSON. The public demo's context was a person too, `p_demo` at `read`,
          and this lock answered it 200 with one model call, which on a live host opens the owner's `slash` key and
-         spends the record's `ask_cap` for somebody who never signed in (`loop/research-batch-seventeen-audit.md`
-         finding 5, `test/slash-demo.test.ts`). The demo is gone and the lock stays: the object is where the record
+         spends the record's `ask_cap` for somebody who never signed in (`test/slash-demo.test.ts`). The demo is gone and the lock stays: the object is where the record
          decides who is asking, and a session's context says `credentialed: true`, so anything short of it is not one. */
       if (ctx.credentialed !== true) return json({ ok: false, refusal: NO_SLASH_UNSIGNED }, 403);
       this.#slash ??= workerSlashDoor(
@@ -1709,7 +1706,7 @@ export class Record$ extends DurableObject<Env> {
     }
 
     /* SLASH'S DAILY LOOK, beside the answer and not in its way: the record says whether it is due, at most once a UTC day.
-       NEVER WHILE LAPSED (`loop/finish/ops.md` OPS-14): no Slash ask starts on a lapsed record, and the alarm already
+       NEVER WHILE LAPSED: no Slash ask starts on a lapsed record, and the alarm already
        skips this call for the same reason, so a read must skip it too. */
     /* BUT NEVER FOR THE VERSION POLL. An open tab asks `/api/version` every 1.5 s while it has focus
        (`apps/web/src/lib/data/live.ts`), and the poll is the one call that must stay one `MAX(rowid)`: a daily look
@@ -1768,7 +1765,7 @@ export class Directory$ extends DurableObject<Env> {
     const mac = this.#mac;
     const host = this.env.PUBLIC_HOST ?? '';
     /* `RP_ID` NAMES A PARENT OF THE HOST, so a passkey made at `app.brain.dog` is still offered at `brain.dog` once the
-       app moves there (`loop/research-one-domain.md` §3.0). A name the host is not under is no passkeys at all rather
+       app moves there. A name the host is not under is no passkeys at all rather
        than a ceremony every browser fails, and unset is the exact host, which is what this was. */
     const rp = host ? relyingParty(`https://${host}`, this.env.RP_ID) : null;
     this.#dir = createDirectory(
@@ -1848,7 +1845,7 @@ export class Directory$ extends DurableObject<Env> {
   }
 
   /**
-   * The note this record's owner is owed about its month, once, or `null` when nothing is owed (MTR-2). A record's
+   * The note this record's owner is owed about its month, once, or `null` when nothing is owed. A record's
    * alarm asks after each pass it meters (`noticePass` in `@braindog/host/actions`), which decides who is told.
    */
   notice(record: string): UsageNotice | null {
@@ -1866,7 +1863,7 @@ export class Directory$ extends DurableObject<Env> {
     return this.#directory().meterMany(record, runs);
   }
 
-  /** A record's Slash asks by UTC day, at most `SLASH_DAYS` of them: the nightly walk's call through `Record$.meterReplay` (MTR-3). */
+  /** A record's Slash asks by UTC day, at most `SLASH_DAYS` of them: the nightly walk's call through `Record$.meterReplay`. */
   meterSlash(record: string, days: readonly SlashDay[]): Result<SlashTally> {
     return this.#directory().meterSlash(record, days);
   }
@@ -1878,7 +1875,7 @@ export class Directory$ extends DurableObject<Env> {
 
   /**
    * Who pays for which record, and whether it has lapsed: `createDirectory`'s `billing` group, one RPC for all of it,
-   * as `auth` is for sign-in (`loop/finish/ops.md` 4.0 B).
+   * as `auth` is for sign-in.
    *
    * THE WEBHOOK AND THE NIGHT WRITE THROUGH IT AND NOTHING ELSE DOES. Only a verified Stripe event may move a record
    * into or out of a lapse, so a route never hands a caller's body to this method; the doors that only read ask `of`,
@@ -1895,8 +1892,8 @@ export class Directory$ extends DurableObject<Env> {
   }
 
   /**
-   * OAuth's store, one RPC for all of it, as `billing` is (`answerOAuth` in `@braindog/record/oauth`, `loop/finish/agents.md`
-   * C4). `serveOAuth` in `oauth.ts` calls it and nothing else does.
+   * OAuth's store, one RPC for all of it, as `billing` is (`answerOAuth` in `@braindog/record/oauth`).
+   * `serveOAuth` in `oauth.ts` calls it and nothing else does.
    *
    * ON THIS OBJECT'S STORAGE AND OUTSIDE `createDirectory`, because the store's tables are its own and made on first use:
    * the Directory never names them. Synchronous, so a `take` or a `redeem` reads and deletes its row with no yield
@@ -1943,7 +1940,7 @@ export class Directory$ extends DurableObject<Env> {
    *
    * THE OTHER HALF OF `recordFor`, AND IT WAS MISSING FOR A DAY. `feefa3f4` put the reader above on this object
    * and left the writer off it, so the index this Worker reads on every forwarded message was one nothing in
-   * the deployment could write: measured on 2026-09-21 by grepping `apps/` and `packages/` for `inbound$`, whose
+   * the deployment could write: measured by grepping `apps/` and `packages/` for `inbound$`, whose
    * only callers were tests. `/api/inbound/mint` is the caller that needed it (`inbound.ts`).
    *
    * IT TAKES THE DIGEST AND CANNOT BE HANDED A TOKEN, which `inbound$` refuses with a sentence rather than
@@ -1992,8 +1989,8 @@ export class Directory$ extends DurableObject<Env> {
   }
 
   /**
-   * The Directory's carried tables as lines, for the night's sealed copy (`directory-copy.ts`, `loop/research-restore.md`
-   * §6). Sessions, links, challenges and strikes are left out by `createDirectory`, so a copy signs nobody in.
+   * The Directory's carried tables as lines, for the night's sealed copy (`directory-copy.ts`).
+   * Sessions, links, challenges and strikes are left out by `createDirectory`, so a copy signs nobody in.
    */
   dump(): string[] {
     return this.#directory().dump();
@@ -2065,7 +2062,7 @@ export class Directory$ extends DurableObject<Env> {
   }
 
   /**
-   * A person's own name, moved here after one of their records has accepted a rename (GAP-7). `forward()`'s
+   * A person's own name, moved here after one of their records has accepted a rename. `forward()`'s
    * `renamedEverywhere` calls it once the record has said the new name was good, then carries it into every other
    * record this person reaches (`mirrorPerson`, `mirrorEverywhere`).
    */
@@ -2177,7 +2174,7 @@ async function drainOutbox(env: Env, id: string): Promise<void> {
     /* EVERY JOB THAT WAS SENT, COUNTED IN THE ACCOUNT'S LEDGER AND NEVER LIMITED, by the record's own object, which knows
        the record id the ledger is keyed by. The kind and the id cross the RPC and nothing of the payload does. */
     counted: (job) => record.countDelivery({ id: job.id, kind: job.kind }),
-    /* A FILE DELETED FROM `BLOBS`, FOR AN `erase.r2` JOB (OPS-20). `id` here is the Durable Object's own hex id, and the
+    /* A FILE DELETED FROM `BLOBS`, FOR AN `erase.r2` JOB. `id` here is the Durable Object's own hex id, and the
        bytes live at `rec_<id>/a/<sha256>`, so the record's own id is asked of the object once, over the same RPC as
        `counted` and `pushTargetFor` above. Absent when this deployment has no bucket, or the object could not say its
        id, and then an erasure dead-letters saying so rather than doing nothing silently. */
@@ -2263,7 +2260,7 @@ function bearerDeps(env: Env): BearerDeps {
   };
 }
 
-/** The methods a runner calls, and the only paths `runnerOf` reads a bearer at (`loop/finish/agents.md` C13). */
+/** The methods a runner calls, and the only paths `runnerOf` reads a bearer at. */
 const RUNNER_METHODS: ReadonlySet<string> = new Set(['claimJob', 'postJobEvent', 'readCancel']);
 
 /**
@@ -2377,7 +2374,7 @@ const buildId = (env: Env): Response => json({ app: env.BRAINDOG_BUILD || null }
  * readable without any credential at all, because it said which names exist.
  *
  * AND THE SENTENCE SAID SOMETHING NOBODY COULD DO. `Mint one from the app` was measured against the
- * live host by an audit reading it as a stranger would: whoever hits this IS at the app, there is
+ * live host by reading it as a stranger would: whoever hits this IS at the app, there is
  * no sign-up on it, and the product's own changelog says so in as many words. So the one refusal
  * every agent and every developer meets first pointed them at a door that is not there.
  *
@@ -2415,7 +2412,7 @@ const unauthorized = (env: Env): Response =>
  *
  * THE REASON USED TO GO TO WHOEVER ASKED. This answered `This request could not be answered: <what was thrown>.`, and a
  * Directory's driver sentence can name a row, which can hold an address, so a stranger who made the router throw read
- * it back (`loop/finish/ops.md` SC16). The caller now gets a reference; the reason goes to one `op: 'crash'` line under
+ * it back. The caller now gets a reference; the reason goes to one `op: 'crash'` line under
  * the same reference, which names the door and never the whole path (`doorPath`), since a path can carry a token.
  *
  * THE LINE IS WRITTEN THROUGH `op` (`oplog.ts`), as every Worker line is, so an address the thrown sentence quoted is
@@ -2536,7 +2533,7 @@ export default {
   },
 
   /**
-   * Mail to a record's mailbox, from Email Routing (DOR-7, `email.ts`).
+   * Mail to a record's mailbox, from Email Routing (`email.ts`).
    *
    * THE SAME DOOR AS `POST /in/email/<token>`, WITH THE FILE STORE ADDED. `arrivals` is the Directory, the object and the
    * brake the HTTP door uses, so a message is budgeted, looked up and stored exactly as a forwarder's post is, and
@@ -2560,7 +2557,7 @@ async function nightly(env: Env): Promise<void> {
      the next with none, and the retention count would be counting nights that are not nights. */
   const at = new Date().toISOString();
   /* THE DIRECTORY FIRST, BECAUSE IT IS ONE OBJECT AND EVERY RECORD DEPENDS ON IT. Lose it and every record survives with
-     nobody able to reach one (`loop/research-restore.md` §6), and nothing copied it before this line. Before the walk, so
+     nobody able to reach one, and nothing copied it before this line. Before the walk, so
      a fleet slow enough to run the invocation out of time costs a record its night and never the tenant map its copy.
      A failure is said at once and makes the invocation red below, after the records have had their turn. */
   let directoryFailed: string | null = null;
@@ -2597,8 +2594,8 @@ async function nightly(env: Env): Promise<void> {
       const rows = (await object.eraseRows(new Date(tonight - ERASE_CHECK_MS).toISOString())) as EraseRow[];
       return reconcileErase(
         rows,
-        /* `key` IS THE BARE SHA-256 (`erase.r2`'s payload), and the object lives at `rec_<id>/a/<sha256>` (`fileKey`,
-           OPS-20), so the head must ask for that address and not the hash alone. */
+        /* `key` IS THE BARE SHA-256 (`erase.r2`'s payload), and the object lives at `rec_<id>/a/<sha256>` (`fileKey`),
+           so the head must ask for that address and not the hash alone. */
         async (key) => (await blobs.head(fileKey(record, key))) !== null,
         async (again) => {
           await object.eraseAgain(again);
@@ -2631,7 +2628,7 @@ async function nightly(env: Env): Promise<void> {
     /* AND EACH RECORD'S LAST FORTY DAYS OF RUNS INTO THE LEDGER AGAIN, by its own object (`Record$.meterReplay`), so a
        count a pass lost and every automation run are in the account by morning. */
     replay: (record) => stub(record).meterReplay(),
-    /* AND WHAT EACH RECORD HAS ON, TALLIED INTO THE KENNEL'S PUBLIC INSTALL COUNTS (`writeCounts`, PLT-15). */
+    /* AND WHAT EACH RECORD HAS ON, TALLIED INTO THE KENNEL'S PUBLIC INSTALL COUNTS (`writeCounts`). */
     installed: (record) => stub(record).packsOn(),
     counts: (held) => writeCounts({ blobs, assets: env.ASSETS }, held, new Date(tonight)),
     speak: op,
@@ -2650,7 +2647,7 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
        on `PUBLIC_HOST` and a 308 to `/app/healthz` on a legacy host for a caller sending `accept: text/html`, so a monitor
        either read the Worker as down or followed the redirect to the app shell and read somebody else's 200. */
     if (HEALTHZ.test(url.pathname)) return healthz(request, env.BRAINDOG_BUILD);
-    /* THE OLD HOST FIRST, AND ONLY FOR A PAGE LOAD (`loop/research-one-domain.md` §2.5). `legacyRedirect` answers
+    /* THE OLD HOST FIRST, AND ONLY FOR A PAGE LOAD. `legacyRedirect` answers
        `null` for every path this Worker serves itself, the build id and sign-in included, so an agent, a webhook
        sender and a stale tab on `app.brain.dog` are served where they stand. Unset `LEGACY_HOSTS` is no host at all. */
     const moved = legacyRedirect(request, env.LEGACY_HOSTS, env.PUBLIC_HOST);
@@ -2663,7 +2660,7 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
        address is the one thing a caller cannot choose here (`cf-connecting-ip`). */
     if (servesAuth(url.pathname)) return (await overLimit(env, null, request, SAFE_METHODS.has(request.method) ? 'read' : 'write')) ?? signIn(request, env, ctx);
     if (servesAccount(url.pathname)) return account(request, env, ctx);
-    /* OAUTH 2.1, WITH BRAINDOG AS ITS OWN AUTHORIZATION SERVER (`loop/finish/agents.md` C4): the metadata an MCP client
+    /* OAUTH 2.1, WITH BRAINDOG AS ITS OWN AUTHORIZATION SERVER: the metadata an MCP client
        discovers from `/mcp`'s 401, and the endpoints it signs in by. Before `/mcp` and every record door, because none
        of it reaches a record until a person approves in the app. Only the names it owns are handed over (`servesOAuth`,
        `servesOAuthMeta`), and `serveOAuth` answers `null` for a path under them it does not serve, which falls through
@@ -2697,7 +2694,7 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
         bearer: bearerDeps(env),
         spend: (asked) => overLimit(env, null, asked, 'write'),
       });
-    /* A RECORD'S FILES, AT EITHER ADDRESS (`files.ts`, OPS-20): the bytes go to `BLOBS` and never through the record's
+    /* A RECORD'S FILES, AT EITHER ADDRESS (`files.ts`): the bytes go to `BLOBS` and never through the record's
        object, and who may is asked of the same session and bearer doors `recordApi` asks, in its order. */
     if (servesFiles(url.pathname))
       return serveFiles(request, {
@@ -2715,8 +2712,8 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
        route pattern can pick it out, and handed to the door, which has the Directory check it before anything is
        addressed. AFTER THE ROOT'S OWN DOORS, which none of its paths can reach: every one of them is a prefix that
        `/app` is not. THIS IS LIVE, NOT DARK: `app.brain.dog`'s Custom Domain sends every path to this Worker, `/app`
-       included, and production answered `GET https://app.brain.dog/app/` with 200 `text/html` at 14:18 UTC on
-       23 September. An earlier line here said nothing reached it until `wrangler.jsonc` listed `/app`, which was true
+       included, and production answered `GET https://app.brain.dog/app/` with 200 `text/html`.
+       An earlier line here said nothing reached it until `wrangler.jsonc` listed `/app`, which was true
        only of `brain.dog`, where the site's assets answer first. */
     const app = appPath(url.pathname);
     /* A RECORD'S PUBLIC KEY, UNDER ITS NAME, before the page and the API are told apart: it is neither. */
@@ -2831,8 +2828,8 @@ async function recordApi(request: Request, env: Env, slug: string | null): Promi
     /* A BEARER. This Worker serves MANY records, and a request that says who it is by nothing but the
        header it carries says so here, or not at all. `session.ts` holds the path, and `/mcp` takes the same one. */
     const found = await bearerOf(request, 'api', bearerDeps(env), slug);
-    /* AND A BEARER NO TOKEN ROW KNOWS MAY BE A RUNNER'S, AT THE THREE PATHS A RUNNER CALLS AND NOWHERE ELSE
-       (`loop/finish/agents.md` C13). It is the same door, a bearer on `/api`, so it reaches the record through the same
+    /* AND A BEARER NO TOKEN ROW KNOWS MAY BE A RUNNER'S, AT THE THREE PATHS A RUNNER CALLS AND NOWHERE ELSE.
+       It is the same door, a bearer on `/api`, so it reaches the record through the same
        line below; the record builds the runner's context from its own device grants, and every method but the JOBS
        ones refuses it. */
     const caller = 'status' in found && found.status === 401 ? ((await runnerOf(request, env, slug)) ?? found) : found;
@@ -2859,7 +2856,7 @@ const claimAsked = (method: string, pathname: string): boolean => method === 'PO
 
 /**
  * A runner's `claimJob`, asked of its record again every `CLAIM_EVERY_MS` until a job is handed over or the wait the
- * runner sent has passed (`holdClaim` in `@braindog/host`, `loop/finish/agents.md` C13): the last answer either way.
+ * runner sent has passed (`holdClaim` in `@braindog/host`): the last answer either way.
  *
  * THE WAIT IS HELD IN THIS WORKER AND NEVER IN THE RECORD'S OBJECT, so the record's single thread answers each ask at
  * once and serves everyone else between them. `inner` is never read itself: each ask forwards a copy, because the
@@ -3000,7 +2997,7 @@ async function leftDirectory(asked: Request, env: Env, record: string): Promise<
 }
 
 /**
- * The Directory's `renamePerson` and `mirrorEverywhere`, for a rename the record has already accepted (GAP-7).
+ * The Directory's `renamePerson` and `mirrorEverywhere`, for a rename the record has already accepted.
  *
  * THE RECORD'S ANSWER STANDS WHATEVER THIS DOES, as `leftDirectory`'s removal does: the name is already the new one
  * where it was asked, and this only moves it in the Directory and carries it, with the address as the Directory holds
@@ -3032,7 +3029,7 @@ async function renamedEverywhere(answer: Response, env: Env, ctx: CallContext): 
  *
  * WHAT IT DOES TELL A STRANGER IS THAT A LIVE NAME EXISTS, which no other door here does without a credential: every
  * other answer under a slug is the shell or one 401. A key published per name cannot avoid it, and it is recorded
- * rather than decided here (`loop/research-restore.md` §8 put the URL per record). The id-shaped alternative,
+ * rather than decided here. The id-shaped alternative,
  * `/.well-known/braindog-key/<rec_id>`, would say nothing a caller did not already hold.
  */
 async function recordKey(request: Request, env: Env, slug: string): Promise<Response> {
@@ -3052,7 +3049,7 @@ async function recordKey(request: Request, env: Env, slug: string): Promise<Resp
  * everything else is the shell, which reads the path itself.
  *
  * THE WORKER DRAWS THE SHELL BECAUSE THE ASSETS NO LONGER DO. With `/app/*` in `run_worker_first` and
- * `not_found_handling: none` (`loop/research-one-domain.md` §2.2), an app navigation reaches this function and not a
+ * `not_found_handling: none`, an app navigation reaches this function and not a
  * fallback, so `/app/acme/r/tasks` has to be answered with `/app/`'s bytes here. Under a slug no file is looked for:
  * a record's page is always the shell, and the shell's `boot` under that slug is where a stranger meets sign-in.
  *
@@ -3065,8 +3062,8 @@ async function appPage(request: Request, env: Env, app: AppPath): Promise<Respon
   const assets = env.ASSETS;
   if (!assets) return json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'This deployment serves no app, only its API.' } }, 404);
   /* EVERY ANSWER THE ASSETS GIVE HERE IS A PAGE OF THE APP, OR A FILE BESIDE ONE, and leaves with `asPage`'s four
-     headers: measured on production, the shell and the sign-in page carried none (`loop/research-push-a-live.md`
-     finding 1). The 302 `appEntry` answers for bare `/app` is not wrapped, because a frame follows it to the shell. */
+     headers: measured on production, the shell and the sign-in page carried none.
+     The 302 `appEntry` answers for bare `/app` is not wrapped, because a frame follows it to the shell. */
   const shell = async () => asPage(await assets.fetch(new Request(new URL('/app/', request.url), { method: request.method })), new URL(request.url).pathname);
   if (app.slug === null && app.rest === '/') {
     const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
@@ -3149,8 +3146,8 @@ function arrivals(env: Env): CloudIngestDeps {
  * that will not open says so only to a grant holder.
  *
  * AND THE DEPOSIT DOOR TAKES AN AGENT'S LOGIN TOKEN, checked as `/api` checks any bearer, by `bearerOf` in
- * `session.ts` and nothing else, so the record the key is sealed for is the one whose token table knew it
- * (`loop/finish/agents.md` C1). `vault.ts` asks it only for a bearer that is not a vault grant, and only at
+ * `session.ts` and nothing else, so the record the key is sealed for is the one whose token table knew it.
+ * `vault.ts` asks it only for a bearer that is not a vault grant, and only at
  * `/api/vault/deposit`; the record then adds the key as new, in the token's run's project, or refuses.
  */
 async function keyDoor(request: Request, env: Env): Promise<Response> {
@@ -3263,8 +3260,8 @@ async function agent(request: Request, env: Env): Promise<Response> {
   const early = gate(request);
   if (early) return early;
   const found = await bearerOf(request, 'mcp', bearerDeps(env));
-  /* THE 401 NAMES WHERE TO SIGN IN, so an MCP client that holds no token starts OAuth from it (RFC 9728,
-     `loop/finish/agents.md` C4). Without a public host there is no address to name, and the 401 is as it was. */
+  /* THE 401 NAMES WHERE TO SIGN IN, so an MCP client that holds no token starts OAuth from it (RFC 9728).
+     Without a public host there is no address to name, and the 401 is as it was. */
   const metadata = env.PUBLIC_HOST ? `https://${env.PUBLIC_HOST}/.well-known/oauth-protected-resource` : undefined;
   if ('status' in found) return found.status === 403 ? json({ ok: false, refusal: found.refusal }, 403) : unknownAgent(metadata);
   /* THE TOKEN'S MINUTE BEFORE THE RECORD READS THE BODY, and always the read budget: which tool is called is inside a
@@ -3280,7 +3277,7 @@ async function agent(request: Request, env: Env): Promise<Response> {
  * account route but the webhook is 401; the webhook is Stripe's, has no cookie, and checks its own signature.
  *
  * A POST IS LIMITED BY ADDRESS BEFORE ANYTHING IS READ, on the write budget, as `/auth/*` is: a checkout and a portal
- * each spend a Stripe call, and the webhook is a public door (`loop/finish/rules.md` §12). The address is
+ * each spend a Stripe call, and the webhook is a public door. The address is
  * `cf-connecting-ip`, which Cloudflare writes and a caller cannot.
  *
  * THE BILLING DOORS ARE HANDED IN WHATEVER THE SETTINGS SAY: while billing is off the list says so and every other
@@ -3303,7 +3300,7 @@ async function account(request: Request, env: Env, ctx: ExecutionContext): Promi
     provision: (args) => provision(env, args),
     /* THE ALLOWANCE FOLLOWS THE PLAN: the Directory meters the record under the plan it now pays for. */
     setPlan: (record, plan) => directory.setPlan(record, plan),
-    /* THE RECORD'S OWN SWITCH, over RPC to its object by id (`loop/finish/ops.md` §4.0 F): while it is on, the record
+    /* THE RECORD'S OWN SWITCH, over RPC to its object by id: while it is on, the record
        answers reads and refuses writes, and its alarm runs the drain and nothing else. */
     setLapsed: (record, on) => env.RECORD.get(env.RECORD.idFromName(record)).setLapsed(on),
     stripe: (key) => stripeOf(key, () => Date.now()),
@@ -3313,7 +3310,7 @@ async function account(request: Request, env: Env, ctx: ExecutionContext): Promi
     auth: (env.SESSION_SECRET ?? '').length >= 32 ? (((call: AuthCall) => directory.auth(call)) as unknown as Auth) : null,
     usage: (person, range) => directory.usage(person, range) as unknown as Promise<Result<AccountUsage>>,
     records: async (person) => ({ ok: true as const, value: await directory.recordsFor(person) }),
-    /* THE WAY BACK FROM A LOST MAILBOX (GAP-7), and only while this deployment can prove an address and sign somebody
+    /* THE WAY BACK FROM A LOST MAILBOX, and only while this deployment can prove an address and sign somebody
        in: unset, both `/account/email` rows stay 404 `ROUTE_UNKNOWN`, as `ACCOUNT_ROUTES` promises a host that hands in
        no door. `mirror` reaches a record's own object over RPC, because the host holds no record here to call into. */
     ...(env.AUTH_MAIL_FROM && env.EMAIL && (env.SESSION_SECRET ?? '').length >= 32
@@ -3327,7 +3324,7 @@ async function account(request: Request, env: Env, ctx: ExecutionContext): Promi
           } satisfies EmailDoor,
         }
       : {}),
-    /* CLOSING AN ACCOUNT (OPS-21), only where somebody can sign in: unset, the row stays 404 as `ACCOUNT_ROUTES`
+    /* CLOSING AN ACCOUNT, only where somebody can sign in: unset, the row stays 404 as `ACCOUNT_ROUTES`
        promises. Who owns a record is each record's own table, so every record this person holds at `owner` is asked
        for its owners over RPC, at most `CLOSE_RECORDS_MOST`; the rest are named back, and the door refuses. The
        Directory's half rides on `auth`, the one RPC it already answers for a person's way in, whose parameter does
@@ -3374,7 +3371,7 @@ async function signIn(request: Request, env: Env, ctx: ExecutionContext): Promis
   if (Object.hasOwn(SIGNUP_ROUTES, signupPath)) return signUp(request, env, ctx, signupPath as keyof typeof SIGNUP_ROUTES);
   /* THE ZONE IS READ FROM A COPY OF THE BODY, because `operated()` in `packages/host/src/auth.ts` hands `provision`
      the slug, the email and the name and drops every other field, so a `tz` in the body never arrived here and every
-     record was made in `UTC` (`loop/research-first-sign-in.md` friction 12). The copy is read only inside the
+     record was made in `UTC`. The copy is read only inside the
      `provision` callback, which `operated()` calls after it has checked the operator key and parsed the same bytes as
      a JSON object, so an unauthenticated POST never has its copy read. When `operated()` forwards `tz` itself, this
      copy and `askedZone` go. */
@@ -3424,7 +3421,7 @@ const signupRefused = (status: number, refusal: Refusal, extra: readonly (readon
   signupReply(status, { ok: false, refusal }, extra);
 
 /**
- * `/auth/signup/*`: a stranger asking for a record of their own (`loop/finish/ops.md` OPS-17).
+ * `/auth/signup/*`: a stranger asking for a record of their own.
  *
  * THE SAME ORDER `serveAuth` KEEPS. The method first; then whether sign-in is on at all (a `SESSION_SECRET` and an
  * origin a cookie can be set on); then, on a POST, the origin and the content type before the body is read, so a page
@@ -3579,8 +3576,7 @@ function invites(env: Env): InviteDoor {
       if (!joined.ok) return joined;
       /* THE SLUG OF THE RECORD JUST JOINED, so `serveInvite` can move a signed-in person's session onto it. This
          answered the join's `null`, and a colleague who owns a record of their own was told they were on the invited
-         one while their cookie still opened theirs (`loop/research-invite-landing.md` finding 2,
-         `test/invite-accept.test.ts`). `reaches` and not `resolve`, because the token names an id and the name is
+         one while their cookie still opened theirs (`test/invite-accept.test.ts`). `reaches` and not `resolve`, because the token names an id and the name is
          the Directory's to say. A record with no live name answers `null`, and the session stays where it was. */
       const slug = (await directory.reaches(person.id)).find((r) => r.record === found.id)?.slug ?? null;
       return { ok: true, value: { slug } };
@@ -3639,7 +3635,7 @@ async function askedZone(copy: Request | null): Promise<unknown> {
  * out for the half of the year London is not on summer time. It is refused here rather than stored.
  *
  * AND AN OFFSET SPELLED AS A ZONE IS AN OFFSET, SO THE SPELLING TYPED IS READ AS WELL AS THE ONE `Intl` ANSWERS.
- * Measured on Node 24.13 (ICU 77.1, tz 2025b) and in workerd (`loop/research-batch-forty-six-audit.md` §8): `Etc/GMT-3`
+ * Measured on Node 24.13 (ICU 77.1, tz 2025b) and in workerd: `Etc/GMT-3`
  * is answered back as itself and is `+03:00` under a zone's name, and `EST` is answered as `America/Panama`, which reads
  * like any region's zone and has no summer time, so a record typed `EST` from New York is an hour out from March to
  * November. The answer cannot tell `EST` from somebody who meant Panama, which is why the typed word is the test, and
@@ -3669,8 +3665,8 @@ function zoneOf(asked: unknown): string | null {
  * tz database does not hold, and `EST`, `MST` and `HST`, which it held as fixed offsets.
  *
  * EACH IS A CLOCK'S ABBREVIATION THAT `Intl` ANSWERS AS ONE PLACE, AND OFTEN NOT THE PLACE THE TYPIST MEANT. Only
- * `EST`, `MST` and `HST` were refused at first, the three `loop/research-batch-forty-six-audit.md` §8 named, and the
- * other twenty-five were stored for good (`loop/research-batch-forty-eight-audit.md` §1, Node 24.13 and workerd alike):
+ * `EST`, `MST` and `HST` were refused at first, and the other twenty-five were stored
+ * for good (Node 24.13 and workerd alike):
  * `BST` as `Asia/Dhaka`, five hours ahead of London in the summer and six in the winter; `IST` as
  * `Asia/Calcutta` for somebody in Dublin; `CST` as `America/Chicago` for somebody in Shanghai; `NST` as
  * `Pacific/Auckland` and not Newfoundland; `ECT` as `Europe/Paris` and not Ecuador. Some land where the typist meant,
@@ -3715,9 +3711,9 @@ function zoneFix(asked: unknown): string {
  * A NAME HOLDING `<` OR `>` WAS THE FIRST RULE, AND IT HELD ONE SPELLING. `provision-check.mjs` printed
  * `name = '<your name>'` to be changed by hand, the slug and the email each refused their placeholder, and this one was
  * taken: `personName` in `packages/host/src/invite.ts` allows brackets, so the owner's `me` and his passkey's display
- * name said `<your name>` (`loop/research-batch-forty-six-audit.md` §7). The rule was `/[<>]/`, and on a local Worker
+ * name said `<your name>`. The rule was `/[<>]/`, and on a local Worker
  * `＜your name＞`, `‹your name›`, `[your name]`, `{your name}`, `&lt;your name&gt;`, `YOUR NAME` and `Your Name` were
- * each 200 and stored (`loop/research-batch-forty-eight-audit.md` §5). The form no longer prints a placeholder at all,
+ * each 200 and stored. The form no longer prints a placeholder at all,
  * so the rule is for one copied from anywhere else, an older copy of the form among them.
  *
  * SO A NAME IS REFUSED WHEN IT OPENS WITH AN OPENING BRACKET AND CLOSES WITH A CLOSING ONE: Unicode's own open and
@@ -3730,11 +3726,11 @@ function zoneFix(asked: unknown): string {
  * rule does not lean on it.
  *
  * AND THE TWO ENDS HAVE TO BE ONE SPAN. Tested only at its ends, the rule refused `(ex-Acme) Sam (work)` and
- * `(Sam) [work]` at name through this Worker, which are `Sam (work)` said at both ends and a name with a note
- * (`loop/research-batch-fifty-audit.md` §3). So a name is refused for its brackets when it is a run of opening
+ * `(Sam) [work]` at name through this Worker, which are `Sam (work)` said at both ends and a name with a note.
+ * So a name is refused for its brackets when it is a run of opening
  * brackets, then no closing bracket at all, then a run of closing ones. THE RUNS ARE WHAT KEEPS `{{name}}` REFUSED:
  * with one bracket allowed at each end, `{{name}}`, `[[Name]]`, `{{ owner }}` and `((Name))` each have a closing
- * brace between their ends and would have been stored. The audit ran both forms over the spellings in
+ * brace between their ends and would have been stored. Both forms were run over the spellings in
  * `test/provision-tz.test.ts` and those four, and the one-bracket form got 4 wrong where the runs got none.
  *
  * `“` `”` AND `‘` CLOSE A NAME AND DO NOT OPEN ONE, because `„` and `‚`, the German and Polish opening quotes, are
@@ -3754,7 +3750,7 @@ function placeholderName(name: string): boolean {
 /**
  * Whether a name holds a mail-merge field nobody filled, anywhere in it.
  *
- * ONE SPAN AT BOTH ENDS WAS NOT THE WHOLE CLASS (`loop/finish/defects.md` H2). A form filled from a template stored
+ * ONE SPAN AT BOTH ENDS WAS NOT THE WHOLE CLASS. A form filled from a template stored
  * `{{first_name}} {{last_name}}` as an owner's name: two spans, so neither end-to-end rule above matched it, and every
  * place the name is drawn said it for good. A merge field is a doubled bracket around a word (`{{first}}`, `[[Name]]`),
  * or the other spellings template tools print: `${first}`, `*|FNAME|*` and `%FIRST_NAME%`. A single bracket inside a

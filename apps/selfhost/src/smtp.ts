@@ -2,7 +2,7 @@
  * The self-host's way out for mail: a submission client over `node:net` and `node:tls`, and the letters it sends.
  *
  * NO DEPENDENCY, because a submission client is a greeting, EHLO, one upgrade to TLS, one sign-in, and three commands
- * per message, and the tree carries no mail library to trust with a password (`loop/research-w61.md` W61-4).
+ * per message, and the tree carries no mail library to trust with a password.
  *
  * TLS OR NOTHING. `smtps://` (465) is TLS from the first byte; `smtp://` (587) must be upgraded with STARTTLS before the
  * password is sent, and a server that does not offer the upgrade is refused rather than handed the password in the
@@ -22,7 +22,7 @@ import type { OutboxRow } from '@braindog/kernel';
 import type { MailNotice } from '@braindog/host/auth';
 
 /**
- * `MailNotice`, plus the two email-change letters (GAP-7, `loop/finish/contracts.md` §12.1): `email.change` and
+ * `MailNotice`, plus the two email-change letters: `email.change` and
  * `email.changed` are not part of `MailNotice`, because that type comes from `packages/ports`'s `Mail`, which is not
  * this lane's to widen. The sign-in sender takes both anyway, so `serveAccount`'s email door can call it with either.
  */
@@ -295,7 +295,7 @@ export function letterOf(kind: SignInMailKind | undefined, link: string): { subj
       subject: 'A passkey was removed from your BrainDog account',
       text: 'A passkey was removed from your BrainDog account. If you did not remove it, sign in and check your passkeys and sessions in Settings.',
     };
-  /* THE TWO HALVES OF CHANGING A SIGN-IN ADDRESS (GAP-7). The link goes to the new address, so only somebody who reads
+  /* THE TWO HALVES OF CHANGING A SIGN-IN ADDRESS. The link goes to the new address, so only somebody who reads
      it can finish; the notice goes to the old one, and names no address, since it may be read by whoever holds that
      mailbox now. */
   if (kind === 'email.change')

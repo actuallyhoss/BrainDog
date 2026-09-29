@@ -1,5 +1,5 @@
 /**
- * An erasure, as the Cloud's nightly copy carries it (OPS-21, `research-w61.md` W62-3): the next sealed copy of the
+ * An erasure, as the Cloud's nightly copy carries it: the next sealed copy of the
  * record holds nothing of the person, and neither does the search index.
  *
  * THE COPY IS THE WORKER'S OWN: `dumpOf` and `r2Snapshots` with a recipient, sealed as the night seals it and opened
@@ -80,7 +80,7 @@ async function sealedCopy(k: Kernel): Promise<string> {
   return ageOpen(stored, id).toString('utf8').toLowerCase();
 }
 
-/** A record with the person in an entry, the search index, and each of the six stores OPS-21 adds to the erasure. */
+/** A record with the person in an entry, the search index, and each of the six stores the erasure reaches. */
 async function record(): Promise<{ k: Kernel; sql: NodeSql }> {
   const sql = openSqlite();
   const k = await openRecord(sql, fixedClock(NOW));

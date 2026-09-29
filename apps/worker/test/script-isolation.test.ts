@@ -1,11 +1,10 @@
 /**
- * What the Cloud's loaded Worker must not keep, and whom a key may reach from it (`loop/research-batch-thirty-five-audit.md`
- * findings 2, 4 and 6), run the way `test/script.test.ts` runs a script: `src/script.ts` bundled by esbuild and run in
+ * What the Cloud's loaded Worker must not keep, and whom a key may reach from it, run the way `test/script.test.ts` runs a script: `src/script.ts` bundled by esbuild and run in
  * workerd from a Durable Object's `alarm()`.
  *
  * ONE SCRIPT, TWO RUNTIMES, UNTIL THIS FILE. The self-host starts every run in a fresh QuickJS instance, and the Cloud
  * cached one Worker per version under `<record>:<script>:v<n>`, so every run of a version shared its `globalThis`: the
- * audit's second run read "one,two" off what the first had left there. And a run that spun without awaiting could not
+ * second run read "one,two" off what the first had left there. And a run that spun without awaiting could not
  * be ended by the raced deadline, because locally the loaded Worker runs on the object's thread, so a four-second loop
  * under `wall_ms: 500` answered clean with its log; the self-host refuses any run that answers past its deadline.
  *
@@ -32,7 +31,7 @@ const { Miniflare, convertV4MiniflareOptions } = (await import(pathToFileURL(fro
 
 const GOLD = 'https://api.gold.test';
 const COLLECTOR = 'https://collector.test';
-/** The audit's key, with a `/` in it, so its JSON-escaped and URL-encoded spellings differ from the bytes. */
+/** A key with a `/` in it, so its JSON-escaped and URL-encoded spellings differ from the bytes. */
 const KEY = 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY';
 
 const ENTRY = `
@@ -183,7 +182,7 @@ const run = async (source: string, over: Record<string, unknown> = {}): Promise<
 };
 
 test('EVERY RUN OF ONE VERSION STARTS FRESH: the second run does not see what the first left on globalThis', async () => {
-  /* C3 IN THE AUDIT: `run two -> {"writes":[],"log":"seen by run two: one,two"}`, where QuickJS would have said "one". */
+  /* MEASURED BEFORE THIS: `run two -> {"writes":[],"log":"seen by run two: one,two"}`, where QuickJS would have said "one". */
   const source = `
 export default async function run(ctx) {
   globalThis.seen = (globalThis.seen ?? 0) + 1;
@@ -196,7 +195,7 @@ export default async function run(ctx) {
 });
 
 test('A RUN THAT ANSWERS PAST ITS wall_ms IS REFUSED, even when it never awaited and the raced deadline could not fire', async () => {
-  /* C5 IN THE AUDIT: a busy loop under `wall_ms: 500` answered `{"writes":[],"log":"spun",...,"wall_ms":4011}`. The
+  /* MEASURED BEFORE THIS: a busy loop under `wall_ms: 500` answered `{"writes":[],"log":"spun",...,"wall_ms":4011}`. The
      loop is bounded by a count as well as the clock, so a runtime whose clock stood still inside it still ends. */
   const { answer } = await run(
     `

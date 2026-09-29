@@ -1,10 +1,10 @@
 /**
  * The self-host's own action pass and a script trial, over a Directory with one run of the month left: whichever starts
- * first runs, the other is held, and the month closes at 15,000 (`loop/research-batch-thirty-nine-audit.md` finding 4).
+ * first runs, the other is held, and the month closes at 15,000.
  *
  * TWO DOORS ASKED ONE LEDGER, AND NEITHER SAW THE OTHER'S RUN IN HAND. `scriptTrial` reserves its run in the runtime's
  * `IN_FLIGHT` while its sandbox works, and the pass built `pass()` with no count, so it neither reserved its run there
- * nor saw a trial's. The audit measured both orders with the pass assembled by hand as `server.ts` assembled it: one run
+ * nor saw a trial's. Both orders were measured with the pass assembled by hand as `server.ts` assembled it: one run
  * left, both ran, and the month closed at 15,001 of 15,000. This drives the pass `server.ts` builds itself
  * (`running.poll()`), and the trial through the record's own `scriptTry`, so what is held is the wiring and not a copy.
  *

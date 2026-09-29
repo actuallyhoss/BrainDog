@@ -590,7 +590,7 @@ test('AN OWNER MINTS AN ADDRESS THAT TAKES MAIL AT ONCE, AND THE INDEX HOLDS ONL
   assert.equal(rows.includes(hash), true, 'the digest is not in the table this test just read');
 
   /* AND THE ADDRESS WORKS THE MOMENT IT IS ANSWERED, through the real reader and the real mail door.
-     This is the loop that was open until 2026-09-21: the door could resolve a digest and nothing could
+     This is the loop that was open: the door could resolve a digest and nothing could
      put one there, so both halves were finished and no forwarded message had ever arrived. */
   const { door: arrival, seen } = overDirectory(d);
   const delivered = await serveIngest(mail(token), arrival);
@@ -771,7 +771,7 @@ test('A PROOF OLDER THAN FIFTEEN MINUTES MINTS NOTHING AND REVOKES NOTHING', asy
 
   /* AND A COLLEAGUE WITH A STALE PROOF IS TOLD THE LEVEL AND NOT THE PROOF, which is the whole of what
      the check's POSITION decides, and the one claim the paragraph above this test made without testing:
-     measured on 2026-09-21 by lifting the line above the level check, with this assertion not yet
+     measured by lifting the line above the level check, with this assertion not yet
      written, and all 26 tests in the file stayed green while a `decide` colleague was sent off to sign
      in again for a door that signing in again does not open. `LEVEL_REQUIRED` is the remedy they
      actually have, which is to ask an owner. With the assertion here that mutation fails on this line. */
@@ -881,7 +881,7 @@ function stubSurface(): ReadonlySet<string> {
   const from = SOURCE.indexOf('export class Directory$');
   /* THE CLOSING BRACE IN COLUMN ONE, AND THE LINE ENDING IS NOT ASSUMED. A checkout with CRLF endings
      matched no `\n}\n` at all and failed as "no Directory$ class", which is a sentence about the wrong
-     thing: measured on 2026-09-21 by rewriting the file through a tool that translates newlines. */
+     thing: measured by rewriting the file through a tool that translates newlines. */
   const to = from + (/\r?\n\}\r?\n/u.exec(SOURCE.slice(from))?.index ?? -1);
   assert.ok(from > 0, 'index.ts declares no Directory$ class, so this read the wrong file');
   assert.ok(to > from, 'the Directory$ class has no closing brace in column one, so this read past the end of it');
@@ -931,7 +931,7 @@ function asStub(
  *
  * THIS IS THE LOOP THAT WAS OPEN, and the reason it stayed open through two commits that each closed half
  * of it: the door could resolve a digest, the Directory could store one, the mint could ask for one, and
- * the one call that joined them was not on the class. Driven by the auditor on 2026-09-21: state A, the
+ * the one call that joined them was not on the class. Measured before the fix: state A, the
  * only state a deployed Worker could be in, was 404 with no row and `recordFor` answering `null` for every
  * digest for ever.
  *
@@ -979,7 +979,7 @@ test('AN ADDRESS MINTED OVER THE RPC SURFACE A DEPLOYED WORKER HAS TAKES MAIL AT
 
 /* ── the context the record is told ──────────────────────────────────────── */
 
-/* THESE TWO WERE IN `demo.test.ts`, which went with the public demo (`loop/research-no-sample.md` A1). They were never
+/* THESE TWO WERE IN `demo.test.ts`, which went with the public demo. They were never
    about the demo: `inward` is how every door hands the record its caller, and `Record$.fetch` reads the header it writes
    as the whole of who is asking, so a caller who could set it would be whoever they said. */
 test('A CONTEXT THE CALLER SENT IS OVERWRITTEN, NOT TRUSTED, and the bearer goes no further', () => {
@@ -997,8 +997,7 @@ test('A CONTEXT THE CALLER SENT IS OVERWRITTEN, NOT TRUSTED, and the bearer goes
 });
 
 test('AND THE WORKER SETS THE CONTEXT IN ONE PLACE, for every door', () => {
-  /* A SECOND PLACE THAT SET IT is a second chance to set it after something the caller controls, which is A9 in
-     `loop/research-anon-read.md`. */
+  /* A SECOND PLACE THAT SET IT is a second chance to set it after something the caller controls. */
   assert.doesNotMatch(SOURCE, /headers\.set\(\s*'x-braindog-ctx'/u, 'index.ts sets the context itself again');
   /* FIVE DOORS NOW: a session, the owner opening a shared link (whose answer the Worker signs), a shared link reading its
      page, a bearer on `/api` and a bearer on `/mcp`, and each reaches the record through `inward`. There were four while

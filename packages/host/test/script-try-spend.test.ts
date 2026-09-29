@@ -1,9 +1,9 @@
 /**
- * What trials started together spend against the plan (`src/script-try.ts`, audit thirty-seven finding 2).
+ * What trials started together spend against the plan (`src/script-try.ts`).
  *
  * A TRIAL ASKED THE ALLOWANCE WITH NO COUNT OF THE TRIALS ALREADY RUNNING. `scriptTrial` asked `mayRun(record, script)`
  * with no `pending` and metered after the sandbox answered, so every trial still in its sandbox was invisible to the
- * next one's question. Measured by the audit over a real `createDirectory`, a hosted record with one run left: five
+ * next one's question. Measured over a real `createDirectory`, a hosted record with one run left: five
  * trials at once all ran and the month closed at 15,004 runs of 15,000; the same five one after another ran one and
  * held four. A scheduled pass never had this hole, because `pass()` carries what it has let through.
  *

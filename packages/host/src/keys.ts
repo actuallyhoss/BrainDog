@@ -56,8 +56,8 @@ export type SealedUnder = 'record' | 'connector';
  * READ HERE, BY BOTH HOSTS' DEPOSIT STEPS, AND NOT BY THE RECORD ALONE, because the choice changes which key the host
  * unwraps to seal, and a value the host cannot read is refused before any key is touched.
  *
- * NOT FROM AN AGENT'S LOGIN TOKEN. That door adds a key for the run to use and nothing else (`loop/finish/agents.md`
- * C1), and a key a scheduled run can open without a person present is the owner's to add, from the app, or an agent's
+ * NOT FROM AN AGENT'S LOGIN TOKEN. That door adds a key for the run to use and nothing else,
+ * and a key a scheduled run can open without a person present is the owner's to add, from the app, or an agent's
  * holding a vault grant. So the connector path stays behind a vault grant or a browser session.
  */
 export function sealedUnderOf(body: Record<string, unknown>, agentDeposit = false): Result<SealedUnder> {

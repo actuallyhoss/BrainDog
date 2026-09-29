@@ -1,9 +1,9 @@
 /**
  * A script on the Cloud that filters on a secret field with a sentence, run the way `test/script.test.ts` runs a script:
  * `src/script.ts` bundled by esbuild, the script in a Dynamic Worker from `env.LOADER`, and `ctx.record.list` going
- * through `ScriptRecord` back into the record's object (`loop/research-batch-thirty-six-audit.md` finding 7).
+ * through `ScriptRecord` back into the record's object.
  *
- * THE AUDIT DROVE THE SELF-HOST AND SAID THE CLOUD FOLLOWED "BY CONSTRUCTION". That was a reading, not a run, so this file
+ * THE SELF-HOST WAS DRIVEN AND THE CLOUD WAS SAID TO FOLLOW "BY CONSTRUCTION". That was a reading, not a run, so this file
  * is the run. `ScriptRecord.list` parses the `where` the prelude stringified and hands it to `ScriptRuns.answer` as it
  * was written, and `answer` hands it to the reads `src/index.ts` builds with `scriptReads`, so a string reached the
  * record's `list`, which reads a string as a sentence. Measured before `scriptReads` refused one: all four runs below

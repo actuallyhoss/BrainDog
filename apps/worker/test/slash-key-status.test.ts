@@ -1,14 +1,13 @@
 /**
  * An automation's question to Slash on the Worker, when the key is there and will not open, and when the provider answers a
- * status no retry mends. `loop/research-batch-forty-nine-audit.md` findings 2 and 4, driven as the audit drove them (its
- * P1 and P6); the host's half is `packages/host/test/slash-status-final.test.ts`.
+ * status no retry mends; the host's half is `packages/host/test/slash-status-final.test.ts`.
  *
- * FINDING 2. `workerSlashAnswers` refused a job when no live grant was labelled `slash`, and read the label, not the
+ * THE KEY THAT WILL NOT OPEN. `workerSlashAnswers` refused a job when no live grant was labelled `slash`, and read the label, not the
  * opening. With the owner's key put under one `KEK` and the object woken under another, as a `wrangler secret put KEK`
- * leaves it, the audit measured 8 POSTs with no `authorization` of 8 over the ladder, 8 ledger rows under the dash, and a
+ * leaves it, 8 POSTs were measured with no `authorization` of 8 over the ladder, 8 ledger rows under the dash, and a
  * run ending "Slash could not be reached after 8 attempts". A scheduled action on the same key refuses `WRONG_KEY`.
  *
- * FINDING 4. A 400, a 401 and a 404 to a good key were each asked eight times over about 266 minutes, and the run ended
+ * A STATUS NO RETRY MENDS. A 400, a 401 and a 404 to a good key were each asked eight times over about 266 minutes, and the run ended
  * "could not be reached" about a provider that answered all eight.
  *
  * THE HARNESS IS `slash-answers.test.ts`'s, CUT DOWN AND COPIED RATHER THAN IMPORTED, because a test file exports nothing
@@ -16,8 +15,8 @@
  * `node:sqlite`, the key put through `serveWorkerKeys` under a bound `KEK`, the rule filed as the canvas files one, and
  * `globalThis.fetch` the only double. What is added is `rekey`, which wakes the object again under another `KEK`.
  *
- * THE KEY IS HIS OWN, CHOSEN IN SETTINGS, since `loop/finish/agents.md` AGT-21: put through the key door and picked by its
- * grant id through the settings door, as `slash-answers.test.ts` now does. Findings 2 and 4 hold on that path unchanged.
+ * THE KEY IS HIS OWN, CHOSEN IN SETTINGS: put through the key door and picked by its
+ * grant id through the settings door, as `slash-answers.test.ts` now does. Both faults hold on that path unchanged.
  */
 
 import { test } from 'node:test';
@@ -172,7 +171,7 @@ async function hosted(answer: () => Response) {
   };
 }
 
-/* ── P1 · the KEK changed under the record ───────────────────────────────── */
+/* ── the KEK changed under the record ────────────────────────────────────── */
 
 test('HIS KEY THAT WILL NOT OPEN UNDER THIS KEK: NOTHING IS POSTED, NOTHING IS WRITTEN TO THE LEDGER, and the run says why', async () => {
   const s = await hosted(() => new Response('{"error":"no key"}', { status: 401 }));
@@ -194,7 +193,7 @@ test('HIS KEY THAT WILL NOT OPEN UNDER THIS KEK: NOTHING IS POSTED, NOTHING IS W
   }
 });
 
-/* ── P6 · a status no retry mends ────────────────────────────────────────── */
+/* ── a status no retry mends ─────────────────────────────────────────────── */
 
 for (const n of [400, 401, 404])
   test(`A ${n} TO A GOOD KEY IS ONE POST, and the run ends in the first alarms on a sentence that names the status`, async () => {
@@ -206,7 +205,7 @@ for (const n of [400, 401, 404])
 
       assert.equal(s.sent.length, 1, `${s.sent.length} posts for a status that answers the same on every rung`);
       assert.equal(s.sent[0]!.authorization, `Bearer ${s.value}`, "the question did not go out on the owner's key");
-      /* THE RUN IS OVER, AND NOT PARKED FOR THE NEXT RUNG: the audit's run was still waiting here, a retry queued. */
+      /* THE RUN IS OVER, AND NOT PARKED FOR THE NEXT RUNG: the run was once still waiting here, a retry queued. */
       const [r] = s.runs();
       assert.equal(r?.state, 'failed', `the run is ${r?.state ?? 'missing'}, with ${s.retries()} retry queued`);
       assert.equal(s.retries(), 0, 'the ladder is asking again');

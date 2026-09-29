@@ -29,7 +29,7 @@ test('A GUIDE WHOSE IDEA STAGE IS OVER IS ASKED ONCE TO ADD PROJECTS AND WORK, a
   value(await api.decide({ id: asked.id, decide: { option: 'accept', reason: 'yes' } } as never, owner));
   const packs = () => sql.all<{ id: string }>('SELECT id FROM pack').map((p) => p.id).sort();
   assert.deepEqual(packs(), ['usecase-guide']);
-  /* NO EXAMPLE ROWS COME WITH THE PACK ANY MORE (`loop/finish/modules.md` C11, `packages/seed/src/usecases/catalogue.ts`
+  /* NO EXAMPLE ROWS COME WITH THE PACK ANY MORE (`packages/seed/src/usecases/catalogue.ts`
      "NO EXAMPLE ROWS, FROM ANYTHING ON OFFER"): a plain install off the catalogue plants nothing, and what a person
      would have from onboarding is either a model's formed plan or their own typed rows. This test is about growth once
      the idea stage is reached, not about seeding, so it writes the guide's own template rows by hand, word for word as

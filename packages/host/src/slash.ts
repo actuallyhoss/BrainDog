@@ -11,8 +11,8 @@
  *
  * WHOSE KEY, AND HOW IT IS FOUND. A host's own endpoint is called with the operator's `SLASH_KEY` or with none. The owner's
  * own key is the grant he picked in Settings, stored by its id (`slashOwnKeyOf`), and nothing else: no key is chosen by its
- * label any more, so a key somebody named `slash` for another reason is never sent to a model (`loop/finish/defects.md`
- * S1), and migration 0016's relabel of old `spark` keys has nothing left to decide.
+ * label any more, so a key somebody named `slash` for another reason is never sent to a model,
+ * and migration 0016's relabel of old `spark` keys has nothing left to decide.
  *
  * NO RUNTIME HERE, like `actions.ts`: no bare `fetch`, so both hosts import it and pass their own `send`.
  *
@@ -21,13 +21,13 @@
  * THEY ARE TWO FEATURES THAT SHARE A NAME, AND NEITHER IS A NEWER VERSION OF THE OTHER, so neither is deleted. This file is
  * the model behind the RECORD's Slash, which reads how a BrainDog is used and drafts `pack`, `settings` and `arrange`
  * proposals about its arrangement, and a `change` that builds a register, an ingest, a rule, a metric or a page
- * (`packages/record/src/slash.ts`, `loop/research-spark.md` S15, `loop/research-shell-mcp.md` §4 Brief D). `@braindog/slash` is
+ * (`packages/record/src/slash.ts`). `@braindog/slash` is
  * `docs/46`'s assistant engine: a person's typed question turned into a predicate, their own rows, and one cited proposal
  * with verbs, plus the ingest-pattern proposer, the meter and the tiers.
  *
  * THEY OVERLAP ON EXACTLY ONE BODY KIND OF SEVEN, AND `rowset` IS IT. An earlier line here called the two sets disjoint,
  * which `grep -n rowset packages/record/src/slash.ts` refutes at `:622`: the record's Slash files `pack`, `settings`,
- * `arrange`, a model's `change` (Brief D), and one `rowset`, the skill row a use case names and the Skills list has not
+ * `arrange`, a model's `change`, and one `rowset`, the skill row a use case names and the Skills list has not
  * got. The package files `query`, `options`, `rowset` and `pattern`. The one shared kind is not one feature written twice either, because what reaches it
  * differs: the record's is drafted from usage by rules with no model in the path, and the package's is drafted from a typed
  * question against rows the asker may read and is refused unless it cites one. So a deletion either way loses a feature, and
@@ -82,14 +82,14 @@ export const SLASH_TOKENS_CEILING = 1_000_000;
  * What the model is told. Data, so it can be read and reviewed in one place.
  *
  * IT NAMES ONLY GRAMMARS IT IS SENT. It told the model to write in `grammar/register`, `grammar/ingest`, `grammar/rule`,
- * `grammar/metric` and `grammar/page` while the record put none of them in the input (`loop/finish/defects.md` G1); a
+ * `grammar/metric` and `grammar/page` while the record put none of them in the input; a
  * description now carries the grammars of what it may build under `grammar` (`SlashModelInput.grammar`,
  * `packages/record/src/grammar.ts`), and a plain press, which carries none, is pointed at the rules' drafts for its shapes.
  *
  * A SCRIPT'S HEADER IS WRITTEN OUT HERE, BECAUSE NO GRAMMAR CARRIES IT. The record files a `script` change from a press and
- * from a description (`BUILDS` and `DESCRIBED_BUILDS` in `packages/record/src/slash.ts`, `loop/finish/agents.md` AGT-27),
+ * from a description (`BUILDS` and `DESCRIBED_BUILDS` in `packages/record/src/slash.ts`),
  * while `describedGrammar` hands the model a page, a list, a figure, a rule and an ingest only. Told nothing, the model never drafted
- * the fetch the brief asks for; told the header as the kernel checks it (`scriptBody` in `packages/kernel/src/script.ts`),
+ * the fetch a script needs; told the header as the kernel checks it (`scriptBody` in `packages/kernel/src/script.ts`),
  * with the sandbox's two calls (`ctx.fetch` and `ctx.write`, `packages/script/src/prelude.ts`), it can. What a description
  * may not build is said beside it, as the record holds it (`describedScript`): a clock and no list read.
  */
@@ -186,15 +186,15 @@ const endpointUrl = (raw: string): URL => {
  *
  * `UNREACHABLE` WAS EVERY THROW, AND FOUR OF THEM CAME AFTER A MODEL RAN. `core.run` calls any throw out of `complete`
  * `UNREACHABLE`, `answer` settles that row under `-`, which no count reads, and `serveAsks`'s `RETRIED` asks it again.
- * Measured by `loop/research-batch-forty-six-audit.md` finding 4 through the self-host: a model answering one question with
+ * Measured through the self-host: a model answering one question with
  * a 200 of 70,000 characters served four completions, the endpoint reporting 16,000 completion tokens each, and the ledger
  * held four rows under `-` with `tokens_out` 0 (`apps/selfhost/test/slash-answers.test.ts`). The size and the parse are
  * read after a 200, so a model ran and the provider may have billed; the timeout is counted with them because the cap is
  * the bound on spend and a model that ran out the clock may have run to the end.
  *
- * A STATUS THAT IS NOT `ok` IS NOT ONE OF THEM, AND WAVE 47 HAD IT AS ONE. `loop/research-worker-spark.md` §6 Q8, whose
- * default is taken here for the owner: marked, a 429, a 502, a 503 or a 401 spent an ask and ended the run on the first
- * rung, where before wave 47 each was retried uncounted. A status is the endpoint saying no completion was served, so it
+ * A STATUS THAT IS NOT `ok` IS NOT ONE OF THEM, AND AN EARLIER BUILD HAD IT AS ONE. The retry default is taken here for
+ * the owner: marked, a 429, a 502, a 503 or a 401 spent an ask and ended the run on the first
+ * rung, where before that build each was retried uncounted. A status is the endpoint saying no completion was served, so it
  * is a plain throw again (`post`), and what is marked is what a provider bills: the size, the parse, a body that broke
  * off, and the timeout.
  *
@@ -217,7 +217,7 @@ export class SlashAnsweredError extends Error {
 /**
  * A status the provider will answer again on every rung, which the package settles as final and uncounted.
  *
- * Q8'S DEFAULT WAS WRITTEN FOR 5XX AND APPLIED TO EVERY STATUS. `loop/research-batch-forty-nine-audit.md` finding 4
+ * THE RETRY DEFAULT WAS WRITTEN FOR 5XX AND APPLIED TO EVERY STATUS. A probe
  * measured a 400, a 401 and a 404 to a good key on the Worker: each made 8 keyed posts over about 266 minutes, opened the
  * owner's key 8 times, and ended the run "Slash could not be reached after 8 attempts" about a provider that answered all
  * eight. A wrong model name, a wrong or expired key and a wrong `SLASH_ENDPOINT` path are the same answer tomorrow, so
@@ -289,8 +289,8 @@ const usageIn = (text: string): { in: number; out: number } | undefined => {
  * eight lines is a second place for the key to end up in a request body or an error sentence.
  *
  * TWO THROWS ARE PLAIN, AND THE PACKAGE SETTLES BOTH UNDER `-` AND THE HOST ASKS BOTH AGAIN: a `send` that never
- * resolved, and not by the clock (a refused connection, a name that did not resolve), which is audit forty-two's finding
- * 6 and stays fixed; and a 408, 425, 429 or 5xx, which is Q8's default (`SlashAnsweredError` says why). Any other status
+ * resolved, and not by the clock (a refused connection, a name that did not resolve), which stays fixed; and a 408, 425,
+ * 429 or 5xx, which is the retry default (`SlashAnsweredError` says why). Any other status
  * that is not `ok` is a `SlashRefusedError`, settled under `-` and not asked again. Everything after a 200, and the
  * timeout, is a `SlashAnsweredError`, carrying `model`, the name the body was sent with.
  */
@@ -326,7 +326,7 @@ const post = async (url: URL, options: EndpointModelOptions, body: unknown, mode
   }
   /* THE STATUS AND NOTHING ELSE. An error body can echo the request, and the request can carry the key. NEVER MARKED
      `answered`: no completion was served, so the package settles either throw under `-`. A status a later rung may find
-     mended is the plain throw the ladder asks again (Q8's default); any other is final (`SlashRefusedError`). */
+     mended is the plain throw the ladder asks again (the retry default); any other is final (`SlashRefusedError`). */
   if (!res.ok) {
     if (retried(res.status)) throw new Error(`The Slash endpoint answered ${res.status}.`);
     throw new SlashRefusedError(res.status, key ? (options.keyName ?? 'the key it was sent') : null);
@@ -427,12 +427,12 @@ const modelSent = (asked: string, configured: string | undefined): string =>
  * A count the endpoint may not have sent. Absent is zero, and zero bills nothing rather than guessing a figure.
  *
  * WHOLE AND NOT NEGATIVE, because the ledger's `tokens_in` and `tokens_out` are `INTEGER NOT NULL` and SQLite keeps what
- * it is handed: measured on 23 September, a body reporting `prompt_tokens: -40` and `completion_tokens: 2.5` reached the
+ * it is handed: measured, a body reporting `prompt_tokens: -40` and `completion_tokens: 2.5` reached the
  * package as exactly that, a count that subtracts from the month and a REAL in an integer column. A fraction is rounded
  * up, as the package's own estimate (`tokens`) rounds, so a count nobody can bill in halves is never billed low.
  *
  * AND NOT PAST `SLASH_TOKENS_CEILING`, because whole and not negative is also true of `1e300`: `Number.isInteger(1e300)`
- * holds, so wave 48's clamp handed it on, and measured on 23 September the ledger stored `tokens_in` and `tokens_out` as a
+ * holds, so the first clamp handed it on, and measured, the ledger stored `tokens_in` and `tokens_out` as a
  * REAL 1e300, with tier `a`'s `neurons` a REAL beside them (`packages/slash/test/slash-ledger-model.test.ts`). A number
  * past the ceiling, `Infinity` included, which is what `JSON.parse` makes of `1e999`, is billed at the ceiling and not as
  * zero, so a body that lies high is still counted high. `NaN > 0` is false, so a count that is not a number stays zero.
@@ -449,10 +449,10 @@ const counted = (value: unknown): number =>
  * `SLASH_MODEL` the short name is passed through, which is right for an endpoint that serves exactly one model and says so.
  *
  * ONLY A SHORT NAME IS MAPPED, AND A NAME THE OWNER TYPED PASSES THROUGH. This line used to read
- * `options.model ?? call.model`, and measured on 22 September an owner's `llama3:8b` on tier `byo` was posted as
+ * `options.model ?? call.model`, and measured, an owner's `llama3:8b` on tier `byo` was posted as
  * `ENV_MODEL`: the package hands `settings.model` down as `call.model` on tiers `b` and `byo` (`propose.ts`), so on any
- * host with `SLASH_MODEL` set the model a settings route stored was a model nothing sent (`loop/research-spark-routes.md`
- * F1). `modelSent` below is the whole rule, and `slashNamedEngine` uses the same function so that what a status names and
+ * host with `SLASH_MODEL` set the model a settings route stored was a model nothing sent.
+ * `modelSent` below is the whole rule, and `slashNamedEngine` uses the same function so that what a status names and
  * what the endpoint is sent cannot come apart.
  *
  * `response_format` IS `json_schema` AND NOT `json_object`, which is the whole difference from `endpointModel`'s ask: the
@@ -466,7 +466,7 @@ const counted = (value: unknown): number =>
  * status no retry mends is a `SlashRefusedError`, which the ladder does not ask again either and nothing counts.
  *
  * THE REPLY AND THE THROW BOTH SAY WHICH MODEL WAS SENT, because the package cannot know `SLASH_MODEL` and its row named
- * the routing short name instead: measured on 23 September through the self-host with `SLASH_MODEL=llama3`, the ledger
+ * the routing short name instead: measured through the self-host with `SLASH_MODEL=llama3`, the ledger
  * held `glm-5.3-flash` for a completion the endpoint was asked of as `llama3` (`apps/selfhost/test/slash-answers.test.ts`).
  * `slashNamedEngine` corrects `status()` the same way and with the same `modelSent`.
  */
@@ -599,7 +599,7 @@ export function anthropicModel(options: EndpointModelOptions): SlashModel {
 /**
  * The vault label the included model's key was once found under, and which no script may name (`script.ts`).
  *
- * NO KEY IS CHOSEN BY IT ANY MORE (`loop/finish/defects.md` S1). Slash's key is the grant the owner picked, by its id
+ * NO KEY IS CHOSEN BY IT ANY MORE. Slash's key is the grant the owner picked, by its id
  * (`slashOwnKeyOf`); a host's own endpoint is called with its operator's `SLASH_KEY` or with none. The name stays because
  * `script.ts` still refuses a script that names it, which is `script.ts`'s rule to retire.
  */
@@ -636,7 +636,7 @@ export type SlashHostDeps = {
    *
    * AN OPTION AND NOT THE RULE, because the self-host's keyless local model is the product working: a server on the owner's
    * own machine, and a POST with no header. An own key needs no option: it is always required (`ownOptionsOf`), because
-   * `loop/research-batch-forty-nine-audit.md` finding 2 measured a key that would not open posted without one, 8 times.
+   * a key that would not open was measured posting without one, 8 times.
    */
   keyRequired?: boolean | undefined;
 };
@@ -665,7 +665,7 @@ export function slashFromEnv(env: Readonly<Record<string, unknown>>, options: { 
  * Slash's rows at all (`23 §8`).
  *
  * THE VAULT IS NOT READ HERE. It was, for the newest live grant labelled `slash`, whenever no `SLASH_KEY` was set, so any key
- * a person labelled `slash` for another reason went to this endpoint as its bearer (`loop/finish/defects.md` S1). Now the
+ * a person labelled `slash` for another reason went to this endpoint as its bearer. Now the
  * endpoint has the operator's key or none, and the owner's key is his own key, picked by its id.
  */
 function endpointOptionsOf(config: SlashHostConfig | undefined, deps: SlashHostDeps): EndpointModelOptions | undefined {
@@ -711,7 +711,7 @@ export const SLASH_BASE_URLS: Readonly<Record<SlashProvider, string>> = {
   openai: 'https://api.openai.com/v1',
 };
 
-/** The own key as Slash's store keeps it: never the key, only the grant it lives in (`loop/finish/defects.md` S1). */
+/** The own key as Slash's store keeps it: never the key, only the grant it lives in. */
 export type SlashOwnKey = { provider: SlashProvider; base_url: string | null; model: string; grant_id: string };
 
 /**
@@ -784,7 +784,7 @@ const publicHost = (hostname: string): boolean => {
  * `https:` ONLY, NO NAME OR PASSWORD IN IT, AND A PUBLIC HOST. The key rides in the request's headers, so an address over
  * plain http hands it to every network between; a name and password in the address are a second credential stored where
  * no vault seals it; and a private or loopback host is a server inside somebody's network, where a key that opened the
- * owner's provider has no business going (`loop/finish/agents.md` AGT-21). Checked at the settings door and again on every
+ * owner's provider has no business going. Checked at the settings door and again on every
  * call (`ownAddressOf`), so an address stored before a rule here changed is held to the rule as it is now.
  *
  * WHAT THIS CANNOT SEE is a public name that resolves to a private address, because it resolves nothing. Where a Worker's
@@ -837,7 +837,7 @@ const OWN_KEY_SHUT = 'Your own key for Slash would not open on this host, so not
  *
  * THE GRANT IS THE ONE HE PICKED, BY ITS ID, AND IT MUST BE A LIVE API TOKEN. It is looked up again on each call, so a key he
  * revokes after this is built is no key, and a key that will not open is a `SlashKeyClosedError` before `post` sends: never a
- * call with no key, which to a provider is an anonymous request on his account (`loop/finish/defects.md` S2).
+ * call with no key, which to a provider is an anonymous request on his account.
  *
  * `SLASH_MODEL` IS NOT CONSULTED. It maps the package's routing names to what a host's own model runs; on his key and his
  * bill the name he typed is sent for every call, the package's short names included.
@@ -913,8 +913,7 @@ export type SlashVaultApi = Pick<RecordApi, 'kernel' | 'listGrants'>;
  *
  * `46 §5.9` step 2 HAS THE HOST OPEN THE GRANT "UNDER THE ASKER'S BROWSER SESSION". Measured in
  * `apps/selfhost/test/slash-byok-guard.test.ts` before the gate existed: a `read` colleague whose last proof was fifty minutes
- * old proposed, got 200, and the proposal went out on the owner's key, with one `grant.read` whose actor was `system`
- * (`loop/research-batch-thirty-one-audit.md` §1).
+ * old proposed, got 200, and the proposal went out on the owner's key, with one `grant.read` whose actor was `system`.
  *
  * SO THE VAULT GATE RUNS FIRST, AND IT IS THE RECORD'S AND NOT A COPY. `listGrants(ctx)` is the record's `vault(ctx)` and
  * nothing else: a person at `owner`, never a bearer, and a proof in the last fifteen minutes. It writes no event, which is
@@ -1040,13 +1039,12 @@ export type SlashGuardDeps = {
  * the first all answered 200 where the cap allowed one.
  *
  * TIER `b` LEFT THIS LIST WITH HIS OWN KEY. Its first pass drafted on this host's model, so it was counted here; now both
- * passes go to the key he picked (`slashOwnKeyFor`), on his own bill, and his asks there are listed and not capped
- * (`loop/finish/agents.md` §5 item 7).
+ * passes go to the key he picked (`slashOwnKeyFor`), on his own bill, and his asks there are listed and not capped.
  */
 const HOST_DRAFTED: readonly string[] = ['byo'];
 
 /**
- * OPTIONAL `answer`, BECAUSE THE PACKAGE GAINS IT IN A BRIEF BESIDE THIS ONE (`loop/research-infer-ask.md` §6 Brief B), and
+ * OPTIONAL `answer`, BECAUSE THE PACKAGE GAINED IT SEPARATELY, and
  * both apps pass their engine here today. Required, every host would fail to typecheck until that package landed; absent,
  * the guard adds nothing, so a host on the older package keeps the shape it had.
  */
@@ -1081,8 +1079,8 @@ const dayOf = (iso: string): string => {
  *
  * ON `byo` A PROPOSE IS COUNTED AND STOPPED LIKE A DRAFT, stored `ask_id` or not: the proposal is on this host's endpoint
  * too. Measured at `ask_cap: 1` before it was, one read and five proposes on its `ask_id` answered 200 five times on six
- * calls to the operator key, with status reading 1 of 1 (`loop/research-batch-thirty-four-audit.md` §3,
- * `apps/selfhost/test/slash-byo-propose.test.ts`).
+ * calls to the operator key, with status reading 1 of 1
+ * (`apps/selfhost/test/slash-byo-propose.test.ts`).
  */
 export function slashGuardedEngine<E extends Guarded>(engine: E, deps: SlashGuardDeps): E {
   const tierOf = (): { tier: string; grant_id: string | null; ask_cap: number } | undefined => {
@@ -1130,11 +1128,11 @@ export function slashGuardedEngine<E extends Guarded>(engine: E, deps: SlashGuar
     const stop = spent();
     return stop ? Promise.resolve({ ok: false, refusal: stop }) : engine.propose(question, ctx, byok, askId, inference);
   };
-  /* AN AUTOMATION'S QUESTION IS SPENT FROM THE SAME COUNT AS A PERSON'S READ, which is `loop/research-infer-ask.md` §5 Q2's
+  /* AN AUTOMATION'S QUESTION IS SPENT FROM THE SAME COUNT AS A PERSON'S READ, by
      default. Before this line the guard named `read` and `propose` alone, so `answer` reached the engine through the
      prototype `Object.create` leaves: measured in `test/slash-guard-answer.test.ts`, at `ask_cap: 1` with one read made,
      the engine was called once where the cap allowed none. The package accounts an answer as `kind = 'read'` with no
-     predicate (Brief B), so `drafted()` already counts it. The sentence is its own because the run shows it, and it names
+     predicate, so `drafted()` already counts it. The sentence is its own because the run shows it, and it names
      the rule and the step, never a value from the row. */
   if (typeof engine.answer === 'function') {
     const answer = engine.answer.bind(engine);
@@ -1151,7 +1149,7 @@ export function slashGuardedEngine<E extends Guarded>(engine: E, deps: SlashGuar
     };
   }
   /* A SAVE ON HIS OWN KEY MUST PICK A KEY THE VAULT HOLDS. `configure` checks a grant id's shape and never the vault, so an
-     id that is not there saved with 200 and every ask after it was 403 (`loop/research-batch-thirty-one-audit.md` §5). The
+     id that is not there saved with 200 and every ask after it was 403. The
      grant it checks is the one his key would open: the patch's, or the one already stored when the patch names none,
      which is how a revoked key reached the save. A caller who is not the owner is left to `configure`, which refuses them
      in its own sentence, so this check never tells a colleague whether a grant id exists.
@@ -1204,7 +1202,7 @@ export const slashModelNameOf = (config: SlashHostConfig | undefined): string | 
  * THE PACKAGE CANNOT KNOW THE PROVIDER ID AND MUST NOT (`46 §2`), so on tier `a` its `status()` says `glm-5.3-flash`,
  * measured as `{"tier":"a","model":"glm-5.3-flash",...}` on a host whose `SLASH_MODEL` was an Ollama tag. `23 §8` makes the
  * model name the one thing a person is never told wrong, so the host corrects it here with the same `modelSent` the
- * endpoint is sent through (`loop/research-spark-routes.md` F2). A name the owner typed on `byo` is left as it is, because
+ * endpoint is sent through. A name the owner typed on `byo` is left as it is, because
  * that is now what goes on the wire too, and so is every name on his own key, a short one included: `SLASH_MODEL` has no
  * say over what his key is asked for (`ownOptionsOf`), so it has none over what status says of it either.
  *
@@ -1251,7 +1249,7 @@ export type SlashProjectionRow = {
 export type SlashFigure = { id: string; name: string; value: number | null; unit: string | null; format: string | null };
 
 /**
- * The projection, with the two things this bridge adds to `45 §4.4`'s shape (`loop/finish/agents.md` S13).
+ * The projection, with the two things this bridge adds to `45 §4.4`'s shape.
  *
  * `figures` ON THE INDEX IS WHAT THE RECORD KEEPS, by id and name, so the predicate draft can name the one a question is
  * about; `figures` ON THE ROWS CALL IS THOSE IT NAMED, read. `cut` names each register whose rows stopped short, at the

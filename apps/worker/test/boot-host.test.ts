@@ -2,7 +2,7 @@
  * The Worker's `boot` says `host: 'cloud'`, through `Record$` as it ships.
  *
  * WHY THE HOST SAYS IT AND THE CLIENT DOES NOT GUESS. Billing told the Cloud from a self-host by whether
- * `/api/inbound/mint` answered 404 (`loop/research-held-landing.md` friction 5), because `boot` named the record and the
+ * `/api/inbound/mint` answered 404, because `boot` named the record and the
  * caller and nothing about the host. `packages/record` now copies `Build.host` onto `boot`, and leaves the key out when
  * the host names none, so a Worker that forgot to name itself would answer a `boot` with no `host` and every reader
  * would fall back to the guess. This holds the Worker to naming itself.

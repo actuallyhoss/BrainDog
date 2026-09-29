@@ -1,6 +1,6 @@
 /**
  * The record's methods under the app's address, on the self-host: `/app/<slug>/api/<method>` is `/api/<method>` when
- * the slug is this host's record, and a 403 for any other name (`loop/research-one-domain.md` §2.4).
+ * the slug is this host's record, and a 403 for any other name.
  *
  * WHY THE SELF-HOST ANSWERS IT AT ALL. The web sends every record call under a slug to `${origin}/app/<slug>`
  * (`apps/web/src/lib/at.ts` `apiBase`), so a tab opened at `/app/the-studio/r/tasks` asked this host for

@@ -1,14 +1,14 @@
 /**
  * OAuth on the Cloud: `@braindog/host/oauth`'s doors with this Worker's store, sessions and records behind them, and
- * the consent page an app's sign-in lands on (`loop/finish/agents.md` C4, AGT-3).
+ * the consent page an app's sign-in lands on.
  *
  * THE PROTOCOL IS THE HOST PACKAGE'S AND THIS FILE IS THE WIRING. The store is the Directory object, reached in one
  * RPC (`Directory$.oauth`, over `@braindog/record/oauth`); the person is the browser session `session.ts` already
  * resolves, on the record they chose; the token is minted by that record's own `createToken`, as that person, so the
- * record's ADMIN guard decides whether they may. The self-host wires the same doors to its own store (AGT-31).
+ * record's ADMIN guard decides whether they may. The self-host wires the same doors to its own store.
  *
  * THE APP'S CONSENT ROUTE HAS LANDED, AND `CONSENT_AT` IS WHERE `/oauth/authorize` SENDS THE BROWSER TO IT
- * (`/app/connect`, AGT-8, C5). This Worker's own page, server-rendered, no script, below, stays only as the
+ * (`/app/connect`). This Worker's own page, server-rendered, no script, below, stays only as the
  * fallback for a link already issued to the old address; it reads the held request, the session and the records the
  * person owns, and posts Allow and Deny to the host's doors, the same as the app's route does.
  *
@@ -42,7 +42,7 @@ import { inward, isRecordId, servesOAuth, servesOAuthMeta } from './route.ts';
 import { doorOf, withCookie, type Deps as SessionDeps, type Held } from './session.ts';
 
 /**
- * Where `/oauth/authorize` sends the browser to answer a held request: the app's own consent route (AGT-8), which
+ * Where `/oauth/authorize` sends the browser to answer a held request: the app's own consent route, which
  * reads the same held request this Worker's fallback page below does.
  */
 const CONSENT_AT = '/app/connect';

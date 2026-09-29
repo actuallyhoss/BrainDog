@@ -1,8 +1,8 @@
 /**
- * The self-host answers an automation's question to Slash: `loop/research-infer-ask-next.md` §2 Brief D.
+ * The self-host answers an automation's question to Slash.
  *
- * WHAT STOOD BETWEEN THE TWO HALVES. Brief A put the record's switch in (`answersSlash`) and left it off, and Briefs B
- * and C built `@braindog/slash`'s `answer` and `@braindog/host/slash-answers`'s `serveAsks`, and nothing on this host
+ * WHAT STOOD BETWEEN THE TWO HALVES. The record's switch (`answersSlash`) was in and left off, and
+ * `@braindog/slash`'s `answer` and `@braindog/host/slash-answers`'s `serveAsks` were built, and nothing on this host
  * called either. So a self-host with a model refused `ask_slash` at install in the words "no host in this build answers
  * an automation's question to Slash", which was true.
  *
@@ -10,7 +10,7 @@
  * every stack below and any embedder, so a pass placed there would leave a record that admits the step and a host that
  * never asks it. None of these stacks passes `actions`, which is how that placement is held.
  *
- * RED BEFORE THE WIRING, MEASURED ON 23 SEPTEMBER with `src/` as it stood at `3d596321`: seven tests, one pass, six
+ * RED BEFORE THE WIRING, MEASURED with `src/` as it stood at `3d596321`: seven tests, one pass, six
  * fail. The install case read `NOT_IN_THIS_BUILD` where it expects `null`; the answered, the doorbell and the spent cases
  * failed at the same install; and the deliverer on every kind, with a model and without, was handed the queued questions,
  * which is the pump acking each `done` with no text. The host with no model passed before and after, which
@@ -70,7 +70,7 @@ const KEYS = {
   } as never,
 };
 
-/** The brief's rule: ask Slash for a number about the task just written, then say it. */
+/** The rule under test: ask Slash for a number about the task just written, then say it. */
 const RATE = {
   id: 'rule.rate',
   kind: 'rule' as const,
@@ -182,7 +182,7 @@ async function stack(opts: { model?: boolean; deliver?: boolean; answer?: () => 
     running.sql.one<{ state: string; vars: string; say: string | null }>("SELECT state, vars, say FROM automation_run WHERE rule = 'rate' ORDER BY rowid DESC");
   const reads = () => running.sql.all<{ actor: string }>("SELECT actor FROM event WHERE kind = 'grant.read' ORDER BY rowid").map((e) => e.actor);
 
-  /** A task written, then the brief's drive: `drain`, `poll`, `drain`. */
+  /** A task written, then the drive: `drain`, `poll`, `drain`. */
   const write = async (what: string) => {
     assert.ok(running.api.kernel.create('tasks', { what }, { actor: owner }).ok);
     await running.drain();
@@ -238,7 +238,7 @@ test("THE QUESTION IS ASKED ONCE, TYPED AS A NUMBER, ON THE OWNER'S KEY OPENED I
     const value = ['bd_fake_slash_', randomBytes(24).toString('hex')].join('');
     const put = await s.post('/api/keys/put', ada, { label: 'model provider', opens: 'Slash', value });
     assert.equal(put.status, 200, 'the key was not put in');
-    /* AND PICKED IN SETTINGS BY ITS GRANT ID, since no label chooses a key any more (`loop/finish/defects.md` S1). With no
+    /* AND PICKED IN SETTINGS BY ITS GRANT ID, since no label chooses a key any more. With no
        address of his own, his key is sent to this host's endpoint. */
     const row = s.running.api.kernel.get(String(put.body?.value?.['credential'])) ?? assert.fail('the key row is not there');
     const chose = await s.post('/api/slash/settings', ada, { source: 'key', model: 'his-model', grant_id: String(row.fields['value']) });
@@ -318,8 +318,8 @@ test('WITH NO MODEL, THE RULE IS STILL REFUSED AND A QUEUED QUESTION IS LEFT WHE
   }
 });
 
-/* THE CASE WITHOUT A MODEL IS THE ONE THAT HOLDS THE PUMP'S LIST, AND THE CASE WITH ONE DOES NOT. Measured by the checker
-   on 23 September with `k !== 'infer.ask'` taken out of the pump's list: the first writing of this case, one job on a host
+/* THE CASE WITHOUT A MODEL IS THE ONE THAT HOLDS THE PUMP'S LIST, AND THE CASE WITH ONE DOES NOT. Measured
+   with `k !== 'infer.ask'` taken out of the pump's list: the first writing of this case, one job on a host
    with a model, still passed, because `serveAsks` runs first in `poll` and had already leased it. Six jobs, one more than
    the five a pass leases, passed as well: the pass's own `tail` rings the doorbell for the sixth, and the second `poll`
    that rings leases it before the first reaches the pump. On a host with no model nothing leases the question but the
@@ -352,7 +352,7 @@ for (const model of [true, false]) {
 
 const HOUR = 60 * MINUTE;
 
-/** The audit's endpoint: a 200 whose completion is 70,000 characters, reporting 16,000 completion tokens. */
+/** The probe's endpoint: a 200 whose completion is 70,000 characters, reporting 16,000 completion tokens. */
 const AT_LENGTH = (): Response =>
   new Response(
     JSON.stringify({
@@ -362,18 +362,18 @@ const AT_LENGTH = (): Response =>
     { status: 200 },
   );
 
-/* `loop/research-batch-forty-six-audit.md` FINDING 4, THE AUDIT'S PROBE AS A CASE. The host threw `UNREACHABLE` for a 200
-   it could not read, the package settled that under `-`, which no count reads, and `RETRIED` asked again: measured by the
-   audit, four completions served for one question and four rows under `-` with `tokens_out` 0, until the one-day wait
+/* A PROBE AS A CASE: A READ THAT FAILS AFTER A 200 IS NOT ASKED AGAIN. The host threw `UNREACHABLE` for a 200
+   it could not read, the package settled that under `-`, which no count reads, and `RETRIED` asked again: measured,
+   four completions served for one question and four rows under `-` with `tokens_out` 0, until the one-day wait
    (`ASK_SLASH_WAIT_MS`) ended the run. Forty passes six hours apart are ten days, well past that wait, so a ladder that
-   still asks again is seen asking. RED ON 23 SEPTEMBER before the repair: four completions served, and four rows
+   still asks again is seen asking. RED before the repair: four completions served, and four rows
    `{"model":"-","tokens_in":411,"tokens_out":0,"status":"error","code":"UNREACHABLE"}`, the estimate and not the count.
-   THE ROW NAMES `llama3`, THE MODEL THIS HOST SENT, AND NOT THE PACKAGE'S SHORT NAME. As wave 47 landed it the row read
+   THE ROW NAMES `llama3`, THE MODEL THIS HOST SENT, AND NOT THE PACKAGE'S SHORT NAME. It once read
    `glm-5.3-flash`: `answer` passes no model to `core.run`, which names the template's, and the host maps that name onto
-   `SLASH_MODEL` on the way out, so the ledger named a model nothing was sent. RED ON 23 SEPTEMBER, before the host's
+   `SLASH_MODEL` on the way out, so the ledger named a model nothing was sent. RED before the host's
    reply and its throw said what they sent: `{"model":"glm-5.3-flash",...,"code":"PROPOSAL_SCHEMA"}`, the name and the
    code both the ones this case no longer expects. The code is `ANSWER_UNREADABLE`, the answered-unreadable failure's own,
-   where wave 47 borrowed `PROPOSAL_SCHEMA`, which `30 §6` files as output that fails its schema, not output never read. */
+   where an earlier build borrowed `PROPOSAL_SCHEMA`, which `30 §6` files as output that fails its schema, not output never read. */
 test('A MODEL THAT ANSWERED AT A LENGTH THIS HOST DOES NOT READ IS ASKED ONCE, and the one row carries its name and its tokens', async () => {
   let now = Date.parse('2026-09-23T12:00:00.000Z');
   const s = await stack({ answer: AT_LENGTH, now: () => now });
@@ -404,10 +404,9 @@ test('A MODEL THAT ANSWERED AT A LENGTH THIS HOST DOES NOT READ IS ASKED ONCE, a
 /* THE MARK ITSELF, ON THE HOST'S REAL `endpointInference`. Every throw after a 200 carries `answered: true`, and the
    timeout does too, because the cap is the bound on spend and a model that ran out the clock may have run to the end.
    A `send` that never resolved keeps no mark, which is what keeps an outage off the cap, and so does a status that is
-   not `ok` (`loop/research-worker-spark.md` §6 Q8's default): a 503 is the endpoint saying no model ran, and marked, wave
-   47 spent an ask on it and ended the run on the first rung. RED ON 23 SEPTEMBER, before wave 47: no throw carried a
-   mark, the body that was not JSON threw the parser's own `SyntaxError`, and the timeout threw "The operation was
-   aborted due to timeout". The status case was then red the other way, `answered: true`, until Q8's default. */
+   not `ok`: a 503 is the endpoint saying no model ran, and marked, an earlier build spent an ask on it and ended the run
+   on the first rung. RED before the mark: no throw carried a mark, the body that was not JSON threw the parser's own `SyntaxError`, and the timeout threw "The operation was
+   aborted due to timeout". The status case was then red the other way, `answered: true`, until a status that is not `ok` went unmarked. */
 test('THE HOST MARKS EVERY THROW AFTER THE ENDPOINT ANSWERED, AND THE TIMEOUT, AS ANSWERED, and a refused connection as not', async () => {
   const call = { model: 'glm-5.3-flash', messages: [{ role: 'user' as const, content: 'q' }], maxTokens: 64, jsonSchema: {} };
   const thrown = async (send: (url: URL, init: RequestInit) => Promise<Response>) => {
@@ -424,7 +423,7 @@ test('THE HOST MARKS EVERY THROW AFTER THE ENDPOINT ANSWERED, AND THE TIMEOUT, A
     size: await thrown(async () => AT_LENGTH()),
     parse: await thrown(async () => new Response('<html>a proxy page</html>', { status: 200 })),
     /* A 200 WHOSE BODY BREAKS OFF MID-READ, a connection reset after the headers. Without this case the body read's mark
-       could be taken off and every other case here stayed green, measured on 23 September by the checker. */
+       could be taken off and every other case here stayed green, measured. */
     broke: await thrown(
       async () =>
         new Response(
@@ -475,10 +474,10 @@ const ladder = async (s: Awaited<ReturnType<typeof stack>>, tick: () => void): P
   }
 };
 
-/* `loop/research-worker-spark.md` §6 Q8, ITS DEFAULT TAKEN FOR THE OWNER: A NON-2xx STATUS IS NOT AN ANSWER. As wave 47
-   landed, the host marked a 503 `answered`, so the package spent an ask on it and `serveAsks` acked the run `done` on
-   the first rung. Before wave 47 a 503 was retried uncounted, and that is what this case holds again. RED ON 23
-   SEPTEMBER against wave 47's `post` and `answer`: the run read `failed` where this expects `done`, after one call. */
+/* A NON-2xx STATUS IS NOT AN ANSWER. An earlier build marked a 503 `answered`, so the package spent an ask on it and
+   `serveAsks` acked the run `done` on the first rung. Before that a 503 was retried uncounted, and that is what this
+   case holds again. RED against that build's `post` and `answer`: the run read `failed` where this expects `done`,
+   after one call. */
 test('A 503 AND THEN A GOOD 200 ENDS THE RUN DONE, on one counted ask, with the 503 settled under the mark for a model not reached', async () => {
   let now = Date.parse('2026-09-23T12:00:00.000Z');
   const s = await stack({ answer: inTurn([503]), now: () => now });
@@ -504,8 +503,8 @@ test('A 503 AND THEN A GOOD 200 ENDS THE RUN DONE, on one counted ask, with the 
   }
 });
 
-/* THE SAME DEFAULT, AT ITS WORST: A PROVIDER THAT ANSWERS 429 ON EVERY RUNG. Each attempt is a row, so the outage is in
-   the ledger, and every row is under `-`, which neither count reads. RED ON 23 SEPTEMBER against wave 47: one model call
+/* THE SAME RULE, AT ITS WORST: A PROVIDER THAT ANSWERS 429 ON EVERY RUNG. Each attempt is a row, so the outage is in
+   the ledger, and every row is under `-`, which neither count reads. RED against the earlier build: one model call
    in forty passes, the ladder never asking again because the first 429 had already ended the run as a counted ask. */
 test('A 429 ON EVERY RUNG SPENDS NOTHING, and the ladder is seen asking again', async () => {
   let now = Date.parse('2026-09-23T12:00:00.000Z');

@@ -1,5 +1,5 @@
 /**
- * An `/api` body is weighed as it arrives. Brief W60-1, `loop/research-hardening.md` §2.2.
+ * An `/api` body is weighed as it arrives.
  *
  * THE WORKER HAD NO CAP AT ALL. `serveApi` read every POST with `request.json()`, so the only ceiling on the Cloud was
  * the platform's own, and the whole body was held in the record's Durable Object, whose memory is 128 MB
@@ -8,7 +8,7 @@
  * API since it was written; `/mcp` already holds it (`packages/mcp/src/http.ts`, `MAX_BODY_BYTES`).
  *
  * `import` IS THE ONE METHOD WHOSE BODY IS A WHOLE FILE, and a flat megabyte would have broken it: a real copy measured
- * 95 bytes a row (`loop/research-restore.md`), so 1 MiB is about 11,000 rows. It keeps a ceiling of its own, and the
+ * 95 bytes a row, so 1 MiB is about 11,000 rows. It keeps a ceiling of its own, and the
  * argument for its number is at its declaration in `src/index.ts`.
  *
  * THE HANDLERS HERE ARE FAKES THAT COUNT. Whether the record would have accepted the row is not the question; whether
@@ -41,7 +41,7 @@ function counting() {
 /** A JSON body of about `bytes` bytes, as `create` would send it. */
 const createOf = (bytes: number): string => JSON.stringify({ list: 'notes', values: { what: 'x'.repeat(bytes) } });
 
-/** A `.brainl` in the body `import` takes: one line per row, each about the 95 bytes `research-restore.md` measured. */
+/** A `.brainl` in the body `import` takes: one line per row, each about the 95 bytes a real copy measured. */
 function importOf(bytes: number): { body: string; lines: string[] } {
   const line = JSON.stringify({ t: 'dog_row', id: 'r_01JZ8QK3F7R2M9V4XN6TCB5HAD', v: 'x'.repeat(40) });
   const lines = Array.from({ length: Math.ceil(bytes / (line.length + 3)) }, () => line);

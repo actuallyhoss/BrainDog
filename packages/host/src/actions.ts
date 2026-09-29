@@ -1,5 +1,5 @@
 /**
- * The one send loop for scheduled actions (`pull`, `call` and `poll`, `loop/DIRECTION.md` §0b), shared by both hosts.
+ * The one send loop for scheduled actions (`pull`, `call` and `poll`), shared by both hosts.
  *
  * THE RECORD BUILDS THE REQUEST AND THIS FILE SENDS IT. The kernel's `runActions` hands over a method, an address,
  * the origin the declaration names and the key it wants by reference. This file decides whether the request may
@@ -93,7 +93,7 @@ const hexOf = (bytes: Uint8Array): string => [...bytes].map((byte) => byte.toStr
 /**
  * A pattern source for one character of a key as a JSON string or an HTML page may write it: itself, as `JSON.stringify`
  * writes it, as `\/`, as `\uXXXX` (a pair of them past the BMP), as `&#NN;` or as `&#xNN;`, the hex in either case and
- * leading zeros allowed in a reference. A character in `[A-Za-z0-9_-]` is only itself, which no encoder the audits measured escapes by default.
+ * leading zeros allowed in a reference. A character in `[A-Za-z0-9_-]` is only itself, which no encoder measured escapes by default.
  */
 function escapable(char: string): string {
   if (/^[A-Za-z0-9_-]$/.test(char)) return char;
@@ -108,8 +108,8 @@ function escapable(char: string): string {
  * The spellings of an opened key that `sendAction` takes out of what it returns: the patterns first, then the exact
  * texts longest first, so no shorter spelling is struck out of a longer one before the longer is found.
  *
- * THE EXACT BYTES WERE THE ONLY SPELLING, AND A PROVIDER THAT ECHOES THE HEADER NEED NOT ECHO THOSE. Measured by the
- * audit of wave thirty-five in workerd, through the real gateway, with a key holding a `/`: a provider that answered the
+ * THE EXACT BYTES WERE THE ONLY SPELLING, AND A PROVIDER THAT ECHOES THE HEADER NEED NOT ECHO THOSE. Measured in
+ * workerd, through the real gateway, with a key holding a `/`: a provider that answered the
  * authorization header JSON-escaped the PHP way (`\/`), base64-encoded whole, or URL-encoded put all three into the
  * sandbox intact, and from there `ctx.log(await r.text())` carried the key onto the run's event.
  *
@@ -138,16 +138,16 @@ function escapable(char: string): string {
  *     with a NUL after it (little-endian) or before it (big-endian). Only for a key that is all ASCII, whose code units
  *     each read back as one character and a NUL; a key with any other character is not caught in UTF-16.
  *
- * WRAPPED BASE64, QUOTED-PRINTABLE AND UTF-16 WERE MEASURED GETTING THROUGH by audit thirty-seven (finding 5) with a
+ * WRAPPED BASE64, QUOTED-PRINTABLE AND UTF-16 WERE MEASURED GETTING THROUGH with a
  * 64-character key and a provider that echoed the authorization header: each reached the script with no other spelling
- * intact, and one line of the script's own put the key back together (removing the breaks, or the NULs). Audit
- * thirty-nine (finding 7) measured nine more the same way, with the same key: hex in either case, every byte percent-
+ * intact, and one line of the script's own put the key back together (removing the breaks, or the NULs). A second
+ * probe measured nine more the same way, with the same key: hex in either case, every byte percent-
  * encoded, URL-encoded twice, quoted-printable in lower-case hex, System.Text.Json's `+`, Go's `&#43;`, hex
  * character references for `=`, `/` and `+`, and base64 folded with a CRLF and a space. `test/actions.test.ts` holds
  * every one, and each spelling above that was added for them turns a case red when it is taken out.
  *
  * WHAT IT COSTS: every pattern and every text is one pass over the body, and none of them backtracks further than the
- * key's own length from any position, so the scrub is linear in the body. Measured on 2026-09-23 over the scrub alone
+ * key's own length from any position, so the scrub is linear in the body. Measured over the scrub alone
  * with that key, before these nine and after: 1 MB of JSON rows holding the key once took 0.75 ms and then 1.06 ms; the
  * worst body tried, the key's folded base64 less its last character repeated to 1 MB, took 0.57 ms and then 6.39 ms,
  * and 3.07 ms at 512 KB. Through the whole `sendAction`, reading the body included, 1 MB went from 2.6 ms to 2.9 ms.
@@ -278,8 +278,8 @@ export type Admissions = { ask: (record: string, action: string, mayRun: Ledger[
  * with; `release` gives the place back, once, and a second call does nothing. `count` reads without reserving.
  *
  * A PASS'S OWN COUNT DIES WITH THE PASS, AND A TRIAL HAS NO PASS. `pass()` holds its admissions in a closure, which is
- * right for the runs of one pass and blind to anything else spending the same month. Measured by audit thirty-seven
- * over a real Directory: five trials at once with one run left all ran, and the month closed at 15,004 of 15,000
+ * right for the runs of one pass and blind to anything else spending the same month. Measured over a real
+ * Directory: five trials at once with one run left all ran, and the month closed at 15,004 of 15,000
  * (`test/script-try-spend.test.ts`). This is the count that outlives one pass, keyed by record, so the trials a host
  * runs between passes, and a pass running beside them, ask the ledger with each other's runs in hand.
  */
@@ -636,8 +636,7 @@ export const AUTOMATION_HELD = 'This automation';
 export const RUNS_HOLD_EVERY_MS = 15 * 60_000;
 
 /**
- * An automation's hold, asked of the same ledger and in the same words an action's pass asks (`loop/finish/decisions.md`
- * C34), kept for `RUNS_HOLD_EVERY_MS`. One per record's runtime, like `IN_FLIGHT`.
+ * An automation's hold, asked of the same ledger and in the same words an action's pass asks, kept for `RUNS_HOLD_EVERY_MS`. One per record's runtime, like `IN_FLIGHT`.
  *
  * A QUESTION THAT THROWS HOLDS NOTHING and is asked again the next time: a Directory that cannot be reached never stops
  * a record's automations on its own say-so.
@@ -1041,7 +1040,7 @@ export type PublicRead = { ok: true; text: string; bytes: number } | { ok: false
 
 /**
  * Reads one https address a person pasted to install a use case from, on the host, so a site that sends no CORS
- * header can still be read (`loop/research-spark.md` S14).
+ * header can still be read.
  *
  * THE SAME FENCE AS A SCHEDULED ACTION, without the declared origin: https only; never a host written as a private or
  * local address, and on the self-host never a name that resolves to one (`pin`); redirects three at most, each hop
@@ -1098,7 +1097,7 @@ export function readPublic<P extends object | undefined = undefined>(options: { 
 /* ── what one invocation may spend ───────────────────────────────────────── */
 
 /**
- * Requests one Cloudflare invocation may make, from `research-scheduled-actions` §2.3.
+ * Requests one Cloudflare invocation may make.
  *
  * EIGHT HUNDRED AND NOT A THOUSAND, which is what the Paid plan actually allows. The two hundred is
  * for everything this file cannot see: the object's own reads, a Directory call, a queue send. A

@@ -1,6 +1,6 @@
 /**
  * The pass that answers an automation's question to Slash: lease the `infer.ask` jobs, ask `answer` for each, ack each
- * with what came back, then tail the scheduler once. `loop/research-infer-ask.md` §4 and §6 Brief C.
+ * with what came back, then tail the scheduler once.
  *
  * THE RECORD IS THE QUEUE AND THE JUDGE, AND THIS IS ONLY THE PASS. `flow.ts` `ask()` queued the question, `answerStep`
  * holds the text to the shape the rule asked for, and `outbox.ts` `ack` walks the ladder and ends the run with a sentence
@@ -31,7 +31,7 @@ import type { ModelJobEmbed } from './model-jobs.ts';
  * One question, as `flow.ts` `ask()` queues it and `@braindog/slash`'s `answer` takes it.
  *
  * `step` IS THE KERNEL'S, COUNTED FROM 0, and every sentence a person reads says `step + 1`, as `flow.ts` does. `rule` is
- * Brief A's addition to the payload: Slash's ledger row is written as `rule.<id> step <n>` and the key is opened as
+ * a later addition to the payload: Slash's ledger row is written as `rule.<id> step <n>` and the key is opened as
  * `rule:<id>`, so a job without it cannot be answered in anybody's name.
  */
 export type SlashAsk = {
@@ -59,14 +59,14 @@ export type SlashAsksServed = { answered: number; failed: number; refused: numbe
 /**
  * The one refusal a retry can change.
  *
- * `UNREACHABLE` SAYS THE MODEL WAS NOT REACHED, AND EVERY OTHER REFUSAL IS SLASH DECIDING. The brief names three that end
+ * `UNREACHABLE` SAYS THE MODEL WAS NOT REACHED, AND EVERY OTHER REFUSAL IS SLASH DECIDING. Three refusals end
  * the run (`SLASH_BUDGET_SPENT`, `PROPOSAL_SCHEMA`, `FORBIDDEN`), and this is the same rule stated from the other side, so
  * a refusal the package adds later ends the run with its own sentence rather than walking eight rungs. A cap that is
  * spent is spent for the month, and asking it seven more times would be seven more hold rows on the owner's allowance.
  *
  * AND A RETRY OF `UNREACHABLE` SPENDS NOTHING. The package settles that row under `-`, which no count reads
  * (`packages/slash/src/answer.ts`, `test/slash-answers-unreachable.test.ts`). Settled under the model's name, each rung
- * was an ask: `loop/research-batch-forty-two-audit.md` finding 6 put a fifteen-minute clock rule through a two-hour
+ * was an ask: a fifteen-minute clock rule through a two-hour
  * outage at about forty asks that reached nothing, half the default cap of 80, by the ladder's arithmetic and not by a run.
  */
 const RETRIED: ReadonlySet<string> = new Set(['UNREACHABLE']);
@@ -83,7 +83,7 @@ type Settled =
  * The job's payload as a question, or the step it was at when it cannot be read.
  *
  * EVERY FIELD IS CHECKED, AND ONLY THE KNOWN ONES ARE PASSED ON. The payload is the kernel's own JSON, but a row queued by
- * a build before Brief A has no `rule`, and a model call built from a half-read job would bill the owner for a question
+ * a build older than `rule` has none, and a model call built from a half-read job would bill the owner for a question
  * whose answer nothing could file.
  */
 function askOf(payload: string): SlashAsk | { unread: true; step: number | undefined } {
@@ -195,7 +195,7 @@ export async function serveAsks(
   return out;
 }
 
-/* ── the record's model jobs: a pattern's draft and a digest's two sentences (`loop/finish/contracts.md` X8) ────────── */
+/* ── the record's model jobs: a pattern's draft and a digest's two sentences ───────────────────────────────────────────── */
 
 /**
  * One arrival a pattern is drafted from: `@braindog/slash`'s `RawPayload`, restated because this package never imports
@@ -215,7 +215,7 @@ export type DraftSample = {
  * (`{ question, body_kind, body }`, `packages/kernel/src/outbox.ts`), and files as `slash` in the ack's transaction.
  *
  * THE INGEST IS A DECLARATION, `{ id, kind: 'ingest', body }`, BECAUSE THAT IS WHAT AN ACCEPT INSTALLS: a bare body was
- * filed and then refused at every accept (`loop/finish/defects.md` A7).
+ * filed and then refused at every accept.
  */
 export type DraftedPattern = {
   question: string;

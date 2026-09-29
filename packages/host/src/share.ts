@@ -1,7 +1,7 @@
 /**
  * A link to one page that anybody holding it may read: the token both hosts sign and check, the door that reads it,
- * and the step that turns the record's `openShare` answer into a link (`loop/finish/platform.md` §4.0 H,
- * `docs/51-SPEC-WORKER.md` §5.6).
+ * and the step that turns the record's `openShare` answer into a link
+ * (`docs/51-SPEC-WORKER.md` §5.6).
  *
  * THE RECORD NEVER HOLDS THE KEY. A link's token is `<record id>.<claim>.<mac>`: the claim is `{ id, slug, exp }`
  * written as JCS and then base64url, and the MAC is HMAC-SHA-256 over `<record id>.<claim>` under a key derived from

@@ -1,11 +1,10 @@
 /**
  * What `braindog import <adapter> <export>` asks of an adapter, how it finds one, and the pack offers it resolves for
- * it (`loop/research-legacy-parity.md` brief B2, `loop/DIRECTION.md` sections 22 and 27).
+ * it.
  *
- * THE COMMAND WAS ONE PERSON'S MIGRATION. The importer took one word, the name of his old record, and a planner of
- * 3,589 lines that knew about 180 of that record's field names and eight of its word tables was compiled into
- * `apps/cli`. Another person's export had no way in, and section 27 moves his record only once nothing in `apps/`
- * exists because he has it. So the line is drawn where the knowledge is. What is true of any import stays here: read
+ * THE LINE IS DRAWN WHERE THE KNOWLEDGE IS. A planner that knows one tool's field names and word tables compiled into
+ * `apps/cli` leaves every other person's export with no way in, and nothing in `apps/` should exist because one
+ * person has one tool. What is true of any import stays here: read
  * every list to the end, find each row again by the key in its tags, write only what differs, hold back what the owner
  * deleted, and remember the night. What is true of one tool's export is the adapter's: how to read it, which rows it
  * makes, and which words mean what, the last of those in a mapping file beside it that a person can edit.

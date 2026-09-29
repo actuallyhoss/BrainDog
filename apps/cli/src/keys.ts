@@ -1,9 +1,9 @@
 /**
  * `braindog keys put <label>`, `braindog keys exec <label> -- <command>` and `braindog keys headers <credential> --as
  * <Header>`: a key into the vault, a key handed to one command, and a key handed to one program as the header it asks
- * for, through the host's key doors, under a vault grant (`loop/research-agent-path.md` §5.7, `docs/48-SPEC-CLI.md` §2).
+ * for, through the host's key doors, under a vault grant (`docs/48-SPEC-CLI.md` §2).
  *
- * `put` WITH NO VAULT GRANT TO USE SENDS THE LOGIN INSTEAD (`loop/finish/agents.md` C1). The deposit door takes a
+ * `put` WITH NO VAULT GRANT TO USE SENDS THE LOGIN INSTEAD. The deposit door takes a
  * `write` token too, and the record puts the key in this run's project as a NEW key: a label already there is refused
  * with the sentence that names the two ways a value is replaced. So an agent that finds a key can put it away on a
  * machine that was never given a vault grant, and a login that leaks can add a key and never swap one. `exec` reads a
@@ -14,8 +14,8 @@
  *
  * AND ONE COMMAND PRINTS A KEY, TO A PROGRAM AND NEVER TO A PERSON. `exec` reads one back and puts it into the
  * environment of the command after `--`, under one variable, and nowhere else: not standard output, not standard
- * error, not a file. A printed key lands in a terminal's scrollback or an agent's transcript, which is the leak §5.7
- * closes. `headers` is the one exception (`loop/finish/agents.md` C9, owner item 3): Claude Code's `headersHelper`
+ * error, not a file. A printed key lands in a terminal's scrollback or an agent's transcript, which is the leak this
+ * closes. `headers` is the one exception, at the owner's request: Claude Code's `headersHelper`
  * reads an HTTP server's headers only from a command's standard output, so a key an HTTP tool needs in a header can
  * reach it no other way. It refuses standard output that is a terminal before it reads or sends anything, it opens
  * the key under a vault grant as `exec` does, which the host logs as a `grant.read`, and it prints the one header

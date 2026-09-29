@@ -1,6 +1,5 @@
 /**
- * `braindog session show|next|tried|note|end`: the handoff from a shell
- * (`loop/research-agent-path.md` §6).
+ * `braindog session show|next|tried|note|end`: the handoff from a shell.
  *
  * NO VERB NAMES A RUN. Each one addresses the run the session file for this folder names, which is how
  * every other command names one: the session headers carry it, and `handoff` refuses a token that names
@@ -131,7 +130,7 @@ async function show(rest: string[], io: AgentIo): Promise<number> {
   const place = c.project ? `project ${clip(c.project.name, 60)}` : 'no project here';
   /* A STATE IS THE RECORD'S WORD, not a closed list: the client types it `string | null`, and `braindog context` clips
      the same field in its headline. Printed as sent here, a DEL and a U+009B in it reached the terminal. THE SPOKEN ID
-     IS THE RECORD'S WORD TOO, so it is clipped to the 40 characters `headline` in `context.ts` gives it (defects G5). */
+     IS THE RECORD'S WORD TOO, so it is clipped to the 40 characters `headline` in `context.ts` gives it. */
   const spoken = clip(c.session.spoken, 40);
   io.out(c.session.state === null ? `${spoken} · ${place}.` : `${spoken} is ${clip(c.session.state, 40)} · ${place}.`);
 

@@ -1,5 +1,5 @@
 /**
- * The Worker's half of parity B7: `bearerOf` puts the reach `verifyToken` read from the token's own row on the token
+ * The Worker's half of a token's reach: `bearerOf` puts the reach `verifyToken` read from the token's own row on the token
  * principal, and the record's inbox gate then admits that token and no other.
  */
 

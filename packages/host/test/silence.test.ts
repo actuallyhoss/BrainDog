@@ -67,8 +67,8 @@ test('and so is a handler that answers something that is not a Result at all', a
 
 test('and a handler that throws answers a reference, and the reason goes to the log and nowhere else', async () => {
   /* THIS TEST USED TO PIN THE LEAK AS CORRECT: it asserted the fix was `boot could not be answered: the database is on
-     fire.`, the thrown message verbatim, so the sentence a driver writes about a row reached whoever asked
-     (`loop/research-hardening.md` §2.1). It now asserts the other half: the same reference in the answer and in the
+     fire.`, the thrown message verbatim, so the sentence a driver writes about a row reached whoever asked.
+     It now asserts the other half: the same reference in the answer and in the
      one line logged, and the reason only in the line. `test/crash.test.ts` holds the probe's own sentence. */
   const lines: unknown[] = [];
   const was = console.error;

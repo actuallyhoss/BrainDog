@@ -1,6 +1,6 @@
 /**
  * A root key rotation on the self-host, walked through the self-host's own code over a real record and real key files
- * (`53 §5.6` step 8, `loop/finish/ops.md` OPS-16).
+ * (`53 §5.6` step 8).
  *
  * WHAT RUNS HERE IS THE HOST'S CODE, NOT A COPY OF IT. `openKeyStore` opens the key file and the `<file>.prev` beside
  * it and says at boot what a new key file does; `keyOpener` offers `openGrant` the id the record is wrapped under

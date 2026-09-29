@@ -1,5 +1,5 @@
 /**
- * The Worker's front doors (`loop/finish/ops.md` OPS-4): a crash answered by reference, the limit asked before a record
+ * The Worker's front doors: a crash answered by reference, the limit asked before a record
  * is, and the JSON lines the operator's alerts are queries over.
  *
  * THE CRASH IS MADE WHERE A STRANGER CAN MAKE ONE: a Directory that throws, which is the first binding every record door

@@ -1,5 +1,5 @@
 /**
- * The route rows for shared links to one page (`packages/record/src/methods/shares.ts`, `loop/finish/platform.md` §4.0 H).
+ * The route rows for shared links to one page (`packages/record/src/methods/shares.ts`).
  *
  * ONE ROW A LINE, IN THE SHAPE `ROUTES` HAS ALWAYS HAD, because the two gates over the table read it by that shape:
  * `router-groups` holds each row's group to `docs/30-BLUEPRINT.md` §5, and `guards` holds the record method of the same

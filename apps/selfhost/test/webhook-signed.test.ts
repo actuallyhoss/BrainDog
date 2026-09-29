@@ -1,5 +1,5 @@
 /**
- * The self-host signs a digest's webhook as the Worker does, or does not post it (KRN-13, delivery half).
+ * The self-host signs a digest's webhook as the Worker does, or does not post it (the delivery half).
  *
  * MEASURED AT afb3b1b2, BEFORE THIS FILE: the self-host had no way to sign a post at all. `Deliver` is handed the job
  * and nothing else, the record's `sealedGrant` refused every job that was not a `pull.fetch`, and `main.ts` passes no

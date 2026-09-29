@@ -1,5 +1,5 @@
 /**
- * The address a device start tells a person to open (`loop/research-one-domain.md` Brief D).
+ * The address a device start tells a person to open.
  *
  * THE APP LIVES UNDER `/app` NOW, so `${origin}/settings/agents` is a page on the marketing site: once `brain.dog`
  * serves both, the old address answers the site's 404 and the six digits have nowhere to be typed. On the Worker the

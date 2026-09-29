@@ -160,9 +160,9 @@ test("THE OWNER'S TRIAL OPENS HER KEY IN HER NAME, and the grant.read it leaves 
 });
 
 /*
- * A TRIAL OPENED THE OWNER'S KEY FOR A SESSION THE VAULT ITSELF REFUSES (audit thirty-eight, finding 2). The record
+ * A TRIAL OPENED THE OWNER'S KEY FOR A SESSION THE VAULT ITSELF REFUSES. The record
  * handed the trial the vault on `level === 'owner'` alone, and the vault's own gate asks one thing more, a proof under
- * fifteen minutes old. Measured by the audit on this stack: a session proved two hours ago was refused `listGrants` with
+ * fifteen minutes old. Measured on this stack: a session proved two hours ago was refused `listGrants` with
  * `NEEDS_BROWSER_SESSION`, and the same cookie's `scriptTry` sent one request carrying the owner's key and left a
  * `grant.read` signed with her id, for an opening her session could not have made. A cookie is thirty days of standing
  * access, and the draft chooses the origin, so the trial was what a laptop left open reached.

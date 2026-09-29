@@ -25,8 +25,8 @@
  * over everything written since. That wiring is `index.ts`'s and not this file's.
  *
  * AND NONE OF THE RESTORE HALF HAS RUN ON A REAL DURABLE OBJECT. Local workerd throws "does not
- * implement point-in-time recovery" for both restore methods (`loop/research-restore.md` answer 7,
- * measured), so the test drives a fake storage, and the proof is one restore on alpha.
+ * implement point-in-time recovery" for both restore methods
+ * (measured), so the test drives a fake storage, and the proof is one restore on alpha.
  */
 
 import type { Snapshot, Snapshots } from '@braindog/ports';
@@ -90,7 +90,7 @@ export function cloudSnapshots(
    * Every copy under the prefix, with its metadata, paged.
    *
    * ONE LISTING WITH `include` AND NOT A `head` PER COPY. R2 carries `customMetadata` in a listing
-   * only when asked, and `r2Snapshots` never asks (`research-restore.md` 3.3 measured its list with
+   * only when asked, and `r2Snapshots` never asks (its list was measured with
    * no bookmark and every instant at midnight). Forty-odd copies is one page either way.
    */
   const held = async (): Promise<(CloudCopy & { key: string })[]> => {

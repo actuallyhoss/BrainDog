@@ -68,7 +68,7 @@ test('A RECORD MADE AT 1.0.0 IS OFFERED ONLY THE PACKS THAT CHANGED, and updatin
   assert.equal(packs.updates, undefined, 'nothing is offered once the updates are in');
 
   /* A PACK ALREADY AT ITS VERSION HAS NOTHING TO UPDATE, and asking says so. This was asked before the updates of a
-     pack still at 1.0.0, People, until People 2.0.0 (M3 B9) left no first-party pack at 1.0.0; asked after them it is
+     pack still at 1.0.0, People, until People 2.0.0 left no first-party pack at 1.0.0; asked after them it is
      the same question of a pack with nothing new. */
   const same = await api.propose({ question: 'Update People?', body_kind: 'pack', body: { install: 'people' } } as never, agent);
   assert.equal((same as { ok: boolean }).ok, false);

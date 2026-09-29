@@ -1,5 +1,5 @@
 /**
- * `braindog setup <url> [--dry-run]`: one command sets a machine up from the record (`loop/finish/agents.md` C9).
+ * `braindog setup <url> [--dry-run]`: one command sets a machine up from the record.
  *
  * THE STEPS IN ORDER, EACH ONE ALREADY A COMMAND OF ITS OWN: sign in unless a live login for the host is held,
  * `install --apply` into the user profile, the `braindog` MCP server registered at user scope, `tools write --scope

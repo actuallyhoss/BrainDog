@@ -1,33 +1,29 @@
 /**
- * Follow-ups close with their parent, and start in its project: W59-1 (`loop/research-living-in-it.md` section 7), on a
- * real self-host with the Work pack installed, and why the brief STOPPED at its first step.
+ * Follow-ups close with their parent, and start in its project, on a real self-host with the Work pack installed.
  *
- * THE BRIEF'S ROUTE WAS A RULE ON THE PARENT THAT RUNS A SCRIPT (section 5): `when: state is done`, `then: [{ run:
- * <script> }]`, and a script that lists the parent's children and queues an `update` for each. Section 5 said plainly
- * that the three had not been driven together, and the brief was to stop and report if they did not compose. They do
- * not, by either of the two ways a rule can reach a script in this build, measured on 24 September at `8a489d4c`:
+ * A RULE ON THE PARENT THAT RUNS A SCRIPT is the route: `when: state is done`, `then: [{ run: <script> }]`, and a script
+ * that lists the parent's children and queues an `update` for each. There are two ways a rule could reach a script,
+ * and only one composes:
  *
  *   1. A RULE'S `run:` NAMES A CALL AND NOTHING ELSE. `flow-lint.ts`'s `callFault` looks the name up as `ingest.<name>`,
  *      so a `script.close_children` with `runs: { rule: true }` beside it is not found, and the install is refused:
  *      `DECLARATION_UNKNOWN: rule.close_children runs close_children, and there is no action called close_children.`
  *      The kernel's `queueCall` would refuse it again at run time, since it asks for `channel: call`. `runs: { rule:
  *      true }` on a script is read by the egress line that tells the owner about it, and by nothing that starts one.
- *   2. AN AUTOMATION'S `script` STEP INSTALLS AND FAILS EVERY RUN. `on: { written: { register: tasks } }` with the step
- *      under `if: state is done` is accepted, a run starts on every write, and `flow.ts` fails it at the step:
+ *   2. AN AUTOMATION'S `script` STEP. `on: { written: { register: tasks } }` with the step under `if: state is done`
+ *      is accepted and a run starts on every write. Before the step was built, `flow.ts` failed it at the step:
  *      `rule.close_children reached a script step, and a step that waits on a script is not in this build
  *      (NOT_IN_THIS_BUILD). The steps before it were taken.`
  *
- * THE SECOND WAY IS THE ONE THE DOCUMENTS DRAW, AND IT IS BUILT NOW. `docs/07-INGEST-AND-RULES.md` §6.2 gives a step
- * `{ script: { id, input, as } }` and the lint has checked its shape since 22 September, so `flow.ts` now queues the
- * script's run for a script that says `runs: { rule: true }` (`startScript`, and `packages/kernel/test/rule-script.test.ts`)
- * instead of failing the run. The first test below was the pin on the refusal and failed the moment the step ran,
- * with "no run of the automation stopped with a sentence: the script step may now be in this build"; it now holds the
- * step to composing end to end, and still pins the first way, which nobody built: `run:` names a call and nothing else.
+ * THE SECOND WAY IS THE ONE THE DOCUMENTS DRAW, AND IT IS BUILT. `docs/07-INGEST-AND-RULES.md` §6.2 gives a step
+ * `{ script: { id, input, as } }`, so `flow.ts` queues the script's run for a script that says `runs: { rule: true }`
+ * (`startScript`, and `packages/kernel/test/rule-script.test.ts`) instead of failing the run. The first test below
+ * holds the step to composing end to end, and still pins the first way, which is not built: `run:` names a call and
+ * nothing else.
  *
  * WORK 1.8.0 DECLARES THE CASCADE, two rules and two scripts (`WORK_AUTOMATIONS` in `packages/seed/src/modules/work.ts`).
- * The second test was written as W59-1's behaviour and marked `todo` while the brief was stopped. Before the pack
- * declared anything it failed at its first assertion, a follow-up created with a parent and no project: `thing` was
- * `undefined` where the parent's project was expected. It is the spec, and it runs now.
+ * Before the pack declared anything the second test failed at its first assertion, a follow-up created with a parent
+ * and no project: `thing` was `undefined` where the parent's project was expected. It is the spec.
  */
 
 import { test } from 'node:test';
@@ -50,7 +46,7 @@ const said = <T>(r: unknown): T => {
   return x.value;
 };
 
-/** The script W59-1 would ship: every open, doing or blocked child of the row it was started for, moved to done. */
+/** The script the cascade runs: every open, doing or blocked child of the row it was started for, moved to done. */
 const CLOSES = `export default async function run(ctx) {
   const parent = ctx.input;
   const children = await ctx.record.list('tasks', { all: [{ field: 'parent', is: parent.id }, { field: 'state', in: ['open', 'doing', 'blocked'] }] });
@@ -121,7 +117,7 @@ test('A SCRIPT STEP STARTS A SCRIPT ON A SELF-HOST AND ITS WRITES LAND, and `run
     assert.match(JSON.stringify(inline), /there is no action called close_children/);
 
     /* ROUTE TWO: AN AUTOMATION'S `script` STEP INSTALLS, THE RUN QUEUES THE SCRIPT, AND THE HOST RUNS IT. This is the
-       held brief's own script and rule, installed beside the pack's, so what is measured is the step and not the pack. */
+       test's own script and rule, installed beside the pack's, so what is measured is the step and not the pack. */
     said(
       await s.k.install([
         {
@@ -191,7 +187,7 @@ test(
   },
 );
 
-/* THE CHECKER'S SECOND REFUSAL, on 24 September: with the runner taking the step, the dry run the owner and an agent read
+/* THE DRY RUN MUST NOT CALL THE STEP UNBUILT: with the runner taking the step, the dry run the owner and an agent read
    before installing still ended it with "Not in this build: a run stops here, after the steps before it", because
    `WAITS_ON_OTHERS` and the step's line in `packages/record/src/automations.ts` still named `script`. Measured here
    against that line: the step read `Run script.close_follow_ups, and keep its answer as closing. Not in this build...`
@@ -238,8 +234,7 @@ test('A TASK REOPENED BEFORE ITS SCRIPT RUNS CLOSES NOTHING, because the script 
     await s.settle();
     assert.equal(s.stateOf(child), 'open', 'a script queued while the task was done closed its step after the task was reopened');
     /* AND THE SCRIPT DID RUN. Without this the test passed on a Work pack that declared no cascade at all, since a step
-       nothing closes stays open too: measured by the checker on 24 September with `WORK_AUTOMATIONS` not yet in the
-       Work document. */
+       nothing closes stays open too: measured with `WORK_AUTOMATIONS` not yet in the Work document. */
     const jobs = s.running.sql.all<{ state: string }>("SELECT state FROM outbox WHERE kind = 'script.run' AND json_extract(payload, '$.script') = 'close_follow_ups'");
     assert.deepEqual(
       jobs.map((j) => j.state),
@@ -251,7 +246,7 @@ test('A TASK REOPENED BEFORE ITS SCRIPT RUNS CLOSES NOTHING, because the script 
   }
 });
 
-/* THE CHECKER'S REFUSAL OF THE FIRST ATTEMPT, driven the way it happens on a host: a script whose source throws is
+/* A PAUSED SCRIPT STAYS PAUSED, driven the way it happens on a host: a script whose source throws is
    refused three runs in a row, `pauseAfterRefusals` pauses it and tells the owner, and the next write that fires the
    rule used to queue a fourth run all the same, because `startScript` read the declaration and not the schedule row. */
 test('A SCRIPT PAUSED BY THREE REFUSED RUNS IS NOT STARTED AGAIN BY THE RULE THAT STARTED THEM', async () => {

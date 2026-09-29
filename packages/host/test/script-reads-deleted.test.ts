@@ -1,8 +1,8 @@
 /**
- * A script can read the rows a person deleted, when it asks, and is handed them with their secrets off (DEF-4).
+ * A script can read the rows a person deleted, when it asks, and is handed them with their secrets off.
  *
  * WHY IT ASKS. mercury's ledger read live rows only, so a transaction he deleted had no row the script could see, and
- * the next run wrote it again (`loop/finish/defects.md` M6). The record's `list` has read `includeDeleted` for as long
+ * the next run wrote it again. The record's `list` has read `includeDeleted` for as long
  * as rows have been soft-deleted; `scriptReads` did not pass it, and `ctx.record.list` had no way to say it.
  *
  * THE READS HERE ARE THE SHIPPED ONES: `scriptReads` over a real record, and for the whole path the runner the

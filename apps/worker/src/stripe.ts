@@ -27,7 +27,7 @@ export const STRIPE_WAIT_MS = 15_000;
 /**
  * The most characters of one answer this file parses. Stripe's answers to these calls are a few kilobytes; a longer
  * one is not Stripe's and is read as no object, so `JSON.parse` is never asked to build a tree from a broken proxy's or
- * a misrouted request's page (`loop/finish/rules.md` §6 COST). The text is still read whole before it is measured.
+ * a misrouted request's page. The text is still read whole before it is measured.
  */
 const ANSWER_MAX = 1_048_576;
 

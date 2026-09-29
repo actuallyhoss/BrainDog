@@ -1,5 +1,5 @@
 /**
- * Mail sent to a record's mailbox on the Cloud: the Worker's `email()` handler. DOR-7.
+ * Mail sent to a record's mailbox on the Cloud: the Worker's `email()` handler.
  *
  * THE SAME DOOR AS A FORWARDER'S POST, AND NOT A SECOND ONE. A self-host has no MX and takes a message over
  * `POST /in/email/<token>` (`49 §13` #3); the Cloud has Email Routing, which hands this Worker the message itself.

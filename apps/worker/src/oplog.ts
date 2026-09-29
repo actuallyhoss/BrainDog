@@ -1,5 +1,5 @@
 /**
- * One JSON line for the operator, the shape every Worker log line takes (`53 §2.3`, `loop/finish/ops.md` 4.0 F).
+ * One JSON line for the operator, the shape every Worker log line takes (`53 §2.3`).
  *
  * PROSE COULD NOT BE QUERIED. The Worker's lines were sentences (`fetch: ...`, `auth: signin refused (...)`), and the
  * five alerts `53 §2.3` names are saved Workers Logs queries over fields: `op=refuse`, `op=outbox state=dead`,

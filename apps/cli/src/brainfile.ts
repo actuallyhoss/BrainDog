@@ -1,26 +1,25 @@
 /**
  * `braindog export` and `braindog import <file.brainl>`: the record as a file, taken and put back (`docs/48-SPEC-CLI.md`
- * §5.4 and §5.8, `loop/research-restore.md` §9 W55-3).
+ * §5.4 and §5.8).
  *
  * AT `07ba6dbd` NEITHER EXISTED. `braindog export` answered "braindog has no command called export", and `braindog
- * import latest.brainl` answered with the the old tool importer's usage line, exit 1 (both measured before this file). The
- * record had the doors (`export`, and since W55-2 an `import` that replaces), and nothing on this machine could reach
+ * import latest.brainl` answered with the adapter importer's usage line, exit 1 (both measured before this file). The
+ * record had the doors (`export`, and an `import` that replaces), and nothing on this machine could reach
  * them, because both are ADMIN and the only bearer the CLI kept was a login token no ADMIN door takes (ADR-060).
  *
- * A BACKUP CARRIES THE SEALED BYTES BY DEFAULT, BECAUSE OF WHAT W55-2'S CHECKER FOUND. A
- * replacing import is refused when the record holds `vault_key` rows or sealed grants and the file carries none
- * (`packages/kernel/src/index.ts`, `import`), because putting such a file back would throw every key away. The record's
+ * A BACKUP CARRIES THE SEALED BYTES BY DEFAULT. A replacing import is refused when the record holds `vault_key` rows or
+ * sealed grants and the file carries none (`packages/kernel/src/index.ts`, `import`), because putting such a file back would throw every key away. The record's
  * `export` redacts unless it is asked not to and the wrapping key is named, so an export that took the record's own
  * default could never restore the record it came from. So this asks for `redactGrants: false` with the key named, and
  * `--redact-grants` is the copy to hand somebody, which says in so many words that it cannot put the vault back.
  *
- * THE FILE IS CHECKED ON THIS MACHINE ON BOTH SIDES, with `verify` (W55-1): after an export lands, so a copy that does not
+ * THE FILE IS CHECKED ON THIS MACHINE ON BOTH SIDES, with `verify`: after an export lands, so a copy that does not
  * check is said to be one before anybody relies on it, and before an import leaves, so a damaged or forged file is
  * refused here with nothing sent.
  *
- * `import` ALWAYS REPLACES. A record `createRecord` made is never empty (W55-2 measured two schedule rows, the owner's
+ * `import` ALWAYS REPLACES. A record `createRecord` made is never empty (measured: two schedule rows, the owner's
  * person and member rows and the `create` event), so the empty-record import could never put a record back into itself,
- * and a fresh record is `braindog init --from`'s work on the self-host (W55-4). The record refuses a file that is not
+ * and a fresh record is `braindog init --from`'s work on the self-host. The record refuses a file that is not
  * its own copy, and names both ids in that sentence.
  */
 
@@ -232,7 +231,7 @@ export async function exportFile(args: string[], io: BrainfileIo): Promise<numbe
     const code = refuse(io, got);
     const refusal = (got as { refusal?: Refusal }).refusal;
     /* `--kek` ONLY WHEN THE RECORD NAMED A KEY, which it says with `at: 'kek_id'`. This line was said on every
-       `WRONG_KEY`, and wave fifty-five's checker found it sending the owner of a record with no vault to name a key that
+       `WRONG_KEY`, and a review found it sending the owner of a record with no vault to name a key that
        does not exist. The record now takes that export, and refuses a vault whose key has no id at `vault_key`, which
        gets the one sentence that is true of it. A record build older than this one still answers a vault-less record
        at `kek_id`, and that owner still hears `--kek` until the host is updated: the refusal carries no other signal. */

@@ -1,6 +1,6 @@
 /**
  * `braindog tools scan` and `braindog tools write`: the MCP servers this machine runs, recorded as rows of `tools`,
- * and the record's tools written back as Claude Code entries that hold no key (`loop/research-agent-path.md` §5.5).
+ * and the record's tools written back as Claude Code entries that hold no key.
  *
  * SCAN ONLY READS CONFIGS. `<top-level>/.mcp.json` is the project's, and `~/.claude.json` is read and never written:
  * its `mcpServers` are global and its `projects[<path>].mcpServers` are this project's.
@@ -150,7 +150,7 @@ export type Depositor = (ask: { label: string; opens: string }, given: string) =
  * A depositor over `braindog keys put`, the one door a key goes in by. The value is handed to it as its standard
  * input and to nothing else; its one line of output never quotes a value.
  *
- * NO GRANT IS NEEDED TO PUT A KEY AWAY (`loop/finish/agents.md` C1). `keys put` uses the vault grant kept for the host
+ * NO GRANT IS NEEDED TO PUT A KEY AWAY. `keys put` uses the vault grant kept for the host
  * when there is one, and otherwise the login this scan already reads the record with, which the door takes to add a
  * NEW key in this run's project. A key whose label is already there is refused with the rotation sentence, which names
  * a vault grant, and is then counted with the keys kept by name only.
@@ -508,8 +508,8 @@ const HELPER_PATH = /^[A-Za-z0-9 _.:/()-]+$/;
  *
  * A stdio tool's keys are handed to it by `braindog keys exec`, one wrapper per key, so the entry names the key and
  * never holds it. An HTTP tool's header key is handed over by `braindog keys headers`, which the entry names as its
- * `headersHelper`: Claude Code runs that command when it connects and reads the header from its standard output
- * (`loop/finish/agents.md` C9), so the entry holds the command and never the key. An entry has one helper, so a second
+ * `headersHelper`: Claude Code runs that command when it connects and reads the header from its standard output,
+ * so the entry holds the command and never the key. An entry has one helper, so a second
  * header key is left out and said, as is an env or header value BrainDog does not keep.
  */
 export function renderEntry(name: string, fields: Record<string, unknown>, cli: string): { entry: Record<string, unknown> | null; notes: string[] } {

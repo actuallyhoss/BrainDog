@@ -1,6 +1,5 @@
 /**
- * What a record whose billing has lapsed may still do: read everything, export, and nothing else (`loop/finish/ops.md`
- * OPS-14, ADR-059).
+ * What a record whose billing has lapsed may still do: read everything, export, and nothing else (ADR-059).
  *
  * ITS OWN FILE, AND FREE OF `cloudflare:`, for `session.ts`'s reason: this decides what a paying customer's agent is
  * refused, and a decision that can only run inside workerd is a decision nobody tests. The doors in `session.ts` ask

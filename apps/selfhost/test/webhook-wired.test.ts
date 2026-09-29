@@ -1,6 +1,5 @@
 /**
- * The self-host's signed webhooks leave through the pinned socket, and `braindog serve` wires it (wave 54's report on
- * deb5b703, ROADMAP W55-4); notification mail, which has no transport here yet, says so once rather than waiting unseen.
+ * The self-host's signed webhooks leave through the pinned socket, and `braindog serve` wires it; notification mail, which has no transport here yet, says so once rather than waiting unseen.
  *
  * MEASURED AT 1586f2a2, BEFORE THIS FILE. `signedWebhooks` existed and was handed to nothing: `main.ts` passed no
  * `deliver` to `start()`, so a `notify.webhook` job an automation queued sat `pending` with `attempts` 0 for as long as

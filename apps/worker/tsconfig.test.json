@@ -2,7 +2,7 @@
   // THE `src/` MODULES ARE NOT LISTED, BECAUSE TYPESCRIPT ALREADY FOLLOWS THE IMPORTS.
   // `include` names the program's ROOTS, and every file a root imports joins the program whether it
   // is listed or not. Six modules were named here and `src/inbound.ts` was not, and `src/inbound.ts`
-  // was typechecked all the same, because `test/route.test.ts` imports it. Measured on 2026-09-21
+  // was typechecked all the same, because `test/route.test.ts` imports it. Measured
   // with `tsc --noEmit -p tsconfig.test.json --listFiles`: 18 of the 19 modules in `src/` were in
   // the program, and the list named six of them. A list that describes a third of what it claims to
   // is a list somebody has to remember, and the name it was missing is the evidence that nobody

@@ -1,5 +1,5 @@
 /**
- * The letters, and the one function that sends them (`src/mail.ts`, `loop/finish/ops.md` OPS-9).
+ * The letters, and the one function that sends them (`src/mail.ts`).
  *
  * WHAT IS ASSERTED HERE IS WHAT A PERSON AND AN OPERATOR EACH SEE. A person sees the sign-in letter's old words, a
  * footer that says what the mail is, and nothing a typed record name could add to it. An operator sees one `op: 'mail'`
@@ -279,7 +279,7 @@ test('A CRASH MAILS ITS REF, DOOR, BUILD AND RUNBOOK ONCE IN 15 MINUTES, and nev
   await logged(async () => {
     assert.equal(await opsAlert(env, CRASH, undefined, t), true);
     assert.equal(await opsAlert(env, CRASH, undefined, t + OPS_QUIET_MS - 1), false);
-    assert.equal(await opsAlert(env, { op: 'refuse', rec: 'rec_1', code: 'FORMAT_AHEAD' }, undefined, t + 1), true);
+    assert.equal(await opsAlert(env, { op: 'refuse', rec: 'rec_1', code: 'FORMAT_NEWER_THAN_READER' }, undefined, t + 1), true);
     assert.equal(await opsAlert(env, CRASH, undefined, t + OPS_QUIET_MS), true);
   });
   assert.equal(email.sent.length, 3);

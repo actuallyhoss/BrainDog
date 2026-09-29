@@ -67,7 +67,7 @@ export const servesAuth = (pathname: string): boolean => /^\/+auth(?:\/|$)/.test
 export const servesAccount = (pathname: string): boolean => /^\/+account(?:\/|$)/.test(pathname);
 
 /**
- * `/mcp`: an agent's MCP client, with its bearer and nothing else (`loop/research-agent-path.md` §1.1).
+ * `/mcp`: an agent's MCP client, with its bearer and nothing else.
  * One path and no subpaths, because the transport is one endpoint and `run_worker_first` names it alone.
  */
 export const servesMcp = (pathname: string): boolean => /^\/+mcp\/*$/.test(pathname);
@@ -88,7 +88,7 @@ export const servesMcp = (pathname: string): boolean => /^\/+mcp\/*$/.test(pathn
 export const servesIn = (pathname: string): boolean => /^\/+in(?:\/|$)/.test(pathname);
 
 /**
- * `/oauth/*`: OAuth 2.1's endpoints, with BrainDog as its own authorization server (`loop/finish/agents.md` C4), and the
+ * `/oauth/*`: OAuth 2.1's endpoints, with BrainDog as its own authorization server, and the
  * consent page this Worker draws until the app has its own (`oauth.ts`).
  *
  * A PREFIX AND NOT A LIST, for `servesIn`'s reason: which endpoints exist is `@braindog/host/oauth`'s to say, and a path
@@ -130,7 +130,7 @@ export const servesBuild = (pathname: string): boolean => /^\/+\.well-known\/+br
  *
  * A PATH AFTER THE SLUG AND NOT AT THE ROOT, BECAUSE ONE WORKER SERVES MANY RECORDS. `03 §4` puts the key at the host's
  * root, which on a self-host is one record and here is every record on the deployment, each signing with its own key.
- * So the router asks this of `appPath`'s `rest` alone (`loop/research-restore.md` §9, W55-7), and `/app/*` is already
+ * So the router asks this of `appPath`'s `rest` alone, and `/app/*` is already
  * the Worker's in the site's `run_worker_first`. THE ROOT IS LEFT TO THE ROUTER'S 404: the site forwards no
  * `/.well-known/braindog-key`, so an answer there would be one `app.brain.dog` gives and `brain.dog` never does, and
  * `test/site-binding.test.ts` holds every root branch of `route()` to a door the site forwards.
@@ -197,7 +197,7 @@ export type Restored = { bookmark: string; kept: string | null; by: string };
  * AND A REFUSED RESTORE IS RESET TOO, BECAUSE ONE CAN BE REFUSED AFTER IT WAS ARMED. When the bucket refuses the receipt,
  * `copies.ts` calls the restore off by arming the undo bookmark, and there is no call that disarms: the object is still
  * set to go back, to the moment of the first arm, at its next start. Left running, every write it accepted until an
- * eviction would be taken by that rewind. Measured by the checker: the Worker reset nothing for a refused restore
+ * eviction would be taken by that rewind. Measured: the Worker reset nothing for a refused restore
  * (`test/restore-in-do.test.ts`, the restore called off). `reopen` answers `false` for an object that armed nothing, so
  * asking after every refusal costs one call and resets only what is armed. No `restore.pitr` follows, since none happened.
  */
@@ -298,8 +298,7 @@ const NOT_A_PAGE = new Set(['auth', 'mcp', 'a', 'in', 'ws', 'admin', 'app', 'ass
 /**
  * A path under `/app`: the record it names, if any, and the path the app or the record reads once `/app/<slug>` is gone.
  *
- * THE FIRST SEGMENT IS A PAGE OR A RECORD'S NAME, AND THE DIRECTORY'S `badSlug` ALONE SAYS WHICH (`loop/research-one-domain.md`
- * §2.4). A string it would accept as a name is a slug; a word the app routes (`settings`, `signin`, `catalogue`), a
+ * THE FIRST SEGMENT IS A PAGE OR A RECORD'S NAME, AND THE DIRECTORY'S `badSlug` ALONE SAYS WHICH. A string it would accept as a name is a slug; a word the app routes (`settings`, `signin`, `catalogue`), a
  * spoken id (`d41`) and a file (`mark.svg`) are all refused as names there, so here they are the app's own paths with no
  * record named, which means the record the session is on. A zone route takes a wildcard only at the end of its path,
  * so no route can pick out the API under a slug, which is why the Worker takes all of `/app` and strips the slug itself.
@@ -320,13 +319,12 @@ export function appPath(pathname: string): AppPath | null {
   /* `/app/api/*` NAMES NO RECORD AND NO PAGE, SO IT IS NOT AN APP PATH, and the router's own `ROUTE_UNKNOWN` answers it.
      `api` is a word the Directory never hands out, so it fell to the line below as a page, the rest was `/api/boot`,
      and the Worker served a second copy of the root `/api`. Measured through the bundle in `test/slug-api.test.ts`: a
-     GET with no credential answered 200 from the public demo's record (the demo is gone since, `loop/research-no-sample.md`
-     A1), a cookie reached its session's record, and
-     `/app/api/vault/deposit` with a grant went past the key doors' own check, which reads the slug and saw none, into
-     `doorOf` and the record's `verify`. The web never renders the address (`apiBase` is the bare origin with no slug). */
+     GET with no credential answered 200 from the public demo's record (the demo is gone since), a cookie
+     reached its session's record, and `/app/api/vault/deposit` with a grant went past the key doors' own check,
+     which reads the slug and saw none, into `doorOf` and the record's `verify`. The web never renders the address (`apiBase` is the bare origin with no slug). */
   if (segment === 'api') return null;
   if (badSlug(segment) === null) return { slug: segment, rest: tail === '' ? '/' : tail };
-  /* NOR AN API PATH UNDER A WORD THAT CAN ONLY BE A MISTAKE (`loop/research-push-a-live.md` finding 3). Measured on
+  /* NOR AN API PATH UNDER A WORD THAT CAN ONLY BE A MISTAKE. Measured on
      production: `/app/Acme/api/boot`, `/app/admin/api/boot` and `/app/www/api/boot` fell to the line below as pages and
      answered the shell with a 200, which a JSON client with a mistyped slug reads as success. NOT EVERY WORD THAT IS
      NOT A NAME: ten of the app's routes take a parameter as their second segment (`r/[register]`, `settings/[area]`
@@ -338,9 +336,9 @@ export function appPath(pathname: string): AppPath | null {
 
 /**
  * A page of the app as the static assets gave it, with the four headers that say nobody may frame it or sniff it and
- * that its links send no referrer off the site (`loop/research-push-a-live.md` finding 1).
+ * that its links send no referrer off the site.
  *
- * MEASURED ON PRODUCTION ON 23 SEPTEMBER: NONE OF THEM ON ANY ANSWER, the shell and the sign-in page included. They are
+ * MEASURED ON PRODUCTION: NONE OF THEM ON ANY ANSWER, the shell and the sign-in page included. They are
  * set here because this is the only place certain to reach a page: whether `apps/web/static/_headers` survives a
  * response fetched through the `ASSETS` binding was not measured. HSTS is not among them, because it is a zone setting
  * whose `max-age` browsers never give back. None of the four touches the passkey ceremony, which runs in the top-level
@@ -417,7 +415,7 @@ export function atRoot(request: Request, rest: string): Request {
 /**
  * A page load on a host the app used to live at: a 308 to the same page under `https://<PUBLIC_HOST>/app`, or `null`.
  *
- * `LEGACY_HOSTS` IS A LIST OF NAMES THIS WORKER STILL ANSWERS FOR (`loop/research-one-domain.md` §2.5): `app.brain.dog`,
+ * `LEGACY_HOSTS` IS A LIST OF NAMES THIS WORKER STILL ANSWERS FOR: `app.brain.dog`,
  * for at least the ninety days a token lives. Unset or empty and nothing is legacy, which is the Worker before the move;
  * a public host that is also listed is never redirected, because that would be a redirect to itself for ever.
  *
@@ -432,16 +430,16 @@ export function atRoot(request: Request, rest: string): Request {
  * because a HEAD stays a HEAD and nothing caches a guess about it.
  *
  * AND THE PUBLIC HOST ITSELF, FOR A BROWSER'S PAGE LOAD OUTSIDE `/app`: a 308 to `/app<path>` on the same name, which is
- * the design's §3.7 promise that "legacy bare paths redirect within the same host" and was not built. It is what makes
- * the dark deploy dark (`loop/research-one-domain-cutover.md` §2.2). With the app built under `build/app` and the Worker
+ * the one-domain design's promise that "legacy bare paths redirect within the same host" and was not built. It is what makes
+ * the dark deploy dark. With the app built under `build/app` and the Worker
  * still on `app.brain.dog`, `/`, `/signin` and `/r/tasks` there were measured answering a JSON `ROUTE_UNKNOWN` 404: the
  * site's "Open the app" and every magic link already mailed would have landed on it. After the flip this branch does
  * not fire, because the zone routes on `brain.dog` deliver only the doors and `/app`, and the site answers the rest.
  *
  * ONLY WHEN THE BROWSER ASKS FOR HTML, ON EITHER HOST. A navigation always says `text/html`; an old shell's poll of
  * `/_app/version.json`, a favicon and a script's GET do not, and for those the router's own answer is the true one
- * where a redirect into the app would be a page handed to something that cannot draw one. The old host asked no
- * `Accept` until audit forty-two's finding 7: with push B's vars, a stale tab's `/app/_app/version.json` and
+ * where a redirect into the app would be a page handed to something that cannot draw one. The old host once asked no
+ * `Accept`: with push B's vars, a stale tab's `/app/_app/version.json` and
  * `/app/fonts/geist.woff2` under a wildcard `Accept` were measured going to `brain.dog`, another origin, which a
  * same-origin fetch cannot follow.
  *
@@ -694,7 +692,7 @@ export function cloudIngest(deps: CloudIngestDeps): IngestDoor {
           }),
     limit: (ask) => deps.spends(ask),
     /* AN ABSENT KEY AND NOT A METHOD ANSWERING `null`, and the difference is not one a caller can
-       see: measured against `serveIngest` on 2026-09-20, a door with no `inbound` and a door whose
+       see: measured against `serveIngest`, a door with no `inbound` and a door whose
        `inbound` always answers `null` both give 404 to `POST /in/email/<tok>` and 405 to a GET.
        What the absent key buys is that `IngestDoor.inbound?` is the type's own way of saying "this
        host takes no forwarded mail", which the self-host spreads in the same way, so nothing has to

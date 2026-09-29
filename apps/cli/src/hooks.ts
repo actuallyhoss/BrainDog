@@ -1,7 +1,7 @@
 /**
  * `braindog hook start` and `braindog hook end`, which Claude Code runs when a session starts and ends.
  *
- * A HOOK NEVER STOPS A SESSION (`loop/research-agent-path.md` §4.1). Every path exits 0, a host that is
+ * A HOOK NEVER STOPS A SESSION. Every path exits 0, a host that is
  * down included. The start hook prints the briefing or one plain line saying why there is none; the end
  * hook prints nothing.
  *
@@ -254,7 +254,7 @@ export function withLines(text: string, extra: string[]): string {
 
 /* ── the people met in this session's commits ──────────────────────────── */
 
-/** The most authors one session's end sends to `meet` (`loop/research-agent-path.md` §4.4). */
+/** The most authors one session's end sends to `meet`. */
 export const MET_PER_SESSION = 10;
 
 /** One author as `meet` takes them, and the commit they were met in. */

@@ -8,7 +8,7 @@
 # listen on. Without a server key the server treats every request as the owner's, so it binds 127.0.0.1 and nothing
 # outside the container can reach it; the health check below asks from inside and still passes. The operator makes it
 # reachable with the env file, which names the key and the address, a decision made where the
-# record lives and not baked into a layer anybody can pull (loop/research-w61.md section 1 item 6). The key file is made
+# record lives and not baked into a layer anybody can pull. The key file is made
 # by `init` inside the volume.
 
 # The major version is the root package.json's `engines`, and the exact one is `.node-version`.
@@ -22,7 +22,7 @@ RUN corepack enable
 WORKDIR /app
 
 # THE WHOLE WORKSPACE, INSTALLED AS IT IS IN CI, and never `pnpm deploy`: the self-host imports the workspace packages
-# as TypeScript source through their `exports`, so the tree is what runs (loop/research-w61.md section 1 item 5).
+# as TypeScript source through their `exports`, so the tree is what runs.
 COPY . .
 RUN pnpm install --frozen-lockfile
 

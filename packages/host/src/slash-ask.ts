@@ -1,22 +1,20 @@
 /**
  * Slash's doors: `POST /api/slash/read`, `GET /api/slash/status`, `POST /api/slash/settings`,
  * `POST /api/slash/propose`, `GET /api/slash/asks` and `POST /api/slash/pattern`, the half both hosts
- * share. `docs/46` §5.2, `23 §7` and `§8`, and C15 in `loop/finish/agents.md`.
+ * share. `docs/46` §5.2, `23 §7` and `§8`.
  *
- * THE READ WAS ALONE FOR A DAY. `loop/research-spark-routes.md` found that the Slash object both hosts
+ * THE READ WAS ALONE FOR A DAY. The Slash object both hosts
  * build had five methods and only `read` had a door, so tier stayed `a`, the cap stayed 80, and an owner
  * could neither see nor set Slash's model from the product. Status, settings and propose came next; the
  * owner's list of what was asked (`asks`) and a pattern drafted from the inbox (`pattern`) are the last
- * two, and this file is their one writer (`loop/finish/contracts.md` X26).
+ * two, and this file is their one writer.
  *
  * BOTH HOSTS MOUNT THIS DOOR, AND THE ENGINE IS REACHED THROUGH IT FROM A BROWSER. `903bc9c9` wrote the
- * door and `1816500a` wrote the two branches in front of it, eight minutes apart on 21 September:
+ * door and `1816500a` wrote the two branches in front of it, eight minutes apart:
  * `apps/selfhost/src/server.ts` hands a request to `serveSlash` when `servesSlash` names the path, ahead
  * of `servesKeys`, and `apps/worker/src/index.ts` does the same in `Record$.#answer`, beside `servesMcp`'s
  * branch and behind two locks of its own (a person, and a credentialed one). The palette's `slashRead`
- * (`packages/client/src/index.ts`) is the caller. This header said for a day afterwards that nothing
- * reached the door; that was true only between those two commits, and `loop/research-spark-seam.md` §0
- * is the survey that caught it.
+ * (`packages/client/src/index.ts`) is the caller.
  *
  * WHAT WAS WRONG ONCE IT WAS REACHED WAS THE WORKER'S BUILD OF THE ENGINE, and neither host's tests saw it,
  * because every one of them ran over `node:sqlite`. On a Durable Object `createSlash` threw
@@ -203,7 +201,7 @@ export function servesSlash(pathname: string): SlashRoute | null {
 
 /**
  * The keys a settings patch may carry, which are the keys `configure` reads (`packages/slash/src/index.ts`): the source and
- * where his own key is asked (`loop/finish/contracts.md` §3.2), and `tier`, kept readable for one workflow.
+ * where his own key is asked, and `tier`, kept readable for one release.
  */
 const SETTINGS = ['source', 'provider', 'base_url', 'model', 'grant_id', 'ask_cap', 'tier'] as const;
 
@@ -213,7 +211,7 @@ const ASKS_MOST = 100;
 
 /**
  * The most arrivals one pattern is drafted from, the ceiling on what one press sends a model. Three alike is where the inbox
- * offers the button (AGT-26), and a pattern is checked anchor by anchor against every sample it was drafted from, so a
+ * offers the button, and a pattern is checked anchor by anchor against every sample it was drafted from, so a
  * handful proves it as well as a hundred would.
  */
 export const PATTERN_SAMPLES_MOST = 10;
@@ -308,7 +306,7 @@ export async function serveSlash<C>(request: Request, door: SlashAskDoor<C>, ctx
   }
 
   if (route === 'asks') {
-    /* DIGITS OR NOTHING, as a typed number is read everywhere (`loop/finish/rules.md` §4): `?limit=0x10` is not sixteen. */
+    /* DIGITS OR NOTHING, as a typed number is read everywhere: `?limit=0x10` is not sixteen. */
     const said = url.searchParams.get('limit');
     if (said !== null && !/^[0-9]{1,4}$/u.test(said))
       return refusal(422, { code: 'VALUE_MALFORMED', fix: `limit is a whole number of asks, at most ${ASKS_MOST}.`, at: 'limit' });
@@ -406,8 +404,8 @@ export async function serveSlash<C>(request: Request, door: SlashAskDoor<C>, ctx
  * package's (`proposePattern`, `packages/slash/src/jobs.ts`), on his own key where he chose it.
  *
  * A PRESS IS CHECKED AGAINST THE MONTH BEFORE ANY MODEL IS ASKED, on the same count `status()` shows: the package does
- * not hold a pattern to `ask_cap` itself, and a button that drafts past the month's limit is a model call nobody stopped
- * (`loop/research-spark-routes.md` F4). On his own key nothing is capped, so nothing stops it here.
+ * not hold a pattern to `ask_cap` itself, and a button that drafts past the month's limit is a model call nobody stopped.
+ * On his own key nothing is capped, so nothing stops it here.
  * ON THE INCLUDED MODEL, CHECKED AND NOT YET COUNTED. The draft settles as a `kind = 'pattern'` row, and the included
  * count `status()` reads is `read` and `propose` rows alone (`asksUsed` in `packages/slash/src/call.ts`), so a press does
  * not yet move it. Counting it is `call.ts`'s, which this unit asked of that file's owner. On his own key the listing
@@ -555,7 +553,7 @@ export type SlashLedgerDeps = {
 /**
  * Slash's press and first plan held and settled in the package's own ledger (`@braindog/record` `SlashMeter`).
  *
- * THEY WERE THE TWO ASKS NOTHING COUNTED. `loop/research-batch-sixty-audit.md` finding 2 measured the audit's S2 probe, a
+ * THEY WERE THE TWO ASKS NOTHING COUNTED. Measured with a probe on a
  * record 20 days old over the Worker's included model: 25 presses, 25 included calls, and neither a `call` row nor a look
  * at `ask_cap` anywhere, because the record's model is built beside the engine and not through it. The record now asks
  * this before it asks its model, and `packages/record/test/slash-press-cap.test.ts` drives the same 25 presses at
@@ -574,7 +572,7 @@ export type SlashLedgerDeps = {
  * THE COUNTS ARE THE RECORD'S ESTIMATE, bytes over three as the package's `tokens` counts a prompt, of what it sent and
  * what came back. The record's `SlashModel` answers the parsed plan and not the provider's usage, so this is the figure
  * the package itself bills a model it could not read a count from (`core.run`'s `UNREACHABLE` arm). IT BILLS LOW, AND BY
- * A LOT: the instructions and the schema are the host's and never reach the record. Measured on 24 September through the
+ * A LOT: the instructions and the schema are the host's and never reach the record. Measured through the
  * Worker's own `workerSlashModel` over a binding reporting 700 tokens in and 60 out, the row held 176 and 5, 3 neurons
  * where the provider's count is 12. The COUNT against `ask_cap` is exact; the price waits on a `SlashModel` that hands
  * back the provider's usage, which is `packages/record/src/slash.ts` and each host's builder and not this file.
@@ -660,7 +658,7 @@ export function slashRecordMeter(deps: SlashLedgerDeps): SlashMeter {
       };
     },
     /**
-     * ONE ASK OF THE BACKGROUND ALLOWANCE, never his: the daily look's skill draft (GAP-12). Counted the way
+     * ONE ASK OF THE BACKGROUND ALLOWANCE, never his: the daily look's skill draft. Counted the way
      * `backgroundMeter` counts it, over a `pattern` row with no `filed`, which `asksUsed` (the engine's own count of kind
      * `read`) never sees, so a skill draft never spends one of his asks.
      */

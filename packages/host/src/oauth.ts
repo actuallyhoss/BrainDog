@@ -1,6 +1,6 @@
 /**
  * OAuth 2.1, with BrainDog as its own authorization server: how any MCP client connects by a URL and a person's yes
- * (`loop/finish/agents.md` C4, `docs/10-MCP.md` §2).
+ * (`docs/10-MCP.md` §2).
  *
  * THE FLOW IS THE STANDARD ONE, AND EVERY STEP IS HERE. An app that gets `/mcp`'s 401 reads the protected resource's
  * metadata, then this server's, registers itself (RFC 7591) or names its metadata document (a Client ID Metadata
@@ -12,7 +12,7 @@
  * PURE, OVER PORTS, SO BOTH HOSTS SERVE THE SAME PROTOCOL. The store is `OAuthStore` (the Directory's SQL through
  * `@braindog/record/oauth`), the person is `Approver` (the host's own browser session and record), and reading an
  * app's metadata document is `fetchDocument`, which only an app can do (`packages/*` make no outbound call). WebCrypto
- * only, and nothing of `node:` (`loop/finish/agents.md` §6 point 5).
+ * only, and nothing of `node:`.
  *
  * NOTHING INVALID IS EVER SENT BACK TO AN APP'S ADDRESS UNTIL THAT ADDRESS IS PROVED. An unknown client or a redirect
  * address it did not register is answered on a BrainDog page, because sending an error to an address nobody vouched
@@ -21,7 +21,7 @@
  *
  * OAUTH'S OWN ERRORS, AND NEVER A REFUSAL. Every JSON error here is `{ error, error_description }` as RFC 6749 §5.2
  * writes it, because that is what an OAuth client reads; a record's `code:` shape would be a refusal code the
- * `refusals` gate counts and no client understands (`loop/finish/contracts.md` §10.2).
+ * `refusals` gate counts and no client understands.
  *
  * THE CODE OPENS THE BEARER AND NOTHING ELSE DOES. The store keeps the code's SHA-256 and the bearer sealed under a key
  * derived from the code (`sealBearer`), so the Directory's storage, or a copy of it, holds no token that works: the only
@@ -51,7 +51,7 @@ const DOCUMENT_LIFE = 24 * 60 * 60_000;
 export const DOCUMENT_MOST_BYTES = 5 * 1024;
 
 /**
- * The ceilings on what one stranger's request can make this file read or keep (`loop/finish/rules.md` §6 COST): a body,
+ * The ceilings on what one stranger's request can make this file read or keep: a body,
  * the addresses one app registers, one address's length, an app's name, and the `state` echoed back to it.
  */
 const BODY_MOST_BYTES = 8 * 1024;
@@ -355,7 +355,7 @@ const REQUEST_ID = /^[A-Za-z0-9_-]{16,64}$/;
  * loopback (RFC 8252 §7.3), with no fragment and no user name, at most `URI_MOST` characters.
  *
  * THE SENTENCE NAMES NO PART OF WHAT WAS SENT. A registration is a public write, and a public door echoes nothing back
- * that it was handed (`loop/finish/platform.md` §6.8).
+ * that it was handed.
  */
 export function redirectWrong(uri: unknown): string | null {
   if (typeof uri !== 'string' || uri.length === 0 || uri.length > URI_MOST) return `A redirect address is a URL of at most ${URI_MOST} characters.`;
@@ -451,8 +451,7 @@ const ladder = (scope: string): string => {
 };
 
 /**
- * A scope as a sentence, which is how the consent screen says it and never as the bare word
- * (`loop/finish/agents.md` C5).
+ * A scope as a sentence, which is how the consent screen says it and never as the bare word.
  */
 export const scopeSentence = (scope: OAuthScope): string =>
   scope === 'read'
@@ -684,7 +683,7 @@ async function consentDoor(request: Request, deps: OAuthDeps): Promise<Response>
  * higher than the app asked for.
  *
  * FROM A PAGE ON THIS BRAINDOG, BY A PERSON WHO PROVED WHO THEY ARE IN THE LAST FIFTEEN MINUTES, as `deviceApprove`
- * asks (`FRESH`, `loop/finish/contracts.md` §2.7). A browser left signed in for a month is not enough to hand an app a
+ * asks (`FRESH`). A browser left signed in for a month is not enough to hand an app a
  * bearer that works from anywhere for ninety days.
  *
  * THE REQUEST IS TAKEN BEFORE THE TOKEN IS MINTED, so a second press, or a second tab, finds nothing to answer and no

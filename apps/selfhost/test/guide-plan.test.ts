@@ -163,7 +163,7 @@ test('A MILESTONE REACHED ASKS ONCE WHETHER TO START THE NEXT ONE, and the guide
   const api = await createRecordApi({ sql, clock: fixedClock(Date.UTC(2026, 8, 17, 12)), catalogue: seedCatalogue() });
   const asked = value<{ id: string }>(await api.propose({ question: 'Use the New project guide?', body_kind: 'pack', body: { install: 'usecase-guide' } }, owner));
   value(await api.decide({ id: asked.id, decide: { option: 'accept', reason: 'yes' } } as never, owner));
-  /* NO EXAMPLE ROWS COME WITH THE PACK ANY MORE (`loop/finish/modules.md` C11): a plain install off the catalogue
+  /* NO EXAMPLE ROWS COME WITH THE PACK ANY MORE: a plain install off the catalogue
      plants nothing, so the guide's own template rows, word for word as `guide.ts`'s retired `seeds:` once planted
      them, are written by hand for this test to reach a milestone in. */
   for (const fields of [

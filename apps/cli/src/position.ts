@@ -1,7 +1,7 @@
 /**
  * Where a session stands: the folder, the repository, its remote, the machine, the branch and the
  * commit. The record resolves a project from these, so they travel with every call as the session
- * headers of `loop/research-agent-path.md` §3.4.
+ * headers.
  *
  * A REPOSITORY IS A GIT TOP-LEVEL FOLDER OR NOTHING. A temporary folder is not a project, so outside
  * a work tree every git field is null rather than a guess.

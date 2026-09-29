@@ -4,20 +4,20 @@
  * WHY THIS FILE EXISTS. Every other test of the ask ran over `objectStorage()` (`test/bundled-worker.ts`), a `node:sqlite`
  * double with no authorizer, and every one of them was green while the real object could not build the engine at all.
  * `createSlash` ran `PRAGMA user_version = 1` unguarded, a Durable Object's authorizer answers that statement
- * `not authorized: SQLITE_AUTH`, and so every ask on the Worker was 500 `INTERNAL` (`loop/research-spark-seam.md` §4). The
- * directory had met the same refusal first (`packages/record/src/directory.ts`), and `test/import-in-do.test.ts` is the
- * harness that can see a fault of that kind, so this file copies its bundling, its Miniflare options and its sign-in.
+ * `not authorized: SQLITE_AUTH`, and so every ask on the Worker was 500 `INTERNAL`. The
+ * directory had met the same refusal first (`packages/record/src/directory.ts`), and only a harness over workerd can see
+ * a fault of that kind, so this file bundles `src/index.ts`, starts Miniflare and signs in as the other `*-in-do` tests do.
  *
  * WHAT A PERSON SAW IS TWO ANSWERS THAT DISAGREE, and both are asserted. `/api/version` says `slash: true`, because that flag
  * is the record's model being configured and never builds the engine, so the palette offers the ask; the ask itself was the
  * 500. The flag is asserted true on the run that failed as well as on the run that passed, so the test says which half moved.
  *
- * THE MODEL IS HIS OWN KEY'S, AND IT IS COUNTED (`loop/finish/defects.md` G4). The Worker has no endpoint of its own any more;
+ * THE MODEL IS HIS OWN KEY'S, AND IT IS COUNTED. The Worker has no endpoint of its own any more;
  * a record reaches a model it did not come with only through the key its owner picked. So the owner puts an API token in
  * the vault through the key door, picks it in Settings with a provider, an address and a model, and the ask is answered by
  * Miniflare's `outboundService`, which is every `fetch` the Worker makes. It counts the calls and keeps the address and the
  * header each carried. A 200 that never reached the model reads as green if only the status is checked, which is what
- * this file once found; and a call that reached it without the key is the fault S2 names, so the header is asserted too.
+ * this file once found; and a call that reached it without the key is a fault of its own, so the header is asserted too.
  */
 
 import { test, before, after } from 'node:test';
@@ -194,7 +194,7 @@ test('THE ASK IS ANSWERED ON A DURABLE OBJECT, and not a 500 naming SQLITE_AUTH'
 });
 
 /* `post` SENDS WITH `redirect: 'manual'`, which workerd takes; it once sent `'error'`, which workerd refuses outright, and the
-   ask then answered 200 on the question as keywords with no call made (measured on 22 September). */
+   ask then answered 200 on the question as keywords with no call made (measured). */
 test('THE ASK REACHES HIS KEY, exactly once, at the address he named, carrying the key he picked', async () => {
   const from = reached.length;
   const out = await ask();
@@ -203,7 +203,7 @@ test('THE ASK REACHES HIS KEY, exactly once, at the address he named, carrying t
   assert.deepEqual(reached.slice(from), [{ url: `${PROVIDER}/chat/completions`, authorization: `Bearer ${HIS_TOKEN}` }]);
 });
 
-/* HIS ASKS ARE LISTED AND NOT CAPPED (`loop/finish/agents.md` §5 item 7), and the one count that feeds the list is the one
+/* HIS ASKS ARE LISTED AND NOT CAPPED, and the one count that feeds the list is the one
    status reads, so the asks above are in it. */
 test('ON HIS OWN KEY STATUS SAYS SO: the source, the provider, and a count with no cap', async () => {
   const status = await owner().slashStatus();

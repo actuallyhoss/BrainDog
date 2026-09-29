@@ -92,7 +92,7 @@ export type IngestPath =
  * bytes and does the comparison, once, for both.
  *
  * `path` CARRIES THE TOKEN'S SHA-256 IN HEX, which is all a record keeps (`ingestMint` in
- * `packages/record/src/index.ts`). It carried the token itself until 22 September, and measured at
+ * `packages/record/src/index.ts`). It once carried the token itself, and measured at
  * `15a6aa33` that shape could never be answered: the record keeps no token, so it said `none` and the
  * right token posted through the Worker's door was stored `untriaged`. `hook` digests the segment and
  * compares the digests.
@@ -157,7 +157,7 @@ export type IngestDoor = {
   /**
    * Keep one attachment in the record's file store, and answer what it was kept as, or `null` for one it does not take.
    *
-   * THE HOST'S OWN STORE AND ITS OWN RULES (`/api/files`, OPS-20): the same sniffed types and the same ceiling a person
+   * THE HOST'S OWN STORE AND ITS OWN RULES (`/api/files`): the same sniffed types and the same ceiling a person
    * uploading the file would meet, so mail is no side door into the store for a type it refuses. A file answered `null`
    * is still named on the arrival with its size, so "there was a PDF on that message" stays true when the PDF was not kept.
    *
@@ -358,7 +358,7 @@ function joinHead(head: (readonly [string, string])[]): Record<string, string> {
  * The head, unfolded and lower-cased, IN THE ORDER IT ARRIVED and with the repeats still separate.
  *
  * THE ORDER IS LOAD BEARING AND THE JOINED MAP THROWS IT AWAY, which is what this function exists for.
- * Measured on 2026-09-20: a message carrying its own `Authentication-Results: x; dkim=pass` under the
+ * Measured: a message carrying its own `Authentication-Results: x; dkim=pass` under the
  * forwarder's `dkim=fail; spf=fail` was stored `verified: true`, because eligibility was a substring
  * search over the joined value and the join cannot say which hop wrote which half. The record still
  * wants the join (a `match:` over `received` wants every relay), so both shapes are built from this one.
@@ -532,7 +532,7 @@ function results(value: string): Resinfo[] {
  * Whether a forwarder said this message is who it claims to be.
  *
  * THE TOP `Authentication-Results` AND ONLY THE TOP ONE, because every line below it was typed by
- * somebody this record has no reason to trust. Measured on 2026-09-20 against the first cut, which
+ * somebody this record has no reason to trust. Measured against the first cut, which
  * searched the joined value of every hop: a message whose own head carried
  * `Authentication-Results: anything-the-sender-typed; dkim=pass`, forwarded by an MTA that had just
  * written `dkim=fail ... spf=fail` above it, was stored `verified: true`.
@@ -541,14 +541,14 @@ function results(value: string): Resinfo[] {
  * one and the reason this function stopped being a substring search. DKIM says "the holder of the key
  * for `header.d` signed these bytes" and says nothing at all about the `From:` line: a stranger who
  * owns `evil.example`, signs with it correctly, and writes `From: alerts@hsbc.example` collects a
- * genuine `dkim=pass` from the forwarder. Measured on 2026-09-20 end to end against the self-host,
+ * genuine `dkim=pass` from the forwarder. Measured end to end against the self-host,
  * that message was stored `matched`, extracted, and written into the record's register as a bank
  * debit of the attacker's chosen amount at the attacker's chosen merchant. So a verdict counts only
  * when the identity it authenticated aligns with the From domain, which is DMARC's own question.
  *
  * AND WITH EVERY DOMAIN THE LINE SPELLS, NOT ONLY THE ONE IT DELIVERS TO. Alignment against the
  * address alone reads a different string from the one a record's `match:` reads, and the gap is
- * wide enough to drive the same forgery through: measured on 2026-09-20 with alignment in place,
+ * wide enough to drive the same forgery through: measured with alignment in place,
  * `From: "alerts@hsbc.example" <bot@evil.example>` signed by `evil.example` aligned, and a pattern
  * written `from contains "alerts@hsbc.example"` matched it and wrote the attacker's amount into the
  * register. `fromDomains` reads the whole line and `covers` makes one verdict answer for all of it.
@@ -613,7 +613,7 @@ async function pathToken(segment: string, v: Extract<IngestVerify, { kind: 'path
 /**
  * Whether Stripe signed this body, within the declared window of this host's clock (DOR-3).
  *
- * `verifyStripe` AND NOTHING OF THIS FILE'S OWN (`loop/finish/contracts.md` X38): the billing webhook calls the same
+ * `verifyStripe` AND NOTHING OF THIS FILE'S OWN: the billing webhook calls the same
  * function, so the repository has one Stripe check and not two that could disagree. The text handed in is the body
  * decoded once and never parsed, the string Stripe signed. An absent header is `false`, as `signed` answers one.
  */

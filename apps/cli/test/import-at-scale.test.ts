@@ -1,21 +1,15 @@
 /**
- * The import's claims about re-running, measured at the size his record actually reaches.
+ * The import's claims about re-running, measured at the size a real record reaches.
  *
- * WHY THIS FILE IS NOT IN `import.test.ts`. Those 499 lines drive `memoryRecord`, whose `list`
- * ignores `limit` and `cursor` and answers every row in one page, and whose `governance` ignores
- * `limit` and answers every suggestion ever opened. The first two failures below are failures of
- * PAGING, so the fake cannot hold either of them: it is green against an importer that reads one
- * page and calls it the whole list. The door here is the kernel this product ships, opened over an
- * in-memory SQLite, so the page sizes, the cursors and the two hundred row governance ceiling are
- * the record's own numbers and not this file's. The third is the same read refusing outright, which
- * `memoryRecord` never does either: its `governance` is a function that cannot fail.
+ * THE DOOR IS THE KERNEL THIS PRODUCT SHIPS, NOT A FAKE. A fake whose `list` ignores `limit` and `cursor` and answers
+ * every row in one page, and whose `governance` answers every suggestion ever opened, cannot hold the first two
+ * failures below, because they are failures of PAGING: it is green against an importer that reads one page and calls
+ * it the whole list. Opened over an in-memory SQLite, the page sizes, the cursors and the two hundred row governance
+ * ceiling are the record's own numbers and not this file's. The third is the same read refusing outright, which a
+ * fake whose `governance` cannot fail never does either.
  *
- * AND IT IS NOT IN `tools/gates/import.mjs` EITHER, which rehearses the whole switch against a real
- * self-host over HTTP and re-runs it. That gate is the right place for the end to end claim and it
- * runs at the fixture's size: five suggestions on Decide and forty-two rows. Neither failure below
- * appears under a hundred of anything. Writing seven hundred rows and two hundred and fifty
- * questions into the gate would put about a second on every full run to measure something that
- * needs no HTTP hop to be true.
+ * NO HTTP HOP. Neither failure below appears under a hundred of anything, and seven hundred rows and two hundred and
+ * fifty questions need no network to be true.
  *
  * `openRecord` AND NOT `createRecordApi`, because `apps/cli` declares `@braindog/kernel` and not
  * `@braindog/record`. The ceiling filter the record wraps this read in only ever REMOVES rows from
@@ -112,18 +106,18 @@ function doorOf(kernel: Kernel, o: { refuseListAfter?: number; refuseDecide?: bo
   return { door, lists: () => lists };
 }
 
-const plan = (rows: PlannedRow[], asks: PlannedAsk[] = []): Plan => ({ key: 'legacy:', taken: '2026-09-15', rev: 1, rows, asks, polls: [], skipped: [], changed: [] });
+const plan = (rows: PlannedRow[], asks: PlannedAsk[] = []): Plan => ({ key: 'tallybook:', taken: '2026-09-15', rev: 1, rows, asks, polls: [], skipped: [], changed: [] });
 
 const project = (n: number): PlannedRow => ({
   register: 'things',
-  key: `legacy:project:p${String(n)}`,
+  key: `tallybook:project:p${String(n)}`,
   label: `Project ${String(n)}`,
   fields: { name: `Project ${String(n)}` },
 });
 
-/** The one question this import brings, shaped as `packs/legacy-import/adapter.ts` shapes an open question. */
+/** The one question this import brings, shaped as an adapter shapes an open question. */
 const ASK: PlannedAsk = {
-  key: 'legacy:suggestion:SG7',
+  key: 'tallybook:suggestion:SG7',
   label: 'SG7',
   question: 'Which store should Tidepool launch on first?',
   body: {
@@ -131,7 +125,7 @@ const ASK: PlannedAsk = {
       { id: 'A', label: 'The desktop store', because: 'Where the beta players already are.', recommended: true },
       { id: 'B', label: 'The console store', because: 'A bigger audience later.' },
     ],
-    from: 'legacy:suggestion:SG7',
+    from: 'tallybook:suggestion:SG7',
   },
 };
 

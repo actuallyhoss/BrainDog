@@ -134,7 +134,7 @@ export async function serveDevice(request: Request, route: AuthRoute, door: Door
   });
   if ('retryAfter' in out) return reply(429, { ok: false, retryAfter: out.retryAfter }, [['retry-after', String(out.retryAfter)]]);
   if (!out.ok) return reply(httpStatus(out), out);
-  /* THE APP IS UNDER `/app` (`loop/research-one-domain.md` Brief D). `${origin}/settings/agents` is a marketing
+  /* THE APP IS UNDER `/app`. `${origin}/settings/agents` is a marketing
      page's address once the site and the app share `brain.dog`, so the six digits would be sent to a 404. With a
      slug the page is that record's, because under `/app/<slug>` the app reads that record and no other; without
      one it is `/app/settings/agents`, the record the session is on.

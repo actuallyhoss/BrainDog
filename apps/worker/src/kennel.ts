@@ -1,6 +1,6 @@
 /**
  * The Kennel on the Cloud: `/api/kennel/v1/`, the registry every BrainDog reads add-ons and use cases from
- * (`loop/finish/platform.md` §4.0 K, `docs/14-KENNEL-AND-COMMUNITY.md` §1).
+ * (`docs/14-KENNEL-AND-COMMUNITY.md` §1).
  *
  * THIS FILE READS AND WRITES AND DECIDES NOTHING. Every rule, what a submission must be, what a verdict or a yank does
  * and how the two indexes become one, is `@braindog/declare/kennel`'s, so the self-host and a test hold the same rules
@@ -186,7 +186,7 @@ export async function serveKennel(request: Request, deps: KennelDeps): Promise<R
     }
     switch (asked.ask) {
       case 'index': {
-        /* THE PUBLIC INDEX LEAVES OUT AN `unlisted` ENTRY (C41), while its files still download by exact path, and
+        /* THE PUBLIC INDEX LEAVES OUT AN `unlisted` ENTRY, while its files still download by exact path, and
            install by id keeps resolving against the bundled catalogue, which keeps it. */
         const merged = mergeIndexes(await bundledIndex(deps.assets, false), await readingIndex(deps.blobs));
         return answer(200, JSON.stringify({ ...merged, entries: listedEntries(merged) }), { open: true, head });

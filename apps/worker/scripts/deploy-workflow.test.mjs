@@ -93,7 +93,7 @@ test('only production\'s smoke is handed the canary token', () => {
   assert.doesNotMatch(step('Smoke alpha').body, /SMOKE_TOKEN/);
 });
 
-test('the Sandbox smoke follows Smoke, cannot go unnoticed, and reads its canary from wrangler.jsonc (SCR-4)', () => {
+test('the Sandbox smoke follows Smoke, cannot go unnoticed, and reads its canary from wrangler.jsonc', () => {
   assert.ok(at('Sandbox smoke') > at('Smoke'), 'the sandbox smoke runs before Smoke has answered');
   const sandbox = step('Sandbox smoke');
   assert.doesNotMatch(sandbox.body, /continue-on-error/, 'Sandbox smoke is continue-on-error');

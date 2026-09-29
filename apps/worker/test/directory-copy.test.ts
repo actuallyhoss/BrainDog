@@ -1,5 +1,5 @@
 /**
- * The Directory's nightly copy, sealed and put: `loop/research-restore.md` §6's second half.
+ * The Directory's nightly copy, sealed and put.
  *
  * THE COPY IS ONLY WORTH ITS READ-BACK. So the first test opens what was put with the test identity, the way the drill
  * opens a record's copy, and loads the lines into an empty Directory that must then resolve the name. Everything else

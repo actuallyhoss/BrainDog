@@ -1,7 +1,7 @@
 /**
  * A script's run on a host: the sandbox's `ctx.fetch` wired to the one send loop, and the plan's allowance asked first.
  *
- * `loop/research-shell-scripts.md` Brief 4, and DIRECTION section 22. The kernel leases a `script.run` job and hands a
+ * The kernel leases a `script.run` job and hands a
  * `Scripted` to whatever `ScriptRunner` the host passed `runActions`; `finishScript` applies what comes back. This file
  * is the part between the two that does not depend on which sandbox or which socket: both hosts build their runner
  * here, and each passes only what differs (`run`, `send`, `pin`, `openKey`), exactly as `sendAction` is shared.
@@ -98,7 +98,7 @@ function unsealed(api: Pick<RecordApi, 'kernel'>, row: Entry): Json {
  *
  * TAKING THE FIELD OFF THE ROW IS NOT ENOUGH WHILE THE FILTER CAN STILL ASK ABOUT IT. `@braindog/where` lets `starts`
  * test a `secret` like any text, so a script that asked which rows start with each character in turn read the grant id
- * back out of how many rows came home: measured by the checker on September 22nd, the whole id written into a row in
+ * back out of how many rows came home: measured: the whole id written into a row in
  * one run (`apps/selfhost/test/script-reads.test.ts`). Every value in the tree is walked, not only `all`, `any` and
  * `none`, so a group shape added later is covered without anyone remembering this function; a leaf names its field by
  * id only (`IDENT` there), so the id is the one spelling to catch.
@@ -120,7 +120,7 @@ function namesSealed(where: unknown, sealed: Set<string>): string | null {
  *
  * WHY A SCRIPT ASKS AT ALL. A pack that copies rows in from a provider has to know which ones a person already threw
  * away, or it writes each of them again on its next run: mercury's ledger read live rows only and put back every
- * transaction he deleted (`loop/finish/defects.md` M6).
+ * transaction he deleted.
  *
  * ANYTHING ELSE IS REFUSED, NOT READ AS NO OPTIONS. A script that meant to ask for its deleted rows and misspelled the
  * question would be answered the live rows alone, and would write the deleted ones back without a word. The record's
@@ -146,7 +146,7 @@ function listOptions(script: string, register: string, options: Json): { include
  * spoken id outside them answers as a row that is not there, the record's answer to any caller who may not read it,
  * so the prefix `runInQuickJs` cannot resolve is resolved here by the only party that can.
  *
- * THE WORKER HAD THIS INLINE SINCE BRIEF 5 AND THE SELF-HOST DID NOT HAVE IT AT ALL: its `CtxHost` carried no `list`
+ * THE WORKER HAD THIS INLINE AND THE SELF-HOST DID NOT HAVE IT AT ALL: its `CtxHost` carried no `list`
  * and no `get`, so `reads: ["clients"]` ran on the Cloud and was refused at home as "read clients, which is not in its
  * reads" (`apps/selfhost/test/script-reads.test.ts`). One copy here is what keeps the two answering alike.
  */
@@ -156,8 +156,7 @@ export function scriptReads(api: Pick<RecordApi, 'kernel' | 'list' | 'get'>): (s
     return {
       list: async (register, where, options = null) => {
         /* A SENTENCE IS REFUSED BEFORE THE TREE IS WALKED, because `namesSealed` cannot see into one and the record's
-           `list` reads a string as a sentence. Measured before this line (`script-reads.test.ts`, the audit of wave
-           thirty-six, finding 7): `token is set`, `token is empty` and `token is <grant id>` each answered which client
+           `list` reads a string as a sentence. Measured before this line (`script-reads.test.ts`): `token is set`, `token is empty` and `token is <grant id>` each answered which client
            holds a key, while the same question as a tree was refused. Refused rather than parsed, because a tree is what
            the grammar tells a script to write, and parsing here would be a second reader of sentences that has to agree
            with the kernel's on every word it adds. */
@@ -201,7 +200,7 @@ export function grantNamed(grants: () => ReturnType<RecordApi['kernel']['grants'
  * it refuses the whole run on both hosts, as a key the script does not declare does.
  *
  * A KEY GOES ONLY TO THE HOST ITS VAULT ENTRY SAYS IT OPENS. A script names its keys and its origins as two lists, and
- * nothing joined them: the audit of wave thirty-five sent `goldapi`, whose entry opens `api.gold.test`, to
+ * nothing joined them: a probe sent `goldapi`, whose entry opens `api.gold.test`, to
  * `collector.test` as a bearer, because that origin was also in the script's `egress:`, and the one line the owner
  * approves names both lists without saying which host gets the key. A `call` has one host and one grant, so the pairing
  * was implicit there; a script is the first declaration that can hold two origins and one key. The host is compared

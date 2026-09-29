@@ -154,7 +154,7 @@ function utf16(text: string, order: 'le' | 'be'): Uint8Array {
 }
 
 test('THE KEY IS SCRUBBED FROM THREE ECHOES THE BYTES DO NOT MATCH: MIME base64 wrapped at 76, quoted-printable with soft breaks, and UTF-16 either way round', async () => {
-  /* MEASURED BY AUDIT THIRTY-SEVEN (finding 5) WITH `sendAction` AND A 64-CHARACTER KEY: each of these reached the
+  /* MEASURED WITH `sendAction` AND A 64-CHARACTER KEY: each of these reached the
      script with no spelling of the key intact, and one line of the script's own put it back together. Each case below
      is that line. A `=` in the key makes quoted-printable differ from the bytes, a `/` and a `+` put both of base64's
      odd characters in play, and the JSON around it is long enough that every wrap at 76 lands inside the key. */
@@ -203,7 +203,7 @@ test('THE KEY IS SCRUBBED FROM THREE ECHOES THE BYTES DO NOT MATCH: MIME base64 
 const hexOf = (text: string): string => [...new TextEncoder().encode(text)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 
 test('THE KEY IS SCRUBBED FROM NINE MORE ECHOES: hex, every byte percent-encoded, URL-encoded twice, lower-case quoted-printable, JSON and HTML escapes, and base64 folded as a header', async () => {
-  /* MEASURED BY AUDIT THIRTY-NINE (finding 7) WITH `sendAction`, THIS KEY AND A PROVIDER ECHOING IT IN ONE ENCODING PER
+  /* MEASURED WITH `sendAction`, THIS KEY AND A PROVIDER ECHOING IT IN ONE ENCODING PER
      CASE: each of the nine it names reached the script whole, and each case below is the one line of the script's own
      that gave it back. Two are the defaults of widespread stacks: ASP.NET Core's System.Text.Json writes every `+` as
      `+`, and a Go error page through `html/template` writes it as `&#43;`. Neither escapes the `=` or the `/`, so a

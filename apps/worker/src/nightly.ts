@@ -22,8 +22,8 @@
  *
  * AND THE SAME WALK EXPIRES WHAT DELETED RECORDS LEFT. A deleted record keeps one final copy for
  * `FINAL_KEPT_DAYS` (`destroy.ts`), and nothing else would ever visit its prefix again: the records
- * page above lists open records only, which is how the two objects `loop/research-restore.md` §5
- * measured outlived their record. So after the copies, the Directory is asked which records closed
+ * page above lists open records only, which is how two objects were
+ * measured outliving their record. So after the copies, the Directory is asked which records closed
  * before the cutoff, and each one's prefix is emptied.
  *
  * AND LAST, THE LEDGER IS MADE EQUAL TO THE EVENTS. Every run a record metered is a `pull` event in it,
@@ -131,7 +131,7 @@ export type Walk = {
   note?: ((text: string) => Promise<void>) | undefined;
   /**
    * The records closed before `cutoff` (epoch milliseconds), paged like `records`: the Directory's `closedBefore`.
-   * ABSENT, NOTHING IS EXPIRED AND THE CLOSING LINE SAYS NOTHING ABOUT EXPIRY, which is the Worker until W55-7 wires it.
+   * ABSENT, NOTHING IS EXPIRED AND THE CLOSING LINE SAYS NOTHING ABOUT EXPIRY, which is the Worker until it is wired.
    */
   closed?: ((cutoff: number, cursor?: string) => Promise<Page>) | undefined;
   /** Empties one closed record's prefix and answers how many objects went: `expireFinal` over the bucket. */

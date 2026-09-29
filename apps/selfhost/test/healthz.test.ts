@@ -1,5 +1,5 @@
 /**
- * `GET /healthz` and `GET /.well-known/braindog-key` on the self-host (ROADMAP W55, `53 §13 #9`, `03 §4`).
+ * `GET /healthz` and `GET /.well-known/braindog-key` on the self-host (`53 §13 #9`, `03 §4`).
  *
  * MEASURED AT afb3b1b2, BEFORE THE FIRST TEST HERE: a server started with a token answered `GET /healthz` with 404
  * `ROUTE_UNKNOWN`, "A record method is at /api/<method>.", because the path fell through to the record's router. A

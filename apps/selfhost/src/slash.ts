@@ -8,7 +8,7 @@
  * the operator set one, and with none otherwise, which is a local model working. HIS OWN KEY is the one he picked from the
  * vault in Settings, by its id, with the provider and address he named (`slashOwnKeyOf`), opened through this host's key
  * store on each call (`actions.ts` `keyOpener`, which counts the opening under a `grant.read` event) and always required.
- * No key is chosen by its label any more (`loop/finish/defects.md` S1). Neither is written anywhere. The builders are
+ * No key is chosen by its label any more. Neither is written anywhere. The builders are
  * `@braindog/host/slash`'s, the ones the Worker uses too.
  *
  * TWO FEATURES SHARE THE NAME AND THIS FILE NOW BUILDS BOTH. `slashModelFor` is the model behind the RECORD's Slash, which
@@ -19,7 +19,7 @@
  *
  * AND `slashDoor` IS THE THIRD NAME HERE, because a builder is not a caller: `POST /api/slash/read` is what a
  * request reaches. BOTH ARE REACHED NOW: `server.ts:1167` mounts this door in the site literal and dispatches
- * `servesSlash(path)` ahead of `servesKeys(path)`, which landed on 21 September. `slashDoor`'s own memo below
+ * `servesSlash(path)` ahead of `servesKeys(path)`. `slashDoor`'s own memo below
  * carries what a real socket answers through it, and what that answer does not contain.
  */
 
@@ -110,7 +110,7 @@ export function slashModelFor(
       if (model.form === undefined) throw Object.assign(new Error('The model Slash answers with here drafts no first plan.'), { sent: false });
       return model.form(input);
     },
-    /* HANDS `SlashModel.skill` THROUGH THE SAME CHOICE `form` IS (GAP-12), so the daily look's skill step reads his own
+    /* HANDS `SlashModel.skill` THROUGH THE SAME CHOICE `form` IS, so the daily look's skill step reads his own
        key's model, and not only the record's endpoint, when he has one chosen. */
     skill: async (input) => {
       const model = chosen();
@@ -154,8 +154,8 @@ export async function slashEngineFor(
   const inference = slashInferenceOf(config, wireOf(config, api, store));
   if (inference === undefined) return undefined;
   const { createSlash } = await import('@braindog/slash');
-  /* NAMED BY THIS HOST, because on tier `a` the package can only say `glm-5.3-flash` and what answers is `SLASH_MODEL`
-     (`loop/research-spark-routes.md` F2). Every door this engine is handed to reads the one `status()`. On his own key
+  /* NAMED BY THIS HOST, because on tier `a` the package can only say `glm-5.3-flash` and what answers is `SLASH_MODEL`.
+     Every door this engine is handed to reads the one `status()`. On his own key
      the name is the one he typed, and the wrap leaves it. */
   const engine = slashNamedEngine(createSlash({ sql: deps.sql, clock: deps.clock, inference, record: slashRecord(api()) }), slashModelNameOf(config));
   /* GUARDED BY THIS HOST, because `byo`'s asks are on this host's endpoint and the package meters tier `a` alone, and
@@ -172,14 +172,14 @@ export async function slashEngineFor(
  * `SLASH_ENDPOINT` still never evaluates `@braindog/slash` (`46 §5.1`).
  *
  * THE ENGINE IS BUILT ONCE, ON THE FIRST QUESTION, THROUGH `slashEngineFor`, so it is the guarded one: `byo` spends the
- * one `ask_cap` a person's read does (Q2's default, built in Brief C). A second engine beside the door's, over the same
+ * one `ask_cap` a person's read does. A second engine beside the door's, over the same
  * Slash SQLite, because both read `slash_settings` and `slash_call` on every ask and hold nothing of their own. A build
  * that throws is let go, so the next pass builds again rather than every question after it failing on one bad import.
  *
- * ON HIS OWN KEY THE QUESTION GOES TO HIS KEY (`loop/finish/agents.md` AGT-21), asked on a wire signed `rule:<id>`, so the
+ * ON HIS OWN KEY THE QUESTION GOES TO HIS KEY, asked on a wire signed `rule:<id>`, so the
  * vault's `grant.read` names the rule that opened it and not `system`. This never runs the vault's session gate
  * (`slashOwnKeyFor`): a rule has no session for it to read, and installing a rule that asks Slash is the owner's consent to
- * its question going to the model he chose (`loop/research-infer-ask-next.md` §4, Q3's default). A key that is gone or will
+ * its question going to the model he chose. A key that is gone or will
  * not open stops the run `FORBIDDEN` with nothing sent and nothing in the ledger, and this host's endpoint is never asked
  * in its place.
  */
@@ -234,7 +234,7 @@ export function slashAnswersFor(
  * What answers the record's model jobs on this host, or nothing: `serveModelJobs`'s `deps.inference` for the tick, the
  * twin of the Worker's `workerModelJobs` (`apps/worker/src/slash-jobs.ts`).
  *
- * TWO JOBS, AND BOTH ARE SLASH'S (`loop/finish/contracts.md` X8): an `infer.draft` is a pattern for messages nothing
+ * TWO JOBS, AND BOTH ARE SLASH'S: an `infer.draft` is a pattern for messages nothing
  * parsed, drafted by `draftPattern`, and an `infer.prose` is the two sentences above a digest, written by `digestProse`.
  * The pass that leases, meters and acks them is `@braindog/host`'s; this is only the engine it is handed.
  *
@@ -270,48 +270,23 @@ export function slashModelJobs(
 /**
  * `POST /api/slash/read` for this process: the door `@braindog/host` serves, over the builder above.
  *
- * THIS IS THE CALLER THE BUILDER HAD NOT GOT, AND NOTHING CALLS IT EITHER, so say both. Finding 2 of
- * `loop/research-batch-five-audit.md` is the absence, and it reproduces exactly. Re-measured on 2026-09-21 with
- * `throw new Error(…)` on the first line of `slashEngineFor`: `node --test --experimental-strip-types
- * "apps/selfhost/test/*.test.ts"` is 204 tests, 202 pass, 0 fail, 2 skipped, which is byte for byte the
- * unmutated tally. Not one test in this app reaches its own builder, so the two reds the mutation does produce
- * are both in `apps/worker/test/slash.test.ts`, at `:206` and `:238`, driving THIS file's builder from the
- * other app's suite. A THREE-red tally wants both builders throwing at once and not this one alone, which is
- * the arithmetic `apps/worker/src/slash.ts`'s own memo got wrong before it was re-measured here: mutate either
- * builder by itself and that suite is 177 pass, 2 fail, never 176 and 3. Three passes added the dependency, then
- * the builder, then the door below, and the fourth mounted it; before that mount `grep -rn slashDoor apps` found
- * this declaration and no call, which was the same sentence the audit wrote about `slashEngineFor`.
+ * THE DOOR IS MOUNTED IN `server.ts`, AND UNMOUNTED IT IS A 404 THAT NO TEST IN THIS APP NOTICES. With the mount
+ * absent, a real `start({ file, port: 0, slash: { url, model, key, send } })` reported `slash: true` at `/api/version`
+ * and answered `POST /api/slash/read` with 404 `ROUTE_UNKNOWN` "There is no method called slash/read.", from
+ * `serveApi`, because nothing stood in front of it. With `throw new Error(…)` on the first line of `slashEngineFor`,
+ * every test in `apps/selfhost/test` was measured green: the only reds were in `apps/worker/test/slash.test.ts`, which drives
+ * THIS file's builder from the other app's suite.
  *
- * THE PRODUCT ANSWERED A 404 UNTIL IT WAS MOUNTED, and that is the measurement that settled the absence: a real
- * `start({ file, port: 0, slash: { url, model, key, send } })` reported `slash: true` at `/api/version` and
- * answered `POST /api/slash/read` with 404 `ROUTE_UNKNOWN` "There is no method called slash/read.", from
- * `serveApi`, because nothing stood in front of it.
+ * WHAT IT ANSWERS, DRIVEN OVER A REAL SOCKET: 200, on exactly one model call, for an owner signed in with the server
+ * key, and the row it was asked about. On a record holding three rows in `things`, one of them named Kiln, the single
+ * word `Kiln` comes back with that row and `{"register":"things","rows":1,"predicate":"all"}` in the fold.
  *
- * WHAT IT ANSWERS SINCE, DRIVEN OVER A REAL SOCKET ON 21 SEPTEMBER: 200, on exactly one model call, for an owner
- * signed in with the server key, and the row it was asked about. On a record holding three rows in `things`, one
- * of them named Kiln, the single word `Kiln` comes back with that row and
- * `{"register":"things","rows":1,"predicate":"all"}` in the fold.
- *
- * AND THE FIRST WRITING OF THIS PARAGRAPH SAID THE ANSWER WAS EMPTY, WHICH WAS THE DRIVE'S FAULT AND NOT THE
- * DOOR'S. The register it built declared no field with `search: true`, and `packages/kernel/src/fts.ts`
- * `projectedText` indexes nothing else, so the record was never asked about text it held: `kernel.search('Kiln')`
- * answered `[]` correctly and the ask answered nothing correctly. One flag in the drive turned every reading
- * green. It is written out here rather than quietly replaced, because a memo that records a measurement has to
- * record a wrong one too.
- *
- * THE MOUNT IS THREE EDITS TO `server.ts` AND THEY WERE DRIVEN GREEN, in memory through a `node:module`
- * `registerHooks` load hook so that no file outside this pass's own list was written: one `openSqlite` for
- * Slash's own database beside `const sql` at `:751`, one `slash: slashDoor(slashConfig, () => api,
- * options.keys, { sql: slashSql, clock }, origins)` in the `site` literal at `:1129` (with `slashConfig`
- * lifted out of the `slashModelFor` call at `:796`, since both ports must read one config), and
- * `servesSlash(path)` ahead of `servesKeys(path)` at the dispatch at `:1352`. Under that patch, one real
- * question over a real socket answered 200 with the record's two open rows and not the third, the predicate the
- * model drafted, the fold's `{ register: 'tasks', rows: 2 }` and its closing `{ register: 'grant', rows: 0,
- * predicate: 'refused' }`, on exactly one model call, while `/api/boot` and `/api/list?register=tasks` still
- * answered 200 and three rows.
+ * A REGISTER IS ASKED ABOUT ITS TEXT ONLY THROUGH A FIELD DECLARED `search: true`. `packages/kernel/src/fts.ts`
+ * `projectedText` indexes nothing else, so on a register with no such field `kernel.search('Kiln')` answers `[]` and
+ * the ask answers nothing, both correctly.
  *
  * TWO OF THE DOOR'S OWN REFUSALS ARE UNREACHABLE HERE, AND THAT IS THE DISPATCH ORDER RATHER THAN A DEFECT.
- * Mounted at `:1352` the door sits behind `contextFor`, so under the patch a bearer this record does not know
+ * The door sits behind `contextFor` in the dispatch, so a bearer this record does not know
  * answered 401 `UNAUTHORIZED` and a page at `https://evil.example` answered 403 `FORBIDDEN` in this host's own
  * CSRF sentence, not the door's 403 `NEEDS_BROWSER_SESSION` at `principal` or its 403 at `origin`. `serveKeys`
  * sits at the same place for the same reason and inherits the same order, and a bearer that IS known does reach
@@ -337,7 +312,7 @@ export function slashDoor(
      been built, so a key he picks or revokes counts on the next ask.
      AND IT IS OPENED FOR THE ASKER, NOT FOR `system`. `slashOwnKeyFor` runs the vault's own gate on `ctx` and signs the
      `grant.read` with the asker's id; before it, a read colleague with a fifty-minute-old proof proposed on the owner's key
-     and the log said `system` (`loop/research-batch-thirty-one-audit.md` §1). */
+     and the log said `system`. */
   const byok =
     config === undefined || store === undefined
       ? undefined
@@ -373,7 +348,7 @@ export async function slashErased(sql: Sql, subjects: readonly string[]): Promis
 
 /**
  * The record's `erase`, followed by `eraseSlash` over the Slash SQLite this process hands every engine, so an erasure
- * reaches the questions Slash kept (`loop/finish/contracts.md` §7.2). `server.ts` calls it once, on the record it built.
+ * reaches the questions Slash kept. `server.ts` calls it once, on the record it built.
  *
  * THE RECORD CANNOT DO IT ITSELF: it has no edge to `@braindog/slash` and must not, and the ledger is not even in the
  * record's file here but beside it. So the host that holds both finishes the erasure.

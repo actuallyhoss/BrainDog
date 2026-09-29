@@ -5,7 +5,7 @@
  *   node --test --experimental-strip-types "apps/worker/scripts/*.test.mjs"
  *
  * EACH CHECK HAS A WRONG ANSWER THAT LOOKS RIGHT, AND THAT IS WHAT THIS FILE PINS. Two Workers answer one hostname once
- * the site binds the app (`loop/research-one-domain-binding.md`), and the site's 404 page is a perfectly healthy
+ * the site binds the app, and the site's 404 page is a perfectly healthy
  * response from the wrong Worker. A smoke step that reads "not 5xx" as green would pass a deploy where every `/api`
  * call reaches the marketing site. So each judgement below is held against the answer the other Worker would give, not
  * only against the one it should.
@@ -15,9 +15,9 @@
  * flip taken back out (`flip-fixture.mjs`), because that is what a rollback of push 4 deploys behind push 3's site, and
  * the smoke step still has to judge it. The site each push is made beside
  * is built in memory (`site-fixture.mjs`), so these tests say the same thing before and after the commit that binds a
- * site; the one test that reads the real site says so in its name. The wave-thirty-nine version of this step asked
+ * site; the one test that reads the real site says so in its name. An earlier version of this step asked
  * `https://<PUBLIC_HOST>/pricing`, which in push A is `app.brain.dog/pricing`: the Worker's page, not the site, so a
- * good dark deploy would have gone red (`loop/research-one-domain-cutover.md` §2.3).
+ * good dark deploy would have gone red.
  *
  * NOTHING HERE TOUCHES THE NETWORK. `checks` and `judge` are pure; `smoke()` is one `fetch` per check.
  */
@@ -135,7 +135,7 @@ test('push A: the front door is a 308 into /app on the same name, and the Worker
   assert.equal(front.headers?.accept, 'text/html', 'a page load says it wants a page, or the Worker rightly leaves it alone');
   assert.equal(judge(front, answer(308, { location: 'https://app.brain.dog/app/r/x' })), null);
   /* THE WORKER WITHOUT THE SAME-HOST REDIRECT answers `ROUTE_UNKNOWN` in JSON here, which is the site's "Open the app"
-     and every mailed magic link landing on an error. Measured in the cut-over survey, §2.2. */
+     and every mailed magic link landing on an error. Measured before the move. */
   assert.match(judge(front, answer(404, json)) ?? '', /ROUTE_UNKNOWN|same name/);
   /* AND A REDIRECT TO brain.dog IN PUSH A is the flip's vars deployed before the site hands that name the doors: the
      site's 404 for everyone. */
@@ -169,7 +169,7 @@ test('a public host nothing reaches is refused before anything is asked, and the
   assert.throws(() => checks(staged('B2'), 'production', crossed), /binds APP to braindog-alpha/);
 });
 
-/* THE PUBLIC DEMO IS GONE (`loop/research-no-sample.md` A1), and with it the one var that turned the anonymous boot into
+/* THE PUBLIC DEMO IS GONE, and with it the one var that turned the anonymous boot into
    a 200. A file that still carries a well-formed `DEMO_RECORD` deploys a Worker that reads it nowhere, so the check has
    to expect the 401 whatever the file says: a 200 there is a Worker older than the removal, or a door nobody meant. */
 test('the anonymous boot is 401 JSON whatever the file says, a leftover DEMO_RECORD included', () => {
@@ -199,7 +199,7 @@ test('the real files: the deploy step reads the site by default, and asks a site
   }
 });
 
-/* `/healthz` ON EVERY NAME THE APP IS ON, WITH ITS `kernel` HELD TO THE CHECKOUT (defects H4). The wrong answers that look
+/* `/healthz` ON EVERY NAME THE APP IS ON, WITH ITS `kernel` HELD TO THE CHECKOUT. The wrong answers that look
    right are the site's 404 page on a shared name, which is every uptime monitor reading the marketing site, and a
    healthy 200 from a build that is not this one. */
 test('/healthz passes only the liveness answer of this build, and names the site when the site keeps the door', () => {

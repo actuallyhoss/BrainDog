@@ -1,5 +1,5 @@
 /**
- * A crash answers a reference and logs the reason. Brief W60-1, `loop/research-hardening.md` §2.1 and H10.
+ * A crash answers a reference and logs the reason.
  *
  * THE REASON WAS IN THE ANSWER AND NOWHERE ELSE. `serveApi`'s catch wrote the thrown message into the 500's `fix`, so
  * the caller read the driver's sentence and the operator read nothing: the probe behind §2.1 (`probe-host-throw.txt`)
@@ -23,7 +23,7 @@ import { ok } from '@braindog/ports';
 
 /* A NAMESPACE IMPORT, SO THIS FILE LOADS AGAINST A TREE WITHOUT `crashed`. A named import of an export that does not
    exist is a link error, and the first test below would then have been red for the wrong reason: it would never have
-   run, and so it could not have shown the reason reaching the caller, which is the red this brief asks to be seen. */
+   run, and so it could not have shown the reason reaching the caller, which is the red this file exists to show. */
 import * as host from '../src/index.ts';
 
 type Answer = { ok: boolean; refusal?: { code: string; fix: string } };

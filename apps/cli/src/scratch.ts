@@ -1,6 +1,6 @@
 /**
  * A scratch record in memory, for the SDK to plan, install, test and draw a pack in before anybody else sees it:
- * `pack check`, `pack test`, and the operator's `kennel review show` and `list` (`loop/finish/platform.md` PLT-5).
+ * `pack check`, `pack test`, and the operator's `kennel review show` and `list`.
  *
  * THE RECORD'S OWN CODE, NOT A COPY OF ITS RULES. The kernel is opened over `node:sqlite` exactly as
  * `packages/kernel/test/sqlite.ts` opens it for the tests, and a pack goes through `declare`'s `normalise`, `plan` and

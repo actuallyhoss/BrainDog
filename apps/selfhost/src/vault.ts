@@ -1,6 +1,6 @@
 /**
  * The self-host's key step: where a key put in is sealed, and where one read back is opened.
- * `12 §6`, ADR-062, `loop/research-agent-path.md` §5.7.
+ * `12 §6`, ADR-062.
  *
  * ONE OF THE THREE FILES THE `Plaintext` BRAND LIVES IN (`tools/gates/secret-grep.mjs`). A value arrives in a
  * body, is sealed here under a key derived from the record's own, and is dropped; the record is handed sealed
@@ -208,7 +208,7 @@ function steps(api: RecordApi, store: KeyStore) {
  * An agent's door, `/api/vault/*`. Without a key store both halves answer `NOT_IN_THIS_BUILD`.
  *
  * `token` IS THE HOST'S OWN `/api` BEARER CHECK, and with it the deposit door takes an agent's login token as well as a
- * vault grant (`loop/finish/agents.md` C1): the record adds that key as new, in the token's run's project, or refuses.
+ * vault grant: the record adds that key as new, in the token's run's project, or refuses.
  * The open door still takes a vault grant only (`serveVault` in `@braindog/host`).
  */
 export function vaultDoor(

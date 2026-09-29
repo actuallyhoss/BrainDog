@@ -1,8 +1,8 @@
 /**
  * `init <slug> --from <file>` restores a record every member of it can still open, and a throw part way through leaves
- * nothing behind (`loop/research-batch-fifty-seven-audit.md` finding 1, and the checker's line on `restore.ts`).
+ * nothing behind.
  *
- * MEASURED BEFORE THIS FILE, by the audit's probe S3/S4 and again here: `initFrom` wrote ONE `dir_person` row, for
+ * MEASURED BEFORE THIS FILE: `initFrom` wrote ONE `dir_person` row, for
  * `owners[0]`, and nobody else on the record got one. The self-host's door for a new address, `person$`, found no row
  * and minted `p_<new ulid>`, an id no `member` row names, so every other member signed in as a stranger. The owner filter
  * never read `person.suspended_at`, so with a suspended first owner the one person the Directory named could not open it
@@ -179,7 +179,7 @@ test('A MEMBER THE DIRECTORY HOLDS UNDER ANOTHER ID IS NOT CARRIED, IS NAMED, AN
    the restore before this one leaves exactly that behind: the member it could not carry signed in under a fresh id and
    was invited again, so the next copy names them twice. The Directory holds one row per address (`dir_person_email`),
    so the second insert threw `UNIQUE constraint failed` and the whole restore was refused, keeping the record from
-   everybody (measured by the checker on the first version of this change). One is carried and the other is named. */
+   everybody (measured on the first version of this change). One is carried and the other is named. */
 test('AN ADDRESS THE COPY NAMES TWICE IS CARRIED ONCE AND THE OTHER IS NAMED, and the restore still serves everyone else', async (t) => {
   const work = scratch(t);
   const file = await copyOf(work, (sql) => {
@@ -236,7 +236,7 @@ test('A THROW AFTER THE RECORD FOLDER IS MADE LEAVES NO FOLDER AND NO DIRECTORY 
 });
 
 /* THE TEST ABOVE THROWS BEFORE THE DIRECTORY IS WRITTEN, so its empty tables prove nothing about the undo's own rows:
-   measured by the checker, deleting the `provisioned` branch of `undo` or its `dir_person` loop left it green. This
+   measured, deleting the `provisioned` branch of `undo` or its `dir_person` loop left it green. This
    clock stops once the Directory holds the record, which is `directory.join` for the first person carried after the
    owner, so by then `provision` has written the record, its name and the owner's membership, and `dir_person` holds the
    owner and that person under the copy's ids. */

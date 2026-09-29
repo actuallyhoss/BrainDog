@@ -1,6 +1,6 @@
 /**
  * The self-host's sandbox for scripts: `@braindog/script`'s QuickJS runner, with this host's socket, name service and
- * keys (`loop/research-shell-scripts.md` Brief 4, DIRECTION 22).
+ * keys.
  *
  * EVERYTHING ELSE IS `@braindog/host/script`, which the Worker will build its runner from too. This file passes in what
  * only a Node host has, the same three things `actionExecutor` passes the send loop for a `call`: `pinFor`, so a name

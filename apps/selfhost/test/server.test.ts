@@ -2,8 +2,8 @@
  * `/in/*` on a self-host: the door something arrives at from outside.
  *
  * THE ROUTE WAS BUILT AND NOTHING DISPATCHED IT. `packages/host/src/ingest.ts` had `serveIngest`,
- * its own tests and a header explaining every refusal, and no host called it: measured on
- * 2026-09-20 against this server, `POST /in/webhook/<a declared ingest>` answered 404
+ * its own tests and a header explaining every refusal, and no host called it: measured
+ * against this server, `POST /in/webhook/<a declared ingest>` answered 404
  * `ROUTE_UNKNOWN` from the `/api` fallback, and with a shell configured it would have answered
  * `index.html` and a 200, which a sender's retry logic reads as delivered. The whole extraction
  * pipeline was reachable by no message at all.
@@ -214,7 +214,7 @@ test('and a `pull` ingest is not a webhook, so its own id is 404 at this door', 
       ).ok,
     );
     /* THE EMPTY BODY IS WHAT SAYS THE DOOR ANSWERED, and not the `/api` fallback behind it.
-       Measured on 2026-09-20 by commenting the `/in/*` line out of `answer()`: this test and the
+       Measured by commenting the `/in/*` line out of `answer()`: this test and the
        two below it still passed, because the fallback's own 404 carries a `ROUTE_UNKNOWN` sentence
        and only the status was being read. `serveIngest` answers 404 with no body at all, so the
        two are one assertion apart. */
@@ -231,8 +231,8 @@ test("and the Cloud's own webhook shape is declined for an ingest that reads no 
   const made = await host();
   try {
     /* THIS RECORD'S OWN ID IS IN THE URL AND IT IS STILL A 404, because `till` declares no `verify:` and
-       so has nothing that would read the last segment. The self-host does compare the first segment now,
-       since 22 September (`arrivalDoor` in `src/server.ts` says why the oracle it was once said to open is
+       so has nothing that would read the last segment. The self-host does compare the first segment now
+       (`arrivalDoor` in `src/server.ts` says why the oracle it was once said to open is
        not one); what it will not do is let a second URL reach an ingest whose one URL has no token in it,
        which would make two URLs one door. `shortcut-arrival.test.ts` is the ingest that does read one. */
     const out = await send(made.port, '/in/webhook/rec_01JZ8QK3F7R2M9V4XN6TCB5HAD/till/some-token', 'charge');
@@ -369,7 +369,7 @@ test('A FLOOD AT ONE INGEST IS RATIONED, and the answer says how long to wait', 
 test('and a thousand invented ingest ids do not close the door on the real ones', async () => {
   /**
    * THE KEY OF THE BUDGET IS A PATH A STRANGER TYPES, so the table it lives in is a table a stranger
-   * fills. Measured on 2026-09-20 against the first cut: 1,000 POSTs to `/in/webhook/invented-<n>`,
+   * fills. Measured against the first cut: 1,000 POSTs to `/in/webhook/invented-<n>`,
    * which cost no credential and left no row, filled the map to its ceiling, and the next arrival at
    * a real ingest and the next forwarded message were both refused 429 until the window rolled. That
    * is the whole arrival surface closed by anybody who can reach the port, over and over, for free.
@@ -416,7 +416,7 @@ test('and a body this door will never take is refused before it is read', async 
   /**
    * `answer()` WEIGHS EVERY BODY BEFORE IT ROUTES, AND ITS CEILING IS A HUNDRED MEBIBYTES. That is
    * the right number for `/api/import`, which a signed-in owner calls. `/in/*` is the one path here
-   * with no credential on it at any point, and measured on 2026-09-20 an 8 MiB POST to
+   * with no credential on it at any point, and, measured, an 8 MiB POST to
    * `/in/webhook/till` from anybody who could reach the port was read whole into this process and
    * only then compared against the one mebibyte the channel allows. On a host bound to `0.0.0.0`,
    * which is the default once a token is set, that was a hundred megabytes per connection for free.
@@ -462,7 +462,7 @@ test('A STRANGER WHO SIGNS WITH THEIR OWN DOMAIN IS NOT THE BANK, however well t
    * says "the holder of the key for `header.d` signed these bytes" and says nothing whatever about
    * the `From:` line, so a stranger who owns `evil.example`, signs correctly with it, and puts
    * `From: alerts@hsbc.example` on the message collects a genuine `dkim=pass` from the forwarder.
-   * Measured on 2026-09-20 against the first cut, which searched the top hop for the substring
+   * Measured against the first cut, which searched the top hop for the substring
    * `dkim=pass`: the message below was stored `matched`, extracted, and written into the register as
    * a EGP 9,999.00 debit at a merchant the attacker chose. SPF is worse, because a forwarder rewrites
    * the envelope sender and an `spf=pass` on forwarded mail is the forwarder vouching for itself.
@@ -558,7 +558,7 @@ test('and four messages arriving together are four arrivals, not one read and th
    * door off the disk must not turn that into 404s. The first cut of `inboundDigest` stamped the
    * window before it awaited the digest and kept the ANSWER rather than the read, so callers two,
    * three and four found the window already closed and were handed the value from before the read,
-   * which is `null`: measured on 2026-09-20, three of four callers in one tick. A message refused
+   * which is `null`: measured, three of four callers in one tick. A message refused
    * 404 is one a forwarder may not send again.
    */
   const made = await host();
@@ -611,7 +611,7 @@ test('and a file caught half-written opens nothing, rather than opening on the e
  * message is "the token now on disk did not open the door", which sends the next reader looking at the
  * window, the digest or the rotation, and not at the one character that changed.
  *
- * MEASURED ON 2026-09-21 BY DELETING THE `.trim()` AND RUNNING THIS FILE: 23 tests, 20 pass, 3 fail.
+ * MEASURED BY DELETING THE `.trim()` AND RUNNING THIS FILE: 23 tests, 20 pass, 3 fail.
  * The three are the rotation test and the two below. With the trim back: 23 pass, 0 fail.
  */
 test('and a token file ending in the newline an editor leaves still opens the door', async () => {
@@ -639,7 +639,7 @@ test('and a file holding nothing but whitespace is no token, rather than a token
    * the OLD token, which is 404 with the trim and 404 without it, because whitespace digests to
    * neither token either way. What actually changes is what the whitespace itself becomes: with no
    * trim, `load()` returns the digest of `'   \n'`, so the file's own contents are a live credential
-   * and `/in/email/%20%20%20%0A` opens the record to anybody who thinks of it. Measured on 2026-09-21
+   * and `/in/email/%20%20%20%0A` opens the record to anybody who thinks of it. Measured
    * with the `.trim()` deleted: 202 and one row in `inbox_raw`. With it: 404 and none.
    */
   let at = Date.now();

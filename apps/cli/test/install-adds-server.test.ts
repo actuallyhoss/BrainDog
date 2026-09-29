@@ -1,11 +1,10 @@
 /**
- * `braindog install --replace` putting BrainDog's MCP server in where it takes the old tool's out: brief 2 of
- * `loop/research-switch-recheck.md` §3.
+ * `braindog install --replace` putting BrainDog's MCP server in where it takes Tallybook's out.
  *
- * MEASURED BEFORE THIS EXISTED, on HEAD at f88eb95b: the cut-over removed every the old tool server it could name and
+ * MEASURED BEFORE THIS EXISTED: the cut-over removed every Tallybook server it could name and
  * added none, and the one line main.ts printed for BrainDog's server had no `CLAUDE_CONFIG_DIR`, so run as printed it
- * landed in whichever profile the shell was in. A session that reached the old tool only through a `.mcp.json` (the
- * `acme` shape, `C:\Repos\.mcp.json`) had no brain at all after `--apply`, and nothing said so.
+ * landed in whichever profile the shell was in. A session that reached Tallybook only through a `.mcp.json` (the
+ * `client` shape, `C:\Repos\.mcp.json`) had no brain at all after `--apply`, and nothing said so.
  *
  * EVERY FILE HERE IS UNDER A TEMPORARY FOLDER, and each function is called with `home` set to it, so the real
  * `~/.claude.json` is never read. The temporary folder is in no git working tree, which `--mcp-json` requires.
@@ -33,7 +32,7 @@ const BRAINDOG = { type: 'stdio', command: 'node', args: [join(APP, 'src', 'main
 const PLUS = `  + mcpServers.braindog: ${JSON.stringify(BRAINDOG)}`;
 
 const HB_SECRET = 'hb-token-never-printed-5a9c';
-const SAM = { type: 'stdio', command: 'node', args: ['C:\\Tools\\legacy\\mcp\\brain-mcp.mjs'], env: { MCP_TOKEN: HB_SECRET } };
+const OLD_SERVER = { type: 'stdio', command: 'node', args: ['C:\\Tools\\tallybook\\mcp\\tallybook-mcp.mjs'], env: { MCP_TOKEN: HB_SECRET } };
 
 const scratch = mkdtempSync(join(tmpdir(), 'braindog-install-server-'));
 /* A read-only file cannot be removed on Windows, so everything is made writable before the folder goes. */
@@ -69,12 +68,12 @@ function profile(home: string, name: string, config: Record<string, unknown>) {
 
 const read = (file: string) => JSON.parse(readFileSync(file, 'utf8')) as { mcpServers: Record<string, unknown>; projects?: Record<string, { mcpServers: Record<string, unknown> }> };
 
-test('A PROFILE WHOSE .claude.json RUNS brain-mcp.mjs: the dry run lists + mcpServers.braindog beside the removal, and --apply writes it', () => {
+test('A PROFILE WHOSE .claude.json RUNS tallybook-mcp.mjs: the dry run lists + mcpServers.braindog beside the removal, and --apply writes it', () => {
   const home = folder('home');
-  const p = profile(home, '.claude-quartz', { numStartups: 9, mcpServers: { brain: SAM, figma: { type: 'http', url: 'https://mcp.figma.com/mcp' } } });
+  const p = profile(home, '.claude-studio', { numStartups: 9, mcpServers: { brain: OLD_SERVER, figma: { type: 'http', url: 'https://mcp.figma.com/mcp' } } });
 
   const dry = installInto(p.dir, { apply: false, replace: REPLACE, scripts, home });
-  assert.ok(dry.includes("  - mcpServers.brain, the old tool's: node [1 argument hidden]"), dry.join('\n'));
+  assert.ok(dry.includes("  - mcpServers.brain, Tallybook's: node [1 argument hidden]"), dry.join('\n'));
   assert.ok(dry.includes(PLUS), `no + line for BrainDog's server:\n${dry.join('\n')}`);
   assert.equal(readFileSync(p.claudeJson, 'utf8'), p.before, 'the dry run changed the file');
 
@@ -83,17 +82,17 @@ test('A PROFILE WHOSE .claude.json RUNS brain-mcp.mjs: the dry run lists + mcpSe
   const now = read(p.claudeJson);
   assert.deepEqual(now.mcpServers, { figma: { type: 'http', url: 'https://mcp.figma.com/mcp' }, braindog: BRAINDOG });
 
-  /* A second run finds nothing of the old tool's and BrainDog's server in, so it writes nothing and keeps no second copy. */
+  /* A second run finds nothing of Tallybook's and BrainDog's server in, so it writes nothing and keeps no second copy. */
   const after = readFileSync(p.claudeJson, 'utf8');
   /* `checkout: home`, a folder in no git tree, so the last line is the file's and not the moving-checkout warning. */
-  assert.deepEqual(installInto(p.dir, { apply: true, replace: REPLACE, scripts, home, checkout: home }).slice(-1), [`${p.claudeJson} registers no the old tool MCP server. Nothing to change.`]);
+  assert.deepEqual(installInto(p.dir, { apply: true, replace: REPLACE, scripts, home, checkout: home }).slice(-1), [`${p.claudeJson} registers no Tallybook MCP server. Nothing to change.`]);
   assert.equal(readFileSync(p.claudeJson, 'utf8'), after);
   assert.deepEqual(readdirSync(p.dir).sort(), ['.claude.json', '.claude.json.bak', 'settings.json', 'skills']);
 });
 
 test("A SERVER ONLY IN ONE PROJECT'S LOCAL SCOPE is replaced at user scope, since BrainDog's one server serves every folder", () => {
   const home = folder('home');
-  const p = profile(home, '.claude-acme', { projects: { 'C:/Repos/acme': { allowedTools: [], mcpServers: { brain: SAM } } } });
+  const p = profile(home, '.claude-client', { projects: { 'C:/Repos/acme': { allowedTools: [], mcpServers: { brain: OLD_SERVER } } } });
 
   installInto(p.dir, { apply: true, replace: REPLACE, scripts, home });
   const now = read(p.claudeJson);
@@ -102,20 +101,18 @@ test("A SERVER ONLY IN ONE PROJECT'S LOCAL SCOPE is replaced at user scope, sinc
 });
 
 /*
- * THIS CASE CHANGED WITH BRIEF 44-B (`loop/research-switch-left.md`). It asserted that a profile with no the old tool
- * server was not given BrainDog's either, and that was the fault: finding 2 of the same file measured that a new
- * name in a `.mcp.json` stays `Pending approval` wherever a `settings.local.json` approved the old one by name, so the
- * profile's own user-scope entry is the one that is started. The profile now gains the entry.
- * AND THE .mcp.json GAINS NOTHING, the half wave forty-four left because `hooks.test.ts` was another brief's then. It
- * asserted `{ braindog }` here, which is the entry finding 2 measured as `Pending approval` in `C:\Repos\acme` and
- * shadowed by the user-scope one wherever both exist: a prompt, and no server.
+ * A PROFILE WITH NO TALLYBOOK SERVER STILL GAINS BRAINDOG'S. This case once asserted it did not, and that was the
+ * fault: a new name in a `.mcp.json` stays `Pending approval` wherever a `settings.local.json` approved the old one by
+ * name (measured), so the profile's own user-scope entry is the one that is started.
+ * AND THE .mcp.json GAINS NOTHING. It once asserted `{ braindog }` here, which is the entry measured as
+ * `Pending approval` in `C:\Repos\acme` and shadowed by the user-scope one wherever both exist: a prompt, and no server.
  */
-test('A .mcp.json HOLDING THE ONLY THE OLD TOOL SERVER, the acme shape: after --apply the profile holds braindog, and the .mcp.json loses brain and gains nothing', () => {
+test('A .mcp.json HOLDING THE ONLY TALLYBOOK SERVER, the client shape: after --apply the profile holds braindog, and the .mcp.json loses brain and gains nothing', () => {
   const home = folder('home');
-  const p = profile(home, '.claude-acme', { mcpServers: {} });
+  const p = profile(home, '.claude-client', { mcpServers: {} });
   const repos = folder('repos');
   const file = join(repos, '.mcp.json');
-  writeFileSync(file, `${JSON.stringify({ mcpServers: { brain: SAM }, note: 'kept' }, null, 2)}\n`);
+  writeFileSync(file, `${JSON.stringify({ mcpServers: { brain: OLD_SERVER }, note: 'kept' }, null, 2)}\n`);
 
   const dry = installEvery([p.dir], [], { apply: false, replace: REPLACE, scripts, home }, [file]);
   assert.ok(dry.includes(PLUS), dry.join('\n'));
@@ -126,22 +123,22 @@ test('A .mcp.json HOLDING THE ONLY THE OLD TOOL SERVER, the acme shape: after --
 });
 
 /*
- * THE AUDIT'S OWN RUN, finding 5 of `loop/research-batch-forty-two-audit.md`: two profiles, `--replace --apply` over
- * both. Measured at 5287d8e4, `.claude-quartz` ended with `braindog`, `.claude-acme` with no server, and no line
- * said so, because the one line was withheld as soon as any file gained the entry. The audit asked for the line once,
- * naming `.claude-acme`; brief 44-B goes further and gives that profile the entry, so no line is owed.
+ * THE TWO-PROFILE RUN: `--replace --apply` over both. Measured before this, `.claude-studio` ended with `braindog`,
+ * `.claude-client` with no server, and no line said so, because the one line was withheld as soon as any file gained
+ * the entry. A line naming `.claude-client` would have been enough; this goes further and gives that profile the
+ * entry, so no line is owed.
  */
-test('THE AUDIT’S TWO-PROFILE RUN through main.ts: both profiles end with braindog, and no hand-run line is printed for either', () => {
+test('THE TWO-PROFILE RUN through main.ts: both profiles end with braindog, and no hand-run line is printed for either', () => {
   const home = folder('home');
-  const quartz = profile(home, '.claude-quartz', { mcpServers: { brain: SAM } });
-  const acme = profile(home, '.claude-acme', { mcpServers: {} });
+  const studio = profile(home, '.claude-studio', { mcpServers: { brain: OLD_SERVER } });
+  const client = profile(home, '.claude-client', { mcpServers: {} });
   const env: NodeJS.ProcessEnv = { ...process.env, HOME: home, USERPROFILE: home, XDG_CONFIG_HOME: join(home, 'config') };
   for (const name of Object.keys(env)) if (name.startsWith('BRAINDOG_') || name === 'CLAUDE_CONFIG_DIR') delete env[name];
-  const ran = spawnSync(process.execPath, [join(APP, 'src', 'main.ts'), 'install', '--replace', REPLACE_FILE, '--apply', '--config-dir', quartz.dir, '--config-dir', acme.dir], { cwd: home, env, encoding: 'utf8', timeout: 30_000 });
+  const ran = spawnSync(process.execPath, [join(APP, 'src', 'main.ts'), 'install', '--replace', REPLACE_FILE, '--apply', '--config-dir', studio.dir, '--config-dir', client.dir], { cwd: home, env, encoding: 'utf8', timeout: 30_000 });
 
   assert.equal(ran.status, 0, ran.stderr);
-  assert.deepEqual(read(quartz.claudeJson).mcpServers, { braindog: BRAINDOG });
-  assert.deepEqual(read(acme.claudeJson).mcpServers, { braindog: BRAINDOG });
+  assert.deepEqual(read(studio.claudeJson).mcpServers, { braindog: BRAINDOG });
+  assert.deepEqual(read(client.claudeJson).mcpServers, { braindog: BRAINDOG });
   assert.ok(!ran.stdout.includes('claude mcp add'), ran.stdout);
 });
 
@@ -149,15 +146,15 @@ test('A FILE ALREADY HOLDING A braindog SERVER keeps it as it is: byte for byte 
   const home = folder('home');
   const own = { type: 'stdio', command: 'braindog', args: ['mcp', '--agent', 'claude'] };
 
-  /* Nothing of the old tool's: the file is not written, not copied, and not touched. A guard; HEAD passed it too. */
+  /* Nothing of Tallybook's: the file is not written, not copied, and not touched. A guard; HEAD passed it too. */
   const settled = profile(home, '.claude-settled', { mcpServers: { braindog: own } });
   const lines = installInto(settled.dir, { apply: true, replace: REPLACE, scripts, home });
   assert.ok(!lines.some((l) => l.startsWith('  + mcpServers.braindog')), lines.join('\n'));
   assert.equal(readFileSync(settled.claudeJson, 'utf8'), settled.before);
   assert.deepEqual(readdirSync(settled.dir).sort(), ['.claude.json', 'settings.json', 'skills']);
 
-  /* the old tool's beside it: the old tool's goes, and the person's own braindog entry is neither replaced nor added twice. */
-  const both = profile(home, '.claude-both', { mcpServers: { braindog: own, brain: SAM } });
+  /* Tallybook's beside it: Tallybook's goes, and the person's own braindog entry is neither replaced nor added twice. */
+  const both = profile(home, '.claude-both', { mcpServers: { braindog: own, brain: OLD_SERVER } });
   const dry = installInto(both.dir, { apply: false, replace: REPLACE, scripts, home });
   assert.ok(!dry.some((l) => l.startsWith('  + mcpServers.braindog')), dry.join('\n'));
   assert.ok(dry.includes('  mcpServers.braindog is registered already, and is left as it is.'), dry.join('\n'));
@@ -172,23 +169,23 @@ test('A FILE ALREADY HOLDING A braindog SERVER keeps it as it is: byte for byte 
  */
 test('A FAILURE IN A LATER FILE PUTS BACK THE ADDED ENTRY WITH THE REMOVED ONES', { skip: process.platform !== 'win32' }, () => {
   const home = folder('home');
-  const a = profile(home, '.claude-a', { mcpServers: { brain: SAM } });
-  const b = profile(home, '.claude-b', { mcpServers: { brain: SAM } });
+  const a = profile(home, '.claude-a', { mcpServers: { brain: OLD_SERVER } });
+  const b = profile(home, '.claude-b', { mcpServers: { brain: OLD_SERVER } });
   chmodSync(b.claudeJson, 0o444);
 
   const dry = installEvery([a.dir, b.dir], [], { apply: false, replace: REPLACE, scripts, home });
   assert.equal(dry.filter((l) => l === PLUS).length, 2, dry.join('\n'));
 
   assert.throws(() => installEvery([a.dir, b.dir], [], { apply: true, replace: REPLACE, scripts, home }), /changed nothing/);
-  assert.equal(readFileSync(a.claudeJson, 'utf8'), a.before, 'the first profile kept BrainDog in and the old tool out');
+  assert.equal(readFileSync(a.claudeJson, 'utf8'), a.before, 'the first profile kept BrainDog in and Tallybook out');
   assert.equal(readFileSync(b.claudeJson, 'utf8'), b.before);
   assert.deepEqual(readdirSync(a.dir).sort(), ['.claude.json', 'settings.json', 'skills']);
 });
 
 test('NO TOKEN IN THE ENTRY OR THE OUTPUT: the removed server’s env and headers are not carried into the new one', () => {
   const home = folder('home');
-  const http = { type: 'http', url: `https://brain.example.com/mcp?token=${HB_SECRET}`, headers: { Authorization: `Bearer ${HB_SECRET}` } };
-  const p = profile(home, '.claude-secret', { mcpServers: { brain: SAM, 'brain-http': http } });
+  const http = { type: 'http', url: `https://tallybook.example/mcp?token=${HB_SECRET}`, headers: { Authorization: `Bearer ${HB_SECRET}` } };
+  const p = profile(home, '.claude-secret', { mcpServers: { brain: OLD_SERVER, 'brain-http': http } });
 
   const lines = installInto(p.dir, { apply: true, replace: REPLACE, scripts, home });
   assert.ok(!lines.join('\n').includes(HB_SECRET), lines.join('\n'));

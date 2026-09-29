@@ -1,5 +1,5 @@
 /**
- * The self-host's nightly copy (`loop/research-switch.md` §4, step 6, for a record kept on this machine).
+ * The self-host's nightly copy, for a record kept on this machine.
  *
  * THE SAME COPY AS "SNAPSHOT NOW", ON A CLOCK. `snapshots.ts` takes it (`VACUUM INTO`, the whole file, beside the record in
  * `snapshots/`), keeps thirty nightly copies apart from the thirty a person takes, and puts one back; the app lists, downloads and restores them. This only decides
@@ -10,11 +10,11 @@
  * "is it that minute now?". So a laptop asleep at night still keeps one a day, and a restart never takes a second.
  *
  * AND THE DIRECTORY IS COPIED ON THE SAME CLOCK, `VACUUM INTO <data>/directory-snapshots/<time>-nightly.sqlite`, thirty
- * kept (`loop/research-restore.md` section 6). Measured at 1586f2a2, a nightly copy left the data directory holding the
+ * kept. Measured at 1586f2a2, a nightly copy left the data directory holding the
  * record's copy and nothing of `directory.sqlite`, the only file that knows which name reaches which record, who owns it
  * and their passkeys: lose it and every record is whole and nobody can reach one. It is the whole file, sessions
  * included, because it is a backup of this machine and never leaves it; the Cloud's copy, which does leave, carries only
- * the durable tables (W55-6). Asked on its own question, "is there a Directory copy since it fell due?", so a host
+ * the durable tables. Asked on its own question, "is there a Directory copy since it fell due?", so a host
  * upgraded after tonight's record copy still takes tonight's Directory copy.
  */
 
@@ -25,7 +25,7 @@ import type { Sql } from '@braindog/ports';
 
 import { fileSnapshots, isNightly, KEEP } from './snapshots.ts';
 
-/** the old tool's own nightly copy ran at 03:20 UTC; this keeps the hour. */
+/** The nightly copy runs at 03:20 UTC, an hour when a record is quiet. */
 export const NIGHTLY_AT = '03:20';
 
 const AT = /^([01]\d|2[0-3]):([0-5]\d)$/u;

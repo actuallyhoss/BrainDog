@@ -1,5 +1,5 @@
 /**
- * A record armed to go back to a copy, reached through the Worker's real doors (audit fifty-seven, findings 2 and 6).
+ * A record armed to go back to a copy, reached through the Worker's real doors.
  *
  * MEASURED BEFORE THIS FILE, through the bundle. A restore answered by the record whose Worker invocation ended before
  * `reopen` left the object armed for good: `/api/boot` with the owner's cookie was 500 `INTERNAL` "This request could
@@ -93,7 +93,7 @@ for (const [door, knock] of DOORS)
 test('REQUESTS THAT FIND THE SAME STRANDED RECORD TOGETHER RESET IT ONCE AND WRITE THE REWIND ONCE', async () => {
   const c = await ready();
   /* A PAGE LOAD SENDS SEVERAL AT ONCE, and every one of them is told by `stranded` that the object is left behind. Only
-     the first `reopen` ends it; the rest reach the object that came back and get `false`. Checked by the checker: with
+     the first `reopen` ends it; the rest reach the object that came back and get `false`. Checked by mutation: with
      `recoverRestore` writing on a `false` as well, every other test in this file stayed green and this one counted 2. */
   const restored = await c.call('/api/restore', { bookmark: c.copy });
   assert.equal(restored.status, 200, await restored.clone().text());

@@ -1,6 +1,5 @@
 /**
- * The route rows for the ingest pattern builder (`packages/record/src/methods/pattern.ts`, `loop/finish/platform.md`
- * §4.0 T).
+ * The route rows for the ingest pattern builder (`packages/record/src/methods/pattern.ts`).
  *
  * ONE ROW A LINE, IN THE SHAPE `ROUTES` HAS ALWAYS HAD, because the two gates over the table read it by that shape:
  * `router-groups` holds each row's group to `docs/30-BLUEPRINT.md` §5, and `guards` holds the record method of the same

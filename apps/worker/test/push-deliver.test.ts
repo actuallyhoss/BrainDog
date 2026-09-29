@@ -1,8 +1,8 @@
 /**
  * Web Push end to end on one real record: the interrupt queues a job per phone, the pump leases it, the record hands
- * the endpoint out under the lease, a push service answers, and the answer goes back into the record. `51 §5`, W58.
+ * the endpoint out under the lease, a push service answers, and the answer goes back into the record. `51 §5`.
  *
- * THE TWO HALVES WERE EACH SOUND AND DID NOT MEET. W58-2's kernel named subscriptions by id and W58-3's deliverer read
+ * THE TWO HALVES WERE EACH SOUND AND DID NOT MEET. The kernel named subscriptions by id and the deliverer read
  * `payload.sub.endpoint`, so every push the kernel queued would have dead-lettered as "a push goes to an https address
  * on a public host"; and the 410 the deliverer acked as `{ gone: true }` was dropped by `makeDeliver` and never reached
  * `ackOutbox`, because `pump` had no way to carry it. What is proved here is the join, against a push service that is a
@@ -171,7 +171,7 @@ test('A PHONE UNSUBSCRIBED BETWEEN THE QUEUE AND THE LEASE IS NOT RUNG, and the 
 });
 
 test('A PUSH AN OLDER BUILD QUEUED IS NOBODY TO RING, and the day the keys are set it is done rather than a dead letter', async () => {
-  /* EVERY RECORD ALREADY HOLDS THESE. Until W58 an urgent notice and a digest's push channel wrote `{ title, url }`
+  /* EVERY RECORD ALREADY HOLDS THESE. Until Web Push was wired an urgent notice and a digest's push channel wrote `{ title, url }`
      whether or not a phone or a key existed, and `DELIVERS` never leased them, so they sit `pending`. The kernel reads
      one as nobody to ring (`pushSubOf` in `packages/kernel/src/push.ts`). The deliverer threw on it instead, measured
      here before the fix: `failed: 1`, and eight such throws open a "could not be delivered" item in Decide for each

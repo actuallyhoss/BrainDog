@@ -1,5 +1,5 @@
 /**
- * The Worker's wiring for scheduled actions: `pull`, `call` and `poll` (`loop/DIRECTION.md` §0b), run from the
+ * The Worker's wiring for scheduled actions: `pull`, `call` and `poll` run from the
  * record's alarm.
  *
  * THE SEND LOOP IS `@braindog/host/actions`, the same one the self-host runs. It holds https to a declared origin, a
@@ -46,7 +46,7 @@ export {
 export type Send = (input: URL, init: RequestInit) => Promise<Response>;
 
 /**
- * Runs one alarm sends, at most. `research-scheduled-actions` §2.3's ceilings are 800 subrequests and ten minutes
+ * Runs one alarm sends, at most. The platform's ceilings are 800 subrequests and ten minutes
  * per invocation; five runs of at most four requests each (one and three redirects) is twenty subrequests, and five
  * runs of ten seconds is fifty seconds.
  */
@@ -62,7 +62,7 @@ export const ALARM_RUNS = 5;
  *
  * `actor` SIGNS THE `grant.read`, AND `system` IS RIGHT ONLY WHERE NOBODY ASKED. The alarm's actions have no asker, so the
  * default stands. Slash's tier `b` does have one, and with `system` written into this line an owner reading the vault's
- * log could not tell her own asks from a colleague's (`loop/research-batch-thirty-one-audit.md` §1). That path is the one
+ * log could not tell her own asks from a colleague's. That path is the one
  * to pass the asker's id here; until `slash.ts`'s `wireOf` does, `slashOwnKeyFor` hands this opener a view of the record
  * whose `openGrant` signs as the asker whatever it is told.
  */

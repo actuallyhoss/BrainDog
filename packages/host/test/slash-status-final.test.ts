@@ -1,15 +1,14 @@
 /**
  * A status no retry mends is final and uncounted, and a key that is there and will not open is a throw before any POST.
- * The host's half of `loop/research-batch-forty-nine-audit.md` findings 2 and 4; the Worker's is
- * `apps/worker/test/slash-key-status.test.ts`.
+ * The host's half; the Worker's is `apps/worker/test/slash-key-status.test.ts`.
  *
- * FINDING 4, THE STATUS. Q8's default made every status that is not `ok` a plain throw, which `answer` settles as
+ * THE STATUS. The retry default made every status that is not `ok` a plain throw, which `answer` settles as
  * `UNREACHABLE` and `serveAsks` asks again. Right for a 429 or a 503, which the next rung may find mended; wrong for a 400
  * (a model name the provider does not know), a 401 (a key that is wrong or expired) and a 404 (a wrong `SLASH_ENDPOINT`
- * path), which answer the same on every rung. The audit measured each of those as eight keyed posts over about 266
+ * path), which answer the same on every rung. A probe measured each of those as eight keyed posts over about 266
  * minutes, ending "could not be reached" about a provider that answered all eight.
  *
- * FINDING 2, THE KEY. `endpointOptionsOf`'s `own()` answered `null` for a grant labelled `slash` that would not open, and
+ * THE KEY. `endpointOptionsOf`'s `own()` answered `null` for a grant labelled `slash` that would not open, and
  * `post` then sent with no `authorization`. The Worker checks the label and not the opening, so a `KEK` changed under a
  * record sent eight anonymous POSTs to the owner's provider. `keyRequired` is the Worker's switch for the rule tier `b`
  * already keeps; the self-host passes none, because its keyless local model is the product working.
@@ -17,8 +16,8 @@
  * THE REAL `endpointInference` AND THE REAL `createSlash`, reached by relative paths as `slash-answers-unreachable.test.ts`
  * reaches them, because which throws carry which mark is this host's decision and how each is settled is the package's.
  *
- * THE KEY IS HIS OWN KEY NOW (`loop/finish/agents.md` AGT-21): the grant he picked by id, opened through `slashOwnInference`,
- * which always requires it. No label chooses a key any more (`loop/finish/defects.md` S1), so the cases that opened the
+ * THE KEY IS HIS OWN KEY NOW: the grant he picked by id, opened through `slashOwnInference`,
+ * which always requires it. No label chooses a key any more, so the cases that opened the
  * grant labelled `slash` open his instead, and the findings hold on that path unchanged.
  */
 

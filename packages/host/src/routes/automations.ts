@@ -1,10 +1,9 @@
 /**
- * The route rows for the record's automation methods (`packages/record/src/methods/automations.ts`,
- * `loop/finish/contracts.md` §2.2 and §3.1).
+ * The route rows for the record's automation methods (`packages/record/src/methods/automations.ts`).
  *
  * ONE ROW A LINE, IN THE SHAPE `ROUTES` HAS ALWAYS HAD, for the reason `routes/agents.ts` gives: `router-groups` holds
  * each row's group to `docs/30-BLUEPRINT.md` §5, and `guards` holds the record method of the same name to its group's
- * guard. `automations` itself is not here: it was routed before this file and is widened in place (X10).
+ * guard. `automations` itself is not here: it was routed before this file and is widened in place.
  *
  * `checkAutomation` AND `tryAutomation` ARE POSTS, as `previewPage` is, though neither writes anything the record keeps:
  * a rule body is no query string, and a try runs the steps inside a rehearsal that rolls them back. `setAutomation` and

@@ -18,7 +18,7 @@
  * other, so for the rest there is no specified object to print. There were 53 `io.out` call sites
  * when this was written, which matches §4.5's own count exactly. Inventing 53 ad-hoc shapes here
  * would publish a surface nobody had agreed and that the specification would then have to follow.
- * So the default `value` is `{ lines }` — the exact lines the command would have printed — and a
+ * So the default `value` is `{ lines }`, the exact lines the command would have printed, and a
  * command whose answer has a real shape hands one over with `io.answer`. What a caller branches on
  * is the envelope: `ok`, the refusal codes, and the exit code, and those are right for every
  * command from the first day.

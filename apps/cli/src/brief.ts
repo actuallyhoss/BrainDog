@@ -1,9 +1,9 @@
 /**
  * The briefing the start hook prints, which Claude Code adds to the model's context before its first turn.
  *
- * BUILT FROM `context` ALONE, in the order the owner asked for (`loop/research-agent-path.md` §4.3): who
+ * BUILT FROM `context` ALONE, in the order the owner asked for: who
  * this run is and where, the last handoff, who else is live here, what waits on him, then what applies
- * here. Every module can be switched off (`loop/DIRECTION.md` §9), so a register the record does not have
+ * here. Every module can be switched off, so a register the record does not have
  * is a line that is not printed, never an error.
  *
  * NAMES ONLY. A row is shown by its spoken id and its own words, and only string fields are ever read, so
@@ -81,7 +81,7 @@ export function briefing(attached: Attached, at: Where, moved: Moved): string {
 }
 
 /**
- * The open rows somebody handed to this agent, by the name it signs with (GAP-11): the rows whose `agent` field holds it.
+ * The open rows somebody handed to this agent, by the name it signs with: the rows whose `agent` field holds it.
  *
  * THE FIELD'S OWN NAME, because Work's `hand:` names `agent` and `context` sends a row's string fields and not its
  * list's declaration. The kernel's own run register is left out, since every run there carries the agent that ran it.
@@ -106,7 +106,7 @@ export function briefingOf(head: string, c: Context, moved: Moved, agent: string
   const keep = (text: string) => lines.push({ text, keep: true });
   const add = (text: string) => lines.push({ text, keep: false });
 
-  /* WHAT WAS HANDED TO THIS AGENT COMES BEFORE ANYTHING ELSE (GAP-11), and is kept: a person pressed "Hand to" and the
+  /* WHAT WAS HANDED TO THIS AGENT COMES BEFORE ANYTHING ELSE, and is kept: a person pressed "Hand to" and the
      row says it waits for this session, so a briefing that dropped the line would leave it waiting. */
   const handed = handedTo(c, agent);
   if (handed.length > 0) keep(`Handed to you (${String(handed.length)}): ${handed.slice(0, PER_LINE).map((row) => item(row, 60)).join('; ')}. Take these first.`);

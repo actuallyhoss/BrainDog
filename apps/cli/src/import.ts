@@ -1,6 +1,5 @@
 /**
- * `braindog import <adapter> <export.json>`: move another tool's record into this BrainDog (`loop/research-switch.md`
- * §4, and brief B2 of the parity survey under `loop/`).
+ * `braindog import <adapter> <export.json>`: move another tool's record into this BrainDog.
  *
  * THE ADAPTER IS NAMED ON THE LINE AND IS NOT THIS FILE (`adapter.ts` says what one is). It reads its tool's export
  * and plans the rows; this file applies the plan, and holds nothing about any one tool. A pack id names a folder in
@@ -90,11 +89,10 @@ export type Door = {
    * import tells a row he threw away from a row nobody has written yet: see `gone` in `applyPlan`.
    *
    * A DOOR THAT ANSWERS LIVE ROWS ONLY IS NOT SAFE, and this sentence used to say it was. Nothing is read as deleted,
-   * so nothing is held back, and every row he deleted is planned again as new: measured against a host at `19d4c785`
-   * (the adapter's `test/import-deleted-skew.test.ts`), task 101 and ledger row T1 came back, `Tasks: 1 added` and `Ledger: 1 added`,
-   * exit 0. So the importer's door asks as a POST, which every host decodes (`listWithDeleted`), and `applyPlan`
-   * refuses an answer that holds nothing in the bin when the run before saw rows there that cannot have left it
-   * (`BinUnread`).
+   * so nothing is held back, and every row he deleted is planned again as new: measured against a host at `19d4c785`,
+   * task 101 and ledger row T1 came back, `Tasks: 1 added` and `Ledger: 1 added`, exit 0. So the importer's door asks
+   * as a POST, which every host decodes (`listWithDeleted`), and `applyPlan` refuses an answer that holds nothing in
+   * the bin when the run before saw rows there that cannot have left it (`BinUnread`).
    */
   list: (args: { register: string; limit?: number; cursor?: string | null; deleted?: boolean }) => Promise<Result<{ rows: unknown[]; cursor: string | null }>>;
   create: (args: { register: string; fields: Record<string, unknown>; note?: string }) => Promise<Result<unknown>>;
@@ -122,8 +120,7 @@ export type Tally = { added: number; updated: number; unchanged: number };
  * A ROW THE IMPORT'S OWN RETIRE PASS PUT IN THE BIN, BY ITS ID AND THE VERSION THE DELETE LEFT IT AT.
  *
  * The holdings retire deletes, because Holdings has no state to close a row with, and a deleted row is what `gone` in
- * `applyPlan` reads as his. Measured before this (the adapter's `test/import-own-deletes.test.ts`): a gold lot corrected 5 to 6 and
- * back to 5 in the old tool left no lot here, and the report said he had deleted it. The row itself does not say who
+ * `applyPlan` reads as his. Measured before this: a gold lot corrected 5 to 6 and back to 5 in the old tool left no lot here, and the report said he had deleted it. The row itself does not say who
  * deleted it, so the run remembers it (`Run.binned`), and a row still in the bin at the version the import's delete
  * gave it is the import's. A row he put back and deleted again is at a later version, and is his.
  *
@@ -159,14 +156,14 @@ export type Report = {
   asked: number;
   alreadyAsked: number;
   /**
-   * Each question this run asked on Decide (or, on a dry run, would ask), by its the old tool id and its words.
+   * Each question this run asked on Decide (or, on a dry run, would ask), by its old tool id and its words.
    *
    * KEPT BY NAME AND NOT ONLY COUNTED, because the morning read is made from what a run remembers and a count says
-   * nothing he can act on: over the shadow week's seven made-up nights a question asked on night 3 was on Decide and
-   * not in `--since last` at all (`loop/research-shadow-week.md` §2 night 3).
+   * nothing he can act on: over seven made-up nights of rehearsal, a question asked on night 3 was on Decide and not
+   * in `--since last` at all.
    *
-   * THIS AND `waiting` ARE OPTIONAL ONLY FOR A REPORT WRITTEN OUT BY HAND, which `test/import.test.ts` does to test
-   * `said`; `applyPlan` always sets both, and every reader takes a missing one as empty.
+   * THIS AND `waiting` ARE OPTIONAL ONLY FOR A REPORT WRITTEN OUT BY HAND, which a test of `said` does; `applyPlan`
+   * always sets both, and every reader takes a missing one as empty.
    */
   questions?: { label: string; question: string }[];
   /**
@@ -294,8 +291,7 @@ class PartlyRead extends Error {
  * AN ANSWER THAT HELD NOTHING IN THE BIN WHEN THE RUN BEFORE SAW ROWS THERE THAT COULD NOT HAVE LEFT IT (`InBin`).
  *
  * The read that asks for deleted rows cannot show by itself that the host honoured the ask. A host at `19d4c785`
- * answered the GET `dc9ec9e4` sent with live rows alone, 200 (`loop/research-batch-fifty-five-audit.md` section 1),
- * and the import took that as a bin with nothing in it and planned every row he had deleted as new. So the answer is
+ * answered the GET `dc9ec9e4` sent with live rows alone, 200, and the import took that as a bin with nothing in it and planned every row he had deleted as new. So the answer is
  * held to what the run before saw: when it holds no deleted row at all, and a row the run before saw in the bin is
  * neither in tonight's answer nor old enough for the sweep to have taken, the host left the bin out. Thrown before any
  * write, like `PartlyRead`, and for the same reason: every write after it would be working from the wrong list.
@@ -348,10 +344,9 @@ const DECIDE_PAGE = 200;
 /**
  * HOW MANY WRITES OF ONE LIST ARE IN FLIGHT AT ONCE, AND WHY EIGHT.
  *
- * His first run is one write per row, about 3,315 of them, and it is the run the freeze waits on. Sent one at a time,
- * each write waited out its own round trip before the next was sent. Measured on 23 September through the Worker in
- * workerd with a fixed delay put on every request (the adapter's `test/import-throughput.test.ts` has the method), for the 44-row
- * fixture grown by 320 tasks, 400 requests in all:
+ * A first run is one write per row, a few thousand of them, and it is the run a switch waits on. Sent one at a time,
+ * each write waited out its own round trip before the next was sent. Measured through the Worker in workerd with a
+ * fixed delay put on every request, for a 44-row fixture grown by 320 tasks, 400 requests in all:
  *
  *   at a time:   1        4        8        16
  *   0 ms       6.0 s    3.2 s    2.7 s
@@ -400,7 +395,7 @@ async function readDecide(door: Door): Promise<Result<Decide>> {
         if (typeof s.body.install === 'string') installs.add(s.body.install);
         /* A VALUE PROPOSED BY ANYBODY, IN ANY STATE. An open one is waiting on him, and one he turned down is an answer:
            proposing it again every night is asking a question he has already answered. The record stores an addition as
-           it was asked (`packages/record/test/schema-add.test.ts`, B3), so the words are here as they were filed. */
+           it was asked (`packages/record/test/schema-add.test.ts`), so the words are here as they were filed. */
         const add = isObj(s.body.to) && isObj(s.body.to.add) ? s.body.to.add : null;
         if (add && typeof add.register === 'string' && isObj(add.values))
           for (const [field, more] of Object.entries(add.values))
@@ -554,7 +549,7 @@ export async function applyPlan(
   /**
    * WHAT THE KERNEL'S COERCION WOULD SAY OF A ROW'S TEXTS, ASKED BEFORE A DRY RUN COUNTS IT.
    *
-   * Measured on his real export (`loop/research-import-real.md`, finding 3): `--dry-run` ended 0 and printed `Agent runs:
+   * Measured on a real export: `--dry-run` ended 0 and printed `Agent runs:
    * 198 would be added` with no refusal block, and the real run added 195 and ended 1, all three refused as
    * `TEXT_ESCAPED_NEWLINE`. A dry run reads the lists and sends nothing, so a refusal the kernel makes on a value never
    * reached it, and the command he is told to run first promised rows the record would not take. So each text a write
@@ -635,8 +630,8 @@ export async function applyPlan(
      WHERE THE ROW NAMES THE PACK, THE PACK IS ASKED FOR TOO, because its fields stay declared after it is uninstalled
      and nothing draws them then (`ifDeclared.pack`). Off counts as not held: its pages are gone as well. A door that
      cannot answer, answers with a refusal, or answers something other than a list leaves the fields alone to decide, as
-     they did before: the stub host in `test/import.test.ts` answers `{}` to every route it does not know, and reading
-     that as a list threw and ended three runs. */
+     they did before: a stub host that answers `{}` to every route it does not know, read as a list, threw and ended
+     three runs. */
   let on: Set<string> | null = null;
   if (door.packs && plan.rows.some((r) => r.ifDeclared?.pack !== undefined)) {
     const got = await door.packs();
@@ -664,7 +659,7 @@ export async function applyPlan(
    *
    * A list a pack declares gains fields as the pack moves on, and a record keeps the version it installed until the
    * owner takes the update. Sent as planned, the one field that record has not got is `FIELD_UNKNOWN`, and the record
-   * refuses the WHOLE ROW over it. Measured on 2026-09-22 against the kernel (`test/import-note.test.ts`): a domain row
+   * refuses the WHOLE ROW over it. Measured against the kernel (`test/import-note.test.ts`): a domain row
    * carrying the `note` Estate 1.2.0 declares, sent to a record on 1.1.0, was refused, and its name, registrar and
    * status went with it. `holdings.currency` did the same to fourteen rows at once. So the field is taken off, the rest
    * is written, and every row that lost one is named with the list and the pack whose update brings the field in.
@@ -729,10 +724,10 @@ export async function applyPlan(
   /**
    * A WORD THE OLD TOOL USED THAT A CLOSED LIST HERE HAS NOT GOT IS PROPOSED TO THE LIST, BEFORE ANY ROW IS WRITTEN.
    *
-   * Measured before this (the adapter's `test/import-values.test.ts`): a `crypto` holding arrived as `other`, a `registrar` service as
+   * Measured before this: a `crypto` holding arrived as `other`, a `registrar` service as
    * `hosting` and an `investor` as `collaborator`, and two of the three said nothing. The record grows a closed list at
    * run time: an `add` of values is answered by rule and lands at once when the owner's own key files it, and waits on
-   * Decide when anybody else does (DIRECTION §22). So each list gets ONE `add` carrying every word it is missing, and a
+   * Decide when anybody else does. So each list gets ONE `add` carrying every word it is missing, and a
    * row carries its word only once the list holds it. Written before that, the row is `ENUM_VALUE_UNKNOWN` whole, and a
    * question nobody has answered yet would cost him the row; written with the fallback, the next import after he
    * approves moves it, because `applyPlan` patches a field whose planned value differs.
@@ -741,10 +736,10 @@ export async function applyPlan(
    * list, and proposing every word to it every night, with no way to tell whether one had landed, would be a question
    * a night on Decide.
    */
-  /* A WORD SHAPED LIKE A KEY IS NEVER PROPOSED, whichever adapter planned it. The audit measured one landing in
-     `register.people` as a role, resolved by rule, where a declaration's history keeps it for good
-     (`loop/research-audit-2026-09-25-import.md` S1). The the old tool adapter leaves such a word out itself, and this is
-     the same check for every other adapter; the kernel refuses the declaration too. The row still arrives with the word
+  /* A WORD SHAPED LIKE A KEY IS NEVER PROPOSED, whichever adapter planned it. One was measured landing in
+     `register.people` as a role, resolved by rule, where a declaration's history keeps it for good. An adapter may
+     leave such a word out itself, and this is the same check for every adapter; the kernel refuses the declaration
+     too. The row still arrives with the word
      the list already holds, and the line names the row and the field, never the word, because it is printed and saved. */
   const keyish: string[] = [];
   const wanted = new Map<string, Map<string, string[]>>();
@@ -830,8 +825,7 @@ export async function applyPlan(
    * AN EXPORT TAKEN BEFORE ONE AN EARLIER RUN CARRIED INTO THIS RECORD CLOSES NOTHING.
    *
    * Every retire reads tonight's export against itself, so a row only a newer export held reads as gone from the old
-   * tool. Measured before this (the adapter's `test/import-older-export.test.ts`, `loop/research-batch-fifty-three-audit.md` section
-   * 3): an export of 2026-09-16 and then a saved one of 2026-09-09 dropped the newer one's task, voided its ledger row
+   * tool. Measured before this: an export of 2026-09-16 and then a saved one of 2026-09-09 dropped the newer one's task, voided its ledger row
    * dated inside the older ledger's days, and deleted its gold lot, each said as gone from the old tool. The ledger's own
    * window (`Retire.inside`) spares only a row dated after the older export's newest day. So the whole pass is skipped,
    * with one line naming both days, and the rows the older export holds are written as they stand in it.
@@ -873,9 +867,9 @@ export async function applyPlan(
    * EVERY KEY A ROW HE DELETED HERE STILL HOLDS, AND THE PLAN DOES NOT WRITE ONE OF THEM AGAIN.
    *
    * `readAll` listed live rows only, and a planned key no live row holds is a row to create, so a task or a ledger row
-   * he deleted in BrainDog was added back by the next night's import, which is every night of the shadow week: the old
-   * tool is still where he works, and its export still holds the row (the adapter's `test/import-deleted-stays.test.ts`, measured
-   * before this: `Tasks: 1 added` and `Ledger: 1 added` for the two rows deleted). A deleted row is still a row in the
+   * he deleted in BrainDog was added back by the next night's import, which is every night while he still works in the
+   * old tool, and its export still holds the row (measured before this: `Tasks: 1 added` and `Ledger: 1 added` for the
+   * two rows deleted). A deleted row is still a row in the
    * record until it is purged, with its tags, so its key is read with the live ones and set aside here.
    *
    * A LIVE ROW UNDER THE SAME KEY WINS. A record the import ran on before this holds, for each row he deleted, the
@@ -1068,7 +1062,7 @@ export async function applyPlan(
      * A PLANNED `null` AND A FIELD THE ROW DOES NOT HOLD ARE ONE VALUE, so nothing is sent between them.
      *
      * The kernel leaves a field with no value off the row, so compared as JSON a planned `null` read `null` against
-     * `undefined` and differed every night: measured in `test/import-null-clears.test.ts`, a steady export patched
+     * `undefined` and differed every night: measured, a steady export patched
      * `ends` on every repeating Money row with no end, night after night. That is why the planner sent an end only when
      * the old tool had one, and so an end the old tool later took away stayed on the row and stopped the forecast early. A
      * planned `null` over a field the row does hold still differs, and is the patch that clears it.
@@ -1080,8 +1074,7 @@ export async function applyPlan(
      * UNLESS THE DAY THOSE FIELDS WERE READ FROM HAS MOVED, and then they are the planner's again.
      *
      * A one-off's `state` and `done_on` are the planner's reading of its day against the day of the import, so kept
-     * past a change of day they describe a day that is gone. Measured before this (`loop/research-batch-fifty-one-audit.md`
-     * finding 5, the adapter's `test/import-moved-oneoff.test.ts`): a return dated 2026-09-01 arrived done on the 17th, was moved in
+     * past a change of day they describe a day that is gone. Measured before this: a return dated 2026-09-01 arrived done on the 17th, was moved in
      * the old tool to 2026-10-15, and the next night patched `by` alone, leaving a task done six weeks before its day and
      * in no list of what is due. A night on which the day did not move sends none of them, so a state he set holds
      * until the old tool moves the day it was set against.
@@ -1144,8 +1137,7 @@ export async function applyPlan(
         try {
           await writeRow(list[at]!, said[at]!);
         } catch (error) {
-          /* A THROW STOPS THE SENDING TOO, not only the taking. Measured before this line (the adapter's `test/import-throughput.test.ts`):
-             with task 101's create throwing, task 102, already in a lane and waiting on its parent's answer, was sent
+          /* A THROW STOPS THE SENDING TOO, not only the taking. Measured before this line: with task 101's create throwing, task 102, already in a lane and waiting on its parent's answer, was sent
              afterwards, a write made after the run had failed. */
           failed ??= { error };
           stopped = true;
@@ -1171,15 +1163,14 @@ export async function applyPlan(
     /**
      * A REF TO A ROW HE DELETED HERE IS NEVER RESOLVED, AND THAT WAS SAID OF THE ROW HE DELETED ONLY.
      *
-     * Measured before this (the adapter's `test/import-own-deletes.test.ts`, `loop/research-batch-fifty-four-audit.md` section 6): the
-     * project `lanternly` deleted here, and the next export filing a new task 106 under it. Task 106 arrived with no
+     * Measured before this: the project `lanternly` deleted here, and the next export filing a new task 106 under it. Task 106 arrived with no
      * project, and the one line was the project's. So the row is named with what it names, and only when the field is
      * empty on the row as it now stands: task 101, written before the delete, still points at the project's id and lost
      * nothing. Putting the project back mends it, because the next night resolves the ref and patches the field.
      *
-     * ONLY A ROW THAT WAS WRITTEN OR FOUND. A row held back or refused still leaves its refs for this pass, and measured
-     * by the checker (the last test there): task 101 deleted here with its project was named as held back and as
-     * "Written without lanternly" on the same night.
+     * ONLY A ROW THAT WAS WRITTEN OR FOUND. A row held back or refused still leaves its refs for this pass, and without
+     * this, task 101 deleted here with its project was named as held back and as "Written without lanternly" on the same
+     * night.
      */
     const held = [value].flat().filter(isRef).filter((x) => report.outcomes[x.$ref] === 'deleted');
     const wrote = ['added', 'updated', 'unchanged'].includes(report.outcomes[row.key] ?? '');
@@ -1200,7 +1191,7 @@ export async function applyPlan(
    * Moving a key is what makes these invisible: `existing` is keyed by import key alone, so a row written under
    * `<key>instalment:` is never found by a plan that writes `<key>schedule:`, and the record ends up
    * holding the same instalment in two lists with a wall that is double. Measured on an in-memory record with
-   * money-core 1.2.0 installed (the adapter's `test/plan.test.ts`): a wall of EGP 5,000,000 imported under the old shape and
+   * money-core 1.2.0 installed: a wall of EGP 5,000,000 imported under the old shape and
    * then under the new read EGP 10,000,000 across the two lists.
    *
    * THE PATCH ONLY EVER CLOSES A ROW, and the reason goes in the write's own note rather than into the row's `note`
@@ -1217,7 +1208,7 @@ export async function applyPlan(
       if (Object.entries(r.only).some(([field, value]) => stable(at.fields[field]) !== stable(value))) continue;
       /* A ROW DATED OUTSIDE THE DAYS THE EXPORT SPOKE ABOUT IS NOT ONE IT DROPPED (`Retire.inside`): an opening balance
          older than a windowed ledger answer was voided here, and so was a row only a newer export carried when an
-         older one was imported after it (the adapter's `test/import-ledger-window.test.ts`). A row with no day is outside too. */
+         older one was imported after it. A row with no day is outside too. */
       if (r.inside && !(r.spoken ?? []).some((p) => key.startsWith(p))) {
         const day = at.fields[r.inside.field];
         if (typeof day !== 'string' || day.slice(0, 10) <= r.inside.after || day.slice(0, 10) >= r.inside.before) continue;
@@ -1229,7 +1220,7 @@ export async function applyPlan(
       if (o.dryRun) {
         report.retired.push({ register: r.register, label, why: r.why });
         /* A DRY RUN READS ON AS THE REAL ONE WOULD: a later pass sees the row as this pass leaves it, so a half kept
-           owed by one pass is not then listed as written off by the next (the adapter's `test/part.test.ts`). */
+           owed by one pass is not then listed as written off by the next. */
         existing.set(key, { ...at, fields: { ...at.fields, ...patch } } as Row);
         continue;
       }
@@ -1238,7 +1229,7 @@ export async function applyPlan(
         /* A DELETE WHOSE ANSWER NEVER CAME MAY HAVE LANDED, and if it did the row is in the bin at the next version,
            because every write moves a row one version on (`packages/kernel/src/index.ts`, `version = version + 1`).
            Remembered at that version it is the import's if it landed, and matches nothing if it did not. Measured
-           before this (the adapter's `test/import-own-deletes.test.ts`, DURING): the delete landed, the run stopped, and the next
+           before this: the delete landed, the run stopped, and the next
            night read the lot as his delete. A row he deletes himself at exactly that version before the next night is
            read as the import's, which costs one row the old tool still holds coming back; the other way lost it. */
         if (unreachable(done)) {
@@ -1356,7 +1347,7 @@ export async function applyPlan(
     for (const pack of list) {
       /* HELD IS AS GOOD AS OFFERED. A bank pack may be installed by hand by whoever banks there, which leaves nothing on
          Decide, and `propose` does not refuse a pack the record already holds: reading Decide alone filed a second offer
-         of a pack that was already reading his texts (the adapter's `test/import-bank-pack.test.ts`). */
+         of a pack that was already reading his texts. */
       if (installs.has(pack.install) || (holding?.ok === true && holding.value.some((p) => p.id === pack.install))) {
         if (installs.has(pack.install)) onDecide.add(pack.install);
         tally.before++;
@@ -1399,7 +1390,7 @@ export async function applyPlan(
    * A LIST WHOSE PACK IS WAITING ON DECIDE IS APPROVED THERE, NOT INSTALLED. The "Left out" line is written before the
    * packs are offered, so the first run's report said "Packs: 1 filed on Decide for you to approve" and, under it, "This
    * BrainDog has no Holdings list. Install Holdings beside Solo founder": two instructions for one step, and the second
-   * is not the one he should take (`loop/research-switch-today.md` brief 50-B, the adapter's `test/import-holdings-lead.test.ts`).
+   * is not the one he should take.
    * A dry run files nothing and a Money too old holds the offer back, so neither is on Decide and both keep the install.
    */
   for (const [register, line] of leftOut) {
@@ -1501,7 +1492,7 @@ export function said(report: Report, o: { dryRun: boolean; file: string }): stri
       if (was === 'refused') return 'refused';
       /* A ROW HE DELETED HERE IS NOT "UNCHANGED". It fell through to that word, so the same night's report called
          lanternly.example unchanged on Estate two lines above saying it was deleted and not added again (measured on
-         the synthetic export with the domain deleted, the adapter's `test/import-deleted-stays.test.ts`). */
+         a synthetic export with the domain deleted). */
       if (was === 'deleted') return o.dryRun ? 'deleted here, so it would not be added again' : 'deleted here, so not added again';
       return 'unchanged';
     };
@@ -1559,7 +1550,7 @@ export function said(report: Report, o: { dryRun: boolean; file: string }): stri
 /**
  * WHAT ONE RUN CARRIED, BY NAME, remembered on the machine that ran it so the next morning can be told.
  *
- * THE SHADOW WEEK IS THE REASON (`loop/research-switch.md` §3): the importer runs every night against a fresh export,
+ * A SWITCH RUNS IN PARALLEL FOR A WHILE, AND THAT IS THE REASON: the importer runs every night against a fresh export,
  * the old tool stays the one he works in, and the question each morning is what moved there and whether it arrived.
  * Until this, every answer to that was printed once at three in the morning to a terminal nobody was reading.
  *
@@ -1582,10 +1573,9 @@ export type Run = {
   skipped: { reason: string; items: string[] }[];
   /**
    * WHAT IT ASKED, WHAT IT CLOSED AND WHAT STILL WAITS ON DECIDE, AND ALL THREE OPTIONAL, because a line written before
-   * they were kept is still a night he ran (`isRun`). Kept because the shadow week's morning read left out Decide
+   * they were kept is still a night he ran (`isRun`). Kept because a morning read without them left out Decide
    * entirely: a question asked in the night was not said, and one answered in the old tool was said only as the planner's
-   * skip line, "Already decided, and carried with its decision", which reads as done while it waited on Decide here
-   * (`loop/research-shadow-week.md` §3).
+   * skip line, "Already decided, and carried with its decision", which reads as done while it waited on Decide here.
    */
   asked?: { label: string; question: string }[];
   retired?: { register: string; label: string; why: string }[];
@@ -1603,9 +1593,8 @@ export type Run = {
   unfiled?: Unfiled[];
   /**
    * THE HOST STOPPED ANSWERING PART WAY, and what this line holds is what had answered by then. Such a run used to be
-   * forgotten, which lost the rows its retire pass had put in the bin, and the next night read them as his deletes
-   * (the adapter's `test/import-own-deletes.test.ts`, the checker's gap on `48858b72`). Optional: a line without it ran
-   * to the end.
+   * forgotten, which lost the rows its retire pass had put in the bin, and the next night read them as his deletes.
+   * Optional: a line without it ran to the end.
    */
   stopped?: boolean;
   /**
@@ -1646,8 +1635,7 @@ const localOffset = (at: Date): number => -at.getTimezoneOffset();
 /**
  * A run's instant as the owner's clock showed it: the day, the time and the zone, `UTC` when the offset is nothing.
  *
- * THE DAY `--since` TAKES IS THE MACHINE'S LOCAL DAY, NOT THE UTC DATE OF THE RUN
- * (`loop/research-batch-twenty-four-audit.md` §6). It was the UTC date, and at +03:00 a run at 02:30 on the 22nd is 23:30 UTC on the 21st, so `--since
+ * THE DAY `--since` TAKES IS THE MACHINE'S LOCAL DAY, NOT THE UTC DATE OF THE RUN. It was the UTC date, and at +03:00 a run at 02:30 on the 22nd is 23:30 UTC on the 21st, so `--since
  * 2026-09-22` read that morning said no run was remembered. The machine's zone and not the record's, because the morning
  * read is made with no host (it is what this machine remembers, and the host may be what failed in the night), and this
  * file knows no zone for the record anyway: the machine that ran the night is the machine being asked about it. The
@@ -1683,8 +1671,8 @@ export function sinceSaid(runs: Run[], since: string, offsetOf: (at: Date) => nu
     const run = runs[i]!;
     const before = runs.slice(0, i).findLast((r) => r.host === run.host);
     /* BY THE ITEM ALONE, NOT THE ITEM WITH ITS REASON. A reason is a sentence this code writes, and the first morning
-       after wave fifty-two reworded three of them said every decided and dismissed question and every deleted task once
-       more as "Newly left out" (the adapter's `test/import-left-out.test.ts`). The item is what the old tool holds, so a new wording is
+       after a change reworded three of them said every decided and dismissed question and every deleted task once
+       more as "Newly left out". The item is what the old tool holds, so a new wording is
        not news and a new item is. An item several reasons used to share, `the ledger`, was split so this holds. */
     const had = new Set((before?.skipped ?? []).flatMap((s) => s.items));
     if (lines.length > 0) lines.push('');
@@ -1737,7 +1725,7 @@ const DAY = /^\d{4}-\d{2}-\d{2}$/u;
 const runsFile = (home: string) => join(home, '.braindog', 'imports.jsonl');
 
 /**
- * THE LAST SIXTY RUNS AND NO MORE: two months of nights is the shadow week several times over, and a file that grew
+ * THE LAST SIXTY RUNS AND NO MORE: two months of nights is a switch's parallel run several times over, and a file that grew
  * by a run a night for as long as the importer was scheduled would be read whole every morning for no reason.
  */
 const RUNS_KEPT = 60;
@@ -1751,7 +1739,7 @@ const itemsHold = (v: unknown, one: string[], many: string[] = []): boolean =>
 /**
  * A remembered line is a run only when every value `sinceSaid` reads off it has the shape `runOf` gives it.
  *
- * THE ITEMS ARE CHECKED AS WELL AS THE LISTS (`loop/research-batch-twenty-four-audit.md` §7). The lists alone were
+ * THE ITEMS ARE CHECKED AS WELL AS THE LISTS. The lists alone were
  * checked, after a line with no `updated` had stopped `--since` on "rows is not iterable"; then a line whose `updated`
  * item had no `fields` stopped it again on "Cannot read properties of undefined (reading 'join')", with a good night on
  * the 19th before it unread. Only this code writes the file, so the trigger is a hand edit or a later version's shape,
@@ -1832,12 +1820,10 @@ const wroteAny = (report: Report): boolean =>
  * One page of a list with the rows he deleted in it, AS A POST, and why it is not `client.list`.
  *
  * `client.list` SENDS A READ AS A GET, and a GET's `includeDeleted` is decoded only by a host at `dc9ec9e4` or later,
- * where `ROUTES` declares it. Wave fifty-four moved this read onto that GET, and against a host at `19d4c785`, the
- * build production answered on 23 September, it came back with live rows alone, 200, and every row he had deleted
- * was added back (`loop/research-batch-fifty-five-audit.md` section 1, the adapter's `test/import-deleted-skew.test.ts`). A POST's
- * body keeps its JSON types, and the record hands `includeDeleted: true` to the kernel on every host from before
- * `19d4c785` on, which the audit measured on both builds. So this is the door the import keeps whichever build the
- * host is at, and it carries the headers, the bearer and the deadline every other request of the run carries.
+ * where `ROUTES` declares it. Moved onto that GET, this read came back from a host at `19d4c785` with live rows
+ * alone, 200, and every row he had deleted was added back. A POST's body keeps its JSON types, and the record hands
+ * `includeDeleted: true` to the kernel on every host from before `19d4c785` on, measured on both builds. So this is
+ * the door the import keeps whichever build the host is at, and it carries the headers, the bearer and the deadline every other request of the run carries.
  */
 async function listWithDeleted(send: typeof fetch, to: Target, args: { register: string; limit?: number; cursor?: string | null }): Promise<Result<{ rows: unknown[]; cursor: string | null }>> {
   const lost = (why: string) => no<never>('UNREACHABLE', `The record could not be reached: ${why}`);
@@ -1906,8 +1892,8 @@ async function resolveOffers(offers: readonly Offer[], catalogue: CatalogueRead,
  * A catalogue at an address, read as a host serves one: no token goes with it, because a catalogue is public.
  *
  * THROUGH `readSource`, THE READ `pack install` MAKES OF THE SAME FILES, and within the import's own budget. It was a
- * bare `fetch`: no deadline, a redirect followed anywhere, no cap on the answer and http to any machine. Measured on
- * 25 September (`test/import-adapter.test.ts`), a catalogue that took the connection and never answered held the
+ * bare `fetch`: no deadline, a redirect followed anywhere, no cap on the answer and http to any machine. Measured
+ * (`test/import-adapter.test.ts`), a catalogue that took the connection and never answered held the
  * import on its first read of `index.json` until the test's ten seconds ran out, where the host's own requests give up
  * at the budget.
  */
@@ -2080,10 +2066,10 @@ export async function importCommand(args: string[], io: AgentIo, given?: string,
   }
   /**
    * THE IMPORT WRITES AS A RUN OF ITS OWN, ONE A NIGHT, AND SENDS NOTHING OF THE FOLDER IT WAS STARTED IN BUT THE
-   * MACHINE'S NAME (`loop/research-shadow-week.md` §4 option A, and the checker's note under it).
+   * MACHINE'S NAME.
    *
    * It sent `io.headers(to.key)`, the folder's position and the run its session file names, and measured through this
-   * command on a host over the record (the adapter's `test/import-own-run.test.ts`) that was 44 runs for the fixture's
+   * command on a host over the record that was 44 runs for the fixture's
    * 44 writes from a folder with no repository, every one left `active`, and from a folder an agent was working in, the
    * agent's own run signing every write. A client id of its own is what the ladder finds the same run by on every write,
    * whatever the folder. And the folder's repository, remote and path go with the run it names, not only the session
@@ -2105,7 +2091,7 @@ export async function importCommand(args: string[], io: AgentIo, given?: string,
     const sent = new Headers(init?.headers);
     for (const [name, value] of Object.entries(headers)) sent.set(name, value);
     /* A 429 IS WAITED OUT, not written down as a refusal. A record answers a caller as many requests as a minute allows,
-       and an import of a few thousand rows is past that in its first minute: the the old tool import of 28 September had
+       and an import of a few thousand rows is past that in its first minute: a real import measured before this had
        400 rows refused RATE_LIMITED and exited 1 with a third of its lists half-carried. The record says when to come
        back in `retry-after`, and the request is sent again then, the same body, up to the tenth time. */
     for (let tries = 1; ; tries++) {
@@ -2181,8 +2167,7 @@ export async function importCommand(args: string[], io: AgentIo, given?: string,
       io.say(`${to.key} stopped answering part way. Run the import again: rows already written are found and not added twice.`);
       /* AND WHAT IT DID BEFORE THAT IS REMEMBERED, which it was not. The rows the retire pass put in the bin were then in
          no run's `binned`, and the next night held back every one of them as a row he had deleted: the lot of 5 that the
-         old tool held again the night after stayed in the bin (the adapter's `test/import-own-deletes.test.ts`, measured
-         before this). Only a run that wrote or binned something, because one that stopped while reading changed nothing. */
+         old tool held again the night after stayed in the bin (measured before this). Only a run that wrote or binned something, because one that stopped while reading changed nothing. */
       const got = progress.report;
       if (!dryRun && got !== null && got.missing.length === 0 && (wroteAny(got) || (got.binned ?? []).length > 0)) {
         remember(got, true);
@@ -2214,7 +2199,7 @@ export async function importCommand(args: string[], io: AgentIo, given?: string,
    * AND ONCE ITS LAST WRITE HAS ANSWERED, THE RUN IS ENDED `done`, named by the export it carried.
    *
    * Left alone it stayed `active`, read as live beside the agents actually working until the twelve-hour sweep
-   * abandoned it (`loop/research-shadow-week.md` §1, 8 runs for 8 nights each abandoned the day after). Ending it is
+   * abandoned it (8 runs for 8 nights, each abandoned the day after). Ending it is
    * safe only because the run is this command's own: sent with the folder's headers, the same handoff would have ended
    * the agent's. Only when something was written, because a night that wrote nothing opened no run, and a handoff would
    * open one only to end it. A refusal or no answer is said and changes nothing else: the rows are in, and the exit is

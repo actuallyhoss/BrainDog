@@ -3,15 +3,15 @@
  * against the doors the Worker's own router answers.
  *
  * THE SITE WORKER HANDS THE APP ITS DOORS, OR `brain.dog` NEVER REACHES THE APP. With a service binding in place of zone
- * routes (`loop/research-one-domain-binding.md`), the list that decides which Worker answers a path on the site's name is
+ * routes, the list that decides which Worker answers a path on the site's name is
  * the site's `assets.run_worker_first`, and the thing that decides which app answers is the site's `services` entry. A
  * door the app has built and the site does not list is answered by the site's 404 page, to a webhook sender or an MCP
  * client, and nothing fails at deploy time. A path the site lists and the app has not built takes a name away from that
- * 404 page. Both were measured locally on 23 September with `wrangler dev -c site -c app`: every listed door answered the
- * app's own bytes, and `/mcp/`, `/auth` and `/account`, which the survey's list did not carry and `src/route.ts` accepts,
- * answered the site's 404 page (sections 2.1 and 2.6).
+ * 404 page. Both were measured locally with `wrangler dev -c site -c app`: every listed door answered the
+ * app's own bytes, and `/mcp/`, `/auth` and `/account`, which an earlier list did not carry and `src/route.ts` accepts,
+ * answered the site's 404 page.
  *
- * BOTH ENVIRONMENTS ARE BOUND, ALPHA SINCE PUSH 1 AND PRODUCTION SINCE PUSH 3 (section 4 of the research). Push 1 held
+ * BOTH ENVIRONMENTS ARE BOUND, ALPHA SINCE PUSH 1 AND PRODUCTION SINCE PUSH 3. Push 1 held
  * production unbound with a fourth test, so the token, the binding and a version rollback were rehearsed on
  * `alpha.brain.dog` before `brain.dog` changed at all. With every environment bound that test had nothing left to read,
  * and a check with nothing to read is the same silence as no check, so it went with this push.
@@ -20,7 +20,7 @@
  * a hand-written `DOORS` and to a `served` built from six `serves*` predicates, and its header said a door the router
  * gained was not seen until somebody added it to both. `/healthz` (deb5b703) is that door: `route()` in `src/index.ts`
  * answers it ahead of every predicate, nobody added it, alpha's site answered it with its 404 page, and every test here
- * stayed green (`loop/research-batch-fifty-five-audit.md` section 3). So the branches are now read off `route()` itself,
+ * stayed green. So the branches are now read off `route()` itself,
  * every call it makes on `url.pathname`, and each one must have a door below or this file fails by the branch's name.
  * Whether a path is a door is then asked of the bundled Worker, with every binding a trap: a door is any path the
  * Worker answers otherwise than with its fallback, the 404 it gives a name no branch takes.
@@ -37,9 +37,9 @@ type Assets = { not_found_handling?: string; run_worker_first?: string[] | boole
 type Env = { main?: string; routes?: { pattern: string; custom_domain?: boolean }[]; services?: { binding: string; service: string }[]; assets?: Assets };
 type Config = { name?: string; main?: string; assets?: Assets; env?: { [name: string]: Env } };
 
-/* THE CHECKER'S READER, BY A WIDENED DYNAMIC IMPORT. A static import of the `.mjs` is TS7016 under `strict`, because it
+/* `provision-check`'S READER, BY A WIDENED DYNAMIC IMPORT. A static import of the `.mjs` is TS7016 under `strict`, because it
    has no declaration beside it and this program has no `allowJs`; and a second comment scanner that disagrees with the
-   checker about one comment is how a test goes green on a file the checker cannot parse. */
+   `provision-check` about one comment is how a test goes green on a file it cannot parse. */
 const checker = '../scripts/provision-check.mjs' as string;
 const { stripJsonc } = (await import(checker)) as { stripJsonc: (text: string) => string };
 const read = (path: string): Config => JSON.parse(stripJsonc(readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8'))) as Config;
@@ -50,14 +50,14 @@ const BOUND: readonly string[] = ENVIRONMENTS;
 
 /* EVERY BRANCH `route()` TAKES ON THE PATH, READ FROM ITS SOURCE. The function runs to the first line that is a lone
    closing brace, which is how the file writes the end of a top-level function, and a line may end in `\r\n`: an
-   editor on this machine saved `index.ts` that way on 23 September, and a pattern of bare `\n` then found no `route()`
+   editor on this machine saved `index.ts` that way, and a pattern of bare `\n` then found no `route()`
    at all and failed on it, which is the right failure but the wrong reason. What counts as a branch is a call on
    `url.pathname`, a predicate (`servesMcp(url.pathname)`) or a pattern (`HEALTHZ.test(url.pathname)`); `servesApi(app.rest)`
    is the `/app` branch's own second question and is not one. Measured: a line `if (servesHooks(url.pathname)) ...` put
    into `route()` failed the first test below with "src/index.ts's route() asks servesHooks(url.pathname), and this file
    has no door for it".
 
-   AND A PATH READ ANY OTHER WAY IS REFUSED, NOT SKIPPED. Measured by the checker on 23 September: a line
+   AND A PATH READ ANY OTHER WAY IS REFUSED, NOT SKIPPED. Measured by mutation: a line
    `if (url.pathname.startsWith('/hooks/')) return buildId(env);` put into `route()`, and another with
    `url.pathname === '/status'`, left all five tests green, because neither is a call on the path and so neither was a
    branch here. `BARE` is every line of `route()` that still names `url.pathname` once its calls are taken out, and the
@@ -69,7 +69,7 @@ const ASKED = [...new Set([...routeSource.matchAll(CALL)].map((m) => m[1] ?? '')
 const BARE = routeSource.replace(CALL, '').match(/[^\n]*url\.pathname[^\n]*/g) ?? [];
 
 /* THE DOORS, ONE OR MORE SAMPLE PATHS PER BRANCH OF `route()`. `/mcp/` is here because an MCP client configured with the
-   slash reached the site's 404 page in the survey (section 2.6), while `servesMcp` accepts it. `/healthz/` is not, as the
+   slash reached the site's 404 page when measured, while `servesMcp` accepts it. `/healthz/` is not, as the
    bare `/auth` is not: the router forgives it, and nobody was measured asking it. `/a`, `/s` and `/ws` have no branch
    because they are not built, and the site keeps its 404 page for them. The vault's doors are under `/api/`, so the
    site's `/api/*` carries them. */
@@ -81,7 +81,7 @@ const DOOR_OF: { [asked: string]: string[] } = {
   servesMcp: ['/mcp', '/mcp/'],
   servesIn: ['/in/abc'],
   servesVault: ['/api/vault/deposit'],
-  /* OPS-20's file store, `PUT /api/files` and `GET /api/files/<sha256>` (ops §4.0 D), under `/api/*` like every other
+  /* The file store, `PUT /api/files` and `GET /api/files/<sha256>`, under `/api/*` like every other
      door here, so the site's own entry already carries it. */
   servesFiles: ['/api/files/abc123'],
   servesKennel: ['/api/kennel/v1/index.json'],

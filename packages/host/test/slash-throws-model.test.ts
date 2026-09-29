@@ -2,10 +2,10 @@
  * The two throws out of `post` that come after a request left and before a body was read, the timeout and the body that
  * broke off, name the model this host sent, as the size and the parse already do.
  *
- * WAVE 48 PASSED `model` INTO BOTH AND TESTED NEITHER. `packages/host/test/slash.test.ts` holds the parse throw to
+ * AN EARLIER BUILD PASSED `model` INTO BOTH AND TESTED NEITHER. `packages/host/test/slash.test.ts` holds the parse throw to
  * `model: 'llama3'`, and `apps/selfhost/test/slash-answers.test.ts` holds the size throw's row to it; the timeout and the
  * broke-off body were checked for their mark and their message and never for a name, so either `model` argument could
- * be dropped and every suite stayed green. That is not a guess: on 23 September, with the third argument taken off both
+ * be dropped and every suite stayed green. That is not a guess: with the third argument taken off both
  * `SlashAnsweredError`s in `post`, the host's other 232 tests, the 9 in `packages/slash/test/slash-*.test.ts` and the 46
  * in `apps/selfhost/test/slash*.test.ts` all passed. Dropped, `answer` settles the row under the template's
  * `glm-5.3-flash` on a host whose endpoint was sent `llama3`.

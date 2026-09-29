@@ -55,12 +55,12 @@ const attached = (context: Context | undefined, resumed = false): Attached => ({
   ...(context === undefined ? {} : { context }),
 });
 
-const AT = { repo: 'braindog', host: 'studio-pc' };
+const AT = { repo: 'braindog', host: 'STUDIO-PC' };
 
 test('THE BRIEFING IS IN THE OWNER’S ORDER: who and where, the handoff, who else is here, what waits, then what applies', () => {
   const text = briefing(attached(full()), AT, 4);
   const order = [
-    'BrainDog: S47 started in braindog on studio-pc. Project: BrainDog.',
+    'BrainDog: S47 started in braindog on STUDIO-PC. Project: BrainDog.',
     'Last handoff (S45, 3 hours ago): Wire the device routes into the self-host.',
     '  Already tried: Reading the claim from the cookie.',
     '  HEAD has moved 4 commits since then. Re-read before trusting it.',
@@ -153,7 +153,7 @@ test('A RECORD WITH ITS MODULES SWITCHED OFF still briefs: no people, no keys, n
   const empty = { ...bare, registers: [{ id: 'credentials', name: 'Keys', rows: [], inherited: [], truncated: false }] };
   assert.ok(!briefing(attached(empty), AT, undefined).includes('Keys'));
   /* And a host older than `context` sends none. */
-  assert.match(briefing(attached(undefined), AT, undefined), /^BrainDog: S47 started in braindog on studio-pc\.[^\n]*\nThis host sends no briefing\./);
+  assert.match(briefing(attached(undefined), AT, undefined), /^BrainDog: S47 started in braindog on STUDIO-PC\.[^\n]*\nThis host sends no briefing\./);
 });
 
 test('a tie between projects is said, and HEAD that git cannot count is said plainly', () => {

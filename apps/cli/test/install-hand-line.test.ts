@@ -1,9 +1,9 @@
 /**
  * The hand-run line `braindog install` prints for a profile left without BrainDog's server, run in the shell it is
- * printed for: finding 1 of `loop/research-batch-forty-four-audit.md`.
+ * printed for.
  *
- * MEASURED BEFORE THIS EXISTED, at e4326ea6. The line was `sh` on every platform, `CLAUDE_CONFIG_DIR='<dir>' claude
- * mcp add-json braindog '<json>' --scope user`, and Sam runs install on Windows. Windows PowerShell 5.1 read the
+ * MEASURED BEFORE THIS EXISTED. The line was `sh` on every platform, `CLAUDE_CONFIG_DIR='<dir>' claude
+ * mcp add-json braindog '<json>' --scope user`, and the owner runs install on Windows. Windows PowerShell 5.1 read the
  * assignment as a command name and threw `CommandNotFoundException`, `cmd` said "not recognized", and the bare line
  * reached `claude` with the JSON's inner double quotes stripped, `{type:stdio,command:node,...}`, which does not
  * parse. Only Git Bash ran it.
@@ -16,7 +16,7 @@
  * So the stand-in here is a `.ps1`, the harsher of the two; `claude.exe` from the native installer took the quoted
  * form and wrote the entry, checked by hand once against the real CLI in a scratch `CLAUDE_CONFIG_DIR`.
  *
- * AND A LINE PRINTED FOR ONE SHELL MUST RUN NOTHING IN ANOTHER (finding 6 of `loop/research-batch-forty-six-audit.md`).
+ * AND A LINE PRINTED FOR ONE SHELL MUST RUN NOTHING IN ANOTHER.
  * The PowerShell form was bare `;` statements, and Git Bash ran them one by one: the assignments failed and `claude mcp
  * add` ran in the shell's own profile. So the form is chosen by the shell where it can be told, and each is tested in
  * the shell it is not for as well as the one it is.
@@ -45,7 +45,7 @@ after(() => rmSync(scratch, { recursive: true, force: true }));
 
 const home = join(scratch, 'home');
 /* A space and an apostrophe, the two characters each shell's quoting has to survive. */
-const named = join(home, ".claude-en core's");
+const named = join(home, ".claude-side job's");
 const WAS = 'C:\\the\\shell\\own\\profile';
 
 /*
@@ -120,8 +120,8 @@ test('PASTED INTO POWERSHELL 5.1, THE NAMED LINE REACHES claude WITH THE PROFILE
   assert.deepEqual(ran.dirs, [named], ran.stdout);
   assert.deepEqual(ran.args, ARGS, ran.stdout);
   /*
-   * RESTORED, NOT REMOVED. His shell already holds `CLAUDE_CONFIG_DIR` (the audit's session sat in
-   * `.ccenv\profiles\quartz`), and a line that finished with `Remove-Item` left it unset, so every later `claude` in
+   * RESTORED, NOT REMOVED. A shell may already hold `CLAUDE_CONFIG_DIR` (one measured sat in
+   * `.ccenv\profiles\studio`), and a line that finished with `Remove-Item` left it unset, so every later `claude` in
    * that window ran in `~/.claude`. Where it was unset, it is left unset.
    */
   assert.equal(ran.after, `after=${WAS}|set=True`, ran.stdout);
@@ -143,8 +143,8 @@ test('A CURLY APOSTROPHE IN THE PROFILE IS DOUBLED TOO, because PowerShell ends 
 
 test('THE DEFAULT PROFILE IS REACHED FROM A SHELL THAT SITS IN ANOTHER: CLAUDE_CONFIG_DIR is cleared for the one call and put back after', { skip: process.platform !== 'win32' }, () => {
   /*
-   * The bare line went to whichever profile the shell was in, so `--config-dir ~/.claude` pasted into his window
-   * registered the server in the quartz profile. Claude Code keeps the default profile's servers in `~/.claude.json`
+   * The bare line went to whichever profile the shell was in, so `--config-dir ~/.claude` pasted into such a window
+   * registered the server in the studio profile. Claude Code keeps the default profile's servers in `~/.claude.json`
    * only when the variable is unset, so unset is the one value that names it.
    */
   const lines = byHand([join(home, '.claude')], home, 'PowerShell');
@@ -167,9 +167,9 @@ function bashReaching(bin: string): string | false {
 
 test('THE POWERSHELL LINES PASTED INTO GIT BASH RUN NOTHING, so a line printed for the wrong shell fails closed', (t) => {
   /*
-   * MEASURED BEFORE THIS TEST EXISTED (audit forty-six, finding 6): bash ran each `;` statement of the PowerShell
+   * MEASURED BEFORE THIS TEST EXISTED: bash ran each `;` statement of the PowerShell
    * line, the two assignments failed with "=: command not found", and `claude mcp add` then ran in whatever profile
-   * the shell was in, the acme one for a line that named another and for the line that meant `~/.claude`.
+   * the shell was in, the client one for a line that named another and for the line that meant `~/.claude`.
    */
   const dir = mkdtempSync(join(scratch, 'bash-'));
   mkdirSync(join(dir, 'bin'));

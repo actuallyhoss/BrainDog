@@ -2,7 +2,7 @@
  * Deleting a hosted record: the final copy, the sweep, the alarm, the bytes, then the names, and a name that will not
  * release is not "deleted".
  *
- * THE SWEEP IS HERE BECAUSE IT WAS MEASURED MISSING. `loop/research-restore.md` §5 ran `destroyRecord` over a bucket
+ * THE SWEEP IS HERE BECAUSE IT WAS MEASURED MISSING. `destroyRecord` was run over a bucket
  * holding a record's nightly copy and `latest`, and the bucket held the same 2 objects afterwards; the next walk lists
  * only open records, so nothing ever visited that prefix again. Every test below that names a bucket is a way that
  * failure comes back: copies left, a sweep that half ran and the record gone anyway, or a final copy that was never
@@ -175,7 +175,7 @@ test('A FINAL COPY THE BUCKET DOES NOT HOLD STOPS THE DELETE BEFORE A NIGHT GOES
 });
 
 test('THE FINAL COPY IS KEPT THIRTY DAYS UNTIL HE SAYS OTHERWISE', () => {
-  // `loop/research-restore.md` §8: none, a day or thirty is his call and unanswered. Pinned so that changing it is a
+  // None, a day or thirty is his call and unanswered. Pinned so that changing it is a
   // decision somebody makes in this file and its test, and `deleteCosts` in the web copy is changed with it.
   assert.equal(FINAL_KEPT_DAYS, 30);
 });

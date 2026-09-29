@@ -17,7 +17,7 @@
  *
  * PATH 3 MADE THE PERSON AT ONCE, AND THAT WAS AN ACCOUNT IN SOMEBODY ELSE'S NAME. Whoever held the link typed a name
  * and became the person at the invited address, so a forwarded or leaked invitation signed a stranger in as the
- * invitee (`loop/finish/ops.md` §6.2). A host that cannot send mail cannot prove anything, so it says so in one
+ * invitee. A host that cannot send mail cannot prove anything, so it says so in one
  * sentence and makes nobody.
  *
  * NOTHING HERE LOGS. The invitation is in request bodies and in the one mail that proves the address, and nowhere else.
@@ -71,7 +71,7 @@ export const NAME_MAX = 100;
 
 /* WHAT DRAWS NOTHING: white space, every Default_Ignorable_Code_Point (the zero-width space, the word joiner, both
    Hangul fillers, the soft hyphen, the byte order mark), every format character, and the braille blank, which is a
-   symbol by category but a blank cell on every screen. The audit stored five of these as names. */
+   symbol by category but a blank cell on every screen. Five of these were once stored as names. */
 const DRAWS_NOTHING = String.raw`[\p{White_Space}\p{Default_Ignorable_Code_Point}\p{Cf}\u2800]`;
 /* LESS WHAT A SCRIPT SPELLS WITH: ZWNJ and ZWJ, which are spelling in Persian and the Indic scripts, and the
    variation selectors, which choose a glyph. Trimmed off the edges, these would cut the last letter off a
@@ -83,18 +83,17 @@ const INVISIBLE_EDGE = new RegExp(`^${EDGE}+|${EDGE}+$`, 'gv');
 /* AND WHAT MAY NOT SIT INSIDE A NAME. White space between words is a name; a zero-width space or a filler between
    them is two names drawn as one, or a gap nobody can see is there. */
 const INVISIBLE_INSIDE = new RegExp(String.raw`[[\p{Default_Ignorable_Code_Point}\p{Cf}\u2800]--${SPELLS_WITH}]`, 'v');
-/* A JOINER IS SPELLING ONLY WHERE A SCRIPT SPELLS WITH IT. The exemption above was for every script, so the audit
-   stored `Bob\u200cSmith` and `a`, 98 joiners and `b` (`loop/research-batch-sixteen-audit.md` finding 6). A joiner is
+/* A JOINER IS SPELLING ONLY WHERE A SCRIPT SPELLS WITH IT. The exemption above was for every script, so a probe
+   stored `Bob\u200cSmith` and `a`, 98 joiners and `b`. A joiner is
    kept after a letter or mark of a script that writes with one (Script_Extensions, so an Arabic vowel mark counts as
    Arabic), or as ZWJ between two emoji, which is how a family or the rainbow flag is written. Each joiner must follow
    one of those itself, so a second joiner in a row follows a joiner and is refused: no script needs a run of them.
    ADLAM AND HANIFI ROHINGYA ARE ON IT TOO. Both are cursive scripts with living users (Fula, Rohingya), a joiner is
-   spelling there as it is in Arabic, and leaving them off newly refused `\u{1E900}\u200d\u{1E901}`
-   (`loop/research-batch-eighteen-audit.md` finding 8).
+   spelling there as it is in Arabic, and leaving them off newly refused `\u{1E900}\u200d\u{1E901}`.
    THE SCRIPT ASKED IS THE BASE LETTER'S, NOT THE MARK'S. Asking the character just before the joiner let one borrowed
    mark stand in for a script: `Bob`, one haraka, ZWNJ, `Smith` passed as Arabic, a candrabindu as Devanagari, and once
-   Adlam was on the list an Adlam mark as Adlam, three ways to split a Latin name unseen
-   (`loop/research-batch-twenty-audit.md` finding 7). The lookbehind now steps back over every mark to the letter under
+   Adlam was on the list an Adlam mark as Adlam, three ways to split a Latin name unseen.
+   The lookbehind now steps back over every mark to the letter under
    them and asks that letter, so a Persian `\u0645\u0650` or a Malayalam chillu keeps its joiner and `b` with a haraka does not.
    It does not step over a joiner, so a mark after a joiner has no base and cannot carry a second one. */
 const JOINS_WITH = String.raw`[\p{scx=Arabic}\p{scx=Syriac}\p{scx=Nko}\p{scx=Adlam}\p{scx=Hanifi_Rohingya}\p{scx=Mongolian}\p{scx=Devanagari}\p{scx=Bengali}\p{scx=Gurmukhi}\p{scx=Gujarati}\p{scx=Oriya}\p{scx=Tamil}\p{scx=Telugu}\p{scx=Kannada}\p{scx=Malayalam}\p{scx=Sinhala}\p{scx=Khmer}\p{scx=Myanmar}]`;
@@ -102,16 +101,15 @@ const JOINER_SPELLING = new RegExp(
   String.raw`(?<=[${JOINS_WITH}--\p{M}]\p{M}*)[\u200c\u200d]|(?<=[\p{Extended_Pictographic}\p{Emoji_Modifier}\ufe0f])\u200d(?=\p{Extended_Pictographic})`,
   'gv',
 );
-/* WHAT IS VISIBLE AND STILL NO NAME (finding 7). A mark with no letter under it, at the start or after a space, draws
-   a floating accent. A run of more than `MARKS_MAX` marks is the audit's letter carrying 99 of them, and a variation
+/* WHAT IS VISIBLE AND STILL NO NAME. A mark with no letter under it, at the start or after a space, draws
+   a floating accent. A run of more than `MARKS_MAX` marks is the probe's letter carrying 99 of them, and a variation
    selector is a mark too, so the same run refuses 90 of those. The longest run in the names
    `invite-names-drawn.test.ts` keeps is three, a Tibetan stack, but a Burmese syllable such as `ချွှေး` carries five
    (every sign after the first letter is a mark), so six is the tightest bound that keeps it. Private use draws
    whatever one font chose, or a box. A noncharacter is not text at all.
    THE RUN IS COUNTED THROUGH A JOINER. `\p{M}{7}` alone ended the run at a joiner, and a joiner is kept after any mark
    of a joining script, so a ZWJ after every sixth candrabindu stored one Devanagari letter carrying 84 of them, 99
-   code points, and a ZWNJ every sixth haraka did the same in Arabic (`loop/research-batch-eighteen-audit.md` finding
-   1). A joiner between two marks now counts as nothing, so the bound is marks per letter. One joiner is enough to
+   code points, and a ZWNJ every sixth haraka did the same in Arabic. A joiner between two marks now counts as nothing, so the bound is marks per letter. One joiner is enough to
    step over, because a second in a row is already refused above. */
 const MARKS_MAX = 6;
 const NOISE = new RegExp(
@@ -138,7 +136,7 @@ const SPACE_RUN = /(\p{White_Space})\p{White_Space}+/gu;
  * U+FFFD), and more than `NAME_MAX`. The one thing cleaned inside is a run of spaces, which draws as a gap between
  * the words the person typed and hides nothing, so it becomes one space as the edges already become none.
  *
- * `NAME_MAX` IS 100 CODE POINTS. A person's name needs far less, and the audit's 60,000-character name would have
+ * `NAME_MAX` IS 100 CODE POINTS. A person's name needs far less, and a probe's 60,000-character name would have
  * been the passkey chooser's `displayName` (`packages/record/src/identity.ts:413`). Code points and not UTF-16
  * units, so a name in an astral script is not refused at half the length of one in Latin.
  */
@@ -154,7 +152,7 @@ export function personName(raw: unknown): Result<string | null> {
   if (/[\p{Cc}\p{Zl}\p{Zp}\p{Bidi_Control}]/u.test(name) || INVISIBLE_INSIDE.test(name) || /[\u200C\u200D]/.test(name.replace(JOINER_SPELLING, '')))
     return malformed('That name has a hidden character in it, such as a line break or a direction mark. Type it again without it.');
   if (NOISE.test(name)) return malformed('That name has a character in it that draws no letter, such as an accent on its own. Type it again without it.');
-  /* A NAME NOBODY TYPED IS REFUSED, NOT STORED (`loop/finish/defects.md` H2): a form filled from a template stored
+  /* A NAME NOBODY TYPED IS REFUSED, NOT STORED: a form filled from a template stored
      `{{first_name}} {{last_name}}` as a person's name, and every place the name is drawn said it for good. A merge
      field is a doubled bracket around a word, `${first}`, `*|FNAME|*` or `%FIRST_NAME%`; a single bracket inside a
      name stays a name. */
@@ -210,8 +208,7 @@ function joinedSlug(value: unknown): string | null {
 }
 
 /**
- * What the record answers about a link before anybody accepts it: `acceptInvite({ token })` with no person
- * (`loop/finish/contracts.md` §2.5).
+ * What the record answers about a link before anybody accepts it: `acceptInvite({ token })` with no person.
  *
  * WHAT IT OPENS, SAID BEFORE THE PRESS. The page could say only the address and the date, so somebody accepted a record
  * they could not name, at a level they had not been told, and found out what they held by opening it. `record` is the
@@ -297,8 +294,8 @@ export async function serveInvite(
     if (!out.ok) return reply(httpStatus(out), out);
     /* AND THE SESSION MOVES ONTO THE RECORD JUST JOINED, where the host names one. This answered `live` as it was,
        so a colleague who owns a record of their own was told "You are on the record." and `Open BrainDog` opened
-       theirs: the session row still named it, and a fresh sign-in picks an owned record first
-       (`loop/research-invite-landing.md` finding 2). THE ROTATED COOKIE IS CARRIED BACK BY HAND. The `session` call
+       theirs: the session row still named it, and a fresh sign-in picks an owned record first.
+       THE ROTATED COOKIE IS CARRIED BACK BY HAND. The `session` call
        above rotates a day-old cookie, and the switch answers no cookie of its own, so an answer built from the
        switch alone left the browser holding an id that dies a minute later (`test/invite-session-move.test.ts`
        went red on exactly that). The switch is sent with the new id as well, though the old one, inside its

@@ -1,6 +1,5 @@
 /**
- * The route row for a person changing their own name (`packages/record/src/methods/person-name.ts`,
- * `loop/finish/contracts.md` §12.1, GAP-7).
+ * The route row for a person changing their own name (`packages/record/src/methods/person-name.ts`).
  *
  * ONE ROW A LINE, IN THE SHAPE `ROUTES` HAS ALWAYS HAD, because the two gates over the table read it by that shape:
  * `router-groups` holds each row's group to `docs/30-BLUEPRINT.md` §5, and `guards` holds the record method of the same

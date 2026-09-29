@@ -1,13 +1,12 @@
 /**
- * Names that draw nothing, or draw noise, and the joiners that let them in. `loop/research-batch-sixteen-audit.md`
- * findings 6 and 7, on `personName` (`packages/host/src/invite.ts`).
+ * Names that draw nothing, or draw noise, and the joiners that let them in, on `personName` (`packages/host/src/invite.ts`).
  *
  * THE JOINERS WERE EXEMPT FOR EVERY SCRIPT. ZWNJ and ZWJ were taken out of the inside check wholesale, because they
- * are spelling in Persian and the Indic scripts, so the audit stored `Bob\u200CSmith` (a Latin name with a gap nobody
+ * are spelling in Persian and the Indic scripts, so a probe stored `Bob\u200CSmith` (a Latin name with a gap nobody
  * can see) and `a`, 98 joiners and `b`, which is 100 code points drawn as `ab`. The Malayalam chillu the exemption was
  * written for and a Latin spoof were the same to it.
  *
- * AND WHAT IS LEFT AFTER THE INVISIBLES ARE GONE COULD STILL BE NOISE. Stored by the audit: a combining acute with no
+ * AND WHAT IS LEFT AFTER THE INVISIBLES ARE GONE COULD STILL BE NOISE. Stored by a probe: a combining acute with no
  * letter under it, one letter carrying 99 combining marks, 90 emoji variation selectors after a letter, a private use
  * character alone, the noncharacters U+FFFF and U+FDD0, and `Bo`, 80 figure spaces and `T`.
  *
@@ -22,7 +21,7 @@ import { personName } from '../src/invite.ts';
 
 /** Each of these has something visible in it and something a screen should not draw as part of a person's name. */
 const REFUSED: [string, string][] = [
-  /* FINDING 6. A joiner is spelling only after a letter of a script that spells with it, or between two emoji. */
+  /* A joiner is spelling only after a letter of a script that spells with it, or between two emoji. */
   ['a non-joiner between Latin letters', 'Bob\u200CSmith'],
   ['a joiner between Latin letters', 'Bo\u200DTanner'],
   ['98 joiners between two letters', `a${'\u200D'.repeat(98)}b`],
@@ -30,7 +29,7 @@ const REFUSED: [string, string][] = [
   /* THE SCRIPT BEING RIGHT IS NOT ENOUGH. Persian needs one non-joiner between two halves, never a run of them. */
   ['two non-joiners in a row in Persian', 'محمد\u200C\u200Cرضا'],
   ['50 joiners after a Malayalam virama', `ന്${'\u200D'.repeat(50)}`],
-  /* FINDING 7. What is not invisible, and still draws no name. */
+  /* What is not invisible, and still draws no name. */
   ['a lone combining acute', '\u0301'],
   ['a combining acute after a space', 'Bo \u0301Tanner'],
   ['a letter carrying 99 combining marks', `a${'\u0301'.repeat(99)}`],

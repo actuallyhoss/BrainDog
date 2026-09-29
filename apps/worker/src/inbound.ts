@@ -7,7 +7,7 @@
  *
  * THE ADDRESS HAD NO ORIGIN ON THIS HOST, WHICH IS WHY THIS FILE EXISTS. `feefa3f4` gave the
  * Directory `dir_inbound`, a reader, a writer, and gave the mail door its lookup, so
- * `/in/email/<token>` answers the moment a digest is in that index. Grepped on 2026-09-21 across
+ * `/in/email/<token>` answers the moment a digest is in that index. Grepped across
  * `apps/` and `packages/`: every caller of `inbound$` was a test in `apps/worker/test/route.test.ts`,
  * so the index held nothing on the hosted Worker and every forwarded message was a 404 with both
  * halves of the surface finished and green. This is the half that mints.
@@ -167,7 +167,7 @@ const digest = async (token: string): Promise<string> =>
  * self-host with no `BRAINDOG_TOKEN` makes an unauthenticated request the owner, which is right for
  * one person on loopback and stops being right the moment the call mints something that works from
  * anywhere. A forwarding address is exactly that, and it is handed to third parties on purpose. This
- * Worker has no uncredentialed principal now its public demo is gone (`loop/research-no-sample.md` A1);
+ * Worker has no uncredentialed principal now its public demo is gone;
  * the check is here because the rule belongs to the door and not to the deployment.
  */
 export async function serveInbound(request: Request, door: InboundDoor, ctx: CallContext): Promise<Response> {

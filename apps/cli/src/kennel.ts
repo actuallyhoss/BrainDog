@@ -1,7 +1,7 @@
 /**
  * The Kennel from this machine: submitting, yanking and searching as an author (`pack publish --kennel`, `pack yank`,
- * `pack search` with no `--from`), and `braindog kennel review` as its operator (`loop/finish/platform.md` PLT-5, the
- * `/api/kennel/v1/` row of `loop/finish/contracts.md`).
+ * `pack search` with no `--from`), and `braindog kennel review` as its operator, over
+ * `/api/kennel/v1/`.
  *
  * A KENNEL IS A CATALOGUE AT AN ADDRESS. Its reads (`index.json`, `packs/<id>/<version>.pack.json`) are laid out as a
  * catalogue folder is, so searching it and installing from it go through `catalogue.ts`'s own address reader; only the

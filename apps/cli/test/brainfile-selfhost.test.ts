@@ -2,12 +2,12 @@
  * `braindog export` then `braindog import` against a real self-host, started in this process by `start` with a server
  * key and a key store, over a real socket: the round trip a restore depends on, and the two files it must refuse.
  *
- * THE MANIFESTS ARE THE PROOF. W55-2 wrote no event for a replacing import so that the record exported after it is the
+ * THE MANIFESTS ARE THE PROOF. A replacing import writes no event so that the record exported after it is the
  * file it came from, manifest for manifest; a row written between the export and the import is gone afterwards, and a
  * second export carries the first one's `dog_manifest` block exactly.
  *
  * THE VAULT IS REAL. `recordKeys` wraps the record's three keys under a KEK made for this run, so the record holds
- * `vault_key` rows, and a copy without them is the one W55-2's checker found a replacing import must refuse.
+ * `vault_key` rows, and a copy without them is one a replacing import must refuse.
  *
  * THE COMMAND'S FUNCTIONS ARE CALLED HERE, NOT A CHILD PROCESS, because the self-host runs in this process and the
  * dispatch in `main.ts` is pinned by `brainfile.test.ts`. The requests still go over the socket, through `fetch`.

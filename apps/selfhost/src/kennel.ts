@@ -1,6 +1,6 @@
 /**
- * The Kennel on a self-host: `/api/kennel/v1/`, the paths the Cloud answers (`loop/finish/platform.md` §4.0 K,
- * `docs/14-KENNEL-AND-COMMUNITY.md` §1), so the app, the command line and an agent ask every BrainDog the same way.
+ * The Kennel on a self-host: `/api/kennel/v1/`, the paths the Cloud answers
+ * (`docs/14-KENNEL-AND-COMMUNITY.md` §1), so the app, the command line and an agent ask every BrainDog the same way.
  *
  * A SELF-HOST KEEPS NO KENNEL OF ITS OWN. It answers from two places, in this order: the operator's catalogue folder
  * (`BRAINDOG_CATALOGUE`, or the one bundled in the built shell, `catalogueFolder`), then the public Kennel that
@@ -205,7 +205,7 @@ export async function kennelAnswer(method: string, pathname: string, folder: str
   switch (asked.ask) {
     case 'index': {
       const theirs = base === null ? null : catalogueIn(await keptText(deps, `${base}index.json`, (text) => catalogueIn(text) !== null));
-      /* THE INDEX LEAVES OUT AN `unlisted` ENTRY, as the Worker's does (`apps/worker/src/kennel.ts`, C41): its files still
+      /* THE INDEX LEAVES OUT AN `unlisted` ENTRY, as the Worker's does (`apps/worker/src/kennel.ts`): its files still
          answer by exact path. */
       const merged = mergeIndexes(catalogueIn(local(folder, 'index.json')), theirs);
       return { status: 200, headers: READ, body: JSON.stringify({ ...merged, entries: listedEntries(merged) }) };

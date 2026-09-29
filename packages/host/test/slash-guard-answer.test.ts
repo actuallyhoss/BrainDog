@@ -1,7 +1,6 @@
 /**
  * `slashGuardedEngine`'s `answer` (`src/slash.ts`): `byo`'s monthly cap, held for an automation's question as it is for a
- * person's read. `loop/research-infer-ask.md` §2.3 and §6 Brief C, case (6). Tier `b` was held to it too until it became
- * his own key, whose asks are listed and not capped (`loop/finish/agents.md` AGT-21).
+ * person's read. Tier `b` was held to it too until it became his own key, whose asks are listed and not capped.
  *
  * THE GUARD WRAPPED `read` AND `propose` AND NOTHING ELSE, so a method the package gained reached the engine unguarded
  * through the prototype `Object.create` leaves. The package counts tier `a` alone (`packages/slash/src/propose.ts`,
@@ -9,8 +8,8 @@
  * minutes with nothing standing in front of it. Run before the guard named `answer`: the two tier cases below failed, each
  * with the fake engine called once where the cap allowed none.
  *
- * THE ENGINE IS A FAKE AND THE LEDGER IS REAL. `@braindog/slash` gains `answer` in Brief B, beside this, so the package
- * has none to wrap yet; the guard reads Slash's own `slash_settings` and `slash_call` tables, so those are the package's DDL on real
+ * THE ENGINE IS A FAKE AND THE LEDGER IS REAL. `@braindog/slash` gained `answer` separately, so a package
+ * before it has none to wrap; the guard reads Slash's own `slash_settings` and `slash_call` tables, so those are the package's DDL on real
  * SQLite, imported by a relative path as `slash.test.ts` imports `createSlash`.
  */
 
@@ -88,7 +87,7 @@ test('on tier byo at ask_cap 1 with one read made, answer refuses SLASH_BUDGET_S
   });
 });
 
-/* ON HIS OWN KEY NOTHING IS CAPPED (`loop/finish/agents.md` §5 item 7): his provider bills the ask, so the guard lists it
+/* ON HIS OWN KEY NOTHING IS CAPPED: his provider bills the ask, so the guard lists it
    and stands aside, as it does on tier `a`, where the package holds the cap itself. Before his own key replaced the host's
    drafting on tier `b`, this case was the refusal above. */
 test('on his own key, tier b, at ask_cap 1 with one read made, the guard calls through: his asks are listed and not capped', async () => {
@@ -114,7 +113,7 @@ test('on tier a the guard stands aside, because the package holds that cap itsel
 });
 
 test("an answer's own ledger row, kind read with no predicate, is spent from the same count as a person's read", async () => {
-  /* BRIEF B WRITES THE ROW AS `read` AND NOT A NEW KIND (§4), and this pins the half of that choice the guard relies on:
+  /* THE PACKAGE WRITES THE ROW AS `read` AND NOT A NEW KIND, and this pins the half of that choice the guard relies on:
      `drafted()` counts it. */
   const { guarded, reached, sql } = guardOf('byo', 1, 0);
   sql.exec(
@@ -130,7 +129,7 @@ test("an answer's own ledger row, kind read with no predicate, is spent from the
   assert.equal(read.ok, false);
 });
 
-test('an engine with no answer is left with none, so a host on a package before Brief B keeps its shape', () => {
+test('an engine with no answer is left with none, so a host on a package before answer keeps its shape', () => {
   const { engine } = engineOf();
   const { answer: _answer, ...before } = engine;
   const guarded = slashGuardedEngine(before, { sql: ledger('b', 1, 1), clock: fixedClock(NOW), grants: () => [] });

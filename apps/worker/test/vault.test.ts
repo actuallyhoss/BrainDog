@@ -114,10 +114,10 @@ test('THE ROOT KEY IS READ ONLY FROM env.KEK: the doors and the alarm get keys o
      callback rather than a value so that a `KEK` which is bound and malformed is one failed export
      with a sentence, and not every record on the deployment refusing to open. */
   assert.match(source, /workerSigner\(sql, \(\) => keyStoreOf\(this\.env\.KEK\)/, 'the export signer reads KEK some other way');
-  /* AND THE OUTBOX IS THE EIGHTH, added with the signed webhook (KRN-13): `leasedOpener` asks for the store only when a
+  /* AND THE OUTBOX IS THE EIGHTH, added with the signed webhook: `leasedOpener` asks for the store only when a
      post names a key, so a malformed `KEK` fails that one post and not the email beside it. */
   assert.match(source, /leasedOpener\([\s\S]{0,200}?\(\) => keyStoreOf\(env\.KEK\)/, 'the outbox reads KEK some other way than through leasedOpener');
-  /* AND THE SHARE LINKS (COL-3, `shareKey`) AND THE VAULT PASSPHRASE (COL-5, `passphraseRoot`, built once for both of
+  /* AND THE SHARE LINKS (`shareKey`) AND THE VAULT PASSPHRASE (`passphraseRoot`, built once for both of
      the object's `serveApi` calls) READ IT TOO. */
   assert.equal(
     (source.match(/env\.KEK\b/g) ?? []).length,

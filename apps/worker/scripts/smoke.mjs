@@ -4,11 +4,11 @@
  *   node apps/worker/scripts/smoke.mjs production
  *   node apps/worker/scripts/smoke.mjs alpha
  *
- * THE ANSWERS IN `loop/research-one-domain.md` SECTION 3.5, ASKED LIVE, FOR WHICHEVER PUSH OF THE MOVE JUST DEPLOYED.
+ * THE ONE-DOMAIN MOVE'S ANSWERS, ASKED LIVE, FOR WHICHEVER PUSH OF THE MOVE JUST DEPLOYED.
  * Once an environment's site binds this Worker, the app lives on the site's name beside the marketing site: the site
  * holds the name as its Custom Domain, runs its script first on the app's doors (`assets.run_worker_first` in
  * `apps/site/wrangler.jsonc`) and hands each of those requests to this Worker through its `APP` service binding
- * (`loop/research-one-domain-binding.md`). `wrangler deploy` says nothing about whether the site hands over every door,
+ * `wrangler deploy` says nothing about whether the site hands over every door,
  * and `deploy-parity` asks one host. A door the site keeps shows up as the site's 404 page answering an API call, which
  * is a healthy-looking response from the wrong Worker, and every check below is written against that answer as much as
  * against the right one. Before the site binds this Worker (push A) the checks are on the Worker's own name, and the
@@ -18,7 +18,7 @@
  * Worker's Custom Domains and the site's binding are what the two Workers were deployed with, so reading them here asks
  * the names the deploys claimed rather than the name somebody typed into the repository settings.
  *
- * `/healthz` IS ASKED ON EVERY NAME THE APP IS ON, AND ITS `kernel` IS HELD TO THIS CHECKOUT (defects H4). It is the
+ * `/healthz` IS ASKED ON EVERY NAME THE APP IS ON, AND ITS `kernel` IS HELD TO THIS CHECKOUT. It is the
  * door an uptime check reads, so a site that keeps it answers every monitor with its own 404 page; and `kernel` is the
  * count of migrations the serving build carries, which must be the count of files in `packages/kernel/src/migrations/`
  * here, or the version answering is not the one this job built.
@@ -67,7 +67,7 @@ const SLUG = /^[a-z][a-z0-9-]{0,30}[a-z0-9]$/;
  * The checks for one environment, read off the shape the two files deploy.
  *
  * THE NAMES COME FROM THE SITE'S BINDING AS WELL AS FROM `PUBLIC_HOST`, BECAUSE THE MOVE GOES OUT IN PUSHES AND EACH ONE
- * PUTS THE WORKER ON A DIFFERENT SET OF NAMES (`loop/research-one-domain-binding.md` section 4). Reading `PUBLIC_HOST`
+ * PUTS THE WORKER ON A DIFFERENT SET OF NAMES. Reading `PUBLIC_HOST`
  * alone, as this once did, asked `https://app.brain.dog/pricing` after push A: that is the Worker's name, where
  * `/pricing` is the Worker's 308 and not the site, so a good dark deploy went red. Now:
  *
@@ -131,8 +131,7 @@ export function checks(config, name, site = siteConfig(), kernel = migrationCoun
       {
         method: 'GET',
         url: `https://${on}/api/boot`,
-        /* ALWAYS 401. The public demo was the one var that made this a 200, and it is gone (`loop/research-no-sample.md`
-           A1): a file that still sets it deploys a Worker that reads it nowhere, so a 200 here is a Worker older than that. */
+        /* ALWAYS 401. The public demo was the one var that made this a 200, and it is gone: a file that still sets it deploys a Worker that reads it nowhere, so a 200 here is a Worker older than that. */
         expects: '401 JSON',
         judge: (a) => {
           if (a.status === 401 && isJson(a)) return null;

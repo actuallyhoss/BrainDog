@@ -12,7 +12,7 @@
  * line is erased, so the client's bundle carries no byte of the record by way of it.
  *
  * THE HAND-WRITTEN SHAPES STAY WHERE THEY ARE. The client's existing types are held by `client.test.ts`, and rewriting
- * them by reading, with nothing run, is where a build breaks (`loop/finish/architecture.md`, ARC-4). They move here one
+ * them by reading, with nothing run, is where a build breaks. They move here one
  * at a time, each with the test that holds it.
  */
 

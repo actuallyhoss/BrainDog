@@ -1,6 +1,5 @@
 /**
- * `braindog usecase list|export|check|install`: a BrainDog's arrangement as a file somebody else can install
- * (`loop/research-spark.md` S14).
+ * `braindog usecase list|export|check|install`: a BrainDog's arrangement as a file somebody else can install.
  *
  * EXPORT IS A READ, so a signed-in machine may save one: `exportUseCase` answers the modules, the use case's lists and
  * pages, the pages placed by hand, the voice and the labels, and no row unless `--example list:1,2` names it. `--minor`
@@ -156,7 +155,7 @@ async function check(args: string[], io: AgentIo): Promise<number> {
     io.say('braindog usecase check takes one file, as in braindog usecase check student-1.0.1.usecase.json.');
     return 1;
   }
-  /* READ AS PUBLISH, PREVIEW, DIFF, SEARCH AND YANK ALREADY DO (PLT-5), through `catalogue.ts`'s `loadSource`, so a
+  /* READ AS PUBLISH, PREVIEW, DIFF, SEARCH AND YANK ALREADY DO, through `catalogue.ts`'s `loadSource`, so a
      `.usecase.yaml` file checks the same as the JSON it means. */
   const loaded = await loadSource(file, io);
   if (!loaded.ok) {
@@ -169,7 +168,7 @@ async function check(args: string[], io: AgentIo): Promise<number> {
     return 1;
   }
   /* THE FILE'S WORDS ARE ITS AUTHOR'S, and `readShared` takes a title, author or license holding ESC and BEL without a
-     word (audit thirty-nine finding 2), so the lines are built from a scrubbed copy. */
+     word, so the lines are built from a scrubbed copy. */
   const u = printable(shared.value.usecase);
   const lists = shared.value.pack?.declarations.filter((d) => d.kind === 'register').length ?? 0;
   const pages = shared.value.pack?.declarations.filter((d) => d.kind === 'page').length ?? 0;
@@ -266,7 +265,7 @@ async function installFile(args: string[], io: AgentIo): Promise<number> {
     return 1;
   }
   if (ID.test(given)) return installOffered(given, values.host, io);
-  /* AS `check` READS ITS FILE (PLT-5): YAML turns to JSON text here too, so `install <file>.usecase.yaml` reads. */
+  /* AS `check` READS ITS FILE: YAML turns to JSON text here too, so `install <file>.usecase.yaml` reads. */
   const read = await loadSource(given, io);
   if (!read.ok) {
     io.say(read.fix);

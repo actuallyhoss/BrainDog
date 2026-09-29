@@ -2,7 +2,7 @@
  * An age v1 decryptor for the tests, written from https://age-encryption.org/v1 and nothing else.
  *
  * WHY THIS AND NOT THE REFERENCE. Neither reference was on this machine when the sealer was written:
- * `age` was not on PATH and neither `age-encryption` nor `pyrage` was installed, and the brief was to
+ * `age` was not on PATH and neither `age-encryption` nor `pyrage` was installed, and the rule was to
  * check rather than install. So the proof of the sealer is a second reading of the spec, and it is
  * only worth anything if it shares no code with the first. It shares none: every primitive here is
  * `node:crypto`'s (OpenSSL's X25519, HKDF, HMAC and ChaCha20-Poly1305), where `src/seal.ts` uses

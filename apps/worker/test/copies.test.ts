@@ -5,7 +5,7 @@
  * Local workerd cannot do point-in-time recovery: in miniflare `5.20260903.0-alpha` a Durable Object
  * answered `getCurrentBookmark`, and `getBookmarkForTime` and `onNextSessionRestoreBookmark` threw
  * "This Durable Object's storage back-end does not implement point-in-time recovery"
- * (`loop/research-restore.md` answer 7, measured). So what is proved here is everything on this side
+ * (measured). So what is proved here is everything on this side
  * of the platform: which bookmark is handed over, what is put first, what is refused and what is
  * kept. Whether the object then comes back at that bookmark is proved on alpha, by one restore of an
  * alpha record, and nowhere else. No Durable Object is faked: the storage below is the three PITR
@@ -49,7 +49,7 @@ const testStore = async (): Promise<KeyStore> =>
  * `customMetadata` COMES BACK FROM `list` ONLY WHEN IT WAS ASKED FOR, as R2's does: without the
  * `include` option an R2 listing carries keys and sizes and nothing else. A bucket that always
  * answered with the metadata would let a `list` that never asked for it pass here and show no
- * bookmark on the Cloud, which is the gap `research-restore.md` 3.3 measured.
+ * bookmark on the Cloud, which is the gap that was measured before this.
  */
 function bucket(log: string[], fail?: (key: string) => boolean) {
   const held = new Map<string, { bytes: Uint8Array; meta: Record<string, string> }>();
@@ -154,7 +154,7 @@ function cheap(blobs: Blobs, storage: ReturnType<typeof pitr>['storage'], clock:
 }
 
 test('A COPY IS LISTED WITH THE BOOKMARK IT WAS TAKEN AT, ITS ROWS AND ITS INSTANT, read from its own metadata', async () => {
-  // MEASURED BEFORE THIS (`research-restore.md` 3.3): `r2Snapshots(...).list` answered
+  // MEASURED BEFORE THIS: `r2Snapshots(...).list` answered
   // `{"id":"nightly-2026-09-23","at":"2026-09-23T00:00:00.000Z","bytes":9141}`, midnight and no
   // bookmark, because it read keys only. A restore through PITR needs the bookmark, and it is in the
   // object's `customMetadata`, which an R2 listing carries only when asked.

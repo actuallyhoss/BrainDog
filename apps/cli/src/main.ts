@@ -2,16 +2,15 @@
 /**
  * `braindog`, the command on an agent's machine.
  *
- * THE WHOLE OF `loop/research-agent-path.md` §4.2 IS BUILT: `mcp`, the stdio server Claude Code
- * launches (§1.1), `hook` and `install`, the session hooks of its §4, `login` and `logout`, the device
- * grant of its step 12 and its other half, `keys` and `run`, the key doors of its step 18, `skills`
- * and `tools`, the sync and scan of its step 19, and `session` and `context`, the handoff and the
- * briefing from a shell. There is no longer a list of commands that name themselves and do nothing:
+ * THE WHOLE AGENT PATH IS BUILT: `mcp`, the stdio server Claude Code launches, `hook` and `install`,
+ * the session hooks, `login` and `logout`, the device grant and its other half, `keys` and `run`, the
+ * key doors, `skills` and `tools`, the sync and the scan, and `session` and `context`, the handoff and
+ * the briefing from a shell. There is no longer a list of commands that name themselves and do nothing:
  * a word this command does not know is a typo, and it says so.
  *
- * `setup` IS THE ONE LINE A NEW MACHINE NEEDS (`loop/finish/agents.md` C9, `setup.ts`): it runs `login`, `install`,
- * the MCP registration, `tools write` and `skills sync` in order, each of them still a command of its own. `runner`
- * runs the jobs the record hands this machine (C14), and lives in `runner.ts`.
+ * `setup` IS THE ONE LINE A NEW MACHINE NEEDS (`setup.ts`): it runs `login`, `install`, the MCP registration,
+ * `tools write` and `skills sync` in order, each of them still a command of its own. `runner` runs the jobs the
+ * record hands this machine, and lives in `runner.ts`.
  *
  * `init` AND `serve` BELONG TO THE SELF-HOST, which has no `bin` of its own and whose messages tell
  * people to run `braindog init` and `braindog serve`. This command claims the name and hands those two
@@ -61,7 +60,7 @@ const say = (line: string) => writeFileSync(2, `${line}\n`);
  * The folder the two hook shims are in, which is what `install` and `setup` write into Claude Code's settings.
  *
  * IN A CHECKOUT IT IS `hooks/` BESIDE `src/`. THE PUBLISHED CLI IS ONE FILE, and `install.ps1` and `install.sh` put
- * nothing beside it, so `../hooks/` named a folder no machine had: `braindog setup` on 28 September wrote both hooks
+ * nothing beside it, so `../hooks/` named a folder no machine had: `braindog setup` once wrote both hooks
  * into three profiles pointing at `~/.braindog/hooks/braindog-hook.ps1`, which did not exist, and every session would
  * have started without its context. So the bundle writes its own shims beside itself, each running this file.
  */
@@ -266,7 +265,7 @@ async function mcp(args: string[]): Promise<void> {
   } catch (e) {
     /*
      * NOT SIGNED IN IS A SERVER THAT REFUSES, NOT ONE THAT IS MISSING (`signed-out.ts`). Exiting here was `/mcp`'s
-     * `braindog failed` and a model with no word to pass on (`loop/research-cutover-day.md` §7 item 4). Any other reason
+     * `braindog failed` and a model with no word to pass on. Any other reason
      * `target` gives is a setup mistake and still stops the server, below.
      */
     const fix = signedOutFix(values.host, process.env, hostsPath(process.env));
@@ -311,8 +310,8 @@ async function mcp(args: string[]): Promise<void> {
 async function signIn(args: string[]): Promise<void> {
   /* `brain.dog` AND NOT `app.brain.dog`, because the example is the one address a person copies and only production's
      `PUBLIC_HOST` starts a device. This said `app.brain.dog` and that it "signs in on both sides" because the old name
-     stays a Custom Domain of the same Worker; with push B2's vars a device start there answered 403 "This BrainDog signs
-     devices in at https://brain.dog, so start there" (`loop/research-one-domain-binding.md` section 2.4). Tokens minted
+     stays a Custom Domain of the same Worker; with production's vars a device start there answered 403 "This BrainDog
+     signs devices in at https://brain.dog, so start there". Tokens minted
      on the old name keep working there, but a new login does not. `test/login.test.ts` reads the host from
      `apps/worker/wrangler.jsonc`, so a later move fails there rather than in somebody's terminal. */
   const wrong = 'braindog login takes one host, as in braindog login https://brain.dog/app/<slug>, and --vault <project>, and nothing else.';
@@ -462,8 +461,7 @@ async function setupCommand(args: string[]): Promise<void> {
 }
 
 /**
- * `braindog runner enrol|repos|allow|run`, over the real terminal, and the exit code `runner` decides (`runner.ts`,
- * `loop/finish/agents.md` C14).
+ * `braindog runner enrol|repos|allow|run`, over the real terminal, and the exit code `runner` decides (`runner.ts`).
  *
  * NOT ONE OF `agentCommand`'s, because `enrol` runs the device flow and `run` waits for jobs until Ctrl+C, so both need
  * the hosts file and the stop signal, as `login` does. `--json` IS TAKEN: every verb says its lines on stderr and keeps
@@ -513,8 +511,7 @@ async function hook(args: string[]): Promise<void> {
   /*
    * THE LAPSE GOES ABOVE WHATEVER THE START HOOK SAYS, while there is still time to act on it. The login is a ninety-day
    * bearer that does not slide (`lapseWarning`), and past it the server has nothing to reach, so the first word anyone
-   * had was this hook's line on the morning after (`loop/research-cutover-day.md` §8: "worth a calendar entry until
-   * wave 54's item 4 lands"). First, not last, because the briefing's last line is its next step and `withLines` keeps
+   * had was this hook's line on the morning after. First, not last, because the briefing's last line is its next step and `withLines` keeps
    * it there; and it rides the one write `hookStart` makes, the failure line's included.
    */
   const lapse = which === 'start' ? lapseWarning(process.env, hostsPath(process.env)) : null;
@@ -567,14 +564,13 @@ function install(args: string[]): void {
   const lines: string[] = [];
   /* A NAMED FILE OR FOLDER IS THE WHOLE LIST: the user profile is changed only when nothing else is named. */
   /* ONE CHANGE ACROSS EVERY PROFILE AND FILE. Looping `installInto` per profile made each profile's two files
-     all-or-nothing and nothing more, so a malformed third profile left the first two cut over (audit twenty-four,
-     finding 1). */
+     all-or-nothing and nothing more, so a malformed third profile left the first two cut over. */
   const profiles = files.length > 0 && dirs.length === 0 ? [] : profilesOf(dirs, process.env);
   const run = installProfiles(profiles, files, options, mcpFiles);
   lines.push(...run.lines);
   /*
-   * EVERY SESSION STILL OPEN ON A PROFILE THIS RUN CHANGES, NAMED BY ITS PROCESS ID (brief 53-B). The plan's first
-   * sentence is to close them all, and the survey found three open on the default profile and two on a named one with
+   * EVERY SESSION STILL OPEN ON A PROFILE THIS RUN CHANGES, NAMED BY ITS PROCESS ID. A cut-over's first step is to
+   * close them all, and three were found open on the default profile and two on a named one with
    * nothing in the install's output to say so: its one sentence about open sessions was printed under `.claude.json`
    * alone and gave a reason that was not observed. A line, never a refusal (see `openSessionsLine`).
    */
@@ -587,8 +583,7 @@ function install(args: string[]): void {
   if (options.replace && mcpFiles.length === 0) lines.push('', replaceByHand(options.replace));
   /*
    * ONE LINE PER PROFILE LEFT WITHOUT THE SERVER, each naming its profile. It was one line for the run, withheld when
-   * any file gained the entry, and the audit's second profile ended with no server and no line
-   * (`loop/research-batch-forty-two-audit.md` §5). A run that names only settings files has no profile to name, so
+   * any file gained the entry, and a second profile ended with no server and no line. A run that names only settings files has no profile to name, so
    * its line is for the profile the shell is in, as it always was.
    *
    * HEADED WITH THE SHELL IT IS FOR, because that is chosen from the environment and can be wrong (see `shellOf`).

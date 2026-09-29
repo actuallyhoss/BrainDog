@@ -203,7 +203,7 @@ export const previousOf = (file: string): string => `${file}.prev`;
  * The host's key store, over the key file and, during a rotation, the previous one beside it.
  *
  * `byId` KNOWS THE IDS OF THE FILES THAT ARE THERE AND NO OTHER. A rotation puts the new key in the key file and the
- * old one in `<file>.prev` (`loop/finish/contracts.md` §9): `current` then wraps under the new key, `byId` still opens
+ * old one in `<file>.prev`: `current` then wraps under the new key, `byId` still opens
  * every row wrapped under the old, and `rewrapAtStart` (`rewrap.ts`) moves the record's rows across as the process
  * starts. A row wrapped under a key neither file holds answers `WRONG_KEY`, because a `byId` that answered for any id
  * would be a store claiming to hold keys it does not have.
@@ -224,7 +224,7 @@ export async function openKeyStore(
        It is what the Directory takes every session and link MAC under, so replacing the key file signs
        everybody out, which is `12 §8`'s lever. `serve` hands it to the Directory once and zero-fills it. */
     const sessionKey = await deriveSessionKey(root);
-    /* AND THE SHARE KEY, info `braindog/share` (`loop/finish/contracts.md` §3.2): what a link to one page is signed and
+    /* AND THE SHARE KEY, info `braindog/share`: what a link to one page is signed and
        checked with, from the key file and never from `BRAINDOG_SESSION_SECRET`. `serve` hands it over and zero-fills it. */
     const shareKey = await deriveShareKey(root);
 
@@ -236,7 +236,7 @@ export async function openKeyStore(
         ? null
         : { kekId: prevId, key: await crypto.subtle.importKey('raw', prev, 'AES-GCM', false, ['encrypt', 'decrypt']) };
 
-    /* A ROTATION SIGNS EVERYBODY OUT, and the boot says so (`loop/research-w61.md` §1 item 10): the session key above
+    /* A ROTATION SIGNS EVERYBODY OUT, and the boot says so: the session key above
        comes from the new key file, so every session made under the old one no longer verifies, unless
        `BRAINDOG_SESSION_SECRET` is set, which `main.ts` then derives the Directory's key from in its place. */
     if (before !== null)
@@ -271,7 +271,7 @@ export async function openKeyStore(
  *
  * WHY NOT ALWAYS THE CURRENT ONE. The record refuses `WRONG_KEY` when the id offered is not the id its rows name
  * (`packages/kernel/src/vault.ts`, `openGrant`), and between a new key file and the re-wrap every stored credential
- * would refuse although `byId` could open them all (`loop/research-w61.md` §1 item 8). The same function as the
+ * would refuse although `byId` could open them all. The same function as the
  * Worker's, over this host's store. A record wrapped under a key neither file holds is offered the current id, so its
  * refusal names both.
  */

@@ -8,8 +8,8 @@
  * (FIELD_UNKNOWN)` and refused the WHOLE ROW, so the domain's name, renewal day and registrar went missing along with
  * the one field that record could not hold. That is exactly what `holdings.currency` did to fourteen rows at once.
  *
- * THE ROWS ARE PLANNED BY HAND AND NOT BY `planLegacyTool`, on purpose. Whether the the old tool mapping puts a note on a
- * domain row is `packs/legacy-import/adapter.ts`'s decision; this file holds `applyPlan` to what it does with one once it is there.
+ * THE ROWS ARE PLANNED BY HAND AND NOT BY AN ADAPTER, on purpose. Whether a mapping puts a note on a domain row is
+ * the adapter's decision; this file holds `applyPlan` to what it does with one once it is there.
  *
  * THE DOOR ANSWERS `schema` WITH THE REGISTER THE KERNEL HOLDS, as `packages/record`'s `schema` does over HTTP, because
  * the declared field ids in that answer are what the importer reads to tell the two records apart.
@@ -62,7 +62,7 @@ const NOTE = 'Held against the clearance search of 2026-08. The .gg is not bough
 
 const domain = (name: string, note?: string): PlannedRow => ({
   register: 'services',
-  key: `legacy:domain:${name}`,
+  key: `tallybook:domain:${name}`,
   label: name,
   fields: { name, kind: 'domain', cycle: 'yearly', state: 'live', provider: 'Cove Domains', ...(note === undefined ? {} : { note }) },
 });
@@ -74,7 +74,7 @@ const WORDS: Words = {
   map: { targets: { order: ['services'], optional: [], providedBy: { services: 'Estate' }, names: { services: 'Services' } }, usecase: null, listed: null, raw: {} },
 };
 
-const planOf = (rows: PlannedRow[]): Plan => ({ key: 'legacy:', taken: null, rev: null, rows, asks: [], polls: [], skipped: [], changed: [] });
+const planOf = (rows: PlannedRow[]): Plan => ({ key: 'tallybook:', taken: null, rev: null, rows, asks: [], polls: [], skipped: [], changed: [] });
 
 const held = async (kernel: Kernel): Promise<Record<string, Record<string, unknown>>> => {
   const got = await kernel.list({ register: 'services', limit: 50 });

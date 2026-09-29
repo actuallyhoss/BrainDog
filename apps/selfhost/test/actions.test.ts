@@ -1,5 +1,5 @@
 /**
- * The self-host's executor for scheduled actions (`loop/DIRECTION.md` §0b).
+ * The self-host's executor for scheduled actions.
  *
  * WHAT MAY LEAVE, asserted one door at a time: https to a declared origin and nothing else, a public address and
  * nothing else, a connection to the address that was checked, a redirect only to the same origin and checked again,

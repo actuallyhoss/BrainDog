@@ -1,6 +1,6 @@
 /**
  * The use-case and add-on SDK on this machine: `braindog usecase|pack new|check|diff|publish|yank|search|key|preview`, `pack test`,
- * and `install <id> --from` (`loop/research-marketplace.md` §3, over `@braindog/declare/catalogue`).
+ * and `install <id> --from` (over `@braindog/declare/catalogue`).
  *
  * NEW writes a starting file that already reads through its door (`readShared` for a use case, `readPackFile` for an
  * add-on), so the first `check` passes and every edit after it is checked the way a record will check it. An add-on
@@ -29,7 +29,7 @@
  * plan says what it adds, changes and takes away. Which key signed it is said, and whether this machine has seen that key
  * for its author before (trust on first use, kept beside the hosts file), or that its old key named it in a rotation.
  *
- * AN ADD-ON IS INSTALLED BY ID OR BY FILE (brief B3 of `loop/research-legacy-parity.md`). `pack install <id>` with no
+ * AN ADD-ON IS INSTALLED BY ID OR BY FILE. `pack install <id>` with no
  * `--from` finds the id in the catalogue the host serves, which `tools/catalogue/from-packs.mjs` fills from `packs/`, and
  * `pack install <file>` reads a `.pack.json` through the add-on door. Before this, `install` took only `<id> --from`, and
  * the four packs in `packs/` could be installed by nobody, from the app or from here. `--dry-run` says what the owner
@@ -407,7 +407,7 @@ async function testPack(args: string[], io: AgentIo): Promise<number> {
  * The lines `check` and `search` say about what a version can reach.
  *
  * SCRUBBED HERE AND NOT BY EACH CALLER. `search` hands over the reach an index states, which is a stranger's file, and
- * audit thirty-nine measured a page name holding OSC 0 printed as sent; three commands build these lines, and none of
+ * a page name holding OSC 0 was measured printed as sent; three commands build these lines, and none of
  * them has to remember that.
  */
 export function reachLines(given: Reach): string[] {
@@ -745,7 +745,7 @@ async function search(args: string[], io: AgentIo, kind: EntryKind): Promise<num
   const statements = await verifiedStatements(at.index.keys);
   for (const e of found) {
     const v = e.versions[0];
-    /* THE ENTRY AS THE INDEX HOLDS IT decides trust, and a scrubbed copy is what is printed (audit thirty-nine finding 2). */
+    /* THE ENTRY AS THE INDEX HOLDS IT decides trust, and a scrubbed copy is what is printed. */
     const shown = printable(e);
     io.out(`${shown.id}  ${shown.title} ${shown.latest} by ${shown.author}. ${shown.summary}`);
     if (v) for (const line of reachLines(v.reach)) io.out(line);

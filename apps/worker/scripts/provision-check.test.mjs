@@ -46,7 +46,7 @@ test('the host a person names decides which environment, which bucket and which 
   const config = wranglerConfig(root);
 
   /* PRODUCTION HAS FLIPPED (push 4), AND ITS OLD NAME IS STILL PRODUCTION'S. `app.brain.dog` was the host the owner
-     ran this against before he provisioned (`loop/research-one-domain-cutover.md` §5, the runbook's O3); it stays a
+     ran this against before he provisioned; it stays a
      Custom Domain of this Worker as the legacy host, so a check run against it reads production's bucket and
      production's vars, which now name `brain.dog`. */
   /* THE SITE IS HANDED IN, UNBOUND, as it was before push 1, so what this test says about `brain.dog` does not change
@@ -111,9 +111,9 @@ test('once the site hands this app its doors, the site\'s name is that environme
 });
 
 test('a site that keeps /healthz as its own page does not hand this app its name, and the sentence names the door', () => {
-  /* `/healthz` IS ONE OF THE DOORS (defects H4). Before it was, a site that handed over every other door read as bound
+  /* `/healthz` IS ONE OF THE DOORS. Before it was, a site that handed over every other door read as bound
      here, while `/healthz` on its name answered the site's 404 page to every uptime check. */
-  assert.ok(DOORS.includes('/healthz'), 'the checker does not ask for /healthz');
+  assert.ok(DOORS.includes('/healthz'), 'provision-check does not ask for /healthz');
   assert.ok(SITE_DOORS.includes('/healthz'), 'the bound site in the fixture does not hand over /healthz');
   const config = wranglerConfig(root);
   const bound = { alpha: 'braindog-alpha', production: 'braindog-production' };
@@ -193,8 +193,7 @@ test('what /auth/methods reports is the session secret and the passkey count, an
   assert.equal(configured.state, 'configured');
   assert.equal(configured.firstRun, true);
   assert.equal(configured.magic, false);
-  /* AND NOTHING ABOUT A DEMO. `/auth/methods` stopped sending the key when the public demo went
-     (`loop/research-no-sample.md` A1), and a reading that still reported one would print `false` for a door no host has. */
+  /* AND NOTHING ABOUT A DEMO. `/auth/methods` stopped sending the key when the public demo went, and a reading that still reported one would print `false` for a door no host has. */
   assert.equal('demo' in configured, false, 'the reading still reports a demo');
 
   const bare = readMethods({ passkey: false, magic: false, key: false, open: false, me: null, why: 'not-configured' });
@@ -234,7 +233,7 @@ test('one missing thing is named once, and the list is in the order to repair it
  *
  * CI CLONES SHALLOW. `git show` on a commit outside the fetched depth fails, `guardsKeylessRecords`
  * answers `unknown`, which is its correct answer, and the three readings below have nothing to be
- * measured against. On 21 September this test was wired into `pnpm -C apps/worker test` and CI went
+ * measured against. When this test was first wired into `pnpm -C apps/worker test`, CI went
  * red on the first line of it for exactly that reason, which is a defect in the test's reach rather
  * than in the function: a run that cannot see the history cannot be asked about it.
  */
@@ -306,8 +305,8 @@ async function readyHost(t, { ready = true } = {}) {
 }
 
 test('READY prints the provision command for both shells, and the operator key is never in either', async (t) => {
-  /* MEASURED ON 23 SEPTEMBER, `loop/research-first-sign-in.md` friction 2. READY ended at "The next command is the
-     provision itself" and printed no command, so he would have typed the runbook's curl into Windows PowerShell 5.1,
+  /* MEASURED BEFORE THIS: READY ended at "The next command is the
+     provision itself" and printed no command, so he would have typed a documented curl into Windows PowerShell 5.1,
      his primary shell, where `curl` is `Invoke-WebRequest` and refuses the flags, and `curl.exe` with the JSON in
      single quotes answers `400 BODY_MALFORMED` because 5.1 strips the inner quotes. Nothing is made either way. */
   const OPERATOR = 'sentinel-operator-key-0123456789abcdef';
@@ -329,14 +328,14 @@ test('READY prints the provision command for both shells, and the operator key i
   const powershell = host.lines.slice(ps + 1, sh).join('\n');
   const bash = host.lines.slice(sh).join('\n');
 
-  /* THE REHEARSED FORM, `loop/research-first-sign-in.md` section 4: the key at a prompt that echoes nothing, the body
+  /* THE REHEARSED FORM: the key at a prompt that echoes nothing, the body
      built by `ConvertTo-Json` so no quoting is PowerShell's to strip, and the key taken out of the session after. */
   assert.match(powershell, /Read-Host 'Operator key' -AsSecureString/);
   assert.match(powershell, /ConvertTo-Json/);
   assert.match(powershell, new RegExp(`Invoke-RestMethod -Method Post -Uri '${host.origin}/auth/provision'`));
   assert.match(powershell, /Remove-Variable pk, key/);
-  /* THE CHARSET IS NAMED, because without it Windows PowerShell 5.1 sends a string body as Latin-1. Measured on 23
-     September from 5.1.26100 to an echo server on this machine: the name `Zoë Łuk` arrived as `Zo� Luk` under
+  /* THE CHARSET IS NAMED, because without it Windows PowerShell 5.1 sends a string body as Latin-1. Measured
+     from 5.1.26100 to an echo server on this machine: the name `Zoë Łuk` arrived as `Zo� Luk` under
      `application/json` and whole under `application/json; charset=utf-8`, and the name is fixed at provision. */
   assert.match(powershell, /-ContentType 'application\/json; charset=utf-8'/);
   assert.doesNotMatch(powershell, /curl/i, 'the PowerShell form names curl, which is Invoke-WebRequest there or curl.exe and BODY_MALFORMED');
@@ -351,9 +350,9 @@ test('READY prints the provision command for both shells, and the operator key i
   assert.match(out, /slug, the name and the time zone are fixed at provision/i);
 
   /* THE KEY IS THE SHELL'S, NEVER THIS SCRIPT'S. With it in this process's environment it is still in no printed
-     line and on no request the checker sent. */
+     line and on no request provision-check sent. */
   assert.ok(!out.includes(OPERATOR), 'the operator key was printed');
-  assert.ok(host.seen.every((r) => r.authorization === null), 'the checker sent an authorization header');
+  assert.ok(host.seen.every((r) => r.authorization === null), 'provision-check sent an authorization header');
 });
 
 test('NOT READY prints no provision command, because that command is only worth typing on a host that answers ready', async (t) => {

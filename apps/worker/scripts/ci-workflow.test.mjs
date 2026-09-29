@@ -1,5 +1,5 @@
 /**
- * What `ci.yml` promises about itself, read off the workflow file (OPS-1).
+ * What `ci.yml` promises about itself, read off the workflow file.
  *
  *   node --test apps/worker/scripts/ci-workflow.test.mjs
  *
@@ -137,9 +137,8 @@ function workspaces() {
   return globs.flatMap(expand).filter((dir) => existsSync(join(ROOT, dir, 'package.json'))).sort();
 }
 
-/* OPS-1'S THREE JOBS, IN THIS ORDER, AND NO `check` BESIDE THEM. Other jobs may follow them (OPS-25's `windows` is one),
-   so the three are read out of the whole list rather than held equal to it: a job another unit adds is that unit's to
-   test, and pinning the list here would make every such addition red in a file that says nothing about it. */
+/* THE THREE JOBS, IN THIS ORDER, AND NO `check` BESIDE THEM. Other jobs may follow them (`windows` is one), so the
+   three are read out of the whole list rather than held equal to it: a job added later is its own file's to test, and pinning the list here would make every such addition red in a file that says nothing about it. */
 test('the jobs are the four-leg test, the source gates and the build, and the single check job is gone', () => {
   const names = jobNames(ci);
   assert.deepEqual(names.filter((name) => ['test', 'gates', 'build'].includes(name)), ['test', 'gates', 'build']);
@@ -161,7 +160,7 @@ test('every workspace is in exactly one leg, and every folder a leg names is a w
   assert.deepEqual(missing, [], `in no leg, so ci.yml never runs their tests: ${missing.join(', ')}`);
 });
 
-test('the legs are the four OPS-1 drew', () => {
+test('the legs are the four the workflow was drawn with', () => {
   const packs = expand('packs/*/').filter((dir) => existsSync(join(ROOT, dir, 'package.json')));
   const drawn = {
     kernel: ['ports', 'where', 'kernel', 'declare', 'extract', 'dog'].map((p) => `packages/${p}`),

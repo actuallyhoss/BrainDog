@@ -168,13 +168,13 @@ test('braindog context prints the whole briefing, line by line, and exits 0', as
 });
 
 test('THE FIRST LINE CARRIES NO EVENT WORD: nothing started and nothing resumed, and a state is said as it is', () => {
-  const at: Where = { repo: 'kiln', host: 'studio-pc' };
-  assert.equal(headline({ spoken: 'S7', state: 'active' }, at, 'Project: Kiln.'), 'BrainDog: S7 in kiln on studio-pc, active. Project: Kiln.');
-  assert.equal(headline({ spoken: 'S7', state: 'handoff' }, at, 'Project: Kiln.'), 'BrainDog: S7 in kiln on studio-pc, handoff. Project: Kiln.');
-  assert.equal(headline({ spoken: 'S7', state: null }, at, 'Project: Kiln.'), 'BrainDog: S7 in kiln on studio-pc. Project: Kiln.');
+  const at: Where = { repo: 'kiln', host: 'STUDIO-PC' };
+  assert.equal(headline({ spoken: 'S7', state: 'active' }, at, 'Project: Kiln.'), 'BrainDog: S7 in kiln on STUDIO-PC, active. Project: Kiln.');
+  assert.equal(headline({ spoken: 'S7', state: 'handoff' }, at, 'Project: Kiln.'), 'BrainDog: S7 in kiln on STUDIO-PC, handoff. Project: Kiln.');
+  assert.equal(headline({ spoken: 'S7', state: null }, at, 'Project: Kiln.'), 'BrainDog: S7 in kiln on STUDIO-PC. Project: Kiln.');
   assert.equal(
-    headline({ spoken: 'S7', state: 'active' }, { repo: null, host: 'studio-pc' }, 'No project here, so only what applies everywhere is shown.'),
-    'BrainDog: S7 in a folder outside any repository on studio-pc, active. No project here, so only what applies everywhere is shown.',
+    headline({ spoken: 'S7', state: 'active' }, { repo: null, host: 'STUDIO-PC' }, 'No project here, so only what applies everywhere is shown.'),
+    'BrainDog: S7 in a folder outside any repository on STUDIO-PC, active. No project here, so only what applies everywhere is shown.',
   );
   for (const word of ['started', 'resumed', 'attached']) assert.equal(headline({ spoken: 'S7', state: 'active' }, at, 'Project: Kiln.').includes(word), false, `the first line says ${word}`);
 });
@@ -202,12 +202,12 @@ test('AN EMPTY LIVE, WAITING AND REGISTERS is the first line and the next step, 
 /* ── the start hook's output did not move ──────────────────────────────── */
 
 test('THE START HOOK GETS THE SAME CHARACTERS: briefing is its own first line and briefingOf, and nothing else', () => {
-  const at: Where = { repo: 'braindog', host: 'studio-pc' };
+  const at: Where = { repo: 'braindog', host: 'STUDIO-PC' };
   const attached: Attached = { session: { id: 'e_7', seq: 7, state: 'active', version: 1, fields: {} }, spoken: 'S7', resumed: true, project: 'things#1', context: FULL };
 
   const whole = briefing(attached, at, 4);
-  assert.equal(whole.split('\n')[0], 'BrainDog: S7 resumed in braindog on studio-pc. Project: Kiln.');
-  assert.equal(whole, briefingOf(`BrainDog: S7 resumed in braindog on studio-pc. ${placeOf(FULL)}`, FULL, 4));
+  assert.equal(whole.split('\n')[0], 'BrainDog: S7 resumed in braindog on STUDIO-PC. Project: Kiln.');
+  assert.equal(whole, briefingOf(`BrainDog: S7 resumed in braindog on STUDIO-PC. ${placeOf(FULL)}`, FULL, 4));
 
   const started: Attached = { ...attached, resumed: false };
   assert.equal(briefing(started, { repo: null, host: 'box' }, undefined), briefingOf(`BrainDog: S7 started in a folder outside any repository on box. ${placeOf(FULL)}`, FULL, undefined));
@@ -216,7 +216,7 @@ test('THE START HOOK GETS THE SAME CHARACTERS: briefing is its own first line an
   const bare: Attached = { session: attached.session, spoken: 'S7', resumed: false, project: null };
   assert.equal(
     briefing(bare, at, undefined),
-    'BrainDog: S7 started in braindog on studio-pc. No project here, so only what applies everywhere is shown.\nThis host sends no briefing. Call context for one, and call handoff with the one next step before you stop.',
+    'BrainDog: S7 started in braindog on STUDIO-PC. No project here, so only what applies everywhere is shown.\nThis host sends no briefing. Call context for one, and call handoff with the one next step before you stop.',
   );
 });
 

@@ -2,17 +2,17 @@
  * A `change` Slash drafted from one reading lands against that reading, so a change that landed while the model was
  * thinking is not undone by accepting Slash's.
  *
- * SPK-4, AUDIT THIRTY-TWO SECTION 2, SECOND HALF. The kernel keeps a proposer's `from_version` when it names a version that
+ * THE DRAFT CARRIES THE VERSION IT WAS DRAWN AT. The kernel keeps a proposer's `from_version` when it names a version that
  * has been live, and stamps the version live AT FILING when it is absent (`packages/kernel/src/govern.ts`, `propose`).
  * Slash sent none: `fromModel` passed the model's body through with whatever it wrote, and the model is handed a reading
  * with no versions in it, so every Slash change was stamped at filing. A model drafting a whole Rates from the reading
  * at v1, while another change took Rates to v2, was stamped v2, and accepting it installed v1's fields over v2's.
  *
- * IT LIVES IN `packages/host/test` BECAUSE THAT IS A DIRECTORY THIS WAVE'S BRIEF OWNS, and the host already reaches the
+ * IT LIVES IN `packages/host/test` FOR NOW, and the host already reaches the
  * record by relative path, as `slash-status-final.test.ts` reaches the Slash package. It belongs beside
  * `packages/record/test/slash-change.test.ts`, and can move there unchanged apart from the two import paths.
  *
- * RED BEFORE THE REPAIR, MEASURED ON 23 SEPTEMBER with `drawnVersions` in and `fromModel` not yet reading it: three tests,
+ * RED BEFORE THE REPAIR, MEASURED with `drawnVersions` in and `fromModel` not yet reading it: three tests,
  * all three fail. Case 1's accept installed the stale body, leaving Rates as `what, price, unit` with `source` gone; case 2
  * found the model's own guess, 2, kept as the draft's `from_version`; case 3, through `slashPropose`, failed as case 1 did.
  * After it, all three pass: `slashFile` in `packages/record/src/index.ts` passes `drawnVersions` to `fromModel`.

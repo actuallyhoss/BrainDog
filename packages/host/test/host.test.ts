@@ -125,7 +125,7 @@ test('what is new and the log are reads, with their numbers checked on the way i
 test("a member held to one list pages the log with the `e.` cursor she was handed, through a GET", async () => {
   /* THE HOST REFUSED IT BEFORE THE RECORD WAS ASKED. `takes: { cursor: 'integer' }` answered `e.01M...` 422 "a whole
      number", which was true of the rowid the record handed everybody and is not true of the cursor it hands a member
-     now (`loop/research-history-cursor.md`). The owner's rowid still arrives as its digits and still pages. */
+     now. The owner's rowid still arrives as its digits and still pages. */
   const { api, call, sql } = await host();
   await call('create', { register: 'obligations', fields: { what: 'Invoice 41', state: 'open' } });
   await call('create', { register: 'obligations', fields: { what: 'Invoice 42', state: 'open' } });

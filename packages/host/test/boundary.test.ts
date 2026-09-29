@@ -66,7 +66,7 @@ async function host() {
 /* ── an argument's shape ─────────────────────────────────────────────────── */
 
 /**
- * The fourteen shapes the audit fuzzed with, and the pool of argument names is the table's own.
+ * The fourteen shapes the boundary is fuzzed with, and the pool of argument names is the table's own.
  *
  * DRIVEN OFF `ROUTES` AND NOT OFF A LIST OF THE BROKEN ONES. `page` and `metric` coerced their slug
  * and their id and said why, at `packages/record/src/index.ts:744`; `get`, `history`, `search`,

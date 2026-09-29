@@ -60,7 +60,7 @@ export type Bytes = Uint8Array<ArrayBuffer>;
  * AND A BARE `ArrayBuffer` IS WRAPPED, NOT COPIED, because that is what the Durable Object's SQLite hands back
  * for a BLOB. Before this branch it fell into `Uint8Array.from`, which makes an `ArrayBuffer` an EMPTY array:
  * the nonce was zero bytes long, and no value sealed on the Worker ever opened again, every read answering
- * `WRONG_KEY` (`apps/worker/test/vault-imported-row.test.ts`, measured 23 September). The self-host's
+ * `WRONG_KEY` (measured on the Worker). The self-host's
  * `node:sqlite` hands back a `Uint8Array`, which is why only the Worker lost its keys.
  */
 const view = (bytes: Uint8Array | ArrayBuffer): Bytes =>

@@ -2,8 +2,8 @@
  * A person's script, run the way the Cloud runs it: in a Dynamic Worker from `env.LOADER`, with every `fetch` it makes
  * going through `ScriptOutbound` and back into the record's own object (`src/script.ts`).
  *
- * REAL, NOT A STUB LOADER. The research brief allowed a stub if local support was missing, and it is not missing.
- * Measured on September 22nd with the miniflare 5.20260903.0-alpha and workerd 1.20260903.1 that wrangler 4.129.0
+ * REAL, NOT A STUB LOADER. A stub would do if local support were missing, and it is not missing.
+ * Measured with the miniflare 5.20260903.0-alpha and workerd 1.20260903.1 that wrangler 4.129.0
  * already brings: a `workerLoaders` binding loads a module from a string, `this.ctx.exports.<Entrypoint>({ props })`
  * works from inside a Durable Object's `alarm()`, and a `WorkerEntrypoint` handed in as `globalOutbound` sees every
  * `fetch` the loaded code makes. So this file runs `src/script.ts` as it ships, bundled by esbuild, in workerd, from
@@ -272,7 +272,7 @@ export default async function run(ctx) {
 
 /**
  * A USER NAME IN THE URL REFUSES THE RUN HERE AS IT DOES IN QUICKJS. workerd's `fetch` inside the loaded Worker drops
- * `me:pw@` before the request reaches `ScriptOutbound` (measured by the checker on September 22nd: the bare URL arrived
+ * `me:pw@` before the request reaches `ScriptOutbound` (measured: the bare URL arrived
  * with no authorization header and was sent), so the gateway's check on `request.url` could never fire, and the same
  * script was refused on the self-host and ran clean here. Red against that: `sent` held the declared origin's URL.
  */
@@ -331,7 +331,7 @@ export default async function run(ctx) {
 /**
  * THE METHOD THE SCRIPT WROTE IS THE METHOD SENT, AS ON THE SELF-HOST. `@braindog/host/script` passes it through as
  * written, and this host turned everything that was not a GET into a POST: a `DELETE` of a provider's row went out as a
- * POST to the same URL, which on most APIs is a create. Found by the checker; this case was red against that mapping.
+ * POST to the same URL, which on most APIs is a create. This case was red against that mapping.
  */
 test('ctx.fetch sends the method the script asked for, not a POST in its place', async () => {
   const { answer, methods } = await run(`
@@ -461,7 +461,7 @@ export default async function run(ctx) {
 });
 
 /**
- * `ScriptTail` IS EXPORTED FROM THE TEST'S MAIN MODULE ABOVE, next to `ScriptOutbound` and `ScriptRecord` (SCR-4), so
+ * `ScriptTail` IS EXPORTED FROM THE TEST'S MAIN MODULE ABOVE, next to `ScriptOutbound` and `ScriptRecord`, so
  * `LOADER.load`'s `tails` option is one this suite's Worker actually carries, and every run above already went through
  * it. This case is the one that says so directly: the platform's own tail is loaded, and the run still answers clean
  * and closes its slot, so the door `tails` opens does not leave a run waiting on a report that never lands locally.

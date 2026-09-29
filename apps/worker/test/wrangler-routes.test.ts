@@ -3,7 +3,7 @@
  * against the doors the Worker has built.
  *
  * THE MOVE TO ONE DOMAIN GOES THROUGH THE SITE'S SERVICE BINDING, AND THIS FILE HOLDS EVERY PUSH OF IT THAT TOUCHES
- * `wrangler.jsonc` (`loop/research-one-domain-binding.md` section 4). Push A put the app under `/app` with the Worker on
+ * `wrangler.jsonc`. Push A put the app under `/app` with the Worker on
  * `app.brain.dog` alone and no zone route. B1 flipped alpha's two vars (push 2) and B2 production's (push 4), and
  * `wrangler.jsonc` as it stands is B2: both environments on the site's names, their old names legacy. The two pushes
  * that bind the site (1 and 3) change `apps/site/wrangler.jsonc` and nothing here. Nothing is staged in the comment at
@@ -52,14 +52,14 @@ type Binding = { names: string[]; why: string | null };
 
 /**
  * `stripJsonc`, `pushes` and `siteBinding` from `scripts/provision-check.mjs`, and the in-memory sites, so the test, the
- * checker and the smoke step read the files, the staged pushes and the binding the same way.
+ * `provision-check` and the smoke step read the files, the staged pushes and the binding the same way.
  *
  * A DYNAMIC IMPORT WITH A WIDENED SPECIFIER, BECAUSE A STATIC ONE DOES NOT TYPECHECK. The script is plain JavaScript with
  * no declaration beside it and this program has no `allowJs`, so `import { stripJsonc } from
- * '../scripts/provision-check.mjs'` is TS7016 under `strict`. Measured with `tsc --noEmit -p tsconfig.test.json` on 23
- * September: "Could not find a declaration file for module", and the implicit `any` it names. The alternative was a
+ * '../scripts/provision-check.mjs'` is TS7016 under `strict`. Measured with `tsc --noEmit -p tsconfig.test.json`:
+ * "Could not find a declaration file for module", and the implicit `any` it names. The alternative was a
  * fourth copy of the comment-stripping scanner (`alarm.test.ts` holds a third), and a second reader that disagrees with
- * the checker about one comment is exactly how a test goes green on a file the checker cannot parse.
+ * `provision-check` about one comment is exactly how a test goes green on a file `provision-check` cannot parse.
  */
 const checker = '../scripts/provision-check.mjs' as string;
 const { stripJsonc, pushes, siteBinding, DOORS } = (await import(checker)) as {
@@ -99,7 +99,7 @@ const envOf = (config: Config, name: string): Env => {
  *
  * THE FILE AS IT DEPLOYS IS CHECKED AGAINST THE REAL SITE, WHATEVER ITS PUSH IS CALLED. This was keyed by name alone,
  * which was harmless while the file was A and had no entry. Once the file is B1 it is checked beside the fixture and
- * never beside the site it deploys with. Measured in the clone of push 2 on 23 September, with `STAGE B2` also moved into
+ * never beside the site it deploys with. Measured in a clone of push 2, with `STAGE B2` also moved into
  * `env.production.vars` and `apps/site/wrangler.jsonc` left without push 3: keyed by name, the reachability test below
  * passed, and the only failure in this file was the one that names the file's push; read from the real site, it failed
  * on "brain.dog is no Custom Domain of this Worker, and the site does not hand it the doors: the site's env.production
@@ -221,8 +221,7 @@ test('in every push, every name the app answers is reached, beside the site that
 test('a flip beside a site that does not bind that environment\'s own app is refused, which is what keeps B2 behind push 3', () => {
   const b2 = pushNamed('B2').config;
   /* PUSH 1'S SITE, ALPHA BOUND AND PRODUCTION NOT. B2 landing here would move production's sign-in to `brain.dog`, where
-     every door is the site's 404 page. With B2 in the file this is also the rollback the research's section 5 calls the
-     one full outage: the site taken back to a version from before push 3 while the app stays flipped. */
+     every door is the site's 404 page. With B2 in the file this is also the one rollback that is a full outage: the site taken back to a version from before push 3 while the app stays flipped. */
   assert.match(unreached(b2, boundSite({ alpha: 'braindog-alpha' }), 'production').join('\n'), /^brain\.dog .*env\.production/);
   /* PRODUCTION'S SITE BOUND TO ALPHA'S APP: every door answers, from the wrong record, and nothing else would notice. */
   const crossed = boundSite({ alpha: 'braindog-alpha', production: 'braindog-alpha' });
@@ -237,7 +236,7 @@ test('a flip beside a site that does not bind that environment\'s own app is ref
   /* A SCRIPT WITH NO `APP` TO CALL, AND THE SAME BINDING WRITTEN AT THE SITE'S TOP LEVEL, WHICH WRANGLER DOES NOT
      INHERIT. Neither case was held by anything here: with the `binds no APP` refusal taken out of `siteBinding`, or with
      `services` read from the top level as a fallback, every test in this file and in `scripts/*.test.mjs` stayed green
-     (the checker's mutation run on 23 September). */
+     (measured by mutation). */
   const unbound = boundSite({ alpha: 'braindog-alpha', production: 'braindog-production' });
   delete envOf(unbound, 'production').services;
   assert.match(unreached(b2, unbound, 'production').join('\n'), /env\.production binds no APP/);
@@ -275,15 +274,15 @@ test('no push has a zone route: the site\'s binding carries the shared name, so 
   }
 });
 
-test('the checker\'s own door list is the doors src/route.ts has built, so the smoke step and this file agree on what reaches the app', () => {
-  /* `DOORS` IN THE CHECKER IS A LIST WRITTEN BY HAND, for the reason its comment gives, and this is what keeps it
+test('provision-check\'s own door list is the doors src/route.ts has built, so the smoke step and this file agree on what reaches the app', () => {
+  /* `DOORS` IN `provision-check` IS A LIST WRITTEN BY HAND, for the reason its comment gives, and this is what keeps it
      honest. Every entry has to be a path the Worker serves, and every door family the app's own `run_worker_first` has
      built (its first path segment) has to have an entry, so a door added to the router is a line here or a red test. */
-  for (const door of DOORS) assert.ok(served(door), `${door} is in the checker's DOORS and is not a door the Worker serves`);
+  for (const door of DOORS) assert.ok(served(door), `${door} is in provision-check's DOORS and is not a door the Worker serves`);
   const family = (path: string): string => path.split('/')[1] ?? '';
   for (const name of ENVIRONMENTS) {
     const missing = builtDoors(worker, name).filter((p) => !DOORS.some((d) => family(d) === family(p)));
-    assert.deepEqual(missing, [], `${name}: built doors the checker's DOORS has no entry for`);
+    assert.deepEqual(missing, [], `${name}: built doors provision-check's DOORS has no entry for`);
   }
   /* AND THE IN-MEMORY SITE HANDS OVER EVERY ONE OF THEM, or the staged pushes above are checked beside a site that could
      not exist. */

@@ -30,10 +30,10 @@ export { keysReply, purposeOf, sealedUnderOf, serveKeys, servesKeys, type KeysAs
    ingest doors are: both hosts import one module to get the whole surface, and a door one host can find and the other cannot
    is the drift this file's header is about. */
 export { serveSlash, servesSlash, slashAskDoor, slashReply, type SlashAskDoor, type SlashAskEngine } from './slash-ask.ts';
-/* `slashRecordMeter` IS HERE FOR THE SAME REASON, AND IT WAS MISSING FROM HERE FOR A BATCH. `d16d9d35` built the meter
+/* `slashRecordMeter` IS HERE FOR THE SAME REASON, AND IT WAS ONCE MISSING FROM HERE. `d16d9d35` built the meter
    that holds the record's press and first plan in Slash's ledger and exported it from `slash-ask.ts` alone, which no
-   app imports, so both hosts built the record without it and every press stayed unmetered (`loop/research-batch-sixty-audit.md`
-   finding 2). `apps/worker/test/slash-press-metered.test.ts` is the press on the Worker that shows it wired. */
+   app imports, so both hosts built the record without it and every press stayed unmetered.
+   `apps/worker/test/slash-press-metered.test.ts` is the press on the Worker that shows it wired. */
 export { slashRecordMeter, type SlashLedgerDeps } from './slash-ask.ts';
 /* `/in/*` IS NOT IN `ROUTES` AND BELONGS HERE ANYWAY. The table below is the record's methods, every one
    of them behind the auth gate at `/api/<name>`; an arrival is above that gate by design (`33 §4`), takes
@@ -42,7 +42,7 @@ export { slashRecordMeter, type SlashLedgerDeps } from './slash-ask.ts';
    one host can find and the other cannot is exactly the drift this file's header is about. */
 export { EMAIL_LIMIT, FILES_HEADER, messageHeaders, serveIngest, servesIngest, type IngestArrival, type IngestChannel, type IngestDoor, type IngestFile, type IngestPath, type IngestVerify } from './ingest.ts';
 export { freshNonce, grantAad, grantKey, NONCE_BYTES, openSealed, recordAad, seal, type Bytes, type DerivedKey } from './sealing.ts';
-/* `crashed` IS EXPORTED FOR THE OTHER TWO DOORS, the Worker's router and the self-host's outer catch (W60-6, W60-7).
+/* `crashed` IS EXPORTED FOR THE OTHER TWO DOORS, the Worker's router and the self-host's outer catch.
    `serveApi` below is the first of three places a crash is answered, and three answers to one crash is the drift this
    file's header is about. */
 export { crashed, type CrashLog, type Crashed } from './crash.ts';
@@ -178,8 +178,7 @@ export type Route = {
 
 /**
  * The rows written in this file. NOBODY ADDS ONE HERE ANY MORE: a new route is a row in `routes/<unit>.ts`, registered in
- * `routes/index.ts`, beside its record method in `packages/record/src/methods/<unit>.ts` (`loop/finish/contracts.md` §0
- * point 5). These stay where they are, because moving every one of them would be a diff every reader has to check for a
+ * `routes/index.ts`, beside its record method in `packages/record/src/methods/<unit>.ts`. These stay where they are, because moving every one of them would be a diff every reader has to check for a
  * changed group and nothing would be gained by it.
  */
 const CORE_ROUTES: readonly Route[] = [
@@ -194,7 +193,7 @@ const CORE_ROUTES: readonly Route[] = [
        reading it as the text the record minted is the same answer on purpose.
 
        `includeDeleted` IS `json` SO A GET CAN ASK FOR DELETED ROWS AT ALL. The kernel reads it as `=== true`, and
-       undeclared it arrived as the four letters "true": measured on afb3b1b2, `GET /api/list?includeDeleted=true`
+       undeclared it arrived as the four letters "true": measured at afb3b1b2, `GET /api/list?includeDeleted=true`
        answered the live rows alone, 200, nothing said, while the same read as a POST answered the deleted ones too.
        The CLI's import sent that POST by hand for want of this line. Decoded, `true` is `true`; a value that is not
        true or false is the record's to refuse (`record.list`), because read as false it is the same silent answer. */
@@ -205,7 +204,7 @@ const CORE_ROUTES: readonly Route[] = [
     takes: { register: 'text', seq: 'integer', limit: 'integer', cursor: 'text' } },
   /* `cursor` IS NOT DECLARED ON THESE TWO, SO IT ARRIVES AS THE TEXT IT WAS SENT on a GET and as itself in a POST. It
      was `integer`, and a member held to named lists is now handed `e.<event id>` rather than the event's rowid
-     (`loop/research-history-cursor.md`: the rowid between two of her lines counted the events she was not shown), so
+     (the rowid between two of her lines counted the events she was not shown), so
      the host refused her own cursor with a 422 before the record could read it. `text` would refuse the owner's rowid
      in a POST body, which is a number there. The record checks both spellings and says what it wanted. */
   { name: 'whatsNew', group: 'READ+', writes: false, what: 'What changed since you last read, newest first, held to what you may see.',
@@ -229,7 +228,7 @@ const CORE_ROUTES: readonly Route[] = [
     takes: { slug: 'text' } },
   { name: 'metric', group: 'READ+', writes: false, what: 'One figure, with its target and how it compares.',
     takes: { metric: 'text' } },
-  /* EVERY FIGURE, AND NOT ONLY A DRAWN ONE (audit sixty-two finding 2). `metric` reads an id already known and `page`
+  /* EVERY FIGURE, AND NOT ONLY A DRAWN ONE. `metric` reads an id already known and `page`
      names the figures its blocks draw, which on money-core as it ships was 18 of 36; nothing routed listed the rest, so
      neither could MCP's `record_index`. It takes nothing and evaluates nothing. */
   { name: 'figures', group: 'READ+', writes: false, what: 'Every figure you may read: its id, its name, how it is written, its list, its pack and whether it takes a parameter. Never a reading.' },
@@ -238,18 +237,18 @@ const CORE_ROUTES: readonly Route[] = [
   { name: 'dryRun', group: 'READ+', writes: false, what: 'What a rule would do, before anybody turns it on. It writes nothing.',
     takes: { rule: 'json', limit: 'integer' } },
   /* A DRAFT SCRIPT, RUN NOW (`script-try.ts`). READ+ AND NOT ADMIN, because `admin` refuses every token and the caller
-     this exists for is an agent trying a script before it proposes one (`loop/research-shell-scripts.md` section 7),
+     this exists for is an agent trying a script before it proposes one,
      at `propose`'s rung, as `dryRun` is READ+ for a rule. What READ+ would otherwise let through is held elsewhere: a
      token's trial opens no key, its reads are the caller's own and never `system`'s, and the allowance is asked first.
      `writes: true` ALTHOUGH IT WRITES NOTHING TO THE RECORD, because the flag is what makes a route a POST and a trial
      is not safe to repeat: it spends a run of the plan and may send a POST of its own to a provider. As a GET it would
      also carry the whole source in a query string, and a prefetched link could run it. */
   { name: 'scriptTry', group: 'READ+', writes: true, what: 'Run a draft script now and answer the writes it would make, its log and any refusal. It writes nothing, and it is counted as a run.' },
-  /* A PROPOSED PAGE, DRAWN BEFORE ANYBODY ACCEPTS IT (M4 wave two brief 5). READ+ beside `page`, since it draws what
+  /* A PROPOSED PAGE, DRAWN BEFORE ANYBODY ACCEPTS IT. READ+ beside `page`, since it draws what
      `page` draws and holds each block to the caller the same way. `writes: true` ALTHOUGH IT WRITES NOTHING, for one of
      `scriptTry`'s reasons: a page body of up to twenty blocks is no query string. It also kept a caller-written body
-     that walks a list off the Cloud's public demo, which answered any GET to anybody; that door is gone
-     (`loop/research-no-sample.md` A1), and the flag stays for the first reason. */
+     that walks a list off the Cloud's public demo, which answered any GET to anybody; that door is gone,
+     and the flag stays for the first reason. */
   { name: 'previewPage', group: 'READ+', writes: true, what: 'Draw a page body nobody has installed, as page would draw it, each block held to what you may read. It installs nothing and writes nothing.' },
   { name: 'governance', group: 'READ+', writes: false, what: 'What has been proposed, what was decided, and what was predicted.',
     takes: { register: 'text', id: 'text', status: 'text', limit: 'integer', cursor: 'text' } },
@@ -263,9 +262,9 @@ const CORE_ROUTES: readonly Route[] = [
   { name: 'exportUseCase', group: 'READ+', writes: false, what: "This BrainDog's arrangement as a use-case file: modules, its own lists and pages, voice and labels, and only the example rows named.",
     takes: { usecase: 'text', title: 'text', summary: 'text', version: 'text', audience: 'text', author: 'text', examples: 'json', step: 'text', nav: 'json', signals: 'json', skills: 'json' } },
   { name: 'actions', group: 'READ+', writes: false, what: "Every scheduled action: what it calls, how often, whether it is paused and why, and this month's runs." },
-  /* THE AUTOMATIONS, READ BY THE CANVAS AND BY AN AGENT THROUGH ONE METHOD (`loop/research-shell-automations.md` §5). With
+  /* THE AUTOMATIONS, READ BY THE CANVAS AND BY AN AGENT THROUGH ONE METHOD. With
      no `rule` it is the list; with one it is that automation with its last ten runs, each step's outcome beside it, and
-     `before` and `limit` page that rule's older runs (`loop/finish/contracts.md` §2.2, X10: widened, not a new row). */
+     `before` and `limit` page that rule's older runs (the method widened, not a new row). */
   { name: 'automations', group: 'READ+', writes: false, what: 'Every automation: what starts it, when it runs next and how its runs went; or one, with its last ten runs step by step, and older runs a page at a time.',
     takes: { rule: 'text', before: 'text', limit: 'integer' } },
   /* THE SCRIPTS, WHICH NOTHING LISTED. `resumeScript` was routed and no read named what it could resume: `actions` stops at
@@ -337,7 +336,7 @@ const CORE_ROUTES: readonly Route[] = [
   { name: 'deleteRecord', group: 'ADMIN', writes: true, what: 'Delete this record, with its name typed to confirm. There is no undo.' },
   { name: 'markRead', group: 'DATA', writes: true, what: 'How far you have read, named as an event. A person only, and never an event of its own.' },
   { name: 'setPref', group: 'DATA', writes: true, what: 'One of your own settings: the rail order, the pages hidden from it, the navigation shape, whether new pages are suggested, or what you dismissed. A person only, and not an event.' },
-  /* A PHONE ASKING TO BE TOLD, AND TELLING IT TO STOP (brief W58-2). READ+ because they are verbs over no row, as `boot`
+  /* A PHONE ASKING TO BE TOLD, AND TELLING IT TO STOP. READ+ because they are verbs over no row, as `boot`
      and `whoami` are; POSTs because each keeps or removes a `push_sub` row. Only a person's own, and never an event. */
   { name: 'subscribePush', group: 'READ+', writes: true, what: 'This browser asks to be told when something needs you. A person only, their own, and not an event.' },
   { name: 'unsubscribePush', group: 'READ+', writes: true, what: 'This browser stops being told. Only your own subscription is taken away.' },
@@ -395,7 +394,7 @@ export const UNROUTED = [
   /* The key doors' record half: `vault.ts` calls them after `vaultGrant`, with sealed bytes only. */
   'depositGrant',
   'openForGrant',
-  /* `operationGrant`, `signingKey` AND `restored` ARE INTERNAL TOO (W55-2) AND ARE NOT LISTED YET. `router-groups.mjs`
+  /* `operationGrant`, `signingKey` AND `restored` ARE INTERNAL TOO AND ARE NOT LISTED YET. `router-groups.mjs`
      refuses a name here that `30 §5`'s INTERNAL row does not carry, and that row has not been amended for them. None of
      the three is in `ROUTES`, and `packages/record/test/file-doors.test.ts` fails if one is added. */
 ] as const;
@@ -782,7 +781,7 @@ export async function serveApi(
   if (request.method === 'POST') {
     /* WEIGHED BEFORE IT IS PARSED, AND BEFORE ANY HANDLER RUNS. This was `request.json()`, which reads to the end
        whatever the end is: on the Cloud the only ceiling was the platform's, and the whole body sat in the record's
-       Durable Object before a byte of it was looked at (`loop/research-hardening.md` §2.2). The method is known by
+       Durable Object before a byte of it was looked at. The method is known by
        now, so the ceiling is chosen per method here, in one place, for both hosts. */
     const cap = name === 'import' ? IMPORT_BODY_MOST_BYTES : API_BODY_MOST_BYTES;
     const text = await textOf(request, cap);
@@ -877,8 +876,8 @@ export async function serveApi(
   /**
    * THE STATUS AND THE BODY ARE INSIDE THE TRY TOO, because the two lines after it threw.
    *
-   * The promise above was kept for the handler and for nothing that read its answer. Measured on
-   * 2026-09-20 by handing `serveApi` three answers a handler can really produce: `ok(1n)` came out
+   * The promise above was kept for the handler and for nothing that read its answer. Measured by
+   * handing `serveApi` three answers a handler can really produce: `ok(1n)` came out
    * as `TypeError: Do not know how to serialize a BigInt` from `json`, a value holding itself as
    * `TypeError: Converting circular structure to JSON` from the same line, and a handler answering
    * `undefined` as `TypeError: Cannot read properties of undefined (reading 'ok')` from
@@ -887,10 +886,10 @@ export async function serveApi(
    * `@braindog/ports` says a driver may hand back, lists it.
    */
   /**
-   * THE REASON GOES TO THE LOG, AND THE CALLER GETS A REFERENCE TO IT (W60-1).
+   * THE REASON GOES TO THE LOG, AND THE CALLER GETS A REFERENCE TO IT.
    *
-   * This catch wrote the thrown message into the `fix`, and logged nothing. Measured for
-   * `loop/research-hardening.md` §2.1: a handler throwing `SQLITE_AUTH: not authorized, row alice@example.com` answered
+   * This catch wrote the thrown message into the `fix`, and logged nothing. Measured:
+   * a handler throwing `SQLITE_AUTH: not authorized, row alice@example.com` answered
    * that sentence, row and all, to whoever asked, and neither host's log had a line about it. `crashed` logs the reason
    * under a new reference and answers the reference alone; `test/crash.test.ts` holds the probe's sentence.
    */
@@ -907,7 +906,7 @@ export async function serveApi(
  *
  * `51-SPEC-WORKER` HAS SAID 1 MB FOR THE API SINCE IT WAS WRITTEN, and `/mcp` holds exactly this number for the same
  * surface reached another way (`packages/mcp/src/http.ts`, `MAX_BODY_BYTES`). A method's arguments are a row, a query
- * or a declaration, and until W60-1 the Cloud read any body to the end, up to the platform's own limit, before
+ * or a declaration, and before this ceiling the Cloud read any body to the end, up to the platform's own limit, before
  * finding out.
  */
 export const API_BODY_MOST_BYTES = 1_048_576;
@@ -916,11 +915,11 @@ export const API_BODY_MOST_BYTES = 1_048_576;
  * The most an `import` body may weigh: sixteen mebibytes, about 147,000 rows.
  *
  * `import` IS THE ONE METHOD WHOSE BODY IS A WHOLE FILE, `{ lines, replace }`, and a flat megabyte would have broken
- * it: a real copy measured 94 rows in 8,941 bytes, 95 bytes a row (`loop/research-restore.md` §3.1), so 1 MiB is about
+ * it: a real copy measured 94 rows in 8,941 bytes, 95 bytes a row, so 1 MiB is about
  * 11,000 rows, and his own record is larger than that.
  *
  * THE NUMBER IS SET BY THE DURABLE OBJECT, NOT BY A GUESS AT RECORD SIZES. On the Cloud this runs inside the record's
- * object, which has 128 MB (`docs/01-ARCHITECTURE.md`). Measured on 2026-09-24 in Node 24: a body is held three times
+ * object, which has 128 MB (`docs/01-ARCHITECTURE.md`). Measured in Node 24: a body is held three times
  * over at the peak of reading it, its bytes, the text they decode to, and the parsed lines, each about the body's
  * size (a 16 MiB body added 15.8 MiB decoding and 16.5 MiB parsing); the lines alone, about one body's worth, are what
  * the handler keeps. The kernel's import then buffers the whole file again, and `41-SPEC-KERNEL` §10 puts its own

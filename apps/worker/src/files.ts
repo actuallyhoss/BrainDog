@@ -1,6 +1,6 @@
 /**
  * A record's files on the Cloud: `PUT /api/files` keeps the bytes and answers their name, `GET /api/files/<sha256>`
- * gives them back (`51 §5.5`, `12 §8` "The asset store", `loop/finish/ops.md` §4.0 D). Both also under
+ * gives them back (`51 §5.5`, `12 §8` "The asset store"). Both also under
  * `/app/<slug>/api/files`, which is the address the app calls from.
  *
  * THE BYTES NEVER CROSS INTO THE RECORD'S OBJECT. A row holds `{ sha256, mime, bytes, name }` (`kernel/src/coerce.ts`

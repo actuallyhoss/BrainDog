@@ -264,8 +264,7 @@ const LOW_ORDER = 'AGE_RECIPIENT is a low-order X25519 point, and nothing sealed
  * tells a sender to refuse.
  *
  * HERE AND NOT ONLY IN `sealTo`, BECAUSE THERE IT WAS SAID ONCE PER RECORD AND NEVER IN ITS OWN
- * WORDS. The batch-sixteen audit (finding 8) built the nightly copier with the all-zero point and
- * every `take()` threw; on Node, WebCrypto's `deriveBits` refused the all-zero secret itself, with
+ * WORDS. A nightly copier was once built with the all-zero point, and every `take()` threw; on Node, WebCrypto's `deriveBits` refused the all-zero secret itself, with
  * "The operation failed for an operation-specific reason", before `sealTo`'s sentence was reached.
  * `recipientOf` is synchronous and runs where the copier is built, so the check cannot ask WebCrypto.
  *
@@ -325,8 +324,8 @@ export type Sealed = { length: number; stream: ReadableStream<Uint8Array> };
  *
  * WHY THE SEALER TAKES THIS AND NOT ONLY BYTES. The nightly dump reaches the Worker as a string, and
  * encoding it to one buffer before sealing held the string and a file as long as the dump at once:
- * 120.8 MiB of a 122 MiB isolate at the ceiling once the string held one character outside Latin-1
- * (batch-twenty audit, finding 4). `snapshots.ts` hands a reader over the string instead, and each
+ * 120.8 MiB of a 122 MiB isolate at the ceiling once the string held one character outside Latin-1.
+ * `snapshots.ts` hands a reader over the string instead, and each
  * pull encodes one chunk's worth.
  */
 export type Plain = { length: number; read(out: Uint8Array): void };

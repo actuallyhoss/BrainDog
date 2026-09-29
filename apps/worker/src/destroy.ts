@@ -2,7 +2,7 @@
  * Deleting a hosted record (`02 §9`, `51 §5.13`): the host's half of `deleteRecord`.
  *
  * THE RECORD CHECKED EVERYTHING BEFORE THIS RUNS: an owner, a recent sign-in, the name typed exactly. What is left is
- * the platform's, in the order `loop/research-restore.md` §5 decided: the final copy, then every other copy the bucket
+ * the platform's, in this order: the final copy, then every other copy the bucket
  * holds for the record, then the alarm, then every byte the object holds, then the Directory's names for it, so nothing
  * resolves to the empty object afterwards and nothing of the record is left in R2 but the one copy that is meant to be.
  *
@@ -30,9 +30,9 @@ import { prefixOf, type Blobs } from './snapshots.ts';
 /**
  * How long a deleted record's final copy is kept, in days. HIS CALL AND NOT YET ANSWERED.
  *
- * `loop/research-restore.md` §8 puts it to him as none, a day, or thirty, because it is a promise to customers and the
+ * The choice is none, a day, or thirty, because it is a promise to customers and the
  * sentence Settings shows before a delete (`deleteCosts` in `apps/web/src/lib/copy.ts`) must say the same number.
- * Thirty is the brief's until he answers: it is `53 §5.9`'s "by day +30 nothing of the record remains anywhere", and
+ * Thirty stands until he answers: it is `53 §5.9`'s "by day +30 nothing of the record remains anywhere", and
  * it is the PITR window, so the final copy and the platform's own history of the object end on the same day.
  */
 export const FINAL_KEPT_DAYS = 30;
@@ -135,8 +135,8 @@ export async function expireFinal(blobs: Pick<Blobs, 'list' | 'delete'>, record:
  * Deletes a record: final copy, sweep, alarm, bytes, names.
  *
  * `copies` ABSENT IS THE WORKER AS IT IS WIRED TODAY, which hands this no bucket, and it keeps the order it had: the
- * copies stay in R2, as §5 measured. W55-7 passes the Worker's bucket and its copies port; nothing here should be read
- * as the Cloud already sweeping until that lands.
+ * copies stay in R2, as was measured. Passing the Worker's bucket and its copies port is still to be wired; nothing here
+ * should be read as the Cloud already sweeping until that lands.
  */
 export async function destroyRecord(storage: Wipe, close: Close, record: string | null, copies?: Swept): Promise<void> {
   /* A RECORD WITH NO IDENTITY HAS NO PREFIX, because the prefix is its id. Such an object never finished `createRecord`,
@@ -147,7 +147,7 @@ export async function destroyRecord(storage: Wipe, close: Close, record: string 
     if (!kept.startsWith(`${prefix}${FINAL}`))
       throw new Error(`The final copy was written to ${kept}, outside ${prefix}${FINAL}, where no night would ever expire it. Nothing was deleted.`);
     await sweep(copies.blobs, prefix, kept);
-    /* THE RECORD'S FILES GO WITH ITS COPIES, before the bytes and for the same reason (OPS-20): a file whose row is gone
+    /* THE RECORD'S FILES GO WITH ITS COPIES, before the bytes and for the same reason: a file whose row is gone
        is a photo of somebody's receipt that nothing names and nobody can delete, and a failed sweep throws while the
        record is still whole. None is kept: the final copy holds each file's name and not its bytes, so a record put
        back from it within the thirty days comes back with its facts and without its files. */

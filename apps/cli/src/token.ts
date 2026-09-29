@@ -1,11 +1,11 @@
 /**
  * `braindog token create`: an agent token, minted by the owner from a shell and printed once (`docs/48-SPEC-CLI.md`
- * §5.12, parity brief B7).
+ * §5.12).
  *
  * BEFORE THIS NOTHING ON THIS MACHINE COULD MINT ONE. The CLI's device reaches were login, vault, export and import; the
  * kernel's `token` operation reach existed and nothing asked for it, so an agent's token came from Settings or not at
- * all. And no token from anywhere could read the money inbox, because `createToken` kept no reach (DIRECTION section 30,
- * P2). `--inbox` asks for that reach, and it is off unless it is typed.
+ * all. And no token from anywhere could read the money inbox, because `createToken` kept no reach.
+ * `--inbox` asks for that reach, and it is off unless it is typed.
  *
  * THE TOKEN IS PRINTED ONCE, TO STDOUT, AND KEPT NOWHERE. It is not written to the hosts file: this is a credential for
  * another agent, not for this machine's own login, and a copy on disk is a key somebody has to remember is there. It is

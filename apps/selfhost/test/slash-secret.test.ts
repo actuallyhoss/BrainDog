@@ -1,14 +1,14 @@
 /**
- * A self-host with a model does not send a secret field's value to that model: audit forty-six §1.
+ * A self-host with a model does not send a secret field's value to that model.
  *
- * WHAT THE AUDIT MEASURED, THROUGH A REAL `start`. `eb1a131b` turned `answersSlash` on for every self-host with a
+ * WHAT WAS MEASURED, THROUGH A REAL `start`. `eb1a131b` turned `answersSlash` on for every self-host with a
  * model, and the kernel filled `set_var`'s `to` from the whole row. Over a list whose `pin` is a secret, `set_var: { to:
  * '{{trigger.row.pin}}' }` then `{{vars.p}}` in the question installed, and the model's request body held "What rate
  * applies to Rent, given hunter2?"; `set_var` to `{{trigger.row}}` sent the row's JSON with `pin` in it. These are the
  * probe's two cases, each twice: once as the owner would write it, which the install must now refuse, and once written
  * into the table past the lint, as a rule an earlier build let in would sit there, which the runner must now clean.
  *
- * RED BEFORE THE REPAIR, MEASURED ON 23 SEPTEMBER with `packages/kernel/src/flow.ts` and `flow-lint.ts` as they stood:
+ * RED BEFORE THE REPAIR, MEASURED with `packages/kernel/src/flow.ts` and `flow-lint.ts` as they stood:
  * four tests, four fail. Both installs read `null` where they expect `DECLARATION_INVALID`, and both stored rules sent
  * one request whose body held `hunter2`.
  *
@@ -108,7 +108,7 @@ async function stack() {
   return {
     running,
     sent,
-    /** A row written, its `pin` put in by SQL before the drain takes the run, then the brief's `drain`, `poll`, `drain`. */
+    /** A row written, its `pin` put in by SQL before the drain takes the run, then `drain`, `poll`, `drain`. */
     async write(what: string) {
       const row = running.api.kernel.create('obligations', { what }, { actor: owner });
       assert.ok(row.ok, JSON.stringify(row));

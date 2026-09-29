@@ -1,6 +1,6 @@
 /**
  * The self-host's re-wrap: as the process starts, the record's keys are moved from the previous key file's key to the
- * current one. `53 §5.6` step 8, `loop/finish/ops.md` OPS-16.
+ * current one. `53 §5.6` step 8.
  *
  * WHY AT START AND NOT AT NIGHT. A self-host serves one record from one process, and a new key file only takes effect
  * when the process starts, so the start is the one moment a rotation can have happened. `openKeyStore` (`keys.ts`)

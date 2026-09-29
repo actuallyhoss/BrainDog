@@ -2,7 +2,7 @@
  * The marketing site's config as each push of the one-domain move leaves it, built in memory for the tests.
  *
  * IN MEMORY, NOT READ FROM `apps/site/wrangler.jsonc`, BECAUSE THAT FILE CHANGES UNDER THESE TESTS ON PURPOSE. Push 1
- * binds alpha's site to alpha's app and push 3 binds production's (`loop/research-one-domain-binding.md` section 4), and
+ * binds alpha's site to alpha's app and push 3 binds production's, and
  * each lands in a commit of its own. A test that asked what the smoke step does after push 3 by reading the real file
  * would pass or fail depending on which of those commits is checked out, and the one that failed would say nothing
  * about the code under test. So the site of a push is written here once, and the tests that read the real file say so
@@ -13,8 +13,8 @@
  */
 
 /**
- * The doors the site runs its script first on once it is bound: those of the research's section 1.1, `/mcp/`, and
- * `/healthz`, which the real site's `run_worker_first` hands the app and the checker's `DOORS` asks for (defects H4).
+ * The doors the site runs its script first on once it is bound: the app's doors, `/mcp/`, and `/healthz`, which the
+ * real site's `run_worker_first` hands the app and `provision-check`'s `DOORS` asks for.
  */
 export const SITE_DOORS = ['/app', '/app/*', '/api/*', '/auth/*', '/account/*', '/mcp', '/mcp/', '/in/*', '/.well-known/braindog-build', '/healthz'];
 

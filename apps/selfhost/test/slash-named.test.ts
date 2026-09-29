@@ -1,16 +1,15 @@
 /**
  * The model name and the key an owner's Slash setting names, reaching the endpoint through this host's door, over a
- * real socket. `loop/research-spark-routes.md` brief K1, and the app-level half of F1 and F2 that
- * `packages/host/test/slash.test.ts` holds one layer down.
+ * real socket: the app-level half of what `packages/host/test/slash.test.ts` holds one layer down.
  *
  * WHY THIS FILE EXISTS WHEN THE HOST PACKAGE ALREADY TESTS `slashNamedEngine` AND `slashByokOf`. Those tests call the
  * builders by hand. What they cannot say is that THIS app wraps its engine in the one and hands its door the other, and
- * both are one line in `src/slash.ts` that a refactor drops without a single host test going red. Measured on 22
- * September: with the `slashNamedEngine(...)` wrap removed from `slashEngineFor`, `packages/host/test/slash*.test.ts`
+ * both are one line in `src/slash.ts` that a refactor drops without a single host test going red. Measured:
+ * with the `slashNamedEngine(...)` wrap removed from `slashEngineFor`, `packages/host/test/slash*.test.ts`
  * stayed 27 of 27 and the status case below failed on `glm-5.3-flash`, the package's short name, where `llama3` is what
  * this host runs.
  *
- * RED BEFORE K1'S DOOR, MEASURED THE SAME DAY: the tier `b` case failed at its settings POST with 501
+ * RED BEFORE THE DOOR TOOK A KEY OF HIS OWN, MEASURED: the tier `b` case failed at its settings POST with 501
  * `NOT_IN_THIS_BUILD`, "Slash cannot use a key of your own on this host yet.", because `slashDoor` handed
  * `slashAskDoor` no `byok` builder.
  *
@@ -196,8 +195,8 @@ test('TIER b REACHES THE ENDPOINT WITH THE KEY THE OWNER PUT IN AND THE MODEL TH
     assert.equal(out.body?.value?.['body_kind'], 'rowset');
     assert.equal(s.sent.length, 2);
     /* BOTH PASSES CARRY THE VALUE TYPED INTO THE KEY DOOR, opened from the vault by id, and the owner's model name. The
-       draft went on this host's own route, the operator's key and `SLASH_MODEL`, until his own key carried both passes
-       (`loop/finish/agents.md` AGT-21); with no address of his own it is still this host's endpoint he is sent to. */
+       draft went on this host's own route, the operator's key and `SLASH_MODEL`, until his own key carried both passes;
+       with no address of his own it is still this host's endpoint he is sent to. */
     for (const i of [0, 1]) {
       assert.equal(s.bearer(i), `Bearer ${value}`);
       assert.equal(s.model(i), 'gpt-4o-mini');

@@ -1,10 +1,10 @@
 /**
- * A script that declares `reads:` reads on the self-host, and never reads a secret field (`loop/BACKLOG.md`, Scripts).
+ * A script that declares `reads:` reads on the self-host, and never reads a secret field.
  *
  * RED BEFORE THIS FILE'S CHANGE, AND WITH A SENTENCE THAT WAS NOT TRUE. `scriptRunner` handed QuickJS a `CtxHost` with
  * no `list` and no `get`, and `runInQuickJs` answers a missing `list` the way it answers a register outside `reads`, so
  * a script declaring `reads: ["clients"]` and calling `ctx.record.list('clients')` was refused as
- * "reads-clients read clients, which is not in its reads." The Worker had wired both since Brief 5; the self-host had
+ * "reads-clients read clients, which is not in its reads." The Worker had wired both; the self-host had
  * not, so one declaration ran on the Cloud and was refused at home.
  *
  * A SECRET FIELD NAMES WHERE A KEY IS SEALED, AND A SCRIPT HAS NO USE FOR THAT. `list` and `get` as the record answers
@@ -164,7 +164,7 @@ test("A SECRET FIELD IS NOT HANDED TO A SCRIPT'S READS, by list or by get, so th
  * A FILTER ON A SECRET FIELD WOULD HAND BACK WHAT TAKING THE FIELD OFF THE ROW WITHHELD. `where` reaches the record's
  * `list` as the script wrote it, and `starts` takes a `secret` (`TEXTUAL` in `@braindog/where`), so a script that asks
  * one character at a time which rows start with what it has so far reads the grant id out of the answer's length.
- * Measured by the checker on September 22nd: this script wrote the Acme grant's id, whole, into `seen` while the row it
+ * Measured before the change: this script wrote the Acme grant's id, whole, into `seen` while the row it
  * was handed carried no `token` at all. The filter is refused before the record is asked.
  */
 test('A FILTER ON A SECRET FIELD IS REFUSED, so the grant id cannot be read back one prefix at a time', async () => {
@@ -201,8 +201,7 @@ test('A FILTER ON A SECRET FIELD IS REFUSED, so the grant id cannot be read back
 /**
  * A SENTENCE IS A FILTER TOO, AND THE CHECK ABOVE ONLY WALKED A TREE. The record's `list` reads a `where` that is a
  * string as a sentence, and QuickJS hands the script's `where` through as it was written, so `token is set` went to the
- * record unasked. Measured by the audit of wave thirty-six (`loop/research-batch-thirty-six-audit.md` finding 7) and
- * again here before the change: the four runs below answered `ok`, and wrote `["Acme"]`, `["Bolt"]`, `["Acme"]` and
+ * record unasked. Measured before the change: the four runs below answered `ok`, and wrote `["Acme"]`, `["Bolt"]`, `["Acme"]` and
  * `[]`, so a script learned which client holds a key and whether an id it already had was the one sealed there. The
  * grammar the agent reads promised the opposite ("a predicate that names one is refused").
  *

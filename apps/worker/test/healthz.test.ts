@@ -1,5 +1,5 @@
 /**
- * `GET /healthz` on the Cloud Worker: a liveness answer that asks nothing of anybody (ROADMAP W55).
+ * `GET /healthz` on the Cloud Worker: a liveness answer that asks nothing of anybody.
  *
  * MEASURED AT afb3b1b2, BEFORE THIS FILE: the bundle answered `GET /healthz` with 404 `ROUTE_UNKNOWN`, "A record method
  * is at /api/<method>.", which is the router's answer for a path it does not know. An uptime check pointed at it read

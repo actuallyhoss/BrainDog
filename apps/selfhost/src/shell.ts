@@ -6,7 +6,7 @@
  * from the same process as `/auth/*` and `/api/*`, or the browser holds the session for a host that never
  * reads it. The Worker has this from its assets binding; this is the same `build/`, served the same way.
  *
- * THE APP IS MOUNTED AT `/app` (`loop/research-one-domain.md` Brief D). `apps/web` is built with
+ * THE APP IS MOUNTED AT `/app`. `apps/web` is built with
  * `paths.base: '/app'` and writes every file under `build/app/`, so its pages ask for `/app/_app/…`. `/api`,
  * `/auth`, `/mcp` and `/in` stay at the root, where `server.ts` answers them before this file is reached.
  *

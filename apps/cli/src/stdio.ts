@@ -21,7 +21,7 @@ import { handle, type Reply } from '@braindog/mcp/rpc';
  * runs as each message arrives, so a deadline counts from when the call was made.
  *
  * `origin` is where the host serves the app, the host this command line talks to, handed to `handle` for a filed
- * question's `decide` link (`loop/finish/contracts.md` §6.3), as `serveMcp` hands its own. Left out, that link is left out.
+ * question's `decide` link, as `serveMcp` hands its own. Left out, that link is left out.
  */
 export async function serveStdio<C>(
   surface: McpSurface<C>,

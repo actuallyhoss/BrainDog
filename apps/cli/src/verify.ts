@@ -1,8 +1,7 @@
 /**
  * `braindog verify <file> [--key <pubkey|url>]`: a file checked on this machine, against a key you name.
  *
- * AT `b7409d2d` THERE WAS NO SUCH COMMAND, and the check it runs could be passed by a forgery.
- * `loop/research-restore.md` §2.1 measured "braindog has no command called verify", and §3.5 took a
+ * THERE WAS ONCE NO SUCH COMMAND, and the check it runs could be passed by a forgery. A probe took a
  * Cloud copy, changed its record's name, recomputed that table's hash, and signed it again with a key
  * made for the purpose: `checkBrainl` answered ok and the file imported. The key inside a file proves
  * that nothing changed since that key signed it and nothing about whose key it is. `--key` is where
@@ -42,7 +41,7 @@ import type { AgentIo } from './skills.ts';
  *
  * NOT `48 §5.6`'s 1145193761. That decimal is `0x44424521`, the bytes `DBE!`, copied from `03 §2`'s
  * table into three documents; `packages/kernel/src/migrate.ts` writes the hex, `0x444F4721`, and
- * `loop/research-restore.md` §2.2 read 1146046241 off a real self-host copy. Checked against the
+ * 1146046241 was read off a real self-host copy. Checked against the
  * spec's number, every self-host copy was "not a .brain file", which is exactly wrong.
  */
 const APPLICATION_ID = 0x444f4721;
@@ -248,7 +247,7 @@ async function countsOf(path: string): Promise<{ tables: number; rows: number }>
  * replace, and then the pin proves that the file matches the attacker's key, which is the forgery
  * this command exists to catch. Loopback is allowed because nothing crosses a network to reach it.
  *
- * AND EVERY ADDRESS IT IS SENT ON TO PASSES THE SAME TEST. Wave fifty-five's checker found the test made once, on the
+ * AND EVERY ADDRESS IT IS SENT ON TO PASSES THE SAME TEST. A review found the test made once, on the
  * address typed, and `fetch` then left to follow redirects on its own: Node 24's `fetch`, asked an https address that
  * answers 302 to an http one, follows it and hands back the http answer with `redirected: true` (measured against a
  * local https server). So an https address was as good as an http one to anybody who could make it redirect, or who

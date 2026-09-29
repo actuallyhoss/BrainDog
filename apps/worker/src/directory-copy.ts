@@ -1,6 +1,5 @@
 /**
  * The Directory's nightly copy, in R2: sealed to `AGE_RECIPIENT`, under `directory/snapshots/`, thirty kept.
- * `loop/research-restore.md` §6.
  *
  * WHY THE DIRECTORY NEEDS ONE AT ALL. Every record is copied nightly and nothing copied the Directory, which is the
  * only place that knows which person is which, which name reaches which record, who may reach it and their passkeys.

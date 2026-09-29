@@ -139,8 +139,8 @@ function launch(extra: Record<string, string>, options: { args?: string[]; confi
    * else this does not fire, and when it does fire the child's stderr goes in the message, because a reply that
    * never arrives is usually a child that died saying why.
    */
-  /* AND DOUBLED OFF CI. The timings above were taken on a machine doing nothing else, and `loop/finish/defects.md` T1
-     found this deadline firing on one running every workspace's tests at once, where the child's own startup waits for
+  /* AND DOUBLED OFF CI. The timings above were taken on a machine doing nothing else, and this deadline was
+     found firing on one running every workspace's tests at once, where the child's own startup waits for
      a core. A deadline is here to turn a hang into a failure, not to time anything, so off CI it is twice as long and
      on CI it is the ten seconds argued for above. */
   const DEADLINE_MS = process.env.CI ? 10_000 : 20_000;
@@ -411,7 +411,7 @@ test('A LIST CALL goes to /api/list with the bearer and the session headers, and
 });
 
 /**
- * A FIGURE IS READ BY `get` OVER THE PIPE AS IN PROCESS (audit sixty-two finding 2). A client with tools and no resources
+ * A FIGURE IS READ BY `get` OVER THE PIPE AS IN PROCESS. A client with tools and no resources
  * had no figure at all once the money tool left, and the command line is where Claude Code meets this server, so the
  * route is driven here and not only in `packages/mcp/test/figures.test.ts`: the id goes to the host's `metric`, never
  * its `get`, and the reading comes back as the host answered it.
@@ -462,7 +462,7 @@ test('A HOST THAT DOES NOT ANSWER gets the unreachable sentence once the budget 
   const waited = Date.now() - started;
   assert.ok(waited >= 350, `it gave up after ${waited} ms, before its budget`);
   assert.equal(reply.result.isError, true);
-  /* THE REASON RIDES IN `detail` (the client's refusal since DSN-12), beside the sentence and never as it. */
+  /* THE REASON RIDES IN `detail` (as the client's refusal carries it), beside the sentence and never as it. */
   const { detail, ...refused } = said(reply) as { detail?: unknown };
   assert.deepEqual(refused, { code: 'UNREACHABLE', fix: UNREACHABLE_FIX });
   assert.equal(typeof detail, 'string');

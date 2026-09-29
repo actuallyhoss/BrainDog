@@ -1,14 +1,13 @@
 /**
- * Tier `byo`'s proposal is on this host's key, so it is held to `ask_cap` like the draft before it:
- * `loop/research-batch-thirty-four-audit.md` §3.
+ * Tier `byo`'s proposal is on this host's key, so it is held to `ask_cap` like the draft before it.
  *
- * WHAT THE AUDIT MEASURED, AND WHAT THIS FILE REPEATS. `slashGuardedEngine` let any propose on a stored `ask_id` through,
+ * WHAT WAS MEASURED, AND WHAT THIS FILE REPEATS. `slashGuardedEngine` let any propose on a stored `ask_id` through,
  * on the reason "its one call is on the owner's key". That is tier `b`. On `byo` the package proposes on `fallback`
  * (`packages/slash/src/propose.ts`, `s.tier === 'b' ? byok : fallback`), which is `SLASH_ENDPOINT` with `SLASH_KEY`, and
  * writes the row `kind = 'propose'`, which the host's count did not read. At `ask_cap: 1`, one read and five proposes on
  * its `ask_id` answered `200 200 200 200 200` on six model calls, all six on the operator key, with status reading 1 of 1.
  *
- * RED BEFORE THE REPAIR, measured on 22 September against the tree as it stood: the first case below answered
+ * RED BEFORE THE REPAIR, measured against the tree as it stood: the first case below answered
  * `proposes on the stored ask_id: 200 200 200; 4 model calls; status used 1`, and the second, four proposes sent
  * together at `ask_cap: 2` after the read, `200 200 200 200; 5 model calls`.
  *

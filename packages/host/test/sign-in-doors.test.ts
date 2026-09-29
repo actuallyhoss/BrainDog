@@ -1,7 +1,7 @@
 /**
  * Sign-in's doors, against a real Directory: an invitation that proves the mailbox before it makes anybody, the
  * sessions a person can see and end, the step-up answer a page can tell from a failed sign-in, the account table's
- * new rows, and the operator key's lockout. `loop/finish/ops.md` OPS-7.
+ * new rows, and the operator key's lockout.
  *
  * THE DIRECTORY IS THE REAL ONE, so the proof, the sessions and the fifteen minutes are the flows that ship, and
  * only the record behind an invitation is a double: what a record does with an invitation is `packages/record`'s.

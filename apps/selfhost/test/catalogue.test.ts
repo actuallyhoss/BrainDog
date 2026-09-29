@@ -3,7 +3,7 @@
  * folder, whatever the path says.
  *
  * UNDER THE APP'S BASE, BECAUSE THAT IS WHERE THE APP ASKS (`apps/web/src/routes/packs/browse/catalogue.ts`
- * `CATALOGUE_BASE`, `loop/research-one-domain.md` §2.2). Served at `/catalogue/` alone, every catalogue this host held
+ * `CATALOGUE_BASE`). Served at `/catalogue/` alone, every catalogue this host held
  * was a 404 to the tab that reads it: the app fetched `/app/catalogue/index.json` and the shell answered that path.
  */
 

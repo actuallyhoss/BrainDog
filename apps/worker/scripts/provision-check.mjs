@@ -4,11 +4,11 @@
  *   node apps/worker/scripts/provision-check.mjs brain.dog     (app.brain.dog, the legacy host since push B2, reads as production too)
  *   node apps/worker/scripts/provision-check.mjs http://localhost:8787 --no-account
  *
- * THIS IS THE REHEARSAL IN `loop/research-provision-day.md` TURNED INTO A COMMAND. That document
- * walked the whole of provisioning on a host configured the way production is, and the part of it a
- * person needs at midnight is not the prose: it is the four or five questions he would otherwise ask
- * by hand, with curl, in the wrong order, from a terminal, while a `wrangler tail` scrolls. Every
- * reading below is one of that document's measurements, asked live instead of remembered.
+ * THIS IS THE PROVISIONING REHEARSAL TURNED INTO A COMMAND. The rehearsal walked the whole of
+ * provisioning on a host configured the way production is, and the part of it a person needs at
+ * midnight is not the prose: it is the four or five questions he would otherwise ask by hand, with
+ * curl, in the wrong order, from a terminal, while a `wrangler tail` scrolls. Every reading below is
+ * one of the rehearsal's measurements, asked live instead of remembered.
  *
  * IT NEVER MINTS, WRITES OR PRINTS A SECRET, AND THAT IS A PROPERTY OF WHAT IT SENDS RATHER THAN A
  * PROMISE. It sends no `authorization` header, no request body and no `Origin`, so there is no call
@@ -113,8 +113,7 @@ export function applyPush(config, change) {
 /**
  * The one-domain move as the pushes it goes out in: the file as it deploys, under the name its opening comment gives it
  * (`THIS FILE IS PUSH <name>`), then each `STAGE <name> {...}` fragment in that comment applied on top of the one before.
- * Today that is `B1`, the file, with alpha flipped, and `B2`, production's flip, still staged
- * (`loop/research-one-domain-binding.md` section 4).
+ * Today that is `B1`, the file, with alpha flipped, and `B2`, production's flip, still staged.
  *
  * THE FLIP IS KEPT AS DATA IN THE FILE IT CHANGES, AND READ BY THE SAME SCANNER. Left in a note it would be a config
  * nobody had parsed; here `test/wrangler-routes.test.ts` holds every push to the same checks as the file, and
@@ -176,13 +175,13 @@ export const workerFirst = (entries, path) => {
  * its names is one of the app's.
  *
  * WRITTEN HERE RATHER THAN READ FROM `src/route.ts`, SO THE DEPLOY'S SMOKE STEP DOES NOT LOAD THE WORKER'S MODULE GRAPH.
- * That is a choice and not a limit: a bare `node` 24.13 imports `route.ts` and `@braindog/host` behind it (measured on
- * 23 September), but a smoke step that goes red because the router gained an import a runner cannot load is red for a
+ * That is a choice and not a limit: a bare `node` 24.13 imports `route.ts` and `@braindog/host` behind it (measured), but a
+ * smoke step that goes red because the router gained an import a runner cannot load is red for a
  * reason that has nothing to do with the deploy it is judging. So `test/wrangler-routes.test.ts` holds this list to
  * `route.ts` instead: every entry must be a path the Worker serves, and every door the app's own `run_worker_first` has
  * built must have an entry here. A door added to the router without a line here fails that test rather than a deploy.
  *
- * `/healthz` IS A DOOR LIKE THE OTHERS (defects H4). The router answers it before anything else (`HEALTHZ` in
+ * `/healthz` IS A DOOR LIKE THE OTHERS. The router answers it before anything else (`HEALTHZ` in
  * `src/health.ts`) and the site's own `run_worker_first` hands it over, but it was missing here, so a site that kept it
  * as its 404 page read as bound and every uptime check on that name read the site.
  */
@@ -191,7 +190,7 @@ export const DOORS = ['/app', '/app/', '/app/acme/api/boot', '/api/boot', '/auth
 /**
  * Which of the site's names are this app's in one environment, and when none are, the sentence that says why.
  *
- * THE MOVE TO ONE DOMAIN GOES THROUGH THE SITE'S SERVICE BINDING, NOT A ZONE ROUTE (`loop/research-one-domain-binding.md`).
+ * THE MOVE TO ONE DOMAIN GOES THROUGH THE SITE'S SERVICE BINDING, NOT A ZONE ROUTE.
  * The site keeps `brain.dog` as its Custom Domain and hands the app's doors to it: `assets.run_worker_first` decides
  * which paths reach the site's script, and `services` decides which app that script calls. So a site name is the app's
  * when all three hold in the SAME environment: a script to run (`main`, which is inherited), `APP` bound to
@@ -444,17 +443,16 @@ export function readProvision(status, body) {
 /**
  * The provision itself, in the two shells he has, for a host that has just answered READY.
  *
- * TWO FORMS BECAUSE ONE OF THEM FAILED IN HIS PRIMARY SHELL, and both failures were measured on 23 September
- * (`loop/research-first-sign-in.md` friction 2). In Windows PowerShell 5.1 `curl` is `Invoke-WebRequest`, which
+ * TWO FORMS BECAUSE ONE OF THEM FAILED IN HIS PRIMARY SHELL, and both failures were measured. In Windows PowerShell 5.1 `curl` is `Invoke-WebRequest`, which
  * refuses curl's flags with "A positional parameter cannot be found", and `curl.exe` with the JSON in single quotes
  * answers `400 BODY_MALFORMED`, because 5.1 strips the inner double quotes on the way to a native command. So the
  * PowerShell form builds the body with `ConvertTo-Json` and sends it with `Invoke-RestMethod`, which leaves no quoting
- * for 5.1 to strip. It is section 4's form, and that form was rehearsed against a local host: the success,
+ * for 5.1 to strip. That form was rehearsed against a local host: the success,
  * `ALREADY_KNOWN` for a taken slug and `UNAUTHORIZED` for a wrong key all came back.
  *
- * THE CONTENT TYPE NAMES ITS CHARSET, which section 4's form did not. Without one, 5.1 encodes a string body as
+ * THE CONTENT TYPE NAMES ITS CHARSET, which the rehearsed form did not. Without one, 5.1 encodes a string body as
  * Latin-1, so a name outside ASCII arrives broken and stays broken, because the name is fixed at provision. Measured
- * on 23 September from 5.1.26100 to an echo server on this machine: `Zoë Łuk` arrived as `Zo` U+FFFD ` Luk` under
+ * from 5.1.26100 to an echo server on this machine: `Zoë Łuk` arrived as `Zo` U+FFFD ` Luk` under
  * `application/json` and whole under `application/json; charset=utf-8`, which `isJson` in `auth.ts` accepts.
  *
  * THE OPERATOR KEY IS THE SHELL'S AND NEVER THIS SCRIPT'S. Each form reads it at a prompt that echoes nothing, keeps
@@ -466,28 +464,27 @@ export function readProvision(status, body) {
  * without one is `UTC` for good. An offset or no answer at all falls back to `UTC`, which the Worker takes too.
  *
  * EACH FORM ASKS, AND PRINTS NOTHING TO BE EDITED. It printed `name = '<your name>'` to be changed by hand, and the
- * Worker took that placeholder as the owner's name for good (`loop/research-batch-forty-six-audit.md` §7). So the slug,
+ * Worker took that placeholder as the owner's name for good. So the slug,
  * the email, the name and the zone are prompts, and the zone's prompt offers this machine's as the answer to Enter.
  * The bash form has `node` build the body because a name is typed by a person: pasted into a JSON string by the shell,
  * a double quote in it breaks the body. `apps/worker/scripts/provision-ask.test.mjs` runs that form with
  * `Zoë "Z" O'Brien` and compares what arrives.
  *
  * AND curl READS THE BODY FROM ITS STDIN, NOT FROM AN ARGUMENT. Git for Windows' `curl` is `/mingw64/bin/curl`, a
- * native program that takes its arguments in the ANSI code page: measured on 23 September against a server on this
+ * native program that takes its arguments in the ANSI code page: measured against a server on this
  * machine, `-d "Zoë"` arrived as `5a 6f eb`, Windows-1252, with `LANG=en_US.UTF-8` or without it, and `--data-binary @-`
  * fed the same bytes by `printf` arrived as `5a 6f c3 ab`. `node` takes its arguments as UTF-16 and was whole either
  * way, which is why the body is built there and piped. The earlier form, `-d '{...}'` edited by hand, had the same
  * fault for any name outside ASCII.
  *
  * THE CLAIM LINK IS PRINTED ON A LINE OF ITS OWN, because `Format-List` hard-wraps a value: at 80 columns the only copy
- * came out as two lines with ten spaces before the second (the same audit, "Found on the way"), and a link copied
+ * came out as two lines with ten spaces before the second, and a link copied
  * from that is broken.
  *
  * AND THE POWERSHELL FORM IS ONE SCRIPT BLOCK, `& {` ON THE FIRST LINE AND `}` ON THE LAST, because a paste of bare
- * lines races the first question. Audit forty-six measured the one-question form pasted whole and found PSReadLine
- * took the paste into its own queue; that was measured for one `Read-Host`, and this form asks five. Measured again for
- * this form (`loop/research-batch-forty-eight-audit.md` §3, the lines written into a real 5.1 console's input buffer
- * with PSReadLine 2.0.0 and each answer typed three seconds apart): the bare lines lost the tail of line two to the
+ * lines races the first question. The one-question form pasted whole was measured, and PSReadLine took the paste
+ * into its own queue; that was measured for one `Read-Host`, and this form asks five. Measured again for this form
+ * (the lines written into a real 5.1 console's input buffer with PSReadLine 2.0.0 and each answer typed three seconds apart): the bare lines lost the tail of line two to the
  * first `Read-Host` in 2 of 14 runs, so `$pk` was never set, the post went as `Bearer ` and answered `UNAUTHORIZED`, and
  * the answers typed after it ran as commands at the prompt. Inside `& { ... }` it was 8 of 8, because PSReadLine holds
  * an unclosed block as one incomplete input and runs none of it until the last line. And 8 of 8 again for these exact
@@ -501,12 +498,12 @@ export function readProvision(status, body) {
  * editor reads the paste decides it. PSReadLine, loaded in a 5.1 console by default, parses what it holds and runs the
  * block at the `}`. The console host's own line reader, which is what reads the line when PSReadLine is not loaded,
  * holds any input of more than one line at `>>` until it is sent an empty line, closed or not. Measured
- * (`loop/research-batch-fifty-audit.md` §2, 5.1.26100 started with `Remove-Module PSReadLine`, these lines as printed,
+ * (5.1.26100 started with `Remove-Module PSReadLine`, these lines as printed,
  * answers typed three seconds apart): without the empty line nothing ran in 3 of 3, and the operator key typed after
  * the paste went into the script as the line under the brace, unmasked and in that console's transcript. With it the
  * post went with the right bearer, 2 of 2 without PSReadLine and 4 of 4 with it, where the empty line was never
- * taken as the operator key by the first `Read-Host`. `pwsh` 7 was not measured: it is not on the machine the audit
- * ran on. READY says to copy through that line, in `printedForms`, since every block he has copied before ended at
+ * taken as the operator key by the first `Read-Host`. `pwsh` 7 was not measured: it is not on the machine the
+ * measurement ran on. READY says to copy through that line, in `printedForms`, since every block he has copied before ended at
  * its brace.
  */
 export function provisionCommands(origin, zone = localZone()) {

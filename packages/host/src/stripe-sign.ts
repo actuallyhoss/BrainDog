@@ -1,7 +1,7 @@
 /**
  * Stripe's webhook signature, checked over WebCrypto and nothing else.
  *
- * THE ONE STRIPE SIGNATURE CHECK IN THE REPOSITORY (`loop/finish/contracts.md` §2.6, X38). The Worker's billing webhook
+ * THE ONE STRIPE SIGNATURE CHECK IN THE REPOSITORY. The Worker's billing webhook
  * calls it (`apps/worker/src/billing.ts`), and an ingest that declares `verify: { kind: 'stripe' }` calls it on both
  * hosts. It lives in a package and not in the Worker because a package cannot import an app, and two copies of a
  * signature check are two chances for one of them to be wrong.
@@ -25,7 +25,7 @@ export const STRIPE_TOLERANCE_S = 300;
 /**
  * The most `v1=` values one header is checked for.
  *
- * A CEILING ON THE WORK A STRANGER CAN ASK FOR (`loop/finish/rules.md` §6 COST). The door is public, and every value is
+ * A CEILING ON THE WORK A STRANGER CAN ASK FOR. The door is public, and every value is
  * one comparison; Stripe sends two at most, while a secret is rolled, so eight is room to spare and a header of ten
  * thousand is refused rather than walked.
  */

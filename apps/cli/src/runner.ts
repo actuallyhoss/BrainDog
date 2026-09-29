@@ -1,6 +1,6 @@
 /**
- * `braindog runner`: this machine runs the jobs its owner starts in the app (`loop/finish/agents.md` C13 and C14,
- * `docs/48-SPEC-CLI.md` §5.13, `loop/DIRECTION.md` section 30, P3).
+ * `braindog runner`: this machine runs the jobs its owner starts in the app
+ * (`docs/48-SPEC-CLI.md` §5.13).
  *
  * THE RECORD KEEPS THE QUEUE AND THIS MACHINE RUNS IT. `enrol` takes a device grant of reach `runner`, approved with six
  * digits in the app, and keeps it in the hosts file beside the login. `run` claims a job, starts Claude Code on it under
@@ -12,7 +12,7 @@
  * could hand this machine any prompt and any tool, so the first time a machine sees a kind, by the SHA-256 of what it
  * would run, `run` prints it and asks the person at the terminal once. With no terminal attached it refuses the job,
  * keeps the kind in `~/.braindog/runner.json`, and `braindog runner allow <kind>` asks later. A machine that never allowed
- * a kind never runs it, whatever the host says (owner item 13).
+ * a kind never runs it, whatever the host says.
  *
  * THE HOST SENDS A NAME AND NEVER A PATH. A kind that works in a repository names it, and only this machine's own map
  * (`runner repos add <name> <folder>`) turns the name into a folder. A kind that names none works in an empty folder of
@@ -248,8 +248,8 @@ async function claudeHere(io: RunnerIo): Promise<Claude | string> {
 /**
  * Whether the installed `claude --help` names a flag.
  *
- * THE FIRST SPEC'S `--restricted` AND `--disable-slash-commands` ARE PASSED ONLY WHERE THE HELP LISTS THEM
- * (`loop/finish/agents.md` C14, risk 9). Neither was ever confirmed against an installed Claude Code, and a flag the
+ * THE FIRST SPEC'S `--restricted` AND `--disable-slash-commands` ARE PASSED ONLY WHERE THE HELP LISTS THEM.
+ * Neither was ever confirmed against an installed Claude Code, and a flag the
  * installed one does not know stops every job before it starts. Its `--json-schema` went with the fixed kinds, which
  * were the only thing that had a schema.
  */

@@ -2,13 +2,13 @@
  * An automation's question that reached no model spends none of `ask_cap`, on any tier, and one the model did answer
  * still does.
  *
- * `loop/research-batch-forty-two-audit.md` FINDING 6. `answer` holds its row before the call and settled it, on
+ * THE ROW WAS SETTLED UNDER THE MODEL'S NAME. `answer` holds its row before the call and settled it, on
  * `UNREACHABLE`, as an error under the model's name, and both counts (the package's tier `a` count and this host's
- * `drafted()` for `b` and `byo`) pass over a row only when its model is `-`. Measured by the audit on 23 September with a
+ * `drafted()` for `b` and `byo`) pass over a row only when its model is `-`. Measured with a
  * real `createSlash` behind `slashGuardedEngine` at `ask_cap: 3` and an inference throwing `ECONNREFUSED`: on tiers `a`
  * and `b` the four asks answered `UNREACHABLE` three times and then `SLASH_BUDGET_SPENT`.
  *
- * THE SCALE, AS THE AUDIT'S CHECKER CORRECTED IT. `serveAsks` acks `UNREACHABLE` as `failed`, so the outbox asks again up
+ * THE SCALE. `serveAsks` acks `UNREACHABLE` as `failed`, so the outbox asks again up
  * to its eighth rung, and the ladder doubles: a fifteen-minute clock rule through a two-hour outage is about forty asks
  * that reached nothing, by that arithmetic and not by a run. That is half the default cap of 80, not a spent one; what
  * spends it is a longer outage, a second rule or the owner's own reads in the meantime, and then his reads are refused.
@@ -33,7 +33,7 @@ const DOWN: SlashInference = {
 const UP: SlashInference = { complete: async () => ({ text: '{"answer":4}', usage: { in: 12, out: 3 } }) };
 const WRONG: SlashInference = { complete: async () => ({ text: '{"answer":"four"}', usage: { in: 12, out: 3 } }) };
 
-/** A real Slash on its own SQLite at `tier` and `ask_cap: 3`, behind this host's guard, as the audit's probe built it. */
+/** A real Slash on its own SQLite at `tier` and `ask_cap: 3`, behind this host's guard, as the probe built it. */
 function slashAt(tier: 'a' | 'b' | 'byo') {
   const sql = openSqlite();
   const slash = createSlash({ sql, clock: fixedClock(NOW), inference: DOWN, record: {} as never });

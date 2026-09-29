@@ -1,5 +1,5 @@
 /**
- * A script's scheduled run on the self-host, end to end: `loop/research-shell-scripts.md` Brief 4, DIRECTION 22.
+ * A script's scheduled run on the self-host, end to end.
  *
  * THE WHOLE PATH AND NOT A PIECE OF IT. A `script` declaration is installed, its schedule comes due, `poll` fires it
  * into the outbox, the pass leases it, QuickJS runs the source, its `ctx.fetch` leaves through the same `sendAction`
@@ -178,7 +178,7 @@ test('A SCHEDULED SCRIPT FETCHES WITH ITS KEY, WRITES ONE ROW AS ITSELF, and the
     assert.match(rows[0]?.said ?? '', /--redacted--/);
     assert.doesNotMatch(JSON.stringify(s.rows()), new RegExp(FAKE_KEY));
     /* EVERY EVENT, NOT ONLY THE RUN'S: the `grant.read` the opening wrote, and the run's `to_v`, which carries the
-       sandbox's log once the kernel keeps it there (measured with that change in the tree on September 22nd: the
+       sandbox's log once the kernel keeps it there (measured with that change in the tree: the
        log arrived on the event as `Bearer --redacted--`). */
     assert.doesNotMatch(JSON.stringify(s.allEvents()), new RegExp(FAKE_KEY));
 
@@ -253,7 +253,7 @@ test("THE KEY'S VALUE IS NOT IN THE SANDBOX'S LOG EITHER, as the runner hands it
 });
 
 test('A REVOKED KEY IS NEVER OPENED FOR A SCRIPT: the live one under the same label is, and with none live nothing is sent at all', async () => {
-  /* WRITTEN BY THE CHECKER, because the three tests above stayed green with `grantNamed`'s revoked filter deleted and
+  /* HERE BECAUSE the three tests above stayed green with `grantNamed`'s revoked filter deleted and
      with the host's "not in the vault" refusal deleted, which sent the request bare. A key revoked after the script was
      installed is the ordinary way to reach both. */
   const { scriptSandbox } = await import('../src/script.ts');
@@ -288,7 +288,7 @@ test('A REVOKED KEY IS NEVER OPENED FOR A SCRIPT: the live one under the same la
 });
 
 test('A SCRIPT AND A CALL IN ONE PASS SHARE ONE ADMISSION COUNT, so a record with one run left spends it once', async () => {
-  /* WRITTEN BY THE CHECKER, because `holdingScript` could be made to ignore its hold and every test above stayed green:
+  /* HERE BECAUSE `holdingScript` could be made to ignore its hold and every test above stayed green:
      a pass on the self-host never meets the allowance in them. */
   const { holding, pass } = await import('../src/actions.ts');
   const { holdingScript } = await import('@braindog/host/script');

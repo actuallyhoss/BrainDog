@@ -1,6 +1,6 @@
 /**
  * OAuth on the self-host: `@braindog/host/oauth`'s doors over this process's Directory, browser session and record, and
- * the consent page an app's sign-in lands on (`loop/finish/agents.md` C4, AGT-31).
+ * the consent page an app's sign-in lands on.
  *
  * THE PROTOCOL IS THE HOST PACKAGE'S AND THIS FILE IS THE WIRING, as `apps/worker/src/oauth.ts` is the Cloud's. The store
  * is `answerOAuth` over the Directory's own SQLite, `directory.sqlite` in the data folder, called in this process; the

@@ -1,24 +1,23 @@
 /**
- * Every way the Worker reaches Workers AI, held under the operator's ceiling at once (`loop/research-batch-sixty-two-audit.md`
- * findings 1 and 3, its probes S1 and S3 carried into this suite and driven through the bundle).
+ * Every way the Worker reaches Workers AI, held under the operator's ceiling at once, driven through the bundle.
  *
- * FINDING 1, SEV 1. At the audit's HEAD the press, the first plan and the daily look asked the record's model with no
+ * EVERY DOOR THAT ENDS AT THE BINDING. Before this the press, the first plan and the daily look asked the record's model with no
  * meter beside it, so at `SLASH_INCLUDED_MONTH_NEURONS: '0'`, which `wrangler.jsonc` documents as "turns every ask away",
  * five presses and one daily look made 6 binding calls. `70e45882` passed `workerSlashMeter` to the record, and the
- * audit's S1 re-run on 24 September is still red, 6 calls, because the probe builds the record as `index.ts` did BEFORE
+ * probe re-run afterwards was still red, 6 calls, because the probe builds the record as `index.ts` did BEFORE
  * that commit and never loads the bundle. So the case below asks the bundle itself, over every door a person can reach
  * that ends at the binding: the press, the daily look it wakes, the first plan, a read and a propose at the palette.
  * `grep -rn "aiInference\|includedInference\|includedModel\|env.AI" apps/worker/src` finds no other caller: the embeddings
  * in `inference.ts` have none, a script's sandbox is handed `RECORD` alone (`script.ts`), and an automation's question
  * and `proposePattern` go through the engine `operatorCeiling` wraps (`slash-operator-cap.test.ts` case 3 holds the first).
- * RED WITHOUT THE METER, measured on 24 September by taking the `slashMeter` line out of `Record$.#open`: 7 binding calls
+ * RED WITHOUT THE METER, measured by taking the `slashMeter` line out of `Record$.#open`: 7 binding calls
  * at a ceiling of 0 (5 presses, the look, the plan), and the two palette doors refused.
  *
- * FINDING 3, SEV 3. The ceiling turns neurons into asks at the package's worst call, 232 (`worstAsk`), and a press was
- * held only by `INCLUDED_NEURONS_PER_CALL`, 2,500, while its input is the record's own reading and grows with it. S3
+ * A PRESS AT THE WORST CALL. The ceiling turns neurons into asks at the package's worst call, 232 (`worstAsk`), and a press was
+ * held only by `INCLUDED_NEURONS_PER_CALL`, 2,500, while its input is the record's own reading and grows with it. A probe
  * measured a record of 300 lists: a prompt of 52,310 bytes, a worst case of 272 neurons, counted as one ask of 232.
- * The record's two asks are now held to the same worst call the ceiling counts them at. RED BEFORE THAT, measured on
- * 24 September: this file 1 pass, 1 fail, "a press may spend 274 neurons and the ceiling counts every call at 232".
+ * The record's two asks are now held to the same worst call the ceiling counts them at. RED BEFORE THAT, measured:
+ * this file 1 pass, 1 fail, "a press may spend 274 neurons and the ceiling counts every call at 232".
  *
  * THE CLOCK IS MOCKED, because a press on a record younger than two weeks asks no model at all, and the Worker's clock
  * is `Date.now()`. The binding is a local function and no test here spends a neuron.
@@ -85,7 +84,7 @@ async function recordOver(t: TestContext, neurons: string, lists: number, guide 
   return { ai, c, cookie, post: (method: string, body: object) => post(method, body, cookie) };
 }
 
-test('S1 AT A CEILING OF 0 NOTHING REACHES THE BINDING: five presses, the daily look, a first plan, a read and a propose at the palette', async (t) => {
+test('AT A CEILING OF 0 NOTHING REACHES THE BINDING: five presses, the daily look, a first plan, a read and a propose at the palette', async (t) => {
   const { ai, c, cookie, post } = await recordOver(t, '0', 1, true);
   const presses: Out[] = [];
   for (let i = 0; i < 5; i++) presses.push(await post('slashPropose', {}));
@@ -103,7 +102,7 @@ test('S1 AT A CEILING OF 0 NOTHING REACHES THE BINDING: five presses, the daily 
   for (const out of doors) assert.equal(out.refusal?.code, 'SLASH_BUDGET_SPENT', JSON.stringify(out));
 });
 
-test('S3 A PRESS NEVER SPENDS MORE THAN THE ASK THE CEILING COUNTS IT AS: on 300 lists the model is not asked, on 1 it is', async (t) => {
+test('A PRESS NEVER SPENDS MORE THAN THE ASK THE CEILING COUNTS IT AS: on 300 lists the model is not asked, on 1 it is', async (t) => {
   const { ai, c, post } = await recordOver(t, '900000', 300);
   const out = await post('slashPropose', {});
   assert.ok(out.ok, JSON.stringify(out));

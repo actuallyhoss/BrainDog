@@ -109,7 +109,7 @@ test('the host is --host, then BRAINDOG_HOST, then the default; the token is BRA
 });
 
 test('THE APP\'S OWN ADDRESS FOR A RECORD, /app/<slug>, IS THE SAME HOST AS /<slug>', (t) => {
-  /* `loop/research-one-domain.md` Brief D. `app` is a reserved slug (`packages/record/src/directory.ts`), so a first
+  /* `app` is a reserved slug (`packages/record/src/directory.ts`), so a first
      segment of `app` is never a record and always the app's prefix. Only that whole segment goes: `/apple` is a slug. */
   assert.equal(hostKey('https://brain.dog/app/acme'), 'https://brain.dog/acme');
   assert.equal(hostKey('brain.dog/app/acme/'), 'https://brain.dog/acme');
@@ -201,10 +201,10 @@ test('A REDIRECT IS NOT FOLLOWED, so the bearer never goes where nobody chose', 
 
 test('a remote is compared without its scheme, its user, a password or .git', () => {
   const cases: [string, string | null][] = [
-    ['git@github.com:Sam/braindog.git', 'github.com/Sam/braindog'],
-    ['https://github.com/Sam/braindog.git', 'github.com/Sam/braindog'],
-    ['https://name:not-a-password@GitHub.com/Sam/braindog/', 'github.com/Sam/braindog'],
-    ['ssh://git@github.com:22/Sam/braindog.git', 'github.com:22/Sam/braindog'],
+    ['git@github.com:Acme/braindog.git', 'github.com/Acme/braindog'],
+    ['https://github.com/Acme/braindog.git', 'github.com/Acme/braindog'],
+    ['https://name:not-a-password@GitHub.com/Acme/braindog/', 'github.com/Acme/braindog'],
+    ['ssh://git@github.com:22/Acme/braindog.git', 'github.com:22/Acme/braindog'],
     ['C:\\repos\\braindog', null],
     ['/srv/git/braindog.git', null],
   ];
@@ -215,15 +215,15 @@ test('A HEADER OUTSIDE ITS GRAMMAR IS DROPPED rather than sent broken', () => {
   const p: Position = {
     cwd: 'C:\\Repos\\braindog',
     repo: 'braindog',
-    remote: 'github.com/Sam/braindog',
-    host: 'studio-pc',
+    remote: 'github.com/Acme/braindog',
+    host: 'STUDIO-PC',
     branch: 'master',
     head: 'aee9762',
   };
   assert.deepEqual(sessionHeaders(p, 'claude'), {
-    'x-braindog-host': 'studio-pc',
+    'x-braindog-host': 'STUDIO-PC',
     'x-braindog-repo': 'braindog',
-    'x-braindog-remote': 'github.com/Sam/braindog',
+    'x-braindog-remote': 'github.com/Acme/braindog',
     'x-braindog-cwd': 'C:\\Repos\\braindog',
     'x-braindog-agent': 'claude',
   });

@@ -1,6 +1,5 @@
 /**
- * The route row for stopping a member and letting them back in (`packages/record/src/index.ts` `suspendMember`,
- * `loop/finish/contracts.md` §2.5 and X11).
+ * The route row for stopping a member and letting them back in (`packages/record/src/index.ts` `suspendMember`).
  *
  * ONE ROW A LINE, IN THE SHAPE `ROUTES` HAS ALWAYS HAD, because the two gates over the table read it by that shape:
  * `router-groups` holds each row's group to `docs/30-BLUEPRINT.md` §5, and `guards` holds the record method of the same

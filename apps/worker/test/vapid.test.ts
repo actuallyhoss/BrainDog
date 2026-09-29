@@ -2,7 +2,7 @@
  * Web Push from the Worker, content-free, signed with VAPID over WebCrypto. `09 §3`, `51 §5` (`notify.push`), RFC 8292.
  *
  * THE KEYS HERE ARE MADE IN MEMORY AND THROWN AWAY. No VAPID pair is written to this repository, in a test or
- * anywhere else: the real one is his to generate and put in (`loop/research-living-in-it.md` §8, call 6), and a
+ * anywhere else: the real one is his to generate and put in, and a
  * fixture that looked like one is a secret somebody eventually pastes into production because it was lying there.
  *
  * WHAT IS ASSERTED IS WHAT A PUSH SERVICE CHECKS. FCM, Mozilla and Apple each verify the JWT against the `k=` key in
@@ -185,7 +185,7 @@ test('AN ENDPOINT THAT IS NOT A PUBLIC HTTPS ADDRESS IS NEVER POSTED TO, and a d
 });
 
 test('THE JOB NAMES A SUBSCRIPTION BY ID, AND AN ENDPOINT IN THE PAYLOAD IS NEVER READ', async () => {
-  /* W58-3 posted to `payload.sub.endpoint`, which is the shape an endpoint in every `.brain` export would take. A payload
+  /* The deliverer once posted to `payload.sub.endpoint`, which is the shape an endpoint in every `.brain` export would take. A payload
      that still says one is read for its id, and a `sub` with no id is a dead letter that says so, not a guess. */
   const { vapid } = await keyed();
   const sent: string[] = [];

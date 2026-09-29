@@ -17,9 +17,9 @@ import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 const GOOD: Record<string, string> = {
   'x-braindog-session': 'S12',
   'x-braindog-client': 'a1b2-c3:d4.e_5',
-  'x-braindog-host': 'studio-pc',
+  'x-braindog-host': 'STUDIO-PC',
   'x-braindog-repo': 'braindog',
-  'x-braindog-remote': 'github.com/sam/braindog',
+  'x-braindog-remote': 'github.com/acme/braindog',
   'x-braindog-cwd': 'C:\\Repos\\braindog',
   'x-braindog-agent': 'claude',
 };
@@ -27,9 +27,9 @@ const GOOD: Record<string, string> = {
 const KEPT = {
   spoken: 'S12',
   client_id: 'a1b2-c3:d4.e_5',
-  host: 'studio-pc',
+  host: 'STUDIO-PC',
   repo: 'braindog',
-  remote: 'github.com/sam/braindog',
+  remote: 'github.com/acme/braindog',
   cwd: 'C:\\Repos\\braindog',
   agent: 'claude',
 };
@@ -75,7 +75,7 @@ test('_meta.session IS HELD TO THE SAME GRAMMAR, and only its own string keys ar
   assert.deepEqual(hintsOf({ ...KEPT, repo: '../etc', agent: 'gpt', cwd: 'C:\\Users\\Zoë', host: 7, doing: 'not a hint' }), {
     spoken: 'S12',
     client_id: 'a1b2-c3:d4.e_5',
-    remote: 'github.com/sam/braindog',
+    remote: 'github.com/acme/braindog',
   });
   assert.deepEqual(hintsOf(JSON.parse('{"__proto__":{"repo":"braindog"}}')), {});
   assert.deepEqual(hintsOf(Object.create({ repo: 'braindog' })), {}, 'an inherited key was read as a hint');
@@ -85,9 +85,9 @@ test('_meta.session IS HELD TO THE SAME GRAMMAR, and only its own string keys ar
 test('THE HINTS GO ON THE CONTEXT KEY BY KEY, and a call with none leaves it as it was', () => {
   const ctx: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'owner' } };
   assert.equal(withSession(ctx, {}), ctx);
-  const once = withSession(ctx, { repo: 'braindog', host: 'studio-pc' });
-  assert.deepEqual(once.session, { repo: 'braindog', host: 'studio-pc' });
-  assert.deepEqual(withSession(once, { repo: 'site' }).session, { repo: 'site', host: 'studio-pc' });
+  const once = withSession(ctx, { repo: 'braindog', host: 'STUDIO-PC' });
+  assert.deepEqual(once.session, { repo: 'braindog', host: 'STUDIO-PC' });
+  assert.deepEqual(withSession(once, { repo: 'site' }).session, { repo: 'site', host: 'STUDIO-PC' });
   assert.equal(ctx.session, undefined, 'the context it was given was changed');
 });
 
@@ -104,7 +104,7 @@ test('ATTACH AND sessionsLive THROUGH THE SHARED WIRING: a token is a run, and a
   const handlers = handlersFor(api);
   const agent: CallContext = {
     principal: { kind: 'token', id: 'tok_1', scope: 'write', person: 'p_1', level: 'owner' },
-    session: { host: 'studio-pc', repo: 'braindog', agent: 'claude' },
+    session: { host: 'STUDIO-PC', repo: 'braindog', agent: 'claude' },
   };
   const post = async (name: string, body: unknown, ctx: CallContext) => {
     const res = await serveApi(new Request(`https://x/api/${name}`, { method: 'POST', body: JSON.stringify(body) }), handlers, ctx);
@@ -133,7 +133,7 @@ test('CONTEXT IS A READ+ GET THROUGH THE SHARED WIRING, naming the run the heade
   const handlers = handlersFor(api);
   const agent: CallContext = {
     principal: { kind: 'token', id: 'tok_1', scope: 'read', person: 'p_1', level: 'owner' },
-    session: { host: 'studio-pc', repo: 'braindog', agent: 'claude', client_id: 'c-1' },
+    session: { host: 'STUDIO-PC', repo: 'braindog', agent: 'claude', client_id: 'c-1' },
   };
   const read = async () => {
     const res = await serveApi(new Request('https://x/api/context'), handlers, agent);
@@ -190,7 +190,7 @@ test('MEET IS A DATA WRITE THROUGH THE SHARED WIRING: 422 where People is switch
   const handlers = handlersFor(api);
   const agent: CallContext = {
     principal: { kind: 'token', id: 'tok_1', scope: 'propose', person: 'p_1', level: 'owner' },
-    session: { host: 'studio-pc', repo: 'braindog', agent: 'claude', client_id: 'c-1' },
+    session: { host: 'STUDIO-PC', repo: 'braindog', agent: 'claude', client_id: 'c-1' },
   };
   const post = async (body: unknown) => {
     const res = await serveApi(new Request('https://x/api/meet', { method: 'POST', body: JSON.stringify(body) }), handlers, agent);
@@ -211,9 +211,9 @@ test('MEET IS A DATA WRITE THROUGH THE SHARED WIRING: 422 where People is switch
 });
 
 test('A REMOTE LOSES ITS USERINFO, so a password in a git remote never reaches the record', () => {
-  const said = sessionOf(new Headers({ 'x-braindog-remote': 'https://sam:hunter2@github.com/sam/braindog.git' }));
-  assert.equal(said.remote, 'https://github.com/sam/braindog.git');
+  const said = sessionOf(new Headers({ 'x-braindog-remote': 'https://acme:hunter2@github.com/acme/braindog.git' }));
+  assert.equal(said.remote, 'https://github.com/acme/braindog.git');
   assert.equal(hintsOf({ remote: 'ssh://deploy:hunter2@example.com/r.git' }).remote, 'ssh://example.com/r.git');
   /* scp-style has no scheme and no password: left as it is, and the scope resolver reads it. */
-  assert.equal(sessionOf(new Headers({ 'x-braindog-remote': 'git@github.com:sam/braindog.git' })).remote, 'git@github.com:sam/braindog.git');
+  assert.equal(sessionOf(new Headers({ 'x-braindog-remote': 'git@github.com:acme/braindog.git' })).remote, 'git@github.com:acme/braindog.git');
 });

@@ -1,6 +1,6 @@
 /**
  * The route rows for retyping a field: previewing what changing its type would do to a list's rows, then doing it
- * (`packages/record/src/methods/retype.ts`, `loop/finish/gaps.md` GAP-8).
+ * (`packages/record/src/methods/retype.ts`).
  *
  * ONE ROW A LINE, IN THE SHAPE `ROUTES` HAS ALWAYS HAD: `router-groups` holds each row's group to
  * `docs/30-BLUEPRINT.md` §5, and `guards` holds the record method of the same name to the guard its group implies.

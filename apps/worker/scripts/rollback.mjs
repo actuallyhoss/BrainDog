@@ -12,7 +12,7 @@
  * deployed, and says in `$GITHUB_OUTPUT` which versions to put back; the workflow's next steps call `wrangler rollback`
  * with them. The decision is here, where a test can hold it, and the command is in the workflow, where the token is.
  *
- * A ROLLBACK IS NOT ALWAYS SAFE, AND THE CASES WHERE IT IS NOT ARE WHY THIS FILE EXISTS (`loop/finish/ops.md` §6.4).
+ * A ROLLBACK IS NOT ALWAYS SAFE, AND THE CASES WHERE IT IS NOT ARE WHY THIS FILE EXISTS.
  * A kernel migration runs the first time a record opens on the new build, and the build before it refuses a record that is
  * newer than it knows, so rolling the Worker back after one shuts every record that opened in between. A Durable
  * Object class migration in `wrangler.jsonc` changes what classes exist, and an older version does not carry the new

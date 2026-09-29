@@ -24,8 +24,8 @@
  * owner. So the runner creates a record for the principal and suspends them.
  *
  * AND IT SUSPENDS THEM WITH SQL, BECAUSE THE RECORD WILL NOT. `suspendMember` refuses to suspend the
- * last owner who can act (`packages/kernel/src/members.ts`, `LEVEL_REQUIRED`), and measured on
- * 2026-09-22 no test anywhere in the tree reaches this refusal, so the state that raises it is one
+ * last owner who can act (`packages/kernel/src/members.ts`, `LEVEL_REQUIRED`), and, measured,
+ * no test anywhere in the tree reaches this refusal, so the state that raises it is one
  * the product's own methods refuse to produce. The UPDATE writes it the way a restore of an old
  * file, or a hand edit, would leave it, which is the case the refusal is there for.
  */

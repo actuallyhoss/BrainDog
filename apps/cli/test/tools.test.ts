@@ -116,7 +116,7 @@ async function stubRecord(t: After, o: { project?: boolean; register?: boolean }
 type Call = { args: string[]; cwd: string };
 
 /* `login: false` IS A MACHINE HOLDING NO LOGIN AT ALL, since `keys put` deposits with the login when there is no vault
-   grant (`loop/finish/agents.md` C1), so the name-only path is now the one with neither. The stub reads no bearer. */
+   grant, so the name-only path is now the one with neither. The stub reads no bearer. */
 async function setup(t: After, o: { project?: boolean; grant?: boolean; register?: boolean; login?: boolean } = {}) {
   const host = await stubRecord(t, o);
   const dir = mkdtempSync(join(tmpdir(), 'braindog-tools-'));

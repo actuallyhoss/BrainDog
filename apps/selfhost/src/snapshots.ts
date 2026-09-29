@@ -104,7 +104,7 @@ const NATURAL = new Intl.Collator('en', { numeric: true });
  * The credentials a restore must not bring back: each table, the rows of it the live record has ended, and the columns
  * that say so, written over the copy's row with the same id when the copy still has it open.
  *
- * MEASURED BEFORE THIS (`test/restore-revoked.test.ts`, audit fifty-seven finding 3): every table was copied as the copy
+ * MEASURED BEFORE THIS (`test/restore-revoked.test.ts`): every table was copied as the copy
  * held it, so a token revoked after the copy answered `/api/boot` 200 again once the copy was restored, an operation
  * grant already spent exported a second time, and a withdrawn invitation link opened again. Nothing said so.
  *

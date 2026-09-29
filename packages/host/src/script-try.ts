@@ -1,6 +1,5 @@
 /**
- * `script_try`: a draft script run now, in the sandbox, answering the writes it would make and writing none of them
- * (`loop/research-shell-scripts.md` section 7 and the remainder of Brief 6).
+ * `script_try`: a draft script run now, in the sandbox, answering the writes it would make and writing none of them.
  *
  * AN AGENT WRITING A SCRIPT HAD NO WAY TO RUN IT BEFORE A PERSON ACCEPTED IT. The only run was the scheduled one, after
  * Decide, so a script that misread its provider's answer was found by its owner, as three refused runs and a pause.
@@ -20,7 +19,7 @@
  * `grantOf` from that word and passes `null` for everybody else, and then a fetch naming a key is a rejected promise
  * inside the run: the script may catch it and go on, and the caller sees how far it got.
  *
- * THE VAULT GATE, NOT `level === 'owner'`. Audit thirty-eight (finding 2) planted a session proved two hours ago: the
+ * THE VAULT GATE, NOT `level === 'owner'`. A probe planted a session proved two hours ago: the
  * vault refused it `listGrants` with `NEEDS_BROWSER_SESSION`, and the same cookie's trial sent a request carrying the
  * owner's key and left a `grant.read` in her name. So `owner` is the record's `vault()` answer, held to a person. A trial
  * refused the key for that reason alone still runs, keyless: the record says `stale` when the proof's age is the only
@@ -40,7 +39,7 @@
  *
  * AND COUNTED AS IN FLIGHT FROM BEFORE IT ASKS UNTIL IT IS METERED. The allowance was asked with no count of the
  * trials still in their sandboxes, so five started together with one run left all ran and the month closed at 15,004
- * of 15,000 (audit thirty-seven finding 2, `test/script-try-spend.test.ts`). A trial now takes a place in `inFlight`
+ * of 15,000 (`test/script-try-spend.test.ts`). A trial now takes a place in `inFlight`
  * before the question, asks with the places taken before it as `pending`, and gives its place back once the ledger has
  * been told, whichever way it ended.
  *

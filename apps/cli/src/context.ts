@@ -1,5 +1,5 @@
 /**
- * `braindog context`: the briefing on demand (`loop/research-agent-path.md` §4.2), for a session that has lost
+ * `braindog context`: the briefing on demand, for a session that has lost
  * it, an agent with no hooks, or a person at a shell.
  *
  * ONE RENDERER, NOT TWO. The start hook and this command print the same lines, from `briefingOf` in

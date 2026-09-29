@@ -2,8 +2,8 @@
  * The app's config with one or both flips of the one-domain move taken back out, built in memory for the tests.
  *
  * THE SHAPE BEFORE A FLIP IS WHAT A ROLLBACK OF THAT FLIP LANDS ON, SO ITS CHECKS OUTLIVE THE PUSH THAT RETIRED IT.
- * `loop/research-one-domain-binding.md` section 5 undoes a faulty flip with `wrangler rollback` of the app and a
- * `git revert`, which puts these vars back behind the same site binding. The smoke step and the checker still carry a
+ * A faulty flip is undone with `wrangler rollback` of the app and a `git revert`, which puts these vars back behind the
+ * same site binding. The smoke step and `provision-check` still carry a
  * branch for that shape (the public host is the Worker's own Custom Domain, and its page loads are sent into `/app` on
  * the same name), and once B2 moved production's vars into `wrangler.jsonc` nothing in the file reached that branch:
  * with push 4's vars in place, eight of the scripts' tests that asked the file for production's pre-flip answers

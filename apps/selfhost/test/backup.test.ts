@@ -147,7 +147,7 @@ test('A NIGHTLY COPY THAT CANNOT BE WRITTEN IS SAID IN ONE SENTENCE, and the hos
 test('THE DIRECTORY IS COPIED WITH THE NIGHTLY COPY, into <data>/directory-snapshots/, once a night and thirty kept', async () => {
   /* MEASURED AT 1586f2a2, BEFORE THIS TEST: after a nightly copy the data directory held the record's copy in
      `<slug>/snapshots/` and nothing of `directory.sqlite`, which is the only file that knows which name reaches which
-     record, who owns it and their passkeys (`loop/research-restore.md` section 6). A lost Directory left every record
+     record, who owns it and their passkeys. A lost Directory left every record
      whole and nobody able to reach one. */
   const data = mkdtempSync(join(tmpdir(), 'braindog-nightly-dir-'));
   const dirFile = join(data, 'directory.sqlite');

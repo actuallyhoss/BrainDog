@@ -1,6 +1,5 @@
 /**
- * A record method under a slug, `/app/<slug>/api/<method>`, through `export default`'s own `fetch` and a real `Directory$`
- * (`loop/research-one-domain.md` §2.4).
+ * A record method under a slug, `/app/<slug>/api/<method>`, through `export default`'s own `fetch` and a real `Directory$`.
  *
  * THE WEB SENDS EVERY RECORD CALL THERE ONCE A PAGE IS UNDER A SLUG (`apiBase` in `apps/web/src/lib/at.ts`), so the
  * pieces `app-path.test.ts` and `session.test.ts` hold one at a time have to meet in `route()`: the slug read off the
@@ -11,9 +10,9 @@
  *
  * AND `/app/api/<method>`, WHICH NAMES NO RECORD AND NO PAGE. `api` is a word the Directory never hands out, so the
  * first segment was read as one of the app's pages, the rest was `/api/boot`, and the Worker served it as a second
- * copy of the root `/api`: the public demo to a caller with no credential (the demo is gone since,
- * `loop/research-no-sample.md` A1), a cookie's record to a signed-in caller, and the key doors past their own check, which
- * reads the slug and saw none (the checker's finding in wave forty-one). The web never renders that address, so it
+ * copy of the root `/api`: the public demo to a caller with no credential (the demo is gone since),
+ * a cookie's record to a signed-in caller, and the key doors past their own check, which
+ * reads the slug and saw none. The web never renders that address, so it
  * is refused, as `ROUTE_UNKNOWN`, the way any other path this Worker does not serve is.
  */
 

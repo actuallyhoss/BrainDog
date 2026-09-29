@@ -1,12 +1,12 @@
 /**
- * The same vault answers the same key to a scheduled action and to a script. SPK-3's guard against drift. Slash was a third
- * caller until its key became the one the owner picks by id (`loop/finish/agents.md` AGT-21), and the paragraphs below keep
+ * The same vault answers the same key to a scheduled action and to a script. A guard against drift. Slash was a third
+ * caller until its key became the one the owner picks by id, and the paragraphs below keep
  * the history as it was measured.
  *
  * THREE CALLERS, ONE ORDER. A scheduled action's `grant:` opens what `keyNamed` (`packages/kernel/src/actions.ts`) finds,
  * and the approval line names what `opensNamed` finds. A script's key is what `grantNamed` (`src/script.ts`) finds. The
  * host's own Slash key is what `slashGrantOf` (`src/slash.ts`) finds. At `afb3b1b2` each of the four wrote the newest-first
- * order out for itself, and the audit of wave forty-nine found a fifth, Slash's `grants().find(...)`, opening the OLDEST
+ * order out for itself, and a probe found a fifth, Slash's `grants().find(...)`, opening the OLDEST
  * `slash` key while every action named `slash` sent the newest (`slash-grant-chooser.test.ts` case 1). Nothing but four
  * authors copying the same clause kept the rest in step.
  *
@@ -14,7 +14,7 @@
  * back in from `listGrants` (`ORDER BY label` and nothing within it) is exactly what a chooser that forgot to order would
  * return, and a fixture array is in whatever order its author typed.
  *
- * MEASURED ON 23 SEPTEMBER, AGAINST THE FOUR COPIES AS THEY STOOD: 8 tests, 8 pass. No state here, ties on the instant
+ * MEASURED AGAINST THE FOUR COPIES AS THEY STOOD: 8 tests, 8 pass. No state here, ties on the instant
  * included, made two of them disagree, so this file is the guard for the move to one chooser and not the proof of a wrong
  * winner. Copies were then broken by hand to see that the guard holds them. `grantNamed`'s sort turned oldest-first: 6 of
  * 8 fail, every case but the two revoke cases. Its id tie-break alone reversed: the two case 2s fail. `grantChosen`'s id
@@ -74,7 +74,7 @@ async function vault() {
   };
   const script = grantNamed(() => k.grants());
   /* SLASH IS NO LONGER ONE OF THE CALLERS. Its key is the grant the owner picked by id in Settings, and no label chooses
-     it (`loop/finish/defects.md` S1), so `slashGrantOf` is gone and `slash` is a label like `goldapi` to the two left. */
+     it, so `slashGrantOf` is gone and `slash` is a label like `goldapi` to the two left. */
   /** What each caller opens under `name`. */
   const opened = (name: string) => ({
     action: keyNamed(sql, name)?.id ?? null,

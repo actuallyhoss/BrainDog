@@ -1,5 +1,5 @@
 /**
- * Every mail the Worker sends a person, and the one function that sends it (`loop/finish/ops.md` 4.0 F).
+ * Every mail the Worker sends a person, and the one function that sends it.
  *
  * ONE MODULE, SO THE LETTERS CANNOT DRIFT. Sign-in, sign-up, an invitation's proof, a passkey notice, the lapse ladder
  * and the welcome after payment each write their words here and nowhere else, as text and as HTML, with the same
@@ -103,7 +103,7 @@ export type MailVars = {
   label?: string | undefined;
   /** Where to write with a question. Empty, and the footer names no address. */
   support?: string | undefined;
-  /** The one sentence the Directory already wrote, printed whole as the letter's body (`usage.notice`, MTR-2). */
+  /** The one sentence the Directory already wrote, printed whole as the letter's body (`usage.notice`). */
   say?: string | undefined;
 };
 
@@ -212,7 +212,7 @@ function partsOf(kind: MailKind, v: { [K in keyof MailVars]-?: string }): { subj
         subject: 'You are signed out of BrainDog',
         parts: [{ say: 'Every BrainDog session for this address has ended, on every device. Signing in again needs a passkey or a new sign-in link.' }],
       };
-    /* THE TWO HALVES OF CHANGING A SIGN-IN ADDRESS (GAP-7). The link goes to the new address, so only somebody who reads
+    /* THE TWO HALVES OF CHANGING A SIGN-IN ADDRESS. The link goes to the new address, so only somebody who reads
        it can finish; the notice goes to the old one, so a change nobody there made is seen by the person it was done to.
        The notice names no address, old or new: the mail may be read by whoever now holds the old mailbox. */
     case 'email.change':
@@ -274,7 +274,7 @@ function partsOf(kind: MailKind, v: { [K in keyof MailVars]-?: string }): { subj
           ...(v.asked ? [{ say: `The name ${v.asked} was taken before the payment went through, so the record was made as ${v.record || 'the next free name'}.` }] : []),
         ],
       };
-    /* THE ONE SENTENCE THE DIRECTORY ALREADY WROTE (MTR-2), printed whole: `notice()` decided the words against the
+    /* THE ONE SENTENCE THE DIRECTORY ALREADY WROTE, printed whole: `notice()` decided the words against the
        record's own allowance and plan, and this letter adds nothing to them beyond the subject and the footer. */
     case 'usage.notice':
       return {
@@ -475,7 +475,7 @@ const textFooter = (why: string, support: string): string =>
  * A kind's letter, with every value in it made safe: a line of text, and escaped in the HTML.
  *
  * THE FOOTER NAMES WHAT THE MAIL IS, and where to write once `SUPPORT_ADDRESS` is set; while it is empty the footer
- * names no address at all (`loop/finish/contracts.md` 8.4, "support address").
+ * names no address at all.
  *
  * THE LINK IS THE BUTTON. What comes before it is the letter's body; what comes after it is quieter, under a hairline,
  * because it is the sentence for the person who did not ask. A link that works once also shows itself as text under

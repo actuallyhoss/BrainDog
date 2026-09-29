@@ -1,6 +1,6 @@
 /**
  * `braindog skills sync`: the record's skills written to the folders Claude Code reads them from, and a local
- * edit sent back as a proposal (`loop/research-agent-path.md` §5.4).
+ * edit sent back as a proposal.
  *
  * THE RECORD WRITES FILES, AND A LOCAL EDIT IS NEVER OVERWRITTEN. A file is written only when it is unchanged since
  * the last sync, which the lock file at `~/.braindog/skills-lock.json` says: keyed by the file's absolute path, it

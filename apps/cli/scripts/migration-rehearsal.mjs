@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /**
  * The migration rehearsal: last night's copy of a Cloud record, restored by the build that is live, then opened by this
- * checkout's kernel so every migration it adds runs over real rows before any person's record meets it (ops.md OPS-3).
+ * checkout's kernel so every migration it adds runs over real rows before any person's record meets it.
  *
  *   node apps/cli/scripts/migration-rehearsal.mjs <night.brainl.age> --identity <age identity file> --deployed <sha>
  *   node apps/cli/scripts/migration-rehearsal.mjs <record.brain>
  *
  * WHY IT EXISTS. A migration runs at open on every live record, the first time that record is opened on the new build,
- * and it cannot be rolled back once it has run (contracts.md §1.1, ops.md §6.4). The tests run each migration over a
+ * and it cannot be rolled back once it has run. The tests run each migration over a
  * record a test built, which holds the rows a test thought of. This runs them over the rows a person actually holds,
  * on a throwaway copy, before the merge that ships them, and FAIL stops that merge.
  *
@@ -34,8 +34,7 @@
  * data directory before an upgrade, so steps 1 to 3 are skipped and it is copied into the folder, never opened in place.
  * The copy is SQLite's own `VACUUM INTO`, a consistent snapshot even while a host is writing the file.
  *
- * NOTHING HERE WRITES TO A NETWORK OR TO A LIVE RECORD. The night is a file he fetched himself (the command is in
- * `loop/research-restore.md`, "Drill"); the one network read is `pnpm install`'s, and only when the package store on this
+ * NOTHING HERE WRITES TO A NETWORK OR TO A LIVE RECORD. The night is a file he fetched himself; the one network read is `pnpm install`'s, and only when the package store on this
  * machine does not already hold what the live build's lockfile names.
  *
  * THE WORKTREE IS NOT THIS TREE, and that is the point of it: a restore by this checkout's kernel would run the new

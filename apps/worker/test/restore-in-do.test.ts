@@ -1,5 +1,5 @@
 /**
- * The Worker wired to its copies (ROADMAP W55-7, `loop/research-restore.md` §9): the record's `Snapshots` port, going back
+ * The Worker wired to its copies: the record's `Snapshots` port, going back
  * through `51 D15`'s two calls, a delete that sweeps the bucket, and a night that copies the Directory and expires what
  * deleted records left.
  *
@@ -13,7 +13,7 @@
  * (`cloud-harness.ts`). The one thing faked is the rewind: PITR does not run locally, so the object that comes back
  * after `ctx.abort()` holds the rows it held before. What this proves is the order of the calls and where the event
  * lands. THAT THE OBJECT COMES BACK AT THE ARMED BOOKMARK IS PROVED ON ALPHA ONLY, by one restore of an alpha record,
- * which is his step (`loop/research-restore.md` §8).
+ * which is his step.
  */
 
 import { test } from 'node:test';
@@ -136,7 +136,7 @@ test('A WRITE THAT ARRIVES WHILE THE RECEIPT IS BEING PUT IS REFUSED, because th
   assert.ok(took.ok, JSON.stringify(took));
   /* THE GAP THE PLATFORM LEAVES OPEN. `copies.ts` arms the bookmark and then puts its receipt to R2, and a Durable
      Object's input gate stays shut for its own storage and not for a bucket, so a second request can be delivered in
-     between. Measured by the checker: with the object marked armed only once `restore` had answered, a `setPref` sent
+     between. Measured by mutation: with the object marked armed only once `restore` had answered, a `setPref` sent
      from inside that put was answered 200, and the rewind the object was already armed for would have taken it. */
   const put = c.blobs.put.bind(c.blobs);
   let between: Response | undefined;
@@ -157,7 +157,7 @@ test('A RESTORE CALLED OFF AFTER IT WAS ARMED STILL RESETS THE OBJECT, so the wa
   /* THE RECEIPT REFUSED, SO `copies.ts` CALLS IT OFF BY ARMING THE UNDO BOOKMARK. That bookmark is the moment of the
      first arm, and `onNextSessionRestoreBookmark` has no way to disarm, so the object is still set to go back at its
      next start: every write it accepted between this answer and an eviction would be taken by that rewind. Measured by
-     the checker: the Worker reset nothing for a refused restore, and the object went on answering writes. */
+     mutation: the Worker reset nothing for a refused restore, and the object went on answering writes. */
   const put = c.blobs.put.bind(c.blobs);
   c.blobs.put = async (key, value, options) => {
     if (key.includes('/restore-')) throw new Error('the bucket is having a day');

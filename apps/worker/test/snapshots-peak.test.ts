@@ -3,8 +3,8 @@
  *
  * WHY THIS FILE AND NOT ANOTHER CASE IN `snapshots-stream.test.ts`. That test builds its 40 MiB of
  * `x` before it takes a baseline, so the string the Durable Object hands the Worker is never in its
- * figure, and its text is all Latin-1, which V8 keeps at one byte a character. The batch-twenty audit
- * (finding 4) measured what it leaves out: with one U+2014 in the dump V8 holds the string at two
+ * figure, and its text is all Latin-1, which V8 keeps at one byte a character. What that
+ * leaves out was measured: with one U+2014 in the dump V8 holds the string at two
  * bytes a character, 80 MiB, and `take` encoded all of it into a 40 MiB file beside it, 120.8 MiB of
  * a 128 MB (122 MiB) isolate. A real record's dump has a dash or a curly quote in it somewhere, so
  * the two-byte string is the ordinary case and not the pathological one.

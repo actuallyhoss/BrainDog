@@ -2,20 +2,19 @@
  * A crash: what the caller is told, and what the operator is told, which are not the same thing.
  *
  * THE REASON USED TO GO TO THE CALLER AND NOWHERE ELSE. `serveApi`'s catch wrote the thrown message into the 500's
- * `fix`, and nothing logged it. Measured for `loop/research-hardening.md` §2.1: a handler throwing the driver's sentence
+ * `fix`, and nothing logged it. Measured: a handler throwing the driver's sentence
  * `SQLITE_AUTH: not authorized, row alice@example.com` answered `boot could not be answered: SQLITE_AUTH: not
  * authorized, row alice@example.com.` to whoever asked, on both hosts, and left no line in either host's log. So a
  * row's value reached a stranger, and the person who could fix the fault had nothing to read.
  *
  * SO IT IS SPLIT, THE WAY `/mcp` ALREADY SPLITS IT (`packages/mcp/src/rpc.ts`, the catch in `handle`). The caller gets
  * a reference and a sentence that says nothing of the reason; the log gets one JSON line with the same reference, the
- * place, and the reason. Whether the reason belongs in that line is H10 in `research-hardening.md` §3, flagged for his
- * call because `53 §2.3` keeps field values out of log lines and a driver's sentence can hold one. Until he answers,
- * the default there is the one built here: the sentence is the one thing that diagnoses a crash, so it is logged, and
+ * place, and the reason. Whether the reason belongs in that line is an open question, because `53 §2.3` keeps field
+ * values out of log lines and a driver's sentence can hold one. Until it is settled, the default is the one built here: the sentence is the one thing that diagnoses a crash, so it is logged, and
  * it is never answered.
  *
  * ONE FUNCTION FOR EVERY DOOR. `serveApi` calls it here; the Worker's router and the self-host's outer catch are the
- * other two places a crash is answered (W60-6, W60-7), and the reason this module exists apart from `index.ts` is that
+ * other two places a crash is answered, and the reason this module exists apart from `index.ts` is that
  * three doors answering a crash three ways is the drift `index.ts`'s header is about.
  *
  * NO CLOCK AND NO `node:` IMPORT, because `tools/gates/stack.mjs` refuses both under `packages/`. The line carries no

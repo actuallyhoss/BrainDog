@@ -1,15 +1,15 @@
 /**
- * The Claude Code sessions still running on a profile, by process id (brief 53-B of `loop/research-cutover-day.md`).
+ * The Claude Code sessions still running on a profile, by process id.
  *
  * A SESSION OPEN ACROSS AN INSTALL KEEPS WHAT IT STARTED WITH. Measured with Claude Code 2.1.280 and stand-ins for the
- * old tool's server and hooks (`loop/research-cutover-day.md` §4): a session held open across `install --replace --apply`
+ * old tool's server and hooks: a session held open across `install --replace --apply`
  * on its own profile went on calling the old server 15 seconds later, answered `mcp__braindog__context` with "No such
  * tool", and still listed the old tool's skill. Only its hooks moved over, because Claude Code reloads `settings.json`
  * within a few seconds. So the one fix is to close each window and open it again, and until this file the install gave
  * no way to see which windows those were.
  *
  * THE FOLDER IS CLAUDE CODE'S OWN, AND UNDOCUMENTED. Each running session keeps `<profile>/sessions/<pid>.json`, which
- * is how the survey counted three open on the default profile and two on a named one. The files are READ BY NAME ONLY AND
+ * is how three were counted open on the default profile and two on a named one. The files are READ BY NAME ONLY AND
  * NEVER OPENED: the name is all this needs, and what is inside belongs to a program that may change it in any release.
  * For the same reason any error at all is an empty list, since a folder that moved or a name that changed shape is a
  * profile with nothing this code can say about it, not a reason to stop an install.

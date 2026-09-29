@@ -20,7 +20,7 @@ const PATH = /^(?:index\.json|usecases\/[a-z][a-z0-9-]{0,62}\/\d{1,6}\.\d{1,6}\.
 /**
  * Where the build puts the catalogue: at the root today, and under `/app` once the web app has its base path.
  *
- * BOTH, WHILE THE BUILD MOVES (`loop/research-one-domain.md` §3.1 and §3.2). `paths.base: '/app'` puts
+ * BOTH, WHILE THE BUILD MOVES. `paths.base: '/app'` puts
  * `apps/web/static/catalogue` at `build/app/catalogue`, and this Worker and that build deploy as separate commits, so a
  * reader that knew only one place offered nothing from Slash for as long as the other was live: the shell, or a 404,
  * is read as no file. The root is asked first because it is where every deployed build holds it today, and it costs

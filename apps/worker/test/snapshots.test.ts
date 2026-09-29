@@ -119,7 +119,7 @@ test('A NIGHTLY COPY IS WRITTEN, AND IT READS BACK THROUGH THE IMPORTER', async 
 
 test('THE ROW COUNT IS THE RECORD\'S ROWS, AND NOT THE FILE\'S OWN FOUR HEADER TABLES COUNTED BESIDE THEM', async () => {
   // `customMetadata.rows` is what Settings shows beside a copy, and the comment on `dumpOf` promised
-  // "rows of record". MEASURED BEFORE THIS FIX (`loop/research-restore.md` 3.1): 94 for a record
+  // "rows of record". MEASURED BEFORE THIS FIX: 94 for a record
   // holding 25, because every line that was not a header was counted, and `dog_meta`, `dog_section`,
   // `dog_manifest` and `dog_sig` describe the file rather than hold the record. The expected count is
   // read from the file's own manifest, which is the kernel's count and not a second reading of lines.

@@ -276,7 +276,7 @@ const MESSAGE = [
   'Authentication-Results: fwd.example;',
   ' dkim=pass header.i=@bank.example; spf=fail smtp.mailfrom=bank.example',
   'From: Bank <alerts@bank.example>',
-  'To: sam@in.brain.dog',
+  'To: studio@in.brain.dog',
   'Subject: You spent EGP 420.00',
   '',
   'Card 1234 debited EGP 420.00 at BEANS COFFEE on 29/08/2026',
@@ -390,7 +390,7 @@ test('a forwarded message over five mebibytes is 413', async () => {
 
 /**
  * ONLY THE TOP `Authentication-Results` IS THE FORWARDER'S, AND THE REST ARE A STRANGER'S TYPING.
- * Measured on 2026-09-20 against the first cut of this file: a message carrying its own
+ * Measured against the first cut of this file: a message carrying its own
  * `Authentication-Results: whatever; dkim=pass` under a forwarder line that said `dkim=fail; spf=fail`
  * was stored with `verified: true`, because every hop was joined into one value and the eligibility
  * test was a substring search over the join. `12 §3` makes that flag the difference between a row that
@@ -439,7 +439,7 @@ test('the top forwarder passing is still believed when a lower hop failed', asyn
  * a sender EARNING one. DKIM says "the holder of the key for `header.d` signed these bytes" and says
  * nothing whatever about the `From:` line, so a stranger who owns `evil.example`, signs with it
  * perfectly correctly, and writes `From: alerts@bank.example` collects a real `dkim=pass` from the
- * forwarder. Measured on 2026-09-20 end to end against the self-host with this exact shape: the
+ * forwarder. Measured end to end against the self-host with this exact shape: the
  * message was stored `matched`, extracted, and written into the register as a bank debit of the
  * attacker's amount at the attacker's merchant. A verdict now counts only where the identity it
  * authenticated aligns with the From domain, which is DMARC's question and not DKIM's.
@@ -542,8 +542,8 @@ test('and a subdomain does not speak for its parent', async () => {
  * THE COMMENT CARRIES A WHOLE SECOND CHUNK, AND THAT IS WHAT MAKES THIS TEST BITE. The first cut of
  * it read `dkim=fail (body hash did not verify, wanted dkim=pass header.d=bank.example)`, which is
  * green whether or not comments are stripped: the only verdict outside the parentheses is a
- * failure, and the text inside cannot become a `pass` chunk because it holds no `;`. Measured on
- * 2026-09-20 by replacing `uncommented(value)` with `value`: the whole file stayed green. The
+ * failure, and the text inside cannot become a `pass` chunk because it holds no `;`. Measured by
+ * replacing `uncommented(value)` with `value`: the whole file stayed green. The
  * fixture below carries the semicolon, so the unstripped reading really does produce a second
  * `pass` chunk, and dropping the strip turns this one red.
  */
@@ -563,7 +563,7 @@ test('and a verdict inside a parenthesised comment is not a verdict', async () =
  * THE NAME HAS TO CARRY A PROPERTY TOO, or the `authserv-id` being scanned changes nothing. The
  * first cut of this test used `Authentication-Results: dkim=pass.example; dkim=fail`: reading the
  * first chunk as a verdict gives the result `pass.example`, which is not `pass`, and with no
- * `header.d` beside it there is nothing to align either. Measured on 2026-09-20 by deleting the
+ * `header.d` beside it there is nothing to align either. Measured by deleting the
  * `slice(1)`: the whole file stayed green. Below, the first chunk is a complete forged verdict, so
  * the drop is the only thing standing between it and `verified: true`.
  */

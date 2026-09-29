@@ -5,12 +5,12 @@
  *
  * A PLACEHOLDER LEFT IN WAS TAKEN AS HIS NAME FOR GOOD. The command printed `name = '<your name>'` to be edited by hand
  * at midnight, the Worker refused the slug's and the email's placeholders and took the name's, and the owner's `me`
- * then said `<your name>` with no screen that renames him (`loop/research-batch-forty-six-audit.md` §7). The Worker now
+ * then said `<your name>` with no screen that renames him. The Worker now
  * refuses a name holding `<` or `>` (`test/provision-tz.test.ts`), and this file holds the other half: nothing is
  * printed to be edited, because each form asks.
  *
  * THE CLAIM LINK IS PRINTED ON A LINE OF ITS OWN. `Format-List` hard-wraps a value, and at 80 columns the one copy of
- * the claim link came out on two lines with ten spaces before the second (the same audit, "Found on the way"). A value
+ * the claim link came out on two lines with ten spaces before the second. A value
  * printed by itself is one line whatever the width.
  *
  * THE BASH FORM IS RUN, NOT READ, where there is a bash and a curl to run it with: its answers are piped in, it posts to
@@ -52,8 +52,8 @@ test('THE POWERSHELL FORM ASKS FOR EACH OF THE FOUR, and offers this machine\'s 
 test('THE POWERSHELL FORM IS ONE SCRIPT BLOCK, & { on the first line and } on the last that is not empty, so no Read-Host runs before the paste is whole', () => {
   /* STANDS IN FOR THE PASTE, WHICH A UNIT TEST CANNOT MAKE. Pasted as twelve bare lines into a 5.1 console, PSReadLine
      ran line one while the rest was still arriving, and the first Read-Host took the tail of line two as the operator
-     key in 2 of 14 runs: a ParserError, `$pk` never set, UNAUTHORIZED, and the answers typed after it run as commands
-     (`loop/research-batch-forty-eight-audit.md` §3, `paste-answers.ps1`). The same lines inside `& { ... }` were 8 of 8.
+     key in 2 of 14 runs: a ParserError, `$pk` never set, UNAUTHORIZED, and the answers typed after it run as commands.
+     The same lines inside `& { ... }` were 8 of 8.
      So the braces are counted as well as the ends: a block that closed on an earlier line would run from there. */
   const all = provisionCommands(ORIGIN, ZONE).powershell;
   const lines = all.slice(0, all.findLastIndex((line) => line !== '') + 1);
@@ -71,8 +71,8 @@ test('THE POWERSHELL FORM IS ONE SCRIPT BLOCK, & { on the first line and } on th
 test('AND THE POWERSHELL FORM ENDS WITH ONE EMPTY LINE UNDER }, because 5.1 without PSReadLine runs nothing until it is sent one', () => {
   /* THE CONSOLE HOST'S OWN LINE READER HOLDS MULTI-LINE INPUT AT `>>` UNTIL AN EMPTY LINE, closed or not. Pasted without
      one into 5.1.26100 with PSReadLine removed, the form ran nothing in 3 of 3 runs, and the operator key typed after
-     the paste went into the script as a line under the closing brace, unmasked and in that console's transcript
-     (`loop/research-batch-fifty-audit.md` §2). With the empty line in the paste it posted with the right bearer, 2 of 2
+     the paste went into the script as a line under the closing brace, unmasked and in that console's transcript.
+     With the empty line in the paste it posted with the right bearer, 2 of 2
      without PSReadLine and 4 of 4 with it, where the blank line was never taken as the key. EMPTY AND NOT SPACES, since
      what was measured was an empty line, and whether that line reader takes a line of spaces as one was not. And only
      the one: an empty line inside the block is where that line reader would stop reading it. */

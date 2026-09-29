@@ -1,6 +1,6 @@
 /**
  * The app under `/app`, on the one domain: which path names a record, where the old host sends a page load, and what
- * bare `/app` opens (`loop/research-one-domain.md` §2.4, §2.5 and §3.1).
+ * bare `/app` opens.
  *
  * THE FIRST SEGMENT AFTER `/app/` IS A PAGE OR A RECORD'S NAME, AND NOTHING ELSE DECIDES WHICH. `appPath` asks the
  * Directory's own `badSlug`, so `/app/settings` is always the page and `/app/acme` is always acme; a second list here
@@ -53,7 +53,7 @@ test('A SLUG AFTER /app/ IS THE RECORD, A WORD THE APP ROUTES IS ITS PAGE, AND T
   for (const path of ['/', '/api/boot', '/apple', '/application/x', '/r/tasks', '/in/webhook/x']) assert.equal(appPath(path), null, path);
 });
 
-/* FINDING 3 OF `loop/research-push-a-live.md`. Measured on production at 01:08 on 23 September: `/app/Acme/api/boot`,
+/* MEASURED ON PRODUCTION BEFORE THIS: `/app/Acme/api/boot`,
    `/app/admin/api/boot` and `/app/www/api/boot` were `200 text/html`, the shell, so a JSON client with a mistyped or
    upper-case slug read a page as success. It cannot be every word that is not a name, because ten of the app's routes
    take a parameter as their second segment (`apps/web/src/routes/<word>/[param]/`, counted), and `/app/r/api` is the
@@ -113,11 +113,11 @@ test('A PAGE LOAD ON THE OLD HOST IS A 308 TO THE SAME PAGE UNDER /app ON THE NE
   assert.equal(legacyRedirect(new Request('https://APP.Brain.Dog/x', { headers: html }), ' other.example , app.brain.dog', PUBLIC)?.status, 308);
 });
 
-/* FINDING 7 OF `loop/research-batch-forty-two-audit.md`, AGAINST §2.5'S TWO STATEMENTS. Measured with push B's vars
+/* AGAINST THE ONE-DOMAIN MOVE'S TWO STATEMENTS BELOW. Measured with push B's vars
    before this test: `GET app.brain.dog/app/acme/api/boot` was a 308 to `brain.dog` with no Accept, with a wildcard one
    and with `text/html`, and so were `/app/_app/version.json` and `/app/fonts/geist.woff2` under a wildcard. The public
    host's branch already asked both questions below; the legacy branch asked neither. */
-test('§2.5: "/api/*, /mcp AND /in/* ARE SERVED, NEVER REDIRECTED" ON THE OLD HOST, AND THAT INCLUDES A SLUG’S /api', () => {
+test('"/api/*, /mcp AND /in/* ARE SERVED, NEVER REDIRECTED" ON THE OLD HOST, AND THAT INCLUDES A SLUG’S /api', () => {
   /* THE WEB'S ONE GET, `hostGet`'s Slash status, is sent under the slug by `apiBase()`. A 308 to another origin carries
      no CORS header, so a stale tab's same-origin fetch cannot follow it and the palette's Slash line fails. */
   for (const accept of [undefined, '*/*', 'text/html,application/xhtml+xml'])
@@ -125,7 +125,7 @@ test('§2.5: "/api/*, /mcp AND /in/* ARE SERVED, NEVER REDIRECTED" ON THE OLD HO
       assert.equal(legacyRedirect(on(path, accept === undefined ? {} : { headers: { accept } }), LEGACY, PUBLIC), null, `${path} ${accept ?? '(no accept)'}`);
 });
 
-test('§2.5: ONLY A "BROWSER NAVIGATION" IS MOVED OFF THE OLD HOST, which is a GET or a HEAD that asks for HTML', () => {
+test('ONLY A "BROWSER NAVIGATION" IS MOVED OFF THE OLD HOST, which is a GET or a HEAD that asks for HTML', () => {
   /* A STALE SHELL'S VERSION POLL AND ITS FONTS: a 308 to another origin fails the fetch where serving them costs nothing. */
   for (const path of ['/app/_app/version.json', '/app/fonts/geist.woff2', '/_app/version.json', '/favicon.ico'])
     assert.equal(legacyRedirect(on(path, { headers: { accept: '*/*' } }), LEGACY, PUBLIC), null, path);
@@ -166,7 +166,7 @@ test('UNSET IS THE WORKER AS IT WAS: no legacy host or no public host, and the p
 
 /* ── the public host, before the move reaches it ──────────────────────── */
 
-/* PUSH A OF `loop/research-one-domain-cutover.md` §5: the app built under `/app`, and the Worker still on `app.brain.dog`
+/* PUSH A OF THE ONE-DOMAIN MOVE: the app built under `/app`, and the Worker still on `app.brain.dog`
    with nothing listed as legacy. Measured there before this branch: `/`, `/signin` and `/r/tasks` answered a JSON
    `ROUTE_UNKNOWN` 404, because the build has no root `index.html` any more and `not_found_handling` is `none`. */
 const DARK = 'app.brain.dog';
@@ -262,7 +262,7 @@ test('A ROTATION RIDES ON THE 302, AND A DEAD COOKIE IS THE SHELL WITH THE COOKI
 /* ── the catalogue ────────────────────────────────────────────────────── */
 
 test('THE CATALOGUE IS READ UNDER /app/catalogue/, WHERE THE BUILD PUTS IT ONCE THE APP HAS A BASE PATH', async () => {
-  /* `paths.base: '/app'` moves `apps/web/static/catalogue` to `build/app/catalogue` (`loop/research-one-domain.md` §3.2),
+  /* `paths.base: '/app'` moves `apps/web/static/catalogue` to `build/app/catalogue`,
      so a reader that asked only `/catalogue/` would find the shell, read it as no file, and Slash would offer nothing. */
   const asked: string[] = [];
   const moved: Assets = {

@@ -1,14 +1,14 @@
 /**
- * `braindog init <slug> --from <file.brainl>`: a copy of a record becomes a record this host serves (ROADMAP W55-4).
+ * `braindog init <slug> --from <file.brainl>`: a copy of a record becomes a record this host serves.
  *
  * MEASURED BEFORE THIS FILE, at 1586f2a2: `init drill --from nightly.brainl` ignored the flag. With no owner it refused
  * "needs an owner", and with one it made a NEW record under a new id, so the copy never became anything; the only other
  * way in, `init` then an import, is `IMPORT_NOT_EMPTY`, because `createRecord` writes the owner, the schedules and the
- * three keys first (`loop/research-restore.md` 3.4). A Cloud copy could be checked and read, and could not be served.
+ * three keys first. A Cloud copy could be checked and read, and could not be served.
  *
  * THE COPY IS BUILT THE WAY THE CLOUD BUILDS ITS NIGHTLY ONE: `kernel.export({ redactGrants: false, actor: 'system' })`
  * joined by newlines, as `apps/worker/src/snapshots.ts` `dumpOf` does, with the record's keys wrapped by a root key the
- * test holds. What is proved is the round trip the brief names: the served record's next export carries the same
+ * test holds. What is proved is the round trip: the served record's next export carries the same
  * manifest, table for table but the migration ledger, which is this host's own and says so below, and under the same
  * root key the same signing key.
  *

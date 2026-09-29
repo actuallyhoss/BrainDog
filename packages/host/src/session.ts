@@ -1,7 +1,7 @@
 /**
  * What an agent says about its run, read off a request and checked.
  *
- * SEVEN HINTS, EACH WITH ITS GRAMMAR (`loop/research-agent-path.md` §3.4, `44 §4.2`). A value that
+ * SEVEN HINTS, EACH WITH ITS GRAMMAR (`44 §4.2`). A value that
  * fails is dropped, never corrected and never refused: these are hints, and a call whose hint is
  * wrong is still a call the record answers. The kernel writes what reaches it into a row as given,
  * so this is the one place a stranger's text is held to a shape first.

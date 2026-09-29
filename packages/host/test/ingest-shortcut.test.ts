@@ -1,8 +1,7 @@
 /**
  * His iOS Shortcut posting one `From HSBC:` SMS body at `/in/*`, through a real record holding the money pack.
  *
- * `loop/research-switch-matrix.md` brief 2. The bank patterns read his real bodies (71 of 74 exact,
- * `loop/research-bank-real.md`); what was missing is a door the Shortcut can reach that files anything. Every
+ * The bank patterns read his real bodies (71 of 74 exact); what was missing is a door the Shortcut can reach that files anything. Every
  * amount, date, account digit and wording below is invented, in the shape `packages/record/test/money-ipn.test.ts`
  * already uses.
  *
@@ -26,8 +25,8 @@
  * Shortcut has no URL a path token can ride in yet; that door is `apps/selfhost`'s to open. The mint is routed now,
  * as the ADMIN write `/api/ingestMint`, and (8) drives it from the request a browser would send to the SMS it matches.
  *
- * THE BANK'S PATTERNS ARE ITS PACK FILE'S, INSTALLED ON TOP OF THE SEED. The sample carried the twelve until
- * 25 September, for this file among others; `record()` now installs `packs/bank-hsbc-eg/bank-hsbc-eg.pack.json` itself
+ * THE BANK'S PATTERNS ARE ITS PACK FILE'S, INSTALLED ON TOP OF THE SEED. The sample once carried the twelve, for
+ * this file among others; `record()` now installs `packs/bank-hsbc-eg/bank-hsbc-eg.pack.json` itself
  * (`seed/test/pack-files.ts`), and (7) holds that the seed alone ships no text door at all since money-core 3.0.0.
  */
 

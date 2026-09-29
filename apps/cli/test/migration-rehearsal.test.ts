@@ -1,6 +1,6 @@
 /**
  * `apps/cli/scripts/migration-rehearsal.mjs`: a record at an older migration count opened by this checkout's kernel,
- * compared table by table and list by list, and read through `boot` and `list` (ops.md OPS-3).
+ * compared table by table and list by list, and read through `boot` and `list`.
  *
  * THE RECORD IS BUILT AT THE OLDER COUNT HERE, NOT FOUND IN A FIXTURE. Today's kernel writes the rows into one file; a
  * second file gets the schema of the first `OLDER` migrations and nothing else, each with the ledger row and checksum

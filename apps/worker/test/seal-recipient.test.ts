@@ -1,7 +1,7 @@
 /**
  * A low-order X25519 recipient, refused where the recipient is read and not where a record is sealed.
  *
- * WHAT WENT WRONG, MEASURED BY THE BATCH-SIXTEEN AUDIT (finding 8). The all-zero point
+ * WHAT WENT WRONG, AS MEASURED. The all-zero point
  * `age1qqqq...5cu47z` passed `recipientOf`, so `r2Snapshots` was built with it, and every `take()`
  * then threw. On Node it did not even throw the sealer's own sentence: WebCrypto's `deriveBits`
  * refuses an all-zero shared secret first, with "The operation failed for an operation-specific
@@ -51,7 +51,7 @@ async function nodeAccepts(pub: Uint8Array): Promise<boolean> {
   }
 }
 
-test('THE ALL-ZERO POINT THE AUDIT USED IS REFUSED BY recipientOf, IN THE WORDS seal.ts ALREADY HAD FOR IT', () => {
+test('THE ALL-ZERO POINT IS REFUSED BY recipientOf, IN THE WORDS seal.ts ALREADY HAD FOR IT', () => {
   const said = recipientOf('age1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq5cu47z');
   assert.equal(typeof said, 'string', 'the all-zero point was accepted as a recipient');
   assert.match(String(said), /^AGE_RECIPIENT is a low-order X25519 point, and nothing sealed to it would be secret\./u);

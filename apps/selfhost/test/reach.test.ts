@@ -144,11 +144,11 @@ test('changing the name retires every passkey, and the operator is told once', (
     const file = join(dir, 'served-at');
     assert.equal(nameChange(file, 'https://brain.home.arpa:8443'), null, 'a first boot has nothing to compare against');
     assert.equal(nameChange(file, 'https://brain.home.arpa:9443'), null, 'a different port is the same relying party');
-    const said = nameChange(file, 'https://brain.example.com') ?? assert.fail('a changed hostname must be said');
+    const said = nameChange(file, 'https://tallybook.example') ?? assert.fail('a changed hostname must be said');
     assert.match(said, /brain\.home\.arpa/);
-    assert.match(said, /brain\.sam\.link/);
+    assert.match(said, /tallybook\.example/);
     assert.match(said, /passkey/i);
-    assert.equal(nameChange(file, 'https://brain.example.com'), null, 'it is said once and not every boot');
+    assert.equal(nameChange(file, 'https://tallybook.example'), null, 'it is said once and not every boot');
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

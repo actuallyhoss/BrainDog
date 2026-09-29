@@ -1,14 +1,13 @@
 /**
  * `braindog verify <file> [--key <pubkey|url>]`, through a real child process.
  *
- * AT `b7409d2d` THIS COMMAND DID NOT EXIST. `loop/research-restore.md` §2.1 measured `braindog verify`
- * answering "braindog has no command called verify", exit 1, and §3.5 measured the reason it is
- * needed: a Cloud copy with one row edited, its manifest recomputed and a stranger's signature put on
- * it passes `checkBrainl` and imports. The only thing that tells that file from the real one is the key
+ * BEFORE THIS, THE COMMAND DID NOT EXIST: `braindog verify` answered "braindog has no command called verify",
+ * exit 1. And it is needed, as measured: a Cloud copy with one row edited, its manifest recomputed and a
+ * stranger's signature put on it passes `checkBrainl` and imports. The only thing that tells that file from the real one is the key
  * it was signed by, and the only place a person can say which key that must be is `--key`.
  *
  * EVERY FILE HERE IS MADE HERE. A real export of a kernel record signed by a key generated for this
- * run, the same forgery §3.5 made, a SQLite file written by the kernel's own migrations the way the
+ * run, the same forgery as that Cloud copy, a SQLite file written by the kernel's own migrations the way the
  * self-host's copies are, and the first line of an age file. No production identity or key is read.
  */
 
@@ -56,7 +55,7 @@ const scratch = (t: { after: (f: () => void) => void }): string => {
   return dir;
 };
 
-/** A signed export of a record whose `record` row names "The Studio", as §3.5's Cloud copy did. */
+/** A signed export of a record whose `record` row names "The Studio", as the forged Cloud copy did. */
 async function exported(signer: TestSigner): Promise<string[]> {
   const sql = openSqlite();
   const k = await openRecord(sql, fixedClock(NOW), { sign: signer });
@@ -75,7 +74,7 @@ async function exported(signer: TestSigner): Promise<string[]> {
   return out.value!;
 }
 
-/** §3.5's forgery: the record's name changed, its manifest row recomputed, and a stranger's signature in place of the old one. */
+/** The forgery: the record's name changed, its manifest row recomputed, and a stranger's signature in place of the old one. */
 async function forged(lines: readonly string[]): Promise<string[]> {
   const out = lines.map((l) => (l.startsWith(`[1,"${REC}"`) ? l.replace('"The Studio"', '"The Forgery"') : l));
   const header = out.findIndex((l) => l.startsWith('#table record '));
@@ -120,7 +119,7 @@ test('A --key THAT BEGINS WITH A DASH IS READ AS THE KEY, and the wrong one refu
   assert.equal(out.code, 1, out.stdout);
 });
 
-test('§3.5 FORGERY: IT PASSES UNPINNED, AND --key WITH THE REAL KEY REFUSES IT, exit 1', async (t) => {
+test('A FORGERY: IT PASSES UNPINNED, AND --key WITH THE REAL KEY REFUSES IT, exit 1', async (t) => {
   const dir = scratch(t);
   const signer = testSigner();
   const lines = await exported(signer);
@@ -293,7 +292,7 @@ test('A SELF-HOST COPY (application_id 1146046241) WITH NO .sig BESIDE IT IS REF
   const dir = scratch(t);
 
   /* THE KERNEL'S OWN MIGRATIONS WRITE THE HEADER, as they do for every self-host record and every
-     `VACUUM INTO` copy of one: `loop/research-restore.md` §2.2 read 1146046241 off a real copy. */
+     `VACUUM INTO` copy of one: 1146046241 was read off a real copy. */
   const path = join(dir, '2026-09-23T03-20-00Z-drill.brain');
   const sql = openSqlite(path);
   await openRecord(sql, fixedClock(NOW));

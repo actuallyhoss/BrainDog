@@ -1,15 +1,14 @@
 /**
- * The Worker answers an automation's question to Slash: Brief E of the wave forty-seven survey of the Worker's half
- * (`research-worker-spark.md` §5). The self-host's half is `apps/selfhost/test/slash-answers.test.ts`.
+ * The Worker answers an automation's question to Slash: the Worker's half. The self-host's half is `apps/selfhost/test/slash-answers.test.ts`.
  *
  * WHAT STOOD BETWEEN THE TWO HALVES ON THIS HOST. `Record$.#open` passed no `answersSlash`, so a Worker with an endpoint
  * and `KEK` said `slash: true` at `/api/version` and refused `ask_slash` at propose in the words "no host in this build
  * answers an automation's question to Slash", and nothing in `alarm()` would have asked a queued question if it had.
  *
- * RED BEFORE THE WIRING, MEASURED ON 23 SEPTEMBER with `src/` as it stood at `afe656eb`: ten tests, two pass, seven fail,
+ * RED BEFORE THE WIRING, MEASURED with `src/` as it stood at `afe656eb`: ten tests, two pass, seven fail,
  * one todo. The filing case read `NOT_IN_THIS_BUILD` where it expects `null`, and the answered, spent-month, no-key,
  * unread-answer and seven-question cases failed at the same filing. The secret case's propose was ALREADY refused
- * `DECLARATION_INVALID` before the wiring, not `NOT_IN_THIS_BUILD` as the survey expected, because the lint runs before
+ * `DECLARATION_INVALID` before the wiring, not `NOT_IN_THIS_BUILD` as expected, because the lint runs before
  * the switch; it went red at its second half, zero posts for the rule stored past the lint. The Worker with no `KEK` and
  * the pump's list passed before and after, which is their job: they are the lines the wiring must not cross.
  *
@@ -20,20 +19,20 @@
  * with no `authorization`, and the seven-question case fails too. The alarm for now left out after a full pass: the
  * seven-question case alone fails, with five runs `failed`, two `waiting` and two questions `pending` after the alarms
  * the platform would fire now, because the alarm was armed an hour out for the record's `purge` sweep and not for them.
- * On a record with no such row it is the parked runs' day, which is what the survey's checker measured over the kernel.
+ * On a record with no such row it is the parked runs' day, which is what was measured over the kernel.
  *
  * THE OBJECT IS REAL AND SO IS THE KEY, as in `script-try-asker.test.ts`: `src/index.ts` bundled by `wrangler`'s esbuild,
  * its record over `node:sqlite`, the key put through `serveWorkerKeys` under a bound `KEK`, and every rule filed as the
  * canvas files one. The model is `globalThis.fetch` and it is the only double. No key is printed.
  *
  * CASE 9, THE SAME QUESTION THROUGH WORKERD, IS LEFT A `todo`. Every earlier Slash fault on the Worker was found there
- * (`slash-in-do.test.ts`, `SQLITE_AUTH` on a pragma), and the engine this pass builds is the one the door builds over the
+ * (`slash-in-do.test.ts`, `SQLITE_AUTH` on a pragma), and the engine this file builds is the one the door builds over the
  * same storage, which that file already drives through workerd; the alarm, the key door and a filed rule in Miniflare
- * are a harness of their own and were not built in this pass.
+ * are a harness of their own and were not built here.
  *
- * ON HIS OWN KEY SINCE `loop/finish/agents.md` AGT-21. The Worker named an endpoint of its own and keyed it with whatever
+ * ON HIS OWN KEY. The Worker named an endpoint of its own and keyed it with whatever
  * the vault held under the label `slash`; it names none now, and the one model a keyed question reaches is the key the
- * owner picked in Settings, by its grant id (`loop/finish/defects.md` S1). So the key is put through the key door as
+ * owner picked in Settings, by its grant id. So the key is put through the key door as
  * before and then chosen through the settings door, as the owner chooses it, and every sentence about a missing key is
  * the one his own key's path says.
  */
@@ -78,7 +77,7 @@ const KEY_GONE =
 const RATE_ANSWER = (): Response =>
   new Response(JSON.stringify({ choices: [{ message: { role: 'assistant', content: '{"answer":4.25}' } }], usage: { prompt_tokens: 300, completion_tokens: 8 } }), { status: 200 });
 
-/** The audit's endpoint: a 200 whose completion is 70,000 characters, reporting 16,000 completion tokens. */
+/** An endpoint at length: a 200 whose completion is 70,000 characters, reporting 16,000 completion tokens. */
 const AT_LENGTH = (): Response =>
   new Response(
     JSON.stringify({ choices: [{ message: { role: 'assistant', content: JSON.stringify({ answer: 'x'.repeat(70_000) }) } }], usage: { prompt_tokens: 415, completion_tokens: 16_000 } }),
@@ -287,7 +286,7 @@ test("THE QUESTION IS POSTED ONCE, TYPED AS A NUMBER, ON THE OWNER'S KEY OPENED 
 
 /* ── 3 · the one meter ───────────────────────────────────────────────────── */
 
-/* ON HIS OWN KEY THE MONTHLY LIMIT DOES NOT STOP HIM (`loop/finish/agents.md` §5 item 7): his provider bills the ask, so
+/* ON HIS OWN KEY THE MONTHLY LIMIT DOES NOT STOP HIM: his provider bills the ask, so
    Slash lists it and caps nothing. Before his own key the same setting ended this run on the month's sentence, with no
    post; the limit is the included model's, and this Worker has none. */
 test('ON HIS OWN KEY ask_cap 0 STOPS NOTHING: the question is posted once, and the run ends done', async () => {
@@ -384,7 +383,7 @@ test('KEK UNBOUND: /api/version SAYS slash false, THE RULE IS REFUSED, and a que
   }
 });
 
-/* ── 6 · a secret through a variable (audit forty-six finding 1) ─────────── */
+/* ── 6 · a secret through a variable ──────────────────────────────────────── */
 
 const OBLIGATIONS = {
   id: 'obligations',
@@ -431,7 +430,7 @@ test('A QUESTION NAMING A VARIABLE SET FROM A SECRET FIELD IS REFUSED AT PROPOSE
   }
 });
 
-/* ── 7 · an answer this host cannot read (audit forty-six finding 4) ─────── */
+/* ── 7 · an answer this host cannot read ──────────────────────────────────── */
 
 /* THE MODEL NAME AND THE REFUSAL CODE ARE NOT PINNED HERE, because both are being settled in `packages/host/src/slash.ts`
    and `packages/slash/src/answer.ts` as this is written: the ledger's `model` is the package prompt's and not

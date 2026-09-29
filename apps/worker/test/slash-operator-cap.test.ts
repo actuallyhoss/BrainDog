@@ -1,22 +1,21 @@
 /**
- * The operator's ceiling on the included model, and the two ledger faults beside it (`loop/research-batch-sixty-audit.md`
- * findings 1, 4 and 5, the audit's probes S1, S3 and S4 carried into this suite).
+ * The operator's ceiling on the included model, and the two ledger faults beside it.
  *
- * FINDING 1, SEV 1. `4e701b15` switched the included model on in both environments, so a record's asks spend the
- * operator's Workers AI. The only monthly bound was `slash_settings.ask_cap`, which is the record owner's to type: S1 saved
+ * THE CEILING. `4e701b15` switched the included model on in both environments, so a record's asks spend the
+ * operator's Workers AI. The only monthly bound was `slash_settings.ask_cap`, which is the record owner's to type: a probe saved
  * `ask_cap: 1_000_000_000` through the door's engine and 200 reads all reached the binding, `{ answered: 200, runs: 200 }`.
  * The ceiling is now a Worker var, `SLASH_INCLUDED_MONTH_NEURONS`, turned into asks at the package's worst call, and the
  * Worker holds every record's engine under it: a save above it is refused, and a cap already stored above it no longer
  * lets an ask through.
  *
- * FINDING 4. S3: tier `byo` with `model: glm-5.3-flash` on a Worker with no endpoint ran on the binding and the ledger
+ * THE byo TIER. Tier `byo` with `model: glm-5.3-flash` on a Worker with no endpoint ran on the binding and the ledger
  * priced it `neurons: 0`.
  *
- * FINDING 5. S4: one binding throw was priced 9 and counted on a read, and settled under `-`, priced 0 and uncounted on an
+ * A BINDING THROW. One binding throw was priced 9 and counted on a read, and settled under `-`, priced 0 and uncounted on an
  * automation's answer, which the ladder then asked again. Both are settled under the model's name now, priced by the
  * package's one rule and counted.
  *
- * RED BEFORE THE REPAIR, MEASURED ON 24 SEPTEMBER: 8 tests, 1 pass, 7 fail. Case 7 passed before and after, which is its
+ * RED BEFORE THE REPAIR, MEASURED: 8 tests, 1 pass, 7 fail. Case 7 passed before and after, which is its
  * job: an owner's lower cap still lowers.
  *
  * THE BINDING IS A LOCAL FUNCTION, as in `slash-included.test.ts`. No test here spends a neuron.
@@ -98,11 +97,11 @@ async function withEngine(ai: ReturnType<typeof fakeAi>, neurons?: string) {
    231.8. So 2,320 neurons is ten asks, and the default of 300,000 is 1,293. */
 const TEN_ASKS = '2320';
 
-test('S1 (1) AN OWNER CANNOT RAISE THE CAP PAST THE OPERATOR: ask_cap 1,000,000,000 is refused and names the ceiling', async () => {
+test('(1) AN OWNER CANNOT RAISE THE CAP PAST THE OPERATOR: ask_cap 1,000,000,000 is refused and names the ceiling', async () => {
   const ai = fakeAi(PREDICATE);
   const { engine, done } = await withEngine(ai);
   const set = engine.configure({ ask_cap: 1_000_000_000 }, OWNER) as Refused;
-  /* RED: `{ ok: true }`, the audit's `saved: true`. */
+  /* RED: `{ ok: true }`, the probe's `saved: true`. */
   assert.equal(set.ok, false, 'an owner saved a cap a billion asks high');
   assert.equal(set.refusal?.code, 'VALUE_MALFORMED');
   assert.match(set.refusal?.fix ?? '', /1,293/u);
@@ -112,7 +111,7 @@ test('S1 (1) AN OWNER CANNOT RAISE THE CAP PAST THE OPERATOR: ask_cap 1,000,000,
   done();
 });
 
-test('S1 (2) A CAP ALREADY STORED ABOVE THE CEILING DOES NOT LET AN ASK THROUGH: ten asks run, the eleventh is refused before the binding', async () => {
+test('(2) A CAP ALREADY STORED ABOVE THE CEILING DOES NOT LET AN ASK THROUGH: ten asks run, the eleventh is refused before the binding', async () => {
   const ai = fakeAi(PREDICATE);
   const { own, engine, done } = await withEngine(ai, TEN_ASKS);
   /* WRITTEN AS A RECORD SAVED BEFORE THIS REPAIR HOLDS IT, past the door that now refuses it. */
@@ -130,7 +129,7 @@ test('S1 (2) A CAP ALREADY STORED ABOVE THE CEILING DOES NOT LET AN ASK THROUGH:
   done();
 });
 
-test("S1 (3) AN AUTOMATION'S QUESTION IS HELD UNDER THE SAME CEILING, in the run's own sentence", async () => {
+test("(3) AN AUTOMATION'S QUESTION IS HELD UNDER THE SAME CEILING, in the run's own sentence", async () => {
   const clock = fixedClock(T0);
   const sql = openSqlite();
   const own = openSqlite();
@@ -150,7 +149,7 @@ test("S1 (3) AN AUTOMATION'S QUESTION IS HELD UNDER THE SAME CEILING, in the run
   own.close();
 });
 
-test('S1 (4) THE VAR IS READ WHOLE OR NOT AT ALL: 0 turns the included model off, and a value that is not a count is the default', async () => {
+test('(4) THE VAR IS READ WHOLE OR NOT AT ALL: 0 turns the included model off, and a value that is not a count is the default', async () => {
   const off = fakeAi(PREDICATE);
   const zero = await withEngine(off, '0');
   assert.equal(((await zero.engine.read('open tasks', OWNER)) as Refused).refusal?.code, 'SLASH_BUDGET_SPENT');
@@ -164,8 +163,8 @@ test('S1 (4) THE VAR IS READ WHOLE OR NOT AT ALL: 0 turns the included model off
   }
 });
 
-/* 300000 SINCE `loop/finish/decisions.md` C19: about $3.30 a record a month, down from 900000 and about $9.90. */
-test('S1 (5) BOTH ENVIRONMENTS DECLARE THE CEILING, at 300000 neurons a record a month', async () => {
+/* 300000: about $3.30 a record a month, down from 900000 and about $9.90. */
+test('(5) BOTH ENVIRONMENTS DECLARE THE CEILING, at 300000 neurons a record a month', async () => {
   const checker = '../scripts/provision-check.mjs' as string;
   const { stripJsonc } = (await import(checker)) as { stripJsonc: (text: string) => string };
   const config = JSON.parse(stripJsonc(readFileSync(fileURLToPath(new URL('../wrangler.jsonc', import.meta.url)), 'utf8'))) as {
@@ -175,13 +174,13 @@ test('S1 (5) BOTH ENVIRONMENTS DECLARE THE CEILING, at 300000 neurons a record a
     assert.equal(config.env[name]?.vars?.['SLASH_INCLUDED_MONTH_NEURONS'], '300000', `env.${name} does not declare the ceiling`);
 });
 
-/* THE RENAME (DIRECTION 31) CARRIES THE VALUES, NOT ONLY THE NAMES. `src/slash.ts` reads `SLASH_INCLUDED` and
+/* THE RENAME CARRIES THE VALUES, NOT ONLY THE NAMES. `src/slash.ts` reads `SLASH_INCLUDED` and
    `SLASH_INCLUDED_MONTH_NEURONS`, so an environment still declaring the old names deploys with the included model off,
-   silently: his "yes" of 24 September stops holding without an error anywhere. The model's vars are found by their
+   silently: his "yes" stops holding without an error anywhere. The model's vars are found by their
    suffixes rather than by the old prefix, so this file holds no name the product no longer has.
-   RED BEFORE THE RENAME, MEASURED ON 25 SEPTEMBER: 10 tests, 9 pass, this one failing on `env.alpha` with the three
+   RED BEFORE THE RENAME, MEASURED: 10 tests, 9 pass, this one failing on `env.alpha` with the three
    model vars under the old prefix and none under `SLASH_`. */
-test('S1 (5b) BOTH ENVIRONMENTS DECLARE THE INCLUDED MODEL UNDER SLASH_ NAMES ALONE, still on and at 300000', async () => {
+test('(5b) BOTH ENVIRONMENTS DECLARE THE INCLUDED MODEL UNDER SLASH_ NAMES ALONE, still on and at 300000', async () => {
   const checker = '../scripts/provision-check.mjs' as string;
   const { stripJsonc } = (await import(checker)) as { stripJsonc: (text: string) => string };
   const config = JSON.parse(stripJsonc(readFileSync(fileURLToPath(new URL('../wrangler.jsonc', import.meta.url)), 'utf8'))) as {
@@ -199,10 +198,10 @@ test('S1 (5b) BOTH ENVIRONMENTS DECLARE THE INCLUDED MODEL UNDER SLASH_ NAMES AL
   }
 });
 
-/* TIER `byo` IS NOT RUN ON THE CLOUD (`CLOUD_TIERS`), so finding 4's probe cannot be saved any more. What stands in for it is
+/* TIER `byo` IS NOT RUN ON THE CLOUD (`CLOUD_TIERS`), so the byo probe above cannot be saved any more. What stands in for it is
    a record saved on `byo` before: read as the included model, answered, and priced and counted as the included model is.
    The name typed for `byo` is not the included model's, and before this it went to the binding's table as typed. */
-test('S3 (6) A RECORD SAVED ON byo IS READ AS THE INCLUDED MODEL ON THE CLOUD: answered, priced, counted, and byo cannot be saved again', async () => {
+test('(6) A RECORD SAVED ON byo IS READ AS THE INCLUDED MODEL ON THE CLOUD: answered, priced, counted, and byo cannot be saved again', async () => {
   const ai = fakeAi(PREDICATE);
   const { own, engine, done } = await withEngine(ai);
   own.exec("UPDATE slash_settings SET tier = 'byo', model = 'llama3:8b' WHERE singleton = 1");
@@ -219,7 +218,7 @@ test('S3 (6) A RECORD SAVED ON byo IS READ AS THE INCLUDED MODEL ON THE CLOUD: a
   done();
 });
 
-test('S1 (7) AN OWNER WHO LOWERS THE CAP STILL LOWERS IT: at ask_cap 3 the fourth read is refused', async () => {
+test('(7) AN OWNER WHO LOWERS THE CAP STILL LOWERS IT: at ask_cap 3 the fourth read is refused', async () => {
   const ai = fakeAi(PREDICATE);
   const { engine, done } = await withEngine(ai);
   assert.ok((engine.configure({ ask_cap: 3 }, OWNER) as Refused).ok);
@@ -233,7 +232,7 @@ test('S1 (7) AN OWNER WHO LOWERS THE CAP STILL LOWERS IT: at ask_cap 3 the fourt
    `byo`, so an owner who moved from `a` to `byo` in the month was shown 2 of 10 used by a host refusing the ninth ask.
    `byo` cannot be saved on the Cloud now (`CLOUD_TIERS`), so the move is written into the row as a record saved before
    holds it, and the count must still be the ceiling's. */
-test('S1 (9) WHERE THE CEILING IS THE CAP STATUS NAMES, THE COUNT IS THE CEILING\'S, across a tier moved mid-month', async () => {
+test('(9) WHERE THE CEILING IS THE CAP STATUS NAMES, THE COUNT IS THE CEILING\'S, across a tier moved mid-month', async () => {
   const ai = fakeAi(PREDICATE);
   const { own, engine, done } = await withEngine(ai, TEN_ASKS);
   own.exec('UPDATE slash_settings SET ask_cap = 1000000000 WHERE singleton = 1');
@@ -246,7 +245,7 @@ test('S1 (9) WHERE THE CEILING IS THE CAP STATUS NAMES, THE COUNT IS THE CEILING
   done();
 });
 
-test('S4 (8) ONE BINDING THROW, ONE SETTLEMENT: the read and the answer both keep the model, are priced by one rule and are counted', async () => {
+test('(8) ONE BINDING THROW, ONE SETTLEMENT: the read and the answer both keep the model, are priced by one rule and are counted', async () => {
   const ai = fakeAi('', true);
   const { clock, api, own, engine, done } = await withEngine(ai);
   await engine.read('open tasks', OWNER);

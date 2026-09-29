@@ -1,6 +1,5 @@
 /**
- * What a trial tells a fetch naming a key when the record gave it no vault (`src/script-try.ts`, audit thirty-eight
- * finding 2).
+ * What a trial tells a fetch naming a key when the record gave it no vault (`src/script-try.ts`).
  *
  * ONE SENTENCE WAS SAID TO EVERY CALLER WITHOUT A KEY, AND IT NAMED AN AGENT. The record gives a trial the vault only
  * when the vault itself would open for the caller: an owner, in a browser, proved within fifteen minutes. The owner whose

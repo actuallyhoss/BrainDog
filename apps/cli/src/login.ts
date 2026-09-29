@@ -20,8 +20,8 @@ import type { Answering } from './json.ts';
 /**
  * The command that signs this machine in to `host`, written out whole.
  *
- * `node <this main.ts>` AND NOT `braindog`, because `braindog` is not on his PATH: he runs `node apps\cli\src\main.ts`
- * (`loop/research-cutover-day.md` §7 item 1), and the MCP server `install` registers is this same file under `node`. A
+ * `node <this main.ts>` AND NOT `braindog`, because `braindog` is not on his PATH: he runs `node apps\cli\src\main.ts`,
+ * and the MCP server `install` registers is this same file under `node`. A
  * line that says `braindog login` is one he has to translate before it runs. Double quotes, and forward slashes as the
  * server entry has them, because that one spelling of the path is read the same by PowerShell, `cmd` and Git Bash.
  */
@@ -32,7 +32,7 @@ export function loginCommand(host: string): string {
 /**
  * What to type when no host is known at all: the address the app prints, with the slug left for the person.
  *
- * ON `brain.dog` SINCE PUSH B2, for the reason at `signIn` in `main.ts`: the old name refuses a device start, so an
+ * ON `brain.dog`, for the reason at `signIn` in `main.ts`: the old name refuses a device start, so an
  * agent that passed on `app.brain.dog` would be handing the person a login that answers 403.
  */
 export const ANY_HOST = 'https://brain.dog/app/<slug>';
@@ -368,7 +368,7 @@ export async function approveOperation(raw: string, reach: OperationReach, io: F
 }
 
 /**
- * A runner's enrolment for `braindog runner enrol <host>` (`docs/48-SPEC-CLI.md` §5.13, `loop/finish/agents.md` C14): the
+ * A runner's enrolment for `braindog runner enrol <host>` (`docs/48-SPEC-CLI.md` §5.13): the
  * host as `hostKey` spells it, and the bearer of reach `runner` with its expiry and the label it was approved under, or
  * the exit code once the reason has been said.
  *

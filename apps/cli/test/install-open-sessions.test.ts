@@ -1,15 +1,14 @@
 /**
- * The cut-over names each Claude Code session still open on a profile it changes: brief 53-B of
- * `loop/research-cutover-day.md`.
+ * The cut-over names each Claude Code session still open on a profile it changes.
  *
- * MEASURED, with Claude Code 2.1.280 and stand-ins for the old tool's server and hooks at the paths install
+ * MEASURED, with Claude Code 2.1.280 and stand-ins for Tallybook's server and hooks at the paths install
  * matches: a session held open across `install --replace --apply` on its own profile called the old server
- * after the install, had no `mcp__braindog__*` tool ("No such tool"), and still listed the old tool's skill,
- * 15 seconds on. Only its hooks moved over: Claude Code reloads `settings.json` within seconds, and the old tool's
+ * after the install, had no `mcp__braindog__*` tool ("No such tool"), and still listed Tallybook's skill,
+ * 15 seconds on. Only its hooks moved over: Claude Code reloads `settings.json` within seconds, and Tallybook's
  * end hook ran at close only when the session exited half a second after the install, not after 3 s or more. Each
  * running session keeps
- * `<profile>\sessions\<pid>.json`; on the day this was measured his default profile held three live ones and
- * quartz two, and the only sentence install prints about them is a generic one, under `.claude.json` alone.
+ * `<profile>\sessions\<pid>.json`; on the day this was measured one default profile held three live ones and
+ * the studio profile two, and the only sentence install prints about them is a generic one, under `.claude.json` alone.
  */
 
 import { after, test } from 'node:test';
@@ -39,7 +38,7 @@ function deadPid(): number {
 }
 
 test('a live session file is named with its profile, and a dead one is not', () => {
-  const dir = join(scratch, 'quartz');
+  const dir = join(scratch, 'studio');
   mkdirSync(join(dir, 'sessions'), { recursive: true });
   writeFileSync(join(dir, 'settings.json'), '{}');
   /* This test's own process stands in for an open Claude Code session: it is alive for as long as the run. */

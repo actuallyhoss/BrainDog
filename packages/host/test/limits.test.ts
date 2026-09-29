@@ -1,20 +1,20 @@
 /**
- * The limiter both hosts call. Brief W60-2, `loop/research-hardening.md` §2.2.
+ * The limiter both hosts call.
  *
- * NEITHER DOOR HAD A RATE AT ALL. §2.2's table has `none` in both columns for `/api` and for `/mcp`: a token that
+ * NEITHER DOOR HAD A RATE AT ALL, on `/api` or on `/mcp`: a token that
  * loops asks the record as often as the network lets it, on the Cloud and on a self-host alike, and the only limits in
  * the tree were the sign-in lockout, the ingest budget and a report key's minute. The Cloud's binding was drafted in
  * `wrangler.jsonc` at 600 reads and 120 writes a minute and never read by any code.
  *
- * THESE ARE THE PIECES BOTH DOORS SHARE, AND NONE OF THEM TOUCHES A DOOR. The Worker wires the binding (W60-6) and the
- * self-host wires `windowLimiter` (W60-7); each has its own integration test there. What is tested here is the key,
+ * THESE ARE THE PIECES BOTH DOORS SHARE, AND NONE OF THEM TOUCHES A DOOR. The Worker wires the binding and the
+ * self-host wires `windowLimiter`; each has its own integration test there. What is tested here is the key,
  * the class, the window and the refusal, with a clock this file moves by hand.
  */
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-/* THE RED AT THE HEAD THIS BRIEF STARTS FROM IS `ERR_MODULE_NOT_FOUND` for this path, before any test runs. A
+/* THE RED BEFORE `limits.ts` EXISTED WAS `ERR_MODULE_NOT_FOUND` for this path, before any test runs. A
    namespace import does not soften that, as it does for a missing export in `crash.test.ts`: a module that is not
    there fails the link whichever way it is imported. It was run and seen that way. */
 import * as limits from '../src/limits.ts';
@@ -67,8 +67,8 @@ test('THE 601ST READ IN A MINUTE IS 429 WITH RETRY-AFTER, AND ANOTHER TOKEN IS N
   assert.deepEqual(await l.limit(b, 'read'), { ok: true });
 
   /* THE SAME TOKEN'S WRITES ARE A BUDGET OF THEIR OWN. The 121st-write test below cannot show this, because 121
-     requests on one shared counter are still under the read ceiling: a checker keyed the counter without the class
-     and every test here stayed green. Only reads spent past 120 and then a write can tell the two apart. */
+     requests on one shared counter are still under the read ceiling: a counter keyed without the class kept
+     every test here green. Only reads spent past 120 and then a write can tell the two apart. */
   assert.deepEqual(await l.limit(a, 'write'), { ok: true }, 'a write passes after the reads are spent');
 });
 
@@ -113,8 +113,8 @@ test('THE KEY IS THE TOKEN, THE PERSON, OR THE ADDRESS', () => {
   /* A bearer that an operation grant turned into its approver is that person, as a session would be. */
   assert.equal(limits.limitKey({ door: 'bearer', record: 'r', ctx: { principal: { kind: 'person', id: 'p_1' } } }, ip), 'person:p_1');
   assert.equal(limits.limitKey({ door: 'session', record: 'r', ctx: { principal: { kind: 'person', id: 'p_1' } } }, ip), 'person:p_1');
-  /* NO DOOR IS THE ADDRESS, and it is the only keyless request left now the public demo is gone
-     (`loop/research-no-sample.md` A1). The demo was keyed by address too, because every visitor to it was the one
+  /* NO DOOR IS THE ADDRESS, and it is the only keyless request left now the public demo is gone.
+     The demo was keyed by address too, because every visitor to it was the one
      `p_demo`; a door that is no longer a `LimitDoor` cannot be handed in at all, which the typecheck holds. */
   assert.equal(limits.limitKey(null, ip), `ip:${ip}`);
   // @ts-expect-error `demo` is not a door any host has.

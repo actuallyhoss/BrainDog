@@ -22,7 +22,7 @@ const reachable = <T>(r: Result<T>): Result<T> =>
   refused(r) && r.refusal.code === 'UNREACHABLE' ? { ok: false, refusal: { ...r.refusal, fix: UNREACHABLE_FIX } } : r;
 
 /**
- * The optional methods of `McpSurface` this client routes: the first four since build step 16, `arrangement` since S12 and
+ * The optional methods of `McpSurface` this client routes: the first four, `arrangement` and
  * `recentHistory` with the `activity` tool; the probe below stays so that a client built before a route landed gives its
  * tool's own "not yet" sentence.
  *
@@ -40,15 +40,15 @@ const reachable = <T>(r: Result<T>): Result<T> =>
  *
  * `scriptTry` IS ON IT FROM THE DAY IT WAS ROUTED, for `recentHistory`'s lesson: it backs `propose` with `"try"` on a
  * script change, and a stdio agent left off this list would be told this record cannot try a script when its host can.
- * `previewPage` JOINED WITH ITS BRANCH (M4 wave three brief 3) for the same reason: before it, a host that routed the
+ * `previewPage` JOINED WITH ITS BRANCH for the same reason: before it, a host that routed the
  * method still left `surfaceOver`'s answer without it, measured, so `propose` with `try` on a page change would have
  * answered `NOT_IN_THIS_BUILD` over stdio and drawn the page over HTTP.
  *
- * `triage` JOINED WITH ITS TOOL (`loop/finish/contracts.md` §6.2), for the same lesson: an agent given the `inbox` reach
+ * `triage` JOINED WITH ITS TOOL, for the same lesson: an agent given the `inbox` reach
  * works from the command line as often as over `POST /mcp`, and left off this list it would be told this record cannot
  * file an arrival when its host can. Who may triage is still the record's to say, in its own sentence.
  *
- * `previewChange` JOINED WITH ITS BRANCH (`loop/finish/contracts.md` §6.3, `change_preview`), and `tryAutomation` beside it
+ * `previewChange` JOINED WITH ITS BRANCH (`change_preview`), and `tryAutomation` beside it
  * for its own (`automation_try`), for `previewPage`'s reason: each backs `propose` with `"try"`, on a bundle and on a
  * rule change, and left off this list a stdio agent would be told this record cannot draw a change or try a rule when
  * its host can.
@@ -89,8 +89,8 @@ export async function surfaceOver(clientFor: (ctx: Ctx) => Client): Promise<McpS
   /* `actions` TAKES NO ARGUMENTS, so it is written out rather than folded into the loop above: the surface declares it
      as `(ctx)` alone, and giving it the loop's `(args, ctx)` shape is a compile error, not a harmless widening. */
   if (routed.has('actions')) later.actions = (ctx: Ctx) => ask<unknown>(ctx, 'actions');
-  /* AND `figures` FOR THE SAME REASON, ON THIS LIST BEFORE ANY HOST ROUTES IT, for `recentHistory`'s lesson (audit
-     sixty-two finding 2). Without it `record_index` names only the figures a page draws; the probe keeps it off until
+  /* AND `figures` FOR THE SAME REASON, ON THIS LIST BEFORE ANY HOST ROUTES IT, for `recentHistory`'s lesson.
+     Without it `record_index` names only the figures a page draws; the probe keeps it off until
      the client's table carries the name, so no call goes out for a route that is not there. */
   if (routed.has('figures')) later.figures = (ctx: Ctx) => ask<{ id: string; name?: string }[]>(ctx, 'figures');
 

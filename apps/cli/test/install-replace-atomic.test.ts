@@ -1,6 +1,6 @@
 /**
  * `braindog install --replace --apply` as all or nothing, what its printout withholds, and the proxied
- * registration it used to miss: findings 1, 4 and 5 of `loop/research-batch-twenty-four-audit.md`.
+ * registration it used to miss.
  *
  * EVERY FILE HERE IS UNDER A TEMPORARY FOLDER. The command is run with `HOME` and `USERPROFILE` pointed at it,
  * `CLAUDE_CONFIG_DIR` removed and each profile named with `--config-dir`, so the real `~/.claude` and
@@ -41,10 +41,10 @@ const folder = (name: string) => {
   return dir;
 };
 
-const HB_START = 'powershell -NoProfile -ExecutionPolicy Bypass -File "C:\\Tools\\legacy\\hooks\\session-start.ps1"';
+const HB_START = 'powershell -NoProfile -ExecutionPolicy Bypass -File "C:\\Tools\\tallybook\\hooks\\session-start.ps1"';
 
-/** A profile as the cut-over finds it: the old tool's start hook in `settings.json` and its server in `.claude.json`. */
-function profile(dir: string, servers: Record<string, unknown> = { brain: { type: 'stdio', command: 'node', args: ['C:\\Tools\\legacy\\mcp\\brain-mcp.mjs'] } }) {
+/** A profile as the cut-over finds it: Tallybook's start hook in `settings.json` and its server in `.claude.json`. */
+function profile(dir: string, servers: Record<string, unknown> = { brain: { type: 'stdio', command: 'node', args: ['C:\\Tools\\tallybook\\mcp\\tallybook-mcp.mjs'] } }) {
   mkdirSync(dir, { recursive: true });
   const settings = join(dir, 'settings.json');
   const claudeJson = join(dir, '.claude.json');
@@ -55,7 +55,7 @@ function profile(dir: string, servers: Record<string, unknown> = { brain: { type
 
 /**
  * Every file under a folder with its bytes, so "as it was" is compared whole and a stray `.tmp` or `.bak` is seen.
- * Keyed by its path from the folder, and walked, since OPS-26's skills/braindog/ nests a file a level down.
+ * Keyed by its path from the folder, and walked, since skills/braindog/ nests a file a level down.
  */
 function snapshot(dir: string, prefix = ''): Record<string, string> {
   const out: Record<string, string> = {};
@@ -75,12 +75,12 @@ function cli(args: string[], home: string) {
   return { code: ran.status, stdout: ran.stdout, stderr: ran.stderr };
 }
 
-/* ── finding 1: all or nothing ─────────────────────────────────────────── */
+/* ── all or nothing ────────────────────────────────────────────────────── */
 
 /*
- * THE AUDIT'S OWN FAULT, A READ-ONLY `.claude.json`. Windows refuses a rename onto a read-only file, so the second
- * write fails after the first has been renamed into place. Measured before the fix: `settings.json` had lost Sam
- * Brain's hook, `.claude.json` still held its server, stdout was empty, and the `.tmp` left behind (made with the
+ * THE FAULT FOUND FIRST, A READ-ONLY `.claude.json`. Windows refuses a rename onto a read-only file, so the second
+ * write fails after the first has been renamed into place. Measured before the fix: `settings.json` had lost
+ * Tallybook's hook, `.claude.json` still held its server, stdout was empty, and the `.tmp` left behind (made with the
  * original's read-only mode) failed every retry at `open`, each retry adding one more `.claude.json.bak`.
  */
 test('A WRITE THAT FAILS ON THE SECOND FILE PUTS THE FIRST BACK, leaves no .tmp or .bak, says so, and a retry fails the same clean way', { skip: process.platform !== 'win32' }, () => {
@@ -120,7 +120,7 @@ test('EVERY PROFILE IS READ BEFORE ANY IS WRITTEN: a malformed third profile lea
   for (const p of [a, b]) {
     assert.deepEqual(readdirSync(p.dir).sort(), ['.claude.json', '.claude.json.bak', 'settings.json', 'settings.json.bak', 'skills']);
     assert.ok(!readFileSync(p.settings, 'utf8').includes('session-start.ps1'));
-    assert.ok(!readFileSync(p.claudeJson, 'utf8').includes('brain-mcp.mjs'));
+    assert.ok(!readFileSync(p.claudeJson, 'utf8').includes('tallybook-mcp.mjs'));
   }
   assert.equal(lines.filter((l) => l.startsWith('Changed ')).length, 6, lines.join('\n'));
 });
@@ -134,7 +134,7 @@ test('A STALE .tmp FROM AN EARLIER FAILED RUN, read-only as that run made it, do
   const lines = installInto(a.dir, { apply: true, replace: REPLACE, scripts, home });
   assert.ok(lines.includes(`The file as it was is kept at ${a.claudeJson}.bak.`), lines.join('\n'));
   assert.deepEqual(readdirSync(a.dir).sort(), ['.claude.json', '.claude.json.bak', 'settings.json', 'settings.json.bak', 'skills']);
-  assert.ok(!readFileSync(a.claudeJson, 'utf8').includes('brain-mcp.mjs'));
+  assert.ok(!readFileSync(a.claudeJson, 'utf8').includes('tallybook-mcp.mjs'));
 });
 
 test('THE SAME FILE NAMED TWICE is written once, from one reading', () => {
@@ -145,26 +145,26 @@ test('THE SAME FILE NAMED TWICE is written once, from one reading', () => {
   assert.equal(lines.filter((l) => l === `Changed ${a.settings}:`).length, 1, lines.join('\n'));
 });
 
-/* ── finding 4: what the printout withholds ────────────────────────────── */
+/* ── what the printout withholds ───────────────────────────────────────── */
 
 const SECRETS = ['hb_live_SECRET_77', 'hb_live_SECRET_88', 'hb_live_SECRET_99', 'sk-ant-SECRET0042', 'SECRETheader31', 'SECRETquery55', 'SECRETword66', 'SECRETcolon1', 'SECRETcolon2'];
 
 const LEAKY = {
-  'token-in-args': { command: 'node', args: ['C:\\Tools\\legacy\\mcp\\brain-mcp.mjs', '--token', 'hb_live_SECRET_77'] },
-  'token-in-path': { type: 'http', url: 'https://brain.example.com/mcp/hb_live_SECRET_88' },
-  'token-joined': { command: 'node', args: ['C:\\Tools\\legacy\\mcp\\brain-mcp.mjs', '--api-key=sk-ant-SECRET0042'] },
-  'token-in-one-string': { command: 'node C:\\Tools\\legacy\\mcp\\brain-mcp.mjs --secret hb_live_SECRET_99' },
-  'token-bare': { command: 'node', args: ['C:\\Tools\\legacy\\mcp\\brain-mcp.mjs', 'SECRETword66a1b2c3d4'] },
+  'token-in-args': { command: 'node', args: ['C:\\Tools\\tallybook\\mcp\\tallybook-mcp.mjs', '--token', 'hb_live_SECRET_77'] },
+  'token-in-path': { type: 'http', url: 'https://tallybook.example/mcp/hb_live_SECRET_88' },
+  'token-joined': { command: 'node', args: ['C:\\Tools\\tallybook\\mcp\\tallybook-mcp.mjs', '--api-key=sk-ant-SECRET0042'] },
+  'token-in-one-string': { command: 'node C:\\Tools\\tallybook\\mcp\\tallybook-mcp.mjs --secret hb_live_SECRET_99' },
+  'token-bare': { command: 'node', args: ['C:\\Tools\\tallybook\\mcp\\tallybook-mcp.mjs', 'SECRETword66a1b2c3d4'] },
   'proxied-with-header': {
     command: 'npx',
-    args: ['-y', 'mcp-remote', 'https://brain.example.com/mcp?key=SECRETquery55', '--header', 'Authorization: Bearer SECRETheader31'],
+    args: ['-y', 'mcp-remote', 'https://tallybook.example/mcp?key=SECRETquery55', '--header', 'Authorization: Bearer SECRETheader31'],
   },
   /*
    * WITHOUT THE SPACE, as mcp-remote's own README writes it, because Windows splits an argument at a space. Measured
    * before the colon was read as a separator: `Authorization:Bearer` was hidden and the short key after it printed.
    */
-  'proxied-header-no-space': { command: 'npx', args: ['-y', 'mcp-remote', 'https://brain.example.com/mcp', '--header', 'Authorization:Bearer SECRETcolon1'] },
-  'proxied-header-short-flag': { command: 'npx', args: ['-y', 'mcp-remote', 'https://brain.example.com/mcp', '-H', 'Authorization:SECRETcolon2'] },
+  'proxied-header-no-space': { command: 'npx', args: ['-y', 'mcp-remote', 'https://tallybook.example/mcp', '--header', 'Authorization:Bearer SECRETcolon1'] },
+  'proxied-header-short-flag': { command: 'npx', args: ['-y', 'mcp-remote', 'https://tallybook.example/mcp', '-H', 'Authorization:SECRETcolon2'] },
 };
 
 test('A TOKEN IN AN ARGUMENT, A PATH OR A QUERY IS NEVER PRINTED, on the dry run or under --json', () => {
@@ -174,10 +174,10 @@ test('A TOKEN IN AN ARGUMENT, A PATH OR A QUERY IS NEVER PRINTED, on the dry run
   const text = installInto(a.dir, { apply: false, replace: REPLACE, scripts, home }).join('\n');
   for (const secret of SECRETS) assert.ok(!text.includes(secret.slice(0, 12)), `${secret} was printed:\n${text}`);
   /* Still readable: what runs is named, and what was withheld is marked rather than silently dropped. */
-  assert.ok(text.includes("  - mcpServers.token-in-args, the old tool's: node [3 arguments hidden]"), text);
-  assert.ok(text.includes("  - mcpServers.token-in-path, the old tool's: https://brain.example.com/mcp/[hidden]"), text);
-  assert.ok(text.includes("  - mcpServers.token-joined, the old tool's: node [2 arguments hidden]"), text);
-  assert.ok(text.includes("  - mcpServers.proxied-with-header, the old tool's: npx [5 arguments hidden]"), text);
+  assert.ok(text.includes("  - mcpServers.token-in-args, Tallybook's: node [3 arguments hidden]"), text);
+  assert.ok(text.includes("  - mcpServers.token-in-path, Tallybook's: https://tallybook.example/mcp/[hidden]"), text);
+  assert.ok(text.includes("  - mcpServers.token-joined, Tallybook's: node [2 arguments hidden]"), text);
+  assert.ok(text.includes("  - mcpServers.proxied-with-header, Tallybook's: npx [5 arguments hidden]"), text);
 
   const ran = cli(['install', '--replace', REPLACE_FILE, '--json', '--config-dir', a.dir], home);
   assert.equal(ran.code, 0, ran.stderr);
@@ -185,25 +185,25 @@ test('A TOKEN IN AN ARGUMENT, A PATH OR A QUERY IS NEVER PRINTED, on the dry run
   assert.ok(ran.stdout.includes('[hidden]'), ran.stdout);
 });
 
-/* ── finding 5: a proxied registration ─────────────────────────────────── */
+/* ── a proxied registration ────────────────────────────────────────────── */
 
 /*
- * MEASURED BEFORE THE FIX: a profile whose only the old tool server went through `mcp-remote` printed "registers no
- * the old tool MCP server. Nothing to change." and kept it. The host is now looked for in the arguments too.
+ * MEASURED BEFORE THE FIX: a profile whose only Tallybook server went through `mcp-remote` printed "registers no
+ * Tallybook MCP server. Nothing to change." and kept it. The host is now looked for in the arguments too.
  */
-test('A SERVER REGISTERED THROUGH A PROXY, npx mcp-remote https://brain.example.com/mcp, is named and removed, and a near miss is kept', () => {
+test('A SERVER REGISTERED THROUGH A PROXY, npx mcp-remote https://tallybook.example/mcp, is named and removed, and a near miss is kept', () => {
   const home = folder('home');
   const a = profile(join(home, '.claude-a'), {
-    remote: { command: 'npx', args: ['-y', 'mcp-remote', 'https://brain.example.com/mcp'] },
-    'remote-one-string': { command: 'npx -y mcp-remote "https://BRAIN.example.com/mcp"' },
-    dotted: { type: 'http', url: 'https://brain.example.com./mcp' },
-    other: { command: 'npx', args: ['-y', 'mcp-remote', 'https://notbrain.example.com.example.com/mcp'] },
+    remote: { command: 'npx', args: ['-y', 'mcp-remote', 'https://tallybook.example/mcp'] },
+    'remote-one-string': { command: 'npx -y mcp-remote "https://TALLYBOOK.example/mcp"' },
+    dotted: { type: 'http', url: 'https://tallybook.example./mcp' },
+    other: { command: 'npx', args: ['-y', 'mcp-remote', 'https://nottallybook.example.example.com/mcp'] },
   });
 
   const dry = installInto(a.dir, { apply: false, replace: REPLACE, scripts, home });
-  assert.ok(dry.includes("  - mcpServers.remote, the old tool's: npx [3 arguments hidden]"), dry.join('\n'));
-  assert.ok(dry.some((l) => l.startsWith("  - mcpServers.remote-one-string, the old tool's: ")), dry.join('\n'));
-  assert.ok(dry.some((l) => l.startsWith("  - mcpServers.dotted, the old tool's: ")), dry.join('\n'));
+  assert.ok(dry.includes("  - mcpServers.remote, Tallybook's: npx [3 arguments hidden]"), dry.join('\n'));
+  assert.ok(dry.some((l) => l.startsWith("  - mcpServers.remote-one-string, Tallybook's: ")), dry.join('\n'));
+  assert.ok(dry.some((l) => l.startsWith("  - mcpServers.dotted, Tallybook's: ")), dry.join('\n'));
   assert.ok(!dry.some((l) => l.includes('mcpServers.other')), dry.join('\n'));
 
   installInto(a.dir, { apply: true, replace: REPLACE, scripts, home });

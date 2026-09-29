@@ -1,14 +1,12 @@
 /**
- * `braindog import <adapter> <export>` TAKES ANY ADAPTER, NOT ONE (`loop/research-legacy-parity.md` brief B2).
+ * `braindog import <adapter> <export>` TAKES ANY ADAPTER, NOT ONE.
  *
- * The importer was one person's migration compiled into the command line: it took the one word naming his old record
- * and refused everything else, so another person's export had no door in at all, and the planner that read his
- * export's field names lived in `apps/cli`. `loop/DIRECTION.md` section 27 moves his record only once nothing in
- * `apps/` exists because he has it. So the command keeps the part that is anybody's (read every list, find each row by
- * its key, write what differs, remember the night) and takes the part that is one tool's from a file named on the line.
+ * The command keeps the part that is anybody's (read every list, find each row by its key, write what differs,
+ * remember the night) and takes the part that is one tool's from a file named on the line, so another person's export
+ * has a door in and no planner for one tool's field names lives in `apps/cli`.
  *
- * RED FIRST, MEASURED ON 25 SEPTEMBER AGAINST `7140616f`: this file's adapter, twenty lines for an invented tool, was
- * refused with the command's usage, "braindog import takes legacy <export.json> ...", exit 1, and nothing was written.
+ * RED FIRST: before this, this file's adapter, twenty lines for an invented tool, was refused with the command's usage,
+ * exit 1, and nothing was written.
  *
  * THE KERNEL ANSWERS, over HTTP as a host would, because what the record holds after the run is the fact.
  * EVERY VALUE IS MADE UP.
@@ -110,8 +108,6 @@ test('AN ADAPTER NAMED BY ITS PATH IS TAKEN, and its rows arrive under its own k
   assert.equal(first, 0, [...said, ...out].join(' | '));
   assert.deepEqual(await whats(kernel), ['Renew the workshop lease', 'Send the October invoices']);
   assert.ok(out.includes('Tasks: 2 added, 0 updated, 0 unchanged.'), out.join(' | '));
-  /* THE WRITE'S NOTE NAMES WHERE THE ROW CAME FROM IN THE ADAPTER'S OWN WORDS, and no other tool's. */
-  assert.ok(!out.join('\n').includes('Sam'), out.join('\n'));
 
   out.length = 0;
   assert.equal(await importCommand([ADAPTER, 'export.json'], io, undefined, now, utc), 0, [...said, ...out].join(' | '));
@@ -151,13 +147,15 @@ test('--MAP IS READ IN PLACE OF THE ADAPTER\'S OWN, so a person renames a list w
   assert.ok(said.some((l) => l.includes('tasks')), said.join(' | '));
 });
 
-test('A PACK IS NAMED BY ITS ID, found in packs/ of the checkout the command runs from', async (t) => {
-  const { io, said } = await setUp(t);
-  /* THE DRAFT NEEDS NO HOST, so this reaches the adapter and stops short of writing: a pack id resolved from a folder
-     that holds no packs/ of its own. The export is the tallybook one, and the answer is the the old tool adapter's own
-     refusal of it, which only that adapter says. */
-  assert.equal(await importCommand(['legacy-import', 'export.json', '--draft-setup'], io), 1);
-  assert.deepEqual(said, ['The file is not a the old tool export: it has no db with projects in it. Export it again with packs/legacy-import/export.mjs.']);
+test('A PACK IS NAMED BY ITS ID, found in packs/ of the folder the command runs from', async (t) => {
+  const { kernel, io, out, said } = await setUp(t);
+  /* THE FIXTURE ADAPTER, SAT AS A PACK SITS: `packs/<id>/adapter.ts` with its `map.json` beside it, named by the id
+     alone, so the command resolves the folder and not a path. */
+  const pack = join(io.cwd, 'packs', 'tallybook');
+  mkdirSync(pack, { recursive: true });
+  for (const name of ['adapter.ts', 'map.json']) writeFileSync(join(pack, name), readFileSync(fileURLToPath(new URL(`./fixtures/tallybook/${name}`, import.meta.url)), 'utf8'));
+  assert.equal(await importCommand(['tallybook', 'export.json'], io, undefined, () => new Date(NOW), () => 0), 0, [...said, ...out].join(' | '));
+  assert.deepEqual(await whats(kernel), ['Renew the workshop lease', 'Send the October invoices']);
 });
 
 /*
@@ -166,7 +164,7 @@ test('A PACK IS NAMED BY ITS ID, found in packs/ of the checkout the command run
  * The offers used to be compiled in, so the import touched no address but the host's, and every request to the host
  * carries the budget. Resolving them in a catalogue added one more address, read with a bare `fetch`: no deadline, a
  * redirect followed anywhere, no cap on what came back, and plain http to any machine, where `pack install` reads the
- * same files through `readSource` with all four. Measured on 25 September before `addressCatalogue` read through it:
+ * same files through `readSource` with all four. Measured before `addressCatalogue` read through it:
  * this test ran out its ten seconds with the import still waiting on the first read of `index.json`.
  */
 test('A CATALOGUE THAT NEVER ANSWERS IS GIVEN UP ON AT THE BUDGET, and the offer is said as not filed', { timeout: 10_000 }, async (t) => {
@@ -199,7 +197,7 @@ test('A CATALOGUE THAT NEVER ANSWERS IS GIVEN UP ON AT THE BUDGET, and the offer
  *
  * `packFrom` read the index, the checksum and the entry, and stopped there, so a version signed by a key its author had
  * revoked, or one whose signature was stripped after signed versions, was filed on Decide by the import where
- * `braindog pack install` refuses both. Measured on 25 September before `packFrom` shared the install's checks: both
+ * `braindog pack install` refuses both. Measured before `packFrom` shared the install's checks: both
  * runs below filed the pack ("Packs: 1 filed on Decide"), and neither said why it should not have been.
  */
 async function offering(io: AgentIo, id: string): Promise<string> {
@@ -265,7 +263,7 @@ test('AN OFFER WHOSE SIGNATURE WAS STRIPPED AFTER SIGNED VERSIONS IS NOT FILED, 
  * WHAT AN ADAPTER THROWS IS SAID AS ITS REFUSAL, NAMING IT, AND NOTHING IS SENT.
  *
  * `plan` was wrapped and `read`, `readSetup`, `draftSetup`, `offers` and `settled` were not, so an adapter that threw
- * in any of them ended the command in a bare stack naming neither the adapter nor the file. Measured on 25 September
+ * in any of them ended the command in a bare stack naming neither the adapter nor the file. Measured
  * before `ask` wrapped them: each case below rejected `importCommand` with the adapter's own error.
  */
 test('AN ADAPTER THAT THROWS IS REFUSED BY NAME, whichever of its parts threw, and nothing is written', async (t) => {
@@ -295,9 +293,9 @@ test('AN ADAPTER THAT THROWS IS REFUSED BY NAME, whichever of its parts threw, a
 /*
  * A NIGHT REMEMBERED WITH NO SOURCE IS THE ADAPTER'S THAT SAYS `unsourced`, AND NO OTHER'S.
  *
- * Runs have named their adapter since adapters were named on the line; the nights before that were the one importer's,
- * the the old tool one. `mine` took a night with no source as every adapter's, so the first morning read of any other
- * adapter was handed his nights as its own. Measured on 25 September before `unsourced`: the Tallybook read below said
+ * Runs have named their adapter since adapters were named on the line; the nights before that were the one importer's
+ * that came first. `mine` took a night with no source as every adapter's, so the first morning read of any other
+ * adapter was handed that importer's nights as its own. Measured before `unsourced`: the Tallybook read below said
  * "Created in Tasks: A night before sources" and ended 0.
  */
 test('A NIGHT WITH NO SOURCE IS READ ONLY BY THE ADAPTER THAT SAYS IT WROTE THOSE, not by every adapter', async (t) => {

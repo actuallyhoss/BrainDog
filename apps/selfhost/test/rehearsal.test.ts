@@ -1,6 +1,6 @@
 /**
  * A scheduled action's real run on this machine: a pull, a call and a poll, each once, through the runner, a real https
- * socket, the usage ledger and the record's own events (`loop/DIRECTION.md` §0b).
+ * socket, the usage ledger and the record's own events.
  *
  * THE SERVER IS A TINY LOCAL ONE WITH A THROWAWAY CERTIFICATE, made by openssl in a temp folder and deleted with it. The
  * self-host still refuses local addresses; `rehearseOnThisMachine` is passed in code, names only `.test` hosts, and is

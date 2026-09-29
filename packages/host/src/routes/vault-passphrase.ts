@@ -1,6 +1,6 @@
 /**
- * The route rows for the vault passphrase (`packages/record/src/methods/vault-passphrase.ts`, `loop/finish/contracts.md`
- * §2.5 and §3.1, `docs/12-SECURITY.md` §6).
+ * The route rows for the vault passphrase (`packages/record/src/methods/vault-passphrase.ts`,
+ * `docs/12-SECURITY.md` §6).
  *
  * ONE ROW A LINE, IN THE SHAPE `ROUTES` HAS ALWAYS HAD, because the two gates over the table read it by that shape:
  * `router-groups` holds each row's group to `docs/30-BLUEPRINT.md` §5, and `guards` holds the record method of the same

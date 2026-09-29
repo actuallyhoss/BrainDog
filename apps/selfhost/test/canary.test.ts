@@ -1,5 +1,5 @@
 /**
- * Canaries planted in a real self-host, and looked for in every answer of every route (DEF-1).
+ * Canaries planted in a real self-host, and looked for in every answer of every route.
  *
  * THE CLASS THIS ENDS IS A NEW DOOR NOBODY SWEPT. A secret reached an answer, or a member read a list they were never
  * given, through a route written after the last audit, and each fix closed the one door it was found at. So nothing

@@ -1,5 +1,5 @@
 /**
- * Slash on the Worker: the model hookup and the daily look (`loop/research-spark.md` S15, `docs/46` §5.9).
+ * Slash on the Worker: the model hookup and the daily look (`docs/46` §5.9).
  *
  * TWO WAYS TO A MODEL, AND THE OWNER CHOOSES. The INCLUDED model (`includedInference` below): Workers AI through `AI`, which
  * spends the Cloudflare account's neurons and opens no key at all. And HIS OWN KEY: a provider (Anthropic's Messages or an
@@ -10,11 +10,10 @@
  *
  * `SLASH_ENDPOINT` IS NOT READ HERE ANY MORE. It named a deployment's own endpoint, asked with whatever key the vault held
  * under the label `slash`, which on a hosted record was the person's key sent to an address the operator chose. His own
- * key replaces it: he names the address, he picks the key by its id, and no key is chosen by its label (`loop/finish/agents.md`
- * §5 item 5, `loop/finish/defects.md` S1). The builders are `@braindog/host/slash`'s, the ones the self-host uses, so the two
+ * key replaces it: he names the address, he picks the key by its id, and no key is chosen by its label. The builders are `@braindog/host/slash`'s, the ones the self-host uses, so the two
  * hosts cannot drift.
  *
- * EVERY WIRE HERE THAT CARRIES A KEY REQUIRES IT (`loop/finish/defects.md` S2). A key that will not open is a
+ * EVERY WIRE HERE THAT CARRIES A KEY REQUIRES IT. A key that will not open is a
  * `SlashKeyClosedError` before anything is sent, never a request with no key, because every address his key goes to is a
  * hosted provider on his own bill. `wireOf` sets it, and the own-key path in the host keeps it whatever a caller passes.
  *
@@ -24,7 +23,7 @@
  * THE INCLUDED MODEL IS SWITCHED ON BY `SLASH_INCLUDED`, NOT BY THE BINDING. `AI` is bound in both environments already
  * (`wrangler.jsonc`, since `src/inference.ts` was written) and `deploy.yml` deploys production on every green `ci`, so a
  * model keyed on the binding alone would have started spending his account at the first deploy of the commit that built it.
- * Spending it is his call (`loop/research-living-in-it.md` section 8, call 2), so it takes a var.
+ * Spending it is his call, so it takes a var.
  *
  * TWO FEATURES SHARE THE NAME AND THIS FILE BUILDS BOTH. `workerSlashModel` is the model behind the RECORD's Slash, which
  * proposes how a BrainDog is ARRANGED; `workerSlashEngine` is `@braindog/slash`, `docs/46`'s engine, which answers a typed
@@ -81,15 +80,14 @@ export type SlashEnv = {
 /**
  * The most one included call may spend, in neurons, checked by `aiInference` BEFORE the call against its worst case.
  *
- * THE NUMBER IS HIS TO CHANGE (`loop/research-living-in-it.md` section 8, call 2), and this is the survey's default. One
+ * THE NUMBER IS HIS TO CHANGE, and this is the default. One
  * conversational turn on `glm-5.3-flash`, 12,000 tokens in and 1,500 out, is 231.8 neurons or $0.00255 (`inference.ts`,
  * the rate table's comment). 2,500 is about ten and a half such turns, and 2,500 × $0.011 / 1,000 is $0.0275 at most.
  *
  * IT STOPS A RUNAWAY AND NOTHING ELSE, AND ONLY ON THE ENGINE'S CALLS NOW. The package caps its own prompts at 12,000 tokens
  * in and 2,048 out, 256.7 neurons at the most, so no package call comes near it; the package's monthly `ask_cap` is what
  * bounds those. It was once the whole bound on the record's own `draft` too, whose reading has no cap of its own, and that
- * let a press on a large record spend more than the one ask the ceiling counted it as (`loop/research-batch-sixty-two-audit.md`
- * finding 3). The record's two asks are held to `worstAsk` instead (`includedModel`).
+ * let a press on a large record spend more than the one ask the ceiling counted it as. The record's two asks are held to `worstAsk` instead (`includedModel`).
  */
 export const INCLUDED_NEURONS_PER_CALL = 2_500;
 
@@ -98,12 +96,12 @@ export const INCLUDED_NEURONS_PER_CALL = 2_500;
  * `SLASH_INCLUDED_MONTH_NEURONS` does not say otherwise. The var is the operator's; `ask_cap` is the record owner's and
  * can only lower what this allows (`operatorCeiling` below).
  *
- * WHY A CEILING OF THE OPERATOR'S AT ALL. `loop/research-batch-sixty-audit.md` finding 1, severity 1: once `4e701b15`
+ * WHY A CEILING OF THE OPERATOR'S AT ALL. Once `4e701b15`
  * switched the included model on, the only monthly bound on the operator's neurons was `ask_cap`, which any record owner
- * types, with no upper limit. Its probe S1 saved `ask_cap: 1_000_000_000` through the door and 200 reads all reached the
- * binding, and the audit put 100,000 proposes from one owner with a cookie at about $283.
+ * types, with no upper limit. A probe saved `ask_cap: 1_000_000_000` through the door and 200 reads all reached the
+ * binding, and 100,000 proposes from one owner with a cookie came to about $283.
  *
- * WHY 300,000. At $0.011 a thousand neurons that is about $3.30 a record a month (`loop/finish/decisions.md` C19, down
+ * WHY 300,000. At $0.011 a thousand neurons that is about $3.30 a record a month (down
  * from 900,000 and about $9.90), the same number `wrangler.jsonc` sets in both environments, so an unset or mistyped var
  * falls back to the ceiling the operator chose. The package's own caps put the default month (80 asks) at about 20,600
  * neurons at the very worst, some $0.23, so this is some fourteen times what an owner who never touches the setting
@@ -151,8 +149,8 @@ class NotSent extends Error {
 /**
  * The binding was called and threw: a call the platform may have billed, which the package reads by this mark.
  *
- * IT WAS A PLAIN `Error` UNTIL `loop/research-batch-sixty-audit.md` finding 5, and the package read a plain throw two ways.
- * Its probe S4 put one `AI.run` that threw through both paths: a read kept `glm-5.3-flash`, priced the prompt estimate at
+ * IT WAS ONCE A PLAIN `Error`, and the package read a plain throw two ways.
+ * A probe put one `AI.run` that threw through both paths: a read kept `glm-5.3-flash`, priced the prompt estimate at
  * 9 neurons and counted the ask, and an automation's answer settled it under `-`, priced 0, uncounted, and was asked
  * again up to the ladder's eighth rung. With the mark both settle it under the model's name, priced and counted.
  * `model` is the routing name, for the reason `includedInference` gives.
@@ -227,7 +225,7 @@ export function includedInference(env: SlashEnv, most: () => number | Promise<nu
  * The record's meter writes one `slash_call` row a press, and `operatorCeiling` turns the month's neurons into asks at 232 each,
  * so a press that may spend more than 232 spends past the ceiling. The package's templates never do, because each trims
  * its input to `capIn`; the press's input is the record's own reading, which has no cap and grows with the record.
- * `loop/research-batch-sixty-two-audit.md` finding 3 measured it at 300 lists: 52,310 bytes, a worst case of 272
+ * It was measured at 300 lists: 52,310 bytes, a worst case of 272
  * neurons, and 274 through the bundle with the instructions counted (`test/slash-ceiling-all.test.ts`). Checked here,
  * by `aiInference`'s own worst case and before the call, a press past it is never sent: the record releases its hold,
  * writes no row, and its rules draft. A record of 150 lists is 186 and is still asked. The package is imported only
@@ -278,7 +276,7 @@ export type SlashWire = {
 /**
  * The deps every call on his own key is built from. Written once because the key discipline is the part that must not be copied.
  *
- * `keyRequired` IS ALWAYS SET (`loop/finish/defects.md` S2): every model this Worker reaches with a key is a hosted provider
+ * `keyRequired` IS ALWAYS SET: every model this Worker reaches with a key is a hosted provider
  * on his own bill, so a key that will not open is a `SlashKeyClosedError` before anything is sent.
  *
  * `actor` SIGNS EVERY `grant.read` THIS WIRE OPENS, AND `system` IS RIGHT ONLY WHERE NOBODY ASKED: the record's own press
@@ -337,7 +335,7 @@ export function workerSlashModel(env: SlashEnv, api: () => Pick<RecordApi, 'kern
       if (model.form === undefined) throw new NotSent('The model Slash answers with here drafts no first plan.');
       return model.form(input);
     },
-    /* THE DAILY LOOK'S SKILL STEP (GAP-12), through the same model choice as `form`: the included model or the
+    /* THE DAILY LOOK'S SKILL STEP, through the same model choice as `form`: the included model or the
        record's own key, whichever `chosen()` says is asking today. */
     skill: async (input) => {
       const model = chosen();
@@ -368,8 +366,8 @@ export type SlashEngineDeps = SlashWire & {
  * but the included one. On the included model the name went to Workers AI's own table, which answered "no adapter on this
  * host" on every pass 2 (`src/inference.ts`), while the host still counted each ask against the cap Settings said `byo`
  * did not have. So on every Worker the package refuses to store it, reads a record already saved on it as the included
- * model, and the guard counts it the same way. Settings offers "Included" and "Your own key" and nothing else, which is
- * the two sources of `loop/finish/agents.md` AGT-21.
+ * model, and the guard counts it the same way. Settings offers "Included" and "Your own key" and nothing else: the
+ * Cloud's two sources.
  */
 export const CLOUD_TIERS = ['a', 'b'] as const;
 
@@ -578,7 +576,7 @@ function operatorCeiling(engine: Slash, deps: { sql: Sql; clock: Clock }, asks: 
  * chose where his questions go.
  *
  * AND A KEY THAT IS THERE AND WILL NOT OPEN IS REFUSED TOO, which the check above cannot see: it reads that the grant is
- * live, and the opening is the call's. `loop/research-batch-forty-nine-audit.md` finding 2 put the owner's key under one
+ * live, and the opening is the call's. A probe put the owner's key under one
  * `KEK` and woke the object under another, as a `wrangler secret put KEK` leaves it: 8 POSTs with no `authorization` of 8
  * over the ladder, 8 ledger rows under the dash, and a run ending "could not be reached". `keyOpener` answers `null` for
  * that and for four other ways a grant fails to open (`actions.ts`). His key's wire always requires it (`wireOf`), the host
@@ -652,22 +650,19 @@ export function workerSlashAnswers(env: SlashEnv, api: () => RecordApi, deps: Sl
 /**
  * `POST /api/slash/read` for this record's object: the door `@braindog/host` serves, over the builder above.
  *
- * THIS WAS THE CALLER THE BUILDER HAD NOT GOT, and finding 2 of `loop/research-batch-five-audit.md` is that
- * absence. Three passes added the dependency, then the builder, then a door, and none added the branch in
- * `Record$.#answer` that hands a request to one; the fourth added it, so `grep -rn workerSlashDoor apps` now
+ * THIS IS THE CALLER THE BUILDER ONCE LACKED. The dependency, the builder and a door were each added without the
+ * branch in `Record$.#answer` that hands a request to one; that branch is added now, so `grep -rn workerSlashDoor apps`
  * finds this declaration and the branch that calls it.
  *
- * AND THE TALLY THIS MEMO CARRIED WAS WRONG TWICE OVER, so each mutation is written out on its own. Every
+ * EACH MUTATION IS WRITTEN OUT ON ITS OWN, because a tally over several is easy to misread. Every
  * figure below is `node --test --experimental-strip-types "apps/worker/test/*.test.ts"`, whose unmutated run
  * is 179 tests, 179 pass. A `throw new Error(…)` on the first line of `workerSlashEngine` ALONE is 177 pass,
  * 2 fail, at `slash.test.ts:153` and `:238`. On the first line of `slashEngineFor` alone it is also 177 pass,
  * 2 fail, but at `:206` and `:238`, because `:206` drives the SELF-HOST's builder out of this app's suite.
- * Only BOTH builders throwing is 176 pass, 3 fail at `:153`, `:206` and `:238`. The revision of this memo that
- * replaced a "179 of 179" reading hung that three-red tally on the single mutation, which no run produces, so
- * the correction needed correcting. Every reading carries the audit's point rather than refuting it: the only
- * callers of either builder are the tests that name them. The audit's 172 was this same glob LESS
- * `slash.test.ts`, and dropping that exclusion turned a true sentence about every OTHER suite into a false one
- * about this app. `apps/selfhost` is the cleaner measurement, because with `slashEngineFor` throwing its own
+ * Only BOTH builders throwing is 176 pass, 3 fail at `:153`, `:206` and `:238`, and no single mutation
+ * produces that three-red tally. Every reading says the same thing: the only callers of either builder are the
+ * tests that name them. The same glob LESS `slash.test.ts` counts 172, which is true of every OTHER suite and
+ * not of this app. `apps/selfhost` is the cleaner measurement, because with `slashEngineFor` throwing its own
  * suite is 204 tests, 202 pass, 0 fail, 2 skipped, exactly as an unmutated run: no test in that app reaches
  * its own builder at all.
  *
@@ -676,13 +671,12 @@ export function workerSlashAnswers(env: SlashEnv, api: () => RecordApi, deps: Sl
  * method called slash/read." at `POST /api/slash/read`, because `serveApi` was the only thing behind `/api` on
  * either host.
  *
- * WHAT IT MEETS NOW, on the self-host, driven over a real socket on 21 September: 200 on one model call, and the
+ * WHAT IT MEETS NOW, on the self-host, driven over a real socket: 200 on one model call, and the
  * row it asked about. A record holding three rows in `things` asked the name of one of them answers that row,
- * with `{"register":"things","rows":1,"predicate":"all"}` in the fold. The first writing of this paragraph said
- * the read came back empty; the drive's own register declared no field with `search: true`, so nothing about
- * those rows was indexed and both the record and the ask were answering correctly. This Worker's mount is the
- * same door over the same builder and has not been driven against a deployed object, so it is not claimed here.
- * The drive and the correction are in `loop/BACKLOG.md`.
+ * with `{"register":"things","rows":1,"predicate":"all"}` in the fold. A register that declares no field with
+ * `search: true` reads back empty, because nothing about its rows is indexed, and that is the record and the ask
+ * answering correctly. This Worker's mount is the same door over the same builder and has not been driven against a
+ * deployed object, so it is not claimed here.
  *
  * IT IS BUILT INSIDE THE OBJECT AND NOT IN THE ROUTER, unlike `/api/keys/*`, and the difference is what each
  * door needs: the key doors need the `KEK` binding alone, so the Worker answers them without waking the record,
@@ -710,8 +704,7 @@ export function workerSlashDoor(
      it: offering it on a Worker with no `KEK` would save a choice every later ask refuses. `api` is not called until an
      ask, by which time the engine is built and its `slash_settings` table exists for `slashOwnKeyOf` to read.
      OPENED FOR THE ASKER, NOT FOR `system`: `slashOwnKeyFor` runs the vault's own gate on `ctx` and signs the `grant.read`
-     with the asker's id, where this line once opened the owner's key for any caller the door let through
-     (`loop/research-batch-thirty-one-audit.md` §1). */
+     with the asker's id, where this line once opened the owner's key for any caller the door let through. */
   const byok = isBound(env.KEK)
     ? async (ctx: CallContext) => slashOwnKeyFor(slashOwnKeyOf(deps.sql), api(), ctx, (_asker, actor) => wireOf(env, api, deps, actor))
     : undefined;
@@ -751,7 +744,7 @@ export async function slashErased(sql: Sql, subjects: readonly string[]): Promis
 
 /**
  * The record's `erase`, followed by `eraseSlash` over the store this object hands every Slash engine, so an erasure reaches
- * the questions Slash kept (`loop/finish/contracts.md` §7.2). `Record$.#open` calls it once, on the record it has just built.
+ * the questions Slash kept. `Record$.#open` calls it once, on the record it has just built.
  *
  * THE RECORD CANNOT DO IT ITSELF: it has no edge to `@braindog/slash` and must not, and the kernel's cascade walks the
  * record's own tables and names none of Slash's. So the host that holds both finishes the erasure.

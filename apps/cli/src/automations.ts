@@ -1,6 +1,6 @@
 /**
  * `braindog automations list|show|run|cancel` and `braindog scripts list|resume`: the record's automations and scripts from a
- * terminal, over the methods the canvas and an agent's MCP tools already call (`loop/DIRECTION.md` §22).
+ * terminal, over the methods the canvas and an agent's MCP tools already call.
  *
  * READING IS FOR ANY TOKEN; STARTING, STOPPING AND RESUMING ARE A BROWSER'S. `automations` is READ+, held to the lists
  * the caller reads, so `list` and `show` answer a login from this machine. `automationRun`, `cancelRun` and
@@ -11,7 +11,7 @@
  * that is not a browser cookie, they work with no change here, and until then a person reading the refusal learns where
  * the button is rather than learning that the command does not exist.
  *
- * `scripts list` WAS REFUSED HERE UNTIL THE RECORD HAD A READ TO ANSWER IT. Measured on 2026-09-22 across
+ * `scripts list` WAS REFUSED HERE UNTIL THE RECORD HAD A READ TO ANSWER IT. Measured across
  * `packages/host/src/index.ts`'s route table: no method read the `schedule` rows of kind `script` or listed script
  * declarations, and `actions` filters to `pull`, `call` and `poll`, so a list verb here would have had to invent its
  * answer. The record's READ+ `scripts` is that read now, held to the lists each script touches, and `list` prints it.
@@ -22,7 +22,7 @@
  *
  * EVERY LINE IS BUILT FROM A SCRUBBED COPY. Almost every string these lines print was written by somebody other than the
  * person running the command: a step's answer is what a row's field filled it with, and the row belongs to whoever may
- * append to the list. Audit thirty-seven finding 3 measured an OSC 52, an OSC 0 and a CR plus CSI 2K reaching the owner's
+ * append to the list. An audit measured an OSC 52, an OSC 0 and a CR plus CSI 2K reaching the owner's
  * terminal byte for byte through `show`. Each verb now passes the record's answer through `printable` once, before any
  * line is built, and a refusal's sentence through it as well; the value `io.answer` hands an agent is the one the record
  * sent, untouched.

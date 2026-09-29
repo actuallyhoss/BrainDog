@@ -1,7 +1,7 @@
 /**
  * Where a mailed sign-in link sends him once he is in: the page he was sent from, carried in the link's query.
  *
- * MEASURED FIRST (`loop/research-batch-forty-six-audit.md`, "Found on the way"). `linkOf` wrote
+ * MEASURED FIRST. `linkOf` wrote
  * `/app/signin#magic=<token>` with no query whatever the sign-in page had been handed, so a link opened from the mail
  * landed on a page whose `onward()` read an empty search and sent him to `/app/`, not to the record that asked him to
  * sign in. The link carries `?next=` now, and only a path under `/app` on this origin: a `next` is typed by whoever

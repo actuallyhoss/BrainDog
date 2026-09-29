@@ -1,17 +1,16 @@
 /**
- * A joiner between marks, and the joining scripts the list left out. `loop/research-batch-eighteen-audit.md` findings
- * 1 and 8, on `personName` (`packages/host/src/invite.ts`).
+ * A joiner between marks, and the joining scripts the list left out, on `personName` (`packages/host/src/invite.ts`).
  *
  * A JOINER ENDED A RUN OF MARKS, AND THE NEXT MARK STARTED A NEW ONE. `bd928ffe` refused seven marks in a row and kept a
  * joiner after any character of a joining script, marks included, so a ZWJ after every sixth candrabindu reset the
- * count: the audit stored one Devanagari letter carrying 84 of them (99 code points), one Arabic letter carrying 84
+ * count: a probe stored one Devanagari letter carrying 84 of them (99 code points), one Arabic letter carrying 84
  * harakat split by ZWNJ, and `Bo`, sixty harakat and `Tanner`. The count now runs through a joiner, so it is marks per
  * letter however many joiners sit between them.
  *
  * AND ADLAM AND HANIFI ROHINGYA WERE REFUSED A JOINER. Both are cursive scripts with living users (Fula, Rohingya), and
  * a joiner is spelling there as it is in Arabic, but neither was on the list, so `bd928ffe` newly refused both.
  *
- * A TRAILING EMOJI ZWJ WAS UNTESTED. The checker of `bd928ffe` noted it: the emoji branch needs a pictograph after the
+ * A TRAILING EMOJI ZWJ WAS UNTESTED after `bd928ffe`: the emoji branch needs a pictograph after the
  * joiner, so a ZWJ at the end of an emoji sequence is refused, and nothing proved it.
  */
 
@@ -30,7 +29,7 @@ const REFUSED: [string, string][] = [
   ['an emoji ZWJ onto a Latin letter', '\u{1F468}\u200dBo'],
   /* ONE BORROWED MARK MADE A LATIN NAME A JOINING ONE. `7f6610bd` asked the script of the character before the joiner,
      so a single haraka, candrabindu or Adlam mark on `b` passed as Arabic, Devanagari or Adlam, and the joiner after it
-     split `Bob` from `Smith` unseen (`loop/research-batch-twenty-audit.md` finding 7). The Adlam line was refused
+     split `Bob` from `Smith` unseen. The Adlam line was refused
      before `7f6610bd` put Adlam on the list. */
   ['Bob, one Arabic haraka, ZWNJ, Smith', 'Bob\u064b\u200cSmith'],
   ['Bob, one Devanagari mark, ZWJ, Smith', 'Bob\u0901\u200dSmith'],

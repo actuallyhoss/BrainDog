@@ -1,10 +1,10 @@
 /**
  * The nightly re-wrap: one record's keys moved from the root key they were wrapped under to the current one.
- * `53 §5.6` step 5, `loop/finish/contracts.md` §8.4.
+ * `53 §5.6` step 5.
  *
  * WHY IT EXISTS. After a rotation `KEK` holds the new key and the old one (`keys.ts`), so every record still opens, and
  * that is only safe for as long as the old key is kept. `rewrapRecord` is the nightly walk's step for one record, and the
- * walk's call of it for every record is `loop/finish/ops.md` OPS-15's. A record whose keys are all under the current key
+ * walk calls it for every record. A record whose keys are all under the current key
  * answers `ok` and costs one read; a record still under the old one is re-wrapped; a record under a key the secret no
  * longer holds is a `straggler`, for the walk to count and to tell the operator of before the old key is retired
  * (`53 §5.6` step 6).
@@ -120,7 +120,7 @@ export type RewrapEnv<Id> = {
 
 /**
  * One record's re-wrap, by the record's name: what the nightly walk is to call for each record it visits, and the name
- * is the one the walk addresses the record's object by, its record id (`loop/finish/ops.md` OPS-15).
+ * is the one the walk addresses the record's object by, its record id.
  *
  * A `KEK` THAT IS NOT KEYS THROWS, as it does at every other door, so the walk's line for the record carries the
  * sentence rather than a count of stragglers that hides a deployment fault.

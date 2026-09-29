@@ -1,6 +1,6 @@
 /**
- * The route rows for a colleague's own agent (`packages/record/src/methods/own-tokens.ts`, `loop/finish/contracts.md`
- * §2.8, `docs/20-COLLABORATION.md` §2, tier 0).
+ * The route rows for a colleague's own agent (`packages/record/src/methods/own-tokens.ts`,
+ * `docs/20-COLLABORATION.md` §2, tier 0).
  *
  * DATA, NOT ADMIN, because the point is that a member who is not an owner reaches them. The record holds each to a
  * person in a browser with a credential of their own, so no token mints a token, and minting to a sign-in proved in the

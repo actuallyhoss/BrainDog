@@ -3,8 +3,8 @@
  * over the engine `workerSlashAnswers` and the door are built from, in this object's own storage.
  *
  * THE RECORD ASKED FOR THIS AND NO HOST GAVE IT. `d16d9d35` made the record hold both asks through `deps.slashMeter` and
- * ask its model unmetered where none is passed (`loop/research-batch-sixty-audit.md` finding 2). `Record$.#open` passed
- * none, so measured on 24 September through the bundle (`test/slash-press-metered.test.ts`): 5 presses and the daily look
+ * ask its model unmetered where none is passed. `Record$.#open` passed
+ * none, so measured through the bundle (`test/slash-press-metered.test.ts`): 5 presses and the daily look
  * under a ceiling of three asks made 6 binding calls and no `call` row, while a person's read at the palette was held to
  * both the owner's `ask_cap` and the operator's `SLASH_INCLUDED_MONTH_NEURONS` (`1cdc6721`).
  *
@@ -51,7 +51,7 @@ export function workerSlashMeter(env: SlashEnv, api: () => RecordApi, deps: Slas
   return { hold: async (kind) => (await meterOf()).hold(kind) };
 }
 
-/* ── the account's copy of the asks (MTR-3) ───────────────────────────────────────────────────────────────────────── */
+/* ── the account's copy of the asks ───────────────────────────────────────────────────────────────────────────────── */
 
 const DAY_MS = 86_400_000;
 const dayOf = (ms: number): string => new Date(ms).toISOString().slice(0, 10);

@@ -1,8 +1,8 @@
 /**
  * `braindog mcp` on a machine with no login: a server that starts, and answers every call with how to sign in.
  *
- * BEFORE THIS THE SERVER EXITED 1 BEFORE `initialize`. Measured with Claude Code 2.1.280 on the cut-over copy of quartz
- * (`loop/research-cutover-day.md` §6, §7 item 4): with no host set, or a login past its expiry, `target` threw in `mcp`,
+ * BEFORE THIS THE SERVER EXITED 1 BEFORE `initialize`. Measured with Claude Code 2.1.280 on a copy of a real
+ * profile: with no host set, or a login past its expiry, `target` threw in `mcp`,
  * `/mcp` showed `braindog failed`, and the model had no BrainDog tool and so nothing to tell the person. The start hook's
  * one line reached a session's start and no further, and a session open since before the lapse got nothing at all.
  *

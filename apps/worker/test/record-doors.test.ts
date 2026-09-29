@@ -1,5 +1,5 @@
 /**
- * Two doors a file needs from the Cloud (ROADMAP W55-7): the record's public key at `/app/<slug>/.well-known/braindog-key`,
+ * Two doors a file needs from the Cloud: the record's public key at `/app/<slug>/.well-known/braindog-key`,
  * and an operation bearer, which opens its one method once.
  *
  * MEASURED BEFORE THIS FILE, AT 07ba6dbd, through the bundle. `GET /app/studio/.well-known/braindog-key` fell to

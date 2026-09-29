@@ -356,7 +356,7 @@ test('EIGHT PROCESSES MINTING AT ONCE ALL END UP WITH THE SAME KEY', async () =>
     const mod = new URL('../src/keys.ts', import.meta.url).href;
 
     const at = Date.now() + 10_000;
-    /* 10000, NOT 5000: the CHECK pass runs many workspaces' tests at once under `--workspace-concurrency=2`, and
+    /* 10000, NOT 5000: a full test run runs many workspaces' tests at once under `--workspace-concurrency=2`, and
        eight Node processes each loading TypeScript missed a 5000 ms deadline under that load (2 of 8 started late)
        while passing alone. Doubled off that failure, the same wall-clock deadline this test needs to prove the race
        happened at all, not a CPU budget it is measuring. */

@@ -122,7 +122,7 @@ test('which origins may hold a cookie, and which may run a passkey', () => {
 });
 
 test('AN RP ID THE HOST NAMES MUST BE THE HOST OR A DOT-SUFFIX OF IT, and anything else is no passkeys at all', () => {
-  /* THE MOVE TO ONE DOMAIN IS WHY THIS EXISTS (`loop/research-one-domain.md` §3.0). A passkey made at
+  /* THE MOVE TO ONE DOMAIN IS WHY THIS EXISTS. A passkey made at
      `app.brain.dog` under the exact host is never offered at `brain.dog`, and production has no magic links, so the
      owner's only passkey would lock him out the day the app moves. Under `brain.dog` it is offered on both names. */
   assert.deepEqual(relyingParty('https://app.brain.dog', 'brain.dog'), { id: 'brain.dog', origin: 'https://app.brain.dog' });

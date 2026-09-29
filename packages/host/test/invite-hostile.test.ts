@@ -1,8 +1,8 @@
 /**
- * Hostile names on `/auth/invite`, against a real Directory. `loop/research-batch-fourteen-audit.md` finding 4.
+ * Hostile names on `/auth/invite`, against a real Directory.
  *
  * ANYBODY HOLDING THE LINK TYPES THIS, BEFORE THEY HAVE SIGNED IN, because path 3 of `serveInvite` needs no session.
- * The audit sent each of these through and every one answered 200: five invisible names were stored as names, so a
+ * A probe sent each of these through and every one answered 200: five invisible names were stored as names, so a
  * screen that asks "is there a name" was told yes and drew nothing; `Bo\u0000Tanner` was stored as `Bo` by
  * `node:sqlite`'s bind, with nobody told; a CRLF, a BEL and an ANSI escape were stored as typed; a right-to-left
  * override stored `Bo nimda`, which draws as `Bo admin`; and 60,000 characters were stored whole. The same column is the
@@ -71,7 +71,7 @@ function setup() {
   };
 }
 
-/** Each of these has nothing a reader can see. The audit stored the zero-width space, the joiners, the word joiner,
+/** Each of these has nothing a reader can see. A probe stored the zero-width space, the joiners, the word joiner,
     the hangul filler and the braille blank as names; the rest are their neighbours in the same classes. */
 const INVISIBLE: [string, unknown][] = [
   ['empty', ''],

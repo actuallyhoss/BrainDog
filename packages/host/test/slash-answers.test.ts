@@ -1,9 +1,9 @@
 /**
  * `serveAsks` (`src/slash-answers.ts`), the pass both hosts will run to answer an automation's `infer.ask` job, driven
- * against a fake kernel and a fake `answer`. `loop/research-infer-ask.md` §6 Brief C.
+ * against a fake kernel and a fake `answer`.
  *
  * A FAKE KERNEL AND NOT A REAL ONE, because a real kernel cannot queue this job yet: the lint refuses `ask_slash` until
- * Brief A's `answersSlash` flag lands in `packages/kernel`, which another agent owns while this is written. What the
+ * the `answersSlash` flag lands in `packages/kernel`. What the
  * kernel does with an ack is already the kernel's own tests (`packages/kernel/test/flow-waits.test.ts`); what is tested
  * here is which ack this pass sends for which outcome, which is the one decision in this file.
  *
@@ -18,7 +18,7 @@ import type { Refusal, Result, Scheduler } from '@braindog/ports';
 
 import { serveAsks, type SlashAsk } from '../src/slash-answers.ts';
 
-/** A question as `flow.ts` `ask()` queues it, with Brief A's `rule` beside the run. The client's name is a row value. */
+/** A question as `flow.ts` `ask()` queues it, with its `rule` beside the run. The client's name is a row value. */
 const ASK: SlashAsk = { run: 'r_1', step: 1, rule: 'rate', question: 'What rate for Acme Ltd?', shape: 'number', about: { client: 'Acme Ltd' } };
 
 const row = (id: string, payload: unknown = ASK): OutboxRow => ({
@@ -69,7 +69,7 @@ test('a job answered is acked done with the text and the lease it was handed, an
 });
 
 test('a refusal a retry cannot change is acked done with its sentence as result.failed, and is not retried', async () => {
-  /* THE THREE THE BRIEF NAMES AND ONE IT DOES NOT. `OUT_OF_BOUNDS` stands for any refusal Slash adds later: only
+  /* THE THREE THAT END A RUN AND ONE NOBODY LISTED. `OUT_OF_BOUNDS` stands for any refusal Slash adds later: only
      `UNREACHABLE` says the model was not reached, so only it walks the ladder, and a refusal nobody listed is not
      asked eight more times on the owner's allowance. */
   for (const code of ['SLASH_BUDGET_SPENT', 'PROPOSAL_SCHEMA', 'FORBIDDEN', 'OUT_OF_BOUNDS'] as const) {
@@ -157,7 +157,7 @@ test('the jobs of one pass are asked together, not one after another', async () 
 });
 
 test('a job this pass cannot read is ended with a sentence and never reaches Slash', async () => {
-  /* `rule` IS BRIEF A's, AND A ROW QUEUED BY A BUILD BEFORE IT HAS NONE. Slash's ledger row is written in the rule's
+  /* `rule` IS NEWER THAN THE QUEUE, AND A ROW QUEUED BY A BUILD BEFORE IT HAS NONE. Slash's ledger row is written in the rule's
      name (`rule.<id> step <n>`), so a job without one is not asked; retrying cannot add the field either, so it ends. */
   const { rule: _rule, ...old } = ASK;
   const kernel = kernelOf([row('o_1', old), row('o_2', 'not json')]);

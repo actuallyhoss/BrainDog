@@ -1,7 +1,7 @@
 /**
  * The pass that serves the record's model jobs on either host: lease the `infer.draft`, `infer.prose` and `infer.embed`
  * rows, answer each through the Slash engine the host hands in, and ack each in the shape `packages/kernel/src/outbox.ts`'s
- * `ack` reads. `loop/finish/platform.md` §4.0 J, `loop/finish/contracts.md` X8.
+ * `ack` reads.
  *
  * ONE PASS FOR BOTH HOSTS, AND THE RECORD STAYS THE JUDGE. The Worker calls this from `alarm()` as `#model`, after `#ask`,
  * and the self-host from `poll`, after its asks. The kernel files a draft through its one gate in the ack's transaction and

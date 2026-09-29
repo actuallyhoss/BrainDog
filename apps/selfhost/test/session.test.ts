@@ -28,7 +28,7 @@ const TASKS = {
 
 /** Where an agent says it is: the headers the command line sends. */
 const HERE: Record<string, string> = {
-  'x-braindog-host': 'dev-pc',
+  'x-braindog-host': 'studio-pc',
   'x-braindog-repo': 'braindog',
   'x-braindog-agent': 'claude',
   'x-braindog-cwd': 'C:\\Repos\\braindog',
@@ -138,7 +138,7 @@ test('AN AGENT’S FIRST WRITE THROUGH THE SELF-HOST IS SIGNED S1, and its next 
     const s1 = (await s.run('S1')) ?? assert.fail('S1 is not there');
     assert.deepEqual(
       { client_id: s1.fields.client_id, host: s1.fields.host, repo: s1.fields.repo, agent: s1.fields.agent, cwd: s1.fields.cwd },
-      { client_id: 'claude-run-1', host: 'dev-pc', repo: 'braindog', agent: 'claude', cwd: 'C:\\Repos\\braindog' },
+      { client_id: 'claude-run-1', host: 'studio-pc', repo: 'braindog', agent: 'claude', cwd: 'C:\\Repos\\braindog' },
     );
     assert.deepEqual(
       (await s.history('session', 1)).map((e) => [e.actor, e.kind, e.note]),
@@ -154,7 +154,7 @@ test('THE SAME THROUGH /mcp: _meta.session names the run, over the headers key b
   const s = await stack();
   try {
     const token = await s.mint();
-    const meta = { client_id: 'codex-run-1', host: 'dev-pc', repo: 'braindog', agent: 'codex' };
+    const meta = { client_id: 'codex-run-1', host: 'studio-pc', repo: 'braindog', agent: 'codex' };
     for (const what of ['One', 'Two']) {
       const r = await s.tool(token, 'create', { register: 'tasks', fields: { what } }, meta);
       assert.equal(r.status, 200);

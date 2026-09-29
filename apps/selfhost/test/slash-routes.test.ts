@@ -1,7 +1,6 @@
 /**
  * Slash's three new doors on the self-host, over a real socket: `GET /api/slash/status`, `POST /api/slash/settings`
- * and the cap they set, held by `POST /api/slash/read` and kept across a restart. `loop/research-spark-routes.md`
- * §6, brief D2.
+ * and the cap they set, held by `POST /api/slash/read` and kept across a restart.
  *
  * WHY A SECOND FILE AND NOT MORE CASES IN `packages/host/test/slash-ask.test.ts`. That suite drives `serveSlash`
  * over an engine it writes itself, so it can say the door calls `configure` and cannot say the call reaches the
@@ -9,7 +8,7 @@
  * truth of `servesSlash` alone, so widening it mounted three doors here without a line of this app changing, and
  * nothing had driven them through this host until this file.
  *
- * RED BEFORE D1, MEASURED ON 22 SEPTEMBER, with `aa763cdf^`'s `packages/host/src/slash-ask.ts` served in place of
+ * RED BEFORE THE DOORS, MEASURED with `aa763cdf^`'s `packages/host/src/slash-ask.ts` served in place of
  * today's by a loader hook and nothing in the tree changed: both tests failed at their first status GET, 404
  * `ROUTE_UNKNOWN`, "There is no method called slash/status." The old `servesSlash` named `read` alone, so the path
  * fell through to `serveApi`, which read it as a record method. Neither test reached a settings POST.

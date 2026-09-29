@@ -1,6 +1,5 @@
 /**
- * A root key rotation on the Worker, walked through the Worker's own code over a real record (`53 §5.6`,
- * `loop/finish/ops.md` OPS-16).
+ * A root key rotation on the Worker, walked through the Worker's own code over a real record (`53 §5.6`).
  *
  * WHAT RUNS HERE IS THE HOST'S CODE, NOT A COPY OF IT. `keyStoreOf` reads `KEK` holding the new key, a space and the old
  * one; `keyOpener` offers `openGrant` the id the record is wrapped under through `offeredId` and opens the sealed bytes;

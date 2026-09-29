@@ -1,6 +1,5 @@
 /**
  * Accepting an invitation while signed in, against a real Directory: which record the colleague's cookie opens after.
- * `loop/research-invite-landing.md` finding 2.
  *
  * THE COLLEAGUE OWNS A RECORD OF THEIR OWN. They are signed in on `books-co`, open a link to `the-studio`, and are
  * told "You are on the record." Path 1 of `serveInvite` answered `finish({ ...live, body: who })`, so the session row

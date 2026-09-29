@@ -1,8 +1,7 @@
 /**
- * Putting a copy back puts back the rows, and not a credential somebody has since taken away
- * (`loop/research-batch-fifty-seven-audit.md` finding 3, the self-host half).
+ * Putting a copy back puts back the rows, and not a credential somebody has since taken away.
  *
- * MEASURED BEFORE THIS FILE, by the audit's probe S5 and again here: `fileSnapshots.restore` copies every table but
+ * MEASURED BEFORE THIS FILE: `fileSnapshots.restore` copies every table but
  * `migration` and the search index, so the `token`, `device_grant` and `invitation` rows came back as the copy held
  * them. A token that answered `/api/boot` 200, was revoked (401), and then saw last night's copy restored answered 200
  * again, and nothing said so. An owner who revokes a leaked token and then restores to undo something else has handed

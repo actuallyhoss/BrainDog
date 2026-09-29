@@ -1,12 +1,12 @@
 /**
  * Slash's press on the Worker, held and settled in the ledger every other ask is spent from, and under the operator's
- * ceiling (`loop/research-batch-sixty-audit.md` finding 2, carried from the record to the host that ships it).
+ * ceiling, carried from the record to the host that ships it.
  *
  * WHY THIS FILE EXISTS AFTER `packages/record/test/slash-press-cap.test.ts`. `d16d9d35` taught the record to hold a press
  * and a first plan through a `slashMeter`, and proved it with the host's `slashRecordMeter` over the package's own
  * ledger. But the record asks the meter only when the host passes one, and neither host did: `grep -rn slashMeter apps`
  * found nothing. So on the Worker as it shipped a press was still asked of the operator's Workers AI with no `call` row
- * and no look at `ask_cap` or `SLASH_INCLUDED_MONTH_NEURONS` (`1cdc6721`), which is the audit's S2 probe exactly.
+ * and no look at `ask_cap` or `SLASH_INCLUDED_MONTH_NEURONS` (`1cdc6721`).
  *
  * DRIVEN THROUGH THE BUNDLE, `src/index.ts` as it ships, over the cloud harness: the owner signs in, presses at
  * `/api/slashPropose`, and the rows are read out of the object's own storage. A test of `slashRecordMeter` alone would
@@ -68,7 +68,7 @@ test('A PRESS ON THE WORKER WRITES A LEDGER ROW AND IS REFUSED PAST THE OPERATOR
   const post = async (method: string, body: object, cookie: string): Promise<Out> =>
     (await (await c.ask(`/api/${method}`, { method: 'POST', cookie, body: JSON.stringify(body) })).json()) as Out;
 
-  /* THE AUDIT'S S2 RECORD: one list and one open row, written on day one. */
+  /* THE PROBE'S RECORD: one list and one open row, written on day one. */
   const early = await c.signIn(OWNER);
   const declared = await post('setDeclaration', { body: TASKS }, early);
   assert.ok(declared.ok, JSON.stringify(declared));
@@ -87,7 +87,7 @@ test('A PRESS ON THE WORKER WRITES A LEDGER ROW AND IS REFUSED PAST THE OPERATOR
 
   /* SIX ASKS AND NOT FIVE: the first request past the fortnight also wakes Slash's daily look (`slashLook` beside every
      answer), which drafts through the same `slashFile` and so is the same unmetered call. RED BEFORE THE METER WAS
-     PASSED, measured on 24 September: 6 binding calls under a ceiling of 3, one per press and one for the look, and the
+     PASSED, measured: 6 binding calls under a ceiling of 3, one per press and one for the look, and the
      `call` table not even created, because nothing had built the engine that owns it. */
   assert.equal(ai.runs(), 3, `5 presses and the daily look under a ceiling of three asks made ${ai.runs()} included calls`);
   const rows = c.storages

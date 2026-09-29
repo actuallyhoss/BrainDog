@@ -1,6 +1,5 @@
 /**
- * One Analytics Engine point per request, written after the answer has gone (`51 §5.18`, `08 §5`, `loop/finish/ops.md`
- * OPS-23).
+ * One Analytics Engine point per request, written after the answer has gone (`51 §5.18`, `08 §5`).
  *
  * WHAT A POINT CARRIES IS THE SHAPE OF A REQUEST AND NEVER ITS CONTENT. Five blobs, named for `08 §5`'s columns: which
  * door it came in by (`kind`), from what kind of client (`surface`), the record method it asked for (`tool`), how it
@@ -9,11 +8,11 @@
  * the build on a point that carries anything else or on a second place that writes one.
  *
  * THE OUTCOME IS THE REFUSAL'S CODE WHEN THE ANSWER NAMES ONE, AND THE STATUS CLASS OTHERWISE. `08 §5` wrote the column
- * as `ok`, `refused` or `error`, and the brief asked for the code and the class both. A code already implies its status
+ * as `ok`, `refused` or `error`, and the design asked for the code and the class both. A code already implies its status
  * (`httpStatus` in `@braindog/host` maps one to the other), so one column holds both without a sixth blob: `2xx` is
  * `ok`, a code is `refused` and says which, and `5xx` with no code is an `error` the refusal envelope did not name.
  *
- * THE RECORD IS HASHED UNDER A KEY THAT CHANGES EVERY MONTH (his H12). HKDF over `SESSION_SECRET`, with the month and
+ * THE RECORD IS HASHED UNDER A KEY THAT CHANGES EVERY MONTH, at the owner's word. HKDF over `SESSION_SECRET`, with the month and
  * the record id in the info, cut to sixteen hex characters. Inside one month the same record gives the same hash, so
  * "how many distinct records called `ingest` this week" has an answer; across months it does not, so no record can be
  * followed through the three months Analytics Engine keeps, and without the secret no hash maps back to an id. No new
@@ -29,7 +28,7 @@
  * been returned, every step is inside one `try`, and a point that cannot be made is dropped without a word: telemetry
  * that could fail a request, or fill the logs about itself, would cost more than the counts it keeps.
  *
- * UNBOUND IS OFF. `TELEMETRY` stays commented in `wrangler.jsonc` until his H5, and with no binding this returns before
+ * UNBOUND IS OFF. `TELEMETRY` stays commented in `wrangler.jsonc` until the owner decides, and with no binding this returns before
  * it reads anything, so the code ships dark.
  */
 

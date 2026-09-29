@@ -1,5 +1,5 @@
 /**
- * The self-host's wiring for scheduled actions: `pull`, `call` and `poll` (`loop/DIRECTION.md` §0b).
+ * The self-host's wiring for scheduled actions: `pull`, `call` and `poll`.
  *
  * THE SEND LOOP IS `@braindog/host/actions`, the same one the Worker runs. It holds https to a declared origin, a
  * literal private address refused, same-origin redirects three at most, ten seconds, two megabytes, the ledger asked
@@ -68,7 +68,7 @@ const utf8 = (text: string): Uint8Array => new TextEncoder().encode(text);
  *
  * `actor` SIGNS THE `grant.read`, AND `system` IS RIGHT ONLY WHERE NOBODY ASKED. A scheduled action has no asker, so the
  * default stands. Slash's tier `b` does have one, and with `system` written into this line the owner's vault log showed
- * `system` for her own asks and for a colleague's alike (`loop/research-batch-thirty-one-audit.md` §1). That path is
+ * `system` for her own asks and for a colleague's alike. That path is
  * the one to pass the asker's id here; until `slash.ts`'s `wireOf` does, `slashOwnKeyFor` hands this opener a view of the
  * record whose `openGrant` signs as the asker whatever it is told. The Worker's `keyOpener` takes the same parameter.
  */

@@ -1,10 +1,8 @@
 /**
- * The host's table routes `subscribePush` and `unsubscribePush`, as POSTs, to the record. Brief W58-2.
+ * The host's table routes `subscribePush` and `unsubscribePush`, as POSTs, to the record.
  *
- * A METHOD THE RECORD HAS AND THE TABLE LACKS IS `ROUTE_UNKNOWN` TO EVERY CLIENT, so the two rows W58-2 added to `ROUTES`
- * are held here, and so is the POST: each keeps or removes a `push_sub` row. Written by the W58-2 agent and run from its
- * scratchpad, because this directory was outside its list, and moved here with relative imports when the two halves of
- * push were joined.
+ * A METHOD THE RECORD HAS AND THE TABLE LACKS IS `ROUTE_UNKNOWN` TO EVERY CLIENT, so the two push rows in `ROUTES`
+ * are held here, and so is the POST: each keeps or removes a `push_sub` row.
  */
 
 import { test } from 'node:test';

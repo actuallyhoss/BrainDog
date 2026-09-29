@@ -1,5 +1,5 @@
 /**
- * A digest's webhook is signed with the key it names, or it is not sent (KRN-13, delivery half).
+ * A digest's webhook is signed with the key it names, or it is not sent (the delivery half).
  *
  * MEASURED AT afb3b1b2, BEFORE THIS FILE: `digest.ts` queued `notify.webhook { url, body, grant: 'collector' }`, and
  * `makeDeliver` read `url` and `body` and posted. `Transports.post` took no headers, `payload.grant` was never read, and

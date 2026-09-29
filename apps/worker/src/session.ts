@@ -10,12 +10,12 @@
  * A cookie is a person, and one that names no session is a 401 that clears it. A request carrying no credential at all
  * is the same 401 with no cookie to clear, whatever it asks for and whichever path names it.
  *
- * THERE WAS A FOURTH DOOR, THE PUBLIC DEMO, AND IT IS GONE (`loop/DIRECTION.md` 26, `loop/research-no-sample.md` A1).
+ * THERE WAS A FOURTH DOOR, THE PUBLIC DEMO, AND IT IS GONE.
  * A request with nothing on it read one record the deployment pinned in its `vars`, as `p_demo` at `read`. The app
  * now shows only a real record, so no variable names one any more, and a deploy that still sets it opens nothing
  * (`test/slash-demo.test.ts`, which answered 200 from the pinned record before this).
  *
- * AND A REQUEST MAY NOW NAME ITS RECORD IN THE PATH, `/app/<slug>/api/…` (`loop/research-one-domain.md` §2.4).
+ * AND A REQUEST MAY NOW NAME ITS RECORD IN THE PATH, `/app/<slug>/api/…`.
  * The slug is a claim like a bearer's record id: the Directory says whether it is this person's before anything
  * is addressed, and one 403 answers every name that is not.
  */
@@ -136,12 +136,12 @@ export type BearerDeps = {
   named?: (slug: string) => Promise<string | null>;
   /**
    * The record's `operationGrant`: the method an operation bearer opens and who approved it, SPENT BY THE ASKING, or
-   * `null` when the bearer is not one. Absent, and no operation bearer is taken, which is the Worker before W55-7.
+   * `null` when the bearer is not one. Absent, and no operation bearer is taken, which is the Worker before operation grants.
    */
   operation?: (record: string, bearer: string) => Promise<{ method: string; person: string } | null>;
   /**
    * Whether the record's billing has lapsed, the Directory's `billing({ op: 'lapsed' })`. Asked only once the secret is
-   * checked, so a stranger learns nothing from it. Absent, and no bearer is capped, which is the Worker before OPS-14.
+   * checked, so a stranger learns nothing from it. Absent, and no bearer is capped, which is the Worker before the lapse ladder.
    */
   lapsed?: (record: string) => Promise<boolean>;
 };
@@ -158,7 +158,7 @@ const OPERATIONS: ReadonlySet<string> = new Set(Object.values(OPERATION_METHOD))
  *
  * THE VERB IS PART OF THE QUESTION. All four are `writes: true` in `ROUTES`, so the router answers anything but a POST
  * with 405, and before this read the method a `GET /api/export` spent the grant first and was answered 405 after it
- * was gone: the POST that followed was 401 (audit fifty-seven §4, `test/operation-grant-doors.test.ts`).
+ * was gone: the POST that followed was 401 (`test/operation-grant-doors.test.ts`).
  */
 export const operationAsked = (request: Request): string | null => {
   if (request.method !== 'POST') return null;
@@ -214,7 +214,7 @@ export async function bearerOf(request: Request, surface: 'api' | 'mcp', deps: B
     const asked = surface === 'api' && bearer && deps.operation ? operationAsked(request) : null;
     /* THE PATH'S NAME IS ASKED BEFORE THE GRANT IS READ, BECAUSE READING IT SPENDS IT. `heldBy` below asks it too, but
        only after `operation` has marked the row used, so a POST under another record's name, or a name nobody holds,
-       was refused 403 with the grant already gone (audit fifty-seven §5). THE ANSWER IS THE UNKNOWN BEARER'S 401 AND NOT
+       was refused 403 with the grant already gone. THE ANSWER IS THE UNKNOWN BEARER'S 401 AND NOT
        `heldBy`'s 403: nothing has checked the secret yet, and a 403 here would tell anybody holding a record id which
        names are that record's, which is what `heldBy` waits for the secret to prevent. The grant is kept either way. */
     if (asked !== null && slug !== null && (deps.named === undefined || (await deps.named(slug)) !== record)) return { status: 401 };
@@ -235,7 +235,7 @@ export async function bearerOf(request: Request, surface: 'api' | 'mcp', deps: B
   if ('status' in admitted) return admitted;
   const held = admitted.held;
   /* THE REACH IS THE TOKEN ROW'S, AS `verifyToken` READ IT INSIDE THE RECORD, and nothing in the request can add to it.
-     The record's inbox gate admits a whole-record owner token that carries `inbox` (DIRECTION section 30, P2), and
+     The record's inbox gate admits a whole-record owner token that carries `inbox`, and
      before this no token principal carried a reach, so a token minted with it was refused like any other.
      `Record$.verify` now declares it as the kernel's `Verified` has it, and it is still matched against the record's
      own closed list rather than trusted as typed: a string would pass `includes` as a substring, which is how the gate
@@ -282,7 +282,7 @@ type PersonPrincipal = Extract<CallContext['principal'], { kind: 'person' }>;
  * The lists a person is held to on the record, when they are held to any, and the rows of each they reach.
  *
  * `wheres` TRAVELS WHEREVER `levels` DOES, so a narrowed grant reaches every reader the same way through a bearer as
- * through a session (`loop/finish/platform.md` §4.0 W). Left off, every reader would show a narrowed colleague the
+ * through a session. Left off, every reader would show a narrowed colleague the
  * whole list.
  */
 const scoped = (held: Held): Pick<CallContext, 'registers' | 'levels'> & { wheres?: Wheres } => ({
@@ -318,7 +318,7 @@ export type EntryDeps = {
 /**
  * `GET /app`: the record this browser was last on, or the shell.
  *
- * ONE DIRECTORY READ AND NO PICKER (`loop/research-one-domain.md` §2.4). A session holding a record is a 302 to
+ * ONE DIRECTORY READ AND NO PICKER. A session holding a record is a 302 to
  * `/app/<slug>/`, a session on no record yet is sent to `/app/start`, and no cookie is the shell. The shell asks
  * `/api/boot`, which answers a stranger 401 now there is no demo record behind it, and the app sends a 401 to sign-in.
  * The last record is the session row's, which only `/auth/switch` moves, and the switcher is the picker.

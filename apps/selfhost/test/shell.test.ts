@@ -2,7 +2,7 @@
  * The app as the self-host serves it: the file when there is one, the app when there is not, and nothing
  * outside the build whatever the path says.
  *
- * THE BUILD IS LAID OUT AS `apps/web` WRITES IT WITH `paths.base: '/app'` (`loop/research-one-domain.md` Brief B):
+ * THE BUILD IS LAID OUT AS `apps/web` WRITES IT WITH `paths.base: '/app'`:
  * every file under `build/app/`, so the app is `/app/…` and its scripts are `/app/_app/…`.
  */
 
@@ -167,7 +167,7 @@ test('a directory that is not a build is refused at start, with a sentence', () 
   }
 });
 
-/* OPS-22. The page's own policy is the header's, so a hash in the shell's meta is a hash the header allows, and a
+/* The page's own policy is the header's, so a hash in the shell's meta is a hash the header allows, and a
    header `script-src` without it would refuse the shell's inline scripts and draw nothing. Turnstile is taken out,
    because the self-host has no sign-up page to load it. */
 test('A PAGE CARRIES THE POLICY IN ITS OWN META, LESS TURNSTILE AND WITH FRAME-ANCESTORS; A FILE GETS THE STRICT ONE', async () => {

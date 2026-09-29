@@ -1,5 +1,5 @@
 /**
- * When `gates.yml` runs, and what its push to master is allowed to skip, read off the workflow file (OPS-1).
+ * When `gates.yml` runs, and what its push to master is allowed to skip, read off the workflow file.
  *
  *   node --test apps/worker/scripts/gates-workflow.test.mjs
  *

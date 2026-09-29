@@ -1,8 +1,7 @@
 /**
- * An operation bearer is spent only by a request that could have used it: a POST, under this record's own name
- * (`loop/research-batch-fifty-seven-audit.md` findings 4 and 5, the self-host half).
+ * An operation bearer is spent only by a request that could have used it: a POST, under this record's own name.
  *
- * MEASURED BEFORE THIS FILE, by the audit's probe and again here: `contextFor` was handed the path's method name as the
+ * MEASURED BEFORE THIS FILE: `contextFor` was handed the path's method name as the
  * door for any HTTP method and under any slug, and `bearerFor` spent the grant as soon as that name was one of the four.
  * `GET /api/export` spent it and then `serveApi` answered 405 "export changes the record, so it is a POST.", and
  * `POST /app/not-this-one/api/export` spent it and then the slug was refused 403 "You are not on this record.". In both

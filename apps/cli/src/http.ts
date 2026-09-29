@@ -107,7 +107,7 @@ export const inTheClear = (url: URL): boolean => url.protocol === 'http:' && !LO
  * NO SENTENCE HERE REPEATS WHAT WAS TYPED. Somebody who pasted a token into the address would find it
  * in the log of every agent session.
  *
- * `/app/<slug>` IS KEPT AS `/<slug>` (`loop/research-one-domain.md` Brief D). The app moved to
+ * `/app/<slug>` IS KEPT AS `/<slug>`. The app moved to
  * `brain.dog/app/<slug>` and its connect screen prints that address, so it is what people paste; before
  * this line the whole of `app/acme` went to the Directory as the slug and the sign-in was refused. `app`
  * is a reserved slug (`packages/record/src/directory.ts`), so a first segment of `app` is always the
@@ -199,8 +199,7 @@ export function clientFor(to: Target, headers: () => Promise<Record<string, stri
 /* ── a runner's enrolment, and the three calls it makes ─────────────────── */
 
 /**
- * The host a runner works for and the bearer it was enrolled with (`docs/48-SPEC-CLI.md` §5.13,
- * `loop/finish/agents.md` C14).
+ * The host a runner works for and the bearer it was enrolled with (`docs/48-SPEC-CLI.md` §5.13).
  *
  * THE ENROLMENT AND NEVER THE LOGIN. A runner's bearer is a device grant of reach `runner`, which the
  * record admits at `claimJob`, `postJobEvent` and `readCancel` and at nothing else, and a login is

@@ -1,6 +1,5 @@
 /**
- * The route row for trying a whole change before anybody accepts it (`packages/record/src/methods/preview-change.ts`,
- * `loop/finish/contracts.md` §2.4 and §3.1).
+ * The route row for trying a whole change before anybody accepts it (`packages/record/src/methods/preview-change.ts`).
  *
  * ONE ROW A LINE, IN THE SHAPE `ROUTES` HAS ALWAYS HAD, because the two gates over the table read it by that shape:
  * `router-groups` holds each row's group to `docs/30-BLUEPRINT.md` §5, and `guards` holds the record method of the same

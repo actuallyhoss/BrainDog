@@ -1,10 +1,10 @@
 /**
- * What `install --replace` prints of a the old tool server's command line: the program, and how many arguments were
- * hidden, and never an argument (backlog SEC-6, taking the brief of `loop/research-batch-twenty-eight-audit.md` §5).
+ * What `install --replace` prints of a Tallybook server's command line: the program, and how many arguments were
+ * hidden, and never an argument.
  *
  * WHY THE RULE WAS INVERTED RATHER THAN WIDENED. `describe` hid a word after one naming a secret, a word after a short
- * flag, and anything shaped like a token, and each audit since the twenty-fourth found a shape outside those three.
- * Probed on this tree before the fix: `node brain-mcp.mjs q7Rw2xT9` and `node brain-mcp.mjs --hb q7Rw2xT9` printed the
+ * flag, and anything shaped like a token, and each review of it found a shape outside those three.
+ * Probed on this tree before the fix: `node tallybook-mcp.mjs q7Rw2xT9` and `node tallybook-mcp.mjs --hb q7Rw2xT9` printed the
  * nine-character token whole, since it follows no secret-naming word, `--hb` is neither short enough to be a short flag
  * nor a name the pattern knows, and nine characters is no length a shape test can tell from a folder's name. A list of
  * spellings has no end, so the test below iterates shapes and asks of each that NO argument reaches the line at all.
@@ -26,7 +26,7 @@ const scratch = mkdtempSync(join(tmpdir(), 'braindog-describe-hides-'));
 after(() => rmSync(scratch, { recursive: true, force: true }));
 let folders = 0;
 
-const PREFIX = "  - mcpServers.brain, the old tool's: ";
+const PREFIX = "  - mcpServers.brain, Tallybook's: ";
 
 /** The dry run's one line about the entry, from a named profile whose `.claude.json` holds only that entry. */
 function lineFor(server: Record<string, unknown>): string {
@@ -43,22 +43,22 @@ function lineFor(server: Record<string, unknown>): string {
 const CORE = 'q7Rw2xT9';
 
 const SHAPES: { name: string; server: Record<string, unknown>; shown: string }[] = [
-  { name: 'a bare short token after the script (probed)', server: { command: 'node', args: ['C:/Tools/legacy/mcp/brain-mcp.mjs', CORE] }, shown: 'node [2 arguments hidden]' },
-  { name: 'a short token after a flag no pattern knows (probed)', server: { command: 'node', args: ['C:/Tools/legacy/mcp/brain-mcp.mjs', '--hb', CORE] }, shown: 'node [3 arguments hidden]' },
-  { name: 'the whole command line in one string', server: { command: `node C:\\Tools\\legacy\\mcp\\brain-mcp.mjs --hb ${CORE}` }, shown: 'node [3 arguments hidden]' },
-  { name: 'a proxy whose URL carries the token in its path', server: { command: 'npx', args: ['-y', 'mcp-remote', `https://brain.example.com/mcp/${CORE}`] }, shown: 'npx [3 arguments hidden]' },
-  { name: 'a proxy with the URL joined to its flag', server: { command: 'npx', args: ['-y', 'mcp-remote', `--url=https://brain.example.com/mcp?t=${CORE}`] }, shown: 'npx [3 arguments hidden]' },
+  { name: 'a bare short token after the script (probed)', server: { command: 'node', args: ['C:/Tools/tallybook/mcp/tallybook-mcp.mjs', CORE] }, shown: 'node [2 arguments hidden]' },
+  { name: 'a short token after a flag no pattern knows (probed)', server: { command: 'node', args: ['C:/Tools/tallybook/mcp/tallybook-mcp.mjs', '--hb', CORE] }, shown: 'node [3 arguments hidden]' },
+  { name: 'the whole command line in one string', server: { command: `node C:\\Tools\\tallybook\\mcp\\tallybook-mcp.mjs --hb ${CORE}` }, shown: 'node [3 arguments hidden]' },
+  { name: 'a proxy whose URL carries the token in its path', server: { command: 'npx', args: ['-y', 'mcp-remote', `https://tallybook.example/mcp/${CORE}`] }, shown: 'npx [3 arguments hidden]' },
+  { name: 'a proxy with the URL joined to its flag', server: { command: 'npx', args: ['-y', 'mcp-remote', `--url=https://tallybook.example/mcp?t=${CORE}`] }, shown: 'npx [3 arguments hidden]' },
   /* One argument holding spaces is one argument: split whole, this was counted as six. */
-  { name: 'a bearer inside one header argument', server: { command: 'npx', args: ['mcp-remote', 'https://brain.example.com/mcp', '--header', `Authorization: Bearer b${CORE}`] }, shown: 'npx [4 arguments hidden]' },
-  { name: 'one argument, said in the singular', server: { command: 'node', args: [`C:/Tools/legacy/mcp/brain-mcp.mjs`] }, shown: 'node [1 argument hidden]' },
+  { name: 'a bearer inside one header argument', server: { command: 'npx', args: ['mcp-remote', 'https://tallybook.example/mcp', '--header', `Authorization: Bearer b${CORE}`] }, shown: 'npx [4 arguments hidden]' },
+  { name: 'one argument, said in the singular', server: { command: 'node', args: [`C:/Tools/tallybook/mcp/tallybook-mcp.mjs`] }, shown: 'node [1 argument hidden]' },
   /*
-   * AN ASSIGNMENT BEFORE THE PROGRAM IS NO PROGRAM. Measured by the checker on the first cut of this rule: the first word
+   * AN ASSIGNMENT BEFORE THE PROGRAM IS NO PROGRAM. Measured on the first cut of this rule: the first word
    * of `command` was shown as the program, so `TOKEN=q7Rw2xT9 node ...` printed `TOKEN=q7Rw2xT9 [2 arguments hidden]`,
    * where the word-by-word rules it replaced had printed `TOKEN=[hidden]`. The assignment is counted with what is hidden.
    */
-  { name: 'an assignment before the program in one command string', server: { command: `TOKEN=${CORE} node C:/Tools/legacy/mcp/brain-mcp.mjs` }, shown: 'node [2 arguments hidden]' },
+  { name: 'an assignment before the program in one command string', server: { command: `TOKEN=${CORE} node C:/Tools/tallybook/mcp/tallybook-mcp.mjs` }, shown: 'node [2 arguments hidden]' },
   /* No `command` at all: nothing to name it by but the count, and no stray space before it. */
-  { name: 'arguments and no program', server: { args: ['C:/Tools/legacy/mcp/brain-mcp.mjs', CORE] }, shown: '[2 arguments hidden]' },
+  { name: 'arguments and no program', server: { args: ['C:/Tools/tallybook/mcp/tallybook-mcp.mjs', CORE] }, shown: '[2 arguments hidden]' },
 ];
 
 for (const shape of SHAPES)
@@ -75,8 +75,8 @@ for (const shape of SHAPES)
 
 /*
  * AN ENTRY REGISTERED BY URL KEEPS ITS ORIGIN. It has no program to name it by, and the origin is what says the entry is
- * the old tool's; the path past `/mcp` is still hidden, as audit twenty-eight's §5 asked.
+ * Tallybook's; the path past `/mcp` is still hidden.
  */
 test('an entry registered by URL is still named by its origin, with its path hidden', () => {
-  assert.equal(lineFor({ type: 'http', url: `https://brain.example.com/mcp/t${CORE}?k=${CORE}` }), 'https://brain.example.com/mcp/[hidden]');
+  assert.equal(lineFor({ type: 'http', url: `https://tallybook.example/mcp/t${CORE}?k=${CORE}` }), 'https://tallybook.example/mcp/[hidden]');
 });

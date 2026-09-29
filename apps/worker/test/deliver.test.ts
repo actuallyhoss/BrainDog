@@ -114,7 +114,7 @@ test('A KIND NOTHING HERE DELIVERS IS SAID OUT LOUD, and never acked as done', a
   assert.deepEqual(DELIVERS, ['notify.email', 'notify.webhook', 'erase.r2']);
 });
 
-test('AN ERASURE DELETES THE FILE IT NAMES BY ITS HASH, and a key that is not one never reaches the bucket (OPS-20)', async () => {
+test('AN ERASURE DELETES THE FILE IT NAMES BY ITS HASH, and a key that is not one never reaches the bucket', async () => {
   const deleted: string[] = [];
   const deliver = makeDeliver({ erase: async (sha) => void deleted.push(sha) });
   const sha = 'c'.repeat(64);

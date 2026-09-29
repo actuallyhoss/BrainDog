@@ -1,6 +1,5 @@
 /**
- * A runner at a host: the context its bearer earns, and the wait a claim may be held for (`loop/finish/agents.md` C13,
- * `docs/33-CONTRACTS.md` §11).
+ * A runner at a host: the context its bearer earns, and the wait a claim may be held for (`docs/33-CONTRACTS.md` §11).
  *
  * A RUNNER'S BEARER IS CHECKED BY THE RECORD IT NAMES, because only that record holds the device grant it was minted
  * for. `runnerContext` asks the record's kernel and builds the principal from what the grant says, never from anything

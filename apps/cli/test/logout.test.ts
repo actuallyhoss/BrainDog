@@ -164,7 +164,7 @@ test('A BARE NAME NAMES THE SAME HOST AS ITS https ADDRESS', async (t) => {
 });
 
 test('THE ADDRESS THE APP PRINTS, brain.dog/app/<slug>, IS THE SAME HOST AS THE KEY A LOGIN KEPT', async (t) => {
-  /* `loop/research-one-domain.md` Brief D. The connect screen prints `/app/<slug>` and a login keeps `/<slug>`,
+  /* The connect screen prints `/app/<slug>` and a login keeps `/<slug>`,
      so a logout typed from the screen that left the entry behind would say "nothing to remove" over a live bearer. */
   const kept = 'https://brain.dog/acme';
   const { file } = config(t, { default: kept, hosts: { [kept]: { token: held(TOKEN) }, [OTHER]: { token: held(OTHER_TOKEN) } } });

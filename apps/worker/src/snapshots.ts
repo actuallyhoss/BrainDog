@@ -52,8 +52,8 @@ export const KEEP = 30;
  * bytes of UTF-8, and V8 holds a string at two bytes a character as soon as one character is outside
  * Latin-1, so a dump at the ceiling can be an 80 MiB string. `take` never makes the file beside it on
  * workerd: it encodes one 64 KiB chunk per pull. A two-byte dump at the ceiling, counted from before
- * the string existed, held 120.8 MiB live of the isolate's 122 when the whole file was encoded first
- * (batch-twenty audit, finding 4), and `test/snapshots-peak.test.ts` read 133 MiB peak resident for
+ * the string existed, held 120.8 MiB live of the isolate's 122 when the whole file was encoded first,
+ * and `test/snapshots-peak.test.ts` read 133 MiB peak resident for
  * that code against 93 streamed, 13 above the string. Raising this raises the string first, at up to
  * two bytes of string per byte of file.
  */
@@ -90,7 +90,7 @@ export type Blobs = {
   get(key: string): Promise<{ size: number; text(): Promise<string>; body?: ReadableStream<Uint8Array> } | null>;
   /* `include` IS R2'S OWN OPTION, AND WITHOUT IT A LISTING CARRIES NO `customMetadata` AT ALL. The
      walk never asks, because it prunes by key; `copies.ts` asks, because the bookmark a restore
-     needs is in the metadata and nowhere else (`loop/research-restore.md` 3.3). */
+     needs is in the metadata and nowhere else. */
   list(options?: { prefix?: string; cursor?: string; include?: 'customMetadata'[] }): Promise<{
     objects: { key: string; size: number; customMetadata?: Record<string, string> }[];
     truncated: boolean;
@@ -277,7 +277,7 @@ export async function dumpOf(
   /* A ROW OF RECORD IS A LINE UNDER A TABLE THAT IS NOT ONE OF THE FILE'S OWN. This counted every
      line that was not a header, and the four `dog_` tables (`dog_meta`, `dog_section`,
      `dog_manifest`, `dog_sig`) describe the file rather than hold the record: a fresh record read 94
-     for the 25 its manifest counts (`loop/research-restore.md` 3.1), and Settings showed the 94. */
+     for the 25 its manifest counts, and Settings showed the 94. */
   let table = '';
   let rows = 0;
   for (const line of out.value) {
@@ -374,7 +374,7 @@ export function r2Snapshots(
    */
   const write = async (record: string, name: string, dump: Dump, pointer: boolean): Promise<Kept & { stored: number }> => {
     /* THE STRING IS NEVER ENCODED WHOLE ON WORKERD. It stays live for all of `take` whatever is
-       done with it: the audit's probe dropped the caller's reference before `take` ran and the
+       done with it: a probe dropped the caller's reference before `take` ran and the
        suspended frame still held the parameter, 120.8 MiB either way. So what can be cut is only
        what is made beside it, and here that is a count and then one 64 KiB piece per pull. */
     const utf8 = plainOf(dump.text);

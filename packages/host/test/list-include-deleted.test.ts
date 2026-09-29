@@ -1,5 +1,5 @@
 /**
- * A LIST THAT ASKS FOR DELETED ROWS GETS THEM, BY EITHER VERB, AND THE TABLE SAYS SO (backlog IMP-1, wave fifty-three).
+ * A LIST THAT ASKS FOR DELETED ROWS GETS THEM, BY EITHER VERB, AND THE TABLE SAYS SO.
  *
  * `kernel.list` has read `includeDeleted` for as long as rows have been soft-deleted, and the record's `list` handed
  * the kernel every argument it was sent. Nothing between a caller and the kernel NAMED it: `ROUTES` declared `register`,

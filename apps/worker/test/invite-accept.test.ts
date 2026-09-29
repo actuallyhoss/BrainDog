@@ -1,6 +1,5 @@
 /**
  * `POST /auth/invite` on the Worker, signed in, through `export default`'s own `fetch` and a real `Directory$`.
- * `loop/research-invite-landing.md` finding 2.
  *
  * THE HOST'S HALF IS `packages/host/test/invite-session-move.test.ts`: path 1 of `serveInvite` moves the session when
  * `accept` answers a slug. This is the Worker's half, `invites(env).accept`, which joined the Directory and answered the

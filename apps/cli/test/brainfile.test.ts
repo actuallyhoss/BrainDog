@@ -3,7 +3,7 @@
  * the one request its bearer is spent on, the wrapping key a backup names, and the check on both sides of the wire.
  *
  * AT `07ba6dbd` NEITHER COMMAND EXISTED. `braindog export` answered "braindog has no command called export" and
- * `braindog import latest.brainl` answered with the the old tool importer's usage, exit 1 (measured, and pinned below
+ * `braindog import latest.brainl` answered with the adapter importer's usage, exit 1 (measured, and pinned below
  * through a real process). The door here is a function standing in for `fetch`, so every request the command makes is
  * counted, and "nothing was sent" is a number and not a hope.
  *
@@ -316,7 +316,7 @@ test('THE COMMAND KNOWS BOTH WORDS, and import with an adapter and its options i
 
   /* AN ADAPTER IS TOLD FROM A .brainl BY A SECOND WORD OR AN OPTION ONLY IT TAKES (`isAdapterImport`): one word alone is
      a file to put back, as it was before the importer took any adapter. */
-  const adapter = await ran(['import', 'legacy-import', '--dry-run'], dir);
+  const adapter = await ran(['import', 'tallybook', '--dry-run'], dir);
   assert.equal(adapter.code, 1);
   assert.match(adapter.stderr, /braindog import takes <adapter> <export\.json>/);
 

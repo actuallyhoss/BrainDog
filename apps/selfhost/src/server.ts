@@ -87,7 +87,7 @@ import { unwrap, type KeyStore } from './keys.ts';
 import { shellOf } from './shell.ts';
 import { signerFor } from './sign.ts';
 import { keysDoor, vaultDoor } from './vault.ts';
-/* OAUTH 2.1 ON THIS HOST (`loop/finish/agents.md` C4, AGT-31): the host package's doors over this process's Directory. */
+/* OAUTH 2.1 ON THIS HOST: the host package's doors over this process's Directory. */
 import { oauthHere, servesOAuth, type OAuthHere } from './oauth.ts';
 import { claimIdle, holdClaim, runnerContext } from '@braindog/host';
 import { withVaultPassphrase } from '@braindog/host';
@@ -98,7 +98,7 @@ import { deriveShareKey, serveShared, sharedNone, shareOf, withShareLinks, type 
 /* NAMED APART FOR THE LINK'S DOOR, so the API door's own limiter can import the same two functions under their own
    names without this file binding one name twice. */
 import { refusedFor as linkRefused, windowLimiter as linkLimiter } from '@braindog/host/limits';
-/* THE FRONT DOORS (`loop/finish/ops.md` OPS-4): a crash answered by reference, the limiter, and the guard in front of
+/* THE FRONT DOORS: a crash answered by reference, the limiter, and the guard in front of
    every statement. */
 import { crashed } from '@braindog/host';
 import { classOf, limitKey, refusedFor, windowLimiter, type LimitClass, type LimitDoor, type Limiter } from '@braindog/host/limits';
@@ -165,7 +165,7 @@ function openDriver(path: string): Sql & { close(): void } {
 }
 
 /**
- * THE NAME SLASH'S LEDGER HAD BEFORE DIRECTION 31, the one place this app still spells it. A self-host that ran the old
+ * THE NAME SLASH'S LEDGER HAD WHEN SLASH WAS CALLED SPARK, the one place this app still spells it. A self-host that ran the old
  * build has its `settings` row and its month's `call` rows in this file, and they are the only copy (`46 §4.1`).
  */
 const LEDGER_BEFORE = 'spark.sqlite';
@@ -307,7 +307,7 @@ type Site = {
   snapshots: FileSnapshots | undefined;
   /** A record's files, `<slug>/blobs/` beside the record file (`./files.ts`); `null` for a database in memory. */
   blobs: string | null;
-  /** `/account/email` and `/account/email/confirm` (GAP-7), where this host can mail the notices; absent where it cannot. */
+  /** `/account/email` and `/account/email/confirm`, where this host can mail the notices; absent where it cannot. */
   email: EmailDoor | undefined;
   /** Whether the Directory gives this record `slug` as a name it holds now, beside the one the record carries. */
   names: (slug: string) => boolean;
@@ -432,8 +432,8 @@ async function bearerFor(sent: string, site: Site, surface: 'api' | 'mcp', door?
   const seen = await api.kernel.verifyToken(sent, surface, validFrom());
   if (!seen.ok) {
     if (door !== undefined && OPERATION_DOORS.has(door)) return operationFor(sent, api);
-    /* AND A BEARER NO TOKEN ROW KNOWS MAY BE A RUNNER'S, AT THE THREE DOORS A RUNNER CALLS AND NOWHERE ELSE
-       (`loop/finish/agents.md` C13), as the Worker's `runnerOf` reads it: the record builds the runner's context from its
+    /* AND A BEARER NO TOKEN ROW KNOWS MAY BE A RUNNER'S, AT THE THREE DOORS A RUNNER CALLS AND NOWHERE ELSE,
+       as the Worker's `runnerOf` reads it: the record builds the runner's context from its
        own device grants, held to the same cut-off, and every method but the JOBS ones refuses it. */
     if (door !== undefined && RUNNER_DOORS.has(door)) {
       const ran = await runnerContext(api, sent, validFrom());
@@ -447,7 +447,7 @@ async function bearerFor(sent: string, site: Site, surface: 'api' | 'mcp', door?
   const held = api.kernel.access(seen.value.person_id);
   if (!held) return { refused: OFF };
   /* THE REACH IS THE TOKEN ROW'S, AS `verifyToken` READ IT, and nothing in the request can add to it. The record's inbox
-     gate admits a whole-record owner token that carries `inbox` (DIRECTION section 30, P2); before this line no token
+     gate admits a whole-record owner token that carries `inbox`; before this line no token
      principal carried a reach at all, so a token minted with it was refused like any other. Left off when empty, so a
      principal without one is the principal every older token had. */
   const reach = seen.value.reach;
@@ -463,7 +463,7 @@ async function bearerFor(sent: string, site: Site, surface: 'api' | 'mcp', door?
       },
       ...(held.registers === null ? {} : { registers: held.registers }),
       ...(Object.keys(held.levels).length === 0 ? {} : { levels: held.levels }),
-      /* `wheres` GOES WHEREVER `levels` GOES (COL-9, contracts §12), the rows of each list a narrowed grant reaches, as
+      /* `wheres` GOES WHEREVER `levels` GOES, the rows of each list a narrowed grant reaches, as
          `sessionContext` copies it for the session path. */
       ...(held.wheres === undefined || Object.keys(held.wheres).length === 0 ? {} : { wheres: held.wheres }),
     },
@@ -480,7 +480,7 @@ async function bearerFor(sent: string, site: Site, surface: 'api' | 'mcp', door?
  */
 const OPERATION_DOORS: ReadonlySet<string> = new Set(Object.values(OPERATION_METHOD));
 
-/** The methods a runner calls, and the only doors a runner's bearer is read at (`loop/finish/agents.md` C13). */
+/** The methods a runner calls, and the only doors a runner's bearer is read at. */
 const RUNNER_DOORS: ReadonlySet<string> = new Set(['claimJob', 'postJobEvent', 'readCancel']);
 
 /**
@@ -491,7 +491,7 @@ const RUNNER_DOORS: ReadonlySet<string> = new Set(['claimJob', 'postJobEvent', '
 const vaultSpent = new WeakMap<Request, Response>();
 
 /**
- * An agent's login token at `/api/vault/deposit` (`loop/finish/agents.md` C1): checked as `/api` checks any bearer, and a
+ * An agent's login token at `/api/vault/deposit`: checked as `/api` checks any bearer, and a
  * token's context or nothing. THE SERVER KEY NEVER REACHES THE DEPOSIT DOOR AS THE OWNER, and neither does anything else
  * that is not a token, because the record's `allows` admits more than a token on its rungs. A token spends its own write
  * minute here, as it does at `/api/create`.
@@ -518,14 +518,14 @@ async function vaultToken(request: Request, site: Site | null): Promise<Result<C
  *
  * MEASURED BEFORE THIS EXISTED (`test/operation-bearer.test.ts`): the bearer `braindog export` had just been handed by
  * `/auth/device/token` was answered 401 "This record does not know that credential." at `/api/export`, because
- * `verifyToken` reads the `token` table and an operation lives in `device_grant`. W55-2 gave the record the check and the
+ * `verifyToken` reads the `token` table and an operation lives in `device_grant`. The record had been given the check and the
  * gate, and no host built the context between them.
  *
  * `operation` IS WHAT HOLDS IT TO ONE DOOR. `allows` refuses a context carrying it everywhere, and `admin` admits it only
  * for the method it names, so the approver's owner level reaches that one call and nothing a session would reach.
  */
 async function operationFor(sent: string, api: Api): Promise<Known> {
-  /* THE CUT-OFF IS A SECOND BEARER TO COVER HERE (`loop/research-w61.md` §1 item 13): a grant approved before it is
+  /* THE CUT-OFF IS A SECOND BEARER TO COVER HERE: a grant approved before it is
      refused unspent, as the token check above refuses a token. The record reads it through the `validFrom` it was
      built with, so this call and the key door's carry the same instant. */
   const grant = await api.operationGrant(sent);
@@ -539,7 +539,7 @@ async function operationFor(sent: string, api: Api): Promise<Known> {
       credentialed: true,
       ...(held.registers === null ? {} : { registers: held.registers }),
       ...(Object.keys(held.levels).length === 0 ? {} : { levels: held.levels }),
-      /* `wheres` GOES WHEREVER `levels` GOES (COL-9, contracts §12), as the bearer path above copies it too. */
+      /* `wheres` GOES WHEREVER `levels` GOES, as the bearer path above copies it too. */
       ...(held.wheres === undefined || Object.keys(held.wheres).length === 0 ? {} : { wheres: held.wheres }),
     },
   };
@@ -746,7 +746,7 @@ const IN_KEYS_MOST = 1_000;
  * touch the disk.
  *
  * A NUMBER RATHER THAN A FILE WATCH, and it is the second design. Reading the file on every mail
- * arrival is the version with no staleness at all, and measured on this machine on 2026-09-20 a
+ * arrival is the version with no staleness at all, and measured on one machine a
  * `readFileSync` of the 43-byte token costs 275 microseconds against 15 for a `statSync` and 19 for
  * the digest itself. The budget above lets 120 arrivals a minute through for each of 1,000 distinct
  * digests, so a flood costs up to 2,000 lookups a second: at 275 microseconds of SYNCHRONOUS read
@@ -773,8 +773,8 @@ async function digestOf(text: string): Promise<string> {
  * A FULL TABLE EVICTS AND DOES NOT REFUSE, and the difference is the whole availability of `/in/*`.
  * The first cut answered an unknown key with a window's wait once the map held `IN_KEYS_MOST`
  * entries, on the reasoning that the keys already in it were the configured senders. They are not:
- * the key is built from the path, so every key in the map is one a caller chose. Measured on
- * 2026-09-20 end to end against this server, 1,000 POSTs to `/in/webhook/invented-<n>` cost no
+ * the key is built from the path, so every key in the map is one a caller chose. Measured
+ * end to end against this server, 1,000 POSTs to `/in/webhook/invented-<n>` cost no
  * credential, stored no row, filled the map, and then refused 429 both the next arrival at a real
  * ingest and the next forwarded message, for the rest of the window and again every window after.
  * Anybody who can reach the port could hold the arrival door shut.
@@ -835,7 +835,7 @@ function ingestBudget(now: () => number): (key: string) => number | null {
  * AND WHAT IS CACHED IS THE READ AND NOT ITS ANSWER, which is the whole reason `pending` is a
  * promise. The first cut kept the digest in a variable and stamped the window before awaiting it,
  * so a second arrival in the same tick found the window closed and was served the value from
- * before the read: measured on 2026-09-20 with four callers in one tick against a file holding a
+ * before the read: measured with four callers in one tick against a file holding a
  * real token, three of the four were answered `null` and would have had a valid forwarded message
  * refused 404. Two messages arriving together is what a forwarder's queue draining looks like.
  * Holding the promise makes every caller in the window wait on the one read.
@@ -867,7 +867,7 @@ function inboundDigest(file: string, now: () => number): () => Promise<string | 
  * The self-host's half of `/in/*`: one record, one process, and `49 §5.16`'s two shapes.
  *
  * THE CLOUD'S WEBHOOK SHAPE IS SERVED HERE FOR AN INGEST THAT READS A TOKEN, AND ONLY FOR THAT ONE.
- * Until 22 September every ask carrying a `rec` was answered `null`, on the reasoning that comparing
+ * Every ask carrying a `rec` was once answered `null`, on the reasoning that comparing
  * the id tells whoever holds the URL what it is. That left a path token nowhere to ride:
  * `servesIngest` parses `/in/webhook/<ingest>` with no token segment and the five-segment
  * `/in/webhook/<rec>/<ingest>/<token>` with one, so measured against this server
@@ -901,8 +901,8 @@ function inboundDigest(file: string, now: () => number): () => Promise<string | 
  */
 function arrivalDoor(api: Api, spend: (key: string) => number | null, inbound: (() => Promise<string | null>) | null, open: OpenKey, folder: string | null): IngestDoor {
   return {
-    /* A SIGNED DOOR'S KEY IS OPENED HERE, under this host's key store, and handed to the record for the one answer
-       (DOR-3): `keyOpener` is the opener every scheduled action uses, and its `grant.read` is the audit trail of each
+    /* A SIGNED DOOR'S KEY IS OPENED HERE, under this host's key store, and handed to the record for the one answer:
+       `keyOpener` is the opener every scheduled action uses, and its `grant.read` is the audit trail of each
        check. The Cloud-shaped URL stays a path token's alone, so a signed door has the one URL `49 §231` writes. */
     verify: async (ask) => {
       if (ask.rec === undefined) return api.ingestVerify({ ingest: ask.ingest }, open);
@@ -912,8 +912,8 @@ function arrivalDoor(api: Api, spend: (key: string) => number | null, inbound: (
       return v?.kind === 'path' ? v : null;
     },
     /* THE RECORD TAKES THE BYTES, THE FLAG AND THE INGEST, AND NOTHING ELSE OF THE URL. `rec` is this
-       process's one record and is no fact about the payload. The ingest was dropped here too until
-       22 September, and it is what the token was checked against: without it the record offered a
+       process's one record and is no fact about the payload. The ingest was once dropped here too,
+       and it is what the token was checked against: without it the record offered a
        verified webhook to every webhook pattern in declaration order, and `server.test.ts` measured a
        token minted for `till-b` written under `till`. Mail names none and is offered to them all. */
     arrive: (arrival) =>
@@ -936,7 +936,7 @@ function arrivalDoor(api: Api, spend: (key: string) => number | null, inbound: (
             return held !== null && (await sameKey(hash, held)) ? (api.kernel.identity()?.id ?? null) : null;
           },
         }),
-    /* THE MAIL DOOR'S ATTACHMENTS, KEPT BY THE SAME RULE `/api/files` KEEPS A PERSON'S UPLOAD (DOR-7): the same
+    /* THE MAIL DOOR'S ATTACHMENTS, KEPT BY THE SAME RULE `/api/files` KEEPS A PERSON'S UPLOAD: the same
        sniffed types and the same 2 MB ceiling, over `keepAttachment` in `./files.ts`. A database in memory has no
        folder to keep a file in, so `keep` is absent there and every attachment is named and sized and nothing more,
        the same as a host with no file store (`packages/host/src/ingest.ts` `IngestDoor.keep`). */
@@ -1105,7 +1105,7 @@ export async function start(options: {
    */
   limits?: Limiter | null | undefined;
   /**
-   * Run the scheduled actions, `pull`, `call` and `poll`, on this process's timer (`loop/DIRECTION.md` §0b).
+   * Run the scheduled actions, `pull`, `call` and `poll`, on this process's timer.
    *
    * OFF UNLESS ASKED, because an action sends a request to somebody else's server, and a test that installs a
    * pack should not. `main.ts` turns it on. `send` and `openKey` are for tests: the defaults are `fetch` and
@@ -1137,7 +1137,7 @@ export async function start(options: {
   /**
    * Told once, the first time a pass finds `notify.email` jobs waiting on a host that does not deliver them, with how many.
    *
-   * BECAUSE THEY WAIT IN SILENCE OTHERWISE. A self-host has no mail transport until W61, so a digest an automation mails
+   * BECAUSE THEY WAIT IN SILENCE OTHERWISE. On a self-host with no mail transport configured, a digest an automation mails
    * is queued `pending` and stays there, which is the honest state (`49 §5.12` note 1: a kind not delivered is never
    * leased), and nothing anywhere said so: measured at 1586f2a2, a job queued before `serve` started was still `pending`
    * with nothing on stderr (`test/webhook-wired.test.ts`). Once per process, because the count is the same news every
@@ -1151,7 +1151,7 @@ export async function start(options: {
    * GIVEN, SIGN-IN LINKS TURN ON AND AN INVITATION TO A NEW ADDRESS CAN BE PROVED; absent, the Directory offers no link
    * and an invitation says this host sends no mail, as it always has.
    *
-   * WIDENED PAST `AuthDoor['mail']` FOR THE TWO EMAIL-CHANGE LETTERS (GAP-7): `email.change` and `email.changed` are not
+   * WIDENED PAST `AuthDoor['mail']` FOR THE TWO EMAIL-CHANGE LETTERS: `email.change` and `email.changed` are not
    * `MailNotice`, because `packages/ports` is not this lane's to widen, so this field takes the two kinds beside it and
    * hands them to `serveAccount`'s `email.mail`; a narrower caller (`door.mail`, `AuthDoor['mail']`) still fits it.
    */
@@ -1273,7 +1273,7 @@ export async function start(options: {
   /* BESIDE THE RECORD FILE, `<dir>/slash.sqlite`, AS `inbound.token` IS, AND IN MEMORY ONLY WHERE THE RECORD IS.
      This was `:memory:` everywhere, under a comment calling the tables a cache, and they are not one: `call` is
      the only account of what Slash was asked, and `asksUsed` counts the month's meter out of it (`46 §4.1`).
-     `loop/research-spark-seam.md` measured the cost: every restart began the month again, so the tier `a` cap was
+     The cost was measured: every restart began the month again, so the tier `a` cap was
      a cap per uptime, and the `settings` row an owner chose went back to the defaults. `test/slash-meter-persists`
      asks twice across a restart and reads both rows back.
      THE SNAPSHOTS DO NOT CARRY IT, and that is deliberate: `VACUUM INTO` copies the record, and a restored record
@@ -1292,7 +1292,7 @@ export async function start(options: {
   const jobsMeter = backgroundMeter(slashSql);
   /* AND THE LEDGER THE RECORD'S OWN TWO ASKS ARE SPENT FROM, the press and the first plan, in the same Slash SQLite and
      under the same `ask_cap` a read and an automation's question are (`@braindog/host` `slashRecordMeter`). Without it
-     the record asks `slashModel` unmetered, which it did on both hosts until `loop/research-batch-sixty-audit.md` finding 2
+     the record asks `slashModel` unmetered, which it did on both hosts until this
      was wired. The engine is `slashEngineFor`'s, the guarded one `answers` builds, built on the first press and kept;
      a build that throws is let go, and the record reads that hold as a ledger it could not read and lets its rules draft.
      NO RATE, because this host's endpoint is its owner's and not an account this host pays neurons on: the row is
@@ -1462,7 +1462,7 @@ export async function start(options: {
     await act();
     /* THE QUESTIONS TO SLASH, HERE AND NOT IN `act()`, which returns on its first line when `options.actions` is absent,
        as it is for every embedder and every test that does not pass it; a pass there left a record admitting the step and
-       a host that never asked it (`loop/research-infer-ask-next.md` §5). And before the line below, because production's
+       a host that never asked it. And before the line below, because production's
        `start()` passes no `deliver` (`main.ts`). `serveAsks` catches what `answer` throws; this `try` is for the lease. */
     if (answers && !gone) {
       try {
@@ -1471,7 +1471,7 @@ export async function start(options: {
         console.error('slash answers:', e instanceof Error ? e.message : String(e));
       }
     }
-    /* AND THE RECORD'S MODEL JOBS AFTER THE QUESTIONS, the Worker's alarm order (`contracts.md` X8), through the one pass
+    /* AND THE RECORD'S MODEL JOBS AFTER THE QUESTIONS, the Worker's alarm order, through the one pass
        both hosts share, spent from the background allowance. A pass that leased its full five leaves the rest to the
        next poll, which the fifteen-second belt runs whether or not a bell rang. */
     if (modelJobs && !gone) {
@@ -1502,7 +1502,7 @@ export async function start(options: {
       let sent = false;
       let why = '';
       try {
-        /* AN ERASURE'S FILE, DELETED BY ITS HASH, ON THIS HOST'S OWN DISK (OPS-20), never handed to `options.deliver`:
+        /* AN ERASURE'S FILE, DELETED BY ITS HASH, ON THIS HOST'S OWN DISK, never handed to `options.deliver`:
            the file is this process's own, not a transport's, so the self-host deletes it itself, as the Worker's
            `deliver.ts` does for its bucket. */
         if (job.kind === 'erase.r2') {
@@ -1583,7 +1583,7 @@ export async function start(options: {
       ...(modelJobs ? (['infer.prose'] as const) : []),
     ],
     /* THE RECORD'S SWITCH FOR `ask_slash`, ON EXACTLY WHERE THE PASS ABOVE HAS SOMETHING TO ASK WITH. Off, install refuses
-       the step with `NOT_IN_THIS_BUILD` (Brief A's `unserved`), which is the honest answer on a host with no model. */
+       the step with `NOT_IN_THIS_BUILD` (`unserved`), which is the honest answer on a host with no model. */
     answersSlash: answers !== undefined,
     sign,
     /* THE OPERATOR'S CUT-OFF, READ AT EACH CALL, for the grant readers the record holds (device, vault, operation) and
@@ -1640,8 +1640,8 @@ export async function start(options: {
        `host` is for `boot`, so Billing reads that this is a self-host rather than inferring it from the mail door's 404. */
     build: { app: buildApp, slash: slashModel !== undefined, host: 'self-host' },
   });
-  /* AN ERASURE REACHES SLASH'S LEDGER TOO, in `slash.sqlite` beside the record's file (`slashErasing`,
-     `loop/finish/contracts.md` §7.2), which the kernel's erase cascade never reaches. */
+  /* AN ERASURE REACHES SLASH'S LEDGER TOO, in `slash.sqlite` beside the record's file (`slashErasing`),
+     which the kernel's erase cascade never reaches. */
   slashErasing(api, slashSql);
 
   /* A MODULE-LEVEL REFUSAL NO LONGER ENDS THE PROCESS. This called `process.exit(1)` from inside a library function, so a
@@ -1742,7 +1742,7 @@ export async function start(options: {
       res.end(JSON.stringify({ app: buildApp || null }));
       return;
     }
-    /* `/healthz` (ROADMAP W55, `53 §13 #9`): `{ ok, app, format, kernel, primitives }` and a 200, or `{ ok, code }` and a
+    /* `/healthz` (`53 §13 #9`): `{ ok, app, format, kernel, primitives }` and a 200, or `{ ok, code }` and a
        503 while the kernel holds a module-level refusal, before any door and with no credential, so a container's health
        check needs no token. Never a slug: the record's name is not a fact about whether the process is well. `ok` and
        `app` are the Worker's two (`apps/worker/test/healthz.test.ts` pins them there), so one monitor reads both hosts;
@@ -1907,7 +1907,7 @@ export async function start(options: {
     auth: off === null ? directory.auth : null,
     hosts: new Set([...loopback, new URL(origin).host]),
     origins,
-    /* AN AGENT'S LOGIN TOKEN MAY ADD A KEY AT THE DEPOSIT DOOR (`loop/finish/agents.md` C1), checked as every `/api`
+    /* AN AGENT'S LOGIN TOKEN MAY ADD A KEY AT THE DEPOSIT DOOR, checked as every `/api`
        bearer is (`vaultToken`); the record refuses anything but a token's context there. */
     vault: vaultDoor(api, options.keys, (asked) => vaultToken(asked, site)),
     keys: keysDoor(api, options.keys, origins),
@@ -1942,7 +1942,7 @@ export async function start(options: {
     }),
     snapshots: kept,
     blobs: blobsFolder(options.file),
-    /* GAP-7: THE TWO EMAIL ROUTES, GIVEN ONLY WHERE THIS HOST CAN MAIL THE LETTERS, as the magic-link door beside it is
+    /* THE TWO EMAIL ROUTES, GIVEN ONLY WHERE THIS HOST CAN MAIL THE LETTERS, as the magic-link door beside it is
        (`magic: options.mail !== undefined`, above). `ask` and `move` are the Directory's; `mirror` carries the change
        into the one record this process serves, and no other, because a self-host never opens a second one. */
     email: options.mail
@@ -2107,7 +2107,7 @@ async function overLimit(site: Site, door: LimitDoor | null, ip: string, cls: Li
 
 /**
  * A runner's `claimJob`, asked of the record again every `CLAIM_EVERY_MS` until a job is handed over or the wait the
- * runner sent has passed (`holdClaim` in `@braindog/host`, `loop/finish/agents.md` C13): the last answer either way.
+ * runner sent has passed (`holdClaim` in `@braindog/host`): the last answer either way.
  *
  * `request` IS NEVER READ ITSELF: each ask answers a copy, because `serveApi` consumes the body it is handed. An answer
  * that is not a 200 is a refusal, which `claimIdle` does not wait past.
@@ -2161,7 +2161,7 @@ export const BODY_MOST_BYTES = 100 * 1024 * 1024;
  *
  * A HUNDRED MEBIBYTES IS THE RIGHT NUMBER FOR A SIGNED-IN OWNER CALLING `/api/import` AND THE WRONG
  * ONE FOR A STRANGER. `/in/*` is the only path on this server with no credential anywhere on it, and
- * the weighing above happens before routing, so measured on 2026-09-20 an 8 MiB POST to
+ * the weighing above happens before routing, so, measured, an 8 MiB POST to
  * `/in/webhook/<a declared ingest>` from anybody who could reach the port was read whole into memory
  * and only then compared against the one mebibyte the channel allows. On a host bound to `0.0.0.0`,
  * which is the default once a token is set, that is a hundred megabytes of this process per
@@ -2222,7 +2222,7 @@ async function answer(
   const headers = Object.entries(req.headers).map(([k, v]): [string, string] => [k, Array.isArray(v) ? v.join(', ') : (v ?? '')]);
   if (!site) return write(res, json(503, { ok: false }));
 
-  /* `/app/<slug>/api/<method>` IS `/api/<method>`, READ AT THE ROOT (`loop/research-one-domain.md` §2.4). The web sends
+  /* `/app/<slug>/api/<method>` IS `/api/<method>`, READ AT THE ROOT. The web sends
      every record call under a slug there (`apps/web/src/lib/at.ts` `apiBase`), and this handed the path to the shell,
      which answered `index.html` and a 200 to a tab that then read a page as its record (`test/app-path.test.ts`). The
      path is moved before anything else reads it, because `serveApi` takes the method from the path, as the Worker's
@@ -2312,7 +2312,7 @@ async function answer(
      operation grant spends it, and it was read for any method under any slug, so `GET /api/export` spent the grant and
      then `serveApi` answered 405, and `POST /app/not-this-one/api/export` spent it and then the slug was refused 403;
      either way the right request after it was 401 and the person approved on their phone again for nothing
-     (`test/operation-grant-doors.test.ts`, audit fifty-seven findings 4 and 5). With no door, an operation bearer on
+     (`test/operation-grant-doors.test.ts`). With no door, an operation bearer on
      those requests is a credential this record does not know, 401, and is still good for the one it was minted for. It
      is not told 403 under a foreign name, because telling it that would mean spending it to learn it is real. */
   const door = method === 'POST' && !foreign ? /^\/+api\/+([A-Za-z]+)\/*$/.exec(path)?.[1] : undefined;
@@ -2332,7 +2332,7 @@ async function answer(
   /* A KEPT COPY AS THE FILE IT IS (`49 §5.13`): `GET /api/snapshots/<id>`, for whoever `snapshots` answers. */
   const copyAsked = /^\/+api\/+snapshots\/+([^/]+)\/*$/.exec(path);
   if (copyAsked && method === 'GET' && 'ctx' in seen) return write(res, await copyOf(decodeURIComponent(copyAsked[1]!), seen.ctx, site), seen.cookie);
-  /* `PUT /api/files` AND `GET /api/files/<sha256>` (OPS-19, OPS-20, PGS-14): the self-host half of the file store,
+  /* `PUT /api/files` AND `GET /api/files/<sha256>`: the self-host half of the file store,
      `./files.ts`'s door, so a gallery or a card picture served on the self-host draws the picture and not only its
      caption. */
   if (servesFiles(path) && 'ctx' in seen) return write(res, await serveFiles(request, withSession(seen.ctx, sessionOf(request.headers)), site.blobs), seen.cookie);
@@ -2426,7 +2426,7 @@ async function copyOf(id: string, ctx: CallContext, site: Site): Promise<Respons
   });
 }
 /**
- * `POST /mcp`, for an agent's MCP client (`loop/research-agent-path.md` §1.3, §1.7).
+ * `POST /mcp`, for an agent's MCP client.
  *
  * NOTHING OF THE BODY IS READ UNTIL THE BEARER IS KNOWN. What the headers can refuse, and the bearer, are
  * decided on a request with no body at all; the socket's bytes become one only for a caller this record knows.
@@ -2441,7 +2441,7 @@ async function agent(req: IncomingMessage, url: string, method: string, headers:
   const sent = presented(head);
   const seen = sent === undefined ? null : await bearerFor(sent, site, 'mcp');
   /* THE 401 NAMES WHERE TO SIGN IN, as the Worker's does, so an MCP client holding no token starts OAuth from it
-     (RFC 9728, `loop/finish/agents.md` C4): at the name this process was reached by, and not at all while OAuth is off. */
+     (RFC 9728): at the name this process was reached by, and not at all while OAuth is off. */
   const metadata = site.oauth.metadata(req.headers.host ?? '');
   if (seen === null) return unauthorized(metadata);
   if ('refused' in seen) {

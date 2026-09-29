@@ -609,7 +609,7 @@ async function serve(): Promise<void> {
        row is never leased and waits `pending` for the day mail is set up, rather than walking the ladder to a dead
        letter (`49 §5.12` note 1).
 
-       AND `erase.r2` IS ALWAYS ON IT (OPS-20): `start` deletes that file itself, off this record's own disk, whatever
+       AND `erase.r2` IS ALWAYS ON IT: `start` deletes that file itself, off this record's own disk, whatever
        `deliver` below is passed, so an erasure is never left `pending` for want of a transport it does not need. */
     delivers: notices ? ['notify.webhook', 'notify.email', 'erase.r2'] : ['notify.webhook', 'erase.r2'],
     deliver: (job, keys) => (job.kind === 'notify.email' && notices ? notices(job) : webhooks(job, keys)),

@@ -2,12 +2,12 @@
  * His iOS Shortcut's door on the Cloud: a token minted through the Worker, one `From HSBC:` text posted through the
  * Worker, and a transaction filed on a record that lives in a Durable Object.
  *
- * WHY THIS FILE EXISTS. `loop/research-switch-recheck.md` §3 brief 4. The money moves to the Cloud, and what had been
+ * WHY THIS FILE EXISTS. The money moves to the Cloud, and what had been
  * driven end to end was the self-host (`packages/host/test/ingest-shortcut.test.ts`, the record over `node:sqlite`) and,
  * on the Worker, only the hand-off, with `RECORD` and `DIRECTORY` stubs (`test/arrive-ingest-handoff.test.ts`). Nobody
  * had minted a digest with `ingestMint` and watched workerd verify a path token against it and file a row.
  *
- * WHAT RUNS, AND NOTHING IN THE MIDDLE IS A DOUBLE. Built the way `test/import-in-do.test.ts` builds it: `src/index.ts`
+ * WHAT RUNS, AND NOTHING IN THE MIDDLE IS A DOUBLE. Built the way the other `*-in-do` tests build it: `src/index.ts`
  * bundled by `wrangler`'s own esbuild with `cloudflare:workers` left for workerd, Miniflare serving both Durable Objects
  * on SQLite storage, a record made by `POST /auth/provision`, its owner signed in by spending the claim link, and Solo
  * founder and `bank-hsbc-eg` installed on Decide. The token is minted through `/api/ingestMint` on that session, which
@@ -15,7 +15,7 @@
  * `/in/webhook/<rec>/bank-from-out-sms/<token>` with no credential, as the Shortcut posts it.
  *
  * `bank-hsbc-eg` IS OFFERED WITH ITS DOCUMENT, NOT BY NAME. Proposed as `{ install: 'bank-hsbc-eg' }` the Worker
- * answered `DECLARATION_UNKNOWN`, "There is no pack called bank-hsbc-eg on offer here", measured on 23 September: it
+ * answered `DECLARATION_UNKNOWN`, "There is no pack called bank-hsbc-eg on offer here", measured: it
  * is deliberately not in `seedCatalogue` (`apps/cli/src/import.ts`, `PlannedPack`), and the import offers it the way
  * this file does. Before it is installed the mint answers `DECLARATION_UNKNOWN` for `bank-from-out-sms`, so on the
  * Cloud a record set up with Solo founder alone has no door for his texts.
@@ -23,16 +23,16 @@
  * ONE RECORD PER CASE, because the inbox keys an arrival by its bytes and a case that posts after another would be
  * asking about the first case's leftovers.
  *
- * EVERY ANSWER OF 500 OR MORE IS COUNTED, as `import-in-do` counts them: the door answers 503 for a record that threw,
+ * EVERY ANSWER OF 500 OR MORE IS COUNTED: the door answers 503 for a record that threw,
  * and a 503 on a post is a text the Shortcut was told to send again rather than a row, which no count of rows shows.
  *
- * RED FIRST, MEASURED ON 23 SEPTEMBER without touching the tree. The four cases describe behaviour that should hold at
+ * RED FIRST, MEASURED without touching the tree. The four cases describe behaviour that should hold at
  * HEAD, so the red is made as `arrive-ingest-handoff.test.ts` made its own, over scratch bundles whose esbuild `onLoad`
  * rewrites one line of `arrivals()` in `src/index.ts` before building. `SHORTCUT_MUTANT` picks which, and a rewrite
  * that no longer finds its line throws rather than building the Worker as it ships:
  *   - `unverified`: `verifies:` answers `{ kind: 'none' }` instead of asking the record's `ingestVerify`, so no token
  *     verifies. The minted token, the second mint and the text posted twice went red; the wrong token stayed green,
- *     as the brief expected, because under it nothing verifies at all.
+ *     as expected, because under it nothing verifies at all.
  *   - `verifies-all`: the arrival crosses with `verified: true` whatever the door found. The wrong token and the
  *     rotated token went red, and the other two stayed green.
  * So every case is red under one of the two, and none is green only because the door refuses everything.
@@ -41,7 +41,7 @@
  * row on the account ending 846, and the wrong and rotated tokens were stored `untriaged` with the record's reason
  * "nothing verified this arrival, so no pattern was offered it". The text posted twice left one row and an empty inbox.
  *
- * ABOUT TWO SECONDS, 2.1 and 2.3 across two runs on 23 September: workerd starting once, and four records set up.
+ * ABOUT TWO SECONDS, 2.1 and 2.3 across two runs: workerd starting once, and four records set up.
  */
 
 import { test, before, after } from 'node:test';

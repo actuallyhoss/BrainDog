@@ -1,6 +1,6 @@
 /**
  * An operation grant is spent by the one request it was minted for, and a request that was never going to be answered
- * leaves it where it was (audit fifty-seven, findings 4 and 5, the Cloud half).
+ * leaves it where it was (the Cloud half).
  *
  * MEASURED BEFORE THIS FILE, through the bundle. `bearerOf` spent the grant as soon as the path named one of the four
  * operations, and asked nothing else first. A `GET /api/export` spent it and was then answered 405 by the router, "export

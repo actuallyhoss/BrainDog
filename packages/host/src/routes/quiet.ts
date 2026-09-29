@@ -1,5 +1,5 @@
 /**
- * The route rows for the record's quiet hours (`packages/record/src/methods/quiet.ts`, `loop/finish/contracts.md` §12.1,
+ * The route rows for the record's quiet hours (`packages/record/src/methods/quiet.ts`,
  * `docs/09-ALARMS-AND-NOTIFICATIONS.md` §5 rule 3).
  *
  * ONE ROW A LINE, IN THE SHAPE `ROUTES` HAS ALWAYS HAD, because the two gates over the table read it by that shape:

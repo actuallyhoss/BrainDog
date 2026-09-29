@@ -118,7 +118,7 @@ export async function serveFiles(request: Request, ctx: CallContext, folder: str
 
 /**
  * Sniffs and writes one file's bytes under `folder`, named by its hash: the write half of `PUT /api/files`, reused by
- * `arrivalDoor`'s mail attachments (`DOR-7`) so a kept attachment is stored by the same rule a person's upload meets.
+ * `arrivalDoor`'s mail attachments so a kept attachment is stored by the same rule a person's upload meets.
  * `null` for a type this store does not take, oversized, or empty, since a caller keeping an attachment only needs to
  * know whether it was kept.
  */

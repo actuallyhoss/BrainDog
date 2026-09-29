@@ -1,13 +1,13 @@
 /**
  * How often one caller may ask: the key, the class, the numbers, the window and the refusal, shared by both hosts.
  *
- * NEITHER DOOR HAD A RATE. Measured for `loop/research-hardening.md` §2.2: `/api` and `/mcp` answered as often as they
+ * NEITHER DOOR HAD A RATE. Measured: `/api` and `/mcp` answered as often as they
  * were asked, on the Worker and on the self-host, and the only limits in the tree were the sign-in lockout, the ingest
  * budget and a report key's minute. The Cloud's `ratelimits` binding was drafted in `wrangler.jsonc` and read by no
  * code, so a token in a loop spent the record's Durable Object as fast as the network carried the requests.
  *
- * NOTHING HERE TOUCHES A DOOR. The Worker asks its `RL_READ` and `RL_WRITE` bindings through `bindingLimiter` (W60-6);
- * the self-host, which has no binding, asks `windowLimiter` (W60-7). Both answer the same `Limiter`, both key a caller
+ * NOTHING HERE TOUCHES A DOOR. The Worker asks its `RL_READ` and `RL_WRITE` bindings through `bindingLimiter`;
+ * the self-host, which has no binding, asks `windowLimiter`. Both answer the same `Limiter`, both key a caller
  * with `limitKey` and both refuse with `refusedFor`, so the two hosts cannot drift into two different ideas of who a
  * caller is or what a refusal looks like, which is the drift `index.ts`'s header argues against for the routes.
  *
@@ -72,8 +72,8 @@ export type LimitDoor = {
  * Who a limit counts: the token for a bearer, the person for a session, and the address for no door.
  *
  * THERE WAS A THIRD DOOR, THE PUBLIC DEMO, AND IT WAS KEYED BY ADDRESS because every visitor to it was the same
- * `p_demo`: a key built from that principal would have given the whole internet one budget. The demo is gone
- * (`loop/research-no-sample.md` A1), so every door left names somebody who signed in or holds a token.
+ * `p_demo`: a key built from that principal would have given the whole internet one budget. The demo is gone,
+ * so every door left names somebody who signed in or holds a token.
  *
  * A BEARER CAN BE A PERSON. An operation grant resolves to the person who approved it, not to a token, and it is
  * counted as that person, who is the one spending it.
@@ -150,7 +150,7 @@ export type RateLimitBinding = { limit(options: { key: string }): Promise<{ succ
 /**
  * The Worker's `RL_READ` and `RL_WRITE` as a `Limiter`.
  *
- * AN ABSENT BINDING LIMITS NOTHING. Production binds both (`apps/worker/wrangler.jsonc`, OPS-4); `alpha` and a test's
+ * AN ABSENT BINDING LIMITS NOTHING. Production binds both (`apps/worker/wrangler.jsonc`); `alpha` and a test's
  * `bundled()` bind neither, and answer exactly as they did before.
  *
  * THE PRICE PAGE STATES THE MONTH, NOT THE MINUTE. `/pricing` shows each plan's monthly allowance (runs, requests,

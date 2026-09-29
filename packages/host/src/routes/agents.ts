@@ -5,7 +5,7 @@
  * `router-groups` holds each row's group to `docs/30-BLUEPRINT.md` §5, and `guards` holds the record method of the same
  * name to the guard its group implies.
  *
- * THE JOB ROWS ARE HERE ON AGT-7'S BEHALF (`loop/finish/contracts.md` §3.1), and their methods are in
+ * THE JOB ROWS ARE HERE, and their methods are in
  * `packages/record/src/jobs.ts`, not beside `triage`. `docs/30-BLUEPRINT.md` §5 has named every one of them since tier C
  * was written; a record without them answers each `NOT_IN_THIS_BUILD` through `handlersFor`, never a 500.
  */

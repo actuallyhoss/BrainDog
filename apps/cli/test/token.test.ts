@@ -1,5 +1,5 @@
 /**
- * `braindog token create`, and `--inbox` (parity brief B7, pick P2 in `loop/DIRECTION.md` section 30).
+ * `braindog token create`, and `--inbox`.
  *
  * WHAT WAS MEASURED BEFORE THIS. No CLI command minted an agent token at all, and no token from anywhere could read the
  * money inbox: `createToken` kept no reach, and a token principal never carried one, so the record's inbox gate

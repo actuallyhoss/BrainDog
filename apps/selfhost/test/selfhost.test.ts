@@ -82,8 +82,7 @@ test('THE WHOLE STACK ANSWERS OVER A SOCKET', async () => {
     const boot = await s.call('boot');
     assert.equal(boot.status, 200);
     assert.deepEqual((boot.body.value as { registers: { id: string }[] }).registers.map((r) => r.id), ['session', 'obligations']);
-    /* THE HOST SAYS WHAT IT IS, so Billing reads it rather than inferring it from the mail door's 404
-       (`loop/research-held-landing.md` friction 5). */
+    /* THE HOST SAYS WHAT IT IS, so Billing reads it rather than inferring it from the mail door's 404. */
     assert.equal((boot.body.value as { host?: string }).host, 'self-host');
 
     const made = await s.call('create', { register: 'obligations', fields: { what: 'Invoice 41', state: 'open', amount: { amount: 48_000, currency: 'GBP' } } });

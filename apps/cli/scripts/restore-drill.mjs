@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /**
- * The restore drill: a sealed nightly copy of a Cloud record, opened, verified, restored and counted (ROADMAP W55-8).
+ * The restore drill: a sealed nightly copy of a Cloud record, opened, verified, restored and counted.
  *
  *   node apps/cli/scripts/restore-drill.mjs latest.brainl.age --identity <age identity file> [--key <pubkey|url>]
  *
  * WHY IT EXISTS. Until this, the only code that had ever opened one of the Cloud's copies was a test's decryptor, and the
- * only restore of one was a probe in a scratch clone (`loop/research-restore.md` answer 1). A backup nobody has put back
+ * only restore of one was a probe in a scratch clone. A backup nobody has put back
  * is a hope, and `53 §5.4`'s drill could not be run as written: `age` is not on this machine, `init` then `import` is
- * `IMPORT_NOT_EMPTY`, and `shred` is not on Windows (section 7, measured). This runs all of it with Node alone.
+ * `IMPORT_NOT_EMPTY`, and `shred` is not on Windows (measured). This runs all of it with Node alone.
  *
  * WHAT IT DOES, IN ORDER, and it stops at the first step that fails:
  *   1. opens the copy with the identity file he names. The file is read once, where he keeps it, and never copied,
@@ -23,8 +23,7 @@
  *      both, count and hash, and counts each list's rows in the copy against the restored record.
  *   6. prints PASS or FAIL and the line for the ops record, and removes the folder, plaintext and record with it.
  *
- * NOTHING HERE WRITES TO A NETWORK, and no production record is touched. The copy is a file he fetched himself (the
- * command is in `loop/research-restore.md`, "Drill"); the one request this can make is the GET a `--key` URL asks for.
+ * NOTHING HERE WRITES TO A NETWORK, and no production record is touched. The copy is a file he fetched himself; the one request this can make is the GET a `--key` URL asks for.
  *
  * THE DECRYPTOR IS A THIRD READING OF THE AGE SPEC, written from https://age-encryption.org/v1 over `node:crypto` and
  * sharing no code with the Worker's sealer (`apps/worker/src/seal.ts`, WebCrypto and its own ChaCha20) or the tests'
@@ -379,9 +378,8 @@ async function main() {
 
     // 3 · RESTORE ────────────────────────────────────────────────────────────────────────────────────────────────────
     /* WITH `braindog init drill --from`, THE COMMAND A HOST RUNS, into a throwaway data directory. This imported the file
-       into an empty kernel, which no host does, and it said PASS for the audit's copy (a suspended first owner and two
-       more people) while `init --from` turned the same file into a record none of them could open (audit fifty-seven
-       §7). BRAINDOG_KEK_FILE is left out so the child makes a root key of its own in the scratch folder and reads no real
+       into an empty kernel, which no host does, and it said PASS for a copy with a suspended first owner and two
+       more people while `init --from` turned the same file into a record none of them could open. BRAINDOG_KEK_FILE is left out so the child makes a root key of its own in the scratch folder and reads no real
        one, and BRAINDOG_OWNER is emptied so a value in his shell does not choose the owner for the copy. */
     const data = join(scratch, 'data');
     const env = { ...process.env, BRAINDOG_DATA: data, BRAINDOG_OWNER: '' };
@@ -459,7 +457,7 @@ async function main() {
     let rows = 0;
     out(row('table', 'manifest', 'restored', ''));
     /* THE UNION OF BOTH MANIFESTS, not the copy's alone: a table the restored record exports with rows in it and the copy
-       never named is a difference too, and reading only the copy's names left it unread (audit fifty-seven §7). */
+       never named is a difference too, and reading only the copy's names left it unread. */
     for (const name of ours.keys()) if (!theirs.has(name) && ours.get(name).n > 0) theirs.set(name, { n: 0, sha: '' });
     for (const [name, want] of theirs) {
       /* THE LINE'S ROWS ARE THE RECORD'S, counted as `dumpOf` counts them for the copy's metadata and for Settings: the

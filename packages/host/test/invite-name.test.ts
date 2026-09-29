@@ -147,8 +147,8 @@ test('A SECOND INVITATION DOES NOT RENAME ANYBODY who has since named themselves
 /**
  * THE DIRECTORY ROW WAS NOT THE ROW THE SCREEN READS. People draws `m.name ?? m.email` from the record's own `person`
  * table (`apps/web/src/lib/record/settings-write.ts:49`, fed by `members()`), and `serveInvite` handed `accept` only
- * `{ id, email }`, so the three tests above were green while People still drew `bo@example.com`. The audit measured
- * it with a real record behind the door (`loop/research-batch-fourteen-audit.md` finding 1), and so does this.
+ * `{ id, email }`, so the three tests above were green while People still drew `bo@example.com`. A probe measured
+ * it with a real record behind the door, and so does this.
  */
 test('THE NAME REACHES THE RECORD, so People draws it and not the address', async () => {
   const sql = openSqlite();

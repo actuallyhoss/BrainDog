@@ -1,19 +1,19 @@
 /**
- * Spark is called Slash (DIRECTION 31), and a self-host that ran the old build has its ledger in `<dir>/spark.sqlite`.
+ * Spark is called Slash, and a self-host that ran the old build has its ledger in `<dir>/spark.sqlite`.
  *
  * WHAT A RENAME WITHOUT THIS LOSES. The file holds the `settings` row an owner chose and the `call` ledger the month is
  * metered from (`46 §4.1`, `test/slash-meter-persists.test.ts`). A build that opened `slash.sqlite` and nothing else
  * would start both from the defaults on the first boot after the upgrade: the cap an owner lowered goes back to 80 and
- * the asks already spent this month are forgotten. `loop/research-slash-rename.md` §2.2 names the move.
+ * the asks already spent this month are forgotten. So the file is moved.
  *
  * THE ROW IS IN THE WAL AND NOT IN THE MAIN FILE, on purpose. `openSqlite` runs every file in WAL mode, so an old process
  * that died between checkpoints leaves its newest rows in `spark.sqlite-wal` alone. A move that renamed the main file and
  * left the WAL behind would open a database with no `settings` table at all, and this test would read `undefined`.
  *
- * AND THE OLD DOOR IS GONE. DIRECTION 31 leaves no alias, so `/api/spark/read` is a path this host does not know and
+ * AND THE OLD DOOR IS GONE. The rename leaves no alias, so `/api/spark/read` is a path this host does not know and
  * `serveApi` answers it the way it answers any unknown method, 404 `ROUTE_UNKNOWN`.
  *
- * RED BEFORE THE MOVE, MEASURED ON 25 SEPTEMBER against the tree before the rename: 2 tests, 0 pass. The first failed at
+ * RED BEFORE THE MOVE, MEASURED against the tree before the rename: 2 tests, 0 pass. The first failed at
  * its first assertion, "spark.sqlite is still beside the record after the boot"; the second at its premise, because a
  * boot on a fresh directory wrote `spark.sqlite` and no `slash.sqlite`.
  *

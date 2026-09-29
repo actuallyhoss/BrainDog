@@ -148,7 +148,7 @@ test('THE SAME ENDPOINT IS THE PACKAGE\'S Inference PORT, asked with a schema an
   );
 });
 
-/* ── `SLASH_MODEL` maps the package's four short names and nothing else (research-slash-routes F1, F2) ─── */
+/* ── `SLASH_MODEL` maps the package's four short names and nothing else ──────────────────────────────── */
 
 const ask = (model: string) => ({ model, messages: [], maxTokens: 10, jsonSchema: {} });
 const sentModel = (net: { sent: { init: RequestInit }[] }, i: number): string => (JSON.parse(String(net.sent[i]!.init.body)) as { model: string }).model;
@@ -170,11 +170,11 @@ test('A MODEL THE OWNER NAMED REACHES THE ENDPOINT, and SLASH_MODEL stands in on
   assert.equal(sentModel(net, 5), 'glm-5.3');
 });
 
-/* A STATUS THAT IS NOT `ok` IS A MODEL THAT DID NOT ANSWER, `loop/research-worker-spark.md` §6 Q8's default taken for the
-   owner. Wave 47 marked it `answered`, so the package settled a 429 as a paid ask that ends the run for good, where before
+/* A STATUS THAT IS NOT `ok` IS A MODEL THAT DID NOT ANSWER, the retry default taken for the
+   owner. An earlier build marked it `answered`, so the package settled a 429 as a paid ask that ends the run for good, where before
    it was retried uncounted: a provider's rate limit or an outage behind a gateway spent the owner's allowance and stopped
-   the automation on the first rung. The mark stays on what comes after a 200, which is what a provider bills. RED ON 23
-   SEPTEMBER against wave 47's `post`: all four statuses carried `answered: true`. */
+   the automation on the first rung. The mark stays on what comes after a 200, which is what a provider bills. RED
+   against that build's `post`: all four statuses carried `answered: true`. */
 test('A STATUS THAT IS NOT ok IS THROWN WITHOUT THE ANSWERED MARK, so the ladder asks again and no ask is spent', async () => {
   const marks: Record<string, unknown> = {};
   for (const status of [401, 429, 502, 503]) {
@@ -370,7 +370,7 @@ test('A PREDICATE THE GRAMMAR REFUSES FALLS BACK ON THE RECORD\'S OWN SEARCH, wh
   own.close();
 });
 
-/* ── his own key: named by the setting, asked in the provider's shape, with the model its owner typed (AGT-21) ────── */
+/* ── his own key: named by the setting, asked in the provider's shape, with the model its owner typed ─────────────── */
 
 /** Two live grants and a revoked one. `g_...HAD` is labelled `slash`, which chooses nothing now; `g_...HAE` is the one he picks. */
 const SLASH_GRANT = 'g_01JZ8QK3F7R2M9V4XN6TCB5HAD';
@@ -457,7 +457,7 @@ test('HIS OWN KEY ASKS BOTH PASSES WITH THE KEY HE PICKED AND THE MODEL HE TYPED
   assert.equal(bearer(net, 1), `Bearer ${keyOf(OWN_GRANT)}`);
   assert.equal(sentModel(net, 0), 'gpt-4o-mini');
   assert.equal(sentModel(net, 1), 'gpt-4o-mini');
-  /* THE `slash`-LABELLED KEY IS NEVER OPENED (`loop/finish/defects.md` S1). */
+  /* THE `slash`-LABELLED KEY IS NEVER OPENED. */
   assert.deepEqual(opened, [OWN_GRANT, OWN_GRANT]);
   assert.ok(!String(net.sent[1]!.init.body).includes(keyOf(OWN_GRANT)), 'the key went into what the model reads');
 
@@ -477,7 +477,7 @@ test('HIS OWN KEY ASKS BOTH PASSES WITH THE KEY HE PICKED AND THE MODEL HE TYPED
   assert.equal(slashOwnInference({ ...OWN, base_url: 'https://10.0.0.5/v1' }, deps), undefined);
 
   /* A GRANT REVOKED BETWEEN THE ADAPTER AND THE CALL, OR ONE THE HOST COULD NOT OPEN, SENDS NOTHING. A call with no
-     `authorization` at all is, to a provider, an anonymous call on the owner's account (`loop/finish/defects.md` S2). */
+     `authorization` at all is, to a provider, an anonymous call on the owner's account. */
   const sent = net.sent.length;
   const shut = slashOwnInference(OWN, { ...deps, openKey: async () => null })!;
   await assert.rejects(shut.complete(ask('gpt-4o-mini')), /would not open/u);
@@ -518,7 +518,7 @@ test('NO ENDPOINT MEANS NEITHER PORT IS BUILT, so a keyless host keeps drafting 
   assert.equal(slashModelOf(slashFromEnv({}), deps), undefined);
   assert.equal(slashInferenceOf(slashFromEnv({}), deps), undefined);
   /* AN ENDPOINT WITH NO OPERATOR KEY IS A KEYLESS MODEL, a server on the owner's own machine, whether or not the host can
-     open the vault: the vault is not read for it (`loop/finish/defects.md` S1). Where a key is required, a call is refused
+     open the vault: the vault is not read for it. Where a key is required, a call is refused
      before anything is sent. */
   const configured = slashFromEnv({ SLASH_ENDPOINT: 'http://localhost:11434/v1/chat/completions' }, { operatorKey: false });
   assert.ok(slashInferenceOf(configured, deps) !== undefined);

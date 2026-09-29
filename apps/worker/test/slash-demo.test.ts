@@ -1,7 +1,7 @@
 /**
  * Nobody reaches a record without a credential: not through the router, and not at Slash's door inside the object.
  *
- * THERE WAS A PUBLIC DEMO, AND IT IS GONE (`loop/DIRECTION.md` 26, `loop/research-no-sample.md` A1). `DEMO_RECORD` named
+ * THERE WAS A PUBLIC DEMO, AND IT IS GONE. `DEMO_RECORD` named
  * one record that any GET with no `Authorization` header read as `p_demo` at `read`, uncredentialed. Production shipped
  * it empty, so the door was dark, but it was one `--var` away from open, and the app now shows only a real record. The
  * first test here is the one that went red against the Worker that still had it: a deployment that sets `DEMO_RECORD` to
@@ -10,8 +10,8 @@
  *
  * THE OBJECT'S OWN LOCK STAYS, because it was never only about the demo. It asked only `principal.kind` once, and the
  * demo's context, a person, was answered 200 with a Reading and one model call: on a live host, one opening of the
- * owner's `slash` key and one ask off the record's `ask_cap`, spent by somebody who never signed in
- * (`loop/research-batch-seventeen-audit.md` finding 5). `credentialed` is the field that says it. A session's context
+ * owner's `slash` key and one ask off the record's `ask_cap`, spent by somebody who never signed in.
+ * `credentialed` is the field that says it. A session's context
  * is `credentialed: true` (`packages/host/src/auth.ts`), and a person context that says `false`, or leaves it out, was
  * not built by a sign-in and is refused before the model is called.
  */
@@ -49,7 +49,7 @@ test('A DEPLOYMENT THAT STILL SETS DEMO_RECORD OPENS NOTHING: a GET with no cred
 });
 
 /* THE INCLUDED MODEL OVER A FAKE BINDING, counted. This file drove the Worker's own endpoint until that endpoint was taken
-   out (`loop/finish/defects.md` S1); the lock it holds is the door's, whichever model is behind it. */
+   out; the lock it holds is the door's, whichever model is behind it. */
 const fakeAi = () => {
   const ai = {
     calls: 0,

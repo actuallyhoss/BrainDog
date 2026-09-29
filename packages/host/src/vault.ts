@@ -1,12 +1,12 @@
 /**
  * An agent's keys over HTTP: `POST /api/vault/deposit` and `POST /api/vault/open`, the half both hosts share.
- * `12 §6`, ADR-062, `loop/research-agent-path.md` §5.7.
+ * `12 §6`, ADR-062.
  *
  * THE BEARER IS A VAULT GRANT, EXCEPT THAT A LOGIN TOKEN MAY ADD A KEY. It is checked with the record's `vaultGrant`
  * first, which never accepts a login token, so the bearer an agent uses for everything else opens no key. Only at
  * `/api/vault/deposit`, and only on a host that wires `token` and `depositByToken`, a bearer that is not a vault grant
  * is then asked as the host asks any `/api` bearer, and a `write` token's key is deposited as a NEW key in its run's
- * project (`loop/finish/agents.md` C1). Replacing a value still needs a vault grant or the owner, which the record
+ * project. Replacing a value still needs a vault grant or the owner, which the record
  * decides, so a login token that leaks can add a key and never swap one. `/api/vault/open` takes a vault grant only.
  *
  * NO VALUE IS NAMED HERE. The body is parsed and handed whole to the host's own vault module, `vault.ts` in the

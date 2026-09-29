@@ -1,6 +1,6 @@
 /**
  * `braindog init <slug> --from <file.brainl>`: a copy of a record, from this host or the Cloud, becomes the record this
- * host serves (ROADMAP W55-4, `loop/research-restore.md` sections 4 and 7).
+ * host serves.
  *
  * THERE WAS NO EMPTY RECORD TO PUT A COPY INTO. `init` creates the record with `createRecord`, which writes the owner,
  * two schedules, an event, a member and three keys, so an import after it answered `IMPORT_NOT_EMPTY` (measured,
@@ -111,8 +111,8 @@ export async function initFrom(o: {
       .map(addressed)
       .filter((p): p is Person => p !== null);
     /* A SUSPENDED OWNER IS NEVER CHOSEN WHEN NOBODY WAS NAMED. The record refuses every request of theirs, so naming them in
-       the Directory as the owner restored a record whose one named person could not open it (audit fifty-seven §1,
-       where she was `owners[0]` because her id sorted first). */
+       the Directory as the owner restored a record whose one named person could not open it (she was
+       `owners[0]` because her id sorted first). */
     const open = owners.filter((p) => !p.suspended);
     const wanted = o.owner?.trim().toLowerCase();
     const chosen = wanted === undefined || wanted === '' ? open[0] : owners.find((p) => p.email === wanted);
@@ -181,7 +181,7 @@ export async function initFrom(o: {
     );
 
   /* ── EVERYONE ELSE ON THE RECORD, ASKED OF THIS DIRECTORY BEFORE ANYTHING IS WRITTEN ─────────────────────────────
-     MEASURED BEFORE THIS (`test/restore-members.test.ts`, audit fifty-seven §1): only the owner got a `dir_person` row,
+     MEASURED BEFORE THIS (`test/restore-members.test.ts`): only the owner got a `dir_person` row,
      so a second owner, a writer or a reader of one list who signed in here was minted a new id by `person$`, one no
      `member` row names, and the record refused them all. Each is written under the id the record knows them by, when
      this Directory does not already hold their address or their id as somebody else. One it does hold is left as it is
@@ -192,7 +192,7 @@ export async function initFrom(o: {
   /* ONE ROW PER ADDRESS, AS THE DIRECTORY HOLDS THEM (`dir_person_email`). The record's `person` table can name one
      address twice, which a restore made before this one leaves behind when a member it could not carry was invited
      again under a fresh id; the second insert threw `UNIQUE constraint failed` and refused the whole restore
-     (`test/restore-members.test.ts`, measured by the checker). The first is carried and the other is named. */
+     (`test/restore-members.test.ts`). The first is carried and the other is named. */
   const taken = new Set([owner.email]);
   for (const p of others) {
     if (taken.has(p.email)) {

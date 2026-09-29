@@ -401,19 +401,19 @@ test('INSTALL INTO A SETTINGS FILE THE PERSON NAMES: a project settings.local.js
 /* ── install --replace, the cut-over ───────────────────────────────────── */
 
 /*
- * THE OLD TOOL'S ENTRIES AS `loop/research-switch.md` §1 and step 9 of §3 record them: two PowerShell hooks under
- * `C:\Tools\legacy\hooks\` in `settings.json`, and a stdio server running `C:\Tools\legacy\mcp\brain-mcp.mjs` in
- * each profile's `.claude.json`. The real files were not read to write these; the paths are the recorded ones.
+ * TALLYBOOK'S ENTRIES, AS AN OLD TOOL LEAVES THEM: two PowerShell hooks under `C:\Tools\tallybook\hooks\` in
+ * `settings.json`, and a stdio server running `C:\Tools\tallybook\mcp\tallybook-mcp.mjs` in each profile's
+ * `.claude.json`. Every value is made up.
  */
-const HB_START = 'powershell -NoProfile -ExecutionPolicy Bypass -File "C:\\Tools\\legacy\\hooks\\session-start.ps1"';
-const HB_END = 'powershell -NoProfile -ExecutionPolicy Bypass -File C:\\Tools\\legacy\\hooks\\session-end.ps1';
+const HB_START = 'powershell -NoProfile -ExecutionPolicy Bypass -File "C:\\Tools\\tallybook\\hooks\\session-start.ps1"';
+const HB_END = 'powershell -NoProfile -ExecutionPolicy Bypass -File C:\\Tools\\tallybook\\hooks\\session-end.ps1';
 /*
  * Near misses that must survive: BrainDog's own first shim, and a folder whose name only ends with brain. A
  * lookalike that only BEGAN with brain was tried first and stayed green with the separator before `brain` taken
  * out of the pattern, so it proved nothing about the "named exactly" half.
  */
 const OLD_SHIM = 'powershell -NoProfile -File C:\\Repos\\braindog\\apps\\cli\\hooks\\session-start.ps1';
-const LOOKALIKE = 'node C:\\Repos\\notbrain\\hooks\\session-end.ps1';
+const LOOKALIKE = 'node C:\\Tools\\nottallybook\\hooks\\session-end.ps1';
 const HB_SECRET = 'hb-token-never-printed-77e1';
 
 function cutOverProfile(dir: string, claudeJson: string): { settings: string; before: string; mcpBefore: string } {
@@ -436,13 +436,13 @@ function cutOverProfile(dir: string, claudeJson: string): { settings: string; be
     {
       numStartups: 41,
       mcpServers: {
-        brain: { type: 'stdio', command: 'node', args: ['C:\\Tools\\legacy\\mcp\\brain-mcp.mjs'], env: { MCP_TOKEN: HB_SECRET } },
-        /* No record says the old tool was ever registered over HTTP; this is here so the URL branch is driven. */
-        'brain-http': { type: 'http', url: `https://brain.example.com/mcp?token=${HB_SECRET}`, headers: { Authorization: `Bearer ${HB_SECRET}` } },
+        brain: { type: 'stdio', command: 'node', args: ['C:\\Tools\\tallybook\\mcp\\tallybook-mcp.mjs'], env: { MCP_TOKEN: HB_SECRET } },
+        /* No record says Tallybook was ever registered over HTTP; this is here so the URL branch is driven. */
+        'brain-http': { type: 'http', url: `https://tallybook.example/mcp?token=${HB_SECRET}`, headers: { Authorization: `Bearer ${HB_SECRET}` } },
         figma: { type: 'http', url: 'https://mcp.figma.com/mcp' },
         brainy: { type: 'stdio', command: 'node', args: ['C:\\Repos\\brainy\\server.mjs'] },
       },
-      projects: { 'C:/Repos/acme': { allowedTools: [], mcpServers: { brain: { command: 'node', args: ['C:/Tools/legacy/mcp/brain-mcp.mjs'] } } } },
+      projects: { 'C:/Repos/acme': { allowedTools: [], mcpServers: { brain: { command: 'node', args: ['C:/Tools/tallybook/mcp/tallybook-mcp.mjs'] } } } },
     },
     null,
     2,
@@ -451,50 +451,50 @@ function cutOverProfile(dir: string, claudeJson: string): { settings: string; be
   return { settings, before, mcpBefore };
 }
 
-test('INSTALL --REPLACE IS A DRY RUN THAT NAMES EVERY THE OLD TOOL HOOK AND MCP ENTRY, per profile, and changes nothing', () => {
+test('INSTALL --REPLACE IS A DRY RUN THAT NAMES EVERY TALLYBOOK HOOK AND MCP ENTRY, per profile, and changes nothing', () => {
   const home = folder('home');
   const main = cutOverProfile(join(home, '.claude'), join(home, '.claude.json'));
-  const acme = cutOverProfile(join(home, '.claude-acme'), join(home, '.claude-acme', '.claude.json'));
+  const client = cutOverProfile(join(home, '.claude-client'), join(home, '.claude-client', '.claude.json'));
   const scripts = join(APP, 'hooks');
   const options = { apply: false, replace: REPLACE, scripts, home };
 
-  const lines = [...installInto(join(home, '.claude'), options), ...installInto(join(home, '.claude-acme'), options)];
+  const lines = [...installInto(join(home, '.claude'), options), ...installInto(join(home, '.claude-client'), options)];
   const text = lines.join('\n');
-  for (const file of [main.settings, acme.settings]) {
+  for (const file of [main.settings, client.settings]) {
     assert.ok(text.includes(`braindog install would change ${file}:`), text);
   }
   /* The default profile keeps its servers in the home folder, a named one inside itself: Claude Code's layout. */
-  for (const file of [join(home, '.claude.json'), join(home, '.claude-acme', '.claude.json')]) {
+  for (const file of [join(home, '.claude.json'), join(home, '.claude-client', '.claude.json')]) {
     assert.ok(text.includes(`braindog install --replace would change ${file}:`), text);
   }
   /* A hook is named by its program and a count, as a server is (install-hook-tokens.test.ts), so the script path is not on the line. */
-  assert.equal(lines.filter((l) => l === "  - hooks.SessionStart, the old tool's: powershell [5 arguments hidden]").length, 2, text);
-  assert.equal(lines.filter((l) => l === "  - hooks.SessionEnd, the old tool's: powershell [5 arguments hidden]").length, 2, text);
-  assert.equal(lines.filter((l) => l === "  - mcpServers.brain, the old tool's: node [1 argument hidden]").length, 2, text);
-  assert.equal(lines.filter((l) => l === "  - mcpServers.brain-http, the old tool's: https://brain.example.com/mcp").length, 2, text);
-  assert.equal(lines.filter((l) => l === "  - projects[\"C:/Repos/acme\"].mcpServers.brain, the old tool's: node [1 argument hidden]").length, 2, text);
+  assert.equal(lines.filter((l) => l === "  - hooks.SessionStart, Tallybook's: powershell [5 arguments hidden]").length, 2, text);
+  assert.equal(lines.filter((l) => l === "  - hooks.SessionEnd, Tallybook's: powershell [5 arguments hidden]").length, 2, text);
+  assert.equal(lines.filter((l) => l === "  - mcpServers.brain, Tallybook's: node [1 argument hidden]").length, 2, text);
+  assert.equal(lines.filter((l) => l === "  - mcpServers.brain-http, Tallybook's: https://tallybook.example/mcp").length, 2, text);
+  assert.equal(lines.filter((l) => l === "  - projects[\"C:/Repos/acme\"].mcpServers.brain, Tallybook's: node [1 argument hidden]").length, 2, text);
   assert.ok(!text.includes(OLD_SHIM) && !text.includes(LOOKALIKE) && !text.includes('brainy') && !text.includes('figma'), text);
   assert.ok(!text.includes(HB_SECRET), 'the dry run printed the env of a server it would remove');
   assert.equal(lines.filter((l) => l.startsWith('Nothing was changed. To write it, run this in ') && l.includes(' install --replace ') && l.includes(REPLACE_FILE) && l.includes(' --apply --config-dir ')).length, 2, text);
 
   assert.equal(readFileSync(main.settings, 'utf8'), main.before);
   assert.equal(readFileSync(join(home, '.claude.json'), 'utf8'), main.mcpBefore);
-  assert.deepEqual(readdirSync(home).sort(), ['.claude', '.claude-acme', '.claude.json']);
-  assert.deepEqual(readdirSync(join(home, '.claude-acme')).sort(), ['.claude.json', 'settings.json']);
+  assert.deepEqual(readdirSync(home).sort(), ['.claude', '.claude-client', '.claude.json']);
+  assert.deepEqual(readdirSync(join(home, '.claude-client')).sort(), ['.claude.json', 'settings.json']);
 });
 
 /*
  * WINDOWS PATHS ARE NOT CASE SENSITIVE, AND THE DEFAULT PROFILE NAMED IN ANOTHER CASE WAS MISSED. Measured before
  * the fix: `--config-dir C:\USERS\...\.claude` looked for `.claude.json` inside the folder, found none, and printed
- * "registers no the old tool MCP server. Nothing to change." while the real one in the home folder kept its server.
+ * "registers no Tallybook MCP server. Nothing to change." while the real one in the home folder kept its server.
  */
 test('the default profile is known in any letter case on Windows, so its .claude.json is not silently skipped', { skip: process.platform !== 'win32' }, () => {
   const home = 'C:\\Users\\Someone';
   assert.equal(serversFileOf('c:\\users\\someone\\.CLAUDE', home), join(home, '.claude.json'));
-  assert.equal(serversFileOf('C:\\Users\\Someone\\.claude-acme', home), join('C:\\Users\\Someone\\.claude-acme', '.claude.json'));
+  assert.equal(serversFileOf('C:\\Users\\Someone\\.claude-client', home), join('C:\\Users\\Someone\\.claude-client', '.claude.json'));
 });
 
-test('INSTALL --REPLACE --APPLY copies each file beside itself, removes only the old tool’s entries, adds BrainDog’s hooks, and is not repeated', () => {
+test('INSTALL --REPLACE --APPLY copies each file beside itself, removes only Tallybook’s entries, adds BrainDog’s hooks, and is not repeated', () => {
   const home = folder('home');
   const dir = join(home, '.claude-client');
   const claudeJson = join(dir, '.claude.json');
@@ -513,7 +513,7 @@ test('INSTALL --REPLACE --APPLY copies each file beside itself, removes only the
   type Group = { matcher?: string; hooks: { command: string }[] };
   const now = JSON.parse(readFileSync(settings, 'utf8')) as { model: string; hooks: Record<string, Group[]> };
   assert.equal(now.model, 'opus');
-  /* The group the old tool's hook sat alone in is gone; a group it shared keeps the other hook. */
+  /* The group Tallybook's hook sat alone in is gone; a group it shared keeps the other hook. */
   assert.deepEqual(now.hooks.SessionStart!.map((g) => g.hooks.map((h) => h.command)), [[OLD_SHIM], [start]]);
   assert.equal(now.hooks.SessionStart![0]!.matcher, 'startup');
   assert.deepEqual(now.hooks.SessionEnd!.map((g) => g.hooks.map((h) => h.command)), [[LOOKALIKE], [end]]);
@@ -521,19 +521,19 @@ test('INSTALL --REPLACE --APPLY copies each file beside itself, removes only the
 
   const mcp = JSON.parse(readFileSync(claudeJson, 'utf8')) as { numStartups: number; mcpServers: Record<string, unknown>; projects: Record<string, { allowedTools: unknown[]; mcpServers: Record<string, unknown> }> };
   assert.equal(mcp.numStartups, 41);
-  /* BrainDog's server in where the old tool's came out, once at user scope for the three removed (install-adds-server.test.ts). */
+  /* BrainDog's server in where Tallybook's came out, once at user scope for the three removed (install-adds-server.test.ts). */
   assert.deepEqual(Object.keys(mcp.mcpServers), ['figma', 'brainy', 'braindog']);
   assert.deepEqual(mcp.projects['C:/Repos/acme'], { allowedTools: [], mcpServers: {} });
 
   /* `checkout` a folder in no git tree, so the moving-checkout line, which follows the real tree's state, is not owed. */
   const again = installInto(dir, { apply: true, replace: REPLACE, scripts, home, checkout: home });
   assert.deepEqual(again, [
-    `${settings} already runs both BrainDog hooks and no the old tool hook. Nothing to change.`,
-    `${claudeJson} registers no the old tool MCP server. Nothing to change.`,
+    `${settings} already runs both BrainDog hooks and no Tallybook hook. Nothing to change.`,
+    `${claudeJson} registers no Tallybook MCP server. Nothing to change.`,
   ]);
   assert.deepEqual(readdirSync(dir).sort(), ['.claude.json', '.claude.json.bak', 'settings.json', 'settings.json.bak', 'skills']);
 
-  /* Without --replace, install leaves the old tool's entries where they are, as it always has. */
+  /* Without --replace, install leaves Tallybook's entries where they are, as it always has. */
   const plain = folder('home');
   const kept = cutOverProfile(join(plain, '.claude'), join(plain, '.claude.json'));
   installInto(join(plain, '.claude'), { apply: true, scripts, home: plain });
@@ -545,10 +545,10 @@ test('INSTALL --REPLACE --APPLY copies each file beside itself, removes only the
 /* ── install --replace --mcp-json, the one file the cut-over used to leave ── */
 
 /*
- * `loop/research-switch-matrix.md` "What to build next" item 3. Step 9 of the cut-over records a the old tool server
- * in `C:\Repos\.mcp.json`, a file in no repository, and install never opened a `.mcp.json`, so the cut-over was one
- * sitting plus a hand edit. MEASURED BEFORE `--mcp-json` EXISTED: the flag was refused by the option parse with
- * exit 1, and the same run without it left the file byte for byte as it was and never named it.
+ * AN OLD TOOL'S SERVER CAN SIT IN A `.mcp.json` IN NO REPOSITORY, such as `C:\Repos\.mcp.json`, and install never
+ * opened a `.mcp.json`, so the cut-over was one sitting plus a hand edit. MEASURED BEFORE `--mcp-json` EXISTED: the
+ * flag was refused by the option parse with exit 1, and the same run without it left the file byte for byte as it was
+ * and never named it.
  * Every file here is a scratch copy; no real profile or `.mcp.json` is read.
  */
 function mcpJsonFile(dir: string): { file: string; before: string } {
@@ -557,8 +557,8 @@ function mcpJsonFile(dir: string): { file: string; before: string } {
   const before = `${JSON.stringify(
     {
       mcpServers: {
-        brain: { command: 'node', args: ['C:\\Tools\\legacy\\mcp\\brain-mcp.mjs'], env: { MCP_TOKEN: HB_SECRET } },
-        proxied: { command: 'npx', args: ['-y', 'mcp-remote', 'https://brain.example.com/mcp'] },
+        brain: { command: 'node', args: ['C:\\Tools\\tallybook\\mcp\\tallybook-mcp.mjs'], env: { MCP_TOKEN: HB_SECRET } },
+        proxied: { command: 'npx', args: ['-y', 'mcp-remote', 'https://tallybook.example/mcp'] },
         figma: { type: 'http', url: 'https://mcp.figma.com/mcp' },
         brainy: { command: 'node', args: ['C:\\Repos\\brainy\\server.mjs'] },
       },
@@ -571,7 +571,7 @@ function mcpJsonFile(dir: string): { file: string; before: string } {
   return { file, before };
 }
 
-test('INSTALL --REPLACE --MCP-JSON names the the old tool servers in a .mcp.json outside any repository, is a dry run first, and with --apply copies it and removes only those', async () => {
+test('INSTALL --REPLACE --MCP-JSON names the Tallybook servers in a .mcp.json outside any repository, is a dry run first, and with --apply copies it and removes only those', async () => {
   const outside = folder('repos');
   const { file, before } = mcpJsonFile(outside);
   const profile = folder('profile');
@@ -580,12 +580,11 @@ test('INSTALL --REPLACE --MCP-JSON names the the old tool servers in a .mcp.json
   const dry = await run(['install', '--replace', REPLACE_FILE, '--config-dir', profile, '--mcp-json', file], env, '');
   assert.equal(dry.code, 0, dry.stderr);
   assert.ok(dry.stdout.includes(`braindog install --replace would change ${file}:`), dry.stdout);
-  assert.ok(dry.stdout.includes("  - mcpServers.brain, the old tool's: node [1 argument hidden]"), dry.stdout);
-  assert.ok(dry.stdout.includes("  - mcpServers.proxied, the old tool's: npx [3 arguments hidden]"), dry.stdout);
+  assert.ok(dry.stdout.includes("  - mcpServers.brain, Tallybook's: node [1 argument hidden]"), dry.stdout);
+  assert.ok(dry.stdout.includes("  - mcpServers.proxied, Tallybook's: npx [3 arguments hidden]"), dry.stdout);
   /*
-   * BRAINDOG'S SERVER GOES INTO THE PROFILE, NOT THE .mcp.json (brief 44-B of `loop/research-switch-left.md`). This
-   * once read the whole stdout for the `+` line, and wave forty-four's builder found it passing only because the
-   * profile gained the entry too, so it could not tell which file did. The `.mcp.json`'s own plan is now read on its
+   * BRAINDOG'S SERVER GOES INTO THE PROFILE, NOT THE .mcp.json. This once read the whole stdout for the `+` line,
+   * and it passed only because the profile gained the entry too, so it could not tell which file did. The `.mcp.json`'s own plan is now read on its
    * own, from its heading to the sentence that ends it.
    */
   const lines = dry.stdout.split('\n');
@@ -618,7 +617,7 @@ test('INSTALL --REPLACE --MCP-JSON names the the old tool servers in a .mcp.json
   assert.ok(existsSync(join(profile, 'settings.json')));
 
   const again = await run(['install', '--replace', REPLACE_FILE, '--apply', '--config-dir', profile, '--mcp-json', file], env, '');
-  assert.ok(again.stdout.includes(`${file} registers no the old tool MCP server. Nothing to change.`), again.stdout);
+  assert.ok(again.stdout.includes(`${file} registers no Tallybook MCP server. Nothing to change.`), again.stdout);
   assert.deepEqual(readdirSync(outside).sort(), ['.mcp.json', '.mcp.json.bak']);
 });
 
@@ -649,12 +648,12 @@ test('INSTALL --MCP-JSON IS REFUSED inside a git working tree, without --replace
 });
 
 /*
- * BATCH TWENTY-SEVEN'S TWO FINDINGS ON WHAT A SERVER IS AND WHAT IS SHOWN OF IT. Measured before the fix:
- * `--url=https://brain.example.com/mcp` as one word was not known as the old tool's, so the entry was kept and not named,
+ * WHAT A SERVER IS, AND WHAT IS SHOWN OF IT. Measured before the fix:
+ * `--url=https://tallybook.example/mcp` as one word was not known as Tallybook's, so the entry was kept and not named,
  * and `-t shortpw` printed `shortpw`, which is too short to look like a token and follows a flag too short to say
  * it takes one.
  */
-test('a the old tool URL joined to its flag with = is known, and a short secret after a one-letter flag is not printed', () => {
+test('a Tallybook URL joined to its flag with = is known, and a short secret after a one-letter flag is not printed', () => {
   const home = folder('home');
   const dir = join(home, '.claude-joined');
   mkdirSync(dir, { recursive: true });
@@ -663,17 +662,17 @@ test('a the old tool URL joined to its flag with = is known, and a short secret 
     claudeJson,
     JSON.stringify({
       mcpServers: {
-        joined: { command: 'npx', args: ['-y', 'mcp-remote', '--url=https://brain.example.com/mcp'] },
-        'joined-query': { command: 'npx', args: ['-y', 'mcp-remote', '--url=https://brain.example.com/mcp?t=qpw12'] },
-        'short-flag': { command: 'node', args: ['C:\\Tools\\legacy\\mcp\\brain-mcp.mjs', '-t', 'shortpw', '-v', '--quiet'] },
-        near: { command: 'npx', args: ['-y', 'mcp-remote', '--url=https://notbrain.example.com.example.com/mcp'] },
+        joined: { command: 'npx', args: ['-y', 'mcp-remote', '--url=https://tallybook.example/mcp'] },
+        'joined-query': { command: 'npx', args: ['-y', 'mcp-remote', '--url=https://tallybook.example/mcp?t=qpw12'] },
+        'short-flag': { command: 'node', args: ['C:\\Tools\\tallybook\\mcp\\tallybook-mcp.mjs', '-t', 'shortpw', '-v', '--quiet'] },
+        near: { command: 'npx', args: ['-y', 'mcp-remote', '--url=https://nottallybook.example.example.com/mcp'] },
       },
     }),
   );
   const text = installInto(dir, { apply: false, replace: REPLACE, scripts: join(APP, 'hooks'), home }).join('\n');
-  assert.ok(text.includes("  - mcpServers.joined, the old tool's: npx [3 arguments hidden]"), text);
-  assert.ok(text.includes("  - mcpServers.joined-query, the old tool's: npx [3 arguments hidden]"), text);
-  assert.ok(text.includes("  - mcpServers.short-flag, the old tool's: node [5 arguments hidden]"), text);
+  assert.ok(text.includes("  - mcpServers.joined, Tallybook's: npx [3 arguments hidden]"), text);
+  assert.ok(text.includes("  - mcpServers.joined-query, Tallybook's: npx [3 arguments hidden]"), text);
+  assert.ok(text.includes("  - mcpServers.short-flag, Tallybook's: node [5 arguments hidden]"), text);
   assert.ok(!text.includes('shortpw') && !text.includes('qpw12'), text);
   assert.ok(!text.includes('mcpServers.near'), text);
 });

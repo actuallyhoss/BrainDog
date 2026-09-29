@@ -1,11 +1,11 @@
 /**
- * Tier `b`, the owner's own key, held to the three rules `loop/research-batch-thirty-one-audit.md` §1, §3 and §5 found
+ * Tier `b`, the owner's own key, held to three rules (§1, §3 and §5 below) that were found
  * broken in `bd8add33`, each over a real self-host socket with the self-host's real key store.
  *
  * WHY A SELF-HOST AND NOT A DOOR OVER A HAND-WRITTEN ENGINE. All three faults sat in the join between this package and the
  * app: `slashByokOf` was handed a grant id and an opener that signed every read `system`, the package's meter looked at
  * tier `a` alone, and `configure` checked a grant id's shape and never the vault. `test/slash.test.ts` drives each builder
- * by hand and stayed green through all three, so the measurement has to be the one the audit made, end to end: a key put
+ * by hand and stayed green through all three, so the measurement has to be made end to end: a key put
  * in through `/api/keys/put`, sealed under `openKeyStore`, opened by `keyOpener`, sent by the endpoint double below.
  *
  * THE SESSIONS ARE PLANTED IN THE DIRECTORY, as `apps/selfhost/test/slash-routes.test.ts` plants them, because the case
@@ -231,7 +231,7 @@ test('§1: THE OWNER WITH A STALE PROOF IS SENT BACK TO THE VAULT TOO, since the
   }
 });
 
-/* BOTH PASSES ON HER KEY SINCE `loop/finish/agents.md` AGT-21: the draft went to this host's key before, and now the one
+/* BOTH PASSES ON HER KEY: the draft went to this host's key before, and now the one
    adapter the door opens is handed to both, so there are two openings and both are hers. */
 test("§1: THE OWNER'S OWN FRESH PROPOSE GOES OUT ON HER KEY, both passes, and each grant.read is signed by her and not by system", async () => {
   const s = await stack();
@@ -285,7 +285,7 @@ test('§1: BACK ON TIER a, THE GRANT LEFT IN SETTINGS OPENS NO GATE, so a read c
   }
 });
 
-/* ON HER OWN KEY THE MONTHLY LIMIT STOPS NOTHING (`loop/finish/agents.md` §5 item 7). Before her key carried both passes,
+/* ON HER OWN KEY THE MONTHLY LIMIT STOPS NOTHING. Before her key carried both passes,
    the draft was on this host's key and this case was five reads refused past a cap of one; now every call is on her key
    and her bill, so each is listed in status and none is refused, and the operator's key is never used. */
 test('§3: ON HER OWN KEY AT ask_cap 1, EVERY READ IS ANSWERED ON HER KEY, listed in status and never capped', async () => {

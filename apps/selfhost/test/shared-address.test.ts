@@ -60,7 +60,7 @@ test('A USE CASE SHARED ON ONE HOST INSTALLS ON ANOTHER FROM AN ADDRESS, IN THE 
   t.after(() => a.close());
   const student = value<Planned>(await a.client.planUseCase({ doc: builtInFile('student') }));
   await installPlan(a.client, student);
-  /* A BUILT-IN CARRIES NO EXAMPLE ROW SINCE STUDENT 1.3.0 (`loop/finish/modules.md` MOD-17, C11): a student's record
+  /* A BUILT-IN CARRIES NO EXAMPLE ROW SINCE STUDENT 1.3.0: a student's record
      holds only what the student wrote, so installing the file links nothing yet. */
   assert.equal(await linkExamples(io(a.client), 'student'), 0);
 
@@ -94,7 +94,7 @@ test('A USE CASE SHARED ON ONE HOST INSTALLS ON ANOTHER FROM AN ADDRESS, IN THE 
   assert.equal(read.text, text);
   const plan = value<Planned>(await b.client.planUseCase({ text: read.text, source: { kind: 'url', ref: 'https://files.example.org/student.usecase.json' } }));
   await installPlan(b.client, plan);
-  /* 'student' NAMES NO LINK OF ITS OWN (C11 stripped it with the example course), so B links by the file's OWN
+  /* 'student' NAMES NO LINK OF ITS OWN (it went with the example course), so B links by the file's OWN
      declared links, the way a use case shared under an id this build has never heard of still would. */
   const declaredLinks = (exported.doc.links ?? []) as readonly ExampleLink[];
   assert.ok((await linkExamples(io(b.client), 'student', { links: declaredLinks })) > 0, 'no example was linked on B');

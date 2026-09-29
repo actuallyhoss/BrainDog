@@ -1,12 +1,12 @@
 /**
  * `braindog mcp` on a machine with no login: the server starts, and every call says how to sign in.
  *
- * MEASURED BEFORE THIS, with Claude Code 2.1.280 (`loop/research-cutover-day.md` §6 and §7 item 4): with no host set,
+ * MEASURED BEFORE THIS, with Claude Code 2.1.280: with no host set,
  * or a login past its expiry, `target` threw before the server started, the process exited 1 before `initialize`, and
  * `/mcp` showed `braindog failed`. The model then had no BrainDog tool at all and nothing to tell the person, and a
  * session open since before the lapse was not helped by the start hook's one line either. So the server now answers
  * the handshake and refuses each call, as `UNREACHABLE` already does for a host that is down, with the command that
- * signs this machine in written out whole: `braindog` is not on his PATH, and he runs `node apps\cli\src\main.ts`.
+ * signs this machine in written out whole: `braindog` may be on no PATH, and a checkout runs `node apps\cli\src\main.ts`.
  *
  * NO REAL PROFILE AND NO REAL HOSTS FILE IS READ: the config folder is a scratch one, and every `BRAINDOG_` variable
  * of the machine running the test is taken out.

@@ -1,7 +1,7 @@
 /**
  * What answers the record's model jobs on this Worker: `serveModelJobs`'s `deps.inference`, over Slash's own engine.
  *
- * TWO JOBS, AND BOTH ARE SLASH'S (`loop/finish/contracts.md` X8). An `infer.draft` is a pattern for messages nothing
+ * TWO JOBS, AND BOTH ARE SLASH'S. An `infer.draft` is a pattern for messages nothing
  * parsed, drafted by `draftPattern`; an `infer.prose` is the two sentences above a digest, written by `digestProse`. The
  * pass that leases them, meters them on the background allowance and acks them is `@braindog/host/model-jobs`, and the
  * alarm calls it; this file is only the engine it is handed.
@@ -43,7 +43,7 @@ export function workerModelJobs(env: SlashEnv, api: () => RecordApi, deps: Slash
   return {
     draft: async (samples) => (await engine()).draftPattern(samples),
     prose: async (digest) => (await engine()).digestProse(digest),
-    /* WORKERS AI, NOT THE SLASH ENGINE ABOVE (PLT-11, PLT-18): `embed` is `aiInference`'s own, over the `AI` binding
+    /* WORKERS AI, NOT THE SLASH ENGINE ABOVE: `embed` is `aiInference`'s own, over the `AI` binding
        this Worker holds platform-wide, so it is offered whenever that binding exists and never gated on a record's
        own Slash setup. Absent, `infer.embed` is never leased (`@braindog/host/model-jobs`'s `ModelJobEmbed`). */
     embed: env.AI ? async (texts: readonly string[]) => aiInference(env).embed(texts) : undefined,

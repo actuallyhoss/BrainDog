@@ -1,12 +1,11 @@
 /**
- * The included model on the Worker: Workers AI through `aiInference`, as Slash's model when no endpoint is configured
- * (`loop/research-living-in-it.md` section 7, W56-2).
+ * The included model on the Worker: Workers AI through `aiInference`, as Slash's model when no endpoint is configured.
  *
  * WHAT WAS THERE BEFORE THIS FILE. `src/inference.ts` passed its own 17 tests and nothing imported it, so with `AI` bound
- * and `SLASH_ENDPOINT` empty the survey's probe answered `"no model"`: `/api/version` said `slash: false` on the Cloud and
+ * and `SLASH_ENDPOINT` empty a probe answered `"no model"`: `/api/version` said `slash: false` on the Cloud and
  * the palette drew no Slash row, while the binding sat declared in both environments.
  *
- * DARK UNTIL HE SAYS SO, AND THE BINDING IS NOT THE SWITCH. The brief was written as though `ai` were still to be bound,
+ * DARK UNTIL HE SAYS SO, AND THE BINDING IS NOT THE SWITCH. It is easy to read `ai` as still to be bound,
  * and it is not: `wrangler.jsonc` binds `AI` in alpha and in production, and `deploy.yml` deploys production on every green
  * `ci` on `master`. Keyed on the binding alone, the commit carrying this file would have started spending his account's
  * Workers AI at its first deploy. So the included model needs `SLASH_INCLUDED` set to `yes` as well, a var no environment
@@ -46,7 +45,7 @@ const fakeAi = (answers: string[]) => {
   };
 };
 
-/** The production environment's Slash vars as `wrangler.jsonc` declared them until 24 September, when he switched the
+/** The production environment's Slash vars as `wrangler.jsonc` declared them until he switched the
     included model on (`SLASH_INCLUDED: yes` in both environments), over a fake binding. */
 const shipped = (ai: ReturnType<typeof fakeAi>) => ({ AI: ai.AI, AI_GATEWAY: 'braindog' });
 /** And the same with the included model switched on. */
@@ -70,7 +69,7 @@ test('DARK AS SHIPPED: AI bound and SLASH_INCLUDED unset is no model, no engine,
 test('SWITCHED ON WITH NO ENDPOINT, the record has a model named included, and one draft is one run on glm-5.3-flash', async () => {
   const ai = fakeAi(['{"drafts":[]}', '{"plan":{}}']);
   const model = workerSlashModel(switchedOn(ai), noGrants);
-  /* RED AT HEAD: `undefined`, the survey's `"no model"`. */
+  /* RED BEFORE THIS: `undefined`, the probe's `"no model"`. */
   assert.equal(model?.name, 'included');
 
   assert.deepEqual(await model.draft({ usage: {} } as never), { drafts: [] });
@@ -158,7 +157,7 @@ test('A KEY THAT WILL NOT OPEN SENDS NOTHING, and the included model is not aske
     open: () => async () => null,
   });
   await assert.rejects(model!.draft({ usage: {} } as never), /would not open/u);
-  assert.deepEqual(sent, [], 'a call went out with no key (`loop/finish/defects.md` S2)');
+  assert.deepEqual(sent, [], 'a call went out with no key');
   assert.equal(ai.runs.length, 0);
   store.close();
 });
@@ -254,7 +253,7 @@ test('A BAD ANSWER IS BILLED AND ENDS THE RUN: prose from the included model is 
   own.close();
 });
 
-/* AN AUTOMATION'S QUESTION GOES TO HIS KEY TOO (`loop/finish/agents.md` AGT-21, "the answer path"), signed by the rule, and
+/* AN AUTOMATION'S QUESTION GOES TO HIS KEY TOO, signed by the rule, and
    neither the included model nor the operator's ceiling is in it. The record's vault is his, seen through a view whose
    `grants` holds the one key he picked, because this suite seals no key. */
 test("ON HIS OWN KEY AN AUTOMATION'S QUESTION IS ANSWERED THERE: one POST with his key, no run of the included model", async () => {

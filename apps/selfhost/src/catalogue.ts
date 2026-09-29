@@ -1,9 +1,9 @@
 /**
  * A catalogue of shared use cases and add-ons served from a folder, read-only: `/app/catalogue/index.json` and each version's
- * file at `/app/catalogue/usecases/<id>/<version>.usecase.json` or `/app/catalogue/packs/<id>/<version>.pack.json` (`@braindog/declare/catalogue`, `loop/research-marketplace.md` §2).
+ * file at `/app/catalogue/usecases/<id>/<version>.usecase.json` or `/app/catalogue/packs/<id>/<version>.pack.json` (`@braindog/declare/catalogue`).
  *
- * UNDER THE APP'S BASE, BECAUSE THAT IS WHERE THE APP ASKS. `apps/web` fetches `${BASE}/catalogue/` (`routes/packs/browse/catalogue.ts`,
- * `loop/research-one-domain.md` §2.2), and while this answered `/catalogue/` alone the request fell through to the shell,
+ * UNDER THE APP'S BASE, BECAUSE THAT IS WHERE THE APP ASKS. `apps/web` fetches `${BASE}/catalogue/` (`routes/packs/browse/catalogue.ts`),
+ * and while this answered `/catalogue/` alone the request fell through to the shell,
  * which served the bundled folder's files as static files, `notes.txt` and all, and the operator's named folder not at all.
  * The old address is not answered here: the shell sends a navigation to it on to `/app/catalogue/`.
  *

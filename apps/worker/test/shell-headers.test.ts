@@ -1,8 +1,7 @@
 /**
- * Every page of the app says it may not be framed, may not be sniffed, and sends no referrer off the site
- * (`loop/research-push-a-live.md` finding 1).
+ * Every page of the app says it may not be framed, may not be sniffed, and sends no referrer off the site.
  *
- * MEASURED ON PRODUCTION AT 01:08 ON 23 SEPTEMBER: NOT ONE OF THEM ON ANY ANSWER. `/app/`, `/app/signin`, `/app/acme/`
+ * MEASURED ON PRODUCTION BEFORE THIS: NOT ONE OF THEM ON ANY ANSWER. `/app/`, `/app/signin`, `/app/acme/`
  * and every other page of `app.brain.dog` came back with a `Cache-Control` and a content type and nothing that says who
  * may frame it. The four headers here are the ones that are safe to ship without touching the build: a full
  * `script-src` needs the shell's two inline scripts hashed through `kit.csp`, and HSTS is a zone setting that browsers
@@ -90,7 +89,7 @@ test('THE SHELL AND THE SIGN-IN PAGE CARRY ALL FOUR, and so does a page under a 
   assert.equal(font.status, 200);
   assert.equal(font.headers.get('content-type'), 'font/woff2');
   assert.deepEqual([...new Uint8Array(await font.arrayBuffer())], [119, 79, 70, 50]);
-  /* A FILE BESIDE THE PAGES GETS THE STRICT POLICY (OPS-22): nothing inline runs in a font, a script or an image. */
+  /* A FILE BESIDE THE PAGES GETS THE STRICT POLICY: nothing inline runs in a font, a script or an image. */
   assert.deepEqual(pageHeaders(font), { ...PAGE, 'content-security-policy': FILE_POLICY });
   /* A HEAD IS ANSWERED WITH THE SAME HEADERS AND NO BODY. */
   const head = await ask('/app/signin', { method: 'HEAD' });
@@ -109,11 +108,11 @@ test('/api, /mcp AND /in/* CARRY NONE OF THE FRAMING HEADERS, because nothing th
     const out = await ask(path, init);
     answers.push(`${path} ${out.status} ${out.headers.get('x-frame-options')} ${out.headers.get('content-security-policy')} ${out.headers.get('referrer-policy')}`);
   }
-  /* THE STATUSES ARE PRODUCTION'S OWN (§2, P8, P10 and P11), so a pass is the real door answering and not a crash. */
+  /* THE STATUSES ARE PRODUCTION'S OWN, so a pass is the real door answering and not a crash. */
   assert.deepEqual(answers, ['/api/boot 401 null null null', '/mcp 405 null null null', '/in/anything 404 null null null']);
 });
 
-/* FINDING 3 OF THE SAME DOCUMENT, THROUGH `route()`. Measured on production: `/app/Acme/api/boot`,
+/* A MISTYPED SLUG, THROUGH `route()`. Measured on production: `/app/Acme/api/boot`,
    `/app/admin/api/boot` and `/app/www/api/boot` were `200 text/html`, the 8074-byte shell, so a JSON client with a
    mistyped slug read a page as success. `app-path.test.ts` holds the rule; this holds what the Worker answers with it. */
 test('AN API PATH UNDER A WORD THAT IS NOT A NAME IS THE ROUTER’S 404 JSON, and a page whose second segment is `api` is still a page', async () => {
@@ -136,7 +135,7 @@ test('AN API PATH UNDER A WORD THAT IS NOT A NAME IS THE ROUTER’S 404 JSON, an
   assert.deepEqual(asked, [], 'the Directory was asked about a path that names no record');
 });
 
-/* OPS-22. THE HEADER IS THE PAGE'S OWN META POLICY, so the hashes in it are the build's own: a header `script-src`
+/* THE HEADER IS THE PAGE'S OWN META POLICY, so the hashes in it are the build's own: a header `script-src`
    that lacked them would refuse the shell's inline scripts and draw an empty screen (`apps/site/test/one-origin.test.mjs`
    measured exactly that on the site). Turnstile stays on `/app/signup` alone. */
 test('A PAGE IS SENT THE POLICY IN ITS OWN META WITH FRAME-ANCESTORS, AND TURNSTILE ONLY ON /app/signup', async () => {

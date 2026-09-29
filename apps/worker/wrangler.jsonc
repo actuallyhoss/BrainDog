@@ -28,13 +28,10 @@
   /* ===========================================================================================
      THE MOVE TO ONE DOMAIN: THIS FILE IS PUSH B2. Both environments have flipped: the app lives on
      the name its site holds, under `/app`, and the names it lived on before are legacy hosts.
-     `loop/research-push-a-checks.md` section 3 is the runbook for A,
-     `loop/research-one-domain-binding.md` section 4 the runbook for the pushes after it,
-     `loop/research-push-2.md` push 2's own and `loop/research-push-4.md` this push's, with its
-     checks and its rollback order; this block is the part of them that is config, kept here so it is
-     parsed and tested rather than remembered. `pushes()` reads the file's own name from the first
-     sentence of this paragraph and any `STAGE` fragment from below, and the tests beside it hold
-     each.
+     Each push has a runbook with its checks and its rollback order; this block is the part of them
+     that is config, kept here so it is parsed and tested rather than remembered. `pushes()` reads
+     the file's own name from the first sentence of this paragraph and any `STAGE` fragment from
+     below, and the tests beside it hold each.
 
      PUSH B2, PRODUCTION HERE: `PUBLIC_HOST` is `brain.dog` and `LEGACY_HOSTS` is `app.brain.dog`, and
      no route changed. `brain.dog` is the site's Custom Domain and reaches this Worker only through
@@ -44,17 +41,16 @@
      against the real site, or against push 1's site, if it does not: until production's site binds
      this Worker, `brain.dog/app/` is the site's 404 page. The repository variable `DEPLOY_HOST` has
      to be `brain.dog` before this push deploys, so the Parity step asks the name the app lives on.
-     The binding survey measured these vars through `wrangler dev -c site -c app` on 23 September
-     (its section 2.4): sign-in on `brain.dog`, 403 at `origin` from `app.brain.dog`, both passkey
-     ceremonies under `brain.dog`, and a device start on the old name refused.
+     These vars were measured through `wrangler dev -c site -c app`: sign-in on `brain.dog`, 403
+     at `origin` from `app.brain.dog`, both passkey ceremonies under `brain.dog`, and a device
+     start on the old name refused.
 
      PUSH B1, ALPHA HERE: `PUBLIC_HOST` is `alpha.brain.dog` and `LEGACY_HOSTS` is
      `app.alpha.brain.dog`, and no route changed. The new name is the alpha site's Custom Domain and
      reaches this Worker only through that site's binding (push 1), so B1 is live the moment this
      Worker deploys, with no site deploy, and is broken for everyone if push 1's site is not.
-     Measured through `wrangler dev -c site -c app` on a clone of push 2 on 23 September
-     (`loop/research-push-2.md` section 2): a claim redeemed with `Origin: https://alpha.brain.dog`
-     set `__Host-bd_s`, the same redeem and a cookie write from `app.alpha.brain.dog` were 403 at
+     Measured through `wrangler dev -c site -c app` on a clone of push 2: a claim redeemed with
+     `Origin: https://alpha.brain.dog` set `__Host-bd_s`, the same redeem and a cookie write from `app.alpha.brain.dog` were 403 at
      `origin`, both passkey ceremonies named `alpha.brain.dog`, a device start on the new name
      answered `verification_uri` `https://alpha.brain.dog/app/acme/settings/agents` and on the old one
      403, and every page load on the old name was a 308 to `https://alpha.brain.dog/app/...` while
@@ -64,8 +60,7 @@
      CHANGES FOR IT. The site keeps `brain.dog` (and `alpha.brain.dog`) as its Custom Domain, runs its
      script first on this Worker's doors (its `assets.run_worker_first`) and hands each of those
      requests to this Worker through `services: APP` (`apps/site/wrangler.jsonc`). Measured through
-     `wrangler dev -c site -c app` on 23 September (the research, section 2): every door answered
-     with this Worker's own answer, `Host`, `Origin`, `Cookie` and `cf-connecting-ip` arrived as
+     `wrangler dev -c site -c app`: every door answered with this Worker's own answer, `Host`, `Origin`, `Cookie` and `cf-connecting-ip` arrived as
      sent, and `POST /auth/device` on `brain.dog` passed the `PUBLIC_HOST` check, so this Worker
      cannot tell it is behind the binding. Two reasons it replaced the zone routes that were drafted
      here. NO ROUTE IS WRITTEN, so the deploy token needs no Zone > Workers Routes > Edit on
@@ -109,7 +104,7 @@
      makes every cookie-authenticated mutation require `Origin === "https://" + PUBLIC_HOST`, so a
      second origin is either a surface where nothing can be written (confusing) or, if anyone ever
      "fixes" it by relaxing the check, a CSRF hole with a stable public hostname (12 §8). It is
-     also the reason there are no per-pull-request preview deployments — see REPORT.md §4. */
+     also the reason there are no per-pull-request preview deployments. */
   "workers_dev": false,
   "preview_urls": false,
 
@@ -137,15 +132,14 @@
      has it and `braindog verify` reads `/.well-known/braindog-key` offline (03 §4); the SPA shell
      answering there would break verification of every backup.
 
-     THE APP IS UNDER `/app` NOW, AND THE WORKER RUNS FIRST THERE (`loop/research-one-domain.md`
-     section 2.2). The app shares `brain.dog` with the marketing site, and `/app/<slug>/...` names the
+     THE APP IS UNDER `/app` NOW, AND THE WORKER RUNS FIRST THERE. The app shares `brain.dog` with the marketing site, and `/app/<slug>/...` names the
      record in the path, which the Worker has to check against the Directory before any id is used, so
      no file lookup may answer an app navigation before the Worker has seen it. Two negatives take
      precedence over `/app/*` ("Negative patterns have precedence over non-negative patterns",
      developers.cloudflare.com/workers/static-assets/binding): `_app` is the build's hashed chunks,
      and `catalogue` is the bundled catalogue, which `test/bundled-catalogue.test.ts` holds to being
-     answered by the file and never by the Worker. Brief B of that design builds the app under `app/`
-     inside `directory`, so the path and the folder agree and `directory` itself does not move.
+     answered by the file and never by the Worker. The app is built under `app/` inside
+     `directory`, so the path and the folder agree and `directory` itself does not move.
 
      `not_found_handling` IS `none`, AND IT WAS `single-page-application`. That fallback answered
      every miss with `index.html` and a 200, which on one shared hostname would draw the app shell
@@ -202,7 +196,7 @@
         valid against an empty script — which is a live constraint on `renamed_classes`, whose
         `from` class will not exist there. Create alpha BEFORE the first rename lands and the
         problem never arises, because both scripts then walk the same rungs in the same order.
-        (Whether a rename of an absent class is a no-op or an error is a *verify* — REPORT.md §8.)
+        (Whether a rename of an absent class is a no-op or an error is still to be verified.)
 
      5. NEVER `deleted_classes`. 12 §8 and 53 §3 both state it as a rule rather than a preference:
         it deletes every object of that class and the data in them, and there is no undo. A class
@@ -220,7 +214,7 @@
      would shadow it. 51 §4.6 writes `Record`, `Slash`, `Directory`. A config naming a class the
      script does not export does not deploy, so this file follows the code and 51 §4.6 is the thing
      to amend. THIS IS FREE TO DECIDE EXACTLY ONCE — before the first production deploy. Afterwards
-     the two names cost a `renamed_classes` tag (see REPORT.md §8, risk R2).
+     the two names cost a `renamed_classes` tag.
 
      `Slash$` IS NOT HERE BECAUSE THE CLASS IS NOT WRITTEN. 33 §7 lists three classes; the code has
      two. Its rung is drafted below so the shape is settled before it is needed. */
@@ -251,7 +245,7 @@
      `wrangler r2 bucket create braindog-blobs-alpha`, once each, on the account. */
   "triggers": { "crons": ["17 3 * * *"] },
 
-  /* INBOUND MAIL (DOR-7) NEEDS NO LINE IN THIS FILE, AND THIS NOTE IS WHERE THE STEP THAT DOES LIVES. `src/index.ts`
+  /* INBOUND MAIL NEEDS NO LINE IN THIS FILE, AND THIS NOTE IS WHERE THE STEP THAT DOES LIVES. `src/index.ts`
      exports `email()`, which hands each message to the same door as `POST /in/email/<token>` (`src/email.ts`), and an
      Email Routing rule is what sends a domain's mail to it. That rule is his DNS step, per environment, and nothing
      reaches `email()` before it: turn on Email Routing for a receiving subdomain (the MX records Cloudflare adds), then
@@ -298,8 +292,8 @@
 
          THIS BLOCK CAN GO LIVE WITHOUT `deploy.yml`. Alpha deploys from `deploy.yml` only when
          `DEPLOY_ALPHA` is set, but the Workers Builds connection `braindog-alpha` deploys it about
-         ninety seconds after every push to master, before `ci` has passed and with no smoke after it
-         (`loop/research-push-a-checks.md` finding 5, the cut-over's O4). So B1 is on alpha whether or
+         ninety seconds after every push to master, before `ci` has passed and with no smoke after it.
+         So B1 is on alpha whether or
          not the alpha site was ever deployed with its binding, and push 2 is made only after push 1's
          checks passed on the live `alpha.brain.dog`. It asks for no new permission either way.
 
@@ -353,7 +347,7 @@
          `deploy.yml`. It is here so the key exists, so `wrangler types` emits it, and so the
          failure when the workflow forgets it is `""` — which `deploy-parity` catches (52 §13 #17)
          — rather than an undefined binding. It is a var 51 §4.1's `Env` does not list; adding it
-         is an amendment, and REPORT.md §8 names why `/api/version` cannot answer without it. */
+         is an amendment, and `/api/version` cannot answer without it. */
       "vars": {
         "PUBLIC_HOST": "alpha.brain.dog",
         /* THE OLD NAME, A CUSTOM DOMAIN IN `routes` ABOVE, or nothing reaches the Worker to redirect. A page
@@ -367,14 +361,14 @@
         "AI_GATEWAY": "braindog-alpha",
         "AGE_RECIPIENT": "age1f6rykmshc4zf5y3lf0ecuyzyqr8a4ek29wlmp688gydyxckwjq3s75n58r",
         "SLASH_ENDPOINT": "",
-        /* THE INCLUDED MODEL IS ON, AT HIS WORD ("turn on spark yeah", 24 September). `apps/worker/src/slash.ts` answers
+        /* THE INCLUDED MODEL IS ON, AT THE OWNER'S WORD. `apps/worker/src/slash.ts` answers
            with Workers AI only when this is `yes`; the binding alone never switched it on. One call may spend about 2,500
            neurons (about $0.03) before it is stopped, and one record's asks at most the ceiling below in a month. */
         "SLASH_INCLUDED": "yes",
         /* THE OPERATOR'S CEILING ON ONE RECORD'S ASKS OF Slash, IN NEURONS A UTC MONTH: 300,000 is about $3.30 at $0.011 a
-           thousand (`loop/finish/decisions.md` C19, down from 900,000 and about $9.90). The 80 asks a month a record is
+           thousand (down from 900,000 and about $9.90). The 80 asks a month a record is
            shown fit well inside it. It was the record owner's `ask_cap` alone, with no upper limit, and an owner saved a
-           billion (`loop/research-batch-sixty-audit.md` finding 1); `ask_cap` can now only lower this. It is per record
+           billion; `ask_cap` can now only lower this. It is per record
            and not per account. `INCLUDED_MONTH_NEURONS` in `apps/worker/src/slash.ts` is what an unset or mistyped
            value falls back to; `0` turns every ask away. */
         "SLASH_INCLUDED_MONTH_NEURONS": "300000",
@@ -382,9 +376,9 @@
         /* EMPTY IS NO SIGN-IN LINKS. The sender, on a domain Email Service sends for, switches them on
            with the `EMAIL` binding below (51 §5.8). */
         "AUTH_MAIL_FROM": "hello@brain.dog",
-        /* EMPTY FALLS BACK TO AUTH_MAIL_FROM: mail.ts reads it for everything but a sign-in link (OPS-28). */
+        /* EMPTY FALLS BACK TO AUTH_MAIL_FROM: mail.ts reads it for everything but a sign-in link. */
         "MAIL_FROM": "",
-        /* EMPTY FALLS BACK TO THE GENERIC FOOTER: mail.ts reads it for the address a reader is told to write to (OPS-28). */
+        /* EMPTY FALLS BACK TO THE GENERIC FOOTER: mail.ts reads it for the address a reader is told to write to. */
         "SUPPORT_ADDRESS": "support@brain.dog",
         /* AND THE ONE WORD THAT LETS A KEYLESS RECORD BE MADE ON PURPOSE. Empty is the default and
            the default is a refusal: with no `KEK` bound, `/auth/provision` answers
@@ -396,11 +390,11 @@
         /* WEB PUSH'S PUBLIC KEY, AND EMPTY IS NO PUSH. It is a var and not a secret because the app hands it to every
            browser that subscribes. The private half is the secret `VAPID_PRIVATE` (the note at the end of this file),
            and `notify.push` is leased only when both are set (`delivers` in `src/deliver.ts`), so one without the
-           other leaves pushes `pending`, as they have always been. Generated on 24 September at his word ("you set up
-           VAPID keys"), one pair per environment; the private half lives only in the Worker secret and in his secrets
+           other leaves pushes `pending`, as they have always been. Generated at the owner's word,
+           one pair per environment; the private half lives only in the Worker secret and in his secrets
            folder, never in this repository. */
         "VAPID_PUBLIC": "BOG2T44cb4AumYSqEj5lD1-MyUYp3nD4iABd3Z5oEe_CoivSr_c6dyRmu02G_bAwlhnp6ZPJW5_wmZlNkJJclS0",
-        /* BILLING IS OFF, AND THIS IS ITS SWITCH (`loop/finish/ops.md` §4.0 E, `src/billing.ts`). Empty is off: the
+        /* BILLING IS OFF, AND THIS IS ITS SWITCH (`src/billing.ts`). Empty is off: the
            billing list says `open: false`, every other billing door answers `NOT_IN_THIS_BUILD` naming this setting,
            and the sign-up page asks nothing. `test` or `live` is on, and must agree with the prefix of the
            `STRIPE_SECRET_KEY` secret (`sk_test_` or `sk_live_`) or every billing door refuses, naming both. */
@@ -410,10 +404,10 @@
            `apps/site/src/lib/plans.ts`. What a card is charged is whatever the Stripe price says. */
         "STRIPE_PRICE_HOSTED": "price_1UKiDwPop5yzbTmmSBwLkuFa",
         "STRIPE_PRICE_PLUS": "price_1UKiEhPop5yzbTmmOMMwOGJP",
-        /* THE SIGN-UP PAGE'S TURNSTILE WIDGET (OPS-17). Empty, and sign-up runs on the Directory's lockouts alone; the
+        /* THE SIGN-UP PAGE'S TURNSTILE WIDGET. Empty, and sign-up runs on the Directory's lockouts alone; the
            secret half is `TURNSTILE_SECRET`, named at the end of this file. */
         "TURNSTILE_SITE_KEY": "",
-        /* THE OPERATOR'S CANARY RECORD, a `rec_...` id (OPS-15). Empty, and the nightly walk writes its summary nowhere. */
+        /* THE OPERATOR'S CANARY RECORD, a `rec_...` id. Empty, and the nightly walk writes its summary nowhere. */
         "OPS_RECORD": ""
       },
 
@@ -473,7 +467,7 @@
          `inference.ts` is what keeps the payloads out of the log (11 §3). */
       "ai": { "binding": "AI" },
 
-      /* THE SANDBOX A PERSON'S SCRIPT RUNS IN (`src/script.ts`, `loop/research-shell-scripts.md` section 3). Dynamic
+      /* THE SANDBOX A PERSON'S SCRIPT RUNS IN (`src/script.ts`). Dynamic
          Workers exist on Workers Paid only, and there is no account resource to create first: like `ai`, the binding
          resolves on any paid account.
 
@@ -481,7 +475,7 @@
          level environment, and so must be specified in every named environment." So it is written out again in
          `production` below.
 
-         NO `enable_ctx_exports` IN `compatibility_flags`, although the research brief asked for one. `script.ts` needs
+         NO `enable_ctx_exports` IN `compatibility_flags`, although the design first asked for one. `script.ts` needs
          `ctx.exports`, and at this file's `compatibility_date` it is already on: workerd 1.20260903.1, handed the flag,
          answered "The compatibility flag enable_ctx_exports became the default as of 2025-11-17 so does not need to be
          specified anymore". The array stays empty, and a flag that is already the default is not a diff worth having. */
@@ -494,8 +488,8 @@
          beside each. Names carry the environment for the same reason the queue does — every one of
          these namespaces is account-global.
 
-         `analytics_engine_datasets` IS THE ONE THE CODE ALREADY READS, and it stays drafted on purpose until his H5
-         (`loop/finish/ops.md` OPS-23): one point per request is his money once Analytics Engine bills for it, so
+         `analytics_engine_datasets` IS THE ONE THE CODE ALREADY READS, and it stays drafted on purpose until the owner
+         decides: one point per request is his money once Analytics Engine bills for it, so
          binding it is his call and not a deploy's. `src/telemetry.ts` writes nothing while it is unbound, and with it
          bound writes one point per request once `SESSION_SECRET` is set too, because the record's hash is keyed off
          that secret. There is no account resource to create first: a dataset exists from its first write.
@@ -526,13 +520,13 @@
        NOTE THE SCRIPT NAME. A named environment deploys `<name>-<environment>`, so declaring these
        two environments RENAMES the production Worker from `braindog` to `braindog-production`. If
        `braindog` has ever been deployed, its Durable Objects stay with `braindog` and the new
-       script starts empty — this is a migration, not a rename, and REPORT.md §8 risk R1 is the
-       one thing to settle before the first run of `deploy.yml`.
+       script starts empty: this is a migration, not a rename, and it is the one thing to settle
+       before the first run of `deploy.yml`.
        ----------------------------------------------------------------------------------------- */
     "production": {
       /* THE APP IS UNDER `/app` ON `brain.dog`, WHICH IS THE SITE'S CUSTOM DOMAIN AND NOT THIS WORKER'S.
-         The owner asked on 22 September for the app to leave `app.brain.dog`, and
-         `loop/research-one-domain.md` section 2.2 splits `brain.dog` between two Workers: the site keeps
+         The owner asked for the app to leave `app.brain.dog`, and the one-domain design splits
+         `brain.dog` between two Workers: the site keeps
          it as its Custom Domain, unchanged, and this Worker takes only the paths it answers. The site
          hands those paths to this Worker through its `APP` service binding, which lives in
          `apps/site/wrangler.jsonc` and not here, and the top block says why it is a binding.
@@ -556,7 +550,7 @@
            cookie-authenticated write must now carry `Origin: https://brain.dog`, so a session cookie
            minted on `app.brain.dog` is useless here by construction. That is the `__Host-` cookie doing
            its job. `POST /auth/device` on `app.brain.dog` answers 403 "This BrainDog signs devices in
-           at https://brain.dog, so start there" (measured with these vars, the research's section 2.4),
+           at https://brain.dog, so start there" (measured with these vars),
            so the CLI's login example names this host, and `apps/cli/test/login.test.ts` reads it from
            here. */
         "PUBLIC_HOST": "brain.dog",
@@ -567,10 +561,10 @@
            `PUBLIC_HOST`. A passkey is offered only where its RP ID is the host or a registrable suffix
            of it, so one made under RP ID `app.brain.dog` would never be offered on `brain.dog` after B2;
            made under `brain.dog` it works on both. Sign-in links are on in production (`/auth/methods`
-           answered `magic:true` on 23 September, which the comment here used to deny), so a stranded
+           answers `magic:true`), so a stranded
            passkey is recoverable by mail, but it is still the owner's first passkey thrown away. This
            value must not change between pushes: a rollback to a version without it strands every
-           passkey made since (the cut-over's section 6). `relyingParty` in `packages/host/src/auth.ts`
+           passkey made since. `relyingParty` in `packages/host/src/auth.ts`
            switches passkeys off for an RP ID that is neither the host nor a dot-suffix of it, so
            `rain.dog` here would be a refusal an operator can read rather than a ceremony that fails in
            the browser (section 3.0 of the design). */
@@ -578,20 +572,20 @@
         "AI_GATEWAY": "braindog",
         "AGE_RECIPIENT": "age1av0654ll7t2ghrzr7ekervs5hjc9sm0he0569z45cvu92dd43aqql9gm3t",
         "SLASH_ENDPOINT": "",
-        /* THE INCLUDED MODEL IS ON, AT HIS WORD ("turn on spark yeah", 24 September). `apps/worker/src/slash.ts` answers
+        /* THE INCLUDED MODEL IS ON, AT THE OWNER'S WORD. `apps/worker/src/slash.ts` answers
            with Workers AI only when this is `yes`; the binding alone never switched it on. One call may spend about 2,500
            neurons (about $0.03) before it is stopped, and one record's asks at most the ceiling below in a month. */
         "SLASH_INCLUDED": "yes",
         /* THE OPERATOR'S CEILING ON ONE RECORD'S ASKS OF Slash, as alpha's comment says: 300,000 neurons, about $3.30 a
-           record a month (`loop/finish/decisions.md` C19), which `ask_cap` can only lower. */
+           record a month, which `ask_cap` can only lower. */
         "SLASH_INCLUDED_MONTH_NEURONS": "300000",
         "BRAINDOG_BUILD": "",
         /* EMPTY IS NO SIGN-IN LINKS. The sender, on a domain Email Service sends for, switches them on
            with the `EMAIL` binding below (51 §5.8). */
         "AUTH_MAIL_FROM": "hello@brain.dog",
-        /* EMPTY FALLS BACK TO AUTH_MAIL_FROM: mail.ts reads it for everything but a sign-in link (OPS-28). */
+        /* EMPTY FALLS BACK TO AUTH_MAIL_FROM: mail.ts reads it for everything but a sign-in link. */
         "MAIL_FROM": "",
-        /* EMPTY FALLS BACK TO THE GENERIC FOOTER: mail.ts reads it for the address a reader is told to write to (OPS-28). */
+        /* EMPTY FALLS BACK TO THE GENERIC FOOTER: mail.ts reads it for the address a reader is told to write to. */
         "SUPPORT_ADDRESS": "support@brain.dog",
         /* WHERE A `crash` OR `refuse` LINE IS MAILED, at most once a kind in 15 minutes (`opsAlert` in `src/mail.ts`).
            Production only: empty or absent is no mail, which is what alpha wants. */
@@ -606,12 +600,12 @@
         /* WEB PUSH'S PUBLIC KEY, AND EMPTY IS NO PUSH. It is a var and not a secret because the app hands it to every
            browser that subscribes. The private half is the secret `VAPID_PRIVATE` (the note at the end of this file),
            and `notify.push` is leased only when both are set (`delivers` in `src/deliver.ts`), so one without the
-           other leaves pushes `pending`, as they have always been. Generated on 24 September at his word ("you set up
-           VAPID keys"), one pair per environment; the private half lives only in the Worker secret and in his secrets
+           other leaves pushes `pending`, as they have always been. Generated at the owner's word,
+           one pair per environment; the private half lives only in the Worker secret and in his secrets
            folder, never in this repository. */
         "VAPID_PUBLIC": "BDFva-xw8GzY6aZWJ56lUpaec3IFwe545q2VcuYgEW6QgWkXeGiBUn2WPouNTuJx-_6lPyAcd9KezHlV8DbOE1k",
         /* BILLING IS OFF, AND THIS IS ITS SWITCH, as alpha's comment says. `live` here takes real cards, and is his call
-           alone; the site's `LAUNCH` flags mirror this value, and a site test holds them equal (`loop/finish/contracts.md` §9). */
+           alone; the site's `LAUNCH` flags mirror this value, and a site test holds them equal. */
         "BILLING": "",
         /* THE STRIPE PRICES OF CLOUD AND CLOUD PLUS, as alpha's comment says, from the live mode of his Stripe account. */
         "STRIPE_PRICE_HOSTED": "price_1UKmaqPop5yzbTmmSOx5842B",
@@ -679,7 +673,7 @@
       ]
 
       /* The same drafted blocks as alpha, without the suffix, less `ratelimits`, which is bound above. `TELEMETRY` waits
-         for his H5 here as in alpha, and the argument is there:
+         for the owner's decision here as in alpha, and the argument is there:
          "analytics_engine_datasets": [
            { "binding": "TELEMETRY", "dataset": "braindog_telemetry" }],
          "secrets_store_secrets": [
@@ -729,8 +723,8 @@
      dead-letters with a sentence that names both settings (`vapidKeys` in `src/vapid.ts`). Not under
      `secrets.required`, for the reason `KEK` is not.
 
-     `STRIPE_SECRET_KEY` AND `STRIPE_WEBHOOK_SECRET` ARE BILLING'S TWO, and `TURNSTILE_SECRET` IS SIGN-UP'S
-     (`loop/finish/ops.md` §4.0 E). The first is Stripe's secret key, `sk_test_...` while `BILLING` is `test` and
+     `STRIPE_SECRET_KEY` AND `STRIPE_WEBHOOK_SECRET` ARE BILLING'S TWO, and `TURNSTILE_SECRET` IS SIGN-UP'S.
+     The first is Stripe's secret key, `sk_test_...` while `BILLING` is `test` and
      `sk_live_...` only once he says so; the second is the signing secret Stripe shows for the endpoint
      `https://<PUBLIC_HOST>/account/billing/webhook`, which the webhook checks every event against (`verifyStripe` in
      `packages/host/src/stripe-sign.ts`); the third is the secret half of `TURNSTILE_SITE_KEY`. Each is put with

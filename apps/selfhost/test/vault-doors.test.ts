@@ -267,7 +267,7 @@ test('A LOGIN TOKEN, THE SERVER KEY, NO BEARER AND A PAGE ARE REFUSED AT THE DOO
   try {
     const kiln = s.project('Kiln');
     const login = await s.login();
-    /* A LOGIN TOKEN OPENS NO KEY. It may add one at the deposit door (`loop/finish/agents.md` C1). */
+    /* A LOGIN TOKEN OPENS NO KEY. It may add one at the deposit door. */
     const token = await s.call(door('open'), { bearer: login, body: { label: 'Kiln deploy' } });
     assert.equal(token.status, 403, token.raw);
     assert.equal(token.body?.refusal?.code, 'FORBIDDEN');

@@ -1,9 +1,9 @@
 /**
- * The Cloud as W55-7 wires it, in one process: `src/index.ts` bundled, a real `Directory$`, real `Record$` objects over
+ * The Cloud as `src/index.ts` wires it, in one process: `src/index.ts` bundled, a real `Directory$`, real `Record$` objects over
  * `node:sqlite`, an R2 bucket over a Map, and the two PITR methods of a Durable Object's storage.
  *
  * MINIFLARE IS NOT USED, AND FOR A MEASURED REASON. Local workerd answers `getCurrentBookmark` and throws "does not
- * implement point-in-time recovery" for `onNextSessionRestoreBookmark` (`loop/research-restore.md` answer 7), so a
+ * implement point-in-time recovery" for `onNextSessionRestoreBookmark`, so a
  * restore run there stops at the first of `51 D15`'s two calls and proves nothing about the second. Here the storage
  * records which bookmark was armed and `ctx.abort()` starts a fresh `Record$` over the same rows, which is what the
  * platform does with everything except the rewind itself. WHETHER THE OBJECT COMES BACK AT THAT BOOKMARK IS PROVED ON

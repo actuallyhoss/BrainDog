@@ -1,9 +1,8 @@
 /**
  * A person's script, run on the Cloud: in a Dynamic Worker the record's own object loads from `env.LOADER`.
  *
- * `loop/research-shell-scripts.md` section 3 and Brief 5. The record fires a `script.run` row, the kernel's pass hands
- * this file a `Scripted` (`packages/kernel/src/script-run.ts`), and what comes back is applied by `finishScript` in one
- * transaction. This file runs the source and answers; it writes nothing to any register.
+ * The record fires a `script.run` row, the kernel's pass hands this file a `Scripted`
+ * (`packages/kernel/src/script-run.ts`), and what comes back is applied by `finishScript` in one transaction. This file runs the source and answers; it writes nothing to any register.
  *
  * THE BOUNDARY IS THE ISOLATE, AND EVERY RULE IS ENFORCED ON THIS SIDE OF IT. The loaded Worker holds the prelude
  * (`@braindog/script`, the same text QuickJS evaluates on the self-host), the source, and two bindings. Its
@@ -29,9 +28,9 @@
  * `keyOpener` under `KEK` for that one request and scrubbed from the answer. The sandbox names a key by its label and
  * never holds its bytes.
  *
- * MEASURED LOCALLY, September 22nd, workerd 1.20260903.1 through wrangler 4.129.0's miniflare (`test/script.test.ts`):
+ * MEASURED LOCALLY, workerd 1.20260903.1 through wrangler 4.129.0's miniflare (`test/script.test.ts`):
  * the loader works under `node --test`, `this.ctx.exports` works from a Durable Object's `alarm()`, and the flag the
- * research named, `enable_ctx_exports`, is not needed. workerd said so when it was passed: "The compatibility flag
+ * design first named, `enable_ctx_exports`, is not needed. workerd said so when it was passed: "The compatibility flag
  * enable_ctx_exports became the default as of 2025-11-17 so does not need to be specified anymore", and this record's
  * date is 2026-09-01. Local workerd also enforced no subrequest ceiling (ten fetches under `subRequests: 5` all went),
  * which is one reason the fetch count below is ours and not the platform's.
@@ -72,7 +71,7 @@ export const KEY_HEADER = 'x-braindog-key';
  */
 export const URL_HEADER = 'x-braindog-url';
 
-/** A provider gets ten seconds and two megabytes, as a `call` does (`research-scheduled-actions` section 2.3). */
+/** A provider gets ten seconds and two megabytes, as a `call` does. */
 const TIMEOUT_MS = 10_000;
 const MAX_BYTES = 2 * 1024 * 1024;
 
@@ -330,8 +329,8 @@ export class ScriptRuns {
     /* THE SAME FOUR CHECKS AS `runInQuickJs`, IN ITS ORDER, so one script meets one set of rules on either host.
 
        THE USER NAME IS READ OFF THE URL THE SCRIPT WROTE, AND EVERYTHING ELSE OFF THE URL BEING SENT. workerd's `fetch`
-       inside the loaded Worker drops `me:pw@` before the request reaches this gateway (measured by the checker on
-       September 22nd: `https://me:pw@<declared origin>/rate` arrived bare, with no authorization header, and was sent),
+       inside the loaded Worker drops `me:pw@` before the request reaches this gateway (measured:
+       `https://me:pw@<declared origin>/rate` arrived bare, with no authorization header, and was sent),
        so a check on `call.url` alone never fired, and a run the self-host refuses ran clean here. `call.asked` is the
        URL the loaded module stamped before calling `fetch`. That module runs where the script can reach it, which is
        why the stamp decides nothing else: a script that swaps `globalThis.fetch` keeps the stamp and sends elsewhere,
@@ -526,7 +525,7 @@ function checkWrites(decl: ScriptDecl, limits: ScriptLimits, handed: unknown): S
  * it says how much a run spent is the trace it hands a tail after the run (`ScriptTail`). So each run is loaded with a
  * tail of its own, and its report is waited for, for `TAIL_MS` at most, after the wall time is taken, so the wait is
  * never billed as the script's. Not measured on the platform yet: local workerd may call no tail or report 0, and a run
- * that hears nothing reports 0 as it always did. The ledger meters wall time (`research-shell-scripts` section 6).
+ * that hears nothing reports 0 as it always did. The ledger meters wall time.
  *
  * NO `subRequests` ON THE CODE. The fetch count is `ScriptRuns`', exact and sticky; whether the platform would also
  * count the `env.RECORD` calls as subrequests is not something local workerd can say, and a platform limit that
@@ -555,7 +554,7 @@ export async function runScript(wiring: ScriptWiring, s: Scripted): Promise<Scri
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     /* `load`, NOT `get`: A FRESH WORKER FOR EVERY RUN. `get` caches by id, and the id was `<record>:<script>:v<n>`, so
-       every run of one version shared one module and one `globalThis`: measured by the audit of wave thirty-five, a
+       every run of one version shared one module and one `globalThis`: measured, a
        second run read "one,two" off what the first had left there, where the self-host starts each run in a new
        QuickJS instance and would have said "one" (`test/script-isolation.test.ts`). A script that works on one host
        by carrying state between runs, or trips on another run's leftovers, would behave differently on the other.
@@ -596,7 +595,7 @@ export async function runScript(wiring: ScriptWiring, s: Scripted): Promise<Scri
 
     /* AN ANSWER THAT ARRIVED PAST THE DEADLINE IS LATE, WHOEVER WON THE RACE. The race cannot end code that never
        awaits: locally the loaded Worker runs on this object's thread, so the timer cannot fire until the script lets
-       go, and the audit's four-second busy loop under `wall_ms: 500` then answered clean with its log and writes.
+       go, and a four-second busy loop under `wall_ms: 500` then answered clean with its log and writes.
        The self-host refuses the same run by its last check of the deadline (`runInQuickJs`), so this is that check.
        In production `cpuMs` ends such a loop sooner, which local workerd does not enforce. */
     const handed = outcome !== 'late' && 'handed' in outcome && isObject(outcome.handed) ? (outcome.handed as Handed) : {};

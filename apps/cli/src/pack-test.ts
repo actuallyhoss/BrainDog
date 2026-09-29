@@ -1,5 +1,5 @@
 /**
- * `<id>.test.json`, a pack's own test, read and run in a scratch record (`loop/finish/platform.md` PLT-5):
+ * `<id>.test.json`, a pack's own test, read and run in a scratch record:
  *
  *   { "rows":   [ { "list": "items", "fields": { "name": "Paint the fence" } } ],
  *     "expect": [ { "list": "items", "count": 3 },

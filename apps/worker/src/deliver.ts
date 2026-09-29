@@ -117,7 +117,7 @@ export type Deliver = (job: OutboxRow) => Promise<Delivered | undefined>;
 /**
  * The kinds this host can actually deliver. A kind absent from it dead-letters with a sentence.
  *
- * `erase.r2` IS ONE SINCE THE FILE STORE (OPS-20): an erasure queues one row per file its subject's rows held
+ * `erase.r2` IS ONE SINCE THE FILE STORE: an erasure queues one row per file its subject's rows held
  * (`kernel/src/erase.ts`), and before this the rows sat `pending` for ever while the nightly walk put them back, so the
  * bytes of an erased person's receipt stayed in the bucket.
  */
@@ -381,7 +381,7 @@ export function makeDeliver(transports: Transports): Deliver {
       if (typeof vapid === 'string') throw new Error(vapid);
       /* ONE SUBSCRIPTION PER JOB, NAMED BY ID (`51 §5`, `payload.sub`), because the ack says whether THAT phone is gone.
          The job carries the id and never the endpoint: the outbox travels in every `.brain` file and `push_sub` does
-         not, so the address is asked of the record under this job's lease. W58-3 read `sub.endpoint` here while W58-2's
+         not, so the address is asked of the record under this job's lease. This line once read `sub.endpoint` while the
          kernel wrote `sub.id`, and every push the kernel queued dead-lettered as an address that was not https
          (`test/push-deliver.test.ts`, measured before this line). */
       const sub = payload.sub;

@@ -69,8 +69,7 @@ test('NO KEY IS CHOSEN BY ITS LABEL: a live token labelled slash is never opened
   });
   assert.ok(model);
 
-  /* NOTHING CHOSEN, AND NO INCLUDED MODEL HERE: the press is refused before anything is sent, and the `slash` key stays shut
-     (`loop/finish/defects.md` S1). */
+  /* NOTHING CHOSEN, AND NO INCLUDED MODEL HERE: the press is refused before anything is sent, and the `slash` key stays shut. */
   await assert.rejects(model.draft({} as never), /Pick your key in Settings/u);
   assert.deepEqual(opened, []);
   assert.equal(wire.sent.length, 0);
@@ -199,7 +198,7 @@ test("A REAL ASK ON HIS OWN KEY REACHES THE PACKAGE'S ENGINE THROUGH THE WORKER'
   const out = await engine.propose('Which tasks are open?', OWNER, key as never, undefined, key as never);
   assert.ok(out.ok, `refused: ${JSON.stringify(out)}`);
   /* `door.engine!()` IS TYPED BY THE HOST'S OWN `SlashAskEngine<C>`, whose `propose` answers `Result<unknown>` on
-     purpose so `packages/host` never imports `@braindog/slash` (`loop/finish/rules.md` §5). This test drives the
+     purpose so `packages/host` never imports `@braindog/slash`. This test drives the
      package's real engine underneath it, so the answer is the package's own `Proposal`, cast back to it here rather
      than in the shared host type. */
   const proposed = out.value as Proposal;
@@ -317,7 +316,7 @@ test('NEITHER BUILDER LOADS THE PACKAGE BEFORE IT HAS DECIDED IT NEEDS IT', () =
  * `serveSlash` refuses any `authorization` header with 403 `NEEDS_BROWSER_SESSION`, and on its own it does. But on this host
  * the router resolves the bearer to a context and `inward()` then deletes the header, so the door's first check never sees
  * one, and what was left standing was the `Origin` check, which any client that is not a browser sets to whatever it likes.
- * `loop/research-spark-question.md` §2.3 measured `inward()` into `serveSlash` answering 200 with the TOKEN's context. These
+ * It was measured: `inward()` into `serveSlash` answering 200 with the TOKEN's context. These
  * two tests drive the same hole one level further out: `export default`'s own `fetch`, a real `Record$` holding a real
  * record, a bearer that record minted through `createToken`, and the app's own origin sent by hand. Before the refusals
  * existed both answered 200 with a Reading and the model endpoint was called once each, which on a live host is one opening
@@ -431,8 +430,7 @@ const countedAi = {
 /** One hosted record with a model configured and a read token of its own, and the Worker routing to it. */
 const hostedRecord = async () => {
   const { default: worker, Record$ } = await bundled();
-  /* THE INCLUDED MODEL OVER A COUNTED FAKE BINDING: the Worker names no endpoint of its own any more (`loop/finish/defects.md`
-     S1), and the locks held here are the door's, whichever model is behind it. */
+  /* THE INCLUDED MODEL OVER A COUNTED FAKE BINDING: the Worker names no endpoint of its own any more, and the locks held here are the door's, whichever model is behind it. */
   const env: Record<string, unknown> = { PUBLIC_HOST: HOST, AI: countedAi, SLASH_INCLUDED: 'yes', KEK: FAKE_KEK, INGRESS: { send: async () => {} } };
   const state = { storage: objectStorage(), id: { toString: () => REC }, blockConcurrencyWhile: (f: () => unknown) => f(), waitUntil: () => {} };
   const object = new Record$(state, env);

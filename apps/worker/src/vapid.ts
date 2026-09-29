@@ -5,7 +5,7 @@
  * lockfile: `pnpm install --offline` cannot fetch it, so the pinned route was one nobody could build. What it would have
  * done is two things, and only one of them is needed here. Signing the JWT is an ES256 signature, which WebCrypto does
  * in one call in workerd and in Node alike. Encrypting a payload (RFC 8291, ECDH plus HKDF plus AES-GCM) is the other,
- * and a push with no body needs none of it (`loop/research-living-in-it.md` §3.2).
+ * and a push with no body needs none of it.
  *
  * SO THE PUSH CARRIES NO CONTENT, which `09 §3` asks for in so many words ("one line, no content"). The kernel's
  * `notify.push` payload is `{ sub: { id } }` and nothing else, so there are no words to leave even by mistake: the

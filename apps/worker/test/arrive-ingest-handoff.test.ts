@@ -4,7 +4,7 @@
  * THE LINE THAT SHIPS WAS HELD BY NOTHING. `arrive-ingest.test.ts` drives `cloudIngest` in `route.ts` with an
  * `arrives` of its own, so the spread in `arrivals()` that copies `ingest` across the Durable Object boundary could be
  * deleted and every test here stayed green: `CloudIngestDeps.arrives` still type-checks without it, and the tests that
- * do load `index.ts` through the bundle never posted an arrival (`loop/research-batch-thirty-one-audit.md` 4). Without
+ * do load `index.ts` through the bundle never posted an arrival. Without
  * that spread the record is told nothing of which ingest the token was checked against, and it offers a verified
  * webhook to every webhook pattern in declaration order, which `packages/kernel/test/arrive-ingest.test.ts` measured
  * as a write under the first ingest bought by a token minted for the second.
@@ -12,7 +12,7 @@
  * SO THIS POSTS THROUGH THE WORKER AS IT SHIPS, bundled by `bundled-worker.ts`, with `RECORD` and `DIRECTORY` stubs
  * that keep what reached them. The stub is the far side of the boundary, which is the whole of what is being asked.
  *
- * RED FIRST, MEASURED ON 22 SEPTEMBER without touching the tree: the same two cases run over a scratch bundle whose
+ * RED FIRST, MEASURED without touching the tree: the same two cases run over a scratch bundle whose
  * esbuild `onLoad` deleted the line `...(arrival.ingest === undefined ? {} : { ingest: arrival.ingest }),` from
  * `src/index.ts` before building. The first case failed, `undefined` where `second` was expected, and the mail case
  * still passed, which is the point of it: mail names no ingest with or without the line.

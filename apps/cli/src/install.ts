@@ -6,60 +6,55 @@
  * command prints exactly what it would add and changes nothing without `--apply`. With it, the file as it
  * was is copied beside itself first. Existing entries, other tools' hooks included, are left as they are.
  *
- * `--replace` IS THE CUT-OVER, and the one exception to leaving other entries alone. Step 9 of
- * `loop/research-switch.md` §4 moves the old tool's MCP entry in three profiles and its two hooks "in one sitting",
- * and one profile missed means a session keeps writing to the old record (the split-brain risk it names). With
- * it, the same run also removes every hook and MCP server the file it names (`Replace`) identifies as the old tool's,
- * by the path it runs or the host it reaches, names each one first, and is a dry run until `--apply` exactly as install is. An entry it cannot identify is
- * left, because a false match deletes somebody else's tool and a miss is only a line to remove by hand.
+ * `--replace` IS THE CUT-OVER, and the one exception to leaving other entries alone. Moving off another tool means
+ * moving its MCP entry in every profile and its hooks in one sitting, and one profile missed means a session keeps
+ * writing to the old record: a split brain. With it, the same run also removes every hook and MCP server the file it
+ * names (`Replace`) identifies as the old tool's, by the path it runs or the host it reaches, names each one first,
+ * and is a dry run until `--apply` exactly as install is. An entry it cannot identify is left, because a false match
+ * deletes somebody else's tool and a miss is only a line to remove by hand.
  *
  * AND IT PUTS BRAINDOG'S SERVER IN WHERE IT TAKES THE OLD TOOL'S OUT, in the same file, the same dry run and the same
- * all-or-none write. Measured before it did (`loop/research-switch-recheck.md` §3, brief 2): the cut-over removed
- * three servers and added none, and the one line printed for BrainDog's carried no `CLAUDE_CONFIG_DIR`, so run as
- * printed it registered the server in whichever profile the shell was in. A session that reached the old tool only
- * through `C:\Repos\.mcp.json` was left with no brain at all, and nothing said so. The `.claude.json` is the right
- * owner of the entry, not a second best: it is the file `claude mcp add-json --scope user` writes, and the one this
- * command already rewrites to take the old tool's out.
+ * all-or-none write. Measured before it did: the cut-over removed three servers and added none, and the one line
+ * printed for BrainDog's carried no `CLAUDE_CONFIG_DIR`, so run as printed it registered the server in whichever
+ * profile the shell was in. A session that reached the old tool only through a `.mcp.json` was left with no brain at
+ * all, and nothing said so. The `.claude.json` is the right owner of the entry, not a second best: it is the file
+ * `claude mcp add-json --scope user` writes, and the one this command already rewrites to take the old tool's out.
  *
- * AND INTO EVERY NAMED PROFILE, WHETHER OR NOT THE OLD TOOL'S WAS IN IT (brief 44-B of `loop/research-switch-left.md`).
- * Putting it in only where the old tool's came out left a second named profile with none, since it reached the old tool
- * through `C:\Repos\.mcp.json`, and finding 2 there measured why that file cannot stand in: a new name in a
- * `.mcp.json` stays `Pending approval` wherever a `settings.local.json` approved the old one by name, so a headless
- * `claude -p` has no brain, while a user-scope entry of the same name is the one started. A profile with no
- * `.claude.json` gets one holding only the entry. And the `claude mcp add` line main.ts prints is owed per
- * profile, with `CLAUDE_CONFIG_DIR` naming it: it was one answer for the whole run, so the audit's two-profile
- * `--apply` (`loop/research-batch-forty-two-audit.md` §5) left the second profile with no server and no line.
+ * AND INTO EVERY NAMED PROFILE, WHETHER OR NOT THE OLD TOOL'S WAS IN IT. Putting it in only where the old tool's came
+ * out left a second named profile with none, since it reached the old tool through a `.mcp.json`, and that file cannot
+ * stand in (see below). A profile with no `.claude.json` gets one holding only the entry. And the `claude mcp add` line
+ * main.ts prints is owed per profile, with `CLAUDE_CONFIG_DIR` naming it: it was one answer for the whole run, so a
+ * two-profile `--apply` left the second profile with no server and no line.
  *
  * A `.mcp.json` ONLY WHEN IT IS NAMED, AND NEVER ONE IN A REPOSITORY. A project's `.mcp.json` is shared through its
- * repository (`loop/research-agent-path.md` question 5), so one inside a git working tree is refused. But the one the
- * cut-over needs, `C:\Repos\.mcp.json`, is in no repository, and leaving it to a hand edit made step 9 one sitting
- * plus a line that, missed, leaves a session on the old record. `--replace --mcp-json <file>` opens it, in the same
- * dry run and the same all-or-none write as the profiles. A project's settings file is changed only when it is named.
+ * repository, so one inside a git working tree is refused. But one kept in a parent folder of several repositories is
+ * in no repository, and leaving it to a hand edit made the cut-over one sitting plus a line that, missed, leaves a
+ * session on the old record. `--replace --mcp-json <file>` opens it, in the same dry run and the same all-or-none
+ * write as the profiles. A project's settings file is changed only when it is named.
  *
- * AND THE NAMED `.mcp.json` LOSES THE OLD TOOL'S SERVER AND GAINS NO `braindog` (brief 44-B's second half). It gained
- * one until then, and finding 2 of `loop/research-switch-left.md` measured what that entry does, in a scratch config
- * folder with a do-nothing server. Claude Code does read a `.mcp.json` from a parent folder, but starts a server
- * there only when its name is in `enabledMcpjsonServers`, and that project's `.claude\settings.local.json` approved
- * `brain` and one other server by name, so `braindog` stayed `Pending approval (run claude to approve)`: one prompt in an
- * interactive session, and no brain at all in a headless `claude -p`. Where a user-scope entry of the same name also
- * exists, as every named profile now has, that one is started, with a diagnostic about the two scopes. So the entry
- * here was a prompt and a diagnostic, and never the server that ran.
+ * AND THE NAMED `.mcp.json` LOSES THE OLD TOOL'S SERVER AND GAINS NO `braindog`. It gained one until then, and what
+ * that entry does was measured in a scratch config folder with a do-nothing server. Claude Code does read a
+ * `.mcp.json` from a parent folder, but starts a server there only when its name is in `enabledMcpjsonServers`, and a
+ * project's `.claude\settings.local.json` that approved the old server and one other by name left `braindog` at
+ * `Pending approval (run claude to approve)`: one prompt in an interactive session, and no brain at all in a headless
+ * `claude -p`. Where a user-scope entry of the same name also exists, as every named profile now has, that one is
+ * started, with a diagnostic about the two scopes. So the entry here was a prompt and a diagnostic, and never the
+ * server that ran.
  *
- * AND IT RETIRES THE OLD TOOL'S SKILL (brief 45-A), found by what its `SKILL.md` names (the replace file's `skills`)
- * rather than by its folder's name. With the hooks and servers out and the skill left, a session
- * still loads a skill whose description says to use it whenever he starts work in one of his repositories, and reads and
- * writes the old record beside BrainDog: the split brain again, by another door. A folder under a profile's
- * `skills/` whose `SKILL.md` names one of those is moved to `skills/.replaced/<name>-<date>/`, never deleted, inside the
- * same all-or-none write. A skill that names none of them is somebody else's, and `commands/` holds no skill
- * folders, so neither is opened.
+ * AND IT RETIRES THE OLD TOOL'S SKILL, found by what its `SKILL.md` names (the replace file's `skills`) rather than by
+ * its folder's name. With the hooks and servers out and the skill left, a session still loads a skill whose
+ * description says to use it whenever he starts work, and reads and writes the old record beside BrainDog: the split
+ * brain again, by another door. A folder under a profile's `skills/` whose `SKILL.md` names one of those is moved to
+ * `skills/.replaced/<name>-<date>/`, never deleted, inside the same all-or-none write. A skill that names none of them
+ * is somebody else's, and `commands/` holds no skill folders, so neither is opened.
  *
- * AND IT SAYS WHEN THE CHECKOUT IT RUNS FROM IS MOVING (finding 3). The hooks and the server this writes run this
- * checkout's own files, and the dry run over his profiles planned both from `C:\Repos\braindog`, the tree the loop's
- * agents edit every wave, so a session would start on whatever half-written file was there at the time. One line says
- * so and names the worktree fix. It never refuses, because the tree may be his, changed on purpose.
+ * AND IT SAYS WHEN THE CHECKOUT IT RUNS FROM IS MOVING. The hooks and the server this writes run this checkout's own
+ * files, so run from a working tree that is being edited, a session would start on whatever half-written file was
+ * there at the time. One line says so and names the worktree fix. It never refuses, because the tree may be his,
+ * changed on purpose.
  *
- * AND IT OFFERS BRAINDOG'S OWN AGENT SKILL (OPS-26): each profile's `skills/braindog/SKILL.md`, planned beside the
- * hooks, printed by the dry run and placed by `--apply` in the same all-or-none write (`planAgentSkill`).
+ * AND IT OFFERS BRAINDOG'S OWN AGENT SKILL: each profile's `skills/braindog/SKILL.md`, planned beside the hooks,
+ * printed by the dry run and placed by `--apply` in the same all-or-none write (`planAgentSkill`).
  */
 
 import { execFileSync } from 'node:child_process';
@@ -80,11 +75,9 @@ const EVENTS = [
 /**
  * WHAT `--replace <replace.json>` TAKES OUT, READ FROM THAT FILE AND FROM NOTHING COMPILED HERE.
  *
- * The cut-over's first shape named one tool: its two hook scripts, the file its MCP server runs, the one host it was
- * served from, all as constants in this file, so the command could take out one person's old record and nobody else's.
- * `loop/DIRECTION.md` section 27 moves his record only once nothing in `apps/` exists because he has it, so the four
- * things the cut-over matches by live in a file beside the adapter that imports the same tool, and anybody leaving
- * another tool writes their own.
+ * Compiled in as constants, the markers would let the command take out one tool and no other, so the four things the
+ * cut-over matches by live in a file, beside the adapter that imports the same tool when there is one, and anybody
+ * leaving another tool writes their own.
  *
  * EACH IS MATCHED AS NARROWLY AS THE FIRST ONES WERE, because a false match deletes somebody else's tool and a miss is
  * only a line to remove by hand. `hooks` are patterns a hook's command must match; `programs` patterns a server's command
@@ -161,7 +154,7 @@ export const PLACES_SKILL = '  + skills/braindog/SKILL.md';
  * GIT BASH TAKES THE `sh` FORM, NOT THE ONE `process.platform` NAMES. The line was PowerShell on every win32 run, and
  * Git Bash is a shell he has and the one Claude Code's own Bash tool runs here: pasted there, bash ran each `;`
  * statement, the two assignments failed, and `claude mcp add` ran in the named profile the window sat in, for a line
- * that named another and for the line that meant `~/.claude` (finding 6 of `loop/research-batch-forty-six-audit.md`).
+ * that named another and for the line that meant `~/.claude`.
  */
 export type Shell = 'PowerShell' | 'Git Bash' | 'sh';
 
@@ -169,11 +162,11 @@ export type Shell = 'PowerShell' | 'Git Bash' | 'sh';
  * The shell that ran `braindog install`, where the environment can tell it: `MSYSTEM`, or a `SHELL` naming bash, is
  * Git Bash on win32, unless `_` says the command bash last started was PowerShell.
  *
- * `_` IS BASH'S NOTE OF THE PROGRAM IT RAN, AND A POWERSHELL STARTED UNDER GIT BASH KEEPS IT. Measured on 27 September
- * in Git Bash on Windows 11: `node` run straight from bash saw `MSYSTEM=MINGW64` and `_` naming `node`; the same `node`
+ * `_` IS BASH'S NOTE OF THE PROGRAM IT RAN, AND A POWERSHELL STARTED UNDER GIT BASH KEEPS IT. Measured in Git Bash
+ * on Windows 11: `node` run straight from bash saw `MSYSTEM=MINGW64` and `_` naming `node`; the same `node`
  * run from a `powershell -NoProfile` started in that bash saw the same `MSYSTEM`, and `_` naming
  * `C:/WINDOWS/System32/WindowsPowerShell/v1.0/powershell`, because PowerShell inherits the variable and never writes it.
- * Without this, that PowerShell was handed the `sh` form (defects H3). `pwsh` is matched by the same rule and was not
+ * Without this, that PowerShell was handed the `sh` form. `pwsh` is matched by the same rule and was not
  * measured: it was not installed on the machine that measured.
  *
  * NONE OF THIS IS PROOF, which is why every form fails closed in the others and the lines are headed with the name.
@@ -200,7 +193,7 @@ const quote = (word: string, shell: Shell): string =>
  *
  * `claude mcp add`, NOT `add-json`, BECAUSE NO SHELL HAS TO CARRY JSON. The `add-json` line lost its inner double
  * quotes in Windows PowerShell 5.1, which reached `claude` as `{type:stdio,command:node,...}` and did not parse
- * (finding 1 of `loop/research-batch-forty-four-audit.md`). Written `\"`, the audit measured 5.1 keeping them and 7.3
+ * (measured). Written `\"`, 5.1 was measured keeping them and 7.3
  * passing the backslashes through, and `add-json` reads no file, only its argument (its `--help` in Claude Code 2.1.280).
  *
  * THE `--` IS QUOTED IN POWERSHELL. Without it Claude Code reads `--agent` as its own option and exits 1, "unknown
@@ -251,8 +244,8 @@ const fold = (path: string) => (process.platform === 'win32' ? path.toLowerCase(
 
 /**
  * Where a profile's MCP servers are kept. CLAUDE CODE KEEPS THE DEFAULT PROFILE'S BESIDE ITS FOLDER, in
- * `~/.claude.json`, and a `CLAUDE_CONFIG_DIR` profile's inside it, which is why `research-switch.md` names
- * `~\.claude.json` and `~\.claude\settings.json` as two places.
+ * `~/.claude.json`, and a `CLAUDE_CONFIG_DIR` profile's inside it, which is why `~\.claude.json` and
+ * `~\.claude\settings.json` are two places.
  *
  * COMPARED WITHOUT CASE ON WINDOWS: `--config-dir c:\users\<name>\.claude` is the default profile there, and an
  * exact comparison sent the lookup inside the folder, found no file, and reported no server of the old tool's to remove.
@@ -293,7 +286,7 @@ const isMove = (step: Step): step is MoveStep => 'to' in step;
 
 /**
  * Removes a file this command made, `.tmp` or `.bak`. BOTH TAKE THE ORIGINAL'S MODE, so both can be read-only, and
- * Windows will not unlink a read-only file: the audit's `.claude.json.tmp`, left read-only by a failed rename,
+ * Windows will not unlink a read-only file: a `.claude.json.tmp` left read-only by a failed rename
  * made every later run fail at `open` until it was removed by hand.
  */
 const discard = (path: string): void => {
@@ -307,7 +300,7 @@ const discard = (path: string): void => {
  * so a failure while preparing changes nothing, and a failed rename puts back every file already renamed, from the
  * copy made for it a moment before, and takes away every `.tmp`, `.bak` and folder this run made.
  *
- * MEASURED BEFORE THIS EXISTED (`loop/research-batch-twenty-four-audit.md` §1): each file was written on its own,
+ * MEASURED BEFORE THIS EXISTED: each file was written on its own,
  * so a read-only `.claude.json` left `settings.json` cut over and the MCP server in, the split brain `--replace`
  * exists to prevent, and printed only the `EPERM`. The thrown sentence now names every file and what became of it.
  *
@@ -438,11 +431,11 @@ const readObject = (file: string, what: string): Record<string, unknown> => {
 
 /**
  * The dry run's one closing line: THE COMMAND THAT WRITES WHAT IT SHOWED, word for word, quoted for the shell `shellOf`
- * names. Measured before this (`loop/research-cutover-day.md` §7.1): the line was built from `--replace` alone and
- * printed after every file, ten times in his dry run of 44 lines, as `Run braindog install --replace --apply`. It named
- * no `--config-dir` or `--mcp-json`, and `braindog` is on no PATH of his. Run as printed on copies of his profiles, from
- * a window whose `CLAUDE_CONFIG_DIR` named one profile, it cut over that one alone and left the default and the other profile
- * and `C:\Repos\.mcp.json` on the old tool, the one-profile split brain `--replace` exists to prevent.
+ * names. Measured before this: the line was built from `--replace` alone and printed after every file, ten times in a
+ * dry run of 44 lines, as `Run braindog install --replace --apply`. It named no `--config-dir` or `--mcp-json`, and
+ * `braindog` need not be on the PATH at all. Run as printed on copies of three profiles, from a window whose
+ * `CLAUDE_CONFIG_DIR` named one profile, it cut over that one alone and left the default and the other profile and the
+ * named `.mcp.json` on the old tool, the one-profile split brain `--replace` exists to prevent.
  *
  * THE RESOLVED PROFILES, NOT THE WORDS TYPED. A run that named no `--config-dir` changed the profile the shell was in,
  * and the line pins that one, so pasting it into another window writes what was shown and nothing else.
@@ -474,7 +467,7 @@ export const installEvery = (profiles: string[], files: string[], options: Optio
 /**
  * `installEvery`, and the profiles that end the run without BrainDog's server, for `byHand`. ANSWERED PER PROFILE, not
  * for the run: main.ts used to withhold the hand-run line when any line of the run added the server, which is how
- * the audit's second profile was left with none and nothing said so. Without `replace` no server is written, so a
+ * a second profile was left with none and nothing said so. Without `replace` no server is written, so a
  * profile is owed the line unless its servers file already holds `braindog`.
  */
 export function installProfiles(profiles: string[], files: string[], options: Options, mcpFiles: string[] = []): { lines: string[]; unserved: string[] } {
@@ -500,9 +493,9 @@ export function installProfiles(profiles: string[], files: string[], options: Op
       add(servers, planServers);
       /*
        * THE DEFAULT PROFILE'S SECOND SERVERS FILE, `~\.claude\.claude.json`, WHEN IT EXISTS. Measured with Claude Code
-       * 2.1.280 in a scratch home (`loop/research-cutover-day.md` §7.2): with `CLAUDE_CONFIG_DIR` unset, `claude mcp
+       * 2.1.280 in a scratch home: with `CLAUDE_CONFIG_DIR` unset, `claude mcp
        * list` read `<home>\.claude.json`; set to `<home>\.claude`, the same folder, it read the file inside and said
-       * "No MCP servers configured". His real `~\.claude` holds such a file, so some launcher starts sessions that way,
+       * "No MCP servers configured". A real `~\.claude` was found holding such a file, so some launcher starts sessions that way,
        * and a cut-over of the one file left those with BrainDog's hooks and no server. NEVER MADE when missing, since a
        * profile nobody starts that way has no use for it, and `serversFileOf` stays the answer `byHand` names.
        */
@@ -622,10 +615,10 @@ function planSettings(named: string, options: Options): Plan {
 
   const lines = [`${options.apply ? 'Changed' : 'braindog install would change'} ${file}${had ? '' : ', a new file'}:`];
   /*
-   * A HOOK IS SHOWN AS A SERVER IS, BY ITS PROGRAM AND A COUNT (finding 5 of `loop/research-batch-fifty-four-audit.md`).
-   * SEC-6 inverted `describe` for servers and left this line printing the command whole, so a hook written as
-   * `powershell -File C:/Tools/legacy/hooks/session-start.ps1 -Token <key>` put the key on the line. The replace file's `hooks` have
-   * already said which script it is, and the event heading the line says which of the two.
+   * A HOOK IS SHOWN AS A SERVER IS, BY ITS PROGRAM AND A COUNT. Inverting `describe` for servers left this line
+   * printing the command whole, so a hook written as `powershell -File C:/Tools/tallybook/hooks/session-start.ps1
+   * -Token <key>` put the key on the line. The replace file's `hooks` have already said which script it is, and the
+   * event heading the line says which of the two.
    */
   for (const { event, command } of removed) lines.push(`  - hooks.${event}, ${String(old?.name)}'s: ${describe({ command })}`);
   for (const { event, entry } of added) lines.push(`  + hooks.${event}: ${JSON.stringify(entry)}`);
@@ -640,14 +633,14 @@ const HIDDEN = '[hidden]';
  * own path, the one word `describe` still shows, because a program kept under a folder named for a key is no less a
  * key for being the first word.
  *
- * THE THIRD TEST IS FINDING 5 OF `loop/research-batch-fifty-four-audit.md`: `C:/keys/q7Rw2xT9/node.exe` printed the
+ * THE THIRD TEST IS MEASURED: `C:/keys/q7Rw2xT9/node.exe` printed the
  * folder, eight characters and no prefix, since only the first two tests were asked. A digit between two letters is
  * what a key's random characters do and a folder's name does not: `System32`, `Python312`, `v1.0` and `v24.1.0` keep
  * their digits at the end or apart from the letters, and are still shown. ASKED OF THE WHOLE PIECE, NOT OF EACH RUN
  * BETWEEN `-`, `_` AND `.`: split that way, as first written, `q7Rw-2xT9` was two runs of four and printed whole, and
  * the split kept no name shown that the whole piece hides, since a separator already breaks a letter-digit-letter
  * run. A key of letters alone, eight or more, still shows; nothing in a name's shape tells it from a word, which is
- * why SEC-6 shows no argument at all.
+ * why `describe` shows no argument at all.
  */
 const looksLikeToken = (piece: string) =>
   /^(?:hb|sk|pk|rk|ghp|gho|ghs|ghu|github_pat|glpat|xox[a-z]|rec|AKIA)[_-]/i.test(piece) ||
@@ -659,7 +652,7 @@ const hidePieces = (text: string) => text.split(/([\\/])/).map((piece) => (piece
 
 /*
  * THE PATH SEGMENTS A URL MAY SHOW ARE NAMED, AND EVERY OTHER ONE IS HIDDEN. It was every segment that did not look
- * like a token, and batch twenty-eight's audit (§5) measured `https://<the old host>/mcp/tq7Rw2xT9` printed whole: nine
+ * like a token, and `https://<the old host>/mcp/tq7Rw2xT9` was measured printed whole: nine
  * characters is no length a shape test can tell from a folder's name. Only the old tool's entries are described, and
  * its endpoint is `/mcp`, so a reader loses nothing by seeing `[hidden]` for the rest while the origin still says
  * whose server it is.
@@ -684,10 +677,10 @@ function hideUrl(text: string): string {
  * entry registered by URL, the URL as `hideUrl` shows one. Never `env` or `headers` either, which is where a
  * registration keeps its token.
  *
- * INVERTED FROM A LIST OF SHAPES TO HIDE, because the list had no end (backlog SEC-6, audit twenty-eight's §5 brief).
- * It hid a word after one naming a secret, a word after a short flag, and anything shaped like a token, and each audit
- * since the twenty-fourth measured a shape outside the three: `--header X-Brain-Token <value>`, a nine-character token
- * in a URL path, `-t shortpw`, and last `node brain-mcp.mjs q7Rw2xT9` and `node brain-mcp.mjs --hb q7Rw2xT9`, printed
+ * INVERTED FROM A LIST OF SHAPES TO HIDE, because the list had no end. It hid a word after one naming a secret, a
+ * word after a short flag, and anything shaped like a token, and one probe after another measured a shape outside the
+ * three: `--header X-Brain-Token <value>`, a nine-character token in a URL path, `-t shortpw`, and last
+ * `node tallybook-mcp.mjs q7Rw2xT9` and `node tallybook-mcp.mjs --hb q7Rw2xT9`, printed
  * whole on this tree because the token follows no word the rules knew and is too short to look like one. The line is
  * printed under the entry's own name (`mcpServers.<name>`), which is what tells a reader which entry it is, so the
  * arguments were never needed to name it.
@@ -697,8 +690,8 @@ function hideUrl(text: string): string {
  * four. A program path holding a space is counted as a program and one argument more, which says more is hidden than
  * was, and shows nothing.
  *
- * A LEADING `NAME=value` IS AN ASSIGNMENT, NOT THE PROGRAM, and is counted with what is hidden. Measured by this
- * change's checker: taken as the program, `TOKEN=q7Rw2xT9 node brain-mcp.mjs` printed `TOKEN=q7Rw2xT9`, a token the
+ * A LEADING `NAME=value` IS AN ASSIGNMENT, NOT THE PROGRAM, and is counted with what is hidden. Measured: taken as the
+ * program, `TOKEN=q7Rw2xT9 node tallybook-mcp.mjs` printed `TOKEN=q7Rw2xT9`, a token the
  * word-by-word rules before it had hidden.
  */
 function describe(server: Record<string, unknown>): string {
@@ -729,7 +722,7 @@ function isOldUrl(text: string, r: Replace): boolean {
 /**
  * An old tool's server: its own `url` on one of the tool's hosts, a program the file names among what it runs, or such a
  * host among its arguments. THE LAST IS A PROXY, `npx -y mcp-remote https://<host>/mcp`, the usual way to reach an HTTP
- * server from a client older than the HTTP transport. Measured before it was looked for (the audit's §5), a profile
+ * server from a client older than the HTTP transport. Measured before it was looked for, a profile
  * whose only entry of the old tool's was proxied was reported as registering none, and kept it.
  */
 function isOldServer(server: unknown, r: Replace): server is Record<string, unknown> {
@@ -737,7 +730,7 @@ function isOldServer(server: unknown, r: Replace): server is Record<string, unkn
   if (typeof server.url === 'string' && isOldUrl(server.url, r)) return true;
   const strings = [server.command, ...(Array.isArray(server.args) ? server.args : [])].filter((s): s is string => typeof s === 'string');
   /*
-   * THE WORD, AND WHAT FOLLOWS ITS FIRST `=`. Measured before (batch twenty-seven's finding), `--url=https://<host>/mcp`
+   * THE WORD, AND WHAT FOLLOWS ITS FIRST `=`. Measured before, `--url=https://<host>/mcp`
    * as one word is no URL to `new URL`, so the entry was kept and never named. Both halves are tried because a URL
    * may carry an `=` of its own in its query.
    */
@@ -806,7 +799,7 @@ function planMcpJson(named: string, options: Options): Plan {
   if (!old) return { lines: [], write: null };
   if ('mcpServers' in config) next.mcpServers = withoutOld(config.mcpServers, '', removed, old);
   if (removed.length === 0) return { lines: [`${file} registers no ${old.name} MCP server. Nothing to change.`], write: null };
-  /* No `withBraindog` here: a new name in this file is only a prompt, as the header says finding 2 measured. */
+  /* No `withBraindog` here: a new name in this file is only a prompt, as the header says was measured. */
   const lines = [`${options.apply ? 'Changed' : 'braindog install --replace would change'} ${file}:`, ...removed];
   return { lines, write: { file, had: true, value: next } };
 }
@@ -840,7 +833,7 @@ function planServers(file: string, options: Options): Plan {
     return { lines: [`${file} registers no ${name} MCP server. Nothing to change.${why}`], write: null, serves };
   }
   /*
-   * THE REASON THAT WAS MEASURED, NOT THE ONE THAT WAS GUESSED (`loop/research-cutover-day.md` §4). This said each
+   * THE REASON THAT WAS MEASURED, NOT THE ONE THAT WAS GUESSED. This said each
    * open session rewrites the file, and a session held open across `--apply` did not: no top-level key differed after
    * it exited. What it did do was keep calling the old server 15 s after the install, list the old skill in every
    * request, and answer "No such tool" for BrainDog's, while its hooks were reloaded within seconds. So the line is
@@ -856,7 +849,7 @@ function planServers(file: string, options: Options): Plan {
  * wants it, and the copy is dated because the cut-over may be run again after a restore.
  *
  * A NAME STARTING WITH A DOT IS NEVER A SKILL HERE, because `.replaced` is this command's own. The skip is said
- * outright, not left to the layout: a checker removed it as a mutation and every test stayed green, since the
+ * outright, not left to the layout: removed as a mutation, every test stayed green, since the
  * retired `SKILL.md` files sit one level down and `.replaced` has none of its own, so the second run passed it over
  * anyway. The line keeps that true if a skill is ever set aside flat.
  */
@@ -894,7 +887,7 @@ function planSkills(skills: string, options: Options): Plan {
 
 /**
  * BrainDog's Agent Skill in one profile, at `skills/braindog/SKILL.md`: what the record is to an agent, how it
- * connects and the rules it keeps, so a session that has the server also knows how to use it (contracts X25, X55).
+ * connects and the rules it keeps, so a session that has the server also knows how to use it.
  * OFFERED LIKE EVERYTHING ELSE HERE: the dry run says it would place the file and `--apply` places it, in the same
  * all-or-none write as the profile's settings. A profile already holding this text is no line at all, and one holding
  * an older text gets this one, its copy kept beside it as every file this command changes is.

@@ -84,7 +84,7 @@ export const ROOT_KEYS = 2;
  * A BOUND VALUE THAT IS NOT 32 BYTES IS A REFUSAL, NEVER AN ABSENT STORE. Treating it as unbound would provision
  * records without keys while the owner believes the key store is on, and those records stay keyless for good.
  *
- * ONE KEY, OR TWO SEPARATED BY A SPACE, AND THE FIRST IS CURRENT (`loop/finish/contracts.md` §9). During a rotation the
+ * ONE KEY, OR TWO SEPARATED BY A SPACE, AND THE FIRST IS CURRENT. During a rotation the
  * secret holds the new key and then the old one, so `current` wraps under the new key at once while `byId` still opens
  * every row wrapped under the old, until the nightly walk has re-wrapped each record (`rewrap.ts`). One secret rather
  * than a second binding, so none of this function's callers changes and a Secrets Store binding carries the pair as
@@ -128,9 +128,8 @@ export async function keyStoreOf(bound: KekBinding | undefined): Promise<KeyStor
  *
  * WHY NOT ALWAYS THE CURRENT ONE. The record refuses `WRONG_KEY` when the id offered is not the id its rows name
  * (`packages/kernel/src/vault.ts`, `openGrant`), and a record keeps the old id from a rotation until its night. Offering
- * the current id in that window refused every stored credential on the Cloud, although `byId` could open them all
- * (`loop/research-w61.md` §1 item 8). A record wrapped under a key this store does not hold is offered the current id,
- * so its refusal names both.
+ * the current id in that window refused every stored credential on the Cloud, although `byId` could open them all.
+ * A record wrapped under a key this store does not hold is offered the current id, so its refusal names both.
  */
 export async function offeredId(store: KeyStore, wrapping: string | null): Promise<string> {
   if (wrapping !== null && (await store.byId(wrapping)) !== null) return wrapping;

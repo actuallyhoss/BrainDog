@@ -1,5 +1,5 @@
 /**
- * The self-host's front doors (`loop/finish/ops.md` OPS-4): one caller's minute over a real socket, and the guard in
+ * The self-host's front doors: one caller's minute over a real socket, and the guard in
  * front of every statement this process sends its driver.
  *
  * THE LIMITER'S CLOCK IS PINNED, so every request below falls in one minute and the count is the limiter's and not the
@@ -35,8 +35,10 @@ test('THE 601ST READ FROM ONE CALLER IN A MINUTE IS 429, AND ANOTHER TOKEN\'S FI
     limits: windowLimiter(() => NOW),
   });
   const port = (running.server.address() as { port: number }).port;
+  /* A PLAIN READ, NOT THE VERSION POLL: `/api/version` spends its own poll budget (`POLL_PER_MINUTE`), so this reads
+     the shell's boot, which spends the read budget this test is about. */
   const read = (bearer: string) =>
-    fetch(`http://127.0.0.1:${port}/api/version`, {
+    fetch(`http://127.0.0.1:${port}/api/boot`, {
       method: 'POST',
       headers: { authorization: `Bearer ${bearer}`, 'content-type': 'application/json' },
       body: '{}',

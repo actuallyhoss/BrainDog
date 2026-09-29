@@ -1,23 +1,22 @@
 /**
  * Billing's four doors on the Worker: what each record you own costs and whether it is paid, a payment page for a new
  * record or for paying again, Stripe's own page for changing the card or the plan, and Stripe's webhook, which is the
- * only thing that moves a record into or out of a lapse (`loop/finish/ops.md` OPS-13, §4.0 D).
+ * only thing that moves a record into or out of a lapse.
  *
- * WORKER ONLY, BY DESIGN (`loop/finish/ops.md` §6.3.16). The self-host bills nobody and hands `serveAccount` none of
+ * WORKER ONLY, BY DESIGN. The self-host bills nobody and hands `serveAccount` none of
  * these doors, so each of their rows answers 404 there.
  *
- * TWO PLANS, CLOUD AND CLOUD PLUS (`loop/DIRECTION.md` §33, 26 September, superseding the single $12 product): a record
+ * TWO PLANS, CLOUD AND CLOUD PLUS (superseding the single $12 product): a record
  * is paid for on one of them, and its allowance follows the plan it pays for. A switch is confirmed on Stripe's own page
  * and takes effect when it is confirmed; the webhook moves the record's plan when Stripe says the subscription changed.
  *
- * NOTHING IS WRITTEN FOR A RECORD NOBODY PAID FOR (`loop/finish/ops.md` §4.0 Rule 1). A record with no billing row is
+ * NOTHING IS WRITTEN FOR A RECORD NOBODY PAID FOR. A record with no billing row is
  * not billed and never lapses; a row is written only when a checkout completes, and only a verified Stripe event moves
  * it after that.
  *
  * EVERY SETTING IS OPTIONAL (Rule 2). With `BILLING` empty, billing is off: the list says `open: false` and every
  * other door answers `NOT_IN_THIS_BUILD` with the sentence that names the setting. With `BILLING` set and the key
- * missing, or the two disagreeing about test and live, every door refuses, the list too, naming both settings
- * (`loop/finish/rules.md` §12).
+ * missing, or the two disagreeing about test and live, every door refuses, the list too, naming both settings.
  */
 
 import { personName, type AccountDoor, type Provisioned } from '@braindog/host/auth';
@@ -52,7 +51,7 @@ import {
  *
  * THE WORDS ARE THE SITE'S, SAID AGAIN HERE BECAUSE AN APP CANNOT IMPORT ANOTHER: `apps/site/src/lib/plans.ts` is where
  * every price is chosen ("$12" and "$29", "a month, per record"), and `apps/site/src/lib/plans.test.ts` holds these
- * names and prices to it (`loop/finish/contracts.md` C8). What a person is charged is the
+ * names and prices to it. What a person is charged is the
  * Stripe price the setting names, so a change of price is made in Stripe, in that file, and here, together.
  *
  * `directory` IS THE PLAN THE DIRECTORY METERS THE RECORD UNDER (`PLANS` and `ALLOWANCE` in
@@ -71,15 +70,15 @@ export type MeteredPlan = (typeof HOSTED_PLANS)[HostedPlan]['directory'];
 const PLAN_IDS: readonly HostedPlan[] = ['cloud', 'plus'];
 
 /**
- * How many days after its lapse began a record is deleted: the ladder's last step, which the nightly walk takes
- * (`loop/finish/ops.md` OPS-15). `delete_on` in the list is that day, so the screen and the walk read one number.
+ * How many days after its lapse began a record is deleted: the ladder's last step, which the nightly walk takes.
+ * `delete_on` in the list is that day, so the screen and the walk read one number.
  */
 export const LAPSE_DELETES_DAYS = 90;
 
 const DAY_MS = 86_400_000;
 
 /**
- * The most payment pages one person may open in `CHECKOUT_WINDOW_MS` (`loop/finish/contracts.md` §3.3). Each is a
+ * The most payment pages one person may open in `CHECKOUT_WINDOW_MS`. Each is a
  * Stripe object and a call on this Worker's Stripe budget, so a signed-in person pressing Pay in a loop is refused
  * after five and told when to try again.
  */
@@ -88,14 +87,14 @@ const CHECKOUT_WINDOW_MS = 3_600_000;
 
 /**
  * The names a new record is made under when the one asked for was taken between the checkout and the payment: the name
- * itself, then `<name>-2` to `<name>-9` (`loop/finish/contracts.md` §3.3). A ceiling on the Directory calls one payment
+ * itself, then `<name>-2` to `<name>-9`. A ceiling on the Directory calls one payment
  * makes.
  */
 const NAME_TRIES = 9;
 
 /**
  * The most bytes of one webhook body read. Stripe's events are a few kilobytes; the door is public, so a larger body is
- * refused before it is held (`loop/finish/ops.md` OPS-13, `loop/finish/rules.md` §12).
+ * refused before it is held.
  */
 const WEBHOOK_BODY_MAX = 1_048_576;
 
@@ -198,7 +197,7 @@ const STRIPE_DOWN = 'Stripe could not be reached just now, so nothing was starte
  */
 export type BillingDeps = {
   clock: () => number;
-  /** The Directory's billing group (`loop/finish/ops.md` §4.0 B). */
+  /** The Directory's billing group. */
   billing: <C extends BillingCall>(call: C) => Promise<BillingAnswers[C['op']]>;
   /** The records this person owns, from the Directory's usage ledger: which records the list covers, and where a paid checkout finds a record an earlier delivery made. */
   usage: (person: string, range: { from: string; to: string }) => Promise<Result<AccountUsage>>;
@@ -214,7 +213,7 @@ export type BillingDeps = {
   provision: (args: { slug: string; email: string; name?: string; tz: string }) => Promise<Result<Provisioned>>;
   /** The plan the Directory meters the record under, so its allowance follows what it pays for. `null` is set. */
   setPlan: (record: string, plan: MeteredPlan) => Promise<Refusal | null>;
-  /** The record's own lapse switch (`Record$.setLapsed`, `loop/finish/ops.md` §4.0 F). */
+  /** The record's own lapse switch (`Record$.setLapsed`). */
   setLapsed: (record: string, on: boolean) => Promise<void>;
   /** A Stripe client over the secret key. */
   stripe: (key: string) => Stripe;
@@ -577,10 +576,10 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
   /**
    * Stripe saying a payment happened, handed the request exactly as it arrived.
    *
-   * THE BODY IS READ ONCE, AS TEXT, AT MOST `WEBHOOK_BODY_MAX` BYTES, AND NOTHING PARSES IT BEFORE `verifyStripe`
-   * (`loop/finish/rules.md` §12): a body parsed and written out again is not the body Stripe signed. A wrong signature
-   * is 400, which Stripe reads as not delivered. Then the event's mode must be this host's, then the delivery claims
-   * the event (below), and only then is it applied.
+   * THE BODY IS READ ONCE, AS TEXT, AT MOST `WEBHOOK_BODY_MAX` BYTES, AND NOTHING PARSES IT BEFORE `verifyStripe`:
+   * a body parsed and written out again is not the body Stripe signed. A wrong signature is 400,
+   * which Stripe reads as not delivered. Then the event's mode must be this host's, then the delivery claims the event
+   * (below), and only then is it applied.
    *
    * APPLYING AN EVENT TWICE CHANGES NOTHING, so a delivery that failed is put right by the next one. Each step reads
    * the row before it writes: the lapse switch and the plan are set before the row, the row is written last, a record

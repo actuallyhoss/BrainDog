@@ -6,7 +6,7 @@
  * Durable Object's sentence ("please use the state.storage.transaction() or
  * state.storage.transactionSync() APIs instead of the SQL BEGIN TRANSACTION or SAVEPOINT statements")
  * while this package's 179 tests and the kernel's 1001 were green, because every one of them was
- * `node:sqlite` or read `src/index.ts` as text (`loop/research-provision-day.md`, "Reason two").
+ * `node:sqlite` or read `src/index.ts` as text.
  *
  * REAL, NOT A FAKE. Miniflare starts workerd, the DO class below is bundled with the real kernel by
  * esbuild, and `storageSql` is not a copy: it is cut out of `src/index.ts` as text at test time, the
@@ -17,7 +17,7 @@
  *
  * SLOW BY THE STANDARDS OF THIS SUITE, about two seconds, nearly all of it workerd starting once.
  *
- * THE VAULT CASES AT THE END WERE RED ON 23 SEPTEMBER against the adapter that handed the kernel each BLOB as the
+ * THE VAULT CASES AT THE END WERE RED against the adapter that handed the kernel each BLOB as the
  * object's `ArrayBuffer`: the export's grant line read `...,"api_token",1,{},{},...`, and the old file imported into a
  * second object answered `ok` holding `["[object String]","[object Object]"]` where the ciphertext had been.
  */
@@ -56,7 +56,7 @@ const ADAPTER = `${source.slice(at, end + 2)}\nexport { storageSql };\n`;
 const GUARD = 'if (depth > 0) return fn();';
 const FIXED = 'if (depth > 0) return storage.transactionSync(fn);';
 assert.ok(ADAPTER.includes(GUARD) || ADAPTER.includes(FIXED), 'the nesting guard in storageSql changed; update the delegating variant below');
-/* Since 22 September the adapter delegates itself, so this variant is the adapter as shipped, and the
+/* The adapter now delegates itself, so this variant is the adapter as shipped, and the
    test that runs "the adapter as it stands" is the one that stops it going back to `fn()`. */
 const DELEGATING = ADAPTER.replace(GUARD, FIXED);
 
@@ -265,7 +265,7 @@ test('THE VAULT DEPOSIT ON A DURABLE OBJECT: bindGrant seals and binds, where it
   assert.deepEqual(await run('bind'), { out: 'ok', grants: 1 });
 });
 
-test('AN INVITATION ON A DURABLE OBJECT: the second door the research drove to the same 500', async () => {
+test('AN INVITATION ON A DURABLE OBJECT: the second door that reached the same 500', async () => {
   assert.deepEqual(await run('invite'), { out: 'ok' });
 });
 
@@ -298,7 +298,7 @@ test('A NESTED REFUSAL ROLLS BACK ONLY ITS OWN WRITES once the adapter hands nes
 
 /* ── the vault, through export and import ─────────────────────────────────────────────────────────────────────────── */
 
-/* THE EXPORT WROTE EVERY BLOB AS `{}` ON A DURABLE OBJECT, `loop/research-batch-forty-five-audit.md` §1. The object hands a
+/* THE EXPORT WROTE EVERY BLOB AS `{}` ON A DURABLE OBJECT. The object hands a
    BLOB back as an `ArrayBuffer`, `encode` in `packages/kernel/src/brainl.ts` writes `{ b64 }` only for a `Uint8Array`,
    and `JSON.stringify` writes an `ArrayBuffer` as `{}`. So the owner's export and the nightly copy (`snapshots.ts`, the
    same call) held every row and none of the vault, signed over the `{}` and looking whole, and a restore into another
@@ -337,7 +337,7 @@ test('A COPY WRITTEN BEFORE THE REPAIR IS REFUSED ON A DURABLE OBJECT, at the co
 /* THE SAME FAULT ON THE DOOR EVERY POLL OPENS. `sealedGrant` hands a leased connector its key as `base64(row.ciphertext)`,
    and `base64` in `packages/kernel/src/vault.ts` loops to `bytes.length`, which an `ArrayBuffer` does not have: the loop
    ran no times and the connector was handed `""` under `ok`, so the refusal a runner would have reported never came.
-   The wrapped connector key went out as `""` the same way. Measured on 23 September with `storageSql` taken from
+   The wrapped connector key went out as `""` the same way. Measured with `storageSql` taken from
    `ed350479^`: this case failed on `{ out: 'ok', ciphertext: '', dek: '' }`, and so did the export case above, on its
    `{},{}` grant line. [7, 7, 7] is `BwcH`. */
 test('A CONNECTOR\'S LEASE OPENS ITS KEY WHOLE ON A DURABLE OBJECT, where the old adapter handed it an empty string', async () => {

@@ -1,13 +1,11 @@
 /**
- * `POST /api/slash/read` (`src/slash-ask.ts`), driven over a real socket against a real record, and since
- * `loop/research-spark-routes.md` Brief D1 the three doors beside it: status, settings and propose. Those
+ * `POST /api/slash/read` (`src/slash-ask.ts`), driven over a real socket against a real record, and the
+ * three doors beside it: status, settings and propose. Those
  * five tests at the foot of the file were written first and run against the one-door `servesSlash`: 14 tests,
  * 9 pass, 5 fail, every new door answering 404 because nothing in front of the method router matched it.
  *
- * WHAT THIS IS FOR IS THE PATH AND NOT THE EDGE. Finding 2 of `loop/research-batch-five-audit.md` made both
- * engine builders throw on every call and watched every suite but the builders' own pass unmoved. Re-driven on
- * 2026-09-21 over the WHOLE of each app, because the audit's 172 and 199 were those suites less
- * `slash.test.ts` and a memo that dropped the exclusion turned them into false tallies: `apps/selfhost` is 204
+ * WHAT THIS IS FOR IS THE PATH AND NOT THE EDGE. A probe made both engine builders throw on every call and
+ * watched every suite but the builders' own pass unmoved. Driven over the WHOLE of each app: `apps/selfhost` is 204
  * tests, 202 pass, 0 fail, 2 skipped, identical to an unmutated run, and `apps/worker` is 179 tests, 176 pass,
  * 3 fail, with all three reds inside `apps/worker/test/slash.test.ts`. The thirteenth package had a dependency,
  * a builder, a door and a test, and no request that reached any of them. So the tests below are about a
@@ -16,11 +14,11 @@
  * `:1296`, its `new Request` at `:1319`), against a record on real SQLite, through the real engine of
  * `@braindog/slash`, with the model as the only double. Nothing here leaves the machine.
  *
- * THE TEST THAT MATTERS IS THE ONE WITH THE THROWING BUILDER, because that is the assertion a future pass
+ * THE TEST THAT MATTERS IS THE ONE WITH THE THROWING BUILDER, because that is the assertion a future change
  * cannot delete the caller and keep. Measured by removing the lines that ask `door.engine()` from
  * `serveSlash` and answering a canned reading instead: 5 of the 7 that existed then fail, and the throwing builder answers
  * `200 !== 500` with `{"ok":true,"value":{"ask_id":"a","predicate":null,"q":null,"read":[],"rows":[]}}` under
- * it. That is the inverse of the audit's measurement and the reason this file exists.
+ * it. That is the inverse of the probe's measurement and the reason this file exists.
  *
  * `createSlash` IS IMPORTED BY A RELATIVE PATH, as it is in `slash.test.ts` and for the same reason:
  * `packages/host` does not depend on `@braindog/slash` and must not, because `46 §5.1` puts the dynamic
@@ -271,7 +269,7 @@ test('NO MODEL CONFIGURED SAYS SO IN WORDS, and every other route on the same ho
   const listed = (await rows.json()) as { ok: boolean; value: { rows: unknown[] } };
   assert.equal(listed.value.rows.length, 3);
 
-  /* AND THE PATTERN DOOR, BUILT IN AGT-21, SAYS THE SAME SENTENCE THE ASK DOES with no model behind it, rather than
+  /* AND THE PATTERN DOOR SAYS THE SAME SENTENCE THE ASK DOES with no model behind it, rather than
      falling through to the method router. Status with no model says it too. */
   const pattern = await ask(host.origin, { samples: ['in_01JZ8QK3F7R2M9V4XN6TCB5HAD'] }, {}, '/api/slash/pattern');
   assert.equal(pattern.status, 501, JSON.stringify(pattern.body));
@@ -432,7 +430,7 @@ test('THE DOOR IS NOT A METHOD, which is what keeps it out of the record surface
   );
   /* AND THE ONES THAT ARE THERE ARE THE ARRANGEMENT ENGINE, which `1f85a49a` settled is a different feature
      with the same name: they propose how a BrainDog is put together, and none of them answers a question
-     about what is in it. `slashDraft` (PGS-7) drafts a page or a list from a description and files nothing. */
+     about what is in it. `slashDraft` drafts a page or a list from a description and files nothing. */
   assert.deepEqual(
     ROUTES.filter((r) => r.name.startsWith('slash')).map((r) => r.name),
     ['slash', 'slashPropose', 'slashDaily', 'slashForm', 'slashDraft'],
@@ -443,7 +441,7 @@ test('THE DOOR IS NOT A METHOD, which is what keeps it out of the record surface
   assert.equal(servesSlash('/api/slash/propose'), 'propose');
   assert.equal(servesSlash('/api/slash/status/'), 'status');
   assert.equal(servesSlash('/api/slash/settings'), 'settings');
-  /* THE TWO DOORS `loop/finish/contracts.md` X26 GIVES AGT-21: the owner's list of asks, and a pattern from arrivals. */
+  /* THE TWO NEWER DOORS: the owner's list of asks, and a pattern from arrivals. */
   assert.equal(servesSlash('/api/slash/asks'), 'asks');
   assert.equal(servesSlash('/api/slash/pattern'), 'pattern');
 });
@@ -452,10 +450,10 @@ test('THE DOOR IS NOT A METHOD, which is what keeps it out of the record surface
  * WHETHER A REQUEST CAN ARRIVE AT ALL, which is the one thing every test above this line assumes.
  *
  * THIS IS RED ON PURPOSE AND IT IS THE POINT OF THE FILE. Every other test here builds its own dispatch in
- * `listen`, which is what lets all seven pass while no host routes the door: three reports in a row said the
- * thirteenth package had a caller, and each time the checker measured it and found `packages/host/src/index.ts`
+ * `listen`, which is what lets all seven pass while no host routes the door: the thirteenth package was said to
+ * have a caller, and measuring it found `packages/host/src/index.ts`
  * exporting a door, `apps/worker/src/slash.ts` and `apps/selfhost/src/slash.ts` each declaring one, and no
- * branch anywhere handing a request to either. Measured directly on 2026-09-21: a real self-host started with
+ * branch anywhere handing a request to either. Measured directly: a real self-host started with
  * a `SLASH_ENDPOINT` and a key reports `slash: true` at `/api/version` and answers `POST /api/slash/read` with
  * 404 `ROUTE_UNKNOWN` "There is no method called slash/read." An in-process test cannot see that, so this one
  * reads the two dispatch files off disk instead.
@@ -464,8 +462,7 @@ test('THE DOOR IS NOT A METHOD, which is what keeps it out of the record surface
  * reason: whether a door is routed is a fact about a host's source, not about a function's behaviour, so the
  * source is what is asserted. Its right homes are `apps/worker/test/slash.test.ts` and
  * `apps/selfhost/test/slash.test.ts`, one assertion per host in the suite that owns the host. It is here
- * because this was the only test file the pass that wrote it was allowed to write, and moving it is a
- * five-line change that should happen with the mount.
+ * for now, and moving it is a five-line change that should happen with the mount.
  *
  * WHAT TURNS IT GREEN, both driven before this was written. The self-host wants three edits to `server.ts`:
  * a second `openSqlite` for Slash's own database beside `const sql`, a `slash: slashDoor(...)` entry in the
@@ -555,7 +552,7 @@ test('POST /api/slash/settings CHANGES THE CAP FOR THE OWNER, and a key it does 
   const after = await fetch(`${host.origin}/api/slash/status`);
   assert.equal(((await after.json()) as { value: { asks: { cap: number } } }).value.asks.cap, 5);
 
-  /* F3 OF `loop/research-spark-routes.md`, MEASURED THERE: `configure({ tier: 'a', bogus: 1 })` answered `ok` with
+  /* MEASURED ON THE PACKAGE: `configure({ tier: 'a', bogus: 1 })` answered `ok` with
      nothing changed, so a typo an owner made was a save that did nothing and said it had worked. */
   spy.calls.length = 0;
   const stray = await ask(host.origin, { bogus: 1 }, {}, '/api/slash/settings');
@@ -630,7 +627,7 @@ test('A BEARER AT EACH OF THE THREE NEW DOORS IS REFUSED, before the origin and 
 });
 
 test("A HOST THAT CAN OPEN A KEY GETS TIER b THROUGH, and propose is handed what the host's byok answered", async () => {
-  /* NO TEST REACHED `byok` UNTIL THIS ONE. The checker dropped the spread that puts `slashAskDoor`'s third argument on
+  /* NO TEST REACHED `byok` UNTIL THIS ONE. Dropping the spread that puts `slashAskDoor`'s third argument on
      the door and every other test in this file still passed, because both hosts pass none and every test above
      builds its door the same way. Without the spread a host that could open a key would still be told 501 at
      settings, and `propose` would never see the key it opened. A double engine, because what is measured is only

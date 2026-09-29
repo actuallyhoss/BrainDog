@@ -63,13 +63,13 @@ export { personName } from './invite.ts';
 export type AccountRoute = { path: string; method: 'GET' | 'POST'; on: 'both' | 'worker'; needs: 'session' | 'stripe'; what: string };
 
 /**
- * The routes that answer about a person's account rather than a record (`loop/research-scheduled-actions.md` §4.6).
+ * The routes that answer about a person's account rather than a record.
  *
  * THE DIRECTORY'S, LIKE SIGN-IN, and never a record's: usage is billing, and a record cannot see its own allowance.
  * A person sees the records they own and nothing of anybody else's.
  *
- * THE BILLING ROWS AND CLOSING ARE DECLARED BEFORE THEY ARE BUILT (`loop/finish/ops.md` §4.0 D), so the units that
- * build them in later workflows write a door and never a route. Until a host hands `serveAccount` that door, the
+ * THE BILLING ROWS AND CLOSING ARE DECLARED BEFORE THEY ARE BUILT, so the code that
+ * builds them writes a door and never a route. Until a host hands `serveAccount` that door, the
  * row answers 404 `ROUTE_UNKNOWN`, which is what a path nobody serves already answered.
  */
 export const ACCOUNT_ROUTES: readonly AccountRoute[] = [
@@ -85,7 +85,7 @@ export const ACCOUNT_ROUTES: readonly AccountRoute[] = [
   { path: '/account/close', method: 'POST', on: 'worker', needs: 'session', what: 'Close your account, `{ email }` typed to confirm, from a sign-in in the last fifteen minutes.' },
   /* THE WAY BACK FROM A LOST MAILBOX, with the operator's claim link: sign in by passkey or claim link, then change the
      address. Both hosts, because a self-host's person loses a mailbox as easily; a host with no way to send mail is
-     handed no door and answers 404, as for every row (GAP-7, `loop/finish/contracts.md` §12.1). */
+     handed no door and answers 404, as for every row. */
   { path: '/account/email', method: 'POST', on: 'both', needs: 'session', what: 'Change the address you sign in with, `{ email }`: a link good for a day is mailed to the new address, and nothing moves until it is pressed.' },
   { path: '/account/email/confirm', method: 'POST', on: 'both', needs: 'session', what: 'Press the mailed link, `{ token }`, from a sign-in in the last fifteen minutes: the address moves in every record you belong to.' },
 ];
@@ -129,7 +129,7 @@ export type AccountDoor = {
   email?: EmailDoor | undefined;
 };
 
-/* ── a person's own name and sign-in address (GAP-7, `loop/finish/contracts.md` §12.1) ─────────────────────────── */
+/* ── a person's own name and sign-in address ───────────────────────────────────────────────────────────────────── */
 
 /**
  * What moves in a person's mirror in each record: a new name, a new sign-in address, or both.
@@ -230,7 +230,7 @@ async function emailAsked(door: EmailDoor, origin: string, who: Who, body: Recor
  * belongs to, and one line to the old address saying so.
  *
  * FRESH FIRST, BEFORE THE LINK IS SPENT. Moving the address is taking over the account's way in, so a session left
- * signed in for a month is asked to sign in again (`FRESH`, OPS-7), and the link still works when they come back to it.
+ * signed in for a month is asked to sign in again (`FRESH`), and the link still works when they come back to it.
  */
 async function emailConfirmed(door: EmailDoor, who: Who, body: Record<string, unknown>): Promise<Result<unknown>> {
   const now = door.now ?? Date.now;
@@ -253,7 +253,7 @@ async function emailConfirmed(door: EmailDoor, who: Who, body: Record<string, un
 /** A row this host does not serve: the same answer as a path that is no row at all. */
 const unserved = (): Response => refusal(404, { code: 'ROUTE_UNKNOWN', fix: 'There is no account route at that address.' });
 
-/* ── closing an account (OPS-21, `loop/finish/ops.md` §4.0 D) ─────────────────────────────────────────────── */
+/* ── closing an account ─────────────────────────────────────────────────────────────────────────────────────── */
 
 /** The most owned records the close door asks for their other owners; past it the account is not closed. */
 export const CLOSE_RECORDS_MOST = 200;
@@ -391,7 +391,7 @@ export async function serveAccount(request: Request, door: AccountDoor): Promise
 /**
  * The three sign-up flows, declared here before the Directory has them.
  *
- * THEIR ROWS ARE THIS WORKFLOW'S AND THEIR FLOWS ARE THE NEXT'S (`loop/finish/contracts.md` §3.3): the table is fixed
+ * THEIR ROWS COME BEFORE THEIR FLOWS: the table is fixed
  * now so the sign-up screen is written against it, and until the `AuthCall` union names these three, `serveAuth`
  * answers each row as a way in this host does not offer.
  */
@@ -462,7 +462,7 @@ export type Why = 'not-configured' | 'insecure';
  * session to have. `firstRun` is there whenever sign-in is.
  *
  * NO `demo`. A Worker with a pinned public record said so here, and the app offered a way into it; the public demo is
- * gone (`loop/research-no-sample.md` A1), so there is nothing to offer and the key is not sent. The web reads an absent
+ * gone, so there is nothing to offer and the key is not sent. The web reads an absent
  * key as `false`, so an app older than this host draws the same screen.
  */
 export type MethodsBody = {
@@ -506,7 +506,7 @@ export function cookieMode(origin: string): CookieMode | null {
  * The WebAuthn relying party for an origin, or `null` where a browser will not run a ceremony.
  *
  * THE EXACT HOST UNLESS THE HOST NAMES A PARENT. A passkey made for `app.brain.dog` answers nothing at any other
- * name, which was the whole rule until the app moved to `brain.dog` (`loop/research-one-domain.md` §3.0):
+ * name, which was the whole rule until the app moved to `brain.dog`:
  * production has no magic links, so the owner's first passkey, made at `app.brain.dog`, would have been his only
  * way in and would have stopped working on the day of the move. `rpId` is the Worker's `RP_ID`, and a passkey
  * made under `brain.dog` is offered at `app.brain.dog` and `brain.dog` alike.
@@ -647,7 +647,7 @@ export async function deriveSessionKey(material: Uint8Array): Promise<Uint8Array
  * in the last fifteen minutes. `credentialed`, because a cookie is a credential of the person's own.
  *
  * `wheres` GOES WHEREVER `levels` GOES, the rows of each list a narrowed grant reaches, so both hosts hand every reader
- * the same rules (`loop/finish/platform.md` §4.0 W). Absent from `held`, which is a record older than migration 19,
+ * the same rules. Absent from `held`, which is a record older than migration 19,
  * no grant is narrowed.
  */
 export function sessionContext<L extends string>(
@@ -739,7 +739,7 @@ const off = (): Response => refusal(404, { code: 'ROUTE_UNKNOWN', fix: 'This Bra
 /**
  * The link a person is sent or handed. The fragment is the whole of the design: see the header.
  *
- * UNDER `/app`, BECAUSE THAT IS WHERE THE APP IS NOW SERVED (`loop/research-one-domain.md` §3.4). On `brain.dog`
+ * UNDER `/app`, BECAUSE THAT IS WHERE THE APP IS NOW SERVED. On `brain.dog`
  * the root is the marketing site, so `https://brain.dog/signin` is the site's 404 page and a link to it signs
  * nobody in. A link already mailed at `app.brain.dog/signin#…` still works: that host 308s a page load to
  * `/app/signin`, and a browser keeps the fragment across a redirect whose `Location` carries none.
@@ -755,7 +755,7 @@ const linkOf = (origin: string, mail: LinkMail, next: unknown = undefined): stri
  *
  * THE LINK WROTE NO QUERY, AND THE PAGE HE WAS SENT FROM WAS LOST. Sign-in at `/app/signin?next=/app/acme/r/tasks`
  * mailed `/app/signin#magic=...`, so the tab the mail opened read an empty search and "Open BrainDog" went to `/app/`
- * (`loop/research-batch-forty-six-audit.md`, "Found on the way"; `test/auth-next.test.ts`).
+ * (`test/auth-next.test.ts`).
  *
  * `safeNext` FIRST, THEN UNDER `/app` ONLY. The value is whatever query reached the sign-in page, so a scheme, `//`, a
  * backslash or a control character is dropped before it is ever in a mail with this origin on it; and a path outside
@@ -853,7 +853,7 @@ function callOf(flow: AuthFlow, body: Record<string, unknown>, sid: string | und
  * that is in `AUTH_ROUTES`, in `AuthCall` and in `AuthBodies` and was only missed in the switch
  * above: the route exists, the Directory implements it, and the host answers as though neither did.
  *
- * MEASURED ON 2026-09-20 by adding a fourteenth flow to `AuthCall` and its body to `AuthBodies`.
+ * MEASURED by adding a fourteenth flow to `AuthCall` and its body to `AuthBodies`.
  * `pnpm -C packages/host typecheck` passed, and the new route answered 404. The parameter below is
  * `never`, so the same edit now fails to compile, which is where a missing case belongs.
  *
@@ -1050,7 +1050,7 @@ async function operated(request: Request, route: AuthRoute, door: AuthDoor): Pro
   if (on.status !== 200 || !(on.body as Methods).configured) return off();
 
   const email = text(body.email).trim().toLowerCase();
-  /* AN ABUSIVE ACCOUNT STOPPED (OPS-21): the one writer of `dir_person.suspended_at`. Anything but `false` stops them,
+  /* AN ABUSIVE ACCOUNT STOPPED: the one writer of `dir_person.suspended_at`. Anything but `false` stops them,
      so a body that forgot the field does the safer of the two. */
   if (route.flow === 'suspend') {
     return answered(await door.auth({ flow: 'suspend', email, suspended: body.suspended !== false }), cookieMode(door.origin) ?? 'secure');

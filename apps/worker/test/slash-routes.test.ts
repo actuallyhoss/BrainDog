@@ -1,6 +1,6 @@
 /**
  * Two of Slash's three new doors on the Worker, `GET /api/slash/status` and `POST /api/slash/settings`, driven through
- * the router and the object as they ship. `loop/research-spark-routes.md` §6, brief D2. `POST /api/slash/propose` is
+ * the router and the object as they ship. `POST /api/slash/propose` is
  * not driven here. It sits behind the same two locks and the same router branch, which read the path and not the route,
  * and what it adds is the `ask_id` handed through, which `packages/host/test/slash-ask.test.ts` holds.
  *
@@ -12,7 +12,7 @@
  * hold at `read` are held here at status and settings, and the last case goes to workerd for the one thing a
  * `node:sqlite` double cannot say, that status and settings answer on a Durable Object's own storage.
  *
- * RED BEFORE D1, MEASURED ON 22 SEPTEMBER, with `aa763cdf^`'s `packages/host/src/slash-ask.ts` swapped in by an esbuild
+ * RED BEFORE THE DOORS WERE ROUTED, MEASURED with `aa763cdf^`'s `packages/host/src/slash-ask.ts` swapped in by an esbuild
  * `onLoad` in a scratch bundle outside the tree and nothing in the tree changed: all three tests failed on a 404
  * `ROUTE_UNKNOWN`, and the note above each group says which sentence and what it meant.
  */
@@ -27,7 +27,7 @@ import { bundled, objectStorage } from './bundled-worker.ts';
 const HOST = 'app.example.test';
 const ORIGIN = `https://${HOST}`;
 const REC = 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD';
-/* A PERSON CONTEXT NO SIGN-IN BUILT, the shape the public demo forwarded until it went (`loop/research-no-sample.md` A1).
+/* A PERSON CONTEXT NO SIGN-IN BUILT, the shape the public demo forwarded until it went.
    The demo is gone and the object's lock is not, so the lock is held here to a context a forged or mis-wired door could
    still hand it. */
 const UNCREDENTIALED = { principal: { kind: 'person', id: 'p_demo', level: 'read' }, credentialed: false };
@@ -103,7 +103,7 @@ test('AN UNCREDENTIALED PERSON IS REFUSED AT STATUS AND AT SETTINGS, as at read,
 
 /* ── a bearer, at the router ─────────────────────────────────────────────────────────────────────────────────────────── */
 
-/* THE ROUTER'S BRANCH IS `servesSlash(url.pathname) !== null`, and before D1 that function answered `null` at these
+/* THE ROUTER'S BRANCH IS `servesSlash(url.pathname) !== null`, and before these doors were routed that function answered `null` at these
    paths, so the router resolved the bearer and forwarded it. Measured with the old door bundled: the settings POST
    reached the object and was answered 404 `ROUTE_UNKNOWN`, "There is no method called slash/settings." That forward is
    what would cost something now the object answers the path: `inward()` deletes `authorization`, so a bearer let through
@@ -206,7 +206,7 @@ after(async () => {
   await mf?.dispose();
 });
 
-/* BEFORE D1 THE STATUS GET ANSWERED 404 `ROUTE_UNKNOWN` HERE, measured in workerd with the old door bundled: "There is
+/* BEFORE THESE DOORS WERE ROUTED THE STATUS GET ANSWERED 404 `ROUTE_UNKNOWN` HERE, measured in workerd with the old door bundled: "There is
    no method called slash/status.", which is `serveApi` reading the path as a record method once `servesSlash` said no. */
 test("ON A DURABLE OBJECT, STATUS ANSWERS 200 TO A PALETTE THAT SENDS NO ORIGIN, and an owner's cap is read back", async () => {
   /* WHAT A BROWSER SENDS ON A SAME-ORIGIN GET: the cookie and `Sec-Fetch-Site`, and no `Origin`. */

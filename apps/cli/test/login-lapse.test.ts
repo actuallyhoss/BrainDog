@@ -4,9 +4,9 @@
  * THE LAPSE IS REAL AND IT IS STORED. A login is the device grant's bearer, minted for `DEFAULT_DAYS = 90`
  * (`packages/kernel/src/token.ts:47`, `packages/kernel/src/device.ts:250` to `:261`), with no sliding renewal: nothing in
  * the kernel moves `expires_at` once it is written. `login` keeps the date it was answered in the hosts file as
- * `hosts[<host>].token.expires` (`apps/cli/src/login.ts`), and the self-host's login on 23 September said "token expires
+ * `hosts[<host>].token.expires` (`apps/cli/src/login.ts`), and a self-host's login said "token expires
  * 2026-12-22". Past it, `target` throws, the MCP server has nothing to reach, and until this the first word anyone had
- * was the hook's line on the day after (`loop/research-cutover-day.md` §6 and §8).
+ * was the hook's line on the day after.
  *
  * FOURTEEN DAYS, because a person who opens a session every working day then sees it on ten of them.
  *

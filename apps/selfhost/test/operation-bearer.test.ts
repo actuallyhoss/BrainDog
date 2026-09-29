@@ -1,8 +1,8 @@
 /**
  * An operation bearer over the socket: a device grant of reach `export` or `import`, approved from a session, reaches
- * its one method once and nothing else (ROADMAP W55-4, `48 §5.2`, `49 §5.2` step 7).
+ * its one method once and nothing else (`48 §5.2`, `49 §5.2` step 7).
  *
- * MEASURED AT 1586f2a2, BEFORE THIS FILE: W55-2 gave the record `operationGrant` and an `admin` that admits a context
+ * MEASURED AT 1586f2a2, BEFORE THIS FILE: the record had `operationGrant` and an `admin` that admits a context
  * carrying `operation`, and no host built one. The self-host's `bearerFor` asked `verifyToken`, which reads the `token`
  * table, and an operation bearer lives in `device_grant`, so `POST /api/export` with the bearer the device had just been
  * handed answered 401 "This record does not know that credential." `braindog export` against a self-host had a bearer

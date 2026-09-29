@@ -1,6 +1,6 @@
 /**
  * The vault passphrase, the half both hosts share: the key derived from it, the record key wrapped and opened under
- * that, and the two steps the record's methods are handed (`loop/finish/platform.md` §4.0 V, `12 §6` "The optional
+ * that, and the two steps the record's methods are handed (`12 §6` "The optional
  * second factor").
  *
  * PBKDF2-SHA-256, `PASSPHRASE_ITERATIONS` ROUNDS, A FRESH 16-BYTE SALT EACH TIME ONE IS SET. HKDF is not a passphrase
