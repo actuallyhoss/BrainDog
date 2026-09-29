@@ -172,11 +172,22 @@ export function flatNav<T extends { title: string; href: string; icon: string; r
   sections: readonly (readonly [string, readonly T[]])[],
   open: number,
   words: FlatWords,
+  { work = null }: { work?: string | null } = {},
 ): Flat<T> {
-  const rows = sections.flatMap(([section, entries]) => {
+  type Row = { section: string; lead: T | undefined; entries: readonly T[]; item: FlatItem; screen?: true };
+  const rows: Row[] = sections.flatMap(([section, entries]) => {
     const lead = leadOf(entries);
     return lead ? [{ section, lead, entries, item: sectionItem(section, lead, entries) }] : [];
   });
+  /* THE WORK SCREEN, ON A RECORD THAT HOLDS TASKS (`lib/work/Work.svelte`). Its row is the Work section's, opening on the
+     screen, and the section's own pages go under More with the others; a record with tasks and no Work section gets
+     the row all the same, where Work sits among the sections a day runs through. */
+  if (work !== null) {
+    const item: FlatItem = { key: 'work', href: work, label: WORK_WORD, icon: 'task', near: [work] };
+    const held = rows.find((r) => plainOf(r.section) === 'work');
+    if (held) Object.assign(held, { item: { ...item, label: held.section, icon: held.lead?.icon ?? 'task' }, screen: true });
+    else rows.unshift({ section: WORK_WORD, lead: undefined, entries: [], item, screen: true });
+  }
   const rank = (section: string, list: readonly string[]) => list.indexOf(plainOf(section));
   const first = rows.filter((r) => rank(r.section, FIRST) >= 0).sort((a, b) => rank(a.section, FIRST) - rank(b.section, FIRST));
   const others = rows.filter((r) => rank(r.section, FIRST) < 0 && rank(r.section, AFTER) < 0 && rank(r.section, UNDER) < 0);
@@ -196,16 +207,34 @@ export function flatNav<T extends { title: string; href: string; icon: string; r
 
   const main = [today, ...bodyIn.map((r) => r.item), activity, ...decide, ...afterIn.map((r) => r.item)];
   const more = [...body, ...after, ...under].filter((r) => !shown.has(r)).map((r) => r.item);
-  /* THE OTHER PAGES A SECTION HOLDS, a Board beside Work, and never a row's own page (`row`), which its list's page opens. */
-  const pages = rows.flatMap((r) => r.entries.filter((e) => e !== r.lead && !e.row));
+  /* THE OTHER PAGES A SECTION HOLDS, a Board beside Work, and never a row's own page (`row`), which its list's page opens.
+     A section whose row opens the Work screen keeps its lead page here too, called "Work page" so it is not a second
+     "Work" under More. */
+  const pages = rows.flatMap((r) =>
+    r.entries.flatMap((e) => (e.row ? [] : e !== r.lead ? [e] : r.screen ? [{ ...e, title: `${e.title} page` }] : [])),
+  );
   return { main, more, pages };
 }
+
+/** What the Work screen's row says on a record whose sections do not name Work. */
+const WORK_WORD = 'Work';
 
 /** The page the record opened on before Today, kept under More at a word in the query (`routes/+page.svelte`). */
 export const OVERVIEW = '/?overview';
 
-/** Where the reader is, for the rows to compare against: the address inside the record, and the Overview as its own place. */
-export const placeOf = (path: string, search: URLSearchParams): string => (path === '/' && search.has('overview') ? OVERVIEW : path);
+/**
+ * THE WORK SCREEN, at a word in the query for the Overview's reason: every top-level folder is a word no record may be
+ * named (`APP_WORDS` in `lib/at.ts`, and the Directory's own list), and a record somebody already called "work" must
+ * still open.
+ */
+export const WORK = '/?work';
+
+/**
+ * Where the reader is, for the rows to compare against: the address inside the record, with the Overview and the Work
+ * screen as places of their own.
+ */
+export const placeOf = (path: string, search: URLSearchParams): string =>
+  path === '/' && search.has('overview') ? OVERVIEW : path === '/' && search.has('work') ? WORK : path;
 
 /** Whether `path`, read inside the record, is on this row: one of its addresses or one under it, or exactly `/` for Today. */
 export function isHere(item: Pick<FlatItem, 'near' | 'exact'>, path: string): boolean {

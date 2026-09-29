@@ -61,7 +61,7 @@
   import type KeymapView from '$lib/ui/Keymap.svelte';
   import { palette } from '$lib/palette/open.svelte.ts';
   import { levelWord, openRecord } from '$lib/record/switcher.ts';
-  import { OVERVIEW, arrange, flatNav, isHere, orderLists, placeOf, tabsOf } from '$lib/nav.ts';
+  import { OVERVIEW, WORK, arrange, flatNav, isHere, orderLists, placeOf, tabsOf } from '$lib/nav.ts';
   import { navPrefs } from '$lib/nav-prefs.svelte.ts';
   import { spineOf } from '$lib/spine.ts';
   import { said } from '$lib/voice.svelte.ts';
@@ -179,7 +179,11 @@
    * THE FLAT LIST, ONE RULE FOR THE RAIL, THE TOP BAR, THE TAB BAR AND THE SHEET (`flatNav` in `lib/nav.ts`): Today, the
    * sections a day runs through, Activity, Decide while something waits, seven at most, and everything else under More.
    */
-  const flat = $derived(flatNav(grouped, data.open, { today: copy.today, activity: copy.audit, decide: said('decide') }));
+  /* AND WORK OPENS THE WORK SCREEN ON A RECORD THAT HOLDS TASKS (`lib/work/Work.svelte`), empty or not. */
+  const holdsTasks = $derived(data.lists.some((l) => l.id === 'tasks'));
+  const flat = $derived(
+    flatNav(grouped, data.open, { today: copy.today, activity: copy.audit, decide: said('decide') }, { work: holdsTasks ? WORK : null }),
+  );
   const tabs = $derived(tabsOf(flat.main));
   /* WHAT THE TOP BAR SAYS IS UNDER MORE: the sections and pages that are not rows, and the lists. */
   const behind = $derived(flat.more.length + flat.pages.length + moreLists.length);

@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { arrange, flatNav, isHere, orderLists, tabsOf, withOrder } from './nav.ts';
+import { WORK, arrange, flatNav, isHere, orderLists, placeOf, tabsOf, withOrder } from './nav.ts';
 
 type Entry = { section: string; href: string; order: number };
 
@@ -129,6 +129,23 @@ test('A RECORD WITH SECTIONS THE LIST DOES NOT NAME KEEPS THEM, in the reader`s 
   assert.ok(!isHere(projects, '/p/money'));
   const today = flatNav(FOUNDER, 0, WORDS).main[0]!;
   assert.ok(isHere(today, '/') && !isHere(today, '/audit'));
+});
+
+test('ON A RECORD THAT HOLDS TASKS, WORK OPENS THE WORK SCREEN, and its old pages are under More', () => {
+  const flat = flatNav(FOUNDER, 0, WORDS, { work: WORK });
+  assert.deepEqual(flat.main.map((i) => i.label), ['Today', 'Work', 'Projects', 'Money', 'Activity', 'People', 'Services']);
+  const work = flat.main.find((i) => i.label === 'Work')!;
+  assert.equal(work.href, '/?work');
+  assert.ok(isHere(work, placeOf('/', new URLSearchParams('work'))));
+  assert.ok(!isHere(flat.main[0]!, placeOf('/', new URLSearchParams('work'))), 'Today is not marked on the Work screen');
+  /* The declared Work page is kept, under its own name, beside the Board. */
+  assert.deepEqual(flat.pages.map((p) => [p.title, p.href]), [['Work page', '/p/work'], ['Board', '/p/work-board']]);
+});
+
+test('A RECORD WITH TASKS AND NO WORK SECTION STILL GETS THE ROW', () => {
+  const flat = flatNav([['Coursework', [page('Coursework', '/p/coursework')]]], 0, WORDS, { work: WORK });
+  assert.deepEqual(flat.main.map((i) => [i.label, i.href]), [['Today', '/'], ['Work', '/?work'], ['Coursework', '/p/coursework'], ['Activity', '/audit']]);
+  assert.deepEqual(flat.pages, []);
 });
 
 test('THE PHONE`S TABS ARE THE FIRST FIVE, with Decide beside Today while something waits on it', () => {
