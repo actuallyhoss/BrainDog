@@ -190,6 +190,32 @@ export default async function keys(root = join(import.meta.dirname, '..', '..'))
     };
 
     /**
+     * THE CURSOR ON THE FIRST ROW OF TODAY THAT `test` ACCEPTS. Today's list mixes questions, tasks and bills, and `x`
+     * ticks only a task and a number answers only a question, so each is pressed on a row it can act on. `test` is
+     * run in the page on the row the cursor is on.
+     */
+    const onTodayRow = (test) => async (page) => {
+      for (let i = 0; i < 20; i++) {
+        await page.keyboard.press('j');
+        await page.waitForTimeout(120);
+        if (await page.evaluate(test)) return;
+      }
+    };
+    const onQuestion = onTodayRow(() => document.querySelector('li[data-row][data-cursor] .q') !== null);
+    const onTask = onTodayRow(() => document.querySelector('li[data-row][data-cursor] [role="checkbox"]') !== null);
+
+    /**
+     * THE WRITES A TICK OR AN ANSWER SENDS, HELD. One record serves every recipe in this run, in the registry's order,
+     * and Today and Work come before the queues: `1` on Today answers the first open question, which is one `/decide`
+     * opens on. The screen draws the press before it sends (the row goes, the option is chosen), so the change is
+     * there to see; the request is refused at the socket and the record stays as the later recipes expect it.
+     */
+    const held = (setup) => async (page) => {
+      await page.route(/\/api\/(?:decide|update)(?:\?|$)/u, (route) => route.abort());
+      await setup(page);
+    };
+
+    /**
      * THE GATE'S RECORD HAS NO ARRIVALS, so an inbox key would be pressed on an empty state and read as dead.
      * Two are handed to the screen in the record's own shape, which is the read the keys act on; nothing is
      * written. Filing one then asks the record, which refuses an id it does not hold, and says so in a toast.
@@ -250,6 +276,37 @@ export default async function keys(root = join(import.meta.dirname, '..', '..'))
       },
       'goto-nav': { route: '/inbox', press: ['g', '1'] },
       help: { route: '/', press: ['?'] },
+
+      /* TODAY, the screen `/` opens on (`lib/home/Today.svelte`). The cursor starts on nothing, so `j` alone is the move;
+         `k` is pressed from the second row, since on the first it has nowhere to go. */
+      'today-move': {
+        runs: [
+          { route: '/', press: ['j'] },
+          { route: '/', setup: async (page) => (await onFirst(page), onFirst(page)), press: ['k'] },
+        ],
+      },
+      'today-tick': { route: '/', setup: held(onTask), press: ['x'] },
+      'today-answer': { route: '/', setup: held(onQuestion), press: ['1'] },
+      /* `n` opens the line a task is typed into, and the caret is in it. */
+      'today-new': { route: '/', press: ['n'] },
+
+      /* THE WORK SCREEN, at `/?work` (`lib/work/Work.svelte`). Its keys act on the task under the cursor, so every one
+         but the move and the two that open a box is pressed with the cursor on the first task. `e` opens the task's
+         words in place, `d` and `m` open the row's menu on the day and on the move. */
+      'work-move': {
+        runs: [
+          { route: '/?work', press: ['j'] },
+          { route: '/?work', setup: async (page) => (await onFirst(page), onFirst(page)), press: ['k'] },
+        ],
+      },
+      'work-tick': { route: '/?work', setup: held(onFirst), press: ['x'] },
+      'work-edit': { route: '/?work', setup: onFirst, press: ['e'] },
+      'work-due': { route: '/?work', setup: onFirst, press: ['d'] },
+      'work-lane': { route: '/?work', setup: onFirst, press: ['m'] },
+      /* Both letters the row prints, each on its own: either puts the caret in the capture line. */
+      'work-new': { runs: ['n', 'c'].map((letter) => ({ route: '/?work', press: [letter] })) },
+      /* The screen's own search, taken in the capture phase before the shell would open the palette on it. */
+      'work-find': { route: '/?work', press: ['/'] },
 
       'row-down': { route: GRID, setup: focusFirstCell, press: ['j'] },
       /* Down first: `k` on the first row has nowhere to go, and silence there is the right answer. */
@@ -317,11 +374,25 @@ export default async function keys(root = join(import.meta.dirname, '..', '..'))
         press: ['o'],
       },
 
-      /* A page's block cursor starts on the first block, which on `/p/kiln` is a stat tile with no
-         register behind it. `j` moves to the next block, since portfolio 1.5.0 the "Waiting on you" queue, which has
-         no register either, so `o` and `y` open and copy nothing there; the press still moves the cursor. */
+      /* A page's block cursor starts on nothing, and `j` puts it on the first block the page draws. `/p/kiln` opens
+         with three blocks whose `when:` said no, and the cursor used to land on each of them in turn with nothing to
+         show for it, so one `j` there changed nothing at all (`PageBody.svelte` walks the drawn blocks now).
+
+         `o` IS PRESSED ON A BLOCK WITH A LIST BEHIND IT. It was pressed after one `j`, and the move was the change
+         the gate saw, so `o` could have been unbound and this row stayed green. The setup walks the cursor to the
+         first block whose bar links its list (`a.block-source`, `BlockSlot.svelte`), and the change is `o` opening it. */
       'block-move': { route: '/p/kiln', press: ['j'] },
-      'block-source': { route: '/p/kiln', press: ['j', 'o'] },
+      'block-source': {
+        route: '/p/kiln',
+        setup: async (page) => {
+          for (let i = 0; i < 20; i++) {
+            await page.keyboard.press('j');
+            await page.waitForTimeout(120);
+            if (await page.evaluate(() => document.querySelector('.block-slot[data-cursor] a.block-source') !== null)) return;
+          }
+        },
+        press: ['o'],
+      },
       'block-link': { route: '/p/kiln', press: ['j', 'y'] },
 
       /* The gate is a question, and a question has an address. There is no `/gate` route. SG5 is the
@@ -380,7 +451,10 @@ export default async function keys(root = join(import.meta.dirname, '..', '..'))
         String(document.body.innerHTML.length),
         String(document.querySelectorAll('dialog[open]').length),
         document.querySelector('.toast')?.textContent ?? '',
-        el ? `${el.tagName}.${String(el.className).slice(0, 40)}` : '',
+        /* WHICH ELEMENT, AND NOT ONLY WHAT KIND. `k` on Today moves focus from one row's `a.q-text` to the one above,
+           and a tag and a class read the same on both, so a move between two rows alike was no change here. Its place
+           in the document tells them apart and holds still while nothing moves. */
+        el ? `${el.tagName}.${String(el.className).slice(0, 40)}#${Array.prototype.indexOf.call(document.getElementsByTagName('*'), el)}` : '',
         String(document.querySelectorAll('[data-focused], [aria-selected="true"], [data-on], [data-cursor]').length),
         [...document.querySelectorAll('[aria-live]')].map((n) => n.textContent).join('|').slice(0, 120),
       ].join('␟');
@@ -419,7 +493,11 @@ export default async function keys(root = join(import.meta.dirname, '..', '..'))
         continue;
       }
 
-      const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce', bypassCSP: true });
+      /* `serviceWorkers: 'block'`, BECAUSE THE READ COPY'S WORKER ANSWERS `/api` FROM ITS OWN FETCH. The app registers
+         it on every visit (`lib/data/offline.ts`), and from the first reload on the worker makes the request, which
+         `page.route` never sees: `arrivals` handed the Inbox two rows and the Inbox drew the record's empty one, so
+         every inbox key was pressed on an empty state and read as dead. No key here is about the worker. */
+      const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce', bypassCSP: true, serviceWorkers: 'block' });
       const page = await context.newPage();
       /* THE GATE'S OWN PROOF THAT IT LOOKS AT ANYTHING. `BRAINDOG_GATE_SEED=keys` swallows every `y` in
          the capture phase before any handler sees it, which is exactly what a binding that was never
