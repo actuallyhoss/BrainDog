@@ -2,8 +2,8 @@
  * Element defaults, shared by both apps.
  *
  * Everything past this is scoped to the component that owns it. What is here is what an element
- * IS before anybody styles it — box sizing, the body face and rhythm, headings on the display
- * face, links in ink, and the two rules that make figures and Arabic set correctly.
+ * IS before anybody styles it — box sizing, the body face and rhythm, the ground and its light,
+ * headings on the work face, links in ink, and the two rules that make figures and Arabic set correctly.
  *
  * Deliberately NOT here: `html, body { overflow: hidden }`. The record app is a single scroll
  * container by design and the marketing site is a document that scrolls; a shared base that picks
@@ -27,6 +27,9 @@
   body {
     margin: 0;
     color: var(--ink);
+    /* THE GROUND AND ITS LIGHT (loop/design/SYSTEM.md §2): the page is the ground, and one soft light falls on it
+       from the top of the window. The only gradient in the product, and it is painted here and nowhere else. */
+    background: var(--ground-light), var(--sunk);
     font-family: var(--font-ui);
     font-size: var(--text);
     line-height: var(--lh-body);
@@ -39,7 +42,9 @@
 
   h1, h2, h3, h4 {
     margin: 0;
-    font-family: var(--font-display);
+    /* GEIST, NOT POPPINS (SYSTEM §3: Geist for every word). Poppins stays declared in tokens.css for the
+       wordmark's own use, and nothing in the base reaches for it. */
+    font-family: var(--font-ui);
     font-weight: 600;
     line-height: var(--lh-tight);
     letter-spacing: -0.014em;

@@ -145,7 +145,8 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
      control, which is the same SC 1.4.11 requirement at the same floor as `edge`. It was drawn at
      the call site as a mix of the accent and `sunk` and measured 1.33:1 against `s3` in dark. */
   out.push(...pairsAgainstSurfaces(built.id, p, ['edge', 'accent-edge'], floors.edge, 'D', scheme));
-  const fills = ['earn-fill', 'warn-fill', 'danger-fill', 'info-fill'];
+  /* `live-fill` IS A MARK LIKE THE FOUR: the ring's arc and the running bar (SYSTEM §2), at the same floor. */
+  const fills = ['earn-fill', 'warn-fill', 'danger-fill', 'info-fill', 'live-fill'];
   out.push(...pairsAgainstSurfaces(built.id, p, fills, floors.intentFill, 'D', scheme));
 
   /* E · the focus ring against both neighbours, and the two tones nine apart */
@@ -222,16 +223,23 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
     }
   out.push({ check: 'F', scheme, level: 'pass', measured: r2(worstF) });
 
-  /* G · intent as text x every surface */
-  out.push(...pairsAgainstSurfaces(built.id, p, INTENTS, floors.intentText, 'G', scheme));
+  /* G · intent as text x every surface, and `live`, which is read as text too (the "now" line, a suggestion line) and
+     is held to the same floor without being one of the four words check F keeps apart. */
+  out.push(...pairsAgainstSurfaces(built.id, p, [...INTENTS, 'live'], floors.intentText, 'G', scheme));
 
   /* H · the surface ladder is monotonic in RELATIVE LUMINANCE, not in L*.
-     Ascending in BOTH schemes: `sunk` is always the lowest surface and `s3` always the raised one.
-     What differs between the schemes is where the ladder is anchored, not which way it climbs —
-     light anchors at the top and descends to `sunk`, dark climbs from `bg`. */
+
+     2026-09-29, SYSTEM'S SHAPE (loop/design/SYSTEM.md §2, §12.1). `sunk` is the ground and the lowest surface in both
+     schemes, and `bg`, the tile, sits above it. `s1` to `s3` are the steps inside a tile, and they step AWAY FROM THE
+     TILE, one way the whole length: up in dark, and down in light, where the tile is white and has nothing above it,
+     and never down onto the ground. It asked "ascending in both schemes" until SYSTEM's light tile-2 became a grey in
+     a white tile, which that rule could not hold. The four rows are the four steps, as before. */
   const lum = SURFACES.map((s) => relLuminance(rgb(p[s])));
+  const away = scheme === 'dark' ? 1 : -1;
   for (let i = 1; i < lum.length; i++) {
-    if (lum[i]! <= lum[i - 1]!)
+    const turned =
+      i === 1 ? lum[1]! <= lum[0]! : (lum[i]! - lum[i - 1]!) * away <= 0 || lum[i]! <= lum[0]!;
+    if (turned)
       out.push({
         check: 'H',
         scheme,
@@ -246,7 +254,7 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
        rather than only its faults. The measurement is the climb this rung made, and it is rounded
        to four places rather than to `r2`'s two: the dark ladder steps 0.028 in OKLab L, which is
        a few thousandths of relative luminance, and two decimals would report every rung as 0.00. */
-    else out.push({ check: 'H', scheme, level: 'pass', measured: r4(lum[i]! - lum[i - 1]!) });
+    else out.push({ check: 'H', scheme, level: 'pass', measured: r4(Math.abs(lum[i]! - lum[i - 1]!)) });
   }
 
   /* J · every emitted colour already in the sRGB gamut, and shaped like a colour.
@@ -511,8 +519,11 @@ export function checkElevation(built: Built): Finding[] {
           fix: `theme: elevation level ${i + 1} in ${scheme} carries no readable opacity, so its depth cannot be compared.`,
         });
       }
+    /* 2026-09-29: LEVEL 3 MAY EQUAL LEVEL 2, AND LEVEL 2 MUST STILL CLEAR LEVEL 1. SYSTEM §4 has three levels, the
+       ground, tiles and chrome, and puts the sheet (`--e3`) at chrome's level, so the one step that may be flat is
+       the last. A ladder that goes DOWN is still refused at either step. */
     for (let i = 1; i < alphas.length; i++)
-      if (!(alphas[i]! > alphas[i - 1]!)) {
+      if (i === 1 ? !(alphas[i]! > alphas[i - 1]!) : !(alphas[i]! >= alphas[i - 1]!)) {
         ok = false;
         out.push({
           check: 'I',

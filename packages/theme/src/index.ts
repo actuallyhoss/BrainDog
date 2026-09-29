@@ -12,7 +12,7 @@ export * from './checks.ts';
 export * from './css.ts';
 export * from './record.ts';
 
-import { build, HIGH_CONTRAST_PROFILE, HOUSE_PROFILE, type Seed } from './build.ts';
+import { build, HIGH_CONTRAST_PROFILE, HOUSE_NEUTRAL_HUE, HOUSE_PROFILE, type Seed } from './build.ts';
 
 /**
  * The house seed. Three decisions, and the first two are reversals.
@@ -107,12 +107,17 @@ import { build, HIGH_CONTRAST_PROFILE, HOUSE_PROFILE, type Seed } from './build.
  * AND §FIVE AND §SEVEN SAY HUE 6, WHICH IS NOT THE SEED. The accent has been hue 27, the mark's own,
  * since 2026-09-21 (`theme.test.ts` holds it within two degrees of the mark). The lightness and
  * chroma argument in §SEVEN is unchanged by that.
+ *
+ * NINE · 2026-09-29, loop/design/SYSTEM.md. The seed does not move: the accent is the mark and stays the mark (D-1),
+ * and 260 is already SYSTEM's slate, whose surfaces and inks measure 254 to 263. What moved is the profile
+ * (`HOUSE_PROFILE` in `build.ts`), which now carries SYSTEM's ground, tile, inks, line, intents and `live` as aims,
+ * and the radius, which is SYSTEM §4's: key caps 6, fields and menus 12, tiles and the rail 22 (`tokens.css`).
  */
 export const HOUSE_SEED: Seed = {
   accent: 'oklch(0.575 0.215 27)',
-  neutralHue: 260,
+  neutralHue: HOUSE_NEUTRAL_HUE,
   space: 4,
-  radius: { sm: 6, md: 8, lg: 12 },
+  radius: { sm: 6, md: 12, lg: 22 },
   density: 'comfortable',
 };
 

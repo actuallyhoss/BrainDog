@@ -17,7 +17,7 @@
  * customer can pick a colour at all without somebody reviewing it.
  */
 
-import { build, normalise, HOUSE_PROFILE, HIGH_CONTRAST_PROFILE, type Built, type Seed } from './build.ts';
+import { build, normalise, HOUSE_NEUTRAL_HUE, HOUSE_PROFILE, HIGH_CONTRAST_PROFILE, type Built, type Seed } from './build.ts';
 import { checkElevation, checkScheme, refusals } from './checks.ts';
 import { forcedColors, toCSS } from './css.ts';
 
@@ -39,7 +39,7 @@ export type RecordTheme = {
  * THE NEUTRALS TAKE THE ACCENT'S HUE ONLY WHEN THE ACCENT IS FAINT. `from-accent` on a saturated
  * brand renders brown: at L 0.16 even a whisper of chroma at a warm hue reads as dirt rather than
  * as warmth, which is what the house seed's own note records paying to learn. So a record's
- * surfaces stay the paper-in-the-sun olive that everything else is built against, and what changes
+ * surfaces stay the house's slate that everything else is built against, and what changes
  * is the accent, the marks and the links — which is where colour means anything.
  */
 /**
@@ -83,7 +83,9 @@ export function recordTheme(
 
   const seed: Seed = {
     accent: hex,
-    neutralHue: opts.neutralHue ?? 110,
+    /* 2026-09-29, THE HOUSE SLATE AND NOT 110. SYSTEM's ground is the product's (loop/design/SYSTEM.md §2), and the
+       house profile now carries its chroma, up to 0.02 in dark, which at hue 110 is khaki. The accent is the record's. */
+    neutralHue: opts.neutralHue ?? HOUSE_NEUTRAL_HUE,
     space: 4,
     radius: { sm: 4, md: 6, lg: 8 },
     density: 'comfortable',

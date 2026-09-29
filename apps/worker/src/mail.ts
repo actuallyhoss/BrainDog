@@ -332,7 +332,7 @@ const STYLE = (() => {
   const dark = (p: string): string =>
     [
       `${p}.bd-ground{background-color:${D.sunk} !important}`,
-      `${p}.bd-card{background-color:${D.s1} !important;border-color:${D.line} !important}`,
+      `${p}.bd-card{background-color:${D.bg} !important;border-color:${D.line} !important}`,
       `${p}.bd-ink{color:${D.ink} !important}`,
       `${p}.bd-ink2{color:${D.ink2} !important}`,
       `${p}.bd-dim,${p}.bd-dim a{color:${D.dim} !important}`,
@@ -381,9 +381,9 @@ const button = (label: string, href: string): string => {
   return (
     `<table role="presentation" class="bd-btn-wrap" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 24px;border-collapse:separate">` +
     `<tr><td class="bd-btn" align="center" bgcolor="${L.ink}" style="border-radius:999px;background-color:${L.ink}">` +
-    `<!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${h(href)}" style="height:46px;v-text-anchor:middle;width:${width}px" arcsize="50%" stroke="f" fillcolor="${L.ink}"><w:anchorlock/><center style="color:${L.s3};font-family:Segoe UI,Arial,sans-serif;font-size:16px;font-weight:600">${h(label)}</center></v:roundrect><![endif]-->` +
+    `<!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${h(href)}" style="height:46px;v-text-anchor:middle;width:${width}px" arcsize="50%" stroke="f" fillcolor="${L.ink}"><w:anchorlock/><center style="color:${L.bg};font-family:Segoe UI,Arial,sans-serif;font-size:16px;font-weight:600">${h(label)}</center></v:roundrect><![endif]-->` +
     `<!--[if !mso]><!-->` +
-    `<a href="${h(href)}" target="_blank" style="display:inline-block;padding:13px 28px;font-family:${FONT};font-size:16px;line-height:20px;font-weight:600;color:${L.s3};text-decoration:none;border-radius:999px;mso-hide:all">${h(label)}</a>` +
+    `<a href="${h(href)}" target="_blank" style="display:inline-block;padding:13px 28px;font-family:${FONT};font-size:16px;line-height:20px;font-weight:600;color:${L.bg};text-decoration:none;border-radius:999px;mso-hide:all">${h(label)}</a>` +
     `<!--<![endif]-->` +
     `</td></tr></table>`
   );
@@ -437,9 +437,9 @@ function page(p: Page): string {
     '<!--[if mso]><noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript><![endif]-->' +
     STYLE +
     '</head>' +
-    `<body class="bd-ground" style="margin:0;padding:0;background-color:${L.bg};word-spacing:normal">` +
+    `<body class="bd-ground" style="margin:0;padding:0;background-color:${L.sunk};word-spacing:normal">` +
     preheader(p.preheader) +
-    `<table role="presentation" class="bd-ground" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${L.bg}" style="background-color:${L.bg}">` +
+    `<table role="presentation" class="bd-ground" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${L.sunk}" style="background-color:${L.sunk}">` +
     `<tr><td class="bd-outer" align="center" style="padding:40px 16px 48px">` +
     '<!--[if mso]><table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" align="center"><tr><td><![endif]-->' +
     `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;margin:0 auto">` +
@@ -452,7 +452,7 @@ function page(p: Page): string {
     `</tr></table></td></tr>` +
     /* THE CARD: the letter itself. */
     `<tr><td>` +
-    `<table role="presentation" class="bd-card" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${L.s3}" style="background-color:${L.s3};border:1px solid ${L.line};border-radius:12px;border-collapse:separate">` +
+    `<table role="presentation" class="bd-card" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${L.bg}" style="background-color:${L.bg};border:1px solid ${L.line};border-radius:12px;border-collapse:separate">` +
     `<tr><td class="bd-pad" style="padding:40px 40px 28px">` +
     `<h1 class="bd-ink bd-h1" style="margin:0 0 16px;font-family:${FONT};font-size:22px;line-height:28px;font-weight:600;letter-spacing:-0.01em;color:${L.ink}">${h(p.subject)}</h1>` +
     p.body +

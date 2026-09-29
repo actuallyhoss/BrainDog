@@ -57,6 +57,7 @@
       --d-move: 1ms;
       --d-enter: 1ms;
       --d-exit: 1ms;
+      --d-menu: 1ms;
       --ease-spring: linear(0, 1);
     }
 
@@ -90,6 +91,7 @@
     .media,
     .block,
     .rail,
+    .tile,
     .chip {
       border: 1px solid CanvasText;
     }

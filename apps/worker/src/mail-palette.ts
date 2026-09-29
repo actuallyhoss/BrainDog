@@ -2,25 +2,25 @@
 /** The house colours a mail is painted in, light inline and dark in its media query. Written by `packages/skin/scripts/theme.mjs`. */
 export const MAIL_PALETTE = {
   "light": {
-    "sunk": "#E9EBEE",
-    "bg": "#F4F6F8",
-    "s1": "#F7F9FC",
-    "s3": "#FFFFFF",
-    "ink": "#1C1D20",
-    "ink2": "#3C3D41",
-    "dim": "#505256",
-    "line": "#D3D5D9",
+    "sunk": "#E9ECF0",
+    "bg": "#FFFFFF",
+    "s1": "#F2F4F7",
+    "s3": "#ECEFF2",
+    "ink": "#101318",
+    "ink2": "#4A505B",
+    "dim": "#656B76",
+    "line": "#E3E7EC",
     "accent": "#DB2527"
   },
   "dark": {
-    "sunk": "#0B0C0E",
-    "bg": "#121314",
-    "s1": "#18191B",
-    "s3": "#26282A",
-    "ink": "#F6F9FD",
-    "ink2": "#C8CACE",
-    "dim": "#AAACB0",
-    "line": "#2C2D30",
+    "sunk": "#0C0F14",
+    "bg": "#161A21",
+    "s1": "#1F242D",
+    "s3": "#222831",
+    "ink": "#F1F3F6",
+    "ink2": "#B4BAC4",
+    "dim": "#8C939E",
+    "line": "#262C36",
     "accent": "#DB2527"
   }
 } as const;

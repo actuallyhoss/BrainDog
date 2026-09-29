@@ -20,6 +20,7 @@ const UA =
 const FACES = [
   { file: 'poppins-600.woff2', query: 'family=Poppins:wght@600', subset: 'latin' },
   { file: 'geist.woff2', query: 'family=Geist:wght@300..800', subset: 'latin' },
+  { file: 'geist-mono.woff2', query: 'family=Geist+Mono:wght@400..500', subset: 'latin' },
   { file: 'plex-arabic.woff2', query: 'family=IBM+Plex+Sans+Arabic:wght@400;600', subset: 'arabic' },
 ];
 

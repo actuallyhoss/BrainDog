@@ -55,6 +55,16 @@
       U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
   }
 
+  /* Geist Mono carries key caps, addresses, code and times in a feed (SYSTEM §3). Latin only, and fetched only by
+     a page that draws one of those. */
+  @font-face {
+    font-family: 'Geist Mono';
+    src: url('/fonts/geist-mono.woff2') format('woff2');
+    font-weight: 400 500;
+    font-display: swap;
+    unicode-range: U+0000-00FF, U+2000-206F, U+2190-21FF, U+2318, U+2325, U+238B, U+23CE;
+  }
+
   @font-face {
     font-family: 'Plex';
     src: url('/fonts/plex-arabic.woff2') format('woff2');
@@ -76,7 +86,9 @@
   :root {
     --font-ui: 'Geist', 'Plex', system-ui, -apple-system, 'Segoe UI', sans-serif;
     --font-display: 'Poppins', 'Geist', 'Plex', system-ui, sans-serif;
-    --font-id: ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace;
+    /* SYSTEM §3 names Geist Mono for key caps, addresses, code and times: `geist-mono.woff2` in both apps'
+       `static/fonts`, declared above. */
+    --font-id: 'Geist Mono', ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace;
 
     /* Eight steps, fixed. A theme never sets type; the reader's Text setting picks the body step
        among three of them. Raising the scale is not a fix for a hard-to-read screen — the fault is
@@ -101,6 +113,14 @@
     --t-xl: 24px;
     --t-2xl: 32px;
     --t-3xl: 40px;
+    /* 2026-09-29, SYSTEM §3's own steps, beside the scale rather than in place of it: a row title (15/20, 500; a tile
+       heading at 600), a group heading on the ground and the panel's title (17/24, 600), the figure in a tile (30/34),
+       the page title (28/34) and a lead sentence or figure (34/40). Meta is `--t-sm` and body `--t-base`. */
+    --t-row: 15px;
+    --t-group: 17px;
+    --t-title: 28px;
+    --t-figure: 30px;
+    --t-lead: 34px;
     --text: var(--t-base);
 
     --lh-tight: 1.22;
@@ -145,10 +165,14 @@
        WHAT TAKES WHICH, ONCE (design D-2). `--r-pill` is everything you press or choose: a button of
        any weight, a segmented track and its segments, a chip, an answer option, a toast.
        `--r-md` is a field, a select, a menu and a card; `--r-lg` a sheet, a dialog and the palette;
-       `--r-sm` the focus ring and small marks. There is no fifth radius. */
+       `--r-sm` the focus ring and small marks.
+
+       2026-09-29, SYSTEM §4: a tile, the rail card, the docked panel, a sheet and the palette are 22; a row's wash,
+       a field, a menu and a card inside chrome are 12; a key cap is 6; and an icon well is 9, the fifth radius. */
     --r-sm: 6px;
-    --r-md: 8px;
-    --r-lg: 12px;
+    --r-well: 9px;
+    --r-md: 12px;
+    --r-lg: 22px;
     --r-pill: 999px;
 
     /**
@@ -183,14 +207,18 @@
 
     /* Density is the reader's, labelled Compact / Comfortable / Roomy. A theme sets the enum,
        never the pixels (13 §4.2). */
-    --row-h: 36px;
-    --ctl-h: 32px;
+    /* 2026-09-29, SYSTEM §5 and §6: a one-line row 44 and a two-line row 56, a toolbar control 36, a rail place 36. */
+    --row-h: 44px;
+    --ctl-h: 36px;
     --tap: 44px;
     /* Header and row actions, a two-line row, a table row, a rail row (DESIGN-BRIEF 4.3). */
     --ctl-h-sm: 28px;
     --row-h-2: 56px;
     --table-row-h: 40px;
-    --rail-item-h: 30px;
+    --rail-item-h: 36px;
+    /* An icon well on a tile heading (28) and before a row (32), SYSTEM §6. */
+    --well: 28px;
+    --well-l: 32px;
     /* The widest a dashboard page's content runs, left aligned in the panel. */
     --page-max: 1280px;
     /* The one intent mark a row may carry. */
@@ -213,7 +241,11 @@
        it named. A width query and not a pointer query, because this is layout, not target size. */
     --gutter: var(--sp-6);
     --sticky: 52px;
-    --rail: 240px;
+    /* The rail CARD, 216 wide; the shell adds `--inset` round it. `--inset` is the window inset of the rail and the
+       docked panel, and the gap between tiles; the panel is 440 (SYSTEM §4, §5). */
+    --rail: 216px;
+    --inset: 12px;
+    --panel-w: 440px;
     --kb: 0px;
 
     --icon-s: 12px;
@@ -313,7 +345,10 @@
      * nobody paints is the same defect as a flag nothing reads. The day a second construction-warn
      * element appears it gets a token beside this one, not a tenth percentage.
      */
-    --hover-wash: color-mix(in srgb, var(--ink) 6%, transparent);
+    /* `--hover-wash`, `--selected` AND `--arrived-wash` ARE GENERATED NOW (2026-09-29). SYSTEM §2 gives the wash as a
+       cool near-black at 5% in light and white at 6% in dark, and the arrival as an opaque lavender, which no one
+       `color-mix` of an ink writes in both schemes. `packages/theme` emits all three into every scheme block of the
+       palette sheet, beside the glass. */
     /* THE SOFT RING ROUND A FOCUSED TEXT FIELD, outside its `--ink2` edge (a11y.css, controls.css). One
        value, so every field in the product focuses the same way.
 
@@ -323,9 +358,14 @@
        (design D-1, SYS-1). Focus is a place, not a verdict. */
     --focus-halo: color-mix(in srgb, var(--ink) 14%, transparent);
     --hold-wash: color-mix(in srgb, var(--ink) 12%, transparent);
-    /* A ROW THAT ARRIVED WHILE THE READER LOOKED (`[data-arrived]` in `blocks.css`): the info hue at the wash strength,
-       never the brand's red, and gone in a second and a half. */
-    --arrived-wash: color-mix(in srgb, var(--info) 12%, transparent);
+
+    /* SYSTEM §2 AND §4's GLASS AND THE GROUND'S LIGHT. The colours are generated (`--glass`, `--glass-strong`,
+       `--glass-rim`, `--glass-hair`, `--ground-glow`, `--glass-sat`); the geometry is here. Chrome is
+       `background: var(--glass); backdrop-filter: var(--glass-blur); box-shadow: var(--glass-edge), var(--e2)`.
+       `--ground-light` is the only gradient in the product, painted on the ground by `base.css`. */
+    --ground-light: radial-gradient(1200px 520px at 50% -140px, var(--ground-glow), transparent);
+    --glass-blur: blur(24px) saturate(var(--glass-sat));
+    --glass-edge: inset 0 0 0 0.5px var(--glass-rim), 0 0 0 0.5px var(--glass-hair);
 
     /**
      * THE STATE ROLES: WHAT IS ON, WHAT IS CURRENT, WHAT IS A LINK, AND THE ONE CHART SERIES.
@@ -336,11 +376,10 @@
      * screen could say "wrong" any more (design D-1). The accent now lives on the mark, the record
      * tile, /start, /signin and `::selection`, and these roles carry the rest in ink.
      *
-     * `--selected` IS OPAQUE AND MIXED INTO THE GROUND, NOT A WASH OVER WHATEVER IS BEHIND IT. The
-     * generated light ladder puts `s1`, `s2` and `s3` ABOVE the page, so a selected segment drawn in
-     * `s2` was a near-white box on a near-white page and vanished (design SYS-5). Ink mixed into
-     * `--bg` darkens in light and lightens in dark by construction, so the current thing shows in
-     * both schemes whatever the generator does to the surfaces.
+     * `--selected` WAS HERE, opaque, ink mixed into `--bg`, because the old light ladder put `s1` to
+     * `s3` above the page and a selected segment vanished (design SYS-5). SYSTEM's light ladder steps
+     * DOWN from a white tile, and SYSTEM's selection is its wash, so it is generated beside
+     * `--hover-wash` now.
      *
      * `--on-ink` IS THE GROUND, BECAUSE THE MARK ON AN INK FILL IS A HOLE IN IT: the thumb of a
      * checked switch, the tick in a checked box and the dot in a checked radio all read as the page
@@ -353,13 +392,15 @@
      * They sit on `:root` for the reason `--hover-wash` does: every one resolves its `var()`s against
      * the palette on `html`, which is the element `:root` is.
      */
-    --selected: color-mix(in srgb, var(--ink) 8%, var(--bg));
     --on: var(--ink);
     --on-ink: var(--bg);
     --link: var(--ink);
     --series-1: var(--info);
     --accent-wash: color-mix(in srgb, var(--accent) 12%, transparent);
     /* A divider between rows of one list, softer than a boundary. */
+    /* A hairline that reads on the ground as well as on a tile: `--line` is tuned for the tile and all but
+       vanishes on the ground (1.05:1). Rows and group headings draw their rule with this. */
+    --rule: color-mix(in srgb, var(--ink) 10%, transparent);
     --line-soft: color-mix(in srgb, var(--line) 60%, transparent);
     /* Primary actions are drawn in ink, not in the accent (DESIGN-BRIEF 4.1). */
     --primary-hover: color-mix(in srgb, var(--ink) 88%, var(--bg));
@@ -411,14 +452,15 @@
     --press-dim: 0.62;
     --ease-push: cubic-bezier(0.4, 0, 1, 1);
 
-    /* EVERY DURATION BETWEEN 120 AND 200ms (pass five). Entrances ran 240 and 280, which on a sheet
-       or a toast is long enough to watch; motion here answers, it does not perform. */
+    /* 2026-09-29, SYSTEM §8: 90ms for a hover fill and a row's state, 140ms for menus, tooltips and anything leaving,
+       220ms for the panel sliding in, a sheet and the title collapsing. Motion here answers, it does not perform. */
     --d-press: 120ms;
     --d-release: 160ms;
-    --d-state: 120ms;
-    --d-move: 200ms;
-    --d-enter: 200ms;
-    --d-exit: 160ms;
+    --d-state: 90ms;
+    --d-move: 220ms;
+    --d-enter: 220ms;
+    --d-exit: 140ms;
+    --d-menu: 140ms;
 
     /* zeta 0.7467, omega 6.56, settle 1.214s, peak 1.0292 — scripts/spring.mjs.
        The last stop is forced to exactly 1: a spring that settles at 0.998 leaves a one-pixel gap
@@ -427,7 +469,9 @@
       0, 0.0503, 0.1684, 0.3158, 0.4672, 0.6068, 0.7265, 0.8232, 0.8972, 0.9509, 0.9875, 1.0104,
       1.0232, 1.0286, 1.0292, 1.0268, 1.0229, 1.0185, 1.0141, 1.0102, 1.0069, 1.0043, 1.0024, 1
     );
-    --ease-out: cubic-bezier(0.22, 0.8, 0.3, 1);
+    /* SYSTEM §8: a swift-out curve for anything arriving, and its own curve for leaving. */
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-in: cubic-bezier(0.4, 0, 1, 0.5);
 
     /* The mark is GENERATED now, and this note is where it went.
        Not a role and not an identity accent: the one colour in the product that belongs to the
@@ -472,9 +516,10 @@
     :root { --gutter: var(--sp-4); }
   }
 
-  html[data-density='compact'] { --row-h: 32px; }
-  html[data-density='comfortable'] { --row-h: 36px; }
-  html[data-density='roomy'] { --row-h: 44px; }
+  /* Comfortable is SYSTEM's 44 (§6), and the other two keep a step of 8 either side of it. */
+  html[data-density='compact'] { --row-h: 36px; }
+  html[data-density='comfortable'] { --row-h: 44px; }
+  html[data-density='roomy'] { --row-h: 52px; }
 
   html[data-scheme='dark'] { color-scheme: dark; }
   html[data-scheme='light'] { color-scheme: light; }
@@ -498,4 +543,5 @@
   @property --danger { syntax: '<color>'; inherits: true; initial-value: #c00; }
   @property --info { syntax: '<color>'; inherits: true; initial-value: #06c; }
   @property --accent { syntax: '<color>'; inherits: true; initial-value: #06c; }
+  @property --live { syntax: '<color>'; inherits: true; initial-value: #06c; }
 }

@@ -134,7 +134,7 @@ const ARTEFACTS = [
   { path: join(root, 'apps/web/static/mark.svg'), text: favicon(HOUSE.schemes.light.accent) },
   { path: join(root, 'apps/site/static/mark.svg'), text: favicon(HOUSE.schemes.light.accent) },
   { path: join(root, 'apps/web/static/mark-alpha.svg'), text: favicon(ALPHA.schemes.light.accent) },
-  { path: join(root, 'apps/site/static/bimi/braindog.svg'), text: bimi(HOUSE.schemes.light.accent, HOUSE.schemes.light.s3) },
+  { path: join(root, 'apps/site/static/bimi/braindog.svg'), text: bimi(HOUSE.schemes.light.accent, HOUSE.schemes.light.bg) },
   { path: join(root, 'apps/worker/src/mail-palette.ts'), text: mailPalette(HOUSE) },
 ];
 
