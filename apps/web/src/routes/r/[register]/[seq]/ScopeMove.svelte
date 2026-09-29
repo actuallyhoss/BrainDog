@@ -145,13 +145,28 @@
 
 <style>
   /* ROWS WITH SPACE AND NO BOX AROUND THEM (design-brief §1), each the whole of its target and 48px tall, which is the
-     action sheet's row under a thumb. */
+     action sheet's row under a thumb. A hairline between two rows, drawn inset so it runs under the words and never
+     under the wash's curve; the row pointed at, and the place the row applies now, take the rounded wash (SYSTEM §6). */
   .scope-places {
     display: flex;
     flex-direction: column;
     margin: 0;
     padding: 0;
     list-style: none;
+  }
+
+  .scope-places > li {
+    position: relative;
+  }
+
+  .scope-places > li + li::after {
+    content: '';
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline: var(--sp-3);
+    block-size: 1px;
+    background: var(--line);
+    pointer-events: none;
   }
 
   .scope-place {
@@ -162,15 +177,15 @@
     inline-size: 100%;
     min-block-size: var(--sp-7);
     padding-block: var(--sp-1);
-    padding-inline: var(--sp-2);
+    padding-inline: var(--sp-3);
     background: none;
     border: 0;
-    border-block-end: 1px solid var(--line-soft);
-    border-radius: 0;
+    border-radius: var(--r-md);
     color: var(--ink);
     font: inherit;
     text-align: start;
     cursor: pointer;
+    transition: background var(--d-state) var(--ease-out);
   }
 
   .scope-place[aria-current] {
@@ -181,6 +196,12 @@
     .scope-place:hover {
       background: var(--hover-wash);
     }
+  }
+
+  /* A WASHED ROW'S HAIRLINES STEP ASIDE, so the fill is one clean shape. */
+  .scope-places > li:has(> .scope-place[aria-current])::after,
+  .scope-places > li:has(> .scope-place[aria-current]) + li::after {
+    opacity: 0;
   }
 
   .scope-here {
